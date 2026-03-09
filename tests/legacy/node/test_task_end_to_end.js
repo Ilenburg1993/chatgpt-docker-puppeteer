@@ -1,7 +1,8 @@
-import path from 'node:path';
-import fs from 'node:fs';
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import { parseTask } from '#core/schemas';
 import { saveResponse } from '#infra/storage/response_adapter';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // TODO: ESM MIGRATION — require() mutation pattern is incompatible with ESM.
 // Tests that set require('#infra/fs/paths').PATHS.QUEUE or .RESPOSTAS_DIR
@@ -197,7 +198,7 @@ async function testQueueOperations() {
         // [ESM-SKIP] require('#infra/fs/paths').PATHS.QUEUE = QUEUE_DIR;
 
         const task = createMockTask('test-queue-save');
-        const taskStore = await import('#infra/storage/task_store').then(m => m.default ?? m);
+        const taskStore = await import('#infra/storage/task_store').then((m) => m.default ?? m);
         await taskStore.saveTask(task);
 
         const savedPath = path.join(QUEUE_DIR, 'test-queue-save.json');
@@ -223,7 +224,7 @@ async function testQueueOperations() {
             spec: { prompt: 'Different prompt' },
         });
 
-        const taskStore = await import('#infra/storage/task_store').then(m => m.default ?? m);
+        const taskStore = await import('#infra/storage/task_store').then((m) => m.default ?? m);
         await taskStore.saveTask(task1);
 
         // Second save should log warning (we can't easily test logs, so just verify no error)
@@ -249,14 +250,14 @@ async function testQueueDepthLimit() {
         // [ESM-SKIP] require('#infra/fs/paths').PATHS.QUEUE = QUEUE_DIR;
 
         // Criar 5 tasks (dentro do limite)
-        const taskStore = await import('#infra/storage/task_store').then(m => m.default ?? m);
+        const taskStore = await import('#infra/storage/task_store').then((m) => m.default ?? m);
         for (let i = 1; i <= 5; i++) {
             const task = createMockTask(`test-depth-${i}`);
             await taskStore.saveTask(task);
         }
 
         // Verificar que 5 tasks foram salvas
-        const files = fs.readdirSync(QUEUE_DIR).filter(f => f.startsWith('test-depth-'));
+        const files = fs.readdirSync(QUEUE_DIR).filter((f) => f.startsWith('test-depth-'));
         if (files.length !== 5) {
             throw new Error(`Expected 5 tasks, found ${files.length}`);
         }
@@ -493,7 +494,7 @@ async function testFullE2EFlow() {
         }
 
         // 3. Save to queue
-        const taskStore = await import('#infra/storage/task_store').then(m => m.default ?? m);
+        const taskStore = await import('#infra/storage/task_store').then((m) => m.default ?? m);
         await taskStore.saveTask(validated);
 
         // 4. Simulate execution
@@ -568,7 +569,7 @@ async function testFullE2EFlow() {
         };
 
         // Save V4 task (should auto-migrate to V5)
-        const taskStore = await import('#infra/storage/task_store').then(m => m.default ?? m);
+        const taskStore = await import('#infra/storage/task_store').then((m) => m.default ?? m);
         const saved = await taskStore.saveTask(taskV4);
 
         if (saved.meta.version !== '5.0') {
@@ -588,7 +589,8 @@ async function testFullE2EFlow() {
 
 /**
  * Função exportada: runAllTests.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<void>}
  */
 async function runAllTests() {
     console.log('\n' + '='.repeat(80));
@@ -642,10 +644,10 @@ async function runAllTests() {
 // Run tests
 if (import.meta.filename === process.argv[1]) {
     runAllTests()
-        .then(success => {
+        .then((success) => {
             process.exit(success ? 0 : 1);
         })
-        .catch(error => {
+        .catch((error) => {
             console.error('Test runner crashed:', error);
             process.exit(1);
         });

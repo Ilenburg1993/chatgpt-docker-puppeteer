@@ -1,14 +1,14 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
 import { once } from 'node:events';
+import http from 'node:http';
+import test from 'node:test';
 
-import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';
 import { registerUpstreams, shutdownUpstreams } from '../../../src/integration/mcp/upstream-manager.mjs';
+import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';
 
 /**
- * @returns {Promise<{ server: http.Server, url: string }>}
+ * @returns {Promise<{ server: http.Server; url: string }>}
  */
 function startFakeMcpHttpServer() {
     const server = http.createServer(async (req, res) => {
@@ -21,7 +21,7 @@ function startFakeMcpHttpServer() {
 
             let body = '';
             req.setEncoding('utf8');
-            req.on('data', chunk => (body += chunk));
+            req.on('data', (chunk) => (body += chunk));
             await once(req, 'end');
 
             const msg = JSON.parse(body);
@@ -64,7 +64,7 @@ function startFakeMcpHttpServer() {
             res.statusCode = 200;
             res.setHeader('content-type', 'application/json');
             res.end(JSON.stringify({ jsonrpc: '2.0', id, result }));
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             res.statusCode = 500;
             res.setHeader('content-type', 'application/json');
             res.end(JSON.stringify({ error: err?.message || String(err) }));
@@ -94,16 +94,17 @@ test('imports tools from HTTP upstream and proxies calls', async () => {
 
         const st = await registerUpstreams(registry, { env });
         assert.equal(st.upstreams.length, 1);
-        assert.equal(st.upstreams[0].alias, 'core');
-        assert.equal(st.upstreams[0].ready, true);
-        assert.equal(st.upstreams[0].registeredCount, 1);
+        const up0h = /** @type {any} */ (st.upstreams[0]);
+        assert.equal(up0h.alias, 'core');
+        assert.equal(up0h.ready, true);
+        assert.equal(up0h.registeredCount, 1);
 
         assert.equal(registry.has('mcp_core__hello'), true);
 
-        const out = await registry.execute('mcp_core__hello', { name: 'MCP' });
+        const out = /** @type {any} */ (await registry.execute('mcp_core__hello', { name: 'MCP' }));
         assert.equal(out?.content?.[0]?.text, 'Hello MCP');
     } finally {
         await shutdownUpstreams().catch(() => {});
-        await new Promise(r => server.close(() => r(null)));
+        await new Promise((r) => server.close(() => r(null)));
     }
 });

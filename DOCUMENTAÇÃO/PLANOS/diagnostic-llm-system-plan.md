@@ -207,11 +207,11 @@ export class DirectReader {
 
   async isAllowed(filepath) {
     const resolved = await this.resolvePath(filepath);
-    return this.allowedPaths.some(p => resolved.startsWith(p));
+    return this.allowedPaths.some((p) => resolved.startsWith(p));
   }
 
   async resolvePath(filepath) {
-    const resolved = await import('node:path').then(p => p.resolve(filepath));
+    const resolved = await import('node:path').then((p) => p.resolve(filepath));
     return resolved;
   }
 
@@ -287,10 +287,10 @@ export class LogParser {
   parseContent(content, options = {}) {
     const { maxLines = 1000, filter = null } = options;
     const lines = content.split('\n').slice(0, maxLines);
-    const entries = lines.map(line => this.parseLine(line));
+    const entries = lines.map((line) => this.parseLine(line));
 
     if (filter) {
-      return entries.filter(e => e.message.includes(filter));
+      return entries.filter((e) => e.message.includes(filter));
     }
 
     return entries;

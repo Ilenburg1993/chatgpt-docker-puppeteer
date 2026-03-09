@@ -105,7 +105,7 @@ try {
     if (discovered === 0) {
       log(
         'FATAL',
-        `[FACTORY] Nenhum driver descoberto em ${TARGETS_DIR}. Sistema não pode operar.`
+        `[FACTORY] Nenhum driver descoberto em ${TARGETS_DIR}. Sistema não pode operar.`,
       );
       throw new Error('No drivers discovered');
     }
@@ -456,7 +456,7 @@ async function invalidatePageCache(page, options = {}) {
         `[FACTORY] ${failedDrivers.length}/${instances.size} drivers falharam no cleanup`,
         {
           failed: failedDrivers,
-        }
+        },
       );
     }
 
@@ -465,7 +465,7 @@ async function invalidatePageCache(page, options = {}) {
 
     log(
       'INFO',
-      `[FACTORY] Page cache invalidated. Success: ${instances.size - failedDrivers.length}/${instances.size}`
+      `[FACTORY] Page cache invalidated. Success: ${instances.size - failedDrivers.length}/${instances.size}`,
     );
   }
 }
@@ -548,16 +548,19 @@ entender limitação de WeakMap (keys só objects)
  * ✅ Estrutura: WeakMap<Page, Map<targetName, DriverInstance>>
  *
  * Por que WeakMap?
+ *
  * - Keys devem ser objetos (Page instance)
  * - GC automático: Se page é coletado → entry é removido automaticamente
  * - Previne memory leaks: Drivers não mantém páginas vivas
  *
  * Limitações:
+ *
  * - Não iterável (não tem .keys(), .values(), .entries())
  * - Não tem .size
  * - Keys apenas objects (não strings/numbers)
  *
  * Inner Map:
+ *
  * - Keys: targetName (string) - ex: 'chatgpt', 'gemini'
  * - Values: DriverInstance (TargetDriver subclass)
  */
@@ -584,9 +587,8 @@ como 'chatgpt' → não configurável
 
 ```javascript
 /**
- * Target padrão quando nenhum é especificado.
- * ✅ Configurável via env var FACTORY_DEFAULT_TARGET
- * ✅ Fallback: primeiro driver descoberto se env var não definida
+ * Target padrão quando nenhum é especificado. ✅ Configurável via env var FACTORY_DEFAULT_TARGET ✅ Fallback: primeiro
+ * driver descoberto se env var não definida
  */
 let DEFAULT_TARGET = process.env.FACTORY_DEFAULT_TARGET || 'chatgpt';
 
@@ -599,7 +601,7 @@ if (!driverRegistry[DEFAULT_TARGET.toLowerCase()]) {
     DEFAULT_TARGET = availableTargets[0];
     log(
       'WARN',
-      `[FACTORY] Default target '${process.env.FACTORY_DEFAULT_TARGET || 'chatgpt'}' não encontrado. Usando '${DEFAULT_TARGET}'`
+      `[FACTORY] Default target '${process.env.FACTORY_DEFAULT_TARGET || 'chatgpt'}' não encontrado. Usando '${DEFAULT_TARGET}'`,
     );
   } else {
     log('FATAL', '[FACTORY] Nenhum target disponível e default target inválido');
@@ -950,7 +952,7 @@ function getDriver(targetName, page, config, signal, options = {}) {
     config,
     signal,
     customLogger || log,
-    customAbortController || AbortController
+    customAbortController || AbortController,
   );
 }
 ```

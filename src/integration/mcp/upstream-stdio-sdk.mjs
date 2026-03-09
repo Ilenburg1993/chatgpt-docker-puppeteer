@@ -2,14 +2,14 @@
 /**
  * MCP upstream client over stdio using the official MCP SDK.
  *
- * This spawns an MCP server process (e.g. GitHub MCP) and talks JSON-RPC over stdio.
- * It is intended to be used by the upstream manager to import tools and proxy calls.
+ * This spawns an MCP server process (e.g. GitHub MCP) and talks JSON-RPC over stdio. It is intended to be used by the
+ * upstream manager to import tools and proxy calls.
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-function withTimeout(promise, timeoutMs, label) {
+function withTimeout(/** @type {any} */ promise, /** @type {any} */ timeoutMs, /** @type {any} */ label) {
     const ms = Number(timeoutMs);
     if (!Number.isFinite(ms) || ms <= 0) return promise;
 
@@ -25,7 +25,14 @@ function withTimeout(promise, timeoutMs, label) {
 /** Classe exportada: MCPStdioUpstreamClient. */
 export class MCPStdioUpstreamClient {
     /**
-     * @param {{ alias: string, command: string, args: string[], env?: Record<string,string>, initTimeoutMs?: number, callTimeoutMs?: number }} opts
+     * @param {{
+     *     alias: string;
+     *     command: string;
+     *     args: string[];
+     *     env?: Record<string, string>;
+     *     initTimeoutMs?: number;
+     *     callTimeoutMs?: number;
+     * }} opts
      */
     constructor(opts) {
         this.alias = opts.alias;
@@ -35,9 +42,9 @@ export class MCPStdioUpstreamClient {
         this.initTimeoutMs = Number(opts.initTimeoutMs || 30000);
         this.callTimeoutMs = Number(opts.callTimeoutMs || 90000);
 
-        /** @type {import('@modelcontextprotocol/sdk/client').Client | null} */
+        /** @type {Client | null} */
         this.client = null;
-        /** @type {import('@modelcontextprotocol/sdk/client/stdio.js').StdioClientTransport | null} */
+        /** @type {StdioClientTransport | null} */
         this.transport = null;
         this.connected = false;
     }
@@ -48,13 +55,13 @@ export class MCPStdioUpstreamClient {
         const transport = new StdioClientTransport({
             command: this.command,
             args: this.args,
-            env: this.env,
+            ...(this.env !== undefined ? { env: this.env } : {}),
             stderr: 'pipe',
         });
 
         const client = new Client(
             { name: 'chatgpt-docker-upstream', version: '1.0.0' },
-            /** @type {any} */ ({ capabilities: { tools: {} } })
+            /** @type {any} */ ({ capabilities: { tools: {} } }),
         );
 
         try {
@@ -62,15 +69,16 @@ export class MCPStdioUpstreamClient {
             this.client = client;
             this.transport = transport;
             this.connected = true;
-        } catch (err) {
+        } catch (/** @type {any} */ _raw_err) {
+            const err = /** @type {any} */ (_raw_err);
             try {
                 await client.close();
-            } catch (e) {
+            } catch (_) {
                 // ignore
             }
             try {
                 await transport.close();
-            } catch (e) {
+            } catch (_) {
                 // ignore
             }
             throw err;
@@ -79,11 +87,11 @@ export class MCPStdioUpstreamClient {
 
     async listTools() {
         if (!this.connected) await this.connect();
-        return this.client.listTools();
+        return /** @type {any} */ (this.client).listTools();
     }
 
     /**
-     * @param {{ name?: string, arguments?: Record<string, unknown>, signal?: AbortSignal }} [payload]
+     * @param {{ name?: string; arguments?: Record<string, unknown>; signal?: AbortSignal }} [payload]
      */
     async callTool({ name, arguments: args = {}, signal } = {}) {
         if (!name) {
@@ -98,11 +106,12 @@ export class MCPStdioUpstreamClient {
         // We enforce an upper bound via timeout, and if it fires, we tear down the connection.
         try {
             return await withTimeout(
-                this.client.callTool({ name, arguments: args }),
+                /** @type {any} */ (this.client).callTool({ name, arguments: args }),
                 this.callTimeoutMs,
-                `[MCP stdio:${this.alias}] tools/call(${name})`
+                `[MCP stdio:${this.alias}] tools/call(${name})`,
             );
-        } catch (err) {
+        } catch (/** @type {any} */ _raw_err) {
+            const err = /** @type {any} */ (_raw_err);
             // If call timed out or any transport error occurred, mark connection dead.
             await this.close().catch(() => {});
             throw err;

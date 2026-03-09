@@ -1,8 +1,8 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
+import CONFIG from '#core/config';
+import { log } from '#core/logger';
 import { pm2Raw } from '#infra/system';
 import { notify } from '#server/engine/socket';
-import { log } from '#core/logger';
-import CONFIG from '#core/config';
 
 /**
  * Processos sempre gerenciados (núcleo do ecosystem.config.cjs).
@@ -15,8 +15,8 @@ const CORE_PROCESSES = ['agente-gpt', 'dashboard-web', 'chrome-proxy'];
 const OPTIONAL_PROCESSES = ['inference-gateway', 'ollama-host-supervisor', 'audit-agent'];
 
 /**
- * Conjunto completo de processos gerenciados (dinâmico).
- * Inclui opcionais quando a variável de ambiente correspondente está ativa.
+ * Conjunto completo de processos gerenciados (dinâmico). Inclui opcionais quando a variável de ambiente correspondente
+ * está ativa.
  */
 const MANAGED_PROCESSES = [
     ...CORE_PROCESSES,
@@ -27,14 +27,16 @@ const MANAGED_PROCESSES = [
  * Estado operacional da ponte.
  */
 let isBusActive = false;
+/** @type {any} */
 let healthCheckInterval = null;
+/** @type {any} */
 let reconnectTimer = null;
-let lastProcessStates = new Map(); // Cache de estados
+const lastProcessStates = new Map(); // Cache de estados
 
 /**
- * Inicializa a escuta do barramento de eventos do PM2.
- * Implementa lógica de auto-recuperação e reconexão resiliente.
-  * @returns {void}
+ * Inicializa a escuta do barramento de eventos do PM2. Implementa lógica de auto-recuperação e reconexão resiliente.
+ *
+ * @returns {void}
  */
 function init() {
     if (isBusActive) {
@@ -50,7 +52,7 @@ function init() {
     log('INFO', '[PM2_BRIDGE] Conectando ao barramento de eventos do PM2...');
 
     // Conecta ao daemon do PM2 usando a interface bruta da Infraestrutura
-    pm2Raw.connect(err => {
+    pm2Raw.connect((err) => {
         if (err) {
             log('ERROR', `[PM2_BRIDGE] Falha ao conectar ao daemon: ${err.message}`);
             // Tenta reconectar em 5 segundos (Backoff Passivo)
@@ -70,10 +72,10 @@ function init() {
             log('INFO', '[PM2_BRIDGE] Escuta de eventos PM2 ativa (todos os processos)');
 
             /**
-             * Escuta eventos globais de TODOS os processos gerenciados pelo PM2.
-             * Monitora: agente-gpt, dashboard-web, chrome-proxy
+             * Escuta eventos globais de TODOS os processos gerenciados pelo PM2. Monitora: agente-gpt, dashboard-web,
+             * chrome-proxy
              */
-            bus.on('process:event', data => {
+            bus.on('process:event', (/** @type {any} */ data) => {
                 const processName = data.process ? data.process.name : null;
 
                 // Filtra apenas processos gerenciados
@@ -119,8 +121,7 @@ function init() {
 }
 
 /**
- * Emite snapshot inicial de todos os processos PM2.
- * Chamado após conexão bem-sucedida ao barramento.
+ * Emite snapshot inicial de todos os processos PM2. Chamado após conexão bem-sucedida ao barramento.
  */
 function _emitInitialSnapshot() {
     pm2Raw.list((err, processes) => {
@@ -130,8 +131,8 @@ function _emitInitialSnapshot() {
         }
 
         const snapshot = processes
-            .filter(proc => MANAGED_PROCESSES.includes(proc.name))
-            .map(proc => ({
+            .filter((/** @type {any} */ proc) => MANAGED_PROCESSES.includes(proc.name))
+            .map((/** @type {any} */ proc) => ({
                 name: proc.name,
                 status: proc.pm2_env.status,
                 pid: proc.pid,
@@ -146,7 +147,7 @@ function _emitInitialSnapshot() {
         log('INFO', `[PM2_BRIDGE] Snapshot inicial: ${snapshot.length} processos`);
 
         // Atualiza cache
-        snapshot.forEach(proc => lastProcessStates.set(proc.name, proc));
+        snapshot.forEach((proc) => lastProcessStates.set(proc.name, proc));
 
         // Notifica Dashboard
         notify('pm2:snapshot', {
@@ -158,8 +159,8 @@ function _emitInitialSnapshot() {
 }
 
 /**
- * Watchdog de Saúde do Link: Verifica a integridade da conexão com o PM2 a cada 30s.
- * Garante que a ponte se recupere caso o daemon do PM2 seja reiniciado.
+ * Watchdog de Saúde do Link: Verifica a integridade da conexão com o PM2 a cada 30s. Garante que a ponte se recupere
+ * caso o daemon do PM2 seja reiniciado.
  *
  * ENHANCED: Também emite métricas periódicas de todos os processos.
  */
@@ -184,8 +185,8 @@ function _startHealthCheck() {
 
             // Emite métricas atualizadas de todos os processos
             const metrics = processes
-                .filter(proc => MANAGED_PROCESSES.includes(proc.name))
-                .map(proc => ({
+                .filter((/** @type {any} */ proc) => MANAGED_PROCESSES.includes(proc.name))
+                .map((/** @type {any} */ proc) => ({
                     name: proc.name,
                     status: proc.pm2_env.status,
                     pid: proc.pid,
@@ -198,7 +199,7 @@ function _startHealthCheck() {
                 }));
 
             // Atualiza cache
-            metrics.forEach(proc => lastProcessStates.set(proc.name, proc));
+            metrics.forEach((proc) => lastProcessStates.set(proc.name, proc));
 
             // Notifica Dashboard (throttled - apenas mudanças significativas)
             notify('pm2:metrics', {
@@ -213,9 +214,9 @@ function _startHealthCheck() {
 }
 
 /**
- * Encerramento limpo do barramento.
- * Chamado pelo orquestrador de ciclo de vida (lifecycle.js) no shutdown.
-  * @returns {void}
+ * Encerramento limpo do barramento. Chamado pelo orquestrador de ciclo de vida (lifecycle.js) no shutdown.
+ *
+ * @returns {void}
  */
 function stop() {
     if (healthCheckInterval) {
@@ -232,18 +233,18 @@ function stop() {
     isBusActive = false;
     try {
         pm2Raw.disconnect();
-    } catch (disconnectErr) {
+    } catch (/** @type {any} */ disconnectErr) {
+        const _e = /** @type {any} */ (disconnectErr);
         log(
             'DEBUG',
-            `[PM2_BRIDGE] Disconnect error during stop: ${disconnectErr && disconnectErr.message ? disconnectErr.message : String(disconnectErr)}`
+            `[PM2_BRIDGE] Disconnect error during stop: ${disconnectErr && _e.message ? _e.message : String(_e)}`,
         );
     }
     log('INFO', '[PM2_BRIDGE] Ponte de eventos encerrada.');
 }
 
 /**
- * Retorna estado atual de todos os processos (cache).
- * Útil para health checks e diagnósticos.
+ * Retorna estado atual de todos os processos (cache). Útil para health checks e diagnósticos.
  *
  * @returns {Map<string, object>} Mapa de estados (chave: nome do processo)
  */
@@ -252,8 +253,7 @@ function getProcessStates() {
 }
 
 /**
- * Força refresh de snapshot de todos os processos.
- * Chamado por health endpoints ou triggers externos.
+ * Força refresh de snapshot de todos os processos. Chamado por health endpoints ou triggers externos.
  *
  * @returns {Promise<object[]>} Array de estados de processos
  */
@@ -266,8 +266,8 @@ async function refreshSnapshot() {
             }
 
             const snapshot = processes
-                .filter(proc => MANAGED_PROCESSES.includes(proc.name))
-                .map(proc => ({
+                .filter((/** @type {any} */ proc) => MANAGED_PROCESSES.includes(proc.name))
+                .map((/** @type {any} */ proc) => ({
                     name: proc.name,
                     status: proc.pm2_env.status,
                     pid: proc.pid,
@@ -280,11 +280,11 @@ async function refreshSnapshot() {
                 }));
 
             // Atualiza cache
-            snapshot.forEach(proc => lastProcessStates.set(proc.name, proc));
+            snapshot.forEach((proc) => lastProcessStates.set(proc.name, proc));
 
             resolve(snapshot);
         });
     });
 }
 
-export { init, stop, getProcessStates, refreshSnapshot, MANAGED_PROCESSES, CORE_PROCESSES, OPTIONAL_PROCESSES };
+export { CORE_PROCESSES, getProcessStates, init, MANAGED_PROCESSES, OPTIONAL_PROCESSES, refreshSnapshot, stop };

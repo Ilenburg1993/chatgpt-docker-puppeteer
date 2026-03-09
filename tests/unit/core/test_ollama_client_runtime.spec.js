@@ -1,9 +1,14 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import { OllamaClient } from '../../../tools/ollama/client.mjs';
 
+/**
+ * @param {number} status
+ * @param {any} data
+ * @returns {any}
+ */
 function mockJsonResponse(status, data) {
     return {
         ok: status >= 200 && status < 300,
@@ -30,14 +35,14 @@ test('resolveRuntime forces local for embedding operation', () => {
 });
 
 test('generateWithMetadata uses cloud first in auto mode', async () => {
-    const calls = [];
+    /** @type {any[]} */ const calls = [];
     const client = new OllamaClient({
         cloudEnabled: true,
         cloudBaseUrl: 'https://cloud.example',
         localBaseUrl: 'http://local.example',
         nonEmbeddingRuntime: 'auto',
         nonEmbeddingLocalFallback: true,
-        fetch: async url => {
+        fetch: async (url) => {
             calls.push(String(url));
             return mockJsonResponse(200, { response: 'cloud-ok' });
         },
@@ -53,14 +58,14 @@ test('generateWithMetadata uses cloud first in auto mode', async () => {
 });
 
 test('generateWithMetadata falls back to local when cloud fails and fallback is enabled', async () => {
-    const calls = [];
+    /** @type {any[]} */ const calls = [];
     const client = new OllamaClient({
         cloudEnabled: true,
         cloudBaseUrl: 'https://cloud.example',
         localBaseUrl: 'http://local.example',
         nonEmbeddingRuntime: 'auto',
         nonEmbeddingLocalFallback: true,
-        fetch: async url => {
+        fetch: async (url) => {
             const target = String(url);
             calls.push(target);
 
@@ -93,7 +98,7 @@ test('generateWithMetadata returns explicit error when fallback is disabled', as
 
     await assert.rejects(
         async () => client.generateWithMetadata('hello', 'qwen3-coder-next', { runtime: 'auto' }),
-        /Cloud-first generation failed and local fallback is disabled/
+        /Cloud-first generation failed and local fallback is disabled/,
     );
 });
 
@@ -111,7 +116,7 @@ test('light local profile rejects heavy local model', async () => {
 
     await assert.rejects(
         async () => client.generateWithMetadata('hello', 'qwen2.5-coder:7b', { runtime: 'local' }),
-        /blocked by light profile/
+        /blocked by light profile/,
     );
 
     assert.equal(called, false);
@@ -124,7 +129,7 @@ test('custom local allowlist permits configured model', async () => {
         nonEmbeddingRuntime: 'local',
         localModelProfile: 'custom',
         localAllowedModels: ['my-local-model'],
-        fetch: async url => {
+        fetch: async (url) => {
             assert.ok(String(url).startsWith('http://local.example/api/generate'));
             return mockJsonResponse(200, { response: 'ok' });
         },
@@ -140,7 +145,7 @@ test('listModelsDetailed returns explicit cloud/local separation', async () => {
         cloudEnabled: true,
         cloudBaseUrl: 'https://cloud.example',
         localBaseUrl: 'http://local.example',
-        fetch: async url => {
+        fetch: async (url) => {
             const target = String(url);
             if (target.startsWith('https://cloud.example')) {
                 return mockJsonResponse(200, {

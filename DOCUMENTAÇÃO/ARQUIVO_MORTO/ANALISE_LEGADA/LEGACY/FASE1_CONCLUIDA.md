@@ -23,25 +23,25 @@
 ### 🛠️ Ferramentas Instaladas
 
 ```bash
-✅ mermaid           # Diagramas como código
-✅ graphviz-cli      # Grafos (SVG/PNG)
-✅ madge             # Análise de dependências circulares
+✅ mermaid      # Diagramas como código
+✅ graphviz-cli # Grafos (SVG/PNG)
+✅ madge        # Análise de dependências circulares
 ```
 
 ### 🎨 Scripts Criados
 
 ```bash
-✅ scripts/setup.sh   # Setup automatizado
-✅ scripts/doctor.sh  # Diagnóstico completo
+✅ scripts/setup.sh  # Setup automatizado
+✅ scripts/doctor.sh # Diagnóstico completo
 ```
 
 ### 📦 Novos Comandos NPM
 
 ```bash
-npm run setup                # One-command setup
-npm run doctor               # Diagnóstico do sistema
-npm run analyze:deps         # Detectar dependências circulares
-npm run analyze:deps:graph   # Gerar grafo visual
+npm run setup              # One-command setup
+npm run doctor             # Diagnóstico do sistema
+npm run analyze:deps       # Detectar dependências circulares
+npm run analyze:deps:graph # Gerar grafo visual
 ```
 
 ---
@@ -155,9 +155,9 @@ npm run doctor
 npm run analyze:deps
 
 # Grafo visual (requer graphviz)
-sudo apt-get install graphviz  # Linux
-brew install graphviz          # macOS
-npm run analyze:deps:graph     # Gera deps-graph.svg
+sudo apt-get install graphviz # Linux
+brew install graphviz         # macOS
+npm run analyze:deps:graph    # Gera deps-graph.svg
 ```
 
 ### 4. Setup Inicial
@@ -248,14 +248,14 @@ Docs Pages:        11 → 15 → 20+
 ### Comandos Essenciais
 
 ```bash
-npm run setup           # Setup inicial
-npm run doctor          # Diagnóstico
-npm run dev             # Desenvolvimento
-npm run test            # Testes
-npm run analyze:deps    # Análise
-npm run queue:status    # Status da fila
-npm run daemon:start    # Iniciar daemon
-npm run daemon:logs     # Ver logs
+npm run setup        # Setup inicial
+npm run doctor       # Diagnóstico
+npm run dev          # Desenvolvimento
+npm run test         # Testes
+npm run analyze:deps # Análise
+npm run queue:status # Status da fila
+npm run daemon:start # Iniciar daemon
+npm run daemon:logs  # Ver logs
 ```
 
 ### Documentação

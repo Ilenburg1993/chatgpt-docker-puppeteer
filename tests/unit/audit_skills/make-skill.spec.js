@@ -1,14 +1,14 @@
 // @ts-check
-import { test } from 'node:test';
-import assert from 'node:assert';
-import fs from 'fs/promises';
-import path from 'path';
-import os from 'os';
 import { execSync } from 'child_process';
+import fs from 'fs/promises';
+import assert from 'node:assert';
+import { test } from 'node:test';
+import os from 'os';
+import path from 'path';
 
 // the script uses cwd and --root so we can run in a tmpdir
 
-test('make-skill creates directory and package alias', async t => {
+test('make-skill creates directory and package alias', async (t) => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'skilltest-'));
     // create a minimal package.json so alias update works
     const pkgPath = path.join(tmp, 'package.json');

@@ -1,19 +1,20 @@
+// @ts-check
 /**
- * MMR (Maximal Marginal Relevance) for result diversification
- * Promotes results from different files/locations
- * Avoids returning multiple redundant chunks from the same file
+ * MMR (Maximal Marginal Relevance) for result diversification Promotes results from different files/locations Avoids
+ * returning multiple redundant chunks from the same file
  */
 
 /**
- * Apply MMR (Maximal Marginal Relevance) for diversity
- * Promotes results from different files/locations
+ * Apply MMR (Maximal Marginal Relevance) for diversity Promotes results from different files/locations
+ *
  * @param {object[]} results - Reranked results (must have rerank_score)
  * @param {object} options - MMR options
- * @param {number} [options.lambda] - Balance between relevance and diversity (1.0 = only relevance, 0.0 = only diversity, default: 0.7)
+ * @param {number} [options.lambda] - Balance between relevance and diversity (1.0 = only relevance, 0.0 = only
+ *   diversity, default: 0.7)
  * @param {number} [options.topK] - Number of results to return (default: 8)
  * @returns {object[]} - Diversified results
  */
-export function maximalMarginalRelevance(results, options = {}) {
+export function maximalMarginalRelevance(/** @type {any} */ results, /** @type {any} */ options = {}) {
     const {
         lambda = 0.7, // 1.0 = only relevance, 0.0 = only diversity
         topK = 8,
@@ -63,13 +64,13 @@ export function maximalMarginalRelevance(results, options = {}) {
 }
 
 /**
- * Calculate similarity between two results
- * Higher similarity = more redundant (same file, close line numbers)
- * @param {object} a - First result
- * @param {object} b - Second result
+ * Calculate similarity between two results Higher similarity = more redundant (same file, close line numbers)
+ *
+ * @param {any} a - First result
+ * @param {any} b - Second result
  * @returns {number} - Similarity score [0, 1] (1 = identical, 0 = completely different)
  */
-function calculateSimilarity(a, b) {
+function calculateSimilarity(/** @type {any} */ a, /** @type {any} */ b) {
     // Path similarity
     const pathSim = a.path === b.path ? 1.0 : 0.0;
 

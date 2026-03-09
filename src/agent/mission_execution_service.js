@@ -7,19 +7,21 @@ import { asRecord } from '#types/guards';
 
 /**
  * @typedef {{
- *  ok: boolean,
- *  mission?: any,
- *  statusCode?: number,
- *  code?: string,
- *  error?: string,
- *  details?: any,
+ *     ok: boolean;
+ *     mission?: any;
+ *     statusCode?: number;
+ *     code?: string;
+ *     error?: string;
+ *     details?: unknown;
  * }} MissionTransitionResult
  */
 
+/** @param {any} missionId @returns {string} */
 function _asMissionId(missionId) {
     return String(missionId || '').trim();
 }
 
+/** @param {any} missionId @returns {any} */
 function _ensureMission(missionId) {
     const id = _asMissionId(missionId);
     if (!id) {
@@ -32,10 +34,11 @@ function _ensureMission(missionId) {
     return { ok: true, mission, missionId: id };
 }
 
+/** @param {{ mission: any; toStatus: any; allowedFrom: any }} arg0 @returns {any} */
 function _transitionConflict({ mission, toStatus, allowedFrom }) {
     const from = String(mission?.status || '').toUpperCase();
     const to = String(toStatus || '').toUpperCase();
-    const allowed = new Set((Array.isArray(allowedFrom) ? allowedFrom : []).map(v => String(v).toUpperCase()));
+    const allowed = new Set((Array.isArray(allowedFrom) ? allowedFrom : []).map((v) => String(v).toUpperCase()));
 
     if (from === to) {
         return {
@@ -60,6 +63,7 @@ function _transitionConflict({ mission, toStatus, allowedFrom }) {
     return null;
 }
 
+/** @param {any} baseContext @param {any} patchContext @param {any} [opts] @returns {any} */
 function _mergeMissionContext(baseContext, patchContext, { failureReason = null } = {}) {
     const context = baseContext && typeof baseContext === 'object' ? baseContext : {};
     const patch = patchContext && typeof patchContext === 'object' ? patchContext : {};
@@ -70,6 +74,9 @@ function _mergeMissionContext(baseContext, patchContext, { failureReason = null 
     };
 }
 
+/**
+ * @param {{ missionId: any; eventType: any; actorType?: any; actorId?: any; payload?: any; dedupKey?: any }} arg0
+ */
 function _recordMissionEvent({
     missionId,
     eventType,
@@ -88,11 +95,13 @@ function _recordMissionEvent({
             payload,
             dedupKey,
         });
-    } catch (err) {
+    } catch (/** @type {any} */ _rawErr) {
+        const err = /** @type {any} */ (_rawErr);
         log('WARN', `[MissionExecutionService] Falha ao registrar evento ${eventType}: ${err?.message || String(err)}`);
     }
 }
 
+/** @param {any} mission @param {any} [expected] @returns {any} */
 function _verifyProgressPreconditions(mission, expected = {}) {
     const progress = mission?.context?.progress || {};
     if (expected.currentTaskId !== undefined && progress.current_task_id !== expected.currentTaskId) {
@@ -125,6 +134,7 @@ function _verifyProgressPreconditions(mission, expected = {}) {
     return null;
 }
 
+/** @param {any} taskMutation @param {any} nowMs */
 function _applyTaskMutation(taskMutation, nowMs) {
     if (typeof taskMutation !== 'function') {
         return;
@@ -134,22 +144,25 @@ function _applyTaskMutation(taskMutation, nowMs) {
 }
 
 /**
- * @param {{
- *  missionId: string,
- *  toStatus: string,
- *  allowedFrom: string[],
- *  startedAtMs?: number|null,
- *  completedAtMs?: number|null,
- *  contextPatch?: Record<string, any>|null,
- *  failureReason?: string|null,
- *  expectedProgress?: { currentTaskId?: string|null, currentStepIndex?: number }|null,
- *  actorType?: string,
- *  actorId?: string|null,
- *  eventType?: string,
- *  dedupKey?: string|null,
- *  payload?: Record<string, any>,
- *  taskMutation?: ((db: any, nowMs: number) => void)|null,
- * }} params
+ * @typedef {object} TransitionMissionParams
+ * @property {string} missionId
+ * @property {string} toStatus
+ * @property {string[]} allowedFrom
+ * @property {number | null} [startedAtMs]
+ * @property {number | null} [completedAtMs]
+ * @property {Record<string, any>} [contextPatch]
+ * @property {string | null} [failureReason]
+ * @property {{ currentTaskId?: string | null }} [expectedProgress]
+ * @property {number} [currentStepIndex]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {string} eventType
+ * @property {string | null} [dedupKey]
+ * @property {Record<string, any>} [payload]
+ * @property {((db: any, nowMs: number) => void) | null} [taskMutation]
+ */
+/**
+ * @param {TransitionMissionParams} params
  * @returns {MissionTransitionResult}
  */
 function transitionMission(params) {
@@ -157,7 +170,7 @@ function transitionMission(params) {
     const missionRef = _ensureMission(params.missionId);
     if (!missionRef.ok) return missionRef;
 
-    const { mission, missionId } = missionRef;
+    const { mission, missionId } = /** @type {any} */ (missionRef);
     const conflict = _transitionConflict({
         mission,
         toStatus: params.toStatus,
@@ -194,7 +207,8 @@ function transitionMission(params) {
             ...(params.completedAtMs !== undefined ? { completed_at_ms: params.completedAtMs } : {}),
         });
         _applyTaskMutation(params.taskMutation, now);
-    } catch (err) {
+    } catch (/** @type {any} */ _rawErr) {
+        const err = /** @type {any} */ (_rawErr);
         if (err?.code === 'CONFLICT') {
             return {
                 ok: false,
@@ -231,25 +245,28 @@ function transitionMission(params) {
 }
 
 /**
+ * @typedef {object} UpdateMissionProgressStateParams
+ * @property {string} missionId
+ * @property {Record<string, any>} [progress]
+ * @property {Record<string, any>} [contextPatch]
+ * @property {{ currentTaskId?: string | null }} [expectedProgress]
+ * @property {number} [currentStepIndex]
+ * @property {string} actorType
+ * @property {string | null} actorId
+ * @property {string} eventType
+ * @property {string | null} [dedupKey]
+ * @property {Record<string, any>} [payload]
+ */
+/**
  * Atualiza progresso/contexto da missão em caminho único de domínio.
  *
- * @param {{
- *  missionId: string,
- *  progress: Record<string, any>,
- *  contextPatch?: Record<string, any>|null,
- *  expectedProgress?: { currentTaskId?: string|null, currentStepIndex?: number }|null,
- *  actorType?: string,
- *  actorId?: string|null,
- *  eventType?: string,
- *  dedupKey?: string|null,
- *  payload?: Record<string, any>,
- * }} params
+ * @param {UpdateMissionProgressStateParams} params
  * @returns {MissionTransitionResult}
  */
 function updateMissionProgressState(params) {
     const missionRef = _ensureMission(params.missionId);
     if (!missionRef.ok) return missionRef;
-    const { mission, missionId } = missionRef;
+    const { mission, missionId } = /** @type {any} */ (missionRef);
 
     const missionStatus = String(mission.status || '').toUpperCase();
     if (
@@ -296,7 +313,8 @@ function updateMissionProgressState(params) {
     let updated;
     try {
         updated = updateMission(missionId, { context: nextContext });
-    } catch (err) {
+    } catch (/** @type {any} */ _rawErr) {
+        const err = /** @type {any} */ (_rawErr);
         if (err?.code === 'CONFLICT') {
             return {
                 ok: false,
@@ -328,8 +346,18 @@ function updateMissionProgressState(params) {
 }
 
 /**
+ * @typedef {object} ExecuteMissionTransitionOptions
+ * @property {any} [missionId]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
+ */
+/**
  * Função exportada: executeMissionTransition.
- * @returns {any}
+ *
+ * @param {ExecuteMissionTransitionOptions} options
+ * @returns {MissionTransitionResult}
  */
 function executeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     const mission = getMissionById(missionId);
@@ -348,8 +376,18 @@ function executeMissionTransition({ missionId, actorType = 'user', actorId = nul
 }
 
 /**
+ * @typedef {object} PauseMissionTransitionOptions
+ * @property {any} [missionId]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
+ */
+/**
  * Função exportada: pauseMissionTransition.
- * @returns {any}
+ *
+ * @param {PauseMissionTransitionOptions} options
+ * @returns {MissionTransitionResult}
  */
 function pauseMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     return transitionMission({
@@ -371,15 +409,25 @@ function pauseMissionTransition({ missionId, actorType = 'user', actorId = null,
                 WHERE mission_id = @mission_id
                   AND stage = 'READY'
                   AND status IN ('PENDING', 'RUNNING')
-            `
+            `,
             ).run({ now, mission_id: missionId });
         },
     });
 }
 
 /**
+ * @typedef {object} ResumeMissionTransitionOptions
+ * @property {any} [missionId]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
+ */
+/**
  * Função exportada: resumeMissionTransition.
- * @returns {any}
+ *
+ * @param {ResumeMissionTransitionOptions} options
+ * @returns {MissionTransitionResult}
  */
 function resumeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     const mission = getMissionById(missionId);
@@ -404,15 +452,25 @@ function resumeMissionTransition({ missionId, actorType = 'user', actorId = null
                 WHERE mission_id = @mission_id
                   AND stage = 'READY'
                   AND status = 'PAUSED'
-            `
+            `,
             ).run({ now: ts, mission_id: missionId });
         },
     });
 }
 
 /**
+ * @typedef {object} CancelMissionTransitionOptions
+ * @property {any} [missionId]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
+ */
+/**
  * Função exportada: cancelMissionTransition.
- * @returns {any}
+ *
+ * @param {CancelMissionTransitionOptions} options
+ * @returns {MissionTransitionResult}
  */
 function cancelMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     return transitionMission({
@@ -435,15 +493,28 @@ function cancelMissionTransition({ missionId, actorType = 'user', actorId = null
                     last_error = COALESCE(last_error, 'MISSION_CANCELLED')
                 WHERE mission_id = @mission_id
                   AND status IN ('PENDING', 'RUNNING', 'PAUSED', 'FAILED')
-            `
+            `,
             ).run({ now, mission_id: missionId });
         },
     });
 }
 
 /**
+ * @typedef {object} FailMissionTransitionOptions
+ * @property {any} [missionId]
+ * @property {any} [failureReason]
+ * @property {any} [contextPatch]
+ * @property {any} [expectedProgress]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
+ */
+/**
  * Função exportada: failMissionTransition.
- * @returns {any}
+ *
+ * @param {FailMissionTransitionOptions} options
+ * @returns {MissionTransitionResult}
  */
 function failMissionTransition({
     missionId,
@@ -472,8 +543,20 @@ function failMissionTransition({
 }
 
 /**
+ * @typedef {object} CompleteMissionTransitionOptions
+ * @property {any} [missionId]
+ * @property {any} [contextPatch]
+ * @property {any} [expectedProgress]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
+ */
+/**
  * Função exportada: completeMissionTransition.
- * @returns {any}
+ *
+ * @param {CompleteMissionTransitionOptions} options
+ * @returns {MissionTransitionResult}
  */
 function completeMissionTransition({
     missionId,
@@ -501,11 +584,11 @@ function completeMissionTransition({
 
 /** Reexport público: MISSION_STATUS. */
 export {
-    MISSION_STATUS,
     cancelMissionTransition,
     completeMissionTransition,
     executeMissionTransition,
     failMissionTransition,
+    MISSION_STATUS,
     pauseMissionTransition,
     resumeMissionTransition,
     transitionMission,

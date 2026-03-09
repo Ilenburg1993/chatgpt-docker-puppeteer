@@ -18,8 +18,7 @@ const path = require('path');
 const os = require('os');
 
 /**
- * Detecta se está rodando em Docker
- * Docker: /proc/1/cgroup contém "docker" OU /proc/self/cgroup
+ * Detecta se está rodando em Docker Docker: /proc/1/cgroup contém "docker" OU /proc/self/cgroup
  */
 function isDocker() {
     try {
@@ -33,6 +32,7 @@ function isDocker() {
 
 /**
  * Determina diretório base para cache
+ *
  * - Docker: /home/node/.cache (user node)
  * - Host: ~/.cache (user atual)
  */
@@ -43,8 +43,7 @@ function getCacheDirectory() {
 }
 
 /**
- * Detecta Chrome/Chromium instalado no sistema
- * Ordem de busca: ambiente → paths comuns por plataforma
+ * Detecta Chrome/Chromium instalado no sistema Ordem de busca: ambiente → paths comuns por plataforma
  */
 function findChromeExecutable() {
     // Environment variable override
@@ -55,6 +54,7 @@ function findChromeExecutable() {
     const fs = require('fs');
     const platform = os.platform();
 
+    /** @type {string[]} */
     let candidates = [];
 
     if (platform === 'linux') {

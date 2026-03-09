@@ -1,44 +1,85 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as logger from '#core/logger';
-import { ActionCode, MessageType } from '#shared/nerv/constants';
+import { ActionCode, MessageType, OrchestrationAction } from '#shared/nerv/constants';
 import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#shared/nerv/envelope_reader';
 
 /**
- * @typedef {{ meta: { id: string }, spec?: Record<string, unknown> }} TaskV5
- * @typedef {{ action?: string, [key: string]: unknown }} OrchestrationDecision
- * @typedef {{ taskId?: string, result?: unknown }} DriverTaskCompletedPayload
- * @typedef {{ taskId?: string, error?: string, reason?: string, retryable?: boolean, suggestedDelayMs?: number, retryDelayMs?: number, next_action?: string, [key: string]: unknown }} DriverTaskFailedPayload
- * @typedef {Error & { retryable?: boolean, delayMs?: number, reason?: string, nextAction?: string }} RetryableOrchestratorError
- * @typedef {{ task: TaskV5, correlationId: string|null, startedAt: number }} ActiveExecutionEntry
- * @typedef {'COMPLETED'|'FAILED'} ProcessedEventType
- * @typedef {{ correlationId: string|null, processed: Set<ProcessedEventType> }} ExecutionIdempotencyState
- * @typedef {(input: { taskId: string, correlationId: string|null, delayMs?: number, reason: string, nextAction?: string, payload?: Record<string, unknown> }) => Promise<void>|void} TaskRetryRequestedCallback
- * @typedef {(input: { taskId: string, correlationId: string|null, reason: string, payload?: Record<string, unknown> }) => Promise<void>|void} TaskPermanentFailureCallback
- * @typedef {(input: { taskId: string, correlationId: string|null, decision: OrchestrationDecision }) => Promise<void>|void} TaskCompletedCallback
+ * @typedef {{ meta: { id: string }; spec?: Record<string, unknown> }} TaskV5
+ *
+ * @typedef {{ action?: string; [key: string]: unknown }} OrchestrationDecision
+ *
+ * @typedef {{ taskId?: string; result?: unknown }} DriverTaskCompletedPayload
+ *
+ * @typedef {{
+ *     taskId?: string;
+ *     error?: string;
+ *     reason?: string;
+ *     retryable?: boolean;
+ *     suggestedDelayMs?: number;
+ *     retryDelayMs?: number;
+ *     next_action?: string;
+ *     [key: string]: unknown;
+ * }} DriverTaskFailedPayload
+ *
+ *
+ * @typedef {Error & { retryable?: boolean; delayMs?: number; reason?: string; nextAction?: string }} RetryableOrchestratorError
+ *
+ *
+ * @typedef {{ task: TaskV5; correlationId: string | null; startedAt: number }} ActiveExecutionEntry
+ *
+ * @typedef {'COMPLETED' | 'FAILED'} ProcessedEventType
+ *
+ * @typedef {{ correlationId: string | null; processed: Set<ProcessedEventType> }} ExecutionIdempotencyState
+ *
+ * @typedef {(input: {
+ *     taskId: string;
+ *     correlationId: string | null;
+ *     delayMs?: number;
+ *     reason: string;
+ *     nextAction?: string;
+ *     payload?: Record<string, unknown>;
+ * }) => Promise<void> | void} TaskRetryRequestedCallback
+ *
+ *
+ * @typedef {(input: {
+ *     taskId: string;
+ *     correlationId: string | null;
+ *     reason: string;
+ *     payload?: Record<string, unknown>;
+ * }) => Promise<void> | void} TaskPermanentFailureCallback
+ *
+ *
+ * @typedef {(input: {
+ *     taskId: string;
+ *     correlationId: string | null;
+ *     decision: OrchestrationDecision;
+ * }) => Promise<void> | void} TaskCompletedCallback
  */
 
 /**
  * TaskExecutionOrchestrator - Orquestra execução de tasks V5.
  *
  * Fluxo:
+ *
  * 1. executeTask(task) → beforeExecution() → emit DRIVER_EXECUTE_TASK
  * 2. Escuta DRIVER_TASK_COMPLETED/FAILED/QUEUED
  * 3. afterExecution() → decisão (DONE/RETRY/NEXT_STEP)
  * 4. Processa decisão via KernelNERVBridge
  *
  * Requisitos / invariantes:
+ *
  * - Idempotência por (taskId + correlationId) para evitar duplo processamento por redelivery.
  * - Eventos atrasados/stale (correlationId antigo) são ignorados.
  * - Multi-step / retry: executeTask() reinicializa a janela de idempotência.
  */
 class TaskExecutionOrchestrator {
     /**
-     * @param {Object} params
-     * @param {Object} params.nerv - Instância do NERV
-     * @param {Object} params.nervBridge - KernelNERVBridge
-     * @param {TaskRetryRequestedCallback|null} [params.onTaskRetryRequested] - callback retry
-     * @param {TaskPermanentFailureCallback|null} [params.onTaskPermanentFailure] - callback failure permanente
-     * @param {TaskCompletedCallback|null} [params.onTaskCompleted] - callback conclusão
+     * @param {object} params
+     * @param {any} params.nerv - Instância do NERV
+     * @param {any} params.nervBridge - KernelNERVBridge
+     * @param {TaskRetryRequestedCallback | null} [params.onTaskRetryRequested] - callback retry
+     * @param {TaskPermanentFailureCallback | null} [params.onTaskPermanentFailure] - callback failure permanente
+     * @param {TaskCompletedCallback | null} [params.onTaskCompleted] - callback conclusão
      */
     constructor({
         nerv,
@@ -65,8 +106,7 @@ class TaskExecutionOrchestrator {
         this.activeExecutions = new Map();
 
         /**
-         * Idempotência por execução:
-         * taskId → { correlationId: string|null, processed: Set<'COMPLETED'|'FAILED'> }
+         * Idempotência por execução: taskId → { correlationId: string|null, processed: Set<'COMPLETED'|'FAILED'> }
          */
         /** @type {Map<string, ExecutionIdempotencyState>} */
         this.processedExecutionEvents = new Map();
@@ -80,8 +120,9 @@ class TaskExecutionOrchestrator {
 
     /**
      * Executa uma task (ponto de entrada).
+     *
      * @param {TaskV5} task - Task V5
-     * @param {string|null} correlationId - ID de correlação NERV
+     * @param {string | null} correlationId - ID de correlação NERV
      */
     async executeTask(task, correlationId) {
         if (!task?.meta?.id) {
@@ -102,12 +143,13 @@ class TaskExecutionOrchestrator {
         try {
             // Hook: beforeExecution (orchestrator prepara task)
             preparedTask = await this.nervBridge.beforeTaskExecution(task);
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log(
                 'ERROR',
                 `[TaskExecutionOrchestrator] beforeTaskExecution falhou: ${taskId} - ${msg}`,
-                correlationId
+                correlationId,
             );
 
             // Não mantém estado ativo (evita leak)
@@ -138,7 +180,8 @@ class TaskExecutionOrchestrator {
                     task: preparedTask,
                 },
             });
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log('ERROR', `[TaskExecutionOrchestrator] emitCommand falhou: ${taskId} - ${msg}`, correlationId);
 
@@ -165,16 +208,17 @@ class TaskExecutionOrchestrator {
         if (this.unsubscribeNerv) {
             try {
                 this.unsubscribeNerv();
-            } catch (unsubscribeError) {
+            } catch (/** @type {any} */ _rawUnsubErr) {
+                const unsubscribeError = /** @type {any} */ (_rawUnsubErr);
                 logger.log(
                     'WARN',
-                    `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`
+                    `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`,
                 );
             }
             this.unsubscribeNerv = null;
         }
 
-        const maybeUnsub = this.nerv.onReceive(envelope => {
+        const maybeUnsub = this.nerv.onReceive((/** @type {any} */ envelope) => {
             if (getMessageType(envelope) !== MessageType.EVENT) {
                 return;
             }
@@ -185,33 +229,34 @@ class TaskExecutionOrchestrator {
             let correlationId = null;
             try {
                 correlationId = getCorrelationId(envelope) || null;
-            } catch (correlationReadError) {
+            } catch (/** @type {any} */ _rawCorrErr) {
+                const correlationReadError = /** @type {any} */ (_rawCorrErr);
                 logger.log(
                     'DEBUG',
-                    `[TaskExecutionOrchestrator] Falha ao ler correlationId do envelope: ${correlationReadError?.message || String(correlationReadError)}`
+                    `[TaskExecutionOrchestrator] Falha ao ler correlationId do envelope: ${correlationReadError?.message || String(correlationReadError)}`,
                 );
                 correlationId = envelope?.correlationId || envelope?.causality?.correlation_id || null;
             }
 
             if (actionCode === ActionCode.DRIVER_TASK_COMPLETED) {
                 this._handleTaskCompleted(/** @type {DriverTaskCompletedPayload} */ (payload), correlationId).catch(
-                    err => {
+                    (err) => {
                         logger.log(
                             'ERROR',
                             `[TaskExecutionOrchestrator] Handler DRIVER_TASK_COMPLETED falhou: ${err?.message || String(err)}`,
-                            correlationId
+                            correlationId,
                         );
-                    }
+                    },
                 );
                 return;
             }
 
             if (actionCode === ActionCode.DRIVER_TASK_FAILED) {
-                this._handleTaskFailed(/** @type {DriverTaskFailedPayload} */ (payload), correlationId).catch(err => {
+                this._handleTaskFailed(/** @type {DriverTaskFailedPayload} */ (payload), correlationId).catch((err) => {
                     logger.log(
                         'ERROR',
                         `[TaskExecutionOrchestrator] Handler DRIVER_TASK_FAILED falhou: ${err?.message || String(err)}`,
-                        correlationId
+                        correlationId,
                     );
                 });
                 return;
@@ -219,7 +264,7 @@ class TaskExecutionOrchestrator {
 
             if (actionCode === ActionCode.DRIVER_TASK_ABORTED) {
                 // Treat abort as a non-retryable terminal failure for kernel lifecycle purposes.
-                const safePayload = payload && typeof payload === 'object' ? payload : {};
+                const safePayload = /** @type {any} */ (payload && typeof payload === 'object' ? payload : {});
                 const taskId = safePayload.taskId;
                 this._handleTaskFailed(
                     /** @type {DriverTaskFailedPayload} */ ({
@@ -229,12 +274,12 @@ class TaskExecutionOrchestrator {
                         retryable: false,
                         next_action: 'ABORT',
                     }),
-                    correlationId
-                ).catch(err => {
+                    correlationId,
+                ).catch((err) => {
                     logger.log(
                         'ERROR',
                         `[TaskExecutionOrchestrator] Handler DRIVER_TASK_ABORTED falhou: ${err?.message || String(err)}`,
-                        correlationId
+                        correlationId,
                     );
                 });
                 return;
@@ -254,8 +299,9 @@ class TaskExecutionOrchestrator {
 
     /**
      * Handler: Task completada com sucesso.
+     *
      * @param {DriverTaskCompletedPayload} payload
-     * @param {string|null} correlationId
+     * @param {string | null} correlationId
      */
     async _handleTaskCompleted(payload, correlationId) {
         const safePayload = payload && typeof payload === 'object' ? payload : {};
@@ -277,7 +323,7 @@ class TaskExecutionOrchestrator {
             logger.log(
                 'WARN',
                 `[TaskExecutionOrchestrator] Evento COMPLETED inválido/stale ignorado para ${taskId} (corr=${correlationId || 'missing'}, expected=${cached.correlationId})`,
-                correlationId
+                correlationId,
             );
             return;
         }
@@ -291,7 +337,7 @@ class TaskExecutionOrchestrator {
             logger.log(
                 'WARN',
                 `[TaskExecutionOrchestrator] Janela de idempotência bloqueou COMPLETED para ${taskId} (corr=${correlationId || 'missing'}, expected=${idempotency.correlationId})`,
-                correlationId
+                correlationId,
             );
             return;
         }
@@ -310,19 +356,20 @@ class TaskExecutionOrchestrator {
         logger.log(
             'INFO',
             `[TaskExecutionOrchestrator] Task completada: ${taskId} (${executionDuration}ms)`,
-            correlationId
+            correlationId,
         );
 
         let decision;
         try {
             // Hook: afterExecution (orchestrator decide próxima ação)
             decision = await this.nervBridge.afterTaskExecution(task, result);
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log(
                 'ERROR',
                 `[TaskExecutionOrchestrator] afterTaskExecution falhou: ${taskId} - ${msg}`,
-                correlationId
+                correlationId,
             );
 
             // Trata como falha permanente do pipeline do kernel (não do driver)
@@ -343,17 +390,18 @@ class TaskExecutionOrchestrator {
         logger.log(
             'DEBUG',
             `[TaskExecutionOrchestrator] Decisão: ${decision?.action} para task ${taskId}`,
-            correlationId
+            correlationId,
         );
 
         try {
             await this.nervBridge.processOrchestrationDecision(decision, correlationId);
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log(
                 'ERROR',
                 `[TaskExecutionOrchestrator] processOrchestrationDecision falhou: ${taskId} - ${msg}`,
-                correlationId
+                correlationId,
             );
 
             // Fail-safe: se não consegue processar a decisão, pede retry (quando possível)
@@ -387,7 +435,7 @@ class TaskExecutionOrchestrator {
         }
 
         // Remove do cache se DONE
-        if (decision?.action === 'DONE') {
+        if (decision?.action === OrchestrationAction.DONE) {
             if (typeof this.onTaskCompleted === 'function') {
                 await this.onTaskCompleted({ taskId, correlationId, decision });
             }
@@ -398,8 +446,9 @@ class TaskExecutionOrchestrator {
 
     /**
      * Handler: Task falhou.
+     *
      * @param {DriverTaskFailedPayload} payload
-     * @param {string|null} correlationId
+     * @param {string | null} correlationId
      */
     async _handleTaskFailed(payload, correlationId) {
         const safePayload = payload && typeof payload === 'object' ? payload : {};
@@ -419,7 +468,7 @@ class TaskExecutionOrchestrator {
             logger.log(
                 'WARN',
                 `[TaskExecutionOrchestrator] Evento FAILED inválido/stale ignorado para ${taskId} (corr=${correlationId || 'missing'}, expected=${cached.correlationId})`,
-                correlationId
+                correlationId,
             );
             return;
         }
@@ -433,7 +482,7 @@ class TaskExecutionOrchestrator {
             logger.log(
                 'WARN',
                 `[TaskExecutionOrchestrator] Janela de idempotência bloqueou FAILED para ${taskId} (corr=${correlationId || 'missing'}, expected=${idempotency.correlationId})`,
-                correlationId
+                correlationId,
             );
             return;
         }
@@ -498,15 +547,22 @@ class TaskExecutionOrchestrator {
                     retriesAttempted: safePayload.retriesAttempted ?? null,
                 },
             });
-        } catch (emitError) {
+        } catch (/** @type {any} */ _rawEmitErr) {
+            const emitError = /** @type {any} */ (_rawEmitErr);
             logger.log(
                 'ERROR',
                 `[TaskExecutionOrchestrator] emitEvent TASK_FAILED falhou para ${taskId}: ${emitError?.message || String(emitError)}`,
-                correlationId
+                correlationId,
             );
         }
     }
 
+    /**
+     * Handler: Task enfileirada pelo driver.
+     *
+     * @param {any} payload
+     * @param {any} correlationId
+     */
     _handleTaskQueued(payload, correlationId) {
         const taskId = payload?.taskId;
         if (!taskId) {
@@ -525,10 +581,11 @@ class TaskExecutionOrchestrator {
         if (this.unsubscribeNerv) {
             try {
                 this.unsubscribeNerv();
-            } catch (unsubscribeError) {
+            } catch (/** @type {any} */ _rawUnsubErr) {
+                const unsubscribeError = /** @type {any} */ (_rawUnsubErr);
                 logger.log(
                     'WARN',
-                    `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`
+                    `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`,
                 );
             }
             this.unsubscribeNerv = null;

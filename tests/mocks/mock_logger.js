@@ -3,7 +3,8 @@ import sinon from 'sinon';
 
 /**
  * Cria um logger mockado com todos os métodos
- * @returns {Object} Logger mockado com spies do sinon
+ *
+ * @returns {object} Logger mockado com spies do sinon
  */
 function criarLoggerMock() {
     return {
@@ -14,32 +15,37 @@ function criarLoggerMock() {
         debug: sinon.stub(),
 
         // Helpers para asserções
-        obterLogs: function (nivel) {
+        obterLogs: function (/** @type {string | undefined} */ nivel) {
+            const self = /** @type {Record<string, any>} */ (this);
             if (!nivel) {
-                return this.log.getCalls().map(call => call.args);
+                return self.log.getCalls().map((/** @type {any} */ call) => call.args);
             }
-            return this[nivel].getCalls().map(call => call.args);
+            return self[nivel].getCalls().map((/** @type {any} */ call) => call.args);
         },
 
         limpar: function () {
-            this.log.resetHistory();
-            this.info.resetHistory();
-            this.warn.resetHistory();
-            this.error.resetHistory();
-            this.debug.resetHistory();
+            const self = /** @type {Record<string, any>} */ (this);
+            self.log.resetHistory();
+            self.info.resetHistory();
+            self.warn.resetHistory();
+            self.error.resetHistory();
+            self.debug.resetHistory();
         },
 
-        verificarChamado: function (nivel, mensagem) {
-            const chamadas = this[nivel].getCalls();
-            return chamadas.some(call => call.args.some(arg => typeof arg === 'string' && arg.includes(mensagem)));
+        verificarChamado: function (/** @type {string} */ nivel, /** @type {string} */ mensagem) {
+            const self = /** @type {Record<string, any>} */ (this);
+            const chamadas = self[nivel].getCalls();
+            return chamadas.some((/** @type {any} */ call) =>
+                call.args.some((/** @type {unknown} */ arg) => typeof arg === 'string' && arg.includes(mensagem)),
+            );
         },
     };
 }
 
 /**
- * Cria um logger silencioso (noop)
- * Útil quando você não quer poluir a saída dos testes
-  * @returns {any}
+ * Cria um logger silencioso (noop) Útil quando você não quer poluir a saída dos testes
+ *
+ * @returns {object}
  */
 function criarLoggerSilencioso() {
     return {

@@ -1,7 +1,7 @@
 # Copilot Instructions — chatgpt-docker-puppeteer
 
 **Propósito**: contexto operacional e arquitetural para agentes de IA neste repositório. **Status**:
-Canônico. **Última atualização**: 1 de março de 2026.
+Canônico. **Última atualização**: 8 de março de 2026.
 
 > Responda sempre em **português brasileiro (pt-BR)** ao interagir com humanos ou escrever
 > documentação.
@@ -58,27 +58,98 @@ operacional.
 
 ## Ferramentas disponíveis no ambiente
 
-### CLI instalados no DevContainer
+### Substituições obrigatórias (legacy → moderno)
 
-Use estas ferramentas diretamente no terminal — são instaladas e disponíveis no DevContainer:
+> **NUNCA use os comandos da coluna esquerda.** Todos os equivalentes modernos já estão instalados.
 
-| Ferramenta     | Uso típico                                                           |
-| -------------- | -------------------------------------------------------------------- |
-| `rg` (ripgrep) | Busca de texto rápida: `rg "padrão" src/` · `rg -l "import.*nerv"`   |
-| `fd`           | Localizar arquivos: `fd "\.spec\.js$" tests/` · `fd -e mjs scripts/` |
-| `bat`          | `cat` com syntax highlight: `bat src/nerv/index.js`                  |
-| `fzf`          | Fuzzy finder interativo para arquivos, histórico e seleção           |
-| `jq`           | Processar JSON: `cat config.json \| jq '.server.port'`               |
-| `yq`           | Processar YAML: `yq '.on' .github/workflows/ci.yml`                  |
-| `sqlite3`      | Acesso direto ao banco de estado local                               |
-| `gh`           | GitHub CLI: PRs, issues, runs: `gh run list` · `gh pr view`          |
-| `actionlint`   | Lint de workflows: `actionlint .github/workflows/*.yml`              |
-| `hadolint`     | Lint do Dockerfile: `hadolint .devcontainer/Dockerfile`              |
-| `shellcheck`   | Lint de shell scripts                                                |
-| `hyperfine`    | Benchmark de comandos: `hyperfine 'npm run lint'`                    |
-| `graphviz`     | Gerar diagramas: `dot -Tsvg graph.dot -o graph.svg`                  |
+| ❌ Nunca use              | ✅ Use em vez disso        | Motivo                                               |
+| ------------------------- | -------------------------- | ---------------------------------------------------- |
+| `cat arquivo`             | `bat arquivo`              | Syntax highlighting, números de linha, paginação     |
+| `grep "x" src/`           | `rg "x" src/`              | Ordens de magnitude mais rápido; respeita .gitignore |
+| `find . -name "*.js"`     | `fd "\.js$"`               | Sintaxe intuitiva; respeita .gitignore por padrão    |
+| `sed 's/A/B/g' arquivo`   | `sd 'A' 'B' arquivo`       | Regex mais clara; substitui in-place sem flags       |
+| `du -sh *`                | `dust src/`                | Visualização hierárquica; proporcional e colorida    |
+| `git diff` (puro)         | já configurado com `delta` | Diff semântico com highlighting e contexto rico      |
+| `curl -X POST url -d ...` | `xh POST url chave=valor`  | Sintaxe HTTPie-like; sem flags verbosas              |
+| `ps aux \| grep x`        | `procs x`                  | Filtro automático; saída colorida e estruturada      |
+| `top` / `htop`            | `btm`                      | TUI moderna com gráficos de CPU, memória e rede      |
+| `echo '{"k":"v"}'`        | `jo k=v`                   | Constrói JSON válido sem escaping manual             |
+| `less arquivo.md`         | `glow arquivo.md`          | Renderiza Markdown formatado no terminal             |
+| `cd caminho/longo`        | `z termo` (zoxide)         | Navegação fuzzy por frecency — aprende com o uso     |
 
-**Regra de ouro**: prefira `rg` a `grep` e `fd` a `find` em qualquer busca.
+### Busca e navegação de arquivos
+
+| Ferramenta   | Exemplos canônicos                                                        |
+| ------------ | ------------------------------------------------------------------------- |
+| `rg`         | `rg "padrão" src/` · `rg -l "import.*nerv"` · `rg -t js "export default"` |
+| `fd`         | `fd "\.spec\.js$" tests/` · `fd -e mjs scripts/` · `fd -H "\.env"`        |
+| `fzf`        | `rg -l "todo" \| fzf` · `fd -e js \| fzf \| xargs bat`                    |
+| `z` (zoxide) | `z src` (cd inteligente) · `zi` (seletor interativo com fzf)              |
+| `tree`       | `tree -L 2 src/` · `tree --gitignore src/`                                |
+
+### Leitura, visualização e diff
+
+| Ferramenta | Exemplos canônicos                                                                    |
+| ---------- | ------------------------------------------------------------------------------------- |
+| `bat`      | `bat src/nerv/index.js` · `bat --language=json config.json` · `bat -n arquivo`        |
+| `glow`     | `glow README.md` · `glow DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md`                    |
+| `delta`    | Pager global do git — ativado automaticamente em `git diff`, `git log -p`, `git show` |
+
+### Manipulação de dados e texto
+
+| Ferramenta | Exemplos canônicos                                                            |
+| ---------- | ----------------------------------------------------------------------------- |
+| `jq`       | `jq '.server.port' config.json` · `jq '.[] \| select(.status=="done")'`       |
+| `yq`       | `yq '.on' .github/workflows/ci.yml` · `yq -i '.version = "2.0"' arquivo.yml`  |
+| `sd`       | `sd 'require\(' 'import(' src/legacy.js` · `fd -e js \| xargs sd 'OLD' 'NEW'` |
+| `jo`       | `jo name=task status=done` · `jo -a item1 item2` (arrays JSON)                |
+
+### Filesystem e recursos do sistema
+
+| Ferramenta | Exemplos canônicos                                                  |
+| ---------- | ------------------------------------------------------------------- |
+| `dust`     | `dust src/` · `dust -r -n 20 node_modules/` (top 20 maiores)        |
+| `ncdu`     | `ncdu .` (TUI interativo de uso de disco)                           |
+| `procs`    | `procs node` · `procs --sort cpu` · `procs --watch-interval 1`      |
+| `btm`      | `btm` (monitor TUI: CPU, memória, disco, rede, processos)           |
+| `lsof`     | `lsof -i :3008` (porta em uso) · `lsof -p <PID>` (arquivos abertos) |
+| `pv`       | `cat grande.log \| pv \| rg "error"` (progresso no pipe)            |
+
+### Rede e HTTP
+
+| Ferramenta | Exemplos canônicos                                                       |
+| ---------- | ------------------------------------------------------------------------ |
+| `xh`       | `xh GET localhost:3008/health` · `xh POST api/task name=foo priority:=1` |
+| `nmap`     | `nmap -p 9224 localhost` (verifica porta Chrome/CDP)                     |
+| `socat`    | Proxy TCP/Unix · `socat TCP-LISTEN:9999,fork TCP:host:9224`              |
+
+### Git e GitHub
+
+| Ferramenta | Exemplos canônicos                                                    |
+| ---------- | --------------------------------------------------------------------- |
+| `gh`       | `gh run list` · `gh pr view` · `gh issue list --label bug`            |
+| `delta`    | Pager automático do git — configure via `git config core.pager delta` |
+| `git-lfs`  | Automático para arquivos binários tracked por LFS                     |
+
+### Lint, qualidade e segurança
+
+| Ferramenta   | Exemplos canônicos                                           |
+| ------------ | ------------------------------------------------------------ |
+| `shellcheck` | `shellcheck scripts/**/*.sh` · `shellcheck -f gcc script.sh` |
+| `hadolint`   | `hadolint .devcontainer/Dockerfile`                          |
+| `actionlint` | `actionlint .github/workflows/*.yml`                         |
+| `yamllint`   | `yamllint .github/workflows/ci.yml`                          |
+
+### Desenvolvimento, benchmark e análise
+
+| Ferramenta  | Exemplos canônicos                                                              |
+| ----------- | ------------------------------------------------------------------------------- |
+| `hyperfine` | `hyperfine 'npm run lint'` · `hyperfine --warmup 3 'cmd1' 'cmd2'`               |
+| `entr`      | `fd -e js src/ \| entr npm run test:unit` (re-roda ao salvar)                   |
+| `cloc`      | `cloc src/` · `cloc --by-file src/kernel/` (contagem de linhas de código)       |
+| `sqlite3`   | `sqlite3 state.db '.tables'` · `sqlite3 state.db 'SELECT * FROM tasks LIMIT 5'` |
+| `graphviz`  | `dot -Tsvg graph.dot -o graph.svg`                                              |
+| `moreutils` | `ts` (timestamps em pipes) · `sponge` (write seguro) · `errno` · `parallel`     |
 
 ### Scripts npm essenciais
 
@@ -138,8 +209,9 @@ trabalho. Todas ficam em `.github/skills/`:
 | `exploratory-bug-hunt`           | Caça proativa de bugs sem pista prévia                             |
 | `reactive-bug-audit`             | Auditoria focada em bug operacional específico                     |
 | `audit-system-analysis-planning` | Análise arquitetural e planejamento                                |
-| `typing-node24-esm-tsserver`     | Tipagem TypeScript/JSDoc para Node 24 + ESM                        |
-| `jsdoc-authoring`                | Criação e revisão de JSDoc completo                                |
+| `typing-node24-esm-tsserver`     | Tipagem TypeScript/JSDoc para Node 24 + ESM (arquitetura de lanes) |
+| `jsdoc-authoring`                | Cookbook completo de JSDoc: padrões por TS code, cascata, batch    |
+| `typing-fix-protocol`            | Protocolo operacional de scan+triagem+fix por lane ou arquivo      |
 | `lsp-ops`                        | Operações LSP (definições, referências, diagnósticos via tsserver) |
 | `context7-docs-ops`              | Documentação de libs externas via Context7 MCP                     |
 | `documentation-governance`       | Auditoria e governança de documentação                             |

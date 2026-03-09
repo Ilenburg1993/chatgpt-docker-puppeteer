@@ -1,8 +1,8 @@
-// @ts-nocheck
-import { describe, it } from 'node:test';
-import assert from 'node:assert';
+// @ts-check
+import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import { createEnvelope } from '#shared/nerv/envelope';
-import { MessageType, ActionCode, ActorRole } from '#shared/nerv/constants';
+import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('NERV Envelope - Protocolo Universal', () => {
     describe('1. Criação Básica de Envelope', () => {
@@ -57,7 +57,7 @@ describe('NERV Envelope - Protocolo Universal', () => {
         it('deve aceitar atores válidos', () => {
             const atoresValidos = [ActorRole.KERNEL, ActorRole.SERVER, ActorRole.INFRA, ActorRole.OBSERVER];
 
-            atoresValidos.forEach(actor => {
+            atoresValidos.forEach((actor) => {
                 assert.doesNotThrow(() => {
                     createEnvelope({
                         actor,
@@ -156,7 +156,7 @@ describe('NERV Envelope - Protocolo Universal', () => {
                 payload,
             });
 
-            assert.deepStrictEqual(envelope.payload.nested.array, [1, 2, 3]);
+            assert.deepStrictEqual(/** @type {any} */ (envelope.payload).nested.array, [1, 2, 3]);
         });
     });
 

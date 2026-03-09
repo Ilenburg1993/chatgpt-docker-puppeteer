@@ -1,14 +1,14 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { log, audit } from '#core/logger';
+// @ts-check
+import { audit, log } from '#core/logger';
 
 /**
- * Factory de Validação: Cria um middleware Express para um Schema específico.
- * Atua como o "Guarda de Fronteira" para as intenções de negócio.
+ * Factory de Validação: Cria um middleware Express para um Schema específico. Atua como o "Guarda de Fronteira" para as
+ * intenções de negócio.
  *
  * @param {import('zod').ZodType} schema - O Schema Zod (ex: TaskSchema) para validação.
  * @returns {import('express').RequestHandler} Middleware Express (req, res, next).
  */
-const schemaGuard = schema => (req, res, next) => {
+const schemaGuard = (schema) => (req, res, next) => {
     const requestId = req.id || 'no-id';
 
     // 1. Verificação de Existência
@@ -23,12 +23,12 @@ const schemaGuard = schema => (req, res, next) => {
 
     // 2. Execução da Validação "Safe"
     // safeParse não lança exceções, permitindo controle total sobre o fluxo de erro.
-    const result = /** @type {any} */ (schema.safeParse(req.body));
+    const result = /** @type {unknown} */ (schema.safeParse(req.body));
 
-    if (!result.success) {
+    if (!(/** @type {any} */ (result).success)) {
         // 3. Formatação Amigável de Erros
         // Converte a árvore de erros do Zod em uma lista simples de campo/mensagem.
-        const errorDetails = result.error.issues.map(issue => ({
+        const errorDetails = /** @type {any} */ (result).error.issues.map((/** @type {any} */ issue) => ({
             field: issue.path.join('.'),
             message: issue.message,
         }));
@@ -55,17 +55,14 @@ const schemaGuard = schema => (req, res, next) => {
     }
 
     /**
-     * SUCESSO E CURA:
-     * Substituímos o req.body original pelo dado retornado pelo Zod (result.data).
+     * SUCESSO E CURA: Substituímos o req.body original pelo dado retornado pelo Zod (result.data).
      *
-     * Por que isso é vital?
-     * O Zod aplica valores padrão (defaults), remove campos extras não autorizados
-     * e realiza coerções de tipo (ex: string para número). Isso garante que o
-     * Controller receba um objeto "limpo" e confiável.
+     * Por que isso é vital? O Zod aplica valores padrão (defaults), remove campos extras não autorizados e realiza
+     * coerções de tipo (ex: string para número). Isso garante que o Controller receba um objeto "limpo" e confiável.
      */
-    req.body = result.data;
+    req.body = /** @type {any} */ (result).data;
 
-    next();
+    return next();
 };
 
 export default schemaGuard;

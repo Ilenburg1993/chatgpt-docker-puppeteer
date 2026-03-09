@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 import {
     MAX_CHUNK_CHARS_CODE,
@@ -5,17 +6,17 @@ import {
     RAG_CHUNK_MAX_CHARS,
     RAG_CHUNK_TARGET_CHARS,
 } from '../contract.mjs';
-import { chunkMarkdown } from './chunk_md.mjs';
 import { chunkCode } from './chunk_code.mjs';
-import { chunkPlain } from './chunk_plain.mjs';
 import { chunkJsAst } from './chunk_js_ast.mjs';
+import { chunkMarkdown } from './chunk_md.mjs';
+import { chunkPlain } from './chunk_plain.mjs';
 
-function isDockerfile(relPath) {
+function isDockerfile(/** @type {any} */ relPath) {
     const base = path.posix.basename(relPath);
     return base === 'Dockerfile' || base.toLowerCase().endsWith('.dockerfile');
 }
 
-export function detectLanguage(relPath) {
+export function detectLanguage(/** @type {any} */ relPath) {
     const base = path.posix.basename(relPath);
     if (base === 'Dockerfile' || base.toLowerCase().endsWith('.dockerfile')) return 'dockerfile';
     if (base === 'Makefile') return 'makefile';
@@ -30,7 +31,7 @@ export function detectLanguage(relPath) {
     return undefined;
 }
 
-export function buildTags(relPath) {
+export function buildTags(/** @type {any} */ relPath) {
     const tags = [];
     const language = detectLanguage(relPath);
     if (language) tags.push(language);
@@ -44,7 +45,7 @@ export function buildTags(relPath) {
     return tags;
 }
 
-function detectAliasTag(relPath) {
+function detectAliasTag(/** @type {any} */ relPath) {
     const normalized = String(relPath || '').replace(/\\/g, '/');
     if (normalized.startsWith('src/core/')) return '#core/*';
     if (normalized.startsWith('src/nerv/')) return '#nerv/*';
@@ -58,19 +59,21 @@ function isAstChunkingEnabled() {
     return String(process.env.RAG_AST_CHUNK_ENABLED || 'true') !== 'false';
 }
 
-function buildHeaderText({
-    relPath,
-    language,
-    kind,
-    symbol,
-    exported,
-    tags,
-    imports,
-    anchor,
-    jsdoc,
-    subchunkIndex,
-    subchunkTotal,
-}) {
+function buildHeaderText(
+    /** @type {any} */ {
+        relPath,
+        language,
+        kind,
+        symbol,
+        exported,
+        tags,
+        imports,
+        anchor,
+        jsdoc,
+        subchunkIndex,
+        subchunkTotal,
+    },
+) {
     const lines = [];
     lines.push(`path: ${relPath}`);
     lines.push(`language: ${language || 'unknown'}`);
@@ -85,8 +88,8 @@ function buildHeaderText({
     return lines.join('\n');
 }
 
-function enrichRanges(ranges, defaults) {
-    return ranges.map(r => {
+function enrichRanges(/** @type {any} */ ranges, /** @type {any} */ defaults) {
+    return ranges.map((/** @type {any} */ r) => {
         const kind = r.kind || defaults.kind;
         const symbol = r.symbol || null;
         const exported = typeof r.exported === 'boolean' ? r.exported : defaults.exported;
@@ -118,7 +121,7 @@ function enrichRanges(ranges, defaults) {
     });
 }
 
-export function chunkByType({ relPath, lines, maxChunkChars, minChunkChars = 200 }) {
+export function chunkByType(/** @type {any} */ { relPath, lines, maxChunkChars, minChunkChars = 200 }) {
     const language = detectLanguage(relPath);
     const tags = buildTags(relPath);
 
@@ -149,7 +152,8 @@ export function chunkByType({ relPath, lines, maxChunkChars, minChunkChars = 200
                 });
             }
         } catch (error) {
-            console.warn(`[RAG] AST chunking fallback for ${relPath}: ${error?.message || error}`);
+            const _ce = /** @type {any} */ (error);
+            console.warn(`[RAG] AST chunking fallback for ${relPath}: ${_ce?.message || _ce}`);
         }
     }
 

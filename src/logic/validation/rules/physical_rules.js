@@ -8,11 +8,27 @@
 ========================================================================== */
 
 /**
+ * @typedef {object} CheckPhysicalIntegrityValidation
+ * @property {number} [min_length] - Tamanho mínimo em bytes exigido para o arquivo.
+ */
+/**
+ * @typedef {object} CheckPhysicalIntegritySpec
+ * @property {CheckPhysicalIntegrityValidation} [validation] - Regras de validação física.
+ */
+/**
+ * @typedef {object} CheckPhysicalIntegrityTask
+ * @property {CheckPhysicalIntegritySpec} [spec] - Especificações da tarefa.
+ */
+/**
+ * @typedef {object} CheckPhysicalIntegrityStats
+ * @property {number} size - Tamanho do arquivo em bytes (fs.Stats.size).
+ */
+/**
  * Verifica se o arquivo atende aos requisitos físicos mínimos.
  *
- * @param {object} task - Objeto da tarefa (Schema V4).
- * @param {object} stats - Objeto fs.Stats do arquivo em disco.
- * @returns {object} { ok: boolean, reason: string|null }
+ * @param {CheckPhysicalIntegrityTask} task - Objeto da tarefa (Schema V4).
+ * @param {CheckPhysicalIntegrityStats} stats - Objeto fs.Stats do arquivo em disco.
+ * @returns {any} { ok: boolean, reason: string|null }
  */
 function checkPhysicalIntegrity(task, stats) {
     // 1. Validação de Existência (Blindagem de Objeto)

@@ -1,9 +1,9 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import test from 'node:test';
 import { loadContractRegistry } from '../../../scripts/audit/contracts/load_registry.mjs';
 
 test('contract registry loads active contracts from default path', () => {
@@ -57,9 +57,9 @@ test('contract registry rejects duplicate ids', () => {
                 ],
             },
             null,
-            2
+            2,
         ),
-        'utf8'
+        'utf8',
     );
 
     const registryPath = path.join(tmpDir, 'contracts', 'registry.json');
@@ -71,14 +71,14 @@ test('contract registry rejects duplicate ids', () => {
                 domains: ['domains/runtime.json'],
             },
             null,
-            2
+            2,
         ),
-        'utf8'
+        'utf8',
     );
 
     const result = loadContractRegistry({ registryPath });
     assert.equal(
-        result.errors.some(message => message.includes('duplicado')),
-        true
+        result.errors.some((message) => message.includes('duplicado')),
+        true,
     );
 });

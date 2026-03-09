@@ -1,7 +1,7 @@
 // @ts-check
+import child_process from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import child_process from 'node:child_process';
 
 /** Constante/valor exportado: ROOT. */
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -17,17 +17,18 @@ if (!fs.existsSync(TMP_DIR)) {
 }
 
 /** Constante/valor exportado: sleep. */
-const sleep = ms =>
-    new Promise(r => {
+const sleep = (/** @type {number} */ ms) =>
+    new Promise((r) => {
         setTimeout(r, ms);
     });
 
 /**
  * Função exportada: ensureDirs.
+ *
  * @returns {void}
  */
 function ensureDirs() {
-    [QUEUE_DIR, LOG_DIR, TMP_DIR].forEach(d => {
+    [QUEUE_DIR, LOG_DIR, TMP_DIR].forEach((d) => {
         if (!fs.existsSync(d)) {
             fs.mkdirSync(d, { recursive: true });
         }
@@ -36,8 +37,21 @@ function ensureDirs() {
 
 // GERA TAREFA NO FORMATO SCHEMA V3
 /**
+ * @typedef {object} WriteTaskOptions
+ * @property {string} [id] - ID explícito da tarefa (default: gerado automaticamente)
+ * @property {string} type - Tipo da tarefa
+ * @property {string} [target] - Target URL
+ * @property {any} [prompt] - Prompt da tarefa
+ * @property {any} [context] - Contexto adicional
+ * @property {number} [priority] - Prioridade (default: 5)
+ * @property {string} [status] - Status inicial (default: PENDING)
+ * @property {string | null} [startedEm] - Data de início (para testes de recovery)
+ */
+/**
  * Função exportada: writeTask.
- * @returns {any}
+ *
+ * @param {WriteTaskOptions} options
+ * @returns {string}
  */
 function writeTask(options) {
     ensureDirs();
@@ -80,7 +94,9 @@ function writeTask(options) {
 
 /**
  * Função exportada: readTask.
- * @returns {any}
+ *
+ * @param {string} id
+ * @returns {object | null}
  */
 function readTask(id) {
     try {
@@ -96,6 +112,7 @@ function readTask(id) {
 
 /**
  * Função exportada: removeRunLock.
+ *
  * @returns {void}
  */
 function removeRunLock() {
@@ -110,12 +127,13 @@ function removeRunLock() {
 
 /**
  * Função exportada: cleanTmp.
+ *
  * @returns {void}
  */
 function cleanTmp() {
     try {
         if (fs.existsSync(TMP_DIR)) {
-            fs.readdirSync(TMP_DIR).forEach(f => fs.unlinkSync(path.join(TMP_DIR, f)));
+            fs.readdirSync(TMP_DIR).forEach((f) => fs.unlinkSync(path.join(TMP_DIR, f)));
         }
     } catch (e) {
         /* Ignore temp cleanup errors */
@@ -124,7 +142,9 @@ function cleanTmp() {
 
 /**
  * Função exportada: readLatestGlobalLogTail.
- * @returns {any}
+ *
+ * @param {any} [lines]
+ * @returns {string}
  */
 function readLatestGlobalLogTail(lines = 50) {
     try {
@@ -134,19 +154,21 @@ function readLatestGlobalLogTail(lines = 50) {
         const content = fs.readFileSync(LOG_FILE_CURRENT, 'utf-8').trim().split('\n');
         return content.slice(-lines).join('\n');
     } catch (e) {
-        return `<error reading log: ${e.message}>`;
+        return `<error reading log: ${e instanceof Error ? e.message : String(e)}>`;
     }
 }
 
 /**
  * Função exportada: startAgent.
- * @returns {any}
+ *
+ * @param {any} [timeoutMs]
+ * @returns {object}
  */
 function startAgent(timeoutMs = 15000) {
     ensureDirs();
     const outPath = path.join(TMP_DIR, `stdout-${Date.now()}.log`);
     const outStream = fs.createWriteStream(outPath);
-    const childEnv = { ...process.env, FORCE_COLOR: '1' };
+    const childEnv = /** @type {Record<string, string | undefined>} */ ({ ...process.env, FORCE_COLOR: '1' });
     delete childEnv.NO_COLOR;
 
     const proc = child_process.spawn('node', ['index.js'], {
@@ -164,7 +186,7 @@ function startAgent(timeoutMs = 15000) {
             reject(new Error(`Timeout (${timeoutMs}ms) aguardando agente.`));
         }, timeoutMs);
 
-        const checkOutput = data => {
+        const checkOutput = (/** @type {Buffer} */ data) => {
             const text = data.toString();
             // Accept multiple engine startup variants (e.g. Engine V32.0 Iniciada)
             if (/Engine V\d+\.\d+\s+Iniciad/i.test(text) || text.includes('Agente Iniciado')) {
@@ -190,6 +212,8 @@ function startAgent(timeoutMs = 15000) {
 
 /**
  * Função exportada: stopAgent.
+ *
+ * @param {any} proc
  * @returns {void}
  */
 function stopAgent(proc) {
@@ -212,7 +236,11 @@ function stopAgent(proc) {
 
 /**
  * Função exportada: waitForCondition.
- * @returns {Promise<any>}
+ *
+ * @param {function(): Promise<boolean>|boolean} fn
+ * @param {number} [timeout]
+ * @param {number} [interval]
+ * @returns {Promise<unknown>}
  */
 async function waitForCondition(fn, timeout = 10000, interval = 500) {
     const end = Date.now() + timeout;
@@ -230,16 +258,16 @@ async function waitForCondition(fn, timeout = 10000, interval = 500) {
 }
 
 export {
-    writeTask,
+    QUEUE_DIR,
+    ROOT,
+    cleanTmp,
+    ensureDirs,
+    readLatestGlobalLogTail,
     readTask,
     removeRunLock,
-    cleanTmp,
+    sleep,
     startAgent,
     stopAgent,
     waitForCondition,
-    readLatestGlobalLogTail,
-    sleep,
-    ensureDirs,
-    ROOT,
-    QUEUE_DIR,
+    writeTask,
 };

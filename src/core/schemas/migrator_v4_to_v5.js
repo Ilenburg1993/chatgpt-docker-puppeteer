@@ -1,10 +1,11 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import * as logger from '../logger.js';
 import { TaskSchemaV5 } from './task_schema_v5.js';
 
 /**
  * Detecta se task é V4 baseado na versão.
- * @param {object} task - Task object
+ *
+ * @param {any} task - Task object
  * @returns {boolean} - true se V4, false caso contrário
  */
 function isV4Task(task) {
@@ -13,7 +14,8 @@ function isV4Task(task) {
 
 /**
  * Detecta se task é V5 baseado na versão.
- * @param {object} task - Task object
+ *
+ * @param {any} task - Task object
  * @returns {boolean} - true se V5, false caso contrário
  */
 function isV5Task(task) {
@@ -24,6 +26,7 @@ function isV5Task(task) {
  * Migra task individual de V4 para V5.
  *
  * Estratégia de migração:
+ *
  * - meta.version: 4.0 → 5.0
  * - meta.workflow_id: undefined (task standalone)
  * - meta.mission_id: undefined (task standalone)
@@ -39,8 +42,8 @@ function isV5Task(task) {
  * - result.subtask_results: []
  * - result.validation_results: []
  *
- * @param {object} taskV4 - Task V4 object
- * @returns {object} - Task V5 object
+ * @param {any} taskV4 - Task V4 object
+ * @returns {any} - Task V5 object
  * @throws {Error} - Se migração falhar
  */
 function migrateTaskV4toV5(taskV4) {
@@ -54,7 +57,7 @@ function migrateTaskV4toV5(taskV4) {
         // Se não é V4, assume que é V4 sem versão explícita (legacy)
         if (!isV4Task(taskV4) && !taskV4.meta?.version) {
             logger.warn(
-                `Task ${taskV4.meta?.id || 'unknown'} sem versão explícita, assumindo V4 para migração conservadora`
+                `Task ${taskV4.meta?.id || 'unknown'} sem versão explícita, assumindo V4 para migração conservadora`,
             );
         }
 
@@ -217,28 +220,27 @@ function migrateTaskV4toV5(taskV4) {
 
         logger.info(`Task ${taskV4.meta.id} migrada com sucesso para V5`);
         return validatedTask;
-    } catch (error) {
-        logger.error(`Falha ao migrar task ${taskV4?.meta?.id || 'unknown'} para V5: ${error.message}`, {
-            error,
-            taskV4,
-        });
-        throw new Error(`Schema migration failed for task ${taskV4?.meta?.id}: ${error.message}`, { cause: error });
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
+        logger.error(`Falha ao migrar task ${taskV4?.meta?.id || 'unknown'} para V5: ${_e.message}`);
+        throw new Error(`Schema migration failed for task ${taskV4?.meta?.id}: ${_e.message}`, { cause: error });
     }
 }
 
 /**
  * Migra batch de tasks V4 para V5.
- * @param {object[]} tasksV4 - Array de tasks V4
- * @returns {object[]} - Array de tasks V5
+ *
+ * @param {any[]} tasksV4 - Array de tasks V4
+ * @returns {any[]} - Array de tasks V5
  * @throws {Error} - Se alguma migração falhar
  */
 function migrateBatchV4toV5(tasksV4) {
     logger.info(`Iniciando migração batch de ${tasksV4.length} tasks V4 → V5...`);
 
     const results = {
-        migrated: [],
-        alreadyV5: [],
-        failed: [],
+        migrated: /** @type {any[]} */ ([]),
+        alreadyV5: /** @type {any[]} */ ([]),
+        failed: /** @type {any[]} */ ([]),
     };
 
     for (const taskV4 of tasksV4) {
@@ -249,23 +251,19 @@ function migrateBatchV4toV5(tasksV4) {
                 const taskV5 = migrateTaskV4toV5(taskV4);
                 results.migrated.push(taskV5);
             }
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             results.failed.push({
                 task_id: taskV4?.meta?.id || 'unknown',
-                error: error.message,
+                error: _e.message,
             });
         }
     }
 
-    logger.info(`Migração batch concluída:`, {
-        total: tasksV4.length,
-        migrated: results.migrated.length,
-        alreadyV5: results.alreadyV5.length,
-        failed: results.failed.length,
-    });
+    logger.info(`Migração batch concluída:`);
 
     if (results.failed.length > 0) {
-        logger.error(`${results.failed.length} tasks falharam na migração:`, results.failed);
+        logger.error(`${results.failed.length} tasks falharam na migração:`);
         throw new Error(`Batch migration failed for ${results.failed.length} tasks. See logs for details.`);
     }
 
@@ -274,29 +272,31 @@ function migrateBatchV4toV5(tasksV4) {
 
 /**
  * Valida se task está em formato V5 válido.
- * @param {object} task - Task object
+ *
+ * @param {any} task - Task object
  * @returns {boolean} - true se válido, false caso contrário
  */
 function validateV5Task(task) {
     try {
         TaskSchemaV5.parse(task);
         return true;
-    } catch (error) {
-        logger.error(`Task ${task?.meta?.id} não é V5 válida: ${error.message}`);
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
+        logger.error(`Task ${task?.meta?.id} não é V5 válida: ${_e.message}`);
         return false;
     }
 }
 
 /**
- * Converte task V5 de volta para V4 (downgrade).
- * ATENÇÃO: Perde informações de missões/workflows/execution context/result V2!
+ * Converte task V5 de volta para V4 (downgrade). ATENÇÃO: Perde informações de missões/workflows/execution
+ * context/result V2!
  *
- * @param {object} taskV5 - Task V5 object
- * @returns {object} - Task V4 object
+ * @param {any} taskV5 - Task V5 object
+ * @returns {any} - Task V4 object
  */
 function downgradeV5toV4(taskV5) {
     logger.warn(
-        `Downgrade V5 → V4 para task ${taskV5.meta.id}. ATENÇÃO: Perda de dados de execution/mission/result V2!`
+        `Downgrade V5 → V4 para task ${taskV5.meta.id}. ATENÇÃO: Perda de dados de execution/mission/result V2!`,
     );
 
     const taskV4 = structuredClone(taskV5);
@@ -360,8 +360,9 @@ function downgradeV5toV4(taskV5) {
 
 /**
  * Migra automaticamente task, detectando versão.
- * @param {object} task - Task de qualquer versão
- * @returns {object} - Task V5
+ *
+ * @param {any} task - Task de qualquer versão
+ * @returns {any} - Task V5
  */
 function autoMigrateTask(task) {
     if (!task) {

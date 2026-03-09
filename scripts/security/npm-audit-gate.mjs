@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // @ts-check
+import { execFile as execFileCallback } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFile = promisify(execFileCallback);
@@ -23,19 +23,21 @@ const TARBALL_CHECK_CACHE = new Map();
 /**
  * @param {string[]} argv
  * @returns {{
- *   omitDev: boolean,
- *   minSeverity: keyof typeof SEVERITY_RANK,
- *   reportFile: string | null,
- *   markdownFile: string | null,
+ *     omitDev: boolean;
+ *     minSeverity: keyof typeof SEVERITY_RANK;
+ *     reportFile: string | null;
+ *     markdownFile: string | null;
  * }}
  */
 function parseArgs(argv) {
-    /** @type {{
-     *   omitDev: boolean,
-     *   minSeverity: keyof typeof SEVERITY_RANK,
-     *   reportFile: string | null,
-     *   markdownFile: string | null,
-     * }} */
+    /**
+     * @type {{
+     *     omitDev: boolean;
+     *     minSeverity: keyof typeof SEVERITY_RANK;
+     *     reportFile: string | null;
+     *     markdownFile: string | null;
+     * }}
+     */
     const options = {
         omitDev: false,
         minSeverity: 'high',
@@ -44,7 +46,7 @@ function parseArgs(argv) {
     };
 
     for (let index = 0; index < argv.length; index += 1) {
-        const arg = argv[index];
+        const arg = argv[index] ?? '';
         if (arg === '--omit=dev' || arg === '--omit-dev') {
             options.omitDev = true;
             continue;
@@ -94,7 +96,7 @@ function parseArgs(argv) {
  * @template T
  * @param {string} command
  * @param {string[]} args
- * @returns {Promise<{ stdout: string, stderr: string, exitCode: number }>}
+ * @returns {Promise<{ stdout: string; stderr: string; exitCode: number }>}
  */
 async function execJsonCapable(command, args) {
     try {
@@ -105,10 +107,11 @@ async function execJsonCapable(command, args) {
         });
         return { stdout: result.stdout, stderr: result.stderr, exitCode: 0 };
     } catch (error) {
+        const _ce = /** @type {any} */ (error);
         return {
-            stdout: typeof error.stdout === 'string' ? error.stdout : '',
-            stderr: typeof error.stderr === 'string' ? error.stderr : String(error.message || ''),
-            exitCode: typeof error.code === 'number' ? error.code : 1,
+            stdout: typeof _ce.stdout === 'string' ? _ce.stdout : '',
+            stderr: typeof _ce.stderr === 'string' ? _ce.stderr : String(_ce.message || ''),
+            exitCode: typeof _ce.code === 'number' ? _ce.code : 1,
         };
     }
 }
@@ -133,7 +136,7 @@ function inferExclusiveFixCandidates(text) {
     const candidates = new Set();
     const tokens = String(text || '')
         .split(/\s+/)
-        .map(token => token.trim())
+        .map((token) => token.trim())
         .filter(Boolean);
 
     for (const token of tokens) {
@@ -147,18 +150,18 @@ function inferExclusiveFixCandidates(text) {
 
 /**
  * @param {unknown} value
- * @returns {Array<{name?: string, url?: string, severity?: string, range?: string, title?: string}>}
+ * @returns {{ name?: string; url?: string; severity?: string; range?: string; title?: string }[]}
  */
 function normalizeViaEntries(value) {
     if (!Array.isArray(value)) {
         return [];
     }
-    return value.filter(item => item && typeof item === 'object');
+    return value.filter((item) => item && typeof item === 'object');
 }
 
 /**
  * @param {string} spec
- * @returns {{ name: string, version: string } | null}
+ * @returns {{ name: string; version: string } | null}
  */
 function parseExactPackageSpec(spec) {
     const separatorIndex = spec.lastIndexOf('@');
@@ -178,7 +181,7 @@ function parseExactPackageSpec(spec) {
 
 /**
  * @param {string[]} args
- * @returns {Promise<{ stdout: string, stderr: string, exitCode: number }>}
+ * @returns {Promise<{ stdout: string; stderr: string; exitCode: number }>}
  */
 async function npmViewJson(args) {
     return execJsonCapable('npm', ['view', ...args, '--json', '--prefer-online']);
@@ -186,7 +189,7 @@ async function npmViewJson(args) {
 
 /**
  * @param {string} packageName
- * @returns {Promise<{ versions: Set<string>, time: Record<string, unknown> } | null>}
+ * @returns {Promise<{ versions: Set<string>; time: Record<string, unknown> } | null>}
  */
 async function getPackageRegistryMetadata(packageName) {
     if (PACKAGE_METADATA_CACHE.has(packageName)) {
@@ -206,7 +209,7 @@ async function getPackageRegistryMetadata(packageName) {
     }
 
     const versions = Array.isArray(parsed.versions)
-        ? parsed.versions.filter(version => typeof version === 'string' && version.length > 0)
+        ? parsed.versions.filter((/** @type {string} */ version) => typeof version === 'string' && version.length > 0)
         : [];
     const time =
         parsed.time && typeof parsed.time === 'object' ? /** @type {Record<string, unknown>} */ (parsed.time) : {};
@@ -278,18 +281,22 @@ async function isPublishedVersion(spec) {
 }
 
 /**
- * @param {{
- *   name: string,
- *   severity: string,
- *   fixAvailable?: boolean | { name?: string, version?: string, isSemVerMajor?: boolean },
- *   via?: unknown,
- *   nodes?: string[],
- *   isDirect?: boolean,
- * }} vulnerability
+ * @typedef {object} ClassifyVulnerabilityVulnerability
+ * @property {string} name
+ * @property {string} severity
+ * @property {boolean | { name?: string; version?: string; isSemVerMajor?: boolean }} [fixAvailable]
+ * @property {string} [version]
+ * @property {boolean} [isSemVerMajor]
+ * @property {unknown} [via]
+ * @property {string[]} [nodes]
+ * @property {boolean} [isDirect]
+ */
+/**
+ * @param {ClassifyVulnerabilityVulnerability} vulnerability
  * @returns {Promise<{
- *   state: 'actionable' | 'unpublished-fix' | 'no-fix' | 'manual-review',
- *   candidates: string[],
- *   note: string,
+ *     state: 'actionable' | 'unpublished-fix' | 'no-fix' | 'manual-review';
+ *     candidates: string[];
+ *     note: string;
  * }>}
  */
 async function classifyVulnerability(vulnerability) {
@@ -353,7 +360,7 @@ async function classifyVulnerability(vulnerability) {
 
     return {
         state: 'manual-review',
-        candidates: [...candidates].map(version => `${vulnerability.name}@${version}`),
+        candidates: [...candidates].map((version) => `${vulnerability.name}@${version}`),
         note: 'O advisory só expõe um limite semver inferido; sem versão explícita do npm audit, o finding exige revisão manual e não bloqueia automaticamente.',
     };
 }
@@ -383,7 +390,7 @@ if (!auditResult.stdout.trim()) {
     process.exit(2);
 }
 
-/** @type {{ vulnerabilities?: Record<string, any>, metadata?: any }} */
+/** @type {{ vulnerabilities?: Record<string, unknown>; metadata?: unknown }} */
 let payload;
 try {
     payload = JSON.parse(auditResult.stdout);
@@ -393,15 +400,15 @@ try {
     process.exit(2);
 }
 
-const rawVulnerabilities = Object.values(payload.vulnerabilities || {});
-const filtered = rawVulnerabilities.filter(item => {
+const rawVulnerabilities = /** @type {any[]} */ (Object.values(payload.vulnerabilities || {}));
+const filtered = rawVulnerabilities.filter((item) => {
     const severity = String(item?.severity || 'info');
-    return (SEVERITY_RANK[severity] ?? 0) >= SEVERITY_RANK[options.minSeverity];
+    return /** @type {any} */ (SEVERITY_RANK)[severity] >= SEVERITY_RANK[options.minSeverity];
 });
 
-/** @type {Array<Record<string, unknown>>} */
+/** @type {Record<string, unknown>[]} */
 const actionable = [];
-/** @type {Array<Record<string, unknown>>} */
+/** @type {Record<string, unknown>[]} */
 const residual = [];
 
 for (const vulnerability of filtered) {
@@ -414,7 +421,7 @@ for (const vulnerability of filtered) {
         candidates: assessment.candidates,
         state: assessment.state,
         note: assessment.note,
-        advisories: normalizeViaEntries(vulnerability.via).map(item => ({
+        advisories: normalizeViaEntries(vulnerability.via).map((item) => ({
             title: item.title || null,
             url: item.url || null,
             range: item.range || null,
@@ -456,7 +463,7 @@ if (actionable.length > 0) {
     markdownLines.push('## Blocking (published fix exists)', '');
     for (const item of actionable) {
         markdownLines.push(
-            `- ${item.name} (${item.severity}) -> ${Array.isArray(item.candidates) ? item.candidates.join(', ') : 'n/a'}`
+            `- ${item.name} (${item.severity}) -> ${Array.isArray(item.candidates) ? item.candidates.join(', ') : 'n/a'}`,
         );
     }
     markdownLines.push('');

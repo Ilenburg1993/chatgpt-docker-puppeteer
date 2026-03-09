@@ -425,13 +425,13 @@ NÃO RESOLVIDO
 
 ```javascript
 // ❌ Fallback sintético executa 1x (sem retry)
-await ctx.evaluate(sel => {
+await ctx.evaluate((sel) => {
   const el = document.querySelector(sel);
   if (!el) {
     return;
   }
   // ... dispatchEvent
-  ['keydown', 'keypress', 'keyup'].forEach(t => el.dispatchEvent(new KeyboardEvent(t, evParams)));
+  ['keydown', 'keypress', 'keyup'].forEach((t) => el.dispatchEvent(new KeyboardEvent(t, evParams)));
 }, selector);
 ```
 
@@ -462,9 +462,9 @@ for (let retry = 0; retry < maxRetries; retry++) {
       log(
         'WARN',
         `[SUBMISSION] Synthetic fallback failed (retry ${retry + 1}/${maxRetries})`,
-        correlationId
+        correlationId,
       );
-      await new Promise(r => setTimeout(r, 500 * (retry + 1))); // Backoff
+      await new Promise((r) => setTimeout(r, 500 * (retry + 1))); // Backoff
     } else {
       throw syntheticErr; // Max retries
     }
@@ -750,7 +750,7 @@ module.exports = {
   SubmissionController,
   SUBMISSION_CONFIG,
   SUBMISSION_EVENTS,
-  create: driver => new SubmissionController(driver),
+  create: (driver) => new SubmissionController(driver),
 };
 ```
 

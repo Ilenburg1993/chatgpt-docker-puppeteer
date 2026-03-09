@@ -67,7 +67,7 @@ const TaskSchemaV5 = z.object({
                                 config: z.any(), // Step-specific config
                                 dependencies: z.array(z.string()).default([]), // Step IDs that must complete first
                                 on_failure: z.enum(['retry', 'skip', 'abort']).default('abort'),
-                            })
+                            }),
                         ),
                         max_subtasks: z.number().int().positive().default(50),
                         subtask_concurrency: z.number().int().positive().default(3),
@@ -93,7 +93,7 @@ const TaskSchemaV5 = z.object({
                         z.object({
                             type: z.enum(['regex', 'schema', 'length', 'format', 'llm_judge', 'custom']),
                             config: z.any(),
-                        })
+                        }),
                     )
                     .default([]),
                 on_validation_failure: z.enum(['retry', 'abort', 'manual_review']).default('retry'),
@@ -168,7 +168,7 @@ const TaskSchemaV5 = z.object({
                             output: z.string(),
                             quality_score: z.number().optional(),
                             validation_result: z.any().optional(),
-                        })
+                        }),
                     )
                     .default([]),
             })
@@ -210,7 +210,7 @@ const TaskSchemaV5 = z.object({
                     at: z.string().datetime(),
                     data: z.any().optional(),
                     evidence: z.string().optional(),
-                })
+                }),
             )
             .default([]),
     }),
@@ -229,7 +229,7 @@ const TaskSchemaV5 = z.object({
                     status: z.string(),
                     output: z.string().optional(),
                     quality_score: z.number().optional(),
-                })
+                }),
             )
             .default([]),
 
@@ -241,7 +241,7 @@ const TaskSchemaV5 = z.object({
                     passed: z.boolean(),
                     score: z.number().optional(),
                     feedback: z.string().optional(),
-                })
+                }),
             )
             .default([]),
     }),

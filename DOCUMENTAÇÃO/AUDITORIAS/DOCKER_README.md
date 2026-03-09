@@ -376,8 +376,8 @@ docker-compose run --rm -v ./tests:/app/tests agente-gpt npm test
 
 ```bash
 # Find process
-lsof -i :3008  # Linux/Mac
-netstat -ano | findstr :3008  # Windows
+lsof -i :3008                # Linux/Mac
+netstat -ano | findstr :3008 # Windows
 
 # Kill process or change port in .env
 PORT=3009 docker-compose up

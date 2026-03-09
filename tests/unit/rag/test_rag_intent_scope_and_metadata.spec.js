@@ -1,10 +1,10 @@
 // @ts-check
 import assert from 'node:assert';
 import crypto from 'node:crypto';
-import { describe, it } from 'node:test';
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
+import { describe, it } from 'node:test';
 
 import { ragHybridSearch, ragIndex } from '../../../tools/rag/lib/facade.mjs';
 
@@ -18,10 +18,10 @@ class FakeEmbeddingsProvider {
         return { ok: true, hasModel: true, models: [this.model] };
     }
 
-    async embed(text) {
+    async embed(/** @type {string} */ text) {
         const hash = crypto.createHash('sha256').update(String(text), 'utf8').digest();
         const vector = [];
-        for (let i = 0; i < this.dim; i += 1) vector.push(hash[i] / 255);
+        for (let i = 0; i < this.dim; i += 1) vector.push((hash[i] ?? 0) / 255);
         return vector;
     }
 }

@@ -104,7 +104,7 @@ export function getJwtSecret() {
   if (!secret || secret.length < 32) {
     throw new Error(
       '[AUTH] JWT_SECRET não definida ou muito curta (mínimo 32 caracteres). ' +
-        'Configure a variável de ambiente JWT_SECRET antes de iniciar.'
+        'Configure a variável de ambiente JWT_SECRET antes de iniciar.',
     );
   }
   return secret;
@@ -191,7 +191,7 @@ const db = getDb();
 export function revokeToken(jti, expiresAtMs) {
   db.prepare('INSERT OR IGNORE INTO revoked_tokens (jti, expires_at_ms) VALUES (?, ?)').run(
     jti,
-    expiresAtMs
+    expiresAtMs,
   );
 }
 
@@ -241,7 +241,7 @@ app.use(
     contentSecurityPolicy: false, // Proteção removida
     crossOriginEmbedderPolicy: false,
     // ...
-  })
+  }),
 );
 ```
 
@@ -265,7 +265,7 @@ app.use(
     crossOriginEmbedderPolicy: false,
     frameguard: { action: 'deny' },
     referrerPolicy: { policy: 'no-referrer' },
-  })
+  }),
 );
 ```
 
@@ -285,7 +285,7 @@ onde a variável `NODE_ENV` está incorretamente configurada como `development`.
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
-  skip: req => {
+  skip: (req) => {
     const isDev = process.env.NODE_ENV !== 'production';
     const isLocal = req.ip === '127.0.0.1' || req.ip === '::1';
     return isDev && isLocal; // Skip total — sem proteção
@@ -303,7 +303,7 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   // Remover skip completo
-  keyGenerator: req => req.ip || 'unknown',
+  keyGenerator: (req) => req.ip || 'unknown',
 });
 ```
 
@@ -605,7 +605,7 @@ function _detectDependencyCycle(taskId, newDeps, visited = new Set(), depsCache 
         const rows = getDb()
           .prepare('SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ?')
           .all(taskId);
-        const result = rows.map(r => String(r.depends_on_task_id));
+        const result = rows.map((r) => String(r.depends_on_task_id));
         depsCache.set(taskId, result);
         return result;
       })();
@@ -763,7 +763,7 @@ export function getJwtSecret() {
   if (!secret || secret.length < 32) {
     throw new Error(
       '[AUTH] JWT_SECRET é obrigatória e deve ter pelo menos 32 caracteres. ' +
-        "Gere com: node -e \"console.log(require('crypto').randomBytes(64).toString('hex'))\""
+        "Gere com: node -e \"console.log(require('crypto').randomBytes(64).toString('hex'))\"",
     );
   }
   _cachedSecret = secret;
@@ -816,7 +816,7 @@ export function listTasks({ limit = 100, offset = 0, status = null, stage = null
   params.push(Math.min(limit, 500), Math.max(offset, 0));
   return db
     .prepare(
-      `SELECT * FROM tasks ${where} ORDER BY priority DESC, created_at_ms ASC LIMIT ? OFFSET ?`
+      `SELECT * FROM tasks ${where} ORDER BY priority DESC, created_at_ms ASC LIMIT ? OFFSET ?`,
     )
     .all(...params)
     .map(_rowToTask)

@@ -1,9 +1,13 @@
 // @ts-check
 /**
+ * @typedef {object} SuggestPatchOptions
+ * @property {boolean} proposeDiffs
+ */
+/**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
  * @param {ReturnType<import('./root_cause_ranker.mjs').rankRootCauses>} rankedCauses
- * @param {{ proposeDiffs: boolean }} options
-  * @returns {any}
+ * @param {SuggestPatchOptions} options
+ * @returns {object}
  */
 export function suggestPatch(finding, rankedCauses, options) {
     const file = finding.file || 'arquivo_indefinido.js';

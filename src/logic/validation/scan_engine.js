@@ -1,38 +1,40 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import fs from 'node:fs';
-import { promises as fsp } from 'node:fs';
-import readline from 'node:readline';
 import { MAX_JSON_SIZE } from '#infra/fs/fs_utils';
+import fs, { promises as fsp } from 'node:fs';
+import readline from 'node:readline';
+import { validateJSON, validateMarkdownCode, validateRegex } from './rules/format_rules.js';
 import { checkPhysicalIntegrity } from './rules/physical_rules.js';
-import { evaluateLine, compileForbiddenList } from './rules/semantic_rules.js';
-import { validateJSON, validateRegex, validateMarkdownCode } from './rules/format_rules.js';
+import { compileForbiddenList, evaluateLine } from './rules/semantic_rules.js';
 
 /**
  * Executa a auditoria completa em uma única passagem de leitura.
  *
  * @param {object} task - Objeto da tarefa (Schema V4).
  * @param {string} filePath - Caminho do arquivo em disco.
- * @param {Array<string>} systemErrorTerms - Termos de erro globais (i18n).
- * @param {AbortSignal} signal - Sinal para interrupção imediata.
- * @returns {Promise<object>} { ok: boolean, reason: string|null }
+ * @param {string[]} systemErrorTerms - Termos de erro globais (i18n).
+ * @param {AbortSignal | undefined} [signal] - Sinal para interrupção imediata.
+ * @returns {Promise<{ ok: boolean; reason: string | null }>}
  */
 
-async function runSinglePassValidation(task, filePath, systemErrorTerms = [], signal = null) {
+async function runSinglePassValidation(task, filePath, systemErrorTerms = [], signal = undefined) {
     let fileStream = null;
+    const taskAny = /** @type {Record<string, any>} */ (task);
 
     try {
         // 1. AUDITORIA FÍSICA (Metadados Assíncronos)
         const stats = await fsp.stat(filePath);
-        const physicalCheck = checkPhysicalIntegrity(task, stats);
+        const physicalCheck = /** @type {{ ok: boolean; reason: string | null }} */ (
+            checkPhysicalIntegrity(task, stats)
+        );
         if (!physicalCheck.ok) {
             return physicalCheck;
         }
 
         // 2. PREPARAÇÃO DA VARREDURA
-        const userForbidden = task.spec?.validation?.forbidden_terms || [];
+        const userForbidden = taskAny.spec?.validation?.forbidden_terms || [];
         const forbiddenList = compileForbiddenList(systemErrorTerms, userForbidden);
-        const formatRequired = task.spec?.validation?.required_format || 'text';
-        const patternRequired = task.spec?.validation?.required_pattern;
+        const formatRequired = taskAny.spec?.validation?.required_format || 'text';
+        const patternRequired = taskAny.spec?.validation?.required_pattern;
 
         // [FIX 1.2] Otimização de Memória: Uso de Array Buffer em vez de String Concatenation
         // Isso evita realocações de memória O(N^2) durante o processamento de arquivos grandes.
@@ -82,7 +84,7 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
 
         // Validação JSON (Propaga sinal de aborto para o parser)
         if (formatRequired === 'json') {
-            const jsonCheck = validateJSON(fullContent, signal);
+            const jsonCheck = /** @type {{ ok: boolean; reason: string | null }} */ (validateJSON(fullContent, signal));
             if (!jsonCheck.ok) {
                 return jsonCheck;
             }
@@ -105,15 +107,16 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         }
 
         return { ok: true, reason: null };
-    } catch (scanErr) {
+    } catch (/** @type {any} */ scanErr) {
+        const caught = /** @type {any} */ (scanErr);
         // Tratamento de interrupção via sinal
-        if (scanErr.name === 'AbortError' || scanErr.message === 'VALIDATION_ABORTED') {
+        if (caught.name === 'AbortError' || caught.message === 'VALIDATION_ABORTED') {
             return { ok: false, reason: 'VALIDATION_CANCELLED: Operação interrompida pelo usuário.' };
         }
 
         return {
             ok: false,
-            reason: `VALIDATION_CRASH: Falha no motor de varredura. Erro: ${scanErr.message}`,
+            reason: `VALIDATION_CRASH: Falha no motor de varredura. Erro: ${caught.message}`,
         };
     } finally {
         // [FIX] Garantia de fechamento de handle (Zero-Leak Policy)

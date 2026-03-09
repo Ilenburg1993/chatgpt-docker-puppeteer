@@ -1,10 +1,10 @@
-// @ts-nocheck
+// @ts-check
 // NOTE: This test requires external Chrome proxy availability.
 
-import path from 'node:path';
-import fs from 'node:fs';
-import assert from 'node:assert';
 import config from '#core/config';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // This file currently assumes an external proxy configuration.
 // It is kept as E2E-only and not part of the default `npm test` run.
@@ -14,10 +14,10 @@ console.log('🚀 Testando sequência de boot...\n');
 const PROXY_PORT = 9224;
 
 const log = {
-    section: msg => console.log(`\n=== ${msg} ===`),
+    section: (/** @type {string} */ msg) => console.log(`\n=== ${msg} ===`),
 };
 
-function ok(cond, msg) {
+function ok(/** @type {any} */ cond, /** @type {string} */ msg) {
     assert.ok(cond, msg);
     console.log(`✅ ${msg}`);
 }

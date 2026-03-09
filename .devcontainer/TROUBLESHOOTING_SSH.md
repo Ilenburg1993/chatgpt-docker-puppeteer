@@ -77,7 +77,7 @@ git remote set-url origin https://github.com/Ilenburg1993/chatgpt-docker-puppete
 
 # Git operations funcionarão normalmente
 git fetch origin
-git push origin main  # Pode pedir credenciais
+git push origin main # Pode pedir credenciais
 ```
 
 ### Se SSH_AUTH_SOCK Está Definido
@@ -156,7 +156,7 @@ code .
 # Adicionar ao ~/.bashrc ou ~/.zshrc:
 if [ -z "$SSH_AUTH_SOCK" ]; then
   eval $(ssh-agent -s) > /dev/null
-  ssh-add ~/.ssh/id_ed25519 2>/dev/null
+  ssh-add ~/.ssh/id_ed25519 2> /dev/null
 fi
 ```
 
@@ -181,7 +181,7 @@ fi
 git remote -v
 
 # Se for SSH (git@github.com):
-origin  git@github.com:user/repo.git
+origin git@github.com:user/repo.git
 
 # E SSH não está funcionando, terá problema
 ```

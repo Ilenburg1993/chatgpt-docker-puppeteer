@@ -1,6 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { log } from '#core/logger';
 import { DRIVER_DOMAINS, DRIVER_NAMES } from '#core/constants';
+import { log } from '#core/logger';
 import { DriverReadinessGuard } from '../guards/DriverReadinessGuard.js';
 import PageSessionTracker from '../trackers/PageSessionTracker.js';
 import TargetDriver from './TargetDriver.js';
@@ -65,12 +65,12 @@ class BaseDriver extends TargetDriver {
      * Construtor do BaseDriver - Orquestrador modular de execução.
      *
      * ✅ v3.0: BREAKING CHANGE - Constructor recebe APENAS config
+     *
      * - page e signal são null inicialmente (herdados de TargetDriver)
      * - Use attachContext(page, signal) antes de executar
      *
      * @param {object} config - Configuração da tarefa (clonada)
      * @param {string} config.target - Target específico (chatgpt, gemini, etc)
-     *
      * @throws {Error} MODULE_INSTANTIATION_FAILED - Se subsistema falhar ao inicializar
      */
     constructor(config) {
@@ -90,12 +90,12 @@ class BaseDriver extends TargetDriver {
         try {
             // ✅ BUG FIX: InputResolver DEVE ser criado ANTES de RecoverySystem
             // RecoverySystem.constructor() valida que driver.inputResolver existe
-            this.inputResolver = new InputResolver(this);
-            this.handles = new HandleManager(this);
-            this.recovery = new RecoverySystem(this);
-            this.frameNavigator = new FrameNavigator(this);
-            this.biomechanics = new BiomechanicsEngine(this);
-            this.submission = new SubmissionController(this);
+            this.inputResolver = new InputResolver(/** @type {any} */ (this));
+            this.handles = new HandleManager(/** @type {any} */ (this));
+            this.recovery = new RecoverySystem(/** @type {any} */ (this));
+            this.frameNavigator = new FrameNavigator(/** @type {any} */ (this));
+            this.biomechanics = new BiomechanicsEngine(/** @type {any} */ (this));
+            this.submission = new SubmissionController(/** @type {any} */ (this));
 
             // ✅ Phase 1 (P0-U4): Readiness guard (pre-execution validation)
             this.readinessGuard = new DriverReadinessGuard(this);
@@ -108,7 +108,7 @@ class BaseDriver extends TargetDriver {
 
             // ✅ v2.0: Propagate correlation to ALL modules
             this._propagateCorrelationToModules();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             log('ERROR', `[BASEDRIVER] Module instantiation failed: ${err.message}`, this.correlationId);
             throw new Error(`MODULE_INSTANTIATION_FAILED: ${err.message}`, { cause: err });
         }
@@ -120,8 +120,9 @@ class BaseDriver extends TargetDriver {
 
     /**
      * Gera ID de correlação único para rastreamento.
-     * @returns {string} Correlation ID (formato: drv-{timestamp}-{random})
+     *
      * @private
+     * @returns {string} Correlation ID (formato: drv-{timestamp}-{random})
      */
     _generateCorrelationId() {
         return `drv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -129,8 +130,9 @@ class BaseDriver extends TargetDriver {
 
     /**
      * Valida que todos os módulos foram instanciados corretamente.
-     * @throws {Error} Se algum módulo for null/undefined
+     *
      * @private
+     * @throws {Error} Se algum módulo for null/undefined
      */
     _validateModules() {
         const requiredModules = [
@@ -145,7 +147,7 @@ class BaseDriver extends TargetDriver {
         ];
 
         for (const moduleName of requiredModules) {
-            if (!this[moduleName]) {
+            if (!(/** @type {any} */ (this)[moduleName])) {
                 throw new Error(`Required module '${moduleName}' not instantiated`);
             }
         }
@@ -153,6 +155,7 @@ class BaseDriver extends TargetDriver {
 
     /**
      * Propaga correlation ID para TODOS os 8 módulos (v3.1 - Phase 2).
+     *
      * @private
      */
     _propagateCorrelationToModules() {
@@ -167,7 +170,7 @@ class BaseDriver extends TargetDriver {
             this.sessionTracker, // ✅ Phase 2 (P1-U1)
         ];
 
-        modules.forEach(module => {
+        modules.forEach((module) => {
             if (module) {
                 const moduleWithDriver = /** @type {{ driver?: unknown }} */ (/** @type {unknown} */ (module));
                 moduleWithDriver.driver = this;
@@ -178,16 +181,16 @@ class BaseDriver extends TargetDriver {
     /**
      * Classifica erro em categorias para retry inteligente.
      *
+     * @private
      * @param {Error} err - Erro a classificar
      * @returns {string} Classe do erro (ABORT, FATAL, TIMEOUT, SELECTOR, TRANSIENT)
-     * @private
      */
     _classifyError(err) {
         const message = err.message || '';
 
         // Check each error class patterns
         for (const [errorClass, patterns] of Object.entries(ERROR_PATTERNS)) {
-            if (patterns.some(pattern => message.includes(pattern))) {
+            if (patterns.some((pattern) => message.includes(pattern))) {
                 return errorClass;
             }
         }
@@ -198,9 +201,9 @@ class BaseDriver extends TargetDriver {
     /**
      * Aplica backoff configurável entre tentativas.
      *
+     * @private
      * @param {number} attempt - Número da tentativa (0-based)
      * @returns {Promise<void>}
-     * @private
      */
     async _applyBackoff(attempt) {
         const { RETRY_BACKOFF_TYPE, RETRY_BASE_DELAY_MS, RETRY_MAX_DELAY_MS } = BASEDRIVER_CONFIG;
@@ -220,16 +223,15 @@ class BaseDriver extends TargetDriver {
             type: RETRY_BACKOFF_TYPE,
         });
 
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
     }
 
     /**
-     * Calcula timeout adaptativo baseado em métricas de sessão.
-     * ✅ Phase 2 (P1-U2): Adaptive timeout adjustment
+     * Calcula timeout adaptativo baseado em métricas de sessão. ✅ Phase 2 (P1-U2): Adaptive timeout adjustment
      *
+     * @private
      * @param {number} baseTimeout - Timeout base em milliseconds
      * @returns {number} Timeout ajustado (baseTimeout * multiplier)
-     * @private
      */
     _calculateAdaptiveTimeout(baseTimeout) {
         const multiplier = this.sessionTracker.getTimeoutMultiplier();
@@ -239,7 +241,7 @@ class BaseDriver extends TargetDriver {
             log(
                 'DEBUG',
                 `[BASEDRIVER] Adaptive timeout: ${baseTimeout}ms → ${adjustedTimeout}ms (${multiplier}x)`,
-                this.correlationId
+                this.correlationId,
             );
         }
 
@@ -247,8 +249,8 @@ class BaseDriver extends TargetDriver {
     }
 
     /**
-     * Injeta o rastro de causalidade para todos os sinais emitidos por este driver.
-     * ✅ v2.0: Propaga para TODOS os 6 módulos (vs apenas inputResolver em v1.1)
+     * Injeta o rastro de causalidade para todos os sinais emitidos por este driver. ✅ v2.0: Propaga para TODOS os 6
+     * módulos (vs apenas inputResolver em v1.1)
      *
      * @param {string} id - UUID de correlação da transação
      */
@@ -266,14 +268,12 @@ class BaseDriver extends TargetDriver {
   ====================================================================== */
 
     /**
-     * Emite um sinal vital capturado pela TelemetryBridge.
-     * Mantém o Driver agnóstico ao transporte (IPC/Socket).
-     * ✅ v2.0: Expandido de 1 evento para 18+ eventos em sendPrompt()
+     * Emite um sinal vital capturado pela TelemetryBridge. Mantém o Driver agnóstico ao transporte (IPC/Socket). ✅
+     * v2.0: Expandido de 1 evento para 18+ eventos em sendPrompt()
      *
+     * @fires driver:vital - Evento com type, payload, correlationId, timestamp
      * @param {string} type - Categoria do evento
      * @param {object} payload - Dados técnicos da ação/percepção
-     *
-     * @emits driver:vital - Evento com type, payload, correlationId, timestamp
      */
     _emitVital(type, payload) {
         this.emit('driver:vital', {
@@ -290,6 +290,7 @@ class BaseDriver extends TargetDriver {
 
     /**
      * Verifica se página ainda está ativa.
+     *
      * @throws {Error} TARGET_CLOSED - Se página foi fechada
      */
     _assertPageAlive() {
@@ -299,24 +300,23 @@ class BaseDriver extends TargetDriver {
     }
 
     /**
-     * Atualiza e retorna o domínio atual da página.
-     * ✅ v2.0: Emite evento quando domain muda
+     * Atualiza e retorna o domínio atual da página. ✅ v2.0: Emite evento quando domain muda
      *
-     * @param {boolean} [emitEvent=false] - Se deve emitir evento de mudança
-     * @returns {string} Domain atual (hostname sem www)
      * @private
+     * @param {boolean} [emitEvent=false] - Se deve emitir evento de mudança. Default is `false`
+     * @returns {string} Domain atual (hostname sem www)
      */
     _updateDomain(emitEvent = false) {
         const previousDomain = this.currentDomain;
 
         try {
-            const url = this.page.url();
+            const url = /** @type {any} */ (this.page).url();
             if (!url || url === 'about:blank' || !url.startsWith('http')) {
                 this.currentDomain = DRIVER_DOMAINS.INITIALIZATION;
                 return this.currentDomain;
             }
             this.currentDomain = new URL(url).hostname.replace(/^www\./, '');
-        } catch (_e) {
+        } catch (/** @type {any} */ _e) {
             this.currentDomain = DRIVER_DOMAINS.UNKNOWN_CONTEXT;
         }
 
@@ -332,10 +332,9 @@ class BaseDriver extends TargetDriver {
     }
 
     /**
-     * Retorna status de saúde de todos os módulos.
-     * ✅ v2.0: NEW - Module health diagnostics
+     * Retorna status de saúde de todos os módulos. ✅ v2.0: NEW - Module health diagnostics
      *
-     * @returns {Promise<object>} Health status de cada módulo
+     * @returns {Promise<any>} Health status de cada módulo
      */
     async getModuleHealth() {
         return {
@@ -363,31 +362,29 @@ class BaseDriver extends TargetDriver {
   ====================================================================== */
 
     /**
-     * Executa o envio do prompt com narração sensorial em tempo real.
-     * Segue o fluxo: Validação → Estabilização → Percepção → Navegação → Biomecânica → Envio
+     * Executa o envio do prompt com narração sensorial em tempo real. Segue o fluxo: Validação → Estabilização →
+     * Percepção → Navegação → Biomecânica → Envio
      *
      * ✅ v2.0: Telemetria completa (18+ eventos), timing metrics, signal propagation
      *
+     * @fires EXECUTION_START - Início de execução
+     * @fires PREREQUISITE_CHECK - Resultado de validação
+     * @fires DOMAIN_UPDATED - Domínio atual da página
+     * @fires SELECTOR_RESOLVED - Seletor identificado
+     * @fires CONTEXT_ACQUIRED - Contexto de execução obtido
+     * @fires TYPING_START - Início de digitação
+     * @fires SUBMISSION_SUCCESS - Envio bem-sucedido
+     * @fires EXECUTION_SUCCESS - Execução completa com métricas
+     * @fires RETRY_ATTEMPT - Tentativa de retry após falha
+     * @fires EXECUTION_ABORTED - Cancelamento durante execução
+     * @fires TRIAGE_ALERT - Falha em tentativa individual
      * @param {string} text - Conteúdo do prompt a enviar
-     * @param {string|{ taskId?: string, [key: string]: unknown }} [taskId] - UUID da task ou objeto de contexto
+     * @param {string | { taskId?: string; [key: string]: unknown }} [taskId] - UUID da task ou objeto de contexto
      * @param {AbortSignal} [signal] - Sinal de cancelamento (opcional)
      * @returns {Promise<void>}
-     *
      * @throws {Error} PREREQUISITE_FAILED - Página inválida para execução
      * @throws {Error} OPERATION_ABORTED - Sinal de cancelamento recebido
      * @throws {Error} EXECUTION_FAIL - Máximo de tentativas excedido
-     *
-     * @emits EXECUTION_START - Início de execução
-     * @emits PREREQUISITE_CHECK - Resultado de validação
-     * @emits DOMAIN_UPDATED - Domínio atual da página
-     * @emits SELECTOR_RESOLVED - Seletor identificado
-     * @emits CONTEXT_ACQUIRED - Contexto de execução obtido
-     * @emits TYPING_START - Início de digitação
-     * @emits SUBMISSION_SUCCESS - Envio bem-sucedido
-     * @emits EXECUTION_SUCCESS - Execução completa com métricas
-     * @emits RETRY_ATTEMPT - Tentativa de retry após falha
-     * @emits EXECUTION_ABORTED - Cancelamento durante execução
-     * @emits TRIAGE_ALERT - Falha em tentativa individual
      */
     async sendPrompt(text, taskId, signal) {
         const resolvedTaskId =
@@ -422,11 +419,13 @@ class BaseDriver extends TargetDriver {
         const baseStabilityTimeout = 10000; // 10s base
         const adaptiveStabilityTimeout = this._calculateAdaptiveTimeout(baseStabilityTimeout);
 
-        const readiness = await this.readinessGuard.validateReadiness({
-            stabilityTimeout: adaptiveStabilityTimeout, // ✅ Phase 2: Adaptive timeout
-            skipTriage: false,
-            skipSession: true, // Phase 1: Session tracking not implemented yet
-        });
+        const readiness = /** @type {any} */ (
+            await this.readinessGuard.validateReadiness({
+                stabilityTimeout: adaptiveStabilityTimeout, // ✅ Phase 2: Adaptive timeout
+                skipTriage: false,
+                skipSession: true, // Phase 1: Session tracking not implemented yet
+            })
+        );
 
         timings.readinessCheck = Date.now() - stepStart;
 
@@ -447,8 +446,10 @@ class BaseDriver extends TargetDriver {
 
         // ✅ Phase 1: Abort if NOT ready
         if (!readiness.ready) {
-            const fatalIssues = readiness.issues.filter(i => i.severity === 'FATAL');
-            const error = new Error('READINESS_CHECK_FAILED: ' + fatalIssues.map(i => i.message).join('; '));
+            const fatalIssues = readiness.issues.filter((/** @type {any} */ i) => i.severity === 'FATAL');
+            const error = /** @type {any} */ (
+                new Error('READINESS_CHECK_FAILED: ' + fatalIssues.map((/** @type {any} */ i) => i.message).join('; '))
+            );
             error.details = readiness;
             throw error;
         }
@@ -459,7 +460,7 @@ class BaseDriver extends TargetDriver {
         stepStart = Date.now();
 
         const { validateLLMPage } = await import('#core/validators/prerequisite_validator');
-        const pageValidation = await validateLLMPage(this.page);
+        const pageValidation = await validateLLMPage(/** @type {any} */ (this.page));
 
         timings.prerequisite = Date.now() - stepStart;
 
@@ -471,7 +472,7 @@ class BaseDriver extends TargetDriver {
         });
 
         if (!pageValidation.valid) {
-            const error = new Error(`PREREQUISITE_FAILED: ${pageValidation.reason}`);
+            const error = /** @type {any} */ (new Error(`PREREQUISITE_FAILED: ${pageValidation.reason}`));
             error.details = pageValidation.details;
             throw error;
         }
@@ -529,7 +530,7 @@ class BaseDriver extends TargetDriver {
                 // 3. RESOLUÇÃO DE INTERFACE (DNA V4 Gold)
                 // ================================================================
                 stepStart = Date.now();
-                const proto = await this.inputResolver.resolve();
+                const proto = /** @type {any} */ (await this.inputResolver.resolve());
                 timings.resolution = Date.now() - stepStart;
 
                 // ✅ v2.0: Emit selector resolved
@@ -549,7 +550,7 @@ class BaseDriver extends TargetDriver {
                 // 4. NAVEGAÇÃO DE CONTEXTO (IFrames/ShadowDOM)
                 // ================================================================
                 stepStart = Date.now();
-                const execContext = await this.frameNavigator.getExecutionContext(proto);
+                const execContext = /** @type {any} */ (await this.frameNavigator.getExecutionContext(proto));
                 timings.navigation = Date.now() - stepStart;
 
                 // ✅ v2.0: Emit context acquired
@@ -586,7 +587,7 @@ class BaseDriver extends TargetDriver {
                 });
 
                 // ✅ v2.0: Propagate signal to biomechanics
-                await this.biomechanics.typeText(execContext.ctx, proto.selector, text, signal);
+                await this.biomechanics.typeText(execContext.ctx, proto.selector, text, /** @type {any} */ (signal));
                 timings.typing = Date.now() - stepStart;
 
                 // ✅ v2.0: Signal check after typing
@@ -616,10 +617,12 @@ class BaseDriver extends TargetDriver {
                 const totalDuration = Date.now() - startTime;
 
                 // ✅ Phase 2 (P1-U1): Record response time
-                const { avgResponseTime, trend } = this.sessionTracker.recordResponseTime(totalDuration, true);
+                const { avgResponseTime, trend } = /** @type {any} */ (
+                    this.sessionTracker.recordResponseTime(totalDuration, true)
+                );
 
                 // ✅ Phase 2 (P1-U3): Emit session metrics
-                const sessionMetrics = this.sessionTracker.getMetrics();
+                const sessionMetrics = /** @type {any} */ (this.sessionTracker.getMetrics());
                 this._emitVital('SESSION_METRICS_UPDATE', {
                     turnNumber,
                     turnCount: sessionMetrics.turnCount,
@@ -654,7 +657,7 @@ class BaseDriver extends TargetDriver {
                 });
 
                 return;
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 // ================================================================
                 // ERROR HANDLING v2.0
                 // ================================================================
@@ -713,7 +716,7 @@ class BaseDriver extends TargetDriver {
         // ✅ Phase 2 (P1-U1): Record failed response time
         this.sessionTracker.recordResponseTime(totalDuration, false);
 
-        const finalErr = new Error('EXECUTION_FAIL');
+        const finalErr = /** @type {any} */ (new Error('EXECUTION_FAIL'));
         finalErr.history = errorHistory;
         finalErr.attempts = attempts;
 
@@ -726,7 +729,7 @@ class BaseDriver extends TargetDriver {
             sessionContext: {
                 turnNumber,
                 turnCount: this.sessionTracker.turnCount,
-                avgResponseTime: this.sessionTracker.getMetrics().avgResponseTime,
+                avgResponseTime: /** @type {any} */ (this.sessionTracker.getMetrics()).avgResponseTime,
             },
         });
 
@@ -734,8 +737,8 @@ class BaseDriver extends TargetDriver {
     }
 
     /**
-     * Cleanup profundo da instância e invalidação de caches de subsistemas.
-     * ✅ v2.0: Cleanup garantido com error collection e logging
+     * Cleanup profundo da instância e invalidação de caches de subsistemas. ✅ v2.0: Cleanup garantido com error
+     * collection e logging
      *
      * @returns {Promise<void>}
      */
@@ -753,7 +756,7 @@ class BaseDriver extends TargetDriver {
         for (const step of cleanupSteps) {
             try {
                 await step.fn();
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 const errorInfo = {
                     module: step.name,
                     error: err.message,
@@ -778,7 +781,7 @@ class BaseDriver extends TargetDriver {
         log(
             'DEBUG',
             `[${this.name}] Ciclo de Driver encerrado. Recursos liberados. Erros: ${cleanupErrors.length}`,
-            this.correlationId
+            this.correlationId,
         );
     }
 }
@@ -788,8 +791,7 @@ export default BaseDriver;
 /**
  * Configuração padrão do BaseDriver
  *
- * **Side-effects:** N/A
- * **Semântica:** Configurações de retry, timeouts e limites para operação do driver base.
+ * **Side-effects:** N/A **Semântica:** Configurações de retry, timeouts e limites para operação do driver base.
  * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
  *
  * @type {Object<string, any>}
@@ -799,8 +801,7 @@ export { BASEDRIVER_CONFIG };
 /**
  * Classes de erro para classificação de falhas
  *
- * **Side-effects:** N/A
- * **Semântica:** Enumeração de tipos de erro para estratégia de recuperação adequada.
+ * **Side-effects:** N/A **Semântica:** Enumeração de tipos de erro para estratégia de recuperação adequada.
  * **Unidades:** N/A
  *
  * @type {Object<string, string>}

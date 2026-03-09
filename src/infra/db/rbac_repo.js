@@ -41,7 +41,7 @@ const RBAC_PERMISSIONS = Object.freeze({
 /** Constante/valor exportado: ROLE_PERMISSION_MATRIX. */
 const ROLE_PERMISSION_MATRIX = Object.freeze({
     [RBAC_ROLES.OWNER]: Object.values(RBAC_PERMISSIONS),
-    [RBAC_ROLES.ADMIN]: Object.values(RBAC_PERMISSIONS).filter(p => p !== RBAC_PERMISSIONS.RBAC_MANAGE),
+    [RBAC_ROLES.ADMIN]: Object.values(RBAC_PERMISSIONS).filter((p) => p !== RBAC_PERMISSIONS.RBAC_MANAGE),
     [RBAC_ROLES.OPERATOR]: [
         RBAC_PERMISSIONS.MISSION_READ,
         RBAC_PERMISSIONS.MISSION_EXECUTE,
@@ -67,6 +67,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} raw
+ * @param {any} raw
+ */
 function _hashPassword(raw) {
     return crypto
         .createHash('sha256')
@@ -74,6 +78,10 @@ function _hashPassword(raw) {
         .digest('hex');
 }
 
+/**
+ * @param {any} username
+ * @param {any} username
+ */
 function _normalizeUsername(username) {
     return String(username || '')
         .trim()
@@ -82,6 +90,7 @@ function _normalizeUsername(username) {
 
 /**
  * Função exportada: ensureBaseRbacData.
+ *
  * @returns {void}
  */
 function ensureBaseRbacData() {
@@ -92,7 +101,7 @@ function ensureBaseRbacData() {
                 `
                 INSERT OR IGNORE INTO rbac_roles (id, role_name, description)
                 VALUES (@id, @role_name, @description)
-            `
+            `,
             ).run({
                 id: `role-${roleName}`,
                 role_name: roleName,
@@ -105,7 +114,7 @@ function ensureBaseRbacData() {
                 `
                 INSERT OR IGNORE INTO rbac_permissions (id, permission, description)
                 VALUES (@id, @permission, @description)
-            `
+            `,
             ).run({
                 id: `perm-${permission.replace(/[^a-zA-Z0-9]+/g, '-')}`,
                 permission,
@@ -114,16 +123,18 @@ function ensureBaseRbacData() {
         }
 
         for (const [roleName, permissions] of Object.entries(ROLE_PERMISSION_MATRIX)) {
-            const role = db.prepare('SELECT id FROM rbac_roles WHERE role_name = ?').get(roleName);
+            const role = /** @type {any} */ (db.prepare('SELECT id FROM rbac_roles WHERE role_name = ?').get(roleName));
             if (!role) continue;
             for (const permission of permissions) {
-                const perm = db.prepare('SELECT id FROM rbac_permissions WHERE permission = ?').get(permission);
+                const perm = /** @type {any} */ (
+                    db.prepare('SELECT id FROM rbac_permissions WHERE permission = ?').get(permission)
+                );
                 if (!perm) continue;
                 db.prepare(
                     `
                     INSERT OR IGNORE INTO rbac_role_permission (role_id, permission_id)
                     VALUES (?, ?)
-                `
+                `,
                 ).run(role.id, perm.id);
             }
         }
@@ -132,11 +143,14 @@ function ensureBaseRbacData() {
     tx();
 }
 
+/** @typedef {any} UpsertRbacUserParams */
+/** @typedef {any} UpsertRbacUserOptions */
 /**
- * @param {{username:string, password:string, role?: string, active?: boolean}} params
-  * @returns {any}
+ * @param {any} params
+ * @returns {any}
  */
-function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active = true }) {
+function upsertRbacUser(params = {}) {
+    const { username, password, role = RBAC_ROLES.VIEWER, active = true } = /** @type {any} */ (params);
     const db = getDb();
     const name = _normalizeUsername(username);
     if (!name) throw new Error('username obrigatório');
@@ -148,7 +162,7 @@ function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active =
     const roleValues = /** @type {string[]} */ (Object.values(RBAC_ROLES));
     const roleName = roleValues.includes(String(role)) ? String(role) : RBAC_ROLES.VIEWER;
 
-    const existing = db.prepare('SELECT * FROM rbac_users WHERE username = ?').get(name);
+    const existing = /** @type {any} */ (db.prepare('SELECT * FROM rbac_users WHERE username = ?').get(name));
     const userId = existing?.id || `usr-${uuidv4()}`;
 
     db.prepare(
@@ -159,7 +173,7 @@ function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active =
             password_hash = excluded.password_hash,
             active = excluded.active,
             updated_at_ms = excluded.updated_at_ms
-    `
+    `,
     ).run({
         id: userId,
         username: name,
@@ -169,7 +183,7 @@ function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active =
         updated_at_ms: now,
     });
 
-    const roleRow = db.prepare('SELECT id FROM rbac_roles WHERE role_name = ?').get(roleName);
+    const roleRow = /** @type {any} */ (db.prepare('SELECT id FROM rbac_roles WHERE role_name = ?').get(roleName));
     if (roleRow) {
         db.prepare('DELETE FROM rbac_user_role WHERE user_id = ?').run(userId);
         db.prepare('INSERT OR IGNORE INTO rbac_user_role (user_id, role_id) VALUES (?, ?)').run(userId, roleRow.id);
@@ -180,16 +194,17 @@ function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active =
 
 /**
  * @param {string} username
- * @returns {{id:string, username:string, active:boolean, roles:string[], role:string, permissions:string[], created_at_ms:number, updated_at_ms:number}|null}
+ * @returns {any}
  */
 function getRbacUserByUsername(username) {
     const db = getDb();
     const name = _normalizeUsername(username);
     if (!name) return null;
 
-    const row = db
-        .prepare(
-            `
+    const row = /** @type {any} */ (
+        db
+            .prepare(
+                `
             SELECT u.*,
                    GROUP_CONCAT(DISTINCT r.role_name) AS role_names,
                    GROUP_CONCAT(DISTINCT p.permission) AS permissions
@@ -200,9 +215,10 @@ function getRbacUserByUsername(username) {
             LEFT JOIN rbac_permissions p ON p.id = rp.permission_id
             WHERE u.username = ?
             GROUP BY u.id
-        `
-        )
-        .get(name);
+        `,
+            )
+            .get(name)
+    );
 
     if (!row) return null;
 
@@ -223,6 +239,9 @@ function getRbacUserByUsername(username) {
 
 /**
  * Função exportada: verifyRbacCredentials.
+ *
+ * @param {any} username
+ * @param {any} password
  * @returns {any}
  */
 function verifyRbacCredentials(username, password) {
@@ -230,7 +249,7 @@ function verifyRbacCredentials(username, password) {
     const name = _normalizeUsername(username);
     if (!name || !password) return null;
 
-    const row = db.prepare('SELECT * FROM rbac_users WHERE username = ?').get(name);
+    const row = /** @type {any} */ (db.prepare('SELECT * FROM rbac_users WHERE username = ?').get(name));
     if (!row || Number(row.active) !== 1) return null;
 
     const incomingHash = _hashPassword(password);
@@ -246,6 +265,7 @@ function verifyRbacCredentials(username, password) {
 
 /**
  * Função exportada: bootstrapRbacFromEnv.
+ *
  * @returns {void}
  */
 function bootstrapRbacFromEnv() {
@@ -276,12 +296,12 @@ function bootstrapRbacFromEnv() {
 }
 
 export {
-    RBAC_PERMISSIONS,
-    RBAC_ROLES,
-    ROLE_PERMISSION_MATRIX,
     bootstrapRbacFromEnv,
     ensureBaseRbacData,
     getRbacUserByUsername,
+    RBAC_PERMISSIONS,
+    RBAC_ROLES,
+    ROLE_PERMISSION_MATRIX,
     upsertRbacUser,
     verifyRbacCredentials,
 };

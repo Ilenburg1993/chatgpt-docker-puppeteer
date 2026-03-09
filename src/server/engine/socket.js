@@ -1,4 +1,5 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
+/** @import {VerifyOptions} from "jsonwebtoken" */
 import CONFIG from '#core/config';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import { log } from '#core/logger';
@@ -7,14 +8,15 @@ import { isTokenRevoked } from '#infra/db/token_blocklist';
 import { hasPermission } from '#server/domain/rbac_policy';
 import { ActorRole, PROTOCOL_VERSION } from '#shared/nerv/constants';
 import { validateIPCEnvelope, validateRobotIdentity } from '#shared/nerv/schemas';
-import EventEmitter from 'node:events';
 import jwt from 'jsonwebtoken';
+import EventEmitter from 'node:events';
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Instância única do barramento (Singleton).
  */
+/** @type {any} */
 let ioInstance = null;
 
 /* ==========================================================================
@@ -22,9 +24,10 @@ let ioInstance = null;
 ========================================================================== */
 
 let dashboardAllowedOrigins = new Set();
+/** @type {any} */
 let configUpdatedHandler = null;
 
-function parseBooleanEnv(name, defaultValue) {
+function parseBooleanEnv(/** @type {any} */ name, /** @type {any} */ defaultValue) {
     const raw = process.env[name];
     if (raw === undefined) {
         return defaultValue;
@@ -44,15 +47,15 @@ function getDashboardSocketPolicy() {
     };
 }
 
-function normalizeOrigins(originsLike) {
+function normalizeOrigins(/** @type {any} */ originsLike) {
     if (Array.isArray(originsLike)) {
-        return originsLike.map(origin => String(origin).trim()).filter(Boolean);
+        return originsLike.map((origin) => String(origin).trim()).filter(Boolean);
     }
 
     if (typeof originsLike === 'string') {
         return originsLike
             .split(',')
-            .map(origin => origin.trim())
+            .map((origin) => origin.trim())
             .filter(Boolean);
     }
 
@@ -90,7 +93,7 @@ function removeConfigUpdatedListener() {
     configUpdatedHandler = null;
 }
 
-function isDashboardOriginAllowed(origin) {
+function isDashboardOriginAllowed(/** @type {any} */ origin) {
     if (!origin) return true;
     if (dashboardAllowedOrigins.has(origin)) {
         return true;
@@ -99,14 +102,14 @@ function isDashboardOriginAllowed(origin) {
     return false;
 }
 
-function verifyDashboardToken(token) {
+function verifyDashboardToken(/** @type {any} */ token) {
     if (!token || typeof token !== 'string') {
         return { ok: false, code: 'AUTH_TOKEN_MISSING', message: 'Token JWT ausente no handshake' };
     }
 
     try {
         const decoded = /** @type {any} */ (
-            jwt.verify(token, getJwtSecret(), /** @type {import('jsonwebtoken').VerifyOptions} */ (JWT_VERIFY_OPTIONS))
+            jwt.verify(token, getJwtSecret(), /** @type {VerifyOptions} */ (JWT_VERIFY_OPTIONS))
         );
         const jti = decoded?.jti;
 
@@ -117,41 +120,45 @@ function verifyDashboardToken(token) {
         return {
             ok: true,
             user: {
-                id: decoded.id,
-                username: decoded.username,
-                role: decoded.role || 'viewer',
-                roles: Array.isArray(decoded.roles) ? decoded.roles.map(r => String(r)) : [],
-                permissions: Array.isArray(decoded.permissions) ? decoded.permissions.map(p => String(p)) : [],
-                jti: decoded.jti || null,
-                exp: decoded.exp || null,
+                id: /** @type {any} */ (decoded).id,
+                username: /** @type {any} */ (decoded).username,
+                role: /** @type {any} */ (decoded).role || 'viewer',
+                roles: Array.isArray(/** @type {any} */ (decoded).roles)
+                    ? /** @type {any} */ (decoded).roles.map((/** @type {any} */ r) => String(r))
+                    : [],
+                permissions: Array.isArray(/** @type {any} */ (decoded).permissions)
+                    ? /** @type {any} */ (decoded).permissions.map((/** @type {any} */ p) => String(p))
+                    : [],
+                jti: /** @type {any} */ (decoded).jti || null,
+                exp: /** @type {any} */ (decoded).exp || null,
             },
         };
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return {
             ok: false,
-            code: err?.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
-            message: err?.message || 'Token inválido',
+            code: _e?.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
+            message: _e?.message || 'Token inválido',
         };
     }
 }
 
 /**
- * Internal EventEmitter for bridging Socket.io events to other parts of the system.
- * Allows ServerNERVAdapter and other components to listen to dashboard events.
+ * Internal EventEmitter for bridging Socket.io events to other parts of the system. Allows ServerNERVAdapter and other
+ * components to listen to dashboard events.
  */
 const internalEmitter = new EventEmitter();
 
 /**
- * Registry de Agentes Vivos (In-Memory).
- * Estrutura: robot_id -> { socket_id, identity, last_seen }
+ * Registry de Agentes Vivos (In-Memory). Estrutura: robot_id -> { socket_id, identity, last_seen }
  */
 const agentRegistry = new Map();
 
 /**
- * P9.8: Debounce buffer para task updates (50ms window)
- * Estrutura: taskId -> { data, timestamp }
+ * P9.8: Debounce buffer para task updates (50ms window) Estrutura: taskId -> { data, timestamp }
  */
 const taskUpdateBuffer = new Map();
+/** @type {any} */
 let taskUpdateTimer = null;
 
 /**
@@ -162,7 +169,7 @@ function flushTaskUpdates() {
         return;
     }
 
-    const updates = Array.from(taskUpdateBuffer.values()).map(entry => ({
+    const updates = Array.from(taskUpdateBuffer.values()).map((entry) => ({
         taskId: entry.taskId,
         state: entry.state,
     }));
@@ -183,11 +190,15 @@ function flushTaskUpdates() {
 }
 
 /**
- * Inicializa o barramento de eventos acoplando-o ao motor HTTP.
- * Implementa lógica de reset automático para suporte a testes e reconexões.
+ * @typedef {object} InitHttpServer
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
+ * Inicializa o barramento de eventos acoplando-o ao motor HTTP. Implementa lógica de reset automático para suporte a
+ * testes e reconexões.
  *
- * @param {object} httpServer - Instância ativa do servidor HTTP.
- * @returns {object} A instância do Socket.io configurada.
+ * @param {InitHttpServer} httpServer - Instância ativa do servidor HTTP.
+ * @returns {any} A instância do Socket.io configurada.
  */
 function init(httpServer) {
     if (ioInstance) {
@@ -201,13 +212,13 @@ function init(httpServer) {
 
     log('INFO', '[HUB] Mission Control Hub V600 Online (IPC 2.0 Native).');
 
-    ioInstance = new Server(httpServer, {
+    ioInstance = new Server(/** @type {any} */ (httpServer), {
         cors: {
             origin(origin, callback) {
                 if (isDashboardOriginAllowed(origin)) {
-                    return callback(null, true);
+                    return /** @type {any} */ (callback)(null, true);
                 }
-                return callback(new Error(`Socket CORS blocked for origin: ${origin}`), false);
+                return /** @type {any} */ (callback)(new Error(`Socket CORS blocked for origin: ${origin}`), false);
             },
             methods: ['GET', 'POST'],
             credentials: true,
@@ -217,7 +228,7 @@ function init(httpServer) {
         pingInterval: 5000,
     });
 
-    ioInstance.on('connection', socket => {
+    ioInstance.on('connection', (/** @type {any} */ socket) => {
         // 1. FILTRO DE INFRAESTRUTURA (Token de Acesso)
         const token = socket.handshake.auth?.token;
         const isAgentAttempt = token === 'SYSTEM_MAESTRO_PRIME';
@@ -250,7 +261,7 @@ function init(httpServer) {
             internalEmitter.emit('client:connected', socket.id);
 
             // Setup dashboard command listeners
-            socket.on('dashboard:command', data => {
+            socket.on('dashboard:command', (/** @type {any} */ data) => {
                 const policy = getDashboardSocketPolicy();
                 if (!policy.commandsEnabled) {
                     socket.emit('dashboard:command:error', {
@@ -290,13 +301,13 @@ function init(httpServer) {
                 });
             });
 
-            socket.on('dashboard:status_request', data => {
+            socket.on('dashboard:status_request', (/** @type {any} */ data) => {
                 log('DEBUG', `[HUB] Dashboard status request received`);
                 internalEmitter.emit('dashboard:status_request', data);
             });
         }
 
-        socket.on('disconnect', reason => {
+        socket.on('disconnect', (/** @type {any} */ reason) => {
             if (socket.robot_id) {
                 agentRegistry.delete(socket.robot_id);
                 log('WARN', `[HUB] Maestro ${socket.robot_id} desconectado. Causa: ${reason}`);
@@ -315,8 +326,9 @@ function init(httpServer) {
 }
 
 /**
- * Protocolo de Comunicação Soberana para o Maestro.
- * Implementa Handshake, Promoção de Estado e Roteamento de Envelopes.
+ * Protocolo de Comunicação Soberana para o Maestro. Implementa Handshake, Promoção de Estado e Roteamento de Envelopes.
+ *
+ * @param {any} socket
  */
 function _setupMaestroProtocol(socket) {
     /**
@@ -331,7 +343,7 @@ function _setupMaestroProtocol(socket) {
     }, 5000);
 
     // 1. CERIMÔNIA DE APRESENTAÇÃO (Handshake V2)
-    socket.on('handshake:present', data => {
+    socket.on('handshake:present', (/** @type {any} */ data) => {
         try {
             // Validação Nativa (Shared Kernel) - Audit 410
             const identity = validateRobotIdentity(data.identity);
@@ -368,15 +380,16 @@ function _setupMaestroProtocol(socket) {
 
             // Notifica Dashboards sobre o novo agente pronto para missões
             ioInstance.to('dashboards').emit('hub:agent_online', identity);
-        } catch (err) {
-            log('ERROR', `[HUB] Handshake rejeitado para ${socket.id}: ${err.message}`);
-            socket.emit('handshake:rejected', { reason: err.message });
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('ERROR', `[HUB] Handshake rejeitado para ${socket.id}: ${_e.message}`);
+            socket.emit('handshake:rejected', { reason: _e.message });
             socket.disconnect();
         }
     });
 
     // 2. RECEPTOR DE MENSAGENS ESTRUTURADAS (Envelope V2)
-    socket.on('message', rawEnvelope => {
+    socket.on('message', (/** @type {any} */ rawEnvelope) => {
         if (!socket.authorized) {
             return;
         }
@@ -386,9 +399,8 @@ function _setupMaestroProtocol(socket) {
             const envelope = validateIPCEnvelope(rawEnvelope);
 
             /**
-             * ROTEAMENTO DE TELEMETRIA:
-             * Toda mensagem vinda do Maestro (Eventos, ACKs, Logs) é retransmitida
-             * para os terminais de monitoramento (Dashboards).
+             * ROTEAMENTO DE TELEMETRIA: Toda mensagem vinda do Maestro (Eventos, ACKs, Logs) é retransmitida para os
+             * terminais de monitoramento (Dashboards).
              */
             ioInstance.to('dashboards').emit('maestro:telemetry', envelope);
 
@@ -396,8 +408,9 @@ function _setupMaestroProtocol(socket) {
             if (agentRegistry.has(socket.robot_id)) {
                 agentRegistry.get(socket.robot_id).last_seen = Date.now();
             }
-        } catch (err) {
-            log('ERROR', `[HUB] Envelope malformado de ${socket.robot_id}: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('ERROR', `[HUB] Envelope malformado de ${socket.robot_id}: ${_e.message}`);
         }
     });
 }
@@ -407,12 +420,16 @@ function _setupMaestroProtocol(socket) {
 ========================================================================== */
 
 /**
+ * @typedef {object} SendCommandPayload
+ * @property {any} _ Propriedades definidas via runtime.
+ */
+/**
  * Envia um comando estruturado para um robô específico ou para todos.
  *
  * @param {string} command - Constante ActionCode (ex: ENGINE_PAUSE).
- * @param {object} payload - Conteúdo útil do comando.
- * @param {string} [robotId] - ID do robô alvo. Se nulo, envia para todos (Broadcast).
- * @returns {string} O msg_id gerado para rastreamento de ACK.
+ * @param {SendCommandPayload} payload - Conteúdo útil do comando.
+ * @param {string | null} [robotId] - ID do robô alvo. Se nulo, envia para todos (Broadcast).
+ * @returns {string | null} O msg_id gerado para rastreamento de ACK.
  */
 function sendCommand(command, payload, robotId = null) {
     if (!ioInstance) {
@@ -420,7 +437,7 @@ function sendCommand(command, payload, robotId = null) {
     }
 
     const msgId = uuidv4();
-    const correlationId = payload.correlation_id || uuidv4();
+    const correlationId = /** @type {any} */ (payload).correlation_id || uuidv4();
 
     const envelope = {
         header: {
@@ -446,10 +463,10 @@ function sendCommand(command, payload, robotId = null) {
 }
 
 /**
- * Encerramento atômico do Hub.
- * Garante desconexão forçada de todos os agentes e limpeza total de memória.
- * Essencial para o ciclo de vida NASA Standard.
-  * @returns {Promise<void>}
+ * Encerramento atômico do Hub. Garante desconexão forçada de todos os agentes e limpeza total de memória. Essencial
+ * para o ciclo de vida NASA Standard.
+ *
+ * @returns {Promise<void>}
  */
 async function stop() {
     if (taskUpdateTimer) {
@@ -468,12 +485,16 @@ async function stop() {
             s.disconnect(true);
         }
 
-        await new Promise(resolve => {
-            ioInstance.close(() => {
-                ioInstance = null;
-                resolve();
-            });
-        });
+        await new Promise(
+            /** @type {(resolve: (v?: any) => void) => void} */ (
+                (resolve) => {
+                    ioInstance.close(() => {
+                        ioInstance = null;
+                        resolve();
+                    });
+                }
+            ),
+        );
 
         agentRegistry.clear();
         log('INFO', '[HUB] Barramento Socket.io limpo com sucesso.');
@@ -482,7 +503,10 @@ async function stop() {
 
 /**
  * Notify: Broadcast global informativo para todos os conectados.
-  * @returns {any}
+ *
+ * @param {any} event
+ * @param {any} data
+ * @returns {boolean | void}
  */
 function notify(event, data) {
     if (!ioInstance) {
@@ -492,10 +516,14 @@ function notify(event, data) {
     return true;
 }
 
+/** @typedef {any} NotifyAgentInput */
 /**
- * Notify agents (system room) with a lightweight signal event.
- * Used for wake-ups (e.g. cache invalidation) without a full IPC envelope.
-  * @returns {any}
+ * Notify agents (system room) with a lightweight signal event. Used for wake-ups (e.g. cache invalidation) without a
+ * full IPC envelope.
+ *
+ * @param {any} event
+ * @param {NotifyAgentInput} [data]
+ * @returns {boolean | void}
  */
 function notifyAgent(event, data = {}) {
     if (!ioInstance) {
@@ -506,12 +534,16 @@ function notifyAgent(event, data = {}) {
 }
 
 /**
- * P9.8: Broadcast de task update com debouncing de 50ms.
- * Acumula updates em buffer e envia em batch para reduzir overhead.
+ * @typedef {object} BroadcastTaskUpdateInput
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
+ * P9.8: Broadcast de task update com debouncing de 50ms. Acumula updates em buffer e envia em batch para reduzir
+ * overhead.
  *
- * @param {string|Object} taskId - ID da task ou objeto {taskId, state}
- * @param {Object} [data] - Dados do update (opcional se taskId for objeto)
-  * @returns {void}
+ * @param {string | object} taskId - ID da task ou objeto {taskId, state}
+ * @param {BroadcastTaskUpdateInput} [data] - Dados do update (opcional se taskId for objeto)
+ * @returns {void}
  */
 function broadcastTaskUpdate(taskId, data) {
     if (!ioInstance) {
@@ -524,8 +556,8 @@ function broadcastTaskUpdate(taskId, data) {
 
     if (taskId && typeof taskId === 'object' && data === undefined) {
         // Suporta chamada acidental broadcastTaskUpdate({ taskId, state })
-        normalizedTaskId = taskId.taskId;
-        normalizedState = taskId.state;
+        normalizedTaskId = /** @type {any} */ (taskId).taskId;
+        normalizedState = /** @type {any} */ (taskId).state;
     }
 
     if (!normalizedTaskId) {
@@ -557,17 +589,42 @@ export const getRegistry = () =>
     }));
 /** Constante/valor exportado: getIO. */
 export const getIO = () => ioInstance;
-/** Constante/valor exportado: on. */
+/**
+ * Constante/valor exportado: on.
+ *
+ * @param {string | symbol} eventName
+ * @param {function(...unknown): void} handler
+ */
 export const on = (eventName, handler) => internalEmitter.on(eventName, handler);
-/** Constante/valor exportado: once. */
+/**
+ * Constante/valor exportado: once.
+ *
+ * @param {string | symbol} eventName
+ * @param {function(...unknown): void} handler
+ */
 export const once = (eventName, handler) => internalEmitter.once(eventName, handler);
-/** Constante/valor exportado: off. */
+/**
+ * Constante/valor exportado: off.
+ *
+ * @param {string | symbol} eventName
+ * @param {function(...unknown): void} handler
+ */
 export const off = (eventName, handler) => internalEmitter.off(eventName, handler);
-/** Constante/valor exportado: emit. */
-export const emit = (eventName, ...args) =>
-    /** @type {import('node:events').EventEmitter} */ (internalEmitter).emit(eventName, ...args);
+/**
+ * Constante/valor exportado: emit.
+ *
+ * @param {any} eventName
+ */
+export const emit = (/** @type {any} */ eventName, /** @type {...any} */ ...args) =>
+    /** @type {EventEmitter} */ (internalEmitter).emit(eventName, ...args);
 
-/** Constante/valor exportado: sendToClient. */
+/**
+ * Constante/valor exportado: sendToClient.
+ *
+ * @param {any} clientId
+ * @param {any} eventName
+ * @param {any} data
+ */
 export const sendToClient = (clientId, eventName, data) => {
     if (!ioInstance) {
         log('WARN', '[HUB] Tentativa de enviar evento sem io instance');
@@ -581,7 +638,11 @@ export const sendToClient = (clientId, eventName, data) => {
     }
 };
 
-/** Constante/valor exportado: connectExternal. */
+/**
+ * Constante/valor exportado: connectExternal.
+ *
+ * @param {any} [port]
+ */
 export const connectExternal = async (port = 3008) => {
     const { io: ioClient } = await import('socket.io-client');
     const url = `http://localhost:${port}`;
@@ -607,41 +668,46 @@ export const connectExternal = async (port = 3008) => {
     };
 
     const performHandshake = async () =>
-        new Promise((resolve, reject) => {
-            const onAuthorized = () => {
-                cleanup();
-                resolve();
-            };
+        new Promise(
+            /** @type {(resolve: (v?: any) => void, reject: (e: any) => void) => void} */ (
+                (resolve, reject) => {
+                    const onAuthorized = () => {
+                        cleanup();
+                        resolve();
+                    };
 
-            const onRejected = payload => {
-                cleanup();
-                reject(new Error(`Handshake rejected: ${payload?.reason || 'unknown reason'}`));
-            };
+                    const onRejected = (/** @type {any} */ payload) => {
+                        cleanup();
+                        reject(new Error(`Handshake rejected: ${payload?.reason || 'unknown reason'}`));
+                    };
 
-            const onDisconnect = reason => {
-                cleanup();
-                reject(new Error(`Disconnected before handshake authorization: ${reason}`));
-            };
+                    const onDisconnect = (/** @type {any} */ reason) => {
+                        cleanup();
+                        reject(new Error(`Disconnected before handshake authorization: ${reason}`));
+                    };
 
-            const timer = setTimeout(() => {
-                cleanup();
-                reject(new Error(`Timeout waiting for handshake authorization (${handshakeTimeoutMs}ms)`));
-            }, handshakeTimeoutMs);
+                    const timer = setTimeout(() => {
+                        cleanup();
+                        reject(new Error(`Timeout waiting for handshake authorization (${handshakeTimeoutMs}ms)`));
+                    }, handshakeTimeoutMs);
 
-            function cleanup() {
-                clearTimeout(timer);
-                clientSocket.off('handshake:authorized', onAuthorized);
-                clientSocket.off('handshake:rejected', onRejected);
-                clientSocket.off('disconnect', onDisconnect);
-            }
+                    function cleanup() {
+                        clearTimeout(timer);
+                        clientSocket.off('handshake:authorized', onAuthorized);
+                        clientSocket.off('handshake:rejected', onRejected);
+                        clientSocket.off('disconnect', onDisconnect);
+                    }
 
-            clientSocket.on('handshake:authorized', onAuthorized);
-            clientSocket.on('handshake:rejected', onRejected);
-            clientSocket.on('disconnect', onDisconnect);
-            clientSocket.emit('handshake:present', { identity: handshakeIdentity });
-        });
+                    clientSocket.on('handshake:authorized', onAuthorized);
+                    clientSocket.on('handshake:rejected', onRejected);
+                    clientSocket.on('disconnect', onDisconnect);
+                    clientSocket.emit('handshake:present', { identity: handshakeIdentity });
+                }
+            ),
+        );
 
     // Reaplica handshake a cada (re)conexão para evitar queda por timeout no servidor.
+    /** @type {any} */
     let handshakeInFlight = null;
     const runHandshake = async () => {
         if (!handshakeInFlight) {
@@ -653,66 +719,73 @@ export const connectExternal = async (port = 3008) => {
     };
 
     let initialReadySettled = false;
-    await new Promise((resolve, reject) => {
-        const initialReadyTimeoutMs = connectTimeoutMs + handshakeTimeoutMs;
-        const timer = setTimeout(() => {
-            settleReject(new Error(`Timeout connecting and authorizing external server (${initialReadyTimeoutMs}ms)`));
-        }, initialReadyTimeoutMs);
+    await new Promise(
+        /** @type {(resolve: (v?: any) => void, reject: (e: any) => void) => void} */ (
+            (resolve, reject) => {
+                const initialReadyTimeoutMs = connectTimeoutMs + handshakeTimeoutMs;
+                const timer = setTimeout(() => {
+                    settleReject(
+                        new Error(`Timeout connecting and authorizing external server (${initialReadyTimeoutMs}ms)`),
+                    );
+                }, initialReadyTimeoutMs);
 
-        const settleResolve = () => {
-            if (initialReadySettled) {
-                return;
+                const settleResolve = () => {
+                    if (initialReadySettled) {
+                        return;
+                    }
+                    initialReadySettled = true;
+                    clearTimeout(timer);
+                    clientSocket.off('connect_error', onConnectError);
+                    resolve();
+                };
+
+                const settleReject = (/** @type {any} */ err) => {
+                    if (initialReadySettled) {
+                        return;
+                    }
+                    initialReadySettled = true;
+                    clearTimeout(timer);
+                    clientSocket.off('connect_error', onConnectError);
+                    reject(err instanceof Error ? err : new Error(String(err)));
+                };
+
+                const onConnectError = (/** @type {any} */ err) => {
+                    if (!initialReadySettled) {
+                        settleReject(err);
+                    }
+                };
+
+                const onConnect = async () => {
+                    log('INFO', `[HUB] ✅ Conectado a servidor externo (${url})`);
+                    try {
+                        await runHandshake();
+                        log('INFO', '[HUB] ✅ Handshake autorizado pelo servidor externo');
+                        settleResolve();
+                    } catch (/** @type {any} */ err) {
+                        const _e = /** @type {any} */ (err);
+                        if (!initialReadySettled) {
+                            settleReject(err);
+                        } else {
+                            log('WARN', `[HUB] Handshake em reconexão falhou: ${_e?.message || String(err)}`);
+                        }
+                    }
+                };
+
+                clientSocket.on('connect', onConnect);
+                clientSocket.on('connect_error', onConnectError);
             }
-            initialReadySettled = true;
-            clearTimeout(timer);
-            clientSocket.off('connect_error', onConnectError);
-            resolve();
-        };
+        ),
+    );
 
-        const settleReject = err => {
-            if (initialReadySettled) {
-                return;
-            }
-            initialReadySettled = true;
-            clearTimeout(timer);
-            clientSocket.off('connect_error', onConnectError);
-            reject(err);
-        };
-
-        const onConnectError = err => {
-            if (!initialReadySettled) {
-                settleReject(err);
-            }
-        };
-
-        const onConnect = async () => {
-            log('INFO', `[HUB] ✅ Conectado a servidor externo (${url})`);
-            try {
-                await runHandshake();
-                log('INFO', '[HUB] ✅ Handshake autorizado pelo servidor externo');
-                settleResolve();
-            } catch (err) {
-                if (!initialReadySettled) {
-                    settleReject(err);
-                } else {
-                    log('WARN', `[HUB] Handshake em reconexão falhou: ${err?.message || String(err)}`);
-                }
-            }
-        };
-
-        clientSocket.on('connect', onConnect);
-        clientSocket.on('connect_error', onConnectError);
-    });
-
-    clientSocket.on('reconnect_attempt', attempt => {
+    clientSocket.on('reconnect_attempt', (attempt) => {
         log('DEBUG', `[HUB] Tentativa de reconexão ao servidor externo (#${attempt})`);
     });
 
-    clientSocket.on('reconnect', attempt => {
+    clientSocket.on('reconnect', (attempt) => {
         log('INFO', `[HUB] Reconectado ao servidor externo (#${attempt})`);
     });
 
-    clientSocket.on('reconnect_error', err => {
+    clientSocket.on('reconnect_error', (err) => {
         log('WARN', `[HUB] Erro de reconexão ao servidor externo: ${err?.message || String(err)}`);
     });
 
@@ -727,11 +800,12 @@ export const connectExternal = async (port = 3008) => {
 
     // Retornar adaptador compatível com interface esperada
     return {
-        on: (event, handler) => clientSocket.on(event, handler),
-        off: (event, handler) => clientSocket.off(event, handler),
-        emit: (event, data) => clientSocket.emit(event, data),
+        on: (/** @type {any} */ event, /** @type {any} */ handler) => clientSocket.on(event, handler),
+        off: (/** @type {any} */ event, /** @type {any} */ handler) => clientSocket.off(event, handler),
+        emit: (/** @type {any} */ event, /** @type {any} */ data) => clientSocket.emit(event, data),
         // Best-effort in split mode: preserve API shape even without direct server-side socket lookup.
-        sendToClient: (clientId, event, data) => clientSocket.emit(event, { clientId, payload: data }),
+        sendToClient: (/** @type {any} */ clientId, /** @type {any} */ event, /** @type {any} */ data) =>
+            clientSocket.emit(event, { clientId, payload: data }),
         connected: () => clientSocket.connected,
         disconnect: () => clientSocket.disconnect(),
     };
@@ -739,8 +813,9 @@ export const connectExternal = async (port = 3008) => {
 
 /**
  * Notifica todos os clientes conectados sobre shutdown iminente do servidor.
+ *
  * @param {number} timeoutMs - Tempo em ms até o shutdown forçado
-  * @returns {void}
+ * @returns {void}
  */
 function notifyShutdown(timeoutMs) {
     if (!ioInstance) {

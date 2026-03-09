@@ -1,8 +1,9 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { log } from '#core/logger';
 
 /**
  * Event types emitidos pelo monitor.
+ *
  * @readonly
  * @enum {string}
  */
@@ -14,6 +15,7 @@ const LIFECYCLE_EVENTS = {
 
 /**
  * Reason codes para page close events.
+ *
  * @readonly
  * @enum {string}
  */
@@ -34,9 +36,9 @@ class PageLifecycleMonitor {
      * Cria monitor para página.
      *
      * @param {any} page - Puppeteer Page instance
-     * @param {BrowserPoolManager} poolManager - Pool manager reference
+     * @param {any} poolManager - Pool manager reference
      * @param {string} taskId - Task ID associado à página
-     * @param {{ emit?: (event: unknown) => void } | null} [nerv=null] - NERV event bus (opcional)
+     * @param {{ emit?: (event: unknown) => void } | null} [nerv=null] - NERV event bus (opcional). Default is `null`
      */
     constructor(page, poolManager, taskId, nerv = null) {
         if (!page) {
@@ -55,6 +57,7 @@ class PageLifecycleMonitor {
         this.poolManager = poolManager;
         this.taskId = taskId;
         this.nerv = nerv;
+        /** @type {any[]} */
         this.listeners = [];
         this.active = false;
 
@@ -69,6 +72,7 @@ class PageLifecycleMonitor {
 
     /**
      * Anexa listeners para eventos de página.
+     *
      * @private
      */
     _attachListeners() {
@@ -88,7 +92,7 @@ class PageLifecycleMonitor {
             this.listeners.push({ event: 'close', handler: closeHandler });
 
             // 2. Page error event
-            const errorHandler = err => {
+            const errorHandler = (/** @type {any} */ err) => {
                 this.eventsReceived++;
                 log('ERROR', `[PageLifecycleMonitor] Page error: ${this.taskId} - ${err.message}`);
                 this.handlePageError(err);
@@ -109,9 +113,10 @@ class PageLifecycleMonitor {
 
             log(
                 'DEBUG',
-                `[PageLifecycleMonitor] Listeners attached for ${this.taskId} (${this.listeners.length} events)`
+                `[PageLifecycleMonitor] Listeners attached for ${this.taskId} (${this.listeners.length} events)`,
             );
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Failed to attach listeners: ${err.message}`);
         }
     }
@@ -120,6 +125,7 @@ class PageLifecycleMonitor {
      * Handler para page.on('close').
      *
      * Chamado quando:
+     *
      * - Usuário fecha tab manualmente
      * - Browser fecha
      * - Page.close() é chamado programaticamente
@@ -131,7 +137,7 @@ class PageLifecycleMonitor {
 
             // 2. Emit NERV event (se disponível)
             if (this.nerv) {
-                this.nerv.emit({
+                /** @type {any} */ (this.nerv).emit({
                     type: LIFECYCLE_EVENTS.PAGE_CLOSED,
                     payload: {
                         taskId: this.taskId,
@@ -151,7 +157,8 @@ class PageLifecycleMonitor {
             this.cleanup();
 
             log('INFO', `[PageLifecycleMonitor] Page close handled: ${this.taskId}`);
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Error handling page close: ${err.message}`);
         }
     }
@@ -172,7 +179,7 @@ class PageLifecycleMonitor {
 
             // 2. Emit NERV event
             if (this.nerv) {
-                this.nerv.emit({
+                /** @type {any} */ (this.nerv).emit({
                     type: LIFECYCLE_EVENTS.PAGE_ERROR,
                     payload: {
                         taskId: this.taskId,
@@ -183,7 +190,8 @@ class PageLifecycleMonitor {
             }
 
             log('WARN', `[PageLifecycleMonitor] Page error recorded: ${this.taskId}`);
-        } catch (error) {
+        } catch (/** @type {any} */ _rawError) {
+            const error = /** @type {any} */ (_rawError);
             log('ERROR', `[PageLifecycleMonitor] Error handling page error: ${error.message}`);
         }
     }
@@ -205,7 +213,7 @@ class PageLifecycleMonitor {
 
             // 3. Emit NERV event
             if (this.nerv) {
-                this.nerv.emit({
+                /** @type {any} */ (this.nerv).emit({
                     type: LIFECYCLE_EVENTS.PAGE_DISCONNECTED,
                     payload: {
                         taskId: this.taskId,
@@ -218,7 +226,8 @@ class PageLifecycleMonitor {
             this.cleanup();
 
             log('INFO', `[PageLifecycleMonitor] Page disconnect handled: ${this.taskId}`);
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Error handling page disconnect: ${err.message}`);
         }
     }
@@ -227,6 +236,7 @@ class PageLifecycleMonitor {
      * Remove todos os event listeners.
      *
      * Chamado:
+     *
      * - Automaticamente após page close/disconnect
      * - Manualmente ao liberar página normalmente
      */
@@ -244,7 +254,8 @@ class PageLifecycleMonitor {
             this.active = false;
 
             log('DEBUG', `[PageLifecycleMonitor] Cleanup completed for ${this.taskId}`);
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Cleanup failed: ${err.message}`);
         }
     }
@@ -272,7 +283,7 @@ class PageLifecycleMonitor {
         this.rebindCount++;
 
         if (this.nerv) {
-            this.nerv.emit({
+            /** @type {any} */ (this.nerv).emit({
                 type: 'BROWSER_PAGE_TASK_REBIND',
                 payload: {
                     oldTaskId: previousTaskId,
@@ -289,7 +300,7 @@ class PageLifecycleMonitor {
     /**
      * Retorna status do monitor.
      *
-     * @returns {Object} Status object
+     * @returns {any} Status object
      */
     getStatus() {
         return {
@@ -302,4 +313,4 @@ class PageLifecycleMonitor {
     }
 }
 
-export { PageLifecycleMonitor, LIFECYCLE_EVENTS, CLOSE_REASONS };
+export { CLOSE_REASONS, LIFECYCLE_EVENTS, PageLifecycleMonitor };

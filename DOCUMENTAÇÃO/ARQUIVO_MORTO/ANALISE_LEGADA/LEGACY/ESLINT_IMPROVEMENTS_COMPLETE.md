@@ -38,14 +38,14 @@ npx eslint . --fix
 
 ```javascript
 // ❌ ANTES (erro: no-promise-executor-return)
-await new Promise(r => setTimeout(r, 100));
-await new Promise(r => httpServer.listen(PORT, r));
+await new Promise((r) => setTimeout(r, 100));
+await new Promise((r) => httpServer.listen(PORT, r));
 
 // ✅ DEPOIS (correto: sem retorno implícito)
-await new Promise(r => {
+await new Promise((r) => {
   setTimeout(r, 100);
 });
-await new Promise(r => {
+await new Promise((r) => {
   httpServer.listen(PORT, r);
 });
 ```
@@ -115,14 +115,14 @@ try {
 
 ```javascript
 // ❌ ANTES (warning: no-unused-vars)
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 try {
   doSomething();
 } catch (e) {}
 
 // ✅ DEPOIS (correto: prefixo _ indica intencional)
-const sleep = ms =>
-  new Promise(r => {
+const sleep = (ms) =>
+  new Promise((r) => {
     setTimeout(r, ms);
   });
 try {

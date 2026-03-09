@@ -183,3 +183,9 @@ ssl/
 # DevContainer runtime logs (numeric filenames produced by post-create.sh)
 /60
 60
+
+# ESLint cache (movido para volume Docker: /home/node/.cache/eslint/)
+# .eslintcache — não commitado; reside em XDG_CACHE_HOME no container
+
+# Prettier cache (em volume Docker: /home/node/.cache/prettier/)
+# Ambos são cobertos pelo volume devcontainer-cache e não existem no workspace

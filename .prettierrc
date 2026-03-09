@@ -4,9 +4,9 @@
   "singleQuote": true,
   "tabWidth": 4,
   "useTabs": false,
-  "trailingComma": "es5",
+  "trailingComma": "all",
   "printWidth": 120,
-  "arrowParens": "avoid",
+  "arrowParens": "always",
   "endOfLine": "lf",
   "bracketSpacing": true,
   "bracketSameLine": false,
@@ -14,33 +14,34 @@
   "proseWrap": "preserve",
   "htmlWhitespaceSensitivity": "css",
   "embeddedLanguageFormatting": "auto",
+  "plugins": [
+    "prettier-plugin-packagejson",
+    "prettier-plugin-sh",
+    "prettier-plugin-organize-imports",
+    "prettier-plugin-jsdoc"
+  ],
+  "jsdocCapitalizeDescription": false,
+  "jsdocCommentLineStrategy": "keep",
+  "jsdocVerticalAlignment": false,
+  "jsdocSeparateTagGroups": false,
+  "jsdocPrintWidth": 120,
   "overrides": [
     {
-      "files": [
-        "*.json",
-        "*.jsonc",
-        ".prettierrc",
-        ".eslintrc"
-      ],
+      "files": ["*.json", "*.jsonc", ".prettierrc", ".eslintrc"],
       "options": {
         "tabWidth": 2,
         "trailingComma": "none"
       }
     },
     {
-      "files": [
-        "*.yml",
-        "*.yaml"
-      ],
+      "files": ["*.yml", "*.yaml"],
       "options": {
         "tabWidth": 2,
         "singleQuote": false
       }
     },
     {
-      "files": [
-        "*.md"
-      ],
+      "files": ["*.md"],
       "options": {
         "tabWidth": 2,
         "proseWrap": "always",
@@ -48,10 +49,7 @@
       }
     },
     {
-      "files": [
-        "package.json",
-        "package-lock.json"
-      ],
+      "files": ["package.json", "package-lock.json"],
       "options": {
         "tabWidth": 2,
         "trailingComma": "none"

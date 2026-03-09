@@ -18,16 +18,16 @@ const VALID_ENFORCE_LEVELS = new Set(['off', 'warn', 'p1', 'p0']);
  * @property {string} title
  * @property {string} domain
  * @property {string} description
- * @property {'static'|'runtime'|'protocol'|'operational'|'chaos'} kind
- * @property {'P0'|'P1'|'P2'|'P3'} severity_default
- * @property {'bug'|'gap'|'falha de contrato'|'incompletude'|'upgrade'} type_default
- * @property {Record<string, any>} matcher
- * @property {{ files?: string[], allowlist_id?: string, allowlist_key?: string }} [allowlist]
+ * @property {'static' | 'runtime' | 'protocol' | 'operational' | 'chaos'} kind
+ * @property {'P0' | 'P1' | 'P2' | 'P3'} severity_default
+ * @property {'bug' | 'gap' | 'falha de contrato' | 'incompletude' | 'upgrade'} type_default
+ * @property {Record<string, unknown>} matcher
+ * @property {{ files?: string[]; allowlist_id?: string; allowlist_key?: string }} [allowlist]
  * @property {string[]} test_recipe
  * @property {string} owner
- * @property {'draft'|'active'|'deprecated'|'retired'} status
+ * @property {'draft' | 'active' | 'deprecated' | 'retired'} status
  * @property {number} version
- * @property {{ level?: 'off'|'warn'|'p1'|'p0' }} [enforcement]
+ * @property {{ level?: 'off' | 'warn' | 'p1' | 'p0' }} [enforcement]
  * @property {string} [source_path]
  */
 
@@ -79,15 +79,20 @@ function validateContract(contract, index, sourcePath) {
 }
 
 /**
- * @param {{ registryPath?: string, domainsFilter?: string[] }} [options]
+ * @typedef {object} LoadContractRegistryOptions
+ * @property {string | undefined} [registryPath]
+ * @property {string[] | undefined} [domainsFilter]
+ */
+/**
+ * @param {LoadContractRegistryOptions} [options]
  * @returns {{
- *   registryPath: string,
- *   registry: any,
- *   contracts: ContractDefinitionV1[],
- *   byId: Map<string, ContractDefinitionV1>,
- *   allowlists: Record<string, Record<string, string[]>>,
- *   errors: string[],
- *   warnings: string[],
+ *     registryPath: string;
+ *     registry: unknown;
+ *     contracts: ContractDefinitionV1[];
+ *     byId: Map<string, ContractDefinitionV1>;
+ *     allowlists: Record<string, Record<string, string[]>>;
+ *     errors: string[];
+ *     warnings: string[];
  * }}
  */
 export function loadContractRegistry(options = {}) {
@@ -139,7 +144,7 @@ export function loadContractRegistry(options = {}) {
         const entries = payload?.items && typeof payload.items === 'object' ? payload.items : {};
         for (const [key, value] of Object.entries(entries)) {
             allowlists[allowlistId][key] = Array.isArray(value)
-                ? value.map(item => String(item).replace(/\\/g, '/'))
+                ? value.map((item) => String(item).replace(/\\/g, '/'))
                 : [];
         }
     }
@@ -158,7 +163,7 @@ export function loadContractRegistry(options = {}) {
             continue;
         }
         const domainContracts = Array.isArray(payload?.contracts) ? payload.contracts : [];
-        domainContracts.forEach((item, index) => {
+        domainContracts.forEach((/** @type {any} */ item, /** @type {any} */ index) => {
             const contract = /** @type {ContractDefinitionV1} */ ({
                 ...item,
                 source_path: String(relPath),

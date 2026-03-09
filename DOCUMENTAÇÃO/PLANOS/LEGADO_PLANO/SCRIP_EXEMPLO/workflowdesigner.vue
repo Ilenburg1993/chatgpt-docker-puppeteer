@@ -87,7 +87,7 @@ export default {
         const workflowSteps = computed(() => workflowStore.currentWorkflow?.steps || []);
         const isValid = computed(() => workflowStore.workflowValidation?.valid || false);
 
-        const addStep = actionType => {
+        const addStep = (actionType) => {
             const newStep = {
                 id: `step-${Date.now()}`,
                 name: `New ${actionType} Step`,
@@ -100,7 +100,7 @@ export default {
             workflowStore.addStep(newStep);
         };
 
-        const editStep = stepId => {
+        const editStep = (stepId) => {
             selectedStep.value = workflowStore.getStep(stepId);
         };
 

@@ -38,7 +38,7 @@ if (row.blocked_details_json) {
   } catch (err) {
     log.warn(
       { taskId: task.id, field: 'blocked_details_json', error: err.message },
-      '[task_repo] Fallback to raw string for malformed JSON'
+      '[task_repo] Fallback to raw string for malformed JSON',
     );
     task.state.blocked_details = row.blocked_details_json;
   }

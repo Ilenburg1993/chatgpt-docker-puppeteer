@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/transport/reconnect.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -26,11 +26,13 @@
 
 /**
  * Executa função de forma segura.
+ *
+ * @param {Function} fn
  */
 function safeCall(fn) {
     try {
         fn();
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // falha física não deve propagar
     }
 }
@@ -47,20 +49,31 @@ function now() {
 =========================== */
 
 /**
+ * @typedef {object} CreateReconnectDeps
+ * @property {any} telemetry
+ * @property {function(): void} start
+ * @property {function(): void} stop
+ * @property {any} [policy]
+ */
+/**
+ * @typedef {object} CreateReconnectOptions
+ * @property {any} [telemetry]
+ * @property {any} [start]
+ * @property {any} [stop]
+ * @property {any} [policy]
+ */
+/**
  * Cria um controlador técnico de reconexão.
  *
- * **Side-effects:** Agenda timers de reconexão, emite telemetria.
- * **Semântica:** Política técnica de retry para transporte físico.
- * **Unidades:** interval em ms (padrão 1000), maxAttempts como inteiro ou null.
+ * **Side-effects:** Agenda timers de reconexão, emite telemetria. **Semântica:** Política técnica de retry para
+ * transporte físico. **Unidades:** interval em ms (padrão 1000), maxAttempts como inteiro ou null.
  *
- * @param {object} deps - Dependências do controlador
- * @param {object} deps.telemetry - Interface de telemetria do NERV
- * @param {function(): void} deps.start - Função para iniciar transporte
- * @param {function(): void} deps.stop - Função para parar transporte
- * @param {object} [deps.policy={}] - Política de reconexão
- * @param {number} [deps.policy.interval=1000] - Intervalo entre tentativas (ms)
- * @param {number|null} [deps.policy.maxAttempts=null] - Máximo de tentativas (null=infinito)
- * @returns {object} Controlador com métodos start, stop, onConnectionUp, onConnectionDown
+ * @param {CreateReconnectDeps} deps - Dependências do controlador
+ * @param {object} deps
+ * @param {object} deps.policy
+ * @param {number} [deps.policy.interval=1000] - Intervalo entre tentativas (ms). Default is `1000`
+ * @param {number | null} [deps.policy.maxAttempts=null] - Máximo de tentativas (null=infinito). Default is `null`
+ * @returns {any} Controlador com métodos start, stop, onConnectionUp, onConnectionDown
  * @throws {Error} Se dependências obrigatórias estiverem ausentes ou inválidas
  */
 function createReconnect({ telemetry, start, stop, policy = {} }) {
@@ -77,6 +90,7 @@ function createReconnect({ telemetry, start, stop, policy = {} }) {
 
     let attempts = 0;
     let active = false;
+    /** @type {ReturnType<typeof setTimeout> | null} */
     let timer = null;
 
     /* ===========================

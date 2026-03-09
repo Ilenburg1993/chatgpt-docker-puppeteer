@@ -1,29 +1,31 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
+/** @import {SignOptions} from "jsonwebtoken" */
+import { getJwtSecret, JWT_SIGN_OPTIONS } from '#core/jwt_config';
+import { log } from '#core/logger';
+import { getRbacUserByUsername, verifyRbacCredentials } from '#infra/db/rbac_repo';
+import { revokeToken } from '#infra/db/token_blocklist';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
-import rateLimit from 'express-rate-limit';
-import { log } from '#core/logger';
-import { getJwtSecret, JWT_SIGN_OPTIONS } from '#core/jwt_config';
-import { getRbacUserByUsername, verifyRbacCredentials } from '#infra/db/rbac_repo';
-import { revokeToken } from '#infra/db/token_blocklist';
-import denyIfDelegated from '../../middleware/deny_if_delegated.js';
 import { authenticate } from '../../middleware/auth.js';
-import dashboardTasksRouter from './dashboard_tasks.js';
-import dashboardMissionsRouter from './dashboard_missions.js';
+import denyIfDelegated from '../../middleware/deny_if_delegated.js';
+import dashboardAuditRouter from './dashboard_audit.js';
 import dashboardEventsRouter from './dashboard_events.js';
 import dashboardInferenceRouter from './dashboard_inference.js';
-import dashboardAuditRouter from './dashboard_audit.js';
+import dashboardMissionsRouter from './dashboard_missions.js';
+import dashboardTasksRouter from './dashboard_tasks.js';
 
 /** Constante/valor exportado: default. */
 const router = express.Router();
 const DASHBOARD_AUTH_PASSWORD_MIN_LENGTH = 12;
+/** @type {any} */
 let telemetryAggregatorPromise = null;
 
 /**
- * Rate limiter dedicado para endpoints de autenticação.
- * Mais estrito que o apiLimiter geral para proteção contra brute force.
+ * Rate limiter dedicado para endpoints de autenticação. Mais estrito que o apiLimiter geral para proteção contra brute
+ * force.
  */
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
@@ -42,8 +44,8 @@ const authLimiter = rateLimit({
 async function getTelemetryAggregator() {
     if (!telemetryAggregatorPromise) {
         telemetryAggregatorPromise = import('#server/dashboard-api/telemetry_aggregator')
-            .then(module => module.default ?? module)
-            .catch(err => {
+            .then((module) => module.default ?? module)
+            .catch((err) => {
                 // Clear the cached promise so the next call can retry the import.
                 // Without this, a single import failure permanently breaks all telemetry endpoints.
                 telemetryAggregatorPromise = null;
@@ -67,14 +69,14 @@ function getDashboardAuthCredentials() {
 
     if (password.length < DASHBOARD_AUTH_PASSWORD_MIN_LENGTH) {
         throw new Error(
-            `DASHBOARD_AUTH_PASSWORD invalida (minimo ${DASHBOARD_AUTH_PASSWORD_MIN_LENGTH} caracteres requerido)`
+            `DASHBOARD_AUTH_PASSWORD invalida (minimo ${DASHBOARD_AUTH_PASSWORD_MIN_LENGTH} caracteres requerido)`,
         );
     }
 
     return { username, password, role: 'admin' };
 }
 
-function safeCredentialMatch(input, expected) {
+function safeCredentialMatch(/** @type {any} */ input, /** @type {any} */ expected) {
     // Hash both values to normalize buffer length, preventing length-based timing side-channels.
     // timingSafeEqual requires equal-length buffers; SHA-256 digests are always 32 bytes.
     // An early-return on length mismatch would leak the expected credential's length to timing attacks.
@@ -102,8 +104,7 @@ function getBridgeMetrics() {
 -------------------------------------------------------------------------- */
 
 /**
- * POST /api/dashboard/auth/login
- * Faz login e retorna token JWT
+ * POST /api/dashboard/auth/login Faz login e retorna token JWT
  */
 router.post('/auth/login', authLimiter, async (req, res) => {
     try {
@@ -126,8 +127,9 @@ router.post('/auth/login', authLimiter, async (req, res) => {
                 let credentials;
                 try {
                     credentials = getDashboardAuthCredentials();
-                } catch (configErr) {
-                    log('ERROR', `[AUTH] Configuração de autenticação inválida: ${configErr.message}`, req.id);
+                } catch (/** @type {any} */ configErr) {
+                    const _e = /** @type {any} */ (configErr);
+                    log('ERROR', `[AUTH] Configuração de autenticação inválida: ${_e.message}`, req.id);
                     return res.status(503).json({
                         success: false,
                         error: 'Autenticação do dashboard indisponível por configuração inválida',
@@ -182,11 +184,11 @@ router.post('/auth/login', authLimiter, async (req, res) => {
                 jti,
             },
             getJwtSecret(),
-            /** @type {import('jsonwebtoken').SignOptions} */ (JWT_SIGN_OPTIONS)
+            /** @type {SignOptions} */ (JWT_SIGN_OPTIONS),
         );
 
         log('INFO', `[AUTH] User logged in: ${authUser.username}`, req.id);
-        res.json({
+        return res.json({
             success: true,
             token,
             user: {
@@ -199,9 +201,10 @@ router.post('/auth/login', authLimiter, async (req, res) => {
             expires_in: 24 * 60 * 60, // 24 horas em segundos
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[AUTH] Login error: ${err.message}`, req.id);
-        res.status(500).json({
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[AUTH] Login error: ${_e.message}`, req.id);
+        return res.status(500).json({
             success: false,
             error: 'Erro interno no login',
             request_id: req.id,
@@ -210,9 +213,8 @@ router.post('/auth/login', authLimiter, async (req, res) => {
 });
 
 /**
- * POST /api/dashboard/auth/logout
- * SEC-02 FIX: Revoga o token JWT na blocklist para invalidação imediata.
- * O cliente também deve remover o token do localStorage.
+ * POST /api/dashboard/auth/logout SEC-02 FIX: Revoga o token JWT na blocklist para invalidação imediata. O cliente
+ * também deve remover o token do localStorage.
  */
 router.post('/auth/logout', authenticate, (req, res) => {
     const username = req.user?.username || 'unknown';
@@ -236,8 +238,7 @@ router.post('/auth/logout', authenticate, (req, res) => {
 });
 
 /**
- * GET /api/dashboard/auth/me
- * Retorna informações do usuário autenticado
+ * GET /api/dashboard/auth/me Retorna informações do usuário autenticado
  */
 router.get('/auth/me', authenticate, (req, res) => {
     res.json({
@@ -266,8 +267,9 @@ router.get('/telemetry/current', authenticate, async (req, res) => {
         const telemetryAggregator = await getTelemetryAggregator();
         const metrics = await telemetryAggregator.getCurrent();
         res.json({ success: true, metrics, request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] Erro ao buscar telemetria: ${err.message}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] Erro ao buscar telemetria: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Erro ao recuperar métricas', request_id: req.id });
     }
 });
@@ -277,8 +279,9 @@ router.get('/telemetry/history', async (req, res) => {
         const telemetryAggregator = await getTelemetryAggregator();
         const history = telemetryAggregator.getFullHistory();
         res.json({ success: true, ...history, request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] Erro ao buscar histórico: ${err.message}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] Erro ao buscar histórico: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Erro ao recuperar histórico', request_id: req.id });
     }
 });
@@ -294,10 +297,11 @@ router.get('/telemetry/history/:metric', async (req, res) => {
             return res.status(400).json({ success: false, error: history.error, request_id: req.id });
         }
 
-        res.json({ success: true, ...history, request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] Erro ao buscar histórico: ${err.message}`, req.id);
-        res.status(500).json({ success: false, error: 'Erro ao recuperar histórico', request_id: req.id });
+        return res.json({ success: true, ...history, request_id: req.id });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] Erro ao buscar histórico: ${_e.message}`, req.id);
+        return res.status(500).json({ success: false, error: 'Erro ao recuperar histórico', request_id: req.id });
     }
 });
 
@@ -310,8 +314,9 @@ router.get('/alerts', async (req, res) => {
         const telemetryAggregator = await getTelemetryAggregator();
         const alerts = telemetryAggregator.getActiveAlerts();
         res.json({ success: true, count: alerts.length, alerts, request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] Erro ao buscar alertas: ${err.message}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] Erro ao buscar alertas: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Erro ao recuperar alertas', request_id: req.id });
     }
 });
@@ -322,8 +327,9 @@ router.put('/alerts/thresholds', authenticate, denyIfDelegated, async (req, res)
         const thresholds = req.body;
         telemetryAggregator.setAlertThresholds(thresholds);
         res.json({ success: true, message: 'Thresholds atualizados', request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] Erro ao atualizar thresholds: ${err.message}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] Erro ao atualizar thresholds: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Erro ao atualizar thresholds', request_id: req.id });
     }
 });
@@ -340,7 +346,7 @@ router.get('/system/health', async (req, res) => {
         const bridgeMetrics = getBridgeMetrics();
 
         let overallStatus = 'healthy';
-        if (alerts.some(a => a.severity === 'critical')) {
+        if (alerts.some((/** @type {any} */ a) => a.severity === 'critical')) {
             overallStatus = 'critical';
         } else if (alerts.length > 0) {
             overallStatus = 'warning';
@@ -375,8 +381,9 @@ router.get('/system/health', async (req, res) => {
             uptime_seconds: metrics?.uptime_seconds || 0,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] Erro ao verificar health: ${err.message}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] Erro ao verificar health: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             status: 'error',
@@ -397,8 +404,9 @@ router.get('/system/info', async (req, res) => {
             versions: { node: process.version, platform: process.platform, arch: process.arch },
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] Erro ao buscar info: ${err.message}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] Erro ao buscar info: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Erro ao recuperar informações', request_id: req.id });
     }
 });
@@ -411,8 +419,9 @@ router.get('/bridge/metrics', async (req, res) => {
     try {
         const metrics = getBridgeMetrics();
         res.json({ success: true, metrics, request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] Erro ao buscar métricas bridge: ${err.message}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] Erro ao buscar métricas bridge: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Erro ao recuperar métricas do bridge', request_id: req.id });
     }
 });

@@ -121,10 +121,10 @@ Be specific in your feedback. Instead of "needs improvement", say "Add 2-3 concr
   generateDetailedFeedback(evaluation) {
     let feedback = `Quality Score: ${evaluation.overall_score}/100\n\n`;
 
-    feedback += `**Strengths:**\n${evaluation.strengths.map(s => `✓ ${s}`).join('\n')}\n\n`;
+    feedback += `**Strengths:**\n${evaluation.strengths.map((s) => `✓ ${s}`).join('\n')}\n\n`;
 
     if (evaluation.weaknesses.length > 0) {
-      feedback += `**Weaknesses:**\n${evaluation.weaknesses.map(w => `✗ ${w}`).join('\n')}\n\n`;
+      feedback += `**Weaknesses:**\n${evaluation.weaknesses.map((w) => `✗ ${w}`).join('\n')}\n\n`;
     }
 
     if (evaluation.suggestions.length > 0) {
@@ -164,7 +164,7 @@ class ValidationPipeline {
         currentOutput = await this.refineOutput(
           currentOutput,
           result.feedback,
-          stage.refine_prompt
+          stage.refine_prompt,
         );
       } else if (!result.passed) {
         // Fail fast
@@ -172,7 +172,7 @@ class ValidationPipeline {
       }
     }
 
-    const overallPassed = pipelineResults.every(r => r.passed);
+    const overallPassed = pipelineResults.every((r) => r.passed);
     const avgScore = pipelineResults.reduce((sum, r) => sum + r.score, 0) / pipelineResults.length;
 
     return {
@@ -671,7 +671,7 @@ class FeedbackInjector {
 
   getRelevantFeedback(allFeedback, stepConfig) {
     // Filter feedback relevant to this step
-    return allFeedback.filter(fb => {
+    return allFeedback.filter((fb) => {
       // Feedback explicitly for this step
       if (fb.step_id === stepConfig.id) return true;
 
@@ -733,7 +733,7 @@ class TestDrivenLoop {
       spec.context = {
         ...spec.context,
         previous_code: code,
-        test_failures: testResults.failures.map(f => ({
+        test_failures: testResults.failures.map((f) => ({
           test: f.name,
           error: f.error,
           expected: f.expected,
@@ -757,7 +757,7 @@ class TestDrivenLoop {
 
     if (previousFailures) {
       prompt += `\n\n**Previous attempt failed tests:**\n`;
-      previousFailures.forEach(f => {
+      previousFailures.forEach((f) => {
         prompt += `- Test "${f.name}" failed: ${f.error}\n`;
         prompt += `  Expected: ${f.expected}\n`;
         prompt += `  Actual: ${f.actual}\n`;
@@ -867,19 +867,19 @@ class LintingLoop {
     // Run ESLint, Pylint, etc.
     const { exec } = require('child_process');
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       exec(`eslint --format json`, { input: code }, (error, stdout) => {
         const results = JSON.parse(stdout);
         resolve({
-          errors: results.filter(r => r.severity === 2),
-          warnings: results.filter(r => r.severity === 1),
+          errors: results.filter((r) => r.severity === 2),
+          warnings: results.filter((r) => r.severity === 1),
         });
       });
     });
   }
 
   async fixLintingErrors(code, errors) {
-    const prompt = `Fix the following linting errors in this code:\n\n**Code:**\n\`\`\`\n${code}\n\`\`\`\n\n**Errors:**\n${errors.map(e => `- Line ${e.line}: ${e.message}`).join('\n')}\n\nProvide corrected code.`;
+    const prompt = `Fix the following linting errors in this code:\n\n**Code:**\n\`\`\`\n${code}\n\`\`\`\n\n**Errors:**\n${errors.map((e) => `- Line ${e.line}: ${e.message}`).join('\n')}\n\nProvide corrected code.`;
 
     const driver = await DriverFactory.createDriver('chatgpt');
     const result = await driver.execute({
@@ -949,7 +949,7 @@ class MissionLearner {
           missionId,
           `learned_pattern_${theme.key}`,
           theme.value,
-          'mission_analysis'
+          'mission_analysis',
         );
       }
     }
@@ -957,8 +957,8 @@ class MissionLearner {
 
   analyzeQualityTrend(history) {
     const scores = Object.values(history)
-      .filter(r => r.quality_score !== undefined)
-      .map(r => r.quality_score);
+      .filter((r) => r.quality_score !== undefined)
+      .map((r) => r.quality_score);
 
     if (scores.length < 3) {
       return { improving: false, declining: false, stable: true };
@@ -991,7 +991,7 @@ ${Object.entries(history)
 - Step: ${id}
   Quality Score: ${result.quality_score}
   Issues: ${result.validation_issues?.join(', ') || 'none'}
-`
+`,
   )
   .join('\n')}
 
@@ -1052,8 +1052,8 @@ class StyleLearner {
 
     // Collect approved outputs
     const approvedOutputs = Object.values(mission.state.accumulated_results)
-      .filter(r => r.user_approved || r.quality_score >= 85)
-      .map(r => r.output);
+      .filter((r) => r.user_approved || r.quality_score >= 85)
+      .map((r) => r.output);
 
     if (approvedOutputs.length < 3) {
       // Not enough data to learn style
@@ -1068,7 +1068,7 @@ class StyleLearner {
       missionId,
       'learned_style_guide',
       styleAnalysis,
-      'approved_outputs_analysis'
+      'approved_outputs_analysis',
     );
 
     return styleAnalysis;
@@ -1267,7 +1267,7 @@ class FeedbackMetrics {
   }
 
   calculateQualityImprovement(mission) {
-    const feedbackSteps = mission.user_feedback.map(fb => fb.step_id);
+    const feedbackSteps = mission.user_feedback.map((fb) => fb.step_id);
     const results = mission.state.accumulated_results;
 
     const avgBefore = this.avgQualityBefore(results, feedbackSteps);

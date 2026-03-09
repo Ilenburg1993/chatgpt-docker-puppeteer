@@ -45,7 +45,7 @@ class ValidationService {
 
         // Aggregate results
         const overallScore = results.reduce((sum, r) => sum + r.score, 0) / results.length;
-        const allPassed = results.every(r => r.passed);
+        const allPassed = results.every((r) => r.passed);
         const passed = allPassed && overallScore >= (min_score || 0);
 
         return {
@@ -53,17 +53,17 @@ class ValidationService {
             overall_score: overallScore,
             results,
             feedback: this._generateFeedback(results),
-            issues: results.filter(r => !r.passed).map(r => r.feedback),
+            issues: results.filter((r) => !r.passed).map((r) => r.feedback),
         };
     }
 
     _generateFeedback(results) {
-        const issues = results.filter(r => !r.passed);
+        const issues = results.filter((r) => !r.passed);
         if (issues.length === 0) {
             return 'All validations passed. Output meets quality criteria.';
         }
 
-        return `Found ${issues.length} issue(s):\n` + issues.map(r => `- ${r.feedback}`).join('\n');
+        return `Found ${issues.length} issue(s):\n` + issues.map((r) => `- ${r.feedback}`).join('\n');
     }
 }
 

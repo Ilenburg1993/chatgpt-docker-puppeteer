@@ -3,15 +3,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * @param {{ historyPath: string, scopeKey?: string, ewmaAlpha?: number }} options
-  * @returns {any}
+ * @typedef {object} CreateEtaEstimatorOptions
+ * @property {string} historyPath
+ * @property {string} scopeKey
+ * @property {number} ewmaAlpha
+ */
+/**
+ * @param {CreateEtaEstimatorOptions} options
+ * @returns {object}
  */
 export function createEtaEstimator(options) {
     const historyPath = options.historyPath;
     const scopeKey = String(options.scopeKey || 'default');
     const ewmaAlpha = Math.max(0.05, Math.min(1, Number(options.ewmaAlpha || 0.35)));
 
-    /** @type {Record<string, { avg_ms: number, count: number }>} */
+    /** @type {Record<string, { avg_ms: number; count: number }>} */
     let history = {};
 
     if (fs.existsSync(historyPath)) {
@@ -25,14 +31,17 @@ export function createEtaEstimator(options) {
     /** @type {Map<string, number>} */
     const currentDurations = new Map();
 
+    /** @param {string} stepKey */
     function scopedStepKey(stepKey) {
         return `${scopeKey}::${stepKey}`;
     }
 
+    /** @param {string} stepKey */
     function beginStep(stepKey) {
         currentDurations.set(scopedStepKey(stepKey), Date.now());
     }
 
+    /** @param {string} stepKey */
     function endStep(stepKey) {
         const scoped = scopedStepKey(stepKey);
         const start = currentDurations.get(scoped);

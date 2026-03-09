@@ -1,13 +1,13 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 
-function normalizeDomain(value) {
+function normalizeDomain(/** @type {any} */ value) {
     return String(value || '')
         .trim()
         .toLowerCase()
         .replace(/\.$/, '');
 }
 
-function extractHostname(value) {
+function extractHostname(/** @type {any} */ value) {
     const raw = String(value || '').trim();
     if (!raw) {
         return '';
@@ -15,7 +15,7 @@ function extractHostname(value) {
 
     try {
         return normalizeDomain(new URL(raw).hostname);
-    } catch (_err) {
+    } catch (/** @type {any} */ _err) {
         // Fallback para hostnames sem protocolo (ex: chatgpt.com)
         return normalizeDomain(raw);
     }

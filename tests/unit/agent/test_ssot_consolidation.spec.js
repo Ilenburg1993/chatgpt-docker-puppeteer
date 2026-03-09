@@ -1,21 +1,21 @@
-// @ts-nocheck
-import { describe, it, before, after, beforeEach } from 'node:test';
+// @ts-check
 import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { after, before, beforeEach, describe, it } from 'node:test';
 
+import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import { createEnvelope } from '#shared/nerv/envelope';
-import { ActorRole, ActionCode, MessageType } from '#shared/nerv/constants';
 
-import { getDb, closeDb } from '#infra/db/sqlite';
+import { shutdown as shutdownDriverFactory } from '#driver/factory';
+import { closeDb, getDb } from '#infra/db/sqlite';
 import { insertTask } from '#infra/db/task_repo';
-import { TaskStateProjector } from '../../../src/agent/task_state_projector.js';
+import { AttemptWatchdog } from '../../../src/agent/attempt_watchdog.js';
 import { QueueWorker } from '../../../src/agent/queue_worker.js';
 import { TaskControlWatcher } from '../../../src/agent/task_control_watcher.js';
+import { TaskStateProjector } from '../../../src/agent/task_state_projector.js';
 import { DriverNERVAdapter } from '../../../src/driver/nerv_adapter/driver_nerv_adapter.js';
-import { AttemptWatchdog } from '../../../src/agent/attempt_watchdog.js';
-import { shutdown as shutdownDriverFactory } from '#driver/factory';
 
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
@@ -26,24 +26,24 @@ function makeDbPath() {
 
 class MockNERV {
     constructor() {
-        this.emittedCommands = [];
-        this.emittedEvents = [];
-        this.receiveHandlers = [];
+        /** @type {any[]} */ this.emittedCommands = [];
+        /** @type {any[]} */ this.emittedEvents = [];
+        /** @type {any[]} */ this.receiveHandlers = [];
     }
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.receiveHandlers.push(handler);
         return () => {
             const idx = this.receiveHandlers.indexOf(handler);
             if (idx >= 0) this.receiveHandlers.splice(idx, 1);
         };
     }
-    emitCommand(envelope) {
+    emitCommand(/** @type {any} */ envelope) {
         this.emittedCommands.push(envelope);
     }
-    emitEvent(envelope) {
+    emitEvent(/** @type {any} */ envelope) {
         this.emittedEvents.push(envelope);
     }
-    receive(envelope) {
+    receive(/** @type {any} */ envelope) {
         for (const h of this.receiveHandlers) h(envelope);
     }
 }
@@ -113,18 +113,22 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
         nerv.receive(envelope);
         nerv.receive(envelope); // same envelope (same msg_id)
 
-        const row = db.prepare('SELECT attempts, status FROM tasks WHERE id = ?').get(taskId);
+        /** @type {any} */ const row = db.prepare('SELECT attempts, status FROM tasks WHERE id = ?').get(taskId);
         assert.strictEqual(
             row.attempts,
             0,
-            'attempts não deve ser incrementado por STARTED (attempts contam falhas "counted")'
+            'attempts não deve ser incrementado por STARTED (attempts contam falhas "counted")',
         );
         assert.strictEqual(row.status, 'RUNNING', 'status deve ser projetado para RUNNING');
 
         const evCount =
-            db
-                .prepare('SELECT COUNT(1) AS c FROM events WHERE entity_type = ? AND entity_id = ? AND event_type = ?')
-                .get('task', taskId, ActionCode.DRIVER_TASK_STARTED)?.c || 0;
+            /** @type {any} */ (
+                db
+                    .prepare(
+                        'SELECT COUNT(1) AS c FROM events WHERE entity_type = ? AND entity_id = ? AND event_type = ?',
+                    )
+                    .get('task', taskId, ActionCode.DRIVER_TASK_STARTED)
+            )?.c || 0;
         assert.strictEqual(evCount, 1, 'evento deve ser registrado uma única vez para o mesmo msg_id');
 
         projector.stop();
@@ -152,7 +156,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
 
         const kernel = {
             async executeTask() {
-                const e = new Error('nerv bridge down');
+                const e = /** @type {any} */ (new Error('nerv bridge down'));
                 e.retryable = true;
                 e.delayMs = 500;
                 e.reason = 'EMIT_COMMAND_FAILED';
@@ -168,7 +172,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
             maxConcurrentTasks: 1,
         });
 
-        const beforeRow = db
+        /** @type {any} */ const beforeRow = db
             .prepare('SELECT status, stage, execute_after_ms, locked_by FROM tasks WHERE id = ?')
             .get(taskId);
         assert.strictEqual(beforeRow.status, 'PENDING');
@@ -176,19 +180,19 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
 
         await worker.tick();
 
-        const row = db
+        /** @type {any} */ const row = db
             .prepare('SELECT status, stage, execute_after_ms, locked_by, last_error FROM tasks WHERE id = ?')
             .get(taskId);
         assert.strictEqual(row.status, 'PENDING', 'task deve voltar para PENDING (reschedule)');
         assert.strictEqual(row.stage, 'READY', 'stage deve permanecer READY');
         assert.ok(
             typeof row.execute_after_ms === 'number' && row.execute_after_ms > Date.now(),
-            'execute_after_ms deve ser no futuro'
+            'execute_after_ms deve ser no futuro',
         );
         assert.strictEqual(row.locked_by, null, 'lock deve ser liberado');
         assert.ok(
             String(row.last_error || '').includes('DISPATCH_RETRY_SCHEDULED'),
-            'last_error deve registrar reschedule'
+            'last_error deve registrar reschedule',
         );
     });
 
@@ -235,7 +239,9 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
 
         assert.strictEqual(executed, 0, 'não deve dispatchar se max_attempts já foi atingido');
 
-        const row = db.prepare('SELECT status, stage, locked_by, last_error FROM tasks WHERE id = ?').get(taskId);
+        /** @type {any} */ const row = db
+            .prepare('SELECT status, stage, locked_by, last_error FROM tasks WHERE id = ?')
+            .get(taskId);
         assert.strictEqual(row.status, 'FAILED');
         assert.strictEqual(row.stage, 'ARCHIVED');
         assert.strictEqual(row.locked_by, null, 'lock deve ser liberado');
@@ -271,7 +277,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
                 last_correlation_id = @corr,
                 latest_attempt_id = @corr
             WHERE id = @id
-        `
+        `,
         ).run({ id: taskId, now: Date.now(), exp: Date.now() + 60000, corr: 'corr-blocked-1' });
 
         const nerv = new MockNERV();
@@ -297,9 +303,9 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
 
         nerv.receive(env);
 
-        const row = db
+        /** @type {any} */ const row = db
             .prepare(
-                'SELECT status, blocked_reason, blocked_at_ms, blocked_details_json, attempts, locked_by FROM tasks WHERE id = ?'
+                'SELECT status, blocked_reason, blocked_at_ms, blocked_details_json, attempts, locked_by FROM tasks WHERE id = ?',
             )
             .get(taskId);
         assert.strictEqual(row.status, 'BLOCKED');
@@ -341,7 +347,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
                 last_correlation_id = @corr,
                 latest_attempt_id = @corr
             WHERE id = @id
-        `
+        `,
         ).run({ id: taskId, now: Date.now(), exp: Date.now() + 60000, corr: 'corr-env-1' });
 
         const nerv = new MockNERV();
@@ -367,7 +373,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
 
         nerv.receive(env);
 
-        const row = db
+        /** @type {any} */ const row = db
             .prepare('SELECT status, stage, execute_after_ms, attempts, locked_by FROM tasks WHERE id = ?')
             .get(taskId);
         assert.strictEqual(row.status, 'PENDING');
@@ -410,7 +416,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
                 last_correlation_id = @corr,
                 latest_attempt_id = @corr
             WHERE id = @id
-        `
+        `,
         ).run({ id: taskId, now, exp: now + 60000, corr });
 
         const nerv = new MockNERV();
@@ -438,14 +444,14 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
 
         nerv.receive(env);
 
-        const row = db
+        /** @type {any} */ const row = db
             .prepare('SELECT status, stage, execute_after_ms, attempts, locked_by FROM tasks WHERE id = ?')
             .get(taskId);
         assert.strictEqual(row.status, 'PENDING');
         assert.strictEqual(row.stage, 'READY');
         assert.ok(
             Number(row.execute_after_ms) >= now + 30000,
-            'execute_after_ms deve respeitar backoff operacional (>=30s)'
+            'execute_after_ms deve respeitar backoff operacional (>=30s)',
         );
         assert.strictEqual(row.attempts, 0, 'LLM_TIMEOUT não consome attempts estratégicos');
         assert.strictEqual(row.locked_by, null, 'lock deve ser liberado no reschedule');
@@ -484,7 +490,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
                 last_correlation_id = @corr,
                 latest_attempt_id = @corr
             WHERE id = @id
-        `
+        `,
         ).run({ id: taskId, now, exp: now + 60000, corr });
 
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'maestro-diag-'));
@@ -528,16 +534,20 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
 
         nerv.receive(env);
 
-        const attempt = db.prepare('SELECT diagnostic_artifacts_json FROM task_attempts WHERE id = ?').get(corr);
+        /** @type {any} */ const attempt = db
+            .prepare('SELECT diagnostic_artifacts_json FROM task_attempts WHERE id = ?')
+            .get(corr);
         assert.ok(attempt && attempt.diagnostic_artifacts_json, 'attempt deve conter diagnostic_artifacts_json');
         const ids = JSON.parse(attempt.diagnostic_artifacts_json);
         assert.ok(ids.screenshot, 'screenshot artifact id deve existir');
         assert.ok(ids.html, 'html artifact id deve existir');
         assert.ok(ids.meta, 'meta artifact id deve existir');
 
-        const artifactCount = db
-            .prepare('SELECT COUNT(1) AS c FROM artifacts WHERE id IN (?, ?, ?)')
-            .get(ids.screenshot, ids.html, ids.meta)?.c;
+        const artifactCount = /** @type {any} */ (
+            db
+                .prepare('SELECT COUNT(1) AS c FROM artifacts WHERE id IN (?, ?, ?)')
+                .get(ids.screenshot, ids.html, ids.meta)
+        )?.c;
         assert.strictEqual(artifactCount, 3, 'todos os artifacts devem estar registrados na tabela artifacts');
 
         projector.stop();
@@ -577,7 +587,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
                 last_correlation_id = @corr,
                 latest_attempt_id = @corr
             WHERE id = @id
-        `
+        `,
         ).run({ id: taskId, now, exp: now + 5000, corr: 'corr-hb-1' });
 
         const nerv = new MockNERV();
@@ -594,7 +604,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
         });
         nerv.receive(accepted);
 
-        const row1 = db.prepare('SELECT lock_expires_at_ms FROM tasks WHERE id = ?').get(taskId);
+        /** @type {any} */ const row1 = db.prepare('SELECT lock_expires_at_ms FROM tasks WHERE id = ?').get(taskId);
         assert.ok(Number(row1.lock_expires_at_ms) >= now + 240000, 'lock deve ser estendido no ACCEPTED');
 
         const hb = createEnvelope({
@@ -607,7 +617,9 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
         });
         nerv.receive(hb);
 
-        const attempt = db.prepare('SELECT last_heartbeat_at_ms FROM task_attempts WHERE id = ?').get('corr-hb-1');
+        /** @type {any} */ const attempt = db
+            .prepare('SELECT last_heartbeat_at_ms FROM task_attempts WHERE id = ?')
+            .get('corr-hb-1');
         assert.ok(Number(attempt.last_heartbeat_at_ms) > 0);
 
         projector.stop();
@@ -644,7 +656,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
                 lock_expires_at_ms = @t2,
                 updated_at_ms = @t
             WHERE id = @id
-        `
+        `,
         ).run({ id: taskId, t: Date.now(), t2: Date.now() + 60000 });
 
         const nerv = new MockNERV();
@@ -665,7 +677,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
                 lock_expires_at_ms = @t2,
                 updated_at_ms = @t
             WHERE id = @id
-        `
+        `,
         ).run({ id: taskId, t: Date.now() + 5, t2: Date.now() + 60000 });
 
         await watcher.tick();
@@ -703,12 +715,12 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
         });
 
         nerv.receive(cmd);
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
 
         assert.strictEqual(
             nerv.emittedEvents.length,
             1,
-            'deve emitir ao menos 1 evento de falha (resposta ao comando)'
+            'deve emitir ao menos 1 evento de falha (resposta ao comando)',
         );
         assert.strictEqual(nerv.emittedEvents[0].type.action_code, ActionCode.DRIVER_TASK_FAILED);
         assert.strictEqual(nerv.emittedEvents[0].payload.taskId, taskId);
@@ -750,7 +762,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
                     @id, @task_id, NULL, 'FAILED', NULL, @created_at_ms, @ended_at_ms, @error,
                     'ENV_UNAVAILABLE', 0, @reason_code, 'BROWSER_POOL'
                 )
-            `
+            `,
             ).run({
                 id: `corr-env-escalate-${i}`,
                 task_id: taskId,
@@ -764,7 +776,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
         const watchdog = new AttemptWatchdog({ nerv: null, intervalMs: 999999 });
         await watchdog.tick();
 
-        const row = db
+        /** @type {any} */ const row = db
             .prepare('SELECT status, blocked_reason, blocked_details_json FROM tasks WHERE id = ?')
             .get(taskId);
         assert.strictEqual(row.status, 'BLOCKED');
@@ -803,7 +815,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
                     @id, @task_id, NULL, 'FAILED', NULL, @created_at_ms, @ended_at_ms, @error,
                     'TASK_ERROR', 0, 'LLM_TIMEOUT', 'LLM'
                 )
-            `
+            `,
             ).run({
                 id: `corr-llm-escalate-${i}`,
                 task_id: taskId,
@@ -816,7 +828,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
         const watchdog = new AttemptWatchdog({ nerv: null, intervalMs: 999999 });
         await watchdog.tick();
 
-        const row = db
+        /** @type {any} */ const row = db
             .prepare('SELECT status, blocked_reason, blocked_details_json FROM tasks WHERE id = ?')
             .get(taskId);
         assert.strictEqual(row.status, 'BLOCKED');

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 // ============================================
@@ -57,7 +58,7 @@ section('Test 1: Verify Old Files Removed');
 
 const oldFiles = ['src/driver/modules/human.js', 'src/driver/modules/stabilizer.js'];
 
-oldFiles.forEach(file => {
+oldFiles.forEach((file) => {
     const fullPath = path.join(process.cwd(), file);
     if (fs.existsSync(fullPath)) {
         fail(`Old file removed: ${file}`, 'File still exists (should be deleted)');
@@ -79,7 +80,7 @@ const newFiles = [
     'src/shared/page_stability/README.md',
 ];
 
-newFiles.forEach(file => {
+newFiles.forEach((file) => {
     const fullPath = path.join(process.cwd(), file);
     if (fs.existsSync(fullPath)) {
         pass(`New file exists: ${file}`);
@@ -122,7 +123,7 @@ try {
     const human = await import(pathToFileURL(path.join(process.cwd(), 'src/shared/biomechanics/human.js')).href);
 
     const humanFunctions = ['humanClick', 'humanType', 'wakeUpMove'];
-    humanFunctions.forEach(fn => {
+    humanFunctions.forEach((fn) => {
         if (typeof human[fn] === 'function') {
             pass(`human.${fn} exported`);
         } else {
@@ -139,7 +140,7 @@ try {
     );
 
     const stabilizerFunctions = ['waitForStability', 'measureEventLoopLag', 'getPageLoadStatus'];
-    stabilizerFunctions.forEach(fn => {
+    stabilizerFunctions.forEach((fn) => {
         if (typeof stabilizer[fn] === 'function') {
             pass(`stabilizer.${fn} exported`);
         } else {
@@ -185,7 +186,7 @@ filesToCheck.forEach(({ path: filePath, oldImports, newImports }) => {
     const content = fs.readFileSync(fullPath, 'utf-8');
 
     // Check no old imports remain
-    const hasOldImports = oldImports.some(oldImport => content.includes(oldImport));
+    const hasOldImports = oldImports.some((oldImport) => content.includes(oldImport));
     if (hasOldImports) {
         fail(`No old imports: ${filePath}`, 'Old relative imports still present');
     } else {
@@ -193,7 +194,7 @@ filesToCheck.forEach(({ path: filePath, oldImports, newImports }) => {
     }
 
     // Check new imports exist
-    const hasNewImports = newImports.every(newImport => content.includes(newImport));
+    const hasNewImports = newImports.every((newImport) => content.includes(newImport));
     if (hasNewImports) {
         pass(`New imports present: ${filePath}`);
     } else {
@@ -219,7 +220,7 @@ try {
             'src/driver/modules/recovery_system.js',
         ];
 
-        filesToLint.forEach(file => {
+        filesToLint.forEach((file) => {
             try {
                 execSync(`"${eslintPath}" "${file}" --max-warnings 0`, {
                     stdio: 'pipe',
@@ -266,7 +267,7 @@ readmesToCheck.forEach(({ path: readmePath, requiredSections }) => {
 
     const content = fs.readFileSync(fullPath, 'utf-8');
 
-    requiredSections.forEach(section => {
+    requiredSections.forEach((section) => {
         if (content.includes(section)) {
             pass(`README section: ${readmePath} → ${section}`);
         } else {

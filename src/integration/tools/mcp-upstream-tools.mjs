@@ -1,9 +1,10 @@
 // @ts-check
 /**
- * Optional: Import tools from an upstream MCP server (HTTP JSON-RPC) and register
- * them into the local Tool Registry with a namespace/prefix.
+ * Optional: Import tools from an upstream MCP server (HTTP JSON-RPC) and register them into the local Tool Registry
+ * with a namespace/prefix.
  *
  * ENV:
+ *
  * - MCP_UPSTREAM_ENABLED=true
  * - MCP_UPSTREAM_URL=http://localhost:3008/api/mcp
  * - MCP_UPSTREAM_ALIAS=core (optional; default: upstream)
@@ -13,7 +14,7 @@
 
 import { createMcpHttpClient } from '../mcp/upstream-http.mjs';
 
-function parseJsonObject(value) {
+function parseJsonObject(/** @type {any} */ value) {
     if (!value) return null;
     try {
         const parsed = JSON.parse(value);
@@ -23,7 +24,7 @@ function parseJsonObject(value) {
     }
 }
 
-function sanitizeToolMetadata(tool) {
+function sanitizeToolMetadata(/** @type {any} */ tool) {
     const description =
         typeof tool?.description === 'string' && tool.description.trim()
             ? tool.description
@@ -38,10 +39,17 @@ function sanitizeToolMetadata(tool) {
 }
 
 /**
+ * @typedef {object} RegisterUpstreamMcpToolsOptions
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: registerUpstreamMcpTools.
+ *
+ * @param {any} registry
+ * @param {RegisterUpstreamMcpToolsOptions} [options]
  * @returns {Promise<any>}
  */
-export async function registerUpstreamMcpTools(registry, options = {}) {
+export async function registerUpstreamMcpTools(/** @type {any} */ registry, /** @type {any} */ options = {}) {
     const enabled = options.enabled ?? process.env.MCP_UPSTREAM_ENABLED === 'true';
     if (!enabled) {
         return { enabled: false, registered: 0 };
@@ -57,7 +65,7 @@ export async function registerUpstreamMcpTools(registry, options = {}) {
 
     const headers = options.headers ?? parseJsonObject(process.env.MCP_UPSTREAM_HEADERS_JSON) ?? undefined;
 
-    const client = createMcpHttpClient({ url, headers });
+    const client = /** @type {any} */ (createMcpHttpClient({ url, headers }));
 
     const toolList = await client.listTools();
     const tools = Array.isArray(toolList?.tools) ? toolList.tools : [];
@@ -83,13 +91,13 @@ export async function registerUpstreamMcpTools(registry, options = {}) {
                 const result = await client.callTool({
                     name: upstreamName,
                     arguments: params,
-                    signal: execOptions.signal,
+                    signal: /** @type {any} */ (execOptions).signal,
                 });
 
                 // Pass through MCP tool result shape when available.
                 // MCP handler will preserve it (instead of re-wrapping into text).
                 return result;
-            }
+            },
         );
 
         registered += 1;

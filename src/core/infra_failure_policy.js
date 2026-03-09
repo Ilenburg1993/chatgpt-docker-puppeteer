@@ -1,24 +1,26 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as system from '#infra/system';
-import { log, audit } from './logger.js';
-import { ActionCode, ActorRole } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { ActionCode, ActorRole } from '#shared/nerv/constants';
+import { audit, log } from './logger.js';
 
 // NERV instance will be injected via setNERV()
+/** @type {any} */
 let nervInstance = null;
 
 /**
- * Injeta instância do NERV para emissão de eventos (ONDA 2).
- * Deve ser chamado no boot antes de usar infra_failure_policy.
-  * @returns {void}
+ * Injeta instância do NERV para emissão de eventos (ONDA 2). Deve ser chamado no boot antes de usar
+ * infra_failure_policy.
+ *
+ * @param {any} nerv
+ * @returns {void}
  */
 function setNERV(nerv) {
     nervInstance = nerv;
 }
 
 /**
- * Failure Categories: Categorias de falha de infraestrutura
- * Escopo: Local ao módulo infra_failure_policy
+ * Failure Categories: Categorias de falha de infraestrutura Escopo: Local ao módulo infra_failure_policy
  */
 const FAILURE_CATEGORIES = {
     TARGET_CLOSED: 'TARGET_CLOSED',
@@ -32,8 +34,8 @@ const FAILURE_CATEGORIES = {
  */
 class InfraFailurePolicy {
     /**
-     * Escala uma falha de infraestrutura conforme a severidade técnica.
-     * Transforma um erro passivo em uma decisão ativa de governança.
+     * Escala uma falha de infraestrutura conforme a severidade técnica. Transforma um erro passivo em uma decisão ativa
+     * de governança.
      *
      * @param {object} params
      * @param {object} params.ctx - Contexto de execução { browser, page }.
@@ -54,8 +56,8 @@ class InfraFailurePolicy {
             case FAILURE_CATEGORIES.TARGET_CLOSED:
             case FAILURE_CATEGORIES.CONNECTION_LOST:
                 /**
-                 * Caso: O canal de comunicação com o Chrome foi cortado.
-                 * Ação: Notificar e garantir que não restem processos órfãos.
+                 * Caso: O canal de comunicação com o Chrome foi cortado. Ação: Notificar e garantir que não restem
+                 * processos órfãos.
                  */
                 await this._executeManeuver('TERMINAL_CONNECTION_FAILURE', pid, traceId, ctx);
                 break;
@@ -63,16 +65,16 @@ class InfraFailurePolicy {
             case FAILURE_CATEGORIES.BROWSER_FROZEN:
             case FAILURE_CATEGORIES.INFRA_TIMEOUT:
                 /**
-                 * Caso: O navegador parou de responder ao protocolo DevTools (HUNG).
-                 * Ação: Executar Kill cirúrgico para permitir o restart pelo Engine.
+                 * Caso: O navegador parou de responder ao protocolo DevTools (HUNG). Ação: Executar Kill cirúrgico para
+                 * permitir o restart pelo Engine.
                  */
                 await this._executeManeuver('HARD_BROWSER_STALL', pid, traceId, ctx, true);
                 break;
 
             default:
                 /**
-                 * Caso: Falhas menores ou desconhecidas.
-                 * Ação: Apenas registro em log e auditoria para análise posterior.
+                 * Caso: Falhas menores ou desconhecidas. Ação: Apenas registro em log e auditoria para análise
+                 * posterior.
                  */
                 log('DEBUG', `[POLICY] Falha de infra não crítica registrada: ${reason}`, traceId);
                 break;
@@ -82,7 +84,13 @@ class InfraFailurePolicy {
     /**
      * Executa a manobra física e reporta para a malha sensorial (IPC).
      */
-    async _executeManeuver(type, pid, correlationId, ctx, forceKill = false) {
+    async _executeManeuver(
+        /** @type {any} */ type,
+        /** @type {any} */ pid,
+        /** @type {any} */ correlationId,
+        /** @type {any} */ ctx,
+        forceKill = false,
+    ) {
         if (!type || typeof type !== 'string') {
             log('ERROR', `[POLICY] Invalid maneuver type: ${type}`, correlationId);
             return;
@@ -90,6 +98,7 @@ class InfraFailurePolicy {
         // A. Notifica o Dashboard e o Supervisor sobre a crise de infraestrutura via NERV (ONDA 2 - Migrado)
         if (nervInstance) {
             try {
+                // eslint-disable-next-line @typescript-eslint/await-thenable
                 await HighLevelNERV.sendEvent(
                     nervInstance,
                     ActorRole.INFRA,
@@ -100,32 +109,33 @@ class InfraFailurePolicy {
                         action: forceKill ? 'PROCESS_KILL' : 'CLEANUP',
                         severity: 'CRITICAL',
                     },
-                    correlationId
+                    correlationId,
                 );
 
                 log(
                     'WARN',
                     `[POLICY] Infraestrutura escalada e notificada via NERV: ${type} (PID: ${pid})`,
-                    correlationId
+                    correlationId,
                 );
-            } catch (e) {
+            } catch (/** @type {any} */ _rawE) {
+                const e = /** @type {any} */ (_rawE);
                 log('ERROR', `[POLICY] Falha ao notificar infra escalation via NERV: ${e.message}`, correlationId);
             }
         } else {
             log(
                 'WARN',
                 `[POLICY] Infraestrutura escalada mas NERV não disponível: ${type} (PID: ${pid})`,
-                correlationId
+                correlationId,
             );
         }
 
         // B. Registro em Auditoria Administrativa
-        await audit('INFRA_ESCALATION', { type, pid, correlationId });
+        audit('INFRA_ESCALATION', { type, pid, correlationId });
 
         // C. Execução Física (Apenas se houver um PID válido)
         if (pid && (forceKill || type.includes('TERMINAL'))) {
             log('FATAL', `[POLICY] Sentenciando processo ${pid} à morte (Razão: ${type})`, correlationId);
-            await system.killProcess(pid).catch(err => {
+            await system.killProcess(pid).catch((err) => {
                 log('ERROR', `[POLICY] Falha ao executar sentença no PID ${pid}: ${err.message}`, correlationId);
             });
         }
@@ -134,14 +144,15 @@ class InfraFailurePolicy {
     /**
      * Extrai o PID de forma resiliente, suportando diferentes estados do driver.
      */
-    _getPID(ctx) {
+    _getPID(/** @type {any} */ ctx) {
         try {
             if (ctx?.browser) {
                 // Tenta pegar o PID do processo gerenciado pelo Puppeteer
                 const proc = ctx.browser.process();
                 return proc ? proc.pid : null;
             }
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('DEBUG', `[POLICY] Failed to extract PID: ${err?.message || String(err)}`);
             return null;
         }

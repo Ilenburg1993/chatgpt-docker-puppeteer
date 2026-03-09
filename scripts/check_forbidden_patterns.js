@@ -21,7 +21,7 @@ const { values } = parseArgs({
  * @param {any[]} findings
  */
 function mapOutputFindings(findings) {
-    return findings.map(item => ({
+    return findings.map((item) => ({
         contract_id: item.contract_id || 'CONTRACT-UNKNOWN',
         domain: item.domain || 'unknown',
         file: item.file || null,
@@ -40,7 +40,7 @@ function mapOutputFindings(findings) {
  * @param {any[]} legacyFindings
  * @param {Set<string>} [comparableContractIds]
  */
-function parityReport(dslFindings, legacyFindings, comparableContractIds = null) {
+function parityReport(dslFindings, legacyFindings, comparableContractIds = undefined) {
     /** @type {Map<string, number>} */
     const dslMap = new Map();
     /** @type {Map<string, number>} */
@@ -52,7 +52,7 @@ function parityReport(dslFindings, legacyFindings, comparableContractIds = null)
         legacyMap.set(item.contract_id, (legacyMap.get(item.contract_id) || 0) + 1);
     }
 
-    /** @type {Array<{ contract_id: string, dsl: number, legacy: number }>} */
+    /** @type {{ contract_id: string; dsl: number; legacy: number }[]} */
     const mismatches = [];
     const allKeys = comparableContractIds
         ? new Set([...comparableContractIds])
@@ -90,42 +90,48 @@ function main() {
     const parityEnabled = values['parity-mode'] === true;
 
     const registry = loadContractRegistry();
-    const activeDslContracts = registry.contracts.filter(item => item.kind === 'static' && item.status === 'active');
+    const activeDslContracts = registry.contracts.filter((item) => item.kind === 'static' && item.status === 'active');
     const legacyContracts = getLegacyStaticContracts();
-    const legacyContractIds = new Set(legacyContracts.map(item => String(item?.id || '').trim()).filter(Boolean));
+    const legacyContractIds = new Set(legacyContracts.map((item) => String(item?.id || '').trim()).filter(Boolean));
 
     let primaryContracts = legacyContracts;
     if (mode === 'strict' || mode === 'hybrid') {
         primaryContracts = activeDslContracts;
     }
 
-    const primaryEval = evaluateStaticContracts({
-        rootDir: ROOT,
-        scanDir: SRC,
-        contracts: primaryContracts,
-        allowlists: registry.allowlists,
-    });
+    const primaryEval = /** @type {any} */ (
+        evaluateStaticContracts({
+            rootDir: ROOT,
+            scanDir: SRC,
+            contracts: primaryContracts,
+            allowlists: registry.allowlists,
+        })
+    );
 
-    let parity = {
+    let parity = /** @type {any} */ ({
         enabled: false,
         dsl_findings: 0,
         legacy_findings: 0,
         mismatches: [],
-    };
+    });
 
     if (mode === 'hybrid' && parityEnabled) {
-        const dslEval = evaluateStaticContracts({
-            rootDir: ROOT,
-            scanDir: SRC,
-            contracts: activeDslContracts,
-            allowlists: registry.allowlists,
-        });
-        const legacyEval = evaluateStaticContracts({
-            rootDir: ROOT,
-            scanDir: SRC,
-            contracts: legacyContracts,
-            allowlists: {},
-        });
+        const dslEval = /** @type {any} */ (
+            evaluateStaticContracts({
+                rootDir: ROOT,
+                scanDir: SRC,
+                contracts: activeDslContracts,
+                allowlists: registry.allowlists,
+            })
+        );
+        const legacyEval = /** @type {any} */ (
+            evaluateStaticContracts({
+                rootDir: ROOT,
+                scanDir: SRC,
+                contracts: legacyContracts,
+                allowlists: {},
+            })
+        );
         parity = parityReport(dslEval.findings, legacyEval.findings, legacyContractIds);
     }
 
@@ -158,7 +164,7 @@ function main() {
             console.error(`- [${f.contract_id}] ${f.file || 'n/a'}#L${f.line || 1}: ${f.evidence}`);
             console.error(`  -> ${f.message}`);
             console.error(
-                `  -> domain=${f.domain} severity=${f.severity} owner=${f.owner} enforcement=${f.enforcement}\n`
+                `  -> domain=${f.domain} severity=${f.severity} owner=${f.owner} enforcement=${f.enforcement}\n`,
             );
         }
         if (parity.enabled && parity.mismatches.length > 0) {

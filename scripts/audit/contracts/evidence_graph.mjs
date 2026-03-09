@@ -1,6 +1,9 @@
 // @ts-check
 /**
- * @param {any} finding
+ * @typedef {any} GroupKeyFinding
+ */
+/**
+ * @param {GroupKeyFinding} finding
  */
 function groupKey(finding) {
     if (finding.contract_id) {
@@ -18,8 +21,8 @@ function groupKey(finding) {
 }
 
 /**
- * @param {Array<any>} findings
-  * @returns {any}
+ * @param {unknown[]} findings
+ * @returns {object}
  */
 export function buildEvidenceGraph(findings) {
     /** @type {Map<string, any[]>} */
@@ -29,12 +32,13 @@ export function buildEvidenceGraph(findings) {
         if (!groups.has(key)) {
             groups.set(key, []);
         }
-        groups.get(key).push(finding);
+        const bucket = groups.get(key);
+        if (bucket) bucket.push(finding);
     }
 
-    /** @type {Array<{ id: string, label: string, size: number, contract_id?: string|null }>} */
+    /** @type {{ id: string; label: string; size: number; contract_id?: string | null }[]} */
     const nodes = [];
-    /** @type {Array<{ from: string, to: string, reason: string }>} */
+    /** @type {{ from: string; to: string; reason: string }[]} */
     const edges = [];
 
     let index = 1;
@@ -58,8 +62,8 @@ export function buildEvidenceGraph(findings) {
 
     for (let i = 0; i < nodes.length; i += 1) {
         for (let j = i + 1; j < nodes.length; j += 1) {
-            const left = nodes[i];
-            const right = nodes[j];
+            const left = /** @type {any} */ (nodes[i]);
+            const right = /** @type {any} */ (nodes[j]);
             if (left.contract_id && right.contract_id && left.contract_id === right.contract_id) {
                 edges.push({
                     from: left.id,

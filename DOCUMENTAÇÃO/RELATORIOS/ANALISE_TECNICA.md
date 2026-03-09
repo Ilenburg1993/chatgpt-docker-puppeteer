@@ -142,7 +142,7 @@ class TaskLoader {
 }
 
 // 2. Event-driven
-configEmitter.on('config:loaded', cfg => {
+configEmitter.on('config:loaded', (cfg) => {
   taskLoader.updateConfig(cfg);
 });
 

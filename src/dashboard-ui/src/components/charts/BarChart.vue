@@ -5,8 +5,8 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { Chart, BarController, BarElement, LinearScale, CategoryScale, Title, Tooltip, Legend } from 'chart.js';
+import { BarController, BarElement, CategoryScale, Chart, Legend, LinearScale, Title, Tooltip } from 'chart.js';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 
 // Register Chart.js components
 Chart.register(BarController, BarElement, LinearScale, CategoryScale, Title, Tooltip, Legend);
@@ -120,7 +120,7 @@ export default {
             () => {
                 updateChart();
             },
-            { deep: true }
+            { deep: true },
         );
 
         onMounted(() => {

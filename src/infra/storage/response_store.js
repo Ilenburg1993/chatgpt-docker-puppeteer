@@ -1,17 +1,16 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { promises as fs } from 'node:fs';
-import fss from 'node:fs';
+// @ts-check
+import fss, { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { cleanText, sleep } from '../fs/fs_utils.js';
 import * as PATHS from '../fs/paths.js';
-import { sleep, cleanText } from '../fs/fs_utils.js';
 
 /**
- * Lê o conteúdo de uma resposta anterior com blindagem de memória e I/O.
- * Utiliza loop iterativo para garantir estabilidade da pilha em retries.
+ * Lê o conteúdo de uma resposta anterior com blindagem de memória e I/O. Utiliza loop iterativo para garantir
+ * estabilidade da pilha em retries.
  *
  * @param {string} taskId - ID da tarefa alvo.
- * @param {AbortSignal} signal - Sinal para interromper leitura longa.
- * @returns {Promise<string|null>} Conteúdo limpo ou null se não localizado.
+ * @param {any} signal - Sinal para interromper leitura longa.
+ * @returns {Promise<string | null>} Conteúdo limpo ou null se não localizado.
  */
 async function loadResponse(taskId, signal = null) {
     const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
@@ -43,14 +42,15 @@ async function loadResponse(taskId, signal = null) {
 
             // 4. Sanitização Universal (Remoção de caracteres de controle)
             return cleanText(content);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _ce = /** @type {any} */ (err);
             // Tratamento de interrupção externa
-            if (err.name === 'AbortError' || err.message === 'OPERATION_ABORTED') {
+            if (_ce.name === 'AbortError' || _ce.message === 'OPERATION_ABORTED') {
                 throw new Error('READ_ABORTED'); // eslint-disable-line preserve-caught-error
             }
 
             // Tratamento de Concorrência (Arquivo travado pelo SO ou Logger)
-            if (err.code === 'EBUSY' || err.code === 'EPERM') {
+            if (_ce.code === 'EBUSY' || _ce.code === 'EPERM') {
                 attempts++;
                 await sleep(200 * attempts); // Backoff progressivo (200ms, 400ms...)
                 continue;
@@ -65,8 +65,9 @@ async function loadResponse(taskId, signal = null) {
 
 /**
  * Deleta um arquivo de resposta de forma assíncrona.
+ *
  * @param {string} taskId - ID da tarefa cujo resultado deve ser removido.
-  * @returns {Promise<void>}
+ * @returns {Promise<void>}
  */
 async function deleteResponse(taskId) {
     const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
@@ -76,9 +77,10 @@ async function deleteResponse(taskId) {
         if (fss.existsSync(filepath)) {
             await fs.unlink(filepath);
         }
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
+        const _ce = /** @type {any} */ (_);
         // Falha no delete não deve interromper o fluxo principal (Best-effort)
     }
 }
 
-export { loadResponse, deleteResponse };
+export { deleteResponse, loadResponse };

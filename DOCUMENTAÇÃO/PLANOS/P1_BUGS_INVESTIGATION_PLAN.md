@@ -67,7 +67,7 @@ import { withTimeout } from '#infra/abort_controller_utils';
 const vector = await withTimeout(
   () => embeddings.embed(options.query),
   5000, // 5s timeout
-  'RAG_EMBED_TIMEOUT'
+  'RAG_EMBED_TIMEOUT',
 );
 
 // Em lancedb.mjs L112
@@ -77,7 +77,7 @@ const rows = await withTimeout(() => q.toArray(), 5000, 'VECTOR_SEARCH_TIMEOUT')
 const result = await withTimeout(
   () => ragAsk({ query, topK, pathPrefix, ext, tags }),
   5000,
-  'RAG_ASK_TIMEOUT'
+  'RAG_ASK_TIMEOUT',
 );
 ```
 
@@ -201,7 +201,7 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
 function getDbExclusive() {
   const db = getDb();
   return {
-    transaction: fn => {
+    transaction: (fn) => {
       db.prepare('BEGIN IMMEDIATE').run(); // Lock on start
       try {
         const result = fn();
@@ -460,7 +460,7 @@ function validateJsonColumns() {
         SELECT id FROM tasks
         WHERE task_json IS NOT NULL
         AND json_valid(task_json) = 0
-    `
+    `,
     )
     .all();
 
@@ -593,7 +593,7 @@ async function putText({
   if (sizeBytes > MAX_SIZE) {
     throw new Error(
       `Artifact too large: ${(sizeBytes / 1024 / 1024).toFixed(2)}MB ` +
-        `exceeds max ${(MAX_SIZE / 1024 / 1024).toFixed(2)}MB (kind=${kind})`
+        `exceeds max ${(MAX_SIZE / 1024 / 1024).toFixed(2)}MB (kind=${kind})`,
     );
   }
 
@@ -620,7 +620,7 @@ async function putBuffer({
   if (body.byteLength > MAX_SIZE) {
     throw new Error(
       `Artifact too large: ${(body.byteLength / 1024 / 1024).toFixed(2)}MB ` +
-        `exceeds max ${(MAX_SIZE / 1024 / 1024).toFixed(2)}MB (kind=${kind})`
+        `exceeds max ${(MAX_SIZE / 1024 / 1024).toFixed(2)}MB (kind=${kind})`,
     );
   }
 
@@ -633,9 +633,9 @@ async function putBuffer({
 
 ```bash
 # .env
-ARTIFACT_MAX_SIZE_BYTES=10485760          # 10MB default
-ARTIFACT_SCREENSHOT_MAX_BYTES=52428800    # 50MB para screenshots
-ARTIFACT_HTML_MAX_BYTES=2097152           # 2MB para HTML dumps
+ARTIFACT_MAX_SIZE_BYTES=10485760       # 10MB default
+ARTIFACT_SCREENSHOT_MAX_BYTES=52428800 # 50MB para screenshots
+ARTIFACT_HTML_MAX_BYTES=2097152        # 2MB para HTML dumps
 ```
 
 ### Arquivos para Modificar

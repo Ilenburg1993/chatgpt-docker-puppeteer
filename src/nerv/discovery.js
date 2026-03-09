@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { log } from '#core/logger';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 import { ActionCode, ActorRole } from '#shared/nerv/constants';
@@ -6,21 +6,22 @@ import { ActionCode, ActorRole } from '#shared/nerv/constants';
 /**
  * Publica evento SERVER_READY para descoberta de serviço.
  *
- * **Side-effects:** Envia evento via NERV ou registra estado (modo legado).
- * **Semântica:** Sinaliza que servidor está pronto para aceitar conexões.
- * **Unidades:** Timeout em milissegundos.
+ * **Side-effects:** Envia evento via NERV ou registra estado (modo legado). **Semântica:** Sinaliza que servidor está
+ * pronto para aceitar conexões. **Unidades:** Timeout em milissegundos.
  *
- * @param {object} [nerv] - Instância NERV para publicação (opcional)
- * @param {object} [payload={}] - Payload adicional do evento
- * @returns {Promise<object|null>} Envelope enviado ou null se falhar
+ * @param {any} [nerv] - Instância NERV para publicação (opcional)
+ * @param {Record<string, any>} [payload={}] - Payload adicional do evento. Default is `{}`
+ * @returns {Promise<object | null>} Envelope enviado ou null se falhar
  */
 async function publishServerReady(nerv, payload = {}) {
     // Prefer NERV when available
     if (nerv) {
         try {
+            // eslint-disable-next-line @typescript-eslint/await-thenable
             return await HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
-        } catch (err) {
-            log('WARN', `[DISCOVERY] Falha ao publicar SERVER_READY via NERV: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[DISCOVERY] Falha ao publicar SERVER_READY via NERV: ${_e.message}`);
         }
     }
 
@@ -32,8 +33,7 @@ async function publishServerReady(nerv, payload = {}) {
 /**
  * Remove publicação de SERVER_READY (modo legado).
  *
- * **Side-effects:** Remove arquivo de estado legado se existir.
- * **Semântica:** Limpa sinal de prontidão do servidor.
+ * **Side-effects:** Remove arquivo de estado legado se existir. **Semântica:** Limpa sinal de prontidão do servidor.
  * **Unidades:** N/A
  *
  * @returns {boolean} True se arquivo foi removido, false caso contrário
@@ -46,14 +46,12 @@ function unpublishServerReady() {
 /**
  * Aguarda o primeiro evento SERVER_READY via NERV.
  *
- * **Side-effects:** Registra listener temporário no NERV, configura timeout.
- * **Semântica:** Promise que resolve quando servidor sinaliza prontidão.
- * **Unidades:** timeoutMs em milissegundos (padrão 10000).
+ * **Side-effects:** Registra listener temporário no NERV, configura timeout. **Semântica:** Promise que resolve quando
+ * servidor sinaliza prontidão. **Unidades:** timeoutMs em milissegundos (padrão 10000).
  *
- * @param {object} nerv - Instância NERV com método onEvent
- * @param {object} [options={}] - Opções de configuração
- * @param {number} [options.timeoutMs=10000] - Timeout em milissegundos
- * @returns {Promise<object>} Payload do envelope SERVER_READY
+ * @param {any} nerv - Instância NERV com método onEvent
+ * @param {Record<string, any>} [options={}] - Opções de configuração. Default is `{}`
+ * @returns {Promise<any>} Payload do envelope SERVER_READY
  * @throws {Error} Se NERV não tem onEvent ou timeout expirar
  */
 function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
@@ -62,6 +60,7 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
             return reject(new Error('NERV instance with onEvent required'));
         }
 
+        /** @type {any} */
         let unsub = null;
         const timer = setTimeout(() => {
             if (typeof unsub === 'function') unsub();
@@ -69,7 +68,7 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
         }, timeoutMs);
 
         try {
-            unsub = nerv.onEvent(envelope => {
+            unsub = nerv.onEvent((/** @type {any} */ envelope) => {
                 try {
                     const action = envelope && envelope.type && envelope.type.action_code;
                     if (action === ActionCode.SERVER_READY) {
@@ -77,13 +76,13 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
                         if (typeof unsub === 'function') unsub();
                         resolve(envelope.payload || envelope);
                     }
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     // ignore malformed envelopes
                 }
             });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             clearTimeout(timer);
-            reject(err);
+            reject(err instanceof Error ? err : new Error(String(err)));
         }
     });
 }
@@ -91,11 +90,10 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
 /**
  * Escuta continuamente eventos SERVER_READY e chama handler.
  *
- * **Side-effects:** Registra listener permanente no NERV.
- * **Semântica:** Observador contínuo de eventos de prontidão do servidor.
- * **Unidades:** N/A
+ * **Side-effects:** Registra listener permanente no NERV. **Semântica:** Observador contínuo de eventos de prontidão do
+ * servidor. **Unidades:** N/A
  *
- * @param {object} nerv - Instância NERV com método onEvent
+ * @param {any} nerv - Instância NERV com método onEvent
  * @param {function(object): void} handler - Callback invocado para cada SERVER_READY
  * @returns {function(): void} Função de unsubscribe para remover listener
  * @throws {Error} Se NERV não tem onEvent ou handler não é função
@@ -106,13 +104,13 @@ function listenForServerReady(nerv, handler) {
     }
     if (typeof handler !== 'function') throw new Error('handler must be a function');
 
-    const unsub = nerv.onEvent(envelope => {
+    const unsub = nerv.onEvent((/** @type {any} */ envelope) => {
         try {
             const action = envelope && envelope.type && envelope.type.action_code;
             if (action === ActionCode.SERVER_READY) {
                 handler(envelope.payload || envelope);
             }
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // ignore
         }
     });

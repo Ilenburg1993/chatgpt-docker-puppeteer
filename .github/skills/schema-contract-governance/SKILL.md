@@ -46,7 +46,8 @@ It answers:
 2. If the type is reused across modules, promote it to `.d.ts`.
 3. If the artifact is JSON exchanged between scripts/CI/tools, use JSON Schema.
 4. If the validation is runtime-facing, use Zod where the code already validates inputs.
-5. If the surface is the local tsserver wrapper, map to `ts.server.protocol` and only schema the wrapper envelope.
+5. If the surface is the local tsserver wrapper, map to `ts.server.protocol` and only schema the
+   wrapper envelope.
 
 ## Guardrails
 

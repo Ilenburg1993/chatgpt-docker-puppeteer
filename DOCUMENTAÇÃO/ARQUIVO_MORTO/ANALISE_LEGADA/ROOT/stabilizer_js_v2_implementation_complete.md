@@ -146,7 +146,7 @@ async function measureEventLoopLag(page, retries = STABILIZER_CONFIG.HELPER_RETR
 const rects = node.getClientRects();
 if (rects.length > 0 && node.offsetParent !== null) {
   // Check if actually has dimensions
-  const hasSize = Array.from(rects).some(r => r.width > 0 && r.height > 0);
+  const hasSize = Array.from(rects).some((r) => r.width > 0 && r.height > 0);
   if (hasSize) {
     return true;
   }
@@ -256,7 +256,7 @@ for (let i = 0; i < retries; i++) {
     if (i === retries - 1) {
       // Log + return fallback
     }
-    await new Promise(r => setTimeout(r, BASE_DELAY * (i + 1))); // Exponential backoff
+    await new Promise((r) => setTimeout(r, BASE_DELAY * (i + 1))); // Exponential backoff
   }
 }
 ```
@@ -379,7 +379,7 @@ return result;
 ```javascript
 const rects = node.getClientRects();
 if (rects.length > 0 && node.offsetParent !== null) {
-  const hasSize = Array.from(rects).some(r => r.width > 0 && r.height > 0);
+  const hasSize = Array.from(rects).some((r) => r.width > 0 && r.height > 0);
   if (hasSize) {
     return true; // Actually visible
   }

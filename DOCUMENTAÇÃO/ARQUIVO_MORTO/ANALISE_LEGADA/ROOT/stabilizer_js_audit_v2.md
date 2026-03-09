@@ -62,7 +62,7 @@ pelo código.
 
 ```javascript
 await page.waitForNetworkIdle({ idleTime: 500, timeout: 5000 }); // Magic: 500, 5000
-await new Promise(r => setTimeout(r, 500)); // Magic: 500
+await new Promise((r) => setTimeout(r, 500)); // Magic: 500
 let silenceWindow = 500; // Magic: 500
 if (targetStats.stream.avg > 1000) {
   silenceWindow = 1000;
@@ -75,7 +75,7 @@ setTimeout(() => {
 setTimeout(r, 2000); // Magic: 2000
 while (lag > 150 && Date.now() < cpuDeadline) {
   // Magic: 150
-  await new Promise(r => setTimeout(r, 300)); // Magic: 300
+  await new Promise((r) => setTimeout(r, 300)); // Magic: 300
 }
 ```
 
@@ -223,11 +223,11 @@ Observers podem não ser desconectados em todos os cenários.
 
 ```javascript
 try {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     // ... cria observers ...
   });
 } finally {
-  observers.forEach(o => o.disconnect());
+  observers.forEach((o) => o.disconnect());
 }
 ```
 
@@ -473,7 +473,7 @@ const SPINNER_CACHE = {
 };
 
 // Check rápido no viewport primeiro
-const inViewport = Array.from(document.querySelectorAll(selector)).some(el => {
+const inViewport = Array.from(document.querySelectorAll(selector)).some((el) => {
   const rect = el.getBoundingClientRect();
   return (
     rect.top >= 0 &&
@@ -613,7 +613,7 @@ while (lag > 150 && Date.now() < cpuDeadline) {
       severity: 'LOW',
       evidence: { lag_ms: lag, measurements: lagMeasurements.length },
     });
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 300));
   }
 }
 
@@ -706,7 +706,7 @@ if (node.matches(selector)) {
     const s = window.getComputedStyle(node);
     if (s.display !== 'none' && s.visibility !== 'hidden' && parseFloat(s.opacity || '1') > 0.1) {
       // Check if actually has dimensions
-      const hasSize = Array.from(rects).some(r => r.width > 0 && r.height > 0);
+      const hasSize = Array.from(rects).some((r) => r.width > 0 && r.height > 0);
       if (hasSize) {
         return true;
       }

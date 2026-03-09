@@ -87,10 +87,10 @@ docker stats chatgpt-agent --no-stream
 # 2. Analisar pico de uso
 # Exemplo: Se pico = 850MB, configurar:
 limits:
-  cpus: '1.5'      # Puppeteer não é CPU-intensive
-  memory: 1G       # 20% margem sobre pico
+cpus: '1.5' # Puppeteer não é CPU-intensive
+memory: 1G  # 20% margem sobre pico
 reservations:
-  memory: 256M     # Baseline mínimo
+memory: 256M # Baseline mínimo
 ```
 
 **Benefício**: -50% uso de recursos, mais containers por host
@@ -112,7 +112,7 @@ async function healthcheck() {
   ];
 
   const results = await Promise.allSettled(checks);
-  const failed = results.filter(r => r.status === 'rejected');
+  const failed = results.filter((r) => r.status === 'rejected');
 
   if (failed.length > 0) {
     console.error('Health check failed:', failed);
@@ -147,9 +147,9 @@ volumes:
 
 ```dockerfile
 # No Dockerfile
-RUN mkdir -p fila respostas logs profile && \
-    chown -R node:node /app && \
-    chmod -R 755 fila respostas logs profile
+RUN mkdir -p fila respostas logs profile \
+ && chown -R node:node /app \
+ && chmod -R 755 fila respostas logs profile
 ```
 
 **Trade-off**:
@@ -520,7 +520,7 @@ find backups/ -name "backup_*.tar.gz" -mtime +7 -delete
 ```bash
 # 1. Criar .env
 cp .env.example .env
-nano .env  # Configurar valores
+nano .env # Configurar valores
 
 # 2. Testar build otimizado
 docker build -t chatgpt-agent:optimized .

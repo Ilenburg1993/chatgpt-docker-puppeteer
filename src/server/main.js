@@ -1,8 +1,8 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 
-import '#core/env_bootstrap';
 import * as Authority from '#core/authority';
 import { shouldAutobootEntrypoint } from '#core/entrypoint_guard';
+import '#core/env_bootstrap';
 import { getJwtSecret } from '#core/jwt_config';
 import { log } from '#core/logger';
 import { readPositiveInt, retryWithBackoff } from '#core/retry_policy';
@@ -18,20 +18,28 @@ import {
 ========================================================================== */
 
 /**
- * Persiste estado mínimo do processo SERVER para descoberta por outros
- * processos (ex: Maestro).
+ * @typedef {object} PersistServerStateDeps
+ * @property {typeof import('#nerv/discovery')} discovery
+ * @property {string} protocolVersion
+ * @property {string} singularityMode
+ */
+/**
+ * @typedef {object} PersistServerStateNerv
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
+ * Persiste estado mínimo do processo SERVER para descoberta por outros processos (ex: Maestro).
  *
- * Propriedades:
- *   ✔ Publicação via NERV (assíncrona, observável)
- *   ✔ Commit atômico via arquivo temporário (fallback)
- *   ✔ Nunca retorna estado parcialmente gravado
+ * Propriedades: ✔ Publicação via NERV (assíncrona, observável) ✔ Commit atômico via arquivo temporário (fallback) ✔
+ * Nunca retorna estado parcialmente gravado
  *
- * @param {{discovery: typeof import('#nerv/discovery'), protocolVersion: string, singularityMode: string}} deps
- * @param {object} nerv - Instância NERV para publicação de eventos
+ * @param {PersistServerStateDeps} deps
+ * @param {PersistServerStateNerv} nerv - Instância NERV para publicação de eventos
  * @param {number} port - Porta efetivamente bound pelo HTTP engine
- * @param {'standalone'|'delegated'} [authority='standalone'] - Modo de autoridade do servidor
- * @sideEffects - Publica estado via Discovery (NERV-first, file fallback)
+ * @param {'standalone' | 'delegated'} [authority='standalone'] - Modo de autoridade do servidor. Default is
+ *   `'standalone'`
  * @returns {Promise<void>}
+ * @sideEffects - Publica estado via Discovery (NERV-first, file fallback)
  */
 async function persistServerState(deps, nerv, port, authority = Authority.SERVER_AUTHORITIES.STANDALONE) {
     const { discovery, protocolVersion, singularityMode } = deps;
@@ -53,12 +61,13 @@ async function persistServerState(deps, nerv, port, authority = Authority.SERVER
     try {
         await discovery.publishServerReady(nerv, payload);
         log('DEBUG', '[BOOT] persistServerState delegated to Discovery (NERV-first, file fallback opt-in)');
-    } catch (err) {
-        log('WARN', `[BOOT] persistServerState delegation failed: ${err.message}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('WARN', `[BOOT] persistServerState delegation failed: ${_e.message}`);
     }
 }
 
-function envFlag(name, defaultValue) {
+function envFlag(/** @type {any} */ name, /** @type {any} */ defaultValue) {
     const raw = process.env[name];
     if (raw === undefined) {
         return defaultValue;
@@ -69,7 +78,7 @@ function envFlag(name, defaultValue) {
     return defaultValue;
 }
 
-function validateDashboardAuthConfig(config) {
+function validateDashboardAuthConfig(/** @type {any} */ config) {
     const authRequired = config?.DASHBOARD_AUTH_REQUIRED ?? envFlag('DASHBOARD_AUTH_REQUIRED', true);
     const socketAuthRequired =
         config?.DASHBOARD_SOCKET_AUTH_REQUIRED ?? envFlag('DASHBOARD_SOCKET_AUTH_REQUIRED', true);
@@ -88,7 +97,7 @@ function validateDashboardAuthConfig(config) {
 
     if (authRequired && password.length < 12) {
         throw new Error(
-            '[BOOT] DASHBOARD_AUTH_REQUIRED=true, mas DASHBOARD_AUTH_PASSWORD deve ter ao menos 12 caracteres'
+            '[BOOT] DASHBOARD_AUTH_REQUIRED=true, mas DASHBOARD_AUTH_PASSWORD deve ter ao menos 12 caracteres',
         );
     }
 
@@ -104,7 +113,9 @@ function sendReadySignalOnce() {
     __readySignalSent = true;
 }
 
-async function publishServerReadyWithRetry({ nerv, payload, highLevelNerv, actorRole, actionCode, config }) {
+async function publishServerReadyWithRetry(
+    /** @type {any} */ { nerv, payload, highLevelNerv, actorRole, actionCode, config },
+) {
     let attempt = 0;
     const maxAttempts = Math.max(2, Math.min(3, readPositiveInt(config?.BOOT_RETRY_MAX_ATTEMPTS, 3)));
     const baseDelayMs = readPositiveInt(config?.BOOT_RETRY_BASE_MS, 1000);
@@ -123,10 +134,10 @@ async function publishServerReadyWithRetry({ nerv, payload, highLevelNerv, actor
                 const errorMessage = error instanceof Error ? error.message : String(error);
                 log(
                     'WARN',
-                    `[BOOT] NERV SERVER_READY tentativa ${currentAttempt}/${totalAttempts} falhou: ${errorMessage}. Retry em ${delayMs}ms`
+                    `[BOOT] NERV SERVER_READY tentativa ${currentAttempt}/${totalAttempts} falhou: ${errorMessage}. Retry em ${delayMs}ms`,
                 );
             },
-        }
+        },
     );
 
     return { attempt, maxAttempts };
@@ -138,7 +149,7 @@ async function publishServerReadyWithRetry({ nerv, payload, highLevelNerv, actor
 
 /**
  * @typedef {object} BootstrapOptions
- * @property {'standalone'|'delegated'} [authority] - Modo de autoridade do servidor
+ * @property {'standalone' | 'delegated'} [authority] - Modo de autoridade do servidor
  * @property {object} [nerv] - Instância NERV para injeção
  * @property {object} [missionManager] - MissionManager para injeção
  */
@@ -148,19 +159,19 @@ async function publishServerReadyWithRetry({ nerv, payload, highLevelNerv, actor
  *
  * Ordem é contratual e não deve ser alterada sem auditoria:
  *
- *   1. lifecycle (signals)
- *   2. HTTP engine bind
- *   3. persistência IPC
- *   4. socket hub
- *   5. router / API
- *   6. telemetria
- *   7. watchers
- *   8. NERV local
- *   9. ServerNERVAdapter
- *  10. reconciler
+ * 1. lifecycle (signals)
+ * 2. HTTP engine bind
+ * 3. persistência IPC
+ * 4. socket hub
+ * 5. router / API
+ * 6. telemetria
+ * 7. watchers
+ * 8. NERV local
+ * 9. ServerNERVAdapter
+ * 10. reconciler
  *
- * @param {BootstrapOptions} [options={}] - Opções de configuração do bootstrap
- * @returns {Promise<object>} Contexto operacional mínimo do server
+ * @param {BootstrapOptions} [options={}] - Opções de configuração do bootstrap. Default is `{}`
+ * @returns {Promise<any>} Contexto operacional mínimo do server
  * @throws {Error} - Se alguma fase do bootstrap falhar
  * @sideEffects - Inicializa servidor HTTP, conecta NERV, registra watchers
  */
@@ -221,21 +232,22 @@ async function bootstrap(options = {}) {
             const { bootstrapRbacFromEnv } = await import('#infra/db/rbac_repo');
             bootstrapRbacFromEnv();
             log('DEBUG', '[BOOT] RBAC bootstrap aplicado');
-        } catch (err) {
-            log('WARN', `[BOOT] Falha no bootstrap RBAC: ${err?.message || String(err)}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[BOOT] Falha no bootstrap RBAC: ${_e?.message || String(err)}`);
         }
 
         log('INFO', `🚀 Server Process — Canonical Bootstrap (authority=${authority})`);
         const requestedSyncMode = CONFIG.DASHBOARD_TASK_SYNC_MODE || 'ssot_feed';
         const legacyBridgeContingency = Boolean(
-            CONFIG.DASHBOARD_LEGACY_BRIDGE_CONTINGENCY || envFlag('DASHBOARD_LEGACY_BRIDGE_CONTINGENCY', false)
+            CONFIG.DASHBOARD_LEGACY_BRIDGE_CONTINGENCY || envFlag('DASHBOARD_LEGACY_BRIDGE_CONTINGENCY', false),
         );
         const dashboardTaskSyncMode =
             requestedSyncMode === 'legacy_bridge' && legacyBridgeContingency ? 'legacy_bridge' : 'ssot_feed';
         if (requestedSyncMode === 'legacy_bridge' && !legacyBridgeContingency) {
             log(
                 'WARN',
-                '[BOOT] DASHBOARD_TASK_SYNC_MODE=legacy_bridge ignorado; habilite DASHBOARD_LEGACY_BRIDGE_CONTINGENCY=true apenas em contingência'
+                '[BOOT] DASHBOARD_TASK_SYNC_MODE=legacy_bridge ignorado; habilite DASHBOARD_LEGACY_BRIDGE_CONTINGENCY=true apenas em contingência',
             );
         }
 
@@ -282,7 +294,7 @@ async function bootstrap(options = {}) {
            FASE 4 — Socket Hub
            Acoplado sobre servidor já bound.
         -------------------------------------------------------------- */
-        socketHub.init(httpServer);
+        socketHub.init(/** @type {any} */ (httpServer));
         log('DEBUG', '[BOOT] Socket hub acoplado');
         upsertRuntimeResource({
             id: 'socket_hub',
@@ -313,13 +325,14 @@ async function bootstrap(options = {}) {
                         }
                     },
                 });
-            } catch (err) {
-                log('WARN', `[BOOT] Falha ao iniciar SSOTEventFeed: ${err.message}`);
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
+                log('WARN', `[BOOT] Falha ao iniciar SSOTEventFeed: ${_e.message}`);
                 setRuntimeResourceState('ssot_feed', 'degraded', {
                     owner: runtimeOwner,
                     criticality: 'optional',
                     reasonCode: 'SSOT_EVENT_FEED_START_FAILED',
-                    message: err?.message || String(err),
+                    message: _e?.message || String(err),
                 });
             }
         } else {
@@ -347,13 +360,14 @@ async function bootstrap(options = {}) {
                     }
                 },
             });
-        } catch (err) {
-            log('WARN', `[BOOT] Falha ao iniciar TelemetryAggregator: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[BOOT] Falha ao iniciar TelemetryAggregator: ${_e.message}`);
             setRuntimeResourceState('telemetry_aggregator', 'degraded', {
                 owner: runtimeOwner,
                 criticality: 'optional',
                 reasonCode: 'TELEMETRY_AGGREGATOR_START_FAILED',
-                message: err?.message || String(err),
+                message: _e?.message || String(err),
             });
         }
 
@@ -366,14 +380,15 @@ async function bootstrap(options = {}) {
         try {
             appInstance.locals = appInstance.locals || {};
             appInstance.locals.authority = authority;
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
+            const _e = /** @type {any} */ (e);
             /* noop */
         }
 
         if (typeof applyRoutes !== 'function') {
             throw new Error('router.applyRoutes indisponível');
         }
-        await applyRoutes(appInstance);
+        await applyRoutes(/** @type {any} */ (appInstance));
         log('DEBUG', '[BOOT] Rotas HTTP consolidadas');
 
         try {
@@ -391,13 +406,14 @@ async function bootstrap(options = {}) {
                     }
                 },
             });
-        } catch (err) {
-            log('WARN', `[BOOT] Falha ao iniciar token blocklist cleanup: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[BOOT] Falha ao iniciar token blocklist cleanup: ${_e.message}`);
             setRuntimeResourceState('token_blocklist_cleanup', 'degraded', {
                 owner: runtimeOwner,
                 criticality: 'optional',
                 reasonCode: 'TOKEN_BLOCKLIST_CLEANUP_START_FAILED',
-                message: err?.message || String(err),
+                message: _e?.message || String(err),
             });
         }
 
@@ -418,13 +434,14 @@ async function bootstrap(options = {}) {
                     }
                 },
             });
-        } catch (err) {
-            log('WARN', `[BOOT] PM2 Bridge init falhou: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[BOOT] PM2 Bridge init falhou: ${_e.message}`);
             setRuntimeResourceState('pm2_bridge', 'degraded', {
                 owner: runtimeOwner,
                 criticality: 'optional',
                 reasonCode: 'PM2_BRIDGE_INIT_FAILED',
-                message: err?.message || String(err),
+                message: _e?.message || String(err),
             });
         }
 
@@ -442,13 +459,14 @@ async function bootstrap(options = {}) {
                     }
                 },
             });
-        } catch (err) {
-            log('WARN', `[BOOT] LogTail init falhou: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[BOOT] LogTail init falhou: ${_e.message}`);
             setRuntimeResourceState('log_tail', 'degraded', {
                 owner: runtimeOwner,
                 criticality: 'optional',
                 reasonCode: 'LOG_TAIL_INIT_FAILED',
-                message: err?.message || String(err),
+                message: _e?.message || String(err),
             });
         }
 
@@ -466,22 +484,24 @@ async function bootstrap(options = {}) {
                     }
                 },
             });
-        } catch (err) {
-            log('WARN', `[BOOT] Hardware Telemetry init falhou: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[BOOT] Hardware Telemetry init falhou: ${_e.message}`);
             setRuntimeResourceState('hardware_telemetry', 'degraded', {
                 owner: runtimeOwner,
                 criticality: 'optional',
                 reasonCode: 'HARDWARE_TELEMETRY_INIT_FAILED',
-                message: err?.message || String(err),
+                message: _e?.message || String(err),
             });
         }
 
         // Inicia snapshot de telemetria em background para respostas rápidas
         try {
             const intervalMs = parseInt(process.env.SNAPSHOT_INTERVAL_MS || '60000', 10);
-            snapshot.start(intervalMs);
-        } catch (e) {
-            log('WARN', `[BOOT] Falha ao iniciar snapshot de telemetria: ${e.message}`);
+            void snapshot.start(intervalMs);
+        } catch (/** @type {any} */ e) {
+            const _e = /** @type {any} */ (e);
+            log('WARN', `[BOOT] Falha ao iniciar snapshot de telemetria: ${_e.message}`);
         }
 
         log('DEBUG', '[BOOT] Telemetria online com snapshot');
@@ -503,18 +523,19 @@ async function bootstrap(options = {}) {
                     }
                 },
             });
-        } catch (err) {
-            log('WARN', `[BOOT] FS Watcher init falhou: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[BOOT] FS Watcher init falhou: ${_e.message}`);
             setRuntimeResourceState('fs_watcher', 'degraded', {
                 owner: runtimeOwner,
                 criticality: 'optional',
                 reasonCode: 'FS_WATCHER_INIT_FAILED',
-                message: err?.message || String(err),
+                message: _e?.message || String(err),
             });
         }
 
         try {
-            logWatcher.init();
+            void logWatcher.init();
             log('DEBUG', '[BOOT] Log Watcher inicializado');
             upsertRuntimeResource({
                 id: 'log_watcher',
@@ -527,13 +548,14 @@ async function bootstrap(options = {}) {
                     }
                 },
             });
-        } catch (err) {
-            log('WARN', `[BOOT] Log Watcher init falhou: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[BOOT] Log Watcher init falhou: ${_e.message}`);
             setRuntimeResourceState('log_watcher', 'degraded', {
                 owner: runtimeOwner,
                 criticality: 'optional',
                 reasonCode: 'LOG_WATCHER_INIT_FAILED',
-                message: err?.message || String(err),
+                message: _e?.message || String(err),
             });
         }
 
@@ -572,7 +594,7 @@ async function bootstrap(options = {}) {
         if (dashboardTaskSyncMode === 'legacy_bridge') {
             try {
                 const taskSyncBridge = await import('#server/dashboard-api/task_sync_bridge').then(
-                    module => module.default ?? null
+                    (module) => module.default ?? null,
                 );
                 if (taskSyncBridge && typeof taskSyncBridge.initialize === 'function') {
                     taskSyncBridge.initialize({ socketHub, nervClient: nerv });
@@ -596,13 +618,14 @@ async function bootstrap(options = {}) {
                         reasonCode: 'TASK_SYNC_BRIDGE_MISSING',
                     });
                 }
-            } catch (err) {
-                log('WARN', `[BOOT] Falha ao inicializar TaskSyncBridge: ${err.message}`);
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
+                log('WARN', `[BOOT] Falha ao inicializar TaskSyncBridge: ${_e.message}`);
                 setRuntimeResourceState('task_sync_bridge', 'degraded', {
                     owner: runtimeOwner,
                     criticality: 'optional',
                     reasonCode: 'TASK_SYNC_BRIDGE_START_FAILED',
-                    message: err?.message || String(err),
+                    message: _e?.message || String(err),
                 });
             }
         } else {
@@ -642,12 +665,13 @@ async function bootstrap(options = {}) {
                     const level = attempt > 1 ? 'INFO' : 'DEBUG';
                     log(level, `[BOOT] Evento NERV SERVER_READY publicado na tentativa ${attempt}/${maxAttempts}`);
                     nervPublished = true;
-                } catch (retryErr) {
-                    log('ERROR', `[BOOT] CRITICAL: SERVER_READY falhou após retries: ${retryErr.message}`);
+                } catch (/** @type {any} */ retryErr) {
+                    const _e = /** @type {any} */ (retryErr);
+                    log('ERROR', `[BOOT] CRITICAL: SERVER_READY falhou após retries: ${_e.message}`);
 
                     // Se em modo standalone, discovery é crítica
                     if (Authority.isStandalone(authority)) {
-                        throw new Error(`Discovery crítica falhou: ${retryErr.message}`, { cause: retryErr });
+                        throw new Error(`Discovery crítica falhou: ${_e.message}`, { cause: retryErr });
                     }
                 }
 
@@ -659,20 +683,22 @@ async function bootstrap(options = {}) {
                             protocolVersion: PROTOCOL_VERSION || '2.0.0',
                             singularityMode: CONNECTION_MODES.SINGULARITY,
                         },
-                        nerv,
+                        /** @type {any} */ (nerv),
                         port,
-                        authority
+                        authority,
                     );
-                } catch (persistErr) {
-                    log('ERROR', `[BOOT] persistServerState falhou: ${persistErr.message}`);
+                } catch (/** @type {any} */ persistErr) {
+                    const _e = /** @type {any} */ (persistErr);
+                    log('ERROR', `[BOOT] persistServerState falhou: ${_e.message}`);
                     if (!nervPublished && Authority.isStandalone(authority)) {
                         throw new Error('Discovery falhou completamente (NERV + persistServerState)', {
                             cause: persistErr,
                         });
                     }
                 }
-            } catch (err) {
-                log('ERROR', `[BOOT] Falha crítica na publicação SERVER_READY: ${err.message}`);
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
+                log('ERROR', `[BOOT] Falha crítica na publicação SERVER_READY: ${_e.message}`);
                 throw err; // Re-throw para abortar boot se standalone
             }
         } else {
@@ -682,7 +708,7 @@ async function bootstrap(options = {}) {
         /* --------------------------------------------------------------
          FASE 9 — Adapter NERV ⇄ Socket
       -------------------------------------------------------------- */
-        const serverAdapter = new ServerNERVAdapter(nerv, socketHub);
+        const serverAdapter = new ServerNERVAdapter(/** @type {any} */ (nerv), /** @type {any} */ (socketHub));
         log('INFO', '[BOOT] ServerNERVAdapter ativo');
         setRuntimeResourceState('server_adapter', 'ready', {
             owner: runtimeOwner,
@@ -692,14 +718,15 @@ async function bootstrap(options = {}) {
         // Injeção opcional de MissionManager passada via options (delegated ou embed)
         try {
             if (options.missionManager) {
-                const missionsController = await import('./api/controllers/missions.js').then(m => m.default ?? m);
+                const missionsController = await import('./api/controllers/missions.js').then((m) => m.default ?? m);
                 if (typeof (/** @type {any} */ (missionsController).setMissionManager) === 'function') {
                     /** @type {any} */ (missionsController).setMissionManager(options.missionManager);
                     log('DEBUG', '[BOOT] MissionManager injetado via options.missionManager');
                 }
             }
-        } catch (e) {
-            log('WARN', `[BOOT] Falha ao injetar MissionManager via options: ${e.message}`);
+        } catch (/** @type {any} */ e) {
+            const _e = /** @type {any} */ (e);
+            log('WARN', `[BOOT] Falha ao injetar MissionManager via options: ${_e.message}`);
         }
 
         /* --------------------------------------------------------------
@@ -716,7 +743,8 @@ async function bootstrap(options = {}) {
         try {
             sendReadySignalOnce();
             log('DEBUG', '[BOOT] PM2 ready signal sent');
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
+            const _e = /** @type {any} */ (e);
             // noop
         }
 
@@ -786,7 +814,7 @@ async function bootstrap(options = {}) {
             const upstreamStatusGetter = appInstance.locals.getMcpUpstreamsStatus;
             const upstreams = typeof upstreamStatusGetter === 'function' ? upstreamStatusGetter() : [];
             const hasRequiredUpstreamDown = Array.isArray(upstreams)
-                ? upstreams.some(item => item?.required && item?.enabled !== false && item?.ready !== true)
+                ? upstreams.some((item) => item?.required && item?.enabled !== false && item?.ready !== true)
                 : false;
 
             if (hasRequiredUpstreamDown) {
@@ -804,7 +832,8 @@ async function bootstrap(options = {}) {
             }
 
             const mcpTools = appInstance.locals?.mcp?.tools;
-            const hasLspTools = Array.isArray(mcpTools) && mcpTools.some(tool => String(tool || '').startsWith('lsp_'));
+            const hasLspTools =
+                Array.isArray(mcpTools) && mcpTools.some((tool) => String(tool || '').startsWith('lsp_'));
             setRuntimeResourceState('lsp_daemon', hasLspTools ? 'ready' : 'degraded', {
                 owner: runtimeOwner,
                 criticality: 'optional',
@@ -827,16 +856,17 @@ async function bootstrap(options = {}) {
                     message: ollamaState.message,
                     health: () => probeSupervisor.getState(),
                 });
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
                 setRuntimeResourceState('ollama_host', 'degraded', {
                     owner: runtimeOwner,
                     criticality: 'optional',
                     reasonCode: 'OLLAMA_PROBE_FAILED',
-                    message: err?.message || String(err),
+                    message: _e?.message || String(err),
                 });
             }
 
-            const safeProbeJson = async (url, timeoutMs = 1500) => {
+            const safeProbeJson = async (/** @type {any} */ url, timeoutMs = 1500) => {
                 try {
                     const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
                     const text = await response.text().catch(() => '');
@@ -847,8 +877,9 @@ async function bootstrap(options = {}) {
                         json = null;
                     }
                     return { ok: response.ok, status: response.status, json };
-                } catch (error) {
-                    return { ok: false, status: null, error: error?.message || String(error), json: null };
+                } catch (/** @type {any} */ error) {
+                    const _e = /** @type {any} */ (error);
+                    return { ok: false, status: null, error: _e?.message || String(_e), json: null };
                 }
             };
 
@@ -857,7 +888,7 @@ async function bootstrap(options = {}) {
                 const inferenceGatewayPort = Number(process.env.INFERENCE_GATEWAY_PORT || 3099);
                 const inferenceProbe = await safeProbeJson(
                     `http://${inferenceGatewayHost}:${inferenceGatewayPort}/health`,
-                    1200
+                    1200,
                 );
                 setRuntimeResourceState('inference_gateway', inferenceProbe.ok ? 'ready' : 'degraded', {
                     owner: runtimeOwner,
@@ -868,12 +899,13 @@ async function bootstrap(options = {}) {
                         : inferenceProbe.error || `HTTP ${inferenceProbe.status || 'n/a'}`,
                     health: () => inferenceProbe,
                 });
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
                 setRuntimeResourceState('inference_gateway', 'degraded', {
                     owner: runtimeOwner,
                     criticality: 'optional',
                     reasonCode: 'INFERENCE_GATEWAY_PROBE_FAILED',
-                    message: err?.message || String(err),
+                    message: _e?.message || String(err),
                 });
             }
 
@@ -890,20 +922,22 @@ async function bootstrap(options = {}) {
                         : auditAgentProbe.error || `HTTP ${auditAgentProbe.status || 'n/a'}`,
                     health: () => auditAgentProbe,
                 });
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
                 setRuntimeResourceState('audit_agent', 'degraded', {
                     owner: runtimeOwner,
                     criticality: 'optional',
                     reasonCode: 'AUDIT_AGENT_PROBE_FAILED',
-                    message: err?.message || String(err),
+                    message: _e?.message || String(err),
                 });
             }
 
             log('DEBUG', '[BOOT] runtimeReadiness definido no app (server process)');
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
             log(
                 'WARN',
-                `[BOOT] Não foi possível definir runtimeReadiness no app: ${err && err.message ? err.message : String(err)}`
+                `[BOOT] Não foi possível definir runtimeReadiness no app: ${err && _e.message ? _e.message : String(err)}`,
             );
         }
 
@@ -914,8 +948,9 @@ async function bootstrap(options = {}) {
             serverAdapter,
             authority,
         };
-    } catch (err) {
-        log('FATAL', `[BOOT] Falha crítica de bootstrap: ${err.message}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('FATAL', `[BOOT] Falha crítica de bootstrap: ${_e.message}`);
         if (Authority.isStandalone(authority)) {
             process.exit(1);
         }
@@ -927,19 +962,22 @@ async function bootstrap(options = {}) {
    ENTRYPOINT CONTROL — COMPATIBILITY LAYER
 ========================================================================== */
 
-const __shouldBootstrap = shouldAutobootEntrypoint({
-    importMetaUrl: import.meta.url,
-    explicitAutostartEnv: 'MAESTRO_ENTRY_AUTOSTART',
-    allowPm2ExecPathMatch: true,
-});
+const __shouldBootstrap = shouldAutobootEntrypoint(
+    /** @type {any} */ ({
+        importMetaUrl: import.meta.url,
+        explicitAutostartEnv: 'MAESTRO_ENTRY_AUTOSTART',
+        allowPm2ExecPathMatch: true,
+    }),
+);
 
-if (__shouldBootstrap && !globalThis.__MISSION_CONTROL_BOOTSTRAPPED__) {
-    globalThis.__MISSION_CONTROL_BOOTSTRAPPED__ = true;
-    (async () => {
+if (__shouldBootstrap && !(/** @type {any} */ (globalThis).__MISSION_CONTROL_BOOTSTRAPPED__)) {
+    /** @type {any} */ (globalThis).__MISSION_CONTROL_BOOTSTRAPPED__ = true;
+    void (async () => {
         try {
             await bootstrap();
-        } catch (err) {
-            log('FATAL', `[BOOT] Entrypoint bootstrap falhou: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('FATAL', `[BOOT] Entrypoint bootstrap falhou: ${_e.message}`);
             process.exit(1);
         }
     })();

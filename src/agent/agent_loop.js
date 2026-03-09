@@ -3,35 +3,38 @@ import { log } from '#core/logger';
 
 /**
  * Opções de configuração para intervalos do AgentLoop.
- * @typedef {Object} AgentLoopIntervals
- * @property {number} [kernelMs=50] - Intervalo para kernel.step() em ms.
- * @property {number} [queueMs=250] - Intervalo para queueWorker.tick() em ms.
- * @property {number} [controlMs=500] - Intervalo para taskControlWatcher.tick() em ms.
- * @property {number} [missionMs=1000] - Intervalo para missionRunner.tick() em ms.
- * @property {number} [plannerMs=1500] - Intervalo para missionPlannerProcessor.tick() em ms.
- * @property {number} [watchdogMs=1500] - Intervalo para attemptWatchdog.tick() em ms.
- * @property {number} [orchestrationMs=1250] - Intervalo para taskOrchestrationWorker.tick() em ms.
- * @property {number} [stepTimeoutMs=30000] - Timeout máximo de um step completo em ms.
+ *
+ * @typedef {object} AgentLoopIntervals
+ * @property {number} [kernelMs=50] - Intervalo para kernel.step() em ms. Default is `50`
+ * @property {number} [queueMs=250] - Intervalo para queueWorker.tick() em ms. Default is `250`
+ * @property {number} [controlMs=500] - Intervalo para taskControlWatcher.tick() em ms. Default is `500`
+ * @property {number} [missionMs=1000] - Intervalo para missionRunner.tick() em ms. Default is `1000`
+ * @property {number} [plannerMs=1500] - Intervalo para missionPlannerProcessor.tick() em ms. Default is `1500`
+ * @property {number} [watchdogMs=1500] - Intervalo para attemptWatchdog.tick() em ms. Default is `1500`
+ * @property {number} [orchestrationMs=1250] - Intervalo para taskOrchestrationWorker.tick() em ms. Default is `1250`
+ * @property {number} [stepTimeoutMs=30000] - Timeout máximo de um step completo em ms. Default is `30000`
  */
 
 /**
  * Opções do construtor do AgentLoop.
- * @typedef {Object} AgentLoopOptions
- * @property {Object} kernel - Instância do kernel com método step() (obrigatório).
- * @property {Object} [browserPool=null] - Pool de browsers com circuit breaker.
- * @property {Object} [queueWorker=null] - Worker da fila com método tick().
- * @property {Object} [taskControlWatcher=null] - Watcher de controle de tarefas.
- * @property {Object} [missionRunner=null] - Runner de missões.
- * @property {Object} [missionPlannerProcessor=null] - Processador de planejamento.
- * @property {Object} [attemptWatchdog=null] - Watchdog de tentativas.
- * @property {Object} [taskOrchestrationWorker=null] - Worker de orquestração.
- * @property {AgentLoopIntervals} [intervals={}] - Configuração de intervalos.
- * @property {number} [baseTickMs=25] - Intervalo base do loop principal em ms.
+ *
+ * @typedef {object} AgentLoopOptions
+ * @property {any} kernel - Instância do kernel com método step() (obrigatório).
+ * @property {any} [browserPool=null] - Pool de browsers com circuit breaker. Default is `null`
+ * @property {any} [queueWorker=null] - Worker da fila com método tick(). Default is `null`
+ * @property {any} [taskControlWatcher=null] - Watcher de controle de tarefas. Default is `null`
+ * @property {any} [missionRunner=null] - Runner de missões. Default is `null`
+ * @property {any} [missionPlannerProcessor=null] - Processador de planejamento. Default is `null`
+ * @property {any} [attemptWatchdog=null] - Watchdog de tentativas. Default is `null`
+ * @property {any} [taskOrchestrationWorker=null] - Worker de orquestração. Default is `null`
+ * @property {AgentLoopIntervals} [intervals={}] - Configuração de intervalos. Default is `{}`
+ * @property {number} [baseTickMs=25] - Intervalo base do loop principal em ms. Default is `25`
  */
 
 /**
  * Estado interno dos próximos ticks do AgentLoop.
- * @typedef {Object} AgentLoopNextTicks
+ *
+ * @typedef {object} AgentLoopNextTicks
  * @property {number} kernelAt - Timestamp do próximo tick do kernel.
  * @property {number} queueAt - Timestamp do próximo tick da fila.
  * @property {number} controlAt - Timestamp do próximo tick do controle.
@@ -42,12 +45,13 @@ import { log } from '#core/logger';
  */
 
 /**
- * Loop principal de execução do agente, coordenando múltiplos workers e watchers.
- * Implementa um sistema de ticks assíncronos com intervalos configuráveis.
+ * Loop principal de execução do agente, coordenando múltiplos workers e watchers. Implementa um sistema de ticks
+ * assíncronos com intervalos configuráveis.
  */
 class AgentLoop {
     /**
      * Cria uma nova instância do AgentLoop.
+     *
      * @param {AgentLoopOptions} options - Opções de configuração.
      * @throws {Error} Se kernel.step() não estiver disponível.
      */
@@ -108,8 +112,8 @@ class AgentLoop {
     }
 
     /**
-     * Inicia o loop de execução do agente.
-     * Side-effects: Inicia timer global, chama step() imediatamente e periodicamente.
+     * Inicia o loop de execução do agente. Side-effects: Inicia timer global, chama step() imediatamente e
+     * periodicamente.
      */
     start() {
         if (this._timer) return;
@@ -124,8 +128,7 @@ class AgentLoop {
     }
 
     /**
-     * Para o loop de execução do agente.
-     * Side-effects: Limpa timer global, marca como parado.
+     * Para o loop de execução do agente. Side-effects: Limpa timer global, marca como parado.
      */
     stop() {
         this._stopped = true;
@@ -137,8 +140,9 @@ class AgentLoop {
     }
 
     /**
-     * Executa um passo do loop, verificando e executando workers conforme intervalos.
-     * Side-effects: Executa múltiplos workers assincronamente, logs erros.
+     * Executa um passo do loop, verificando e executando workers conforme intervalos. Side-effects: Executa múltiplos
+     * workers assincronamente, logs erros.
+     *
      * @returns {Promise<void>}
      */
     async step() {
@@ -148,7 +152,7 @@ class AgentLoop {
             if (this._stepStartedAt > 0 && Date.now() - this._stepStartedAt > this._stepTimeoutMs) {
                 log(
                     'ERROR',
-                    `[AgentLoop] step() hung for ${Date.now() - this._stepStartedAt}ms — force-resetting _running flag`
+                    `[AgentLoop] step() hung for ${Date.now() - this._stepStartedAt}ms — force-resetting _running flag`,
                 );
                 this._running = false;
             } else {
@@ -166,7 +170,8 @@ class AgentLoop {
                 this._next.kernelAt = now + this.intervals.kernelMs;
                 try {
                     await this.kernel.step();
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('ERROR', `[AgentLoop] kernel.step failed: ${err?.message || String(err)}`);
                 }
             }
@@ -180,7 +185,8 @@ class AgentLoop {
                 this._next.controlAt = now + this.intervals.controlMs;
                 try {
                     await this.taskControlWatcher.tick();
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] taskControlWatcher.tick failed: ${err?.message || String(err)}`);
                 }
             }
@@ -190,7 +196,8 @@ class AgentLoop {
                 this._next.watchdogAt = now + this.intervals.watchdogMs;
                 try {
                     await this.attemptWatchdog.tick();
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] attemptWatchdog.tick failed: ${err?.message || String(err)}`);
                 }
             }
@@ -200,7 +207,8 @@ class AgentLoop {
                 this._next.queueAt = now + this.intervals.queueMs;
                 try {
                     await this.queueWorker.tick();
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] queueWorker.tick failed: ${err?.message || String(err)}`);
                 }
             }
@@ -210,7 +218,8 @@ class AgentLoop {
                 this._next.missionAt = now + this.intervals.missionMs;
                 try {
                     await this.missionRunner.tick();
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] missionRunner.tick failed: ${err?.message || String(err)}`);
                 }
             }
@@ -219,7 +228,8 @@ class AgentLoop {
                 this._next.plannerAt = now + this.intervals.plannerMs;
                 try {
                     await this.missionPlannerProcessor.tick();
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] missionPlannerProcessor.tick failed: ${err?.message || String(err)}`);
                 }
             }
@@ -229,7 +239,8 @@ class AgentLoop {
                 this._next.orchestrationAt = now + this.intervals.orchestrationMs;
                 try {
                     await this.taskOrchestrationWorker.tick();
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] taskOrchestrationWorker.tick failed: ${err?.message || String(err)}`);
                 }
             }

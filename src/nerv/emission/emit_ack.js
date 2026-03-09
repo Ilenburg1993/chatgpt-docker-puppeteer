@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { MessageType } from '#shared/nerv/constants';
 import { getCorrelationId } from '#shared/nerv/envelope_reader';
 
@@ -7,18 +7,27 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
 =========================== */
 
 /**
+ * @typedef {object} CreateEmitAckDeps
+ * @property {any} envelopes
+ * @property {any} buffers
+ * @property {any} correlation
+ * @property {any} telemetry
+ */
+/**
+ * @typedef {object} CreateEmitAckOptions
+ * @property {any} [envelopes]
+ * @property {any} [buffers]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
+ */
+/**
  * Cria o emissor técnico de ACKs.
  *
- * **Side-effects:** Registra emissão na correlação histórica.
- * **Semântica:** Emissor especializado para acknowledgments NERV.
- * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
+ * **Side-effects:** Registra emissão na correlação histórica. **Semântica:** Emissor especializado para acknowledgments
+ * NERV. **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
- * @param {object} deps - Dependências do emissor
- * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
- * @param {object} deps.buffers - Subsistema de buffers outbound
- * @param {object} deps.correlation - Sistema de correlação histórica
- * @param {object} deps.telemetry - Interface de telemetria NERV
- * @returns {object} Emissor com método emitAck
+ * @param {CreateEmitAckDeps} deps - Dependências do emissor
+ * @returns {any} Emissor com método emitAck
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
@@ -33,8 +42,7 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
     /**
      * Emite um envelope ACK técnico.
      *
-     * @param {Object} envelope
-     * Envelope estruturalmente válido do tipo ACK.
+     * @param {object} envelope Envelope estruturalmente válido do tipo ACK.
      */
     function emitAck(envelope) {
         telemetry.emit('nerv:emission:attempt', {
@@ -49,11 +57,12 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
 
             // 2. Validação estrutural
             envelopes.assertValid(normalized);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:emission:rejected', {
                 kind: MessageType.ACK,
                 reason: 'estrutura',
-                message: error.message,
+                message: _e.message,
             });
             return;
         }

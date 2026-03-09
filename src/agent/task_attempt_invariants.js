@@ -5,22 +5,34 @@ import { releaseTaskLock } from '#infra/db/task_repo';
 
 /**
  * @param {string} taskId
- * @returns {string|null}
+ * @returns {string | null}
  */
 function getCurrentAttemptIdForTask(taskId) {
     if (!taskId) return null;
     try {
         const db = getDb();
-        const row = db.prepare('SELECT latest_attempt_id, last_correlation_id FROM tasks WHERE id = ?').get(taskId);
+        const row = /** @type {any} */ (
+            db.prepare('SELECT latest_attempt_id, last_correlation_id FROM tasks WHERE id = ?').get(taskId)
+        );
         return row?.latest_attempt_id ?? row?.last_correlation_id ?? null;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return null;
     }
 }
 
 /**
- * @param {{ taskId: string, attemptId?: string|null }} params
- * @returns {{ apply: boolean, currentAttemptId: string|null, reason: string }}
+ * @typedef {object} EvaluateAttemptInvariantsParams
+ * @property {string} taskId
+ * @property {string | null} attemptId
+ */
+/**
+ * @typedef {object} EvaluateAttemptInvariantsOptions
+ * @property {any} [taskId]
+ * @property {any} [attemptId]
+ */
+/**
+ * @param {EvaluateAttemptInvariantsParams} params
+ * @returns {{ apply: boolean; currentAttemptId: string | null; reason: string }}
  */
 function evaluateAttemptInvariants({ taskId, attemptId = null }) {
     if (!attemptId) {
@@ -40,16 +52,28 @@ function evaluateAttemptInvariants({ taskId, attemptId = null }) {
 }
 
 /**
- * @param {{
- *   taskId: string,
- *   attemptId?: string|null,
- *   currentAttemptId?: string|null,
- *   actionCode?: string|null,
- *   correlationId?: string|null,
- *   msgId?: string|null,
- *   context?: string
- * }} params
-  * @returns {any}
+ * @typedef {object} EmitStaleAttemptIgnoredEventParams
+ * @property {string} taskId
+ * @property {string | null} attemptId
+ * @property {string | null} currentAttemptId
+ * @property {string | null} actionCode
+ * @property {string | null} correlationId
+ * @property {string | null} msgId
+ * @property {string} context
+ */
+/**
+ * @typedef {object} EmitStaleAttemptIgnoredEventOptions
+ * @property {any} [taskId]
+ * @property {any} [attemptId]
+ * @property {any} [currentAttemptId]
+ * @property {any} [actionCode]
+ * @property {any} [correlationId]
+ * @property {any} [msgId]
+ * @property {any} [context]
+ */
+/**
+ * @param {EmitStaleAttemptIgnoredEventParams} params
+ * @returns {any}
  */
 function emitStaleAttemptIgnoredEvent({
     taskId,
@@ -83,14 +107,25 @@ function emitStaleAttemptIgnoredEvent({
 }
 
 /**
- * @param {{
- *   taskId: string,
- *   attemptId?: string|null,
- *   workerId?: string|null,
- *   actionCode?: string|null,
- *   correlationId?: string|null,
- *   context?: string
- * }} params
+ * @typedef {object} ReleaseTaskLockForAttemptParams
+ * @property {string} taskId
+ * @property {string | null} attemptId
+ * @property {string | null} [workerId]
+ * @property {string | null} actionCode
+ * @property {string | null} correlationId
+ * @property {string} context
+ */
+/**
+ * @typedef {object} ReleaseTaskLockForAttemptOptions
+ * @property {any} [taskId]
+ * @property {any} [attemptId]
+ * @property {any} [workerId]
+ * @property {any} [actionCode]
+ * @property {any} [correlationId]
+ * @property {any} [context]
+ */
+/**
+ * @param {ReleaseTaskLockForAttemptParams} params
  * @returns {number}
  */
 function releaseTaskLockForAttempt({

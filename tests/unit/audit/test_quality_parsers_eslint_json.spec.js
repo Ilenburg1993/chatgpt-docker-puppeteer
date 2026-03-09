@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { parseEslintJsonOutput, parseTypecheckOutput } from '../../../scripts/audit/collectors/quality.mjs';
 
 test('quality parser parses ESLint JSON findings from mixed output', () => {

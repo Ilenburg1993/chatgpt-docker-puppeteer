@@ -1,22 +1,22 @@
 // @ts-check
-import { test } from 'node:test';
-import assert from 'node:assert';
-import fs from 'node:fs';
 import * as PATHS from '#infra/fs/paths';
 import * as Discovery from '#nerv/discovery';
 import { ActionCode } from '#shared/nerv/constants';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import { test } from 'node:test';
 
 function makeMockNerv() {
-    let listeners = [];
+    /** @type {any[]} */ let listeners = [];
     return {
-        onEvent(handler) {
+        onEvent(/** @type {any} */ handler) {
             listeners.push(handler);
             return () => {
-                listeners = listeners.filter(h => h !== handler);
+                listeners = listeners.filter((h) => h !== handler);
             };
         },
-        emitEvent(envelope) {
-            listeners.slice().forEach(h => {
+        emitEvent(/** @type {any} */ envelope) {
+            listeners.slice().forEach((h) => {
                 try {
                     h(envelope);
                 } catch (e) {
@@ -24,8 +24,8 @@ function makeMockNerv() {
                 }
             });
         },
-        emitCommand(envelope) {
-            listeners.slice().forEach(h => {
+        emitCommand(/** @type {any} */ envelope) {
+            listeners.slice().forEach((h) => {
                 try {
                     h(envelope);
                 } catch (e) {
@@ -33,8 +33,8 @@ function makeMockNerv() {
                 }
             });
         },
-        emitAck(envelope) {
-            listeners.slice().forEach(h => {
+        emitAck(/** @type {any} */ envelope) {
+            listeners.slice().forEach((h) => {
                 try {
                     h(envelope);
                 } catch (e) {
@@ -47,9 +47,9 @@ function makeMockNerv() {
 
 test('publishServerReady uses NERV emitEvent', async () => {
     const mock = makeMockNerv();
-    let captured = null;
+    /** @type {any} */ let captured = null;
     // Replace emitEvent to capture envelope
-    mock.emitEvent = env => {
+    mock.emitEvent = (env) => {
         captured = env;
     };
 
@@ -69,14 +69,14 @@ test('waitForServerReady resolves when NERV emits SERVER_READY', async () => {
         mock.emitEvent({ type: { action_code: ActionCode.SERVER_READY }, payload: { port: 3010 } });
     }, 10);
 
-    const payload = await p;
+    const payload = /** @type {any} */ (await p);
     assert.strictEqual(payload.port, 3010);
 });
 
 test('listenForServerReady calls handler and unsubscribe works', async () => {
     const mock = makeMockNerv();
     let calls = 0;
-    const unsub = Discovery.listenForServerReady(mock, payload => {
+    const unsub = Discovery.listenForServerReady(mock, (payload) => {
         calls++;
     });
 

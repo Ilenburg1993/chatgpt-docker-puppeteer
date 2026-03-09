@@ -764,18 +764,18 @@ ws.onopen = () => {
     JSON.stringify({
       type: 'authenticate',
       token: 'my-secret',
-    })
+    }),
   );
 
   ws.send(
     JSON.stringify({
       type: 'subscribe',
       events: ['task:update'],
-    })
+    }),
   );
 };
 
-ws.onmessage = event => {
+ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
   console.log(data.type, data);
 };

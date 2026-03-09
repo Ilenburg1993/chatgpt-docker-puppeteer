@@ -1,7 +1,16 @@
 {
   "version": "0.2.0",
   "configurations": [
-
+    {
+      "name": "Deploy Cloud Function",
+      "type": "cloudcode.cloudfunctions",
+      "request": "launch",
+      "functionName": "CLOUDE-CONFIG",
+      "gen": "GEN_2",
+      "revision": "",
+      "entryPoint": "CLOUDE-CONFIG",
+      "testInput": "CLOUD-TEST"
+    },
     {
       "name": "Node: Agente (dev)",
       "type": "pwa-node",
@@ -16,8 +25,14 @@
         "DEBUG": "nerv:*,kernel:*,driver:*",
         "FORCE_COLOR": "1"
       },
-      "runtimeArgs": ["--enable-source-maps", "--max-old-space-size=2048"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "runtimeArgs": [
+        "--enable-source-maps",
+        "--max-old-space-size=2048"
+      ],
+      "skipFiles": [
+        "<node_internals>/**",
+        "node_modules/**"
+      ],
       "autoAttachChildProcesses": true
     },
     {
@@ -35,8 +50,14 @@
         "DEBUG": "server:*",
         "FORCE_COLOR": "1"
       },
-      "runtimeArgs": ["--enable-source-maps", "--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "runtimeArgs": [
+        "--enable-source-maps",
+        "--max-old-space-size=1024"
+      ],
+      "skipFiles": [
+        "<node_internals>/**",
+        "node_modules/**"
+      ],
       "autoAttachChildProcesses": true
     },
     {
@@ -46,7 +67,10 @@
       "program": "${file}",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
-      "env": { "NODE_ENV": "test", "LOG_LEVEL": "debug" },
+      "env": {
+        "NODE_ENV": "test",
+        "LOG_LEVEL": "debug"
+      },
       "autoAttachChildProcesses": true
     },
     {
@@ -57,7 +81,10 @@
       "restart": true,
       "localRoot": "${workspaceFolder}",
       "remoteRoot": "${workspaceFolder}",
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "skipFiles": [
+        "<node_internals>/**",
+        "node_modules/**"
+      ],
       "autoAttachChildProcesses": true
     },
     {
@@ -69,7 +96,10 @@
       "restart": false,
       "localRoot": "${workspaceFolder}",
       "remoteRoot": "${workspaceFolder}",
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "skipFiles": [
+        "<node_internals>/**",
+        "node_modules/**"
+      ],
       "autoAttachChildProcesses": true
     },
     {
@@ -78,9 +108,16 @@
       "request": "launch",
       "cwd": "${workspaceFolder}/src/dashboard-ui",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "env": { "NODE_ENV": "development" },
-      "presentation": { "group": "vue" }
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "presentation": {
+        "group": "vue"
+      }
     },
     {
       "name": "Chrome: Vue app",
@@ -89,14 +126,18 @@
       "url": "http://localhost:5173/dashboard/",
       "webRoot": "${workspaceFolder}/src/dashboard-ui",
       "sourceMaps": true,
-      "presentation": { "group": "vue" }
+      "presentation": {
+        "group": "vue"
+      }
     },
-    // Python agent debugging configurations
     {
       "name": "Debug Python Agent HTTP Server",
       "type": "debugpy",
       "request": "attach",
-      "connect": { "host": "localhost", "port": 5679 },
+      "connect": {
+        "host": "localhost",
+        "port": 5679
+      },
       "preLaunchTask": "Open Agent Inspector",
       "internalConsoleOptions": "neverOpen",
       "postDebugTask": "Terminate All Tasks"
@@ -105,7 +146,10 @@
       "name": "Debug Python Agent in Terminal",
       "type": "debugpy",
       "request": "attach",
-      "connect": { "host": "localhost", "port": 5679 },
+      "connect": {
+        "host": "localhost",
+        "port": 5679
+      },
       "preLaunchTask": "Run Python Agent in Terminal",
       "internalConsoleOptions": "neverOpen",
       "postDebugTask": "Terminate All Tasks"

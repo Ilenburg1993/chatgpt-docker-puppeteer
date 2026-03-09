@@ -501,14 +501,14 @@ this.driver = driverFactory.getDriver(
   this.task.spec.target,
   this.page,
   this.config,
-  this.abortController.signal
+  this.abortController.signal,
 );
 
 // DEPOIS (v3.0 - Pool):
 this.driver = await driverFactory.acquireFromPool(
   this.task.spec.target,
   this.page,
-  this.abortController.signal
+  this.abortController.signal,
 );
 
 // ✅ Retry logic continua funcionando (envolve acquireFromPool)
@@ -523,7 +523,7 @@ this.driver = await driverFactory.acquireFromPool(
 if (this.driver) {
   // ... removeListener ...
 
-  const destroyPromise = this.driver.destroy().catch(err => {
+  const destroyPromise = this.driver.destroy().catch((err) => {
     log('WARN', `[LIFECYCLE] Erro no descarte do driver: ${err.message}`, this.correlationId);
   });
 
@@ -531,11 +531,11 @@ if (this.driver) {
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(
       () => reject(new Error('Driver destroy timeout')),
-      LIFECYCLE_CONFIG.DESTROY_TIMEOUT_MS
+      LIFECYCLE_CONFIG.DESTROY_TIMEOUT_MS,
     );
   });
 
-  await Promise.race([destroyPromise, timeoutPromise]).catch(err => {
+  await Promise.race([destroyPromise, timeoutPromise]).catch((err) => {
     log('ERROR', `[LIFECYCLE] Destroy timeout ou erro: ${err.message}`, this.correlationId);
   });
 }
@@ -553,9 +553,9 @@ if (this.driver) {
     log(
       'WARN',
       `[LIFECYCLE] Pool release failed, destroying driver: ${err.message}`,
-      this.correlationId
+      this.correlationId,
     );
-    await this.driver.destroy().catch(destroyErr => {
+    await this.driver.destroy().catch((destroyErr) => {
       log('ERROR', `[LIFECYCLE] Destroy fallback error: ${destroyErr.message}`, this.correlationId);
     });
   }

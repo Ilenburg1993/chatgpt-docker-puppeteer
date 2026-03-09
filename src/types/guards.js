@@ -1,12 +1,12 @@
 // @ts-check - Type checking rigoroso habilitado
 
 /**
- * @fileoverview Type Guards
- * Funções de validação de tipo em runtime para uso em todo o sistema
+ * @file Type Guards Funções de validação de tipo em runtime para uso em todo o sistema
  */
 
 /**
  * Verifica se valor é um objeto não-nulo
+ *
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
  */
@@ -16,6 +16,7 @@ export function isObject(value) {
 
 /**
  * Alias semântico para objetos dicionário (record).
+ *
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
  */
@@ -24,8 +25,8 @@ export function isRecord(value) {
 }
 
 /**
- * Converte unknown em record ou retorna fallback vazio.
- * Útil para reduzir casts repetitivos em payloads/eventos.
+ * Converte unknown em record ou retorna fallback vazio. Útil para reduzir casts repetitivos em payloads/eventos.
+ *
  * @param {unknown} value
  * @returns {Record<string, unknown>}
  */
@@ -35,6 +36,7 @@ export function asRecord(value) {
 
 /**
  * Verifica se valor é uma string não-vazia
+ *
  * @param {unknown} value
  * @returns {value is string}
  */
@@ -44,6 +46,7 @@ export function isNonEmptyString(value) {
 
 /**
  * Verifica se valor é um número finito
+ *
  * @param {unknown} value
  * @returns {value is number}
  */
@@ -53,6 +56,7 @@ export function isFiniteNumber(value) {
 
 /**
  * Verifica se valor é um timestamp válido
+ *
  * @param {unknown} value
  * @returns {value is number}
  */
@@ -62,6 +66,7 @@ export function isValidTimestamp(value) {
 
 /**
  * Verifica se valor é um UUID válido
+ *
  * @param {unknown} value
  * @returns {value is string}
  */
@@ -73,6 +78,7 @@ export function isUUID(value) {
 
 /**
  * Verifica se valor é um email válido
+ *
  * @param {unknown} value
  * @returns {value is string}
  */
@@ -84,6 +90,7 @@ export function isValidEmail(value) {
 
 /**
  * Verifica se valor é um URL válido
+ *
  * @param {unknown} value
  * @returns {value is string}
  */
@@ -99,6 +106,7 @@ export function isValidUrl(value) {
 
 /**
  * Verifica se valor é um enum válido
+ *
  * @param {unknown} value
  * @param {readonly string[]} enumValues
  * @returns {boolean}
@@ -109,17 +117,19 @@ export function isValidEnum(value, enumValues) {
 
 /**
  * Verifica se objeto tem propriedade obrigatória
+ *
  * @param {unknown} obj
  * @param {string[]} requiredProps
  * @returns {obj is Record<string, unknown>}
  */
 export function hasRequiredProperties(obj, requiredProps) {
     if (!isObject(obj)) return false;
-    return requiredProps.every(prop => prop in obj && obj[prop] !== undefined);
+    return requiredProps.every((prop) => prop in obj && obj[prop] !== undefined);
 }
 
 /**
  * Guard genérico para actor-like payloads (id/username/role opcionais).
+ *
  * @param {unknown} value
  * @returns {value is {id?: string|number, username?: string, role?: string, roles?: unknown[], permissions?: unknown[]}}
  */
@@ -135,6 +145,7 @@ export function isActorLike(value) {
 
 /**
  * Verifica se valor é um array não-vazio
+ *
  * @param {unknown} value
  * @returns {value is unknown[]}
  */
@@ -144,6 +155,7 @@ export function isNonEmptyArray(value) {
 
 /**
  * Verifica se valor é uma data ISO válida
+ *
  * @param {unknown} value
  * @returns {value is string}
  */
@@ -155,6 +167,7 @@ export function isISODateString(value) {
 
 /**
  * Verifica se valor é um status de task válido
+ *
  * @param {unknown} value
  * @returns {value is 'PENDING'|'RUNNING'|'DONE'|'FAILED'|'CANCELLED'|'PAUSED'}
  */
@@ -165,6 +178,7 @@ export function isTaskStatus(value) {
 
 /**
  * Verifica se valor é um ActionCode válido
+ *
  * @param {unknown} value
  * @returns {value is string}
  */
@@ -175,6 +189,7 @@ export function isActionCode(value) {
 
 /**
  * Normaliza valor para string ou retorna padrão
+ *
  * @param {unknown} value
  * @param {string} defaultValue
  * @returns {string}
@@ -188,6 +203,7 @@ export function toString(value, defaultValue = '') {
 
 /**
  * Normaliza valor para número ou retorna padrão
+ *
  * @param {unknown} value
  * @param {number} defaultValue
  * @returns {number}
@@ -200,6 +216,7 @@ export function toNumber(value, defaultValue = 0) {
 
 /**
  * Normaliza valor para booleano
+ *
  * @param {unknown} value
  * @returns {boolean}
  */

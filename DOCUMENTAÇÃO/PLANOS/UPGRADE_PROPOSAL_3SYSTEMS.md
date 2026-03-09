@@ -317,7 +317,7 @@ class StructuredExtractor {
    */
   async extract(page, protocol) {
     // 1. Extração HTML (preserva estrutura)
-    const html = await page.evaluate(proto => {
+    const html = await page.evaluate((proto) => {
       const msgs = Array.from(document.querySelectorAll(proto.selector));
       const targetMsg = msgs[msgs.length - 1];
 
@@ -330,9 +330,9 @@ class StructuredExtractor {
         '[data-testid*="thought"]',
         '.thought-block',
         'details',
-        '.sr-only'
+        '.sr-only',
       );
-      thoughts.forEach(t => t.remove());
+      thoughts.forEach((t) => t.remove());
 
       return {
         html: clone.innerHTML,
@@ -374,7 +374,7 @@ class StructuredExtractor {
   }
 
   _extractCodeBlocks(root) {
-    return root.querySelectorAll('pre code, code').map(el => ({
+    return root.querySelectorAll('pre code, code').map((el) => ({
       language: el.getAttribute('class')?.replace('language-', '') || 'text',
       code: el.text,
       isInline: el.tagName === 'CODE' && !el.parentNode.tagName === 'PRE',
@@ -382,7 +382,7 @@ class StructuredExtractor {
   }
 
   _extractLinks(root) {
-    return root.querySelectorAll('a').map(el => ({
+    return root.querySelectorAll('a').map((el) => ({
       text: el.text,
       href: el.getAttribute('href'),
       title: el.getAttribute('title'),
@@ -1184,7 +1184,7 @@ const SVG_SIGNATURES = [
 ];
 
 // generateProtocol: Gera identificador único de elemento
-generateProtocol: el => {
+generateProtocol: (el) => {
   // 1. Tenta atributos QA (data-testid, data-cy, name)
   const qaAttrs = ['data-testid', 'data-cy', 'data-qa', 'name'];
   for (const a of qaAttrs) {
@@ -1438,10 +1438,10 @@ class DNAStrategyManager {
    */
   async detect(page, hint) {
     // Executa todas as estratégias em paralelo
-    const results = await Promise.all(this.strategies.map(s => s.detect(page, hint)));
+    const results = await Promise.all(this.strategies.map((s) => s.detect(page, hint)));
 
     // Filtra resultados válidos
-    const valid = results.filter(r => r.confidence > 0);
+    const valid = results.filter((r) => r.confidence > 0);
 
     if (valid.length === 0) {
       throw new Error('ELEMENT_NOT_FOUND: No strategy succeeded');
@@ -1469,8 +1469,7 @@ class DNAStrategyManager {
 
 ```javascript
 /**
- * Detecta via atributos QA (data-testid, data-cy, aria-*)
- * Confidence: 100 (mais confiável)
+ * Detecta via atributos QA (data-testid, data-cy, aria-*) Confidence: 100 (mais confiável)
  */
 class QAAttributeStrategy {
   async detect(page, hint) {
@@ -1490,9 +1489,9 @@ class QAAttributeStrategy {
           const elements = Array.from(document.querySelectorAll(`[${a}]`));
 
           // Filtra por hint (ex: "send", "button")
-          const matches = elements.filter(el => {
+          const matches = elements.filter((el) => {
             const value = el.getAttribute(a).toLowerCase();
-            return h.keywords.some(k => value.includes(k));
+            return h.keywords.some((k) => value.includes(k));
           });
 
           if (matches.length > 0) {
@@ -1502,7 +1501,7 @@ class QAAttributeStrategy {
           return null;
         },
         attr,
-        hint
+        hint,
       );
 
       if (selector) {
@@ -1541,8 +1540,7 @@ class QAAttributeStrategy {
 
 ```javascript
 /**
- * Detecta via DNA vetorial SVG (geometric matching)
- * Confidence: 90
+ * Detecta via DNA vetorial SVG (geometric matching) Confidence: 90
  */
 class SVGDNAStrategy {
   constructor() {
@@ -1599,7 +1597,7 @@ class SVGDNAStrategy {
         return { confidence: 0 };
       },
       this.signatures,
-      hint
+      hint,
     );
 
     return {
@@ -1621,8 +1619,7 @@ class SVGDNAStrategy {
 const crypto = require('crypto');
 
 /**
- * Detecta via screenshot hash (visual similarity)
- * Confidence: 80
+ * Detecta via screenshot hash (visual similarity) Confidence: 80
  */
 class VisualSimilarityStrategy {
   constructor() {
@@ -1636,7 +1633,7 @@ class VisualSimilarityStrategy {
     const screenshots = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
 
-      return buttons.map(btn => {
+      return buttons.map((btn) => {
         const rect = btn.getBoundingClientRect();
         return {
           selector: this._generateSelector(btn),
@@ -1709,8 +1706,7 @@ class VisualSimilarityStrategy {
 
 ```javascript
 /**
- * Cache de protocols (30s TTL)
- * 90% faster (30ms vs 400ms)
+ * Cache de protocols (30s TTL) 90% faster (30ms vs 400ms)
  */
 class DNACache {
   constructor(ttl = 30000) {
@@ -1744,7 +1740,7 @@ class DNACache {
     }
 
     // Validate element still exists
-    const exists = await page.evaluate(sel => {
+    const exists = await page.evaluate((sel) => {
       return document.querySelector(sel) !== null;
     }, entry.protocol.primary.selector);
 

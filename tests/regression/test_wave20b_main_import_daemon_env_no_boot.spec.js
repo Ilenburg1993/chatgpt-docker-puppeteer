@@ -16,7 +16,7 @@ test('wave20b: import de src/main.js com DAEMON_MODE=true não dispara boot sem 
             },
             encoding: 'utf8',
             timeout: 3000,
-        }
+        },
     );
 
     assert.equal(result.status, 0, `import deve sair 0. stderr=${result.stderr || ''}`);

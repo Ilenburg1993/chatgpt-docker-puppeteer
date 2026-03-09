@@ -1,7 +1,7 @@
 // @ts-check
+import yaml from 'js-yaml';
 import fs from 'node:fs';
 import path from 'node:path';
-import yaml from 'js-yaml';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
@@ -9,18 +9,18 @@ const BLUEPRINTS_DIR = path.join(ROOT, 'blueprints');
 
 // --- HELPERS DE ROBUSTEZ ---
 
-function sanitize(name) {
+function sanitize(/** @type {string} */ name) {
     return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 50);
 }
 
-function atomicWrite(filepath, content) {
+function atomicWrite(/** @type {string} */ filepath, /** @type {string} */ content) {
     const tmp = `${filepath}.tmp.${Date.now()}`;
     fs.writeFileSync(tmp, content, 'utf-8');
     fs.renameSync(tmp, filepath);
 }
 
 // Garante infraestrutura
-[BLUEPRINTS_DIR, QUEUE_DIR].forEach(d => {
+[BLUEPRINTS_DIR, QUEUE_DIR].forEach((d) => {
     if (!fs.existsSync(d)) {
         fs.mkdirSync(d, { recursive: true });
     }
@@ -31,8 +31,8 @@ function atomicWrite(filepath, content) {
 const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
 const afterArgIndex = args.indexOf('--after');
-const executeAfterInput = afterArgIndex !== -1 ? args[afterArgIndex + 1] : null;
-const blueprintArg = args.find(a => !a.startsWith('--') && a !== executeAfterInput);
+const executeAfterInput = afterArgIndex !== -1 ? (args[afterArgIndex + 1] ?? null) : null;
+const blueprintArg = args.find((a) => !a.startsWith('--') && a !== executeAfterInput);
 
 if (!blueprintArg) {
     console.log(`
@@ -50,14 +50,14 @@ Exemplo:
 
 // --- PARSER DE AGENDAMENTO ---
 
-function parseSchedule(input) {
+function parseSchedule(/** @type {string | null} */ input) {
     if (!input) {
         return null;
     }
     const match = input.match(/^(\d+)([mh])$/);
     if (match) {
-        const val = parseInt(match[1], 10);
-        const unit = match[2];
+        const val = parseInt(match[1] ?? '0', 10);
+        const unit = match[2] ?? '';
         return new Date(Date.now() + val * (unit === 'm' ? 60000 : 3600000)).toISOString();
     }
     const date = new Date(input);
@@ -76,7 +76,7 @@ if (!fs.existsSync(blueprintPath)) {
 
 try {
     const fileContent = fs.readFileSync(blueprintPath, 'utf-8');
-    const doc = yaml.load(fileContent);
+    const doc = /** @type {any} */ (yaml.load(fileContent));
 
     if (!doc.project || !Array.isArray(doc.tasks)) {
         throw new Error("Formato de YAML inválido. Requer 'project' (string) e 'tasks' (array).");
@@ -92,10 +92,10 @@ try {
     console.log(`   🛠️ MODO: ${isDryRun ? 'SIMULAÇÃO (DRY-RUN)' : 'EXECUÇÃO'}`);
 
     // 1. Mapeamento de IDs
-    const tasks = [];
-    const idMap = {}; // ID Curto -> ID Real do Sistema
+    /** @type {any[]} */ const tasks = [];
+    /** @type {any} */ const idMap = {}; // ID Curto -> ID Real do Sistema
 
-    doc.tasks.forEach(t => {
+    doc.tasks.forEach((/** @type {any} */ t) => {
         if (!t.id) {
             throw new Error("Uma das tarefas não possui o campo 'id' obrigatório.");
         }
@@ -105,10 +105,10 @@ try {
     });
 
     // 2. Validação de Dependências e Ciclos
-    const adj = {};
-    tasks.forEach(t => {
+    /** @type {any} */ const adj = {};
+    tasks.forEach((/** @type {any} */ t) => {
         const deps = t.depends_on || [];
-        deps.forEach(d => {
+        deps.forEach((/** @type {any} */ d) => {
             if (!idMap[d]) {
                 throw new Error(`Dependência quebrada: '${t.id}' refere-se a '${d}', que não existe.`);
             }
@@ -118,7 +118,7 @@ try {
 
     const visited = new Set();
     const stack = new Set();
-    function hasCycle(v) {
+    function hasCycle(/** @type {any} */ v) {
         visited.add(v);
         stack.add(v);
         for (const neighbor of adj[v] || []) {
@@ -146,10 +146,10 @@ try {
     let created = 0;
     let updated = 0;
     let skipped = 0;
-    let previousTaskId = null;
+    /** @type {any} */ let previousTaskId = null;
 
-    tasks.forEach(t => {
-        const realDeps = (t.depends_on || []).map(d => idMap[d]);
+    tasks.forEach((t) => {
+        const realDeps = (t.depends_on || []).map((/** @type {any} */ d) => idMap[d]);
 
         // Suporte a {{REF:LAST}}
         if (t.prompt.includes('{{REF:LAST}}') && previousTaskId) {
@@ -160,7 +160,7 @@ try {
 
         // Resolução de Referências no Prompt
         let finalPrompt = t.prompt;
-        Object.keys(idMap).forEach(shortId => {
+        Object.keys(idMap).forEach((shortId) => {
             const regex = new RegExp(`\\{\\{REF:${shortId}\\}\\}`, 'g');
             finalPrompt = finalPrompt.replace(regex, `{{REF:${idMap[shortId]}}}`);
         });
@@ -215,7 +215,11 @@ try {
         if (!isDryRun) {
             atomicWrite(filePath, JSON.stringify(taskObj, null, 2));
             console.log(`   [${action}] ${t.id} -> ${t.realId}`);
-            action === 'CREATE' ? created++ : updated++;
+            if (action === 'CREATE') {
+                created++;
+            } else {
+                updated++;
+            }
         } else {
             console.log(`   [DRY] ${action}: ${t.id} (Deps: ${realDeps.length})`);
         }
@@ -226,6 +230,7 @@ try {
     console.log(`\n✅ SUCESSO: Fluxo processado.`);
     console.log(`   Criadas: ${created} | Atualizadas: ${updated} | Puladas: ${skipped}\n`);
 } catch (e) {
-    console.error(`\n❌ ERRO FATAL: ${e.message}`);
+    const _ce = /** @type {any} */ (e);
+    console.error(`\n\u274c ERRO FATAL: ${_ce.message}`);
     process.exit(1);
 }

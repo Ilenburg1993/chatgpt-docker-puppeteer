@@ -24,7 +24,7 @@ const SUMMARIZATION_POLICY = {
 
 /** Classe exportada: ContextManager. */
 class ContextManager {
-    constructor(options = {}) {
+    constructor(options = /** @type {any} */ ({})) {
         this.config = {
             maxTokens: options.maxTokens || 100000, // Max tokens no contexto
             chunkingStrategy: options.chunkingStrategy || CHUNKING_STRATEGY.SLIDING_WINDOW,
@@ -43,21 +43,21 @@ class ContextManager {
 
         log(
             'INFO',
-            `[ContextManager] Inicializado com strategy=${this.config.chunkingStrategy}, maxTokens=${this.config.maxTokens}`
+            `[ContextManager] Inicializado com strategy=${this.config.chunkingStrategy}, maxTokens=${this.config.maxTokens}`,
         );
     }
 
     /**
      * Inicializa contexto para uma missão
      */
-    initializeContext(missionId, initialContext = {}) {
+    initializeContext(/** @type {any} */ missionId, /** @type {any} */ initialContext = {}) {
         if (this.contextCache.has(missionId)) {
             log('WARN', `[ContextManager] Contexto para mission ${missionId} já existe, sobrescrevendo`);
         }
 
         const context = {
             mission_id: missionId,
-            steps: [], // Array de { step_id, output, timestamp }
+            steps: /** @type {any[]} */ ([]), // Array de { step_id, output, timestamp }
             summary: initialContext.summary || null, // Summary acumulado (se houver)
             metadata: initialContext.metadata || {},
             created_at: Date.now(),
@@ -74,7 +74,7 @@ class ContextManager {
     /**
      * Adiciona output de um step ao contexto
      */
-    async addStepOutput(missionId, stepId, output) {
+    async addStepOutput(/** @type {any} */ missionId, /** @type {any} */ stepId, /** @type {any} */ output) {
         let context = this.contextCache.get(missionId);
 
         if (!context) {
@@ -96,7 +96,7 @@ class ContextManager {
 
         log(
             'DEBUG',
-            `[ContextManager] Step ${stepId} adicionado ao contexto (${stepData.tokens} tokens, total: ${context.token_count})`
+            `[ContextManager] Step ${stepId} adicionado ao contexto (${stepData.tokens} tokens, total: ${context.token_count})`,
         );
 
         // Verifica se precisa fazer chunking/summarization
@@ -108,7 +108,7 @@ class ContextManager {
     /**
      * Obtém contexto para um step (usado para gerar prompt)
      */
-    getContextForStep(missionId, stepId) {
+    getContextForStep(/** @type {any} */ missionId, /** @type {any} */ stepId) {
         const context = this.contextCache.get(missionId);
 
         if (!context) {
@@ -123,12 +123,12 @@ class ContextManager {
     }
 
     /**
-     * Compatibilidade retroativa: APIs legadas esperam `getContext`.
-     * Mantém contrato estável delegando para `getContextForStep`.
+     * Compatibilidade retroativa: APIs legadas esperam `getContext`. Mantém contrato estável delegando para
+     * `getContextForStep`.
      *
      * @param {string} missionId
      * @param {string} [stepId]
-     * @returns {object|null}
+     * @returns {object | null}
      */
     getContext(missionId, stepId = 'current') {
         return this.getContextForStep(missionId, stepId);
@@ -137,7 +137,7 @@ class ContextManager {
     /**
      * Aplica estratégia de chunking
      */
-    _applyChunkingStrategy(context, _) {
+    _applyChunkingStrategy(/** @type {any} */ context, /** @type {any} */ _) {
         switch (this.config.chunkingStrategy) {
             case CHUNKING_STRATEGY.NONE:
                 return this._buildFullContext(context);
@@ -160,7 +160,7 @@ class ContextManager {
     /**
      * Contexto completo (sem chunking)
      */
-    _buildFullContext(context) {
+    _buildFullContext(/** @type {any} */ context) {
         return {
             summary: context.summary,
             steps: context.steps,
@@ -171,7 +171,7 @@ class ContextManager {
     /**
      * Sliding window (últimos N steps)
      */
-    _buildSlidingWindowContext(context) {
+    _buildSlidingWindowContext(/** @type {any} */ context) {
         const recentSteps = context.steps.slice(-this.config.windowSize);
 
         return {
@@ -188,7 +188,7 @@ class ContextManager {
     /**
      * Hierárquico (summary + recent steps)
      */
-    _buildHierarchicalContext(context) {
+    _buildHierarchicalContext(/** @type {any} */ context) {
         const recentSteps = context.steps.slice(-this.config.windowSize);
 
         return {
@@ -205,7 +205,7 @@ class ContextManager {
     /**
      * Token limit (trunca ou resume para caber no limite)
      */
-    _buildTokenLimitContext(context) {
+    _buildTokenLimitContext(/** @type {any} */ context) {
         let totalTokens = 0;
         const selectedSteps = [];
 
@@ -235,7 +235,7 @@ class ContextManager {
     /**
      * Verifica se precisa otimizar contexto (summarize, truncate)
      */
-    async _maybeOptimizeContext(context) {
+    async _maybeOptimizeContext(/** @type {any} */ context) {
         // Se desabilitado, não faz nada
         if (this.config.summarizationPolicy === SUMMARIZATION_POLICY.DISABLED) {
             return;
@@ -246,7 +246,7 @@ class ContextManager {
         if (shouldSummarize) {
             log(
                 'INFO',
-                `[ContextManager] Otimizando contexto para mission ${context.mission_id} (${context.token_count} tokens)`
+                `[ContextManager] Otimizando contexto para mission ${context.mission_id} (${context.token_count} tokens)`,
             );
             await this._summarizeContext(context);
         }
@@ -255,7 +255,7 @@ class ContextManager {
     /**
      * Decide se deve resumir baseado na política
      */
-    _shouldSummarize(context) {
+    _shouldSummarize(/** @type {any} */ context) {
         switch (this.config.summarizationPolicy) {
             case SUMMARIZATION_POLICY.DISABLED:
                 return false;
@@ -278,7 +278,7 @@ class ContextManager {
     /**
      * Resume contexto via LLM (placeholder - será implementado com LLM integration)
      */
-    async _summarizeContext(context) {
+    async _summarizeContext(/** @type {any} */ context) {
         // TODO: Integrar com LLM para gerar summary
         // Por ora, faz summary simples (concatena outputs)
 
@@ -289,7 +289,9 @@ class ContextManager {
         }
 
         // Summary básico: concatena outputs
-        const summaryText = oldSteps.map(s => `Step ${s.step_id}: ${s.output.substring(0, 200)}...`).join('\n');
+        const summaryText = oldSteps
+            .map((/** @type {any} */ s) => `Step ${s.step_id}: ${s.output.substring(0, 200)}...`)
+            .join('\n');
 
         // Atualiza context — cap summary to prevent unbounded growth
         const maxSummaryChars = this.config.maxTokens * 2; // ~50% do token budget em chars
@@ -297,20 +299,20 @@ class ContextManager {
         context.summary = combined.length > maxSummaryChars ? combined.slice(-maxSummaryChars) : combined;
         context.steps = context.steps.slice(-this.config.windowSize); // Mantém apenas recentes
         context.token_count =
-            this._estimateTokens(context.summary) + context.steps.reduce((sum, s) => sum + s.tokens, 0);
+            this._estimateTokens(context.summary) +
+            context.steps.reduce((/** @type {any} */ sum, /** @type {any} */ s) => sum + s.tokens, 0);
 
         log(
             'INFO',
-            `[ContextManager] Contexto resumido: ${oldSteps.length} steps antigos, ${context.steps.length} recentes mantidos`
+            `[ContextManager] Contexto resumido: ${oldSteps.length} steps antigos, ${context.steps.length} recentes mantidos`,
         );
     }
 
     /**
-     * Estima tokens aproximadamente.
-     * Usa heurística combinada: max(chars/4, words*1.3) para precisão em ambos
-     * texto natural (word-heavy) e strings técnicas (char-heavy, sem espaços).
+     * Estima tokens aproximadamente. Usa heurística combinada: max(chars/4, words*1.3) para precisão em ambos texto
+     * natural (word-heavy) e strings técnicas (char-heavy, sem espaços).
      */
-    _estimateTokens(text) {
+    _estimateTokens(/** @type {any} */ text) {
         if (!text) return 0;
         const charEstimate = Math.ceil(text.length / 4);
         const wordEstimate = Math.ceil(text.split(/\s+/).length * 1.3);
@@ -320,7 +322,7 @@ class ContextManager {
     /**
      * Adiciona pattern ao memory store
      */
-    addPattern(pattern) {
+    addPattern(/** @type {any} */ pattern) {
         if (!this.memoryStore) {
             log('WARN', '[ContextManager] Memory store desabilitado, ignorando pattern');
             return;
@@ -332,7 +334,7 @@ class ContextManager {
     /**
      * Busca patterns relevantes no memory store
      */
-    getRelevantPatterns(query, limit = 5) {
+    getRelevantPatterns(/** @type {any} */ query, limit = 5) {
         if (!this.memoryStore) {
             return [];
         }
@@ -343,7 +345,7 @@ class ContextManager {
     /**
      * Limpa contexto de uma missão
      */
-    clearContext(missionId) {
+    clearContext(/** @type {any} */ missionId) {
         const deleted = this.contextCache.delete(missionId);
 
         if (deleted) {
@@ -384,4 +386,4 @@ class ContextManager {
     }
 }
 
-export { ContextManager, CHUNKING_STRATEGY, SUMMARIZATION_POLICY };
+export { CHUNKING_STRATEGY, ContextManager, SUMMARIZATION_POLICY };

@@ -72,7 +72,7 @@
       "REMOTE_USER": "node",
       "VCS_REF": "${localEnv:GIT_COMMIT}",
       // --- METADATA & VERSIONING ---
-      "VERSION": "5.3.1"
+      "VERSION": "5.4.0"
     },
     "context": "..",
     "dockerfile": "Dockerfile"
@@ -91,8 +91,11 @@
     "APP_ENV": "dev",
     "APP_NAME": "chatgpt-docker-puppeteer",
     "APP_ROLE": "agent",
-    "CHOKIDAR_INTERVAL": "1000",
-    "CHOKIDAR_USEPOLLING": "true",
+    // CHOKIDAR_USEPOLLING e CHOKIDAR_INTERVAL removidos em v5.4.0:
+    // O workspace é montado como ext4 (inotify nativo funciona).
+    // Vite já configura polling explicitamente em vite.config.js (watch.usePolling: true).
+    // Os watchers do servidor usam fs.watch() nativo — não dependem de chokidar.
+    // Referência: DEVCONTAINER_ARCHITECTURE.md [DEC-001]
     "DEBUG": "puppeteer:*,agent:*",
     "DEVCONTAINER_DOCKER_ENABLED": "true",
     "DOCKER_BUILDKIT": "1",
@@ -241,10 +244,21 @@
     "VSCODE_SERVER_EXPECTED": "true",
     "VSCODE_SERVER_ROLE": "instrumentation",
     // ============================================================
+    // LSP / TSSERVER DAEMON (comportamento ajustável sem rebuild)
+    // ============================================================
+    // Timeout por operação LSP (ms). O daemon usa este valor como fallback;
+    // cada chamada pode sobrescrever via options.timeoutMs.
+    "LSP_TOOL_TIMEOUT_MS": "15000",
+    // Número máximo de resultados retornados por operações de busca (references,
+    // workspace_symbols, diagnostics, completion). Reduzir melhora latência
+    // em projetos grandes; aumentar melhora completude de busca.
+    "LSP_MAX_RESULTS": "200"
+    // ============================================================
     // FILE WATCHING & VS CODE INTERNALS
     // ============================================================
-    // Mantido para garantir que o hot-reload funcione no Windows/Docker
-    "WATCHPACK_POLLING": "true"
+    // WATCHPACK_POLLING removido em v5.4.0:
+    // Projeto usa Vite (não webpack). Variável não tem efeito detectável no projeto.
+    // Referência: DEVCONTAINER_ARCHITECTURE.md [DEC-002]
   },
   // ============================================================
   // VS CODE CUSTOMIZATIONS
@@ -437,7 +451,7 @@
         // ========================================================
         "terminal.integrated.defaultProfile.linux": "bash",
         "terminal.integrated.detectLocale": "off",
-        "terminal.integrated.drawBoldTextInInvertedColors": true,
+        // "terminal.integrated.drawBoldTextInInvertedColors" removido: setting deprecado no VS Code 1.100+
         "terminal.integrated.enableMultiLinePasteWarning": "never",
         "terminal.integrated.gpuAcceleration": "auto",
         "terminal.integrated.inheritEnv": true,
@@ -1033,7 +1047,7 @@
     "--shm-size=4g",
     // STABILITY: Evita erro de "Too many open files" no VS Code/Node
     "--ulimit",
-    "nofile=65536:65536",
+    "nofile=262144:262144",
     // ============================================================================
     // IDENTITY & SECURITY: Docker CLI Access
     // ============================================================================
@@ -1077,7 +1091,7 @@
     "--label",
     "role=devcontainer",
     "--label",
-    "version=5.3.1"
+    "version=5.4.0"
   ],
   // ============================================================
   // LIFECYCLE FINALIZATION
@@ -1092,6 +1106,29 @@
   // always resolvable.  See .devcontainer/USER_ID_ASSIGNMENT_INVESTIGATION.md
   // for a full analysis.
   "updateRemoteUserUID": true,
+  // ============================================================
+  // USER ENV PROBE — loginInteractiveShell (explícito)
+  // ============================================================
+  // "loginInteractiveShell" (default do VS Code) executa:
+  //   /bin/bash --login --interactive
+  //
+  // VANTAGENS sobre loginShell:
+  // • Captura variáveis de ambiente que dependem de shell interativo
+  // • Garante que PATH, completions e aliases estejam completos
+  // • Compatível com shell integration do VS Code (decorations, history)
+  //
+  // MITIGAÇÃO DE LENTIDÃO (problema original: 10s+ de delay):
+  // • Causa: scripts /etc/update-motd.d/ fazem calls de rede (50-motd-news,
+  //   91-contract-ua-esm-status, 50-landscape-sysinfo)
+  // • Solução no CONTAINER: ~/.hushlogin para o user node (Dockerfile, SECTION 8)
+  //   → update-motd.sh checa `[ ! -e "$HOME/.hushlogin" ]` antes de rodar
+  // • Solução no WSL HOST: ~/.hushlogin para o user ilenburg (já criado)
+  //
+  // Scripts do projeto em /etc/profile.d/ NÃO são afetados:
+  //   00-runtime.sh, 10-gatekeeper-nss.sh, 20-devcontainer-ux.sh
+  //   → Todos checam `case "$-" in *i*) ;;` ou são idempotentes
+  // ============================================================
+  "userEnvProbe": "loginInteractiveShell",
   "waitFor": "postCreateCommand",
   // Workspace dinâmico: herda o nome da pasta no seu Windows/Host
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"

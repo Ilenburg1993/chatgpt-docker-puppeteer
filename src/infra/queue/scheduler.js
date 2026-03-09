@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { STATUS_VALUES } from '#core/constants/tasks';
 
 /* ==========================================================================
@@ -17,9 +17,9 @@ import { STATUS_VALUES } from '#core/constants/tasks';
 /**
  * Filtra e ordena as tarefas elegíveis para execução imediata.
  *
- * @param {Array} allTasks - Snapshot estável da fila carregado em RAM.
- * @param {string|null} targetFilter - Nome da IA alvo (ex: 'chatgpt').
- * @returns {Array} Lista de tarefas prontas para o motor de execução.
+ * @param {any[]} allTasks - Snapshot estável da fila carregado em RAM.
+ * @param {string | null} targetFilter - Nome da IA alvo (ex: 'chatgpt').
+ * @returns {any[]} Lista de tarefas prontas para o motor de execução.
  */
 function getNextEligible(allTasks, targetFilter = null) {
     // 1. BLINDAGEM DEFENSIVA
@@ -40,7 +40,7 @@ function getNextEligible(allTasks, targetFilter = null) {
 
     // 3. FILTRAGEM DE ELEGIBILIDADE
 
-    const eligible = allTasks.filter(t => {
+    const eligible = allTasks.filter((t) => {
         // Validação de Integridade Mínima (Schema V4 Guard)
         if (!t?.state || !t?.meta || !t?.policy) {
             return false;
@@ -93,7 +93,7 @@ function getNextEligible(allTasks, targetFilter = null) {
     // 4. ORDENAÇÃO SOBERANA
     // Critério 1: Prioridade (Descendente - 100 vem antes de 0)
     // Critério 2: Data de Criação (Ascendente - Mais velha vem antes)
-    return eligible.sort((a, b) => {
+    return eligible.sort((/** @type {any} */ a, /** @type {any} */ b) => {
         const pA = a.meta.priority || 0;
         const pB = b.meta.priority || 0;
 

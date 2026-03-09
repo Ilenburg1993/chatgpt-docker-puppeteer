@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import {
     __lifecycleTestHooks,
@@ -9,11 +9,11 @@ import {
     setAllowProcessExit,
 } from '#server/engine/lifecycle';
 
-function captureCounts(events) {
-    return Object.fromEntries(events.map(event => [event, process.listenerCount(event)]));
+function captureCounts(/** @type {any} */ events) {
+    return Object.fromEntries(events.map((/** @type {any} */ event) => [event, process.listenerCount(event)]));
 }
 
-function assertCountsEqual(actual, expected, messagePrefix) {
+function assertCountsEqual(/** @type {any} */ actual, /** @type {any} */ expected, /** @type {any} */ messagePrefix) {
     for (const [event, expectedCount] of Object.entries(expected)) {
         assert.equal(actual[event], expectedCount, `${messagePrefix}: listener count mismatch for ${event}`);
     }
@@ -86,12 +86,12 @@ test('wave10: lifecycle signal matrix is registered once with platform policy', 
     assert.equal(
         afterSetup.uncaughtException,
         before.uncaughtException + 1,
-        'uncaughtException should be registered once'
+        'uncaughtException should be registered once',
     );
     assert.equal(
         afterSetup.unhandledRejection,
         before.unhandledRejection + 1,
-        'unhandledRejection should be registered once'
+        'unhandledRejection should be registered once',
     );
 });
 
@@ -130,16 +130,16 @@ test('wave10: optional subprocess handlers do not arm shutdown state', () => {
     const handlers = __lifecycleTestHooks.getSignalHandlers();
 
     if (typeof handlers.sigpipe === 'function') {
-        handlers.sigpipe();
+        /** @type {any} */ (handlers).sigpipe();
     }
     if (typeof handlers.sigchld === 'function') {
-        handlers.sigchld();
+        /** @type {any} */ (handlers).sigchld();
     }
 
     assert.equal(
         __lifecycleTestHooks.isShuttingDown(),
         false,
-        'SIGPIPE/SIGCHLD should not move lifecycle to shuttingDown state'
+        'SIGPIPE/SIGCHLD should not move lifecycle to shuttingDown state',
     );
     assert.equal(__lifecycleTestHooks.isSignalsListening(), true, 'signal listening should remain active');
 });

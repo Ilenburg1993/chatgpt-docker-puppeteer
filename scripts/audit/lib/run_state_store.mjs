@@ -3,8 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * @param {{ runDir: string }} options
-  * @returns {any}
+ * @typedef {object} CreateRunStateStoreOptions
+ * @property {string} runDir
+ */
+/**
+ * @param {CreateRunStateStoreOptions} options
+ * @returns {object}
  */
 export function createRunStateStore(options) {
     const runDir = options.runDir;
@@ -29,6 +33,10 @@ export function createRunStateStore(options) {
     /** @type {any[]} */
     let phaseTimeline = [];
 
+    /**
+     * @param {string} filePath
+     * @param {any} payload
+     */
     function writeJson(filePath, payload) {
         fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
     }
@@ -51,53 +59,69 @@ export function createRunStateStore(options) {
             gateDecisionsPath,
             summaryPath,
         },
+        /** @param {any} payload */
         writeManifest(payload) {
             writeJson(manifestPath, payload);
         },
+        /** @param {any} payload */
         writeProgress(payload) {
             writeJson(progressPath, payload);
         },
+        /** @param {any} entry */
         addPhaseStatus(entry) {
             phaseTimeline.push(entry);
             writeJson(phaseTimelinePath, phaseTimeline);
         },
+        /** @param {any} entries */
         setPhaseTimeline(entries) {
             phaseTimeline = Array.isArray(entries) ? entries : [];
             writeJson(phaseTimelinePath, phaseTimeline);
         },
+        /** @param {any} payload */
         writeFindingsRaw(payload) {
             writeJson(findingsRawPath, payload);
         },
+        /** @param {any} payload */
         writeFindingsNormalized(payload) {
             writeJson(findingsNormalizedPath, payload);
         },
+        /** @param {any} payload */
         writeProposals(payload) {
             writeJson(proposalsPath, payload);
         },
+        /** @param {any} payload */
         writeContractRegistrySnapshot(payload) {
             writeJson(contractRegistrySnapshotPath, payload);
         },
+        /** @param {any} payload */
         writeContractCoverage(payload) {
             writeJson(contractCoveragePath, payload);
         },
+        /** @param {any} payload */
         writeContractDrift(payload) {
             writeJson(contractDriftPath, payload);
         },
+        /** @param {any} payload */
         writeContractParity(payload) {
             writeJson(contractParityPath, payload);
         },
+        /** @param {any} payload */
         writeSemanticPreflight(payload) {
             writeJson(semanticPreflightPath, payload);
         },
+        /** @param {any} payload */
         writeLogStats(payload) {
             writeJson(logStatsPath, payload);
         },
+        /** @param {any} payload */
         writeEvidenceGraph(payload) {
             writeJson(evidenceGraphPath, payload);
         },
+        /** @param {any} payload */
         writeGateDecisions(payload) {
             writeJson(gateDecisionsPath, payload);
         },
+        /** @param {any} text */
         writeSummary(text) {
             fs.writeFileSync(summaryPath, text, 'utf8');
         },

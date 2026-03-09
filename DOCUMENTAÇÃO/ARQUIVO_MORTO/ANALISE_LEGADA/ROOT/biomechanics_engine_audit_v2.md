@@ -104,7 +104,7 @@ while (Date.now() - start < timeout && iterations < 50) {
     await human.wakeUpMove(this.driver.page).catch(() => {});
     this.lastKeepAlive = Date.now();
   }
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise((r) => setTimeout(r, 800));
 }
 
 // getStableRect
@@ -117,12 +117,12 @@ for (let i = 0; i < 10; i++) {
   ) {
     return rect;
   }
-  await new Promise(r => setTimeout(r, 60));
+  await new Promise((r) => setTimeout(r, 60));
 }
 
 // omniScroll
 const baseOffset = mainHeight * 0.15;
-await new Promise(r => setTimeout(r, 500));
+await new Promise((r) => setTimeout(r, 500));
 
 // typeText
 if (text.length > 2000) {
@@ -937,7 +937,7 @@ module.exports = {
   BiomechanicsEngine,
   BIOMECH_CONFIG,
   BIOMECH_EVENTS,
-  create: driver => new BiomechanicsEngine(driver),
+  create: (driver) => new BiomechanicsEngine(driver),
 };
 ```
 

@@ -1689,7 +1689,7 @@ const TaskSchemaV5 = z.object({
                 config: z.any(), // Step-specific config
                 dependencies: z.array(z.string()).default([]), // Step IDs that must complete first
                 on_failure: z.enum(['retry', 'skip', 'abort']).default('abort'),
-              })
+              }),
             ),
             max_subtasks: z.number().int().positive().default(50),
             subtask_concurrency: z.number().int().positive().default(3),
@@ -1715,7 +1715,7 @@ const TaskSchemaV5 = z.object({
             z.object({
               type: z.enum(['regex', 'schema', 'length', 'format', 'llm_judge', 'custom']),
               config: z.any(),
-            })
+            }),
           )
           .default([]),
         on_validation_failure: z.enum(['retry', 'abort', 'manual_review']).default('retry'),
@@ -1790,7 +1790,7 @@ const TaskSchemaV5 = z.object({
               output: z.string(),
               quality_score: z.number().optional(),
               validation_result: z.any().optional(),
-            })
+            }),
           )
           .default([]),
       })
@@ -1832,7 +1832,7 @@ const TaskSchemaV5 = z.object({
           at: z.string().datetime(),
           data: z.any().optional(),
           evidence: z.string().optional(),
-        })
+        }),
       )
       .default([]),
   }),
@@ -1853,7 +1853,7 @@ const TaskSchemaV5 = z.object({
           status: z.string(),
           output: z.string().optional(),
           quality_score: z.number().optional(),
-        })
+        }),
       )
       .default([]),
 
@@ -1865,7 +1865,7 @@ const TaskSchemaV5 = z.object({
           passed: z.boolean(),
           score: z.number().optional(),
           feedback: z.string().optional(),
-        })
+        }),
       )
       .default([]),
   }),
@@ -2194,8 +2194,8 @@ class OrchestratorEngine {
       workflowState.current_step_index = i;
 
       // Check dependencies
-      const dependenciesMet = step.dependencies.every(depId =>
-        workflowState.completed_steps.includes(depId)
+      const dependenciesMet = step.dependencies.every((depId) =>
+        workflowState.completed_steps.includes(depId),
       );
 
       if (!dependenciesMet) {
@@ -2276,7 +2276,7 @@ class OrchestratorEngine {
     const finalOutput = this._aggregateWorkflowResults(workflowState);
     const totalCost = workflowState.results.reduce(
       (sum, r) => sum + (r.cost_tracking?.cost_usd || 0),
-      0
+      0,
     );
     const avgQualityScore =
       workflowState.results.reduce((sum, r) => sum + (r.quality_score || 0), 0) /
@@ -2288,7 +2288,7 @@ class OrchestratorEngine {
         cost_usd: totalCost,
         total_tokens: workflowState.results.reduce(
           (sum, r) => sum + (r.cost_tracking?.total_tokens || 0),
-          0
+          0,
         ),
       },
       quality_score: avgQualityScore,
@@ -2304,7 +2304,7 @@ class OrchestratorEngine {
     let prompt = step.config.prompt;
 
     // Replace placeholders with accumulated context
-    Object.keys(workflowState.accumulated_context).forEach(key => {
+    Object.keys(workflowState.accumulated_context).forEach((key) => {
       const value = workflowState.accumulated_context[key];
       prompt = prompt.replace(`{${key}}`, value);
     });
@@ -2356,7 +2356,7 @@ class OrchestratorEngine {
   _aggregateWorkflowResults(workflowState) {
     // Simple concatenation for now
     // Could be more sophisticated (e.g., structured JSON, markdown sections)
-    return workflowState.results.map(r => r.output).join('\n\n---\n\n');
+    return workflowState.results.map((r) => r.output).join('\n\n---\n\n');
   }
 
   /**
@@ -2424,7 +2424,7 @@ class ValidationService {
 
     // Aggregate results
     const overallScore = results.reduce((sum, r) => sum + r.score, 0) / results.length;
-    const allPassed = results.every(r => r.passed);
+    const allPassed = results.every((r) => r.passed);
     const passed = allPassed && overallScore >= (min_score || 0);
 
     return {
@@ -2432,17 +2432,17 @@ class ValidationService {
       overall_score: overallScore,
       results,
       feedback: this._generateFeedback(results),
-      issues: results.filter(r => !r.passed).map(r => r.feedback),
+      issues: results.filter((r) => !r.passed).map((r) => r.feedback),
     };
   }
 
   _generateFeedback(results) {
-    const issues = results.filter(r => !r.passed);
+    const issues = results.filter((r) => !r.passed);
     if (issues.length === 0) {
       return 'All validations passed. Output meets quality criteria.';
     }
 
-    return `Found ${issues.length} issue(s):\n` + issues.map(r => `- ${r.feedback}`).join('\n');
+    return `Found ${issues.length} issue(s):\n` + issues.map((r) => `- ${r.feedback}`).join('\n');
   }
 }
 
@@ -2623,7 +2623,7 @@ class DriverFactoryV2 {
         const score = this._scoreDriver(capabilities, requirements);
 
         return { name, driver, score, capabilities };
-      })
+      }),
     );
 
     // Sort by score (descending)
@@ -2810,7 +2810,7 @@ export default {
     const workflowSteps = computed(() => workflowStore.currentWorkflow?.steps || []);
     const isValid = computed(() => workflowStore.workflowValidation?.valid || false);
 
-    const addStep = actionType => {
+    const addStep = (actionType) => {
       const newStep = {
         id: `step-${Date.now()}`,
         name: `New ${actionType} Step`,
@@ -2823,7 +2823,7 @@ export default {
       workflowStore.addStep(newStep);
     };
 
-    const editStep = stepId => {
+    const editStep = (stepId) => {
       selectedStep.value = workflowStore.getStep(stepId);
     };
 
@@ -3062,7 +3062,7 @@ class SemanticTelemetry {
 
   _setupListeners() {
     // Quality events
-    this.nerv.on('QUALITY_ASSESSED', envelope => {
+    this.nerv.on('QUALITY_ASSESSED', (envelope) => {
       const { task_id, overall_score, criteria_scores } = envelope.payload;
 
       const metrics = this._getOrCreateMetrics(task_id);
@@ -3074,7 +3074,7 @@ class SemanticTelemetry {
     });
 
     // Iteration events
-    this.nerv.on('ITERATION_COMPLETED', envelope => {
+    this.nerv.on('ITERATION_COMPLETED', (envelope) => {
       const { task_id, iteration, quality_score } = envelope.payload;
 
       const metrics = this._getOrCreateMetrics(task_id);
@@ -3088,7 +3088,7 @@ class SemanticTelemetry {
     });
 
     // Cost events
-    this.nerv.on('TOKEN_USAGE_RECORDED', envelope => {
+    this.nerv.on('TOKEN_USAGE_RECORDED', (envelope) => {
       const { task_id, input_tokens, output_tokens, cost_usd, model } = envelope.payload;
 
       const metrics = this._getOrCreateMetrics(task_id);
@@ -3101,7 +3101,7 @@ class SemanticTelemetry {
     });
 
     // Progress events
-    this.nerv.on('PROGRESS_MILESTONE', envelope => {
+    this.nerv.on('PROGRESS_MILESTONE', (envelope) => {
       const { task_id, milestone, progress_percent } = envelope.payload;
 
       const metrics = this._getOrCreateMetrics(task_id);
@@ -3141,13 +3141,13 @@ class SemanticTelemetry {
     return {
       total_tasks: allMetrics.length,
       avg_quality_score: this._average(
-        allMetrics.map(m => m.quality?.overall_score).filter(Boolean)
+        allMetrics.map((m) => m.quality?.overall_score).filter(Boolean),
       ),
-      avg_iterations: this._average(allMetrics.map(m => m.iterations?.length).filter(Boolean)),
+      avg_iterations: this._average(allMetrics.map((m) => m.iterations?.length).filter(Boolean)),
       total_cost_usd: allMetrics.reduce((sum, m) => sum + (m.cost?.total_cost_usd || 0), 0),
       total_tokens: allMetrics.reduce(
         (sum, m) => sum + (m.cost?.input_tokens || 0) + (m.cost?.output_tokens || 0),
-        0
+        0,
       ),
     };
   }
@@ -3203,7 +3203,7 @@ class CostTracker {
    */
   async getCostsByDateRange(startTimestamp, endTimestamp) {
     const filtered = this.costRecords.filter(
-      r => r.timestamp >= startTimestamp && r.timestamp <= endTimestamp
+      (r) => r.timestamp >= startTimestamp && r.timestamp <= endTimestamp,
     );
 
     return {

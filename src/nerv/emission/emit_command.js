@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { MessageType } from '#shared/nerv/constants';
 import { getCorrelationId } from '#shared/nerv/envelope_reader';
 
@@ -7,18 +7,27 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
 =========================== */
 
 /**
+ * @typedef {object} CreateEmitCommandDeps
+ * @property {any} envelopes
+ * @property {any} buffers
+ * @property {any} correlation
+ * @property {any} telemetry
+ */
+/**
+ * @typedef {object} CreateEmitCommandOptions
+ * @property {any} [envelopes]
+ * @property {any} [buffers]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
+ */
+/**
  * Cria o emissor técnico de COMMANDs.
  *
- * **Side-effects:** Registra emissão na correlação histórica.
- * **Semântica:** Emissor especializado para mensagens de comando NERV.
- * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
+ * **Side-effects:** Registra emissão na correlação histórica. **Semântica:** Emissor especializado para mensagens de
+ * comando NERV. **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
- * @param {object} deps - Dependências do emissor
- * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
- * @param {object} deps.buffers - Subsistema de buffers outbound
- * @param {object} deps.correlation - Sistema de correlação histórica
- * @param {object} deps.telemetry - Interface de telemetria NERV
- * @returns {object} Emissor com método emitCommand
+ * @param {CreateEmitCommandDeps} deps - Dependências do emissor
+ * @returns {any} Emissor com método emitCommand
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
@@ -33,8 +42,7 @@ function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
     /**
      * Emite um envelope COMMAND.
      *
-     * @param {Object} envelope
-     * Envelope estruturalmente válido.
+     * @param {object} envelope Envelope estruturalmente válido.
      */
     function emitCommand(envelope) {
         telemetry.emit('nerv:emission:attempt', {
@@ -49,11 +57,12 @@ function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
 
             // 2. Validação estrutural
             envelopes.assertValid(normalized);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:emission:rejected', {
                 kind: MessageType.COMMAND,
                 reason: 'estrutura',
-                message: error.message,
+                message: _e.message,
             });
             return;
         }

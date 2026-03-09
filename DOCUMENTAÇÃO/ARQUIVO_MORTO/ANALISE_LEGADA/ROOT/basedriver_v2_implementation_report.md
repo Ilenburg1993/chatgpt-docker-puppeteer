@@ -533,7 +533,6 @@ _generateCorrelationId() {
  * @param {object} page - Instância ativa do Puppeteer
  * @param {object} config - Configuração da tarefa (clonada)
  * @param {AbortSignal} signal - Sinal soberano de interrupção
- *
  * @throws {Error} MODULE_INSTANTIATION_FAILED - Se subsistema falhar ao inicializar
  */
 
@@ -541,18 +540,15 @@ _generateCorrelationId() {
 /**
  * Executa o envio do prompt com narração sensorial em tempo real.
  *
+ * @fires EXECUTION_START - Início
+ * @fires PREREQUISITE_CHECK - Validação ... (15+ eventos documentados)
  * @param {string} text - Conteúdo do prompt a enviar
  * @param {string} taskId - UUID da task (para correlação)
  * @param {AbortSignal} [signal] - Sinal de cancelamento (opcional)
  * @returns {Promise<void>}
- *
  * @throws {Error} PREREQUISITE_FAILED - Página inválida
  * @throws {Error} OPERATION_ABORTED - Cancelamento
  * @throws {Error} EXECUTION_FAIL - Max retries
- *
- * @emits EXECUTION_START - Início
- * @emits PREREQUISITE_CHECK - Validação
- * ... (15+ eventos documentados)
  */
 ```
 

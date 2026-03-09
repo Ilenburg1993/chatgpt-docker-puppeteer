@@ -1,25 +1,24 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { getDb } from './sqlite.js';
 import { log } from '#core/logger';
+import { getDb } from './sqlite.js';
 
 /**
- * @fileoverview Blocklist de tokens JWT revogados.
- *
- * Implementa invalidação de tokens JWT após logout, prevenindo re-uso
- * de tokens roubados dentro do período de expiração.
- *
- * A tabela `revoked_tokens` é limpa automaticamente via `cleanExpired()`,
- * que deve ser chamado periodicamente (ex: a cada hora via AgentLoop ou cron).
- *
  * @module infra/db/token_blocklist
+ * @file Blocklist de tokens JWT revogados.
+ *
+ *   Implementa invalidação de tokens JWT após logout, prevenindo re-uso de tokens roubados dentro do período de
+ *   expiração.
+ *
+ *   A tabela `revoked_tokens` é limpa automaticamente via `cleanExpired()`, que deve ser chamado periodicamente (ex: a
+ *   cada hora via AgentLoop ou cron).
  */
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hora
-let _cleanupTimer = null;
+let _cleanupTimer = /** @type {any} */ (null);
 
 /**
- * Garante que a tabela de tokens revogados existe no banco de dados.
- * Idempotente — seguro para chamar múltiplas vezes.
+ * Garante que a tabela de tokens revogados existe no banco de dados. Idempotente — seguro para chamar múltiplas vezes.
+ *
  * @returns {void}
  */
 export function ensureTokenBlocklistTable() {
@@ -54,8 +53,8 @@ export function revokeToken(jti, expiresAtMs) {
             .prepare('INSERT OR IGNORE INTO revoked_tokens (jti, revoked_at_ms, expires_at_ms) VALUES (?, ?, ?)')
             .run(jti, Date.now(), Number(expiresAtMs) || Date.now() + 86400000);
         return result.changes > 0;
-    } catch (err) {
-        log('ERROR', `[TOKEN_BLOCKLIST] Erro ao revogar token: ${err.message}`);
+    } catch (/** @type {any} */ err) {
+        log('ERROR', `[TOKEN_BLOCKLIST] Erro ao revogar token: ${/** @type {any} */ (err).message}`);
         return false;
     }
 }
@@ -73,14 +72,15 @@ export function isTokenRevoked(jti) {
         const db = getDb();
         const row = db.prepare('SELECT 1 FROM revoked_tokens WHERE jti = ? AND expires_at_ms > ?').get(jti, Date.now());
         return !!row;
-    } catch (err) {
-        log('WARN', `[TOKEN_BLOCKLIST] Erro ao verificar token: ${err.message}`);
+    } catch (/** @type {any} */ err) {
+        log('WARN', `[TOKEN_BLOCKLIST] Erro ao verificar token: ${/** @type {any} */ (err).message}`);
         return false; // Fail-open: se não conseguimos verificar, permitir (log gerado)
     }
 }
 
 /**
  * Remove tokens expirados da blocklist para manter o banco enxuto.
+ *
  * @returns {number} Número de registros removidos.
  */
 export function cleanExpiredTokens() {
@@ -93,15 +93,16 @@ export function cleanExpiredTokens() {
             log('DEBUG', `[TOKEN_BLOCKLIST] Limpeza: ${removed} tokens expirados removidos`);
         }
         return removed;
-    } catch (err) {
-        log('WARN', `[TOKEN_BLOCKLIST] Erro na limpeza de tokens: ${err.message}`);
+    } catch (/** @type {any} */ err) {
+        log('WARN', `[TOKEN_BLOCKLIST] Erro na limpeza de tokens: ${/** @type {any} */ (err).message}`);
         return 0;
     }
 }
 
 /**
- * Inicia limpeza periódica automática de tokens expirados.
- * Seguro para chamar múltiplas vezes — só registra um timer por vez.
+ * Inicia limpeza periódica automática de tokens expirados. Seguro para chamar múltiplas vezes — só registra um timer
+ * por vez.
+ *
  * @returns {void}
  */
 export function startPeriodicCleanup() {
@@ -116,6 +117,7 @@ export function startPeriodicCleanup() {
 
 /**
  * Para a limpeza periódica (usado em testes e shutdown).
+ *
  * @returns {void}
  */
 export function stopPeriodicCleanup() {
@@ -127,6 +129,7 @@ export function stopPeriodicCleanup() {
 
 /**
  * Exposto para testes/regressão de import-safety.
+ *
  * @returns {boolean}
  */
 export function isPeriodicCleanupRunning() {

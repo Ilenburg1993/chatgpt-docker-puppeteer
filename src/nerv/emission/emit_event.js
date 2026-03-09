@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { MessageType } from '#shared/nerv/constants';
 import { getCorrelationId } from '#shared/nerv/envelope_reader';
 
@@ -7,18 +7,27 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
 =========================== */
 
 /**
+ * @typedef {object} CreateEmitEventDeps
+ * @property {any} envelopes
+ * @property {any} buffers
+ * @property {any} correlation
+ * @property {any} telemetry
+ */
+/**
+ * @typedef {object} CreateEmitEventOptions
+ * @property {any} [envelopes]
+ * @property {any} [buffers]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
+ */
+/**
  * Cria o emissor técnico de EVENTs.
  *
- * **Side-effects:** Registra emissão na correlação histórica.
- * **Semântica:** Emissor especializado para mensagens de evento NERV.
- * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
+ * **Side-effects:** Registra emissão na correlação histórica. **Semântica:** Emissor especializado para mensagens de
+ * evento NERV. **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
- * @param {object} deps - Dependências do emissor
- * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
- * @param {object} deps.buffers - Subsistema de buffers outbound
- * @param {object} deps.correlation - Sistema de correlação histórica
- * @param {object} deps.telemetry - Interface de telemetria NERV
- * @returns {object} Emissor com método emitEvent
+ * @param {CreateEmitEventDeps} deps - Dependências do emissor
+ * @returns {any} Emissor com método emitEvent
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
@@ -33,8 +42,7 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
     /**
      * Emite um envelope EVENT.
      *
-     * @param {Object} envelope
-     * Envelope estruturalmente válido.
+     * @param {object} envelope Envelope estruturalmente válido.
      */
     function emitEvent(envelope) {
         telemetry.emit('nerv:emission:attempt', {
@@ -49,11 +57,12 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
 
             // 2. Validação estrutural
             envelopes.assertValid(normalized);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:emission:rejected', {
                 kind: MessageType.EVENT,
                 reason: 'estrutura',
-                message: error.message,
+                message: _e.message,
             });
             return;
         }

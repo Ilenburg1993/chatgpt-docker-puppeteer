@@ -1,14 +1,16 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { z } from 'zod';
-import { CONNECTION_MODES } from '../constants/browser.js';
+// @ts-check
+import { CONNECTION_MODES } from '#core/constants/browser';
+import { z as _zImport } from 'zod';
+/** @type {any} */
+const z = _zImport;
 
 import {
-    ID_SCHEMA,
-    TIMESTAMP_SCHEMA,
     CLEAN_STRING_SCHEMA,
+    ID_SCHEMA,
     PRIORITY_SCHEMA,
     SOURCE_SCHEMA,
     STATUS_SCHEMA,
+    TIMESTAMP_SCHEMA,
 } from './shared_types.js';
 
 /**
@@ -106,7 +108,7 @@ const StateSchema = z.object({
                 event: z.string(),
                 msg: z.string().optional(),
                 evidence: z.any().optional(), // Para metadados do Triage
-            })
+            }),
         )
         .default([]),
 });
@@ -135,33 +137,33 @@ const TaskSchema = z
     .passthrough();
 
 import {
-    TaskSchemaV5,
-    MetaSchemaV5,
-    SpecSchemaV5,
-    PolicySchemaV5,
     ExecutionSchemaV5,
+    MetaSchemaV5,
     MissionSchemaV5,
-    StateSchemaV5,
+    PolicySchemaV5,
     ResultSchemaV5,
+    SpecSchemaV5,
+    StateSchemaV5,
+    TaskSchemaV5,
 } from './task_schema_v5.js';
 
 /**
- * Barrel de schemas de task (V4/V5) para compatibilidade de import no core.
- * Reexporta contratos legados e canônicos usados por validação/migração.
+ * Barrel de schemas de task (V4/V5) para compatibilidade de import no core. Reexporta contratos legados e canônicos
+ * usados por validação/migração.
  */
 export {
-    TaskSchema,
-    MetaSchema,
-    SpecSchema,
-    PolicySchema,
-    StateSchema,
-    ResultSchema,
-    TaskSchemaV5,
-    MetaSchemaV5,
-    SpecSchemaV5,
-    PolicySchemaV5,
     ExecutionSchemaV5,
+    MetaSchema,
+    MetaSchemaV5,
     MissionSchemaV5,
-    StateSchemaV5,
+    PolicySchema,
+    PolicySchemaV5,
+    ResultSchema,
     ResultSchemaV5,
+    SpecSchema,
+    SpecSchemaV5,
+    StateSchema,
+    StateSchemaV5,
+    TaskSchema,
+    TaskSchemaV5,
 };

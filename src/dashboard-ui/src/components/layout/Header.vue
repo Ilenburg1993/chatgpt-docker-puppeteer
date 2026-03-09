@@ -1,8 +1,8 @@
 <script setup>
-import { Bell, Menu, Search, User, LogIn, LogOut } from 'lucide-vue-next';
+import { useUiPreferences } from '@/composables/useUiPreferences';
+import { Bell, LogIn, LogOut, Menu, Search, User } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
 import { useAuth } from '../../composables/useAuth.js';
-import { useUiPreferences } from '@/composables/useUiPreferences';
 import LoginModal from '../auth/LoginModal.vue';
 
 const emit = defineEmits(['toggleSidebar']);

@@ -1,4 +1,5 @@
 // @ts-check
+/** @typedef {any} InferenceModel */
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
@@ -6,6 +7,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} value
+ * @param {any} value
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -14,6 +19,10 @@ function _safeJsonString(value, fallback = '{}') {
     }
 }
 
+/**
+ * @param {any} raw
+ * @param {any} fallback
+ */
 function _parseJson(raw, fallback) {
     if (raw == null) return fallback;
     try {
@@ -23,6 +32,10 @@ function _parseJson(raw, fallback) {
     }
 }
 
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToModel(row) {
     if (!row) return null;
     return {
@@ -40,6 +53,10 @@ function _rowToModel(row) {
     };
 }
 
+/**
+ * @param {any} id
+ * @param {any} enabled
+ */
 function _setModelEnabled(id, enabled) {
     const db = getDb();
     const targetId = String(id || '').trim();
@@ -49,23 +66,28 @@ function _setModelEnabled(id, enabled) {
     db.prepare('UPDATE inference_models SET enabled = ?, updated_at_ms = ? WHERE id = ?').run(
         enabled ? 1 : 0,
         _now(),
-        targetId
+        targetId,
     );
     return getInferenceModelById(targetId);
 }
 
+/** @typedef {any} UpsertInferenceModelInput */
 /**
  * Função exportada: upsertInferenceModel.
- * @returns {any}
+ *
+ * @param {any} [input]
+ * @returns {InferenceModel | null}
  */
 function upsertInferenceModel(input = {}) {
     const db = getDb();
     const now = _now();
-    const existing = input.id
-        ? db.prepare('SELECT * FROM inference_models WHERE id = ?').get(String(input.id))
-        : input.alias
-          ? db.prepare('SELECT * FROM inference_models WHERE alias = ?').get(String(input.alias))
-          : null;
+    const existing = /** @type {any} */ (
+        input.id
+            ? db.prepare('SELECT * FROM inference_models WHERE id = ?').get(String(input.id))
+            : input.alias
+              ? db.prepare('SELECT * FROM inference_models WHERE alias = ?').get(String(input.alias))
+              : null
+    );
     const id = existing?.id || `infm-${uuidv4()}`;
     const alias = String(input.alias || existing?.alias || '').trim();
     const modelName = String(input.model_name || input.modelName || existing?.model_name || '').trim();
@@ -91,7 +113,7 @@ function upsertInferenceModel(input = {}) {
             safety_profile_json = excluded.safety_profile_json,
             default_params_json = excluded.default_params_json,
             updated_at_ms = excluded.updated_at_ms
-    `
+    `,
     ).run({
         id,
         backend_id: backendId,
@@ -110,16 +132,21 @@ function upsertInferenceModel(input = {}) {
 
 /**
  * Função exportada: getInferenceModelById.
- * @returns {any}
+ *
+ * @param {string} id Unique identifier.
+ * @returns {InferenceModel | null}
  */
 function getInferenceModelById(id) {
     const db = getDb();
     return _rowToModel(db.prepare('SELECT * FROM inference_models WHERE id = ?').get(String(id || '').trim()));
 }
 
+/** @typedef {any} ListInferenceModelsOptions */
 /**
  * Função exportada: listInferenceModels.
- * @returns {any}
+ *
+ * @param {ListInferenceModelsOptions} [options]
+ * @returns {InferenceModel[]}
  */
 function listInferenceModels({ backendId = null, enabledOnly = false, limit = 200 } = {}) {
     const db = getDb();
@@ -131,7 +158,7 @@ function listInferenceModels({ backendId = null, enabledOnly = false, limit = 20
               AND (@enabledOnly = 0 OR enabled = 1)
             ORDER BY updated_at_ms DESC
             LIMIT @limit
-        `
+        `,
         )
         .all({
             backendId: backendId ? String(backendId) : null,
@@ -143,7 +170,10 @@ function listInferenceModels({ backendId = null, enabledOnly = false, limit = 20
 
 /**
  * Função exportada: setInferenceModelEnabled.
- * @returns {any}
+ *
+ * @param {string} id
+ * @param {boolean} enabled
+ * @returns {InferenceModel | null}
  */
 function setInferenceModelEnabled(id, enabled) {
     return _setModelEnabled(id, Boolean(enabled));

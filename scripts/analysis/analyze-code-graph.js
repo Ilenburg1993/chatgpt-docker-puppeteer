@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// @ts-nocheck
-import ts from 'typescript';
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const TSCONFIG = path.join(ROOT, 'tsconfig.json');
@@ -38,18 +38,23 @@ const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options);
 const _typeChecker = program.getTypeChecker();
 
 // Data structures for analysis
-const dependencyGraph = new Map(); // file -> [dependencies]
-const reverseGraph = new Map(); // file -> [dependents]
-const nervEvents = { emitters: {}, listeners: {} };
+const dependencyGraph = /** @type {Map<string, string[]>} */ (new Map()); // file -> [dependencies]
+const reverseGraph = /** @type {Map<string, string[]>} */ (new Map()); // file -> [dependents]
+const nervEvents = /** @type {{ emitters: Record<string, string[]>; listeners: Record<string, string[]> }} */ ({
+    emitters: {},
+    listeners: {},
+});
 const moduleStats = {
     total: 0,
-    byDirectory: {},
+    byDirectory: /** @type {Record<string, number>} */ ({}),
     topImporters: [],
     topImported: [],
 };
 
 /**
  * Normalize file path relative to root
+ *
+ * @param {string} filePath
  */
 function normalizePath(filePath) {
     return path.relative(ROOT, filePath).replace(/\\/g, '/');
@@ -57,6 +62,8 @@ function normalizePath(filePath) {
 
 /**
  * Get module category (nerv, kernel, driver, etc.)
+ *
+ * @param {string} filePath
  */
 function getModuleCategory(filePath) {
     const normalized = normalizePath(filePath);
@@ -89,20 +96,24 @@ function getModuleCategory(filePath) {
 
 /**
  * Extract dependencies from a source file
+ *
+ * @param {any} sourceFile
  */
 function extractDependencies(sourceFile) {
     const _filePath = normalizePath(sourceFile.fileName);
+    /** @type {string[]} */
     const deps = [];
 
+    /** @param {any} node */
     function visit(node) {
         // require() calls
         if (
             ts.isCallExpression(node) &&
             node.expression.kind === ts.SyntaxKind.Identifier &&
-            node.expression.text === 'require' &&
+            /** @type {any} */ (node.expression).text === 'require' &&
             node.arguments.length > 0
         ) {
-            const arg = node.arguments[0];
+            const arg = /** @type {any} */ (node.arguments[0]);
             if (ts.isStringLiteral(arg)) {
                 deps.push(arg.text);
             }
@@ -122,11 +133,15 @@ function extractDependencies(sourceFile) {
 
 /**
  * Extract NERV event emissions and listeners
+ *
+ * @param {any} sourceFile
  */
 function extractNervEvents(sourceFile) {
     const _filePath = normalizePath(sourceFile.fileName);
+    /** @type {{ emits: string[]; listens: string[] }} */
     const events = { emits: [], listens: [] };
 
+    /** @param {any} node */
     function visit(node) {
         // nerv.emit('EVENT_NAME', ...)
         if (ts.isCallExpression(node)) {
@@ -135,9 +150,9 @@ function extractNervEvents(sourceFile) {
                 ts.isPropertyAccessExpression(expr) &&
                 expr.name.text === 'emit' &&
                 node.arguments.length > 0 &&
-                ts.isStringLiteral(node.arguments[0])
+                ts.isStringLiteral(/** @type {any} */ (node.arguments[0]))
             ) {
-                events.emits.push(node.arguments[0].text);
+                events.emits.push(/** @type {any} */ (node.arguments[0]).text);
             }
 
             // nerv.on('EVENT_NAME', ...)
@@ -145,9 +160,9 @@ function extractNervEvents(sourceFile) {
                 ts.isPropertyAccessExpression(expr) &&
                 expr.name.text === 'on' &&
                 node.arguments.length > 0 &&
-                ts.isStringLiteral(node.arguments[0])
+                ts.isStringLiteral(/** @type {any} */ (node.arguments[0]))
             ) {
-                events.listens.push(node.arguments[0].text);
+                events.listens.push(/** @type {any} */ (node.arguments[0]).text);
             }
         }
 
@@ -162,7 +177,7 @@ function extractNervEvents(sourceFile) {
  * Build dependency graph
  */
 function buildDependencyGraph() {
-    program.getSourceFiles().forEach(sourceFile => {
+    program.getSourceFiles().forEach((sourceFile) => {
         if (sourceFile.fileName.includes('node_modules')) {
             return;
         }
@@ -177,23 +192,23 @@ function buildDependencyGraph() {
         moduleStats.byDirectory[category] = (moduleStats.byDirectory[category] || 0) + 1;
 
         // Build reverse graph
-        deps.forEach(dep => {
+        deps.forEach((dep) => {
             if (!reverseGraph.has(dep)) {
                 reverseGraph.set(dep, []);
             }
-            reverseGraph.get(dep).push(filePath);
+            reverseGraph.get(dep)?.push(filePath);
         });
 
         // Extract NERV events
         if (options.mapNerv) {
             const events = extractNervEvents(sourceFile);
-            events.emits.forEach(evt => {
+            events.emits.forEach((evt) => {
                 if (!nervEvents.emitters[evt]) {
                     nervEvents.emitters[evt] = [];
                 }
                 nervEvents.emitters[evt].push(filePath);
             });
-            events.listens.forEach(evt => {
+            events.listens.forEach((evt) => {
                 if (!nervEvents.listeners[evt]) {
                     nervEvents.listeners[evt] = [];
                 }
@@ -209,8 +224,10 @@ function buildDependencyGraph() {
 function findCircularDependencies() {
     const visited = new Set();
     const stack = new Set();
+    /** @type {string[][]} */
     const cycles = [];
 
+    /** @param {string} node @param {string[]} path */
     function dfs(node, path = []) {
         if (stack.has(node)) {
             const cycleStart = path.indexOf(node);
@@ -227,7 +244,7 @@ function findCircularDependencies() {
         path.push(node);
 
         const deps = dependencyGraph.get(node) || [];
-        deps.forEach(dep => {
+        deps.forEach((dep) => {
             // Resolve relative paths
             const resolvedDep = resolveImport(node, dep);
             if (resolvedDep) {
@@ -244,6 +261,9 @@ function findCircularDependencies() {
 
 /**
  * Resolve import path
+ *
+ * @param {string} fromFile
+ * @param {string} importPath
  */
 function resolveImport(fromFile, importPath) {
     if (importPath.startsWith('.')) {
@@ -259,6 +279,7 @@ function resolveImport(fromFile, importPath) {
  * Find orphaned modules
  */
 function findOrphans() {
+    /** @type {string[]} */
     const orphans = [];
     dependencyGraph.forEach((deps, file) => {
         const dependents = reverseGraph.get(file) || [];
@@ -338,7 +359,7 @@ if (options.findOrphans) {
         console.log('✅ No orphaned modules found!');
     } else {
         console.log(`Found ${orphans.length} orphaned modules:\n`);
-        orphans.forEach(file => console.log(`  - ${file}`));
+        orphans.forEach((file) => console.log(`  - ${file}`));
     }
 }
 
@@ -350,7 +371,7 @@ if (options.mapNerv) {
     if (allEvents.size === 0) {
         console.log('ℹ️  No NERV events detected (requires .emit() and .on() calls)');
     } else {
-        allEvents.forEach(event => {
+        allEvents.forEach((event) => {
             const emitters = nervEvents.emitters[event] || [];
             const listeners = nervEvents.listeners[event] || [];
 
@@ -402,7 +423,7 @@ if (options.exportDot) {
             CORE: 'orange',
         };
 
-        deps.forEach(dep => {
+        deps.forEach((dep) => {
             const resolvedDep = resolveImport(file, dep);
             if (resolvedDep) {
                 dot += `  "${file}" -> "${resolvedDep}";\n`;

@@ -2,42 +2,44 @@
 import { log } from '#core/logger';
 
 /**
- * @fileoverview PageSessionTracker - Session metrics and health tracking
+ * @file PageSessionTracker - Session metrics and health tracking
  *
- * **Purpose**: Track session-level metrics (turn count, response times, memory usage)
- *              to enable adaptive timeout adjustment for long conversations.
+ *   **Purpose**: Track session-level metrics (turn count, response times, memory usage) to enable adaptive timeout
+ *   adjustment for long conversations.
  *
- * **Phase**: 2 (Performance Upgrades) - P1-U1
- * **Status**: Production Ready
- * **Version**: 1.0
+ *   **Phase**: 2 (Performance Upgrades) - P1-U1 **Status**: Production Ready **Version**: 1.0
  *
- * **Responsibilities**:
- * - Track turn count (conversational interactions)
- * - Record response times (typing + submission + wait)
- * - Monitor session age (uptime)
- * - Calculate session health score
- * - Provide metrics for adaptive timeout calculation
+ *   **Responsibilities**:
  *
- * **Integration Points**:
- * - BaseDriver.sendPrompt() - Record turn metrics after each execution
- * - DriverReadinessGuard - Use session health for validation
- * - NERV Events - Emit session metrics updates
+ *   - Track turn count (conversational interactions)
+ *   - Record response times (typing + submission + wait)
+ *   - Monitor session age (uptime)
+ *   - Calculate session health score
+ *   - Provide metrics for adaptive timeout calculation
  *
- * **Key Metrics**:
- * - turnCount: Total interactions in session
- * - avgResponseTime: Moving average of response times
- * - recentResponseTimes: Last N response times (for trend analysis)
- * - sessionAge: Time since session start (ms)
- * - sessionHealth: Calculated health score (0-100)
+ *   **Integration Points**:
  *
- * **Adaptive Timeout Logic**:
- * - Sessions with turnCount > 10: +50% timeout
- * - Sessions with turnCount > 20: +100% timeout
- * - Sessions with avgResponseTime > 10s: +50% timeout
- * - Sessions with sessionAge > 30min: +50% timeout
+ *   - BaseDriver.sendPrompt() - Record turn metrics after each execution
+ *   - DriverReadinessGuard - Use session health for validation
+ *   - NERV Events - Emit session metrics updates
  *
- * **Created**: February 2026 (Phase 2 implementation)
- * **Related**: DRIVER_BROWSER_INTEGRATION_ANALYSIS.md (P1-U1, P1-U2)
+ *   **Key Metrics**:
+ *
+ *   - turnCount: Total interactions in session
+ *   - avgResponseTime: Moving average of response times
+ *   - recentResponseTimes: Last N response times (for trend analysis)
+ *   - sessionAge: Time since session start (ms)
+ *   - sessionHealth: Calculated health score (0-100)
+ *
+ *   **Adaptive Timeout Logic**:
+ *
+ *   - Sessions with turnCount > 10: +50% timeout
+ *   - Sessions with turnCount > 20: +100% timeout
+ *   - Sessions with avgResponseTime > 10s: +50% timeout
+ *   - Sessions with sessionAge > 30min: +50% timeout
+ *
+ *   **Created**: February 2026 (Phase 2 implementation) **Related**: DRIVER_BROWSER_INTEGRATION_ANALYSIS.md (P1-U1,
+ *   P1-U2)
  */
 
 /* ==========================================================================
@@ -46,6 +48,7 @@ import { log } from '#core/logger';
 
 /**
  * Tracker configuration constants.
+ *
  * @readonly
  */
 const TRACKER_CONFIG = Object.freeze({
@@ -68,6 +71,7 @@ const TRACKER_CONFIG = Object.freeze({
 
 /**
  * Session health levels.
+ *
  * @readonly
  * @enum {string}
  */
@@ -80,8 +84,8 @@ const HEALTH_LEVELS = {
 };
 
 /**
- * Timeout multiplier based on session characteristics.
- * Used by adaptive timeout logic in BaseDriver.
+ * Timeout multiplier based on session characteristics. Used by adaptive timeout logic in BaseDriver.
+ *
  * @readonly
  */
 const TIMEOUT_MULTIPLIERS = Object.freeze({
@@ -122,7 +126,7 @@ class PageSessionTracker {
 
         // Session metrics
         this.turnCount = 0;
-        this.responseTimes = []; // Array of {timestamp, duration} objects
+        this.responseTimes = /** @type {any[]} */ ([]); // Array of {timestamp, duration} objects
         this.sessionStartTime = Date.now();
         this.lastTurnTime = null;
 
@@ -139,8 +143,7 @@ class PageSessionTracker {
     ====================================================================== */
 
     /**
-     * Records a new turn (interaction).
-     * Call this at the START of sendPrompt().
+     * Records a new turn (interaction). Call this at the START of sendPrompt().
      *
      * @returns {number} Current turn count
      */
@@ -157,12 +160,11 @@ class PageSessionTracker {
     }
 
     /**
-     * Records response time for last turn.
-     * Call this at the END of sendPrompt() (success or failure).
+     * Records response time for last turn. Call this at the END of sendPrompt() (success or failure).
      *
      * @param {number} durationMs - Total response time in milliseconds
-     * @param {boolean} [success=true] - Whether turn was successful
-     * @returns {object} { avgResponseTime, trend }
+     * @param {boolean} [success=true] - Whether turn was successful. Default is `true`
+     * @returns {any} { avgResponseTime, trend }
      */
     recordResponseTime(durationMs, success = true) {
         const entry = {
@@ -189,7 +191,7 @@ class PageSessionTracker {
         log(
             'DEBUG',
             `[SESSION_TRACKER] Response time recorded: ${durationMs}ms (avg: ${avgResponseTime}ms, trend: ${trend})`,
-            this._getCorrelationId()
+            this._getCorrelationId(),
         );
 
         // Invalidate metrics cache
@@ -203,10 +205,9 @@ class PageSessionTracker {
     ====================================================================== */
 
     /**
-     * Gets comprehensive session metrics.
-     * Results are cached for 1s to avoid recalculation overhead.
+     * Gets comprehensive session metrics. Results are cached for 1s to avoid recalculation overhead.
      *
-     * @returns {object} Session metrics
+     * @returns {any} Session metrics
      */
     getMetrics() {
         const now = Date.now();
@@ -228,7 +229,7 @@ class PageSessionTracker {
             avgResponseTime: this._calculateAverageResponseTime(),
             minResponseTime: this._calculateMinResponseTime(),
             maxResponseTime: this._calculateMaxResponseTime(),
-            recentResponseTimes: this.responseTimes.slice(-5).map(r => r.duration), // Last 5
+            recentResponseTimes: this.responseTimes.slice(-5).map((r) => r.duration), // Last 5
 
             // Trend analysis
             responseTimeTrend: this._detectResponseTimeTrend(),
@@ -252,13 +253,12 @@ class PageSessionTracker {
     }
 
     /**
-     * Gets session health score and level.
-     * Quick method for health checks.
+     * Gets session health score and level. Quick method for health checks.
      *
-     * @returns {object} { score, level, factors }
+     * @returns {any} { score, level, factors }
      */
     getSessionHealth() {
-        const metrics = this.getMetrics();
+        const metrics = /** @type {any} */ (this.getMetrics());
 
         return {
             score: metrics.sessionHealth,
@@ -268,13 +268,12 @@ class PageSessionTracker {
     }
 
     /**
-     * Gets timeout multiplier for adaptive timeout adjustment.
-     * Used by BaseDriver to adjust timeouts dynamically.
+     * Gets timeout multiplier for adaptive timeout adjustment. Used by BaseDriver to adjust timeouts dynamically.
      *
      * @returns {number} Timeout multiplier (1.0 - 5.0)
      */
     getTimeoutMultiplier() {
-        return this.getMetrics().timeoutMultiplier;
+        return /** @type {any} */ (this.getMetrics()).timeoutMultiplier;
     }
 
     /**
@@ -306,8 +305,9 @@ class PageSessionTracker {
 
     /**
      * Calculates average response time from recorded data.
-     * @returns {number} Average in milliseconds (or 0 if no data)
+     *
      * @private
+     * @returns {number} Average in milliseconds (or 0 if no data)
      */
     _calculateAverageResponseTime() {
         if (this.responseTimes.length === 0) return 0;
@@ -318,30 +318,31 @@ class PageSessionTracker {
 
     /**
      * Calculates minimum response time.
-     * @returns {number} Min in milliseconds (or 0 if no data)
+     *
      * @private
+     * @returns {number} Min in milliseconds (or 0 if no data)
      */
     _calculateMinResponseTime() {
         if (this.responseTimes.length === 0) return 0;
-        return Math.min(...this.responseTimes.map(r => r.duration));
+        return Math.min(...this.responseTimes.map((r) => r.duration));
     }
 
     /**
      * Calculates maximum response time.
-     * @returns {number} Max in milliseconds (or 0 if no data)
+     *
      * @private
+     * @returns {number} Max in milliseconds (or 0 if no data)
      */
     _calculateMaxResponseTime() {
         if (this.responseTimes.length === 0) return 0;
-        return Math.max(...this.responseTimes.map(r => r.duration));
+        return Math.max(...this.responseTimes.map((r) => r.duration));
     }
 
     /**
-     * Detects response time trend (improving/degrading/stable).
-     * Compares last 5 vs previous 5 response times.
+     * Detects response time trend (improving/degrading/stable). Compares last 5 vs previous 5 response times.
      *
-     * @returns {string} 'IMPROVING', 'DEGRADING', 'STABLE', or 'INSUFFICIENT_DATA'
      * @private
+     * @returns {string} 'IMPROVING', 'DEGRADING', 'STABLE', or 'INSUFFICIENT_DATA'
      */
     _detectResponseTimeTrend() {
         if (this.responseTimes.length < 10) return 'INSUFFICIENT_DATA';
@@ -368,16 +369,16 @@ class PageSessionTracker {
     ====================================================================== */
 
     /**
-     * Calculates overall session health score (0-100).
-     * Higher score = healthier session.
+     * Calculates overall session health score (0-100). Higher score = healthier session.
      *
      * Factors:
+     *
      * - Response time (40%): Lower is better
      * - Turn count (30%): Moderate is best (too low or too high penalized)
      * - Session age (30%): Younger is better
      *
-     * @returns {number} Health score (0-100)
      * @private
+     * @returns {number} Health score (0-100)
      */
     _calculateSessionHealth() {
         const config = TRACKER_CONFIG;
@@ -420,7 +421,7 @@ class PageSessionTracker {
         const healthScore = Math.round(
             responseScore * config.HEALTH_WEIGHT_RESPONSE_TIME +
                 turnScore * config.HEALTH_WEIGHT_TURN_COUNT +
-                ageScore * config.HEALTH_WEIGHT_SESSION_AGE
+                ageScore * config.HEALTH_WEIGHT_SESSION_AGE,
         );
 
         return Math.max(0, Math.min(100, healthScore)); // Clamp 0-100
@@ -428,8 +429,9 @@ class PageSessionTracker {
 
     /**
      * Converts health score to level enum.
-     * @returns {string} Health level (EXCELLENT, GOOD, FAIR, DEGRADED, CRITICAL)
+     *
      * @private
+     * @returns {string} Health level (EXCELLENT, GOOD, FAIR, DEGRADED, CRITICAL)
      */
     _getHealthLevel() {
         const score = this._calculateSessionHealth();
@@ -443,8 +445,9 @@ class PageSessionTracker {
 
     /**
      * Gets detailed health factors for debugging.
-     * @returns {object} Health contributing factors
+     *
      * @private
+     * @returns {any} Health contributing factors
      */
     _getHealthFactors() {
         const config = TRACKER_CONFIG;
@@ -475,10 +478,11 @@ class PageSessionTracker {
     ====================================================================== */
 
     /**
-     * Calculates timeout multiplier based on session characteristics.
-     * Used by BaseDriver for adaptive timeout adjustment.
+     * Calculates timeout multiplier based on session characteristics. Used by BaseDriver for adaptive timeout
+     * adjustment.
      *
      * Rules:
+     *
      * - Long sessions (10-20 turns): 1.5x
      * - Very long sessions (20+ turns): 2.0x
      * - Slow avg response (10-30s): 1.5x
@@ -487,8 +491,8 @@ class PageSessionTracker {
      * - Old sessions (60+ min): 1.5x
      * - Maximum cap: 5.0x
      *
-     * @returns {number} Timeout multiplier (1.0 - 5.0)
      * @private
+     * @returns {number} Timeout multiplier (1.0 - 5.0)
      */
     _calculateTimeoutMultiplier() {
         const config = TRACKER_CONFIG;
@@ -533,11 +537,12 @@ class PageSessionTracker {
 
     /**
      * Gets correlation ID from parent driver.
-     * @returns {string} Correlation ID
+     *
      * @private
+     * @returns {string} Correlation ID
      */
     _getCorrelationId() {
-        return this.driver?.correlationId || 'no-correlation';
+        return /** @type {any} */ (this.driver)?.correlationId || 'no-correlation';
     }
 }
 
@@ -546,8 +551,7 @@ export default PageSessionTracker;
 /**
  * Níveis de saúde da sessão
  *
- * **Side-effects:** N/A
- * **Semântica:** Enumeração de níveis de saúde para avaliação de qualidade da sessão.
+ * **Side-effects:** N/A **Semântica:** Enumeração de níveis de saúde para avaliação de qualidade da sessão.
  * **Unidades:** N/A
  *
  * @type {Object<string, string>}
@@ -557,8 +561,7 @@ export { HEALTH_LEVELS };
 /**
  * Multiplicadores de timeout adaptativos
  *
- * **Side-effects:** N/A
- * **Semântica:** Configurações para ajuste dinâmico de timeouts baseado no histórico da sessão.
+ * **Side-effects:** N/A **Semântica:** Configurações para ajuste dinâmico de timeouts baseado no histórico da sessão.
  * **Unidades:** Números decimais para multiplicadores.
  *
  * @type {Object<string, number>}
@@ -568,8 +571,7 @@ export { TIMEOUT_MULTIPLIERS };
 /**
  * Configurações do tracker de sessão
  *
- * **Side-effects:** N/A
- * **Semântica:** Configurações de limites e intervalos para monitoramento de sessão.
+ * **Side-effects:** N/A **Semântica:** Configurações de limites e intervalos para monitoramento de sessão.
  * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
  *
  * @type {Object<string, any>}

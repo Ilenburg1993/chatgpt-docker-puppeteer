@@ -1,7 +1,7 @@
 // @ts-check
+import { upsertAuditFinding } from '#infra/db/audit_finding_repo';
 import { createAuditJob, getAuditJobById, listAuditJobs, upsertAuditJobSnapshot } from '#infra/db/audit_job_repo';
 import { createAuditJobRun, updateAuditJobRun } from '#infra/db/audit_job_run_repo';
-import { upsertAuditFinding } from '#infra/db/audit_finding_repo';
 import { createAuditPatchProposal } from '#infra/db/audit_patch_repo';
 
 /**
@@ -16,8 +16,9 @@ import { createAuditPatchProposal } from '#infra/db/audit_patch_repo';
  */
 
 /**
- * Store persistente (SQLite) para snapshots de jobs e runs do Audit Agent.
- * É um sink incremental: o runtime em memória continua sendo fonte de execução na V0.
+ * Store persistente (SQLite) para snapshots de jobs e runs do Audit Agent. É um sink incremental: o runtime em memória
+ * continua sendo fonte de execução na V0.
+ *
  * @returns {AuditAgentDbStore}
  */
 export function createAuditAgentDbStore() {
@@ -26,11 +27,11 @@ export function createAuditAgentDbStore() {
          * @param {Record<string, unknown>} job
          */
         saveJob(job) {
-            const existing = getAuditJobById(job?.id);
+            const existing = getAuditJobById(String(job?.id || ''));
             if (!existing) {
-                return createAuditJob(job);
+                return createAuditJob(/** @type {any} */ (job));
             }
-            return upsertAuditJobSnapshot(job);
+            return upsertAuditJobSnapshot(/** @type {any} */ (job));
         },
         /**
          * @param {Record<string, unknown>} job
@@ -39,12 +40,12 @@ export function createAuditAgentDbStore() {
             if (!job?.current_run_id) return null;
             try {
                 return createAuditJobRun({
-                    id: job.current_run_id,
-                    job_id: job.id,
-                    attempt_seq: job.attempt_seq,
-                    status: job.status,
+                    id: String(job.current_run_id),
+                    job_id: String(job.id || ''),
+                    attempt_seq: Number(job.attempt_seq) || undefined,
+                    status: String(job.status || ''),
                     executor: 'audit-agent',
-                    started_at_ms: job.updated_at_ms || job.started_at_ms || Date.now(),
+                    started_at_ms: Number(job.updated_at_ms || job.started_at_ms) || Date.now(),
                     metrics_json: { skeleton: true },
                 });
             } catch {
@@ -57,9 +58,9 @@ export function createAuditAgentDbStore() {
         onRunFinish(job) {
             if (!job?.current_run_id) return null;
             try {
-                return updateAuditJobRun(job.current_run_id, {
-                    status: job.status,
-                    completed_at_ms: job.completed_at_ms ?? job.updated_at_ms ?? Date.now(),
+                return updateAuditJobRun(String(job.current_run_id), {
+                    status: String(job.status || ''),
+                    completed_at_ms: Number(job.completed_at_ms ?? job.updated_at_ms) || Date.now(),
                     metrics_json: {
                         skeleton: true,
                         current_step: job.current_step || null,
@@ -72,7 +73,7 @@ export function createAuditAgentDbStore() {
         },
         /**
          * @param {string} jobId
-         * @param {Record<string, unknown>[]} [findings=[]]
+         * @param {Record<string, unknown>[]} [findings=[]] Default is `[]`
          */
         saveFindings(jobId, findings = []) {
             const rows = [];
@@ -81,15 +82,15 @@ export function createAuditAgentDbStore() {
                     rows.push(
                         upsertAuditFinding({
                             job_id: jobId,
-                            severity: item.severity || 'info',
-                            category: item.category || 'generic',
-                            title: item.title || 'finding',
-                            source: item.source || 'audit-agent',
-                            contract_id: item.contract_id || null,
-                            dedup_key: item.dedup_key || null,
-                            status: item.status || 'open',
+                            severity: String(item.severity || 'info'),
+                            category: String(item.category || 'generic'),
+                            title: String(item.title || 'finding'),
+                            source: String(item.source || 'audit-agent'),
+                            contract_id: item.contract_id ? String(item.contract_id) : undefined,
+                            dedup_key: item.dedup_key ? String(item.dedup_key) : undefined,
+                            status: String(item.status || 'open'),
                             evidence: item.evidence || item.evidence_json || {},
-                        })
+                        }),
                     );
                 } catch {
                     // best effort per finding
@@ -99,7 +100,7 @@ export function createAuditAgentDbStore() {
         },
         /**
          * @param {string} jobId
-         * @param {Record<string, unknown>[]} [patches=[]]
+         * @param {Record<string, unknown>[]} [patches=[]] Default is `[]`
          */
         savePatchProposals(jobId, patches = []) {
             const rows = [];
@@ -108,14 +109,14 @@ export function createAuditAgentDbStore() {
                     rows.push(
                         createAuditPatchProposal({
                             job_id: jobId,
-                            status: p.status || 'draft',
-                            patch_unified_diff: p.patch_unified_diff || '',
+                            status: String(p.status || 'draft'),
+                            patch_unified_diff: String(p.patch_unified_diff || ''),
                             patch_summary: p.patch_summary || {},
-                            risk_score: p.risk_score ?? null,
+                            risk_score: p.risk_score != null ? Number(p.risk_score) : null,
                             dry_run_result_json: p.dry_run_result_json ?? null,
                             approval_required: p.approval_required !== false,
-                            rollback_patch: p.rollback_patch || null,
-                        })
+                            rollback_patch: p.rollback_patch ? String(p.rollback_patch) : undefined,
+                        }),
                     );
                 } catch {
                     // best effort per patch

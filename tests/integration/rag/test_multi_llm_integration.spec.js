@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 /**
  * Integration Tests: RAG v4.0 Multi-LLM Integration
  *
@@ -7,16 +7,16 @@
  * Run: node --test tests/integration/rag/test_multi_llm_integration.spec.js
  */
 
-import { describe, it, before, after } from 'node:test';
-import assert from 'node:assert';
 import express from 'express';
+import assert from 'node:assert';
+import { after, before, describe, it } from 'node:test';
 import { registry } from '../../../src/integration/tool-registry.mjs';
 import { setupMCPHandler } from '../../../src/server/handlers/mcp-handler.js';
 
 // Test server instance
-let app;
-let server;
-let baseUrl;
+/** @type {any} */ let app;
+/** @type {any} */ let server;
+/** @type {any} */ let baseUrl;
 
 // Setup test server
 before(async () => {
@@ -27,20 +27,22 @@ before(async () => {
     app.use(express.json());
 
     // Wait for Tool Registry to initialize
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // Setup MCP handler
     setupMCPHandler(app, registry);
 
     // Start server on random port
-    await new Promise(resolve => {
-        server = app.listen(0, () => {
-            const { port } = server.address();
-            baseUrl = `http://localhost:${port}`;
-            console.log(`[Test] Server started on ${baseUrl}`);
-            resolve();
-        });
-    });
+    await /** @type {Promise<void>} */ (
+        new Promise((resolve) => {
+            server = app.listen(0, () => {
+                const { port } = server.address();
+                baseUrl = `http://localhost:${port}`;
+                console.log(`[Test] Server started on ${baseUrl}`);
+                resolve();
+            });
+        })
+    );
 });
 
 // Cleanup
@@ -51,7 +53,7 @@ after(() => {
 });
 
 // Helper: Make MCP request
-async function mcpRequest(method, params = {}) {
+async function mcpRequest(/** @type {any} */ method, params = {}) {
     const response = await fetch(`${baseUrl}/api/mcp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -148,7 +150,7 @@ describe('MCP Protocol - tools/list', () => {
         assert.ok(Array.isArray(result.result.tools));
         assert.ok(result.result.tools.length >= 5);
 
-        const toolNames = result.result.tools.map(t => t.name);
+        const toolNames = result.result.tools.map((/** @type {any} */ t) => t.name);
         assert.ok(toolNames.includes('rag_search'));
         assert.ok(toolNames.includes('rag_health'));
         assert.ok(toolNames.includes('rag_expand'));
@@ -171,7 +173,7 @@ describe('MCP Protocol - tools/list', () => {
             assert.strictEqual(tool.inputSchema.type, 'object', `Tool ${tool.name} inputSchema not object`);
         }
 
-        const generateTool = tools.find(t => t.name === 'ollama_generate');
+        const generateTool = tools.find((/** @type {any} */ t) => t.name === 'ollama_generate');
         assert.ok(generateTool, 'ollama_generate metadata not found');
         assert.ok(generateTool.inputSchema.properties.runtime, 'ollama_generate.runtime schema missing');
         assert.deepEqual(generateTool.inputSchema.properties.runtime.enum, ['auto', 'cloud', 'local']);
@@ -212,7 +214,7 @@ describe('Tool: ollama_models', () => {
 });
 
 describe('Tool: ollama_embed', () => {
-    it('should generate embeddings for text', async t => {
+    it('should generate embeddings for text', async (t) => {
         const result = await mcpRequest('tools/call', {
             name: 'ollama_embed',
             arguments: {
@@ -248,7 +250,7 @@ describe('Tool: ollama_embed', () => {
         const text = result.result?.content?.[0]?.text || result.error?.message || '';
         assert.ok(
             text.includes('Invalid input') || text.includes('Text cannot be empty'),
-            `Expected validation error message, got: ${text}`
+            `Expected validation error message, got: ${text}`,
         );
         assert.ok(!text.includes('TypeError'), `Should not leak internal TypeError, got: ${text}`);
         assert.ok(!text.includes('undefined'), `Should not include "undefined" in error message, got: ${text}`);
@@ -256,7 +258,7 @@ describe('Tool: ollama_embed', () => {
 });
 
 describe('Tool: ollama_generate', () => {
-    it('should generate text with qwen2.5-coder', async t => {
+    it('should generate text with qwen2.5-coder', async (t) => {
         // Skip if model not available (CI environment)
         try {
             const result = await mcpRequest('tools/call', {
@@ -280,7 +282,7 @@ describe('Tool: ollama_generate', () => {
         }
     });
 
-    it('should respect temperature parameter', async t => {
+    it('should respect temperature parameter', async (t) => {
         try {
             const result = await mcpRequest('tools/call', {
                 name: 'ollama_generate',
@@ -320,7 +322,7 @@ describe('Tool: rag_health', () => {
 });
 
 describe('Tool: rag_search', () => {
-    it('should search codebase for CHROME_PROXY_PORT', async t => {
+    it('should search codebase for CHROME_PROXY_PORT', async (t) => {
         const result = await mcpRequest('tools/call', {
             name: 'rag_search',
             arguments: {
@@ -332,7 +334,7 @@ describe('Tool: rag_search', () => {
         assert.strictEqual(result.jsonrpc, '2.0');
         if (!result.result || result.result.isError) {
             t.skip(
-                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`
+                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`,
             );
             return;
         }
@@ -356,7 +358,7 @@ describe('Tool: rag_search', () => {
         }
     });
 
-    it('should respect topK parameter', async t => {
+    it('should respect topK parameter', async (t) => {
         const result = await mcpRequest('tools/call', {
             name: 'rag_search',
             arguments: {
@@ -367,7 +369,7 @@ describe('Tool: rag_search', () => {
 
         if (!result.result || result.result.isError) {
             t.skip(
-                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`
+                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`,
             );
             return;
         }
@@ -378,7 +380,7 @@ describe('Tool: rag_search', () => {
         assert.ok(resultCount <= 2, `Expected <=2 results, got ${resultCount}`);
     });
 
-    it('should filter by pathPrefix', async t => {
+    it('should filter by pathPrefix', async (t) => {
         const result = await mcpRequest('tools/call', {
             name: 'rag_search',
             arguments: {
@@ -390,7 +392,7 @@ describe('Tool: rag_search', () => {
 
         if (!result.result || result.result.isError) {
             t.skip(
-                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`
+                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`,
             );
             return;
         }
@@ -402,7 +404,7 @@ describe('Tool: rag_search', () => {
         }
     });
 
-    it('should complete search in <2 seconds', async t => {
+    it('should complete search in <2 seconds', async (t) => {
         const start = Date.now();
         const result = await mcpRequest('tools/call', {
             name: 'rag_search',
@@ -415,7 +417,7 @@ describe('Tool: rag_search', () => {
 
         if (!result.result || result.result.isError) {
             t.skip(
-                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`
+                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`,
             );
             return;
         }
@@ -428,7 +430,7 @@ describe('Tool: rag_search', () => {
 });
 
 describe('Tool: rag_expand', () => {
-    it('should expand a chunk returned by rag_search', async t => {
+    it('should expand a chunk returned by rag_search', async (t) => {
         const search = await mcpRequest('tools/call', {
             name: 'rag_search',
             arguments: {
@@ -440,7 +442,7 @@ describe('Tool: rag_expand', () => {
 
         if (!search.result || search.result.isError) {
             t.skip(
-                `rag_search unavailable: ${search?.result?.content?.[0]?.text || search?.error?.message || 'unknown error'}`
+                `rag_search unavailable: ${search?.result?.content?.[0]?.text || search?.error?.message || 'unknown error'}`,
             );
             return;
         }
@@ -515,7 +517,7 @@ describe('MCP Protocol - resources/list', () => {
         assert.ok(Array.isArray(result.result.resources));
         assert.ok(result.result.resources.length > 0);
 
-        const ragStats = result.result.resources.find(r => r.uri === 'rag://stats');
+        const ragStats = result.result.resources.find((/** @type {any} */ r) => r.uri === 'rag://stats');
         assert.ok(ragStats);
         assert.strictEqual(ragStats.mimeType, 'application/json');
     });
@@ -582,7 +584,7 @@ describe('Tool Registry - Direct Access', () => {
         const result = await registry.execute('ollama_models');
 
         assert.ok(result);
-        assert.ok(result.includes('Available Ollama Models'));
+        assert.ok(/** @type {any} */ (result).includes('Available Ollama Models'));
     });
 
     it('should throw on unknown tool', async () => {
@@ -590,7 +592,7 @@ describe('Tool Registry - Direct Access', () => {
     });
 
     it('should return correct stats', () => {
-        const stats = registry.getStats();
+        const stats = /** @type {any} */ (registry.getStats());
 
         assert.ok(stats.totalTools >= 5);
         assert.ok(Array.isArray(stats.tools));
@@ -599,7 +601,7 @@ describe('Tool Registry - Direct Access', () => {
 });
 
 describe('Performance - Cache Behavior', () => {
-    it('should cache repeated queries', async t => {
+    it('should cache repeated queries', async (t) => {
         const query = `test query ${Math.random()}`;
 
         const before = await mcpRequest('resources/read', { uri: 'rag://stats' });
@@ -614,7 +616,7 @@ describe('Performance - Cache Behavior', () => {
         const duration1 = Date.now() - start1;
         if (!first.result || first.result.isError) {
             t.skip(
-                `rag_search unavailable: ${first?.result?.content?.[0]?.text || first?.error?.message || 'unknown error'}`
+                `rag_search unavailable: ${first?.result?.content?.[0]?.text || first?.error?.message || 'unknown error'}`,
             );
             return;
         }
@@ -628,7 +630,7 @@ describe('Performance - Cache Behavior', () => {
         const duration2 = Date.now() - start2;
         if (!second.result || second.result.isError) {
             t.skip(
-                `rag_search unavailable: ${second?.result?.content?.[0]?.text || second?.error?.message || 'unknown error'}`
+                `rag_search unavailable: ${second?.result?.content?.[0]?.text || second?.error?.message || 'unknown error'}`,
             );
             return;
         }
@@ -637,7 +639,7 @@ describe('Performance - Cache Behavior', () => {
         const afterStats = JSON.parse(after.result.contents[0].text);
 
         console.log(
-            `[Cache Test] First: ${duration1}ms, Second: ${duration2}ms | Hits: ${beforeStats.hits}→${afterStats.hits}, Misses: ${beforeStats.misses}→${afterStats.misses}`
+            `[Cache Test] First: ${duration1}ms, Second: ${duration2}ms | Hits: ${beforeStats.hits}→${afterStats.hits}, Misses: ${beforeStats.misses}→${afterStats.misses}`,
         );
 
         if (afterStats.hits < beforeStats.hits + 1) {
@@ -649,5 +651,5 @@ describe('Performance - Cache Behavior', () => {
 });
 
 console.log(
-    '\n✅ All integration tests defined. Run with: node --test tests/integration/rag/test_multi_llm_integration.spec.js\n'
+    '\n✅ All integration tests defined. Run with: node --test tests/integration/rag/test_multi_llm_integration.spec.js\n',
 );

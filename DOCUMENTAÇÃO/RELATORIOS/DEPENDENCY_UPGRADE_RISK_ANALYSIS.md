@@ -31,7 +31,7 @@ e estratégias de migração para atualizações de dependências
 
 ```dockerfile
 # Linha 81 do Dockerfile
-CMD ["node", "src/main.js"]  # ❌ ARQUIVO NÃO EXISTE
+CMD ["node", "src/main.js"] # ❌ ARQUIVO NÃO EXISTE
 ```
 
 **Verificação:**
@@ -41,8 +41,8 @@ $ ls -la src/main.js
 ls: cannot access 'src/main.js': No such file or directory
 
 $ ls -la index.js src/server/main.js
--rw-r--r-- 1 user user  9234 Jan 20 index.js           # Entry point do agente
--rw-r--r-- 1 user user  4521 Jan 20 src/server/main.js # Entry point do dashboard
+-rw-r--r-- 1 user user 9234 Jan 20 index.js           # Entry point do agente
+-rw-r--r-- 1 user user 4521 Jan 20 src/server/main.js # Entry point do dashboard
 ```
 
 **Impacto:**
@@ -193,7 +193,7 @@ node -e "const puppeteer = require('puppeteer-extra'); console.log(puppeteer.ver
 ```bash
 git checkout -b upgrade/puppeteer-24
 npm install puppeteer@24.35.0
-npm install  # Verificar peer dependencies
+npm install # Verificar peer dependencies
 ```
 
 **Passo 3: Testes de Integração**
@@ -426,7 +426,7 @@ curl http://localhost:3008/api/health
 # Se falhar
 npm install pm2@5.4.3
 pm2 kill
-pm2 resurrect  # Restaurar estado salvo
+pm2 resurrect # Restaurar estado salvo
 ```
 
 ### Riscos Identificados
@@ -682,7 +682,7 @@ git checkout -b fix/dockerfile-cmd
 git commit -m "fix(docker): Corrigir CMD para pm2-runtime"
 git push
 docker build -t test .
-docker run --rm test  # Validar
+docker run --rm test # Validar
 ```
 
 **Status:** 🔴 **FAZER AGORA**

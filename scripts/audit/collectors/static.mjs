@@ -3,13 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { commandExists, parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
 
-/**
- * @typedef {import('../normalize/findings.mjs').RawFinding} RawFinding
- */
+/** @import {RawFinding} from "../normalize/findings.mjs" */
 
 /**
  * @param {unknown} value
- * @returns {'off'|'warn'|'p1'|'p0'}
+ * @returns {'off' | 'warn' | 'p1' | 'p0'}
  */
 function normalizeEnforcementState(value) {
     const normalized = String(value || '')
@@ -22,7 +20,7 @@ function normalizeEnforcementState(value) {
 }
 
 /**
- * @param {string|null|undefined} value
+ * @param {string | null | undefined} value
  */
 function normalizePathLike(value) {
     return String(value || '')
@@ -31,7 +29,7 @@ function normalizePathLike(value) {
 }
 
 /**
- * @param {string|null|undefined} value
+ * @param {string | null | undefined} value
  */
 function isDistArtifactPath(value) {
     const normalized = normalizePathLike(value);
@@ -45,7 +43,7 @@ function isDistArtifactPath(value) {
 function parseForbiddenOutput(stdoutOrStderr) {
     const parsed = parseJsonFromMixedOutput(String(stdoutOrStderr || ''));
     if (parsed?.findings && Array.isArray(parsed.findings)) {
-        return parsed.findings.map(item => ({
+        return parsed.findings.map((/** @type {any} */ item) => ({
             source_tool: 'check:forbidden',
             contract_id: item.contract_id || null,
             domain: item.domain || null,
@@ -71,23 +69,25 @@ function parseForbiddenOutput(stdoutOrStderr) {
     for (const line of lines) {
         const match = line.match(/^- \[([^\]]+)\] (.+)#L(\d+): (.+)$/);
         if (!match) continue;
-        findings.push({
-            source_tool: 'check:forbidden',
-            contract_id: match[1],
-            domain: 'logic',
-            rule: match[1],
-            file: match[2],
-            line: Number(match[3]),
-            evidence: match[4],
-            severity_hint: 'P1',
-            type: 'falha de contrato',
-            impact: 'Violação de contrato arquitetural detectada por política de padrões proibidos.',
-            root_cause: 'Uso de padrão proibido sem exceção explícita no gate arquitetural.',
-            suggested_patch:
-                'Substituir o padrão proibido por alternativa canônica do projeto ou justificar em allowlist controlada.',
-            test_strategy: 'Executar `npm run check:forbidden` e validar ausência de ocorrências.',
-            regression_risk: 'Médio',
-        });
+        findings.push(
+            /** @type {any} */ ({
+                source_tool: 'check:forbidden',
+                contract_id: match[1],
+                domain: 'logic',
+                rule: match[1],
+                file: match[2],
+                line: Number(match[3]),
+                evidence: match[4],
+                severity_hint: 'P1',
+                type: 'falha de contrato',
+                impact: 'Violação de contrato arquitetural detectada por política de padrões proibidos.',
+                root_cause: 'Uso de padrão proibido sem exceção explícita no gate arquitetural.',
+                suggested_patch:
+                    'Substituir o padrão proibido por alternativa canônica do projeto ou justificar em allowlist controlada.',
+                test_strategy: 'Executar `npm run check:forbidden` e validar ausência de ocorrências.',
+                regression_risk: 'Médio',
+            }),
+        );
     }
     return findings;
 }
@@ -106,20 +106,22 @@ function parseEslintOutput(output) {
             continue;
         }
 
-        findings.push({
-            source_tool: 'lint:quiet',
-            file: match[1],
-            line: Number(match[2]),
-            evidence: `${match[4]} ${match[5]} (${match[6]})`,
-            rule: match[6],
-            severity_hint: match[4] === 'error' ? 'P1' : 'P2',
-            type: 'incompletude',
-            impact: 'Qualidade de código degradada por violação de lint.',
-            root_cause: 'Regra de lint violada no arquivo alvo.',
-            suggested_patch: 'Corrigir a violação de lint de acordo com a regra indicada.',
-            test_strategy: 'Executar `npm run lint:quiet` e confirmar saída limpa.',
-            regression_risk: 'Baixo',
-        });
+        findings.push(
+            /** @type {any} */ ({
+                source_tool: 'lint:quiet',
+                file: match[1],
+                line: Number(match[2]),
+                evidence: `${match[4]} ${match[5]} (${match[6]})`,
+                rule: match[6],
+                severity_hint: match[4] === 'error' ? 'P1' : 'P2',
+                type: 'incompletude',
+                impact: 'Qualidade de código degradada por violação de lint.',
+                root_cause: 'Regra de lint violada no arquivo alvo.',
+                suggested_patch: 'Corrigir a violação de lint de acordo com a regra indicada.',
+                test_strategy: 'Executar `npm run lint:quiet` e confirmar saída limpa.',
+                regression_risk: 'Baixo',
+            }),
+        );
     }
 
     return findings;
@@ -139,24 +141,26 @@ function parseTypecheckOutput(output) {
             continue;
         }
 
-        findings.push({
-            source_tool: 'typecheck',
-            contract_id: 'CONTRACT-SCHEMA-TYPECHECK',
-            domain: 'schemas',
-            owner: 'core-schema',
-            enforcement_state: 'p1',
-            file: match[1],
-            line: Number(match[2]),
-            evidence: `TS${match[4]}: ${match[5]}`,
-            rule: `TS${match[4]}`,
-            severity_hint: 'P1',
-            type: 'falha de contrato',
-            impact: 'Contrato de tipo inconsistente detectado em build time.',
-            root_cause: 'Incompatibilidade de tipos no trecho apontado pelo TypeScript.',
-            suggested_patch: 'Ajustar tipos/assinaturas para satisfazer o contrato apontado pelo compilador.',
-            test_strategy: 'Executar `npm run typecheck` e validar zero erros.',
-            regression_risk: 'Médio',
-        });
+        findings.push(
+            /** @type {any} */ ({
+                source_tool: 'typecheck',
+                contract_id: 'CONTRACT-SCHEMA-TYPECHECK',
+                domain: 'schemas',
+                owner: 'core-schema',
+                enforcement_state: 'p1',
+                file: match[1],
+                line: Number(match[2]),
+                evidence: `TS${match[4]}: ${match[5]}`,
+                rule: `TS${match[4]}`,
+                severity_hint: 'P1',
+                type: 'falha de contrato',
+                impact: 'Contrato de tipo inconsistente detectado em build time.',
+                root_cause: 'Incompatibilidade de tipos no trecho apontado pelo TypeScript.',
+                suggested_patch: 'Ajustar tipos/assinaturas para satisfazer o contrato apontado pelo compilador.',
+                test_strategy: 'Executar `npm run typecheck` e validar zero erros.',
+                regression_risk: 'Médio',
+            }),
+        );
     }
 
     return findings;
@@ -178,7 +182,7 @@ function parseMadgeOutput(output) {
             if (!Array.isArray(item) || item.length < 2) {
                 continue;
             }
-            const cycle = item.map(token => normalizePathLike(String(token || ''))).filter(Boolean);
+            const cycle = item.map((token) => normalizePathLike(String(token || ''))).filter(Boolean);
             if (cycle.length >= 2) {
                 cycles.push(cycle);
             }
@@ -191,9 +195,9 @@ function parseMadgeOutput(output) {
             if (!cyclePrefix) {
                 continue;
             }
-            const parts = cyclePrefix[1]
+            const parts = (cyclePrefix[1] ?? '')
                 .split('>')
-                .map(part => normalizePathLike(part))
+                .map((part) => normalizePathLike(part))
                 .filter(Boolean);
             if (parts.length >= 2) {
                 cycles.push(parts);
@@ -204,7 +208,7 @@ function parseMadgeOutput(output) {
     /** @type {Set<string>} */
     const dedup = new Set();
     for (const cycle of cycles) {
-        if (cycle.every(entry => isDistArtifactPath(entry))) {
+        if (cycle.every((entry) => isDistArtifactPath(entry))) {
             continue;
         }
 
@@ -233,7 +237,10 @@ function parseMadgeOutput(output) {
 }
 
 /**
- * @param {any} depcruiseJson
+ * @typedef {any} ParseDepCruiseOutputDepcruiseJson
+ */
+/**
+ * @param {ParseDepCruiseOutputDepcruiseJson} depcruiseJson
  * @returns {RawFinding[]}
  */
 function parseDepCruiseOutput(depcruiseJson) {
@@ -318,30 +325,37 @@ function parseJscpdReport(jscpdJsonPath) {
 }
 
 /**
- * @param {{
- *   profile: 'quick'|'deep'|'nightly',
- *   changedFiles: string[],
- *   artifactsDir?: string,
- *   contractsMode?: 'legacy'|'hybrid'|'strict',
- *   skipQuickSyntax?: boolean,
- *   skipLintTypecheck?: boolean,
- *   exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
- *   commandExistsFn?: (binary: string, stepId?: string) => Promise<boolean>,
- * }} options
- * @returns {Promise<{ findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: Record<string,any>}>}
+ * @typedef {object} CollectStaticFindingsOptions
+ * @property {'quick' | 'deep' | 'nightly'} profile
+ * @property {string[]} changedFiles
+ * @property {string} artifactsDir
+ * @property {'legacy' | 'hybrid' | 'strict'} contractsMode
+ * @property {boolean} skipQuickSyntax
+ * @property {boolean} skipLintTypecheck
+ * @property {(stepId: any, command: any, args: any, opts: any) => Promise<any>} exec
+ * @property {Function} commandExistsFn
+ */
+/**
+ * @param {CollectStaticFindingsOptions} options
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ *     telemetry: Record<string, any>;
+ * }>}
  */
 export async function collectStaticFindings(options) {
     /** @type {RawFinding[]} */
     const findings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
 
     const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
-    const exists = options.commandExistsFn || (async binary => commandExists(binary));
+    const exists = options.commandExistsFn || (async (/** @type {string} */ binary) => commandExists(binary));
 
-    const telemetry = {
+    const telemetry = /** @type {any} */ ({
         profile: options.profile,
         changed_files_count: options.changedFiles.length,
         gates: {
@@ -350,11 +364,11 @@ export async function collectStaticFindings(options) {
             typecheck_ok: null,
             depgraph_ok: null,
         },
-    };
+    });
 
     const changedJsFiles = options.changedFiles
-        .filter(file => /\.(js|mjs|cjs)$/.test(file))
-        .filter(file => fs.existsSync(file));
+        .filter((file) => /\.(js|mjs|cjs)$/.test(file))
+        .filter((file) => fs.existsSync(file));
 
     if (!options.skipQuickSyntax && options.profile === 'quick' && changedJsFiles.length > 0) {
         for (const file of changedJsFiles) {
@@ -385,7 +399,7 @@ export async function collectStaticFindings(options) {
         'static.forbidden',
         'npm',
         ['run', 'check:forbidden', '--', '--json', '--contracts-mode', contractsMode, '--parity-mode'],
-        { timeoutMs: 90000, acceptExitCodes: [0, 2] }
+        { timeoutMs: 90000, acceptExitCodes: [0, 2] },
     );
     const forbiddenOutput = `${forbidden.stdout}\n${forbidden.stderr}`;
     const forbiddenPayload = parseJsonFromMixedOutput(forbiddenOutput);
@@ -474,7 +488,7 @@ export async function collectStaticFindings(options) {
             'static.madge',
             'npx',
             ['madge', '--circular', '--extensions', 'js,mjs,cjs', '--json', '--exclude', '^dashboard-ui/dist/', 'src/'],
-            { timeoutMs: 300000, acceptExitCodes: [0, 1] }
+            { timeoutMs: 300000, acceptExitCodes: [0, 1] },
         );
         const madgeFindings = parseMadgeOutput(`${madge.stdout}\n${madge.stderr}`);
         telemetry.gates.depgraph_ok = madgeFindings.length === 0 && madge.ok;
@@ -494,7 +508,7 @@ export async function collectStaticFindings(options) {
                 'static.depcruise',
                 'depcruise',
                 ['--config', '.dependency-cruiser.mjs', 'src', '--output-type', 'json'],
-                { timeoutMs: 300000, acceptExitCodes: [0, 2] }
+                { timeoutMs: 300000, acceptExitCodes: [0, 2] },
             );
             if (!depcruise.ok) {
                 warnings.push({
@@ -538,7 +552,7 @@ export async function collectStaticFindings(options) {
                 '--ignore',
                 '**/dist/**,**/*.min.js,**/*.spec.js,tests/**',
             ],
-            { timeoutMs: 300000, acceptExitCodes: [0, 1] }
+            { timeoutMs: 300000, acceptExitCodes: [0, 1] },
         );
         if (!jscpd.ok) {
             warnings.push({

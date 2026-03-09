@@ -222,7 +222,7 @@ mv src/shared/ipc src/shared/nerv
 ### **Fase 2: Delete redundante**
 
 ```bash
-rm -rf src/nerv/envelopes  # Protocolo inferior deletado
+rm -rf src/nerv/envelopes # Protocolo inferior deletado
 ```
 
 ### **Fase 3: Unificação de imports**

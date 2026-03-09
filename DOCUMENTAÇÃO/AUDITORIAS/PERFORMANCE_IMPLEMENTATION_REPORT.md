@@ -48,8 +48,8 @@ const os = require('os');
 const { log } = require('./logger');
 
 /**
- * [P9.1] PERFORMANCE: Heap monitoring using v8.getHeapStatistics()
- * Provides real-time visibility into memory usage to prevent OOM crashes
+ * [P9.1] PERFORMANCE: Heap monitoring using v8.getHeapStatistics() Provides real-time visibility into memory usage to
+ * prevent OOM crashes
  */
 function getHeapStats() {
   const heap = v8.getHeapStatistics();
@@ -179,10 +179,10 @@ curl http://localhost:3008/api/health-metrics
 # Exemplo de resposta
 {
   "heap": {
-    "heap_used_mb": 45,
-    "heap_total_mb": 60,
-    "heap_limit_mb": 2048,
-    "heap_usage_percent": "2.20"
+  "heap_used_mb": 45,
+  "heap_total_mb": 60,
+  "heap_limit_mb": 2048,
+  "heap_usage_percent": "2.20"
   },
   "cpu": { "cpu_count": 8, "load_average_1m": "1.23" },
   "memory": { "total_memory_mb": 16384, "used_memory_mb": 8192 }
@@ -324,7 +324,7 @@ async function scanQueue() {
       const files = listTaskFiles();
 
       // [P9.7] Apply p-limit to control concurrency
-      const results = await Promise.all(files.map(file => limit(() => loadTask(file))));
+      const results = await Promise.all(files.map((file) => limit(() => loadTask(file))));
 
       // Filtra nulos (falhas de leitura) e atualiza o estado global
       globalQueueCache = results.filter(Boolean);
@@ -987,13 +987,13 @@ curl http://localhost:3008/api/health-metrics
 ```javascript
 // Simulate slow decision (4s - OK)
 policyEngine.evaluateTasks = async () => {
-  await new Promise(r => setTimeout(r, 4000));
+  await new Promise((r) => setTimeout(r, 4000));
   return { decisions: [] };
 };
 
 // Simulate stuck decision (6s - TIMEOUT)
 policyEngine.evaluateTasks = async () => {
-  await new Promise(r => setTimeout(r, 6000));
+  await new Promise((r) => setTimeout(r, 6000));
   return { decisions: [] };
 };
 
@@ -1005,7 +1005,7 @@ policyEngine.evaluateTasks = async () => {
 ```bash
 # Create 100 test tasks
 for i in {1..100}; do
-    echo '{"id":"task-'$i'","status":"PENDING"}' > fila/task-$i.json
+  echo '{"id":"task-'$i'","status":"PENDING"}' > fila/task-$i.json
 done
 
 # Monitor I/O

@@ -168,13 +168,13 @@ async function shutdown(signal, bootContext) {
     if (activeMissions.length > 0 || activeTransactions.length > 0) {
       log(
         'WARN',
-        `[SHUTDOWN] Operações críticas em andamento: ${activeMissions.length} missões, ${activeTransactions.length} transações`
+        `[SHUTDOWN] Operações críticas em andamento: ${activeMissions.length} missões, ${activeTransactions.length} transações`,
       );
 
       // Aguardar conclusão (timeout 30s)
       await Promise.race([
         waitForCriticalOps(bootContext),
-        new Promise(resolve => setTimeout(resolve, 30000)),
+        new Promise((resolve) => setTimeout(resolve, 30000)),
       ]);
     }
   } catch (err) {
@@ -239,7 +239,7 @@ export function readiness(req, res) {
   const runtime = app.locals.runtimeReadiness || {};
   const required = app.locals.requiredReadiness || [];
 
-  const missing = required.filter(key => !runtime[key]);
+  const missing = required.filter((key) => !runtime[key]);
 
   if (missing.length > 0) {
     log('WARN', `[HEALTH] Readiness check falhou: faltando ${missing.join(', ')}`);
@@ -354,7 +354,7 @@ async function waitForChromeProxyWithRetry(nerv, maxRetries = 3) {
       const timeout = 10000 * Math.pow(1.5, attempt - 1); // 10s, 15s, 22.5s
       log(
         'INFO',
-        `[BOOT] Aguardando Chrome Proxy (tentativa ${attempt}/${maxRetries}, timeout=${timeout}ms)`
+        `[BOOT] Aguardando Chrome Proxy (tentativa ${attempt}/${maxRetries}, timeout=${timeout}ms)`,
       );
 
       await waitForChromeProxy(nerv, timeout);
@@ -366,7 +366,7 @@ async function waitForChromeProxyWithRetry(nerv, maxRetries = 3) {
         throw err;
       }
       log('WARN', `[BOOT] Chrome Proxy timeout, tentando novamente... (${attempt}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 2s entre retries
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // 2s entre retries
     }
   }
 }

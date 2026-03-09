@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // Mapeamento: padrão antigo -> quantos níveis subir
-const correcoes = {
+const correcoes = /** @type {Record<string, string>} */ ({
     'tests/unit/core': '../../../',
     'tests/unit/infra': '../../../',
     'tests/unit/driver': '../../../',
@@ -22,8 +22,12 @@ const correcoes = {
     'tests/regression': '../../',
     'tests/manual': '../../',
     'tests/helpers': '../../',
-};
+});
 
+/**
+ * @param {string} caminhoArquivo
+ * @returns {boolean | undefined}
+ */
 function corrigirArquivo(caminhoArquivo) {
     const conteudo = fs.readFileSync(caminhoArquivo, 'utf-8');
     let alterado = false;

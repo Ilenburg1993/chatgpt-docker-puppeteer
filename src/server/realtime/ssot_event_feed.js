@@ -3,9 +3,11 @@ import { log } from '#core/logger';
 import { getDb } from '#infra/db/sqlite';
 import { taskRowToListItem } from '../api/utils/task_views.js';
 
+/** @type {any} */
 let _timer = null;
 let _running = false;
 let _stopped = false;
+/** @type {any} */
 let _lastEventId = null;
 let _lastErrorLogAtMs = 0;
 let _errorCount = 0;
@@ -13,17 +15,18 @@ let _errorCount = 0;
 /**
  * @typedef {object} TickOptions
  * @property {object} socketHub - Instância do SocketHub para emissão de eventos
- * @property {number} [batchLimit=500] - Número máximo de eventos por lote
+ * @property {number} [batchLimit=500] - Número máximo de eventos por lote. Default is `500`
  */
 
 /**
  * @typedef {object} StartOptions
  * @property {object} socketHub - Instância do SocketHub para emissão de eventos
- * @property {number} [intervalMs=1000] - Intervalo em ms entre verificações (aumentado de 250ms para reduzir sobrecarga)
- * @property {number} [batchLimit=500] - Número máximo de eventos por lote
+ * @property {number} [intervalMs=1000] - Intervalo em ms entre verificações (aumentado de 250ms para reduzir
+ *   sobrecarga). Default is `1000`
+ * @property {number} [batchLimit=500] - Número máximo de eventos por lote. Default is `500`
  */
 
-function _asInt(raw, fallback) {
+function _asInt(/** @type {any} */ raw, /** @type {any} */ fallback) {
     const n = Number(raw);
     return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
@@ -35,7 +38,7 @@ function _isCompatEmitEnabled() {
     return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
 
-function _fetchMissionCounts(db, missionIds) {
+function _fetchMissionCounts(/** @type {any} */ db, /** @type {any} */ missionIds) {
     if (!missionIds || missionIds.length === 0) return {};
 
     // Otimização: Uma única query para buscar counts de todas as missões ativas
@@ -62,13 +65,13 @@ function _fetchMissionCounts(db, missionIds) {
             WHERE m.id IN (${missionIds.map(() => '?').join(',')})
             AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.mission_id = m.id)
             GROUP BY m.id
-        `
+        `,
         )
         .all(...missionIds, ...missionIds);
 
     /** @type {Record<string, any>} */
     const out = {};
-    for (const r of rows) {
+    for (const /** @type {any} */ r of rows) {
         const mid = String(r.mission_id);
         if (!out[mid]) {
             out[mid] = {
@@ -102,26 +105,26 @@ function _fetchMissionCounts(db, missionIds) {
     return out;
 }
 
-function _safeParsePayloadJson(raw) {
+function _safeParsePayloadJson(/** @type {any} */ raw) {
     try {
         return raw ? JSON.parse(String(raw)) : {};
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return raw ?? {};
     }
 }
 
-function _getInitialLastEventId(db, { fromStart = false } = {}) {
+function _getInitialLastEventId(/** @type {any} */ db, { fromStart = false } = {}) {
     if (fromStart) return 0;
     try {
         return Number(db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM events').get()?.id) || 0;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return 0;
     }
 }
 
 /**
- * Executa um ciclo de polling de eventos SSOT e os emite via Socket.io.
- * Busca novos eventos no banco de dados e os envia para clientes conectados.
+ * Executa um ciclo de polling de eventos SSOT e os emite via Socket.io. Busca novos eventos no banco de dados e os
+ * envia para clientes conectados.
  *
  * @param {TickOptions} options - Opções do ciclo de polling
  * @returns {Promise<void>}
@@ -134,7 +137,7 @@ async function _tick(options) {
     _running = true;
 
     try {
-        const io = socketHub?.getIO?.();
+        const io = /** @type {any} */ (socketHub)?.getIO?.();
         if (!io) {
             return;
         }
@@ -152,7 +155,7 @@ async function _tick(options) {
                 WHERE id > ?
                 ORDER BY id ASC
                 LIMIT ?
-            `
+            `,
             )
             .all(_lastEventId, Math.max(1, Math.min(Number(batchLimit) || 500, 2000)));
 
@@ -160,7 +163,8 @@ async function _tick(options) {
             return;
         }
 
-        const lastId = Number(events[events.length - 1]?.id) || _lastEventId;
+        /** @type {any} */
+        const lastId = Number(/** @type {any} */ (events[events.length - 1])?.id) || _lastEventId;
         _lastEventId = lastId;
 
         /** @type {Set<string>} */
@@ -169,19 +173,20 @@ async function _tick(options) {
         const missionIds = new Set();
 
         for (const e of events) {
-            if (e.entity_type === 'task') taskIds.add(String(e.entity_id));
-            if (e.entity_type === 'mission') missionIds.add(String(e.entity_id));
+            if (/** @type {any} */ (e).entity_type === 'task') taskIds.add(String(/** @type {any} */ (e).entity_id));
+            if (/** @type {any} */ (e).entity_type === 'mission')
+                missionIds.add(String(/** @type {any} */ (e).entity_id));
         }
 
-        const normalizedEvents = events.map(e => ({
-            id: e.id,
-            entity_type: e.entity_type,
-            entity_id: e.entity_id,
-            ts_ms: e.ts_ms,
-            actor_type: e.actor_type,
-            actor_id: e.actor_id,
-            event_type: e.event_type,
-            payload: _safeParsePayloadJson(e.payload_json),
+        const normalizedEvents = events.map((e) => ({
+            id: /** @type {any} */ (e).id,
+            entity_type: /** @type {any} */ (e).entity_type,
+            entity_id: /** @type {any} */ (e).entity_id,
+            ts_ms: /** @type {any} */ (e).ts_ms,
+            actor_type: /** @type {any} */ (e).actor_type,
+            actor_id: /** @type {any} */ (e).actor_id,
+            event_type: /** @type {any} */ (e).event_type,
+            payload: _safeParsePayloadJson(/** @type {any} */ (e).payload_json),
         }));
 
         io.to('dashboards').emit('ssot:events_batch', {
@@ -211,14 +216,14 @@ async function _tick(options) {
                         started_at_ms, completed_at_ms, failed_at_ms, paused_at_ms, cancelled_at_ms
                     FROM tasks
                     WHERE id IN (${placeholders})
-                `
+                `,
                 )
                 .all(...ids);
 
-            const updates = rows.map(r => {
-                const task = taskRowToListItem(r);
+            const updates = rows.map((r) => {
+                const task = taskRowToListItem(/** @type {any} */ (r));
                 return {
-                    taskId: r.id,
+                    taskId: /** @type {any} */ (r).id,
                     task,
                     // Legacy compatibility: keep a minimal `state` for consumers that only
                     // care about status transitions.
@@ -250,24 +255,24 @@ async function _tick(options) {
                     SELECT *
                     FROM missions
                     WHERE id IN (${placeholders})
-                `
+                `,
                 )
                 .all(...ids);
 
             const counts = _fetchMissionCounts(db, ids);
-            const updates = rows.map(r => ({
-                missionId: r.id,
+            const updates = rows.map((r) => ({
+                missionId: /** @type {any} */ (r).id,
                 mission: {
-                    id: r.id,
-                    title: r.title,
-                    description: r.description,
-                    status: r.status,
-                    autonomy_mode: r.autonomy_mode,
-                    created_at_ms: r.created_at_ms,
-                    updated_at_ms: r.updated_at_ms,
-                    started_at_ms: r.started_at_ms ?? null,
-                    completed_at_ms: r.completed_at_ms ?? null,
-                    counts: counts[String(r.id)] || null,
+                    id: /** @type {any} */ (r).id,
+                    title: /** @type {any} */ (r).title,
+                    description: /** @type {any} */ (r).description,
+                    status: /** @type {any} */ (r).status,
+                    autonomy_mode: /** @type {any} */ (r).autonomy_mode,
+                    created_at_ms: /** @type {any} */ (r).created_at_ms,
+                    updated_at_ms: /** @type {any} */ (r).updated_at_ms,
+                    started_at_ms: /** @type {any} */ (r).started_at_ms ?? null,
+                    completed_at_ms: /** @type {any} */ (r).completed_at_ms ?? null,
+                    counts: counts[String(/** @type {any} */ (r).id)] || null,
                 },
             }));
 
@@ -284,13 +289,14 @@ async function _tick(options) {
                 }
             }
         }
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         _errorCount += 1;
         const now = Date.now();
         const minIntervalMs = 5000;
         if (now - _lastErrorLogAtMs >= minIntervalMs) {
             _lastErrorLogAtMs = now;
-            log('ERROR', `[SSOTEventFeed] tick failed (count=${_errorCount}): ${err?.message || String(err)}`);
+            log('ERROR', `[SSOTEventFeed] tick failed (count=${_errorCount}): ${_e?.message || String(_e)}`);
         }
     } finally {
         _running = false;
@@ -298,13 +304,13 @@ async function _tick(options) {
 }
 
 /**
- * Inicia o feed de eventos SSOT (Single Source of Truth) em tempo real.
- * Monitora mudanças no banco de dados SQLite e emite eventos via Socket.io para dashboards conectados.
+ * Inicia o feed de eventos SSOT (Single Source of Truth) em tempo real. Monitora mudanças no banco de dados SQLite e
+ * emite eventos via Socket.io para dashboards conectados.
  *
  * @param {StartOptions} options - Opções de configuração do feed
+ * @returns {void}
  * @throws {Error} Se socketHub não for fornecido
  * @sideEffects - Inicia timer de polling, registra listeners de Socket.io, emite eventos 'ssot:events_batch' e 'mission:updates_batch'
- * @returns {void}
  */
 function start(options) {
     const { socketHub, intervalMs = 1000, batchLimit = 500 } = options || {};
@@ -324,7 +330,7 @@ function start(options) {
     const lim = Math.max(10, Math.min(_asInt(batchLimit, 500), 2000));
 
     _timer = setInterval(() => {
-        void _tick({ socketHub, batchLimit: lim }).catch(err => {
+        void _tick({ socketHub, batchLimit: lim }).catch((err) => {
             _errorCount += 1;
             const now = Date.now();
             const minIntervalMs = 5000;
@@ -332,7 +338,7 @@ function start(options) {
                 _lastErrorLogAtMs = now;
                 log(
                     'ERROR',
-                    `[SSOTEventFeed] tick unhandled error (count=${_errorCount}): ${err?.message || String(err)}`
+                    `[SSOTEventFeed] tick unhandled error (count=${_errorCount}): ${err?.message || String(err)}`,
                 );
             }
         });
@@ -344,11 +350,11 @@ function start(options) {
 }
 
 /**
- * Para o feed de eventos SSOT e limpa todos os recursos associados.
- * Interrompe o polling de eventos, cancela timers e marca o feed como parado.
+ * Para o feed de eventos SSOT e limpa todos os recursos associados. Interrompe o polling de eventos, cancela timers e
+ * marca o feed como parado.
  *
- * @sideEffects - Cancela timer de polling, limpa estado interno, emite log de parada
  * @returns {void}
+ * @sideEffects - Cancela timer de polling, limpa estado interno, emite log de parada
  */
 function stop() {
     _stopped = true;

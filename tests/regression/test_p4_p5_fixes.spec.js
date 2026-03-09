@@ -12,16 +12,16 @@ const colors = {
     cyan: '\x1b[36m',
 };
 
-function log(type, message) {
+function log(/** @type {any} */ type, /** @type {any} */ message) {
     const prefix = type === 'SUCCESS' ? '✅' : type === 'FAIL' ? '❌' : '>';
     console.log(`${prefix} ${message}`);
 }
 
-function header(text) {
+function header(/** @type {any} */ text) {
     console.log(`\n${colors.cyan}=== ${text} ===${colors.reset}`);
 }
 
-function summary(text) {
+function summary(/** @type {any} */ text) {
     console.log(`\n${colors.blue}╔══════════════════════════════════════════════════════════════╗`);
     console.log(`║${text.padEnd(62)}║`);
     console.log(`╚══════════════════════════════════════════════════════════════╝${colors.reset}`);
@@ -42,7 +42,7 @@ async function test1_StabilizerCleanup() {
         'src',
         'shared',
         'page_stability',
-        'stabilizer.js'
+        'stabilizer.js',
     );
     const content = await fs.readFile(stabilizerPath, 'utf-8');
 
@@ -65,9 +65,9 @@ async function test1_StabilizerCleanup() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -105,9 +105,9 @@ async function test2_ServerShutdown() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -149,9 +149,9 @@ async function test3_SignalGuard() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -174,7 +174,7 @@ async function test4_KernelLocking() {
         'src',
         'kernel',
         'task_runtime',
-        'task_runtime.js'
+        'task_runtime.js',
     );
     const content = await fs.readFile(taskRuntimePath, 'utf-8');
 
@@ -201,9 +201,9 @@ async function test4_KernelLocking() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -224,24 +224,24 @@ async function test5_CacheInvalidation() {
 
     // Verificar ordem dentro das funções saveTask e deleteTask
     const saveTaskFuncMatch = content.match(
-        /export const saveTask\s*=\s*async function\s*\(task\)\s*\{([\s\S]*?)\n\};/
+        /export const saveTask\s*=\s*async function\s*\(task\)\s*\{([\s\S]*?)\n\};/,
     );
     const deleteTaskFuncMatch = content.match(
-        /export const deleteTask\s*=\s*async function\s*\(id\)\s*\{([\s\S]*?)\n\};/
+        /export const deleteTask\s*=\s*async function\s*\(id\)\s*\{([\s\S]*?)\n\};/,
     );
 
     let saveTaskOrderCorrect = false;
     let deleteTaskOrderCorrect = false;
 
     if (saveTaskFuncMatch) {
-        const funcBody = saveTaskFuncMatch[1];
+        const funcBody = saveTaskFuncMatch[1] ?? '';
         const markDirtyIndex = funcBody.indexOf('markDirty');
         const saveTaskIndex = funcBody.indexOf('taskStore.saveTask');
         saveTaskOrderCorrect = markDirtyIndex > 0 && markDirtyIndex < saveTaskIndex;
     }
 
     if (deleteTaskFuncMatch) {
-        const funcBody = deleteTaskFuncMatch[1];
+        const funcBody = deleteTaskFuncMatch[1] ?? '';
         const markDirtyIndex = funcBody.indexOf('markDirty');
         const deleteTaskIndex = funcBody.indexOf('taskStore.deleteTask');
         deleteTaskOrderCorrect = markDirtyIndex > 0 && markDirtyIndex < deleteTaskIndex;
@@ -262,9 +262,9 @@ async function test5_CacheInvalidation() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -284,7 +284,7 @@ async function test6_ConcurrentSignals() {
     let _shutdownInProgress = false;
     let shutdownCalls = 0;
 
-    const gracefulShutdown = async signal => {
+    const gracefulShutdown = async (/** @type {any} */ signal) => {
         if (_shutdownInProgress) {
             log('INFO', `${signal} ignorado (guard funcionou)`);
             return false;
@@ -294,7 +294,7 @@ async function test6_ConcurrentSignals() {
         shutdownCalls++;
 
         // Simula shutdown delay
-        await new Promise(r => {
+        await new Promise((r) => {
             setTimeout(r, 100);
         });
         return true;
@@ -310,8 +310,8 @@ async function test6_ConcurrentSignals() {
         gracefulShutdown('SIGTERM'),
     ]);
 
-    const successCalls = results.filter(r => r).length;
-    const blockedCalls = results.filter(r => !r).length;
+    const successCalls = results.filter((r) => r).length;
+    const blockedCalls = results.filter((r) => !r).length;
 
     log('INFO', `Shutdowns executados: ${successCalls}`);
     log('INFO', `Shutdowns bloqueados: ${blockedCalls}`);
@@ -320,12 +320,12 @@ async function test6_ConcurrentSignals() {
         { name: 'Apenas 1 shutdown executou', pass: shutdownCalls === 1 },
         { name: '1 chamada retornou true', pass: successCalls === 1 },
         { name: '4 chamadas bloqueadas', pass: blockedCalls === 4 },
-        { name: 'Flag ativada', pass: _shutdownInProgress === true },
+        { name: 'Flag ativada', pass: /** @type {boolean} */ (_shutdownInProgress) === true },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -347,7 +347,7 @@ async function test7_OptimisticLock() {
         state: 'ACTIVE',
     };
 
-    const applyTransition = (expectedState, newState) => {
+    const applyTransition = (/** @type {any} */ expectedState, /** @type {any} */ newState) => {
         // Simula validação (delay)
         const actualState = task.state;
 
@@ -365,7 +365,7 @@ async function test7_OptimisticLock() {
     try {
         const result = applyTransition('ACTIVE', 'COMPLETED');
         log('SUCCESS', 'Transição bem-sucedida');
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         log('FAIL', `Erro inesperado: ${e.message}`);
         return false;
     }
@@ -382,7 +382,7 @@ async function test7_OptimisticLock() {
         applyTransition(expectedState, 'ACTIVE');
         log('FAIL', 'Race NÃO detectada (deveria falhar)');
         return false;
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         if (e.message.includes('[RACE]')) {
             log('SUCCESS', `Race detectada corretamente: ${e.message}`);
         } else {
@@ -423,7 +423,7 @@ async function runAllTests() {
     console.log(results.test7 ? '✅' : '❌', 'Optimistic Lock:', results.test7 ? 'PASSOU' : 'FALHOU');
 
     const totalTests = Object.keys(results).length;
-    const passedTests = Object.values(results).filter(r => r).length;
+    const passedTests = Object.values(results).filter((r) => r).length;
 
     console.log('');
     console.log(`${colors.cyan}📊 Score: ${passedTests}/${totalTests} testes passaram${colors.reset}`);
@@ -444,12 +444,10 @@ async function runAllTests() {
         console.log(`${colors.red}⚠️  Alguns testes falharam. Revise as correções.${colors.reset}`);
         process.exit(1);
     }
-
-    console.log('');
 }
 
 // Executa
-runAllTests().catch(err => {
+runAllTests().catch((err) => {
     console.error(`${colors.red}❌ Erro fatal nos testes:`, err.message + colors.reset);
     console.error(err.stack);
     process.exit(1);

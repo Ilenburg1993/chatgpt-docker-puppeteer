@@ -60,7 +60,7 @@ import { ollama } from './tools/ollama/client.mjs';
 const code = await ollama.generate(
   'Write a JavaScript function to validate email',
   'qwen3-coder-next',
-  { temperature: 0.3, num_predict: 200 }
+  { temperature: 0.3, num_predict: 200 },
 );
 
 console.log(code);
@@ -306,13 +306,13 @@ cat .env.local | grep OLLAMA_CLOUD
 
    ```bash
    # Em .env.local
-   OLLAMA_GENERATE_TIMEOUT=120000  # 2 minutos
+   OLLAMA_GENERATE_TIMEOUT=120000 # 2 minutos
    ```
 
 2. **Use modelo local como fallback:**
    ```bash
    # Em .env.local
-   OLLAMA_CLOUD_ENABLED=false  # Temporariamente
+   OLLAMA_CLOUD_ENABLED=false # Temporariamente
    ```
 
 ---
@@ -403,7 +403,7 @@ const code = await ollama.generate('Write a factorial function in Python', 'qwen
 const explanation = await ollama.generate(
   'Explain recursion in simple terms',
   'qwen3-next:80b-cloud',
-  { temperature: 0.7, num_predict: 150 }
+  { temperature: 0.7, num_predict: 150 },
 );
 
 // Embedding (RAG)

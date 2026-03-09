@@ -1,12 +1,22 @@
 // @ts-check
 import path from 'node:path';
 
+/**
+ * @param {string} filePath
+ * @param {string} targetPath
+ * @returns {string}
+ */
 function getImportPath(filePath, targetPath) {
     const relativePath = path.relative(path.dirname(filePath), targetPath);
     const normalizedPath = relativePath.replace(/\\/g, '/');
     return normalizedPath.startsWith('.') ? normalizedPath : `./${normalizedPath}`;
 }
 
+/**
+ * @param {any} fileInfo
+ * @param {any} api
+ * @returns {any}
+ */
 module.exports = function (fileInfo, api) {
     const j = api.jscodeshift;
     const root = j(fileInfo.source);
@@ -28,7 +38,7 @@ module.exports = function (fileInfo, api) {
 
     // Replace string literals
     Object.entries(CONNECTION_MODES_MAP).forEach(([literal, constant]) => {
-        root.find(j.Literal, { value: literal }).forEach(path => {
+        root.find(j.Literal, { value: literal }).forEach((/** @type {any} */ path) => {
             // Skip if in object key position
             const parent = path.parent;
             if (parent.value.type === 'Property' && parent.value.key === path.value) {
@@ -77,7 +87,7 @@ module.exports = function (fileInfo, api) {
                 j.objectPattern([
                     j.property('init', j.identifier('CONNECTION_MODES'), j.identifier('CONNECTION_MODES')),
                 ]),
-                j.callExpression(j.identifier('require'), [j.literal(importPath)])
+                j.callExpression(j.identifier('require'), [j.literal(importPath)]),
             ),
         ]);
 

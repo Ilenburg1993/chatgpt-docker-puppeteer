@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.tests.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.strict.tests.legacy.tsbuildinfo",
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "useUnknownInCatchVariables": true,
+    "noEmit": true
+  },
+  "include": [
+    "../../../tests/legacy/**/*",
+    "../../../tests/nightly/**/*",
+    "../../../tests/scripts/**/*",
+    "../../../tests/support/**/*",
+    "../../../src/types/**/*.d.ts"
+  ]
+}

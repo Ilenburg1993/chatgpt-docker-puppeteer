@@ -58,7 +58,7 @@ function _fetchMissionCounts(db, missionIds) {
         FROM tasks
         WHERE mission_id IN (${placeholders})
         GROUP BY mission_id, stage, status
-    `
+    `,
     )
     .all(...missionIds);
 }

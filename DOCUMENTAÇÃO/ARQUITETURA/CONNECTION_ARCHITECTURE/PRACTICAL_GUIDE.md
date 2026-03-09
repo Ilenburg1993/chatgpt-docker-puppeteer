@@ -135,7 +135,7 @@ bash wsl-chrome-integration.sh validate
 
 ```bash
 # Container
-unset NODE_OPTIONS  # Evitar flags duplicadas
+unset NODE_OPTIONS # Evitar flags duplicadas
 CHROME_HOST=host.docker.internal node scripts/chrome-proxy-service.js > /tmp/proxy.log 2>&1 &
 
 # Ver logs
@@ -322,7 +322,7 @@ pm2 list | grep proxy
    ```bash
    # Erro típico
    Error: illegal value for flag --max-old-space-size=6144--max-old-space-size=6144
-
+   
    # Solução: Limpar NODE_OPTIONS
    unset NODE_OPTIONS
    node scripts/chrome-proxy-service.js &
@@ -345,7 +345,7 @@ pm2 list | grep proxy
    ```bash
    # Erro
    Error: Cannot find module 'axios'
-
+   
    # Solução
    npm install axios
    ```
@@ -387,7 +387,7 @@ Target closed.
    ```bash
    # Container: Testar latência
    ping -c 5 host.docker.internal
-
+   
    # Se alta latência (>50ms), reiniciar Docker Desktop
    ```
 
@@ -422,7 +422,7 @@ curl -s http://localhost:9224/json/version | jq .webSocketDebuggerUrl
 
 ```bash
 # 1. Verificar IP público do proxy
-docker exec -it <container_id> hostname -I
+docker exec -it -I < container_id > hostname
 # Anote primeiro IP (ex: 172.17.0.2)
 
 # 2. Reiniciar proxy com IP explícito
@@ -466,7 +466,7 @@ pm2 logs chrome-proxy-service --lines 100
 pm2 logs chrome-proxy-service --err
 
 # Manual
-tail -f /tmp/proxy.log | grep '"level":50'  # Level 50 = ERROR
+tail -f /tmp/proxy.log | grep '"level":50' # Level 50 = ERROR
 ```
 
 ### Health Checks Automatizados
@@ -478,20 +478,20 @@ tail -f /tmp/proxy.log | grep '"level":50'  # Level 50 = ERROR
 # monitor-chrome-stack.sh
 
 while true; do
-    echo "=== $(date) ==="
+  echo "=== $(date) ==="
 
-    # 1. Chrome no Windows
-    echo -n "Chrome (Windows): "
-    curl -sf -H "Host: localhost" http://host.docker.internal:9225/json/version >/dev/null 2>&1 && \
-        echo "✅ OK" || echo "❌ DOWN"
+  # 1. Chrome no Windows
+  echo -n "Chrome (Windows): "
+  curl -sf -H "Host: localhost" http://host.docker.internal:9225/json/version > /dev/null 2>&1 \
+    && echo "✅ OK" || echo "❌ DOWN"
 
-    # 2. Proxy no Container
-    echo -n "Proxy (Container): "
-    curl -sf http://localhost:9224/health >/dev/null 2>&1 && \
-        echo "✅ OK" || echo "❌ DOWN"
+  # 2. Proxy no Container
+  echo -n "Proxy (Container): "
+  curl -sf http://localhost:9224/health > /dev/null 2>&1 \
+    && echo "✅ OK" || echo "❌ DOWN"
 
-    echo ""
-    sleep 30
+  echo ""
+  sleep 30
 done
 ```
 
@@ -532,8 +532,8 @@ chmod +x monitor-chrome-stack.sh
 STATUS=$(curl -sf http://localhost:9224/health | jq -r .status)
 
 if [ "$STATUS" != "ok" ]; then
-    echo "⚠️ ALERTA: Proxy não está saudável!"
-    # Enviar email, Slack, etc.
+  echo "⚠️ ALERTA: Proxy não está saudável!"
+  # Enviar email, Slack, etc.
 fi
 ```
 
@@ -629,7 +629,7 @@ const puppeteer = require('puppeteer');
 
 (async () => {
   // Conectar via proxy
-  const version = await fetch('http://localhost:9224/json/version').then(r => r.json());
+  const version = await fetch('http://localhost:9224/json/version').then((r) => r.json());
   const browser = await puppeteer.connect({
     browserWSEndpoint: version.webSocketDebuggerUrl,
   });
@@ -687,20 +687,20 @@ pm2 status
 **Proxy** (`scripts/chrome-proxy-service.js`):
 
 ```bash
-CHROME_HOST=host.docker.internal  # Host do Chrome
-CHROME_PORT=9225                  # Porta do Chrome
-CHROME_PROXY_PORT=9224            # Porta do proxy
-PUBLIC_IP=172.17.0.2              # IP público do proxy (auto-detect)
-LOG_LEVEL=info                    # info | debug | warn | error
-WS_IDLE_TIMEOUT_MS=60000          # Timeout WebSocket idle (ms)
+CHROME_HOST=host.docker.internal # Host do Chrome
+CHROME_PORT=9225                 # Porta do Chrome
+CHROME_PROXY_PORT=9224           # Porta do proxy
+PUBLIC_IP=172.17.0.2             # IP público do proxy (auto-detect)
+LOG_LEVEL=info                   # info | debug | warn | error
+WS_IDLE_TIMEOUT_MS=60000         # Timeout WebSocket idle (ms)
 ```
 
 **Puppeteer** (debug):
 
 ```bash
-DEBUG=puppeteer:*                 # Logs detalhados
-PUPPETEER_PRODUCT=chrome          # chrome | firefox
-PUPPETEER_SKIP_DOWNLOAD=true      # Não baixar Chromium bundled
+DEBUG=puppeteer:*            # Logs detalhados
+PUPPETEER_PRODUCT=chrome     # chrome | firefox
+PUPPETEER_SKIP_DOWNLOAD=true # Não baixar Chromium bundled
 ```
 
 ### Arquivos de Configuração

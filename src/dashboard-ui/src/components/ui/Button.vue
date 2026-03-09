@@ -7,12 +7,12 @@ const props = defineProps({
     variant: {
         type: String,
         default: 'primary',
-        validator: v => ['primary', 'secondary', 'ghost', 'danger', 'outline'].includes(v),
+        validator: (v) => ['primary', 'secondary', 'ghost', 'danger', 'outline'].includes(v),
     },
     size: {
         type: String,
         default: 'md',
-        validator: v => ['sm', 'md', 'lg'].includes(v),
+        validator: (v) => ['sm', 'md', 'lg'].includes(v),
     },
     disabled: {
         type: Boolean,
@@ -51,12 +51,12 @@ const buttonVariants = cva(
             variant: 'primary',
             size: 'md',
         },
-    }
+    },
 );
 
 const buttonClass = computed(() => cn(buttonVariants({ variant: props.variant, size: props.size }), props.class));
 
-const handleClick = event => {
+const handleClick = (event) => {
     if (!props.disabled && !props.loading) {
         emit('click', event);
     }

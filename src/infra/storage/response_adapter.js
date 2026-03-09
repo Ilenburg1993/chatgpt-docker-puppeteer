@@ -1,20 +1,21 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { saveResponseV2, loadResponseV2 } from './response_store_v2.js';
 import * as logger from '#core/logger';
+import { ROOT } from '#infra/fs/paths';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { ROOT } from '#infra/fs/paths';
+import { loadResponseV2, saveResponseV2 } from './response_store_v2.js';
 
 const RESPONSE_DIR = path.join(ROOT, 'respostas');
 
+/** @typedef {any} SaveResponseTask */
 /**
  * Salva response (detecta V1 ou V2 automaticamente)
  *
  * @param {string} taskId - Task ID
- * @param {string|Object} response - Response V1 (string) ou V2 (object)
- * @param {Object} task - Task object (para preencher result)
- * @param {string=} attemptId - attempt/correlation id (opcional)
- * @returns {Promise<Object>} - { storage, format }
+ * @param {string | object} response - Response V1 (string) ou V2 (object)
+ * @param {SaveResponseTask} task - Task object (para preencher result)
+ * @param {string} [attemptId] - attempt/correlation id (opcional)
+ * @returns {Promise<any>} - { storage, format }
  */
 async function saveResponse(taskId, response, task, attemptId) {
     try {
@@ -26,37 +27,47 @@ async function saveResponse(taskId, response, task, attemptId) {
             return await saveResponseV2Format(taskId, response, task, attemptId);
         } else {
             // Response V1 (string simples) - converter para V2
-            logger.debug('[RESPONSE_ADAPTER] Response V1 detectada, convertendo para V2', {
-                taskId,
-                responseLength: typeof response === 'string' ? response.length : 0,
-            });
+            logger.debug(
+                '[RESPONSE_ADAPTER] Response V1 detectada, convertendo para V2',
+                /** @type {any} */ ({
+                    taskId,
+                    responseLength: typeof response === 'string' ? response.length : 0,
+                }),
+            );
 
-            const responseV2 = convertV1toV2(response, task);
+            const responseV2 = convertV1toV2(/** @type {any} */ (response), task);
             return await saveResponseV2Format(taskId, responseV2, task, attemptId);
         }
-    } catch (error) {
-        logger.error('[RESPONSE_ADAPTER] Erro ao salvar response', {
-            taskId,
-            error: error.message,
-            stack: error.stack,
-        });
+    } catch (/** @type {any} */ error) {
+        logger.error(
+            '[RESPONSE_ADAPTER] Erro ao salvar response',
+            /** @type {any} */ ({
+                taskId,
+                error: /** @type {any} */ (error).message,
+                stack: /** @type {any} */ (error).stack,
+            }),
+        );
         throw error;
     }
 }
 
+/** @typedef {any} SaveResponseV2FormatResponseV2 */
+/** @typedef {any} SaveResponseV2FormatTask */
 /**
  * Salva response V2 e preenche task.result
  *
- * @param {string} taskId - Task ID
- * @param {Object} responseV2 - Response V2 object
- * @param {Object} task - Task object
- * @param {string=} attemptId - attempt/correlation id (opcional)
- * @returns {Promise<Object>} - { storage, format }
  * @private
+ * @param {string} taskId - Task ID
+ * @param {SaveResponseV2FormatResponseV2} responseV2 - Response V2 object
+ * @param {SaveResponseV2FormatTask} task - Task object
+ * @param {string} [attemptId] - attempt/correlation id (opcional)
+ * @returns {Promise<any>} - { storage, format }
  */
 async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
     // Salvar em 4 formatos
-    const storage = await saveResponseV2(taskId, responseV2, { attemptId: attemptId || null, writeLegacyLatest: true });
+    const storage = /** @type {any} */ (
+        await saveResponseV2(taskId, responseV2, { attemptId: attemptId || null, writeLegacyLatest: true })
+    );
 
     // Preencher task.result V5
     if (task && task.result) {
@@ -83,25 +94,29 @@ async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
         task.result.finish_reason = 'success';
     }
 
-    logger.info('[RESPONSE_ADAPTER] Response V2 salva com sucesso', {
-        taskId,
-        formats: 4,
-        storageSize: {
-            text: responseV2.content?.text?.length || 0,
-            markdown: responseV2.content?.markdown?.length || 0,
-            html: responseV2.content?.html?.length || 0,
-        },
-    });
+    logger.info(
+        '[RESPONSE_ADAPTER] Response V2 salva com sucesso',
+        /** @type {any} */ ({
+            taskId,
+            formats: 4,
+            storageSize: {
+                text: responseV2.content?.text?.length || 0,
+                markdown: responseV2.content?.markdown?.length || 0,
+                html: responseV2.content?.html?.length || 0,
+            },
+        }),
+    );
 
     return { storage, format: 'v2' };
 }
 
+/** @typedef {any} IsResponseV2Response */
 /**
  * Detecta se response é V2 (object) ou V1 (string)
  *
- * @param {any} response - Response para verificar
- * @returns {boolean} - true se V2, false se V1
  * @private
+ * @param {IsResponseV2Response} response - Response para verificar
+ * @returns {boolean} - true se V2, false se V1
  */
 function isResponseV2(response) {
     if (!response) return false;
@@ -115,13 +130,14 @@ function isResponseV2(response) {
     );
 }
 
+/** @typedef {any} ConvertV1toV2Task */
 /**
  * Converte response V1 (string) para V2 (object)
  *
- * @param {string} responseText - Response V1 (texto plano)
- * @param {Object} task - Task object (para metadata)
- * @returns {Object} - Response V2
  * @private
+ * @param {string} responseText - Response V1 (texto plano)
+ * @param {ConvertV1toV2Task} task - Task object (para metadata)
+ * @returns {any} - Response V2
  */
 function convertV1toV2(responseText, task) {
     const text = typeof responseText === 'string' ? responseText : String(responseText || '');
@@ -162,12 +178,11 @@ function convertV1toV2(responseText, task) {
 }
 
 /**
- * Carrega response (backward compatible)
- * Tenta V2 primeiro, fallback para V1
+ * Carrega response (backward compatible) Tenta V2 primeiro, fallback para V1
  *
  * @param {string} taskId - Task ID
  * @param {string} format - Formato desejado ('text', 'markdown', 'json', 'html')
- * @returns {Promise<string|Object|null>} - Response content
+ * @returns {Promise<string | object | null>} - Response content
  */
 async function loadResponse(taskId, format) {
     format = format || 'text';
@@ -175,9 +190,9 @@ async function loadResponse(taskId, format) {
     try {
         // Tentar carregar V2
         return await loadResponseV2(taskId, format);
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         // Fallback: tentar carregar V1 (apenas .txt)
-        logger.debug('[RESPONSE_ADAPTER] V2 não encontrada, tentando V1', { taskId });
+        logger.debug('[RESPONSE_ADAPTER] V2 não encontrada, tentando V1', /** @type {any} */ ({ taskId }));
 
         if (format === 'text' || format === 'json') {
             try {
@@ -190,11 +205,14 @@ async function loadResponse(taskId, format) {
                 }
 
                 return text;
-            } catch (_) {
-                logger.warn('[RESPONSE_ADAPTER] Response não encontrada (V1 e V2)', {
-                    taskId,
-                    format,
-                });
+            } catch (/** @type {any} */ _) {
+                logger.warn(
+                    '[RESPONSE_ADAPTER] Response não encontrada (V1 e V2)',
+                    /** @type {any} */ ({
+                        taskId,
+                        format,
+                    }),
+                );
                 return null;
             }
         }
@@ -206,9 +224,9 @@ async function loadResponse(taskId, format) {
 /**
  * Escape HTML (utility)
  *
+ * @private
  * @param {string} text - Texto para escapar
  * @returns {string} - Texto escapado
- * @private
  */
 function escapeHtml(text) {
     return text
@@ -219,4 +237,4 @@ function escapeHtml(text) {
         .replace(/'/g, '&#039;');
 }
 
-export { saveResponse, loadResponse, isResponseV2, convertV1toV2 };
+export { convertV1toV2, isResponseV2, loadResponse, saveResponse };

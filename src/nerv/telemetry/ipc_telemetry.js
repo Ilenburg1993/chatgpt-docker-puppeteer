@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/telemetry/ipc_telemetry.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -33,13 +33,15 @@ function now() {
 }
 
 /**
- * Garante execução segura de handlers de telemetria.
- * Qualquer erro é isolado e ignorado.
+ * Garante execução segura de handlers de telemetria. Qualquer erro é isolado e ignorado.
+ *
+ * @param {Function} handler
+ * @param {any} payload
  */
 function safeCall(handler, payload) {
     try {
         handler(payload);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // Falha silenciosa: telemetria nunca interfere
     }
 }
@@ -49,12 +51,19 @@ function safeCall(handler, payload) {
 =========================== */
 
 /**
+ * @typedef {object} CreateIPCTelemetryConfig
+ * @property {string} [namespace]
+ * @property {boolean} [enabled]
+ * @property {number} [maxListeners]
+ */
+/**
  * Cria o sistema de telemetria do NERV.
  *
- * @param {Object} config
- * Configuração estritamente técnica (opcional):
- * - enabled: boolean
-  * @returns {any}
+ * @param {CreateIPCTelemetryConfig} config Configuração estritamente técnica (opcional):
+ *
+ *   - enabled: boolean
+ *
+ * @returns {any}
  */
 function createIPCTelemetry(config = {}) {
     const enabled = config.enabled !== false;
@@ -78,6 +87,9 @@ function createIPCTelemetry(config = {}) {
 
     /**
      * Incrementa contador técnico.
+     *
+     * @param {string} name
+     * @param {number} [value]
      */
     function incCounter(name, value = 1) {
         metrics.counters[name] = (metrics.counters[name] || 0) + value;
@@ -85,6 +97,9 @@ function createIPCTelemetry(config = {}) {
 
     /**
      * Atualiza gauge técnico.
+     *
+     * @param {string} name
+     * @param {any} value
      */
     function setGauge(name, value) {
         metrics.gauges[name] = value;
@@ -92,6 +107,8 @@ function createIPCTelemetry(config = {}) {
 
     /**
      * Registra timestamp técnico.
+     *
+     * @param {string} name
      */
     function mark(name) {
         metrics.timestamps[name] = now();
@@ -104,13 +121,10 @@ function createIPCTelemetry(config = {}) {
     /**
      * Emite um evento técnico de telemetria.
      *
-     * @param {string} type
-     * Nome do evento técnico (ex.: nerv:envelope:sent)
-     *
-     * @param {Object} [meta]
-     * Metadados técnicos opcionais (nunca semânticos)
+     * @param {string} type Nome do evento técnico (ex.: nerv:envelope:sent)
+     * @param {any} [meta] Metadados técnicos opcionais (nunca semânticos)
      */
-    function emit(type, meta = null) {
+    function emit(type, meta = undefined) {
         if (!enabled) {
             return;
         }
@@ -134,7 +148,7 @@ function createIPCTelemetry(config = {}) {
     /**
      * Subscrição passiva a eventos de telemetria.
      *
-     * @param {Function} handler
+     * @param {function} handler
      */
     function on(handler) {
         if (typeof handler !== 'function') {
@@ -154,8 +168,7 @@ function createIPCTelemetry(config = {}) {
     }
 
     /**
-     * Retorna snapshot das métricas atuais.
-     * Leitura pura, sem efeitos colaterais.
+     * Retorna snapshot das métricas atuais. Leitura pura, sem efeitos colaterais.
      */
     function stats() {
         return {
@@ -166,8 +179,7 @@ function createIPCTelemetry(config = {}) {
     }
 
     /**
-     * Reseta métricas internas.
-     * Uso permitido apenas para testes.
+     * Reseta métricas internas. Uso permitido apenas para testes.
      */
     function reset() {
         metrics.counters = Object.create(null);

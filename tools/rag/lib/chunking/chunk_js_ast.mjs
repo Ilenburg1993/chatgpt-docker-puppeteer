@@ -1,16 +1,17 @@
+// @ts-check
 import { parse } from '@babel/parser';
 import traverseModule from '@babel/traverse';
-import { chunkPlain } from './chunk_plain.mjs';
-import { estimateCharsForLines } from '../text.mjs';
 import { RAG_CHUNK_MAX_CHARS, RAG_CHUNK_TARGET_CHARS } from '../contract.mjs';
+import { estimateCharsForLines } from '../text.mjs';
+import { chunkPlain } from './chunk_plain.mjs';
 
-const traverse = typeof traverseModule === 'function' ? traverseModule : traverseModule.default;
+const traverse = typeof traverseModule === 'function' ? traverseModule : /** @type {any} */ (traverseModule).default;
 
-function buildCodeFromLines(lines) {
+function buildCodeFromLines(/** @type {any} */ lines) {
     return lines.join('\n');
 }
 
-function parserPlugins(language) {
+function parserPlugins(/** @type {any} */ language) {
     const plugins = [
         'jsx',
         'classProperties',
@@ -26,7 +27,7 @@ function parserPlugins(language) {
     return plugins;
 }
 
-function buildSymbolFromNode(node) {
+function buildSymbolFromNode(/** @type {any} */ node) {
     if (!node) return null;
     if (node.id?.name) return String(node.id.name);
     if (node.key?.name) return String(node.key.name);
@@ -34,7 +35,7 @@ function buildSymbolFromNode(node) {
     return null;
 }
 
-function readJsDocMeta(node) {
+function readJsDocMeta(/** @type {any} */ node) {
     const comments = Array.isArray(node?.leadingComments) ? node.leadingComments : [];
     for (let i = comments.length - 1; i >= 0; i--) {
         const c = comments[i];
@@ -43,7 +44,7 @@ function readJsDocMeta(node) {
         if (!raw.startsWith('*')) continue;
         const cleaned = raw
             .split('\n')
-            .map(line => line.replace(/^\s*\*\s?/, '').trimEnd())
+            .map((/** @type {any} */ line) => line.replace(/^\s*\*\s?/, '').trimEnd())
             .join('\n')
             .trim();
         if (!cleaned) continue;
@@ -55,11 +56,11 @@ function readJsDocMeta(node) {
     return null;
 }
 
-function readJsDoc(node) {
+function readJsDoc(/** @type {any} */ node) {
     return readJsDocMeta(node)?.text || null;
 }
 
-function jsDocStartLine(node, fallbackStartLine) {
+function jsDocStartLine(/** @type {any} */ node, /** @type {any} */ fallbackStartLine) {
     const startLine = readJsDocMeta(node)?.startLine;
     if (typeof startLine === 'number' && startLine > 0) {
         return startLine;
@@ -67,7 +68,12 @@ function jsDocStartLine(node, fallbackStartLine) {
     return fallbackStartLine;
 }
 
-function firstNonEmptyLine(lines, startLine, endLine, maxLookahead = 6) {
+function firstNonEmptyLine(
+    /** @type {any} */ lines,
+    /** @type {any} */ startLine,
+    /** @type {any} */ endLine,
+    /** @type {any} */ maxLookahead = 6,
+) {
     const startIdx = Math.max(0, startLine - 1);
     const endIdx = Math.min(lines.length - 1, endLine - 1, startIdx + maxLookahead);
     for (let i = startIdx; i <= endIdx; i++) {
@@ -77,7 +83,12 @@ function firstNonEmptyLine(lines, startLine, endLine, maxLookahead = 6) {
     return null;
 }
 
-function splitLargeUnit(unit, lines, maxChunkChars, minChunkChars) {
+function splitLargeUnit(
+    /** @type {any} */ unit,
+    /** @type {any} */ lines,
+    /** @type {any} */ maxChunkChars,
+    /** @type {any} */ minChunkChars,
+) {
     const startIdx = unit.startLine - 1;
     const endIdx = unit.endLine - 1;
     const subLines = lines.slice(startIdx, endIdx + 1);
@@ -88,21 +99,23 @@ function splitLargeUnit(unit, lines, maxChunkChars, minChunkChars) {
         linesPerBlock: 50,
     });
 
-    return subRanges.map((r, idx) => ({
-        startLine: startIdx + r.startLine,
-        endLine: startIdx + r.endLine,
-        kind: `${unit.kind}_block`,
-        symbol: unit.symbol,
-        exported: unit.exported,
-        jsdoc: unit.jsdoc,
-        anchor: unit.anchor,
-        imports: unit.imports,
-        subchunkIndex: idx + 1,
-        subchunkTotal: subRanges.length,
-    }));
+    return subRanges.map(
+        /** @type {any} */ (r, idx) => ({
+            startLine: startIdx + r.startLine,
+            endLine: startIdx + r.endLine,
+            kind: `${unit.kind}_block`,
+            symbol: unit.symbol,
+            exported: unit.exported,
+            jsdoc: unit.jsdoc,
+            anchor: unit.anchor,
+            imports: unit.imports,
+            subchunkIndex: idx + 1,
+            subchunkTotal: subRanges.length,
+        }),
+    );
 }
 
-function normalizeAndSplitUnits(units, lines, maxChunkChars) {
+function normalizeAndSplitUnits(/** @type {any} */ units, /** @type {any} */ lines, /** @type {any} */ maxChunkChars) {
     const minChunkChars = Math.max(200, Math.floor(RAG_CHUNK_TARGET_CHARS / 6));
     const normalized = [];
 
@@ -116,10 +129,10 @@ function normalizeAndSplitUnits(units, lines, maxChunkChars) {
     }
 
     normalized.sort(
-        (a, b) =>
+        /** @type {any} */ (a, b) =>
             a.startLine - b.startLine ||
             a.endLine - b.endLine ||
-            String(a.symbol || '').localeCompare(String(b.symbol || ''))
+            String(a.symbol || '').localeCompare(String(b.symbol || '')),
     );
 
     // Remove overlap conservatively.
@@ -142,7 +155,7 @@ function normalizeAndSplitUnits(units, lines, maxChunkChars) {
     return deduped;
 }
 
-function collectImports(ast) {
+function collectImports(/** @type {any} */ ast) {
     const imports = [];
     const body = Array.isArray(ast?.program?.body) ? ast.program.body : [];
     for (const node of body) {
@@ -153,13 +166,13 @@ function collectImports(ast) {
     return [...new Set(imports)].slice(0, 5);
 }
 
-function collectUnits(ast, lines, maxChunkChars) {
-    const units = [];
+function collectUnits(/** @type {any} */ ast, /** @type {any} */ lines, /** @type {any} */ maxChunkChars) {
+    /** @type {any[]} */ const units = [];
     const imported = collectImports(ast);
     const exportTypes = new Set(['ExportNamedDeclaration', 'ExportDefaultDeclaration']);
 
     traverse(ast, {
-        FunctionDeclaration(path) {
+        FunctionDeclaration(/** @type {any} */ path) {
             if (!path.node?.loc) return;
             const exported =
                 path.parentPath?.isExportNamedDeclaration() || path.parentPath?.isExportDefaultDeclaration();
@@ -177,7 +190,7 @@ function collectUnits(ast, lines, maxChunkChars) {
                 imports: imported,
             });
         },
-        ClassDeclaration(path) {
+        ClassDeclaration(/** @type {any} */ path) {
             if (!path.node?.loc) return;
             const exported =
                 path.parentPath?.isExportNamedDeclaration() || path.parentPath?.isExportDefaultDeclaration();
@@ -226,7 +239,7 @@ function collectUnits(ast, lines, maxChunkChars) {
                 }
             }
         },
-        VariableDeclaration(path) {
+        VariableDeclaration(/** @type {any} */ path) {
             if (!path.node?.loc) return;
             const exported =
                 path.parentPath?.isExportNamedDeclaration() || path.parentPath?.isExportDefaultDeclaration();
@@ -255,7 +268,9 @@ function collectUnits(ast, lines, maxChunkChars) {
     return units;
 }
 
-export function chunkJsAst({ relPath, lines, language = 'js', maxChunkChars = RAG_CHUNK_MAX_CHARS }) {
+export function chunkJsAst(
+    /** @type {any} */ { relPath, lines, language = 'js', maxChunkChars = RAG_CHUNK_MAX_CHARS },
+) {
     const source = buildCodeFromLines(lines);
     const ast = parse(source, {
         sourceType: 'module',
@@ -272,16 +287,19 @@ export function chunkJsAst({ relPath, lines, language = 'js', maxChunkChars = RA
     if (!units.length) return [];
 
     const normalized = normalizeAndSplitUnits(units, lines, maxChunkChars);
-    return normalized.map(unit => ({
-        startLine: unit.startLine,
-        endLine: unit.endLine,
-        kind: unit.kind,
-        symbol: unit.symbol || null,
-        exported: Boolean(unit.exported),
-        jsdoc: unit.jsdoc || null,
-        anchor: unit.anchor || null,
-        imports: unit.imports || [],
-        subchunk_index: unit.subchunkIndex || null,
-        subchunk_total: unit.subchunkTotal || null,
-    }));
+    return normalized.map(
+        (/** @type {any} */ unit) =>
+            /** @type {any} */ ({
+                startLine: unit.startLine,
+                endLine: unit.endLine,
+                kind: unit.kind,
+                symbol: unit.symbol || null,
+                exported: Boolean(unit.exported),
+                jsdoc: unit.jsdoc || null,
+                anchor: unit.anchor || null,
+                imports: unit.imports || [],
+                subchunk_index: unit.subchunkIndex || null,
+                subchunk_total: unit.subchunkTotal || null,
+            }),
+    );
 }

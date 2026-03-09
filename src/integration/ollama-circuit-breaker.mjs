@@ -2,21 +2,24 @@
 /**
  * Circuit Breaker for Ollama API Calls
  *
- * Prevents thundering herd and cascading failures when Ollama is unavailable.
- * Based on circuit_breaker.js pattern from browser pool.
+ * Prevents thundering herd and cascading failures when Ollama is unavailable. Based on circuit_breaker.js pattern from
+ * browser pool.
  *
  * States:
+ *
  * - CLOSED: Normal operation (all requests allowed)
  * - OPEN: Too many failures (requests rejected for timeout period)
  * - HALF_OPEN: Testing recovery (1 request allowed to probe)
  *
  * Transitions:
+ *
  * - CLOSED → OPEN: After N consecutive failures
  * - OPEN → HALF_OPEN: After timeout period
  * - HALF_OPEN → CLOSED: After M consecutive successes
  * - HALF_OPEN → OPEN: After any failure
  *
  * Usage:
+ *
  * ```javascript
  * import { getCircuitBreaker } from './ollama-circuit-breaker.mjs';
  *
@@ -41,6 +44,7 @@ import { log } from '#core/logger';
 
 /**
  * Circuit states
+ *
  * @enum {string}
  */
 const CircuitState = Object.freeze({
@@ -52,19 +56,19 @@ const CircuitState = Object.freeze({
 /**
  * Circuit Breaker for Ollama (prevent thundering herd)
  *
- * Implements 3-state circuit breaker pattern with sliding window
- * for failure rate tracking.
+ * Implements 3-state circuit breaker pattern with sliding window for failure rate tracking.
  */
 export class OllamaCircuitBreaker {
     /**
-     * @param {Object} options - Circuit breaker configuration
-     * @param {number} [options.failureThreshold=5] - Consecutive failures to open circuit
-     * @param {number} [options.successThreshold=2] - Consecutive successes to close circuit (from half-open)
-     * @param {number} [options.timeout=60000] - Milliseconds before trying half-open (60s)
-     * @param {number} [options.windowSize=10] - Number of recent calls to track for failure rate
+     * @param {object} options - Circuit breaker configuration
+     * @param {number} [options.failureThreshold=5] - Consecutive failures to open circuit. Default is `5`
+     * @param {number} [options.successThreshold=2] - Consecutive successes to close circuit (from half-open). Default
+     *   is `2`
+     * @param {number} [options.timeout=60000] - Milliseconds before trying half-open (60s). Default is `60000`
+     * @param {number} [options.windowSize=10] - Number of recent calls to track for failure rate. Default is `10`
      */
     constructor({ failureThreshold = 5, successThreshold = 2, timeout = 60000, windowSize = 10 } = {}) {
-        /** @type {'CLOSED'|'OPEN'|'HALF_OPEN'} */
+        /** @type {'CLOSED' | 'OPEN' | 'HALF_OPEN'} */
         this.state = CircuitState.CLOSED;
         this.failureCount = 0;
         this.successCount = 0;
@@ -76,7 +80,7 @@ export class OllamaCircuitBreaker {
         this.nextAttemptTime = 0;
 
         // Sliding window for failure rate calculation
-        this.callHistory = []; // Array of {timestamp, success: boolean}
+        /** @type {any[]} */ this.callHistory = []; // Array of {timestamp, success: boolean}
         this.windowSize = windowSize;
     }
 
@@ -153,6 +157,7 @@ export class OllamaCircuitBreaker {
 
     /**
      * Open circuit (transition to OPEN state)
+     *
      * @private
      */
     _openCircuit() {
@@ -164,13 +169,15 @@ export class OllamaCircuitBreaker {
         log(
             'ERROR',
             `[OllamaCircuitBreaker] Circuit OPEN (${this.failureCount} consecutive failures, ` +
-                `${Math.round(failureRate * 100)}% failure rate, retry in ${this.timeout}ms)`
+                `${Math.round(failureRate * 100)}% failure rate, retry in ${this.timeout}ms)`,
         );
     }
 
     /**
      * Record call in sliding window
+     *
      * @private
+     * @param {boolean} success
      */
     _recordCall(success) {
         this.callHistory.push({ timestamp: Date.now(), success });
@@ -183,20 +190,21 @@ export class OllamaCircuitBreaker {
 
     /**
      * Calculate failure rate from sliding window
+     *
      * @private
      * @returns {number} Failure rate (0.0-1.0)
      */
     _getFailureRate() {
         if (this.callHistory.length === 0) return 0;
 
-        const failures = this.callHistory.filter(c => !c.success).length;
+        const failures = this.callHistory.filter((c) => !c.success).length;
         return failures / this.callHistory.length;
     }
 
     /**
      * Get current circuit breaker status
      *
-     * @returns {Object} Status object with current state and metrics
+     * @returns {any} Status object with current state and metrics
      */
     getStatus() {
         const now = Date.now();
@@ -221,7 +229,7 @@ export class OllamaCircuitBreaker {
         this.state = CircuitState.CLOSED;
         this.failureCount = 0;
         this.successCount = 0;
-        this.callHistory = [];
+        /** @type {any[]} */ this.callHistory = [];
         this.lastFailureTime = 0;
         this.nextAttemptTime = 0;
         log('INFO', '[OllamaCircuitBreaker] Circuit manually RESET to CLOSED');
@@ -257,25 +265,30 @@ export class OllamaCircuitBreaker {
 
 /**
  * Singleton circuit breakers per endpoint
+ *
  * @type {Map<string, OllamaCircuitBreaker>}
  */
 const circuitBreakers = new Map();
 
 /**
+ * @typedef {object} GetCircuitBreakerOptions
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Get circuit breaker for endpoint (singleton)
  *
- * @param {string} endpoint - Endpoint identifier ('cloud' or 'local')
- * @param {Object} [options] - Circuit breaker options (only used if creating new instance)
- * @returns {OllamaCircuitBreaker} Circuit breaker instance
- *
  * @example
- * // Get breaker for Ollama cloud
- * const cloudBreaker = getCircuitBreaker('cloud');
+ *     // Get breaker for Ollama cloud
+ *     const cloudBreaker = getCircuitBreaker('cloud');
  *
- * // Get breaker for local Ollama
- * const localBreaker = getCircuitBreaker('local');
+ *     // Get breaker for local Ollama
+ *     const localBreaker = getCircuitBreaker('local');
+ *
+ * @param {string} endpoint - Endpoint identifier ('cloud' or 'local')
+ * @param {GetCircuitBreakerOptions} [options] - Circuit breaker options (only used if creating new instance)
+ * @returns {OllamaCircuitBreaker} Circuit breaker instance
  */
-export function getCircuitBreaker(endpoint, options = {}) {
+export function getCircuitBreaker(/** @type {any} */ endpoint, /** @type {any} */ options = {}) {
     if (!circuitBreakers.has(endpoint)) {
         // Apply env var overrides
         const config = {
@@ -290,29 +303,30 @@ export function getCircuitBreaker(endpoint, options = {}) {
         log('INFO', `[OllamaCircuitBreaker] Created circuit breaker for endpoint: ${endpoint}`);
     }
 
-    return circuitBreakers.get(endpoint);
+    return /** @type {any} */ (circuitBreakers.get(endpoint));
 }
 
 /**
  * Get all circuit breaker statuses
  *
- * @returns {Object} Map of endpoint → status
- *
  * @example
- * const statuses = getAllStatuses();
- * // { cloud: { state: 'CLOSED', failureRate: 0.0, ... }, local: { ... } }
+ *     const statuses = getAllStatuses();
+ *     // { cloud: { state: 'CLOSED', failureRate: 0.0, ... }, local: { ... } }
+ *
+ * @returns {any} Map of endpoint → status
  */
 export function getAllStatuses() {
     const statuses = {};
     for (const [endpoint, breaker] of circuitBreakers.entries()) {
-        statuses[endpoint] = breaker.getStatus();
+        /** @type {any} */ (statuses)[endpoint] = breaker.getStatus();
     }
     return statuses;
 }
 
 /**
  * Reset all circuit breakers (for testing)
-  * @returns {void}
+ *
+ * @returns {void}
  */
 export function resetAll() {
     for (const breaker of circuitBreakers.values()) {

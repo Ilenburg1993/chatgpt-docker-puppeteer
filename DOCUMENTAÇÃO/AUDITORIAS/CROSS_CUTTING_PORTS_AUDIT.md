@@ -76,12 +76,12 @@ PORT=3008
 ```javascript
 // src/server/engine/server.js (lines 21-61)
 function start(port) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     httpServer.listen(port, () => {
       resolve({ server: httpServer, port });
     });
 
-    httpServer.on('error', e => {
+    httpServer.on('error', (e) => {
       if (e.code === 'EADDRINUSE') {
         log('WARN', `Porta ${port} ocupada. Escalando para ${port + 1}...`);
         resolve(start(port + 1)); // Recursivo: 3008 → 3009 → 3010...
@@ -285,7 +285,7 @@ function start(port) {
     resolve({ server, port });
   });
 
-  httpServer.on('error', e => {
+  httpServer.on('error', (e) => {
     if (e.code === 'EADDRINUSE') {
       // Tenta próxima porta recursivamente
       resolve(start(port + 1));
@@ -329,11 +329,11 @@ function start(port, maxAttempts = 5) {
     resolve({ server, port });
   });
 
-  httpServer.on('error', e => {
+  httpServer.on('error', (e) => {
     if (e.code === 'EADDRINUSE') {
       log(
         'WARN',
-        `Porta ${port} ocupada, tentando ${port + 1} (${maxAttempts - 1} tentativas restantes)`
+        `Porta ${port} ocupada, tentando ${port + 1} (${maxAttempts - 1} tentativas restantes)`,
       );
       resolve(start(port + 1, maxAttempts - 1));
     }
@@ -590,17 +590,17 @@ describe('Docker Port Mapping', () => {
    # =============================================================================
    # NETWORKING & PORTS
    # =============================================================================
-
+   
    # Server URL (base URL for API/Dashboard)
    SERVER_URL=http://localhost:3008
-
+   
    # Health check endpoint
    HEALTH_CHECK_URL=http://localhost:3008/api/health
-
+   
    # Port hunting configuration
    ENABLE_PORT_HUNTING=true
    MAX_PORT_ATTEMPTS=5
-
+   
    # Chrome connection configuration
    CHROME_CONNECTION_TIMEOUT=5000
    CHROME_CONNECTION_RETRIES=3

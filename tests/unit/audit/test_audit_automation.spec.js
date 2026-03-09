@@ -1,9 +1,9 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import test from 'node:test';
 import { parseJsonFromMixedOutput, runCommand } from '../../../scripts/audit/lib/exec.mjs';
 import { validateAuditRun } from '../../../scripts/audit/lib/schema.mjs';
 import { publishSnapshot } from '../../../scripts/audit/publish_snapshot.mjs';
@@ -31,7 +31,7 @@ test('audit runner fatal fallback emits valid AuditRunV3 payload and artifacts',
             env: {
                 AUDIT_RUNNER_TEST_FORCE_FATAL_FALLBACK: '1',
             },
-        }
+        },
     );
 
     assert.equal(run.ok, true, run.stderr || run.stdout);
@@ -48,7 +48,7 @@ test('audit runner fatal fallback emits valid AuditRunV3 payload and artifacts',
             }
         }
         if (fs.existsSync(runsRoot)) {
-            const runDirs = fs.readdirSync(runsRoot).map(name => path.join(runsRoot, name));
+            const runDirs = fs.readdirSync(runsRoot).map((name) => path.join(runsRoot, name));
             for (const runDir of runDirs) {
                 if (!fs.existsSync(runDir)) continue;
                 for (const name of fs.readdirSync(runDir)) {
@@ -60,7 +60,7 @@ test('audit runner fatal fallback emits valid AuditRunV3 payload and artifacts',
         }
         assert.ok(reportFiles.length > 0, 'runner must produce audit_report artifact when stdout JSON is unavailable');
         const latestReport = reportFiles.sort().at(-1);
-        const report = JSON.parse(fs.readFileSync(latestReport, 'utf8'));
+        const report = JSON.parse(fs.readFileSync(/** @type {string} */ (latestReport), 'utf8'));
         payload = {
             report,
             outputs: {
@@ -137,7 +137,9 @@ test('publishSnapshot creates immutable markdown copy from master', () => {
     const snapshotsDir = path.join(tmpDir, 'rodadas');
 
     fs.writeFileSync(masterPath, '# MASTER\nconteudo\n', 'utf8');
-    const out = publishSnapshot({ masterPath, snapshotsDir, now: new Date('2026-02-15T10:00:00Z') });
+    const out = publishSnapshot(
+        /** @type {any} */ ({ masterPath, snapshotsDir, now: new Date('2026-02-15T10:00:00Z') }),
+    );
 
     assert.ok(fs.existsSync(out.path), 'snapshot file should exist');
     const content = fs.readFileSync(out.path, 'utf8');

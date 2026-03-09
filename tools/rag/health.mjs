@@ -1,5 +1,6 @@
-import './lib/env-bootstrap.mjs';
+// @ts-check
 import { parseArgs } from 'node:util';
+import './lib/env-bootstrap.mjs';
 import { ragHealth } from './lib/facade.mjs';
 
 const { values } = parseArgs({
@@ -10,10 +11,12 @@ const { values } = parseArgs({
     },
 });
 
-const report = await ragHealth({
-    ollamaBaseUrl: values['ollama-base-url'],
-    model: values.model,
-});
+const report = /** @type {any} */ (
+    await ragHealth({
+        ollamaBaseUrl: values['ollama-base-url'],
+        model: values.model,
+    })
+);
 
 if (values.json) {
     console.log(JSON.stringify(report, null, 2));
@@ -24,23 +27,23 @@ if (values.json) {
     console.log(`  Directories:      ${report.writable ? '✅' : '❌'} Writable`);
     console.log(`  Manifest:         ${report.manifest_ok ? '✅' : '❌'} ${report.manifest_ok ? 'Valid' : 'Error'}`);
     console.log(
-        `  Ollama:           ${report.ollama?.ok ? '✅' : '❌'} ${report.ollama?.ok ? 'Connected' : 'Unreachable'}`
+        `  Ollama:           ${report.ollama?.ok ? '✅' : '❌'} ${report.ollama?.ok ? 'Connected' : 'Unreachable'}`,
     );
     console.log(
-        `  Embedding Model:  ${report.ollama?.hasModel ? '✅' : '❌'} ${report.ollama?.hasModel ? report.manifest?.embedding?.model || 'nomic-embed-text:latest' : 'Not found'}`
+        `  Embedding Model:  ${report.ollama?.hasModel ? '✅' : '❌'} ${report.ollama?.hasModel ? report.manifest?.embedding?.model || 'nomic-embed-text:latest' : 'Not found'}`,
     );
     console.log(
-        `  LanceDB:          ${report.lancedb?.ok ? '✅' : '❌'} ${report.lancedb?.ok ? 'Accessible' : 'Error'}`
+        `  LanceDB:          ${report.lancedb?.ok ? '✅' : '❌'} ${report.lancedb?.ok ? 'Accessible' : 'Error'}`,
     );
     console.log(`  Index Available:  ${report.available ? '✅' : '❌'} ${report.available ? 'Ready' : 'Not ready'}`);
     if (report.active_scope_defaults) {
         console.log(
-            `  Active Scope:     profile=${report.active_scope_defaults.profile} docs=${report.active_scope_defaults.docs_mode} hash=${report.active_scope_defaults.scope_hash}`
+            `  Active Scope:     profile=${report.active_scope_defaults.profile} docs=${report.active_scope_defaults.docs_mode} hash=${report.active_scope_defaults.scope_hash}`,
         );
     }
     if (report.last_index_scope) {
         console.log(
-            `  Last Index Scope: profile=${report.last_index_scope.profile} docs=${report.last_index_scope.docs_mode} hash=${report.last_index_scope.scope_hash || report.scope_hash}`
+            `  Last Index Scope: profile=${report.last_index_scope.profile} docs=${report.last_index_scope.docs_mode} hash=${report.last_index_scope.scope_hash || report.scope_hash}`,
         );
     }
 

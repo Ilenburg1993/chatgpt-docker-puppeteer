@@ -5,6 +5,11 @@ import { getDb } from './sqlite.js';
 function _now() {
     return Date.now();
 }
+/**
+ * @param {unknown} value
+ * @param {string} [fallback]
+ * @returns {string}
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -12,6 +17,11 @@ function _safeJsonString(value, fallback = '{}') {
         return fallback;
     }
 }
+/**
+ * @param {unknown} raw
+ * @param {unknown} [fallback]
+ * @returns {any}
+ */
 function _parseJson(raw, fallback = {}) {
     if (raw == null) return fallback;
     try {
@@ -20,6 +30,30 @@ function _parseJson(raw, fallback = {}) {
         return fallback;
     }
 }
+
+/**
+ * @typedef {object} AuditPatch
+ * @property {string} id
+ * @property {string} job_id
+ * @property {string} status
+ * @property {string} patch_unified_diff
+ * @property {Record<string, any>} patch_summary_json
+ * @property {number | null} risk_score
+ * @property {any} dry_run_result_json
+ * @property {boolean} approval_required
+ * @property {string | null} approved_by
+ * @property {number | null} approved_at_ms
+ * @property {string | null} applied_by
+ * @property {number | null} applied_at_ms
+ * @property {string | null} rollback_patch
+ * @property {number} created_at_ms
+ * @property {number} updated_at_ms
+ */
+
+/**
+ * @param {Record<string, any> | null | undefined} row
+ * @returns {AuditPatch | null}
+ */
 function _rowToPatch(row) {
     if (!row) return null;
     return {
@@ -41,10 +75,17 @@ function _rowToPatch(row) {
     };
 }
 
+/**
+ * @param {string} id
+ * @param {Record<string, any>} [fields]
+ * @returns {AuditPatch | null}
+ */
 function _updatePatch(id, fields = {}) {
     const db = getDb();
     const now = _now();
-    const existing = db.prepare('SELECT * FROM audit_patch_proposals WHERE id = ?').get(String(id || '').trim());
+    const existing = /** @type {Record<string, any> | null} */ (
+        db.prepare('SELECT * FROM audit_patch_proposals WHERE id = ?').get(String(id || '').trim())
+    );
     if (!existing) return null;
 
     db.prepare(
@@ -63,14 +104,14 @@ function _updatePatch(id, fields = {}) {
             rollback_patch = @rollback_patch,
             updated_at_ms = @updated_at_ms
         WHERE id = @id
-    `
+    `,
     ).run({
         id: existing.id,
         status: String(fields.status ?? existing.status ?? 'draft'),
         patch_unified_diff: String(fields.patch_unified_diff ?? existing.patch_unified_diff ?? ''),
         patch_summary_json: _safeJsonString(
             fields.patch_summary_json ?? fields.patch_summary ?? _parseJson(existing.patch_summary_json, {}),
-            '{}'
+            '{}',
         ),
         risk_score: fields.risk_score == null ? existing.risk_score : Number(fields.risk_score),
         dry_run_result_json:
@@ -90,10 +131,29 @@ function _updatePatch(id, fields = {}) {
 }
 
 /**
- * Função exportada: createAuditPatchProposal.
- * @returns {any}
+ * @typedef {object} CreateAuditPatchProposalInput
+ * @property {string} [id]
+ * @property {string} job_id
+ * @property {string} [status]
+ * @property {string} [patch_unified_diff]
+ * @property {Record<string, any>} [patch_summary_json]
+ * @property {Record<string, any>} [patch_summary]
+ * @property {number | null} [risk_score]
+ * @property {any} [dry_run_result_json]
+ * @property {boolean} [approval_required]
+ * @property {string} [approved_by]
+ * @property {number | null} [approved_at_ms]
+ * @property {string} [applied_by]
+ * @property {number | null} [applied_at_ms]
+ * @property {string | undefined} [rollback_patch]
  */
-function createAuditPatchProposal(input = {}) {
+/**
+ * Função exportada: createAuditPatchProposal.
+ *
+ * @param {CreateAuditPatchProposalInput} input Input data for the AuditPatch record.
+ * @returns {AuditPatch | null}
+ */
+function createAuditPatchProposal(input = /** @type {CreateAuditPatchProposalInput} */ ({})) {
     const db = getDb();
     const id = String(input.id || `apch-${uuidv4()}`);
     const now = _now();
@@ -108,7 +168,7 @@ function createAuditPatchProposal(input = {}) {
             @approval_required, @approved_by, @approved_at_ms, @applied_by, @applied_at_ms, @rollback_patch,
             @created_at_ms, @updated_at_ms
         )
-    `
+    `,
     ).run({
         id,
         job_id: String(input.job_id || '').trim(),
@@ -132,16 +192,29 @@ function createAuditPatchProposal(input = {}) {
 
 /**
  * Função exportada: getAuditPatchProposalById.
- * @returns {any}
+ *
+ * @param {string} id Unique identifier.
+ * @returns {AuditPatch | null}
  */
 function getAuditPatchProposalById(id) {
     const db = getDb();
-    return _rowToPatch(db.prepare('SELECT * FROM audit_patch_proposals WHERE id = ?').get(String(id || '').trim()));
+    return _rowToPatch(
+        /** @type {Record<string, any> | null} */ (
+            db.prepare('SELECT * FROM audit_patch_proposals WHERE id = ?').get(String(id || '').trim())
+        ),
+    );
 }
 
 /**
+ * @typedef {object} ListAuditPatchProposalsByJobIdOptions
+ * @property {number} [limit]
+ */
+/**
  * Função exportada: listAuditPatchProposalsByJobId.
- * @returns {any}
+ *
+ * @param {string} jobId
+ * @param {ListAuditPatchProposalsByJobIdOptions} [options]
+ * @returns {AuditPatch[]}
  */
 function listAuditPatchProposalsByJobId(jobId, { limit = 50 } = {}) {
     const db = getDb();
@@ -152,15 +225,33 @@ function listAuditPatchProposalsByJobId(jobId, { limit = 50 } = {}) {
             WHERE job_id = ?
             ORDER BY created_at_ms DESC
             LIMIT ?
-        `
+        `,
         )
         .all(String(jobId || '').trim(), Math.max(1, Math.min(Number(limit) || 50, 500)));
-    return rows.map(_rowToPatch).filter(Boolean);
+    return /** @type {AuditPatch[]} */ (/** @type {Record<string, any>[]} */ (rows).map(_rowToPatch).filter(Boolean));
 }
 
 /**
+ * @typedef {object} UpdateAuditPatchProposalFields
+ * @property {string} [status]
+ * @property {string} [patch_unified_diff]
+ * @property {Record<string, any>} [patch_summary_json]
+ * @property {Record<string, any>} [patch_summary]
+ * @property {number | null} [risk_score]
+ * @property {any} [dry_run_result_json]
+ * @property {boolean} [approval_required]
+ * @property {string | null} [approved_by]
+ * @property {number | null} [approved_at_ms]
+ * @property {string | null} [applied_by]
+ * @property {number | null} [applied_at_ms]
+ * @property {string | null} [rollback_patch]
+ */
+/**
  * Função exportada: updateAuditPatchProposal.
- * @returns {any}
+ *
+ * @param {string} id
+ * @param {UpdateAuditPatchProposalFields} [fields]
+ * @returns {AuditPatch | null}
  */
 function updateAuditPatchProposal(id, fields = {}) {
     return _updatePatch(id, fields);

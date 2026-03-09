@@ -1,13 +1,13 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { InferenceGateway } from '../../../src/inference_gateway/gateway.js';
 
 test('InferenceGateway generate uses policy precedence and validates route', async () => {
-    const calls = [];
+    /** @type {any[]} */ const calls = [];
     const gateway = new InferenceGateway({
         ollamaClient: {
-            async generate(prompt, model, options) {
+            async generate(/** @type {any} */ prompt, /** @type {any} */ model, /** @type {any} */ options) {
                 calls.push({ op: 'generate', prompt, model, options });
                 return { response: 'ok', model: model || 'default' };
             },
@@ -45,13 +45,13 @@ test('InferenceGateway rejects disallowed route by client policy', async () => {
 
     await assert.rejects(
         () => gateway.generate({ clientTag: 'audit_agent_patch', prompt: 'x', model: 'other-model' }),
-        /não permitido/
+        /não permitido/,
     );
 });
 
 test('InferenceGateway enforces per-client concurrency limit', async () => {
     let release;
-    const blocker = new Promise(resolve => {
+    const blocker = new Promise((resolve) => {
         release = resolve;
     });
     const gateway = new InferenceGateway({
@@ -66,6 +66,6 @@ test('InferenceGateway enforces per-client concurrency limit', async () => {
 
     const p1 = gateway.generate({ clientTag: 'audit_agent_triage', prompt: 'a' });
     await assert.rejects(() => gateway.generate({ clientTag: 'audit_agent_triage', prompt: 'b' }), /concorrência/);
-    release();
+    /** @type {any} */ (release)();
     await p1;
 });

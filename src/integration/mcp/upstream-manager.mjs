@@ -2,23 +2,25 @@
 /**
  * MCP Upstream Manager
  *
- * Imports tools from one or more upstream MCP servers and registers them
- * into the local Tool Registry with prefixes (namespaces).
+ * Imports tools from one or more upstream MCP servers and registers them into the local Tool Registry with prefixes
+ * (namespaces).
  *
  * Supported transports:
+ *
  * - HTTP JSON-RPC 2.0 (Streamable HTTP fallback)
  * - Stdio (via MCP SDK client + StdioClientTransport)
  *
  * Backwards compatibility:
+ *
  * - MCP_UPSTREAM_ENABLED/MCP_UPSTREAM_URL/... (single HTTP upstream)
  * - GitHub proxy preset via MCP_GITHUB_PROXY_ENABLED (+ GITHUB_PERSONAL_ACCESS_TOKEN)
  */
 
+import { computeExponentialBackoffDelay, readPositiveInt } from '../../core/retry_policy.js';
 import { createMcpHttpClient } from './upstream-http.mjs';
 import { MCPStdioUpstreamClient } from './upstream-stdio-sdk.mjs';
-import { computeExponentialBackoffDelay, readPositiveInt } from '../../core/retry_policy.js';
 
-function safeJsonParse(s) {
+function safeJsonParse(/** @type {any} */ s) {
     try {
         return JSON.parse(s);
     } catch {
@@ -26,26 +28,26 @@ function safeJsonParse(s) {
     }
 }
 
-function normalizeAlias(alias) {
+function normalizeAlias(/** @type {any} */ alias) {
     const a = String(alias || '').trim();
     if (!a) return null;
     if (!/^[a-zA-Z0-9_-]+$/.test(a)) return null;
     return a;
 }
 
-function parseJsonObject(value) {
+function parseJsonObject(/** @type {any} */ value) {
     if (!value) return null;
     const parsed = safeJsonParse(String(value));
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
 }
 
-function parseJsonArray(value) {
+function parseJsonArray(/** @type {any} */ value) {
     if (!value) return null;
     const parsed = safeJsonParse(String(value));
     return Array.isArray(parsed) ? parsed : null;
 }
 
-function sanitizeToolMetadata(tool) {
+function sanitizeToolMetadata(/** @type {any} */ tool) {
     const description =
         typeof tool?.description === 'string' && tool.description.trim()
             ? tool.description
@@ -62,22 +64,22 @@ function sanitizeToolMetadata(tool) {
 /**
  * @typedef {object} UpstreamConfig
  * @property {string} alias
- * @property {'http'|'stdio'} transport
+ * @property {'http' | 'stdio'} transport
  * @property {string} toolPrefix
  * @property {boolean} [required]
  * @property {string} [url]
- * @property {Record<string,string>} [headers]
+ * @property {Record<string, string>} [headers]
  * @property {string} [command]
  * @property {string[]} [args]
  * @property {string[]} [envFrom]
- * @property {number} [initTimeoutMs]
- * @property {number} [callTimeoutMs]
+ * @property {number | undefined} [initTimeoutMs]
+ * @property {number | undefined} [callTimeoutMs]
  */
 
 /**
  * @typedef {object} UpstreamStatus
  * @property {string} alias
- * @property {'http'|'stdio'} transport
+ * @property {'http' | 'stdio'} transport
  * @property {string} toolPrefix
  * @property {string} target
  * @property {boolean} enabled
@@ -86,7 +88,7 @@ function sanitizeToolMetadata(tool) {
  * @property {number} registeredCount
  * @property {string | null} lastInitAt
  * @property {string | null} lastError
- * @property {'ready'|'not-ready'|'disabled'} state
+ * @property {'ready' | 'not-ready' | 'disabled'} state
  */
 
 /** @type {{ upstreams: UpstreamStatus[] }} */
@@ -98,11 +100,12 @@ const _registeredAliases = new Set();
 /** @type {Map<string, MCPStdioUpstreamClient>} */
 const _stdioClients = new Map();
 
-/** @type {Map<string, { attempts: number, timer: NodeJS.Timeout | null }>} */
+/** @type {Map<string, { attempts: number; timer: NodeJS.Timeout | null }>} */
 const _retryState = new Map();
 
 /** @type {boolean} */
 let _shutdownHookInstalled = false;
+/** @type {{ exit: (() => void) | null; sigint: (() => void) | null; sigterm: (() => void) | null }} */
 const _shutdownHookHandlers = {
     exit: null,
     sigint: null,
@@ -149,7 +152,7 @@ function cleanupShutdownHook() {
     _shutdownHookInstalled = false;
 }
 
-function envFlag(raw, fallback = false) {
+function envFlag(/** @type {any} */ raw, /** @type {any} */ fallback = false) {
     if (raw === undefined || raw === null || raw === '') return fallback;
     const value = String(raw).trim().toLowerCase();
     if (value === '1' || value === 'true' || value === 'yes' || value === 'on') return true;
@@ -157,12 +160,12 @@ function envFlag(raw, fallback = false) {
     return fallback;
 }
 
-function setStatus(next) {
+function setStatus(/** @type {any} */ next) {
     _status.upstreams = next;
 }
 
-function setOneStatus(next) {
-    const idx = _status.upstreams.findIndex(u => u.alias === next.alias);
+function setOneStatus(/** @type {any} */ next) {
+    const idx = _status.upstreams.findIndex((/** @type {any} */ u) => u.alias === next.alias);
     if (idx >= 0) {
         _status.upstreams[idx] = next;
         return;
@@ -172,20 +175,21 @@ function setOneStatus(next) {
 
 /**
  * Função exportada: getUpstreamStatus.
- * @returns {any}
+ *
+ * @returns {{ upstreams: any[] }}
  */
 export function getUpstreamStatus() {
     // Return a shallow clone to avoid accidental mutation
-    return { upstreams: _status.upstreams.map(u => ({ ...u })) };
+    return { upstreams: _status.upstreams.map((/** @type {any} */ u) => ({ ...u })) };
 }
 
 /**
  * Parse upstreams from ENV.
  *
- * @param {Record<string, any>} env
+ * @param {Record<string, unknown>} env
  * @returns {UpstreamConfig[]}
  */
-export function parseUpstreamsFromEnv(env = process.env) {
+export function parseUpstreamsFromEnv(/** @type {any} */ env = process.env) {
     /** @type {UpstreamConfig[]} */
     const upstreams = [];
 
@@ -269,14 +273,14 @@ export function parseUpstreamsFromEnv(env = process.env) {
 
     // Enforce unique aliases (first wins)
     const seen = new Set();
-    return upstreams.filter(u => {
+    return upstreams.filter((/** @type {any} */ u) => {
         if (seen.has(u.alias)) return false;
         seen.add(u.alias);
         return true;
     });
 }
 
-function buildChildEnv(env, envFrom) {
+function buildChildEnv(/** @type {any} */ env, /** @type {any} */ envFrom) {
     const base = { ...process.env };
     for (const key of envFrom || []) {
         const v = String(env[key] || '').trim();
@@ -285,7 +289,7 @@ function buildChildEnv(env, envFrom) {
     return base;
 }
 
-function getRestartConfig(env) {
+function getRestartConfig(/** @type {any} */ env) {
     const enabled = envFlag(env.MCP_UPSTREAM_RESTART_ENABLED, false);
     const baseBackoffMs = readPositiveInt(env.MCP_UPSTREAM_RESTART_BACKOFF_MS || env.BOOT_RETRY_BASE_MS, 5000);
     const maxBackoffMs = readPositiveInt(env.MCP_UPSTREAM_RESTART_MAX_BACKOFF_MS || env.BOOT_RETRY_MAX_MS, 60000);
@@ -300,7 +304,7 @@ function getRestartConfig(env) {
     };
 }
 
-function clearRetry(alias) {
+function clearRetry(/** @type {any} */ alias) {
     const entry = _retryState.get(alias);
     if (!entry) return;
     if (entry.timer) clearTimeout(entry.timer);
@@ -308,12 +312,23 @@ function clearRetry(alias) {
 }
 
 /**
+ * @typedef {object} ScheduleRetryOptions
+ * @property {boolean} refresh
+ * @property {boolean} force
+ * @property {ReturnType<typeof getRestartConfig>} restart
+ */
+/**
  * @param {UpstreamConfig} cfg
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
- * @param {Record<string, any>} env
- * @param {{ refresh: boolean, force: boolean, restart: ReturnType<typeof getRestartConfig> }} options
+ * @param {Record<string, unknown>} env
+ * @param {ScheduleRetryOptions} options
  */
-function scheduleRetry(cfg, registry, env, options) {
+function scheduleRetry(
+    /** @type {any} */ cfg,
+    /** @type {any} */ registry,
+    /** @type {any} */ env,
+    /** @type {any} */ options,
+) {
     const { restart } = options;
     if (!restart.enabled) return;
 
@@ -345,18 +360,29 @@ function scheduleRetry(cfg, registry, env, options) {
 }
 
 /**
+ * @typedef {object} RegisterOneUpstreamOptions
+ * @property {boolean} refresh
+ * @property {boolean} force
+ * @property {ReturnType<typeof getRestartConfig>} restart
+ */
+/**
  * @param {UpstreamConfig} cfg
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
- * @param {Record<string, any>} env
- * @param {{ refresh: boolean, force: boolean, restart: ReturnType<typeof getRestartConfig> }} options
+ * @param {Record<string, unknown>} env
+ * @param {RegisterOneUpstreamOptions} options
  * @returns {Promise<{ status: UpstreamStatus }>}
  */
-async function registerOneUpstream(cfg, registry, env, options) {
+async function registerOneUpstream(
+    /** @type {any} */ cfg,
+    /** @type {any} */ registry,
+    /** @type {any} */ env,
+    /** @type {any} */ options,
+) {
     const { refresh, restart } = options;
 
     const already = _registeredAliases.has(cfg.alias);
     if (already && !refresh && !options.force) {
-        const prev = _status.upstreams.find(u => u.alias === cfg.alias);
+        const prev = _status.upstreams.find((/** @type {any} */ u) => u.alias === cfg.alias);
         if (prev) {
             return {
                 status: {
@@ -404,16 +430,16 @@ async function registerOneUpstream(cfg, registry, env, options) {
         lastError: null,
         state: 'not-ready',
     };
-    const prev = _status.upstreams.find(u => u.alias === cfg.alias);
+    const prev = _status.upstreams.find((/** @type {any} */ u) => u.alias === cfg.alias);
     if (!refresh && prev && typeof prev.registeredCount === 'number') {
         st.registeredCount = prev.registeredCount;
     }
 
     try {
-        let tools = [];
+        /** @type {any[]} */ let tools = [];
 
         if (cfg.transport === 'http') {
-            const client = createMcpHttpClient({ url: cfg.url, headers: cfg.headers });
+            const client = /** @type {any} */ (createMcpHttpClient({ url: cfg.url, headers: cfg.headers }));
             const toolList = await client.listTools();
             tools = Array.isArray(toolList?.tools) ? toolList.tools : [];
 
@@ -432,13 +458,14 @@ async function registerOneUpstream(cfg, registry, env, options) {
                             return await client.callTool({
                                 name: upstreamName,
                                 arguments: params,
-                                signal: execOptions.signal,
+                                signal: /** @type {any} */ (execOptions).signal,
                             });
-                        } catch (err) {
+                        } catch (/** @type {any} */ _raw_err) {
+                            const err = /** @type {any} */ (_raw_err);
                             markUpstreamCallFailure(cfg, err, registry, env, restart);
                             throw err;
                         }
-                    }
+                    },
                 );
                 if (refresh || !prev) st.registeredCount += 1;
             }
@@ -451,7 +478,7 @@ async function registerOneUpstream(cfg, registry, env, options) {
             const envFrom = Array.isArray(cfg.envFrom) ? cfg.envFrom : [];
             const childEnv = buildChildEnv(env, envFrom);
 
-            let client = _stdioClients.get(cfg.alias);
+            let client = /** @type {any} */ (_stdioClients.get(cfg.alias));
             if (client && refresh) {
                 await client.close().catch(() => {});
                 _stdioClients.delete(cfg.alias);
@@ -463,7 +490,7 @@ async function registerOneUpstream(cfg, registry, env, options) {
                     alias: cfg.alias,
                     command: cfg.command,
                     args: cfg.args || [],
-                    env: childEnv,
+                    env: /** @type {Record<string, string>} */ (childEnv),
                     initTimeoutMs: cfg.initTimeoutMs || Number(env.MCP_UPSTREAM_INIT_TIMEOUT_MS || 30000),
                     callTimeoutMs: cfg.callTimeoutMs || Number(env.MCP_TOOL_TIMEOUT || 90000),
                 });
@@ -489,13 +516,14 @@ async function registerOneUpstream(cfg, registry, env, options) {
                             return await client.callTool({
                                 name: upstreamName,
                                 arguments: params,
-                                signal: execOptions.signal,
+                                signal: /** @type {any} */ (execOptions).signal,
                             });
-                        } catch (err) {
+                        } catch (/** @type {any} */ _raw_err) {
+                            const err = /** @type {any} */ (_raw_err);
                             markUpstreamCallFailure(cfg, err, registry, env, restart);
                             throw err;
                         }
-                    }
+                    },
                 );
                 if (refresh || !prev) st.registeredCount += 1;
             }
@@ -505,7 +533,8 @@ async function registerOneUpstream(cfg, registry, env, options) {
         st.state = 'ready';
         _registeredAliases.add(cfg.alias);
         clearRetry(cfg.alias);
-    } catch (err) {
+    } catch (/** @type {any} */ _raw_err) {
+        const err = /** @type {any} */ (_raw_err);
         st.ready = false;
         st.state = 'not-ready';
         st.lastError = err && err.message ? err.message : String(err);
@@ -517,8 +546,14 @@ async function registerOneUpstream(cfg, registry, env, options) {
     return { status: st };
 }
 
-function markUpstreamCallFailure(cfg, err, registry, env, restart) {
-    const prev = _status.upstreams.find(u => u.alias === cfg.alias);
+function markUpstreamCallFailure(
+    /** @type {any} */ cfg,
+    /** @type {any} */ err,
+    /** @type {any} */ registry,
+    /** @type {any} */ env,
+    /** @type {any} */ restart,
+) {
+    const prev = _status.upstreams.find((/** @type {any} */ u) => u.alias === cfg.alias);
     const next = {
         alias: cfg.alias,
         transport: cfg.transport,
@@ -541,13 +576,18 @@ function markUpstreamCallFailure(cfg, err, registry, env, restart) {
 }
 
 /**
+ * @typedef {object} RegisterUpstreamsOptions
+ * @property {any} env
+ * @property {boolean} installShutdownHook
+ */
+/**
  * Register tools from all enabled upstreams into the local registry.
  *
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
- * @param {{ env?: Record<string, any>, installShutdownHook?: boolean }} [options]
- * @returns {Promise<{upstreams: UpstreamStatus[]}>}
+ * @param {RegisterUpstreamsOptions} [options]
+ * @returns {Promise<{ upstreams: UpstreamStatus[] }>}
  */
-export async function registerUpstreams(registry, options = {}) {
+export async function registerUpstreams(/** @type {any} */ registry, /** @type {any} */ options = {}) {
     const env = options.env || process.env;
     const refresh = String(env.MCP_UPSTREAM_REFRESH || '') === 'true';
     const restart = getRestartConfig(env);
@@ -580,6 +620,7 @@ export async function registerUpstreams(registry, options = {}) {
 
 /**
  * Função exportada: shutdownUpstreams.
+ *
  * @returns {Promise<void>}
  */
 export async function shutdownUpstreams() {

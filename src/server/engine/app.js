@@ -1,6 +1,6 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import * as hardware from '#core/hardware';
+// @ts-check
 import CONFIG from '#core/config';
+import * as hardware from '#core/hardware';
 import { log } from '#core/logger';
 import { getRuntimeReadinessSummary } from '#core/runtime_resource_registry';
 import { LOG_DIR, ROOT } from '#infra/fs/fs_utils';
@@ -21,7 +21,7 @@ import requestId from '../middleware/request_id.js';
 const app = express();
 const RAG_MANIFEST_PATH = process.env.RAG_MANIFEST_PATH || '/home/node/.local/share/rag-index/manifest.v1.json';
 
-function formatIsoSecond(epochMs) {
+function formatIsoSecond(/** @type {any} */ epochMs) {
     if (!Number.isFinite(epochMs)) return null;
     return new Date(epochMs).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
@@ -65,7 +65,7 @@ if (process.env.NODE_ENV === 'production') {
 /* --------------------------------------------------------------------------
    1. TRACEABILITY ABSOLUTA
 -------------------------------------------------------------------------- */
-app.use(requestId);
+/** @type {any} */ (app).use(requestId);
 
 /* --------------------------------------------------------------------------
    1.1 RESPONSE TIMING (OBSERVABILIDADE)
@@ -78,7 +78,7 @@ app.use((req, res, next) => {
     res.writeHead = function (...args) {
         const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
         res.setHeader('X-Response-Time', `${durationMs.toFixed(2)}ms`);
-        return originalWriteHead.apply(this, args);
+        return originalWriteHead.apply(this, /** @type {any} */ (args));
     };
 
     next();
@@ -117,7 +117,7 @@ app.use(
             process.env.NODE_ENV === 'production'
                 ? { maxAge: 31536000, includeSubDomains: true, preload: true }
                 : false,
-    })
+    }),
 );
 
 /* --------------------------------------------------------------------------
@@ -146,18 +146,18 @@ function updateCorsOrigins() {
     // Add default/local origins
     const defaults = ['http://localhost:3008', 'http://127.0.0.1:3008', process.env.DASHBOARD_ORIGIN];
 
-    defaults.filter(Boolean).forEach(o => corsOrigins.add(o));
+    defaults.filter(Boolean).forEach((o) => corsOrigins.add(o));
 
     // Add from CONFIG
     const configOrigins = CONFIG.ALLOWED_ORIGINS;
     if (Array.isArray(configOrigins)) {
-        configOrigins.forEach(o => corsOrigins.add(o));
+        configOrigins.forEach((o) => corsOrigins.add(o));
     } else if (typeof configOrigins === 'string') {
         configOrigins
             .split(',')
-            .map(s => s.trim())
+            .map((s) => s.trim())
             .filter(Boolean)
-            .forEach(o => corsOrigins.add(o));
+            .forEach((o) => corsOrigins.add(o));
     }
 
     log('INFO', `[SERVER] CORS origins updated: ${corsOrigins.size} allowed origins`);
@@ -189,7 +189,7 @@ app.use(
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
         maxAge: 600,
-    })
+    }),
 );
 
 /* --------------------------------------------------------------------------
@@ -197,11 +197,11 @@ app.use(
 -------------------------------------------------------------------------- */
 
 /**
- * Rate limiter para endpoints da API.
- * SEC-04 FIX: Removido skip total em desenvolvimento. Usa limite maior em não-produção
- * para facilitar testes sem desabilitar completamente a proteção.
+ * Rate limiter para endpoints da API. SEC-04 FIX: Removido skip total em desenvolvimento. Usa limite maior em
+ * não-produção para facilitar testes sem desabilitar completamente a proteção.
  *
  * Limites:
+ *
  * - produção: 100 req/min por IP
  * - desenvolvimento/staging: 2000 req/min por IP (mais permissivo para dev workflow)
  *
@@ -215,7 +215,7 @@ const apiLimiter = rateLimit({
             : parseInt(process.env.RATE_LIMIT_MAX_DEV || '2000', 10),
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: req => ipKeyGenerator(req.ip || ''),
+    keyGenerator: (req) => ipKeyGenerator(req.ip || ''),
     message: {
         success: false,
         error: 'Muitas requisições. Tente novamente em breve.',
@@ -240,7 +240,7 @@ app.use((req, res, next) => {
             request_id: req.id,
         });
     }
-    next();
+    return next();
 });
 
 app.use(express.json({ limit: '10mb', strict: true }));
@@ -304,7 +304,7 @@ app.use(
                 }
             }
         },
-    })
+    }),
 );
 
 // Serve non-asset dashboard files (index.html, icons, etc.) without aggressive caching.
@@ -320,7 +320,7 @@ app.use(
                 res.setHeader('Cache-Control', 'no-cache');
             }
         },
-    })
+    }),
 );
 
 app.get(/^\/dashboard($|\/.*)/, (req, res) => {
@@ -368,7 +368,7 @@ app.get('/ready', (req, res) => {
             if (upstreams && Array.isArray(upstreams)) {
                 mcp = Object.assign({}, mcpBase || {}, { upstreams });
             }
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
             // ignore
         }
 
@@ -381,15 +381,17 @@ app.get('/ready', (req, res) => {
             // Non-required readiness hints
             try {
                 if (mcp && Array.isArray(mcp.upstreams)) {
-                    const requiredUpstreams = mcp.upstreams.filter(u => u?.required);
+                    const requiredUpstreams = mcp.upstreams.filter((/** @type {any} */ u) => u?.required);
                     runtime.mcp_upstreams =
-                        requiredUpstreams.length === 0 ? true : requiredUpstreams.every(u => !u?.enabled || u?.ready);
+                        requiredUpstreams.length === 0
+                            ? true
+                            : requiredUpstreams.every((/** @type {any} */ u) => !u?.enabled || u?.ready);
                 }
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // ignore
             }
 
-            const allReady = requiredKeys.length > 0 ? requiredKeys.every(k => runtime[k] === true) : true;
+            const allReady = requiredKeys.length > 0 ? requiredKeys.every((k) => runtime[k] === true) : true;
 
             status = allReady ? 'ready' : 'not-ready';
         }
@@ -402,11 +404,12 @@ app.get('/ready', (req, res) => {
 
         const payload = Object.assign(
             { status, ts: Date.now(), runtime, runtime_resources: runtimeResources, mcp, rag: readRagReadiness() },
-            hardwareMetrics || {}
+            hardwareMetrics || {},
         );
         res.json(payload);
-    } catch (err) {
-        log('ERROR', `[STATUS] Health check failed: ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[STATUS] Health check failed: ${_e?.message || String(_e)}`);
         res.status(500).json({ status: 'unknown', error: 'Internal server error' });
     }
 });
@@ -423,7 +426,7 @@ app.use((req, res, next) => {
 /* --------------------------------------------------------------------------
    9. ERROR BOUNDARY GLOBAL
 -------------------------------------------------------------------------- */
-app.use((err, req, res, next) => {
+app.use((/** @type {any} */ err, /** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ next) => {
     const status = err.status || 500;
     log('ERROR', `[APP] Unhandled error: ${err?.message || String(err)}${err?.stack ? `\n${err.stack}` : ''}`);
 

@@ -19,9 +19,9 @@ const REQUIRED_LSP_TOOLS = [
 /**
  * @param {string} base
  * @param {string} method
- * @param {object} params
+ * @param {any} params
  * @param {number} id
- * @returns {Promise<{ ok: boolean, status: number, json: any, text: string }>}
+ * @returns {Promise<{ ok: boolean; status: number; json: unknown; text: string }>}
  */
 async function callMcp(base, method, params, id) {
     const url = `${base}/api/mcp`;
@@ -57,7 +57,7 @@ function toolNamesFromList(payload) {
     if (!Array.isArray(tools)) {
         return [];
     }
-    return tools.map(item => item?.name).filter(Boolean);
+    return tools.map((item) => item?.name).filter(Boolean);
 }
 
 /**
@@ -113,7 +113,7 @@ async function main() {
     }));
 
     const toolNames = toolNamesFromList(toolsList.json);
-    const missingTools = REQUIRED_LSP_TOOLS.filter(name => !toolNames.includes(name));
+    const missingTools = REQUIRED_LSP_TOOLS.filter((name) => !toolNames.includes(name));
     if (missingTools.length > 0) {
         issues.push(`missing LSP tools: ${missingTools.join(', ')}`);
     }
@@ -122,7 +122,7 @@ async function main() {
         base,
         'tools/call',
         { name: 'lsp_diagnostics', arguments: { filePath: targetFile, maxResults: 20 } },
-        2
+        2,
     ).catch(() => ({
         ok: false,
         status: 0,
@@ -138,7 +138,7 @@ async function main() {
         base,
         'tools/call',
         { name: 'lsp_definition', arguments: { filePath: targetFile, line, character, maxResults: 20 } },
-        3
+        3,
     ).catch(() => ({
         ok: false,
         status: 0,
@@ -155,7 +155,7 @@ async function main() {
         base,
         target_file: targetFile,
         health_ok: health.ok,
-        mcp_tools_list_ok: toolsList.ok && !toolsList.json?.error,
+        mcp_tools_list_ok: toolsList.ok && !(/** @type {any} */ (toolsList.json)?.error),
         lsp_tools_present: missingTools.length === 0,
         lsp_tools_missing: missingTools,
         lsp_functional_ok: diagnosticsEval.ok && definitionEval.ok,
@@ -182,7 +182,7 @@ async function main() {
     process.exit(report.ok ? 0 : 1);
 }
 
-main().catch(error => {
+main().catch((error) => {
     console.error(`[LSP DIAG] Fatal: ${error?.message || String(error)}`);
     process.exit(1);
 });

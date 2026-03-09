@@ -1,8 +1,8 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import { strict as assert } from 'assert';
 import { execSync } from 'child_process';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { describe, it } from 'node:test';
 import { tmpdir } from 'os';
 import { join } from 'path';
 

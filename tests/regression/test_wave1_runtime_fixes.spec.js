@@ -1,12 +1,12 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 const ROOT = process.cwd();
 
-async function read(relPath) {
+async function read(/** @type {any} */ relPath) {
     return fs.readFile(path.join(ROOT, relPath), 'utf8');
 }
 
@@ -16,12 +16,12 @@ test('wave1: main.js uses invoked Promise in SSOT race', async () => {
     assert.match(
         content,
         /Promise\.race\(\[\s*\/\/ Inicialização normal\s*\(async\s*\(\)\s*=>/m,
-        'SSOT initialization must use invoked async IIFE'
+        'SSOT initialization must use invoked async IIFE',
     );
     assert.doesNotMatch(
         content,
         /Promise\.race\(\[\s*\/\/ Inicialização normal\s*async\s*\(\)\s*=>/m,
-        'SSOT initialization must not pass async function reference to Promise.race'
+        'SSOT initialization must not pass async function reference to Promise.race',
     );
 });
 
@@ -31,12 +31,12 @@ test('wave1: main.js stores real shutdown promise', async () => {
     assert.match(
         content,
         /_shutdownPromise\s*=\s*\(async\s*\(\)\s*=>/m,
-        '_shutdownPromise must be assigned to an invoked async IIFE'
+        '_shutdownPromise must be assigned to an invoked async IIFE',
     );
     assert.doesNotMatch(
         content,
         /_shutdownPromise\s*=\s*async\s*\(\)\s*=>/m,
-        '_shutdownPromise must not hold an async function reference'
+        '_shutdownPromise must not hold an async function reference',
     );
 });
 
@@ -52,7 +52,7 @@ test('wave1: persistServerState publishes with nerv instance', async () => {
     assert.match(
         content,
         /publishServerReady\(nerv,\s*payload\)/,
-        'persistServerState must pass the NERV instance to Discovery.publishServerReady'
+        'persistServerState must pass the NERV instance to Discovery.publishServerReady',
     );
 });
 

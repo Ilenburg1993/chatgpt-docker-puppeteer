@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import path from 'node:path';
 
 const ROOT = path.join(import.meta.dirname, '..');
@@ -13,15 +13,15 @@ async function testHealthLogic() {
     // Test 1: Chrome Health
     console.log('📡 1. Chrome Health Logic');
     try {
-        const doctor = await import('#core/doctor').then(m => m.default ?? m);
-        const config = await import('../config.json').then(m => m.default ?? m);
+        const doctor = await import('#core/doctor').then((m) => /** @type {any} */ (m).default ?? m);
+        const config = await import('../../config.json').then((m) => /** @type {any} */ (m).default ?? m);
 
         const chrome = await doctor.probeChromeConnection();
 
         console.log('   ✓ Chrome connection probe:', chrome.connected ? 'CONNECTED' : 'DISCONNECTED');
         console.log(
             '   ✓ Endpoint:',
-            chrome.endpoint || `http://${config.CHROME_PROXY_HOST}:${config.CHROME_PROXY_PORT}/json/version`
+            chrome.endpoint || `http://${config.CHROME_PROXY_HOST}:${config.CHROME_PROXY_PORT}/json/version`,
         );
         console.log('   ✓ Version:', chrome.version || 'N/A');
         console.log('   ✓ Latency:', chrome.latency_ms, 'ms');
@@ -29,14 +29,15 @@ async function testHealthLogic() {
         console.log('   ✓ Mode:', config.BROWSER_MODE);
         console.log('');
     } catch (e) {
-        console.log('   ✗ Error:', e.message);
+        const _ce = /** @type {any} */ (e);
+        console.log('   ✗ Error:', _ce.message);
         console.log('');
     }
 
     // Test 2: PM2 Health
     console.log('📡 2. PM2 Health Logic');
     try {
-        const system = await import('#infra/system').then(m => m.default ?? m);
+        const system = await import('#infra/system').then((m) => /** @type {any} */ (m).default ?? m);
 
         const status = await system.getAgentStatus();
 
@@ -45,61 +46,66 @@ async function testHealthLogic() {
 
         // Try to list PM2 processes
         try {
-            const pm2 = await import('pm2').then(m => m.default ?? m);
+            const pm2 = await import('pm2').then((m) => /** @type {any} */ (m).default ?? m);
             const allProcesses = await new Promise((resolve, reject) => {
-                pm2.list((err, list) => {
+                pm2.list((/** @type {any} */ err, /** @type {any} */ list) => {
                     if (err) {
                         reject(err);
                     } else {
                         resolve(
-                            list.map(proc => ({
+                            list.map((/** @type {any} */ proc) => ({
                                 name: proc.name,
-                                status: proc.pm2_env.status,
+                                status: /** @type {any} */ (proc).pm2_env.status,
                                 pid: proc.pid,
-                                memory: Math.floor(proc.monit.memory / 1024 / 1024) + 'MB',
-                                cpu: proc.monit.cpu + '%',
-                            }))
+                                memory: Math.floor(/** @type {any} */ (proc).monit.memory / 1024 / 1024) + 'MB',
+                                cpu: /** @type {any} */ (proc).monit.cpu + '%',
+                            })),
                         );
                     }
                 });
             });
 
             console.log('   ✓ Total processes:', allProcesses.length);
-            console.log('   ✓ Online processes:', allProcesses.filter(p => p.status === 'online').length);
+            console.log(
+                '   ✓ Online processes:',
+                allProcesses.filter((/** @type {any} */ p) => p.status === 'online').length,
+            );
             if (allProcesses.length > 0) {
                 console.log('   ✓ Processes:');
-                allProcesses.forEach(p => {
+                allProcesses.forEach((/** @type {any} */ p) => {
                     console.log(`      - ${p.name}: ${p.status} (PID ${p.pid}, ${p.memory}, CPU ${p.cpu})`);
                 });
             }
         } catch (listErr) {
-            console.log('   ⚠ Cannot list PM2 processes:', listErr.message);
+            const _ce = /** @type {any} */ (listErr);
+            console.log('   ⚠ Cannot list PM2 processes:', _ce.message);
         }
         console.log('');
     } catch (e) {
-        console.log('   ✗ Error:', e.message);
+        const _ce = /** @type {any} */ (e);
+        console.log('   ✗ Error:', _ce.message);
         console.log('');
     }
 
     // Test 3: Disk Health
     console.log('📡 3. Disk Health Logic');
     try {
-        const fs = await import('node:fs').then(m => m.default ?? m);
+        const fs = await import('node:fs').then((m) => /** @type {any} */ (m).default ?? m);
         const { execSync } = await import('node:child_process');
 
-        const getDirSize = dirPath => {
+        const getDirSize = (/** @type {any} */ dirPath) => {
             try {
                 if (!fs.existsSync(dirPath)) {
                     return 0;
                 }
                 const output = execSync(`du -sb "${dirPath}"`, { encoding: 'utf-8' });
-                return parseInt(output.split('\t')[0]);
+                return parseInt(output.split('\t')[0] ?? '0');
             } catch {
                 return 0;
             }
         };
 
-        const countFiles = dirPath => {
+        const countFiles = (/** @type {any} */ dirPath) => {
             try {
                 if (!fs.existsSync(dirPath)) {
                     return 0;
@@ -137,25 +143,27 @@ async function testHealthLogic() {
         }
         console.log('');
     } catch (e) {
-        console.log('   ✗ Error:', e.message);
+        const _ce = /** @type {any} */ (e);
+        console.log('   ✗ Error:', _ce.message);
         console.log('');
     }
 
     // Test 4: Kernel Health (simplified without NERV)
     console.log('📡 4. Kernel Health Logic (Simplified)');
     try {
-        const io = await import('#infra/io').then(m => m.default ?? m);
+        const io = await import('#infra/io').then((m) => /** @type {any} */ (m).default ?? m);
         const { STATUS_VALUES } = await import('#core/constants/tasks');
 
         const tasks = await io.loadAllTasks();
-        const runningTasks = tasks.filter(t => t.status === STATUS_VALUES.RUNNING).length;
+        const runningTasks = tasks.filter((/** @type {any} */ t) => t.status === STATUS_VALUES.RUNNING).length;
 
         console.log('   ✓ Total tasks:', tasks.length);
         console.log('   ✓ Running tasks:', runningTasks);
         console.log('   ✓ Kernel state:', runningTasks > 0 ? 'RUNNING' : 'IDLE');
         console.log('');
     } catch (e) {
-        console.log('   ✗ Error:', e.message);
+        const _ce = /** @type {any} */ (e);
+        console.log('   ✗ Error:', _ce.message);
         console.log('');
     }
 
@@ -167,7 +175,7 @@ async function testHealthLogic() {
     process.exit(0);
 }
 
-testHealthLogic().catch(e => {
+testHealthLogic().catch((e) => {
     console.error('Fatal error:', e);
     process.exit(1);
 });

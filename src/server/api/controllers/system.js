@@ -1,29 +1,28 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import express from 'express';
-/** Constante/valor exportado: default. */
-const router = express.Router();
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import * as system from '#infra/system';
+// @ts-check
 import * as doctor from '#core/doctor';
-import * as io from '#infra/io';
-import * as socketHub from '#server/engine/socket';
 import { audit, log } from '#core/logger';
 import { ROOT } from '#infra/fs/fs_utils';
+import * as io from '#infra/io';
+import * as system from '#infra/system';
+import * as socketHub from '#server/engine/socket';
+import express from 'express';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+/** Constante/valor exportado: default. */
+const router = express.Router();
 
 /* --------------------------------------------------------------------------
    1. OBSERVABILIDADE DE AGENTES (IPC 2.0)
 -------------------------------------------------------------------------- */
 
 /**
- * GET /agents
- * Retorna o inventário em tempo real de todos os robôs homologados no Hub.
+ * GET /agents Retorna o inventário em tempo real de todos os robôs homologados no Hub.
  */
 router.get('/agents', (req, res) => {
     try {
         const registry = socketHub.getRegistry();
 
-        const agents = registry.map(entry => ({
+        const agents = registry.map((entry) => ({
             robot_id: entry.identity.robot_id,
             instance_id: entry.identity.instance_id,
             status: 'ONLINE',
@@ -39,8 +38,9 @@ router.get('/agents', (req, res) => {
             agents,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha ao listar agentes: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha ao listar agentes: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao acessar o Registry de Agentes.',
@@ -50,8 +50,7 @@ router.get('/agents', (req, res) => {
 });
 
 /**
- * POST /agents/:id/command
- * Despacha um comando IPC 2.0 para um robô específico via Unicast.
+ * POST /agents/:id/command Despacha um comando IPC 2.0 para um robô específico via Unicast.
  */
 router.post('/agents/:id/command', async (req, res) => {
     const { id } = req.params;
@@ -67,6 +66,7 @@ router.post('/agents/:id/command', async (req, res) => {
 
     try {
         // Auditoria obrigatória da intenção de comando administrativo
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('REMOTE_COMMAND', {
             target_robot: id,
             command,
@@ -85,16 +85,17 @@ router.post('/agents/:id/command', async (req, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             msg_id: msgId,
             status: 'DISPATCHED',
             target: id,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha no despacho de comando: ${e.message}`, req.id);
-        res.status(500).json({
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha no despacho de comando: ${_e.message}`, req.id);
+        return res.status(500).json({
             success: false,
             error: 'Falha interna no barramento de comando.',
             request_id: req.id,
@@ -107,8 +108,7 @@ router.post('/agents/:id/command', async (req, res) => {
 -------------------------------------------------------------------------- */
 
 /**
- * GET /health
- * Executa o check-up completo (Rede, Disco, DNA, RAM).
+ * GET /health Executa o check-up completo (Rede, Disco, DNA, RAM).
  */
 router.get('/health', async (req, res) => {
     try {
@@ -117,8 +117,9 @@ router.get('/health', async (req, res) => {
             ...report,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha no motor de diagnóstico: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha no motor de diagnóstico: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao executar diagnóstico de saúde.',
@@ -128,8 +129,7 @@ router.get('/health', async (req, res) => {
 });
 
 /**
- * GET /status
- * Retorna o estado do processo (PM2) do Agente local.
+ * GET /status Retorna o estado do processo (PM2) do Agente local.
  */
 router.get('/status', async (req, res) => {
     try {
@@ -138,8 +138,9 @@ router.get('/status', async (req, res) => {
             ...status,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha ao obter status do processo: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha ao obter status do processo: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao obter status do processo.',
@@ -153,8 +154,7 @@ router.get('/status', async (req, res) => {
 -------------------------------------------------------------------------- */
 
 /**
- * POST /control/:action
- * Executa comandos de ciclo de vida: start, stop, restart, kill_daemon.
+ * POST /control/:action Executa comandos de ciclo de vida: start, stop, restart, kill_daemon.
  */
 router.post('/control/:action', async (req, res) => {
     const { action } = req.params;
@@ -168,15 +168,17 @@ router.post('/control/:action', async (req, res) => {
                 request_id: req.id,
             });
         }
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('PROCESS_CONTROL', { action, source: 'API', request_id: req.id });
         const result = await system.controlAgent(action);
-        res.json({
+        return res.json({
             ...result,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha na operação ${action}: ${e.message}`, req.id);
-        res.status(500).json({
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha na operação ${action}: ${_e.message}`, req.id);
+        return res.status(500).json({
             success: false,
             error: `Falha ao executar comando de processo: ${action}`,
             request_id: req.id,
@@ -185,16 +187,15 @@ router.post('/control/:action', async (req, res) => {
 });
 
 /**
- * GET /locks
- * Inspeção de contenção de recursos físicos (.lock na raiz).
+ * GET /locks Inspeção de contenção de recursos físicos (.lock na raiz).
  */
 router.get('/locks', async (req, res) => {
     try {
         const files = await fs.readdir(ROOT);
-        const lockFiles = files.filter(f => f.startsWith('RUNNING_') && f.endsWith('.lock'));
+        const lockFiles = files.filter((f) => f.startsWith('RUNNING_') && f.endsWith('.lock'));
 
         const locks = await Promise.all(
-            lockFiles.map(async f => {
+            lockFiles.map(async (f) => {
                 const content = await io.safeReadJSON(path.join(ROOT, f));
                 if (!content) {
                     return null;
@@ -207,16 +208,17 @@ router.get('/locks', async (req, res) => {
                     target: f.replace('RUNNING_', '').replace('.lock', ''),
                     ...safeContent,
                 };
-            })
+            }),
         );
 
         res.json({
             success: true,
-            locks: locks.filter(l => l !== null),
+            locks: locks.filter((l) => l !== null),
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha ao listar travas: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha ao listar travas: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao listar travas ativas no sistema.',

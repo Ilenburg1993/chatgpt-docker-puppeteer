@@ -841,10 +841,10 @@ reconhecido.
    ```bash
    # Container
    docker-compose up -d
-
+   
    # Windows (manual!)
    cd C:\proxy
-   npm install  # Precisa Node.js no Windows
+   npm install # Precisa Node.js no Windows
    pm2 start proxy.js
    ```
 

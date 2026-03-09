@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { promises as fs } from 'node:fs';
-// @ts-nocheck
-import path from 'node:path';
+// @ts-check
 import { log } from '#core/logger';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const PROFILE_DIR = path.join(ROOT, 'profile');
@@ -11,7 +11,8 @@ const MAX_BACKUPS_DAYS = 30; // Mantém backups por 30 dias
 
 /**
  * Rotaciona o profile persistente atual para backup
-  * @returns {Promise<any>}
+ *
+ * @returns {Promise<any>}
  */
 async function rotateProfile() {
     try {
@@ -29,7 +30,7 @@ async function rotateProfile() {
         try {
             await fs.mkdir(BACKUP_DIR, { recursive: true });
         } catch (error) {
-            log('ERROR', `[ROTATE] Erro ao criar diretório de backups: ${error.message}`);
+            log('ERROR', `[ROTATE] Erro ao criar diretório de backups: ${/** @type {any} */ (error).message}`);
             throw error;
         }
 
@@ -57,14 +58,15 @@ async function rotateProfile() {
             timestamp,
         };
     } catch (error) {
-        log('ERROR', `[ROTATE] Erro ao rotacionar profile: ${error.message}`);
+        log('ERROR', `[ROTATE] Erro ao rotacionar profile: ${/** @type {any} */ (error).message}`);
         throw error;
     }
 }
 
 /**
  * Remove backups antigos (>30 dias)
-  * @returns {Promise<any>}
+ *
+ * @returns {Promise<any>}
  */
 async function cleanOldBackups() {
     try {
@@ -79,7 +81,7 @@ async function cleanOldBackups() {
         }
 
         const entries = await fs.readdir(BACKUP_DIR, { withFileTypes: true });
-        const backups = entries.filter(e => e.isDirectory() && e.name.startsWith('profile_'));
+        const backups = entries.filter((e) => e.isDirectory() && e.name.startsWith('profile_'));
 
         const now = Date.now();
         const maxAge = MAX_BACKUPS_DAYS * 24 * 60 * 60 * 1000;
@@ -98,7 +100,7 @@ async function cleanOldBackups() {
 
                 log(
                     'INFO',
-                    `[ROTATE] Removendo backup antigo: ${backup.name} (${(age / 1000 / 60 / 60 / 24).toFixed(1)} dias)`
+                    `[ROTATE] Removendo backup antigo: ${backup.name} (${(age / 1000 / 60 / 60 / 24).toFixed(1)} dias)`,
                 );
                 await fs.rm(backupPath, { recursive: true, force: true });
                 cleaned++;
@@ -115,14 +117,16 @@ async function cleanOldBackups() {
 
         return { cleaned, totalSizeMB: parseFloat(totalSizeMB) };
     } catch (error) {
-        log('ERROR', `[ROTATE] Erro ao limpar backups: ${error.message}`);
+        log('ERROR', `[ROTATE] Erro ao limpar backups: ${/** @type {any} */ (error).message}`);
         throw error;
     }
 }
 
 /**
  * Calcula tamanho total de um diretório (recursivo)
-  * @returns {Promise<any>}
+ *
+ * @param {any} dirPath
+ * @returns {Promise<number>}
  */
 async function getDirectorySize(dirPath) {
     let totalSize = 0;
@@ -149,7 +153,8 @@ async function getDirectorySize(dirPath) {
 
 /**
  * Retorna estatísticas dos backups atuais
-  * @returns {Promise<any>}
+ *
+ * @returns {Promise<any>}
  */
 async function getBackupStats() {
     try {
@@ -159,7 +164,7 @@ async function getBackupStats() {
     }
 
     const entries = await fs.readdir(BACKUP_DIR, { withFileTypes: true });
-    const backups = entries.filter(e => e.isDirectory() && e.name.startsWith('profile_'));
+    const backups = entries.filter((e) => e.isDirectory() && e.name.startsWith('profile_'));
 
     let totalSize = 0;
     const backupDetails = [];
@@ -179,7 +184,7 @@ async function getBackupStats() {
     }
 
     // Ordena por data (mais recente primeiro)
-    backupDetails.sort((a, b) => b.created - a.created);
+    backupDetails.sort((/** @type {any} */ a, /** @type {any} */ b) => b.created - a.created);
 
     return {
         count: backups.length,
@@ -221,14 +226,14 @@ async function main() {
 
         if (stats.backups.length > 0) {
             console.log(`\n📦 Backups disponíveis:`);
-            stats.backups.forEach(b => {
+            stats.backups.forEach((/** @type {any} */ b) => {
                 console.log(`   - ${b.name}: ${b.sizeMB} MB (${b.ageDays} dias)`);
             });
         }
 
         console.log('\n✅ Rotação concluída com sucesso!');
     } catch (error) {
-        console.error(`\n❌ Erro na rotação: ${error.message}`);
+        console.error(`\n\u274c Erro na rotação: ${/** @type {any} */ (error).message}`);
         process.exit(1);
     }
 }
@@ -238,4 +243,4 @@ if (import.meta.filename === process.argv[1]) {
     main();
 }
 
-export { rotateProfile, cleanOldBackups, getBackupStats, getDirectorySize };
+export { cleanOldBackups, getBackupStats, getDirectorySize, rotateProfile };

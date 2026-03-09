@@ -1,8 +1,8 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import * as socketHub from '#server/engine/socket';
-import remediation from './remediation.js';
+// @ts-check
 import { log } from '#core/logger';
+import * as socketHub from '#server/engine/socket';
 import { ActionCode, MessageType } from '#shared/nerv/constants';
+import remediation from './remediation.js';
 
 class SupervisorReconciler {
     constructor() {
@@ -16,8 +16,8 @@ class SupervisorReconciler {
     }
 
     /**
-     * Inicia a vigilância ativa e acopla os gatilhos de remediação ao barramento.
-     * Garante que o sistema entre em modo de monitoramento contínuo.
+     * Inicia a vigilância ativa e acopla os gatilhos de remediação ao barramento. Garante que o sistema entre em modo
+     * de monitoramento contínuo.
      */
     start() {
         if (this.checkInterval) {
@@ -34,8 +34,8 @@ class SupervisorReconciler {
     }
 
     /**
-     * Acopla o Reconciliador ao barramento Socket.io para intercepção de falhas.
-     * Implementa proteção contra duplicidade de listeners em reinicializações.
+     * Acopla o Reconciliador ao barramento Socket.io para intercepção de falhas. Implementa proteção contra duplicidade
+     * de listeners em reinicializações.
      */
     _attachSensoryListeners() {
         if (this.isListening) {
@@ -56,13 +56,13 @@ class SupervisorReconciler {
         }
 
         /**
-         * Intercepta eventos de diagnóstico (STALL_DETECTED) no milissegundo
-         * em que são emitidos pelo robô, permitindo reação instantânea do Supervisor.
+         * Intercepta eventos de diagnóstico (STALL_DETECTED) no milissegundo em que são emitidos pelo robô, permitindo
+         * reação instantânea do Supervisor.
          */
-        io.on('connection', socket => {
-            socket.on('message', envelope => {
+        io.on('connection', (/** @type {any} */ socket) => {
+            socket.on('message', (/** @type {any} */ envelope) => {
                 if (envelope.kind === MessageType.EVENT && envelope.actionCode === ActionCode.STALL_DETECTED) {
-                    this._handleStallSignal(socket.robot_id, envelope);
+                    void this._handleStallSignal(socket.robot_id, envelope);
                 }
             });
         });
@@ -72,14 +72,14 @@ class SupervisorReconciler {
     }
 
     /**
-     * Loop de Reconciliação: Compara o estado real reportado com o estado desejado.
-     * Atua como a "vontade do sistema" sobre a frota.
+     * Loop de Reconciliação: Compara o estado real reportado com o estado desejado. Atua como a "vontade do sistema"
+     * sobre a frota.
      */
     reconcile() {
         const agents = socketHub.getRegistry();
         const now = Date.now();
 
-        agents.forEach(agent => {
+        agents.forEach((agent) => {
             const { robot_id, last_seen } = agent;
             const idleTime = now - last_seen;
 
@@ -88,7 +88,7 @@ class SupervisorReconciler {
             if (idleTime > this.HEARTBEAT_THRESHOLD_MS) {
                 log(
                     'WARN',
-                    `[RECONCILER] Drift detectado: Agente ${robot_id} está silencioso há ${Math.round(idleTime / 1000)}s.`
+                    `[RECONCILER] Drift detectado: Agente ${robot_id} está silencioso há ${Math.round(idleTime / 1000)}s.`,
                 );
                 this._attemptEmergencyPing(robot_id);
                 return;
@@ -104,7 +104,7 @@ class SupervisorReconciler {
      * Processa um alerta de Stall e aplica a manobra de remediação prescrita.
      *
      * @param {string} robotId - Identidade do robô que emitiu o alerta.
-     * @param {object} envelope - O Envelope IPC contendo o diagnóstico técnico.
+     * @param {any} envelope - O Envelope IPC contendo o diagnóstico técnico.
      */
     async _handleStallSignal(robotId, envelope) {
         const diagnosis = envelope.payload;
@@ -113,7 +113,7 @@ class SupervisorReconciler {
         log('INFO', `[RECONCILER] Analisando sintoma "${diagnosis.type}" no robô ${robotId}`, correlationId);
 
         // Consulta a "Farmacopeia" (Remediation Engine) para obter a prescrição
-        const prescription = remediation.evaluate(diagnosis);
+        const prescription = /** @type {any} */ (remediation.evaluate(diagnosis));
 
         if (prescription) {
             log('WARN', `[RECONCILER] Executando Autocura: ${prescription.command}`, correlationId);
@@ -125,13 +125,14 @@ class SupervisorReconciler {
                     ...prescription.params,
                     correlation_id: correlationId, // Preserva o Fio de Ariadne para rastreabilidade
                 },
-                robotId
+                robotId,
             );
         }
     }
 
     /**
      * Tenta reativar um robô silencioso enviando um pulso de Resume.
+     *
      * @param {string} robotId - ID do robô alvo.
      */
     _attemptEmergencyPing(robotId) {
@@ -141,14 +142,14 @@ class SupervisorReconciler {
                 reason: 'RECONCILER_HEARTBEAT_RECOVERY',
                 correlation_id: `sys-rec-${Date.now()}`,
             },
-            robotId
+            robotId,
         );
     }
 
     /**
      * Verifica inconsistências entre o que o robô reporta e o que a fila exige.
      */
-    _checkTaskDrift(agent, now) {
+    _checkTaskDrift(/** @type {any} */ agent, /** @type {any} */ now) {
         // Implementação futura: detecção de inconsistência entre disco (Tarefa RUNNING) e memória (Robô IDLE).
         // Referências temporárias para evitar avisos de variáveis não utilizadas até a implementação completa.
         void agent;
@@ -156,8 +157,7 @@ class SupervisorReconciler {
     }
 
     /**
-     * Encerra a vigilância e limpa os timers.
-     * Chamado pelo orquestrador de ciclo de vida no desligamento do servidor.
+     * Encerra a vigilância e limpa os timers. Chamado pelo orquestrador de ciclo de vida no desligamento do servidor.
      */
     stop() {
         if (this.checkInterval) {

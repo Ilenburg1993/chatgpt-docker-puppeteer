@@ -1,5 +1,6 @@
-import './lib/env-bootstrap.mjs';
+// @ts-check
 import { parseArgs } from 'node:util';
+import './lib/env-bootstrap.mjs';
 import { ragReset } from './lib/facade.mjs';
 
 const { values } = parseArgs({

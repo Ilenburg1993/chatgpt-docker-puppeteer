@@ -110,8 +110,8 @@ try {
     new Promise((_, reject) =>
       setTimeout(
         () => reject(new Error(`SSOT init timeout após ${SSOT_INIT_TIMEOUT}ms`)),
-        SSOT_INIT_TIMEOUT
-      )
+        SSOT_INIT_TIMEOUT,
+      ),
     ),
   ]);
 } catch (err) {
@@ -186,7 +186,7 @@ log('INFO', '[BOOT] ✅ ContextManager online (será compartilhado por Kernel e 
 ```javascript
 // Em SPLIT mode (L787):
 const ServerNERVAdapter = await import('./server/nerv_adapter/server_nerv_adapter.js').then(
-  m => m.default ?? m
+  (m) => m.default ?? m,
 );
 serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
 
@@ -236,7 +236,7 @@ _signalHandlers.sighup = async () => {
     // BUG-012: Adiciona timeout no reload
     const reloadPromise = CONFIG.reload('sys-sighup');
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('CONFIG reload timeout após 5s')), 5000)
+      setTimeout(() => reject(new Error('CONFIG reload timeout após 5s')), 5000),
     );
 
     await Promise.race([reloadPromise, timeoutPromise]);
@@ -272,14 +272,14 @@ _signalHandlers.sighup = async () => {
 ```javascript
 // ANTES:
 try {
-  const reconciler = await import('./server/supervisor/reconcilier.js').then(m => m.default ?? m);
+  const reconciler = await import('./server/supervisor/reconcilier.js').then((m) => m.default ?? m);
   if (typeof reconciler?.stop === 'function') {
     try {
       await reconciler.stop();
     } catch (err) {
       log(
         'WARN',
-        `[SHUTDOWN] reconciler.stop threw: ${err && err.message ? err.message : String(err)}`
+        `[SHUTDOWN] reconciler.stop threw: ${err && err.message ? err.message : String(err)}`,
       );
     }
   }
@@ -289,7 +289,7 @@ try {
 
 // DEPOIS:
 try {
-  const reconciler = await import('./server/supervisor/reconcilier.js').then(m => m.default ?? m);
+  const reconciler = await import('./server/supervisor/reconcilier.js').then((m) => m.default ?? m);
   if (reconciler && typeof reconciler.stop === 'function') {
     try {
       await reconciler.stop();

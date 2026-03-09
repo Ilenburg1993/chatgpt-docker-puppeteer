@@ -103,11 +103,13 @@ this.stats = {
 // Linha 762 (JSDoc comment)
 /**
  * PRÉ-CONDIÇÕES:
+ *
  * - Interface ready (validateLLMInterface passou)
  * - DNA loaded (getTargetRules executou) ✅
  * - Estado inicial: IDLE
  *
  * INTEGRAÇÃO:
+ *
  * - DNA: Usa selectors de dynamic_rules.json (this.dnaRules) ✅
  * - BiomechanicsEngine: Typing biomimético, click submit
  * - AbortSignal: Checked a cada ciclo de perception loop
@@ -329,7 +331,7 @@ async function findChatInputSelector(page, langCode = 'en') {
         shadowRoot: discovered.isShadowRoot,
       },
       domain,
-      'input_box'
+      'input_box',
     );
 
     if (result.accepted) {

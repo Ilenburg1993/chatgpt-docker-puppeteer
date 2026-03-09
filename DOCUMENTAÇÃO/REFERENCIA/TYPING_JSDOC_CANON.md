@@ -12,8 +12,8 @@ Use this file when the question is:
 - which scripts and gates are part of the supported interface
 - what "done" means for typing and JSDoc
 
-This file is normative. Supporting documents may explain, index, or operationalize it, but they
-must not compete with it.
+This file is normative. Supporting documents may explain, index, or operationalize it, but they must
+not compete with it.
 
 ## Scope
 
@@ -74,8 +74,8 @@ never replaces file-local JSDoc when the type is not shared.
 - `tsconfig.node.json`, `tsconfig.browser.json`, `tsconfig.tools.json`, `tsconfig.tests.json`:
   family configs
 - `tsconfig.strict.json`: strict workspace solution only
-- `tsconfig.strict.*.json`: operational strict lanes
-- `tsconfig.strict.public.json`: normative public-contract lane
+- `config/typing/strict/tsconfig.strict.*.json`: operational strict lanes
+- `config/typing/strict/tsconfig.strict.public.json`: normative public-contract lane
 - `tsconfig.declarations.json`: declaration emit validator for public JS-first APIs
 
 ### Contract layer
@@ -90,8 +90,8 @@ never replaces file-local JSDoc when the type is not shared.
 
 - `scripts/analysis/jsdoc_coverage_engine.mjs`: measurement engine
 - `scripts/analysis/jsdoc_coverage_cli.mjs`: canonical JSDoc report CLI
-- `scripts/analysis/typing_hardening_audit.mjs`: aggregate quality audit
-- `scripts/analysis/tsserver_contract_audit.mjs`: wrapper drift audit
+- `scripts/analysis/typing/typing_hardening_audit.mjs`: aggregate quality audit
+- `scripts/analysis/typing/tsserver_contract_audit.mjs`: wrapper drift audit
 
 ### Governance layer
 
@@ -162,8 +162,8 @@ The following commands are part of the supported repository contract and may not
 - `check:schemas:typing`
 - `check:skills:strict`
 
-Changing any of these commands requires a governance update in this canon, the automation index,
-and the relevant skill documentation.
+Changing any of these commands requires a governance update in this canon, the automation index, and
+the relevant skill documentation.
 
 ## Canonical CI Gate
 

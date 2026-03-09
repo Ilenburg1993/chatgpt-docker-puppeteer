@@ -1,4 +1,5 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
+// Mock chrome page — todos os métodos são async para compatibilidade com a API Puppeteer
 import { v4 as uuidv4 } from 'uuid';
 
 function createMockPage() {
@@ -11,10 +12,10 @@ function createMockPage() {
         url() {
             return this._url;
         },
-        async goto(url, _ = {}) {
+        async goto(/** @type {any} */ url, _ = {}) {
             this._url = url;
             // pequeno delay simulado para aproximar comportamento real
-            await new Promise(resolve => setTimeout(resolve, 5));
+            await new Promise((resolve) => setTimeout(resolve, 5));
             return { ok: true };
         },
         async title() {
@@ -26,11 +27,15 @@ function createMockPage() {
         async setViewport() {
             return;
         },
+        /**
+         * @param {any} fn
+         * @param {...any} args
+         */
         async evaluate(fn, ...args) {
             if (typeof fn === 'function') {
                 try {
                     return fn(...args);
-                } catch (e) {
+                } catch (/** @type {any} */ e) {
                     return null;
                 }
             }
@@ -62,6 +67,7 @@ function createMockPage() {
 
 /**
  * Função exportada: createMockBrowser.
+ *
  * @returns {any}
  */
 function createMockBrowser() {
@@ -94,7 +100,7 @@ function createMockBrowser() {
             for (const p of pages) {
                 try {
                     if (!p.isClosed()) await p.close();
-                } catch (e) {
+                } catch (/** @type {any} */ e) {
                     // swallow
                 }
             }

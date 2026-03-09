@@ -1,10 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
-import Badge from '@/components/ui/Badge.vue';
-import { useEventsVNextStore } from '@/stores/events_vnext';
 import { useSocket } from '@/composables/useSocket';
+import { useEventsVNextStore } from '@/stores/events_vnext';
+import { computed, onMounted, ref } from 'vue';
 
 const store = useEventsVNextStore();
 const { isConnected } = useSocket();

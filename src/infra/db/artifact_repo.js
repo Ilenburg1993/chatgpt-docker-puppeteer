@@ -11,17 +11,19 @@ function _makeArtifactId() {
 }
 
 /**
- * @typedef {{
- *   id?: string,
- *   kind: string,
- *   mime: string,
- *   size_bytes: number,
- *   sha256?: string|null,
- *   storage_uri: string,
- *   created_at_ms?: number,
- *   created_by?: string|null,
- * }} ArtifactInsert
-  * @returns {any}
+ * @typedef {object} ArtifactInsert
+ * @property {string} [id] - ID do artefato (gerado se omitido)
+ * @property {string} kind - Tipo do artefato
+ * @property {string} mime - MIME type
+ * @property {number} size_bytes - Tamanho em bytes
+ * @property {string | null} [sha256] - Hash SHA-256
+ * @property {string} storage_uri - URI de armazenamento
+ * @property {number} [created_at_ms] - Timestamp de criação
+ * @property {string | null} [created_by] - ID do criador
+ */
+/**
+ * @param {ArtifactInsert} input
+ * @returns {string | null}
  */
 
 function insertArtifact(input) {
@@ -36,7 +38,7 @@ function insertArtifact(input) {
         ) VALUES (
             @id, @kind, @mime, @size_bytes, @sha256, @storage_uri, @created_at_ms, @created_by
         )
-    `
+    `,
     ).run({
         id,
         kind: String(input.kind),
@@ -53,6 +55,8 @@ function insertArtifact(input) {
 
 /**
  * Função exportada: getArtifactById.
+ *
+ * @param {any} artifactId
  * @returns {any}
  */
 function getArtifactById(artifactId) {
@@ -62,6 +66,7 @@ function getArtifactById(artifactId) {
 
 /**
  * Deletes an artifact record by ID. Returns the number of rows deleted (0 or 1).
+ *
  * @param {string} artifactId
  * @returns {number}
  */
@@ -71,4 +76,4 @@ function deleteArtifactById(artifactId) {
     return result.changes;
 }
 
-export { insertArtifact, getArtifactById, deleteArtifactById };
+export { deleteArtifactById, getArtifactById, insertArtifact };

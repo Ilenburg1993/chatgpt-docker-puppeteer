@@ -135,7 +135,7 @@ git commit -m "feat: Integrar sistema ENV no DevContainer boot flow
 - Integrar .env files no devcontainer.json (runArgs + remoteEnv)
 - Documentar ENV defaults no Dockerfile (Section 8.5)
 - Converter ENABLE_STATE_FILE para ENV var
-- Adicionar análise completa em `RELATORIOS/RECLASSIFICADOS/DEVCONTAINER_REBUILD_ANALYSIS.md`
+- Adicionar análise completa em $(RELATORIOS/RECLASSIFICADOS/DEVCONTAINER_REBUILD_ANALYSIS.md)
 
 BREAKING CHANGE: ENABLE_STATE_FILE agora requer ENV var (fallback: true)"
 

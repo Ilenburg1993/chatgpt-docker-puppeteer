@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import adaptive from '#logic/adaptive';
-// @ts-nocheck
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -48,7 +48,7 @@ function assertLess(actual, threshold, message) {
 }
 
 async function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /* --------------------------------------------------------------------------
@@ -274,7 +274,7 @@ async function runTests() {
 }
 
 // Run
-runTests().catch(e => {
+runTests().catch((e) => {
     console.error('Fatal error:', e);
     process.exit(1);
 });

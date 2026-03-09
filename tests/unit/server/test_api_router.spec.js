@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('API Router - Rotas e Controllers', () => {
     describe('1. Rotas de Tarefas (Tasks)', () => {
@@ -11,7 +11,7 @@ describe('API Router - Rotas e Controllers', () => {
                 { method: 'GET', path: '/api/tasks/:id' },
             ];
 
-            const getRoute = routes.find(r => r.method === 'GET' && r.path === '/api/tasks');
+            const getRoute = routes.find((r) => r.method === 'GET' && r.path === '/api/tasks');
 
             assert.ok(getRoute, 'Rota GET /api/tasks deve existir');
         });
@@ -19,7 +19,7 @@ describe('API Router - Rotas e Controllers', () => {
         it('deve ter rota POST /api/tasks', () => {
             const routes = [{ method: 'POST', path: '/api/tasks' }];
 
-            const postRoute = routes.find(r => r.method === 'POST');
+            const postRoute = routes.find((r) => r.method === 'POST');
 
             assert.ok(postRoute);
         });
@@ -237,7 +237,7 @@ describe('API Router - Rotas e Controllers', () => {
 
         it('deve criar nova tarefa', () => {
             const controller = {
-                createTask: body => {
+                createTask: (/** @type {any} */ body) => {
                     return {
                         id: 'task-new',
                         ...body,
@@ -256,10 +256,10 @@ describe('API Router - Rotas e Controllers', () => {
 
         it('deve buscar tarefa por ID', () => {
             const controller = {
-                getTask: id => {
-                    const tasks = {
+                getTask: (/** @type {any} */ id) => {
+                    const tasks = /** @type {Record<string, any>} */ ({
                         'task-001': { id: 'task-001', status: 'DONE' },
-                    };
+                    });
                     return tasks[id];
                 },
             };
@@ -288,7 +288,7 @@ describe('API Router - Rotas e Controllers', () => {
 
         it('deve processar comando de controle', () => {
             const controller = {
-                controlAgent: command => {
+                controlAgent: (/** @type {any} */ command) => {
                     return {
                         command,
                         executed: true,
@@ -321,7 +321,7 @@ describe('API Router - Rotas e Controllers', () => {
 
     describe('11. Tratamento de Erros', () => {
         it('deve capturar erro de validação', () => {
-            const validateTask = body => {
+            const validateTask = (/** @type {any} */ body) => {
                 if (!body.prompt) {
                     throw new Error('Prompt is required');
                 }
@@ -379,7 +379,7 @@ describe('API Router - Rotas e Controllers', () => {
                 { method: 'GET', path: '/static/*' },
             ];
 
-            const staticRoute = routes.find(r => r.path === '/static/*');
+            const staticRoute = routes.find((r) => r.path === '/static/*');
 
             assert.ok(staticRoute);
         });

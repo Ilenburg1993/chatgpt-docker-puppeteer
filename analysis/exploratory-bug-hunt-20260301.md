@@ -29,7 +29,7 @@ Ambos necessitam correção antes do próximo ciclo de carga.
 
 ```js
 step()
-  .catch(err => {
+  .catch((err) => {
     consecutiveStepFailures++; // (1) incrementa
     if (consecutiveStepFailures >= MAX_CONSECUTIVE_FAILURES) {
       stop(); // (2) stop — mas...
@@ -52,7 +52,7 @@ step()
   .then(() => {
     consecutiveStepFailures = 0;
   }) // reset APENAS em sucesso
-  .catch(err => {
+  .catch((err) => {
     consecutiveStepFailures++;
     // ... telemetria ...
     if (consecutiveStepFailures >= MAX_CONSECUTIVE_FAILURES) {
@@ -110,7 +110,7 @@ try {
       ActionCode.DRIVER_ABORT,
       { taskId, reason: 'WATCHDOG_HEARTBEAT_TIMEOUT' },
       attemptId,
-      ActorRole.DRIVER
+      ActorRole.DRIVER,
     );
   }
 } catch (err) {
@@ -205,7 +205,7 @@ let timeoutHandle;
 const timeoutPromise = new Promise((_, reject) => {
   timeoutHandle = setTimeout(
     () => reject(new Error('Decision application timeout after 5s')),
-    5000
+    5000,
   );
 });
 try {

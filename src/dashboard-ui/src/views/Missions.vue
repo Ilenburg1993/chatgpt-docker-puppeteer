@@ -1,13 +1,13 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Plus, RefreshCw } from 'lucide-vue-next';
-import { useRouter } from 'vue-router';
-import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
-import Badge from '@/components/ui/Badge.vue';
 import Modal from '@/components/ui/Modal.vue';
 import { useSsotRealtime } from '@/composables/useSsotRealtime';
+import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import { Plus, RefreshCw } from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const store = useMissionsVNextStore();
@@ -71,7 +71,7 @@ async function createMission() {
                 description: createForm.value.description,
                 autonomy_mode: createForm.value.autonomy_mode,
             },
-            createForm.value.reason.trim()
+            createForm.value.reason.trim(),
         );
         showCreate.value = false;
         createForm.value = { title: '', description: '', autonomy_mode: 'USER_ONLY', reason: '' };

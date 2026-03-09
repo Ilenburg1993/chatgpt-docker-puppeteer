@@ -1,12 +1,14 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { createInferenceGatewayServer } from '../../../src/inference_gateway/server.js';
 
-async function listen(server) {
-    await new Promise((resolve, reject) => {
-        server.listen(0, '127.0.0.1', err => (err ? reject(err) : resolve()));
-    });
+async function listen(/** @type {any} */ server) {
+    await /** @type {Promise<void>} */ (
+        new Promise((resolve, reject) => {
+            server.listen(0, '127.0.0.1', (/** @type {any} */ err) => (err ? reject(err) : resolve()));
+        })
+    );
     const addr = server.address();
     return `http://${addr.address}:${addr.port}`;
 }
@@ -14,8 +16,8 @@ async function listen(server) {
 test('inference gateway server exposes validate/generate preflight endpoint', async () => {
     let validateCalls = 0;
     const server = createInferenceGatewayServer({
-        gateway: {
-            validateGenerate(body) {
+        gateway: /** @type {any} */ ({
+            validateGenerate(/** @type {any} */ body) {
                 validateCalls += 1;
                 return {
                     ok: true,
@@ -29,7 +31,7 @@ test('inference gateway server exposes validate/generate preflight endpoint', as
             getMetrics() {
                 return {};
             },
-        },
+        }),
     });
     const base = await listen(server);
     try {
@@ -44,20 +46,20 @@ test('inference gateway server exposes validate/generate preflight endpoint', as
         assert.equal(json.clientTag, 'audit_agent_triage');
         assert.equal(validateCalls, 1);
     } finally {
-        await new Promise(resolve => server.close(() => resolve()));
+        await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
     }
 });
 
 test('inference gateway server returns 400 when preflight route is rejected', async () => {
     const server = createInferenceGatewayServer({
-        gateway: {
+        gateway: /** @type {any} */ ({
             validateGenerate() {
                 return { ok: false, reason: 'model not allowed' };
             },
             getMetrics() {
                 return {};
             },
-        },
+        }),
     });
     const base = await listen(server);
     try {
@@ -71,6 +73,6 @@ test('inference gateway server returns 400 when preflight route is rejected', as
         assert.equal(json.ok, false);
         assert.equal(json.reason, 'model not allowed');
     } finally {
-        await new Promise(resolve => server.close(() => resolve()));
+        await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
     }
 });

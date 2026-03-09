@@ -1,8 +1,8 @@
 // @ts-check
+import { HandleManager } from '#driver/modules/handle_manager';
 import { promises as fsPromises } from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { HandleManager } from '#driver/modules/handle_manager';
 
 // ============================================================================
 // TEST 1: Shutdown - Isolamento de Erros Por Fase
@@ -10,14 +10,15 @@ import { HandleManager } from '#driver/modules/handle_manager';
 
 /**
  * Função exportada: testShutdownPhaseIsolation.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function testShutdownPhaseIsolation() {
     console.log('\n=== TEST 1: Shutdown - Isolamento de Erros ===');
 
     try {
         // Mock de shutdown function (baseado em src/main.js)
-        async function mockShutdown(context) {
+        async function mockShutdown(/** @type {any} */ context) {
             const phases = [];
             let failedPhases = 0;
 
@@ -26,7 +27,7 @@ async function testShutdownPhaseIsolation() {
                     name: 'Phase1-Success',
                     fn: async () => {
                         // Fase que funciona
-                        await new Promise(resolve => {
+                        await new Promise((resolve) => {
                             setTimeout(resolve, 10);
                         });
                     },
@@ -42,7 +43,7 @@ async function testShutdownPhaseIsolation() {
                     name: 'Phase3-Success',
                     fn: async () => {
                         // Fase após falha (deve executar mesmo assim)
-                        await new Promise(resolve => {
+                        await new Promise((resolve) => {
                             setTimeout(resolve, 10);
                         });
                     },
@@ -58,7 +59,7 @@ async function testShutdownPhaseIsolation() {
                     name: 'Phase5-Success',
                     fn: async () => {
                         // Última fase (deve executar)
-                        await new Promise(resolve => {
+                        await new Promise((resolve) => {
                             setTimeout(resolve, 10);
                         });
                     },
@@ -70,7 +71,7 @@ async function testShutdownPhaseIsolation() {
                 try {
                     await phase.fn();
                     phases.push({ name: phase.name, status: 'SUCCESS' });
-                } catch (error) {
+                } catch (/** @type {any} */ error) {
                     failedPhases++;
                     phases.push({ name: phase.name, status: 'FAILED', error: error.message });
                 }
@@ -94,7 +95,7 @@ async function testShutdownPhaseIsolation() {
         console.log('✅ Todas as 5 fases foram executadas');
 
         // Valida que fases com sucesso realmente passaram
-        const successPhases = result.phases.filter(p => p.status === 'SUCCESS');
+        const successPhases = result.phases.filter((p) => p.status === 'SUCCESS');
         if (successPhases.length !== 3) {
             console.error(`❌ Esperado 3 sucessos, obteve ${successPhases.length}`);
             return false;
@@ -103,7 +104,7 @@ async function testShutdownPhaseIsolation() {
         console.log('✅ 3 fases com sucesso (Phase1, Phase3, Phase5)');
 
         // Valida que fases com erro foram capturadas
-        const failedPhases = result.phases.filter(p => p.status === 'FAILED');
+        const failedPhases = result.phases.filter((p) => p.status === 'FAILED');
         if (failedPhases.length !== 2) {
             console.error(`❌ Esperado 2 falhas, obteve ${failedPhases.length}`);
             return false;
@@ -112,8 +113,8 @@ async function testShutdownPhaseIsolation() {
         console.log('✅ 2 fases com falha capturadas (Phase2, Phase4)');
 
         // Valida que Phase3 executou APÓS Phase2 falhar
-        const phase3Index = result.phases.findIndex(p => p.name === 'Phase3-Success');
-        const phase2Index = result.phases.findIndex(p => p.name === 'Phase2-Fail');
+        const phase3Index = result.phases.findIndex((p) => p.name === 'Phase3-Success');
+        const phase2Index = result.phases.findIndex((p) => p.name === 'Phase2-Fail');
 
         if (phase3Index <= phase2Index) {
             console.error('❌ Phase3 não executou após Phase2 falhar');
@@ -124,7 +125,7 @@ async function testShutdownPhaseIsolation() {
 
         console.log('✅ TEST 1 PASSOU: Isolamento de erros implementado corretamente\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 1 FALHOU:', error.message);
         return false;
     }
@@ -136,7 +137,8 @@ async function testShutdownPhaseIsolation() {
 
 /**
  * Função exportada: testHandleManagerAbort.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function testHandleManagerAbort() {
     console.log('\n=== TEST 2: HandleManager - AbortController ===');
@@ -152,7 +154,7 @@ async function testHandleManagerAbort() {
             mockHandles.push({
                 dispose: async () => {
                     // Simula dispose lento (500ms cada)
-                    await new Promise(resolve => {
+                    await new Promise((resolve) => {
                         setTimeout(resolve, 500);
                     });
                 },
@@ -160,7 +162,7 @@ async function testHandleManagerAbort() {
         }
 
         // Registra todos os handles
-        mockHandles.forEach(h => manager.register(h));
+        mockHandles.forEach((h) => manager.register(h));
 
         console.log(`> ${manager.getActiveCount()} handles registrados`);
         console.log('> Iniciando cleanup com timeout de 3s...');
@@ -198,7 +200,7 @@ async function testHandleManagerAbort() {
 
         console.log('✅ TEST 2 PASSOU: AbortController funcionando corretamente\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 2 FALHOU:', error.message);
         return false;
     }
@@ -210,7 +212,8 @@ async function testHandleManagerAbort() {
 
 /**
  * Função exportada: testHandleManagerComplete.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function testHandleManagerComplete() {
     console.log('\n=== TEST 3: HandleManager - Cleanup Completo ===');
@@ -224,14 +227,14 @@ async function testHandleManagerComplete() {
         for (let i = 0; i < 5; i++) {
             mockHandles.push({
                 dispose: async () => {
-                    await new Promise(resolve => {
+                    await new Promise((resolve) => {
                         setTimeout(resolve, 50);
                     });
                 },
             });
         }
 
-        mockHandles.forEach(h => manager.register(h));
+        mockHandles.forEach((h) => manager.register(h));
 
         console.log(`> ${manager.getActiveCount()} handles registrados`);
         console.log('> Iniciando cleanup rápido (5 × 50ms = 250ms)...');
@@ -260,7 +263,7 @@ async function testHandleManagerComplete() {
 
         console.log('✅ TEST 3 PASSOU: Cleanup completo sem abort\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 3 FALHOU:', error.message);
         return false;
     }
@@ -272,7 +275,8 @@ async function testHandleManagerComplete() {
 
 /**
  * Função exportada: testHandleManagerWithErrors.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function testHandleManagerWithErrors() {
     console.log('\n=== TEST 4: HandleManager - Handles com Erros Individuais ===');
@@ -310,7 +314,7 @@ async function testHandleManagerWithErrors() {
             },
         ];
 
-        mockHandles.forEach(h => manager.register(h));
+        mockHandles.forEach((h) => manager.register(h));
 
         console.log('> 5 handles registrados (2 com erros simulados)...');
         console.log('> Executando cleanup...');
@@ -328,7 +332,7 @@ async function testHandleManagerWithErrors() {
 
         console.log('✅ TEST 4 PASSOU: Erros individuais não travam cleanup\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 4 FALHOU:', error.message);
         return false;
     }
@@ -340,7 +344,8 @@ async function testHandleManagerWithErrors() {
 
 /**
  * Função exportada: testCodeValidation.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function testCodeValidation() {
     console.log('\n=== TEST 5: Validação de Código Modificado ===');
@@ -396,7 +401,7 @@ async function testCodeValidation() {
 
         console.log('✅ TEST 5 PASSOU: Código validado\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 5 FALHOU:', error.message);
         return false;
     }
@@ -408,7 +413,8 @@ async function testCodeValidation() {
 
 /**
  * Função exportada: runAllTests.
- * @returns {Promise<void>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function runAllTests() {
     console.log('╔══════════════════════════════════════════════════════════════╗');
@@ -429,7 +435,7 @@ async function runAllTests() {
         try {
             const passed = await test.fn();
             results.push({ name: test.name, passed });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error(`💥 Exceção em ${test.name}:`, error);
             results.push({ name: test.name, passed: false });
         }
@@ -440,10 +446,10 @@ async function runAllTests() {
     console.log('║                    SUMÁRIO DOS TESTES                        ║');
     console.log('╚══════════════════════════════════════════════════════════════╝\n');
 
-    const passed = results.filter(r => r.passed).length;
+    const passed = results.filter((r) => r.passed).length;
     const total = results.length;
 
-    results.forEach(r => {
+    results.forEach((r) => {
         const icon = r.passed ? '✅' : '❌';
         const status = r.passed ? 'PASSOU' : 'FALHOU';
         console.log(`${icon} ${r.name}: ${status}`);
@@ -462,17 +468,17 @@ async function runAllTests() {
 
 // Executa se chamado diretamente
 if (import.meta.filename === process.argv[1]) {
-    runAllTests().catch(error => {
+    runAllTests().catch((error) => {
         console.error('💥 Erro fatal na suite de testes:', error);
         process.exit(1);
     });
 }
 
 export {
-    testShutdownPhaseIsolation,
+    runAllTests,
+    testCodeValidation,
     testHandleManagerAbort,
     testHandleManagerComplete,
     testHandleManagerWithErrors,
-    testCodeValidation,
-    runAllTests,
+    testShutdownPhaseIsolation,
 };

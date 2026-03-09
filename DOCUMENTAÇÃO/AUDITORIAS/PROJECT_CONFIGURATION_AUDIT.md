@@ -258,7 +258,7 @@ module.exports = {
 
 ```dockerfile
 # Dockerfile linha 81
-CMD ["node", "src/main.js"]  # ❌ ARQUIVO NÃO EXISTE
+CMD ["node", "src/main.js"] # ❌ ARQUIVO NÃO EXISTE
 ```
 
 **Análise:**
@@ -326,14 +326,13 @@ ARG ALPINE_VERSION=3.19
 FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS deps
 
 # ⭐ NOVO: Build-time cache mount (Docker BuildKit)
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --only=production --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm npm ci --only=production --ignore-scripts
 
 # ⭐ NOVO: Metadata labels (OCI standard)
 LABEL org.opencontainers.image.title="Chatgpt Docker Puppeteer" \
-      org.opencontainers.image.version="1.0.0" \
-      org.opencontainers.image.description="Autonomous AI agent for browser automation" \
-      org.opencontainers.image.source="https://github.com/Ilenburg1993/chatgpt-docker-puppeteer"
+ org.opencontainers.image.version="1.0.0" \
+ org.opencontainers.image.description="Autonomous AI agent for browser automation" \
+ org.opencontainers.image.source="https://github.com/Ilenburg1993/chatgpt-docker-puppeteer"
 
 # ⭐ NOVO: Security scanning
 # Adicionar: hadolint ignore comments para warnings conhecidos
@@ -847,7 +846,7 @@ app.use(
       includeSubDomains: true,
       preload: true,
     },
-  })
+  }),
 );
 ```
 

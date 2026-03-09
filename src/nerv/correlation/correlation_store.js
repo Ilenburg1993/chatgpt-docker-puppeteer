@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/correlation/correlation_store.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -46,19 +46,30 @@ function emptyMap() {
 =========================== */
 
 /**
+ * @typedef {object} CreateCorrelationStoreDeps
+ * @property {any} telemetry
+ * @property {any} [limits]
+ */
+/**
+ * @typedef {object} CreateCorrelationStoreOptions
+ * @property {any} [telemetry]
+ * @property {any} [limits]
+ */
+/**
  * Cria o armazenamento histórico de correlações.
  *
- * **Side-effects:** Inicializa mapa de correlações vazio, configura limites.
- * **Semântica:** Store histórico que preserva ordem de chegada dos fatos por correlation_id.
- * **Unidades:** TTL em milissegundos (padrão 3600000), maxEntries como inteiro.
+ * **Side-effects:** Inicializa mapa de correlações vazio, configura limites. **Semântica:** Store histórico que
+ * preserva ordem de chegada dos fatos por correlation_id. **Unidades:** TTL em milissegundos (padrão 3600000),
+ * maxEntries como inteiro.
  *
- * @param {object} deps - Dependências do módulo
- * @param {object} deps.telemetry - Interface de telemetria do NERV
- * @param {object} [deps.limits={}] - Limites técnicos opcionais
+ * @param {CreateCorrelationStoreDeps} deps - Dependências do módulo
+ * @param {object} deps
+ * @param {object} deps.limits
  * @param {number} [deps.limits.maxEntries] - Máximo de entradas por correlação
- * @param {number} [deps.limits.maxCorrelations=10000] - Máximo de correlações armazenadas em memória
- * @param {number} [deps.limits.ttl=3600000] - TTL em milissegundos (1 hora padrão)
- * @returns {object} Store de correlação com métodos addEntry, getCorrelation, listCorrelations
+ * @param {number} [deps.limits.maxCorrelations=10000] - Máximo de correlações armazenadas em memória. Default is
+ *   `10000`
+ * @param {number} [deps.limits.ttl=3600000] - TTL em milissegundos (1 hora padrão). Default is `3600000`
+ * @returns {any} Store de correlação com métodos addEntry, getCorrelation, listCorrelations
  * @throws {Error} Se telemetry não for fornecida ou inválida
  */
 function createCorrelationStore({ telemetry, limits = {} }) {
@@ -78,6 +89,8 @@ function createCorrelationStore({ telemetry, limits = {} }) {
 
     /**
      * Cria uma nova correlação, se ainda não existir.
+     *
+     * @param {string} correlationId
      */
     function ensureCorrelation(correlationId) {
         if (!store[correlationId]) {
@@ -87,8 +100,8 @@ function createCorrelationStore({ telemetry, limits = {} }) {
                 const sortedIds = keys.sort((a, b) => store[a].createdAt - store[b].createdAt);
                 const evictCount = Math.max(1, Math.ceil(MAX_CORRELATIONS * 0.1)); // Evict 10%
                 const actualEvictCount = Math.min(evictCount, sortedIds.length); // Count actual evicted items
-                for (let i = 0; i < actualEvictCount; i++) {
-                    delete store[sortedIds[i]];
+                for (const id of sortedIds.slice(0, actualEvictCount)) {
+                    delete store[id];
                 }
                 telemetry.emit('nerv:correlation:evicted_overflow', {
                     evicted: actualEvictCount,
@@ -137,9 +150,10 @@ function createCorrelationStore({ telemetry, limits = {} }) {
     cleanupInterval.unref(); // Não bloqueia o processo de encerrar
 
     /**
-     * Cria um registro técnico mínimo a partir de um envelope.
-     * Payload permanece opaco (não armazenado integralmente).
+     * Cria um registro técnico mínimo a partir de um envelope. Payload permanece opaco (não armazenado integralmente).
      * P9.5: Adiciona memoization de JSON serialization
+     *
+     * @param {any} envelope
      */
     function createRecord(envelope) {
         const messageType = getMessageType(envelope);
@@ -162,7 +176,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
      * Registra um envelope em sua correlação.
      *
      * @param {string} correlationId
-     * @param {Object} envelope
+     * @param {any} envelope
      */
     function append(correlationId, envelope) {
         if (typeof correlationId !== 'string') {
@@ -195,7 +209,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
      * Retorna cópia do histórico de uma correlação.
      *
      * @param {string} correlationId
-     * @returns {Array}
+     * @returns {unknown[]}
      */
     function get(correlationId) {
         if (!store[correlationId]) {
@@ -230,10 +244,9 @@ function createCorrelationStore({ telemetry, limits = {} }) {
     }
 
     /**
-     * Lista todos os correlation_ids existentes.
-     * Uso exclusivo para auditoria/diagnóstico.
+     * Lista todos os correlation_ids existentes. Uso exclusivo para auditoria/diagnóstico.
      *
-     * @returns {Array<string>}
+     * @returns {string[]}
      */
     function list() {
         return Object.keys(store);

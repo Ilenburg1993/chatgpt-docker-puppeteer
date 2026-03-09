@@ -656,7 +656,7 @@ fs.writeFileSync('fila/task-123.json', JSON.stringify(task));
 
 ```javascript
 // src/infra/queue/fs_watcher.js
-watcher.on('change', filePath => {
+watcher.on('change', (filePath) => {
   debounce(() => {
     cache.markDirty(); // P5.2: Mark BEFORE write
     nerv.emit('QUEUE_CHANGE', { filePath });
@@ -728,7 +728,7 @@ nerv.emit('TASK_ALLOCATED', {
 // Driver recebe evento
 class DriverNERVAdapter {
   constructor() {
-    nerv.on('TASK_ALLOCATED', data => {
+    nerv.on('TASK_ALLOCATED', (data) => {
       this.handleTaskAllocation(data);
     });
   }

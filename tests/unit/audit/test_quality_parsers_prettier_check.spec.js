@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { parsePrettierCheckOutput, parseTsIgnoreFindings } from '../../../scripts/audit/collectors/quality.mjs';
 
 const TS_IGNORE_TOKEN = '@ts-' + 'ignore';
@@ -28,6 +28,6 @@ test('quality parser filters ts-ignore findings by scope files in quick mode', (
 
     const findings = parseTsIgnoreFindings(output, ['src/a.js', 'scripts/x.mjs']);
     assert.equal(findings.length, 2);
-    assert.deepEqual(findings.map(f => f.file).sort(), ['scripts/x.mjs', 'src/a.js']);
-    assert.ok(findings.every(f => f.contract_id === 'CONTRACT-QUALITY-TS-IGNORE-FORBIDDEN'));
+    assert.deepEqual(findings.map((f) => f.file).sort(), ['scripts/x.mjs', 'src/a.js']);
+    assert.ok(findings.every((f) => f.contract_id === 'CONTRACT-QUALITY-TS-IGNORE-FORBIDDEN'));
 });

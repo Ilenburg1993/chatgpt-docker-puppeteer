@@ -1,9 +1,10 @@
+// @ts-check
 import { MAX_CHUNK_CHARS_DOCS } from '../contract.mjs';
 import { estimateCharsForLines } from '../text.mjs';
 import { chunkPlain } from './chunk_plain.mjs';
 import { mergeSmallRanges } from './merge_ranges.mjs';
 
-export function chunkMarkdown({ lines, maxChunkChars = MAX_CHUNK_CHARS_DOCS, minChunkChars = 200 }) {
+export function chunkMarkdown(/** @type {any} */ { lines, maxChunkChars = MAX_CHUNK_CHARS_DOCS, minChunkChars = 200 }) {
     if (!lines || lines.length === 0) return [];
 
     const headingStarts = new Set([0]);
@@ -26,8 +27,8 @@ export function chunkMarkdown({ lines, maxChunkChars = MAX_CHUNK_CHARS_DOCS, min
     const ranges = [];
 
     for (let s = 0; s < starts.length; s++) {
-        const startIdx = starts[s];
-        const endIdx = s + 1 < starts.length ? starts[s + 1] - 1 : lines.length - 1;
+        const startIdx = /** @type {number} */ (starts[s]);
+        const endIdx = s + 1 < starts.length ? /** @type {number} */ (starts[s + 1]) - 1 : lines.length - 1;
         if (startIdx > endIdx) continue;
 
         const chunkLen = estimateCharsForLines(lines, startIdx, endIdx);

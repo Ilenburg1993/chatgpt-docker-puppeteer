@@ -2,11 +2,10 @@
 // @ts-check
 
 /**
- * @fileoverview Configuração visual do ambiente no terminal
- * Define prompts e indicadores visuais para desenvolvimento vs produção
- *
- * @author Sistema de Ambiente
  * @version 1.0.0
+ * @file Configuração visual do ambiente no terminal Define prompts e indicadores visuais para desenvolvimento vs
+ *   produção
+ * @author Sistema de Ambiente
  */
 
 import { existsSync } from 'fs';
@@ -17,8 +16,17 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const projectRoot = resolve(__dirname, '..');
 
 /**
+ * @typedef {object} EnvironmentInfo
+ * @property {boolean} isProduction - Indica se está em ambiente de produção
+ * @property {boolean} hasDistBuild - Indica se o build dist existe
+ * @property {string} cwd - Diretório de trabalho atual
+ * @property {boolean} isInDist - Indica se está no diretório dist
+ */
+
+/**
  * Detecta o ambiente atual
- * @returns {Object} Informações do ambiente
+ *
+ * @returns {EnvironmentInfo} Informações do ambiente
  */
 function detectEnvironment() {
     const hasDistBuild = existsSync(join(projectRoot, 'dist/main.js'));
@@ -34,8 +42,16 @@ function detectEnvironment() {
 }
 
 /**
+ * @typedef {object} GeneratePromptConfigEnv
+ * @property {boolean} isProduction - Indica se está em produção
+ * @property {boolean} isInDist - Indica se está no diretório dist
+ * @property {boolean} [hasDistBuild] - Se o build dist existe
+ * @property {string} [cwd] - Diretório de trabalho atual
+ */
+/**
  * Gera configuração do prompt do terminal
- * @param {Object} env - Informações do ambiente
+ *
+ * @param {GeneratePromptConfigEnv} env - Informações do ambiente
  * @returns {string} Comando para configurar o prompt
  */
 function generatePromptConfig(env) {
@@ -59,8 +75,16 @@ export PROMPT_COMMAND='echo -e "\\e[1;32m💻 Ambiente de Desenvolvimento\\e[0m"
 }
 
 /**
+ * @typedef {object} GenerateAliasesEnv
+ * @property {boolean} isProduction - Indica se está em produção
+ * @property {boolean} isInDist - Indica se está no diretório dist
+ * @property {boolean} [hasDistBuild] - Se o build dist existe
+ * @property {string} [cwd] - Diretório de trabalho atual
+ */
+/**
  * Gera aliases úteis baseados no ambiente
- * @param {Object} env - Informações do ambiente
+ *
+ * @param {GenerateAliasesEnv} env - Informações do ambiente
  * @returns {string} Comandos de alias
  */
 function generateAliases(env) {

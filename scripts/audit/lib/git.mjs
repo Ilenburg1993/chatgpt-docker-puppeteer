@@ -3,6 +3,7 @@ import { runCommand } from './exec.mjs';
 
 /**
  * Returns changed files from git working tree and index.
+ *
  * @returns {Promise<string[]>}
  */
 export async function getChangedFiles() {
@@ -13,6 +14,6 @@ export async function getChangedFiles() {
 
     return result.stdout
         .split(/\r?\n/)
-        .map(line => line.trim())
+        .map((line) => line.trim())
         .filter(Boolean);
 }

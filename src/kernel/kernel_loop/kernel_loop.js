@@ -38,15 +38,15 @@ import { DecisionKind } from '../execution_engine/execution_engine.js';
 
 /**
  * @typedef {object} KernelLoopOptions
- * @property {object} executionEngine - Motor semântico que avalia e produz decisões
- * @property {object} nervBridge - Ponte de integração com NERV
- * @property {object} telemetry - Sistema de telemetria
- * @property {object} [browserPool=null] - Pool de browsers
- * @property {object} [scheduler=global] - Scheduler para setInterval
- * @property {number} [baseIntervalMs=50] - Intervalo base entre ciclos
- * @property {function|null} [onActivateTask=null] - Callback para ativação de tarefa
- * @property {function|null} [onTerminateTask=null] - Callback para terminação de tarefa
- * @property {function|null} [onSuspendTask=null] - Callback para suspensão de tarefa
+ * @property {any} executionEngine - Motor semântico que avalia e produz decisões
+ * @property {any} nervBridge - Ponte de integração com NERV
+ * @property {any} telemetry - Sistema de telemetria
+ * @property {any} [browserPool=null] - Pool de browsers. Default is `null`
+ * @property {any} [scheduler=global] - Scheduler para setInterval. Default is `global`
+ * @property {number} [baseIntervalMs=50] - Intervalo base entre ciclos. Default is `50`
+ * @property {function | null} [onActivateTask=null] - Callback para ativação de tarefa. Default is `null`
+ * @property {function | null} [onTerminateTask=null] - Callback para terminação de tarefa. Default is `null`
+ * @property {function | null} [onSuspendTask=null] - Callback para suspensão de tarefa. Default is `null`
  */
 
 /* ===========================
@@ -55,33 +55,16 @@ import { DecisionKind } from '../execution_engine/execution_engine.js';
 
 class KernelLoop {
     /**
-     * @param {Object} params
-     * @param {Object} params.executionEngine
-     * Motor semântico que avalia e produz decisões.
-     *
-     * @param {Object} params.nervBridge
-     * Ponte de integração com NERV (para drenagem de buffers).
-     *
-     * @param {Object} params.telemetry
-     * Canal de telemetria do Kernel.
-     *
-     * @param {Object} [params.browserPool]
-     * Browser Pool Manager (para checar Circuit Breaker).
-     *
-     * @param {Object} [params.scheduler]
-     * Scheduler técnico (padrão: global).
-     *
-     * @param {number} [params.baseIntervalMs]
-     * Intervalo base entre ciclos (padrão: 50ms).
-     *
-     * @param {function|null} [params.onActivateTask]
-     * Callback para ativação de tarefa.
-     *
-     * @param {function|null} [params.onTerminateTask]
-     * Callback para terminação de tarefa.
-     *
-     * @param {function|null} [params.onSuspendTask]
-     * Callback para suspensão de tarefa.
+     * @param {object} params
+     * @param {any} params.executionEngine Motor semântico que avalia e produz decisões.
+     * @param {any} params.nervBridge Ponte de integração com NERV (para drenagem de buffers).
+     * @param {any} params.telemetry Canal de telemetria do Kernel.
+     * @param {any} [params.browserPool] Browser Pool Manager (para checar Circuit Breaker).
+     * @param {any} [params.scheduler] Scheduler técnico (padrão: global).
+     * @param {number} [params.baseIntervalMs] Intervalo base entre ciclos (padrão: 50ms).
+     * @param {function | null} [params.onActivateTask] Callback para ativação de tarefa.
+     * @param {function | null} [params.onTerminateTask] Callback para terminação de tarefa.
+     * @param {function | null} [params.onSuspendTask] Callback para suspensão de tarefa.
      */
     constructor({
         executionEngine,
@@ -192,8 +175,8 @@ class KernelLoop {
     /**
      * Executa um único ciclo lógico do Kernel.
      *
-     * Sequência canônica:
-     * 0. Verifica Circuit Breaker (pausa se necessário)
+     * Sequência canônica: 0. Verifica Circuit Breaker (pausa se necessário)
+     *
      * 1. Drenagem de buffers do NERV (inbound)
      * 2. Avaliação semântica (ExecutionEngine)
      * 3. Aplicação de decisões
@@ -249,7 +232,8 @@ class KernelLoop {
 
             // 4. Drenagem de buffer outbound (COMMANDs/EVENTs a enviar)
             this._drainOutbound();
-        } catch (error) {
+        } catch (/** @type {any} */ _rawError) {
+            const error = /** @type {any} */ (_rawError);
             this.state = KernelLoopState.DEGRADED;
 
             this.telemetry.critical('kernel_loop_tick_error', {
@@ -272,6 +256,7 @@ class KernelLoop {
 
     /**
      * Verifica Circuit Breaker e pausa sistema se necessário.
+     *
      * @returns {boolean} - true se pausado, false se pode executar
      */
     _checkCircuitBreaker() {
@@ -302,8 +287,7 @@ class KernelLoop {
   =========================== */
 
     /**
-     * Drena buffer inbound do NERV.
-     * EVENTs recebidos são processados pela NERVBridge.
+     * Drena buffer inbound do NERV. EVENTs recebidos são processados pela NERVBridge.
      */
     _drainInbound() {
         if (!this.nervBridge.nerv || !this.nervBridge.nerv.buffers) {
@@ -334,8 +318,7 @@ class KernelLoop {
     }
 
     /**
-     * Drena buffer outbound do NERV.
-     * Envia mensagens pendentes via transporte físico.
+     * Drena buffer outbound do NERV. Envia mensagens pendentes via transporte físico.
      */
     _drainOutbound() {
         if (!this.nervBridge.nerv || !this.nervBridge.nerv.buffers) {
@@ -364,13 +347,15 @@ class KernelLoop {
             try {
                 transport.send(envelope);
                 drained++;
-            } catch (error) {
+            } catch (/** @type {any} */ _rawErr) {
+                const error = /** @type {any} */ (_rawErr);
                 try {
                     const serialized = JSON.stringify(envelope);
                     const buffer = Buffer.from(serialized, 'utf8');
                     transport.send(buffer);
                     drained++;
-                } catch (fallbackError) {
+                } catch (/** @type {any} */ _rawFallback) {
+                    const fallbackError = /** @type {any} */ (_rawFallback);
                     this.telemetry.critical('kernel_loop_outbound_send_failed', {
                         error: fallbackError?.message || error?.message || String(fallbackError || error),
                         at: Date.now(),
@@ -392,15 +377,11 @@ class KernelLoop {
   =========================== */
 
     /**
-     * Aplica decisões produzidas pelo ExecutionEngine.
-     * [P3.2 CORREÇÃO] Aplica propostas em paralelo quando possível
+     * Aplica decisões produzidas pelo ExecutionEngine. [P3.2 CORREÇÃO] Aplica propostas em paralelo quando possível
      * [P9.4 CORREÇÃO] Adiciona timeout de 5s para prevenir kernel loop blocking
      *
-     * @param {Array<Object>} proposals
-     * Lista de propostas de decisão.
-     *
-     * @param {Object} context
-     * Contexto do ciclo atual.
+     * @param {any[]} proposals Lista de propostas de decisão.
+     * @param {any} context Contexto do ciclo atual.
      */
     async _applyDecisions(proposals, context) {
         if (!Array.isArray(proposals) || proposals.length === 0) {
@@ -420,23 +401,25 @@ class KernelLoop {
         });
 
         const decisionsPromise = Promise.all(
-            proposals.map(async proposal => {
+            proposals.map(async (proposal) => {
                 try {
                     await this._applyDecision(proposal, context);
-                } catch (error) {
+                } catch (/** @type {any} */ _rawError) {
+                    const error = /** @type {any} */ (_rawError);
                     this.telemetry.critical('kernel_loop_decision_application_failed', {
                         proposal,
                         error: error.message,
                         at: Date.now(),
                     });
                 }
-            })
+            }),
         );
 
         // Race entre decisions e timeout; sempre limpa o timer (A005)
         try {
             await Promise.race([decisionsPromise, timeoutPromise]);
-        } catch (error) {
+        } catch (/** @type {any} */ _rawError) {
+            const error = /** @type {any} */ (_rawError);
             if (error.message.includes('timeout')) {
                 this.telemetry.critical('kernel_loop_decision_timeout', {
                     count: proposals.length,
@@ -454,6 +437,9 @@ class KernelLoop {
 
     /**
      * Aplica uma única decisão.
+     *
+     * @param {any} proposal - Proposta de decisão do ExecutionEngine.
+     * @param {any} context - Contexto do ciclo atual.
      */
     async _applyDecision(proposal, context) {
         const { kind, taskId, reason } = proposal;
@@ -514,13 +500,12 @@ class KernelLoop {
      * Agenda próximo ciclo lógico.
      *
      * Invariante de scheduling (A010):
-     * - step() é awaited antes de _scheduleNextTick() ser chamado.
-     *   Isso garante que apenas uma execução de step() ocorre por vez.
-     * - Se stop() é chamado durante step(): this._running passa a false,
-     *   _scheduleNextTick() retorna imediatamente (linha 1), e nenhum
-     *   novo timer é criado. Race condition controlada.
-     * - Se stop() é chamado DENTRO de step() (via circuit breaker):
-     *   this._timer já foi limpo por stop(); a sequência
+     *
+     * - step() é awaited antes de _scheduleNextTick() ser chamado. Isso garante que apenas uma execução de step() ocorre
+     *   por vez.
+     * - Se stop() é chamado durante step(): this._running passa a false, _scheduleNextTick() retorna imediatamente (linha
+     *   1), e nenhum novo timer é criado. Race condition controlada.
+     * - Se stop() é chamado DENTRO de step() (via circuit breaker): this._timer já foi limpo por stop(); a sequência
      *   "await step() → _scheduleNextTick() → return" termina sem agendar.
      */
     _scheduleNextTick() {
@@ -539,8 +524,7 @@ class KernelLoop {
     }
 
     /**
-     * Calcula delay até próximo ciclo.
-     * Pode ser adaptativo com base no estado.
+     * Calcula delay até próximo ciclo. Pode ser adaptativo com base no estado.
      */
     _computeDelay() {
         if (this.state === KernelLoopState.DEGRADED) {

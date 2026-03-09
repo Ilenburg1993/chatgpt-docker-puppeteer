@@ -4,21 +4,29 @@ import path from 'node:path';
 import { evaluateRuntimeSignals } from './evaluate_runtime.mjs';
 
 /**
- * @param {{
- *   profile: 'quick'|'deep'|'nightly',
- *   chaosProfile: 'off'|'light'|'full',
- *   contracts: import('./load_registry.mjs').ContractDefinitionV1[],
- *   runDir: string,
- *   exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
- * }} options
-  * @returns {Promise<any>}
+ * @typedef {object} EvaluateChaosContractsOptions
+ * @property {'quick' | 'deep' | 'nightly'} profile
+ * @property {'off' | 'light' | 'full'} chaosProfile
+ * @property {import('./load_registry.mjs').ContractDefinitionV1[]} contracts
+ * @property {string} runDir
+ * @property {(stepId: any, command: any, args: any, opts: any) => Promise<any>} exec
+ */
+/**
+ * @param {EvaluateChaosContractsOptions} options
+ * @returns {Promise<any>}
  */
 export async function evaluateChaosContracts(options) {
-    /** @type {Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>} */
+    /** @type {{
+    signal: string;
+    evidence: string;
+    source_tool: string;
+    file?: string | null;
+    line?: number | null;
+}[]} */
     const signals = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
 
     const eventsPath = path.join(options.runDir, 'chaos_events.jsonl');
@@ -29,7 +37,8 @@ export async function evaluateChaosContracts(options) {
         violations: 0,
     };
 
-    const record = payload => fs.appendFileSync(eventsPath, `${JSON.stringify(payload)}\n`, 'utf8');
+    const record = (/** @type {any} */ payload) =>
+        fs.appendFileSync(eventsPath, `${JSON.stringify(payload)}\n`, 'utf8');
 
     if (options.profile !== 'nightly' || options.chaosProfile === 'off') {
         record({
@@ -96,10 +105,14 @@ export async function evaluateChaosContracts(options) {
         }
     }
 
-    const findings = evaluateRuntimeSignals({
-        contracts: options.contracts,
-        signals,
-    });
+    const findings = /** @type {any[]} */ (
+        evaluateRuntimeSignals(
+            /** @type {any} */ ({
+                contracts: options.contracts,
+                signals,
+            }),
+        )
+    );
     summary.violations = findings.length;
 
     return {

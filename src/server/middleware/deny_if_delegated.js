@@ -1,10 +1,13 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { log } from '#core/logger';
 
 /**
- * Middleware que bloqueia operações de escrita/configuração
- * quando o servidor está rodando no modo 'delegated'.
-  * @returns {any}
+ * Middleware que bloqueia operações de escrita/configuração quando o servidor está rodando no modo 'delegated'.
+ *
+ * @param {any} req
+ * @param {any} res
+ * @param {any} next
+ * @returns {void}
  */
 function denyIfDelegated(req, res, next) {
     try {
@@ -17,8 +20,9 @@ function denyIfDelegated(req, res, next) {
                 request_id: req.id,
             });
         }
-    } catch (e) {
-        log('ERROR', `[MW] Erro no denyIfDelegated: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[MW] Erro no denyIfDelegated: ${_e.message}`, req.id);
     }
     return next();
 }

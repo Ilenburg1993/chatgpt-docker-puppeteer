@@ -6,61 +6,75 @@ import { normalizeInferenceClientTag } from './client_tags.js';
  * @typedef {object} InferencePolicyConfig
  * @property {number} [timeoutMs]
  * @property {number} [maxParallel]
- * @property {string[]|null} [allowedModels]
- * @property {string[]|null} [allowedBackends]
- * @property {number|null} [maxTokens]
- * @property {'degraded_continue'|'fail_closed'|null} [degradedBehavior]
+ * @property {string[] | null} [allowedModels]
+ * @property {string[] | null} [allowedBackends]
+ * @property {number | null} [maxTokens]
+ * @property {'degraded_continue' | 'fail_closed' | null} [degradedBehavior]
  */
 
 /**
  * @typedef {object} ResolveInferencePolicyInput
  * @property {unknown} [clientTag]
- * @property {Partial<InferencePolicyConfig>|null} [overrides]
- * @property {Partial<InferencePolicyConfig>|null} [clientPolicy]
- * @property {Partial<InferencePolicyConfig>|null} [profilePolicy]
- * @property {Partial<InferencePolicyConfig>|null} [globalPolicy]
- * @property {Partial<InferencePolicyConfig>|null} [envPolicy]
- * @property {Partial<InferencePolicyConfig>|null} [defaults]
+ * @property {Partial<InferencePolicyConfig> | null} [overrides]
+ * @property {Partial<InferencePolicyConfig> | null} [clientPolicy]
+ * @property {Partial<InferencePolicyConfig> | null} [profilePolicy]
+ * @property {Partial<InferencePolicyConfig> | null} [globalPolicy]
+ * @property {Partial<InferencePolicyConfig> | null} [envPolicy]
+ * @property {Partial<InferencePolicyConfig> | null} [defaults]
  */
 
 /**
- * @typedef {Required<Pick<InferencePolicyConfig,'timeoutMs'|'maxParallel'|'degradedBehavior'>> & {
- *   maxTokens: number|null,
- *   allowedModels: string[]|null,
- *   allowedBackends: string[]|null
+ * @typedef {Required<Pick<InferencePolicyConfig, 'timeoutMs' | 'maxParallel' | 'degradedBehavior'>> & {
+ *     maxTokens: number | null;
+ *     allowedModels: string[] | null;
+ *     allowedBackends: string[] | null;
  * }} EffectiveInferencePolicy
  */
 
 /**
  * @typedef {{
- *   clientTag: import('./client_tags.js').InferenceClientTag,
- *   effective: EffectiveInferencePolicy,
- *   sourcesApplied: string[]
+ *     clientTag: import('./client_tags.js').InferenceClientTag;
+ *     effective: EffectiveInferencePolicy;
+ *     sourcesApplied: string[];
  * }} ResolvedInferencePolicy
  */
 
+/** @param {any} value */
 function asPlainObject(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     return value;
 }
 
+/** @param {any} value */
 function asStringArray(value) {
     if (!Array.isArray(value)) return null;
-    const items = value.map(item => String(item || '').trim()).filter(Boolean);
+    const items = value.map((item) => String(item || '').trim()).filter(Boolean);
     return items.length > 0 ? [...new Set(items)] : [];
 }
 
+/**
+ * @param {any} value
+ * @param {number} fallback
+ */
 function asPositiveInt(value, fallback) {
     const n = Number(value);
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
+/**
+ * @param {any} value
+ * @param {number | null} [fallback]
+ */
 function asNonNegativeIntOrNull(value, fallback = null) {
     if (value === null || value === undefined || value === '') return fallback;
     const n = Number(value);
     return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
 }
 
+/**
+ * @param {any} value
+ * @param {string} [fallback]
+ */
 function normalizeDegradedBehavior(value, fallback = 'degraded_continue') {
     const normalized = String(value || '')
         .trim()
@@ -68,42 +82,35 @@ function normalizeDegradedBehavior(value, fallback = 'degraded_continue') {
     return normalized === 'fail_closed' ? 'fail_closed' : fallback;
 }
 
+/**
+ * @param {any} target
+ * @param {any} layer
+ */
 function mergeLayer(target, layer) {
     const src = asPlainObject(layer);
     if (!src) return target;
 
     if ('timeoutMs' in src || 'timeout_ms' in src) {
-        target.timeoutMs = asPositiveInt(
-            /** @type {any} */ (src).timeoutMs ?? /** @type {any} */ (src).timeout_ms,
-            target.timeoutMs
-        );
+        target.timeoutMs = asPositiveInt(src.timeoutMs ?? src.timeout_ms, target.timeoutMs);
     }
     if ('maxParallel' in src || 'max_parallel' in src) {
-        target.maxParallel = asPositiveInt(
-            /** @type {any} */ (src).maxParallel ?? /** @type {any} */ (src).max_parallel,
-            target.maxParallel
-        );
+        target.maxParallel = asPositiveInt(src.maxParallel ?? src.max_parallel, target.maxParallel);
     }
     if ('maxTokens' in src || 'max_tokens' in src) {
-        target.maxTokens = asNonNegativeIntOrNull(
-            /** @type {any} */ (src).maxTokens ?? /** @type {any} */ (src).max_tokens,
-            target.maxTokens
-        );
+        target.maxTokens = asNonNegativeIntOrNull(src.maxTokens ?? src.max_tokens, target.maxTokens);
     }
     if ('allowedModels' in src || 'allowed_models' in src) {
-        const models = asStringArray(/** @type {any} */ (src).allowedModels ?? /** @type {any} */ (src).allowed_models);
+        const models = asStringArray(src.allowedModels ?? src.allowed_models);
         if (models !== null) target.allowedModels = models;
     }
     if ('allowedBackends' in src || 'allowed_backends' in src) {
-        const backends = asStringArray(
-            /** @type {any} */ (src).allowedBackends ?? /** @type {any} */ (src).allowed_backends
-        );
+        const backends = asStringArray(src.allowedBackends ?? src.allowed_backends);
         if (backends !== null) target.allowedBackends = backends;
     }
     if ('degradedBehavior' in src || 'degraded_behavior' in src) {
         target.degradedBehavior = normalizeDegradedBehavior(
-            /** @type {any} */ (src).degradedBehavior ?? /** @type {any} */ (src).degraded_behavior,
-            target.degradedBehavior
+            src.degradedBehavior ?? src.degraded_behavior,
+            target.degradedBehavior,
         );
     }
 
@@ -111,8 +118,8 @@ function mergeLayer(target, layer) {
 }
 
 /**
- * Resolve política efetiva de inferência por precedência.
- * Ordem (menor -> maior): defaults, env, global, profile, client, overrides.
+ * Resolve política efetiva de inferência por precedência. Ordem (menor -> maior): defaults, env, global, profile,
+ * client, overrides.
  *
  * @param {ResolveInferencePolicyInput} input
  * @returns {ResolvedInferencePolicy}
@@ -122,13 +129,13 @@ export function resolveInferencePolicy(input = {}) {
     const base = {
         timeoutMs: 120000,
         maxParallel: 1,
-        maxTokens: null,
-        allowedModels: null,
-        allowedBackends: null,
-        degradedBehavior: /** @type {'degraded_continue'|'fail_closed'} */ ('degraded_continue'),
+        maxTokens: /** @type {number | null} */ (null),
+        allowedModels: /** @type {string[] | null} */ (null),
+        allowedBackends: /** @type {string[] | null} */ (null),
+        degradedBehavior: /** @type {'degraded_continue' | 'fail_closed'} */ ('degraded_continue'),
     };
 
-    /** @type {Array<[string, unknown]>} */
+    /** @type {[string, unknown][]} */
     const layers = [
         ['defaults', input.defaults],
         ['env', input.envPolicy],
@@ -153,11 +160,21 @@ export function resolveInferencePolicy(input = {}) {
 }
 
 /**
+ * @typedef {object} ValidateInferenceRouteEffective
+ * @property {string[] | null} allowedModels
+ * @property {string[] | null} allowedBackends
+ */
+/**
+ * @typedef {object} ValidateInferenceRouteRequest
+ * @property {string | null} [model]
+ * @property {string | null} [backend]
+ */
+/**
  * Valida se uma policy efetiva permite usar backend/model específicos.
  *
- * @param {{ allowedModels: string[]|null, allowedBackends: string[]|null }} effective
- * @param {{ model?: string|null, backend?: string|null }} request
- * @returns {{ ok: boolean, reason?: string }}
+ * @param {ValidateInferenceRouteEffective} effective
+ * @param {ValidateInferenceRouteRequest} request
+ * @returns {{ ok: boolean; reason?: string }}
  */
 export function validateInferenceRoute(effective, request) {
     const model = String(request?.model || '').trim();

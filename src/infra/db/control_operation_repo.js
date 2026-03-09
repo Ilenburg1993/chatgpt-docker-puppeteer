@@ -1,4 +1,5 @@
 // @ts-check
+/** @typedef {any} ControlOperation */
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
@@ -15,23 +16,35 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} value
+ * @param {any} value
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
 
+/**
+ * @param {any} raw
+ * @param {any} raw
+ */
 function _parseJson(raw, fallback = {}) {
     if (!raw) return fallback;
     try {
         return JSON.parse(String(raw));
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
 
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToOperation(row) {
     if (!row) return null;
     return {
@@ -45,7 +58,7 @@ function _rowToOperation(row) {
         idempotency_key: String(row.idempotency_key || ''),
         status: String(row.status || CONTROL_OPERATION_STATUS.PENDING),
         payload: _parseJson(row.payload_json, {}),
-        result: _parseJson(row.result_json, null),
+        result: _parseJson(/** @type {any} */ (row.result_json), /** @type {any} */ (null)),
         error_code: row.error_code ? String(row.error_code) : null,
         error_message: row.error_message ? String(row.error_message) : null,
         created_at_ms: Number(row.created_at_ms) || 0,
@@ -53,20 +66,24 @@ function _rowToOperation(row) {
     };
 }
 
+/** @typedef {any} CreateControlOperationOptions */
 /**
  * Função exportada: createControlOperation.
- * @returns {any}
+ *
+ * @param {any} [opts]
+ * @returns {ControlOperation | null}
  */
-function createControlOperation({
-    command,
-    entityType,
-    entityId,
-    actorId = null,
-    actorRole = null,
-    reason,
-    idempotencyKey,
-    payload = {},
-}) {
+function createControlOperation(opts = {}) {
+    const {
+        command,
+        entityType,
+        entityId,
+        actorId = null,
+        actorRole = null,
+        reason,
+        idempotencyKey,
+        payload = {},
+    } = /** @type {any} */ (opts);
     const db = getDb();
     const now = _now();
     const id = `cop-${uuidv4()}`;
@@ -86,7 +103,7 @@ function createControlOperation({
             NULL, NULL,
             @created_at_ms, @updated_at_ms
         )
-    `
+    `,
     ).run({
         id,
         command: String(command || '')
@@ -109,7 +126,9 @@ function createControlOperation({
 
 /**
  * Função exportada: getControlOperationById.
- * @returns {any}
+ *
+ * @param {string} id Unique identifier.
+ * @returns {ControlOperation | null}
  */
 function getControlOperationById(id) {
     const db = getDb();
@@ -119,7 +138,9 @@ function getControlOperationById(id) {
 
 /**
  * Função exportada: getControlOperationByIdempotencyKey.
- * @returns {any}
+ *
+ * @param {any} idempotencyKey
+ * @returns {ControlOperation | null}
  */
 function getControlOperationByIdempotencyKey(idempotencyKey) {
     const db = getDb();
@@ -129,9 +150,13 @@ function getControlOperationByIdempotencyKey(idempotencyKey) {
     return _rowToOperation(row);
 }
 
+/** @typedef {any} UpdateControlOperationUpdates */
 /**
  * Função exportada: updateControlOperation.
- * @returns {any}
+ *
+ * @param {string} id
+ * @param {any} [updates]
+ * @returns {ControlOperation | null}
  */
 function updateControlOperation(id, updates = {}) {
     const db = getDb();
@@ -149,7 +174,7 @@ function updateControlOperation(id, updates = {}) {
             error_message = @error_message,
             updated_at_ms = @updated_at_ms
         WHERE id = @id
-    `
+    `,
     ).run({
         id: existing.id,
         status: updates.status ? String(updates.status).trim().toUpperCase() : existing.status,
@@ -167,14 +192,17 @@ function updateControlOperation(id, updates = {}) {
     return getControlOperationById(existing.id);
 }
 
+/** @typedef {any} ListControlOperationsOptions */
 /**
  * Função exportada: listControlOperations.
- * @returns {any}
+ *
+ * @param {ListControlOperationsOptions} [options]
+ * @returns {ControlOperation[]}
  */
 function listControlOperations({ limit = 100, entityType = null, entityId = null } = {}) {
     const db = getDb();
     const where = [];
-    const params = { limit: Math.max(1, Math.min(Number(limit) || 100, 500)) };
+    const params = /** @type {any} */ ({ limit: Math.max(1, Math.min(Number(limit) || 100, 500)) });
 
     if (entityType) {
         where.push('entity_type = @entity_type');
@@ -194,7 +222,7 @@ function listControlOperations({ limit = 100, entityType = null, entityId = null
             ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY created_at_ms DESC
             LIMIT @limit
-        `
+        `,
         )
         .all(params);
 

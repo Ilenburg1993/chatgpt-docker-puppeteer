@@ -15,14 +15,14 @@ import BrowserPoolManager from '#infra/browser_pool/pool_manager';
         },
     };
 
-    const pool = new BrowserPoolManager(config);
+    const pool = /** @type {any} */ (new BrowserPoolManager(config));
 
     console.log('✅ Pool criado');
 
     await pool.initialize();
 
     console.log('✅ Pool inicializado:', pool.pool.length, 'instâncias');
-    console.log('   IDs:', pool.pool.map(p => p.id).join(', '));
+    console.log('   IDs:', pool.pool.map((/** @type {any} */ p) => p.id).join(', '));
 
     // Testa alocação de página
     const page = await pool.allocate('chatgpt');
@@ -45,7 +45,7 @@ import BrowserPoolManager from '#infra/browser_pool/pool_manager';
 
     // Força encerramento do processo
     process.exit(0);
-})().catch(err => {
+})().catch((err) => {
     console.error('❌ Erro no teste:', err);
     process.exit(1);
 });

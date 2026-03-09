@@ -1,14 +1,14 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import * as server from './server.js';
-import * as socketHub from './socket.js';
-import { log } from '#core/logger';
+// @ts-check
 import CONFIG from '#core/config';
+import { log } from '#core/logger';
 import { setRuntimeResourceState, stopRuntimeResources } from '#core/runtime_resource_registry';
 import * as Discovery from '#nerv/discovery';
+import * as server from './server.js';
+import * as socketHub from './socket.js';
 
 /**
- * Legacy: file-based discovery handled by `@nerv/discovery`.
- * We avoid direct filesystem operations here and delegate cleanup to Discovery.
+ * Legacy: file-based discovery handled by `@nerv/discovery`. We avoid direct filesystem operations here and delegate
+ * cleanup to Discovery.
  */
 
 /**
@@ -16,12 +16,12 @@ import * as Discovery from '#nerv/discovery';
  */
 let isShuttingDown = false;
 /**
- * Controle se o lifecycle deve chamar `process.exit()` ao final.
- * Em modo 'delegated' o processo chamador (Maestro) deve controlar o exit.
+ * Controle se o lifecycle deve chamar `process.exit()` ao final. Em modo 'delegated' o processo chamador (Maestro) deve
+ * controlar o exit.
  */
 let allowProcessExit = true;
 let signalsListening = false;
-const signalHandlers = {
+const signalHandlers = /** @type {Record<string, any>} */ ({
     sigint: null,
     sigterm: null,
     sigusr2: null,
@@ -31,29 +31,32 @@ const signalHandlers = {
     sigchld: null,
     uncaughtException: null,
     unhandledRejection: null,
-};
+});
 
 /**
  * Função exportada: setAllowProcessExit.
+ *
+ * @param {any} flag
  * @returns {void}
  */
 function setAllowProcessExit(flag) {
     allowProcessExit = !!flag;
 }
 
-function registerSignalSafely(signal, key, handler) {
+function registerSignalSafely(/** @type {any} */ signal, /** @type {any} */ key, /** @type {any} */ handler) {
     try {
         process.on(signal, handler);
         signalHandlers[key] = handler;
         return true;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         signalHandlers[key] = null;
-        log('DEBUG', `[LIFECYCLE] ${signal} não suportado nesta plataforma: ${err.message}`);
+        log('DEBUG', `[LIFECYCLE] ${signal} não suportado nesta plataforma: ${_e.message}`);
         return false;
     }
 }
 
-function removeSignalListenerSafely(signal, key) {
+function removeSignalListenerSafely(/** @type {any} */ signal, /** @type {any} */ key) {
     if (!signalHandlers[key]) {
         return;
     }
@@ -63,11 +66,11 @@ function removeSignalListenerSafely(signal, key) {
 }
 
 /**
- * Realiza o encerramento gracioso de todos os módulos do Mission Control.
- * Estratégia: Desativação em cascata reversa (Periferia -> Núcleo).
+ * Realiza o encerramento gracioso de todos os módulos do Mission Control. Estratégia: Desativação em cascata reversa
+ * (Periferia -> Núcleo).
  *
  * @param {string} signal - O sinal de interrupção (ex: SIGINT, SIGTERM).
-  * @returns {Promise<void>}
+ * @returns {Promise<void>}
  */
 async function gracefulShutdown(signal) {
     if (isShuttingDown) {
@@ -120,14 +123,14 @@ async function gracefulShutdown(signal) {
         const telemetryAggregator = /** @type {any} */ (telemetryAggregatorModule?.default);
 
         if (
-            !stopResults.some(result => result.id === 'task_sync_bridge' && result.ok) &&
+            !stopResults.some((result) => result.id === 'task_sync_bridge' && result.ok) &&
             taskSyncBridge &&
             typeof taskSyncBridge.stop === 'function'
         ) {
             await taskSyncBridge.stop();
         }
         if (
-            !stopResults.some(result => result.id === 'telemetry_aggregator' && result.ok) &&
+            !stopResults.some((result) => result.id === 'telemetry_aggregator' && result.ok) &&
             telemetryAggregator &&
             typeof telemetryAggregator.stop === 'function'
         ) {
@@ -136,7 +139,7 @@ async function gracefulShutdown(signal) {
 
         // 3. DESATIVAÇÃO DO HUB DE EVENTOS (SOCKET.IO)
         // [V600] Desconecta agentes e limpa o Registry de forma assíncrona.
-        const socketStoppedByRegistry = stopResults.some(result => result.id === 'socket_hub' && result.ok);
+        const socketStoppedByRegistry = stopResults.some((result) => result.id === 'socket_hub' && result.ok);
         log('DEBUG', '[LIFECYCLE] Desconectando agentes e limpando barramento IPC...');
         if (!socketStoppedByRegistry && socketHub && typeof socketHub.stop === 'function') {
             await socketHub.stop();
@@ -152,14 +155,12 @@ async function gracefulShutdown(signal) {
             } else {
                 log(
                     'DEBUG',
-                    '[LIFECYCLE] Pulando limpeza do arquivo de estado legado (não habilitado ou não presente)'
+                    '[LIFECYCLE] Pulando limpeza do arquivo de estado legado (não habilitado ou não presente)',
                 );
             }
-        } catch (cleanupErr) {
-            log(
-                'WARN',
-                `[LIFECYCLE] Falha ao tentar unpublish arquivo de estado legado via Discovery: ${cleanupErr.message}`
-            );
+        } catch (/** @type {any} */ cleanupErr) {
+            const _e = /** @type {any} */ (cleanupErr);
+            log('WARN', `[LIFECYCLE] Falha ao tentar unpublish arquivo de estado legado via Discovery: ${_e.message}`);
         }
 
         // 5. DESATIVAÇÃO DA FUNDAÇÃO HTTP
@@ -177,8 +178,9 @@ async function gracefulShutdown(signal) {
         } else {
             log('INFO', '[LIFECYCLE] Encerramento concluído (exit suprimido por allowProcessExit=false)');
         }
-    } catch (e) {
-        log('ERROR', `[LIFECYCLE] Colapso durante a sequência de encerramento: ${e.message}`);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[LIFECYCLE] Colapso durante a sequência de encerramento: ${_e.message}`);
         if (allowProcessExit) {
             process.exit(1);
         } else {
@@ -194,9 +196,10 @@ async function gracefulShutdown(signal) {
 }
 
 /**
- * Ativa a escuta de sinais vitais do SO e monitora exceções críticas.
- * Deve ser invocado no início do bootstrap em main.js.
-  * @returns {void}
+ * Ativa a escuta de sinais vitais do SO e monitora exceções críticas. Deve ser invocado no início do bootstrap em
+ * main.js.
+ *
+ * @returns {void}
  */
 function listenToSignals() {
     if (signalsListening) {
@@ -247,15 +250,15 @@ function listenToSignals() {
     }
 
     // Captura de falhas catastróficas para evitar encerramento "sujo" da infraestrutura
-    signalHandlers.uncaughtException = err => {
+    signalHandlers.uncaughtException = (/** @type {any} */ err) => {
         log('FATAL', `[LIFECYCLE] Exceção não tratada: ${err.message}\n${err.stack}`);
-        gracefulShutdown('UNCAUGHT_EXCEPTION');
+        void gracefulShutdown('UNCAUGHT_EXCEPTION');
     };
     process.on('uncaughtException', signalHandlers.uncaughtException);
 
-    signalHandlers.unhandledRejection = reason => {
+    signalHandlers.unhandledRejection = (/** @type {any} */ reason) => {
         log('FATAL', `[LIFECYCLE] Rejeição de Promise não tratada: ${reason}`);
-        gracefulShutdown('UNHANDLED_REJECTION');
+        void gracefulShutdown('UNHANDLED_REJECTION');
     };
     process.on('unhandledRejection', signalHandlers.unhandledRejection);
 
@@ -264,6 +267,7 @@ function listenToSignals() {
 
 /**
  * Função exportada: cleanupSignalListeners.
+ *
  * @returns {void}
  */
 function cleanupSignalListeners() {

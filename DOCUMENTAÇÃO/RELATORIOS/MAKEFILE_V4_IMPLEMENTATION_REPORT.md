@@ -281,23 +281,23 @@ a: analyze-graph   # Code analysis
 ### ✅ Validação de Sintaxe
 
 ```bash
-make --dry-run help        # ✅ PASSOU
-make --dry-run start       # ✅ PASSOU
-make --dry-run queue-status # ✅ PASSOU
-make --dry-run analyze-deps # ✅ PASSOU
+make --dry-run help          # ✅ PASSOU
+make --dry-run start         # ✅ PASSOU
+make --dry-run queue-status  # ✅ PASSOU
+make --dry-run analyze-deps  # ✅ PASSOU
 make --dry-run test-coverage # ✅ PASSOU
 ```
 
 ### ✅ Testes de Comandos
 
 ```bash
-make version               # ✅ v4.0.0
-make info                  # ✅ Exibe novos pacotes (chalk, dotenv, winston)
-make help                  # ✅ Help menu completo com BOLD
-make q                     # ✅ Alias funciona (queue-status)
-make m                     # ✅ Alias funciona (monit)
-make d                     # ✅ Alias funciona (diagnose)
-make a                     # ✅ Alias funciona (analyze-graph)
+make version # ✅ v4.0.0
+make info    # ✅ Exibe novos pacotes (chalk, dotenv, winston)
+make help    # ✅ Help menu completo com BOLD
+make q       # ✅ Alias funciona (queue-status)
+make m       # ✅ Alias funciona (monit)
+make d       # ✅ Alias funciona (diagnose)
+make a       # ✅ Alias funciona (analyze-graph)
 ```
 
 ### ✅ Contagem de Targets

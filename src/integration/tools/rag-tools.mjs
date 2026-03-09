@@ -2,39 +2,58 @@
 /**
  * RAG Tools for Tool Registry
  *
- * Wraps existing RAG v3.0 backend (tools/rag/lib/facade.mjs)
- * Implements tools for semantic code search and health checks
+ * Wraps existing RAG v3.0 backend (tools/rag/lib/facade.mjs) Implements tools for semantic code search and health
+ * checks
  *
  * Tools:
+ *
  * - rag_search: Hybrid/lexical semantic search (with degraded fallback)
  * - rag_health: RAG system health check (LanceDB, Ollama, cache)
  * - rag_expand: Context expansion by chunk_id (lines or symbol span)
  */
 
-import { ragHybridSearch, ragHealth, ragExpand, getRagCacheStats } from '../../../tools/rag/lib/facade.mjs';
+import { getRagCacheStats, ragExpand, ragHealth, ragHybridSearch } from '../../../tools/rag/lib/facade.mjs';
 
+/**
+ * @typedef {object} RagSearchHandlerParams
+ * @property {string} query
+ * @property {number} topK
+ * @property {string} pathPrefix
+ * @property {string} ext
+ * @property {'core' | 'dev' | 'full'} profile
+ * @property {'hybrid' | 'lexical-only' | 'auto'} mode
+ * @property {'code-first' | 'docs-first' | 'all'} intent_scope
+ * @property {boolean} auto_expand
+ * @property {'lines' | 'symbol'} expand_mode
+ * @property {number} expand_top_n
+ * @property {boolean} includeDiagnostics
+ */
+/**
+ * @typedef {object} RagSearchHandlerOptions
+ * @property {any} [query]
+ * @property {any} [topK]
+ * @property {any} [pathPrefix]
+ * @property {any} [ext]
+ * @property {any} [profile]
+ * @property {any} [mode]
+ * @property {any} [intent_scope]
+ * @property {any} [auto_expand]
+ * @property {any} [expand_mode]
+ * @property {any} [expand_top_n]
+ * @property {any} [includeDiagnostics]
+ */
 /**
  * rag_search tool: Hybrid semantic search
  *
  * Searches the chatgpt-docker-puppeteer codebase using:
+ *
  * - Vector search (semantic understanding)
  * - Full-text search (exact term matching)
  * - Multi-signal reranking (6 signals)
  * - MMR diversity (avoids redundant results)
  *
- * @param {Object} params - Search parameters
- * @param {string} params.query - Search query (natural language or exact terms)
- * @param {number} params.topK - Number of results (default: 5, max: 20)
- * @param {string} params.pathPrefix - Optional: Filter by path (e.g., "src/kernel")
- * @param {string} params.ext - Optional: Filter by extension (e.g., ".js", ".mjs")
- * @param {'core'|'dev'|'full'} params.profile - RAG scan profile context
- * @param {'hybrid'|'lexical-only'|'auto'} params.mode - Search mode
- * @param {'code-first'|'docs-first'|'all'} params.intent_scope - Result intent policy
- * @param {boolean} params.auto_expand - Expand top results automatically
- * @param {'lines'|'symbol'} params.expand_mode - Expansion mode
- * @param {number} params.expand_top_n - Number of top chunks to auto-expand
- * @param {boolean} params.includeDiagnostics - Include diagnostic details in text output
- * @returns {Promise<{text:string,json?:any,flags:any}>} Structured tool result
+ * @param {RagSearchHandlerParams} params - Search parameters
+ * @returns {Promise<{ text: string; json?: any; flags: any }>} Structured tool result
  */
 async function ragSearchHandler({
     query,
@@ -74,7 +93,7 @@ async function ragSearchHandler({
                 rerank: true,
                 mmr: true,
                 mmrLambda: 0.7,
-            })
+            }),
         );
 
         console.error(`[RAG Tool] Found ${result.results.length} results`);
@@ -208,7 +227,7 @@ async function ragSearchHandler({
                 ...(result.reason_code ? { reason_code: result.reason_code } : {}),
                 ...(result.degraded_reason ? { degraded_reason: result.degraded_reason } : {}),
                 result_count: result.results.length,
-                results: result.results.map(r => ({
+                results: result.results.map((/** @type {any} */ r) => ({
                     chunk_id: r.chunk_id,
                     path: r.path,
                     content_class: r.content_class || null,
@@ -247,7 +266,8 @@ async function ragSearchHandler({
                 partial: Boolean(result.degraded),
             },
         };
-    } catch (error) {
+    } catch (/** @type {any} */ _raw_error) {
+        const error = /** @type {any} */ (_raw_error);
         console.error('[RAG Tool] rag_search error:', error);
         throw new Error(`RAG search failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
@@ -257,6 +277,7 @@ async function ragSearchHandler({
  * rag_health tool: RAG system health check
  *
  * Checks the health of all RAG components:
+ *
  * - LanceDB (vector database)
  * - Ollama (embedding model)
  * - Cache statistics
@@ -267,7 +288,7 @@ async function ragHealthHandler() {
     console.error('[RAG Tool] rag_health check...');
 
     try {
-        const health = await ragHealth();
+        const health = /** @type {any} */ (await ragHealth());
         const cacheStats = getRagCacheStats();
 
         let status = '# RAG System Health\n\n';
@@ -320,13 +341,14 @@ async function ragHealthHandler() {
         }
 
         return status;
-    } catch (error) {
+    } catch (/** @type {any} */ _raw_error) {
+        const error = /** @type {any} */ (_raw_error);
         console.error('[RAG Tool] rag_health error:', error);
         throw new Error(`RAG health check failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
-async function ragExpandHandler({ chunk_id, before_lines, after_lines, mode = 'lines' }) {
+async function ragExpandHandler(/** @type {any} */ { chunk_id, before_lines, after_lines, mode = 'lines' }) {
     console.error(`[RAG Tool] rag_expand: chunk_id=${chunk_id} mode=${mode}`);
 
     const expanded = /** @type {any} */ (
@@ -387,12 +409,16 @@ async function ragExpandHandler({ chunk_id, before_lines, after_lines, mode = 'l
 }
 
 /**
+ * @typedef {object} RegisterRagToolsRegistry
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Register RAG tools in the Tool Registry
  *
- * @param {any} registry - Tool registry instance
-  * @returns {Promise<void>}
+ * @param {RegisterRagToolsRegistry} registry - Tool registry instance
+ * @returns {Promise<void>}
  */
-export async function registerRagTools(registry) {
+export async function registerRagTools(/** @type {any} */ registry) {
     console.error('[RAG Tools] Registering tools...');
 
     // rag_search
@@ -481,7 +507,7 @@ Examples:
                 required: ['query'],
             },
         },
-        ragSearchHandler
+        ragSearchHandler,
     );
 
     // rag_health
@@ -494,7 +520,7 @@ Examples:
                 properties: {},
             },
         },
-        ragHealthHandler
+        ragHealthHandler,
     );
 
     registry.register(
@@ -528,7 +554,7 @@ Examples:
                 required: ['chunk_id'],
             },
         },
-        ragExpandHandler
+        ragExpandHandler,
     );
 
     console.error('[RAG Tools] Registered 3 tools: rag_search, rag_health, rag_expand');

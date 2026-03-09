@@ -1,8 +1,19 @@
 // @ts-check
 /**
- * @param {Record<string, { total: number, violated: number, covered: number, covered_by_run?: number, covered_by_tests?: number }>} coverage
- * @param {Record<string, any>} [drift]
-  * @returns {any}
+ * @typedef {object} ContractCoverageMap
+ * @property {number} total
+ * @property {number} violated
+ * @property {number} covered
+ * @property {number} [covered_by_run]
+ * @property {number} [covered_by_tests]
+ */
+/**
+ * @typedef {any} ContractDrift
+ */
+/**
+ * @param {Record<string, ContractCoverageMap>} coverage
+ * @param {ContractDrift} [drift]
+ * @returns {string}
  */
 export function renderContractCoverage(coverage, drift = {}) {
     const lines = ['## Contract Coverage'];
@@ -15,7 +26,7 @@ export function renderContractCoverage(coverage, drift = {}) {
             const coveredByRun = Number.isFinite(row.covered_by_run) ? row.covered_by_run : row.covered;
             const coveredByTests = Number.isFinite(row.covered_by_tests) ? row.covered_by_tests : 0;
             lines.push(
-                `- ${domain}: total=${row.total}, cobertos_run=${coveredByRun}, cobertos_testes=${coveredByTests}, violados=${row.violated}`
+                `- ${domain}: total=${row.total}, cobertos_run=${coveredByRun}, cobertos_testes=${coveredByTests}, violados=${row.violated}`,
             );
         }
     }

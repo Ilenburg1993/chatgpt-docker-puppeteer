@@ -27,44 +27,46 @@ if (cfg.persistDb) {
     try {
         const { createAuditAgentDbStore } = await import('./db_store.js');
         store = createAuditAgentDbStore();
-    } catch (error) {
-        console.warn(`[audit-agent] db store unavailable (fallback in-memory): ${error?.message || String(error)}`);
+    } catch (/** @type {any} */ error) {
+        console.warn(
+            `[audit-agent] db store unavailable (fallback in-memory): ${error instanceof Error ? error.message : String(error)}`,
+        );
     }
 }
 let contextBuilder = null;
 try {
     const { createAuditAgentContextBuilder } = await import('./context_builder.js');
     contextBuilder = createAuditAgentContextBuilder();
-} catch (error) {
+} catch (/** @type {any} */ error) {
     console.warn(
-        `[audit-agent] context builder unavailable (read-only probes disabled): ${error?.message || String(error)}`
+        `[audit-agent] context builder unavailable (read-only probes disabled): ${error instanceof Error ? error.message : String(error)}`,
     );
 }
 let triageClient = null;
 try {
     const { createAuditAgentTriageLlmClient } = await import('./triage_llm.js');
     triageClient = createAuditAgentTriageLlmClient();
-} catch (error) {
+} catch (/** @type {any} */ error) {
     console.warn(
-        `[audit-agent] triage llm client unavailable (LLM triage disabled): ${error?.message || String(error)}`
+        `[audit-agent] triage llm client unavailable (LLM triage disabled): ${error instanceof Error ? error.message : String(error)}`,
     );
 }
 let patchAuthorClient = null;
 try {
     const { createAuditAgentPatchAuthorLlmClient } = await import('./patch_author_llm.js');
     patchAuthorClient = createAuditAgentPatchAuthorLlmClient();
-} catch (error) {
+} catch (/** @type {any} */ error) {
     console.warn(
-        `[audit-agent] patch author llm client unavailable (LLM patch author disabled): ${error?.message || String(error)}`
+        `[audit-agent] patch author llm client unavailable (LLM patch author disabled): ${error instanceof Error ? error.message : String(error)}`,
     );
 }
 
 const runtime = new AuditAgentRuntime({
     maxConcurrentJobs: cfg.maxConcurrentJobs,
-    store,
-    contextBuilder,
-    triageClient,
-    patchAuthorClient,
+    store: /** @type {any} */ (store),
+    contextBuilder: /** @type {any} */ (contextBuilder),
+    triageClient: /** @type {any} */ (triageClient),
+    patchAuthorClient: /** @type {any} */ (patchAuthorClient),
     logger(level, message, data) {
         const suffix = data ? ` ${JSON.stringify(data)}` : '';
         console.log(`[${level}] ${message}${suffix}`);
@@ -83,12 +85,13 @@ const heartbeat = setInterval(
     () => {
         void runtime.tick();
     },
-    Math.max(1000, cfg.triggerDebounceMs)
+    Math.max(1000, cfg.triggerDebounceMs),
 );
 heartbeat.unref?.();
 
 await new Promise((resolve, reject) => {
-    server.listen(cfg.port, cfg.host, err => (err ? reject(err) : resolve(undefined)));
+    server.listen(cfg.port, cfg.host, () => resolve(undefined));
+    server.once('error', reject);
 });
 console.log(`[audit-agent] http listening on http://${cfg.host}:${cfg.port}`);
 if (process.send) {
@@ -100,6 +103,12 @@ if (process.send) {
 }
 
 let shuttingDown = false;
+/**
+ * @param {string} signal
+ */
+/**
+ * @param {string} signal
+ */
 function shutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;

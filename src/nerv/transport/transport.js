@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import createConnection from './connection.js';
 import * as framing from './framing.js';
 import createReconnect from './reconnect.js';
@@ -8,17 +8,25 @@ import createReconnect from './reconnect.js';
 =========================== */
 
 /**
+ * @typedef {object} CreateTransportDeps
+ * @property {any} telemetry
+ * @property {any} adapter
+ * @property {any} [reconnect]
+ */
+/**
+ * @typedef {object} CreateTransportOptions
+ * @property {any} [telemetry]
+ * @property {any} [adapter]
+ * @property {any} [reconnect]
+ */
+/**
  * Cria o subsistema de transporte físico do NERV.
  *
- * **Side-effects:** Inicializa framing, conexão e reconexão automática.
- * **Semântica:** Composição completa do plano físico de comunicação.
- * **Unidades:** Políticas de reconexão seguem typedef de createReconnect.
+ * **Side-effects:** Inicializa framing, conexão e reconexão automática. **Semântica:** Composição completa do plano
+ * físico de comunicação. **Unidades:** Políticas de reconexão seguem typedef de createReconnect.
  *
- * @param {object} deps - Dependências do transporte
- * @param {object} deps.telemetry - Interface de telemetria do NERV
- * @param {object} deps.adapter - Adaptador físico (IPC, socket, pipe)
- * @param {object} [deps.reconnect] - Política de reconexão opcional
- * @returns {object} Transporte com métodos send, start, stop, onReceive
+ * @param {CreateTransportDeps} deps - Dependências do transporte
+ * @returns {any} Transporte com métodos send, start, stop, onReceive
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
@@ -34,37 +42,42 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
      1. Framing (empacotamento físico)
   ========================================================= */
 
-    const unpacker = framing.createUnpacker();
+    const unpacker = /** @type {any} */ (framing.createUnpacker());
 
     /* =========================================================
      2. Conexão física
   ========================================================= */
 
-    const connection = createConnection({
-        telemetry,
-        adapter: {
-            ...adapter,
+    const connection = /** @type {any} */ (
+        createConnection({
+            telemetry,
+            adapter: {
+                ...adapter,
 
-            // Recebe chunks brutos do meio físico
-            onReceive(handler) {
-                adapter.onReceive(chunk => {
-                    unpacker.push(chunk, handler);
-                });
+                // Recebe chunks brutos do meio físico
+                /** @param {any} handler */
+                onReceive(handler) {
+                    adapter.onReceive((/** @type {any} */ chunk) => {
+                        unpacker.push(chunk, handler);
+                    });
+                },
             },
-        },
-    });
+        })
+    );
 
     /* =========================================================
      3. Reconexão técnica (opcional)
   ========================================================= */
 
     const reconnect = reconnectPolicy
-        ? createReconnect({
-              telemetry,
-              start: connection.start,
-              stop: connection.stop,
-              policy: reconnectPolicy,
-          })
+        ? /** @type {any} */ (
+              createReconnect({
+                  telemetry,
+                  start: connection.start,
+                  stop: connection.stop,
+                  policy: reconnectPolicy,
+              })
+          )
         : null;
 
     /* =========================================================
@@ -95,7 +108,7 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
     /**
      * Envia frame opaco pelo meio físico.
      *
-     * @param {Buffer|Uint8Array} frame
+     * @param {Buffer | Uint8Array} frame
      */
     function send(frame) {
         const packed = framing.pack(frame);
@@ -105,7 +118,7 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
     /**
      * Registra handler para frames recebidos.
      *
-     * @param {Function} handler
+     * @param {function} handler
      */
     function onReceive(handler) {
         connection.onReceive(handler);

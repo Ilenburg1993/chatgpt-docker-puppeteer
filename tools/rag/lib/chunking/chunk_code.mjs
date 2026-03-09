@@ -1,3 +1,4 @@
+// @ts-check
 import { MAX_CHUNK_CHARS_CODE } from '../contract.mjs';
 import { estimateCharsForLines } from '../text.mjs';
 import { chunkPlain } from './chunk_plain.mjs';
@@ -7,7 +8,7 @@ const ANCHOR_RE =
     /^(?:\s*export\s+|\s*class\s+\w|\s*(?:async\s+)?function\s+\w|\s*interface\s+\w|\s*type\s+\w|\s*const\s+\w+\s*=\s*\(|\s*describe\(|\s*it\()/;
 const BLOCK_COMMENT_START = /^\s*\/\*\*/;
 
-export function chunkCode({ lines, maxChunkChars = MAX_CHUNK_CHARS_CODE, minChunkChars = 200 }) {
+export function chunkCode(/** @type {any} */ { lines, maxChunkChars = MAX_CHUNK_CHARS_CODE, minChunkChars = 200 }) {
     if (!lines || lines.length === 0) return [];
 
     const candidates = new Set([0]);
@@ -21,8 +22,8 @@ export function chunkCode({ lines, maxChunkChars = MAX_CHUNK_CHARS_CODE, minChun
     const ranges = [];
 
     for (let s = 0; s < starts.length; s++) {
-        const startIdx = starts[s];
-        const endIdx = s + 1 < starts.length ? starts[s + 1] - 1 : lines.length - 1;
+        const startIdx = /** @type {number} */ (starts[s]);
+        const endIdx = s + 1 < starts.length ? /** @type {number} */ (starts[s + 1]) - 1 : lines.length - 1;
         if (startIdx > endIdx) continue;
 
         const len = estimateCharsForLines(lines, startIdx, endIdx);

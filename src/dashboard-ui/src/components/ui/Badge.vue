@@ -7,12 +7,12 @@ const props = defineProps({
     variant: {
         type: String,
         default: 'default',
-        validator: v => ['default', 'success', 'warning', 'error', 'info'].includes(v),
+        validator: (v) => ['default', 'success', 'warning', 'error', 'info'].includes(v),
     },
     size: {
         type: String,
         default: 'md',
-        validator: v => ['sm', 'md', 'lg'].includes(v),
+        validator: (v) => ['sm', 'md', 'lg'].includes(v),
     },
     class: {
         type: String,

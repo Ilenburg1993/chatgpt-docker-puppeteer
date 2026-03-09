@@ -1,13 +1,12 @@
 // @ts-check
 import {
-    writeTask,
+    readLatestGlobalLogTail,
     readTask,
+    removeRunLock,
     startAgent,
     stopAgent,
     waitForCondition,
-    removeRunLock,
-    readLatestGlobalLogTail,
-    sleep,
+    writeTask,
 } from './helpers.js';
 
 (async () => {
@@ -84,7 +83,7 @@ import {
                     (finalTask.state && finalTask.state.error));
             throw new Error(`Estado inválido: ${finalStatus}. Erro: ${finalErr}`);
         }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         console.error('FAIL:', e.message);
         console.error('--- LOGS RECENTES ---');
         console.error(readLatestGlobalLogTail(50));

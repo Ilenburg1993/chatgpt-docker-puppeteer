@@ -123,7 +123,7 @@ Trigger action
 
 ```javascript
 // src/infra/queue/fs_watcher.js
-watcher.on('add', filePath => {
+watcher.on('add', (filePath) => {
   debouncedInvalidate(() => {
     log('DEBUG', `[WATCHER] New file detected: ${filePath}`);
 
@@ -279,12 +279,12 @@ async function evaluateTasks() {
 
 ```javascript
 async function scanQueue() {
-  const files = fs.readdirSync('fila/').filter(f => f.endsWith('.json'));
+  const files = fs.readdirSync('fila/').filter((f) => f.endsWith('.json'));
 
   // P9.7: p-limit controla concorrência (10 simultâneos)
   const limit = pLimit(10);
 
-  const tasks = await Promise.all(files.map(file => limit(() => loadTask(file))));
+  const tasks = await Promise.all(files.map((file) => limit(() => loadTask(file))));
 
   // P9.6: Cache metrics
   cacheHits = 0;
@@ -541,7 +541,7 @@ function serializeEnvelope(envelope) {
 ```javascript
 class DriverNERVAdapter {
   constructor() {
-    nerv.on('TASK_ALLOCATED', envelope => {
+    nerv.on('TASK_ALLOCATED', (envelope) => {
       this.handleAllocation(envelope.payload);
     });
   }
@@ -581,7 +581,7 @@ const page = await browserPool.allocatePage('chatgpt');
 function _selectInstance(target) {
   // Filtrar apenas instâncias HEALTHY (circuit breaker)
   const healthy = pool.filter(
-    e => e.health.status === 'HEALTHY' && e.health.consecutiveFailures === 0
+    (e) => e.health.status === 'HEALTHY' && e.health.consecutiveFailures === 0,
   );
 
   if (healthy.length === 0) {
@@ -898,7 +898,7 @@ nerv.on('DRIVER_RESULT', async ({ taskId, status, correlationId }) => {
     await taskRuntime.updateState(
       taskId,
       status === 'SUCCESS' ? 'DONE' : 'FAILED',
-      'RUNNING' // Expected state
+      'RUNNING', // Expected state
     );
 
     // 2. Remove from running set

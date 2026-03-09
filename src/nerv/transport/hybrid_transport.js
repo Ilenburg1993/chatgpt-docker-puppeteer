@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { CONNECTION_MODES } from '#core/constants/browser';
 import { getActionCode, getCorrelationId, getMessageType, getMsgId } from '#shared/nerv/envelope_reader';
 import EventEmitter from 'node:events';
@@ -13,17 +13,26 @@ const CIRCUIT_STATES = {
 };
 
 /**
+ * @typedef {object} CreateHybridTransportConfig
+ * @property {any} telemetry
+ * @property {any} [mode]
+ * @property {any} [socketAdapter]
+ */
+/**
+ * @typedef {object} CreateHybridTransportOptions
+ * @property {any} [mode]
+ * @property {any} [socketAdapter]
+ * @property {any} [telemetry]
+ */
+/**
  * Cria transporte híbrido com suporte local + remoto + circuit breaker.
  *
- * **Side-effects:** Inicializa EventEmitter local, conecta Socket.io se híbrido.
- * **Semântica:** Abstração unificada de transporte local/remoto via NERV com resiliência.
- * **Unidades:** mode segue CONNECTION_MODES, handlerId como contador incremental.
+ * **Side-effects:** Inicializa EventEmitter local, conecta Socket.io se híbrido. **Semântica:** Abstração unificada de
+ * transporte local/remoto via NERV com resiliência. **Unidades:** mode segue CONNECTION_MODES, handlerId como contador
+ * incremental.
  *
- * @param {object} config - Configuração do transporte híbrido
- * @param {string} [config.mode='LOCAL'] - Modo de conexão ('LOCAL'|'HYBRID')
- * @param {object} [config.socketAdapter=null] - Adapter Socket.io para modo híbrido
- * @param {object} config.telemetry - Interface de telemetria NERV
- * @returns {object} Transporte híbrido com métodos send, onReceive, start, stop
+ * @param {CreateHybridTransportConfig} config - Configuração do transporte híbrido
+ * @returns {any} Transporte híbrido com métodos send, onReceive, start, stop
  * @throws {Error} Se telemetry não for fornecida
  */
 function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = null, telemetry }) {
@@ -51,6 +60,8 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
 
     /**
      * Atualiza estado do circuit breaker baseado em sucesso/falha.
+     *
+     * @param {boolean} success
      */
     function updateCircuitBreaker(success) {
         const now = Date.now();
@@ -106,7 +117,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
 
         if (mode === CONNECTION_MODES.HYBRID && socketAdapter) {
             // Configura recepção remota
-            socketAdapter.onReceive(frame => {
+            socketAdapter.onReceive((/** @type {any} */ frame) => {
                 try {
                     const envelope = JSON.parse(frame);
 
@@ -114,21 +125,23 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                     localBus.emit('message', envelope);
 
                     // Notifica handlers registrados
-                    handlers.forEach(handler => {
+                    handlers.forEach((handler) => {
                         try {
                             handler(envelope);
-                        } catch (err) {
+                        } catch (/** @type {any} */ err) {
+                            const _e = /** @type {any} */ (err);
                             telemetry.emit('hybrid_transport_handler_error', {
-                                error: err.message,
+                                error: _e.message,
                                 correlationId: envelope.causality?.correlation_id,
                                 msgId: envelope.causality?.msg_id,
                                 actionCode: envelope.type?.action_code,
                             });
                         }
                     });
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
                     telemetry.emit('hybrid_transport_parse_error', {
-                        error: err.message,
+                        error: _e.message,
                     });
                 }
             });
@@ -154,7 +167,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
     /**
      * Envia mensagem (local via EventEmitter, remoto via Socket.io com circuit breaker).
      *
-     * @param {Object} envelope - Envelope NERV normalizado
+     * @param {any} envelope - Envelope NERV normalizado
      */
     function send(envelope) {
         // 1. SEMPRE emite local (fast-path para mesmos processo)
@@ -167,9 +180,10 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                     const frame = JSON.stringify(envelope);
                     socketAdapter.send(frame);
                     updateCircuitBreaker(true); // Sucesso na tentativa
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
                     telemetry.emit('hybrid_transport_send_error', {
-                        error: err.message,
+                        error: _e.message,
                         correlationId: envelope.causality?.correlation_id,
                         msgId: envelope.causality?.msg_id,
                         actionCode: envelope.type?.action_code,
@@ -199,8 +213,8 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
     /**
      * Registra handler para receber mensagens.
      *
-     * @param {(envelope: any) => void} handler - (envelope) => void
-     * @returns {Function} Unsubscribe function
+     * @param {(envelope: unknown) => void} handler - (envelope) => void
+     * @returns {function} Unsubscribe function
      */
     function onReceive(handler) {
         if (typeof handler !== 'function') {
@@ -224,8 +238,8 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
      * Registra listener para actionCode específico.
      *
      * @param {string} actionCode - Código de ação (ex: 'TASK_START')
-     * @param {(envelope: any) => void} handler - (envelope) => void
-     * @returns {Function} Unsubscribe function
+     * @param {(envelope: unknown) => void} handler - (envelope) => void
+     * @returns {function} Unsubscribe function
      */
     function onEvent(actionCode, handler) {
         if (typeof actionCode !== 'string' || !actionCode.trim()) {
@@ -235,7 +249,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
             throw new Error('onEvent requer função');
         }
 
-        const wrappedHandler = envelope => {
+        const wrappedHandler = (/** @type {any} */ envelope) => {
             if (getMessageType(envelope) !== 'EVENT') return;
             if (getActionCode(envelope) === actionCode) {
                 handler(envelope);
@@ -249,15 +263,15 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
      * Registra listener para actor específico.
      *
      * @param {string} actor - Actor (ex: 'KERNEL', 'DRIVER', 'SERVER')
-     * @param {Function} handler - (envelope) => void
-     * @returns {Function} Unsubscribe function
+     * @param {function} handler - (envelope) => void
+     * @returns {function} Unsubscribe function
      */
     function onActor(actor, handler) {
         if (typeof handler !== 'function') {
             throw new Error('onActor requer função');
         }
 
-        const wrappedHandler = envelope => {
+        const wrappedHandler = (/** @type {any} */ envelope) => {
             const a = envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null;
             if (a === actor) {
                 handler(envelope);
@@ -278,7 +292,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
         };
 
         if (mode === CONNECTION_MODES.HYBRID && socketAdapter) {
-            status.remote = socketAdapter.events ? 'active' : 'inactive';
+            /** @type {any} */ (status).remote = socketAdapter.events ? 'active' : 'inactive';
         }
 
         return status;

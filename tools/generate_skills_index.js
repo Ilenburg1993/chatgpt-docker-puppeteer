@@ -9,6 +9,10 @@ const ROOT = path.resolve(__dirname, '..');
 const SKILLS_DIR = path.join(ROOT, 'skills');
 const INDEX_FILE = path.join(SKILLS_DIR, 'index.json');
 
+/**
+ * @param {string[]} bases
+ * @returns {{ dir: string; md: string; source: string }[]}
+ */
 function findSkillDirs(bases) {
     const found = [];
     for (const base of bases) {
@@ -29,15 +33,16 @@ function findSkillDirs(bases) {
 
 const candidates = findSkillDirs(['skills/personal', 'skills/project', '.github/skills', '.claude/skills', 'skills']);
 
-const skills = candidates.map(c => {
+const skills = candidates.map((c) => {
     const contents = fs.readFileSync(c.md, 'utf8');
     const match = contents.match(/^---\n([\s\S]*?)\n---/);
-    let meta = {};
+    let meta = /** @type {any} */ ({});
     if (match) {
         try {
-            meta = yaml.load(match[1]) || {};
+            meta = yaml.load(match[1] ?? '') || {};
         } catch (e) {
-            console.error('YAML parse error in', c.md, e.message || e);
+            const _e = /** @type {any} */ (e);
+            console.error('YAML parse error in', c.md, _e.message || e);
         }
     }
     return {
@@ -56,7 +61,7 @@ console.log(`Wrote ${skills.length} skills to ${path.relative(ROOT, INDEX_FILE)}
 // Update skills/README.md with a simple list
 const readmePath = path.join(SKILLS_DIR, 'README.md');
 const header = '# Skills index\n\nThis directory holds collected skills.\n\n';
-let list = skills.map(s => `- **${s.name}**: ${s.description} ([${s.path}](./${s.path}/SKILL.md))`).join('\n');
+let list = skills.map((s) => `- **${s.name}**: ${s.description} ([${s.path}](./${s.path}/SKILL.md))`).join('\n');
 if (!list) list = '_No skills found._';
 fs.writeFileSync(readmePath, header + list + '\n');
 console.log(`Updated ${path.relative(ROOT, readmePath)}`);

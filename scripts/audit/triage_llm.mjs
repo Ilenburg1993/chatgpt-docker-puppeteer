@@ -1,21 +1,22 @@
 // @ts-check
 import { setTimeout as sleep } from 'node:timers/promises';
 import { buildContextPack } from './triage/context_pack.mjs';
+import { buildProposalV3 } from './triage/proposal_engine_v3.mjs';
 import { rankRootCauses } from './triage/root_cause_ranker.mjs';
 import { buildTestPlan } from './triage/test_planner.mjs';
-import { buildProposalV3 } from './triage/proposal_engine_v3.mjs';
 
 /**
- * @typedef {import('./lib/schema.mjs').AuditFindingV3} AuditFindingV3
+ * @import {AuditFindingV3} from "./lib/schema.mjs"
  */
 
 const MCP_URL = process.env.MCP_DIAG_URL ? `${process.env.MCP_DIAG_URL}/api/mcp` : 'http://localhost:3008/api/mcp';
 
+/** @typedef {Record<string, any>} CallMcpParams */
 /**
  * @param {string} method
- * @param {object} params
+ * @param {CallMcpParams} params
  * @param {number} id
- * @returns {Promise<any|null>}
+ * @returns {Promise<any | null>}
  */
 async function callMcp(method, params, id) {
     const ctrl = new AbortController();
@@ -41,12 +42,14 @@ async function callMcp(method, params, id) {
 }
 
 /**
+ * @typedef {object} DeterministicFallbackOptions
+ * @property {boolean | undefined} [proposeDiffs]
+ * @property {'basic' | 'standard' | 'deep' | undefined} [proposalDepth]
+ * @property {string | undefined} [masterPath]
+ */
+/**
  * @param {AuditFindingV3} finding
- * @param {{
- *   proposeDiffs: boolean,
- *   proposalDepth: 'basic'|'standard'|'deep',
- *   masterPath?: string,
- * }} options
+ * @param {DeterministicFallbackOptions} options
  */
 function deterministicFallback(finding, options) {
     if (!finding.proposal || typeof finding.proposal !== 'object') {
@@ -143,26 +146,22 @@ function deterministicFallback(finding, options) {
 }
 
 /**
+ * @typedef {object} TriageFindingsOptions
+ * @property {boolean} [enabled]
+ * @property {number} [maxMcpFindings]
+ * @property {boolean} [proposeDiffs]
+ * @property {'bug-first' | 'all'} [focusMode]
+ * @property {'basic' | 'standard' | 'deep'} [proposalDepth]
+ * @property {'off' | 'on'} [cloudFallback]
+ * @property {string} [masterPath]
+ * @property {number} [maxDurationMs]
+ * @property {(payload: any) => void} [onProgress]
+ * @property {string | null} [findingId]
+ */
+/**
  * @param {AuditFindingV3[]} findings
- * @param {{
- *   enabled?: boolean,
- *   maxMcpFindings?: number,
- *   proposeDiffs?: boolean,
- *   focusMode?: 'bug-first'|'all',
- *   proposalDepth?: 'basic'|'standard'|'deep',
- *   cloudFallback?: 'off'|'on',
- *   masterPath?: string,
- *   maxDurationMs?: number,
- *   onProgress?: (payload: {
- *     phase: 'triage-intelligence',
- *     processed: number,
- *     total: number,
- *     percent: number,
- *     mode: 'mcp'|'fallback'|'disabled'|'timeout',
- *     findingId: string|null
- *   }) => void,
- * }} [options]
- * @returns {Promise<{ findings: AuditFindingV3[], usedMcp: boolean, degraded: boolean, warnings: string[] }>}
+ * @param {TriageFindingsOptions} [options]
+ * @returns {Promise<{ findings: AuditFindingV3[]; usedMcp: boolean; degraded: boolean; warnings: string[] }>}
  */
 export async function triageFindings(findings, options = {}) {
     const enabled = options.enabled !== false;
@@ -181,7 +180,7 @@ export async function triageFindings(findings, options = {}) {
     const warnings = [];
 
     if (!enabled || findings.length === 0) {
-        const enriched = findings.map(finding => {
+        const enriched = findings.map((finding) => {
             const working = { ...finding };
             deterministicFallback(working, {
                 proposeDiffs,
@@ -210,10 +209,10 @@ export async function triageFindings(findings, options = {}) {
         warnings.push('MCP unavailable for LLM triage; deterministic fallback used.');
         if (cloudFallback === 'on') {
             warnings.push(
-                'cloud-fallback=on configurado, mas fallback cloud não foi executado (sem cliente remoto configurado).'
+                'cloud-fallback=on configurado, mas fallback cloud não foi executado (sem cliente remoto configurado).',
             );
         }
-        const enriched = findings.map(finding => {
+        const enriched = findings.map((finding) => {
             const working = { ...finding };
             deterministicFallback(working, {
                 proposeDiffs,
@@ -244,10 +243,10 @@ export async function triageFindings(findings, options = {}) {
         if (maxDurationMs > 0 && Date.now() - startedAt >= maxDurationMs) {
             timedOut = true;
             warnings.push(
-                `Triage timeout atingido (${maxDurationMs}ms); fallback determinístico aplicado no restante.`
+                `Triage timeout atingido (${maxDurationMs}ms); fallback determinístico aplicado no restante.`,
             );
             for (let rest = index; rest < findings.length; rest += 1) {
-                const pending = { ...findings[rest] };
+                const pending = { .../** @type {any} */ (findings[rest]) };
                 deterministicFallback(pending, {
                     proposeDiffs,
                     proposalDepth,
@@ -280,7 +279,7 @@ export async function triageFindings(findings, options = {}) {
             break;
         }
 
-        const finding = findings[index];
+        const finding = /** @type {any} */ (findings[index]);
         const working = {
             ...finding,
             proposal: {
@@ -322,7 +321,7 @@ export async function triageFindings(findings, options = {}) {
                             ext: extMatch ? extMatch[1] : undefined,
                         },
                     },
-                    requestId++
+                    requestId++,
                 );
 
                 ragData = ragSearch?.result?.structuredContent?.data || null;
@@ -334,13 +333,13 @@ export async function triageFindings(findings, options = {}) {
                             name: 'lsp_diagnostics',
                             arguments: { filePath: working.file, maxResults: 20 },
                         },
-                        requestId++
+                        requestId++,
                     );
                     lspData = lspDiag?.result?.structuredContent?.data || null;
                 }
             } else if (index === maxMcpFindings) {
                 warnings.push(
-                    `MCP triage limitado aos primeiros ${maxMcpFindings} achados; fallback determinístico aplicado no restante.`
+                    `MCP triage limitado aos primeiros ${maxMcpFindings} achados; fallback determinístico aplicado no restante.`,
                 );
             }
 

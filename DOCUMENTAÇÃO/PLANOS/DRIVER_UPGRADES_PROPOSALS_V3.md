@@ -296,7 +296,7 @@ if (this.taskQueue.length > 0 && this.activeDrivers.size < MAX_ACTIVE_DRIVERS) {
   const next = this.taskQueue.shift();
 
   setImmediate(() => {
-    this._executeTask(next.payload, next.correlationId).catch(err => {
+    this._executeTask(next.payload, next.correlationId).catch((err) => {
       log('ERROR', `Error executing queued task: ${err.message}`);
     });
   });

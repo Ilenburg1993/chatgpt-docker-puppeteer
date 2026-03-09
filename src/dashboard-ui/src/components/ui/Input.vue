@@ -37,11 +37,11 @@ const inputClass = computed(() =>
         'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         props.error ? 'border-error focus:ring-error/30' : 'border-border',
-        props.class
-    )
+        props.class,
+    ),
 );
 
-const handleInput = event => {
+const handleInput = (event) => {
     emit('update:modelValue', event.target.value);
 };
 </script>

@@ -1,8 +1,7 @@
 // @ts-check
 /**
- * Core Type Definitions
- * Centralized type definitions for the entire project
- * Use these types across all modules for consistency
+ * Core Type Definitions Centralized type definitions for the entire project Use these types across all modules for
+ * consistency
  *
  * @module types/core
  * @version 1.0.0
@@ -10,6 +9,7 @@
 
 /**
  * Result wrapper for operations that can succeed or fail
+ *
  * @template T - The type of the success data
  */
 export interface Result<T> {
@@ -20,11 +20,12 @@ export interface Result<T> {
 
 /**
  * Pagination parameters for list queries
+ *
  * @typedef {Object} PaginationParams
  * @property {number} page - Page number (0-indexed)
  * @property {number} pageSize - Items per page
  * @property {string} [sortBy] - Sort field
- * @property {'asc'|'desc'} [sortOrder] - Sort direction
+ * @property {'asc' | 'desc'} [sortOrder] - Sort direction
  */
 export interface PaginationParams {
     page: number;
@@ -35,31 +36,37 @@ export interface PaginationParams {
 
 /**
  * Connection mode types for browser orchestration
- * @typedef {'HYBRID'|'LOCAL'|'AUTO'|'LAUNCHER'|'REMOTE'|'SINGULARITY'} ConnectionMode
+ *
+ * @typedef {'HYBRID' | 'LOCAL' | 'AUTO' | 'LAUNCHER' | 'REMOTE' | 'SINGULARITY'} ConnectionMode
  */
 
 /**
  * Browser pool states
- * @typedef {'HEALTHY'|'UNHEALTHY'|'CRASHED'|'IDLE'} BrowserState
+ *
+ * @typedef {'HEALTHY' | 'UNHEALTHY' | 'CRASHED' | 'IDLE'} BrowserState
  */
 
 /**
  * Driver domain states
- * @typedef {'INITIALIZATION'|'UNKNOWN_CONTEXT'|'MAIN_PAGE'|'IFRAME'|'POPUP'} DriverDomain
+ *
+ * @typedef {'INITIALIZATION' | 'UNKNOWN_CONTEXT' | 'MAIN_PAGE' | 'IFRAME' | 'POPUP'} DriverDomain
  */
 
 /**
  * Task execution status
- * @typedef {'PENDING'|'RUNNING'|'SUCCESS'|'FAILED'|'CANCELLED'|'SUSPENDED'|'TERMINATED'} TaskStatus
+ *
+ * @typedef {'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'SUSPENDED' | 'TERMINATED'} TaskStatus
  */
 
 /**
  * Modifier keys for keyboard shortcuts
- * @typedef {'CONTROL'|'META'|'SHIFT'|'ALT'} ModifierKey
+ *
+ * @typedef {'CONTROL' | 'META' | 'SHIFT' | 'ALT'} ModifierKey
  */
 
 /**
  * Base configuration interface
+ *
  * @typedef {Object} BaseConfig
  * @property {string} id - Unique identifier
  * @property {string} name - Display name
@@ -69,6 +76,7 @@ export interface PaginationParams {
 
 /**
  * Configuration object for browser pool
+ *
  * @typedef {Object} BrowserPoolConfig
  * @property {number} maxSize - Maximum number of browsers
  * @property {number} minSize - Minimum number of browsers
@@ -78,6 +86,7 @@ export interface PaginationParams {
 
 /**
  * Task execution result
+ *
  * @typedef {Object} TaskResult
  * @property {string} taskId - Unique task identifier
  * @property {TaskStatus} status - Task status
@@ -89,6 +98,7 @@ export interface PaginationParams {
 
 /**
  * Driver state representation
+ *
  * @typedef {Object} DriverState
  * @property {string} driverId - Driver identifier
  * @property {string} [currentDomain] - Current domain context
@@ -99,6 +109,7 @@ export interface PaginationParams {
 
 /**
  * Connection metadata
+ *
  * @typedef {Object} ConnectionInfo
  * @property {string} id - Connection identifier
  * @property {ConnectionMode} mode - Connection mode
@@ -109,6 +120,7 @@ export interface PaginationParams {
 
 /**
  * Error with context
+ *
  * @typedef {Object} ContextError
  * @property {string} message - Error message
  * @property {string} [code] - Error code
@@ -118,6 +130,7 @@ export interface PaginationParams {
 
 /**
  * Event payload
+ *
  * @template T - Event data type
  * @typedef {Object} EventPayload<T>
  * @property {string} type - Event type
@@ -128,6 +141,7 @@ export interface PaginationParams {
 
 /**
  * Retry configuration
+ *
  * @typedef {Object} RetryConfig
  * @property {number} maxAttempts - Maximum retry attempts
  * @property {number} initialDelayMs - Initial delay in milliseconds
@@ -137,6 +151,7 @@ export interface PaginationParams {
 
 /**
  * Health check result
+ *
  * @typedef {Object} HealthCheckResult
  * @property {boolean} healthy - Overall health status
  * @property {string} [message] - Health message
@@ -149,6 +164,7 @@ export type { Result as AsyncResult } from './types';
 
 /**
  * Type guard for checking if a value is a Result
+ *
  * @param {unknown} value - Value to check
  * @returns {value is Result<unknown>}
  */
@@ -158,6 +174,7 @@ export function isResult(value: unknown): value is { success: boolean; data?: un
 
 /**
  * Type guard for checking if a value is a valid ConnectionMode
+ *
  * @param {unknown} value - Value to check
  * @returns {boolean}
  */
@@ -276,6 +293,7 @@ export type PromiseRejecter = (reason?: unknown) => void;
 
 /**
  * Configuration with generic type
+ *
  * @template T - Configuration object type
  */
 export interface ConfigWithDefaults<T extends Record<string, unknown>> {

@@ -51,8 +51,7 @@ Criar `src/core/boot_config.js`:
 
 ```javascript
 /**
- * Configuração centralizada de bootstrap
- * Fonte única de verdade para intervalos, timeouts e limites
+ * Configuração centralizada de bootstrap Fonte única de verdade para intervalos, timeouts e limites
  */
 class BootConfig {
   constructor() {
@@ -62,14 +61,14 @@ class BootConfig {
       'HEARTBEAT_WATCHDOG_INTERVAL_MS',
       500,
       100,
-      5000
+      5000,
     );
     this.KERNEL_CYCLE_INTERVAL = this._parseInterval('KERNEL_CYCLE_INTERVAL', 1000, 50, 5000);
     this.MISSION_RUNNER_INTERVAL_MS = this._parseInterval(
       'MISSION_RUNNER_INTERVAL_MS',
       1500,
       500,
-      10000
+      10000,
     );
 
     // Timeouts (5s - 180s)
@@ -77,13 +76,13 @@ class BootConfig {
       'KERNEL_BOOT_TIMEOUT_MS',
       30000,
       5000,
-      180000
+      180000,
     );
     this.SERVER_DISCOVERY_TIMEOUT = this._parseInterval(
       'SERVER_DISCOVERY_TIMEOUT',
       30000,
       0,
-      180000
+      180000,
     );
     this.SSOT_INIT_TIMEOUT_MS = this._parseInterval('SSOT_INIT_TIMEOUT_MS', 30000, 10000, 180000);
 
@@ -100,7 +99,7 @@ class BootConfig {
     if (value < min || value > max) {
       log(
         'WARN',
-        `[BootConfig] ${envVar}=${value} fora do range [${min}, ${max}], usando ${defaultValue}`
+        `[BootConfig] ${envVar}=${value} fora do range [${min}, ${max}], usando ${defaultValue}`,
       );
       return defaultValue;
     }
@@ -115,11 +114,11 @@ class BootConfig {
     this.constructor(); // Re-run parsing
 
     // Emit telemetry se mudou
-    const changed = Object.keys(this).filter(k => old[k] !== this[k]);
+    const changed = Object.keys(this).filter((k) => old[k] !== this[k]);
     if (changed.length > 0) {
       log(
         'INFO',
-        `[BootConfig] Recarregadas ${changed.length} configurações: ${changed.join(', ')}`
+        `[BootConfig] Recarregadas ${changed.length} configurações: ${changed.join(', ')}`,
       );
     }
   }
@@ -257,9 +256,10 @@ import { Authority } from '#shared/constants/authority';
 
 /**
  * Resolve modo de servidor com validação
+ *
  * @param {boolean} isPM2 - Se processo está sob PM2
  * @param {string} serverModeEnv - Valor de SERVER_MODE
- * @returns {'integrated'|'split'|'disabled'}
+ * @returns {'integrated' | 'split' | 'disabled'}
  */
 export function resolveServerMode(isPM2, serverModeEnv) {
   const mode = serverModeEnv || 'integrated';
@@ -282,9 +282,10 @@ export function resolveServerMode(isPM2, serverModeEnv) {
 
 /**
  * Resolve autoridade do processo
+ *
  * @param {boolean} isPM2
  * @param {string} serverMode
- * @returns {Authority.MAESTRO|Authority.SERVER|Authority.STANDALONE}
+ * @returns {Authority.MAESTRO | Authority.SERVER | Authority.STANDALONE}
  */
 export function resolveAuthority(isPM2, serverMode) {
   return Authority.resolveAuthority(isPM2, serverMode);
@@ -324,7 +325,7 @@ Implementação manual de port checking (L97-118) tem race condition:
 async function checkPortInUse(port) {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.once('error', err => {
+    server.once('error', (err) => {
       if (err.code === 'EADDRINUSE') resolve(true);
       else reject(err);
     });
@@ -406,7 +407,7 @@ async function initChromeProxyService(nerv, config) {
 
   // Instantiate
   const ChromeProxyService = await import('./infra/proxy/chromeProxyService.js').then(
-    m => m.default ?? m
+    (m) => m.default ?? m,
   );
   const proxy = new ChromeProxyService(config.CHROME_PROXY_PORT, config.CHROME_PORT);
 

@@ -1,4 +1,5 @@
 // @ts-check
+/** @typedef {any} AuditDiff */
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
@@ -6,23 +7,35 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} value
+ * @param {any} value
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
 
+/**
+ * @param {any} raw
+ * @param {any} raw
+ */
 function _parseJson(raw, fallback = {}) {
     if (!raw) return fallback;
     try {
         return JSON.parse(String(raw));
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
 
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToAuditDiff(row) {
     if (!row) return null;
     return {
@@ -37,8 +50,17 @@ function _rowToAuditDiff(row) {
 }
 
 /**
+ * @typedef {object} InsertAuditDiffOptions
+ * @property {any} [operationId]
+ * @property {any} [entityType]
+ * @property {any} [entityId]
+ * @property {any} [before]
+ */
+/**
  * Função exportada: insertAuditDiff.
- * @returns {any}
+ *
+ * @param {any} options
+ * @returns {AuditDiff | null}
  */
 function insertAuditDiff({ operationId, entityType, entityId, before = {}, after = {} }) {
     const db = getDb();
@@ -54,7 +76,7 @@ function insertAuditDiff({ operationId, entityType, entityId, before = {}, after
             @id, @operation_id, @entity_type, @entity_id,
             @before_json, @after_json, @created_at_ms
         )
-    `
+    `,
     ).run({
         id,
         operation_id: String(operationId || '').trim(),
@@ -70,7 +92,9 @@ function insertAuditDiff({ operationId, entityType, entityId, before = {}, after
 
 /**
  * Função exportada: getAuditDiffById.
- * @returns {any}
+ *
+ * @param {string} id Unique identifier.
+ * @returns {AuditDiff | null}
  */
 function getAuditDiffById(id) {
     const db = getDb();
@@ -80,7 +104,9 @@ function getAuditDiffById(id) {
 
 /**
  * Função exportada: listAuditDiffsByOperation.
- * @returns {any}
+ *
+ * @param {any} operationId
+ * @returns {AuditDiff[]}
  */
 function listAuditDiffsByOperation(operationId) {
     const db = getDb();
@@ -91,7 +117,7 @@ function listAuditDiffsByOperation(operationId) {
             FROM audit_diffs
             WHERE operation_id = ?
             ORDER BY created_at_ms ASC
-        `
+        `,
         )
         .all(String(operationId || '').trim());
 
@@ -100,7 +126,11 @@ function listAuditDiffsByOperation(operationId) {
 
 /**
  * Função exportada: listAuditDiffsByEntity.
- * @returns {any}
+ *
+ * @param {any} entityType
+ * @param {any} entityId
+ * @param {number} [limit]
+ * @returns {AuditDiff[]}
  */
 function listAuditDiffsByEntity(entityType, entityId, limit = 100) {
     const db = getDb();
@@ -112,12 +142,12 @@ function listAuditDiffsByEntity(entityType, entityId, limit = 100) {
             WHERE entity_type = ? AND entity_id = ?
             ORDER BY created_at_ms DESC
             LIMIT ?
-        `
+        `,
         )
         .all(
             String(entityType || '').trim(),
             String(entityId || '').trim(),
-            Math.max(1, Math.min(Number(limit) || 100, 500))
+            Math.max(1, Math.min(Number(limit) || 100, 500)),
         );
 
     return rows.map(_rowToAuditDiff).filter(Boolean);

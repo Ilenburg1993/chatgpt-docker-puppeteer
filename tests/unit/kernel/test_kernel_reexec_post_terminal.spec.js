@@ -1,19 +1,19 @@
 // @ts-check
-import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import EventEmitter from 'node:events';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { createKernel } from '#kernel/kernel';
 
 class MockNERV extends EventEmitter {
     constructor() {
         super();
-        this.emittedCommands = [];
-        this.emittedEvents = [];
-        this.receiveHandlers = [];
+        this.emittedCommands = /** @type {any[]} */ ([]);
+        this.emittedEvents = /** @type {any[]} */ ([]);
+        this.receiveHandlers = /** @type {any[]} */ ([]);
     }
 
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.receiveHandlers.push(handler);
         return () => {
             const index = this.receiveHandlers.indexOf(handler);
@@ -21,22 +21,22 @@ class MockNERV extends EventEmitter {
         };
     }
 
-    receive(envelope) {
-        this.receiveHandlers.forEach(h => h(envelope));
+    receive(/** @type {any} */ envelope) {
+        this.receiveHandlers.forEach((h) => h(envelope));
     }
 
-    emitCommand(envelope) {
+    emitCommand(/** @type {any} */ envelope) {
         this.emittedCommands.push(envelope);
     }
 
-    emitEvent(envelope) {
+    emitEvent(/** @type {any} */ envelope) {
         this.emittedEvents.push(envelope);
     }
 }
 
 describe('Kernel ssot_gateway (re-dispatch safe)', () => {
-    let nerv;
-    let kernel;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let kernel;
 
     beforeEach(() => {
         nerv = new MockNERV();

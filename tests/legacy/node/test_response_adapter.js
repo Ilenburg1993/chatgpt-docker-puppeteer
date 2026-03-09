@@ -1,14 +1,13 @@
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
+import { convertV1toV2, isResponseV2, loadResponse, saveResponse } from '#infra/storage/response_adapter';
 import path from 'node:path';
-import fs from 'node:fs';
-import { saveResponse, loadResponse, isResponseV2, convertV1toV2 } from '#infra/storage/response_adapter';
-import { log } from '#core/logger';
 
 // Diretórios temporários para testes (NOTA: response_store_v2 salva em respostas/ produção)
 const TEST_DIR = path.join(import.meta.dirname, 'temp_test_responses');
 const RESPONSES_DIR = path.join(TEST_DIR, 'respostas');
 
 // Mock task para testes
-const createMockTask = taskId => ({
+const createMockTask = (taskId) => ({
     meta: {
         id: taskId,
         created_at: new Date().toISOString(),
@@ -24,7 +23,8 @@ const createMockTask = taskId => ({
 // Testes
 /**
  * Função exportada: runTests.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<void>}
  */
 async function runTests() {
     let passed = 0;
@@ -256,10 +256,10 @@ async function runTests() {
 // Run
 if (import.meta.filename === process.argv[1]) {
     runTests()
-        .then(success => {
+        .then((success) => {
             process.exit(success ? 0 : 1);
         })
-        .catch(error => {
+        .catch((error) => {
             console.error('Test runner crashed:', error);
             process.exit(1);
         });

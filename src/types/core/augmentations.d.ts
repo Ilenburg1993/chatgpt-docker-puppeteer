@@ -170,6 +170,18 @@ declare module '#core/identity_manager' {
     export function getIdentity(): Promise<Identity>;
     export function saveIdentity(identity: Identity): Promise<void>;
     export function getRobotId(): string;
+
+    /** Default export: singleton IdentityManager instance */
+    const _default: {
+        robotId: string | null;
+        instanceId: string;
+        initialize(): Promise<void>;
+        getIdentity(): Promise<Identity>;
+        getRobotId(): string;
+        getInstanceId(): string;
+        [key: string]: any;
+    };
+    export default _default;
 }
 
 // ============================================================

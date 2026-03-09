@@ -23,18 +23,18 @@ if (unusedVars.length === 0) {
 
 console.log(`\n🔧 Processing ${unusedVars.length} unused variable(s)...\n`);
 
-const changes = {};
+const changes = /** @type {any} */ ({});
 
 // Parse ESLint output
-unusedVars.forEach(line => {
+unusedVars.forEach((line) => {
     const match = line.match(
-        /^(.*?):(\d+):(\d+):\s+'(.+?)' is (defined but never used|assigned a value but never used)/
+        /^(.*?):(\d+):(\d+):\s+'(.+?)' is (defined but never used|assigned a value but never used)/,
     );
     if (!match) {
         return;
     }
 
-    const [, file, lineNum, , varName, type] = match;
+    const [, file = '', lineNum = '', , varName = '', type = ''] = match;
     if (!changes[file]) {
         changes[file] = [];
     }
@@ -55,13 +55,13 @@ Object.entries(changes).forEach(([file, vars]) => {
     const lines = content.split('\n');
     let modified = false;
 
-    vars.forEach(({ line, varName }) => {
+    vars.forEach((/** @type {any} */ { line, varName }) => {
         const lineIdx = line - 1;
         if (lineIdx >= lines.length) {
             return;
         }
 
-        const lineContent = lines[lineIdx];
+        const lineContent = lines[lineIdx] ?? '';
         let newLine = lineContent;
 
         // Fix pattern 1: catch(e) -> catch(_e)

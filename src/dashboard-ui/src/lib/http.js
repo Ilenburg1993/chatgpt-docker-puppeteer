@@ -10,7 +10,7 @@ export const http = axios.create({
 });
 
 http.interceptors.request.use(
-    config => {
+    (config) => {
         const token = localStorage.getItem('auth_token');
         if (token) {
             const headers = /** @type {any} */ (config.headers || {});
@@ -19,27 +19,30 @@ http.interceptors.request.use(
         }
         return config;
     },
-    error => Promise.reject(error)
+    (error) => Promise.reject(error),
 );
 
 http.interceptors.response.use(
-    response => response,
-    error => {
+    (response) => response,
+    (error) => {
         // Attach request_id (when present) for better UX/logging.
         try {
             const requestId = error?.response?.data?.request_id || error?.response?.data?.requestId || null;
             if (requestId) {
                 error.request_id = requestId;
             }
-        } catch (e) {
+        } catch (/** @type {any} */ _rawE) {
+            const e = /** @type {any} */ (_rawE);
             // ignore
         }
         return Promise.reject(error);
-    }
+    },
 );
 
 /**
  * Função exportada: formatHttpError.
+ *
+ * @param {any} error
  * @returns {any}
  */
 export function formatHttpError(error) {

@@ -1,19 +1,20 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import crypto from 'node:crypto';
 
 /**
- * Regex para validação rigorosa de UUID v4.
- * Garante que IDs providos externamente sigam o padrão industrial.
+ * Regex para validação rigorosa de UUID v4. Garante que IDs providos externamente sigam o padrão industrial.
  */
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** @typedef {any} RequestIdReq */
+/** @typedef {any} RequestIdRes */
 /**
  * Middleware de Injeção de Identidade de Requisição.
  *
- * @param {object} req - Request Express.
- * @param {object} res - Response Express.
+ * @param {RequestIdReq} req - Request Express.
+ * @param {RequestIdRes} res - Response Express.
  * @param {function} next - Próximo middleware.
-  * @returns {void}
+ * @returns {void}
  */
 function requestId(req, res, next) {
     // 1. Tenta recuperar ID pré-existente (vido de Proxy, Load Balancer ou Dashboard)

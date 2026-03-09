@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/buffers/outbound_queue.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -27,6 +27,8 @@
 
 /**
  * Cria um array vazio isolado.
+ *
+ * @returns {any[]}
  */
 function createQueue() {
     return [];
@@ -37,22 +39,29 @@ function createQueue() {
 =========================== */
 
 /**
+ * @typedef {object} CreateOutboundQueueDeps
+ * @property {any} telemetry
+ * @property {number | null} maxSize
+ */
+/**
+ * @typedef {object} CreateOutboundQueueOptions
+ * @property {any} [telemetry]
+ * @property {any} [maxSize]
+ */
+/**
  * Cria a fila técnica de saída.
  *
- * @param {Object} deps
- * @param {Object} deps.telemetry
- * Interface de telemetria do NERV (observação técnica).
+ * @param {CreateOutboundQueueDeps} deps Interface de telemetria do NERV (observação técnica).
  *
- * @param {number|null} deps.maxSize
- * Limite máximo técnico da fila (opcional).
-  * @returns {any}
+ *   Limite máximo técnico da fila (opcional).
+ * @returns {any}
  */
 function createOutboundQueue({ telemetry, maxSize = null }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {
         throw new Error('outbound_queue requer telemetry válida');
     }
 
-    const queue = createQueue();
+    const queue = /** @type {any[]} */ (createQueue());
 
     /* ===========================
      Operações internas
@@ -72,8 +81,7 @@ function createOutboundQueue({ telemetry, maxSize = null }) {
     /**
      * Enfileira item na fila outbound.
      *
-     * @param {*} item
-     * Item opaco (frame, bytes ou estrutura técnica)
+     * @param {object} item Item opaco (frame, bytes ou estrutura técnica)
      * @returns {boolean} true se aceito, false se recusado por pressão
      */
     function enqueue(item) {
@@ -97,7 +105,7 @@ function createOutboundQueue({ telemetry, maxSize = null }) {
     /**
      * Remove e retorna o próximo item da fila.
      *
-     * @returns {*} item ou null se vazio
+     * @returns {object | null} item ou null se vazio
      */
     function dequeue() {
         if (queue.length === 0) {

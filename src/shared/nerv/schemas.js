@@ -8,7 +8,7 @@ import { ActionCode, ActorRole, MessageType, PROTOCOL_VERSION } from './constant
  * @property {import('./constants.js').ActorRole} role
  * @property {string} version
  * @property {string[]} capabilities
- * @property {{ platform: string, node_version: string, started_at: string }} metadata
+ * @property {{ platform: string; node_version: string; started_at: string }} metadata
  */
 
 /* --------------------------------------------------------------------------
@@ -17,31 +17,38 @@ import { ActionCode, ActorRole, MessageType, PROTOCOL_VERSION } from './constant
 
 /**
  * Lança erro de violação de esquema IPC
+ *
  * @param {string} message - Mensagem de erro descritiva
  * @throws {Error} Sempre lança erro com prefixo [IPC SCHEMA VIOLATION]
  * @sideEffects Lança erro - função de validação
  */
-function violation(message) {
+function violation(/** @type {any} */ message) {
     throw new Error(`[IPC SCHEMA VIOLATION] ${message}`);
 }
 
 /**
+ * @typedef {object} IsPlainObjectObj
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Verifica se valor é um objeto plano (não array, não null)
- * @param {*} obj - Valor a ser verificado
+ *
+ * @param {IsPlainObjectObj} obj - Valor a ser verificado
  * @returns {boolean} true se for objeto plano
  * @sideEffects Nenhum - função pura
  */
-function isPlainObject(obj) {
+function isPlainObject(/** @type {any} */ obj) {
     return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
 }
 
 /**
  * Valida se string é um UUID válido (formato RFC 4122)
+ *
  * @param {string} value - String a ser validada
  * @returns {boolean} true se for UUID válido
  * @sideEffects Nenhum - função pura
  */
-function isUUID(value) {
+function isUUID(/** @type {any} */ value) {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
@@ -50,12 +57,17 @@ function isUUID(value) {
  * ------------------------------------------------------------------------ */
 
 /**
+ * @typedef {object} ValidateStructureEnvelope
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida a estrutura básica de um envelope NERV canônico
- * @param {any} envelope - Envelope a ser validado
+ *
+ * @param {ValidateStructureEnvelope} envelope - Envelope a ser validado
  * @throws {Error} Se a estrutura violar o esquema
  * @sideEffects Pode lançar erro - função de validação
  */
-function validateStructure(envelope) {
+function validateStructure(/** @type {any} */ envelope) {
     if (!isPlainObject(envelope)) {
         violation('Envelope must be an object');
     }
@@ -96,12 +108,17 @@ function validateStructure(envelope) {
  * ------------------------------------------------------------------------ */
 
 /**
+ * @typedef {object} ValidateOntologyEnvelope
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida a ontologia e semântica de um envelope NERV
- * @param {any} envelope - Envelope a ser validado
+ *
+ * @param {ValidateOntologyEnvelope} envelope - Envelope a ser validado
  * @throws {Error} Se a ontologia violar as regras do protocolo
  * @sideEffects Pode lançar erro - função de validação
  */
-function validateOntology(envelope) {
+function validateOntology(/** @type {any} */ envelope) {
     const { identity, causality, type, payload } = envelope;
 
     /* ---- Identity ---- */
@@ -157,14 +174,19 @@ function validateOntology(envelope) {
 const FORBIDDEN_FIELDS = ['status', 'result', 'success', 'error', 'response', 'return_value', 'exception', 'completed'];
 
 /**
+ * @typedef {object} ValidateProhibitionsEnvelope
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida proibições semânticas em envelope NERV (campos proibidos)
- * @param {any} envelope - Envelope a ser verificado
+ *
+ * @param {ValidateProhibitionsEnvelope} envelope - Envelope a ser verificado
  * @throws {Error} Se encontrar campos semânticos proibidos
  * @sideEffects Pode lançar erro - função de validação negativa
  */
-function validateProhibitions(envelope) {
+function validateProhibitions(/** @type {any} */ envelope) {
     // Recursive walk para detectar campos proibidos (mais eficiente que JSON.stringify)
-    function walk(obj, path = 'envelope') {
+    function walk(/** @type {any} */ obj, /** @type {any} */ path = 'envelope') {
         if (typeof obj !== 'object' || obj === null) return;
 
         for (const key of Object.keys(obj)) {
@@ -183,13 +205,18 @@ function validateProhibitions(envelope) {
  * ------------------------------------------------------------------------ */
 
 /**
+ * @typedef {object} ValidateEnvelopeEnvelope
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida completamente um envelope NERV (estrutura + ontologia + proibições)
- * @param {object} envelope - Envelope NERV canônico a ser validado
+ *
+ * @param {ValidateEnvelopeEnvelope} envelope - Envelope NERV canônico a ser validado
  * @returns {boolean} true se válido
  * @throws {Error} Se qualquer aspecto do envelope violar o esquema
  * @sideEffects Pode lançar erro - função de validação completa
  */
-function validateEnvelope(envelope) {
+function validateEnvelope(/** @type {any} */ envelope) {
     validateStructure(envelope);
     validateOntology(envelope);
     validateProhibitions(envelope);
@@ -198,12 +225,13 @@ function validateEnvelope(envelope) {
 
 /**
  * Valida a identidade de um robô/agente no sistema NERV
+ *
  * @param {NERVRobotIdentity} identity - Objeto de identidade a ser validado
  * @returns {NERVRobotIdentity} A identidade validada (retornada para chaining)
  * @throws {Error} Se a identidade não atender aos requisitos
  * @sideEffects Pode lançar erro - função de validação
  */
-function validateRobotIdentity(identity) {
+function validateRobotIdentity(/** @type {any} */ identity) {
     if (!identity || typeof identity !== 'object') {
         violation('Identity must be a plain object');
     }
@@ -232,14 +260,19 @@ function validateRobotIdentity(identity) {
 }
 
 /**
+ * @typedef {object} ValidateIPCEnvelopeEnvelope
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida um envelope de IPC (InterProcess Communication) - wrapper legado
- * @param {object} envelope - Envelope IPC a ser validado
+ *
+ * @deprecated Use validateEnvelope diretamente para novos códigos
+ * @param {ValidateIPCEnvelopeEnvelope} envelope - Envelope IPC a ser validado
  * @returns {boolean} true se válido
  * @throws {Error} Se o envelope violar o esquema
  * @sideEffects Pode lançar erro - função de validação
- * @deprecated Use validateEnvelope diretamente para novos códigos
  */
-function validateIPCEnvelope(envelope) {
+function validateIPCEnvelope(/** @type {any} */ envelope) {
     return validateEnvelope(envelope);
 }
 

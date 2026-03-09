@@ -6,8 +6,12 @@ import path from 'node:path';
 
 const ROOT = process.argv[2] || path.join(process.cwd(), 'src');
 const EXT = new Set(['.js', '.ts', '.cjs', '.mjs', '.jsx', '.tsx']);
-let issues = [];
+const issues = /** @type {any[]} */ ([]);
 
+/**
+ * @param {string} dir
+ * @returns {void}
+ */
 function walk(dir) {
     let entries;
     try {
@@ -30,7 +34,7 @@ function walk(dir) {
             }
 
             // Patterns: .listen(..., '127.0.0.1'|'localhost')
-            const regex = /\.listen\s*\([^)]*['\"`](127\\.0\\.0\\.1|localhost)['\"`]/g;
+            const regex = /\.listen\s*\([^)]*['"`](127\\.0\\.0\\.1|localhost)['"`]/g;
             let m;
             while ((m = regex.exec(content)) !== null) {
                 const before = content.substr(0, m.index);
@@ -39,14 +43,14 @@ function walk(dir) {
             }
 
             // More generous pattern including createServer..listen
-            const regex2 = /createServer[\s\S]{0,200}\.listen\s*\([^)]*['\"`](127\\.0\\.0\\.1|localhost)['\"`]/g;
+            const regex2 = /createServer[\s\S]{0,200}\.listen\s*\([^)]*['"`](127\\.0\\.0\\.1|localhost)['"`]/g;
             while ((m = regex2.exec(content)) !== null) {
                 const before = content.substr(0, m.index);
                 const line = before.split('\n').length;
                 issues.push({ file: full, line, match: m[0].trim().slice(0, 200) });
             }
 
-            const regex3 = /\.listen\s*\(\s*[^,]+,\s*['\"`](127\\.0\\.0\\.1|localhost)['\"`]/g;
+            const regex3 = /\.listen\s*\(\s*[^,]+,\s*['"`](127\\.0\\.0\\.1|localhost)['"`]/g;
             while ((m = regex3.exec(content)) !== null) {
                 const before = content.substr(0, m.index);
                 const line = before.split('\n').length;

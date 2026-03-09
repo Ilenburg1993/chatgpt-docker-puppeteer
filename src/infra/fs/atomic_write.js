@@ -1,16 +1,15 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { promises as fs } from 'node:fs';
-import fss from 'node:fs';
+// @ts-check
 import crypto from 'node:crypto';
+import fss, { promises as fs } from 'node:fs';
 import { sleep } from './fs_utils.js';
 
 /**
- * Atomically writes content to a file (write to temp → rename).
- * Handles cross-device (EXDEV) scenarios and retries on EPERM/EBUSY.
+ * Atomically writes content to a file (write to temp → rename). Handles cross-device (EXDEV) scenarios and retries on
+ * EPERM/EBUSY.
  *
  * @param {string} filepath - Target file path.
- * @param {string|Buffer|Uint8Array} content - Data to write.
- * @param {BufferEncoding} [encoding='utf-8'] - Encoding for string content (ignored for binary).
+ * @param {string | Buffer | Uint8Array} content - Data to write.
+ * @param {BufferEncoding} [encoding='utf-8'] - Encoding for string content (ignored for binary). Default is `'utf-8'`
  * @returns {Promise<true>}
  */
 async function atomicWrite(filepath, content, encoding) {
@@ -30,14 +29,15 @@ async function atomicWrite(filepath, content, encoding) {
             try {
                 await fs.rename(tmpPath, filepath);
                 return true;
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
+                const _ce = /** @type {any} */ (err);
                 // [FIX 1.4] Suporte a Docker/Volumes (Cross-device link error)
-                if (err.code === 'EXDEV') {
+                if (_ce.code === 'EXDEV') {
                     await fs.copyFile(tmpPath, filepath);
                     await fs.unlink(tmpPath);
                     return true;
                 }
-                if (err.code === 'EPERM' || err.code === 'EBUSY') {
+                if (_ce.code === 'EPERM' || _ce.code === 'EBUSY') {
                     attempts++;
                     await sleep(100 * attempts);
                     continue;
@@ -47,7 +47,8 @@ async function atomicWrite(filepath, content, encoding) {
         }
         // P0: All rename retries exhausted — throw so callers don't assume success.
         throw new Error(`atomicWrite: rename failed after 10 retries (EPERM/EBUSY) for ${filepath}`);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _ce = /** @type {any} */ (err);
         if (fss.existsSync(tmpPath)) {
             await fs.unlink(tmpPath).catch(() => {});
         }

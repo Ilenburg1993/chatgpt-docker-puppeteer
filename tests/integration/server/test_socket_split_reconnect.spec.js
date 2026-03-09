@@ -1,10 +1,10 @@
 // @ts-check
-import test from 'node:test';
+import * as socketEngine from '#server/engine/socket';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import * as socketEngine from '#server/engine/socket';
+import test from 'node:test';
 
-function listenRandomPort(server) {
+function listenRandomPort(/** @type {any} */ server) {
     return new Promise((resolve, reject) => {
         server.once('error', reject);
         server.listen(0, '127.0.0.1', () => {
@@ -14,31 +14,33 @@ function listenRandomPort(server) {
     });
 }
 
-function closeServer(server) {
-    return new Promise(resolve => {
-        server.close(() => resolve());
-    });
+function closeServer(/** @type {any} */ server) {
+    return /** @type {Promise<void>} */ (
+        new Promise((resolve) => {
+            server.close(() => resolve());
+        })
+    );
 }
 
-async function waitFor(predicate, timeoutMs = 10000, intervalMs = 100) {
+async function waitFor(/** @type {any} */ predicate, timeoutMs = 10000, intervalMs = 100) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         if (await predicate()) {
             return;
         }
-        await new Promise(resolve => setTimeout(resolve, intervalMs));
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     throw new Error(`Timeout waiting for condition (${timeoutMs}ms)`);
 }
 
-test('split mode reconnects and reauthorizes handshake after forced disconnect', async t => {
+test('split mode reconnects and reauthorizes handshake after forced disconnect', async (t) => {
     const httpServer = http.createServer((_, res) => {
         res.statusCode = 200;
         res.end('ok');
     });
 
     const port = await listenRandomPort(httpServer);
-    socketEngine.init(httpServer);
+    socketEngine.init(/** @type {any} */ (httpServer));
 
     const adapter = await socketEngine.connectExternal(port);
 
@@ -62,7 +64,7 @@ test('split mode reconnects and reauthorizes handshake after forced disconnect',
     assert.ok(io, 'io instance should be initialized');
 
     const sockets = await io.fetchSockets();
-    const agentSocket = sockets.find(socket => Boolean(socket.robot_id));
+    const agentSocket = sockets.find((/** @type {any} */ socket) => Boolean(socket.robot_id));
     assert.ok(agentSocket, 'authorized agent socket should exist');
 
     let reconnectConnectEvents = 0;
@@ -80,7 +82,7 @@ test('split mode reconnects and reauthorizes handshake after forced disconnect',
     await waitFor(() => reconnectConnectEvents >= 1 && adapter.connected() === true, 10000);
 
     // Garante que após a janela de timeout de handshake (5s), a conexão continua viva.
-    await new Promise(resolve => setTimeout(resolve, 5500));
+    await new Promise((resolve) => setTimeout(resolve, 5500));
     assert.equal(adapter.connected(), true, 'connection must remain authorized after reconnect handshake');
 
     const registry = socketEngine.getRegistry();

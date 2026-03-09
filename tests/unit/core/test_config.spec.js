@@ -1,8 +1,8 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { describe, it } from 'node:test';
 
 const errors = 0;
 
@@ -78,14 +78,14 @@ describe('Core Config Completo - Configuração', () => {
 
     describe('3. Integração com Zod', () => {
         it('deve carregar CONFIG sem erros', async () => {
-            const CONFIG = await import('#core/config').then(m => m.default ?? m);
+            const CONFIG = /** @type {any} */ (await import('#core/config').then((m) => m.default ?? m));
 
             assert.ok(CONFIG, 'CONFIG deve ser exportado');
             assert.ok(typeof CONFIG.reload === 'function', 'Deve ter método reload');
         });
 
         it('deve fornecer acesso a configurações', async () => {
-            const CONFIG = await import('#core/config').then(m => m.default ?? m);
+            const CONFIG = /** @type {any} */ (await import('#core/config').then((m) => m.default ?? m));
 
             // Verificar estrutura básica
             assert.ok(CONFIG.all || CONFIG.isInitialized !== undefined);
@@ -94,13 +94,13 @@ describe('Core Config Completo - Configuração', () => {
 
     describe('4. Hot-Reload de Configuração', () => {
         it('deve ter método reload disponível', async () => {
-            const CONFIG = await import('#core/config').then(m => m.default ?? m);
+            const CONFIG = /** @type {any} */ (await import('#core/config').then((m) => m.default ?? m));
 
             assert.ok(typeof CONFIG.reload === 'function');
         });
 
         it('deve invalidar cache ao recarregar', async () => {
-            const CONFIG = await import('#core/config').then(m => m.default ?? m);
+            const CONFIG = /** @type {any} */ (await import('#core/config').then((m) => m.default ?? m));
 
             // Simular reload (não executar para não afetar outros testes)
             const hasReload = typeof CONFIG.reload === 'function';

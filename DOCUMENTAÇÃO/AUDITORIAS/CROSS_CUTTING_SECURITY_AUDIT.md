@@ -338,7 +338,7 @@ grep -r "cors\|CORS\|Access-Control" src/server --include="*.js"
 
 ```javascript
 // socket.js:55-57
-io.on('connection', socket => {
+io.on('connection', (socket) => {
   const token = socket.handshake.auth?.token;
   const isAgentAttempt = token === 'SYSTEM_MAESTRO_PRIME';
 
@@ -1020,7 +1020,7 @@ app.use(
       process.env.DASHBOARD_ORIGIN || 'http://localhost:3008',
     ],
     credentials: true,
-  })
+  }),
 );
 ```
 
@@ -1089,7 +1089,7 @@ if (!isAgentAttempt) {
 function validateEnvFile() {
   const requiredEnvVars = ['NODE_ENV', 'SERVER_PORT', 'DASHBOARD_PORT'];
 
-  const missing = requiredEnvVars.filter(v => !process.env[v]);
+  const missing = requiredEnvVars.filter((v) => !process.env[v]);
 
   if (missing.length > 0) {
     log('WARN', `[CONFIG] Missing env vars: ${missing.join(', ')}`);

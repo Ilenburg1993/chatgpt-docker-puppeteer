@@ -6,28 +6,27 @@ import { v4 as uuidv4 } from 'uuid';
 import { log } from './logger.js';
 
 /**
- * @typedef {Object} RobotIdentity
+ * @typedef {object} RobotIdentity
  * @property {string} robot_id - ID único e persistente do robô.
  * @property {string} instance_id - ID efêmero da instância atual.
  * @property {string} role - Papel do ator no sistema NERV.
  * @property {string} version - Versão do protocolo.
  * @property {string[]} capabilities - Lista de capacidades suportadas.
- * @property {Object} metadata - Metadados da instância.
+ * @property {object} metadata - Metadados da instância.
  * @property {string} metadata.platform - Plataforma do sistema.
  * @property {string} metadata.node_version - Versão do Node.js.
  * @property {string} metadata.started_at - Timestamp de inicialização.
  */
 
 /**
- * @typedef {Object} StoredIdentity
+ * @typedef {object} StoredIdentity
  * @property {string} robot_id - ID do robô armazenado.
  * @property {string} [born_at] - Data de nascimento do robô.
  * @property {string} [protocol] - Versão do protocolo.
  */
 
 /**
- * Gerenciador de identidade soberana do robô.
- * Mantém DNA persistente (robot_id) e identidade efêmera (instance_id).
+ * Gerenciador de identidade soberana do robô. Mantém DNA persistente (robot_id) e identidade efêmera (instance_id).
  * Side-effects: Lê/escreve identidade em armazenamento persistente, valida identidade.
  */
 class IdentityManager {
@@ -78,9 +77,9 @@ class IdentityManager {
     }
 
     /**
-     * Inicializa a identidade soberana.
-     * Tenta carregar o DNA existente ou realiza o "Nascimento" do robô.
-     * Side-effects: Lê identidade armazenada, gera nova se necessário, salva no armazenamento.
+     * Inicializa a identidade soberana. Tenta carregar o DNA existente ou realiza o "Nascimento" do robô. Side-effects:
+     * Lê identidade armazenada, gera nova se necessário, salva no armazenamento.
+     *
      * @returns {Promise<void>} Não retorna valor.
      * @throws {Error} Lança erro se falhar ao inicializar identidade.
      */
@@ -104,15 +103,16 @@ class IdentityManager {
 
                 log('WARN', `[IDENTITY] Novo DNA gerado (Nascimento): ${this.robotId}`);
             }
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('FATAL', `[IDENTITY] Falha crítica ao inicializar identidade: ${err.message}`);
             throw err;
         }
     }
 
     /**
-     * Retorna o objeto de identidade completo e validado.
-     * Esta é a ÚNICA saída autorizada para o Handshake do IPC 2.0.
+     * Retorna o objeto de identidade completo e validado. Esta é a ÚNICA saída autorizada para o Handshake do IPC 2.0.
+     *
      * @returns {RobotIdentity} Identidade homologada conforme o Shared Kernel.
      * @throws {Error} Lança erro se identidade não foi inicializada.
      */
@@ -143,7 +143,8 @@ class IdentityManager {
      */
     /**
      * Retorna o ID persistente do robô.
-     * @returns {string|null} ID do robô ou null se não inicializado.
+     *
+     * @returns {string | null} ID do robô ou null se não inicializado.
      */
     getRobotId() {
         return this.robotId;
@@ -151,6 +152,7 @@ class IdentityManager {
 
     /**
      * Retorna o ID efêmero da instância atual.
+     *
      * @returns {string} ID da instância atual.
      */
     getInstanceId() {
@@ -159,8 +161,8 @@ class IdentityManager {
 }
 
 /**
- * Instância singleton do gerenciador de identidade.
- * Side-effects: Mantém estado de identidade em memória, persiste DNA.
+ * Instância singleton do gerenciador de identidade. Side-effects: Mantém estado de identidade em memória, persiste DNA.
+ *
  * @type {IdentityManager}
  */
 export default new IdentityManager();

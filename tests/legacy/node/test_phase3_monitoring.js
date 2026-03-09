@@ -1,7 +1,6 @@
 #!/usr/bin/env node
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import assert from 'node:assert';
-// @ts-nocheck
-import EventEmitter from 'node:events';
 
 /* ==========================================================================
    MOCK SETUP
@@ -161,7 +160,7 @@ async function runTests() {
         let statusChanged = false;
         let warningDetected = false;
 
-        monitor.on(MONITOR_EVENTS.STATUS_CHANGED, data => {
+        monitor.on(MONITOR_EVENTS.STATUS_CHANGED, (data) => {
             if (data.oldStatus === HEALTH_STATUS.HEALTHY && data.newStatus === HEALTH_STATUS.WARNING) {
                 statusChanged = true;
             }
@@ -180,7 +179,7 @@ async function runTests() {
         assert(results.issues.length > 0, 'Should have issues');
 
         // Check issue details
-        const jsHeapIssue = results.issues.find(i => i.type === 'JS_HEAP_WARNING');
+        const jsHeapIssue = results.issues.find((i) => i.type === 'JS_HEAP_WARNING');
         assert(jsHeapIssue, 'Should have JS_HEAP_WARNING issue');
         assert.strictEqual(jsHeapIssue.severity, 'WARNING', 'Issue severity should be WARNING');
         assert.strictEqual(jsHeapIssue.value, 350, 'Issue value should be 350MB');
@@ -218,7 +217,7 @@ async function runTests() {
             connectionLost = true;
         });
 
-        monitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, data => {
+        monitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, (data) => {
             if (data.reason === 'CONNECTION_LOST') {
                 recoveryNeeded = true;
             }
@@ -232,7 +231,7 @@ async function runTests() {
         assert.strictEqual(recoveryNeeded, true, 'RECOVERY_NEEDED event should fire');
 
         // Check connection issue
-        const connIssue = results.issues.find(i => i.type === CHECK_TYPES.CONNECTION);
+        const connIssue = results.issues.find((i) => i.type === CHECK_TYPES.CONNECTION);
         assert(connIssue, 'Should have CONNECTION issue');
         assert.strictEqual(connIssue.severity, 'CRITICAL', 'Connection issue should be CRITICAL');
         assert.strictEqual(connIssue.action, 'RECONNECT_NEEDED', 'Should need reconnection');
@@ -266,7 +265,7 @@ async function runTests() {
         assert(monitor.intervalHandle, 'Interval handle should exist');
 
         // Wait for 2 checks (200ms + buffer)
-        await new Promise(resolve => setTimeout(resolve, 250));
+        await new Promise((resolve) => setTimeout(resolve, 250));
 
         assert(monitor.stats.totalChecks >= 2, `Should have at least 2 checks (got ${monitor.stats.totalChecks})`);
 
@@ -279,7 +278,7 @@ async function runTests() {
         const checksBeforeStop = monitor.stats.totalChecks;
 
         // Wait and verify no more checks
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await new Promise((resolve) => setTimeout(resolve, 150));
 
         assert.strictEqual(monitor.stats.totalChecks, checksBeforeStop, 'Checks should not increase after stop');
 
@@ -369,7 +368,7 @@ async function runTests() {
 }
 
 // Run tests
-runTests().catch(err => {
+runTests().catch((err) => {
     console.error('Test suite failed:', err);
     process.exit(1);
 });

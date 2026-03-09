@@ -1,7 +1,7 @@
 // @ts-check
 import { getTsserverDaemon, startTsserverDaemon } from '../lsp/tsserver-daemon.mjs';
 
-function formatListResult(title, list, maxPreview = 10) {
+function formatListResult(/** @type {any} */ title, /** @type {any} */ list, /** @type {any} */ maxPreview = 10) {
     let text = `# ${title}\n\n`;
     text += `Total: ${list.length}\n\n`;
     for (const item of list.slice(0, maxPreview)) {
@@ -13,13 +13,13 @@ function formatListResult(title, list, maxPreview = 10) {
     return text;
 }
 
-async function withDaemon(operation, params, options = {}) {
+async function withDaemon(/** @type {any} */ operation, /** @type {any} */ params, /** @type {any} */ options = {}) {
     await startTsserverDaemon();
     const daemon = getTsserverDaemon();
     return daemon.execute(operation, params, options);
 }
 
-async function lspDefinitionHandler(params, ctx) {
+async function lspDefinitionHandler(/** @type {any} */ params, /** @type {any} */ ctx) {
     const locations = await withDaemon('definition', params, ctx);
     return {
         text: formatListResult('LSP Definition', locations),
@@ -28,7 +28,7 @@ async function lspDefinitionHandler(params, ctx) {
     };
 }
 
-async function lspReferencesHandler(params, ctx) {
+async function lspReferencesHandler(/** @type {any} */ params, /** @type {any} */ ctx) {
     const references = await withDaemon('references', params, ctx);
     return {
         text: formatListResult('LSP References', references),
@@ -37,7 +37,7 @@ async function lspReferencesHandler(params, ctx) {
     };
 }
 
-async function lspHoverHandler(params, ctx) {
+async function lspHoverHandler(/** @type {any} */ params, /** @type {any} */ ctx) {
     const hover = await withDaemon('hover', params, ctx);
     return {
         text: `# LSP Hover\n\n${hover ? hover.display : 'No hover info available'}`,
@@ -46,7 +46,7 @@ async function lspHoverHandler(params, ctx) {
     };
 }
 
-async function lspDocumentSymbolsHandler(params, ctx) {
+async function lspDocumentSymbolsHandler(/** @type {any} */ params, /** @type {any} */ ctx) {
     const symbols = await withDaemon('document_symbols', params, ctx);
     return {
         text: formatListResult('LSP Document Symbols', symbols),
@@ -55,7 +55,7 @@ async function lspDocumentSymbolsHandler(params, ctx) {
     };
 }
 
-async function lspWorkspaceSymbolsHandler(params, ctx) {
+async function lspWorkspaceSymbolsHandler(/** @type {any} */ params, /** @type {any} */ ctx) {
     const symbols = await withDaemon('workspace_symbols', params, ctx);
     return {
         text: formatListResult('LSP Workspace Symbols', symbols),
@@ -64,7 +64,7 @@ async function lspWorkspaceSymbolsHandler(params, ctx) {
     };
 }
 
-async function lspDiagnosticsHandler(params, ctx) {
+async function lspDiagnosticsHandler(/** @type {any} */ params, /** @type {any} */ ctx) {
     const diagnostics = await withDaemon('diagnostics', params, ctx);
     return {
         text: formatListResult('LSP Diagnostics', diagnostics),
@@ -73,7 +73,7 @@ async function lspDiagnosticsHandler(params, ctx) {
     };
 }
 
-async function lspCodeActionsHandler(params, ctx) {
+async function lspCodeActionsHandler(/** @type {any} */ params, /** @type {any} */ ctx) {
     const actions = await withDaemon('code_actions', params, ctx);
     return {
         text: formatListResult('LSP Code Actions', actions),
@@ -82,7 +82,7 @@ async function lspCodeActionsHandler(params, ctx) {
     };
 }
 
-async function lspApplyCodeActionHandler(params, ctx) {
+async function lspApplyCodeActionHandler(/** @type {any} */ params, /** @type {any} */ ctx) {
     const result = await withDaemon('apply_code_action', params, ctx);
     const previewMode = String(params.mode || 'preview') === 'preview';
     return {
@@ -94,9 +94,11 @@ async function lspApplyCodeActionHandler(params, ctx) {
 
 /**
  * Função exportada: registerLspTools.
+ *
+ * @param {any} registry
  * @returns {Promise<void>}
  */
-export async function registerLspTools(registry) {
+export async function registerLspTools(/** @type {any} */ registry) {
     registry.register(
         'lsp_definition',
         {
@@ -111,7 +113,7 @@ export async function registerLspTools(registry) {
                 required: ['filePath', 'line', 'character'],
             },
         },
-        lspDefinitionHandler
+        lspDefinitionHandler,
     );
 
     registry.register(
@@ -128,7 +130,7 @@ export async function registerLspTools(registry) {
                 required: ['filePath', 'line', 'character'],
             },
         },
-        lspReferencesHandler
+        lspReferencesHandler,
     );
 
     registry.register(
@@ -145,7 +147,7 @@ export async function registerLspTools(registry) {
                 required: ['filePath', 'line', 'character'],
             },
         },
-        lspHoverHandler
+        lspHoverHandler,
     );
 
     registry.register(
@@ -160,7 +162,7 @@ export async function registerLspTools(registry) {
                 required: ['filePath'],
             },
         },
-        lspDocumentSymbolsHandler
+        lspDocumentSymbolsHandler,
     );
 
     registry.register(
@@ -176,7 +178,7 @@ export async function registerLspTools(registry) {
                 required: ['query'],
             },
         },
-        lspWorkspaceSymbolsHandler
+        lspWorkspaceSymbolsHandler,
     );
 
     registry.register(
@@ -191,7 +193,7 @@ export async function registerLspTools(registry) {
                 required: ['filePath'],
             },
         },
-        lspDiagnosticsHandler
+        lspDiagnosticsHandler,
     );
 
     registry.register(
@@ -211,7 +213,7 @@ export async function registerLspTools(registry) {
                 required: ['filePath', 'line', 'character'],
             },
         },
-        lspCodeActionsHandler
+        lspCodeActionsHandler,
     );
 
     registry.register(
@@ -230,6 +232,6 @@ export async function registerLspTools(registry) {
                 required: ['mode', 'action'],
             },
         },
-        lspApplyCodeActionHandler
+        lspApplyCodeActionHandler,
     );
 }

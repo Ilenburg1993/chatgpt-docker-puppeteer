@@ -205,9 +205,9 @@ tests/
 ### Comandos de Validação Executados
 
 ```bash
-✓ tree tests/ -L 3          # Estrutura validada (27 diretórios)
-✓ find tests -name "*.spec.js" | wc -l  # 18 testes encontrados
-✓ git status                 # Todas as mudanças staged
+✓ tree tests/ -L 3                     # Estrutura validada (27 diretórios)
+✓ find tests -name "*.spec.js" | wc -l # 18 testes encontrados
+✓ git status                           # Todas as mudanças staged
 ```
 
 ## Próximos Passos (FASE 3)

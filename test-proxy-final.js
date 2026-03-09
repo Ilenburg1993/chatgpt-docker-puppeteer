@@ -97,7 +97,7 @@ async function runTest() {
     }
 }
 
-runTest().catch(err => {
+runTest().catch((err) => {
     console.error('\n💥 Falha catastrófica:', err);
     process.exit(1);
 });

@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
 
 test('AuditAgentRuntime creates, queues and processes quick audit jobs to completed', async () => {
@@ -14,7 +14,7 @@ test('AuditAgentRuntime creates, queues and processes quick audit jobs to comple
     assert.equal(job.status, 'PENDING');
     rt.queueJob(job.id);
     await rt.tick();
-    const after = rt.getJob(job.id);
+    const after = /** @type {any} */ (rt.getJob(job.id));
     assert.equal(after.status, 'COMPLETED');
     assert.equal(after.current_step, 'completed');
 });
@@ -24,13 +24,13 @@ test('AuditAgentRuntime patch-like job ends in waiting approval', async () => {
     const job = rt.createJob({ kind: 'patch_suggest', trigger_type: 'api' });
     rt.queueJob(job.id);
     await rt.tick();
-    const after = rt.getJob(job.id);
+    const after = /** @type {any} */ (rt.getJob(job.id));
     assert.equal(after.status, 'WAITING_APPROVAL');
     assert.equal(after.result_json.patch_proposal_pending, true);
 });
 
 test('AuditAgentRuntime passes job to contextBuilder.collectQuickContext', async () => {
-    /** @type {string|null} */
+    /** @type {string | null} */
     let seenJobId = null;
     /** @type {any} */
     let seenScope = null;
@@ -82,7 +82,7 @@ test('AuditAgentRuntime executes triageClient and records llm triage result', as
     const job = rt.createJob({ kind: 'quick_audit', trigger_type: 'manual' });
     rt.queueJob(job.id);
     await rt.tick();
-    const after = rt.getJob(job.id);
+    const after = /** @type {any} */ (rt.getJob(job.id));
     assert.equal(triageCalled, 1);
     assert.equal(after.status, 'COMPLETED');
     assert.equal(after.result_json?.llm_triage?.ok, true);
@@ -91,7 +91,7 @@ test('AuditAgentRuntime executes triageClient and records llm triage result', as
 
 test('AuditAgentRuntime executes patchAuthorClient for patch-like job and records result', async () => {
     let patchAuthorCalled = 0;
-    const savedPatches = [];
+    /** @type {any[]} */ const savedPatches = [];
     const rt = new AuditAgentRuntime({
         contextBuilder: {
             async collectQuickContext() {
@@ -138,7 +138,7 @@ test('AuditAgentRuntime executes patchAuthorClient for patch-like job and record
     const job = rt.createJob({ kind: 'patch_suggest', trigger_type: 'manual' });
     rt.queueJob(job.id);
     await rt.tick();
-    const after = rt.getJob(job.id);
+    const after = /** @type {any} */ (rt.getJob(job.id));
     assert.equal(after.status, 'WAITING_APPROVAL');
     assert.equal(patchAuthorCalled, 1);
     assert.equal(after.result_json?.llm_patch_author?.ok, true);

@@ -1,8 +1,8 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import { strict as assert } from 'assert';
 import { execSync } from 'child_process';
-import { mkdtempSync, writeFileSync, rmSync, chmodSync } from 'fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { describe, it } from 'node:test';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -46,7 +46,7 @@ describe('post-create.sh NSS checks', () => {
             });
             assert.fail('Expected post-create to throw when lib missing');
         } catch (err) {
-            assert(err.status !== 0, 'exit code should be non-zero');
+            assert(/** @type {any} */ (err).status !== 0, 'exit code should be non-zero');
         } finally {
             rmSync(dir, { recursive: true, force: true });
             rmSync(bin, { recursive: true, force: true });

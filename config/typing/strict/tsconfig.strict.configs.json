@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.strict.configs.tsbuildinfo",
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "useUnknownInCatchVariables": true,
+    "noEmit": true
+  },
+  "files": [
+    "../../../.puppeteerrc.cjs",
+    "../../../ecosystem.config.cjs",
+    "../../../eslint.config.mjs",
+    "../../../src/dashboard-ui/vite.config.js",
+    "../../../src/dashboard-ui/tailwind.config.js",
+    "../../../src/dashboard-ui/postcss.config.js",
+    "../../../vitest.config.js"
+  ]
+}

@@ -1,18 +1,18 @@
 // @ts-check
-import test from 'node:test';
+import * as lifecycle from '#server/engine/lifecycle';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import * as lifecycle from '#server/engine/lifecycle';
+import test from 'node:test';
 
-async function waitForOutput(getOutput, matcher, timeoutMs = 10000) {
+async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ matcher, timeoutMs = 10000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         const output = getOutput();
         if (matcher.test(output)) {
             return output;
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
     }
     throw new Error(`Timeout waiting for output: ${matcher}`);
 }
@@ -78,18 +78,18 @@ test('wave4: real SIGTERM+SIGINT in subprocess trigger single coordinated shutdo
     let stdout = '';
     let stderr = '';
 
-    child.stdout.on('data', chunk => {
+    child.stdout.on('data', (chunk) => {
         stdout += chunk.toString();
     });
 
-    child.stderr.on('data', chunk => {
+    child.stderr.on('data', (chunk) => {
         stderr += chunk.toString();
     });
 
     await waitForOutput(() => stdout, /W4_READY/, 15000);
 
     child.kill('SIGTERM');
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
     try {
         child.kill('SIGINT');
     } catch {

@@ -130,7 +130,7 @@ Passos (alto nível):
 Trecho de pseudocódigo (node.js) — handler simplificado:
 
 ```javascript
-nerv.on('envelope', async env => {
+nerv.on('envelope', async (env) => {
   if (env.actionCode !== 'DRIVER_TASK_FAILED') return;
   const err = env.payload?.error;
   if (!err || err.code !== 'TARGET_CLOSED') return;

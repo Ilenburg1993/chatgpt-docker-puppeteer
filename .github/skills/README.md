@@ -54,6 +54,16 @@ Cada skill canônica deve ter:
 - `schema-contract-governance`: escolha e governança das camadas de contrato entre JSDoc, `.d.ts`,
   JSON Schema, Zod e `ts.server.protocol`
 
+## Taxonomia de tipagem e JSDoc
+
+- `jsdoc-authoring`: criação/hardening de JSDoc em arquivos `.js/.mjs`. Inclui cookbook completo de
+  códigos TS, padrão por código de erro, ordem de cascata, edição em lote e casos especiais
+- `typing-node24-esm-tsserver`: orquestração do Full-Strict Roadmap — lanes, tsconfig strict,
+  declaração, vue-tsc, CI gates. Inclui protocolo de execução por lane e triagem de erros
+- **`typing-fix-protocol`**: protocolo operacional de scan + triagem + fix lane por lane. Use como
+  guia de execução passo a passo. Contém: comandos de diagnóstico, cookbook por TS code, ordem de
+  cascata, estratégia de batch edit, casos especiais (emoji em catch, `never[]`, typedef malformado)
+
 ## Taxonomia de configuração e ambiente
 
 - `env-governance`: auditoria, consolidação, expansão e documentação da superfície de variáveis de

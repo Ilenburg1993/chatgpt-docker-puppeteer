@@ -1,10 +1,11 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import EventEmitter from 'node:events';
-import { log } from '#core/logger';
 import { ERROR_NAMES } from '#core/constants';
+import { log } from '#core/logger';
+import EventEmitter from 'node:events';
 
 /**
  * A Promise that also exposes a `.cancel()` method to clear its internal timer.
+ *
  * @typedef {Promise<never> & { cancel: () => void }} CancelableTimeoutPromise
  */
 
@@ -68,13 +69,13 @@ const FRAME_NAV_EVENTS = {
  *
  * @extends Error
  */
-class FrameNavError extends Error {
+class FrameNavError extends /** @type {any} */ (Error) {
     /**
      * Cria uma instância de FrameNavError.
      *
      * @param {string} type - Tipo do erro (TIMEOUT, BARRIER, INVALID_PATH, MAX_DEPTH)
      * @param {string} message - Mensagem de erro
-     * @param {Object} context - Contexto adicional
+     * @param {Record<string, unknown>} context - Contexto adicional
      */
     constructor(type, message, context) {
         super(message);
@@ -89,12 +90,14 @@ class FrameNavError extends Error {
  * FrameNavigator v2.0 - Instrumented Frame Navigator
  *
  * Navega em hierarquias complexas de IFrames com:
+ *
  * - Detecção de barreiras (security/infra)
  * - Cálculo de offsets físicos (bounding boxes)
  * - Cleanup automático de handles
  * - Telemetria completa (eventos locais + IPC)
  *
  * FEATURES v2.0:
+ *
  * - EventEmitter inheritance (8 eventos locais)
  * - FRAME_NAV_CONFIG (5 keys configuráveis via env vars)
  * - Timeout protection em operações críticas
@@ -103,46 +106,45 @@ class FrameNavError extends Error {
  * - JSDoc 100%
  * - getStats() method para introspection
  *
- * @extends EventEmitter
- *
  * @example
- * const navigator = new FrameNavigator(driver);
+ *     const navigator = new FrameNavigator(driver);
  *
- * // Listen to events
- * navigator.on(FRAME_NAV_EVENTS.FRAME_ENTERED, (data) => {
- *     console.log('Entered frame:', data);
- * });
+ *     // Listen to events
+ *     navigator.on(FRAME_NAV_EVENTS.FRAME_ENTERED, (data) => {
+ *         console.log('Entered frame:', data);
+ *     });
  *
- * // Navigate
- * const protocol = {
- *     context: 'frame',
- *     framePath: 'IFRAME#main > IFRAME[name="nested"]'
- * };
+ *     // Navigate
+ *     const protocol = {
+ *         context: 'frame',
+ *         framePath: 'IFRAME#main > IFRAME[name="nested"]',
+ *     };
  *
- * const execContext = await navigator.getExecutionContext(protocol, signal);
- * console.log('Final depth:', execContext.frameStack.length);
+ *     const execContext = await navigator.getExecutionContext(protocol, signal);
+ *     console.log('Final depth:', execContext.frameStack.length);
  *
- * // Get metrics
- * const stats = navigator.getStats();
- * console.log('Success rate:', stats.successRate);
+ *     // Get metrics
+ *     const stats = navigator.getStats();
+ *     console.log('Success rate:', stats.successRate);
+ *
+ * @extends EventEmitter
  */
 class FrameNavigator extends EventEmitter {
     /**
      * Cria uma instância do FrameNavigator.
      *
-     * @param {Object} driver - Instância do BaseDriver
-     * @param {Object} [driver.page] - Puppeteer Page instance (pode ser null até attachContext)
-     * @param {Function} driver._emitVital - Método IPC para telemetria vital
-     * @param {Object} driver.handles - HandleManager para cleanup
-     * @param {Function} driver.handles.register - Método para registrar handles
-     * @param {string} driver.correlationId - ID de correlação para logs
+     * @example
+     *     const navigator = new FrameNavigator(driver);
      *
+     * @param {object} driver - Instância do BaseDriver
+     * @param {object} [driver.page] - Puppeteer Page instance (pode ser null até attachContext)
+     * @param {function} driver._emitVital - Método IPC para telemetria vital
+     * @param {object} driver.handles - HandleManager para cleanup
+     * @param {function} driver.handles.register - Método para registrar handles
+     * @param {string} driver.correlationId - ID de correlação para logs
      * @throws {Error} Se driver não for fornecido
      * @throws {Error} Se driver._emitVital não for uma função
      * @throws {Error} Se driver.handles não existir
-     *
-     * @example
-     * const navigator = new FrameNavigator(driver);
      */
     constructor(driver) {
         super(); // EventEmitter constructor
@@ -183,27 +185,27 @@ class FrameNavigator extends EventEmitter {
      * Tenta dispose até DISPOSE_RETRY_ATTEMPTS vezes com backoff.
      *
      * @private
-     * @param {Object} handle - JSHandle ou ElementHandle para dispose
-     * @param {string} [handleName='unknown'] - Nome do handle (para logs)
-     * @returns {Promise<boolean>} true se dispose bem-sucedido, false caso contrário
-     *
      * @example
-     * const success = await this._disposeWithRetry(frameJSHandle, 'frameJSHandle');
+     *     const success = await this._disposeWithRetry(frameJSHandle, 'frameJSHandle');
+     *
+     * @param {any} handle - JSHandle ou ElementHandle para dispose
+     * @param {string} [handleName='unknown'] - Nome do handle (para logs). Default is `'unknown'`
+     * @returns {Promise<boolean>} true se dispose bem-sucedido, false caso contrário
      */
     async _disposeWithRetry(handle, handleName = 'unknown') {
         for (let attempt = 0; attempt < FRAME_NAV_CONFIG.DISPOSE_RETRY_ATTEMPTS; attempt++) {
             try {
                 await handle.dispose();
                 return true;
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log(
                     'WARN',
-                    `[FRAME_NAV] Dispose attempt ${attempt + 1}/${FRAME_NAV_CONFIG.DISPOSE_RETRY_ATTEMPTS} failed for ${handleName}: ${err.message}`,
-                    this.driver.correlationId
+                    `[FRAME_NAV] Dispose attempt ${attempt + 1}/${FRAME_NAV_CONFIG.DISPOSE_RETRY_ATTEMPTS} failed for ${handleName}: ${/** @type {any} */ (err).message}`,
+                    this.driver.correlationId,
                 );
 
                 if (attempt < FRAME_NAV_CONFIG.DISPOSE_RETRY_ATTEMPTS - 1) {
-                    await new Promise(r => setTimeout(r, FRAME_NAV_CONFIG.DISPOSE_RETRY_DELAY_MS));
+                    await new Promise((r) => setTimeout(r, FRAME_NAV_CONFIG.DISPOSE_RETRY_DELAY_MS));
                 }
             }
         }
@@ -211,7 +213,7 @@ class FrameNavigator extends EventEmitter {
         log(
             'ERROR',
             `[FRAME_NAV] Failed to dispose ${handleName} after ${FRAME_NAV_CONFIG.DISPOSE_RETRY_ATTEMPTS} attempts`,
-            this.driver.correlationId
+            this.driver.correlationId,
         );
         return false;
     }
@@ -220,16 +222,16 @@ class FrameNavigator extends EventEmitter {
      * Executa navegação interna (sem timeout wrapper).
      *
      * @private
-     * @param {Object} protocol - Protocolo SADI contendo framePath
+     * @param {any} protocol - Protocolo SADI contendo framePath
      * @param {AbortSignal} signal - AbortSignal para cancelamento
-     * @returns {Promise<Object>} Contexto de execução
+     * @returns {Promise<any>} Contexto de execução
      */
     async _executeGetExecutionContext(protocol, signal) {
         const result = {
             ctx: this.driver.page,
             offsetX: 0,
             offsetY: 0,
-            frameStack: [],
+            frameStack: /** @type {any[]} */ ([]),
         };
 
         // Caso base: Elemento está na raiz (Root)
@@ -245,7 +247,7 @@ class FrameNavigator extends EventEmitter {
             return result;
         }
 
-        const pathParts = protocol.framePath.split(' > ').filter(p => p.trim());
+        const pathParts = protocol.framePath.split(' > ').filter(/** @type {function(any): any} */ ((p) => p.trim()));
 
         if (pathParts.length === 0) {
             log('WARN', '[FRAME_NAV] Empty framePath after split', correlationId);
@@ -260,7 +262,7 @@ class FrameNavigator extends EventEmitter {
             path: protocol.framePath,
         });
 
-        let currentLevel = this.driver.page;
+        let currentLevel = /** @type {any} */ (this.driver.page);
 
         for (let i = 0; i < pathParts.length; i++) {
             const part = pathParts[i];
@@ -313,18 +315,21 @@ class FrameNavigator extends EventEmitter {
             const targetSig = part.toLowerCase();
 
             // Localiza o frame no nível atual
-            const frameJSHandle = await currentLevel.evaluateHandle(sig => {
-                const frames = Array.from(document.querySelectorAll('iframe'));
-                return frames.find(f => {
-                    if (f.tagName.toLowerCase() !== 'iframe') {
-                        return false;
-                    }
-                    const id = f.id ? `#${f.id}` : '';
-                    const name = f.name ? `[name="${f.name}"]` : '';
-                    const currentSig = `${f.tagName}${id}${name}`.toLowerCase();
-                    return currentSig === sig;
-                });
-            }, targetSig);
+            const frameJSHandle = await /** @type {any} */ (currentLevel).evaluateHandle(
+                /** @param {any} sig */ (sig) => {
+                    const frames = Array.from(/** @type {any} */ (document).querySelectorAll('iframe'));
+                    return frames.find((f) => {
+                        if (f.tagName.toLowerCase() !== 'iframe') {
+                            return false;
+                        }
+                        const id = f.id ? `#${f.id}` : '';
+                        const name = f.name ? `[name="${f.name}"]` : '';
+                        const currentSig = `${f.tagName}${id}${name}`.toLowerCase();
+                        return currentSig === sig;
+                    });
+                },
+                targetSig,
+            );
 
             let element;
             try {
@@ -347,7 +352,7 @@ class FrameNavigator extends EventEmitter {
 
                         currentLevel = nextFrame;
                         result.ctx = nextFrame;
-                        result.frameStack.push(element);
+                        result.frameStack.push(/** @type {never} */ (element));
 
                         this.stats.totalFramesTraversed++;
                         this.stats.maxDepthReached = Math.max(this.stats.maxDepthReached, result.frameStack.length);
@@ -395,15 +400,32 @@ class FrameNavigator extends EventEmitter {
     /**
      * Resolve o contexto de execução e calcula o deslocamento (offset) visual.
      *
-     * Navega através da hierarquia de frames definida em `protocol.framePath`,
-     * acumulando offsets físicos (bounding boxes) e registrando handles.
+     * Navega através da hierarquia de frames definida em `protocol.framePath`, acumulando offsets físicos (bounding
+     * boxes) e registrando handles.
      *
-     * @param {Object} protocol - Protocolo SADI contendo framePath
-     * @param {string} protocol.framePath - Path de frames (formato: "IFRAME#id > IFRAME[name='x']")
-     * @param {string} protocol.context - Contexto ('root' ou 'frame')
+     * @example
+     *     const protocol = {
+     *         context: 'frame',
+     *         framePath: 'IFRAME#main > IFRAME[name="nested"]',
+     *     };
+     *
+     *     const execContext = await navigator.getExecutionContext(protocol, signal);
+     *     console.log('Final context:', execContext.ctx);
+     *     console.log('Offset:', execContext.offsetX, execContext.offsetY);
+     *     console.log('Depth:', execContext.frameStack.length);
+     *
+     * @fires FRAME_NAV_EVENTS.NAVIGATION_STARTED
+     * @fires FRAME_NAV_EVENTS.FRAME_ENTERED
+     * @fires FRAME_NAV_EVENTS.FRAME_ENTRY_FAILED
+     * @fires FRAME_NAV_EVENTS.NAVIGATION_COMPLETED
+     * @fires FRAME_NAV_EVENTS.NAVIGATION_FAILED
+     * @fires FRAME_NAV_EVENTS.INFRA_BARRIER_DETECTED
+     * @fires FRAME_NAV_EVENTS.SECURITY_BARRIER_DETECTED
+     * @fires FRAME_NAV_EVENTS.MAX_DEPTH_REACHED
+     * @param {any} protocol - Protocolo SADI contendo framePath
      * @param {AbortSignal} [signal] - AbortSignal para cancelamento
-     * @returns {Promise<Object>} Contexto de execução
-     * Propriedades do objeto retornado:
+     * @returns {Promise<any>} Contexto de execução Propriedades do objeto retornado:
+     *
      *   - ctx (Object): Context (page ou frame)
      *   - offsetX (number): Offset horizontal acumulado
      *   - offsetY (number): Offset vertical acumulado
@@ -413,26 +435,6 @@ class FrameNavigator extends EventEmitter {
      * @throws {FrameNavError} Se max depth atingido (type: MAX_DEPTH)
      * @throws {FrameNavError} Se timeout exceder (type: TIMEOUT)
      * @throws {FrameNavError} Se security barrier detectada (type: SECURITY_BARRIER)
-     *
-     * @emits FRAME_NAV_EVENTS.NAVIGATION_STARTED
-     * @emits FRAME_NAV_EVENTS.FRAME_ENTERED
-     * @emits FRAME_NAV_EVENTS.FRAME_ENTRY_FAILED
-     * @emits FRAME_NAV_EVENTS.NAVIGATION_COMPLETED
-     * @emits FRAME_NAV_EVENTS.NAVIGATION_FAILED
-     * @emits FRAME_NAV_EVENTS.INFRA_BARRIER_DETECTED
-     * @emits FRAME_NAV_EVENTS.SECURITY_BARRIER_DETECTED
-     * @emits FRAME_NAV_EVENTS.MAX_DEPTH_REACHED
-     *
-     * @example
-     * const protocol = {
-     *     context: 'frame',
-     *     framePath: 'IFRAME#main > IFRAME[name="nested"]'
-     * };
-     *
-     * const execContext = await navigator.getExecutionContext(protocol, signal);
-     * console.log('Final context:', execContext.ctx);
-     * console.log('Offset:', execContext.offsetX, execContext.offsetY);
-     * console.log('Depth:', execContext.frameStack.length);
      */
     async getExecutionContext(protocol, signal) {
         this.emit(FRAME_NAV_EVENTS.NAVIGATION_STARTED, {
@@ -445,9 +447,15 @@ class FrameNavigator extends EventEmitter {
         try {
             // ✅ BUG #4 fix: Timeout protection
             const timeoutP = this._timeout(FRAME_NAV_CONFIG.TRAVERSAL_TIMEOUT_MS, 'getExecutionContext');
-            let result;
+            let result = /** @type {any} */ (null);
             try {
-                result = await Promise.race([this._executeGetExecutionContext(protocol, signal), timeoutP]);
+                result = await Promise.race([
+                    this._executeGetExecutionContext(
+                        protocol,
+                        /** @type {AbortSignal} */ (/** @type {any} */ (signal)),
+                    ),
+                    timeoutP,
+                ]);
             } finally {
                 timeoutP.cancel();
             }
@@ -469,33 +477,40 @@ class FrameNavigator extends EventEmitter {
             });
 
             return result;
-        } catch (lineageErr) {
+        } catch (/** @type {any} */ lineageErr) {
             this.stats.failedNavigations++;
 
-            log('ERROR', `[FRAME_NAV] Colapso na navegação: ${lineageErr.message}`, this.driver.correlationId);
+            log(
+                'ERROR',
+                `[FRAME_NAV] Colapso na navegação: ${/** @type {any} */ (lineageErr).message}`,
+                this.driver.correlationId,
+            );
 
             this.emit(FRAME_NAV_EVENTS.NAVIGATION_FAILED, {
                 path: protocol?.framePath,
-                error: lineageErr.message,
+                error: /** @type {any} */ (lineageErr).message,
             });
 
             // [V500] Alerta de segurança: Provável bloqueio de Cross-Origin (CORS/CSP)
-            if (lineageErr.message.includes('CSP') || lineageErr.message.includes('CORS')) {
+            if (
+                /** @type {any} */ (lineageErr).message.includes('CSP') ||
+                /** @type {any} */ (lineageErr).message.includes('CORS')
+            ) {
                 this.stats.totalBarriersDetected++;
                 this.stats.totalSecurityBarriers++;
 
                 this.emit(FRAME_NAV_EVENTS.SECURITY_BARRIER_DETECTED, {
                     path: protocol?.framePath,
-                    error: lineageErr.message,
+                    error: /** @type {any} */ (lineageErr).message,
                 });
 
                 this.driver._emitVital('TRIAGE_ALERT', {
                     type: 'SECURITY_BARRIER_HIT',
                     severity: 'HIGH',
-                    evidence: { error: lineageErr.message, path: protocol?.framePath },
+                    evidence: { error: /** @type {any} */ (lineageErr).message, path: protocol?.framePath },
                 });
 
-                throw new FrameNavError('SECURITY_BARRIER', lineageErr.message, {
+                throw new FrameNavError('SECURITY_BARRIER', /** @type {any} */ (lineageErr).message, {
                     path: protocol?.framePath,
                 });
             }
@@ -507,8 +522,13 @@ class FrameNavigator extends EventEmitter {
     /**
      * Retorna estatísticas de navegação de frames.
      *
-     * @returns {Object} Objeto com métricas de navegação
-     * Propriedades do objeto retornado:
+     * @example
+     *     const stats = navigator.getStats();
+     *     console.log('Success rate:', stats.successRate);
+     *     console.log('Avg depth:', stats.avgDepth);
+     *
+     * @returns {any} Objeto com métricas de navegação Propriedades do objeto retornado:
+     *
      *   - totalNavigations (number): Total de navegações
      *   - successfulNavigations (number): Navegações bem-sucedidas
      *   - failedNavigations (number): Navegações que falharam
@@ -523,11 +543,6 @@ class FrameNavigator extends EventEmitter {
      *   - successRate (string): Taxa de sucesso (%)
      *   - avgDepth (string): Profundidade média
      *   - config (Object): Configuração atual (FRAME_NAV_CONFIG)
-     *
-     * @example
-     * const stats = navigator.getStats();
-     * console.log('Success rate:', stats.successRate);
-     * console.log('Avg depth:', stats.avgDepth);
      */
     getStats() {
         return {
@@ -557,7 +572,7 @@ class FrameNavigator extends EventEmitter {
      * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
-        let timerId;
+        let timerId = /** @type {any} */ (undefined);
         const p = /** @type {CancelableTimeoutPromise} */ (
             new Promise((_, reject) => {
                 timerId = setTimeout(() => {
@@ -575,17 +590,21 @@ class FrameNavigator extends EventEmitter {
 }
 
 /**
+ * @typedef {object} CreateDriver
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Factory function para criar instância de FrameNavigator.
  *
- * @param {Object} driver - Instância do driver
- * @returns {FrameNavigator} Nova instância
- *
  * @example
- * const { create } = require('./frame_navigator');
- * const navigator = create(driver);
+ *     const { create } = require('./frame_navigator');
+ *     const navigator = create(driver);
+ *
+ * @param {object} driver - Instância do driver
+ * @returns {FrameNavigator} Nova instância
  */
 function create(driver) {
-    return new FrameNavigator(driver);
+    return new FrameNavigator(/** @type {any} */ (driver));
 }
 
-export { FrameNavigator, FRAME_NAV_CONFIG, FRAME_NAV_EVENTS, FrameNavError, create };
+export { create, FRAME_NAV_CONFIG, FRAME_NAV_EVENTS, FrameNavError, FrameNavigator };

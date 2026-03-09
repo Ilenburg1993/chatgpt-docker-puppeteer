@@ -1,11 +1,11 @@
 // @ts-check
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
-import { buildQualityExecutionPlan } from '../lib/impact_classifier.mjs';
 import { parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
+import { buildQualityExecutionPlan } from '../lib/impact_classifier.mjs';
 
-/** @typedef {import('../normalize/findings.mjs').RawFinding} RawFinding */
+/** @import {RawFinding} from "../normalize/findings.mjs" */
 
 const QUALITY_CONTRACTS = Object.freeze({
     NODE_SYNTAX: 'CONTRACT-QUALITY-NODE-SYNTAX',
@@ -30,10 +30,13 @@ function normPath(p) {
 
 /** @param {unknown} value */
 function toStringList(value) {
-    return Array.isArray(value) ? value.map(v => String(v || '')).filter(Boolean) : [];
+    return Array.isArray(value) ? value.map((v) => String(v || '')).filter(Boolean) : [];
 }
 
-/** @param {unknown} value */
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 function stableJson(value) {
     if (Array.isArray(value)) {
         return `[${value.map(stableJson).join(',')}]`;
@@ -67,7 +70,7 @@ function fileSig(file) {
 
 /**
  * @param {string[]} files
- * @returns {Array<Record<string, unknown>>}
+ * @returns {Record<string, unknown>[]}
  */
 function fileSigs(files) {
     return [...new Set((files || []).map(normPath).filter(Boolean))].map(fileSig);
@@ -79,16 +82,20 @@ function ensureDir(dir) {
 }
 
 /**
+ * @typedef {object} MakeCachePathCacheInput
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * @param {string} cacheDir
  * @param {string} stepKey
- * @param {any} cacheInput
+ * @param {MakeCachePathCacheInput} cacheInput
  */
 function makeCachePath(cacheDir, stepKey, cacheInput) {
     const hash = sha256(
         stableJson({
             quality_cache_schema_version: '2',
             cacheInput,
-        })
+        }),
     );
     return path.join(cacheDir, `${stepKey.replace(/[^a-zA-Z0-9._-]/g, '_')}__${hash}.json`);
 }
@@ -119,18 +126,24 @@ function writeCacheEntry(filePath, payload) {
 }
 
 /**
+ * @typedef {object} FindingMeta
+ * @property {string | null} [contractId]
+ * @property {string} [owner]
+ * @property {'off' | 'warn' | 'p1' | 'p0'} [enforcement]
+ */
+/**
  * @param {string} sourceTool
- * @param {string|null} file
- * @param {number|null} line
+ * @param {string | null} file
+ * @param {number | null} line
  * @param {string} evidence
  * @param {string} rule
- * @param {'P0'|'P1'|'P2'|'P3'} severity
- * @param {'bug'|'gap'|'falha de contrato'|'incompletude'|'upgrade'} type
+ * @param {'P0' | 'P1' | 'P2' | 'P3'} severity
+ * @param {'bug' | 'gap' | 'falha de contrato' | 'incompletude' | 'upgrade'} type
  * @param {string} impact
  * @param {string} rootCause
  * @param {string} suggestedPatch
  * @param {string} testStrategy
- * @param {{ contractId?: string|null, owner?: string, enforcement?: 'off'|'warn'|'p1'|'p0' }} [meta]
+ * @param {FindingMeta} [meta]
  * @returns {RawFinding}
  */
 function finding(
@@ -145,7 +158,7 @@ function finding(
     rootCause,
     suggestedPatch,
     testStrategy,
-    meta = {}
+    meta = {},
 ) {
     return {
         source_tool: sourceTool,
@@ -169,7 +182,7 @@ function finding(
 
 /**
  * @param {string} output
- * @returns {any}
+ * @returns {any[]}
  */
 export function parseTypecheckOutput(output) {
     /** @type {RawFinding[]} */
@@ -180,7 +193,7 @@ export function parseTypecheckOutput(output) {
         findings.push(
             finding(
                 'quality:typecheck',
-                normPath(m[1]),
+                normPath(m[1] ?? ''),
                 Number(m[2]),
                 `TS${m[4]}: ${m[5]}`,
                 `TS${m[4]}`,
@@ -190,8 +203,8 @@ export function parseTypecheckOutput(output) {
                 'Incompatibilidade de tipos no trecho apontado pelo TypeScript.',
                 'Ajustar tipos/assinaturas para satisfazer o contrato do compilador.',
                 'Executar `npm run typecheck:full` e validar saída limpa.',
-                { contractId: QUALITY_CONTRACTS.TYPECHECK_NODE }
-            )
+                { contractId: QUALITY_CONTRACTS.TYPECHECK_NODE },
+            ),
         );
     }
     return findings;
@@ -199,7 +212,7 @@ export function parseTypecheckOutput(output) {
 
 /**
  * @param {string} output
- * @returns {any}
+ * @returns {any[]}
  */
 export function parsePrettierCheckOutput(output) {
     /** @type {RawFinding[]} */
@@ -212,7 +225,7 @@ export function parsePrettierCheckOutput(output) {
         findings.push(
             finding(
                 'quality:prettier',
-                normPath(m[1]),
+                normPath(m[1] ?? ''),
                 null,
                 clean,
                 'prettier-check',
@@ -222,8 +235,8 @@ export function parsePrettierCheckOutput(output) {
                 'Formatação divergente do contrato canônico.',
                 'Aplicar formatter Prettier no arquivo afetado.',
                 'Executar `npm run format:check`.',
-                { contractId: QUALITY_CONTRACTS.PRETTIER_CHECK }
-            )
+                { contractId: QUALITY_CONTRACTS.PRETTIER_CHECK },
+            ),
         );
     }
     return findings;
@@ -231,10 +244,10 @@ export function parsePrettierCheckOutput(output) {
 
 /**
  * @param {string} output
- * @returns {any}
+ * @returns {any[]}
  */
 export function parseEslintJsonOutput(output) {
-    const parsed = parseJsonFromMixedOutput(String(output || ''));
+    const parsed = /** @type {any} */ (parseJsonFromMixedOutput(String(output || '')));
     const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.results) ? parsed.results : [];
     /** @type {RawFinding[]} */
     const findings = [];
@@ -255,8 +268,8 @@ export function parseEslintJsonOutput(output) {
                     'Regra de lint violada no arquivo alvo.',
                     'Corrigir a violação de lint conforme a regra indicada.',
                     'Executar `npm run lint -- --quiet` ou ESLint no arquivo.',
-                    { contractId: QUALITY_CONTRACTS.LINT_CLEAN }
-                )
+                    { contractId: QUALITY_CONTRACTS.LINT_CLEAN },
+                ),
             );
         }
     }
@@ -277,27 +290,31 @@ function parseNodeCheckFailure(file, stderr) {
         'Erro sintático detectado no parsing JavaScript.',
         'Corrigir sintaxe no arquivo indicado.',
         `Executar \`node --check ${file}\`.`,
-        { contractId: QUALITY_CONTRACTS.NODE_SYNTAX }
+        { contractId: QUALITY_CONTRACTS.NODE_SYNTAX },
     );
 }
 
 /**
  * @param {string} stdout
-  * @returns {any}
+ * @returns {any}
  */
 export function parseJSDocCoverageReport(stdout) {
-    return parseJsonFromMixedOutput(String(stdout || ''));
+    return /** @type {any} */ (parseJsonFromMixedOutput(String(stdout || '')));
 }
 
 /**
- * @param {any} report
+ * @typedef {object} ParseJSDocCoverageFindingsFromReportReport
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
+ * @param {ParseJSDocCoverageFindingsFromReportReport} report
  * @param {string} contractId
  * @returns {RawFinding[]}
  */
 export function parseJSDocCoverageFindingsFromReport(report, contractId) {
     /** @type {RawFinding[]} */
     const findings = [];
-    const files = Array.isArray(report?.files) ? report.files : [];
+    const files = Array.isArray(/** @type {any} */ (report)?.files) ? /** @type {any} */ (report).files : [];
     for (const fr of files) {
         const symbols = Array.isArray(fr?.exported_symbols) ? fr.exported_symbols : [];
         for (const sym of symbols) {
@@ -315,8 +332,8 @@ export function parseJSDocCoverageFindingsFromReport(report, contractId) {
                     'Export nomeado sem JSDoc associado.',
                     'Adicionar JSDoc ao símbolo exportado com descrição e tags relevantes.',
                     'Executar `npm run analyze:jsdoc` / `audit:quick`.',
-                    { contractId }
-                )
+                    { contractId },
+                ),
             );
         }
     }
@@ -336,14 +353,14 @@ export function parseTsIgnoreFindings(stdout, scopeFiles) {
         const m = line.match(/^(.+?):(\d+):(.*)$/);
         if (!m) continue;
         if (!String(m[3] || '').includes(TS_IGNORE_TOKEN)) continue;
-        const file = normPath(m[1]);
+        const file = normPath(m[1] ?? '');
         if (allowedScope.size > 0 && !allowedScope.has(file)) continue;
         findings.push(
             finding(
                 'quality:ts-ignore-scan',
                 file,
                 Number(m[2]),
-                m[3].trim(),
+                (m[3] ?? '').trim(),
                 'ts-ignore-forbidden',
                 'P1',
                 'falha de contrato',
@@ -351,46 +368,53 @@ export function parseTsIgnoreFindings(stdout, scopeFiles) {
                 'Suppressão de TypeScript proibida por padrão do projeto.',
                 'Substituir por correção estrutural ou `@ts-expect-error` justificado e rastreável.',
                 `Executar scan de \`${TS_IGNORE_TOKEN}\` e \`typecheck:full\`.`,
-                { contractId: QUALITY_CONTRACTS.TS_IGNORE_FORBIDDEN }
-            )
+                { contractId: QUALITY_CONTRACTS.TS_IGNORE_FORBIDDEN },
+            ),
         );
     }
     return findings;
 }
 
 /**
- * @param {{
- *  profile: 'quick'|'deep'|'nightly',
- *  changedFiles: string[],
- *  qualityMode?: 'smart'|'full'|'changed'|'off',
- *  qualityJsdoc?: boolean,
- *  qualityPrettier?: boolean,
- *  qualityJsdocFullThresholdPct?: number,
- *  qualityCache?: boolean,
- *  qualityCacheDir?: string,
- *  qualityParallelism?: 'auto'|'serial',
- *  exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
- * }} options
-  * @returns {Promise<any>}
+ * @typedef {object} CollectQualityFindingsOptions
+ * @property {'quick' | 'deep' | 'nightly'} profile
+ * @property {string[]} changedFiles
+ * @property {'smart' | 'full' | 'changed' | 'off'} qualityMode
+ * @property {boolean} qualityJsdoc
+ * @property {boolean} qualityPrettier
+ * @property {number} qualityJsdocFullThresholdPct
+ * @property {boolean} qualityCache
+ * @property {string} qualityCacheDir
+ * @property {'auto' | 'serial'} qualityParallelism
+ * @property {(stepId: any, command: any, args: any, opts: any) => Promise<any>} exec
+ */
+/**
+ * @param {CollectQualityFindingsOptions} options
+ * @returns {Promise<any>}
  */
 export async function collectQualityFindings(options) {
     /** @type {RawFinding[]} */
     const findings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
 
-    const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
-    const plan = buildQualityExecutionPlan({
-        profile: options.profile,
-        changedFiles: options.changedFiles || [],
-        qualityMode: options.qualityMode,
-        qualityJsdoc: options.qualityJsdoc,
-        qualityPrettier: options.qualityPrettier,
-    });
+    /** @type {(stepId: any, command: any, args: any, runOpts: any) => Promise<any>} */
+    const exec =
+        /** @type {any} */ (options.exec) ||
+        (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
+    const plan = /** @type {any} */ (
+        buildQualityExecutionPlan({
+            profile: options.profile,
+            changedFiles: options.changedFiles || [],
+            qualityMode: options.qualityMode,
+            qualityJsdoc: options.qualityJsdoc,
+            qualityPrettier: options.qualityPrettier,
+        })
+    );
 
-    const telemetry = {
+    const telemetry = /** @type {any} */ ({
         strategy: plan.strategy,
         risk: plan.risk,
         reasons: plan.reasons,
@@ -404,7 +428,7 @@ export async function collectQualityFindings(options) {
             has_browser_type_impact: plan.impact.hasBrowserTypeImpact,
         },
         steps_executed: [],
-        steps_skipped: /** @type {Array<{step:string,reason:string}>} */ ([]),
+        steps_skipped: /** @type {{ step: string; reason: string }[]} */ ([]),
         duration_ms_by_step: /** @type {Record<string, number>} */ ({}),
         gates: {
             node_check_ok: null,
@@ -435,14 +459,14 @@ export async function collectQualityFindings(options) {
         },
         parallelism: {
             mode: String(options.qualityParallelism || 'auto'),
-            groups: /** @type {Array<{name:string,steps:string[]}>} */ ([]),
+            groups: /** @type {{ name: string; steps: string[] }[]} */ ([]),
         },
         dedup: {
             before: 0,
             after: 0,
             removed: 0,
         },
-    };
+    });
 
     const cacheEnabled = telemetry.cache.enabled;
     const cacheDir = String(options.qualityCacheDir || 'artifacts/audit/cache/quality');
@@ -456,16 +480,16 @@ export async function collectQualityFindings(options) {
      * @template T
      * @param {string} stepId
      * @param {() => Promise<T>} markerExec
-     * @param {any} cacheInput
+     * @param {object} cacheInput
      * @param {() => Promise<T>} producer
-     * @returns {Promise<{ value: T, cacheHit: boolean }>}
+     * @returns {Promise<{ value: T; cacheHit: boolean }>}
      */
     async function runCached(stepId, markerExec, cacheInput, producer) {
         if (!cacheEnabled) {
             telemetry.cache.steps_uncached.push(stepId);
             return { value: await producer(), cacheHit: false };
         }
-        const cachePath = makeCachePath(cacheDir, stepId, cacheInput);
+        const cachePath = makeCachePath(cacheDir, stepId, /** @type {any} */ (cacheInput));
         const cached = readCacheEntry(cachePath);
         if (cached && cached.version === 1 && Object.prototype.hasOwnProperty.call(cached, 'value')) {
             telemetry.cache.hits += 1;
@@ -484,7 +508,7 @@ export async function collectQualityFindings(options) {
     /**
      * @template T
      * @param {string} key
-     * @param {'skip'|'changed-only'|'full'} mode
+     * @param {'skip' | 'changed-only' | 'full'} mode
      * @param {() => Promise<T>} fn
      * @param {(result: T) => void} [onResult]
      */
@@ -522,18 +546,22 @@ export async function collectQualityFindings(options) {
     }
 
     const nodeCheckTask = runPlanned('quality.node_check', plan.steps.node_check.mode, async () => {
-        await exec('quality.node_check', 'node', ['-e', 'process.stdout.write(\"quality-node-check\")'], {
+        await exec('quality.node_check', 'node', ['-e', 'process.stdout.write("quality-node-check")'], {
             timeoutMs: 10000,
             acceptExitCodes: [0],
             env: { NO_COLOR: undefined },
         });
         const stepFindings = [];
         for (const file of plan.steps.node_check.files || []) {
-            const check = await runCommand('node', ['--check', file], {
-                timeoutMs: 30000,
-                env: { NO_COLOR: undefined },
-                acceptExitCodes: [0, 1],
-            });
+            const check = await runCommand(
+                'node',
+                ['--check', file],
+                /** @type {any} */ ({
+                    timeoutMs: 30000,
+                    env: { NO_COLOR: undefined },
+                    acceptExitCodes: [0, 1],
+                }),
+            );
             if (!check.ok) stepFindings.push(parseNodeCheckFailure(file, check.stderr || check.stdout));
         }
         findings.push(...stepFindings);
@@ -548,21 +576,25 @@ export async function collectQualityFindings(options) {
             await exec(
                 'quality.entrypoint_import_smoke',
                 'node',
-                ['-e', 'process.stdout.write(\"quality-entrypoint-smoke\")'],
+                ['-e', 'process.stdout.write("quality-entrypoint-smoke")'],
                 {
                     timeoutMs: 10000,
                     acceptExitCodes: [0],
                     env: { NO_COLOR: undefined },
-                }
+                },
             );
             const stepFindings = [];
             for (const target of plan.steps.entrypoint_import_smoke.targets || []) {
                 const cmd = `import './${target}'; console.log('OK')`;
-                const check = await runCommand('node', ['--input-type=module', '-e', cmd], {
-                    timeoutMs: 45000,
-                    env: { NO_COLOR: undefined, NODE_APP_INSTANCE: undefined, DAEMON_MODE: undefined },
-                    acceptExitCodes: [0, 1],
-                });
+                const check = await runCommand(
+                    'node',
+                    ['--input-type=module', '-e', cmd],
+                    /** @type {any} */ ({
+                        timeoutMs: 45000,
+                        env: { NO_COLOR: undefined, NODE_APP_INSTANCE: undefined, DAEMON_MODE: undefined },
+                        acceptExitCodes: [0, 1],
+                    }),
+                );
                 const out = `${check.stdout}\n${check.stderr}`;
                 const clean = out.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '').trim();
                 if (!check.ok || !clean.endsWith('OK')) {
@@ -579,15 +611,15 @@ export async function collectQualityFindings(options) {
                             'Quebra de import-safety em entrypoint impactado.',
                             'Garantir import puro do módulo e mover bootstrap para caminho explícito.',
                             `Executar \`node --input-type=module -e "import './${target}'; console.log('OK')"\`.`,
-                            { contractId: QUALITY_CONTRACTS.ENTRYPOINT_IMPORT_SMOKE }
-                        )
+                            { contractId: QUALITY_CONTRACTS.ENTRYPOINT_IMPORT_SMOKE },
+                        ),
                     );
                 }
             }
             findings.push(...stepFindings);
             telemetry.gates.entrypoint_import_smoke_ok = stepFindings.length === 0;
             return stepFindings.length;
-        }
+        },
     );
 
     if (qualityParallelism !== 'serial') {
@@ -609,7 +641,7 @@ export async function collectQualityFindings(options) {
         const { value: res } = await runCached(
             'quality.lint',
             () =>
-                exec('quality.lint', 'node', ['-e', 'process.stdout.write(\"quality-lint-cache-hit\")'], {
+                exec('quality.lint', 'node', ['-e', 'process.stdout.write("quality-lint-cache-hit")'], {
                     timeoutMs: 10000,
                     acceptExitCodes: [0],
                     env: { NO_COLOR: undefined },
@@ -636,7 +668,7 @@ export async function collectQualityFindings(options) {
                     timeoutMs: 300000,
                     acceptExitCodes: [0, 1, 2],
                     env: { NO_COLOR: undefined },
-                })
+                }),
         );
         const lintFindings = parseEslintJsonOutput(`${res.stdout}\n${res.stderr}`);
         findings.push(...lintFindings);
@@ -657,12 +689,12 @@ export async function collectQualityFindings(options) {
                 exec(
                     'quality.typecheck_node',
                     'node',
-                    ['-e', 'process.stdout.write(\"quality-typecheck-node-cache-hit\")'],
+                    ['-e', 'process.stdout.write("quality-typecheck-node-cache-hit")'],
                     {
                         timeoutMs: 10000,
                         acceptExitCodes: [0],
                         env: { NO_COLOR: undefined },
-                    }
+                    },
                 ),
             {
                 profile: options.profile,
@@ -670,14 +702,16 @@ export async function collectQualityFindings(options) {
                 mode: plan.steps.typecheck_node.mode,
                 changed: fileSigs(plan.impact.changed),
                 configs: fileSigs(['package.json', 'tsconfig.json', 'jsconfig.json']),
-                types: fileSigs((plan.impact.changed || []).filter(f => String(f).startsWith('src/types/'))),
+                types: fileSigs(
+                    (plan.impact.changed || []).filter((/** @type {any} */ f) => String(f).startsWith('src/types/')),
+                ),
             },
             async () =>
                 exec('quality.typecheck_node', 'npm', ['run', '-s', 'typecheck:node'], {
                     timeoutMs: 300000,
                     acceptExitCodes: [0, 1, 2],
                     env: { NO_COLOR: undefined },
-                })
+                }),
         );
         const typeFindings = parseTypecheckOutput(`${res.stdout}\n${res.stderr}`);
         findings.push(...typeFindings);
@@ -698,12 +732,12 @@ export async function collectQualityFindings(options) {
                 exec(
                     'quality.typecheck_browser',
                     'node',
-                    ['-e', 'process.stdout.write(\"quality-typecheck-browser-cache-hit\")'],
+                    ['-e', 'process.stdout.write("quality-typecheck-browser-cache-hit")'],
                     {
                         timeoutMs: 10000,
                         acceptExitCodes: [0],
                         env: { NO_COLOR: undefined },
-                    }
+                    },
                 ),
             {
                 profile: options.profile,
@@ -717,9 +751,9 @@ export async function collectQualityFindings(options) {
                     timeoutMs: 300000,
                     acceptExitCodes: [0, 1, 2],
                     env: { NO_COLOR: undefined },
-                })
+                }),
         );
-        const typeFindings = parseTypecheckOutput(`${res.stdout}\n${res.stderr}`).map(item => ({
+        const typeFindings = parseTypecheckOutput(`${res.stdout}\n${res.stderr}`).map((item) => ({
             ...item,
             source_tool: 'quality:typecheck_browser',
             contract_id: QUALITY_CONTRACTS.TYPECHECK_BROWSER,
@@ -744,7 +778,7 @@ export async function collectQualityFindings(options) {
         const { value: res } = await runCached(
             'quality.prettier_check',
             () =>
-                exec('quality.prettier_check', 'node', ['-e', 'process.stdout.write(\"quality-prettier-cache-hit\")'], {
+                exec('quality.prettier_check', 'node', ['-e', 'process.stdout.write("quality-prettier-cache-hit")'], {
                     timeoutMs: 10000,
                     acceptExitCodes: [0],
                     env: { NO_COLOR: undefined },
@@ -774,7 +808,7 @@ export async function collectQualityFindings(options) {
                           timeoutMs: 120000,
                           acceptExitCodes: [0, 1, 2],
                           env: { NO_COLOR: undefined },
-                      })
+                      }),
         );
         const prettierFindings = parsePrettierCheckOutput(`${res.stdout}\n${res.stderr}`);
         findings.push(...prettierFindings);
@@ -793,7 +827,7 @@ export async function collectQualityFindings(options) {
         const { value: res } = await runCached(
             'quality.jsdoc_delta',
             () =>
-                exec('quality.jsdoc_delta', 'node', ['-e', 'process.stdout.write(\"quality-jsdoc-delta-cache-hit\")'], {
+                exec('quality.jsdoc_delta', 'node', ['-e', 'process.stdout.write("quality-jsdoc-delta-cache-hit")'], {
                     timeoutMs: 10000,
                     acceptExitCodes: [0],
                     env: { NO_COLOR: undefined },
@@ -827,16 +861,16 @@ export async function collectQualityFindings(options) {
                         timeoutMs: 120000,
                         acceptExitCodes: [0, 1, 2],
                         env: { NO_COLOR: undefined },
-                    }
-                )
+                    },
+                ),
         );
         const jsdocReport = parseJSDocCoverageReport(`${res.stdout}\n${res.stderr}`);
         if (Number.isFinite(jsdocReport?.coverage_pct)) {
             telemetry.jsdoc.delta_coverage_pct = Number(jsdocReport.coverage_pct);
         }
         const jsdocFindingsAll = parseJSDocCoverageFindingsFromReport(
-            jsdocReport,
-            QUALITY_CONTRACTS.JSDOC_DELTA_EXPORT_DOCS
+            /** @type {any} */ (jsdocReport),
+            QUALITY_CONTRACTS.JSDOC_DELTA_EXPORT_DOCS,
         );
         const quickCap = options.profile === 'quick' ? 50 : 1000;
         const jsdocFindings =
@@ -857,16 +891,11 @@ export async function collectQualityFindings(options) {
         const { value: res } = await runCached(
             'quality.ts_ignore_scan',
             () =>
-                exec(
-                    'quality.ts_ignore_scan',
-                    'node',
-                    ['-e', 'process.stdout.write(\"quality-ts-ignore-cache-hit\")'],
-                    {
-                        timeoutMs: 10000,
-                        acceptExitCodes: [0],
-                        env: { NO_COLOR: undefined },
-                    }
-                ),
+                exec('quality.ts_ignore_scan', 'node', ['-e', 'process.stdout.write("quality-ts-ignore-cache-hit")'], {
+                    timeoutMs: 10000,
+                    acceptExitCodes: [0],
+                    env: { NO_COLOR: undefined },
+                }),
             {
                 profile: options.profile,
                 step: 'quality.ts_ignore_scan',
@@ -882,8 +911,8 @@ export async function collectQualityFindings(options) {
                         timeoutMs: 30000,
                         acceptExitCodes: [0, 1],
                         env: { NO_COLOR: undefined },
-                    }
-                )
+                    },
+                ),
         );
         const scanFindings = parseTsIgnoreFindings(`${res.stdout}\n${res.stderr}`, scopeFiles);
         findings.push(...scanFindings);
@@ -906,7 +935,7 @@ export async function collectQualityFindings(options) {
         const { value: res } = await runCached(
             'quality.jsdoc_full',
             () =>
-                exec('quality.jsdoc_full', 'node', ['-e', 'process.stdout.write(\"quality-jsdoc-full-cache-hit\")'], {
+                exec('quality.jsdoc_full', 'node', ['-e', 'process.stdout.write("quality-jsdoc-full-cache-hit")'], {
                     timeoutMs: 10000,
                     acceptExitCodes: [0],
                     env: { NO_COLOR: undefined },
@@ -915,7 +944,7 @@ export async function collectQualityFindings(options) {
                 profile: options.profile,
                 step: 'quality.jsdoc_full',
                 mode: plan.steps.jsdoc_full.mode,
-                roots: fileSigs(['src', 'scripts', 'tests'].filter(p => fs.existsSync(p))),
+                roots: fileSigs(['src', 'scripts', 'tests'].filter((p) => fs.existsSync(p))),
                 engine: fileSigs([
                     'scripts/analysis/jsdoc_coverage_engine.mjs',
                     'scripts/analysis/jsdoc_coverage_cli.mjs',
@@ -939,16 +968,16 @@ export async function collectQualityFindings(options) {
                         timeoutMs: 300000,
                         acceptExitCodes: [0, 1, 2],
                         env: { NO_COLOR: undefined },
-                    }
-                )
+                    },
+                ),
         );
         const jsdocReport = parseJSDocCoverageReport(`${res.stdout}\n${res.stderr}`);
         if (Number.isFinite(jsdocReport?.coverage_pct)) {
             telemetry.jsdoc.full_coverage_pct = Number(jsdocReport.coverage_pct);
         }
         const jsdocFindings = parseJSDocCoverageFindingsFromReport(
-            jsdocReport,
-            QUALITY_CONTRACTS.JSDOC_FULL_EXPORT_DOCS
+            /** @type {any} */ (jsdocReport),
+            QUALITY_CONTRACTS.JSDOC_FULL_EXPORT_DOCS,
         );
         const thresholdPct = Number(telemetry.jsdoc.threshold_pct || 80);
         if (Number.isFinite(jsdocReport?.coverage_pct) && Number(jsdocReport.coverage_pct) < thresholdPct) {
@@ -965,8 +994,8 @@ export async function collectQualityFindings(options) {
                     'Crescimento de exports sem documentação proporcional.',
                     'Adicionar JSDoc nos exports públicos de maior prioridade até atingir o threshold.',
                     'Executar `npm run analyze:jsdoc` e `npm run audit:deep`.',
-                    { contractId: QUALITY_CONTRACTS.JSDOC_FULL_COVERAGE_THRESHOLD }
-                )
+                    { contractId: QUALITY_CONTRACTS.JSDOC_FULL_COVERAGE_THRESHOLD },
+                ),
             );
         }
         findings.push(...jsdocFindings);

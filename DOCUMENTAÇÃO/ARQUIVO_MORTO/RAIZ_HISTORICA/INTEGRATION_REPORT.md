@@ -236,10 +236,8 @@ Fase 6: Finalização
 
 ```javascript
 /**
- * DOMÍNIO DE MISSÕES (Mission Orchestration Platform V2.0)
- * Namespace: /api/missions
- * Responsável por orquestração de missões multi-step com workflows dinâmicos.
- * Inclui: MissionManager, WorkflowGenerator, templates, execution control.
+ * DOMÍNIO DE MISSÕES (Mission Orchestration Platform V2.0) Namespace: /api/missions Responsável por orquestração de
+ * missões multi-step com workflows dinâmicos. Inclui: MissionManager, WorkflowGenerator, templates, execution control.
  */
 app.use('/api/missions', apiLimiter, missionsController);
 ```

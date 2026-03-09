@@ -1,12 +1,22 @@
 // @ts-check
 import path from 'node:path';
 
+/**
+ * @param {string} filePath
+ * @param {string} targetPath
+ * @returns {string}
+ */
 function getImportPath(filePath, targetPath) {
     const relativePath = path.relative(path.dirname(filePath), targetPath);
     const normalizedPath = relativePath.replace(/\\/g, '/');
     return normalizedPath.startsWith('.') ? normalizedPath : `./${normalizedPath}`;
 }
 
+/**
+ * @param {any} fileInfo
+ * @param {any} api
+ * @returns {any}
+ */
 module.exports = function (fileInfo, api) {
     const j = api.jscodeshift;
     const root = j(fileInfo.source);
@@ -35,8 +45,8 @@ module.exports = function (fileInfo, api) {
     let needsImport = false;
 
     // Replace string literals with constant references
-    STATUS_VALUES.forEach(value => {
-        root.find(j.Literal, { value: value }).forEach(path => {
+    STATUS_VALUES.forEach((value) => {
+        root.find(j.Literal, { value: value }).forEach((/** @type {any} */ path) => {
             // Skip if already using constant (e.g., in constant definitions)
             const parent = path.parent;
             if (parent.value.type === 'Property' && parent.value.key === path.value) {
@@ -71,7 +81,7 @@ module.exports = function (fileInfo, api) {
         const importStatement = j.variableDeclaration('const', [
             j.variableDeclarator(
                 j.objectPattern([j.property('init', j.identifier('STATUS_VALUES'), j.identifier('STATUS_VALUES'))]),
-                j.callExpression(j.identifier('require'), [j.literal(importPath)])
+                j.callExpression(j.identifier('require'), [j.literal(importPath)]),
             ),
         ]);
 

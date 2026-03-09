@@ -1,94 +1,150 @@
+#!/usr/bin/env node
 // @ts-check
+/**
+ * @fileoverview Valida cobertura e uso de todos os enums exportados por
+ *               src/shared/nerv/constants.js em relação ao código src/.
+ *
+ * Flags:
+ *   --enum=NAME   Analisa apenas o enum informado
+ *   --all         Analisa todos os enums (comportamento padrão)
+ *   --strict      Falha se houver constantes não utilizadas
+ *   --json        Saída JSON
+ */
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
+
+const execFileAsync = promisify(execFile);
 
 const STRICT = process.argv.includes('--strict');
 const JSON_OUTPUT = process.argv.includes('--json');
+const targetEnum = process.argv.find((a) => a.startsWith('--enum='))?.split('=')[1];
+const ROOT = path.join(import.meta.dirname, '..');
+const SRC_DIR = path.join(ROOT, 'src');
 
-// Import constants
-const constantsPath = path.join(import.meta.dirname, '..', 'src', 'shared', 'nerv', 'constants.js');
-const constants = await import(pathToFileURL(path.resolve(constantsPath)).href).then(m => m.default ?? m);
+// Import constants module
+const constantsPath = path.join(ROOT, 'src', 'shared', 'nerv', 'constants.js');
+const constants = await import(pathToFileURL(path.resolve(constantsPath)).href).then((m) => m.default ?? m);
 
-/**
- * Extracts ActionCodes from JavaScript files using grep
- * @returns {Promise<string[]>}
- */
-async function extractUsedActionCodes() {
-    const { execa } = await import('execa');
-    try {
-        const { stdout } = await execa('grep', ['-r', 'ActionCode\\.', 'src/', '--include=*.js']);
-        const matches = stdout.split('\n').filter(line => line.trim());
-        const codes = new Set();
-        for (const line of matches) {
-            // Match ActionCode.SOMETHING, handling line breaks
-            const fullLine = line.replace(/\s+/g, '');
-            const match = fullLine.match(/ActionCode\.([A-Z_]+)(?:\(|,|\)|;|$)/);
-            if (match) {
-                codes.add(match[1]);
-            }
+/** Nomes dos enums exportados pelo módulo de constantes NERV. */
+const ALL_ENUMS = [
+    'MessageType',
+    'ActionCode',
+    'ActorRole',
+    'ChannelState',
+    'TechnicalCode',
+    'OrchestrationAction',
+    'TaskControlCommand',
+];
+
+function getEnumKeys(enumName) {
+    const obj = constants[enumName];
+    if (!obj || typeof obj !== 'object') return [];
+    return Object.keys(obj).sort();
+}
+
+async function findUsedKeys(enumName, keys) {
+    const result = [];
+    for (const key of keys) {
+        const pattern = `${enumName}\\.${key}\\b`;
+        try {
+            const { stdout } = await execFileAsync('rg', [
+                '--glob', '*.js',
+                '--glob', '*.mjs',
+                '--glob', '*.ts',
+                '-l',
+                pattern,
+                SRC_DIR,
+            ]);
+            const files = stdout.split('\n').filter(Boolean).map((f) => path.relative(ROOT, f));
+            result.push({ key, files });
+        } catch {
+            result.push({ key, files: [] });
         }
-        return Array.from(codes).sort();
-    } catch (_) {
-        return [];
+    }
+    return result;
+}
+
+async function analyzeEnum(enumName) {
+    const defined = getEnumKeys(enumName);
+    if (defined.length === 0) {
+        return { enumName, error: `Enum "${enumName}" não encontrado.`, defined: [], usedKeys: [], unusedKeys: [], coverage: 0 };
+    }
+    const usageMap = await findUsedKeys(enumName, defined);
+    const usedKeys = usageMap.filter((u) => u.files.length > 0).map((u) => u.key);
+    const unusedKeys = defined.filter((k) => !usedKeys.includes(k));
+    return {
+        enumName,
+        defined,
+        usedKeys,
+        unusedKeys,
+        coverage: defined.length === 0 ? 100 : Math.round((usedKeys.length / defined.length) * 100),
+        usageDetail: usageMap.filter((u) => u.files.length > 0),
+    };
+}
+
+function printEnumReport(report) {
+    if (report.error) {
+        console.log(`  ⚠️  ${report.enumName}: ${report.error}`);
+        return;
+    }
+    const { enumName, defined, usedKeys, unusedKeys, coverage } = report;
+    const icon = coverage === 100 ? '✅' : coverage >= 60 ? '🟡' : '🔴';
+    console.log(`\n${icon} ${enumName}: ${usedKeys.length}/${defined.length} usados (${coverage}% cobertura)`);
+    if (unusedKeys.length > 0) {
+        console.log(`   ⚠️  Não utilizados (${unusedKeys.length}):`);
+        unusedKeys.forEach((k) => console.log(`      - ${k}`));
     }
 }
 
-// ActionCodes used in production code (automated extraction)
-const usedActionCodes = await extractUsedActionCodes();
+const enumsToCheck = targetEnum ? [targetEnum] : ALL_ENUMS;
+const reports = await Promise.all(enumsToCheck.map(analyzeEnum));
 
-const defined = Object.keys(constants.ActionCode);
-const missing = usedActionCodes.filter(code => !defined.includes(code));
-const unused = defined.filter(code => !usedActionCodes.includes(code));
-
-// Output
 if (JSON_OUTPUT) {
-    const report = {
+    const summary = {
         timestamp: new Date().toISOString(),
-        summary: {
-            defined: defined.length,
-            used: usedActionCodes.length,
-            missing: missing.length,
-            unused: unused.length,
-            coverage: ((usedActionCodes.length / defined.length) * 100).toFixed(1) + '%',
-        },
-        missing,
-        unused,
-        allDefined: defined,
-        allUsed: usedActionCodes,
+        enums: reports.map(({ enumName, defined = [], usedKeys = [], unusedKeys = [], coverage = 0 }) => ({
+            enumName, defined: defined.length, used: usedKeys.length, unused: unusedKeys.length, coverage: `${coverage}%`,
+        })),
+        detail: reports,
     };
-    console.log(JSON.stringify(report, null, 2));
+    console.log(JSON.stringify(summary, null, 2));
+    process.exit(0);
+}
+
+console.log('\n=== ANÁLISE DE CONSTANTES NERV ===\n');
+console.log(`📁 Escopo: src/`);
+console.log(`🔎 Enums: ${enumsToCheck.join(', ')}\n`);
+console.log('─'.repeat(60));
+
+let hasProblems = false;
+for (const report of reports) {
+    printEnumReport(report);
+    if (report.unusedKeys?.length > 0 && STRICT) hasProblems = true;
+}
+
+console.log('\n' + '─'.repeat(60));
+const totalDefined = reports.reduce((s, r) => s + (r.defined?.length ?? 0), 0);
+const totalUsed = reports.reduce((s, r) => s + (r.usedKeys?.length ?? 0), 0);
+const totalUnused = reports.reduce((s, r) => s + (r.unusedKeys?.length ?? 0), 0);
+const globalCoverage = totalDefined === 0 ? 100 : Math.round((totalUsed / totalDefined) * 100);
+
+console.log(`\n📊 RESUMO GLOBAL:`);
+console.log(`   Constantes definidas : ${totalDefined}`);
+console.log(`   Constantes usadas    : ${totalUsed}`);
+console.log(`   Não utilizadas       : ${totalUnused}`);
+console.log(`   Cobertura global     : ${globalCoverage}%\n`);
+
+if (totalUnused > 0) {
+    console.log('💡 Constantes não utilizadas podem ser para uso futuro ou candidatas a remoção.');
+    console.log('   Execute com --strict para falhar neste caso.\n');
+}
+
+if (hasProblems) {
+    console.log('🔴 MODO STRICT: Constantes não utilizadas detectadas.\n');
+    process.exit(1);
 } else {
-    console.log('\n=== ANÁLISE DE CONSTANTES NERV ===\n');
-    console.log(`📋 ActionCodes DEFINIDOS: ${defined.length}`);
-    console.log(`🔧 ActionCodes USADOS no código: ${usedActionCodes.length}`);
-    console.log(`📊 Cobertura: ${((usedActionCodes.length / defined.length) * 100).toFixed(1)}%`);
-    console.log();
-
-    if (missing.length > 0) {
-        console.log(`❌ FALTAM nas constantes (${missing.length}):`);
-        missing.forEach(code => console.log(`   - ${code}`));
-        console.log();
-    } else {
-        console.log('✅ Todas as constantes usadas estão definidas!\n');
-    }
-
-    if (unused.length > 0) {
-        console.log(`⚠️  DEFINIDOS mas NÃO USADOS (${unused.length}):`);
-        unused.forEach(code => console.log(`   - ${code}`));
-        console.log('\n💡 Considerar se são para uso futuro ou podem ser removidos');
-        console.log();
-    }
-
-    console.log('='.repeat(50));
-
-    if (missing.length > 0) {
-        console.log('🔴 AÇÃO NECESSÁRIA: Adicionar', missing.length, 'constantes faltantes\n');
-        process.exit(1);
-    } else if (STRICT && unused.length > 0) {
-        console.log('⚠️  MODO STRICT: Constantes não utilizadas encontradas\n');
-        process.exit(1);
-    } else {
-        console.log('🟢 Constantes estão completas e alinhadas com o código\n');
-        process.exit(0);
-    }
+    console.log('🟢 Validação concluída sem bloqueadores.\n');
+    process.exit(0);
 }

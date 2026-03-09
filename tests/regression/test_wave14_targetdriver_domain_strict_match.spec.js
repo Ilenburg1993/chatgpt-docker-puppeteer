@@ -1,13 +1,13 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
+import test from 'node:test';
 
 import { isDomainMatch } from '#core/domain_matcher';
 import TargetDriver from '#driver/core/TargetDriver';
 
 class FakeTargetDriver extends TargetDriver {
-    constructor(config) {
+    constructor(/** @type {any} */ config) {
         super(config);
         this.name = 'FakeTargetDriver';
     }
@@ -17,8 +17,8 @@ class FakeTargetDriver extends TargetDriver {
     }
 }
 
-function createPage(url) {
-    const page = new EventEmitter();
+function createPage(/** @type {any} */ url) {
+    const page = /** @type {any} */ (new EventEmitter());
     page.url = () => url;
     page.isClosed = () => false;
     return page;
@@ -43,7 +43,7 @@ test('wave14: TargetDriver attachContext rejects domain mismatch with strict hos
     assert.throws(
         () => driver.attachContext(evilPage, abortController.signal, 'corr-evil'),
         /Domain mismatch/,
-        'attachContext should reject lookalike domains'
+        'attachContext should reject lookalike domains',
     );
 });
 

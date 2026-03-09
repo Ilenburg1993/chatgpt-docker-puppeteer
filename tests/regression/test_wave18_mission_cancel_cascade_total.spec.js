@@ -1,25 +1,25 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import test from 'node:test';
 
 import * as schemas from '#core/schemas';
-import { cancelMissionCommand } from '#server/domain/mission_control_service';
 import { createMission, getMissionById, updateMission } from '#infra/db/mission_repo';
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { insertTask } from '#infra/db/task_repo';
+import { cancelMissionCommand } from '#server/domain/mission_control_service';
 
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
     fs.mkdirSync(dir, { recursive: true });
     return path.join(
         dir,
-        `maestro-wave18-cascade-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+        `maestro-wave18-cascade-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`,
     );
 }
 
-function makeTask(id, missionId, userMessage) {
+function makeTask(/** @type {any} */ id, /** @type {any} */ missionId, /** @type {any} */ userMessage) {
     return schemas.core.TaskSchemaV5.parse({
         meta: {
             id,
@@ -43,7 +43,7 @@ function makeTask(id, missionId, userMessage) {
     });
 }
 
-test('wave18: cancelamento de missão cancela tasks ativas em cascata', async t => {
+test('wave18: cancelamento de missão cancela tasks ativas em cascata', async (t) => {
     const dbPath = makeDbPath();
     process.env.MAESTRO_DB_PATH = dbPath;
 
@@ -58,7 +58,7 @@ test('wave18: cancelamento de missão cancela tasks ativas em cascata', async t 
         DELETE FROM missions;
     `);
 
-    const mission = createMission({ title: 'Wave18 Cascade', description: 'test' });
+    const mission = /** @type {any} */ (createMission({ title: 'Wave18 Cascade', description: 'test' }));
     updateMission(mission.id, { status: 'RUNNING' });
 
     insertTask(makeTask('task-wave18-cascade-1', mission.id, 'pending'), {
@@ -77,11 +77,15 @@ test('wave18: cancelamento de missão cancela tasks ativas em cascata', async t 
         actor: 'test',
     });
 
-    const result = cancelMissionCommand({
-        missionId: mission.id,
-        reason: 'Teste de cancelamento em cascata',
-        actor: { id: 'tester', username: 'tester', role: 'owner' },
-    });
+    const result = /** @type {any} */ (
+        cancelMissionCommand(
+            /** @type {any} */ ({
+                missionId: mission.id,
+                reason: 'Teste de cancelamento em cascata',
+                actor: { id: 'tester', username: 'tester', role: 'owner' },
+            }),
+        )
+    );
 
     const after = getMissionById(mission.id);
     const rows = db.prepare('SELECT id, status FROM tasks WHERE mission_id = ? ORDER BY id').all(mission.id);
@@ -89,7 +93,7 @@ test('wave18: cancelamento de missão cancela tasks ativas em cascata', async t 
     assert.equal(result.after.status, 'CANCELLED');
     assert.equal(after?.status, 'CANCELLED');
 
-    const byId = new Map(rows.map(r => [String(r.id), String(r.status)]));
+    const byId = new Map(rows.map((/** @type {any} */ r) => [String(r.id), String(r.status)]));
     assert.equal(byId.get('task-wave18-cascade-1'), 'CANCELLED');
     assert.equal(byId.get('task-wave18-cascade-2'), 'CANCELLED');
     assert.equal(byId.get('task-wave18-cascade-3'), 'DONE');

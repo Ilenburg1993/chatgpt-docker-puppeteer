@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Test Ollama Cloud Integration
- * Tests both code generation and text generation using cloud models
+ * Test Ollama Cloud Integration Tests both code generation and text generation using cloud models
  */
 
 import { ollama } from './tools/ollama/client.mjs';
@@ -33,7 +32,7 @@ try {
     const codeResult = await ollama.generate(
         'Write a hello world function in JavaScript. Just the code, no explanation.',
         'qwen3:4b',
-        { temperature: 0.7, num_predict: 100 }
+        { temperature: 0.7, num_predict: 100 },
     );
 
     console.log('RESPOSTA LITERAL (Code Generation):');
@@ -61,7 +60,7 @@ try {
     const textResult = await ollama.generate(
         'Explain what is a closure in JavaScript in one sentence.',
         'qwen2.5:3b-instruct',
-        { temperature: 0.7, num_predict: 50 }
+        { temperature: 0.7, num_predict: 50 },
     );
 
     console.log('RESPOSTA LITERAL (Text Generation):');

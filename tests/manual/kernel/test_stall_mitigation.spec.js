@@ -1,7 +1,7 @@
 // @ts-check
 import puppeteer from 'puppeteer-core';
 
-import { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondition, sleep } from './helpers.js';
+import { readLatestGlobalLogTail, sleep, startAgent, stopAgent, waitForCondition, writeTask } from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Stall Mitigation (Watchdog V4) ===');
@@ -27,7 +27,7 @@ import { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondi
                 `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`,
         });
         const pages = await browser.pages();
-        const page = pages.find(p => p.url().includes('chatgpt.com'));
+        const page = pages.find((p) => p.url().includes('chatgpt.com'));
 
         if (!page) {
             throw new Error('Aba ChatGPT não encontrada.');
@@ -40,11 +40,11 @@ import { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondi
         await page.evaluate(() => {
             // Sabota as variáveis exatas que o src/driver/browser.js usa
             // window.__wd_last_change é a chave do novo driver
-            window.__wd_last_change = Date.now() - 300000; // 5 minutos atrás
+            /** @type {any} */ (window).__wd_last_change = Date.now() - 300000; // 5 minutos atrás
 
             // Garante que o observer existe para não ser recriado imediatamente
-            if (!window.__wd_obs) {
-                window.__wd_obs = true;
+            if (!(/** @type {any} */ (window).__wd_obs)) {
+                /** @type {any} */ (window).__wd_obs = true;
             }
         });
 
@@ -62,7 +62,7 @@ import { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondi
         }
 
         browser.disconnect();
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         console.error('FAIL:', e.message);
         console.error('Logs:', readLatestGlobalLogTail(30));
         process.exit(1);

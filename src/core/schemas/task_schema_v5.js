@@ -1,15 +1,17 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { z } from 'zod';
-import { CONNECTION_MODES } from '../constants/browser.js';
+// @ts-check
+import { CONNECTION_MODES } from '#core/constants/browser';
+import { z as _zImport } from 'zod';
 
 import {
-    ID_SCHEMA,
-    TIMESTAMP_SCHEMA,
     CLEAN_STRING_SCHEMA,
+    ID_SCHEMA,
     PRIORITY_SCHEMA,
     SOURCE_SCHEMA,
     STATUS_SCHEMA,
+    TIMESTAMP_SCHEMA,
 } from './shared_types.js';
+/** @type {any} */
+const z = _zImport;
 
 /**
  * 1. MetaSchema V5: Identidade e Rastreabilidade + Hierarquia de Missões.
@@ -31,8 +33,8 @@ const MetaSchemaV5 = z.object({
 /**
  * 1.5 ExecutionSchemaV5: Contexto de Execução (NOVO - Unified V5)
  *
- * Captura contexto completo de execução: driver usado, ambiente, retry telemetry.
- * Preenchido automaticamente pelo BaseDriver e ExecutionEngine.
+ * Captura contexto completo de execução: driver usado, ambiente, retry telemetry. Preenchido automaticamente pelo
+ * BaseDriver e ExecutionEngine.
  */
 const ExecutionSchemaV5 = z
     .object({
@@ -71,8 +73,8 @@ const ExecutionSchemaV5 = z
 /**
  * 1.6 MissionSchemaV5: Mission System Context (NOVO - Unified V5)
  *
- * Suporte completo para Mission System: agrupa tasks em workflows,
- * permite context flow entre steps, checkpoint recovery.
+ * Suporte completo para Mission System: agrupa tasks em workflows, permite context flow entre steps, checkpoint
+ * recovery.
  */
 const MissionSchemaV5 = z
     .object({
@@ -157,7 +159,7 @@ const SpecSchemaV5 = z.object({
                             config: z.any(), // Step-specific config
                             dependencies: z.array(z.string()).default([]), // Step IDs que devem completar primeiro
                             on_failure: z.enum(['retry', 'skip', 'abort']).default('abort'),
-                        })
+                        }),
                     ),
                     max_subtasks: z.number().int().positive().default(50),
                     subtask_concurrency: z.number().int().positive().default(3),
@@ -192,7 +194,7 @@ const SpecSchemaV5 = z.object({
                             'custom', // Função customizada
                         ]),
                         config: z.any(), // Validator-specific config
-                    })
+                    }),
                 )
                 .default([]),
             on_validation_failure: z.enum(['retry', 'abort', 'manual_review']).default('retry'),
@@ -287,7 +289,7 @@ const StateSchemaV5 = z.object({
                         output: z.string(),
                         quality_score: z.number().optional(),
                         validation_result: z.any().optional(),
-                    })
+                    }),
                 )
                 .default([]),
         })
@@ -363,7 +365,7 @@ const StateSchemaV5 = z.object({
                         event: z.string(),
                         msg: z.string().optional(),
                         evidence: z.any().optional(),
-                    })
+                    }),
                 )
                 .default([]),
 
@@ -375,7 +377,7 @@ const StateSchemaV5 = z.object({
                     warnings_count: z.number().int().default(0),
                     retry_count: z.number().int().default(0),
                     // Zod v4: record(keyType, valueType)
-                    phase_durations: z.record(z.string(), z.number()).default(/** @type {any} */ ({})), // { 'preparation': 1200, 'execution': 3400, ... }
+                    phase_durations: z.record(z.string(), z.number()).default(/** @type {unknown} */ ({})), // { 'preparation': 1200, 'execution': 3400, ... }
                 })
                 .default({}),
         })
@@ -470,7 +472,7 @@ const ResultSchemaV5 = z.object({
                 status: z.string(),
                 output: z.string().optional(),
                 quality_score: z.number().optional(),
-            })
+            }),
         )
         .default([]),
 
@@ -484,7 +486,7 @@ const ResultSchemaV5 = z.object({
                 passed: z.boolean(),
                 score: z.number().optional(),
                 feedback: z.string().optional(),
-            })
+            }),
         )
         .default([]),
 });
@@ -493,6 +495,7 @@ const ResultSchemaV5 = z.object({
  * TASK_SCHEMA_V5: O Contrato Mestre V5 (Unified - Fevereiro 2026)
  *
  * Combina:
+ *
  * - Mission System (workflow, iteration, validation)
  * - Execution Context (driver, environment, retry)
  * - Result V2 (multi-formato, metadata, LLM-judge preparado)
@@ -510,12 +513,12 @@ const TaskSchemaV5 = z
     .passthrough();
 
 export {
-    TaskSchemaV5,
-    MetaSchemaV5,
-    SpecSchemaV5,
-    PolicySchemaV5,
     ExecutionSchemaV5,
+    MetaSchemaV5,
     MissionSchemaV5,
-    StateSchemaV5,
+    PolicySchemaV5,
     ResultSchemaV5,
+    SpecSchemaV5,
+    StateSchemaV5,
+    TaskSchemaV5,
 };

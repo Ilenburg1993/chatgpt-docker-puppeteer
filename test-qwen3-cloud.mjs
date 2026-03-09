@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Teste DIRETO com modelos qwen3 cloud
- * Tenta usar qwen3-coder-next e qwen3-next via Ollama
+ * Teste DIRETO com modelos qwen3 cloud Tenta usar qwen3-coder-next e qwen3-next via Ollama
  */
 
 console.log('='.repeat(80));

@@ -15,14 +15,13 @@ const PATTERN_TYPE = {
 /**
  * MemoryStore - Armazenamento de padrões aprendidos para orquestração adaptativa.
  *
- * **Side-effects:** Mantém estado em memória, opcionalmente persiste em disco.
- * **Semântica:** Indexa padrões por tipo para busca rápida e aprendizado contínuo.
- * **Unidades:** maxSize limita número de padrões armazenados.
+ * **Side-effects:** Mantém estado em memória, opcionalmente persiste em disco. **Semântica:** Indexa padrões por tipo
+ * para busca rápida e aprendizado contínuo. **Unidades:** maxSize limita número de padrões armazenados.
  *
  * @class
  */
 class MemoryStore {
-    constructor(options = {}) {
+    constructor(options = /** @type {any} */ ({})) {
         this.config = {
             maxSize: options.maxSize || 1000, // Max patterns armazenados
             persistToDisk: options.persistToDisk || false, // Persistir em disk (TODO)
@@ -32,11 +31,12 @@ class MemoryStore {
         if (options.persistToDisk) {
             log(
                 'WARN',
-                '[MemoryStore] persistToDisk=true não está implementado. Os patterns serão armazenados apenas em memória.'
+                '[MemoryStore] persistToDisk=true não está implementado. Os patterns serão armazenados apenas em memória.',
             );
         }
 
         // Array de patterns
+        /** @type {any[]} */
         this.patterns = [];
 
         // Índice por tipo (para busca rápida)
@@ -56,7 +56,7 @@ class MemoryStore {
     /**
      * Adiciona pattern ao store
      */
-    addPattern(pattern) {
+    addPattern(/** @type {any} */ pattern) {
         // Valida pattern
         if (!pattern || !pattern.type || !pattern.content) {
             log('WARN', '[MemoryStore] Pattern inválido, ignorando');
@@ -95,7 +95,7 @@ class MemoryStore {
     /**
      * Busca patterns relevantes
      */
-    searchPatterns(query, limit = 5) {
+    searchPatterns(/** @type {any} */ query, limit = 5) {
         this.stats.total_searches++;
 
         // Se query é vazia, retorna patterns mais recentes
@@ -120,7 +120,7 @@ class MemoryStore {
         matches.sort((a, b) => b.score - a.score);
 
         // Pega top N
-        const results = matches.slice(0, limit).map(m => {
+        const results = matches.slice(0, limit).map((m) => {
             // Atualiza last_accessed e access_count
             m.pattern.last_accessed = Date.now();
             m.pattern.access_count++;
@@ -140,13 +140,13 @@ class MemoryStore {
     /**
      * Busca patterns por tipo
      */
-    getPatternsByType(type, limit = 10) {
+    getPatternsByType(/** @type {any} */ type, limit = 10) {
         const patternIds = this.indexByType.get(type) || [];
 
         const results = patternIds
             .slice(0, limit)
-            .map(id => this.patterns.find(p => p.id === id))
-            .filter(p => p !== undefined);
+            .map((/** @type {any} */ id) => this.patterns.find((/** @type {any} */ p) => p.id === id))
+            .filter((/** @type {any} */ p) => p !== undefined);
 
         return results;
     }
@@ -154,7 +154,7 @@ class MemoryStore {
     /**
      * Calcula relevância de um pattern para uma query
      */
-    _calculateRelevanceScore(pattern, keywords) {
+    _calculateRelevanceScore(/** @type {any} */ pattern, /** @type {any} */ keywords) {
         let score = 0;
 
         const contentLower = pattern.content.toLowerCase();
@@ -183,7 +183,7 @@ class MemoryStore {
     /**
      * Retorna patterns mais recentes
      */
-    _getMostRecent(limit) {
+    _getMostRecent(/** @type {any} */ limit) {
         // Stable ordering: insertion order is the source of truth for most-recent.
         // Using created_at can be non-deterministic when multiple patterns share the same ms timestamp.
         return this.patterns.slice(-limit).reverse();
@@ -249,6 +249,7 @@ class MemoryStore {
      * Limpa todos os patterns
      */
     clear() {
+        /** @type {any[]} */
         this.patterns = [];
         this.indexByType.clear();
         log('INFO', '[MemoryStore] Todos os patterns removidos');
@@ -269,8 +270,7 @@ export default MemoryStore;
 /**
  * Constantes de tipos de patterns suportados.
  *
- * **Side-effects:** Nenhum (constante imutável).
- * **Semântica:** Define tipos padrão para categorização de patterns.
+ * **Side-effects:** Nenhum (constante imutável). **Semântica:** Define tipos padrão para categorização de patterns.
  * **Unidades:** Strings que representam categorias de patterns.
  */
 export { PATTERN_TYPE };

@@ -1,22 +1,50 @@
 // @ts-check
-import { ref, computed, onMounted } from 'vue';
-import { useNotifications } from './useNotifications.js';
+/** @import {
+  ComputedRef,
+  Ref
+} from "vue" */
 import { http } from '@/lib/http';
+import { computed, onMounted, ref } from 'vue';
+import { useNotifications } from './useNotifications.js';
 
-const authUser = ref(null);
+/**
+ * @typedef {object} AuthUser
+ * @property {string} [id]
+ * @property {string} [username]
+ * @property {string} [role]
+ * @property {string[]} [permissions]
+ */
+
+/**
+ * @typedef {object} UseAuthReturn
+ * @property {Ref<AuthUser | null>} user
+ * @property {Ref<boolean>} loading
+ * @property {ComputedRef<boolean>} isAuthenticated
+ * @property {ComputedRef<boolean>} isAdmin
+ * @property {ComputedRef<boolean>} isOwner
+ * @property {ComputedRef<boolean>} isOperator
+ * @property {ComputedRef<string[]>} permissions
+ * @property {(permission: string) => boolean} can
+ * @property {(username: string, password: string) => Promise<boolean>} login
+ * @property {() => Promise<void>} logout
+ * @property {() => Promise<boolean>} verifyToken
+ * @property {(url: string, options?: RequestInit) => Promise<Response>} authenticatedFetch
+ * @property {() => string | null} getToken
+ */
+
+const authUser = /** @type {Ref<AuthUser | null>} */ (ref(null));
 const authLoading = ref(false);
-let verifyInFlight = null;
+let verifyInFlight = /** @type {any} */ (null);
 let authInitialized = false;
 
 const getTokenFromStorage = () => localStorage.getItem('auth_token');
-const setTokenInStorage = token => localStorage.setItem('auth_token', token);
+const setTokenInStorage = (/** @type {any} */ token) => localStorage.setItem('auth_token', /** @type {any} */ token);
 const clearTokenInStorage = () => localStorage.removeItem('auth_token');
 
 /**
- * Composable para gerenciamento de autenticação JWT
- * Gerencia login, logout, e verificação de token automaticamente
+ * Composable para gerenciamento de autenticação JWT Gerencia login, logout, e verificação de token automaticamente
  *
- * @returns {object} Estado e funções de autenticação
+ * @returns {UseAuthReturn} Estado e funções de autenticação
  * @sideEffects - Gerencia token JWT no localStorage, faz verificações automáticas
  */
 export function useAuth() {
@@ -38,7 +66,7 @@ export function useAuth() {
     const isOperator = computed(() => authUser.value?.role === 'operator');
     const permissions = computed(() => (Array.isArray(authUser.value?.permissions) ? authUser.value.permissions : []));
 
-    const can = permission => {
+    const can = (/** @type {any} */ permission) => {
         if (!permission) return false;
         const role = String(authUser.value?.role || '');
         if (role === 'owner') return true;
@@ -48,7 +76,8 @@ export function useAuth() {
 
     /**
      * Obtém token do localStorage
-     * @returns {string|null} Token JWT ou null
+     *
+     * @returns {string | null} Token JWT ou null
      */
     const getToken = () => {
         return getTokenFromStorage();
@@ -56,9 +85,10 @@ export function useAuth() {
 
     /**
      * Salva token no localStorage
+     *
      * @param {string} token - Token JWT
      */
-    const setToken = token => {
+    const setToken = (token) => {
         setTokenInStorage(token);
     };
 
@@ -71,6 +101,7 @@ export function useAuth() {
 
     /**
      * Verifica se token é válido fazendo request para /auth/me
+     *
      * @returns {Promise<boolean>} True se token válido
      */
     const verifyToken = async () => {
@@ -90,7 +121,7 @@ export function useAuth() {
                 const payload = response?.data || {};
                 authUser.value = payload.user || null;
                 return Boolean(payload.user);
-            } catch (_error) {
+            } catch (/** @type {any} */ _error) {
                 removeToken();
                 authUser.value = null;
                 return false;
@@ -104,6 +135,7 @@ export function useAuth() {
 
     /**
      * Faz login com credenciais
+     *
      * @param {string} username - Nome do usuário
      * @param {string} password - Senha
      * @returns {Promise<boolean>} True se login bem-sucedido
@@ -124,7 +156,8 @@ export function useAuth() {
 
             showError(data.error || 'Erro no login');
             return false;
-        } catch (error) {
+        } catch (/** @type {any} */ _rawError) {
+            const error = /** @type {any} */ (_rawError);
             const apiError = error?.response?.data?.error || 'Erro de conexão';
             showError(apiError);
             return false;
@@ -135,7 +168,8 @@ export function useAuth() {
 
     /**
      * Faz logout
-     * @returns {Promise<void>}
+     *
+     * @returns {Promise<any>}
      */
     const logout = async () => {
         const token = getToken();
@@ -145,7 +179,8 @@ export function useAuth() {
             if (token) {
                 await http.post('/api/dashboard/auth/logout');
             }
-        } catch (error) {
+        } catch (/** @type {any} */ _rawError) {
+            const error = /** @type {any} */ (_rawError);
             console.error('Logout error:', error);
         }
 
@@ -157,11 +192,12 @@ export function useAuth() {
 
     /**
      * Faz fetch autenticado com token automático
+     *
      * @param {string} url - URL da API
      * @param {object} options - Opções do fetch
      * @returns {Promise<Response>} Response do fetch
      */
-    const authenticatedFetch = async (url, options = {}) => {
+    const authenticatedFetch = async (url, /** @type {any} */ options = {}) => {
         const token = getToken();
 
         const headers = {

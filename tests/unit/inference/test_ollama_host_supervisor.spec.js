@@ -1,19 +1,23 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { createOllamaHostSupervisor } from '../../../src/inference_gateway/ollama_host_supervisor.js';
 
 test('supervisor marks ready on successful probe and emits state', async () => {
-    const events = [];
+    /** @type {any[]} */ const events = [];
     const supervisor = createOllamaHostSupervisor({
-        fetch: async () => ({
-            ok: true,
-            status: 200,
-            async json() {
-                return { version: '0.7.0' };
-            },
-        }),
-        onStateChange: s => events.push(s.state),
+        fetch: /** @type {any} */ (
+            async () => ({
+                ok: true,
+                status: 200,
+                async json() {
+                    return { version: '0.7.0' };
+                },
+            })
+        ),
+        onStateChange: (/** @type {any} */ s) => {
+            events.push(s.state);
+        },
         setIntervalFn: () => /** @type {any} */ (1),
         clearIntervalFn: () => {},
     });

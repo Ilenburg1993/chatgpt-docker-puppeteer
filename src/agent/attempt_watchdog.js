@@ -7,34 +7,38 @@ import { releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
 import { sendCommand } from '#nerv/adapters/high_level_adapter';
 import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
+/** @param {any} ms */
 function _sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * Opções do construtor do AttemptWatchdog.
- * @typedef {Object} AttemptWatchdogOptions
- * @property {Object|null} [nerv] - Instância do sistema nerv para comunicação.
- * @property {number} [intervalMs=1500] - Intervalo entre ticks em ms.
- * @property {number} [dispatchedStuckMs=30000] - Timeout para estado DISPATCHED em ms.
- * @property {number} [acceptedStuckMs=120000] - Timeout para estado ACCEPTED em ms.
- * @property {number} [runningHeartbeatStuckMs=30000] - Timeout para heartbeats em RUNNING em ms.
- * @property {number} [rescheduleDelayMs=1000] - Delay para reagendamento em ms.
- * @property {number} [envEscalationWindowMs=900000] - Janela para escalação de ambiente em ms.
- * @property {number} [envEscalationThreshold=10] - Threshold para escalação de ambiente.
- * @property {number} [llmTimeoutEscalationWindowMs=1800000] - Janela para escalação de timeout LLM em ms.
- * @property {number} [llmTimeoutEscalationThreshold=10] - Threshold para escalação de timeout LLM.
- * @property {number} [maxBatch=25] - Máximo de tarefas por lote.
+ *
+ * @typedef {object} AttemptWatchdogOptions
+ * @property {object | null} [nerv] - Instância do sistema nerv para comunicação.
+ * @property {number} [intervalMs=1500] - Intervalo entre ticks em ms. Default is `1500`
+ * @property {number} [dispatchedStuckMs=30000] - Timeout para estado DISPATCHED em ms. Default is `30000`
+ * @property {number} [acceptedStuckMs=120000] - Timeout para estado ACCEPTED em ms. Default is `120000`
+ * @property {number} [runningHeartbeatStuckMs=30000] - Timeout para heartbeats em RUNNING em ms. Default is `30000`
+ * @property {number} [rescheduleDelayMs=1000] - Delay para reagendamento em ms. Default is `1000`
+ * @property {number} [envEscalationWindowMs=900000] - Janela para escalação de ambiente em ms. Default is `900000`
+ * @property {number} [envEscalationThreshold=10] - Threshold para escalação de ambiente. Default is `10`
+ * @property {number} [llmTimeoutEscalationWindowMs=1800000] - Janela para escalação de timeout LLM em ms. Default is
+ *   `1800000`
+ * @property {number} [llmTimeoutEscalationThreshold=10] - Threshold para escalação de timeout LLM. Default is `10`
+ * @property {number} [maxBatch=25] - Máximo de tarefas por lote. Default is `25`
  */
 
 /**
- * Watchdog que monitora tentativas de tarefas e detecta timeouts ou falhas.
- * Responsável por escalar tarefas stuck e manter saúde do sistema.
+ * Watchdog que monitora tentativas de tarefas e detecta timeouts ou falhas. Responsável por escalar tarefas stuck e
+ * manter saúde do sistema.
  */
 class AttemptWatchdog {
     /**
      * Cria um watchdog para monitorar tentativas de tarefas.
-     * @param {AttemptWatchdogOptions} [options={}] - Opções de configuração.
+     *
+     * @param {AttemptWatchdogOptions} [options={}] - Opções de configuração. Default is `{}`
      */
     constructor({
         nerv = null,
@@ -68,6 +72,7 @@ class AttemptWatchdog {
 
     /**
      * Inicia o watchdog, começando a monitorar tentativas de tarefas.
+     *
      * @returns {void}
      * @sideEffects Inicia timer interno e executa tick imediatamente.
      */
@@ -81,6 +86,7 @@ class AttemptWatchdog {
 
     /**
      * Para o watchdog, cancelando o timer de monitoramento.
+     *
      * @returns {void}
      * @sideEffects Cancela timer interno.
      */
@@ -94,8 +100,9 @@ class AttemptWatchdog {
     }
 
     /**
-     * Executa um ciclo de monitoramento: detecta tentativas stuck e as escalona.
-     * Verifica timeouts para estados DISPATCHED, ACCEPTED e heartbeats em RUNNING.
+     * Executa um ciclo de monitoramento: detecta tentativas stuck e as escalona. Verifica timeouts para estados
+     * DISPATCHED, ACCEPTED e heartbeats em RUNNING.
+     *
      * @returns {Promise<void>}
      * @throws {Error} Erros são logados mas não relançados.
      * @sideEffects Modifica estado do banco (status, locks) e envia comandos via nerv.
@@ -112,9 +119,10 @@ class AttemptWatchdog {
             const acceptedCutoff = now - this.acceptedStuckMs;
             const runningCutoff = now - this.runningHeartbeatStuckMs;
 
-            const dispatchedRows = db
-                .prepare(
-                    `
+            const dispatchedRows = /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `
                     SELECT t.id AS task_id,
                            t.latest_attempt_id AS attempt_id,
                            a.created_at_ms AS attempt_created_at_ms,
@@ -131,13 +139,15 @@ class AttemptWatchdog {
                       AND (a.last_heartbeat_at_ms IS NULL AND a.created_at_ms <= @cutoff)
                     ORDER BY a.created_at_ms ASC
                     LIMIT @limit
-                `
-                )
-                .all({ now, cutoff, limit: this.maxBatch });
+                `,
+                    )
+                    .all({ now, cutoff, limit: this.maxBatch })
+            );
 
-            const acceptedRows = db
-                .prepare(
-                    `
+            const acceptedRows = /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `
                     SELECT t.id AS task_id,
                            t.latest_attempt_id AS attempt_id,
                            a.created_at_ms AS attempt_created_at_ms,
@@ -157,13 +167,15 @@ class AttemptWatchdog {
                       AND a.last_heartbeat_at_ms <= @acceptedCutoff
                     ORDER BY a.last_heartbeat_at_ms ASC
                     LIMIT @limit
-                `
-                )
-                .all({ now, acceptedCutoff, limit: this.maxBatch });
+                `,
+                    )
+                    .all({ now, acceptedCutoff, limit: this.maxBatch })
+            );
 
-            const runningRows = db
-                .prepare(
-                    `
+            const runningRows = /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `
                     SELECT t.id AS task_id,
                            t.latest_attempt_id AS attempt_id,
                            a.last_heartbeat_at_ms AS last_heartbeat_at_ms
@@ -182,9 +194,10 @@ class AttemptWatchdog {
                       )
                     ORDER BY COALESCE(a.last_heartbeat_at_ms, a.created_at_ms) ASC
                     LIMIT @limit
-                `
-                )
-                .all({ now, runningCutoff, limit: this.maxBatch });
+                `,
+                    )
+                    .all({ now, runningCutoff, limit: this.maxBatch })
+            );
 
             for (const row of dispatchedRows) {
                 const taskId = row?.task_id;
@@ -209,7 +222,7 @@ class AttemptWatchdog {
                         ended_at_ms: now,
                         error: 'WATCHDOG: stuck in DISPATCHED without driver response',
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -220,13 +233,13 @@ class AttemptWatchdog {
                         execute_after_ms: now + this.rescheduleDelayMs,
                         last_error: 'ATTEMPT_STUCK_DISPATCHED',
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
                 try {
                     releaseTaskLock({ taskId });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -258,7 +271,7 @@ class AttemptWatchdog {
                         reason_class: 'ENV_UNAVAILABLE',
                         count_attempt: 0,
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -269,13 +282,13 @@ class AttemptWatchdog {
                         execute_after_ms: now + this.rescheduleDelayMs,
                         last_error: 'ATTEMPT_STUCK_ACCEPTED_NO_START',
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
                 try {
                     releaseTaskLock({ taskId });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -302,20 +315,22 @@ class AttemptWatchdog {
                 // Best-effort abort to stop runaway driver execution (if still alive).
                 try {
                     if (this.nerv) {
+                        // eslint-disable-next-line @typescript-eslint/await-thenable
                         await sendCommand(
                             this.nerv,
                             ActorRole.KERNEL,
                             ActionCode.DRIVER_ABORT,
                             { taskId, reason: 'WATCHDOG_HEARTBEAT_TIMEOUT' },
                             attemptId,
-                            ActorRole.DRIVER
+                            ActorRole.DRIVER,
                         );
                     }
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log(
                         'WARN',
                         `[AttemptWatchdog] Failed to emit DRIVER_ABORT for ${taskId}: ${err?.message || String(err)}`,
-                        attemptId
+                        attemptId,
                     );
                 }
 
@@ -327,7 +342,7 @@ class AttemptWatchdog {
                         reason_class: 'ENV_UNAVAILABLE',
                         count_attempt: 0,
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -338,13 +353,13 @@ class AttemptWatchdog {
                         execute_after_ms: now + this.rescheduleDelayMs,
                         last_error: 'ATTEMPT_STUCK_RUNNING_NO_HEARTBEAT',
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
                 try {
                     releaseTaskLock({ taskId });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -357,9 +372,10 @@ class AttemptWatchdog {
                 const envCutoff = now - this.envEscalationWindowMs;
                 const llmCutoff = now - this.llmTimeoutEscalationWindowMs;
 
-                const envLongRows = db
-                    .prepare(
-                        `
+                const envLongRows = /** @type {any[]} */ (
+                    db
+                        .prepare(
+                            `
                         SELECT t.id AS task_id,
                                COUNT(1) AS c,
                                MAX(a.ended_at_ms) AS last_ts,
@@ -396,18 +412,20 @@ class AttemptWatchdog {
                         HAVING COUNT(1) >= @threshold
                         ORDER BY last_ts DESC
                         LIMIT @limit
-                    `
-                    )
-                    .all({
-                        now,
-                        cutoff: envCutoff,
-                        threshold: this.envEscalationThreshold,
-                        limit: this.maxBatch,
-                    });
+                    `,
+                        )
+                        .all({
+                            now,
+                            cutoff: envCutoff,
+                            threshold: this.envEscalationThreshold,
+                            limit: this.maxBatch,
+                        })
+                );
 
-                const llmTimeoutRows = db
-                    .prepare(
-                        `
+                const llmTimeoutRows = /** @type {any[]} */ (
+                    db
+                        .prepare(
+                            `
                         SELECT t.id AS task_id,
                                COUNT(1) AS c,
                                MAX(a.ended_at_ms) AS last_ts,
@@ -434,14 +452,15 @@ class AttemptWatchdog {
                         HAVING COUNT(1) >= @threshold
                         ORDER BY last_ts DESC
                         LIMIT @limit
-                    `
-                    )
-                    .all({
-                        now,
-                        cutoff: llmCutoff,
-                        threshold: this.llmTimeoutEscalationThreshold,
-                        limit: this.maxBatch,
-                    });
+                    `,
+                        )
+                        .all({
+                            now,
+                            cutoff: llmCutoff,
+                            threshold: this.llmTimeoutEscalationThreshold,
+                            limit: this.maxBatch,
+                        })
+                );
 
                 for (const row of envLongRows) {
                     const taskId = row?.task_id;
@@ -484,13 +503,13 @@ class AttemptWatchdog {
                             execute_after_ms: null,
                             last_error: String(row?.last_error || 'ENV_UNAVAILABLE_LONG').slice(0, 2000),
                         });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* ignore */
                     }
 
                     try {
                         releaseTaskLock({ taskId });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* ignore */
                     }
 
@@ -536,19 +555,19 @@ class AttemptWatchdog {
                             execute_after_ms: null,
                             last_error: String(row?.last_error || 'LLM_TIMEOUT_PERSISTENT').slice(0, 2000),
                         });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* ignore */
                     }
 
                     try {
                         releaseTaskLock({ taskId });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* ignore */
                     }
 
                     await _sleep(0);
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* ignore escalation errors */
             }
         } finally {

@@ -5,19 +5,19 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
 import {
+    CategoryScale,
     Chart,
+    Filler,
+    Legend,
+    LinearScale,
     LineController,
     LineElement,
     PointElement,
-    LinearScale,
-    CategoryScale,
     Title,
     Tooltip,
-    Legend,
-    Filler,
 } from 'chart.js';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 
 // Register Chart.js components
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Title, Tooltip, Legend, Filler);
@@ -114,7 +114,7 @@ export default {
                         tooltip: {
                             enabled: true,
                             callbacks: {
-                                label: context => {
+                                label: (context) => {
                                     return `${props.label}: ${context.parsed.y.toFixed(2)}`;
                                 },
                             },
@@ -165,7 +165,7 @@ export default {
             () => {
                 updateChart();
             },
-            { deep: true }
+            { deep: true },
         );
 
         onMounted(() => {

@@ -44,7 +44,7 @@ npm install vue-router@4 pinia@2 socket.io-client@4 axios@1
 npm install chart.js@4 vue-chartjs@5 cytoscape@3 vis-timeline@7 d3@7
 
 # Instalar UI framework
-npm install element-plus@2  # OU vuetify@3
+npm install element-plus@2 # OU vuetify@3
 
 # Instalar utilitários
 npm install lodash-es@4 date-fns@3 uuid@10
@@ -161,7 +161,7 @@ class TaskSyncBridge extends EventEmitter {
   async getUnifiedTasks() {
     const diskTasks = await queueCache.getQueue();
 
-    return diskTasks.map(diskTask => {
+    return diskTasks.map((diskTask) => {
       const kernelState = this.kernelStateCache.get(diskTask.meta.id);
 
       return {
@@ -190,7 +190,7 @@ class TaskSyncBridge extends EventEmitter {
    * Listen to NERV events to update kernel state cache
    */
   _setupNervListeners() {
-    nervClient.on(ActionCode.TASK_STARTED, envelope => {
+    nervClient.on(ActionCode.TASK_STARTED, (envelope) => {
       const { task_id, worker_id } = envelope.payload;
 
       this.kernelStateCache.set(task_id, {
@@ -202,7 +202,7 @@ class TaskSyncBridge extends EventEmitter {
       this._notifyDashboards(task_id);
     });
 
-    nervClient.on(ActionCode.TASK_COMPLETED, envelope => {
+    nervClient.on(ActionCode.TASK_COMPLETED, (envelope) => {
       const { task_id, result } = envelope.payload;
 
       this.kernelStateCache.set(task_id, {
@@ -214,7 +214,7 @@ class TaskSyncBridge extends EventEmitter {
       this._notifyDashboards(task_id);
     });
 
-    nervClient.on(ActionCode.TASK_FAILED, envelope => {
+    nervClient.on(ActionCode.TASK_FAILED, (envelope) => {
       const { task_id, error } = envelope.payload;
 
       this.kernelStateCache.set(task_id, {
@@ -226,7 +226,7 @@ class TaskSyncBridge extends EventEmitter {
       this._notifyDashboards(task_id);
     });
 
-    nervClient.on(ActionCode.TASK_PROGRESS, envelope => {
+    nervClient.on(ActionCode.TASK_PROGRESS, (envelope) => {
       const { task_id, progress_percent, current_step } = envelope.payload;
 
       const existing = this.kernelStateCache.get(task_id) || {};
@@ -369,7 +369,7 @@ class TelemetryAggregator {
 
   async _measureEventLoopLag() {
     const start = Date.now();
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
     return Date.now() - start;
   }
 
@@ -415,7 +415,7 @@ module.exports = new TelemetryAggregator();
     const task = await taskSyncBridge.getUnifiedTask(req.params.id);
     const dependencies = task.policy.dependencies || [];
 
-    const depTasks = await Promise.all(dependencies.map(id => taskSyncBridge.getUnifiedTask(id)));
+    const depTasks = await Promise.all(dependencies.map((id) => taskSyncBridge.getUnifiedTask(id)));
 
     res.json({ task_id: req.params.id, dependencies: depTasks });
   });
@@ -533,24 +533,24 @@ export const useTaskStore = defineStore('tasks', {
   }),
 
   getters: {
-    filteredTasks: state => {
+    filteredTasks: (state) => {
       let tasks = state.tasks;
 
       if (state.filters.status) {
-        tasks = tasks.filter(t => t.unified_status === state.filters.status);
+        tasks = tasks.filter((t) => t.unified_status === state.filters.status);
       }
 
       if (state.filters.priority !== null) {
-        tasks = tasks.filter(t => t.meta.priority >= state.filters.priority);
+        tasks = tasks.filter((t) => t.meta.priority >= state.filters.priority);
       }
 
       return tasks;
     },
 
-    runningTasks: state => state.tasks.filter(t => t.unified_status === 'RUNNING'),
-    pendingTasks: state => state.tasks.filter(t => t.unified_status === 'PENDING'),
+    runningTasks: (state) => state.tasks.filter((t) => t.unified_status === 'RUNNING'),
+    pendingTasks: (state) => state.tasks.filter((t) => t.unified_status === 'PENDING'),
 
-    taskById: state => id => state.tasks.find(t => t.meta.id === id),
+    taskById: (state) => (id) => state.tasks.find((t) => t.meta.id === id),
   },
 
   actions: {
@@ -583,7 +583,7 @@ export const useTaskStore = defineStore('tasks', {
     async updateTask(id, data) {
       try {
         const response = await axios.put(`/api/tasks/${id}`, data);
-        const index = this.tasks.findIndex(t => t.meta.id === id);
+        const index = this.tasks.findIndex((t) => t.meta.id === id);
         if (index !== -1) {
           this.tasks[index] = response.data.task;
         }
@@ -596,7 +596,7 @@ export const useTaskStore = defineStore('tasks', {
     async deleteTask(id) {
       try {
         await axios.delete(`/api/tasks/${id}`);
-        this.tasks = this.tasks.filter(t => t.meta.id !== id);
+        this.tasks = this.tasks.filter((t) => t.meta.id !== id);
       } catch (error) {
         this.error = error.message;
         throw error;
@@ -606,7 +606,7 @@ export const useTaskStore = defineStore('tasks', {
     async retryTask(id) {
       try {
         const response = await axios.post(`/api/tasks/${id}/retry`);
-        const index = this.tasks.findIndex(t => t.meta.id === id);
+        const index = this.tasks.findIndex((t) => t.meta.id === id);
         if (index !== -1) {
           this.tasks[index] = response.data.task;
         }
@@ -619,7 +619,7 @@ export const useTaskStore = defineStore('tasks', {
     handleTaskUpdate(data) {
       // Real-time Socket.io update
       const { taskId, state } = data;
-      const task = this.tasks.find(t => t.meta.id === taskId);
+      const task = this.tasks.find((t) => t.meta.id === taskId);
 
       if (task && task.runtime_state) {
         task.runtime_state = { ...task.runtime_state, ...state };
@@ -660,7 +660,7 @@ export function useSocket(url = '', options = {}) {
       console.log('[Socket.io] Disconnected');
     });
 
-    socket.value.on('error', err => {
+    socket.value.on('error', (err) => {
       error.value = err.message;
       console.error('[Socket.io] Error:', err);
     });
@@ -795,19 +795,19 @@ export default {
     const taskCounts = computed(() => ({
       running: taskStore.runningTasks.length,
       pending: taskStore.pendingTasks.length,
-      done: taskStore.tasks.filter(t => t.unified_status === 'DONE').length,
-      failed: taskStore.tasks.filter(t => t.unified_status === 'FAILED').length,
+      done: taskStore.tasks.filter((t) => t.unified_status === 'DONE').length,
+      failed: taskStore.tasks.filter((t) => t.unified_status === 'FAILED').length,
     }));
 
     const healthComponents = computed(() => Object.values(systemStore.components));
 
-    const getCpuColor = value => {
+    const getCpuColor = (value) => {
       if (value > 90) return 'red';
       if (value > 70) return 'yellow';
       return 'green';
     };
 
-    const getMemoryColor = value => {
+    const getMemoryColor = (value) => {
       if (value > 95) return 'red';
       if (value > 80) return 'yellow';
       return 'green';
@@ -909,17 +909,17 @@ export default {
       router.push('/tasks/new');
     };
 
-    const editTask = taskId => {
+    const editTask = (taskId) => {
       router.push(`/tasks/${taskId}`);
     };
 
-    const deleteTask = async taskId => {
+    const deleteTask = async (taskId) => {
       if (confirm('Delete this task?')) {
         await taskStore.deleteTask(taskId);
       }
     };
 
-    const retryTask = async taskId => {
+    const retryTask = async (taskId) => {
       await taskStore.retryTask(taskId);
     };
 
@@ -933,7 +933,7 @@ export default {
     });
 
     // Watch filters and update store
-    watch(filters, newFilters => {
+    watch(filters, (newFilters) => {
       taskStore.filters = { ...newFilters };
     });
 
@@ -1099,7 +1099,7 @@ const TaskSchemaV5 = z.object({
                 action: z.enum(['execute_prompt', 'validate', 'branch', 'loop', 'spawn_subtask']),
                 config: z.any(),
                 dependencies: z.array(z.string()).default([]),
-              })
+              }),
             ),
             max_subtasks: z.number().int().positive().default(50),
           })
@@ -1115,7 +1115,7 @@ const TaskSchemaV5 = z.object({
             z.object({
               type: z.enum(['regex', 'schema', 'length', 'llm_judge', 'custom']),
               config: z.any(),
-            })
+            }),
           )
           .default([]),
       })
@@ -1292,7 +1292,7 @@ class OrchestratorEngine {
       const result = await this._getDriver(task.spec.target).execute(task);
       const validation = await this.validationService.validate(
         result.output,
-        config.validation_criteria
+        config.validation_criteria,
       );
 
       if (validation.passed) {

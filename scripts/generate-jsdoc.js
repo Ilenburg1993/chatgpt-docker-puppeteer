@@ -6,9 +6,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Script para gerar JSDOC automaticamente para funções que não possuem.
- * Analisa arquivos JavaScript/TypeScript e adiciona JSDOCs básicos onde faltam.
- * Side-effects: Lê e escreve arquivos no sistema de arquivos.
+ * Script para gerar JSDOC automaticamente para funções que não possuem. Analisa arquivos JavaScript/TypeScript e
+ * adiciona JSDOCs básicos onde faltam. Side-effects: Lê e escreve arquivos no sistema de arquivos.
  */
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +16,7 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 
 /**
  * Verifica se um arquivo é JavaScript ou TypeScript.
+ *
  * @param {string} filepath - Caminho do arquivo.
  * @returns {boolean} Verdadeiro se for arquivo JS/TS, falso caso contrário.
  */
@@ -26,8 +26,10 @@ function isJSFile(filepath) {
 
 /**
  * Extrai funções e métodos de um arquivo JavaScript.
+ *
  * @param {string} content - Conteúdo do arquivo.
- * @returns {Array<{name: string, type: string, startLine: number, endLine: number}>} Lista de funções/métodos encontrados.
+ * @returns {{ name: string; type: string; startLine: number; endLine?: number }[]} Lista de funções/métodos
+ *   encontrados.
  */
 function extractFunctions(content) {
     const functions = [];
@@ -45,7 +47,7 @@ function extractFunctions(content) {
     ];
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const line = (lines[i] ?? '').trim();
 
         // Pular linhas que já têm JSDOC
         if (line.startsWith('/**') || line.includes('* @')) {
@@ -56,7 +58,7 @@ function extractFunctions(content) {
         for (const pattern of functionPatterns) {
             const match = line.match(pattern);
             if (match) {
-                const funcName = match[1];
+                const funcName = match[1] ?? '';
 
                 // Verificar se esta função faz parte de uma classe
                 let funcType = 'function';
@@ -86,24 +88,25 @@ function extractFunctions(content) {
 
 /**
  * Gera JSDOC básico para uma função.
+ *
  * @param {string} funcName - Nome da função.
  * @param {string} funcType - Tipo da função.
  * @returns {string} String com JSDOC gerado.
  */
 function generateJSDoc(funcName, funcType) {
-    let params = '';
+    const params = '';
     let returns = '';
 
     // Dependendo do tipo, podemos inferir diferentes coisas
     switch (funcType) {
         case 'async-function':
-            returns = '\n * @returns {Promise<any>} ';
+            returns = '\n * @returns {Promise<void>} ';
             break;
         case 'constructor':
             returns = '';
             break;
         default:
-            returns = '\n * @returns {any} ';
+            returns = '\n * @returns {object} ';
     }
 
     return `/**
@@ -115,6 +118,7 @@ function generateJSDoc(funcName, funcType) {
 
 /**
  * Verifica se uma função já tem JSDOC acima dela.
+ *
  * @param {string[]} lines - Linhas do arquivo.
  * @param {number} funcStartLine - Linha onde a função começa.
  * @returns {boolean} Verdadeiro se já tiver JSDOC, falso caso contrário.
@@ -122,7 +126,7 @@ function generateJSDoc(funcName, funcType) {
 function hasJSDocAbove(lines, funcStartLine) {
     // Procurar para cima até 5 linhas
     for (let i = funcStartLine - 1; i >= Math.max(0, funcStartLine - 5); i--) {
-        const line = lines[i].trim();
+        const line = (lines[i] ?? '').trim();
         if (line.startsWith('/**')) {
             return true;
         }
@@ -136,6 +140,7 @@ function hasJSDocAbove(lines, funcStartLine) {
 
 /**
  * Processa um único arquivo para adicionar JSDOCs.
+ *
  * @param {string} filepath - Caminho do arquivo a ser processado.
  * @returns {number} Número de JSDOCs adicionados.
  */
@@ -149,7 +154,7 @@ function processFile(filepath) {
 
     // Processar funções de trás para frente para manter os índices corretos
     for (let i = functions.length - 1; i >= 0; i--) {
-        const func = functions[i];
+        const func = /** @type {any} */ (functions[i]);
 
         // Verificar se já tem JSDOC acima
         if (!hasJSDocAbove(lines, func.startLine)) {
@@ -171,8 +176,9 @@ function processFile(filepath) {
 
 /**
  * Processa todos os arquivos JS/TS em um diretório recursivamente.
+ *
  * @param {string} dir - Diretório para processar.
- * @returns {Object} Estatísticas de processamento.
+ * @returns {{ totalAdded: number; totalProcessed: number }} Estatísticas de processamento.
  */
 function processDirectory(dir) {
     let totalAdded = 0;
@@ -196,7 +202,8 @@ function processDirectory(dir) {
                 }
                 totalProcessed++;
             } catch (error) {
-                console.error(`❌ Erro ao processar ${fullPath}:`, error.message);
+                const _ce = /** @type {any} */ (error);
+                console.error(`❌ Erro ao processar ${fullPath}:`, _ce.message);
             }
         }
     }
@@ -205,8 +212,7 @@ function processDirectory(dir) {
 }
 
 /**
- * Função principal do script.
- * Side-effects: Processa arquivos no sistema de arquivos.
+ * Função principal do script. Side-effects: Processa arquivos no sistema de arquivos.
  */
 function main() {
     console.log('🚀 Iniciando geração automática de JSDOC...\n');
@@ -230,4 +236,4 @@ if (import.meta.filename === process.argv[1]) {
     main();
 }
 
-export { processFile, processDirectory, extractFunctions, generateJSDoc };
+export { extractFunctions, generateJSDoc, processDirectory, processFile };

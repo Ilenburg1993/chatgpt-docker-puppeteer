@@ -1,16 +1,16 @@
+// @ts-check
 import { sha256HexForString } from '../contract.mjs';
 
 /**
- * LRU cache for query embeddings
- * Avoids re-embedding common queries (saves ~100-300ms per cached hit)
+ * LRU cache for query embeddings Avoids re-embedding common queries (saves ~100-300ms per cached hit)
  *
  * @example
- * const cache = new EmbeddingCache(100);
- * const vector = cache.get(query, model);
- * if (!vector) {
- *   vector = await embeddings.embed(query);
- *   cache.set(query, model, vector);
- * }
+ *     const cache = new EmbeddingCache(100);
+ *     const vector = cache.get(query, model);
+ *     if (!vector) {
+ *         vector = await embeddings.embed(query);
+ *         cache.set(query, model, vector);
+ *     }
  */
 export class EmbeddingCache {
     constructor(maxSize = 100) {
@@ -22,9 +22,10 @@ export class EmbeddingCache {
 
     /**
      * Get cached embedding vector for a query
+     *
      * @param {string} query - The query text
      * @param {string} model - The embedding model name
-     * @returns {number[]|null} Cached vector or null if not found
+     * @returns {number[] | null} Cached vector or null if not found
      */
     get(query, model) {
         const key = sha256HexForString(`${query}::${model}`);
@@ -42,6 +43,7 @@ export class EmbeddingCache {
 
     /**
      * Store embedding vector in cache
+     *
      * @param {string} query - The query text
      * @param {string} model - The embedding model name
      * @param {number[]} vector - The embedding vector
@@ -58,6 +60,7 @@ export class EmbeddingCache {
 
     /**
      * Get cache statistics
+     *
      * @returns {Object} Stats object with size, hits, misses, hitRate
      */
     getStats() {

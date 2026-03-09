@@ -3,9 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { evaluateStaticContracts } from '../contracts/evaluate_static.mjs';
 
-/**
- * @typedef {import('../normalize/findings.mjs').RawFinding} RawFinding
- */
+/** @import {RawFinding} from "../normalize/findings.mjs" */
 
 /**
  * @param {string} value
@@ -41,44 +39,55 @@ function collectJsFiles(currentDir, files) {
 }
 
 /**
- * @param {{ rootDir: string, contracts?: any[] }} options
+ * @typedef {object} CollectSecurityFindingsOptions
+ * @property {string} rootDir
+ * @property {unknown[]} contracts
+ */
+/**
+ * @param {CollectSecurityFindingsOptions} options
  * @returns {Promise<{
- *   findings: RawFinding[],
- *   errors: Array<{source:string,message:string}>,
- *   warnings: Array<{source:string,message:string}>,
- *   telemetry: {
- *     contracts_scanned: number,
- *     files_scanned: number,
- *     checks: string[],
- *     findings_by_kind: Record<string, number>,
- *   },
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ *     telemetry: {
+ *         contracts_scanned: number;
+ *         files_scanned: number;
+ *         checks: string[];
+ *         findings_by_kind: Record<string, number>;
+ *     };
  * }>}
  */
 export async function collectSecurityFindings(options) {
     const rootDir = path.resolve(options.rootDir);
     /** @type {RawFinding[]} */
     const findings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
 
-    const securityContracts = Array.isArray(options.contracts)
-        ? options.contracts.filter(contract => contract?.domain === 'security')
-        : [];
+    const securityContracts = /** @type {any[]} */ (
+        Array.isArray(options.contracts)
+            ? options.contracts.filter((/** @type {any} */ contract) => contract?.domain === 'security')
+            : []
+    );
 
-    const contractEval = evaluateStaticContracts({
-        rootDir,
-        scanDir: path.join(rootDir, 'src'),
-        contracts: securityContracts,
-    });
+    const contractEval = /** @type {any} */ (
+        evaluateStaticContracts(
+            /** @type {any} */ ({
+                rootDir,
+                scanDir: path.join(rootDir, 'src'),
+                contracts: securityContracts,
+            }),
+        )
+    );
     for (const item of contractEval.findings) {
         findings.push(
             /** @type {RawFinding} */ ({
                 ...item,
                 source_tool: item.source_tool || 'security-contracts',
                 domain: item.domain || 'security',
-            })
+            }),
         );
     }
 

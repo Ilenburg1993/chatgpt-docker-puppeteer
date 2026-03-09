@@ -326,8 +326,7 @@ describe('Test 1', () => {
 /**
  * Unit Test: [Module Name]
  *
- * Tests: [src/path/to/module.js]
- * Coverage: [Funcionalidades testadas]
+ * Tests: [src/path/to/module.js] Coverage: [Funcionalidades testadas]
  *
  * @group unit
  * @group [categoria] (core, kernel, driver, etc)
@@ -376,7 +375,7 @@ describe('ModuleName', () => {
           new ModuleName({
             /* logger missing */
           }),
-        { message: /logger/i }
+        { message: /logger/i },
       );
     });
 
@@ -427,7 +426,7 @@ describe('ModuleName', () => {
     it('should emit error telemetry on failure', async () => {
       await assert.rejects(() => instance.mainMethod(null));
 
-      const errorEvent = mockNerv.emittedEvents.find(e => e.type === 'MODULE_ERROR');
+      const errorEvent = mockNerv.emittedEvents.find((e) => e.type === 'MODULE_ERROR');
       assert.ok(errorEvent);
       assert.match(errorEvent.error, /invalid input/i);
     });
@@ -465,13 +464,13 @@ describe('ModuleName', () => {
     it('should log info messages', async () => {
       await instance.mainMethod({ foo: 'bar' });
 
-      assert.ok(mockLogger.calls.some(c => c.level === 'INFO'));
+      assert.ok(mockLogger.calls.some((c) => c.level === 'INFO'));
     });
 
     it('should log errors with context', async () => {
       await assert.rejects(() => instance.mainMethod(null));
 
-      const errorLog = mockLogger.calls.find(c => c.level === 'ERROR');
+      const errorLog = mockLogger.calls.find((c) => c.level === 'ERROR');
       assert.ok(errorLog);
       assert.ok(errorLog.context.taskId);
     });
@@ -498,8 +497,7 @@ function createInvalidInput() {
 /**
  * Integration Test: [Feature Name]
  *
- * Tests: Integration between [Component A] and [Component B]
- * Setup: Requires [dependencies] running
+ * Tests: Integration between [Component A] and [Component B] Setup: Requires [dependencies] running
  *
  * @group integration
  * @group [categoria]
@@ -544,7 +542,7 @@ describe('ComponentA + ComponentB Integration', () => {
       const message = { type: 'TEST', data: 'hello' };
 
       // B escuta mensagens
-      const received = new Promise(resolve => {
+      const received = new Promise((resolve) => {
         componentB.on('message', resolve);
       });
 
@@ -584,8 +582,7 @@ describe('ComponentA + ComponentB Integration', () => {
 /**
  * E2E Test: [Flow Name]
  *
- * Tests: Complete user flow from [start] to [end]
- * Setup: Full system running
+ * Tests: Complete user flow from [start] to [end] Setup: Full system running
  *
  * @group e2e
  * @slow (pode levar > 10s)
@@ -644,7 +641,7 @@ describe('E2E: Full Task Flow', () => {
 
     // 5. Verificar logs
     const logs = await readAgentLogs();
-    assert.ok(logs.some(l => l.includes(`Task ${taskId} completed`)));
+    assert.ok(logs.some((l) => l.includes(`Task ${taskId} completed`)));
   });
 
   it('should handle multiple tasks concurrently', async () => {
@@ -658,11 +655,13 @@ describe('E2E: Full Task Flow', () => {
     const taskIds = await Promise.all(tasks);
 
     // Aguardar todas completarem
-    const responses = await Promise.all(taskIds.map(id => waitForResponse(id, { timeout: 90000 })));
+    const responses = await Promise.all(
+      taskIds.map((id) => waitForResponse(id, { timeout: 90000 })),
+    );
 
     // Validar todas completaram
     assert.strictEqual(responses.length, 3);
-    responses.forEach(r => {
+    responses.forEach((r) => {
       assert.strictEqual(r.status, 'DONE');
     });
   });
@@ -693,7 +692,7 @@ async function readAgentLogs() {
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 ```
 
@@ -775,8 +774,7 @@ npm install --save-dev @faker-js/faker
 
 ```javascript
 /**
- * Global Test Setup
- * Executado UMA VEZ antes de todos os testes
+ * Global Test Setup Executado UMA VEZ antes de todos os testes
  */
 
 const fs = require('fs');
@@ -785,7 +783,7 @@ const path = require('path');
 // Criar diretórios necessários
 const dirs = ['tests/tmp', 'tests/tmp/tasks', 'tests/tmp/responses', 'tests/tmp/logs', 'coverage'];
 
-dirs.forEach(dir => {
+dirs.forEach((dir) => {
   const fullPath = path.join(__dirname, '..', dir);
   if (!fs.existsSync(fullPath)) {
     fs.mkdirSync(fullPath, { recursive: true });
@@ -812,8 +810,7 @@ console.log('✅ Global test setup complete');
 
 ```javascript
 /**
- * Global Test Teardown
- * Executado UMA VEZ depois de todos os testes
+ * Global Test Teardown Executado UMA VEZ depois de todos os testes
  */
 
 const fs = require('fs');

@@ -6,8 +6,8 @@ const JS_SOURCE_RE = /\.(js|mjs|cjs)$/i;
 const CODE_EXT_RE = /\.(js|mjs|cjs|ts|tsx|jsx|vue|json)$/i;
 
 /**
- * Arquivos que, quando alterados, exigem smoke de import dos entrypoints no `audit:quick`.
- * A lista cobre acoplamentos que historicamente geraram side effects no import.
+ * Arquivos que, quando alterados, exigem smoke de import dos entrypoints no `audit:quick`. A lista cobre acoplamentos
+ * que historicamente geraram side effects no import.
  */
 export const ENTRYPOINT_SMOKE_IMPACT_PATHS = Object.freeze([
     'src/main.js',
@@ -19,8 +19,8 @@ export const ENTRYPOINT_SMOKE_IMPACT_PATHS = Object.freeze([
 ]);
 
 /**
- * @param {string|null|undefined} file
- * @returns {any}
+ * @param {string | null | undefined} file
+ * @returns {string}
  */
 export function normalizeRepoPath(file) {
     return String(file || '')
@@ -31,7 +31,7 @@ export function normalizeRepoPath(file) {
 
 /**
  * @param {unknown} value
- * @returns {any}
+ * @returns {string[]}
  */
 export function normalizeChangedFiles(value) {
     if (!Array.isArray(value)) return [];
@@ -40,7 +40,7 @@ export function normalizeChangedFiles(value) {
 
 /**
  * @param {string} file
- * @returns {any}
+ * @returns {boolean}
  */
 export function isDocOnlyFile(file) {
     const f = normalizeRepoPath(file);
@@ -51,7 +51,7 @@ export function isDocOnlyFile(file) {
 
 /**
  * @param {string} file
- * @returns {any}
+ * @returns {boolean}
  */
 export function isCodeFile(file) {
     return CODE_EXT_RE.test(normalizeRepoPath(file));
@@ -59,7 +59,7 @@ export function isCodeFile(file) {
 
 /**
  * @param {string} file
- * @returns {any}
+ * @returns {boolean}
  */
 export function isJsSourceFile(file) {
     return JS_SOURCE_RE.test(normalizeRepoPath(file));
@@ -67,7 +67,7 @@ export function isJsSourceFile(file) {
 
 /**
  * @param {string} file
- * @returns {any}
+ * @returns {boolean}
  */
 export function isPrettierEligibleFile(file) {
     return PRETTIER_EXT_RE.test(normalizeRepoPath(file));
@@ -75,7 +75,7 @@ export function isPrettierEligibleFile(file) {
 
 /**
  * @param {string} file
- * @returns {any}
+ * @returns {boolean}
  */
 export function isDashboardFile(file) {
     const f = normalizeRepoPath(file);
@@ -84,7 +84,7 @@ export function isDashboardFile(file) {
 
 /**
  * @param {string} file
- * @returns {any}
+ * @returns {boolean}
  */
 export function isBrowserTypeImpactFile(file) {
     const f = normalizeRepoPath(file);
@@ -100,7 +100,7 @@ export function isBrowserTypeImpactFile(file) {
 
 /**
  * @param {string} file
- * @returns {any}
+ * @returns {boolean}
  */
 export function isNodeTypeImpactFile(file) {
     const f = normalizeRepoPath(file);
@@ -117,7 +117,7 @@ export function isNodeTypeImpactFile(file) {
 
 /**
  * @param {string} file
- * @returns {any}
+ * @returns {boolean}
  */
 export function isHighRiskQualityConfigFile(file) {
     const f = normalizeRepoPath(file);
@@ -140,10 +140,10 @@ export function isHighRiskQualityConfigFile(file) {
 
 /**
  * @param {string[]} files
- * @returns {any}
+ * @returns {string[]}
  */
 export function filterExistingFiles(files) {
-    return files.filter(file => {
+    return files.filter((file) => {
         try {
             return fs.existsSync(file);
         } catch {
@@ -154,7 +154,7 @@ export function filterExistingFiles(files) {
 
 /**
  * @param {string[]} changed
- * @returns {any}
+ * @returns {string[]}
  */
 export function pickJsCheckFiles(changed) {
     return filterExistingFiles(changed.filter(isJsSourceFile));
@@ -162,7 +162,7 @@ export function pickJsCheckFiles(changed) {
 
 /**
  * @param {string[]} changed
- * @returns {any}
+ * @returns {string[]}
  */
 export function pickPrettierFiles(changed) {
     return filterExistingFiles(changed.filter(isPrettierEligibleFile));
@@ -170,13 +170,13 @@ export function pickPrettierFiles(changed) {
 
 /**
  * @param {string[]} changed
- * @returns {any}
+ * @returns {string[]}
  */
 export function pickJSDocDeltaFiles(changed) {
     return filterExistingFiles(
         changed.filter(
-            file => isJsSourceFile(file) && !file.includes('/dist/') && !file.startsWith('src/dashboard-ui/dist/')
-        )
+            (file) => isJsSourceFile(file) && !file.includes('/dist/') && !file.startsWith('src/dashboard-ui/dist/'),
+        ),
     );
 }
 
@@ -193,15 +193,15 @@ export function summarizeChangeImpact(changed) {
         hasHighRiskConfig: normalized.some(isHighRiskQualityConfigFile),
         hasNodeTypeImpact: normalized.some(isNodeTypeImpactFile),
         hasBrowserTypeImpact: normalized.some(isBrowserTypeImpactFile),
-        hasSrcOutsideDashboard: normalized.some(f => f.startsWith('src/') && !f.startsWith('src/dashboard-ui/')),
-        hasTypes: normalized.some(f => f.startsWith('src/types/')),
-        hasAuditInfra: normalized.some(f => f.startsWith('scripts/audit/')),
+        hasSrcOutsideDashboard: normalized.some((f) => f.startsWith('src/') && !f.startsWith('src/dashboard-ui/')),
+        hasTypes: normalized.some((f) => f.startsWith('src/types/')),
+        hasAuditInfra: normalized.some((f) => f.startsWith('scripts/audit/')),
     };
 }
 
 /**
  * @param {string[]} changed
- * @returns {any}
+ * @returns {string[]}
  */
 export function resolveEntrypointSmokeTargets(changed) {
     const impacted = new Set();
@@ -219,5 +219,5 @@ export function resolveEntrypointSmokeTargets(changed) {
         if (file === 'src/main.js') impacted.add('src/main.js');
         if (file === 'src/server/main.js') impacted.add('src/server/main.js');
     }
-    return [...impacted].filter(file => fs.existsSync(file));
+    return [...impacted].filter((file) => fs.existsSync(file));
 }

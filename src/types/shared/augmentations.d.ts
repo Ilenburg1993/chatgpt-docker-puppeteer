@@ -27,7 +27,7 @@ declare module '#shared/page_stability/stabilizer' {
     export function waitForStability(
         driverOrPage: unknown,
         timeoutMs?: number,
-        signal?: AbortSignal | null
+        signal?: AbortSignal | null,
     ): Promise<{
         success?: boolean;
         timeout?: boolean;
@@ -57,7 +57,7 @@ declare module '#shared/biomechanics/human' {
         driver: unknown,
         selector: string,
         text: string,
-        opts?: HumanOptions & { profile?: string; signal?: AbortSignal | null }
+        opts?: HumanOptions & { profile?: string; signal?: AbortSignal | null },
     ): Promise<boolean>;
     export function humanType(
         page: unknown,
@@ -67,12 +67,12 @@ declare module '#shared/biomechanics/human' {
         currentLag?: number,
         signal?: AbortSignal | null,
         onPulse?: ((payload: unknown) => void) | null,
-        profile?: string
+        profile?: string,
     ): Promise<boolean>;
     export function humanClick(
         driver: unknown,
         selector: string,
-        opts?: HumanOptions & { signal?: AbortSignal | null }
+        opts?: HumanOptions & { signal?: AbortSignal | null },
     ): Promise<boolean>;
     export function humanClick(
         page: unknown,
@@ -81,7 +81,7 @@ declare module '#shared/biomechanics/human' {
         offsetX?: number,
         offsetY?: number,
         signal?: AbortSignal | null,
-        onPulse?: ((payload: unknown) => void) | null
+        onPulse?: ((payload: unknown) => void) | null,
     ): Promise<boolean>;
     export function wakeUpMove(page: unknown): Promise<void>;
     export function gaussian(mean?: number, stdev?: number): number;

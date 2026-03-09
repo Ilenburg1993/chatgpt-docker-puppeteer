@@ -118,8 +118,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
 import { useAudit } from '@/composables/useAudit';
+import { onMounted, ref } from 'vue';
 
 const { jobs, loading, error, listJobs } = useAudit();
 
@@ -130,8 +130,8 @@ onMounted(async () => {
         await listJobs();
         stats.value = {
             jobsTotal: jobs.value.length,
-            jobsPending: jobs.value.filter(j => j.status === 'pending' || j.status === 'running').length,
-            patchesApproved: jobs.value.filter(j => j.status === 'waiting_approval').length,
+            jobsPending: jobs.value.filter((j) => j.status === 'pending' || j.status === 'running').length,
+            patchesApproved: jobs.value.filter((j) => j.status === 'waiting_approval').length,
             findingsCount: 0,
         };
     } catch (e) {

@@ -1,13 +1,13 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
 import { strict as assert } from 'assert';
 import { execSync } from 'child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { describe, it } from 'node:test';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
 // Helper that returns the evaluated LD_PRELOAD after sourcing the gatekeeper snippet
-function runGatekeeper(env = {}) {
+function runGatekeeper(/** @type {any} */ env = {}) {
     // embed the profile logic we maintain in the repo and write it to a temporary
     // shell script to avoid any quoting/escaping issues when passing to bash.
     const scriptContent = `
@@ -116,7 +116,8 @@ cat "$PASSWD_FILE"`;
                 env: process.env,
             }).toString();
         } catch (e) {
-            out = e.stdout ? e.stdout.toString() : '';
+            const err = /** @type {any} */ (e);
+            out = err.stdout ? err.stdout.toString() : '';
         }
         assert(out.includes('exceeds kernel limit'));
     });

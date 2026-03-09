@@ -172,12 +172,12 @@ for (let retry = 0; retry < BIOMECHANICS_CONFIG.FOCUS_MAX_RETRIES && !focusOk; r
   focusOk = await ctx.evaluate(/* check focus */).catch(() => false);
 
   if (!focusOk) {
-    await ctx.focus(selector).catch(err => {
+    await ctx.focus(selector).catch((err) => {
       if (onPulse) {
         onPulse({ type: 'FOCUS_ERROR', error: err.message, retry });
       }
     });
-    await new Promise(r => setTimeout(r, BIOMECHANICS_CONFIG.FOCUS_RESTORE_DELAY * (retry + 1)));
+    await new Promise((r) => setTimeout(r, BIOMECHANICS_CONFIG.FOCUS_RESTORE_DELAY * (retry + 1)));
   }
 }
 
@@ -227,7 +227,7 @@ async function getElementRect(ctx, selector, retries = 3, delayMs = 500) {
     if (rect) return rect;
 
     if (i < retries - 1) {
-      await new Promise(r => setTimeout(r, delayMs * (i + 1))); // Exponential backoff
+      await new Promise((r) => setTimeout(r, delayMs * (i + 1))); // Exponential backoff
     }
   }
   return null;
@@ -356,7 +356,7 @@ async function humanType(
   currentLag = 0,
   signal = null,
   onPulse = null,
-  profile = 'average'
+  profile = 'average',
 ) {
   const speed = TYPING_PROFILES[profile] || TYPING_PROFILES.average;
 
@@ -457,7 +457,7 @@ await humanType(page, ctx, '#input', 'Hello');
 await humanType(page, ctx, '#input', 'Hello', 0, null, null, 'expert'); // 90 WPM
 
 // Use telemetry
-await humanClick(page, ctx, '#button', 0, 0, null, event => {
+await humanClick(page, ctx, '#button', 0, 0, null, (event) => {
   console.log(event.type, event); // CLICK_START, MOUSE_MOVE, etc.
 });
 

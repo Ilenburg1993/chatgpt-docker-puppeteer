@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/main.js
    Entry Point: Maestro Bootstrap (Singularity Edition)
@@ -25,25 +25,23 @@
  *
  * - Este sistema NÃO gerencia browsers.
  * - Este sistema NÃO executa Chromium nem chama `puppeteer.launch()`.
- * - Toda interação com browsers ocorre via conexão a um Chrome externo
- *   já em execução, acessível pelo DevTools Protocol (HTTP / WebSocket).
+ * - Toda interação com browsers ocorre via conexão a um Chrome externo já em execução, acessível pelo DevTools Protocol
+ *   (HTTP / WebSocket).
  * - Campo canônico de configuração: `browserEndpoint` (url, optional wsEndpoint).
  *
- * Qualquer tentativa de iniciar ou gerenciar o ciclo de vida do browser
- * a partir deste processo constitui uma violação arquitetural.
+ * Qualquer tentativa de iniciar ou gerenciar o ciclo de vida do browser a partir deste processo constitui uma violação
+ * arquitetural.
  */
-
-// @ts-nocheck - Suprime warnings TypeScript para propriedades dinâmicas e tipos implícitos
 
 // =========================================================================
 // ENVIRONMENT VARIABLES (load .env.local before imports)
 // =========================================================================
-import './core/env_bootstrap.js';
+import { CONNECTION_MODES } from '#core/constants/browser';
+import { STATUS_VALUES } from '#core/constants/tasks';
 import * as Authority from './core/authority.js';
 import CONFIG from './core/config.js';
-import { CONNECTION_MODES } from './core/constants/browser.js';
-import { STATUS_VALUES } from './core/constants/tasks.js';
 import { shouldAutobootEntrypoint } from './core/entrypoint_guard.js';
+import './core/env_bootstrap.js';
 import * as forensics from './core/forensics.js';
 import identityManager from './core/identity_manager.js';
 import { log } from './core/logger.js';
@@ -78,14 +76,14 @@ async function ensurePuppeteerGuardLoaded() {
 // ============================================================================
 
 /**
- * Modos operacionais suportados para o servidor HTTP.
- * Define como o processo Maestro interage com a camada de servidor/socket.
+ * Modos operacionais suportados para o servidor HTTP. Define como o processo Maestro interage com a camada de
+ * servidor/socket.
  *
- * @enum {string}
- * @readonly
  * @property {string} INTEGRATED - Maestro inicia e gerencia servidor HTTP local
  * @property {string} SPLIT - Maestro conecta a servidor externo (gerenciado por PM2)
  * @property {string} DISABLED - Camada server/socket completamente desabilitada
+ * @enum {string}
+ * @readonly
  */
 const SERVER_MODES = Object.freeze({
     INTEGRATED: 'integrated',
@@ -94,37 +92,33 @@ const SERVER_MODES = Object.freeze({
 });
 
 /**
- * Verifica se uma porta está em uso.
- * Retorna true se porta ocupada, false se disponível.
+ * Verifica se uma porta está em uso. Retorna true se porta ocupada, false se disponível.
  *
  * @param {number} port - Porta a verificar
- * @returns {Promise<boolean>} - Verdadeiro se porta está em uso, falso caso contrário
- * Side-effects: Cria e fecha um servidor TCP temporário para testar a porta.
+ * @returns {Promise<boolean>} - Verdadeiro se porta está em uso, falso caso contrário Side-effects: Cria e fecha um
+ *   servidor TCP temporário para testar a porta.
  */
 /**
  * Verifica se uma porta TCP está em uso no sistema.
  *
- * Cria um servidor TCP temporário na porta especificada e tenta
- * fazer bind. Se conseguir, a porta está livre. Se receber
- * EADDRINUSE, a porta está ocupada.
+ * Cria um servidor TCP temporário na porta especificada e tenta fazer bind. Se conseguir, a porta está livre. Se
+ * receber EADDRINUSE, a porta está ocupada.
  *
  * @async
  * @param {number} port - Número da porta TCP a verificar (1-65535)
  * @returns {Promise<boolean>} - true se porta está em uso, false se disponível
- *
  * @throws {Error} Se ocorrer erro inesperado ao verificar porta
- *
  * @sideEffects
  * - Cria e fecha servidor TCP temporário
  * - Não afeta estado global do sistema
  */
 async function checkPortInUse(port) {
-    const net = await import('node:net').then(m => m.default ?? m);
+    const net = await import('node:net').then((m) => m.default ?? m);
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const server = net.createServer();
 
-        server.once('error', err => {
+        server.once('error', (err) => {
             if (err.code === 'EADDRINUSE') {
                 resolve(true); // Porta em uso
             } else {
@@ -145,14 +139,13 @@ async function checkPortInUse(port) {
  * Resolve autoridade do processo (standalone|delegated).
  *
  * Precedência de resolução:
- *  1) Argumento CLI `--authority=...` ou `--server-authority=...`
- *  2) Variável de ambiente `SERVER_AUTHORITY`
- *  3) Fallback padrão: `standalone`
+ *
+ * 1. Argumento CLI `--authority=...` ou `--server-authority=...`
+ * 2. Variável de ambiente `SERVER_AUTHORITY`
+ * 3. Fallback padrão: `standalone`
  *
  * @returns {string} - Autoridade do processo ('standalone' ou 'delegated')
- *
  * @throws {Error} Process.exit(1) se autoridade for inválida
- *
  * @sideEffects
  * - Log de resolução da autoridade
  * - Process.exit(1) se autoridade inválida
@@ -160,7 +153,7 @@ async function checkPortInUse(port) {
  */
 function resolveAuthority() {
     // CLI override (ex: --authority=delegated)
-    const arg = process.argv.slice(2).find(a => a.startsWith('--authority=') || a.startsWith('--server-authority='));
+    const arg = process.argv.slice(2).find((a) => a.startsWith('--authority=') || a.startsWith('--server-authority='));
     const rawFromArg = arg ? arg.split('=')[1] : undefined;
 
     const raw = rawFromArg ?? process.env.SERVER_AUTHORITY ?? Authority.SERVER_AUTHORITIES.STANDALONE;
@@ -169,10 +162,11 @@ function resolveAuthority() {
 
     try {
         authority = Authority.resolveAuthority(raw);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         log('FATAL', `[CONFIG] SERVER_AUTHORITY inválido: "${raw}"`);
         log('FATAL', `[CONFIG] Valores válidos: ${allowed.join(', ')}`);
-        log('FATAL', `[CONFIG] Detalhe: ${err?.message || String(err)}`);
+        log('FATAL', `[CONFIG] Detalhe: ${_e?.message || String(err)}`);
         process.exit(1);
     }
 
@@ -184,19 +178,19 @@ function resolveAuthority() {
  * Resolve modo operacional do server de forma canônica e validada.
  *
  * Hierarquia de resolução:
- *   1) process.env.SERVER_MODE (override runtime)
- *   2) CONFIG.SERVER_MODE (configuração padrão)
- *   3) Fallback: SERVER_MODES.INTEGRATED
+ *
+ * 1. process.env.SERVER_MODE (override runtime)
+ * 2. CONFIG.SERVER_MODE (configuração padrão)
+ * 3. Fallback: SERVER_MODES.INTEGRATED
  *
  * Validações aplicadas:
- *   - Normalização para lowercase e trim
- *   - Validação contra enum SERVER_MODES
- *   - Fail-fast com exit(1) em valores inválidos
+ *
+ * - Normalização para lowercase e trim
+ * - Validação contra enum SERVER_MODES
+ * - Fail-fast com exit(1) em valores inválidos
  *
  * @returns {string} - Modo do servidor ('integrated', 'split' ou 'disabled')
- *
  * @throws {Error} Process.exit(1) se modo for inválido
- *
  * @sideEffects
  * - Log da resolução do modo
  * - Process.exit(1) se modo inválido
@@ -209,7 +203,7 @@ function resolveServerMode() {
 
     const valid = Object.values(SERVER_MODES);
 
-    if (!valid.includes(mode)) {
+    if (!valid.includes(/** @type {any} */ (mode))) {
         log('FATAL', `[CONFIG] SERVER_MODE inválido: "${raw}"`);
         log('FATAL', `[CONFIG] Valores válidos: ${valid.join(', ')}`);
         process.exit(1);
@@ -220,17 +214,27 @@ function resolveServerMode() {
     return mode;
 }
 
+/**
+ * @param {string} name
+ * @param {number} fallback
+ * @returns {number}
+ */
 function readPositiveIntEnv(name, fallback) {
     const parsed = Number.parseInt(String(process.env[name] ?? fallback), 10);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/**
+ * @param {any} value
+ * @param {number} fallback
+ * @returns {number}
+ */
 function readPositiveInt(value, fallback) {
     const parsed = Number.parseInt(String(value ?? fallback), 10);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-async function probeSplitServerHealth(port, timeoutMs = 2000) {
+async function probeSplitServerHealth(/** @type {any} */ port, timeoutMs = 2000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -246,6 +250,11 @@ async function probeSplitServerHealth(port, timeoutMs = 2000) {
     }
 }
 
+/**
+ * @param {any} socketModule
+ * @param {number} externalPort
+ * @returns {Promise<any>}
+ */
 async function connectSplitExternalWithRetry(socketModule, externalPort) {
     if (!socketModule || typeof socketModule.connectExternal !== 'function') {
         throw new Error('socket.connectExternal não disponível em modo split');
@@ -253,11 +262,11 @@ async function connectSplitExternalWithRetry(socketModule, externalPort) {
 
     const maxAttempts = readPositiveInt(
         process.env.SPLIT_CONNECT_MAX_ATTEMPTS ?? process.env.BOOT_RETRY_MAX_ATTEMPTS,
-        10
+        10,
     );
     const baseDelayMs = readPositiveInt(
         process.env.SPLIT_CONNECT_RETRY_BASE_MS ?? process.env.BOOT_RETRY_BASE_MS,
-        1000
+        1000,
     );
     const maxDelayMs = readPositiveInt(process.env.SPLIT_CONNECT_RETRY_MAX_MS ?? process.env.BOOT_RETRY_MAX_MS, 8000);
     const waitForHealth = process.env.SPLIT_WAIT_HEALTH === 'true';
@@ -278,17 +287,18 @@ async function connectSplitExternalWithRetry(socketModule, externalPort) {
                 onRetry: ({ attempt: currentAttempt, maxAttempts: totalAttempts, error, delayMs }) => {
                     log(
                         'WARN',
-                        `[BOOT] Split connect tentativa ${currentAttempt}/${totalAttempts} falhou: ${error?.message || String(error)}. Retry em ${delayMs}ms`
+                        `[BOOT] Split connect tentativa ${currentAttempt}/${totalAttempts} falhou: ${/** @type {any} */ (error)?.message || String(error)}. Retry em ${delayMs}ms`,
                     );
                 },
-            }
+            },
         );
         log('INFO', `[BOOT] Conexão split estabelecida na tentativa ${attempt}/${maxAttempts}`);
         return socketHub;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         throw new Error(
             `Falha ao conectar servidor externo em modo split após ${maxAttempts} tentativas (porta=${externalPort})`,
-            { cause: err }
+            { cause: err },
         );
     }
 }
@@ -301,6 +311,7 @@ async function connectSplitExternalWithRetry(socketModule, externalPort) {
  * Executa sequência completa de inicialização do sistema Maestro.
  *
  * Ordem crítica de inicialização (6 fases):
+ *
  * 1. **Configuração e Identidade**: Carrega config, estabelece robot_id
  * 2. **NERV**: Inicializa event bus (local + Socket.io híbrido)
  * 3. **Browser Pool**: Conecta a 3x instâncias Chrome (porta 9224)
@@ -308,29 +319,12 @@ async function connectSplitExternalWithRetry(socketModule, externalPort) {
  * 5. **Adapters**: Inicializa bridges Driver↔NERV e Server↔NERV
  * 6. **Server Web**: Inicia Express + Socket.io na porta 3008
  *
- * Cada fase é executada sequencialmente com validações e fail-fast.
- * Em caso de falha, executa cleanup parcial antes de re-throw.
+ * Cada fase é executada sequencialmente com validações e fail-fast. Em caso de falha, executa cleanup parcial antes de
+ * re-throw.
  *
  * @async
- * @returns {Promise<Object>} Contexto de runtime com todas as instâncias ativas
- * @returns {Object} returns.nerv - Sistema de comunicação NERV
- * @returns {Object} returns.browserPool - Pool de browsers Chrome
- * @returns {Object} returns.kernel - Instância do KERNEL
- * @returns {Object} returns.driverAdapter - Adaptador NERV do driver
- * @returns {Object} returns.serverAdapter - Adaptador NERV do servidor
- * @returns {Object} returns.httpServer - Servidor HTTP (se autoridade)
- * @returns {boolean} returns.httpAuthority - Se este processo é dono do bind HTTP
- * @returns {Object} returns.queueWorker - Worker da fila SSOT
- * @returns {Object} returns.taskProjector - Projetor de estado de tarefas
- * @returns {Object} returns.taskControlWatcher - Watcher de controle de tarefas
- * @returns {Object} returns.missionRunner - Executor de missões
- * @returns {Object} returns.missionPlannerProcessor - Processador de planejamento
- * @returns {Object} returns.attemptWatchdog - Watchdog de tentativas
- * @returns {Object} returns.heartbeatWatchdog - Watchdog de heartbeat
- * @returns {Object} returns.agentLoop - Loop principal do agente
- *
+ * @returns {Promise<any>} Contexto de runtime
  * @throws {Error} Se qualquer fase crítica falhar na inicialização
- *
  * @sideEffects
  * - Inicializa todos os subsistemas globais
  * - Estabelece conexões de rede (Chrome, HTTP)
@@ -441,8 +435,8 @@ async function boot() {
         // ===== FASE 2: NERV (IPC 3.0 - CANAL ÚNICO) =====
         log('INFO', '[BOOT] Fase 2/6: Inicializando NERV (canal de transporte)');
 
-        const nerv = await createNERV({
-            mode: CONNECTION_MODES.HYBRID, // local EventEmitter + Socket.io adapter
+        const nerv = await /** @type {any} */ (createNERV)({
+            mode: /** @type {any} */ (CONNECTION_MODES.HYBRID), // local EventEmitter + Socket.io adapter
             correlation: true, // Event sourcing
             bufferSize: process.env.NERV_BUFFER_SIZE || CONFIG.NERV_BUFFER_SIZE || 1000,
             telemetry: process.env.NERV_TELEMETRY !== 'false' && CONFIG.NERV_TELEMETRY !== false,
@@ -478,7 +472,7 @@ async function boot() {
 
             try {
                 const ChromeProxyService = await import('./infra/proxy/chromeProxyService.js').then(
-                    m => m.default ?? m
+                    (m) => m.default ?? m,
                 );
                 const { sendEvent } = await import('#nerv/adapters/high_level_adapter');
                 const { ActionCode, ActorRole } = await import('#shared/nerv/constants');
@@ -508,17 +502,18 @@ async function boot() {
                     });
 
                     // Injeta NERV no proxy para telemetria
-                    chromeProxy.setNERV(nerv);
+                    /** @type {any} */ (chromeProxy).setNERV(nerv);
 
                     // Inicia proxy
                     await chromeProxy.start();
 
                     // Armazena globalmente para shutdown
-                    global.chromeProxy = chromeProxy;
+                    /** @type {any} */ (global).chromeProxy = chromeProxy;
 
                     log('INFO', `[BOOT] ✅ Chrome Proxy Service online (porta ${proxyPort})`);
 
                     // ✅ Emite evento NERV: Proxy iniciado
+                    // eslint-disable-next-line @typescript-eslint/await-thenable
                     await sendEvent(
                         nerv,
                         ActorRole.INFRA,
@@ -531,12 +526,13 @@ async function boot() {
                             mode: 'inline',
                         },
                         null, // correlationId
-                        null // target (broadcast)
+                        null, // target (broadcast)
                     );
                     log('DEBUG', '[BOOT] Evento NERV INFRA_READY publicado (ChromeProxy)');
                 }
-            } catch (error) {
-                log('ERROR', `[BOOT] ❌ Falha ao iniciar Chrome Proxy Service: ${error.message}`);
+            } catch (/** @type {any} */ error) {
+                const _e = /** @type {any} */ (error);
+                log('ERROR', `[BOOT] ❌ Falha ao iniciar Chrome Proxy Service: ${_e.message}`);
                 log('ERROR', '[BOOT]');
                 log('ERROR', '[BOOT] TROUBLESHOOTING:');
                 log('ERROR', '[BOOT] 1. Verifique se porta está disponível:');
@@ -552,7 +548,7 @@ async function boot() {
             if (externalProxyRunning) {
                 log(
                     'INFO',
-                    `[BOOT] Chrome Proxy inline desabilitado (CONFIG.CHROME_PROXY_ENABLED=false), usando proxy externo na porta ${proxyPort}`
+                    `[BOOT] Chrome Proxy inline desabilitado (CONFIG.CHROME_PROXY_ENABLED=false), usando proxy externo na porta ${proxyPort}`,
                 );
             } else {
                 log('WARN', '[BOOT] ⚠️  Chrome Proxy Service desabilitado (CONFIG.CHROME_PROXY_ENABLED=false)');
@@ -561,7 +557,9 @@ async function boot() {
         }
 
         // NERV-based server discovery (non-blocking): escuta evento SERVER_READY
+        /** @type {any} */
         let discoveredServerInfo = null;
+        /** @type {any} */
         let discoveryUnsub = null;
         let discoveryCleanupExecuted = false;
 
@@ -575,13 +573,14 @@ async function boot() {
                     // Para funções async, aguardamos em background
                     const cleanupResult = discoveryUnsub();
                     if (cleanupResult && typeof cleanupResult.then === 'function') {
-                        cleanupResult.catch(e => {
+                        cleanupResult.catch((/** @type {any} */ e) => {
                             log('DEBUG', `[BOOT] Discovery cleanup async error: ${e.message}`);
                         });
                     }
                     discoveryUnsub = null;
                     log('DEBUG', '[BOOT] Discovery listener removido');
-                } catch (e) {
+                } catch (/** @type {any} */ e) {
+                    const _e = /** @type {any} */ (e);
                     /* noop */
                 }
             }
@@ -594,21 +593,28 @@ async function boot() {
         try {
             discoveryUnsub =
                 typeof nerv.onEvent === 'function'
-                    ? nerv.onEvent(envelope => {
-                          try {
-                              if (!envelope || !envelope.type || envelope.type.action_code !== ActionCode.SERVER_READY)
-                                  return;
-                              if (envelope.identity && envelope.identity.actor !== ActorRole.SERVER) return;
-                              discoveredServerInfo = envelope.payload || null;
-                              log(
-                                  'INFO',
-                                  `[BOOT] Descoberto servidor via NERV: ${JSON.stringify(discoveredServerInfo)}`
-                              );
-                              cleanupDiscoveryListener(); // Remove listener após descoberta
-                          } catch (e) {
-                              /* ignore */
-                          }
-                      })
+                    ? nerv.onEvent(
+                          /** @param {any} envelope */ (envelope) => {
+                              try {
+                                  if (
+                                      !envelope ||
+                                      !envelope.type ||
+                                      envelope.type.action_code !== ActionCode.SERVER_READY
+                                  )
+                                      return;
+                                  if (envelope.identity && envelope.identity.actor !== ActorRole.SERVER) return;
+                                  discoveredServerInfo = envelope.payload || null;
+                                  log(
+                                      'INFO',
+                                      `[BOOT] Descoberto servidor via NERV: ${JSON.stringify(discoveredServerInfo)}`,
+                                  );
+                                  cleanupDiscoveryListener(); // Remove listener após descoberta
+                              } catch (/** @type {any} */ e) {
+                                  const _e = /** @type {any} */ (e);
+                                  /* ignore */
+                              }
+                          },
+                      )
                     : null;
 
             if (discoveryTimeoutMs > 0) {
@@ -621,8 +627,9 @@ async function boot() {
                     cleanupDiscoveryListener();
                 }, 60000);
             }
-        } catch (err) {
-            log('DEBUG', `[BOOT] Falha ao registrar discovery NERV: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('DEBUG', `[BOOT] Falha ao registrar discovery NERV: ${_e.message}`);
         } finally {
             // Cleanup adicional garantido (caso exception interrompa)
             if (!discoveryCleanupExecuted && discoveryUnsub) {
@@ -642,12 +649,12 @@ async function boot() {
             process.exit(1);
         }
 
-        const browserPoolResult = await initializeBrowserPoolResilient(
+        const browserPoolResult = await /** @type {any} */ (initializeBrowserPoolResilient)(
             {
                 poolSize: readPositiveInt(process.env.BROWSER_POOL_SIZE ?? CONFIG.BROWSER_POOL_SIZE, 3),
                 allocationStrategy: (() => {
                     const strategyRaw = String(
-                        process.env.ALLOCATION_STRATEGY ?? CONFIG.ALLOCATION_STRATEGY ?? 'round-robin'
+                        process.env.ALLOCATION_STRATEGY ?? CONFIG.ALLOCATION_STRATEGY ?? 'round-robin',
                     )
                         .toLowerCase()
                         .trim();
@@ -656,12 +663,12 @@ async function boot() {
                 })(),
                 healthCheckInterval: readPositiveInt(
                     process.env.HEALTH_CHECK_INTERVAL ?? CONFIG.HEALTH_CHECK_INTERVAL,
-                    30000
+                    30000,
                 ),
                 pageTtlMs: readPositiveInt(process.env.BROWSER_PAGE_TTL_MS ?? CONFIG.BROWSER_PAGE_TTL_MS, 3600000),
                 allocateMaxAttempts: readPositiveInt(
                     process.env.BROWSER_ALLOCATE_MAX_ATTEMPTS ?? CONFIG.BROWSER_ALLOCATE_MAX_ATTEMPTS,
-                    Math.max(3, readPositiveInt(process.env.BROWSER_POOL_SIZE ?? CONFIG.BROWSER_POOL_SIZE, 3) * 3)
+                    Math.max(3, readPositiveInt(process.env.BROWSER_POOL_SIZE ?? CONFIG.BROWSER_POOL_SIZE, 3) * 3),
                 ),
                 browserEndpoint,
             },
@@ -670,7 +677,7 @@ async function boot() {
                 allowDegradedMode: process.env.ALLOW_DEGRADED_MODE !== 'false',
                 autoRetry: process.env.AUTO_RETRY_CHROME !== 'false',
                 maxAutoRetries: Number.parseInt(process.env.MAX_AUTO_RETRIES ?? '2', 10),
-            }
+            },
         );
 
         // Valida resultado
@@ -762,8 +769,9 @@ async function boot() {
                 kernel.start({ autoLoop: false });
                 log('INFO', '[BOOT] ✅ KERNEL started (SSOT gateway; pump manual via AgentLoop)');
             }
-        } catch (err) {
-            log('FATAL', `[BOOT] kernel.start() falhou: ${err?.message || String(err)}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('FATAL', `[BOOT] kernel.start() falhou: ${_e?.message || String(err)}`);
             process.exit(1);
         }
 
@@ -836,16 +844,21 @@ async function boot() {
                     getDb();
                     try {
                         await importLegacyQueueFromDisk();
-                    } catch (err) {
-                        log('WARN', `[BOOT] Legacy queue import skipped/failed: ${err?.message || String(err)}`);
+                    } catch (/** @type {any} */ err) {
+                        const _e = /** @type {any} */ (err);
+                        log('WARN', `[BOOT] Legacy queue import skipped/failed: ${_e?.message || String(err)}`);
                     }
 
                     const identityNow = identityManager.getFullIdentity?.() || {};
                     const workerId = identityNow.robot_id || `worker-${process.pid}`;
 
                     taskProjector = new TaskStateProjector({ nerv, workerId });
+                    // eslint-disable-next-line @typescript-eslint/await-thenable
                     await taskProjector.start();
-                    if (taskProjector.isRunning && !taskProjector.isRunning()) {
+                    if (
+                        /** @type {any} */ (taskProjector).isRunning &&
+                        !(/** @type {any} */ (taskProjector).isRunning())
+                    ) {
                         log('WARN', '[BOOT] TaskProjector.start() completou mas worker não está running');
                     }
                     log('DEBUG', '[BOOT] TaskProjector iniciado');
@@ -882,8 +895,12 @@ async function boot() {
                         intervalMs: Number(process.env.HEARTBEAT_WATCHDOG_INTERVAL_MS || 60000) || 60000, // 1min default
                         staleThresholdMs: Number(process.env.HEARTBEAT_STALE_THRESHOLD_MS || 180000) || 180000, // 3min default
                     });
+                    // eslint-disable-next-line @typescript-eslint/await-thenable
                     await heartbeatWatchdog.start();
-                    if (heartbeatWatchdog.isActive && !heartbeatWatchdog.isActive()) {
+                    if (
+                        /** @type {any} */ (heartbeatWatchdog).isActive &&
+                        !(/** @type {any} */ (heartbeatWatchdog).isActive())
+                    ) {
                         log('WARN', '[BOOT] HeartbeatWatchdog.start() completou mas watchdog não está ativo');
                     }
                     log('DEBUG', '[BOOT] HeartbeatWatchdog iniciado');
@@ -915,23 +932,24 @@ async function boot() {
                             orchestrationMs: Number(process.env.TASK_ORCHESTRATION_INTERVAL_MS || 1250) || 1250,
                         },
                     });
+                    // eslint-disable-next-line @typescript-eslint/await-thenable
                     await agentLoop.start();
-                    if (agentLoop.isRunning && !agentLoop.isRunning()) {
+                    if (/** @type {any} */ (agentLoop).isRunning && !(/** @type {any} */ (agentLoop).isRunning())) {
                         log('WARN', '[BOOT] AgentLoop.start() completou mas loop não está running');
                     }
                     log('DEBUG', '[BOOT] AgentLoop iniciado');
 
                     // Validação final: verifica que todos os workers críticos estão ativos
                     const workersStatus = {
-                        taskProjector: taskProjector?.isRunning?.() ?? true,
-                        heartbeatWatchdog: heartbeatWatchdog?.isActive?.() ?? true,
-                        agentLoop: agentLoop?.isRunning?.() ?? true,
+                        taskProjector: /** @type {any} */ (taskProjector)?.isRunning?.() ?? true,
+                        heartbeatWatchdog: /** @type {any} */ (heartbeatWatchdog)?.isActive?.() ?? true,
+                        agentLoop: /** @type {any} */ (agentLoop)?.isRunning?.() ?? true,
                     };
-                    const allRunning = Object.values(workersStatus).every(status => status);
+                    const allRunning = Object.values(workersStatus).every((status) => status);
                     if (!allRunning) {
                         log(
                             'WARN',
-                            `[BOOT] Alguns workers não confirmaram estado running: ${JSON.stringify(workersStatus)}`
+                            `[BOOT] Alguns workers não confirmaram estado running: ${JSON.stringify(workersStatus)}`,
                         );
                     }
 
@@ -942,12 +960,13 @@ async function boot() {
                 new Promise((_, reject) =>
                     setTimeout(
                         () => reject(new Error(`SSOT init timeout após ${SSOT_INIT_TIMEOUT}ms`)),
-                        SSOT_INIT_TIMEOUT
-                    )
+                        SSOT_INIT_TIMEOUT,
+                    ),
                 ),
             ]);
-        } catch (err) {
-            log('FATAL', `[BOOT] SSOT workers init failed: ${err?.message || String(err)}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('FATAL', `[BOOT] SSOT workers init failed: ${_e?.message || String(err)}`);
             process.exit(1);
         }
 
@@ -968,9 +987,11 @@ async function boot() {
         // Apenas logamos aqui para clareza
         log('INFO', `[BOOT] Server mode (determinístico): ${SERVER_MODE}`);
 
-        const socketModule = await import('./server/engine/socket.js').then(m => m.default ?? m);
+        const socketModule = await import('./server/engine/socket.js').then((m) => /** @type {any} */ (m).default ?? m);
 
+        /** @type {any} */
         let socketHub = null;
+        /** @type {any} */
         let serverAdapter = null;
         let boundPort = undefined;
         let httpServer = undefined;
@@ -998,8 +1019,9 @@ async function boot() {
 
             try {
                 socketHub = await connectSplitExternalWithRetry(socketModule, externalPort);
-            } catch (err) {
-                log('FATAL', `[BOOT] Falha ao conectar a servidor externo: ${err.message}`);
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
+                log('FATAL', `[BOOT] Falha ao conectar a servidor externo: ${_e.message}`);
                 process.exit(1);
             }
 
@@ -1012,14 +1034,19 @@ async function boot() {
             let socketHubWrapper = socketHub;
             if (typeof socketHub.sendToClient !== 'function') {
                 socketHubWrapper = Object.create(socketHub);
-                socketHubWrapper.sendToClient = (clientId, event, payload) => {
+                socketHubWrapper.sendToClient = (
+                    /** @type {any} */ clientId,
+                    /** @type {any} */ event,
+                    /** @type {any} */ payload,
+                ) => {
                     try {
                         const io = typeof socketModule.getIO === 'function' ? socketModule.getIO() : null;
                         if (io) {
                             io.to(clientId).emit(event, payload);
                             return true;
                         }
-                    } catch (e) {
+                    } catch (/** @type {any} */ e) {
+                        const _e = /** @type {any} */ (e);
                         /* fallback */
                     }
                     if (typeof socketHub.emit === 'function') {
@@ -1034,7 +1061,7 @@ async function boot() {
             socketHub = socketHubWrapper;
 
             const ServerNERVAdapter = await import('./server/nerv_adapter/server_nerv_adapter.js').then(
-                m => m.default ?? m
+                (m) => m.default ?? m,
             );
             serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
 
@@ -1056,16 +1083,17 @@ async function boot() {
         // ----------------------------------------------------------------------
         else if (SERVER_MODE === 'integrated') {
             /**
-             * Em modo integrado, o Maestro NÃO monta manualmente HTTP/socket.
-             * O bootstrap canônico do servidor (`src/server/main.js`) é reutilizado
-             * para garantir:
-             *  - mesmo contrato de inicialização entre processo dedicado e integrado
-             *  - um único caminho de configuração de telemetria/watchers/router
-             *  - menor divergência de comportamento operacional
+             * Em modo integrado, o Maestro NÃO monta manualmente HTTP/socket. O bootstrap canônico do servidor
+             * (`src/server/main.js`) é reutilizado para garantir:
+             *
+             * - mesmo contrato de inicialização entre processo dedicado e integrado
+             * - um único caminho de configuração de telemetria/watchers/router
+             * - menor divergência de comportamento operacional
              *
              * A autoridade é forçada para `delegated` neste contexto porque:
-             *  - sinais e exit policy já são coordenados por `src/main.js`;
-             *  - o NERV principal já existe e deve ser injetado.
+             *
+             * - sinais e exit policy já são coordenados por `src/main.js`;
+             * - o NERV principal já existe e deve ser injetado.
              */
             const { serverBootstrap } = await import('./server/main.js');
             const serverRuntime = await serverBootstrap({
@@ -1103,21 +1131,24 @@ async function boot() {
             socketHub = socketModule;
 
             try {
-                serverLifecycle = await import('./server/engine/lifecycle.js').then(m => m.default ?? m);
+                serverLifecycle = await import('./server/engine/lifecycle.js').then(
+                    (m) => /** @type {any} */ (m).default ?? m,
+                );
                 if (serverLifecycle && typeof serverLifecycle.gracefulShutdown === 'function') {
                     serverLifecycleManaged = true;
                 } else {
                     serverLifecycle = null;
                 }
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
                 serverLifecycle = null;
                 serverLifecycleManaged = false;
-                log('WARN', `[BOOT] Lifecycle do server indisponível para shutdown coordenado: ${err.message}`);
+                log('WARN', `[BOOT] Lifecycle do server indisponível para shutdown coordenado: ${_e.message}`);
             }
 
             log(
                 'INFO',
-                `[BOOT] Server integrado via serverBootstrap (porta=${boundPort}, lifecycleManaged=${serverLifecycleManaged})`
+                `[BOOT] Server integrado via serverBootstrap (porta=${boundPort}, lifecycleManaged=${serverLifecycleManaged})`,
             );
         }
 
@@ -1174,7 +1205,7 @@ async function boot() {
         try {
             if (httpServer) {
                 try {
-                    const serverApp = await import('./server/engine/app.js').then(m => m.default ?? m);
+                    const serverApp = await import('./server/engine/app.js').then((m) => m.default ?? m);
                     serverApp.locals = serverApp.locals || {};
                     serverApp.locals.runtimeReadiness = {
                         nerv: Boolean(nerv),
@@ -1185,26 +1216,29 @@ async function boot() {
                     // Campos minimamente exigidos para considerar o processo pronto
                     serverApp.locals.requiredReadiness = serverApp.locals.requiredReadiness || ['nerv', 'kernel'];
                     log('DEBUG', '[BOOT] runtimeReadiness definido no app HTTP');
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
                     log(
                         'WARN',
-                        `[BOOT] Não foi possível setar runtimeReadiness no app: ${err && err.message ? err.message : String(err)}`
+                        `[BOOT] Não foi possível setar runtimeReadiness no app: ${err && _e.message ? _e.message : String(err)}`,
                     );
                 }
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
             // não bloqueante — apenas registra
-            log('DEBUG', `[BOOT] runtimeReadiness skip: ${err && err.message ? err.message : String(err)}`);
+            log('DEBUG', `[BOOT] runtimeReadiness skip: ${err && _e.message ? _e.message : String(err)}`);
         }
 
         /**
          * Contexto canônico de runtime — contrato estrutural do processo.
          *
          * Regras:
-         *   - Campos podem ser null, nunca undefined (shape estável)
-         *   - httpAuthority indica se este processo é dono do bind
-         *   - serverMode é a topologia efetiva
-         *   - shutdown NÃO deve redescobrir nada via filesystem
+         *
+         * - Campos podem ser null, nunca undefined (shape estável)
+         * - httpAuthority indica se este processo é dono do bind
+         * - serverMode é a topologia efetiva
+         * - shutdown NÃO deve redescobrir nada via filesystem
          */
         return {
             // -------- CORE --------
@@ -1243,18 +1277,20 @@ async function boot() {
             // -------- METRICS --------
             bootDuration,
         };
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
         // Diagnóstico síncrono: logs assíncronos podem não flushar antes do process.exit.
-        console.error('[BOOT_FATAL_SYNC]', error && error.stack ? error.stack : error);
-        log('FATAL', `[BOOT] Falha catastrófica durante boot: ${error.message}`);
-        log('ERROR', `[BOOT] Stack trace: ${error.stack}`);
+        console.error('[BOOT_FATAL_SYNC]', error && _e.stack ? _e.stack : error);
+        log('FATAL', `[BOOT] Falha catastrófica durante boot: ${_e.message}`);
+        log('ERROR', `[BOOT] Stack trace: ${_e.stack}`);
 
         try {
             if (typeof forensics?.createCrashDump === 'function') {
-                forensics.createCrashDump(null, error, 'sys-boot', 'boot-failure');
+                void forensics.createCrashDump(/** @type {any} */ (null), error, 'sys-boot', 'boot-failure');
             }
-        } catch (dumpErr) {
-            log('ERROR', `[BOOT] Falha ao gerar crash dump: ${dumpErr.message}`);
+        } catch (/** @type {any} */ dumpErr) {
+            const _e = /** @type {any} */ (dumpErr);
+            log('ERROR', `[BOOT] Falha ao gerar crash dump: ${_e.message}`);
         }
 
         process.exit(1);
@@ -1266,9 +1302,34 @@ async function boot() {
 ========================================================================== */
 
 /**
+ * @typedef {object} ShutdownContext
+ * @property {any} serverAdapter
+ * @property {any} driverAdapter
+ * @property {any} kernel
+ * @property {any} browserPool
+ * @property {any} nerv
+ * @property {any} httpServer
+ * @property {boolean} httpAuthority
+ * @property {any} serverLifecycle
+ * @property {boolean} serverLifecycleManaged
+ * @property {any} queueWorker
+ * @property {any} taskProjector
+ * @property {any} taskControlWatcher
+ * @property {any} missionRunner
+ * @property {any} missionPlannerProcessor
+ * @property {any} attemptWatchdog
+ * @property {any} heartbeatWatchdog
+ * @property {any} agentLoop
+ */
+/**
+ * @typedef {object} ShutdownOptions
+ * @property {boolean} [exitOnComplete] - Chama process.exit() ao concluir.
+ */
+/**
  * Executa shutdown gracioso coordenado do sistema.
  *
  * Ordem de encerramento (crítica para evitar race conditions):
+ *
  * 1. ServerAdapter (ponte NERV/socket)
  * 2. ChromeProxyService (proxy WebSocket)
  * 3. HTTPServer (apenas se autoridade)
@@ -1280,30 +1341,10 @@ async function boot() {
  * 9. TempProfiles (limpeza final)
  *
  * @async
- * @param {Object} context - Contexto de runtime retornado por boot()
- * @param {Object} context.serverAdapter - Adaptador do servidor NERV
- * @param {Object} context.driverAdapter - Adaptador do driver NERV
- * @param {Object} context.kernel - Instância do KERNEL
- * @param {Object} context.browserPool - Pool de browsers
- * @param {Object} context.nerv - Sistema de comunicação NERV
- * @param {Object} context.httpServer - Servidor HTTP (se integrado)
- * @param {boolean} context.httpAuthority - Se este processo é dono do bind HTTP
- * @param {Object} context.serverLifecycle - Módulo de lifecycle do server (opcional)
- * @param {boolean} context.serverLifecycleManaged - Se lifecycle do server deve coordenar teardown de infraestrutura
- * @param {Object} context.queueWorker - Worker da fila SSOT
- * @param {Object} context.taskProjector - Projetor de estado de tarefas
- * @param {Object} context.taskControlWatcher - Watcher de controle de tarefas
- * @param {Object} context.missionRunner - Executor de missões
- * @param {Object} context.missionPlannerProcessor - Processador de planejamento de missões
- * @param {Object} context.attemptWatchdog - Watchdog de tentativas
- * @param {Object} context.heartbeatWatchdog - Watchdog de heartbeat
- * @param {Object} context.agentLoop - Loop principal do agente
- * @param {Object} [options] - Opções de shutdown
- * @param {boolean} [options.exitOnComplete=false] - Se verdadeiro, encerra processo ao concluir
- * @returns {Promise<{ok: boolean, failedPhases: number, totalPhases: number, duration: number}>}
- *
+ * @param {ShutdownContext} context - Contexto de runtime retornado por boot()
+ * @param {ShutdownOptions} [options] - Opções de shutdown
+ * @returns {Promise<{ ok: boolean; failedPhases: number; totalPhases: number; duration: number }>}
  * @throws {Error} Se alguma fase crítica do shutdown falhar
- *
  * @sideEffects
  * - Encerra todos os subsistemas ativos
  * - Remove signal handlers
@@ -1364,37 +1405,42 @@ async function shutdown(context, options = {}) {
 
                 // auxiliares — best effort
                 try {
-                    const reconciler = await import('./server/supervisor/reconcilier.js').then(m => m.default ?? m);
+                    const reconciler = await import('./server/supervisor/reconcilier.js').then((m) => m.default ?? m);
                     if (reconciler && typeof reconciler.stop === 'function') {
                         try {
+                            // eslint-disable-next-line @typescript-eslint/await-thenable
                             await reconciler.stop();
                             log('DEBUG', '[SHUTDOWN] Reconciler parado');
-                        } catch (err) {
-                            log('WARN', `[SHUTDOWN] Erro ao parar reconciler: ${err?.message || String(err)}`);
+                        } catch (/** @type {any} */ err) {
+                            const _e = /** @type {any} */ (err);
+                            log('WARN', `[SHUTDOWN] Erro ao parar reconciler: ${_e?.message || String(err)}`);
                         }
                     } else {
                         log('DEBUG', '[SHUTDOWN] Reconciler não estava ativo ou método stop() ausente');
                     }
-                } catch (importErr) {
-                    log('WARN', `[SHUTDOWN] Falha ao importar reconciler: ${importErr.message}`);
+                } catch (/** @type {any} */ importErr) {
+                    const _e = /** @type {any} */ (importErr);
+                    log('WARN', `[SHUTDOWN] Falha ao importar reconciler: ${_e.message}`);
                 }
 
                 try {
                     const hardwareTelemetry = await import('./server/realtime/telemetry/hardware.js').then(
-                        m => m.default ?? m
+                        (m) => /** @type {any} */ (m).default ?? m,
                     );
                     if (typeof hardwareTelemetry?.stop === 'function') {
                         try {
                             await hardwareTelemetry.stop();
-                        } catch (err) {
+                        } catch (/** @type {any} */ err) {
+                            const _e = /** @type {any} */ (err);
                             log(
                                 'WARN',
-                                `[SHUTDOWN] hardwareTelemetry.stop threw: ${err && err.message ? err.message : String(err)}`
+                                `[SHUTDOWN] hardwareTelemetry.stop threw: ${err && _e.message ? _e.message : String(err)}`,
                             );
                         }
                     }
-                } catch (e) {
-                    log('WARN', `[SHUTDOWN] hardwareTelemetry.stop falhou: ${e.message}`);
+                } catch (/** @type {any} */ e) {
+                    const _e = /** @type {any} */ (e);
+                    log('WARN', `[SHUTDOWN] hardwareTelemetry.stop falhou: ${_e.message}`);
                 }
             },
         },
@@ -1405,9 +1451,12 @@ async function shutdown(context, options = {}) {
         {
             name: 'ChromeProxyService',
             fn: async () => {
-                if (global.chromeProxy && typeof global.chromeProxy.stop === 'function') {
+                if (
+                    /** @type {any} */ (global).chromeProxy &&
+                    typeof (/** @type {any} */ (global).chromeProxy.stop) === 'function'
+                ) {
                     try {
-                        await global.chromeProxy.stop();
+                        await /** @type {any} */ (global).chromeProxy.stop();
                         log('INFO', '[SHUTDOWN] Chrome Proxy Service parado');
 
                         // ✅ Emite evento NERV: Proxy encerrado
@@ -1415,21 +1464,23 @@ async function shutdown(context, options = {}) {
                             const { sendEvent } = await import('#nerv/adapters/high_level_adapter');
                             const { ActionCode, ActorRole } = await import('#shared/nerv/constants');
 
+                            // eslint-disable-next-line @typescript-eslint/await-thenable
                             await sendEvent(
                                 nerv,
                                 ActorRole.INFRA,
                                 ActionCode.INFRA_SHUTDOWN,
                                 { component: 'ChromeProxyService', timestamp: Date.now() },
                                 null,
-                                null
+                                null,
                             );
                             log('DEBUG', '[SHUTDOWN] Evento NERV INFRA_SHUTDOWN publicado');
                         }
-                    } catch (err) {
-                        log('WARN', `[SHUTDOWN] Erro ao parar Chrome Proxy: ${err.message}`);
+                    } catch (/** @type {any} */ err) {
+                        const _e = /** @type {any} */ (err);
+                        log('WARN', `[SHUTDOWN] Erro ao parar Chrome Proxy: ${_e.message}`);
                     } finally {
                         // BUG-013: Garante cleanup da referência global mesmo em caso de erro
-                        global.chromeProxy = null;
+                        /** @type {any} */ (global).chromeProxy = null;
                         log('DEBUG', '[SHUTDOWN] Referência global chromeProxy limpa');
                     }
                 } else {
@@ -1455,9 +1506,11 @@ async function shutdown(context, options = {}) {
                 }
 
                 if (httpServer && typeof httpServer.close === 'function') {
-                    await new Promise(resolve => {
-                        httpServer.close(() => resolve());
-                    });
+                    await /** @type {Promise<void>} */ (
+                        new Promise((resolve) => {
+                            httpServer.close(() => resolve());
+                        })
+                    );
                     log('INFO', '[SHUTDOWN] HTTP server fechado');
                 }
             },
@@ -1473,64 +1526,72 @@ async function shutdown(context, options = {}) {
                     if (agentLoop && typeof agentLoop.stop === 'function') {
                         agentLoop.stop();
                     }
-                } catch (err) {
-                    log('WARN', `[SHUTDOWN] agentLoop.stop falhou: ${err?.message || String(err)}`);
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
+                    log('WARN', `[SHUTDOWN] agentLoop.stop falhou: ${_e?.message || String(err)}`);
                 }
 
                 try {
                     if (queueWorker && typeof queueWorker.stop === 'function') {
                         queueWorker.stop();
                     }
-                } catch (err) {
-                    log('WARN', `[SHUTDOWN] queueWorker.stop falhou: ${err?.message || String(err)}`);
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
+                    log('WARN', `[SHUTDOWN] queueWorker.stop falhou: ${_e?.message || String(err)}`);
                 }
 
                 try {
                     if (taskControlWatcher && typeof taskControlWatcher.stop === 'function') {
                         taskControlWatcher.stop();
                     }
-                } catch (err) {
-                    log('WARN', `[SHUTDOWN] taskControlWatcher.stop falhou: ${err?.message || String(err)}`);
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
+                    log('WARN', `[SHUTDOWN] taskControlWatcher.stop falhou: ${_e?.message || String(err)}`);
                 }
 
                 try {
                     if (taskProjector && typeof taskProjector.stop === 'function') {
                         taskProjector.stop();
                     }
-                } catch (err) {
-                    log('WARN', `[SHUTDOWN] taskProjector.stop falhou: ${err?.message || String(err)}`);
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
+                    log('WARN', `[SHUTDOWN] taskProjector.stop falhou: ${_e?.message || String(err)}`);
                 }
 
                 try {
                     if (missionRunner && typeof missionRunner.stop === 'function') {
                         missionRunner.stop();
                     }
-                } catch (err) {
-                    log('WARN', `[SHUTDOWN] missionRunner.stop falhou: ${err?.message || String(err)}`);
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
+                    log('WARN', `[SHUTDOWN] missionRunner.stop falhou: ${_e?.message || String(err)}`);
                 }
 
                 try {
                     if (missionPlannerProcessor && typeof missionPlannerProcessor.stop === 'function') {
                         missionPlannerProcessor.stop();
                     }
-                } catch (err) {
-                    log('WARN', `[SHUTDOWN] missionPlannerProcessor.stop falhou: ${err?.message || String(err)}`);
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
+                    log('WARN', `[SHUTDOWN] missionPlannerProcessor.stop falhou: ${_e?.message || String(err)}`);
                 }
 
                 try {
                     if (attemptWatchdog && typeof attemptWatchdog.stop === 'function') {
                         attemptWatchdog.stop();
                     }
-                } catch (err) {
-                    log('WARN', `[SHUTDOWN] attemptWatchdog.stop falhou: ${err?.message || String(err)}`);
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
+                    log('WARN', `[SHUTDOWN] attemptWatchdog.stop falhou: ${_e?.message || String(err)}`);
                 }
 
                 try {
                     if (heartbeatWatchdog && typeof heartbeatWatchdog.stop === 'function') {
                         heartbeatWatchdog.stop();
                     }
-                } catch (err) {
-                    log('WARN', `[SHUTDOWN] heartbeatWatchdog.stop falhou: ${err?.message || String(err)}`);
+                } catch (/** @type {any} */ err) {
+                    const _e = /** @type {any} */ (err);
+                    log('WARN', `[SHUTDOWN] heartbeatWatchdog.stop falhou: ${_e?.message || String(err)}`);
                 }
             },
         },
@@ -1586,11 +1647,11 @@ async function shutdown(context, options = {}) {
         {
             name: 'TempProfiles',
             fn: async () => {
-                const cleanupTempProfiles = ConnectionOrchestrator?.cleanupTempProfiles;
+                const cleanupTempProfiles = /** @type {any} */ (ConnectionOrchestrator)?.cleanupTempProfiles;
                 if (typeof cleanupTempProfiles !== 'function') {
                     log(
                         'DEBUG',
-                        '[SHUTDOWN] ConnectionOrchestrator.cleanupTempProfiles indisponível; limpeza de perfil temporário ignorada'
+                        '[SHUTDOWN] ConnectionOrchestrator.cleanupTempProfiles indisponível; limpeza de perfil temporário ignorada',
                     );
                     return;
                 }
@@ -1605,28 +1666,29 @@ async function shutdown(context, options = {}) {
 
     const total = shutdownPhases.length;
 
-    for (let i = 0; i < shutdownPhases.length; i++) {
-        const phase = shutdownPhases[i];
+    for (const [i, phase] of shutdownPhases.entries()) {
         const phaseStartTime = Date.now();
 
         try {
             log('INFO', `[SHUTDOWN] ${i + 1}/${total}: Encerrando ${phase.name}...`);
-            await new Promise((resolve, reject) => {
-                const timer = setTimeout(() => {
-                    reject(new Error(`Timeout em fase ${phase.name} após ${shutdownPhaseTimeoutMs}ms`));
-                }, shutdownPhaseTimeoutMs);
+            await /** @type {Promise<void>} */ (
+                new Promise((resolve, reject) => {
+                    const timer = setTimeout(() => {
+                        reject(new Error(`Timeout em fase ${phase.name} após ${shutdownPhaseTimeoutMs}ms`));
+                    }, shutdownPhaseTimeoutMs);
 
-                Promise.resolve()
-                    .then(() => phase.fn())
-                    .then(() => {
-                        clearTimeout(timer);
-                        resolve();
-                    })
-                    .catch(err => {
-                        clearTimeout(timer);
-                        reject(err);
-                    });
-            });
+                    Promise.resolve()
+                        .then(() => phase.fn())
+                        .then(() => {
+                            clearTimeout(timer);
+                            resolve();
+                        })
+                        .catch((err) => {
+                            clearTimeout(timer);
+                            reject(err instanceof Error ? err : new Error(String(err)));
+                        });
+                })
+            );
 
             const duration = Date.now() - phaseStartTime;
 
@@ -1637,7 +1699,8 @@ async function shutdown(context, options = {}) {
             });
 
             log('DEBUG', `[SHUTDOWN] ${phase.name} concluído em ${duration}ms`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             const duration = Date.now() - phaseStartTime;
             failedPhases++;
 
@@ -1645,15 +1708,15 @@ async function shutdown(context, options = {}) {
                 name: phase.name,
                 status: STATUS_VALUES.FAILED,
                 duration,
-                error: error.message,
+                error: _e.message,
             });
 
-            log('ERROR', `[SHUTDOWN] Falha em ${phase.name}: ${error.message}`);
+            log('ERROR', `[SHUTDOWN] Falha em ${phase.name}: ${_e.message}`);
         }
     }
 
     const shutdownDuration = Date.now() - shutdownStartTime;
-    const successCount = phases.filter(p => p.status === STATUS_VALUES.SUCCESS).length;
+    const successCount = phases.filter((p) => p.status === STATUS_VALUES.SUCCESS).length;
 
     // Remove signal handlers ao final para evitar janela de fallback para signal default
     // enquanto o shutdown coordenado ainda está em execução.
@@ -1674,12 +1737,12 @@ async function shutdown(context, options = {}) {
 
     log(
         'WARN',
-        `[SHUTDOWN] ⚠️ Shutdown parcial: ${successCount}/${total} OK, ${failedPhases} falhas em ${shutdownDuration}ms`
+        `[SHUTDOWN] ⚠️ Shutdown parcial: ${successCount}/${total} OK, ${failedPhases} falhas em ${shutdownDuration}ms`,
     );
 
     phases
-        .filter(p => p.status === STATUS_VALUES.FAILED)
-        .forEach(p => {
+        .filter((p) => p.status === STATUS_VALUES.FAILED)
+        .forEach((p) => {
             log('ERROR', `   ❌ ${p.name}: ${p.error}`);
         });
 
@@ -1699,13 +1762,16 @@ async function shutdown(context, options = {}) {
 ========================================================================== */
 
 /**
- * Exclusão mútua global para prevenir shutdown concorrente.
- * Usando Promise em vez de boolean para evitar race conditions.
+ * Exclusão mútua global para prevenir shutdown concorrente. Usando Promise em vez de boolean para evitar race
+ * conditions.
  */
+/** @type {any} */
 let _shutdownPromise = null;
 
 /**
  * Armazena referências dos signal handlers para cleanup
+ *
+ * @type {{ [key: string]: any }}
  */
 const _signalHandlers = {
     sigterm: null,
@@ -1726,13 +1792,11 @@ const _signalHandlers = {
 /**
  * Remove todos os signal handlers registrados.
  *
- * Limpa handlers para SIGINT, SIGTERM, SIGHUP, SIGUSR2, SIGQUIT/SIGBREAK
- * e sinais opcionais de subprocesso (SIGPIPE/SIGCHLD).
- * Essencial para evitar memory leaks e comportamento inesperado
- * durante shutdown ou reinicialização.
+ * Limpa handlers para SIGINT, SIGTERM, SIGHUP, SIGUSR2, SIGQUIT/SIGBREAK e sinais opcionais de subprocesso
+ * (SIGPIPE/SIGCHLD). Essencial para evitar memory leaks e comportamento inesperado durante shutdown ou
+ * reinicialização.
  *
  * @returns {void}
- *
  * @sideEffects
  * - Remove signal handlers do processo
  * - Não afeta outros event listeners
@@ -1780,19 +1844,47 @@ function cleanupSignalHandlers() {
             _signalHandlers.unhandledRejection = null;
         }
         log('DEBUG', '[SHUTDOWN] Signal handlers removidos');
-    } catch (err) {
-        log('WARN', `[SHUTDOWN] Erro ao remover signal handlers: ${err.message}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('WARN', `[SHUTDOWN] Erro ao remover signal handlers: ${_e.message}`);
     }
 }
 
 /**
- * Configura handlers de sinais e falhas fatais.
- * Shutdown sempre passa pelo coordenador único.
+ * Configura handlers de sinais e falhas fatais. Shutdown sempre passa pelo coordenador único.
+ */
+/**
+ * @typedef {object} SetupSignalHandlersContext
+ * @property {any} nerv
+ * @property {any} kernel
+ * @property {any} browserPool
+ * @property {any} driverAdapter
+ * @property {any} serverAdapter
+ * @property {any} httpServer
+ * @property {boolean} httpAuthority
+ * @property {any} queueWorker
+ * @property {any} taskProjector
+ * @property {any} taskControlWatcher
+ * @property {any} missionRunner
+ * @property {any} missionPlannerProcessor
+ * @property {any} attemptWatchdog
+ * @property {any} heartbeatWatchdog
+ * @property {any} agentLoop
+ * @property {any} socketHub
+ * @property {any} serverLifecycle
+ * @property {boolean} serverLifecycleManaged
+ * @property {string} serverMode
+ * @property {any} processAuthority
+ * @property {any} httpPort
+ * @property {any} bootDuration
+ * @property {any} identity
+ * @property {any} systemMode
  */
 /**
  * Registra signal handlers para graceful shutdown.
  *
  * Handlers registrados:
+ *
  * - SIGINT (Ctrl+C): Inicia shutdown gracioso
  * - SIGTERM: Inicia shutdown gracioso
  * - SIGQUIT (POSIX): Inicia shutdown gracioso
@@ -1802,25 +1894,25 @@ function cleanupSignalHandlers() {
  * - SIGHUP: Inicia shutdown gracioso (terminal hangup)
  * - SIGUSR2: Inicia shutdown gracioso (PM2 graceful reload)
  *
- * @param {Object} context - Contexto de runtime retornado por boot()
+ * @param {SetupSignalHandlersContext} context - Contexto de runtime retornado por boot()
  * @returns {void}
- *
  * @sideEffects
  * - Registra signal handlers no processo
  * - Pode sobrescrever handlers existentes
  */
 function setupSignalHandlers(context) {
-    const registerOptionalSignal = (signal, key, handler) => {
+    const registerOptionalSignal = (/** @type {any} */ signal, /** @type {any} */ key, /** @type {any} */ handler) => {
         try {
             process.on(signal, handler);
             _signalHandlers[key] = handler;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
             _signalHandlers[key] = null;
-            log('DEBUG', `[SIGNAL] ${signal} não suportado nesta plataforma: ${err.message}`);
+            log('DEBUG', `[SIGNAL] ${signal} não suportado nesta plataforma: ${_e.message}`);
         }
     };
 
-    const triggerShutdown = async (reason, meta = {}) => {
+    const triggerShutdown = async (/** @type {any} */ reason, /** @type {any} */ meta = {}) => {
         // Se já há shutdown em andamento, retorna a mesma Promise
         if (_shutdownPromise) {
             log('WARN', `[SIGNAL] ${reason} ignorado — shutdown já em andamento, aguardando conclusão...`);
@@ -1831,23 +1923,25 @@ function setupSignalHandlers(context) {
         _shutdownPromise = (async () => {
             log(
                 'WARN',
-                `[SIGNAL] Shutdown disparado (${reason}) — serverMode=${context?.serverMode ?? 'n/a'} httpAuthority=${context?.httpAuthority ?? false} port=${context?.httpPort ?? 'n/a'}`
+                `[SIGNAL] Shutdown disparado (${reason}) — serverMode=${context?.serverMode ?? 'n/a'} httpAuthority=${context?.httpAuthority ?? false} port=${context?.httpPort ?? 'n/a'}`,
             );
 
             // forensics best-effort (não pode falhar)
             try {
                 if (typeof forensics?.createCrashDump === 'function' && meta.error) {
-                    forensics.createCrashDump(null, meta.error, 'sys-signal', reason);
+                    void forensics.createCrashDump(/** @type {any} */ (null), meta.error, 'sys-signal', reason);
                 }
-            } catch (e) {
-                log('ERROR', `[SIGNAL] forensics falhou: ${e.message}`);
+            } catch (/** @type {any} */ e) {
+                const _e = /** @type {any} */ (e);
+                log('ERROR', `[SIGNAL] forensics falhou: ${_e.message}`);
             }
 
             try {
                 const result = await shutdown(context, { exitOnComplete: false });
                 process.exit(result?.ok ? 0 : 1);
-            } catch (err) {
-                log('FATAL', `[SIGNAL] Falha durante shutdown: ${err.message}`);
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
+                log('FATAL', `[SIGNAL] Falha durante shutdown: ${_e.message}`);
                 process.exit(1);
             }
         })();
@@ -1919,14 +2013,15 @@ function setupSignalHandlers(context) {
             const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(
                     () => reject(new Error(`CONFIG reload timeout após ${CONFIG_RELOAD_TIMEOUT_MS}ms`)),
-                    CONFIG_RELOAD_TIMEOUT_MS
-                )
+                    CONFIG_RELOAD_TIMEOUT_MS,
+                ),
             );
 
             await Promise.race([reloadPromise, timeoutPromise]);
             log('INFO', '[SIGNAL] Configuração recarregada');
-        } catch (err) {
-            log('ERROR', `[SIGNAL] Reload falhou: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('ERROR', `[SIGNAL] Reload falhou: ${_e.message}`);
         }
     };
 
@@ -1936,20 +2031,20 @@ function setupSignalHandlers(context) {
        Falhas fatais — crash path coordenado
     ----------------------------------------------------------- */
 
-    _signalHandlers.uncaughtException = error => {
+    _signalHandlers.uncaughtException = (/** @type {any} */ error) => {
         log('FATAL', `[CRASH] Uncaught Exception: ${error.message}`);
         log('ERROR', `[CRASH] Stack: ${error.stack}`);
 
-        triggerShutdown('uncaught-exception', { error });
+        void triggerShutdown('uncaught-exception', { error });
     };
 
-    _signalHandlers.unhandledRejection = (reason, promise) => {
+    _signalHandlers.unhandledRejection = (/** @type {any} */ reason, /** @type {any} */ promise) => {
         log('FATAL', `[CRASH] Unhandled Rejection: ${reason}`);
         log('ERROR', `[CRASH] Promise: ${promise}`);
 
         const error = reason instanceof Error ? reason : new Error(String(reason));
 
-        triggerShutdown('unhandled-rejection', { error });
+        void triggerShutdown('unhandled-rejection', { error });
     };
 
     process.on('uncaughtException', _signalHandlers.uncaughtException);
@@ -1961,8 +2056,8 @@ function __resetShutdownStateForTests() {
 }
 
 /**
- * Hooks de teste do entrypoint principal.
- * Expostos para regressões de lifecycle/sinais sem acionar bootstrap real do processo.
+ * Hooks de teste do entrypoint principal. Expostos para regressões de lifecycle/sinais sem acionar bootstrap real do
+ * processo.
  */
 const __mainTestHooks = Object.freeze({
     setupSignalHandlers,
@@ -1980,17 +2075,14 @@ const __mainTestHooks = Object.freeze({
 /**
  * Entry point soberano do processo.
  *
- * Responsabilidades:
- *   ✔ imprime banner
- *   ✔ executa boot completo
- *   ✔ valida invariantes
- *   ✔ instala signal handlers
- *   ✔ declara modo operacional
+ * Responsabilidades: ✔ imprime banner ✔ executa boot completo ✔ valida invariantes ✔ instala signal handlers ✔ declara
+ * modo operacional
  */
 /**
  * Ponto de entrada principal do sistema Maestro.
  *
  * Sequência de execução:
+ *
  * 1. Validação de argumentos CLI
  * 2. Boot do sistema (6 fases)
  * 3. Setup de signal handlers
@@ -2000,9 +2092,7 @@ const __mainTestHooks = Object.freeze({
  *
  * @async
  * @returns {Promise<void>}
- *
  * @throws {Error} Se boot falhar ou shutdown for forçado
- *
  * @sideEffects
  * - Inicializa sistema completo
  * - Registra signal handlers globais
@@ -2020,7 +2110,7 @@ async function main() {
     ║   Version: 2.0.0 (NERV Architecture)                          ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
-        `
+        `,
         );
 
         const context = await boot();
@@ -2033,22 +2123,24 @@ async function main() {
 
         log(
             'INFO',
-            `[MAIN] Sistema operacional | mode=${context.systemMode} | httpAuthority=${context.httpAuthority ?? false} | port=${context.httpPort ?? 'n/a'}`
+            `[MAIN] Sistema operacional | mode=${context.systemMode} | httpAuthority=${context.httpAuthority ?? false} | port=${context.httpPort ?? 'n/a'}`,
         );
 
         log('INFO', '[MAIN] Ctrl+C para shutdown gracioso.');
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
         // Diagnóstico síncrono para cenários em que o processo encerra antes de flush de logs.
-        console.error('[MAIN_FATAL_SYNC]', error && error.stack ? error.stack : error);
-        log('FATAL', `[MAIN] Falha fatal no entrypoint: ${error.message}`);
-        log('ERROR', `[MAIN] Stack: ${error.stack}`);
+        console.error('[MAIN_FATAL_SYNC]', error && _e.stack ? _e.stack : error);
+        log('FATAL', `[MAIN] Falha fatal no entrypoint: ${_e.message}`);
+        log('ERROR', `[MAIN] Stack: ${_e.stack}`);
 
         try {
             if (typeof forensics?.createCrashDump === 'function') {
-                forensics.createCrashDump(null, error, 'sys-main', 'entrypoint-failure');
+                void forensics.createCrashDump(/** @type {any} */ (null), error, 'sys-main', 'entrypoint-failure');
             }
-        } catch (e) {
-            log('ERROR', `[MAIN] forensics falhou: ${e.message}`);
+        } catch (/** @type {any} */ e) {
+            const _e = /** @type {any} */ (e);
+            log('ERROR', `[MAIN] forensics falhou: ${_e.message}`);
         }
 
         process.exit(1);
@@ -2059,21 +2151,23 @@ async function main() {
    EXECUÇÃO CONDICIONAL — COMPATIBILITY LAYER
 ========================================================================== */
 
-const __shouldBootstrap = shouldAutobootEntrypoint({
-    importMetaUrl: import.meta.url,
-    explicitAutostartEnv: 'MAESTRO_ENTRY_AUTOSTART',
-    allowPm2ExecPathMatch: false,
-});
+const __shouldBootstrap = shouldAutobootEntrypoint(
+    /** @type {any} */ ({
+        importMetaUrl: import.meta.url,
+        explicitAutostartEnv: 'MAESTRO_ENTRY_AUTOSTART',
+        allowPm2ExecPathMatch: false,
+    }),
+);
 
-if (__shouldBootstrap && !globalThis.__MISSION_CONTROL_BOOTSTRAPPED__) {
-    globalThis.__MISSION_CONTROL_BOOTSTRAPPED__ = true;
-    main().catch(err => {
+if (__shouldBootstrap && !(/** @type {any} */ (globalThis).__MISSION_CONTROL_BOOTSTRAPPED__)) {
+    /** @type {any} */ (globalThis).__MISSION_CONTROL_BOOTSTRAPPED__ = true;
+    main().catch((err) => {
         log('FATAL', `[MAIN] Entrypoint main falhou: ${err.message}`);
         process.exit(1);
     });
 }
 
-export { boot, main, resolveServerMode, shutdown, __mainTestHooks };
+export { __mainTestHooks, boot, main, resolveServerMode, shutdown };
 
 // Compatibility exports for server integration
 export { main as maestroBootstrap };

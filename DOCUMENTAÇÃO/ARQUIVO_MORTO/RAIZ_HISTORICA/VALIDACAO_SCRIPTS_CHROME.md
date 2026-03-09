@@ -188,7 +188,7 @@ Retry Delay:       1 segundo
 
 ```bash
 # No container (validar sintaxe)
-bash -c "exit 0"  # Scripts estão no Windows Host, não no container
+bash -c "exit 0" # Scripts estão no Windows Host, não no container
 ```
 
 ### 2. Executar no Windows Host

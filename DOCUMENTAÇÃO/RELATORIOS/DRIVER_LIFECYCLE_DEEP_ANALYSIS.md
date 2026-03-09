@@ -1030,7 +1030,7 @@ if (driverMap.size >= FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE) {
     'WARN',
     `[Factory] Page has ${driverMap.size} drivers cached. ` +
       `Limit: ${FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE}. ` +
-      `Consider invalidating cache.`
+      `Consider invalidating cache.`,
   );
 
   // Estratégia: LRU eviction (futuro)

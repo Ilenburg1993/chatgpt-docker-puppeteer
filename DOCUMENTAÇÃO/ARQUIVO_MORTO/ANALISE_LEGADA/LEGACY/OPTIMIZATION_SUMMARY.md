@@ -136,13 +136,13 @@ make start-linux
 ### Makefile
 
 ```bash
-make build-prod      # Build produção
-make start-prod      # Iniciar produção
-make monitoring      # Prometheus + Grafana
-make backup          # Backup de volumes
-make stats           # Uso de recursos
-make validate        # Validar configuração
-make ci-test         # Testes CI/CD
+make build-prod # Build produção
+make start-prod # Iniciar produção
+make monitoring # Prometheus + Grafana
+make backup     # Backup de volumes
+make stats      # Uso de recursos
+make validate   # Validar configuração
+make ci-test    # Testes CI/CD
 ```
 
 ### NPM Scripts

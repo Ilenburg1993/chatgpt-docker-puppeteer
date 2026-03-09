@@ -1,18 +1,17 @@
 // @ts-check
+import { formatHttpError, http } from '@/lib/http';
 import { defineStore } from 'pinia';
-import { http } from '@/lib/http';
-import { formatHttpError } from '@/lib/http';
 
-function _normalizeUpper(value) {
+function _normalizeUpper(/** @type {any} */ value) {
     return value ? String(value).toUpperCase().trim() : null;
 }
 
-function _normalizeLower(value) {
+function _normalizeLower(/** @type {any} */ value) {
     return value ? String(value).toLowerCase().trim() : null;
 }
 
-function _buildQueryParams(filters, cursor, limit) {
-    const params = { limit: limit || 200 };
+function _buildQueryParams(/** @type {any} */ filters, /** @type {any} */ cursor, /** @type {any} */ limit) {
+    const params = /** @type {any} */ ({ limit: limit || 200 });
     if (cursor) params.cursor = cursor;
 
     const status = _normalizeUpper(filters?.status);
@@ -36,7 +35,7 @@ function _buildQueryParams(filters, cursor, limit) {
     return params;
 }
 
-function _upsertById(list, byId, item) {
+function _upsertById(/** @type {any} */ list, /** @type {any} */ byId, /** @type {any} */ item) {
     if (!item?.id) return;
     const id = String(item.id);
     const existing = byId.get(id);
@@ -45,7 +44,7 @@ function _upsertById(list, byId, item) {
         list.unshift(item);
         return;
     }
-    const idx = list.findIndex(t => t.id === id);
+    const idx = list.findIndex((/** @type {any} */ t) => t.id === id);
     const merged = { ...existing, ...item };
     byId.set(id, merged);
     if (idx >= 0) {
@@ -57,7 +56,7 @@ function _newIdempotencyKey(prefix = 'ui') {
     return `${prefix}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
 }
 
-async function _dispatchControlCommand(command, payload) {
+async function _dispatchControlCommand(/** @type {any} */ command, /** @type {any} */ payload) {
     const idempotencyKey = payload?.idempotency_key || _newIdempotencyKey('ui');
     const res = await http.post('/api/control/commands', {
         command,
@@ -91,11 +90,12 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
         },
     }),
     getters: {
-        getById: state => id => state.byId.get(String(id)) || null,
-        getTaskIdsByMissionId: state => missionId => state.taskIdsByMissionId.get(String(missionId || '')) || [],
-        getTasksByMissionId: state => missionId => {
+        getById: (state) => (/** @type {any} */ id) => state.byId.get(String(/** @type {any} */ id)) || null,
+        getTaskIdsByMissionId: (state) => (/** @type {any} */ missionId) =>
+            state.taskIdsByMissionId.get(String(missionId || '')) || [],
+        getTasksByMissionId: (state) => (/** @type {any} */ missionId) => {
             const ids = state.taskIdsByMissionId.get(String(missionId || '')) || [];
-            return ids.map(id => state.byId.get(id)).filter(Boolean);
+            return ids.map((id) => state.byId.get(id)).filter(Boolean);
         },
     },
     actions: {
@@ -142,7 +142,8 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
 
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
-            } catch (err) {
+            } catch (/** @type {any} */ _rawErr) {
+                const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loading = false;
@@ -168,14 +169,15 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
 
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
-            } catch (err) {
+            } catch (/** @type {any} */ _rawErr) {
+                const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loadingMore = false;
             }
         },
 
-        applyRealtimeUpdatesBatch(payload) {
+        applyRealtimeUpdatesBatch(/** @type {any} */ payload) {
             const updates = payload?.updates || [];
             for (const u of updates) {
                 const task = u?.task || null;
@@ -185,14 +187,19 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             this.rebuildMissionIndex();
         },
 
-        async createTask(payload, reason = 'Criação de task via control plane') {
+        async createTask(/** @type {any} */ payload, reason = 'Criação de task via control plane') {
             return _dispatchControlCommand('TASK_CREATE', {
                 task: payload || {},
                 reason,
             });
         },
 
-        async patchTask(taskId, patch, reason = 'Edição de task via control plane', ifVersion = null) {
+        async patchTask(
+            /** @type {any} */ taskId,
+            /** @type {any} */ patch,
+            reason = 'Edição de task via control plane',
+            ifVersion = null,
+        ) {
             const current = this.getById(taskId);
             const version = ifVersion ?? current?.timestamps?.updated_at_ms ?? current?.updated_at_ms ?? null;
             if (version === null || version === undefined) {
@@ -206,7 +213,12 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             });
         },
 
-        async reassignTaskMission(taskId, missionId, reason = 'Reatribuição de missão da task', ifVersion = null) {
+        async reassignTaskMission(
+            /** @type {any} */ taskId,
+            /** @type {any} */ missionId,
+            reason = 'Reatribuição de missão da task',
+            ifVersion = null,
+        ) {
             const current = this.getById(taskId);
             const version = ifVersion ?? current?.timestamps?.updated_at_ms ?? current?.updated_at_ms ?? null;
             if (version === null || version === undefined) {
@@ -220,16 +232,21 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             });
         },
 
-        async setDependencies(taskId, dependencies, reason = 'Atualização de dependências da task', ifVersion = null) {
+        async setDependencies(
+            /** @type {any} */ taskId,
+            /** @type {any} */ dependencies,
+            reason = 'Atualização de dependências da task',
+            ifVersion = null,
+        ) {
             return this.patchTask(
                 taskId,
                 { dependencies: Array.isArray(dependencies) ? dependencies : [] },
                 reason,
-                ifVersion
+                ifVersion,
             );
         },
 
-        async taskAction(taskId, action, reason = null, ifVersion = null) {
+        async taskAction(/** @type {any} */ taskId, /** @type {any} */ action, reason = null, ifVersion = null) {
             const normalizedAction = String(action || '')
                 .trim()
                 .toUpperCase();
@@ -241,11 +258,11 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
                 task_id: String(taskId),
                 reason: reason || `Ação ${normalizedAction} na task`,
             };
-            if (ifVersion !== null && ifVersion !== undefined) payload.if_version = ifVersion;
+            if (ifVersion !== null && ifVersion !== undefined) /** @type {any} */ (payload).if_version = ifVersion;
             return _dispatchControlCommand(command, payload);
         },
 
-        async bulkAction({ ids, action, params = {}, reason = null }) {
+        async bulkAction(/** @type {any} */ { ids, action, params = {}, reason = null }) {
             const normalizedAction = String(action || '')
                 .trim()
                 .toUpperCase();
@@ -254,7 +271,7 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             }
 
             let bulkAction = normalizedAction;
-            const bulkParams = /** @type {Record<string, any>} */ ({ ...(params || {}) });
+            const bulkParams = /** @type {Record<string, unknown>} */ ({ ...(params || {}) });
 
             if (normalizedAction === 'APPROVE') {
                 bulkAction = 'PATCH';

@@ -1,17 +1,17 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import { DriverNERVAdapter } from '#driver/nerv_adapter/driver_nerv_adapter';
 
-function createAdapterLike(browserPool, hooks = {}) {
+function createAdapterLike(/** @type {any} */ browserPool, /** @type {any} */ hooks = {}) {
     return {
         browserPool,
         _detachDriverTelemetry: hooks.detachDriverTelemetry || (() => {}),
         _cleanupDriver: hooks.cleanupDriver || (() => {}),
         _timeout:
             hooks.timeout ||
-            ((ms, operation) =>
+            ((/** @type {any} */ ms, /** @type {any} */ operation) =>
                 new Promise((_, reject) => {
                     setTimeout(() => {
                         reject(new Error(`Timeout after ${ms}ms (${operation})`));
@@ -38,7 +38,7 @@ test('wave13: hot pool cleanup does not detach context and does not release page
             cleanupDriver: () => {
                 cleanupCalls++;
             },
-        }
+        },
     );
 
     const driver = {
@@ -82,7 +82,7 @@ test('wave13: cold pool cleanup keeps detach + BrowserPool page release', async 
             cleanupDriver: () => {
                 cleanupCalls++;
             },
-        }
+        },
     );
 
     const driver = {

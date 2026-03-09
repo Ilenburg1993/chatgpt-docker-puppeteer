@@ -9,13 +9,13 @@ const HTML_OUT = path.join(PUBLIC_DIR, 'graph.html');
 const MODE_HTML = process.argv.includes('--html');
 
 // --- HELPERS DE DADOS (V3) ---
-const getStatus = t => t.state?.status || t.status || 'UNKNOWN';
-const getId = t => t.meta?.id || t.id || '???';
-const getDeps = t => t.policy?.dependencies || t.dependsOn || [];
-const getPrompt = t => t.spec?.payload?.user_message || t.prompt || '';
-const getPrio = t => t.meta?.priority ?? t.prioridade ?? 5;
-const getAttempts = t => t.state?.attempts || 0;
-const getProject = t => (t.meta?.tags && t.meta.tags.length > 0 ? t.meta.tags[0] : 'Sem Projeto');
+const getStatus = (/** @type {any} */ t) => t.state?.status || t.status || 'UNKNOWN';
+const getId = (/** @type {any} */ t) => t.meta?.id || t.id || '???';
+const getDeps = (/** @type {any} */ t) => t.policy?.dependencies || t.dependsOn || [];
+const getPrompt = (/** @type {any} */ t) => t.spec?.payload?.user_message || t.prompt || '';
+const getPrio = (/** @type {any} */ t) => t.meta?.priority ?? t.prioridade ?? 5;
+const getAttempts = (/** @type {any} */ t) => t.state?.attempts || 0;
+const getProject = (/** @type {any} */ t) => (t.meta?.tags && t.meta.tags.length > 0 ? t.meta.tags[0] : 'Sem Projeto');
 
 // Cores Semânticas
 const COLORS = {
@@ -37,10 +37,11 @@ if (MODE_HTML && !fs.existsSync(PUBLIC_DIR)) {
     fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 }
 
-const files = fs.readdirSync(QUEUE_DIR).filter(f => f.endsWith('.json'));
+const files = fs.readdirSync(QUEUE_DIR).filter((f) => f.endsWith('.json'));
+/** @type {any[]} */
 const tasks = [];
 
-files.forEach(f => {
+files.forEach((f) => {
     try {
         const content = fs.readFileSync(path.join(QUEUE_DIR, f), 'utf-8');
         tasks.push(JSON.parse(content));
@@ -52,7 +53,7 @@ files.forEach(f => {
 // --- MODO HTML (Vis.js) ---
 
 if (MODE_HTML) {
-    const nodes = tasks.map(t => {
+    const nodes = tasks.map((t) => {
         const status = getStatus(t);
         const attempts = getAttempts(t);
         const prio = getPrio(t);
@@ -68,7 +69,7 @@ if (MODE_HTML) {
             group: getProject(t),
             title: `<b>Prompt:</b> ${getPrompt(t).slice(0, 500)}...<br><b>Prio:</b> ${prio}<br><b>Status:</b> ${status}`,
             color: {
-                background: COLORS[status] || '#fff',
+                background: /** @type {any} */ (COLORS)[status] || '#fff',
                 border: '#30363d',
                 highlight: { background: '#58a6ff', border: '#fff' },
             },
@@ -79,10 +80,10 @@ if (MODE_HTML) {
         };
     });
 
-    const edges = [];
-    tasks.forEach(t => {
-        getDeps(t).forEach(depId => {
-            const exists = tasks.some(x => getId(x) === depId);
+    /** @type {any[]} */ const edges = [];
+    tasks.forEach((t) => {
+        getDeps(t).forEach((/** @type {any} */ depId) => {
+            const exists = tasks.some((x) => getId(x) === depId);
             edges.push({
                 from: depId,
                 to: getId(t),
@@ -157,14 +158,14 @@ if (MODE_HTML) {
     console.log('  node [shape=box, style="filled,rounded", fontname="Arial", fontcolor="#ffffff", color="#30363d"];');
     console.log('  edge [color="#8b949e", arrowsize=0.7];');
 
-    tasks.forEach(t => {
+    tasks.forEach((t) => {
         const id = getId(t);
         const status = getStatus(t);
-        const color = COLORS[status] || '#ffffff';
+        const color = /** @type {any} */ (COLORS)[status] || '#ffffff';
         console.log(`  "${id}" [label="${id}\\n(${status})", fillcolor="${color}"];`);
 
-        getDeps(t).forEach(depId => {
-            const exists = tasks.some(x => getId(x) === depId);
+        getDeps(t).forEach((/** @type {any} */ depId) => {
+            const exists = tasks.some((x) => getId(x) === depId);
             const edgeColor = exists ? '#8b949e' : '#f85149';
             const style = exists ? 'solid' : 'dashed';
             console.log(`  "${depId}" -> "${id}" [color="${edgeColor}", style="${style}"];`);

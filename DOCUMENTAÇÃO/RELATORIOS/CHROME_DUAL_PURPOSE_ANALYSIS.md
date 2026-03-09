@@ -129,7 +129,7 @@ const browserPoolResult = await initializeBrowserPoolResilient(
     poolSize: 3,
     browserEndpoint, // ✅ Conecta a Chrome no Windows
   },
-  { nerv }
+  { nerv },
 );
 ```
 

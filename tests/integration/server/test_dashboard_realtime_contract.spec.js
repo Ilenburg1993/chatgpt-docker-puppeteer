@@ -1,29 +1,29 @@
 // @ts-check
-import assert from 'node:assert';
-import http from 'node:http';
-import { after, before, describe, it } from 'node:test';
-import { io as ioClient } from 'socket.io-client';
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import fs from 'node:fs';
+import { after, before, describe, it } from 'node:test';
+import { io as ioClient } from 'socket.io-client';
 
-import * as socketHub from '#server/engine/socket';
-import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
-import * as ssotEventFeed from '#server/realtime/ssot_event_feed';
 import * as schemas from '#core/schemas';
-import { insertTask } from '#infra/db/task_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { closeDb } from '#infra/db/sqlite';
+import { insertTask } from '#infra/db/task_repo';
+import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
+import * as socketHub from '#server/engine/socket';
+import * as ssotEventFeed from '#server/realtime/ssot_event_feed';
 
-function waitForEvent(socket, eventName, timeoutMs = 1500) {
+function waitForEvent(/** @type {any} */ socket, /** @type {any} */ eventName, timeoutMs = 1500) {
     return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
             reject(new Error(`Timeout waiting for ${eventName}`));
         }, timeoutMs);
 
-        socket.once(eventName, data => {
+        socket.once(eventName, (/** @type {any} */ data) => {
             clearTimeout(timeout);
             resolve(data);
         });
@@ -31,13 +31,13 @@ function waitForEvent(socket, eventName, timeoutMs = 1500) {
 }
 
 describe('Dashboard realtime contract (Socket.io)', () => {
-    /** @type {import('http').Server|null} */
+    /** @type {import('http').Server | null} */
     let httpServer = null;
-    /** @type {number|null} */
+    /** @type {number | null} */
     let port = null;
-    /** @type {ReturnType<typeof ioClient>|null} */
+    /** @type {ReturnType<typeof ioClient> | null} */
     let client = null;
-    /** @type {string|null} */
+    /** @type {string | null} */
     let dbPath = null;
 
     before(async () => {
@@ -46,7 +46,7 @@ describe('Dashboard realtime contract (Socket.io)', () => {
 
         dbPath = path.join(
             os.tmpdir(),
-            `maestro-test-dashboard-realtime-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+            `maestro-test-dashboard-realtime-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`,
         );
         process.env.MAESTRO_DB_PATH = dbPath;
         try {
@@ -56,16 +56,18 @@ describe('Dashboard realtime contract (Socket.io)', () => {
         const app = express();
         httpServer = http.createServer(app);
 
-        await new Promise(resolve => {
-            httpServer.listen(0, '127.0.0.1', () => resolve());
-        });
+        await /** @type {Promise<void>} */ (
+            new Promise((resolve) => {
+                /** @type {any} */ (httpServer).listen(0, '127.0.0.1', () => resolve());
+            })
+        );
 
         const address = httpServer.address();
         assert.ok(address && typeof address !== 'string', 'server should expose AddressInfo');
         port = address.port;
         assert.ok(port, 'server should bind an ephemeral port');
 
-        socketHub.init(httpServer);
+        socketHub.init(/** @type {any} */ (httpServer));
 
         const token = jwt.sign(
             {
@@ -75,7 +77,7 @@ describe('Dashboard realtime contract (Socket.io)', () => {
                 jti: `jti-${Date.now()}`,
             },
             process.env.JWT_SECRET,
-            { algorithm: 'HS256', expiresIn: '1h' }
+            { algorithm: 'HS256', expiresIn: '1h' },
         );
 
         client = ioClient(`http://localhost:${port}`, {
@@ -140,7 +142,9 @@ describe('Dashboard realtime contract (Socket.io)', () => {
 
         try {
             if (httpServer) {
-                await new Promise(resolve => httpServer.close(() => resolve()));
+                await /** @type {Promise<void>} */ (
+                    new Promise((resolve) => /** @type {any} */ (httpServer).close(() => resolve()))
+                );
                 httpServer = null;
             }
         } catch {}

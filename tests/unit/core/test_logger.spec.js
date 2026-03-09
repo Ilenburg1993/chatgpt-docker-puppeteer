@@ -1,12 +1,12 @@
 // @ts-check
-import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { after, before, beforeEach, describe, it } from 'node:test';
 import sinon from 'sinon';
 
 // Import logger module (ESM)
-const logger = await import('#core/logger').then(m => m.default ?? m);
+const logger = await import('#core/logger').then((m) => /** @type {any} */ (m).default ?? m);
 
 describe('Logger - Sistema de Logging Unificado', () => {
     const TEST_LOG_DIR = path.join(import.meta.dirname, '../../tmp/logs');
@@ -29,7 +29,7 @@ describe('Logger - Sistema de Logging Unificado', () => {
     beforeEach(() => {
         // Limpar logs entre testes
         const files = fs.existsSync(TEST_LOG_DIR) ? fs.readdirSync(TEST_LOG_DIR) : [];
-        files.forEach(file => {
+        files.forEach((file) => {
             try {
                 fs.unlinkSync(path.join(TEST_LOG_DIR, file));
             } catch (_e) {
@@ -131,7 +131,7 @@ describe('Logger - Sistema de Logging Unificado', () => {
             logger.log('INFO', 'Teste de escrita em arquivo');
 
             // Aguardar escrita assíncrona
-            await new Promise(resolve => {
+            await new Promise((resolve) => {
                 setTimeout(resolve, 100);
             });
 
@@ -208,7 +208,7 @@ describe('Logger - Sistema de Logging Unificado', () => {
             }
 
             const files = fs.readdirSync(TEST_LOG_DIR);
-            const backups = files.filter(f => f.includes('.bak'));
+            const backups = files.filter((f) => f.includes('.bak'));
 
             // Nota: limpeza é feita pela função cleanOldFiles
             assert.ok(backups.length <= 7, 'Deve ter no máximo os arquivos criados');
@@ -237,8 +237,8 @@ describe('Logger - Sistema de Logging Unificado', () => {
 
     describe('8. Integração com Sistema', () => {
         it('deve ser usável como módulo singleton', async () => {
-            const logger1 = await import('#core/logger').then(m => m.default ?? m);
-            const logger2 = await import('#core/logger').then(m => m.default ?? m);
+            const logger1 = await import('#core/logger').then((m) => /** @type {any} */ (m).default ?? m);
+            const logger2 = await import('#core/logger').then((m) => /** @type {any} */ (m).default ?? m);
 
             assert.strictEqual(logger1, logger2, 'Deve retornar a mesma instância');
         });

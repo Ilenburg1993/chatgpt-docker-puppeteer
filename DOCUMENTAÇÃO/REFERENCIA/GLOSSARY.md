@@ -223,7 +223,7 @@ requisições) quando serviço está degradado, prevenindo cascata de falhas.
 
 ```javascript
 // _selectInstance() filtra HEALTHY apenas
-const healthy = pool.filter(e => e.health.status === 'HEALTHY');
+const healthy = pool.filter((e) => e.health.status === 'HEALTHY');
 ```
 
 **Ver também**: [Browser States](#browser-states), [P9.2](#p92-circuit-breaker)
@@ -497,7 +497,7 @@ própria.
 **Exemplo**:
 
 ```javascript
-watcher.on('add', filePath => {
+watcher.on('add', (filePath) => {
   cache.markDirty();
   nerv.emit('QUEUE_CHANGE', { action: 'add', filePath });
 });

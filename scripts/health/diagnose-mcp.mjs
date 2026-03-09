@@ -41,8 +41,14 @@ async function fetchJson(url, init) {
 }
 
 /**
+ * @typedef {object} PrintResultResult
+ * @property {boolean} ok
+ * @property {number} status
+ * @property {string} text
+ */
+/**
  * @param {string} label
- * @param {{ ok: boolean, status: number, text: string }} result
+ * @param {PrintResultResult} result
  */
 function printResult(label, result) {
     const status = `${result.status}${result.ok ? ' OK' : ' FAIL'}`;
@@ -59,7 +65,7 @@ function printResult(label, result) {
  * @param {string} base
  * @param {number} id
  * @param {string} name
- * @param {object} args
+ * @param {any} args
  */
 async function callTool(base, id, name, args) {
     return fetchJson(`${base}/api/mcp`, {
@@ -122,14 +128,16 @@ async function main() {
     printResult('POST /api/mcp tools/list', toolsList);
 
     const toolNames = Array.isArray(toolsList.json?.result?.tools)
-        ? toolsList.json.result.tools.map(item => item?.name).filter(Boolean)
+        ? toolsList.json.result.tools.map((/** @type {any} */ item) => item?.name).filter(Boolean)
         : [];
     if (toolNames.length > 0) {
         console.log(`[MCP DIAG] tools/list count: ${toolNames.length}`);
     }
 
-    const missingCoreTools = REQUIRED_CORE_TOOLS.filter(name => !toolNames.includes(name));
-    const missingLspTools = LSP_ENABLED ? REQUIRED_LSP_TOOLS.filter(name => !toolNames.includes(name)) : [];
+    const missingCoreTools = REQUIRED_CORE_TOOLS.filter((/** @type {any} */ name) => !toolNames.includes(name));
+    const missingLspTools = LSP_ENABLED
+        ? REQUIRED_LSP_TOOLS.filter((/** @type {any} */ name) => !toolNames.includes(name))
+        : [];
     const lspToolsPresent = !LSP_ENABLED || missingLspTools.length === 0;
 
     const ragProbe = await callTool(base, 3, 'rag_search', {
@@ -146,7 +154,7 @@ async function main() {
         const indexMode = ragStructured.data.index_mode;
         const freshness = ragStructured.data.index_freshness_ms;
         console.log(
-            `[MCP DIAG] rag_search backend=${backend} degraded=${degraded} index_mode=${indexMode || 'unknown'} freshness_ms=${typeof freshness === 'number' ? freshness : 'n/a'}`
+            `[MCP DIAG] rag_search backend=${backend} degraded=${degraded} index_mode=${indexMode || 'unknown'} freshness_ms=${typeof freshness === 'number' ? freshness : 'n/a'}`,
         );
     }
 
@@ -157,11 +165,12 @@ async function main() {
         'rag_expand',
         firstChunkId
             ? { chunk_id: firstChunkId, mode: 'lines', before_lines: 20, after_lines: 20 }
-            : { chunk_id: '__diag_missing_chunk__', mode: 'lines', before_lines: 5, after_lines: 5 }
+            : { chunk_id: '__diag_missing_chunk__', mode: 'lines', before_lines: 5, after_lines: 5 },
     );
     printResult('POST /api/mcp tools/call rag_expand', ragExpandProbe);
 
     let lspFunctionalOk = false;
+    /** @type {any[]} */
     let lspFunctionalIssues = [];
     if (LSP_ENABLED && lspToolsPresent) {
         const lspDiagnostics = await callTool(base, 5, 'lsp_diagnostics', { filePath, maxResults: 20 });
@@ -190,7 +199,7 @@ async function main() {
     let githubToolsOk = true;
     if (githubProxyEnabled && toolNames.length > 0) {
         const prefix = String(process.env.MCP_GITHUB_TOOL_PREFIX || 'mcp_github__');
-        const count = toolNames.filter(name => String(name).startsWith(prefix)).length;
+        const count = toolNames.filter((/** @type {any} */ name) => String(name).startsWith(prefix)).length;
         githubToolsOk = count > 0;
     }
 
@@ -243,7 +252,7 @@ async function main() {
     console.log('[MCP DIAG] OK');
 }
 
-main().catch(error => {
+main().catch((error) => {
     console.error(`[MCP DIAG] Fatal: ${error?.message || String(error)}`);
     process.exit(1);
 });

@@ -20,7 +20,7 @@ import { log } from '#core/logger';
 /**
  * @typedef {object} NERVLike
  * @property {(event: string, handler: (payload: unknown) => void) => void} onEvent
- * @property {(actor: string, action: string, payload?: Record<string, unknown>) => unknown|Promise<unknown>} sendEvent
+ * @property {(actor: string, action: string, payload?: Record<string, unknown>) => unknown | Promise<unknown>} sendEvent
  * @property {object} [state]
  */
 
@@ -29,11 +29,16 @@ import { log } from '#core/logger';
  */
 
 /**
+ * @typedef {object} IsValidNERVNerv
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida se uma instância NERV é válida e segura para uso
- * @param {object} [nerv] - Instância do NERV a validar
+ *
+ * @param {IsValidNERVNerv} [nerv] - Instância do NERV a validar
  * @returns {boolean} true se o NERV é válido, false caso contrário
  */
-export function isValidNERV(nerv) {
+export function isValidNERV(/** @type {any} */ nerv) {
     try {
         // Verificações básicas de tipo e estrutura
         if (!nerv || typeof nerv !== 'object') {
@@ -58,21 +63,27 @@ export function isValidNERV(nerv) {
 
         log('DEBUG', '[NERV_UTILS] NERV instance validation passed');
         return true;
-    } catch (err) {
-        log('ERROR', `[NERV_UTILS] Error validating NERV instance: ${err.message}`);
+    } catch (/** @type {any} */ err) {
+        const _ce = /** @type {any} */ (err);
+        log('ERROR', `[NERV_UTILS] Error validating NERV instance: ${_ce.message}`);
         return false;
     }
 }
 
 /**
  * Executa uma operação NERV com validação prévia
+ *
  * @template T
  * @param {NERVLike} nerv - Instância do NERV
  * @param {string} operation - Nome da operação para logging
- * @param {() => T|Promise<T>} operationFn - Função que executa a operação
+ * @param {() => T | Promise<T>} operationFn - Função que executa a operação
  * @returns {Promise<T>} Resultado da operação ou throws se NERV inválido
  */
-export async function safeNERVOperation(nerv, operation, operationFn) {
+export async function safeNERVOperation(
+    /** @type {any} */ nerv,
+    /** @type {any} */ operation,
+    /** @type {any} */ operationFn,
+) {
     if (!isValidNERV(nerv)) {
         const error = new Error(`[NERV_UTILS] Cannot execute ${operation}: NERV instance is invalid`);
         log('ERROR', error.message);
@@ -82,20 +93,22 @@ export async function safeNERVOperation(nerv, operation, operationFn) {
     try {
         log('DEBUG', `[NERV_UTILS] Executing safe NERV operation: ${operation}`);
         return await operationFn();
-    } catch (err) {
-        log('ERROR', `[NERV_UTILS] Error in NERV operation ${operation}: ${err.message}`);
-        throw err;
+    } catch (/** @type {any} */ err) {
+        const _ce = /** @type {any} */ (err);
+        log('ERROR', `[NERV_UTILS] Error in NERV operation ${operation}: ${_ce.message}`);
+        throw _ce;
     }
 }
 
 /**
  * Wrapper para nerv.onEvent com validação
+ *
  * @param {NERVLike} nerv - Instância do NERV
  * @param {string} event - Nome do evento
  * @param {(payload: unknown) => void} handler - Handler do evento
  * @returns {Promise<boolean>} true se registrado com sucesso
  */
-export async function safeOnEvent(nerv, event, handler) {
+export async function safeOnEvent(/** @type {any} */ nerv, /** @type {any} */ event, /** @type {any} */ handler) {
     return safeNERVOperation(nerv, `onEvent(${event})`, () => {
         nerv.onEvent(event, handler);
         return true;
@@ -104,13 +117,19 @@ export async function safeOnEvent(nerv, event, handler) {
 
 /**
  * Wrapper para nerv.sendEvent com validação
+ *
  * @param {NERVLike} nerv - Instância do NERV
  * @param {string} actor - Ator que envia o evento
  * @param {string} action - Ação do evento
- * @param {NERVEventPayload} [payload={}] - Payload do evento
+ * @param {NERVEventPayload} [payload={}] - Payload do evento. Default is `{}`
  * @returns {Promise<unknown>} Resultado do sendEvent
  */
-export async function safeSendEvent(nerv, actor, action, payload = {}) {
+export async function safeSendEvent(
+    /** @type {any} */ nerv,
+    /** @type {any} */ actor,
+    /** @type {any} */ action,
+    /** @type {any} */ payload = {},
+) {
     return safeNERVOperation(nerv, `sendEvent(${actor}, ${action})`, () => {
         return nerv.sendEvent(actor, action, payload);
     });

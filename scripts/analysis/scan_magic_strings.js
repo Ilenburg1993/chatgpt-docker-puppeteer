@@ -6,7 +6,7 @@ import path from 'node:path';
 // Parse arguments
 const args = process.argv.slice(2);
 const INCLUDE_TESTS = args.includes('--include-tests');
-const CUSTOM_DIR = args.find(arg => arg.startsWith('--directory='))?.split('=')[1];
+const CUSTOM_DIR = args.find((arg) => arg.startsWith('--directory='))?.split('=')[1];
 
 const ROOT = CUSTOM_DIR || '/workspaces/chatgpt-docker-puppeteer';
 const DEFAULT_EXCLUDES = ['node_modules', 'backups', '.git', 'logs', 'coverage', 'profile', 'dist'];
@@ -68,10 +68,32 @@ const PATTERNS = [
 
     // Switch statements
     {
-        name: "case 'ACTIONCODE':",
-        regex: /case\s+['"](?!ActionCode\.)([A-Z_]{3,})['"]\s*:/g,
+        name: "case 'ACTIONCODE': (genérico — use enum específico)",
+        regex: /case\s+['"](?!ActionCode\.|TaskControlCommand\.|OrchestrationAction\.)([A-Z_]{3,})['"]\s*:/g,
         severity: 'MEDIUM',
-        fix: 'Use case ActionCode.CONSTANT:',
+        fix: 'Use case ActionCode.CONSTANT / TaskControlCommand.CONSTANT / OrchestrationAction.CONSTANT',
+    },
+
+    // OrchestrationAction — decision.action comparisons
+    {
+        name: "decision.action === 'STRING'",
+        regex: /\.action\s*===?\s*['"](?!OrchestrationAction\.)(DONE|RETRY|NEXT_STEP)['"]/g,
+        severity: 'MEDIUM',
+        fix: 'Use OrchestrationAction.DONE / .RETRY / .NEXT_STEP',
+    },
+    {
+        name: "action: 'STRING' (decision literal)",
+        regex: /\{\s*action:\s*['"](?!OrchestrationAction\.)(DONE|RETRY|NEXT_STEP)['"]/g,
+        severity: 'HIGH',
+        fix: 'Use OrchestrationAction.DONE / .RETRY / .NEXT_STEP in decision object',
+    },
+
+    // TaskControlCommand strings fora de switch
+    {
+        name: "command: 'CONTROL_STRING'",
+        regex: /command:\s*['"](?!TaskControlCommand\.)(PAUSE|RESUME|UNBLOCK|CANCEL|APPROVE|REJECT|REASSIGN_MISSION)['"]/g,
+        severity: 'HIGH',
+        fix: 'Use TaskControlCommand.CONSTANT',
     },
 
     // Object literals (envelope creation)
@@ -93,19 +115,27 @@ const PATTERNS = [
 
 /**
  * Scan a single file for magic string patterns
-  * @returns {any}
+ *
+ * @param {any} filePath
+ * @returns {any[]}
  */
 function scanFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
+    /** @type {any[]} */
     const results = [];
 
-    PATTERNS.forEach(pattern => {
+    PATTERNS.forEach((pattern) => {
         const matches = [...content.matchAll(pattern.regex)];
         if (matches.length > 0) {
-            matches.forEach(match => {
+            matches.forEach((match) => {
                 const lines = content.substring(0, match.index).split('\n');
                 const lineNum = lines.length;
-                const lineContent = lines[lineNum - 1].trim();
+                const lineContent = (lines[lineNum - 1] ?? '').trim();
+
+                // Ignora linhas de comentário (JSDoc, inline, bloco)
+                if (lineContent.startsWith('*') || lineContent.startsWith('//') || lineContent.startsWith('/*')) {
+                    return;
+                }
 
                 results.push({
                     pattern: pattern.name,
@@ -125,12 +155,16 @@ function scanFile(filePath) {
 
 /**
  * Recursively scan directory for JS files
-  * @returns {any}
+ *
+ * @param {any} dir
+ * @param {any[]} [results]
+ * @param {any[]} [excludeDirs]
+ * @returns {any[]}
  */
 function scanDirectory(dir, results = [], excludeDirs = DEFAULT_EXCLUDES) {
     const items = fs.readdirSync(dir);
 
-    items.forEach(item => {
+    items.forEach((item) => {
         if (item.startsWith('.')) {
             return;
         }
@@ -151,6 +185,9 @@ function scanDirectory(dir, results = [], excludeDirs = DEFAULT_EXCLUDES) {
 
 /**
  * Print results grouped by file
+ *
+ * @param {any[]} results
+ * @param {any} label
  */
 function printResults(results, label) {
     if (results.length === 0) {
@@ -161,18 +198,26 @@ function printResults(results, label) {
     console.log(`\n⚠️  ${label}: FOUND ${results.length} OCCURRENCE(S):\n`);
 
     // Group by file
+    /** @type {any} */
     const byFile = {};
-    results.forEach(r => {
-        const shortPath = r.file.replace(ROOT + '/', '');
-        if (!byFile[shortPath]) {
-            byFile[shortPath] = [];
-        }
-        byFile[shortPath].push(r);
-    });
+    results.forEach(
+        /** @param {any} r */ (r) => {
+            const shortPath = r.file.replace(ROOT + '/', '');
+            if (!byFile[shortPath]) {
+                byFile[shortPath] = [];
+            }
+            byFile[shortPath].push(r);
+        },
+    );
 
     // Group by severity
+    /** @type {Record<string, number>} */
     const bySeverity = { HIGH: 0, MEDIUM: 0, LOW: 0 };
-    results.forEach(r => bySeverity[r.severity]++);
+    results.forEach(
+        /** @param {any} r */ (r) => {
+            bySeverity[r.severity] = (bySeverity[r.severity] ?? 0) + 1;
+        },
+    );
 
     console.log('📊 SEVERITY BREAKDOWN:');
     console.log(`   🔴 HIGH: ${bySeverity.HIGH} (must fix)`);
@@ -182,8 +227,9 @@ function printResults(results, label) {
     // Print details
     Object.keys(byFile)
         .sort()
-        .forEach(file => {
-            const issues = byFile[file];
+        .forEach((file) => {
+            const issues = byFile[file] ?? [];
+            /** @type {Record<string, string>} */
             const severityIcon = {
                 HIGH: '🔴',
                 MEDIUM: '🟡',
@@ -191,12 +237,16 @@ function printResults(results, label) {
             };
 
             console.log(`\n📄 ${file} (${issues.length} issue${issues.length > 1 ? 's' : ''}):`);
-            issues.forEach(r => {
-                console.log(`   ${severityIcon[r.severity]} Line ${r.line}: ${r.pattern}`);
-                console.log(`      Match: ${r.match}`);
-                console.log(`      Fix: ${r.fix}`);
-                console.log(`      Code: ${r.lineContent.substring(0, 80)}${r.lineContent.length > 80 ? '...' : ''}`);
-            });
+            issues.forEach(
+                /** @param {any} r */ (r) => {
+                    console.log(`   ${severityIcon[r.severity]} Line ${r.line}: ${r.pattern}`);
+                    console.log(`      Match: ${r.match}`);
+                    console.log(`      Fix: ${r.fix}`);
+                    console.log(
+                        `      Code: ${r.lineContent.substring(0, 80)}${r.lineContent.length > 80 ? '...' : ''}`,
+                    );
+                },
+            );
         });
 }
 
@@ -227,19 +277,22 @@ function main() {
             console.log(`\nℹ️  TESTS: ${testResults.length} occurrence(s)`);
             console.log('(Note: Tests may legitimately use string literals for validation)\n');
 
+            /** @type {any} */
             const byFile = {};
-            testResults.forEach(r => {
-                const shortPath = r.file.replace(ROOT + '/', '');
-                if (!byFile[shortPath]) {
-                    byFile[shortPath] = [];
-                }
-                byFile[shortPath].push(r);
-            });
+            testResults.forEach(
+                /** @param {any} r */ (r) => {
+                    const shortPath = r.file.replace(ROOT + '/', '');
+                    if (!byFile[shortPath]) {
+                        byFile[shortPath] = [];
+                    }
+                    byFile[shortPath].push(r);
+                },
+            );
 
             Object.keys(byFile)
                 .sort()
-                .forEach(file => {
-                    console.log(`  ${file}: ${byFile[file].length} occurrence(s)`);
+                .forEach((file) => {
+                    console.log(`  ${file}: ${(byFile[file] ?? []).length} occurrence(s)`);
                 });
         }
     }
@@ -255,7 +308,8 @@ function main() {
     } else {
         console.log(`❌ ACTION REQUIRED: ${srcResults.length} magic string(s) found in src/\n`);
         console.log('Please replace hardcoded strings with constants from:');
-        console.log('  - src/shared/nerv/constants.js (ActorRole, MessageType, ActionCode)\n');
+        console.log('  - src/shared/nerv/constants.js (ActorRole, MessageType, ActionCode)');
+        console.log('  - src/shared/nerv/constants.js (OrchestrationAction, TaskControlCommand)\n');
         return 1;
     }
 }
@@ -266,10 +320,11 @@ if (import.meta.filename === process.argv[1]) {
         const exitCode = main();
         process.exit(exitCode);
     } catch (err) {
-        console.error('\n❌ ERROR:', err.message);
-        console.error(err.stack);
+        const _e = /** @type {any} */ (err);
+        console.error('\n\u274c ERROR:', _e.message);
+        console.error(_e.stack);
         process.exit(2);
     }
 }
 
-export { scanFile, scanDirectory, PATTERNS };
+export { PATTERNS, scanDirectory, scanFile };

@@ -1,34 +1,52 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import crypto from 'node:crypto';
 
+/**
+ * @param {any} input
+ * @returns {string}
+ */
 function _hashId(input) {
     return crypto.createHash('sha256').update(String(input), 'utf8').digest('hex').slice(0, 20);
 }
 
+/**
+ * @param {any} value
+ * @returns {any[]}
+ */
 function _ensureArray(value) {
     return Array.isArray(value) ? value : [];
 }
 
 /**
+ * @typedef {object} BuildWorkflowNextStepTaskParams
+ * @property {any} parentTask
+ * @property {string} parentTaskId
+ * @property {any} [attemptId]
+ * @property {any} [nextStep]
+ * @property {number} [nextStepIndex]
+ * @property {any} [workflowConfig]
+ * @property {any[]} [completedStepIds]
+ * @property {any} [accumulatedContext]
+ * @property {number} [nowMs]
+ * @property {string} [source]
+ */
+/**
+ * @typedef {object} BuildWorkflowNextStepTaskOptions
+ * @property {any} [parentTask]
+ * @property {any} [parentTaskId]
+ * @property {any} [attemptId]
+ * @property {any} [nextStep]
+ */
+/**
  * Cria task filha determinística para o próximo step de workflow.
  *
- * @param {Object} params
- * @param {Record<string, any>} params.parentTask
- * @param {string} params.parentTaskId
- * @param {string|null} [params.attemptId]
- * @param {Record<string, any>} [params.nextStep]
- * @param {number} [params.nextStepIndex=0]
- * @param {Record<string, any>|null} [params.workflowConfig]
- * @param {string[]} [params.completedStepIds]
- * @param {Record<string, any>} [params.accumulatedContext]
- * @param {number} [params.nowMs]
- * @param {string} [params.source='self_generated']
+ * @param {BuildWorkflowNextStepTaskParams} params
  * @returns {{
- *   childTask: Record<string, any>,
- *   childId: string,
- *   nextStepId: string,
- *   nextStepIndex: number,
- *   workflowId: string
+ *     childTask: Record<string, unknown>;
+ *     childId: string;
+ *     nextStepId: string;
+ *     nextStepIndex: number;
+ *     workflowId: string;
  * }}
  */
 function buildWorkflowNextStepTask({
@@ -68,7 +86,7 @@ function buildWorkflowNextStepTask({
         `Execute workflow step ${safeStepIndex + 1}`;
 
     const completed = _ensureArray(completedStepIds);
-    const inputs = completed.map(stepId => ({
+    const inputs = completed.map((stepId) => ({
         type: 'task_result',
         task_id: accumulatedContext?.[stepId]?.task_id || parentTaskId,
         attempt: 'latest',
@@ -76,7 +94,7 @@ function buildWorkflowNextStepTask({
         label: `workflow_step_output:${String(stepId)}`,
     }));
 
-    const existingTags = _ensureArray(parentTask?.meta?.tags).map(tag => String(tag));
+    const existingTags = _ensureArray(parentTask?.meta?.tags).map((tag) => String(tag));
     const tags = Array.from(new Set([...existingTags, 'workflow_step']));
 
     const childTask = {

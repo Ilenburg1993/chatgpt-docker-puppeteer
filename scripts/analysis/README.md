@@ -1,10 +1,8 @@
 # scripts/analysis
 
 **Propósito**: Scripts de análise estática do código — grafo de dependências, variáveis, strings
-mágicas e cobertura JSDoc.  
-**Status**: Canônico de apoio.  
-**Público**: Mantenedores e ferramentas de CI de qualidade.  
-**Última atualização**: 2 de março de 2026.
+mágicas e cobertura JSDoc. **Status**: Canônico de apoio. **Público**: Mantenedores e ferramentas de
+CI de qualidade. **Última atualização**: 2 de março de 2026.
 
 ## O que esta pasta contém
 
@@ -21,8 +19,9 @@ mágicas e cobertura JSDoc.
 | `jsdoc_coverage_cli.mjs`                     | CLI de cobertura JSDoc                    |
 | `jsdoc_coverage_engine.mjs`                  | Engine de análise de cobertura JSDoc      |
 | `jsdoc_backfill_missing_exports.mjs`         | Identifica exports sem JSDoc              |
-| `typing_hardening_audit.mjs`                 | Auditoria agregada de tipagem e contratos |
-| `tsserver_contract_audit.mjs`                | Verifica drift do wrapper local LSP       |
+| `typing/typing_hardening_audit.mjs`          | Auditoria agregada de tipagem e contratos |
+| `typing/strict_lane_audit.mjs`               | Auditoria de cobertura das lanes strict   |
+| `typing/tsserver_contract_audit.mjs`         | Verifica drift do wrapper local LSP       |
 | `scan_magic_strings.js`                      | Detecta strings mágicas no código         |
 | `scan_literals.js` / `scan_literals_deep.js` | Scanner de literais                       |
 

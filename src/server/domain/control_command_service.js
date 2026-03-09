@@ -1,10 +1,8 @@
 // @ts-check
-import { execFileSync } from 'node:child_process';
-import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { log } from '#core/logger';
 import { insertAuditDiff } from '#infra/db/audit_diff_repo';
+import { getAuditPatchProposalById, updateAuditPatchProposal } from '#infra/db/audit_patch_repo';
+import { getAuditWatchRuleById, upsertAuditWatchRule } from '#infra/db/audit_watch_rule_repo';
 import {
     CONTROL_OPERATION_STATUS,
     createControlOperation,
@@ -13,17 +11,21 @@ import {
     updateControlOperation,
 } from '#infra/db/control_operation_repo';
 import { recordEvent } from '#infra/db/events_repo';
-import { RBAC_PERMISSIONS } from '#infra/db/rbac_repo';
-import { getAuditPatchProposalById, updateAuditPatchProposal } from '#infra/db/audit_patch_repo';
-import { getAuditWatchRuleById, upsertAuditWatchRule } from '#infra/db/audit_watch_rule_repo';
-import { upsertInferenceProfile } from '#infra/db/inference_profile_repo';
 import {
     getInferenceBackendById,
     setInferenceBackendEnabled,
     upsertInferenceBackend,
 } from '#infra/db/inference_backend_repo';
-import { getInferenceModelById, setInferenceModelEnabled, upsertInferenceModel } from '#infra/db/inference_model_repo';
 import { getInferenceClientPolicyByTag, upsertInferenceClientPolicy } from '#infra/db/inference_client_policy_repo';
+import { getInferenceModelById, setInferenceModelEnabled, upsertInferenceModel } from '#infra/db/inference_model_repo';
+import { upsertInferenceProfile } from '#infra/db/inference_profile_repo';
+import { RBAC_PERMISSIONS } from '#infra/db/rbac_repo';
+import { execFileSync } from 'node:child_process';
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { normalizeInferenceClientTag } from '../../inference_gateway/client_tags.js';
+import { resolveInferencePolicy, validateInferenceRoute } from '../../inference_gateway/policy_config.js';
 import {
     cancelMissionCommand,
     createMissionCommand,
@@ -34,6 +36,7 @@ import {
     resumeMissionCommand,
     setMissionPolicyCommand,
 } from './mission_control_service.js';
+import { assertPermission, normalizeActor } from './rbac_policy.js';
 import {
     bulkTaskActionCommand,
     cancelTaskCommand,
@@ -45,9 +48,6 @@ import {
     resumeTaskCommand,
     retryTaskCommand,
 } from './task_control_service.js';
-import { assertPermission, normalizeActor } from './rbac_policy.js';
-import { normalizeInferenceClientTag } from '../../inference_gateway/client_tags.js';
-import { resolveInferencePolicy, validateInferenceRoute } from '../../inference_gateway/policy_config.js';
 
 /** Constante/valor exportado: COMMANDS. */
 const COMMANDS = Object.freeze({
@@ -161,7 +161,7 @@ const COMMAND_OPTIONAL_ENTITY_ID = new Set([
     COMMANDS.DIAGNOSTIC_JOB_CREATE,
 ]);
 
-function _boolEnv(name, fallback) {
+function _boolEnv(/** @type {any} */ name, /** @type {any} */ fallback) {
     const raw = process.env[name];
     if (raw === undefined) return fallback;
     const value = String(raw).trim().toLowerCase();
@@ -170,21 +170,21 @@ function _boolEnv(name, fallback) {
     return fallback;
 }
 
-function _positiveIntEnv(name, fallback) {
+function _positiveIntEnv(/** @type {any} */ name, /** @type {any} */ fallback) {
     const raw = Number(process.env[name]);
     return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
 }
 
-function _csvEnv(name) {
+function _csvEnv(/** @type {any} */ name) {
     const raw = String(process.env[name] || '').trim();
     if (!raw) return [];
     return raw
         .split(',')
-        .map(v => v.trim())
+        .map((v) => v.trim())
         .filter(Boolean);
 }
 
-function _asRecord(value) {
+function _asRecord(/** @type {any} */ value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
@@ -204,7 +204,7 @@ function _safeGitWorktreeStatus() {
         const out = String(execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }) || '');
         const lines = out
             .split(/\r?\n/)
-            .map(v => v.trimEnd())
+            .map((v) => v.trimEnd())
             .filter(Boolean);
         return {
             ok: true,
@@ -212,26 +212,27 @@ function _safeGitWorktreeStatus() {
             changes_count: lines.length,
             sample: lines.slice(0, 20),
         };
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
         return {
             ok: false,
             clean: false,
             changes_count: null,
             sample: [],
-            error: error?.message || String(error),
+            error: _e?.message || String(_e),
         };
     }
 }
 
-function _readPatchCandidateFiles(patch) {
+function _readPatchCandidateFiles(/** @type {any} */ patch) {
     const patchSummary = _asRecord(patch?.patch_summary_json);
     const candidates = Array.isArray(patchSummary.candidate_files)
-        ? patchSummary.candidate_files.map(v => String(v || '').trim()).filter(Boolean)
+        ? patchSummary.candidate_files.map((/** @type {any} */ v) => String(v || '').trim()).filter(Boolean)
         : [];
     return [...new Set(candidates)].slice(0, 100);
 }
 
-function _validateAuditPatchApplyGuards(patch) {
+function _validateAuditPatchApplyGuards(/** @type {any} */ patch) {
     const currentBranch = _safeGitCurrentBranch();
     const allowedBranches = _csvEnv('AUDIT_PATCH_APPLY_ALLOWED_BRANCHES');
     const allowedPrefixes = _csvEnv('AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES');
@@ -240,7 +241,7 @@ function _validateAuditPatchApplyGuards(patch) {
     const pathViolations =
         allowedPrefixes.length === 0
             ? []
-            : candidateFiles.filter(file => !allowedPrefixes.some(prefix => String(file).startsWith(prefix)));
+            : candidateFiles.filter((file) => !allowedPrefixes.some((prefix) => String(file).startsWith(prefix)));
     const worktree = _safeGitWorktreeStatus();
     const requireClean = _boolEnv('AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE', false);
     const worktreeOk = requireClean ? worktree.ok && worktree.clean : true;
@@ -266,7 +267,7 @@ function _validateAuditPatchApplyGuards(patch) {
     };
 }
 
-function _evaluateAuditPatchApplyReadiness(patch) {
+function _evaluateAuditPatchApplyReadiness(/** @type {any} */ patch) {
     const patchId = String(patch?.id || '');
     const approved = patch?.approval_required ? Boolean(patch?.approved_at_ms || patch?.approved_by) : true;
     const statusApproved = String(patch?.status || '') === 'approved';
@@ -329,13 +330,13 @@ function _evaluateAuditPatchApplyReadiness(patch) {
     };
 }
 
-function _normalizeCommand(command) {
+function _normalizeCommand(/** @type {any} */ command) {
     return String(command || '')
         .trim()
         .toUpperCase();
 }
 
-function _asEntity(command, payload = {}) {
+function _asEntity(/** @type {any} */ command, /** @type {any} */ payload = {}) {
     if (command.startsWith('AUDIT_')) {
         if (command.startsWith('AUDIT_PATCH_')) {
             return {
@@ -374,7 +375,7 @@ function _asEntity(command, payload = {}) {
                     payload.alias ||
                     payload.name ||
                     payload.id ||
-                    ''
+                    '',
             ),
         };
     }
@@ -404,15 +405,13 @@ function _getInferenceGatewayBaseUrl() {
     return `http://${host}:${port}`;
 }
 
-/* eslint-disable no-unused-vars */
 function _getDiagnosticAgentBaseUrl() {
     const host = process.env.DIAGNOSTIC_AGENT_HOST || '127.0.0.1';
     const port = Number(process.env.DIAGNOSTIC_AGENT_PORT || 3097);
     return `http://${host}:${port}`;
 }
-/* eslint-enable no-unused-vars */
 
-async function _fetchJson(url, init = {}, timeoutMs = 5000) {
+async function _fetchJson(/** @type {any} */ url, init = {}, timeoutMs = 5000) {
     const res = await fetch(url, {
         ...init,
         signal: AbortSignal.timeout(timeoutMs),
@@ -427,7 +426,7 @@ async function _fetchJson(url, init = {}, timeoutMs = 5000) {
     return { ok: res.ok, status: res.status, json, text };
 }
 
-async function _postJson(url, body, timeoutMs = 5000) {
+async function _postJson(/** @type {any} */ url, /** @type {any} */ body, timeoutMs = 5000) {
     return _fetchJson(
         url,
         {
@@ -435,16 +434,21 @@ async function _postJson(url, body, timeoutMs = 5000) {
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(body || {}),
         },
-        timeoutMs
+        timeoutMs,
     );
 }
 
 /**
- * Envia comandos DIAGNOSTIC_* para o Audit Agent (diagnóstico integrado ao Audit Agent).
- * O Diagnostic Agent standalone foi removido; DIAGNOSTIC_* agora roteia para Audit Agent.
+ * @typedef {object} DispatchDiagnosticCommandPayload
+ * @property {any} _ Propriedades definidas via runtime.
+ */
+/**
+ * Envia comandos DIAGNOSTIC_* para o Audit Agent (diagnóstico integrado ao Audit Agent). O Diagnostic Agent standalone
+ * foi removido; DIAGNOSTIC_* agora roteia para Audit Agent.
+ *
  * @param {string} command - Comando a executar
- * @param {object} payload - Payload do comando
- * @returns {Promise<object>} Resultado da operação
+ * @param {any} payload - Payload do comando
+ * @returns {Promise<any>} Resultado da operação
  */
 async function _dispatchDiagnosticCommand(command, payload) {
     // DIAGNOSTIC_* agora roteia para o Audit Agent (mesma porta/base URL)
@@ -510,7 +514,7 @@ async function _dispatchDiagnosticCommand(command, payload) {
                 const upstream = await _postJson(
                     `${baseUrl}/jobs/${encodeURIComponent(jobId)}/cancel`,
                     { reason: payload.reason || 'control_command_cancel' },
-                    4000
+                    4000,
                 );
                 if (!upstream.ok) {
                     const err = new Error('Falha ao cancelar diagnostic job');
@@ -537,18 +541,19 @@ async function _dispatchDiagnosticCommand(command, payload) {
                 throw err;
             }
         }
-    } catch (err) {
-        if (err?.code) throw err;
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        if (_e?.code) throw err;
         // Diagnostic Agent standalone foi removido; agora roteia para Audit Agent
-        const wrapped = new Error(`Audit Agent (para DIAGNOSTIC) indisponível: ${err?.message || String(err)}`);
+        const wrapped = new Error(`Audit Agent (para DIAGNOSTIC) indisponível: ${_e?.message || String(_e)}`);
         wrapped.statusCode = 503;
         wrapped.code = 'DIAGNOSTIC_TO_AUDIT_AGENT_ROUTING_FAILED';
-        wrapped.details = { base_url: baseUrl, original_error: err?.message };
+        wrapped.details = { base_url: baseUrl, original_error: _e?.message };
         throw wrapped;
     }
 }
 
-async function _dispatchAuditCommand(command, payload) {
+async function _dispatchAuditCommand(/** @type {any} */ command, /** @type {any} */ payload) {
     const baseUrl = _getAuditAgentBaseUrl();
     try {
         switch (command) {
@@ -611,7 +616,7 @@ async function _dispatchAuditCommand(command, payload) {
                 const upstream = await _postJson(
                     `${baseUrl}/jobs/${encodeURIComponent(jobId)}/cancel`,
                     { reason: payload.reason || 'control_command_cancel' },
-                    4000
+                    4000,
                 );
                 if (!upstream.ok) {
                     const err = new Error('Falha ao cancelar audit job');
@@ -638,9 +643,10 @@ async function _dispatchAuditCommand(command, payload) {
                 throw err;
             }
         }
-    } catch (err) {
-        if (err?.code) throw err;
-        const wrapped = new Error(`Audit Agent indisponível: ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        if (_e?.code) throw err;
+        const wrapped = new Error(`Audit Agent indisponível: ${_e?.message || String(_e)}`);
         wrapped.statusCode = 503;
         wrapped.code = 'AUDIT_AGENT_UNAVAILABLE';
         wrapped.details = { base_url: baseUrl };
@@ -648,7 +654,11 @@ async function _dispatchAuditCommand(command, payload) {
     }
 }
 
-async function _dispatchAuditPatchCommand(command, payload, actor) {
+async function _dispatchAuditPatchCommand(
+    /** @type {any} */ command,
+    /** @type {any} */ payload,
+    /** @type {any} */ actor,
+) {
     const patchId = String(payload.patch_id || payload.id || '').trim();
     if (!patchId) {
         const err = new Error('patch_id é obrigatório');
@@ -795,11 +805,16 @@ async function _dispatchAuditPatchCommand(command, payload, actor) {
 }
 
 /**
+ * @typedef {object} ExecuteAuditPatchApplyBefore
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Executa a aplicação real do patch com rollback em caso de falha.
+ *
  * @param {string} patchId - ID do patch
- * @param {object} before - Estado atual do patch
- * @param {string|null} actorId - ID do usuário que executou
- * @returns {object} Resultado da operação
+ * @param {any} before - Estado atual do patch
+ * @param {string | null} actorId - ID do usuário que executou
+ * @returns {any} Resultado da operação
  */
 function _executeAuditPatchApply(patchId, before, actorId) {
     const patchDiff = before.patch_unified_diff;
@@ -837,9 +852,10 @@ function _executeAuditPatchApply(patchId, before, actorId) {
                     // Criar diff reverso para rollback
                     rollbackPatch = _createRollbackDiff(beforeState);
                 }
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
+                const _e = /** @type {any} */ (e);
                 // Não conseguimos capturar estado para rollback - continuamos sem rollback
-                log('WARN', `[AUDIT_PATCH_APPLY] Não foi possível capturar estado para rollback: ${e?.message}`);
+                log('WARN', `[AUDIT_PATCH_APPLY] Não foi possível capturar estado para rollback: ${_e?.message}`);
             }
         }
 
@@ -856,11 +872,12 @@ function _executeAuditPatchApply(patchId, before, actorId) {
                     encoding: 'utf8',
                     stdio: ['pipe', 'pipe', 'ignore'],
                 });
-            } catch (checkErr) {
-                const err = new Error(`Patch não pode ser aplicado (dry-run failed): ${checkErr.message}`);
+            } catch (/** @type {any} */ checkErr) {
+                const _e = /** @type {any} */ (checkErr);
+                const err = new Error(`Patch não pode ser aplicado (dry-run failed): ${_e.message}`);
                 err.statusCode = 409;
                 err.code = 'AUDIT_PATCH_APPLY_DRY_RUN_FAILED';
-                err.details = { check_error: checkErr.message };
+                err.details = { check_error: _e.message };
                 throw err;
             }
         }
@@ -868,7 +885,6 @@ function _executeAuditPatchApply(patchId, before, actorId) {
         // 4. Aplicar o patch
         let stderrOutput = '';
         try {
-            // eslint-disable-next-line no-unused-vars
             const _applyResult = execFileSync('git', ['apply', '--3way', patchFile], {
                 encoding: 'utf8',
                 stdio: ['pipe', 'pipe', 'pipe'],
@@ -879,15 +895,14 @@ function _executeAuditPatchApply(patchId, before, actorId) {
             if (stderrOutput && stderrOutput.trim().length > 0) {
                 log('WARN', `[AUDIT_PATCH_APPLY] git apply output: ${stderrOutput}`);
             }
-        } catch (applyErr) {
-            stderrOutput = applyErr.stderr || '';
-            const err = new Error(
-                `Falha ao aplicar patch: ${applyErr.message}${stderrOutput ? ` - ${stderrOutput}` : ''}`
-            );
+        } catch (/** @type {any} */ applyErr) {
+            const _e = /** @type {any} */ (applyErr);
+            stderrOutput = _e.stderr || '';
+            const err = new Error(`Falha ao aplicar patch: ${_e.message}${stderrOutput ? ` - ${stderrOutput}` : ''}`);
             err.statusCode = 500;
             err.code = 'AUDIT_PATCH_APPLY_FAILED';
             err.details = {
-                apply_error: applyErr.message,
+                apply_error: _e.message,
                 stderr: stderrOutput || null,
                 has_conflicts: stderrOutput?.includes('conflict') || stderrOutput?.includes('CONFLICT'),
             };
@@ -917,7 +932,7 @@ function _executeAuditPatchApply(patchId, before, actorId) {
                 has_rollback: !!rollbackPatch,
             },
         };
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         // 6. Em caso de erro, tentar rollback se possível
         if (applySucceeded && rollbackPatch) {
             try {
@@ -930,8 +945,9 @@ function _executeAuditPatchApply(patchId, before, actorId) {
                 });
                 unlinkSync(rollbackFile);
                 log('INFO', `[AUDIT_PATCH_APPLY] Rollback concluído para patch ${patchId}`);
-            } catch (rollbackErr) {
-                log('ERROR', `[AUDIT_PATCH_APPLY] Rollback falhou para patch ${patchId}: ${rollbackErr.message}`);
+            } catch (/** @type {any} */ rollbackErr) {
+                const _e = /** @type {any} */ (rollbackErr);
+                log('ERROR', `[AUDIT_PATCH_APPLY] Rollback falhou para patch ${patchId}: ${_e.message}`);
             }
         }
 
@@ -943,16 +959,19 @@ function _executeAuditPatchApply(patchId, before, actorId) {
             if (existsSync(patchFile)) {
                 unlinkSync(patchFile);
             }
-        } catch (cleanupErr) {
-            log('WARN', `[AUDIT_PATCH_APPLY] Falha ao limpar arquivo temporário: ${cleanupErr.message}`);
+        } catch (/** @type {any} */ cleanupErr) {
+            const _e = /** @type {any} */ (cleanupErr);
+            log('WARN', `[AUDIT_PATCH_APPLY] Falha ao limpar arquivo temporário: ${_e.message}`);
         }
     }
 }
 
 /**
- * Cria um diff de rollback a partir do estado anterior dos arquivos.
- * Gera um diff reverso que pode ser aplicado para restaurar o estado anterior.
- * @param {Array<{file: string, content: string}>} beforeState - Estado anterior dos arquivos
+ * Cria um diff de rollback a partir do estado anterior dos arquivos. Gera um diff reverso que pode ser aplicado para
+ * restaurar o estado anterior.
+ *
+ * @param {{ file: string; content: string }[]} beforeState - Estado anterior dos arquivos
+ * @param {any} beforeState
  * @returns {string} Diff reverso no formato unificado
  */
 function _createRollbackDiff(beforeState) {
@@ -995,7 +1014,7 @@ function _createRollbackDiff(beforeState) {
     return diffLines.join('\n');
 }
 
-async function _dispatchAuditWatchRuleCommand(command, payload) {
+async function _dispatchAuditWatchRuleCommand(/** @type {any} */ command, /** @type {any} */ payload) {
     if (command === COMMANDS.AUDIT_WATCH_RULE_UPSERT) {
         const before =
             payload.id || payload.watch_rule_id ? getAuditWatchRuleById(payload.id || payload.watch_rule_id) : null;
@@ -1059,16 +1078,17 @@ async function _refreshInferenceGatewayPolicies() {
             status: upstream.status,
             result: upstream.json || null,
         };
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return {
             ok: false,
             status: null,
-            error: err?.message || String(err),
+            error: _e?.message || String(_e),
         };
     }
 }
 
-async function _dispatchInferenceCommand(command, payload) {
+async function _dispatchInferenceCommand(/** @type {any} */ command, /** @type {any} */ payload) {
     if (command === COMMANDS.INFERENCE_BACKEND_UPSERT) {
         const before = null;
         const backend = upsertInferenceBackend({
@@ -1121,7 +1141,7 @@ async function _dispatchInferenceCommand(command, payload) {
         }
         const after = setInferenceBackendEnabled(
             backendId,
-            payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled)
+            payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled),
         );
         const reload = await _refreshInferenceGatewayPolicies();
         return {
@@ -1142,7 +1162,7 @@ async function _dispatchInferenceCommand(command, payload) {
         }
         const after = setInferenceModelEnabled(
             modelId,
-            payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled)
+            payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled),
         );
         const reload = await _refreshInferenceGatewayPolicies();
         return {
@@ -1181,21 +1201,23 @@ async function _dispatchInferenceCommand(command, payload) {
     if (command === COMMANDS.INFERENCE_CLIENT_POLICY_UPSERT) {
         const clientTag = String(payload.client_tag || payload.clientTag || '').trim();
         const before = clientTag ? getInferenceClientPolicyByTag(clientTag) : null;
-        const policy = upsertInferenceClientPolicy({
-            id: payload.id || null,
-            client_tag: clientTag,
-            enabled: payload.enabled,
-            profile_id: payload.profile_id,
-            allowed_backends_json: payload.allowed_backends_json ?? payload.allowed_backends,
-            allowed_models_json: payload.allowed_models_json ?? payload.allowed_models,
-            max_parallel: payload.max_parallel ?? payload.maxParallel,
-            rate_limit_json: payload.rate_limit_json ?? payload.rate_limit,
-            timeout_ms: payload.timeout_ms ?? payload.timeoutMs,
-            token_budget_json: payload.token_budget_json ?? payload.token_budget,
-            priority: payload.priority,
-            degraded_behavior_json: payload.degraded_behavior_json ?? payload.degraded_behavior,
-            approval_policy_json: payload.approval_policy_json ?? payload.approval_policy,
-        });
+        const policy = upsertInferenceClientPolicy(
+            /** @type {any} */ ({
+                id: payload.id || null,
+                client_tag: clientTag,
+                enabled: payload.enabled,
+                profile_id: payload.profile_id,
+                allowed_backends_json: payload.allowed_backends_json ?? payload.allowed_backends,
+                allowed_models_json: payload.allowed_models_json ?? payload.allowed_models,
+                max_parallel: payload.max_parallel ?? payload.maxParallel,
+                rate_limit_json: payload.rate_limit_json ?? payload.rate_limit,
+                timeout_ms: payload.timeout_ms ?? payload.timeoutMs,
+                token_budget_json: payload.token_budget_json ?? payload.token_budget,
+                priority: payload.priority,
+                degraded_behavior_json: payload.degraded_behavior_json ?? payload.degraded_behavior,
+                approval_policy_json: payload.approval_policy_json ?? payload.approval_policy,
+            }),
+        );
         const reload = await _refreshInferenceGatewayPolicies();
         return {
             before,
@@ -1242,15 +1264,16 @@ async function _dispatchInferenceCommand(command, payload) {
             const upstream = await _postJson(
                 `${_getInferenceGatewayBaseUrl()}/v1/models`,
                 { clientTag: resolved.clientTag },
-                3000
+                3000,
             );
             modelsProbe = {
                 ok: upstream.ok,
                 status: upstream.status,
                 models_count: Array.isArray(upstream.json?.models) ? upstream.json.models.length : null,
             };
-        } catch (err) {
-            modelsProbe = { ok: false, status: null, error: err?.message || String(err) };
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            modelsProbe = { ok: false, status: null, error: _e?.message || String(_e) };
         }
     }
 
@@ -1275,7 +1298,7 @@ async function _dispatchInferenceCommand(command, payload) {
     };
 }
 
-function _assertBaseCommandGuards(command, payload) {
+function _assertBaseCommandGuards(/** @type {any} */ command, /** @type {any} */ payload) {
     const requireReason = _boolEnv('CONTROL_REQUIRE_REASON', true);
     const requireIdempotency = _boolEnv('CONTROL_REQUIRE_IDEMPOTENCY_KEY', true);
 
@@ -1308,18 +1331,19 @@ function _assertBaseCommandGuards(command, payload) {
     return { reason, idempotencyKey };
 }
 
-async function _emitCommandStatus(statusPayload) {
+async function _emitCommandStatus(/** @type {any} */ statusPayload) {
     try {
         const socketHub = await import('#server/engine/socket');
         if (typeof socketHub?.notify === 'function') {
             socketHub.notify('control:command_status', statusPayload);
         }
-    } catch (err) {
-        log('DEBUG', `[ControlCommandService] notify(control:command_status) skipped: ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('DEBUG', `[ControlCommandService] notify(control:command_status) skipped: ${_e?.message || String(_e)}`);
     }
 }
 
-function _dispatch(command, payload, actor) {
+function _dispatch(/** @type {any} */ command, /** @type {any} */ payload, /** @type {any} */ actor) {
     switch (command) {
         case COMMANDS.MISSION_CREATE:
             return createMissionCommand({
@@ -1484,10 +1508,18 @@ function _dispatch(command, payload, actor) {
 }
 
 /**
+ * @typedef {object} ValidateCommandOptions
+ * @property {any} [command]
+ * @property {any} [payload]
+ * @property {any} [actor]
+ */
+/**
  * Função exportada: validateCommand.
+ *
+ * @param {ValidateCommandOptions} [options]
  * @returns {any}
  */
-function validateCommand({ command, payload = {}, actor = null }) {
+function validateCommand({ command, payload = {}, actor = null } = {}) {
     const normalized = _normalizeCommand(command);
 
     try {
@@ -1501,7 +1533,7 @@ function validateCommand({ command, payload = {}, actor = null }) {
         }
 
         const actorNormalized = normalizeActor(actor || {});
-        const permission = COMMAND_PERMISSION[normalized];
+        const permission = /** @type {any} */ (COMMAND_PERMISSION)[normalized];
         assertPermission(actorNormalized, permission);
 
         _assertBaseCommandGuards(normalized, payload);
@@ -1522,25 +1554,35 @@ function validateCommand({ command, payload = {}, actor = null }) {
             statusCode: 200,
             errors: [],
         };
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return {
             ok: false,
-            code: err?.code || 'CONTROL_COMMAND_INVALID',
-            statusCode: err?.statusCode || 422,
-            errors: [err?.message || String(err)],
+            code: _e?.code || 'CONTROL_COMMAND_INVALID',
+            statusCode: _e?.statusCode || 422,
+            errors: [_e?.message || String(_e)],
         };
     }
 }
 
 /**
+ * @typedef {object} ExecuteCommandOptions
+ * @property {any} [command]
+ * @property {any} [payload]
+ * @property {any} [actor]
+ * @property {boolean} [dryRun]
+ */
+/**
  * Função exportada: executeCommand.
+ *
+ * @param {ExecuteCommandOptions} [options]
  * @returns {Promise<any>}
  */
-async function executeCommand({ command, payload = {}, actor = null, dryRun = false }) {
+async function executeCommand({ command, payload = {}, actor = null, dryRun = false } = {}) {
     const normalized = _normalizeCommand(command);
 
     const actorNormalized = normalizeActor(actor || {});
-    const permission = COMMAND_PERMISSION[normalized];
+    const permission = /** @type {any} */ (COMMAND_PERMISSION)[normalized];
     if (!permission) {
         const err = new Error(`Comando não suportado: ${normalized}`);
         err.statusCode = 422;
@@ -1609,7 +1651,8 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
     });
 
     try {
-        const result = await _dispatch(normalized, payload, actorNormalized);
+        // eslint-disable-next-line @typescript-eslint/await-thenable
+        const result = /** @type {any} */ (await _dispatch(normalized, payload, actorNormalized));
         const finalEntityId = entity.entityId || result?.after?.meta?.id || result?.after?.id || 'task:new';
 
         const updatedOperation = updateControlOperation(operation.id, {
@@ -1631,8 +1674,9 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
                     before: result?.before ?? null,
                     after: result?.after ?? null,
                 });
-            } catch (err) {
-                log('WARN', `[ControlCommandService] insertAuditDiff failed: ${err?.message || String(err)}`);
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
+                log('WARN', `[ControlCommandService] insertAuditDiff failed: ${_e?.message || String(_e)}`);
             }
         }
 
@@ -1651,7 +1695,7 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
                 },
                 dedupKey: `control:${operation.id}:succeeded`,
             });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             void err;
             // Best-effort audit event; command success path must continue.
         }
@@ -1671,11 +1715,12 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
             operation: updatedOperation || getControlOperationById(operation.id),
             result,
         };
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         const failedOperation = updateControlOperation(operation.id, {
             status: CONTROL_OPERATION_STATUS.FAILED,
-            error_code: err?.code || 'CONTROL_COMMAND_FAILED',
-            error_message: err?.message || String(err),
+            error_code: _e?.code || 'CONTROL_COMMAND_FAILED',
+            error_message: _e?.message || String(_e),
             result: {
                 command: normalized,
                 entity_type: entity.entityType,
@@ -1695,12 +1740,12 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
                     entity_type: entity.entityType,
                     entity_id: entity.entityId,
                     reason,
-                    code: err?.code || 'CONTROL_COMMAND_FAILED',
-                    error: err?.message || String(err),
+                    code: _e?.code || 'CONTROL_COMMAND_FAILED',
+                    error: _e?.message || String(_e),
                 },
                 dedupKey: `control:${operation.id}:failed`,
             });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             void err;
             // Best-effort audit event; failure path telemetry must not mask original error.
         }
@@ -1712,15 +1757,15 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
             entity_type: entity.entityType,
             entity_id: entity.entityId,
             error: {
-                code: err?.code || 'CONTROL_COMMAND_FAILED',
-                message: err?.message || String(err),
+                code: _e?.code || 'CONTROL_COMMAND_FAILED',
+                message: _e?.message || String(_e),
             },
         });
 
-        const wrapped = new Error(err?.message || 'Falha ao executar comando de controle');
-        wrapped.statusCode = err?.statusCode || 500;
-        wrapped.code = err?.code || 'CONTROL_COMMAND_FAILED';
-        wrapped.details = err?.details || null;
+        const wrapped = new Error(_e?.message || 'Falha ao executar comando de controle');
+        wrapped.statusCode = _e?.statusCode || 500;
+        wrapped.code = _e?.code || 'CONTROL_COMMAND_FAILED';
+        wrapped.details = _e?.details || null;
         /** @type {any} */ (wrapped).operation = failedOperation;
         throw wrapped;
     }

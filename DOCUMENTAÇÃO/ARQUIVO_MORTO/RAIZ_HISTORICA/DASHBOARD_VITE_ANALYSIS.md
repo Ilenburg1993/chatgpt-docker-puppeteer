@@ -476,7 +476,7 @@ export default defineConfig({
           vis: ['vis-timeline', 'vis-data'],
           utils: ['axios', 'lodash-es', 'date-fns', 'uuid'],
         },
-        assetFileNames: assetInfo => {
+        assetFileNames: (assetInfo) => {
           const info = assetInfo.name.split('.');
           const extType = info[info.length - 1];
           if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/i.test(assetInfo.name)) {

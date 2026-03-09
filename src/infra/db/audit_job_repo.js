@@ -5,6 +5,11 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} [fallback]
+ * @returns {string}
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -13,6 +18,11 @@ function _safeJsonString(value, fallback = '{}') {
     }
 }
 
+/**
+ * @param {unknown} raw
+ * @param {unknown} [fallback]
+ * @returns {any}
+ */
 function _parseJson(raw, fallback = null) {
     if (raw === null || raw === undefined) return fallback;
     try {
@@ -22,6 +32,33 @@ function _parseJson(raw, fallback = null) {
     }
 }
 
+/**
+ * @typedef {object} AuditJob
+ * @property {string} id
+ * @property {string} status
+ * @property {string} kind
+ * @property {number} priority
+ * @property {string} trigger_type
+ * @property {string | null} trigger_ref
+ * @property {Record<string, any>} scope_json
+ * @property {Record<string, any>} policy_json
+ * @property {string | null} mission_id
+ * @property {string | null} current_step
+ * @property {string | null} created_by
+ * @property {string | null} assigned_to
+ * @property {number} attempt_seq
+ * @property {any} result_json
+ * @property {any} error_json
+ * @property {number} created_at_ms
+ * @property {number} updated_at_ms
+ * @property {number | null} started_at_ms
+ * @property {number | null} completed_at_ms
+ */
+
+/**
+ * @param {Record<string, any> | null | undefined} row
+ * @returns {AuditJob | null}
+ */
 function _rowToAuditJob(row) {
     if (!row) return null;
     return {
@@ -48,10 +85,36 @@ function _rowToAuditJob(row) {
 }
 
 /**
- * Função exportada: createAuditJob.
- * @returns {any}
+ * @typedef {object} CreateAuditJobInput
+ * @property {string} [id]
+ * @property {string} [status]
+ * @property {string} [kind]
+ * @property {number} [priority]
+ * @property {string} [trigger_type]
+ * @property {string} [trigger_ref]
+ * @property {Record<string, any>} [scope_json]
+ * @property {Record<string, any>} [scope]
+ * @property {Record<string, any>} [policy_json]
+ * @property {Record<string, any>} [policy]
+ * @property {string} [mission_id]
+ * @property {string} [current_step]
+ * @property {string} [created_by]
+ * @property {string} [assigned_to]
+ * @property {number} [attempt_seq]
+ * @property {any} [result_json]
+ * @property {any} [error_json]
+ * @property {number} [created_at_ms]
+ * @property {number} [updated_at_ms]
+ * @property {number | null} [started_at_ms]
+ * @property {number | null} [completed_at_ms]
  */
-function createAuditJob(input = {}) {
+/**
+ * Função exportada: createAuditJob.
+ *
+ * @param {CreateAuditJobInput} [input]
+ * @returns {AuditJob | null}
+ */
+function createAuditJob(input = /** @type {CreateAuditJobInput} */ ({})) {
     const db = getDb();
     const now = _now();
     db.prepare(
@@ -67,7 +130,7 @@ function createAuditJob(input = {}) {
             @created_by, @assigned_to, @attempt_seq, @result_json, @error_json,
             @created_at_ms, @updated_at_ms, @started_at_ms, @completed_at_ms
         )
-    `
+    `,
     ).run({
         id: String(input.id || '').trim(),
         status: String(input.status || 'PENDING')
@@ -96,17 +159,28 @@ function createAuditJob(input = {}) {
 
 /**
  * Função exportada: getAuditJobById.
- * @returns {any}
+ *
+ * @param {string} id Unique identifier.
+ * @returns {AuditJob | null}
  */
 function getAuditJobById(id) {
     const db = getDb();
-    const row = db.prepare('SELECT * FROM audit_jobs WHERE id = ?').get(String(id || '').trim());
+    const row = /** @type {Record<string, any> | null} */ (
+        db.prepare('SELECT * FROM audit_jobs WHERE id = ?').get(String(id || '').trim())
+    );
     return _rowToAuditJob(row);
 }
 
 /**
+ * @typedef {object} ListAuditJobsOptions
+ * @property {any} [status]
+ * @property {any} [limit]
+ */
+/**
  * Função exportada: listAuditJobs.
- * @returns {any}
+ *
+ * @param {ListAuditJobsOptions} [options]
+ * @returns {AuditJob[]}
  */
 function listAuditJobs({ status = null, limit = 100 } = {}) {
     const db = getDb();
@@ -118,18 +192,39 @@ function listAuditJobs({ status = null, limit = 100 } = {}) {
             ${status ? 'WHERE status = @status' : ''}
             ORDER BY updated_at_ms DESC
             LIMIT @limit
-        `
+        `,
         )
         .all({
             status: status ? String(status) : null,
             limit: Math.max(1, Math.min(Number(limit) || 100, 500)),
         });
-    return rows.map(_rowToAuditJob).filter(Boolean);
+    return /** @type {AuditJob[]} */ (/** @type {Record<string, any>[]} */ (rows).map(_rowToAuditJob).filter(Boolean));
 }
 
 /**
+ * @typedef {object} UpdateAuditJobUpdates
+ * @property {string} [status]
+ * @property {number} [priority]
+ * @property {string} [trigger_ref]
+ * @property {Record<string, any>} [scope_json]
+ * @property {Record<string, any>} [scope]
+ * @property {Record<string, any>} [policy_json]
+ * @property {Record<string, any>} [policy]
+ * @property {string} [mission_id]
+ * @property {string} [current_step]
+ * @property {string} [assigned_to]
+ * @property {number} [attempt_seq]
+ * @property {any} [result_json]
+ * @property {any} [error_json]
+ * @property {number | null} [started_at_ms]
+ * @property {number | null} [completed_at_ms]
+ */
+/**
  * Função exportada: updateAuditJob.
- * @returns {any}
+ *
+ * @param {string} id
+ * @param {UpdateAuditJobUpdates} [updates]
+ * @returns {AuditJob | null}
  */
 function updateAuditJob(id, updates = {}) {
     const existing = getAuditJobById(id);
@@ -154,7 +249,7 @@ function updateAuditJob(id, updates = {}) {
             started_at_ms = @started_at_ms,
             completed_at_ms = @completed_at_ms
         WHERE id = @id
-    `
+    `,
     ).run({
         id: existing.id,
         status: updates.status ? String(updates.status).trim().toUpperCase() : existing.status,
@@ -223,7 +318,9 @@ function updateAuditJob(id, updates = {}) {
 
 /**
  * Função exportada: upsertAuditJobSnapshot.
- * @returns {any}
+ *
+ * @param {any} job
+ * @returns {AuditJob | null}
  */
 function upsertAuditJobSnapshot(job) {
     const existing = getAuditJobById(job?.id);

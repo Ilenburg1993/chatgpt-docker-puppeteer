@@ -106,10 +106,7 @@ winston (3 novos pacotes)
 ### ✅ Seção 2: Locale / Timezone / System
 
 ```dockerfile
-locales              ✅ OK (PT-BR support)
-libnss-wrapper       ✅ OK (NSS Gatekeeper, requerido por post-create.sh)
-curl                 ✅ OK (downloads, health checks)
-openssh-client       ✅ OK (SSH agent forwarding)
+
 ```
 
 ---
@@ -117,16 +114,7 @@ openssh-client       ✅ OK (SSH agent forwarding)
 ### ✅ Seção 3: Node Native Build Toolchain
 
 ```dockerfile
-build-essential      ✅ OK (gcc, g++, make para node-gyp)
-pkg-config           ✅ OK (configuração de builds nativos)
-autoconf             ✅ OK (bindings legados)
-automake             ✅ OK (bindings legados)
-libtool              ✅ OK (bindings legados)
-python3              ✅ OK (node-gyp requer Python)
-python3-pip          ✅ OK (scripts Python como colect.py)
-python-is-python3    ✅ OK (compatibility)
-openssl              ✅ OK (TLS, crypto)
-ca-certificates      ✅ OK (HTTPS validation)
+
 ```
 
 **Análise**:
@@ -139,40 +127,7 @@ ca-certificates      ✅ OK (HTTPS validation)
 ### ✅ Seção 4: Browser Fallback & Chrome Compatibility
 
 ```dockerfile
-chromium             ✅ OK (fallback local)
-libasound2           ✅ OK (audio)
-libcups2             ✅ OK (printing)
-libdbus-1-3          ✅ OK (IPC)
-libdrm2              ✅ OK (GPU)
-libgbm1              ✅ OK (GPU)
-libglib2.0-0         ✅ OK (runtime)
-libgtk-3-0           ✅ OK (UI shims)
-libatk1.0-0          ✅ OK (accessibility)
-libatk-bridge2.0-0   ✅ OK (accessibility bridge)
-libx11-6             ✅ OK (X11)
-libx11-xcb1          ✅ OK (X11-XCB)
-libxcb1              ✅ OK (XCB)
-libxcomposite1       ✅ OK (compositing)
-libxdamage1          ✅ OK (damage tracking)
-libxfixes3           ✅ OK (X fixes)
-libxrandr2           ✅ OK (RandR)
-libxrender1          ✅ OK (rendering)
-libxcursor1          ✅ OK (cursor)
-libxi6               ✅ OK (input)
-libxkbcommon0        ✅ OK (keyboard)
-libxshmfence1        ✅ OK (shared memory)
-libxss1              ✅ OK (screensaver)
-libxtst6             ✅ OK (testing)
-libnss3              ✅ OK (TLS internals)
-libnspr4             ✅ OK (Netscape Portable Runtime)
-libgl1               ✅ OK (OpenGL)
-libvulkan1           ✅ OK (Vulkan)
-mesa-utils           ✅ OK (GPU utilities)
-gdb                  ✅ OK (debugging)
-heaptrack            ✅ OK (memory profiling)
-fontconfig           ✅ OK (fonts management)
-libfreetype6         ✅ OK (font rendering)
-xdg-utils            ✅ OK (desktop integration)
+
 ```
 
 **Análise**:
@@ -186,21 +141,7 @@ xdg-utils            ✅ OK (desktop integration)
 ### ✅ Seção 5: Fonts
 
 ```dockerfile
-fontconfig                ✅ OK (fundacional)
-fonts-dejavu-core         ✅ OK (latinas)
-fonts-dejavu-extra        ✅ OK (extended)
-fonts-liberation          ✅ OK (compatibility)
-fonts-noto-core           ✅ OK (Noto base)
-fonts-noto-ui-core        ✅ OK (Noto UI)
-fonts-noto-color-emoji    ✅ OK (emojis)
-fonts-noto-cjk            ✅ OK (CJK - Chinese/Japanese/Korean)
-fonts-noto-extra          ✅ OK (extended)
-fonts-jetbrains-mono      ✅ OK (monospace dev)
-fonts-ipafont-gothic      ✅ OK (Japanese fallback)
-fonts-wqy-zenhei          ✅ OK (Chinese fallback)
-fonts-kacst               ✅ OK (Arabic)
-fonts-freefont-ttf        ✅ OK (legacy PDF)
-xdg-utils                 ✅ OK (PDF viewers)
+
 ```
 
 **Análise**:
@@ -214,48 +155,7 @@ xdg-utils                 ✅ OK (PDF viewers)
 ### ✅ Seção 6: Dev UX (CLI & Diagnostics)
 
 ```dockerfile
-git                  ✅ OK (version control)
-less                 ✅ OK (paging)
-vim                  ✅ OK (editor)
-nano                 ✅ OK (editor simples)
-unzip                ✅ OK (archives)
-zip                  ✅ OK (archives)
-tree                 ✅ OK (directory visualization)
-jq                   ✅ OK (JSON parsing - CRÍTICO para scripts)
-dos2unix             ✅ OK (line endings)
-file                 ✅ OK (file type detection)
-libc-bin             ✅ OK (locale management)
-htop                 ✅ OK (process monitoring)
-lsof                 ✅ OK (open files)
-procps               ✅ OK (ps, top, etc.)
-psmisc               ✅ OK (killall, fuser, etc.)
-sysstat              ✅ OK (system stats)
-curl                 ✅ OK (HTTP client)
-wget                 ✅ OK (downloads)
-netcat-openbsd       ✅ OK (TCP/UDP testing)
-dnsutils             ✅ OK (dig, nslookup)
-iputils-ping         ✅ OK (ping)
-traceroute           ✅ OK (route tracing)
-openssl              ✅ OK (TLS testing)
-watch                ✅ OK (command repetition)
-time                 ✅ OK (timing)
-strace               ✅ OK (syscall tracing)
-bat                  ✅ OK (cat alternative)
-ripgrep              ✅ OK (grep alternative)
-fd-find              ✅ OK (find alternative)
-fzf                  ✅ OK (fuzzy finder)
-sqlite3              ✅ OK (database CLI)
-redis-tools          ✅ OK (Redis CLI)
-shellcheck           ✅ OK (shell script linting - CRÍTICO)
-yamllint             ✅ OK (YAML linting)
-gnupg                ✅ OK (GPG)
-pass                 ✅ OK (password manager)
-age                  ✅ OK (encryption)
-graphviz             ✅ OK (graph visualization)
-yq                   ✅ OK (YAML processing)
-moreutils            ✅ OK (Unix utilities)
-watchman             ✅ OK (file watching)
-hyperfine            ✅ OK (benchmarking)
+
 ```
 
 **Análise**:
@@ -269,7 +169,7 @@ hyperfine            ✅ OK (benchmarking)
 ### ✅ Seção 6.5: PowerShell (Instrumental)
 
 ```dockerfile
-powershell           ✅ OK (instrumental shell para AI/Copilot)
+
 ```
 
 **Análise**:
@@ -282,7 +182,7 @@ powershell           ✅ OK (instrumental shell para AI/Copilot)
 ### ✅ Seção 7: Docker CLI (No Dockerd)
 
 ```dockerfile
-docker-ce-cli        ✅ OK (apenas CLI, sem daemon)
+
 ```
 
 **Análise**:
@@ -295,8 +195,7 @@ docker-ce-cli        ✅ OK (apenas CLI, sem daemon)
 ### ✅ Seção 8: Shell UX
 
 ```dockerfile
-bash-completion      ✅ OK (autocomplete)
-dumb-init            ✅ OK (PID 1 signal handling)
+
 ```
 
 **Análise**:

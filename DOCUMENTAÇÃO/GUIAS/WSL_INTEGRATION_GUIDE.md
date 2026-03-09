@@ -219,7 +219,7 @@ New-NetFirewallRule -DisplayName "Chrome DevTools for WSL" `
 
 ```bash
 # No WSL
-cat /etc/resolv.conf  # Ver IP do Windows
+cat /etc/resolv.conf # Ver IP do Windows
 ping $(grep nameserver /etc/resolv.conf | awk '{print $2}')
 
 # Se ping falhar, WSL networking está quebrado

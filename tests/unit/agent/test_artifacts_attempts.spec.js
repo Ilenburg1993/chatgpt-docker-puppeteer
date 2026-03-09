@@ -1,22 +1,22 @@
-// @ts-nocheck
-import { describe, it, before, after, beforeEach } from 'node:test';
+// @ts-check
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { after, before, beforeEach, describe, it } from 'node:test';
 
+import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import { createEnvelope } from '#shared/nerv/envelope';
-import { ActorRole, ActionCode, MessageType } from '#shared/nerv/constants';
 
-import { getDb, closeDb } from '#infra/db/sqlite';
-import { insertTask, updateTask } from '#infra/db/task_repo';
-import { createMission, AUTONOMY_MODES, updateMission, MISSION_STATUS } from '#infra/db/mission_repo';
 import { getArtifactById } from '#infra/db/artifact_repo';
+import { AUTONOMY_MODES, createMission, MISSION_STATUS, updateMission } from '#infra/db/mission_repo';
+import { closeDb, getDb } from '#infra/db/sqlite';
 import { getAttemptById } from '#infra/db/task_attempt_repo';
+import { insertTask, updateTask } from '#infra/db/task_repo';
 import { saveResponse } from '#infra/storage/response_adapter';
 
+import { MissionPlannerProcessor } from '../../../src/agent/mission_planner_processor.js';
 import { QueueWorker } from '../../../src/agent/queue_worker.js';
 import { TaskStateProjector } from '../../../src/agent/task_state_projector.js';
-import { MissionPlannerProcessor } from '../../../src/agent/mission_planner_processor.js';
 
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
@@ -30,7 +30,7 @@ function makeArtifactsDir() {
         process.cwd(),
         'tmp',
         'test-artifacts',
-        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     );
     fs.mkdirSync(dir, { recursive: true });
     return dir;
@@ -38,16 +38,17 @@ function makeArtifactsDir() {
 
 class MockNERV {
     constructor() {
+        /** @type {any[]} */
         this.receiveHandlers = [];
     }
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.receiveHandlers.push(handler);
         return () => {
             const idx = this.receiveHandlers.indexOf(handler);
             if (idx >= 0) this.receiveHandlers.splice(idx, 1);
         };
     }
-    receive(envelope) {
+    receive(/** @type {any} */ envelope) {
         for (const h of this.receiveHandlers) h(envelope);
     }
 }
@@ -107,6 +108,7 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
         const worker = new QueueWorker({ kernel, workerId: 'w_test', intervalMs: 999999, maxConcurrentTasks: 1 });
         await worker.tick();
 
+        /** @type {any} */
         const taskRow = db
             .prepare('SELECT latest_attempt_id, latest_rendered_prompt_artifact_id FROM tasks WHERE id = ?')
             .get(taskId);
@@ -131,7 +133,9 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
         const taskId = 'task-resp-1';
         const baseTask = { result: {} };
 
+        /** @type {any} */
         const r1 = await saveResponse(taskId, 'first', baseTask, 'att1');
+        /** @type {any} */
         const r2 = await saveResponse(taskId, 'second', baseTask, 'att2');
 
         assert.ok(r1.storage?.textFile?.includes(`${path.sep}${taskId}${path.sep}att1.txt`));
@@ -164,6 +168,7 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
 
         // Create response files for this attempt via adapter/store.
         const tmpTask = { result: {} };
+        /** @type {any} */
         const persisted = await saveResponse(taskId, 'ok', tmpTask, attemptId);
 
         const storage = {
@@ -184,10 +189,12 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
 
         nerv.receive(completed);
 
+        /** @type {any} */
         const a = db.prepare('SELECT status, response_text_artifact_id FROM task_attempts WHERE id = ?').get(attemptId);
         assert.strictEqual(a.status, 'DONE');
         assert.ok(a.response_text_artifact_id, 'attempt deve ter response_text_artifact_id');
 
+        /** @type {any} */
         const t = db.prepare('SELECT latest_attempt_id, status FROM tasks WHERE id = ?').get(taskId);
         assert.strictEqual(t.latest_attempt_id, attemptId);
         assert.strictEqual(t.status, 'DONE');
@@ -197,6 +204,7 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
 
     it('MissionPlannerProcessor lê resposta via result_json.storage e cria proposals', async () => {
         const db = getDb();
+        /** @type {any} */
         const mission = createMission({
             title: 'm1',
             autonomy_mode: AUTONOMY_MODES.LLM_SUGGEST,
@@ -222,7 +230,7 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
                 state: { status: 'DONE' },
                 result: {},
             },
-            { stage: 'ARCHIVED', status: 'DONE', actor: 'system' }
+            { stage: 'ARCHIVED', status: 'DONE', actor: 'system' },
         );
 
         const attemptId = 'att-planner-1';
@@ -242,6 +250,7 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
             stop_reason: null,
         });
         const tmpTask = { result: {} };
+        /** @type {any} */
         const persisted = await saveResponse(plannerTaskId, responseText, tmpTask, attemptId);
         const storage = {
             text_file: persisted.storage.textFile,
@@ -258,15 +267,17 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
         const proc = new MissionPlannerProcessor({ intervalMs: 999999 });
         await proc.tick();
 
-        const count = db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(mission.id)?.c || 0;
+        const count =
+            /** @type {any} */ (db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(mission.id))
+                ?.c || 0;
         assert.ok(count >= 2, 'deve criar pelo menos uma nova task proposal na missão');
 
         const rows = db
             .prepare('SELECT stage, status FROM tasks WHERE mission_id = ? AND id != ?')
             .all(mission.id, plannerTaskId);
         assert.ok(
-            rows.some(r => r.stage === 'PROPOSED'),
-            'em LLM_SUGGEST, proposals devem entrar como PROPOSED'
+            rows.some((/** @type {any} */ r) => r.stage === 'PROPOSED'),
+            'em LLM_SUGGEST, proposals devem entrar como PROPOSED',
         );
     });
 });

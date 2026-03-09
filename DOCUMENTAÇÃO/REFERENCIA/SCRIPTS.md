@@ -16,8 +16,8 @@ Scripts para iniciar e gerenciar o agente.
 **Exemplos**:
 
 ```bash
-npm start              # Produção
-npm run dev            # Desenvolvimento (auto-restart em mudanças)
+npm start   # Produção
+npm run dev # Desenvolvimento (auto-restart em mudanças)
 ```
 
 ---
@@ -41,10 +41,10 @@ Scripts para gerenciar processos via PM2 (produção).
 **Exemplos**:
 
 ```bash
-npm run daemon:start   # Inicia PM2 daemon
-npm run daemon:status  # Verifica status
-npm run daemon:logs    # Vê logs em tempo real
-npm run daemon:stop    # Para tudo
+npm run daemon:start  # Inicia PM2 daemon
+npm run daemon:status # Verifica status
+npm run daemon:logs   # Vê logs em tempo real
+npm run daemon:stop   # Para tudo
 ```
 
 **Quando usar**:
@@ -70,11 +70,11 @@ Scripts para gerenciar fila de tarefas.
 **Exemplos**:
 
 ```bash
-npm run queue:status           # Ver fila
-npm run queue:add              # Adicionar tarefa (wizard)
-npm run queue:import           # Importar de prompts.txt
-npm run queue:graph            # Gerar visualização
-dot -Tpng fila.dot > fila.png  # Converter DOT para PNG
+npm run queue:status          # Ver fila
+npm run queue:add             # Adicionar tarefa (wizard)
+npm run queue:import          # Importar de prompts.txt
+npm run queue:graph           # Gerar visualização
+dot -Tpng fila.dot > fila.png # Converter DOT para PNG
 ```
 
 ---
@@ -97,9 +97,9 @@ Scripts para análise estática de código (complexidade, dependências, duplica
 **Exemplos**:
 
 ```bash
-npm run analyze:deps           # Circular dependencies (rápido)
-npm run analyze:graph:full     # Análise completa (lento)
-npm run analyze:graph:export   # Exportar para tools externos
+npm run analyze:deps         # Circular dependencies (rápido)
+npm run analyze:graph:full   # Análise completa (lento)
+npm run analyze:graph:export # Exportar para tools externos
 ```
 
 **Quando usar**:
@@ -126,9 +126,9 @@ Scripts para limpeza e manutenção.
 **Exemplos**:
 
 ```bash
-npm run clean              # Limpeza normal (seguro)
-npm run clean:logs         # Apenas logs (seguro)
-npm run reset:hard         # CUIDADO: apaga tudo incluindo fila!
+npm run clean      # Limpeza normal (seguro)
+npm run clean:logs # Apenas logs (seguro)
+npm run reset:hard # CUIDADO: apaga tudo incluindo fila!
 ```
 
 ⚠️ **ATENÇÃO**: `reset:hard` e `clean:queue` apagam dados de tarefas!
@@ -195,12 +195,12 @@ Scripts para executar testes (Node.js Test Runner nativo).
 **Exemplos**:
 
 ```bash
-npm test                       # Todos os testes
-npm run test:unit              # Apenas unit tests
-npm run test:watch:unit        # Watch mode (auto-rerun)
-npm run test:coverage          # Com coverage report
-npm run test:debug             # Debug no Chrome DevTools
-npm run test:health            # Teste específico
+npm test                # Todos os testes
+npm run test:unit       # Apenas unit tests
+npm run test:watch:unit # Watch mode (auto-rerun)
+npm run test:coverage   # Com coverage report
+npm run test:debug      # Debug no Chrome DevTools
+npm run test:health     # Teste específico
 ```
 
 **Estrutura de Testes**:
@@ -252,19 +252,19 @@ Scripts para linting e formatação.
 **Exemplos**:
 
 ```bash
-npm run lint:fix               # Fix ESLint issues
-npm run format                 # Format code
-npm run validate:all           # Full validation (antes de commit)
-npm run check                  # Quick check (lint + format)
+npm run lint:fix     # Fix ESLint issues
+npm run format       # Format code
+npm run validate:all # Full validation (antes de commit)
+npm run check        # Quick check (lint + format)
 ```
 
 **Workflow Recomendado**:
 
 ```bash
 # Antes de commit
-npm run lint:fix               # Auto-fix ESLint
-npm run format                 # Auto-format Prettier
-npm run validate:all           # Lint + format + tests
+npm run lint:fix     # Auto-fix ESLint
+npm run format       # Auto-format Prettier
+npm run validate:all # Lint + format + tests
 git add .
 git commit -m "feat: ..."
 ```
@@ -284,9 +284,9 @@ Scripts utilitários diversos.
 **Exemplos**:
 
 ```bash
-bash scripts/setup/setup.sh    # Setup inicial (primeira vez)
-bash scripts/health/doctor.sh  # Diagnosticar problemas
-npm run diagnose               # Analisar crashes
+bash scripts/setup/setup.sh   # Setup inicial (primeira vez)
+bash scripts/health/doctor.sh # Diagnosticar problemas
+npm run diagnose              # Analisar crashes
 ```
 
 ---
@@ -312,35 +312,35 @@ Scripts executados automaticamente pelo npm.
 **Uso Diário** (desenvolvimento):
 
 ```bash
-npm run dev                    # Iniciar dev mode
-npm run queue:status           # Ver fila
-npm test                       # Rodar testes
-npm run lint:fix               # Fix code issues
+npm run dev          # Iniciar dev mode
+npm run queue:status # Ver fila
+npm test             # Rodar testes
+npm run lint:fix     # Fix code issues
 ```
 
 **Uso Semanal** (manutenção):
 
 ```bash
-npm run clean                  # Limpar logs
-npm run test:coverage          # Coverage report
-npm run analyze:deps           # Verificar dependências
-bash scripts/health/doctor.sh  # Health check
+npm run clean                 # Limpar logs
+npm run test:coverage         # Coverage report
+npm run analyze:deps          # Verificar dependências
+bash scripts/health/doctor.sh # Health check
 ```
 
 **Uso Mensal** (análise profunda):
 
 ```bash
-npm run analyze:graph:full     # Análise completa de código
-npm run test:ci                # CI full validation
-npm run validate:all           # Full validation
+npm run analyze:graph:full # Análise completa de código
+npm run test:ci            # CI full validation
+npm run validate:all       # Full validation
 ```
 
 **Uso Raro** (deploy/emergência):
 
 ```bash
-npm run daemon:start           # Produção
-npm run reset:hard             # Reset total (emergência)
-npm run diagnose               # Crash analysis
+npm run daemon:start # Produção
+npm run reset:hard   # Reset total (emergência)
+npm run diagnose     # Crash analysis
 ```
 
 ### Por Categoria
@@ -379,8 +379,9 @@ npm run diagnose               # Crash analysis
 3. **Passar args**: `npm run script -- --arg=value` (note o `--` extra)
 4. **Rodar múltiplos**: Use `&&` (sequencial) ou `&` (paralelo)
    ```bash
-   npm run lint:fix && npm test      # Sequencial
-   npm run dev & npm run queue:status -- --watch  # Paralelo (background)
+   npm run lint:fix && npm test # Sequencial
+   npm run dev &
+   npm run queue:status -- --watch # Paralelo (background)
    ```
 
 ---

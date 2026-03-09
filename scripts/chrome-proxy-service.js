@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // @ts-check
 import _Impl from '#infra/proxy/chromeProxyService';
-import * as fs from 'node:fs';
 import * as dns from 'node:dns/promises';
+import * as fs from 'node:fs';
 
 /**
- * @typedef {Object} ChromeProxyConfig
+ * @typedef {object} ChromeProxyConfig
  * @property {string | null} [PUBLIC_IP] - Public IP address (auto-detect if null)
  * @property {number} CHROME_PORT - Chrome debugging port (default: 9225)
  * @property {number} PROXY_PORT - Proxy listening port (default: 9224)
@@ -15,14 +15,13 @@ import * as dns from 'node:dns/promises';
  */
 
 /**
- * @typedef {Object} ParseIntSafeOptions
+ * @typedef {object} ParseIntSafeOptions
  * @property {number} [min] - Minimum allowed value (default: 1)
  * @property {number} [max] - Maximum allowed value (default: 65535)
  */
 
 /**
- * Wrapper class - re-exposes important method names for static checks
- * and delegates to the real implementation.
+ * Wrapper class - re-exposes important method names for static checks and delegates to the real implementation.
  *
  * @extends {_Impl}
  */
@@ -36,6 +35,7 @@ class ChromeProxyService extends _Impl {
 
     /**
      * Rewrite WebSocket URL for Chrome DevTools Protocol
+     *
      * @param {string} url - Original WebSocket URL
      * @returns {string} Rewritten URL
      */
@@ -45,6 +45,7 @@ class ChromeProxyService extends _Impl {
 
     /**
      * Handle HTTP request proxying to Chrome
+     *
      * @param {import('http').IncomingMessage} req - HTTP request
      * @param {import('http').ServerResponse} res - HTTP response
      * @returns {void}
@@ -55,6 +56,7 @@ class ChromeProxyService extends _Impl {
 
     /**
      * Handle WebSocket upgrade for Chrome DevTools Protocol
+     *
      * @param {import('http').IncomingMessage} req - HTTP request
      * @param {import('net').Socket} socket - TCP socket
      * @param {Buffer} head - First packet of upgraded stream
@@ -66,6 +68,7 @@ class ChromeProxyService extends _Impl {
 
     /**
      * Start proxy service
+     *
      * @returns {Promise<void>}
      */
     async start() {
@@ -74,6 +77,7 @@ class ChromeProxyService extends _Impl {
 
     /**
      * Stop proxy service gracefully
+     *
      * @returns {Promise<void>}
      */
     async stop() {
@@ -84,21 +88,21 @@ class ChromeProxyService extends _Impl {
 /**
  * Parse and validate integer from environment variable with range checking
  *
+ * @example
+ *     const port = parseIntSafe(process.env.PORT, 3000, 'PORT', { min: 1024, max: 65535 });
+ *
  * @param {string | undefined} value - Raw environment variable value
  * @param {number} defaultValue - Fallback value if parsing fails or out of range
  * @param {string} varName - Variable name for warning messages
  * @param {ParseIntSafeOptions} [range] - Optional min/max range constraints
  * @returns {number} Parsed and validated integer
- *
- * @example
- * const port = parseIntSafe(process.env.PORT, 3000, 'PORT', { min: 1024, max: 65535 });
  */
 function parseIntSafe(value, defaultValue, varName, range = {}) {
     if (value == null || value === '') return defaultValue;
 
     const parsed = parseInt(String(value), 10);
-    const min = Number.isFinite(range.min) ? range.min : 1;
-    const max = Number.isFinite(range.max) ? range.max : 65535;
+    const min = Number.isFinite(range.min) ? /** @type {number} */ (range.min) : 1;
+    const max = Number.isFinite(range.max) ? /** @type {number} */ (range.max) : 65535;
 
     if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
         console.warn(`[WARN] Invalid ${varName}="${value}", using default: ${defaultValue}`);
@@ -111,23 +115,25 @@ function parseIntSafe(value, defaultValue, varName, range = {}) {
  * Parse and validate bind address (IPv4 or IPv6) with strict validation
  *
  * Validates that the address is a valid IP format. Accepts:
+ *
  * - IPv4: 0.0.0.0, 127.0.0.1, 192.168.1.1 (each octet 0-255, no leading zeros except "0")
  * - IPv6: ::, ::1, ::ffff:192.168.1.1, fe80::1, 2001:db8::1 (proper hex format, valid :: compression)
  *
  * Rejects:
+ *
  * - IPv4 out of range (256.1.1.1, 999.999.999.999)
  * - IPv4 with leading zeros (01.02.03.04)
  * - IPv6 malformed (:::1, ::1::2, groups > 4 hex digits)
  * - Hostnames (localhost) and random strings
  *
+ * @example
+ *     const bind = parseBindSafe(process.env.BIND_ADDR, '0.0.0.0');
+ *     // Valid: '0.0.0.0', '127.0.0.1', '::', '::1', 'fe80::1'
+ *     // Invalid: '256.1.1.1', ':::1', 'localhost' → returns '0.0.0.0'
+ *
  * @param {string | undefined} value - Raw bind address value
  * @param {string} defaultValue - Fallback address if invalid
  * @returns {string} Validated bind address
- *
- * @example
- * const bind = parseBindSafe(process.env.BIND_ADDR, '0.0.0.0');
- * // Valid: '0.0.0.0', '127.0.0.1', '::', '::1', 'fe80::1'
- * // Invalid: '256.1.1.1', ':::1', 'localhost' → returns '0.0.0.0'
  */
 function parseBindSafe(value, defaultValue) {
     const v = (value ?? '').trim();
@@ -138,7 +144,7 @@ function parseBindSafe(value, defaultValue) {
         const parts = v.split('.');
         if (parts.length !== 4) return false;
 
-        return parts.every(part => {
+        return parts.every((part) => {
             const num = parseInt(part, 10);
             // Validate: is numeric, no leading zeros (except "0" itself), range 0-255
             return /^\d+$/.test(part) && (part === '0' || !part.startsWith('0')) && num >= 0 && num <= 255;
@@ -155,7 +161,7 @@ function parseBindSafe(value, defaultValue) {
             const ipv4Part = v.substring(7);
             const parts = ipv4Part.split('.');
             if (parts.length === 4) {
-                return parts.every(part => {
+                return parts.every((part) => {
                     const num = parseInt(part, 10);
                     return /^\d+$/.test(part) && num >= 0 && num <= 255;
                 });
@@ -176,10 +182,10 @@ function parseBindSafe(value, defaultValue) {
         if (/:{3,}/.test(v)) return false;
 
         // Validate hex groups: each must be 1-4 hex digits
-        const groups = v.split(':').filter(g => g !== ''); // Empty groups from :: are ok
+        const groups = v.split(':').filter((g) => g !== ''); // Empty groups from :: are ok
         if (groups.length === 0 && v !== '::') return false; // ":" alone is invalid
 
-        return groups.every(group => /^[0-9a-fA-F]{1,4}$/.test(group));
+        return groups.every((group) => /^[0-9a-fA-F]{1,4}$/.test(group));
     })();
 
     if (!isIPv4 && !isIPv6) {
@@ -194,17 +200,18 @@ function parseBindSafe(value, defaultValue) {
  * Detect if running inside a Docker container or Kubernetes pod (best-effort heuristic)
  *
  * Checks multiple indicators:
+ *
  * - Existence of /.dockerenv file
  * - Docker/containerd/kubepods in /proc/1/cgroup
  * - KUBERNETES_SERVICE_HOST environment variable
  * - container environment variable
  *
- * @returns {boolean} True if likely running in a container
- *
  * @example
- * if (isLikelyContainer()) {
- *   console.log('Running in container, using host.docker.internal');
- * }
+ *     if (isLikelyContainer()) {
+ *         console.log('Running in container, using host.docker.internal');
+ *     }
+ *
+ * @returns {boolean} True if likely running in a container
  */
 function isLikelyContainer() {
     try {
@@ -227,13 +234,13 @@ function isLikelyContainer() {
  *
  * Performs a DNS lookup with a configurable timeout. Cleans up timer to prevent leaks.
  *
- * @param {string} host - Hostname or IP to resolve
- * @param {number} [timeoutMs=250] - Timeout in milliseconds (default: 250ms)
- * @returns {Promise<boolean>} True if host resolves, false if fails or times out
- *
  * @example
- * const accessible = await canResolve('host.docker.internal', 500);
- * if (!accessible) console.warn('Chrome host not accessible');
+ *     const accessible = await canResolve('host.docker.internal', 500);
+ *     if (!accessible) console.warn('Chrome host not accessible');
+ *
+ * @param {string} host - Hostname or IP to resolve
+ * @param {number} [timeoutMs=250] - Timeout in milliseconds (default: 250ms). Default is `250`
+ * @returns {Promise<boolean>} True if host resolves, false if fails or times out
  */
 async function canResolve(host, timeoutMs = 250) {
     let timer;
@@ -255,14 +262,14 @@ async function canResolve(host, timeoutMs = 250) {
 /**
  * Extract default gateway IPv4 address from /proc/net/route (Linux containers)
  *
- * Parses the Linux routing table to find the default gateway.
- * Useful for Docker containers running on Linux engines (not Docker Desktop).
- *
- * @returns {string | null} Gateway IP address (e.g., '172.17.0.1') or null if not found
+ * Parses the Linux routing table to find the default gateway. Useful for Docker containers running on Linux engines
+ * (not Docker Desktop).
  *
  * @example
- * const gateway = getDefaultGatewayIPv4();
- * if (gateway) console.log(`Container gateway: ${gateway}`);
+ *     const gateway = getDefaultGatewayIPv4();
+ *     if (gateway) console.log(`Container gateway: ${gateway}`);
+ *
+ * @returns {string | null} Gateway IP address (e.g., '172.17.0.1') or null if not found
  */
 function getDefaultGatewayIPv4() {
     try {
@@ -275,7 +282,7 @@ function getDefaultGatewayIPv4() {
             if (parts.length < 3) continue;
 
             const destination = parts[1];
-            const gatewayHex = parts[2];
+            const gatewayHex = parts[2] ?? '';
 
             // Default route has Destination == 00000000
             if (destination !== '00000000') continue;
@@ -299,18 +306,19 @@ function getDefaultGatewayIPv4() {
  * Intelligently resolve Chrome host address based on environment
  *
  * Resolution strategy (in priority order):
+ *
  * 1. Explicit CHROME_HOST environment variable (always wins)
  * 2. host.docker.internal (Docker Desktop / DevContainer - if resolvable)
  * 3. Default gateway IP (Linux containers - via /proc/net/route)
  * 4. localhost / 127.0.0.1 (fallback)
  *
- * @returns {Promise<string>} Resolved Chrome host address
- *
  * @example
- * const chromeHost = await resolveChromeHost();
- * // Docker Desktop: 'host.docker.internal'
- * // Linux container: '172.17.0.1' (gateway)
- * // Native: '127.0.0.1'
+ *     const chromeHost = await resolveChromeHost();
+ *     // Docker Desktop: 'host.docker.internal'
+ *     // Linux container: '172.17.0.1' (gateway)
+ *     // Native: '127.0.0.1'
+ *
+ * @returns {Promise<string>} Resolved Chrome host address
  */
 async function resolveChromeHost() {
     const explicit = (process.env.CHROME_HOST || '').trim();
@@ -332,15 +340,16 @@ async function resolveChromeHost() {
  * Get PM2 instance identifier for logging and clustering
  *
  * Checks multiple environment variables used by PM2 in different modes:
+ *
  * - NODE_APP_INSTANCE (PM2 cluster mode)
  * - pm_id (PM2 process ID)
  * - PM2_INSTANCE_ID (PM2 instance ID)
  *
- * @returns {string} Instance identifier (defaults to '0')
- *
  * @example
- * const tag = getInstanceTag();
- * console.log(`[pm2:${tag}] Starting...`);
+ *     const tag = getInstanceTag();
+ *     console.log(`[pm2:${tag}] Starting...`);
+ *
+ * @returns {string} Instance identifier (defaults to '0')
  */
 function getInstanceTag() {
     const inst = process.env.NODE_APP_INSTANCE ?? process.env.pm_id ?? process.env.PM2_INSTANCE_ID ?? '0';
@@ -351,20 +360,21 @@ function getInstanceTag() {
  * Create idempotent graceful shutdown handler with hard timeout
  *
  * Returns an async function that:
+ *
  * - Ensures shutdown runs only once (idempotent via closure)
  * - Attempts graceful service stop with timeout protection
  * - Exits process with specified exit code
  * - Aligns with PM2 kill_timeout to prevent forced kills
+ *
+ * @example
+ *     const shutdown = shutdownOnceFactory(service, 12000, 'graceful', 0);
+ *     process.on('SIGTERM', shutdown);
  *
  * @param {ChromeProxyService} svc - Service instance to stop
  * @param {number} timeoutMs - Maximum time to wait for graceful stop (ms)
  * @param {string} reason - Shutdown reason for logging ('graceful' or 'fatal')
  * @param {number} exitCode - Process exit code (0 = success, 1 = error)
  * @returns {() => Promise<void>} Async shutdown handler function
- *
- * @example
- * const shutdown = shutdownOnceFactory(service, 12000, 'graceful', 0);
- * process.on('SIGTERM', shutdown);
  */
 function shutdownOnceFactory(svc, timeoutMs, reason, exitCode) {
     let stopping = false;
@@ -379,9 +389,10 @@ function shutdownOnceFactory(svc, timeoutMs, reason, exitCode) {
             // ✅ P1 FIX: Properly await svc.stop() with null-safe fallback
             const stopPromise = typeof svc.stop === 'function' ? svc.stop() : Promise.resolve();
 
-            await Promise.race([stopPromise, new Promise(resolve => setTimeout(resolve, timeoutMs))]);
+            await Promise.race([stopPromise, new Promise((resolve) => setTimeout(resolve, timeoutMs))]);
         } catch (err) {
-            console.error(`[ERROR][pm2:${tag}] Error during shutdown:`, err && err.stack ? err.stack : err);
+            const _ce = /** @type {any} */ (err);
+            console.error(`[ERROR][pm2:${tag}] Error during shutdown:`, _ce && _ce.stack ? _ce.stack : _ce);
         } finally {
             process.exit(exitCode);
         }
@@ -392,6 +403,7 @@ function shutdownOnceFactory(svc, timeoutMs, reason, exitCode) {
  * Main entry point for Chrome Proxy Service
  *
  * Responsibilities:
+ *
  * - Parse and validate environment configuration
  * - Auto-detect Chrome host (Docker-aware)
  * - Validate port conflicts
@@ -472,7 +484,7 @@ async function main() {
     const shutdownFatal = shutdownOnceFactory(svc, PM2_KILL_TIMEOUT_MS, 'fatal', 1);
 
     const processHandlers = {
-        message: msg => {
+        message: (/** @type {any} */ msg) => {
             // PM2: shutdown_with_message
             if (msg === 'shutdown') shutdownGracefully();
         },
@@ -484,11 +496,11 @@ async function main() {
         sigterm: shutdownGracefully,
         sigquit: shutdownGracefully,
         sigusr2: shutdownGracefully,
-        uncaughtException: err => {
+        uncaughtException: (/** @type {any} */ err) => {
             console.error(`[ERROR][pm2:${tag}] uncaughtException:`, err && err.stack ? err.stack : err);
             shutdownFatal();
         },
-        unhandledRejection: reason => {
+        unhandledRejection: (/** @type {any} */ reason) => {
             console.error(`[ERROR][pm2:${tag}] unhandledRejection:`, reason);
             shutdownFatal();
         },
@@ -518,8 +530,9 @@ async function main() {
         await svc.start();
         console.log(`[INFO][pm2:${tag}] ChromeProxyService started successfully`);
     } catch (err) {
+        const _ce = /** @type {any} */ (err);
         console.error(`\n❌ Failed to start ChromeProxyService [pm2:${tag}]:`);
-        console.error(err && err.stack ? err.stack : err);
+        console.error(_ce && _ce.stack ? _ce.stack : _ce);
 
         unregisterProcessHandlers();
 

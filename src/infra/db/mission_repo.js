@@ -2,6 +2,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
+/** @typedef {Record<string, any>} Mission */
+/** @typedef {Record<string, any>} UpdateMissionUpdates */
+
 /** Constante/valor exportado: MISSION_STATUS. */
 const MISSION_STATUS = Object.freeze({
     DRAFT: 'DRAFT',
@@ -25,6 +28,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} policy
+ * @returns {any}
+ */
 function _normalizePolicy(policy) {
     const base = {
         max_cost_usd_total: 10,
@@ -40,14 +47,23 @@ function _normalizePolicy(policy) {
 }
 
 /**
- * @param {{
- *   title?: string,
- *   description?: string,
- *   autonomy_mode?: string,
- *   policy?: Record<string, unknown>,
- *   context?: Record<string, unknown>
- * }} [input={}]
-  * @returns {any}
+ * @typedef {object} CreateMissionOptions
+ * @property {any} [title]
+ * @property {any} [description]
+ * @property {any} [autonomy_mode]
+ * @property {any} [policy]
+ */
+/**
+ * @typedef {object} CreateMissionInput
+ * @property {string} [title]
+ * @property {string} [description]
+ * @property {string} [autonomy_mode]
+ * @property {Record<string, any>} [policy]
+ * @property {Record<string, any>} [context]
+ */
+/**
+ * @param {CreateMissionInput} [input]
+ * @returns {Mission | null}
  */
 function createMission({
     title,
@@ -73,7 +89,7 @@ function createMission({
             (id, title, description, status, autonomy_mode, policy_json, context_json, created_at_ms, updated_at_ms, started_at_ms, completed_at_ms)
         VALUES
             (@id, @title, @description, @status, @autonomy_mode, @policy_json, @context_json, @created_at_ms, @updated_at_ms, NULL, NULL)
-    `
+    `,
     ).run({
         id,
         title: String(title),
@@ -90,8 +106,15 @@ function createMission({
 }
 
 /**
+ * @typedef {object} ListMissionsOptions
+ * @property {any} [status]
+ * @property {any} [limit]
+ */
+/**
  * Função exportada: listMissions.
- * @returns {any}
+ *
+ * @param {ListMissionsOptions} [options]
+ * @returns {Mission[]}
  */
 function listMissions({ status = null, limit = 500 } = {}) {
     const db = getDb();
@@ -102,16 +125,20 @@ function listMissions({ status = null, limit = 500 } = {}) {
         ORDER BY created_at_ms DESC
         LIMIT @limit
     `;
-    const rows = db.prepare(sql).all({
-        status,
-        limit: Math.max(1, Math.min(Number(limit) || 500, 5000)),
-    });
+    const rows = /** @type {any[]} */ (
+        db.prepare(sql).all({
+            status,
+            limit: Math.max(1, Math.min(Number(limit) || 500, 5000)),
+        })
+    );
     return rows.map(_rowToMission);
 }
 
 /**
  * Função exportada: getMissionById.
- * @returns {any}
+ *
+ * @param {string} missionId Unique identifier.
+ * @returns {Mission | null}
  */
 function getMissionById(missionId) {
     const db = getDb();
@@ -119,13 +146,17 @@ function getMissionById(missionId) {
     return row ? _rowToMission(row) : null;
 }
 
+/**
+ * @param {any} row
+ * @returns {any}
+ */
 function _rowToMission(row) {
     // ✅ P1-20: Protect JSON.parse() from corrupted policy_json
     let policy = {};
     if (row.policy_json) {
         try {
             policy = JSON.parse(row.policy_json);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[mission_repo] Invalid policy_json for mission ${row?.id}: ${msg}`);
             policy = {}; // Fallback to empty object
@@ -137,7 +168,7 @@ function _rowToMission(row) {
     if (row.context_json) {
         try {
             context = JSON.parse(row.context_json);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[mission_repo] Invalid context_json for mission ${row?.id}: ${msg}`);
             context = {}; // Fallback to empty object
@@ -161,11 +192,14 @@ function _rowToMission(row) {
 
 /**
  * Função exportada: updateMission.
- * @returns {any}
+ *
+ * @param {any} missionId
+ * @param {UpdateMissionUpdates} [updates]
+ * @returns {Mission | null}
  */
 function updateMission(missionId, updates = {}) {
     const db = getDb();
-    const existing = db.prepare('SELECT * FROM missions WHERE id = ?').get(missionId);
+    const existing = /** @type {any} */ (db.prepare('SELECT * FROM missions WHERE id = ?').get(missionId));
     if (!existing) return null;
 
     const now = _now();
@@ -204,7 +238,7 @@ function updateMission(missionId, updates = {}) {
             started_at_ms = @started_at_ms,
             completed_at_ms = @completed_at_ms
         WHERE id = @id AND updated_at_ms = @expected_updated_at_ms
-    `
+    `,
         )
         .run({
             id: missionId,
@@ -222,7 +256,7 @@ function updateMission(missionId, updates = {}) {
 
     if (result.changes === 0) {
         // Concurrent modification detected — throw conflict error for caller to handle
-        const error = /** @type {Error & { code?: string, status?: number, missionId?: string }} */ (
+        const error = /** @type {Error & { code?: string; status?: number; missionId?: string }} */ (
             new Error('Concurrent modification detected — mission was updated by another process')
         );
         error.code = 'CONFLICT';
@@ -236,7 +270,9 @@ function updateMission(missionId, updates = {}) {
 
 /**
  * Função exportada: deleteMission.
- * @returns {any}
+ *
+ * @param {any} missionId
+ * @returns {number}
  */
 function deleteMission(missionId) {
     const db = getDb();
@@ -244,4 +280,4 @@ function deleteMission(missionId) {
     return res.changes || 0;
 }
 
-export { MISSION_STATUS, AUTONOMY_MODES, createMission, listMissions, getMissionById, updateMission, deleteMission };
+export { AUTONOMY_MODES, createMission, deleteMission, getMissionById, listMissions, MISSION_STATUS, updateMission };

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // @ts-check
 import 'dotenv/config';
-import { parseArgs } from 'node:util';
 import { spawn } from 'node:child_process';
+import { parseArgs } from 'node:util';
 
 const EXIT = Object.freeze({
     OK: 0,
@@ -30,7 +30,7 @@ const { values } = parseArgs({
 });
 
 const baseUrl = process.env.MCP_DIAG_URL || 'http://localhost:3008';
-const report = {
+const report = /** @type {any} */ ({
     ok: false,
     profile: values.profile || 'full',
     skipPm2: Boolean(values['skip-pm2']),
@@ -50,8 +50,13 @@ const report = {
     steps: [],
     startedAt: new Date().toISOString(),
     finishedAt: null,
-};
+});
 
+/**
+ * @param {string} name
+ * @param {boolean} ok
+ * @param {Record<string, any>} [details]
+ */
 function addStep(name, ok, details = {}) {
     report.steps.push({
         name,
@@ -61,18 +66,27 @@ function addStep(name, ok, details = {}) {
     });
 }
 
+/** @param {string} msg */
 function log(msg) {
     if (!values.json) {
         console.log(msg);
     }
 }
 
+/** @param {string} msg */
 function logError(msg) {
     if (!values.json) {
         console.error(msg);
     }
 }
 
+/**
+ * @param {string} label
+ * @param {string} cmd
+ * @param {string[]} args
+ * @param {{ allowFailure?: boolean }} [opts]
+ * @returns {Promise<number>}
+ */
 async function runCommand(label, cmd, args, { allowFailure = false } = {}) {
     log(`[RAG Rebuild] ${label}: ${cmd} ${args.join(' ')}`);
     return new Promise((resolve, reject) => {
@@ -81,7 +95,7 @@ async function runCommand(label, cmd, args, { allowFailure = false } = {}) {
             env: process.env,
         });
         child.on('error', reject);
-        child.on('exit', code => {
+        child.on('exit', (code) => {
             if (code === 0 || allowFailure) {
                 resolve(code ?? 0);
                 return;
@@ -91,6 +105,11 @@ async function runCommand(label, cmd, args, { allowFailure = false } = {}) {
     });
 }
 
+/**
+ * @param {string} url
+ * @param {RequestInit} [init]
+ * @returns {Promise<{ ok: boolean; status: number; text: string; json: any }>}
+ */
 async function fetchJson(url, init) {
     const response = await fetch(url, init);
     const text = await response.text();
@@ -103,9 +122,14 @@ async function fetchJson(url, init) {
     return { ok: response.ok, status: response.status, text, json };
 }
 
+/**
+ * @param {string} url
+ * @param {number} [timeoutMs]
+ * @param {number} [intervalMs]
+ */
 async function waitForHttp(url, timeoutMs = 90000, intervalMs = 2000) {
     const started = Date.now();
-    let lastError = null;
+    let lastError = /** @type {any} */ (null);
     while (Date.now() - started < timeoutMs) {
         try {
             const res = await fetchJson(url);
@@ -114,25 +138,25 @@ async function waitForHttp(url, timeoutMs = 90000, intervalMs = 2000) {
         } catch (error) {
             lastError = error;
         }
-        await new Promise(resolve => setTimeout(resolve, intervalMs));
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     throw new Error(`Timeout waiting for ${url}: ${lastError?.message || 'unknown error'}`);
 }
 
 async function isPm2FullyOnline() {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const child = spawn('npx', ['pm2', 'jlist'], {
             stdio: ['ignore', 'pipe', 'pipe'],
             env: process.env,
         });
 
         let stdout = '';
-        child.stdout.on('data', chunk => {
+        child.stdout.on('data', (chunk) => {
             stdout += String(chunk);
         });
 
         child.on('error', () => resolve(false));
-        child.on('exit', code => {
+        child.on('exit', (code) => {
             if (code !== 0) {
                 resolve(false);
                 return;
@@ -142,11 +166,11 @@ async function isPm2FullyOnline() {
                 const required = new Set(['agente-gpt', 'dashboard-web', 'chrome-proxy']);
                 const online = new Set(
                     parsed
-                        .filter(proc => proc?.pm2_env?.status === 'online')
-                        .map(proc => proc?.name)
-                        .filter(Boolean)
+                        .filter((/** @type {any} */ proc) => proc?.pm2_env?.status === 'online')
+                        .map((/** @type {any} */ proc) => proc?.name)
+                        .filter(Boolean),
                 );
-                resolve([...required].every(name => online.has(name)));
+                resolve([...required].every((name) => online.has(name)));
             } catch {
                 resolve(false);
             }
@@ -213,8 +237,9 @@ async function main() {
                 try {
                     await runCommand('daemon:start', 'npm', ['run', 'daemon:start']);
                 } catch (error) {
-                    addStep('pm2-start', false, { reason: error.message });
-                    throw Object.assign(error, { exitCode: EXIT.PM2_START_FAILED });
+                    const _ce = /** @type {any} */ (error);
+                    addStep('pm2-start', false, { reason: _ce.message });
+                    throw Object.assign(_ce, { exitCode: EXIT.PM2_START_FAILED });
                 }
                 addStep('pm2-start', true, { action: 'started' });
             } else {
@@ -229,24 +254,27 @@ async function main() {
             await waitForHttp(`${baseUrl}/api/mcp`, 90000, 2000);
             addStep('wait-mcp-http', true);
         } catch (error) {
-            addStep('wait-mcp-http', false, { reason: error.message });
-            throw Object.assign(error, { exitCode: EXIT.MCP_HEALTH_FAILED });
+            const _ce = /** @type {any} */ (error);
+            addStep('wait-mcp-http', false, { reason: _ce.message });
+            throw Object.assign(_ce, { exitCode: EXIT.MCP_HEALTH_FAILED });
         }
 
         try {
             await runCommand('mcp:diagnose', 'npm', ['run', 'mcp:diagnose']);
             addStep('mcp-diagnose', true);
         } catch (error) {
-            addStep('mcp-diagnose', false, { reason: error.message });
-            throw Object.assign(error, { exitCode: EXIT.MCP_DIAG_FAILED });
+            const _ce = /** @type {any} */ (error);
+            addStep('mcp-diagnose', false, { reason: _ce.message });
+            throw Object.assign(_ce, { exitCode: EXIT.MCP_DIAG_FAILED });
         }
 
         try {
             await runCommand('rag:reset', 'npm', ['run', 'rag:reset', '--', '--yes']);
             addStep('rag-reset', true);
         } catch (error) {
-            addStep('rag-reset', false, { reason: error.message });
-            throw Object.assign(error, { exitCode: EXIT.RAG_RESET_FAILED });
+            const _ce = /** @type {any} */ (error);
+            addStep('rag-reset', false, { reason: _ce.message });
+            throw Object.assign(_ce, { exitCode: EXIT.RAG_RESET_FAILED });
         }
 
         try {
@@ -273,24 +301,27 @@ async function main() {
                 intentDefaults: report.defaults,
             });
         } catch (error) {
-            addStep('rag-index', false, { reason: error.message, profile });
-            throw Object.assign(error, { exitCode: EXIT.RAG_INDEX_FAILED });
+            const _ce = /** @type {any} */ (error);
+            addStep('rag-index', false, { reason: _ce.message, profile });
+            throw Object.assign(_ce, { exitCode: EXIT.RAG_INDEX_FAILED });
         }
 
         try {
             await runCommand('rag:health', 'npm', ['run', 'rag:health', '--', '--json']);
             addStep('rag-health', true);
         } catch (error) {
-            addStep('rag-health', false, { reason: error.message });
-            throw Object.assign(error, { exitCode: EXIT.RAG_HEALTH_FAILED });
+            const _ce = /** @type {any} */ (error);
+            addStep('rag-health', false, { reason: _ce.message });
+            throw Object.assign(_ce, { exitCode: EXIT.RAG_HEALTH_FAILED });
         }
 
         try {
             const smokeStructured = await smokeRagSearch();
             addStep('mcp-rag-smoke', true, { structured: smokeStructured });
         } catch (error) {
-            addStep('mcp-rag-smoke', false, { reason: error.message });
-            throw Object.assign(error, { exitCode: EXIT.MCP_SMOKE_FAILED });
+            const _ce = /** @type {any} */ (error);
+            addStep('mcp-rag-smoke', false, { reason: _ce.message });
+            throw Object.assign(_ce, { exitCode: EXIT.MCP_SMOKE_FAILED });
         }
 
         report.ok = true;
@@ -302,15 +333,16 @@ async function main() {
         }
         process.exit(EXIT.OK);
     } catch (error) {
+        const _ce = /** @type {any} */ (error);
         report.ok = false;
-        report.error = error?.message || String(error);
+        report.error = _ce?.message || String(_ce);
         report.finishedAt = new Date().toISOString();
         if (values.json) {
             console.log(JSON.stringify(report, null, 2));
         } else {
             logError(`[RAG Rebuild] ❌ Falha: ${report.error}`);
         }
-        process.exit(error?.exitCode || 1);
+        process.exit(_ce?.exitCode || 1);
     }
 }
 

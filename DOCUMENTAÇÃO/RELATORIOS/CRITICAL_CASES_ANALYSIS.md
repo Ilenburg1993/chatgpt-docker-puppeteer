@@ -519,12 +519,12 @@ function listenToSignals() {
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-  process.on('uncaughtException', err => {
+  process.on('uncaughtException', (err) => {
     log('FATAL', `[LIFECYCLE] Exceção não tratada: ${err.message}\n${err.stack}`);
     gracefulShutdown('UNCAUGHT_EXCEPTION');
   });
 
-  process.on('unhandledRejection', reason => {
+  process.on('unhandledRejection', (reason) => {
     log('FATAL', `[LIFECYCLE] Rejeição de Promise não tratada: ${reason}`);
     gracefulShutdown('UNHANDLED_REJECTION');
   });

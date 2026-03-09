@@ -1,11 +1,10 @@
 <script setup>
+import VisGraph from '@/components/graphs/VisGraph.vue';
+import Badge from '@/components/ui/Badge.vue';
+import Button from '@/components/ui/Button.vue';
+import { formatHttpError, http } from '@/lib/http';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { http } from '@/lib/http';
-import { formatHttpError } from '@/lib/http';
-import Button from '@/components/ui/Button.vue';
-import Badge from '@/components/ui/Badge.vue';
-import VisGraph from '@/components/graphs/VisGraph.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -18,7 +17,7 @@ const workflowId = computed(() => String(route.params.workflowId || ''));
 
 const nodes = computed(() => {
     const tasks = data.value?.tasks || [];
-    return tasks.map(t => ({
+    return tasks.map((t) => ({
         id: t.id,
         label: `${t.id}\n${t.unified_status} · ${t.stage}`,
         title: t.spec_user_message_preview || '',
@@ -37,7 +36,7 @@ const nodes = computed(() => {
 
 const edges = computed(() => {
     const list = data.value?.edges || [];
-    return list.map(e => ({ from: e.depends_on_task_id, to: e.task_id }));
+    return list.map((e) => ({ from: e.depends_on_task_id, to: e.task_id }));
 });
 
 async function fetchWorkflow() {

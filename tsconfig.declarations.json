@@ -9,11 +9,7 @@
     "declarationMap": false,
     "outDir": "./tmp/types-public"
   },
-  "include": [
-    "src/shared/health-check.js",
-    "src/shared/inference-gateway-client.js",
-    "src/types/**/*.d.ts"
-  ],
+  "include": ["src/shared/health-check.js", "src/shared/inference-gateway-client.js", "src/types/**/*.d.ts"],
   "exclude": [
     "node_modules",
     "dist",

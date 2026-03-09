@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 /**
  * Environment bootstrap (idempotent):
+ *
  * - Loads .env first (defaults only)
  * - Then overlays .env.${NODE_ENV}, .env.local and .env.${NODE_ENV}.local
  * - Later files win when the same key is defined multiple times
@@ -16,12 +17,12 @@ const BOOTSTRAP_FLAG = '__MAESTRO_ENV_BOOTSTRAPPED__';
  * @returns {boolean} `true` quando bootstrap ocorre nesta chamada; `false` quando já estava aplicado.
  */
 function ensureEnvBootstrap() {
-    if (globalThis[BOOTSTRAP_FLAG]) {
+    if (/** @type {Record<string, unknown>} */ (globalThis)[BOOTSTRAP_FLAG]) {
         return false;
     }
 
     const nodeEnv = String(process.env.NODE_ENV || '').trim();
-    /** @type {Array<{path: string, override?: boolean}>} */
+    /** @type {{ path: string; override?: boolean }[]} */
     const loadOrder = [
         { path: '.env' },
         ...(nodeEnv ? [{ path: `.env.${nodeEnv}`, override: true }] : []),
@@ -45,10 +46,10 @@ function ensureEnvBootstrap() {
         delete process.env.NO_COLOR;
     }
 
-    globalThis[BOOTSTRAP_FLAG] = true;
+    /** @type {Record<string, unknown>} */ (globalThis)[BOOTSTRAP_FLAG] = true;
     return true;
 }
 
 ensureEnvBootstrap();
 
-export { ensureEnvBootstrap, BOOTSTRAP_FLAG };
+export { BOOTSTRAP_FLAG, ensureEnvBootstrap };

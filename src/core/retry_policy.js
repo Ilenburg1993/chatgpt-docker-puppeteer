@@ -18,7 +18,7 @@ function readPositiveInt(rawValue, fallback) {
  * @param {number} attempt
  * @param {number} baseDelayMs
  * @param {number} maxDelayMs
- * @param {number} [jitterRatio=0.2]
+ * @param {number} [jitterRatio=0.2] Default is `0.2`
  * @returns {number}
  */
 function computeExponentialBackoffDelay(attempt, baseDelayMs, maxDelayMs, jitterRatio = 0.2) {
@@ -30,15 +30,18 @@ function computeExponentialBackoffDelay(attempt, baseDelayMs, maxDelayMs, jitter
 }
 
 /**
+ * @typedef {object} RetryWithBackoffConfig
+ * @property {number} maxAttempts
+ * @property {number} baseDelayMs
+ * @property {number} maxDelayMs
+ * @property {number} [jitterRatio]
+ * @property {((ctx: { attempt: number; maxAttempts: number; error: unknown; delayMs: number }) => void | Promise<void>)
+ *     | undefined} [onRetry]
+ */
+/**
  * @template T
  * @param {() => Promise<T>} operation
- * @param {{
- *   maxAttempts: number,
- *   baseDelayMs: number,
- *   maxDelayMs: number,
- *   jitterRatio?: number,
- *   onRetry?: (ctx: { attempt: number, maxAttempts: number, error: unknown, delayMs: number }) => Promise<void>|void
- * }} config
+ * @param {RetryWithBackoffConfig} config
  * @returns {Promise<T>}
  */
 async function retryWithBackoff(operation, config) {
@@ -51,7 +54,7 @@ async function retryWithBackoff(operation, config) {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
             return await operation();
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             lastError = error;
             if (attempt >= maxAttempts) break;
 
@@ -59,7 +62,7 @@ async function retryWithBackoff(operation, config) {
             if (typeof config?.onRetry === 'function') {
                 await config.onRetry({ attempt, maxAttempts, error, delayMs });
             }
-            await new Promise(resolve => setTimeout(resolve, delayMs));
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
     }
 

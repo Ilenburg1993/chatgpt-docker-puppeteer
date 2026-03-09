@@ -153,8 +153,8 @@
 </template>
 
 <script>
-import { computed, onMounted } from 'vue';
 import { useSystemStore } from '@/stores/system';
+import { computed, onMounted } from 'vue';
 
 export default {
     name: 'SystemHealth',
@@ -186,7 +186,7 @@ export default {
         // Health counts summary
         const healthyCounts = computed(() => {
             const counts = { healthy: 0, warning: 0, critical: 0, unknown: 0 };
-            system.componentsList.forEach(comp => {
+            system.componentsList.forEach((comp) => {
                 const status = comp.status;
                 if (counts[status] !== undefined) {
                     counts[status]++;
@@ -213,7 +213,7 @@ export default {
 
         // Format metric label
         function formatMetricLabel(key) {
-            return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
         }
 
         // Format metric value

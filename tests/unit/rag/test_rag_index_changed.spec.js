@@ -1,10 +1,10 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
 import crypto from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, it } from 'node:test';
 
 import { ragIndex, ragIndexChanged, ragQuery } from '../../../tools/rag/lib/facade.mjs';
 
@@ -18,10 +18,10 @@ class FakeEmbeddingsProvider {
         return { ok: true, hasModel: true, models: [this.model] };
     }
 
-    async embed(text) {
+    async embed(/** @type {string} */ text) {
         const hash = crypto.createHash('sha256').update(String(text), 'utf8').digest();
         const vector = [];
-        for (let i = 0; i < this.dim; i++) vector.push(hash[i] / 255);
+        for (let i = 0; i < this.dim; i++) vector.push((hash[i] ?? 0) / 255);
         return vector;
     }
 }
@@ -49,13 +49,15 @@ describe('ragIndexChanged', () => {
 
             await fs.writeFile(path.join(ws, 'a.ts'), 'export const A = 999;\n', 'utf8');
 
-            const report = await ragIndexChanged({
-                root: ws,
-                paths: ragPaths,
-                embeddingsProvider: embeddings,
-                profile: 'full',
-                changedPaths: ['a.ts'],
-            });
+            const report = /** @type {any} */ (
+                await ragIndexChanged({
+                    root: ws,
+                    paths: ragPaths,
+                    embeddingsProvider: embeddings,
+                    profile: 'full',
+                    changedPaths: ['a.ts'],
+                })
+            );
 
             assert.strictEqual(report.changed_files, 1);
             assert.strictEqual(report.deleted_files, 0);
@@ -66,12 +68,14 @@ describe('ragIndexChanged', () => {
             assert.ok(after.files['a.ts'].indexed_at >= before.files['a.ts'].indexed_at);
             assert.ok(typeof after.files['a.ts'].indexed_at_iso === 'string');
 
-            const query = await ragQuery({
-                query: 'A = 999',
-                topK: 2,
-                paths: ragPaths,
-                embeddingsProvider: embeddings,
-            });
+            const query = /** @type {any} */ (
+                await ragQuery({
+                    query: 'A = 999',
+                    topK: 2,
+                    paths: ragPaths,
+                    embeddingsProvider: embeddings,
+                })
+            );
 
             assert.ok(Array.isArray(query.results));
             assert.ok(query.results.length >= 1);
@@ -101,13 +105,15 @@ describe('ragIndexChanged', () => {
             await ragIndex({ root: ws, paths: ragPaths, embeddingsProvider: embeddings, profile: 'full' });
             await fs.unlink(path.join(ws, 'gone.ts'));
 
-            const report = await ragIndexChanged({
-                root: ws,
-                paths: ragPaths,
-                embeddingsProvider: embeddings,
-                profile: 'full',
-                changedPaths: ['gone.ts'],
-            });
+            const report = /** @type {any} */ (
+                await ragIndexChanged({
+                    root: ws,
+                    paths: ragPaths,
+                    embeddingsProvider: embeddings,
+                    profile: 'full',
+                    changedPaths: ['gone.ts'],
+                })
+            );
 
             assert.strictEqual(report.deleted_files, 1);
             const manifestPath = path.join(ragPaths.indexDir, 'manifest.v1.json');

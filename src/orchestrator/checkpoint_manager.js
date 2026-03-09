@@ -1,12 +1,13 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import * as logger from '#core/logger';
 import fs from 'fs/promises';
 import path from 'node:path';
-import * as logger from '#core/logger';
 
 /**
  * CheckpointManager - Gerencia checkpoints de missões para crash recovery.
  *
  * Responsabilidades:
+ *
  * 1. Salvar snapshot completo da missão a cada step
  * 2. Manter checkpoint-latest.json para acesso rápido
  * 3. Permitir recovery de crashes (reload from checkpoint)
@@ -14,16 +15,17 @@ import * as logger from '#core/logger';
  * 5. Listar histórico de checkpoints
  *
  * Integração:
+ *
  * - MissionManager: Chama saveCheckpoint() após cada step
  * - MissionManager: Chama loadCheckpoint() no initialize() para recovery
  * - MissionStateManager: Fornece mission state completo
  */
 class CheckpointManager {
     /**
-     * @param {Object} options
-     * @param {string} [options.baseDir='missions'] - Diretório base de missões
-     * @param {number} [options.keepLast=10] - Quantos checkpoints manter por missão
-     * @param {boolean} [options.autoCleanup=true] - Limpar checkpoints antigos automaticamente
+     * @param {object} options
+     * @param {string} [options.baseDir='missions'] - Diretório base de missões. Default is `'missions'`
+     * @param {number} [options.keepLast=10] - Quantos checkpoints manter por missão. Default is `10`
+     * @param {boolean} [options.autoCleanup=true] - Limpar checkpoints antigos automaticamente. Default is `true`
      */
     constructor({ baseDir = 'missions', keepLast = 10, autoCleanup = true } = {}) {
         this.baseDir = baseDir;
@@ -36,17 +38,17 @@ class CheckpointManager {
     /**
      * Salva checkpoint de uma missão.
      *
+     * @example
+     *     await checkpointManager.saveCheckpoint('mission-123', 5, missionState, {
+     *         reason: 'step_completed',
+     *         created_by: 'mission_manager',
+     *     });
+     *
      * @param {string} missionId - ID da missão
      * @param {number} stepIndex - Índice do step completado
-     * @param {Object} missionState - Estado completo da missão
-     * @param {Object} [metadata={}] - Metadata adicional (reason, created_by, etc)
+     * @param {object} missionState - Estado completo da missão
+     * @param {object} [metadata={}] - Metadata adicional (reason, created_by, etc). Default is `{}`
      * @returns {Promise<string>} - ID do checkpoint criado
-     *
-     * @example
-     * await checkpointManager.saveCheckpoint('mission-123', 5, missionState, {
-     *     reason: 'step_completed',
-     *     created_by: 'mission_manager'
-     * });
      */
     async saveCheckpoint(missionId, stepIndex, missionState, metadata = {}) {
         const timestamp = Date.now();
@@ -82,7 +84,7 @@ class CheckpointManager {
         await fs.rename(tmpLatestPath, latestPath);
 
         logger.info(
-            `[CheckpointManager] Checkpoint saved: ${missionId} (step ${stepIndex}, checkpoint: ${checkpointId})`
+            `[CheckpointManager] Checkpoint saved: ${missionId} (step ${stepIndex}, checkpoint: ${checkpointId})`,
         );
 
         // Auto-cleanup de checkpoints antigos
@@ -96,15 +98,15 @@ class CheckpointManager {
     /**
      * Carrega último checkpoint de uma missão.
      *
-     * @param {string} missionId - ID da missão
-     * @returns {Promise<Object|null>} - Checkpoint ou null se não existir
-     *
      * @example
-     * const checkpoint = await checkpointManager.loadCheckpoint('mission-123');
-     * if (checkpoint) {
-     *     const recoveredState = checkpoint.mission_state;
-     *     const stepIndex = checkpoint.step_index;
-     * }
+     *     const checkpoint = await checkpointManager.loadCheckpoint('mission-123');
+     *     if (checkpoint) {
+     *         const recoveredState = checkpoint.mission_state;
+     *         const stepIndex = checkpoint.step_index;
+     *     }
+     *
+     * @param {string} missionId - ID da missão
+     * @returns {Promise<object | null>} - Checkpoint ou null se não existir
      */
     async loadCheckpoint(missionId) {
         const latestPath = path.join(this.baseDir, missionId, 'checkpoints', 'checkpoint-latest.json');
@@ -120,17 +122,19 @@ class CheckpointManager {
             }
 
             logger.info(
-                `[CheckpointManager] Checkpoint loaded: ${missionId} (step ${checkpoint.step_index}, checkpoint: ${checkpoint.checkpoint_id})`
+                `[CheckpointManager] Checkpoint loaded: ${missionId} (step ${checkpoint.step_index}, checkpoint: ${checkpoint.checkpoint_id})`,
             );
 
             return checkpoint;
-        } catch (error) {
-            if (error.code === 'ENOENT') {
+        } catch (/** @type {any} */ error) {
+            if (/** @type {any} */ (error).code === 'ENOENT') {
                 logger.warn(`[CheckpointManager] No checkpoint found for mission: ${missionId}`);
                 return null;
             }
 
-            logger.error(`[CheckpointManager] Error loading checkpoint for ${missionId}: ${error.message}`);
+            logger.error(
+                `[CheckpointManager] Error loading checkpoint for ${missionId}: ${/** @type {any} */ (error).message}`,
+            );
             throw error;
         }
     }
@@ -140,7 +144,7 @@ class CheckpointManager {
      *
      * @param {string} missionId - ID da missão
      * @param {string} checkpointId - ID do checkpoint
-     * @returns {Promise<Object|null>} - Checkpoint ou null
+     * @returns {Promise<object | null>} - Checkpoint ou null
      */
     async loadCheckpointById(missionId, checkpointId) {
         const checkpointPath = path.join(this.baseDir, missionId, 'checkpoints', `${checkpointId}.json`);
@@ -148,8 +152,8 @@ class CheckpointManager {
         try {
             const data = await fs.readFile(checkpointPath, 'utf-8');
             return JSON.parse(data);
-        } catch (error) {
-            if (error.code === 'ENOENT') {
+        } catch (/** @type {any} */ error) {
+            if (/** @type {any} */ (error).code === 'ENOENT') {
                 return null;
             }
             throw error;
@@ -159,15 +163,15 @@ class CheckpointManager {
     /**
      * Lista todos os checkpoints de uma missão (ordenados por timestamp desc).
      *
+     * @example
+     *     const checkpoints = await checkpointManager.listCheckpoints('mission-123');
+     *     // [
+     *     //   { checkpoint_id, timestamp, step_index, created_at },
+     *     //   ...
+     *     // ]
+     *
      * @param {string} missionId - ID da missão
      * @returns {Promise<Object[]>} - Lista de metadados de checkpoints
-     *
-     * @example
-     * const checkpoints = await checkpointManager.listCheckpoints('mission-123');
-     * // [
-     * //   { checkpoint_id, timestamp, step_index, created_at },
-     * //   ...
-     * // ]
      */
     async listCheckpoints(missionId) {
         const checkpointsDir = path.join(this.baseDir, missionId, 'checkpoints');
@@ -176,7 +180,7 @@ class CheckpointManager {
             const files = await fs.readdir(checkpointsDir);
 
             // Filtra apenas arquivos checkpoint-*.json (exclui checkpoint-latest.json)
-            const checkpointFiles = files.filter(f => f.startsWith('checkpoint-') && f !== 'checkpoint-latest.json');
+            const checkpointFiles = files.filter((f) => f.startsWith('checkpoint-') && f !== 'checkpoint-latest.json');
 
             const checkpoints = [];
 
@@ -198,8 +202,8 @@ class CheckpointManager {
             checkpoints.sort((a, b) => b.timestamp - a.timestamp);
 
             return checkpoints;
-        } catch (error) {
-            if (error.code === 'ENOENT') {
+        } catch (/** @type {any} */ error) {
+            if (/** @type {any} */ (error).code === 'ENOENT') {
                 return [];
             }
             throw error;
@@ -218,10 +222,10 @@ class CheckpointManager {
         try {
             await fs.unlink(checkpointPath);
             logger.info(`[CheckpointManager] Checkpoint deleted: ${missionId}/${checkpointId}`);
-        } catch (error) {
-            if (error.code !== 'ENOENT') {
+        } catch (/** @type {any} */ error) {
+            if (/** @type {any} */ (error).code !== 'ENOENT') {
                 logger.error(
-                    `[CheckpointManager] Error deleting checkpoint ${missionId}/${checkpointId}: ${error.message}`
+                    `[CheckpointManager] Error deleting checkpoint ${missionId}/${checkpointId}: ${/** @type {any} */ (error).message}`,
                 );
             }
         }
@@ -238,8 +242,10 @@ class CheckpointManager {
         try {
             await fs.rm(checkpointsDir, { recursive: true, force: true });
             logger.info(`[CheckpointManager] All checkpoints deleted: ${missionId}`);
-        } catch (error) {
-            logger.error(`[CheckpointManager] Error deleting checkpoints for ${missionId}: ${error.message}`);
+        } catch (/** @type {any} */ error) {
+            logger.error(
+                `[CheckpointManager] Error deleting checkpoints for ${missionId}: ${/** @type {any} */ (error).message}`,
+            );
         }
     }
 
@@ -255,7 +261,7 @@ class CheckpointManager {
         try {
             await fs.access(latestPath);
             return true;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             return false;
         }
     }
@@ -277,7 +283,7 @@ class CheckpointManager {
         const toDelete = checkpoints.slice(keepLast);
 
         for (const checkpoint of toDelete) {
-            await this.deleteCheckpoint(missionId, checkpoint.checkpoint_id);
+            await this.deleteCheckpoint(missionId, /** @type {any} */ (checkpoint).checkpoint_id);
         }
 
         logger.info(`[CheckpointManager] Cleaned up ${toDelete.length} old checkpoints for ${missionId}`);
@@ -287,9 +293,9 @@ class CheckpointManager {
      * Retorna estatísticas do CheckpointManager.
      *
      * @param {string} [missionId] - ID da missão (opcional, se omitido retorna stats globais)
-     * @returns {Promise<Object>} - Estatísticas
+     * @returns {Promise<any>} - Estatísticas
      */
-    async getStats(missionId = null) {
+    async getStats(/** @type {any} */ missionId = undefined) {
         if (missionId) {
             const checkpoints = await this.listCheckpoints(missionId);
             const hasLatest = await this.hasCheckpoint(missionId);

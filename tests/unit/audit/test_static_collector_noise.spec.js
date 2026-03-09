@@ -1,9 +1,9 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import test from 'node:test';
 import { collectStaticFindings } from '../../../scripts/audit/collectors/static.mjs';
 
 test('static collector filters dist cycles and test-only duplication noise', async () => {
@@ -62,29 +62,31 @@ test('static collector filters dist cycles and test-only duplication noise', asy
                         ],
                     },
                     null,
-                    2
+                    2,
                 ),
-                'utf8'
+                'utf8',
             );
             return { ok: true, exitCode: 0, stdout: '', stderr: '' };
         }
         return { ok: true, exitCode: 0, stdout: '', stderr: '' };
     }
 
-    const out = await collectStaticFindings({
-        profile: 'deep',
-        changedFiles: [],
-        artifactsDir: tmpDir,
-        contractsMode: 'hybrid',
-        exec,
-        commandExistsFn: async () => false,
-    });
+    const out = await collectStaticFindings(
+        /** @type {any} */ ({
+            profile: 'deep',
+            changedFiles: [],
+            artifactsDir: tmpDir,
+            contractsMode: 'hybrid',
+            exec,
+            commandExistsFn: async () => false,
+        }),
+    );
 
-    const madgeFindings = out.findings.filter(item => item.source_tool === 'madge');
-    const jscpdFindings = out.findings.filter(item => item.source_tool === 'jscpd');
+    const madgeFindings = out.findings.filter((item) => item.source_tool === 'madge');
+    const jscpdFindings = out.findings.filter((item) => item.source_tool === 'jscpd');
 
     assert.equal(madgeFindings.length, 1);
-    assert.equal(madgeFindings[0].file, 'src/server/main.js');
+    assert.equal(/** @type {any} */ (madgeFindings[0]).file, 'src/server/main.js');
     assert.equal(jscpdFindings.length, 1);
-    assert.equal(jscpdFindings[0].file, 'src/server/main.js');
+    assert.equal(/** @type {any} */ (jscpdFindings[0]).file, 'src/server/main.js');
 });

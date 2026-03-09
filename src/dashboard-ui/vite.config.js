@@ -1,14 +1,14 @@
 // @ts-check
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath, URL } from 'node:url';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 import { compression } from 'vite-plugin-compression2';
-import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
 /** Reexport público: default. */
 export default defineConfig({
-    plugins: [
+    plugins: /** @type {any} */ ([
         vue(),
         // Precompressed assets for production (served by the server when available)
         compression({
@@ -23,7 +23,7 @@ export default defineConfig({
                   brotliSize: true,
               })
             : null,
-    ].filter(Boolean),
+    ]).filter(Boolean),
 
     // Base path para servir em /dashboard
     base: '/dashboard/',
@@ -70,7 +70,7 @@ export default defineConfig({
         cssCodeSplit: true, // Separate CSS per chunk for better caching
         rollupOptions: {
             output: {
-                manualChunks: id => {
+                manualChunks: (id) => {
                     // Vendor libraries
                     if (id.includes('node_modules')) {
                         if (id.includes('vue') || id.includes('vue-router') || id.includes('pinia')) {
@@ -106,7 +106,7 @@ export default defineConfig({
                     // Application code splitting
                     if (id.includes('/views/')) {
                         // Split each view into its own chunk for better caching
-                        const viewName = id.split('/views/')[1].split('.')[0];
+                        const viewName = (id.split('/views/')[1] ?? '').split('.')[0] ?? '';
                         return `view-${viewName.toLowerCase()}`;
                     }
 
@@ -118,14 +118,16 @@ export default defineConfig({
                             return 'ui-components';
                         }
                     }
+                    return undefined;
                 },
-                assetFileNames: assetInfo => {
-                    const info = assetInfo.name.split('.');
+                assetFileNames: (assetInfo) => {
+                    const name = assetInfo.name ?? 'asset';
+                    const info = name.split('.');
                     const extType = info[info.length - 1];
-                    if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/i.test(assetInfo.name)) {
+                    if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/i.test(name)) {
                         return `assets/images/[name]-[hash][extname]`;
                     }
-                    if (/\.(woff2?|eot|ttf|otf)$/i.test(assetInfo.name)) {
+                    if (/\.(woff2?|eot|ttf|otf)$/i.test(name)) {
                         return `assets/fonts/[name]-[hash][extname]`;
                     }
                     return `assets/[name]-[hash][extname]`;

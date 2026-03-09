@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 const ROOT = process.cwd();
 
@@ -15,6 +15,6 @@ test('wave13: browserpool allocate retry loop is iterative and bounded', async (
     assert.match(
         content,
         /for\s*\(let\s+attempt\s*=\s*1;\s*attempt\s*<=\s*maxAttempts;\s*attempt\+\+\)/,
-        'allocate() should use a bounded attempt loop'
+        'allocate() should use a bounded attempt loop',
     );
 });

@@ -27,13 +27,13 @@
 </template>
 
 <script setup>
+import { useSsotRealtime } from '@/composables/useSsotRealtime';
+import { useUiPreferences } from '@/composables/useUiPreferences';
 import { computed, onMounted, ref } from 'vue';
+import NotificationContainer from '../ui/NotificationContainer.vue';
 import Footer from './Footer.vue';
 import Header from './Header.vue';
 import Sidebar from './Sidebar.vue';
-import NotificationContainer from '../ui/NotificationContainer.vue';
-import { useSsotRealtime } from '@/composables/useSsotRealtime';
-import { useUiPreferences } from '@/composables/useUiPreferences';
 
 const sidebarCollapsed = ref(false);
 

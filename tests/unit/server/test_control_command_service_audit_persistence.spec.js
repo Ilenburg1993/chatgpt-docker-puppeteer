@@ -1,21 +1,21 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import http from 'node:http';
-import { getDb, closeDb } from '../../../src/infra/db/sqlite.js';
-import { RBAC_PERMISSIONS } from '../../../src/infra/db/rbac_repo.js';
-import { COMMANDS, executeCommand } from '../../../src/server/domain/control_command_service.js';
+import test from 'node:test';
 import { createAuditJob } from '../../../src/infra/db/audit_job_repo.js';
 import { createAuditPatchProposal, getAuditPatchProposalById } from '../../../src/infra/db/audit_patch_repo.js';
 import { getAuditWatchRuleById } from '../../../src/infra/db/audit_watch_rule_repo.js';
-import { getInferenceClientPolicyByTag } from '../../../src/infra/db/inference_client_policy_repo.js';
-import { listInferenceProfiles } from '../../../src/infra/db/inference_profile_repo.js';
 import { listInferenceBackends } from '../../../src/infra/db/inference_backend_repo.js';
+import { getInferenceClientPolicyByTag } from '../../../src/infra/db/inference_client_policy_repo.js';
 import { listInferenceModels } from '../../../src/infra/db/inference_model_repo.js';
+import { listInferenceProfiles } from '../../../src/infra/db/inference_profile_repo.js';
+import { RBAC_PERMISSIONS } from '../../../src/infra/db/rbac_repo.js';
+import { closeDb, getDb } from '../../../src/infra/db/sqlite.js';
+import { COMMANDS, executeCommand } from '../../../src/server/domain/control_command_service.js';
 
 function actor() {
     return {
@@ -26,7 +26,7 @@ function actor() {
     };
 }
 
-function withTempDb(fn) {
+function withTempDb(/** @type {() => Promise<void>} */ fn) {
     return async () => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'control-audit-persist-'));
         const dbPath = path.join(tmpDir, 'maestro.sqlite');
@@ -44,20 +44,20 @@ function withTempDb(fn) {
     };
 }
 
-async function listenJsonStub(handler) {
+async function listenJsonStub(/** @type {(req: any) => any} */ handler) {
     const server = http.createServer((req, res) => {
         Promise.resolve(handler(req))
-            .then(body => {
+            .then((body) => {
                 res.statusCode = 200;
                 res.setHeader('content-type', 'application/json');
                 res.end(JSON.stringify(body));
             })
-            .catch(err => {
+            .catch((err) => {
                 res.statusCode = 500;
                 res.end(JSON.stringify({ ok: false, error: err?.message || String(err) }));
             });
     });
-    await new Promise((resolve, reject) => server.listen(0, '127.0.0.1', err => (err ? reject(err) : resolve())));
+    await /** @type {Promise<void>} */ (new Promise((resolve) => server.listen(0, '127.0.0.1', resolve)));
     const addr = /** @type {import('node:net').AddressInfo} */ (server.address());
     return { server, host: addr.address, port: addr.port };
 }
@@ -67,7 +67,7 @@ test(
     withTempDb(async () => {
         const prevGwHost = process.env.INFERENCE_GATEWAY_HOST;
         const prevGwPort = process.env.INFERENCE_GATEWAY_PORT;
-        const stub = await listenJsonStub(req => {
+        const stub = await listenJsonStub((/** @type {any} */ req) => {
             if ((req.url || '').startsWith('/v1/policies/reload')) {
                 return { ok: true, reloaded: { ok: true } };
             }
@@ -82,6 +82,7 @@ test(
                 kind: 'patch_suggest',
                 trigger_type: 'manual',
             });
+            /** @type {any} */
             const patch = createAuditPatchProposal({
                 job_id: 'ajb-test',
                 patch_unified_diff: 'diff --git a/x b/x',
@@ -123,7 +124,7 @@ test(
                         },
                         actor: actor(),
                     }),
-                /aprovado/i
+                /aprovado/i,
             );
 
             await executeCommand({
@@ -183,7 +184,7 @@ test(
                 actor: actor(),
             });
             assert.equal(profileOut.success, true);
-            assert.ok(listInferenceProfiles().some(p => p.name === 'patch_safe'));
+            assert.ok(listInferenceProfiles().some((p) => p.name === 'patch_safe'));
 
             const backendOut = await executeCommand({
                 command: COMMANDS.INFERENCE_BACKEND_UPSERT,
@@ -197,7 +198,7 @@ test(
                 actor: actor(),
             });
             assert.equal(backendOut.success, true);
-            const backend = listInferenceBackends().find(b => b.name === 'ollama_local');
+            const backend = listInferenceBackends().find((b) => b.name === 'ollama_local');
             assert.ok(backend);
 
             const modelOut = await executeCommand({
@@ -214,7 +215,7 @@ test(
             });
             assert.equal(modelOut.success, true);
             const createdModel = listInferenceModels({ backendId: backend?.id }).find(
-                m => m.alias === 'patch_model_strong'
+                (m) => m.alias === 'patch_model_strong',
             );
             assert.ok(createdModel);
 
@@ -229,7 +230,7 @@ test(
                 actor: actor(),
             });
             assert.equal(backendToggleOut.success, true);
-            assert.equal(listInferenceBackends().find(b => b.id === backend?.id)?.enabled, false);
+            assert.equal(listInferenceBackends().find((b) => b.id === backend?.id)?.enabled, false);
 
             const modelToggleOut = await executeCommand({
                 command: COMMANDS.INFERENCE_MODEL_TOGGLE,
@@ -243,11 +244,11 @@ test(
             });
             assert.equal(modelToggleOut.success, true);
             assert.equal(
-                listInferenceModels({ backendId: backend?.id }).find(m => m.id === createdModel?.id)?.enabled,
-                false
+                listInferenceModels({ backendId: backend?.id }).find((m) => m.id === createdModel?.id)?.enabled,
+                false,
             );
 
-            const createdProfile = listInferenceProfiles().find(p => p.name === 'patch_safe');
+            const createdProfile = listInferenceProfiles().find((p) => p.name === 'patch_safe');
             const clientPolicyOut = await executeCommand({
                 command: COMMANDS.INFERENCE_CLIENT_POLICY_UPSERT,
                 payload: {
@@ -281,7 +282,7 @@ test(
                         },
                         actor: actor(),
                     }),
-                /propose_only/i
+                /propose_only/i,
             );
 
             const validateApply = await executeCommand({
@@ -302,7 +303,7 @@ test(
             assert.equal(Array.isArray(validateApply.result?.metadata?.validation?.blocking_reasons), true);
             assert.equal(
                 validateApply.result?.metadata?.validation?.blocking_reasons.includes('apply_mode_propose_only'),
-                true
+                true,
             );
 
             const prevApplyEnabled = process.env.AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL;
@@ -325,7 +326,7 @@ test(
                             },
                             actor: actor(),
                         }),
-                    /worktree local precisa estar limpo/i
+                    /worktree local precisa estar limpo/i,
                 );
 
                 process.env.AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE = 'false';
@@ -341,7 +342,7 @@ test(
                             },
                             actor: actor(),
                         }),
-                    /paths fora da allowlist/i
+                    /paths fora da allowlist/i,
                 );
 
                 process.env.AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES = '';
@@ -357,7 +358,7 @@ test(
                             },
                             actor: actor(),
                         }),
-                    /branch atual não permitido/i
+                    /branch atual não permitido/i,
                 );
             } finally {
                 if (prevApplyEnabled === undefined) delete process.env.AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL;
@@ -374,7 +375,11 @@ test(
             else process.env.INFERENCE_GATEWAY_HOST = prevGwHost;
             if (prevGwPort === undefined) delete process.env.INFERENCE_GATEWAY_PORT;
             else process.env.INFERENCE_GATEWAY_PORT = prevGwPort;
-            await new Promise(resolve => stub.server.close(() => resolve()));
+            await /** @type {Promise<void>} */ (
+                new Promise((resolve) => {
+                    stub.server.close(() => resolve());
+                })
+            );
         }
-    })
+    }),
 );

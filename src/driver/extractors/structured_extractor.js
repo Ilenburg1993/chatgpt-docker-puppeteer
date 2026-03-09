@@ -1,7 +1,7 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import TurndownService from 'turndown';
-import { parse as parseHTML } from 'node-html-parser';
+// @ts-check
 import * as logger from '#core/logger';
+import { parse as parseHTML } from 'node-html-parser';
+import TurndownService from 'turndown';
 
 /**
  * StructuredExtractor - Extrai resposta LLM em múltiplos formatos
@@ -28,7 +28,7 @@ class StructuredExtractor {
      *
      * @param {any} page - Puppeteer page instance
      * @param {any} protocol - SADI protocol (selector, etc)
-     * @returns {Promise<Object>} - { text, markdown, html, json }
+     * @returns {Promise<any>} - { text, markdown, html, json }
      */
     async extract(page, protocol) {
         try {
@@ -49,12 +49,15 @@ class StructuredExtractor {
             // 4. Preview estruturado
             const preview = this._generatePreview(rawExtraction.text, structured);
 
-            logger.debug('[STRUCTURED_EXTRACTOR] Extração completa', {
-                textLength: rawExtraction.text.length,
-                codeBlocks: structured.codeBlocks.length,
-                links: structured.links.length,
-                sections: structured.sections.length,
-            });
+            logger.debug(
+                '[STRUCTURED_EXTRACTOR] Extração completa',
+                /** @type {any} */ ({
+                    textLength: rawExtraction.text.length,
+                    codeBlocks: structured.codeBlocks.length,
+                    links: structured.links.length,
+                    sections: structured.sections.length,
+                }),
+            );
 
             return {
                 text: rawExtraction.text,
@@ -63,8 +66,11 @@ class StructuredExtractor {
                 json: structured,
                 preview,
             };
-        } catch (error) {
-            logger.error('[STRUCTURED_EXTRACTOR] Erro ao extrair resposta', { error: error.message });
+        } catch (/** @type {any} */ error) {
+            logger.error(
+                '[STRUCTURED_EXTRACTOR] Erro ao extrair resposta',
+                /** @type {any} */ ({ error: error.message }),
+            );
             return this._emptyResponse();
         }
     }
@@ -72,13 +78,13 @@ class StructuredExtractor {
     /**
      * Extrai HTML do browser (browser-side function)
      *
-     * @param {Object} protocol - SADI protocol
-     * @returns {Object} - { html, text, thoughtBlocksRemoved }
      * @private
+     * @param {any} protocol - SADI protocol
+     * @returns {any} - { html, text, thoughtBlocksRemoved }
      */
     _extractHTML(protocol) {
         // Esta função roda NO BROWSER (não tem acesso a Node.js)
-        const msgs = Array.from(document.querySelectorAll(protocol.selector));
+        const msgs = Array.from(/** @type {any} */ (document).querySelectorAll(protocol.selector));
         const targetMsg = msgs[msgs.length - 1];
 
         if (!targetMsg) {
@@ -99,9 +105,9 @@ class StructuredExtractor {
         ];
 
         let thoughtBlocksRemoved = 0;
-        thoughtSelectors.forEach(selector => {
+        thoughtSelectors.forEach((selector) => {
             const thoughts = clone.querySelectorAll(selector);
-            thoughts.forEach(t => {
+            thoughts.forEach((/** @type {any} */ t) => {
                 t.remove();
                 thoughtBlocksRemoved++;
             });
@@ -117,15 +123,18 @@ class StructuredExtractor {
     /**
      * Converte HTML para Markdown
      *
+     * @private
      * @param {string} html - HTML bruto
      * @returns {string} - Markdown formatado
-     * @private
      */
     _convertToMarkdown(html) {
         try {
             return this.turndownService.turndown(html);
-        } catch (error) {
-            logger.warn('[STRUCTURED_EXTRACTOR] Erro ao converter HTML → Markdown', { error: error.message });
+        } catch (/** @type {any} */ error) {
+            logger.warn(
+                '[STRUCTURED_EXTRACTOR] Erro ao converter HTML → Markdown',
+                /** @type {any} */ ({ error: error.message }),
+            );
             // Fallback: retorna HTML como texto
             return html.replace(/<[^>]*>/g, '');
         }
@@ -134,9 +143,9 @@ class StructuredExtractor {
     /**
      * Parseia HTML para JSON estruturado
      *
-     * @param {string} html - HTML bruto
-     * @returns {Object} - { sections, codeBlocks, links, images, tables }
      * @private
+     * @param {string} html - HTML bruto
+     * @returns {any} - { sections, codeBlocks, links, images, tables }
      */
     _parseStructured(html) {
         try {
@@ -149,8 +158,8 @@ class StructuredExtractor {
                 images: this._extractImages(root),
                 tables: this._extractTables(root),
             };
-        } catch (error) {
-            logger.warn('[STRUCTURED_EXTRACTOR] Erro ao parsear HTML', { error: error.message });
+        } catch (/** @type {any} */ error) {
+            logger.warn('[STRUCTURED_EXTRACTOR] Erro ao parsear HTML', /** @type {any} */ ({ error: error.message }));
             return {
                 sections: [],
                 codeBlocks: [],
@@ -164,15 +173,15 @@ class StructuredExtractor {
     /**
      * Extrai seções (headings)
      *
-     * @param {any} root - Parsed HTML
-     * @returns {Array} - [{ level, text, content }]
      * @private
+     * @param {any} root - Parsed HTML
+     * @returns {unknown[]} - [{ level, text, content }]
      */
     _extractSections(root) {
-        const sections = [];
+        const sections = /** @type {any[]} */ ([]);
         const headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
 
-        headings.forEach(heading => {
+        headings.forEach((/** @type {any} */ heading) => {
             const level = parseInt(heading.tagName[1], 10);
             const text = heading.text.trim();
 
@@ -197,16 +206,16 @@ class StructuredExtractor {
     /**
      * Extrai code blocks
      *
-     * @param {any} root - Parsed HTML
-     * @returns {Array} - [{ language, code, isInline }]
      * @private
+     * @param {any} root - Parsed HTML
+     * @returns {unknown[]} - [{ language, code, isInline }]
      */
     _extractCodeBlocks(root) {
-        const codeBlocks = [];
+        const codeBlocks = /** @type {any[]} */ ([]);
 
         // Code blocks (fenced)
         const preBlocks = root.querySelectorAll('pre code, pre');
-        preBlocks.forEach(el => {
+        preBlocks.forEach((/** @type {any} */ el) => {
             const codeEl = el.tagName === 'PRE' ? el.querySelector('code') || el : el;
             const language = this._detectLanguage(codeEl);
             const code = codeEl.text.trim();
@@ -222,7 +231,7 @@ class StructuredExtractor {
 
         // Inline code
         const inlineCodes = root.querySelectorAll('code:not(pre code)');
-        inlineCodes.forEach(el => {
+        inlineCodes.forEach((/** @type {any} */ el) => {
             const code = el.text.trim();
             if (code && code.length < 100) {
                 // Apenas code curtos
@@ -240,9 +249,9 @@ class StructuredExtractor {
     /**
      * Detecta linguagem de code block
      *
+     * @private
      * @param {any} codeEl - Code element
      * @returns {string} - Language (python, javascript, etc)
-     * @private
      */
     _detectLanguage(codeEl) {
         // Tenta pegar de class (language-python, lang-js, etc)
@@ -265,15 +274,15 @@ class StructuredExtractor {
     /**
      * Extrai links
      *
-     * @param {any} root - Parsed HTML
-     * @returns {Array} - [{ text, href, title }]
      * @private
+     * @param {any} root - Parsed HTML
+     * @returns {unknown[]} - [{ text, href, title }]
      */
     _extractLinks(root) {
-        const links = [];
+        const links = /** @type {any[]} */ ([]);
         const anchors = root.querySelectorAll('a[href]');
 
-        anchors.forEach(a => {
+        anchors.forEach((/** @type {any} */ a) => {
             const href = a.getAttribute('href');
             const text = a.text.trim();
             const title = a.getAttribute('title') || null;
@@ -289,15 +298,15 @@ class StructuredExtractor {
     /**
      * Extrai images
      *
-     * @param {any} root - Parsed HTML
-     * @returns {Array} - [{ src, alt, title }]
      * @private
+     * @param {any} root - Parsed HTML
+     * @returns {unknown[]} - [{ src, alt, title }]
      */
     _extractImages(root) {
-        const images = [];
+        const images = /** @type {any[]} */ ([]);
         const imgs = root.querySelectorAll('img[src]');
 
-        imgs.forEach(img => {
+        imgs.forEach((/** @type {any} */ img) => {
             const src = img.getAttribute('src');
             const alt = img.getAttribute('alt') || '';
             const title = img.getAttribute('title') || null;
@@ -313,29 +322,29 @@ class StructuredExtractor {
     /**
      * Extrai tables
      *
-     * @param {any} root - Parsed HTML
-     * @returns {Array} - [{ headers, rows }]
      * @private
+     * @param {any} root - Parsed HTML
+     * @returns {unknown[]} - [{ headers, rows }]
      */
     _extractTables(root) {
-        const tables = [];
+        const tables = /** @type {any[]} */ ([]);
         const tableEls = root.querySelectorAll('table');
 
-        tableEls.forEach(table => {
+        tableEls.forEach((/** @type {any} */ table) => {
             // Headers
-            const headers = [];
+            const headers = /** @type {any[]} */ ([]);
             const headerCells = table.querySelectorAll('thead th, thead td');
-            headerCells.forEach(th => {
+            headerCells.forEach((/** @type {any} */ th) => {
                 headers.push(th.text.trim());
             });
 
             // Rows
-            const rows = [];
+            const rows = /** @type {any[]} */ ([]);
             const bodyRows = table.querySelectorAll('tbody tr, tr:not(thead tr)');
-            bodyRows.forEach(tr => {
-                const cells = [];
+            bodyRows.forEach((/** @type {any} */ tr) => {
+                const cells = /** @type {any[]} */ ([]);
                 const tds = tr.querySelectorAll('td, th');
-                tds.forEach(td => {
+                tds.forEach((/** @type {any} */ td) => {
                     cells.push(td.text.trim());
                 });
                 if (cells.length > 0) {
@@ -354,10 +363,10 @@ class StructuredExtractor {
     /**
      * Gera preview estruturado
      *
-     * @param {string} text - Texto plano
-     * @param {Object} structured - Dados estruturados
-     * @returns {Object} - { text, sections_count, code_blocks_count, links_count, images_count }
      * @private
+     * @param {string} text - Texto plano
+     * @param {any} structured - Dados estruturados
+     * @returns {any} - { text, sections_count, code_blocks_count, links_count, images_count }
      */
     _generatePreview(text, structured) {
         // Primeiro parágrafo (até 500 chars)
@@ -366,7 +375,7 @@ class StructuredExtractor {
         return {
             text: previewText,
             sections_count: structured.sections.length,
-            code_blocks_count: structured.codeBlocks.filter(cb => !cb.isInline).length,
+            code_blocks_count: structured.codeBlocks.filter((/** @type {any} */ cb) => !cb.isInline).length,
             links_count: structured.links.length,
             images_count: structured.images.length,
         };
@@ -375,8 +384,8 @@ class StructuredExtractor {
     /**
      * Resposta vazia (fallback)
      *
-     * @returns {Object}
      * @private
+     * @returns {any}
      */
     _emptyResponse() {
         return {

@@ -69,12 +69,12 @@ const nativeModules = [
 ];
 
 // Analysis
-const missing = usedModules.filter(m => !nativeModules.includes(m) && !allDeps[m]);
+const missing = usedModules.filter((m) => !nativeModules.includes(m) && !allDeps[m]);
 
-const unused = Object.keys(allDeps).filter(d => !usedModules.includes(d) && !d.startsWith('@'));
+const unused = Object.keys(allDeps).filter((d) => !usedModules.includes(d) && !d.startsWith('@'));
 
-const externalUsed = usedModules.filter(m => !nativeModules.includes(m));
-const nativeUsed = usedModules.filter(m => nativeModules.includes(m));
+const externalUsed = usedModules.filter((m) => !nativeModules.includes(m));
+const nativeUsed = usedModules.filter((m) => nativeModules.includes(m));
 
 // Output
 if (JSON_OUTPUT) {
@@ -99,7 +99,7 @@ if (JSON_OUTPUT) {
 
     if (missing.length > 0) {
         console.log('❌ FALTANDO no package.json:');
-        missing.forEach(m => console.log(`   - ${m}`));
+        missing.forEach((m) => console.log(`   - ${m}`));
         console.log();
     } else {
         console.log('✅ Todas as dependências usadas estão declaradas\n');
@@ -107,7 +107,7 @@ if (JSON_OUTPUT) {
 
     console.log('⚠️  POSSÍVEIS DEPENDÊNCIAS NÃO UTILIZADAS:');
     if (unused.length > 0) {
-        unused.forEach(m => console.log(`   - ${m}`));
+        unused.forEach((m) => console.log(`   - ${m}`));
         console.log('\n💡 Revisar manualmente antes de remover (podem ser usadas dinamicamente)');
     } else {
         console.log('   Nenhuma detectada');

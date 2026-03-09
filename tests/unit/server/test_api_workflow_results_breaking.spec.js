@@ -1,19 +1,19 @@
-// @ts-nocheck
-import { describe, it, before, after, beforeEach } from 'node:test';
-import assert from 'node:assert';
+// @ts-check
 import express from 'express';
-import request from 'supertest';
+import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { after, before, beforeEach, describe, it } from 'node:test';
+import request from 'supertest';
 
-import dashboardController from '#server/api/controllers/dashboard';
-import tasksController from '#server/api/controllers/tasks';
-import resultsController from '#server/api/controllers/results';
 import * as schemas from '#core/schemas';
-import { getDb, closeDb } from '#infra/db/sqlite';
+import { closeDb, getDb } from '#infra/db/sqlite';
 import { insertTask, updateTask } from '#infra/db/task_repo';
+import dashboardController from '#server/api/controllers/dashboard';
+import resultsController from '#server/api/controllers/results';
+import tasksController from '#server/api/controllers/tasks';
 
-function makeTmpDir(name) {
+function makeTmpDir(/** @type {string} */ name) {
     const dir = path.join(process.cwd(), 'tmp', name);
     fs.mkdirSync(dir, { recursive: true });
     return dir;
@@ -27,7 +27,7 @@ function makeDbPath() {
 function makeArtifactsDir() {
     const dir = path.join(
         makeTmpDir('test-artifacts'),
-        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     );
     fs.mkdirSync(dir, { recursive: true });
     return dir;
@@ -70,7 +70,7 @@ describe('Server API - workflow empty + results controller + breaking /api/tasks
     it('GET /api/dashboard/workflows/:workflow_id returns empty payload when no tasks', async () => {
         const app = express();
         app.use(express.json());
-        app.use((req, _res, next) => {
+        app.use((/** @type {any} */ req, _res, next) => {
             req.id = 'test';
             next();
         });
@@ -99,12 +99,12 @@ describe('Server API - workflow empty + results controller + breaking /api/tasks
 
         const app = express();
         app.use(express.json());
-        app.use((req, _res, next) => {
+        app.use((/** @type {any} */ req, _res, next) => {
             req.id = 'test';
             next();
         });
-        app.use('/api/tasks', tasksController);
-        app.use('/api/results', resultsController);
+        app.use('/api/tasks', /** @type {any} */ (tasksController));
+        app.use('/api/results', /** @type {any} */ (resultsController));
 
         const got = await request(app).get('/api/tasks/task-json-1').expect(200);
         assert.strictEqual(got.body.success, true);
@@ -140,8 +140,8 @@ describe('Server API - workflow empty + results controller + breaking /api/tasks
         const db = getDb();
         const rows = db.prepare('SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ?').all('task-child');
         assert.deepStrictEqual(
-            rows.map(r => r.depends_on_task_id),
-            ['task-parent']
+            rows.map((/** @type {any} */ r) => r.depends_on_task_id),
+            ['task-parent'],
         );
     });
 });

@@ -1,9 +1,9 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import test from 'node:test';
 
-function runPureImport(modulePath) {
+function runPureImport(/** @type {any} */ modulePath) {
     const env = { ...process.env };
     delete env.NO_COLOR;
     delete env.FORCE_COLOR;

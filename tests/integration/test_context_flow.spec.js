@@ -1,20 +1,20 @@
 // @ts-check
-import assert from 'node:assert';
-import { describe, it, before, after } from 'node:test';
-import { ContextManager, CHUNKING_STRATEGY } from '#orchestrator/context_manager';
 import { MissionManager } from '#missions/mission_manager';
 import { MissionStateManager } from '#missions/mission_state_manager';
-import path from 'node:path';
+import { CHUNKING_STRATEGY, ContextManager } from '#orchestrator/context_manager';
 import fs from 'fs/promises';
+import assert from 'node:assert';
+import path from 'node:path';
+import { after, before, describe, it } from 'node:test';
 
 describe('Context Flow Integration Tests', () => {
-    let contextManager;
-    let missionManager;
-    let testMissionsDir;
+    /** @type {any} */ let contextManager;
+    /** @type {any} */ let missionManager;
+    /** @type {any} */ let testMissionsDir;
 
     // Mock dependencies
     const mockKernel = {
-        executeTask: async (task, correlationId) => {
+        executeTask: async (/** @type {any} */ task, /** @type {any} */ correlationId) => {
             // Mock: retorna sucesso
             return { status: 'queued', task_id: task.meta.id };
         },
@@ -77,7 +77,7 @@ describe('Context Flow Integration Tests', () => {
     });
 
     describe('2. Context Accumulation During Execution', () => {
-        let testMissionId;
+        /** @type {any} */ let testMissionId;
 
         before(async () => {
             const mission = await missionManager.createMission({
@@ -98,12 +98,12 @@ describe('Context Flow Integration Tests', () => {
             await contextManager.addStepOutput(
                 testMissionId,
                 'step-1',
-                'Chapter outline: Introduction, Chapter 1, Chapter 2'
+                'Chapter outline: Introduction, Chapter 1, Chapter 2',
             );
             await contextManager.addStepOutput(
                 testMissionId,
                 'step-2',
-                'Chapter 1: This is the first chapter about Accumulation'
+                'Chapter 1: This is the first chapter about Accumulation',
             );
             await contextManager.addStepOutput(testMissionId, 'step-3', 'Chapter 2: This continues the topic');
 
@@ -136,7 +136,7 @@ describe('Context Flow Integration Tests', () => {
     });
 
     describe('3. Context in Task Generation', () => {
-        let testMissionId;
+        /** @type {any} */ let testMissionId;
 
         before(async () => {
             const mission = await missionManager.createMission({
@@ -246,7 +246,7 @@ describe('Context Flow Integration Tests', () => {
 
             assert.ok(results.length > 0);
             // Deve priorizar patterns com "code" e "quality"
-            const hasRelevant = results.some(p => p.content.toLowerCase().includes('code'));
+            const hasRelevant = results.some((/** @type {any} */ p) => p.content.toLowerCase().includes('code'));
             assert.ok(hasRelevant);
         });
     });

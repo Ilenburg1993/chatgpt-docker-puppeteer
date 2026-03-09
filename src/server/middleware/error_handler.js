@@ -1,10 +1,14 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { log, audit } from '#core/logger';
+// @ts-check
+import { audit, log } from '#core/logger';
 
 /**
- * Middleware para tratamento de rotas não localizadas (404).
- * Atua como o último recurso antes do processador de erros global.
-  * @returns {void}
+ * Middleware para tratamento de rotas não localizadas (404). Atua como o último recurso antes do processador de erros
+ * global.
+ *
+ * @param {any} req
+ * @param {any} res
+ * @param {any} next
+ * @returns {void}
  */
 function notFound(req, res, next) {
     const error = new Error(`Recurso não localizado: ${req.method} ${req.originalUrl}`);
@@ -12,15 +16,16 @@ function notFound(req, res, next) {
     next(error);
 }
 
+/** @typedef {any} ErrorHandlerReq */
+/** @typedef {any} ErrorHandlerRes */
 /**
- * Middleware Global de Erros (500).
- * Captura qualquer exceção lançada nos controllers ou middlewares anteriores.
+ * Middleware Global de Erros (500). Captura qualquer exceção lançada nos controllers ou middlewares anteriores.
  *
  * @param {Error} err - Objeto de erro capturado.
- * @param {object} req - Request Express.
- * @param {object} res - Response Express.
+ * @param {ErrorHandlerReq} req - Request Express.
+ * @param {ErrorHandlerRes} res - Response Express.
  * @param {function} next - Próximo middleware.
-  * @returns {void}
+ * @returns {void}
  */
 function errorHandler(err, req, res, next) {
     // 1. Determinação do Status Code
@@ -65,4 +70,4 @@ function errorHandler(err, req, res, next) {
     });
 }
 
-export { notFound, errorHandler };
+export { errorHandler, notFound };

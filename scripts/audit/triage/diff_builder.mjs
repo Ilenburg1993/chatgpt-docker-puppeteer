@@ -7,7 +7,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..', '..');
 /**
  * @param {string} filePath
  * @param {number} line
- * @returns {string|null}
+ * @returns {string | null}
  */
 function readTargetLine(filePath, line) {
     const full = path.resolve(ROOT, filePath);
@@ -27,8 +27,9 @@ function getIndentation(line) {
     return match ? match[0] : '';
 }
 
+/** @typedef {any} BuildContractAwareReplacementFinding */
 /**
- * @param {any} finding
+ * @param {BuildContractAwareReplacementFinding} finding
  * @param {string} oldLine
  * @param {string} fallback
  */
@@ -61,9 +62,16 @@ function buildContractAwareReplacement(finding, oldLine, fallback) {
 }
 
 /**
- * @param {any} finding
- * @param {{ title?: string, cause?: string, replacementHint?: string }} [context]
-  * @returns {any}
+ * @typedef {object} BuildSuggestedDiffContext
+ * @property {string | undefined} [title]
+ * @property {string | undefined} [cause]
+ * @property {string | undefined} [replacementHint]
+ */
+/** @typedef {any} BuildSuggestedDiffFinding */
+/**
+ * @param {BuildSuggestedDiffFinding} finding
+ * @param {BuildSuggestedDiffContext} [context]
+ * @returns {any}
  */
 export function buildSuggestedDiff(finding, context = {}) {
     if (!finding?.file) {

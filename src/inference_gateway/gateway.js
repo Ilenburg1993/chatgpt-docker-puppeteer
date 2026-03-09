@@ -1,34 +1,45 @@
 // @ts-check
 
 import { ollama as defaultOllamaClient } from '../../tools/ollama/client.mjs';
-import { resolveInferencePolicy, validateInferenceRoute } from './policy_config.js';
 import { requireInferenceClientTag } from './client_tags.js';
+import { resolveInferencePolicy, validateInferenceRoute } from './policy_config.js';
 
 /**
  * @typedef {{
- *   generate?: number,
- *   embed?: number,
- *   listModels?: number,
- *   errors?: number,
- *   byClientTag: Record<string, number>,
- *   byOperation: Record<string, number>
+ *     generate?: number;
+ *     embed?: number;
+ *     listModels?: number;
+ *     errors?: number;
+ *     byClientTag: Record<string, number>;
+ *     byOperation: Record<string, number>;
  * }} InferenceGatewayMetrics
  */
 
+/**
+ * @param {string} name
+ * @param {number} fallback
+ */
 function parsePositiveIntEnv(name, fallback) {
     const n = Number(process.env[name]);
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
 /**
- * @returns {{ timeoutMs:number, maxParallel:number, maxTokens:number|null, allowedModels:string[]|null, allowedBackends:string[]|null, degradedBehavior:'degraded_continue'|'fail_closed' }}
+ * @returns {{
+ *     timeoutMs: number;
+ *     maxParallel: number;
+ *     maxTokens: number | null;
+ *     allowedModels: string[] | null;
+ *     allowedBackends: string[] | null;
+ *     degradedBehavior: 'degraded_continue' | 'fail_closed';
+ * }}
  */
 export function getInferenceEnvBootstrapPolicy() {
     const allowedModelsRaw = String(process.env.OLLAMA_LOCAL_ALLOWED_MODELS || '').trim();
     const allowedModels = allowedModelsRaw
         ? allowedModelsRaw
               .split(',')
-              .map(v => v.trim())
+              .map((v) => v.trim())
               .filter(Boolean)
         : null;
 
@@ -46,18 +57,18 @@ export function getInferenceEnvBootstrapPolicy() {
 }
 
 /**
- * Gateway de inferência para geração, embedding e listagem de modelos.
- * Aplica políticas por cliente/perfil e controla concorrência por clientTag.
+ * Gateway de inferência para geração, embedding e listagem de modelos. Aplica políticas por cliente/perfil e controla
+ * concorrência por clientTag.
  */
 export class InferenceGateway {
     /**
      * @param {{
-     *   ollamaClient?: any,
-     *   now?: () => number,
-     *   globalPolicy?: any,
-     *   profilePolicies?: Record<string, any>,
-     *   clientPolicies?: Record<string, any>,
-     *   defaults?: any,
+     *     ollamaClient?: unknown;
+     *     now?: () => number;
+     *     globalPolicy?: unknown;
+     *     profilePolicies?: Record<string, unknown>;
+     *     clientPolicies?: Record<string, unknown>;
+     *     defaults?: unknown;
      * }} [options]
      */
     constructor(options = {}) {
@@ -85,7 +96,12 @@ export class InferenceGateway {
 
     /**
      * Atualiza policies em memória (reload explícito, sem reiniciar processo).
-     * @param {{ globalPolicy?: any, profilePolicies?: Record<string, any>, clientPolicies?: Record<string, any> }} input
+     *
+     * @param {{
+     *     globalPolicy?: unknown;
+     *     profilePolicies?: Record<string, unknown>;
+     *     clientPolicies?: Record<string, unknown>;
+     * }} input
      */
     setPolicies(input = {}) {
         if (input.globalPolicy !== undefined) this.globalPolicy = input.globalPolicy || null;
@@ -95,7 +111,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @returns {{ globalPolicyPresent: boolean, profileCount: number, clientPolicyCount: number }}
+     * @returns {{ globalPolicyPresent: boolean; profileCount: number; clientPolicyCount: number }}
      */
     getPolicySummary() {
         return {
@@ -105,6 +121,10 @@ export class InferenceGateway {
         };
     }
 
+    /**
+     * @param {string} clientTag
+     * @param {string} operation
+     */
     _bumpMetric(clientTag, operation) {
         this.metrics.byClientTag[clientTag] = (this.metrics.byClientTag[clientTag] || 0) + 1;
         this.metrics.byOperation[operation] = (this.metrics.byOperation[operation] || 0) + 1;
@@ -113,6 +133,10 @@ export class InferenceGateway {
         if (operation === 'listModels') this.metrics.listModels = (this.metrics.listModels || 0) + 1;
     }
 
+    /**
+     * @param {string} clientTag
+     * @param {number} maxParallel
+     */
     _acquire(clientTag, maxParallel) {
         const current = this._inFlightByClient.get(clientTag) || 0;
         if (current >= maxParallel) {
@@ -124,6 +148,7 @@ export class InferenceGateway {
         this._inFlightByClient.set(clientTag, current + 1);
     }
 
+    /** @param {string} clientTag */
     _release(clientTag) {
         const current = this._inFlightByClient.get(clientTag) || 0;
         if (current <= 1) {
@@ -134,7 +159,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, profileName?: string, overrides?: any }} options
+     * @param {{ clientTag: unknown; profileName?: string | undefined; overrides?: unknown }} options
      */
     resolvePolicy(options) {
         const clientTag = requireInferenceClientTag(options?.clientTag);
@@ -143,7 +168,7 @@ export class InferenceGateway {
             options?.profileName ||
                 /** @type {any} */ (clientPolicy)?.profile_name ||
                 /** @type {any} */ (clientPolicy)?.profileName ||
-                ''
+                '',
         ).trim();
         return resolveInferencePolicy({
             clientTag,
@@ -157,7 +182,13 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, profileName?: string, model?: string, backend?: string, policyOverrides?: any }} request
+     * @param {{
+     *     clientTag: unknown;
+     *     profileName?: string;
+     *     model?: string;
+     *     backend?: string;
+     *     policyOverrides?: unknown;
+     * }} request
      */
     validateGenerate(request) {
         const policy = this.resolvePolicy({
@@ -184,7 +215,16 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, prompt: string, model?: string, backend?: string, maxTokens?: number, runtime?: 'auto'|'cloud'|'local', profileName?: string, policyOverrides?: any }} request
+     * @param {{
+     *     clientTag: unknown;
+     *     prompt: string;
+     *     model?: string;
+     *     backend?: string;
+     *     maxTokens?: number;
+     *     runtime?: 'auto' | 'cloud' | 'local';
+     *     profileName?: string;
+     *     policyOverrides?: unknown;
+     * }} request
      */
     async generate(request) {
         const policy = this.resolvePolicy({
@@ -209,7 +249,7 @@ export class InferenceGateway {
         this._bumpMetric(clientTag, 'generate');
         try {
             const maxTokens = request.maxTokens ?? policy.effective.maxTokens ?? undefined;
-            const result = await this.ollamaClient.generate(request.prompt, request.model, {
+            const result = await /** @type {any} */ (this.ollamaClient).generate(request.prompt, request.model, {
                 max_tokens: maxTokens,
                 runtime: request.runtime,
             });
@@ -220,7 +260,7 @@ export class InferenceGateway {
                 result,
                 ts: this.now(),
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this.metrics.errors = (this.metrics.errors || 0) + 1;
             throw error;
         } finally {
@@ -229,7 +269,15 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, text: string, model?: string, backend?: string, runtime?: 'auto'|'cloud'|'local', profileName?: string, policyOverrides?: any }} request
+     * @param {{
+     *     clientTag: unknown;
+     *     text: string;
+     *     model?: string;
+     *     backend?: string;
+     *     runtime?: 'auto' | 'cloud' | 'local';
+     *     profileName?: string;
+     *     policyOverrides?: unknown;
+     * }} request
      */
     async embed(request) {
         const policy = this.resolvePolicy({
@@ -252,7 +300,7 @@ export class InferenceGateway {
         this._acquire(clientTag, Math.max(1, Number(policy.effective.maxParallel || 1)));
         this._bumpMetric(clientTag, 'embed');
         try {
-            const result = await this.ollamaClient.embed(request.text, request.model, {
+            const result = await /** @type {any} */ (this.ollamaClient).embed(request.text, request.model, {
                 runtime: request.runtime,
             });
             return {
@@ -262,7 +310,7 @@ export class InferenceGateway {
                 result,
                 ts: this.now(),
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this.metrics.errors = (this.metrics.errors || 0) + 1;
             throw error;
         } finally {
@@ -271,7 +319,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, profileName?: string, policyOverrides?: any }} request
+     * @param {{ clientTag: unknown; profileName?: string; policyOverrides?: unknown }} request
      */
     async listModels(request) {
         const policy = this.resolvePolicy({
@@ -284,7 +332,7 @@ export class InferenceGateway {
         this._acquire(clientTag, Math.max(1, Number(policy.effective.maxParallel || 1)));
         this._bumpMetric(clientTag, 'listModels');
         try {
-            const models = await this.ollamaClient.listModels();
+            const models = await /** @type {any} */ (this.ollamaClient).listModels();
             return {
                 ok: true,
                 clientTag,
@@ -292,7 +340,7 @@ export class InferenceGateway {
                 models,
                 ts: this.now(),
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this.metrics.errors = (this.metrics.errors || 0) + 1;
             throw error;
         } finally {
@@ -310,6 +358,7 @@ export class InferenceGateway {
 
 /**
  * Instância singleton do gateway de inferência usada pelo servidor HTTP do módulo.
+ *
  * @type {InferenceGateway}
  */
 export const inferenceGateway = new InferenceGateway();

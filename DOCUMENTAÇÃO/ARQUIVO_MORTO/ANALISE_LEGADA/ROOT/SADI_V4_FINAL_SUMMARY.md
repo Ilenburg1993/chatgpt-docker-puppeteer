@@ -217,8 +217,8 @@ npm start
  * v4.0: Localiza o campo de input com validação, cache e telemetria
  *
  * @param {Object} page - Puppeteer Page instance
- * @param {string} [langCode='en'] - Language code (en, pt, es, etc.)
- * @returns {Promise<Object|null>} Detection result
+ * @param {string} [langCode='en'] - Language code (en, pt, es, etc.). Default is `'en'`
+ * @returns {Promise<Object | null>} Detection result
  *
  * @typedef {Object} DetectionResult
  * @property {Object} protocol - Element protocol
@@ -228,7 +228,6 @@ npm start
  * @property {string} page_url - Current URL
  * @property {Object} viewport - Viewport dimensions
  * @property {Object} best_candidate - Element details
- *
  * @throws {Error} If page or langCode invalid
  */
 ```
@@ -241,7 +240,7 @@ npm start
  *
  * @param {Object} page - Puppeteer Page instance
  * @param {Object} inputProtocol - From findChatInputSelector
- * @returns {Promise<Object|null>} Detection result
+ * @returns {Promise<Object | null>} Detection result
  *
  * @typedef {Object} ButtonResult
  * @property {Object} protocol - Element protocol
@@ -249,7 +248,6 @@ npm start
  * @property {number} detection_time_ms - Time taken
  * @property {boolean} has_svg - Has SVG path
  * @property {boolean} is_disabled - Button state
- *
  * @throws {Error} If page or inputProtocol invalid
  */
 ```
@@ -261,7 +259,7 @@ npm start
  * v4.0: Monitora área de resposta para detectar atividade da IA
  *
  * @param {Object} page - Puppeteer Page instance
- * @returns {Promise<Object|null>} Detection result
+ * @returns {Promise<Object | null>} Detection result
  *
  * @typedef {Object} ResponseResult
  * @property {Object} protocol - Element protocol
@@ -269,7 +267,6 @@ npm start
  * @property {number} growth_delta - Text growth
  * @property {number} detection_time_ms - Time taken
  * @property {number} content_length - Current length
- *
  * @throws {Error} If page invalid
  */
 ```
@@ -294,7 +291,7 @@ npm start
  *
  * @param {Object} page - Puppeteer Page instance
  * @param {string} framePath - Frame identifier
- * @returns {Promise<Frame|Page>} Frame or mainFrame
+ * @returns {Promise<Frame | Page>} Frame or mainFrame
  * @throws {Error} If page invalid
  */
 ```

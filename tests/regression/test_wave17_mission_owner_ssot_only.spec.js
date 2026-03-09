@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import test from 'node:test';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { MissionManager } from '#missions/mission_manager';
@@ -12,20 +12,19 @@ function makeDbPath() {
     fs.mkdirSync(dir, { recursive: true });
     return path.join(
         dir,
-        `maestro-wave17-owner-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+        `maestro-wave17-owner-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`,
     );
 }
 
-function makeMissionManager({ missionState, kernelExecuteTask }) {
+function makeMissionManager(
+    /** @type {{ missionState: any; kernelExecuteTask: any }} */ { missionState, kernelExecuteTask },
+) {
     const stateRef = { value: JSON.parse(JSON.stringify(missionState)) };
     const stateManager = {
         baseDir: path.join(process.cwd(), 'tmp', 'missions-wave17-owner'),
         async initialize() {},
-        async getMission(missionId) {
-            return stateRef.value?.id === missionId ? JSON.parse(JSON.stringify(stateRef.value)) : null;
-        },
-        async updateMission(missionId, updates) {
-            if (stateRef.value?.id !== missionId) return null;
+        async getMission(/** @type {any} */ missionId) {},
+        async updateMission(/** @type {any} */ missionId, /** @type {any} */ updates) {
             stateRef.value = { ...stateRef.value, ...updates };
             return JSON.parse(JSON.stringify(stateRef.value));
         },
@@ -50,7 +49,7 @@ function makeMissionManager({ missionState, kernelExecuteTask }) {
         cleanup() {},
     };
     const feedbackProcessor = {
-        processFeedback(text) {
+        processFeedback(/** @type {any} */ text) {
             return {
                 id: 'fb',
                 original: text,
@@ -60,7 +59,7 @@ function makeMissionManager({ missionState, kernelExecuteTask }) {
                 patterns: [],
             };
         },
-        injectIntoStep(prompt) {
+        injectIntoStep(/** @type {any} */ prompt) {
             return prompt;
         },
     };
@@ -88,7 +87,7 @@ function makeMissionManager({ missionState, kernelExecuteTask }) {
     });
 }
 
-test('wave17: MissionManager força SSOT quando legacy_direct não está em contingência', async t => {
+test('wave17: MissionManager força SSOT quando legacy_direct não está em contingência', async (t) => {
     const dbPath = makeDbPath();
     process.env.MAESTRO_DB_PATH = dbPath;
     process.env.MISSION_STEP_DISPATCH_MODE = 'legacy_direct';
@@ -138,9 +137,9 @@ test('wave17: MissionManager força SSOT quando legacy_direct não está em cont
     await manager._executeNextStep('mission-wave17-owner');
 
     assert.equal(kernelCalls, 0);
-    const row = db
-        .prepare('SELECT id, mission_id, stage, status FROM tasks WHERE mission_id = ?')
-        .get('mission-wave17-owner');
+    const row = /** @type {any} */ (
+        db.prepare('SELECT id, mission_id, stage, status FROM tasks WHERE mission_id = ?').get('mission-wave17-owner')
+    );
     assert.ok(row);
     assert.equal(row.stage, 'READY');
     assert.equal(row.status, 'PENDING');

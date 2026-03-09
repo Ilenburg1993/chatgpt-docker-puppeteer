@@ -1,14 +1,15 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 
 /**
  * SQLite schema migrations (SSOT).
  *
  * IMPORTANT:
+ *
  * - Migrations must be append-only.
  * - Each migration must be idempotent (safe to re-run) via IF NOT EXISTS.
  */
 
-/** @typedef {{ version: number, name: string, up?: string, upFn?: (db: import('better-sqlite3').Database) => void }} Migration */
+/** @typedef {{ version: number; name: string; up?: string; upFn?: (db: import('better-sqlite3').Database) => void }} Migration */
 
 /** @type {Migration[]} */
 const MIGRATIONS = [
@@ -112,7 +113,7 @@ const MIGRATIONS = [
     {
         version: 2,
         name: 'artifacts_and_attempts',
-        upFn: db => {
+        upFn: (db) => {
             // Artifacts: metadata + ponteiro para storage (FS, por enquanto).
             db.exec(`
                 CREATE TABLE IF NOT EXISTS artifacts (
@@ -165,7 +166,7 @@ const MIGRATIONS = [
                 db
                     .prepare("PRAGMA table_info('tasks')")
                     .all()
-                    .map(r => String(r.name))
+                    .map(/** @param {any} r */ (r) => String(r.name)),
             );
 
             if (!cols.has('prompt_template_artifact_id')) {
@@ -189,13 +190,13 @@ const MIGRATIONS = [
     {
         version: 3,
         name: 'blocked_and_attempt_heartbeats',
-        upFn: db => {
+        upFn: (db) => {
             // tasks: add BLOCKED metadata columns (idempotent).
             const taskCols = new Set(
                 db
                     .prepare("PRAGMA table_info('tasks')")
                     .all()
-                    .map(r => String(r.name))
+                    .map(/** @param {any} r */ (r) => String(r.name)),
             );
             if (!taskCols.has('blocked_reason')) {
                 db.exec('ALTER TABLE tasks ADD COLUMN blocked_reason TEXT NULL;');
@@ -212,7 +213,7 @@ const MIGRATIONS = [
                 db
                     .prepare("PRAGMA table_info('task_attempts')")
                     .all()
-                    .map(r => String(r.name))
+                    .map(/** @param {any} r */ (r) => String(r.name)),
             );
             if (!attemptCols.has('reason_class')) {
                 db.exec('ALTER TABLE task_attempts ADD COLUMN reason_class TEXT NULL;');
@@ -234,12 +235,12 @@ const MIGRATIONS = [
     {
         version: 4,
         name: 'attempt_diagnostics_and_failure_codes',
-        upFn: db => {
+        upFn: (db) => {
             const attemptCols = new Set(
                 db
                     .prepare("PRAGMA table_info('task_attempts')")
                     .all()
-                    .map(r => String(r.name))
+                    .map(/** @param {any} r */ (r) => String(r.name)),
             );
             if (!attemptCols.has('reason_code')) {
                 db.exec('ALTER TABLE task_attempts ADD COLUMN reason_code TEXT NULL;');
@@ -263,12 +264,12 @@ const MIGRATIONS = [
     {
         version: 5,
         name: 'tasks_workflow_fields',
-        upFn: db => {
+        upFn: (db) => {
             const taskCols = new Set(
                 db
                     .prepare("PRAGMA table_info('tasks')")
                     .all()
-                    .map(r => String(r.name))
+                    .map(/** @param {any} r */ (r) => String(r.name)),
             );
 
             if (!taskCols.has('parent_id')) {
@@ -285,7 +286,7 @@ const MIGRATIONS = [
 
             // Best-effort backfill from task_json (requires SQLite JSON1).
             try {
-                const probe = db.prepare("SELECT json_extract('{\"a\":1}', '$.a') AS a").get();
+                const probe = /** @type {any} */ (db.prepare("SELECT json_extract('{\"a\":1}', '$.a') AS a").get());
                 const jsonOk = probe && Number(probe.a) === 1;
                 if (jsonOk) {
                     db.exec(`
@@ -301,7 +302,7 @@ const MIGRATIONS = [
                           AND json_extract(task_json, '$.meta.workflow_id') IS NOT NULL;
                     `);
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 // Skip backfill if JSON1 is unavailable.
             }
         },

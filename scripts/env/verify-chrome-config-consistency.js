@@ -1,5 +1,6 @@
 // @ts-check
-import config from '../config.json' with { type: 'json' };
+import configRaw from '../../config.json' with { type: 'json' };
+const config = /** @type {any} */ (configRaw);
 
 console.log('🔍 VERIFICAÇÃO DE CONFIGURAÇÃO');
 console.log('='.repeat(70));

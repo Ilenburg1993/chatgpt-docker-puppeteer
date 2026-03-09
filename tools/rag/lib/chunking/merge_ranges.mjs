@@ -1,6 +1,7 @@
+// @ts-check
 import { estimateCharsForLines } from '../text.mjs';
 
-export function mergeSmallRanges({ ranges, lines, minChunkChars, maxChunkChars }) {
+export function mergeSmallRanges(/** @type {any} */ { ranges, lines, minChunkChars, maxChunkChars }) {
     if (!ranges.length) return ranges;
     const merged = [];
 
@@ -10,14 +11,14 @@ export function mergeSmallRanges({ ranges, lines, minChunkChars, maxChunkChars }
             continue;
         }
 
-        const current = merged[merged.length - 1];
+        const current = /** @type {any} */ (merged[merged.length - 1]);
         const currentLen = estimateCharsForLines(lines, current.startLine - 1, current.endLine - 1);
         if (currentLen >= minChunkChars) {
             merged.push({ ...r });
             continue;
         }
 
-        const combined = { startLine: current.startLine, endLine: r.endLine };
+        const combined = /** @type {any} */ ({ startLine: current.startLine, endLine: r.endLine });
         const combinedLen = estimateCharsForLines(lines, combined.startLine - 1, combined.endLine - 1);
         if (combinedLen <= maxChunkChars) {
             merged[merged.length - 1] = combined;

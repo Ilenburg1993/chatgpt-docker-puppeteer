@@ -1,14 +1,14 @@
 // @ts-check
-import test, { after } from 'node:test';
+import { shutdown as shutdownDriverFactory } from '#driver/factory';
+import { resolveServerMode, shutdown } from '#main';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { promisify } from 'node:util';
+import test, { after } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { resolveServerMode, shutdown } from '#main';
-import { shutdown as shutdownDriverFactory } from '#driver/factory';
+import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
@@ -46,7 +46,7 @@ test('wave2: shutdown does not call process.exit by default', async () => {
     };
 
     try {
-        const result = await shutdown({}, { exitOnComplete: false });
+        const result = await shutdown(/** @type {any} */ ({}), /** @type {any} */ ({ exitOnComplete: false }));
         assert.equal(result.ok, true);
         assert.equal(exitCalls, 0);
     } finally {
@@ -54,7 +54,7 @@ test('wave2: shutdown does not call process.exit by default', async () => {
     }
 });
 
-test('wave2: env bootstrap honors .env.local precedence and remains idempotent', async t => {
+test('wave2: env bootstrap honors .env.local precedence and remains idempotent', async (t) => {
     const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wave2-env-bootstrap-'));
     t.after(async () => {
         await rm(tmpDir, { recursive: true, force: true });
@@ -79,7 +79,7 @@ test('wave2: env bootstrap honors .env.local precedence and remains idempotent',
     const lines = stdout
         .trim()
         .split('\n')
-        .map(line => line.trim())
+        .map((line) => line.trim())
         .filter(Boolean);
     const lastLine = lines[lines.length - 1] || '';
 

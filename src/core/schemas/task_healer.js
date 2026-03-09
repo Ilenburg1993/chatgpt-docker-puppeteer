@@ -1,13 +1,12 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { TaskSchema } from './task_schema.js';
+// @ts-check
 import { log } from '../logger.js';
+import { TaskSchema } from './task_schema.js';
 
 /**
- * HEAL_TASK: O Motor de Normalização e Cura.
- * Transforma qualquer input bruto em uma estrutura V4 perfeita.
+ * HEAL_TASK: O Motor de Normalização e Cura. Transforma qualquer input bruto em uma estrutura V4 perfeita.
  *
- * @param {object} raw - Objeto bruto vindo da fila, API ou scripts.
- * @returns {object} Tarefa validada e curada conforme o Schema V4.
+ * @param {any} raw - Objeto bruto vindo da fila, API ou scripts.
+ * @returns {any} Tarefa validada e curada conforme o Schema V4.
  */
 
 function healTask(raw) {
@@ -72,9 +71,10 @@ function healTask(raw) {
     // O Zod aplicará os valores padrão (defaults) definidos nos sub-schemas.
     try {
         return TaskSchema.parse(task);
-    } catch (healErr) {
+    } catch (/** @type {any} */ healErr) {
+        const _ce = /** @type {any} */ (healErr);
         // [FIX 1.1] Nomenclatura contextual para evitar shadowing
-        log('ERROR', `[HEALER] Falha crítica na integridade da tarefa: ${healErr.message}`);
+        log('ERROR', `[HEALER] Falha crítica na integridade da tarefa: ${_ce.message}`);
         throw healErr;
     }
 }

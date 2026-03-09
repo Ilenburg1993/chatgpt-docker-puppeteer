@@ -102,7 +102,7 @@ Sequência de 8 passos determinística:
 ### 2. **Port Hunting Resiliente** (server.js)
 
 ```javascript
-httpServer.on('error', e => {
+httpServer.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {
     log('WARN', `Porta ${port} ocupada. Escalando para ${port + 1}...`);
     httpServer.close();
@@ -178,7 +178,7 @@ function requestId(req, res, next) {
 const result = schema.safeParse(req.body);
 
 if (!result.success) {
-  const errorDetails = result.error.issues.map(issue => ({
+  const errorDetails = result.error.issues.map((issue) => ({
     field: issue.path.join('.'),
     message: issue.message,
   }));
@@ -286,8 +286,8 @@ está conectado ao Socket.io.
 
 ```javascript
 // Linha 90: Setup listeners
-this.socketHub.on('dashboard:command', data => {
-  this._handleDashboardCommand(data).catch(err => {
+this.socketHub.on('dashboard:command', (data) => {
+  this._handleDashboardCommand(data).catch((err) => {
     /* ... */
   });
 });

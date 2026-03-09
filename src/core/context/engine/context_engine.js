@@ -1,19 +1,18 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as io from '#infra/io';
-import { parseReferences } from '../parsing/ref_parser.js';
-import { assertSafetyDepth } from '../limits/guardrails.js';
-import { BudgetManager } from '../limits/budget_manager.js';
-import { extractJsonByStack } from '../extractors/json_logic.js';
-import { extractCodeBlocks } from '../extractors/code_logic.js';
-import { smartTruncate } from '../transformers/summary.js';
-import { extractTaskMetadata } from '../transformers/metadata.js';
-import identity from '../transformers/identity.js';
-import { log } from '../../logger.js';
 import { asRecord } from '#types/guards';
+import { log } from '../../logger.js';
+import { extractCodeBlocks } from '../extractors/code_logic.js';
+import { extractJsonByStack } from '../extractors/json_logic.js';
+import { BudgetManager } from '../limits/budget_manager.js';
+import { assertSafetyDepth } from '../limits/guardrails.js';
+import { parseReferences } from '../parsing/ref_parser.js';
+import identity from '../transformers/identity.js';
+import { extractTaskMetadata } from '../transformers/metadata.js';
+import { smartTruncate } from '../transformers/summary.js';
 
 /**
- * Transform Types: Tipos de transformação de contexto suportados
- * Escopo: Local ao módulo context_engine
+ * Transform Types: Tipos de transformação de contexto suportados Escopo: Local ao módulo context_engine
  */
 const TRANSFORM_TYPES = {
     SUMMARY: 'SUMMARY',
@@ -27,6 +26,10 @@ const TRANSFORM_TYPES = {
 
 /**
  * Pipeline de Transformação: Mapeia o token de transformação para a lógica real.
+ *
+ * @param {any} content
+ * @param {any} transform
+ * @param {any} targetTask
  */
 async function applyTransform(content, transform, targetTask) {
     const type = (transform || TRANSFORM_TYPES.RAW).toUpperCase();
@@ -51,15 +54,22 @@ async function applyTransform(content, transform, targetTask) {
 
 /**
  * resolveContext: O motor recursivo de resolução de referências.
+ *
  * @param {string} text - O prompt original com tags {{REF:...}}.
  * @param {object} currentTask - A tarefa que está sendo processada.
  * @param {AbortSignal} signal - Sinal para cancelamento imediato.
  * @param {number} depth - Nível atual de recursão.
  * @param {BudgetManager} budget - Gestor de volume de injeção.
-  * @returns {Promise<any>}
+ * @returns {Promise<any>}
  */
 
-async function resolveContext(text, currentTask = null, signal = null, depth = 0, budget = null) {
+async function resolveContext(
+    text,
+    /** @type {any} */ currentTask = null,
+    /** @type {any} */ signal = null,
+    depth = 0,
+    /** @type {any} */ budget = null,
+) {
     // 1. GUARDRAILS: Validação de segurança e aborto
     if (signal?.aborted) {
         throw new Error('CONTEXT_RESOLUTION_ABORTED');
@@ -80,7 +90,7 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
     }
 
     let resolvedText = text;
-    const projectId = currentTask?.meta?.project_id || 'default';
+    const projectId = /** @type {any} */ (currentTask)?.meta?.project_id || 'default';
 
     for (const ref of refs) {
         // Check de aborto em cada iteração do loop para resposta imediata
@@ -104,9 +114,9 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
             if (criteria === 'LAST') {
                 targetTask = await io.findLast(projectId);
             } else if (criteria.startsWith('FIRST:TAG:')) {
-                targetTask = await io.findFirstByTag(projectId, criteria.split(':')[2]);
+                targetTask = await io.findFirstByTag(projectId, criteria.split(':')[2] ?? '');
             } else if (criteria.startsWith('TAG:')) {
-                targetTask = await io.findLastByTag(projectId, criteria.split(':')[1]);
+                targetTask = await io.findLastByTag(projectId, criteria.split(':')[1] ?? '');
             } else {
                 targetTask = await io.findById(criteria);
             }
@@ -154,7 +164,8 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
 
             // Substituição atômica no texto (Literal Replacement)
             resolvedText = resolvedText.split(ref.fullMatch).join(injectedContent);
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `Falha ao resolver referência ${ref.fullMatch}: ${err.message}`);
             resolvedText = resolvedText.split(ref.fullMatch).join(`[ERRO_CONTEXTO]`);
         }

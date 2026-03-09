@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 // NOTE: This is an E2E test and requires external dependencies (Chrome proxy).
 // It is not part of the default CI/unit/integration/regression test run.
 
@@ -14,10 +14,15 @@ console.log(`
 
 let testsPassed = 0;
 let testsFailed = 0;
+/** @type {any} */
 let context = null;
 
 /**
  * Helper para executar testes com timeout
+ *
+ * @param {string} name
+ * @param {any} testFn
+ * @param {any} [timeoutMs]
  */
 async function runTest(name, testFn, timeoutMs = 5000) {
     process.stdout.write(`\n=== ${name} ===\n`);
@@ -33,7 +38,8 @@ async function runTest(name, testFn, timeoutMs = 5000) {
         testsPassed++;
         return true;
     } catch (error) {
-        console.log(`❌ FALHOU: ${error.message}\n`);
+        const _ce = /** @type {any} */ (error);
+        console.log(`❌ FALHOU: ${_ce.message}\n`);
         testsFailed++;
         return false;
     }
@@ -50,7 +56,9 @@ async function test1_BootSequence() {
             console.log('  (BrowserPool desabilitado para testes sem Chrome externo)');
 
             // Temporariamente mocka o BrowserPool para não tentar conectar
-            const BrowserPoolManager = await import('#infra/browser_pool/pool_manager').then(m => m.default ?? m);
+            const BrowserPoolManager = /** @type {any} */ (
+                await import('#infra/browser_pool/pool_manager').then((m) => m.default ?? m)
+            );
             const originalInitialize = BrowserPoolManager.prototype.initialize;
             const originalGetHealth = BrowserPoolManager.prototype.getHealth;
             const originalShutdown = BrowserPoolManager.prototype.shutdown;
@@ -101,7 +109,7 @@ async function test1_BootSequence() {
                 BrowserPoolManager.prototype.shutdown = originalShutdown;
             }
         },
-        20000
+        20000,
     );
 }
 
@@ -151,7 +159,7 @@ async function test3_Shutdown() {
             await shutdown(context);
             console.log('  ✓ Shutdown completado');
         },
-        15000
+        15000,
     );
 }
 
@@ -161,7 +169,7 @@ async function test3_Shutdown() {
 (async () => {
     // Ensure artifacts folder
     const artifacts = path.join(process.cwd(), 'tmp', 'e2e');
-    await import('node:fs/promises').then(fs => fs.mkdir(artifacts, { recursive: true }));
+    await import('node:fs/promises').then((fs) => fs.mkdir(artifacts, { recursive: true }));
 
     await test1_BootSequence();
     await test2_NERVChannel();

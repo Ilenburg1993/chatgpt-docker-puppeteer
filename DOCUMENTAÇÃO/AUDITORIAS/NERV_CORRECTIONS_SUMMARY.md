@@ -242,13 +242,13 @@ if (nervInstance) {
   log(
     'WARN',
     `[POLICY] Infraestrutura escalada e notificada via NERV: ${type} (PID: ${pid})`,
-    correlationId
+    correlationId,
   );
 } else {
   log(
     'WARN',
     `[POLICY] Infraestrutura escalada mas NERV não disponível: ${type} (PID: ${pid})`,
-    correlationId
+    correlationId,
   );
 }
 ```
@@ -752,7 +752,7 @@ async function createNERV(config = {}) {
   const hybridTransport = bootstrapHybridTransport({ mode, socketAdapter, telemetry });
 
   /* 3-9. Componentes NERV */
-  const envelopes = { createEnvelope, normalize: createEnvelope, validate: env => env };
+  const envelopes = { createEnvelope, normalize: createEnvelope, validate: (env) => env };
   const correlation = createCorrelation({ telemetry });
   const buffers = createBuffers({ telemetry, limits: config.buffers || {} });
   const transport = bootstrapTransport({ hybridTransport, config, telemetry });

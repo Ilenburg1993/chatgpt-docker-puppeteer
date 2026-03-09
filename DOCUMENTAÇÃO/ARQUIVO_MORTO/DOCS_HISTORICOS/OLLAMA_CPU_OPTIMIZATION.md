@@ -193,7 +193,7 @@ Result: Python/JS function with proper syntax
 
 ```bash
 # .env.development
-OLLAMA_DEFAULT_MODEL=qwen2.5-coder:3b  # For all generations
+OLLAMA_DEFAULT_MODEL=qwen2.5-coder:3b # For all generations
 ```
 
 #### 2. Via Tool Parameter (Per-Call Override)
@@ -256,16 +256,16 @@ All timeouts are configurable via `.env`:
 
 ```bash
 # Ollama Client Timeouts
-OLLAMA_GENERATE_TIMEOUT=60000    # 60s for text generation
-OLLAMA_EMBED_TIMEOUT=30000       # 30s for embeddings
-OLLAMA_LIST_TIMEOUT=10000        # 10s for listing models
-OLLAMA_HEALTH_TIMEOUT=5000       # 5s for health checks
+OLLAMA_GENERATE_TIMEOUT=60000 # 60s for text generation
+OLLAMA_EMBED_TIMEOUT=30000    # 30s for embeddings
+OLLAMA_LIST_TIMEOUT=10000     # 10s for listing models
+OLLAMA_HEALTH_TIMEOUT=5000    # 5s for health checks
 
 # MCP Handler Timeout
-MCP_TOOL_TIMEOUT=90000           # 90s (wraps Ollama calls)
+MCP_TOOL_TIMEOUT=90000 # 90s (wraps Ollama calls)
 
 # Express Server Timeout
-SERVER_REQUEST_TIMEOUT=120000    # 120s (outermost protection)
+SERVER_REQUEST_TIMEOUT=120000 # 120s (outermost protection)
 ```
 
 ### Expected Response Times
@@ -411,7 +411,7 @@ If you have 20GB+ RAM and want best quality occasionally:
 4. Increase timeout for 7b calls:
    ```bash
    # Temporary override
-   OLLAMA_GENERATE_TIMEOUT=180000  # 3 minutes for 7b
+   OLLAMA_GENERATE_TIMEOUT=180000 # 3 minutes for 7b
    ```
 
 ---

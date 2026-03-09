@@ -8,21 +8,7 @@
     "lib": ["ES2024", "ES2022.Error", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": [
-    "scripts/build/**/*.mjs",
-    "scripts/env/**/*.mjs",
-    "scripts/health/**/*.mjs",
-    "scripts/setup/**/*.mjs",
-    "scripts/analysis/jsdoc_coverage_cli.mjs",
-    "scripts/analysis/jsdoc_coverage_engine.mjs",
-    "scripts/analysis/jsdoc_backfill_missing_exports.mjs",
-    "scripts/analysis/typing_hardening_audit.mjs",
-    "scripts/analysis/tsserver_contract_audit.mjs",
-    "scripts/ci/verify-github-workflows.mjs",
-    "scripts/ci/verify-skills-governance.mjs",
-    "eslint.config.mjs",
-    ".puppeteerrc.cjs"
-  ],
+  "include": ["scripts/**/*.mjs", "scripts/**/*.cjs", "scripts/**/*.js", "eslint.config.mjs", ".puppeteerrc.cjs"],
   "exclude": [
     "node_modules",
     "dist",
@@ -49,6 +35,7 @@
     "**/*.bundle.js",
     "**/*.d.ts.map",
     "**/*.js.map",
-    "scripts/legacy/**"
+    "scripts/legacy/**",
+    "scripts/dist/**"
   ]
 }

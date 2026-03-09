@@ -1,7 +1,16 @@
 // @ts-check
 /**
- * @param {{ runId: string, profile: string, progress: any, eta: any, phase: string, message: string }} payload
-  * @returns {void}
+ * @typedef {object} PrintProgressPayload
+ * @property {string} runId
+ * @property {string} profile
+ * @property {any} progress
+ * @property {any} eta
+ * @property {string} phase
+ * @property {string} message
+ */
+/**
+ * @param {PrintProgressPayload} payload
+ * @returns {void}
  */
 export function printProgress(payload) {
     const pct = Number(payload.progress?.progress_pct || 0).toFixed(2);
@@ -14,14 +23,20 @@ export function printProgress(payload) {
         : '';
     const pendingText = remainingKeys ? ` pendentes=[${remainingKeys}]` : '';
     console.log(
-        `[audit][${payload.profile}] ${pct}% fase=${payload.phase} restantes=${remaining} eta=${etaSec}s${activeText}${pendingText} ${payload.message}`
+        `[audit][${payload.profile}] ${pct}% fase=${payload.phase} restantes=${remaining} eta=${etaSec}s${activeText}${pendingText} ${payload.message}`,
     );
 }
 
 /**
+ * @typedef {object} PrintFinalReportOutputs
+ * @property {string} jsonPath
+ * @property {string | null} [masterPath]
+ * @property {string | null} [snapshotPath]
+ */
+/**
  * @param {import('../lib/schema.mjs').AuditRunV3} report
- * @param {{ jsonPath: string, masterPath?: string|null, snapshotPath?: string|null }} outputs
-  * @returns {void}
+ * @param {PrintFinalReportOutputs} outputs
+ * @returns {void}
  */
 export function printFinalReport(report, outputs) {
     console.log('=== Audit Automation Report v3.2 ===');

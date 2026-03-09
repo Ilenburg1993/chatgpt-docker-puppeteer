@@ -1,16 +1,17 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { CONTROL, safeReadJSON } from './fs_core.js';
+// @ts-check
 import { STATUS_VALUES } from '#core/constants/tasks';
+import { CONTROL, safeReadJSON } from './fs_core.js';
 
 /**
  * Função exportada: checkControlPause.
+ *
  * @returns {Promise<any>}
  */
 async function checkControlPause() {
     try {
-        const control = await safeReadJSON(CONTROL);
+        const control = /** @type {any} */ (await safeReadJSON(CONTROL));
         return control && control.estado === STATUS_VALUES.PAUSED;
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         return false; // Em caso de erro, assume execução normal
     }
 }

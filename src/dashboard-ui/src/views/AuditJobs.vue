@@ -81,8 +81,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
 import { useAudit } from '@/composables/useAudit';
+import { computed, onMounted, ref } from 'vue';
 
 const { jobs, loading, error, listJobs, createJob, runJob, cancelJob } = useAudit();
 
@@ -90,7 +90,7 @@ const statusFilter = ref('');
 
 const filteredJobs = computed(() => {
     if (!statusFilter.value) return jobs.value;
-    return jobs.value.filter(j => j.status === statusFilter.value);
+    return jobs.value.filter((j) => j.status === statusFilter.value);
 });
 
 onMounted(async () => {

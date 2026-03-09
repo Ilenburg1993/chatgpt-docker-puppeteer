@@ -6,7 +6,7 @@ export default defineConfig({
         environment: 'node', // running in Node.js
         include: ['tests/**/*.spec.js'],
         coverage: {
-            provider: 'c8', // use the existing c8 dependency for coverage
+            provider: 'v8', // use v8 coverage (built into Node.js)
             reporter: ['text', 'html'],
         },
         watch: false, // default behaviour; use `vitest` CLI for watch mode

@@ -1,8 +1,8 @@
 // @ts-check
 import { log } from '#core/logger';
 import { recordEvent } from '#infra/db/events_repo';
-import { STEP_STATUS, syncMissionStepsFromWorkflow } from '#infra/db/mission_step_repo';
 import { AUTONOMY_MODES, createMission } from '#infra/db/mission_repo';
+import { STEP_STATUS, syncMissionStepsFromWorkflow } from '#infra/db/mission_step_repo';
 import { getDb } from '#infra/db/sqlite';
 import { asRecord } from '#types/guards';
 
@@ -25,32 +25,37 @@ function _now() {
     return Date.now();
 }
 
-function _safeJsonParse(raw, fallback = {}) {
+function _safeJsonParse(/** @type {any} */ raw, fallback = {}) {
     if (!raw) return fallback;
     try {
         return JSON.parse(String(raw));
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
 
-function _safeJsonString(value, fallback = '{}') {
+function _safeJsonString(/** @type {any} */ value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
 
-function _error(statusCode, code, message, details = null) {
+function _error(
+    /** @type {any} */ statusCode,
+    /** @type {any} */ code,
+    /** @type {any} */ message,
+    /** @type {any} */ details = null,
+) {
     const err = new Error(message || code);
     err.statusCode = Number(statusCode) || 500;
     err.code = String(code || 'MISSION_CONTROL_ERROR');
-    err.details = details;
+    /** @type {any} */ (err).details = details;
     return err;
 }
 
-function _assertIfVersion(row, ifVersion) {
+function _assertIfVersion(/** @type {any} */ row, /** @type {any} */ ifVersion) {
     if (ifVersion === undefined || ifVersion === null) return;
     const expected = Number(ifVersion);
     const actual = Number(row.updated_at_ms || 0);
@@ -62,7 +67,7 @@ function _assertIfVersion(row, ifVersion) {
     }
 }
 
-function _readMissionRowTx(db, missionId) {
+function _readMissionRowTx(/** @type {any} */ db, /** @type {any} */ missionId) {
     const row = db.prepare('SELECT * FROM missions WHERE id = ?').get(String(missionId || '').trim());
     if (!row) {
         throw _error(404, 'MISSION_NOT_FOUND', 'Missão não encontrada');
@@ -70,7 +75,7 @@ function _readMissionRowTx(db, missionId) {
     return row;
 }
 
-function _rowToMission(row) {
+function _rowToMission(/** @type {any} */ row) {
     return {
         id: String(row.id),
         title: String(row.title || ''),
@@ -87,7 +92,7 @@ function _rowToMission(row) {
     };
 }
 
-function _updateMissionTx(db, row, updates) {
+function _updateMissionTx(/** @type {any} */ db, /** @type {any} */ row, /** @type {any} */ updates) {
     const now = _now();
     const next = {
         title: updates.title !== undefined ? String(updates.title || '') : row.title,
@@ -115,13 +120,17 @@ function _updateMissionTx(db, row, updates) {
             completed_at_ms = @completed_at_ms,
             updated_at_ms = @updated_at_ms
         WHERE id = @id
-    `
+    `,
     ).run(next);
 
     return db.prepare('SELECT * FROM missions WHERE id = ?').get(row.id);
 }
 
-function _assertAllowedTransition(fromStatus, allowedFrom, toStatus) {
+function _assertAllowedTransition(
+    /** @type {any} */ fromStatus,
+    /** @type {any} */ allowedFrom,
+    /** @type {any} */ toStatus,
+) {
     const from = String(fromStatus || '').toUpperCase();
     if (from === String(toStatus || '').toUpperCase()) {
         throw _error(409, 'MISSION_TRANSITION_NOOP', `Missão já está em ${toStatus}`);
@@ -135,18 +144,19 @@ function _assertAllowedTransition(fromStatus, allowedFrom, toStatus) {
     }
 }
 
-function _syncMissionStepsForMission(mission) {
+function _syncMissionStepsForMission(/** @type {any} */ mission) {
     try {
         const workflow = mission?.context?.workflow || null;
         if (workflow && Array.isArray(workflow.steps) && workflow.steps.length > 0) {
             syncMissionStepsFromWorkflow(mission.id, workflow);
         }
-    } catch (err) {
-        log('WARN', `[MissionControl] Falha ao sincronizar mission_steps: ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('WARN', `[MissionControl] Falha ao sincronizar mission_steps: ${_e?.message || String(_e)}`);
     }
 }
 
-function _setActiveStepsStatusTx(db, missionId, status) {
+function _setActiveStepsStatusTx(/** @type {any} */ db, /** @type {any} */ missionId, /** @type {any} */ status) {
     db.prepare(
         `
         UPDATE mission_steps
@@ -156,7 +166,7 @@ function _setActiveStepsStatusTx(db, missionId, status) {
             version = version + 1
         WHERE mission_id = @mission_id
           AND status IN ('PENDING', 'RUNNING', 'PAUSED')
-    `
+    `,
     ).run({
         mission_id: missionId,
         status,
@@ -165,7 +175,7 @@ function _setActiveStepsStatusTx(db, missionId, status) {
     });
 }
 
-function _cancelMissionTasksCascadeTx(db, missionId) {
+function _cancelMissionTasksCascadeTx(/** @type {any} */ db, /** @type {any} */ missionId) {
     const rows = db
         .prepare(
             `
@@ -173,11 +183,11 @@ function _cancelMissionTasksCascadeTx(db, missionId) {
             FROM tasks
             WHERE mission_id = ?
               AND status IN ('PENDING', 'RUNNING', 'PAUSED', 'BLOCKED')
-        `
+        `,
         )
         .all(missionId);
 
-    const affectedTaskIds = rows.map(row => String(row.id));
+    const affectedTaskIds = rows.map((/** @type {any} */ row) => String(row.id));
     if (affectedTaskIds.length === 0) return affectedTaskIds;
 
     const now = _now();
@@ -192,7 +202,7 @@ function _cancelMissionTasksCascadeTx(db, missionId) {
             updated_at_ms = @now,
             last_error = 'MISSION_CANCELLED_CASCADE'
         WHERE id = @id
-    `
+    `,
     );
 
     for (const taskId of affectedTaskIds) {
@@ -203,11 +213,10 @@ function _cancelMissionTasksCascadeTx(db, missionId) {
 }
 
 /**
- * Cascades mission pause to PENDING tasks: marks them PAUSED so the queue
- * worker won't pick them up AND the UI shows a consistent state.
- * RUNNING tasks are intentionally left running — the SQL gate in
- * claimNextEligibleTask (mission_id IS NULL OR m.status = 'RUNNING') already
- * prevents new tasks from being dispatched while the mission is PAUSED.
+ * Cascades mission pause to PENDING tasks: marks them PAUSED so the queue worker won't pick them up AND the UI shows a
+ * consistent state. RUNNING tasks are intentionally left running — the SQL gate in claimNextEligibleTask (mission_id IS
+ * NULL OR m.status = 'RUNNING') already prevents new tasks from being dispatched while the mission is PAUSED.
+ *
  * @param {import('better-sqlite3').Database} db
  * @param {string} missionId
  * @returns {string[]} affected task IDs
@@ -228,23 +237,22 @@ function _pauseMissionPendingTasksTx(db, missionId) {
         WHERE mission_id = @mission_id
           AND status = 'PENDING'
           AND stage = 'READY'
-    `
+    `,
     ).run({ mission_id: missionId, now });
 
     const paused = db
         .prepare(
-            `SELECT id FROM tasks WHERE mission_id = ? AND status = 'PAUSED' AND last_error = 'MISSION_PAUSED_CASCADE'`
+            `SELECT id FROM tasks WHERE mission_id = ? AND status = 'PAUSED' AND last_error = 'MISSION_PAUSED_CASCADE'`,
         )
         .all(missionId);
-    return paused.map(r => String(r.id));
+    return paused.map((/** @type {any} */ r) => String(r.id));
 }
 
 /**
- * Reverses _pauseMissionPendingTasksTx: restores tasks that were paused
- * specifically due to the mission cascade back to PENDING so they're
- * eligible for dispatch again.
- * Tasks explicitly paused by the user (last_error != 'MISSION_PAUSED_CASCADE')
- * are intentionally left PAUSED to honour the user's intent.
+ * Reverses _pauseMissionPendingTasksTx: restores tasks that were paused specifically due to the mission cascade back to
+ * PENDING so they're eligible for dispatch again. Tasks explicitly paused by the user (last_error !=
+ * 'MISSION_PAUSED_CASCADE') are intentionally left PAUSED to honour the user's intent.
+ *
  * @param {import('better-sqlite3').Database} db
  * @param {string} missionId
  * @returns {string[]} affected task IDs
@@ -262,7 +270,7 @@ function _resumeMissionCascadedTasksTx(db, missionId) {
           AND status = 'PAUSED'
           AND last_error = 'MISSION_PAUSED_CASCADE'
           AND stage = 'READY'
-    `
+    `,
     ).run({ mission_id: missionId, now });
 
     const resumed = db
@@ -272,22 +280,15 @@ function _resumeMissionCascadedTasksTx(db, missionId) {
                AND status = 'PENDING'
                AND stage = 'READY'
                AND paused_at_ms IS NULL
-               AND updated_at_ms >= @since`
+               AND updated_at_ms >= @since`,
         )
         .all({ mission_id: missionId, since: now - 5000 });
-    return resumed.map(r => String(r.id));
+    return resumed.map((/** @type {any} */ r) => String(r.id));
 }
 
-function _recordMissionEvents({
-    missionId,
-    actorId,
-    actorType = 'user',
-    operation,
-    before,
-    after,
-    reason,
-    metadata = {},
-}) {
+function _recordMissionEvents(
+    /** @type {any} */ { missionId, actorId, actorType = 'user', operation, before, after, reason, metadata = {} },
+) {
     try {
         recordEvent({
             entityType: 'mission',
@@ -303,16 +304,20 @@ function _recordMissionEvents({
             },
             dedupKey: `mission:${missionId}:${operation}:${after?.updated_at_ms || Date.now()}`,
         });
-    } catch (err) {
-        log('WARN', `[MissionControl] Falha ao registrar evento ${operation}: ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('WARN', `[MissionControl] Falha ao registrar evento ${operation}: ${_e?.message || String(_e)}`);
     }
 }
 
+/** @typedef {any} CreateMissionCommandOptions */
 /**
  * Função exportada: createMissionCommand.
- * @returns {any}
+ *
+ * @param {CreateMissionCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
-function createMissionCommand({ actor = {}, reason, payload = {} }) {
+function createMissionCommand(/** @type {any} */ { actor = {}, reason, payload = {} }) {
     const actorView = asRecord(actor);
     const payloadView = asRecord(payload);
     const title = String(payloadView.title || '').trim();
@@ -340,7 +345,7 @@ function createMissionCommand({ actor = {}, reason, payload = {} }) {
     });
 
     const db = getDb();
-    const row = _readMissionRowTx(db, created.id);
+    const row = _readMissionRowTx(db, /** @type {any} */ (created).id);
     const after = _rowToMission(row);
     _syncMissionStepsForMission(after);
 
@@ -366,11 +371,16 @@ function createMissionCommand({ actor = {}, reason, payload = {} }) {
     };
 }
 
+/** @typedef {any} ExecuteMissionCommandOptions */
 /**
  * Função exportada: executeMissionCommand.
- * @returns {any}
+ *
+ * @param {ExecuteMissionCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
-function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null, command = 'MISSION_EXECUTE' }) {
+function executeMissionCommand(
+    /** @type {any} */ { missionId, actor = {}, reason, ifVersion = null, command = 'MISSION_EXECUTE' },
+) {
     const actorView = asRecord(actor);
     const db = getDb();
 
@@ -404,11 +414,14 @@ function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null
     return result;
 }
 
+/** @typedef {any} PauseMissionCommandOptions */
 /**
  * Função exportada: pauseMissionCommand.
- * @returns {any}
+ *
+ * @param {PauseMissionCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
-function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
+function pauseMissionCommand(/** @type {any} */ { missionId, actor = {}, reason, ifVersion = null }) {
     const actorView = asRecord(actor);
     const db = getDb();
 
@@ -446,11 +459,14 @@ function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }
     return result;
 }
 
+/** @typedef {any} ResumeMissionCommandOptions */
 /**
  * Função exportada: resumeMissionCommand.
- * @returns {any}
+ *
+ * @param {ResumeMissionCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
-function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
+function resumeMissionCommand(/** @type {any} */ { missionId, actor = {}, reason, ifVersion = null }) {
     const actorView = asRecord(actor);
     const db = getDb();
 
@@ -488,11 +504,14 @@ function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
     return result;
 }
 
+/** @typedef {any} CancelMissionCommandOptions */
 /**
  * Função exportada: cancelMissionCommand.
- * @returns {any}
+ *
+ * @param {CancelMissionCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
-function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
+function cancelMissionCommand(/** @type {any} */ { missionId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
 
     const result = db.transaction(() => {
@@ -547,7 +566,7 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
                     payload: { mission_id: missionId, reason },
                     dedupKey: `task:${taskId}:cancelled_by_mission:${result.after.updated_at_ms}`,
                 });
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 // best effort
             }
         }
@@ -556,11 +575,14 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
     return result;
 }
 
+/** @typedef {any} PatchMissionCommandOptions */
 /**
  * Função exportada: patchMissionCommand.
- * @returns {any}
+ *
+ * @param {PatchMissionCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
-function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, patch = {} }) {
+function patchMissionCommand(/** @type {any} */ { missionId, actor = {}, reason, ifVersion = null, patch = {} }) {
     const actorView = asRecord(actor);
     const patchView = asRecord(patch);
     const db = getDb();
@@ -597,18 +619,16 @@ function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, 
     return result;
 }
 
+/** @typedef {any} SetMissionPolicyCommandOptions */
 /**
  * Função exportada: setMissionPolicyCommand.
- * @returns {any}
+ *
+ * @param {SetMissionPolicyCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
-function setMissionPolicyCommand({
-    missionId,
-    actor = {},
-    reason,
-    ifVersion = null,
-    policy = null,
-    autonomyMode = null,
-}) {
+function setMissionPolicyCommand(
+    /** @type {any} */ { missionId, actor = {}, reason, ifVersion = null, policy = null, autonomyMode = null },
+) {
     const actorView = asRecord(actor);
     const db = getDb();
 
@@ -624,7 +644,7 @@ function setMissionPolicyCommand({
                 'Policy da missão pode ser alterada apenas em READY ou PAUSED',
                 {
                     status: row.status,
-                }
+                },
             );
         }
 
@@ -651,11 +671,16 @@ function setMissionPolicyCommand({
     return result;
 }
 
+/** @typedef {any} ReorderMissionStepsCommandOptions */
 /**
  * Função exportada: reorderMissionStepsCommand.
- * @returns {any}
+ *
+ * @param {ReorderMissionStepsCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
-function reorderMissionStepsCommand({ missionId, actor = {}, reason, ifVersion = null, stepOrder = [] }) {
+function reorderMissionStepsCommand(
+    /** @type {any} */ { missionId, actor = {}, reason, ifVersion = null, stepOrder = [] },
+) {
     const actorView = asRecord(actor);
     const db = getDb();
 
@@ -677,8 +702,8 @@ function reorderMissionStepsCommand({ missionId, actor = {}, reason, ifVersion =
             throw _error(422, 'MISSION_WORKFLOW_MISSING', 'Missão não possui workflow com steps');
         }
 
-        const order = Array.isArray(stepOrder) ? stepOrder.map(id => String(id)) : [];
-        const byId = new Map(currentSteps.map(step => [String(step?.id || ''), step]));
+        const order = Array.isArray(stepOrder) ? stepOrder.map((id) => String(id)) : [];
+        const byId = new Map(currentSteps.map((/** @type {any} */ step) => [String(step?.id || ''), step]));
         const reordered = [];
 
         for (const stepId of order) {
@@ -706,7 +731,7 @@ function reorderMissionStepsCommand({ missionId, actor = {}, reason, ifVersion =
             before: _rowToMission(row),
             after: _rowToMission(updatedRow),
             metadata: {
-                step_order: reordered.map(step => String(step?.id || '')),
+                step_order: reordered.map((step) => String(step?.id || '')),
             },
         };
     })();
@@ -728,10 +753,10 @@ function reorderMissionStepsCommand({ missionId, actor = {}, reason, ifVersion =
 }
 
 export {
-    createMissionCommand,
-    MISSION_STATUS,
     cancelMissionCommand,
+    createMissionCommand,
     executeMissionCommand,
+    MISSION_STATUS,
     patchMissionCommand,
     pauseMissionCommand,
     reorderMissionStepsCommand,

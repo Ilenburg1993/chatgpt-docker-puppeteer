@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // @ts-check
 
-import { createInferenceGatewayServer } from './server.js';
 import { inferenceGateway } from './gateway.js';
 import { loadInferencePoliciesFromDb } from './persistence.js';
+import { createInferenceGatewayServer } from './server.js';
 
 const enabled = String(process.env.INFERENCE_GATEWAY_ENABLED || 'false').toLowerCase() === 'true';
 if (!enabled) {
@@ -26,10 +26,10 @@ function reloadPolicies() {
             ...loaded.meta,
             summary: inferenceGateway.getPolicySummary(),
         };
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         return {
             ok: false,
-            error: error?.message || String(error),
+            error: /** @type {any} */ (error)?.message || String(error),
         };
     }
 }
@@ -52,6 +52,7 @@ server.listen(port, host, () => {
 });
 
 let shuttingDown = false;
+/** @param {string} signal */
 function shutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;

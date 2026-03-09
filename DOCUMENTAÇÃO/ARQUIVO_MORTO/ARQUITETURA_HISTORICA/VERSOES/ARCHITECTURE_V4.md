@@ -1766,16 +1766,16 @@ io.saveResponse(taskId, response)
 
 ```bash
 # 1. Node.js (v20+ LTS)
-node --version  # v20.11.0 ou superior
+node --version # v20.11.0 ou superior
 
 # 2. npm (v10+)
-npm --version   # 10.2.4 ou superior
+npm --version # 10.2.4 ou superior
 
 # 3. PM2 (Process Manager)
-pm2 --version   # 5.3.0 ou superior
+pm2 --version # 5.3.0 ou superior
 
 # 4. Git (controle de versão)
-git --version   # 2.34.0 ou superior
+git --version # 2.34.0 ou superior
 
 # 5. Chrome/Chromium (navegador)
 # Linux: apt install chromium-browser
@@ -1783,7 +1783,7 @@ git --version   # 2.34.0 ou superior
 # macOS: brew install --cask google-chrome
 
 # 6. Make (build system)
-make --version  # GNU Make 4.3 ou superior (Linux/macOS)
+make --version # GNU Make 4.3 ou superior (Linux/macOS)
 # Windows: Git Bash inclui make, ou instalar mingw32-make
 ```
 
@@ -1831,7 +1831,7 @@ cd chatgpt-docker-puppeteer
 make install-deps
 
 # Ou via npm direto
-npm ci  # Clean install (usa package-lock.json)
+npm ci # Clean install (usa package-lock.json)
 
 # Verificar consistência
 make deps-consistency
@@ -1908,8 +1908,8 @@ curl http://localhost:9224/json/version
 npm install -g pm2
 
 # Ou via script dedicado (cross-platform)
-bash scripts/install-pm2-gui.sh     # Linux/macOS
-scripts\install-pm2-gui.bat         # Windows
+bash scripts/install-pm2-gui.sh # Linux/macOS
+scripts\install-pm2-gui.bat     # Windows
 
 # Verificar instalação
 pm2 --version
@@ -2248,8 +2248,8 @@ make git-push-safe
 
 ```bash
 # Pausar sistema (via controle.json)
-bash scripts/quick-ops.sh pause     # Linux
-scripts\quick-ops.bat pause         # Windows
+bash scripts/quick-ops.sh pause # Linux
+scripts\quick-ops.bat pause     # Windows
 
 # Resume
 bash scripts/quick-ops.sh resume
@@ -2833,6 +2833,7 @@ Lock Management:
 class MissionManager {
   /**
    * Criar nova mission
+   *
    * @param {string} templateId - ID do template (e.g., 'book_writing')
    * @param {object} params - Parâmetros do template (e.g., { genre: 'sci-fi' })
    * @returns {Promise<Mission>} Mission criada
@@ -2868,6 +2869,7 @@ class MissionManager {
 
   /**
    * Iniciar mission (executar workflow completo)
+   *
    * @param {string} missionId - UUID da mission
    */
   async startMission(missionId) {
@@ -3042,7 +3044,7 @@ class WorkflowGenerator {
     this.validateParams(template.params_schema, params);
 
     // Substituir placeholders nos prompts
-    const workflow = template.workflow.map(step => ({
+    const workflow = template.workflow.map((step) => ({
       ...step,
       prompt: this.replacePlaceholders(step.prompt, params),
     }));
@@ -3152,7 +3154,7 @@ class OrchestratorEngine {
   async executeStep(step, context) {
     logger.log(
       'INFO',
-      `[ORCHESTRATOR] Executing step: ${step.stepId} (strategy: ${step.execution.strategy})`
+      `[ORCHESTRATOR] Executing step: ${step.stepId} (strategy: ${step.execution.strategy})`,
     );
 
     switch (step.execution.strategy) {
@@ -3330,14 +3332,14 @@ class ContextManager {
     let injected = prompt;
 
     // Substituir outputs
-    Object.keys(context.outputs || {}).forEach(stepId => {
+    Object.keys(context.outputs || {}).forEach((stepId) => {
       const placeholder = `{{outputs.${stepId}}}`;
       const value = context.outputs[stepId];
       injected = injected.replace(new RegExp(placeholder, 'g'), value);
     });
 
     // Substituir params
-    Object.keys(context.params || {}).forEach(key => {
+    Object.keys(context.params || {}).forEach((key) => {
       const placeholder = `{{${key}}}`;
       const value = context.params[key];
       injected = injected.replace(new RegExp(placeholder, 'g'), value);
@@ -3423,7 +3425,7 @@ Return JSON only: { "coherence": 0.85, "creativity": 0.90, ... }
     if (!valid) {
       logger.log(
         'WARN',
-        `[VALIDATOR] Length validation failed: ${len} (expected: ${minLength}-${maxLength})`
+        `[VALIDATOR] Length validation failed: ${len} (expected: ${minLength}-${maxLength})`,
       );
     }
 
@@ -3688,7 +3690,7 @@ class ChatGPTAdapter {
     logger.log(
       'INFO',
       `[DRIVER:ChatGPT] Executing prompt for task ${taskId} (${prompt.length} chars)`,
-      taskId
+      taskId,
     );
 
     try {
@@ -3726,7 +3728,7 @@ class ChatGPTAdapter {
       logger.log(
         'INFO',
         `[DRIVER:ChatGPT] ✅ Response collected (${response.length} chars)`,
-        taskId
+        taskId,
       );
 
       return {
@@ -3757,13 +3759,13 @@ class ChatGPTAdapter {
     let elapsed = 0;
 
     while (elapsed < MAX_WAIT) {
-      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
       elapsed += POLL_INTERVAL;
 
       // Coletar texto atual
       const currentText = await page.evaluate(() => {
         const elements = Array.from(
-          document.querySelectorAll('[data-message-author-role="assistant"]')
+          document.querySelectorAll('[data-message-author-role="assistant"]'),
         );
         if (elements.length === 0) return '';
 
@@ -3877,7 +3879,7 @@ class ConnectionOrchestrator {
 
     logger.log(
       'INFO',
-      `[POOL] New browser instance created (pool size: ${this.pool.size}/${this.maxInstances})`
+      `[POOL] New browser instance created (pool size: ${this.pool.size}/${this.maxInstances})`,
     );
 
     return browser;
@@ -4020,7 +4022,7 @@ class ConnectionOrchestrator {
     this.pool.delete(hash);
     logger.log(
       'INFO',
-      `[POOL] Instance evicted (pool size: ${this.pool.size}/${this.maxInstances})`
+      `[POOL] Instance evicted (pool size: ${this.pool.size}/${this.maxInstances})`,
     );
   }
 }
@@ -4120,7 +4122,7 @@ class MissionNERVAdapter {
    */
   setupListeners() {
     // Ouvir MISSION_CREATE do ServerNERVAdapter
-    this.nerv.on('MISSION', envelope => {
+    this.nerv.on('MISSION', (envelope) => {
       if (envelope.action === 'CREATE') {
         this.handleMissionCreate(envelope.payload);
       }
@@ -4407,7 +4409,7 @@ class FileWatcher {
       },
     });
 
-    this.watcher.on('change', filePath => {
+    this.watcher.on('change', (filePath) => {
       const taskId = path.basename(filePath, '.json');
       cache.invalidate(taskId);
       logger.log('INFO', `[WATCHER] Cache invalidated: ${taskId}`);
@@ -4476,7 +4478,7 @@ class LockManager {
           hostname: os.hostname(),
           acquiredAt: new Date().toISOString(),
         }),
-        { flag: 'wx' }
+        { flag: 'wx' },
       ); // wx = write + exclusive (fail if exists)
 
       logger.log('INFO', `[LOCK] Acquired: ${taskId} (PID: ${process.pid})`, taskId);

@@ -58,6 +58,7 @@ jobs:
           run_check typecheck-strict-public npm run typecheck:strict:public
           run_check typecheck-strict-all npm run typecheck:strict:all
           run_check typecheck-declarations npm run typecheck:declarations
+          run_check typecheck-declarations-full npm run typecheck:declarations:full
           run_check jsdoc-coverage npm run jsdoc:coverage:json -- --validate-schema --output-json artifacts/typing/jsdoc-report.json
           run_check jsdoc-coverage-public npm run jsdoc:coverage:public
           run_check check-schemas npm run check:schemas:typing
@@ -78,6 +79,7 @@ jobs:
             ['typecheck-strict-public', 'typecheck:strict:public'],
             ['typecheck-strict-all', 'typecheck:strict:all'],
             ['typecheck-declarations', 'typecheck:declarations'],
+            ['typecheck-declarations-full', 'typecheck:declarations:full'],
             ['jsdoc-coverage', 'jsdoc:coverage:json'],
             ['jsdoc-coverage-public', 'jsdoc:coverage:public'],
             ['check-schemas', 'check:schemas:typing'],

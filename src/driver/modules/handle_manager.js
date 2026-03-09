@@ -1,16 +1,16 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import EventEmitter from 'node:events';
 import { log } from '#core/logger';
 import { withTimeout } from '#infra/abort_controller_utils';
+import EventEmitter from 'node:events';
 
 /* ==========================================================================
    HANDLE_CONFIG - Configurações centralizadas (zero magic numbers)
 ========================================================================== */
 
 /**
- * Configurações do HandleManager.
- * Todas são configuráveis via variáveis de ambiente.
- * @constant {Object} HANDLE_CONFIG
+ * Configurações do HandleManager. Todas são configuráveis via variáveis de ambiente.
+ *
+ * @constant {object} HANDLE_CONFIG
  */
 const HANDLE_CONFIG = {
     /** Timeout máximo para clearAll (ms) - Default: 3 segundos */
@@ -28,9 +28,10 @@ const HANDLE_CONFIG = {
 ========================================================================== */
 
 /**
- * Eventos emitidos pelo HandleManager (EventEmitter local).
- * Subscribers podem escutar estes eventos para observar lifecycle.
- * @constant {Object} HANDLE_EVENTS
+ * Eventos emitidos pelo HandleManager (EventEmitter local). Subscribers podem escutar estes eventos para observar
+ * lifecycle.
+ *
+ * @constant {object} HANDLE_EVENTS
  */
 const HANDLE_EVENTS = {
     /** Handle registrado no manager */
@@ -57,6 +58,7 @@ const HANDLE_EVENTS = {
  * Gerencia lifecycle de handles do Puppeteer com cleanup automático.
  *
  * v2.0 Features:
+ *
  * - EventEmitter inheritance (observability via eventos locais)
  * - Validação completa (tipo + dispose method + limite)
  * - Timeout protection (clearAll 3s + dispose individual 1s)
@@ -64,63 +66,66 @@ const HANDLE_EVENTS = {
  * - Cleanup seletivo (clearOne method)
  * - Introspection (getStats method)
  *
+ * @example
+ *     const manager = new HandleManager(driver);
+ *
+ *     // Escutar eventos
+ *     manager.on(HANDLE_EVENTS.HANDLE_REGISTERED, (data) => {
+ *         console.log(`Handle registered (${data.count} active)`);
+ *     });
+ *
+ *     manager.on(HANDLE_EVENTS.CLEANUP_TIMEOUT, (data) => {
+ *         console.warn(`Cleanup timeout: ${data.cleaned}/${data.remaining}`);
+ *     });
+ *
+ *     // Registrar handles
+ *     const handle = await page.$('.selector');
+ *     manager.register(handle);
+ *
+ *     // Cleanup
+ *     await manager.clearAll(); // ou
+ *     await manager.clearOne(handle);
+ *
+ *     // Stats
+ *     const stats = manager.getStats();
+ *
  * @class HandleManager
  * @extends EventEmitter
- *
- * @example
- * const manager = new HandleManager(driver);
- *
- * // Escutar eventos
- * manager.on(HANDLE_EVENTS.HANDLE_REGISTERED, (data) => {
- *   console.log(`Handle registered (${data.count} active)`);
- * });
- *
- * manager.on(HANDLE_EVENTS.CLEANUP_TIMEOUT, (data) => {
- *   console.warn(`Cleanup timeout: ${data.cleaned}/${data.remaining}`);
- * });
- *
- * // Registrar handles
- * const handle = await page.$('.selector');
- * manager.register(handle);
- *
- * // Cleanup
- * await manager.clearAll(); // ou
- * await manager.clearOne(handle);
- *
- * // Stats
- * const stats = manager.getStats();
  */
 class HandleManager extends EventEmitter {
     /**
      * Cria HandleManager instance.
      *
-     * @constructor
-     * @param {Object} driver - Driver Puppeteer (para referência)
-     *
      * @example
-     * const manager = new HandleManager(driver);
+     *     const manager = new HandleManager(driver);
+     *
+     * @class
+     * @param {object} driver - Driver Puppeteer (para referência)
      */
     constructor(driver) {
         super(); // ✅ EventEmitter constructor
 
         /**
          * Referência ao driver Puppeteer.
-         * @type {Object}
+         *
          * @private
+         * @type {object}
          */
         this.driver = driver;
 
         /**
          * Array de handles ativos (aguardando cleanup).
-         * @type {Array<Object>}
+         *
          * @private
+         * @type {object[]}
          */
         this.activeHandles = [];
 
         /**
          * Métricas de lifecycle.
-         * @type {Object}
+         *
          * @private
+         * @type {any}
          */
         this.stats = {
             /** Total de handles registrados (histórico) */
@@ -152,23 +157,23 @@ class HandleManager extends EventEmitter {
      * Registra handle para cleanup automático.
      *
      * Validações:
+     *
      * - Handle não pode ser null/undefined
      * - Handle deve ter método dispose() (Puppeteer JSHandle)
      * - Limite MAX_HANDLES não pode ser ultrapassado
      *
-     * @param {Object} handle - Handle Puppeteer (JSHandle com método dispose)
-     * @returns {Object} Handle registrado (para chaining)
-     * @throws {Error} Se handle inválido ou limite atingido
-     *
-     * @emits HANDLE_EVENTS.HANDLE_REGISTERED - Handle registrado com sucesso
-     * @emits HANDLE_EVENTS.CLEANUP_ERROR - Limite atingido
-     *
      * @example
-     * const handle = await page.$('.selector');
-     * manager.register(handle); // ✅ Válido
+     *     const handle = await page.$('.selector');
+     *     manager.register(handle); // ✅ Válido
      *
-     * manager.register(null); // ❌ Erro: Handle is required
-     * manager.register('string'); // ❌ Erro: Must have dispose() method
+     *     manager.register(null); // ❌ Erro: Handle is required
+     *     manager.register('string'); // ❌ Erro: Must have dispose() method
+     *
+     * @fires HANDLE_EVENTS.HANDLE_REGISTERED - Handle registrado com sucesso
+     * @fires HANDLE_EVENTS.CLEANUP_ERROR - Limite atingido
+     * @param {any} handle - Handle Puppeteer (JSHandle com método dispose)
+     * @returns {any} Handle registrado (para chaining)
+     * @throws {Error} Se handle inválido ou limite atingido
      */
     register(handle) {
         // ✅ Validação 1: Handle não pode ser null/undefined
@@ -228,32 +233,33 @@ class HandleManager extends EventEmitter {
      * Limpa todos os handles com timeout protection.
      *
      * v2.0 Improvements:
+     *
      * - Timeout configurável (CLEANUP_TIMEOUT_MS)
      * - Timeout individual em dispose (DISPOSE_TIMEOUT_MS)
      * - Metrics tracking (duration, cleaned, errors)
      * - Event emission (success, timeout, error)
      * - AbortController (V800 - cancelamento real)
      *
-     * [V800] Usa AbortController para cancelar cleanup em timeout,
-     * evitando promises órfãs rodando indefinidamente em background.
+     * [V800] Usa AbortController para cancelar cleanup em timeout, evitando promises órfãs rodando indefinidamente em
+     * background.
      *
      * @async
-     * @returns {Promise<Object>} Resultado do cleanup
+     * @example
+     *     const result = await manager.clearAll();
+     *     // { cleaned: 10, errors: 0, timeout: false, duration: 543 }
      *
-     * Propriedades do objeto retornado:
+     * @fires HANDLE_EVENTS.HANDLE_CLEARED - Cada handle limpo
+     * @fires HANDLE_EVENTS.HANDLES_CLEARED_ALL - Cleanup completo
+     * @fires HANDLE_EVENTS.CLEANUP_TIMEOUT - Timeout atingido
+     * @fires HANDLE_EVENTS.CLEANUP_ERROR - Erro em dispose
+     * @returns {Promise<any>} Resultado do cleanup
+     *
+     *   Propriedades do objeto retornado:
+     *
      *   - cleaned (number): Handles limpos com sucesso
      *   - errors (number): Erros durante cleanup
      *   - timeout (boolean): Se timeout ocorreu
      *   - duration (number): Duração total (ms)
-     *
-     * @emits HANDLE_EVENTS.HANDLE_CLEARED - Cada handle limpo
-     * @emits HANDLE_EVENTS.HANDLES_CLEARED_ALL - Cleanup completo
-     * @emits HANDLE_EVENTS.CLEANUP_TIMEOUT - Timeout atingido
-     * @emits HANDLE_EVENTS.CLEANUP_ERROR - Erro em dispose
-     *
-     * @example
-     * const result = await manager.clearAll();
-     * // { cleaned: 10, errors: 0, timeout: false, duration: 543 }
      */
     async clearAll() {
         const startTime = Date.now();
@@ -283,7 +289,7 @@ class HandleManager extends EventEmitter {
                     throw new Error('CLEANUP_ABORTED');
                 }
 
-                const h = this.activeHandles.pop();
+                const h = /** @type {any} */ (this.activeHandles.pop());
 
                 try {
                     // FIXED (P0-1.3): Usa withTimeout para garantir cleanup
@@ -298,7 +304,7 @@ class HandleManager extends EventEmitter {
                         remaining: this.activeHandles.length,
                         timestamp: Date.now(),
                     });
-                } catch (disposeErr) {
+                } catch (/** @type {any} */ disposeErr) {
                     errorsCount++;
                     this.stats.errorsOccurred++;
 
@@ -326,7 +332,7 @@ class HandleManager extends EventEmitter {
 
             log(
                 'INFO',
-                `[HandleManager] clearAll completed (${cleanedCount} cleaned, ${errorsCount} errors, ${duration}ms)`
+                `[HandleManager] clearAll completed (${cleanedCount} cleaned, ${errorsCount} errors, ${duration}ms)`,
             );
 
             // ✅ Emit evento de sucesso
@@ -339,7 +345,7 @@ class HandleManager extends EventEmitter {
             });
 
             return { cleaned: cleanedCount, errors: errorsCount, timeout: false, duration };
-        } catch (_abortErr) {
+        } catch (/** @type {any} */ _abortErr) {
             // ✅ Timeout atingido: cleanup interrompido
             clearTimeout(timeoutId);
 
@@ -353,7 +359,7 @@ class HandleManager extends EventEmitter {
             log('WARN', `[HandleManager] Cleanup aborted after timeout (${timeout}ms)`);
             log(
                 'WARN',
-                `[HandleManager] ${cleanedCount} cleaned, ${errorsCount} errors, ${remaining} remaining marked for GC`
+                `[HandleManager] ${cleanedCount} cleaned, ${errorsCount} errors, ${remaining} remaining marked for GC`,
             );
 
             // ✅ Emit evento de timeout
@@ -376,23 +382,22 @@ class HandleManager extends EventEmitter {
     /**
      * Limpa handle específico (cleanup seletivo).
      *
-     * v2.0 New Method - permite cleanup individual sem limpar todos.
-     * Útil quando handle específico não é mais necessário.
+     * v2.0 New Method - permite cleanup individual sem limpar todos. Útil quando handle específico não é mais
+     * necessário.
      *
      * @async
-     * @param {Object} handle - Handle a limpar
-     * @returns {Promise<boolean>} True se limpo, false se não encontrado
-     *
-     * @emits HANDLE_EVENTS.HANDLE_CLEARED - Handle limpo com sucesso
-     * @emits HANDLE_EVENTS.CLEANUP_ERROR - Erro ao limpar
-     *
      * @example
-     * const handle = await page.$('.selector');
-     * manager.register(handle);
+     *     const handle = await page.$('.selector');
+     *     manager.register(handle);
      *
-     * // Cleanup seletivo
-     * const cleared = await manager.clearOne(handle);
-     * // true (handle limpo)
+     *     // Cleanup seletivo
+     *     const cleared = await manager.clearOne(handle);
+     *     // true (handle limpo)
+     *
+     * @fires HANDLE_EVENTS.HANDLE_CLEARED - Handle limpo com sucesso
+     * @fires HANDLE_EVENTS.CLEANUP_ERROR - Erro ao limpar
+     * @param {any} handle - Handle a limpar
+     * @returns {Promise<boolean>} True se limpo, false se não encontrado
      */
     async clearOne(handle) {
         const index = this.activeHandles.indexOf(handle);
@@ -422,7 +427,7 @@ class HandleManager extends EventEmitter {
             log('DEBUG', `[HandleManager] Handle cleared (${this.activeHandles.length} remaining)`);
 
             return true;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             this.stats.errorsOccurred++;
 
             log('WARN', `[HandleManager] Error clearing handle: ${err.message}`);
@@ -437,7 +442,7 @@ class HandleManager extends EventEmitter {
             // FIXED: Forçar dispose mesmo em timeout (best effort)
             try {
                 await handle.dispose().catch(() => {});
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 // Ignore - já logamos o erro principal acima
             }
 
@@ -448,11 +453,11 @@ class HandleManager extends EventEmitter {
     /**
      * Retorna número de handles ativos.
      *
-     * @returns {number} Count de handles aguardando cleanup
-     *
      * @example
-     * const count = manager.getActiveCount();
-     * // 5
+     *     const count = manager.getActiveCount();
+     *     // 5
+     *
+     * @returns {number} Count de handles aguardando cleanup
      */
     getActiveCount() {
         return this.activeHandles.length;
@@ -463,9 +468,25 @@ class HandleManager extends EventEmitter {
      *
      * v2.0 New Method - introspection completa para debugging/monitoring.
      *
-     * @returns {Object} Stats object com todas as métricas
+     * @example
+     *     const stats = manager.getStats();
+     *     console.log(stats);
+     *     // {
+     *     //   handlesRegistered: 100,
+     *     //   handlesCleared: 95,
+     *     //   timeoutsOccurred: 1,
+     *     //   errorsOccurred: 3,
+     *     //   totalClearAllCalls: 10,
+     *     //   lastClearAllDuration: 543,
+     *     //   maxClearAllDuration: 2890,
+     *     //   activeHandles: 5,
+     *     //   config: { CLEANUP_TIMEOUT_MS: 3000, ... }
+     *     // }
      *
-     * Propriedades do objeto retornado:
+     * @returns {any} Stats object com todas as métricas
+     *
+     *   Propriedades do objeto retornado:
+     *
      *   - handlesRegistered (number): Total registrados (histórico)
      *   - handlesCleared (number): Total limpos
      *   - timeoutsOccurred (number): Total de timeouts
@@ -475,21 +496,6 @@ class HandleManager extends EventEmitter {
      *   - maxClearAllDuration (number): Duração máxima clearAll (ms)
      *   - activeHandles (number): Handles atualmente ativos
      *   - config (Object): Configuração atual
-     *
-     * @example
-     * const stats = manager.getStats();
-     * console.log(stats);
-     * // {
-     * //   handlesRegistered: 100,
-     * //   handlesCleared: 95,
-     * //   timeoutsOccurred: 1,
-     * //   errorsOccurred: 3,
-     * //   totalClearAllCalls: 10,
-     * //   lastClearAllDuration: 543,
-     * //   maxClearAllDuration: 2890,
-     * //   activeHandles: 5,
-     * //   config: { CLEANUP_TIMEOUT_MS: 3000, ... }
-     * // }
      */
     getStats() {
         return {
@@ -500,24 +506,20 @@ class HandleManager extends EventEmitter {
     }
 
     /**
-     * Helper para criar timeout Promise (usado internamente).
-     * Similar ao pattern usado em driver_nerv_adapter v2.0.
+     * Helper para criar timeout Promise (usado internamente). Similar ao pattern usado em driver_nerv_adapter v2.0.
      *
      * @private
+     * @example
+     *     await Promise.race([handle.dispose(), this._timeout(1000, 'dispose')]);
+     *
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para erro)
      * @returns {Promise<never>} Promise que rejeita após timeout
-     *
-     * @example
-     * await Promise.race([
-     *   handle.dispose(),
-     *   this._timeout(1000, 'dispose')
-     * ]);
      */
     _timeout(ms, operation) {
         return new Promise((_, reject) => {
             setTimeout(() => {
-                const error = new Error(`Timeout after ${ms}ms`);
+                const error = /** @type {any} */ (new Error(`Timeout after ${ms}ms`));
                 error.name = 'TimeoutError';
                 error.operation = operation;
                 reject(error);
@@ -529,23 +531,21 @@ class HandleManager extends EventEmitter {
 /**
  * Factory function para criar instância do HandleManager
  *
- * **Side-effects:** N/A
- * **Semântica:** Cria nova instância do HandleManager associada ao driver fornecido.
+ * **Side-effects:** N/A **Semântica:** Cria nova instância do HandleManager associada ao driver fornecido.
  * **Unidades:** N/A
  *
  * @param {object} driver - Instância do driver para gerenciar handles
  * @returns {HandleManager} Nova instância do HandleManager
  */
-export const create = driver => {
+export const create = (driver) => {
     return new HandleManager(driver);
 };
 
 /**
  * Constantes de configuração do HandleManager
  *
- * **Side-effects:** N/A
- * **Semântica:** Configurações de timeouts e limites para gerenciamento de handles.
- * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ * **Side-effects:** N/A **Semântica:** Configurações de timeouts e limites para gerenciamento de handles. **Unidades:**
+ * Milissegundos para timeouts, números inteiros para contadores.
  *
  * @type {Object<string, number>}
  */
@@ -554,9 +554,7 @@ export { HandleManager };
 /**
  * Eventos emitidos pelo HandleManager
  *
- * **Side-effects:** N/A
- * **Semântica:** Enumeração de eventos para comunicação com sistemas externos.
- * **Unidades:** N/A
+ * **Side-effects:** N/A **Semântica:** Enumeração de eventos para comunicação com sistemas externos. **Unidades:** N/A
  *
  * @type {Object<string, string>}
  */
@@ -565,9 +563,8 @@ export { HANDLE_CONFIG };
 /**
  * Configurações do HandleManager
  *
- * **Side-effects:** N/A
- * **Semântica:** Configurações de timeouts e limites para gerenciamento de handles.
- * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ * **Side-effects:** N/A **Semântica:** Configurações de timeouts e limites para gerenciamento de handles. **Unidades:**
+ * Milissegundos para timeouts, números inteiros para contadores.
  *
  * @type {Object<string, number>}
  */

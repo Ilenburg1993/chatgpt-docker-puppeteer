@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/reception/receive.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -29,15 +29,19 @@
 import { getCorrelationId, getMessageType } from '#shared/nerv/envelope_reader';
 
 /**
- * Executa handlers de forma isolada.
- * Falhas são capturadas e observadas.
+ * Executa handlers de forma isolada. Falhas são capturadas e observadas.
+ *
+ * @param {Function} handler
+ * @param {any} envelope
+ * @param {any} telemetry
  */
 function safeCall(handler, envelope, telemetry) {
     try {
         handler(envelope);
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
         telemetry.emit('nerv:reception:handler_error', {
-            message: error.message,
+            message: _e.message,
         });
     }
 }
@@ -47,17 +51,25 @@ function safeCall(handler, envelope, telemetry) {
 =========================== */
 
 /**
+ * @typedef {object} CreateReceptionDeps
+ * @property {any} envelopes
+ * @property {any} correlation
+ * @property {any} telemetry
+ */
+/**
+ * @typedef {object} CreateReceptionOptions
+ * @property {any} [envelopes]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
+ */
+/**
  * Cria o módulo de recepção bruta do NERV.
  *
- * **Side-effects:** Registra envelopes na correlação histórica, notifica handlers.
- * **Semântica:** Receptor técnico que processa frames inbound desserializados.
- * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
+ * **Side-effects:** Registra envelopes na correlação histórica, notifica handlers. **Semântica:** Receptor técnico que
+ * processa frames inbound desserializados. **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
- * @param {object} deps - Dependências do receptor
- * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
- * @param {object} deps.correlation - Sistema de correlação histórica
- * @param {object} deps.telemetry - Interface de telemetria NERV
- * @returns {object} Receptor com métodos onMessage, receive
+ * @param {CreateReceptionDeps} deps - Dependências do receptor
+ * @returns {any} Receptor com métodos onMessage, receive
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createReception({ envelopes, correlation, telemetry }) {
@@ -72,10 +84,9 @@ function createReception({ envelopes, correlation, telemetry }) {
   =========================== */
 
     /**
-     * Recebe um frame inbound já desserializado
-     * (objeto bruto ou buffer convertido).
+     * Recebe um frame inbound já desserializado (objeto bruto ou buffer convertido).
      *
-     * @param {*} raw
+     * @param {object} raw
      */
     function receive(raw) {
         telemetry.emit('nerv:reception:frame_received');
@@ -85,9 +96,10 @@ function createReception({ envelopes, correlation, telemetry }) {
         try {
             // 1. Desserialização técnica (se necessário)
             envelope = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:reception:deserialization_failed', {
-                message: error.message,
+                message: _e.message,
             });
             return;
         }
@@ -100,9 +112,10 @@ function createReception({ envelopes, correlation, telemetry }) {
 
             // 3. Validação estrutural
             envelopes.assertValid(normalized);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:reception:invalid_envelope', {
-                message: error.message,
+                message: _e.message,
             });
             return;
         }
@@ -124,7 +137,7 @@ function createReception({ envelopes, correlation, telemetry }) {
     /**
      * Registra handler de recepção.
      *
-     * @param {Function} handler
+     * @param {function} handler
      */
     function onReceive(handler) {
         if (typeof handler !== 'function') {

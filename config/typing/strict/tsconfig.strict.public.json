@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.strict.public.tsbuildinfo",
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "useUnknownInCatchVariables": true,
+    "noEmit": true
+  },
+  "files": [
+    "../../../src/audit_agent/context_builder.js",
+    "../../../src/audit_agent/contracts.js",
+    "../../../src/shared/nerv/constants.js",
+    "../../../src/inference_gateway/client_tags.js",
+    "../../../src/server/api/utils/api_envelope.js",
+    "../../../src/integration/lsp/tsserver-contract.d.ts"
+  ],
+  "include": [],
+  "exclude": [
+    "../../../dist",
+    "../../../node_modules",
+    "../../../tmp",
+    "../../../DOCUMENTAÇÃO",
+    "../../../tests/**",
+    "../../../src/dashboard-ui/**"
+  ],
+  "display": "strict public contracts lane"
+}

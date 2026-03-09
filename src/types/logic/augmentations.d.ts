@@ -45,11 +45,11 @@ declare module '#logic/adaptive' {
     export function getAdjustedTimeout(
         target: string,
         attempt?: number,
-        phase?: string
+        phase?: string,
     ): Promise<AdaptiveTimeoutResult>;
     export function getToolTimeout(
         tool?: string,
-        options?: { contextSize?: number; [key: string]: unknown }
+        options?: { contextSize?: number; [key: string]: unknown },
     ): Promise<AdaptiveTimeoutResult>;
     export function recordMetric(type: string, ms: number, target?: string): Promise<void>;
     export function getStabilityMetrics(target?: string): Promise<{ score: number; status: string; samples: number }>;

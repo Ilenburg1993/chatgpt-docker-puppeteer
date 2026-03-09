@@ -1,7 +1,7 @@
 // @ts-check
-import { computed, ref } from 'vue';
-import { http } from '@/lib/http';
 import { useAuth } from '@/composables/useAuth';
+import { http } from '@/lib/http';
+import { computed, ref } from 'vue';
 
 const STORAGE_KEY = 'ui_preset_v1';
 const ALLOWED_PRESETS = new Set(['dense', 'balanced', 'focus']);
@@ -10,22 +10,22 @@ const currentPreset = ref('dense');
 const loading = ref(false);
 let initialized = false;
 
-function _normalizePreset(value) {
+function _normalizePreset(/** @type {any} */ value) {
     const preset = String(value || '')
         .trim()
         .toLowerCase();
     return ALLOWED_PRESETS.has(preset) ? preset : 'dense';
 }
 
-function _applyPresetToDom(preset) {
+function _applyPresetToDom(/** @type {any} */ preset) {
     if (typeof document === 'undefined') return;
     document.documentElement.setAttribute('data-ui-preset', preset);
 }
 
-function _persistLocalPreset(preset) {
+function _persistLocalPreset(/** @type {any} */ preset) {
     try {
         localStorage.setItem(STORAGE_KEY, preset);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // noop
     }
 }
@@ -37,7 +37,7 @@ async function _loadFromServer() {
     return { preset, prefs };
 }
 
-async function _saveToServer(preset) {
+async function _saveToServer(/** @type {any} */ preset) {
     await http.patch('/api/control/preferences/me', {
         layout: {
             preset,
@@ -48,6 +48,7 @@ async function _saveToServer(preset) {
 
 /**
  * Função exportada: useUiPreferences.
+ *
  * @returns {any}
  */
 export function useUiPreferences() {
@@ -61,7 +62,7 @@ export function useUiPreferences() {
             let localPreset = 'dense';
             try {
                 localPreset = _normalizePreset(localStorage.getItem(STORAGE_KEY));
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 localPreset = 'dense';
             }
             currentPreset.value = localPreset;
@@ -73,14 +74,14 @@ export function useUiPreferences() {
                 _applyPresetToDom(preset);
                 _persistLocalPreset(preset);
             }
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             _applyPresetToDom(currentPreset.value);
         } finally {
             loading.value = false;
         }
     };
 
-    const setPreset = async presetInput => {
+    const setPreset = async (/** @type {any} */ presetInput) => {
         const preset = _normalizePreset(presetInput);
         currentPreset.value = preset;
         _applyPresetToDom(preset);
@@ -89,7 +90,7 @@ export function useUiPreferences() {
         if (isAuthenticated.value) {
             try {
                 await _saveToServer(preset);
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 // best effort: mantém persistência local.
             }
         }

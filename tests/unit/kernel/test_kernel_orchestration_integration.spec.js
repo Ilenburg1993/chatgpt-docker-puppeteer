@@ -1,9 +1,9 @@
 // @ts-check
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert';
-import EventEmitter from 'node:events';
 import { createKernel } from '#kernel/kernel';
 import { ActionCode, MessageType } from '#shared/nerv/constants';
+import assert from 'node:assert';
+import EventEmitter from 'node:events';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 // Mock NERV simple (compatível com nerv.onReceive + nerv.emitCommand/emitEvent)
 class MockNERV extends EventEmitter {
@@ -13,12 +13,12 @@ class MockNERV extends EventEmitter {
             dequeueInbound: () => null,
             dequeueOutbound: () => null,
         };
-        this.emittedCommands = [];
-        this.emittedEvents = [];
-        this.receiveHandlers = [];
+        this.emittedCommands = /** @type {any[]} */ ([]);
+        this.emittedEvents = /** @type {any[]} */ ([]);
+        this.receiveHandlers = /** @type {any[]} */ ([]);
     }
 
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.receiveHandlers.push(handler);
         return () => {
             const index = this.receiveHandlers.indexOf(handler);
@@ -26,26 +26,26 @@ class MockNERV extends EventEmitter {
         };
     }
 
-    receive(envelope) {
-        this.receiveHandlers.forEach(h => h(envelope));
+    receive(/** @type {any} */ envelope) {
+        this.receiveHandlers.forEach((h) => h(envelope));
     }
 
-    emitCommand(envelope) {
+    emitCommand(/** @type {any} */ envelope) {
         this.emittedCommands.push(envelope);
     }
 
-    emitEvent(envelope) {
+    emitEvent(/** @type {any} */ envelope) {
         this.emittedEvents.push(envelope);
     }
 
-    emit(actionCode, payload) {
-        super.emit(actionCode, payload);
+    emit(/** @type {any} */ actionCode, /** @type {any} */ payload) {
+        return super.emit(actionCode, payload);
     }
 }
 
 describe('Kernel Orchestration Integration (V2.0)', () => {
-    let nerv;
-    let kernel;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let kernel;
 
     beforeEach(() => {
         nerv = new MockNERV();
@@ -107,7 +107,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
             assert.strictEqual(
                 commands[0].payload.actionCode,
                 ActionCode.DRIVER_EXECUTE_TASK,
-                'Comando é DRIVER_EXECUTE_TASK'
+                'Comando é DRIVER_EXECUTE_TASK',
             );
             assert.strictEqual(commands[0].payload.task.meta.id, 'task-single-shot', 'Task ID correto');
 
@@ -164,13 +164,13 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
 
             // No novo modelo SSOT, o Kernel NÃO re-dispatcha retries.
             // Ele encerra/limpa runtime e deixa o worker/DB reagendar.
-            await new Promise(resolve => setTimeout(resolve, 25));
+            await new Promise((resolve) => setTimeout(resolve, 25));
 
             assert.strictEqual(nerv.emittedCommands.length, 1, 'Kernel não deve reenviar task no caminho de retry');
             assert.strictEqual(
                 kernel.getTask('task-retry-payload'),
                 null,
-                'runtime deve ser esquecido após retry solicitado'
+                'runtime deve ser esquecido após retry solicitado',
             );
 
             kernel.stop();
@@ -230,7 +230,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
                 },
             });
 
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise((resolve) => setTimeout(resolve, 100));
 
             kernel.stop();
         });
@@ -310,20 +310,24 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
 });
 
 describe('TaskExecutionOrchestrator (standalone)', () => {
-    let nerv;
-    let nervBridge;
-    let orchestrator;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let nervBridge;
+    /** @type {any} */ let orchestrator;
 
     beforeEach(async () => {
         nerv = new MockNERV();
 
         // Mock simplificado do nervBridge
         nervBridge = {
-            beforeTaskExecution: async task => task,
-            afterTaskExecution: async (task, result) => ({ action: 'DONE', task, feedback: null }),
-            processOrchestrationDecision: async (decision, correlationId) => {},
-            emitCommand: params => nerv.emitCommand(params),
-            emitEvent: params => nerv.emitEvent(params),
+            beforeTaskExecution: async (/** @type {any} */ task) => task,
+            afterTaskExecution: async (/** @type {any} */ task, /** @type {any} */ result) => ({
+                action: 'DONE',
+                task,
+                feedback: null,
+            }),
+            processOrchestrationDecision: async (/** @type {any} */ decision, /** @type {any} */ correlationId) => {},
+            emitCommand: (/** @type {any} */ params) => nerv.emitCommand(params),
+            emitEvent: (/** @type {any} */ params) => nerv.emitEvent(params),
         };
 
         const { TaskExecutionOrchestrator } = await import('#kernel/task_execution_orchestrator');

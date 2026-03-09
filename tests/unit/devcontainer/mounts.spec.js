@@ -1,15 +1,15 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import { strict as assert } from 'assert';
 import { execSync } from 'child_process';
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { describe, it } from 'node:test';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
 // helper that sources post-create.sh and then invokes a named function with args
 import { spawnSync } from 'child_process';
 
-function runPostCreateHelper(func, args = [], env = {}) {
+function runPostCreateHelper(/** @type {any} */ func, /** @type {any[]} */ args = [], env = {}) {
     // create a small wrapper script to avoid quoting headaches
     // we sometimes need to modify PATH for the helper function only while
     // keeping the original PATH available during the initial sourcing phase.
@@ -26,7 +26,7 @@ source "${process.cwd()}/.devcontainer/scripts/post-create.sh"
 if [[ -n "\${TEST_PATH:-}" ]]; then
     export PATH="$TEST_PATH"
 fi
-${func} ${args.map(a => `'${a}'`).join(' ')}
+${func} ${args.map((a) => `'${a}'`).join(' ')}
 `;
     const tmp = mkdtempSync(join(tmpdir(), 'helper-')) + '.sh';
     writeFileSync(tmp, script);
@@ -49,7 +49,7 @@ ${func} ${args.map(a => `'${a}'`).join(' ')}
 }
 
 // create a fake binary in a temp directory and prepend to PATH
-function withFakeBinary(name, content, fn) {
+function withFakeBinary(/** @type {any} */ name, /** @type {any} */ content, /** @type {any} */ fn) {
     const binDir = mkdtempSync(join(tmpdir(), 'fakebin-'));
     const pathFile = join(binDir, name);
     writeFileSync(pathFile, content, { mode: 0o755 });
@@ -66,7 +66,7 @@ function withFakeBinary(name, content, fn) {
 }
 
 // shorthand for creating a fake stat that returns a constant UID
-function fakeStat(uid) {
+function fakeStat(/** @type {any} */ uid) {
     return `#!/usr/bin/env bash
         # ignore args, always print uid
         echo ${uid}
@@ -74,7 +74,7 @@ function fakeStat(uid) {
 }
 
 // shorthand for creating a fake mount output
-function fakeMount(output) {
+function fakeMount(/** @type {any} */ output) {
     return `#!/usr/bin/env bash
         cat <<'MOUNTOUT'
 ${output}
@@ -89,7 +89,7 @@ describe('devcontainer mount helpers', () => {
         const project = '/some/dir';
         const fake = fakeStat(9999);
         const result = withFakeBinary('stat', fake, () =>
-            runPostCreateHelper('check_chown_contract', [project, '1000'])
+            runPostCreateHelper('check_chown_contract', [project, '1000']),
         );
         assert(result.stderr.includes('chown recursivo é proibido'));
     });
@@ -98,7 +98,7 @@ describe('devcontainer mount helpers', () => {
         const project = '/other';
         const fake = fakeStat(1000);
         const result = withFakeBinary('stat', fake, () =>
-            runPostCreateHelper('check_chown_contract', [project, '1000'])
+            runPostCreateHelper('check_chown_contract', [project, '1000']),
         );
         assert.equal(result.stderr.trim(), '');
     });
@@ -106,8 +106,8 @@ describe('devcontainer mount helpers', () => {
     it('audit_mounts handles missing mount command', () => {
         // filter PATH for the helper only; leave the test process untouched so
         // bootstrap helpers like "date" continue to be available.
-        const parts = process.env.PATH.split(':');
-        const filtered = parts.filter(d => {
+        const parts = (process.env.PATH ?? '').split(':');
+        const filtered = parts.filter((d) => {
             try {
                 return !existsSync(join(d, 'mount'));
             } catch {
@@ -121,7 +121,7 @@ describe('devcontainer mount helpers', () => {
     it('audit_mounts prints provided mount lines', () => {
         const fake = fakeMount('/dev/sda1 on /workspaces/foo ext4 rw,relatime');
         const res = withFakeBinary('mount', fake, () =>
-            runPostCreateHelper('audit_mounts', ['/workspaces/foo', 'user'])
+            runPostCreateHelper('audit_mounts', ['/workspaces/foo', 'user']),
         );
         assert(res.stdout.includes('/dev/sda1'));
         assert(res.stdout.includes('/workspaces/foo'));

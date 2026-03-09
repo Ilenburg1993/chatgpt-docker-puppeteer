@@ -416,7 +416,7 @@
                     contentEl.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
                 } else {
                     const processes = data.processes || [];
-                    const online = processes.filter(p => p.status === 'online').length;
+                    const online = processes.filter((p) => p.status === 'online').length;
 
                     let html = `
                     <div class="info-row">
@@ -431,7 +431,7 @@
 
                     if (processes.length > 0) {
                         html += '<div class="process-list">';
-                        processes.forEach(proc => {
+                        processes.forEach((proc) => {
                             const statusClass = proc.status === 'online' ? 'status-online' : 'status-stopped';
                             html += `
                             <div class="process-item">

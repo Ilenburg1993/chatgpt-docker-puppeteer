@@ -1,17 +1,16 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import * as cache from './cache.js';
-import { STATUS_VALUES } from '#core/constants/tasks';
-import { getNextEligible } from './scheduler.js';
-import { saveTask } from '../storage/task_store.js';
+// @ts-check
 import CONFIG from '#core/config';
+import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
+import { saveTask } from '../storage/task_store.js';
+import * as cache from './cache.js';
+import { getNextEligible } from './scheduler.js';
 
 /**
- * Analisa o snapshot da fila, recupera inconsistências e retorna a próxima
- * tarefa elegível para o motor de execução.
+ * Analisa o snapshot da fila, recupera inconsistências e retorna a próxima tarefa elegível para o motor de execução.
  *
- * @param {string|null} targetFilter - Filtro de IA alvo (ex: 'chatgpt').
- * @returns {Promise<object|null>}
+ * @param {string | null} targetFilter - Filtro de IA alvo (ex: 'chatgpt').
+ * @returns {Promise<any>}
  */
 
 async function loadNextTask(targetFilter = null) {
@@ -63,7 +62,7 @@ async function loadNextTask(targetFilter = null) {
 
         // B. Anulação em Cascata (Se o pai falhou/foi pulado, o filho é SKIPPED)
         if (task.state.status === STATUS_VALUES.PENDING && task.policy.dependencies?.length > 0) {
-            const hasFailedParent = task.policy.dependencies.some(depId => {
+            const hasFailedParent = task.policy.dependencies.some((/** @type {any} */ depId) => {
                 const parent = taskMap.get(depId);
                 return (
                     parent &&
@@ -90,8 +89,9 @@ async function loadNextTask(targetFilter = null) {
             try {
                 await saveTask(task);
                 queueWasMutated = true;
-            } catch (err) {
-                log('ERROR', `[LOADER] Falha ao persistir cura da tarefa ${task.meta.id}: ${err.message}`);
+            } catch (/** @type {any} */ err) {
+                const _ce = /** @type {any} */ (err);
+                log('ERROR', `[LOADER] Falha ao persistir cura da tarefa ${task.meta.id}: ${_ce.message}`);
             }
         }
     }
@@ -110,11 +110,12 @@ async function loadNextTask(targetFilter = null) {
 
 /**
  * Operação Administrativa: Reinicia em lote todas as tarefas que falharam.
+ *
  * @returns {Promise<number>} Total de tarefas movidas para PENDING.
  */
 async function bulkRetryFailed() {
     const allTasks = await cache.getQueue();
-    const failedTasks = allTasks.filter(t => t?.state?.status === STATUS_VALUES.FAILED);
+    const failedTasks = allTasks.filter((/** @type {any} */ t) => t?.state?.status === STATUS_VALUES.FAILED);
 
     if (failedTasks.length === 0) {
         return 0;
@@ -137,8 +138,9 @@ async function bulkRetryFailed() {
 
             await saveTask(task);
             count++;
-        } catch (err) {
-            log('ERROR', `[LOADER] Erro no retry da tarefa ${originalTask.meta.id}: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _ce = /** @type {any} */ (err);
+            log('ERROR', `[LOADER] Erro no retry da tarefa ${originalTask.meta.id}: ${_ce.message}`);
         }
     }
 
@@ -148,4 +150,4 @@ async function bulkRetryFailed() {
     return count;
 }
 
-export { loadNextTask, bulkRetryFailed };
+export { bulkRetryFailed, loadNextTask };

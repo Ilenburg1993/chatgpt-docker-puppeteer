@@ -245,16 +245,16 @@ async function findChatInputSelector(page, langCode = 'en') {
 
 ```javascript
 // ANTES (linha 258)
-const scoreCandidate = el => {
+const scoreCandidate = (el) => {
   let score = 0;
   if (rect.top > window.innerHeight * 0.4) score += 100;
-  if (terms.some(k => text.includes(k))) score += 150;
+  if (terms.some((k) => text.includes(k))) score += 150;
   if (el.id && isNaN(el.id.charAt(0))) score += 50;
   return score;
 };
 
 // DEPOIS (v4.0)
-const scoreCandidate = el => {
+const scoreCandidate = (el) => {
   let score = 0;
   const rect = el.getBoundingClientRect();
 
@@ -269,7 +269,7 @@ const scoreCandidate = el => {
     el.getAttribute('aria-label') ||
     ''
   ).toLowerCase();
-  if (terms.some(k => text.includes(k))) score += 200; // Aumentado 150→200
+  if (terms.some((k) => text.includes(k))) score += 200; // Aumentado 150→200
 
   // Stable ID (data-testid, id)
   if (el.getAttribute('data-testid')?.includes('message')) score += 100;
@@ -314,7 +314,7 @@ checkSystemStatus: () => {
   ];
 
   // Streaming dots detection
-  const streamingDots = SADI.query('[class*="dot"], [class*="ellipsis"]').filter(el => {
+  const streamingDots = SADI.query('[class*="dot"], [class*="ellipsis"]').filter((el) => {
     const style = window.getComputedStyle(el);
     return style.animation || style.animationName;
   });
@@ -368,7 +368,7 @@ async function findFrameByPath(page, framePath) {
 const candidates = [
   ...new Set(SADI.query('textarea, div[contenteditable="true"], [role="textbox"]')),
 ]
-  .filter(el => !SADI.isOccluded(el))
+  .filter((el) => !SADI.isOccluded(el))
   .slice(0, SADI_CONFIG.MAX_CANDIDATES); // Limita a 50 candidatos
 
 debug('Filtered to %d candidates (max: %d)', candidates.length, SADI_CONFIG.MAX_CANDIDATES);
@@ -442,7 +442,7 @@ const SVG_SIGNATURES = [
   // Plus (new chat)
   'M12 5v14m-7-7h14',
   'M12 6v12m-6-6h12',
-].map(sig => sig.replace(/[\s,]/g, '').slice(0, 20));
+].map((sig) => sig.replace(/[\s,]/g, '').slice(0, 20));
 ```
 
 **Benefício**: 95% → 99% button detection accuracy.
@@ -455,7 +455,7 @@ const SVG_SIGNATURES = [
 
 ```javascript
 // ADICIONADO (v4.0)
-isOccluded: el => {
+isOccluded: (el) => {
   // ... checks existentes ...
 
   // NEW: Z-index check (elementos com z-index negativo são invisíveis)
@@ -524,23 +524,23 @@ return best
 /**
  * Localiza o campo de input com breakdown de confiança para telemetria.
  *
+ * @example
+ *   const result = await findChatInputSelector(page, 'pt');
+ *   if (result && result.confidence > 100) {
+ *     console.log('Found input:', result.protocol.selector);
+ *   }
+ *
  * @param {Object} page - Puppeteer Page instance
- * @param {string} [langCode='en'] - Language code for i18n keywords (en, pt, es, etc.)
- * @returns {Promise<Object|null>} Detection result with protocol and confidence
+ * @param {string} [langCode='en'] - Language code for i18n keywords (en, pt, es, etc.). Default is `'en'`
+ * @returns {Promise<Object | null>} Detection result with protocol and confidence
+ *
  *
  * @typedef {Object} DetectionResult
  * @property {Object} protocol - Element protocol (selector, framePath, etc.)
  * @property {number} confidence - Confidence score (0-500+)
  * @property {number} candidates_count - Total candidates evaluated
  * @property {number} detection_time_ms - Time taken for detection
- *
  * @throws {Error} If page is invalid or langCode is invalid
- *
- * @example
- * const result = await findChatInputSelector(page, 'pt');
- * if (result && result.confidence > 100) {
- *     console.log('Found input:', result.protocol.selector);
- * }
  */
 async function findChatInputSelector(page, langCode = 'en') {
   // ...
@@ -561,20 +561,22 @@ async function findChatInputSelector(page, langCode = 'en') {
  * SADI Analyzer v4.0
  *
  * CHANGELOG:
+ *
  * - v4.0 (Feb 2026): Consolidation upgrade
- *   * 7 bugs fixed (async, validation, fallbacks)
- *   * 15 improvements (cache, scoring, telemetry)
- *   * Performance: 90% faster with cache (30ms vs 300ms)
- *   * Accuracy: 85% → 95% (input), 95% → 99% (button)
  *
+ *   - 7 bugs fixed (async, validation, fallbacks)
+ *   - 15 improvements (cache, scoring, telemetry)
+ *   - Performance: 90% faster with cache (30ms vs 300ms)
+ *   - Accuracy: 85% → 95% (input), 95% → 99% (button)
  * - v3.0 (Feb 2026): SADI migration to shared layer
- *   * Moved from driver/modules to shared/sadi
- *   * Fixed architectural inversion
  *
+ *   - Moved from driver/modules to shared/sadi
+ *   - Fixed architectural inversion
  * - v2.0 (Jan 2026): SADI Fortress (Protocol 11)
- *   * Shadow DOM + IFrame traversal
- *   * Heuristic scoring
- *   * SVG signature matching
+ *
+ *   - Shadow DOM + IFrame traversal
+ *   - Heuristic scoring
+ *   - SVG signature matching
  */
 ```
 

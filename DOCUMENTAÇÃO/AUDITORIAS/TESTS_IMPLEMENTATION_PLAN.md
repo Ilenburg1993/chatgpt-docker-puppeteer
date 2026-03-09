@@ -538,7 +538,7 @@ PENDENTE (iniciar após FASE 1)
 
 ```bash
 # Deletar 11 testes obsoletos identificados na auditoria
-rm -f tests/integration/identity_lifecycle.test.js  # ❌ Obsoleto (IPC antigo)
+rm -f tests/integration/identity_lifecycle.test.js # ❌ Obsoleto (IPC antigo)
 
 # Criar commit
 git add -A

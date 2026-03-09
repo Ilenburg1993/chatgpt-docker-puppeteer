@@ -1,10 +1,10 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
-async function read(relPath) {
+async function read(/** @type {any} */ relPath) {
     return fs.readFile(path.join(process.cwd(), relPath), 'utf8');
 }
 
@@ -34,7 +34,7 @@ test('wave19: router ativo não aponta para views legadas e não usa useRealtime
 
     assert.doesNotMatch(
         routerContent,
-        /Dashboard\.vue|TaskQueue\.vue|PerformanceMetrics\.vue|WorkflowEditor\.vue|Templates\.vue/
+        /Dashboard\.vue|TaskQueue\.vue|PerformanceMetrics\.vue|WorkflowEditor\.vue|Templates\.vue/,
     );
     assert.doesNotMatch(tasksView, /useRealtime/);
     assert.doesNotMatch(taskDetail, /useRealtime/);

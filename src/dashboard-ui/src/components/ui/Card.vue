@@ -18,8 +18,8 @@ const cardClass = computed(() =>
         'backdrop-blur-sm bg-slate-900/50 border border-slate-700/50 rounded-2xl shadow-xl transition-all duration-300',
         props.hoverable &&
             'hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10 cursor-pointer hover:scale-[1.02]',
-        props.class
-    )
+        props.class,
+    ),
 );
 </script>
 

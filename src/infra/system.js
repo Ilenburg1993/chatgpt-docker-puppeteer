@@ -1,11 +1,11 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
+import { log } from '#core/logger';
+import { execa } from 'execa';
 import { exec } from 'node:child_process';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import pm2 from 'pm2';
 import treeKill from 'tree-kill';
-import path from 'node:path';
-import { execa } from 'execa';
-import { log } from '#core/logger';
 
 const AGENTE_NAME = 'agente-gpt';
 
@@ -14,13 +14,12 @@ const require_ = createRequire(import.meta.url);
 const ecosystemConfig = require_(path.join(import.meta.dirname, '../../ecosystem.config.cjs'));
 
 /**
- * Interface Promisificada interna para o PM2.
- * Evita o aninhamento de callbacks e facilita o tratamento de erros.
+ * Interface Promisificada interna para o PM2. Evita o aninhamento de callbacks e facilita o tratamento de erros.
  */
-const pm2p = {
+const pm2p = /** @type {any} */ ({
     connect: () =>
-        new Promise((res, rej) => {
-            pm2.connect(err => {
+        new Promise((/** @type {any} */ res, /** @type {any} */ rej) => {
+            pm2.connect((err) => {
                 if (err) {
                     rej(err);
                 } else {
@@ -28,8 +27,8 @@ const pm2p = {
                 }
             });
         }),
-    describe: name =>
-        new Promise((res, rej) => {
+    describe: /** @param {any} name */ (name) =>
+        new Promise((/** @type {any} */ res, /** @type {any} */ rej) => {
             pm2.describe(name, (err, list) => {
                 if (err) {
                     rej(err);
@@ -38,9 +37,9 @@ const pm2p = {
                 }
             });
         }),
-    start: opts =>
-        new Promise((res, rej) => {
-            pm2.start(opts, err => {
+    start: (/** @type {any} */ opts) =>
+        new Promise((/** @type {any} */ res, /** @type {any} */ rej) => {
+            pm2.start(opts, (err) => {
                 if (err) {
                     rej(err);
                 } else {
@@ -48,9 +47,9 @@ const pm2p = {
                 }
             });
         }),
-    stop: name =>
-        new Promise((res, rej) => {
-            pm2.stop(name, err => {
+    stop: (/** @type {any} */ name) =>
+        new Promise((/** @type {any} */ res, /** @type {any} */ rej) => {
+            pm2.stop(name, (err) => {
                 if (err) {
                     rej(err);
                 } else {
@@ -58,9 +57,9 @@ const pm2p = {
                 }
             });
         }),
-    restart: name =>
-        new Promise((res, rej) => {
-            pm2.restart(name, err => {
+    restart: (/** @type {any} */ name) =>
+        new Promise((/** @type {any} */ res, /** @type {any} */ rej) => {
+            pm2.restart(name, (err) => {
                 if (err) {
                     rej(err);
                 } else {
@@ -69,16 +68,16 @@ const pm2p = {
             });
         }),
     disconnect: () => pm2.disconnect(),
-};
+});
 
 /* ==========================================================================
    API DE CONTROLE DE PROCESSO (PM2)
 ========================================================================== */
 
 /**
- * Retorna o status detalhado do processo do Agente.
- * Mapeia os dados brutos do PM2 para um contrato limpo.
-  * @returns {Promise<any>}
+ * Retorna o status detalhado do processo do Agente. Mapeia os dados brutos do PM2 para um contrato limpo.
+ *
+ * @returns {Promise<any>}
  */
 async function getAgentStatus() {
     try {
@@ -96,16 +95,19 @@ async function getAgentStatus() {
             uptime: app.pm2_env.status === 'online' ? Date.now() - app.pm2_env.pm_uptime : 0,
             pid: app.pid,
         };
-    } catch (e) {
-        log('ERROR', `[SYSTEM] Falha ao obter status PM2: ${e.message}`);
-        return { agent: 'offline', error: e.message };
+    } catch (/** @type {any} */ e) {
+        const _ce = /** @type {any} */ (e);
+        log('ERROR', `[SYSTEM] Falha ao obter status PM2: ${_ce.message}`);
+        return { agent: 'offline', error: _ce.message };
     }
 }
 
 /**
- * Executa uma ação de controle no Agente (start/stop/restart/kill_daemon).
- * Contém a inteligência de decisão de comando baseada no estado atual.
-  * @returns {Promise<any>}
+ * Executa uma ação de controle no Agente (start/stop/restart/kill_daemon). Contém a inteligência de decisão de comando
+ * baseada no estado atual.
+ *
+ * @param {any} action
+ * @returns {Promise<any>}
  */
 async function controlAgent(action) {
     try {
@@ -120,7 +122,7 @@ async function controlAgent(action) {
                     await pm2p.restart(AGENTE_NAME);
                 } else {
                     // Se não existe ou está totalmente parado, iniciamos com a spec oficial do ecosystem.config.js
-                    const agenteSpec = ecosystemConfig.apps.find(app => app.name === AGENTE_NAME);
+                    const agenteSpec = ecosystemConfig.apps.find((/** @type {any} */ app) => app.name === AGENTE_NAME);
                     if (!agenteSpec) {
                         throw new Error(`Configuração para "${AGENTE_NAME}" não encontrada em ecosystem.config.js`);
                     }
@@ -151,20 +153,21 @@ async function controlAgent(action) {
                     try {
                         await execa('pm2', ['kill']);
                         return { success: true };
-                    } catch (err) {
+                    } catch (/** @type {any} */ err) {
+                        const _ce = /** @type {any} */ (err);
                         try {
                             await execa('npx', ['pm2', 'kill']);
                             return { success: true };
-                        } catch (err2) {
-                            log('ERROR', `[SYSTEM] Falha ao matar daemon: ${err2.message}`);
+                        } catch (/** @type {any} */ err2) {
+                            log('ERROR', `[SYSTEM] Falha ao matar daemon: ${/** @type {any} */ (err2).message}`);
                             return { success: false };
                         }
                     }
                 }
 
                 // Fallback to original exec behavior
-                return new Promise(res => {
-                    exec('npx pm2 kill', err => {
+                return new Promise((/** @type {any} */ res) => {
+                    exec('npx pm2 kill', (err) => {
                         if (err) {
                             log('ERROR', `[SYSTEM] Falha ao matar daemon: ${err.message}`);
                         }
@@ -177,8 +180,9 @@ async function controlAgent(action) {
                 throw new Error(`Ação de controle inválida: ${action}`);
         }
         return { success: true };
-    } catch (e) {
-        log('ERROR', `[SYSTEM] Erro na operação ${action}: ${e.message}`);
+    } catch (/** @type {any} */ e) {
+        const _ce = /** @type {any} */ (e);
+        log('ERROR', `[SYSTEM] Erro na operação ${action}: ${_ce.message}`);
         throw e;
     }
 }
@@ -189,7 +193,9 @@ async function controlAgent(action) {
 
 /**
  * Mata um processo específico e sua árvore de filhos com SIGKILL.
-  * @returns {Promise<void>}
+ *
+ * @param {any} pid
+ * @returns {Promise<any>}
  */
 async function killProcess(pid) {
     if (!pid) {
@@ -208,32 +214,35 @@ async function killProcess(pid) {
                 // attempt to kill child processes first, then parent
                 try {
                     await execa('pkill', ['-P', String(pid)]);
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
+                    const _ce = /** @type {any} */ (err);
                     void err;
                 }
                 try {
                     process.kill(pid, 'SIGKILL');
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
+                    const _ce = /** @type {any} */ (err);
                     void err;
                 }
             }
             log('INFO', `Processo ${pid} e filhos encerrados.`);
             return;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _ce = /** @type {any} */ (err);
             log(
                 'ERROR',
-                `Falha ao matar PID ${pid}: ${err && err.message ? err.message : String(err)} — usando fallback tree-kill`
+                `Falha ao matar PID ${pid}: ${err && _ce.message ? _ce.message : String(err)} — usando fallback tree-kill`,
             );
         }
     }
 
     // Fallback to tree-kill (legacy behavior)
-    await new Promise(resolve => {
-        treeKill(pid, 'SIGKILL', err => {
+    await new Promise((/** @type {any} */ resolve) => {
+        treeKill(pid, 'SIGKILL', (err) => {
             if (err) {
                 log('ERROR', `Falha ao matar PID ${pid} com tree-kill: ${err.message}`);
                 // As a last resort, attempt a global Chrome kill
-                killChromeGlobal().then(() => resolve());
+                void killChromeGlobal().then(() => resolve());
             } else {
                 log('INFO', `Processo ${pid} e filhos encerrados via tree-kill.`);
                 resolve();
@@ -244,7 +253,8 @@ async function killProcess(pid) {
 
 /**
  * Mata TODOS os processos do Chrome (Fallback Nuclear).
-  * @returns {Promise<any>}
+ *
+ * @returns {Promise<any>}
  */
 async function killChromeGlobal() {
     log('WARN', 'Executando Kill Global no Chrome (Fallback)...');
@@ -258,15 +268,16 @@ async function killChromeGlobal() {
             }
             log('INFO', 'Todos os Chromes encerrados.');
             return;
-        } catch (err) {
-            log('WARN', `Falha no Kill Global (execa): ${err && err.message ? err.message : String(err)}`);
+        } catch (/** @type {any} */ err) {
+            const _ce = /** @type {any} */ (err);
+            log('WARN', `Falha no Kill Global (execa): ${err && _ce.message ? _ce.message : String(err)}`);
         }
     }
 
     // Fallback to exec
-    return new Promise(resolve => {
+    return new Promise((/** @type {any} */ resolve) => {
         const cmd = isWin ? 'taskkill /F /IM chrome.exe /T' : 'pkill -9 chrome';
-        exec(cmd, err => {
+        exec(cmd, (err) => {
             if (err) {
                 log('WARN', `Falha no Kill Global: ${err.message}`);
             } else {
@@ -278,4 +289,4 @@ async function killChromeGlobal() {
 }
 
 /** Reexport público: pm2Raw. */
-export { getAgentStatus, controlAgent, killProcess, killChromeGlobal, pm2 as pm2Raw };
+export { controlAgent, getAgentStatus, killChromeGlobal, killProcess, pm2 as pm2Raw };

@@ -125,7 +125,7 @@ um diretório), mas a configuração atual está causando conflito de tipos no D
 
 ```bash
 # ✅ Safe variable access
-readonly CURRENT_USER="$(id -un 2>/dev/null || echo unknown)"
+readonly CURRENT_USER="$(id -un 2> /dev/null || echo unknown)"
 value="${!var:-}"
 
 # ✅ Safe counters (set -u compliant)
@@ -133,7 +133,7 @@ STRUCT_ERRORS=0
 OPER_WARNINGS=0
 
 # ✅ Safe pipeline redirection
-exec > >(tee -a "${LOG_FILE}" >/dev/null || true) 2>&1
+exec > >(tee -a "${LOG_FILE}" > /dev/null || true) 2>&1
 ```
 
 #### 2.2 SSH Contract (Section 7)
@@ -243,18 +243,18 @@ SSH_CONTRACT_STATUS:
 
 ```dockerfile
 ENV NODE_ENV=development \
-    SERVER_MODE=split \
-    SERVER_AUTHORITY=standalone \
-    \
-    SERVER_PORT=3008 \
-    PORT=3008 \
-    CHROME_PROXY_PORT=9224 \
-    CHROME_PORT=9225 \
-    CHROME_HOST=host.docker.internal \
-    \
-    BROWSER_MODE=wsEndpoint \
-    PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
-    MOCK_CHROME=0
+ SERVER_MODE=split \
+ SERVER_AUTHORITY=standalone \
+ \
+ SERVER_PORT=3008 \
+ PORT=3008 \
+ CHROME_PROXY_PORT=9224 \
+ CHROME_PORT=9225 \
+ CHROME_HOST=host.docker.internal \
+ \
+ BROWSER_MODE=wsEndpoint \
+ PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
+ MOCK_CHROME=0
 ```
 
 **Nenhuma referência direta a SSH no Dockerfile** → ✅ Correto (SSH é runtime concern)
@@ -265,8 +265,8 @@ ENV NODE_ENV=development \
 
 ```dockerfile
 ENV USER_NAME=node \
-    HOME_DIR=/home/node \
-    APP_DIR=/workspaces/${PROJECT_NAME}
+ HOME_DIR=/home/node \
+ APP_DIR=/workspaces/${PROJECT_NAME}
 ```
 
 **Alinhamento:**
@@ -445,17 +445,17 @@ set -euo pipefail
 
 # Se SSH_AUTH_SOCK for /dev/null, não temos SSH
 if [[ "${SSH_AUTH_SOCK:-}" == "/dev/null" ]]; then
-    echo "⚠️  SSH agent não disponível (container iniciado sem SSH forwarding)"
-    echo "→ git operations via HTTPS"
-    exit 0
+  echo "⚠️  SSH agent não disponível (container iniciado sem SSH forwarding)"
+  echo "→ git operations via HTTPS"
+  exit 0
 fi
 
 # Se chegou aqui, SSH existe - validar
 if [[ -S "${SSH_AUTH_SOCK}" ]]; then
-    echo "✅ SSH agent disponível: ${SSH_AUTH_SOCK}"
-    ssh-add -l || echo "⚠️  SSH agent vazio (adicione chaves com ssh-add)"
+  echo "✅ SSH agent disponível: ${SSH_AUTH_SOCK}"
+  ssh-add -l || echo "⚠️  SSH agent vazio (adicione chaves com ssh-add)"
 else
-    echo "❌ SSH_AUTH_SOCK definido mas socket inválido: ${SSH_AUTH_SOCK}"
+  echo "❌ SSH_AUTH_SOCK definido mas socket inválido: ${SSH_AUTH_SOCK}"
 fi
 ```
 
@@ -490,8 +490,8 @@ PROXY_SOCKET="/tmp/.ssh-agent-proxy"
 REAL_SOCKET="${SSH_AUTH_SOCK:-}"
 
 if [[ -z "${REAL_SOCKET}" ]] || [[ ! -S "${REAL_SOCKET}" ]]; then
-    echo "⚠️  No SSH agent detected, skipping proxy"
-    exit 0
+  echo "⚠️  No SSH agent detected, skipping proxy"
+  exit 0
 fi
 
 # Criar symlink para socket real

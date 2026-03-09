@@ -1,15 +1,15 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
-import assert from 'node:assert';
 import ServerNERVAdapter from '#server/nerv_adapter/server_nerv_adapter';
 import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
+import assert from 'node:assert';
+import { beforeEach, describe, it } from 'node:test';
 
 class MockNerv {
     constructor() {
-        this.receiveHandlers = [];
+        this.receiveHandlers = /** @type {any[]} */ ([]);
     }
 
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.receiveHandlers.push(handler);
         return () => {
             const idx = this.receiveHandlers.indexOf(handler);
@@ -17,7 +17,7 @@ class MockNerv {
         };
     }
 
-    offReceive(handler) {
+    offReceive(/** @type {any} */ handler) {
         const idx = this.receiveHandlers.indexOf(handler);
         if (idx >= 0) this.receiveHandlers.splice(idx, 1);
     }
@@ -27,31 +27,31 @@ class MockNerv {
 
 class MockSocketHub {
     constructor() {
-        this.events = [];
+        this.events = /** @type {any[]} */ ([]);
         this.handlers = new Map();
     }
 
-    emit(name, payload) {
+    emit(/** @type {any} */ name, /** @type {any} */ payload) {
         this.events.push({ name, payload });
     }
 
-    on(name, handler) {
+    on(/** @type {any} */ name, /** @type {any} */ handler) {
         this.handlers.set(name, handler);
     }
 
-    off(name) {
+    off(/** @type {any} */ name) {
         this.handlers.delete(name);
     }
 
-    sendToClient(clientId, event, payload) {
+    sendToClient(/** @type {any} */ clientId, /** @type {any} */ event, /** @type {any} */ payload) {
         this.events.push({ name: event, payload, clientId });
     }
 }
 
 describe('ServerNERVAdapter runtime behavior', () => {
-    let nerv;
-    let socketHub;
-    let adapter;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let socketHub;
+    /** @type {any} */ let adapter;
 
     beforeEach(() => {
         nerv = new MockNerv();
@@ -88,7 +88,7 @@ describe('ServerNERVAdapter runtime behavior', () => {
             payload: {},
         });
 
-        const commandError = socketHub.events.find(evt => evt.name === 'command:error');
+        const commandError = socketHub.events.find((/** @type {any} */ evt) => evt.name === 'command:error');
         assert.ok(commandError);
         assert.strictEqual(commandError.payload.error, 'TASK_ID_REQUIRED');
     });
@@ -101,7 +101,7 @@ describe('ServerNERVAdapter runtime behavior', () => {
             payload: { task_id: 'task-xyz' },
         });
 
-        const ack = socketHub.events.find(evt => evt.name === 'command:ack');
+        const ack = socketHub.events.find((/** @type {any} */ evt) => evt.name === 'command:ack');
         assert.ok(ack);
         assert.strictEqual(ack.payload.taskId, 'task-xyz');
         assert.strictEqual(ack.payload.correlationId, 'corr-client-123');
@@ -118,7 +118,7 @@ describe('ServerNERVAdapter runtime behavior', () => {
 
         nerv.receiveHandlers[0](envelope);
 
-        const emitted = socketHub.events.find(evt => evt.name === 'driver:task_failed');
+        const emitted = socketHub.events.find((/** @type {any} */ evt) => evt.name === 'driver:task_failed');
         assert.ok(emitted);
         assert.strictEqual(emitted.payload.taskId, 'task-failed-1');
         assert.strictEqual(emitted.payload.correlationId, 'corr-2');

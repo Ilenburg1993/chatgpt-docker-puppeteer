@@ -7,31 +7,47 @@ import {
     summarizeChangeImpact,
 } from './quality_targets.mjs';
 
-/** @typedef {'quick'|'deep'|'nightly'} Profile */
-/** @typedef {'smart'|'full'|'changed'|'off'} QualityMode */
-/** @typedef {'skip'|'changed-only'|'full'} StepMode */
+/** @typedef {'quick' | 'deep' | 'nightly'} Profile */
+/** @typedef {'smart' | 'full' | 'changed' | 'off'} QualityMode */
+/** @typedef {'skip' | 'changed-only' | 'full'} StepMode */
 
 /**
- * @param {{ mode: StepMode, [k:string]: any }} step
+ * @typedef {object} StepStep
+ * @property {StepMode} mode
+ * @property {string[]} [files]
+ * @property {string[]} [targets]
+ */
+/**
+ * @param {StepStep} step
  */
 function step(step) {
     return step;
 }
 
 /**
- * @param {{ profile: Profile, changedFiles?: string[], qualityMode?: QualityMode, qualityJsdoc?: boolean, qualityPrettier?: boolean }} options
-  * @returns {any}
+ * @typedef {object} BuildQualityExecutionPlanOptions
+ * @property {Profile} profile
+ * @property {string[]} changedFiles
+ * @property {QualityMode} qualityMode
+ * @property {boolean} qualityJsdoc
+ * @property {boolean} qualityPrettier
+ */
+/**
+ * @param {BuildQualityExecutionPlanOptions} options
+ * @returns {any}
  */
 export function buildQualityExecutionPlan(options) {
     const profile = options.profile;
     const qualityMode = options.qualityMode || (profile === 'quick' ? 'smart' : 'full');
     const impact = summarizeChangeImpact(options.changedFiles || []);
+    /** @type {string[]} */
     const reasons = [];
+    /** @type {any[]} */
     const fallbacks = [];
 
-    /** @type {'changed-only'|'full'|'off'|'smart'} */
+    /** @type {'changed-only' | 'full' | 'off' | 'smart'} */
     let strategy = qualityMode === 'changed' ? 'changed-only' : qualityMode;
-    /** @type {'low'|'medium'|'high'} */
+    /** @type {'low' | 'medium' | 'high'} */
     let risk = 'low';
 
     if (qualityMode === 'off') {
@@ -148,7 +164,10 @@ export function buildQualityExecutionPlan(options) {
         steps: {
             node_check: step({ mode: nodeCheckMode, files: jsFiles }),
             entrypoint_import_smoke: step({ mode: entrypointSmokeMode, targets: smokeTargets }),
-            lint: step({ mode: lintMode, files: impact.changed.filter(f => /\.(js|mjs|cjs|vue|json)$/.test(f)) }),
+            lint: step({
+                mode: lintMode,
+                files: impact.changed.filter((/** @type {string} */ f) => /\.(js|mjs|cjs|vue|json)$/.test(f)),
+            }),
             typecheck_node: step({ mode: typecheckNodeMode }),
             typecheck_browser: step({ mode: typecheckBrowserMode }),
             prettier_check: step({ mode: prettierMode, files: prettierFiles }),

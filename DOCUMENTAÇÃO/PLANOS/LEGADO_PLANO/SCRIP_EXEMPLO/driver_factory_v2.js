@@ -46,7 +46,7 @@ class DriverFactoryV2 {
                 const score = this._scoreDriver(capabilities, requirements);
 
                 return { name, driver, score, capabilities };
-            })
+            }),
         );
 
         // Sort by score (descending)

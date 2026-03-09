@@ -4,7 +4,8 @@ import v8 from 'node:v8';
 
 /**
  * Estatísticas detalhadas de heap memory do V8.
- * @typedef {Object} HeapStats
+ *
+ * @typedef {object} HeapStats
  * @property {number} heap_used_mb - Memória heap usada em MB.
  * @property {number} heap_total_mb - Memória heap total em MB.
  * @property {number} heap_limit_mb - Limite de heap em MB.
@@ -21,8 +22,8 @@ import v8 from 'node:v8';
  */
 
 /**
- * Retorna estatísticas detalhadas de heap memory.
- * P9.1: Adiciona visibilidade para prevenir OOM.
+ * Retorna estatísticas detalhadas de heap memory. P9.1: Adiciona visibilidade para prevenir OOM.
+ *
  * @returns {HeapStats} Estatísticas do heap V8.
  */
 function getHeapStats() {
@@ -53,7 +54,8 @@ function getHeapStats() {
 
 /**
  * Estatísticas de CPU do sistema.
- * @typedef {Object} CPUStats
+ *
+ * @typedef {object} CPUStats
  * @property {string} model - Modelo do processador.
  * @property {number} cores - Número de núcleos.
  * @property {number} usage_percent - Uso de CPU em percentual real (0..100).
@@ -62,7 +64,7 @@ function getHeapStats() {
  * @property {string} load_15min - Carga média de 15 minutos.
  */
 
-/** @type {{ idle: number, total: number } | null} */
+/** @type {{ idle: number; total: number } | null} */
 let previousCpuSnapshot = null;
 
 function snapshotCpuTimes() {
@@ -116,11 +118,12 @@ function measureCpuUsagePercent() {
 
 /**
  * Retorna estatísticas de CPU.
+ *
  * @returns {CPUStats} Estatísticas de CPU do sistema.
  */
 function getCPUStats() {
     const cpus = os.cpus();
-    const loadAvg = os.loadavg();
+    const loadAvg = /** @type {[number, number, number]} */ (os.loadavg());
     const usagePercent = measureCpuUsagePercent();
 
     return {
@@ -135,7 +138,8 @@ function getCPUStats() {
 
 /**
  * Estatísticas de memória do sistema.
- * @typedef {Object} MemoryStats
+ *
+ * @typedef {object} MemoryStats
  * @property {number} total_mb - Memória total em MB.
  * @property {number} free_mb - Memória livre em MB.
  * @property {number} used_mb - Memória usada em MB.
@@ -144,6 +148,7 @@ function getCPUStats() {
 
 /**
  * Retorna estatísticas de memória do sistema.
+ *
  * @returns {MemoryStats} Estatísticas de memória do sistema.
  */
 function getMemoryStats() {
@@ -161,7 +166,8 @@ function getMemoryStats() {
 
 /**
  * Informações gerais do sistema.
- * @typedef {Object} SystemInfo
+ *
+ * @typedef {object} SystemInfo
  * @property {string} platform - Plataforma do sistema operacional.
  * @property {string} arch - Arquitetura do processador.
  * @property {string} hostname - Nome do host.
@@ -172,6 +178,7 @@ function getMemoryStats() {
 
 /**
  * Retorna informações gerais do sistema.
+ *
  * @returns {SystemInfo} Informações do sistema e processo.
  */
 function getSystemInfo() {
@@ -187,7 +194,8 @@ function getSystemInfo() {
 
 /**
  * Todas as métricas de hardware consolidadas.
- * @typedef {Object} HardwareMetrics
+ *
+ * @typedef {object} HardwareMetrics
  * @property {number} timestamp - Timestamp da coleta em ms.
  * @property {HeapStats} heap - Estatísticas do heap V8.
  * @property {MemoryStats} memory - Estatísticas de memória do sistema.
@@ -196,8 +204,8 @@ function getSystemInfo() {
  */
 
 /**
- * Retorna todas as métricas de hardware em um único objeto.
- * Útil para dashboards e health checks.
+ * Retorna todas as métricas de hardware em um único objeto. Útil para dashboards e health checks.
+ *
  * @returns {HardwareMetrics} Todas as métricas de hardware consolidadas.
  */
 function getAllMetrics() {

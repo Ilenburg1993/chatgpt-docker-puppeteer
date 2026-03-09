@@ -1,14 +1,14 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Plus, RefreshCw } from 'lucide-vue-next';
-import { useRouter } from 'vue-router';
-import Button from '@/components/ui/Button.vue';
 import Badge from '@/components/ui/Badge.vue';
+import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
 import Modal from '@/components/ui/Modal.vue';
-import { useTasksVNextStore } from '@/stores/tasks_vnext';
-import { useMissionsVNextStore } from '@/stores/missions_vnext';
 import { useSsotRealtime } from '@/composables/useSsotRealtime';
+import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import { Plus, RefreshCw } from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const store = useTasksVNextStore();
@@ -119,7 +119,7 @@ function toggleAll() {
         selectedIds.value = new Set();
         return;
     }
-    selectedIds.value = new Set(items.value.map(t => t.id));
+    selectedIds.value = new Set(items.value.map((t) => t.id));
 }
 
 async function refresh() {
@@ -144,7 +144,7 @@ async function runBulk() {
     if (ids.length === 0) return;
 
     const action = bulkAction.value;
-    requestReason(`bulk:${String(action).toUpperCase()} (${ids.length} tasks)`, async reason => {
+    requestReason(`bulk:${String(action).toUpperCase()} (${ids.length} tasks)`, async (reason) => {
         const params = {};
         if (action === 'set_stage') params.stage = bulkStage.value;
         if (action === 'set_target') params.target = bulkTarget.value;
@@ -174,7 +174,7 @@ async function runBulk() {
 }
 
 async function quickAction(taskId, action) {
-    requestReason(`task:${String(action).toUpperCase()} (${taskId})`, async reason => {
+    requestReason(`task:${String(action).toUpperCase()} (${taskId})`, async (reason) => {
         try {
             await store.taskAction(taskId, action, reason);
             showFeedback(`Ação ${String(action).toUpperCase()} executada na task ${taskId}.`);
@@ -190,7 +190,7 @@ async function createTask() {
         showFeedback('User message é obrigatória.', 'error');
         return;
     }
-    requestReason('TASK_CREATE', async reason => {
+    requestReason('TASK_CREATE', async (reason) => {
         creating.value = true;
         try {
             const taskPayload = {

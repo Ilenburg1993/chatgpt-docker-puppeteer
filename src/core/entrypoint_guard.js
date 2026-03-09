@@ -2,7 +2,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-function normalizePath(value) {
+function normalizePath(/** @type {any} */ value) {
     if (!value) return null;
     try {
         return resolve(String(value));
@@ -15,7 +15,7 @@ function normalizePath(value) {
  * Lê flag booleana de environment com parsing resiliente.
  *
  * @param {unknown} value
- * @param {boolean} [fallback=false]
+ * @param {boolean} [fallback=false] Default is `false`
  * @returns {boolean}
  */
 function parseEnvFlag(value, fallback = false) {
@@ -28,7 +28,7 @@ function parseEnvFlag(value, fallback = false) {
     return fallback;
 }
 
-function resolveEntrypointFile(importMetaUrl) {
+function resolveEntrypointFile(/** @type {any} */ importMetaUrl) {
     try {
         return normalizePath(fileURLToPath(importMetaUrl));
     } catch {
@@ -40,7 +40,7 @@ function resolveEntrypointFile(importMetaUrl) {
  * Detecta execução direta do arquivo atual (entrypoint real via CLI/Node).
  *
  * @param {string} importMetaUrl
- * @param {string|null|undefined} [argvFile=process.argv[1]]
+ * @param {string | null | undefined} [argvFile=process.argv[1]] Default is `process.argv[1]`
  * @returns {boolean}
  */
 function isDirectEntryExecution(importMetaUrl, argvFile = process.argv[1]) {
@@ -54,7 +54,7 @@ function isDirectEntryExecution(importMetaUrl, argvFile = process.argv[1]) {
  * Detecta quando o PM2 está executando exatamente este arquivo como script principal.
  *
  * @param {string} importMetaUrl
- * @param {NodeJS.ProcessEnv} [env=process.env]
+ * @param {NodeJS.ProcessEnv} [env=process.env] Default is `process.env`
  * @returns {boolean}
  */
 function isPm2ExecPathMatch(importMetaUrl, env = process.env) {
@@ -66,14 +66,16 @@ function isPm2ExecPathMatch(importMetaUrl, env = process.env) {
 }
 
 /**
+ * @typedef {object} ShouldAutobootEntrypointOptions
+ * @property {string} importMetaUrl
+ * @property {NodeJS.ProcessEnv} env
+ * @property {string | null} explicitAutostartEnv
+ * @property {boolean} allowPm2ExecPathMatch
+ */
+/**
  * Decide se o entrypoint deve auto-bootstrap no import atual.
  *
- * @param {{
- *   importMetaUrl: string,
- *   env?: NodeJS.ProcessEnv,
- *   explicitAutostartEnv?: string|null,
- *   allowPm2ExecPathMatch?: boolean,
- * }} options
+ * @param {ShouldAutobootEntrypointOptions} options
  * @returns {boolean}
  */
 function shouldAutobootEntrypoint({

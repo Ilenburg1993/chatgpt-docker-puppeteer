@@ -74,7 +74,7 @@ declare module '#nerv/adapters/high_level_adapter' {
         actionCode: string,
         payload?: Record<string, unknown>,
         correlationId?: string | null,
-        target?: string | null
+        target?: string | null,
     ): IPCEnvelope;
 
     export function sendCommand(
@@ -83,7 +83,7 @@ declare module '#nerv/adapters/high_level_adapter' {
         actionCode: string,
         payload?: Record<string, unknown>,
         correlationId?: string | null,
-        target?: string | null
+        target?: string | null,
     ): IPCEnvelope;
 
     export function sendAck(
@@ -91,7 +91,7 @@ declare module '#nerv/adapters/high_level_adapter' {
         actor: string,
         actionCode: string,
         correlationId?: string | null,
-        target?: string | null
+        target?: string | null,
     ): IPCEnvelope;
 }
 

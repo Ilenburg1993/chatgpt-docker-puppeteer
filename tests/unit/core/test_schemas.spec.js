@@ -1,8 +1,8 @@
 // @ts-check
-import { describe, it } from 'node:test';
-import assert from 'node:assert';
-import * as schemas from '#core/schemas';
 import { STATUS_VALUES } from '#core/constants/tasks';
+import * as schemas from '#core/schemas';
+import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Task Schema Validation', () => {
     describe('Validação de tarefas válidas', () => {
@@ -201,7 +201,7 @@ describe('Task Schema Validation', () => {
                     schemas.parseTask(tarefaInvalida);
                 },
                 /target/i,
-                'Deve lançar erro sobre target ausente'
+                'Deve lançar erro sobre target ausente',
             );
         });
 
@@ -245,7 +245,7 @@ describe('Task Schema Validation', () => {
                     schemas.parseTask(tarefaInvalida);
                 },
                 /user_message/i,
-                'Deve lançar erro sobre user_message ausente'
+                'Deve lançar erro sobre user_message ausente',
             );
         });
 

@@ -1,17 +1,18 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import fs from 'node:fs';
-import path from 'node:path';
-import Database from 'better-sqlite3';
+// @ts-check
 import CONFIG from '#core/config';
 import { log } from '#core/logger';
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 import { MIGRATIONS } from './migrations.js';
 
-/** @type {import('better-sqlite3').Database|null} */
+/** @type {import('better-sqlite3').Database | null} */
 let singletonDb = null;
 
 /**
  * Função exportada: resolveDbPath.
- * @returns {any}
+ *
+ * @returns {string}
  */
 function resolveDbPath() {
     const fromEnv = process.env.MAESTRO_DB_PATH || process.env.DB_PATH || null;
@@ -53,7 +54,7 @@ function migrate(db) {
         db
             .prepare('SELECT version FROM schema_migrations ORDER BY version ASC')
             .all()
-            .map(r => Number(r.version))
+            .map(/** @param {any} r */ (r) => Number(r.version)),
     );
 
     for (const migration of MIGRATIONS) {
@@ -74,7 +75,7 @@ function migrate(db) {
             db.prepare('INSERT INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
                 migration.version,
                 migration.name,
-                Date.now()
+                Date.now(),
             );
         });
 
@@ -84,7 +85,8 @@ function migrate(db) {
 
 /**
  * Função exportada: getDb.
- * @returns {any}
+ *
+ * @returns {import('better-sqlite3').Database}
  */
 function getDb() {
     if (singletonDb) {
@@ -95,8 +97,11 @@ function getDb() {
     const dir = path.dirname(dbPath);
     try {
         fs.mkdirSync(dir, { recursive: true });
-    } catch (err) {
-        log('ERROR', `[DB] Failed to create DB directory: ${dir} - ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        log(
+            'ERROR',
+            `[DB] Failed to create DB directory: ${dir} - ${/** @type {any} */ (err)?.message || String(err)}`,
+        );
         throw err;
     }
 
@@ -113,6 +118,7 @@ function getDb() {
 
 /**
  * Função exportada: closeDb.
+ *
  * @returns {void}
  */
 function closeDb() {
@@ -121,8 +127,8 @@ function closeDb() {
     }
     try {
         singletonDb.close();
-    } catch (err) {
-        log('WARN', `[DB] Failed to close SQLite DB: ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        log('WARN', `[DB] Failed to close SQLite DB: ${/** @type {any} */ (err)?.message || String(err)}`);
     } finally {
         singletonDb = null;
     }
@@ -137,7 +143,7 @@ function registerExitHandler() {
         if (singletonDb) {
             try {
                 singletonDb.close();
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* process is exiting — best-effort */
             }
             singletonDb = null;
@@ -145,4 +151,4 @@ function registerExitHandler() {
     });
 }
 
-export { getDb, closeDb, resolveDbPath };
+export { closeDb, getDb, resolveDbPath };

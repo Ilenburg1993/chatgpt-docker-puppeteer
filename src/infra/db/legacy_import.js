@@ -1,16 +1,16 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import { log } from '#core/logger';
+import * as PATHS from '#infra/fs/paths';
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
-import * as PATHS from '#infra/fs/paths';
-import { log } from '#core/logger';
 import { insertTask, TASK_STAGES } from './task_repo.js';
 
 async function _listLegacyQueueFiles() {
     try {
         const files = await fsp.readdir(PATHS.QUEUE);
-        return files.filter(f => f.endsWith('.json')).map(f => path.join(PATHS.QUEUE, f));
-    } catch (err) {
-        if (err && err.code === 'ENOENT') {
+        return files.filter((f) => f.endsWith('.json')).map((f) => path.join(PATHS.QUEUE, f));
+    } catch (/** @type {any} */ err) {
+        if (err && /** @type {any} */ (err).code === 'ENOENT') {
             return [];
         }
         throw err;
@@ -18,7 +18,13 @@ async function _listLegacyQueueFiles() {
 }
 
 /**
+ * @typedef {object} ImportLegacyQueueFromDiskOptions
+ * @property {any} [limit]
+ */
+/**
  * Função exportada: importLegacyQueueFromDisk.
+ *
+ * @param {ImportLegacyQueueFromDiskOptions} [options]
  * @returns {Promise<any>}
  */
 async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {
@@ -51,11 +57,11 @@ async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {
             } else {
                 skipped++;
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             failed++;
             log(
                 'WARN',
-                `[DB] Legacy queue import failed for ${path.basename(filePath)}: ${err?.message || String(err)}`
+                `[DB] Legacy queue import failed for ${path.basename(filePath)}: ${/** @type {any} */ (err)?.message || String(err)}`,
             );
         }
     }

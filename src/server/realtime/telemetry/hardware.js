@@ -1,24 +1,25 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import * as doctor from '#core/doctor';
-import { notify } from '#server/engine/socket';
 import { log } from '#core/logger';
+import { notify } from '#server/engine/socket';
 
 /**
- * Referência privada para o temporizador do ciclo de amostragem.
- * Mantida fora do export para garantir a soberania do Singleton.
+ * Referência privada para o temporizador do ciclo de amostragem. Mantida fora do export para garantir a soberania do
+ * Singleton.
  */
+/** @type {any} */
 let pulseInterval = null;
 
 /**
- * Cadência de amostragem (5000ms).
- * Define a resolução temporal da telemetria de hardware no Dashboard.
+ * Cadência de amostragem (5000ms). Define a resolução temporal da telemetria de hardware no Dashboard.
  */
 const PULSE_RATE_MS = 5000;
 
 /**
- * Inicializa o ciclo de emissão de telemetria de hardware.
- * Garante que apenas um loop de pulso esteja ativo por processo.
-  * @returns {void}
+ * Inicializa o ciclo de emissão de telemetria de hardware. Garante que apenas um loop de pulso esteja ativo por
+ * processo.
+ *
+ * @returns {void}
  */
 function init() {
     if (pulseInterval) {
@@ -38,14 +39,14 @@ function init() {
 }
 
 /**
- * Coleta dados do motor de diagnóstico e realiza o broadcast via Hub de Eventos.
- * Implementa a ponte de compatibilidade para o Dashboard V1 e V2.
+ * Coleta dados do motor de diagnóstico e realiza o broadcast via Hub de Eventos. Implementa a ponte de compatibilidade
+ * para o Dashboard V1 e V2.
  */
 function _pushMetrics() {
     try {
         /**
-         * O doctor.js atua como a autoridade de leitura física.
-         * Se o motor de diagnóstico falhar, o sistema registra e aguarda o próximo ciclo.
+         * O doctor.js atua como a autoridade de leitura física. Se o motor de diagnóstico falhar, o sistema registra e
+         * aguarda o próximo ciclo.
          */
         if (typeof doctor.getHardwareMetrics !== 'function') {
             throw new Error('Interface de telemetria do Doctor indisponível.');
@@ -55,6 +56,7 @@ function _pushMetrics() {
 
         /**
          * PAYLOAD DE TRANSMISSÃO (IPC 2.0 Standard)
+         *
          * - cpu_usage_percent: Uso real de CPU em percentual (0..100)
          * - cpu_load_1min/5min/15min: load average bruto
          * - cpu_load: [LEGACY] alias para cpu_usage_percent
@@ -76,16 +78,18 @@ function _pushMetrics() {
         // Broadcast global para todos os terminais conectados (Dashboards)
         // O método notify do socket.js V600 garante a entrega atômica.
         notify('sys_metrics', payload);
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
         // Falhas na telemetria de hardware são não-críticas e não devem parar o servidor
-        log('ERROR', `[TELEMETRY_HW] Erro no ciclo de amostragem: ${e.message}`);
+        log('ERROR', `[TELEMETRY_HW] Erro no ciclo de amostragem: ${_e.message}`);
     }
 }
 
 /**
- * Interrompe o ciclo de monitoramento e limpa recursos de memória.
- * Chamado pelo orquestrador de ciclo de vida (lifecycle.js) no shutdown.
-  * @returns {void}
+ * Interrompe o ciclo de monitoramento e limpa recursos de memória. Chamado pelo orquestrador de ciclo de vida
+ * (lifecycle.js) no shutdown.
+ *
+ * @returns {void}
  */
 function stop() {
     if (pulseInterval) {

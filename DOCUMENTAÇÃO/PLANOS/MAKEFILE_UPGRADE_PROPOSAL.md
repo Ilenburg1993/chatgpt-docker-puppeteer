@@ -75,7 +75,7 @@ nome.
 
 ```bash
 # Se existir arquivo "test" no workspace
-make test  # Pode falhar ou não executar
+make test # Pode falhar ou não executar
 ```
 
 **Solução**: Adicionar declarações .PHONY para todos os targets

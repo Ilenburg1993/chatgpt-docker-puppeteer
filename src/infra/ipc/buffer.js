@@ -7,13 +7,12 @@ class IPCBuffer {
      * @param {number} maxSize - Limite máximo de mensagens para evitar Out-of-Memory.
      */
     constructor(maxSize = 1000) {
-        this.queue = [];
+        this.queue = /** @type {any[]} */ ([]);
         this.maxSize = maxSize;
     }
 
     /**
-     * Adiciona um envelope à fila de espera.
-     * Implementa política de descarte FIFO se o limite for atingido.
+     * Adiciona um envelope à fila de espera. Implementa política de descarte FIFO se o limite for atingido.
      *
      * @param {object} envelope - O Envelope V2 validado.
      */
@@ -28,10 +27,9 @@ class IPCBuffer {
     }
 
     /**
-     * Extrai todas as mensagens acumuladas para transmissão.
-     * Limpa a fila atômicamente após a leitura.
+     * Extrai todas as mensagens acumuladas para transmissão. Limpa a fila atômicamente após a leitura.
      *
-     * @returns {Array} Lista de envelopes em ordem cronológica.
+     * @returns {unknown[]} Lista de envelopes em ordem cronológica.
      */
     flush() {
         if (this.queue.length === 0) {

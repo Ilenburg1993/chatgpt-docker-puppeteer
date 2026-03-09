@@ -73,11 +73,11 @@ const DISALLOWED_PATTERNS = [
 
 /**
  * @typedef {{
- *   file: string,
- *   prefix: string | string[],
- *   scope: string,
- *   body: string | string[],
- *   description: string
+ *     file: string;
+ *     prefix: string | string[];
+ *     scope: string;
+ *     body: string | string[];
+ *     description: string;
  * }} SnippetDefinition
  */
 
@@ -95,7 +95,7 @@ const format = String(values.format || 'console').toLowerCase();
 const strict = Boolean(values.strict);
 const expectedFamilies = String(values.families || DEFAULT_EXPECTED_FAMILIES.join(','))
     .split(',')
-    .map(item => item.trim())
+    .map((item) => item.trim())
     .filter(Boolean);
 
 const report = analyzeSnippetCatalog({
@@ -114,7 +114,12 @@ if (strict && (report.issues.length > 0 || report.gaps.length > 0)) {
 }
 
 /**
- * @param {{ snippetFile: string, expectedFamilies: string[] }} options
+ * @typedef {object} AnalyzeSnippetCatalogOptions
+ * @property {string} snippetFile
+ * @property {string[]} expectedFamilies
+ */
+/**
+ * @param {AnalyzeSnippetCatalogOptions} options
  */
 function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
     /** @type {Record<string, SnippetDefinition>} */
@@ -124,7 +129,7 @@ function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
     const issues = [];
 
     for (const [name, snippet] of entries) {
-        const missing = ['prefix', 'scope', 'body', 'description'].filter(key => !(key in snippet));
+        const missing = ['prefix', 'scope', 'body', 'description'].filter((key) => !(key in snippet));
         if (missing.length > 0) {
             issues.push({
                 type: 'missing_fields',
@@ -169,8 +174,8 @@ function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
 
     const scopes = [...new Set(entries.map(([, snippet]) => snippet.scope))].sort();
     const familyCounts = prefixes.reduce((acc, entry) => {
-        const family = String(entry.prefix).split('.')[0];
-        acc[family] = (acc[family] || 0) + 1;
+        const family = String(entry.prefix).split('.')[0] ?? '';
+        acc[family] = (acc[family] ?? 0) + 1;
         return acc;
     }, /** @type {Record<string, number>} */ ({}));
 
@@ -195,7 +200,7 @@ function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
         }
     }
 
-    const prefixSet = new Set(prefixes.map(entry => entry.prefix));
+    const prefixSet = new Set(prefixes.map((entry) => entry.prefix));
     for (const expectedPrefix of RECOMMENDED_PREFIXES) {
         if (!prefixSet.has(expectedPrefix)) {
             gaps.push({
@@ -232,14 +237,15 @@ function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
         scopes,
         families: Object.keys(familyCounts)
             .sort()
-            .map(family => ({ family, count: familyCounts[family] })),
+            .map((family) => ({ family, count: familyCounts[family] })),
         issues,
         gaps,
     };
 }
 
 /**
- * @param {{ prefix: string, snippet: string }[]} prefixes
+ * @param {{ prefix: string; snippet: string }[]} prefixes
+ * @param {any} prefixes
  */
 function collectDuplicatePrefixes(prefixes) {
     const map = new Map();

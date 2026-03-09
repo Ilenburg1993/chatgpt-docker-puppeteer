@@ -147,8 +147,8 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import cytoscape from 'cytoscape';
+import { computed, onUnmounted, ref, watch } from 'vue';
 
 export default {
     name: 'WorkflowEditor',
@@ -255,7 +255,7 @@ export default {
                     {
                         selector: 'node',
                         css: {
-                            'background-color': ele => typeColors[ele.data('type')] || '#64748b',
+                            'background-color': (ele) => typeColors[ele.data('type')] || '#64748b',
                             label: 'data(label)',
                             color: '#fff',
                             'text-align': 'center',
@@ -314,7 +314,7 @@ export default {
             });
 
             // Node click handler
-            cy.on('tap', 'node', evt => {
+            cy.on('tap', 'node', (evt) => {
                 const node = evt.target;
 
                 if (edgeMode) {
@@ -343,7 +343,7 @@ export default {
             });
 
             // Background click: deselect
-            cy.on('tap', evt => {
+            cy.on('tap', (evt) => {
                 if (evt.target === cy) {
                     deselectNode();
                     if (edgeMode) {
@@ -363,9 +363,9 @@ export default {
         function syncPositions() {
             if (!cy || !currentWorkflow.value) return;
 
-            cy.nodes().forEach(node => {
+            cy.nodes().forEach((node) => {
                 const pos = node.position();
-                const nodeData = currentWorkflow.value.nodes.find(n => n.data.id === node.id());
+                const nodeData = currentWorkflow.value.nodes.find((n) => n.data.id === node.id());
                 if (nodeData) {
                     nodeData.data.position = { x: pos.x, y: pos.y };
                 }
@@ -377,7 +377,7 @@ export default {
             if (!cy || !currentWorkflow.value) return;
 
             currentWorkflow.value.edges = [];
-            cy.edges().forEach(edge => {
+            cy.edges().forEach((edge) => {
                 currentWorkflow.value.edges.push({
                     data: { source: edge.source().id(), target: edge.target().id() },
                 });
@@ -429,7 +429,7 @@ export default {
             cy.getElementById(nodeId).remove();
 
             // Sync back
-            currentWorkflow.value.nodes = currentWorkflow.value.nodes.filter(n => n.data.id !== nodeId);
+            currentWorkflow.value.nodes = currentWorkflow.value.nodes.filter((n) => n.data.id !== nodeId);
             syncEdges();
 
             selectedNode.value = null;
@@ -450,7 +450,7 @@ export default {
             }
 
             // Update workflow data
-            const nodeData = currentWorkflow.value.nodes.find(n => n.data.id === nodeId);
+            const nodeData = currentWorkflow.value.nodes.find((n) => n.data.id === nodeId);
             if (nodeData) {
                 nodeData.data = { ...selectedNode.value.data };
             }
@@ -471,9 +471,9 @@ export default {
             if (!currentWorkflow.value) return [];
 
             return currentWorkflow.value.edges
-                .filter(e => e.data.target === nodeId)
-                .map(e => {
-                    const sourceNode = currentWorkflow.value.nodes.find(n => n.data.id === e.data.source);
+                .filter((e) => e.data.target === nodeId)
+                .map((e) => {
+                    const sourceNode = currentWorkflow.value.nodes.find((n) => n.data.id === e.data.source);
                     return sourceNode ? sourceNode.data.label : e.data.source;
                 });
         }
@@ -519,10 +519,10 @@ export default {
 
             // Check: cycle detection (simple DFS)
             const adj = {};
-            nodes.forEach(n => {
+            nodes.forEach((n) => {
                 adj[n.data.id] = [];
             });
-            edges.forEach(e => {
+            edges.forEach((e) => {
                 if (adj[e.data.source]) {
                     adj[e.data.source].push(e.data.target);
                 }
@@ -558,16 +558,16 @@ export default {
 
             // Check: orphan detection (nodes with no in or out edges, except start/end nodes)
             const nodesWithEdges = new Set();
-            edges.forEach(e => {
+            edges.forEach((e) => {
                 nodesWithEdges.add(e.data.source);
                 nodesWithEdges.add(e.data.target);
             });
 
-            const orphans = nodes.filter(n => !nodesWithEdges.has(n.data.id));
+            const orphans = nodes.filter((n) => !nodesWithEdges.has(n.data.id));
             if (orphans.length > 0 && nodes.length > 1) {
                 validationResult.value = {
                     status: 'warning',
-                    message: `${orphans.length} nó(s) sem conexão: ${orphans.map(o => o.data.label).join(', ')}`,
+                    message: `${orphans.length} nó(s) sem conexão: ${orphans.map((o) => o.data.label).join(', ')}`,
                 };
                 return;
             }
@@ -584,7 +584,7 @@ export default {
             syncEdges();
 
             // Update in workflows list
-            const idx = workflows.value.findIndex(w => w.id === currentWorkflow.value.id);
+            const idx = workflows.value.findIndex((w) => w.id === currentWorkflow.value.id);
             if (idx !== -1) {
                 workflows.value[idx] = JSON.parse(JSON.stringify(currentWorkflow.value));
             }

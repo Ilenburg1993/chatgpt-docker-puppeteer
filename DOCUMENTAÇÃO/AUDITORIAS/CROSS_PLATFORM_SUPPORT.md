@@ -151,7 +151,7 @@ endif
    ```bash
    # Linux/macOS
    curl -s http://localhost:2998/api/health
-
+   
    # Windows (PowerShell)
    Invoke-WebRequest -Uri http://localhost:2998/api/health -UseBasicParsing
    ```
@@ -394,7 +394,7 @@ Invoke-WebRequest -Uri "http://localhost:$Port/api/health" -UseBasicParsing
 ```bash
 #!/usr/bin/env bash
 PORT=${1:-2998}
-pm2 jlist 2>/dev/null | grep -q '"status":"online"'
+pm2 jlist 2> /dev/null | grep -q '"status":"online"'
 curl -s -f "http://localhost:$PORT/api/health"
 ```
 

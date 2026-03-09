@@ -7,6 +7,10 @@ import path from 'node:path';
 const PATTERN = /new Promise\(r => setTimeout\(r, (\d+)\)\)/g;
 const REPLACEMENT = 'new Promise(r => { setTimeout(r, $1); })';
 
+/**
+ * @param {string} filePath
+ * @returns {number}
+ */
 function fixFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf-8');
     const matches = content.match(PATTERN);
@@ -21,6 +25,10 @@ function fixFile(filePath) {
     return matches.length;
 }
 
+/**
+ * @param {string} dir
+ * @returns {number}
+ */
 function walkDir(dir) {
     let totalFixed = 0;
     const files = fs.readdirSync(dir);

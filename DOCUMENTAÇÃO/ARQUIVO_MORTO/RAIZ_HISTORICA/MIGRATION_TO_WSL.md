@@ -24,8 +24,8 @@ com o mínimo de atrito.
 git clone https://github.com/Ilenburg1993/chatgpt-docker-puppeteer.git
 cd chatgpt-docker-puppeteer
 git fetch origin
-git rev-parse --short HEAD  # verificar commit
-git status --porcelain      # deve estar limpo
+git rev-parse --short HEAD # verificar commit
+git status --porcelain     # deve estar limpo
 ```
 
 ## Configurar Git (recomendado)

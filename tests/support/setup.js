@@ -34,7 +34,8 @@ const GLOBAL_TEST_CONFIG = {
 
 /**
  * Setup principal
-  * @returns {Promise<void>}
+ *
+ * @returns {Promise<void>}
  */
 async function setup() {
     console.log('[TEST SETUP] Iniciando setup global...');
@@ -54,7 +55,7 @@ async function setup() {
     console.log('[TEST SETUP] Variáveis de ambiente configuradas');
 
     // 3. Configurar configuração global de testes
-    global.testConfig = GLOBAL_TEST_CONFIG;
+    /** @type {any} */ (global).testConfig = GLOBAL_TEST_CONFIG;
     console.log('[TEST SETUP] Configuração global definida');
 
     // 4. Suprimir avisos não críticos
@@ -67,7 +68,7 @@ async function setup() {
         ) {
             return;
         }
-        originalWarning.call(process, warning, ...args);
+        /** @type {Function} */ (originalWarning).call(process, warning, ...args);
     };
 
     // 5. Configurar handlers globais de erro
@@ -75,7 +76,7 @@ async function setup() {
         console.error('[TEST SETUP] Unhandled Rejection:', reason);
     });
 
-    process.on('uncaughtException', error => {
+    process.on('uncaughtException', (error) => {
         console.error('[TEST SETUP] Uncaught Exception:', error);
     });
 
@@ -83,9 +84,9 @@ async function setup() {
 }
 
 // Executar setup
-setup().catch(error => {
+setup().catch((error) => {
     console.error('[TEST SETUP] ❌ Erro no setup:', error);
     process.exit(1);
 });
 
-export { setup, TMP_DIRS, TEST_ENV, GLOBAL_TEST_CONFIG };
+export { GLOBAL_TEST_CONFIG, TEST_ENV, TMP_DIRS, setup };

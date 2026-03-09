@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 test('wave16r: socket CORS uses unified allowlist without permissive private-network regex', async () => {
     const socketPath = path.join(process.cwd(), 'src/server/engine/socket.js');

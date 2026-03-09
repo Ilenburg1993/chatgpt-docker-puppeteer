@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { log } from '#core/logger';
 import { resolveDbPath } from '#infra/db/sqlite';
 import { _resolveArtifactsRoot } from '#infra/storage/artifact_store';
@@ -6,17 +6,26 @@ import fs from 'node:fs/promises';
 
 /**
  * @typedef {{ app?: { locals?: { kernel?: { getStatus?: () => unknown } } } }} HealthRequestLike
- * @typedef {{ json: (payload: unknown) => unknown, status: (code: number) => HealthResponseLike }} HealthResponseLike
- * @typedef {{ bsize: number, blocks: number, bfree: number, bavail: number, free_bytes: number, total_bytes: number }} DiskStatfsSummary
- * @typedef {{ path: string, exists: boolean, statfs: DiskStatfsSummary|null }} DiskHealthEntry
+ *
+ * @typedef {{ json: (payload: unknown) => unknown; status: (code: number) => HealthResponseLike }} HealthResponseLike
+ *
+ * @typedef {{
+ *     bsize: number;
+ *     blocks: number;
+ *     bfree: number;
+ *     bavail: number;
+ *     free_bytes: number;
+ *     total_bytes: number;
+ * }} DiskStatfsSummary
+ *
+ * @typedef {{ path: string; exists: boolean; statfs: DiskStatfsSummary | null }} DiskHealthEntry
  */
 
 /**
  * GET /api/health - Health check geral do sistema.
  *
- * **Side-effects:** Coleta métricas de sistema (uptime, memória, PID).
- * **Semântica:** Verificação básica de saúde do processo Node.js.
- * **Unidades:** uptime em segundos, memory em bytes, timestamp em milissegundos.
+ * **Side-effects:** Coleta métricas de sistema (uptime, memória, PID). **Semântica:** Verificação básica de saúde do
+ * processo Node.js. **Unidades:** uptime em segundos, memory em bytes, timestamp em milissegundos.
  *
  * @param {HealthRequestLike} req - Requisição HTTP
  * @param {HealthResponseLike} res - Resposta HTTP
@@ -31,18 +40,18 @@ async function getHealth(req, res) {
             memory: process.memoryUsage(),
             pid: process.pid,
         });
-    } catch (err) {
-        log('ERROR', `[HEALTH] Erro no health check: ${err.message}`);
-        res.status(500).json({ status: 'error', message: err.message });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no health check: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
     }
 }
 
 /**
  * GET /api/health/chrome - Health check do Chrome remote debugging.
  *
- * **Side-effects:** Testa conectividade com Chrome via WebSocket endpoint.
- * **Semântica:** Verifica se Chrome está acessível e respondendo.
- * **Unidades:** Timeout de 3000ms para verificação.
+ * **Side-effects:** Testa conectividade com Chrome via WebSocket endpoint. **Semântica:** Verifica se Chrome está
+ * acessível e respondendo. **Unidades:** Timeout de 3000ms para verificação.
  *
  * @param {HealthRequestLike} req - Requisição HTTP
  * @param {HealthResponseLike} res - Resposta HTTP
@@ -70,11 +79,12 @@ async function getChromeHealth(req, res) {
                 timestamp: Date.now(),
             });
         }
-    } catch (err) {
-        log('ERROR', `[HEALTH] Erro no Chrome health check: ${err.message}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no Chrome health check: ${_e.message}`);
         res.status(500).json({
             status: 'error',
-            message: err.message,
+            message: _e.message,
             timestamp: Date.now(),
         });
     }
@@ -82,6 +92,7 @@ async function getChromeHealth(req, res) {
 
 /**
  * GET /api/health/pm2 - Health check dos processos PM2
+ *
  * @param {HealthRequestLike} req
  * @param {HealthResponseLike} res
  * @returns {Promise<void>}
@@ -96,14 +107,16 @@ async function getPm2Health(req, res) {
             processes: snapshot || [],
             timestamp: Date.now(),
         });
-    } catch (err) {
-        log('ERROR', `[HEALTH] Erro no PM2 health check: ${err.message}`);
-        res.status(500).json({ status: 'error', message: err.message });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no PM2 health check: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
     }
 }
 
 /**
  * GET /api/health/kernel - Health check do Kernel
+ *
  * @param {HealthRequestLike} req
  * @param {HealthResponseLike} res
  * @returns {Promise<void>}
@@ -122,10 +135,10 @@ async function getKernelHealth(req, res) {
             return;
         }
 
-        if (typeof kernel.getStatus === 'function') {
+        if (typeof (/** @type {any} */ (kernel).getStatus) === 'function') {
             res.json({
                 status: 'ok',
-                kernel: kernel.getStatus(),
+                kernel: /** @type {any} */ (kernel).getStatus(),
                 timestamp: Date.now(),
             });
             return;
@@ -136,14 +149,16 @@ async function getKernelHealth(req, res) {
             message: 'Kernel injected but getStatus() is unavailable',
             timestamp: Date.now(),
         });
-    } catch (err) {
-        log('ERROR', `[HEALTH] Erro no Kernel health check: ${err.message}`);
-        res.status(500).json({ status: 'error', message: err.message });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no Kernel health check: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
     }
 }
 
 /**
  * GET /api/health/disk - Health check do disco
+ *
  * @param {HealthRequestLike} req
  * @param {HealthResponseLike} res
  * @returns {Promise<void>}
@@ -167,7 +182,7 @@ async function getDiskHealth(req, res) {
             try {
                 await fs.stat(t.path);
                 entry.exists = true;
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 entry.exists = false;
             }
 
@@ -175,7 +190,7 @@ async function getDiskHealth(req, res) {
             try {
                 if (typeof fs.statfs === 'function') {
                     const s = await fs.statfs(t.path);
-                    entry.statfs = {
+                    /** @type {any} */ (entry).statfs = {
                         bsize: s.bsize,
                         blocks: s.blocks,
                         bfree: s.bfree,
@@ -184,7 +199,7 @@ async function getDiskHealth(req, res) {
                         total_bytes: Number(s.bsize) * Number(s.blocks),
                     };
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 entry.statfs = null;
             }
 
@@ -194,9 +209,10 @@ async function getDiskHealth(req, res) {
 
         const status = okCount === targets.length ? 'ok' : 'degraded';
         res.json({ status, targets: out, timestamp: Date.now() });
-    } catch (err) {
-        log('ERROR', `[HEALTH] Erro no Disk health check: ${err.message}`);
-        res.status(500).json({ status: 'error', message: err.message });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no Disk health check: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
     }
 }
 

@@ -4,101 +4,103 @@ import path from 'node:path';
 import ts from 'typescript';
 
 /** Schema version for the JSON report emitted by the JSDoc coverage tooling. */
-export const JSDOC_COVERAGE_SCHEMA_VERSION = '3.0.0';
+export const JSDOC_COVERAGE_SCHEMA_VERSION = '3.1.0';
 
-/** @typedef {'none'|'minimal'|'complete'} JSDocQualityLevel */
-/** @typedef {'function'|'class'|'const'|'typedef'|'reexport'|'unknown'} ExportKind */
+/** @typedef {'none' | 'minimal' | 'complete'} JSDocQualityLevel */
+/** @typedef {'function' | 'class' | 'const' | 'typedef' | 'reexport' | 'unknown'} ExportKind */
 
 /**
  * @typedef {{
- *   export_name: string,
- *   kind: ExportKind,
- *   has_jsdoc: boolean,
- *   tags_present: string[],
- *   missing_tags: string[],
- *   quality_level: JSDocQualityLevel,
- *   line: number|null,
- *   param_count: number,
- *   param_tags_count: number,
- *   has_complete_param_tags: boolean,
- *   has_options_param: boolean,
- *   has_options_typedef: boolean,
- *   unsafe_generic_tags_count: number,
- *   public_any_tags_count: number,
- *   public_unknown_tags_count: number,
- *   uses_import_types: boolean,
- *   uses_template_tags: boolean,
+ *     export_name: string;
+ *     kind: ExportKind;
+ *     has_jsdoc: boolean;
+ *     tags_present: string[];
+ *     missing_tags: string[];
+ *     quality_level: JSDocQualityLevel;
+ *     line: number | null;
+ *     param_count: number;
+ *     param_tags_count: number;
+ *     has_complete_param_tags: boolean;
+ *     has_options_param: boolean;
+ *     has_options_typedef: boolean;
+ *     unsafe_generic_tags_count: number;
+ *     public_any_tags_count: number;
+ *     public_unknown_tags_count: number;
+ *     uses_import_types: boolean;
+ *     uses_template_tags: boolean;
  * }} ExportJSDocAssessment
  */
 
 /**
  * @typedef {{
- *   file: string,
- *   exported_symbols: ExportJSDocAssessment[],
- *   exports_total: number,
- *   exports_with_jsdoc: number,
- *   coverage_pct: number,
- *   functions_total: number,
- *   functions_with_returns_tag: number,
- *   functions_missing_returns_tag: number,
- *   function_returns_coverage_pct: number,
- *   functions_with_complete_param_tags: number,
- *   functions_missing_param_tags: number,
- *   functions_with_options_typedef: number,
- *   functions_missing_options_typedef: number,
- *   unsafe_generic_tags_total: number,
- *   public_symbols_using_import_types: number,
- *   public_symbols_using_template_tags: number,
+ *     file: string;
+ *     exported_symbols: ExportJSDocAssessment[];
+ *     exports_total: number;
+ *     exports_with_jsdoc: number;
+ *     coverage_pct: number;
+ *     functions_total: number;
+ *     functions_with_returns_tag: number;
+ *     functions_missing_returns_tag: number;
+ *     function_returns_coverage_pct: number;
+ *     functions_with_complete_param_tags: number;
+ *     functions_missing_param_tags: number;
+ *     functions_with_options_typedef: number;
+ *     functions_missing_options_typedef: number;
+ *     unsafe_generic_tags_total: number;
+ *     public_symbols_using_import_types: number;
+ *     public_symbols_using_template_tags: number;
  * }} FileJSDocReport
  */
 
 /**
  * @typedef {{
- *   files: number,
- *   exports_total: number,
- *   exports_with_jsdoc: number,
- *   coverage_pct: number,
- *   functions_total: number,
- *   functions_with_returns_tag: number,
- *   functions_missing_returns_tag: number,
- *   function_returns_coverage_pct: number,
- *   functions_with_complete_param_tags: number,
- *   functions_missing_param_tags: number,
- *   functions_with_options_typedef: number,
- *   functions_missing_options_typedef: number,
- *   unsafe_generic_tags_total: number,
- *   public_symbols_using_import_types: number,
- *   public_symbols_using_template_tags: number
+ *     files: number;
+ *     exports_total: number;
+ *     exports_with_jsdoc: number;
+ *     coverage_pct: number;
+ *     functions_total: number;
+ *     functions_with_returns_tag: number;
+ *     functions_missing_returns_tag: number;
+ *     function_returns_coverage_pct: number;
+ *     functions_with_complete_param_tags: number;
+ *     functions_missing_param_tags: number;
+ *     functions_with_options_typedef: number;
+ *     functions_missing_options_typedef: number;
+ *     unsafe_generic_tags_total: number;
+ *     public_symbols_using_import_types: number;
+ *     public_symbols_using_template_tags: number;
  * }} PathPrefixReport
  */
 
 /**
  * @typedef {{
- *   schema_version: string,
- *   scope: 'changed'|'full',
- *   files_scanned: number,
- *   files_with_exports: number,
- *   exports_total: number,
- *   exports_with_jsdoc: number,
- *   coverage_pct: number,
- *   functions_total: number,
- *   functions_with_returns_tag: number,
- *   functions_missing_returns_tag: number,
- *   function_returns_coverage_pct: number,
- *   functions_with_complete_param_tags: number,
- *   functions_missing_param_tags: number,
- *   functions_with_options_typedef: number,
- *   functions_missing_options_typedef: number,
- *   unsafe_generic_tags_total: number,
- *   public_symbols_using_import_types: number,
- *   public_symbols_using_template_tags: number,
- *   by_path_prefix: Record<string, PathPrefixReport>,
- *   files: FileJSDocReport[],
+ *     schema_version: string;
+ *     scope: 'changed' | 'full';
+ *     files_scanned: number;
+ *     files_with_exports: number;
+ *     exports_total: number;
+ *     exports_with_jsdoc: number;
+ *     coverage_pct: number;
+ *     functions_total: number;
+ *     functions_with_returns_tag: number;
+ *     functions_missing_returns_tag: number;
+ *     function_returns_coverage_pct: number;
+ *     functions_with_complete_param_tags: number;
+ *     functions_missing_param_tags: number;
+ *     functions_with_options_typedef: number;
+ *     functions_missing_options_typedef: number;
+ *     unsafe_generic_tags_total: number;
+ *     public_any_tags_total: number;
+ *     public_unknown_tags_total: number;
+ *     public_symbols_using_import_types: number;
+ *     public_symbols_using_template_tags: number;
+ *     by_path_prefix: Record<string, PathPrefixReport>;
+ *     files: FileJSDocReport[];
  * }} JSDocCoverageReport
  */
 
 /**
- * @typedef {{ node: ts.Node, kind: ExportKind }} LocalExportTarget
+ * @typedef {{ node: ts.Node; kind: ExportKind }} LocalExportTarget
  */
 
 const JS_EXT_RE = /\.(js|mjs|cjs)$/i;
@@ -107,8 +109,34 @@ const TYPEDEF_OBJECT_RE = /@typedef\s+\{(?:object|Object)\}\s+([A-Za-z_$][\w$]*)
 const PARAM_TYPE_RE = /@param\s+\{([^}]+)\}\s+(?:\[)?([A-Za-z_$][\w$]*)/g;
 const ANY_TAG_RE = /\bany\b/g;
 const UNKNOWN_TAG_RE = /\bunknown\b/g;
-const UNSAFE_GENERIC_RE = /\b(?:Object|Array|Function)\b|Promise<\s*any\s*>|\bany\b/g;
+/**
+ * Matches unsafe generic types ONLY within JSDoc type annotation positions ({...}).
+ *
+ * - Object: bare (not Object.<T> or Object<T>) — use Record<K,V> or object instead.
+ * - Array: bare without type argument — Array<string> is fine, bare Array is not.
+ * - Function: bare (any casing) — prefer typed function signatures.
+ * - any: as a type (not in description text — enforced by extractTypeAnnotations). Avoids false positives from
+ *   natural-language uses of "any" in descriptions.
+ */
+const UNSAFE_GENERIC_IN_TYPE_RE = /\bObject\b(?!\s*[.<])|Promise<\s*any\s*>|\bArray\b(?!\s*<)|\bFunction\b|\bany\b/g;
 const IMPORT_TYPE_RE = /\bimport\s*\(/;
+
+/**
+ * Extracts the concatenated content of all `{...}` type annotations from a JSDoc block. Used to scope
+ * `UNSAFE_GENERIC_IN_TYPE_RE` checks to type-position text only.
+ *
+ * @param {string} jsdocText
+ * @returns {string}
+ */
+function extractTypeAnnotations(jsdocText) {
+    const parts = [];
+    const re = /\{([^}]+)\}/g;
+    let m;
+    while ((m = re.exec(jsdocText)) !== null) {
+        parts.push(m[1]);
+    }
+    return parts.join(' ');
+}
 
 /** @param {string} input */
 function norm(input) {
@@ -127,7 +155,7 @@ function inferPrefix(file) {
 /**
  * @param {ts.Node} node
  * @param {ts.SourceFile} sourceFile
- * @returns {number|null}
+ * @returns {number | null}
  */
 function getLine(node, sourceFile) {
     try {
@@ -162,13 +190,7 @@ function getJSDocBlocks(node) {
  */
 function getJSDocTags(node) {
     const tags = ts.getJSDocTags(node) || [];
-    return Array.from(
-        new Set(
-            tags
-                .map(tag => String(tag.tagName?.escapedText || '').trim())
-                .filter(Boolean)
-        )
-    );
+    return Array.from(new Set(tags.map((tag) => String(tag.tagName?.escapedText || '').trim()).filter(Boolean)));
 }
 
 /**
@@ -179,7 +201,7 @@ function getJSDocTags(node) {
 function getJSDocText(node, sourceFile) {
     const blocks = getJSDocBlocks(node);
     if (blocks.length === 0) return '';
-    return blocks.map(block => block.getFullText(sourceFile)).join('\n');
+    return blocks.map((block) => block.getFullText(sourceFile)).join('\n');
 }
 
 /**
@@ -206,7 +228,7 @@ function getFunctionParamCount(node) {
  * @returns {number}
  */
 function getParamTagCount(node) {
-    return (ts.getJSDocTags(node) || []).filter(tag => {
+    return (ts.getJSDocTags(node) || []).filter((tag) => {
         const tagName = String(tag.tagName?.escapedText || '').trim();
         return tagName === 'param';
     }).length;
@@ -259,13 +281,16 @@ function collectOptionParamNames(node) {
  */
 function hasOptionsTypedef(jsdocText, optionParamNames, declaredTypedefs) {
     if (optionParamNames.length === 0) return false;
+    const hasDestructured = optionParamNames.includes('destructured');
     for (const match of jsdocText.matchAll(PARAM_TYPE_RE)) {
         const rawType = String(match[1] || '').trim();
         const rawName = String(match[2] || '').trim();
-        if (!optionParamNames.includes(rawName) && !(rawName === 'destructured' && optionParamNames.includes('destructured'))) {
+        // For destructured params, accept any @param {TypeName} where TypeName is a typedef,
+        // regardless of the documented param name (options, opts, config, payload, etc.).
+        if (!optionParamNames.includes(rawName) && !hasDestructured) {
             continue;
         }
-        const typeName = rawType.replace(/[\[\]\(\)\|?]/g, '').trim();
+        const typeName = rawType.replace(/[[\]()|?]/g, '').trim();
         if (!typeName || typeName === 'object' || typeName === 'Object') continue;
         if (typeName.includes('<') || typeName.includes(',') || typeName.includes(' ')) continue;
         if (declaredTypedefs.has(typeName)) return true;
@@ -289,9 +314,16 @@ function isFunctionExport(node, kind) {
  * @param {boolean} hasOptionsParam
  * @param {boolean} hasOptionsTypedef
  * @param {number} unsafeGenericTagsCount
- * @returns {{ missing: string[], quality: JSDocQualityLevel }}
+ * @returns {{ missing: string[]; quality: JSDocQualityLevel }}
  */
-function assessQuality(kind, hasReturnsTag, hasCompleteParamTags, hasOptionsParam, hasOptionsTypedef, unsafeGenericTagsCount) {
+function assessQuality(
+    kind,
+    hasReturnsTag,
+    hasCompleteParamTags,
+    hasOptionsParam,
+    hasOptionsTypedef,
+    unsafeGenericTagsCount,
+) {
     /** @type {string[]} */
     const missing = [];
     if (kind === 'function') {
@@ -313,7 +345,7 @@ function assessQuality(kind, hasReturnsTag, hasCompleteParamTags, hasOptionsPara
  */
 function hasModifierKind(node, kind) {
     const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
-    return Boolean(modifiers?.some(modifier => modifier.kind === kind));
+    return Boolean(modifiers?.some((modifier) => modifier.kind === kind));
 }
 
 /**
@@ -376,7 +408,8 @@ function buildAssessment(node, sourceFile, exportName, kind, declaredTypedefs) {
     const optionParamNames = collectOptionParamNames(node);
     const hasOptionsParam = optionParamNames.length > 0;
     const hasOptionsTypedefValue = hasOptionsTypedef(jsdocText, optionParamNames, declaredTypedefs);
-    const unsafeGenericTagsCount = countMatches(jsdocText, UNSAFE_GENERIC_RE);
+    const typeAnnotationsText = extractTypeAnnotations(jsdocText);
+    const unsafeGenericTagsCount = countMatches(typeAnnotationsText, UNSAFE_GENERIC_IN_TYPE_RE);
     const publicAnyTagsCount = countMatches(jsdocText, ANY_TAG_RE);
     const publicUnknownTagsCount = countMatches(jsdocText, UNKNOWN_TAG_RE);
     const usesImportTypes = IMPORT_TYPE_RE.test(jsdocText);
@@ -387,7 +420,7 @@ function buildAssessment(node, sourceFile, exportName, kind, declaredTypedefs) {
         hasCompleteParamTags,
         hasOptionsParam,
         hasOptionsTypedefValue,
-        unsafeGenericTagsCount
+        unsafeGenericTagsCount,
     );
     /** @type {JSDocQualityLevel} */
     const qualityLevel = hasJsdoc ? assessed.quality : 'none';
@@ -444,7 +477,7 @@ function collectExportsFromSourceFile(sourceFile) {
             for (const declaration of statement.declarationList.declarations) {
                 if (ts.isIdentifier(declaration.name)) {
                     exportedSymbols.push(
-                        buildAssessment(statement, sourceFile, declaration.name.text, 'const', declaredTypedefs)
+                        buildAssessment(statement, sourceFile, declaration.name.text, 'const', declaredTypedefs),
                     );
                 }
             }
@@ -452,7 +485,9 @@ function collectExportsFromSourceFile(sourceFile) {
         }
 
         if (ts.isTypeAliasDeclaration(statement) && isExportedStatement(statement)) {
-            exportedSymbols.push(buildAssessment(statement, sourceFile, statement.name.text, 'typedef', declaredTypedefs));
+            exportedSymbols.push(
+                buildAssessment(statement, sourceFile, statement.name.text, 'typedef', declaredTypedefs),
+            );
             continue;
         }
 
@@ -460,7 +495,9 @@ function collectExportsFromSourceFile(sourceFile) {
             if (ts.isIdentifier(statement.expression)) {
                 const local = localTargets.get(statement.expression.text);
                 if (local) {
-                    exportedSymbols.push(buildAssessment(local.node, sourceFile, 'default', local.kind, declaredTypedefs));
+                    exportedSymbols.push(
+                        buildAssessment(local.node, sourceFile, 'default', local.kind, declaredTypedefs),
+                    );
                     continue;
                 }
             }
@@ -476,12 +513,14 @@ function collectExportsFromSourceFile(sourceFile) {
                     const local = localTargets.get(localName);
                     if (local) {
                         exportedSymbols.push(
-                            buildAssessment(local.node, sourceFile, element.name.text, local.kind, declaredTypedefs)
+                            buildAssessment(local.node, sourceFile, element.name.text, local.kind, declaredTypedefs),
                         );
                         continue;
                     }
                 }
-                exportedSymbols.push(buildAssessment(statement, sourceFile, element.name.text, 'reexport', declaredTypedefs));
+                exportedSymbols.push(
+                    buildAssessment(statement, sourceFile, element.name.text, 'reexport', declaredTypedefs),
+                );
             }
         }
     }
@@ -499,25 +538,30 @@ function parseFile(file) {
     const sourceFile = ts.createSourceFile(absoluteFile, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
     const exportedSymbols = collectExportsFromSourceFile(sourceFile);
     const exportsTotal = exportedSymbols.length;
-    const exportsWithJsdoc = exportedSymbols.filter(symbol => symbol.has_jsdoc).length;
+    const exportsWithJsdoc = exportedSymbols.filter((symbol) => symbol.has_jsdoc).length;
     const coveragePct = exportsTotal > 0 ? Number(((exportsWithJsdoc / exportsTotal) * 100).toFixed(1)) : 100;
-    const functionExports = exportedSymbols.filter(symbol => symbol.kind === 'function');
+    const functionExports = exportedSymbols.filter((symbol) => symbol.kind === 'function');
     const functionsTotal = functionExports.length;
-    const functionsMissingReturnsTag = functionExports.filter(symbol => symbol.missing_tags.includes('returns')).length;
+    const functionsMissingReturnsTag = functionExports.filter((symbol) =>
+        symbol.missing_tags.includes('returns'),
+    ).length;
     const functionsWithReturnsTag = functionsTotal - functionsMissingReturnsTag;
     const functionReturnsCoveragePct =
         functionsTotal > 0 ? Number(((functionsWithReturnsTag / functionsTotal) * 100).toFixed(1)) : 100;
-    const functionsMissingParamTags = functionExports.filter(symbol => !symbol.has_complete_param_tags).length;
+    const functionsMissingParamTags = functionExports.filter((symbol) => !symbol.has_complete_param_tags).length;
     const functionsWithCompleteParamTags = functionsTotal - functionsMissingParamTags;
     const functionsWithOptionsTypedef = functionExports.filter(
-        symbol => !symbol.has_options_param || symbol.has_options_typedef
+        (symbol) => !symbol.has_options_param || symbol.has_options_typedef,
     ).length;
     const functionsMissingOptionsTypedef = functionExports.filter(
-        symbol => symbol.has_options_param && !symbol.has_options_typedef
+        (symbol) => symbol.has_options_param && !symbol.has_options_typedef,
     ).length;
-    const unsafeGenericTagsTotal = exportedSymbols.reduce((total, symbol) => total + symbol.unsafe_generic_tags_count, 0);
-    const publicSymbolsUsingImportTypes = exportedSymbols.filter(symbol => symbol.uses_import_types).length;
-    const publicSymbolsUsingTemplateTags = exportedSymbols.filter(symbol => symbol.uses_template_tags).length;
+    const unsafeGenericTagsTotal = exportedSymbols.reduce(
+        (total, symbol) => total + symbol.unsafe_generic_tags_count,
+        0,
+    );
+    const publicSymbolsUsingImportTypes = exportedSymbols.filter((symbol) => symbol.uses_import_types).length;
+    const publicSymbolsUsingTemplateTags = exportedSymbols.filter((symbol) => symbol.uses_template_tags).length;
 
     return {
         file: norm(path.relative(process.cwd(), absoluteFile)),
@@ -540,14 +584,19 @@ function parseFile(file) {
 }
 
 /**
- * @param {{ files: string[], scope?: 'changed'|'full' }} options
+ * @typedef {object} AnalyzeJSDocCoverageOptions
+ * @property {string[]} files
+ * @property {'changed' | 'full'} scope
+ */
+/**
+ * @param {AnalyzeJSDocCoverageOptions} options
  * @returns {JSDocCoverageReport}
  */
 export function analyzeJSDocCoverage(options) {
     const files = Array.from(new Set((options.files || []).map(norm)))
         .filter(Boolean)
-        .filter(file => JS_EXT_RE.test(file))
-        .filter(file => fs.existsSync(file));
+        .filter((file) => JS_EXT_RE.test(file))
+        .filter((file) => fs.existsSync(file));
 
     /** @type {FileJSDocReport[]} */
     const fileReports = [];
@@ -569,31 +618,43 @@ export function analyzeJSDocCoverage(options) {
     const functionsWithReturnsTag = fileReports.reduce((total, item) => total + item.functions_with_returns_tag, 0);
     const functionsMissingReturnsTag = fileReports.reduce(
         (total, item) => total + item.functions_missing_returns_tag,
-        0
+        0,
     );
     const functionReturnsCoveragePct =
         functionsTotal > 0 ? Number(((functionsWithReturnsTag / functionsTotal) * 100).toFixed(1)) : 100;
     const functionsWithCompleteParamTags = fileReports.reduce(
         (total, item) => total + item.functions_with_complete_param_tags,
-        0
+        0,
     );
     const functionsMissingParamTags = fileReports.reduce((total, item) => total + item.functions_missing_param_tags, 0);
     const functionsWithOptionsTypedef = fileReports.reduce(
         (total, item) => total + item.functions_with_options_typedef,
-        0
+        0,
     );
     const functionsMissingOptionsTypedef = fileReports.reduce(
         (total, item) => total + item.functions_missing_options_typedef,
-        0
+        0,
     );
     const unsafeGenericTagsTotal = fileReports.reduce((total, item) => total + item.unsafe_generic_tags_total, 0);
     const publicSymbolsUsingImportTypes = fileReports.reduce(
         (total, item) => total + item.public_symbols_using_import_types,
-        0
+        0,
     );
     const publicSymbolsUsingTemplateTags = fileReports.reduce(
         (total, item) => total + item.public_symbols_using_template_tags,
-        0
+        0,
+    );
+    const publicAnyTagsTotal = fileReports.reduce(
+        (total, fileReport) =>
+            total +
+            fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
+        0,
+    );
+    const publicUnknownTagsTotal = fileReports.reduce(
+        (total, fileReport) =>
+            total +
+            fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_unknown_tags_count, 0),
+        0,
     );
 
     /** @type {Record<string, PathPrefixReport>} */
@@ -661,6 +722,8 @@ export function analyzeJSDocCoverage(options) {
         functions_with_options_typedef: functionsWithOptionsTypedef,
         functions_missing_options_typedef: functionsMissingOptionsTypedef,
         unsafe_generic_tags_total: unsafeGenericTagsTotal,
+        public_any_tags_total: publicAnyTagsTotal,
+        public_unknown_tags_total: publicUnknownTagsTotal,
         public_symbols_using_import_types: publicSymbolsUsingImportTypes,
         public_symbols_using_template_tags: publicSymbolsUsingTemplateTags,
         by_path_prefix: byPathPrefix,

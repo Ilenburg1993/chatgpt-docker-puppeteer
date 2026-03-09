@@ -1,15 +1,14 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { log } from '#core/logger';
 import { isDomainMatch } from '#core/domain_matcher';
+import { log } from '#core/logger';
 import * as stabilizer from '#shared/page_stability/stabilizer';
 import { Triage } from '../modules/triage.js';
 
-/**
- * @typedef {import('#driver/core/BaseDriver').default} BaseDriver
- */
+/** @import BaseDriver from "#driver/core/BaseDriver" */
 
 /**
  * Check types para readiness validation.
+ *
  * @readonly
  * @enum {string}
  */
@@ -23,6 +22,7 @@ const CHECK_TYPES = {
 
 /**
  * Severity levels para validation issues.
+ *
  * @readonly
  * @enum {string}
  */
@@ -34,8 +34,9 @@ const SEVERITY = {
 
 /**
  * FATAL patterns detectados por Triage que bloqueiam execução.
- * @readonly
+ *
  * @type {string[]}
+ * @readonly
  */
 const FATAL_TRIAGE_PATTERNS = ['CAPTCHA', 'LOGIN_REQUIRED', 'PAGE_ERROR', 'CRITICAL_DOM_ERROR'];
 
@@ -65,23 +66,22 @@ class DriverReadinessGuard {
      * Valida readiness completo do driver.
      *
      * Executa 5 checks em sequência:
+     *
      * 1. Page alive
      * 2. Page stable (stabilizer)
      * 3. Triage scan
      * 4. Domain validation
      * 5. Session health
      *
-     * @param {Object} [options={}] - Validation options
-     * @param {number} [options.stabilityTimeout=10000] - Stabilizer timeout
-     * @param {boolean} [options.skipTriage=false] - Skip triage scan (fast mode)
-     * @param {boolean} [options.skipSession=false] - Skip session health check
-     *
-     * @returns {Promise<Object>} Validation result
      * @property {boolean} ready - true se pode executar
-     * @property {Object} checks - Status de cada check (pass/fail)
-     * @property {Array<Object>} issues - Lista de problemas detectados
+     * @property {object} checks - Status de cada check (pass/fail)
+     * @property {object[]} issues - Lista de problemas detectados
      * @property {number} duration - Duração da validação (ms)
-     *
+     * @param {object} [options={}] - Validation options. Default is `{}`
+     * @param {number} [options.stabilityTimeout=10000] - Stabilizer timeout. Default is `10000`
+     * @param {boolean} [options.skipTriage=false] - Skip triage scan (fast mode). Default is `false`
+     * @param {boolean} [options.skipSession=false] - Skip session health check Default is `false`
+     * @returns {Promise<any>} Validation result
      * @throws {Error} Se validation encontra FATAL issues
      */
     async validateReadiness(options = {}) {
@@ -134,10 +134,12 @@ class DriverReadinessGuard {
             // CHECK 2: Page Stable (Stabilizer)
             // ============================================
             try {
-                const stabilityResult = await stabilizer.waitForStability(
-                    this.driver,
-                    Number(opts.stabilityTimeout) || 10000,
-                    this.driver.signal || null
+                const stabilityResult = /** @type {any} */ (
+                    await stabilizer.waitForStability(
+                        this.driver,
+                        Number(opts.stabilityTimeout) || 10000,
+                        this.driver.signal || null,
+                    )
                 );
 
                 if (!stabilityResult?.success) {
@@ -153,14 +155,17 @@ class DriverReadinessGuard {
                 } else {
                     checks[CHECK_TYPES.PAGE_STABLE] = true;
                 }
-            } catch (stabilityErr) {
+            } catch (/** @type {any} */ stabilityErr) {
                 issues.push({
                     check: CHECK_TYPES.PAGE_STABLE,
                     severity: SEVERITY.WARNING,
-                    message: `Stability check failed: ${stabilityErr.message}`,
+                    message: `Stability check failed: ${/** @type {any} */ (stabilityErr).message}`,
                 });
 
-                log('WARN', `[DriverReadinessGuard] Stability check error: ${stabilityErr.message}`);
+                log(
+                    'WARN',
+                    `[DriverReadinessGuard] Stability check error: ${/** @type {any} */ (stabilityErr).message}`,
+                );
             }
 
             // ============================================
@@ -172,23 +177,23 @@ class DriverReadinessGuard {
                         this.triage = new Triage(this.driver.page, this.driver.config.langCode || 'en');
                     }
 
-                    const triageResult = await this.triage.diagnose();
+                    const triageResult = /** @type {any} */ (await this.triage.diagnose());
 
                     if (triageResult.detected && triageResult.detected.length > 0) {
                         log(
                             'WARN',
                             `[DriverReadinessGuard] Triage detected issues: ${JSON.stringify(triageResult.detected)}`,
-                            this.driver.correlationId
+                            this.driver.correlationId,
                         );
 
                         // Check for FATAL patterns
-                        const hasFatal = triageResult.detected.some(d =>
-                            FATAL_TRIAGE_PATTERNS.includes(d.type || d.pattern)
+                        const hasFatal = triageResult.detected.some((/** @type {any} */ d) =>
+                            FATAL_TRIAGE_PATTERNS.includes(d.type || d.pattern),
                         );
 
                         if (hasFatal) {
-                            const fatalIssues = triageResult.detected.filter(d =>
-                                FATAL_TRIAGE_PATTERNS.includes(d.type || d.pattern)
+                            const fatalIssues = triageResult.detected.filter((/** @type {any} */ d) =>
+                                FATAL_TRIAGE_PATTERNS.includes(d.type || d.pattern),
                             );
 
                             issues.push({
@@ -218,19 +223,19 @@ class DriverReadinessGuard {
                     } else {
                         checks[CHECK_TYPES.TRIAGE_CLEAN] = true;
                     }
-                } catch (triageErr) {
+                } catch (/** @type {any} */ triageErr) {
                     // Triage error itself is not blocking (unless FATAL pattern detected)
-                    if (triageErr.message.startsWith('Triage FATAL:')) {
+                    if (/** @type {any} */ (triageErr).message.startsWith('Triage FATAL:')) {
                         throw triageErr;
                     }
 
                     issues.push({
                         check: CHECK_TYPES.TRIAGE_CLEAN,
                         severity: SEVERITY.WARNING,
-                        message: `Triage scan failed: ${triageErr.message}`,
+                        message: `Triage scan failed: ${/** @type {any} */ (triageErr).message}`,
                     });
 
-                    log('WARN', `[DriverReadinessGuard] Triage error: ${triageErr.message}`);
+                    log('WARN', `[DriverReadinessGuard] Triage error: ${/** @type {any} */ (triageErr).message}`);
                 }
             } else {
                 checks[CHECK_TYPES.TRIAGE_CLEAN] = true; // Skipped = pass
@@ -256,7 +261,7 @@ class DriverReadinessGuard {
                     });
 
                     throw new Error(
-                        `Domain validation failed: empty URL (expected ${this.driver.config.expectedDomain})`
+                        `Domain validation failed: empty URL (expected ${this.driver.config.expectedDomain})`,
                     );
                 } else if (!isDomainMatch(currentUrl, this.driver.config.expectedDomain)) {
                     issues.push({
@@ -268,7 +273,7 @@ class DriverReadinessGuard {
                     });
 
                     throw new Error(
-                        `Domain mismatch: expected ${this.driver.config.expectedDomain}, got ${currentUrl}`
+                        `Domain mismatch: expected ${this.driver.config.expectedDomain}, got ${currentUrl}`,
                     );
                 } else {
                     checks[CHECK_TYPES.DOMAIN_VALID] = true;
@@ -282,7 +287,7 @@ class DriverReadinessGuard {
             // ============================================
             if (!opts.skipSession && this.driver.sessionTracker) {
                 try {
-                    const sessionHealth = this.driver.sessionTracker.getSessionHealth();
+                    const sessionHealth = /** @type {any} */ (this.driver.sessionTracker.getSessionHealth());
 
                     // Check if session is DEGRADED or CRITICAL
                     const isDegraded = sessionHealth.level === 'DEGRADED' || sessionHealth.level === 'CRITICAL';
@@ -298,7 +303,7 @@ class DriverReadinessGuard {
                         log(
                             'WARN',
                             `[DriverReadinessGuard] Session ${sessionHealth.level}: ${sessionHealth.score}`,
-                            this.driver.correlationId
+                            this.driver.correlationId,
                         );
 
                         if (this.driver.emit) {
@@ -307,11 +312,11 @@ class DriverReadinessGuard {
                     }
 
                     checks[CHECK_TYPES.SESSION_HEALTHY] = true;
-                } catch (sessionErr) {
+                } catch (/** @type {any} */ sessionErr) {
                     issues.push({
                         check: CHECK_TYPES.SESSION_HEALTHY,
                         severity: SEVERITY.INFO,
-                        message: `Session health check failed: ${sessionErr.message}`,
+                        message: `Session health check failed: ${/** @type {any} */ (sessionErr).message}`,
                     });
                 }
             } else {
@@ -321,7 +326,7 @@ class DriverReadinessGuard {
             // ============================================
             // RESULT
             // ============================================
-            const hasFatalIssues = issues.some(issue => issue.severity === SEVERITY.FATAL);
+            const hasFatalIssues = issues.some((issue) => issue.severity === SEVERITY.FATAL);
 
             const result = {
                 ready: !hasFatalIssues,
@@ -337,11 +342,11 @@ class DriverReadinessGuard {
             log(
                 'DEBUG',
                 `[DriverReadinessGuard] Validation complete: ready=${result.ready}, issues=${issues.length}, duration=${result.duration}ms`,
-                this.driver.correlationId
+                this.driver.correlationId,
             );
 
             return result;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             // FATAL error during validation
             const result = {
                 ready: false,
@@ -350,12 +355,16 @@ class DriverReadinessGuard {
                 timestamp: Date.now(),
                 duration: Date.now() - startTime,
                 validationCount: this.validationCount,
-                error: err.message,
+                error: /** @type {any} */ (err).message,
             };
 
             this.lastValidation = result;
 
-            log('ERROR', `[DriverReadinessGuard] Validation failed: ${err.message}`, this.driver.correlationId);
+            log(
+                'ERROR',
+                `[DriverReadinessGuard] Validation failed: ${/** @type {any} */ (err).message}`,
+                this.driver.correlationId,
+            );
 
             throw err;
         }
@@ -364,8 +373,7 @@ class DriverReadinessGuard {
     /**
      * Quick validation (apenas checks críticos).
      *
-     * Executa apenas: page alive + page stable (sem triage).
-     * Mais rápido para hot-path.
+     * Executa apenas: page alive + page stable (sem triage). Mais rápido para hot-path.
      *
      * @returns {Promise<boolean>} true se ready, false se not ready
      */
@@ -377,8 +385,8 @@ class DriverReadinessGuard {
                 stabilityTimeout: 5000,
             });
 
-            return result.ready;
-        } catch (_) {
+            return /** @type {any} */ (result).ready;
+        } catch (/** @type {any} */ _) {
             return false;
         }
     }
@@ -386,7 +394,7 @@ class DriverReadinessGuard {
     /**
      * Retorna última validação executada.
      *
-     * @returns {Object|null} Last validation result
+     * @returns {object | null} Last validation result
      */
     getLastValidation() {
         return this.lastValidation;
@@ -401,4 +409,4 @@ class DriverReadinessGuard {
     }
 }
 
-export { DriverReadinessGuard, CHECK_TYPES, SEVERITY, FATAL_TRIAGE_PATTERNS };
+export { CHECK_TYPES, DriverReadinessGuard, FATAL_TRIAGE_PATTERNS, SEVERITY };

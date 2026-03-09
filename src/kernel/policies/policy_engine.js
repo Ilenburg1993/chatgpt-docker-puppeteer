@@ -1,9 +1,12 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { ActionCode, MessageType } from '#shared/nerv/constants';
 import { STATUS_VALUES } from '#core/constants/tasks';
+import { ActionCode, MessageType } from '#shared/nerv/constants';
 
 /** Classe exportada: default. */
 class PolicyEngine {
+    /**
+     * @param {any} config
+     */
     constructor(config) {
         this.config = config;
 
@@ -13,11 +16,12 @@ class PolicyEngine {
     }
 
     /**
-     * O Método Principal de Julgamento.
-     * Chamado pelo Core a cada tick.
-     * * @param {object} state - Snapshot da memória de longo prazo (TaskStore).
-     * @param {Array} observations - Lista de novos eventos (ObservationStore).
-     * @returns {Array} Lista de Propostas (Decisões).
+     * O Método Principal de Julgamento. Chamado pelo Core a cada tick.
+     *
+     * - @param {any} state - Snapshot da memória de longo prazo (TaskStore).
+     *
+     * @param {unknown[]} observations - Lista de novos eventos (ObservationStore).
+     * @returns {unknown[]} Lista de Propostas (Decisões).
      */
     evaluate(state, observations) {
         const proposals = [];
@@ -44,6 +48,10 @@ class PolicyEngine {
        JURISPRUDÊNCIA (Lógica de Decisão)
     ========================================================= */
 
+    /**
+     * @param {any} obs
+     * @param {any} state
+     */
     _reactToObservation(obs, state) {
         // LEI 1: Se o servidor propõe uma tarefa e estou livre -> Aceite.
         if (obs.code === ActionCode.PROPOSE_TASK) {
@@ -69,6 +77,9 @@ class PolicyEngine {
         return null;
     }
 
+    /**
+     * @param {any} state
+     */
     _evaluateStateHealth(state) {
         const proposals = [];
 
@@ -100,9 +111,15 @@ class PolicyEngine {
        HELPERS DE BUROCRACIA (Criação de Envelopes de Resposta)
     ========================================================= */
 
+    /**
+     * @param {any} originalObs
+     * @param {any} reason
+     */
     async _createRejectionEnvelope(originalObs, reason) {
         // Cria um envelope virtual para ser enviado pelo NERV
-        const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(m => m.default ?? m);
+        const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(
+            (m) => /** @type {any} */ (m).default ?? m,
+        );
         const { ActorRole } = await import('#shared/nerv/constants');
 
         return HighLevelNERV.makeEnvelope({
@@ -115,8 +132,14 @@ class PolicyEngine {
         });
     }
 
+    /**
+     * @param {any} task
+     * @param {any} reason
+     */
     async _createTaskFailedEnvelope(task, reason) {
-        const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(m => m.default ?? m);
+        const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(
+            (m) => /** @type {any} */ (m).default ?? m,
+        );
         const { ActorRole } = await import('#shared/nerv/constants');
 
         return HighLevelNERV.makeEnvelope({

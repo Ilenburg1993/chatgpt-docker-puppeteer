@@ -3,11 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import {
-    JSDOC_COVERAGE_SCHEMA_VERSION,
-    analyzeJSDocCoverage,
-    collectJsSourceFiles,
-} from './jsdoc_coverage_engine.mjs';
+import { JSDOC_COVERAGE_SCHEMA_VERSION, analyzeJSDocCoverage, collectJsSourceFiles } from './jsdoc_coverage_engine.mjs';
 
 const DEFAULT_SCHEMA_PATH = path.resolve('schemas/typing/jsdoc-coverage-report.schema.json');
 
@@ -21,6 +17,8 @@ const { values } = parseArgs({
         'output-json': { type: 'string', default: 'jsdoc-coverage-report.json' },
         'validate-schema': { type: 'boolean', default: false },
         'schema-version': { type: 'string', default: JSDOC_COVERAGE_SCHEMA_VERSION },
+        gaps: { type: 'boolean', default: false },
+        'fail-on-any-gap': { type: 'boolean', default: false },
     },
 });
 
@@ -152,15 +150,16 @@ const format = String(values.format || 'console').toLowerCase();
 const filesArg = String(values.files || '').trim();
 const roots = String(values.roots || 'src,scripts,tests')
     .split(',')
-    .map(item => item.trim())
+    .map((item) => item.trim())
     .filter(Boolean);
-const expectedSchemaVersion = String(values['schema-version'] || JSDOC_COVERAGE_SCHEMA_VERSION).trim() || JSDOC_COVERAGE_SCHEMA_VERSION;
+const expectedSchemaVersion =
+    String(values['schema-version'] || JSDOC_COVERAGE_SCHEMA_VERSION).trim() || JSDOC_COVERAGE_SCHEMA_VERSION;
 const quiet = Boolean(values.quiet);
 
 const files = filesArg
     ? filesArg
           .split(',')
-          .map(item => item.trim())
+          .map((item) => item.trim())
           .filter(Boolean)
     : collectJsSourceFiles(roots);
 const report = analyzeJSDocCoverage({ files, scope });
@@ -170,7 +169,10 @@ if (String(values['output-json'] || '').trim()) {
 }
 
 if (values['validate-schema']) {
-    const issues = [...validateSchemaFile(expectedSchemaVersion), ...validateReportShape(report, expectedSchemaVersion)];
+    const issues = [
+        ...validateSchemaFile(expectedSchemaVersion),
+        ...validateReportShape(report, expectedSchemaVersion),
+    ];
     if (issues.length > 0) {
         for (const issue of issues) {
             console.error(`[jsdoc-schema] ${issue}`);
@@ -213,7 +215,7 @@ if (quiet) {
                 right.functions_missing_param_tags - left.functions_missing_param_tags ||
                 right.functions_missing_options_typedef - left.functions_missing_options_typedef ||
                 right.unsafe_generic_tags_total - left.unsafe_generic_tags_total ||
-                left.file.localeCompare(right.file)
+                left.file.localeCompare(right.file),
         )
         .slice(0, 25);
 
@@ -228,7 +230,49 @@ if (quiet) {
             continue;
         }
         console.log(
-            `- ${item.file}: exports ${item.coverage_pct}% (${item.exports_with_jsdoc}/${item.exports_total}), returns ${item.function_returns_coverage_pct}% (${item.functions_with_returns_tag}/${item.functions_total}), params ${item.functions_with_complete_param_tags}/${item.functions_total}, options typedef missing ${item.functions_missing_options_typedef}, unsafe tags ${item.unsafe_generic_tags_total}`
+            `- ${item.file}: exports ${item.coverage_pct}% (${item.exports_with_jsdoc}/${item.exports_total}), returns ${item.function_returns_coverage_pct}% (${item.functions_with_returns_tag}/${item.functions_total}), params ${item.functions_with_complete_param_tags}/${item.functions_total}, options typedef missing ${item.functions_missing_options_typedef}, unsafe tags ${item.unsafe_generic_tags_total}`,
         );
+    }
+}
+
+if (values.gaps) {
+    console.log('');
+    console.log('='.repeat(80));
+    console.log('GAPS — símbolos bloqueadores por arquivo');
+    console.log('='.repeat(80));
+    let gapCount = 0;
+    for (const fileReport of report.files) {
+        /** @type {string[]} */
+        const fileGaps = [];
+        for (const symbol of fileReport.exported_symbols) {
+            if (symbol.missing_tags.length > 0) {
+                fileGaps.push(
+                    `  ${symbol.export_name}:${symbol.line ?? '?'}  missing=[${symbol.missing_tags.join(',')}]`,
+                );
+                gapCount++;
+            }
+        }
+        if (fileGaps.length > 0) {
+            console.log(`\n${fileReport.file}:`);
+            for (const gap of fileGaps) {
+                console.log(gap);
+            }
+        }
+    }
+    if (gapCount === 0) {
+        console.log('✅ Nenhum gap de JSDoc encontrado.');
+    } else {
+        console.log(`\nTotal de gaps: ${gapCount}`);
+    }
+}
+
+if (values['fail-on-any-gap']) {
+    const hasGap =
+        report.functions_missing_param_tags > 0 ||
+        report.functions_missing_options_typedef > 0 ||
+        report.unsafe_generic_tags_total > 0 ||
+        report.public_any_tags_total > 0;
+    if (hasGap) {
+        process.exit(1);
     }
 }

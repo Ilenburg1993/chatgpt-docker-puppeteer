@@ -1,16 +1,16 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { getDb, closeDb } from '../../../src/infra/db/sqlite.js';
-import { upsertInferenceProfile } from '../../../src/infra/db/inference_profile_repo.js';
-import { upsertInferenceClientPolicy } from '../../../src/infra/db/inference_client_policy_repo.js';
-import { loadInferencePoliciesFromDb } from '../../../src/inference_gateway/persistence.js';
+import test from 'node:test';
 import { InferenceGateway } from '../../../src/inference_gateway/gateway.js';
+import { loadInferencePoliciesFromDb } from '../../../src/inference_gateway/persistence.js';
+import { upsertInferenceClientPolicy } from '../../../src/infra/db/inference_client_policy_repo.js';
+import { upsertInferenceProfile } from '../../../src/infra/db/inference_profile_repo.js';
+import { closeDb, getDb } from '../../../src/infra/db/sqlite.js';
 
-function withTempDb(fn) {
+function withTempDb(/** @type {any} */ fn) {
     return async () => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inference-loader-'));
         const dbPath = path.join(tmpDir, 'maestro.sqlite');
@@ -39,7 +39,7 @@ test(
         });
         upsertInferenceClientPolicy({
             client_tag: 'audit_agent_patch',
-            profile_id: profile.id,
+            profile_id: /** @type {any} */ (profile).id,
             max_parallel: 1,
             timeout_ms: 7777,
             allowed_models: ['qwen2.5-coder:7b'],
@@ -72,5 +72,5 @@ test(
         assert.deepEqual(resolved.effective.allowedBackends, ['ollama_local']);
         assert.equal(gateway.getPolicySummary().profileCount, 1);
         assert.equal(gateway.getPolicySummary().clientPolicyCount, 1);
-    })
+    }),
 );

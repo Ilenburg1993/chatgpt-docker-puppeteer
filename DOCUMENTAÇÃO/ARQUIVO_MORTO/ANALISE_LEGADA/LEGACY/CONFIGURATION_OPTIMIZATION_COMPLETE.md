@@ -72,18 +72,18 @@
 
 ```bash
 # Produção
-make build-prod      # Build otimizado
-make start-prod      # Inicia stack de produção
-make monitoring      # Prometheus + Grafana
+make build-prod # Build otimizado
+make start-prod # Inicia stack de produção
+make monitoring # Prometheus + Grafana
 
 # Desenvolvimento
-make dev             # Hot reload mode
-make stats           # Uso de recursos
+make dev   # Hot reload mode
+make stats # Uso de recursos
 
 # Manutenção
-make backup          # Backup de volumes
-make restore         # Restaurar backup
-make ci-test         # Testes CI/CD
+make backup  # Backup de volumes
+make restore # Restaurar backup
+make ci-test # Testes CI/CD
 ```
 
 #### ✅ Validação de Configuração

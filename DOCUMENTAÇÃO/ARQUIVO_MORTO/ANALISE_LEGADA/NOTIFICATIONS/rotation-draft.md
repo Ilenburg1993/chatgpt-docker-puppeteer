@@ -52,7 +52,7 @@ aws iam delete-access-key --user-name <USER> --access-key-id <KEYID>
 - To find any remaining references locally (owners):
 
 ```bash
-git clone --mirror <repo-url> repo-mirror.git
+git clone --mirror < repo-url > repo-mirror.git
 cd repo-mirror.git
 git rev-list --all --objects | cut -d' ' -f2- | grep -E 'local-login/|profile/|node_modules/' -n || true
 ```

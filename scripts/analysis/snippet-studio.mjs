@@ -134,7 +134,7 @@ switch (command) {
                 minScore: Number.parseFloat(String(values['min-score'] || '0.55')) || 0.55,
                 insertMissing: Boolean(values['insert-missing']),
             }),
-            format
+            format,
         );
         break;
     case 'scaffold':
@@ -234,25 +234,38 @@ function generateSuggestions(snippetFile) {
 }
 
 /**
- * @param {{
- *   snippetFile: string,
- *   roots: string[],
- *   maxImports: number,
- *   maxCandidates: number,
- *   maxBlocks: number,
- *   minBlockOccurrences: number,
- *   minScore: number,
- *   insertMissing: boolean
- * }} options
+ * @typedef {object} GenerateLearningReportOptions
+ * @property {string} snippetFile
+ * @property {string[]} roots
+ * @property {number} maxImports
+ * @property {number} maxCandidates
+ * @property {number} maxBlocks
+ * @property {number} minBlockOccurrences
+ * @property {number} minScore
+ * @property {boolean} insertMissing
  */
-function generateLearningReport({ snippetFile, roots, maxImports, maxCandidates, maxBlocks, minBlockOccurrences, minScore, insertMissing }) {
+/**
+ * @param {GenerateLearningReportOptions} options
+ */
+function generateLearningReport({
+    snippetFile,
+    roots,
+    maxImports,
+    maxCandidates,
+    maxBlocks,
+    minBlockOccurrences,
+    minScore,
+    insertMissing,
+}) {
     const catalog = JSON.parse(fs.readFileSync(snippetFile, 'utf8'));
     const repo = analyzeRepositorySignals(roots, { minBlockOccurrences });
     const catalogPrefixes = new Set(
-        Object.values(catalog).flatMap(snippet => (Array.isArray(snippet.prefix) ? snippet.prefix : [snippet.prefix]))
+        Object.values(catalog).flatMap((snippet) =>
+            Array.isArray(snippet.prefix) ? snippet.prefix : [snippet.prefix],
+        ),
     );
-    const normalizedSnippetBodies = Object.values(catalog).map(snippet =>
-        normalizeBlockLines(Array.isArray(snippet.body) ? snippet.body : [String(snippet.body || '')]).join('\n')
+    const normalizedSnippetBodies = Object.values(catalog).map((snippet) =>
+        normalizeBlockLines(Array.isArray(snippet.body) ? snippet.body : [String(snippet.body || '')]).join('\n'),
     );
 
     const candidates = [];
@@ -262,11 +275,17 @@ function generateLearningReport({ snippetFile, roots, maxImports, maxCandidates,
             continue;
         }
 
-        const importHits = (candidate.imports || []).reduce((sum, specifier) => sum + (repo.importCounts[specifier] || 0), 0);
-        const patternHits = (candidate.patterns || []).reduce((sum, patternName) => sum + (repo.patternCounts[patternName] || 0), 0);
+        const importHits = (candidate.imports || []).reduce(
+            (sum, specifier) => sum + (repo.importCounts[specifier] || 0),
+            0,
+        );
+        const patternHits = (candidate.patterns || []).reduce(
+            (sum, patternName) => sum + (repo.patternCounts[patternName] || 0),
+            0,
+        );
         const sequenceHits = (candidate.sequences || []).reduce(
             (sum, sequenceName) => sum + (repo.sequenceCounts[sequenceName] || 0),
-            0
+            0,
         );
         const hitCount = importHits + sequenceHits;
         if (hitCount < candidate.minHits) {
@@ -297,15 +316,15 @@ function generateLearningReport({ snippetFile, roots, maxImports, maxCandidates,
             hit_count: hitCount,
             confidence_score: Number(confidence.toFixed(3)),
             reason: candidate.reason,
-            based_on_imports: (candidate.imports || []).map(specifier => ({
+            based_on_imports: (candidate.imports || []).map((specifier) => ({
                 specifier,
                 hits: repo.importCounts[specifier] || 0,
             })),
-            based_on_patterns: (candidate.patterns || []).map(patternName => ({
+            based_on_patterns: (candidate.patterns || []).map((patternName) => ({
                 pattern: patternName,
                 hits: repo.patternCounts[patternName] || 0,
             })),
-            based_on_sequences: (candidate.sequences || []).map(sequenceName => ({
+            based_on_sequences: (candidate.sequences || []).map((sequenceName) => ({
                 sequence: sequenceName,
                 hits: repo.sequenceCounts[sequenceName] || 0,
             })),
@@ -319,9 +338,13 @@ function generateLearningReport({ snippetFile, roots, maxImports, maxCandidates,
         }
     }
 
-    candidates.sort((a, b) => b.confidence_score - a.confidence_score || b.hit_count - a.hit_count || a.prefix.localeCompare(b.prefix));
+    candidates.sort(
+        (a, b) =>
+            b.confidence_score - a.confidence_score || b.hit_count - a.hit_count || a.prefix.localeCompare(b.prefix),
+    );
     lowConfidenceCandidates.sort(
-        (a, b) => b.confidence_score - a.confidence_score || b.hit_count - a.hit_count || a.prefix.localeCompare(b.prefix)
+        (a, b) =>
+            b.confidence_score - a.confidence_score || b.hit_count - a.hit_count || a.prefix.localeCompare(b.prefix),
     );
     const limitedCandidates = candidates.slice(0, Math.max(1, maxCandidates));
     const insertedCandidates = [];
@@ -341,7 +364,7 @@ function generateLearningReport({ snippetFile, roots, maxImports, maxCandidates,
 
     const topRepeatedBlocks = repo.repeatedBlocks.slice(0, Math.max(1, maxBlocks));
     const uncoveredRepeatedBlocks = topRepeatedBlocks.filter(
-        block => !normalizedSnippetBodies.some(body => body.includes(block.signature))
+        (block) => !normalizedSnippetBodies.some((body) => body.includes(block.signature)),
     );
     const blockOpportunities = suggestBlockOpportunities(uncoveredRepeatedBlocks, catalogPrefixes, maxCandidates);
 
@@ -372,19 +395,21 @@ function generateLearningReport({ snippetFile, roots, maxImports, maxCandidates,
 }
 
 /**
- * @param {{
- *   snippetFile: string,
- *   format: string,
- *   name: string,
- *   prefix: string,
- *   scope: string,
- *   description: string,
- *   template: string,
- *   include: string,
- *   exclude: string,
- *   fileTemplate: boolean,
- *   insert: boolean
- * }} options
+ * @typedef {object} RunScaffoldOptions
+ * @property {string} snippetFile
+ * @property {string} format
+ * @property {string} name
+ * @property {string} prefix
+ * @property {string} scope
+ * @property {string} description
+ * @property {string} template
+ * @property {string} include
+ * @property {string} exclude
+ * @property {boolean} fileTemplate
+ * @property {boolean} insert
+ */
+/**
+ * @param {RunScaffoldOptions} options
  */
 function runScaffold(options) {
     const name = options.name.trim();
@@ -502,12 +527,7 @@ function getTemplateDefaults(template) {
                 include: [],
                 isFileTemplate: false,
                 description: 'Importa fs e path de node: de forma canônica.',
-                body: [
-                    "import fs from 'node:fs';",
-                    "import path from 'node:path';",
-                    '',
-                    '$0',
-                ],
+                body: ["import fs from 'node:fs';", "import path from 'node:path';", '', '$0'],
             };
         case 'node-fs-promises':
             return {
@@ -515,11 +535,7 @@ function getTemplateDefaults(template) {
                 include: [],
                 isFileTemplate: false,
                 description: 'Importa fs/promises no padrão moderno do projeto.',
-                body: [
-                    "import fs from 'node:fs/promises';",
-                    '',
-                    '$0',
-                ],
+                body: ["import fs from 'node:fs/promises';", '', '$0'],
             };
         case 'node-spawn-sync':
             return {
@@ -532,7 +548,7 @@ function getTemplateDefaults(template) {
                     '',
                     "const ${1:result} = spawnSync(${2:process.execPath}, ${3:['--version']}, {",
                     "    encoding: 'utf8',",
-                    "    timeout: ${4:3000}",
+                    '    timeout: ${4:3000}',
                     '});',
                     '',
                     'if (${1:result}.status !== 0) {',
@@ -548,12 +564,7 @@ function getTemplateDefaults(template) {
                 include: TEST_INCLUDE_PATTERNS,
                 isFileTemplate: false,
                 description: 'Importa node:test e node:assert/strict.',
-                body: [
-                    "import test from 'node:test';",
-                    "import assert from 'node:assert/strict';",
-                    '',
-                    '$0',
-                ],
+                body: ["import test from 'node:test';", "import assert from 'node:assert/strict';", '', '$0'],
             };
         case 'zod-object':
             return {
@@ -564,8 +575,8 @@ function getTemplateDefaults(template) {
                 body: [
                     "import { z } from 'zod';",
                     '',
-                    "const ${1:SchemaName} = z.object({",
-                    "    ${2:field}: z.${3|string,number,boolean,array,object|}()",
+                    'const ${1:SchemaName} = z.object({',
+                    '    ${2:field}: z.${3|string,number,boolean,array,object|}()',
                     '});',
                     '',
                     'export { ${1:SchemaName} };',
@@ -632,34 +643,36 @@ function getTemplateDefaults(template) {
 function parseCsvList(value) {
     const items = String(value || '')
         .split(',')
-        .map(item => item.trim())
+        .map((item) => item.trim())
         .filter(Boolean);
     return items;
 }
 
 /**
- * @param {{
- *   name: string,
- *   prefix: string,
- *   template: string,
- *   scope: string,
- *   description: string,
- *   include: string,
- *   exclude: string,
- *   fileTemplate: boolean
- * }} options
+ * @typedef {object} BuildSnippetDefinitionOptions
+ * @property {string} name
+ * @property {string} prefix
+ * @property {string} template
+ * @property {string} scope
+ * @property {string} description
+ * @property {string} include
+ * @property {string} exclude
+ * @property {boolean} fileTemplate
+ */
+/**
+ * @param {BuildSnippetDefinitionOptions} options
  */
 function buildSnippetDefinition(options) {
     const defaults = getTemplateDefaults(options.template.trim().toLowerCase());
     const parsedInclude = parseCsvList(options.include);
     const include = parsedInclude.length > 0 ? parsedInclude : defaults.include;
     const exclude = parseCsvList(options.exclude);
-    const snippet = {
+    const snippet = /** @type {any} */ ({
         prefix: options.prefix.trim(),
         scope: options.scope.trim() || defaults.scope,
         body: defaults.body,
         description: options.description.trim() || defaults.description || `Snippet gerado para ${options.name}.`,
-    };
+    });
 
     if (include.length > 0) {
         snippet.include = include;
@@ -675,7 +688,12 @@ function buildSnippetDefinition(options) {
 }
 
 /**
+ * @typedef {object} AnalyzeRepositorySignalsOptions
+ * @property {any} [minBlockOccurrences]
+ */
+/**
  * @param {string[]} roots
+ * @param {AnalyzeRepositorySignalsOptions} [options]
  */
 function analyzeRepositorySignals(roots, { minBlockOccurrences = 4 } = {}) {
     const files = collectSourceFiles(roots);
@@ -710,11 +728,11 @@ function analyzeRepositorySignals(roots, { minBlockOccurrences = 4 } = {}) {
         node_test: /\btest\(/g,
     };
     const sequenceMatchers = {
-        fs_promises_io: /import\s+(?:\*\s+as\s+)?fs(?:\s*,|\s+)?.*from ['"]node:fs\/promises['"][\s\S]{0,4000}?\bfs\.(?:readFile|writeFile|stat|readdir|mkdir|rm|unlink)\(/,
+        fs_promises_io:
+            /import\s+(?:\*\s+as\s+)?fs(?:\s*,|\s+)?.*from ['"]node:fs\/promises['"][\s\S]{0,4000}?\bfs\.(?:readFile|writeFile|stat|readdir|mkdir|rm|unlink)\(/,
         spawn_sync_usage:
             /import\s*\{\s*[^}]*spawnSync[^}]*\}\s*from ['"]node:child_process['"][\s\S]{0,4000}?\bspawnSync\(/,
-        express_router_module:
-            /import\s+express\s+from ['"]express['"][\s\S]{0,2000}?\bexpress\.Router\(\)/,
+        express_router_module: /import\s+express\s+from ['"]express['"][\s\S]{0,2000}?\bexpress\.Router\(\)/,
         node_test_import_pair:
             /import\s+test\s+from ['"]node:test['"][\s\S]{0,2000}?import\s+assert\s+from ['"]node:assert\/strict['"]/,
         db_prepare_sql: /\b[A-Za-z_$][\w$]*\s*=\s*[A-Za-z_$][\w$]*\s*\.prepare\(\s*`[\s\S]{0,4000}?`?\s*\)/,
@@ -730,12 +748,12 @@ function analyzeRepositorySignals(roots, { minBlockOccurrences = 4 } = {}) {
         }
 
         for (const [key, regex] of Object.entries(patternMatchers)) {
-            patternCounts[key] += (text.match(regex) || []).length;
+            patternCounts[key] = (patternCounts[key] ?? 0) + (text.match(regex) || []).length;
         }
 
         for (const [key, regex] of Object.entries(sequenceMatchers)) {
             if (regex.test(text)) {
-                sequenceCounts[key] += 1;
+                sequenceCounts[key] = (sequenceCounts[key] ?? 0) + 1;
             }
         }
 
@@ -748,21 +766,24 @@ function analyzeRepositorySignals(roots, { minBlockOccurrences = 4 } = {}) {
         patternCounts,
         sequenceCounts,
         repeatedBlocks: [...repeatedBlockMap.values()]
-            .filter(item => item.hits >= minBlockOccurrences)
-            .sort((a, b) => b.hits - a.hits || b.files.length - a.files.length || a.signature.localeCompare(b.signature)),
+            .filter((item) => item.hits >= minBlockOccurrences)
+            .sort(
+                (a, b) => b.hits - a.hits || b.files.length - a.files.length || a.signature.localeCompare(b.signature),
+            ),
     };
 }
 
 /**
  * @param {string} text
  * @param {string} file
- * @param {Map<string, {signature: string, hits: number, files: string[], example: string[]}>} repeatedBlockMap
+ * @param {Map<string, { signature: string; hits: number; files: string[]; example: string[] }>} repeatedBlockMap
+ * @param {any} repeatedBlockMap
  */
 function collectRepeatedBlockWindows(text, file, repeatedBlockMap) {
     const lines = text
         .split('\n')
-        .map(line => line.trim())
-        .filter(line => isMeaningfulLearningLine(line));
+        .map((line) => line.trim())
+        .filter((line) => isMeaningfulLearningLine(line));
 
     for (let index = 0; index <= lines.length - 3; index++) {
         const window = lines.slice(index, index + 3);
@@ -805,7 +826,7 @@ function isMeaningfulLearningLine(line) {
  * @param {string[]} lines
  */
 function normalizeBlockLines(lines) {
-    return lines.map(line =>
+    return lines.map((line) =>
         line
             .trim()
             .replace(/(["'`])(?:\\.|(?!\1).)*\1/g, '<str>')
@@ -813,17 +834,19 @@ function normalizeBlockLines(lines) {
             .replace(/\b(const|let|var)\s+[A-Za-z_$][\w$]*\s*=/g, '$1 <id> =')
             .replace(/\basync function\s+[A-Za-z_$][\w$]*\s*\(/g, 'async function <fn>(')
             .replace(/\bfunction\s+[A-Za-z_$][\w$]*\s*\(/g, 'function <fn>(')
-            .replace(/\s+/g, ' ')
+            .replace(/\s+/g, ' '),
     );
 }
 
 /**
- * @param {{
- *   candidate: { imports?: string[], patterns?: string[], sequences?: string[], minHits: number },
- *   importHits: number,
- *   patternHits: number,
- *   sequenceHits: number
- * }} options
+ * @typedef {object} ScoreLearningCandidateOptions
+ * @property {any} candidate
+ * @property {number} importHits
+ * @property {number} patternHits
+ * @property {number} sequenceHits
+ */
+/**
+ * @param {ScoreLearningCandidateOptions} options
  */
 function scoreLearningCandidate({ candidate, importHits, patternHits, sequenceHits }) {
     const weightedParts = [];
@@ -859,16 +882,18 @@ function scoreLearningCandidate({ candidate, importHits, patternHits, sequenceHi
 }
 
 /**
- * @param {{ signature: string, hits: number, files: string[], example: string[] }[]} blocks
+ * @param {{ signature: string; hits: number; files: string[]; example: string[] }[]} blocks
+ * @param {any} blocks
  * @param {Set<string>} catalogPrefixes
  * @param {number} maxCandidates
  */
 function suggestBlockOpportunities(blocks, catalogPrefixes, maxCandidates) {
+    /** @type {any[]} */
     const opportunities = [];
 
     for (const block of blocks) {
         const exampleText = block.example.join('\n');
-        /** @type {{ prefix: string, template: string, reason: string } | null} */
+        /** @type {{ prefix: string; template: string; reason: string } | null} */
         let suggestion = null;
 
         if (
@@ -892,7 +917,10 @@ function suggestBlockOpportunities(blocks, catalogPrefixes, maxCandidates) {
                 template: 'express-router',
                 reason: 'Bloco recorrente de módulo Express com router.',
             };
-        } else if (exampleText.includes("import { spawnSync } from 'node:child_process';") || exampleText.includes('spawnSync(')) {
+        } else if (
+            exampleText.includes("import { spawnSync } from 'node:child_process';") ||
+            exampleText.includes('spawnSync(')
+        ) {
             suggestion = {
                 prefix: 'node.process.spawn-sync',
                 template: 'node-spawn-sync',
@@ -918,7 +946,11 @@ function suggestBlockOpportunities(blocks, catalogPrefixes, maxCandidates) {
             };
         }
 
-        if (!suggestion || catalogPrefixes.has(suggestion.prefix) || opportunities.some(item => item.prefix === suggestion.prefix)) {
+        if (
+            !suggestion ||
+            catalogPrefixes.has(suggestion.prefix) ||
+            opportunities.some((item) => item.prefix === suggestion.prefix)
+        ) {
             continue;
         }
 
@@ -942,6 +974,7 @@ function suggestBlockOpportunities(blocks, catalogPrefixes, maxCandidates) {
  * @param {string[]} roots
  */
 function collectSourceFiles(roots) {
+    /** @type {string[]} */
     const files = [];
     for (const root of roots) {
         const absoluteRoot = path.resolve(process.cwd(), root);

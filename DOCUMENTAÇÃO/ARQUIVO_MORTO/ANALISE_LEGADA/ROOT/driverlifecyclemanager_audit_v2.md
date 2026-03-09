@@ -48,7 +48,7 @@ this.driver = driverFactory.getDriver(
   this.task.spec.target,
   this.page,
   this.config,
-  this.abortController.signal
+  this.abortController.signal,
 );
 
 // Linha 57-59 - ❌ Não valida se driver é null
@@ -71,7 +71,7 @@ this.driver = driverFactory.getDriver(
   this.task.spec.target,
   this.page,
   this.config,
-  this.abortController.signal
+  this.abortController.signal,
 );
 
 // ✅ Validar driver antes de usar
@@ -311,7 +311,7 @@ release() nunca completa
 
 ```javascript
 // Linha 95-97
-await this.driver.destroy().catch(err => {
+await this.driver.destroy().catch((err) => {
   log('WARN', `[LIFECYCLE] Erro no descarte do driver: ${err.message}`, this.correlationId);
 });
 ```
@@ -332,7 +332,7 @@ try {
   await Promise.race([
     this.driver.destroy(),
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Destroy timeout')), DESTROY_TIMEOUT_MS)
+      setTimeout(() => reject(new Error('Destroy timeout')), DESTROY_TIMEOUT_MS),
     ),
   ]);
   log('DEBUG', `[LIFECYCLE] Driver destroyed successfully`, this.correlationId);

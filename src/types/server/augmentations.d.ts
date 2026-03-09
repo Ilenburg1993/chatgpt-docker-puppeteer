@@ -18,12 +18,12 @@ declare module '#server/engine/socket' {
     };
 
     export function init(httpServer: unknown): unknown;
-    export function getIO(): unknown | null;
+    export function getIO(): { fetchSockets(): Promise<any[]>; [key: string]: any } | null;
     export function getRegistry(): AgentRegistryEntry[];
     export function sendCommand(
         command: string,
         payload: Record<string, unknown>,
-        robotId?: string | null
+        robotId?: string | null,
     ): string | null;
     export function notify(event: string, data?: unknown): void;
     export function notifyAgent(event: string, data?: unknown): boolean;

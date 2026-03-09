@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { probeChromeConnection } from '#core/doctor';
 import { log } from '#core/logger';
 import { apiLimiter } from '#server/engine/app';
@@ -17,17 +17,21 @@ import systemController from './controllers/system.js';
 import tasksController from './controllers/tasks.js';
 
 /**
- * @typedef {{ use: (...args: unknown[]) => unknown, get: (...args: unknown[]) => unknown, post: (...args: unknown[]) => unknown, locals: Record<string, unknown> }} ExpressAppLike
+ * @typedef {{
+ *     use: (...args: unknown[]) => unknown;
+ *     get: (...args: unknown[]) => unknown;
+ *     post: (...args: unknown[]) => unknown;
+ *     locals: Record<string, unknown>;
+ * }} ExpressAppLike
  */
 
 /**
- * Aplica a malha de rotas à instância do Express.
- * Define a topologia lógica da API e injeta os escudos de integridade.
+ * Aplica a malha de rotas à instância do Express. Define a topologia lógica da API e injeta os escudos de integridade.
  *
  * @param {ExpressAppLike} app - Instância do Express vinda de engine/app.js
+ * @returns {Promise<void>}
  * @throws {Error} - Se algum controller falhar ao inicializar
  * @sideEffects - Registra rotas HTTP, middlewares, handlers de erro
- * @returns {Promise<void>}
  */
 async function applyRoutes(app) {
     log('INFO', '[GATEWAY] Selando malha de rotas V700 (Consolidação Total)...');
@@ -35,7 +39,7 @@ async function applyRoutes(app) {
     // FIXED (P1-14): Global request timeout middleware (30s default)
     // Previne requests órfãos que bloqueiam workers indefinidamente
     const REQUEST_TIMEOUT_MS = parseInt(process.env.API_REQUEST_TIMEOUT || '30000', 10);
-    app.use((req, res, next) => {
+    app.use((/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ next) => {
         // Set timeout on the request
         req.setTimeout(REQUEST_TIMEOUT_MS, () => {
             if (!res.headersSent) {
@@ -57,14 +61,15 @@ async function applyRoutes(app) {
 
     // Bloqueio global para métodos mutantes quando o server roda em modo delegated.
     // Evita duplicar checks em todos os controllers: usa o middleware central `denyIfDelegated`.
-    app.use((req, res, next) => {
+    app.use((/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ next) => {
         const MUTATING = ['POST', 'PUT', 'DELETE', 'PATCH'];
         try {
             if (MUTATING.includes(req.method)) {
                 return denyIfDelegated(req, res, next);
             }
-        } catch (err) {
-            log('WARN', `[GATEWAY] Falha no guard mutante: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[GATEWAY] Falha no guard mutante: ${_e.message}`);
         }
         return next();
     });
@@ -75,15 +80,16 @@ async function applyRoutes(app) {
 
     // Health endpoints
     // GET /api/health
-    app.get('/api/health', async (req, res) => {
+    app.get('/api/health', async (/** @type {any} */ req, /** @type {any} */ res) => {
         try {
             const chrome = await probeChromeConnection();
             res.json({ success: true, ts: Date.now(), chrome, request_id: req.id });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
             res.status(503).json({
                 success: false,
                 ts: Date.now(),
-                chrome: { connected: false, error: err?.message || String(err) },
+                chrome: { connected: false, error: _e?.message || String(err) },
                 request_id: req.id,
             });
         }
@@ -102,9 +108,8 @@ async function applyRoutes(app) {
     -------------------------------------------------------------------------- */
 
     /**
-     * DOMÍNIO DE MISSÃO (Tarefas, Fila e Artefatos)
-     * Namespace: /api/tasks, /api/queue, /api/results
-     * Responsável pelo ciclo de vida das intenções de execução e download de .txt.
+     * DOMÍNIO DE MISSÃO (Tarefas, Fila e Artefatos) Namespace: /api/tasks, /api/queue, /api/results Responsável pelo
+     * ciclo de vida das intenções de execução e download de .txt.
      */
     app.use('/api/tasks', apiLimiter, tasksController);
     app.use('/api/queue', apiLimiter, tasksController); // Alias para operações bulk de fila
@@ -112,50 +117,41 @@ async function applyRoutes(app) {
     app.use('/api/artifacts', apiLimiter, artifactsController);
 
     /**
-     * DOMÍNIO DE SISTEMA E OBSERVABILIDADE (Agentes e Infraestrutura)
-     * Namespace: /api/system
-     * Responsável pelo inventário IPC 2.0 (/agents), saúde (Doctor) e processos.
+     * DOMÍNIO DE SISTEMA E OBSERVABILIDADE (Agentes e Infraestrutura) Namespace: /api/system Responsável pelo
+     * inventário IPC 2.0 (/agents), saúde (Doctor) e processos.
      */
     app.use('/api/system', apiLimiter, systemController);
 
     /**
-     * DOMÍNIO DE INTELIGÊNCIA E CONFIGURAÇÃO (DNA e Parâmetros)
-     * Namespace: /api/config
-     * Responsável pela evolução do genoma (SADI) e controle do config.json.
+     * DOMÍNIO DE INTELIGÊNCIA E CONFIGURAÇÃO (DNA e Parâmetros) Namespace: /api/config Responsável pela evolução do
+     * genoma (SADI) e controle do config.json.
      */
     // Protege todas as rotas de configuração contra mutações quando em modo delegated
     app.use('/api/config', apiLimiter, denyIfDelegated, dnaController);
 
     /**
-     * DOMÍNIO DE MISSÕES (Mission Orchestration Platform V2.0)
-     * Namespace: /api/missions
-     * Responsável por orquestração de missões multi-step com workflows dinâmicos.
-     * Inclui: MissionManager, WorkflowGenerator, templates, execution control.
+     * DOMÍNIO DE MISSÕES (Mission Orchestration Platform V2.0) Namespace: /api/missions Responsável por orquestração de
+     * missões multi-step com workflows dinâmicos. Inclui: MissionManager, WorkflowGenerator, templates, execution
+     * control.
      */
     app.use('/api/missions', apiLimiter, missionsController);
 
     /**
-     * DOMÍNIO CONTROL PLANE (SSOT mutações)
-     * Namespace: /api/control
-     * Responsável por comando único de mutações auditáveis de missão/task.
+     * DOMÍNIO CONTROL PLANE (SSOT mutações) Namespace: /api/control Responsável por comando único de mutações
+     * auditáveis de missão/task.
      */
     app.use('/api/control', apiLimiter, controlController);
 
     /**
-     * DOMÍNIO DO DASHBOARD V2 (Mission Control Enterprise)
-     * Namespace: /api/dashboard
-     * Responsável por APIs estendidas de tasks, telemetria, alertas e health.
-     * Inclui: TaskSyncBridge, TelemetryAggregator, Sistema de Alertas.
+     * DOMÍNIO DO DASHBOARD V2 (Mission Control Enterprise) Namespace: /api/dashboard Responsável por APIs estendidas de
+     * tasks, telemetria, alertas e health. Inclui: TaskSyncBridge, TelemetryAggregator, Sistema de Alertas.
      */
     app.use('/api/dashboard', apiLimiter, dashboardController);
 
     /**
-     * DOMÍNIO RAG (Retrieval-Augmented Generation)
-     * Namespace: /api/rag
-     * Responsável por busca semântica no codebase via LanceDB + Ollama.
-     * Permite que LLMs externas (OpenCode, Claude, Copilot) acessem o código.
-     * Inclui: Semantic search, hybrid search (vector + FTS + reranking + MMR),
-     * health check, indexing trigger, cache statistics.
+     * DOMÍNIO RAG (Retrieval-Augmented Generation) Namespace: /api/rag Responsável por busca semântica no codebase via
+     * LanceDB + Ollama. Permite que LLMs externas (OpenCode, Claude, Copilot) acessem o código. Inclui: Semantic
+     * search, hybrid search (vector + FTS + reranking + MMR), health check, indexing trigger, cache statistics.
      */
     app.post('/api/rag/ask', apiLimiter, ragController.handleRagAsk);
     app.post('/api/rag/query', apiLimiter, ragController.handleRagQuery);
@@ -165,15 +161,16 @@ async function applyRoutes(app) {
     app.post('/api/rag/index', apiLimiter, ragController.handleRagIndex);
 
     /**
-     * MCP INTEGRATION (Model Context Protocol - Multi-LLM Tool Server)
-     * Namespace: /api/mcp
-     * Expõe Tool Registry via MCP Streamable HTTP para todas as LLMs:
+     * MCP INTEGRATION (Model Context Protocol - Multi-LLM Tool Server) Namespace: /api/mcp Expõe Tool Registry via MCP
+     * Streamable HTTP para todas as LLMs:
+     *
      * - Claude Desktop
      * - GitHub Copilot
      * - OpenCode CLI
      * - Cursor/Codex (via HTTP fallback)
      *
      * Tools disponíveis:
+     *
      * - rag_search: Hybrid semantic search (Vector + FTS + Reranking + MMR)
      * - rag_health: RAG system health check
      * - rag_expand: Expand chunk context by chunk_id
@@ -210,26 +207,27 @@ async function applyRoutes(app) {
                 };
 
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: true });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // Non-fatal observability failure
             }
 
             // Expose upstream status dynamically (if upstream-manager is present).
             try {
-                const { getUpstreamStatus } = /** @type {{ getUpstreamStatus?: () => { upstreams?: any[] } }} */ (
+                const { getUpstreamStatus } = /** @type {{ getUpstreamStatus?: () => { upstreams?: unknown[] } }} */ (
                     await import('../../integration/mcp/upstream-manager.mjs').catch(() => ({}))
                 );
                 if (typeof getUpstreamStatus === 'function') {
                     app.locals = app.locals || {};
                     app.locals.getMcpUpstreamsStatus = () => getUpstreamStatus().upstreams;
                 }
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // noop
             }
 
             log('INFO', '[MCP] Handler registered at POST/GET /api/mcp');
-        } catch (error) {
-            log('ERROR', `[MCP] Failed to setup MCP handler: ${error.message}`);
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
+            log('ERROR', `[MCP] Failed to setup MCP handler: ${_e.message}`);
             log('WARN', '[MCP] MCP features will be unavailable');
             // Don't crash server, just disable MCP
             try {
@@ -239,10 +237,10 @@ async function applyRoutes(app) {
                     ready: false,
                     toolCount: null,
                     lastInitAt: new Date().toISOString(),
-                    lastInitError: error && error.message ? error.message : String(error),
+                    lastInitError: error && _e.message ? _e.message : String(error),
                 };
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: false });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // noop
             }
         }
@@ -258,7 +256,7 @@ async function applyRoutes(app) {
                 lastInitError: null,
             };
             app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: false });
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
             // noop
         }
     }
@@ -286,13 +284,14 @@ async function applyRoutes(app) {
                 };
 
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { openai: true });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // Non-fatal observability failure
             }
 
             log('INFO', '[OpenAI] Handler registered at POST /v1/chat/completions, GET /v1/models');
-        } catch (error) {
-            log('ERROR', `[OpenAI] Failed to setup handler: ${error.message}`);
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
+            log('ERROR', `[OpenAI] Failed to setup handler: ${_e.message}`);
             log('WARN', '[OpenAI] OpenAI-compatible features will be unavailable');
 
             // Don't crash server, just disable feature
@@ -302,10 +301,10 @@ async function applyRoutes(app) {
                     enabled: true,
                     ready: false,
                     lastInitAt: new Date().toISOString(),
-                    lastInitError: error.message,
+                    lastInitError: _e.message,
                 };
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { openai: false });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // noop
             }
         }

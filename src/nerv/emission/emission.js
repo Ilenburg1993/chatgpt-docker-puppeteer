@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import createEmitAck from './emit_ack.js';
 import createEmitCommand from './emit_command.js';
 import createEmitEvent from './emit_event.js';
@@ -8,18 +8,28 @@ import createEmitEvent from './emit_event.js';
 =========================== */
 
 /**
+ * @typedef {object} CreateEmissionDeps
+ * @property {any} envelopes
+ * @property {any} buffers
+ * @property {any} correlation
+ * @property {any} telemetry
+ */
+/**
+ * @typedef {object} CreateEmissionOptions
+ * @property {any} [envelopes]
+ * @property {any} [buffers]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
+ */
+/**
  * Cria o módulo de emissão do NERV.
  *
- * **Side-effects:** Inicializa emissores de comandos, eventos e acknowledgments.
- * **Semântica:** Composição de subsistemas de emissão para comunicação neural.
- * **Unidades:** Dependências seguem contratos NERV (envelopes, buffers, correlation, telemetry).
+ * **Side-effects:** Inicializa emissores de comandos, eventos e acknowledgments. **Semântica:** Composição de
+ * subsistemas de emissão para comunicação neural. **Unidades:** Dependências seguem contratos NERV (envelopes, buffers,
+ * correlation, telemetry).
  *
- * @param {object} deps - Dependências do módulo
- * @param {object} deps.envelopes - Sistema de envelopes (normalização + validação)
- * @param {object} deps.buffers - Subsistema de buffers (fila outbound)
- * @param {object} deps.correlation - Sistema de correlação histórica
- * @param {object} deps.telemetry - Interface de telemetria do NERV
- * @returns {object} Módulo de emissão com métodos sendCommand, sendEvent, sendAck
+ * @param {CreateEmissionDeps} deps - Dependências do módulo
+ * @returns {any} Módulo de emissão com métodos sendCommand, sendEvent, sendAck
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createEmission({ envelopes, buffers, correlation, telemetry }) {
@@ -31,26 +41,32 @@ function createEmission({ envelopes, buffers, correlation, telemetry }) {
      Composição dos emissores
   ========================================================= */
 
-    const commandEmitter = createEmitCommand({
-        envelopes,
-        buffers,
-        correlation,
-        telemetry,
-    });
+    const commandEmitter = /** @type {any} */ (
+        createEmitCommand({
+            envelopes,
+            buffers,
+            correlation,
+            telemetry,
+        })
+    );
 
-    const eventEmitter = createEmitEvent({
-        envelopes,
-        buffers,
-        correlation,
-        telemetry,
-    });
+    const eventEmitter = /** @type {any} */ (
+        createEmitEvent({
+            envelopes,
+            buffers,
+            correlation,
+            telemetry,
+        })
+    );
 
-    const ackEmitter = createEmitAck({
-        envelopes,
-        buffers,
-        correlation,
-        telemetry,
-    });
+    const ackEmitter = /** @type {any} */ (
+        createEmitAck({
+            envelopes,
+            buffers,
+            correlation,
+            telemetry,
+        })
+    );
 
     /* =========================================================
      Interface pública do módulo

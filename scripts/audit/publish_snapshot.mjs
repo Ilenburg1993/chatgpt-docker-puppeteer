@@ -15,7 +15,14 @@ function formatSnapshotStamp(date) {
 }
 
 /**
- * @param {{ masterPath: string, snapshotsDir: string, report?: import('./lib/schema.mjs').AuditRunV3, now?: Date }} options
+ * @typedef {object} PublishSnapshotOptions
+ * @property {string} masterPath
+ * @property {string} snapshotsDir
+ * @property {import('./lib/schema.mjs').AuditRunV3} report
+ * @property {Date} now
+ */
+/**
+ * @param {PublishSnapshotOptions} options
  * @returns {{ path: string }}
  */
 export function publishSnapshot(options) {

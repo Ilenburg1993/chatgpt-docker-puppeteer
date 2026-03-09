@@ -317,7 +317,7 @@ const result = await dnaEvolution.evolveWithSadiProtocol(
     shadowRoot: false,
   },
   'chatgpt.com',
-  'send-message'
+  'send-message',
 );
 
 if (result.accepted) {
@@ -358,7 +358,7 @@ async function evolveWithSadiProtocol(protocol, domain, intent) {
 
   // 4. Check duplicates
   const rules = dna.targets[domain]?.[intent] || [];
-  const isDuplicate = rules.some(r => r.selector === protocol.selector);
+  const isDuplicate = rules.some((r) => r.selector === protocol.selector);
   if (isDuplicate) {
     return { accepted: false, reason: 'DUPLICATE' };
   }
@@ -551,7 +551,7 @@ const result = await dnaEvolution.evolveWithSadiProtocol(
     shadowRoot: false,
   },
   'chatgpt.com',
-  'send-message'
+  'send-message',
 );
 
 if (result.accepted) {
@@ -742,7 +742,7 @@ if (discovered.confidence >= 75) {
       shadowRoot: discovered.isShadowRoot,
     },
     'chatgpt.com',
-    'send-message'
+    'send-message',
   );
 
   if (result.accepted) {
@@ -993,11 +993,11 @@ const dna = await io.getDna();
 const rules = dna.targets['chatgpt.com']?.['send-message'] || [];
 console.log(
   'Rules existentes:',
-  rules.map(r => r.selector)
+  rules.map((r) => r.selector),
 );
 
 // Se quiser forçar update (aumentar confidence):
-const index = rules.findIndex(r => r.selector === '#prompt-textarea');
+const index = rules.findIndex((r) => r.selector === '#prompt-textarea');
 if (index >= 0) {
   rules[index].confidence = 95; // Update
   await io.saveDna(dna, 'manual-confidence-update');

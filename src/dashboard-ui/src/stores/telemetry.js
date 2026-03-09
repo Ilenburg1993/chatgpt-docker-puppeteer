@@ -3,13 +3,14 @@
  * Pinia Store: Telemetry
  *
  * Gerencia métricas de telemetria no dashboard.
+ *
  * - Recebe métricas em tempo real via Socket.io
  * - Mantém histórico local para gráficos
  * - Carrega histórico da API
  */
 
-import { defineStore } from 'pinia';
 import { formatHttpError, http } from '@/lib/http';
+import { defineStore } from 'pinia';
 
 /**
  * Ring buffer simples para histórico de métricas
@@ -17,10 +18,11 @@ import { formatHttpError, http } from '@/lib/http';
 class MetricBuffer {
     constructor(maxSize = 120) {
         this.maxSize = maxSize;
+        /** @type {any[]} */
         this.data = [];
     }
 
-    push(value, timestamp = Date.now()) {
+    push(/** @type {any} */ value, timestamp = Date.now()) {
         this.data.push({ value, timestamp });
         if (this.data.length > this.maxSize) {
             this.data.shift();
@@ -50,7 +52,7 @@ class MetricBuffer {
 
     get max() {
         if (this.data.length === 0) return 0;
-        return Math.max(...this.data.map(item => item.value));
+        return Math.max(...this.data.map((item) => item.value));
     }
 }
 
@@ -94,52 +96,52 @@ export const useTelemetryStore = defineStore('telemetry', {
         /**
          * Uso de CPU atual (% real)
          */
-        cpuLoad: state => state.current.cpu.usage_percent,
+        cpuLoad: (state) => state.current.cpu.usage_percent,
 
         /**
          * Load average de 1 min (não percentual)
          */
-        cpuLoad1m: state => state.current.cpu.load_1min,
+        cpuLoad1m: (state) => state.current.cpu.load_1min,
 
         /**
          * Uso de memória em %
          */
-        memoryUsage: state => state.current.memory.usage_percent,
+        memoryUsage: (state) => state.current.memory.usage_percent,
 
         /**
          * Uso de heap em %
          */
-        heapUsage: state => state.current.heap.usage_percent,
+        heapUsage: (state) => state.current.heap.usage_percent,
 
         /**
          * Lag do event loop em ms
          */
-        eventLoopLag: state => state.current.event_loop.lag_ms,
+        eventLoopLag: (state) => state.current.event_loop.lag_ms,
 
         /**
          * Tamanho da fila
          */
-        queueSize: state => state.current.queue.size,
+        queueSize: (state) => state.current.queue.size,
 
         /**
          * Histórico de CPU (últimos 60 pontos)
          */
-        cpuHistory: state => state.history.cpu.getLast(60),
+        cpuHistory: (state) => state.history.cpu.getLast(60),
 
         /**
          * Histórico de memória (últimos 60 pontos)
          */
-        memoryHistory: state => state.history.memory.getLast(60),
+        memoryHistory: (state) => state.history.memory.getLast(60),
 
         /**
          * Histórico de heap (últimos 60 pontos)
          */
-        heapHistory: state => state.history.heap.getLast(60),
+        heapHistory: (state) => state.history.heap.getLast(60),
 
         /**
          * Médias
          */
-        averages: state => ({
+        averages: (state) => ({
             cpu: state.history.cpu.average.toFixed(2),
             memory: state.history.memory.average.toFixed(1),
             heap: state.history.heap.average.toFixed(1),
@@ -149,7 +151,7 @@ export const useTelemetryStore = defineStore('telemetry', {
         /**
          * Máximos
          */
-        maxValues: state => ({
+        maxValues: (state) => ({
             cpu: state.history.cpu.max.toFixed(2),
             memory: state.history.memory.max.toFixed(1),
             heap: state.history.heap.max.toFixed(1),
@@ -159,7 +161,7 @@ export const useTelemetryStore = defineStore('telemetry', {
         /**
          * Status de saúde baseado nas métricas
          */
-        healthStatus: state => {
+        healthStatus: (state) => {
             const heap = state.current.heap.usage_percent;
             const memory = state.current.memory.usage_percent;
             const eventLoop = state.current.event_loop.lag_ms;
@@ -186,8 +188,9 @@ export const useTelemetryStore = defineStore('telemetry', {
                 if (metrics) {
                     this.updateMetrics(metrics);
                 }
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (/** @type {any} */ _rawError) {
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 console.error('[TelemetryStore] Erro ao carregar métricas:', error);
             }
         },
@@ -203,40 +206,41 @@ export const useTelemetryStore = defineStore('telemetry', {
                 // Popula buffers com histórico do servidor
                 if (data.cpu?.history) {
                     this.history.cpu.clear();
-                    data.cpu.history.forEach(item => {
+                    data.cpu.history.forEach((/** @type {any} */ item) => {
                         this.history.cpu.push(item.value, item.timestamp);
                     });
                 }
 
                 if (data.memory?.history) {
                     this.history.memory.clear();
-                    data.memory.history.forEach(item => {
+                    data.memory.history.forEach((/** @type {any} */ item) => {
                         this.history.memory.push(item.value, item.timestamp);
                     });
                 }
 
                 if (data.heap?.history) {
                     this.history.heap.clear();
-                    data.heap.history.forEach(item => {
+                    data.heap.history.forEach((/** @type {any} */ item) => {
                         this.history.heap.push(item.value, item.timestamp);
                     });
                 }
 
                 if (data.event_loop?.history) {
                     this.history.eventLoop.clear();
-                    data.event_loop.history.forEach(item => {
+                    data.event_loop.history.forEach((/** @type {any} */ item) => {
                         this.history.eventLoop.push(item.value, item.timestamp);
                     });
                 }
 
                 if (data.queue?.history) {
                     this.history.queueSize.clear();
-                    data.queue.history.forEach(item => {
+                    data.queue.history.forEach((/** @type {any} */ item) => {
                         this.history.queueSize.push(item.value, item.timestamp);
                     });
                 }
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (/** @type {any} */ _rawError) {
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 console.error('[TelemetryStore] Erro ao carregar histórico:', error);
             }
         },
@@ -244,7 +248,7 @@ export const useTelemetryStore = defineStore('telemetry', {
         /**
          * Atualiza métricas (usado por Socket.io handler)
          */
-        updateMetrics(metrics) {
+        updateMetrics(/** @type {any} */ metrics) {
             this.current = {
                 ...this.current,
                 ...metrics,
@@ -257,7 +261,7 @@ export const useTelemetryStore = defineStore('telemetry', {
             this.history.eventLoop.push(metrics.event_loop?.lag_ms || 0, metrics.timestamp);
             this.history.queueSize.push(metrics.queue?.size || 0, metrics.timestamp);
 
-            this.lastReceived = Date.now();
+            this.lastReceived = /** @type {any} */ (Date.now());
             this.receiving = true;
             this.samplesReceived++;
         },
@@ -265,14 +269,14 @@ export const useTelemetryStore = defineStore('telemetry', {
         /**
          * Handler para evento Socket.io telemetry:metrics
          */
-        handleTelemetryMetrics(data) {
+        handleTelemetryMetrics(/** @type {any} */ data) {
             this.updateMetrics(data);
         },
 
         /**
          * Define status de conexão
          */
-        setConnected(connected) {
+        setConnected(/** @type {any} */ connected) {
             this.connected = connected;
             if (!connected) {
                 this.receiving = false;

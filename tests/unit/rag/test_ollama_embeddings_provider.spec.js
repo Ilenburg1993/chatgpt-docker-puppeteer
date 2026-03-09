@@ -57,9 +57,11 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
         let receivedInputLength = 0;
         try {
             process.env.OLLAMA_EMBED_MAX_CHARS = '50';
-            global.fetch = async (_url, options = {}) => {
+            /** @type {any} */ (global).fetch = async (/** @type {any} */ _url, /** @type {any} */ options = {}) => {
                 const body = JSON.parse(options.body || '{}');
-                receivedInputLength = String(body.input || '').length;
+                if (typeof body.input === 'string') {
+                    receivedInputLength = body.input.length;
+                }
                 return {
                     ok: true,
                     async json() {
@@ -100,11 +102,11 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
         const prevMax = process.env.OLLAMA_EMBED_MAX_CHARS;
         const prevFastShrink = process.env.OLLAMA_EMBED_CONTEXT_FAST_SHRINK;
         const prevFetch = global.fetch;
-        const attempts = [];
+        /** @type {any[]} */ const attempts = [];
         try {
             process.env.OLLAMA_EMBED_MAX_CHARS = '8000';
             process.env.OLLAMA_EMBED_CONTEXT_FAST_SHRINK = 'true';
-            global.fetch = async (_url, options = {}) => {
+            /** @type {any} */ (global).fetch = async (/** @type {any} */ _url, /** @type {any} */ options = {}) => {
                 const body = JSON.parse(options.body || '{}');
                 const size = String(body.input || '').length;
                 attempts.push(size);
@@ -128,9 +130,9 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
             const vector = await provider.embed('x'.repeat(6000));
             assert.deepStrictEqual(vector, [0.1, 0.2, 0.3]);
             assert.deepStrictEqual(
-                attempts.filter(size => size > 2000),
+                attempts.filter((size) => size > 2000),
                 [6000, 4200, 2940, 2058],
-                'context overflow must shrink immediately without retrying same size'
+                'context overflow must shrink immediately without retrying same size',
             );
             assert.strictEqual(provider.runtimeSafeChars, 1440);
 

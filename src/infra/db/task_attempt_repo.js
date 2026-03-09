@@ -6,32 +6,34 @@ function _now() {
 }
 
 /**
- * @typedef {{
- *   id: string,
- *   task_id: string,
- *   mission_id?: string|null,
- *   status: string,
- *   worker_id?: string|null,
- *   created_at_ms?: number,
- *   started_at_ms?: number|null,
- *   ended_at_ms?: number|null,
- *   rendered_prompt_artifact_id?: string|null,
- *   response_text_artifact_id?: string|null,
- *   response_v2_json_artifact_id?: string|null,
- *   response_md_artifact_id?: string|null,
- *   response_html_artifact_id?: string|null,
- *   error?: string|null,
- *   driver_target?: string|null,
- *   model?: string|null,
- *   reason_class?: string|null,
- *   count_attempt?: number|null,
- *   last_heartbeat_at_ms?: number|null,
- *   reason_code?: string|null,
- *   cause_layer?: string|null,
- *   diagnostic_artifacts_json?: string|null,
- *   diagnosis_json?: string|null,
- * }} AttemptUpsert
-  * @returns {void}
+ * @typedef {object} AttemptUpsert
+ * @property {string} id
+ * @property {string} task_id
+ * @property {string | null | undefined} [mission_id]
+ * @property {string} status
+ * @property {string | null | undefined} [worker_id]
+ * @property {number | undefined} [created_at_ms]
+ * @property {number | null | undefined} [started_at_ms]
+ * @property {number | null | undefined} [ended_at_ms]
+ * @property {string | null | undefined} [rendered_prompt_artifact_id]
+ * @property {string | null | undefined} [response_text_artifact_id]
+ * @property {string | null | undefined} [response_v2_json_artifact_id]
+ * @property {string | null | undefined} [response_md_artifact_id]
+ * @property {string | null | undefined} [response_html_artifact_id]
+ * @property {string | null | undefined} [error]
+ * @property {string | null | undefined} [driver_target]
+ * @property {string | null | undefined} [model]
+ * @property {string | null | undefined} [reason_class]
+ * @property {number | null | undefined} [count_attempt]
+ * @property {number | null | undefined} [last_heartbeat_at_ms]
+ * @property {string | null | undefined} [reason_code]
+ * @property {string | null | undefined} [cause_layer]
+ * @property {string | null | undefined} [diagnostic_artifacts_json]
+ * @property {string | null | undefined} [diagnosis_json]
+ */
+/**
+ * @param {AttemptUpsert} input
+ * @returns {void}
  */
 
 function upsertAttempt(input) {
@@ -81,7 +83,7 @@ function upsertAttempt(input) {
             cause_layer = COALESCE(excluded.cause_layer, task_attempts.cause_layer),
             diagnostic_artifacts_json = COALESCE(excluded.diagnostic_artifacts_json, task_attempts.diagnostic_artifacts_json),
             diagnosis_json = COALESCE(excluded.diagnosis_json, task_attempts.diagnosis_json)
-    `
+    `,
     ).run({
         id: String(input.id),
         task_id: String(input.task_id),
@@ -110,46 +112,70 @@ function upsertAttempt(input) {
 }
 
 /**
+ * @typedef {Record<string, any>} TaskAttempt
+ */
+/**
+ * @typedef {Record<string, any>} UpdateAttemptUpdates
+ */
+/**
  * Função exportada: updateAttempt.
- * @returns {any}
+ *
+ * @param {any} attemptId
+ * @param {UpdateAttemptUpdates} [updates]
+ * @returns {TaskAttempt | null}
  */
 function updateAttempt(attemptId, updates = {}) {
     const db = getDb();
     const existing = db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId);
     if (!existing) return null;
 
-    const next = { ...existing, ...updates };
+    const next = /** @type {any} */ ({ .../** @type {any} */ (existing), ...updates });
     upsertAttempt(next);
-    return db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null;
+    return /** @type {TaskAttempt | null} */ (
+        db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null
+    );
 }
 
 /**
  * Função exportada: getAttemptById.
- * @returns {any}
+ *
+ * @param {string} attemptId Unique identifier.
+ * @returns {TaskAttempt | null}
  */
 function getAttemptById(attemptId) {
     const db = getDb();
-    return db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null;
+    return /** @type {TaskAttempt | null} */ (
+        db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null
+    );
 }
 
 /**
+ * @typedef {object} ListAttemptsByTaskOptions
+ * @property {any} [limit]
+ */
+/**
  * Função exportada: listAttemptsByTask.
- * @returns {any}
+ *
+ * @param {any} taskId
+ * @param {ListAttemptsByTaskOptions} [options]
+ * @returns {TaskAttempt[]}
  */
 function listAttemptsByTask(taskId, { limit = 200 } = {}) {
     const db = getDb();
     const lim = Math.max(1, Math.min(Number(limit) || 200, 2000));
-    return db
-        .prepare(
-            `
+    return /** @type {TaskAttempt[]} */ (
+        db
+            .prepare(
+                `
             SELECT *
             FROM task_attempts
             WHERE task_id = ?
             ORDER BY created_at_ms DESC
             LIMIT ?
-        `
-        )
-        .all(taskId, lim);
+        `,
+            )
+            .all(taskId, lim)
+    );
 }
 
-export { upsertAttempt, updateAttempt, getAttemptById, listAttemptsByTask };
+export { getAttemptById, listAttemptsByTask, updateAttempt, upsertAttempt };

@@ -257,8 +257,8 @@ async function controlAgent(action) {
         await pm2p.restart(AGENTE_NAME);
         break;
       case 'kill_daemon':
-        return new Promise(res => {
-          exec('npx pm2 kill', err => {
+        return new Promise((res) => {
+          exec('npx pm2 kill', (err) => {
             if (err) log('ERROR', `[SYSTEM] Falha ao matar daemon: ${err.message}`);
             res({ success: !err });
           });
@@ -337,7 +337,7 @@ function init() {
 
   log('INFO', '[PM2_BRIDGE] Conectando ao barramento de eventos do PM2...');
 
-  pm2Raw.connect(err => {
+  pm2Raw.connect((err) => {
     if (err) {
       log('ERROR', `[PM2_BRIDGE] Falha ao conectar ao daemon: ${err.message}`);
       reconnectTimer = setTimeout(init, 5000); // ✅ Retry com backoff passivo
@@ -354,7 +354,7 @@ function init() {
       isBusActive = true;
       log('INFO', '[PM2_BRIDGE] Escuta de eventos ativa.');
 
-      bus.on('process:event', data => {
+      bus.on('process:event', (data) => {
         const processName = data.process ? data.process.name : null;
 
         if (processName === AGENTE_NAME) {
@@ -393,7 +393,7 @@ function _startHealthCheck() {
   healthCheckInterval = setInterval(() => {
     if (!isBusActive) return;
 
-    pm2Raw.list(err => {
+    pm2Raw.list((err) => {
       if (err) {
         log('WARN', '[PM2_BRIDGE] Link perdido. Reiniciando ponte...');
         isBusActive = false;
@@ -873,7 +873,7 @@ healthCheckInterval = setInterval(
   () => {
     // ...
   },
-  CONFIG.get('SERVER_PM2_HEALTH_CHECK_INTERVAL_MS', 30000)
+  CONFIG.get('SERVER_PM2_HEALTH_CHECK_INTERVAL_MS', 30000),
 );
 ```
 
@@ -917,7 +917,7 @@ const forceExitTimeout = setTimeout(
     log('FATAL', '[LIFECYCLE] Shutdown excedeu tempo limite. Forçando saída.');
     process.exit(1);
   },
-  CONFIG.get('SERVER_SHUTDOWN_TIMEOUT_MS', 5000)
+  CONFIG.get('SERVER_SHUTDOWN_TIMEOUT_MS', 5000),
 );
 ```
 
@@ -1262,7 +1262,7 @@ router.get('/api/pm2/metrics', async (req, res) => {
 
 ```javascript
 // pm2_bridge.js já faz isso!
-bus.on('process:event', data => {
+bus.on('process:event', (data) => {
   notify('pm2:process_event', {
     event: data.event,
     status: data.process.status,
@@ -1271,7 +1271,7 @@ bus.on('process:event', data => {
 });
 
 // Dashboard frontend escuta:
-socket.on('pm2:process_event', payload => {
+socket.on('pm2:process_event', (payload) => {
   console.log(`Processo ${payload.event}: ${payload.status}`);
   // Atualizar UI em tempo real
 });
@@ -1335,8 +1335,8 @@ describe('PM2 Lifecycle Integration Tests', () => {
     const processes = JSON.parse(stdout);
 
     assert.strictEqual(processes.length, 2);
-    assert(processes.some(p => p.name === 'agente-gpt'));
-    assert(processes.some(p => p.name === 'dashboard-web'));
+    assert(processes.some((p) => p.name === 'agente-gpt'));
+    assert(processes.some((p) => p.name === 'dashboard-web'));
   });
 
   it('should stop both processes gracefully', async () => {
@@ -1344,8 +1344,8 @@ describe('PM2 Lifecycle Integration Tests', () => {
     const { stdout } = await execAsync('npx pm2 jlist');
     const processes = JSON.parse(stdout);
 
-    const agente = processes.find(p => p.name === 'agente-gpt');
-    const dashboard = processes.find(p => p.name === 'dashboard-web');
+    const agente = processes.find((p) => p.name === 'agente-gpt');
+    const dashboard = processes.find((p) => p.name === 'dashboard-web');
 
     assert.strictEqual(agente.pm2_env.status, 'stopped');
     assert.strictEqual(dashboard.pm2_env.status, 'stopped');
@@ -1356,8 +1356,8 @@ describe('PM2 Lifecycle Integration Tests', () => {
     const { stdout } = await execAsync('npx pm2 jlist');
     const processes = JSON.parse(stdout);
 
-    const agente = processes.find(p => p.name === 'agente-gpt');
-    const dashboard = processes.find(p => p.name === 'dashboard-web');
+    const agente = processes.find((p) => p.name === 'agente-gpt');
+    const dashboard = processes.find((p) => p.name === 'dashboard-web');
 
     assert.strictEqual(agente.pm2_env.status, 'online');
     assert.strictEqual(dashboard.pm2_env.status, 'online');

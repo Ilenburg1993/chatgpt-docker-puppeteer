@@ -4,7 +4,14 @@ import { parseArgs } from 'node:util';
 import { parseJsonFromMixedOutput, runCommand } from './lib/exec.mjs';
 
 /**
- * @param {{ ok: boolean, exitCode: number|null, stdout: string, stderr: string }} result
+ * @typedef {object} SummarizeResultResult
+ * @property {boolean} ok
+ * @property {number | null} exitCode
+ * @property {string} stdout
+ * @property {string} stderr
+ */
+/**
+ * @param {SummarizeResultResult} result
  */
 function summarizeResult(result) {
     return {
@@ -38,16 +45,17 @@ async function main() {
 
     const components = {
         pm2: {
+            ...summarizeResult(pm2Status),
             ok: pm2Status.ok,
             details: pm2Status.ok ? 'daemon-status-ok' : 'daemon-status-failed',
-            ...summarizeResult(pm2Status),
         },
         mcp: {
+            ...summarizeResult(mcpDiagnose),
             ok: mcpDiagnose.ok,
             details: mcpDiagnose.ok ? 'mcp-diagnose-ok' : 'mcp-diagnose-failed',
-            ...summarizeResult(mcpDiagnose),
         },
         rag: {
+            ...summarizeResult(ragHealth),
             ok: ragHealth.ok && Boolean(ragJson?.ok || ragOkFromText),
             available:
                 ragJson && Object.prototype.hasOwnProperty.call(ragJson, 'available')
@@ -56,14 +64,13 @@ async function main() {
                       ? true
                       : null,
             details: ragHealth.ok ? 'rag-health-command-ok' : 'rag-health-command-failed',
-            ...summarizeResult(ragHealth),
         },
         lsp: {
+            ...summarizeResult(lspHealth),
             ok: lspHealth.ok && Boolean(lspJson?.ok),
             lsp_tools_present: Boolean(lspJson?.lsp_tools_present),
             lsp_functional_ok: Boolean(lspJson?.lsp_functional_ok),
             details: lspHealth.ok ? 'lsp-health-command-ok' : 'lsp-health-command-failed',
-            ...summarizeResult(lspHealth),
         },
     };
 
@@ -95,7 +102,7 @@ async function main() {
         console.log('[SEMANTIC PREFLIGHT]');
         console.log(`ok=${report.ok}`);
         console.log(
-            `pm2=${components.pm2.ok} mcp=${components.mcp.ok} rag=${components.rag.ok} lsp=${components.lsp.ok}`
+            `pm2=${components.pm2.ok} mcp=${components.mcp.ok} rag=${components.rag.ok} lsp=${components.lsp.ok}`,
         );
         if (issues.length > 0) {
             console.log(`issues=${issues.join(' | ')}`);
@@ -108,7 +115,7 @@ async function main() {
     process.exit(0);
 }
 
-main().catch(error => {
+main().catch((error) => {
     console.error(`[semantic-preflight] fatal: ${error?.message || String(error)}`);
     process.exit(1);
 });

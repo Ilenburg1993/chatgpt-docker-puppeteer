@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/correlation/correlation_context.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -27,6 +27,8 @@
 
 /**
  * Verifica se valor é string não vazia.
+ *
+ * @param {any} value
  */
 function isNonEmptyString(value) {
     return typeof value === 'string' && value.length > 0;
@@ -34,6 +36,8 @@ function isNonEmptyString(value) {
 
 /**
  * Clona array de registros de forma segura.
+ *
+ * @param {any} records
  */
 function cloneRecords(records) {
     return Array.isArray(records) ? records.slice() : [];
@@ -44,16 +48,23 @@ function cloneRecords(records) {
 =========================== */
 
 /**
+ * @typedef {object} CreateCorrelationContextDeps
+ * @property {any} store
+ * @property {any} telemetry
+ */
+/**
+ * @typedef {object} CreateCorrelationContextOptions
+ * @property {any} [store]
+ * @property {any} [telemetry]
+ */
+/**
  * Cria o contexto de leitura de correlações.
  *
- * **Side-effects:** Emite telemetria para operações de leitura.
- * **Semântica:** Camada de leitura/auditoria sobre correlações históricas.
- * **Unidades:** correlationId como string não vazia, histórico como array de registros.
+ * **Side-effects:** Emite telemetria para operações de leitura. **Semântica:** Camada de leitura/auditoria sobre
+ * correlações históricas. **Unidades:** correlationId como string não vazia, histórico como array de registros.
  *
- * @param {object} deps - Dependências do contexto
- * @param {object} deps.store - Instância de correlation_store
- * @param {object} deps.telemetry - Interface de telemetria NERV
- * @returns {object} Contexto com métodos getHistory, getLatest, getStats
+ * @param {CreateCorrelationContextDeps} deps - Dependências do contexto
+ * @returns {any} Contexto com métodos getHistory, getLatest, getStats
  * @throws {Error} Se store ou telemetry forem inválidos
  */
 function createCorrelationContext({ store, telemetry }) {
@@ -73,7 +84,7 @@ function createCorrelationContext({ store, telemetry }) {
      * Retorna o histórico completo de uma correlação.
      *
      * @param {string} correlationId
-     * @returns {Array<Object>}
+     * @returns {object[]}
      */
     function getHistory(correlationId) {
         if (!isNonEmptyString(correlationId)) {
@@ -119,10 +130,9 @@ function createCorrelationContext({ store, telemetry }) {
     }
 
     /**
-     * Retorna lista de todas as correlações existentes.
-     * Uso exclusivo para auditoria/diagnóstico.
+     * Retorna lista de todas as correlações existentes. Uso exclusivo para auditoria/diagnóstico.
      *
-     * @returns {Array<string>}
+     * @returns {string[]}
      */
     function list() {
         const ids = store.list();

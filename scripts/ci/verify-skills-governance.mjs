@@ -11,7 +11,15 @@ const requiredCanonicalSkills = [
     '.github/skills/typing-node24-esm-tsserver',
     '.github/skills/lsp-ops',
     '.github/skills/schema-contract-governance',
+    '.github/skills/strict-lane-governance',
+    '.github/skills/vue-tsc-dashboard',
 ];
+
+/** Skills que requerem apenas SKILL.md (sem README nem referências de typing canon). */
+const skillsOnlyRequiringSkillMd = new Set([
+    '.github/skills/strict-lane-governance',
+    '.github/skills/vue-tsc-dashboard',
+]);
 
 const requiredCanonicalDocs = [
     'DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md',
@@ -21,7 +29,7 @@ const requiredCanonicalDocs = [
     'DOCUMENTAÇÃO/PLANOS/TYPING_CANON_LIFECYCLE.md',
 ];
 
-const requiredReferenceSkills = new Set([
+const _requiredReferenceSkills = new Set([
     '.github/skills/typing-node24-esm-tsserver',
     '.github/skills/schema-contract-governance',
 ]);
@@ -42,8 +50,8 @@ const requiredCanonAnchor = 'TYPING_JSDOC_CANON.md';
 function extractMarkdownLinks(filePath) {
     const text = fs.readFileSync(filePath, 'utf8');
     return Array.from(text.matchAll(/\[[^\]]+\]\(([^)]+)\)/g))
-        .map(match => String(match[1] || '').trim())
-        .filter(link => link && !link.startsWith('http://') && !link.startsWith('https://') && !link.startsWith('#'));
+        .map((match) => String(match[1] || '').trim())
+        .filter((link) => link && !link.startsWith('http://') && !link.startsWith('https://') && !link.startsWith('#'));
 }
 
 /**
@@ -68,16 +76,18 @@ const issues = [];
 for (const skillDir of requiredCanonicalSkills) {
     const readmePath = path.resolve(skillDir, 'README.md');
     const skillPath = path.resolve(skillDir, 'SKILL.md');
-    if (!fs.existsSync(readmePath)) {
+    const skillOnlyMode = skillsOnlyRequiringSkillMd.has(skillDir);
+
+    if (!skillOnlyMode && !fs.existsSync(readmePath)) {
         issues.push(`Missing canonical README: ${readmePath}`);
     }
     if (!fs.existsSync(skillPath)) {
         issues.push(`Missing canonical SKILL: ${skillPath}`);
     }
-    if (requiredReferenceSkills.has(skillDir) && !fs.existsSync(path.resolve(skillDir, 'references'))) {
+    if (!skillOnlyMode && !fs.existsSync(path.resolve(skillDir, 'references'))) {
         issues.push(`Missing references directory for canonical skill: ${skillDir}`);
     }
-    if (fs.existsSync(readmePath)) {
+    if (!skillOnlyMode && fs.existsSync(readmePath)) {
         const readmeText = fs.readFileSync(readmePath, 'utf8');
         if (!readmeText.includes(requiredCanonAnchor)) {
             issues.push(`Canonical skill README must link to the typing canon: ${readmePath}`);
@@ -89,7 +99,6 @@ for (const skillDir of requiredCanonicalSkills) {
             issues.push(`Canonical skill SKILL.md must link to the typing canon: ${skillPath}`);
         }
     }
-    if (fs.existsSync(readmePath)) validateLocalLinks(readmePath, issues);
     if (fs.existsSync(skillPath)) validateLocalLinks(skillPath, issues);
 }
 

@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 import { DriverNERVAdapter } from '#driver/nerv_adapter/driver_nerv_adapter';
 
@@ -11,17 +11,20 @@ test('wave14: _withTimeout resolves and clears timer on success path', async () 
     const originalClearTimeout = global.clearTimeout;
     let clearCalls = 0;
 
-    global.clearTimeout = (...args) => {
-        clearCalls++;
-        return originalClearTimeout(...args);
-    };
+    const _mockClear = /** @type {any} */ (
+        function mockClearTimeout(/** @type {any} */ id) {
+            clearCalls++;
+            originalClearTimeout(id);
+        }
+    );
+    global.clearTimeout = _mockClear;
 
     try {
         const result = await DriverNERVAdapter.prototype._withTimeout.call(
             adapterLike,
             Promise.resolve('ok'),
             100,
-            'unit-success'
+            'unit-success',
         );
         assert.equal(result, 'ok');
     } finally {
@@ -36,11 +39,11 @@ test('wave14: _withTimeout returns TimeoutError metadata on timeout', async () =
 
     await assert.rejects(
         () => DriverNERVAdapter.prototype._withTimeout.call(adapterLike, new Promise(() => {}), 20, 'unit-timeout'),
-        err => {
-            assert.equal(err?.name, 'TimeoutError');
-            assert.equal(err?.operation, 'unit-timeout');
+        (err) => {
+            assert.equal(/** @type {any} */ (err)?.name, 'TimeoutError');
+            assert.equal(/** @type {any} */ (err)?.operation, 'unit-timeout');
             return true;
-        }
+        },
     );
 });
 

@@ -1,10 +1,11 @@
 // @ts-check
-import * as schemas from '#core/schemas';
 import { log } from '#core/logger';
+import * as schemas from '#core/schemas';
 import { recordEvent } from '#infra/db/events_repo';
 import { getMissionById } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
 import { getTaskById, insertTask, purgeTask, releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
+import { TaskControlCommand } from '#shared/nerv/constants';
 import { asRecord } from '#types/guards';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -14,7 +15,12 @@ function _now() {
     return Date.now();
 }
 
-function _error(statusCode, code, message, details = null) {
+function _error(
+    /** @type {any} */ statusCode,
+    /** @type {any} */ code,
+    /** @type {any} */ message,
+    /** @type {any} */ details = undefined,
+) {
     const err = new Error(message || code);
     err.statusCode = Number(statusCode) || 500;
     err.code = String(code || 'TASK_CONTROL_ERROR');
@@ -22,16 +28,16 @@ function _error(statusCode, code, message, details = null) {
     return err;
 }
 
-function _safeJsonParse(raw, fallback = {}) {
+function _safeJsonParse(/** @type {any} */ raw, fallback = {}) {
     if (!raw) return fallback;
     try {
         return JSON.parse(String(raw));
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
 
-function _readTaskRowTx(db, taskId) {
+function _readTaskRowTx(/** @type {any} */ db, /** @type {any} */ taskId) {
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(String(taskId || '').trim());
     if (!row) {
         throw _error(404, 'TASK_NOT_FOUND', 'Task não encontrada');
@@ -39,7 +45,7 @@ function _readTaskRowTx(db, taskId) {
     return row;
 }
 
-function _assertIfVersion(row, ifVersion) {
+function _assertIfVersion(/** @type {any} */ row, /** @type {any} */ ifVersion) {
     if (ifVersion === undefined || ifVersion === null) return;
     const expected = Number(ifVersion);
     const actual = Number(row.updated_at_ms || 0);
@@ -51,7 +57,7 @@ function _assertIfVersion(row, ifVersion) {
     }
 }
 
-function _assertPauseToEditTask(row) {
+function _assertPauseToEditTask(/** @type {any} */ row) {
     const status = String(row.status || '').toUpperCase();
     const canEditPendingNotStarted =
         status === 'PENDING' &&
@@ -68,12 +74,12 @@ function _assertPauseToEditTask(row) {
                 status,
                 stage: row.stage,
                 attempts: Number(row.attempts || 0),
-            }
+            },
         );
     }
 }
 
-function _buildTaskV5FromPayload(payload = {}) {
+function _buildTaskV5FromPayload(/** @type {any} */ payload = {}) {
     const nowIso = new Date().toISOString();
     const providedId = payload?.meta?.id ? String(payload.meta.id) : null;
     const taskId = (providedId || `task-${uuidv4()}`).replace(/[^a-zA-Z0-9._-]/g, '');
@@ -124,7 +130,7 @@ function _buildTaskV5FromPayload(payload = {}) {
     return task;
 }
 
-function _recordTaskEvent({ taskId, actor, eventType, reason, payload = {} }) {
+function _recordTaskEvent(/** @type {any} */ { taskId, actor, eventType, reason, payload = {} }) {
     try {
         recordEvent({
             entityType: 'task',
@@ -138,12 +144,13 @@ function _recordTaskEvent({ taskId, actor, eventType, reason, payload = {} }) {
             },
             dedupKey: `task:${taskId}:${eventType}:${Date.now()}`,
         });
-    } catch (err) {
-        log('WARN', `[TaskControl] Falha ao registrar evento ${eventType}: ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('WARN', `[TaskControl] Falha ao registrar evento ${eventType}: ${_e?.message || String(_e)}`);
     }
 }
 
-function _recordMissionEvent({ missionId, actor, eventType, reason, payload = {} }) {
+function _recordMissionEvent(/** @type {any} */ { missionId, actor, eventType, reason, payload = {} }) {
     if (!missionId) return;
     try {
         recordEvent({
@@ -158,19 +165,20 @@ function _recordMissionEvent({ missionId, actor, eventType, reason, payload = {}
             },
             dedupKey: `mission:${missionId}:${eventType}:${Date.now()}`,
         });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         log(
             'WARN',
-            `[TaskControl] Falha ao registrar evento ${eventType} na mission ${missionId}: ${err?.message || String(err)}`
+            `[TaskControl] Falha ao registrar evento ${eventType} na mission ${missionId}: ${_e?.message || String(_e)}`,
         );
     }
 }
 
-function _hasOwn(obj, key) {
+function _hasOwn(/** @type {any} */ obj, /** @type {any} */ key) {
     return Boolean(obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, key));
 }
 
-function _patchTouchesMissionBinding(patch = {}) {
+function _patchTouchesMissionBinding(/** @type {any} */ patch = {}) {
     if (_hasOwn(patch, 'mission_id')) return true;
     if (_hasOwn(patch, 'missionId')) return true;
     if (_hasOwn(patch, 'parent_id') || _hasOwn(patch, 'workflow_id')) return true;
@@ -200,7 +208,7 @@ function _patchTouchesMissionBinding(patch = {}) {
     return false;
 }
 
-function _isReadyNotStarted(row) {
+function _isReadyNotStarted(/** @type {any} */ row) {
     return (
         String(row.status || '').toUpperCase() === 'PENDING' &&
         String(row.stage || '').toUpperCase() === TASK_STAGES.READY &&
@@ -209,7 +217,7 @@ function _isReadyNotStarted(row) {
     );
 }
 
-function _assertTaskMissionReassignEligibility(row) {
+function _assertTaskMissionReassignEligibility(/** @type {any} */ row) {
     const status = String(row.status || '').toUpperCase();
     if (status === 'PAUSED') return;
     if (_isReadyNotStarted(row)) return;
@@ -222,11 +230,11 @@ function _assertTaskMissionReassignEligibility(row) {
             stage: String(row.stage || '').toUpperCase(),
             attempts: Number(row.attempts || 0),
             started_at_ms: row.started_at_ms ?? null,
-        }
+        },
     );
 }
 
-function _assertMissionDestinationAllowed(destination, missionId) {
+function _assertMissionDestinationAllowed(/** @type {any} */ destination, /** @type {any} */ missionId) {
     if (!destination) {
         throw _error(404, 'MISSION_NOT_FOUND', 'Missão de destino não encontrada', { mission_id: missionId });
     }
@@ -239,7 +247,7 @@ function _assertMissionDestinationAllowed(destination, missionId) {
     }
 }
 
-function _isTaskBoundToMissionStep(db, row, task) {
+function _isTaskBoundToMissionStep(/** @type {any} */ db, /** @type {any} */ row, /** @type {any} */ task) {
     const taskMission = task?.mission || _safeJsonParse(row.task_json, {})?.mission || {};
     const stepId = taskMission?.step_id || taskMission?.stepId || null;
     if (stepId) return true;
@@ -256,15 +264,24 @@ function _isTaskBoundToMissionStep(db, row, task) {
             FROM mission_steps
             WHERE current_task_id = @task_id OR last_task_id = @task_id
             LIMIT 1
-        `
+        `,
         )
         .get({ task_id: row.id });
     return Boolean(binding);
 }
 
 /**
- * Função exportada: createTaskCommand.
- * @returns {any}
+ * @typedef {object} CreateTaskCommandOptions
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
+ * @property {string} [reason] - Motivo do comando.
+ * @property {object} [payload={}] - Dados adicionais da tarefa. Default is `{}`
+ * @property {boolean} [ifNotExists=false] - Criar somente se ainda não existir. Default is `false`
+ */
+/**
+ * Cria um novo comando de task no sistema.
+ *
+ * @param {CreateTaskCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
 function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = false }) {
     const actorView = asRecord(actor);
@@ -272,12 +289,14 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
     const task = _buildTaskV5FromPayload(payloadView);
     const stage = String(payloadView.stage || TASK_STAGES.READY).toUpperCase();
     const status = String(payloadView.status || 'PENDING').toUpperCase();
-    const created = insertTask(task, {
-        stage,
-        status,
-        actor: String(actorView.username || actorView.id || 'user'),
-        ifNotExists,
-    });
+    const created = /** @type {any} */ (
+        insertTask(task, {
+            stage,
+            status,
+            actor: String(actorView.username || actorView.id || 'user'),
+            ifNotExists,
+        })
+    );
 
     _recordTaskEvent({
         taskId: created?.meta?.id || task.meta.id,
@@ -299,8 +318,18 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
 }
 
 /**
- * Função exportada: patchTaskCommand.
- * @returns {any}
+ * @typedef {object} PatchTaskCommandOptions
+ * @property {string} taskId - ID da task a alterar.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
+ * @property {string | undefined} [reason] - Motivo da alteração.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
+ * @property {object} [patch={}] - Campos a alterar. Default is `{}`
+ */
+/**
+ * Aplica um patch parcial a uma task existente.
+ *
+ * @param {PatchTaskCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
 function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch = {} }) {
     const patchView = asRecord(patch);
@@ -312,11 +341,11 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
         throw _error(
             422,
             'TASK_MISSION_REASSIGN_USE_COMMAND',
-            'Use TASK_REASSIGN_MISSION para alterar vínculo de missão/workflow/parent da task'
+            'Use TASK_REASSIGN_MISSION para alterar vínculo de missão/workflow/parent da task',
         );
     }
 
-    const existingTask = getTaskById(taskId);
+    const existingTask = /** @type {any} */ (getTaskById(taskId));
     if (!existingTask) {
         throw _error(404, 'TASK_NOT_FOUND', 'Task não encontrada');
     }
@@ -396,8 +425,18 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
 }
 
 /**
- * Função exportada: reassignTaskMissionCommand.
- * @returns {any}
+ * @typedef {object} ReassignTaskMissionCommandOptions
+ * @property {string} taskId - ID da task.
+ * @property {string | null} missionId - ID da missão destino (null para desassociar).
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
+ * @property {string | undefined} [reason] - Motivo da reassociação.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
+ */
+/**
+ * Reassocia uma task a outra missão.
+ *
+ * @param {ReassignTaskMissionCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
 function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifVersion = null }) {
     const destinationMissionId = missionId === null || missionId === undefined ? '' : String(missionId).trim();
@@ -420,7 +459,7 @@ function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifV
     const destinationMission = getMissionById(destinationMissionId);
     _assertMissionDestinationAllowed(destinationMission, destinationMissionId);
 
-    const existingTask = getTaskById(taskId);
+    const existingTask = /** @type {any} */ (getTaskById(taskId));
     if (!existingTask) {
         throw _error(404, 'TASK_NOT_FOUND', 'Task não encontrada');
     }
@@ -430,7 +469,7 @@ function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifV
             423,
             'TASK_REASSIGN_BLOCKED_BY_MISSION_STEP',
             'Task vinculada a step de missão ativa não pode ser reatribuída',
-            { task_id: taskId }
+            { task_id: taskId },
         );
     }
 
@@ -498,8 +537,17 @@ function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifV
 }
 
 /**
- * Função exportada: pauseTaskCommand.
- * @returns {any}
+ * @typedef {object} PauseTaskCommandOptions
+ * @property {string} taskId - ID da task a pausar.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
+ * @property {string | undefined} [reason] - Motivo da pausa.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
+ */
+/**
+ * Pausa a execução de uma task.
+ *
+ * @param {PauseTaskCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
 function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -517,7 +565,7 @@ function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
     try {
         releaseTaskLock({ taskId });
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // best effort
     }
 
@@ -531,8 +579,17 @@ function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 }
 
 /**
- * Função exportada: resumeTaskCommand.
- * @returns {any}
+ * @typedef {object} ResumeTaskCommandOptions
+ * @property {string} taskId - ID da task a retomar.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
+ * @property {string | undefined} [reason] - Motivo da retomada.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
+ */
+/**
+ * Retoma a execução de uma task pausada.
+ *
+ * @param {ResumeTaskCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
 function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -561,7 +618,7 @@ function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
     try {
         releaseTaskLock({ taskId });
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // best effort
     }
 
@@ -575,8 +632,17 @@ function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 }
 
 /**
- * Função exportada: cancelTaskCommand.
- * @returns {any}
+ * @typedef {object} CancelTaskCommandOptions
+ * @property {string} taskId - ID da task a cancelar.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
+ * @property {string | undefined} [reason] - Motivo do cancelamento.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
+ */
+/**
+ * Cancela uma task ativa.
+ *
+ * @param {CancelTaskCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
 function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -599,7 +665,7 @@ function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
     try {
         releaseTaskLock({ taskId });
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // best effort
     }
 
@@ -613,8 +679,17 @@ function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 }
 
 /**
- * Função exportada: retryTaskCommand.
- * @returns {any}
+ * @typedef {object} RetryTaskCommandOptions
+ * @property {string} taskId - ID da task a retentar.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
+ * @property {string | undefined} [reason] - Motivo da retentativa.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
+ */
+/**
+ * Retenta uma task falha ou cancelada.
+ *
+ * @param {RetryTaskCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
 function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -641,7 +716,7 @@ function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
     try {
         releaseTaskLock({ taskId });
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // best effort
     }
 
@@ -655,8 +730,16 @@ function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 }
 
 /**
- * Função exportada: purgeTaskCommand.
- * @returns {any}
+ * @typedef {object} PurgeTaskCommandOptions
+ * @property {string} taskId - ID da task a purgar.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
+ * @property {string} [reason] - Motivo da purga.
+ */
+/**
+ * Remove permanentemente uma task do sistema.
+ *
+ * @param {PurgeTaskCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
 function purgeTaskCommand({ taskId, actor = {}, reason }) {
     const before = getTaskById(taskId);
@@ -679,11 +762,21 @@ function purgeTaskCommand({ taskId, actor = {}, reason }) {
 }
 
 /**
- * Função exportada: bulkTaskActionCommand.
- * @returns {any}
+ * @typedef {object} BulkTaskActionCommandOptions
+ * @property {string[]} [ids=[]] - Lista de IDs de tasks. Default is `[]`
+ * @property {string} action - Ação a executar (ex: cancel, pause, retry).
+ * @property {object} [params={}] - Parâmetros adicionais da ação. Default is `{}`
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
+ * @property {string} [reason] - Motivo da ação em massa.
+ */
+/**
+ * Executa uma ação em lote sobre múltiplas tasks.
+ *
+ * @param {BulkTaskActionCommandOptions} options
+ * @returns {Promise<object> | object | null}
  */
 function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reason }) {
-    const normalized = Array.isArray(ids) ? ids.map(id => String(id)).filter(Boolean) : [];
+    const normalized = Array.isArray(ids) ? ids.map((id) => String(id)).filter(Boolean) : [];
     const paramsView = asRecord(params);
     if (normalized.length === 0) {
         throw _error(400, 'TASK_BULK_IDS_REQUIRED', 'ids vazio');
@@ -696,38 +789,38 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
         try {
             let result;
             switch (String(action || '').toUpperCase()) {
-                case 'PAUSE':
+                case TaskControlCommand.PAUSE:
                     result = pauseTaskCommand({ taskId, actor, reason });
                     break;
-                case 'RESUME':
-                case 'UNBLOCK':
+                case TaskControlCommand.RESUME:
+                case TaskControlCommand.UNBLOCK:
                     result = resumeTaskCommand({ taskId, actor, reason });
                     break;
-                case 'RETRY':
+                case TaskControlCommand.RETRY:
                     result = retryTaskCommand({ taskId, actor, reason });
                     break;
-                case 'CANCEL':
+                case TaskControlCommand.CANCEL:
                     result = cancelTaskCommand({ taskId, actor, reason });
                     break;
-                case 'PATCH':
+                case TaskControlCommand.PATCH:
                     result = patchTaskCommand({ taskId, actor, reason, patch: params || {} });
                     break;
-                case 'APPROVE':
+                case TaskControlCommand.APPROVE:
                     result = patchTaskCommand({ taskId, actor, reason, patch: { stage: 'READY' } });
                     break;
-                case 'REJECT':
+                case TaskControlCommand.REJECT:
                     result = patchTaskCommand({ taskId, actor, reason, patch: { stage: 'REJECTED' } });
                     break;
-                case 'SET_STAGE':
+                case TaskControlCommand.SET_STAGE:
                     result = patchTaskCommand({ taskId, actor, reason, patch: { stage: paramsView.stage } });
                     break;
-                case 'SET_TARGET':
+                case TaskControlCommand.SET_TARGET:
                     result = patchTaskCommand({ taskId, actor, reason, patch: { target: paramsView.target } });
                     break;
-                case 'SET_PRIORITY':
+                case TaskControlCommand.SET_PRIORITY:
                     result = patchTaskCommand({ taskId, actor, reason, patch: { priority: paramsView.priority } });
                     break;
-                case 'SET_EXECUTE_AFTER':
+                case TaskControlCommand.SET_EXECUTE_AFTER:
                     result = patchTaskCommand({
                         taskId,
                         actor,
@@ -737,7 +830,7 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                         },
                     });
                     break;
-                case 'SET_DEPENDENCIES':
+                case TaskControlCommand.SET_DEPENDENCIES:
                     result = patchTaskCommand({
                         taskId,
                         actor,
@@ -747,25 +840,26 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                         },
                     });
                     break;
-                case 'REASSIGN_MISSION':
+                case TaskControlCommand.REASSIGN_MISSION:
                     result = reassignTaskMissionCommand({
                         taskId,
-                        missionId: paramsView.mission_id,
+                        missionId: /** @type {any} */ (paramsView.mission_id),
                         actor,
                         reason,
-                        ifVersion: paramsView.if_version,
+                        ifVersion: /** @type {any} */ (paramsView.if_version),
                     });
                     break;
                 default:
                     throw _error(422, 'TASK_BULK_ACTION_INVALID', `Ação não suportada: ${action}`);
             }
             results.push({ id: taskId, ok: true, result });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
             failed.push({
                 id: taskId,
                 ok: false,
-                code: err?.code || 'TASK_BULK_ITEM_FAILED',
-                error: err?.message || String(err),
+                code: _e?.code || 'TASK_BULK_ITEM_FAILED',
+                error: _e?.message || String(_e),
             });
         }
     }

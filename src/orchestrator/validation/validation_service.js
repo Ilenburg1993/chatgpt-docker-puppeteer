@@ -1,12 +1,13 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as logger from '#core/logger';
-import { ActionCode, ActorRole } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
 /**
  * ValidationService - Serviço de validação de outputs.
  *
  * Suporta múltiplos tipos de validadores:
+ *
  * - regex: Valida com regex pattern
  * - schema: Valida com Zod schema (JSON parsing)
  * - length: Valida min/max length
@@ -15,6 +16,9 @@ import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
  * - custom: Função customizada
  */
 class ValidationService {
+    /**
+     * @param {{ nerv: any }} options
+     */
     constructor({ nerv }) {
         this.nerv = nerv;
         this.validators = new Map();
@@ -28,7 +32,7 @@ class ValidationService {
      */
     _registerBuiltinValidators() {
         // Regex validator
-        this.validators.set('regex', async (output, config) => {
+        this.validators.set('regex', async (/** @type {any} */ output, /** @type {any} */ config) => {
             const pattern = new RegExp(config.pattern, config.flags || '');
             const passed = pattern.test(output);
             return {
@@ -39,7 +43,7 @@ class ValidationService {
         });
 
         // Length validator
-        this.validators.set('length', async (output, config) => {
+        this.validators.set('length', async (/** @type {any} */ output, /** @type {any} */ config) => {
             const length = output.length;
             const min = config.min_length || 0;
             const max = config.max_length || Infinity;
@@ -53,7 +57,7 @@ class ValidationService {
         });
 
         // Schema validator (JSON)
-        this.validators.set('schema', async (output, config) => {
+        this.validators.set('schema', async (/** @type {any} */ output, /** @type {any} */ config) => {
             try {
                 const parsed = JSON.parse(output);
                 // Se tem schema Zod, valida
@@ -71,17 +75,18 @@ class ValidationService {
                     score: 100,
                     feedback: 'Valid JSON',
                 };
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
+                const _err = /** @type {any} */ (error);
                 return {
                     passed: false,
                     score: 0,
-                    feedback: `Invalid JSON: ${error.message}`,
+                    feedback: `Invalid JSON: ${_err.message}`,
                 };
             }
         });
 
         // Format validator
-        this.validators.set('format', async (output, config) => {
+        this.validators.set('format', async (/** @type {any} */ output, /** @type {any} */ config) => {
             const format = config.format || 'text';
             let passed = true;
             let feedback = 'Format OK';
@@ -89,9 +94,10 @@ class ValidationService {
             if (format === 'json') {
                 try {
                     JSON.parse(output);
-                } catch (error) {
+                } catch (/** @type {any} */ error) {
+                    const _err = /** @type {any} */ (error);
                     passed = false;
-                    feedback = `Not valid JSON: ${error.message}`;
+                    feedback = `Not valid JSON: ${_err.message}`;
                 }
             } else if (format === 'markdown') {
                 // Validação básica de markdown (tem # ou *)
@@ -116,22 +122,22 @@ class ValidationService {
             logger.warn(
                 '[ValidationService] llm_judge não implementado — validação em modo bypass. ' +
                     'Retornando passed=true com score=null. ' +
-                    'Para habilitar validação real, implemente o driver LLM neste validador.'
+                    'Para habilitar validação real, implemente o driver LLM neste validador.',
             );
             return {
                 passed: true, // Não bloqueia o fluxo
-                score: null, // null = não validado (vs 0 = falhou)
+                score: /** @type {number | null} */ (null), // null = não validado (vs 0 = falhou)
                 validation_mode: 'bypassed',
                 feedback: 'LLM-as-judge não configurado. Validação em modo bypass.',
-                strengths: [],
-                weaknesses: [],
-                suggestions: [],
+                strengths: /** @type {any[]} */ ([]),
+                weaknesses: /** @type {any[]} */ ([]),
+                suggestions: /** @type {any[]} */ ([]),
                 _bypass_reason: 'LLM_JUDGE_NOT_IMPLEMENTED',
             };
         });
 
         // Custom validator
-        this.validators.set('custom', async (output, config) => {
+        this.validators.set('custom', async (/** @type {any} */ output, /** @type {any} */ config) => {
             if (typeof config.validator !== 'function') {
                 throw new Error('Custom validator must be a function');
             }
@@ -143,8 +149,8 @@ class ValidationService {
      * Valida output usando múltiplos validadores.
      *
      * @param {string} output - Output do LLM
-     * @param {{ validators?: Array, criteria?: object }} [options] - Opções de validação
-     * @returns {Promise<object>} - { passed, overall_score, validation_results, feedback, issues }
+     * @param {{ validators?: any[]; criteria?: any }} [options] - Opções de validação
+     * @returns {Promise<any>} - { passed, overall_score, validation_results, feedback, issues }
      */
     async validate(output, options = {}) {
         const { validators = [], criteria = {} } = options;
@@ -197,14 +203,15 @@ class ValidationService {
                 if (!result.passed) {
                     issues.push(`${type}: ${result.feedback}`);
                 }
-            } catch (error) {
-                logger.error(`[ValidationService] Validator ${type} failed: ${error.message}`, { error });
-                issues.push(`${type} error: ${error.message}`);
+            } catch (/** @type {any} */ error) {
+                const _err = /** @type {any} */ (error);
+                logger.error(`[ValidationService] Validator ${type} failed: ${_err.message}`);
+                issues.push(`${type} error: ${_err.message}`);
                 validation_results.push({
                     validator_type: type,
                     passed: false,
                     score: 0,
-                    feedback: `Error: ${error.message}`,
+                    feedback: `Error: ${_err.message}`,
                 });
             }
         }
@@ -227,14 +234,16 @@ class ValidationService {
         // Emite evento NERV
         if (this.nerv) {
             try {
+                // eslint-disable-next-line @typescript-eslint/await-thenable
                 await HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, ActionCode.VALIDATION_COMPLETED, {
                     passed,
                     overall_score,
                     num_validators: validators.length,
                     num_issues: issues.length,
                 });
-            } catch (e) {
-                logger.error('[ValidationService] Falha ao emitir VALIDATION_COMPLETED via NERV:', e.message);
+            } catch (/** @type {any} */ e) {
+                const _e = /** @type {any} */ (e);
+                logger.error('[ValidationService] Falha ao emitir VALIDATION_COMPLETED via NERV:', _e.message);
             }
         }
 
@@ -249,6 +258,7 @@ class ValidationService {
 
     /**
      * Registra validator customizado.
+     *
      * @param {string} name - Nome do validator
      * @param {function} validatorFn - Função do validator
      */

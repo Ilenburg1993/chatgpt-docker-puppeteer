@@ -638,7 +638,7 @@ getHealth() {
 if (instances.size >= FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE) {
   log(
     'WARN',
-    `[FACTORY] Cache limit reached (${instances.size}/${FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE}). Evicting oldest.`
+    `[FACTORY] Cache limit reached (${instances.size}/${FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE}). Evicting oldest.`,
   );
 
   const oldestKey = instances.keys().next().value;
@@ -646,7 +646,7 @@ if (instances.size >= FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE) {
 
   try {
     if (oldestDriver && !oldestDriver.destroyed) {
-      oldestDriver.destroy().catch(err => {
+      oldestDriver.destroy().catch((err) => {
         log('WARN', `[FACTORY] Error destroying evicted driver: ${err.message}`);
       });
     }
@@ -815,15 +815,15 @@ Constantes Config:  2 → 14 (+600%)
 const factory = require('./driver/factory');
 
 // Escutar eventos de factory
-factory.on('factory:discovery_complete', data => {
+factory.on('factory:discovery_complete', (data) => {
   console.log(`Descobertos ${data.targetCount} drivers: ${data.targets.join(', ')}`);
 });
 
-factory.on('factory:driver_created', data => {
+factory.on('factory:driver_created', (data) => {
   console.log(`Driver ${data.name} criado para target ${data.target}`);
 });
 
-factory.on('factory:driver_reused', data => {
+factory.on('factory:driver_reused', (data) => {
   console.log(`Driver ${data.name} reutilizado (cache hit)`);
 });
 

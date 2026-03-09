@@ -1,10 +1,10 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import test from 'node:test';
 
-import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';
 import { registerUpstreams, shutdownUpstreams } from '../../../src/integration/mcp/upstream-manager.mjs';
+import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';
 
 test('imports tools from stdio upstream (SDK) and proxies calls', async () => {
     const registry = new ToolRegistry();
@@ -28,17 +28,18 @@ test('imports tools from stdio upstream (SDK) and proxies calls', async () => {
     try {
         const st = await registerUpstreams(registry, { env });
         assert.equal(st.upstreams.length, 1);
-        assert.equal(st.upstreams[0].alias, 'fixture');
-        assert.equal(st.upstreams[0].ready, true);
-        assert.ok(st.upstreams[0].registeredCount >= 2);
+        const up0s = /** @type {any} */ (st.upstreams[0]);
+        assert.equal(up0s.alias, 'fixture');
+        assert.equal(up0s.ready, true);
+        assert.ok(up0s.registeredCount >= 2);
 
         assert.equal(registry.has('mcp_fixture__echo'), true);
         assert.equal(registry.has('mcp_fixture__add'), true);
 
-        const echo = await registry.execute('mcp_fixture__echo', { message: 'hi' });
+        const echo = /** @type {any} */ (await registry.execute('mcp_fixture__echo', { message: 'hi' }));
         assert.equal(echo?.content?.[0]?.text, 'hi');
 
-        const add = await registry.execute('mcp_fixture__add', { a: 2, b: 3 });
+        const add = /** @type {any} */ (await registry.execute('mcp_fixture__add', { a: 2, b: 3 }));
         assert.equal(add?.content?.[0]?.text, '5');
     } finally {
         await shutdownUpstreams().catch(() => {});

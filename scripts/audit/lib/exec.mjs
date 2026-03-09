@@ -2,23 +2,38 @@
 import { spawn } from 'node:child_process';
 
 /**
+ * @typedef {object} RunCommandOptions
+ * @property {string} [cwd]
+ * @property {Record<string, string>} [env]
+ * @property {number} [timeoutMs]
+ * @property {number[]} [acceptExitCodes]
+ * @property {number} [maxStdoutBytes]
+ * @property {number} [maxStderrBytes]
+ * @property {number} [truncationHeadRatio]
+ * @property {boolean} [shell]
+ * @property {any} [stdio]
+ * @property {(chunk: string) => void} [onStdout]
+ * @property {(chunk: string) => void} [onStderr]
+ */
+/**
  * Runs a command and captures stdout/stderr without throwing.
+ *
  * @param {string} command
  * @param {string[]} args
- * @param {{
- *   cwd?: string,
- *   env?: Record<string,string|undefined>,
- *   timeoutMs?: number,
- *   acceptExitCodes?: number[],
- *   maxStdoutBytes?: number,
- *   maxStderrBytes?: number,
- *   truncationHeadRatio?: number,
- *   shell?: boolean,
- *   stdio?: any,
- *   onStdout?: (chunk: string) => void,
- *   onStderr?: (chunk: string) => void,
- * }} [options]
- * @returns {Promise<{ ok: boolean, exitCode: number|null, stdout: string, stderr: string, durationMs: number, timedOut: boolean, command: string, stdoutBytes: number, stderrBytes: number, stdoutTruncated: boolean, stderrTruncated: boolean }>}
+ * @param {RunCommandOptions} [options]
+ * @returns {Promise<{
+ *     ok: boolean;
+ *     exitCode: number | null;
+ *     stdout: string;
+ *     stderr: string;
+ *     durationMs: number;
+ *     timedOut: boolean;
+ *     command: string;
+ *     stdoutBytes: number;
+ *     stderrBytes: number;
+ *     stdoutTruncated: boolean;
+ *     stderrTruncated: boolean;
+ * }>}
  */
 export async function runCommand(command, args = [], options = {}) {
     const startedAt = Date.now();
@@ -27,10 +42,10 @@ export async function runCommand(command, args = [], options = {}) {
     const maxStderrBytes = Math.max(65536, Number(options.maxStderrBytes || 1024 * 1024));
     const headRatio = Math.max(0.2, Math.min(0.8, Number(options.truncationHeadRatio || 0.6)));
     const acceptExitCodes = Array.isArray(options.acceptExitCodes)
-        ? options.acceptExitCodes.map(value => Number(value)).filter(Number.isInteger)
+        ? options.acceptExitCodes.map((value) => Number(value)).filter(Number.isInteger)
         : [];
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const child = spawn(command, args, {
             cwd: options.cwd || process.cwd(),
             env: { ...process.env, ...(options.env || {}) },
@@ -48,7 +63,7 @@ export async function runCommand(command, args = [], options = {}) {
         let timeout = null;
 
         if (child.stdout) {
-            child.stdout.on('data', chunk => {
+            child.stdout.on('data', (chunk) => {
                 const text = String(chunk);
                 const bounded = appendBoundedOutput({
                     current: stdout,
@@ -69,7 +84,7 @@ export async function runCommand(command, args = [], options = {}) {
         }
 
         if (child.stderr) {
-            child.stderr.on('data', chunk => {
+            child.stderr.on('data', (chunk) => {
                 const text = String(chunk);
                 const bounded = appendBoundedOutput({
                     current: stderr,
@@ -96,7 +111,7 @@ export async function runCommand(command, args = [], options = {}) {
             }, timeoutMs);
         }
 
-        child.on('error', err => {
+        child.on('error', (err) => {
             if (timeout) {
                 clearTimeout(timeout);
             }
@@ -115,7 +130,7 @@ export async function runCommand(command, args = [], options = {}) {
             });
         });
 
-        child.on('close', code => {
+        child.on('close', (code) => {
             if (timeout) {
                 clearTimeout(timeout);
             }
@@ -138,15 +153,17 @@ export async function runCommand(command, args = [], options = {}) {
 }
 
 /**
- * @param {{
- *   current: string,
- *   incoming: string,
- *   previousBytes: number,
- *   limitBytes: number,
- *   wasTruncated: boolean,
- *   headRatio: number,
- *   marker: string,
- * }} input
+ * @typedef {object} AppendBoundedOutputInput
+ * @property {string} current
+ * @property {string} incoming
+ * @property {number} previousBytes
+ * @property {number} limitBytes
+ * @property {boolean} wasTruncated
+ * @property {number} headRatio
+ * @property {string} marker
+ */
+/**
+ * @param {AppendBoundedOutputInput} input
  */
 function appendBoundedOutput(input) {
     const incomingBytes = Buffer.byteLength(input.incoming, 'utf8');
@@ -194,7 +211,7 @@ function sliceByUtf8Bytes(text, maxBytes, fromEnd) {
 
 /**
  * @param {string} binary
- * @param {(command: string, args: string[], options?: any) => Promise<{ ok: boolean }>} [execFn]
+ * @param {any} [execFn]
  * @returns {Promise<boolean>}
  */
 export async function commandExists(binary, execFn = runCommand) {
@@ -205,7 +222,7 @@ export async function commandExists(binary, execFn = runCommand) {
 
 /**
  * @param {string} text
- * @returns {any|null}
+ * @returns {any}
  */
 function tryParseJson(text) {
     try {
@@ -216,15 +233,16 @@ function tryParseJson(text) {
 }
 
 /**
- * Extracts balanced JSON blocks (objects/arrays) from a mixed output stream.
- * Scans with string-escape awareness to avoid braces/brackets inside quoted strings.
+ * Extracts balanced JSON blocks (objects/arrays) from a mixed output stream. Scans with string-escape awareness to
+ * avoid braces/brackets inside quoted strings.
+ *
  * @param {string} text
  * @returns {string[]}
  */
 function extractBalancedJsonBlocks(text) {
     /** @type {string[]} */
     const blocks = [];
-    /** @type {Array<{ start: number, opener: '{'|'[' }>} */
+    /** @type {Array<{start: number, opener: string}>} */
     const stack = [];
     let inString = false;
     let stringQuote = '';
@@ -259,7 +277,7 @@ function extractBalancedJsonBlocks(text) {
         if (ch === '{' || ch === '[') {
             stack.push({
                 start: index,
-                opener: /** @type {'{'|'['} */ (ch),
+                opener: /** @type {string} */ (ch),
             });
             continue;
         }
@@ -271,7 +289,7 @@ function extractBalancedJsonBlocks(text) {
                 stack.length = 0;
                 continue;
             }
-            if (stack.length === 0 && Number.isInteger(top?.start)) {
+            if (stack.length === 0 && top && Number.isInteger(top.start)) {
                 blocks.push(text.slice(top.start, index + 1));
             }
         }
@@ -281,10 +299,15 @@ function extractBalancedJsonBlocks(text) {
 }
 
 /**
+ * @typedef {object} ParseJsonFromMixedOutputOptions
+ * @property {boolean} [preferLast]
+ */
+/**
  * Attempts to parse a JSON object from noisy stdout.
+ *
  * @param {string} stdout
- * @param {{ preferLast?: boolean }} [options]
- * @returns {any|null}
+ * @param {ParseJsonFromMixedOutputOptions} [options]
+ * @returns {any}
  */
 export function parseJsonFromMixedOutput(stdout, options = {}) {
     const text = String(stdout || '')
@@ -320,7 +343,7 @@ export function parseJsonFromMixedOutput(stdout, options = {}) {
         }
     }
     if (parsedCandidates.length > 0) {
-        const withKeys = parsedCandidates.find(item => !Array.isArray(item) && Object.keys(item).length > 0);
+        const withKeys = parsedCandidates.find((item) => !Array.isArray(item) && Object.keys(item).length > 0);
         if (withKeys) {
             return withKeys;
         }
@@ -329,9 +352,8 @@ export function parseJsonFromMixedOutput(stdout, options = {}) {
 
     // Fallback: lines starting with "{" in case output is truncated around the block.
     const lines = text.split(/\r?\n/);
-    const indexes = preferLast
-        ? Array.from({ length: lines.length }, (_item, idx) => lines.length - idx - 1)
-        : Array.from({ length: lines.length }, (_item, idx) => idx);
+    const allLineIndexes = lines.map((_, idx) => idx);
+    const indexes = preferLast ? [...allLineIndexes].reverse() : allLineIndexes;
     for (const start of indexes) {
         if (
             !String(lines[start] || '')

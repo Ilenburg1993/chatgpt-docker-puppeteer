@@ -1,6 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { ActorRole, ActionCode } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
 // ONDA 2.5: Removido EventEmitter, usa NERV para comunicação
 
@@ -22,19 +22,12 @@ const TelemetrySeverity = Object.freeze({
 /** Classe exportada: KernelTelemetry. */
 class KernelTelemetry {
     /**
-     * @param {Object} [config]
-     * @param {Object} [config.nerv]
-     * Instância do NERV para emissão de eventos (OBRIGATÓRIO após ONDA 2).
-     *
-     * @param {string} [config.source]
-     * Identificador da origem dos eventos (ex.: 'kernel', 'task_runtime').
-     *
-     * @param {number|null} [config.retention]
-     * Política de retenção em memória (null = sem retenção interna).
-     * [P3.3 FIX] Padrão aumentado de 1000 para 5000 para melhor análise pós-mortem.
-     *
-     * @param {boolean} [config.enabled]
-     * Habilita/desabilita telemetria (default: true).
+     * @param {object} [config]
+     * @param {any} [config.nerv] Instância do NERV para emissão de eventos (OBRIGATÓRIO após ONDA 2).
+     * @param {string} [config.source] Identificador da origem dos eventos (ex.: 'kernel', 'task_runtime').
+     * @param {number | null} [config.retention] Política de retenção em memória (null = sem retenção interna). [P3.3
+     *   FIX] Padrão aumentado de 1000 para 5000 para melhor análise pós-mortem.
+     * @param {boolean} [config.enabled] Habilita/desabilita telemetria (default: true).
      */
     constructor(config = {}) {
         const { nerv = null, source = 'kernel', retention = 5000, enabled = true } = config;
@@ -51,7 +44,7 @@ class KernelTelemetry {
         /**
          * Buffer interno para auditoria/retenção.
          */
-        this.buffer = [];
+        this.buffer = /** @type {any[]} */ ([]);
 
         /**
          * Contadores e gauges técnicos.
@@ -72,17 +65,10 @@ class KernelTelemetry {
     /**
      * Emite evento de telemetria estruturado.
      *
-     * @param {string} type
-     * Tipo canônico do evento (ex.: 'task_created').
-     *
-     * @param {Object} [payload]
-     * Dados observáveis.
-     *
-     * @param {string} [severity]
-     * Severidade (INFO, WARNING, CRITICAL).
-     *
-     * @returns {Promise<Object>}
-     * Evento criado.
+     * @param {string} type Tipo canônico do evento (ex.: 'task_created').
+     * @param {object} [payload] Dados observáveis.
+     * @param {string} [severity] Severidade (INFO, WARNING, CRITICAL).
+     * @returns {Promise<any>} Evento criado.
      */
     async emitEvent(type, payload = {}, severity = TelemetrySeverity.INFO) {
         if (!this.enabled) {
@@ -113,11 +99,12 @@ class KernelTelemetry {
                 const discarded = this.buffer.shift();
                 // ONDA 2.5: Emitir via NERV (não mais EventEmitter interno)
                 try {
+                    // eslint-disable-next-line @typescript-eslint/await-thenable
                     await HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.TELEMETRY_DISCARDED, {
                         discardedAt: Date.now(),
                         discardedEventType: discarded.type,
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     // Best-effort: don't crash telemetry on emit failures
                 }
             }
@@ -125,8 +112,9 @@ class KernelTelemetry {
 
         // ONDA 2.5: Emissão via NERV (desacoplado)
         try {
+            // eslint-disable-next-line @typescript-eslint/await-thenable
             await HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.KERNEL_TELEMETRY, event);
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // Best-effort: avoid failing kernel telemetry on emission errors
         }
 
@@ -139,6 +127,9 @@ class KernelTelemetry {
 
     /**
      * Emite evento informativo.
+     *
+     * @param {any} type
+     * @param {object} [payload]
      */
     info(type, payload = {}) {
         return this.emitEvent(type, payload, TelemetrySeverity.INFO);
@@ -146,6 +137,9 @@ class KernelTelemetry {
 
     /**
      * Emite alerta.
+     *
+     * @param {any} type
+     * @param {object} [payload]
      */
     warning(type, payload = {}) {
         return this.emitEvent(type, payload, TelemetrySeverity.WARNING);
@@ -153,14 +147,19 @@ class KernelTelemetry {
 
     /**
      * Emite evento crítico.
+     *
+     * @param {any} type
+     * @param {object} [payload]
      */
     critical(type, payload = {}) {
         return this.emitEvent(type, payload, TelemetrySeverity.CRITICAL);
     }
 
     /**
-     * Emite evento genérico (compatibilidade com NERV).
-     * ONDA 2.5: Delega para NERV, não usa EventEmitter interno.
+     * Emite evento genérico (compatibilidade com NERV). ONDA 2.5: Delega para NERV, não usa EventEmitter interno.
+     *
+     * @param {any} type
+     * @param {object} [payload]
      */
     emit(type, payload = {}) {
         return this.emitEvent(type, payload, TelemetrySeverity.INFO);
@@ -172,6 +171,9 @@ class KernelTelemetry {
 
     /**
      * Incrementa contador técnico.
+     *
+     * @param {any} name
+     * @param {number} [value]
      */
     _incrementCounter(name, value = 1) {
         this.counters[name] = (this.counters[name] || 0) + value;
@@ -179,6 +181,9 @@ class KernelTelemetry {
 
     /**
      * Define gauge técnico.
+     *
+     * @param {any} name
+     * @param {any} value
      */
     _setGauge(name, value) {
         this.gauges[name] = value;
@@ -186,6 +191,8 @@ class KernelTelemetry {
 
     /**
      * Registra timestamp técnico.
+     *
+     * @param {any} name
      */
     _mark(name) {
         this.timestamps[name] = Date.now();
@@ -219,23 +226,31 @@ class KernelTelemetry {
 
     /**
      * Retorna eventos por tipo.
+     *
+     * @param {any} type
      */
     getEventsByType(type) {
-        return Object.freeze(this.buffer.filter(e => e.type === type));
+        return Object.freeze(this.buffer.filter((e) => e.type === type));
     }
 
     /**
      * Retorna eventos por severidade.
+     *
+     * @param {any} severity
      */
     getEventsBySeverity(severity) {
-        return Object.freeze(this.buffer.filter(e => e.severity === severity));
+        return Object.freeze(this.buffer.filter((e) => e.severity === severity));
     }
 
     /**
      * Retorna eventos em intervalo temporal.
+     *
+     * @param {object} params
+     * @param {number} params.startAt
+     * @param {number} params.endAt
      */
     getEventsByTimeRange({ startAt, endAt }) {
-        return Object.freeze(this.buffer.filter(e => e.at >= startAt && e.at <= endAt));
+        return Object.freeze(this.buffer.filter((e) => e.at >= startAt && e.at <= endAt));
     }
 
     /* ===========================
@@ -247,7 +262,7 @@ class KernelTelemetry {
      */
     enable() {
         this.enabled = true;
-        this.info('telemetry_enabled', { at: Date.now() });
+        void this.info('telemetry_enabled', { at: Date.now() });
     }
 
     /**
@@ -264,7 +279,7 @@ class KernelTelemetry {
         const count = this.buffer.length;
         this.buffer = [];
 
-        this.info('telemetry_buffer_cleared', {
+        void this.info('telemetry_buffer_cleared', {
             clearedCount: count,
             at: Date.now(),
         });
@@ -278,7 +293,7 @@ class KernelTelemetry {
         this.gauges = Object.create(null);
         this.timestamps = Object.create(null);
 
-        this.info('telemetry_metrics_reset', {
+        void this.info('telemetry_metrics_reset', {
             at: Date.now(),
         });
     }
@@ -288,14 +303,10 @@ class KernelTelemetry {
   =========================== */
 
     /**
-     * Registra observador de telemetria via NERV.
-     * ONDA 2.5: Usa NERV.onEvent() ao invés de EventEmitter interno.
+     * Registra observador de telemetria via NERV. ONDA 2.5: Usa NERV.onEvent() ao invés de EventEmitter interno.
      *
-     * @param {Function} handler
-     * Função chamada para cada evento de telemetria do Kernel.
-     *
-     * @returns {Function}
-     * Função de unsubscribe.
+     * @param {function} handler Função chamada para cada evento de telemetria do Kernel.
+     * @returns {function} Função de unsubscribe.
      */
     onEvent(handler) {
         if (typeof handler !== 'function') {
@@ -303,44 +314,51 @@ class KernelTelemetry {
         }
 
         // ONDA 2.5: Delega para NERV, filtra apenas eventos KERNEL_TELEMETRY
-        return this.nerv.onEvent('KERNEL_TELEMETRY', envelope => {
-            const actor = envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null;
+        return this.nerv.onEvent('KERNEL_TELEMETRY', (/** @type {any} */ envelope) => {
+            const env = /** @type {any} */ (envelope);
+            const actor = env?.identity?.actor || env?.actor || env?.header?.source || null;
             if (actor === ActorRole.KERNEL) {
-                handler(envelope.payload);
+                handler(env.payload);
             }
         });
     }
 
     /**
-     * Registra observador para tipo específico de telemetria.
-     * ONDA 2.5: Usa NERV com filtro de tipo.
+     * Registra observador para tipo específico de telemetria. ONDA 2.5: Usa NERV com filtro de tipo.
+     *
+     * @param {any} type
+     * @param {function} handler
      */
     onEventType(type, handler) {
         if (typeof handler !== 'function') {
             throw new Error('onEventType requer função');
         }
 
-        return this.nerv.onEvent('KERNEL_TELEMETRY', envelope => {
-            const actor = envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null;
-            if (actor === ActorRole.KERNEL && envelope.payload.type === type) {
-                handler(envelope.payload);
+        return this.nerv.onEvent('KERNEL_TELEMETRY', (/** @type {any} */ envelope) => {
+            const env = /** @type {any} */ (envelope);
+            const actor = env?.identity?.actor || env?.actor || env?.header?.source || null;
+            if (actor === ActorRole.KERNEL && env.payload.type === type) {
+                handler(env.payload);
             }
         });
     }
 
     /**
-     * Registra observador para severidade específica.
-     * ONDA 2.5: Usa NERV com filtro de severidade.
+     * Registra observador para severidade específica. ONDA 2.5: Usa NERV com filtro de severidade.
+     *
+     * @param {any} severity
+     * @param {function} handler
      */
     onEventSeverity(severity, handler) {
         if (typeof handler !== 'function') {
             throw new Error('onEventSeverity requer função');
         }
 
-        return this.nerv.onEvent('KERNEL_TELEMETRY', envelope => {
-            const actor = envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null;
-            if (actor === ActorRole.KERNEL && envelope.payload.severity === severity) {
-                handler(envelope.payload);
+        return this.nerv.onEvent('KERNEL_TELEMETRY', (/** @type {any} */ envelope) => {
+            const env = /** @type {any} */ (envelope);
+            const actor = env?.identity?.actor || env?.actor || env?.header?.source || null;
+            if (actor === ActorRole.KERNEL && env.payload.severity === severity) {
+                handler(env.payload);
             }
         });
     }

@@ -48,7 +48,7 @@ Performs a human-like click with gaussian variance.
 ```javascript
 const human = require('@shared/biomechanics/human');
 
-await human.humanClick(page, page, 'button#submit', 0, 0, null, pulse => {
+await human.humanClick(page, page, 'button#submit', 0, 0, null, (pulse) => {
   console.log('Mouse moved to:', pulse.coords);
 });
 ```
@@ -90,7 +90,7 @@ Performs human-like typing with errors, corrections, and adaptive rhythm.
 ```javascript
 const human = require('@shared/biomechanics/human');
 
-await human.humanType(page, page, '#prompt-textarea', 'Hello, world!', 0, null, pulse => {
+await human.humanType(page, page, '#prompt-textarea', 'Hello, world!', 0, null, (pulse) => {
   console.log(`Typed: ${pulse.char} (${pulse.index + 1}/${pulse.total})`);
 });
 ```
@@ -145,7 +145,7 @@ Currently supports **QWERTY** layout with neighbor key mapping for typo simulati
 Both `humanClick` and `humanType` support optional `onPulse` callbacks for real-time telemetry:
 
 ```javascript
-await human.humanType(page, page, '#input', text, 0, null, pulse => {
+await human.humanType(page, page, '#input', text, 0, null, (pulse) => {
   if (pulse.type === 'KEY_PRESS') {
     telemetry.emit('BIOMECHANICS', {
       action: 'TYPING',
@@ -155,7 +155,7 @@ await human.humanType(page, page, '#input', text, 0, null, pulse => {
   }
 });
 
-await human.humanClick(page, page, '#button', 0, 0, null, pulse => {
+await human.humanClick(page, page, '#button', 0, 0, null, (pulse) => {
   if (pulse.type === 'MOUSE_MOVE') {
     telemetry.emit('BIOMECHANICS', {
       action: 'CLICKING',

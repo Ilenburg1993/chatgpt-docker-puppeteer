@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 
 const DOC_EXTENSIONS = new Set(['.md', '.mdx']);
@@ -6,7 +7,7 @@ const CONFIG_BASENAMES = new Set(['dockerfile', 'makefile']);
 
 /**
  * @param {string} rawScope
- * @returns {'code-first'|'docs-first'|'all'}
+ * @returns {'code-first' | 'docs-first' | 'all'}
  */
 export function normalizeIntentScope(rawScope) {
     const scope = String(rawScope || '')
@@ -17,10 +18,10 @@ export function normalizeIntentScope(rawScope) {
 }
 
 /**
- * @param {string|null|undefined} value
- * @param {string|null|undefined} relPath
- * @param {string|null|undefined} extHint
- * @returns {'code'|'config'|'docs'}
+ * @param {string | null | undefined} value
+ * @param {string | null | undefined} relPath
+ * @param {string | null | undefined} extHint
+ * @returns {'code' | 'config' | 'docs'}
  */
 export function normalizeContentClass(value, relPath, extHint = null) {
     const normalized = String(value || '')
@@ -33,9 +34,9 @@ export function normalizeContentClass(value, relPath, extHint = null) {
 }
 
 /**
- * @param {string|null|undefined} relPath
- * @param {string|null|undefined} extHint
- * @returns {'code'|'config'|'docs'}
+ * @param {string | null | undefined} relPath
+ * @param {string | null | undefined} extHint
+ * @returns {'code' | 'config' | 'docs'}
  */
 export function classifyContentClass(relPath, extHint = null) {
     const rel = String(relPath || '').replace(/\\/g, '/');
@@ -52,8 +53,8 @@ export function classifyContentClass(relPath, extHint = null) {
 }
 
 /**
- * @param {'code'|'config'|'docs'} contentClass
- * @param {'code-first'|'docs-first'|'all'} intentScope
+ * @param {'code' | 'config' | 'docs'} contentClass
+ * @param {'code-first' | 'docs-first' | 'all'} intentScope
  * @returns {boolean}
  */
 export function isPreferredByIntent(contentClass, intentScope) {

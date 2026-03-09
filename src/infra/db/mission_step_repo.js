@@ -1,4 +1,5 @@
 // @ts-check
+/** @typedef {any} MissionStep */
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
@@ -16,6 +17,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToStep(row) {
     if (!row) return null;
     return {
@@ -35,7 +40,9 @@ function _rowToStep(row) {
 
 /**
  * Função exportada: listMissionSteps.
- * @returns {any}
+ *
+ * @param {any} missionId
+ * @returns {MissionStep[]}
  */
 function listMissionSteps(missionId) {
     const db = getDb();
@@ -46,7 +53,7 @@ function listMissionSteps(missionId) {
             FROM mission_steps
             WHERE mission_id = ?
             ORDER BY step_index ASC, attempt_seq DESC
-        `
+        `,
         )
         .all(String(missionId || '').trim());
 
@@ -55,7 +62,11 @@ function listMissionSteps(missionId) {
 
 /**
  * Função exportada: getMissionStep.
- * @returns {any}
+ *
+ * @param {any} missionId
+ * @param {any} stepId
+ * @param {any} [attemptSeq]
+ * @returns {MissionStep | null}
  */
 function getMissionStep(missionId, stepId, attemptSeq = null) {
     const db = getDb();
@@ -73,7 +84,7 @@ function getMissionStep(missionId, stepId, attemptSeq = null) {
                 WHERE mission_id = ? AND step_id = ?
                 ORDER BY attempt_seq DESC
                 LIMIT 1
-            `
+            `,
                   )
                   .get(mission, step)
             : db
@@ -83,7 +94,7 @@ function getMissionStep(missionId, stepId, attemptSeq = null) {
                 FROM mission_steps
                 WHERE mission_id = ? AND step_id = ? AND attempt_seq = ?
                 LIMIT 1
-            `
+            `,
                   )
                   .get(mission, step, Number(attemptSeq) || 0);
 
@@ -92,7 +103,10 @@ function getMissionStep(missionId, stepId, attemptSeq = null) {
 
 /**
  * Função exportada: syncMissionStepsFromWorkflow.
- * @returns {any}
+ *
+ * @param {any} missionId
+ * @param {any} workflow
+ * @returns {MissionStep | null}
  */
 function syncMissionStepsFromWorkflow(missionId, workflow) {
     const db = getDb();
@@ -109,17 +123,19 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
             const stepId = String(step.id || `step-${index}`);
             const title = String(step.title || step.name || step.description || `Step ${index + 1}`);
 
-            const existing = db
-                .prepare(
-                    `
+            const existing = /** @type {any} */ (
+                db
+                    .prepare(
+                        `
                     SELECT *
                     FROM mission_steps
                     WHERE mission_id = ? AND step_id = ?
                     ORDER BY attempt_seq DESC
                     LIMIT 1
-                `
-                )
-                .get(mission, stepId);
+                `,
+                    )
+                    .get(mission, stepId)
+            );
 
             if (!existing) {
                 db.prepare(
@@ -131,7 +147,7 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
                         @id, @mission_id, @step_id, @step_index, @title, @status,
                         NULL, NULL, @attempt_seq, 1, @updated_at_ms
                     )
-                `
+                `,
                 ).run({
                     id: `ms-${uuidv4()}`,
                     mission_id: mission,
@@ -152,7 +168,7 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
                     title = @title,
                     updated_at_ms = @updated_at_ms
                 WHERE id = @id
-            `
+            `,
             ).run({
                 id: existing.id,
                 step_index: index,
@@ -166,18 +182,23 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
     return listMissionSteps(mission);
 }
 
+/** @typedef {any} MarkMissionStepStatusOptions */
+
 /**
  * Função exportada: markMissionStepStatus.
- * @returns {any}
+ *
+ * @param {any} [options]
+ * @returns {MissionStep | null}
  */
-function markMissionStepStatus({
-    missionId,
-    stepId,
-    attemptSeq = null,
-    status,
-    currentTaskId = undefined,
-    lastTaskId = undefined,
-}) {
+function markMissionStepStatus(options = {}) {
+    const {
+        missionId,
+        stepId,
+        attemptSeq = null,
+        status,
+        currentTaskId = undefined,
+        lastTaskId = undefined,
+    } = /** @type {any} */ (options);
     const db = getDb();
     const mission = String(missionId || '').trim();
     const step = String(stepId || '').trim();
@@ -197,7 +218,7 @@ function markMissionStepStatus({
             version = version + 1,
             updated_at_ms = @updated_at_ms
         WHERE id = @id
-    `
+    `,
     ).run({
         id: existing.id,
         status: nextStatus,
@@ -209,11 +230,15 @@ function markMissionStepStatus({
     return getMissionStep(mission, step, existing.attempt_seq);
 }
 
+/** @typedef {any} CreateNextStepAttemptOptions */
 /**
  * Função exportada: createNextStepAttempt.
- * @returns {any}
+ *
+ * @param {any} [options]
+ * @returns {MissionStep | null}
  */
-function createNextStepAttempt({ missionId, stepId, title = '', stepIndex = 0 }) {
+function createNextStepAttempt(options = {}) {
+    const { missionId, stepId, title = '', stepIndex = 0 } = /** @type {any} */ (options);
     const db = getDb();
     const mission = String(missionId || '').trim();
     const step = String(stepId || '').trim();
@@ -232,7 +257,7 @@ function createNextStepAttempt({ missionId, stepId, title = '', stepIndex = 0 })
             @id, @mission_id, @step_id, @step_index, @title, @status,
             NULL, @last_task_id, @attempt_seq, 1, @updated_at_ms
         )
-    `
+    `,
     ).run({
         id: `ms-${uuidv4()}`,
         mission_id: mission,
@@ -249,10 +274,10 @@ function createNextStepAttempt({ missionId, stepId, title = '', stepIndex = 0 })
 }
 
 export {
-    STEP_STATUS,
     createNextStepAttempt,
     getMissionStep,
     listMissionSteps,
     markMissionStepStatus,
+    STEP_STATUS,
     syncMissionStepsFromWorkflow,
 };

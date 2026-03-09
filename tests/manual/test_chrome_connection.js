@@ -31,14 +31,16 @@ async function testChromeConnection() {
 
         // 2. Conectar com Puppeteer
         console.log('2. Conectando via Puppeteer...');
-        const browser = await puppeteer.connect({
-            browserURL: CHROME_URL,
-            defaultViewport: {
-                width: 1920,
-                height: 1080,
-            },
-            ignoreHTTPSErrors: true,
-        });
+        const browser = await puppeteer.connect(
+            /** @type {any} */ ({
+                browserURL: CHROME_URL,
+                defaultViewport: {
+                    width: 1920,
+                    height: 1080,
+                },
+                ignoreHTTPSErrors: true,
+            }),
+        );
 
         console.log('   ✅ Puppeteer conectado!');
         console.log(`   Type: ${browser.constructor.name}`);
@@ -114,7 +116,7 @@ async function testChromeConnection() {
         console.log('🚀 Sistema pronto para automação!');
 
         process.exit(0);
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('');
         console.error('╔══════════════════════════════════════════════════════════════╗');
         console.error('║                     ❌ TESTE FALHOU                          ║');
@@ -131,7 +133,7 @@ async function testChromeConnection() {
             console.error('SOLUÇÃO:');
             console.error('');
             console.error('1. Windows Host - Iniciar Chrome:');
-            console.error('   "C:\Program Files\\Google\\Chrome\\Application\\chrome.exe" ^');
+            console.error('   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" ^');
             console.error('     --remote-debugging-port=9225 ^');
             console.error('     --user-data-dir="C:\\chrome-automation-profile"');
             console.error('');

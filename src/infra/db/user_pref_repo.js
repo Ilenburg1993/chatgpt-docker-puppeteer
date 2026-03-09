@@ -5,23 +5,35 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} value
+ * @param {any} value
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
 
+/**
+ * @param {any} raw
+ * @param {any} raw
+ */
 function _parseJson(raw, fallback = {}) {
     if (!raw) return fallback;
     try {
         return JSON.parse(String(raw));
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
 
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToPrefs(row) {
     if (!row) return null;
     return {
@@ -38,6 +50,8 @@ function _rowToPrefs(row) {
 
 /**
  * Função exportada: getUserPreferences.
+ *
+ * @param {any} userId
  * @returns {any}
  */
 function getUserPreferences(userId) {
@@ -46,8 +60,12 @@ function getUserPreferences(userId) {
     return _rowToPrefs(row);
 }
 
+/** @typedef {any} UpsertUserPreferencesUpdates */
 /**
  * Função exportada: upsertUserPreferences.
+ *
+ * @param {any} userId
+ * @param {any} [patch]
  * @returns {any}
  */
 function upsertUserPreferences(userId, patch = {}) {
@@ -97,7 +115,7 @@ function upsertUserPreferences(userId, patch = {}) {
             shortcuts_json = excluded.shortcuts_json,
             alerts_json = excluded.alerts_json,
             updated_at_ms = excluded.updated_at_ms
-    `
+    `,
     ).run({
         user_id: id,
         layout_json: _safeJsonString(next.layout),

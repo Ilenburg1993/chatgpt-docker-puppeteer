@@ -1,10 +1,10 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
+import test from 'node:test';
 
-import BrowserPoolManager from '#infra/browser_pool/pool_manager';
 import { PageLifecycleMonitor } from '#infra/browser_pool/PageLifecycleMonitor';
+import BrowserPoolManager from '#infra/browser_pool/pool_manager';
 
 test('wave14: updatePageTaskId rebinds lifecycle monitor taskId on hot-reuse', () => {
     const manager = new BrowserPoolManager({ poolSize: 1 });
@@ -20,7 +20,7 @@ test('wave14: updatePageTaskId rebinds lifecycle monitor taskId on hot-reuse', (
     const realTaskId = 'task-real-123';
 
     poolEntry.pages.set(tempTaskId, page);
-    manager.pool = [poolEntry];
+    manager.pool = /** @type {any[]} */ ([poolEntry]);
 
     page._poolEntry = poolEntry;
     page._tempTaskId = tempTaskId;
@@ -29,7 +29,7 @@ test('wave14: updatePageTaskId rebinds lifecycle monitor taskId on hot-reuse', (
     let reboundTo = null;
     const monitor = {
         cleanup: () => {},
-        rebindTaskId: nextTaskId => {
+        rebindTaskId: (/** @type {any} */ nextTaskId) => {
             reboundTo = nextTaskId;
         },
     };
@@ -54,7 +54,7 @@ test('wave14: removePageFromPool supports fallback by page reference when taskId
         stats: { activeTasks: 1 },
     };
 
-    manager.pool = [poolEntry];
+    manager.pool = /** @type {any[]} */ ([poolEntry]);
 
     let cleaned = false;
     manager.lifecycleMonitors.set('task-live', {
@@ -72,10 +72,10 @@ test('wave14: removePageFromPool supports fallback by page reference when taskId
 
 test('wave14: lifecycle monitor uses rebound taskId on close/disconnect cleanup', () => {
     const page = new EventEmitter();
-    const removals = [];
+    const removals = /** @type {any[]} */ ([]);
     const poolManager = {
         stats: {},
-        removePageFromPool: (...args) => {
+        removePageFromPool: (/** @type {any[]} */ ...args) => {
             removals.push(args);
         },
     };

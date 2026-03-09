@@ -3,38 +3,27 @@
  * Unified MCP Server for chatgpt-docker-puppeteer (v5.0)
  *
  * Exposes multiple tools via Tool Registry to Claude Desktop:
+ *
  * - RAG search (local codebase)
  * - Ollama Cloud generation (qwen3-coder-next, qwen3-next)
  * - Ollama Local embeddings (nomic-embed-text)
  * - GitHub integration (via upstream MCP - optional)
  *
- * Usage:
- * node tools/mcp/unified-server.mjs
+ * Usage: node tools/mcp/unified-server.mjs
  *
- * Configure in Claude Desktop:
- * ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)
+ * Configure in Claude Desktop: ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)
  * %AppData%/Claude/claude_desktop_config.json (Windows)
  *
- * {
- *   "mcpServers": {
- *     "chatgpt-docker": {
- *       "command": "node",
- *       "args": ["/workspaces/chatgpt-docker-puppeteer/tools/mcp/unified-server.mjs"],
- *       "env": {
- *         "OLLAMA_CLOUD_ENABLED": "true",
- *         "OLLAMA_CLOUD_API_KEY": "your_key_here",
- *         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..."
- *       }
- *     }
- *   }
- * }
+ * { "mcpServers": { "chatgpt-docker": { "command": "node", "args":
+ * ["/workspaces/chatgpt-docker-puppeteer/tools/mcp/unified-server.mjs"], "env": { "OLLAMA_CLOUD_ENABLED": "true",
+ * "OLLAMA_CLOUD_API_KEY": "your_key_here", "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..." } } } }
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 // Tool Registry (DRY Architecture)
-import { registry, initialize, normalizeToolResultPayload } from '../../src/integration/tool-registry.mjs';
+import { initialize, normalizeToolResultPayload, registry } from '../../src/integration/tool-registry.mjs';
 
 const server = new Server(
     {
@@ -46,7 +35,7 @@ const server = new Server(
             tools: {},
             resources: {},
         },
-    }
+    },
 );
 
 /** @type {Map<string, AbortController>} */
@@ -55,16 +44,16 @@ const activeRequests = new Map();
 /**
  * List all available tools from Tool Registry
  */
-server.setRequestHandler('tools/list', async () => {
+server.setRequestHandler(/** @type {any} */ ('tools/list'), async () => {
     const tools = registry.getAllMetadata();
-    console.error('[MCP] Listing tools:', tools.map(t => t.name).join(', '));
+    console.error('[MCP] Listing tools:', tools.map((t) => t.name).join(', '));
     return { tools };
 });
 
 /**
  * Execute tool by name via Tool Registry
  */
-server.setRequestHandler('tools/call', async request => {
+server.setRequestHandler(/** @type {any} */ ('tools/call'), async (request) => {
     const toolName = request.params.name;
     const args = request.params.arguments || {};
     const requestId =
@@ -80,7 +69,7 @@ server.setRequestHandler('tools/call', async request => {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-        const result = await registry.execute(toolName, args, { signal: controller.signal });
+        const result = /** @type {any} */ (await registry.execute(toolName, args, { signal: controller.signal }));
 
         // MCP expects content array format
         // If result is already in MCP format, return as-is
@@ -116,11 +105,12 @@ server.setRequestHandler('tools/call', async request => {
             };
         }
         console.error(`[MCP] Tool error:`, error);
+        const _ce = /** @type {any} */ (error);
         return {
             content: [
                 {
                     type: 'text',
-                    text: `Error executing ${toolName}: ${error.message}`,
+                    text: `Error executing ${toolName}: ${_ce.message}`,
                 },
             ],
             isError: true,
@@ -132,25 +122,30 @@ server.setRequestHandler('tools/call', async request => {
 });
 
 if (typeof server.setNotificationHandler === 'function') {
-    server.setNotificationHandler('notifications/cancelled', async notification => {
-        const targetId =
-            notification?.params?.requestId ?? notification?.params?.id ?? notification?.params?.request_id;
-        const key = targetId !== undefined && targetId !== null ? String(targetId) : null;
-        if (!key) return {};
-        const controller = activeRequests.get(key);
-        if (controller) {
-            controller.abort();
-            activeRequests.delete(key);
-            console.error(`[MCP] Cancelled active request ${key}`);
-        }
-        return {};
-    });
+    server.setNotificationHandler(
+        /** @type {any} */ ('notifications/cancelled'),
+        /** @type {any} */ (
+            async (/** @type {any} */ notification) => {
+                const targetId =
+                    notification?.params?.requestId ?? notification?.params?.id ?? notification?.params?.request_id;
+                const key = targetId !== undefined && targetId !== null ? String(targetId) : null;
+                if (!key) return {};
+                const controller = activeRequests.get(key);
+                if (controller) {
+                    controller.abort();
+                    activeRequests.delete(key);
+                    console.error(`[MCP] Cancelled active request ${key}`);
+                }
+                return {};
+            }
+        ),
+    );
 }
 
 /**
  * List available resources (optional - for future use)
  */
-server.setRequestHandler('resources/list', async () => {
+server.setRequestHandler(/** @type {any} */ ('resources/list'), async () => {
     return {
         resources: [
             {
@@ -166,7 +161,7 @@ server.setRequestHandler('resources/list', async () => {
 /**
  * Read resource content (optional - for future use)
  */
-server.setRequestHandler('resources/read', async request => {
+server.setRequestHandler(/** @type {any} */ ('resources/read'), async (request) => {
     const uri = request.params.uri;
 
     if (uri === 'rag://stats') {
@@ -192,7 +187,7 @@ server.setRequestHandler('resources/read', async request => {
                             },
                         },
                         null,
-                        2
+                        2,
                     ),
                 },
             ],
@@ -211,7 +206,7 @@ async function main() {
     // Initialize Tool Registry (RAG + Ollama Cloud/Local + Upstreams)
     await initialize();
 
-    const stats = registry.getStats();
+    const stats = /** @type {any} */ (registry.getStats());
     console.error(`[MCP] Tools registered: ${stats.totalTools}`);
     console.error(`[MCP] Available tools: ${stats.tools.join(', ')}`);
 
@@ -221,7 +216,7 @@ async function main() {
     console.error('[MCP] Server ready! Waiting for requests from Claude Desktop...');
 }
 
-main().catch(error => {
+main().catch((error) => {
     console.error('[MCP] Fatal error:', error);
     process.exit(1);
 });

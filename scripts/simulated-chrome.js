@@ -2,7 +2,7 @@
 // @ts-check
 
 import http from 'node:http';
-import WebSocket from 'ws';
+import { WebSocketServer } from 'ws';
 
 // ✅ Padronizado: host.docker.internal (Docker/WSL-friendly)
 // Para uso local direto (fora de Docker): CHROME_HOST=127.0.0.1 node scripts/simulated-chrome.js
@@ -35,11 +35,11 @@ const server = http.createServer((req, res) => {
     res.end('Not found');
 });
 
-const wss = new WebSocket.Server({ noServer: true });
+const wss = new WebSocketServer({ noServer: true });
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', (/** @type {any} */ ws, /** @type {any} */ req) => {
     console.log(`[sim-chrome] WS connection from ${req.socket.remoteAddress}`);
-    ws.on('message', message => {
+    ws.on('message', (/** @type {any} */ message) => {
         console.log('[sim-chrome] received:', message.toString());
         try {
             const parsed = JSON.parse(message);
@@ -55,7 +55,7 @@ wss.on('connection', (ws, req) => {
 
 server.on('upgrade', (req, socket, head) => {
     if (req.url === PATH) {
-        wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+        wss.handleUpgrade(req, socket, head, (/** @type {any} */ ws) => wss.emit('connection', ws, req));
     } else {
         socket.destroy();
     }

@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Driver Factory - Fábrica de Drivers', () => {
     describe('1. Registro de Drivers', () => {
@@ -43,14 +43,15 @@ describe('Driver Factory - Fábrica de Drivers', () => {
     describe('2. Criação de Drivers', () => {
         it('deve criar instância de ChatGPT driver', () => {
             const factory = {
-                create: type => {
+                create: (/** @type {any} */ type) => {
                     if (type === 'chatgpt') {
                         return { type: 'chatgpt', initialized: true };
                     }
+                    return undefined;
                 },
             };
 
-            const driver = factory.create('chatgpt');
+            const driver = /** @type {any} */ (factory.create('chatgpt'));
 
             assert.strictEqual(driver.type, 'chatgpt');
             assert.ok(driver.initialized);
@@ -58,21 +59,22 @@ describe('Driver Factory - Fábrica de Drivers', () => {
 
         it('deve criar instância de Gemini driver', () => {
             const factory = {
-                create: type => {
+                create: (/** @type {any} */ type) => {
                     if (type === 'gemini') {
                         return { type: 'gemini', initialized: true };
                     }
+                    return undefined;
                 },
             };
 
-            const driver = factory.create('gemini');
+            const driver = /** @type {any} */ (factory.create('gemini'));
 
             assert.strictEqual(driver.type, 'gemini');
         });
 
         it('deve rejeitar driver desconhecido', () => {
             const factory = {
-                create: type => {
+                create: (/** @type {any} */ type) => {
                     const known = ['chatgpt', 'gemini'];
                     if (!known.includes(type)) {
                         throw new Error(`Driver desconhecido: ${type}`);
@@ -86,11 +88,11 @@ describe('Driver Factory - Fábrica de Drivers', () => {
 
     describe('3. Seleção Automática', () => {
         it('deve selecionar driver baseado em target', () => {
-            const selectDriver = target => {
-                const mapping = {
+            const selectDriver = (/** @type {any} */ target) => {
+                const mapping = /** @type {Record<string, string>} */ ({
                     chatgpt: 'chatgpt',
                     gemini: 'gemini',
-                };
+                });
                 return mapping[target];
             };
 
@@ -99,11 +101,11 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         });
 
         it('deve usar driver padrão se target inválido', () => {
-            const selectDriver = target => {
-                const mapping = {
+            const selectDriver = (/** @type {any} */ target) => {
+                const mapping = /** @type {Record<string, string>} */ ({
                     chatgpt: 'chatgpt',
                     gemini: 'gemini',
-                };
+                });
                 return mapping[target] || 'chatgpt'; // default
             };
 
@@ -164,7 +166,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                 { id: 'driver-3', busy: true },
             ];
 
-            const available = pool.find(d => !d.busy);
+            const available = /** @type {any} */ (pool.find((d) => !d.busy));
 
             assert.strictEqual(available.id, 'driver-2');
         });
@@ -175,7 +177,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                 { id: 'driver-2', busy: true },
             ];
 
-            const available = pool.find(d => !d.busy);
+            const available = pool.find((d) => !d.busy);
 
             assert.strictEqual(available, undefined);
         });
@@ -194,7 +196,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         });
 
         it('deve comparar versões', () => {
-            const compareVersions = (v1, v2) => {
+            const compareVersions = (/** @type {any} */ v1, /** @type {any} */ v2) => {
                 const parts1 = v1.split('.').map(Number);
                 const parts2 = v2.split('.').map(Number);
 
@@ -230,7 +232,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                 capabilities: ['text-generation', 'conversation'],
             };
 
-            const hasCapability = cap => driver.capabilities.includes(cap);
+            const hasCapability = (/** @type {any} */ cap) => driver.capabilities.includes(cap);
 
             assert.ok(hasCapability('conversation'));
             assert.strictEqual(hasCapability('image-generation'), false);
@@ -247,7 +249,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
             // Simular cleanup
             driver = {
                 ...driver,
-                resources: null,
+                resources: /** @type {any} */ (null),
             };
 
             assert.strictEqual(driver.resources, null);
@@ -256,12 +258,12 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         it('deve remover driver do pool', () => {
             const pool = [{ id: 'driver-1' }, { id: 'driver-2' }, { id: 'driver-3' }];
 
-            const filtered = pool.filter(d => d.id !== 'driver-2');
+            const filtered = pool.filter((d) => d.id !== 'driver-2');
 
             assert.strictEqual(filtered.length, 2);
             assert.strictEqual(
-                filtered.find(d => d.id === 'driver-2'),
-                undefined
+                filtered.find((d) => d.id === 'driver-2'),
+                undefined,
             );
         });
     });

@@ -1,16 +1,16 @@
 // @ts-check
-import { describe, it } from 'node:test';
-import assert from 'node:assert';
 import { TaskSchemaV5 } from '#core/schemas/task_schema_v5';
+import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 import {
+    autoMigrateTask,
+    downgradeV5toV4,
     isV4Task,
     isV5Task,
-    migrateTaskV4toV5,
     migrateBatchV4toV5,
+    migrateTaskV4toV5,
     validateV5Task,
-    downgradeV5toV4,
-    autoMigrateTask,
 } from '#core/schemas/migrator_v4_to_v5';
 
 import { STATUS_VALUES } from '#core/constants/tasks';
@@ -532,8 +532,8 @@ describe('Migrator V4 → V5', () => {
 
             assert.strictEqual(resultado.length, 2);
             assert.ok(
-                resultado.every(t => t.meta.version === '5.0'),
-                'Todas devem ser V5'
+                resultado.every((t) => t.meta.version === '5.0'),
+                'Todas devem ser V5',
             );
         });
     });

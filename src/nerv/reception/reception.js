@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import createReceive from './receive.js';
 
 /* ===========================
@@ -6,17 +6,26 @@ import createReceive from './receive.js';
 =========================== */
 
 /**
+ * @typedef {object} CreateReceptionDeps
+ * @property {any} envelopes
+ * @property {any} correlation
+ * @property {any} telemetry
+ */
+/**
+ * @typedef {object} CreateReceptionOptions
+ * @property {any} [envelopes]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
+ */
+/**
  * Cria o módulo de recepção do NERV.
  *
- * **Side-effects:** Inicializa receptor de mensagens e correlação histórica.
- * **Semântica:** Composição de subsistemas de recepção para comunicação neural.
- * **Unidades:** Dependências seguem contratos NERV (envelopes, correlation, telemetry).
+ * **Side-effects:** Inicializa receptor de mensagens e correlação histórica. **Semântica:** Composição de subsistemas
+ * de recepção para comunicação neural. **Unidades:** Dependências seguem contratos NERV (envelopes, correlation,
+ * telemetry).
  *
- * @param {object} deps - Dependências do módulo
- * @param {object} deps.envelopes - Sistema de envelopes (normalização + validação)
- * @param {object} deps.correlation - Sistema de correlação histórica
- * @param {object} deps.telemetry - Interface de telemetria do NERV
- * @returns {object} Módulo de recepção com método onMessage
+ * @param {CreateReceptionDeps} deps - Dependências do módulo
+ * @returns {any} Módulo de recepção com método onMessage
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createReception({ envelopes, correlation, telemetry }) {
@@ -28,11 +37,13 @@ function createReception({ envelopes, correlation, telemetry }) {
      Composição do receptor factual
   ========================================================= */
 
-    const receiver = createReceive({
-        envelopes,
-        correlation,
-        telemetry,
-    });
+    const receiver = /** @type {any} */ (
+        createReceive({
+            envelopes,
+            correlation,
+            telemetry,
+        })
+    );
 
     /* =========================================================
      Interface pública do módulo
@@ -40,8 +51,7 @@ function createReception({ envelopes, correlation, telemetry }) {
 
     return Object.freeze({
         /**
-         * Recebe um frame inbound já desserializado.
-         * Ato puramente factual.
+         * Recebe um frame inbound já desserializado. Ato puramente factual.
          */
         receive: receiver.receive,
 

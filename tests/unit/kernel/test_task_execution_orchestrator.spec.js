@@ -1,17 +1,17 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
-import assert from 'node:assert';
-import EventEmitter from 'node:events';
 import { TaskExecutionOrchestrator } from '#kernel/task_execution_orchestrator';
 import { ActionCode, MessageType } from '#shared/nerv/constants';
+import assert from 'node:assert';
+import EventEmitter from 'node:events';
+import { beforeEach, describe, it } from 'node:test';
 
 class MockNERV extends EventEmitter {
     constructor() {
         super();
-        this.receiveHandlers = [];
+        this.receiveHandlers = /** @type {any[]} */ ([]);
     }
 
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.receiveHandlers.push(handler);
         return () => {
             const idx = this.receiveHandlers.indexOf(handler);
@@ -19,31 +19,31 @@ class MockNERV extends EventEmitter {
         };
     }
 
-    receive(envelope) {
-        this.receiveHandlers.forEach(h => h(envelope));
+    receive(/** @type {any} */ envelope) {
+        this.receiveHandlers.forEach((h) => h(envelope));
     }
 }
 
 describe('TaskExecutionOrchestrator', () => {
-    let nerv;
-    let nervBridge;
-    let orchestrator;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let nervBridge;
+    /** @type {any} */ let orchestrator;
 
     beforeEach(() => {
         nerv = new MockNERV();
 
         nervBridge = {
-            beforeTaskExecution: async task => task,
+            beforeTaskExecution: async (/** @type {any} */ task) => task,
             emitCommandCalls: [],
             emitEventCalls: [],
             decisions: 0,
-            emitCommand(cmd) {
+            emitCommand(/** @type {any} */ cmd) {
                 this.emitCommandCalls.push(cmd);
             },
-            emitEvent(evt) {
+            emitEvent(/** @type {any} */ evt) {
                 this.emitEventCalls.push(evt);
             },
-            async afterTaskExecution(task) {
+            async afterTaskExecution(/** @type {any} */ task) {
                 this.decisions += 1;
                 return { action: 'DONE', task, feedback: null };
             },
@@ -72,7 +72,7 @@ describe('TaskExecutionOrchestrator', () => {
         nerv.receive(completion);
         nerv.receive(completion);
 
-        await new Promise(resolve => setTimeout(resolve, 20));
+        await new Promise((resolve) => setTimeout(resolve, 20));
 
         assert.strictEqual(nervBridge.decisions, 1, 'afterTaskExecution deve rodar uma vez');
     });
@@ -105,7 +105,7 @@ describe('TaskExecutionOrchestrator', () => {
             },
         });
 
-        await new Promise(resolve => setTimeout(resolve, 20));
+        await new Promise((resolve) => setTimeout(resolve, 20));
 
         assert.strictEqual(nervBridge.emitEventCalls.length, 1);
         const emitted = nervBridge.emitEventCalls[0];
@@ -141,7 +141,7 @@ describe('TaskExecutionOrchestrator', () => {
             payload: { taskId: 'task-missing-corr', result: { output: 'ok' } },
         });
 
-        await new Promise(resolve => setTimeout(resolve, 20));
+        await new Promise((resolve) => setTimeout(resolve, 20));
 
         assert.strictEqual(nervBridge.decisions, 0, 'evento sem correlationId deve ser descartado');
     });
@@ -161,7 +161,7 @@ describe('TaskExecutionOrchestrator', () => {
             payload: { taskId: 'task-stale-fail', reason: 'STALE', error: 'stale event' },
         });
 
-        await new Promise(resolve => setTimeout(resolve, 20));
+        await new Promise((resolve) => setTimeout(resolve, 20));
 
         assert.strictEqual(nervBridge.emitEventCalls.length, 0, 'falha stale não deve emitir TASK_FAILED');
     });

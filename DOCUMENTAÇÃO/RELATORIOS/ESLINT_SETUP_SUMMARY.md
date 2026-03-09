@@ -27,12 +27,12 @@ npm run lint:src
 
    ```javascript
    // ❌ ERRO
-   new Promise(resolve => {
+   new Promise((resolve) => {
      return someAsyncFunction(); // NÃO retornar no executor
    });
 
    // ✅ CORRETO
-   new Promise(resolve => {
+   new Promise((resolve) => {
      someAsyncFunction().then(resolve);
    });
    ```
@@ -68,7 +68,7 @@ npm run lint:src
    }
 
    // ✅ CORRETO
-   await Promise.all(items.map(item => processItem(item)));
+   await Promise.all(items.map((item) => processItem(item)));
    ```
 
 3. **`no-nested-ternary`** - Legibilidade
@@ -89,7 +89,7 @@ npm run lint:src
 
 ```bash
 # Focar nos 78 erros primeiro
-npm run lint -- --quiet  # Ver apenas erros
+npm run lint -- --quiet # Ver apenas erros
 ```
 
 **Prioridade:**
@@ -193,15 +193,15 @@ Baseado na análise inicial:
 
 ```bash
 # Análise
-npm run lint              # Todo o projeto
-npm run lint:src          # Apenas src/
-npm run lint:tests        # Apenas tests/
+npm run lint       # Todo o projeto
+npm run lint:src   # Apenas src/
+npm run lint:tests # Apenas tests/
 
 # Correção
-npm run lint:fix          # Auto-fix tudo
+npm run lint:fix # Auto-fix tudo
 
 # Relatórios
-npm run lint:report       # Gera logs/eslint-report.txt
+npm run lint:report # Gera logs/eslint-report.txt
 ```
 
 ---

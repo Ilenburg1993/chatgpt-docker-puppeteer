@@ -17,12 +17,12 @@ const TEST_TEMPLATES_DIR = path.join(import.meta.dirname, '../../../src/missions
 class MockNERV extends EventEmitter {
     constructor() {
         super();
-        this.receiveHandlers = [];
-        this.emittedCommands = [];
-        this.emittedEvents = [];
+        /** @type {any[]} */ this.receiveHandlers = [];
+        /** @type {any[]} */ this.emittedCommands = [];
+        /** @type {any[]} */ this.emittedEvents = [];
     }
 
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.receiveHandlers.push(handler);
         return () => {
             const index = this.receiveHandlers.indexOf(handler);
@@ -30,15 +30,15 @@ class MockNERV extends EventEmitter {
         };
     }
 
-    receive(envelope) {
+    receive(/** @type {any} */ envelope) {
         this.receiveHandlers.forEach(h => h(envelope));
     }
 
-    emitCommand(envelope) {
+    emitCommand(/** @type {any} */ envelope) {
         this.emittedCommands.push(envelope);
     }
 
-    emitEvent(envelope) {
+    emitEvent(/** @type {any} */ envelope) {
         this.emittedEvents.push(envelope);
     }
 }
@@ -46,16 +46,27 @@ class MockNERV extends EventEmitter {
 // Mock Kernel simples
 class MockKernel {
     constructor() {
-        this.executedTasks = [];
+        /** @type {any[]} */ this.executedTasks = [];
     }
 
-    async executeTask(task, correlationId) {
+    async executeTask(/** @type {any} */ task, /** @type {any} */ correlationId) {
         this.executedTasks.push({ task, correlationId });
     }
 }
 
 // Helper: envelope do driver → mission manager (formato resiliente)
-function buildTaskEnvelope({ actionCode, missionId, taskId, stepId, result = null, error = null, correlationId = null }) {
+/**
+ * @param {{ actionCode: any, missionId: any, taskId: any, stepId: any, result?: any, error?: any, correlationId?: any }} opts
+ */
+function buildTaskEnvelope({
+    actionCode,
+    missionId,
+    taskId,
+    stepId,
+    result = null,
+    error = null,
+    correlationId = null,
+}) {
     return {
         // aceita os dois nomes (alguns consumidores usam kind; outros messageType)
         kind: MessageType.EVENT,
@@ -67,17 +78,17 @@ function buildTaskEnvelope({ actionCode, missionId, taskId, stepId, result = nul
                 meta: {
                     mission_id: missionId,
                     id: taskId,
-                    step_id: stepId
-                }
+                    step_id: stepId,
+                },
             },
             result,
-            error
-        }
+            error,
+        },
     };
 }
 
 // Helper anti-flake: espera condição com timeout
-async function waitForCondition(predicate, { timeoutMs = 1500, intervalMs = 10 } = {}) {
+async function waitForCondition(/** @type {any} */ predicate, { timeoutMs = 1500, intervalMs = 10 } = {}) {
     const start = Date.now();
     while (true) {
         if (predicate()) return;
@@ -89,7 +100,7 @@ async function waitForCondition(predicate, { timeoutMs = 1500, intervalMs = 10 }
 }
 
 describe('MissionStateManager (filesystem persistence)', () => {
-    let stateManager;
+    /** @type {any} */ let stateManager;
 
     beforeEach(async () => {
         stateManager = new MissionStateManager({ baseDir: TEST_MISSIONS_DIR });
@@ -114,10 +125,10 @@ describe('MissionStateManager (filesystem persistence)', () => {
                     id: 'workflow-001',
                     steps: [
                         { id: 'step-1', name: 'Step 1' },
-                        { id: 'step-2', name: 'Step 2' }
-                    ]
+                        { id: 'step-2', name: 'Step 2' },
+                    ],
                 },
-                config: { template: 'test_template' }
+                config: { template: 'test_template' },
             };
 
             const state = await stateManager.createMission(mission);
@@ -143,7 +154,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 title: 'Test',
                 description: 'Desc',
                 workflow: { id: 'wf', steps: [] },
-                config: {}
+                config: {},
             };
 
             await stateManager.createMission(mission);
@@ -166,7 +177,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 title: 'A',
                 description: 'A',
                 workflow: { id: 'wf-a', steps: [] },
-                config: {}
+                config: {},
             });
 
             await stateManager.createMission({
@@ -174,11 +185,11 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 title: 'B',
                 description: 'B',
                 workflow: { id: 'wf-b', steps: [] },
-                config: {}
+                config: {},
             });
 
             await stateManager.updateMission('mission-b', {
-                status: MISSION_STATUS.RUNNING
+                status: MISSION_STATUS.RUNNING,
             });
 
             const all = await stateManager.listMissions();
@@ -195,18 +206,18 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 title: 'Test',
                 description: 'Test',
                 workflow: { id: 'wf-update', steps: [] },
-                config: {}
+                config: {},
             });
 
             const updated = await stateManager.updateMission('mission-update', {
-                status: MISSION_STATUS.RUNNING
+                status: MISSION_STATUS.RUNNING,
             });
 
             assert.strictEqual(updated.status, MISSION_STATUS.RUNNING);
             assert.ok(updated.updated_at !== updated.created_at);
 
             const hasStatusChange = updated.history.some(
-                h => h.event === 'STATUS_CHANGED' && h.msg.includes('pending → running')
+                (/** @type {any} */ h) => h.event === 'STATUS_CHANGED' && h.msg.includes('pending → running')
             );
             assert.ok(hasStatusChange, 'Histórico contém mudança de status');
         });
@@ -217,7 +228,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 title: 'Delete me',
                 description: 'Test',
                 workflow: { id: 'wf-delete', steps: [] },
-                config: {}
+                config: {},
             });
 
             await stateManager.deleteMission('mission-delete');
@@ -234,7 +245,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 title: 'Test',
                 description: 'Test',
                 workflow: { id: 'wf-output', steps: [] },
-                config: {}
+                config: {},
             });
 
             const output = 'This is the output of step 1';
@@ -250,7 +261,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 title: 'Test',
                 description: 'Test',
                 workflow: { id: 'wf-no-output', steps: [] },
-                config: {}
+                config: {},
             });
 
             const result = await stateManager.getOutput('mission-no-output', 'step-999');
@@ -263,13 +274,13 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 title: 'Test',
                 description: 'Test',
                 workflow: { id: 'wf-checkpoint', steps: [] },
-                config: {}
+                config: {},
             });
 
             const checkpoint = {
                 ts: new Date().toISOString(),
                 step_index: 5,
-                data: { some: 'data' }
+                data: { some: 'data' },
             };
 
             await stateManager.saveCheckpoint('mission-checkpoint', checkpoint);
@@ -286,7 +297,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 title: 'Test',
                 description: 'Test',
                 workflow: { id: 'wf-feedback', steps: [] },
-                config: {}
+                config: {},
             });
 
             await stateManager.addFeedback('mission-feedback', 'Please add more examples');
@@ -295,14 +306,14 @@ describe('MissionStateManager (filesystem persistence)', () => {
             assert.strictEqual(state.feedback.length, 1);
             assert.strictEqual(state.feedback[0].content, 'Please add more examples');
 
-            const hasFeedback = state.history.some(h => h.event === 'FEEDBACK_ADDED');
+            const hasFeedback = state.history.some((/** @type {any} */ h) => h.event === 'FEEDBACK_ADDED');
             assert.ok(hasFeedback);
         });
     });
 });
 
 describe('WorkflowGenerator (template → workflow)', () => {
-    let generator;
+    /** @type {any} */ let generator;
 
     beforeEach(() => {
         generator = new WorkflowGenerator({ templatesDir: TEST_TEMPLATES_DIR });
@@ -326,7 +337,7 @@ describe('WorkflowGenerator (template → workflow)', () => {
     describe('2. Workflow Generation', () => {
         it('should generate workflow with default params', async () => {
             const workflow = await generator.generateWorkflow('book_writing', {
-                topic: 'Rust Programming'
+                topic: 'Rust Programming',
             });
 
             assert.ok(workflow);
@@ -339,7 +350,7 @@ describe('WorkflowGenerator (template → workflow)', () => {
         it('should expand repeat_for_each steps', async () => {
             const workflow = await generator.generateWorkflow('book_writing', {
                 topic: 'Python',
-                num_chapters: 5
+                num_chapters: 5,
             });
 
             assert.strictEqual(workflow.steps.length, 7);
@@ -349,7 +360,7 @@ describe('WorkflowGenerator (template → workflow)', () => {
             const workflow = await generator.generateWorkflow('book_writing', {
                 topic: 'JavaScript',
                 num_chapters: 5,
-                target_audience: 'beginners'
+                target_audience: 'beginners',
             });
 
             const outlineStep = workflow.steps[0];
@@ -358,14 +369,17 @@ describe('WorkflowGenerator (template → workflow)', () => {
         });
 
         it('should validate required params', async () => {
-            await assert.rejects(generator.generateWorkflow('book_writing', {}), /Parâmetro obrigatório ausente: topic/);
+            await assert.rejects(
+                generator.generateWorkflow('book_writing', {}),
+                /Parâmetro obrigatório ausente: topic/
+            );
         });
 
         it('should validate param ranges', async () => {
             await assert.rejects(
                 generator.generateWorkflow('book_writing', {
                     topic: 'Rust',
-                    num_chapters: 100
+                    num_chapters: 100,
                 }),
                 /deve ser <= 50/
             );
@@ -383,11 +397,11 @@ describe('WorkflowGenerator (template → workflow)', () => {
 });
 
 describe('MissionManager (end-to-end)', () => {
-    let missionManager;
-    let kernel;
-    let nerv;
-    let prevMissionDispatchMode;
-    let prevMissionLegacyDispatchEnabled;
+    /** @type {any} */ let missionManager;
+    /** @type {any} */ let kernel;
+    /** @type {any} */ let nerv;
+    /** @type {string|undefined} */ let prevMissionDispatchMode;
+    /** @type {string|undefined} */ let prevMissionLegacyDispatchEnabled;
 
     beforeEach(async () => {
         // Este suite valida integração histórica com mock de kernel (dispatch direto).
@@ -407,7 +421,7 @@ describe('MissionManager (end-to-end)', () => {
             kernel,
             nerv,
             stateManager,
-            workflowGenerator
+            workflowGenerator,
         });
 
         await missionManager.initialize();
@@ -445,8 +459,8 @@ describe('MissionManager (end-to-end)', () => {
                 params: {
                     topic: 'Rust',
                     num_chapters: 5,
-                    target_pages: 200
-                }
+                    target_pages: 200,
+                },
             });
 
             assert.ok(mission);
@@ -462,7 +476,7 @@ describe('MissionManager (end-to-end)', () => {
                 title: 'Test',
                 description: 'Desc',
                 templateId: 'book_writing',
-                params: { topic: 'Go', num_chapters: 5 }
+                params: { topic: 'Go', num_chapters: 5 },
             });
 
             const retrieved = await missionManager.getMission(created.id);
@@ -476,14 +490,14 @@ describe('MissionManager (end-to-end)', () => {
                 title: 'Mission 1',
                 description: 'Desc',
                 templateId: 'book_writing',
-                params: { topic: 'Topic1', num_chapters: 5 }
+                params: { topic: 'Topic1', num_chapters: 5 },
             });
 
             await missionManager.createMission({
                 title: 'Mission 2',
                 description: 'Desc',
                 templateId: 'book_writing',
-                params: { topic: 'Topic2', num_chapters: 5 }
+                params: { topic: 'Topic2', num_chapters: 5 },
             });
 
             const missions = await missionManager.listMissions();
@@ -495,7 +509,7 @@ describe('MissionManager (end-to-end)', () => {
                 title: 'Delete me',
                 description: 'Desc',
                 templateId: 'book_writing',
-                params: { topic: 'DeleteTopic', num_chapters: 5 }
+                params: { topic: 'DeleteTopic', num_chapters: 5 },
             });
 
             await missionManager.deleteMission(created.id);
@@ -511,7 +525,7 @@ describe('MissionManager (end-to-end)', () => {
                 title: 'Execute Test',
                 description: 'Test execution',
                 templateId: 'book_writing',
-                params: { topic: 'Python', num_chapters: 5 }
+                params: { topic: 'Python', num_chapters: 5 },
             });
 
             await missionManager.executeMission(created.id);
@@ -533,7 +547,7 @@ describe('MissionManager (end-to-end)', () => {
                 title: 'Dedup Test',
                 description: 'Ensure same event is processed once',
                 templateId: 'book_writing',
-                params: { topic: 'Node.js', num_chapters: 5 }
+                params: { topic: 'Node.js', num_chapters: 5 },
             });
 
             await missionManager.executeMission(created.id);
@@ -547,7 +561,7 @@ describe('MissionManager (end-to-end)', () => {
                 missionId: created.id,
                 taskId: firstTask.meta.id,
                 stepId: firstTask.meta.step_id,
-                result: { output: 'step result' }
+                result: { output: 'step result' },
             });
 
             nerv.receive(envelope);
@@ -567,7 +581,7 @@ describe('MissionManager (end-to-end)', () => {
                 title: 'Late Event Test',
                 description: 'Ignore events when inactive',
                 templateId: 'book_writing',
-                params: { topic: 'Kotlin', num_chapters: 5 }
+                params: { topic: 'Kotlin', num_chapters: 5 },
             });
 
             await missionManager.executeMission(created.id);
@@ -584,7 +598,7 @@ describe('MissionManager (end-to-end)', () => {
                     missionId: created.id,
                     taskId: firstTask.meta.id,
                     stepId: firstTask.meta.step_id,
-                    result: { output: 'should be ignored' }
+                    result: { output: 'should be ignored' },
                 })
             );
 
@@ -602,7 +616,7 @@ describe('MissionManager (end-to-end)', () => {
                 title: 'Pause Test',
                 description: 'Test',
                 templateId: 'book_writing',
-                params: { topic: 'Java', num_chapters: 5 }
+                params: { topic: 'Java', num_chapters: 5 },
             });
 
             await missionManager.executeMission(created.id);
@@ -617,7 +631,7 @@ describe('MissionManager (end-to-end)', () => {
                 title: 'Resume Test',
                 description: 'Test',
                 templateId: 'book_writing',
-                params: { topic: 'C++', num_chapters: 5 }
+                params: { topic: 'C++', num_chapters: 5 },
             });
 
             await missionManager.executeMission(created.id);
@@ -635,7 +649,7 @@ describe('MissionManager (end-to-end)', () => {
                 title: 'Feedback Test',
                 description: 'Test',
                 templateId: 'book_writing',
-                params: { topic: 'Ruby', num_chapters: 5 }
+                params: { topic: 'Ruby', num_chapters: 5 },
             });
 
             await missionManager.addFeedback(created.id, 'Please add more code examples');
@@ -652,7 +666,7 @@ describe('MissionManager (end-to-end)', () => {
                 title: 'Progress Test',
                 description: 'Test',
                 templateId: 'book_writing',
-                params: { topic: 'Swift', num_chapters: 5 }
+                params: { topic: 'Swift', num_chapters: 5 },
             });
 
             const progress = await missionManager.getMissionProgress(created.id);

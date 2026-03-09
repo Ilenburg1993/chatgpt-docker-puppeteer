@@ -2,11 +2,10 @@
 // @ts-check
 
 /**
- * @fileoverview Validação pré-voo para ambiente de produção
- * Verifica se todos os pré-requisitos estão atendidos antes de iniciar PM2
- *
- * @author Sistema de Ambiente
  * @version 1.0.0
+ * @file Validação pré-voo para ambiente de produção Verifica se todos os pré-requisitos estão atendidos antes de
+ *   iniciar PM2
+ * @author Sistema de Ambiente
  */
 
 import { existsSync, statSync } from 'fs';
@@ -18,6 +17,7 @@ const projectRoot = resolve(__dirname, '..');
 
 /**
  * Validações críticas para produção
+ *
  * @typedef {Object} ValidationResult
  * @property {boolean} success - Se a validação passou
  * @property {string} message - Mensagem descritiva
@@ -26,6 +26,7 @@ const projectRoot = resolve(__dirname, '..');
 
 /**
  * Verifica se arquivos essenciais existem
+ *
  * @param {boolean} isProduction - Se está em modo produção
  * @returns {ValidationResult}
  */
@@ -37,7 +38,7 @@ function validateEssentialFiles(isProduction) {
         essentialFiles.push('dist/main.js');
     }
 
-    const missing = essentialFiles.filter(file => !existsSync(join(projectRoot, file)));
+    const missing = essentialFiles.filter((file) => !existsSync(join(projectRoot, file)));
 
     if (missing.length > 0) {
         return {
@@ -56,6 +57,7 @@ function validateEssentialFiles(isProduction) {
 
 /**
  * Verifica se o build de produção está atualizado
+ *
  * @param {boolean} isProduction - Se está em modo produção
  * @returns {ValidationResult}
  */
@@ -100,6 +102,7 @@ function validateBuildFreshness(isProduction) {
 
 /**
  * Verifica se as dependências estão instaladas
+ *
  * @returns {ValidationResult}
  */
 function validateDependencies() {
@@ -115,7 +118,7 @@ function validateDependencies() {
 
     // Verifica se algumas dependências críticas existem
     const criticalDeps = ['puppeteer', 'express', 'socket.io'];
-    const missingDeps = criticalDeps.filter(dep => !existsSync(join(nodeModules, dep)));
+    const missingDeps = criticalDeps.filter((dep) => !existsSync(join(nodeModules, dep)));
 
     if (missingDeps.length > 0) {
         return {
@@ -134,6 +137,7 @@ function validateDependencies() {
 
 /**
  * Verifica se as portas necessárias estão livres
+ *
  * @returns {ValidationResult}
  */
 function validatePorts() {
@@ -148,6 +152,7 @@ function validatePorts() {
 
 /**
  * Executa todas as validações
+ *
  * @returns {Promise<void>}
  */
 async function runValidations() {
@@ -190,7 +195,7 @@ async function runValidations() {
 }
 
 // Executa as validações
-runValidations().catch(error => {
+runValidations().catch((error) => {
     console.error('❌ Erro durante validação:', error.message);
     process.exit(1);
 });

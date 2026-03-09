@@ -6,18 +6,27 @@ import http from 'node:http';
  * @typedef {object} AuditAgentServerDependencies
  * @property {import('./runtime.js').AuditAgentRuntime} runtime
  */
-/** @typedef {Error & { statusCode?: number, code?: string }} AuditAgentServerError */
+/** @typedef {Error & { statusCode?: number; code?: string }} AuditAgentServerError */
 
+/**
+ * @param {import('node:http').ServerResponse} res
+ * @param {number} statusCode
+ * @param {unknown} body
+ */
 function writeJson(res, statusCode, body) {
     res.statusCode = statusCode;
     res.setHeader('content-type', 'application/json; charset=utf-8');
     res.end(JSON.stringify(body));
 }
 
+/**
+ * @param {import('node:http').IncomingMessage} req
+ * @returns {Promise<unknown>}
+ */
 function readJsonBody(req) {
     return new Promise((resolve, reject) => {
         let raw = '';
-        req.on('data', chunk => {
+        req.on('data', (/** @type {unknown} */ chunk) => {
             raw += String(chunk);
             if (raw.length > 1_000_000) {
                 reject(Object.assign(new Error('payload too large'), { statusCode: 413 }));
@@ -28,7 +37,7 @@ function readJsonBody(req) {
             if (!raw.trim()) return resolve({});
             try {
                 resolve(JSON.parse(raw));
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 reject(Object.assign(new Error('invalid json body'), { statusCode: 400, cause: error }));
             }
         });
@@ -52,12 +61,13 @@ export function createAuditAgentServer(deps) {
                 return writeJson(res, 200, { ok: true, metrics: runtime.getMetrics() });
             }
             if (req.method === 'GET' && url.pathname === '/jobs') {
-                const status = url.searchParams.get('status');
+                const statusParam = url.searchParams.get('status');
+                const status = statusParam != null ? statusParam : null;
                 const limit = Number(url.searchParams.get('limit') || 100);
                 return writeJson(res, 200, { ok: true, items: runtime.listJobs({ status, limit }) });
             }
             if (req.method === 'GET' && url.pathname.match(/^\/jobs\/[^/]+$/)) {
-                const id = decodeURIComponent(url.pathname.split('/')[2]);
+                const id = decodeURIComponent(url.pathname.split('/')[2] ?? '');
                 const job = runtime.getJob(id);
                 if (!job) {
                     return writeJson(res, 404, { ok: false, error: 'not_found', code: 'AUDIT_JOB_NOT_FOUND' });
@@ -70,25 +80,25 @@ export function createAuditAgentServer(deps) {
                 return writeJson(res, 201, { ok: true, job });
             }
             if (req.method === 'POST' && url.pathname.match(/^\/jobs\/[^/]+\/run$/)) {
-                const id = decodeURIComponent(url.pathname.split('/')[2]);
+                const id = decodeURIComponent(url.pathname.split('/')[2] ?? '');
                 const job = runtime.queueJob(id);
                 await runtime.tick();
                 return writeJson(res, 200, { ok: true, job: runtime.getJob(job.id) });
             }
             if (req.method === 'POST' && url.pathname.match(/^\/jobs\/[^/]+\/cancel$/)) {
-                const id = decodeURIComponent(url.pathname.split('/')[2]);
+                const id = decodeURIComponent(url.pathname.split('/')[2] ?? '');
                 const body = /** @type {Record<string, unknown>} */ (await readJsonBody(req));
                 const reason = typeof body.reason === 'string' ? body.reason : 'manual_cancel';
                 const job = runtime.cancelJob(id, reason);
                 return writeJson(res, 200, { ok: true, job });
             }
             return writeJson(res, 404, { ok: false, error: 'not_found' });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             const typedError = /** @type {AuditAgentServerError} */ (error);
             return writeJson(res, typedError.statusCode || 500, {
                 ok: false,
                 error: typedError.code || 'AUDIT_AGENT_SERVER_ERROR',
-                message: error?.message || String(error),
+                message: error instanceof Error ? error.message : String(error),
             });
         }
     });

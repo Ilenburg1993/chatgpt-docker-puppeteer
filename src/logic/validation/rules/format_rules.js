@@ -9,14 +9,14 @@
 ========================================================================== */
 
 /**
- * Valida se o conteúdo contém um JSON íntegro via análise de profundidade de pilha.
- * [HARDENING] Inclui verificação de sinal de aborto para interromper processamento longo.
+ * Valida se o conteúdo contém um JSON íntegro via análise de profundidade de pilha. [HARDENING] Inclui verificação de
+ * sinal de aborto para interromper processamento longo.
  *
  * @param {string} content - Conteúdo acumulado para validação.
  * @param {AbortSignal} [signal] - Sinal de cancelamento opcional.
- * @returns {object} { ok: boolean, reason: string|null }
+ * @returns {any} { ok: boolean, reason: string|null }
  */
-function validateJSON(content, signal = null) {
+function validateJSON(content, signal = undefined) {
     if (!content || typeof content !== 'string') {
         return { ok: false, reason: 'INVALID_INPUT: Conteúdo nulo ou inválido.' };
     }
@@ -44,8 +44,11 @@ function validateJSON(content, signal = null) {
                     JSON.parse(jsonCandidate);
                     found = true;
                     break;
-                } catch (e) {
-                    return { ok: false, reason: `JSON_CORRUPTED: Estrutura inválida. ${e.message}` };
+                } catch (/** @type {any} */ e) {
+                    return {
+                        ok: false,
+                        reason: `JSON_CORRUPTED: Estrutura inválida. ${e instanceof Error ? e.message : String(e)}`,
+                    };
                 }
             }
         }
@@ -64,9 +67,9 @@ function validateJSON(content, signal = null) {
  * @param {string} content - Conteúdo a ser testado.
  * @param {string} patternStr - String da expressão regular.
  * @param {AbortSignal} [signal] - Sinal de cancelamento.
-  * @returns {any}
+ * @returns {{ ok: boolean; reason: string | null }}
  */
-function validateRegex(content, patternStr, signal = null) {
+function validateRegex(content, patternStr, signal = undefined) {
     if (!patternStr) {
         return { ok: true, reason: null };
     }
@@ -85,14 +88,16 @@ function validateRegex(content, patternStr, signal = null) {
             };
         }
         return { ok: true, reason: null };
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return { ok: false, reason: 'INVALID_REGEX_RULE: Expressão regular malformada.' };
     }
 }
 
 /**
  * Valida se o conteúdo respeita o formato Markdown (presença de blocos de código).
-  * @returns {any}
+ *
+ * @param {string} content
+ * @returns {{ ok: boolean; reason: string | null }}
  */
 function validateMarkdownCode(content) {
     if (!content || !content.includes('```')) {
@@ -101,4 +106,4 @@ function validateMarkdownCode(content) {
     return { ok: true, reason: null };
 }
 
-export { validateJSON, validateRegex, validateMarkdownCode };
+export { validateJSON, validateMarkdownCode, validateRegex };

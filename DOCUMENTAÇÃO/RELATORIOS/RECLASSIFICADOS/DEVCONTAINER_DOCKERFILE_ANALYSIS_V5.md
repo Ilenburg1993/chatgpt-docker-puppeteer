@@ -32,16 +32,16 @@ priority | 6 medium priority
 ```dockerfile
 # SECTION 2
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    locales \
-    libnss-wrapper \
-    curl \  # <--- DUPLICADO
+ && apt-get install -y --no-install-recommends \
+  locales \
+  libnss-wrapper \
+  curl \  # <--- DUPLICADO
 
 # SECTION 3
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    openssl \
-    ca-certificates \  # <--- DUPLICADO
+ && apt-get install -y --no-install-recommends \
+  openssl \
+  ca-certificates \  # <--- DUPLICADO
 ```
 
 **Impacto**: Build mais lento, layers desnecessárias.
@@ -51,27 +51,27 @@ RUN apt-get update \
 ```dockerfile
 # SECTION 2 - Remover curl (já instalado em SECTION 3)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    locales \
-    libnss-wrapper \
-    && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends \
+  locales \
+  libnss-wrapper \
+ && rm -rf /var/lib/apt/lists/*
 
 # SECTION 3 - Consolidar deps de rede/TLS
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    build-essential \
-    pkg-config \
-    autoconf \
-    automake \
-    libtool \
-    python3 \
-    python3-pip \
-    python-is-python3 \
-    openssl \
-    ca-certificates \
-    curl \
-    libnss-wrapper \
-    && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends \
+  build-essential \
+  pkg-config \
+  autoconf \
+  automake \
+  libtool \
+  python3 \
+  python3-pip \
+  python-is-python3 \
+  openssl \
+  ca-certificates \
+  curl \
+  libnss-wrapper \
+ && rm -rf /var/lib/apt/lists/*
 ```
 
 ---
@@ -224,8 +224,8 @@ RUN apt-get update \
 
 ```dockerfile
 RUN echo "Building ${IMAGE_NAME} v${VERSION} (${BUILD_ENV})" \
-    && echo "Build date: ${BUILD_DATE}" \
-    && echo "VCS ref: ${VCS_REF}"
+ && echo "Build date: ${BUILD_DATE}" \
+ && echo "VCS ref: ${VCS_REF}"
 ```
 
 ---
@@ -361,8 +361,6 @@ sudo apt-get update && sudo apt-get install -y gdb heaptrack
 
 ```dockerfile
 # CORE (manter)
-fonts-dejavu-core \
-fonts-noto-core \
 fonts-noto-color-emoji \
 
 # REMOVER (raramente usado)
@@ -449,7 +447,7 @@ RUN apt-get install -y gh git-lfs socat
 ```dockerfile
 # Adicionar HEALTHCHECK
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:3008/health || exit 1
+ CMD curl -f http://localhost:3008/health || exit 1
 ```
 
 **Ganho**: Container auto-recovery, melhor observabilidade.
@@ -493,9 +491,9 @@ backups
 
 ```dockerfile
 # Criar arquivo de versão
-RUN echo "Dockerfile v${VERSION}" > /etc/container-version \
-    && echo "Build: ${BUILD_DATE}" >> /etc/container-version \
-    && echo "Commit: ${VCS_REF}" >> /etc/container-version
+RUN echo "Dockerfile v${VERSION}" >/etc/container-version \
+ && echo "Build: ${BUILD_DATE}" >>/etc/container-version \
+ && echo "Commit: ${VCS_REF}" >>/etc/container-version
 ```
 
 **Ganho**: Rastreabilidade, debugging mais fácil.

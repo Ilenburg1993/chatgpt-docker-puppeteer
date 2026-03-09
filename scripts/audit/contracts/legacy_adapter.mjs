@@ -1,10 +1,9 @@
 // @ts-check
-/**
- * @typedef {import('./load_registry.mjs').ContractDefinitionV1} ContractDefinitionV1
- */
+/** @import {ContractDefinitionV1} from "./load_registry.mjs" */
 
 /**
  * Contratos legados usados para paridade durante migração híbrida.
+ *
  * @returns {ContractDefinitionV1[]}
  */
 export function getLegacyStaticContracts() {
@@ -118,7 +117,8 @@ export function getLegacyStaticContracts() {
 
 /**
  * @param {{ id: string }[]} contracts
-  * @returns {any}
+ * @param {any} contracts
+ * @returns {object}
  */
 export function indexByContractId(contracts) {
     /** @type {Map<string, any>} */

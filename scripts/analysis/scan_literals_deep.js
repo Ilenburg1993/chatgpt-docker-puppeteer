@@ -14,11 +14,14 @@ console.log(`Src: ${SRC}\n`);
 // ANÁLISE COMPLETA DE ARQUIVOS
 // ============================================
 
+/** @param {string} dir */
 function getAllJsFiles(dir) {
+    /** @type {string[]} */
     const files = [];
+    /** @param {string} d */
     function walk(d) {
         const entries = fs.readdirSync(d, { withFileTypes: true });
-        entries.forEach(entry => {
+        entries.forEach((entry) => {
             const fullPath = path.join(d, entry.name);
             // Skip dist/build artifacts when recursing
             if (
@@ -129,13 +132,13 @@ const patterns = {
 // PROCESSAMENTO
 // ============================================
 
-files.forEach(file => {
+files.forEach((file) => {
     const relativePath = path.relative(ROOT, file);
     let content = '';
     try {
         content = fs.readFileSync(file, 'utf8');
     } catch (_error) {
-        console.error(`Erro ao processar ${file}:`, _error.message);
+        console.error(`Erro ao processar ${file}:`, /** @type {any} */ (_error).message);
         return;
     }
     const _lines = content.split('\n');
@@ -220,7 +223,7 @@ files.forEach(file => {
     // Log categories
     patterns.logCategory.lastIndex = 0;
     while ((match = patterns.logCategory.exec(content)) !== null) {
-        const value = match[1];
+        const value = match[1] ?? '';
         if (value.length > 3 && !value.match(/^(INFO|WARN|ERROR|DEBUG)$/)) {
             const lineNum = content.substring(0, match.index).split('\n').length;
             if (!analysis.logCategories.values.has(value)) {
@@ -271,6 +274,7 @@ files.forEach(file => {
 console.log('📊 RELATÓRIO DETALHADO\n');
 console.log('='.repeat(100));
 
+/** @param {any} title @param {any} data */
 function printCategory(title, data, minOccurrences = 1) {
     const entries = Array.from(data.values.entries())
         .filter(([_, locs]) => locs.length >= minOccurrences)
@@ -285,9 +289,11 @@ function printCategory(title, data, minOccurrences = 1) {
     entries.forEach(([value, locations]) => {
         console.log(`   ${value.padEnd(30)} → ${locations.length} uso(s)`);
         if (locations.length <= 3) {
-            locations.forEach(loc => {
-                console.log(`      ${loc.file}:${loc.line}`);
-            });
+            locations.forEach(
+                /** @param {any} loc */ (loc) => {
+                    console.log(`      ${loc.file}:${loc.line}`);
+                },
+            );
         } else {
             console.log(`      ${locations[0].file}:${locations[0].line}`);
             console.log(`      ... e mais ${locations.length - 1} arquivo(s)`);
@@ -385,7 +391,7 @@ recommendations.forEach((rec, i) => {
     console.log(`\n${i + 1}. ${rec.file}`);
     console.log(`   Exports: ${rec.exports.join(', ')}`);
     console.log(`   Valores (${rec.values.length}):`);
-    rec.values.sort().forEach(v => console.log(`      - ${v}`));
+    rec.values.sort().forEach((v) => console.log(`      - ${v}`));
 });
 
 console.log(`\n${'='.repeat(100)}`);

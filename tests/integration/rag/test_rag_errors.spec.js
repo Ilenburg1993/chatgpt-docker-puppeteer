@@ -1,14 +1,14 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
-import { ragIndex, ragReset, ragHybridSearch } from '../../../tools/rag/lib/facade.mjs';
+import path from 'node:path';
+import { describe, it } from 'node:test';
+import { ragHybridSearch, ragIndex, ragReset } from '../../../tools/rag/lib/facade.mjs';
 
 // Fake embeddings provider for testing
 class FakeEmbeddingsProvider {
-    constructor(options = {}) {
+    constructor(/** @type {any} */ options = {}) {
         this.dim = options.dim || 8;
         this.model = options.model || 'fake-model';
         this.shouldFail = options.shouldFail || false;
@@ -18,7 +18,7 @@ class FakeEmbeddingsProvider {
         return { ok: true, hasModel: true, models: [this.model] };
     }
 
-    async embed(text) {
+    async embed(/** @type {any} */ text) {
         if (this.shouldFail) {
             throw new Error('FAKE_EMBEDDING_ERROR');
         }
@@ -71,11 +71,11 @@ describe('RAG Error Scenarios', () => {
                         profile: 'full',
                     });
                 },
-                err => {
+                (/** @type {any} */ err) => {
                     assert.ok(err.message.includes('SCHEMA_VERSION_MISMATCH'));
                     assert.ok(err.message.includes('npm run rag:reset'));
                     return true;
-                }
+                },
             );
         } finally {
             await fs.rm(ws, { recursive: true, force: true });
@@ -112,12 +112,12 @@ describe('RAG Error Scenarios', () => {
                         profile: 'full',
                     });
                 },
-                err => {
+                (/** @type {any} */ err) => {
                     assert.ok(err.message.includes('EMBEDDING_DIM_MISMATCH'));
                     assert.ok(err.message.includes('dim=8'));
                     assert.ok(err.message.includes('dim=16'));
                     return true;
-                }
+                },
             );
         } finally {
             await fs.rm(ws, { recursive: true, force: true });
@@ -143,7 +143,7 @@ describe('RAG Error Scenarios', () => {
                 async health() {
                     return { ok: true, hasModel: true, models: ['flaky-model'] };
                 },
-                async embed(text) {
+                async embed(/** @type {any} */ text) {
                     attempts++;
                     if (attempts <= 2) {
                         throw new Error('TEMPORARY_ERROR');
@@ -154,12 +154,14 @@ describe('RAG Error Scenarios', () => {
             };
 
             // Should succeed after retries
-            const result = await ragIndex({
-                root: ws,
-                paths,
-                embeddingsProvider: flakyProvider,
-                profile: 'full',
-            });
+            const result = /** @type {any} */ (
+                await ragIndex({
+                    root: ws,
+                    paths,
+                    embeddingsProvider: flakyProvider,
+                    profile: 'full',
+                })
+            );
 
             assert.strictEqual(result.scanned_files, 1);
             assert.strictEqual(result.changed_files, 1);
@@ -187,10 +189,10 @@ describe('RAG Error Scenarios', () => {
                 async () => {
                     await ragReset({ paths, yes: false });
                 },
-                err => {
+                (/** @type {any} */ err) => {
                     assert.ok(err.message.includes('--yes'));
                     return true;
-                }
+                },
             );
 
             // With yes flag - should succeed

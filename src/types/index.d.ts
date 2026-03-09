@@ -1,8 +1,7 @@
 /**
  * Type Declarations Index
  *
- * Agrega todas as declarações de tipo do projeto.
- * Este arquivo garante que todos os .d.ts sejam carregados.
+ * Agrega todas as declarações de tipo do projeto. Este arquivo garante que todos os .d.ts sejam carregados.
  */
 
 /// <reference path="./global.d.ts" />

@@ -1,10 +1,10 @@
 // @ts-check
 /**
  * @param {ReturnType<import('./context_pack.mjs').buildContextPack>} contextPack
-  * @returns {any}
+ * @returns {any[]}
  */
 export function rankRootCauses(contextPack) {
-    /** @type {Array<{ cause: string, score: number }>} */
+    /** @type {{ cause: string; score: number }[]} */
     const candidates = [];
 
     const src = String(contextPack.finding.source_tool || '');

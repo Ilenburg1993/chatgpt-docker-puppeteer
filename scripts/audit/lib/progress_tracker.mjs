@@ -1,22 +1,29 @@
 // @ts-check
 /**
- * @param {{ stepsTotal: number, startedAt?: number }} options
-  * @returns {any}
+ * @typedef {object} CreateProgressTrackerOptions
+ * @property {number} stepsTotal
+ * @property {number} startedAt
+ */
+/**
+ * @param {CreateProgressTrackerOptions} options
+ * @returns {object}
  */
 export function createProgressTracker(options) {
     let stepsTotal = Math.max(1, Number(options.stepsTotal || 1));
     let stepsDone = 0;
     let currentPhase = 'preflight';
-    let lastStepId = null;
+    let lastStepId = /** @type {any} */ (null);
     const startedAt = Number(options.startedAt || Date.now());
 
     /** @type {Map<string, number>} */
     const runningSteps = new Map();
 
+    /** @param {any} phase */
     function setPhase(phase) {
         currentPhase = phase;
     }
 
+    /** @param {any} nextTotal */
     function setStepsTotal(nextTotal) {
         const value = Number(nextTotal || 0);
         if (Number.isFinite(value) && value > stepsTotal) {
@@ -24,6 +31,7 @@ export function createProgressTracker(options) {
         }
     }
 
+    /** @param {any} stepId */
     function stepStarted(stepId) {
         lastStepId = stepId;
         runningSteps.set(stepId, Date.now());
@@ -33,6 +41,7 @@ export function createProgressTracker(options) {
         }
     }
 
+    /** @param {any} stepId */
     function stepFinished(stepId) {
         if (runningSteps.has(stepId)) {
             runningSteps.delete(stepId);

@@ -3,9 +3,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
+ * @typedef {object} PublishJsonOptions
+ * @property {string} outputDir
+ * @property {string} runDir
+ */
+/**
  * @param {import('./lib/schema.mjs').AuditRunV3} report
- * @param {{ outputDir: string, runDir?: string }} options
- * @returns {{ path: string, runReportPath: string }}
+ * @param {PublishJsonOptions} options
+ * @returns {{ path: string; runReportPath: string }}
  */
 export function publishJson(report, options) {
     fs.mkdirSync(options.outputDir, { recursive: true });

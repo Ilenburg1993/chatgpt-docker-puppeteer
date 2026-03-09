@@ -10,10 +10,13 @@ console.log(`
 
 let testsPassed = 0;
 let testsFailed = 0;
-const results = [];
+const results = /** @type {any[]} */ ([]);
 
 /**
  * Helper para executar testes
+ *
+ * @param {string} name
+ * @param {any} testFn
  */
 function runTest(name, testFn) {
     process.stdout.write(`\n=== ${name} ===\n`);
@@ -24,7 +27,7 @@ function runTest(name, testFn) {
         testsPassed++;
         results.push({ name, passed: true });
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.log(`❌ FALHOU: ${error.message}\n`);
         testsFailed++;
         results.push({ name, passed: false, error });
@@ -109,7 +112,7 @@ runTest('TEST 3: Driver - Zero acesso direto ao filesystem', () => {
         // Verifica chamadas proibidas (exceto em comentários)
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
+            const line = (lines[i] ?? '').trim();
 
             // Ignora comentários
             if (line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) {
@@ -163,7 +166,7 @@ runTest('TEST 4: DriverNERVAdapter - Comunicação 100% via NERV', () => {
     // NÃO deve fazer emissões externas diretas (fora do NERV)
     const lines = content.split('\n');
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const line = (lines[i] ?? '').trim();
 
         // Ignora comentários e logs normais
         if (line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) {
@@ -176,7 +179,7 @@ runTest('TEST 4: DriverNERVAdapter - Comunicação 100% via NERV', () => {
         const hasForbiddenEmit = /\b(socket|io|socketHub)\.emit\s*\(/.test(line);
         if (hasForbiddenEmit) {
             throw new Error(
-                `Emissão externa direta detectada (fora do NERV) em driver_nerv_adapter.js:${i + 1}: ${line}`
+                `Emissão externa direta detectada (fora do NERV) em driver_nerv_adapter.js:${i + 1}: ${line}`,
             );
         }
     }
@@ -262,7 +265,7 @@ runTest('TEST 7: DriverLifecycleManager - Conformidade NERV', () => {
 
     // NÃO deve ter require do KERNEL (apenas logger é OK)
     const kernelImports = content.match(/require\(['"].*kernel/gi) || [];
-    const legitimateImports = kernelImports.filter(imp => !imp.includes('logger'));
+    const legitimateImports = kernelImports.filter((imp) => !imp.includes('logger'));
 
     if (legitimateImports.length > 0) {
         throw new Error(`DriverLifecycleManager importa KERNEL: ${legitimateImports}`);
@@ -328,7 +331,7 @@ console.log(`
 📊 Score: ${testsPassed}/8 testes passaram
 
 ${
-    results.length === 8 && results.every(r => r.passed)
+    results.length === 8 && results.every((r) => r.passed)
         ? `
 🎉 DRIVER COMPLETAMENTE INTEGRADO VIA NERV!
 
@@ -350,4 +353,4 @@ dos princípios NERV.
 }
 `);
 
-process.exit(results.length === 8 && results.every(r => r.passed) ? 0 : 1);
+process.exit(results.length === 8 && results.every((r) => r.passed) ? 0 : 1);

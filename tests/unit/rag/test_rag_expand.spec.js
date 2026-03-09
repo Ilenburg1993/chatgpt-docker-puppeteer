@@ -1,12 +1,12 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
 import crypto from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, it } from 'node:test';
 
-import { ragIndex, ragQuery, ragExpand } from '../../../tools/rag/lib/facade.mjs';
+import { ragExpand, ragIndex, ragQuery } from '../../../tools/rag/lib/facade.mjs';
 
 class FakeEmbeddingsProvider {
     constructor(dim = 8) {
@@ -18,10 +18,10 @@ class FakeEmbeddingsProvider {
         return { ok: true, hasModel: true, models: [this.model] };
     }
 
-    async embed(text) {
+    async embed(/** @type {any} */ text) {
         const hash = crypto.createHash('sha256').update(String(text), 'utf8').digest();
         const vector = [];
-        for (let i = 0; i < this.dim; i++) vector.push(hash[i] / 255);
+        for (let i = 0; i < this.dim; i++) vector.push((hash[i] ?? 0) / 255);
         return vector;
     }
 }
@@ -47,11 +47,13 @@ describe('ragExpand', () => {
                 profile: 'full',
             });
 
-            const result = await ragExpand({
-                paths,
-                root: ws,
-                chunkId: 'non-existent',
-            });
+            const result = /** @type {any} */ (
+                await ragExpand({
+                    paths,
+                    root: ws,
+                    chunkId: 'non-existent',
+                })
+            );
             assert.strictEqual(result.ok, false);
             assert.strictEqual(result.reason_code, 'CHUNK_NOT_FOUND');
         } finally {
@@ -83,7 +85,7 @@ describe('ragExpand', () => {
                     'export const value = 42;',
                     '',
                 ].join('\n'),
-                'utf8'
+                'utf8',
             );
 
             await ragIndex({
@@ -93,23 +95,27 @@ describe('ragExpand', () => {
                 profile: 'full',
             });
 
-            const query = await ragQuery({
-                query: 'hello(name)',
-                topK: 1,
-                paths: ragPaths,
-                embeddingsProvider: embeddings,
-            });
+            const query = /** @type {any} */ (
+                await ragQuery({
+                    query: 'hello(name)',
+                    topK: 1,
+                    paths: ragPaths,
+                    embeddingsProvider: embeddings,
+                })
+            );
             const chunkId = query.results?.[0]?.chunk_id;
             assert.ok(chunkId, 'Expected at least one indexed chunk');
 
-            const expanded = await ragExpand({
-                paths: ragPaths,
-                root: ws,
-                chunkId,
-                mode: 'lines',
-                beforeLines: 200,
-                afterLines: 200,
-            });
+            const expanded = /** @type {any} */ (
+                await ragExpand({
+                    paths: ragPaths,
+                    root: ws,
+                    chunkId,
+                    mode: 'lines',
+                    beforeLines: 200,
+                    afterLines: 200,
+                })
+            );
 
             assert.strictEqual(expanded.ok, true);
             assert.strictEqual(expanded.mode, 'lines');
@@ -141,7 +147,7 @@ describe('ragExpand', () => {
             await fs.writeFile(
                 path.join(ws, 'src', 'big.ts'),
                 ['export function heavySymbol() {', body, '  return line_1 + line_699;', '}', ''].join('\n'),
-                'utf8'
+                'utf8',
             );
 
             await ragIndex({
@@ -151,23 +157,27 @@ describe('ragExpand', () => {
                 profile: 'full',
             });
 
-            const query = await ragQuery({
-                query: 'line_699',
-                topK: 1,
-                paths: ragPaths,
-                embeddingsProvider: embeddings,
-            });
+            const query = /** @type {any} */ (
+                await ragQuery({
+                    query: 'line_699',
+                    topK: 1,
+                    paths: ragPaths,
+                    embeddingsProvider: embeddings,
+                })
+            );
             const chunkId = query.results?.[0]?.chunk_id;
             assert.ok(chunkId, 'Expected indexed chunk for heavySymbol');
 
-            const expanded = await ragExpand({
-                paths: ragPaths,
-                root: ws,
-                chunkId,
-                mode: 'symbol',
-                beforeLines: 0,
-                afterLines: 0,
-            });
+            const expanded = /** @type {any} */ (
+                await ragExpand({
+                    paths: ragPaths,
+                    root: ws,
+                    chunkId,
+                    mode: 'symbol',
+                    beforeLines: 0,
+                    afterLines: 0,
+                })
+            );
 
             assert.strictEqual(expanded.ok, true);
             assert.strictEqual(expanded.mode, 'symbol');

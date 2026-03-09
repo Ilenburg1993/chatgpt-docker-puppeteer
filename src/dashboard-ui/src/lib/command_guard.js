@@ -1,6 +1,9 @@
 // @ts-check
 /**
  * Função exportada: requireReason.
+ *
+ * @param {any} reason
+ * @param {any} [fallbackMessage]
  * @returns {any}
  */
 export function requireReason(reason, fallbackMessage = 'Motivo operacional é obrigatório para este comando.') {
@@ -12,10 +15,21 @@ export function requireReason(reason, fallbackMessage = 'Motivo operacional é o
 }
 
 /**
+ * @typedef {object} ConfirmTwoStepActionOptions
+ * @property {any} [actionLabel]
+ * @property {any} [reason]
+ * @property {any} [firstMessage]
+ * @property {any} [secondMessage]
+ */
+/**
  * Função exportada: confirmTwoStepAction.
+ *
+ * @param {ConfirmTwoStepActionOptions} [options]
  * @returns {any}
  */
-export function confirmTwoStepAction({ actionLabel, reason, firstMessage = null, secondMessage = null }) {
+export function confirmTwoStepAction(
+    /** @type {any} */ { actionLabel, reason, firstMessage = null, secondMessage = null } = {},
+) {
     const normalizedReason = requireReason(reason);
     if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
         return true;

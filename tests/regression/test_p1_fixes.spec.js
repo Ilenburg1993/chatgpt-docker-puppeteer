@@ -1,7 +1,7 @@
 // @ts-check
-import path from 'node:path';
-import { promises as fs } from 'node:fs';
 import { acquireLock, releaseLock } from '#infra/locks/lock_manager';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const LOCK_DIR = ROOT;
@@ -12,7 +12,8 @@ const LOCK_DIR = ROOT;
 
 /**
  * Função exportada: testLockTwoPhaseCommit.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function testLockTwoPhaseCommit() {
     console.log('\n=== TEST 1: Lock Manager - Two-Phase Commit ===');
@@ -59,7 +60,7 @@ async function testLockTwoPhaseCommit() {
 
         console.log('✅ TEST 1 PASSOU: Two-Phase Commit funcionando corretamente\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 1 FALHOU:', error.message);
 
         // Cleanup em caso de erro
@@ -75,7 +76,8 @@ async function testLockTwoPhaseCommit() {
 
 /**
  * Função exportada: testLockConcurrency.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function testLockConcurrency() {
     console.log('\n=== TEST 2: Lock Manager - Concorrência (10 tentativas simultâneas) ===');
@@ -91,35 +93,37 @@ async function testLockConcurrency() {
 
         const promises = [];
         for (let i = 0; i < numAttempts; i++) {
-            promises.push(acquireLock(`task-${i}`, target).then(result => ({ taskId: `task-${i}`, acquired: result })));
+            promises.push(
+                acquireLock(`task-${i}`, target).then((result) => ({ taskId: `task-${i}`, acquired: result })),
+            );
         }
 
         const results = await Promise.all(promises);
 
         // Conta quantos conseguiram
-        const successCount = results.filter(r => r.acquired).length;
-        const winner = results.find(r => r.acquired);
+        const successCount = results.filter((r) => r.acquired).length;
+        const winner = results.find((r) => r.acquired);
 
         console.log(`> Resultados: ${successCount} sucesso(s), ${numAttempts - successCount} falhas`);
 
         if (successCount !== 1) {
             console.error(`❌ RACE CONDITION DETECTADA: ${successCount} locks adquiridos (esperado: 1)`);
             results
-                .filter(r => r.acquired)
-                .forEach(r => {
+                .filter((r) => r.acquired)
+                .forEach((r) => {
                     console.error(`   - ${r.taskId} conseguiu lock`);
                 });
             return false;
         }
 
-        console.log(`✅ Apenas ${winner.taskId} adquiriu lock (atomicidade garantida)`);
+        console.log(`✅ Apenas ${winner?.taskId} adquiriu lock (atomicidade garantida)`);
 
         // Cleanup
         await releaseLock(target);
 
         console.log('✅ TEST 2 PASSOU: Concorrência tratada corretamente\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 2 FALHOU:', error.message);
 
         // Cleanup em caso de erro
@@ -135,7 +139,8 @@ async function testLockConcurrency() {
 
 /**
  * Função exportada: testLockNoTempOrphans.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function testLockNoTempOrphans() {
     console.log('\n=== TEST 3: Lock Manager - Sem arquivos .tmp órfãos ===');
@@ -156,18 +161,18 @@ async function testLockNoTempOrphans() {
         console.log('> Verificando arquivos .tmp órfãos...');
 
         const files = await fs.readdir(LOCK_DIR);
-        const tempFiles = files.filter(f => f.includes('RUNNING_') && f.includes('.tmp') && f.includes(target));
+        const tempFiles = files.filter((f) => f.includes('RUNNING_') && f.includes('.tmp') && f.includes(target));
 
         if (tempFiles.length > 0) {
             console.error(`❌ Encontrados ${tempFiles.length} arquivos .tmp órfãos:`);
-            tempFiles.forEach(f => console.error(`   - ${f}`));
+            tempFiles.forEach((f) => console.error(`   - ${f}`));
             return false;
         }
 
         console.log('✅ Nenhum arquivo .tmp órfão encontrado');
         console.log('✅ TEST 3 PASSOU: Cleanup de temp files funcionando\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 3 FALHOU:', error.message);
         return false;
     }
@@ -179,7 +184,8 @@ async function testLockNoTempOrphans() {
 
 /**
  * Função exportada: testBrowserPoolMemoization.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function testBrowserPoolMemoization() {
     console.log('\n=== TEST 4: BrowserPool - Promise Memoization ===');
@@ -217,7 +223,7 @@ async function testBrowserPoolMemoization() {
                 this.initCount++;
 
                 // Simula tempo de inicialização
-                await new Promise(resolve => {
+                await new Promise((resolve) => {
                     setTimeout(resolve, 100);
                 });
 
@@ -252,7 +258,7 @@ async function testBrowserPoolMemoization() {
         console.log('✅ Retornou imediatamente (já inicializado)');
         console.log('✅ TEST 4 PASSOU: Promise Memoization implementado corretamente\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 4 FALHOU:', error.message);
         return false;
     }
@@ -264,7 +270,8 @@ async function testBrowserPoolMemoization() {
 
 /**
  * Função exportada: testIntegrationValidation.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function testIntegrationValidation() {
     console.log('\n=== TEST 5: Validação de Integração ===');
@@ -329,7 +336,7 @@ async function testIntegrationValidation() {
 
         console.log('✅ TEST 5 PASSOU: Todos os arquivos validados\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 5 FALHOU:', error.message);
         return false;
     }
@@ -341,7 +348,8 @@ async function testIntegrationValidation() {
 
 /**
  * Função exportada: runAllTests.
- * @returns {Promise<void>}
+ *
+ * @returns {Promise<boolean>}
  */
 async function runAllTests() {
     console.log('╔══════════════════════════════════════════════════════════════╗');
@@ -362,7 +370,7 @@ async function runAllTests() {
         try {
             const passed = await test.fn();
             results.push({ name: test.name, passed });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error(`💥 Exceção em ${test.name}:`, error);
             results.push({ name: test.name, passed: false });
         }
@@ -373,10 +381,10 @@ async function runAllTests() {
     console.log('║                    SUMÁRIO DOS TESTES                        ║');
     console.log('╚══════════════════════════════════════════════════════════════╝\n');
 
-    const passed = results.filter(r => r.passed).length;
+    const passed = results.filter((r) => r.passed).length;
     const total = results.length;
 
-    results.forEach(r => {
+    results.forEach((r) => {
         const icon = r.passed ? '✅' : '❌';
         const status = r.passed ? 'PASSOU' : 'FALHOU';
         console.log(`${icon} ${r.name}: ${status}`);
@@ -395,17 +403,17 @@ async function runAllTests() {
 
 // Executa se chamado diretamente
 if (import.meta.filename === process.argv[1]) {
-    runAllTests().catch(error => {
+    runAllTests().catch((error) => {
         console.error('💥 Erro fatal na suite de testes:', error);
         process.exit(1);
     });
 }
 
 export {
-    testLockTwoPhaseCommit,
-    testLockConcurrency,
-    testLockNoTempOrphans,
+    runAllTests,
     testBrowserPoolMemoization,
     testIntegrationValidation,
-    runAllTests,
+    testLockConcurrency,
+    testLockNoTempOrphans,
+    testLockTwoPhaseCommit,
 };

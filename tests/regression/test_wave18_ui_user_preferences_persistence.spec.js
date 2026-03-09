@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import test from 'node:test';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { getUserPreferences, upsertUserPreferences } from '#infra/db/user_pref_repo';
@@ -12,11 +12,11 @@ function makeDbPath() {
     fs.mkdirSync(dir, { recursive: true });
     return path.join(
         dir,
-        `maestro-wave18-prefs-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+        `maestro-wave18-prefs-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`,
     );
 }
 
-test('wave18: preferências de UI persistem em sqlite por usuário', async t => {
+test('wave18: preferências de UI persistem em sqlite por usuário', async (t) => {
     const dbPath = makeDbPath();
     process.env.MAESTRO_DB_PATH = dbPath;
 

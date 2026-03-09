@@ -2,13 +2,13 @@
 import { Buffer } from 'node:buffer';
 
 /**
- * @typedef {Record<string, unknown> & { id?: string|null }} ApiRequestLike
+ * @typedef {Record<string, unknown> & { id?: string | null }} ApiRequestLike
  */
 
 /**
  * @typedef {{
- *   json(payload: unknown): void,
- *   status(code: number): ApiResponseLike
+ *     json(payload: unknown): void;
+ *     status(code: number): ApiResponseLike;
  * }} ApiResponseLike
  */
 
@@ -17,10 +17,11 @@ import { Buffer } from 'node:buffer';
 
 /**
  * Sends a successful JSON envelope with the request identifier.
+ *
  * @param {ApiResponseLike} res
  * @param {ApiRequestLike} req
  * @param {unknown} data
- * @param {ApiEnvelopeMetaOptions} [meta={}]
+ * @param {ApiEnvelopeMetaOptions} [meta={}] Default is `{}`
  * @returns {void}
  */
 function ok(res, req, data, meta = {}) {
@@ -35,15 +36,15 @@ function ok(res, req, data, meta = {}) {
 
 /**
  * Sends a failed JSON envelope with a stable error shape.
+ *
  * @param {ApiResponseLike} res
  * @param {ApiRequestLike} req
  * @param {number} httpStatus
- * @param {FailureOptions} [options={}]
+ * @param {FailureOptions} [options={}] Default is `{}`
  * @returns {void}
  */
 function fail(res, req, httpStatus, options = {}) {
-    const optionRecord =
-        options && typeof options === 'object' ? /** @type {Record<string, unknown>} */ (options) : {};
+    const optionRecord = options && typeof options === 'object' ? /** @type {Record<string, unknown>} */ (options) : {};
     const code = typeof optionRecord.code === 'string' ? optionRecord.code : undefined;
     const error = typeof optionRecord.error === 'string' ? optionRecord.error : undefined;
     const details = optionRecord.details;
@@ -58,23 +59,25 @@ function fail(res, req, httpStatus, options = {}) {
 
 /**
  * Encodes a cursor object as base64 JSON.
- * @param {Record<string, unknown>|null|undefined} obj
- * @returns {string|null}
+ *
+ * @param {Record<string, unknown> | null | undefined} obj
+ * @returns {string | null}
  */
 function encodeCursor(obj) {
     if (!obj || typeof obj !== 'object') return null;
     try {
         const raw = JSON.stringify(obj);
         return Buffer.from(raw, 'utf8').toString('base64');
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return null;
     }
 }
 
 /**
  * Decodes a base64 cursor payload into an object.
+ *
  * @param {unknown} cursor
- * @returns {Record<string, unknown>|null}
+ * @returns {Record<string, unknown> | null}
  */
 function decodeCursor(cursor) {
     if (!cursor) return null;
@@ -82,13 +85,14 @@ function decodeCursor(cursor) {
         const raw = Buffer.from(String(cursor), 'base64').toString('utf8');
         const parsed = /** @type {unknown} */ (JSON.parse(raw));
         return parsed && typeof parsed === 'object' ? /** @type {Record<string, unknown>} */ (parsed) : null;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return null;
     }
 }
 
 /**
  * Parses a comma-separated include list into a normalized set.
+ *
  * @param {unknown} raw
  * @returns {Set<string>}
  */
@@ -97,8 +101,8 @@ function parseIncludeParam(raw) {
     const set = new Set(
         value
             .split(',')
-            .map(s => s.trim())
-            .filter(Boolean)
+            .map((s) => s.trim())
+            .filter(Boolean),
     );
     return set;
 }

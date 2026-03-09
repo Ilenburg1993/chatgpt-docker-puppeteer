@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
-/** @typedef {import('puppeteer-core').Page} PuppeteerPage */
+/** @import {Page as PuppeteerPage} from "puppeteer-core" */
 
 /**
  * Resultados de validação de pré-requisitos.
@@ -11,7 +11,7 @@ const ValidationResult = {
     ok: () => ({ valid: true }),
 
     // Cria resultado de falha com mensagem
-    fail: (reason, details = {}) => ({
+    fail: (/** @type {string} */ reason, details = {}) => ({
         valid: false,
         reason,
         details,
@@ -22,7 +22,7 @@ const ValidationResult = {
  * Valida se a página está em URL utilizável para um provedor LLM suportado.
  *
  * @param {PuppeteerPage} page - Puppeteer Page
- * @returns {Promise<Object>} ValidationResult
+ * @returns {Promise<any>} ValidationResult
  */
 async function validateLLMPage(page) {
     if (!page) {
@@ -40,17 +40,18 @@ async function validateLLMPage(page) {
     let url;
     try {
         url = page.url();
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _ce = /** @type {any} */ (err);
         return ValidationResult.fail('PAGE_ERROR', {
             message: 'Erro ao obter URL da página',
-            error: err.message,
+            error: _ce.message,
         });
     }
 
     // URLs inválidas
     const invalidUrls = ['about:blank', 'chrome://', 'chrome-extension://', 'data:', 'file://'];
 
-    if (invalidUrls.some(prefix => url.startsWith(prefix))) {
+    if (invalidUrls.some((prefix) => url.startsWith(prefix))) {
         return ValidationResult.fail('INVALID_URL', {
             message: 'Página não está em URL utilizável',
             url,
@@ -61,7 +62,7 @@ async function validateLLMPage(page) {
     // URLs de LLMs suportadas
     const supportedDomains = ['chatgpt.com', 'openai.com', 'gemini.google.com', 'claude.ai', 'anthropic.com'];
 
-    const isSupported = supportedDomains.some(domain => url.includes(domain));
+    const isSupported = supportedDomains.some((domain) => url.includes(domain));
 
     if (!isSupported) {
         return ValidationResult.fail('UNSUPPORTED_LLM', {
@@ -75,11 +76,10 @@ async function validateLLMPage(page) {
 }
 
 /**
- * Valida se interface LLM está carregada e utilizável.
- * Usa SADI (Sensory Analysis Deep Intelligence) via analyzer.js.
+ * Valida se interface LLM está carregada e utilizável. Usa SADI (Sensory Analysis Deep Intelligence) via analyzer.js.
  *
  * @param {PuppeteerPage} page - Puppeteer Page
- * @returns {Promise<Object>} ValidationResult
+ * @returns {Promise<any>} ValidationResult
  */
 async function validateLLMInterface(page) {
     const pageValidation = await validateLLMPage(page);
@@ -88,7 +88,7 @@ async function validateLLMInterface(page) {
     }
 
     // Usa analyzer.js (SADI) em vez de seletores hardcoded
-    const analyzer = await import('#shared/sadi/analyzer').then(m => m.default ?? m);
+    const analyzer = await import('#shared/sadi/analyzer').then((/** @type {any} */ m) => m.default ?? m);
     const url = page.url();
 
     try {
@@ -131,16 +131,18 @@ async function validateLLMInterface(page) {
             if (!responseArea) {
                 log('WARN', `[PrerequisiteValidator] Área de resposta não detectada (não-crítico)`);
             }
-        } catch (err) {
-            log('WARN', `[PrerequisiteValidator] Erro ao detectar área de resposta: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _ce = /** @type {any} */ (err);
+            log('WARN', `[PrerequisiteValidator] Erro ao detectar área de resposta: ${_ce.message}`);
         }
 
         return ValidationResult.ok();
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _ce = /** @type {any} */ (err);
         return ValidationResult.fail('INTERFACE_CHECK_ERROR', {
             message: 'Erro ao verificar interface LLM usando SADI',
-            error: err.message,
-            stack: err.stack,
+            error: _ce.message,
+            stack: _ce.stack,
         });
     }
 }
@@ -148,8 +150,8 @@ async function validateLLMInterface(page) {
 /**
  * Valida se Browser Pool está disponível e funcional.
  *
- * @param {BrowserPoolManager} browserPool
- * @returns {Object} ValidationResult
+ * @param {any} browserPool
+ * @returns {any} ValidationResult
  */
 function validateBrowserPool(browserPool) {
     if (!browserPool) {
@@ -201,10 +203,14 @@ function validateBrowserPool(browserPool) {
 }
 
 /**
+ * @typedef {object} ValidateBrowserConnectionBrowser
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida se browser instance está conectada e utilizável.
  *
- * @param {any} browser - Puppeteer Browser
- * @returns {Object} ValidationResult
+ * @param {ValidateBrowserConnectionBrowser} browser - Puppeteer Browser
+ * @returns {any} ValidationResult
  */
 function validateBrowserConnection(browser) {
     if (!browser) {
@@ -224,13 +230,15 @@ function validateBrowserConnection(browser) {
 }
 
 /**
- * Valida pré-requisitos para execução de Driver.
- * Verifica: Browser Pool, Circuit Breaker, Página, Interface LLM.
+ * @typedef {object} ValidateDriverExecutionOptions
+ * @property {any} browserPool
+ * @property {PuppeteerPage} page
+ */
+/**
+ * Valida pré-requisitos para execução de Driver. Verifica: Browser Pool, Circuit Breaker, Página, Interface LLM.
  *
- * @param {Object} options
- * @param {BrowserPoolManager} options.browserPool
- * @param {PuppeteerPage} options.page
- * @returns {Promise<Object>} ValidationResult
+ * @param {ValidateDriverExecutionOptions} options
+ * @returns {Promise<any>} ValidationResult
  */
 async function validateDriverExecution({ browserPool, page }) {
     // 1. Valida Browser Pool
@@ -255,13 +263,16 @@ async function validateDriverExecution({ browserPool, page }) {
 }
 
 /**
+ * @typedef {object} ValidateKernelExecutionOptions
+ * @property {any} executionEngine
+ * @property {any} nervBridge
+ * @property {any} telemetry
+ */
+/**
  * Valida pré-requisitos para execução do Kernel Loop.
  *
- * @param {Object} options
- * @param {any} options.executionEngine
- * @param {any} options.nervBridge
- * @param {any} options.telemetry
- * @returns {Object} ValidationResult
+ * @param {ValidateKernelExecutionOptions} options
+ * @returns {any} ValidationResult
  */
 function validateKernelExecution({ executionEngine, nervBridge, telemetry }) {
     if (!executionEngine) {
@@ -299,11 +310,11 @@ function validateKernelExecution({ executionEngine, nervBridge, telemetry }) {
  * API pública de validação de pré-requisitos para browser pool, drivers e kernel.
  */
 export {
-    ValidationResult,
-    validateLLMPage,
-    validateLLMInterface,
-    validateBrowserPool,
     validateBrowserConnection,
+    validateBrowserPool,
     validateDriverExecution,
     validateKernelExecution,
+    validateLLMInterface,
+    validateLLMPage,
+    ValidationResult,
 };

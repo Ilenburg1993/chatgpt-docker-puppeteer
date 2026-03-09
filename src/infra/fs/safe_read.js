@@ -1,13 +1,14 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { promises as fs } from 'node:fs';
-import fss from 'node:fs';
+import fss, { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { CORRUPT, MAX_JSON_SIZE, sleep } from './fs_utils.js';
 
 /**
- * Lê um JSON do disco com proteção contra corrupção e travamentos de arquivo.
- * Utiliza loop iterativo em vez de recursão para prevenir Stack Overflow.
-  * @returns {Promise<any>}
+ * Lê um JSON do disco com proteção contra corrupção e travamentos de arquivo. Utiliza loop iterativo em vez de recursão
+ * para prevenir Stack Overflow.
+ *
+ * @param {any} filepath
+ * @returns {Promise<unknown>}
  */
 async function safeReadJSON(filepath) {
     if (!fss.existsSync(filepath)) {
@@ -28,9 +29,10 @@ async function safeReadJSON(filepath) {
             }
 
             return JSON.parse(content);
-        } catch (readErr) {
+        } catch (/** @type {any} */ readErr) {
             // Tratamento de concorrência (Arquivo sendo escrito ou indexado pelo SO)
-            if (readErr.code === 'EBUSY' || readErr.code === 'EPERM') {
+            const re = /** @type {any} */ (readErr);
+            if (re.code === 'EBUSY' || re.code === 'EPERM') {
                 attempts++;
                 await sleep(200 * attempts);
                 continue; // Tenta novamente no próximo ciclo do loop
@@ -38,8 +40,8 @@ async function safeReadJSON(filepath) {
 
             // Tratamento de integridade (JSON malformado, gigante, ou vazio)
             const fileName = path.basename(filepath);
-            const errorType = readErr.message || 'UNKNOWN';
-            const isJSONError = readErr instanceof SyntaxError || errorType.includes('JSON');
+            const errorType = re.message || 'UNKNOWN';
+            const isJSONError = re instanceof SyntaxError || errorType.includes('JSON');
             const isIntegrityError = errorType === 'FILE_TOO_LARGE' || errorType === 'EMPTY_FILE';
 
             // Log detalhado do erro
@@ -57,14 +59,18 @@ async function safeReadJSON(filepath) {
             try {
                 await fs.rename(filepath, badFile);
                 console.error(`[FS] ✅ Quarantine successful: ${fileName} → ${path.basename(badFile)}`);
-            } catch (renameErr) {
-                console.error(`[FS] ❌ Quarantine failed: ${renameErr.message} - attempting deletion`);
+            } catch (/** @type {any} */ renameErr) {
+                console.error(
+                    `[FS] ❌ Quarantine failed: ${/** @type {any} */ (renameErr).message} - attempting deletion`,
+                );
                 // Fallback: Se não puder mover, tenta deletar para não travar o sistema
                 try {
                     await fs.unlink(filepath);
                     console.error(`[FS] ✅ Deleted corrupted file: ${fileName}`);
-                } catch (unlinkErr) {
-                    console.error(`[FS] ❌ Cannot delete corrupted file: ${fileName} - ${unlinkErr.message}`);
+                } catch (/** @type {any} */ unlinkErr) {
+                    console.error(
+                        `[FS] ❌ Cannot delete corrupted file: ${fileName} - ${/** @type {any} */ (unlinkErr).message}`,
+                    );
                 }
             }
             return null;

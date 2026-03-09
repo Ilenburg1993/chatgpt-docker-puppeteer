@@ -1,7 +1,8 @@
 // @ts-check
+/** @import {RouteRecordRaw} from "vue-router" */
 import { createRouter, createWebHistory } from 'vue-router';
 
-/** @type {import('vue-router').RouteRecordRaw[]} */
+/** @type {RouteRecordRaw[]} */
 const routes = [
     {
         path: '/',
@@ -103,7 +104,7 @@ const routes = [
 /** Constante/valor exportado: default. */
 const router = createRouter({
     history: createWebHistory('/dashboard/'),
-    routes: /** @type {import('vue-router').RouteRecordRaw[]} */ (routes),
+    routes: /** @type {RouteRecordRaw[]} */ (routes),
 });
 
 // Navigation guards

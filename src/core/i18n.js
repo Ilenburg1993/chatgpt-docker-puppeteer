@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { log } from './logger.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../../');
@@ -47,19 +47,22 @@ const BASE_VOCAB = {
     ],
 };
 
-let vocabCache = null;
+let vocabCache = /** @type {Record<string, any> | null} */ (null);
 
 /* ==========================================================================
    UTILITÁRIOS INTERNOS
 ========================================================================== */
 
-const sleep = ms =>
-    new Promise(r => {
+const sleep = (/** @type {number} */ ms) =>
+    new Promise((r) => {
         setTimeout(r, ms);
     });
 
 /**
  * Escrita Atômica com Retry (Proteção Windows EPERM)
+ *
+ * @param {any} filepath
+ * @param {any} content
  */
 async function atomicWrite(filepath, content) {
     const tmp = `${filepath}.tmp.${crypto.randomBytes(4).toString('hex')}`;
@@ -70,16 +73,16 @@ async function atomicWrite(filepath, content) {
             try {
                 fs.renameSync(tmp, filepath);
                 return;
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 attempts++;
                 await sleep(100 * attempts);
             }
         }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         if (fs.existsSync(tmp)) {
             try {
                 fs.unlinkSync(tmp);
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* Ignore cleanup errors */
             }
         }
@@ -89,12 +92,14 @@ async function atomicWrite(filepath, content) {
 
 /**
  * Normaliza códigos de idioma (ex: 'pt-BR' -> 'pt', 'EN_US' -> 'en')
+ *
+ * @param {any} langCode
  */
 function normalizeLang(langCode) {
     if (!langCode || typeof langCode !== 'string') {
         return 'en';
     }
-    return langCode.split(/[-_]/)[0].toLowerCase();
+    return (langCode.split(/[-_]/)[0] ?? langCode).toLowerCase();
 }
 
 /* ==========================================================================
@@ -117,7 +122,7 @@ async function loadVocab() {
                 return vocabCache;
             }
         }
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         log('ERROR', `[i18n] Vocabulário corrompido ou ilegível. Restaurando base.`);
     }
 
@@ -129,10 +134,14 @@ async function loadVocab() {
 
 /**
  * Retorna termos de uma categoria com fallback hierárquico para o Inglês.
-  * @returns {Promise<any>}
+ *
+ * @param {any} category
+ * @param {any} [langCode]
+ * @returns {Promise<string[]>}
  */
 async function getTerms(category, langCode = 'en') {
     const v = await loadVocab();
+    if (!v) return [];
     const lang = normalizeLang(langCode);
 
     // Usamos um Set para garantir unicidade
@@ -140,12 +149,12 @@ async function getTerms(category, langCode = 'en') {
 
     // 1. Prioridade: Idioma Detectado
     if (v[lang] && v[lang][category]) {
-        v[lang][category].forEach(t => terms.add(t.toLowerCase()));
+        v[lang][category].forEach((/** @type {string} */ t) => terms.add(t.toLowerCase()));
     }
 
     // 2. Fallback: Inglês (Sempre incluído como segurança universal)
     if (lang !== 'en' && v['en'] && v['en'][category]) {
-        v['en'][category].forEach(t => terms.add(t.toLowerCase()));
+        v['en'][category].forEach((/** @type {string} */ t) => terms.add(t.toLowerCase()));
     }
 
     return Array.from(terms);
@@ -153,7 +162,11 @@ async function getTerms(category, langCode = 'en') {
 
 /**
  * Aprende e persiste um novo termo após validação semântica.
-  * @returns {Promise<void>}
+ *
+ * @param {any} langCode
+ * @param {any} category
+ * @param {any} term
+ * @returns {Promise<void>}
  */
 async function learnTerm(langCode, category, term) {
     if (!term || typeof term !== 'string' || term.length < 3) {
@@ -161,6 +174,7 @@ async function learnTerm(langCode, category, term) {
     }
 
     const v = await loadVocab();
+    if (!v) return;
     const lang = normalizeLang(langCode);
     const cleanTerm = term
         .toLowerCase()
@@ -168,7 +182,7 @@ async function learnTerm(langCode, category, term) {
         .replace(/[.!?]$/, '');
 
     // 1. Proteção contra Envenenamento (Blocklist)
-    if (v.blocked.some(bad => cleanTerm.includes(bad))) {
+    if (v.blocked.some((/** @type {string} */ bad) => cleanTerm.includes(bad))) {
         return;
     }
 
@@ -187,8 +201,8 @@ async function learnTerm(langCode, category, term) {
             await atomicWrite(VOCAB_FILE, JSON.stringify(v, null, 2));
             vocabCache = v; // Atualiza cache em memória
             log('INFO', `[i18n] Aprendizado consolidado (${lang}): "${cleanTerm}"`);
-        } catch (e) {
-            log('ERROR', `[i18n] Falha ao persistir aprendizado: ${e.message}`);
+        } catch (/** @type {any} */ e) {
+            log('ERROR', `[i18n] Falha ao persistir aprendizado: ${/** @type {any} */ (e).message}`);
         }
     }
 }

@@ -7,6 +7,7 @@
 
 /**
  * Modos de autoridade suportados pelo servidor.
+ *
  * @enum {string}
  */
 const SERVER_AUTHORITIES = Object.freeze({
@@ -16,12 +17,14 @@ const SERVER_AUTHORITIES = Object.freeze({
 
 /**
  * Tipo union dos modos de autoridade válidos.
+ *
  * @typedef {(typeof SERVER_AUTHORITIES)[keyof typeof SERVER_AUTHORITIES]} AuthorityMode
  */
 
 /**
- * Resolve o modo de autoridade do servidor.
- * Ordem de precedência: parâmetro explícito > env SERVER_AUTHORITY > default STANDALONE.
+ * Resolve o modo de autoridade do servidor. Ordem de precedência: parâmetro explícito > env SERVER_AUTHORITY > default
+ * STANDALONE.
+ *
  * @param {unknown} [explicitAuthority] - Modo de autoridade explícito (opcional).
  * @returns {AuthorityMode} Modo de autoridade resolvido.
  * @throws {Error} Se o modo de autoridade for inválido.
@@ -40,7 +43,8 @@ function resolveAuthority(explicitAuthority = null) {
 
 /**
  * Verifica se o modo de autoridade é 'delegated'.
- * @param {string|AuthorityMode} authority - Modo de autoridade a verificar.
+ *
+ * @param {string | AuthorityMode} authority - Modo de autoridade a verificar.
  * @returns {boolean} True se for delegated, false caso contrário.
  */
 function isDelegated(authority) {
@@ -49,7 +53,8 @@ function isDelegated(authority) {
 
 /**
  * Verifica se o modo de autoridade é 'standalone'.
- * @param {string|AuthorityMode} authority - Modo de autoridade a verificar.
+ *
+ * @param {string | AuthorityMode} authority - Modo de autoridade a verificar.
  * @returns {boolean} True se for standalone, false caso contrário.
  */
 function isStandalone(authority) {

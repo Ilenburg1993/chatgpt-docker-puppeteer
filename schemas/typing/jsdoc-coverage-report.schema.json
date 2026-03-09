@@ -20,6 +20,8 @@
     "functions_with_options_typedef",
     "functions_missing_options_typedef",
     "unsafe_generic_tags_total",
+    "public_any_tags_total",
+    "public_unknown_tags_total",
     "public_symbols_using_import_types",
     "public_symbols_using_template_tags",
     "by_path_prefix",
@@ -28,7 +30,7 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "3.0.0"
+      "const": "3.1.0"
     },
     "scope": {
       "type": "string",
@@ -74,6 +76,12 @@
       "type": "number"
     },
     "unsafe_generic_tags_total": {
+      "type": "number"
+    },
+    "public_any_tags_total": {
+      "type": "number"
+    },
+    "public_unknown_tags_total": {
       "type": "number"
     },
     "public_symbols_using_import_types": {

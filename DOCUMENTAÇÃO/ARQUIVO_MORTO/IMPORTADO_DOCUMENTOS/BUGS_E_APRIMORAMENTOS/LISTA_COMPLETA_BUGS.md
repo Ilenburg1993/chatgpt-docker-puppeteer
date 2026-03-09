@@ -155,7 +155,7 @@ para cleanup. Se o processo for terminado durante a fase de boot, o timer persis
 // src/main.js:412-418
 setTimeout(() => {
   if (typeof bootResilienceManager?.validateState === 'function') {
-    bootResilienceManager.validateState().catch(err => {
+    bootResilienceManager.validateState().catch((err) => {
       log('WARN', `[BOOT] Validação retardada do Browser Pool falhou: ${err.message}`);
     });
   }
@@ -171,7 +171,7 @@ let bootValidationTimer = null;
 // No boot:
 bootValidationTimer = setTimeout(() => {
   if (typeof bootResilienceManager?.validateState === 'function') {
-    bootResilienceManager.validateState().catch(err => {
+    bootResilienceManager.validateState().catch((err) => {
       log('WARN', `[BOOT] Validação retardada do Browser Pool falhou: ${err.message}`);
     });
   }
@@ -209,7 +209,7 @@ listener persiste indefinidamente.
 
 ```javascript
 // src/main.js:392-409
-nerv.onEvent(envelope => {
+nerv.onEvent((envelope) => {
   try {
     const action = envelope?.type?.action_code;
     if (action === ActionCode.CHROME_PROXY_READY) {
@@ -233,7 +233,7 @@ nerv.onEvent(envelope => {
 let chromeProxyListener = null;
 
 // No boot:
-chromeProxyListener = nerv.onEvent(envelope => {
+chromeProxyListener = nerv.onEvent((envelope) => {
   try {
     const action = envelope?.type?.action_code;
     if (action === ActionCode.CHROME_PROXY_READY) {
@@ -398,7 +398,7 @@ async function persistServerState(nerv, port, authority = Authority.SERVER_AUTHO
     await Discovery.publishServerReady(nerv, payload);
     log(
       'DEBUG',
-      '[BOOT] persistServerState delegated to Discovery (NERV-first, file fallback opt-in)'
+      '[BOOT] persistServerState delegated to Discovery (NERV-first, file fallback opt-in)',
     );
   } catch (err) {
     log('WARN', `[BOOT] persistServerState delegation failed: ${err.message}`);

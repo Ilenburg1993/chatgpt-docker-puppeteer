@@ -1,33 +1,37 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { log } from '#core/logger';
 import { releaseTaskLockForAttempt } from '#agent/task_attempt_invariants';
+import { log } from '#core/logger';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
 import { updateAttempt, upsertAttempt } from '#infra/db/task_attempt_repo';
 import { claimNextEligibleTask, TASK_STAGES, updateTask } from '#infra/db/task_repo';
 import { putJson, putText, readText } from '#infra/storage/artifact_store';
+import { ActionCode } from '#shared/nerv/constants';
 import { promises as fs } from 'node:fs';
 
 /**
  * Opções do construtor do QueueWorker.
- * @typedef {Object} QueueWorkerOptions
- * @property {Object} kernel - Instância do kernel com método executeTask() (obrigatório).
+ *
+ * @typedef {object} QueueWorkerOptions
+ * @property {any} kernel - Instância do kernel com método executeTask() (obrigatório).
  * @property {string} workerId - ID único do worker (obrigatório).
- * @property {number} [intervalMs=250] - Intervalo entre ticks em ms.
- * @property {number} [lockTtlMs=60000] - TTL do lock em ms.
- * @property {number} [maxConcurrentTasks=2] - Máximo de tarefas concorrentes.
+ * @property {number} [intervalMs=250] - Intervalo entre ticks em ms. Default is `250`
+ * @property {number} [lockTtlMs=60000] - TTL do lock em ms. Default is `60000`
+ * @property {number} [maxConcurrentTasks=2] - Máximo de tarefas concorrentes. Default is `2`
  */
 
 /**
  * Parâmetros para composição de prompt do driver.
- * @typedef {Object} DriverPromptParams
+ *
+ * @typedef {object} DriverPromptParams
  * @property {string} [systemMessage] - Mensagem do sistema.
  * @property {string} [userMessage] - Mensagem do usuário.
  */
 
+/** @param {any} ms */
 function _sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function _makeCorrelationId() {
@@ -36,6 +40,7 @@ function _makeCorrelationId() {
     return `c_${ts}_${rnd}`;
 }
 
+/** @param {any} text @param {any} maxLen */
 function _truncate(text, maxLen) {
     const s = typeof text === 'string' ? text : String(text ?? '');
     const n = Number(maxLen) || 0;
@@ -45,7 +50,8 @@ function _truncate(text, maxLen) {
 
 /**
  * Compõe um prompt para o driver baseado em mensagens do sistema e usuário.
- * @param {DriverPromptParams} [params={}] - Parâmetros do prompt.
+ *
+ * @param {DriverPromptParams} [params={}] - Parâmetros do prompt. Default is `{}`
  * @returns {string} Prompt composto ou string vazia se não houver mensagem do usuário.
  */
 function _composeDriverPrompt(params = {}) {
@@ -56,25 +62,27 @@ function _composeDriverPrompt(params = {}) {
     return sys ? `SYSTEM:\n${sys}\n\nUSER:\n${usr}` : usr;
 }
 
+/** @param {any} taskId */
 async function _readTextFromTaskLatestResult(taskId) {
     const db = getDb();
-    const row = db.prepare('SELECT result_json FROM tasks WHERE id = ?').get(taskId);
+    const row = /** @type {any} */ (db.prepare('SELECT result_json FROM tasks WHERE id = ?').get(taskId));
     if (!row?.result_json) return '';
     let parsed;
     try {
         parsed = JSON.parse(row.result_json);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         parsed = null;
     }
     const p = parsed?.storage?.text_file || parsed?.storage?.textFile || null;
     if (!p) return '';
     try {
         return await fs.readFile(String(p), 'utf8');
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return '';
     }
 }
 
+/** @param {any} inputs @param {any} [currentTaskId] */
 async function _resolveContextInputs(inputs = [], currentTaskId = null) {
     if (!Array.isArray(inputs) || inputs.length === 0) return '';
 
@@ -93,7 +101,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
             if (currentTaskId && srcTaskId === currentTaskId) {
                 log(
                     'WARN',
-                    `[QUEUE] Skipping self-referencing context input (task_id=${srcTaskId}) in task ${currentTaskId}`
+                    `[QUEUE] Skipping self-referencing context input (task_id=${srcTaskId}) in task ${currentTaskId}`,
                 );
                 continue;
             }
@@ -104,7 +112,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
                 // BUG-CONTEXT-INPUT-SILENT-DROP: non-text formats silently ignored → warn for debuggability
                 log(
                     'WARN',
-                    `[QUEUE] context.inputs: unsupported format '${format}' for task_result(task_id=${srcTaskId}) — only 'text' is supported. Update the task spec to use format='text'.`
+                    `[QUEUE] context.inputs: unsupported format '${format}' for task_result(task_id=${srcTaskId}) — only 'text' is supported. Update the task spec to use format='text'.`,
                 );
                 continue;
             }
@@ -120,7 +128,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
                     if (guess) {
                         text = await fs.readFile(guess, 'utf8');
                     }
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     text = '';
                 }
             }
@@ -143,7 +151,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
             try {
                 const raw = await readText(artifactId);
                 text = typeof raw === 'string' ? raw : '';
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 text = '';
             }
             if (!text) continue;
@@ -167,6 +175,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
 class QueueWorker {
     /**
      * Cria um worker da fila para reivindicar e executar tarefas.
+     *
      * @param {QueueWorkerOptions} options - Opções de configuração do worker.
      */
     constructor(options) {
@@ -191,13 +200,17 @@ class QueueWorker {
 
     /**
      * ✅ P1-17: Safe wrapper for updateTask() that catches OptimisticLockError.
+     *
      * @private
+     * @param {any} taskId
+     * @param {any} updates
      */
     _safeUpdateTask(taskId, updates, { critical = false, context = '' } = {}) {
         try {
             updateTask(taskId, updates);
             return true;
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             if (err && err.name === 'OptimisticLockError') {
                 log('WARN', `[QueueWorker] ${context || 'Update'}: Task ${taskId} conflict`, String(taskId));
                 if (critical) throw err;
@@ -209,6 +222,7 @@ class QueueWorker {
 
     /**
      * Inicia o worker, começando a reivindicar e executar tarefas periodicamente.
+     *
      * @returns {void}
      * @sideEffects Inicia timer interno e executa tick imediatamente.
      */
@@ -228,6 +242,7 @@ class QueueWorker {
 
     /**
      * Para o worker, cancelando o timer e impedindo novas execuções.
+     *
      * @returns {void}
      * @sideEffects Cancela timer interno e marca worker como parado.
      */
@@ -242,6 +257,7 @@ class QueueWorker {
 
     /**
      * Executa um ciclo do worker: reivindica tarefas elegíveis e as executa.
+     *
      * @returns {Promise<void>}
      * @throws {Error} Se houver erro na execução de tarefa (logado, não relançado).
      * @sideEffects Modifica estado do banco de dados, executa tarefas via kernel.
@@ -256,9 +272,10 @@ class QueueWorker {
             const now = Date.now();
 
             const inflight =
-                db
-                    .prepare(
-                        `
+                /** @type {any} */ (
+                    db
+                        .prepare(
+                            `
                     SELECT COUNT(1) AS c
                     FROM tasks
                     WHERE locked_by = @workerId
@@ -266,9 +283,10 @@ class QueueWorker {
                       AND lock_expires_at_ms > @now
                       AND stage = @stage
                       AND status IN ('PENDING', 'RUNNING')
-                `
-                    )
-                    .get({ workerId: this.workerId, now, stage: TASK_STAGES.READY })?.c || 0;
+                `,
+                        )
+                        .get({ workerId: this.workerId, now, stage: TASK_STAGES.READY })
+                )?.c || 0;
 
             const availableSlots = Math.max(0, this.maxConcurrentTasks - Number(inflight || 0));
             if (availableSlots <= 0) {
@@ -276,11 +294,13 @@ class QueueWorker {
             }
 
             for (let i = 0; i < availableSlots; i++) {
-                const claimed = claimNextEligibleTask({
-                    workerId: this.workerId,
-                    nowMs: now,
-                    lockTtlMs: this.lockTtlMs,
-                });
+                const claimed = /** @type {any} */ (
+                    claimNextEligibleTask({
+                        workerId: this.workerId,
+                        nowMs: now,
+                        lockTtlMs: this.lockTtlMs,
+                    })
+                );
 
                 if (!claimed || !claimed.task) {
                     break;
@@ -311,7 +331,7 @@ class QueueWorker {
                         payload: { reason: 'TASK_INVALID', detail: 'spec.payload.user_message missing or empty' },
                         dedupKey: `task:${taskId}:invalid_rejected:user_message`,
                     });
-                    releaseTaskLockForAttempt({ taskId, context: 'queue_invalid_task' });
+                    releaseTaskLockForAttempt(/** @type {any} */ ({ taskId, context: 'queue_invalid_task' }));
                     continue;
                 }
 
@@ -334,7 +354,7 @@ class QueueWorker {
                         payload: { currentAttempts, maxAttempts },
                         dedupKey: `task:${taskId}:max_attempts:${currentAttempts}:${maxAttempts}`,
                     });
-                    releaseTaskLockForAttempt({ taskId, context: 'queue_max_attempts' });
+                    releaseTaskLockForAttempt(/** @type {any} */ ({ taskId, context: 'queue_max_attempts' }));
                     continue;
                 }
 
@@ -397,7 +417,8 @@ class QueueWorker {
                         });
                         this._safeUpdateTask(taskId, { prompt_template_artifact_id: artId });
                     }
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[QueueWorker] Prompt template artifact storage failed for ${taskId}: ${err?.message}`);
                 }
 
@@ -434,7 +455,8 @@ class QueueWorker {
                         latest_attempt_id: correlationId,
                         latest_rendered_prompt_artifact_id: renderedPromptArtifactId,
                     });
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[QueueWorker] Rendered prompt artifact failed for ${taskId}: ${err?.message}`);
                     renderedPromptArtifactId = null;
                 }
@@ -447,7 +469,8 @@ class QueueWorker {
 
                 try {
                     await this.kernel.executeTask(runtimeTask, correlationId);
-                } catch (err) {
+                } catch (/** @type {any} */ _rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     const msg = err?.message || String(err);
                     log('ERROR', `[QueueWorker] dispatch failed for ${taskId}: ${msg}`, correlationId);
 
@@ -462,7 +485,8 @@ class QueueWorker {
                             ended_at_ms: Date.now(),
                             error: msg,
                         });
-                    } catch (err) {
+                    } catch (/** @type {any} */ _rawErr) {
+                        const err = /** @type {any} */ (_rawErr);
                         log('WARN', `[QueueWorker] Attempt update failed for ${taskId}: ${err?.message}`);
                     }
 
@@ -511,7 +535,7 @@ class QueueWorker {
                     releaseTaskLockForAttempt({
                         taskId,
                         attemptId: correlationId,
-                        actionCode: 'QUEUE_DISPATCH_FAILED',
+                        actionCode: ActionCode.QUEUE_DISPATCH_FAILED,
                         correlationId,
                         context: 'queue_dispatch_failed',
                     });

@@ -1,7 +1,7 @@
 // @ts-check
-import { describe, it } from 'node:test';
-import assert from 'node:assert';
 import { STATUS_VALUES } from '#core/constants/tasks';
+import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Kernel Execution Engine - Motor de Execução', () => {
     describe('1. Ciclo de Vida de Tarefas', () => {
@@ -114,7 +114,8 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
                 completedAt: new Date(fim).toISOString(),
             };
 
-            const duracao = new Date(tarefa.completedAt) - new Date(tarefa.startedAt);
+            const duracao =
+                /** @type {any} */ (new Date(tarefa.completedAt)) - /** @type {any} */ (new Date(tarefa.startedAt));
 
             assert.ok(duracao >= 5000, 'Duração deve ser ~5 segundos');
         });
@@ -170,7 +171,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
             };
 
             assert.strictEqual(tarefa.errors.length, 1);
-            assert.strictEqual(tarefa.errors[0].type, 'TIMEOUT');
+            assert.strictEqual(/** @type {any} */ (tarefa.errors[0]).type, 'TIMEOUT');
         });
 
         it('deve acumular múltiplos erros', () => {
@@ -197,8 +198,8 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
 
             const ordenadas = [...tarefas].sort((a, b) => b.priority - a.priority);
 
-            assert.strictEqual(ordenadas[0].id, 't2', 'Maior prioridade primeiro');
-            assert.strictEqual(ordenadas[2].id, 't1', 'Menor prioridade por último');
+            assert.strictEqual(/** @type {any} */ (ordenadas[0]).id, 't2', 'Maior prioridade primeiro');
+            assert.strictEqual(/** @type {any} */ (ordenadas[2]).id, 't1', 'Menor prioridade por último');
         });
 
         it('deve respeitar ordem FIFO para mesma prioridade', () => {
@@ -210,12 +211,12 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
 
             const ordenadas = [...tarefas].sort((a, b) => {
                 if (a.priority === b.priority) {
-                    return new Date(a.createdAt) - new Date(b.createdAt);
+                    return /** @type {any} */ (new Date(a.createdAt)) - /** @type {any} */ (new Date(b.createdAt));
                 }
                 return b.priority - a.priority;
             });
 
-            assert.strictEqual(ordenadas[0].id, 't1', 'Primeira criada primeiro');
+            assert.strictEqual(/** @type {any} */ (ordenadas[0]).id, 't1', 'Primeira criada primeiro');
         });
     });
 
@@ -248,7 +249,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('deve notificar mudanças de estado', () => {
             let notificado = false;
 
-            const observador = (oldState, newState) => {
+            const observador = (/** @type {any} */ oldState, /** @type {any} */ newState) => {
                 notificado = true;
             };
 

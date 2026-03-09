@@ -2,57 +2,64 @@
 /**
  * Tool Registry (DRY Architecture)
  *
- * Central registry for all LLM-accessible tools.
- * Each tool is implemented ONCE and shared across:
+ * Central registry for all LLM-accessible tools. Each tool is implemented ONCE and shared across:
+ *
  * - MCP Server (developer LLMs: Claude, OpenCode, Copilot)
  * - REST API (Cursor, Codex)
  * - Direct code calls (program logic: OrchestratorEngine, etc.)
  *
  * Benefits:
+ *
  * - DRY: No code duplication between protocols
  * - Consistency: Same implementation for all clients
  * - Testability: Test once, works everywhere
  * - Maintainability: Single source of truth
  *
  * @example
- * // Register a tool
- * registry.register('rag_search', {
- *   description: 'Search codebase',
- *   inputSchema: { type: 'object', properties: {...} }
- * }, async (params) => {
- *   return ragHybridSearch(params);
- * });
+ *     // Register a tool
+ *     registry.register('rag_search', {
+ *     description: 'Search codebase',
+ *     inputSchema: { type: 'object', properties: {...} }
+ *     }, async (params) => {
+ *     return ragHybridSearch(params);
+ *     });
  *
- * // Use in MCP server
- * const result = await registry.execute('rag_search', { query: 'foo' });
+ *     // Use in MCP server
+ *     const result = await registry.execute('rag_search', { query: 'foo' });
  *
- * // Use in program code
- * const result = await registry.execute('rag_search', { query: 'bar' });
+ *     // Use in program code
+ *     const result = await registry.execute('rag_search', { query: 'bar' });
  */
 
 /**
  * Tool definition structure
- * @typedef {Object} ToolDefinition
- * @property {Object} metadata - Tool metadata for MCP/LSP
+ *
+ * @typedef {object} ToolDefinition
+ * @property {object} metadata - Tool metadata for MCP/LSP
  * @property {string} metadata.description - Human-readable description
- * @property {Object} metadata.inputSchema - JSON Schema for parameters
- * @property {boolean} [metadata.allowMutations=false] - Tool may mutate files/state
- * @property {boolean} [metadata.requiresConfirmationToken=false] - Tool requires explicit confirmation token
- * @property {Function} handler - Async function (params) => Promise<string|Object>
+ * @property {object} metadata.inputSchema - JSON Schema for parameters
+ * @property {boolean} [metadata.allowMutations=false] - Tool may mutate files/state. Default is `false`
+ * @property {boolean} [metadata.requiresConfirmationToken=false] - Tool requires explicit confirmation token. Default
+ *   is `false`
+ * @property {function} handler - Async function (params) => Promise<string|object>
  */
 
 /**
- * Normalize any tool output to a structured shape used by MCP adapters.
- * Backward-compatible: plain strings/objects are still accepted.
+ * @typedef {object} NormalizeToolResultPayloadValue
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
+ * Normalize unknown tool output to a structured shape used by MCP adapters. Backward-compatible: plain strings/objects
+ * are still accepted.
  *
  * @param {any} value
- * @returns {{ text: string, json?: any, flags: { degraded: boolean, mutating: boolean, partial: boolean } }}
+ * @returns {{ text: string; json?: unknown; flags: { degraded: boolean; mutating: boolean; partial: boolean } }}
  */
 export function normalizeToolResultPayload(value) {
     if (value && typeof value === 'object' && Array.isArray(value.content)) {
         const textParts = value.content
-            .filter(part => part && part.type === 'text' && typeof part.text === 'string')
-            .map(part => part.text);
+            .filter((/** @type {any} */ part) => part && part.type === 'text' && typeof part.text === 'string')
+            .map((/** @type {any} */ part) => part.text);
         return {
             text: textParts.join('\n').trim() || JSON.stringify(value, null, 2),
             json: value.structuredContent,
@@ -99,8 +106,7 @@ export function normalizeToolResultPayload(value) {
 }
 
 /**
- * Tool Registry
- * Manages registration and execution of LLM tools
+ * Tool Registry Manages registration and execution of LLM tools
  */
 export class ToolRegistry {
     constructor() {
@@ -111,23 +117,27 @@ export class ToolRegistry {
     /**
      * Register a tool in the registry
      *
-     * @param {string} name - Tool name (e.g., 'rag_search', 'ollama_generate')
-     * @param {Object} metadata - Tool metadata (description, inputSchema)
-     * @param {Function} handler - Async function to execute the tool
-     *
      * @example
-     * registry.register('rag_search', {
-     *   description: 'Search codebase semantically',
-     *   inputSchema: {
-     *     type: 'object',
-     *     properties: {
-     *       query: { type: 'string', description: 'Search query' }
-     *     },
-     *     required: ['query']
-     *   }
-     * }, async ({ query, topK = 5 }) => {
-     *   return await ragHybridSearch({ query, topK });
-     * });
+     *     registry.register(
+     *         'rag_search',
+     *         {
+     *             description: 'Search codebase semantically',
+     *             inputSchema: {
+     *                 type: 'object',
+     *                 properties: {
+     *                     query: { type: 'string', description: 'Search query' },
+     *                 },
+     *                 required: ['query'],
+     *             },
+     *         },
+     *         async ({ query, topK = 5 }) => {
+     *             return await ragHybridSearch({ query, topK });
+     *         },
+     *     );
+     *
+     * @param {string} name - Tool name (e.g., 'rag_search', 'ollama_generate')
+     * @param {any} metadata - Tool metadata (description, inputSchema)
+     * @param {function} handler - Async function to execute the tool
      */
     register(name, metadata, handler) {
         if (!name || typeof name !== 'string') {
@@ -148,8 +158,8 @@ export class ToolRegistry {
 
         const normalizedMetadata = {
             ...metadata,
-            allowMutations: metadata.allowMutations === true,
-            requiresConfirmationToken: metadata.requiresConfirmationToken === true,
+            allowMutations: /** @type {any} */ (metadata).allowMutations === true,
+            requiresConfirmationToken: /** @type {any} */ (metadata).requiresConfirmationToken === true,
         };
 
         this.tools.set(name, { metadata: normalizedMetadata, handler });
@@ -159,20 +169,23 @@ export class ToolRegistry {
     /**
      * Execute a tool by name (with optional retry, adaptive timeout, circuit breaker)
      *
-     * @param {string} name - Tool name
-     * @param {Object} params - Tool parameters (validated against inputSchema)
-     * @param {Object} options - Execution options (signal for cancellation, etc.)
-     * @returns {Promise<string|Object>} Tool result
-     *
-     * @throws {Error} If tool not found or execution fails
-     *
      * @example
-     * const result = await registry.execute('rag_search', {
-     *   query: 'CHROME_PROXY_PORT',
-     *   topK: 5
-     * }, {
-     *   signal: abortController.signal
-     * });
+     *     const result = await registry.execute(
+     *         'rag_search',
+     *         {
+     *             query: 'CHROME_PROXY_PORT',
+     *             topK: 5,
+     *         },
+     *         {
+     *             signal: abortController.signal,
+     *         },
+     *     );
+     *
+     * @param {string} name - Tool name
+     * @param {any} params - Tool parameters (validated against inputSchema)
+     * @param {any} options - Execution options (signal for cancellation, etc.)
+     * @returns {Promise<string | object>} Tool result
+     * @throws {Error} If tool not found or execution fails
      */
     async execute(name, params = {}, options = {}) {
         const tool = this.tools.get(name);
@@ -209,7 +222,7 @@ export class ToolRegistry {
             toolTimeout = adaptive.timeout;
             console.error(
                 `[Tool Registry] Using adaptive timeout for ${name}: ${toolTimeout}ms ` +
-                    `(learned_avg=${adaptive.breakdown.learned_avg}ms, phase=${adaptive.phase})`
+                    `(learned_avg=${adaptive.breakdown?.learned_avg}ms, phase=${adaptive.phase})`,
             );
         } else {
             // Fallback to fixed timeout (backward compatible)
@@ -225,10 +238,10 @@ export class ToolRegistry {
             const breaker = getCircuitBreaker(endpoint);
 
             if (!breaker.allowRequest()) {
-                const status = breaker.getStatus();
+                const status = /** @type {any} */ (breaker.getStatus());
                 throw new Error(
                     `Ollama ${endpoint} circuit breaker OPEN - service unavailable. ` +
-                        `Retry in ${Math.round(status.nextAttemptIn / 1000)}s`
+                        `Retry in ${Math.round(status.nextAttemptIn / 1000)}s`,
                 );
             }
         }
@@ -244,14 +257,14 @@ export class ToolRegistry {
 
             console.error(
                 `[Tool Registry] Executing tool: ${name} ` +
-                    `(attempt ${attempt}/${maxAttempts}${retryEnabled ? ', retry enabled' : ''})`
+                    `(attempt ${attempt}/${maxAttempts}${retryEnabled ? ', retry enabled' : ''})`,
             );
 
             const internalController = new AbortController();
             const timeoutId = setTimeout(() => internalController.abort(), toolTimeout);
 
             try {
-                // Combine external signal (if any) with internal timeout signal
+                // Combine external signal (if unknown) with internal timeout signal
                 const combinedSignal = options.signal
                     ? AbortSignal.any([options.signal, internalController.signal])
                     : internalController.signal;
@@ -282,27 +295,30 @@ export class ToolRegistry {
                 if (attempt > 1) {
                     console.error(
                         `[Tool Registry] Tool ${name} succeeded on attempt ${attempt}/${maxAttempts} ` +
-                            `after ${duration}ms`
+                            `after ${duration}ms`,
                     );
                 }
 
                 console.error(`[Tool Registry] Tool execution completed: ${name} (${duration}ms)`);
                 return result;
-            } catch (error) {
+            } catch (/** @type {any} */ _raw_error) {
+                const error = /** @type {any} */ (_raw_error);
                 clearTimeout(timeoutId);
                 lastError = error;
 
                 // Classify error for retry decision
                 const { classifyError, calculateBackoff } = await import('./error-classifier.mjs');
-                const classification = classifyError(error, {
-                    tool: name,
-                    model: params.model,
-                    attempt,
-                });
+                const classification = /** @type {any} */ (
+                    classifyError(error, {
+                        tool: name,
+                        model: /** @type {any} */ (params).model,
+                        attempt,
+                    })
+                );
 
                 console.error(
                     `[Tool Registry] Tool ${name} failed (attempt ${attempt}/${maxAttempts}): ` +
-                        `${classification.errorClass} - ${classification.reasonCode}`
+                        `${classification.errorClass} - ${classification.reasonCode}`,
                 );
 
                 // Record circuit breaker failure
@@ -317,7 +333,7 @@ export class ToolRegistry {
                 if (!retryEnabled || !classification.retryable || attempt >= maxAttempts) {
                     throw new Error( // eslint-disable-line preserve-caught-error
                         `Tool ${name} execution failed: ${error.message} ` +
-                            `(${classification.reasonCode}, attempt ${attempt}/${maxAttempts})`
+                            `(${classification.reasonCode}, attempt ${attempt}/${maxAttempts})`,
                     );
                 }
 
@@ -337,10 +353,10 @@ export class ToolRegistry {
 
                 console.error(
                     `[Tool Registry] Retrying tool ${name} in ${delayMs}ms ` +
-                        `(strategy: ${classification.strategy}, ${classification.message})`
+                        `(strategy: ${classification.strategy}, ${classification.message})`,
                 );
 
-                await new Promise(resolve => setTimeout(resolve, delayMs));
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
             }
         }
 
@@ -351,14 +367,14 @@ export class ToolRegistry {
     /**
      * Get all tool metadata (for MCP tools/list, LSP capabilities)
      *
-     * @returns {Array<{name: string, description: string, inputSchema: Object}>}
-     *
      * @example
-     * const tools = registry.getAllMetadata();
-     * // [
-     * //   { name: 'rag_search', description: '...', inputSchema: {...} },
-     * //   { name: 'ollama_generate', description: '...', inputSchema: {...} }
-     * // ]
+     *     const tools = registry.getAllMetadata();
+     *     // [
+     *     //   { name: 'rag_search', description: '...', inputSchema: {...} },
+     *     //   { name: 'ollama_generate', description: '...', inputSchema: {...} }
+     *     // ]
+     *
+     * @returns {{ name: string; description: string; inputSchema: object }[]}
      */
     getAllMetadata() {
         return Array.from(this.tools.entries()).map(([name, { metadata }]) => ({
@@ -371,7 +387,7 @@ export class ToolRegistry {
      * Get metadata for a specific tool
      *
      * @param {string} name - Tool name
-     * @returns {Object|null} Tool metadata or null if not found
+     * @returns {object | null} Tool metadata or null if not found
      */
     getMetadata(name) {
         const tool = this.tools.get(name);
@@ -422,7 +438,7 @@ export class ToolRegistry {
     /**
      * Get registry stats
      *
-     * @returns {Object} Stats object
+     * @returns {any} Stats object
      */
     getStats() {
         return {
@@ -433,8 +449,7 @@ export class ToolRegistry {
 }
 
 /**
- * Default registry instance (singleton)
- * Import and use this across the codebase
+ * Default registry instance (singleton) Import and use this across the codebase
  */
 export const registry = new ToolRegistry();
 
@@ -442,18 +457,17 @@ export const registry = new ToolRegistry();
  * Initialization state
  */
 let initialized = false;
-let initPromise = null;
+/** @type {Promise<void> | null} */ let initPromise = null;
 
 /**
- * Initialize registry with all available tools
- * This is idempotent - can be called multiple times safely
- *
- * @returns {Promise<void>}
+ * Initialize registry with all available tools This is idempotent - can be called multiple times safely
  *
  * @example
- * import { registry, initialize } from './tool-registry.mjs';
- * await initialize();
- * await registry.execute('rag_search', { query: 'foo' });
+ *     import { registry, initialize } from './tool-registry.mjs';
+ *     await initialize();
+ *     await registry.execute('rag_search', { query: 'foo' });
+ *
+ * @returns {Promise<void>}
  */
 export async function initialize() {
     // If already initialized, return immediately
@@ -491,21 +505,21 @@ export async function initialize() {
                 const { registerUpstreams, getUpstreamStatus } = await import('./mcp/upstream-manager.mjs');
                 await registerUpstreams(registry, { installShutdownHook: false });
                 const st = getUpstreamStatus();
-                const readyCount = st.upstreams.filter(u => u.ready).length;
+                const readyCount = st.upstreams.filter((u) => u.ready).length;
                 const totalCount = st.upstreams.length;
                 if (totalCount > 0) {
                     console.error(`[Tool Registry] Upstreams: ${readyCount}/${totalCount} ready`);
                 }
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 console.error('[Tool Registry] Upstream manager failed (continuing without upstreams):', error);
             }
 
             initialized = true;
 
-            const stats = registry.getStats();
+            const stats = /** @type {any} */ (registry.getStats());
             console.error(`[Tool Registry] Initialization complete: ${stats.totalTools} tools registered`);
             console.error(`[Tool Registry] Available tools: ${stats.tools.join(', ')}`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error('[Tool Registry] Initialization error:', error);
             // Reset promise so initialization can be retried
             initPromise = null;
@@ -518,7 +532,7 @@ export async function initialize() {
 
 // Auto-initialize on import (fire-and-forget, for backward compatibility)
 // Explicit consumers should call await initialize() to ensure readiness
-initialize().catch(err => {
+initialize().catch((err) => {
     console.error('[Tool Registry] Auto-initialization failed:', err);
     console.error('[Tool Registry] MCP/API endpoints should explicitly call initialize()');
 });

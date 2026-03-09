@@ -774,7 +774,7 @@ for (const proposal of proposals) {
 }
 
 // DEPOIS (paralelo):
-await Promise.all(proposals.map(proposal => this._applyProposal(proposal)));
+await Promise.all(proposals.map((proposal) => this._applyProposal(proposal)));
 ```
 
 **Impacto**: Reduz latência do loop quando múltiplas propostas

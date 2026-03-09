@@ -96,10 +96,10 @@ CRITICAL_ENV_VARS=(NODE_ENV SERVER_PORT CHROME_HOST CHROME_PORT CHROME_PROXY_POR
 info "Configuração de ambiente:"
 ok "Arquivo .env detectado e ativo"
 info "→ 47 variáveis definidas"
-  • NODE_ENV:            development
-  • SERVER_PORT:         3008
-  • CHROME_HOST:         host.docker.internal
-  • CHROME_PORT:         9225
+• NODE_ENV: development
+• SERVER_PORT: 3008
+• CHROME_HOST: host.docker.internal
+• CHROME_PORT: 9225
 ```
 
 **O que faz**: Feedback visual instantâneo do estado ENV (troubleshooting rápido).
@@ -148,10 +148,10 @@ bash -n .devcontainer/scripts/post-attach.sh
 
 # 2. Teste validate-env.sh (com mock)
 export NODE_ENV=development \
-       SERVER_PORT=3008 \
-       CHROME_HOST=host.docker.internal \
-       CHROME_PORT=9225 \
-       CHROME_PROXY_PORT=9224
+  SERVER_PORT=3008 \
+  CHROME_HOST=host.docker.internal \
+  CHROME_PORT=9225 \
+  CHROME_PROXY_PORT=9224
 
 bash .devcontainer/scripts/validate-env.sh
 

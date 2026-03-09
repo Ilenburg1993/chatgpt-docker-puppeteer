@@ -1,14 +1,14 @@
 <script setup>
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import Button from '@/components/ui/Button.vue';
 import Badge from '@/components/ui/Badge.vue';
+import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Input from '@/components/ui/Input.vue';
 import Modal from '@/components/ui/Modal.vue';
+import { confirmTwoStepAction, requireReason } from '@/lib/command_guard';
 import { useMissionsVNextStore } from '@/stores/missions_vnext';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
-import { confirmTwoStepAction, requireReason } from '@/lib/command_guard';
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 const VisGraph = defineAsyncComponent(() => import('@/components/graphs/VisGraph.vue'));
 
@@ -88,7 +88,7 @@ function resolveReason(defaultReason, errorMessage) {
     if (typed) return typed;
     if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
         const prompted = String(
-            window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || ''
+            window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || '',
         ).trim();
         if (prompted) {
             commandReason.value = prompted;
@@ -140,7 +140,7 @@ async function loadAll() {
 async function executeMission() {
     const reason = resolveReason(
         'Execução da missão a partir do dashboard',
-        'Motivo obrigatório para executar missão.'
+        'Motivo obrigatório para executar missão.',
     );
     if (!confirmTwoStepAction({ actionLabel: `MISSION_EXECUTE (${missionId.value})`, reason })) return;
     await missions.executeMission(missionId.value, {
@@ -159,7 +159,7 @@ async function pauseMission() {
 async function resumeMission() {
     const reason = resolveReason(
         'Retomada da missão após intervenção humana',
-        'Motivo obrigatório para retomar missão.'
+        'Motivo obrigatório para retomar missão.',
     );
     if (!confirmTwoStepAction({ actionLabel: `MISSION_RESUME (${missionId.value})`, reason })) return;
     await missions.resumeMission(missionId.value, {
@@ -170,7 +170,7 @@ async function resumeMission() {
 async function cancelMission() {
     const reason = resolveReason(
         'Cancelamento manual da missão por operador',
-        'Motivo obrigatório para cancelar missão.'
+        'Motivo obrigatório para cancelar missão.',
     );
     if (!confirmTwoStepAction({ actionLabel: `MISSION_CANCEL (${missionId.value})`, reason })) return;
     await missions.cancelMission(missionId.value, {
@@ -214,7 +214,7 @@ async function savePolicy() {
     }
     const reason = resolveReason(
         'Atualização de policy/autonomia da missão',
-        'Motivo obrigatório para atualizar policy.'
+        'Motivo obrigatório para atualizar policy.',
     );
     if (!confirmTwoStepAction({ actionLabel: `MISSION_SET_POLICY (${missionId.value})`, reason })) return;
     await missions.updatePolicy(missionId.value, {
@@ -237,7 +237,7 @@ async function bulkApproveProposals() {
     if (ids.length === 0) return;
     const reason = resolveReason(
         'Aprovação em lote de propostas da missão',
-        'Motivo obrigatório para aprovar proposals.'
+        'Motivo obrigatório para aprovar proposals.',
     );
     if (!confirmTwoStepAction({ actionLabel: `TASK_BULK_ACTION.approve (${ids.length})`, reason })) return;
     await tasks.bulkAction({ ids, action: 'approve', reason });
@@ -250,7 +250,7 @@ async function bulkRejectProposals() {
     if (ids.length === 0) return;
     const reason = resolveReason(
         'Rejeição em lote de propostas da missão',
-        'Motivo obrigatório para rejeitar proposals.'
+        'Motivo obrigatório para rejeitar proposals.',
     );
     if (!confirmTwoStepAction({ actionLabel: `PROPOSALS_REJECT (${ids.length})`, reason })) return;
     try {
@@ -297,13 +297,15 @@ async function sendFeedback() {
 
 const graphNodes = computed(() => {
     const list = graph.value?.tasks || [];
-    return list.map(t => ({
+    return list.map((t) => ({
         id: t.id,
         label: `${t.id}\n${t.unified_status} · ${t.stage}`,
         title: t.spec_user_message_preview || '',
     }));
 });
-const graphEdges = computed(() => (graph.value?.edges || []).map(e => ({ from: e.depends_on_task_id, to: e.task_id })));
+const graphEdges = computed(() =>
+    (graph.value?.edges || []).map((e) => ({ from: e.depends_on_task_id, to: e.task_id })),
+);
 
 async function createTaskInMission() {
     if (!createTaskForm.value.user_message.trim()) return;
@@ -326,7 +328,7 @@ async function createTaskInMission() {
         };
         const reason = resolveReason(
             'Criação de task dentro da missão',
-            'Motivo obrigatório para criar task na missão.'
+            'Motivo obrigatório para criar task na missão.',
         );
         if (!confirmTwoStepAction({ actionLabel: `TASK_CREATE (mission:${missionId.value})`, reason })) return;
         await tasks.createTask(payload, reason);
@@ -348,7 +350,7 @@ async function createTaskInMission() {
 async function quickTaskAction(taskId, action) {
     const reason = resolveReason(
         `Ação ${String(action).toUpperCase()} na task ${taskId}`,
-        'Motivo obrigatório para comando de task.'
+        'Motivo obrigatório para comando de task.',
     );
     if (
         !confirmTwoStepAction({

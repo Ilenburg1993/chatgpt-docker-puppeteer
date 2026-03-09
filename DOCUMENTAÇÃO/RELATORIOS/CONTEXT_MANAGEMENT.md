@@ -708,19 +708,19 @@ contextManager.initializeContext('mission-book-writing', {
 await contextManager.addStepOutput(
   'mission-book-writing',
   'step-1',
-  'Outline: Introduction, Chapter 1: Basics, Chapter 2: Advanced...'
+  'Outline: Introduction, Chapter 1: Basics, Chapter 2: Advanced...',
 );
 
 await contextManager.addStepOutput(
   'mission-book-writing',
   'step-2',
-  'Chapter 1: Rust Basics. Rust is a systems programming language...'
+  'Chapter 1: Rust Basics. Rust is a systems programming language...',
 );
 
 await contextManager.addStepOutput(
   'mission-book-writing',
   'step-3',
-  "Chapter 2: Ownership. The ownership system is Rust's most unique feature..."
+  "Chapter 2: Ownership. The ownership system is Rust's most unique feature...",
 );
 
 // 4. Gera prompt para próximo step
@@ -732,7 +732,7 @@ const prompt = `Write Chapter 3 about Borrowing.
 ${context.summary || 'No summary yet'}
 
 [RECENT STEPS]:
-${context.steps.map(s => `${s.step_id}: ${s.output.substring(0, 200)}...`).join('\n')}
+${context.steps.map((s) => `${s.step_id}: ${s.output.substring(0, 200)}...`).join('\n')}
 `;
 
 // 5. Adiciona pattern ao memory store

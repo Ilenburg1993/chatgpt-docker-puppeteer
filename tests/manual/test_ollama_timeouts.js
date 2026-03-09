@@ -3,6 +3,7 @@
  * Ollama Timeout & Performance Test
  *
  * Tests:
+ *
  * 1. Environment variable loading
  * 2. Health check speed
  * 3. Model listing
@@ -10,12 +11,11 @@
  * 5. Large generation (tests timeout enforcement)
  * 6. Performance benchmarks
  *
- * Usage:
- *   node tests/manual/test_ollama_timeouts.js
+ * Usage: node tests/manual/test_ollama_timeouts.js
  */
 
-import { ollama } from '../../tools/ollama/client.mjs';
 import assert from 'node:assert';
+import { ollama } from '../../tools/ollama/client.mjs';
 
 console.log('=== Ollama Timeout & Performance Test ===\n');
 
@@ -45,7 +45,7 @@ async function runTests() {
         const listTime = Date.now() - listStart;
         assert.ok(models.length > 0, 'Should have at least 1 model');
         console.log(`✅ Found ${models.length} models in ${listTime}ms:`);
-        models.forEach(m => console.log(`  - ${m.name} (${(m.size / 1e9).toFixed(2)} GB)`));
+        models.forEach((m) => console.log(`  - ${m.name} (${(m.size / 1e9).toFixed(2)} GB)`));
         console.log();
 
         // Test 4: Small Generation (should succeed)
@@ -69,14 +69,14 @@ async function runTests() {
             const largeResult = await ollama.generate(
                 'Write a detailed explanation of how neural networks work, including architecture, training, and applications.',
                 process.env.OLLAMA_DEFAULT_MODEL,
-                { num_predict: 2000, temperature: 0.7 }
+                { num_predict: 2000, temperature: 0.7 },
             );
             const timeoutTime = Date.now() - timeoutStart;
             console.log(`✅ Completed in ${timeoutTime}ms (within timeout)`);
             console.log(`   Generated ${largeResult.length} chars`);
             const wordCount = largeResult.split(/\s+/).length;
             console.log(`   Throughput: ${Math.round((wordCount / timeoutTime) * 60000)} tokens/min`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             const timeoutTime = Date.now() - timeoutStart;
             if (error.message.includes('timeout') || error.message.includes('aborted')) {
                 console.log(`✅ Timeout enforced at ${timeoutTime}ms (expected behavior)`);
@@ -102,7 +102,7 @@ async function runTests() {
         console.log('1. Test MCP integration: ./tests/manual/test_mcp_ollama.sh');
         console.log('2. Test with Claude Desktop or GitHub Copilot');
         console.log('3. Monitor performance: pm2 logs dashboard-web');
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('\n❌ Test failed:');
         console.error(error);
         process.exit(1);

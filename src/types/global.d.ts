@@ -1,9 +1,19 @@
 /**
  * Global Type Extensions
  *
- * Extensões de tipos nativos do JavaScript/TypeScript.
- * Declarações globais que não pertencem a nenhum módulo específico.
+ * Extensões de tipos nativos do JavaScript/TypeScript. Declarações globais que não pertencem a nenhum módulo
+ * específico.
  */
+
+// ============================================================
+// Ambient Module Declarations (third-party without @types)
+// ============================================================
+
+/** @babel/traverse — sem pacote @types oficial no projeto */
+declare module '@babel/traverse' {
+    const traverse: (...args: any[]) => any;
+    export default traverse;
+}
 
 // ============================================================
 // Error Extensions
@@ -11,48 +21,50 @@
 
 interface Error {
     /** Detalhes adicionais do erro */
-    details?: string | Record<string, unknown>;
+    details?: string | Record<string, unknown> | undefined;
 
     /** Causa raiz do erro (ES2022+) */
     cause?: Error | unknown;
 
     /** Histórico de tentativas (recovery systems) */
-    history?: Array<{
-        attempt?: number;
-        error?: unknown;
-        errorClass?: string;
-        ts?: number;
-        timestamp?: number;
-        action?: string;
-        result?: string;
-        [key: string]: unknown;
-    }>;
+    history?:
+        | Array<{
+              attempt?: number;
+              error?: unknown;
+              errorClass?: string;
+              ts?: number;
+              timestamp?: number;
+              action?: string;
+              result?: string;
+              [key: string]: unknown;
+          }>
+        | undefined;
 
     /** Número de tentativas */
-    attempts?: number;
+    attempts?: number | undefined;
 
     /** Operação que causou o erro */
-    operation?: string;
+    operation?: string | undefined;
 
-    /** Código de erro */
-    code?: string | number;
+    /** Código de erro (pode ser string, número ou undefined conforme exactOptionalPropertyTypes) */
+    code?: string | number | undefined;
 
     /** Contexto adicional */
-    context?: Record<string, unknown>;
+    context?: Record<string, unknown> | undefined;
 
     /** Deprecation warnings */
-    originalFunction?: string;
-    replacedBy?: string;
+    originalFunction?: string | undefined;
+    replacedBy?: string | undefined;
 
     /** Status HTTP ou custom */
-    status?: number | string;
-    statusCode?: number | string;
-    timeoutMs?: number;
+    status?: number | string | undefined;
+    statusCode?: number | string | undefined;
+    timeoutMs?: number | undefined;
     lastError?: unknown;
-    url?: string;
+    url?: string | undefined;
     body?: unknown;
     openaiError?: unknown;
-    reason_code?: string;
+    reason_code?: string | undefined;
 }
 
 // ============================================================
@@ -131,6 +143,12 @@ declare namespace Express {
         [key: string]: any;
     }
     interface Request {
+        /** Request ID adicionado pelo middleware request_id */
+        id: string;
+        /** Usuário autenticado adicionado pelo middleware de autenticação */
+        user?: Record<string, any>;
+        /** Token JWT bruto (header Authorization) */
+        token?: string;
         [key: string]: any;
     }
     interface Response {
@@ -340,3 +358,5 @@ type Callback<T = void> = (error?: Error, result?: T) => void;
  * Type helper para promises que podem retornar void
  */
 type MaybePromise<T> = T | Promise<T>;
+
+declare module 'supertest';

@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 const ROOT = process.cwd();
 
@@ -13,12 +13,12 @@ test('wave13: reconnection flow updates all pool entries and circuit breaker rec
     assert.match(
         content,
         /for\s*\(const\s+poolEntry\s+of\s+this\.pool\)\s*\{\s*poolEntry\.browser\s*=\s*newBrowser;/s,
-        'reconnection success should propagate newBrowser to all pool entries'
+        'reconnection success should propagate newBrowser to all pool entries',
     );
 
     assert.match(
         content,
         /for\s*\(const\s+poolEntry\s+of\s+this\.pool\)\s*\{\s*this\.circuitBreaker\.registerRecovery\(poolEntry\.id\);/s,
-        'reconnection success should register circuit-breaker recovery for all entries'
+        'reconnection success should register circuit-breaker recovery for all entries',
     );
 });

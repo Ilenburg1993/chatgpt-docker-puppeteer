@@ -10,9 +10,9 @@ async function main() {
         process.exit(1);
     }
 
-    const name = argv[0];
+    const name = argv[0] ?? '';
     const rootIndex = argv.indexOf('--root');
-    const root = rootIndex !== -1 && argv[rootIndex + 1] ? path.resolve(argv[rootIndex + 1]) : process.cwd();
+    const root = rootIndex !== -1 && argv[rootIndex + 1] ? path.resolve(argv[rootIndex + 1] ?? '') : process.cwd();
     // skills now live under .github/skills instead of .codex/skills
     const skillDir = path.join(root, '.github', 'skills', name);
 
@@ -45,17 +45,17 @@ _TODO: escreva uma visão geral do skill._
         const pkgText = await fs.readFile(pkgPath, 'utf8');
         const pkg = JSON.parse(pkgText);
         pkg.scripts = pkg.scripts || {};
-        pkg.scripts[`audit:${name}`] = `echo \"run ${name} skill\"`;
+        pkg.scripts[`audit:${name}`] = `echo "run ${name} skill"`;
         await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
     } catch (err) {
-        console.warn('unable to update package.json alias', err.message);
+        console.warn('unable to update package.json alias', /** @type {any} */ (err).message);
     }
 
     console.log(`skill ${name} created at ${skillDir}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-    main().catch(err => {
+    main().catch((err) => {
         console.error(err);
         process.exit(1);
     });

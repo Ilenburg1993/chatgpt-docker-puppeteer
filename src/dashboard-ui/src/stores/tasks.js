@@ -3,15 +3,16 @@
  * Pinia Store: Tasks
  *
  * Gerencia estado de tarefas no dashboard.
+ *
  * - Carrega tasks da API
  * - Mantém filtros ativos
  * - Recebe updates em tempo real via Socket.io
  */
 
-import { defineStore } from 'pinia';
 import { formatHttpError, http } from '@/lib/http';
+import { defineStore } from 'pinia';
 
-function _msToIso(ms) {
+function _msToIso(/** @type {any} */ ms) {
     const n = Number(ms);
     if (!Number.isFinite(n) || n <= 0) return null;
     try {
@@ -21,7 +22,7 @@ function _msToIso(ms) {
     }
 }
 
-function _listItemToLegacyTask(item) {
+function _listItemToLegacyTask(/** @type {any} */ item) {
     if (!item || typeof item !== 'object') return null;
 
     const createdAtIso = _msToIso(item.timestamps?.created_at_ms);
@@ -61,7 +62,7 @@ function _listItemToLegacyTask(item) {
     };
 }
 
-function _mergeTask(existing, incoming) {
+function _mergeTask(/** @type {any} */ existing, /** @type {any} */ incoming) {
     if (!existing) return incoming;
     if (!incoming) return existing;
 
@@ -103,7 +104,7 @@ function _mergeTask(existing, incoming) {
 export const useTaskStore = defineStore('tasks', {
     state: () => ({
         // Lista de tasks
-        tasks: [],
+        tasks: /** @type {any[]} */ ([]),
 
         // Task selecionada para detalhes
         selectedTaskId: null,
@@ -130,10 +131,10 @@ export const useTaskStore = defineStore('tasks', {
         },
 
         // Última atualização
-        lastUpdate: null,
+        lastUpdate: /** @type {number | null} */ (null),
 
         // Cursor de paginação do snapshot
-        nextCursor: null,
+        nextCursor: /** @type {string | null} */ (null),
         hasMore: false,
     }),
 
@@ -141,26 +142,26 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Tasks filtradas conforme filtros ativos
          */
-        filteredTasks: state => {
+        filteredTasks: (state) => {
             let filtered = state.tasks;
 
             // Filtro por status
             if (state.filters.status) {
-                filtered = filtered.filter(t => t.unified_status === state.filters.status);
+                filtered = filtered.filter((t) => t.unified_status === state.filters.status);
             }
 
             // Filtro por prioridade mínima
             if (state.filters.priority !== null) {
-                filtered = filtered.filter(t => (t.meta?.priority || 0) >= state.filters.priority);
+                filtered = filtered.filter((t) => (t.meta?.priority || 0) >= (state.filters.priority ?? 0));
             }
 
             // Filtro por busca (ID ou prompt)
             if (state.filters.search) {
                 const search = state.filters.search.toLowerCase();
                 filtered = filtered.filter(
-                    t =>
+                    (t) =>
                         t.meta?.id?.toLowerCase().includes(search) ||
-                        t.spec?.payload?.user_message?.toLowerCase().includes(search)
+                        t.spec?.payload?.user_message?.toLowerCase().includes(search),
                 );
             }
 
@@ -170,43 +171,44 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Tasks em execução
          */
-        runningTasks: state => state.tasks.filter(t => t.unified_status === 'RUNNING'),
+        runningTasks: (state) => state.tasks.filter((t) => t.unified_status === 'RUNNING'),
 
         /**
          * Tasks pendentes
          */
-        pendingTasks: state => state.tasks.filter(t => t.unified_status === 'PENDING'),
+        pendingTasks: (state) => state.tasks.filter((t) => t.unified_status === 'PENDING'),
 
         /**
          * Tasks concluídas
          */
-        completedTasks: state => state.tasks.filter(t => t.unified_status === 'DONE'),
+        completedTasks: (state) => state.tasks.filter((t) => t.unified_status === 'DONE'),
 
         /**
          * Tasks com erro
          */
-        failedTasks: state => state.tasks.filter(t => t.unified_status === 'FAILED'),
+        failedTasks: (state) => state.tasks.filter((t) => t.unified_status === 'FAILED'),
 
         /**
          * Busca task por ID
          */
-        taskById: state => id => state.tasks.find(t => t.meta?.id === id || t.id === id),
+        taskById: (state) => (/** @type {any} */ id) =>
+            state.tasks.find((t) => t.meta?.id === id || t.id === /** @type {any} */ id),
 
         /**
          * Task selecionada
          */
-        selectedTask: state => state.tasks.find(t => t.meta?.id === state.selectedTaskId),
+        selectedTask: (state) => state.tasks.find((t) => t.meta?.id === state.selectedTaskId),
 
         /**
          * Contadores por status
          */
-        statusCounts: state => ({
-            RUNNING: state.tasks.filter(t => t.unified_status === 'RUNNING').length,
-            PENDING: state.tasks.filter(t => t.unified_status === 'PENDING').length,
-            DONE: state.tasks.filter(t => t.unified_status === 'DONE').length,
-            FAILED: state.tasks.filter(t => t.unified_status === 'FAILED').length,
-            PAUSED: state.tasks.filter(t => t.unified_status === 'PAUSED').length,
-            CANCELLED: state.tasks.filter(t => t.unified_status === 'CANCELLED').length,
+        statusCounts: (state) => ({
+            RUNNING: state.tasks.filter((t) => t.unified_status === 'RUNNING').length,
+            PENDING: state.tasks.filter((t) => t.unified_status === 'PENDING').length,
+            DONE: state.tasks.filter((t) => t.unified_status === 'DONE').length,
+            FAILED: state.tasks.filter((t) => t.unified_status === 'FAILED').length,
+            PAUSED: state.tasks.filter((t) => t.unified_status === 'PAUSED').length,
+            CANCELLED: state.tasks.filter((t) => t.unified_status === 'CANCELLED').length,
         }),
     },
 
@@ -226,12 +228,14 @@ export const useTaskStore = defineStore('tasks', {
                 let pages = 0;
 
                 while (pages < 50) {
-                    const response = await http.get('/api/dashboard/tasks', {
-                        params: {
-                            limit,
-                            cursor: cursor || undefined,
-                        },
-                    });
+                    const response = /** @type {any} */ (
+                        await http.get('/api/dashboard/tasks', {
+                            params: {
+                                limit,
+                                cursor: cursor || undefined,
+                            },
+                        })
+                    );
 
                     const items = response.data?.data?.items || [];
                     for (const item of items) {
@@ -239,7 +243,7 @@ export const useTaskStore = defineStore('tasks', {
                         if (t) all.push(t);
                     }
 
-                    const meta = response.data?.meta || {};
+                    const meta = /** @type {any} */ (response.data?.meta || {});
                     cursor = meta.next_cursor || null;
                     pages += 1;
 
@@ -256,8 +260,9 @@ export const useTaskStore = defineStore('tasks', {
 
                 this.tasks = all;
                 this.lastUpdate = Date.now();
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (/** @type {any} */ _rawError) {
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 console.error('[TaskStore] Erro ao carregar tasks:', error);
             } finally {
                 this.loading = false;
@@ -267,7 +272,7 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Carrega uma task específica
          */
-        async fetchTask(taskId) {
+        async fetchTask(/** @type {any} */ taskId) {
             this.loadingTask = true;
 
             try {
@@ -280,7 +285,7 @@ export const useTaskStore = defineStore('tasks', {
                 }
 
                 // Atualiza na lista local
-                const index = this.tasks.findIndex(t => t.meta?.id === taskId);
+                const index = this.tasks.findIndex((t) => t.meta?.id === taskId);
                 if (index !== -1) {
                     this.tasks[index] = _mergeTask(this.tasks[index], task);
                 } else {
@@ -288,8 +293,9 @@ export const useTaskStore = defineStore('tasks', {
                 }
 
                 return task;
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (/** @type {any} */ _rawError) {
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
             } finally {
                 this.loadingTask = false;
@@ -310,7 +316,8 @@ export const useTaskStore = defineStore('tasks', {
                         by_priority: this.stats.by_priority,
                     };
                 }
-            } catch (error) {
+            } catch (/** @type {any} */ _rawError) {
+                const error = /** @type {any} */ (_rawError);
                 console.error('[TaskStore] Erro ao carregar stats:', error);
             }
         },
@@ -318,14 +325,15 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Cria uma nova task
          */
-        async createTask(taskData) {
+        async createTask(/** @type {any} */ taskData) {
             try {
                 const response = await http.post('/api/tasks', taskData);
                 // Recarrega lista
                 await this.fetchTasks();
                 return response.data;
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (/** @type {any} */ _rawError) {
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
             }
         },
@@ -333,19 +341,20 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Atualiza uma task
          */
-        async updateTask(taskId, taskData) {
+        async updateTask(/** @type {any} */ taskId, /** @type {any} */ taskData) {
             try {
                 const response = await http.put(`/api/tasks/${taskId}`, taskData);
 
                 // Atualiza na lista local
-                const index = this.tasks.findIndex(t => t.meta?.id === taskId);
+                const index = this.tasks.findIndex((t) => t.meta?.id === taskId);
                 if (index !== -1) {
                     this.tasks[index] = { ...this.tasks[index], ...taskData };
                 }
 
                 return response.data;
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (/** @type {any} */ _rawError) {
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
             }
         },
@@ -353,12 +362,13 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Remove uma task
          */
-        async deleteTask(taskId) {
+        async deleteTask(/** @type {any} */ taskId) {
             try {
                 await http.delete(`/api/tasks/${taskId}`);
-                this.tasks = this.tasks.filter(t => t.meta?.id !== taskId);
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+                this.tasks = this.tasks.filter((t) => t.meta?.id !== taskId);
+            } catch (/** @type {any} */ _rawError) {
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
             }
         },
@@ -372,8 +382,9 @@ export const useTaskStore = defineStore('tasks', {
                 // Recarrega lista
                 await this.fetchTasks();
                 return response.data;
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (/** @type {any} */ _rawError) {
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
             }
         },
@@ -387,8 +398,9 @@ export const useTaskStore = defineStore('tasks', {
                 // Recarrega lista
                 await this.fetchTasks();
                 return response.data;
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (/** @type {any} */ _rawError) {
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
             }
         },
@@ -396,14 +408,14 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Handler para updates em tempo real via Socket.io
          */
-        handleTaskUpdate(data) {
+        handleTaskUpdate(/** @type {any} */ data) {
             const taskId = data?.taskId || data?.task?.id || data?.id || null;
             const state = data?.state || null;
             const taskListItem = data?.task || null;
 
             if (!taskId) return;
 
-            const index = this.tasks.findIndex(t => t.meta?.id === taskId || t.id === taskId);
+            const index = this.tasks.findIndex((t) => t.meta?.id === taskId || t.id === taskId);
 
             if (index !== -1) {
                 let incoming = null;
@@ -432,7 +444,7 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Handler para batch de updates
          */
-        handleTaskUpdatesBatch(data) {
+        handleTaskUpdatesBatch(/** @type {any} */ data) {
             const updates = data?.updates || [];
 
             for (const update of updates) {
@@ -443,14 +455,14 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Define task selecionada
          */
-        selectTask(taskId) {
+        selectTask(/** @type {any} */ taskId) {
             this.selectedTaskId = taskId;
         },
 
         /**
          * Atualiza filtros
          */
-        setFilters(filters) {
+        setFilters(/** @type {any} */ filters) {
             this.filters = { ...this.filters, ...filters };
         },
 

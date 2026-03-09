@@ -1,8 +1,8 @@
 <script setup>
 import { reactive, ref, watch } from 'vue';
+import { useNotifications } from '../../composables/useNotifications.js';
 import Button from '../ui/Button.vue';
 import Modal from '../ui/Modal.vue';
-import { useNotifications } from '../../composables/useNotifications.js';
 
 const props = defineProps({
     open: {
@@ -59,7 +59,7 @@ const modelOptions = {
 
 watch(
     () => props.open,
-    newVal => {
+    (newVal) => {
         if (newVal && props.task && props.mode === 'edit') {
             form.prompt = props.task.spec?.payload?.user_message || '';
             form.agent = props.task.meta?.agent || 'chatgpt';
@@ -69,7 +69,7 @@ watch(
         } else if (newVal && props.mode === 'create') {
             resetForm();
         }
-    }
+    },
 );
 
 const resetForm = () => {

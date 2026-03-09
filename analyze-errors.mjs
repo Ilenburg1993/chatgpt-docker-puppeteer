@@ -4,7 +4,7 @@ import fs from 'node:fs';
 const data = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 const byFile = {};
 
-data.errors.forEach(d => {
+data.errors.forEach((d) => {
     const file = d.file;
     if (!byFile[file]) byFile[file] = [];
     byFile[file].push(d.code);
@@ -24,9 +24,9 @@ sorted.forEach(({ file, count, codes }) => {
 
 console.log('\n📈 Categorização de erros:');
 console.log('\nBrowser globals (TS2304, TS2584):');
-const browserErrors = data.errors.filter(d => d.code === 2304 || d.code === 2584);
+const browserErrors = data.errors.filter((d) => d.code === 2304 || d.code === 2584);
 console.log(`   Total: ${browserErrors.length} erros`);
 
-const browserFiles = new Set(browserErrors.map(d => d.file.replace('/workspaces/chatgpt-docker-puppeteer/', '')));
+const browserFiles = new Set(browserErrors.map((d) => d.file.replace('/workspaces/chatgpt-docker-puppeteer/', '')));
 console.log(`   Arquivos afetados: ${browserFiles.size}`);
-browserFiles.forEach(f => console.log(`      - ${f}`));
+browserFiles.forEach((f) => console.log(`      - ${f}`));

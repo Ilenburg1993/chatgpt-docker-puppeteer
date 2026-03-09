@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.declarations-full.tsbuildinfo",
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": true,
+    "rootDir": ".",
+    "outDir": "./tmp/types-all"
+  },
+  "include": ["src/**/*.js", "src/types/**/*.d.ts"],
+  "exclude": [
+    "src/dashboard-ui/**",
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "logs",
+    "fila",
+    "respostas",
+    "artifacts",
+    "profile",
+    "public",
+    "backups",
+    "monitoring",
+    "tmp",
+    "analysis",
+    "local-login",
+    "DOCUMENTAÇÃO",
+    ".git",
+    "**/node_modules/**",
+    "**/*.min.js",
+    "**/*.map",
+    "**/*.bundle.js",
+    "**/*.d.ts.map",
+    "**/*.js.map"
+  ],
+  "display": "full declaration emit (all src/ → tmp/types-all)"
+}

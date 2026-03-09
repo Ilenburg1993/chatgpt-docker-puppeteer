@@ -1,11 +1,11 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import test from 'node:test';
 
 import { __mainTestHooks } from '#main';
 
-async function withEnv(overrides, fn) {
+async function withEnv(/** @type {any} */ overrides, /** @type {any} */ fn) {
     const previous = new Map();
 
     for (const [key, value] of Object.entries(overrides)) {
@@ -42,12 +42,14 @@ async function startHealthServer() {
         res.end();
     });
 
-    await new Promise((resolve, reject) => {
-        server.listen(0, 'localhost', err => {
-            if (err) reject(err);
-            else resolve();
-        });
-    });
+    await /** @type {Promise<void>} */ (
+        new Promise((resolve, reject) => {
+            /** @type {any} */ (server).listen(0, 'localhost', (/** @type {any} */ err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        })
+    );
 
     const address = server.address();
     if (!address || typeof address !== 'object') {
@@ -58,9 +60,11 @@ async function startHealthServer() {
         server,
         port: address.port,
         close: () =>
-            new Promise(resolve => {
-                server.close(() => resolve());
-            }),
+            /** @type {Promise<void>} */ (
+                new Promise((resolve) => {
+                    server.close(() => resolve());
+                })
+            ),
     };
 }
 
@@ -95,7 +99,7 @@ test('split retry tolerates transient connect failures and succeeds before max a
         async () => {
             const socketHub = await __mainTestHooks.connectSplitExternalWithRetry(fakeSocketModule, 3008);
             assert.ok(socketHub, 'split helper should eventually return a socket hub');
-        }
+        },
     );
 
     assert.equal(attempts, 3, 'helper should stop retrying after first successful connection');
@@ -130,10 +134,10 @@ test('split retry can gate connection on /health when SPLIT_WAIT_HEALTH=true', a
             async () => {
                 const socketHub = await __mainTestHooks.connectSplitExternalWithRetry(
                     fakeSocketModule,
-                    healthServer.port
+                    healthServer.port,
                 );
                 assert.ok(socketHub, 'split helper should connect when health endpoint is available');
-            }
+            },
         );
 
         assert.equal(connectCalls, 1, 'connectExternal should be called after health gate passes');

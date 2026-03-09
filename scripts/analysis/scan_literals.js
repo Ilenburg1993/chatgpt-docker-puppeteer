@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // @ts-check
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SRC = path.join(ROOT, 'src');
@@ -39,6 +39,7 @@ const GREP_PATTERNS = [
 
 function grepScan() {
     console.log('🔍 FASE 1: Grep Pattern Scan\n');
+    /** @type {Record<string, any>} */
     const results = {};
 
     GREP_PATTERNS.forEach(({ pattern, category }) => {
@@ -52,7 +53,7 @@ function grepScan() {
                     results[category] = new Set();
                 }
 
-                matches.forEach(match => {
+                matches.forEach((match) => {
                     const regex = new RegExp(pattern);
                     const found = match.match(regex);
                     if (found && found[1]) {
@@ -66,7 +67,7 @@ function grepScan() {
     });
 
     // Convert Sets to Arrays
-    Object.keys(results).forEach(key => {
+    Object.keys(results).forEach((key) => {
         results[key] = Array.from(results[key]).sort();
     });
 
@@ -81,10 +82,12 @@ function astScan() {
     console.log('\n🔬 FASE 2: AST Deep Analysis\n');
 
     // Buscar todos arquivos .js em src/
+    /** @type {string[]} */
     const files = [];
+    /** @param {string} dir */
     function walk(dir) {
         const entries = fs.readdirSync(dir, { withFileTypes: true });
-        entries.forEach(entry => {
+        entries.forEach((entry) => {
             const fullPath = path.join(dir, entry.name);
             // Skip build artifacts (dist) and hidden dirs
             if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'dist') {
@@ -106,7 +109,7 @@ function astScan() {
     console.log(`Analisando ${files.length} arquivos...\n`);
 
     // Análise simplificada via regex (AST parser seria esprima/acorn)
-    files.forEach(file => {
+    files.forEach((file) => {
         try {
             const content = fs.readFileSync(file, 'utf8');
             const relativePath = path.relative(ROOT, file);
@@ -152,7 +155,7 @@ function astScan() {
                 literalsByContext.logCalls.get(level).push(relativePath);
             }
         } catch (error) {
-            console.error(`Erro ao processar ${file}:`, error.message);
+            console.error(`Erro ao processar ${file}:`, /** @type {any} */ (error).message);
         }
     });
 
@@ -163,6 +166,10 @@ function astScan() {
 // MERGE & REPORT
 // ============================================
 
+/**
+ * @param {any} grepResults
+ * @param {any} astResults
+ */
 function generateReport(grepResults, astResults) {
     console.log('\n📊 RELATÓRIO CONSOLIDADO\n');
     console.log('='.repeat(80));
@@ -172,7 +179,7 @@ function generateReport(grepResults, astResults) {
     Object.entries(grepResults).forEach(([category, values]) => {
         if (values.length > 0) {
             console.log(`\n📦 ${category} (${values.length} valores):`);
-            values.forEach(v => console.log(`   - ${v}`));
+            values.forEach(/** @param {any} v */ (v) => console.log(`   - ${v}`));
         }
     });
 
@@ -198,14 +205,14 @@ function generateReport(grepResults, astResults) {
 
     console.log('\n📡 Emit Events:');
     const events = Array.from(astResults.emitCalls.keys()).sort();
-    events.forEach(event => {
+    events.forEach((event) => {
         const count = astResults.emitCalls.get(event).length;
         console.log(`   ${event} - ${count} emissão(ões)`);
     });
 
     console.log('\n📋 Log Levels:');
     const levels = Array.from(astResults.logCalls.keys()).sort();
-    levels.forEach(level => {
+    levels.forEach((level) => {
         const count = astResults.logCalls.get(level).length;
         console.log(`   ${level} - ${count} uso(s)`);
     });

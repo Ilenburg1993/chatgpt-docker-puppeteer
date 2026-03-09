@@ -3,7 +3,8 @@ import sinon from 'sinon';
 
 /**
  * Cria uma página mockada do Puppeteer
-  * @returns {any}
+ *
+ * @returns {object}
  */
 function criarPaginaMock() {
     return {
@@ -27,9 +28,10 @@ function criarPaginaMock() {
 
         // Helpers
         limpar: function () {
-            Object.keys(this).forEach(key => {
-                if (typeof this[key]?.resetHistory === 'function') {
-                    this[key].resetHistory();
+            const self = /** @type {Record<string, any>} */ (this);
+            Object.keys(self).forEach((key) => {
+                if (typeof self[key]?.resetHistory === 'function') {
+                    self[key].resetHistory();
                 }
             });
         },
@@ -38,7 +40,8 @@ function criarPaginaMock() {
 
 /**
  * Cria um browser mockado do Puppeteer
-  * @returns {any}
+ *
+ * @returns {object}
  */
 function criarBrowserMock() {
     const pagina = criarPaginaMock();
@@ -56,17 +59,19 @@ function criarBrowserMock() {
 
         // Helpers
         limpar: function () {
-            this.newPage.resetHistory();
-            this.pages.resetHistory();
-            this.close.resetHistory();
-            this._pagina.limpar();
+            const self = /** @type {Record<string, any>} */ (this);
+            self.newPage.resetHistory();
+            self.pages.resetHistory();
+            self.close.resetHistory();
+            self._pagina.limpar();
         },
     };
 }
 
 /**
  * Cria um BrowserPoolManager mockado
-  * @returns {any}
+ *
+ * @returns {object}
  */
 function criarBrowserPoolMock() {
     const browser = criarBrowserMock();
@@ -86,17 +91,19 @@ function criarBrowserPoolMock() {
 
         // Helpers
         limpar: function () {
-            this.acquire.resetHistory();
-            this.release.resetHistory();
-            this.closeAll.resetHistory();
-            this._browser.limpar();
+            const self = /** @type {Record<string, any>} */ (this);
+            self.acquire.resetHistory();
+            self.release.resetHistory();
+            self.closeAll.resetHistory();
+            self._browser.limpar();
         },
     };
 }
 
 /**
  * Cria um ConnectionOrchestrator mockado
-  * @returns {any}
+ *
+ * @returns {object}
  */
 function criarConnectionOrchestratorMock() {
     return {
@@ -106,10 +113,11 @@ function criarConnectionOrchestratorMock() {
         getMode: sinon.stub().returns('wsEndpoint'),
 
         limpar: function () {
-            this.connect.resetHistory();
-            this.disconnect.resetHistory();
+            const self = /** @type {Record<string, any>} */ (this);
+            self.connect.resetHistory();
+            self.disconnect.resetHistory();
         },
     };
 }
 
-export { criarPaginaMock, criarBrowserMock, criarBrowserPoolMock, criarConnectionOrchestratorMock };
+export { criarBrowserMock, criarBrowserPoolMock, criarConnectionOrchestratorMock, criarPaginaMock };

@@ -49,7 +49,7 @@ positivos (stall detectado indevidamente)
 const timeoutData = await adaptive.getAdjustedTimeout(this.driver.currentDomain, 0, 'ECHO');
 debounceDelay = Math.min(
   Math.floor(timeoutData.timeout / 10), // 10% do timeout ECHO
-  SUBMISSION_CONFIG.DEBOUNCE_MAX_MS
+  SUBMISSION_CONFIG.DEBOUNCE_MAX_MS,
 );
 ```
 
@@ -266,7 +266,7 @@ await adaptive.recordMetric('echo', continuationLatency, this.currentDomain);
 **Implementação**:
 
 ```javascript
-page.on('response', async response => {
+page.on('response', async (response) => {
   const timing = response.timing();
   if (timing) {
     const totalTime = timing.responseEnd - timing.requestStart;
@@ -488,7 +488,7 @@ const state = JSON.parse(fs.readFileSync('logs/adaptive_state.json'));
 Object.entries(state.targets).forEach(([target, profile]) => {
   console.log(`${target}:`);
   console.log(
-    `  TTFT: avg=${profile.ttft.avg}ms, std=${Math.sqrt(profile.ttft.var).toFixed(0)}ms, count=${profile.ttft.count}`
+    `  TTFT: avg=${profile.ttft.avg}ms, std=${Math.sqrt(profile.ttft.var).toFixed(0)}ms, count=${profile.ttft.count}`,
   );
   console.log(`  Stream: avg=${profile.stream.avg}ms, count=${profile.stream.count}`);
 });

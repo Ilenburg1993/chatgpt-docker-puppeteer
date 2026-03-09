@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -7,7 +7,6 @@ const router = express.Router();
 
 import { audit, log } from '#core/logger';
 import * as schemas from '#core/schemas';
-import { executeCommand } from '#server/domain/control_command_service';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
@@ -16,13 +15,14 @@ import {
     clearQueuePreserveRunning,
     countTasks,
     getTaskById,
-    insertTask as persistTaskInsert,
     listTasks,
+    insertTask as persistTaskInsert,
+    updateTask as persistTaskUpdate,
     releaseTaskLock,
     retryFailedTasks,
-    updateTask as persistTaskUpdate,
 } from '#infra/db/task_repo';
 import { putJson, readText as readArtifactText } from '#infra/storage/artifact_store';
+import { executeCommand } from '#server/domain/control_command_service';
 import schemaGuard from '../../middleware/schema_guard.js';
 import { fail, ok } from '../utils/api_envelope.js';
 
@@ -39,24 +39,27 @@ const ALLOWED_TASK_STATUSES = new Set([
 ]);
 const ALLOWED_TARGETS = new Set(['auto', 'chatgpt', 'gemini', 'claude', 'ollama']);
 
-function _safeId(raw) {
+function _safeId(/** @type {any} */ raw) {
     return String(raw || '').replace(/[^a-zA-Z0-9._-]/g, '');
 }
 
+/** @typedef {any} SafeUpdateTaskUpdates */
+/** @typedef {any} SafeUpdateTaskOptions */
 /**
- * ✅ P1-17: Safe wrapper for _safeUpdateTask() that catches OptimisticLockError.
- * Returns null on conflict, allowing API to return 409 Conflict.
+ * ✅ P1-17: Safe wrapper for _safeUpdateTask() that catches OptimisticLockError. Returns null on conflict, allowing API
+ * to return 409 Conflict.
+ *
  * @param {string} taskId - Task ID
- * @param {object} updates - Updates
- * @param {object} [options] - Options
- * @param {boolean} [options.throwOnConflict=false] - If true, re-throws
- * @returns {object|null} Updated task or null on conflict
+ * @param {SafeUpdateTaskUpdates} updates - Updates
+ * @param {SafeUpdateTaskOptions} [options] - Options
+ * @returns {object | null} Updated task or null on conflict
  */
 function _safeUpdateTask(taskId, updates, { throwOnConflict = false } = {}) {
     try {
         return persistTaskUpdate(taskId, updates);
-    } catch (err) {
-        if (err && err.name === 'OptimisticLockError') {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        if (err && _e.name === 'OptimisticLockError') {
             log('WARN', `[TasksAPI] Task ${taskId} update conflict after retries`);
             if (throwOnConflict) throw err;
             return null;
@@ -67,10 +70,11 @@ function _safeUpdateTask(taskId, updates, { throwOnConflict = false } = {}) {
 
 /**
  * Detects cycles in task dependency graph using DFS.
+ *
  * @param {string} taskId - Starting task ID
  * @param {string[]} newDeps - New dependencies being added
  * @param {Set<string>} [visited] - Already visited in current path
- * @returns {{ hasCycle: boolean, path?: string[] }}
+ * @returns {{ hasCycle: boolean; path?: string[] }}
  */
 function _detectDependencyCycle(taskId, newDeps, visited = new Set()) {
     if (visited.has(taskId)) {
@@ -86,7 +90,7 @@ function _detectDependencyCycle(taskId, newDeps, visited = new Set()) {
     if (!depsToCheck) {
         // For non-starting tasks, read existing dependencies from DB
         const rows = db.prepare('SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ?').all(taskId);
-        const existingDeps = rows.map(r => String(r.depends_on_task_id));
+        const existingDeps = rows.map((/** @type {any} */ r) => String(r.depends_on_task_id));
 
         for (const depId of existingDeps) {
             const result = _detectDependencyCycle(depId, newDeps, new Set(visited));
@@ -107,9 +111,11 @@ function _detectDependencyCycle(taskId, newDeps, visited = new Set()) {
     return { hasCycle: false };
 }
 
-function _getLockSnapshot(taskId) {
+function _getLockSnapshot(/** @type {any} */ taskId) {
     const db = getDb();
-    const row = db.prepare('SELECT locked_by, lock_expires_at_ms, status, stage FROM tasks WHERE id = ?').get(taskId);
+    const row = /** @type {any} */ (
+        db.prepare('SELECT locked_by, lock_expires_at_ms, status, stage FROM tasks WHERE id = ?').get(taskId)
+    );
     if (!row) return null;
     return {
         locked_by: row.locked_by ? String(row.locked_by) : null,
@@ -122,7 +128,7 @@ function _getLockSnapshot(taskId) {
     };
 }
 
-function _isTaskActivelyClaimed(lockSnapshot, nowMs = Date.now()) {
+function _isTaskActivelyClaimed(/** @type {any} */ lockSnapshot, nowMs = Date.now()) {
     if (!lockSnapshot) return false;
     if (!lockSnapshot.locked_by) return false;
     const exp = Number(lockSnapshot.lock_expires_at_ms);
@@ -130,7 +136,7 @@ function _isTaskActivelyClaimed(lockSnapshot, nowMs = Date.now()) {
     return exp > nowMs;
 }
 
-function _uniqStrings(list) {
+function _uniqStrings(/** @type {any} */ list) {
     const out = [];
     const seen = new Set();
     for (const v of Array.isArray(list) ? list : []) {
@@ -143,7 +149,12 @@ function _uniqStrings(list) {
     return out;
 }
 
-async function _runTaskControlCommand(req, res, command, payload = {}) {
+async function _runTaskControlCommand(
+    /** @type {any} */ req,
+    /** @type {any} */ res,
+    /** @type {any} */ command,
+    /** @type {any} */ payload = {},
+) {
     try {
         const result = await executeCommand({
             command,
@@ -158,12 +169,13 @@ async function _runTaskControlCommand(req, res, command, payload = {}) {
         });
 
         return result;
-    } catch (err) {
-        res.status(Number(err?.statusCode || 500)).json({
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        res.status(Number(_e?.statusCode || 500)).json({
             success: false,
-            code: err?.code || 'TASK_CONTROL_FAILED',
-            error: err?.message || 'Falha no comando de task',
-            details: err?.details || null,
+            code: _e?.code || 'TASK_CONTROL_FAILED',
+            error: _e?.message || 'Falha no comando de task',
+            details: _e?.details || null,
             request_id: req.id,
         });
         return null;
@@ -175,9 +187,7 @@ async function _runTaskControlCommand(req, res, command, payload = {}) {
 -------------------------------------------------------------------------- */
 
 /**
- * GET /
- * Lista tarefas com paginação.
- * Query params: page (default 1), limit (default 100, max 1000)
+ * GET / Lista tarefas com paginação. Query params: page (default 1), limit (default 100, max 1000)
  */
 router.get('/', async (req, res) => {
     try {
@@ -209,21 +219,21 @@ router.get('/', async (req, res) => {
                 total,
                 page,
                 totalPages,
-            }
+            },
         );
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao ler fila: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao ler fila: ${_e.message}`, req.id);
         fail(res, req, 500, {
             code: 'TASKS_LIST_FAILED',
             error: 'Erro interno ao acessar a fila de tarefas.',
-            details: e.message,
+            details: _e.message,
         });
     }
 });
 
 /**
- * POST /
- * Ingestão de nova tarefa com cura automática para o padrão V4 Gold.
+ * POST / Ingestão de nova tarefa com cura automática para o padrão V4 Gold.
  */
 router.post('/', async (req, res) => {
     try {
@@ -318,12 +328,12 @@ router.post('/', async (req, res) => {
                 created_by: 'user',
                 created_at_ms: Date.now(),
             });
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             promptTemplateArtifactId = null;
         }
 
         // Idempotency: check if task already exists before insert
-        const existing = getTaskById(safeId);
+        const existing = /** @type {any} */ (getTaskById(safeId));
         let created = false;
 
         if (existing) {
@@ -334,7 +344,7 @@ router.post('/', async (req, res) => {
                 log(
                     'INFO',
                     `[API_TASKS] Idempotent retry detected for task ${safeId} with client_request_id ${clientRequestId}`,
-                    req.id
+                    req.id,
                 );
             }
             // Return existing task
@@ -348,6 +358,7 @@ router.post('/', async (req, res) => {
             });
             created = true;
 
+            // eslint-disable-next-line @typescript-eslint/await-thenable
             await audit('CREATE_TASK', {
                 id: safeId,
                 source: 'GUI',
@@ -364,31 +375,34 @@ router.post('/', async (req, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             created,
             id: safeId,
             task: created ? getTaskById(safeId) : existing,
             request_id: req.id,
         });
-    } catch (e) {
-        log('WARN', `[API_TASKS] Ingestão rejeitada: ${e.message}`, req.id);
-        res.status(400).json({
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('WARN', `[API_TASKS] Ingestão rejeitada: ${_e.message}`, req.id);
+        return res.status(400).json({
             success: false,
-            error: `Dados da tarefa inválidos: ${e.message}`,
+            error: `Dados da tarefa inválidos: ${_e.message}`,
             request_id: req.id,
         });
     }
 });
 
 /**
- * PUT /:id
- * Atualização parcial ou total de uma tarefa existente.
+ * PUT /:id Atualização parcial ou total de uma tarefa existente.
+ *
+ * @param {any} req
+ * @param {any} res
  */
 async function handleTaskUpdate(req, res) {
     try {
         const safeId = _safeId(req.params.id);
-        const existing = getTaskById(safeId);
+        const existing = /** @type {any} */ (getTaskById(safeId));
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
@@ -402,7 +416,10 @@ async function handleTaskUpdate(req, res) {
                 error: 'Task em processamento (claim)',
                 message:
                     'A task foi clamada por um worker e pode estar prestes a iniciar. Pause/cancele e tente novamente.',
-                details: { locked_by: lockSnapshot.locked_by, lock_expires_at_ms: lockSnapshot.lock_expires_at_ms },
+                details: {
+                    locked_by: /** @type {any} */ (lockSnapshot).locked_by,
+                    lock_expires_at_ms: /** @type {any} */ (lockSnapshot).lock_expires_at_ms,
+                },
                 request_id: req.id,
             });
         }
@@ -508,11 +525,11 @@ async function handleTaskUpdate(req, res) {
                 created_by: 'user',
                 created_at_ms: now,
             });
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             promptTemplateArtifactId = null;
         }
 
-        const extra = {};
+        const extra = /** @type {any} */ ({});
         if (desiredStatus === 'CANCELLED') {
             extra.cancelled_at_ms = now;
         } else if (desiredStatus === 'PAUSED') {
@@ -544,11 +561,12 @@ async function handleTaskUpdate(req, res) {
         if (desiredStatus || desiredStage) {
             try {
                 releaseTaskLock({ taskId: safeId });
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* ignore */
             }
         }
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('EDIT_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         recordEvent({
             entityType: 'task',
@@ -565,11 +583,12 @@ async function handleTaskUpdate(req, res) {
             task: updated,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha na atualização: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha na atualização: ${_e.message}`, req.id);
         res.status(400).json({
             success: false,
-            error: e.message,
+            error: _e.message,
             request_id: req.id,
         });
     }
@@ -589,8 +608,9 @@ router.get('/:id/attempts', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const attempts = listAttemptsByTask(safeId, { limit: 200 });
         res.json({ success: true, attempts, request_id: req.id });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao listar attempts: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao listar attempts: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao listar attempts.', request_id: req.id });
     }
 });
@@ -627,10 +647,11 @@ router.get('/:id/prompt', async (req, res) => {
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Content-Disposition', `inline; filename="${safeId}-${attemptId}-prompt.txt"`);
-        res.send(text);
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao baixar prompt: ${e.message}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha ao baixar prompt.', request_id: req.id });
+        return res.send(text);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao baixar prompt: ${_e.message}`, req.id);
+        return res.status(500).json({ success: false, error: 'Falha ao baixar prompt.', request_id: req.id });
     }
 });
 
@@ -649,14 +670,15 @@ router.get('/:id/dependencies', async (req, res) => {
         const db = getDb();
         const rows = db
             .prepare(
-                'SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ? ORDER BY depends_on_task_id ASC'
+                'SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ? ORDER BY depends_on_task_id ASC',
             )
             .all(taskId);
-        const deps = rows.map(r => String(r.depends_on_task_id));
-        res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[API_TASKS] Falha ao ler dependências: ${err?.message || String(err)}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha ao ler dependências.', request_id: req.id });
+        const deps = rows.map((/** @type {any} */ r) => String(r.depends_on_task_id));
+        return res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[API_TASKS] Falha ao ler dependências: ${_e?.message || String(_e)}`, req.id);
+        return res.status(500).json({ success: false, error: 'Falha ao ler dependências.', request_id: req.id });
     }
 });
 
@@ -667,7 +689,7 @@ const replaceDependenciesSchema = z.object({
 router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (req, res) => {
     try {
         const taskId = _safeId(req.params.id);
-        const existing = getTaskById(taskId);
+        const existing = /** @type {any} */ (getTaskById(taskId));
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
@@ -691,13 +713,16 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
                 error: 'Task em processamento (claim)',
                 message:
                     'A task foi clamada por um worker e pode estar prestes a iniciar. Pause/cancele e tente novamente.',
-                details: { locked_by: lockSnapshot.locked_by, lock_expires_at_ms: lockSnapshot.lock_expires_at_ms },
+                details: {
+                    locked_by: /** @type {any} */ (lockSnapshot).locked_by,
+                    lock_expires_at_ms: /** @type {any} */ (lockSnapshot).lock_expires_at_ms,
+                },
                 request_id: req.id,
             });
         }
 
         const incoming = _uniqStrings(req.body.dependencies).map(_safeId).filter(Boolean);
-        const deps = incoming.filter(d => d && d !== taskId);
+        const deps = incoming.filter((d) => d && d !== taskId);
 
         const db = getDb();
         if (deps.length > 0) {
@@ -705,9 +730,9 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
             const found = db
                 .prepare(`SELECT id FROM tasks WHERE id IN (${placeholders})`)
                 .all(...deps)
-                .map(r => String(r.id));
+                .map((/** @type {any} */ r) => String(r.id));
             const foundSet = new Set(found);
-            const missing = deps.filter(d => !foundSet.has(d));
+            const missing = deps.filter((d) => !foundSet.has(d));
             if (missing.length > 0) {
                 return res.status(400).json({
                     success: false,
@@ -757,8 +782,9 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
 
         try {
             tx();
-        } catch (txErr) {
-            if (txErr && txErr.message === 'CIRCULAR_DEPENDENCY_DETECTED') {
+        } catch (/** @type {any} */ txErr) {
+            const _e = /** @type {any} */ (txErr);
+            if (txErr && _e.message === 'CIRCULAR_DEPENDENCY_DETECTED') {
                 return res.status(400).json({
                     success: false,
                     error: 'Dependência circular detectada',
@@ -770,10 +796,11 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
             throw txErr; // Re-throw unexpected errors
         }
 
-        res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[API_TASKS] Falha ao atualizar dependências: ${err?.message || String(err)}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha ao atualizar dependências.', request_id: req.id });
+        return res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[API_TASKS] Falha ao atualizar dependências: ${_e?.message || String(_e)}`, req.id);
+        return res.status(500).json({ success: false, error: 'Falha ao atualizar dependências.', request_id: req.id });
     }
 });
 
@@ -784,7 +811,7 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
 router.post('/:id/approve', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
-        const existing = getTaskById(safeId);
+        const existing = /** @type {any} */ (getTaskById(safeId));
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
@@ -807,10 +834,11 @@ router.post('/:id/approve', async (req, res) => {
         });
         try {
             releaseTaskLock({ taskId: safeId });
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             /* ignore */
         }
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('APPROVE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         recordEvent({
             entityType: 'task',
@@ -822,17 +850,18 @@ router.post('/:id/approve', async (req, res) => {
             dedupKey: `req:${req.id}:task:${safeId}:approve`,
         });
 
-        res.json({ success: true, task: updated, request_id: req.id });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao aprovar task: ${e.message}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha ao aprovar task.', request_id: req.id });
+        return res.json({ success: true, task: updated, request_id: req.id });
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao aprovar task: ${_e.message}`, req.id);
+        return res.status(500).json({ success: false, error: 'Falha ao aprovar task.', request_id: req.id });
     }
 });
 
 router.post('/:id/reject', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
-        const existing = getTaskById(safeId);
+        const existing = /** @type {any} */ (getTaskById(safeId));
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
@@ -853,10 +882,11 @@ router.post('/:id/reject', async (req, res) => {
         });
         try {
             releaseTaskLock({ taskId: safeId });
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             /* ignore */
         }
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('REJECT_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         recordEvent({
             entityType: 'task',
@@ -868,10 +898,11 @@ router.post('/:id/reject', async (req, res) => {
             dedupKey: `req:${req.id}:task:${safeId}:reject`,
         });
 
-        res.json({ success: true, task: updated, request_id: req.id });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao rejeitar task: ${e.message}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha ao rejeitar task.', request_id: req.id });
+        return res.json({ success: true, task: updated, request_id: req.id });
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao rejeitar task: ${_e.message}`, req.id);
+        return res.status(500).json({ success: false, error: 'Falha ao rejeitar task.', request_id: req.id });
     }
 });
 
@@ -880,10 +911,12 @@ router.post('/:id/pause', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_PAUSE', { task_id: safeId });
         if (!control) return;
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('PAUSE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao pausar task: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao pausar task: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao pausar task.', request_id: req.id });
     }
 });
@@ -893,10 +926,12 @@ router.post('/:id/resume', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_RESUME', { task_id: safeId });
         if (!control) return;
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('RESUME_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao resumir task: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao resumir task: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao resumir task.', request_id: req.id });
     }
 });
@@ -907,10 +942,12 @@ router.post('/:id/unblock', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_UNBLOCK', { task_id: safeId });
         if (!control) return;
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('UNBLOCK_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao desbloquear task: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao desbloquear task: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao desbloquear task.', request_id: req.id });
     }
 });
@@ -921,34 +958,36 @@ router.post('/:id/retry', async (req, res) => {
         const control = await _runTaskControlCommand(req, res, 'TASK_RETRY', { task_id: safeId });
         if (!control) return;
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('RETRY_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao retry task: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao retry task: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao retry task.', request_id: req.id });
     }
 });
 
 /**
- * DELETE /:id/purge
- * Remoção física (SSOT) — uso administrativo.
+ * DELETE /:id/purge Remoção física (SSOT) — uso administrativo.
  */
 router.delete('/:id/purge', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_PURGE', { task_id: safeId });
         if (!control) return;
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('PURGE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, operation: control.operation, request_id: req.id });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao purgar tarefa: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao purgar tarefa: ${_e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao purgar task.', request_id: req.id });
     }
 });
 
 /**
- * DELETE /:id
- * Remoção física da intenção de execução.
+ * DELETE /:id Remoção física da intenção de execução.
  */
 router.delete('/:id', async (req, res) => {
     try {
@@ -956,14 +995,16 @@ router.delete('/:id', async (req, res) => {
         const control = await _runTaskControlCommand(req, res, 'TASK_CANCEL', { task_id: safeId });
         if (!control) return;
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('DELETE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({
             success: true,
             task: control?.result?.after || null,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao remover tarefa: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao remover tarefa: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao remover tarefa do disco.',
@@ -1067,15 +1108,15 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
             }
         }
 
-        const updated = [];
+        const updated = /** @type {any[]} */ ([]);
         const failed = [];
 
         // Prepare all updates first (validate), then apply atomically
-        const batch = [];
+        const batch = /** @type {any[]} */ ([]);
 
         for (const id of ids) {
             try {
-                const existing = getTaskById(id);
+                const existing = /** @type {any} */ (getTaskById(id));
                 if (!existing) {
                     failed.push({ id, error: 'Task não encontrada' });
                     continue;
@@ -1190,7 +1231,7 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
                 } else if (action === 'set_priority') {
                     const task = existing;
                     task.meta = task.meta || {};
-                    task.meta.priority = Math.trunc(priorityParam);
+                    task.meta.priority = Math.trunc(/** @type {any} */ (priorityParam));
                     updatePayload = { task };
                 } else if (action === 'set_execute_after') {
                     const task = existing;
@@ -1219,8 +1260,9 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
 
                 // Add to batch for atomic execution
                 batch.push({ id, updatePayload, shouldReleaseLock });
-            } catch (err) {
-                failed.push({ id: ids[ids.indexOf(id)] || 'unknown', error: err?.message || String(err) });
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
+                failed.push({ id: ids[ids.indexOf(id)] || 'unknown', error: _e?.message || String(_e) });
             }
         }
 
@@ -1246,7 +1288,7 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
                     if (shouldReleaseLock) {
                         try {
                             releaseTaskLock({ taskId: id });
-                        } catch (_) {
+                        } catch (/** @type {any} */ _) {
                             /* ignore */
                         }
                     }
@@ -1261,30 +1303,32 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
                         dedupKey: `req:${req.id}:task:${id}:bulk:${action}`,
                     });
                 }
-            } catch (txErr) {
+            } catch (/** @type {any} */ txErr) {
+                const _e = /** @type {any} */ (txErr);
                 // Transaction failed - all updates rolled back
                 for (const { id } of batch) {
-                    failed.push({ id, error: txErr?.message || 'Transaction failed' });
+                    failed.push({ id, error: _e?.message || 'Transaction failed' });
                 }
                 // Clear any partial success
                 updated.length = 0;
             }
         }
 
-        res.json({ success: true, updated, failed, request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[API_TASKS] Falha no bulk: ${err?.message || String(err)}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha em operação bulk.', request_id: req.id });
+        return res.json({ success: true, updated, failed, request_id: req.id });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[API_TASKS] Falha no bulk: ${_e?.message || String(_e)}`, req.id);
+        return res.status(500).json({ success: false, error: 'Falha em operação bulk.', request_id: req.id });
     }
 });
 
 /**
- * POST /retry-failed
- * Reinicia o ciclo de vida de todas as tarefas com status FAILED.
+ * POST /retry-failed Reinicia o ciclo de vida de todas as tarefas com status FAILED.
  */
 router.post('/retry-failed', async (req, res) => {
     try {
         const count = retryFailedTasks();
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('RETRY_BATCH', { count, request_id: req.id });
         recordEvent({
             entityType: 'queue',
@@ -1300,8 +1344,9 @@ router.post('/retry-failed', async (req, res) => {
             count,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha na reinicialização em lote: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha na reinicialização em lote: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha na reinicialização em lote.',
@@ -1311,12 +1356,12 @@ router.post('/retry-failed', async (req, res) => {
 });
 
 /**
- * POST /clear
- * Limpeza higiênica da fila (preserva tarefas em execução).
+ * POST /clear Limpeza higiênica da fila (preserva tarefas em execução).
  */
 router.post('/clear', async (req, res) => {
     try {
         const report = clearQueuePreserveRunning();
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('CLEAR_QUEUE', { ...report, request_id: req.id });
         recordEvent({
             entityType: 'queue',
@@ -1332,8 +1377,9 @@ router.post('/clear', async (req, res) => {
             ...report,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_TASKS] Falha ao limpar a fila: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_TASKS] Falha ao limpar a fila: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao limpar a fila.',
@@ -1387,12 +1433,13 @@ router.get('/:id', async (req, res) => {
             });
         }
         ok(res, req, { task }, {});
-    } catch (err) {
-        log('ERROR', `[API_TASKS] Falha ao buscar task: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[API_TASKS] Falha ao buscar task: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'TASK_GET_FAILED',
             error: 'Falha ao buscar task',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });

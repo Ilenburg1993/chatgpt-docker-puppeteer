@@ -10,7 +10,7 @@
   // ===========================================================================
   // Subfase 00.1) Scopes de linguagem
   "[css]": {
-    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[dockerfile]": {
     "editor.defaultFormatter": "ms-azuretools.vscode-containers"
@@ -24,16 +24,10 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[json]": {
-    "editor.defaultFormatter": "vscode.json-language-features",
-    "editor.codeActionsOnSave": {
-      "source.sort.json": "never"
-    }
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "[jsonc]": {
-    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint",
-    "editor.codeActionsOnSave": {
-      "source.sort.json": "never"
-    }
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "[markdown]": {
     "editor.defaultFormatter": "yzhang.markdown-all-in-one",
@@ -60,7 +54,7 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[vue]": {
-    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
 
   // ===========================================================================
@@ -85,7 +79,6 @@
   "files.autoSaveDelay": 1000,
   "files.encoding": "utf8",
   "files.eol": "\n",
-  "files.hotExit": "onExitAndWindowClose",
   "files.insertFinalNewline": true,
   "files.refactoring.autoSave": true,
   "files.restoreUndoStack": true,
@@ -111,13 +104,14 @@
   // Subfase 03.1) Base e formatacao
   "editor.acceptSuggestionOnCommitCharacter": true,
   "editor.acceptSuggestionOnEnter": "off",
-  "editor.codeActions.triggerOnFocusChange": true,
+  "editor.codeActions.triggerOnFocusChange": false,
   "editor.codeActionsOnSave": {
-    "source.fixAll": "always",
-    "source.fixAll.eslint": "always",
-    "source.fixAll.prettier": "always",
+    "source.fixAll": "never",
+    "source.fixAll.eslint": "never",
+    "source.fixAll.prettier": "never",
     "source.organizeLinkDefinitions": "always",
-    "source.sort.json": "always"
+    "source.organizeImports": "explicit",
+    "source.sort.json": "never"
   },
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.detectIndentation": true,
@@ -166,16 +160,16 @@
   "editor.inlayHints.padding": true,
   "editor.inlineCompletionsAccessibilityVerbose": true,
   "editor.inlineSuggest.enabled": true,
-  "editor.inlineSuggest.minShowDelay": 300,
+  "editor.inlineSuggest.minShowDelay": 100,
   "editor.inlineSuggest.suppressSuggestions": false,
   "editor.inlineSuggest.syntaxHighlightingEnabled": true,
   "editor.largeFileOptimizations": true,
   "editor.lightbulb.enabled": "on",
   "editor.linkedEditing": true,
   "editor.quickSuggestions": {
-    "comments": "off",
-    "other": "off",
-    "strings": "off"
+    "comments": "on",
+    "other": "on",
+    "strings": "on"
   },
   "editor.quickSuggestionsDelay": 100,
   "editor.snippetSuggestions": "bottom",
@@ -190,9 +184,7 @@
   "editor.suggest.showStatusBar": true,
   "editor.suggestOnTriggerCharacters": true,
   "editor.tabCompletion": "on",
-  "editor.wordBasedSuggestions": "offWithInlineSuggestions",
-  "editor.wordBasedSuggestionsMode": "currentDocument",
-
+  "editor.wordBasedSuggestions": "matchingDocuments",
   // ===========================================================================
   // FASE 06) EDITOR — NAVEGACAO / FOLDING / MATCHING
   // Navegacao, dobragem e comportamento de leitura.
@@ -226,7 +218,7 @@
   "gitlens.codeLens.enabled": true,
   "outline.showFiles": true,
   "outline.showFunctions": true,
-  "outline.showModules": false,
+  "outline.showModules": true,
   "outline.showVariables": false,
 
   // ===========================================================================
@@ -237,7 +229,7 @@
   "diffEditor.codeLens": true,
   "diffEditor.diffAlgorithm": "advanced",
   "diffEditor.experimental.showMoves": true,
-  "diffEditor.ignoreTrimWhitespace": true,
+  "diffEditor.ignoreTrimWhitespace": false,
   "diffEditor.maxComputationTime": 0,
   "diffEditor.maxFileSize": 100,
   "diffEditor.renderIndicators": true,
@@ -250,11 +242,10 @@
   // Regras e execucao do ESLint no workspace.
   // ===========================================================================
   // Subfase 09.1) ESLint
-  "eslint.alwaysShowStatus": false,
   "eslint.codeActionsOnSave.mode": "problems",
   "eslint.debug": false,
   "eslint.enable": true,
-  "eslint.format.enable": true,
+  "eslint.format.enable": false,
   "eslint.lintTask.enable": true,
   "eslint.problems.shortenToSingleLine": true,
   "eslint.quiet": false,
@@ -268,12 +259,19 @@
       "severity": "warn"
     },
     {
+      "rule": "@typescript-eslint/no-unused-vars",
+      "severity": "warn"
+    },
+    {
       "rule": "no-console",
       "severity": "off"
+    },
+    {
+      "rule": "@typescript-eslint/no-floating-promises",
+      "severity": "warn"
     }
   ],
   "eslint.run": "onType",
-  "eslint.showOutputChannelOn": "onError",
   "eslint.useESLintClass": true,
   "eslint.validate": [
     "javascript",
@@ -293,13 +291,12 @@
   // ===========================================================================
   // Subfase 10.1) JavaScript
   "javascript.format.enable": false,
-  "javascript.implicitProjectConfig.checkJs": true,
   "javascript.inlayHints.functionLikeReturnTypes.enabled": true,
   "javascript.inlayHints.parameterNames.enabled": "literals",
   "javascript.inlayHints.parameterTypes.enabled": true,
   "javascript.inlayHints.propertyDeclarationTypes.enabled": true,
   "javascript.inlayHints.variableTypes.enabled": true,
-  "javascript.preferences.importModuleSpecifier": "non-relative",
+  "javascript.preferences.importModuleSpecifier": "shortest",
   "javascript.preferences.importModuleSpecifierEnding": "js",
   "javascript.preferences.quoteStyle": "single",
   "javascript.referencesCodeLens.enabled": true,
@@ -319,12 +316,22 @@
   // Subfase 11.1) Projeto implicito JS/TS
   "js/ts.implicitProjectConfig.checkJs": true,
   "js/ts.implicitProjectConfig.module": "NodeNext",
-  "js/ts.implicitProjectConfig.moduleResolution": "NodeNext",
   "js/ts.implicitProjectConfig.target": "ES2024",
 
   // ===========================================================================
   // FASE 12) TYPESCRIPT — LANGUAGE FEATURES / TSSERVER
-  // Preferencias de TypeScript, tsserver e diagnosticos.
+  // Preferências de TypeScript, tsserver e diagnósticos.
+  //
+  // ARQUITETURA DO TSSERVER (VS Code):
+  //   • useSyntaxServer "auto" → inicia syntax server imediato (hover + coloração)
+  //     e promove ao semantic server completo em seguida (diagnósticos + navegação).
+  //     ⚠️  "always" desabilita TODO o servidor semântico — sem erros, sem go-to-def.
+  //   • nodePath "node" → tsserver usa o Node.js 24 do sistema (não o Electron interno).
+  //     Garante alinhamento com o runtime ESM do projeto.
+  //   • maxTsServerMemory 6144 → 6 GB para o heap do servidor TS. Cobre repositórios
+  //     grandes com multi-lane (tsconfig.node + tools + browser + strict).
+  //   • watchOptions "useFsEvents" → inotify nativo (ext4 bind-mount). Sem polling.
+  //     excludeDirectories reduz watches em ~60% (node_modules + cache + logs etc.).
   // ===========================================================================
   // Subfase 12.1) TypeScript
   "typescript.disableAutomaticTypeAcquisition": false,
@@ -332,34 +339,55 @@
   "typescript.implementationsCodeLens.enabled": true,
   "typescript.implementationsCodeLens.showOnAllClassMethods": true,
   "typescript.implementationsCodeLens.showOnInterfaceMethods": true,
-  "typescript.implicitProjectConfig.checkJs": true,
   "typescript.inlayHints.enumMemberValues.enabled": true,
   "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
-  "typescript.inlayHints.parameterNames.enabled": "all",
+  "typescript.inlayHints.parameterNames.enabled": "literals",
   "typescript.inlayHints.parameterTypes.enabled": true,
   "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
   "typescript.inlayHints.variableTypes.enabled": true,
-  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.importModuleSpecifier": "shortest",
   "typescript.preferences.importModuleSpecifierEnding": "js",
   "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.preferences.useLabelDetailsInCompletionEntries": true,
   "typescript.referencesCodeLens.enabled": true,
   "typescript.referencesCodeLens.showOnAllFunctions": true,
-  "typescript.reportStyleChecksAsWarnings": false,
+  "typescript.reportStyleChecksAsWarnings": true,
   "typescript.suggest.autoImports": true,
   "typescript.suggest.completeFunctionCalls": true,
+  "typescript.surveys.enabled": false,
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.tsserver.enableTracing": false,
   "typescript.tsserver.experimental.enableProjectDiagnostics": true,
-  "typescript.tsserver.experimental.useVsCodeWatcher": true,
-  "typescript.tsserver.log": "terse",
+  "typescript.tsserver.log": "off",
   "typescript.tsserver.maxTsServerMemory": 6144,
-  "typescript.tsserver.useSeparateSyntaxServer": true,
-  "typescript.tsserver.useSyntaxServer": "always",
+  // "auto" = syntax server imediato + semantic server completo em paralelo (correto).
+  // "always" desabilita o semantic server — NUNCA usar em projeto com checkJs/strict.
+  "typescript.tsserver.nodePath": "node",
+  "typescript.tsserver.useSyntaxServer": "auto",
   "typescript.tsserver.watchOptions": {
     "fallbackPolling": "dynamicPriorityPolling",
     "watchDirectory": "useFsEvents",
-    "watchFile": "useFsEvents"
+    "watchFile": "useFsEvents",
+    // Exclui diretórios pesados do file watcher do tsserver (reduz inotify watches ~60%).
+    // node_modules é excluído por maxNodeModuleJsDepth=0 no tsconfig, mas o watcher
+    // precisa ser configurado separadamente.
+    "excludeDirectories": [
+      "**/node_modules",
+      "**/.cache",
+      "**/logs",
+      "**/dist",
+      "**/build",
+      "**/backups",
+      "**/respostas",
+      "**/profile",
+      "**/artifacts",
+      "**/monitoring",
+      "**/tmp",
+      "**/.git"
+    ]
   },
+  "typescript.workspaceSymbols.scope": "allOpenProjects",
   "typescript.updateImportsOnFileMove.enabled": "always",
   "typescript.validate.enable": true,
   // Subfase 12.2) Python analysis complementar
@@ -370,7 +398,7 @@
   // Validacao e schemas para arquivos JSON e JSONC.
   // ===========================================================================
   // Subfase 13.1) JSON
-  "json.format.enable": true,
+  "json.format.enable": false,
   "json.maxItemsComputed": 10000,
   "json.schemaDownload.enable": true,
   "json.schemas": [
@@ -485,7 +513,6 @@
       }
     }
   ],
-  "json.suggest.enable": true,
   "json.trace.server": "messages",
   "json.validate.enable": true,
 
@@ -552,7 +579,6 @@
     "**/build": true
   },
   "search.followSymlinks": false,
-  "search.globalFindClipboard": true,
   "search.location": "panel",
   "search.maxResults": 50000,
   "search.quickOpen.includeSymbols": true,
@@ -588,7 +614,6 @@
   "git.showProgress": true,
   "git.timeline.showUncommitted": true,
   "git.untrackedChanges": "separate",
-  "scm.alwaysShowProviders": true,
   "scm.defaultViewMode": "tree",
   "scm.diffDecorations": "all",
   "scm.diffDecorationsGutterWidth": 3,
@@ -632,7 +657,7 @@
   // Observabilidade do editor e execucao de tarefas.
   // ===========================================================================
   // Subfase 17.1) Debug e problemas
-  "debug.javascript.autoAttachFilter": "smart",
+  "debug.javascript.autoAttachFilter": "always",
   "debug.focusEditorOnBreak": true,
   "debug.inlineValues": "on",
   "debug.showBreakpointsInOverviewRuler": true,
@@ -699,7 +724,7 @@
   // ===========================================================================
   // Subfase 19.1) Chat e agentes
   "chat.agent.enabled": true,
-  "chat.agent.maxRequests": 250,
+  "chat.agent.maxRequests": 500,
   "chat.agent.thinking.collapsedTools": "always",
   "chat.agent.thinkingStyle": "fixedScrolling",
   "chat.agentsControl.clickBehavior": "cycle",
@@ -718,11 +743,8 @@
   "chat.experimental.useSkillAdherencePrompt": true,
   "chat.includeApplyingInstructions": true,
   "chat.includeReferencedInstructions": true,
-  "chat.instructionsFilesLocations": [
-    ".github/instructions"
-  ],
   "chat.math.enabled": true,
-  "chat.mcp.access": true,
+  "chat.mcp.access": "all",
   "chat.mcp.assisted.nuget.enabled": true,
   "chat.mcp.discovery.enabled": {
     "claude-desktop": true,
@@ -836,7 +858,7 @@
   "github.copilot.chat.githubMcpServer.enabled": true,
   "github.copilot.chat.languageContext.fix.typescript.enabled": true,
   "github.copilot.chat.languageContext.inline.typescript.enabled": true,
-  "github.copilot.chat.languageContext.typescript.cacheTimeout": 800,
+  "github.copilot.chat.languageContext.typescript.cacheTimeout": 500,
   "github.copilot.chat.languageContext.typescript.enabled": true,
   "github.copilot.chat.languageContext.typescript.includeDocumentation": true,
   "github.copilot.chat.localeOverride": "pt-br",
@@ -845,7 +867,6 @@
   "github.copilot.chat.newWorkspaceCreation.enabled": true,
   "github.copilot.chat.responsesApiReasoningEffort": "high",
   "github.copilot.chat.reviewSelection.enabled": true,
-  "github.copilot.chat.reviewSelection.instructions": {"pt-br": "Selecione o código que deseja revisar e pressione Ctrl+Enter para enviar ao Copilot Chat."},
   "github.copilot.chat.summarizeAgentConversationHistory.enabled": true,
   "github.copilot.chat.switchAgent.enabled": true,
   "github.copilot.chat.tools.memory.enabled": true,
@@ -871,7 +892,7 @@
   "inlineChat.finishOnType": true,
   "inlineChat.lineEmptyHint": "Digite uma mensagem para iniciar o chat...",
   "inlineChat.lineNaturalLanguageHint": "Digite uma mensagem em linguagem natural...",
-  "inlineChat.notebookAgent": false,
+  "inlineChat.notebookAgent": true,
   "inlineChat.renderMode": "hover",
 
   // ===========================================================================
@@ -885,7 +906,7 @@
   "window.restoreWindows": "none",
   "window.titleBarStyle": "custom",
   "workbench.colorTheme": "GitHub Dark Default",
-  "workbench.editor.alwaysShowEditorActions": false,
+  "workbench.editor.alwaysShowEditorActions": true,
   "workbench.editor.closeEmptyGroups": true,
   "workbench.editor.closeOnFileDelete": true,
   "workbench.editor.enablePreview": true,
@@ -903,7 +924,7 @@
   "telemetry.telemetryLevel": "off",
   "windowsaistudio.enableRemoteFine-tuningAndInference": false,
   "windowsaistudio.externalOpenAIProviders": [],
-  "windowsaistudio.openAIInferencePort": 0,
+  "windowsaistudio.openAIInferencePort": 11435,
   "windowsaistudio.remoteInfereneEndpoints": [],
 
   // ===========================================================================
@@ -916,9 +937,65 @@
   "kilo-code.newTaskRequireTodos": true,
   "kilo-code.preventCompletionWithOpenTodos": true,
   "makefile.configureOnOpen": false,
-  "notebook.defaultFormatter": "rvest.vs-code-prettier-eslint",
+  "notebook.defaultFormatter": "esbenp.prettier-vscode",
   "git-graph.repository.sign.tags": false,
   "git-graph.repository.useMailmap": false,
   "git-graph.date.format": "Date & Time",
-  "git-graph.dialog.addTag.pushToRemote": true
+  "git-graph.dialog.addTag.pushToRemote": true,
+  "python.analysis.typeCheckingMode": "standard",
+  "github.copilot.chat.reviewSelection.instructions": [
+    {
+      "file": ".copilot-review-instructions.md"
+    }
+  ],
+  "github.copilot.chat.additionalReadAccessPaths": [
+    "C:\\",
+    "D:\\"
+  ],
+  "js/ts.tsserver.experimental.enableProjectDiagnostics": true,
+  "js/ts.tsserver.useSyntaxServer": "auto",
+  "js/ts.tsserver.maxMemory": 6144,
+  "js/ts.preferences.preferTypeOnlyAutoImports": true,
+  "js/ts.preferences.importModuleSpecifierEnding": "js",
+  "js/ts.preferences.includePackageJsonAutoImports": "on",
+  "js/ts.updateImportsOnFileMove.enabled": "always",
+  "js/ts.preferGoToSourceDefinition": true,
+  "js/ts.suggest.completeFunctionCalls": true,
+  "js/ts.implementationsCodeLens.enabled": true,
+  "js/ts.implementationsCodeLens.showOnAllClassMethods": true,
+  "js/ts.implementationsCodeLens.showOnInterfaceMethods": true,
+  "js/ts.referencesCodeLens.enabled": true,
+  "js/ts.referencesCodeLens.showOnAllFunctions": true,
+  "js/ts.inlayHints.propertyDeclarationTypes.enabled": true,
+  "js/ts.inlayHints.parameterTypes.enabled": true,
+  "js/ts.inlayHints.functionLikeReturnTypes.enabled": true,
+  "js/ts.inlayHints.enumMemberValues.enabled": true,
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
+  "js/ts.inlayHints.variableTypes.enabled": true,
+  "js/ts.inlayHints.parameterNames.enabled": "literals",
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+  "remoteHub.richNavigation.enabled": true,
+  "remoteHub.richNavigation.indexMode": {},
+  "remote.tunnels.tunnelCredentialCommand": null,
+  "git.addAICoAuthor": "chatAndAgent",
+  "git.autofetchPeriod": 360,
+  "git.enableCommitSigning": true,
+  "git.terminalGitEditor": true,
+  "terminal.integrated.suggest.providers": {
+    "lsp": true
+  },
+  "editor.inlineSuggest.experimental.showOnSuggestConflict": "whenSuggestListIsIncomplete",
+  "workbench.settings.alwaysShowAdvancedSettings": true,
+  "inlineChat.holdToSpeech": false,
+  "explorer.fileNesting.enabled": true,
+  "scm.alwaysShowActions": true,
+  "npm-intellisense.packageSubfoldersIntellisense": true,
+  "editor.inlineSuggest.edits.showCollapsed": true,
+  "diffEditor.hideUnchangedRegions.enabled": true,
+  "todo-tree.tree.scanMode": "workspace only",
+  "github.copilot.chat.agentHistorySummarizationWithPromptCache": true,
+  "githubRepositories.indexing.cacheSizeLimit": 2000,
+  "githubRepositories.indexing.cacheRepoLimit": 6,
+  "errorLens.codeLensEnabled": true,
+  "js/ts.tsserver.web.projectWideIntellisense.suppressSemanticErrors": true
 }

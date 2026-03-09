@@ -107,14 +107,15 @@ const LAYOUTS = {
 // ============================================
 // GAUSSIAN RANDOM (v2.0 - Cached + Clamped)
 // ============================================
-let _gaussianCache = null;
+/** @type {any} */ let _gaussianCache = null;
 
 /**
  * Generate a typo by transposing characters or using neighboring keys.
+ *
  * @param {string} char - Original character
  * @returns {string} Typo character
  */
-function _generateTypo(char) {
+function _generateTypo(/** @type {any} */ char) {
     // Keyboard layout mapping for common typos
     const keyboardMap = {
         a: ['s', 'q', 'w', 'z'],
@@ -146,7 +147,7 @@ function _generateTypo(char) {
     };
 
     const lowerChar = char.toLowerCase();
-    const neighbors = keyboardMap[lowerChar];
+    const neighbors = /** @type {any} */ (keyboardMap)[lowerChar];
 
     if (neighbors && neighbors.length > 0) {
         // 70% chance of transposing with adjacent character, 30% chance of neighbor key
@@ -165,14 +166,18 @@ function _generateTypo(char) {
 }
 
 /**
- * Generate gaussian random with Box-Muller transform.
- * v2.0: Caches second sample for 2x performance, clamps outliers.
+ * Generate gaussian random with Box-Muller transform. v2.0: Caches second sample for 2x performance, clamps outliers.
+ *
  * @param {number} mean - Mean value
  * @param {number} stdev - Standard deviation
  * @param {number} clampStdev - Clamp to ±N standard deviations (default: 3)
  * @returns {number} Random value from gaussian distribution
  */
-function gaussianRandom(mean = 0, stdev = 1, clampStdev = BIOMECHANICS_CONFIG.GAUSSIAN_CLAMP_SIGMA) {
+function gaussianRandom(
+    /** @type {any} */ mean = 0,
+    /** @type {any} */ stdev = 1,
+    /** @type {any} */ clampStdev = BIOMECHANICS_CONFIG.GAUSSIAN_CLAMP_SIGMA,
+) {
     // Use cached value if available (Box-Muller generates 2 samples)
     if (_gaussianCache !== null) {
         const z = _gaussianCache;
@@ -195,7 +200,7 @@ function gaussianRandom(mean = 0, stdev = 1, clampStdev = BIOMECHANICS_CONFIG.GA
 // ============================================
 // CURSOR CACHE MANAGEMENT (v2.0 - Fixed)
 // ============================================
-function getCursor(page) {
+function getCursor(/** @type {any} */ page) {
     // Validation (v2.0)
     if (!page || typeof page !== 'object') {
         throw new TypeError('getCursor: page must be a valid Page object');
@@ -225,16 +230,17 @@ function getCursor(page) {
 // ============================================
 // KEYBOARD LAYOUT DETECTION
 // ============================================
-async function detectKeyboardLayout(page) {
+async function detectKeyboardLayout(/** @type {any} */ page) {
     try {
         return page.evaluate(() => {
-            if (navigator.keyboard && navigator.keyboard.getLayoutMap) {
+            if (/** @type {any} */ (navigator).keyboard && /** @type {any} */ (navigator).keyboard.getLayoutMap) {
                 return 'qwerty';
             }
             const lang = (navigator.language || 'en').toLowerCase();
             return lang.includes('fr') ? 'azerty' : 'qwerty';
         });
-    } catch (_err) {
+    } catch (/** @type {any} */ _err) {
+        const _ce = /** @type {any} */ (_err);
         return 'qwerty';
     }
 }
@@ -243,33 +249,38 @@ async function detectKeyboardLayout(page) {
 // ELEMENT RETRY HELPER (v2.0 - Phase 2)
 // ============================================
 /**
+ * @typedef {object} GetElementRectContext
+ * @property {any} _ Propriedades definidas via runtime.
+ */
+/**
  * Retry element lookup with exponential backoff.
- * @param {object} ctx - Execution context
+ *
+ * @param {GetElementRectContext} ctx - Execution context
  * @param {string} selector - CSS selector
  * @param {number} retries - Max retry attempts
  * @param {number} delayMs - Base delay between retries
- * @returns {Promise<object|null>} Element rect or null
+ * @returns {Promise<object | null>} Element rect or null
  */
 async function getElementRect(
-    ctx,
-    selector,
-    retries = BIOMECHANICS_CONFIG.ELEMENT_RETRY_COUNT,
-    delayMs = BIOMECHANICS_CONFIG.ELEMENT_RETRY_DELAY
+    /** @type {any} */ ctx,
+    /** @type {any} */ selector,
+    /** @type {any} */ retries = BIOMECHANICS_CONFIG.ELEMENT_RETRY_COUNT,
+    /** @type {any} */ delayMs = BIOMECHANICS_CONFIG.ELEMENT_RETRY_DELAY,
 ) {
     for (let i = 0; i < retries; i++) {
         const rect = await ctx
-            .evaluate(sel => {
+            .evaluate((/** @type {any} */ sel) => {
                 const el = document.querySelector(sel);
                 if (!el) return null;
                 const r = el.getBoundingClientRect();
                 return r.width > 0 && r.height > 0 ? { x: r.left, y: r.top, w: r.width, h: r.height } : null;
             }, selector)
-            .catch(() => null);
+            .catch(() => /** @type {null} */ (null));
 
         if (rect) return rect;
 
         if (i < retries - 1) {
-            await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+            await new Promise((/** @type {any} */ r) => setTimeout(r, delayMs * (i + 1)));
         }
     }
     return null;
@@ -280,12 +291,17 @@ async function getElementRect(
 // ============================================
 
 /**
+ * @typedef {object} WakeUpMovePage
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Executa movimento de "acordar" o mouse para posição aleatória na viewport
- * @param {object} page - Instância da página Puppeteer
+ *
+ * @param {WakeUpMovePage} page - Instância da página Puppeteer
  * @returns {Promise<void>} Completa quando movimento terminar ou falhar silenciosamente
  * @sideEffects Move mouse para posição aleatória - operação I/O
  */
-async function wakeUpMove(page) {
+async function wakeUpMove(/** @type {any} */ page) {
     try {
         if (!page || page.isClosed()) {
             return;
@@ -305,8 +321,9 @@ async function wakeUpMove(page) {
         const y = padY + Math.random() * (view.height - padY * 2);
 
         await cursor.move({ x, y });
-    } catch (err) {
-        _log('DEBUG', '[HUMAN] wakeUpMove error (ignored)', err.message);
+    } catch (/** @type {any} */ err) {
+        const _ce = /** @type {any} */ (err);
+        _log('DEBUG', '[HUMAN] wakeUpMove error (ignored)', _ce.message);
     }
 }
 
@@ -314,9 +331,18 @@ async function wakeUpMove(page) {
 // HUMAN CLICK (v2.0 - Enhanced with validation)
 // ============================================
 /**
+ * @typedef {object} HumanClickCoreContext
+ * @property {any} _ Propriedades definidas via runtime.
+ */
+/**
+ * @typedef {object} HumanClickCorePage
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Realiza um clique humano com variância gaussiana.
- * @param {object} page - Puppeteer Page instance (required)
- * @param {object} ctx - Execution context (Page or Frame) (required)
+ *
+ * @param {HumanClickCorePage} page - Puppeteer Page instance (required)
+ * @param {HumanClickCoreContext} ctx - Execution context (Page or Frame) (required)
  * @param {string} selector - CSS selector (required)
  * @param {number} offsetX - X offset for frame navigation (default: 0)
  * @param {number} offsetY - Y offset for frame navigation (default: 0)
@@ -324,7 +350,15 @@ async function wakeUpMove(page) {
  * @param {function} onPulse - [V500] Callback para reportar coordenadas ao IPC
  * @throws {TypeError} If required parameters are missing or invalid
  */
-async function humanClickCore(page, ctx, selector, offsetX = 0, offsetY = 0, signal = null, onPulse = null) {
+async function humanClickCore(
+    /** @type {any} */ page,
+    /** @type {any} */ ctx,
+    /** @type {any} */ selector,
+    /** @type {any} */ offsetX = 0,
+    /** @type {any} */ offsetY = 0,
+    /** @type {any} */ signal = null,
+    /** @type {any} */ onPulse = null,
+) {
     // [v2.0] Parameter validation (Bug #2 fix)
     if (!page || typeof page !== 'object') {
         throw new TypeError('humanClick: page is required and must be a Page object');
@@ -353,7 +387,7 @@ async function humanClickCore(page, ctx, selector, offsetX = 0, offsetY = 0, sig
         }
 
         // [v2.0] Retry logic for element not found
-        const rect = await getElementRect(ctx, selector);
+        const rect = /** @type {any} */ (await getElementRect(ctx, selector));
 
         if (!rect) {
             throw new Error('ELEMENT_NOT_VISIBLE');
@@ -389,7 +423,7 @@ async function humanClickCore(page, ctx, selector, offsetX = 0, offsetY = 0, sig
         const preDelay =
             BIOMECHANICS_CONFIG.CLICK_PRE_DELAY_MIN +
             Math.random() * (BIOMECHANICS_CONFIG.CLICK_PRE_DELAY_MAX - BIOMECHANICS_CONFIG.CLICK_PRE_DELAY_MIN);
-        await new Promise(r => setTimeout(r, preDelay));
+        await new Promise((/** @type {any} */ r) => setTimeout(r, preDelay));
 
         // [v2.0] Abort check
         if (signal?.aborted) {
@@ -407,7 +441,7 @@ async function humanClickCore(page, ctx, selector, offsetX = 0, offsetY = 0, sig
         const holdDelay =
             BIOMECHANICS_CONFIG.CLICK_HOLD_MIN +
             Math.random() * (BIOMECHANICS_CONFIG.CLICK_HOLD_MAX - BIOMECHANICS_CONFIG.CLICK_HOLD_MIN);
-        await new Promise(r => setTimeout(r, holdDelay));
+        await new Promise((/** @type {any} */ r) => setTimeout(r, holdDelay));
 
         await page.mouse.up();
 
@@ -415,10 +449,11 @@ async function humanClickCore(page, ctx, selector, offsetX = 0, offsetY = 0, sig
         if (onPulse) {
             onPulse({ type: 'CLICK_COMPLETE', totalTime: Date.now() - startTime });
         }
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _ce = /** @type {any} */ (err);
         // [v2.0] Error telemetry (Bug #7 fix)
         if (onPulse) {
-            onPulse({ type: 'CLICK_ERROR', error: err.message, fallback: 'synthetic_click' });
+            onPulse({ type: 'CLICK_ERROR', error: _ce.message, fallback: 'synthetic_click' });
         }
         await ctx.click(selector).catch(() => {});
     }
@@ -429,6 +464,7 @@ async function humanClickCore(page, ctx, selector, offsetX = 0, offsetY = 0, sig
 // ============================================
 /**
  * Realiza digitação humana com erros, correções e ritmo adaptativo.
+ *
  * @param {object} page - Puppeteer Page instance (required)
  * @param {object} ctx - Execution context (Page or Frame) (required)
  * @param {string} selector - CSS selector (required)
@@ -442,14 +478,14 @@ async function humanClickCore(page, ctx, selector, offsetX = 0, offsetY = 0, sig
  */
 
 async function humanTypeCore(
-    page,
-    ctx,
-    selector,
-    text,
-    currentLag = 0,
-    signal = null,
-    onPulse = null,
-    profile = 'average'
+    /** @type {any} */ page,
+    /** @type {any} */ ctx,
+    /** @type {any} */ selector,
+    /** @type {any} */ text,
+    /** @type {any} */ currentLag = 0,
+    /** @type {any} */ signal = null,
+    /** @type {any} */ onPulse = null,
+    /** @type {any} */ profile = 'average',
 ) {
     // [v2.0] Parameter validation (Bug #3 fix)
     if (!page || typeof page !== 'object') {
@@ -470,8 +506,8 @@ async function humanTypeCore(
 
     const startTime = Date.now();
     const layoutKey = await detectKeyboardLayout(page);
-    const neighbors = LAYOUTS[layoutKey] || LAYOUTS.qwerty;
-    const speed = TYPING_PROFILES[profile] || TYPING_PROFILES.average;
+    const neighbors = /** @type {any} */ (LAYOUTS)[layoutKey] || LAYOUTS.qwerty;
+    const speed = /** @type {any} */ (TYPING_PROFILES)[profile] || TYPING_PROFILES.average;
     let charsSinceLastPause = 0;
 
     // [P8.1] SECURITY: Sanitize prompt to remove control characters
@@ -494,7 +530,7 @@ async function humanTypeCore(
         onPulse({ type: 'TYPE_START', text: sanitizedText, chars: sanitizedText.length, profile });
     }
 
-    await ctx.focus(selector).catch(err => {
+    await ctx.focus(selector).catch((/** @type {any} */ err) => {
         // [v2.0] Error telemetry
         if (onPulse) {
             onPulse({ type: 'FOCUS_ERROR', error: err.message });
@@ -515,7 +551,7 @@ async function humanTypeCore(
             let focusOk = false;
             for (let retry = 0; retry < BIOMECHANICS_CONFIG.FOCUS_MAX_RETRIES && !focusOk; retry++) {
                 focusOk = await ctx
-                    .evaluate(sel => {
+                    .evaluate((/** @type {any} */ sel) => {
                         const el = document.querySelector(sel);
                         let active = document.activeElement;
                         while (active && active.shadowRoot && active.shadowRoot.activeElement) {
@@ -526,12 +562,14 @@ async function humanTypeCore(
                     .catch(() => false);
 
                 if (!focusOk) {
-                    await ctx.focus(selector).catch(err => {
+                    await ctx.focus(selector).catch((/** @type {any} */ err) => {
                         if (onPulse) {
                             onPulse({ type: 'FOCUS_ERROR', error: err.message, retry });
                         }
                     });
-                    await new Promise(r => setTimeout(r, BIOMECHANICS_CONFIG.FOCUS_RESTORE_DELAY * (retry + 1)));
+                    await new Promise((/** @type {any} */ r) =>
+                        setTimeout(r, BIOMECHANICS_CONFIG.FOCUS_RESTORE_DELAY * (retry + 1)),
+                    );
                 }
             }
 
@@ -545,15 +583,16 @@ async function humanTypeCore(
             }
         }
 
-        const char = sanitizedText[i];
+        const char = /** @type {string} */ (sanitizedText[i]);
         const lowerChar = char.toLowerCase();
 
         // Typos e Transposição ([v2.0] Use config constants)
         if (i > 2 && Math.random() < BIOMECHANICS_CONFIG.TYPO_RATE) {
             let typoChar;
-            if (Math.random() > BIOMECHANICS_CONFIG.TYPO_TRANSPOSE_RATE && sanitizedText[i + 1]) {
+            const nextChar = sanitizedText[i + 1];
+            if (Math.random() > BIOMECHANICS_CONFIG.TYPO_TRANSPOSE_RATE && nextChar) {
                 // Transposition
-                typoChar = sanitizedText[i + 1] + char;
+                typoChar = nextChar + char;
                 await page.keyboard.type(typoChar);
                 i++;
             } else {
@@ -569,7 +608,9 @@ async function humanTypeCore(
                 onPulse({ type: 'TYPO_GENERATED', typo: typoChar, original: char, index: i });
             }
 
-            await new Promise(r => setTimeout(r, BIOMECHANICS_CONFIG.TYPO_BACKSPACE_DELAY + currentLag * 0.5));
+            await new Promise((/** @type {any} */ r) =>
+                setTimeout(r, BIOMECHANICS_CONFIG.TYPO_BACKSPACE_DELAY + currentLag * 0.5),
+            );
             await page.keyboard.press('Backspace');
 
             // [v2.0] Telemetry: Typo corrected
@@ -586,7 +627,7 @@ async function humanTypeCore(
         const needsShift = /[A-Z!@#$%^&*()_+|:<>?]/.test(char);
         if (needsShift) {
             await page.keyboard.down('Shift');
-            await new Promise(r => {
+            await new Promise((/** @type {any} */ r) => {
                 setTimeout(r, 30 + Math.random() * 30);
             });
         }
@@ -594,7 +635,7 @@ async function humanTypeCore(
         await page.keyboard.type(char);
 
         if (needsShift) {
-            await new Promise(r => {
+            await new Promise((/** @type {any} */ r) => {
                 setTimeout(r, 20 + Math.random() * 20);
             });
             await page.keyboard.up('Shift');
@@ -609,7 +650,9 @@ async function humanTypeCore(
         if (currentLag > 100) {
             flightTime += currentLag * BIOMECHANICS_CONFIG.LAG_COMPENSATION_FACTOR;
         }
-        await new Promise(r => setTimeout(r, Math.min(flightTime, BIOMECHANICS_CONFIG.MAX_FLIGHT_TIME)));
+        await new Promise((/** @type {any} */ r) =>
+            setTimeout(r, Math.min(flightTime, BIOMECHANICS_CONFIG.MAX_FLIGHT_TIME)),
+        );
 
         // Fadiga Estocástica ([v2.0] Use config constants)
         charsSinceLastPause++;
@@ -626,7 +669,7 @@ async function humanTypeCore(
                 onPulse({ type: 'FATIGUE_PAUSE', duration: pause, charIndex: i });
             }
 
-            await new Promise(r => setTimeout(r, pause));
+            await new Promise((/** @type {any} */ r) => setTimeout(r, pause));
 
             if (
                 pause > BIOMECHANICS_CONFIG.FATIGUE_MOVE_THRESHOLD &&
@@ -697,13 +740,14 @@ const _gaussianParamCache = new Map();
 
 /**
  * Gera número aleatório com distribuição gaussiana (normal) usando cache de parâmetros
+ *
  * @param {number} mean - Média da distribuição
  * @param {number} sigma - Desvio padrão da distribuição
  * @returns {number} Valor aleatório gaussiano
  * @throws {TypeError} Se parâmetros não forem números válidos
  * @sideEffects Modifica cache interno - operação com estado
  */
-function gaussian(mean, sigma) {
+function gaussian(/** @type {any} */ mean, /** @type {any} */ sigma) {
     if (typeof mean !== 'number' || Number.isNaN(mean)) {
         throw new TypeError('mean must be a number');
     }
@@ -732,11 +776,11 @@ function gaussian(mean, sigma) {
     return value;
 }
 
-function _isDriverLike(x) {
+function _isDriverLike(/** @type {any} */ x) {
     return !!(x && typeof x === 'object' && x.page && typeof x._emitVital === 'function');
 }
 
-function _isLegacyHumanClickArgs(args) {
+function _isLegacyHumanClickArgs(/** @type {any} */ args) {
     // legacy: (page, ctx, selector, ...)
     return (
         args.length >= 3 &&
@@ -749,7 +793,7 @@ function _isLegacyHumanClickArgs(args) {
     );
 }
 
-function _isLegacyHumanTypeArgs(args) {
+function _isLegacyHumanTypeArgs(/** @type {any} */ args) {
     // legacy: (page, ctx, selector, text, ...)
     return (
         args.length >= 4 &&
@@ -762,19 +806,19 @@ function _isLegacyHumanTypeArgs(args) {
     );
 }
 
-function _sleep(ms) {
-    return new Promise(r => setTimeout(r, ms));
+function _sleep(/** @type {any} */ ms) {
+    return new Promise((/** @type {any} */ r) => setTimeout(r, ms));
 }
 
-function _resolveTypingProfile(profile) {
+function _resolveTypingProfile(/** @type {any} */ profile) {
     const normalized = String(profile || 'average').toLowerCase();
     if (normalized === 'balanced') {
         return TYPING_PROFILES.average;
     }
-    return TYPING_PROFILES[normalized] || TYPING_PROFILES.average;
+    return /** @type {any} */ (TYPING_PROFILES)[normalized] || TYPING_PROFILES.average;
 }
 
-function _computeFlightTime(profileConfig, char, page) {
+function _computeFlightTime(/** @type {any} */ profileConfig, /** @type {any} */ char, /** @type {any} */ page) {
     const rawMin = Number(profileConfig?.min ?? HUMAN_CONFIG.TYPE_DELAY_MIN);
     const rawMax = Number(profileConfig?.max ?? HUMAN_CONFIG.TYPE_DELAY_MAX);
     const min = Number.isFinite(rawMin) ? Math.max(0, rawMin) : HUMAN_CONFIG.TYPE_DELAY_MIN;
@@ -787,8 +831,8 @@ function _computeFlightTime(profileConfig, char, page) {
     return Math.max(0, Math.min(BIOMECHANICS_CONFIG.MAX_FLIGHT_TIME, scaled));
 }
 
-/** @typedef {{ page: unknown, _emitVital: (event: string, payload?: Record<string, unknown>) => void }} HumanDriverLike */
-/** @typedef {{ signal?: AbortSignal|null, profile?: string }} HumanActionOptions */
+/** @typedef {{ page: unknown; _emitVital: (event: string, payload?: Record<string, unknown>) => void }} HumanDriverLike */
+/** @typedef {{ signal?: AbortSignal | null; profile?: string }} HumanActionOptions */
 
 // ============================================
 // PUBLIC API (Driver-first) + Legacy Compatibility
@@ -796,12 +840,13 @@ function _computeFlightTime(profileConfig, char, page) {
 
 /**
  * Executa clique humano realista em elemento usando biometria comportamental
+ *
  * @param {...unknown} args - Driver-first `(driver, selector, options?)` ou legacy `(page, ctx, selector, ...)`
  * @returns {Promise<boolean>} true se clique foi executado com sucesso
  * @throws {TypeError} Se parâmetros obrigatórios estiverem ausentes ou inválidos
  * @sideEffects Move mouse, executa clique, emite eventos vitais - operação I/O
  */
-async function humanClick(...args) {
+async function humanClick(/** @type {any} */ ...args) {
     if (_isLegacyHumanClickArgs(args)) {
         // Legacy API used by biomechanics_engine.
         /** @type {[any, any, string, number?, number?, AbortSignal?, ((payload: unknown) => void)?]} */
@@ -842,9 +887,10 @@ async function humanClick(...args) {
         try {
             await page.waitForSelector(selector);
             break;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _ce = /** @type {any} */ (err);
             if (attempt >= HUMAN_CONFIG.ELEMENT_RETRY_COUNT) {
-                driver._emitVital('CLICK_ERROR', { selector, error: err?.message || String(err), attempt });
+                driver._emitVital('CLICK_ERROR', { selector, error: _ce?.message || String(_ce), attempt });
                 throw err;
             }
             await _sleep(HUMAN_CONFIG.ELEMENT_RETRY_DELAY * attempt);
@@ -877,7 +923,8 @@ async function humanClick(...args) {
             x = box.x + (box.width || 0) / 2;
             y = box.y + (box.height || 0) / 2;
         }
-    } catch (_err) {
+    } catch (/** @type {any} */ _err) {
+        const _ce = /** @type {any} */ (_err);
         // ignore
     }
 
@@ -890,10 +937,12 @@ async function humanClick(...args) {
 
 /**
  * Executa digitação humana realista com suporte ao contrato driver-first e ao wrapper legado.
- * @param {...unknown} args - Driver-first `(driver, selector, text, options?)` ou legacy `(page, ctx, selector, text, ...)`
+ *
+ * @param {...unknown} args - Driver-first `(driver, selector, text, options?)` ou legacy `(page, ctx, selector, text,
+ *   ...)`
  * @returns {Promise<boolean>}
  */
-async function humanType(...args) {
+async function humanType(/** @type {any} */ ...args) {
     if (_isLegacyHumanTypeArgs(args)) {
         // Legacy API used by biomechanics_engine.
         /** @type {[any, any, string, string, number?, AbortSignal?, ((payload: unknown) => void)?, string?]} */
@@ -970,8 +1019,9 @@ async function humanType(...args) {
             // Focus check every N characters
             if (typed % HUMAN_CONFIG.TYPE_FOCUS_CHECK_EVERY === 0) {
                 const focused = await page.evaluate(
-                    () => document.activeElement === document.querySelector(arguments[0]),
-                    selector
+                    /** @param {string} sel */
+                    (sel) => document.activeElement === document.querySelector(sel),
+                    selector,
                 );
                 if (!focused) {
                     driver._emitVital('TYPE_FOCUS_LOST', { selector, attempt: typed });
@@ -979,7 +1029,8 @@ async function humanType(...args) {
                     try {
                         await page.focus(selector);
                         await _sleep(HUMAN_CONFIG.TYPE_FOCUS_RESTORE_DELAY);
-                    } catch (_e) {
+                    } catch (/** @type {any} */ _e) {
+                        const _ce = /** @type {any} */ (_e);
                         driver._emitVital('TYPE_ABORTED', {
                             selector,
                             reason: 'focus_restore_failed',
@@ -1049,8 +1100,9 @@ async function humanType(...args) {
                 }
             }
         }
-    } catch (err) {
-        driver._emitVital('TYPE_ERROR', { selector, error: err?.message || String(err), critical: true });
+    } catch (/** @type {any} */ err) {
+        const _ce = /** @type {any} */ (err);
+        driver._emitVital('TYPE_ERROR', { selector, error: _ce?.message || String(_ce), critical: true });
         throw err;
     }
 

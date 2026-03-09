@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Teste REAL com Ollama Cloud usando API Key
- * Testa qwen3-coder-next e qwen3-next via https://ollama.com
+ * Teste REAL com Ollama Cloud usando API Key Testa qwen3-coder-next e qwen3-next via https://ollama.com
  */
 
 // Carregar .env.local para pegar API key
@@ -29,7 +28,7 @@ console.log('  - Cloud Enabled:', ollama.cloudEnabled);
 console.log('  - Has API Key:', ollama.cloudApiKey ? '✅ Sim' : '❌ Não');
 console.log(
     '  - API Key (primeiros 20 chars):',
-    ollama.cloudApiKey ? ollama.cloudApiKey.substring(0, 20) + '...' : 'N/A'
+    ollama.cloudApiKey ? ollama.cloudApiKey.substring(0, 20) + '...' : 'N/A',
 );
 console.log();
 console.log('='.repeat(80));
@@ -51,7 +50,7 @@ try {
         {
             temperature: 0.3,
             num_predict: 150,
-        }
+        },
     );
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

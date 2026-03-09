@@ -4,6 +4,7 @@
  * Runtime Bug Hunter - Foco em Cenários Críticos
  *
  * Estratégia direcionada para detectar bugs de runtime específicos:
+ *
  * - Memory leaks em operações de longa duração
  * - Race conditions em operações concorrentes
  * - Unhandled rejections em promises
@@ -110,12 +111,12 @@ const CRITICAL_SCENARIOS = [
 
 class RuntimeMonitor {
     constructor() {
-        this.metrics = {
+        this.metrics = /** @type {any} */ ({
             memory: [],
             cpu: [],
             handles: [],
             requests: [],
-        };
+        });
         this.interval = null;
     }
 
@@ -143,12 +144,14 @@ class RuntimeMonitor {
         if (this.metrics.memory.length === 0) return null;
 
         const memoryTrend = this.analyzeMemoryTrend();
-        const peakMemory = Math.max(...this.metrics.memory.map(m => m.heapUsed));
+        const peakMemory = Math.max(...this.metrics.memory.map((/** @type {any} */ m) => m.heapUsed));
 
         return {
             memoryTrend,
             peakMemory,
-            averageMemory: this.metrics.memory.reduce((sum, m) => sum + m.heapUsed, 0) / this.metrics.memory.length,
+            averageMemory:
+                this.metrics.memory.reduce((/** @type {any} */ sum, /** @type {any} */ m) => sum + m.heapUsed, 0) /
+                this.metrics.memory.length,
             memorySamples: this.metrics.memory.length,
         };
     }
@@ -161,8 +164,10 @@ class RuntimeMonitor {
 
         if (!older.length) return 'stable';
 
-        const recentAvg = recent.reduce((sum, m) => sum + m.heapUsed, 0) / recent.length;
-        const olderAvg = older.reduce((sum, m) => sum + m.heapUsed, 0) / older.length;
+        const recentAvg =
+            recent.reduce((/** @type {any} */ sum, /** @type {any} */ m) => sum + m.heapUsed, 0) / recent.length;
+        const olderAvg =
+            older.reduce((/** @type {any} */ sum, /** @type {any} */ m) => sum + m.heapUsed, 0) / older.length;
 
         const growthRate = (recentAvg - olderAvg) / olderAvg;
 
@@ -176,6 +181,10 @@ class RuntimeMonitor {
 // EXECUTOR ESPECIALIZADO
 // ============================================================================
 
+/**
+ * @param {any} scenario
+ * @returns {Promise<any>}
+ */
 async function executeCriticalScenario(scenario) {
     console.log(`\n🎯 Executando cenário crítico: ${scenario.name}`);
     console.log(`   📝 ${scenario.description}`);
@@ -185,7 +194,7 @@ async function executeCriticalScenario(scenario) {
     const monitor = new RuntimeMonitor();
     monitor.start();
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const child = spawn('node', [scenario.script, ...scenario.args], {
             cwd: ROOT_DIR,
             env: { ...process.env, ...scenario.env },
@@ -194,18 +203,17 @@ async function executeCriticalScenario(scenario) {
 
         let stdout = '';
         let stderr = '';
-        let timeoutId;
 
-        child.stdout.on('data', data => {
+        child.stdout.on('data', (data) => {
             stdout += data.toString();
         });
 
-        child.stderr.on('data', data => {
+        child.stderr.on('data', (data) => {
             stderr += data.toString();
             process.stderr.write(`[${scenario.name}] ${data}`);
         });
 
-        timeoutId = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
             console.log(`   ⏰ Timeout, encerrando processo...`);
             try {
                 child.kill('SIGTERM');
@@ -244,7 +252,7 @@ async function executeCriticalScenario(scenario) {
             resolve(result);
         });
 
-        child.on('error', error => {
+        child.on('error', (error) => {
             clearTimeout(timeoutId);
             monitor.stop();
             console.error(`   ❌ Erro crítico: ${error.message}`);
@@ -264,19 +272,23 @@ async function executeCriticalScenario(scenario) {
 // ANALISADOR DE BUGS DE RUNTIME
 // ============================================================================
 
+/**
+ * @param {any[]} results
+ * @returns {any}
+ */
 function analyzeRuntimeBugs(results) {
     console.log('\n🐛 ANÁLISE DE BUGS DE RUNTIME\n');
 
-    const bugs = {
+    const bugs = /** @type {any} */ ({
         memoryLeaks: [],
         raceConditions: [],
         unhandledRejections: [],
         blockingOperations: [],
         resourceLeaks: [],
         errorPropagation: [],
-    };
+    });
 
-    results.forEach(result => {
+    results.forEach((/** @type {any} */ result) => {
         if (!result.success) {
             console.log(`❌ Cenário falhou: ${result.scenario}`);
             if (result.stderr) {
@@ -341,7 +353,7 @@ function analyzeRuntimeBugs(results) {
     Object.entries(bugs).forEach(([type, issues]) => {
         if (issues.length > 0) {
             console.log(`🚨 ${type.toUpperCase()}: ${issues.length} ocorrências`);
-            issues.forEach((issue, idx) => {
+            issues.forEach((/** @type {any} */ issue, /** @type {any} */ idx) => {
                 console.log(`   ${idx + 1}. ${issue.scenario}`);
                 console.log(`      ${issue.evidence.slice(0, 100)}...`);
             });
@@ -358,6 +370,7 @@ function analyzeRuntimeBugs(results) {
 
 /**
  * Função exportada: huntRuntimeBugs.
+ *
  * @returns {Promise<void>}
  */
 async function main() {
@@ -379,13 +392,14 @@ async function main() {
             results.push(result);
 
             // Pausa entre cenários para limpeza
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
         } catch (error) {
-            console.error(`❌ Erro crítico no cenário ${scenario.name}: ${error.message}`);
+            const _ce = /** @type {any} */ (error);
+            console.error(`❌ Erro crítico no cenário ${scenario.name}: ${_ce.message}`);
             results.push({
                 scenario: scenario.name,
                 focus: scenario.focus,
-                error: error.message,
+                error: _ce.message,
                 success: false,
             });
         }
@@ -402,7 +416,7 @@ async function main() {
     console.log(`💾 Relatório salvo em: ${reportPath}`);
 
     // Resumo final
-    const successful = results.filter(r => r.success).length;
+    const successful = results.filter((r) => r.success).length;
     const failed = results.length - successful;
 
     console.log('\n🏁 RESUMO FINAL:');

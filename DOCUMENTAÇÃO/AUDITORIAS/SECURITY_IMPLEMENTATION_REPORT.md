@@ -165,7 +165,7 @@ app.use(
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-  })
+  }),
 );
 ```
 
@@ -201,7 +201,7 @@ Dashboard acessível por qualquer cliente na rede sem autenticação.
 #### Solução Implementada
 
 ```javascript
-io.on('connection', socket => {
+io.on('connection', (socket) => {
   // [P8.4] SECURITY: Dashboard password authentication (optional)
   const dashboardPassword = process.env.DASHBOARD_PASSWORD || null;
 
@@ -302,13 +302,13 @@ function validateEnvFile() {
   const requiredEnvVars = ['NODE_ENV'];
   const recommendedEnvVars = ['SERVER_PORT', 'DASHBOARD_PORT', 'CHROME_REMOTE_DEBUGGING_ADDRESS'];
 
-  const missing = requiredEnvVars.filter(v => !process.env[v]);
+  const missing = requiredEnvVars.filter((v) => !process.env[v]);
 
   if (missing.length > 0) {
     log('ERROR', `[CONFIG] Missing required env vars: ${missing.join(', ')}`);
   }
 
-  const missingRecommended = recommendedEnvVars.filter(v => !process.env[v]);
+  const missingRecommended = recommendedEnvVars.filter((v) => !process.env[v]);
 
   if (missingRecommended.length > 0) {
     log('WARN', `[CONFIG] Missing recommended env vars: ${missingRecommended.join(', ')}`);
@@ -349,8 +349,8 @@ Sem validação explícita de paths, mesmo que `path.join()` já forneça prote�
 const path = require('path'); // Added import
 
 /**
- * [P8.7] SECURITY: Validate path is within workspace boundary
- * Defense-in-depth: even though path.join() is safe, this adds explicit validation
+ * [P8.7] SECURITY: Validate path is within workspace boundary Defense-in-depth: even though path.join() is safe, this
+ * adds explicit validation
  *
  * @param {string} filePath - Path to validate
  * @returns {boolean} - True if path is safe
@@ -406,7 +406,7 @@ para `/etc/passwd`, etc.
 #### Solução Implementada
 
 ```javascript
-loadTask: async id => {
+loadTask: async (id) => {
   // [P8.8] SECURITY: Validate not a symlink
   const filePath = path.join(PATHS.QUEUE, `${id}.json`);
 

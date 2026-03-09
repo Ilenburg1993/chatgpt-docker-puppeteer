@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import sinon from 'sinon';
 import * as contextBuilder from '../../../src/audit_agent/context_builder.js';
 
@@ -13,7 +13,7 @@ test('mcp lsp cache stores definition/references and avoids duplicate calls', as
     contextBuilder._clearMcpLspCache();
     assert.equal(contextBuilder._getMcpLspCacheSize(), 0);
 
-    const calls = [];
+    /** @type {any[]} */ const calls = [];
     const fakeResponse = {
         ok: true,
         status: 200,

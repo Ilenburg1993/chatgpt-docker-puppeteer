@@ -714,7 +714,7 @@ rag-rebuild-code-config-strict:
 # 🔟 FORMATAÇÃO & LINT
 # =============================================================================
 
-.PHONY: format format-check jsdoc-coverage jsdoc-delta lint lint-fix lint-quiet lint-report lint-src lint-tests typecheck-node typecheck-browser typecheck-full test-audit-quality
+.PHONY: format format-check jsdoc-coverage jsdoc-delta jsdoc-gaps lint lint-fix lint-quiet lint-report lint-src lint-tests typecheck-node typecheck-browser typecheck-full typecheck-dashboard typecheck-repo analyze-typing-gaps check-ts-expect-error check-base-strict typing-fullstrict-check test-audit-quality
 
 format:
 	@echo "$(CYAN)🎨 Formatando código (Prettier)$(NC)"
@@ -772,6 +772,38 @@ typecheck-browser:
 typecheck-full:
 	@echo "$(CYAN)🔎 Typecheck completo (Node + Browser/UI)$(NC)"
 	@$(NPM) run typecheck:full
+
+typecheck-dashboard:
+	@echo "$(CYAN)🔎 Typecheck Dashboard (vue-tsc --noEmit)$(NC)"
+	@$(NPM) run typecheck:dashboard
+
+typecheck-repo:
+	@echo "$(CYAN)🔎 Typecheck repo completo (full + tests + dashboard)$(NC)"
+	@$(NPM) run typecheck:repo
+
+analyze-typing-gaps:
+	@echo "$(CYAN)📊 Analisando gaps de tipagem$(NC)"
+	@$(NPM) run analyze:typing:gaps
+
+jsdoc-gaps:
+	@echo "$(CYAN)📊 JSDoc gaps (símbolos bloqueadores por lote)$(NC)"
+	@$(NPM) run jsdoc:coverage:gaps
+
+check-ts-expect-error:
+	@echo "$(CYAN)🔍 Gate CI: @ts-expect-error allowlist$(NC)"
+	@$(NPM) run check:ts-expect-error
+
+check-base-strict:
+	@echo "$(CYAN)🔍 Gate CI: tsconfig.base.json strict$(NC)"
+	@$(NPM) run check:base-strict
+
+typing-fullstrict-check:
+	@echo "$(CYAN)🎟️ Full-Strict Check: todos os gates de tipagem$(NC)"
+	@$(NPM) run typecheck:repo
+	@$(NPM) run typecheck:strict:all
+	@$(NPM) run check:ts-expect-error
+	@$(NPM) run check:base-strict
+	@echo "$(GREEN)✅ Todos os gates de tipagem passaram$(NC)"
 
 test-audit-quality:
 	@echo "$(CYAN)🧪 Testes unitários do audit quality/JSDoc$(NC)"

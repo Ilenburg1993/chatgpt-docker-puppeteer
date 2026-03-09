@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/buffers/backpressure.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -25,12 +25,18 @@
 =========================== */
 
 /**
+ * @typedef {object} CreateBackpressureDeps
+ * @property {any} telemetry
+ */
+/**
+ * @typedef {object} CreateBackpressureOptions
+ * @property {any} [telemetry]
+ */
+/**
  * Cria um observador técnico de backpressure.
  *
- * @param {Object} deps
- * @param {Object} deps.telemetry
- * Interface de telemetria do NERV.
-  * @returns {any}
+ * @param {CreateBackpressureDeps} deps Interface de telemetria do NERV.
+ * @returns {any}
  */
 function createBackpressure({ telemetry }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {
@@ -40,15 +46,7 @@ function createBackpressure({ telemetry }) {
     /**
      * Emite sinal técnico de pressão.
      *
-     * @param {Object} info
-     * @param {string} info.buffer
-     * Nome do buffer (ex.: inbound, outbound)
-     *
-     * @param {number} info.size
-     * Tamanho atual da fila
-     *
-     * @param {number|null} info.limit
-     * Limite técnico configurado
+     * @param {{ buffer: string; size: number; limit: number | null }} info
      */
     function signal({ buffer, size, limit }) {
         telemetry.emit('nerv:buffer:pressure', {
@@ -60,6 +58,8 @@ function createBackpressure({ telemetry }) {
 
     /**
      * Emite sinal técnico de normalização (pressão aliviada).
+     *
+     * @param {{ buffer: string; size: number }} info
      */
     function relief({ buffer, size }) {
         telemetry.emit('nerv:buffer:relief', {

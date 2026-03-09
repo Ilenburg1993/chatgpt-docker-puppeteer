@@ -4,26 +4,38 @@ import * as logger from '#core/logger';
 /**
  * LLMJudge - Valida qualidade de resposta usando LLM como juiz.
  *
- * **Side-effects:** Executa chamada adicional ao LLM para avaliação.
- * **Semântica:** Usa modelo de linguagem para avaliar resposta em completude, relevância e qualidade.
- * **Unidades:** Scores de 0-100, thresholds configuráveis para decisão automática.
+ * **Side-effects:** Executa chamada adicional ao LLM para avaliação. **Semântica:** Usa modelo de linguagem para
+ * avaliar resposta em completude, relevância e qualidade. **Unidades:** Scores de 0-100, thresholds configuráveis para
+ * decisão automática.
  *
+ * @typedef {object} LLMJudgeResult
+ * @property {number} score - Score de 0-100
+ * @property {string} reasoning - Justificativa do score
+ */
+
+/**
  * @class
  */
 class LLMJudge {
+    /**
+     * @param {Record<string, unknown>} [options]
+     */
     constructor(options) {
         options = options || {};
 
         this.enabled = options.enabled !== false; // Habilitado por padrão
-        this.driver = options.driver || null; // Driver para chamar LLM
-        this.model = options.model || 'gpt-5-mini'; // Model para validação (GPT-5-mini é rápido e eficiente)
-        this.timeout = options.timeout || 15000; // 15s timeout
+        this.driver =
+            /** @type {{ sendPrompt: (prompt: string, opts: Record<string, unknown>) => Promise<string> } | null} */ (
+                options.driver || null
+            ); // Driver para chamar LLM
+        this.model = /** @type {string} */ (options.model) || 'gpt-5-mini'; // Model para validação (GPT-5-mini é rápido e eficiente)
+        this.timeout = /** @type {number} */ (options.timeout) || 15000; // 15s timeout
 
         // Thresholds de score
         this.thresholds = {
-            accept: options.acceptThreshold || 70, // >= 70 = ACCEPT
-            retry: options.retryThreshold || 50, // < 50 = RETRY
-            manualReview: options.manualReviewThreshold || 70, // 50-70 = MANUAL_REVIEW
+            accept: /** @type {number} */ (options.acceptThreshold) || 70, // >= 70 = ACCEPT
+            retry: /** @type {number} */ (options.retryThreshold) || 50, // < 50 = RETRY
+            manualReview: /** @type {number} */ (options.manualReviewThreshold) || 70, // 50-70 = MANUAL_REVIEW
         };
     }
 
@@ -33,7 +45,7 @@ class LLMJudge {
      * @param {string} prompt - Prompt original do usuário
      * @param {string} response - Resposta da LLM
      * @param {AbortSignal} signal - Abort signal
-     * @returns {Promise<Object|null>} - { completeness, relevance, quality, recommendation }
+     * @returns {Promise<object | null>} - { completeness, relevance, quality, recommendation }
      */
     async validate(prompt, response, signal) {
         if (!this.enabled) {
@@ -47,10 +59,13 @@ class LLMJudge {
         }
 
         try {
-            logger.debug('[LLM_JUDGE] Iniciando validação de resposta', {
-                promptLength: prompt.length,
-                responseLength: response.length,
-            });
+            logger.debug(
+                /** @type {Record<string, unknown>} */ ({
+                    msg: '[LLM_JUDGE] Iniciando validação de resposta',
+                    promptLength: prompt.length,
+                    responseLength: response.length,
+                }),
+            );
 
             // Validação paralela (3 prompts independentes)
             const [completeness, relevance, quality] = await Promise.all([
@@ -77,20 +92,23 @@ class LLMJudge {
                 recommendation,
             };
 
-            logger.info('[LLM_JUDGE] Validação completa', {
-                overallScore,
-                recommendation,
-                completeness: completeness.score,
-                relevance: relevance.score,
-                quality: quality.score,
-            });
+            logger.info(
+                /** @type {Record<string, unknown>} */ ({
+                    msg: '[LLM_JUDGE] Validação completa',
+                    overallScore,
+                    recommendation,
+                    completeness: completeness.score,
+                    relevance: relevance.score,
+                    quality: quality.score,
+                }),
+            );
 
             return validation;
-        } catch (error) {
-            logger.error('[LLM_JUDGE] Erro ao validar resposta', {
-                error: error.message,
-                stack: error.stack,
-            });
+        } catch (/** @type {any} */ error) {
+            logger.error(
+                `[LLM_JUDGE] Erro ao validar resposta: ${error instanceof Error ? error.message : String(error)}`,
+                String(error instanceof Error ? (error.stack ?? '-') : '-'),
+            );
             // Retorna null ao invés de falhar (validação é opcional)
             return null;
         }
@@ -99,28 +117,28 @@ class LLMJudge {
     /**
      * Verifica completude da resposta
      *
+     * @private
      * @param {string} prompt - Prompt original
      * @param {string} response - Resposta
      * @param {AbortSignal} signal - Abort signal
-     * @returns {Promise<Object>} - { score, reasoning, isComplete }
-     * @private
+     * @returns {Promise<{ score: number; reasoning: string; isComplete: boolean }>} - { score, reasoning, isComplete }
      */
     async _checkCompleteness(prompt, response, signal) {
         const judgePrompt = this._buildCompletenessPrompt(prompt, response);
 
         try {
             const result = await this._callLLM(judgePrompt, signal);
-            const parsed = this._parseJudgmentResult(result);
+            const parsed = /** @type {LLMJudgeResult} */ (this._parseJudgmentResult(result));
 
             return {
                 score: parsed.score,
                 reasoning: parsed.reasoning,
                 isComplete: parsed.score >= 70,
             };
-        } catch (error) {
-            logger.warn('[LLM_JUDGE] Erro ao verificar completeness, usando fallback', {
-                error: error.message,
-            });
+        } catch (/** @type {any} */ error) {
+            logger.warn(
+                `[LLM_JUDGE] Erro ao verificar completeness, usando fallback: ${error instanceof Error ? error.message : String(error)}`,
+            );
             return { score: 50, reasoning: 'Validation failed', isComplete: false };
         }
     }
@@ -128,28 +146,28 @@ class LLMJudge {
     /**
      * Verifica relevância da resposta
      *
+     * @private
      * @param {string} prompt - Prompt original
      * @param {string} response - Resposta
      * @param {AbortSignal} signal - Abort signal
-     * @returns {Promise<Object>} - { score, reasoning, isRelevant }
-     * @private
+     * @returns {Promise<{ score: number; reasoning: string; isRelevant: boolean }>} - { score, reasoning, isRelevant }
      */
     async _checkRelevance(prompt, response, signal) {
         const judgePrompt = this._buildRelevancePrompt(prompt, response);
 
         try {
             const result = await this._callLLM(judgePrompt, signal);
-            const parsed = this._parseJudgmentResult(result);
+            const parsed = /** @type {LLMJudgeResult} */ (this._parseJudgmentResult(result));
 
             return {
                 score: parsed.score,
                 reasoning: parsed.reasoning,
                 isRelevant: parsed.score >= 70,
             };
-        } catch (error) {
-            logger.warn('[LLM_JUDGE] Erro ao verificar relevance, usando fallback', {
-                error: error.message,
-            });
+        } catch (/** @type {any} */ error) {
+            logger.warn(
+                `[LLM_JUDGE] Erro ao verificar relevance, usando fallback: ${error instanceof Error ? error.message : String(error)}`,
+            );
             return { score: 50, reasoning: 'Validation failed', isRelevant: false };
         }
     }
@@ -157,26 +175,26 @@ class LLMJudge {
     /**
      * Verifica qualidade da resposta
      *
+     * @private
      * @param {string} response - Resposta
      * @param {AbortSignal} signal - Abort signal
-     * @returns {Promise<Object>} - { score, reasoning }
-     * @private
+     * @returns {Promise<{ score: number; reasoning: string }>} - { score, reasoning }
      */
     async _checkQuality(response, signal) {
         const judgePrompt = this._buildQualityPrompt(response);
 
         try {
             const result = await this._callLLM(judgePrompt, signal);
-            const parsed = this._parseJudgmentResult(result);
+            const parsed = /** @type {LLMJudgeResult} */ (this._parseJudgmentResult(result));
 
             return {
                 score: parsed.score,
                 reasoning: parsed.reasoning,
             };
-        } catch (error) {
-            logger.warn('[LLM_JUDGE] Erro ao verificar quality, usando fallback', {
-                error: error.message,
-            });
+        } catch (/** @type {any} */ error) {
+            logger.warn(
+                `[LLM_JUDGE] Erro ao verificar quality, usando fallback: ${error instanceof Error ? error.message : String(error)}`,
+            );
             return { score: 50, reasoning: 'Validation failed' };
         }
     }
@@ -184,10 +202,10 @@ class LLMJudge {
     /**
      * Constrói prompt para validar completude
      *
+     * @private
      * @param {string} prompt - Prompt original
      * @param {string} response - Resposta
      * @returns {string} - Judge prompt
-     * @private
      */
     _buildCompletenessPrompt(prompt, response) {
         // Trunca resposta se muito longa (economizar tokens)
@@ -223,10 +241,10 @@ Respond ONLY in JSON format:
     /**
      * Constrói prompt para validar relevância
      *
+     * @private
      * @param {string} prompt - Prompt original
      * @param {string} response - Resposta
      * @returns {string} - Judge prompt
-     * @private
      */
     _buildRelevancePrompt(prompt, response) {
         const responsePreview =
@@ -261,9 +279,9 @@ Respond ONLY in JSON format:
     /**
      * Constrói prompt para validar qualidade
      *
+     * @private
      * @param {string} response - Resposta
      * @returns {string} - Judge prompt
-     * @private
      */
     _buildQualityPrompt(response) {
         const responsePreview =
@@ -297,10 +315,10 @@ Respond ONLY in JSON format:
     /**
      * Chama LLM para obter julgamento
      *
+     * @private
      * @param {string} judgePrompt - Prompt para juiz
      * @param {AbortSignal} signal - Abort signal
      * @returns {Promise<string>} - Resposta do LLM (JSON)
-     * @private
      */
     async _callLLM(judgePrompt, signal) {
         // Aqui chamamos o driver para executar o prompt
@@ -336,10 +354,8 @@ Respond ONLY in JSON format:
                 clearTimeout(timeoutId);
             }
             return response;
-        } catch (error) {
-            logger.error('[LLM_JUDGE] Erro ao chamar LLM', {
-                error: error.message,
-            });
+        } catch (/** @type {any} */ error) {
+            logger.error(`[LLM_JUDGE] Erro ao chamar LLM: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
         }
     }
@@ -347,9 +363,9 @@ Respond ONLY in JSON format:
     /**
      * Parseia resultado do julgamento (JSON)
      *
-     * @param {string} result - Resposta do LLM
-     * @returns {Object} - { score, reasoning }
      * @private
+     * @param {string} result - Resposta do LLM
+     * @returns {LLMJudgeResult} - { score, reasoning }
      */
     _parseJudgmentResult(result) {
         try {
@@ -360,7 +376,7 @@ Respond ONLY in JSON format:
                 score: this._normalizeScore(parsed.score),
                 reasoning: parsed.reasoning || 'No reasoning provided',
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             // Fallback: tenta extrair JSON de texto
             const jsonMatch = result.match(/\{[\s\S]*"score"[\s\S]*\}/);
             if (jsonMatch) {
@@ -370,14 +386,12 @@ Respond ONLY in JSON format:
                         score: this._normalizeScore(parsed.score),
                         reasoning: parsed.reasoning || 'No reasoning provided',
                     };
-                } catch (e) {
+                } catch (/** @type {any} */ e) {
                     // Ignora
                 }
             }
 
-            logger.warn('[LLM_JUDGE] Erro ao parsear resultado, usando fallback', {
-                result: result.slice(0, 200),
-            });
+            logger.warn(`[LLM_JUDGE] Erro ao parsear resultado, usando fallback: ${result.slice(0, 200)}`);
 
             // Fallback: score 50 (neutro)
             return {
@@ -390,9 +404,9 @@ Respond ONLY in JSON format:
     /**
      * Normaliza score (0-100)
      *
+     * @private
      * @param {number} score - Score bruto
      * @returns {number} - Score normalizado
-     * @private
      */
     _normalizeScore(score) {
         const parsed = typeof score === 'string' ? Number(score) : score;

@@ -1,22 +1,27 @@
 // @ts-check
-import express from 'express';
 import { log } from '#core/logger';
-import { ok, fail } from '../utils/api_envelope.js';
-import { authenticate } from '../../middleware/auth.js';
-import { COMMANDS, executeCommand } from '#server/domain/control_command_service';
 import { listInferenceBackends } from '#infra/db/inference_backend_repo';
+import { listInferenceClientPolicies } from '#infra/db/inference_client_policy_repo';
 import { listInferenceModels } from '#infra/db/inference_model_repo';
 import { listInferenceProfiles } from '#infra/db/inference_profile_repo';
-import { listInferenceClientPolicies } from '#infra/db/inference_client_policy_repo';
+import { COMMANDS, executeCommand } from '#server/domain/control_command_service';
+import express from 'express';
+import { authenticate } from '../../middleware/auth.js';
+import { fail, ok } from '../utils/api_envelope.js';
 
 /** @type {ReturnType<typeof express.Router>} */
 const router = express.Router();
 
-function _actorFromReq(req) {
+function _actorFromReq(/** @type {any} */ req) {
     return req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] };
 }
 
-async function _runControl(req, res, command, payload = {}) {
+async function _runControl(
+    /** @type {any} */ req,
+    /** @type {any} */ res,
+    /** @type {any} */ command,
+    /** @type {Record<string, any>} */ payload = {},
+) {
     try {
         const result = await executeCommand({
             command,
@@ -34,21 +39,22 @@ async function _runControl(req, res, command, payload = {}) {
             actor: _actorFromReq(req),
         });
         return result;
-    } catch (err) {
-        fail(res, req, Number(err?.statusCode || 500), {
-            code: err?.code || 'INFERENCE_CONTROL_COMMAND_FAILED',
-            error: err?.message || 'Falha em comando de inferência',
-            details: err?.details || null,
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        fail(res, req, Number(_e?.statusCode || 500), {
+            code: _e?.code || 'INFERENCE_CONTROL_COMMAND_FAILED',
+            error: _e?.message || 'Falha em comando de inferência',
+            details: _e?.details || null,
         });
         return null;
     }
 }
 
-function _asRecord(value) {
+function _asRecord(/** @type {any} */ value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
-function _capabilitySummary(model) {
+function _capabilitySummary(/** @type {any} */ model) {
     const caps = _asRecord(model?.capabilities_json);
     return {
         supports_code_patch: Boolean(caps.supports_code_patch),
@@ -61,7 +67,7 @@ function _capabilitySummary(model) {
     };
 }
 
-function _enrichModelDb(model) {
+function _enrichModelDb(/** @type {any} */ model) {
     return {
         ...model,
         capabilities_summary: _capabilitySummary(model),
@@ -74,10 +80,14 @@ function _enrichModelDb(model) {
     };
 }
 
+/**
+ * @param {{ backends?: any[]; models?: any[]; profiles?: any[]; clientPolicies?: any[] }} param0
+ * @returns {any}
+ */
 function _buildInferenceSummary({ backends = [], models = [], profiles = [], clientPolicies = [] }) {
-    const enabledBackends = backends.filter(b => b?.enabled);
-    const enabledModels = models.filter(m => m?.enabled);
-    const byBackend = {};
+    const enabledBackends = backends.filter((b) => b?.enabled);
+    const enabledModels = models.filter((m) => m?.enabled);
+    const byBackend = /** @type {Record<string, any>} */ ({});
     for (const backend of backends) {
         byBackend[backend.id] = {
             backend_id: backend.id,
@@ -110,16 +120,16 @@ function _buildInferenceSummary({ backends = [], models = [], profiles = [], cli
             models_total: models.length,
             models_enabled: enabledModels.length,
             profiles_total: profiles.length,
-            profiles_enabled: profiles.filter(p => p?.enabled).length,
+            profiles_enabled: profiles.filter((p) => p?.enabled).length,
             client_policies_total: clientPolicies.length,
-            client_policies_enabled: clientPolicies.filter(p => p?.enabled).length,
+            client_policies_enabled: clientPolicies.filter((p) => p?.enabled).length,
         },
         by_backend: Object.values(byBackend),
         capability_totals: {
-            code_patch_models: models.filter(m => _capabilitySummary(m).supports_code_patch).length,
-            embedding_models: models.filter(m => _capabilitySummary(m).supports_embeddings).length,
-            json_strict_models: models.filter(m => _capabilitySummary(m).supports_json_strict).length,
-            long_context_models: models.filter(m => _capabilitySummary(m).supports_long_context).length,
+            code_patch_models: models.filter((m) => _capabilitySummary(m).supports_code_patch).length,
+            embedding_models: models.filter((m) => _capabilitySummary(m).supports_embeddings).length,
+            json_strict_models: models.filter((m) => _capabilitySummary(m).supports_json_strict).length,
+            long_context_models: models.filter((m) => _capabilitySummary(m).supports_long_context).length,
         },
     };
 }
@@ -135,7 +145,7 @@ function getBaseUrls() {
     };
 }
 
-async function safeFetchJson(url, timeoutMs = 2000) {
+async function safeFetchJson(/** @type {any} */ url, timeoutMs = 2000) {
     try {
         const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
         const text = await res.text();
@@ -146,12 +156,13 @@ async function safeFetchJson(url, timeoutMs = 2000) {
             json = null;
         }
         return { ok: res.ok, status: res.status, json, text };
-    } catch (error) {
-        return { ok: false, status: null, json: null, text: null, error: error?.message || String(error) };
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
+        return { ok: false, status: null, json: null, text: null, error: _e?.message || String(_e) };
     }
 }
 
-async function safePostJson(url, body, timeoutMs = 2000) {
+async function safePostJson(/** @type {any} */ url, /** @type {any} */ body, timeoutMs = 2000) {
     try {
         const res = await fetch(url, {
             method: 'POST',
@@ -167,8 +178,9 @@ async function safePostJson(url, body, timeoutMs = 2000) {
             json = null;
         }
         return { ok: res.ok, status: res.status, json, text };
-    } catch (error) {
-        return { ok: false, status: null, json: null, text: null, error: error?.message || String(error) };
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
+        return { ok: false, status: null, json: null, text: null, error: _e?.message || String(_e) };
     }
 }
 
@@ -185,8 +197,8 @@ router.get('/inference/runtime', authenticate, async (req, res) => {
         ]);
 
         const resources = Array.isArray(runtimeSummary?.resources)
-            ? runtimeSummary.resources.filter(item =>
-                  ['ollama_host', 'inference_gateway', 'audit_agent'].includes(String(item.id))
+            ? runtimeSummary.resources.filter((/** @type {any} */ item) =>
+                  ['ollama_host', 'inference_gateway', 'audit_agent'].includes(String(item.id)),
               )
             : [];
 
@@ -203,14 +215,15 @@ router.get('/inference/runtime', authenticate, async (req, res) => {
             },
             {
                 readiness_status: runtimeSummary?.status || 'unknown',
-            }
+            },
         );
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] inference runtime failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] inference runtime failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'INFERENCE_RUNTIME_FAILED',
             error: 'Erro ao recuperar runtime de inferência',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -228,12 +241,13 @@ router.get('/inference/metrics', authenticate, async (req, res) => {
             audit_agent: auditAgentMetrics,
             endpoints: urls,
         });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] inference metrics failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] inference metrics failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'INFERENCE_METRICS_FAILED',
             error: 'Erro ao recuperar métricas de inferência',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -256,11 +270,12 @@ router.get('/inference/models', authenticate, async (req, res) => {
             });
         }
         return ok(res, req, json?.models ?? [], { source: 'inference-gateway' });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 503, {
             code: 'INFERENCE_GATEWAY_UNAVAILABLE',
             error: 'Inference Gateway indisponível',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -271,11 +286,12 @@ router.get('/inference/models-db', authenticate, async (req, res) => {
         const models = listInferenceModels({ backendId, enabledOnly: false, limit: 1000 });
         const enriched = models.map(_enrichModelDb);
         return ok(res, req, enriched, { count: enriched.length, source: 'sqlite', enriched: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 500, {
             code: 'INFERENCE_MODELS_DB_LIST_FAILED',
             error: 'Erro ao listar modelos persistidos',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -289,11 +305,12 @@ router.get('/inference/summary', authenticate, async (req, res) => {
         return ok(res, req, _buildInferenceSummary({ backends, models, profiles, clientPolicies }), {
             source: 'sqlite',
         });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 500, {
             code: 'INFERENCE_SUMMARY_FAILED',
             error: 'Erro ao montar summary de inferência',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -302,11 +319,12 @@ router.get('/inference/backends', authenticate, async (req, res) => {
     try {
         const backends = listInferenceBackends({ enabledOnly: false, limit: 500 });
         return ok(res, req, backends, { count: backends.length, source: 'sqlite' });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 500, {
             code: 'INFERENCE_BACKENDS_LIST_FAILED',
             error: 'Erro ao listar backends de inferência',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -315,11 +333,12 @@ router.get('/inference/profiles', authenticate, async (req, res) => {
     try {
         const profiles = listInferenceProfiles({ enabledOnly: false, limit: 500 });
         return ok(res, req, profiles, { count: profiles.length, source: 'sqlite' });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 500, {
             code: 'INFERENCE_PROFILES_LIST_FAILED',
             error: 'Erro ao listar profiles de inferência',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -328,11 +347,12 @@ router.get('/inference/client-policies', authenticate, async (req, res) => {
     try {
         const policies = listInferenceClientPolicies({ enabledOnly: false, limit: 500 });
         return ok(res, req, policies, { count: policies.length, source: 'sqlite' });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 500, {
             code: 'INFERENCE_CLIENT_POLICIES_LIST_FAILED',
             error: 'Erro ao listar client policies de inferência',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -349,11 +369,12 @@ router.get('/inference/policies/summary', authenticate, async (req, res) => {
             });
         }
         return ok(res, req, response.json?.summary || null, { source: 'inference-gateway' });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 503, {
             code: 'INFERENCE_GATEWAY_UNAVAILABLE',
             error: 'Inference Gateway indisponível',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -375,14 +396,14 @@ router.post('/inference/triage/preflight', authenticate, async (req, res) => {
                 model: model ? String(model) : undefined,
                 backend: backend ? String(backend) : undefined,
             },
-            timeoutMs
+            timeoutMs,
         );
         const modelsProbe =
             String(body.probe_models || 'false').toLowerCase() === 'true'
                 ? await safePostJson(
                       `${urls.inferenceGateway}/v1/models`,
                       { clientTag: 'diagnostics_probe' },
-                      Math.min(timeoutMs + 1000, 5000)
+                      Math.min(timeoutMs + 1000, 5000),
                   )
                 : null;
         if (!out.ok) {
@@ -406,13 +427,14 @@ router.post('/inference/triage/preflight', authenticate, async (req, res) => {
                     client_tag: 'audit_agent_triage',
                 },
             },
-            { source: 'inference-gateway', endpoint: '/v1/validate/generate' }
+            { source: 'inference-gateway', endpoint: '/v1/validate/generate' },
         );
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 503, {
             code: 'INFERENCE_TRIAGE_PREFLIGHT_UNAVAILABLE',
             error: 'Preflight de triage indisponível',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -434,7 +456,7 @@ router.post('/inference/patch/preflight', authenticate, async (req, res) => {
                 model: model ? String(model) : undefined,
                 backend: backend ? String(backend) : undefined,
             },
-            timeoutMs
+            timeoutMs,
         );
         if (!out.ok) {
             return fail(res, req, out.status || 503, {
@@ -456,13 +478,14 @@ router.post('/inference/patch/preflight', authenticate, async (req, res) => {
                     client_tag: 'audit_agent_patch',
                 },
             },
-            { source: 'inference-gateway', endpoint: '/v1/validate/generate' }
+            { source: 'inference-gateway', endpoint: '/v1/validate/generate' },
         );
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 503, {
             code: 'INFERENCE_PATCH_PREFLIGHT_UNAVAILABLE',
             error: 'Preflight de patch author indisponível',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });

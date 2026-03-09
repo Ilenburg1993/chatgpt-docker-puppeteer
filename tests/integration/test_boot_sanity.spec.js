@@ -1,8 +1,8 @@
 // @ts-check
-import assert from 'node:assert';
-import { describe, it } from 'node:test';
-import path from 'node:path';
 import fs from 'fs/promises';
+import assert from 'node:assert';
+import path from 'node:path';
+import { describe, it } from 'node:test';
 
 describe('Boot Sequence Sanity Check (V2.0)', () => {
     it('should have MissionManager module available', async () => {
@@ -49,7 +49,7 @@ describe('Boot Sequence Sanity Check (V2.0)', () => {
         assert.strictEqual(
             typeof missionsController.setMissionManager,
             'function',
-            'Controller deveria ter método setMissionManager'
+            'Controller deveria ter método setMissionManager',
         );
     });
 
@@ -105,7 +105,7 @@ describe('Boot Sequence Sanity Check (V2.0)', () => {
         assert.strictEqual(
             typeof TaskExecutionOrchestrator,
             'function',
-            'TaskExecutionOrchestrator deveria ser uma classe'
+            'TaskExecutionOrchestrator deveria ser uma classe',
         );
     });
 

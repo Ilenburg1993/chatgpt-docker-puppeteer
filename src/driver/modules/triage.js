@@ -1,10 +1,10 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
-import EventEmitter from 'node:events';
-import * as stabilizer from '#shared/page_stability/stabilizer';
-import { STATUS_VALUES } from '#core/constants/tasks';
+// @ts-check
 import { ERROR_NAMES } from '#core/constants';
+import { STATUS_VALUES } from '#core/constants/tasks';
 import * as i18n from '#core/i18n';
 import { log } from '#core/logger';
+import * as stabilizer from '#shared/page_stability/stabilizer';
+import EventEmitter from 'node:events';
 
 /**
  * Configuração do sistema de triage (timeouts, thresholds, limits).
@@ -87,13 +87,13 @@ class TriageError extends Error {
      *
      * @param {string} type - Tipo do erro (TIMEOUT, ABORTED, INVALID_PAGE, SCAN_FAILED, LAG_MEASUREMENT_FAILED)
      * @param {string} message - Mensagem de erro
-     * @param {Object} context - Contexto adicional
+     * @param {object} context - Contexto adicional
      */
     constructor(type, message, context) {
         super(message);
         this.name = ERROR_NAMES.TRIAGE_ERROR;
         this.type = type;
-        this.context = context;
+        this.context = /** @type {Record<string, unknown>} */ (context);
         this.timestamp = Date.now();
     }
 }
@@ -102,6 +102,7 @@ class TriageError extends Error {
  * Triage v2.0 - Instrumented Diagnostic System
  *
  * Sistema de diagnóstico em tempo real que detecta:
+ *
  * - Browser frozen (event loop lag)
  * - CAPTCHA/Cloudflare challenges
  * - Login walls
@@ -113,6 +114,7 @@ class TriageError extends Error {
  * - Logical loops (spinning without progress)
  *
  * FEATURES v2.0:
+ *
  * - EventEmitter inheritance (8 eventos locais)
  * - TRIAGE_CONFIG (10 keys configuráveis via env vars)
  * - Timeout protection em operações críticas
@@ -124,38 +126,37 @@ class TriageError extends Error {
  * - getStats() method para introspection
  * - Backward compatibility (diagnoseStall function preserved)
  *
- * @extends EventEmitter
- *
  * @example
- * const triage = new Triage(page, 'en');
+ *     const triage = new Triage(page, 'en');
  *
- * // Listen to events
- * triage.on(TRIAGE_EVENTS.PATTERN_DETECTED, (data) => {
- *     console.log('Pattern:', data.pattern);
- * });
+ *     // Listen to events
+ *     triage.on(TRIAGE_EVENTS.PATTERN_DETECTED, (data) => {
+ *         console.log('Pattern:', data.pattern);
+ *     });
  *
- * // Diagnose
- * const result = await triage.diagnose(signal);
- * console.log('Type:', result.type);
+ *     // Diagnose
+ *     const result = await triage.diagnose(signal);
+ *     console.log('Type:', result.type);
  *
- * // Get metrics
- * const stats = triage.getStats();
- * console.log('Success rate:', stats.successRate);
+ *     // Get metrics
+ *     const stats = triage.getStats();
+ *     console.log('Success rate:', stats.successRate);
+ *
+ * @extends EventEmitter
  */
 class Triage extends EventEmitter {
     /**
      * Cria uma instância do Triage.
      *
-     * @param {Object} page - Puppeteer Page instance
-     * @param {Function} page.evaluate - Método para executar código no browser
-     * @param {string} [langCode='en'] - Código de idioma para análise semântica
+     * @example
+     *     const triage = new Triage(page, 'en');
      *
+     * @param {object} page - Puppeteer Page instance
+     * @param {function} page.evaluate - Método para executar código no browser
+     * @param {string} [langCode='en'] - Código de idioma para análise semântica Default is `'en'`
      * @throws {Error} Se page não for fornecido
      * @throws {Error} Se page.evaluate não for uma função
      * @throws {Error} Se langCode não for uma string não-vazia
-     *
-     * @example
-     * const triage = new Triage(page, 'en');
      */
     constructor(page, langCode = 'en') {
         super(); // EventEmitter constructor
@@ -213,13 +214,14 @@ class Triage extends EventEmitter {
      * Mede event loop lag com retry logic.
      *
      * @private
+     * @example
+     *     const lag = await this._measureLagWithRetry();
+     *
      * @returns {Promise<number>} Event loop lag em ms
      * @throws {TriageError} Se todas as tentativas falharem
-     *
-     * @example
-     * const lag = await this._measureLagWithRetry();
      */
     async _measureLagWithRetry() {
+        let _lastError;
         for (let attempt = 0; attempt < TRIAGE_CONFIG.LAG_RETRY_ATTEMPTS; attempt++) {
             try {
                 const lag = await stabilizer.measureEventLoopLag(this.page);
@@ -236,10 +238,10 @@ class Triage extends EventEmitter {
                 }
 
                 return lag;
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log(
                     'WARN',
-                    `[TRIAGE] Lag measurement attempt ${attempt + 1}/${TRIAGE_CONFIG.LAG_RETRY_ATTEMPTS} failed: ${err.message}`
+                    `[TRIAGE] Lag measurement attempt ${attempt + 1}/${TRIAGE_CONFIG.LAG_RETRY_ATTEMPTS} failed: ${err.message}`,
                 );
 
                 if (attempt === TRIAGE_CONFIG.LAG_RETRY_ATTEMPTS - 1) {
@@ -250,9 +252,12 @@ class Triage extends EventEmitter {
                 }
 
                 // Backoff
-                await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
+                await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
             }
         }
+        throw new TriageError('LAG_MEASUREMENT_FAILED', 'All lag measurement attempts exhausted', {
+            langCode: this.langCode,
+        });
     }
 
     /**
@@ -260,7 +265,7 @@ class Triage extends EventEmitter {
      *
      * @private
      * @param {AbortSignal} signal - AbortSignal para cancelamento
-     * @returns {Promise<Object>} Resultado do diagnóstico
+     * @returns {Promise<any>} Resultado do diagnóstico
      */
     async _executeDiagnosis(signal) {
         // ✅ BUG #7 fix: AbortSignal check
@@ -299,21 +304,27 @@ class Triage extends EventEmitter {
 
         try {
             const diagnosis = await this.page.evaluate(
-                async (errors, closers, config) => {
+                async (/** @type {any} */ errors, /** @type {any} */ closers, /** @type {any} */ config) => {
                     const Probe = {
                         /**
                          * Varredura Consolidada em passagem única (Single-Pass Scan).
                          */
                         scan: (
-                            /** @type {Document|ShadowRoot} */ root = document,
-                            acc = { textParts: [], nodeCount: 0, hasPassword: false, spinners: [], buttons: [] },
-                            depth = 0
+                            /** @type {Document | ShadowRoot} */ root = document,
+                            acc = {
+                                textParts: /** @type {any[]} */ ([]),
+                                nodeCount: 0,
+                                hasPassword: false,
+                                spinners: /** @type {any[]} */ ([]),
+                                buttons: /** @type {any[]} */ ([]),
+                            },
+                            depth = 0,
                         ) => {
                             if (depth > config.maxScanDepth) {
                                 return acc;
                             }
                             const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-                            let node = walker.currentNode;
+                            let node = /** @type {any} */ (walker.currentNode);
 
                             while (node) {
                                 if (node.nodeType === 1) {
@@ -361,9 +372,9 @@ class Triage extends EventEmitter {
                         /**
                          * Detecta erros visuais (vermelho/laranja) em botões e alertas.
                          */
-                        checkVisualError: (buttons, config) => {
-                            const candidates = buttons.filter(b =>
-                                b.matches('[role="alert"], .error, .warning, [class*="error"]')
+                        checkVisualError: (/** @type {any} */ buttons, /** @type {any} */ config) => {
+                            const candidates = buttons.filter((/** @type {any} */ b) =>
+                                b.matches('[role="alert"], .error, .warning, [class*="error"]'),
                             );
                             for (const el of candidates) {
                                 if (!el.isConnected || el.innerText.length < 3) {
@@ -378,7 +389,7 @@ class Triage extends EventEmitter {
                                     continue;
                                 }
 
-                                const parseRGB = str => {
+                                const parseRGB = (/** @type {any} */ str) => {
                                     const m = str.match(/\d+/g);
                                     return m && m.length >= 3 ? { r: +m[0], g: +m[1], b: +m[2] } : null;
                                 };
@@ -386,7 +397,7 @@ class Triage extends EventEmitter {
                                 const fg = parseRGB(style.color);
                                 const bg = parseRGB(style.backgroundColor);
 
-                                const isAlert = c =>
+                                const isAlert = (/** @type {any} */ c) =>
                                     c &&
                                     ((c.r > config.redThreshold && c.g < 100 && c.b < 100) || // Vermelho
                                         (c.r > config.orangeThreshold && c.g > 100 && c.g < 200 && c.b < 80)); // Laranja
@@ -404,7 +415,7 @@ class Triage extends EventEmitter {
                     const startTime = performance.now();
 
                     // Intervalo para detecção de entropia (movimento do DOM)
-                    await new Promise(r => {
+                    await new Promise((r) => {
                         setTimeout(r, config.snapshotDelay);
                     });
 
@@ -434,20 +445,22 @@ class Triage extends EventEmitter {
                     }
 
                     // 3. BARREIRAS DE RENDERIZAÇÃO
-                    const hasMajorBarrier = Array.from(document.querySelectorAll('iframe')).some(f => {
-                        try {
-                            if (f.contentDocument) {
-                                return false;
+                    const hasMajorBarrier = Array.from(/** @type {any} */ (document).querySelectorAll('iframe')).some(
+                        (/** @type {any} */ f) => {
+                            try {
+                                if (f.contentDocument) {
+                                    return false;
+                                }
+                            } catch {
+                                const r = f.getBoundingClientRect();
+                                return (
+                                    r.width > window.innerWidth * config.iframeSizeThreshold &&
+                                    r.height > window.innerHeight * config.iframeSizeThreshold
+                                );
                             }
-                        } catch {
-                            const r = f.getBoundingClientRect();
-                            return (
-                                r.width > window.innerWidth * config.iframeSizeThreshold &&
-                                r.height > window.innerHeight * config.iframeSizeThreshold
-                            );
-                        }
-                        return false;
-                    });
+                            return false;
+                        },
+                    );
                     if (hasMajorBarrier && snap2.nodeCount < 50) {
                         return {
                             type: 'INFRA_BARRIER_DETECTED',
@@ -457,11 +470,11 @@ class Triage extends EventEmitter {
                     }
 
                     // 4. LIMITES E ERROS SEMÂNTICOS
-                    if (['limit', 'limite', 'quota', 'too many'].some(p => fullText.includes(p))) {
+                    if (['limit', 'limite', 'quota', 'too many'].some((p) => fullText.includes(p))) {
                         return { type: 'LIMIT_REACHED', severity: 'HIGH', evidence: { text: 'quota_exhausted' } };
                     }
 
-                    const foundError = errors.find(term => fullText.includes(term.toLowerCase()));
+                    const foundError = errors.find((/** @type {any} */ term) => fullText.includes(term.toLowerCase()));
                     if (foundError) {
                         return { type: 'GENERIC_ERROR_TEXT', severity: 'MEDIUM', evidence: { term: foundError } };
                     }
@@ -478,12 +491,14 @@ class Triage extends EventEmitter {
 
                     // 6. FIM ABRUPTO (Botão de Retry sem botão de Stop)
                     const retryBtn = snap2.buttons.find(
-                        b => closers.some(c => (b.innerText || '').toLowerCase().includes(c)) && b.offsetParent !== null
+                        (b) =>
+                            closers.some((/** @type {any} */ c) => (b.innerText || '').toLowerCase().includes(c)) &&
+                            b.offsetParent !== null,
                     );
                     const stopBtn = snap2.buttons.find(
-                        b =>
+                        (b) =>
                             (b.querySelector('svg rect') || (b.innerText || '').toLowerCase().includes('stop')) &&
-                            b.offsetParent !== null
+                            b.offsetParent !== null,
                     );
                     if (retryBtn && !stopBtn) {
                         return { type: 'FINISHED_ABRUPTLY', severity: 'MEDIUM', evidence: { has_retry: true } };
@@ -492,7 +507,7 @@ class Triage extends EventEmitter {
                     // 7. LOOP LÓGICO (Spinning sem alteração de conteúdo)
                     const semanticChanged = snap1.textParts.join('') !== snap2.textParts.join('');
                     const domMutated = snap1.nodeCount !== snap2.nodeCount;
-                    const isSpinning = snap2.spinners.some(s => s.offsetParent !== null);
+                    const isSpinning = snap2.spinners.some((s) => s.offsetParent !== null);
 
                     if (!semanticChanged && !domMutated && isSpinning) {
                         return {
@@ -513,7 +528,7 @@ class Triage extends EventEmitter {
                     redThreshold: TRIAGE_CONFIG.ERROR_COLOR_RED_THRESHOLD,
                     orangeThreshold: TRIAGE_CONFIG.ERROR_COLOR_ORANGE_THRESHOLD,
                     iframeSizeThreshold: TRIAGE_CONFIG.IFRAME_SIZE_THRESHOLD,
-                }
+                },
             );
 
             const scanDuration = Date.now() - scanStartTime;
@@ -529,7 +544,7 @@ class Triage extends EventEmitter {
 
             // Track pattern detection
             if (diagnosis && Object.hasOwn(this.stats.patternsDetected, diagnosis.type)) {
-                this.stats.patternsDetected[diagnosis.type]++;
+                /** @type {any} */ (this.stats.patternsDetected)[diagnosis.type]++;
                 this.emit(TRIAGE_EVENTS.PATTERN_DETECTED, {
                     pattern: diagnosis.type,
                     result,
@@ -537,7 +552,7 @@ class Triage extends EventEmitter {
             }
 
             return result;
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
             log('ERROR', `[TRIAGE] Falha na autópsia V2: ${e.message}`);
 
             throw new TriageError('SCAN_FAILED', e.message, {
@@ -551,6 +566,7 @@ class Triage extends EventEmitter {
      * Realiza diagnóstico profundo de travamento/anomalias na página.
      *
      * Detecta 9 padrões de falhas:
+     *
      * 1. BROWSER_FROZEN (event loop lag > threshold)
      * 2. CAPTCHA_CHALLENGE (Cloudflare/captcha)
      * 3. LOGIN_REQUIRED (password input)
@@ -561,9 +577,33 @@ class Triage extends EventEmitter {
      * 8. FINISHED_ABRUPTLY (retry without stop)
      * 9. LOGICAL_LOOP (spinning without progress)
      *
+     * @example
+     *     const triage = new Triage(page, 'en');
+     *
+     *     // Listen to events
+     *     triage.on('triage:pattern_detected', (data) => {
+     *         console.log('Pattern:', data.pattern);
+     *     });
+     *
+     *     // Diagnose with AbortSignal
+     *     const controller = new AbortController();
+     *     const result = await triage.diagnose(controller.signal);
+     *
+     *     if (result.type === 'BROWSER_FROZEN') {
+     *         console.log('Browser frozen with lag:', result.evidence.lag_ms);
+     *     }
+     *
+     * @fires TRIAGE_EVENTS.DIAGNOSIS_STARTED
+     * @fires TRIAGE_EVENTS.LAG_DETECTED
+     * @fires TRIAGE_EVENTS.PATTERN_DETECTED
+     * @fires TRIAGE_EVENTS.SCAN_STARTED
+     * @fires TRIAGE_EVENTS.SCAN_COMPLETED
+     * @fires TRIAGE_EVENTS.DIAGNOSIS_COMPLETED
+     * @fires TRIAGE_EVENTS.DIAGNOSIS_FAILED
+     * @fires TRIAGE_EVENTS.TIMEOUT_REACHED
      * @param {AbortSignal} [signal] - AbortSignal para cancelamento
-     * @returns {Promise<Object>} Diagnóstico estruturado
-     * Propriedades do objeto retornado:
+     * @returns {Promise<any>} Diagnóstico estruturado Propriedades do objeto retornado:
+     *
      *   - type (string): Tipo de diagnóstico
      *   - severity (string): Severidade (CRITICAL, HIGH, MEDIUM, NONE)
      *   - evidence (Object): Evidências coletadas
@@ -573,31 +613,6 @@ class Triage extends EventEmitter {
      * @throws {TriageError} Se timeout exceder (type: TIMEOUT)
      * @throws {TriageError} Se scan falhar (type: SCAN_FAILED)
      * @throws {TriageError} Se lag measurement falhar (type: LAG_MEASUREMENT_FAILED)
-     *
-     * @emits TRIAGE_EVENTS.DIAGNOSIS_STARTED
-     * @emits TRIAGE_EVENTS.LAG_DETECTED
-     * @emits TRIAGE_EVENTS.PATTERN_DETECTED
-     * @emits TRIAGE_EVENTS.SCAN_STARTED
-     * @emits TRIAGE_EVENTS.SCAN_COMPLETED
-     * @emits TRIAGE_EVENTS.DIAGNOSIS_COMPLETED
-     * @emits TRIAGE_EVENTS.DIAGNOSIS_FAILED
-     * @emits TRIAGE_EVENTS.TIMEOUT_REACHED
-     *
-     * @example
-     * const triage = new Triage(page, 'en');
-     *
-     * // Listen to events
-     * triage.on('triage:pattern_detected', (data) => {
-     *     console.log('Pattern:', data.pattern);
-     * });
-     *
-     * // Diagnose with AbortSignal
-     * const controller = new AbortController();
-     * const result = await triage.diagnose(controller.signal);
-     *
-     * if (result.type === 'BROWSER_FROZEN') {
-     *     console.log('Browser frozen with lag:', result.evidence.lag_ms);
-     * }
      */
     async diagnose(signal) {
         this.emit(TRIAGE_EVENTS.DIAGNOSIS_STARTED, {
@@ -610,7 +625,7 @@ class Triage extends EventEmitter {
         try {
             // ✅ BUG #5 fix: Timeout protection
             const result = await Promise.race([
-                this._executeDiagnosis(signal),
+                this._executeDiagnosis(/** @type {any} */ (signal)),
                 this._timeout(TRIAGE_CONFIG.DIAGNOSIS_TIMEOUT_MS, 'diagnose'),
             ]);
 
@@ -626,7 +641,7 @@ class Triage extends EventEmitter {
             });
 
             return result;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             this.stats.failedDiagnoses++;
 
             if (err.type === 'TIMEOUT') {
@@ -649,8 +664,14 @@ class Triage extends EventEmitter {
     /**
      * Retorna estatísticas de diagnóstico.
      *
-     * @returns {Object} Objeto com métricas de diagnóstico
-     * Propriedades do objeto retornado:
+     * @example
+     *     const stats = triage.getStats();
+     *     console.log('Success rate:', stats.successRate);
+     *     console.log('Most common pattern:', stats.mostCommonPattern);
+     *     console.log('Avg lag:', stats.avgLag);
+     *
+     * @returns {any} Objeto com métricas de diagnóstico Propriedades do objeto retornado:
+     *
      *   - totalDiagnoses (number): Total de diagnósticos
      *   - successfulDiagnoses (number): Diagnósticos bem-sucedidos
      *   - failedDiagnoses (number): Diagnósticos que falharam
@@ -667,12 +688,6 @@ class Triage extends EventEmitter {
      *   - avgLag (string): Lag médio
      *   - mostCommonPattern (string): Padrão mais comum
      *   - config (Object): Configuração atual (TRIAGE_CONFIG)
-     *
-     * @example
-     * const stats = triage.getStats();
-     * console.log('Success rate:', stats.successRate);
-     * console.log('Most common pattern:', stats.mostCommonPattern);
-     * console.log('Avg lag:', stats.avgLag);
      */
     getStats() {
         // Find most common pattern
@@ -727,39 +742,46 @@ class Triage extends EventEmitter {
 }
 
 /**
+ * @typedef {object} CreatePage
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Factory function para criar instância de Triage.
  *
- * @param {Object} page - Puppeteer page instance
- * @param {string} [langCode='en'] - Código de idioma
- * @returns {Triage} Nova instância
- *
  * @example
- * const { create } = require('./triage');
- * const triage = create(page, 'en');
+ *     const { create } = require('./triage');
+ *     const triage = create(page, 'en');
+ *
+ * @param {CreatePage} page - Puppeteer page instance
+ * @param {string} [langCode='en'] - Código de idioma. Default is `'en'`
+ * @returns {Triage} Nova instância
  */
 function create(page, langCode = 'en') {
-    return new Triage(page, langCode);
+    return new Triage(/** @type {any} */ (page), langCode);
 }
 
+/**
+ * @typedef {object} DiagnoseStallPage
+ * @property {any} _ Propriedades definidas em runtime.
+ */
 /**
  * Legacy function para backward compatibility.
  *
  * Preserva a API original v1.x (function export).
  *
- * @param {Object} page - Puppeteer Page instance
- * @param {string} [langCode='en'] - Código de idioma
- * @returns {Promise<Object>} Resultado do diagnóstico
- *
  * @deprecated Use new Triage(page, langCode).diagnose() instead
- *
  * @example
- * // Legacy API (v1.x)
- * const { diagnoseStall } = require('./triage');
- * const result = await diagnoseStall(page, 'en');
+ *     // Legacy API (v1.x)
+ *     const { diagnoseStall } = require('./triage');
+ *     const result = await diagnoseStall(page, 'en');
+ *
+ * @param {DiagnoseStallPage} page - Puppeteer Page instance
+ * @param {string} [langCode='en'] - Código de idioma. Default is `'en'`
+ * @returns {Promise<any>} Resultado do diagnóstico
  */
 async function diagnoseStall(page, langCode = 'en') {
-    const triage = new Triage(page, langCode);
+    const triage = new Triage(/** @type {any} */ (page), langCode);
     return await triage.diagnose();
 }
 
-export { Triage, TRIAGE_CONFIG, TRIAGE_EVENTS, TriageError, create, diagnoseStall };
+export { create, diagnoseStall, Triage, TRIAGE_CONFIG, TRIAGE_EVENTS, TriageError };

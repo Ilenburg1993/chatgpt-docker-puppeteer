@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { log } from '#core/logger';
 
 /**
@@ -27,8 +27,10 @@ const CircuitState = Object.freeze({
 // Gerenciador inteligente de falhas do Chrome.
 /** Classe exportada: CircuitBreakerManager. */
 class CircuitBreakerManager {
+    /** @param {{ poolSize?: number; nerv?: any }} opts */
     constructor({ poolSize = 3, nerv = null }) {
         this.poolSize = poolSize;
+        /** @type {any} */
         this.nerv = nerv; // NERV bus para emitir eventos
 
         // Estado atual
@@ -37,6 +39,7 @@ class CircuitBreakerManager {
         this.lastStateChange = Date.now();
 
         // Histórico de falhas (últimas 10)
+        /** @type {any[]} */
         this.failureHistory = [];
         this.maxHistorySize = 10;
 
@@ -108,10 +111,10 @@ class CircuitBreakerManager {
      *
      * @param {string} instanceId - ID da instância (ex: "browser-0")
      * @param {Error} error - Erro capturado
-     * @param {Object} context - Contexto adicional (browser version, PID, etc.)
-     * @returns {Object} - { cause, shouldPause, policy }
+     * @param {object} context - Contexto adicional (browser version, PID, etc.)
+     * @returns {any} - { cause, shouldPause, policy }
      */
-    registerFailure(instanceId, error, context = {}) {
+    registerFailure(/** @type {any} */ instanceId, /** @type {any} */ error, /** @type {any} */ context = {}) {
         const timestamp = Date.now();
 
         // Registra falha no histórico
@@ -153,12 +156,12 @@ class CircuitBreakerManager {
         }
 
         // Obtém política para esta causa
-        const policy = this.policies[cause];
+        const policy = /** @type {any} */ (this.policies)[cause];
 
         log('WARN', `[CircuitBreaker] Falha registrada: ${instanceId} - Causa: ${cause} - Estado: ${this.state}`);
         log(
             'DEBUG',
-            `[CircuitBreaker] Política: pause=${policy.shouldPause}, autoRestart=${policy.autoRestart}, polling=${policy.pollingInterval}ms`
+            `[CircuitBreaker] Política: pause=${policy.shouldPause}, autoRestart=${policy.autoRestart}, polling=${policy.pollingInterval}ms`,
         );
 
         return {
@@ -173,10 +176,10 @@ class CircuitBreakerManager {
      * Detecta causa da falha baseado em sintomas.
      *
      * @param {Error} error - Erro capturado
-     * @param {Object} context - Contexto (browser, version, PID, etc.)
+     * @param {object} context - Contexto (browser, version, PID, etc.)
      * @returns {string} - FailureCause
      */
-    _detectFailureCause(error, context = {}) {
+    _detectFailureCause(error, /** @type {any} */ context = {}) {
         const errorMsg = error.message || '';
         const errorStack = error.stack || '';
 
@@ -221,15 +224,14 @@ class CircuitBreakerManager {
     }
 
     /**
-     * Verifica se falhas foram simultâneas (< 5s diferença).
-     * Indica fechamento manual do Chrome.
+     * Verifica se falhas foram simultâneas (< 5s diferença). Indica fechamento manual do Chrome.
      */
     _isSimultaneousFailure() {
         if (this.instanceFailures.size < 2) {
             return false;
         }
 
-        const timestamps = Array.from(this.instanceFailures.values()).map(f => f.timestamp);
+        const timestamps = Array.from(this.instanceFailures.values()).map((f) => f.timestamp);
         const minTime = Math.min(...timestamps);
         const maxTime = Math.max(...timestamps);
 
@@ -237,8 +239,7 @@ class CircuitBreakerManager {
     }
 
     /**
-     * Conta instâncias saudáveis.
-     * (Assume que instâncias NÃO em instanceFailures estão OK)
+     * Conta instâncias saudáveis. (Assume que instâncias NÃO em instanceFailures estão OK)
      */
     _getHealthyCount() {
         return this.poolSize - this.instanceFailures.size;
@@ -247,7 +248,7 @@ class CircuitBreakerManager {
     /**
      * Registra recovery de uma instância.
      */
-    registerRecovery(instanceId) {
+    registerRecovery(/** @type {any} */ instanceId) {
         this.instanceFailures.delete(instanceId);
 
         const healthyCount = this._getHealthyCount();
@@ -266,7 +267,7 @@ class CircuitBreakerManager {
 
         log(
             'INFO',
-            `[CircuitBreaker] Recovery: ${instanceId} - Estado: ${this.state} (${healthyCount}/${this.poolSize})`
+            `[CircuitBreaker] Recovery: ${instanceId} - Estado: ${this.state} (${healthyCount}/${this.poolSize})`,
         );
     }
 
@@ -282,7 +283,7 @@ class CircuitBreakerManager {
             return true; // Pausa por padrão se causa desconhecida
         }
 
-        const policy = this.policies[this.lastCause];
+        const policy = /** @type {any} */ (this.policies)[this.lastCause];
         return policy.shouldPause;
     }
 
@@ -294,7 +295,7 @@ class CircuitBreakerManager {
             return false;
         }
 
-        const policy = this.policies[this.lastCause];
+        const policy = /** @type {any} */ (this.policies)[this.lastCause];
 
         if (!policy.autoRestart) {
             return false;
@@ -303,7 +304,7 @@ class CircuitBreakerManager {
         if (this.recoveryAttempts >= policy.maxRetries) {
             log(
                 'WARN',
-                `[CircuitBreaker] Max recovery attempts (${policy.maxRetries}) atingido para ${this.lastCause}`
+                `[CircuitBreaker] Max recovery attempts (${policy.maxRetries}) atingido para ${this.lastCause}`,
             );
             return false;
         }
@@ -327,14 +328,14 @@ class CircuitBreakerManager {
             return 5000; // Default 5s
         }
 
-        const policy = this.policies[this.lastCause];
+        const policy = /** @type {any} */ (this.policies)[this.lastCause];
         return policy.pollingInterval;
     }
 
     /**
      * Emite evento NERV quando estado muda.
      */
-    _emitStateChange(previousState, newState, cause) {
+    _emitStateChange(/** @type {any} */ previousState, /** @type {any} */ newState, /** @type {any} */ cause) {
         this.lastStateChange = Date.now();
 
         const event = {
@@ -365,7 +366,7 @@ class CircuitBreakerManager {
     /**
      * Mensagens amigáveis para usuário por causa.
      */
-    _logUserMessage(cause) {
+    _logUserMessage(/** @type {any} */ cause) {
         const messages = {
             [FailureCause.USER_CLOSED]: `
 ┌────────────────────────────────────────────────────────────┐
@@ -406,7 +407,7 @@ class CircuitBreakerManager {
         };
 
         const message =
-            messages[cause] ||
+            /** @type {any} */ (messages)[cause] ||
             `
 ┌────────────────────────────────────────────────────────────┐
 │ ❓ FALHA DESCONHECIDA                                      │
@@ -448,4 +449,4 @@ class CircuitBreakerManager {
     }
 }
 
-export { CircuitBreakerManager, FailureCause, CircuitState };
+export { CircuitBreakerManager, CircuitState, FailureCause };

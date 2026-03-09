@@ -28,7 +28,7 @@ corrigidos e melhorias são aplicadas.
 ### 2.1 `checkPortInUse()` resolve `false` em qualquer erro não‑EADDRINUSE
 
 ```js
-server.once('error', err => {
+server.once('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     resolve(true); // Porta em uso
   } else {

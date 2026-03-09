@@ -379,16 +379,16 @@ await withTimeout(
     /* operation */
   },
   5000,
-  'OPERATION_TIMEOUT'
+  'OPERATION_TIMEOUT',
 );
 
 // With AbortSignal
 await withAbort(
-  async signal => {
+  async (signal) => {
     /* operation that accepts signal */
   },
   10000,
-  'OPERATION_ABORTED'
+  'OPERATION_ABORTED',
 );
 ```
 
@@ -401,16 +401,16 @@ await withAbort(
 ```bash
 # All 15 P0 bug fix files
 npx eslint src/core/boot_resilience_manager.js \
-            src/core/forensics.js \
-            src/core/logger.js \
-            src/core/kernel.js \
-            src/driver/core/TargetDriver.js \
-            src/driver/modules/handle_manager.js \
-            src/driver/modules/recovery_system.js \
-            src/agent/task_orchestration_worker.js \
-            src/orchestrator/orchestrator_engine.js \
-            src/infra/ConnectionOrchestrator.js \
-            src/infra/db/task_repo.js
+  src/core/forensics.js \
+  src/core/logger.js \
+  src/core/kernel.js \
+  src/driver/core/TargetDriver.js \
+  src/driver/modules/handle_manager.js \
+  src/driver/modules/recovery_system.js \
+  src/agent/task_orchestration_worker.js \
+  src/orchestrator/orchestrator_engine.js \
+  src/infra/ConnectionOrchestrator.js \
+  src/infra/db/task_repo.js
 ```
 
 **Result:** ✅ **0 errors, 0 warnings**

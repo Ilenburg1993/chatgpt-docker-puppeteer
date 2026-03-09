@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/infra/storage/dna_evolution.js
    Audit Level: 750 — Automatic DNA Evolution Engine
@@ -9,6 +9,7 @@
 ========================================================================== */
 
 // Lazy load para evitar circular dependency
+/** @type {any} */
 let dnaStore = null;
 const getDnaStore = async () => {
     if (!dnaStore) {
@@ -38,14 +39,15 @@ const evolutionCounter = new Map();
  * Evolui o DNA automaticamente quando SADI descobre novo selector.
  *
  * Critérios de Aceitação:
+ *
  * - Confidence >= MIN_CONFIDENCE_THRESHOLD
  * - Selector não existe no DNA atual
  * - Não exceder MAX_EVOLUTIONS_PER_DOMAIN por sessão
  *
- * @param {object} protocol - Protocolo SADI com selector descoberto
+ * @param {any} protocol - Protocolo SADI com selector descoberto
  * @param {string} domain - Domínio (ex: 'chatgpt.com')
  * @param {string} intent - Intenção (ex: 'input_box', 'send_button')
- * @returns {Promise<{accepted: boolean, reason?: string, stats?: object, error?: string}>}
+ * @returns {Promise<{ accepted: boolean; reason?: string; stats?: object; error?: string }>}
  */
 async function evolveWithSadiProtocol(protocol, domain, intent) {
     try {
@@ -53,7 +55,7 @@ async function evolveWithSadiProtocol(protocol, domain, intent) {
         if (!protocol || !protocol.confidence || protocol.confidence < MIN_CONFIDENCE_THRESHOLD) {
             log(
                 'DEBUG',
-                `[DNA_EVOLUTION] Selector rejeitado (confidence ${protocol.confidence || 0} < ${MIN_CONFIDENCE_THRESHOLD})`
+                `[DNA_EVOLUTION] Selector rejeitado (confidence ${protocol.confidence || 0} < ${MIN_CONFIDENCE_THRESHOLD})`,
             );
             return { accepted: false, reason: 'LOW_CONFIDENCE' };
         }
@@ -63,7 +65,7 @@ async function evolveWithSadiProtocol(protocol, domain, intent) {
         if (count >= MAX_EVOLUTIONS_PER_DOMAIN) {
             log(
                 'WARN',
-                `[DNA_EVOLUTION] Limite de evoluções atingido para ${domain} (${count}/${MAX_EVOLUTIONS_PER_DOMAIN})`
+                `[DNA_EVOLUTION] Limite de evoluções atingido para ${domain} (${count}/${MAX_EVOLUTIONS_PER_DOMAIN})`,
             );
             return { accepted: false, reason: 'RATE_LIMITED' };
         }
@@ -122,7 +124,7 @@ async function evolveWithSadiProtocol(protocol, domain, intent) {
 
         log(
             'INFO',
-            `[DNA_EVOLUTION] DNA evoluído: ${domain}/${intent} → ${protocol.selector} (confidence: ${protocol.confidence})`
+            `[DNA_EVOLUTION] DNA evoluído: ${domain}/${intent} → ${protocol.selector} (confidence: ${protocol.confidence})`,
         );
 
         // Retorna resultado com stats
@@ -136,17 +138,17 @@ async function evolveWithSadiProtocol(protocol, domain, intent) {
                 session_evolutions: count + 1,
             },
         };
-    } catch (error) {
-        log('ERROR', `[DNA_EVOLUTION] Falha ao evoluir DNA: ${error.message}`);
-        return { accepted: false, reason: 'ERROR', error: error.message };
+    } catch (/** @type {any} */ error) {
+        const _ce = /** @type {any} */ (error);
+        log('ERROR', `[DNA_EVOLUTION] Falha ao evoluir DNA: ${_ce.message}`);
+        return { accepted: false, reason: 'ERROR', error: _ce.message };
     }
 }
 
 /**
- * Evolui DNA com protocolo SADI completo (incluindo metadata).
- * Substitui array de strings por protocolo estruturado.
+ * Evolui DNA com protocolo SADI completo (incluindo metadata). Substitui array de strings por protocolo estruturado.
  *
- * @param {object} fullProtocol - Protocolo completo com context, isShadow, etc
+ * @param {any} fullProtocol - Protocolo completo com context, isShadow, etc
  * @param {string} domain - Domínio
  * @param {string} intent - Intenção
  * @returns {Promise<boolean>} - true se evoluiu
@@ -180,15 +182,17 @@ async function evolveWithFullProtocol(fullProtocol, domain, intent) {
 
         log('INFO', `[DNA_EVOLUTION] Protocolo estruturado salvo: ${domain}/${intent}`);
         return true;
-    } catch (error) {
-        log('ERROR', `[DNA_EVOLUTION] Falha ao salvar protocolo: ${error.message}`);
+    } catch (/** @type {any} */ error) {
+        const _ce = /** @type {any} */ (error);
+        log('ERROR', `[DNA_EVOLUTION] Falha ao salvar protocolo: ${_ce.message}`);
         return false;
     }
 }
 
 /**
  * Reseta contadores de evolução (chamado no boot).
-  * @returns {void}
+ *
+ * @returns {void}
  */
 function resetEvolutionCounters() {
     evolutionCounter.clear();
@@ -198,10 +202,10 @@ function resetEvolutionCounters() {
 /**
  * Retorna estatísticas de evolução da sessão atual.
  *
- * @returns {object} - {domain: count}
+ * @returns {any} - {domain: count}
  */
 function getEvolutionStats() {
-    const stats = {};
+    const stats = /** @type {any} */ ({});
     evolutionCounter.forEach((count, domain) => {
         stats[domain] = count;
     });
@@ -209,10 +213,10 @@ function getEvolutionStats() {
 }
 
 export {
-    evolveWithSadiProtocol,
     evolveWithFullProtocol,
-    resetEvolutionCounters,
+    evolveWithSadiProtocol,
     getEvolutionStats,
-    MIN_CONFIDENCE_THRESHOLD,
     MAX_EVOLUTIONS_PER_DOMAIN,
+    MIN_CONFIDENCE_THRESHOLD,
+    resetEvolutionCounters,
 };

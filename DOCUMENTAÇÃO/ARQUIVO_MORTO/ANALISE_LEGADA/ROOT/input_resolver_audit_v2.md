@@ -615,7 +615,7 @@ for (let retry = 0; retry < maxRetries; retry++) {
         heuristicResult.protocol,
         'HEURISTIC_MATCH',
         dnaRules,
-        heuristicResult.confidence
+        heuristicResult.confidence,
       );
     }
   } catch (heuristicErr) {
@@ -623,9 +623,9 @@ for (let retry = 0; retry < maxRetries; retry++) {
       log(
         'WARN',
         `[INPUT_RESOLVER] Heurística failed (retry ${retry + 1}/${maxRetries})`,
-        correlationId
+        correlationId,
       );
-      await new Promise(r => setTimeout(r, 1000 * (retry + 1))); // Backoff
+      await new Promise((r) => setTimeout(r, 1000 * (retry + 1))); // Backoff
     } else {
       throw heuristicErr; // Max retries
     }

@@ -1,3 +1,4 @@
+// @ts-check
 import crypto from 'node:crypto';
 
 export const SCHEMA_VERSION = 1;
@@ -13,7 +14,7 @@ export const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text:latest';
 // Fallback: Uses OLLAMA_LOCAL_BASE_URL env var if set
 export const DEFAULT_OLLAMA_BASE_URL = process.env.OLLAMA_LOCAL_BASE_URL || 'http://host.docker.internal:11434/v1';
 
-function parsePositiveInt(rawValue, fallback) {
+function parsePositiveInt(/** @type {any} */ rawValue, /** @type {any} */ fallback) {
     const parsed = Number.parseInt(String(rawValue ?? ''), 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
@@ -29,23 +30,25 @@ export const MAX_CHUNK_CHARS_CODE = Math.min(RAG_CHUNK_TARGET_CHARS, RAG_CHUNK_M
 export const MAX_CHUNK_CHARS_DOCS = Math.min(RAG_CHUNK_TARGET_CHARS + 600, RAG_CHUNK_MAX_CHARS);
 export const MAX_CHUNK_CHARS = RAG_CHUNK_MAX_CHARS;
 
-export function sha256Hex(input) {
+export function sha256Hex(/** @type {any} */ input) {
     return crypto.createHash('sha256').update(input).digest('hex');
 }
 
-export function sha256HexForString(text) {
+export function sha256HexForString(/** @type {any} */ text) {
     return sha256Hex(Buffer.from(text, 'utf8'));
 }
 
-export function normalizeRelPath(pathLike) {
+export function normalizeRelPath(/** @type {any} */ pathLike) {
     return String(pathLike).split('\\').join('/');
 }
 
-export function buildFileId(relPath) {
+export function buildFileId(/** @type {any} */ relPath) {
     return sha256HexForString(`file:${normalizeRelPath(relPath)}`);
 }
 
-export function buildChunkId({ relPath, startByte, endByte, contentSha256, chunkerVersion = CHUNKER_VERSION }) {
+export function buildChunkId(
+    /** @type {any} */ { relPath, startByte, endByte, contentSha256, chunkerVersion = CHUNKER_VERSION },
+) {
     const base = `${normalizeRelPath(relPath)}:${startByte}:${endByte}:${contentSha256}:${chunkerVersion}`;
     return sha256HexForString(base);
 }

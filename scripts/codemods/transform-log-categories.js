@@ -1,12 +1,22 @@
 // @ts-check
 import path from 'node:path';
 
+/**
+ * @param {string} filePath
+ * @param {string} targetPath
+ * @returns {string}
+ */
 function getImportPath(filePath, targetPath) {
     const relativePath = path.relative(path.dirname(filePath), targetPath);
     const normalizedPath = relativePath.replace(/\\/g, '/');
     return normalizedPath.startsWith('.') ? normalizedPath : `./${normalizedPath}`;
 }
 
+/**
+ * @param {any} fileInfo
+ * @param {any} api
+ * @returns {any}
+ */
 module.exports = function (fileInfo, api) {
     const j = api.jscodeshift;
     const root = j(fileInfo.source);
@@ -48,7 +58,7 @@ module.exports = function (fileInfo, api) {
     // Find log() calls and replace category strings
     root.find(j.CallExpression, {
         callee: { name: 'log' },
-    }).forEach(path => {
+    }).forEach((/** @type {any} */ path) => {
         const args = path.value.arguments;
         if (args.length > 0 && args[0].type === 'Literal' && typeof args[0].value === 'string') {
             const category = args[0].value;
@@ -63,8 +73,8 @@ module.exports = function (fileInfo, api) {
     });
 
     // Also replace standalone literal strings (for other use cases)
-    LOG_CATEGORIES.forEach(category => {
-        root.find(j.Literal, { value: category }).forEach(path => {
+    LOG_CATEGORIES.forEach((category) => {
+        root.find(j.Literal, { value: category }).forEach((/** @type {any} */ path) => {
             // Skip if already handled by log() transformation above
             const parent = path.parent;
             if (parent.value.type === 'CallExpression' && parent.value.callee.name === 'log') {
@@ -103,7 +113,7 @@ module.exports = function (fileInfo, api) {
         const importStatement = j.variableDeclaration('const', [
             j.variableDeclarator(
                 j.objectPattern([j.property('init', j.identifier('LOG_CATEGORIES'), j.identifier('LOG_CATEGORIES'))]),
-                j.callExpression(j.identifier('require'), [j.literal(importPath)])
+                j.callExpression(j.identifier('require'), [j.literal(importPath)]),
             ),
         ]);
 

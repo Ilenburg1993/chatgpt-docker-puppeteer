@@ -1,26 +1,30 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import os from 'node:os';
 import * as logger from '#core/logger';
 import fs from 'node:fs';
+import os from 'node:os';
 
 /**
  * @typedef {object} FillExecutionContextOptions
  * @property {object} [driver] - Driver instance (BaseDriver, ChatGPTDriver, etc)
  * @property {object} [browserPool] - BrowserPool manager instance
- * @property {number} [tacticalAttempts=0] - Tentativas de retry tático (Driver)
- * @property {number} [strategicAttempts=0] - Tentativas de retry estratégico (Kernel)
- * @property {string[]} [errorsRecovered=[]] - Erros recuperados via retry
- * @property {number} [totalBackoffMs=0] - Tempo total aguardado entre retries
+ * @property {number} [tacticalAttempts=0] - Tentativas de retry tático (Driver). Default is `0`
+ * @property {number} [strategicAttempts=0] - Tentativas de retry estratégico (Kernel). Default is `0`
+ * @property {string[]} [errorsRecovered=[]] - Erros recuperados via retry. Default is `[]`
+ * @property {number} [totalBackoffMs=0] - Tempo total aguardado entre retries. Default is `0`
  */
 
 /**
+ * @typedef {object} FillExecutionContextTask
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Preenche execution context de uma task V5.
  *
- * @param {object} task - Task V5 object (mutável)
+ * @param {FillExecutionContextTask} task - Task V5 object (mutável)
  * @param {FillExecutionContextOptions} options - Opções de preenchimento
- * @returns {object} Task com execution context preenchido
+ * @returns {any} Task com execution context preenchido
  */
-function fillExecutionContext(task, options) {
+function fillExecutionContext(/** @type {any} */ task, /** @type {any} */ options) {
     options = options || {};
 
     try {
@@ -74,19 +78,26 @@ function fillExecutionContext(task, options) {
             total_backoff_ms: options.totalBackoffMs || task.execution.retry?.total_backoff_ms || 0,
         };
 
-        logger.debug(`[EXECUTION_FILLER] Execution context preenchido para task ${task.meta.id}`, {
-            driver: task.execution.driver.type,
-            platform: task.execution.environment.platform,
-            tacticalAttempts: task.execution.retry.tactical_attempts,
-            strategicAttempts: task.execution.retry.strategic_attempts,
-        });
+        logger.debug(
+            `[EXECUTION_FILLER] Execution context preenchido para task ${task.meta.id}`,
+            /** @type {any} */ ({
+                driver: task.execution.driver.type,
+                platform: task.execution.environment.platform,
+                tacticalAttempts: task.execution.retry.tactical_attempts,
+                strategicAttempts: task.execution.retry.strategic_attempts,
+            }),
+        );
 
         return task;
-    } catch (error) {
-        logger.error(`[EXECUTION_FILLER] Erro ao preencher execution context: ${error.message}`, {
-            task_id: task?.meta?.id,
-            error,
-        });
+    } catch (/** @type {any} */ error) {
+        const _ce = /** @type {any} */ (error);
+        logger.error(
+            `[EXECUTION_FILLER] Erro ao preencher execution context: ${_ce.message}`,
+            /** @type {any} */ ({
+                task_id: task?.meta?.id,
+                error,
+            }),
+        );
         // Não throw - retorna task sem modificar
         return task;
     }
@@ -94,8 +105,9 @@ function fillExecutionContext(task, options) {
 
 /**
  * Detecta se está rodando em container Docker.
- * @returns {boolean}
+ *
  * @private
+ * @returns {boolean}
  */
 function _detectContainer() {
     try {
@@ -113,19 +125,28 @@ function _detectContainer() {
         }
 
         return false;
-    } catch (error) {
-        logger.debug('[EXECUTION_FILLER] Erro ao detectar container, assumindo false', { error: error.message });
+    } catch (/** @type {any} */ error) {
+        const _ce = /** @type {any} */ (error);
+        logger.debug(
+            '[EXECUTION_FILLER] Erro ao detectar container, assumindo false',
+            /** @type {any} */ ({ error: _ce.message }),
+        );
         return false;
     }
 }
 
 /**
- * Obtém versão do Chrome do BrowserPool.
- * @param {object} browserPool - BrowserPool manager
- * @returns {Promise<string>} Chrome version ou 'unknown'
- * @private
+ * @typedef {object} GetChromeVersionBrowserPool
+ * @property {any} _ Propriedades definidas em runtime.
  */
-async function _getChromeVersion(browserPool) {
+/**
+ * Obtém versão do Chrome do BrowserPool.
+ *
+ * @private
+ * @param {GetChromeVersionBrowserPool} browserPool - BrowserPool manager
+ * @returns {Promise<string>} Chrome version ou 'unknown'
+ */
+async function _getChromeVersion(/** @type {any} */ browserPool) {
     try {
         // Tenta obter versão do browserPool
         if (browserPool?.browser?.version) {
@@ -133,29 +154,37 @@ async function _getChromeVersion(browserPool) {
         }
 
         // Fallback: tenta obter via puppeteer
-        const puppeteer = await import('puppeteer').then(m => m.default ?? m);
-        if (puppeteer.executablePath) {
+        const puppeteer = await import('puppeteer').then((m) => m.default ?? m);
+        if (typeof puppeteer.executablePath === 'function') {
             // Versão está embutida no path geralmente
             return 'unknown';
         }
 
         return 'unknown';
-    } catch (error) {
-        logger.debug('[EXECUTION_FILLER] Erro ao obter Chrome version', { error: error.message });
+    } catch (/** @type {any} */ error) {
+        const _ce = /** @type {any} */ (error);
+        logger.debug('[EXECUTION_FILLER] Erro ao obter Chrome version', /** @type {any} */ ({ error: _ce.message }));
         return 'unknown';
     }
 }
 
 /**
- * Incrementa tactical_attempts (retry Driver).
- * Usado durante retry loop no Driver.
- *
- * @param {object} task - Task V5 object
- * @param {string} [errorRecovered] - Erro recuperado (opcional)
- * @param {number} [backoffMs=0] - Tempo aguardado neste backoff
-  * @returns {void}
+ * @typedef {object} IncrementTacticalAttemptsTask
+ * @property {any} _ Propriedades definidas em runtime.
  */
-function incrementTacticalAttempts(task, errorRecovered, backoffMs) {
+/**
+ * Incrementa tactical_attempts (retry Driver). Usado durante retry loop no Driver.
+ *
+ * @param {IncrementTacticalAttemptsTask} task - Task V5 object
+ * @param {string} [errorRecovered] - Erro recuperado (opcional)
+ * @param {number} [backoffMs=0] - Tempo aguardado neste backoff. Default is `0`
+ * @returns {void}
+ */
+function incrementTacticalAttempts(
+    /** @type {any} */ task,
+    /** @type {any} */ errorRecovered,
+    /** @type {any} */ backoffMs,
+) {
     errorRecovered = errorRecovered || null;
     backoffMs = backoffMs || 0;
 
@@ -177,23 +206,33 @@ function incrementTacticalAttempts(task, errorRecovered, backoffMs) {
         task.execution.retry.errors_recovered.push(errorRecovered);
     }
 
-    logger.debug(`[EXECUTION_FILLER] Tactical attempt ${task.execution.retry.tactical_attempts}`, {
-        task_id: task.meta.id,
-        error: errorRecovered,
-        backoff_ms: backoffMs,
-    });
+    logger.debug(
+        `[EXECUTION_FILLER] Tactical attempt ${task.execution.retry.tactical_attempts}`,
+        /** @type {any} */ ({
+            task_id: task.meta.id,
+            error: errorRecovered,
+            backoff_ms: backoffMs,
+        }),
+    );
 }
 
 /**
- * Incrementa strategic_attempts (retry Kernel - reagendamento).
- * Usado quando Kernel reagenda task após falha.
- *
- * @param {object} task - Task V5 object
- * @param {string} [errorRecovered] - Erro recuperado (opcional)
- * @param {number} [backoffMs=0] - Tempo aguardado neste backoff
-  * @returns {void}
+ * @typedef {object} IncrementStrategicAttemptsTask
+ * @property {any} _ Propriedades definidas em runtime.
  */
-function incrementStrategicAttempts(task, errorRecovered, backoffMs) {
+/**
+ * Incrementa strategic_attempts (retry Kernel - reagendamento). Usado quando Kernel reagenda task após falha.
+ *
+ * @param {IncrementStrategicAttemptsTask} task - Task V5 object
+ * @param {string} [errorRecovered] - Erro recuperado (opcional)
+ * @param {number} [backoffMs=0] - Tempo aguardado neste backoff. Default is `0`
+ * @returns {void}
+ */
+function incrementStrategicAttempts(
+    /** @type {any} */ task,
+    /** @type {any} */ errorRecovered,
+    /** @type {any} */ backoffMs,
+) {
     errorRecovered = errorRecovered || null;
     backoffMs = backoffMs || 0;
 
@@ -215,11 +254,14 @@ function incrementStrategicAttempts(task, errorRecovered, backoffMs) {
         task.execution.retry.errors_recovered.push(errorRecovered);
     }
 
-    logger.debug(`[EXECUTION_FILLER] Strategic attempt ${task.execution.retry.strategic_attempts}`, {
-        task_id: task.meta.id,
-        error: errorRecovered,
-        backoff_ms: backoffMs,
-    });
+    logger.debug(
+        `[EXECUTION_FILLER] Strategic attempt ${task.execution.retry.strategic_attempts}`,
+        /** @type {any} */ ({
+            task_id: task.meta.id,
+            error: errorRecovered,
+            backoff_ms: backoffMs,
+        }),
+    );
 }
 
-export { fillExecutionContext, incrementTacticalAttempts, incrementStrategicAttempts };
+export { fillExecutionContext, incrementStrategicAttempts, incrementTacticalAttempts };

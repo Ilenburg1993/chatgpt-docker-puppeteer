@@ -6,8 +6,8 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..', '..');
 const DEFAULT_MASTER = path.join(ROOT, 'DOCUMENTAÇÃO', 'BUGS', 'BUG_AUDIT_MASTER.md');
 
 /**
- * @param {string} filePath
- * @param {number|null} line
+ * @param {string | null} filePath
+ * @param {number | null} line
  * @param {number} radius
  */
 function readLocalCodeContext(filePath, line, radius = 6) {
@@ -35,7 +35,7 @@ function readLocalCodeContext(filePath, line, radius = 6) {
 
 /**
  * @param {string} masterPath
- * @param {string|null} contractId
+ * @param {string | null} contractId
  * @returns {string[]}
  */
 function readMasterHistoryHints(masterPath, contractId) {
@@ -57,16 +57,23 @@ function readMasterHistoryHints(masterPath, contractId) {
 }
 
 /**
+ * @typedef {object} BuildContextPackSources
+ * @property {unknown} [rag]
+ * @property {unknown} [lsp]
+ * @property {unknown} [history]
+ * @property {string | undefined} [masterPath]
+ */
+/**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
- * @param {{ rag?: any, lsp?: any, history?: any, masterPath?: string }} sources
-  * @returns {any}
+ * @param {BuildContextPackSources} sources
+ * @returns {any}
  */
 export function buildContextPack(finding, sources = {}) {
     const codeContext = readLocalCodeContext(finding.file, finding.line, 8);
     const masterPath = sources.masterPath || DEFAULT_MASTER;
     const historyHints = Array.isArray(sources.history)
         ? sources.history
-        : readMasterHistoryHints(masterPath, finding.contract_id || null);
+        : readMasterHistoryHints(masterPath, String(finding.contract_id || ''));
 
     return {
         finding: {

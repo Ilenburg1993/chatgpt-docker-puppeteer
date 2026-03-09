@@ -3,10 +3,11 @@
 /**
  * Shared Inference Gateway Client
  *
- * Módulo centralizado para comunicação com o Inference Gateway.
- * Usado por Audit Agent, Diagnostic Agent e outros consumidores.
+ * Módulo centralizado para comunicação com o Inference Gateway. Usado por Audit Agent, Diagnostic Agent e outros
+ * consumidores.
  *
  * Variáveis de ambiente:
+ *
  * - INFERENCE_GATEWAY_HOST: Host do Gateway (padrão: 127.0.0.1)
  * - INFERENCE_GATEWAY_PORT: Porta do Gateway (padrão: 3099)
  * - INFERENCE_GATEWAY_ENABLED: Habilitar/desabilitar (padrão: true)
@@ -14,6 +15,7 @@
  * - INFERENCE_GATEWAY_DEFAULT_MODEL: Modelo padrão (padrão: llama3.2)
  *
  * Client Tags disponíveis:
+ *
  * - audit_agent_triage: Para triage de auditoria
  * - audit_agent_patch: Para geração de patches
  * - audit_agent_review: Para revisão de código
@@ -61,11 +63,11 @@ export const ENDPOINTS = Object.freeze([
 
 /**
  * @typedef {object} GatewayBaseUrlOverrides
- * @property {string} [host]
- * @property {number} [port]
+ * @property {string | undefined} [host]
+ * @property {number | undefined} [port]
  * @property {string} [baseUrl]
  */
-/** @typedef {{ ok: boolean, status: number, text: string, json: any }} GatewayJsonResponse */
+/** @typedef {{ ok: boolean; status: number; text: string; json: any }} GatewayJsonResponse */
 /**
  * @typedef {object} CreateGatewayClientOptions
  * @property {string} [clientTag]
@@ -99,7 +101,8 @@ function getErrorMessage(error) {
 
 /**
  * Obtém a URL base do Inference Gateway
- * @param {GatewayBaseUrlOverrides} [overrides={}]
+ *
+ * @param {GatewayBaseUrlOverrides} [overrides={}] Default is `{}`
  * @returns {string}
  */
 export function getGatewayBaseUrl(overrides = {}) {
@@ -113,6 +116,7 @@ export function getGatewayBaseUrl(overrides = {}) {
 
 /**
  * Verifica se o Gateway está habilitado
+ *
  * @returns {boolean}
  */
 export function isGatewayEnabled() {
@@ -125,6 +129,7 @@ export function isGatewayEnabled() {
 
 /**
  * Obtém o timeout configurado
+ *
  * @param {number} defaultTimeout
  * @returns {number}
  */
@@ -139,6 +144,7 @@ export function getTimeout(defaultTimeout = 120000) {
 
 /**
  * Obtém o modelo padrão configurado
+ *
  * @param {string} defaultModel
  * @returns {string}
  */
@@ -153,8 +159,9 @@ export function getDefaultModel(defaultModel = 'llama3.2') {
 
 /**
  * Parseia JSON de forma segura
+ *
  * @param {unknown} text
- * @returns {object|null}
+ * @returns {object | null}
  */
 function _parseJsonMaybe(text) {
     try {
@@ -165,9 +172,14 @@ function _parseJsonMaybe(text) {
 }
 
 /**
+ * @typedef {object} PostJsonBody
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Faz um POST JSON para o Gateway
+ *
  * @param {string} url
- * @param {object} body
+ * @param {PostJsonBody} body
  * @param {number} timeoutMs
  * @returns {Promise<GatewayJsonResponse>}
  */
@@ -185,6 +197,7 @@ async function _postJson(url, body, timeoutMs) {
 
 /**
  * Faz um GET para o Gateway
+ *
  * @param {string} url
  * @param {number} timeoutMs
  * @returns {Promise<GatewayJsonResponse>}
@@ -206,7 +219,8 @@ async function _getJson(url, timeoutMs) {
 
 /**
  * Cria um cliente do Inference Gateway com configuração padronizada
- * @param {CreateGatewayClientOptions} [options={}]
+ *
+ * @param {CreateGatewayClientOptions} [options={}] Default is `{}`
  * @returns {GatewayClient}
  */
 export function createGatewayClient(options = {}) {
@@ -228,7 +242,8 @@ export function createGatewayClient(options = {}) {
 
         /**
          * Verifica a saúde do Gateway
-         * @returns {Promise<{ok: boolean, health?: object, error?: string}>}
+         *
+         * @returns {Promise<{ ok: boolean; health?: object; error?: string }>}
          */
         async checkHealth() {
             try {
@@ -237,14 +252,15 @@ export function createGatewayClient(options = {}) {
                     return { ok: false, error: `HTTP ${result.status}` };
                 }
                 return { ok: true, health: result.json };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return { ok: false, error: getErrorMessage(err) };
             }
         },
 
         /**
          * Lista modelos disponíveis
-         * @returns {Promise<{ok: boolean, models?: object[], error?: string}>}
+         *
+         * @returns {Promise<{ ok: boolean; models?: object[]; error?: string }>}
          */
         async listModels() {
             try {
@@ -253,15 +269,16 @@ export function createGatewayClient(options = {}) {
                     return { ok: false, error: `HTTP ${result.status}` };
                 }
                 return { ok: true, models: result.json?.models || [] };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return { ok: false, error: getErrorMessage(err) };
             }
         },
 
         /**
          * Valida se uma geração é permitida (preflight)
-         * @param {ValidateGenerateOptions} [options={}]
-         * @returns {Promise<{ok: boolean, validated?: boolean, error?: string, status?: number, details?: object}>}
+         *
+         * @param {ValidateGenerateOptions} [options={}] Default is `{}`
+         * @returns {Promise<{ ok: boolean; validated?: boolean; error?: string; status?: number; details?: object }>}
          */
         async validateGenerate(options = {}) {
             const payload = {
@@ -272,7 +289,11 @@ export function createGatewayClient(options = {}) {
             };
 
             try {
-                const result = await _postJson(`${_baseUrl}/v1/validate/generate`, payload, Math.min(_timeout, 10000));
+                const result = await _postJson(
+                    `${_baseUrl}/v1/validate/generate`,
+                    /** @type {any} */ (payload),
+                    Math.min(_timeout, 10000),
+                );
 
                 if (!result.ok || !result.json?.ok) {
                     return {
@@ -284,36 +305,37 @@ export function createGatewayClient(options = {}) {
                     };
                 }
                 return { ok: true, validated: true, details: result.json };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return { ok: false, validated: false, error: getErrorMessage(err) };
             }
         },
 
         /**
          * Gera texto usando o Gateway
+         *
          * @param {{
-         *   prompt?: string,
-         *   clientTag?: string,
-         *   model?: string,
-         *   profileName?: string,
-         *   runtime?: string,
-         *   maxTokens?: number,
-         *   temperature?: number,
-         *   preflight?: boolean
+         *     prompt?: string;
+         *     clientTag?: string;
+         *     model?: string;
+         *     profileName?: string;
+         *     runtime?: string;
+         *     maxTokens?: number;
+         *     temperature?: number;
+         *     preflight?: boolean;
          * }} options
          * @returns {Promise<{
-         *   ok: boolean,
-         *   skipped?: boolean,
-         *   response?: string,
-         *   parsed?: object|null,
-         *   error?: string,
-         *   status?: number,
-         *   details?: object,
-         *   preflight?: object,
-         *   policy?: object,
-         *   model?: string,
-         *   clientTag?: string,
-         *   ts?: number
+         *     ok: boolean;
+         *     skipped?: boolean;
+         *     response?: string;
+         *     parsed?: object | null;
+         *     error?: string;
+         *     status?: number;
+         *     details?: object;
+         *     preflight?: object;
+         *     policy?: object;
+         *     model?: string;
+         *     clientTag?: string;
+         *     ts?: number;
          * }>}
          */
         async generate(options = {}) {
@@ -333,7 +355,7 @@ export function createGatewayClient(options = {}) {
 
             // Preflight opcional
             if (doPreflight) {
-                const preflightResult = await this.validateGenerate({
+                const preflightResult = await /** @type {any} */ (this).validateGenerate({
                     clientTag: tag,
                     profileName,
                     model: mod,
@@ -363,11 +385,11 @@ export function createGatewayClient(options = {}) {
             };
 
             if (temperature !== undefined) {
-                payload.temperature = temperature;
+                /** @type {any} */ (payload).temperature = temperature;
             }
 
             try {
-                const result = await _postJson(`${_baseUrl}/v1/generate`, payload, _timeout);
+                const result = await _postJson(`${_baseUrl}/v1/generate`, /** @type {any} */ (payload), _timeout);
 
                 if (!result.ok || !result.json?.ok) {
                     return {
@@ -390,12 +412,12 @@ export function createGatewayClient(options = {}) {
                     response: responseText,
                     parsed,
                     policy: result.json?.policy || null,
-                    preflight: doPreflight ? { validated: true } : null,
+                    preflight: doPreflight ? { validated: true } : /** @type {any} */ (null),
                     clientTag: tag,
                     model: mod,
                     ts: result.json?.ts || Date.now(),
                 };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return {
                     ok: false,
                     skipped: false,
@@ -408,18 +430,19 @@ export function createGatewayClient(options = {}) {
 
         /**
          * Gera embeddings usando o Gateway
+         *
          * @param {{
-         *   input?: string | string[],
-         *   clientTag?: string,
-         *   model?: string,
-         *   preflight?: boolean
+         *     input?: string | string[];
+         *     clientTag?: string;
+         *     model?: string;
+         *     preflight?: boolean;
          * }} options
          * @returns {Promise<{
-         *   ok: boolean,
-         *   skipped?: boolean,
-         *   embedding?: number[],
-         *   embeddings?: number[][],
-         *   error?: string
+         *     ok: boolean;
+         *     skipped?: boolean;
+         *     embedding?: number[];
+         *     embeddings?: number[][];
+         *     error?: string;
          * }>}
          */
         async embed(options = {}) {
@@ -430,7 +453,7 @@ export function createGatewayClient(options = {}) {
 
             // Preflight opcional
             if (doPreflight) {
-                const preflightResult = await this.validateEmbed({
+                const preflightResult = await /** @type {any} */ (this).validateEmbed({
                     clientTag: tag,
                     model: mod,
                 });
@@ -451,7 +474,7 @@ export function createGatewayClient(options = {}) {
             };
 
             try {
-                const result = await _postJson(`${_baseUrl}/v1/embed`, payload, _timeout);
+                const result = await _postJson(`${_baseUrl}/v1/embed`, /** @type {any} */ (payload), _timeout);
 
                 if (!result.ok || !result.json?.ok) {
                     return {
@@ -466,7 +489,7 @@ export function createGatewayClient(options = {}) {
                     embedding: embeddings[0] || null,
                     embeddings: embeddings.length > 1 ? embeddings : undefined,
                 };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return {
                     ok: false,
                     error: getErrorMessage(err),
@@ -476,11 +499,12 @@ export function createGatewayClient(options = {}) {
 
         /**
          * Valida se um embedding é permitido (preflight)
+         *
          * @param {{
-         *   clientTag?: string,
-         *   model?: string
+         *     clientTag?: string;
+         *     model?: string;
          * }} options
-         * @returns {Promise<{ok: boolean, validated?: boolean, error?: string}>}
+         * @returns {Promise<{ ok: boolean; validated?: boolean; error?: string }>}
          */
         async validateEmbed(options = {}) {
             const payload = {
@@ -489,7 +513,11 @@ export function createGatewayClient(options = {}) {
             };
 
             try {
-                const result = await _postJson(`${_baseUrl}/v1/validate/embed`, payload, Math.min(_timeout, 10000));
+                const result = await _postJson(
+                    `${_baseUrl}/v1/validate/embed`,
+                    /** @type {any} */ (payload),
+                    Math.min(_timeout, 10000),
+                );
 
                 if (!result.ok || !result.json?.ok) {
                     return {
@@ -499,7 +527,7 @@ export function createGatewayClient(options = {}) {
                     };
                 }
                 return { ok: true, validated: true };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return { ok: false, validated: false, error: getErrorMessage(err) };
             }
         },
@@ -512,6 +540,7 @@ export function createGatewayClient(options = {}) {
 
 /**
  * Cria cliente para Audit Agent Triage
+ *
  * @returns {GatewayClient}
  */
 export function createAuditTriageClient() {
@@ -523,6 +552,7 @@ export function createAuditTriageClient() {
 
 /**
  * Cria cliente para Audit Agent Patch
+ *
  * @returns {GatewayClient}
  */
 export function createAuditPatchClient() {
@@ -534,6 +564,7 @@ export function createAuditPatchClient() {
 
 /**
  * Cria cliente para Diagnostic Code Analyzer
+ *
  * @returns {GatewayClient}
  */
 export function createDiagnosticCodeAnalyzerClient() {
@@ -544,6 +575,7 @@ export function createDiagnosticCodeAnalyzerClient() {
 
 /**
  * Cria cliente para Diagnostic System Analyzer
+ *
  * @returns {GatewayClient}
  */
 export function createDiagnosticSystemAnalyzerClient() {
@@ -554,6 +586,7 @@ export function createDiagnosticSystemAnalyzerClient() {
 
 /**
  * Cria cliente para Diagnostic Report Generator
+ *
  * @returns {GatewayClient}
  */
 export function createDiagnosticReportClient() {
@@ -568,19 +601,20 @@ export function createDiagnosticReportClient() {
 
 /**
  * Barrel compatível com consumidores legados dos clientes do Inference Gateway.
+ *
  * @type {{
- *   CLIENT_TAGS: typeof CLIENT_TAGS,
- *   ENDPOINTS: typeof ENDPOINTS,
- *   getGatewayBaseUrl: typeof getGatewayBaseUrl,
- *   isGatewayEnabled: typeof isGatewayEnabled,
- *   getTimeout: typeof getTimeout,
- *   getDefaultModel: typeof getDefaultModel,
- *   createGatewayClient: typeof createGatewayClient,
- *   createAuditTriageClient: typeof createAuditTriageClient,
- *   createAuditPatchClient: typeof createAuditPatchClient,
- *   createDiagnosticCodeAnalyzerClient: typeof createDiagnosticCodeAnalyzerClient,
- *   createDiagnosticSystemAnalyzerClient: typeof createDiagnosticSystemAnalyzerClient,
- *   createDiagnosticReportClient: typeof createDiagnosticReportClient
+ *     CLIENT_TAGS: typeof CLIENT_TAGS;
+ *     ENDPOINTS: typeof ENDPOINTS;
+ *     getGatewayBaseUrl: typeof getGatewayBaseUrl;
+ *     isGatewayEnabled: typeof isGatewayEnabled;
+ *     getTimeout: typeof getTimeout;
+ *     getDefaultModel: typeof getDefaultModel;
+ *     createGatewayClient: typeof createGatewayClient;
+ *     createAuditTriageClient: typeof createAuditTriageClient;
+ *     createAuditPatchClient: typeof createAuditPatchClient;
+ *     createDiagnosticCodeAnalyzerClient: typeof createDiagnosticCodeAnalyzerClient;
+ *     createDiagnosticSystemAnalyzerClient: typeof createDiagnosticSystemAnalyzerClient;
+ *     createDiagnosticReportClient: typeof createDiagnosticReportClient;
  * }}
  */
 export default {

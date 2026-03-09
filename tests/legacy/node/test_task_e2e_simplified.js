@@ -1,6 +1,7 @@
-import path from 'node:path';
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
+import { loadResponse, saveResponse } from '#infra/storage/response_adapter';
 import fs from 'node:fs';
-import { saveResponse, loadResponse } from '#infra/storage/response_adapter';
+import path from 'node:path';
 
 // TODO: ESM MIGRATION — require() mutation pattern is incompatible with ESM.
 // Tests that set require('#infra/fs/paths').RESPONSE cannot work because
@@ -63,7 +64,8 @@ async function runTest(name, testFn) {
 
 /**
  * Função exportada: runAllTests.
- * @returns {Promise<any>}
+ *
+ * @returns {Promise<void>}
  */
 async function runAllTests() {
     console.log('\n' + '='.repeat(80));
@@ -84,7 +86,7 @@ async function runAllTests() {
 
         // Test 2: Response V2 - 4 format save
         await runTest('OUTPUT: Save response (4 formats)', async () => {
-            const paths = await import('#infra/fs/paths').then(m => m.default ?? m);
+            const paths = await import('#infra/fs/paths').then((m) => m.default ?? m);
             const originalDir = paths.RESPONSE;
             // [ESM-SKIP] paths.RESPONSE = RESPONSES_DIR; // ESM export is read-only
 
@@ -94,7 +96,7 @@ async function runAllTests() {
 
             await saveResponse(taskId, response, task);
 
-            const files = ['txt', 'md', 'json', 'html'].map(ext => path.join(RESPONSES_DIR, `${taskId}.${ext}`));
+            const files = ['txt', 'md', 'json', 'html'].map((ext) => path.join(RESPONSES_DIR, `${taskId}.${ext}`));
 
             for (const file of files) {
                 if (!fs.existsSync(file)) {
@@ -264,10 +266,10 @@ async function runAllTests() {
 
 if (import.meta.filename === process.argv[1]) {
     runAllTests()
-        .then(success => {
+        .then((success) => {
             process.exit(success ? 0 : 1);
         })
-        .catch(error => {
+        .catch((error) => {
             console.error('Test runner crashed:', error);
             process.exit(1);
         });

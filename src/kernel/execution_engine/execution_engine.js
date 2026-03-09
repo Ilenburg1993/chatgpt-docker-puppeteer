@@ -46,18 +46,11 @@ const DecisionKind = Object.freeze({
 /** Classe exportada: ExecutionEngine. */
 class ExecutionEngine {
     /**
-     * @param {Object} params
-     * @param {Object} params.taskRuntime
-     * Gerenciador de vida das tarefas.
-     *
-     * @param {Object} params.observationStore
-     * Registro de EVENTs recebidos.
-     *
-     * @param {Object} params.policyEngine
-     * Motor normativo consultivo.
-     *
-     * @param {Object} params.telemetry
-     * Canal de telemetria.
+     * @param {object} params
+     * @param {any} params.taskRuntime Gerenciador de vida das tarefas.
+     * @param {any} params.observationStore Registro de EVENTs recebidos.
+     * @param {any} params.policyEngine Motor normativo consultivo.
+     * @param {any} params.telemetry Canal de telemetria.
      */
     constructor({ taskRuntime, observationStore, policyEngine, telemetry }) {
         if (!taskRuntime) {
@@ -91,15 +84,10 @@ class ExecutionEngine {
      *
      * Chamado exclusivamente pelo KernelLoop a cada ciclo.
      *
-     * @param {Object} context
-     * @param {number} context.tickId
-     * Identificador do ciclo lógico.
-     *
-     * @param {number} context.at
-     * Timestamp do ciclo.
-     *
-     * @returns {Array<Object>}
-     * Lista de propostas de decisão.
+     * @param {object} context
+     * @param {number} context.tickId Identificador do ciclo lógico.
+     * @param {number} context.at Timestamp do ciclo.
+     * @returns {object[]} Lista de propostas de decisão.
      */
     evaluate({ tickId, at }) {
         this.telemetry.info('execution_engine_evaluation_start', {
@@ -107,12 +95,13 @@ class ExecutionEngine {
             at,
         });
 
-        const proposals = [];
+        const proposals = /** @type {any[]} */ ([]);
 
         let tasks;
         try {
             tasks = this.taskRuntime.listTasks();
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             this.telemetry.warning('execution_engine_list_tasks_failed', {
                 error: err?.message || String(err),
                 tickId,
@@ -129,7 +118,8 @@ class ExecutionEngine {
                 if (Array.isArray(taskProposals)) {
                     proposals.push(...taskProposals);
                 }
-            } catch (err) {
+            } catch (/** @type {any} */ _rawErr) {
+                const err = /** @type {any} */ (_rawErr);
                 this.telemetry.warning('execution_engine_task_evaluation_failed', {
                     taskId: task?.taskId || task?.meta?.id,
                     error: err?.message || String(err),
@@ -155,17 +145,12 @@ class ExecutionEngine {
     /**
      * Avalia uma tarefa específica.
      *
-     * @param {Object} task
-     * Snapshot imutável da tarefa.
-     *
-     * @param {Object} context
-     * Contexto do ciclo.
-     *
-     * @returns {Array<Object>}
-     * Propostas geradas para esta tarefa.
+     * @param {any} task Snapshot imutável da tarefa.
+     * @param {object} context Contexto do ciclo.
+     * @returns {object[]} Propostas geradas para esta tarefa.
      */
-    _evaluateTask(task, { tickId, at }) {
-        const proposals = [];
+    _evaluateTask(task, /** @type {any} */ { tickId, at }) {
+        const proposals = /** @type {any[]} */ ([]);
 
         // 1. Recupera observações correlacionadas
         const observations = task.metadata?.correlationId
@@ -180,7 +165,8 @@ class ExecutionEngine {
                 observations,
                 at,
             });
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             this.telemetry.warning('execution_engine_policy_assess_failed', {
                 taskId: task?.taskId || task?.meta?.id,
                 error: err?.message || String(err),
@@ -196,7 +182,8 @@ class ExecutionEngine {
                 observations,
                 at,
             });
-        } catch (err) {
+        } catch (/** @type {any} */ _rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             this.telemetry.warning('execution_engine_interpret_failed', {
                 taskId: task?.taskId || task?.meta?.id,
                 error: err?.message || String(err),
@@ -205,7 +192,7 @@ class ExecutionEngine {
                 hasCompletionSignal: false,
                 hasErrorSignal: false,
                 hasProgressSignal: false,
-                lastObservationAt: null,
+                lastObservationAt: /** @type {number | null} */ (null),
             };
         }
 
@@ -239,20 +226,18 @@ class ExecutionEngine {
     /**
      * Interpreta semanticamente as observações de uma tarefa.
      *
-     * @param {Object} params
-     * @param {Object} params.task
-     * @param {Array} params.observations
+     * @param {object} params
+     * @param {any} params.task
+     * @param {any[]} params.observations
      * @param {number} params.at
-     *
-     * @returns {Object}
-     * Resultado da interpretação semântica.
+     * @returns {any} Resultado da interpretação semântica.
      */
     _interpretObservations({ task, observations, at }) {
         const result = {
             hasCompletionSignal: false,
             hasErrorSignal: false,
             hasProgressSignal: false,
-            lastObservationAt: null,
+            lastObservationAt: /** @type {number | null} */ (null),
         };
 
         if (observations.length === 0) {
@@ -301,13 +286,18 @@ class ExecutionEngine {
 
     /**
      * Sintetiza uma proposta de decisão a partir de:
+     *
      * - Avaliação normativa (PolicyEngine)
      * - Interpretação semântica (observações)
      * - Estado atual da tarefa
      *
-     * @param {Object} params
-     * @returns {Object|null}
-     * Proposta de decisão ou null se nenhuma ação necessária.
+     * @param {object} params
+     * @param {any} params.task
+     * @param {any} params.observations
+     * @param {any} params.policyAssessment
+     * @param {any} params.semanticDecisions
+     * @param {number} params.at
+     * @returns {any} Proposta de decisão ou null se nenhuma ação necessária.
      */
     _synthesizeProposal({ task, observations: _, policyAssessment, semanticDecisions, at }) {
         // Regra 1: Suspender tarefa se avaliação normativa crítica
@@ -360,4 +350,4 @@ class ExecutionEngine {
     }
 }
 
-export { ExecutionEngine, DecisionKind };
+export { DecisionKind, ExecutionEngine };

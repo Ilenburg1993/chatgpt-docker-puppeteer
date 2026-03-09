@@ -1,8 +1,8 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
+import { log } from '#core/logger';
 import fs from 'node:fs';
 import path from 'node:path';
 import pLimit from 'p-limit';
-import { log } from '#core/logger';
 import * as PATHS from '../fs/paths.js';
 
 // --- CONFIGURAÇÃO DE CADÊNCIA ---
@@ -10,11 +10,14 @@ const CACHE_HEARTBEAT_MS = 5000; // Varredura forçada a cada 5s
 const OBSERVATION_WINDOW_MS = 300; // Janela de estabilização para eventos de disco
 
 // --- ESTADO VOLÁTIL DO CACHE ---
+/** @type {any[]} */
 let globalQueueCache = [];
 let isCacheDirty = true;
 let lastFullScan = 0;
+/** @type {any} */
 let currentScanPromise = null;
 // const WATCHER_DEBOUNCE_MS = 100; // Debounce para file watcher (P1.2) - not used yet
+/** @type {any} */
 let windowTimer = null;
 // watcherDebounceTimer reserved for future use
 
@@ -24,37 +27,41 @@ let cacheMisses = 0;
 
 /**
  * Lista arquivos de tarefa existentes no diretório físico.
+ *
  * @returns {string[]} Lista de caminhos absolutos para arquivos .json.
  */
 function listTaskFiles() {
     try {
         return fs
             .readdirSync(PATHS.QUEUE)
-            .filter(file => file.endsWith('.json'))
-            .map(file => path.join(PATHS.QUEUE, file));
-    } catch (err) {
-        log('ERROR', `[CACHE] Falha ao listar diretório da fila: ${err.message}`);
+            .filter((file) => file.endsWith('.json'))
+            .map((file) => path.join(PATHS.QUEUE, file));
+    } catch (/** @type {any} */ err) {
+        const _ce = /** @type {any} */ (err);
+        log('ERROR', `[CACHE] Falha ao listar diretório da fila: ${_ce.message}`);
         return [];
     }
 }
 
 /**
  * Carrega o conteúdo de uma tarefa individual.
+ *
  * @param {string} filePath - Caminho do arquivo.
  */
 async function loadTask(filePath) {
     try {
         const raw = await fs.promises.readFile(filePath, 'utf-8');
         return JSON.parse(raw);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
+        const _ce = /** @type {any} */ (_);
         // Falha silenciosa para arquivos em processo de escrita/deleção
         return null;
     }
 }
 
 /**
- * Executa uma varredura completa do disco e atualiza o snapshot em RAM.
- * Implementa o padrão Singleton para evitar concorrência de I/O.
+ * Executa uma varredura completa do disco e atualiza o snapshot em RAM. Implementa o padrão Singleton para evitar
+ * concorrência de I/O.
  */
 async function scanQueue() {
     if (currentScanPromise) {
@@ -67,7 +74,7 @@ async function scanQueue() {
 
             // P9.7: Limita a 10 reads simultâneos para prevenir I/O spikes
             const limit = pLimit(10);
-            const results = await Promise.all(files.map(file => limit(() => loadTask(file))));
+            const results = await Promise.all(files.map((file) => limit(() => loadTask(file))));
 
             // Filtra nulos (falhas de leitura) e atualiza o estado global
             globalQueueCache = results.filter(Boolean);
@@ -85,8 +92,8 @@ async function scanQueue() {
 }
 
 /**
- * Abre uma janela de observação para estabilizar gatilhos externos.
- * Sinais de sensores (Watchers) apenas marcam o cache como sujo e chamam esta função.
+ * Abre uma janela de observação para estabilizar gatilhos externos. Sinais de sensores (Watchers) apenas marcam o cache
+ * como sujo e chamam esta função.
  */
 function openObservationWindow() {
     if (windowTimer) {
@@ -97,7 +104,7 @@ function openObservationWindow() {
         windowTimer = null;
         if (isCacheDirty) {
             // Erros de scanQueue são logados; não devem virar unhandled rejection
-            scanQueue().catch(err => {
+            scanQueue().catch((err) => {
                 log('ERROR', `[CACHE] Falha na varredura da fila (observation window): ${err.message}`);
             });
         }
@@ -105,10 +112,10 @@ function openObservationWindow() {
 }
 
 /**
- * API PÚBLICA: Retorna o snapshot atual da fila.
- * Implementa o Heartbeat de segurança para garantir consistência eventual.
- * P9.6: Adiciona tracking de cache hits/misses
-  * @returns {Promise<any>}
+ * API PÚBLICA: Retorna o snapshot atual da fila. Implementa o Heartbeat de segurança para garantir consistência
+ * eventual. P9.6: Adiciona tracking de cache hits/misses
+ *
+ * @returns {Promise<any>}
  */
 async function getQueue() {
     const now = Date.now();
@@ -133,9 +140,10 @@ async function getQueue() {
 }
 
 /**
- * Sinalização Externa: Marca o cache como inconsistente.
- * Chamado exclusivamente por sensores (fs_watcher) ou comandos IPC.
-  * @returns {void}
+ * Sinalização Externa: Marca o cache como inconsistente. Chamado exclusivamente por sensores (fs_watcher) ou comandos
+ * IPC.
+ *
+ * @returns {any}
  */
 function markDirty() {
     isCacheDirty = true;
@@ -144,7 +152,8 @@ function markDirty() {
 
 /**
  * P9.6: Retorna métricas de cache para observabilidade.
- * @returns {Object} Cache metrics
+ *
+ * @returns {any} Cache metrics
  */
 function getCacheMetrics() {
     const total = cacheHits + cacheMisses;
@@ -161,4 +170,4 @@ function getCacheMetrics() {
     };
 }
 
-export { getQueue, markDirty, getCacheMetrics };
+export { getCacheMetrics, getQueue, markDirty };

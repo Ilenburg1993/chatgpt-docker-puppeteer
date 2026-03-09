@@ -1,12 +1,13 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import EventEmitter from 'node:events';
-import * as analyzer from '#shared/sadi/analyzer';
-import * as io from '#infra/io';
 import CONFIG from '#core/config';
 import { log } from '#core/logger';
+import * as io from '#infra/io';
+import * as analyzer from '#shared/sadi/analyzer';
+import EventEmitter from 'node:events';
 
 /**
  * A Promise that also exposes a `.cancel()` method to clear its internal timer.
+ *
  * @typedef {Promise<never> & { cancel: () => void }} CancelableTimeoutPromise
  */
 
@@ -20,7 +21,7 @@ const RESOLVER_CONFIG = {
     /** Cache TTL para protocolos (ms) - Default: 60s */
     CACHE_TTL_MS: parseInt(
         process.env.RESOLVER_CACHE_TTL || String(/** @type {any} */ (CONFIG)?.all?.INPUT_CACHE_TTL || '60000'),
-        10
+        10,
     ),
 
     /** Timeout para resolve completo (ms) - Default: 15s */
@@ -74,11 +75,11 @@ const RESOLVER_EVENTS = {
 /**
  * InputResolver v2.0 - Governed Input Resolver
  *
- * Localiza interfaces de interação (input box) com hierarquia de autoridade:
- * Cache → DNA (rules) → Heurística (SADI). Cache multi-domain com LRU eviction,
- * timeout protection, retry logic, e metrics tracking completo.
+ * Localiza interfaces de interação (input box) com hierarquia de autoridade: Cache → DNA (rules) → Heurística (SADI).
+ * Cache multi-domain com LRU eviction, timeout protection, retry logic, e metrics tracking completo.
  *
  * FEATURES v2.0:
+ *
  * - EventEmitter inheritance (8 eventos locais)
  * - RESOLVER_CONFIG (6 keys configuráveis via env vars)
  * - Cache multi-domain (Map com LRU eviction)
@@ -89,47 +90,46 @@ const RESOLVER_EVENTS = {
  * - JSDoc 100% (class, constructor, methods, events)
  * - getStats() method para introspection
  *
- * @extends EventEmitter
- *
  * @example
- * const resolver = new InputResolver(driver);
+ *     const resolver = new InputResolver(driver);
  *
- * // Listen to events
- * resolver.on(RESOLVER_EVENTS.CACHE_HIT, (data) => {
- *     console.log('Cache hit:', data);
- * });
+ *     // Listen to events
+ *     resolver.on(RESOLVER_EVENTS.CACHE_HIT, (data) => {
+ *         console.log('Cache hit:', data);
+ *     });
  *
- * resolver.on(RESOLVER_EVENTS.RESOLUTION_COMPLETED, (data) => {
- *     console.log('Resolution completed:', data);
- * });
+ *     resolver.on(RESOLVER_EVENTS.RESOLUTION_COMPLETED, (data) => {
+ *         console.log('Resolution completed:', data);
+ *     });
  *
- * // Resolve input protocol
- * const protocol = await resolver.resolve();
- * console.log('Selector:', protocol.selector);
+ *     // Resolve input protocol
+ *     const protocol = await resolver.resolve();
+ *     console.log('Selector:', protocol.selector);
  *
- * // Get metrics
- * const stats = resolver.getStats();
- * console.log('Cache hit rate:', stats.cacheHitRate + '%');
+ *     // Get metrics
+ *     const stats = resolver.getStats();
+ *     console.log('Cache hit rate:', stats.cacheHitRate + '%');
+ *
+ * @extends EventEmitter
  */
 class InputResolver extends EventEmitter {
     /**
      * Cria uma instância do InputResolver.
      *
-     * @param {Object} driver - Instância do driver (BaseDriver ou subclasses)
-     * @param {Function} driver._emitVital - Método IPC para telemetria vital
-     * @param {Function} driver._assertPageAlive - Validação de page alive
-     * @param {string} driver.correlationId - ID de correlação para logs
-     * @param {Object} [driver.page] - Instância Puppeteer Page (pode ser null até attachContext)
-     * @param {string} [driver.currentDomain] - Domain atual
-     * @param {Object} [driver.handles] - HandleManager para cleanup (injetado após instanciar)
+     * @example
+     *     const resolver = new InputResolver(driver);
      *
+     * @param {object} driver - Instância do driver (BaseDriver ou subclasses)
+     * @param {function} driver._emitVital - Método IPC para telemetria vital
+     * @param {function} driver._assertPageAlive - Validação de page alive
+     * @param {string} driver.correlationId - ID de correlação para logs
+     * @param {object} [driver.page] - Instância Puppeteer Page (pode ser null até attachContext)
+     * @param {string} [driver.currentDomain] - Domain atual
+     * @param {object} [driver.handles] - HandleManager para cleanup (injetado após instanciar)
      * @throws {Error} Se driver não for fornecido
      * @throws {Error} Se driver._emitVital não for uma função
      * @throws {Error} Se driver.page não existir
      * @throws {Error} Se driver.handles não existir
-     *
-     * @example
-     * const resolver = new InputResolver(driver);
      */
     constructor(driver) {
         super(); // EventEmitter constructor
@@ -166,14 +166,27 @@ class InputResolver extends EventEmitter {
      * Resolve o protocolo de entrada (seletor + contexto) com hierarquia de autoridade.
      *
      * FLUXO DE EXECUÇÃO:
+     *
      * 1. Validação de precondições (page alive)
      * 2. Cache validation (multi-domain lookup)
      * 3. DNA First (io.getTargetRules → _tryKnownSelectors)
      * 4. Heuristic Second (analyzer.findChatInputSelector com retry)
      * 5. Finalize discovery (resolve sendButton + cache update)
      *
-     * @returns {Promise<Object>} Protocolo resolvido
-     * Propriedades do objeto retornado:
+     * @example
+     *     const protocol = await resolver.resolve();
+     *     console.log('Selector:', protocol.selector);
+     *     console.log('Source:', protocol.source);
+     *
+     * @fires RESOLVER_EVENTS.RESOLUTION_STARTED
+     * @fires RESOLVER_EVENTS.CACHE_HIT
+     * @fires RESOLVER_EVENTS.CACHE_MISS
+     * @fires RESOLVER_EVENTS.DNA_MATCH
+     * @fires RESOLVER_EVENTS.HEURISTIC_MATCH
+     * @fires RESOLVER_EVENTS.RESOLUTION_COMPLETED
+     * @fires RESOLVER_EVENTS.RESOLUTION_FAILED
+     * @returns {Promise<any>} Protocolo resolvido Propriedades do objeto retornado:
+     *
      *   - selector (string): Seletor CSS do input
      *   - context (string): Contexto do seletor ('root' ou frame)
      *   - hasSendButton (boolean): Se possui botão de envio
@@ -182,19 +195,6 @@ class InputResolver extends EventEmitter {
      *
      * @throws {Error} Se input não for encontrado (INPUT_NOT_FOUND)
      * @throws {Error} Se timeout exceder RESOLVE_TIMEOUT_MS
-     *
-     * @emits RESOLVER_EVENTS.RESOLUTION_STARTED
-     * @emits RESOLVER_EVENTS.CACHE_HIT
-     * @emits RESOLVER_EVENTS.CACHE_MISS
-     * @emits RESOLVER_EVENTS.DNA_MATCH
-     * @emits RESOLVER_EVENTS.HEURISTIC_MATCH
-     * @emits RESOLVER_EVENTS.RESOLUTION_COMPLETED
-     * @emits RESOLVER_EVENTS.RESOLUTION_FAILED
-     *
-     * @example
-     * const protocol = await resolver.resolve();
-     * console.log('Selector:', protocol.selector);
-     * console.log('Source:', protocol.source);
      */
     async resolve() {
         const startTime = Date.now();
@@ -218,20 +218,21 @@ class InputResolver extends EventEmitter {
             this.stats.maxResolutionDuration = Math.max(this.stats.maxResolutionDuration, duration);
 
             return result;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _ce = /** @type {any} */ (err);
             this.stats.failedResolutions++;
 
             // EventEmitter local
             this.emit(RESOLVER_EVENTS.RESOLUTION_FAILED, {
                 domain: this.driver.currentDomain,
-                error: err.message,
+                error: _ce.message,
                 timestamp: Date.now(),
             });
 
-            throw err;
+            throw _ce;
         } finally {
             // Higiene de handles: evita vazamento de referências Puppeteer
-            await this.driver.handles.clearAll();
+            await /** @type {any} */ (this.driver.handles)?.clearAll();
         }
     }
 
@@ -239,7 +240,7 @@ class InputResolver extends EventEmitter {
      * Executa lógica interna de resolução (sem timeout wrapper).
      *
      * @private
-     * @returns {Promise<Object>} Protocolo resolvido
+     * @returns {Promise<any>} Protocolo resolvido
      */
     async _executeResolve() {
         this.driver._assertPageAlive();
@@ -262,8 +263,9 @@ class InputResolver extends EventEmitter {
                     analyzer.validateCandidateInteractivity(this.driver.page, cached.protocol),
                     cacheTimeoutP,
                 ]);
-            } catch (validationErr) {
-                log('WARN', `[INPUT_RESOLVER] Cache validation timeout/error: ${validationErr.message}`, correlationId);
+            } catch (/** @type {any} */ validationErr) {
+                const _ce = /** @type {any} */ (validationErr);
+                log('WARN', `[INPUT_RESOLVER] Cache validation timeout/error: ${_ce.message}`, correlationId);
             } finally {
                 cacheTimeoutP.cancel();
             }
@@ -304,10 +306,11 @@ class InputResolver extends EventEmitter {
         // 2. CONSULTA À CONSTITUIÇÃO (DNA First)
         this.driver._emitVital('SADI_PERCEPTION', { status: 'CONSULTING_DNA', domain });
         /** @type {{ selectors?: { input_box?: string[] | string } }} */
-        const dnaRules = (await io.getTargetRules(domain)) || {};
+        const dnaRules = (await io.getTargetRules(/** @type {string} */ (domain))) || {};
 
-        if (dnaRules.selectors?.input_box) {
-            const dnaCandidate = await this._tryKnownSelectors(dnaRules.selectors.input_box);
+        const inputBox = dnaRules.selectors?.input_box;
+        if (inputBox) {
+            const dnaCandidate = await this._tryKnownSelectors(inputBox);
             if (dnaCandidate) {
                 this.stats.dnaMatches++;
                 return this._finalizeDiscovery(dnaCandidate, 'DNA_MATCH', dnaRules, 1.0);
@@ -332,17 +335,18 @@ class InputResolver extends EventEmitter {
                         heuristicResult.protocol,
                         'HEURISTIC_MATCH',
                         dnaRules,
-                        heuristicResult.confidence || 0.8
+                        heuristicResult.confidence || 0.8,
                     );
                 }
-            } catch (heuristicErr) {
+            } catch (/** @type {any} */ heuristicErr) {
+                const _ce = /** @type {any} */ (heuristicErr);
                 if (retry < maxRetries - 1) {
                     log(
                         'WARN',
-                        `[INPUT_RESOLVER] Heurística failed (retry ${retry + 1}/${maxRetries}): ${heuristicErr.message}`,
-                        correlationId
+                        `[INPUT_RESOLVER] Heurística failed (retry ${retry + 1}/${maxRetries}): ${_ce.message}`,
+                        correlationId,
                     );
-                    await new Promise(r => setTimeout(r, 1000 * (retry + 1))); // Backoff
+                    await new Promise((r) => setTimeout(r, 1000 * (retry + 1))); // Backoff
                 } else {
                     log('ERROR', `[INPUT_RESOLVER] Heurística failed after ${maxRetries} retries`, correlationId);
                 }
@@ -353,7 +357,7 @@ class InputResolver extends EventEmitter {
         this.driver._emitVital('TRIAGE_ALERT', {
             type: 'INPUT_NOT_FOUND',
             severity: 'HIGH',
-            evidence: { domain, url: this.driver.page.url() },
+            evidence: { domain, url: /** @type {any} */ (this.driver.page).url() },
         });
 
         throw new Error(`INPUT_NOT_FOUND: Falha ao localizar interface em ${domain}`);
@@ -365,11 +369,11 @@ class InputResolver extends EventEmitter {
      * Suporta polimorfismo: aceita Array de strings ou objetos de protocolo SADI.
      *
      * @private
-     * @param {string | Object | Array<string|Object>} inputRules - Lista de seletores ou protocolos
-     * @returns {Promise<Object|null>} Protocolo válido ou null
-     *
      * @example
-     * const protocol = await this._tryKnownSelectors(['#prompt', 'textarea']);
+     *     const protocol = await this._tryKnownSelectors(['#prompt', 'textarea']);
+     *
+     * @param {string | Object | (string | Object)[]} inputRules - Lista de seletores ou protocolos
+     * @returns {Promise<object | null>} Protocolo válido ou null
      */
     async _tryKnownSelectors(inputRules) {
         const candidates = Array.isArray(inputRules) ? inputRules : [inputRules];
@@ -393,7 +397,7 @@ class InputResolver extends EventEmitter {
                 if (ok) {
                     return protocol;
                 }
-            } catch (_err) {
+            } catch (/** @type {any} */ _err) {
                 // Continue to next candidate
                 continue;
             }
@@ -406,19 +410,17 @@ class InputResolver extends EventEmitter {
      * Consolida a descoberta, resolve o botão de envio e atualiza o cache.
      *
      * @private
-     * @param {Object} protocol - Protocolo resolvido
-     * @param {string} source - Fonte da resolução ('DNA_MATCH' ou 'HEURISTIC_MATCH')
-     * @param {Object} dnaRules - Regras DNA do domínio
-     * @param {number} [confidence=1.0] - Nível de confiança (0-1)
-     *
-     * @returns {Promise<Object>} Protocolo final com sendButton
-     *
-     * @emits RESOLVER_EVENTS.DNA_MATCH
-     * @emits RESOLVER_EVENTS.HEURISTIC_MATCH
-     * @emits RESOLVER_EVENTS.RESOLUTION_COMPLETED
-     *
      * @example
-     * const result = await this._finalizeDiscovery(protocol, 'DNA_MATCH', rules);
+     *     const result = await this._finalizeDiscovery(protocol, 'DNA_MATCH', rules);
+     *
+     * @fires RESOLVER_EVENTS.DNA_MATCH
+     * @fires RESOLVER_EVENTS.HEURISTIC_MATCH
+     * @fires RESOLVER_EVENTS.RESOLUTION_COMPLETED
+     * @param {any} protocol - Protocolo resolvido
+     * @param {string} source - Fonte da resolução ('DNA_MATCH' ou 'HEURISTIC_MATCH')
+     * @param {object} dnaRules - Regras DNA do domínio
+     * @param {number} [confidence=1.0] - Nível de confiança (0-1) Default is `1.0`
+     * @returns {Promise<any>} Protocolo final com sendButton
      */
     async _finalizeDiscovery(protocol, source, dnaRules, confidence = 1.0) {
         const domain = this.driver.currentDomain;
@@ -438,7 +440,7 @@ class InputResolver extends EventEmitter {
         const shouldCache = confidence >= RESOLVER_CONFIG.MIN_CONFIDENCE_THRESHOLD;
 
         if (shouldCache) {
-            this._updateCache(domain, finalProtocol, confidence);
+            this._updateCache(domain ?? '', finalProtocol, confidence);
         } else {
             log('WARN', `[INPUT_RESOLVER] Low confidence (${confidence}), não cacheando`, correlationId);
         }
@@ -487,17 +489,17 @@ class InputResolver extends EventEmitter {
      * Atualiza cache multi-domain com LRU eviction.
      *
      * @private
-     * @param {string} domain - Domain atual
-     * @param {Object} protocol - Protocolo a cachear
-     * @param {number} confidence - Nível de confiança
-     *
      * @example
-     * this._updateCache('chatgpt.com', protocol, 0.95);
+     *     this._updateCache('chatgpt.com', protocol, 0.95);
+     *
+     * @param {string} domain - Domain atual
+     * @param {any} protocol - Protocolo a cachear
+     * @param {number} confidence - Nível de confiança
      */
     _updateCache(domain, protocol, confidence) {
         // ✅ LRU eviction se cache > MAX_CACHE_SIZE (BUG #7 fix)
         if (this.protocolCache.size >= RESOLVER_CONFIG.MAX_CACHE_SIZE) {
-            const oldestKey = this.protocolCache.keys().next().value;
+            const oldestKey = /** @type {string} */ (this.protocolCache.keys().next().value);
             this.protocolCache.delete(oldestKey);
 
             log('DEBUG', `[INPUT_RESOLVER] LRU eviction: ${oldestKey}`, this.driver.correlationId);
@@ -515,14 +517,13 @@ class InputResolver extends EventEmitter {
      *
      * Chamado pelo Driver em manobras de recuperação.
      *
+     * @example
+     *     resolver.clearCache(); // Limpa todo o cache
+     *     resolver.clearCache('chatgpt.com'); // Limpa apenas chatgpt.com
+     *
+     * @fires RESOLVER_EVENTS.CACHE_CLEARED
      * @param {string} [domain] - Domain específico para invalidar (opcional, default: all)
      * @returns {void}
-     *
-     * @emits RESOLVER_EVENTS.CACHE_CLEARED
-     *
-     * @example
-     * resolver.clearCache(); // Limpa todo o cache
-     * resolver.clearCache('chatgpt.com'); // Limpa apenas chatgpt.com
      */
     clearCache(domain) {
         if (domain) {
@@ -543,13 +544,13 @@ class InputResolver extends EventEmitter {
     /**
      * Verifica se o cache é válido para o domain atual conforme TTL.
      *
+     * @example
+     *     if (resolver.isCached('chatgpt.com')) {
+     *         console.log('Cache válido para ChatGPT');
+     *     }
+     *
      * @param {string} [domain] - Domain para verificar (opcional, default: currentDomain)
      * @returns {boolean} true se cached válido, false caso contrário
-     *
-     * @example
-     * if (resolver.isCached('chatgpt.com')) {
-     *     console.log('Cache válido para ChatGPT');
-     * }
      */
     isCached(domain) {
         const targetDomain = domain || this.driver.currentDomain;
@@ -561,8 +562,13 @@ class InputResolver extends EventEmitter {
     /**
      * Retorna estatísticas de resolution.
      *
-     * @returns {Object} Objeto com métricas de resolution
-     * Propriedades do objeto retornado:
+     * @example
+     *     const stats = resolver.getStats();
+     *     console.log('Cache hit rate:', stats.cacheHitRate);
+     *     console.log('DNA vs Heuristic:', stats.dnaMatches, 'vs', stats.heuristicMatches);
+     *
+     * @returns {any} Objeto com métricas de resolution Propriedades do objeto retornado:
+     *
      *   - totalResolutions (number): Total de resoluções executadas
      *   - successfulResolutions (number): Resoluções bem-sucedidas
      *   - failedResolutions (number): Resoluções que falharam
@@ -574,11 +580,6 @@ class InputResolver extends EventEmitter {
      *   - maxResolutionDuration (number): Duração máxima individual (ms)
      *   - cacheHitRate (string): Taxa de cache hit (%)
      *   - config (Object): Configuração atual (RESOLVER_CONFIG)
-     *
-     * @example
-     * const stats = resolver.getStats();
-     * console.log('Cache hit rate:', stats.cacheHitRate);
-     * console.log('DNA vs Heuristic:', stats.dnaMatches, 'vs', stats.heuristicMatches);
      */
     getStats() {
         return {
@@ -597,11 +598,10 @@ class InputResolver extends EventEmitter {
      * @private
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para error message)
-     *
      * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
-        let timerId;
+        let timerId = /** @type {ReturnType<typeof setTimeout> | undefined} */ (undefined);
         const p = /** @type {CancelableTimeoutPromise} */ (
             new Promise((_, reject) => {
                 timerId = setTimeout(() => {
@@ -617,17 +617,21 @@ class InputResolver extends EventEmitter {
 }
 
 /**
+ * @typedef {object} CreateDriver
+ * @property {any} _ Propriedades definidas em runtime.
+ */
+/**
  * Factory function para criar instância de InputResolver.
  *
- * @param {Object} driver - Instância do driver
- * @returns {InputResolver} Nova instância
- *
  * @example
- * const { create } = require('./input_resolver');
- * const resolver = create(driver);
+ *     const { create } = require('./input_resolver');
+ *     const resolver = create(driver);
+ *
+ * @param {object} driver - Instância do driver
+ * @returns {InputResolver} Nova instância
  */
 function create(driver) {
-    return new InputResolver(driver);
+    return new InputResolver(/** @type {any} */ (driver));
 }
 
-export { InputResolver, RESOLVER_CONFIG, RESOLVER_EVENTS, create };
+export { create, InputResolver, RESOLVER_CONFIG, RESOLVER_EVENTS };

@@ -1,5 +1,5 @@
 <script setup>
-import { Activity, ChevronLeft, LayoutDashboard, ListTodo, ScrollText, Target, ShieldCheck } from 'lucide-vue-next';
+import { Activity, ChevronLeft, LayoutDashboard, ListTodo, ScrollText, ShieldCheck, Target } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 
 const props = defineProps({
@@ -22,7 +22,7 @@ const menuItems = [
     { icon: Activity, label: 'Saúde', path: '/health' },
 ];
 
-const isActive = path => {
+const isActive = (path) => {
     return route.path === path || route.path.startsWith(path + '/');
 };
 

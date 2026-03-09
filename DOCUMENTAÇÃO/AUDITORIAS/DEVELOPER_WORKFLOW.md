@@ -159,7 +159,7 @@ make queue-watch
 make format
 
 # 4. Rodar testes específicos
-node --test tests/<categoria>/<arquivo>.spec.js
+node --test tests/ < categoria > / < arquivo > .spec.js
 
 # 5. Rodar todos os testes
 make test-all
@@ -274,7 +274,7 @@ make update-deps
 
 # Atualizar manualmente
 npm update
-npm install <package>@latest
+npm install < package > @latest
 
 # Verificar novamente
 make check-deps
@@ -383,29 +383,29 @@ make status
 ### Comandos de 1 letra
 
 ```bash
-make s   # start
-make st  # stop
-make r   # restart
-make h   # health
-make l   # logs
-make t   # test
-make c   # clean
-make b   # backup
-make q   # queue
-make d   # dashboard
-make i   # info
-make v   # vscode-info
-make g   # git-changed
+make s  # start
+make st # stop
+make r  # restart
+make h  # health
+make l  # logs
+make t  # test
+make c  # clean
+make b  # backup
+make q  # queue
+make d  # dashboard
+make i  # info
+make v  # vscode-info
+make g  # git-changed
 ```
 
 ### Quick Operations
 
 ```bash
-make quick CMD=pause     # Pausar sistema
-make quick CMD=resume    # Resume sistema
-make quick CMD=health    # Health check rápido
-make quick CMD=status    # Status rápido
-make quick CMD=backup    # Backup rápido
+make quick CMD=pause  # Pausar sistema
+make quick CMD=resume # Resume sistema
+make quick CMD=health # Health check rápido
+make quick CMD=status # Status rápido
+make quick CMD=backup # Backup rápido
 ```
 
 ---
@@ -627,8 +627,8 @@ git config alias.pushsafe "!make git-push-safe"
 Agora pode usar:
 
 ```bash
-git changed     # = make git-changed
-git pushsafe    # = make git-push-safe
+git changed  # = make git-changed
+git pushsafe # = make git-push-safe
 ```
 
 ### 4. VS Code keyboard shortcuts

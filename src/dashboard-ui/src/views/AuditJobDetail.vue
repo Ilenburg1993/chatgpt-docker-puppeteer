@@ -133,9 +133,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
 import { useAudit } from '@/composables/useAudit';
+import { onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 
 const route = useRoute();
 const { job, findings, patches, loading, error, getJob, runJob, cancelJob, listFindings } = useAudit();

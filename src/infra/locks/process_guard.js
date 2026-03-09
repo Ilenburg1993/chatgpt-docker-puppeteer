@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/infra/locks/process_guard.js
    Audit Level: 700 — Sovereign Process Guard (Singularity Edition)
@@ -22,22 +22,20 @@ function isProcessAlive(pid) {
 
     try {
         /**
-         * O sinal '0' é uma convenção POSIX.
-         * Ele não envia uma interrupção real ao processo, mas executa todas
-         * as checagens de erro, incluindo a verificação de existência.
+         * O sinal '0' é uma convenção POSIX. Ele não envia uma interrupção real ao processo, mas executa todas as
+         * checagens de erro, incluindo a verificação de existência.
          */
         process.kill(pid, 0);
         return true;
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
+        const _ce = /** @type {any} */ (e);
         /**
-         * EPERM: O processo existe, mas o usuário atual não tem permissão
-         * para sinalizá-lo (comum em processos de sistema ou outros usuários).
-         * Consideramos como VIVO.
+         * EPERM: O processo existe, mas o usuário atual não tem permissão para sinalizá-lo (comum em processos de
+         * sistema ou outros usuários). Consideramos como VIVO.
          *
-         * ESRCH: O processo não foi encontrado (morreu ou nunca existiu).
-         * Consideramos como MORTO.
+         * ESRCH: O processo não foi encontrado (morreu ou nunca existiu). Consideramos como MORTO.
          */
-        return e.code === 'EPERM';
+        return _ce.code === 'EPERM';
     }
 }
 

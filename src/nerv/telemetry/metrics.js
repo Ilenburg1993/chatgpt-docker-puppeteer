@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/telemetry/metrics.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -45,8 +45,7 @@ function emptyMap() {
 /**
  * Cria um repositório técnico de métricas.
  *
- * @returns {Object}
- * Estrutura contendo operações puramente técnicas.
+ * @returns {any} Estrutura contendo operações puramente técnicas.
  */
 function createMetrics() {
     const counters = emptyMap();
@@ -57,14 +56,25 @@ function createMetrics() {
      Operações internas
   =========================== */
 
+    /**
+     * @param {string} name
+     * @param {number} [value]
+     */
     function incCounter(name, value = 1) {
         counters[name] = (counters[name] || 0) + value;
     }
 
+    /**
+     * @param {string} name
+     * @param {any} value
+     */
     function setGauge(name, value) {
         gauges[name] = value;
     }
 
+    /**
+     * @param {string} name
+     */
     function mark(name) {
         timestamps[name] = now();
     }

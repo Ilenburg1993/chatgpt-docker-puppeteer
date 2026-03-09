@@ -13,17 +13,17 @@ const colors = {
     cyan: '\x1b[36m',
 };
 
-function log(type, message) {
+function log(/** @type {any} */ type, /** @type {any} */ message) {
     const timestamp = new Date().toISOString();
     const prefix = type === 'SUCCESS' ? '✅' : type === 'FAIL' ? '❌' : '>';
     console.log(`${prefix} ${message}`);
 }
 
-function header(text) {
+function header(/** @type {any} */ text) {
     console.log(`\n${colors.cyan}=== ${text} ===${colors.reset}`);
 }
 
-function summary(text) {
+function summary(/** @type {any} */ text) {
     console.log(`\n${colors.blue}╔══════════════════════════════════════════════════════════════╗`);
     console.log(`║${text.padEnd(62)}║`);
     console.log(`╚══════════════════════════════════════════════════════════════╝${colors.reset}`);
@@ -32,14 +32,16 @@ function summary(text) {
 // ============================================================================
 // Mock: system.js com killProcess simulando delay
 // ============================================================================
-function createMockSystem(delayMs) {
+function createMockSystem(/** @type {any} */ delayMs) {
     return {
-        killProcess: pid => {
-            return new Promise(resolve => {
-                setTimeout(() => {
-                    resolve();
-                }, delayMs);
-            });
+        killProcess: (/** @type {any} */ pid) => {
+            return /** @type {Promise<void>} */ (
+                new Promise((resolve) => {
+                    setTimeout(() => {
+                        resolve();
+                    }, delayMs);
+                })
+            );
         },
     };
 }
@@ -48,12 +50,12 @@ function createMockSystem(delayMs) {
 // Mock: RecoverySystem com system injetável
 // ============================================================================
 class MockRecoverySystem {
-    constructor(driver, systemModule) {
+    constructor(/** @type {any} */ driver, /** @type {any} */ systemModule) {
         this.driver = driver;
         this.system = systemModule;
     }
 
-    async applyTier3Kill(pid, correlationId) {
+    async applyTier3Kill(/** @type {any} */ pid, /** @type {any} */ correlationId) {
         // Simulação da lógica Tier 3 com timeout
         const KILL_TIMEOUT_MS = 5000;
 
@@ -65,7 +67,7 @@ class MockRecoverySystem {
                 }),
             ]);
             return { status: 'SUCCESS', timedOut: false };
-        } catch (killErr) {
+        } catch (/** @type {any} */ killErr) {
             if (killErr.message === 'KILL_TIMEOUT') {
                 return { status: 'TIMEOUT', timedOut: true };
             }
@@ -110,9 +112,9 @@ async function test1_FastKill() {
         { name: 'Tempo ≈ 500ms', pass: elapsed >= 500 && elapsed < 1000 },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -146,9 +148,9 @@ async function test2_SlowKillTimeout() {
         { name: 'Não aguardou 7s', pass: elapsed < 6000 },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -181,9 +183,9 @@ async function test3_BorderlineKill() {
         { name: 'Respeitou timeout máximo', pass: elapsed < 6000 },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -227,15 +229,18 @@ async function test4_SequentialKills() {
     // Validações
     const checks = [
         { name: '3 kills executados', pass: results.length === 3 },
-        { name: 'Kill 1 completou', pass: results[0].status === 'SUCCESS' },
-        { name: 'Kill 2 timeout', pass: results[1].status === 'TIMEOUT' },
-        { name: 'Kill 3 completou', pass: results[2].status === 'SUCCESS' },
-        { name: 'Isolamento mantido', pass: results[0].status !== results[1].status },
+        { name: 'Kill 1 completou', pass: /** @type {any} */ (results[0]).status === 'SUCCESS' },
+        { name: 'Kill 2 timeout', pass: /** @type {any} */ (results[1]).status === 'TIMEOUT' },
+        { name: 'Kill 3 completou', pass: /** @type {any} */ (results[2]).status === 'SUCCESS' },
+        {
+            name: 'Isolamento mantido',
+            pass: /** @type {any} */ (results[0]).status !== /** @type {any} */ (results[1]).status,
+        },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -258,7 +263,7 @@ async function test5_CodeValidation() {
         'src',
         'driver',
         'modules',
-        'recovery_system.js'
+        'recovery_system.js',
     );
     const content = await fs.readFile(recoverySystemPath, 'utf-8');
 
@@ -285,9 +290,9 @@ async function test5_CodeValidation() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -319,7 +324,7 @@ async function runAllTests() {
     console.log(results.test5 ? '✅' : '❌', 'Validação de Código:', results.test5 ? 'PASSOU' : 'FALHOU');
 
     const totalTests = Object.keys(results).length;
-    const passedTests = Object.values(results).filter(r => r).length;
+    const passedTests = Object.values(results).filter((r) => r).length;
 
     console.log('');
     console.log(`${colors.cyan}📊 Score: ${passedTests}/${totalTests} testes passaram${colors.reset}`);
@@ -333,12 +338,10 @@ async function runAllTests() {
         console.log(`${colors.red}⚠️  Alguns testes falharam. Revise as correções.${colors.reset}`);
         process.exit(1);
     }
-
-    console.log('');
 }
 
 // Executa
-runAllTests().catch(err => {
+runAllTests().catch((err) => {
     console.error(`${colors.red}❌ Erro fatal nos testes:`, err.message + colors.reset);
     console.error(err.stack);
     process.exit(1);

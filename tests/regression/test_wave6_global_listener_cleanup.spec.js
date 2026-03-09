@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { registerUpstreams, shutdownUpstreams } from '../../src/integration/mcp/upstream-manager.mjs';
 import { ResilientLockManager } from '../../src/infra/locks/resilient_lock.js';
+import { registerUpstreams, shutdownUpstreams } from '../../src/integration/mcp/upstream-manager.mjs';
 
 const registryStub = {
     has() {
@@ -12,11 +12,11 @@ const registryStub = {
     register() {},
 };
 
-function captureCounts(events) {
-    return Object.fromEntries(events.map(event => [event, process.listenerCount(event)]));
+function captureCounts(/** @type {any} */ events) {
+    return Object.fromEntries(events.map((/** @type {any} */ event) => [event, process.listenerCount(event)]));
 }
 
-function assertCountsEqual(actual, expected, messagePrefix) {
+function assertCountsEqual(/** @type {any} */ actual, /** @type {any} */ expected, /** @type {any} */ messagePrefix) {
     for (const [event, expectedCount] of Object.entries(expected)) {
         assert.equal(actual[event], expectedCount, `${messagePrefix}: listener count mismatch for ${event}`);
     }
@@ -74,7 +74,7 @@ test('wave6: resilient lock unregisters global listeners after releasing final l
     const acquired = await manager.acquire(
         'wave6-lock-1',
         async () => true,
-        async () => {}
+        async () => {},
     );
 
     assert.equal(acquired, true, 'lock should be acquired');
@@ -99,7 +99,7 @@ test('wave6: resilient lock cleanupGlobalListeners is idempotent', async () => {
     await manager.acquire(
         'wave6-lock-2',
         async () => true,
-        async () => {}
+        async () => {},
     );
 
     manager.cleanupGlobalListeners();

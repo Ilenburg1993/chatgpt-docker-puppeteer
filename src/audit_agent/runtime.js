@@ -9,22 +9,34 @@ import {
     isAuditJobTriggerType,
 } from './contracts.js';
 
-/** @typedef {import('./contracts.js')} _unused */
-
 function nowMs() {
     return Date.now();
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} [fallback]
+ * @returns {number}
+ */
 function normPriority(value, fallback = 50) {
     const n = Number(value);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(0, Math.min(100, Math.trunc(n)));
 }
 
+/**
+ * @param {unknown} value
+ * @returns {unknown[]}
+ */
 function _asArray(value) {
     return Array.isArray(value) ? value : [];
 }
 
+/**
+ * @param {Record<string, any> | null | undefined} job
+ * @param {Record<string, any> | null | undefined} contextPack
+ * @returns {any}
+ */
 function _derivePatchDraftFromContext(job, contextPack) {
     const context = contextPack?.context || {};
     const mcpTools = context.mcp_tools || {};
@@ -56,9 +68,12 @@ function _derivePatchDraftFromContext(job, contextPack) {
         context_budget: mcpTools?.budget || null,
         rag_anchor: ragFirst
             ? {
-                  chunk_id: ragFirst.chunk_id || null,
-                  score: ragFirst.score ?? null,
-                  path: ragFirst.path || ragFirst.file_path || null,
+                  chunk_id: /** @type {Record<string, any>} */ (ragFirst).chunk_id || null,
+                  score: /** @type {Record<string, any>} */ (ragFirst).score ?? null,
+                  path:
+                      /** @type {Record<string, any>} */ (ragFirst).path ||
+                      /** @type {Record<string, any>} */ (ragFirst).file_path ||
+                      null,
               }
             : null,
         recommended_next_actions: [
@@ -85,9 +100,13 @@ function _derivePatchDraftFromContext(job, contextPack) {
     };
 }
 
+/**
+ * @param {unknown} kind
+ * @returns {void}
+ */
 function assertKind(kind) {
     if (!isAuditJobKind(kind)) {
-        const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+        const err = /** @type {Error & { statusCode?: number; code?: string }} */ (
             new Error(`audit job kind inválido: ${String(kind)}`)
         );
         err.statusCode = 422;
@@ -96,9 +115,13 @@ function assertKind(kind) {
     }
 }
 
+/**
+ * @param {unknown} triggerType
+ * @returns {void}
+ */
 function assertTriggerType(triggerType) {
     if (!isAuditJobTriggerType(triggerType)) {
-        const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+        const err = /** @type {Error & { statusCode?: number; code?: string }} */ (
             new Error(`audit job trigger_type inválido: ${String(triggerType)}`)
         );
         err.statusCode = 422;
@@ -108,27 +131,42 @@ function assertTriggerType(triggerType) {
 }
 
 /**
- * Runtime de orquestração do Audit Agent.
- * Coordena fila de jobs, coleta de contexto, triagem e propostas de patch.
+ * Runtime de orquestração do Audit Agent. Coordena fila de jobs, coleta de contexto, triagem e propostas de patch.
  */
 export class AuditAgentRuntime {
     /**
      * @param {{
-     *   now?: ()=>number,
-     *   logger?: ((level:string, message:string, data?:unknown)=>void)|null,
-     *   maxConcurrentJobs?: number,
-     *   store?: {
-     *     saveJob?: (job:any)=>unknown,
-     *     onRunStart?: (job:any)=>unknown,
-     *     onRunFinish?: (job:any)=>unknown
-     *     saveFindings?: (jobId:string, findings:any[])=>unknown,
-     *     savePatchProposals?: (jobId:string, patches:any[])=>unknown,
-     *     listJobs?: (opts?:any)=>any[],
-     *   }|null
-     *   contextBuilder?: { collectQuickContext?: (job?:any)=>Promise<{context?:any, findings?:any[], patches?:any[]}> }|null
-     *   triageClient?: { runTriage?: (job:any, contextPack:any)=>Promise<any>, isEnabled?: ()=>boolean }|null
-     *   patchAuthorClient?: { runPatchAuthor?: (job:any, contextPack:any, llmTriage:any)=>Promise<any>, isEnabled?: ()=>boolean }|null
-     *   diagnosticClient?: { runDiagnostic?: (jobKind:string, params?:any)=>Promise<{success:boolean, data?:any, error?:string, durationMs?:number}>, isEnabled?: ()=>boolean }|null
+     *     now?: () => number;
+     *     logger?: ((level: string, message: string, data?: unknown) => void) | null;
+     *     maxConcurrentJobs?: number;
+     *     store?: {
+     *         saveJob?: (job: any) => unknown;
+     *         onRunStart?: (job: any) => unknown;
+     *         onRunFinish?: (job: any) => unknown;
+     *         saveFindings?: (jobId: string, findings: unknown[]) => unknown;
+     *         savePatchProposals?: (jobId: string, patches: unknown[]) => unknown;
+     *         listJobs?: (opts?: any) => unknown[];
+     *     } | null;
+     *     contextBuilder?: {
+     *         collectQuickContext?: (
+     *             job?: any,
+     *         ) => Promise<{ context?: any; findings?: unknown[]; patches?: unknown[] }>;
+     *     } | null;
+     *     triageClient?: {
+     *         runTriage?: (job: any, contextPack: any) => Promise<Record<string, any>>;
+     *         isEnabled?: () => boolean;
+     *     } | null;
+     *     patchAuthorClient?: {
+     *         runPatchAuthor?: (job: any, contextPack: any, llmTriage: any) => Promise<Record<string, any>>;
+     *         isEnabled?: () => boolean;
+     *     } | null;
+     *     diagnosticClient?: {
+     *         runDiagnostic?: (
+     *             jobKind: string,
+     *             params?: any,
+     *         ) => Promise<{ success: boolean; data?: any; error?: string; durationMs?: number }>;
+     *         isEnabled?: () => boolean;
+     *     } | null;
      * }} [options]
      */
     constructor(options = {}) {
@@ -136,7 +174,7 @@ export class AuditAgentRuntime {
         this.logger = options.logger || null;
         this.maxConcurrentJobs = Math.max(
             1,
-            Number(options.maxConcurrentJobs || process.env.AUDIT_AGENT_MAX_CONCURRENT_JOBS || 1)
+            Number(options.maxConcurrentJobs || process.env.AUDIT_AGENT_MAX_CONCURRENT_JOBS || 1),
         );
         this.store = options.store || null;
         this.contextBuilder = options.contextBuilder || null;
@@ -151,63 +189,94 @@ export class AuditAgentRuntime {
         this._failed = 0;
     }
 
+    /**
+     * @param {string} level
+     * @param {string} message
+     * @param {unknown} [data]
+     * @returns {void}
+     */
     _log(level, message, data) {
         if (this.logger) this.logger(level, message, data);
     }
 
+    /**
+     * @param {Record<string, any> | null | undefined} job
+     * @returns {void}
+     */
     _persistJob(job) {
         if (!this.store || typeof this.store.saveJob !== 'function' || !job) return;
         try {
             this.store.saveJob(job);
-        } catch (error) {
-            this._log('WARN', '[audit-agent] saveJob failed', { id: job?.id, error: error?.message || String(error) });
+        } catch (/** @type {any} */ error) {
+            this._log('WARN', '[audit-agent] saveJob failed', {
+                id: job?.id,
+                error: error instanceof Error ? error.message : String(error),
+            });
         }
     }
 
+    /**
+     * @param {Record<string, any> | null | undefined} job
+     * @returns {void}
+     */
     _persistRunStart(job) {
         if (!this.store || typeof this.store.onRunStart !== 'function' || !job) return;
         try {
             this.store.onRunStart(job);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] onRunStart failed', {
                 id: job?.id,
-                error: error?.message || String(error),
+                error: error instanceof Error ? error.message : String(error),
             });
         }
     }
 
+    /**
+     * @param {Record<string, any> | null | undefined} job
+     * @returns {void}
+     */
     _persistRunFinish(job) {
         if (!this.store || typeof this.store.onRunFinish !== 'function' || !job) return;
         try {
             this.store.onRunFinish(job);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] onRunFinish failed', {
                 id: job?.id,
-                error: error?.message || String(error),
+                error: error instanceof Error ? error.message : String(error),
             });
         }
     }
 
+    /**
+     * @param {string} jobId
+     * @param {unknown[]} findings
+     * @returns {void}
+     */
     _persistFindings(jobId, findings) {
         if (!this.store || typeof this.store.saveFindings !== 'function') return;
         try {
             this.store.saveFindings(jobId, Array.isArray(findings) ? findings : []);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] saveFindings failed', {
                 id: jobId,
-                error: error?.message || String(error),
+                error: error instanceof Error ? error.message : String(error),
             });
         }
     }
 
+    /**
+     * @param {string} jobId
+     * @param {unknown[]} patches
+     * @returns {void}
+     */
     _persistPatchProposals(jobId, patches) {
         if (!this.store || typeof this.store.savePatchProposals !== 'function') return;
         try {
             this.store.savePatchProposals(jobId, Array.isArray(patches) ? patches : []);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] savePatchProposals failed', {
                 id: jobId,
-                error: error?.message || String(error),
+                error: error instanceof Error ? error.message : String(error),
             });
         }
     }
@@ -219,7 +288,7 @@ export class AuditAgentRuntime {
         let hydrated = 0;
         let skipped = 0;
         const rows = Array.isArray(this.store.listJobs({ limit })) ? this.store.listJobs({ limit }) : [];
-        for (const row of rows) {
+        for (const row of /** @type {Record<string, any>[]} */ (rows)) {
             if (!row?.id) {
                 skipped += 1;
                 continue;
@@ -228,11 +297,11 @@ export class AuditAgentRuntime {
                 skipped += 1;
                 continue;
             }
-            const job = {
+            const job = /** @type {Record<string, any>} */ ({
                 ...row,
                 history: Array.isArray(row.history) ? row.history : [],
                 current_run_id: null,
-            };
+            });
             this.jobs.set(job.id, job);
             hydrated += 1;
         }
@@ -240,7 +309,7 @@ export class AuditAgentRuntime {
     }
 
     /**
-     * @param {{ kind?: string, trigger_type?: string, scope?: any, priority?: number, created_by?: string }} input
+     * @param {{ kind?: string; trigger_type?: string; scope?: unknown; priority?: number; created_by?: string }} input
      */
     createJob(input = {}) {
         const kind = input.kind || AUDIT_JOB_KIND.QUICK_AUDIT;
@@ -249,7 +318,7 @@ export class AuditAgentRuntime {
         assertTriggerType(triggerType);
         const id = `aj_${randomUUID()}`;
         const ts = this.now();
-        const job = {
+        const job = /** @type {Record<string, any>} */ ({
             id,
             kind,
             trigger_type: triggerType,
@@ -265,30 +334,42 @@ export class AuditAgentRuntime {
             attempt_seq: 0,
             result_json: null,
             error_json: null,
-            history: [],
-        };
+            history: /** @type {any[]} */ ([]),
+        });
         job.history.push({ ts, event: 'created', status: job.status });
         this.jobs.set(id, job);
         this._persistJob(job);
         return { ...job };
     }
 
+    /**
+     * @param {{ status?: string | null; limit?: number }} [opts]
+     * @returns {Record<string, any>[]}
+     */
     listJobs({ status = null, limit = 100 } = {}) {
         const rows = [...this.jobs.values()]
-            .filter(job => !status || job.status === status)
+            .filter((job) => !status || job.status === status)
             .sort((a, b) => b.updated_at_ms - a.updated_at_ms || String(b.id).localeCompare(String(a.id)));
-        return rows.slice(0, Math.max(1, Math.min(Number(limit) || 100, 500))).map(job => ({ ...job }));
+        return rows.slice(0, Math.max(1, Math.min(Number(limit) || 100, 500))).map((job) => ({ ...job }));
     }
 
+    /**
+     * @param {string} id
+     * @returns {Record<string, any> | null}
+     */
     getJob(id) {
         const job = this.jobs.get(String(id));
         return job ? { ...job } : null;
     }
 
+    /**
+     * @param {string} id
+     * @returns {Record<string, any>}
+     */
     queueJob(id) {
         const job = this.jobs.get(String(id));
         if (!job) {
-            const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+            const err = /** @type {Error & { statusCode?: number; code?: string }} */ (
                 new Error('audit job não encontrado')
             );
             err.statusCode = 404;
@@ -296,7 +377,7 @@ export class AuditAgentRuntime {
             throw err;
         }
         if ([AUDIT_JOB_STATUS.COMPLETED, AUDIT_JOB_STATUS.CANCELLED].includes(job.status)) {
-            const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+            const err = /** @type {Error & { statusCode?: number; code?: string }} */ (
                 new Error(`audit job em estado terminal: ${job.status}`)
             );
             err.statusCode = 409;
@@ -311,10 +392,15 @@ export class AuditAgentRuntime {
         return { ...job };
     }
 
+    /**
+     * @param {string} id
+     * @param {string} [reason]
+     * @returns {Record<string, any>}
+     */
     cancelJob(id, reason = 'manual_cancel') {
         const job = this.jobs.get(String(id));
         if (!job) {
-            const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+            const err = /** @type {Error & { statusCode?: number; code?: string }} */ (
                 new Error('audit job não encontrado')
             );
             err.statusCode = 404;
@@ -341,10 +427,14 @@ export class AuditAgentRuntime {
 
     _nextQueuedJobs() {
         return [...this.jobs.values()]
-            .filter(job => job.status === AUDIT_JOB_STATUS.QUEUED)
+            .filter((job) => job.status === AUDIT_JOB_STATUS.QUEUED)
             .sort((a, b) => b.priority - a.priority || a.created_at_ms - b.created_at_ms);
     }
 
+    /**
+     * @param {Record<string, any>} job
+     * @returns {Promise<void>}
+     */
     async _processJob(job) {
         const startTs = this.now();
         job.status = AUDIT_JOB_STATUS.RUNNING;
@@ -378,9 +468,12 @@ export class AuditAgentRuntime {
         ) {
             try {
                 contextPack = await this.contextBuilder.collectQuickContext(job);
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 contextPack = {
-                    context: { mode: 'read_only_probe_v0', error: error?.message || String(error) },
+                    context: {
+                        mode: 'read_only_probe_v0',
+                        error: error instanceof Error ? error.message : String(error),
+                    },
                     findings: [
                         {
                             severity: 'warning',
@@ -388,7 +481,7 @@ export class AuditAgentRuntime {
                             title: 'Falha ao coletar contexto do audit-agent',
                             source: 'audit-agent',
                             dedup_key: 'ctx:collect:error',
-                            evidence: { error: error?.message || String(error) },
+                            evidence: { error: error instanceof Error ? error.message : String(error) },
                         },
                     ],
                     patches: [],
@@ -397,6 +490,7 @@ export class AuditAgentRuntime {
         }
 
         const patchLike = job.kind === AUDIT_JOB_KIND.PATCH_SUGGEST || job.kind === AUDIT_JOB_KIND.BUG_HUNT;
+        /** @type {Record<string, any> | null} */
         let llmTriage = null;
         if (this.triageClient && typeof this.triageClient.runTriage === 'function') {
             const tsTriage = this.now();
@@ -404,15 +498,16 @@ export class AuditAgentRuntime {
             job.history.push({ ts: tsTriage, event: 'step', step: job.current_step });
             this._persistJob(job);
             try {
-                llmTriage = await this.triageClient.runTriage(job, contextPack);
-            } catch (error) {
+                llmTriage = /** @type {Record<string, any>} */ (await this.triageClient.runTriage(job, contextPack));
+            } catch (/** @type {any} */ error) {
                 llmTriage = {
                     ok: false,
                     skipped: false,
-                    error: error?.message || String(error),
+                    error: error instanceof Error ? error.message : String(error),
                 };
             }
         }
+        /** @type {Record<string, any> | null} */
         let llmPatchAuthor = null;
         if (patchLike && this.patchAuthorClient && typeof this.patchAuthorClient.runPatchAuthor === 'function') {
             const tsPatch = this.now();
@@ -420,12 +515,14 @@ export class AuditAgentRuntime {
             job.history.push({ ts: tsPatch, event: 'step', step: job.current_step });
             this._persistJob(job);
             try {
-                llmPatchAuthor = await this.patchAuthorClient.runPatchAuthor(job, contextPack, llmTriage);
-            } catch (error) {
+                llmPatchAuthor = /** @type {Record<string, any>} */ (
+                    await this.patchAuthorClient.runPatchAuthor(job, contextPack, llmTriage)
+                );
+            } catch (/** @type {any} */ error) {
                 llmPatchAuthor = {
                     ok: false,
                     skipped: false,
-                    error: error?.message || String(error),
+                    error: error instanceof Error ? error.message : String(error),
                 };
             }
         }
@@ -438,6 +535,7 @@ export class AuditAgentRuntime {
             job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_VERIFY ||
             job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_REPORT;
 
+        /** @type {Record<string, any> | null} */
         let diagnosticResult = null;
         if (isDiagnosticJob && this.diagnosticClient && typeof this.diagnosticClient.runDiagnostic === 'function') {
             const tsDiag = this.now();
@@ -446,10 +544,10 @@ export class AuditAgentRuntime {
             this._persistJob(job);
             try {
                 diagnosticResult = await this.diagnosticClient.runDiagnostic(job.kind, job.scope_json);
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 diagnosticResult = {
                     success: false,
-                    error: error?.message || String(error),
+                    error: error instanceof Error ? error.message : String(error),
                 };
             }
         }
@@ -478,7 +576,7 @@ export class AuditAgentRuntime {
         job.updated_at_ms = endTs;
         job.history.push({ ts: endTs, event: 'done', status: job.status, step: job.current_step });
         this._persistJob(job);
-        /** @type {any[]} */
+        /** @type {unknown[]} */
         const findingsToPersist = Array.isArray(contextPack?.findings) ? [...contextPack.findings] : [];
         if (llmTriage?.ok) {
             findingsToPersist.push({
@@ -532,7 +630,7 @@ export class AuditAgentRuntime {
         this._persistFindings(job.id, findingsToPersist);
         if (patchLike) {
             const defaultPatch = _derivePatchDraftFromContext(job, contextPack);
-            /** @type {any[]} */
+            /** @type {unknown[]} */
             const patches = [];
             if (
                 llmPatchAuthor?.ok &&
@@ -563,13 +661,13 @@ export class AuditAgentRuntime {
             for (const job of queued) {
                 try {
                     await this._processJob(job);
-                } catch (error) {
+                } catch (/** @type {any} */ error) {
                     this._failed += 1;
                     const ts = this.now();
                     job.status = AUDIT_JOB_STATUS.FAILED;
                     job.updated_at_ms = ts;
                     job.completed_at_ms = ts;
-                    job.error_json = { message: error?.message || String(error) };
+                    job.error_json = { message: error instanceof Error ? error.message : String(error) };
                     job.history.push({ ts, event: 'failed', status: job.status, error: job.error_json.message });
                     this._persistJob(job);
                     this._persistRunFinish(job);
@@ -583,7 +681,7 @@ export class AuditAgentRuntime {
     }
 
     getMetrics() {
-        const byStatus = {};
+        const byStatus = /** @type {Record<string, number>} */ ({});
         for (const job of this.jobs.values()) {
             byStatus[job.status] = (byStatus[job.status] || 0) + 1;
         }

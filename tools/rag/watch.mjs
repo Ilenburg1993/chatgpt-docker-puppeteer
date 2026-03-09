@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import './lib/env-bootstrap.mjs';
-import path from 'node:path';
+// @ts-check
 import { promises as fs, watch as fsWatch } from 'node:fs';
-import { parseArgs } from 'node:util';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+import './lib/env-bootstrap.mjs';
 import { ragIndexChanged } from './lib/facade.mjs';
 
 const DEFAULT_DEBOUNCE_MS = Number(process.env.RAG_WATCH_DEBOUNCE_MS || 3000);
@@ -21,6 +22,10 @@ const SKIP_DIRS = new Set([
     'analysis',
 ]);
 
+/**
+ * @param {string} relPath
+ * @returns {string}
+ */
 function toPosix(relPath) {
     return String(relPath || '')
         .replace(/\\/g, '/')
@@ -28,14 +33,21 @@ function toPosix(relPath) {
         .replace(/^\/+/, '');
 }
 
+/**
+ * @param {string} relDir
+ * @returns {boolean}
+ */
 function shouldSkipDir(relDir) {
     const normalized = toPosix(relDir);
     if (!normalized) return false;
     const parts = normalized.split('/').filter(Boolean);
-    return parts.some(p => SKIP_DIRS.has(p));
+    return parts.some((p) => SKIP_DIRS.has(p));
 }
 
 export class RagWatchBatcher {
+    /**
+     * @param {{ debounceMs?: number; batchMax?: number; onBatch: Function }} opts
+     */
     constructor({ debounceMs, batchMax, onBatch }) {
         this.debounceMs = Math.max(250, Number(debounceMs || DEFAULT_DEBOUNCE_MS));
         this.batchMax = Math.max(1, Number(batchMax || DEFAULT_BATCH_MAX));
@@ -45,6 +57,7 @@ export class RagWatchBatcher {
         this.processing = false;
     }
 
+    /** @param {string} relPath */
     enqueue(relPath) {
         const normalized = toPosix(relPath);
         if (!normalized) return;
@@ -79,6 +92,12 @@ export class RagWatchBatcher {
     }
 }
 
+/**
+ * @param {string} rootAbs
+ * @param {Function} onFsEvent
+ * @param {Map<string, any>} watchers
+ * @param {string} [relDir]
+ */
 async function watchTree(rootAbs, onFsEvent, watchers, relDir = '') {
     if (shouldSkipDir(relDir)) return;
 
@@ -91,14 +110,15 @@ async function watchTree(rootAbs, onFsEvent, watchers, relDir = '') {
     }
 
     try {
-        const watcher = fsWatch(absDir, (eventType, filename) => {
+        const watcher = fsWatch(absDir, (/** @type {string} */ eventType, /** @type {string | null} */ filename) => {
             const file = filename ? String(filename) : '';
             const relPath = toPosix(relDir ? path.posix.join(relDir, file) : file);
             onFsEvent({ eventType, relPath, relDir });
         });
         watchers.set(absDir, watcher);
     } catch (error) {
-        console.warn(`[RAG Watch] failed to watch ${absDir}: ${error?.message || error}`);
+        const _ce = /** @type {any} */ (error);
+        console.warn(`[RAG Watch] failed to watch ${absDir}: ${_ce?.message || _ce}`);
     }
 
     for (const entry of entries) {
@@ -109,6 +129,12 @@ async function watchTree(rootAbs, onFsEvent, watchers, relDir = '') {
     }
 }
 
+/**
+ * @param {string} rootAbs
+ * @param {string} relPath
+ * @param {Map<string, any>} watchers
+ * @param {Function} onFsEvent
+ */
 async function ensureDirectoryWatch(rootAbs, relPath, watchers, onFsEvent) {
     if (!relPath) return;
     const abs = path.join(rootAbs, relPath);
@@ -156,27 +182,29 @@ async function main() {
     const batcher = new RagWatchBatcher({
         debounceMs,
         batchMax,
-        onBatch: async batch => {
+        onBatch: async (/** @type {string[]} */ batch) => {
             const started = Date.now();
-            const report = await ragIndexChanged({
-                root,
-                profile,
-                includeGlobs,
-                excludeGlobs,
-                docsMode,
-                maxFileBytes,
-                changedPaths: batch,
-            });
+            const report = /** @type {any} */ (
+                await ragIndexChanged({
+                    root,
+                    profile,
+                    includeGlobs,
+                    excludeGlobs,
+                    docsMode,
+                    maxFileBytes,
+                    changedPaths: batch,
+                })
+            );
             const tookMs = Date.now() - started;
             console.log(
                 `[RAG Watch] batch=${batch.length} changed=${report.changed_files} ` +
                     `deleted=${report.deleted_files} skipped=${report.skipped_files} chunks=${report.inserted_chunks} ` +
-                    `mode=incremental took=${tookMs}ms`
+                    `mode=incremental took=${tookMs}ms`,
             );
         },
     });
 
-    const onFsEvent = ({ eventType, relPath, relDir }) => {
+    const onFsEvent = (/** @type {any} */ { eventType, relPath, relDir }) => {
         if (!relPath) {
             return;
         }
@@ -199,7 +227,7 @@ async function main() {
     if (excludeGlobs?.length) console.log(`[RAG Watch] excludeGlobs=${excludeGlobs.join(',')}`);
     console.log(`[RAG Watch] debounce=${debounceMs}ms batchMax=${batchMax}`);
 
-    const shutdown = async signal => {
+    const shutdown = async (/** @type {string} */ signal) => {
         console.log(`[RAG Watch] stopping (${signal})...`);
         for (const watcher of watchers.values()) {
             try {
@@ -224,7 +252,7 @@ async function main() {
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {
-    main().catch(error => {
+    main().catch((error) => {
         console.error('[RAG Watch] fatal:', error?.message || error);
         process.exit(1);
     });

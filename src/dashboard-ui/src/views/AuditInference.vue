@@ -184,8 +184,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
 import { useAudit } from '@/composables/useAudit';
+import { onMounted, ref } from 'vue';
 
 const {
     summary,

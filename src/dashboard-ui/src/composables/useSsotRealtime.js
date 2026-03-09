@@ -1,9 +1,9 @@
 // @ts-check
-import { onMounted, onUnmounted } from 'vue';
 import { useSocket } from '@/composables/useSocket';
-import { useTasksVNextStore } from '@/stores/tasks_vnext';
-import { useMissionsVNextStore } from '@/stores/missions_vnext';
 import { useEventsVNextStore } from '@/stores/events_vnext';
+import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import { onMounted, onUnmounted } from 'vue';
 
 const REALTIME_FLUSH_MS = 80;
 const MAX_SEEN_EVENT_IDS = 5000;
@@ -20,14 +20,15 @@ let pendingControlStatuses = [];
 const seenEventIds = new Set();
 /** @type {Set<string>} */
 const seenCommandStatuses = new Set();
+/** @type {any} */
 let flushTimer = null;
 
-function _coerceEventCursor(value) {
+function _coerceEventCursor(/** @type {any} */ value) {
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
 }
 
-function _compactTaskUpdates(batches) {
+function _compactTaskUpdates(/** @type {any} */ batches) {
     const byId = new Map();
     for (const payload of batches) {
         const updates = payload?.updates || [];
@@ -41,7 +42,7 @@ function _compactTaskUpdates(batches) {
     return Array.from(byId.values());
 }
 
-function _compactMissionUpdates(batches) {
+function _compactMissionUpdates(/** @type {any} */ batches) {
     const byId = new Map();
     for (const payload of batches) {
         const updates = payload?.updates || [];
@@ -55,7 +56,7 @@ function _compactMissionUpdates(batches) {
     return Array.from(byId.values());
 }
 
-function _compactEvents(batches) {
+function _compactEvents(/** @type {any} */ batches) {
     const merged = [];
     let lastEventId = null;
     for (const payload of batches) {
@@ -82,7 +83,7 @@ function _compactEvents(batches) {
     };
 }
 
-function _compactCommandStatuses(items) {
+function _compactCommandStatuses(/** @type {any} */ items) {
     const out = [];
     for (const payload of items) {
         const key = `${payload?.operation_id || 'unknown'}:${payload?.status || 'unknown'}`;
@@ -99,6 +100,7 @@ function _compactCommandStatuses(items) {
 
 /**
  * Função exportada: useSsotRealtime.
+ *
  * @returns {void}
  */
 export function useSsotRealtime() {
@@ -106,7 +108,7 @@ export function useSsotRealtime() {
     const missions = useMissionsVNextStore();
     const events = useEventsVNextStore();
 
-    const { subscribe, unsubscribe } = useSocket();
+    const { subscribe, unsubscribe } = /** @type {any} */ (useSocket());
 
     const flushRealtimeBatch = () => {
         flushTimer = null;
@@ -153,19 +155,19 @@ export function useSsotRealtime() {
         flushTimer = setTimeout(flushRealtimeBatch, REALTIME_FLUSH_MS);
     };
 
-    const onTasksBatch = payload => {
+    const onTasksBatch = (/** @type {any} */ payload) => {
         pendingTaskBatches.push(payload);
         scheduleFlush();
     };
-    const onMissionsBatch = payload => {
+    const onMissionsBatch = (/** @type {any} */ payload) => {
         pendingMissionBatches.push(payload);
         scheduleFlush();
     };
-    const onEventsBatch = payload => {
+    const onEventsBatch = (/** @type {any} */ payload) => {
         pendingEventBatches.push(payload);
         scheduleFlush();
     };
-    const onControlCommandStatus = payload => {
+    const onControlCommandStatus = (/** @type {any} */ payload) => {
         pendingControlStatuses.push(payload);
         scheduleFlush();
     };

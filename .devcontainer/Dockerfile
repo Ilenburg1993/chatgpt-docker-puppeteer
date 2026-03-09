@@ -1,7 +1,8 @@
+# syntax=docker/dockerfile:1
 # =============================================================================
 # Dockerfile v1.0 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
 # Base: Node.js 24 + Debian Bookworm (Microsoft DevContainers)
-# hadolint global ignore=DL3008,DL3059
+# hadolint global ignore=DL3008,DL3059,DL3009
 #
 # OBJETIVO MACRO (v1.0)
 #   Este Dockerfile define uma imagem DEV (apenas desenvolvimento) com foco em:
@@ -46,6 +47,19 @@ ARG PNPM_VERSION=10.30.3
 ARG GH_VERSION=2.87.3
 ARG ACTIONLINT_VERSION=1.7.11
 ARG HADOLINT_VERSION=2.14.0
+
+# ---------------------------------------------------------------------------
+# Curated Rust/Go CLIs — pinned upstream releases (Section 6.8)
+# Update via: docker build --build-arg DELTA_VERSION=X.Y.Z ...
+# ---------------------------------------------------------------------------
+ARG DELTA_VERSION=0.17.0
+ARG ZOXIDE_VERSION=0.9.4
+ARG XH_VERSION=0.22.2
+ARG DUST_VERSION=1.0.0
+ARG SD_VERSION=1.0.0
+ARG BOTTOM_VERSION=0.9.6
+ARG GLOW_VERSION=1.5.1
+ARG PROCS_VERSION=0.14.5
 
 # ---------------------------------------------------------------------------
 # SHELL GLOBAL (PIPEFAIL)
@@ -135,7 +149,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TZ=America/Sao_Paulo \
     LANGUAGE=pt_BR:pt:en
 
-RUN ln -snf "/usr/share/zoneinfo/${TZ}" /etc/localtime \
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+    ln -snf "/usr/share/zoneinfo/${TZ}" /etc/localtime \
     && echo "${TZ}" > /etc/timezone \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -145,9 +161,7 @@ RUN ln -snf "/usr/share/zoneinfo/${TZ}" /etc/localtime \
     && sed -i 's/^# *pt_BR.UTF-8/pt_BR.UTF-8/' /etc/locale.gen \
     && sed -i 's/^# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen \
     && locale-gen pt_BR.UTF-8 en_US.UTF-8 \
-    && update-locale LANG=pt_BR.UTF-8 LC_MESSAGES=pt_BR.UTF-8 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    && update-locale LANG=pt_BR.UTF-8 LC_MESSAGES=pt_BR.UTF-8
 
 ENV LANG=pt_BR.UTF-8 \
     LC_MESSAGES=pt_BR.UTF-8
@@ -162,7 +176,9 @@ ENV LANG=pt_BR.UTF-8 \
 #   • TLS e downloads confiáveis (ca-certificates/openssl/curl)
 #   • PATH consistente para npm global prefix (.npm-global)
 # =============================================================================
-RUN apt-get update \
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
@@ -179,8 +195,8 @@ RUN apt-get update \
     cmake \
     libssl-dev \
     zlib1g-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    nasm \
+    libzstd-dev
 
 # Compatibilidade explícita para scripts legados que chamam "python"
 RUN ln -sf /usr/bin/python3 /usr/bin/python
@@ -208,7 +224,8 @@ ENV PATH="/usr/local/share/npm-global/bin:${HOME_DIR}/.npm-global/bin:${HOME_DIR
 # NOTA:
 # - Instalar em /usr/local/share/npm-global evita que o volume /home/node/.npm-global
 #   esconda os binários da imagem após rebuild.
-RUN mkdir -p "${HOME_DIR}/.npm-global" /usr/local/share/npm-global \
+RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm,sharing=locked \
+    mkdir -p "${HOME_DIR}/.npm-global" /usr/local/share/npm-global \
     && env NPM_CONFIG_PREFIX=/usr/local/share/npm-global npm install -g \
     npm@${NPM_VERSION} \
     pnpm@${PNPM_VERSION} \
@@ -236,7 +253,9 @@ RUN mkdir -p "${HOME_DIR}/.npm-global" /usr/local/share/npm-global \
 # Princípio:
 #   • Puppeteer deve preferir CHROME EXTERNO via CDP; Chromium local é contingência.
 # =============================================================================
-RUN apt-get update \
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
     chromium \
     libasound2 \
@@ -271,9 +290,7 @@ RUN apt-get update \
     heaptrack \
     fontconfig \
     libfreetype6 \
-    xdg-utils \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    xdg-utils
 
 # Observação:
 # - Chromium fallback NÃO implica uso por padrão.
@@ -287,7 +304,9 @@ RUN apt-get update \
 #   • Renderização previsível de PDFs e screenshots
 #   • Cobertura ampla (Noto + DejaVu + Liberation + Emoji)
 # =============================================================================
-RUN apt-get update \
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
     fontconfig \
     fonts-dejavu-core \
@@ -301,9 +320,7 @@ RUN apt-get update \
     fonts-wqy-zenhei \
     fonts-kacst \
     fonts-freefont-ttf \
-    xdg-utils \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    xdg-utils
 
 
 # =============================================================================
@@ -313,7 +330,9 @@ RUN apt-get update \
 #   • Ferramentas de linha de comando apenas (sem serviços)
 #   • Úteis para: rede/TLS, inspeção de processos, encoding, análise de código, etc.
 # =============================================================================
-RUN apt-get update \
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
     git \
     less \
@@ -372,18 +391,22 @@ RUN apt-get update \
     ccache \
     postgresql-client \
     protobuf-compiler \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    lz4 \
+    entr \
+    pv \
+    jo \
+    p7zip-full \
+    inotify-tools
 
 # Debian packaging note:
 # - `bat` package exposes `batcat`
 # - `fd-find` package exposes `fdfind`
 # The repo and operator workflows expect the canonical upstream names `bat` and `fd`.
 RUN if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then \
-      ln -sf /usr/bin/batcat /usr/local/bin/bat; \
+    ln -sf /usr/bin/batcat /usr/local/bin/bat; \
     fi \
     && if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then \
-      ln -sf /usr/bin/fdfind /usr/local/bin/fd; \
+    ln -sf /usr/bin/fdfind /usr/local/bin/fd; \
     fi
 
 # Curated upstream CLI binaries
@@ -393,9 +416,9 @@ RUN if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; th
 RUN set -e; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
-      amd64) gh_arch='amd64'; actionlint_arch='amd64'; hadolint_arch='x86_64' ;; \
-      arm64) gh_arch='arm64'; actionlint_arch='arm64'; hadolint_arch='arm64' ;; \
-      *) echo "Unsupported architecture for curated CLIs: $arch" >&2; exit 1 ;; \
+    amd64) gh_arch='amd64'; actionlint_arch='amd64'; hadolint_arch='x86_64' ;; \
+    arm64) gh_arch='arm64'; actionlint_arch='arm64'; hadolint_arch='arm64' ;; \
+    *) echo "Unsupported architecture for curated CLIs: $arch" >&2; exit 1 ;; \
     esac; \
     gh_asset="gh_${GH_VERSION}_linux_${gh_arch}.tar.gz"; \
     curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${gh_asset}" -o /tmp/gh.tgz; \
@@ -420,6 +443,112 @@ RUN set -e; \
 
 
 # =============================================================================
+# SECTION 6.8 — CURATED RUST/GO CLIs (binary releases, pinned upstream)
+#
+# Ferramentas modernas do ecossistema Rust/Go que não estão disponíveis nos
+# repositórios Debian Bookworm, ou estão em versões muito desatualizadas.
+#
+# Cada ferramenta é baixada do GitHub Releases com verificação de integridade
+# via HTTPS. Suporte a amd64 e arm64.
+#
+# Para atualizar: ajuste os ARGs DELTA_VERSION, ZOXIDE_VERSION, etc. no topo.
+# =============================================================================
+RUN set -e; \
+    arch="$(dpkg --print-architecture)"; \
+    # Mapeamento de sufixos de arquitetura por ferramenta
+    case "$arch" in \
+    amd64) \
+    DELTA_ARCH='x86_64-unknown-linux-gnu'; \
+    ZOXIDE_ARCH='x86_64-unknown-linux-musl'; \
+    XH_ARCH='x86_64-unknown-linux-musl'; \
+    DUST_ARCH='x86_64-unknown-linux-musl'; \
+    SD_ARCH='x86_64-unknown-linux-musl'; \
+    BOTTOM_ARCH='x86_64-unknown-linux-musl'; \
+    GLOW_ARCH='x86_64'; \
+    PROCS_ARCH='x86_64-linux'; \
+    ;; \
+    arm64) \
+    DELTA_ARCH='aarch64-unknown-linux-gnu'; \
+    ZOXIDE_ARCH='aarch64-unknown-linux-musl'; \
+    XH_ARCH='aarch64-unknown-linux-musl'; \
+    DUST_ARCH='aarch64-unknown-linux-musl'; \
+    SD_ARCH='aarch64-unknown-linux-musl'; \
+    BOTTOM_ARCH='aarch64-unknown-linux-musl'; \
+    GLOW_ARCH='arm64'; \
+    PROCS_ARCH='aarch64-linux'; \
+    ;; \
+    *) echo "Unsupported architecture for Rust CLIs: $arch" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /tmp/rust-cli; \
+    # ─── delta (git-delta): rich, semantic diff viewer ───────────────────────
+    # Tag format: VERSION (no v prefix). Binary inside subdirectory of tarball.
+    curl -fsSL "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-${DELTA_ARCH}.tar.gz" \
+    -o /tmp/rust-cli/delta.tgz; \
+    tar -xzf /tmp/rust-cli/delta.tgz -C /tmp/rust-cli; \
+    install -m 0755 "/tmp/rust-cli/delta-${DELTA_VERSION}-${DELTA_ARCH}/delta" /usr/local/bin/delta; \
+    # ─── zoxide: smart cd with frecency ranking ───────────────────────────────
+    # Tag format: vVERSION. Binary at tarball root.
+    curl -fsSL "https://github.com/ajeetdsouza/zoxide/releases/download/v${ZOXIDE_VERSION}/zoxide-${ZOXIDE_VERSION}-${ZOXIDE_ARCH}.tar.gz" \
+    -o /tmp/rust-cli/zoxide.tgz; \
+    mkdir -p /tmp/rust-cli/zoxide-extract; \
+    tar -xzf /tmp/rust-cli/zoxide.tgz -C /tmp/rust-cli/zoxide-extract; \
+    install -m 0755 /tmp/rust-cli/zoxide-extract/zoxide /usr/local/bin/zoxide; \
+    # ─── xh: friendly HTTP client (curl/httpie alternative) ──────────────────
+    # Tag format: vVERSION. Binary inside subdirectory of tarball.
+    curl -fsSL "https://github.com/ducaale/xh/releases/download/v${XH_VERSION}/xh-v${XH_VERSION}-${XH_ARCH}.tar.gz" \
+    -o /tmp/rust-cli/xh.tgz; \
+    mkdir -p /tmp/rust-cli/xh-extract; \
+    tar -xzf /tmp/rust-cli/xh.tgz -C /tmp/rust-cli/xh-extract; \
+    install -m 0755 "/tmp/rust-cli/xh-extract/xh-v${XH_VERSION}-${XH_ARCH}/xh" /usr/local/bin/xh; \
+    # ─── dust: intuitive `du` replacement ────────────────────────────────────
+    # Tag format: vVERSION. Binary inside subdirectory of tarball.
+    curl -fsSL "https://github.com/bootandy/dust/releases/download/v${DUST_VERSION}/dust-v${DUST_VERSION}-${DUST_ARCH}.tar.gz" \
+    -o /tmp/rust-cli/dust.tgz; \
+    mkdir -p /tmp/rust-cli/dust-extract; \
+    tar -xzf /tmp/rust-cli/dust.tgz -C /tmp/rust-cli/dust-extract; \
+    install -m 0755 "/tmp/rust-cli/dust-extract/dust-v${DUST_VERSION}-${DUST_ARCH}/dust" /usr/local/bin/dust; \
+    # ─── sd: intuitive find & replace (sed alternative) ──────────────────────
+    # Tag format: vVERSION. Static binary within tarball.
+    curl -fsSL "https://github.com/chmln/sd/releases/download/v${SD_VERSION}/sd-v${SD_VERSION}-${SD_ARCH}.tar.gz" \
+    -o /tmp/rust-cli/sd.tgz; \
+    mkdir -p /tmp/rust-cli/sd-extract; \
+    tar -xzf /tmp/rust-cli/sd.tgz -C /tmp/rust-cli/sd-extract; \
+    find /tmp/rust-cli/sd-extract -type f -name 'sd' -exec install -m 0755 {} /usr/local/bin/sd \;; \
+    # ─── bottom (btm): graphical process/system monitor ──────────────────────
+    # Tag format: VERSION (no v prefix). Asset name has NO version in filename.
+    curl -fsSL "https://github.com/ClementTsang/bottom/releases/download/${BOTTOM_VERSION}/bottom_${BOTTOM_ARCH}.tar.gz" \
+    -o /tmp/rust-cli/bottom.tgz; \
+    mkdir -p /tmp/rust-cli/bottom-extract; \
+    tar -xzf /tmp/rust-cli/bottom.tgz -C /tmp/rust-cli/bottom-extract; \
+    install -m 0755 /tmp/rust-cli/bottom-extract/btm /usr/local/bin/btm; \
+    # ─── glow: Markdown rendering in terminal ─────────────────────────────────
+    # Tag format: vVERSION. Asset name has NO version in filename: glow_Linux_ARCH.
+    curl -fsSL "https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/glow_Linux_${GLOW_ARCH}.tar.gz" \
+    -o /tmp/rust-cli/glow.tgz; \
+    mkdir -p /tmp/rust-cli/glow-extract; \
+    tar -xzf /tmp/rust-cli/glow.tgz -C /tmp/rust-cli/glow-extract; \
+    find /tmp/rust-cli/glow-extract -type f -name 'glow' -exec install -m 0755 {} /usr/local/bin/glow \;; \
+    # ─── procs: modern ps replacement ────────────────────────────────────────
+    # Tag format: vVERSION. Binary within zip.
+    curl -fsSL "https://github.com/dalance/procs/releases/download/v${PROCS_VERSION}/procs-v${PROCS_VERSION}-${PROCS_ARCH}.zip" \
+    -o /tmp/rust-cli/procs.zip; \
+    mkdir -p /tmp/rust-cli/procs-extract; \
+    unzip -q /tmp/rust-cli/procs.zip -d /tmp/rust-cli/procs-extract; \
+    install -m 0755 /tmp/rust-cli/procs-extract/procs /usr/local/bin/procs; \
+    # ─── Cleanup ──────────────────────────────────────────────────────────────
+    rm -rf /tmp/rust-cli; \
+    # ─── Smoke test (verify all binaries respond) ─────────────────────────────
+    delta --version | head -n 1; \
+    zoxide --version; \
+    xh --version | head -n 1; \
+    dust --version | head -n 1; \
+    sd --version; \
+    btm --version | head -n 1; \
+    glow --version; \
+    procs --version | head -n 1
+
+
+# =============================================================================
 # SECTION 6.5 — POWERSHELL (INSTRUMENTAL / NÃO-CANÔNICO)
 #
 # Finalidade:
@@ -429,7 +558,9 @@ RUN set -e; \
 # Contrato:
 #   • PowerShell é SEMPRE subordinado ao bash canônico nesta imagem.
 # =============================================================================
-RUN apt-get update \
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -441,9 +572,7 @@ RUN apt-get update \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" \
     > /etc/apt/sources.list.d/microsoft-prod.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends powershell \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    && apt-get install -y --no-install-recommends powershell
 
 # SECTION 6.6 — POWERSHELL CONTRACT (GLOBAL, READ-ONLY)
 RUN mkdir -p /etc/powershell \
@@ -511,7 +640,9 @@ RUN chmod 0444 /etc/powershell/profile.ps1
 USER root
 ARG DOCKER_GID=999
 
-RUN apt-get update \
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -526,9 +657,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     docker-ce-cli \
     docker-compose-plugin \
-    docker-buildx-plugin \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    docker-buildx-plugin
 
 # Grupo docker — alinhamento defensivo com host (best-effort)
 RUN set -e; \
@@ -545,6 +674,81 @@ RUN set -e; \
     fi; \
     usermod -aG docker "${USER_NAME}" 2>/dev/null || true; \
     true
+
+
+# =============================================================================
+# SECTION 6.9 — TOOL VALIDATION GATE
+#
+# Valida que TODAS as ferramentas esperadas estão presentes no PATH.
+# Posicionado após Docker CLI (Section 7) e PowerShell (Section 6.5).
+# Checks obrigatórios falham o build; checks opcionais emitem aviso.
+# =============================================================================
+RUN set -e; \
+    echo ""; \
+    echo "═══════════════════════════════════════════════════"; \
+    echo " Tool Validation Gate — DevContainer v1.0"; \
+    echo "═══════════════════════════════════════════════════"; \
+    _ok=0; _fail=0; _warn=0; \
+    _check() { \
+    if command -v "$1" >/dev/null 2>&1; then \
+    echo "  ✓  $1"; \
+    _ok=$((_ok + 1)); \
+    else \
+    echo "  ✗  $1  ← MISSING"; \
+    _fail=$((_fail + 1)); \
+    fi; \
+    }; \
+    _check_optional() { \
+    if command -v "$1" >/dev/null 2>&1; then \
+    echo "  ✓  $1"; \
+    _ok=$((_ok + 1)); \
+    else \
+    echo "  ⚠  $1  ← optional/runtime (not blocking)"; \
+    _warn=$((_warn + 1)); \
+    fi; \
+    }; \
+    echo "── System & Build ──────────────────────────────────"; \
+    _check git; _check curl; _check wget; _check openssl; \
+    _check gpg; _check nasm; _check cmake; _check cc; \
+    _check python3; _check node; _check npm; _check pnpm; \
+    echo "── Editors & Navigation ────────────────────────────"; \
+    _check vim; _check nano; _check less; _check fzf; \
+    echo "── File & Archive ──────────────────────────────────"; \
+    _check unzip; _check zip; _check 7za; _check pv; \
+    _check lz4; _check bat; _check fd; _check rg; \
+    _check tree; _check ncdu; _check jo; _check entr; \
+    echo "── Process & System ────────────────────────────────"; \
+    _check htop; _check lsof; _check strace; _check dstat; \
+    _check inotifywait; _check ps; _check watch; \
+    echo "── Network & Debug ─────────────────────────────────"; \
+    _check nc; _check nmap; _check tcpdump; _check mtr; \
+    _check socat; _check traceroute; _check dig; _check ip; \
+    echo "── Code Quality ────────────────────────────────────"; \
+    _check shellcheck; _check yamllint; _check cloc; \
+    _check ccache; _check hyperfine; _check watchman; \
+    echo "── Data & DB ───────────────────────────────────────"; \
+    _check sqlite3; _check redis-cli; _check psql; \
+    _check jq; _check yq; _check protoc; \
+    echo "── TypeScript & LSP ────────────────────────────────"; \
+    _check tsc; _check tsserver; _check typescript-language-server; \
+    echo "── DevOps CLIs (upstream) ──────────────────────────"; \
+    _check gh; _check actionlint; _check hadolint; _check git-lfs; \
+    _check age; _check pass; \
+    echo "── DevOps CLIs (runtime-socket / opcional) ─────────"; \
+    _check_optional docker; \
+    echo "── Rust/Go CLIs (Section 6.8) ──────────────────────"; \
+    _check delta; _check zoxide; _check xh; _check dust; \
+    _check sd; _check btm; _check glow; _check procs; \
+    echo "── Instrumental Shell (opcional) ───────────────────"; \
+    _check_optional pwsh; \
+    echo "───────────────────────────────────────────────────"; \
+    echo " Result: ${_ok} OK  |  ${_fail} MISSING  |  ${_warn} optional absent"; \
+    echo "═══════════════════════════════════════════════════"; \
+    echo ""; \
+    if [ "${_fail}" -gt 0 ]; then \
+    echo "BUILD FAILED: ${_fail} required tool(s) missing." >&2; \
+    exit 1; \
+    fi
 
 
 # =============================================================================
@@ -604,6 +808,12 @@ RUN mkdir -p \
     "/home/${USER_NAME}-history" \
     && touch "/home/${USER_NAME}-history/.bash_history" \
     && chown "${USER_NAME}:${USER_NAME}" "/home/${USER_NAME}-history/.bash_history" \
+    # .hushlogin: suprime MOTD em shells login+interativos (ex.: userEnvProbe loginInteractiveShell)
+    # Elimina: 50-motd-news (rede), 50-landscape-sysinfo (CPU/disco), 91-contract-ua-esm-status (rede)
+    # Mantém intactos todos os scripts de /etc/profile.d/ (runtime.sh, gatekeeper-nss.sh, etc.)
+    && touch "${HOME_DIR}/.hushlogin" \
+    && chown "${USER_NAME}:${USER_NAME}" "${HOME_DIR}/.hushlogin" \
+    && chmod 0644 "${HOME_DIR}/.hushlogin" \
     && chmod 1777 /tmp \
     && chmod 0700 "${HOME_DIR}/.ssh" "${HOME_DIR}/.gnupg" \
     && touch "${HOME_DIR}/.ssh/config" \
@@ -693,6 +903,12 @@ ENV PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
 ENV WS_IDLE_TIMEOUT_MS=300000 \
     ALLOWED_ORIGINS="http://localhost:3008,http://127.0.0.1:3008"
 
+# RUNTIME PERFORMANCE (VM / I/O tuning)
+# UV_THREADPOOL_SIZE: pool de threads do libuv (default=4). Aumentar para
+# melhorar I/O paralelo — tsserver, fs watchers e async file ops se beneficiam.
+# 16 = bom compromisso para ambientes multi-core sem desperdício de memória.
+ENV UV_THREADPOOL_SIZE=16
+
 
 # =============================================================================
 # SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.0)
@@ -710,12 +926,12 @@ ENV WS_IDLE_TIMEOUT_MS=300000 \
 # =============================================================================
 
 # [A] PRÉ-REQUISITOS
-RUN apt-get update \
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
     bash-completion \
-    dumb-init \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    dumb-init
 
 # [B] CONTRATO CANÔNICO RUNTIME (GLOBAL, READ-ONLY)
 RUN mkdir -p /etc/profile.d \

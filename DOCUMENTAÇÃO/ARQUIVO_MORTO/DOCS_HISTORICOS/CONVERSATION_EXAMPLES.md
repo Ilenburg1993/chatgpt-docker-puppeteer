@@ -142,18 +142,18 @@ Vou usar qwen2.5-coder:7b que é bom para código.
 > /**
 >  * Valida um número de CPF (Cadastro de Pessoas Físicas) brasileiro
 >  *
->  * @param {string} cpf - O CPF a ser validado (com ou sem formatação)
->  * @returns {boolean} true se o CPF é válido, false caso contrário
->  *
->  * @example
->  * validateCPF('123.456.789-09') // true ou false
->  * validateCPF('12345678909')     // true ou false
->  *
->  * @description
 >  * Esta função valida o CPF verificando:
+>  *
 >  * 1. Se contém 11 dígitos numéricos
 >  * 2. Se não é uma sequência repetida (111.111.111-11, etc.)
 >  * 3. Se os dígitos verificadores estão corretos
+>  *
+>  * @example
+>  *   validateCPF('123.456.789-09'); // true ou false
+>  *   validateCPF('12345678909'); // true ou false
+>  *
+>  * @param {string} cpf - O CPF a ser validado (com ou sem formatação)
+>  * @returns {boolean} true se o CPF é válido, false caso contrário
 >  */
 > function validateCPF(cpf) {
 >   // Remove caracteres não numéricos
@@ -257,20 +257,19 @@ Vou usar qwen2.5-coder:7b que é bom para código.
 >  * MMR é usado no RAG para balancear relevância e diversidade nos resultados.
 >  *
 >  * PROBLEMA SEM MMR:
+>  *
 >  * - Resultados muito similares (redundantes)
 >  * - Top-K pode retornar o "mesmo" código 5 vezes
 >  *
 >  * SOLUÇÃO COM MMR:
->  * - Lambda (λ) controla o trade-off:
->  *   λ = 1.0 → apenas relevância (pode haver duplicatas)
->  *   λ = 0.0 → apenas diversidade (pode perder relevância)
->  *   λ = 0.7 → balanceado (recomendado)
 >  *
->  * FÓRMULA:
->  * MMR = λ * relevance(doc) - (1-λ) * max_similarity(doc, selected_docs)
+>  * - Lambda (λ) controla o trade-off: λ = 1.0 → apenas relevância (pode haver duplicatas) λ = 0.0 → apenas diversidade
+>  *   (pode perder relevância) λ = 0.7 → balanceado (recomendado)
 >  *
->  * EXEMPLO:
->  * Query: "error handling"
+>  * FÓRMULA: MMR = λ * relevance(doc) - (1-λ) * max_similarity(doc, selected_docs)
+>  *
+>  * EXEMPLO: Query: "error handling"
+>  *
 >  * - Sem MMR: 5 funções diferentes mas todas fazem try-catch
 >  * - Com MMR: try-catch, custom errors, logging, retry logic, fallback
 >  *
@@ -354,26 +353,22 @@ Agora vou buscar exemplos de uso.
 > /**
 >  * Obtém o delay adaptativo atual baseado na carga do sistema
 >  *
->  * @returns {number} Delay em milissegundos (range: 50-5000ms)
->  *
->  * @description
->  * Este método retorna um delay calculado dinamicamente que se ajusta
->  * à carga atual da CPU do sistema:
+>  * Este método retorna um delay calculado dinamicamente que se ajusta à carga atual da CPU do sistema:
 >  *
 >  * - CPU < 50%: delay mínimo (50ms) - Sistema ocioso
 >  * - CPU 50-80%: delay moderado (100-500ms) - Carga normal
 >  * - CPU > 80%: delay máximo (5000ms) - Sistema sobrecarregado
 >  *
->  * O delay é recalculado a cada 30 segundos baseado em métricas
->  * coletadas pelo módulo hardware.
+>  * O delay é recalculado a cada 30 segundos baseado em métricas coletadas pelo módulo hardware.
 >  *
 >  * @example
->  * // Em um processamento batch
->  * for (const task of tasks) {
->  *   await executeTask(task);
->  *   await sleep(adaptive.getDelay());
->  * }
+>  *   // Em um processamento batch
+>  *   for (const task of tasks) {
+>  *     await executeTask(task);
+>  *     await sleep(adaptive.getDelay());
+>  *   }
 >  *
+>  * @returns {number} Delay em milissegundos (range: 50-5000ms)
 >  * @see src/core/hardware.js - Coleta de métricas de CPU
 >  */
 > ```
@@ -460,7 +455,7 @@ SE usuário quer COMPARAR similaridade de textos
 ```bash
 # 1. Copiar config
 cp docs/integration/examples/claude_desktop_config.json \
-   ~/Library/Application\ Support/Claude/claude_desktop_config.json
+  ~/Library/Application\ Support/Claude/claude_desktop_config.json
 
 # 2. Reiniciar Claude Desktop
 

@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/transport/connection.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -26,13 +26,15 @@
 =========================== */
 
 /**
- * Executa handlers de forma segura.
- * Falhas são isoladas e ignoradas.
+ * Executa handlers de forma segura. Falhas são isoladas e ignoradas.
+ *
+ * @param {Function} handler
+ * @param {any} payload
  */
 function safeCall(handler, payload) {
     try {
         handler(payload);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // transporte nunca falha semanticamente
     }
 }
@@ -42,21 +44,29 @@ function safeCall(handler, payload) {
 =========================== */
 
 /**
+ * @typedef {object} CreateConnectionDeps
+ * @property {any} telemetry
+ * @property {any} adapter
+ */
+/**
+ * @typedef {object} CreateConnectionOptions
+ * @property {any} [telemetry]
+ * @property {any} [adapter]
+ */
+/**
  * Cria uma conexão física genérica.
  *
- * @param {Object} deps
- * @param {Object} deps.telemetry
- * Interface de telemetria do NERV.
+ * @param {CreateConnectionDeps} deps Interface de telemetria do NERV.
  *
- * @param {Object} deps.adapter
- * Adaptador físico concreto (ex.: IPC, socket, pipe).
- * Deve expor:
- *  - start()
- *  - stop()
- *  - send(frame)
- *  - onReceive(handler)
- *  - onError(handler) [opcional]
-  * @returns {any}
+ *   Adaptador físico concreto (ex.: IPC, socket, pipe). Deve expor:
+ *
+ *   - start()
+ *   - stop()
+ *   - send(frame)
+ *   - onReceive(handler)
+ *   - onError(handler) [opcional]
+ *
+ * @returns {any}
  */
 function createConnection({ telemetry, adapter }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {
@@ -75,7 +85,7 @@ function createConnection({ telemetry, adapter }) {
   =========================== */
 
     if (typeof adapter.onReceive === 'function') {
-        adapter.onReceive(frame => {
+        adapter.onReceive((/** @type {any} */ frame) => {
             telemetry.emit('nerv:transport:receive', {
                 size: frame ? frame.length || null : null,
             });
@@ -87,7 +97,7 @@ function createConnection({ telemetry, adapter }) {
     }
 
     if (typeof adapter.onError === 'function') {
-        adapter.onError(error => {
+        adapter.onError((/** @type {any} */ error) => {
             telemetry.emit('nerv:transport:error', {
                 message: error ? error.message : 'erro físico',
             });
@@ -137,7 +147,7 @@ function createConnection({ telemetry, adapter }) {
     /**
      * Envia frame opaco pelo meio físico.
      *
-     * @param {*} frame
+     * @param {any} frame
      */
     function send(frame) {
         telemetry.emit('nerv:transport:send', {
@@ -152,7 +162,7 @@ function createConnection({ telemetry, adapter }) {
     /**
      * Registra handler de recepção de frames.
      *
-     * @param {Function} handler
+     * @param {function} handler
      */
     function onReceive(handler) {
         if (typeof handler !== 'function') {

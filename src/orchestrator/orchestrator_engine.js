@@ -2,26 +2,29 @@
 import * as logger from '#core/logger';
 import { resilientLock } from '#infra/locks/resilient_lock';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
-import { ActionCode, ActorRole } from '#shared/nerv/constants';
+import { ActionCode, ActorRole, OrchestrationAction } from '#shared/nerv/constants';
 import { ContextManager } from './context_manager.js';
 import { ValidationService } from './validation/validation_service.js';
 
 /**
  * Opções do construtor do OrchestratorEngine.
- * @typedef {Object} OrchestratorEngineOptions
- * @property {Object} nerv - Instância do sistema NERV.
- * @property {ContextManager} [contextManager] - Gerenciador de contexto opcional.
+ *
+ * @typedef {object} OrchestratorEngineOptions
+ * @property {any} nerv - Instância do sistema NERV.
+ * @property {ContextManager | null} [contextManager] - Gerenciador de contexto opcional.
  */
 
 /**
  * OrchestratorEngine - Motor de orquestração de missões.
  *
  * Suporta 3 estratégias de execução:
+ *
  * 1. SINGLE_SHOT: Executa 1x sem validação (comportamento V4)
  * 2. ITERATIVE: Executa → Valida → Retry com feedback (até max_iterations)
  * 3. MULTI_STEP: Executa workflow com múltiplos steps
  *
  * Integração com Kernel:
+ *
  * - shouldOrchestrate(task): Verifica se task precisa de orquestração
  * - beforeExecution(task): Prepara task antes da execução
  * - afterExecution(task, result): Processa resultado e decide próxima ação
@@ -29,6 +32,7 @@ import { ValidationService } from './validation/validation_service.js';
 class OrchestratorEngine {
     /**
      * Cria um motor de orquestração de missões.
+     *
      * @param {OrchestratorEngineOptions} options - Opções de configuração.
      */
     constructor({ nerv, contextManager = null }) {
@@ -44,8 +48,8 @@ class OrchestratorEngine {
     }
 
     /**
-     * Acquire workflow-level lock para prevenir race conditions.
-     * ✅ P0-2.4: Garante acesso exclusivo ao workflow state.
+     * Acquire workflow-level lock para prevenir race conditions. ✅ P0-2.4: Garante acesso exclusivo ao workflow state.
+     *
      * @private
      * @param {string} workflowId - ID do workflow
      * @returns {Promise<boolean>} True se lock foi adquirido
@@ -55,13 +59,13 @@ class OrchestratorEngine {
             `workflow:state:${workflowId}`,
             async () => true, // Lock in-memory (sem DB)
             async () => {}, // Release no-op
-            { workflowId, ts: Date.now() }
+            { workflowId, ts: Date.now() },
         );
     }
 
     /**
-     * Release workflow-level lock.
-     * ✅ P0-2.4: Libera acesso ao workflow state.
+     * Release workflow-level lock. ✅ P0-2.4: Libera acesso ao workflow state.
+     *
      * @private
      * @param {string} workflowId - ID do workflow
      * @returns {Promise<void>}
@@ -72,7 +76,8 @@ class OrchestratorEngine {
 
     /**
      * Verifica se task precisa de orquestração especial baseada na estratégia de execução.
-     * @param {Object} task - Task V5 com spec.execution.strategy.
+     *
+     * @param {any} task - Task V5 com spec.execution.strategy.
      * @returns {boolean} True se a estratégia for ITERATIVE ou MULTI_STEP.
      */
     shouldOrchestrate(task) {
@@ -81,15 +86,14 @@ class OrchestratorEngine {
     }
 
     /**
-     * Prepara task antes da execução, inicializando estados específicos da estratégia.
-     * ✅ P0-2.4: Agora async para suportar locking em _initializeWorkflowState().
+     * Prepara task antes da execução, inicializando estados específicos da estratégia. ✅ P0-2.4: Agora async para
+     * suportar locking em _initializeWorkflowState().
      *
-     * Para estratégias ITERATIVE: inicializa iteration state com contador e flags.
-     * Para estratégias MULTI_STEP: inicializa workflow state com steps e progresso.
-     * Emite evento NERV 'ORCHESTRATION_STARTED' para observabilidade.
+     * Para estratégias ITERATIVE: inicializa iteration state com contador e flags. Para estratégias MULTI_STEP:
+     * inicializa workflow state com steps e progresso. Emite evento NERV 'ORCHESTRATION_STARTED' para observabilidade.
      *
-     * @param {object} task - Task V5 com spec.execution.strategy
-     * @returns {Promise<object>} - Task modificada com estado inicializado (immutable se frozen)
+     * @param {any} task - Task V5 com spec.execution.strategy
+     * @returns {Promise<any>} - Task modificada com estado inicializado (immutable se frozen)
      * @throws {Error} - Se task.spec.execution.strategy for inválido
      * @sideEffects - Emite evento NERV 'ORCHESTRATION_STARTED'
      */
@@ -117,7 +121,7 @@ class OrchestratorEngine {
             nextTask = await this._initializeWorkflowState(nextTask);
             if (nextTask._lockFailed) {
                 logger.error(
-                    `[OrchestratorEngine] beforeExecution aborted: workflow lock failed for ${nextTask.meta?.id}`
+                    `[OrchestratorEngine] beforeExecution aborted: workflow lock failed for ${nextTask.meta?.id}`,
                 );
                 return nextTask;
             }
@@ -127,12 +131,12 @@ class OrchestratorEngine {
     }
 
     /**
-     * Retorna uma nova task com `state` atualizado, sem mutar o objeto original.
-     * (algumas tasks chegam como snapshots congelados)
+     * Retorna uma nova task com `state` atualizado, sem mutar o objeto original. (algumas tasks chegam como snapshots
+     * congelados)
      *
-     * @param {object} task
-     * @param {object} statePatch
-     * @returns {object}
+     * @param {any} task
+     * @param {any} statePatch
+     * @returns {any}
      */
 
     _withState(task, statePatch) {
@@ -166,14 +170,12 @@ class OrchestratorEngine {
     /**
      * Processa resultado após execução e decide próxima ação baseada na estratégia.
      *
-     * Para SINGLE_SHOT: sempre retorna DONE.
-     * Para ITERATIVE: valida resultado e decide se continua iterando.
-     * Para MULTI_STEP: executa próximo step do workflow.
-     * Estratégias não implementadas caem para SINGLE_SHOT com warning.
+     * Para SINGLE_SHOT: sempre retorna DONE. Para ITERATIVE: valida resultado e decide se continua iterando. Para
+     * MULTI_STEP: executa próximo step do workflow. Estratégias não implementadas caem para SINGLE_SHOT com warning.
      *
-     * @param {object} task - Task V5 com estado atualizado
-     * @param {object} executionResult - Resultado da execução do Driver (com sucesso/erro)
-     * @returns {Promise<object>} - Decision com { action: 'DONE'|'RETRY'|'NEXT_STEP', task, feedback }
+     * @param {any} task - Task V5 com estado atualizado
+     * @param {any} executionResult - Resultado da execução do Driver (com sucesso/erro)
+     * @returns {Promise<any>} - Decision com { action: OrchestrationAction.DONE|'RETRY'|'NEXT_STEP', task, feedback }
      * @throws {Error} - Se estratégia for inválida ou handlers falharem
      * @sideEffects - Emite eventos NERV 'ORCHESTRATION_COMPLETED' ou warnings no log
      */
@@ -189,7 +191,7 @@ class OrchestratorEngine {
             });
 
             return {
-                action: 'DONE',
+                action: OrchestrationAction.DONE,
                 task,
                 feedback: null,
             };
@@ -208,7 +210,7 @@ class OrchestratorEngine {
         // Estratégias não implementadas: TREE_OF_THOUGHT, CHAIN_OF_THOUGHT
         logger.warn(`[OrchestratorEngine] Strategy ${strategy} not implemented yet, fallback to SINGLE_SHOT`);
         return {
-            action: 'DONE',
+            action: OrchestrationAction.DONE,
             task,
             feedback: null,
         };
@@ -217,13 +219,12 @@ class OrchestratorEngine {
     /**
      * Inicializa estado de iteração para task ITERATIVE.
      *
-     * Cria estado interno de iteração com contador, histórico e limites.
-     * Atualiza task.state apenas se não existir iteration_state.
-     * Registra iteração ativa no mapa interno para tracking.
+     * Cria estado interno de iteração com contador, histórico e limites. Atualiza task.state apenas se não existir
+     * iteration_state. Registra iteração ativa no mapa interno para tracking.
      *
      * @private
-     * @param {object} task - Task V5 com spec.execution.iterative_config
-     * @returns {object} - Task com iteration_state inicializado (immutable)
+     * @param {any} task - Task V5 com spec.execution.iterative_config
+     * @returns {any} - Task com iteration_state inicializado (immutable)
      * @sideEffects - Adiciona entrada no activeIterations Map
      */
     _initializeIterationState(task) {
@@ -231,7 +232,7 @@ class OrchestratorEngine {
             task_id: task.meta.id,
             current_iteration: 0,
             max_iterations: task.spec.execution.iterative_config?.max_iterations || 3,
-            iterations_history: [],
+            iterations_history: /** @type {any[]} */ ([]),
         };
 
         this.activeIterations.set(task.meta.id, iterationState);
@@ -251,13 +252,12 @@ class OrchestratorEngine {
     /**
      * Inicializa estado de workflow para task MULTI_STEP.
      *
-     * Cria estado interno de workflow com steps, progresso e contexto acumulado.
-     * Registra workflow ativo no mapa interno e inicializa contexto no ContextManager.
-     * Atualiza task.state apenas se não existir workflow_state.
+     * Cria estado interno de workflow com steps, progresso e contexto acumulado. Registra workflow ativo no mapa
+     * interno e inicializa contexto no ContextManager. Atualiza task.state apenas se não existir workflow_state.
      *
      * @private
-     * @param {object} task - Task V5 com spec.execution.workflow_config
-     * @returns {Promise<object>} - Task com workflow_state inicializado (immutable)
+     * @param {any} task - Task V5 com spec.execution.workflow_config
+     * @returns {Promise<any>} - Task com workflow_state inicializado (immutable)
      * @sideEffects - Adiciona entrada no activeWorkflows Map e inicializa contexto no ContextManager
      */
     async _initializeWorkflowState(task) {
@@ -285,8 +285,8 @@ class OrchestratorEngine {
                 task_id: task.meta.id,
                 steps,
                 current_step_index: 0,
-                completed_steps: [],
-                failed_steps: [],
+                completed_steps: /** @type {any[]} */ ([]),
+                failed_steps: /** @type {any[]} */ ([]),
                 accumulated_context: {},
             };
 
@@ -322,14 +322,14 @@ class OrchestratorEngine {
     /**
      * Estratégia ITERATIVE: Executa → Valida → Retry com feedback.
      *
-     * Incrementa contador de iteração, valida output usando ValidationService,
-     * registra no histórico e decide: DONE (passou validação), RETRY (continua), ou DONE (máx iterações).
-     * Emite eventos NERV para observabilidade e limpa estado quando finaliza.
+     * Incrementa contador de iteração, valida output usando ValidationService, registra no histórico e decide: DONE
+     * (passou validação), RETRY (continua), ou DONE (máx iterações). Emite eventos NERV para observabilidade e limpa
+     * estado quando finaliza.
      *
      * @private
-     * @param {object} task - Task V5 com estado de iteração
-     * @param {object} executionResult - Resultado da execução com output para validação
-     * @returns {Promise<object>} - Decision { action: 'DONE'|'RETRY', task, feedback }
+     * @param {any} task - Task V5 com estado de iteração
+     * @param {any} executionResult - Resultado da execução com output para validação
+     * @returns {Promise<any>} - Decision { action: OrchestrationAction.DONE|'RETRY', task, feedback }
      * @throws {Error} - Se iteration state não for encontrado
      * @sideEffects - Emite eventos NERV, atualiza activeIterations Map, chama ValidationService
      */
@@ -337,7 +337,7 @@ class OrchestratorEngine {
         const iterationState = this.activeIterations.get(task.meta.id);
         if (!iterationState) {
             logger.error(`[OrchestratorEngine] Iteration state not found for task ${task.meta.id}`);
-            return { action: 'DONE', task, feedback: null };
+            return { action: OrchestrationAction.DONE, task, feedback: null };
         }
 
         iterationState.current_iteration++;
@@ -391,7 +391,7 @@ class OrchestratorEngine {
         // Decisão: Passou validação?
         if (validationResult.passed) {
             logger.info(
-                `[OrchestratorEngine] Task ${task.meta.id} passed validation on iteration ${iterationState.current_iteration}`
+                `[OrchestratorEngine] Task ${task.meta.id} passed validation on iteration ${iterationState.current_iteration}`,
             );
 
             // Limpa state
@@ -405,7 +405,7 @@ class OrchestratorEngine {
             });
 
             return {
-                action: 'DONE',
+                action: OrchestrationAction.DONE,
                 task: nextTask,
                 feedback: validationResult.feedback,
             };
@@ -414,7 +414,7 @@ class OrchestratorEngine {
         // Não passou: Verificar se pode iterar
         if (iterationState.current_iteration >= iterationState.max_iterations) {
             logger.warn(
-                `[OrchestratorEngine] Task ${task.meta.id} reached max iterations (${iterationState.max_iterations}), stopping with best result`
+                `[OrchestratorEngine] Task ${task.meta.id} reached max iterations (${iterationState.max_iterations}), stopping with best result`,
             );
 
             // Limpa state
@@ -429,7 +429,7 @@ class OrchestratorEngine {
             });
 
             return {
-                action: 'DONE',
+                action: OrchestrationAction.DONE,
                 task: nextTask,
                 feedback: `Max iterations reached. Best score: ${validationResult.overall_score}/100`,
             };
@@ -437,14 +437,14 @@ class OrchestratorEngine {
 
         // Pode iterar: Injeta feedback no prompt
         logger.info(
-            `[OrchestratorEngine] Task ${task.meta.id} failed validation (score: ${validationResult.overall_score}), retrying (iteration ${iterationState.current_iteration + 1}/${iterationState.max_iterations})`
+            `[OrchestratorEngine] Task ${task.meta.id} failed validation (score: ${validationResult.overall_score}), retrying (iteration ${iterationState.current_iteration + 1}/${iterationState.max_iterations})`,
         );
 
         // Prepara feedback para próxima iteração
         const feedbackPrompt = this._buildIterationFeedback(iterationState, validationResult);
 
         return {
-            action: 'RETRY',
+            action: OrchestrationAction.RETRY,
             task: nextTask,
             feedback: feedbackPrompt,
         };
@@ -453,14 +453,13 @@ class OrchestratorEngine {
     /**
      * Estratégia MULTI_STEP: Executa workflow com múltiplos steps.
      *
-     * Marca step atual como completo, armazena output no contexto acumulado,
-     * atualiza progresso e decide: DONE (último step) ou NEXT_STEP (continua workflow).
-     * Usa ContextManager para contexto avançado e emite eventos NERV.
+     * Marca step atual como completo, armazena output no contexto acumulado, atualiza progresso e decide: DONE (último
+     * step) ou NEXT_STEP (continua workflow). Usa ContextManager para contexto avançado e emite eventos NERV.
      *
      * @private
-     * @param {object} task - Task V5 com estado de workflow
-     * @param {object} executionResult - Resultado da execução do step atual
-     * @returns {Promise<object>} - Decision { action: 'DONE'|'NEXT_STEP', task, feedback, nextStep? }
+     * @param {any} task - Task V5 com estado de workflow
+     * @param {any} executionResult - Resultado da execução do step atual
+     * @returns {Promise<any>} - Decision { action: OrchestrationAction.DONE|'NEXT_STEP', task, feedback, nextStep? }
      * @throws {Error} - Se workflow state não for encontrado
      * @sideEffects - Atualiza activeWorkflows Map, chama ContextManager, emite eventos NERV
      */
@@ -471,7 +470,7 @@ class OrchestratorEngine {
         const lockAcquired = await this._acquireWorkflowLock(workflow_id);
         if (!lockAcquired) {
             logger.error(`[OrchestratorEngine] Failed to acquire workflow lock for ${workflow_id}`);
-            return { action: 'DONE', task, feedback: null, error: 'LOCK_ACQUISITION_FAILED' };
+            return { action: OrchestrationAction.DONE, task, feedback: null, error: 'LOCK_ACQUISITION_FAILED' };
         }
 
         try {
@@ -479,7 +478,7 @@ class OrchestratorEngine {
 
             if (!workflowState) {
                 logger.error(`[OrchestratorEngine] Workflow state not found for ${workflow_id}`);
-                return { action: 'DONE', task, feedback: null };
+                return { action: OrchestrationAction.DONE, task, feedback: null };
             }
 
             const currentStepIndex = workflowState.current_step_index;
@@ -517,7 +516,7 @@ class OrchestratorEngine {
             if (nextStepIndex >= workflowState.steps.length) {
                 // Workflow completo
                 logger.info(
-                    `[OrchestratorEngine] Workflow ${workflow_id} completed (${workflowState.steps.length} steps)`
+                    `[OrchestratorEngine] Workflow ${workflow_id} completed (${workflowState.steps.length} steps)`,
                 );
 
                 this.activeWorkflows.delete(workflow_id);
@@ -533,7 +532,7 @@ class OrchestratorEngine {
                 });
 
                 return {
-                    action: 'DONE',
+                    action: OrchestrationAction.DONE,
                     task: nextTask,
                     feedback: `Workflow completed: ${workflowState.completed_steps.length} steps`,
                 };
@@ -544,7 +543,7 @@ class OrchestratorEngine {
             const nextStep = workflowState.steps[nextStepIndex];
 
             logger.info(
-                `[OrchestratorEngine] Workflow ${workflow_id} moving to step ${nextStepIndex + 1}/${workflowState.steps.length}: ${nextStep.name}`
+                `[OrchestratorEngine] Workflow ${workflow_id} moving to step ${nextStepIndex + 1}/${workflowState.steps.length}: ${nextStep.name}`,
             );
 
             await this._emitNervEvent('WORKFLOW_STEP_STARTED', {
@@ -558,11 +557,11 @@ class OrchestratorEngine {
             const nextStepPrompt = await this._buildStepPrompt(
                 nextStep,
                 workflowState.accumulated_context,
-                workflow_id
+                workflow_id,
             );
 
             return {
-                action: 'NEXT_STEP',
+                action: OrchestrationAction.NEXT_STEP,
                 task: nextTask,
                 feedback: nextStepPrompt,
                 nextStep,
@@ -579,12 +578,11 @@ class OrchestratorEngine {
     /**
      * Constrói feedback textual para próxima iteração baseado na validação.
      *
-     * Formata score, issues e sugestões dos validadores em prompt estruturado
-     * para guiar a próxima tentativa do modelo.
+     * Formata score, issues e sugestões dos validadores em prompt estruturado para guiar a próxima tentativa do modelo.
      *
      * @private
-     * @param {object} iterationState - Estado da iteração atual
-     * @param {object} validationResult - Resultado da validação com score e issues
+     * @param {any} iterationState - Estado da iteração atual
+     * @param {any} validationResult - Resultado da validação com score e issues
      * @returns {string} - Prompt de feedback formatado para injeção
      */
     _buildIterationFeedback(iterationState, validationResult) {
@@ -599,7 +597,7 @@ class OrchestratorEngine {
         for (const result of validationResult.validation_results) {
             if (result.suggestions && result.suggestions.length > 0) {
                 feedbackParts.push(`Suggestions from ${result.validator_type}:`);
-                feedbackParts.push(...result.suggestions.map(s => `  - ${s}`));
+                feedbackParts.push(...result.suggestions.map((/** @type {any} */ s) => `  - ${s}`));
             }
         }
 
@@ -611,14 +609,14 @@ class OrchestratorEngine {
     /**
      * Constrói prompt para step de workflow com contexto acumulado e RAG.
      *
-     * Substitui placeholders {step-id} com outputs anteriores, adiciona contexto do ContextManager,
-     * e auto-injeta código relevante via RAG se detectar keywords técnicos.
-     * Usa hybrid search com reranking e MMR para contexto relevante.
+     * Substitui placeholders {step-id} com outputs anteriores, adiciona contexto do ContextManager, e auto-injeta
+     * código relevante via RAG se detectar keywords técnicos. Usa hybrid search com reranking e MMR para contexto
+     * relevante.
      *
      * @private
-     * @param {object} step - Step configuration com prompt e config
-     * @param {object} accumulated_context - Map de step_id -> output acumulado
-     * @param {string|null} workflow_id - ID do workflow para contexto avançado
+     * @param {any} step - Step configuration com prompt e config
+     * @param {any} accumulated_context - Map de step_id -> output acumulado
+     * @param {string | null} workflow_id - ID do workflow para contexto avançado
      * @returns {Promise<string>} - Prompt enriquecido com contexto
      * @throws {Error} - Se RAG falhar (graceful degradation)
      * @sideEffects - Pode chamar RAG search e ContextManager
@@ -627,7 +625,7 @@ class OrchestratorEngine {
         let prompt = step.config.prompt || step.description || '';
 
         // Substitui placeholders {step-id} com outputs anteriores (backward compatible)
-        Object.keys(accumulated_context).forEach(stepId => {
+        Object.keys(accumulated_context).forEach((stepId) => {
             const value = accumulated_context[stepId];
             prompt = prompt.replace(new RegExp(`\\{${stepId}\\}`, 'g'), value);
         });
@@ -644,7 +642,7 @@ class OrchestratorEngine {
             // Adiciona outputs recentes (se houver e diferentes do accumulated_context)
             if (context && context.steps && context.steps.length > 0) {
                 const recentOutputs = context.steps
-                    .map(s => `Step ${s.step_id}: ${s.output.substring(0, 200)}...`)
+                    .map((/** @type {any} */ s) => `Step ${s.step_id}: ${s.output.substring(0, 200)}...`)
                     .join('\n');
                 prompt += `\n\n[RECENT STEPS]:\n${recentOutputs}`;
             }
@@ -660,18 +658,20 @@ class OrchestratorEngine {
                 logger.debug(`[OrchestratorEngine] Auto-injecting RAG context for query: "${ragQuery}"`);
 
                 // Buscar contexto (hybrid search com reranking + MMR)
-                const ragResult = await ragHybridSearch({
-                    query: ragQuery,
-                    topK: 3, // Limit to 3 chunks to avoid token bloat
-                    rerank: true,
-                    mmr: true,
-                    mmrLambda: 0.7,
-                });
+                const ragResult = /** @type {any} */ (
+                    await ragHybridSearch({
+                        query: ragQuery,
+                        topK: 3, // Limit to 3 chunks to avoid token bloat
+                        rerank: true,
+                        mmr: true,
+                        mmrLambda: 0.7,
+                    })
+                );
 
                 if (ragResult.results && ragResult.results.length > 0) {
                     // Formatar contexto como markdown
                     const contextMd = ragResult.results
-                        .map((r, i) => {
+                        .map((/** @type {any} */ r, /** @type {any} */ i) => {
                             const preview = r.text.length > 400 ? r.text.substring(0, 400) + '...' : r.text;
                             return `### [${i + 1}] ${r.path}:${r.start_line}-${r.end_line}\n\`\`\`${r.language || 'text'}\n${preview}\n\`\`\``;
                         })
@@ -682,8 +682,9 @@ class OrchestratorEngine {
 
                     logger.info(`[OrchestratorEngine] ✓ RAG context injected (${ragResult.results.length} chunks)`);
                 }
-            } catch (err) {
-                logger.warn(`[OrchestratorEngine] RAG auto-injection failed: ${err.message}`);
+            } catch (/** @type {any} */ err) {
+                const _err = /** @type {any} */ (err);
+                logger.warn(`[OrchestratorEngine] RAG auto-injection failed: ${_err.message}`);
                 // Continuar sem RAG se falhar (graceful degradation)
             }
         }
@@ -694,13 +695,12 @@ class OrchestratorEngine {
     /**
      * Extrai query RAG do prompt usando heurística de keywords.
      *
-     * Detecta necessidade de contexto de código baseado em keywords técnicos,
-     * extrai nomes específicos (funções, classes, constantes) e constrói query.
-     * Retorna null se não detectar keywords relevantes.
+     * Detecta necessidade de contexto de código baseado em keywords técnicos, extrai nomes específicos (funções,
+     * classes, constantes) e constrói query. Retorna null se não detectar keywords relevantes.
      *
      * @private
      * @param {string} prompt - Prompt do step para análise
-     * @returns {string|null} - Query RAG ou null se não precisar
+     * @returns {string | null} - Query RAG ou null se não precisar
      */
     _extractRagQuery(prompt) {
         // Keywords que indicam necessidade de contexto de código
@@ -737,7 +737,7 @@ class OrchestratorEngine {
         const promptLower = prompt.toLowerCase();
 
         // Verifica se contém alguma keyword
-        const hasCodeKeyword = CODE_KEYWORDS.some(kw => promptLower.includes(kw.toLowerCase()));
+        const hasCodeKeyword = CODE_KEYWORDS.some((kw) => promptLower.includes(kw.toLowerCase()));
 
         if (!hasCodeKeyword) {
             return null; // Não precisa de RAG
@@ -779,13 +779,12 @@ class OrchestratorEngine {
     /**
      * Emite evento NERV com suporte a diferentes APIs.
      *
-     * ✅ P1-4: Agora async para aguardar emissão e propagar erros corretamente.
-     * Suporta API simples (nerv.emit) para testes e API canônica (nerv.emitEvent)
-     * para produção. Usa HighLevelNERV para envelopes padronizados.
+     * ✅ P1-4: Agora async para aguardar emissão e propagar erros corretamente. Suporta API simples (nerv.emit) para
+     * testes e API canônica (nerv.emitEvent) para produção. Usa HighLevelNERV para envelopes padronizados.
      *
      * @private
      * @param {string} actionCode - Código da ação (ex: 'ORCHESTRATION_STARTED')
-     * @param {object} payload - Dados do evento
+     * @param {any} payload - Dados do evento
      * @returns {Promise<void>}
      * @sideEffects - Emite evento via NERV system
      */
@@ -805,12 +804,14 @@ class OrchestratorEngine {
         // Production adapters: emit canonical envelopes.
         if (typeof this.nerv.emitEvent === 'function') {
             try {
-                const code = ActionCode[actionCode] || actionCode;
+                const code = /** @type {any} */ (ActionCode)[actionCode] || actionCode;
+                // eslint-disable-next-line @typescript-eslint/await-thenable
                 await HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, code, payload); // ✅ P1-4: Added await
-            } catch (e) {
-                logger.error('[OrchestratorEngine] Falha ao emitir evento NERV:', e.message);
+            } catch (/** @type {any} */ e) {
+                const _e = /** @type {any} */ (e);
+                logger.error('[OrchestratorEngine] Falha ao emitir evento NERV:', _e.message);
                 // ✅ P1-4: Re-throw para que caller saiba da falha
-                throw e;
+                throw _e;
             }
         }
     }
@@ -818,8 +819,8 @@ class OrchestratorEngine {
     /**
      * Limpa state interno e recursos (cleanup).
      *
-     * Remove todos os workflows e iterações ativas, limpa ContextManager.
-     * Chamado quando o engine é destruído ou reiniciado.
+     * Remove todos os workflows e iterações ativas, limpa ContextManager. Chamado quando o engine é destruído ou
+     * reiniciado.
      *
      * @sideEffects - Limpa activeWorkflows, activeIterations Maps e ContextManager
      */

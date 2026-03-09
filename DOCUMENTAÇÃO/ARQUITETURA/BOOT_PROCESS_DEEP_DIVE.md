@@ -224,9 +224,9 @@ apps: [
 **Variáveis de ambiente necessárias**:
 
 ```bash
-SERVER_MODE=split               # Maestro NÃO inicia server
-SERVER_AUTHORITY=standalone     # Cada processo é soberano
-CHROME_PROXY_ENABLED=true       # PM2 gerencia proxy separado
+SERVER_MODE=split           # Maestro NÃO inicia server
+SERVER_AUTHORITY=standalone # Cada processo é soberano
+CHROME_PROXY_ENABLED=true   # PM2 gerencia proxy separado
 ```
 
 **Sequência de boot**:
@@ -283,9 +283,9 @@ CHROME_PROXY_ENABLED=true       # PM2 gerencia proxy separado
 **Variáveis de ambiente necessárias**:
 
 ```bash
-SERVER_MODE=integrated          # Maestro INICIA server interno
-SERVER_AUTHORITY=standalone     # Processo único soberano
-CHROME_PROXY_ENABLED=true       # Maestro inicia proxy inline
+SERVER_MODE=integrated      # Maestro INICIA server interno
+SERVER_AUTHORITY=standalone # Processo único soberano
+CHROME_PROXY_ENABLED=true   # Maestro inicia proxy inline
 ```
 
 **Sequência de boot**:
@@ -530,7 +530,7 @@ let discoveredServerInfo = null;
 try {
   const discoveryTimeoutMs = 5000;
 
-  const unsub = nerv.onEvent(envelope => {
+  const unsub = nerv.onEvent((envelope) => {
     if (envelope.type.action_code === ActionCode.SERVER_READY) {
       discoveredServerInfo = envelope.payload;
       log('INFO', `[BOOT] Server descoberto via NERV: porta ${payload.port}`);
@@ -578,7 +578,7 @@ const browserPoolResult = await initializeBrowserPoolResilient(
     allowDegradedMode: true,
     autoRetry: true,
     maxAutoRetries: 2,
-  }
+  },
 );
 
 if (!browserPoolResult.success) {
@@ -1238,7 +1238,7 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Timeout')), timeoutMs);
 
-    const unsub = nerv.onEvent(envelope => {
+    const unsub = nerv.onEvent((envelope) => {
       if (envelope.type.action_code === ActionCode.SERVER_READY) {
         clearTimeout(timer);
         unsub();
@@ -1250,7 +1250,7 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
 
 // Escutar continuamente
 function listenForServerReady(nerv, handler) {
-  return nerv.onEvent(envelope => {
+  return nerv.onEvent((envelope) => {
     if (envelope.type.action_code === ActionCode.SERVER_READY) {
       handler(envelope.payload);
     }
@@ -1355,7 +1355,7 @@ function listenForServerReady(nerv, handler) {
 npx pm2 start ecosystem.config.cjs
 
 # Mas variáveis estão:
-SERVER_MODE=integrated   # ❌ ERRADO!
+SERVER_MODE=integrated # ❌ ERRADO!
 ```
 
 **O que acontece**:
@@ -1399,7 +1399,7 @@ if (process.env.pm_id && SERVER_MODE === 'integrated') {
 npx pm2 start ecosystem.config.cjs
 
 # Mas Maestro também inicia proxy (Fase 2.5)
-CHROME_PROXY_ENABLED=true   # ❌ DUPLICADO!
+CHROME_PROXY_ENABLED=true # ❌ DUPLICADO!
 ```
 
 **O que acontece**:

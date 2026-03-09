@@ -70,9 +70,9 @@ async function runBenchmarks() {
     console.log(`   Plataforma: ${system.platform} ${system.arch}`);
     console.log(`   CPU: ${system.cpu_count}x ${system.cpu_model}`);
     console.log(
-        `   Memória: ${system.free_memory_gb}GB livre / ${system.total_memory_gb}GB total (${system.memory_usage_pct}%)`
+        `   Memória: ${system.free_memory_gb}GB livre / ${system.total_memory_gb}GB total (${system.memory_usage_pct}%)`,
     );
-    console.log(`   Load Average: ${system.load_average.map(l => l.toFixed(2)).join(', ')}`);
+    console.log(`   Load Average: ${system.load_average.map((l) => l.toFixed(2)).join(', ')}`);
     console.log(`   Uptime: ${(system.uptime_seconds / 3600).toFixed(1)} horas\n`);
 
     // Benchmark de CPU

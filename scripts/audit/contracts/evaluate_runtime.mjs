@@ -1,7 +1,5 @@
 // @ts-check
-/**
- * @typedef {import('./load_registry.mjs').ContractDefinitionV1} ContractDefinitionV1
- */
+/** @import {ContractDefinitionV1} from "./load_registry.mjs" */
 
 /**
  * @param {ContractDefinitionV1[]} contracts
@@ -21,15 +19,21 @@ function buildSignalMap(contracts) {
 }
 
 /**
- * @param {{
- *   contracts: ContractDefinitionV1[],
- *   signals: Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>,
- * }} options
-  * @returns {any}
+ * @typedef {object} EvaluateRuntimeSignalsOptions
+ * @property {ContractDefinitionV1[]} contracts
+ * @property {any[]} signals
+ * @property {string} evidence
+ * @property {string} source_tool
+ * @property {string | null} file
+ * @property {number | null} line
+ */
+/**
+ * @param {EvaluateRuntimeSignalsOptions} options
+ * @returns {object}
  */
 export function evaluateRuntimeSignals(options) {
     const signalMap = buildSignalMap(options.contracts || []);
-    /** @type {Array<Record<string, any>>} */
+    /** @type {Record<string, unknown>[]} */
     const findings = [];
 
     for (const entry of options.signals || []) {
