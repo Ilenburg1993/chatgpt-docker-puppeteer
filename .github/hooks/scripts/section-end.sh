@@ -30,11 +30,11 @@ SECTION_TURN_START=0
 TURN_COUNT=0
 
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session.id // "unknown"'             "$CTX_FILE" 2>/dev/null || echo 'unknown')"
-    SECTION_NAME="$(jq -r '.current_section.name // ""'        "$CTX_FILE" 2>/dev/null || echo '')"
-    SECTION_STARTED_AT="$(jq -r '.current_section.started_at // ""' "$CTX_FILE" 2>/dev/null || echo '')"
-    SECTION_TURN_START="$(jq -r '.current_section.turn_start // 0'  "$CTX_FILE" 2>/dev/null || echo 0)"
-    TURN_COUNT="$(jq -r '.session_stats.turn_count // 0'       "$CTX_FILE" 2>/dev/null || echo 0)"
+    SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
+    SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SECTION_STARTED_AT="$(jq -r '.current_section.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SECTION_TURN_START="$(jq -r '.current_section.turn_start // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 fi
 
 # Sem seção ativa — avisa e sai sem erro
@@ -46,8 +46,8 @@ fi
 # Calcula duração da seção em segundos
 DURATION_S=0
 if [ -n "$SECTION_STARTED_AT" ] && [ "$SECTION_STARTED_AT" != "null" ]; then
-    SECTION_EPOCH="$(date -d "$SECTION_STARTED_AT" '+%s' 2>/dev/null || echo 0)"
-    NOW_EPOCH="$(date -u '+%s' 2>/dev/null || echo 0)"
+    SECTION_EPOCH="$(date -d "$SECTION_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
+    NOW_EPOCH="$(date -u '+%s' 2> /dev/null || echo 0)"
     if [ "$NOW_EPOCH" -gt "$SECTION_EPOCH" ]; then
         DURATION_S=$((NOW_EPOCH - SECTION_EPOCH))
     fi
@@ -61,9 +61,9 @@ if [ "$TURNS_COVERED" -lt 0 ]; then
 fi
 
 # Limpa current_section no session-context.json (seção encerrada = sem seção ativa)
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq '.current_section = {name: null, started_at: null, turn_start: null, description: null}' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 elif [ -f "$CTX_FILE" ]; then
     TMP="$(mktemp)"
     jq '.current_section = {name: null, started_at: null, turn_start: null, description: null}' \
@@ -72,16 +72,16 @@ fi
 
 # Registra evento sectionEnd no audit.jsonl
 jq -cn \
-    --arg event        "sectionEnd" \
-    --arg sid          "$SESSION_ID" \
-    --arg ts           "$NOW_ISO" \
-    --arg name         "$SECTION_NAME" \
-    --arg reason       "$REASON" \
-    --arg started_at   "$SECTION_STARTED_AT" \
-    --argjson turn_start   "$SECTION_TURN_START" \
-    --argjson turn_end     "$CURRENT_TURN" \
+    --arg event "sectionEnd" \
+    --arg sid "$SESSION_ID" \
+    --arg ts "$NOW_ISO" \
+    --arg name "$SECTION_NAME" \
+    --arg reason "$REASON" \
+    --arg started_at "$SECTION_STARTED_AT" \
+    --argjson turn_start "$SECTION_TURN_START" \
+    --argjson turn_end "$CURRENT_TURN" \
     --argjson turns_covered "$TURNS_COVERED" \
-    --argjson duration_s   "$DURATION_S" \
+    --argjson duration_s "$DURATION_S" \
     '{
         event:          $event,
         session_id:     $sid,

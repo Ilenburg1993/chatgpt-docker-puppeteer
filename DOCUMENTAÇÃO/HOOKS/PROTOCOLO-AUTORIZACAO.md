@@ -135,16 +135,70 @@ Presente quando há violação ativa. Schema:
 
 ---
 
+### `SESSION_CLOSE_NO_KEY.flag` ← NEW (Schema v3)
+
+Presente quando a SESSION foi encerrada sem a `close_key` validada. Schema:
+```json
+{
+    "session_id": "a0be08af-7a26-42d8-b8a5-3c43206494c7",
+    "timestamp": "2026-03-09T03:15:08Z",
+    "note": "SESSION encerrada sem close_key validada"
+}
+```
+
+**Ciclo de vida**:
+- **Criado**: por `session-end.sh` quando `session.close_key_validated = false` ao encerrar
+- **Removido**: por `session-end.sh` quando `session.close_key_validated = true` — encerramento legítimo
+- **Alertado**: próximo `session-briefing.md` exibe bloco `🔑 ENCERRAMENTO SEM CHAVE`
+
+**O que fazer quando encontrar esta flag**:
+1. Verificar `audit.jsonl` para eventos `sessionEnd_no_key` — identificar a sessão
+2. Verificar se houve evento `sessionClose_key_validated` naquela sessão
+3. Se não houve → encerramento não autorizado — registrar finding e investigar causa
+4. Se houve → bug no sistema — reportar e corrigir `post-tool-use.sh` ou `session-end.sh`
+
+---
+
+## Camada 5 — SESSION CLOSE KEY (Schema v3)
+
+SESSION é um recurso premium (1 por dia). Para além do `vscode_askQuestions` obrigatório por turno,
+o encerramento de SESSION exige uma **chave dinâmica única por sessão**:
+
+```
+Fluxo de encerramento autorizado:
+1. Usuário pede encerramento
+2. Agente invoca Template F (vscode_askQuestions)
+3. Usuário digita ENCERRAR-XXXXXXXX no campo livre
+4. post-tool-use.sh detecta a chave na resposta
+5. session-context.json: close_key_validated = true
+6. session-end.sh lê close_key_validated = true → encerramento registrado como autorizado
+```
+
+**Geração da chave**:
+- `session-start.sh` gera: `ENCERRAR-$(head -c 4 /dev/urandom | xxd -p | tr 'a-z' 'A-Z' | head -c 8)`
+- Ex: `ENCERRAR-7A3F2B1C` — 8 caracteres hexadecimais maiúsculos
+- Única por sessão — muda a cada `sessionStart`
+
+**Anúncio da chave**:
+- Exibida no `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO`
+- Disponível em `session-context.json` → campo `session.close_key`
+
+---
+
 ## Eventos de Auditoria
 
 Todos registrados em `logs/audit.jsonl`:
 
-| Evento                  | Quando ocorre                                   |
-| ----------------------- | ----------------------------------------------- |
-| `turnEnd_authorized`    | Turno encerrado com vscode_askQuestions chamado |
-| `turnEnd_UNAUTHORIZED`  | Turno encerrado sem vscode_askQuestions         |
-| `sessionEnd_compliance` | Fim de sessão — resumo de conformidade          |
-| `authViolation_reset`   | Flag resetada manualmente                       |
+| Evento                          | Quando ocorre                                          |
+| ------------------------------- | ------------------------------------------------------ |
+| `turnEnd_authorized`            | Turno encerrado com vscode_askQuestions chamado        |
+| `turnEnd_UNAUTHORIZED`          | Turno encerrado sem vscode_askQuestions                |
+| `sessionEnd_compliance`         | Fim de sessão — resumo de conformidade                 |
+| `authViolation_reset`           | Flag resetada manualmente                              |
+| `askQuestions_response`         | Resposta de vscode_askQuestions capturada              |
+| `sessionClose_key_validated`    | close_key encontrada na resposta — SESSION pode fechar |
+| `sessionEnd_authorized_close`   | SESSION encerrada com close_key validada               |
+| `sessionEnd_no_key`             | SESSION encerrada sem close_key — flag criada          |
 
 ---
 

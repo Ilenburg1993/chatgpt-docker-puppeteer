@@ -58,7 +58,7 @@ jq -cn \
     }' >> "$LOG_DIR/errors.jsonl"
 
 # Incrementa failures_detected no contexto da sessão (schema v2)
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq '.session_stats.failures_detected = (.session_stats.failures_detected // 0) + 1
          | .session_stats.errors_total = (.session_stats.errors_total // 0) + 1' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true

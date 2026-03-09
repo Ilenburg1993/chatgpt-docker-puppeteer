@@ -62,12 +62,69 @@ jq -cn \
         result_type:  $result
     }' >> "$LOG_DIR/audit.jsonl"
 
-# ── Atualiza contexto — Schema v2 ────────────────────────────────────────────
+# ── Atualiza contexto — Schema v3 ────────────────────────────────────────────
 # last_tool.result: resultado desta chamada específica
 # current_turn.failures_count: acumula falhas do turno atual
 # session_stats.failures_detected: acumula falhas da sessão
+# current_turn.last_askquestions_response: captura todas as respostas de vscode_askQuestions
 if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
-    if [ "$RESULT_TYPE" = "failure" ]; then
+    if [ "$TOOL_NAME" = "vscode_askQuestions" ] && [ -n "$TOOL_RESPONSE" ]; then
+        # Captura resposta completa do usuário ao vscode_askQuestions
+        # tool_response para askQuestions é JSON: {answers:{...}} — normaliza para string
+        RESPONSE_STR="$(echo "$TOOL_RESPONSE" | jq -c '.' 2>/dev/null || echo "$TOOL_RESPONSE")"
+
+        # Lê close_key atual do contexto para verificar se a resposta contém a chave de encerramento
+        CURRENT_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+        KEY_FOUND=false
+        if [ -n "$CURRENT_CLOSE_KEY" ] && echo "$TOOL_RESPONSE" | grep -qF "$CURRENT_CLOSE_KEY"; then
+            KEY_FOUND=true
+        fi
+
+        # Log da resposta no audit.jsonl (sem dados sensíveis excessivos — truncada a 500 chars)
+        RESPONSE_TRUNCATED="$(echo "$RESPONSE_STR" | head -c 500)"
+        jq -cn \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$TIMESTAMP" \
+            --arg tool_use_id "$TOOL_USE_ID" \
+            --arg response "$RESPONSE_TRUNCATED" \
+            --argjson key_found "$KEY_FOUND" \
+            '{
+                event:        "askQuestions_response",
+                session_id:   $sid,
+                timestamp:    $ts,
+                tool_use_id:  $tool_use_id,
+                response:     $response,
+                close_key_found: $key_found
+            }' >> "$LOG_DIR/audit.jsonl"
+
+        # Atualiza contexto com resposta e, se necessário, valida a close_key
+        if [ "$KEY_FOUND" = "true" ]; then
+            jq --arg result "$RESULT_TYPE" \
+               --arg response "$RESPONSE_STR" \
+                '.last_tool.result = $result
+                 | .current_turn.last_askquestions_response = $response
+                 | .session.close_key_validated = true' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+
+            # Log do evento de validação da chave
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$TIMESTAMP" \
+                --arg key "$CURRENT_CLOSE_KEY" \
+                '{
+                    event:      "sessionClose_key_validated",
+                    session_id: $sid,
+                    timestamp:  $ts,
+                    close_key:  $key
+                }' >> "$LOG_DIR/audit.jsonl"
+        else
+            jq --arg result "$RESULT_TYPE" \
+               --arg response "$RESPONSE_STR" \
+                '.last_tool.result = $result
+                 | .current_turn.last_askquestions_response = $response' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+        fi
+    elif [ "$RESULT_TYPE" = "failure" ]; then
         jq --arg result "$RESULT_TYPE" --arg tool "$TOOL_NAME" \
             '.last_tool.result = $result
              | .current_turn.failures_count = ((.current_turn.failures_count // 0) + 1)

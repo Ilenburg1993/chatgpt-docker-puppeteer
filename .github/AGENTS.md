@@ -141,6 +141,11 @@ usuário. O agente é um colaborador ativo e autônomo, não um executor passivo
 > tool call real. O sistema monitora violações automaticamente — ver seção ⛔⛔⛔ no início do
 > arquivo.
 
+> **ENCERRAMENTO DE SESSION (extra-hardening)**: além do `vscode_askQuestions`, o usuário DEVE
+> digitar a chave `ENCERRAR-XXXXXXXX` no campo livre do **Template F**. A chave está no
+> `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO`. **Use sempre Template F**
+> (não Template A) ao encerrar a sessão.
+
 ---
 
 ### Protocolo de início de sessão (OBRIGATÓRIO — todo turno que inicia uma sessão)
@@ -165,6 +170,7 @@ momentos. **Sem exceção.**
 | ≥ 3 bugs encontrados numa auditoria           | **B — Bug Discovery**    | Antes de corrigir        |
 | Proposta de upgrade arquitetural identificada | **C — Upgrade Proposal** | Antes de executar        |
 | `turn_count % 3 == 0` e `turn_count > 0`      | **D — Checkpoint**       | No início do turno       |
+| Usuário pede para encerrar a sessão           | **F — Session Close**    | Antes de encerrar        |
 
 ---
 
@@ -349,6 +355,36 @@ momentos. **Sem exceção.**
 
 ---
 
+### Template F — Session Close (quando usuário pede para encerrar a sessão)
+
+> **USO OBRIGATÓRIO**: Sempre que o usuário mencionar encerrar, fechar, parar ou sair da sessão,
+> invocar este template. Uma SESSION é um recurso premium (1 por dia) — o encerramento exige
+> confirmação explícita com a chave dinâmica gerada no início da sessão.
+>
+> A chave está em:
+> - `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO`
+> - `session-context.json` → campo `session.close_key`
+>
+> **Importante**: digitar a chave no campo livre é a ÚNICA forma de autorizar o encerramento.
+> Selecionar "Confirmar" sem digitar a chave não valida — o sistema verifica a presença literal
+> da string `ENCERRAR-XXXXXXXX` na resposta via `post-tool-use.sh`.
+
+```json
+[
+  {
+    "id": "session_close_key",
+    "prompt": "🔐 Confirmação de encerramento de sessão\n\nEsta SESSION é um recurso premium — foi iniciada hoje e não pode ser reaberta facilmente. Para encerrar legitimamente, digite a chave exibida no session-briefing.md:\n\n  [INSERIR CLOSE_KEY AQUI — ex: ENCERRAR-7A3F2B1C]\n\nDigite a chave no campo abaixo (texto livre) ou escolha uma opção:",
+    "allowFreeformInput": true,
+    "options": [
+      "Cancelar — quero continuar trabalhando",
+      "Salvar estado e encerrar (sem digitar a chave — encerramento NÃO será validado)"
+    ]
+  }
+]
+```
+
+---
+
 ### Criação Autônoma de Tarefas
 
 O agente DEVE criar novas tarefas quando identificar qualquer um destes gatilhos:
@@ -493,6 +529,8 @@ garantir continuidade máxima:
 | `session-context.json` | Estado vivo: session_id, tools_used[], turn_count, last_tool_ts     |
 | `session-briefing.md`  | Briefing gerado automaticamente no sessionStart — **ler sempre**    |
 | `pending-tasks.md`     | Backlog canônico de tarefas — fonte de verdade para próximos passos |
+| `UNAUTHORIZED_CLOSE.flag` | Flag de violação: turno encerrado sem `vscode_askQuestions`      |
+| `SESSION_CLOSE_NO_KEY.flag` | Flag: SESSION encerrada sem close_key validada — exige investigação |
 
 **Checkpoints automáticos (`.github/hooks/checkpoints/`):**
 
@@ -528,6 +566,9 @@ inclui automaticamente as informações de continuidade no `session-briefing.md`
    `tools_used[]`) — não sobrescreva manualmente
 5. Findings em `findings.jsonl` são cumulativos — nunca deletar; usar `resolve-finding.sh` se
    disponível
+6. **ENCERRAMENTO DE SESSION**: sempre invocar **Template F** antes de encerrar. O usuário DEVE
+   digitar a chave `ENCERRAR-XXXXXXXX` (exibida no briefing) para validar o encerramento.
+   Sem a chave → `SESSION_CLOSE_NO_KEY.flag` criado → alerta no próximo briefing.
 
 ---
 

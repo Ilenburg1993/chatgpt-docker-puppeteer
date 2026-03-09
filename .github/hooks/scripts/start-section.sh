@@ -39,27 +39,27 @@ NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 SESSION_ID="unknown"
 TURN_NUMBER=0
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2>/dev/null || echo 'unknown')"
-    TURN_NUMBER="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
+    TURN_NUMBER="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 fi
 
 # Calcula o número do turno atual (turn_count + 1, pois turn_count é incrementado no agentStop)
 CURRENT_TURN=$((TURN_NUMBER + 1))
 
 # Atualiza session-context.json com a seção ativa
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq --arg name "$SECTION_NAME" \
-       --arg ts "$NOW_ISO" \
-       --argjson turn "$CURRENT_TURN" \
-       '.current_section = {name: $name, started_at: $ts, turn_start: $turn, description: null}' \
-       "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null
+        --arg ts "$NOW_ISO" \
+        --argjson turn "$CURRENT_TURN" \
+        '.current_section = {name: $name, started_at: $ts, turn_start: $turn, description: null}' \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null
 elif [ -f "$CTX_FILE" ]; then
     TMP="$(mktemp)"
     jq --arg name "$SECTION_NAME" \
-       --arg ts "$NOW_ISO" \
-       --argjson turn "$CURRENT_TURN" \
-       '.current_section = {name: $name, started_at: $ts, turn_start: $turn, description: null}' \
-       "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
+        --arg ts "$NOW_ISO" \
+        --argjson turn "$CURRENT_TURN" \
+        '.current_section = {name: $name, started_at: $ts, turn_start: $turn, description: null}' \
+        "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
 fi
 
 # Registra evento sectionStart no audit.jsonl

@@ -45,6 +45,31 @@ Cada linha é um objeto JSON independente (JSONL). Campos comuns a todos os even
 }
 ```
 
+#### `sessionEnd_authorized_close`
+```json
+{
+    "event": "sessionEnd_authorized_close",
+    "session_id": "...",
+    "timestamp": "...",
+    "close_key_validated": true
+}
+```
+- Emitido quando a SESSION encerra com `close_key_validated = true` — encerramento legítimo
+- O arquivo `.github/hooks/state/SESSION_CLOSE_NO_KEY.flag` é removido se existir
+
+#### `sessionEnd_no_key`
+```json
+{
+    "event": "sessionEnd_no_key",
+    "session_id": "...",
+    "timestamp": "...",
+    "close_key_validated": false
+}
+```
+- Emitido quando a SESSION encerra **sem** `close_key_validated = true`
+- Cria `.github/hooks/state/SESSION_CLOSE_NO_KEY.flag` com metadados para investigação
+- O próximo `session-briefing.md` exibirá alerta `🔑 ENCERRAMENTO SEM CHAVE`
+
 ---
 
 ### Interação do usuário
@@ -183,6 +208,33 @@ Cada linha é um objeto JSON independente (JSONL). Campos comuns a todos os even
     "reason": "violação resolvida manualmente"
 }
 ```
+
+#### `askQuestions_response`
+```json
+{
+    "event": "askQuestions_response",
+    "session_id": "...",
+    "timestamp": "...",
+    "response_length": 42,
+    "close_key_found": false
+}
+```
+- Emitido a cada resposta capturada de `vscode_askQuestions`
+- O texto completo da resposta **não é logado** — apenas tamanho e flag `close_key_found`
+- Resposta completa é armazenada em `session-context.json` → `current_turn.last_askquestions_response`
+
+#### `sessionClose_key_validated`
+```json
+{
+    "event": "sessionClose_key_validated",
+    "session_id": "...",
+    "timestamp": "...",
+    "close_key": "ENCERRAR-7A3F2B1C"
+}
+```
+- Emitido quando a `close_key` é encontrada na resposta de `vscode_askQuestions`
+- Após este evento, `session.close_key_validated = true` em `session-context.json`
+- Necessário para que `session-end.sh` classifique o encerramento como autorizado
 
 ---
 

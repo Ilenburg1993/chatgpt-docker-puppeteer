@@ -43,7 +43,7 @@ fi
 
 # Calcula duração total da sessão (ISO → epoch → diff)
 DURATION_S=0
-START_EPOCH=0  # inicializado aqui para evitar unbound variable se START_ISO vazio
+START_EPOCH=0 # inicializado aqui para evitar unbound variable se START_ISO vazio
 if [ -n "$START_ISO" ]; then
     START_EPOCH="$(date -d "$START_ISO" '+%s' 2> /dev/null || echo 0)"
     NOW_EPOCH="$(date -u '+%s' 2> /dev/null || echo 0)"
@@ -169,6 +169,48 @@ if [ "$SESSION_AUTH_COMPLIANT" = "true" ] && [ -f "$AUDIT_FILE" ]; then
         '{event: $event, session_id: $sid, timestamp: $ts, reason: $reason,
           authorized_turns: $authorized, violation_turns: $violations,
           fully_compliant: $compliant}' \
+        >> "$AUDIT_FILE"
+fi
+
+# ── Valida SESSION CLOSE KEY ──────────────────────────────────────────────────
+NO_KEY_FLAG_FILE="$STATE_DIR/SESSION_CLOSE_NO_KEY.flag"
+TURN_COUNT_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+CLOSE_KEY_VALIDATED=false
+
+if [ -f "$CTX_FILE" ]; then
+    CLOSE_KEY_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2>/dev/null || echo false)"
+fi
+
+if [ "$CLOSE_KEY_VALIDATED" = "true" ]; then
+    # Encerramento legítimo com chave validada
+    rm -f "$NO_KEY_FLAG_FILE" 2>/dev/null || true
+    jq -cn \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$NOW_MS" \
+        --arg reason "$REASON" \
+        '{event: "sessionEnd_authorized_with_key", session_id: $sid, timestamp: $ts, reason: $reason}' \
+        >> "$AUDIT_FILE"
+else
+    # Encerramento SEM chave — acidental ou não autorizado
+    jq -cn \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$NOW_MS" \
+        --arg reason "$REASON" \
+        --argjson turns "$TURN_COUNT_NOW" \
+        '{
+            event:       "sessionEnd_no_key",
+            session_id:  $sid,
+            timestamp:   $ts,
+            reason:      $reason,
+            turn_count:  $turns
+        }' > "$NO_KEY_FLAG_FILE"
+    # Também loga no audit.jsonl
+    jq -cn \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$NOW_MS" \
+        --arg reason "$REASON" \
+        --argjson turns "$TURN_COUNT_NOW" \
+        '{event: "sessionEnd_no_key", session_id: $sid, timestamp: $ts, reason: $reason, turn_count: $turns}' \
         >> "$AUDIT_FILE"
 fi
 

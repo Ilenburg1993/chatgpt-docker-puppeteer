@@ -93,15 +93,15 @@ Uso: `bash .github/hooks/scripts/smoke-test.sh` (exit code = nº de falhas; 0 = 
 
 ### Documentação — Múltiplas correções ✅ CORRIGIDO
 
-| Arquivo | Problema | Fix |
-| --- | --- | --- |
-| `PROTOCOLO-AUTORIZACAO.md` | `auth_requested_this_turn` (nome v1) em todo o doc | Alterado para `current_turn.auth_requested` |
-| `PROTOCOLO-AUTORIZACAO.md` | Nenhuma menção de que `vscode_askQuestions` é gratuito | Adicionada nota proeminente no cabeçalho |
-| `README.md` | `AUTHORIZED_CLOSE.flag` descrito incorretamente | Descrição corrigida |
-| `README.md` | `tool_responses_empty` referenciado (campo inexistente) | Todas as referências removidas |
-| `AUDIT-SCHEMA.md` | `result_type` mostrava só `"success"` | Adicionados `"failure"` e `"unknown"` |
-| `AUDIT-SCHEMA.md` | Eventos `sectionStart`/`sectionEnd` não documentados | Schemas completos adicionados |
-| `README.md` | `section-end.sh` e `smoke-test.sh` não documentados | Seções adicionadas |
+| Arquivo                    | Problema                                                | Fix                                         |
+| -------------------------- | ------------------------------------------------------- | ------------------------------------------- |
+| `PROTOCOLO-AUTORIZACAO.md` | `auth_requested_this_turn` (nome v1) em todo o doc      | Alterado para `current_turn.auth_requested` |
+| `PROTOCOLO-AUTORIZACAO.md` | Nenhuma menção de que `vscode_askQuestions` é gratuito  | Adicionada nota proeminente no cabeçalho    |
+| `README.md`                | `AUTHORIZED_CLOSE.flag` descrito incorretamente         | Descrição corrigida                         |
+| `README.md`                | `tool_responses_empty` referenciado (campo inexistente) | Todas as referências removidas              |
+| `AUDIT-SCHEMA.md`          | `result_type` mostrava só `"success"`                   | Adicionados `"failure"` e `"unknown"`       |
+| `AUDIT-SCHEMA.md`          | Eventos `sectionStart`/`sectionEnd` não documentados    | Schemas completos adicionados               |
+| `README.md`                | `section-end.sh` e `smoke-test.sh` não documentados     | Seções adicionadas                          |
 
 ---
 

@@ -51,7 +51,13 @@ if [ -f "$STATE_DIR/session-context.json" ]; then
         0' "$STATE_DIR/session-context.json" 2> /dev/null || echo 0)"
 fi
 
-# ── Persiste contexto inicial — Schema v2 (layered) ──────────────────────────
+# ── Gera SESSION CLOSE KEY — Schema v3 ───────────────────────────────────────
+# Chave dinâmica por sessão: ENCERRAR-XXXXXXXX (8 hex maiúsculos aleatórios)
+# O usuário DEVE digitar esta chave ao encerrar a sessão (vscode_askQuestions).
+# Detectada por post-tool-use.sh; validada por session-end.sh.
+CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2>/dev/null | tr a-z A-Z || echo "$(date +%s | sha256sum | head -c 8 | tr a-z A-Z)")"
+
+# ── Persiste contexto inicial — Schema v3 (layered) ──────────────────────────
 # Estrutura em 6 blocos separados por âmbito:
 #   session       → imutável após sessionStart (identidade da sessão)
 #   session_stats → acumuladores agregados ao longo de todos os turnos
@@ -66,16 +72,19 @@ jq -cn \
     --arg date_short "$SESSION_DATE_SHORT" \
     --arg source "$SOURCE" \
     --arg cwd "$CWD" \
+    --arg close_key "$CLOSE_KEY" \
     --argjson consec "$PREV_CONSEC_UNAUTH" \
     '{
         "session": {
-            "id":         $sid,
-            "started_at": $date,
-            "date_short": $date_short,
-            "ended_at":   null,
-            "end_reason": null,
-            "source":     $source,
-            "cwd":        $cwd
+            "id":                  $sid,
+            "started_at":          $date,
+            "date_short":          $date_short,
+            "ended_at":            null,
+            "end_reason":          null,
+            "close_key":           $close_key,
+            "close_key_validated": false,
+            "source":              $source,
+            "cwd":                 $cwd
         },
         "session_stats": {
             "turn_count":         0,
@@ -88,13 +97,14 @@ jq -cn \
             "subagent_calls":     0
         },
         "current_turn": {
-            "number":            1,
-            "started_at":        $date,
-            "tools_count":       0,
-            "tools_by_name":     {},
-            "failures_count":    0,
-            "auth_requested":    false,
-            "auth_requested_at": null
+            "number":                      1,
+            "started_at":                  $date,
+            "tools_count":                 0,
+            "tools_by_name":               {},
+            "failures_count":              0,
+            "auth_requested":              false,
+            "auth_requested_at":           null,
+            "last_askquestions_response":  null
         },
         "current_section": {
             "name":        null,
@@ -301,6 +311,20 @@ if [ -f "$AUTH_FLAG_FILE" ]; then
     PREV_UNAUTH_TURN="$(jq -r '.turn_count // 0' "$AUTH_FLAG_FILE" 2> /dev/null || echo 0)"
 fi
 
+# ── Verifica encerramento sem SESSION CLOSE KEY ─────────────────────────────
+NO_KEY_FLAG_FILE="$STATE_DIR/SESSION_CLOSE_NO_KEY.flag"
+PREV_NO_KEY_CLOSE=false
+PREV_NO_KEY_TS=""
+PREV_NO_KEY_SID=""
+PREV_NO_KEY_TURNS=0
+
+if [ -f "$NO_KEY_FLAG_FILE" ]; then
+    PREV_NO_KEY_CLOSE=true
+    PREV_NO_KEY_TS="$(jq -r '.timestamp // ""' "$NO_KEY_FLAG_FILE" 2> /dev/null || echo '')"
+    PREV_NO_KEY_SID="$(jq -r '.session_id // ""' "$NO_KEY_FLAG_FILE" 2> /dev/null || echo '')"
+    PREV_NO_KEY_TURNS="$(jq -r '.turn_count // 0' "$NO_KEY_FLAG_FILE" 2> /dev/null || echo 0)"
+fi
+
 # Conta violações consecutivas — preservado da sessão anterior em PREV_CONSEC_UNAUTH
 # e já gravado em compliance.consecutive_unauthorized do novo session-context.json.
 CONSECUTIVE_VIOLATIONS="$PREV_CONSEC_UNAUTH"
@@ -357,6 +381,51 @@ if [ "$PREV_UNAUTH_CLOSE" = "true" ]; then
 
 VIOLATION_EOF
 fi
+
+# Injeta alerta de SESSION_CLOSE_NO_KEY se a sessão anterior fechou sem chave
+if [ "$PREV_NO_KEY_CLOSE" = "true" ]; then
+    cat >> "$BRIEFING_FILE" << NO_KEY_EOF
+
+---
+
+## 🔐 ALERTA — SESSÃO ANTERIOR ENCERROU SEM CHAVE DE AUTORIZAÇÃO 🔐
+
+> A sessão anterior foi encerrada **sem que a SESSION CLOSE KEY fosse fornecida**.
+> Isso indica encerramento acidental (crash, timeout, fechamento direto da janela).
+>
+> - **Sessão afetada**: \`${PREV_NO_KEY_SID}\`
+> - **Horário**: \`${PREV_NO_KEY_TS}\`
+> - **Turnos executados**: \`${PREV_NO_KEY_TURNS}\`
+>
+> **Ação recomendada**: revisar o que estava sendo feito e verificar se algo ficou
+> em estado inconsistente (commits pendentes, arquivos abertos, etc.).
+
+---
+
+NO_KEY_EOF
+fi
+
+# Continuação do briefing — Seção da close_key (sempre exibida)
+cat >> "$BRIEFING_FILE" << CLOSE_KEY_EOF
+
+---
+
+## 🔐 CHAVE DE ENCERRAMENTO DA SESSÃO
+
+> **Esta chave DEVE ser fornecida ao encerrar a sessão legitimamente.**
+> Quando solicitar encerramento, o agente usará o Template F (Session Close) e
+> pedirá que você a confirme digitando-a no campo livre do \`vscode_askQuestions\`.
+
+\`\`\`
+${CLOSE_KEY}
+\`\`\`
+
+> A chave é única por sessão e gerada automaticamente. Encerramento sem ela é
+> registrado como **sessionEnd_no_key** e gera alerta na próxima sessão.
+
+---
+
+CLOSE_KEY_EOF
 
 # Continuação do briefing
 cat >> "$BRIEFING_FILE" << BRIEFING_BODY_EOF

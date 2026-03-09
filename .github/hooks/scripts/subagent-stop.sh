@@ -60,9 +60,9 @@ jq -cn \
     }' >> "$LOG_DIR/audit.jsonl"
 
 # Incrementa subagent_calls no contexto da sessão
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq '.session_stats.subagent_calls = (.session_stats.subagent_calls // 0) + 1' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
 exit 0
