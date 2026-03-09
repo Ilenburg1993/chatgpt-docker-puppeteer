@@ -133,12 +133,12 @@ _JQ_ARGS=(
 if [ -n "$SECTION_DESC" ]; then
     _JQ_ARGS+=(--arg desc "$SECTION_DESC")
     # shellcheck disable=SC2016
-    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: $desc, section_number: $section_num, push_count: 0}
+    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: $desc, section_number: $section_num, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
                 | .session_stats.section_count = $section_num
                 | .session_stats.section_names += [$name]'
 else
     # shellcheck disable=SC2016
-    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: null, section_number: $section_num, push_count: 0}
+    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: null, section_number: $section_num, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
                 | .session_stats.section_count = $section_num
                 | .session_stats.section_names += [$name]'
 fi

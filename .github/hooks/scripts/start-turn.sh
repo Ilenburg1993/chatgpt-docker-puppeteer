@@ -64,15 +64,22 @@ jq -cn \
     }' >> "$LOG_DIR/audit.jsonl"
 
 # Sinaliza que a intenção foi declarada para o rastreamento de turno
+# e appenda a intenção ao intent_history da seção atual (cap 50)
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq '.current_turn.intent_declared = true
-         | .current_turn.intent = $intent' \
+         | .current_turn.intent = $intent
+         | .current_section.intent_history = (
+             (.current_section.intent_history // []) + [$intent]
+             | if length > 50 then .[-50:] else . end)' \
         --arg intent "$TURN_INTENT" \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 elif [ -f "$CTX_FILE" ]; then
     TMP="$(mktemp)"
     jq '.current_turn.intent_declared = true
-         | .current_turn.intent = $intent' \
+         | .current_turn.intent = $intent
+         | .current_section.intent_history = (
+             (.current_section.intent_history // []) + [$intent]
+             | if length > 50 then .[-50:] else . end)' \
         --arg intent "$TURN_INTENT" \
         "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
 fi

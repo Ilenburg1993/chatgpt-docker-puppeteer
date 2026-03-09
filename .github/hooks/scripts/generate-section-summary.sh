@@ -79,6 +79,19 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
     [ -n "$TOOLS_TOP" ] && TOOLS_SUMMARY="$TOOLS_TOP" || TOOLS_SUMMARY="  - (nenhuma registrada)"
 fi
 
+# ── Coleta tools_by_name da seção atual (Schema v7) ───────────────────────────
+SECTION_TOOLS_BY_NAME=""
+if [ -f "$CTX_FILE" ]; then
+    SECTION_TOOLS_BY_NAME="$(jq -r '
+        (.current_section.tools_by_name // {})
+        | to_entries
+        | sort_by(-.value)
+        | .[:10]
+        | .[] | "  - `\(.key)`: \(.value)"
+    ' "$CTX_FILE" 2> /dev/null || true)"
+fi
+[ -z "$SECTION_TOOLS_BY_NAME" ] && SECTION_TOOLS_BY_NAME="  - (sem dados de ferramentas por seção)"
+
 # ── Coleta contagem de tasks da seção (se pending-tasks.md existir) ───────────
 TASKS_FILE="$STATE_DIR/pending-tasks.md"
 TASKS_OPEN_ALTA=0
@@ -139,6 +152,10 @@ cat > "$SUMMARY_FILE" << SUMMARY_EOF
 ## Top ferramentas usadas nesta sessão
 
 ${TOOLS_SUMMARY}
+
+## Top ferramentas usadas nesta seção (Schema v7)
+
+${SECTION_TOOLS_BY_NAME}
 
 ## Backlog atual (ao fechar a seção)
 

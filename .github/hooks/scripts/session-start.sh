@@ -1,5 +1,5 @@
 #!/bin/bash
-# session-start.sh — Hook sessionStart do Copilot (Schema v6)
+# session-start.sh — Hook sessionStart do Copilot (Schema v7)
 # Executado quando uma nova sessão inicia ou é retomada.
 # Input JSON (stdin): {timestamp, cwd, source, initialPrompt}
 # Output (stdout, fd 3): {"hookSpecificOutput": {"hookEventName": "SessionStart",
@@ -11,7 +11,9 @@
 #   - Seção ativa, ID da sessão, close key
 #   - Tendências históricas, saúde do sistema
 # O briefing é injetado via additionalContext (acima) E disponível para leitura manual.
-# Schema v6: session_stats.section_history adicionado para rastrear seções fechadas.
+# Schema v7: turn_history[], recovery_hints{}, commit_history[], current_section.tools_by_name{},
+#             current_section.intent_history[], current_section.failures_count, blocked_turns;
+#             current_turn.intent_declared, current_turn.intent adicionados.
 set -euo pipefail
 # Redireciona stdout → stderr para output visual (banner, logs ao dev).
 # O stdout original é preservado em fd 3 para a resposta JSON do hook
@@ -117,10 +119,18 @@ jq -cn \
             "section_count":      1,
             "section_names":      ["início"],
             "section_history":    [],
+            "turn_history":       [],
             "push_count":         0,
             "last_push_at":       null,
             "last_push_turn":     null,
-            "pending_section_after_push": false
+            "pending_section_after_push": false,
+            "commit_history":     [],
+            "recovery_hints": {
+                "last_intent":      null,
+                "last_section":     null,
+                "last_commit_sha":  null,
+                "last_commit_ts":   null
+            }
         },
         "current_turn": {
             "number":                      1,
@@ -131,7 +141,9 @@ jq -cn \
             "auth_requested":              false,
             "auth_requested_at":           null,
             "last_askquestions_response":  null,
-            "section_name":                "início"
+            "section_name":                "início",
+            "intent_declared":             false,
+            "intent":                      null
         },
         "current_section": {
             "name":           "início",
@@ -140,7 +152,11 @@ jq -cn \
             "local_turn":     0,
             "description":    null,
             "section_number": 1,
-            "push_count":     0
+            "push_count":     0,
+            "tools_by_name":  {},
+            "intent_history": [],
+            "failures_count": 0,
+            "blocked_turns":  0
         },
         "last_tool": {
             "name":   null,

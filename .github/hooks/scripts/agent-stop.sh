@@ -84,19 +84,55 @@ if [ -f "$CTX_FILE" ]; then
     fi
 fi
 
+# ── Lê metadados do turno atual para enriquecimento de todos os eventos ───────
+TURN_NUMBER=1
+SECTION_TURN=1
+SECTION_NAME=""
+TURN_INTENT=""
+TURN_INTENT_DECLARED=false
+TURN_TOOLS_COUNT=0
+TURN_FAILURES_COUNT=0
+TURN_BLOCK_COUNT=0
+if [ -f "$CTX_FILE" ]; then
+    TURN_NUMBER="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    TURN_INTENT="$(jq -r '.current_turn.intent // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    TURN_INTENT_DECLARED="$(jq -r '.current_turn.intent_declared // false' "$CTX_FILE" 2> /dev/null || echo false)"
+    TURN_TOOLS_COUNT="$(jq -r '.current_turn.tools_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    TURN_FAILURES_COUNT="$(jq -r '.current_turn.failures_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    TURN_BLOCK_COUNT="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+fi
+
 # Append em audit.jsonl — registra o fim do turno
 jq -cn \
     --arg event "agentStop" \
     --arg sid "$SESSION_ID" \
     --arg ts "${TIMESTAMP:-$NOW_ISO}" \
     --argjson dur "$TURN_DURATION_S" \
-    --argjson sha "$STOP_HOOK_ACTIVE" \
+    --argjson stop_hook_active "$STOP_HOOK_ACTIVE" \
+    --argjson turn_number "$TURN_NUMBER" \
+    --argjson section_turn "$SECTION_TURN" \
+    --arg section_name "$SECTION_NAME" \
+    --arg intent "$TURN_INTENT" \
+    --argjson intent_declared "${TURN_INTENT_DECLARED:-false}" \
+    --argjson tools_count "$TURN_TOOLS_COUNT" \
+    --argjson failures_count "$TURN_FAILURES_COUNT" \
+    --argjson block_count "$TURN_BLOCK_COUNT" \
     '{
         event:            $event,
         session_id:       $sid,
         timestamp:        $ts,
         turn_duration_s:  $dur,
-        stop_hook_active: $sha
+        stop_hook_active: $stop_hook_active,
+        turn_number:      $turn_number,
+        section_turn:     $section_turn,
+        section_name:     (if $section_name == "" then null else $section_name end),
+        intent:           (if $intent == "" then null else $intent end),
+        intent_declared:  $intent_declared,
+        tools_count:      $tools_count,
+        failures_count:   $failures_count,
+        block_count:      $block_count
     }' >> "$LOG_DIR/audit.jsonl"
 
 # ── Detecção de autorização ───────────────────────────────────────────────────
@@ -238,18 +274,8 @@ ${_CONSEC_MSG}
     fi
 fi
 
-# ── Lê métricas do turno atual (para session_summary — fix B4) ───────────────
-TURN_TOOLS_COUNT=0
-TURN_NUMBER=0
-INTENT_DECLARED=false
-if [ -f "$CTX_FILE" ]; then
-    TURN_TOOLS_COUNT="$(jq -r '.current_turn.tools_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-    TURN_NUMBER="$(jq -r '.current_turn.number // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-    INTENT_DECLARED="$(jq -r '.current_turn.intent_declared // false' "$CTX_FILE" 2> /dev/null || echo false)"
-fi
-
 # ── Auto-enrich: gera turnStart_enriched_auto se start-turn.sh não foi chamado ──
-if [ "$INTENT_DECLARED" = "false" ] && [ "$TURN_NUMBER" -gt 0 ]; then
+if [ "$TURN_INTENT_DECLARED" = "false" ] && [ "$TURN_NUMBER" -gt 0 ]; then
     AUTO_INTENT="(não declarada)"
     if [ -f "$CTX_FILE" ]; then
         # Usa as ferramentas do turno como proxy de intenção
@@ -298,8 +324,20 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
         --arg event "turnEnd_authorized" \
         --arg sid "$SESSION_ID" \
         --arg ts "$NOW_ISO" \
+        --argjson turn_number "$TURN_NUMBER" \
+        --argjson section_turn "$SECTION_TURN" \
+        --arg section_name "$SECTION_NAME" \
+        --argjson dur "$TURN_DURATION_S" \
+        --argjson tools "$TURN_TOOLS_COUNT" \
+        --arg intent "$TURN_INTENT" \
+        --argjson failures "$TURN_FAILURES_COUNT" \
         --argjson push_pending "$(jq -r '.session_stats.pending_section_after_push // false' "$CTX_FILE" 2> /dev/null || echo 'false')" \
-        '{event: $event, session_id: $sid, timestamp: $ts, push_pending: $push_pending}' \
+        '{event: $event, session_id: $sid, timestamp: $ts,
+          turn_number: $turn_number, section_turn: $section_turn,
+          section_name: (if $section_name == "" then null else $section_name end),
+          turn_duration_s: $dur, tools_count: $tools,
+          intent: (if $intent == "" then null else $intent end),
+          failures_count: $failures, push_pending: $push_pending}' \
         >> "$LOG_DIR/audit.jsonl"
 else
     TURN_COUNT_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
@@ -325,8 +363,20 @@ else
         --arg event "turnEnd_UNAUTHORIZED" \
         --arg sid "$SESSION_ID" \
         --arg ts "$NOW_ISO" \
+        --argjson turn_number "$TURN_NUMBER" \
+        --argjson section_turn "$SECTION_TURN" \
+        --arg section_name "$SECTION_NAME" \
+        --argjson dur "$TURN_DURATION_S" \
+        --argjson tools "$TURN_TOOLS_COUNT" \
+        --arg intent "$TURN_INTENT" \
+        --argjson failures "$TURN_FAILURES_COUNT" \
         --arg msg "VIOLAÇÃO: turno encerrado sem vscode_askQuestions. Flag gravada em UNAUTHORIZED_CLOSE.flag" \
-        '{event: $event, session_id: $sid, timestamp: $ts, message: $msg}' \
+        '{event: $event, session_id: $sid, timestamp: $ts, message: $msg,
+          turn_number: $turn_number, section_turn: $section_turn,
+          section_name: (if $section_name == "" then null else $section_name end),
+          turn_duration_s: $dur, tools_count: $tools,
+          intent: (if $intent == "" then null else $intent end),
+          failures_count: $failures}' \
         >> "$LOG_DIR/audit.jsonl"
 fi
 
@@ -334,20 +384,45 @@ fi
 # CRÍTICO: reseta current_turn.auth_requested para false APÓS processamento.
 # Sem este reset, a Estratégia 3 produziria falsos positivos no turno seguinte.
 # session_summary usa métricas DO TURNO ATUAL (fix B4), não totais da sessão.
+# Schema v7: appenda turn_history (cap 20) e atualiza recovery_hints.
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     SESSION_SUMMARY="turn=${TURN_NUMBER} dur=${TURN_DURATION_S}s tools=${TURN_TOOLS_COUNT}"
     AUTH_INCR_FIELD="$([ "$AUTH_REQUESTED" = "true" ] && echo 'turn_authorized' || echo 'turn_unauthorized')"
     NEXT_TURN=$((TURN_NUMBER + 1))
-    SECTION_NAME="$(jq -r '.current_section.name // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
     jq --arg now "$NOW_ISO" \
         --arg summary "$SESSION_SUMMARY" \
         --arg auth_field "$AUTH_INCR_FIELD" \
         --argjson next_turn "$NEXT_TURN" \
         --arg section "$SECTION_NAME" \
+        --argjson turn_num "$TURN_NUMBER" \
+        --argjson sec_turn "$SECTION_TURN" \
+        --argjson dur_s "$TURN_DURATION_S" \
+        --argjson tools_n "$TURN_TOOLS_COUNT" \
+        --arg intent_s "$TURN_INTENT" \
+        --arg auth_s "$AUTH_REQUESTED" \
+        --argjson fail_n "$TURN_FAILURES_COUNT" \
         '.session_stats.turn_count    = (.session_stats.turn_count // 0) + 1
          | .session_stats[$auth_field] = (.session_stats[$auth_field] // 0) + 1
          | .last_turn_ts              = $now
          | .session_summary           = $summary
+         | .session_stats.turn_history = (
+             (.session_stats.turn_history // []) + [{
+                 number:       $turn_num,
+                 section:      $section,
+                 section_turn: $sec_turn,
+                 duration_s:   $dur_s,
+                 tools_count:  $tools_n,
+                 intent:       (if $intent_s == "" then null else $intent_s end),
+                 auth:         ($auth_s == "true"),
+                 failures:     $fail_n,
+                 ts:           $now
+             }]
+             | if length > 20 then .[-20:] else . end)
+         | .session_stats.recovery_hints.last_section = $section
+         | .session_stats.recovery_hints.last_intent  = (
+             if $intent_s != "" then $intent_s
+             else (.session_stats.recovery_hints.last_intent // null)
+             end)
          | .current_turn.number            = $next_turn
          | .current_turn.started_at        = $now
          | .current_turn.tools_count       = 0

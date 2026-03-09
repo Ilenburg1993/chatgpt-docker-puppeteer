@@ -166,7 +166,8 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .current_turn.tools_count   = ((.current_turn.tools_count // 0) + 1)
              | .current_turn.tools_by_name = ((.current_turn.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
-             | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
+             | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
+             | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     else
         jq --arg ts "$TIMESTAMP" \
@@ -178,7 +179,8 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .current_turn.tools_count   = ((.current_turn.tools_count // 0) + 1)
              | .current_turn.tools_by_name = ((.current_turn.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
-             | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
+             | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
+             | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
 fi

@@ -84,12 +84,24 @@ _JQ_FILTER='.session_stats.push_count                  = $push_count
            | .session_stats.last_push_at               = $ts
            | .session_stats.last_push_turn             = $turn
            | .session_stats.pending_section_after_push = true
-           | .current_section.push_count              = ((.current_section.push_count // 0) + 1)'
+           | .current_section.push_count              = ((.current_section.push_count // 0) + 1)
+           | .session_stats.recovery_hints.last_commit_sha = $sha
+           | .session_stats.recovery_hints.last_commit_ts  = $ts
+           | .session_stats.commit_history = (
+               (.session_stats.commit_history // []) + [{
+                   sha:    $sha,
+                   branch: $branch,
+                   ts:     $ts,
+                   push_n: $push_count
+               }]
+               | if length > 30 then .[-30:] else . end)'
 
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq --argjson push_count "$NEW_PUSH_COUNT" \
         --arg ts "$NOW_ISO" \
         --argjson turn "$CURRENT_TURN" \
+        --arg sha "${LOCAL_SHA:-}" \
+        --arg branch "${BRANCH:-}" \
         "$_JQ_FILTER" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || {
         echo "[on-git-push] ERRO: falha ao atualizar session-context.json via sponge — push_count e pending_section não atualizados!" >&2
         exit 1
@@ -99,6 +111,8 @@ elif [ -f "$CTX_FILE" ]; then
     jq --argjson push_count "$NEW_PUSH_COUNT" \
         --arg ts "$NOW_ISO" \
         --argjson turn "$CURRENT_TURN" \
+        --arg sha "${LOCAL_SHA:-}" \
+        --arg branch "${BRANCH:-}" \
         "$_JQ_FILTER" "$CTX_FILE" > "$TMP" || {
         rm -f "$TMP"
         echo "[on-git-push] ERRO: jq falhou ao atualizar session-context.json — state intacto" >&2

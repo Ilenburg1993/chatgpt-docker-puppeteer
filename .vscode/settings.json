@@ -724,7 +724,7 @@
   // ===========================================================================
   // Subfase 19.1) Chat e agentes
   "chat.agent.enabled": true,
-  "chat.agent.maxRequests": 500,
+  "chat.agent.maxRequests": 1000,
   "chat.agent.thinking.collapsedTools": "always",
   "chat.agent.thinkingStyle": "fixedScrolling",
   "chat.agentsControl.clickBehavior": "cycle",
