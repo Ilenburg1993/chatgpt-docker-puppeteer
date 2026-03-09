@@ -13,36 +13,36 @@
 
 ## Estado geral — 8 de março de 2026 🎉 FASES 0–D + G.4 + G.5 + H.1 + H.2 COMPLETAS
 
-| Indicador                          | Início do roadmap | Agora (8 mar 2026)                 |
-| ---------------------------------- | ----------------- | ---------------------------------- |
-| Arquivos com `// @ts-check`        | **670**           | **721** ✅ (+51 src/)               |
-| `@ts-ignore` em código real        | desconhecido      | **0** ✅                            |
-| `@ts-nocheck` em código real       | **0** ✅           | **0** ✅                            |
-| Erros `typecheck:node` (base)      | ~2.170            | **0** ✅                            |
-| Erros `typecheck:tools`            | ~2                | **0** ✅                            |
-| Erros `typecheck:browser`          | ~285              | **0** ✅                            |
-| Erros `typecheck:tests`            | 15                | **0** ✅                            |
-| Erros `typecheck:isolated`         | N/A               | **0** ✅ (novo)                     |
-| Erros `typecheck:strict:all`       | ~7.414            | **0** ✅ 🎉                          |
-| Erros `typecheck:repo`             | N/A               | **0** ✅                            |
-| Lanes strict com 0 erros           | 11 de 39          | **39 de 39** ✅                     |
-| `strict: true` em tsconfig.base    | não               | **sim** ✅                           |
-| `useUnknownInCatchVariables`       | não               | **sim** ✅                           |
-| `strictNullChecks`                 | não               | **sim** ✅                           |
-| `noImplicitAny` (via strict)       | não               | **sim** ✅                           |
-| `exactOptionalPropertyTypes`       | não               | **sim** ✅ (G.2)                     |
-| `noUncheckedIndexedAccess`         | não               | **sim** ✅ (G.1)                     |
-| `allowUnreachableCode: false`      | não               | **sim** ✅ (G.4)                     |
-| `allowUnusedLabels: false`         | não               | **sim** ✅ (G.5)                     |
-| `isolatedDeclarations` (src/types) | não               | **sim** ✅                           |
-| `isolatedDeclarations` (constants) | não               | **sim** ✅ (H.2)                     |
-| Node `--strip-types` (H.1)        | não               | **sim** ✅ (src/core/constants .ts)   |
-| Schema tsserver-tool-contract      | v1.0.0            | **v1.1.0** ✅                        |
-| JSDoc cobertura exports            | ~70%              | **100%** (1115/1115) ✅              |
-| Tags unsafe restantes (`@any`)     | ~404              | ~511 (manter monit.)               |
-| Magic strings (NERV) no código    | desconhecido      | **0 HIGH, 0 MEDIUM** ✅ (Fase I — 3 LOW residuais justificados)                    |
-| Enums NERV cobertos                | 3                 | **7** ✅ após Fase I               |
-| Constantes project-wide catalogadas | não               | **sim** ✅ (Fase I)                  |
+| Indicador                           | Início do roadmap | Agora (8 mar 2026)                                             |
+| ----------------------------------- | ----------------- | -------------------------------------------------------------- |
+| Arquivos com `// @ts-check`         | **670**           | **721** ✅ (+51 src/)                                           |
+| `@ts-ignore` em código real         | desconhecido      | **0** ✅                                                        |
+| `@ts-nocheck` em código real        | **0** ✅           | **0** ✅                                                        |
+| Erros `typecheck:node` (base)       | ~2.170            | **0** ✅                                                        |
+| Erros `typecheck:tools`             | ~2                | **0** ✅                                                        |
+| Erros `typecheck:browser`           | ~285              | **0** ✅                                                        |
+| Erros `typecheck:tests`             | 15                | **0** ✅                                                        |
+| Erros `typecheck:isolated`          | N/A               | **0** ✅ (novo)                                                 |
+| Erros `typecheck:strict:all`        | ~7.414            | **0** ✅ 🎉                                                      |
+| Erros `typecheck:repo`              | N/A               | **0** ✅                                                        |
+| Lanes strict com 0 erros            | 11 de 39          | **39 de 39** ✅                                                 |
+| `strict: true` em tsconfig.base     | não               | **sim** ✅                                                      |
+| `useUnknownInCatchVariables`        | não               | **sim** ✅                                                      |
+| `strictNullChecks`                  | não               | **sim** ✅                                                      |
+| `noImplicitAny` (via strict)        | não               | **sim** ✅                                                      |
+| `exactOptionalPropertyTypes`        | não               | **sim** ✅ (G.2)                                                |
+| `noUncheckedIndexedAccess`          | não               | **sim** ✅ (G.1)                                                |
+| `allowUnreachableCode: false`       | não               | **sim** ✅ (G.4)                                                |
+| `allowUnusedLabels: false`          | não               | **sim** ✅ (G.5)                                                |
+| `isolatedDeclarations` (src/types)  | não               | **sim** ✅                                                      |
+| `isolatedDeclarations` (constants)  | não               | **sim** ✅ (H.2)                                                |
+| Node `--strip-types` (H.1)          | não               | **sim** ✅ (src/core/constants .ts)                             |
+| Schema tsserver-tool-contract       | v1.0.0            | **v1.1.0** ✅                                                   |
+| JSDoc cobertura exports             | ~70%              | **100%** (1115/1115) ✅                                         |
+| Tags unsafe restantes (`@any`)      | ~404              | ~511 (manter monit.)                                           |
+| Magic strings (NERV) no código      | desconhecido      | **0 HIGH, 0 MEDIUM** ✅ (Fase I — 3 LOW residuais justificados) |
+| Enums NERV cobertos                 | 3                 | **7** ✅ após Fase I                                            |
+| Constantes project-wide catalogadas | não               | **sim** ✅ (Fase I)                                             |
 
 **Fases 0–D concluídas em 7 de março de 2026**: `strict: true` ativado globalmente em
 `tsconfig.base.json`, todos os targets em 0, `isolatedDeclarations` ativo para `src/types/`.
@@ -711,20 +711,20 @@ incremental por subsistema:
 
 Adicionados dois novos enums ao vocabulário protocolar:
 
-| Enum                  | Valores                                                                        |
-| --------------------- | ------------------------------------------------------------------------------ |
-| `OrchestrationAction` | `RETRY`, `NEXT_STEP`, `DONE` — decisões internas do orchestrator loop          |
+| Enum                  | Valores                                                                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OrchestrationAction` | `RETRY`, `NEXT_STEP`, `DONE` — decisões internas do orchestrator loop                                                                                                                 |
 | `TaskControlCommand`  | `PAUSE`, `RESUME`, `UNBLOCK`, `RETRY`, `CANCEL`, `PATCH`, `APPROVE`, `REJECT`, `SET_STAGE`, `SET_TARGET`, `SET_PRIORITY`, `SET_EXECUTE_AFTER`, `SET_DEPENDENCIES`, `REASSIGN_MISSION` |
 
 `ActionCode` também recebeu `QUEUE_DISPATCH_FAILED`.
 
 ### I.2 — Eliminação de magic strings ✅
 
-| Arquivo                                              | Antes                  | Depois                    |
-| ---------------------------------------------------- | ---------------------- | ------------------------- |
-| `src/kernel/nerv_bridge/kernel_nerv_bridge.js`       | `case 'RETRY':` etc.   | `OrchestrationAction.*`   |
-| `src/server/domain/task_control_service.js`          | 12 `case 'STRING':`    | `TaskControlCommand.*`    |
-| `src/agent/queue_worker.js`                          | `'QUEUE_DISPATCH_FAILED'` | `ActionCode.QUEUE_DISPATCH_FAILED` |
+| Arquivo                                        | Antes                     | Depois                             |
+| ---------------------------------------------- | ------------------------- | ---------------------------------- |
+| `src/kernel/nerv_bridge/kernel_nerv_bridge.js` | `case 'RETRY':` etc.      | `OrchestrationAction.*`            |
+| `src/server/domain/task_control_service.js`    | 12 `case 'STRING':`       | `TaskControlCommand.*`             |
+| `src/agent/queue_worker.js`                    | `'QUEUE_DISPATCH_FAILED'` | `ActionCode.QUEUE_DISPATCH_FAILED` |
 
 Magic strings residuais LOW (`target: 'driver'`): mantidas com comentário — são lowercase de `ActorRole.DRIVER` por requisito de protocolo (campo de roteamento case-sensitive lowercase).
 

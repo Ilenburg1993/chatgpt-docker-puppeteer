@@ -1,31 +1,28 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * @fileoverview Catálogo de constantes do projeto.
+ * @file Catálogo de constantes do projeto.
  *
- * Escaneia todos os módulos de constantes em src/ e reporta:
+ *   Escaneia todos os módulos de constantes em src/ e reporta:
+ *
  *   - Quais constantes são definidas por módulo
  *   - Em quantos arquivos cada constante é utilizada
  *   - Constantes nunca utilizadas (candidatas a remoção)
  *   - Módulos importados por arquivo
  *
- * Flags:
- *   --json            Saída JSON
- *   --unused-only     Mostra apenas constantes nunca usadas
- *   --module=NAME     Filtra por módulo (ex: --module=nerv)
- *   --min-usage=N     Filtra constantes com menos de N utilizações
- *
+ *   Flags: --json Saída JSON --unused-only Mostra apenas constantes nunca usadas --module=NAME Filtra por módulo (ex:
+ *   --module=nerv) --min-usage=N Filtra constantes com menos de N utilizações
  * @example
- *   node scripts/analysis/catalog-constants.mjs
- *   node scripts/analysis/catalog-constants.mjs --json > constants-catalog.json
- *   node scripts/analysis/catalog-constants.mjs --unused-only
- *   node scripts/analysis/catalog-constants.mjs --module=nerv
+ *     node scripts/analysis/catalog-constants.mjs
+ *     node scripts/analysis/catalog-constants.mjs --json > constants-catalog.json
+ *     node scripts/analysis/catalog-constants.mjs --unused-only
+ *     node scripts/analysis/catalog-constants.mjs --module=nerv
  */
 
-import path from 'node:path';
 import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
@@ -115,14 +112,20 @@ async function findSymbolUsage(symbol) {
     const escapedSymbol = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     try {
         const { stdout } = await execFileAsync('rg', [
-            '--glob', '*.js',
-            '--glob', '*.mjs',
-            '--glob', '*.ts',
+            '--glob',
+            '*.js',
+            '--glob',
+            '*.mjs',
+            '--glob',
+            '*.ts',
             '-l',
             escapedSymbol,
             SRC_DIR,
         ]);
-        return stdout.split('\n').filter(Boolean).map((f) => path.relative(ROOT, f));
+        return stdout
+            .split('\n')
+            .filter(Boolean)
+            .map((f) => path.relative(ROOT, f));
     } catch {
         return [];
     }
@@ -138,9 +141,12 @@ async function countImporters(alias) {
     const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     try {
         const { stdout } = await execFileAsync('rg', [
-            '--glob', '*.js',
-            '--glob', '*.mjs',
-            '--glob', '*.ts',
+            '--glob',
+            '*.js',
+            '--glob',
+            '*.mjs',
+            '--glob',
+            '*.ts',
             '-l',
             escapedAlias,
             SRC_DIR,
@@ -155,7 +161,16 @@ async function countImporters(alias) {
 
 /**
  * @typedef {{ key: string; group: string; files: string[]; usageCount: number }} ConstantEntry
- * @typedef {{ module: string; alias: string; importers: number; groups: Record<string, ConstantEntry[]>; totalDefined: number; totalUsed: number; totalUnused: number }} ModuleReport
+ *
+ * @typedef {{
+ *     module: string;
+ *     alias: string;
+ *     importers: number;
+ *     groups: Record<string, ConstantEntry[]>;
+ *     totalDefined: number;
+ *     totalUsed: number;
+ *     totalUnused: number;
+ * }} ModuleReport
  */
 
 const modulesToProcess = MODULE_FILTER
@@ -207,7 +222,15 @@ for (const mod of modulesToProcess) {
     }
 
     const totalUnused = totalDefined - totalUsed;
-    const report = { module: mod.name, alias: mod.alias, importers, groups: groupReports, totalDefined, totalUsed, totalUnused };
+    const report = {
+        module: mod.name,
+        alias: mod.alias,
+        importers,
+        groups: groupReports,
+        totalDefined,
+        totalUsed,
+        totalUnused,
+    };
     allReports.push(report);
 }
 
@@ -216,7 +239,12 @@ if (JSON_OUTPUT) {
         timestamp: new Date().toISOString(),
         totalModules: allReports.length,
         summary: allReports.map(({ module, alias, importers, totalDefined, totalUsed, totalUnused }) => ({
-            module, alias, importers, totalDefined, totalUsed, totalUnused,
+            module,
+            alias,
+            importers,
+            totalDefined,
+            totalUsed,
+            totalUnused,
             coverage: totalDefined === 0 ? '100%' : `${Math.round((totalUsed / totalDefined) * 100)}%`,
         })),
         modules: allReports,
@@ -233,7 +261,9 @@ for (const report of allReports) {
     const icon = coverage === 100 ? '✅' : coverage >= 60 ? '🟡' : '🔴';
 
     console.log(`\n${icon} ${module} (${alias})`);
-    console.log(`   Importado por: ${importers} arquivo(s) | ${totalUsed}/${totalDefined} usados (${coverage}% cobertura)`);
+    console.log(
+        `   Importado por: ${importers} arquivo(s) | ${totalUsed}/${totalDefined} usados (${coverage}% cobertura)`,
+    );
 
     for (const [groupName, entries] of Object.entries(groups)) {
         if (groupName === '_scalars') {
@@ -245,9 +275,7 @@ for (const report of allReports) {
         }
 
         for (const entry of entries) {
-            const usageLabel = entry.usageCount === 0
-                ? '⚠️  UNUSED'
-                : `${entry.usageCount} arquivo(s)`;
+            const usageLabel = entry.usageCount === 0 ? '⚠️  UNUSED' : `${entry.usageCount} arquivo(s)`;
             console.log(`      ${entry.key.padEnd(30)} ${usageLabel}`);
         }
     }

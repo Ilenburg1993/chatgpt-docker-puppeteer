@@ -21,7 +21,9 @@ import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#sh
  *     [key: string]: unknown;
  * }} DriverTaskFailedPayload
  *
+ *
  * @typedef {Error & { retryable?: boolean; delayMs?: number; reason?: string; nextAction?: string }} RetryableOrchestratorError
+ *
  *
  * @typedef {{ task: TaskV5; correlationId: string | null; startedAt: number }} ActiveExecutionEntry
  *
@@ -38,12 +40,14 @@ import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#sh
  *     payload?: Record<string, unknown>;
  * }) => Promise<void> | void} TaskRetryRequestedCallback
  *
+ *
  * @typedef {(input: {
  *     taskId: string;
  *     correlationId: string | null;
  *     reason: string;
  *     payload?: Record<string, unknown>;
  * }) => Promise<void> | void} TaskPermanentFailureCallback
+ *
  *
  * @typedef {(input: {
  *     taskId: string;

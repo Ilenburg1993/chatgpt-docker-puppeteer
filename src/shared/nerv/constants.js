@@ -204,8 +204,8 @@ const TechnicalCode = Object.freeze({
 /**
  * ## ORCHESTRATION ACTION (DECISION)
  *
- * Decisões internas do orchestrator loop após execução de uma task.
- * Conjunto fechado. Representa a próxima ação sobre a task/workflow.
+ * Decisões internas do orchestrator loop após execução de uma task. Conjunto fechado. Representa a próxima ação sobre a
+ * task/workflow.
  */
 const OrchestrationAction = Object.freeze({
     /** Reexecutar a task com feedback injetado */
@@ -219,8 +219,8 @@ const OrchestrationAction = Object.freeze({
 /**
  * ## TASK CONTROL COMMAND (HTTP API)
  *
- * Comandos de controle de tasks via HTTP API.
- * Extensivel apenas por adição explícita (requer atualizar task_control_service).
+ * Comandos de controle de tasks via HTTP API. Extensivel apenas por adição explícita (requer atualizar
+ * task_control_service).
  */
 const TaskControlCommand = Object.freeze({
     PAUSE: 'PAUSE',

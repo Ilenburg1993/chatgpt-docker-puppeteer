@@ -1,13 +1,13 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { releaseTaskLockForAttempt } from '#agent/task_attempt_invariants';
 import { log } from '#core/logger';
-import { ActionCode } from '#shared/nerv/constants';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
 import { updateAttempt, upsertAttempt } from '#infra/db/task_attempt_repo';
 import { claimNextEligibleTask, TASK_STAGES, updateTask } from '#infra/db/task_repo';
 import { putJson, putText, readText } from '#infra/storage/artifact_store';
+import { ActionCode } from '#shared/nerv/constants';
 import { promises as fs } from 'node:fs';
 
 /**
