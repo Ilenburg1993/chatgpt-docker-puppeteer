@@ -2,12 +2,13 @@
 # save-finding.sh — Registra um finding de auditoria em findings.jsonl
 #
 # Uso: bash .github/hooks/scripts/save-finding.sh \
-#         "<módulo>" "<severity>" "<type>" "<descrição>"
+#         "<módulo>" "<severity>" "<type>" "<descrição>" [--create-task <prioridade>]
 #
-#   módulo:   e.g. "src/kernel/", "src/driver/factory.js", "tests/unit/"
-#   severity: critical | high | medium | low | info
-#   type:     bug | gap | improvement | vulnerability | performance | debt
-#   descrição: texto livre descrevendo o finding
+#   módulo:         e.g. "src/kernel/", "src/driver/factory.js", "tests/unit/"
+#   severity:       critical | high | medium | low | info
+#   type:           bug | gap | improvement | vulnerability | performance | debt
+#   descrição:      texto livre descrevendo o finding
+#   --create-task:  cria automaticamente uma tarefa vinculada (prioridade: alta|media|backlog)
 #
 # Exemplos:
 #   bash .github/hooks/scripts/save-finding.sh \
@@ -16,7 +17,8 @@
 #
 #   bash .github/hooks/scripts/save-finding.sh \
 #       "src/kernel/execution_engine/" "medium" "gap" \
-#       "Nenhum teste para o caminho de timeout de execução"
+#       "Nenhum teste para o caminho de timeout de execução" \
+#       --create-task media
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,6 +29,19 @@ MODULE="${1:-unknown}"
 SEVERITY="${2:-medium}"
 TYPE="${3:-bug}"
 DESCRIPTION="${4:-}"
+CREATE_TASK_PRIORITY=""
+
+# Opções extras a partir do 5º argumento
+shift 4 || true
+while [ $# -gt 0 ]; do
+    case "${1:-}" in
+        --create-task)
+            shift
+            CREATE_TASK_PRIORITY="${1:-backlog}"
+            ;;
+    esac
+    shift
+done
 NOW_MS="$(date -u +%s000 2> /dev/null || echo 0)"
 DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo 'unknown')"
 # ID único: timestamp_ms + RANDOM (bash built-in) garante unicidade mesmo no mesmo segundo
@@ -99,4 +114,12 @@ case "$SEVERITY" in
 esac
 
 echo "${ICON} Finding registrado [${SEVERITY}/${TYPE}] ${FINDING_ID} em ${MODULE}: ${DESCRIPTION}"
+
+# Se --create-task foi passado, cria tarefa vinculada automaticamente
+if [ -n "$CREATE_TASK_PRIORITY" ]; then
+    SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+    TASK_TITLE="Fix [${SEVERITY}/${TYPE}] ${MODULE}: ${DESCRIPTION}"
+    bash "$SCRIPT_DIR/add-task.sh" "$CREATE_TASK_PRIORITY" "$TASK_TITLE" "" --finding-id "$FINDING_ID"
+fi
+
 exit 0

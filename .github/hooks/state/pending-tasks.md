@@ -46,7 +46,7 @@
 ---
 
 ## Alta Prioridade
-- [ ] **UP2: Integração Findings ↔ Tasks ↔ Docs**: save-finding.sh pode criar tarefa automática; sync-tasks-to-docs.sh exporta concluídas para DOCUMENTAÇÃO/RELATORIOS/. Gate: finding com tag 'task' cria entrada em pending-tasks.md automaticamente. Detalhe em DOCUMENTAÇÃO/HOOKS/MELHORIAS.md#UP2 <!-- auto:20260309 -->
+- [x] **UP2: Integração Findings ↔ Tasks ↔ Docs**: save-finding.sh pode criar tarefa automática; sync-tasks-to-docs.sh exporta concluídas para DOCUMENTAÇÃO/RELATORIOS/. Gate: finding com tag 'task' cria entrada em pending-tasks.md automaticamente. Detalhe em DOCUMENTAÇÃO/HOOKS/MELHORIAS.md#UP2 <!-- auto:20260309 --> <!-- session:20260309 -->
 
 - [x] **UP1: Analytics Cross-Session de métricas**: Agregar tool-metrics.jsonl + audit.jsonl de múltiplas sessões. Script analytics.sh <início> <fim> gerando top-5 ferramentas, taxa de conformidade histórica, erros por sessão. Gate: report Markdown gerado com dados de 7+ dias. Detalhe em DOCUMENTAÇÃO/HOOKS/MELHORIAS.md#UP1 <!-- auto:20260309 --> <!-- session:20260309 -->
 
@@ -152,6 +152,8 @@
 ---
 
 ## Backlog Livre
+- [ ] **Fix [medium/improvement] .github/hooks/scripts: 
+- [ ] **Fix [medium/improvement] .github/hooks/scripts: 
 - [ ] **UP5: Exportação CSV de Métricas de Performance**: Script export-metrics.sh [csv|json] [início] [fim]. Exporta tool-metrics.jsonl filtrado. Gate: bash export-metrics.sh csv > metricas.csv gera CSV válido. Detalhe em MELHORIAS.md#UP5 <!-- auto:20260309 -->
 
 - [ ] **UP4: Checkpoint de Tarefas com Diff**: Adicionar tasks_hash SHA-256 no checkpoint; se hash changed → tasks_changed=true. Gate: checkpoint.json inclui tasks_hash e tasks_changed. Detalhe em MELHORIAS.md#UP4 <!-- auto:20260309 -->
