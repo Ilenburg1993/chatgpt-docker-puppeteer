@@ -763,7 +763,8 @@ _SC_SCRIPT="$HOOK_DIR/scripts/session-close.sh"
 _SC_DIR="$(mktemp -d)"
 _SC_STATE="$_SC_DIR/state"
 _SC_LOG="$_SC_DIR/logs"
-mkdir -p "$_SC_STATE" "$_SC_LOG"
+_SC_DOCS="$_SC_DIR/docs"
+mkdir -p "$_SC_STATE" "$_SC_LOG" "$_SC_DOCS"
 
 # Seed: contexto mínimo com close_key definida
 _SC_CTX="$_SC_STATE/session-context.json"
@@ -785,7 +786,7 @@ if [ -f "$_SC_SCRIPT" ]; then
     _SC_CTX_COPY="$_SC_STATE/ctx_copy.json"
     cp "$_SC_CTX" "$_SC_CTX_COPY"
     # Chama script com sandbox de state/log
-    _SC_OUT="$(HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" \
+    _SC_OUT="$(HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" HOOKS_DOCS_DIR="$_SC_DOCS" \
         HOME="$_SC_DIR" \
         bash "$_SC_SCRIPT" "ENCERRAR-TESTTEST" 2>&1)" && _SC_RC=$? || _SC_RC=$?
 
@@ -799,7 +800,7 @@ if [ -f "$_SC_SCRIPT" ]; then
     cp "$_SC_CTX_COPY" "$_SC_CTX"
 
     # Teste SC-2: KEY errada → exit 1
-    _SC_OUT2="$(HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" \
+    _SC_OUT2="$(HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" HOOKS_DOCS_DIR="$_SC_DOCS" \
         HOME="$_SC_DIR" \
         bash "$_SC_SCRIPT" "ENCERRAR-WRONGKEY" 2>&1)" && _SC_RC2=$? || _SC_RC2=$?
 
@@ -813,7 +814,7 @@ if [ -f "$_SC_SCRIPT" ]; then
     cp "$_SC_CTX_COPY" "$_SC_CTX"
 
     # Teste SC-3: KEY ausente (sem argumento) → exit 1
-    _SC_OUT3="$(HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" \
+    _SC_OUT3="$(HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" HOOKS_DOCS_DIR="$_SC_DOCS" \
         HOME="$_SC_DIR" \
         bash "$_SC_SCRIPT" 2>&1)" && _SC_RC3=$? || _SC_RC3=$?
 
@@ -825,7 +826,7 @@ if [ -f "$_SC_SCRIPT" ]; then
 
     # Teste SC-4: após KEY correta, sessionCloseAuthorized logado em audit.jsonl
     cp "$_SC_CTX_COPY" "$_SC_CTX"
-    HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" \
+    HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" HOOKS_DOCS_DIR="$_SC_DOCS" \
         HOME="$_SC_DIR" \
         bash "$_SC_SCRIPT" "ENCERRAR-TESTTEST" > /dev/null 2>&1 || true
     if grep -q '"sessionCloseAuthorized"' "$_SC_LOG/audit.jsonl" 2> /dev/null; then
@@ -843,7 +844,7 @@ if [ -f "$_SC_SCRIPT" ]; then
 
     # Teste SC-6: após KEY errada, sessionClose_REJECTED logado
     cp "$_SC_CTX_COPY" "$_SC_CTX"
-    HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" \
+    HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" HOOKS_DOCS_DIR="$_SC_DOCS" \
         HOME="$_SC_DIR" \
         bash "$_SC_SCRIPT" "ENCERRAR-BADKEY" > /dev/null 2>&1 || true
     if grep -q '"sessionClose_REJECTED"' "$_SC_LOG/audit.jsonl" 2> /dev/null; then

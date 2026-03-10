@@ -11,10 +11,10 @@
 
 ### 1.1 Dados Empíricos (audit.jsonl)
 
-| Evento         | Quantidade |
-|----------------|-----------|
-| `sessionStart` | 5         |
-| `sessionEnd`   | 0 (antes do fix)  |
+| Evento                   | Quantidade                |
+| ------------------------ | ------------------------- |
+| `sessionStart`           | 5                         |
+| `sessionEnd`             | 0 (antes do fix)          |
 | `sessionCloseAuthorized` | 0 (mecanismo inexistente) |
 
 **5 sessões iniciadas. 0 encerradas legitimamente.**
@@ -58,13 +58,13 @@ invocava `vscode_askQuestions` com Template F antes de encerrar. Causas:
 
 ## 2. Taxonomia de Encerramento
 
-| Tipo | Descrição | Detectável? | Mitigável? |
-|------|-----------|------------|-----------|
-| **A — Autorizado** | Template F → KEY → session-close.sh | Sim (sessionCloseAuthorized) | — (já é o caso ideal) |
-| **B — Voluntário sem protocolo** | Usuário encerra, agente não invocou Template F | Limitado | Sim: nudge + instruções |
-| **C — Inatividade** | Copilot desconecta por timeout | Sim (last_event_age > 30min) | Parcial: checkpoint periódico |
-| **D — Crash/Restart** | Copilot reinicia abruptamente | Sim (sem sessionEnd) | Não |
-| **E — Nova sessão** | Usuário inicia nova conversa | Sim (nova sessionStart) | Parcial: briefing alerta |
+| Tipo                             | Descrição                                      | Detectável?                  | Mitigável?                    |
+| -------------------------------- | ---------------------------------------------- | ---------------------------- | ----------------------------- |
+| **A — Autorizado**               | Template F → KEY → session-close.sh            | Sim (sessionCloseAuthorized) | — (já é o caso ideal)         |
+| **B — Voluntário sem protocolo** | Usuário encerra, agente não invocou Template F | Limitado                     | Sim: nudge + instruções       |
+| **C — Inatividade**              | Copilot desconecta por timeout                 | Sim (last_event_age > 30min) | Parcial: checkpoint periódico |
+| **D — Crash/Restart**            | Copilot reinicia abruptamente                  | Sim (sem sessionEnd)         | Não                           |
+| **E — Nova sessão**              | Usuário inicia nova conversa                   | Sim (nova sessionStart)      | Parcial: briefing alerta      |
 
 ---
 
@@ -125,7 +125,7 @@ o systemMessage de nudge deve ser mais específico sobre encerramento de SESSION
 Adicionar ao nudge de `agent-stop.sh` quando `close_key_validated=false` e muitos turnos
 sem `vscode_askQuestions`:
 ```
-Se for encerrar a sessão, invoque ANTES: vscode_askQuestions (Template F) 
+Se for encerrar a sessão, invoque ANTES: vscode_askQuestions (Template F)
 com close_key=[ACTUAL_KEY], e então chame: session-close.sh "ENCERRAR-XXX"
 ```
 
@@ -173,12 +173,12 @@ O Copilot desconecta quando fica inativo por muito tempo. Mitigações:
 
 ## 4. Flags do Sistema — Inventário e Ciclo de Vida
 
-| Flag | Criado por | Removido por | Representa |
-|------|-----------|-------------|-----------|
-| `SESSION_CLOSE_AUTHORIZED.flag` | `session-close.sh` (KEY correta) | `session-start.sh` na sessão seguinte | Encerramento legítimo |
-| `SESSION_CLOSE_NO_KEY.flag` | `session-end.sh` (close_key_validated=false) | `session-close.sh` (antes de chamar session-end.sh) | Encerramento sem KEY |
-| `UNAUTHORIZED_CLOSE.flag` | Legado (v4.0) — não mais criado | — | Obsoleto |
-| `SESSION_STALE.flag` | `watchdog.sh` | `watchdog.sh` | Sessão sem atividade |
+| Flag                            | Criado por                                   | Removido por                                        | Representa            |
+| ------------------------------- | -------------------------------------------- | --------------------------------------------------- | --------------------- |
+| `SESSION_CLOSE_AUTHORIZED.flag` | `session-close.sh` (KEY correta)             | `session-start.sh` na sessão seguinte               | Encerramento legítimo |
+| `SESSION_CLOSE_NO_KEY.flag`     | `session-end.sh` (close_key_validated=false) | `session-close.sh` (antes de chamar session-end.sh) | Encerramento sem KEY  |
+| `UNAUTHORIZED_CLOSE.flag`       | Legado (v4.0) — não mais criado              | —                                                   | Obsoleto              |
+| `SESSION_STALE.flag`            | `watchdog.sh`                                | `watchdog.sh`                                       | Sessão sem atividade  |
 
 **Bug encontrado e corrigido (v5.2)**:
 `session-end.sh` hardcodava `STATE_DIR` e `LOG_DIR` sem respeitar `HOOKS_STATE_DIR`/`HOOKS_LOG_DIR`.

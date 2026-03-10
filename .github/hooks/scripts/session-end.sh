@@ -11,7 +11,7 @@ REPO_ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
 # Suporte a override de diretórios (usado por smoke-test sandbox e session-close.sh)
 LOG_DIR="${HOOKS_LOG_DIR:-$HOOK_DIR/logs}"
 STATE_DIR="${HOOKS_STATE_DIR:-$HOOK_DIR/state}"
-DOCS_SESSIONS_DIR="$REPO_ROOT/DOCUMENTAÇÃO/RELATORIOS/SESSIONS"
+DOCS_SESSIONS_DIR="${HOOKS_DOCS_DIR:-$REPO_ROOT/DOCUMENTAÇÃO/RELATORIOS/SESSIONS}"
 SCRIPTS_DIR="$HOOK_DIR/scripts"
 
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
