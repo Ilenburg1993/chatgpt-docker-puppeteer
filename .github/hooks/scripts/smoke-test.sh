@@ -211,14 +211,14 @@ jq -cn '{
     },
     session_stats: {
         turn_count: 0, tools_total: 0, failures_detected: 0,
-        turn_authorized: 0, turn_unauthorized: 0,
+        turn_authorized: 0, turn_no_askQuestions: 0,
+        turns_since_askQuestions: 0,
         section_count: 1, section_names: ["smoke-test"]
     },
     current_turn: {
         number: 0, started_at: null, tools_count: 0,
         auth_requested: false, auth_requested_at: null,
-        last_askquestions_response: null, section_name: "smoke-test",
-        block_count: 0
+        last_askquestions_response: null, section_name: "smoke-test"
     },
     current_section: {
         name: null, section_number: 0, started_at: null, turn_count: 0
@@ -363,7 +363,7 @@ if grep -q '"retomada"' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
 else
     fail "agent-stop.sh não implementa invariante SESSION+SECTION+TURN"
 fi
-if grep -q '_RICH_SECTION' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+if grep -q '_CTX_SECTION' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
     pass "agent-stop.sh emite systemMessage rico com estado contextualizado"
 else
     fail "agent-stop.sh usa systemMessage genérico (não contextualizado)"
@@ -382,7 +382,7 @@ if grep -q 'section_turn' "$SCRIPTS_DIR/log-prompt.sh" 2> /dev/null; then
 else
     fail "log-prompt.sh não calcula section_turn"
 fi
-if grep -q '_RICH_SECTION_TURN' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+if grep -q '_CTX_SECTION_TURN' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
     pass "agent-stop.sh exibe TURN local/global no systemMessage"
 else
     fail "agent-stop.sh não exibe dual turn no systemMessage"
@@ -504,11 +504,11 @@ else
     fail "BUG-A.3: section-end.sh sem aviso de invariante"
 fi
 
-# BUG-B.3: log-prompt.sh reseta block_count
-if grep -q 'block_count.*=.*0\|block_count.*0' "$SCRIPTS_DIR/log-prompt.sh" 2> /dev/null; then
-    pass "BUG-B.3: log-prompt.sh reseta block_count em novo turno"
+# BUG-B.3: agent-stop.sh tracked turns_since_askQuestions (substitui decision:block removido)
+if grep -q 'turns_since_askQuestions' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+    pass "BUG-B.3: agent-stop.sh rastreia turns_since_askQuestions (TURN aut\u00f4nomo v5.0)"
 else
-    fail "BUG-B.3: log-prompt.sh não reseta block_count — decision:block só funciona 1x por sessão"
+    fail "BUG-B.3: agent-stop.sh n\u00e3o rastreia turns_since_askQuestions — contador de nudge ausente"
 fi
 
 # SEC-D.1: redaction inclui novos padrões
@@ -611,7 +611,8 @@ else
 fi
 
 # ── Fase 7: Hardening subagente + REV4-03 a REV4-07 ────────────────────────
-echo ""; echo "[ Fase 7 — hardening subagente + REV4-03~07 ]"
+echo ""
+echo "[ Fase 7 — hardening subagente + REV4-03~07 ]"
 
 # Hardening subagente v6 — pre-tool-use.sh
 if grep -q 'subagent_delegated' "$HOOK_DIR/scripts/pre-tool-use.sh" \
@@ -684,14 +685,21 @@ else
 fi
 
 # ── REV4-08: Sandbox de execução — scripts em dry-run ───────────────────────
-echo ""; echo "[ REV4-08 — Sandbox de execução de scripts ]"
+echo ""
+echo "[ REV4-08 — Sandbox de execução de scripts ]"
 
 _SANDBOX_DIR="$(mktemp -d)"
 _SANDBOX_PASS=0
 _SANDBOX_FAIL=0
 
-_sandbox_pass() { _SANDBOX_PASS=$((_SANDBOX_PASS + 1)); pass "$1"; }
-_sandbox_fail() { _SANDBOX_FAIL=$((_SANDBOX_FAIL + 1)); fail "$1"; }
+_sandbox_pass() {
+    _SANDBOX_PASS=$((_SANDBOX_PASS + 1))
+    pass "$1"
+}
+_sandbox_fail() {
+    _SANDBOX_FAIL=$((_SANDBOX_FAIL + 1))
+    fail "$1"
+}
 
 _run_script_dry() {
     local script="$1" input="$2" label="$3"
@@ -720,7 +728,7 @@ for _script in \
     "$HOOK_DIR/hooks-lib/config.sh"; do
     _script_name="$(basename "$_script")"
     if [ -f "$_script" ]; then
-        bash -n "$_script" 2>/dev/null \
+        bash -n "$_script" 2> /dev/null \
             && _sandbox_pass "Sandbox syntax OK: $_script_name" \
             || _sandbox_fail "Sandbox syntax FAIL: $_script_name"
     else
@@ -734,8 +742,8 @@ if [ -f "$HOOK_DIR/scripts/watchdog.sh" ]; then
     mkdir -p "$_SANDBOX_STATE"
     # watchdog.sh deve lidar graciosamente com state vazio
     HOOKS_STATE_DIR="$_SANDBOX_STATE" \
-    HOOKS_LOG_DIR="$_SANDBOX_DIR/logs" \
-    bash "$HOOK_DIR/scripts/watchdog.sh" --json > "$_SANDBOX_DIR/watchdog-out.json" 2>/dev/null
+        HOOKS_LOG_DIR="$_SANDBOX_DIR/logs" \
+        bash "$HOOK_DIR/scripts/watchdog.sh" --json > "$_SANDBOX_DIR/watchdog-out.json" 2> /dev/null
     _WD_RC=$?
     if [ "$_WD_RC" -eq 0 ] || [ "$_WD_RC" -le 2 ]; then
         _sandbox_pass "Sandbox exec: watchdog.sh --json retornou rc=$_WD_RC (aceitável)"

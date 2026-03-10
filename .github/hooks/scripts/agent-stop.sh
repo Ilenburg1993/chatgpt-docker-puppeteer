@@ -2,21 +2,20 @@
 # agent-stop.sh — Hook agentStop do Copilot (Stop event)
 # Executado quando o agente termina de responder ao prompt (fim de turno).
 # Input JSON (stdin): {timestamp, hook_event_name, session_id, stop_hook_active, ...}
-# Output JSON (stdout): quando o turno não chamou vscode_askQuestions, emite
-#   {"decision":"block","systemMessage":"..."} para forçar o agente a continuar.
+# Output JSON (stdout): systemMessage informativo (nudge) quando há push pendente ou
+#   turns_since_askQuestions >= HOOKS_TURN_NUDGE_INTERVAL (padrão: 5, sem bloqueio).
 #   Caso contrário, não emite nada (saída vazia → agente encerra normalmente).
 #
-# PROTOCOLO DE ENCERRAMENTO: detecta fins de turno e verifica autorização.
-# O agente DEVE usar vscode_askQuestions antes de encerrar — este hook faz a
-# verificação post-hoc e registra conformidade ou violação.
-#
-# HARDENING v5:
-#   - decision:block quando agente tenta encerrar sem vscode_askQuestions
-#   - Anti-recursão: respeita stop_hook_active e block_count (max 1 retry)
+# PROTOCOLO DE ENCERRAMENTO (v5.0 — TURN Autônomo):
+#   - TURNs encerram livremente — sem decision:block.
+#   - vscode_askQuestions é RECOMENDADO por TURN, OBRIGATÓRIO apenas para:
+#       * git commit/push (Template G) e encerramento de SESSION (Template F).
+#   - Auditoria completa: turnEnd_no_askQuestions / turnEnd_authorized em audit.jsonl.
+#   - Nudge periódico informativo (systemMessage) a cada HOOKS_TURN_NUDGE_INTERVAL TURNs.
 #   - Calcula turn_duration a partir de current_turn.started_at (fix B3)
 #   - session_summary usa métricas DO TURNO, não da sessão (fix B4)
 #   - Reseta current_turn.* e incrementa session_stats.* após cada turno
-#   - compliance.* controla o estado de autorização
+#   - compliance.* controla o estado de autorização (informativo)
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -324,107 +323,75 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
     fi
 fi
 
-# ── HARDENING: decision:block para turnos não autorizados ─────────────────────
-# Quando o agente tenta encerrar sem vscode_askQuestions:
-#   1. stop_hook_active=true → hook iniciou esta parada, não bloquear (anti-recursão)
-#   2. block_count >= 1 → já tentamos, safety valve — permitir encerramento
-#   3. Caso contrário → emitir {"decision":"block"} no stdout forçando continuação
+# ── Auditoria de turno sem vscode_askQuestions (informativo, sem bloqueio) ────
+# Novo modelo (v5.0): TURNs são autônomos. O agente encerra livremente.
+# vscode_askQuestions é recomendado, não obrigatório por TURN.
+# O log é informativo — ajuda a entender padrões de comunicação sem bloquear.
 if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
-    BLOCK_COUNT=0
-    if [ -f "$CTX_FILE" ]; then
-        BLOCK_COUNT="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    jq -cn \
+        --arg event "turnEnd_no_askQuestions" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$NOW_ISO" \
+        --arg section_id "$SECTION_ID" \
+        --arg turn_id "$TURN_ID" \
+        '{
+            event:      $event,
+            session_id: $sid,
+            timestamp:  $ts,
+            section_id: (if $section_id == "" then null else $section_id end),
+            turn_id:    (if $turn_id == "" then null else $turn_id end),
+            message:    "Turno encerrado naturalmente (TURN autônomo — sem vscode_askQuestions)"
+        }' >> "$LOG_DIR/audit.jsonl"
+fi
+
+# ── systemMessage contextual (não bloqueante) — nudge periódico ──────────────
+# Emite systemMessage informativo (sem decision:block) quando:
+#   1. pending_section_after_push == true  (git push sem declaração de seção)
+#   2. turns_since_askQuestions >= 5       (checkpoint periódico sugerido)
+_EMIT_CONTEXT_MSG=false
+_PUSH_PENDING="false"
+_TURNS_SINCE_ASK=0
+if [ -f "$CTX_FILE" ]; then
+    _PUSH_PENDING="$(jq -r '.session_stats.pending_section_after_push // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+    _TURNS_SINCE_ASK="$(jq -r '.session_stats.turns_since_askQuestions // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+fi
+[ "$_PUSH_PENDING" = "true" ] && _EMIT_CONTEXT_MSG=true
+{ [ "$_TURNS_SINCE_ASK" -ge 5 ] 2> /dev/null; } && [ "$AUTH_REQUESTED" = "false" ] && _EMIT_CONTEXT_MSG=true
+
+if [ "$_EMIT_CONTEXT_MSG" = "true" ] && [ -f "$CTX_FILE" ]; then
+    _CTX_SECTION="$(jq -r '.current_section.name // "(nenhuma)"' "$CTX_FILE" 2> /dev/null || echo '(nenhuma)')"
+    _CTX_SECTION_NUM="$(jq -r '.current_section.section_number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    _CTX_TURN="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    _CTX_SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    _CTX_PUSH_COUNT="$(jq -r '.session_stats.push_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _CTX_ALTA=0
+    _CTX_MEDIA=0
+    _CTX_BACKLOG=0
+    _CTX_NEXT_TASK="(sem tarefas)"
+    TASKS_FILE_RT="$STATE_DIR/pending-tasks.md"
+    if [ -f "$TASKS_FILE_RT" ]; then
+        _CTX_ALTA="$(grep -c '^- \[ \].*\[alta\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
+        _CTX_MEDIA="$(grep -c '^- \[ \].*\[media\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
+        _CTX_BACKLOG="$(grep -c '^- \[ \].*\[backlog\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
+        _CTX_NEXT_TASK="$(grep '^- \[ \].*\[alta\]' "$TASKS_FILE_RT" 2> /dev/null | head -1 | sed 's/^- \[ \] //' || echo '(sem tarefas alta)')"
     fi
-    if [ "$BLOCK_COUNT" -lt 1 ]; then
-        # Incrementa block_count (safety valve: na próxima vez permite encerrar)
-        if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-            jq '.current_turn.block_count = (.current_turn.block_count // 0) + 1' \
-                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-        elif [ -f "$CTX_FILE" ]; then
-            _TMP_BC="$(mktemp)"
-            if jq '.current_turn.block_count = (.current_turn.block_count // 0) + 1' \
-                "$CTX_FILE" > "$_TMP_BC" 2> /dev/null; then
-                mv "$_TMP_BC" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_BC"
-            else
-                rm -f "$_TMP_BC"
-            fi
-        fi
-        # Registra bloqueio no audit
-        jq -cn \
-            --arg event "turnEnd_BLOCKED" \
-            --arg sid "$SESSION_ID" \
-            --arg ts "$NOW_ISO" \
-            --argjson bc "$((BLOCK_COUNT + 1))" \
-            --arg section_id "$SECTION_ID" \
-            --arg turn_id "$TURN_ID" \
-            '{
-                event:       $event,
-                session_id:  $sid,
-                timestamp:   $ts,
-                block_count: $bc,
-                section_id:  (if $section_id == "" then null else $section_id end),
-                turn_id:     (if $turn_id == "" then null else $turn_id end),
-                message:     "Agente tentou encerrar sem askQuestions — bloqueado para retry"
-            }' >> "$LOG_DIR/audit.jsonl"
-
-        # ── Monta systemMessage rico com estado contextualizado ───────────────
-        _RICH_SECTION="$(jq -r '.current_section.name // "(nenhuma)"' "$CTX_FILE" 2> /dev/null || echo '(nenhuma)')"
-        _RICH_SECTION_NUM="$(jq -r '.current_section.section_number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-        _RICH_TURN="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-        _RICH_SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-        _RICH_TOOLS="$(jq -r '.current_turn.tools_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-        _RICH_CONSEC="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-        _RICH_PUSH_PENDING="$(jq -r '.session_stats.pending_section_after_push // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-        _RICH_PUSH_COUNT="$(jq -r '.session_stats.push_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-        _RICH_ALTA=0
-        _RICH_MEDIA=0
-        _RICH_BACKLOG=0
-        _RICH_NEXT_TASK="(sem tarefas)"
-        TASKS_FILE_RT="$STATE_DIR/pending-tasks.md"
-        if [ -f "$TASKS_FILE_RT" ]; then
-            _RICH_ALTA="$(grep -c '^- \[ \].*\[alta\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
-            _RICH_MEDIA="$(grep -c '^- \[ \].*\[media\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
-            _RICH_BACKLOG="$(grep -c '^- \[ \].*\[backlog\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
-            _RICH_NEXT_TASK="$(grep '^- \[ \].*\[alta\]' "$TASKS_FILE_RT" 2> /dev/null | head -1 | sed 's/^- \[ \] //' || echo '(sem tarefas alta)')"
-        fi
-        _CONSEC_MSG=""
-        if [ "$_RICH_CONSEC" -gt 1 ] 2> /dev/null; then
-            _CONSEC_MSG="⚠ ATENÇÃO: ${_RICH_CONSEC} violações consecutivas detectadas nesta sessão. "
-        fi
-        _PUSH_MSG=""
-        if [ "$_RICH_PUSH_PENDING" = "true" ] 2> /dev/null; then
-            _PUSH_MSG="
-
-🔀 GIT PUSH DETECTADO (push #${_RICH_PUSH_COUNT}) — AÇÃO OBRIGATÓRIA:
-  Execute UMA das opções abaixo usando run_in_terminal ANTES de prosseguir:
+    _CTX_PUSH_MSG=""
+    if [ "$_PUSH_PENDING" = "true" ]; then
+        _CTX_PUSH_MSG="
+🔀 GIT PUSH DETECTADO (push #${_CTX_PUSH_COUNT}):
   → Declarar nova fase:  bash .github/hooks/scripts/start-section.sh \"nome-da-fase\"
-  → Continuar na seção atual:  npm run hooks:continue-section
-  Sem declarar/confirmar a seção, esta exigência reaparecerá nos próximos TURNs bloqueados."
-        fi
-        _RICH_MSG="⛔ BLOQUEIO — ENCERRAMENTO NÃO AUTORIZADO
-
-Você tentou encerrar este turno sem chamar vscode_askQuestions.
-${_CONSEC_MSG}
-📍 ESTADO ATUAL:
-  • Seção: \"${_RICH_SECTION}\" (#${_RICH_SECTION_NUM}) | TURN: ${_RICH_SECTION_TURN}/${_RICH_TURN} (local/global)
-  • Ferramentas usadas: ${_RICH_TOOLS}
-  • Backlog: ${_RICH_ALTA} alta | ${_RICH_MEDIA} média | ${_RICH_BACKLOG} backlog
-  • Próxima tarefa: ${_RICH_NEXT_TASK}${_PUSH_MSG}
-
-✅ AÇÃO OBRIGATÓRIA:
-  1. Chame a ferramenta vscode_askQuestions (tool call real, não texto)
-  2. Use Template A se concluiu uma tarefa
-  3. Use Template F (com close_key) se quer encerrar a sessão
-  4. Use Template E se está retomando após inatividade
-
-📖 Templates completos em .github/AGENTS.md — seção \"Protocolo vscode_askQuestions\""
-
-        # Emite decision:block no stdout — formato oficial VS Code Copilot Hooks
-        # Conforme spec: hookSpecificOutput.decision="block" é lido pelo VS Code.
-        # systemMessage é exibido ao usuário (common output format, complementar).
-        # Referência: code.visualstudio.com/docs/copilot/customization/hooks
-        printf '%s\n' "{\"hookSpecificOutput\":{\"hookEventName\":\"Stop\",\"decision\":\"block\",\"reason\":\"Turno não autorizado — vscode_askQuestions não foi chamado\"},\"systemMessage\":$(printf '%s' "$_RICH_MSG" | jq -Rs .)}"
-        exit 0
+  → Continuar na seção:  npm run hooks:continue-section"
     fi
+    _CTX_PERIOD_MSG=""
+    if { [ "$_TURNS_SINCE_ASK" -ge 5 ] 2> /dev/null; } && [ "$AUTH_REQUESTED" = "false" ]; then
+        _CTX_PERIOD_MSG="
+💡 ${_TURNS_SINCE_ASK} TURNs sem vscode_askQuestions:
+  → Template A se concluiu tarefa | Template D para checkpoint periódico"
+    fi
+    _CTX_MSG="📍 TURN ${_CTX_SECTION_TURN}/${_CTX_TURN} — Seção \"${_CTX_SECTION}\" (#${_CTX_SECTION_NUM})
+  Backlog: ${_CTX_ALTA} alta | ${_CTX_MEDIA} média | ${_CTX_BACKLOG} backlog
+  Próxima tarefa: ${_CTX_NEXT_TASK}${_CTX_PUSH_MSG}${_CTX_PERIOD_MSG}"
+    printf '%s\n' "{\"systemMessage\":$(printf '%s' "$_CTX_MSG" | jq -Rs .)}"
 fi
 
 # ── Auto-enrich: gera turnStart_enriched_auto se start-turn.sh não foi chamado ──
@@ -503,48 +470,17 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
           failures_count: $failures, push_pending: $push_pending}' \
         >> "$LOG_DIR/audit.jsonl"
 else
-    TURN_COUNT_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-    rm -f "$AUTHORIZED_FLAG_FILE" 2> /dev/null || true # remove flag de autorização caso exista
-    jq -cn \
-        --arg ts "$NOW_ISO" \
-        --arg sid "$SESSION_ID" \
-        --argjson turn "$TURN_COUNT_NOW" \
-        '{
-            timestamp:  $ts,
-            session_id: $sid,
-            turn_count: $turn,
-            violation:  "Turno encerrado sem chamar vscode_askQuestions",
-            severity:   "critical"
-        }' > "$AUTH_FLAG_FILE"
+    # Modelo TURN Autônomo (v5.0): TURN encerra livremente — sem flag de violação, sem decision:block.
+    # Apenas atualiza compliance informativo e remove flag legada de autorização se existir.
+    rm -f "$AUTHORIZED_FLAG_FILE" 2> /dev/null || true
+    rm -f "$AUTH_FLAG_FILE" 2> /dev/null || true # garante que flag legada não persiste
     if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         jq '.compliance.last_turn_authorized = false
              | .compliance.consecutive_unauthorized = (.compliance.consecutive_unauthorized // 0) + 1
-             | .compliance.flag_file_exists = true' \
+             | .compliance.flag_file_exists = false' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
-    jq -cn \
-        --arg event "turnEnd_UNAUTHORIZED" \
-        --arg sid "$SESSION_ID" \
-        --arg ts "$NOW_ISO" \
-        --argjson turn_number "$TURN_NUMBER" \
-        --argjson section_turn "$SECTION_TURN" \
-        --arg section_name "$SECTION_NAME" \
-        --arg section_id "$SECTION_ID" \
-        --arg turn_id "$TURN_ID" \
-        --argjson dur "$TURN_DURATION_S" \
-        --argjson tools "$TURN_TOOLS_COUNT" \
-        --arg intent "$TURN_INTENT" \
-        --argjson failures "$TURN_FAILURES_COUNT" \
-        --arg msg "VIOLAÇÃO: turno encerrado sem vscode_askQuestions. Flag gravada em UNAUTHORIZED_CLOSE.flag" \
-        '{event: $event, session_id: $sid, timestamp: $ts, message: $msg,
-          turn_number: $turn_number, section_turn: $section_turn,
-          section_name: (if $section_name == "" then null else $section_name end),
-          section_id:   (if $section_id == "" then null else $section_id end),
-          turn_id:      (if $turn_id == "" then null else $turn_id end),
-          turn_duration_s: $dur, tools_count: $tools,
-          intent: (if $intent == "" then null else $intent end),
-          failures_count: $failures}' \
-        >> "$LOG_DIR/audit.jsonl"
+    # Nota: o evento turnEnd_no_askQuestions já foi emitido anteriormente (seção de auditoria informativa).
 fi
 
 # ── Incrementa session_stats, constrói session_summary e reseta current_turn ──
@@ -554,7 +490,7 @@ fi
 # Schema v7: appenda turn_history (cap 20) e atualiza recovery_hints.
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     SESSION_SUMMARY="turn=${TURN_NUMBER} dur=${TURN_DURATION_S}s tools=${TURN_TOOLS_COUNT}"
-    AUTH_INCR_FIELD="$([ "$AUTH_REQUESTED" = "true" ] && echo 'turn_authorized' || echo 'turn_unauthorized')"
+    AUTH_INCR_FIELD="$([ "$AUTH_REQUESTED" = "true" ] && echo 'turn_authorized' || echo 'turn_no_askQuestions')"
     NEXT_TURN=$((TURN_NUMBER + 1))
     jq --arg now "$NOW_ISO" \
         --arg summary "$SESSION_SUMMARY" \
@@ -572,6 +508,10 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         --argjson fail_n "$TURN_FAILURES_COUNT" \
         '.session_stats.turn_count    = (.session_stats.turn_count // 0) + 1
          | .session_stats[$auth_field] = (.session_stats[$auth_field] // 0) + 1
+         | .session_stats.turns_since_askQuestions = (
+             if $auth_s == "true" then 0
+             else (.session_stats.turns_since_askQuestions // 0) + 1
+             end)
          | .last_turn_ts              = $now
          | .session_summary           = $summary
          | .session_stats.turn_history = (

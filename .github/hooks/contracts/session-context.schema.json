@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/chatgpt-docker-puppeteer/hooks/session-context-v8",
-  "title": "session-context v8",
-  "description": "Schema do estado persistido do sistema de hooks do Copilot. Versão 8 — introduzida em commit 1674615b.",
+  "$id": "https://github.com/chatgpt-docker-puppeteer/hooks/session-context-v9",
+  "title": "session-context v9",
+  "description": "Schema do estado persistido do sistema de hooks do Copilot. Versão 9 — TURN aut\u00f4nomo (v5.0): turn_no_askQuestions substitui turn_unauthorized; turns_since_askQuestions para nudge peri\u00f3dico.",
   "type": "object",
   "required": ["session", "session_stats", "current_turn", "current_section", "compliance"],
   "additionalProperties": false,
@@ -79,10 +79,15 @@
           "minimum": 0,
           "description": "Turnos encerrados com vscode_askQuestions."
         },
-        "turn_unauthorized": {
+        "turn_no_askQuestions": {
           "type": "integer",
           "minimum": 0,
-          "description": "Turnos encerrados sem vscode_askQuestions (violations)."
+          "description": "Turnos encerrados sem vscode_askQuestions (informativo, sem bloqueio — v5.0)."
+        },
+        "turns_since_askQuestions": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Turnos consecutivos desde a \u00faltima chamada a vscode_askQuestions. Reseta a 0 quando vscode_askQuestions \u00e9 chamado. Usado para nudge peri\u00f3dico."
         },
         "tools_total": {
           "type": "integer",
@@ -265,7 +270,7 @@
         "blocked_turns": {
           "type": "integer",
           "minimum": 0,
-          "description": "Turnos bloqueados pelo decision:block nesta seção."
+          "description": "[OBSOLETO v5.0] Turnos bloqueados (decision:block removido). Sempre 0 em novas sess\u00f5es."
         }
       }
     },
@@ -306,8 +311,8 @@
       "additionalProperties": true
     },
     "session_summary": {
-      "type": ["object", "null"],
-      "description": "Resumo da sessão gerado no encerramento (sessionEnd)."
+      "type": ["string", "object", "null"],
+      "description": "Resumo da sess\u00e3o: string resumida por agent-stop.sh (por turno) ou objeto gerado no encerramento (sessionEnd)."
     },
     "last_turn_ts": {
       "type": ["string", "null"],

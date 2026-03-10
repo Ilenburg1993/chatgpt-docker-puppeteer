@@ -9,22 +9,23 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 
 ---
 
-## ⛔⛔⛔ REGRA ABSOLUTA — PROTOCOLO DE ENCERRAMENTO POR NÍVEL ⛔⛔⛔
+## Protocolo de encerramento por nível
 
-> **Esta é a regra mais importante deste arquivo. Aplica-se SEMPRE, sem exceção.**
+> **Modelo v5.0 — TURN Autônomo.** Vigente desde 2026-03-10.
 
-### O que é obrigatório — por nível
+### O que se aplica — por nível
 
-**TURN (turno)** — Protocolo de comunicação obrigatório, sem autorização explícita do usuário:
+**TURN (turno)** — Autônomo, sem obrigação de `vscode_askQuestions`:
 
-1. Invocar a ferramenta `vscode_askQuestions` (tool call real, não texto)
-2. O turno encerra após a chamada — o usuário não precisa dizer "pode encerrar"
-3. A resposta do usuário orienta o próximo passo, não "autoriza" o encerramento
+- TURNs encerram livremente. O agente **não** precisa de autorização para encerrar.
+- `vscode_askQuestions` é **recomendado** como boa prática de comunicação, não obrigatório.
+- Bons momentos para chamar: tarefa concluída → Template A; checkpoint a cada ~5 TURNs → Template D;
+  proposta arquitetural → Template C; sessão ociosa → Template E.
 
 **SECTION (seção temática)** — Autônoma, sem autorização do usuário:
 
-- O agente abre e fecha seções livrement com `start-section.sh "nome"` / `section-end.sh "motivo"`
-- Sem necessidade de pedir permissão — a mudança de contexto semântico é decisão do agente
+- O agente abre e fecha seções com `start-section.sh "nome"` / `section-end.sh "motivo"`
+- A mudança de contexto semântico é decisão do agente — sem necessidade de pedir permissão.
 
 **SESSION (sessão)** — Autorização explícita **obrigatória** com close_key:
 
@@ -38,27 +39,14 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 2. O usuário orienta se deve: commitar+pushar, revisar com subagente, continuar melhorando, etc.
 3. Executar apenas a ação autorizada pelo usuário
 
-### O que NÃO conta como protocolo — exemplos de VIOLAÇÃO
+### Monitoramento automático (informativo)
 
-| ❌ VIOLAÇÃO — isso NÃO cumpre o protocolo         | ✅ CORRETO — único método válido               |
-| ------------------------------------------------ | --------------------------------------------- |
-| Escrever "O que deseja fazer a seguir?" no texto | Chamar a **ferramenta** `vscode_askQuestions` |
-| Terminar a resposta com uma pergunta             | Tool call real, não texto de pergunta         |
-| Dizer "Posso continuar?" como texto do chat      | A ferramenta DEVE aparecer como tool call     |
-| Resumir o trabalho e encerrar sem perguntar      | Aguardar resposta antes de qualquer ação      |
-| Commitar ou fazer push sem chamar Template G     | Sempre invocar Template G antes de git ops    |
-
-> **TEXTO PLANO NÃO EQUIVALE A PROTOCOLO.** Somente o **tool call real** de `vscode_askQuestions`
-> conta. Escrever uma pergunta na resposta é uma violação do protocolo.
-
-### Monitoramento automático
-
-O sistema rastreia violações automaticamente:
+O sistema registra chamadas de `vscode_askQuestions` para auditoria:
 
 - `agent-stop.sh` detecta se `vscode_askQuestions` foi chamado no turno
-- Se NÃO foi chamado → grava `.github/hooks/state/UNAUTHORIZED_CLOSE.flag`
-- A próxima sessão exibe `⛔ ALERTA DE VIOLAÇÃO` no topo do session-briefing.md
-- Violações são registradas em `.github/hooks/logs/audit.jsonl` como `turnEnd_UNAUTHORIZED`
+- Sem chamada: loga `turnEnd_no_askQuestions` em `audit.jsonl` (informativo, **sem bloqueio**)
+- Com chamada: loga `turnEnd_authorized`
+- Nudge periódico via `systemMessage` a cada `HOOKS_TURN_NUDGE_INTERVAL` TURNs (padrão: 5)
 
 ---
 

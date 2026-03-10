@@ -13,24 +13,29 @@ applyTo: '**/*'
 
 ---
 
-## ⛔ REGRA ABSOLUTA — Protocolo de encerramento por nível
+## Protocolo de encerramento por nível
 
-### TURN — Comunicação obrigatória (sem autorização explícita do usuário)
+### TURN — Comunicação recomendada (autônomo)
 
-**Antes de encerrar qualquer turno**, o agente DEVE invocar a **ferramenta** `vscode_askQuestions`
-(tool call real, não texto). Isso é **protocolo de comunicação** — o agente reporta o estado atual e
-pergunta como prosseguir. **O usuário não precisa autorizar explicitamente o encerramento do
-turno**: a chamada à ferramenta cumpre o protocolo; o turno simplesmente encerra após o
-`vscode_askQuestions`.
+**TURNs encerram livremente.** O agente não precisa de autorização para encerrar um turno.
+`vscode_askQuestions` é **recomendado** como boa prática de comunicação, não obrigatório.
 
-**Texto plano NÃO substitui a ferramenta.** O hook `agent-stop.sh` detecta violações e emite
-`{"decision":"block","systemMessage":"..."}` forçando o agente a continuar.
+**Casos em que chamar vscode_askQuestions é valioso (recomendado):**
+
+- Tarefa concluída → Template A (próximo passo)
+- Checkpoint periódico a cada ~5 TURNs → Template D
+- Proposta arquitetural → Template C
+- Sessão ociosa → Template E
+
+**Nudge automático (não bloqueante):** O hook `agent-stop.sh` envia `systemMessage` informativo a
+cada `HOOKS_TURN_NUDGE_INTERVAL` (padrão: 5) TURNs sem `vscode_askQuestions`. Não há
+`decision:block`.
 
 ### SECTION — Autônoma (sem autorização do usuário)
 
 O agente abre e fecha seções temáticas **autonomamente**, com base no contexto semântico do
 trabalho. Não é necessário pedir autorização ao usuário — a decisão de mudar de fase
-(`start- section.sh "nome"`) é tomada pelo próprio agente quando o escopo muda.
+(`start-section.sh "nome"`) é tomada pelo próprio agente quando o escopo muda.
 
 ### SESSION — Autorização explícita obrigatória (chave de encerramento)
 

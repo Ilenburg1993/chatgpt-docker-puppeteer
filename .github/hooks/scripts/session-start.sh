@@ -216,7 +216,28 @@ if [ -n "$PREV_CHECKPOINT" ] && [ -f "$PREV_CHECKPOINT" ]; then
     PREV_CHECKPOINT_TS="$(jq -r '.checkpoint_ts // ""' "$PREV_CHECKPOINT" 2> /dev/null || echo '')"
 fi
 
-# Append em audit.jsonl
+# Detecção de encerramento abrupto: sessão anterior sem evento sessionEnd no audit
+PREV_ABRUPT_CLOSE=false
+if [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
+    _AUDIT_TMP="$LOG_DIR/audit.jsonl"
+    _FOUND_SESSION_END=false
+    # Verifica arquivo ativo primeiro
+    if [ -f "$_AUDIT_TMP" ] && grep -q '"sessionEnd"' "$_AUDIT_TMP" 2>/dev/null && \
+       grep '"sessionEnd"' "$_AUDIT_TMP" 2>/dev/null | grep -q "$PREV_SESSION_ID"; then
+        _FOUND_SESSION_END=true
+    fi
+    # Se não encontrou, verifica o arquivo de audit mais recente (após rotação)
+    if [ "$_FOUND_SESSION_END" = "false" ]; then
+        _LATEST_ARCHIVE="$(find "$LOG_DIR" -maxdepth 1 -name 'audit-*.jsonl' \
+            -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)"
+        if [ -n "$_LATEST_ARCHIVE" ] && [ -f "$_LATEST_ARCHIVE" ] && \
+           grep -q '"sessionEnd"' "$_LATEST_ARCHIVE" 2>/dev/null && \
+           grep '"sessionEnd"' "$_LATEST_ARCHIVE" 2>/dev/null | grep -q "$PREV_SESSION_ID"; then
+            _FOUND_SESSION_END=true
+        fi
+    fi
+    [ "$_FOUND_SESSION_END" = "false" ] && PREV_ABRUPT_CLOSE=true
+fi
 jq -cn \
     --arg event "sessionStart" \
     --arg sid "$SESSION_ID" \
@@ -534,6 +555,30 @@ if [ "$PREV_NO_KEY_CLOSE" = "true" ]; then
 ---
 
 NO_KEY_EOF
+fi
+
+# Injeta aviso de encerramento abrupto se sessão anterior não teve sessionEnd
+if [ "$PREV_ABRUPT_CLOSE" = "true" ]; then
+    cat >> "$BRIEFING_FILE" << ABRUPT_EOF
+
+---
+
+## ⚡ AVISO — SESSÃO ANTERIOR ENCERRADA SEM \`session-end.sh\`
+
+> **A sessão anterior não registrou evento \`sessionEnd\` no \`audit.jsonl\`.**
+> Isso ocorre quando o VS Code / Copilot é fechado abruptamente
+> (timeout, crash, reinicialização ou fechamento direto da janela).
+>
+> - **Sessão afetada**: \`${PREV_SESSION_ID}\`
+> - A \`close_key\` não pôde ser validada — encerramento não auditado pelo sistema.
+> - Sob o modelo v5.0 (TURN Autônomo), \`UNAUTHORIZED_CLOSE.flag\` não é criado por isso.
+>
+> **Ação recomendada**: verificar se havia trabajo pendente e se algo ficou
+> em estado inconsistente (commits, arquivos abertos, locks, etc.).
+
+---
+
+ABRUPT_EOF
 fi
 
 # Continuação do briefing — Seção da close_key (sempre exibida)

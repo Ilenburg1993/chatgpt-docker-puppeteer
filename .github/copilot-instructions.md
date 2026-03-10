@@ -8,38 +8,43 @@ Canônico. **Última atualização**: 10 de março de 2026.
 
 ---
 
-## ⛔ REGRA ABSOLUTA — Encerrar sem autorização é PROIBIDO
+## Protocolo de Comunicação — TURNs, SECTIONs e SESSIONs
 
-> **APLICA-SE A TODA RESPOSTA. SEM EXCEÇÃO.**
+> **Modelo v5.0 — TURN Autônomo** (vigente desde 2026-03-10)
 
-Antes de encerrar qualquer **TURN** (turno), bloco de trabalho ou **SESSION** (sessão), o agente
-**obrigatoriamente** deve invocar a ferramenta `vscode_askQuestions` e aguardar a resposta do
-usuário.
+### TURN — Autônomo (sem obrigação de vscode_askQuestions)
 
-**O que NÃO conta como autorização (VIOLAÇÕES):**
+**TURNs encerram livremente.** O agente não precisa de autorização para encerrar um turno.
+`vscode_askQuestions` é **recomendado** como boa prática de comunicação, não obrigatório.
 
-- Escrever "O que deseja fazer a seguir?" no texto da resposta
-- Terminar a resposta com uma pergunta em texto livre
-- Dizer "posso continuar?" ou "concluí a tarefa" sem chamar a ferramenta
+**Casos em que chamar vscode_askQuestions é valioso:**
 
-**O único método válido:**
+- Tarefa concluída → Template A (próximo passo)
+- Checkpoint periódico a cada ~5 TURNs sem perguntar → Template D
+- Proposta arquitetural → Template C
+- Sessão completamente ociosa → Template E
 
-- Chamar a **ferramenta** `vscode_askQuestions` (tool call real, não texto)
-- Aguardar resposta antes de qualquer ação subsequente
+**O que NÃO é mais enforcement (apenas auditoria informativa):**
 
-**Mecanismos de enforcement (automáticos — não dependem do agente):**
+- Encerrar TURN sem vscode_askQuestions — é autônomo, apenas loga `turnEnd_no_askQuestions`
+- `UNAUTHORIZED_CLOSE.flag` — não é mais criado
+- `decision:block` — removido do agent-stop.sh (v5.0)
 
-- `agent-stop.sh` detecta ausência de `vscode_askQuestions` no TURN e emite `{"decision":"block"}`
-  forçando o agente a continuar (hardening v5)
-- TURNs não autorizados geram `turnEnd_UNAUTHORIZED` no `audit.jsonl`
-- Violações ativam `UNAUTHORIZED_CLOSE.flag` e alertas no próximo `session-briefing.md`
-- `session_id guards` em todos os hooks impedem contaminação cruzada entre SESSIONs
+**Nudge automático (systemMessage informativo — não bloqueante):**
 
-**Encerramento de SESSION (extra-hardening):**
+- `agent-stop.sh` envia systemMessage contextual a cada `HOOKS_TURN_NUDGE_INTERVAL` (padrão: 5)
+  TURNs sem `vscode_askQuestions`, ou quando há git push pendente de section declaration.
 
-Além do `vscode_askQuestions`, o encerramento de uma SESSION exige que o usuário digite a chave
-`ENCERRAR-XXXXXXXX` (gerada no `session-briefing.md`) via **Template F** (ver `.github/AGENTS.md`).
-Sem a chave → `SESSION_CLOSE_NO_KEY.flag` → alerta na próxima SESSION.
+### SESSION — Autorização obrigatória (close_key)
+
+Encerramento de SESSION **ainda exige** que o usuário digite a chave `ENCERRAR-XXXXXXXX` (gerada no
+`session-briefing.md`) via **Template F** (ver `.github/AGENTS.md`). Sem a chave →
+`SESSION_CLOSE_NO_KEY.flag` → alerta na próxima SESSION.
+
+### git commit / git push — Autorização obrigatória (Template G)
+
+Antes de qualquer `git commit` e/ou `git push`, o agente **deve** invocar `vscode_askQuestions` com
+**Template G** apresentando o estado das mudanças.
 
 ---
 

@@ -261,7 +261,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         # Sem este tratamento, o sistema marca o turno como UNAUTHORIZED — falso positivo.
         # Solução: setamos auth_requested=true E subagent_delegated=true no contexto,
         # e logamos evento "subagentStart" no audit.jsonl como sinal de autorização.
-        _SUBAGENT_DESCRIPTION="$(echo "$INPUT" | jq -r '.tool_input.description // .tool_input.prompt // "(sem descrição)"' 2>/dev/null | head -c 200 || echo '(sem descrição)')"
+        _SUBAGENT_DESCRIPTION="$(echo "$INPUT" | jq -r '.tool_input.description // .tool_input.prompt // "(sem descrição)"' 2> /dev/null | head -c 200 || echo '(sem descrição)')"
         jq -cn \
             --arg event "subagentStart" \
             --arg sid "$SESSION_ID" \
