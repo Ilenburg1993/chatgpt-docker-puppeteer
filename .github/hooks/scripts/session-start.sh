@@ -214,6 +214,8 @@ if [ -n "$PREV_CHECKPOINT" ] && [ -f "$PREV_CHECKPOINT" ]; then
     PREV_TURN_COUNT="$(jq -r '.turn_count // 0' "$PREV_CHECKPOINT" 2> /dev/null || echo 0)"
     PREV_TASKS_OPEN="$(jq -r '.tasks.open_total // 0' "$PREV_CHECKPOINT" 2> /dev/null || echo 0)"
     PREV_CHECKPOINT_TS="$(jq -r '.checkpoint_ts // ""' "$PREV_CHECKPOINT" 2> /dev/null || echo '')"
+    # Lê close_key_validated do checkpoint para categorização de encerramento
+    PREV_CLOSE_KEY_VALIDATED="$(jq -r '.session.close_key_validated // false' "$PREV_CHECKPOINT" 2> /dev/null || echo false)"
 fi
 
 # Detecção de encerramento abrupto: sessão anterior sem sessionEnd nem sessionCloseAuthorized
@@ -252,6 +254,21 @@ if [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
         fi
     fi
     [ "$_FOUND_SESSION_END" = "false" ] && PREV_ABRUPT_CLOSE=true
+fi
+# Categoriza o modo de encerramento da sessão anterior:
+#   clean             → sessionCloseAuthorized encontrado OU SESSION_CLOSE_AUTHORIZED.flag OK
+#   key_validated     → close_key_validated=true no checkpoint mas session-close.sh não executado
+#   abrupt_no_key     → encerramento sem KEY (crash/timeout/restart)
+#   ok                → nenhuma sessão anterior detectada
+PREV_CLOSE_MODE="ok"
+if [ "$PREV_ABRUPT_CLOSE" = "true" ]; then
+    if [ "$PREV_CLOSE_KEY_VALIDATED" = "true" ]; then
+        PREV_CLOSE_MODE="key_validated"
+    else
+        PREV_CLOSE_MODE="abrupt_no_key"
+    fi
+elif [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
+    PREV_CLOSE_MODE="clean"
 fi
 # Remove flag de autorização após leitura (evita falsos negativos em sessões futuras)
 if [ -f "$STATE_DIR/SESSION_CLOSE_AUTHORIZED.flag" ]; then
@@ -581,26 +598,53 @@ fi
 
 # Injeta aviso de encerramento abrupto se sessão anterior não teve sessionEnd
 if [ "$PREV_ABRUPT_CLOSE" = "true" ]; then
-    cat >> "$BRIEFING_FILE" << ABRUPT_EOF
+    if [ "$PREV_CLOSE_MODE" = "key_validated" ]; then
+        cat >> "$BRIEFING_FILE" << ABRUPT_EOF
 
 ---
 
-## ⚡ AVISO — SESSÃO ANTERIOR ENCERRADA SEM \`session-end.sh\`
+## ⚠️ AVISO — KEY VALIDADA MAS \`session-close.sh\` NÃO FOI EXECUTADO
 
-> **A sessão anterior não registrou evento \`sessionEnd\` no \`audit.jsonl\`.**
+> **A sessão anterior validou a close_key (Template F), mas \`session-close.sh\` não foi chamado.**
+> O evento \`sessionCloseAuthorized\` não foi registrado — encerramento parcialmente auditado.
+>
+> - **Sessão afetada**: \`${PREV_SESSION_ID}\`
+> - A KEY foi fornecida corretamente via \`vscode_askQuestions\`, mas o script de close não executou.
+> - Possível causa: Copilot encerrou abruptamente após o usuário digitar a KEY, antes de \`session-close.sh\`.
+>
+> **Ação recomendada**: verificar se havia trabalho pendente; o \`post-tool-use.sh\` tenta
+> auto-invocar \`session-close.sh\`, mas falhou ou não foi acionado desta vez.
+
+---
+
+ABRUPT_EOF
+    else
+        cat >> "$BRIEFING_FILE" << ABRUPT_EOF
+
+---
+
+## ⚡ AVISO — ENCERRAMENTO ABRUPTO SEM KEY (\`session-close.sh\` não executado)
+
+> **A sessão anterior encerrou sem registrar \`sessionEnd\` nem \`sessionCloseAuthorized\`.**
 > Isso ocorre quando o VS Code / Copilot é fechado abruptamente
 > (timeout, crash, reinicialização ou fechamento direto da janela).
 >
 > - **Sessão afetada**: \`${PREV_SESSION_ID}\`
-> - A \`close_key\` não pôde ser validada — encerramento não auditado pelo sistema.
-> - Sob o modelo v5.0 (TURN Autônomo), \`UNAUTHORIZED_CLOSE.flag\` não é criado por isso.
+> - A \`close_key\` **não foi validada** — encerramento não auditado pelo sistema.
+> - Causas comuns: inatividade prolongada, restart do container, crash do processo.
 >
-> **Ação recomendada**: verificar se havia trabajo pendente e se algo ficou
+> **Para evitar encerramentos abruptos**:
+> - Mantenha o turno ativo respondendo ao agente regularmente
+> - Antes de encerrar, solicite ao agente para executar o Template F
+> - Não feche a janela do VS Code sem confirmar o encerramento da sessão
+>
+> **Ação recomendada**: verificar se havia trabalho pendente e se algo ficou
 > em estado inconsistente (commits, arquivos abertos, locks, etc.).
 
 ---
 
 ABRUPT_EOF
+    fi
 fi
 
 # Continuação do briefing — Seção da close_key (sempre exibida)

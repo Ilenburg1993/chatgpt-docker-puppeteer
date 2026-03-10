@@ -387,9 +387,18 @@ if [ "$_EMIT_CONTEXT_MSG" = "true" ] && [ -f "$CTX_FILE" ]; then
 💡 ${_TURNS_SINCE_ASK} TURNs sem vscode_askQuestions:
   → Template A se concluiu tarefa | Template D para checkpoint periódico"
     fi
+    # Nudge de encerramento de SESSION: lembra o agente de usar Template F + session-close.sh
+    _CTX_SESSION_CLOSE_MSG=""
+    _CTX_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    _CTX_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+    if [ "$_CTX_CLOSE_VALIDATED" = "false" ] && { [ "$_TURNS_SINCE_ASK" -ge 10 ] 2> /dev/null; }; then
+        _CTX_SESSION_CLOSE_MSG="
+🔐 ENCERRAMENTO DE SESSION (lembrete):
+  Para encerrar: 1) Template F → usuário digita KEY → 2) bash session-close.sh \"${_CTX_CLOSE_KEY}\""
+    fi
     _CTX_MSG="📍 TURN ${_CTX_SECTION_TURN}/${_CTX_TURN} — Seção \"${_CTX_SECTION}\" (#${_CTX_SECTION_NUM})
   Backlog: ${_CTX_ALTA} alta | ${_CTX_MEDIA} média | ${_CTX_BACKLOG} backlog
-  Próxima tarefa: ${_CTX_NEXT_TASK}${_CTX_PUSH_MSG}${_CTX_PERIOD_MSG}"
+  Próxima tarefa: ${_CTX_NEXT_TASK}${_CTX_PUSH_MSG}${_CTX_PERIOD_MSG}${_CTX_SESSION_CLOSE_MSG}"
     printf '%s\n' "{\"systemMessage\":$(printf '%s' "$_CTX_MSG" | jq -Rs .)}"
 fi
 

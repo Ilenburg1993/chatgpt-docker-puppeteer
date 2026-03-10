@@ -161,7 +161,7 @@ rm -f "$STATE_DIR/SESSION_CLOSE_NO_KEY.flag" 2> /dev/null || true
 SESSION_END_SCRIPT="$SCRIPTS_DIR/session-end.sh"
 if [ -f "$SESSION_END_SCRIPT" ] && [ -x "$SESSION_END_SCRIPT" ]; then
     echo "{\"timestamp\":\"$NOW_ISO\",\"cwd\":\"$(pwd)\",\"reason\":\"authorized_close\"}" \
-        | bash "$SESSION_END_SCRIPT" 2> /dev/null || true
+        | HOOKS_STATE_DIR="$STATE_DIR" HOOKS_LOG_DIR="$LOG_DIR" bash "$SESSION_END_SCRIPT" 2> /dev/null || true
     echo "📋 Relatório de sessão gerado por session-end.sh"
 fi
 

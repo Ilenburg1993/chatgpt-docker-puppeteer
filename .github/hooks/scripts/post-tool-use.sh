@@ -192,6 +192,14 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                     timestamp:  $ts,
                     close_key:  $key
                 }' >> "$LOG_DIR/audit.jsonl"
+
+            # Auto-encerramento: chama session-close.sh para garantir que sessionCloseAuthorized
+            # seja registrado mesmo que o agente esqueça de chamar o script manualmente.
+            # Esta é a defesa-em-profundidade: Template F → KEY detectada → encerramento automático.
+            _SESSION_CLOSE_SCRIPT="$HOOK_DIR/scripts/session-close.sh"
+            if [ -f "$_SESSION_CLOSE_SCRIPT" ] && [ -x "$_SESSION_CLOSE_SCRIPT" ]; then
+                bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" > /dev/null 2>&1 || true
+            fi
         else
             jq --arg result "$RESULT_TYPE" \
                 --arg response "$RESPONSE_STR" \
