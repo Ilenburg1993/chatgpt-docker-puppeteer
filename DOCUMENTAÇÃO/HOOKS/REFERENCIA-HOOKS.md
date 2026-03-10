@@ -515,7 +515,7 @@ A maioria das interações (via `vscode_askQuestions`) **não dispara** este hoo
 | **Saída útil**       | `hookSpecificOutput.permissionDecision`: `"allow"`, `"ask"`, `"deny"` |
 | **Exit 2**           | Bloqueia o uso do tool                                                |
 | **Nosso script**     | `.github/hooks/scripts/pre-tool-use.sh`                               |
-| **Uso atual**        | Registra tool call em audit.jsonl                                     |
+| **Uso atual**        | Registra tool call em audit.jsonl; **detecta `runSubagent`/`Task` → seta `subagent_delegated=true` no contexto e loga `subagentStart` (sinal de auth implícita, Hardening v6)** |
 
 ---
 

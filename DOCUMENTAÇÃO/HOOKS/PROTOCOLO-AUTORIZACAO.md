@@ -1,6 +1,6 @@
 # Protocolo de Autorização — Spec Completo
 
-> **Status**: Canônico | **Última atualização**: 2026-03-10 | **Versão**: 3.0
+> **Status**: Canônico | **Última atualização**: 2026-03-11 | **Versão**: 4.0
 
 ---
 
@@ -56,27 +56,38 @@ em `state/session-context.json`.
 
 ### Layer 3 — Detecção por agentStop
 
-A cada fim de turno, `agent-stop.sh` executa 3 estratégias de detecção em cascata:
+A cada fim de turno, `agent-stop.sh` executa **4 estratégias de detecção** em cascata:
 
 ```
 Estratégia 1 — Fronteira por userPromptSubmitted:
   ┌── Encontra linha L = última ocorrência de userPromptSubmitted em audit.jsonl
-  ├── Verifica se existe preToolUse com tool_name=vscode_askQuestions após linha L
+  ├── Verifica se existe preToolUse com tool_name=vscode_askQuestions
+  │   OU subagentStart event após linha L
   └── Se sim → AUTH_REQUESTED = true
 
 Estratégia 2 — Recência (fallback quando userPromptSubmitted ausente):
   ┌── userPromptSubmitted é raro: só dispara quando o Copilot recebe foco
   ├── Se LAST_PROMPT_LINE == 0: varre as últimas 150 linhas do audit.jsonl
-  └── Se vscode_askQuestions presente → AUTH_REQUESTED = true
+  └── Se vscode_askQuestions OU subagentStart presente → AUTH_REQUESTED = true
 
 Estratégia 3 — Contexto (último recurso):
   ┌── Lê current_turn.auth_requested no session-context.json
   └── Se true → AUTH_REQUESTED = true
+
+Estratégia 4 — Delegação via subagente (Hardening v6):
+  ┌── Lê current_turn.subagent_delegated no session-context.json
+  ├── Setado por pre-tool-use.sh quando tool_name = runSubagent|Task
+  ├── Se true → AUTH_REQUESTED = true
+  └── Loga evento auth_via_subagent_delegation em audit.jsonl
 ```
+
+> **Nota (v4.0)**: Estratégias 1 e 2 aceitam `subagentStart` como sinal alternativo a
+> `vscode_askQuestions`. Isso resolve falsos UNAUTHORIZED quando o agente delega trabalho
+> a um subagente sem ter chamado `vscode_askQuestions` antes.
 
 ### Layer 3.5 — decision:block (Hardening v5)
 
-Quando as 3 estratégias acima detectam `AUTH_REQUESTED = false`, o hook **bloqueia o encerramento
+Quando as 4 estratégias acima detectam `AUTH_REQUESTED = false`, o hook **bloqueia o encerramento
 do turno** emitindo `{"decision":"block"}` no stdout. A extensão do Copilot interpreta isso como
 instrução para manter o agente rodando.
 
@@ -97,7 +108,28 @@ Fluxo decision:block:
 infinito). `block_count` é incrementado a cada bloqueio e resetado para 0 quando o turno termina
 normalmente — garante que no pior caso o agente encerra após 1 retry.
 
-### Layer 3.6 — session_id guards (Hardening v5)
+### Layer 3.7 — Delegação via subagente (Hardening v6)
+
+Quando o agente invoca `runSubagent` ou `Task`, o hook `pre-tool-use.sh` detecta a chamada e:
+
+1. Seta `current_turn.subagent_delegated = true` e `current_turn.auth_requested = true` no contexto
+2. Incrementa `session_stats.subagent_calls`
+3. Loga evento `subagentStart` no `audit.jsonl` (reconhecido como sinal de auth pelas Estratégias 1+2)
+
+Ao fim do turno, `agent-stop.sh` detecta:
+- O evento `subagentStart` via Estratégias 1 e 2 (busca em audit.jsonl), **OU**
+- O flag `subagent_delegated = true` via Estratégia 4 (busca em contexto)
+
+Qualquer um dos dois sinaliza autorização implícita e loga `auth_via_subagent_delegation`.
+
+**Fundamento**: quando o agente delega substancialmente a um subagente, isso substitui de forma
+legítima a chamada a `vscode_askQuestions`. A delegação é uma forma válida de encerrar o turno.
+
+**Prevenção de abuso**: o mecanismo é auditado. Todas as delegações ficam registradas em
+`audit.jsonl` com tipo `subagentStart` e `auth_via_subagent_delegation`, rastreáveis via
+`generate-daily-report.sh`.
+
+### Layer 3.8 — session_id guards (Hardening v5)
 
 Todos os hooks que recebem payload com `session_id` validam contra o `session.id` do
 `session-context.json`. Se houver mismatch:
@@ -237,16 +269,19 @@ Fluxo de encerramento autorizado:
 
 Todos registrados em `logs/audit.jsonl`:
 
-| Evento                        | Quando ocorre                                          |
-| ----------------------------- | ------------------------------------------------------ |
-| `turnEnd_authorized`          | Turno encerrado com vscode_askQuestions chamado        |
-| `turnEnd_UNAUTHORIZED`        | Turno encerrado sem vscode_askQuestions                |
-| `sessionEnd_compliance`       | Fim de sessão — resumo de conformidade                 |
-| `authViolation_reset`         | Flag resetada manualmente                              |
-| `askQuestions_response`       | Resposta de vscode_askQuestions capturada              |
-| `sessionClose_key_validated`  | close_key encontrada na resposta — SESSION pode fechar |
-| `sessionEnd_authorized_close` | SESSION encerrada com close_key validada               |
-| `sessionEnd_no_key`           | SESSION encerrada sem close_key — flag criada          |
+| Evento                        | Quando ocorre                                                     |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `turnEnd_authorized`          | Turno encerrado com vscode_askQuestions chamado                   |
+| `turnEnd_UNAUTHORIZED`        | Turno encerrado sem vscode_askQuestions                           |
+| `turnEnd_BLOCKED`             | Turno bloqueado por decision:block (Hardening v5+) — agente continua |
+| `sessionEnd_compliance`       | Fim de sessão — resumo de conformidade                            |
+| `authViolation_reset`         | Flag resetada manualmente                                         |
+| `askQuestions_response`       | Resposta de vscode_askQuestions capturada                         |
+| `sessionClose_key_validated`  | close_key encontrada na resposta — SESSION pode fechar            |
+| `sessionEnd_authorized_close` | SESSION encerrada com close_key validada                          |
+| `sessionEnd_no_key`           | SESSION encerrada sem close_key — flag criada                     |
+| `subagentStart`               | runSubagent/Task detectado em pre-tool-use.sh → auth implícita    |
+| `auth_via_subagent_delegation`| Autorização concedida via subagent_delegated flag (Estratégia 4) |
 
 ---
 
@@ -270,8 +305,14 @@ jq -r 'select(.event | startswith("turnEnd")) | .event' \
 
 ### Subagentes
 
-`subagent-stop.sh` não implementa o protocolo de autorização — subagentes são temporários e
-controlados pelo agente pai. A violação (se houver) é detectada quando o agente pai encerra seu turno.
+**Hardening v6** introduziu delegação automática: quando o agente invoca `runSubagent` ou `Task`,
+`pre-tool-use.sh` seta `current_turn.subagent_delegated = true` e loga `subagentStart` em
+`audit.jsonl`. O `agent-stop.sh` reconhece esse sinal como autorização implícita (Estratégias 1,
+2 e 4), evitando falsos UNAUTHORIZED.
+
+**Subagentes em si** (via `subagent-stop.sh`) não implementam o protocolo de autorização — são
+processos temporários controlados pelo agente pai. A autorização é detectada no lado do pai via
+os mecanismos acima.
 
 ### Sessões que terminam abruptamente
 
