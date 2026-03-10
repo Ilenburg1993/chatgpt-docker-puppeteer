@@ -73,6 +73,14 @@ if [ -x "$HOOK_DIR/scripts/watchdog.sh" ]; then
     bash "$HOOK_DIR/scripts/watchdog.sh" --quiet 2> /dev/null || true
 fi
 
+# ── Auto-rotação de audit.jsonl (antes de queries) ───────────────────────────
+# Rotaciona automaticamente se audit.jsonl ultrapassar 5000 linhas.
+# Preserva as últimas 500 linhas no arquivo ativo para queries de sessão atual.
+# Arquivo histórico salvo em logs/audit-YYYYMMDD_HHMMSS.jsonl.
+if [ -x "$HOOK_DIR/scripts/rotate-audit.sh" ]; then
+    bash "$HOOK_DIR/scripts/rotate-audit.sh" 2> /dev/null || true
+fi
+
 # ── Gera SESSION CLOSE KEY — Schema v3 ───────────────────────────────────────
 # Chave dinâmica por sessão: ENCERRAR-XXXXXXXX (8 hex maiúsculos aleatórios)
 # O usuário DEVE digitar esta chave ao encerrar a sessão (vscode_askQuestions).
@@ -182,6 +190,12 @@ jq -cn \
         "session_summary": null,
         "last_turn_ts":    null
     }' > "$STATE_DIR/session-context.json"
+
+# BUG-A.2: Limpa contador de mismatches de sessões anteriores (HEAL v2).
+# .mismatch_track.json contém estado do contador de sessão id mismatch.
+# Não limpar causaria que o HEAL v2 herde contagem de sessão anterior,
+# podendo disparar ou suprimir heals incorretamente na nova sessão.
+rm -f "$STATE_DIR/.mismatch_track.json" 2> /dev/null || true
 
 # ── Recovery: detecta sessão anterior via último checkpoint ─────────────────
 CHECKPOINT_DIR="$HOOK_DIR/checkpoints"
@@ -332,7 +346,7 @@ if ! command -v jq &> /dev/null; then
 - ⛔ **jq não instalado** — instale com \`sudo apt install jq\`. Sistema de hooks completamente inoperante."
 fi
 
-# audit.jsonl: rotação automática ocorre em 5000 linhas (session-end.sh)
+# audit.jsonl: rotação automática ocorre em 5000 linhas (rotate-audit.sh, chamado por session-start.sh)
 AUDIT_LINES=0
 if [ -f "$AUDIT_FILE" ]; then
     AUDIT_LINES="$(wc -l < "$AUDIT_FILE" | tr -d ' ')"
@@ -365,18 +379,45 @@ elif [ -n "$HEALTH_WARNINGS" ]; then
 fi
 
 # ── Verifica violação de autorização da sessão anterior ────────────────────
+# G9-03: Flag de sessão diferente (obsoleto) é removido automaticamente com audit.
 AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
 PREV_UNAUTH_CLOSE=false
+PREV_UNAUTH_FLAG_STALE=false
 PREV_UNAUTH_TS=""
 PREV_UNAUTH_SID=""
 PREV_UNAUTH_TURN=0
 CONSECUTIVE_VIOLATIONS=0
 
 if [ -f "$AUTH_FLAG_FILE" ]; then
-    PREV_UNAUTH_CLOSE=true
     PREV_UNAUTH_TS="$(jq -r '.timestamp // ""' "$AUTH_FLAG_FILE" 2> /dev/null || echo '')"
     PREV_UNAUTH_SID="$(jq -r '.session_id // ""' "$AUTH_FLAG_FILE" 2> /dev/null || echo '')"
     PREV_UNAUTH_TURN="$(jq -r '.turn_count // 0' "$AUTH_FLAG_FILE" 2> /dev/null || echo 0)"
+
+    # G9-03: Se o flag é de uma sessão diferente da atual, é obsoleto (stale).
+    # Remove-o imediatamente com auditoria e não propaga o contador de violações.
+    if [ -n "$PREV_UNAUTH_SID" ] && [ "$PREV_UNAUTH_SID" != "$SESSION_ID" ]; then
+        PREV_UNAUTH_FLAG_STALE=true
+        PREV_UNAUTH_CLOSE=true # ainda exibe informação leve no briefing
+        rm -f "$AUTH_FLAG_FILE" 2> /dev/null || true
+        jq -cn \
+            --arg event "authViolation_stale_cleared" \
+            --arg new_sid "$SESSION_ID" \
+            --arg old_sid "$PREV_UNAUTH_SID" \
+            --arg ts "${TIMESTAMP:-$SESSION_DATE}" \
+            --arg flag_ts "$PREV_UNAUTH_TS" \
+            '{
+                event:       $event,
+                session_id:  $new_sid,
+                timestamp:   $ts,
+                old_session_id: $old_sid,
+                flag_timestamp: $flag_ts,
+                message:     "Flag UNAUTHORIZED_CLOSE de sessão diferente removido automaticamente"
+            }' >> "$LOG_DIR/audit.jsonl" 2> /dev/null || true
+        # Stale: não acumula consecutive_unauthorized na nova sessão
+        PREV_CONSEC_UNAUTH=0
+    else
+        PREV_UNAUTH_CLOSE=true
+    fi
 fi
 
 # ── Verifica encerramento sem SESSION CLOSE KEY ─────────────────────────────
@@ -421,7 +462,28 @@ BRIEFING_EOF
 
 # Injeta aviso de violação NO TOPO do briefing, se houver (nível escalona com CONSECUTIVE_VIOLATIONS)
 if [ "$PREV_UNAUTH_CLOSE" = "true" ]; then
-    cat >> "$BRIEFING_FILE" << VIOLATION_EOF
+    if [ "$PREV_UNAUTH_FLAG_STALE" = "true" ]; then
+        # G9-03: Flag obsoleto (de outra sessão) — apenas informativo; flag já foi removido
+        cat >> "$BRIEFING_FILE" << STALE_VIOLATION_EOF
+
+---
+
+## ℹ️ Nota informativa — Violação registrada em sessão anterior
+
+> A sessão **\`${PREV_UNAUTH_SID}\`** encerrou sem autorização (\`vscode_askQuestions\` ausente).
+> O flag foi **removido automaticamente** pois pertence a uma sessão diferente.
+> Esta sessão começa com contador de violações zerado.
+>
+> - **Sessão violadora**: \`${PREV_UNAUTH_SID}\`
+> - **Horário**: \`${PREV_UNAUTH_TS}\`
+> - **Turno**: \`${PREV_UNAUTH_TURN}\`
+
+---
+
+STALE_VIOLATION_EOF
+    else
+        # Flag da sessão atual (raro, mas possível): alerta crítico completo
+        cat >> "$BRIEFING_FILE" << VIOLATION_EOF
 
 ---
 
@@ -448,6 +510,7 @@ if [ "$PREV_UNAUTH_CLOSE" = "true" ]; then
 ---
 
 VIOLATION_EOF
+    fi
 fi
 
 # Injeta alerta de SESSION_CLOSE_NO_KEY se a sessão anterior fechou sem chave

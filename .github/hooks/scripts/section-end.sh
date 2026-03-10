@@ -77,6 +77,13 @@ elif [ -f "$CTX_FILE" ]; then
         "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
 fi
 
+# BUG-A.3: Aviso de invariante — current_section foi para null.
+# O invariante SESSION+SECTION+TURN exige que sempre haja uma seção ativa.
+# agent-stop.sh criará auto-seção "retomada" no próximo TURN se necessário,
+# mas o estado transitório sem seção pode causar eventos com section_name=null.
+# AÇÃO RECOMENDADA: chame start-section.sh IMEDIATAMENTE após section-end.sh.
+echo "[seção][AVISO] Invariante SESSION+SECTION+TURN: current_section=null até próximo start-section.sh" >&2
+
 # Registra evento sectionEnd no audit.jsonl (Schema v4: inclui section_number)
 jq -cn \
     --arg event "sectionEnd" \

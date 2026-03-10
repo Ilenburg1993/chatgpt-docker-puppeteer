@@ -422,6 +422,330 @@ else
     fail "install-git-hooks.sh não instala pre-push"
 fi
 
+# ── 15. Fase 9 — G9 checks ───────────────────────────────────────────────────
+echo ""
+echo "15. Fase 9 — G9 checks"
+
+# G9-01: pre-push git hook instalado
+if [ -f "$(git -C "$HOOK_DIR/../.." rev-parse --absolute-git-dir 2> /dev/null)/hooks/pre-push" ]; then
+    pass "G9-01: .git/hooks/pre-push instalado"
+else
+    fail "G9-01: .git/hooks/pre-push NÃO instalado — rode install-git-hooks.sh"
+fi
+
+# G9-02: rotate-audit.sh existe e é executável
+if [ -x "$SCRIPTS_DIR/rotate-audit.sh" ]; then
+    pass "G9-02: rotate-audit.sh presente e executável"
+else
+    fail "G9-02: rotate-audit.sh ausente ou não-executável"
+fi
+
+# G9-02: session-start.sh chama rotate-audit.sh
+if grep -q 'rotate-audit.sh' "$SCRIPTS_DIR/session-start.sh" 2> /dev/null; then
+    pass "G9-02: session-start.sh integra rotate-audit.sh"
+else
+    fail "G9-02: session-start.sh não chama rotate-audit.sh"
+fi
+
+# G9-03: session-start.sh faz auto-clear de flag stale
+if grep -q 'authViolation_stale_cleared' "$SCRIPTS_DIR/session-start.sh" 2> /dev/null; then
+    pass "G9-03: session-start.sh auto-limpa UNAUTHORIZED_CLOSE.flag de sessões diferentes"
+else
+    fail "G9-03: session-start.sh não implementa auto-clear de flag stale"
+fi
+
+# G9-04: HEAL v2 em agent-stop.sh
+if grep -q 'mismatch_track\|HEAL v2\|healed_from_consecutive_mismatch' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+    pass "G9-04: agent-stop.sh implementa HEAL v2 (mismatch consecutivo)"
+else
+    fail "G9-04: agent-stop.sh não tem HEAL v2"
+fi
+
+# G9-05: raw-*.jsonl não devem existir (arquivos de diagnóstico obsoletos)
+RAW_COUNT=0
+for _f in "$LOG_DIR"/raw-*.jsonl; do
+    [ -f "$_f" ] && RAW_COUNT=$((RAW_COUNT + 1))
+done
+if [ "$RAW_COUNT" -eq 0 ]; then
+    pass "G9-05: nenhum arquivo raw-*.jsonl presente (diagnóstico removido)"
+else
+    fail "G9-05: $RAW_COUNT arquivo(s) raw-*.jsonl presente(s) — executar rotate-audit.sh"
+fi
+
+# G9-06: contracts/events-contract.md existe
+if [ -f "$HOOK_DIR/contracts/events-contract.md" ]; then
+    pass "G9-06: contracts/events-contract.md existe"
+else
+    fail "G9-06: contracts/events-contract.md não encontrado"
+fi
+
+# ── 16. Solidificação pós-review ─────────────────────────────────────────────
+echo ""
+echo "16. Solidificação pós-review (bugs críticos/altos + gaps)"
+
+# BUG-A.1: pre-tool-use.sh tem flock
+if grep -q 'flock.*CTX.*lock\|CTX.*lock.*flock\|\.lock.*exec.*9\|exec.*9.*CTX' "$SCRIPTS_DIR/pre-tool-use.sh" 2> /dev/null; then
+    pass "BUG-A.1: pre-tool-use.sh tem flock (race condition corrigido)"
+else
+    fail "BUG-A.1: pre-tool-use.sh sem flock — race condition em session-context.json"
+fi
+
+# BUG-A.2: session-start.sh limpa .mismatch_track.json
+if grep -q 'mismatch_track' "$SCRIPTS_DIR/session-start.sh" 2> /dev/null; then
+    pass "BUG-A.2: session-start.sh limpa .mismatch_track.json (HEAL v2 anti-contaminação)"
+else
+    fail "BUG-A.2: session-start.sh não limpa .mismatch_track.json — HEAL v2 pode herdar estado de sessão anterior"
+fi
+
+# BUG-A.3: section-end.sh tem aviso de invariante
+if grep -q 'Invariante.*SECTION\|SECTION.*TURN.*null\|start-section.sh.*IMEDIATAMENTE' "$SCRIPTS_DIR/section-end.sh" 2> /dev/null; then
+    pass "BUG-A.3: section-end.sh tem aviso de invariante SESSION+SECTION+TURN"
+else
+    fail "BUG-A.3: section-end.sh sem aviso de invariante"
+fi
+
+# BUG-B.3: log-prompt.sh reseta block_count
+if grep -q 'block_count.*=.*0\|block_count.*0' "$SCRIPTS_DIR/log-prompt.sh" 2> /dev/null; then
+    pass "BUG-B.3: log-prompt.sh reseta block_count em novo turno"
+else
+    fail "BUG-B.3: log-prompt.sh não reseta block_count — decision:block só funciona 1x por sessão"
+fi
+
+# SEC-D.1: redaction inclui novos padrões
+if grep -q 'github_pat_\|glpat-\|AKIA' "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null; then
+    pass "SEC-D.1: common.sh::redact_credentials cobre github_pat_, glpat-, AKIA (AWS)"
+else
+    fail "SEC-D.1: common.sh::redact_credentials sem padrões github_pat_/glpat-/AKIA"
+fi
+
+# GAP-C.1: pre-tool-use.sh usa common.sh
+if grep -q 'source.*common.sh\|\. .*common.sh' "$SCRIPTS_DIR/pre-tool-use.sh" 2> /dev/null; then
+    pass "GAP-C.1: pre-tool-use.sh carrega hooks-lib/common.sh"
+else
+    fail "GAP-C.1: pre-tool-use.sh não integra hooks-lib/common.sh"
+fi
+
+# GAP-C.2: contracts/session-context.schema.json existe
+if [ -f "$HOOK_DIR/contracts/session-context.schema.json" ]; then
+    if jq empty "$HOOK_DIR/contracts/session-context.schema.json" 2> /dev/null; then
+        pass "GAP-C.2: contracts/session-context.schema.json existe e é JSON válido"
+    else
+        fail "GAP-C.2: contracts/session-context.schema.json é JSON inválido"
+    fi
+else
+    fail "GAP-C.2: contracts/session-context.schema.json não encontrado"
+fi
+
+# smoke-test fix: --absolute-git-dir
+if grep -q 'absolute-git-dir' "$SCRIPTS_DIR/smoke-test.sh" 2> /dev/null; then
+    pass "Smoke-test usa --absolute-git-dir (path resolution fix)"
+else
+    fail "Smoke-test usa --git-dir sem absolute — G9-01 pode falhar com paths relativos"
+fi
+
+# ── 17. Segunda revisão (REV-09, REV-11, HEAL v2 doc) ────────────────────────
+echo ""
+echo "17. Segunda revisão — REV-09 / REV-11 / config.sh / HEAL v2"
+
+# REV-09: agent-stop.sh incrementa agentStop_invocations
+if grep -q 'agentStop_invocations' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+    pass "REV-09: agent-stop.sh rastreia agentStop_invocations"
+else
+    fail "REV-09: agentStop_invocations ausente em agent-stop.sh"
+fi
+
+# REV-09: log-prompt.sh reseta agentStop_invocations no início do turno
+if grep -q 'agentStop_invocations.*=.*0' "$SCRIPTS_DIR/log-prompt.sh" 2> /dev/null; then
+    pass "REV-09: log-prompt.sh reseta agentStop_invocations = 0"
+else
+    fail "REV-09: log-prompt.sh não reseta agentStop_invocations"
+fi
+
+# REV-11: redact_credentials cobre hf_ e xai-
+if grep -qE 'hf_\[A-Za-z0-9\]' "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null; then
+    pass "REV-11: redact_credentials cobre hf_ (HuggingFace)"
+else
+    fail "REV-11: redact_credentials não cobre hf_"
+fi
+if grep -q 'xai-' "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null; then
+    pass "REV-11: redact_credentials cobre xai- (xAI/Grok)"
+else
+    fail "REV-11: redact_credentials não cobre xai-"
+fi
+
+# Ordem sk-ant- antes de sk-
+_SK_ANT_LINE="$(grep -n 'sk-ant-' "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null | head -1 | cut -d: -f1 || true)"
+_SK_LINE="$(grep -n "sk-\[A-Za-z" "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null | head -1 | cut -d: -f1 || true)"
+if [ -n "$_SK_ANT_LINE" ] && [ -n "$_SK_LINE" ] && [ "$_SK_ANT_LINE" -lt "$_SK_LINE" ]; then
+    pass "REV-11: redact_credentials — sk-ant- vem ANTES de sk- (ordem correta)"
+else
+    fail "REV-11: redact_credentials — sk- antes de sk-ant- captura Anthropic como OpenAI"
+fi
+
+# config.sh existe e tem as variáveis canônicas
+if [ -f "$HOOK_DIR/hooks-lib/config.sh" ]; then
+    pass "config.sh existe (tunáveis centralizados)"
+    if grep -q 'HOOKS_FLOCK_TIMEOUT' "$HOOK_DIR/hooks-lib/config.sh" \
+        && grep -q 'HOOKS_TURN_HISTORY_CAP' "$HOOK_DIR/hooks-lib/config.sh" \
+        && grep -q 'HOOKS_SECTION_HISTORY_CAP' "$HOOK_DIR/hooks-lib/config.sh" \
+        && grep -q 'HOOKS_HEAL_THRESHOLD' "$HOOK_DIR/hooks-lib/config.sh"; then
+        pass "config.sh tem variáveis canônicas (FLOCK_TIMEOUT, HISTORY_CAPs, HEAL_THRESHOLD)"
+    else
+        fail "config.sh está incompleto — variáveis canônicas ausentes"
+    fi
+else
+    fail "config.sh não encontrado em hooks-lib/"
+fi
+
+# REV-12: documentação HEAL v2
+if [ -f "$HOOK_DIR/../../../DOCUMENTAÇÃO/HOOKS/HEAL-v2.md" ] 2> /dev/null \
+    || [ -f "$(git -C "$HOOK_DIR" rev-parse --show-toplevel 2> /dev/null)/DOCUMENTAÇÃO/HOOKS/HEAL-v2.md" ] 2> /dev/null; then
+    pass "REV-12: HEAL-v2.md documentação existe"
+else
+    # Tenta path relativo
+    if [ -f "$HOOK_DIR/../../DOCUMENTAÇÃO/HOOKS/HEAL-v2.md" ] 2> /dev/null; then
+        pass "REV-12: HEAL-v2.md documentação existe"
+    else
+        fail "REV-12: HEAL-v2.md não encontrado em DOCUMENTAÇÃO/HOOKS/"
+    fi
+fi
+
+# ── Fase 7: Hardening subagente + REV4-03 a REV4-07 ────────────────────────
+echo ""; echo "[ Fase 7 — hardening subagente + REV4-03~07 ]"
+
+# Hardening subagente v6 — pre-tool-use.sh
+if grep -q 'subagent_delegated' "$HOOK_DIR/scripts/pre-tool-use.sh" \
+    && grep -q 'subagentStart' "$HOOK_DIR/scripts/pre-tool-use.sh"; then
+    pass "Hardening v6: pre-tool-use.sh detecta runSubagent/Task e loga subagentStart"
+else
+    fail "Hardening v6: pre-tool-use.sh faltando detecção de subagente/subagentStart"
+fi
+
+# Hardening subagente v6 — agent-stop.sh aceita subagentStart nas Strategies 1+2
+if grep -q 'subagentStart' "$HOOK_DIR/scripts/agent-stop.sh" \
+    && grep -q 'subagent_delegated' "$HOOK_DIR/scripts/agent-stop.sh"; then
+    pass "Hardening v6: agent-stop.sh aceita subagentStart + Strategy 4 (subagent_delegated)"
+else
+    fail "Hardening v6: agent-stop.sh faltando subagentStart ou Strategy 4"
+fi
+
+# Hardening subagente v6 — auth_via_subagent_delegation logado
+if grep -q 'auth_via_subagent_delegation' "$HOOK_DIR/scripts/agent-stop.sh"; then
+    pass "Hardening v6: agent-stop.sh loga auth_via_subagent_delegation (Strategy 4)"
+else
+    fail "Hardening v6: agent-stop.sh não loga auth_via_subagent_delegation"
+fi
+
+# REV4-03/04: generate-section-summary.sh e start-section.sh usam cap da config
+if grep -q 'HOOKS_SECTION_HISTORY_CAP' "$HOOK_DIR/scripts/generate-section-summary.sh" \
+    && grep -q 'HOOKS_SECTION_HISTORY_CAP' "$HOOK_DIR/scripts/start-section.sh"; then
+    pass "REV4-03/04: generate-section-summary.sh e start-section.sh usam HOOKS_SECTION_HISTORY_CAP"
+else
+    fail "REV4-03/04: generate-section-summary.sh ou start-section.sh sem HOOKS_SECTION_HISTORY_CAP"
+fi
+
+# REV4-04: start-turn.sh usa HOOKS_TURN_HISTORY_CAP
+if grep -q 'HOOKS_TURN_HISTORY_CAP' "$HOOK_DIR/scripts/start-turn.sh"; then
+    pass "REV4-04: start-turn.sh usa HOOKS_TURN_HISTORY_CAP"
+else
+    fail "REV4-04: start-turn.sh sem HOOKS_TURN_HISTORY_CAP"
+fi
+
+# REV4-05: ctx_guard_session_id removida de common.sh (dead code)
+if ! grep -q 'ctx_guard_session_id' "$HOOK_DIR/hooks-lib/common.sh"; then
+    pass "REV4-05: ctx_guard_session_id removida de common.sh (dead code eliminado)"
+else
+    fail "REV4-05: ctx_guard_session_id ainda presente em common.sh"
+fi
+
+# REV4-06: post-tool-use.sh seta auth_requested_at em ambos os branches
+if [ "$(grep -c 'auth_requested_at' "$HOOK_DIR/scripts/post-tool-use.sh")" -ge 2 ]; then
+    pass "REV4-06: post-tool-use.sh seta auth_requested_at nos dois branches"
+else
+    fail "REV4-06: post-tool-use.sh seta auth_requested_at em menos de 2 branches"
+fi
+
+# REV4-07: session-end.sh tem flock
+if grep -q 'flock' "$HOOK_DIR/scripts/session-end.sh"; then
+    pass "REV4-07: session-end.sh tem flock para prevenir race condition"
+else
+    fail "REV4-07: session-end.sh sem flock"
+fi
+
+# REV4-02: events-contract.md atualizado com novos eventos
+if grep -q 'auth_via_subagent_delegation' "$HOOK_DIR/contracts/events-contract.md" \
+    && grep -q 'sectionContinued' "$HOOK_DIR/contracts/events-contract.md" \
+    && grep -q 'turnStart_enriched' "$HOOK_DIR/contracts/events-contract.md" \
+    && grep -q 'errorOccurred' "$HOOK_DIR/contracts/events-contract.md" \
+    && grep -q 'session_manual_recovery' "$HOOK_DIR/contracts/events-contract.md"; then
+    pass "REV4-02: events-contract.md tem eventos da Fase 7 documentados"
+else
+    fail "REV4-02: events-contract.md faltando eventos da Fase 7"
+fi
+
+# ── REV4-08: Sandbox de execução — scripts em dry-run ───────────────────────
+echo ""; echo "[ REV4-08 — Sandbox de execução de scripts ]"
+
+_SANDBOX_DIR="$(mktemp -d)"
+_SANDBOX_PASS=0
+_SANDBOX_FAIL=0
+
+_sandbox_pass() { _SANDBOX_PASS=$((_SANDBOX_PASS + 1)); pass "$1"; }
+_sandbox_fail() { _SANDBOX_FAIL=$((_SANDBOX_FAIL + 1)); fail "$1"; }
+
+_run_script_dry() {
+    local script="$1" input="$2" label="$3"
+    # Executa com echo vazio (sem stdin real) para detectar syntax errors e erros imediatos
+    echo "$input" | bash -n "$script" 2>&1
+    local rc=$?
+    if [ "$rc" -eq 0 ]; then
+        _sandbox_pass "Sandbox: $label — sem erros de sintaxe bash"
+    else
+        _sandbox_fail "Sandbox: $label — erro de sintaxe detectado (rc=$rc)"
+    fi
+}
+
+# Syntax check: scripts principais
+for _script in \
+    "$HOOK_DIR/scripts/pre-tool-use.sh" \
+    "$HOOK_DIR/scripts/post-tool-use.sh" \
+    "$HOOK_DIR/scripts/agent-stop.sh" \
+    "$HOOK_DIR/scripts/session-start.sh" \
+    "$HOOK_DIR/scripts/session-end.sh" \
+    "$HOOK_DIR/scripts/start-turn.sh" \
+    "$HOOK_DIR/scripts/start-section.sh" \
+    "$HOOK_DIR/scripts/generate-section-summary.sh" \
+    "$HOOK_DIR/scripts/continue-section.sh" \
+    "$HOOK_DIR/hooks-lib/common.sh" \
+    "$HOOK_DIR/hooks-lib/config.sh"; do
+    _script_name="$(basename "$_script")"
+    if [ -f "$_script" ]; then
+        bash -n "$_script" 2>/dev/null \
+            && _sandbox_pass "Sandbox syntax OK: $_script_name" \
+            || _sandbox_fail "Sandbox syntax FAIL: $_script_name"
+    else
+        _sandbox_fail "Sandbox: $_script_name não encontrado"
+    fi
+done
+
+# Execução real com sandbox isolado: watchdog.sh --json (leitura-only)
+if [ -f "$HOOK_DIR/scripts/watchdog.sh" ]; then
+    _SANDBOX_STATE="$_SANDBOX_DIR/state"
+    mkdir -p "$_SANDBOX_STATE"
+    # watchdog.sh deve lidar graciosamente com state vazio
+    HOOKS_STATE_DIR="$_SANDBOX_STATE" \
+    HOOKS_LOG_DIR="$_SANDBOX_DIR/logs" \
+    bash "$HOOK_DIR/scripts/watchdog.sh" --json > "$_SANDBOX_DIR/watchdog-out.json" 2>/dev/null
+    _WD_RC=$?
+    if [ "$_WD_RC" -eq 0 ] || [ "$_WD_RC" -le 2 ]; then
+        _sandbox_pass "Sandbox exec: watchdog.sh --json retornou rc=$_WD_RC (aceitável)"
+    else
+        _sandbox_fail "Sandbox exec: watchdog.sh --json retornou rc=$_WD_RC inesperado"
+    fi
+fi
+
+rm -rf "$_SANDBOX_DIR"
+
 # ── Resumo ───────────────────────────────────────────────────────────────────
 echo ""
 echo "══════════════════════════════════════════════════"

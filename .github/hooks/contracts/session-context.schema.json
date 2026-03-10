@@ -1,0 +1,317 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/chatgpt-docker-puppeteer/hooks/session-context-v8",
+  "title": "session-context v8",
+  "description": "Schema do estado persistido do sistema de hooks do Copilot. Versão 8 — introduzida em commit 1674615b.",
+  "type": "object",
+  "required": ["session", "session_stats", "current_turn", "current_section", "compliance"],
+  "additionalProperties": false,
+  "properties": {
+    "session": {
+      "type": "object",
+      "description": "Identificação e metadados da sessão atual.",
+      "required": ["id", "started_at", "close_key"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "UUID v4 único da sessão (gerado por openssl rand -hex 16).",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp ISO 8601 de início da sessão."
+        },
+        "date_short": {
+          "type": "string",
+          "description": "Data/hora compacta YYYYMMDD_HHMMSS para nomes de arquivo."
+        },
+        "ended_at": {
+          "type": ["string", "null"],
+          "description": "Timestamp ISO 8601 de encerramento, ou null se ativa."
+        },
+        "end_reason": {
+          "type": ["string", "null"],
+          "description": "Motivo de encerramento da sessão, ou null se ativa."
+        },
+        "close_key": {
+          "type": "string",
+          "description": "Chave de encerramento da sessão exibida no briefing. Formato ENCERRAR-XXXXXXXX.",
+          "pattern": "^ENCERRAR-[0-9A-F]{8}$"
+        },
+        "close_key_validated": {
+          "type": "boolean",
+          "description": "True se o usuário forneceu a close_key correta."
+        },
+        "source": {
+          "type": "string",
+          "description": "Origem da sessão: 'new', 'manual_recovery', 'healed_from_real_session', 'healed_auto_consecutive'."
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Diretório de trabalho quando a sessão foi criada."
+        },
+        "mismatch_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Contador de mismatches consecutivos de session_id (usado pelo HEAL v2)."
+        },
+        "last_mismatch_got": {
+          "type": ["string", "null"],
+          "description": "Último session_id 'got' no mismatch (para detecção de padrão HEAL v2)."
+        }
+      }
+    },
+    "session_stats": {
+      "type": "object",
+      "description": "Estatísticas agregadas da sessão inteira.",
+      "required": ["turn_count", "tools_total"],
+      "additionalProperties": true,
+      "properties": {
+        "turn_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Número total de turnos encerrados na sessão."
+        },
+        "turn_authorized": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Turnos encerrados com vscode_askQuestions."
+        },
+        "turn_unauthorized": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Turnos encerrados sem vscode_askQuestions (violations)."
+        },
+        "tools_total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total de ferramentas usadas na sessão."
+        },
+        "tools_by_name": {
+          "type": "object",
+          "description": "Contagem por nome de ferramenta.",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "failures_detected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subagent_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "section_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Número de seções criadas na sessão."
+        },
+        "section_names": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Lista de nomes de seções criadas (em ordem)."
+        },
+        "section_history": {
+          "type": "array",
+          "description": "Histórico de seções (abertas e fechadas).",
+          "items": {
+            "type": "object",
+            "required": ["name", "section_id"],
+            "properties": {
+              "name": { "type": "string" },
+              "section_id": { "type": "string" },
+              "section_number": { "type": "integer" },
+              "started_at": { "type": "string" },
+              "closed_at": { "type": ["string", "null"] },
+              "turns": { "type": "integer" },
+              "duration_s": { "type": ["number", "null"] },
+              "pushes": { "type": "integer" },
+              "summary_file": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "turn_history": {
+          "type": "array",
+          "description": "Histórico resumido dos turnos encerrados.",
+          "items": { "type": "object" }
+        },
+        "push_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Número de git pushes rastreados na sessão."
+        },
+        "last_push_at": { "type": ["string", "null"] },
+        "last_push_turn": { "type": ["integer", "null"] },
+        "pending_section_after_push": {
+          "type": "boolean",
+          "description": "True quando git push ocorreu e o agente deve decidir: nova section ou continuar."
+        },
+        "commit_history": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "recovery_hints": {
+          "type": "object",
+          "description": "Dicas para retomada após interrupção.",
+          "properties": {
+            "last_intent": { "type": ["string", "null"] },
+            "last_section": { "type": ["string", "null"] },
+            "last_commit_sha": { "type": ["string", "null"] },
+            "last_commit_ts": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "current_turn": {
+      "type": "object",
+      "description": "Estado do turno atualmente ativo (reset a cada prompt).",
+      "required": ["number"],
+      "additionalProperties": true,
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Número global do turno na sessão (nunca reseta)."
+        },
+        "section_turn": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Número local do turno dentro da seção atual (reseta em nova seção)."
+        },
+        "turn_id": {
+          "type": "string",
+          "description": "ID único do turno (turn_TIMESTAMP_RANDOM)."
+        },
+        "section_id": {
+          "type": "string",
+          "description": "ID da seção à qual este turno pertence."
+        },
+        "section_name": {
+          "type": "string",
+          "description": "Nome da seção à qual este turno pertence."
+        },
+        "started_at": {
+          "type": "string",
+          "description": "Timestamp ISO de início do turno."
+        },
+        "intent_declared": {
+          "type": "boolean",
+          "description": "True se start-turn.sh foi chamado neste turno."
+        },
+        "intent": {
+          "type": ["string", "null"],
+          "description": "Intenção declarada pelo agente via start-turn.sh."
+        },
+        "auth_requested": {
+          "type": "boolean",
+          "description": "True se vscode_askQuestions foi chamado neste turno."
+        },
+        "auth_requested_at": {
+          "type": ["string", "null"],
+          "description": "Timestamp da chamada a vscode_askQuestions."
+        },
+        "last_askquestions_response": {
+          "type": ["string", "null"],
+          "description": "Resposta JSON do último vscode_askQuestions (serializada)."
+        },
+        "tools_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total de ferramentas usadas neste turno."
+        },
+        "tools_by_name": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "failures_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "current_section": {
+      "type": "object",
+      "description": "Estado da seção atualmente ativa.",
+      "required": ["name", "section_id"],
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string", "description": "Nome da seção (slug)." },
+        "section_id": { "type": "string", "description": "ID único da seção (sect_TIMESTAMP_RANDOM)." },
+        "section_number": { "type": "integer", "minimum": 1 },
+        "started_at": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "local_turn": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Número de turnos encerrados nesta seção (contador local)."
+        },
+        "turn_start": { "type": "integer" },
+        "push_count": { "type": "integer", "minimum": 0 },
+        "tools_by_name": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "intent_history": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Intenções declaradas nesta seção (uma por turno)."
+        },
+        "failures_count": { "type": "integer", "minimum": 0 },
+        "blocked_turns": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Turnos bloqueados pelo decision:block nesta seção."
+        }
+      }
+    },
+    "last_tool": {
+      "type": ["object", "null"],
+      "description": "Metadados da última ferramenta usada.",
+      "properties": {
+        "name": { "type": "string" },
+        "ts": { "type": "string" },
+        "use_id": { "type": "string" },
+        "result": { "type": ["string", "null"] }
+      }
+    },
+    "compliance": {
+      "type": "object",
+      "description": "Estado de conformidade com o protocolo de autorização.",
+      "required": ["consecutive_unauthorized", "flag_file_exists"],
+      "additionalProperties": true,
+      "properties": {
+        "last_turn_authorized": {
+          "type": ["boolean", "null"],
+          "description": "True se o último turno encerrado foi autorizado."
+        },
+        "consecutive_unauthorized": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Número de turnos consecutivos não autorizados."
+        },
+        "flag_file_exists": {
+          "type": "boolean",
+          "description": "True se UNAUTHORIZED_CLOSE.flag existe no disco."
+        }
+      }
+    },
+    "quality_gates": {
+      "type": "object",
+      "description": "Resultados dos gates de qualidade executados nesta sessão.",
+      "additionalProperties": true
+    },
+    "session_summary": {
+      "type": ["object", "null"],
+      "description": "Resumo da sessão gerado no encerramento (sessionEnd)."
+    },
+    "last_turn_ts": {
+      "type": ["string", "null"],
+      "description": "Timestamp do último turnEnd registrado."
+    }
+  }
+}

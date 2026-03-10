@@ -26,6 +26,8 @@ LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
 SUMMARIES_DIR="$STATE_DIR/section-summaries"
+# shellcheck disable=SC1091
+source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
 
 mkdir -p "$SUMMARIES_DIR"
 
@@ -222,8 +224,9 @@ _JQ_HISTORY_FILTER='
                closed_at:    $ts
            }]
            end
-         | if length > 50 then .[-50:] else . end)'
+         | if length > $cap then .[-($cap):] else . end)'
 
+_HISTORY_CAP="${HOOKS_SECTION_HISTORY_CAP:-50}"
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq \
         --arg name "$SECTION_NAME" \
@@ -233,6 +236,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         --argjson pushes "$PUSH_COUNT_SECTION" \
         --arg section_id "${SECTION_ID:-}" \
         --arg ts "$NOW_ISO" \
+        --argjson cap "$_HISTORY_CAP" \
         --arg summary_file "section-summaries/section-${SECTION_NUM}-${SECTION_SLUG}-${NOW_SHORT}.md" \
         "$_JQ_HISTORY_FILTER" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || {
         echo "[section-summary] ⚠️ Falha ao persistir section_history (sponge) — context.json não atualizado" >&2
@@ -247,13 +251,14 @@ elif [ -f "$CTX_FILE" ]; then
         --argjson pushes "$PUSH_COUNT_SECTION" \
         --arg section_id "${SECTION_ID:-}" \
         --arg ts "$NOW_ISO" \
+        --argjson cap "$_HISTORY_CAP" \
         --arg summary_file "section-summaries/section-${SECTION_NUM}-${SECTION_SLUG}-${NOW_SHORT}.md" \
         "$_JQ_HISTORY_FILTER" "$CTX_FILE" > "$TMP" 2> /dev/null
     if mv "$TMP" "$CTX_FILE" 2> /dev/null; then
         : # persistido com sucesso
     else
         rm -f "$TMP" 2> /dev/null || true
-        echo "[section-summary] \u26a0\ufe0f Falha ao persistir section_history (mv) \u2014 context.json n\u00e3o atualizado" >&2
+        echo "[section-summary] Falha ao persistir section_history (mv) -- context.json nao atualizado" >&2
     fi
 fi
 

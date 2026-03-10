@@ -16,6 +16,7 @@ src/dashboard-ui/node_modules/**
 # Local Python virtual environments
 .venv/
 venv/
+remote-kernel/
 __pycache__/
 *.pyc
 *.pyo
@@ -51,6 +52,9 @@ logs/**/*.log
 .github/hooks/state/AUTHORIZED_CLOSE.flag
 .github/hooks/state/SESSION_CLOSE_NO_KEY.flag
 .github/hooks/state/section-summaries/
+.github/hooks/state/audit.jsonl
+.github/hooks/state/*.lock
+.github/hooks/state/.mismatch_track.json
 .github/hooks/checkpoints/
 audit.log
 crash_reports/

@@ -19,6 +19,20 @@ CTX_FILE="$STATE_DIR/session-context.json"
 
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 
+# G9-11/GAP-C.1: Carrega biblioteca de funções compartilhadas (redact_credentials, iso_now, etc.)
+# shellcheck disable=SC1091
+if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
+    source "$HOOK_DIR/hooks-lib/common.sh"
+fi
+
+# G9-08/BUG-A.1: Lock exclusivo para escritas em session-context.json
+# Garante que pre-tool-use.sh não corre com agent-stop.sh, post-tool-use.sh ou log-prompt.sh.
+_CTX_LOCK="${CTX_FILE}.lock"
+exec 9> "$_CTX_LOCK"
+if command -v flock > /dev/null 2>&1; then
+    flock -x -w 3 9 2> /dev/null
+fi
+
 INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos usando o schema real (snake_case, não camelCase)
@@ -30,22 +44,52 @@ TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2> /dev/null || echo '
 
 # session_id vem diretamente do payload (UUID real do Copilot)
 SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+# REV-06: fallback ao contexto ativo se payload não traz session_id
+if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
+    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+fi
 
 # Serializa tool_input (objeto JSON) para string redactável
 TOOL_INPUT_RAW="$(echo "$INPUT" | jq -c '.tool_input // {}' 2> /dev/null || echo '{}')"
 
-# Redacta credentials e tokens antes de qualquer log
-# Padrões: GitHub tokens, Bearer tokens, senhas em flags CLI
-REDACTED_ARGS="$(echo "$TOOL_INPUT_RAW" \
-    | sed -E 's/ghp_[A-Za-z0-9]{20,}/[REDACTED_GHP]/g' \
-    | sed -E 's/gho_[A-Za-z0-9]{20,}/[REDACTED_GHO]/g' \
-    | sed -E 's/ghu_[A-Za-z0-9]{20,}/[REDACTED_GHU]/g' \
-    | sed -E 's/ghs_[A-Za-z0-9]{20,}/[REDACTED_GHS]/g' \
-    | sed -E 's/ghr_[A-Za-z0-9]{20,}/[REDACTED_GHR]/g' \
-    | sed -E 's/Bearer [A-Za-z0-9_\-\.]+/Bearer [REDACTED]/g' \
-    | sed -E 's/--password[=[:space:]][^[:space:]]+/--password=[REDACTED]/g' \
-    | sed -E 's/--token[=[:space:]][^[:space:]]+/--token=[REDACTED]/g' \
-    | sed -E 's/-p [A-Za-z0-9!@#$%^&*]{6,}/-p [REDACTED]/g')"
+# G9-11: Redaction estrutural — usa redact_credentials de common.sh se disponível,
+# com fallback para pipeline inline caso common.sh não esteja carregado.
+# Inclui: GitHub PAT (ghp_, gho_, ghu_, ghs_, ghr_, github_pat_), GitLab (glpat-),
+# AWS (AKIA*), OpenAI (sk-), Anthropic (sk-ant-), JWT, URLs com creds, query params,
+# Bearer tokens, flags --password/--token/-p, JSON fields (password, api_key, secret).
+if command -v redact_credentials > /dev/null 2>&1; then
+    REDACTED_ARGS="$(echo "$TOOL_INPUT_RAW" | redact_credentials)"
+else
+    REDACTED_ARGS="$(echo "$TOOL_INPUT_RAW" \
+        | sed -E 's/ghp_[A-Za-z0-9]{20,}/[REDACTED_GHP]/g' \
+        | sed -E 's/gho_[A-Za-z0-9]{20,}/[REDACTED_GHO]/g' \
+        | sed -E 's/ghu_[A-Za-z0-9]{20,}/[REDACTED_GHU]/g' \
+        | sed -E 's/ghs_[A-Za-z0-9]{20,}/[REDACTED_GHS]/g' \
+        | sed -E 's/ghr_[A-Za-z0-9]{20,}/[REDACTED_GHR]/g' \
+        | sed -E 's/github_pat_[A-Za-z0-9_]{20,}/[REDACTED_GITHUB_PAT]/g' \
+        | sed -E 's/glpat-[A-Za-z0-9_-]{10,}/[REDACTED_GITLAB_PAT]/g' \
+        | sed -E 's/AKIA[0-9A-Z]{16}/[REDACTED_AWS_KEY]/g' \
+        | sed -E 's/sk-[A-Za-z0-9_\-]{20,}/[REDACTED_OPENAI_KEY]/g' \
+        | sed -E 's/sk-ant-[A-Za-z0-9_\-]{20,}/[REDACTED_ANTHROPIC_KEY]/g' \
+        | sed -E 's/eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}/[REDACTED_JWT]/g' \
+        | sed -E 's|https?://[^/@]+:[^@]+@[^"[:space:]]+|[REDACTED_URL_WITH_CREDS]|g' \
+        | sed -E 's/[?&]token=[^&"[:space:]]*/\&token=[REDACTED]/g' \
+        | sed -E 's/[?&]api_key=[^&"[:space:]]*/\&api_key=[REDACTED]/g' \
+        | sed -E 's/Bearer [A-Za-z0-9_\-\.]+/Bearer [REDACTED]/g' \
+        | sed -E 's/--password[=[:space:]][^[:space:]"]+/--password=[REDACTED]/g' \
+        | sed -E 's/--token[=[:space:]][^[:space:]"]+/--token=[REDACTED]/g' \
+        | sed -E 's/-p [A-Za-z0-9!@#$%^&*]{6,}/-p [REDACTED]/g' \
+        | sed -E 's/"password"[[:space:]]*:[[:space:]]*"[^"]+"/\"password\":\"[REDACTED]\"/gi' \
+        | sed -E 's/"api_key"[[:space:]]*:[[:space:]]*"[^"]+"/\"api_key\":\"[REDACTED]\"/gi' \
+        | sed -E 's/"secret"[[:space:]]*:[[:space:]]*"[^"]+"/\"secret\":\"[REDACTED]\"/gi' \
+        | sed -E 's/(PASSWORD|TOKEN|SECRET|API_KEY)=([^[:space:]"]{4,})/\1=[REDACTED]/g')"
+fi
+
+# Camada 2: truncation de payloads muito grandes (>2000 chars → primeiros 500 + tag)
+_ARGS_LEN="${#REDACTED_ARGS}"
+if [ "$_ARGS_LEN" -gt 2000 ]; then
+    REDACTED_ARGS="${REDACTED_ARGS:0:500}[...TRUNCATED ${_ARGS_LEN} chars]"
+fi
 
 # Append em audit.jsonl com toolArgs redactados
 jq -cn \
@@ -208,6 +252,46 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .current_turn.tools_count   = ((.current_turn.tools_count // 0) + 1)
              | .current_turn.tools_by_name = ((.current_turn.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
+             | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
+             | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    elif [ "$TOOL_NAME" = "runSubagent" ]; then
+        # ── HARDENING: delegação ao subagente = autorização implícita ─────────
+        # runSubagent dispara agentStop no agente pai antes do subagente iniciar.
+        # Sem este tratamento, o sistema marca o turno como UNAUTHORIZED — falso positivo.
+        # Solução: setamos auth_requested=true E subagent_delegated=true no contexto,
+        # e logamos evento "subagentStart" no audit.jsonl como sinal de autorização.
+        _SUBAGENT_DESCRIPTION="$(echo "$INPUT" | jq -r '.tool_input.description // .tool_input.prompt // "(sem descrição)"' 2>/dev/null | head -c 200 || echo '(sem descrição)')"
+        jq -cn \
+            --arg event "subagentStart" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+            --arg description "$_SUBAGENT_DESCRIPTION" \
+            --arg tool_use_id "$TOOL_USE_ID" \
+            '{
+                event:          $event,
+                session_id:     $sid,
+                timestamp:      $ts,
+                tool_use_id:    $tool_use_id,
+                description:    $description,
+                auth_implicit:  true,
+                message:        "runSubagent chamado — delegação legítima de trabalho (autorização implícita)"
+            }' >> "$LOG_DIR/audit.jsonl"
+        jq --arg ts "$TIMESTAMP" \
+            --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
+            --arg desc "$_SUBAGENT_DESCRIPTION" \
+            '.last_tool.name   = $tool
+             | .last_tool.ts     = $ts
+             | .last_tool.use_id = $id
+             | .last_tool.result = null
+             | .current_turn.auth_requested       = true
+             | .current_turn.auth_requested_at    = $ts
+             | .current_turn.subagent_delegated   = true
+             | .current_turn.subagent_description = $desc
+             | .current_turn.tools_count   = ((.current_turn.tools_count // 0) + 1)
+             | .current_turn.tools_by_name = ((.current_turn.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
+             | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
+             | .session_stats.subagent_calls = ((.session_stats.subagent_calls // 0) + 1)
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true

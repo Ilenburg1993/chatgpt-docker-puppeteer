@@ -17,6 +17,16 @@ mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 mkdir -p "$STATE_DIR"
 mkdir -p "$DOCS_SESSIONS_DIR"
 
+CTX_FILE="$STATE_DIR/session-context.json"
+
+# REV4-07: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
+# Mesmo esquema de agent-stop.sh, pre-tool-use.sh, post-tool-use.sh e log-prompt.sh.
+_CTX_LOCK="${CTX_FILE}.lock"
+exec 9> "$_CTX_LOCK"
+if command -v flock > /dev/null 2>&1; then
+    flock -x -w "${HOOKS_FLOCK_TIMEOUT:-5}" 9 2> /dev/null || true
+fi
+
 INPUT="$(cat 2> /dev/null || true)"
 
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
@@ -35,7 +45,6 @@ fi
 # ── Obtém dados da sessão do contexto persistido (schema v4) ─────────────────
 SESSION_ID="unknown"
 START_ISO=""
-CTX_FILE="$STATE_DIR/session-context.json"
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
     START_ISO="$(jq -r '.session.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"

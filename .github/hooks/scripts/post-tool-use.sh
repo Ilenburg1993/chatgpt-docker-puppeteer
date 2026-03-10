@@ -13,9 +13,15 @@ HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
-
+# shellcheck disable=SC1091
+source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
-
+# G9-08: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
+_CTX_LOCK="${CTX_FILE}.lock"
+exec 9> "$_CTX_LOCK"
+if command -v flock > /dev/null 2>&1; then
+    flock -x -w 3 9 2> /dev/null
+fi
 INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos usando o schema real (snake_case)
@@ -36,10 +42,12 @@ fi
 # 1. Resposta vazia → "unknown" (muitos sucessos não têm body)
 # 2. Padrões explícitos de falha → "failure"
 # 3. Resposta não-vazia sem padrão de falha → "success"
+# REV-02: regex refinada — removidos ENOENT/EACCES (são errno C, nunca aparecem
+# em tool_response) e patterns muito amplos; mantidos apenas padrões literais claros.
 if [ -z "$TOOL_RESPONSE" ]; then
     RESULT_TYPE="unknown"
 elif echo "$TOOL_RESPONSE" | grep -qiE \
-    "String replacement failed|No such file or directory|Permission denied|command not found|ENOENT|EACCES|fatal:|Error:.*failed|cannot|not found|failed to"; then
+    "String replacement failed|No such file or directory|Permission denied|command not found|fatal: |Error: .*(failed|error|not found)|Tool call failed|cannot open|failed to (open|read|write|connect|parse)"; then
     RESULT_TYPE="failure"
 else
     RESULT_TYPE="success"
@@ -160,11 +168,16 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
             }' >> "$LOG_DIR/audit.jsonl"
 
         # Atualiza contexto com resposta e, se necessário, valida a close_key
+        # REV4-06: setar auth_requested=true aqui também (defesa em profundidade — garante
+        # que mesmo se preToolUse perdeu a janela, postToolUse confirma a autorização)
         if [ "$KEY_FOUND" = "true" ]; then
             jq --arg result "$RESULT_TYPE" \
                 --arg response "$RESPONSE_STR" \
+                --arg ts "$TIMESTAMP" \
                 '.last_tool.result = $result
                  | .current_turn.last_askquestions_response = $response
+                 | .current_turn.auth_requested = true
+                 | .current_turn.auth_requested_at = $ts
                  | .session.close_key_validated = true' \
                 "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 
@@ -182,8 +195,11 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         else
             jq --arg result "$RESULT_TYPE" \
                 --arg response "$RESPONSE_STR" \
+                --arg ts "$TIMESTAMP" \
                 '.last_tool.result = $result
-                 | .current_turn.last_askquestions_response = $response' \
+                 | .current_turn.last_askquestions_response = $response
+                 | .current_turn.auth_requested = true
+                 | .current_turn.auth_requested_at = $ts' \
                 "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
         fi
     elif [ "$RESULT_TYPE" = "failure" ]; then
@@ -205,8 +221,15 @@ fi
 if [ -f "$CTX_FILE" ]; then
     LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$LAST_TOOL_TS" ] && [ -n "$TIMESTAMP" ]; then
-        TS_MS="$(date -d "$TIMESTAMP" '+%s%3N' 2> /dev/null || echo '')"
-        LAST_MS="$(date -d "$LAST_TOOL_TS" '+%s%3N' 2> /dev/null || echo '')"
+        # BUG-B.1 FIX: %3N não é portável em BSD/macOS date; fallback usa %s * 1000
+        _ms_from_iso() {
+            local ts="$1"
+            date -d "$ts" '+%s%3N' 2> /dev/null \
+                || date -d "$ts" '+%s' 2> /dev/null | awk '{printf "%d000", $1}' \
+                || echo ''
+        }
+        TS_MS="$(_ms_from_iso "$TIMESTAMP")"
+        LAST_MS="$(_ms_from_iso "$LAST_TOOL_TS")"
         if [ -n "$TS_MS" ] && [ -n "$LAST_MS" ] && [ "$TS_MS" -gt 0 ] && [ "$LAST_MS" -gt 0 ]; then
             DURATION_MS=$((TS_MS - LAST_MS))
             # Sanity: ignora durações negativas ou absurdas (>10min = gap entre sessões)

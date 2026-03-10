@@ -27,6 +27,8 @@ HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
+# shellcheck disable=SC1091
+source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 
@@ -72,22 +74,23 @@ jq -cn \
     }' >> "$LOG_DIR/audit.jsonl"
 
 # Sinaliza que a intenção foi declarada para o rastreamento de turno
-# e appenda a intenção ao intent_history da seção atual (cap 50)
+# e appenda a intenção ao intent_history da seção atual (cap configurável via config.sh)
+_INTENT_CAP="${HOOKS_TURN_HISTORY_CAP:-50}"
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    jq '.current_turn.intent_declared = true
+    jq --arg intent "$TURN_INTENT" --argjson cap "$_INTENT_CAP" \
+        '.current_turn.intent_declared = true
          | .current_turn.intent = $intent
          | .current_section.intent_history = (
              (.current_section.intent_history // []) + [$intent]
-             | if length > 50 then .[-50:] else . end)' \
-        --arg intent "$TURN_INTENT" \
+             | if length > $cap then .[-($cap):] else . end)' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 elif [ -f "$CTX_FILE" ]; then
     TMP="$(mktemp)"
-    jq '.current_turn.intent_declared = true
+    jq --arg intent "$TURN_INTENT" --argjson cap "$_INTENT_CAP" \
+        '.current_turn.intent_declared = true
          | .current_turn.intent = $intent
          | .current_section.intent_history = (
              (.current_section.intent_history // []) + [$intent]
-             | if length > 50 then .[-50:] else . end)' \
-        --arg intent "$TURN_INTENT" \
+             | if length > $cap then .[-($cap):] else . end)' \
         "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
 fi

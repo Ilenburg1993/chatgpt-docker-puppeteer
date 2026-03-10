@@ -943,6 +943,9 @@
   "git-graph.date.format": "Date & Time",
   "git-graph.dialog.addTag.pushToRemote": true,
   "python.analysis.typeCheckingMode": "standard",
+  "python.defaultInterpreterPath": "/usr/bin/python3",
+  "python.terminal.activateEnvironment": false,
+  "python.terminal.activateEnvInCurrentTerminal": false,
   "github.copilot.chat.reviewSelection.instructions": [
     {
       "file": ".copilot-review-instructions.md"

@@ -1,6 +1,8 @@
 # Sistema de Hooks — Copilot Automation
 
-> **Status**: Canônico | **Última atualização**: 2026-03-10 | **Versão**: 4.0 (Schema v4)
+> **Status**: Canônico | **Última atualização**: 2026-03-10 | **Versão**: 9.0 (Schema v8, Fase 9)
+
+> ⚠️  Para rastreamento detalhado de issues e roadmap, veja [`STATUS-E-ROADMAP.md`](./STATUS-E-ROADMAP.md).
 
 Sistema de hooks do GitHub Copilot que automatiza: rastreabilidade de sessões, protocolo de
 autorização de encerramento, métricas de ferramentas, checkpoints de estado e relatórios.
@@ -26,16 +28,19 @@ autorização de encerramento, métricas de ferramentas, checkpoints de estado e
 O sistema é ativado automaticamente pelo GitHub Copilot via `.github/hooks/copilot-hooks.json`.
 Oito eventos do ciclo de vida do agente disparam scripts shell correspondentes:
 
-| Evento Copilot     | Script              | Propósito                             |
-| ------------------ | ------------------- | ------------------------------------- |
-| `sessionStart`     | `session-start.sh`  | Inicialização + briefing da sessão    |
-| `userPromptSubmit` | `log-prompt.sh`     | Log de metadados + reset de auth flag |
-| `preToolUse`       | `pre-tool-use.sh`   | Rastreia tool calls + redação de cred |
-| `postToolUse`      | `post-tool-use.sh`  | Métricas de duração + quality gates   |
-| `agentStop`        | `agent-stop.sh`     | Detecção de autorização + checkpoint  |
-| `subagentStop`     | `subagent-stop.sh`  | Registro mínimo do subagente          |
-| `errorOccurred`    | `error-occurred.sh` | Log de erros no audit + errors.jsonl  |
-| `sessionEnd`       | `session-end.sh`    | Relatório final + conformidade        |
+| Evento Copilot        | Script                | Propósito                             |
+| --------------------- | --------------------- | ------------------------------------- |
+| `sessionStart`        | `session-start.sh`    | Inicialização + briefing da sessão    |
+| `userPromptSubmitted` | `log-prompt.sh`       | Log de metadados + reset de auth flag |
+| `preToolUse`          | `pre-tool-use.sh`     | Rastreia tool calls + redação de cred |
+| `postToolUse`         | `post-tool-use.sh`    | Métricas de duração + quality gates   |
+| `agentStop`           | `agent-stop.sh`       | Detecção de autorização + checkpoint  |
+| `subagentStop`        | `subagent-stop.sh`    | Registro mínimo do subagente          |
+| `subagentStart`       | `subagent-start.sh`   | Marca início de subagent call         |
+| `postToolUseFailure`  | `tool-use-failure.sh` | Log de falha de ferramenta            |
+| `preCompact`          | `pre-compact.sh`      | Registra compactação de contexto      |
+| `errorOccurred`       | `error-occurred.sh`   | Log de erros no audit + errors.jsonl  |
+| `sessionEnd`          | `session-end.sh`      | Relatório final + conformidade        |
 
 ---
 
@@ -43,40 +48,58 @@ Oito eventos do ciclo de vida do agente disparam scripts shell correspondentes:
 
 ```
 .github/hooks/
-├── copilot-hooks.json          # Configuração canônica de hooks
-├── scripts/                    # 16 scripts shell
-│   ├── session-start.sh        # Hook: sessionStart (352 linhas)
-│   ├── agent-stop.sh           # Hook: agentStop — protocolo de autorização (163 linhas)
-│   ├── session-end.sh          # Hook: sessionEnd — relatório + conformidade (197 linhas)
-│   ├── log-prompt.sh           # Hook: userPromptSubmitted (56 linhas)
-│   ├── pre-tool-use.sh         # Hook: preToolUse (94 linhas)
-│   ├── post-tool-use.sh        # Hook: postToolUse — métricas (120 linhas)
-│   ├── subagent-stop.sh        # Hook: subagentStop (36 linhas)
-│   ├── error-occurred.sh       # Hook: errorOccurred (66 linhas)
-│   ├── session-checkpoint.sh   # Helper: snapshot incremental por turno (160 linhas)
-│   ├── generate-session-summary.sh  # Helper: relatório Markdown da sessão (126 linhas)
-│   ├── generate-daily-report.sh    # Helper: relatório diário de métricas (353 linhas)
-│   ├── save-finding.sh         # Util: registra finding em findings.jsonl (98 linhas)
-│   ├── add-task.sh             # Util: adiciona tarefa em pending-tasks.md (101 linhas)
-│   ├── complete-task.sh        # Util: marca tarefa como concluída (100 linhas)
-│   ├── reset-auth-violation.sh # Admin: reseta UNAUTHORIZED_CLOSE.flag (88 linhas)
-│   └── install-git-hooks.sh    # Setup: instala git hooks pre-commit + commit-msg (133 linhas)
+├── copilot-hooks.json          # Configuração canônica de hooks (10 eventos)
+├── scripts/                    # 33+ scripts shell
+│   ├── session-start.sh        # Hook: sessionStart
+│   ├── agent-stop.sh           # Hook: agentStop — protocolo de autorização
+│   ├── session-end.sh          # Hook: sessionEnd — relatório + conformidade
+│   ├── log-prompt.sh           # Hook: userPromptSubmitted
+│   ├── pre-tool-use.sh         # Hook: preToolUse
+│   ├── post-tool-use.sh        # Hook: postToolUse — métricas
+│   ├── subagent-stop.sh        # Hook: subagentStop
+│   ├── subagent-start.sh       # Hook: subagentStart
+│   ├── tool-use-failure.sh     # Hook: postToolUseFailure
+│   ├── pre-compact.sh          # Hook: preCompact
+│   ├── error-occurred.sh       # Hook: errorOccurred
+│   ├── start-turn.sh           # Helper: declara intent do turno
+│   ├── start-section.sh        # Helper: abre nova seção temática
+│   ├── section-end.sh          # Helper: fecha seção manualmente
+│   ├── continue-section.sh     # Helper: confirma continuação após git push
+│   ├── session-checkpoint.sh   # Helper: snapshot incremental por turno
+│   ├── generate-session-summary.sh  # Helper: relatório Markdown da sessão
+│   ├── generate-section-summary.sh  # Helper: resumo de seção
+│   ├── generate-daily-report.sh    # Helper: relatório diário de métricas
+│   ├── save-finding.sh         # Util: registra finding em findings.jsonl
+│   ├── resolve-finding.sh      # Util: resolve finding aberto
+│   ├── add-task.sh             # Util: adiciona tarefa em pending-tasks.md
+│   ├── complete-task.sh        # Util: marca tarefa como concluída
+│   ├── watchdog.sh             # Saúde: detecta anomalias de sessão
+│   ├── on-git-push.sh          # Git: acionado por .git/hooks/pre-push
+│   ├── install-git-hooks.sh    # Setup: instala hooks git (pre-push, pre-commit, commit-msg)
+│   ├── rotate-audit.sh         # Manutenção: rotaciona audit.jsonl (Fase 9)
+│   ├── reset-auth-violation.sh # Admin: reseta UNAUTHORIZED_CLOSE.flag
+│   ├── smoke-test.sh           # QA: 106+ checks de integridade do sistema
+│   ├── analytics.sh            # Analytics: cross-session
+│   ├── export-metrics.sh       # Export: métricas CSV/JSON
+│   └── sync-tasks-to-docs.sh   # Sync: backlog → docs
+├── contracts/                  # Contratos formais (Fase 9)
+│   ├── events-contract.md      # Contrato de todos os eventos do ciclo de vida
+│   └── session-context.schema.json  # JSON Schema v7 do session-context.json
+├── hooks-lib/                  # Biblioteca compartilhada (Fase 9)
+│   └── common.sh               # Funções: hl_iso_now, hl_with_lock, ctx_update...
 ├── state/                      # Estado persistido entre turnos e sessões
-│   ├── session-context.json    # Contexto da sessão atual (JSON)
-│   ├── session-briefing.md     # Briefing gerado no inicio da sessão
+│   ├── session-context.json    # Contexto da sessão atual (JSON, Schema v8)
+│   ├── session-briefing.md     # Briefing gerado no início da sessão
 │   ├── pending-tasks.md        # Backlog de tarefas do agente
+│   ├── watchdog-report.json    # Último resultado do watchdog
 │   ├── UNAUTHORIZED_CLOSE.flag # Presente quando violação detectada (JSON)
-│   └── AUTHORIZED_CLOSE.flag   # Presente quando último turno foi autorizado (simétrico)
-├── logs/                       # Logs append-only (chmod 700)
-│   ├── audit.jsonl             # Log principal — todos os eventos (max 5000 linhas)
-│   ├── findings.jsonl          # Findings de auditoria registrados
-│   ├── tool-metrics.jsonl      # Métricas de duração por ferramenta
-│   ├── errors.jsonl            # Erros com stack trace completo
-│   ├── raw-input.jsonl         # Payloads brutos de preToolUse (diagnóstico)
-│   └── raw-post-input.jsonl    # Payloads brutos de postToolUse (diagnóstico)
-└── checkpoints/                # Snapshots por turno
-    ├── sess_<uuid>_turn<N>_<ts>.json
-    └── sess_<uuid>_latest.json  # Symlink para o checkpoint mais recente
+│   └── AUTHORIZED_CLOSE.flag   # Presente quando último turno foi autorizado
+└── logs/                       # Logs append-only (chmod 700)
+    ├── audit.jsonl             # Log principal — todos os eventos (<5000 linhas; auto-rotacionado)
+    ├── audit-YYYYMMDD_HHMMSS.jsonl  # Arquivo rotacionado de audit.jsonl
+    ├── findings.jsonl          # Findings de auditoria registrados
+    ├── tool-metrics.jsonl      # Métricas de duração por ferramenta
+    └── errors.jsonl            # Erros com stack trace completo
 ```
 
 ---

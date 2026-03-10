@@ -16,9 +16,15 @@ set -euo pipefail
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
 CTX_FILE="$HOOK_DIR/state/session-context.json"
-
+# shellcheck disable=SC1091
+source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
-
+# G9-08: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
+_CTX_LOCK="${CTX_FILE}.lock"
+exec 9> "$_CTX_LOCK"
+if command -v flock > /dev/null 2>&1; then
+    flock -x -w 3 9 2> /dev/null
+fi
 INPUT="$(cat 2> /dev/null || true)"
 
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
@@ -151,6 +157,8 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.section_id               = .current_section.section_id
          | .current_turn.intent_declared           = false
          | .current_turn.intent                    = null
+         | .current_turn.block_count               = 0
+         | .current_turn.agentStop_invocations     = 0
          | .current_section.local_turn             = ((.current_section.local_turn // 0) + 1)
          | .current_turn.section_turn              = (.current_section.local_turn // 1)' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
@@ -177,6 +185,8 @@ elif [ -f "$CTX_FILE" ]; then
          | .current_turn.section_id               = .current_section.section_id
          | .current_turn.intent_declared           = false
          | .current_turn.intent                    = null
+         | .current_turn.block_count               = 0
+         | .current_turn.agentStop_invocations     = 0
          | .current_section.local_turn             = ((.current_section.local_turn // 0) + 1)
          | .current_turn.section_turn              = (.current_section.local_turn // 1)' \
         "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"

@@ -22,6 +22,8 @@ HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
+# shellcheck disable=SC1091
+source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 
@@ -136,6 +138,7 @@ _JQ_ARGS=(
     --argjson turn "$CURRENT_TURN"
     --argjson section_num "$NEW_SECTION_NUMBER"
     --arg section_id "$NEW_SECTION_ID"
+    --argjson cap "${HOOKS_SECTION_HISTORY_CAP:-50}"
 )
 if [ -n "$SECTION_DESC" ]; then
     _JQ_ARGS+=(--arg desc "$SECTION_DESC")
@@ -143,13 +146,13 @@ if [ -n "$SECTION_DESC" ]; then
     _JQ_FILTER='.current_section = {name: $name, section_id: $section_id, started_at: $ts, turn_start: $turn, local_turn: 0, description: $desc, section_number: $section_num, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
                 | .session_stats.section_count = $section_num
                 | .session_stats.section_names += [$name]
-                | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: $name, section_id: $section_id, section_number: $section_num, started_at: $ts}] | if length > 50 then .[-50:] else . end)'
+                | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: $name, section_id: $section_id, section_number: $section_num, started_at: $ts}] | if length > $cap then .[-($cap):] else . end)'
 else
     # shellcheck disable=SC2016
     _JQ_FILTER='.current_section = {name: $name, section_id: $section_id, started_at: $ts, turn_start: $turn, local_turn: 0, description: null, section_number: $section_num, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
                 | .session_stats.section_count = $section_num
                 | .session_stats.section_names += [$name]
-                | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: $name, section_id: $section_id, section_number: $section_num, started_at: $ts}] | if length > 50 then .[-50:] else . end)'
+                | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: $name, section_id: $section_id, section_number: $section_num, started_at: $ts}] | if length > $cap then .[-($cap):] else . end)'
 fi
 
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then

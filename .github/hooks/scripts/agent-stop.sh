@@ -23,9 +23,16 @@ HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
-
+# shellcheck disable=SC1091
+source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
-
+# G9-08: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
+# flock -w 3: aguarda até 3s; se não conseguir, continua sem lock (degraded mode).
+_CTX_LOCK="${CTX_FILE}.lock"
+exec 9> "$_CTX_LOCK"
+if command -v flock > /dev/null 2>&1; then
+    flock -x -w 3 9 2> /dev/null
+fi
 INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos usando schema real
@@ -80,21 +87,72 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 >> "$LOG_DIR/audit.jsonl"
             SESSION_ID="$SESSION_ID_PAYLOAD" # continua com ID correto
         else
-            jq -cn \
-                --arg event "session_id_mismatch" \
-                --arg expected "$CTX_ACTIVE_SID" \
-                --arg got "$SESSION_ID_PAYLOAD" \
-                --arg source "agent-stop.sh" \
-                --arg ts "${TIMESTAMP:-}" \
-                '{
-                    event:   $event,
-                    expected: $expected,
-                    got:      $got,
-                    source:   $source,
-                    timestamp: $ts,
-                    message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-                }' >> "$LOG_DIR/audit.jsonl"
-            exit 0
+            # G9-04: HEAL v2 — rastreia mismatches consecutivos com o mesmo "got" session_id.
+            # Após 3 ocorrências do mesmo "got", auto-heal (CTX provavelmente defasado).
+            MISMATCH_TRACK_FILE="$STATE_DIR/.mismatch_track.json"
+            PREV_GOT=""
+            PREV_COUNT=0
+            if [ -f "$MISMATCH_TRACK_FILE" ]; then
+                PREV_GOT="$(jq -r '.got // ""' "$MISMATCH_TRACK_FILE" 2> /dev/null || echo '')"
+                PREV_COUNT="$(jq -r '.count // 0' "$MISMATCH_TRACK_FILE" 2> /dev/null || echo 0)"
+            fi
+            if [ "$PREV_GOT" = "$SESSION_ID_PAYLOAD" ]; then
+                NEW_COUNT=$((PREV_COUNT + 1))
+            else
+                NEW_COUNT=1
+            fi
+            jq -cn --arg got "$SESSION_ID_PAYLOAD" --argjson count "$NEW_COUNT" \
+                '{got: $got, count: $count}' > "$MISMATCH_TRACK_FILE" 2> /dev/null || true
+
+            if [ "$NEW_COUNT" -ge 3 ]; then
+                # HEAL v2: ID recorrente → trust como real e sanar o contexto
+                NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+                if command -v sponge &> /dev/null; then
+                    jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
+                        '.session.id = $real_sid | .session.source = "healed_from_consecutive_mismatch" | .session.healed_at = $ts' \
+                        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+                else
+                    _TMP_HEAL="$(mktemp)"
+                    if jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
+                        '.session.id = $real_sid | .session.source = "healed_from_consecutive_mismatch" | .session.healed_at = $ts' \
+                        "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
+                        mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
+                    else
+                        rm -f "$_TMP_HEAL"
+                    fi
+                fi
+                rm -f "$MISMATCH_TRACK_FILE" 2> /dev/null || true
+                jq -cn \
+                    --arg event "session_id_healed" \
+                    --arg old "$CTX_ACTIVE_SID" \
+                    --arg new "$SESSION_ID_PAYLOAD" \
+                    --arg source "agent-stop.sh:heal_v2" \
+                    --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
+                    --argjson count "$NEW_COUNT" \
+                    '{event: $event, old_session_id: $old, new_session_id: $new, source: $source,
+                      timestamp: $ts, consecutive_mismatches: $count,
+                      message: "HEAL v2: mismatch consecutivo (3x) — session_id sanado para ID recorrente"}' \
+                    >> "$LOG_DIR/audit.jsonl"
+                SESSION_ID="$SESSION_ID_PAYLOAD"
+            else
+                jq -cn \
+                    --arg event "session_id_mismatch" \
+                    --arg expected "$CTX_ACTIVE_SID" \
+                    --arg got "$SESSION_ID_PAYLOAD" \
+                    --arg source "agent-stop.sh" \
+                    --arg ts "${TIMESTAMP:-}" \
+                    --argjson count "$NEW_COUNT" \
+                    '{
+                        event:   $event,
+                        expected: $expected,
+                        got:      $got,
+                        source:   $source,
+                        timestamp: $ts,
+                        consecutive_count: $count,
+                        message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
+                    }' >> "$LOG_DIR/audit.jsonl"
+                exit 0
+            fi
         fi
     fi
 fi
@@ -139,6 +197,24 @@ if [ -f "$CTX_FILE" ]; then
     TURN_BLOCK_COUNT="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 fi
 
+# ── REV-09: contador cumulativo de invocações de agentStop por turno ─────────
+# REV4-01: operação atômica via jq (read+increment+write em uma única expressão).
+# Elimina race condition de leitura-modificação-escrita em 3 passos separados.
+AGENTST_INVOCATIONS=1
+if [ -f "$CTX_FILE" ]; then
+    if command -v sponge &> /dev/null; then
+        AGENTST_INVOCATIONS="$(jq '.current_turn.agentStop_invocations = ((.current_turn.agentStop_invocations // 0) + 1)
+            | .current_turn.agentStop_invocations' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || echo 1)"
+    else
+        _TMP_INV="$(mktemp)"
+        AGENTST_INVOCATIONS="$(jq '.current_turn.agentStop_invocations = ((.current_turn.agentStop_invocations // 0) + 1)
+            | .current_turn.agentStop_invocations' \
+            "$CTX_FILE" > "$_TMP_INV" && mv "$_TMP_INV" "$CTX_FILE" \
+            && jq -r '.current_turn.agentStop_invocations // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    fi
+fi
+
 # Append em audit.jsonl — registra o fim do turno
 jq -cn \
     --arg event "agentStop" \
@@ -156,22 +232,24 @@ jq -cn \
     --argjson tools_count "$TURN_TOOLS_COUNT" \
     --argjson failures_count "$TURN_FAILURES_COUNT" \
     --argjson block_count "$TURN_BLOCK_COUNT" \
+    --argjson agentStop_invocations "$AGENTST_INVOCATIONS" \
     '{
-        event:            $event,
-        session_id:       $sid,
-        timestamp:        $ts,
-        turn_duration_s:  $dur,
-        stop_hook_active: $stop_hook_active,
-        turn_number:      $turn_number,
-        section_turn:     $section_turn,
-        section_name:     (if $section_name == "" then null else $section_name end),
-        section_id:       (if $section_id == "" then null else $section_id end),
-        turn_id:          (if $turn_id == "" then null else $turn_id end),
-        intent:           (if $intent == "" then null else $intent end),
-        intent_declared:  $intent_declared,
-        tools_count:      $tools_count,
-        failures_count:   $failures_count,
-        block_count:      $block_count
+        event:                  $event,
+        session_id:             $sid,
+        timestamp:              $ts,
+        turn_duration_s:        $dur,
+        stop_hook_active:       $stop_hook_active,
+        turn_number:            $turn_number,
+        section_turn:           $section_turn,
+        section_name:           (if $section_name == "" then null else $section_name end),
+        section_id:             (if $section_id == "" then null else $section_id end),
+        turn_id:                (if $turn_id == "" then null else $turn_id end),
+        intent:                 (if $intent == "" then null else $intent end),
+        intent_declared:        $intent_declared,
+        tools_count:            $tools_count,
+        failures_count:         $failures_count,
+        block_count:            $block_count,
+        agentStop_invocations:  $agentStop_invocations
     }' >> "$LOG_DIR/audit.jsonl"
 
 # ── Detecção de autorização ───────────────────────────────────────────────────
@@ -195,7 +273,7 @@ if [ -f "$AUDIT_FILE" ]; then
         # (matematicamente redundante dado a condição acima, mas previne tail -n 0 acidental)
         if [ "$LINES_SINCE_PROMPT" -gt 0 ]; then
             if tail -n "$LINES_SINCE_PROMPT" "$AUDIT_FILE" \
-                | jq -re 'select(.tool_name == "vscode_askQuestions")' > /dev/null 2>&1; then
+                | jq -re 'select(.tool_name == "vscode_askQuestions" or .event == "subagentStart")' > /dev/null 2>&1; then
                 AUTH_REQUESTED=true
             fi
         fi
@@ -206,7 +284,7 @@ if [ -f "$AUDIT_FILE" ]; then
         RECENT_LINES=150
         if [ "$TOTAL_LINES" -lt "$RECENT_LINES" ]; then RECENT_LINES="$TOTAL_LINES"; fi
         if tail -n "$RECENT_LINES" "$AUDIT_FILE" \
-            | jq -re 'select(.tool_name == "vscode_askQuestions")' > /dev/null 2>&1; then
+            | jq -re 'select(.tool_name == "vscode_askQuestions" or .event == "subagentStart")' > /dev/null 2>&1; then
             AUTH_REQUESTED=true
         fi
     fi
@@ -220,6 +298,30 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
         .auth_requested_this_turn //
         false' "$CTX_FILE" 2> /dev/null || echo false)"
     if [ "$CTX_FLAG" = "true" ]; then AUTH_REQUESTED=true; fi
+fi
+
+# Estratégia 4: delegação ao subagente = autorização implícita
+# runSubagent dispara agentStop no agente pai antes do subagente iniciar.
+# pre-tool-use.sh seta subagent_delegated=true quando detecta a chamada.
+# Esta estratégia captura o caso em que o contexto foi atualizado mas o audit.jsonl
+# ainda não tinha o evento (race window mínima mas possível).
+if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
+    SUBAGENT_DELEGATED="$(jq -r '.current_turn.subagent_delegated // false' "$CTX_FILE" 2> /dev/null || echo false)"
+    if [ "$SUBAGENT_DELEGATED" = "true" ]; then
+        AUTH_REQUESTED=true
+        jq -cn \
+            --arg event "auth_via_subagent_delegation" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$NOW_ISO" \
+            --arg turn_id "$TURN_ID" \
+            '{
+                event:      $event,
+                session_id: $sid,
+                timestamp:  $ts,
+                turn_id:    (if $turn_id == "" then null else $turn_id end),
+                message:    "Autorização concedida via delegação ao subagente (runSubagent)"
+            }' >> "$LOG_DIR/audit.jsonl"
+    fi
 fi
 
 # ── HARDENING: decision:block para turnos não autorizados ─────────────────────
@@ -529,7 +631,9 @@ if [ -z "$CURR_SECTION_CHECK" ] || [ "$CURR_SECTION_CHECK" = "null" ]; then
             '.current_section = {name: "retomada", section_id: $auto_section_id, started_at: $ts, turn_start: $tnum, description: "Seção automática criada pela invariante SESSION+SECTION+TURN", section_number: $snum, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
              | .session_stats.section_count = $snum
              | .session_stats.section_names += ["retomada"]
-             | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: "retomada", section_id: $auto_section_id, section_number: $snum, started_at: $ts}] | if length > 50 then .[-50:] else . end)' \
+             | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: "retomada", section_id: $auto_section_id, section_number: $snum, started_at: $ts}] | if length > 50 then .[-50:] else . end)
+             | .current_turn.section_turn = 1
+             | .current_turn.agentStop_invocations = 0' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
     jq -cn \
