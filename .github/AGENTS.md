@@ -27,11 +27,19 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 - O agente abre e fecha seções com `start-section.sh "nome"` / `section-end.sh "motivo"`
 - A mudança de contexto semântico é decisão do agente — sem necessidade de pedir permissão.
 
-**SESSION (sessão)** — Autorização explícita **obrigatória** com close_key:
+**SESSION (sessão)** — Autorização explícita **obrigatória** com close_key + session-close.sh:
 
-1. Invocar `vscode_askQuestions` com Template F
-2. O usuário digita a chave `ENCERRAR-XXXXXXXX` no campo livre
-3. Sem a chave → `SESSION_CLOSE_NO_KEY.flag` → sessão NÃO encerrada validamente
+1. Invocar `vscode_askQuestions` com Template F (exibe a `close_key` da sessão)
+2. Usuário digita a chave `ENCERRAR-XXXXXXXX` no campo livre
+3. Agente extrai a KEY da resposta e chama **obrigatoriamente**:
+   ```bash
+   bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
+   ```
+4. Sem a chamada do script → `SESSION_CLOSE_NO_KEY.flag` → alerta de encerramento não autorizado
+
+> **Por que session-close.sh?** O evento `sessionEnd` da plataforma VS Code Copilot não dispara
+> quando a sessão termina abruptamente. O `session-close.sh` é o único mecanismo confiável:
+> valida a KEY, loga `sessionCloseAuthorized`, chama `session-end.sh` e gera o relatório final.
 
 **Commit e/ou Push** — Protocolo obrigatório com Template G:
 
@@ -376,9 +384,16 @@ momentos. **Sem exceção.**
 > - `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO`
 > - `session-context.json` → campo `session.close_key`
 >
-> **Importante**: digitar a chave no campo livre é a ÚNICA forma de autorizar o encerramento.
-> Selecionar "Confirmar" sem digitar a chave não valida — o sistema verifica a presença literal
-> da string `ENCERRAR-XXXXXXXX` na resposta via `post-tool-use.sh`.
+> **Protocolo obrigatório (3 passos)**:
+> 1. Invocar este Template F via `vscode_askQuestions` (exibe a close_key ao usuário)
+> 2. Usuário digita a KEY no campo livre
+> 3. Agente extrai a KEY da resposta e chama **obrigatoriamente**:
+>    ```bash
+>    bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
+>    ```
+> **Por que o script é necessário?** O evento `sessionEnd` da plataforma VS Code Copilot não
+> dispara quando a sessão termina abruptamente. Sem chamar `session-close.sh`, o encerramento
+> nunca é registrado no sistema de auditoria e a próxima sessão detecta "encerramento abrupto".
 
 ```json
 [
@@ -393,6 +408,13 @@ momentos. **Sem exceção.**
   }
 ]
 ```
+
+**Após receber a KEY do usuário**, o agente DEVE executar imediatamente:
+```bash
+bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
+```
+Substituindo `ENCERRAR-XXXXXXXX` pela KEY digitada pelo usuário. O script valida, loga
+`sessionCloseAuthorized` e chama `session-end.sh` internamente.
 
 ---
 
@@ -622,9 +644,11 @@ inclui automaticamente as informações de continuidade no `session-briefing.md`
    `tools_used[]`) — não sobrescreva manualmente
 5. Findings em `findings.jsonl` são cumulativos — nunca deletar; usar `resolve-finding.sh` se
    disponível
-6. **ENCERRAMENTO DE SESSION**: sempre invocar **Template F** antes de encerrar. O usuário DEVE
-   digitar a chave `ENCERRAR-XXXXXXXX` (exibida no briefing) para validar o encerramento.
-   Sem a chave → `SESSION_CLOSE_NO_KEY.flag` criado → alerta no próximo briefing.
+6. **ENCERRAMENTO DE SESSION**: protocolo obrigatório de 3 passos:
+   1. Invocar **Template F** (`vscode_askQuestions`) — exibe a chave `ENCERRAR-XXXXXXXX` ao usuário
+   2. Usuário digita a chave
+   3. Agente chama **obrigatoriamente**: `bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"`
+   Sem o script → `SESSION_CLOSE_NO_KEY.flag` → alerta de encerramento não autorizado no próximo briefing.
 
 ---
 

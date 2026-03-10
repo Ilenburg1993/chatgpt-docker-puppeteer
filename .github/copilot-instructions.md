@@ -35,11 +35,24 @@ Canônico. **Última atualização**: 10 de março de 2026.
 - `agent-stop.sh` envia systemMessage contextual a cada `HOOKS_TURN_NUDGE_INTERVAL` (padrão: 5)
   TURNs sem `vscode_askQuestions`, ou quando há git push pendente de section declaration.
 
-### SESSION — Autorização obrigatória (close_key)
+### SESSION — Autorização obrigatória (close_key + session-close.sh)
 
-Encerramento de SESSION **ainda exige** que o usuário digite a chave `ENCERRAR-XXXXXXXX` (gerada no
-`session-briefing.md`) via **Template F** (ver `.github/AGENTS.md`). Sem a chave →
-`SESSION_CLOSE_NO_KEY.flag` → alerta na próxima SESSION.
+O encerramento de SESSION exige **protocolo explícito obrigatório** (3 passos):
+
+1. Agente invoca `vscode_askQuestions` com **Template F** (exibe a `close_key` da sessão)
+2. Usuário digita a chave `ENCERRAR-XXXXXXXX` na resposta
+3. Agente extrai a KEY da resposta e chama **obrigatoriamente**:
+   ```bash
+   bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
+   ```
+
+**Rationale**: O evento `sessionEnd` da plataforma VS Code Copilot **não dispara** quando a sessão
+termina abruptamente (crash/restart/timeout). O `session-close.sh` é o único mecanismo confiável de
+encerramento autorizado — valida a KEY, loga `sessionCloseAuthorized`, chama `session-end.sh` e gera
+o relatório final.
+
+Sem esse script: `SESSION_CLOSE_NO_KEY.flag` → alerta de encerramento não autorizado no próximo
+briefing.
 
 ### git commit / git push — Autorização obrigatória (Template G)
 

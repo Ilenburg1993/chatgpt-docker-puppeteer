@@ -43,7 +43,17 @@ trabalho. Não é necessário pedir autorização ao usuário — a decisão de 
 
 1. `vscode_askQuestions` com **Template F** (Session Close)
 2. Usuário digita a chave `ENCERRAR-XXXXXXXX` no campo livre do Template F
-3. Sem a chave → `SESSION_CLOSE_NO_KEY.flag` → alerta no próximo briefing
+3. Agente extrai a KEY da resposta e chama **obrigatoriamente**:
+   ```bash
+   bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
+   ```
+4. Sem esse script → `SESSION_CLOSE_NO_KEY.flag` → alerta no próximo briefing
+
+> **Por que o script é necessário?** O evento `sessionEnd` da plataforma VS Code Copilot **não
+> dispara** quando a sessão termina abruptamente (crash/restart/timeout). O `session-close.sh` é o
+> único mecanismo confiável: valida a KEY, loga `sessionCloseAuthorized`, chama `session-end.sh` e
+> gera o relatório final. Sem chamar o script, toda sessão é detectada como "encerramento abrupto"
+> na próxima inicialização.
 
 ### Commit e/ou Push — Protocolo obrigatório (Template G)
 

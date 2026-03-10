@@ -216,27 +216,49 @@ if [ -n "$PREV_CHECKPOINT" ] && [ -f "$PREV_CHECKPOINT" ]; then
     PREV_CHECKPOINT_TS="$(jq -r '.checkpoint_ts // ""' "$PREV_CHECKPOINT" 2> /dev/null || echo '')"
 fi
 
-# Detecção de encerramento abrupto: sessão anterior sem evento sessionEnd no audit
+# Detecção de encerramento abrupto: sessão anterior sem sessionEnd nem sessionCloseAuthorized
+# Nota: o evento `sessionEnd` da plataforma VS Code Copilot não dispara quando a
+# sessão termina abruptamente (crash/restart/timeout). O mecanismo correto de
+# encerramento é o agente chamar session-close.sh manualmente após validar a KEY,
+# o que gera o evento `sessionCloseAuthorized` E depois chama session-end.sh.
+# Encerramento limpo = `sessionEnd` OR `sessionCloseAuthorized` com o session_id correto.
 PREV_ABRUPT_CLOSE=false
 if [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
     _AUDIT_TMP="$LOG_DIR/audit.jsonl"
     _FOUND_SESSION_END=false
+    # Padrão de grep: qualquer um dos dois eventos de encerramento limpo
+    _CLEAN_CLOSE_PATTERN='"sessionEnd"\|"sessionCloseAuthorized"'
     # Verifica arquivo ativo primeiro
-    if [ -f "$_AUDIT_TMP" ] && grep -q '"sessionEnd"' "$_AUDIT_TMP" 2>/dev/null && \
-       grep '"sessionEnd"' "$_AUDIT_TMP" 2>/dev/null | grep -q "$PREV_SESSION_ID"; then
+    if [ -f "$_AUDIT_TMP" ] && grep -q "$_CLEAN_CLOSE_PATTERN" "$_AUDIT_TMP" 2> /dev/null \
+        && grep "$_CLEAN_CLOSE_PATTERN" "$_AUDIT_TMP" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
         _FOUND_SESSION_END=true
     fi
     # Se não encontrou, verifica o arquivo de audit mais recente (após rotação)
     if [ "$_FOUND_SESSION_END" = "false" ]; then
         _LATEST_ARCHIVE="$(find "$LOG_DIR" -maxdepth 1 -name 'audit-*.jsonl' \
-            -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)"
-        if [ -n "$_LATEST_ARCHIVE" ] && [ -f "$_LATEST_ARCHIVE" ] && \
-           grep -q '"sessionEnd"' "$_LATEST_ARCHIVE" 2>/dev/null && \
-           grep '"sessionEnd"' "$_LATEST_ARCHIVE" 2>/dev/null | grep -q "$PREV_SESSION_ID"; then
+            -printf '%T@ %p\n' 2> /dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)"
+        if [ -n "$_LATEST_ARCHIVE" ] && [ -f "$_LATEST_ARCHIVE" ] \
+            && grep -q "$_CLEAN_CLOSE_PATTERN" "$_LATEST_ARCHIVE" 2> /dev/null \
+            && grep "$_CLEAN_CLOSE_PATTERN" "$_LATEST_ARCHIVE" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
+            _FOUND_SESSION_END=true
+        fi
+    fi
+    # Verifica também SESSION_CLOSE_AUTHORIZED.flag (gerado por session-close.sh)
+    _AUTH_FLAG="$STATE_DIR/SESSION_CLOSE_AUTHORIZED.flag"
+    if [ "$_FOUND_SESSION_END" = "false" ] && [ -f "$_AUTH_FLAG" ]; then
+        _FLAG_SID="$(jq -r '.session_id // ""' "$_AUTH_FLAG" 2> /dev/null || echo '')"
+        if [ "$_FLAG_SID" = "$PREV_SESSION_ID" ]; then
             _FOUND_SESSION_END=true
         fi
     fi
     [ "$_FOUND_SESSION_END" = "false" ] && PREV_ABRUPT_CLOSE=true
+fi
+# Remove flag de autorização após leitura (evita falsos negativos em sessões futuras)
+if [ -f "$STATE_DIR/SESSION_CLOSE_AUTHORIZED.flag" ]; then
+    _AUTH_SID="$(jq -r '.session_id // ""' "$STATE_DIR/SESSION_CLOSE_AUTHORIZED.flag" 2> /dev/null || echo '')"
+    if [ -n "$_AUTH_SID" ] && [ "$_AUTH_SID" != "$SESSION_ID" ]; then
+        rm -f "$STATE_DIR/SESSION_CLOSE_AUTHORIZED.flag" 2> /dev/null || true
+    fi
 fi
 jq -cn \
     --arg event "sessionStart" \

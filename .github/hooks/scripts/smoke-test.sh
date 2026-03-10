@@ -720,6 +720,7 @@ for _script in \
     "$HOOK_DIR/scripts/agent-stop.sh" \
     "$HOOK_DIR/scripts/session-start.sh" \
     "$HOOK_DIR/scripts/session-end.sh" \
+    "$HOOK_DIR/scripts/session-close.sh" \
     "$HOOK_DIR/scripts/start-turn.sh" \
     "$HOOK_DIR/scripts/start-section.sh" \
     "$HOOK_DIR/scripts/generate-section-summary.sh" \
@@ -753,6 +754,108 @@ if [ -f "$HOOK_DIR/scripts/watchdog.sh" ]; then
 fi
 
 rm -rf "$_SANDBOX_DIR"
+
+# ── Testes do session-close.sh (validação de close_key) ──────────────────────
+echo ""
+echo "── Grupo 17: session-close.sh — validação de close_key ─────────────────────"
+
+_SC_SCRIPT="$HOOK_DIR/scripts/session-close.sh"
+_SC_DIR="$(mktemp -d)"
+_SC_STATE="$_SC_DIR/state"
+_SC_LOG="$_SC_DIR/logs"
+mkdir -p "$_SC_STATE" "$_SC_LOG"
+
+# Seed: contexto mínimo com close_key definida
+_SC_CTX="$_SC_STATE/session-context.json"
+cat > "$_SC_CTX" << 'SCJSON'
+{
+  "schema_version": 9,
+  "session": {
+    "id": "test-sc-session-001",
+    "close_key": "ENCERRAR-TESTTEST",
+    "close_key_validated": false,
+    "started_at": "2026-01-01T00:00:00Z"
+  }
+}
+SCJSON
+touch "$_SC_LOG/audit.jsonl"
+
+if [ -f "$_SC_SCRIPT" ]; then
+    # Teste SC-1: KEY correta → exit 0
+    _SC_CTX_COPY="$_SC_STATE/ctx_copy.json"
+    cp "$_SC_CTX" "$_SC_CTX_COPY"
+    # Chama script com sandbox de state/log
+    _SC_OUT="$(HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" \
+        HOME="$_SC_DIR" \
+        bash "$_SC_SCRIPT" "ENCERRAR-TESTTEST" 2>&1)" && _SC_RC=$? || _SC_RC=$?
+
+    if [ "$_SC_RC" -eq 0 ]; then
+        pass "SC-1: session-close.sh KEY correta → exit 0"
+    else
+        fail "SC-1: session-close.sh KEY correta → esperado exit 0, obtido rc=$_SC_RC (out: $_SC_OUT)"
+    fi
+
+    # Restaura contexto para próximo teste
+    cp "$_SC_CTX_COPY" "$_SC_CTX"
+
+    # Teste SC-2: KEY errada → exit 1
+    _SC_OUT2="$(HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" \
+        HOME="$_SC_DIR" \
+        bash "$_SC_SCRIPT" "ENCERRAR-WRONGKEY" 2>&1)" && _SC_RC2=$? || _SC_RC2=$?
+
+    if [ "$_SC_RC2" -ne 0 ]; then
+        pass "SC-2: session-close.sh KEY errada → exit≠0 (rc=$_SC_RC2)"
+    else
+        fail "SC-2: session-close.sh KEY errada → esperado exit≠0, obtido exit 0"
+    fi
+
+    # Restaura contexto para próximo teste
+    cp "$_SC_CTX_COPY" "$_SC_CTX"
+
+    # Teste SC-3: KEY ausente (sem argumento) → exit 1
+    _SC_OUT3="$(HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" \
+        HOME="$_SC_DIR" \
+        bash "$_SC_SCRIPT" 2>&1)" && _SC_RC3=$? || _SC_RC3=$?
+
+    if [ "$_SC_RC3" -ne 0 ]; then
+        pass "SC-3: session-close.sh sem KEY → exit≠0 (rc=$_SC_RC3)"
+    else
+        fail "SC-3: session-close.sh sem KEY → esperado exit≠0, obtido exit 0"
+    fi
+
+    # Teste SC-4: após KEY correta, sessionCloseAuthorized logado em audit.jsonl
+    cp "$_SC_CTX_COPY" "$_SC_CTX"
+    HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" \
+        HOME="$_SC_DIR" \
+        bash "$_SC_SCRIPT" "ENCERRAR-TESTTEST" > /dev/null 2>&1 || true
+    if grep -q '"sessionCloseAuthorized"' "$_SC_LOG/audit.jsonl" 2> /dev/null; then
+        pass "SC-4: sessionCloseAuthorized logado em audit.jsonl após KEY correta"
+    else
+        fail "SC-4: sessionCloseAuthorized NÃO encontrado em audit.jsonl"
+    fi
+
+    # Teste SC-5: SESSION_CLOSE_AUTHORIZED.flag gerado após KEY correta
+    if [ -f "$_SC_STATE/SESSION_CLOSE_AUTHORIZED.flag" ]; then
+        pass "SC-5: SESSION_CLOSE_AUTHORIZED.flag gerado"
+    else
+        fail "SC-5: SESSION_CLOSE_AUTHORIZED.flag NÃO gerado"
+    fi
+
+    # Teste SC-6: após KEY errada, sessionClose_REJECTED logado
+    cp "$_SC_CTX_COPY" "$_SC_CTX"
+    HOOKS_STATE_DIR="$_SC_STATE" HOOKS_LOG_DIR="$_SC_LOG" \
+        HOME="$_SC_DIR" \
+        bash "$_SC_SCRIPT" "ENCERRAR-BADKEY" > /dev/null 2>&1 || true
+    if grep -q '"sessionClose_REJECTED"' "$_SC_LOG/audit.jsonl" 2> /dev/null; then
+        pass "SC-6: sessionClose_REJECTED logado para KEY errada"
+    else
+        fail "SC-6: sessionClose_REJECTED NÃO encontrado em audit.jsonl"
+    fi
+else
+    fail "SC-0: session-close.sh não encontrado em $HOOK_DIR/scripts/"
+fi
+
+rm -rf "$_SC_DIR"
 
 # ── Resumo ───────────────────────────────────────────────────────────────────
 echo ""
