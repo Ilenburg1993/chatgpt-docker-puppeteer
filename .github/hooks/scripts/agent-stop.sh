@@ -202,15 +202,14 @@ fi
 AGENTST_INVOCATIONS=1
 if [ -f "$CTX_FILE" ]; then
     if command -v sponge &> /dev/null; then
-        AGENTST_INVOCATIONS="$(jq '.current_turn.agentStop_invocations = ((.current_turn.agentStop_invocations // 0) + 1)
-            | .current_turn.agentStop_invocations' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || echo 1)"
+        jq '.current_turn.agentStop_invocations = ((.current_turn.agentStop_invocations // 0) + 1)' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        AGENTST_INVOCATIONS="$(jq -r '.current_turn.agentStop_invocations // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
     else
         _TMP_INV="$(mktemp)"
-        AGENTST_INVOCATIONS="$(jq '.current_turn.agentStop_invocations = ((.current_turn.agentStop_invocations // 0) + 1)
-            | .current_turn.agentStop_invocations' \
-            "$CTX_FILE" > "$_TMP_INV" && mv "$_TMP_INV" "$CTX_FILE" \
-            && jq -r '.current_turn.agentStop_invocations // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+        jq '.current_turn.agentStop_invocations = ((.current_turn.agentStop_invocations // 0) + 1)' \
+            "$CTX_FILE" > "$_TMP_INV" && mv "$_TMP_INV" "$CTX_FILE" || true
+        AGENTST_INVOCATIONS="$(jq -r '.current_turn.agentStop_invocations // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
     fi
 fi
 
