@@ -1,6 +1,6 @@
 # Status & Roadmap — Sistema de Hooks
 **Documento canônico de acompanhamento evolutivo do sistema de hooks do Copilot.**
-**Última atualização**: 2026-03-10 | **Versão do documento**: 2.0
+**Última atualização**: 2026-03-11 | **Versão do documento**: 2.1
 
 > Este arquivo é o guia vivo do sistema de hooks. Deve ser atualizado a cada fase concluída,
 > novo bug descoberto ou decisão arquitetural tomada. É a fonte primária de verdade sobre o
@@ -87,7 +87,8 @@ SESSION (1 por dia, 1 por ativação Copilot)
 | Guards v2       | `90cd9592`      | 2026-03-09 | Guards completos em error-occurred.sh, subagent-stop.sh, log-prompt.sh                                                                                                  |
 | Consolidação v3 | `6de256b0`      | 2026-03-09 | copilot-instructions atualizado, docs PROTOCOLO-AUTORIZACAO, briefing                                                                                                   |
 | **Fase 8**      | `e22e8730`      | 2026-03-09 | Hotfixes CODEX P0+P1: H-001,H-002,H-003,H-004,H-006,M-001,M-002,M-003                                                                                                   |
-| **Fase 9**      | (pendente push) | 2026-03-10 | G9-01..G9-10: pre-push reinstalado, rotate-audit, flag stale clear, HEAL v2, raw-logs deletados, contracts/events-contract.md, hooks-lib/common.sh, smoke-test seção 15 |
+| **Fase 9**      | `e22e8730` + `1674615b`→`3447fb73` | 2026-03-10 | G9-01..G9-10: pre-push reinstalado, rotate-audit, flag stale clear, HEAL v2, raw-logs deletados, contracts/events-contract.md, hooks-lib/common.sh, smoke-test seção 15 |
+| **Hardening v6** | `3447fb73`                        | 2026-03-11 | Subagente auth (3 camadas), REV4-01~08: auth_via_subagent_delegation, events-contract v1.1, smoke-test sandbox, ctx_guard_session_id removida, flock session-end, caps config |
 
 ### O que a Fase 8 resolveu
 
@@ -99,17 +100,34 @@ SESSION (1 por dia, 1 por ativação Copilot)
 | H-004    | `toolFailure` vs `toolUseFailure` divergência   | ✅ Dual-read implementado em consumidores                  |
 | H-005    | Flood de `session_id_mismatch`                  | ✅ Resolvido na Fase 7 (HEAL v1)                           |
 | H-006    | `reset-auth-violation.sh` campos legados        | ✅ Corrigido para `.compliance.*`                          |
-| H-007    | Ausência de locking transacional                | ⏳ Pendente (P2 — sem flock implementado)                  |
+| H-007    | Ausência de locking transacional                | ✅ Parcialmente resolvido (Hardening v6): session-end.sh tem flock (REV4-07); agent-stop.sh/log-prompt.sh usa sponge (atômico) |
 | M-001    | Smoke-test validações frágeis                   | ✅ Checks alinhados ao contrato correto                    |
 | M-002    | Métricas de seção usam sessão inteira           | ✅ Filtro por `section_id` implementado                    |
 | M-003    | Timestamps inconsistentes                       | ✅ Normalizado; alguns eventos ainda legacy                |
 | M-004    | Pre-commit apenas informativo                   | ⏳ Decidido: P3, não urgente                               |
-| S-001    | Raw logs persistem dados sensíveis              | ⏳ Pendente (P1 — raw logs ainda ativos)                   |
+| S-001    | Raw logs persistem dados sensíveis              | ✅ Resolvido (Fase 9): rotate-audit.sh purga raw-*.jsonl automáticamente |
 | S-002    | Redaction por regex insuficiente                | ⏳ Pendente (P3)                                           |
+
+### O que o Hardening v6 (commit `3447fb73`) resolveu
+
+| ID      | Descrição                                                | Status                                                                              |
+| ------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| HV6-01  | Sessão encerrada sem auth após `runSubagent`             | ✅ `pre-tool-use.sh` detecta `runSubagent`/`Task` → seta `subagent_delegated=true`, loga `subagentStart` |
+| HV6-02  | `agent-stop.sh` não reconhecia subagente como autorização | ✅ Strategies 1+2 aceitam `subagentStart`; Strategy 4 (nova): lê `subagent_delegated` do contexto |
+| REV4-01 | `agentStop_invocations` não incrementava atomicamente   | ✅ `+= 1` via jq (atômico via sponge)                                               |
+| REV4-02 | `events-contract.md` sem 25+ eventos                   | ✅ v1.1: 7 eventos adicionados, `turnStart`→`turnStart_enriched`, agentStop 3→4 strategies |
+| REV4-03 | `generate-section-summary.sh` hardcoded cap `50`        | ✅ Usa `$HOOKS_SECTION_HISTORY_CAP` da `config.sh`                                  |
+| REV4-04 | `start-section.sh`/`start-turn.sh` ignoravam config.sh  | ✅ Ambos sourced `common.sh`; usam `$HOOKS_*_HISTORY_CAP`                           |
+| REV4-05 | `ctx_guard_session_id` dead code em `common.sh`         | ✅ Removida (nenhum script a chamava)                                                |
+| REV4-06 | `auth_requested_at` ausente em branch sem close_key     | ✅ `post-tool-use.sh` seta em ambos os branches                                     |
+| REV4-07 | `session-end.sh` sem flock (race condition)             | ✅ `flock -x -w` adicionado antes da leitura do stdin                               |
+| REV4-08 | `smoke-test.sh` não executava scripts em sandbox         | ✅ Seção REV4-08: syntax check em 11 scripts + exec isolada de `watchdog.sh`        |
+
+**Smoke-test após Hardening v6**: 143/143 PASS | shellcheck: 0 warnings
 
 ---
 
-## 3. Diagnóstico do Estado Atual (2026-03-10 → atualizado Fase 9)
+## 3. Diagnóstico do Estado Atual (2026-03-11 → atualizado Hardening v6)
 
 ### 3.1 O que está funcionando
 
@@ -193,7 +211,7 @@ SESSION (1 por dia, 1 por ativação Copilot)
 - `hl_redact()` já existe em `common.sh` como fundação.
 
 **G9-12 — Schemas JSON formais não existem**
-- ⏳ **PENDENTE**: Sem `contracts/session-context.schema.json`.
+- ✅ **RESOLVIDO (Fase 9)**: `contracts/session-context.schema.json` criado em `.github/hooks/contracts/`.
 - Fix P3: criar contratos formais para validar produtores e consumidores em CI.
 
 **G9-13 — README desatualizado para Schema v8**
@@ -229,7 +247,7 @@ SESSION (1 por dia, 1 por ativação Copilot)
 | ----- | -------------------------- | ---------------------------------------------------- | ------------------------------------------------------- |
 | G9-06 | ~~Sem events-contract.md~~ | `.github/hooks/contracts/`                           | ✅ **RESOLVIDO Fase 9** — events-contract.md criado      |
 | G9-07 | ~~Sem common.sh~~          | `.github/hooks/hooks-lib/`                           | ✅ **RESOLVIDO Fase 9** — common.sh criado com 7 funções |
-| G9-08 | Integrar flock             | `agent-stop.sh`, `post-tool-use.sh`, `log-prompt.sh` | ⏳ `hl_with_lock()` pronto — integrar nos 3 scripts      |
+| G9-08 | Integrar flock             | `agent-stop.sh`, `post-tool-use.sh`, `log-prompt.sh` | ⏳ Parcial: `session-end.sh` tem flock (REV4-07); sponge nos demais |
 | G9-09 | Docs desatualizados        | `DOCUMENTAÇÃO/HOOKS/README.md`                       | ⏳ Atualizar após Fase 9 completa (coincide com G9-13)   |
 
 ### P3 — Backlog estrutural
@@ -238,7 +256,7 @@ SESSION (1 por dia, 1 por ativação Copilot)
 | ----- | ------------------------- | ------- | ----------------------- | ------------------ |
 | G9-10 | ~~Smoke-test section 15~~ | Médio   | Prevenção de regressões | ✅ RESOLVIDO Fase 9 |
 | G9-11 | Redaction estrutural      | Alto    | Segurança de logs       | ⏳ Pendente         |
-| G9-12 | Schemas JSON formais      | Médio   | Contrato versionado     | ⏳ Pendente         |
+| G9-12 | Schemas JSON formais      | Médio   | Contrato versionado     | ✅ `session-context.schema.json` criado (Fase 9) |
 | G9-13 | README.md Schema v8       | Médio   | Documentação atualizada | ⏳ Pendente         |
 | G9-14 | Pre-commit configurável   | Baixo   | Governança leve         | ⏳ Pendente/Backlog |
 
