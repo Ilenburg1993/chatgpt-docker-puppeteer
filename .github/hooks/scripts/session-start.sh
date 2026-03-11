@@ -53,6 +53,12 @@ SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || echo 'unknown')"
 # CRÍTICO: session-context.json é sobrescrito logo abaixo; precisamos dos dados
 # anteriores *agora* para preservar o contador de violações consecutivas.
 PREV_CONSEC_UNAUTH=0
+# Hardening v5.1: captura dados da sessão anterior ANTES de sobrescrever o contexto.
+# Estes dados são usados como fallback para o alerta de violação quando o flag file não existe
+# (caso em que v5.0 silenciava o encerramento incorreto sem nenhuma informação ao usuário).
+PREV_SESSION_ID_FROM_CTX=""
+PREV_LAST_TURN_TS_FROM_CTX=""
+PREV_TURN_NUMBER_FROM_CTX=0
 if [ -f "$STATE_DIR/session-context.json" ] && [ -s "$STATE_DIR/session-context.json" ]; then
     # Suporta schema v2 (.compliance.consecutive_unauthorized) e legado
     # -s verifica se o arquivo tem conteúdo (não é vazio / 0 bytes)
@@ -64,6 +70,10 @@ if [ -f "$STATE_DIR/session-context.json" ] && [ -s "$STATE_DIR/session-context.
     if [[ "$_raw" =~ ^[0-9]+$ ]]; then
         PREV_CONSEC_UNAUTH="$_raw"
     fi
+    # Captura identificadores da sessão anterior (para alerta de violação sem flag file)
+    PREV_SESSION_ID_FROM_CTX="$(jq -r '.session.id // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
+    PREV_LAST_TURN_TS_FROM_CTX="$(jq -r '.last_turn_ts // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
+    PREV_TURN_NUMBER_FROM_CTX="$(jq -r '.current_turn.number // 0' "$STATE_DIR/session-context.json" 2> /dev/null || echo 0)"
 fi
 
 # ── Watchdog: verifica estado anterior antes de sobrescrever ─────────────────
@@ -259,8 +269,10 @@ fi
 #   clean             → sessionCloseAuthorized encontrado OU SESSION_CLOSE_AUTHORIZED.flag OK
 #   key_validated     → close_key_validated=true no checkpoint mas session-close.sh não executado
 #   abrupt_no_key     → encerramento sem KEY (crash/timeout/restart)
+#   abrupt_reconnect  → sessionEnd sintético gerado por rollover de reconexão (log-prompt.sh)
 #   ok                → nenhuma sessão anterior detectada
 PREV_CLOSE_MODE="ok"
+PREV_RECONNECT_COUNT=0
 if [ "$PREV_ABRUPT_CLOSE" = "true" ]; then
     if [ "$PREV_CLOSE_KEY_VALIDATED" = "true" ]; then
         PREV_CLOSE_MODE="key_validated"
@@ -269,6 +281,16 @@ if [ "$PREV_ABRUPT_CLOSE" = "true" ]; then
     fi
 elif [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
     PREV_CLOSE_MODE="clean"
+    # RECONNECT-01: verifica se o encerramento foi via rollover de reconexão
+    # (sessionEnd sintético com close_mode:abrupt_reconnect gerado por log-prompt.sh)
+    _AUDIT_TMP="$LOG_DIR/audit.jsonl"
+    if [ -f "$_AUDIT_TMP" ] && grep -q '"sessionReconnect"' "$_AUDIT_TMP" 2> /dev/null \
+        && grep '"sessionReconnect"' "$_AUDIT_TMP" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
+        PREV_CLOSE_MODE="abrupt_reconnect"
+        # Conta quantas reconexões ocorreram na sessão anterior
+        PREV_RECONNECT_COUNT="$(grep '"sessionReconnect"' "$_AUDIT_TMP" 2> /dev/null \
+            | grep "$PREV_SESSION_ID" | wc -l | tr -d ' ' || echo 0)"
+    fi
 fi
 # Remove flag de autorização após leitura (evita falsos negativos em sessões futuras)
 if [ -f "$STATE_DIR/SESSION_CLOSE_AUTHORIZED.flag" ]; then
@@ -431,6 +453,39 @@ if [ "${CRITICAL_FINDINGS:-0}" -gt 0 ] 2> /dev/null; then
 - ⚠️ **${CRITICAL_FINDINGS} finding(s) crítico/high abertos** — verifique \`logs/findings.jsonl\` antes de iniciar nova tarefa."
 fi
 
+# ── Health check de REDE (v5.5 — Session Robustness) ──────────────────────
+# Detecta problemas de conectividade que causam desconexões/reconexões VS Code.
+# Referência: DOCUMENTAÇÃO/HOOKS/ANALISE-SESSOES-ABRUPTAS.md §5.5
+NET_CHECK_HOST="${HEALTH_CHECK_HOST:-140.82.112.22}" # GitHub (IPs estáticos)
+NET_TIMEOUT=3
+NET_OK=false
+if ping -c 1 -W "$NET_TIMEOUT" "$NET_CHECK_HOST" &> /dev/null 2>&1; then
+    NET_OK=true
+fi
+
+# Verifica taxa de reconexões recentes (sessionReconnect no audit.jsonl)
+RECENT_RECONNECT_COUNT=0
+if [ -f "$AUDIT_FILE" ] && command -v jq &> /dev/null; then
+    RECENT_RECONNECT_COUNT="$(
+        jq -r 'select(.event == "sessionReconnect") | .timestamp' "$AUDIT_FILE" 2> /dev/null \
+            | tail -50 | wc -l | tr -d ' '
+    )"
+fi
+RECENT_RECONNECT_COUNT="${RECENT_RECONNECT_COUNT:-0}"
+
+if [ "$NET_OK" = "false" ]; then
+    HEALTH_CRITICAL="${HEALTH_CRITICAL}
+- ⛔ **Sem conectividade de rede** (ping ${NET_CHECK_HOST} falhou). VS Code pode desconectar. Verifique WSL2/Docker network."
+fi
+
+if [ "${RECENT_RECONNECT_COUNT}" -ge 20 ] 2> /dev/null; then
+    HEALTH_CRITICAL="${HEALTH_CRITICAL}
+- ⛔ **Taxa crítica de reconexões VS Code** (${RECENT_RECONNECT_COUNT} reconexões detectadas). Instabilidade de conexão severa."
+elif [ "${RECENT_RECONNECT_COUNT}" -ge 5 ] 2> /dev/null; then
+    HEALTH_WARNINGS="${HEALTH_WARNINGS}
+- ⚠️ **Taxa elevada de reconexões VS Code** (${RECENT_RECONNECT_COUNT} reconexões). Verifique: extensões auto-update, rede/DNS, sleep do host."
+fi
+
 HEALTH_STATUS="✅ Sistema operacional"
 if [ -n "$HEALTH_CRITICAL" ]; then
     HEALTH_STATUS="⛔ CRÍTICO — verificação imediata necessária"
@@ -480,6 +535,33 @@ if [ -f "$AUTH_FLAG_FILE" ]; then
     fi
 fi
 
+# ── Hardening v5.1: fallback de violação quando não há UNAUTHORIZED_CLOSE.flag ────
+# Em v5.0, o flag era removido silenciosamente no TURN não-autorizado.
+# Este fallback garante que mesmo sem o flag, o alerta de violação aparece no briefing
+# se compliance.consecutive_unauthorized > 0 foi carregado da sessão anterior.
+if [ "$PREV_UNAUTH_CLOSE" = "false" ] && [ "${PREV_CONSEC_UNAUTH:-0}" -gt 0 ]; then
+    PREV_UNAUTH_CLOSE=true
+    PREV_UNAUTH_FLAG_STALE=false
+    # Usa dados capturados antes da sobrescrita do contexto
+    PREV_UNAUTH_SID="${PREV_SESSION_ID_FROM_CTX:-${PREV_SESSION_ID:-sessão anterior}}"
+    PREV_UNAUTH_TS="${PREV_LAST_TURN_TS_FROM_CTX:-desconhecido}"
+    PREV_UNAUTH_TURN="${PREV_TURN_NUMBER_FROM_CTX:-0}"
+    jq -cn \
+        --arg event "authViolation_detected_ctx_fallback" \
+        --arg new_sid "$SESSION_ID" \
+        --arg old_sid "$PREV_UNAUTH_SID" \
+        --arg ts "${TIMESTAMP:-$SESSION_DATE}" \
+        --argjson consec "${PREV_CONSEC_UNAUTH:-0}" \
+        '{
+            event:                    $event,
+            session_id:               $new_sid,
+            timestamp:                $ts,
+            old_session_id:           $old_sid,
+            consecutive_unauthorized: $consec,
+            message:                  "Violação detectada via ctx fallback (sem flag file) — hardening v5.1"
+        }' >> "$LOG_DIR/audit.jsonl" 2> /dev/null || true
+fi
+
 # ── Verifica encerramento sem SESSION CLOSE KEY ─────────────────────────────
 NO_KEY_FLAG_FILE="$STATE_DIR/SESSION_CLOSE_NO_KEY.flag"
 PREV_NO_KEY_CLOSE=false
@@ -518,6 +600,34 @@ cat > "$BRIEFING_FILE" << BRIEFING_EOF
 > Leia-o como primeiro ato de toda sessão, antes de qualquer ação.
 > Após lê-lo, **invoque \`vscode_askQuestions\`** com o Template E (Session Kickoff)
 > para definir com o usuário o rumo desta sessão.
+
+---
+
+## ╔══ PROTOCOLO DE ENCERRAMENTO — LEITURA OBRIGATÓRIA ══╗
+
+> **SESSION ≠ SECTION ≠ TURN — distinção crítica para o agente LLM**
+
+| Conceito    | Encerra como?                           | Autorização    |
+|-------------|------------------------------------------|----------------|
+| **TURN**    | Livremente ao terminar a resposta        | **Nenhuma**    |
+| **SECTION** | \`bash start-section.sh "nome"\` (autônomo)| **Nenhuma**    |
+| **SESSION** | Template F + KEY digitada + \`bash session-close.sh KEY\` | **OBRIGATÓRIA**|
+
+> ⚠️ **Terminar de escrever uma resposta = encerrar um TURN, NÃO a SESSION.**
+> A SESSION só encerra quando o usuário explicitamente digita a chave abaixo.
+
+### 🔐 Chave desta SESSION (mostrar no Template F):
+\`\`\`
+${CLOSE_KEY}
+\`\`\`
+
+### Fluxo de encerramento de SESSION (3 etapas obrigatórias):
+1. Agente chama \`vscode_askQuestions\` com **Template F** (exibe a chave acima)
+2. Usuário digita a chave \`${CLOSE_KEY}\` no campo livre
+3. Agente executa: \`bash .github/hooks/scripts/session-close.sh "${CLOSE_KEY}"\`
+
+---
+
 BRIEFING_EOF
 
 # Injeta aviso de violação NO TOPO do briefing, se houver (nível escalona com CONSECUTIVE_VIOLATIONS)
@@ -647,23 +757,47 @@ ABRUPT_EOF
     fi
 fi
 
-# Continuação do briefing — Seção da close_key (sempre exibida)
+# Injeta aviso de reconexão se a sessão anterior encerrou via rollover (RECONNECT-01)
+if [ "$PREV_CLOSE_MODE" = "abrupt_reconnect" ]; then
+    cat >> "$BRIEFING_FILE" << RECONNECT_EOF
+
+---
+
+## 🔄 INFORMAÇÃO — SESSÃO ANTERIOR ENCERROU POR RECONEXÃO DO CLIENTE
+
+> O VS Code Client (lado Windows) desconectou e reconectou durante a sessão anterior,
+> gerando um novo session_id sem disparar o evento \`sessionStart\`.
+> Esta sessão agora começa com identificação limpa.
+>
+> - **Sessão afetada**: \`${PREV_SESSION_ID}\`
+> - **Reconexões detectadas**: ${PREV_RECONNECT_COUNT}
+> - **Causas comuns**: Windows sleep/hibernação, VS Code restart, WSL2 network reset.
+>
+> **Recomendações para sessões mais estáveis**:
+> - Evitar hibernate/sleep do Windows durante sessões ativas
+> - SSH keepalive configurado (ServerAliveInterval=60) para evitar silent drops
+> - Não fechar a janela do VS Code sem encerrar a sessão via Template F
+
+---
+
+RECONNECT_EOF
+fi
+
+# Continuação do briefing — Seção da close_key (reforço — já exibida no topo)
+# Hardening v6.0: mantemos referência secundária para garantir visibilidade mesmo
+# após o agente scrollar além do topo do briefing.
 cat >> "$BRIEFING_FILE" << CLOSE_KEY_EOF
 
 ---
 
-## 🔐 CHAVE DE ENCERRAMENTO DA SESSÃO
-
-> **Esta chave DEVE ser fornecida ao encerrar a sessão legitimamente.**
-> Quando solicitar encerramento, o agente usará o Template F (Session Close) e
-> pedirá que você a confirme digitando-a no campo livre do \`vscode_askQuestions\`.
+## 🔐 CHAVE DE ENCERRAMENTO (referência rápida)
 
 \`\`\`
 ${CLOSE_KEY}
 \`\`\`
 
-> A chave é única por sessão e gerada automaticamente. Encerramento sem ela é
-> registrado como **sessionEnd_no_key** e gera alerta na próxima sessão.
+> SESSION fecha com: **Template F** → usuário digita KEY → \`bash session-close.sh "${CLOSE_KEY}"\`
+> TURN encerra livremente. SECTION muda via \`start-section.sh\` (autônomo).
 
 ---
 
@@ -748,6 +882,8 @@ ${NEXT_TASK}
 ## Saúde do Sistema
 
 **Status**: ${HEALTH_STATUS}
+**Rede**: $([ "$NET_OK" = "true" ] && echo "✅ OK (ping ${NET_CHECK_HOST})" || echo "⛔ FALHA (sem resposta de ${NET_CHECK_HOST})")
+**Reconexões VS Code (histórico)**: ${RECENT_RECONNECT_COUNT} $([ "${RECENT_RECONNECT_COUNT:-0}" -ge 20 ] && echo "⛔ CRÍTICO" || ([ "${RECENT_RECONNECT_COUNT:-0}" -ge 5 ] && echo "⚠️ ELEVADO" || echo "✅ ok"))
 
 $(if [ -n "$HEALTH_CRITICAL" ]; then printf '%s\n' "$HEALTH_CRITICAL"; fi)
 $(if [ -n "$HEALTH_WARNINGS" ]; then printf '%s\n' "$HEALTH_WARNINGS"; fi)

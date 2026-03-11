@@ -4,10 +4,14 @@
 # Input JSON (stdin): {timestamp, hook_event_name, session_id, transcript_path,
 #                      tool_name, tool_input, tool_use_id, cwd}
 # Schema verificado empiricamente em 2026-03-09 (vide raw-input.jsonl diagnóstico).
-# Output: NÃO emite {"permissionDecision":"deny"} — logging-only por decisão de projeto.
+#
+# PROTOCOLO SESSION PERSISTENTE (v8.0):
+#   - session-close.sh NUNCA pode ser chamado diretamente pelo agente.
+#   - Apenas post-tool-use.sh pode acionar session-close.sh (detectando KEY via vscode_askQuestions).
+#   - Qualquer tentativa de run_in_terminal com session-close.sh → permissionDecision:deny.
+#   - Isso previne o "Mechanism 5": agente hallucinar KEY e chamar o script diretamente.
 #
 # SEGURANÇA: credentials são redactados antes de qualquer log.
-# O agente tem autonomia total — este hook nunca bloqueia.
 #
 # Schema v2: atualiza current_turn.*, session_stats.* e last_tool.* separadamente.
 set -euo pipefail
@@ -116,13 +120,35 @@ jq -cn \
 # contexto Schema v4 mínimo para restaurar funcionalidade dos guards e métricas.
 if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; then
     NOW_RECOVERY="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo "$TIMESTAMP")"
+    # Hardening v6.0: tenta recuperar a close_key do briefing de sessão antes de criar contexto vazio.
+    # Isso evita a discrepância em que auto_recovery cria contexto sem close_key enquanto o
+    # briefing exibe uma close_key diferente gerada pelo session-start.sh.
+    _RECOVERY_CLOSE_KEY=""
+    BRIEFING_FILE_RECOVERY="$STATE_DIR/session-briefing.md"
+    if [ -f "$BRIEFING_FILE_RECOVERY" ]; then
+        _RECOVERY_CLOSE_KEY="$(grep -oP 'ENCERRAR-[A-F0-9]{8}' "$BRIEFING_FILE_RECOVERY" 2> /dev/null | head -1 || echo '')"
+    fi
+
+    # v8.1: herda close_key_validated do flag SESSION_CLOSE_AUTHORIZED se existir.
+    # Evita perda do estado de autorização quando VS Code reinicia com mesmo session_id.
+    _RECOVERY_KEY_VALIDATED="false"
+    _AUTH_FLAG="$STATE_DIR/SESSION_CLOSE_AUTHORIZED.flag"
+    if [ -f "$_AUTH_FLAG" ]; then
+        _FLAG_SID="$(jq -r '.session_id // ""' "$_AUTH_FLAG" 2> /dev/null || echo '')"
+        if [ "$_FLAG_SID" = "$SESSION_ID" ]; then
+            _RECOVERY_KEY_VALIDATED="true"
+        fi
+    fi
     jq -cn \
         --arg sid "$SESSION_ID" \
         --arg now "$NOW_RECOVERY" \
+        --arg close_key "${_RECOVERY_CLOSE_KEY}" \
+        --argjson key_validated "$_RECOVERY_KEY_VALIDATED" \
         '{
             session: {
                 id: $sid, started_at: $now, ended_at: null, end_reason: null,
-                close_key: null, close_key_validated: false,
+                close_key: (if $close_key == "" then null else $close_key end),
+                close_key_validated: $key_validated,
                 source: "auto_recovery", cwd: null
             },
             session_stats: {
@@ -162,12 +188,14 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
         --arg sid "$SESSION_ID" \
         --arg ts "$NOW_RECOVERY" \
         --arg trigger "preToolUse" \
+        --arg close_key "${_RECOVERY_CLOSE_KEY}" \
         '{
             event:   $event,
             session_id: $sid,
             timestamp: $ts,
             trigger: $trigger,
-            message: "session-context.json vazio — estado mínimo criado por auto-recovery"
+            close_key_recovered: (if $close_key == "" then null else $close_key end),
+            message: "session-context.json vazio — estado mínimo criado por auto-recovery (v6.0: close_key preservada do briefing)"
         }' >> "$LOG_DIR/audit.jsonl"
 
     echo "[recovery] session-context.json vazio — criado contexto mínimo para sessão $SESSION_ID" >&2
@@ -308,6 +336,105 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    fi
+fi
+
+# ── Hardening v8.0: BLOQUEIO do Mecanismo 5 — session-close.sh sem KEY ───────
+# O agente NUNCA deve chamar session-close.sh diretamente via run_in_terminal.
+# O único fluxo legítimo é:
+#   (1) agente → vscode_askQuestions Template F (exibe close_key)
+#   (2) usuário digita ENCERRAR-XXXXXXXX
+#   (3) post-tool-use.sh detecta KEY na resposta → chama session-close.sh automaticamente
+#
+# Se o agente tentar chamar session-close.sh diretamente (com ou sem KEY), este
+# guard NEGA a chamada e explica o fluxo correto. Isso previne:
+#   - Hallucinations de KEY pelo agente
+#   - Chamadas diretas acidentais ou intencionais ao script de encerramento
+#
+# EXCEÇÃO: se close_key_validated=true (post-tool-use.sh já detectou a KEY via
+# vscode_askQuestions legítimo), permitimos a chamada — pois post-tool-use.sh
+# pode executar o script automaticamente ou o agente pode fazê-lo como fallback.
+if [ "$TOOL_NAME" = "run_in_terminal" ]; then
+    _M5_CMD="$(echo "$INPUT" | jq -r '.tool_input.command // ""' 2> /dev/null || echo '')"
+    if echo "$_M5_CMD" | grep -q "session-close\.sh"; then
+        _M5_VALIDATED=false
+        if [ -f "$CTX_FILE" ]; then
+            _M5_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+        fi
+        if [ "$_M5_VALIDATED" != "true" ]; then
+            _M5_KEY="$(jq -r '.session.close_key // "N/A"' "$CTX_FILE" 2> /dev/null || echo 'N/A')"
+            # Loga tentativa bloqueada
+            jq -cn \
+                --arg event "sessionClose_direct_blocked" \
+                --arg sid "$SESSION_ID" \
+                --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+                --arg cmd "$_M5_CMD" \
+                --arg tool "$TOOL_NAME" \
+                '{
+                    event:      $event,
+                    session_id: $sid,
+                    timestamp:  $ts,
+                    tool:       $tool,
+                    command:    $cmd,
+                    message:    "BLOQUEADO: agente tentou chamar session-close.sh diretamente sem KEY validada"
+                }' >> "$LOG_DIR/audit.jsonl" 2> /dev/null || true
+            # Nega a ferramenta com contexto explicativo
+            jq -cn \
+                --arg key "$_M5_KEY" \
+                '{
+                    permissionDecision: "deny",
+                    additionalContext: (
+                        "🚫 BLOQUEADO (v8.0 — Mechanism 5 Guard): session-close.sh NÃO pode ser chamado diretamente pelo agente.\n\n" +
+                        "O fluxo CORRETO e ÚNICO para encerrar SESSION é:\n" +
+                        "  (1) Chamar vscode_askQuestions com Template F (exibindo a close_key)\n" +
+                        "  (2) Aguardar o usuário digitar " + $key + " na resposta\n" +
+                        "  (3) post-tool-use.sh detecta automaticamente a KEY e executa session-close.sh\n\n" +
+                        "O agente NUNCA deve chamar session-close.sh diretamente — nem mesmo com a KEY correta.\n" +
+                        "SESSION end = EVENTO EXTREMAMENTE RARO. Apenas o usuário autoriza via Template F."
+                    )
+                }'
+            exit 0
+        fi
+    fi
+fi
+
+# ── SESSION REMINDER por intervalo de ferramentas ────────────────────────────
+# CONTEXTO: userPromptSubmitted dispara APENAS para mensagens digitadas na caixa
+# de chat (não para respostas de vscode_askQuestions, que são tool results).
+# Em sessões onde o usuário interage apenas via askQuestions, userPromptSubmitted
+# dispara raramente. Por isso, o remineder de SESSION é injetado aqui (preToolUse),
+# que dispara ANTES de cada ferramenta — o ponto mais confiável da sessão.
+#
+# Frequência: a cada HOOKS_SESSION_REMINDER_TOOL_INTERVAL ferramentas (padrão: 10)
+# Condição: apenas quando close_key_validated=false (SESSION ainda aberta sem confirmação)
+_SR_INTERVAL="${HOOKS_SESSION_REMINDER_TOOL_INTERVAL:-10}"
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
+    _SR_TOOLS_TOTAL="$(jq -r '.session_stats.tools_total // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _SR_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+    _SR_CLOSE_KEY="$(jq -r '.session.close_key // "N/A"' "$CTX_FILE" 2> /dev/null || echo 'N/A')"
+    # Dispara no intervalo configurado (excluindo tool#0 pois contexto pode não estar pronto)
+    if [ "$_SR_TOOLS_TOTAL" -gt 0 ] && ((_SR_TOOLS_TOTAL % _SR_INTERVAL == 0)) && [ "$_SR_CLOSE_VALIDATED" = "false" ]; then
+        # Loga reminder no audit antes de emitir systemMessage
+        jq -cn \
+            --arg sid "$SESSION_ID" \
+            --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+            --argjson tool_num "$_SR_TOOLS_TOTAL" \
+            --arg key "$_SR_CLOSE_KEY" \
+            '{
+                event:      "sessionReminder_preToolUse",
+                session_id: $sid,
+                timestamp:  $ts,
+                tool_number: $tool_num,
+                close_key:  $key,
+                message:    "SESSION reminder emitido via preToolUse (intervalo de ferramentas)"
+            }' >> "$LOG_DIR/audit.jsonl" 2> /dev/null || true
+        # Emite systemMessage para o agente (SESSION reminder conciso)
+        jq -cn \
+            --arg key "$_SR_CLOSE_KEY" \
+            --argjson n "$_SR_TOOLS_TOTAL" \
+            --arg interval "$_SR_INTERVAL" \
+            '{systemMessage: ("🔐 SESSION REMINDER [tool #" + ($n|tostring) + "] — SESSION≠SECTION≠TURN. Para encerrar esta SESSION: (1) vscode_askQuestions Template F exibindo a KEY (2) usuário digita " + $key + " (3) bash .github/hooks/scripts/session-close.sh \"" + $key + "\". Texto plano não conta — apenas tool call real. Próximo reminder em " + ($n + ($interval|tonumber) | tostring) + " ferramentas.")}' 2> /dev/null || true
+        exit 0
     fi
 fi
 

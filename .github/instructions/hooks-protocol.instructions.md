@@ -7,29 +7,118 @@ applyTo: '**/*'
 # Hooks Protocol — Protocolo Operacional Obrigatório
 
 **Propósito**: regras de operação do sistema de hooks para agentes de IA. **Status**: Canônico.
-**Última atualização**: 2026-03-10.
+**Última atualização**: 2026-03-11 (v9.0 — Protocolo TODO Obrigatório).
 
 > Todo agente executando em sessão Copilot neste repositório DEVE seguir este protocolo.
 
 ---
 
+## ╔═══ PROTOCOLO TODO OBRIGATÓRIO (v9.0) — LEIA PRIMEIRO ═══╗
+
+> **Todo turno de trabalho significativo DEVE seguir este protocolo, sem exceção.**
+
+### Regras do Protocolo TODO (v9.0)
+
+1. **Criar TODOs no início** — ao iniciar qualquer turno de trabalho, use `manage_todo_list` para
+   criar a lista de tarefas. Não comece a trabalhar sem TODOs.
+2. **Último TODO = vscode_askQuestions** — o último item da lista DEVE ser:
+   `"Chamar vscode_askQuestions [Template A/D/E conforme contexto]"`
+3. **Marcar e executar** — ao concluir cada tarefa, marque como `completed`. O último TODO
+   (vscode_askQuestions) DEVE ser executado — não pulado.
+4. **Não é opcional** — este é o único mecanismo confiável que garante comunicação com o usuário.
+   Encerrar um turno sem chamar vscode_askQuestions viola o protocolo.
+
+> **Por que isso é crítico?** O hook `agent-stop.sh` emite `decision:block` quando
+> `vscode_askQuestions` não foi chamado. Mas mesmo sem o block ser efetivo, o padrão de
+> comportamento do agente deve incluir a chamada de vscode_askQuestions como ato final.
+
+---
+
+## ╔═══ SESSION PERSISTENTE — PRINCÍPIO FUNDAMENTAL (v8.0) ═══╗
+
+> **O encerramento de uma SESSION, se o sistema estiver funcionando corretamente, deve ser um evento
+> EXTREMAMENTE RARO.**
+
+**REGRA ABSOLUTA — NUNCA VIOLAR:**
+
+- O agente **NUNCA** deve chamar `session-close.sh` diretamente via `run_in_terminal`.
+- Nem mesmo com a KEY correta. O `pre-tool-use.sh` (v8.0) **NEGA** essa chamada quando
+  `close_key_validated=false`.
+- O único fluxo legítimo: `vscode_askQuestions` Template F → usuário digita KEY → `post-tool-use.sh`
+  executa `session-close.sh` automaticamente.
+
+**SESSION end = EVENTO EXTREMAMENTE RARO. Toda SESSION deve ser mantida viva o máximo possível.**
+
+---
+
+## ╔═══ DISTINÇÃO CRÍTICA — LEIA ANTES DE QUALQUER COISA ═══╗
+
+```
+SESSION  ≠  SECTION  ≠  TURN
+```
+
+| Conceito | O que é                 | Como encerra                                      | Autorização Required   |
+| -------- | ----------------------- | ------------------------------------------------- | ---------------------- |
+| **TURN** | 1 ciclo prompt→resposta | Com chamada a vscode_askQuestions como último ato | ✅ Protocolo TODO v9.0 |
+
+> ⚠️ **IMPORTANTE**: `userPromptSubmitted` dispara SOMENTE ao digitar na **caixa de chat** do VS
+> Code. Respostas ao `vscode_askQuestions` são **tool results** (postToolUse), NÃO novos prompts. Em
+> sessões onde o usuário usa apenas `vscode_askQuestions`, este hook dispara raramente
+> (≲1x/SESSION). Use `preToolUse` para reminders confiáveis (dispara antes de cada tool call). |
+> **SECTION** | Fase lógica dentro da SESSION | `bash start-section.sh "nome"` | ❌ Nenhuma | |
+> **SESSION** | 1 ativação do Copilot Chat | Template F + KEY + session-close.sh | ✅
+> **OBRIGATÓRIA** |
+
+> ⚠️ **REGRA DE OURO**: Terminar de escrever uma resposta = encerrar um **TURN**, NÃO a **SESSION**.
+> A SESSION continua ativa enquanto a janela do chat estiver aberta. A SESSION só encerra quando:
+> (1) usuário digita a chave `ENCERRAR-XXXXXXXX`, (2) `post-tool-use.sh` detecta KEY em
+> `vscode_askQuestions` e chama `session-close.sh`.
+
+### Fluxo de Encerramento de SESSION (3 etapas obrigatórias):
+
+1. Agente chama `vscode_askQuestions` com **Template F** (exibindo a close_key)
+2. Usuário digita a chave `ENCERRAR-XXXXXXXX` no campo livre
+3. **`post-tool-use.sh` detecta a KEY automaticamente e executa `session-close.sh`** (agente não
+   chama diretamente)
+
+> **Sem estas 3 etapas** → `SESSION_CLOSE_NO_KEY.flag` → alerta no próximo briefing.
+
+> **Verificação automática via hooks:** o hook `postToolUse` detecta automaticamente a `close_key`
+> na resposta de `vscode_askQuestions` e registra `sessionClose_key_validated` no `audit.jsonl`.
+> Isso confirma que a KEY foi enviada via tool call legítimo, não por texto plano. Texto plano **não
+> conta** — apenas tool call real é registrado.
+
+### Lembrete rápido (chamar a qualquer momento):
+
+```bash
+bash .github/hooks/scripts/session-reminder.sh
+```
+
+---
+
 ## Protocolo de encerramento por nível
 
-### TURN — Comunicação recomendada (autônomo)
+### TURN — Protocolo TODO obrigatório (v9.0)
 
-**TURNs encerram livremente.** O agente não precisa de autorização para encerrar um turno.
-`vscode_askQuestions` é **recomendado** como boa prática de comunicação, não obrigatório.
+**TURNs com trabalho realizado DEVEM incluir chamada a `vscode_askQuestions` ao final.** O agente
+NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions.
 
-**Casos em que chamar vscode_askQuestions é valioso (recomendado):**
+**Protocolo TODO obrigatório em todo turno:**
+
+1. Use `manage_todo_list` ao iniciar o turno — lista de tarefas é obrigatória
+2. Inclua sempre como ÚLTIMO TODO: `"Chamar vscode_askQuestions [Template X]"`
+3. Execute todos os TODOs em sequência — o último (vscode_askQuestions) não pode ser pulado
+
+**Templates obrigatórios por contexto:**
 
 - Tarefa concluída → Template A (próximo passo)
 - Checkpoint periódico a cada ~5 TURNs → Template D
 - Proposta arquitetural → Template C
 - Sessão ociosa → Template E
 
-**Nudge automático (não bloqueante):** O hook `agent-stop.sh` envia `systemMessage` informativo a
-cada `HOOKS_TURN_NUDGE_INTERVAL` (padrão: 5) TURNs sem `vscode_askQuestions`. Não há
-`decision:block`.
+**Mecanismo de enforcement (v7.0+):** O hook `agent-stop.sh` emite `decision:block` quando
+`vscode_askQuestions` não foi chamado. O consecutive_unauthorized é incrementado a cada violação.
+Violações são logadas como `agentStop_blocked` e `turnEnd_no_askQuestions` em `audit.jsonl`.
 
 ### SECTION — Autônoma (sem autorização do usuário)
 
@@ -85,6 +174,11 @@ melhorando, etc.
 - Exemplos de quando criar: análise → implementação → revisão → debug
 
 ### TURN (ciclo prompt→resposta)
+
+> **Semântica real**: `userPromptSubmitted` dispara apenas quando o usuário digita na **caixa de
+> chat** do VS Code — não para respostas ao `vscode_askQuestions`. Em sessões onde o fluxo principal
+> é via `vscode_askQuestions`, este hook dispara ≲1x por SESSION. As respostas ao askQuestions são
+> registradas como `askQuestions_response` no `audit.jsonl` pelo `post-tool-use.sh`.
 
 - Início automático: `userPromptSubmitted` → `log-prompt.sh` loga `turnStart` com `section_turn` e
   `turn_number`

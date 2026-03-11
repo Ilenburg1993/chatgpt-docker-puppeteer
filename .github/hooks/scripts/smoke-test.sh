@@ -285,7 +285,8 @@ GUARD_EXCLUDED=(session-start.sh session-end.sh)
 
 for s in "${GUARD_REQUIRED[@]}"; do
     f="$SCRIPTS_DIR/$s"
-    if [ -f "$f" ] && rg -q "session_id_mismatch" "$f" 2> /dev/null; then
+    # Guard válido: script loga session_id_mismatch (bloqueia) OU sessionReconnect (rollover RECONNECT-01)
+    if [ -f "$f" ] && (rg -q "session_id_mismatch" "$f" 2> /dev/null || rg -q "sessionReconnect" "$f" 2> /dev/null); then
         pass "session_id guard presente: $s"
     elif [ -f "$f" ]; then
         fail "session_id guard AUSENTE: $s — vulnerável a contaminação cruzada"
@@ -858,7 +859,397 @@ fi
 
 rm -rf "$_SC_DIR"
 
-# ── Resumo ───────────────────────────────────────────────────────────────────
+# ── Grupo 18: agent-stop.sh — decision:block v7.0 ───────────────────────────
+echo ""
+echo "── Grupo 18: agent-stop.sh — decision:block v7.0 ───────────────────────────"
+
+_AS_SCRIPT="$HOOK_DIR/scripts/agent-stop.sh"
+if [ -f "$_AS_SCRIPT" ]; then
+    _AS_DIR="$(mktemp -d)"
+    _AS_STATE="$_AS_DIR/state"
+    _AS_LOG="$_AS_DIR/logs"
+    mkdir -p "$_AS_STATE" "$_AS_LOG"
+
+    # Contexto mínimo para agent-stop.sh rodar
+    _AS_CTX="$_AS_STATE/session-context.json"
+    cat > "$_AS_CTX" << 'ASJSON'
+{
+  "schema_version": 9,
+  "session": {
+    "id": "test-as-session-001",
+    "close_key": "ENCERRAR-ASTEST",
+    "close_key_validated": false,
+    "started_at": "2026-01-01T00:00:00Z"
+  },
+  "current_section": { "name": "teste", "section_id": "s1", "section_number": 1, "turn_start": 0 },
+  "current_turn": {
+    "number": 2, "section_turn": 2,
+    "started_at": "2026-01-01T00:00:00Z",
+    "intent": "teste-smoke",
+    "intent_declared": true,
+    "tools_count": 5,
+    "auth_requested": false,
+    "agentStop_invocations": 0,
+    "subagent_delegated": false
+  },
+  "session_stats": {
+    "turn_count": 2, "turn_authorized": 1, "turn_no_askQuestions": 1,
+    "turns_since_askQuestions": 1, "tools_total": 10,
+    "push_count": 0, "pending_section_after_push": false
+  },
+  "compliance": { "consecutive_unauthorized": 0, "last_turn_authorized": false }
+}
+ASJSON
+
+    # Teste AS-1: agent-stop.sh contém decision:block no código
+    if grep -q 'decision.*block' "$_AS_SCRIPT" 2> /dev/null \
+        && grep -q 'hookSpecificOutput' "$_AS_SCRIPT" 2> /dev/null; then
+        pass "AS-1: agent-stop.sh contém código de decision:block e hookSpecificOutput"
+    else
+        fail "AS-1: agent-stop.sh NÃO contém decision:block ou hookSpecificOutput"
+    fi
+
+    # Teste AS-2: agent-stop.sh verifica stop_hook_active antes de bloquear
+    if grep -q 'STOP_HOOK_ACTIVE.*true\|stop_hook_active.*true' "$_AS_SCRIPT" 2> /dev/null \
+        && grep -q 'NUNCA bloquear\|anti-loop' "$_AS_SCRIPT" 2> /dev/null; then
+        pass "AS-2: agent-stop.sh tem guarda anti-loop (stop_hook_active check)"
+    else
+        fail "AS-2: agent-stop.sh NÃO tem guarda anti-loop contra stop_hook_active"
+    fi
+
+    # Teste AS-3: Estratégia 2 foi removida (variável RECENT_LINES não deve ser usada)
+    if ! grep -q 'RECENT_LINES=' "$_AS_SCRIPT" 2> /dev/null; then
+        pass "AS-3: Estratégia 2 removida (RECENT_LINES não atribuída em agent-stop.sh)"
+    else
+        fail "AS-3: Estratégia 2 ainda usa RECENT_LINES (falso positivo cross-turn)"
+    fi
+
+    # Teste AS-4: agent-stop.sh passa shellcheck (erros críticos)
+    if command -v shellcheck > /dev/null 2>&1; then
+        if shellcheck -S error "$_AS_SCRIPT" > /dev/null 2>&1; then
+            pass "AS-4: agent-stop.sh passa shellcheck -S error"
+        else
+            fail "AS-4: agent-stop.sh tem erros de shellcheck"
+        fi
+    else
+        pass "AS-4: shellcheck não disponível (skip)"
+    fi
+
+    # Teste AS-5: decision:block tem reason obrigatório (campo FORA do hookSpecificOutput também)
+    if grep -q 'reason: \$reason' "$_AS_SCRIPT" 2> /dev/null \
+        && grep -q '_BLOCK_REASON=' "$_AS_SCRIPT" 2> /dev/null; then
+        pass "AS-5: decision:block tem campo reason obrigatório (_BLOCK_REASON)"
+    else
+        fail "AS-5: decision:block NÃO tem campo reason (falta reason: \$reason ou _BLOCK_REASON=)"
+    fi
+
+    # Teste AS-6: agentStop_blocked é logado quando bloqueia
+    if grep -q 'agentStop_blocked' "$_AS_SCRIPT" 2> /dev/null; then
+        pass "AS-6: agent-stop.sh loga evento agentStop_blocked em audit.jsonl"
+    else
+        fail "AS-6: agent-stop.sh NÃO loga agentStop_blocked"
+    fi
+
+    rm -rf "$_AS_DIR"
+else
+    fail "AS-0: agent-stop.sh não encontrado em $HOOK_DIR/scripts/"
+fi
+
+# ── Grupo 19: pre-tool-use.sh — SESSION persistente v8.0 ─────────────────────
+echo ""
+echo "── Grupo 19: pre-tool-use.sh — SESSION persistente v8.0 ──────────────────"
+
+_PTU_SCRIPT="$HOOK_DIR/scripts/pre-tool-use.sh"
+if [ -f "$_PTU_SCRIPT" ]; then
+    # Teste PR-1: pre-tool-use.sh contém guard do Mecanismo 5 (session-close.sh bloqueio)
+    if grep -q 'sessionClose_direct_blocked\|session-close\.sh\|Mechanism 5' "$_PTU_SCRIPT" 2> /dev/null; then
+        pass "PR-1: pre-tool-use.sh contém guard do Mecanismo 5 (session-close.sh)"
+    else
+        fail "PR-1: pre-tool-use.sh NÃO contém guard do Mecanismo 5"
+    fi
+
+    # Teste PR-2: pre-tool-use.sh emite permissionDecision:deny para session-close.sh
+    if grep -q 'permissionDecision.*deny\|"deny"' "$_PTU_SCRIPT" 2> /dev/null; then
+        pass "PR-2: pre-tool-use.sh emite permissionDecision:deny quando necessário"
+    else
+        fail "PR-2: pre-tool-use.sh NÃO emite permissionDecision:deny"
+    fi
+
+    # Teste PR-3: intervalo de reminder é 10 (padrão v8.0)
+    if grep -q 'HOOKS_SESSION_REMINDER_TOOL_INTERVAL:-10' "$_PTU_SCRIPT" 2> /dev/null; then
+        pass "PR-3: intervalo de SESSION reminder é 10 (padrão v8.0)"
+    else
+        fail "PR-3: intervalo de SESSION reminder NÃO é 10 (esperado v8.0)"
+    fi
+
+    # Teste PR-4: pre-tool-use.sh verifica close_key_validated antes de bloquear
+    if grep -q '_M5_VALIDATED\|close_key_validated' "$_PTU_SCRIPT" 2> /dev/null; then
+        pass "PR-4: pre-tool-use.sh verifica close_key_validated antes de bloquear"
+    else
+        fail "PR-4: pre-tool-use.sh NÃO verifica close_key_validated"
+    fi
+
+    # Teste PR-5: pre-tool-use.sh passa shellcheck -S error
+    if shellcheck -S error "$_PTU_SCRIPT" 2> /dev/null; then
+        pass "PR-5: pre-tool-use.sh passa shellcheck -S error"
+    else
+        fail "PR-5: pre-tool-use.sh FALHOU no shellcheck -S error"
+    fi
+
+    # Teste PR-6: guard verifica tool_name = run_in_terminal antes de bloquear
+    if grep -q 'run_in_terminal' "$_PTU_SCRIPT" 2> /dev/null; then
+        pass "PR-6: pre-tool-use.sh verifica tool_name run_in_terminal no Mecanismo 5"
+    else
+        fail "PR-6: pre-tool-use.sh NÃO verifica tool_name run_in_terminal"
+    fi
+else
+    fail "PR-0: pre-tool-use.sh não encontrado em $HOOK_DIR/scripts/"
+fi
+
+# ── Grupo 20: v8.1 — sessionEnd falsos e auto_recovery ───────────────────────
+echo ""
+echo "── Grupo 20: v8.1 — sessionEnd falsos e auto_recovery ────────────────────"
+
+_SC_SCRIPT="$HOOK_DIR/scripts/session-close.sh"
+if [ -f "$_SC_SCRIPT" ]; then
+    # Teste V81-1: session-close.sh NÃO chama session-end.sh diretamente
+    if ! grep -q 'bash.*session-end\.sh\|"session-end\.sh"' "$_SC_SCRIPT" 2> /dev/null; then
+        pass "V81-1: session-close.sh não chama session-end.sh diretamente (fix v8.1)"
+    else
+        fail "V81-1: session-close.sh AINDA chama session-end.sh — risco de sessionEnd falso"
+    fi
+
+    # Teste V81-2: session-close.sh apenas cria SESSION_CLOSE_AUTHORIZED.flag
+    if grep -q 'SESSION_CLOSE_AUTHORIZED' "$_SC_SCRIPT" 2> /dev/null; then
+        pass "V81-2: session-close.sh cria SESSION_CLOSE_AUTHORIZED.flag"
+    else
+        fail "V81-2: session-close.sh NÃO cria SESSION_CLOSE_AUTHORIZED.flag"
+    fi
+
+    # Teste V81-3: session-close.sh seta close_key_validated=true no contexto
+    if grep -q 'close_key_validated = true\|close_key_validated.*true' "$_SC_SCRIPT" 2> /dev/null; then
+        pass "V81-3: session-close.sh seta close_key_validated=true"
+    else
+        fail "V81-3: session-close.sh NÃO seta close_key_validated=true"
+    fi
+else
+    fail "V81-0: session-close.sh não encontrado"
+fi
+
+_PTU_SCRIPT2="$HOOK_DIR/scripts/pre-tool-use.sh"
+if [ -f "$_PTU_SCRIPT2" ]; then
+    # Teste V81-4: auto_recovery herda close_key_validated do SESSION_CLOSE_AUTHORIZED.flag (v8.1)
+    if grep -q 'SESSION_CLOSE_AUTHORIZED\|_AUTH_FLAG\|_RECOVERY_KEY_VALIDATED' "$_PTU_SCRIPT2" 2> /dev/null; then
+        pass "V81-4: auto_recovery herda close_key_validated de SESSION_CLOSE_AUTHORIZED.flag"
+    else
+        fail "V81-4: auto_recovery NÃO herda close_key_validated (v8.1 não aplicado)"
+    fi
+
+    # Teste V81-5: auto_recovery usa _RECOVERY_KEY_VALIDATED como argjson (não string fixa false)
+    if grep -q 'argjson key_validated\|key_validated.*RECOVERY' "$_PTU_SCRIPT2" 2> /dev/null; then
+        pass "V81-5: auto_recovery usa _RECOVERY_KEY_VALIDATED como argjson"
+    else
+        fail "V81-5: auto_recovery NÃO usa _RECOVERY_KEY_VALIDATED corretamente"
+    fi
+else
+    fail "V81-0: pre-tool-use.sh não encontrado"
+fi
+
+# Teste V81-6: session-close.sh passa shellcheck -S error após fix
+if shellcheck -S error "$_SC_SCRIPT" 2> /dev/null; then
+    pass "V81-6: session-close.sh passa shellcheck -S error após fix v8.1"
+else
+    fail "V81-6: session-close.sh FALHOU no shellcheck -S error"
+fi
+
+# ── Grupo 21: Protocolo TODO Obrigatório v9.0 ─────────────────────────────────
+echo ""
+echo "── Grupo 21: Protocolo TODO Obrigatório v9.0 ──────────────────────────────"
+
+_AG_STOP="$SCRIPTS_DIR/agent-stop.sh"
+_LOG_PROMPT="$SCRIPTS_DIR/log-prompt.sh"
+_POST_TOOL="$SCRIPTS_DIR/post-tool-use.sh"
+_REPO_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
+
+# V90-1: post-tool-use.sh rastreia manage_todo_list → todo_created=true
+if [ -f "$_POST_TOOL" ]; then
+    if grep -q 'manage_todo_list' "$_POST_TOOL" && grep -q 'todo_created.*true' "$_POST_TOOL"; then
+        pass "V90-1: post-tool-use.sh seta todo_created=true quando manage_todo_list é chamado"
+    else
+        fail "V90-1: post-tool-use.sh NÃO rastreia manage_todo_list → todo_created"
+    fi
+else
+    fail "V90-1: post-tool-use.sh não encontrado"
+fi
+
+# V90-2: log-prompt.sh reseta todo_created=false no início de cada turno
+if [ -f "$_LOG_PROMPT" ]; then
+    if grep -q 'todo_created.*false' "$_LOG_PROMPT"; then
+        pass "V90-2: log-prompt.sh reseta todo_created=false no início de cada turno"
+    else
+        fail "V90-2: log-prompt.sh NÃO reseta todo_created — campo fica sujo entre TURNs"
+    fi
+else
+    fail "V90-2: log-prompt.sh não encontrado"
+fi
+
+# V90-3: agent-stop.sh lê _BLOCK_TODO_CREATED do contexto
+if [ -f "$_AG_STOP" ]; then
+    if grep -q '_BLOCK_TODO_CREATED' "$_AG_STOP"; then
+        pass "V90-3: agent-stop.sh lê _BLOCK_TODO_CREATED do contexto"
+    else
+        fail "V90-3: agent-stop.sh NÃO lê _BLOCK_TODO_CREATED — sem distinção de violação dupla"
+    fi
+else
+    fail "V90-3: agent-stop.sh não encontrado"
+fi
+
+# V90-4: agent-stop.sh emite agentStop_blocked_no_todo quando todo_created=false
+if [ -f "$_AG_STOP" ]; then
+    if grep -q 'agentStop_blocked_no_todo' "$_AG_STOP"; then
+        pass "V90-4: agent-stop.sh emite evento agentStop_blocked_no_todo quando manage_todo_list ausente"
+    else
+        fail "V90-4: agent-stop.sh NÃO emite agentStop_blocked_no_todo — sem observabilidade de violação dupla"
+    fi
+else
+    fail "V90-4: agent-stop.sh não encontrado"
+fi
+
+# V90-5: agent-stop.sh inclui DUPLA VIOLAÇÃO na mensagem quando todo_created=false
+if [ -f "$_AG_STOP" ]; then
+    if grep -q 'DUPLA' "$_AG_STOP"; then
+        pass "V90-5: agent-stop.sh usa mensagem de DUPLA VIOLAÇÃO quando manage_todo_list ausente"
+    else
+        fail "V90-5: agent-stop.sh NÃO diferencia mensagem de dupla violação"
+    fi
+else
+    fail "V90-5: agent-stop.sh não encontrado"
+fi
+
+# V90-6: hooks-protocol.instructions.md contém PROTOCOLO TODO OBRIGATÓRIO
+_HOOKS_PROTO="$_REPO_ROOT/instructions/hooks-protocol.instructions.md"
+if [ -f "$_HOOKS_PROTO" ]; then
+    if grep -q 'PROTOCOLO TODO OBRIGATÓRIO' "$_HOOKS_PROTO"; then
+        pass "V90-6: hooks-protocol.instructions.md contém seção PROTOCOLO TODO OBRIGATÓRIO"
+    else
+        fail "V90-6: hooks-protocol.instructions.md NÃO contém PROTOCOLO TODO OBRIGATÓRIO"
+    fi
+else
+    fail "V90-6: hooks-protocol.instructions.md não encontrado"
+fi
+
+# V90-7: AGENTS.md não contém linguagem 'recomendado, não obrigatório' na seção TURN
+_AGENTS_MD="$_REPO_ROOT/AGENTS.md"
+if [ -f "$_AGENTS_MD" ]; then
+    if grep -q 'recomendado, não obrigatório' "$_AGENTS_MD"; then
+        fail "V90-7: AGENTS.md AINDA contém 'recomendado, não obrigatório' na seção TURN — doc contradiz enforcement"
+    else
+        pass "V90-7: AGENTS.md NÃO contém linguagem contraditória 'recomendado, não obrigatório'"
+    fi
+else
+    fail "V90-7: AGENTS.md não encontrado"
+fi
+
+# V90-8: log-prompt.sh emite session_id_in_payload no evento userPromptSubmitted
+if [ -f "$_LOG_PROMPT" ]; then
+    if grep -q 'session_id_in_payload' "$_LOG_PROMPT"; then
+        pass "V90-8: log-prompt.sh inclui session_id_in_payload no evento userPromptSubmitted"
+    else
+        fail "V90-8: log-prompt.sh NÃO emite session_id_in_payload — perda de observabilidade"
+    fi
+else
+    fail "V90-8: log-prompt.sh não encontrado"
+fi
+
+# V90-9: shellcheck -S error nos três scripts centrais do v9.0
+_SC_ERRORS=0
+for _SC_F in "$_AG_STOP" "$_LOG_PROMPT" "$_POST_TOOL"; do
+    if ! shellcheck -S error "$_SC_F" 2> /dev/null; then
+        _SC_ERRORS=$((_SC_ERRORS + 1))
+    fi
+done
+if [ "$_SC_ERRORS" -eq 0 ]; then
+    pass "V90-9: agent-stop.sh, log-prompt.sh e post-tool-use.sh passam shellcheck -S error"
+else
+    fail "V90-9: ${_SC_ERRORS} script(s) falhou no shellcheck -S error após mudanças v9.0"
+fi
+
+# V90-10: agent-stop.sh não incrementa consecutive_unauthorized quando stop_hook_active=true (anti-double-increment)
+if [ -f "$_AG_STOP" ]; then
+    if grep -q 'STOP_HOOK_ACTIVE.*consecutive\|stop_hook.*consecutive_unauthorized\|if \$stop_hook' "$_AG_STOP"; then
+        pass "V90-10: agent-stop.sh usa guarda anti-duplo-incremento de consecutive_unauthorized (fix v9.0)"
+    else
+        fail "V90-10: agent-stop.sh NÃO tem guarda anti-duplo-incremento — bug: cada turn bloqueado conta 2x consecutivos"
+    fi
+else
+    fail "V90-10: agent-stop.sh não encontrado"
+fi
+
+# V90-11: agent-stop.sh reseta todo_created=false no jq de fim de turno (reset canônico)
+if [ -f "$_AG_STOP" ]; then
+    if grep -q 'current_turn.todo_created.*=.*false' "$_AG_STOP"; then
+        pass "V90-11: agent-stop.sh reseta current_turn.todo_created=false no reset de fim de turno"
+    else
+        fail "V90-11: agent-stop.sh NÃO reseta todo_created no fim de turno — campo fica sujo no contexto"
+    fi
+else
+    fail "V90-11: agent-stop.sh não encontrado"
+fi
+
+_WD_SCRIPT="$SCRIPTS_DIR/watchdog.sh"
+
+# V90-12: watchdog.sh detecta source=auto_recovery com ended_at não-nulo e trata como sessão ativa
+if [ -f "$_WD_SCRIPT" ]; then
+    if grep -q 'auto_recovery' "$_WD_SCRIPT" \
+        && grep -q '_STALE_ENDED_AT_WARN' "$_WD_SCRIPT" \
+        && grep -q 'STALE_ENDED_AT' "$_WD_SCRIPT"; then
+        pass "V90-12: watchdog.sh detecta auto_recovery e emite alerta STALE_ENDED_AT (fix v9.0)"
+    else
+        fail "V90-12: watchdog.sh NÃO trata auto_recovery corretamente ou falta alerta STALE_ENDED_AT"
+    fi
+else
+    fail "V90-12: watchdog.sh não encontrado"
+fi
+
+# V90-13: watchdog.sh usa threshold SESSION_STALE ≥ 24h (sessões longas são esperadas)
+if [ -f "$_WD_SCRIPT" ]; then
+    _STALE_VAL="$(grep -oP 'WATCHDOG_STALE_HOURS:-\K[0-9]+' "$_WD_SCRIPT" 2> /dev/null | head -1)"
+    if [ -n "$_STALE_VAL" ] && [ "$_STALE_VAL" -ge 24 ] 2> /dev/null; then
+        pass "V90-13: watchdog.sh SESSION_STALE threshold ≥ 24h (atual: ${_STALE_VAL}h — sessões longas não são falso-positivo)"
+    else
+        fail "V90-13: watchdog.sh SESSION_STALE threshold < 24h (${_STALE_VAL}h) — dispara falso-positivo em sessões longas"
+    fi
+else
+    fail "V90-13: watchdog.sh não encontrado"
+fi
+
+# V90-14: watchdog.sh filtra STALE_ID_MISMATCHES por session_id, cutoff 6h e exclui subagente
+if [ -f "$_WD_SCRIPT" ]; then
+    if grep -q 'subagent-stop.sh' "$_WD_SCRIPT" \
+        && grep -q '_MISMATCH_CUTOFF' "$_WD_SCRIPT" \
+        && grep -q '6 hours ago' "$_WD_SCRIPT"; then
+        pass "V90-14: watchdog.sh filtra STALE_ID_MISMATCHES por sessão atual, cutoff 6h e exclui ruído de subagente"
+    else
+        fail "V90-14: watchdog.sh NÃO filtra adequadamente STALE_ID_MISMATCHES (falta cutoff temporal ou filtro de subagente)"
+    fi
+else
+    fail "V90-14: watchdog.sh não encontrado"
+fi
+
+# V90-15: agent-stop.sh atualiza last_turn_ts mesmo em turnos bloqueados (TURN_IDLE mede atividade)
+if [ -f "$_AG_STOP" ]; then
+    if grep -q 'last_turn_ts.*now\|last_turn_ts.*NOW' "$_AG_STOP" 2> /dev/null \
+        &&
+        # Verifica que last_turn_ts aparece tanto no bloco de bloqueio (jq compliance) quanto no fim de turno
+        [ "$(grep -c 'last_turn_ts.*now\|last_turn_ts.*NOW' "$_AG_STOP" 2> /dev/null)" -ge 2 ]; then
+        pass "V90-15: agent-stop.sh atualiza last_turn_ts em bloqueios E em turnos normais (TURN_IDLE preciso)"
+    else
+        fail "V90-15: agent-stop.sh NÃO atualiza last_turn_ts em turnos bloqueados — TURN_IDLE falso-positivo"
+    fi
+else
+    fail "V90-15: agent-stop.sh não encontrado"
+fi
+
 echo ""
 echo "══════════════════════════════════════════════════"
 TOTAL=$((PASS + FAIL))

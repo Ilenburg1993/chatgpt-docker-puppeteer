@@ -53,6 +53,8 @@ const GLOBAL_IGNORES = [
     '.codex/**',
     // Código legado de exemplo — não é parte do runtime, apenas referência histórica
     'DOCUMENTAÇÃO/PLANOS/LEGADO_PLANO/**',
+    // Ambiente virtual Python — nunca deve ser lintado
+    '.venv/**',
 ];
 
 // ─── Regras @typescript-eslint/no-unused-vars reutilizadas por zona ───────────

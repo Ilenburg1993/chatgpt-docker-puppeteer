@@ -216,6 +216,12 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .current_turn.failures_count = ((.current_turn.failures_count // 0) + 1)
              | .session_stats.failures_detected = ((.session_stats.failures_detected // 0) + 1)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    elif [ "$TOOL_NAME" = "manage_todo_list" ]; then
+        # v9.0: rastreia uso de manage_todo_list (Protocolo TODO Obrigatório)
+        jq --arg result "$RESULT_TYPE" \
+            '.last_tool.result = $result
+             | .current_turn.todo_created = true' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     else
         jq --arg result "$RESULT_TYPE" \
             '.last_tool.result = $result' \

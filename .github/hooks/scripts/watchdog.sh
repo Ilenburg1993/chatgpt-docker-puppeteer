@@ -29,7 +29,7 @@ REPORT_FILE="$STATE_DIR/watchdog-report.json"
 AUDIT_FILE="$LOG_DIR/audit.jsonl"
 
 # Limiares configuráveis (horas)
-STALE_HOURS="${WATCHDOG_STALE_HOURS:-8}"
+STALE_HOURS="${WATCHDOG_STALE_HOURS:-36}"
 TURN_IDLE_HOURS="${WATCHDOG_TURN_IDLE_HOURS:-2}"
 COMPACT_WARN="${WATCHDOG_COMPACT_WARN:-5}"
 
@@ -137,12 +137,25 @@ else
     SESSION_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SECTION_NAME_WD="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SECTION_ID_WD="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    # SESSION_SOURCE disponível para expansão futura (ex: "manual_recovery" indica auto-recovery)
-    : "${SESSION_SOURCE}"
+    # FIX v9.0: auto_recovery com ended_at não-nulo indica stale ended_at de fake sessionEnd
+    # (gerado por session-close.sh→session-end.sh antes do fix v8.1). Sessão auto_recovery
+    # é por definição ativa (agente ainda usando o mesmo session_id).
 
-    # Sessão está ativa se ended_at é null/vazio
+    # Sessão está ativa se ended_at é null/vazio OU se source é auto_recovery (stale ended_at fix)
+    _STALE_ENDED_AT_WARN=false
     if [ -z "$ENDED_AT" ] || [ "$ENDED_AT" = "null" ]; then
         SESSION_ACTIVE=true
+    elif [ "$SESSION_SOURCE" = "auto_recovery" ]; then
+        # auto_recovery + ended_at não-nulo = stale ended_at de fake sessionEnd pré-v8.1
+        # Trata como ativa e loga aviso para diagnóstico
+        SESSION_ACTIVE=true
+        _STALE_ENDED_AT_WARN=true
+    fi
+
+    # Emite aviso de ended_at estagnado (stale) detectado em contexto auto_recovery
+    if [ "$_STALE_ENDED_AT_WARN" = "true" ]; then
+        alert_warn "STALE_ENDED_AT" \
+            "session.ended_at contém valor residual de sessionEnd falso pré-v8.1 (source=auto_recovery). Sessão considerada ATIVA. Limpe ended_at no contexto para eliminar este aviso."
     fi
 
     # Calcula epoch dos timestamps relevantes
@@ -232,7 +245,57 @@ if [ -f "$AUDIT_FILE" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. Gera relatório JSON
+# 4. Detecta padrões de reconexão VS Code (session_id_mismatch / sessionReconnect)
+# ─────────────────────────────────────────────────────────────────────────────
+# Referência: DOCUMENTAÇÃO/HOOKS/ANALISE-SESSOES-ABRUPTAS.md §3.2
+# Padrão anômalo: muitos reconnects indica instabilidade de conexão no cliente.
+RECONNECT_WARN_THRESHOLD="${WATCHDOG_RECONNECT_WARN:-5}"
+RECONNECT_CRITICAL_THRESHOLD="${WATCHDOG_RECONNECT_CRITICAL:-20}"
+
+if [ -f "$AUDIT_FILE" ]; then
+    # Conta eventos sessionReconnect na sessão atual (últimas 24h)
+    RECONNECT_COUNT=0
+    STALE_MISMATCH_COUNT=0
+
+    if command -v jq > /dev/null 2>&1; then
+        RECONNECT_COUNT="$(
+            jq -r 'select(.event == "sessionReconnect") | .timestamp' "$AUDIT_FILE" 2> /dev/null \
+                | tail -100 | wc -l | tr -d ' '
+        )"
+        # Mismatches recentes da sessão atual (últimas 6h, expected==SESSION_ID):
+        # filtra ruído histórico pré-fix e mismatches de subagentes (subagent-stop.sh — esperado).
+        _MISMATCH_CUTOFF="$(date -u -d '6 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null \
+            || date -u -v -6H '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null \
+            || echo '1970-01-01T00:00:00Z')"
+        STALE_MISMATCH_COUNT="$(
+            jq --arg sid "$SESSION_ID" --arg cutoff "$_MISMATCH_CUTOFF" -r \
+                'select(.event == "session_id_mismatch"
+                    and .expected == $sid
+                    and (.source // "") != "subagent-stop.sh"
+                    and .timestamp != null
+                    and .timestamp > $cutoff) | .timestamp' "$AUDIT_FILE" 2> /dev/null \
+                | tail -50 | wc -l | tr -d ' '
+        )"
+    fi
+
+    RECONNECT_COUNT="${RECONNECT_COUNT:-0}"
+    STALE_MISMATCH_COUNT="${STALE_MISMATCH_COUNT:-0}"
+
+    if [ "$RECONNECT_COUNT" -ge "$RECONNECT_CRITICAL_THRESHOLD" ] 2> /dev/null; then
+        alert_critical "HIGH_RECONNECT_RATE" \
+            "${RECONNECT_COUNT} reconexões VS Code detectadas. Taxa crítica (≥${RECONNECT_CRITICAL_THRESHOLD}). Verifique estabilidade da rede e extensões."
+    elif [ "$RECONNECT_COUNT" -ge "$RECONNECT_WARN_THRESHOLD" ] 2> /dev/null; then
+        alert_warn "ELEVATED_RECONNECT_RATE" \
+            "${RECONNECT_COUNT} reconexões VS Code detectadas. Taxa elevada (≥${RECONNECT_WARN_THRESHOLD}). Monitorar estabilidade da conexão."
+    else
+        alert_info "Reconexões VS Code: ${RECONNECT_COUNT} (ok, limiar aviso: ${RECONNECT_WARN_THRESHOLD})"
+    fi
+
+    if [ "$STALE_MISMATCH_COUNT" -gt 0 ] 2> /dev/null; then
+        alert_warn "STALE_ID_MISMATCHES" \
+            "${STALE_MISMATCH_COUNT} eventos session_id_mismatch antigos detectados (pre-fix). Monitorar se regridem."
+    fi
+fi
 # ─────────────────────────────────────────────────────────────────────────────
 # Serializa arrays para JSON
 ALERTS_JSON="[]"

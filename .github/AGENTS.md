@@ -9,17 +9,82 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 
 ---
 
+## ╔══════════════════════════════════════════════════════════════════════╗
+## ║  ⚠️  SESSION PERSISTENTE — PRINCÍPIO FUNDAMENTAL (LEIA PRIMEIRO) ║
+## ╚══════════════════════════════════════════════════════════════════════╝
+
+> **O encerramento de uma SESSION, se o sistema estiver funcionando corretamente,**
+> **deve ser um evento EXTREMAMENTE RARO.**
+
+**REGRA ABSOLUTA**: O agente NUNCA deve chamar `session-close.sh` diretamente. Nem mesmo com a KEY correta. O único fluxo legítimo de encerramento é:
+
+1. Agente invoca `vscode_askQuestions` com **Template F** (exibe a `close_key` ao usuário)
+2. Usuário digita `ENCERRAR-XXXXXXXX` no campo de resposta
+3. `post-tool-use.sh` detecta automaticamente a KEY na resposta → executa `session-close.sh` automaticamente
+
+> **Por que nunca chamar session-close.sh diretamente?**
+> - O hook `pre-tool-use.sh` (v8.0) **NEGA** qualquer chamada a `session-close.sh` via `run_in_terminal` enquanto `close_key_validated=false`.
+> - O agente pode halluciná a KEY ou ser manipulado — o fluxo via `vscode_askQuestions` é o único confiável.
+> - `post-tool-use.sh` detecta a KEY na resposta do usuário e aciona o encerramento de forma controlada.
+
+**SESSION end = EVENTO EXTREMAMENTE RARO.** Toda SESSION deve ser mantida viva o máximo possível.
+
+---
+
+## ╔══════════════════════════════════════════════════════════════════╗
+## ║  🔐 PROTOCOLO CRÍTICO — ENCERRAMENTO DE SESSION  (LEIA PRIMEIRO) ║
+## ╚══════════════════════════════════════════════════════════════════╝
+
+> **SESSION ≠ SECTION ≠ TURN** — confundir estes três conceitos é o erro mais frequente.
+
+| Conceito    | O que é                       | Encerra com                           | Autorização       |
+| ----------- | ----------------------------- | ------------------------------------- | ----------------- |
+| **TURN**    | 1 ciclo prompt→resposta       | Livremente ao terminar a resposta     | ❌ Não precisa     |
+| **SECTION** | Fase lógica dentro da SESSION | `bash start-section.sh "nome"`        | ❌ Autônoma        |
+| **SESSION** | 1 ativação do Copilot Chat    | Template F + KEY + `session-close.sh` | ✅ **OBRIGATÓRIA** |
+
+### Para encerrar SESSION — 3 passos obrigatórios
+
+1. Invocar `vscode_askQuestions` com **Template F** (exibe a `close_key`)
+2. Usuário digita `ENCERRAR-XXXXXXXX` no campo livre
+3. **post-tool-use.sh chama `session-close.sh` automaticamente** (o agente não deve chamar)
+
+> **Onde encontrar a `close_key`:**
+> - `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO`
+> - `session-context.json` → campo `session.close_key`
+> - Lembrete rápido: `bash .github/hooks/scripts/session-reminder.sh`
+>
+> **Por que session-close.sh é obrigatório?** O evento `sessionEnd` do VS Code Copilot **não
+> dispara** em encerramento abrupto (crash/restart/timeout). Sem o script:
+> `SESSION_CLOSE_NO_KEY.flag` → alerta na próxima sessão.
+>
+> **Verificação automática:** o hook `postToolUse` detecta a close_key na resposta de
+> `vscode_askQuestions` e registra `sessionClose_key_validated` no audit.jsonl — confirmando
+> que a KEY foi enviada legitimamente via tool call, não por texto plano.
+
+---
+
 ## Protocolo de encerramento por nível
 
-> **Modelo v5.0 — TURN Autônomo.** Vigente desde 2026-03-10.
+> **Modelo v9.0 — Protocolo TODO Obrigatório.** Vigente desde 2026-03-11.
+
+### ╔═══ PROTOCOLO TODO OBRIGATÓRIO (v9.0) ═══╗
+
+> **Todo turno de trabalho significativo DEVE criar TODOs e terminar com vscode_askQuestions.**
+
+**Regras:**
+1. Use `manage_todo_list` ao **iniciar** qualquer turno de trabalho (crie a lista de tarefas).
+2. O último item da lista DEVE ser: `"Chamar vscode_askQuestions [Template A/D/E conforme contexto]"`.
+3. Execute todos os TODOs em sequência — o último (vscode_askQuestions) NÃO pode ser pulado.
+4. `agent-stop.sh` emite `decision:block` quando `vscode_askQuestions` não foi chamado.
 
 ### O que se aplica — por nível
 
-**TURN (turno)** — Autônomo, sem obrigação de `vscode_askQuestions`:
+**TURN (turno)** — Protocolo TODO obrigatório:
 
-- TURNs encerram livremente. O agente **não** precisa de autorização para encerrar.
-- `vscode_askQuestions` é **recomendado** como boa prática de comunicação, não obrigatório.
-- Bons momentos para chamar: tarefa concluída → Template A; checkpoint a cada ~5 TURNs → Template D;
+- TURNs com trabalho realizado DEVEM terminar com `vscode_askQuestions`.
+- `vscode_askQuestions` é **obrigatório** ao final de qualquer turno com trabalho realizado.
+- Templates por contexto: tarefa concluída → Template A; checkpoint a cada ~5 TURNs → Template D;
   proposta arquitetural → Template C; sessão ociosa → Template E.
 
 **SECTION (seção temática)** — Autônoma, sem autorização do usuário:
@@ -47,14 +112,14 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 2. O usuário orienta se deve: commitar+pushar, revisar com subagente, continuar melhorando, etc.
 3. Executar apenas a ação autorizada pelo usuário
 
-### Monitoramento automático (informativo)
+### Monitoramento automático (enforcement v7.0+)
 
-O sistema registra chamadas de `vscode_askQuestions` para auditoria:
+O sistema registra chamadas de `vscode_askQuestions` para auditoria e enforcement:
 
 - `agent-stop.sh` detecta se `vscode_askQuestions` foi chamado no turno
-- Sem chamada: loga `turnEnd_no_askQuestions` em `audit.jsonl` (informativo, **sem bloqueio**)
-- Com chamada: loga `turnEnd_authorized`
-- Nudge periódico via `systemMessage` a cada `HOOKS_TURN_NUDGE_INTERVAL` TURNs (padrão: 5)
+- Sem chamada: loga `turnEnd_no_askQuestions` + emite `decision:block` + incrementa `consecutive_unauthorized`
+- Com chamada: loga `turnEnd_authorized` e reseta `consecutive_unauthorized`
+- `manage_todo_list` não usado no turno: mencionado no `systemMessage` do block
 
 ---
 
@@ -654,18 +719,18 @@ inclui automaticamente as informações de continuidade no `session-briefing.md`
 
 ### Hooks configurados (10 hooks — copilot-hooks.json)
 
-| Hook                  | Script                | Tipo       | Descrição                                         |
-| --------------------- | --------------------- | ---------- | ------------------------------------------------- |
-| `sessionStart`        | `session-start.sh`    | Automático | Cria session-context.json e session-briefing.md   |
-| `userPromptSubmitted` | `log-prompt.sh`       | Automático | Hash do prompt, início de turno                   |
-| `preToolUse`          | `pre-tool-use.sh`     | Automático | Logging, redação de credenciais, auto-recovery    |
-| `postToolUse`         | `post-tool-use.sh`    | Automático | Resultado, detecção de close_key, quality gates   |
-| `postToolUseFailure`  | `tool-use-failure.sh` | Automático | Loga falhas de ferramentas, incrementa contadores |
-| `agentStop`           | `agent-stop.sh`       | Automático | Autorização, checkpoint, reset de turno           |
-| `subagentStart`       | `subagent-start.sh`   | Automático | Loga início de subagente                          |
-| `subagentStop`        | `subagent-stop.sh`    | Automático | Loga fim de subagente                             |
-| `preCompact`          | `pre-compact.sh`      | Automático | Checkpoint antes de compactação de contexto       |
-| `sessionEnd`          | `session-end.sh`      | Automático | Fecha seção, finaliza sessão, gera resumo         |
+| Hook                  | Script                | Tipo       | Descrição                                                                                                                                                                                                 |
+| --------------------- | --------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sessionStart`        | `session-start.sh`    | Automático | Cria session-context.json e session-briefing.md                                                                                                                                                           |
+| `userPromptSubmitted` | `log-prompt.sh`       | Automático | Hash do prompt, início de turno — **dispara apenas quando o usuário digita no chatbox** (raro; comunicação real via `vscode_askQuestions` é rastreada como `askQuestions_response` em `post-tool-use.sh`) |
+| `preToolUse`          | `pre-tool-use.sh`     | Automático | Logging, redação de credenciais, auto-recovery                                                                                                                                                            |
+| `postToolUse`         | `post-tool-use.sh`    | Automático | Resultado, detecção de close_key, quality gates                                                                                                                                                           |
+| `postToolUseFailure`  | `tool-use-failure.sh` | Automático | Loga falhas de ferramentas, incrementa contadores                                                                                                                                                         |
+| `agentStop`           | `agent-stop.sh`       | Automático | Autorização, checkpoint, reset de turno                                                                                                                                                                   |
+| `subagentStart`       | `subagent-start.sh`   | Automático | Loga início de subagente                                                                                                                                                                                  |
+| `subagentStop`        | `subagent-stop.sh`    | Automático | Loga fim de subagente                                                                                                                                                                                     |
+| `preCompact`          | `pre-compact.sh`      | Automático | Checkpoint antes de compactação de contexto                                                                                                                                                               |
+| `sessionEnd`          | `session-end.sh`      | Automático | Fecha seção, finaliza sessão, gera resumo                                                                                                                                                                 |
 
 ### Scripts manuais de emergência
 
@@ -709,6 +774,11 @@ bash .github/hooks/scripts/section-end.sh "tarefa concluída"
 - `session_stats.section_count` e `section_names[]` rastreiam todas as seções da sessão
 
 #### TURN — Enriquecimento de Turnos
+
+> **IMPORTANTE**: `userPromptSubmitted` dispara SOMENTE quando o usuário digita na caixa de chat do VS Code.
+> Respostas ao `vscode_askQuestions` são **tool results** (processadas por `post-tool-use.sh`), NÃO novos prompts.
+> Em sessões onde o usuário interage principalmente via `vscode_askQuestions`, o hook `userPromptSubmitted`
+> dispara muito raramente (1x por SESSION ou menos). Use `preToolUse` para reminders confiáveis.
 
 O início de cada turno é detectado **automaticamente** pelo hook `userPromptSubmitted`.
 O agente pode (e deve) enriquecer o turno chamando `start-turn.sh` como **primeiro ato**:

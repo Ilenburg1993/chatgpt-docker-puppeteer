@@ -381,16 +381,28 @@
           "**/.cache/**": true, // NOVO: Protege contra cache do Puppeteer/NPM
           "**/.claude/**": true, // NOVO: Evita indexar estados pesados da IA
           "**/.git/objects/**": true,
+          "**/.git/refs/**": true,
+          "**/.git/logs/**": true,
+          "**/backups/**": true, // v5.5: exclui backups do watcher
+          "**/artifacts/**": true, // v5.5: arquivos gerados
+          "**/monitoring/**": true,
+          "**/dist/**": true,
           "**/logs/**": true,
           "**/node_modules/**": true,
           "**/node-history/**": true, // NOVO: O histórico é para o shell, não para o editor
           "**/profile/**": true,
-          "**/respostas/**": true
+          "**/respostas/**": true,
+          "**/tmp/**": true
         },
         // ========================================================
-        // GIT (fluxo profissional, baixo atrito)
+        // EXTENSION HOST — ESTABILIDADE DE MEMÓRIA (v5.5)
+        // O extension host com 55+ extensões pode consumir 1.7+ GB.
+        // Reduzir auto-save frequency e desabilitar código desnecessário
+        // alivia o GC do extension host e reduz chances de crash/restart.
         // ========================================================
-        "git.autofetch": true,
+        // Reduz frequência de auto-fetch Git (causa wake-ups do extension host)
+        "git.autofetch": false, // v5.5: desativado (era true) — causa I/O periódico
+        "git.autofetchPeriod": 1800, // v5.5: se reativado, 30 min mínimo
         "git.confirmSync": false,
         "git.decorations.enabled": true,
         "git.enableSmartCommit": true,
@@ -426,6 +438,15 @@
         "remote.SSH.enableAgentForwarding": true,
         "remote.SSH.loglevel": "info",
         "remote.SSH.useLocalServer": true,
+        // ========================================================
+        // EXTENSÕES — ESTABILIDADE DE SESSÃO
+        // Previne atualizações automáticas de extensões durante sessões ativas.
+        // Atualizações mid-session podem causar incompatibilidade de API proposals
+        // (ex.: chatParticipantPrivate no Copilot Chat) e reinício do extension host.
+        // Para atualizar extensões, faça manualmente após encerrar a sessão.
+        // ========================================================
+        "extensions.autoUpdate": false,
+        "extensions.autoCheckUpdates": false,
         "search.exclude": {
           "**/.cache": true,
           "**/.claude": true,
@@ -1085,18 +1106,53 @@
     // 3. Documentação clara de riscos (este bloco)
     // ============================================================================
     "--group-add=docker",
+    // ====================================================================
+    // TCP KEEPALIVE — DETECÇÃO RÁPIDA DE CONEXÕES MORTAS (v5.5)
+    // ====================================================================
+    // Por padrão o kernel Linux usa tcp_keepalive_time=7200 (2 horas).
+    // Isso significa que conexões idle não são sondadas por 2 HORAS antes
+    // de serem declaradas mortas — causando reconnects silenciosos no
+    // VS Code que geram novos session_ids sem disparar sessionStart.
+    //
+    // Reduzimos para valores agressivos mas seguros:
+    // • tcp_keepalive_time=120: começa a sondar após 2 min de idle
+    // • tcp_keepalive_intvl=15: intervalo entre sondas
+    // • tcp_keepalive_probes=3: 3 falhas → conexão declarada morta
+    // Efeito total: conexão morta detectada em ~2min45s (vs 2h15min atual)
+    //
+    // ⚠️ REQUER REBUILD DO CONTAINER para entrar em vigor.
+    // Sysctls net.ipv4.tcp_* são namespace-específicos no Linux 5.15+
+    // (WSL2 6.6 suporta). Testado: `sysctl -w` dentro sem --privileged
+    // retorna EPERM; via --sysctl no docker run funciona sem privilégios.
+    //
+    // Referência: DOCUMENTAÇÃO/HOOKS/ANALISE-SESSOES-ABRUPTAS.md §5.3
+    // ====================================================================
+    "--sysctl",
+    "net.ipv4.tcp_keepalive_time=120",
+    "--sysctl",
+    "net.ipv4.tcp_keepalive_intvl=15",
+    "--sysctl",
+    "net.ipv4.tcp_keepalive_probes=3",
+    "--sysctl",
+    "net.ipv4.tcp_fin_timeout=30",
     // METADATA: Sincronizado com a Section 0 do Dockerfile
     "--label",
     "project=chatgpt-docker-puppeteer",
     "--label",
     "role=devcontainer",
     "--label",
-    "version=5.4.0"
+    "version=5.5.0"
   ],
   // ============================================================
   // LIFECYCLE FINALIZATION
   // ============================================================
-  "shutdownAction": "stopContainer",
+  // "none": container keeps running when VS Code closes/disconnects.
+  // • VS Code reconnects reattach to the SAME running container (faster, stateful)
+  // • PM2, logs e hooks continuam vivos durante desconexão
+  // • Elimina cold-start após reconexão temporária
+  // • Tradeoff: container deve ser parado manualmente (docker stop / make clean)
+  // Referência: DOCUMENTAÇÃO/HOOKS/ANALISE-SESSOES-ABRUPTAS.md §5.2
+  "shutdownAction": "none",
   // IMPORTANT: some hosts may run the container using an arbitrary UID that
   // does not match the fixed ‘node’ entry baked into the image (UID 1000).
   // When this happens the user ID has no corresponding name in /etc/passwd

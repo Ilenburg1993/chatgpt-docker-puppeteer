@@ -8,32 +8,92 @@ Canônico. **Última atualização**: 10 de março de 2026.
 
 ---
 
+## ╔══════════════════════════════════════════════════════════════════════╗
+
+## ║ ⚠️ SESSION PERSISTENTE — PRINCÍPIO FUNDAMENTAL (v8.0) ║
+
+## ╚══════════════════════════════════════════════════════════════════════╝
+
+> **O encerramento de uma SESSION, se o sistema estiver funcionando corretamente,** **deve ser um
+> evento EXTREMAMENTE RARO.**
+
+**REGRA ABSOLUTA — NUNCA VIOLAR:**
+
+- O agente **NUNCA** deve chamar `session-close.sh` diretamente via `run_in_terminal`.
+- Nem mesmo com a KEY correta. O `pre-tool-use.sh` (v8.0) **NEGA** essa chamada quando
+  `close_key_validated=false`.
+- O único fluxo legítimo: `vscode_askQuestions` Template F → usuário digita KEY → `post-tool-use.sh`
+  executa `session-close.sh` automaticamente.
+
+**SESSION end = EVENTO EXTREMAMENTE RARO. Toda SESSION deve ser mantida viva o máximo possível.**
+
+---
+
+## ╔══════════════════════════════════════════════════════════════════╗
+
+## ║ 🔐 PROTOCOLO CRÍTICO — ENCERRAMENTO DE SESSION (LEIA PRIMEIRO) ║
+
+## ╚══════════════════════════════════════════════════════════════════╝
+
+> **SESSION ≠ SECTION ≠ TURN** — confundir estes três conceitos é o erro mais frequente.
+
+| Conceito    | O que é                       | Encerra com                           | Autorização        |
+| ----------- | ----------------------------- | ------------------------------------- | ------------------ |
+| **TURN**    | 1 ciclo prompt→resposta       | Livremente ao terminar a resposta     | ❌ Não precisa     |
+| **SECTION** | Fase lógica dentro da SESSION | `bash start-section.sh "nome"`        | ❌ Autônoma        |
+| **SESSION** | 1 ativação do Copilot Chat    | Template F + KEY + `session-close.sh` | ✅ **OBRIGATÓRIA** |
+
+### Para encerrar SESSION — 3 passos obrigatórios
+
+1. Invocar `vscode_askQuestions` com **Template F** (exibe a `close_key`)
+2. Usuário digita `ENCERRAR-XXXXXXXX` no campo livre
+3. **`post-tool-use.sh` detecta KEY automaticamente e executa `session-close.sh`** (o agente não
+   chama o script diretamente)
+
+> **Onde encontrar a `close_key`:**
+>
+> - `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO` (primeira seção)
+> - `session-context.json` → campo `session.close_key`
+> - Lembrete rápido: `bash .github/hooks/scripts/session-reminder.sh`
+>
+> **Por que `session-close.sh` é obrigatório?** O evento `sessionEnd` do VS Code Copilot **não
+> dispara** em encerramento abrupto. Sem o script → `SESSION_CLOSE_NO_KEY.flag` → alerta no próximo
+> briefing.
+>
+> **Verificação via hooks:** o hook `postToolUse` detecta automaticamente a `close_key` na resposta
+> de `vscode_askQuestions` e registra `sessionClose_key_validated` — confirmando que a KEY foi
+> enviada via tool call (não texto plano). Texto plano não conta.
+
+---
+
 ## Protocolo de Comunicação — TURNs, SECTIONs e SESSIONs
 
-> **Modelo v5.0 — TURN Autônomo** (vigente desde 2026-03-10)
+> **Modelo v9.0 — Protocolo TODO Obrigatório** (vigente desde 2026-03-11)
 
-### TURN — Autônomo (sem obrigação de vscode_askQuestions)
+### TURN — Protocolo TODO obrigatório (v9.0)
 
-**TURNs encerram livremente.** O agente não precisa de autorização para encerrar um turno.
-`vscode_askQuestions` é **recomendado** como boa prática de comunicação, não obrigatório.
+**TURNs com trabalho realizado DEVEM incluir chamada a `vscode_askQuestions` ao final.** O agente
+NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions.
 
-**Casos em que chamar vscode_askQuestions é valioso:**
+**Protocolo TODO obrigatório em todo turno:**
+
+1. Use `manage_todo_list` ao iniciar o turno — lista de tarefas é obrigatória
+2. Inclua sempre como ÚLTIMO TODO: `"Chamar vscode_askQuestions [Template X]"`
+3. Execute todos os TODOs em sequência — o último (vscode_askQuestions) não pode ser pulado
+
+**Cases válidos por contexto:**
 
 - Tarefa concluída → Template A (próximo passo)
 - Checkpoint periódico a cada ~5 TURNs sem perguntar → Template D
 - Proposta arquitetural → Template C
 - Sessão completamente ociosa → Template E
 
-**O que NÃO é mais enforcement (apenas auditoria informativa):**
+**Enforcement (v7.0+):**
 
-- Encerrar TURN sem vscode_askQuestions — é autônomo, apenas loga `turnEnd_no_askQuestions`
-- `UNAUTHORIZED_CLOSE.flag` — não é mais criado
-- `decision:block` — removido do agent-stop.sh (v5.0)
-
-**Nudge automático (systemMessage informativo — não bloqueante):**
-
-- `agent-stop.sh` envia systemMessage contextual a cada `HOOKS_TURN_NUDGE_INTERVAL` (padrão: 5)
-  TURNs sem `vscode_askQuestions`, ou quando há git push pendente de section declaration.
+- Encerrar TURN sem vscode_askQuestions → `decision:block` emitido + `turnEnd_no_askQuestions`
+  logado
+- `consecutive_unauthorized` incrementado a cada violação
+- `manage_todo_list` não usado no turno → mencionado no systemMessage do block
 
 ### SESSION — Autorização obrigatória (close_key + session-close.sh)
 
@@ -65,11 +125,11 @@ Antes de qualquer `git commit` e/ou `git push`, o agente **deve** invocar `vscod
 
 > **Distinção obrigatória**: SESSION ≠ SECTION ≠ TURN. Nunca confundir os três conceitos.
 
-| Conceito    | Escopo                         | Boundary                                           | Cardinalidade  |
-| ----------- | ------------------------------ | -------------------------------------------------- | -------------- |
-| **SESSION** | 1 por ativação do Copilot Chat | `sessionStart` → `sessionEnd`                      | 1 por dia      |
-| **SECTION** | Fase lógica dentro da SESSION  | `start-section.sh` → `section-end.sh` / auto-close | ≥1 por SESSION |
-| **TURN**    | 1 ciclo prompt→resposta        | `userPromptSubmitted` → `agentStop`                | ≥1 por SECTION |
+| Conceito    | Escopo                                                                                                                                                          | Boundary                                           | Cardinalidade  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | -------------- |
+| **SESSION** | 1 por ativação do Copilot Chat                                                                                                                                  | `sessionStart` → `sessionEnd`                      | 1 por dia      |
+| **SECTION** | Fase lógica dentro da SESSION                                                                                                                                   | `start-section.sh` → `section-end.sh` / auto-close | ≥1 por SESSION |
+| **TURN**    | 1 ciclo chat→agentStop. Dentro de um TURN podem ocorrer N chamadas a `vscode_askQuestions` — as respostas são **tool results** (postToolUse), NÃO novos prompts | `userPromptSubmitted` → `agentStop`                | ≥1 por SECTION |
 
 **Invariante absoluto**: sempre deve haver SESSION + SECTION + TURN ativos simultaneamente.
 
@@ -80,11 +140,16 @@ Antes de qualquer `git commit` e/ou `git push`, o agente **deve** invocar `vscod
 - `session-end.sh` auto-fecha a SECTION ativa antes de encerrar a SESSION
 - `log-prompt.sh` reseta `current_turn.*` a cada novo prompt (início de TURN)
 
+**⚠️ `userPromptSubmitted` dispara SOMENTE para mensagens digitadas no chat box** (não para
+respostas a `vscode_askQuestions`). Em sessões onde o usuário interage primariamente via
+askQuestions, esse hook dispara raramente (1x por SESSION). O hook mais confiável para reminders por
+interação é `preToolUse` (dispara antes de cada ferramenta).
+
 **Quando o agente deve agir manualmente**:
 
 - Chamar `start-section.sh "nome"` ao mudar de fase lógica de trabalho
 - Chamar `start-turn.sh "intenção"` como primeiro ato de cada TURN de trabalho
-- Chamar `vscode_askQuestions` antes de encerrar cada TURN
+- Chamar `vscode_askQuestions` como principal canal de interação com o usuário
 
 **Referências completas**: `.github/AGENTS.md` (Templates A-F, protocolo completo),
 `DOCUMENTAÇÃO/HOOKS/PROTOCOLO-AUTORIZACAO.md` (spec técnico),

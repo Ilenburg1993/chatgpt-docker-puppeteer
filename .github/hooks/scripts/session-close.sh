@@ -157,17 +157,19 @@ jq -cn \
 # Remove flag de encerramento SEM key (se existir)
 rm -f "$STATE_DIR/SESSION_CLOSE_NO_KEY.flag" 2> /dev/null || true
 
-# Chama session-end.sh para gerar relatório completo e logar sessionEnd
-SESSION_END_SCRIPT="$SCRIPTS_DIR/session-end.sh"
-if [ -f "$SESSION_END_SCRIPT" ] && [ -x "$SESSION_END_SCRIPT" ]; then
-    echo "{\"timestamp\":\"$NOW_ISO\",\"cwd\":\"$(pwd)\",\"reason\":\"authorized_close\"}" \
-        | HOOKS_STATE_DIR="$STATE_DIR" HOOKS_LOG_DIR="$LOG_DIR" HOOKS_DOCS_DIR="${HOOKS_DOCS_DIR:-}" bash "$SESSION_END_SCRIPT" 2> /dev/null || true
-    echo "📋 Relatório de sessão gerado por session-end.sh"
-fi
+# v8.1: NÃO chama session-end.sh aqui. O hook nativo sessionEnd do VS Code é o
+# único mecanismo responsável por disparar session-end.sh. Chamar session-end.sh
+# aqui gerava eventos sessionEnd ANTES do VS Code encerrar a sessão, criando logs
+# falsos que pareciam indicar encerramento prematuro da SESSION.
+# O session-close.sh apenas: valida KEY, seta close_key_validated=true, loga
+# sessionCloseAuthorized, e prepara flag SESSION_CLOSE_AUTHORIZED.flag.
+# Quando o VS Code encerrar a sessão de fato, o hook sessionEnd chamará
+# session-end.sh e gerará o relatório final com close_key_validated=true.
 
 echo ""
 echo "══════════════════════════════════════════════════════════"
-echo "  SESSION encerrada com autorização expressa."
+echo "  SESSION autorizada para encerramento."
 echo "  close_key: $STORED_KEY"
 echo "  session_id: $SESSION_ID"
+echo "  O relatório final será gerado quando o VS Code encerrar."
 echo "══════════════════════════════════════════════════════════"

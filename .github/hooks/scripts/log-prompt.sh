@@ -2,7 +2,17 @@
 # log-prompt.sh — Hook userPromptSubmitted do Copilot
 # Executado quando o usuário submete um prompt ao agente.
 # Input JSON (stdin): {timestamp, cwd, prompt}
-# Output: ignorado pelo Copilot.
+# Output JSON (stdout): systemMessage com SESSION reminder obrigatório em cada TURN.
+#
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  HARDENING v6.0 — SESSION REMINDER NO INÍCIO DE CADA TURN              ║
+# ║                                                                          ║
+# ║  SESSION  ≠  SECTION  ≠  TURN                                           ║
+# ║  ─────────────────────────────────────────────────────────────────────   ║
+# ║  TURN    → encerra LIVREMENTE (sem autorização)                         ║
+# ║  SECTION → agente decide autonomamente via start-section.sh             ║
+# ║  SESSION → SOMENTE com Template F + KEY digitada + session-close.sh KEY  ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
 #
 # PRIVACIDADE: o texto completo do prompt NÃO é logado.
 # Apenas um hash SHA-256 truncado e o tamanho são registrados.
@@ -80,21 +90,52 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 >> "$LOG_DIR/audit.jsonl"
             SESSION_ID="$SESSION_ID_PAYLOAD" # continua com o ID correto
         else
+            # ── Rollover de reconexão (RECONNECT-01) ──────────────────────────────────
+            # O cliente VS Code desconectou e reconectou, gerando novo session_id.
+            # O evento sessionStart NÃO é disparado pelo Copilot em reconexões.
+            # Comportamento anterior: bloquear state write → 395 mismatches por sessão.
+            # Comportamento novo: detectar como reconexão legítima e atualizar contexto.
+            NOW_RECONNECT="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+            # 1) Logar evento de reconexão
             jq -cn \
-                --arg event "session_id_mismatch" \
-                --arg expected "$CTX_ACTIVE_SID" \
-                --arg got "$SESSION_ID_PAYLOAD" \
+                --arg event "sessionReconnect" \
+                --arg old "$CTX_ACTIVE_SID" \
+                --arg new "$SESSION_ID_PAYLOAD" \
                 --arg source "log-prompt.sh" \
-                --arg ts "${TIMESTAMP:-}" \
-                '{
-                    event:   $event,
-                    expected: $expected,
-                    got:      $got,
-                    source:   $source,
-                    timestamp: $ts,
-                    message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-                }' >> "$LOG_DIR/audit.jsonl"
-            exit 0
+                --arg ts "${TIMESTAMP:-$NOW_RECONNECT}" \
+                '{event: $event, old_session_id: $old, new_session_id: $new,
+                  source: $source, timestamp: $ts,
+                  message: "Reconexão do cliente VS Code detectada — rollover para novo session_id"}' \
+                >> "$LOG_DIR/audit.jsonl"
+            # 2) Gerar sessionEnd sintético para a sessão anterior
+            jq -cn \
+                --arg event "sessionEnd" \
+                --arg sid "$CTX_ACTIVE_SID" \
+                --arg ts "${TIMESTAMP:-$NOW_RECONNECT}" \
+                --arg mode "abrupt_reconnect" \
+                '{event: $event, session_id: $sid, timestamp: $ts, close_mode: $mode,
+                  message: "sessionEnd sintético gerado por log-prompt.sh (rollover de reconexão)"}' \
+                >> "$LOG_DIR/audit.jsonl"
+            # 3) Atualizar contexto para o novo session_id (não bloquear state write)
+            if command -v sponge &> /dev/null; then
+                jq --arg new_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_RECONNECT" \
+                    '.session.id = $new_sid
+                     | .session.reconnect_at = $ts
+                     | .session.source = "reconnect_rollover"' \
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            else
+                _TMP_RC="$(mktemp)"
+                if jq --arg new_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_RECONNECT" \
+                    '.session.id = $new_sid
+                     | .session.reconnect_at = $ts
+                     | .session.source = "reconnect_rollover"' \
+                    "$CTX_FILE" > "$_TMP_RC" 2> /dev/null; then
+                    mv "$_TMP_RC" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_RC"
+                else
+                    rm -f "$_TMP_RC"
+                fi
+            fi
+            SESSION_ID="$SESSION_ID_PAYLOAD" # prossegue com o novo ID
         fi
     fi
 fi
@@ -112,18 +153,20 @@ fi
 jq -cn \
     --arg event "userPromptSubmitted" \
     --arg sid "$SESSION_ID" \
+    --arg sid_payload "$SESSION_ID_PAYLOAD" \
     --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
     --arg cwd "$CWD" \
     --arg hash "$PROMPT_HASH" \
     --arg section_id "$SECTION_ID_PRE" \
     --argjson len "$PROMPT_LEN" \
     '{
-        event:       $event,
-        session_id:  $sid,
-        timestamp:   $ts,
-        cwd:         $cwd,
-        prompt_hash: $hash,
-        prompt_len:  $len,
+        event:               $event,
+        session_id:          $sid,
+        session_id_in_payload: (if $sid_payload == "" then false else true end),
+        timestamp:           $ts,
+        cwd:                 $cwd,
+        prompt_hash:         $hash,
+        prompt_len:          $len,
         section_id:  (if $section_id == "" then null else $section_id end)
     }' >> "$LOG_DIR/audit.jsonl"
 
@@ -159,6 +202,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.intent                    = null
          | .current_turn.block_count               = 0
          | .current_turn.agentStop_invocations     = 0
+         | .current_turn.todo_created              = false
          | .current_section.local_turn             = ((.current_section.local_turn // 0) + 1)
          | .current_turn.section_turn              = (.current_section.local_turn // 1)' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
@@ -187,6 +231,7 @@ elif [ -f "$CTX_FILE" ]; then
          | .current_turn.intent                    = null
          | .current_turn.block_count               = 0
          | .current_turn.agentStop_invocations     = 0
+         | .current_turn.todo_created              = false
          | .current_section.local_turn             = ((.current_section.local_turn // 0) + 1)
          | .current_turn.section_turn              = (.current_section.local_turn // 1)' \
         "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
@@ -217,5 +262,63 @@ jq -cn \
         section_name: (if $section_name == "" then null else $section_name end),
         section_id:   (if $section_id == "" then null else $section_id end)
     }' >> "$LOG_DIR/audit.jsonl"
+
+# ── Hardening v6.0: systemMessage SESSION REMINDER em CADA TURN ──────────────
+# CRÍTICO: Este é o único ponto onde o agente recebe lembrete ANTES de gerar sua
+# resposta. Todos os outros lembretes (agent-stop.sh) são POST-HOC e chegam tarde.
+#
+# SESSION ≠ SECTION ≠ TURN:
+#   TURN    → encerra LIVREMENTE (agentStop automático)
+#   SECTION → agente decide mudança via start-section.sh (autônomo)
+#   SESSION → SOMENTE com vscode_askQuestions Template F + KEY + bash session-close.sh KEY
+_SESSION_REMINDER_MSG=""
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
+    _SR_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    _SR_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+    _SR_SECTION="$(jq -r '.current_section.name // "(sem section)"' "$CTX_FILE" 2> /dev/null || echo '(sem section)')"
+    _SR_CONSEC="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _SR_TURNS_SINCE="$(jq -r '.session_stats.turns_since_askQuestions // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+
+    # Determina severidade do lembrete
+    _SR_SEVERITY="INFO"
+    if { [ "$_SR_CONSEC" -ge 2 ] 2> /dev/null; }; then
+        _SR_SEVERITY="CRITICO"
+    elif { [ "$_SR_CONSEC" -ge 1 ] 2> /dev/null; } || { [ "$_SR_TURNS_SINCE" -ge 3 ] 2> /dev/null; }; then
+        _SR_SEVERITY="ALERTA"
+    fi
+
+    # Emoji de severidade
+    _SR_ICON="📍"
+    [ "$_SR_SEVERITY" = "ALERTA" ] && _SR_ICON="⚠️"
+    [ "$_SR_SEVERITY" = "CRITICO" ] && _SR_ICON="🚨"
+
+    # Linha de violação (se houver)
+    _SR_VIOLATION=""
+    if { [ "$_SR_CONSEC" -ge 1 ] 2> /dev/null; }; then
+        _SR_VIOLATION="
+⛔ VIOLAÇÃO: ${_SR_CONSEC} TURN(s) SEM vscode_askQuestions | ${_SR_TURNS_SINCE} desde o último"
+    fi
+
+    # Linha de SESSION close (sempre visível)
+    _SR_SESSION_LINE="🔐 SESSION ATIVA"
+    if [ "$_SR_CLOSE_VALIDATED" = "true" ]; then
+        _SR_SESSION_LINE="✅ SESSION: close_key validada"
+    elif [ -n "$_SR_CLOSE_KEY" ]; then
+        _SR_SESSION_LINE="🔐 SESSION: chave = ${_SR_CLOSE_KEY} (ainda NÃO encerrada)"
+    fi
+
+    _SESSION_REMINDER_MSG="${_SR_ICON} TURN INICIADO | SECTION: \"${_SR_SECTION}\" | ${_SR_SESSION_LINE}${_SR_VIOLATION}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TURN    → encerra LIVREMENTE (sem autorização necessária)
+  SECTION → muda via: bash .github/hooks/scripts/start-section.sh \"nome\" (autônomo)
+  SESSION → fecha SOMENTE com: vscode_askQuestions (Template F) + usuário digita KEY
+                               + bash .github/hooks/scripts/session-close.sh KEY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Ao CONCLUIR esta resposta: chame vscode_askQuestions para comunicar o resultado."
+fi
+
+if [ -n "$_SESSION_REMINDER_MSG" ]; then
+    printf '%s\n' "{\"systemMessage\":$(printf '%s' "$_SESSION_REMINDER_MSG" | jq -Rs .)}"
+fi
 
 exit 0

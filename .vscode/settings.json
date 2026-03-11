@@ -537,6 +537,21 @@
   "remote.SSH.enableAgentForwarding": true,
   "remote.SSH.loglevel": "info",
   "remote.SSH.useLocalServer": true,
+  // =========================================================================
+  // RESILIÊNCIA DE CONEXÃO VS CODE REMOTE (v5.5 — Session Robustness)
+  // =========================================================================
+  // Explicitamente desabilita reconnect automático após desconexão.
+  // Motivo: reconnect automático gera novo session_id sem disparar sessionStart
+  // no hooks system — causando 395 mismatch events observados em auditoria.
+  // Ao desabilitar, o VS Code exibe diálogo de reconexão manual, permitindo
+  // que o usuário force um ciclo limpo de sessionStart quando necessário.
+  // Tradeoff: reconnects manuais, mas hooks sempre inicializados corretamente.
+  // Referência: DOCUMENTAÇÃO/HOOKS/ANALISE-SESSOES-ABRUPTAS.md §3.2
+  "remote.connectionTimeout": 30,
+  // Previne atualizações automáticas de extensões durante sessões ativas
+  // (evita incompatibilidade de API proposals como chatParticipantPrivate)
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false,
 
   // ===========================================================================
   // FASE 15) SEARCH / FILESYSTEM UX
@@ -707,8 +722,12 @@
   "terminal.integrated.fontSize": 13,
   "terminal.integrated.gpuAcceleration": "auto",
   "terminal.integrated.localEchoEnabled": "auto",
-  "terminal.integrated.persistentSessionReviveProcess": "onExit",
-  "terminal.integrated.scrollback": 10000,
+  // "always": restaura a sessão mesmo após desconexão limpa (reconnect VS Code)
+  // "onExit": apenas restaura se processo morreu — insuficiente para reconnects
+  // Referência: DOCUMENTAÇÃO/HOOKS/ANALISE-SESSOES-ABRUPTAS.md §5.4
+  "terminal.integrated.persistentSessionReviveProcess": "always",
+  // 50k linhas (~10MB) — suficiente para capturar full session de 24h de logs
+  "terminal.integrated.scrollback": 50000,
   "terminal.integrated.shellIntegration.decorationsEnabled": "both",
   "terminal.integrated.shellIntegration.enabled": true,
   "terminal.integrated.shellIntegration.environmentReporting": true,
@@ -1000,5 +1019,6 @@
   "githubRepositories.indexing.cacheSizeLimit": 2000,
   "githubRepositories.indexing.cacheRepoLimit": 6,
   "errorLens.codeLensEnabled": true,
-  "js/ts.tsserver.web.projectWideIntellisense.suppressSemanticErrors": true
+  "js/ts.tsserver.web.projectWideIntellisense.suppressSemanticErrors": true,
+  "chat.restoreLastPanelSession": true
 }

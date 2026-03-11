@@ -2,20 +2,20 @@
 # agent-stop.sh — Hook agentStop do Copilot (Stop event)
 # Executado quando o agente termina de responder ao prompt (fim de turno).
 # Input JSON (stdin): {timestamp, hook_event_name, session_id, stop_hook_active, ...}
-# Output JSON (stdout): systemMessage informativo (nudge) quando há push pendente ou
-#   turns_since_askQuestions >= HOOKS_TURN_NUDGE_INTERVAL (padrão: 5, sem bloqueio).
-#   Caso contrário, não emite nada (saída vazia → agente encerra normalmente).
 #
-# PROTOCOLO DE ENCERRAMENTO (v5.0 — TURN Autônomo):
-#   - TURNs encerram livremente — sem decision:block.
-#   - vscode_askQuestions é RECOMENDADO por TURN, OBRIGATÓRIO apenas para:
-#       * git commit/push (Template G) e encerramento de SESSION (Template F).
-#   - Auditoria completa: turnEnd_no_askQuestions / turnEnd_authorized em audit.jsonl.
-#   - Nudge periódico informativo (systemMessage) a cada HOOKS_TURN_NUDGE_INTERVAL TURNs.
+# PROTOCOLO DE ENCERRAMENTO (v7.0 — BLOCKING ESTRUTURAL via decision:block):
+#   - TURNs SÃO BLOQUEADOS quando AUTH_REQUESTED=false e stop_hook_active=false.
+#   - O agente é forçado a chamar vscode_askQuestions antes de encerrar o TURN.
+#   - Exceções: stop_hook_active=true (anti-loop), primeiro turno (warm-up),
+#     AUTH_REQUESTED=true (askQuestions já foi chamado), subagente delegado.
+#   - Output de bloqueio: hookSpecificOutput.decision="block" + reason + systemMessage.
+#   - Estratégia 2 REMOVIDA (causava falso positivo cross-turn — v7.0).
+#   - Auditoria: turnEnd_no_askQuestions / agentStop_blocked / agentStop_unblocked_* em audit.jsonl.
+#   - UNAUTHORIZED_CLOSE.flag: criado quando turno é bloqueado.
 #   - Calcula turn_duration a partir de current_turn.started_at (fix B3)
 #   - session_summary usa métricas DO TURNO, não da sessão (fix B4)
 #   - Reseta current_turn.* e incrementa session_stats.* após cada turno
-#   - compliance.* controla o estado de autorização (informativo)
+#   - compliance.* controla o estado de autorização
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -253,8 +253,13 @@ jq -cn \
 # ── Detecção de autorização ───────────────────────────────────────────────────
 # Estratégia em camadas (do mais preciso ao mais tolerante):
 #   1. Fronteira por userPromptSubmitted (preciso): busca após o último prompt
-#   2. Fallback por recência (últimas 150 linhas): quando userPromptSubmitted ausente
-#   3. Fallback de contexto: lê current_turn.auth_requested do session-context.json
+#   2. [REMOVIDO v7.0 — causava falso positivo — ver comentário abaixo]
+#   3. Contexto do turno atual: lê current_turn.auth_requested do session-context.json
+#   4. Delegação ao subagente: subagent_delegated=true = autorização implícita
+# A Estratégia 2 foi REMOVIDA em v7.0 porque verificava "últimas 150 linhas" do audit.jsonl
+# e encontrava vscode_askQuestions de TURNOS ANTERIORES, gerando AUTH_REQUESTED=true falso.
+# A Estratégia 3 (current_turn.auth_requested) é perfeitamente escoped ao turno atual:
+# setada por post-tool-use.sh quando askQuestions é chamado, resetada aqui no fim do turno.
 AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
 AUTHORIZED_FLAG_FILE="$STATE_DIR/AUTHORIZED_CLOSE.flag"
 AUTH_REQUESTED=false
@@ -277,15 +282,8 @@ if [ -f "$AUDIT_FILE" ]; then
         fi
     fi
 
-    # Estratégia 2 (fallback): userPromptSubmitted ausente — verifica últimas 150 linhas
-    if [ "$AUTH_REQUESTED" = "false" ] && [ "$LAST_PROMPT_LINE" -eq 0 ]; then
-        RECENT_LINES=150
-        if [ "$TOTAL_LINES" -lt "$RECENT_LINES" ]; then RECENT_LINES="$TOTAL_LINES"; fi
-        if tail -n "$RECENT_LINES" "$AUDIT_FILE" \
-            | jq -re 'select(.tool_name == "vscode_askQuestions" or .event == "subagentStart")' > /dev/null 2>&1; then
-            AUTH_REQUESTED=true
-        fi
-    fi
+    # Estratégia 2 REMOVIDA em v7.0 (falso positivo cross-turn).
+    # Estratégia 3 (session-context.json) é o fallback correto abaixo.
 fi
 
 # Estratégia 3 (fallback de contexto): lê flag do session-context.json
@@ -322,10 +320,9 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
     fi
 fi
 
-# ── Auditoria de turno sem vscode_askQuestions (informativo, sem bloqueio) ────
-# Novo modelo (v5.0): TURNs são autônomos. O agente encerra livremente.
-# vscode_askQuestions é recomendado, não obrigatório por TURN.
-# O log é informativo — ajuda a entender padrões de comunicação sem bloquear.
+# ── Auditoria de turno sem vscode_askQuestions (informativo) ────────────────
+# Loga turnEnd_no_askQuestions antes de decidir se bloqueia.
+# Não loga quando stop_hook_active=true (segunda invocação após block).
 if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
     jq -cn \
         --arg event "turnEnd_no_askQuestions" \
@@ -339,23 +336,139 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
             timestamp:  $ts,
             section_id: (if $section_id == "" then null else $section_id end),
             turn_id:    (if $turn_id == "" then null else $turn_id end),
-            message:    "Turno encerrado naturalmente (TURN autônomo — sem vscode_askQuestions)"
+            message:    "Turno sem vscode_askQuestions — avaliando bloqueio v7.0"
         }' >> "$LOG_DIR/audit.jsonl"
 fi
 
-# ── systemMessage contextual (não bloqueante) — nudge periódico ──────────────
-# Emite systemMessage informativo (sem decision:block) quando:
+# ── Hardening v7.0: BLOCKING estrutural via Stop hook (decision:block) ────────
+# Quando AUTH_REQUESTED=false E stop_hook_active=false: BLOQUEIA o turno.
+# Isso força o agente a chamar vscode_askQuestions antes de poder encerrar.
+# CRÍTICO: se stop_hook_active=true, NUNCA bloquear (prevenção de loop infinito).
+# Referência: https://code.visualstudio.com/docs/copilot/customization/hooks
+if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f "$CTX_FILE" ]; then
+    _BLOCK_TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _BLOCK_CLOSE_KEY="$(jq -r '.session.close_key // "N/A"' "$CTX_FILE" 2> /dev/null || echo 'N/A')"
+    _BLOCK_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+    _BLOCK_CONSECUTIVE="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _BLOCK_TODO_CREATED="$(jq -r '.current_turn.todo_created // false' "$CTX_FILE" 2> /dev/null || echo false)"
+    # Permite o primeiro turno (warm-up): agente ainda obtendo contexto da SESSION
+    if [ "$_BLOCK_TURN_COUNT" -ge 1 ]; then
+        _NEW_CONSEC=$((_BLOCK_CONSECUTIVE + 1))
+        # Loga o evento de bloqueio (v9.0: inclui todo_created)
+        jq -cn \
+            --arg event "agentStop_blocked" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$NOW_ISO" \
+            --arg turn_id "$TURN_ID" \
+            --argjson consec "$_NEW_CONSEC" \
+            --argjson todo "$_BLOCK_TODO_CREATED" \
+            '{
+                event:      $event,
+                session_id: $sid,
+                timestamp:  $ts,
+                turn_id:    (if $turn_id == "" then null else $turn_id end),
+                consecutive_unauthorized: $consec,
+                todo_created: $todo,
+                message:    "TURN bloqueado por hardening v9.0: vscode_askQuestions não chamado"
+            }' >> "$LOG_DIR/audit.jsonl"
+        # Loga evento extra quando manage_todo_list também não foi chamado (v9.0)
+        if [ "$_BLOCK_TODO_CREATED" != "true" ]; then
+            jq -cn \
+                --arg event "agentStop_blocked_no_todo" \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$NOW_ISO" \
+                --arg turn_id "$TURN_ID" \
+                --argjson consec "$_NEW_CONSEC" \
+                '{
+                    event:      $event,
+                    session_id: $sid,
+                    timestamp:  $ts,
+                    turn_id:    (if $turn_id == "" then null else $turn_id end),
+                    consecutive_unauthorized: $consec,
+                    message:    "manage_todo_list NÃO chamado neste turno — violação dupla do Protocolo v9.0"
+                }' >> "$LOG_DIR/audit.jsonl"
+        fi
+        # Atualiza CTX: incrementa consecutive_unauthorized e registra atividade do turno
+        # last_turn_ts atualizado mesmo em bloqueios: TURN_IDLE mede atividade, não autorização
+        jq --argjson c "$_NEW_CONSEC" \
+            --arg now "$NOW_ISO" \
+            '.compliance.consecutive_unauthorized = $c | .compliance.last_turn_authorized = false | .last_turn_ts = $now' \
+            "$CTX_FILE" > "$CTX_FILE.tmp" && mv "$CTX_FILE.tmp" "$CTX_FILE" || true
+        # Registra flag para o próximo briefing
+        printf '%s\n' "TURN_BLOCKED|$(date -u +%Y-%m-%dT%H:%M:%SZ)|consecutive=${_NEW_CONSEC}" > "$AUTH_FLAG_FILE"
+        # Constrói o reason com instrução completa para o agente
+        _BLOCK_SESSION_INFO=""
+        if [ "$_BLOCK_CLOSE_VALIDATED" != "true" ] && [ "$_BLOCK_CLOSE_KEY" != "N/A" ]; then
+            _BLOCK_SESSION_INFO=" Para encerrar esta SESSION ao terminar: (1) chame vscode_askQuestions com Template F exibindo a close_key [${_BLOCK_CLOSE_KEY}], (2) aguarde o usuário digitar a chave, (3) execute bash .github/hooks/scripts/session-close.sh \"${_BLOCK_CLOSE_KEY}\"."
+        fi
+        if [ "$_BLOCK_TODO_CREATED" != "true" ]; then
+            _BLOCK_REASON="🚨 DUPLA VIOLAÇÃO DO PROTOCOLO v9.0: (1) manage_todo_list NÃO foi chamado neste turno — toda resposta DEVE começar com manage_todo_list criando/atualizando a lista de tarefas. (2) vscode_askQuestions NÃO foi chamado — todo turno DEVE terminar com vscode_askQuestions. AÇÕES OBRIGATÓRIAS NESTA ORDEM: chame PRIMEIRO manage_todo_list (criar TODOs com último item = 'Chamar vscode_askQuestions'), depois execute as tarefas, e ao FINAL chame vscode_askQuestions (Template A ou D).${_BLOCK_SESSION_INFO}"
+            _BLOCK_SYS_MSG="🚨 DUPLA VIOLAÇÃO (v9.0): (1) manage_todo_list NÃO chamado. (2) vscode_askQuestions NÃO chamado. Protocolo obrigatório: COMECE com manage_todo_list → execute tarefas → TERMINE com vscode_askQuestions (Template A ou D)."
+        else
+            _BLOCK_REASON="Protocolo v9.0: este TURN encerrou sem chamar vscode_askQuestions. manage_todo_list foi chamado (correto), mas o último TODO (vscode_askQuestions) foi pulado. Ação obrigatória AGORA: chame vscode_askQuestions. Use Template A (tarefa concluída) ou Template D (checkpoint). vscode_askQuestions é o canal primário de comunicação — texto plano no chatbox NÃO é suficiente.${_BLOCK_SESSION_INFO}"
+            _BLOCK_SYS_MSG="🚨 TURN BLOQUEADO (v9.0): manage_todo_list foi chamado (✓) mas vscode_askQuestions NÃO foi chamado. Chame agora (Template A ou D) antes de encerrar."
+        fi
+        # Emite o block: hookSpecificOutput.decision=block + systemMessage visível
+        jq -cn \
+            --arg reason "$_BLOCK_REASON" \
+            --arg sysmsg "$_BLOCK_SYS_MSG" \
+            '{
+                hookSpecificOutput: {
+                    hookEventName: "Stop",
+                    decision: "block",
+                    reason: $reason
+                },
+                systemMessage: $sysmsg
+            }'
+        exit 0
+    fi
+fi
+
+# ── stop_hook_active=true: segunda invocação após block — loga resultado ──────
+# Quando stop_hook_active=true, o agente já foi desbloqueado pelo hook anterior.
+# Verificamos se ele cumpriu o protocolo e logamos o resultado.
+if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+    if [ "$AUTH_REQUESTED" = "true" ]; then
+        jq -cn \
+            --arg event "agentStop_unblocked_complied" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$NOW_ISO" \
+            --arg turn_id "$TURN_ID" \
+            '{event: $event, session_id: $sid, timestamp: $ts, turn_id: (if $turn_id == "" then null else $turn_id end), message: "Agente chamou vscode_askQuestions após block — TURNO AUTORIZADO"}' \
+            >> "$LOG_DIR/audit.jsonl"
+    else
+        jq -cn \
+            --arg event "agentStop_unblocked_no_comply" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$NOW_ISO" \
+            --arg turn_id "$TURN_ID" \
+            '{event: $event, session_id: $sid, timestamp: $ts, turn_id: (if $turn_id == "" then null else $turn_id end), message: "Agente NÃO chamou vscode_askQuestions após block — permit anti-loop (stop_hook_active=true)"}' \
+            >> "$LOG_DIR/audit.jsonl"
+    fi
+fi
+
+# ── systemMessage contextual — nudge periódico (complementar ao blocking) ─────
+# Este nudge é alcançado apenas quando AUTH_REQUESTED=true (turno autorizado)
+# ou quando stop_hook_active=true (segunda invocação após block).
+# O blocking via decision:block (acima) já cobre os casos críticos.
+# Este systemMessage serve como contexto adicional para turnos autorizados.
+# Condições para emitir:
 #   1. pending_section_after_push == true  (git push sem declaração de seção)
-#   2. turns_since_askQuestions >= 5       (checkpoint periódico sugerido)
+#   2. turns_since_askQuestions >= 3       (raramente alcançado com blocking ativo)
+#   3. consecutive_unauthorized >= 1       (SEMPRE emite após qualquer violação)
 _EMIT_CONTEXT_MSG=false
 _PUSH_PENDING="false"
 _TURNS_SINCE_ASK=0
+_CONSECUTIVE_UNAUTH=0
 if [ -f "$CTX_FILE" ]; then
     _PUSH_PENDING="$(jq -r '.session_stats.pending_section_after_push // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
     _TURNS_SINCE_ASK="$(jq -r '.session_stats.turns_since_askQuestions // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _CONSECUTIVE_UNAUTH="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 fi
 [ "$_PUSH_PENDING" = "true" ] && _EMIT_CONTEXT_MSG=true
-{ [ "$_TURNS_SINCE_ASK" -ge 5 ] 2> /dev/null; } && [ "$AUTH_REQUESTED" = "false" ] && _EMIT_CONTEXT_MSG=true
+{ [ "$_TURNS_SINCE_ASK" -ge 3 ] 2> /dev/null; } && [ "$AUTH_REQUESTED" = "false" ] && _EMIT_CONTEXT_MSG=true
+# Hardening v5.1: sempre emite nudge após qualquer violação anterior (consecutive >= 1)
+{ [ "$_CONSECUTIVE_UNAUTH" -ge 1 ] 2> /dev/null; } && [ "$AUTH_REQUESTED" = "false" ] && _EMIT_CONTEXT_MSG=true
 
 if [ "$_EMIT_CONTEXT_MSG" = "true" ] && [ -f "$CTX_FILE" ]; then
     _CTX_SECTION="$(jq -r '.current_section.name // "(nenhuma)"' "$CTX_FILE" 2> /dev/null || echo '(nenhuma)')"
@@ -381,24 +494,44 @@ if [ "$_EMIT_CONTEXT_MSG" = "true" ] && [ -f "$CTX_FILE" ]; then
   → Declarar nova fase:  bash .github/hooks/scripts/start-section.sh \"nome-da-fase\"
   → Continuar na seção:  npm run hooks:continue-section"
     fi
-    _CTX_PERIOD_MSG=""
-    if { [ "$_TURNS_SINCE_ASK" -ge 5 ] 2> /dev/null; } && [ "$AUTH_REQUESTED" = "false" ]; then
-        _CTX_PERIOD_MSG="
-💡 ${_TURNS_SINCE_ASK} TURNs sem vscode_askQuestions:
+    # Hardening v5.1: mensagem de violação escalona por gravidade
+    _CTX_VIOLATION_MSG=""
+    if [ "$AUTH_REQUESTED" = "false" ]; then
+        if { [ "$_CONSECUTIVE_UNAUTH" -ge 3 ] 2> /dev/null; }; then
+            _CTX_VIOLATION_MSG="
+🚨 CRÍTICO: ${_CONSECUTIVE_UNAUTH} TURNs CONSECUTIVOS sem vscode_askQuestions!
+  ⛔ SESSION em risco de encerramento não-autorizado.
+  → Chame vscode_askQuestions AGORA (Template A, D, ou C conforme o contexto)"
+        elif { [ "$_CONSECUTIVE_UNAUTH" -ge 2 ] 2> /dev/null; }; then
+            _CTX_VIOLATION_MSG="
+⛔ ALERTA: ${_CONSECUTIVE_UNAUTH} TURNs CONSECUTIVOS sem vscode_askQuestions!
+  Esta violação será registrada no briefing da próxima sessão.
+  → Template A (tarefa concluída) | Template D (checkpoint) | Template C (proposta)"
+        elif { [ "$_CONSECUTIVE_UNAUTH" -ge 1 ] 2> /dev/null; } || { [ "$_TURNS_SINCE_ASK" -ge 3 ] 2> /dev/null; }; then
+            _CTX_VIOLATION_MSG="
+⚠ Turno encerrado sem vscode_askQuestions (${_TURNS_SINCE_ASK} desde o último).
   → Template A se concluiu tarefa | Template D para checkpoint periódico"
+        fi
     fi
-    # Nudge de encerramento de SESSION: lembra o agente de usar Template F + session-close.sh
+    # ── Hardening v6.0: SESSION close key SEMPRE visível no nudge ────────────
+    # Removida condição >= 10 turnos que tornava o lembrete ineficaz.
+    # A close_key é exibida em TODOS os nudges enquanto SESSION não for encerrada.
     _CTX_SESSION_CLOSE_MSG=""
     _CTX_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     _CTX_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-    if [ "$_CTX_CLOSE_VALIDATED" = "false" ] && { [ "$_TURNS_SINCE_ASK" -ge 10 ] 2> /dev/null; }; then
+    if [ "$_CTX_CLOSE_VALIDATED" = "false" ] && [ -n "$_CTX_CLOSE_KEY" ]; then
         _CTX_SESSION_CLOSE_MSG="
-🔐 ENCERRAMENTO DE SESSION (lembrete):
-  Para encerrar: 1) Template F → usuário digita KEY → 2) bash session-close.sh \"${_CTX_CLOSE_KEY}\""
+🔐 SESSION close key: ${_CTX_CLOSE_KEY}
+  Para encerrar SESSION: vscode_askQuestions (Template F) → usuário digita KEY → bash session-close.sh \"${_CTX_CLOSE_KEY}\""
     fi
-    _CTX_MSG="📍 TURN ${_CTX_SECTION_TURN}/${_CTX_TURN} — Seção \"${_CTX_SECTION}\" (#${_CTX_SECTION_NUM})
-  Backlog: ${_CTX_ALTA} alta | ${_CTX_MEDIA} média | ${_CTX_BACKLOG} backlog
-  Próxima tarefa: ${_CTX_NEXT_TASK}${_CTX_PUSH_MSG}${_CTX_PERIOD_MSG}${_CTX_SESSION_CLOSE_MSG}"
+    # ── Hardening v6.0: formato com distinção explícita SESSION/SECTION/TURN ──
+    _CTX_MSG="━━━ TURN ${_CTX_SECTION_TURN}/${_CTX_TURN} | SECTION: \"${_CTX_SECTION}\" (#${_CTX_SECTION_NUM}) ━━━
+  Backlog: ${_CTX_ALTA} alta | ${_CTX_MEDIA} média | ${_CTX_BACKLOG} backlog | Próxima: ${_CTX_NEXT_TASK}
+─────────────────────────────────────────────────────────────────────────────
+  TURN encerrado → LIVRE (sem autorização)
+  SECTION muda  → autônomo: bash start-section.sh \"nome\"
+  SESSION fecha → SOMENTE: Template F + KEY digitada + bash session-close.sh KEY
+─────────────────────────────────────────────────────────────────────────────${_CTX_PUSH_MSG}${_CTX_VIOLATION_MSG}${_CTX_SESSION_CLOSE_MSG}"
     printf '%s\n' "{\"systemMessage\":$(printf '%s' "$_CTX_MSG" | jq -Rs .)}"
 fi
 
@@ -478,14 +611,43 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
           failures_count: $failures, push_pending: $push_pending}' \
         >> "$LOG_DIR/audit.jsonl"
 else
-    # Modelo TURN Autônomo (v5.0): TURN encerra livremente — sem flag de violação, sem decision:block.
-    # Apenas atualiza compliance informativo e remove flag legada de autorização se existir.
+    # Hardening v5.1: re-introduz UNAUTHORIZED_CLOSE.flag para rastreamento cross-session.
+    # v5.0 removia silenciosamente este flag, impedindo session-start.sh de exibir alerta
+    # de violação no próximo briefing → encerramento 100% silencioso sem feedback ao usuário.
+    # Solução: criar o flag com metadados completos; session-start.sh exibe alerta automaticamente.
     rm -f "$AUTHORIZED_FLAG_FILE" 2> /dev/null || true
-    rm -f "$AUTH_FLAG_FILE" 2> /dev/null || true # garante que flag legada não persiste
+    _CONSEC_NOW="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _TURN_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    # FIX v9.0: Quando stop_hook_active=true, o bloco de primeira invocação JÁ incrementou
+    # consecutive_unauthorized. Não incrementar novamente aqui (evita double-increment).
+    if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+        _CONSEC_FOR_FLAG="$_CONSEC_NOW"
+    else
+        _CONSEC_FOR_FLAG="$((_CONSEC_NOW + 1))"
+    fi
+    jq -cn \
+        --arg ts "$NOW_ISO" \
+        --arg sid "$SESSION_ID" \
+        --argjson turn "${_TURN_NOW:-0}" \
+        --argjson consec "${_CONSEC_FOR_FLAG:-$_CONSEC_NOW}" \
+        --arg intent "$TURN_INTENT" \
+        '{
+            timestamp:                $ts,
+            session_id:               $sid,
+            turn_count:               $turn,
+            consecutive_unauthorized: $consec,
+            intent:                   (if $intent == "" then null else $intent end),
+            message:                  "Turno encerrado sem vscode_askQuestions — hardening v5.1"
+        }' > "$AUTH_FLAG_FILE" 2> /dev/null || true
     if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-        jq '.compliance.last_turn_authorized = false
-             | .compliance.consecutive_unauthorized = (.compliance.consecutive_unauthorized // 0) + 1
-             | .compliance.flag_file_exists = false' \
+        # FIX v9.0: guarda anti-duplo-incremento via --arg stop_hook
+        jq --arg stop_hook "$STOP_HOOK_ACTIVE" \
+            '.compliance.last_turn_authorized = false
+             | .compliance.consecutive_unauthorized = (
+                 if $stop_hook == "true" then (.compliance.consecutive_unauthorized // 0)
+                 else (.compliance.consecutive_unauthorized // 0) + 1
+                 end)
+             | .compliance.flag_file_exists = true' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
     # Nota: o evento turnEnd_no_askQuestions já foi emitido anteriormente (seção de auditoria informativa).
@@ -553,7 +715,8 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.block_count       = 0
          | .current_turn.section_name      = $section
          | .current_turn.intent_declared   = false
-         | .current_turn.intent            = null' \
+         | .current_turn.intent            = null
+         | .current_turn.todo_created      = false' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
