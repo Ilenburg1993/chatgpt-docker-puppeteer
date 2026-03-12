@@ -811,6 +811,12 @@ Isso detectaria BUG-S01 (guard depois de log) automaticamente.
 | 2026-03-12 | EBH-M03 | `session-start.sh` (UPG-01): guard adicionado para `LOGICAL_SESSION_NUMBER != 0` em `inline_restart` sem CTX prévio; mínimo semântico agora é 1 |
 | 2026-03-12 | EBH-L01 | `subagent-start.sh` + `subagent-stop.sh`: adicionado `else`-branch com mktemp/mv para garantir atualização do CTX mesmo sem `sponge`; guard `[ -s "$CTX_FILE" ]` adicionada por consistência |
 | 2026-03-12 | GUIA v2.1 | Footer do `GUIA-HOOKS-COPILOT.md` atualizado para v2.1 documentando BUG-05, UPG-01, UPG-03 e G9-11 |
+| 2026-03-12 | FIX-01 | `log-prompt.sh` RECONNECT-02: adicionado reset de `session_stats.turns_since_askQuestions = 0` em ambos os branches (sponge e mktemp); eliminada falsa severidade ALERTA no primeiro turno após inline_restart |
+| 2026-03-12 | GUIA-CORR-01 | Seção 12.2 do GUIA corrigida: afirmação "geramos um NOVO UUID" era incorreta desde BUG-01; o código usa `SESSION_ID_PAYLOAD` (VS Code session_id) diretamente em inline_restart |
+| 2026-03-12 | GAP-ARCH-01 | Documentado que `prev_session_id === session.id` em RECONNECT-02 é comportamento esperado (mesma sessão VS Code; campo aponta para UUID idêntico) |
+| 2026-03-12 | GAP-ARCH-02 | Documentado que `turn_authorized`/`turn_unauthorized` são preservados em RECONNECT-02 (design intencional: continuidade histórica), enquanto `turn_count` é resetado |
+| 2026-03-12 | GAP-ARCH-03 | Documentado que RECONNECT-01 não limpa `ended_at`, podendo RECONNECT-02 disparar logo após no mesmo prompt (GAP-ARCH-05: duplo-firing); estado final correto |
+| 2026-03-12 | GUIA v2.2 | Seção 19 adicionada ao GUIA: taxonomia completa dos 6 cenários de ciclo de vida de prompt vs sessão, análise de gaps, evidência empírica |
 
 ---
 
@@ -836,8 +842,10 @@ VS Code dispara userPromptSubmitted novamente (mesmo session_id)
     → CTX.session.id = "dcf579af" (mesmo que VS Code) ✅
     → CTX.session.source = "inline_restart"
     → CTX.session.started_at = now (nova sessão lógica)
-    → CTX.session.prev_session_id = "dcf579af" (mesma sessão VS Code anterior)
-    → CTX.session.logical_session_number += 1
+    → CTX.session.prev_session_id = "dcf579af" (= session.id: MESMO UUID — esperado)
+    → CTX.session.logical_session_number = [PRESERVADO — não incrementado; apenas session-start.sh incrementa]
+    → CTX.session_stats.turn_count = 0
+    → CTX.session_stats.turns_since_askQuestions = 0 [FIX-01: corrigido 2026-03-12]
 
 Próximos preToolUse, postToolUse, agentStop:
   → session_id_payload = "dcf579af" == CTX.session.id = "dcf579af" ✅

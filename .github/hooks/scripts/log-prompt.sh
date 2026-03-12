@@ -27,7 +27,12 @@ HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
 CTX_FILE="$HOOK_DIR/state/session-context.json"
 # shellcheck disable=SC1091
-source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
+if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
+    source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null \
+        || echo "[warn] common.sh falhou ao carregar em log-prompt.sh" >&2
+else
+    echo "[warn] common.sh não encontrado (log-prompt.sh) — heal_v1/ctx functions indisponíveis" >&2
+fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 # G9-08: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
 _CTX_LOCK="${CTX_FILE}.lock"
@@ -51,13 +56,32 @@ if [ -f "$CTX_FILE" ]; then
     SECTION_ID_PRE="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 0 — SESSION_ID RECONCILIATION (GAP-01, PREMISSA-1)
+# ══════════════════════════════════════════════════════════════════════════════
+# Esta fase DEVE ser executada ANTES de qualquer outra leitura ou escrita no CTX.
+# Princípio: o session_id do VS Code (SESSION_ID_PAYLOAD) é SEMPRE a fonte da
+# verdade. Nunca geramos um novo UUID nem bloqueamos state writes por mismatch.
+#
+# Casos tratados:
+#   HEAL v1  — CTX source=manual_recovery → adota SESSION_ID_PAYLOAD imediatamente
+#   HEAL v1b — CTX source=inline_restart  → idem (BUG-06 FIX)
+#   RECONNECT-01 — VS Code reconectou (novo session_id, sessionStart não disparou)
+#                  → rollover controlado, sessionEnd sintético, source=reconnect_rollover
+#   RECONNECT-02 — CTX com ended_at != null mas hooks ainda ativos
+#                  → reinício inline (source=inline_restart), nova close_key
+#
+# GAP-03: contadores session_id_mismatches e session_id_syncs_inline em session_stats
+# GAP-02: campo session.vs_code_session_id atualizado em todos os paths abaixo
+# ══════════════════════════════════════════════════════════════════════════════
+
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
 # F0.3: detecta contexto vazio
 if [ -f "$CTX_FILE" ] && [ ! -s "$CTX_FILE" ]; then
     echo "[guard] session-context.json vazio — guard desabilitado (aguardando auto-recovery)" >&2
 fi
 # HARDENING v5: previne contaminação cruzada entre SESSIONs.
-# HEAL v1: quando CTX_FILE é de manual_recovery, adota session_id real do Copilot.
+# HEAL v1: quando CTX_FILE é de manual_recovery ou inline_restart, adota session_id real do Copilot.
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
@@ -107,6 +131,21 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                   source: $source, timestamp: $ts,
                   message: "Reconexão do cliente VS Code detectada — rollover para novo session_id"}' \
                 >> "$LOG_DIR/audit.jsonl"
+            # Detectar se o rollover pode ser causado por compactação inline (inline conversation summary)
+            # Distinção crítica: inline_compact_summary ≠ preCompact hook event
+            # Evidência: compaction_count=0 após rollover indica que preCompact nunca disparou
+            _COMPACT_COUNT_CHK="$(jq -r '.session_stats.compaction_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+            if [ "$_COMPACT_COUNT_CHK" = "0" ] || [ "$_COMPACT_COUNT_CHK" = "null" ]; then
+                jq -cn \
+                    --arg event "inlineCompact_suspected" \
+                    --arg sid "$CTX_ACTIVE_SID" \
+                    --arg ts "${TIMESTAMP:-$NOW_RECONNECT}" \
+                    '{event: $event, session_id: $sid, timestamp: $ts,
+                      source: "log-prompt.sh",
+                      message: "Rollover com compaction_count=0 sugere reinicio inline por orcamento de tokens (nao preCompact)",
+                      note: "inline_conversation_summary != preCompact_hook — ver GUIA-HOOKS-COPILOT.md secao 16.9"}' \
+                    >> "$LOG_DIR/audit.jsonl"
+            fi
             # 2) Gerar sessionEnd sintético para a sessão anterior
             jq -cn \
                 --arg event "sessionEnd" \
@@ -120,6 +159,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
             if command -v sponge &> /dev/null; then
                 jq --arg new_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_RECONNECT" \
                     '.session.id = $new_sid
+                     | .session.vs_code_session_id = $new_sid
                      | .session.reconnect_at = $ts
                      | .session.source = "reconnect_rollover"' \
                     "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
@@ -127,6 +167,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 _TMP_RC="$(mktemp)"
                 if jq --arg new_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_RECONNECT" \
                     '.session.id = $new_sid
+                     | .session.vs_code_session_id = $new_sid
                      | .session.reconnect_at = $ts
                      | .session.source = "reconnect_rollover"' \
                     "$CTX_FILE" > "$_TMP_RC" 2> /dev/null; then
@@ -137,6 +178,109 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
             fi
             SESSION_ID="$SESSION_ID_PAYLOAD" # prossegue com o novo ID
         fi
+    fi
+fi
+
+# ── Post-Close Recovery (RECONNECT-02) ───────────────────────────────────────
+# Detecta "orphan session": sessão encerrada (ended_at != null) mas hooks ainda
+# ativos (mesmo session_id do VS Code → sessão real não reiniciou).
+# Causa: session-close.sh registra ended_at, mas VS Code não dispara sessionStart
+# novamente para o mesmo painel. Resultado: hooks continuam com contexto morto.
+# Fix: ao receber novo prompt com sessão encerrada, inicia sessão inline.
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
+    _ENDED_AT_RC="$(jq -r '.session.ended_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    if [ -n "$_ENDED_AT_RC" ] && [ "$_ENDED_AT_RC" != "null" ]; then
+        NOW_RESTART="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+        _PREV_SID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
+        _PREV_END_REASON="$(jq -r '.session.end_reason // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        _PREV_ENDED_AT="$_ENDED_AT_RC"
+        # FIX BUG-01: usa session_id real do VS Code (Premissa-1: VS Code é a fonte da verdade).
+        # O VS Code continuará enviando SESSION_ID_PAYLOAD em todos os hooks futuros —
+        # gerar UUID aqui causaria mismatch permanente em pre-tool-use.sh e post-tool-use.sh.
+        # A distinção "nova sessão lógica" é capturada por: source="inline_restart",
+        # started_at (novo timestamp) e prev_session_id.
+        if [ -n "$SESSION_ID_PAYLOAD" ]; then
+            _NEW_SID="$SESSION_ID_PAYLOAD"
+        elif [ -f /proc/sys/kernel/random/uuid ]; then
+            # Fallback apenas quando VS Code não enviou session_id (caso improvável)
+            _NEW_SID="$(cat /proc/sys/kernel/random/uuid)"
+        else
+            _NEW_SID="sess_$(date +%s%N 2> /dev/null | sha256sum | head -c 32 || date +%s | head -c 32)"
+        fi
+        # Gera novo close_key
+        _NEW_KEY="ENCERRAR-$(head -c 4 /dev/urandom 2> /dev/null | xxd -p -u 2> /dev/null | head -c 8 \
+            || date +%s | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
+        # Atualiza contexto: nova sessão inline
+        if command -v sponge &> /dev/null; then
+            jq --arg sid "$_NEW_SID" --arg key "$_NEW_KEY" --arg ts "$NOW_RESTART" \
+                --arg prev_sid "$_PREV_SID" --arg prev_ended "$_PREV_ENDED_AT" \
+                --arg prev_reason "$_PREV_END_REASON" \
+                '.session.id                  = $sid
+                 | .session.vs_code_session_id = $sid
+                 | .session.close_key         = $key
+                 | .session.close_key_validated = false
+                 | .session.started_at        = $ts
+                 | .session.ended_at          = null
+                 | .session.end_reason        = null
+                 | .session.source            = "inline_restart"
+                 | .session.prev_session_id   = $prev_sid
+                 | .session.prev_ended_at     = $prev_ended
+                 | .session.prev_end_reason   = $prev_reason
+                 | .session_stats.turn_count  = 0
+                 | .session_stats.failures_detected = 0
+                 | .session_stats.turns_since_askQuestions = 0
+                 | .compliance.consecutive_unauthorized = 0
+                 | .compliance.last_turn_authorized = true
+                 | .current_turn = {number: 0, section_turn: 0, todo_created: false,
+                     tools_count: 0, auth_requested: false, intent: null, intent_declared: false}' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        else
+            _TMP_RESTART="$(mktemp)"
+            if jq --arg sid "$_NEW_SID" --arg key "$_NEW_KEY" --arg ts "$NOW_RESTART" \
+                --arg prev_sid "$_PREV_SID" --arg prev_ended "$_PREV_ENDED_AT" \
+                --arg prev_reason "$_PREV_END_REASON" \
+                '.session.id                  = $sid
+                 | .session.vs_code_session_id = $sid
+                 | .session.close_key         = $key
+                 | .session.close_key_validated = false
+                 | .session.started_at        = $ts
+                 | .session.ended_at          = null
+                 | .session.end_reason        = null
+                 | .session.source            = "inline_restart"
+                 | .session.prev_session_id   = $prev_sid
+                 | .session.prev_ended_at     = $prev_ended
+                 | .session.prev_end_reason   = $prev_reason
+                 | .session_stats.turn_count  = 0
+                 | .session_stats.failures_detected = 0
+                 | .session_stats.turns_since_askQuestions = 0
+                 | .compliance.consecutive_unauthorized = 0
+                 | .compliance.last_turn_authorized = true
+                 | .current_turn = {number: 0, section_turn: 0, todo_created: false,
+                     tools_count: 0, auth_requested: false, intent: null, intent_declared: false}' \
+                "$CTX_FILE" > "$_TMP_RESTART" 2> /dev/null; then
+                mv "$_TMP_RESTART" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_RESTART"
+            else
+                rm -f "$_TMP_RESTART"
+            fi
+        fi
+        # Log do evento sessionStart_inline
+        jq -cn \
+            --arg sid "$_NEW_SID" --arg prev_sid "$_PREV_SID" --arg ts "$NOW_RESTART" \
+            --arg key "$_NEW_KEY" --arg prev_ended "$_PREV_ENDED_AT" \
+            --arg prev_reason "$_PREV_END_REASON" \
+            '{
+                event:           "sessionStart_inline",
+                session_id:      $sid,
+                prev_session_id: $prev_sid,
+                timestamp:       $ts,
+                close_key:       $key,
+                prev_ended_at:   $prev_ended,
+                prev_end_reason: $prev_reason,
+                source:          "log-prompt.sh",
+                message:         "Nova sessão inline após fechamento da sessão anterior"
+            }' >> "$LOG_DIR/audit.jsonl"
+        SESSION_ID="$_NEW_SID"
+        echo "[log-prompt] Sessão anterior encerrada (${_PREV_ENDED_AT}). Nova sessão inline: ${_NEW_SID} | close_key: ${_NEW_KEY}" >&2
     fi
 fi
 

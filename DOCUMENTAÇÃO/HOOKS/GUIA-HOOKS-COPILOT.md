@@ -167,7 +167,9 @@
       - [Identificação no transcript e na UI](#identificação-no-transcript-e-na-ui)
       - [O artefato de "corrupção visual" na UI](#o-artefato-de-corrupção-visual-na-ui)
       - [Hardenings implementados {#hardenings-recomendados-askquestions}](#hardenings-implementados-hardenings-recomendados-askquestions)
-  - [18. Referências](#18-referências)
+  - [18. Achados de Auditoria Proativa — Exploratory Bug Hunt](#18-achados-de-auditoria-proativa--exploratory-bug-hunt-2026-03-12)
+  - [19. Análise Aprofundada: Ciclo de Vida do Prompt vs Sessão](#19-análise-aprofundada-ciclo-de-vida-do-prompt-vs-sessão)
+  - [20. Referências](#20-referências)
     - [Documentação Oficial](#documentação-oficial)
     - [Documentação Interna](#documentação-interna)
 
@@ -963,10 +965,18 @@ Uma confusão comum: **session_id do VS Code ≠ session.id do nosso session-con
 | **Formato**              | UUID: `66abca9d-8655-4060-84b7-a1a3079c476d`        | UUID: mesmo formato, mas pode ser diferente         |
 
 **O que acontece em inline_restart**: Quando `ended_at != null` é detectado em `log-prompt.sh`
-(RECONNECT-02), geramos um NOVO UUID e o gravamos em `session-context.json` como `session.id`.
-Mas o VS Code continua enviando o MESMO `session_id` original em todos os hooks subsequentes.
-Isso cria uma divergência: nosso CTX tem ID "A" mas o VS Code envia ID "B". A lógica de "heal"
-detecta isso e pode sincronizar.
+(RECONNECT-02), o `session.id` do CTX é atualizado para o `SESSION_ID_PAYLOAD` recebido do VS Code
+— ou seja, o **MESMO UUID** da sessão VS Code anterior. **Não é gerado um UUID novo** (isso seria
+um bug: geraria mismatch permanente em todos os hooks subsequentes — ver BUG-01, historicamente
+corrigido). A distinção "nova sessão lógica" é capturada por três campos: `session.source =
+"inline_restart"`, `session.started_at` (novo timestamp ISO) e `session.prev_session_id` (guarda o
+ID anterior, que será **idêntico ao `session.id` atual** — pois trata-se da mesma sessão VS Code).
+Isso é **comportamento esperado e correto**.
+
+> ⚠️ **Nota de consistência** (`prev_session_id === session.id`): Em RECONNECT-02, o campo
+> `prev_session_id` apontará para o mesmo UUID que `session.id`, porque o VS Code não criou uma
+> nova sessão — apenas o nosso sistema lógico foi reiniciado. Não é um bug; é consequência do
+> design. Ver seção 19 para a taxonomia completa dos cenários.
 
 **Implicação prática**: `inline_restart` é 100% um conceito do nosso sistema de tracking.
 Não há nada no VS Code que saiba disso — do ponto de vista da plataforma, é a mesma sessão.
@@ -3182,7 +3192,214 @@ Referência canônica detalhada: `DOCUMENTAÇÃO/HOOKS/PLANO-CORRECOES-HOOKS.md`
 
 ---
 
-## 19. Referências
+## 19. Análise Aprofundada: Ciclo de Vida do Prompt vs Sessão
+
+> **Contexto**: esta seção consolida a investigação realizada em 2026-03-12, motivada pela
+> observação de que "ao enviar um novo prompt em uma caixa já aberta anteriormente" (após o
+> encerramento autorizado da sessão), o comportamento do sistema não era completamente documentado.
+> Cobre todos os cenários possíveis, decisões de design, gaps identificados e correções aplicadas.
+
+---
+
+### 19.1 Taxonomia Completa dos Cenários
+
+Quando um **novo prompt é enviado**, o `log-prompt.sh` (via `userPromptSubmitted`) precisa
+determinar em qual das seis situações abaixo está operando, pois cada uma exige tratamento diferente.
+
+#### Matriz de Decisão
+
+| Cenário | session_id novo? | ended_at != null? | sessionStart disparou? | Resultado |
+| ------- | ---------------- | ----------------- | ---------------------- | --------- |
+| **A — Nova aba de chat** | ✅ Sim | ❌ Não | ✅ Sim (antes) | CTX já criado pelo `sessionStart`; `log-prompt.sh` só reseta turno |
+| **B — Sessão ativa, prompt normal** | ❌ Não | ❌ Não | ✅ Sim | Caminho mais comum; apenas reset de `current_turn.*` |
+| **C — Mesma aba, após close** | ❌ Não | ✅ Sim | ❌ Não | **RECONNECT-02**: cria sessão inline (`inline_restart`) |
+| **D — Reconexão VS Code, novo ID** | ✅ Sim | ❌ Não | ❌ Não | **RECONNECT-01**: rollover com novo session_id |
+| **E — Inline compaction** | ❌ Não (ou Sim) | ❌ Não | ❌ Não | Sub-caso de D; detectado via `compaction_count=0` |
+| **F — Recovery manual** | qualquer | qualquer | ❌ Não | **HEAL v1**: adota SESSION_ID_PAYLOAD como fonte de verdade |
+
+#### Caminho de Decisão no código (`log-prompt.sh` Fase 0)
+
+```
+log-prompt.sh recebe SESSION_ID_PAYLOAD do VS Code
+  │
+  ├─ CTX existe? sim → lê CTX_ACTIVE_SID
+  │     │
+  │     ├─ session_id_payload ≠ CTX_ACTIVE_SID?
+  │     │     │
+  │     │     ├─ source = manual_recovery ou inline_restart → HEAL v1 (healed_from_real_session)
+  │     │     │
+  │     │     └─ source = outro → RECONNECT-01 (reconnect_rollover)
+  │     │           └─ compaction_count=0? → log inlineCompact_suspected
+  │     │
+  │     └─ session_id_payload = CTX_ACTIVE_SID → sem mismatch
+  │
+  ├─ CTX.session.ended_at ≠ null? → RECONNECT-02 (inline_restart)
+  │     └─ gera nova close_key, started_at, reseta turn_count, turns_since_askQuestions
+  │
+  └─ Prossegue para reset de current_turn (turno normal)
+```
+
+> **Ordem determinística**: HEAL v1 → RECONNECT-01 → RECONNECT-02. Cada bloco pode disparar
+> independentemente dos anteriores (não há `return` entre eles).
+
+---
+
+### 19.2 Análise Detalhada por Cenário
+
+#### Cenário A — Nova aba de chat (sessionStart + session_id novo)
+
+- **Trigger**: usuário clica no botão "+" no painel do Copilot
+- **Hookéventos**: `sessionStart` dispara → `session-start.sh` cria CTX completo novo
+- **session.id**: UUID novo gerado pelo VS Code (diferente do anterior)
+- **session.source**: `"new"`
+- **`log-prompt.sh`**: recebe session_id que já está no CTX (criado pelo sessionStart) → caminho
+  normal (sem mismatch, sem ended_at) → apenas reset de turno
+- **Estado final**: CTX limpo, `turn_count=0`, `logical_session_number+1`
+
+#### Cenário B — Sessão ativa, prompt normal (caminho mais comum)
+
+- **Trigger**: agente respondeu, usuário digita novo prompt na mesma aba
+- **Eventos**: apenas `userPromptSubmitted` → `log-prompt.sh`
+- **session.id**: igual ao CTX; `ended_at=null`
+- **`log-prompt.sh`**: sem mismatch, sem ended_at → reset `current_turn.*`, incrementa `turn_count`
+- **Estado final**: novo turno iniciado, seção preservada
+
+#### Cenário C — Mesma aba, prompt após sessão fechada (RECONNECT-02)
+
+- **Trigger**: `session-close.sh` foi executado anteriormente (ended_at gravado); o VS Code NÃO
+  dispara novo `sessionStart` — o painel continua aberto; usuário digita novo prompt
+- **Identidade**: VS Code continua enviando o **MESMO session_id** (ex: `dcf579af-...`)
+- **`log-prompt.sh`**: detecta `ended_at != null` → RECONNECT-02
+- **O que acontece**:
+  - `session.id` ← `SESSION_ID_PAYLOAD` (o MESMO UUID do VS Code — **não gera UUID novo**)
+  - `session.vs_code_session_id` ← mesmo valor
+  - `session.source` ← `"inline_restart"`
+  - `session.started_at` ← novo timestamp ISO
+  - `session.ended_at` ← `null` (limpa)
+  - `session.close_key` ← nova chave `ENCERRAR-XXXXXXXX`
+  - `session.prev_session_id` ← ID anterior (= `session.id` novo = mesmo UUID!)
+  - `session_stats.turn_count` ← `0`
+  - `session_stats.failures_detected` ← `0`
+  - `session_stats.turns_since_askQuestions` ← `0` (**FIX-01**: corrigido em 2026-03-12)
+  - `compliance.consecutive_unauthorized` ← `0`
+  - `current_turn` ← reset completo
+- **Evento logado**: `sessionStart_inline` em `audit.jsonl`
+- **Nota `prev_session_id === session.id`**: comportamento esperado — não é bug. O campo aponta
+  para o UUID anterior (que é o mesmo UUID VS Code atual, pois o VS Code não criou nova sessão).
+
+> **⚠️ Observação de design**: `session_stats.tools_total`, `tools_by_name`, `section_count`,
+> `section_names`, `section_history` e `turn_authorized`/`turn_unauthorized` **não são resetados**
+> em RECONNECT-02 — isso é intencional, para preservar a continuidade histórica da janela VS Code.
+> O campo `turn_count=0` reseta a contagem corrente, mas os acumulados permanecem para referência.
+
+#### Cenário D — Reconexão VS Code, novo session_id sem sessionStart (RECONNECT-01)
+
+- **Trigger**: VS Code fechou e reabriu o painel (crash, restart, tab recovery) **sem** a extensão
+  Copilot disparar `sessionStart`; o novo prompt chega com um session_id diferente
+- **`log-prompt.sh`**: `SESSION_ID_PAYLOAD ≠ CTX.session.id` → RECONNECT-01
+- **O que acontece**:
+  - Log `sessionReconnect` em `audit.jsonl` (cria "synthetic sessionEnd" para sessão anterior)
+  - `session.id` ← novo `SESSION_ID_PAYLOAD`
+  - `session.source` ← `"reconnect_rollover"`
+  - **`ended_at` NÃO é limpo**: se a sessão anterior tinha `ended_at`, RECONNECT-02 pode
+    disparar no mesmo prompt (duplo-firing — ver GAP-ARCH-05)
+
+#### Cenário E — Inline compaction (sub-caso de D)
+
+- Igual ao Cenário D (RECONNECT-01), com session_id diferente
+- Detectado quando `session_stats.compaction_count == 0` no momento do rollover
+- Log adicional: `inlineCompact_suspected` em `audit.jsonl`
+
+#### Cenário F — Manual recovery (HEAL v1)
+
+- **Trigger**: CTX foi criado manualmente (`source = "manual_recovery"`) ou uma sessão
+  `inline_restart` ainda tem ID divergente
+- **`log-prompt.sh`**: `SESSION_ID_PAYLOAD ≠ CTX.session.id` E `source ∈ {manual_recovery, inline_restart}` → HEAL v1
+- **Resultado**: `session.id` ← `SESSION_ID_PAYLOAD`; `session.source` ← `"healed_from_real_session"`
+
+---
+
+### 19.3 Caso Especial: RECONNECT-01 + RECONNECT-02 Simultâneos (GAP-ARCH-05)
+
+**Cenário hipoteticamente possível**: nova abada VS Code com session_id diferente, mas o CTX
+antigo ainda tinha `ended_at != null` (sessão havia sido fechada antes do crash do VS Code).
+
+**O que ocorre no `log-prompt.sh`**:
+1. HEAL v1: `source != manual_recovery/inline_restart` → pula
+2. RECONNECT-01: session_id mudou → dispara, atualiza `session.id`, seta `source = "reconnect_rollover"`, **não limpa `ended_at`**
+3. RECONNECT-02: relê CTX, ainda encontra `ended_at != null` → dispara também, seta `source = "inline_restart"`, limpa `ended_at`
+
+**Estado final**: `source = "inline_restart"` (RECONNECT-02 sobrescreve). Dois eventos são logados:
+`sessionReconnect` (RECONNECT-01) E `sessionStart_inline` (RECONNECT-02). Isso é **aceitável**
+como comportamento, mas o audit.jsonl mostrará ambos os eventos para o mesmo prompt.
+
+**Impacto prático**: raro. Só ocorre quando houve crash do VS Code após `session-close.sh` mas
+antes do usuário fechar a aba. Não há dados corrompidos — a segunda passagem (RECONNECT-02) limpa o estado corretamente.
+
+---
+
+### 19.4 Gaps Identificados e Status de Correção
+
+| ID | Descrição | Severidade | Status |
+| -- | --------- | ---------- | ------ |
+| **FIX-01** | `session_stats.turns_since_askQuestions` não resetado em RECONNECT-02: após um inline_restart, o campo carregava o valor da sessão anterior, causando falsa severidade ALERTA/CRITICO no primeiro turno | MÉDIO | ✅ **Corrigido** em `log-prompt.sh` (2026-03-12) |
+| **GUIA-CORR-01** | Seção 12.2 do GUIA afirmava "geramos um NOVO UUID" em inline_restart — incorreto desde a correção do BUG-01; o código usa `SESSION_ID_PAYLOAD` (VS Code session_id) | MÉDIO | ✅ **Corrigido** (2026-03-12) |
+| **GAP-ARCH-01** | `prev_session_id === session.id` em RECONNECT-02: campo semanticamente confuso quando os dois UUIDs são idênticos; pode gerar estranheza ao ler o CTX | BAIXO | 📋 **Documentado** (comportamento esperado; ver Seção 19.2-C) |
+| **GAP-ARCH-02** | `session_stats.turn_authorized` / `turn_unauthorized` não resetados em RECONNECT-02, mas `turn_count` é resetado: acumulado histórico e contador corrente divergem | BAIXO | 📋 **Documentado** (design intencional: preservar histórico acumulado) |
+| **GAP-ARCH-03** | RECONNECT-01 não limpa `ended_at`: se CTX tinha ended_at de uma sessão fechada anterior, RECONNECT-02 dispara logo após, gerando dois eventos no mesmo prompt | BAIXO | 📋 **Documentado** (GAP-ARCH-05; comportamento aceitável, não corrompe estado) |
+| **GAP-ARCH-04** | `session_stats.tools_total`, `tools_by_name`, `section_count` etc. preservados em RECONNECT-02 sem documentação explícita: pode surpreender ao ler CTX pós-restart | BAIXO | 📋 **Documentado** (design intencional: continuidade histórica da janela VS Code) |
+| **LIM-04** | Timestamps `sessionEnd` em Unix ms em vez de ISO 8601 | BAIXO | 📋 Backlog (sem impacto operacional imediato) |
+
+---
+
+### 19.5 Convenções e Campos de Rastreamento Relevantes
+
+| Campo no CTX | Quem escreve | Quando muda | Valor em RECONNECT-02 |
+| ------------ | ------------ | ----------- | --------------------- |
+| `session.id` | `session-start.sh`, `log-prompt.sh` | sessionStart ou RECONNECT | Igual ao VS Code session_id (mesmo antes e depois) |
+| `session.vs_code_session_id` | `log-prompt.sh` | Toda reconciliação | Sempre igual ao SESSION_ID_PAYLOAD |
+| `session.source` | `session-start.sh`, `log-prompt.sh` | Cada transição | `"inline_restart"` |
+| `session.prev_session_id` | `log-prompt.sh` | RECONNECT-01/02 | Igual a `session.id` em RECONNECT-02 (mesmo UUID) |
+| `session.started_at` | ambos | Cada novo início lógico | Novo timestamp ISO |
+| `session.ended_at` | `session-close.sh` → limpo em RECONNECT-02 | Close + Restart | `null` |
+| `session.close_key` | `session-start.sh`, `log-prompt.sh` RECONNECT-02 | Cada início lógico | Nova chave `ENCERRAR-XXXXXXXX` |
+| `session.logical_session_number` | `session-start.sh` | Só em sessionStart (`source=new`) | **Não incrementado** em RECONNECT-02 |
+| `session_stats.turn_count` | `log-prompt.sh`, `agent-stop.sh` | Cada turno | Resetado para `0` |
+| `session_stats.turns_since_askQuestions` | `agent-stop.sh`, `log-prompt.sh` | Cada turno/restart | Resetado para `0` (FIX-01) |
+| `session_stats.turn_authorized` | `agent-stop.sh` | Cada turno autorizado | **Preservado** (acumulado histórico) |
+| `session_stats.tools_total` | `post-tool-use.sh` | Cada tool call | **Preservado** (acumulado histórico) |
+
+> **Nota sobre `logical_session_number`**: Este campo é incrementado apenas em `session-start.sh`
+> (quando `source = "new"`, ou seja, nova aba). RECONNECT-02 é gerenciado por `log-prompt.sh`
+> e **não** incrementa `logical_session_number`. Isso é design intencional: uma `inline_restart` é
+> uma continuação da mesma sessão lógica VS Code, não um novo número lógico.
+
+---
+
+### 19.6 Evidência Empírica desta Análise
+
+O cenário que motivou esta seção foi observado no `audit.jsonl` desta sessão:
+
+```json
+{"event": "sessionCloseAuthorized", "session_id": "dcf579af-...", "timestamp": "2026-03-12T01:38:07Z"}
+...
+{"event": "userPromptSubmitted",    "session_id": "dcf579af-...", "timestamp": "2026-03-12T09:12:52Z"}
+{"event": "sessionStart_inline",    "session_id": "dcf579af-...", "timestamp": "2026-03-12T09:12:53Z",
+ "message": "Nova sessão inline após fechamento"}
+```
+
+Intervalo de ~7,5 horas entre o fechamento autorizado e o novo prompt na mesma aba.
+O RECONNECT-02 foi ativado corretamente, gerando nova `close_key` e resetando `turn_count`.
+
+Estado do CTX após RECONNECT-02 (confirmado via `session-context.json`):
+- `session.source`: `"inline_restart"` ✅
+- `session.id` === `session.vs_code_session_id` === `session.prev_session_id` = `"dcf579af-..."` ✅ (esperado)
+- `session.ended_at`: `null` ✅
+- `session_stats.turn_count`: `0` ✅
+
+---
+
+## 20. Referências
 
 ### Documentação Oficial
 
@@ -3239,6 +3456,12 @@ Seção 16.2 reescrita com tabela de campos, anti-patterns, regras de hardening 
 Seção 16.3 atualizada com exemplo de lookup correto (`question.header` como chave) e hardening
 de detecção de mismatch. Cabeçalho do documento atualizado de v1.6 para v1.9 (versões 1.7 e 1.8
 não tinham atualizado o cabeçalho). (3115 linhas)
+Versão 2.2 (2026-03-12): Seção 19 adicionada — análise aprofundada do ciclo de vida de prompt
+vs sessão: taxonomia completa dos 6 cenários (A-F), fluxo de decisão de `log-prompt.sh` Fase 0,
+análise detalhada por cenário, gaps GAP-ARCH-01 a 05, tabela de status e evidência empírica.
+FIX-01 aplicado em `log-prompt.sh`: `session_stats.turns_since_askQuestions` agora resetado em
+RECONNECT-02 (inline_restart). Seção 12.2 corrigida (GUIA-CORR-01): afirmação incorreta sobre
+geração de UUID novo removida. Seção 20 (Referências, renumerada de 19). TOC atualizado.
 Versão 1.8 (2026-03-11): Seção 17.11 adicionada — diagnóstico
 empírico do erro `vscode_askQuestions` "Response contained no choices": padrão no transcript,
 artefato visual de "corrupção" na UI, causa raiz (contexto/API limit), 4 hardenings implementados + bridge.
