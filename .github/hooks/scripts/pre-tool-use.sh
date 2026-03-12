@@ -26,7 +26,10 @@ mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 # G9-11/GAP-C.1: Carrega biblioteca de funções compartilhadas (redact_credentials, iso_now, etc.)
 # shellcheck disable=SC1091
 if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
-    source "$HOOK_DIR/hooks-lib/common.sh"
+    source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null \
+        || echo "[warn] common.sh falhou ao carregar em pre-tool-use.sh" >&2
+else
+    echo "[warn] common.sh não encontrado (pre-tool-use.sh) — funções compartilhadas indisponíveis" >&2
 fi
 
 # G9-08/BUG-A.1: Lock exclusivo para escritas em session-context.json
@@ -55,6 +58,12 @@ fi
 
 # Serializa tool_input (objeto JSON) para string redactável
 TOOL_INPUT_RAW="$(echo "$INPUT" | jq -c '.tool_input // {}' 2> /dev/null || echo '{}')"
+
+# G9-11 Camada 0: Redaction estrutural — remove chaves JSON sensíveis por denylist.
+# Opera antes da redact_credentials (regex) para cobrir campos aninhados não pegáveis por regex.
+if command -v strip_sensitive_json_keys > /dev/null 2>&1; then
+    TOOL_INPUT_RAW="$(strip_sensitive_json_keys "$TOOL_INPUT_RAW")"
+fi
 
 # G9-11: Redaction estrutural — usa redact_credentials de common.sh se disponível,
 # com fallback para pipeline inline caso common.sh não esteja carregado.
@@ -139,12 +148,15 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
             _RECOVERY_KEY_VALIDATED="true"
         fi
     fi
-    jq -cn \
-        --arg sid "$SESSION_ID" \
-        --arg now "$NOW_RECOVERY" \
-        --arg close_key "${_RECOVERY_CLOSE_KEY}" \
-        --argjson key_validated "$_RECOVERY_KEY_VALIDATED" \
-        '{
+    # EBH-M01: atomic write via mktemp; validação de mktemp adicionada (fix Haiku P3.1)
+    # Se mktemp falhar (disco cheio, /tmp indisponível), recover é pulado com aviso
+    if _RECOVERY_CTX_TMP="$(mktemp 2> /dev/null)"; then
+        jq -cn \
+            --arg sid "$SESSION_ID" \
+            --arg now "$NOW_RECOVERY" \
+            --arg close_key "${_RECOVERY_CLOSE_KEY}" \
+            --argjson key_validated "$_RECOVERY_KEY_VALIDATED" \
+            '{
             session: {
                 id: $sid, started_at: $now, ended_at: null, end_reason: null,
                 close_key: (if $close_key == "" then null else $close_key end),
@@ -180,7 +192,13 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
                 last_turn_authorized: null, consecutive_unauthorized: 0,
                 flag_file_exists: false
             }
-        }' > "$CTX_FILE" 2> /dev/null || true
+        }' 2> /dev/null > "$_RECOVERY_CTX_TMP" \
+            && mv "$_RECOVERY_CTX_TMP" "$CTX_FILE" 2> /dev/null \
+            || rm -f "$_RECOVERY_CTX_TMP" 2> /dev/null
+
+    else
+        echo "[warn] pre-tool-use: mktemp falhou; auto_recovery atômico pulado" >&2
+    fi
 
     # Loga o evento de recovery no audit.jsonl
     jq -cn \
@@ -204,6 +222,9 @@ fi
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
 # HARDENING v5: previne contaminação cruzada entre sessões.
 # HEAL v1: quando CTX_FILE é de manual_recovery, adota session_id real do Copilot.
+# FIX BUG-06: também trata inline_restart — CTX já tem o session_id correto do VS Code
+# (BUG-02 garante isso); o payload está stale (sessão anterior). Per PREMISSA 1:
+# adotamos SESSION_ID do CTX (VS Code) em vez de bloquear.
 # Se o payload carrega session_id diferente do contexto ativo,
 # ainda loga no audit.jsonl (read-append), mas NÃO modifica session-context.json.
 if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
@@ -214,12 +235,12 @@ if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
             NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
             if command -v sponge &> /dev/null; then
                 jq --arg real_sid "$SESSION_ID" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
                     "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
             else
                 _TMP_HEAL="$(mktemp)"
                 if jq --arg real_sid "$SESSION_ID" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
                     "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
                     mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
                 else
@@ -236,7 +257,36 @@ if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                 '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, tool: $tool, timestamp: $ts,
                   message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
                 >> "$LOG_DIR/audit.jsonl"
-            # SESSION_ID já tem o valor correto — continua
+            # SESSION_ID já tem o valor correto — continua        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
+            # FIX BUG-06: inline_restart — CTX tem o session_id correto do VS Code (PREMISSA 1).
+            # Payload está stale (compilado com contexto antigo). Adotamos CTX como verdade.
+            # Não bloqueamos — apenas sincronizamos a variável local SESSION_ID ao CTX.
+            SESSION_ID="$CTX_ACTIVE_SID"
+            # GAP-O1: limita log de inline_restart para evitar ruído excessivo
+            _SYNCS_INLINE="$(jq -r '.session_stats.session_id_syncs_inline // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+            if [ "$_SYNCS_INLINE" -lt 5 ]; then
+                jq -cn \
+                    --arg event "session_id_sync_inline_restart" \
+                    --arg stale "$SESSION_ID" \
+                    --arg adopted "$CTX_ACTIVE_SID" \
+                    --arg source "pre-tool-use.sh" \
+                    --arg tool "$TOOL_NAME" \
+                    --arg ts "${TIMESTAMP:-}" \
+                    '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
+                      source: $source, tool: $tool, timestamp: $ts,
+                      message: "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"}' \
+                    >> "$LOG_DIR/audit.jsonl"
+            elif [ "$_SYNCS_INLINE" -eq 5 ]; then
+                jq -cn --arg event "session_id_sync_inline_restart_cap" --arg source "pre-tool-use.sh" \
+                    '{event: $event, source: $source, message: "inline_restart sync count reached cap (5) — logs suprimidos daqui em diante"}' \
+                    >> "$LOG_DIR/audit.jsonl"
+            fi
+            # GAP-03: incrementa contador de syncs inline no CTX
+            if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+                jq '.session_stats.session_id_syncs_inline = ((.session_stats.session_id_syncs_inline // 0) + 1)' \
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            fi
+            # Continua normalmente — SESSION_ID agora reflete o CTX correto
         else
             jq -cn \
                 --arg event "session_id_mismatch" \
@@ -254,6 +304,11 @@ if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                     timestamp: $ts,
                     message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
                 }' >> "$LOG_DIR/audit.jsonl"
+            # GAP-03: incrementa contador de mismatches no CTX antes de sair
+            if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+                jq '.session_stats.session_id_mismatches = ((.session_stats.session_id_mismatches // 0) + 1)' \
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            fi
             exit 0
         fi
     fi
@@ -283,12 +338,14 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-    elif [ "$TOOL_NAME" = "runSubagent" ]; then
+    elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; then
         # ── HARDENING: delegação ao subagente = autorização implícita ─────────
-        # runSubagent dispara agentStop no agente pai antes do subagente iniciar.
+        # runSubagent e search_subagent (ambas ferramentas Core) disparam agentStop
+        # no agente pai antes do subagente iniciar.
         # Sem este tratamento, o sistema marca o turno como UNAUTHORIZED — falso positivo.
         # Solução: setamos auth_requested=true E subagent_delegated=true no contexto,
         # e logamos evento "subagentStart" no audit.jsonl como sinal de autorização.
+        # FIX BUG-03: search_subagent agora também é reconhecido (equivalente a runSubagent).
         _SUBAGENT_DESCRIPTION="$(echo "$INPUT" | jq -r '.tool_input.description // .tool_input.prompt // "(sem descrição)"' 2> /dev/null | head -c 200 || echo '(sem descrição)')"
         jq -cn \
             --arg event "subagentStart" \
@@ -319,7 +376,8 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .current_turn.tools_count   = ((.current_turn.tools_count // 0) + 1)
              | .current_turn.tools_by_name = ((.current_turn.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
-             | .session_stats.subagent_calls = ((.session_stats.subagent_calls // 0) + 1)
+             # FIX BUG-04: subagent_calls NÃO incrementado aqui — subagent-start.sh é o local correto
+             # (evita double-count: pre-tool-use.sh + subagent-start.sh = 2x por subagente)
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true

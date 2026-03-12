@@ -118,7 +118,8 @@ ctx_update() {
             sh -c "jq '${expr}' \"$CTX_FILE\" | sponge \"$CTX_FILE\"" 2> /dev/null || return 1
     else
         local tmp
-        tmp="$(mktemp)"
+        # fix Haiku C6.1: valida mktemp antes de usar
+        tmp="$(mktemp)" || return 1
         if with_lock "$lockfile" \
             sh -c "jq '${expr}' \"$CTX_FILE\" > \"$tmp\"" 2> /dev/null; then
             mv "$tmp" "$CTX_FILE" 2> /dev/null || {
@@ -187,6 +188,47 @@ redact_credentials() {
         | sed -E 's/(PASSWORD|TOKEN|SECRET|API_KEY)=([^[:space:]"]{4,})/\1=[REDACTED]/g'
 }
 
+# ── strip_sensitive_json_keys ─────────────────────────────────────────────────
+# G9-11: Redação estrutural por denylist de chaves JSON sensíveis.
+# Remove recursivamente campos com nomes conhecidamente sensíveis de um objeto
+# JSON, independente de nível de aninhamento. Complementa redact_credentials()
+# que opera por regex em strings serializadas.
+#
+# Parâmetros: $1 = JSON string (ou stdin se omitido)
+# Saída: JSON sem campos sensíveis (ou string original se jq indisponível)
+#
+# Chaves removidas: password, passwd, secret, token, api_key, apikey,
+#   authorization, auth_token, access_token, refresh_token, private_key,
+#   client_secret, close_key (nossa chave de encerramento de sessão)
+#
+# Uso: SAFE="$(strip_sensitive_json_keys "$TOOL_INPUT")"
+#      echo "$JSON" | strip_sensitive_json_keys
+strip_sensitive_json_keys() {
+    local input
+    if [ $# -gt 0 ]; then
+        input="$1"
+    else
+        input="$(cat)"
+    fi
+    if ! command -v jq &> /dev/null; then
+        echo "$input"
+        return 0
+    fi
+    # Verifica se é JSON válido; se não, retorna como string (provavelmente conteúdo de arquivo)
+    if ! echo "$input" | jq -e . &> /dev/null 2>&1; then
+        echo "$input"
+        return 0
+    fi
+    echo "$input" | jq 'walk(
+        if type == "object" then
+            with_entries(select(
+                (.key | ascii_downcase) |
+                test("^(password|passwd|secret|token|api_key|apikey|authorization|auth_token|access_token|refresh_token|private_key|client_secret|close_key)$") | not
+            ))
+        else . end
+    )' 2> /dev/null || echo "$input"
+}
+
 # ── log_info / log_warn / log_error ───────────────────────────────────────────
 # Helpers de logging semântico para stderr. Produzem saída padronizada com
 # prefixo [INFO], [WARN] ou [ERROR] e timestamp ISO.
@@ -212,4 +254,163 @@ log_error() {
     local msg="$1"
     shift
     echo "[ERROR] $(iso_now) ${msg}${*:+ | $*}" >&2
+}
+
+# ════════════════════════════════════════════════════════════════════════════
+# HEAL v1 — Adoção imediata de session_id real do VS Code (GAP-04 / BUG-06)
+# ════════════════════════════════════════════════════════════════════════════
+# Premissa-1: o session_id do VS Code é SEMPRE a fonte da verdade.
+# Nunca geramos UUIDs próprios nem bloqueamos state writes por mismatch.
+#
+# Ativa quando:
+#   - CTX source = "manual_recovery" → contexto criado manualmente (sem sessionStart real)
+#   - CTX source = "inline_restart"  → reinício inline (budget de tokens esgotado)
+#
+# Parâmetros:
+#   $1 = SESSION_ID_PAYLOAD  — session_id real recebido do VS Code
+#   $2 = TIMESTAMP           — timestamp ISO-8601 atual
+#
+# Saída:
+#   Retorna 0 se HEAL foi aplicado, 1 se não era necessário ou falhou.
+#   Incrementa ctx session_stats.session_id_syncs_inline.
+#
+# Uso:
+#   if heal_v1 "$SESSION_ID_PAYLOAD" "$TIMESTAMP"; then
+#       SESSION_ID="$SESSION_ID_PAYLOAD"  # continua com o ID correto
+#   fi
+heal_v1() {
+    local real_sid="${1:-}" ts="${2:-$(iso_now)}"
+    [ -n "$real_sid" ] || return 1
+    [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] || return 1
+
+    local ctx_sid ctx_source
+    ctx_sid="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    ctx_source="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+
+    # Só ativa se há mismatch E source é elegível para HEAL v1 imediato
+    [ "$real_sid" != "$ctx_sid" ] || return 1
+    [ "$ctx_source" = "manual_recovery" ] || [ "$ctx_source" = "inline_restart" ] || return 1
+
+    local heal_expr
+    heal_expr=".session.id = \"$real_sid\"
+               | .session.vs_code_session_id = \"$real_sid\"
+               | .session.source = \"healed_from_real_session\"
+               | .session.healed_at = \"$ts\"
+               | .session_stats.session_id_syncs_inline = ((.session_stats.session_id_syncs_inline // 0) + 1)"
+
+    if command -v sponge > /dev/null 2>&1; then
+        # shellcheck disable=SC2016
+        jq "$heal_expr" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || return 1
+    else
+        local tmp
+        # fix Haiku C6.2: valida mktemp antes de usar (heal_v1)
+        tmp="$(mktemp)" || return 1
+        # shellcheck disable=SC2016
+        if jq "$heal_expr" "$CTX_FILE" > "$tmp" 2> /dev/null; then
+            mv "$tmp" "$CTX_FILE" 2> /dev/null || {
+                rm -f "$tmp"
+                return 1
+            }
+        else
+            rm -f "$tmp"
+            return 1
+        fi
+    fi
+
+    log_event "$(jq -cn \
+        --arg event "heal_v1_applied" \
+        --arg old "$ctx_sid" \
+        --arg new "$real_sid" \
+        --arg src "common.sh:heal_v1" \
+        --arg ts "$ts" \
+        '{event: $event, old_session_id: $old, new_session_id: $new, source: $src, timestamp: $ts,
+          message: "HEAL v1: session_id atualizado para ID real do VS Code (manual_recovery/inline_restart)"}')"
+
+    return 0
+}
+
+# ════════════════════════════════════════════════════════════════════════════
+# HEAL v2 — Recuperação por threshold de mismatches (GAP-04)
+# ════════════════════════════════════════════════════════════════════════════
+# Ativa quando session_stats.session_id_mismatches >= HOOKS_HEAL_THRESHOLD.
+# Mais conservador que HEAL v1: exige acúmulo de evidências antes de corrigir.
+# Implementado originalmente em agent-stop.sh — extraído aqui para reutilização.
+#
+# Parâmetros:
+#   $1 = SESSION_ID_PAYLOAD  — session_id real recebido do VS Code
+#   $2 = TIMESTAMP           — timestamp ISO-8601 atual
+#
+# Saída:
+#   Retorna 0 se HEAL v2 foi aplicado, 1 se threshold não atingido ou falhou.
+#
+# Uso:
+#   MISMATCHES="$(ctx_read '.session_stats.session_id_mismatches' 0)"
+#   if [ "$MISMATCHES" -ge "${HOOKS_HEAL_THRESHOLD:-3}" ]; then
+#       heal_v2 "$SESSION_ID_PAYLOAD" "$TIMESTAMP"
+#   fi
+heal_v2() {
+    local real_sid="${1:-}" ts="${2:-$(iso_now)}"
+    [ -n "$real_sid" ] || return 1
+    [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] || return 1
+
+    local ctx_sid mismatches threshold
+    ctx_sid="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    mismatches="$(jq -r '.session_stats.session_id_mismatches // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    threshold="${HOOKS_HEAL_THRESHOLD:-3}"
+
+    [ "$real_sid" != "$ctx_sid" ] || return 1
+    [ "$mismatches" -ge "$threshold" ] 2> /dev/null || return 1
+
+    local heal_expr
+    heal_expr=".session.id = \"$real_sid\"
+               | .session.vs_code_session_id = \"$real_sid\"
+               | .session.source = \"healed_v2_threshold\"
+               | .session.healed_at = \"$ts\"
+               | .session_stats.session_id_mismatches = 0
+               | .session_stats.session_id_syncs_inline = ((.session_stats.session_id_syncs_inline // 0) + 1)"
+
+    if command -v sponge > /dev/null 2>&1; then
+        # shellcheck disable=SC2016
+        jq "$heal_expr" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || return 1
+    else
+        local tmp
+        # fix Haiku C6.3: valida mktemp antes de usar (heal_v2)
+        tmp="$(mktemp)" || return 1
+        # shellcheck disable=SC2016
+        if jq "$heal_expr" "$CTX_FILE" > "$tmp" 2> /dev/null; then
+            mv "$tmp" "$CTX_FILE" 2> /dev/null || {
+                rm -f "$tmp"
+                return 1
+            }
+        else
+            rm -f "$tmp"
+            return 1
+        fi
+    fi
+
+    log_event "$(jq -cn \
+        --arg event "heal_v2_applied" \
+        --arg old "$ctx_sid" \
+        --arg new "$real_sid" \
+        --arg mismatches "$mismatches" \
+        --arg threshold "$threshold" \
+        --arg src "common.sh:heal_v2" \
+        --arg ts "$ts" \
+        '{event: $event, old_session_id: $old, new_session_id: $new,
+          mismatches_at_trigger: ($mismatches | tonumber),
+          threshold: ($threshold | tonumber),
+          source: $src, timestamp: $ts,
+          message: "HEAL v2: session_id corrigido por threshold de mismatches atingido"}')"
+
+    return 0
+}
+
+# ── increment_mismatch ────────────────────────────────────────────────────────
+# Incrementa o contador session_stats.session_id_mismatches no CTX.
+# Chamado pelos hooks quando há mismatch mas nenhum HEAL ativou.
+#
+# Uso: increment_mismatch
+increment_mismatch() {
+    ctx_update '.session_stats.session_id_mismatches = ((.session_stats.session_id_mismatches // 0) + 1)' \
+        2> /dev/null || true
 }

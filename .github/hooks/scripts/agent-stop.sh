@@ -23,7 +23,12 @@ LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
 # shellcheck disable=SC1091
-source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
+if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
+    source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null \
+        || echo "[warn] common.sh falhou ao carregar em agent-stop.sh" >&2
+else
+    echo "[warn] common.sh não encontrado (agent-stop.sh) — heal_v1/ctx functions indisponíveis" >&2
+fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 # G9-08: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
 # flock -w 3: aguarda até 3s; se não conseguir, continua sem lock (degraded mode).
@@ -85,6 +90,22 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                   message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
                 >> "$LOG_DIR/audit.jsonl"
             SESSION_ID="$SESSION_ID_PAYLOAD" # continua com ID correto
+        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
+            # FIX BUG-06: inline_restart — CTX tem o session_id correto do VS Code (PREMISSA 1).
+            # Payload está stale (compilado com contexto antigo). Adotamos CTX como verdade.
+            # Não executamos HEAL v2 (que heala na direção errada); apenas sincronizamos SESSION_ID.
+            SESSION_ID="$CTX_ACTIVE_SID"
+            jq -cn \
+                --arg event "session_id_sync_inline_restart" \
+                --arg stale "$SESSION_ID_PAYLOAD" \
+                --arg adopted "$CTX_ACTIVE_SID" \
+                --arg source "agent-stop.sh" \
+                --arg ts "${TIMESTAMP:-}" \
+                '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
+                  source: $source, timestamp: $ts,
+                  message: "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"}' \
+                >> "$LOG_DIR/audit.jsonl"
+            # Continua normalmente sem bloquear
         else
             # G9-04: HEAL v2 — rastreia mismatches consecutivos com o mesmo "got" session_id.
             # Após 3 ocorrências do mesmo "got", auto-heal (CTX provavelmente defasado).
@@ -351,6 +372,8 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f 
     _BLOCK_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
     _BLOCK_CONSECUTIVE="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     _BLOCK_TODO_CREATED="$(jq -r '.current_turn.todo_created // false' "$CTX_FILE" 2> /dev/null || echo false)"
+    # fix Haiku A4.6: guard numérica — valor corrompido no CTX não causa comportamento imprevisível
+    [[ "$_BLOCK_CONSECUTIVE" =~ ^[0-9]+$ ]] || _BLOCK_CONSECUTIVE=0
     # Permite o primeiro turno (warm-up): agente ainda obtendo contexto da SESSION
     if [ "$_BLOCK_TURN_COUNT" -ge 1 ]; then
         _NEW_CONSEC=$((_BLOCK_CONSECUTIVE + 1))
@@ -390,10 +413,18 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f 
         fi
         # Atualiza CTX: incrementa consecutive_unauthorized e registra atividade do turno
         # last_turn_ts atualizado mesmo em bloqueios: TURN_IDLE mede atividade, não autorização
+        # EBH-M02: usa mktemp em vez de $CTX_FILE.tmp para evitar conflitos de nome estático
+        # fix Haiku A4.1: valida mktemp antes de usar
+        if ! _BLOCK_CTX_TMP="$(mktemp 2>/dev/null)"; then
+            echo "[warn] agent-stop: mktemp falhou; consecutive_unauthorized não atualizado" >&2
+        else
         jq --argjson c "$_NEW_CONSEC" \
             --arg now "$NOW_ISO" \
             '.compliance.consecutive_unauthorized = $c | .compliance.last_turn_authorized = false | .last_turn_ts = $now' \
-            "$CTX_FILE" > "$CTX_FILE.tmp" && mv "$CTX_FILE.tmp" "$CTX_FILE" || true
+            "$CTX_FILE" > "$_BLOCK_CTX_TMP" 2> /dev/null \
+            && mv "$_BLOCK_CTX_TMP" "$CTX_FILE" \
+            || rm -f "$_BLOCK_CTX_TMP" 2> /dev/null
+        fi
         # Registra flag para o próximo briefing
         printf '%s\n' "TURN_BLOCKED|$(date -u +%Y-%m-%dT%H:%M:%SZ)|consecutive=${_NEW_CONSEC}" > "$AUTH_FLAG_FILE"
         # Constrói o reason com instrução completa para o agente
@@ -716,7 +747,8 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.section_name      = $section
          | .current_turn.intent_declared   = false
          | .current_turn.intent            = null
-         | .current_turn.todo_created      = false' \
+         | .current_turn.todo_created      = false
+         | .current_turn.subagent_delegated = false' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 

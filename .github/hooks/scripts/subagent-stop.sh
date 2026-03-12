@@ -11,7 +11,14 @@ LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
 
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
-
+# Carrega biblioteca de funções compartilhadas (heal_v1, increment_mismatch, etc.)
+if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
+    # shellcheck source=../.github/hooks/hooks-lib/common.sh
+    source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null \
+        || echo "[warn] common.sh falhou ao carregar em subagent-stop.sh" >&2
+else
+    echo "[warn] common.sh não encontrado (subagent-stop.sh) — heal_v1/increment_mismatch indisponíveis" >&2
+fi
 INPUT="$(cat 2> /dev/null || true)"
 
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
@@ -33,6 +40,15 @@ fi
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
+        # HEAL v1: se source é manual_recovery ou inline_restart, sincroniza sem bloquear
+        CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        if [ "$CTX_SOURCE" = "manual_recovery" ] || [ "$CTX_SOURCE" = "inline_restart" ]; then
+            if command -v heal_v1 > /dev/null 2>&1; then
+                if heal_v1 "$SESSION_ID_PAYLOAD" "$TIMESTAMP"; then
+                    echo "[heal] HEAL v1 aplicado em subagent-stop.sh" >&2
+                fi
+            fi
+        fi
         jq -cn \
             --arg event "session_id_mismatch" \
             --arg expected "$CTX_ACTIVE_SID" \
@@ -45,6 +61,10 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 source:   $source,
                 message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
             }' >> "$LOG_DIR/audit.jsonl"
+        # GAP-03: incrementa contador de mismatches
+        if command -v increment_mismatch > /dev/null 2>&1; then
+            increment_mismatch
+        fi
         exit 0
     fi
 fi
@@ -85,10 +105,25 @@ jq -cn \
         duration_s:   $duration_s
     }' >> "$LOG_DIR/audit.jsonl"
 
-# Incrementa subagent_calls no contexto da sessão
-if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    jq '.session_stats.subagent_calls = (.session_stats.subagent_calls // 0) + 1' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+# Incrementa subagent_completions no contexto da sessão
+# NOTE: subagent_calls é incrementado em subagent-start.sh (invocação).
+# Aqui incrementamos subagent_completions para rastrear conclusões separadamente.
+# EBH-L01: fallback mktemp quando sponge não disponível
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
+    if command -v sponge &> /dev/null; then
+        jq '.session_stats.subagent_completions = (.session_stats.subagent_completions // 0) + 1' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        # Valida mktemp antes de usar (fix Haiku S2.1: se mktemp falhar, _SA_STOP_TMP fica vazio)
+        if _SA_STOP_TMP="$(mktemp 2> /dev/null)"; then
+            jq '.session_stats.subagent_completions = (.session_stats.subagent_completions // 0) + 1' \
+                "$CTX_FILE" > "$_SA_STOP_TMP" 2> /dev/null \
+                && mv "$_SA_STOP_TMP" "$CTX_FILE" \
+                || rm -f "$_SA_STOP_TMP" 2> /dev/null
+        else
+            echo "[warn] subagent-stop: mktemp falhou; subagent_completions não incrementado" >&2
+        fi
+    fi
 fi
 
 exit 0
