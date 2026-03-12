@@ -145,7 +145,7 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
     if [ -f "$BRIEFING_FILE_RECOVERY" ]; then
         _RECOVERY_CLOSE_KEY="$(grep -oP 'ENCERRAR-[A-F0-9]{8}' "$BRIEFING_FILE_RECOVERY" 2> /dev/null | head -1 || echo '')"
     fi
-    
+
     # BUG-75 FIX: Validar que close_key do briefing não é stale
     # Se uma cópia do CTX antigo ainda existe em um backup, comparar as chaves
     if [ -n "$_RECOVERY_CLOSE_KEY" ]; then

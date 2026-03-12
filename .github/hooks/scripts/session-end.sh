@@ -135,7 +135,7 @@ if [ -n "$CLOSE_SECTION_NAME" ]; then
     # BUG-60 FIX: date -d é GNU-only; fallback para BSD (macOS)
     CLOSE_DURATION_S=0
     if [ -n "$CLOSE_SECTION_STARTED" ]; then
-        if date -d "$CLOSE_SECTION_STARTED" '+%s' >/dev/null 2>&1; then
+        if date -d "$CLOSE_SECTION_STARTED" '+%s' > /dev/null 2>&1; then
             _ep_start="$(date -d "$CLOSE_SECTION_STARTED" '+%s' 2> /dev/null || echo 0)"
         else
             _ep_start="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$CLOSE_SECTION_STARTED" '+%s' 2> /dev/null || echo 0)"
@@ -190,7 +190,7 @@ fi
 DURATION_S=0
 START_EPOCH=0 # inicializado aqui para evitar unbound variable se START_ISO vazio
 if [ -n "$START_ISO" ]; then
-    if date -d "$START_ISO" '+%s' >/dev/null 2>&1; then
+    if date -d "$START_ISO" '+%s' > /dev/null 2>&1; then
         START_EPOCH="$(date -d "$START_ISO" '+%s' 2> /dev/null || echo 0)"
     else
         START_EPOCH="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$START_ISO" '+%s' 2> /dev/null || echo 0)"

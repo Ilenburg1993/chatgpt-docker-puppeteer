@@ -758,6 +758,46 @@ cat > "$BRIEFING_FILE" << BRIEFING_EOF
 > ⚠️ **Terminar de escrever uma resposta = encerrar um TURN, NÃO a SESSION.**
 > A SESSION só encerra quando o usuário explicitamente digita a chave abaixo.
 
+---
+
+## 🚨 INSTRUÇÕES CRÍTICAS PARA O AGENTE COPILOT (BUG-79 Hardening)
+
+### ❌ **NUNCA faça isto:**
+- Tentar encerrar a SESSION diretamente (sem Template F)
+- Assumir que pode fechar porque tem acesso ao close_key abaixo
+- Contornar o protocolo de encerramento por qualquer motivo (token budget baixo, etc)
+- Resumir e "encerrar conversa" implicitamente
+
+### ✅ **FAÇA isto quando a SESSION deve encerrar:**
+
+1. **Invoque \`vscode_askQuestions\`** com **TEMPLATE F** (Session Close)
+   - Não use outro template
+   - Inclua instrução clara: "Digite a chave de encerramento:"
+
+2. **Aguarde a resposta do usuário**
+   - O usuário digitará a chave 16 hex abaixo (ENCERRAR-XXXXXXXX)
+
+3. **Deixe post-tool-use.sh executar session-close.sh** automaticamente
+   - Não tente chamar session-close.sh você mesmo (hooks fazem isto)
+
+4. **Apenas após tudo isto: a SESSION encerrará**
+   - Nunca antes. Sempre com autorização do usuário
+
+### 💡 **Se o token budget ficar baixo:**
+- **NÃO encerre a SESSION**
+- Invoque Template D (Checkpoint) para avisar o usuário
+- Deixe o usuário decidir se continua ou se encerra a SESSION
+- O agente não toma decisões autônomas de encerramento
+
+### 📋 **Referência rápida:**
+- **Encerrar SESSION**: \`vscode_askQuestions\` Template F + KEY + \`session-close.sh\`
+- **Avisar sobre token budget**: \`vscode_askQuestions\` Template D (Checkpoint)
+- **Trocar de fase**: \`bash start-section.sh "nome-nova-fase"\`
+- **Terminar TURN normal**: levemente — sem protocolo especial
+
+---
+
+
 ### 🔐 Chave desta SESSION (mostrar no Template F):
 \`\`\`
 ${CLOSE_KEY}

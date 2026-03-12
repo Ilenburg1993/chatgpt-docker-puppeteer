@@ -190,12 +190,12 @@ if [ -f "$CTX_FILE" ]; then
     TURN_STARTED_AT="$(jq -r '.current_turn.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$TURN_STARTED_AT" ] && [ -n "$NOW_ISO" ]; then
         # BUG-59 FIX: date -d é GNU-only; fallback para BSD (macOS)
-        if date -d "$TURN_STARTED_AT" '+%s' >/dev/null 2>&1; then
+        if date -d "$TURN_STARTED_AT" '+%s' > /dev/null 2>&1; then
             TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
         else
             TURN_START_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$TURN_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
         fi
-        if date -d "$NOW_ISO" '+%s' >/dev/null 2>&1; then
+        if date -d "$NOW_ISO" '+%s' > /dev/null 2>&1; then
             NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
         else
             NOW_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
@@ -283,6 +283,56 @@ jq -cn \
         block_count:            $block_count,
         agentStop_invocations:  $agentStop_invocations
     }' >> "$AUDIT_FILE"
+
+# ── BUG-79 GUARD: SESSION CLOSURE authorization (PRÉ-CLOSE validation) ────────
+# Hardening Fase 0: Detecta tentativa não autorizada de encerrar sessão
+# Protocolo TODO v9.0: SESSION closure APENAS via vscode_askQuestions Template F + close_key
+# Se session.ended_at != null e closure_authorized_at == null → VIOLAÇÃO
+if [ -f "$CTX_FILE" ]; then
+    SESSION_ENDED_AT="$(jq -r '.session.ended_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    if [ -n "$SESSION_ENDED_AT" ]; then
+        # Session foi marcada como ended — verificar se autorização veio via Template F
+        CLOSURE_AUTHORIZED_AT="$(jq -r '.session.closure_authorized_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        if [ -z "$CLOSURE_AUTHORIZED_AT" ]; then
+            # ❌ VIOLAÇÃO: Session ended SEM autorização via vscode_askQuestions Template F
+            echo "[ERROR] SESSION CLOSURE VIOLATION (BUG-79 Guard)" >&2
+            echo "  Session.ended_at: $SESSION_ENDED_AT" >&2
+            echo "  Closure_authorized_at: (empty/missing)" >&2
+            echo "  Protocolo violado: encerramento SEM Template F + close_key validation" >&2
+            echo "  Requerido: vscode_askQuestions Template F com resposta contendo close_key" >&2
+            
+            # Log violation event
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$NOW_ISO" \
+                --arg ended_at "$SESSION_ENDED_AT" \
+                '{
+                    event:      "sessionClose_VIOLATION_unauthorized",
+                    session_id: $sid,
+                    timestamp:  $ts,
+                    session_ended_at: $ended_at,
+                    closure_authorized_at: null,
+                    bug:        "BUG-79",
+                    message:    "Tentativa de encerrar sessão sem autorização via vscode_askQuestions Template F"
+                }' >> "$AUDIT_FILE"
+            
+            # Cria flag de violação para rastreamento na próxima sessão
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$NOW_ISO" \
+                '{
+                    session_id:        $sid,
+                    violation_detected_at: $ts,
+                    violation_type:    "unauthorized_session_close",
+                    requires_investigation: true,
+                    bug_reference:     "BUG-79"
+                }' > "$STATE_DIR/SESSION_CLOSE_VIOLATION.flag"
+            
+            # BLOQUEADOR: Falha com exit code 1
+            exit 1
+        fi
+    fi
+fi
 
 # ── Detecção de autorização ───────────────────────────────────────────────────
 # Estratégia em camadas (do mais preciso ao mais tolerante):

@@ -311,7 +311,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
             }' >> "$AUDIT_FILE"
         SESSION_ID="$_NEW_SID"
         echo "[log-prompt] Sessão anterior encerrada (${_PREV_ENDED_AT}). Nova sessão inline: ${_NEW_SID} | close_key: ${_NEW_KEY}" >&2
-        
+
         # BUG-74 FIX: Atualizar session-briefing.md com a nova close_key
         # (RECONNECT-02 gera nova chave, briefing precisa refletir isso)
         if [ -f "$STATE_DIR/session-briefing.md" ]; then

@@ -89,12 +89,12 @@ DURATION_S=0
 if [ -f "$CTX_FILE" ]; then
     LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$LAST_TOOL_TS" ] && [ -n "$NOW_ISO" ]; then
-        if date -d "$LAST_TOOL_TS" '+%s' >/dev/null 2>&1; then
+        if date -d "$LAST_TOOL_TS" '+%s' > /dev/null 2>&1; then
             LAST_S="$(date -d "$LAST_TOOL_TS" '+%s' 2> /dev/null || echo 0)"
         else
             LAST_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$LAST_TOOL_TS" '+%s' 2> /dev/null || echo 0)"
         fi
-        if date -d "$NOW_ISO" '+%s' >/dev/null 2>&1; then
+        if date -d "$NOW_ISO" '+%s' > /dev/null 2>&1; then
             NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
         else
             NOW_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"

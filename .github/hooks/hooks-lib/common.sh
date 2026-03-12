@@ -149,12 +149,12 @@ ctx_update() {
 iso_to_epoch_portable() {
     local iso_ts="$1"
     [ -z "$iso_ts" ] && echo 0 && return 0
-    
+
     # Tenta GNU date -d primeiro (mais comum)
-    if date -d "$iso_ts" '+%s' >/dev/null 2>&1; then
+    if date -d "$iso_ts" '+%s' > /dev/null 2>&1; then
         date -d "$iso_ts" '+%s' 2> /dev/null || echo 0
     # Fallback para BSD date -j (macOS, FreeBSD)
-    elif date -j -f '%Y-%m-%dT%H:%M:%SZ' "$iso_ts" '+%s' >/dev/null 2>&1; then
+    elif date -j -f '%Y-%m-%dT%H:%M:%SZ' "$iso_ts" '+%s' > /dev/null 2>&1; then
         date -j -f '%Y-%m-%dT%H:%M:%SZ' "$iso_ts" '+%s' 2> /dev/null || echo 0
     # Last resort: extrai segundos do timestamp e usa como epoch (degraded)
     else

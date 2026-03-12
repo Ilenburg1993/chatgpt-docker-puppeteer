@@ -2159,3 +2159,955 @@ jq ... > "$_TMP" && mv "$_TMP" "$(readlink -f "$CTX_FILE" 2>/dev/null || echo "$
 
 _Seção 9.1 gerada por auditoria exaustiva conduzida em 2026-03-12. Nenhuma correção deve ser
 aplicada antes de aprovação via `vscode_askQuestions`._
+
+
+---
+
+## Seção 9.2 — Auditoria Exaustiva v2 (2026-03-XX)
+
+**Contexto**: Segunda rodada de auditoria. Documentação oficial do GitHub Copilot Hooks
+lida integralmente (3 páginas: `about-hooks`, `use-hooks`, `hooks-configuration`). Scripts
+auditados: 25+. Findings consolidados com base em discrepâncias docs×código, portabilidade,
+locking, métricas e lógica de estado.
+
+**Sources oficiais consultados:**
+- `https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-hooks`
+- `https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/use-hooks`
+- `https://docs.github.com/en/copilot/reference/hooks-configuration`
+
+**Descoberta-chave dos docs:** `timeoutSec` default = **30 segundos**. Todos os nossos
+hooks críticos estão abaixo desse valor, elevando o risco de timeout silencioso.
+
+---
+
+### Grupo A — Timeouts Críticos (BUG-49 a BUG-54)
+
+> **Contexto oficial:** Os docs confirmam `timeoutSec: 30` como default. Nossos hooks foram
+> configurados com valores MENORES que o default, o que é contra-intuitivo e arriscado.
+
+---
+
+#### BUG-49 — `sessionStart` timeout 15s incompatível com complexidade do script
+
+**Severidade:** ALTA
+**Arquivo:** `.github/hooks/copilot-hooks.json` + `scripts/session-start.sh`
+
+**Descrição:**
+`session-start.sh` tem 54KB e executa: leitura de CTX existente, geração de session_id,
+detecção de inline_restart, watchdog check, criação do CTX completo (400+ campos via jq),
+chamada a `rotate-audit.sh`, geração do `session-briefing.md` (arquivo Markdown completo).
+Timeout atual: **15 segundos**. Default oficial: **30 segundos**. Sob I/O pesado ou disco
+lento, o script pode exceder 15s — o Copilot MATA o processo, o hook falha silenciosamente
+e a sessão começa sem contexto.
+
+**Fix:**
+```json
+"sessionStart": [{ "timeoutSec": 60 }]
+```
+
+---
+
+#### BUG-50 — `agentStop` timeout 10s incompatível com lógica de bloqueio
+
+**Severidade:** ALTA
+**Arquivo:** `.github/hooks/copilot-hooks.json` + `scripts/agent-stop.sh`
+
+**Descrição:**
+`agent-stop.sh` tem 46KB e executa: leitura de CTX, verificação de vscode_askQuestions,
+emissão de `decision:block` (lógica de compliance), atualização de turn_history no CTX,
+geração de systemMessage de 200+ linhas. Timeout atual: **10 segundos**. Default oficial:
+**30 segundos**. Scripts de bloqueio que falham por timeout causam liberação incorreta do
+agente (sem block) — violando o protocolo TODO v9.0.
+
+**Fix:**
+```json
+"agentStop": [{ "timeoutSec": 45 }]
+```
+
+---
+
+#### BUG-51 — `userPromptSubmitted` timeout 10s insuficiente para HEAL v1
+
+**Severidade:** MÉDIA
+**Arquivo:** `.github/hooks/copilot-hooks.json`
+
+**Descrição:**
+`log-prompt.sh` contém lógica HEAL v1 (detecção de reconnect + RECONNECT-01/02), geração
+de novo close_key, atualização de CTX com turn counters. Sob RECONNECT-02 (reset completo
+de CTX), o script pode levar >10s sob I/O pesado.
+
+**Fix:** `"timeoutSec": 30`
+
+---
+
+#### BUG-52 — `preToolUse` timeout 15s abaixo do default oficial
+
+**Severidade:** MÉDIA
+**Arquivo:** `.github/hooks/copilot-hooks.json`
+
+**Descrição:**
+`pre-tool-use.sh` executa: flock, redação de credenciais (múltiplos sed), append em
+audit.jsonl, auto-recovery (criação de CTX mínimo). O default oficial é 30s; nosso 15s
+não oferece margem.
+
+**Fix:** `"timeoutSec": 30`
+
+---
+
+#### BUG-53 — `postToolUse` timeout 15s abaixo do default oficial
+
+**Severidade:** MÉDIA
+**Arquivo:** `.github/hooks/copilot-hooks.json`
+
+**Descrição:**
+`post-tool-use.sh` tem lógica complexa: guard session_id, HEAL v1, inline_restart sync
+(com contador e cap de 5), detecção de vscode_askQuestions API failures, atualização de CTX
+com múltiplos campos. O default oficial é 30s.
+
+**Fix:** `"timeoutSec": 30`
+
+---
+
+#### BUG-54 — Hooks auxiliares com timeout 10s (abaixo do default oficial 30s)
+
+**Severidade:** BAIXA
+**Arquivo:** `.github/hooks/copilot-hooks.json`
+
+**Descrição:**
+Os hooks `subagentStop`, `subagentStart`, `postToolUseFailure` e `preCompact` têm
+`timeoutSec: 10`, abaixo do default oficial de 30s. Não há justificativa para manter
+valores abaixo do default.
+
+**Fix:** Elevar todos para `"timeoutSec": 30`.
+
+---
+
+### Grupo B — Hooks Não Oficiais / Schema Divergente (BUG-55 a BUG-58)
+
+> **Contexto oficial:** Os docs listam exatamente 8 tipos de hook: `sessionStart`,
+> `sessionEnd`, `userPromptSubmitted`, `preToolUse`, `postToolUse`, `agentStop`,
+> `subagentStop`, `errorOccurred`. Nenhum outro tipo está documentado.
+
+---
+
+#### BUG-55 — `postToolUseFailure` não é hook oficial → `tool-use-failure.sh` é código morto
+
+**Severidade:** ALTA (risco de falsa confiança)
+**Arquivo:** `copilot-hooks.json` + `scripts/tool-use-failure.sh`
+
+**Descrição:**
+O tipo de hook `postToolUseFailure` **não existe** na documentação oficial. O VS Code nunca
+dispara esse evento. `tool-use-failure.sh` **nunca executa** — toda a lógica de tracking de
+falhas de ferramentas nele contida é código morto.
+
+As falhas são detectáveis via `postToolUse` com `toolResult.resultType == "failure"`.
+A heurística já existe em `post-tool-use.sh` (variável `RESULT_TYPE`), mas operadores
+podem acreditar que `tool-use-failure.sh` monitora ativamente as falhas.
+
+**Fix:**
+1. Remover entrada `postToolUseFailure` de `copilot-hooks.json`.
+2. Avaliar integração de `tool-use-failure.sh` à lógica de `post-tool-use.sh`
+   (para quando `RESULT_TYPE == "failure"`).
+
+---
+
+#### BUG-56 — `subagentStart` não está nos docs oficiais
+
+**Severidade:** MÉDIA
+**Arquivo:** `copilot-hooks.json` + `scripts/subagent-start.sh`
+
+**Descrição:**
+O tipo `subagentStart` **não consta** na lista oficial de hook types. Pode ser extensão
+não documentada do VS Code Copilot. `subagent-start.sh` pode nunca executar na prática.
+
+**Fix:** Adicionar comentário de alerta em `copilot-hooks.json` e documentar no
+`GUIA-HOOKS-COPILOT.md` como extensão empiricamente observada, não confirmada pelos docs.
+
+---
+
+#### BUG-57 — `preCompact` não está nos docs públicos oficiais
+
+**Severidade:** BAIXA
+**Arquivo:** `copilot-hooks.json` + `scripts/pre-compact.sh`
+
+**Descrição:**
+`preCompact` não aparece na referência oficial pública, mas é conhecido como extensão do
+GitHub Copilot Chat. O script funciona quando o hook dispara, mas não há garantia de
+estabilidade da API entre versões do VS Code.
+
+**Fix:** Documentar como extensão não oficial no `GUIA-HOOKS-COPILOT.md`.
+
+---
+
+#### BUG-58 — `session_id` não está nos schemas oficiais de hook inputs
+
+**Severidade:** INFO (design documentado)
+**Arquivo:** Todos os scripts de hook
+
+**Descrição:**
+Os schemas oficiais de `sessionStart`, `sessionEnd`, `userPromptSubmitted`, `preToolUse` e
+`postToolUse` **não listam `session_id`** como campo de input. Nosso sistema depende
+fortemente dessa extensão não documentada. O campo existe empiricamente (confirmado em
+2026-03-09 via `raw-post-input.jsonl`), mas não é garantido em futuras versões.
+
+**Fix:** Documentar explicitamente em `GUIA-HOOKS-COPILOT.md` como extensão empírica.
+Manter o padrão `.session_id // ""` como fallback robusto.
+
+---
+
+### Grupo C — Portabilidade (BUG-59 a BUG-64)
+
+> **Contexto:** BUG-45 (corrigido em `start-section.sh` no Sprint 6) identificou o padrão
+> `date -d` como bug de portabilidade GNU/BSD. A análise mostrou que outros 4 scripts têm
+> o mesmo problema, além de outros gaps de portabilidade.
+
+---
+
+#### BUG-59 — `agent-stop.sh` usa `date -d` sem fallback BSD (TURN_START_S)
+
+**Severidade:** ALTA
+**Arquivo:** `scripts/agent-stop.sh` (aprox. linhas 175-180)
+
+**Descrição:**
+```bash
+TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s' 2>/dev/null || echo 0)"
+```
+`date -d` é GNU-only. No macOS/BSD, retorna erro silencioso e `TURN_START_S=0`. O cálculo
+de duração do TURN fica sempre errado em ambientes não-Linux.
+
+**Fix** (padrão BUG-45):
+```bash
+if date -d "$TURN_STARTED_AT" '+%s' >/dev/null 2>&1; then
+    TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s')"
+else
+    TURN_START_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$TURN_STARTED_AT" '+%s' 2>/dev/null || echo 0)"
+fi
+```
+
+---
+
+#### BUG-60 — `session-end.sh` usa `date -d` sem fallback BSD (2 chamadas)
+
+**Severidade:** ALTA
+**Arquivo:** `scripts/session-end.sh` (aprox. linhas 132-180)
+
+**Descrição:**
+Duas instâncias de `date -d` sem fallback BSD:
+1. Duração da seção: `date -d "$CLOSE_SECTION_STARTED" '+%s'`
+2. Duração da sessão: `date -d "$START_ISO" '+%s'`
+
+Ambas retornam 0 no macOS, fazendo com que todas as durações calculadas em session-end.sh
+sejam incorretas em ambientes BSD.
+
+**Fix:** Aplicar helper `iso_to_epoch_portable` (padrão BUG-45) nas duas ocorrências.
+
+---
+
+#### BUG-61 — `section-end.sh` usa `date -d` sem fallback BSD (SECTION_EPOCH)
+
+**Severidade:** ALTA
+**Arquivo:** `scripts/section-end.sh` (aprox. linha 65)
+
+**Descrição:**
+```bash
+SECTION_EPOCH="$(date -d "$SECTION_STARTED_AT" '+%s' 2>/dev/null || echo 0)"
+```
+Mesma classe do BUG-45. DURATION_S sempre 0 ou errado em macOS/BSD.
+
+**Fix:** Mesmo padrão de BUG-59.
+
+---
+
+#### BUG-62 — `subagent-stop.sh` usa `date -d` sem fallback BSD (DURATION_S)
+
+**Severidade:** MÉDIA
+**Arquivo:** `scripts/subagent-stop.sh` (aprox. linhas 88-95)
+
+**Descrição:**
+```bash
+LAST_S="$(date -d "$LAST_TOOL_TS" '+%s' 2>/dev/null || echo 0)"
+NOW_S="$(date -d "$NOW_ISO" '+%s' 2>/dev/null || echo 0)"
+```
+Duas chamadas `date -d` sem fallback BSD. DURATION_S sempre 0 em macOS/BSD.
+
+**Fix:** Mesmo padrão de BUG-59.
+
+---
+
+#### BUG-63 — `log-prompt.sh` close_key usa `xxd -p -u` e fallback de pipeline ineficaz
+
+**Severidade:** MÉDIA
+**Arquivo:** `scripts/log-prompt.sh` (aprox. linha 219 no RECONNECT-02 path)
+
+**Descrição:**
+```bash
+_NEW_KEY="ENCERRAR-$(head -c 4 /dev/urandom 2>/dev/null | xxd -p -u 2>/dev/null | head -c 8 \
+    || date +%s | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
+```
+
+Dois problemas:
+1. **`xxd` não está disponível universalmente** (não é GNU coreutils padrão). Em Alpine
+   Linux ou containers minimalistas, `xxd` pode estar ausente.
+2. **O fallback `||` é ineficaz em pipeline.** Exit code de um pipeline é o do ÚLTIMO
+   comando (`head -c 8`), não do que falhou no meio. Se `xxd` está ausente, a pipe produz
+   saída vazia mas `head -c 8` retorna 0 (sucesso). O fallback NUNCA é ativado. Resultado:
+   `close_key = "ENCERRAR-"` (sufixo vazio) — chave inválida.
+
+Comparar com `session-start.sh` que corretamente usa:
+```bash
+CLOSE_KEY="ENCERRAR-$(head -c 4 /dev/urandom | sha256sum 2>/dev/null | head -c 8 | tr '[:lower:]' '[:upper:]')"
+```
+
+**Fix:** Usar o mesmo método de `session-start.sh` (sha256sum, sempre disponível):
+```bash
+_NEW_KEY="ENCERRAR-$(head -c 4 /dev/urandom 2>/dev/null | sha256sum 2>/dev/null \
+    | head -c 8 | tr '[:lower:]' '[:upper:]' \
+    || date +%s | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
+```
+
+---
+
+#### BUG-64 — `save-finding.sh` usa `date +%s%3N` sem suporte BSD — fallback gera IDs não únicos
+
+**Severidade:** MÉDIA
+**Arquivo:** `scripts/save-finding.sh` (aprox. linha 52)
+
+**Descrição:**
+```bash
+FINDING_ID="f_$(date +%s%3N 2>/dev/null || echo 0)_${RANDOM}"
+```
+`%3N` (milissegundos) **não é suportado pelo BSD date** (macOS). Em macOS, o fallback
+produz `f_0_${RANDOM}`. Múltiplos findings salvos no mesmo segundo terão o prefixo `f_0_`,
+diferenciados apenas por `$RANDOM` — com colisões possíveis.
+
+**Fix:**
+```bash
+# Usa seconds * 1000 como fake-milliseconds (portável, mesmo padrão de add-task.sh)
+FINDING_ID="f_$(date -u +%s000 2>/dev/null || echo "$(date +%s)000")_${RANDOM}"
+```
+
+---
+
+### Grupo D — Mecanismos de Lock (BUG-65 a BUG-67)
+
+---
+
+#### BUG-65 — `ctx_update()` usa `with_lock()` ≠ flock fd 9 dos scripts principais
+
+**Severidade:** ALTA
+**Arquivo:** `hooks-lib/common.sh` (funções `ctx_update`, `with_lock`)
+
+**Descrição:**
+Todos os scripts principais adquirem lock via `exec 9> "$_CTX_LOCK"; flock -x -w N 9`.
+Internamente, `ctx_update()` chama `with_lock()` que abre seu próprio file descriptor,
+independente do fd 9.
+
+**Consequência:** Um script que já detém o lock fd 9 e internamente chama `ctx_update()`
+abre um SEGUNDO fd para o mesmo lockfile via `with_lock()`. O flock por fd é não-reentrante:
+um segundo `open()` + `flock()` no mesmo arquivo pelo mesmo processo pode ser concedido
+imediatamente pelo kernel (o processo já é o owner do lockfile). Isso permite que
+`ctx_update()` escreva no CTX concorrentemente à lógica principal do script, mesmo quando
+o script "acha" que detém o lock exclusivo.
+
+**Fix:** `ctx_update()` deve documentar que o chamador é responsável pelo lock, e remover
+o `with_lock()` interno. Ou: todos os scripts devem usar `ctx_update()` em vez de
+`exec 9>` + jq direto.
+
+---
+
+#### BUG-66 — `rotate-audit.sh` sem lock antes da rotação atômica
+
+**Severidade:** MÉDIA
+**Arquivo:** `scripts/rotate-audit.sh` (linhas de cp + sponge)
+
+**Descrição:**
+```bash
+cp "$AUDIT_FILE" "$ARCHIVE_FILE"                                    # 1. copia
+tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" | sponge "$AUDIT_FILE"  # 2. trunca
+```
+Se outro hook escreve em `$AUDIT_FILE` ENTRE os passos 1 e 2:
+- O evento aparece no arquivo ativo (após sponge) ✓
+- Mas NÃO aparece no arquivo de archive (copiado ANTES) ✗
+→ Evento perdido do histórico.
+
+**Fix:** Adquirir flock antes do cp:
+```bash
+exec 9> "${AUDIT_FILE}.lock"
+flock -x -w "${HOOKS_FLOCK_TIMEOUT:-5}" 9 2>/dev/null || { log "lock timeout"; exit 1; }
+cp "$AUDIT_FILE" "$ARCHIVE_FILE"
+tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" | sponge "$AUDIT_FILE"
+```
+
+---
+
+#### BUG-67 — Timeout de flock inconsistente: hardcoded `-w 3` vs `HOOKS_FLOCK_TIMEOUT`
+
+**Severidade:** BAIXA
+**Arquivo:** `scripts/log-prompt.sh`, `scripts/pre-tool-use.sh` (e outros)
+
+**Descrição:**
+`config.sh` define `HOOKS_FLOCK_TIMEOUT=5`. Mas vários scripts ignoram essa variável:
+- `log-prompt.sh`: `flock -x -w 3 9` (hardcoded 3s)
+- `pre-tool-use.sh`: `flock -x -w 3 9` (hardcoded 3s)
+- `session-end.sh` (correto): `flock -x -w "${HOOKS_FLOCK_TIMEOUT:-5}" 9`
+
+Inconsistência dificulta ajuste centralizado do timeout de lock.
+
+**Fix:** Padronizar todos para `flock -x -w "${HOOKS_FLOCK_TIMEOUT:-5}"`.
+
+---
+
+### Grupo E — Estado e Métricas (BUG-68 a BUG-70)
+
+---
+
+#### BUG-68 — `session-checkpoint.sh` lê `tool-metrics.jsonl` sem resolução per-session
+
+**Severidade:** MÉDIA
+**Arquivo:** `scripts/session-checkpoint.sh`
+
+**Descrição:**
+```bash
+METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"
+```
+Sempre aponta para o arquivo global, sem resolução per-session (sem leitura de
+`current-session-id.txt`). Se métricas forem migradas para arquivos per-session, os
+checkpoints lerão dados errados silenciosamente.
+
+**Fix:** Aplicar o padrão UPG-AUDIT-01 para `METRICS_FILE`:
+```bash
+_CSI_FILE="$STATE_DIR/current-session-id.txt"
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2>/dev/null)" && [ -n "$_CURR_SID" ]; then
+    _SID_SHORT="${_CURR_SID:0:8}"
+    METRICS_FILE="$LOG_DIR/tool-metrics-${_SID_SHORT}.jsonl"
+fi
+```
+
+---
+
+#### BUG-69 — `error-occurred.sh`: `AUDIT_FILE` só definido dentro do bloco per-session
+
+**Severidade:** MÉDIA
+**Arquivo:** `scripts/error-occurred.sh` (aprox. linhas 20-30)
+
+**Descrição:**
+Em `error-occurred.sh`, `AUDIT_FILE` é definido apenas dentro do bloco condicional
+per-session (quando `SESSION_ID_PAYLOAD` é não-vazio). Quando o payload não tem
+`session_id` (possível dado que o campo não está nos schemas oficiais), `AUDIT_FILE`
+recebe o valor default de `common.sh` (`$LOG_DIR/audit.jsonl` global).
+
+Erros com `session_id` vão para o arquivo per-session correto; erros sem `session_id` vão
+para `audit.jsonl` global — dificultando correlação por sessão.
+
+**Fix:** Mover a resolução per-session para o topo do script, antes de qualquer escrita.
+
+---
+
+#### BUG-70 — `generate-daily-report.sh` não faz merge de `tool-metrics.jsonl` per-session
+
+**Severidade:** BAIXA
+**Arquivo:** `scripts/generate-daily-report.sh`
+
+**Descrição:**
+O script já faz merge correto dos arquivos `audit-????????.jsonl` per-session, mas
+`METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"` é sempre o arquivo global. Se métricas de
+ferramentas forem distribuídas em arquivos per-session, o relatório diário ficará incompleto.
+
+**Fix:** Aplicar o mesmo padrão de merge para `tool-metrics-????????.jsonl`.
+
+---
+
+### Grupo F — Lógica e Qualidade de Código (BUG-71 a BUG-78)
+
+---
+
+#### BUG-71 — `iso_to_epoch()` duplicada em `watchdog.sh` e `start-section.sh`; ausente de `common.sh`
+
+**Severidade:** BAIXA
+**Arquivo:** `scripts/watchdog.sh`, `scripts/start-section.sh`
+
+**Descrição:**
+A função de conversão ISO→epoch está implementada duas vezes com nomes diferentes:
+- `watchdog.sh`: `iso_to_epoch()` (inline, sem fallback BSD)
+- `start-section.sh`: `_iso_to_epoch_ss()` (inline, com fallback BSD via BUG-45)
+
+`common.sh` NÃO tem essa função. Quando BUG-45 foi corrigido em `start-section.sh`, o
+fix não foi propagado para `watchdog.sh`.
+
+**Fix:**
+1. Implementar `iso_to_epoch_portable()` em `common.sh` com fallback BSD.
+2. Remover as implementações inline de `watchdog.sh` e `start-section.sh`.
+3. Atualizar os scripts para usar a função de `common.sh`.
+
+---
+
+#### BUG-72 — `on-git-push.sh`: `elif [ $# -ge 4 ]` nunca satisfeito → código morto
+
+**Severidade:** BAIXA
+**Arquivo:** `scripts/on-git-push.sh` (aprox. linhas 46-52)
+
+**Descrição:**
+```bash
+elif [ $# -ge 4 ]; then
+    read -r _LOCAL_REF LOCAL_SHA REMOTE_REF _REMOTE_SHA < /dev/stdin 2>/dev/null || true
+    BRANCH="${REMOTE_REF##*/}"
+fi
+```
+O script é chamado como hook `pre-push` do git, que passa apenas `$1=remote` e `$2=url`
+(portanto `$#=2`). A condição `$# -ge 4` **nunca é verdadeira** em uso real. `BRANCH` e
+`LOCAL_SHA` são sempre obtidos pelos fallbacks abaixo (via `git rev-parse`), que funcionam
+corretamente. O `elif` é código morto com comentário enganoso.
+
+**Fix:** Remover o ramo `elif [ $# -ge 4 ]` e o bloco `read -r` associado.
+
+---
+
+#### BUG-73 — `inline_restart` não reseta `pending_section_after_push` → flag fantasma
+
+**Severidade:** ALTA
+**Arquivo:** `scripts/session-start.sh` (inline_restart path), `scripts/log-prompt.sh` (RECONNECT-02)
+
+**Descrição:**
+Quando um inline_restart ocorre, `session_stats.pending_section_after_push` deve ser
+resetado para `false` (refere-se a um git push da sessão ANTERIOR).
+
+O path de inline_restart em `session-start.sh` (partial CTX update) **não inclui**:
+```bash
+| .session_stats.pending_section_after_push = false
+```
+
+O path RECONNECT-02 em `log-prompt.sh` também não reseta esse campo.
+
+**Consequência:** Após restart, `agent-stop.sh` detecta `pending_section_after_push=true`
+e exige que o agente tome uma decisão de SECTION que não faz mais sentido (o push foi da
+sessão anterior).
+
+**Fix:** Adicionar `.session_stats.pending_section_after_push = false` nos dois paths
+de inline_restart (session-start.sh e log-prompt.sh).
+
+---
+
+#### BUG-74 — `log-prompt.sh` RECONNECT-02: novo close_key sem regeneração de briefing
+
+**Severidade:** MÉDIA
+**Arquivo:** `scripts/log-prompt.sh` (RECONNECT-02 path)
+
+**Descrição:**
+No path RECONNECT-02, `log-prompt.sh` gera um **novo `close_key`** e escreve no CTX, mas
+`session-briefing.md` **não é regenerado** (apenas `session-start.sh` gera o briefing).
+
+**Consequência:** O briefing exibe a `close_key` da sessão anterior, enquanto o CTX tem
+a nova chave. O agente pode ler o briefing e usar a chave errada para Template F.
+`session-reminder.sh` mostrará a chave correta do CTX, criando divergência entre fontes.
+
+**Fix:** Ao final do path RECONNECT-02, regenerar o header do `session-briefing.md`
+com a nova `close_key`. Ou verificar se `session-start.sh` tampém dispara para o mesmo
+evento e garante regeneração.
+
+---
+
+#### BUG-75 — `pre-tool-use.sh` auto-recovery pode herdar `close_key` de sessão anterior
+
+**Severidade:** MÉDIA
+**Arquivo:** `scripts/pre-tool-use.sh` (bloco de auto-recovery, aprox. linhas 145-165)
+
+**Descrição:**
+No auto-recovery (quando `sessionStart` não disparou), `pre-tool-use.sh` extrai a
+`close_key` do `session-briefing.md` existente:
+```bash
+_RECOVERY_CLOSE_KEY="$(grep -oP 'ENCERRAR-[A-F0-9]{8}' "$BRIEFING_FILE_RECOVERY" | head -1)"
+```
+Se o briefing pertence a uma **sessão anterior** (VS Code reiniciou mas o briefing é do
+dia anterior), a chave extraída é da sessão antiga. O novo contexto de auto-recovery terá
+`close_key` errada — incompatível com o `session_id` atual do VS Code.
+
+**Fix:** Verificar se o briefing contém o `session_id` atual antes de extrair a chave:
+```bash
+if grep -q "${SESSION_ID:0:8}" "$BRIEFING_FILE_RECOVERY" 2>/dev/null; then
+    _RECOVERY_CLOSE_KEY="$(grep -oP 'ENCERRAR-[A-F0-9]{8}' "$BRIEFING_FILE_RECOVERY" | head -1)"
+fi
+```
+
+---
+
+#### BUG-76 — `session-start.sh` gera briefing como etapa final: timeout o elimina
+
+**Severidade:** MÉDIA
+**Arquivo:** `scripts/session-start.sh`
+
+**Descrição:**
+A geração do `session-briefing.md` é a **última etapa** de `session-start.sh`. Com
+`timeoutSec: 15`, se o script levar >15s nas etapas anteriores (CTX init, watchdog,
+rotate-audit), o processo é morto ANTES de gerar o briefing. A sessão começa sem
+briefing — o agente não tem acesso à `close_key`, ao backlog, ou ao estado da sessão.
+
+**Fix:**
+1. **Prioritário:** Aplicar BUG-49 (elevar timeout para 60s).
+2. **Complementar:** Mover a geração básica do briefing (só `close_key` + `session_id`)
+   para ANTES das etapas pesadas. O briefing completo pode ser finalizado ao fim do script.
+
+---
+
+#### BUG-77 — `subagent-stop.sh` calcula DURATION_S usando `last_tool.ts` do agente pai
+
+**Severidade:** BAIXA
+**Arquivo:** `scripts/subagent-stop.sh` (aprox. linhas 86-95)
+
+**Descrição:**
+```bash
+LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2>/dev/null)"
+DURATION_S=$((NOW_S - LAST_S))
+```
+`last_tool.ts` é o timestamp da última ferramenta usada pelo **agente PAI**, não pelo
+subagente. A "duração" calculada é o tempo desde o último tool call do pai até o stop do
+subagente — valor sem significado semântico para duração de subagente.
+
+**Fix:** Adicionar campo `session_stats.subagent_started_at` no CTX quando `subagentStart`
+disparar, e usar esse timestamp como referência em `subagent-stop.sh`.
+
+---
+
+#### BUG-78 — `session-start.sh` inline_restart: múltiplos campos de `session_stats` herdados incorretamente
+
+**Severidade:** MÉDIA
+**Arquivo:** `scripts/session-start.sh` (partial CTX update no inline_restart path)
+
+**Descrição:**
+No inline_restart, o CTX é atualizado parcialmente (apenas campos de identidade). Campos
+de `session_stats` são preservados do CTX anterior. Os seguintes campos deveriam ser
+resetados para a nova sessão lógica e **não são**:
+
+- `session_stats.pending_section_after_push` (ver BUG-73)
+- `session_stats.session_id_mismatches` (contagem deveria recomeçar do zero)
+- `session_stats.session_id_syncs_inline` (contador de syncs — deve resetar)
+- `session_stats.push_count` (push count da sessão anterior persiste)
+- `session_stats.last_push_at` / `last_push_turn` (dados de push anterior persistem)
+
+Esses campos persistem indevidamente, distorcendo métricas e triggers da nova sessão.
+
+**Fix:** No inline_restart path de `session-start.sh`, adicionar reset explícito:
+```bash
+| .session_stats.pending_section_after_push = false
+| .session_stats.session_id_mismatches      = 0
+| .session_stats.session_id_syncs_inline    = 0
+| .session_stats.push_count                 = 0
+| .session_stats.last_push_at               = null
+| .session_stats.last_push_turn             = null
+```
+
+---
+
+### Resumo da Seção 9.2
+
+| ID     | Descrição curta                                                 | Severidade | Grupo    |
+|--------|-----------------------------------------------------------------|------------|----------|
+| BUG-49 | sessionStart timeout 15s → insuficiente (script 54KB)          | ALTA       | Timeout  |
+| BUG-50 | agentStop timeout 10s → insuficiente (lógica de bloqueio)      | ALTA       | Timeout  |
+| BUG-51 | userPromptSubmitted timeout 10s → insuficiente                 | MÉDIA      | Timeout  |
+| BUG-52 | preToolUse timeout 15s → abaixo do default oficial 30s         | MÉDIA      | Timeout  |
+| BUG-53 | postToolUse timeout 15s → abaixo do default oficial 30s        | MÉDIA      | Timeout  |
+| BUG-54 | Hooks auxiliares todos a 10s (abaixo do default 30s)           | BAIXA      | Timeout  |
+| BUG-55 | postToolUseFailure: hook não oficial → script é código morto   | ALTA       | Schema   |
+| BUG-56 | subagentStart: não está nos docs oficiais                       | MÉDIA      | Schema   |
+| BUG-57 | preCompact: não está nos docs públicos oficiais                 | BAIXA      | Schema   |
+| BUG-58 | session_id: não está nos schemas oficiais (ext. empírica)      | INFO       | Schema   |
+| BUG-59 | agent-stop.sh: `date -d` sem fallback BSD (TURN_START_S)       | ALTA       | Portab.  |
+| BUG-60 | session-end.sh: `date -d` sem fallback BSD (2 chamadas)        | ALTA       | Portab.  |
+| BUG-61 | section-end.sh: `date -d` sem fallback BSD (SECTION_EPOCH)     | ALTA       | Portab.  |
+| BUG-62 | subagent-stop.sh: `date -d` sem fallback BSD (DURATION_S)      | MÉDIA      | Portab.  |
+| BUG-63 | log-prompt.sh: close_key via `xxd`; fallback pipeline ineficaz | MÉDIA      | Portab.  |
+| BUG-64 | save-finding.sh: `date +%s%3N` sem suporte BSD                 | MÉDIA      | Portab.  |
+| BUG-65 | ctx_update() usa with_lock() ≠ fd 9 → corrida potencial        | ALTA       | Lock     |
+| BUG-66 | rotate-audit.sh sem lock → race em cp + sponge                 | MÉDIA      | Lock     |
+| BUG-67 | Timeout flock inconsistente: -w 3 vs HOOKS_FLOCK_TIMEOUT       | BAIXA      | Lock     |
+| BUG-68 | session-checkpoint.sh: tool-metrics.jsonl sem per-session      | MÉDIA      | Métricas |
+| BUG-69 | error-occurred.sh: AUDIT_FILE só em bloco per-session          | MÉDIA      | Métricas |
+| BUG-70 | generate-daily-report.sh: sem merge de metrics per-session     | BAIXA      | Métricas |
+| BUG-71 | iso_to_epoch() duplicada; ausente de common.sh                 | BAIXA      | Código   |
+| BUG-72 | on-git-push.sh: `elif $# -ge 4` é código morto                | BAIXA      | Código   |
+| BUG-73 | inline_restart não reseta pending_section_after_push           | ALTA       | Lógica   |
+| BUG-74 | log-prompt.sh: novo close_key sem regenerar session-briefing   | MÉDIA      | Lógica   |
+| BUG-75 | pre-tool-use.sh: close_key herdada de briefing de sessão ant.  | MÉDIA      | Lógica   |
+| BUG-76 | session-start.sh: briefing gerado por último → timeout o apaga | MÉDIA      | Lógica   |
+| BUG-77 | subagent-stop.sh: DURATION_S usando last_tool.ts do pai        | BAIXA      | Lógica   |
+| BUG-78 | session-start.sh: session_stats herdadas incorretamente        | MÉDIA      | Lógica   |
+
+**Total: 30 findings (BUG-49 a BUG-78)**
+
+### Priorização proposta (Seção 9.2)
+
+**Fase A — Correções imediatas (alto impacto, baixo risco de regressão):**
+1. **BUG-49 + BUG-50**: Elevar timeouts de sessionStart (15→60s) e agentStop (10→45s)
+2. **BUG-51 a BUG-54**: Elevar demais timeouts para 30s
+3. **BUG-55**: Remover `postToolUseFailure` do JSON; arquivar `tool-use-failure.sh`
+4. **BUG-73**: Reset de `pending_section_after_push` no inline_restart (ambos os paths)
+5. **BUG-63**: Fix de close_key em log-prompt.sh (xxd → sha256sum)
+
+**Fase B — Portabilidade (padrão BUG-45, múltiplos scripts):**
+6. **BUG-59 + BUG-60 + BUG-61 + BUG-62**: `date -d` → helper portável em 4 scripts
+7. **BUG-71**: Consolidar `iso_to_epoch_portable()` em `common.sh`
+8. **BUG-67**: Padronizar `flock -w "${HOOKS_FLOCK_TIMEOUT:-5}"` em todos os scripts
+
+**Fase C — Lógica e estado (maior cuidado, testes antes):**
+9. **BUG-78**: Reset de session_stats completo no inline_restart (amplia BUG-73)
+10. **BUG-74**: Regeneração de briefing no RECONNECT-02
+11. **BUG-75**: Validação de sessão antes de herdar close_key do briefing
+12. **BUG-76**: Geração parcial de briefing no início de session-start.sh
+
+**Fase D — Métricas e limpeza:**
+13. **BUG-64**: Fix de `date +%s%3N` em save-finding.sh
+14. **BUG-65 + BUG-66**: Revisar/unificar mecanismo de lock
+15. **BUG-68 + BUG-69 + BUG-70**: Per-session resolution para métricas
+16. **BUG-56 + BUG-57**: Documentar hooks não oficiais no GUIA
+17. **BUG-72**: Remover código morto em on-git-push.sh
+18. **BUG-77**: Adicionar `subagent_started_at` no CTX
+
+---
+
+_Seção 9.2 gerada por auditoria exaustiva v2. Documentação oficial do GitHub Copilot
+Hooks lida integralmente (3 páginas). 30 findings catalogados (BUG-49 a BUG-78).
+Nenhuma correção deve ser aplicada antes de aprovação via `vscode_askQuestions`._
+
+---
+
+## Seção 10 — BUG-79: Unauthorized Session Termination (Violação Protocolo TODO v9.0)
+
+**Data de descoberta**: 2026-03-12T11:30:00Z (Turn 3 — durante Fase C de auditoria)
+**Severidade**: **CRÍTICA** (Protocol Violation)
+**Categoria**: Security / Session Management
+**Status**: ATIVO (requer hardening imediato)
+
+### 10.1 O que aconteceu (Sequência de Eventos)
+
+**Contexto**: 
+- Sessão ativa: `cd593a12-4938-4ba9-bef7-0b20b72d6b4f`
+- Close_key gerado por `session-start.sh`: `ENCERRAR-521D8562`
+- Session-briefing.md criado corretamente (contém close_key visível)
+- Agente estava analisando bugs Fase C (BUG-76, BUG-77)
+- Budget de tokens baixo (>= alerta emitido)
+
+**Sequência problemática**:
+
+```
+1. Agente leu session-briefing.md e extraiu close_key
+   ✅ session-briefing.md exists com ENCERRAR-521D8562
+
+2. Agente analisou Fases A+B com sucesso
+   ✅ 19 bugs corrigidos
+   ✅ Git commit 85e902cf pushed
+   ✅ Shellcheck validação passou
+
+3. Agente iniciou análise Fase C (BUG-76, 77, 78)
+   ✅ grep_search, read_file operações normais
+
+4. **Agente detecta token budget baixo**
+   ⚠️ Heurística interna: "resumir antes de esgotar"
+
+5. **Agente tenta encerrar sessão DIRETAMENTE**
+   ❌ NÃO invocou vscode_askQuestions Template F
+   ❌ NÃO apresentou close_key ao usuário
+   ❌ NÃO recebeu user input confirmando close_key
+   ❌ NÃO executou session-close.sh via post-tool-use.sh
+   ❌ Apenas tentou "limpar conversa" implicitamente
+
+6. **DETECÇÃO DO BUG POR USUÁRIO**
+   🚨 Usuário intercepta e sinaliza: 
+       "Você encerrou a sessão incorretamente (sem vscode e sem a chave correta)"
+```
+
+### 10.2 O Protocolo Correto (Protocolo TODO v9.0)
+
+**Fluxo obrigatório para session closure**:
+
+**Passo 1 — Agent invoca vscode_askQuestions com Template F**:
+```javascript
+vscode_askQuestions({
+  questions: [
+    {
+      header: "session_close",
+      question: "Deseja encerrar a sessão? Digite a chave de encerramento exibida abaixo:",
+      options: [ /* ... */ ],
+      allowFreeformInput: true
+    }
+  ]
+})
+```
+
+**Passo 2 — Template F apresenta close_key ao usuário**:
+```
+🔐 CHAVE DE ENCERRAMENTO DA SESSÃO (obrigatória)
+Copie a chave abaixo e cole-a para confirmar encerramento:
+   ENCERRAR-521D8562
+```
+
+**Passo 3 — Usuário digita a chave no campo livre da Template F**:
+```
+[Campo de resposta]
+ENCERRAR-521D8562    ← usuário digita exatamente isto
+[Enviar]
+```
+
+**Passo 4 — post-tool-use.sh detecta padrão ENCERRAR-***:
+```bash
+# No post-tool-use.sh
+if [[ "$tool_response" =~ ^ENCERRAR-[A-F0-9]{8}$ ]]; then
+    # Extrair chave
+    CLOSE_KEY=$(echo "$tool_response" | grep -o "ENCERRAR-[A-F0-9]*")
+    
+    # Validar contra sessão ativa
+    if [[ "$CLOSE_KEY" == "$(jq -r .session.close_key "$SESSION_CONTEXT")" ]]; then
+        # ✅ Chave válida — prosseguir
+        session-close.sh "$CLOSE_KEY"
+    fi
+fi
+```
+
+**Passo 5 — session-close.sh limpa e encerra**:
+```bash
+# Validações finais
+# Finalização limpa com audit trail
+# Estado salvo corretamente
+```
+
+### 10.3 O que REALMENTE aconteceu (vs. protocolo)
+
+| Etapa                                      | Esperado (Protocolo)                    | Realidade (Bug)                            | Status |
+|--------------------------------------------|-----------------------------------------|-------------------------------------------|--------|
+| **1. Agente decide encerrar**              | ✅ Detecta intenção corretamente        | ✅ Detecta intenção corretamente           | ✅ OK  |
+| **2. Agente invoca vscode_askQuestions**   | ✅ Template F obrigatório               | ❌ NÃO invocado                            | 🔴 BUG |
+| **3. Template F apresenta close_key**      | ✅ Exibido para usuário                | ❌ Não foi apresentado (step 2 pulado)    | 🔴 BUG |
+| **4. Usuário digita chave**                | ✅ Resposta esperada                    | ❌ Não houve resposta (step 3 impossível)  | 🔴 BUG |
+| **5. post-tool-use.sh valida**             | ✅ Detecta ENCERRAR-* pattern           | ❌ Nenhuma vscode_askQuestions para detectar | 🔴 BUG |
+| **6. session-close.sh executa**            | ✅ Fecha sessão com audit trail         | ❌ Nunca executado                         | 🔴 BUG |
+| **Resultado final**                        | ✅ Sessão fechada limpa e segura        | 🔴 Sessão em estado indefinido             | 🔴 BUG |
+
+### 10.4 Raízes Técnicas (Por que o código permitiu isto)
+
+**Raiz 1 — Ausência de guard em agent-stop.sh**:
+```bash
+# Hoje: agent-stop.sh não valida se session closure foi autorizado
+# Deveria: Verificar se SESSION.closure_authorized_at é != null antes de encerrar
+if [[ -z "${CTX.session.closure_authorized_at}" ]]; then
+    echo "ERROR: Session closure foi tentado sem vscode_askQuestions Template F"
+    exit 1
+fi
+```
+
+**Raiz 2 — session-briefing.md criado mas usuário never vê (não verificado)**:
+```bash
+# Hoje: session-start.sh cria briefing com close_key
+# Deveria: Marcar que briefing foi LIDO pelo LLM E APRESENTADO ao usuário
+# Campo faltando: session.briefing_presented_to_user = false (set to true após Template F)
+```
+
+**Raiz 3 — post-tool-use.sh só funciona se vscode_askQuestions foi invocado**:
+```bash
+# post-tool-use.sh aguarda entrada na resposta
+# Mas não há PRÉ-CHECK que vscode_askQuestions foi realmente chamado
+# Deveria: Validar que a ferramenta foi vscode_askQuestions ANTES de processar resposta
+```
+
+**Raiz 4 — Agent autonomy não tem restrição (BUG criado por LOW_TOKEN_BUDGET heuristic)**:
+```bash
+# O agente implementou lógica:
+#   if token_budget_low:
+#       summarize_and_wrap_up()  ← isto é ERRADO
+# 
+# Deveria ser:
+#   if token_budget_low:
+#       emit_token_warning()
+#       wait_for_user_decision()   ← resonsabilidade do usuário, não do agent
+```
+
+### 10.5 Impacto desta Violação
+
+| Aspecto                    | Impacto                                                                          |
+|----------------------------|----------------------------------------------------------------------------------|
+| **Segurança**              | 🔴 CRÍTICO: Session boundary bypass (session nunca foi autorizado encerrar)     |
+| **Auditoria**              | 🔴 CRÍTICO: Audit trail incompleto (session-close.sh nunca executou)           |
+| **Estado de Sessão**       | 🟠 ALTO: session-context.json pode estar em estado inconsistente               |
+| **Confiabilidade**         | 🟠 ALTO: Próxima sessão pode sofrer RECONNECT issues (session anterior pendente)|
+| **Compliance (TODO v9.0)** | 🔴 CRÍTICO: Violação direta do Protocolo TODO v9.0 § Session Closure         |
+
+### 10.6 Plano de Correção (Fase 0 — Hardening Imediato)
+
+**Passo 1: Adicionar guard em agent-stop.sh**
+```bash
+# Verificar se closure foi autorizado ANTES de permitir session end
+# Arquivo: .github/hooks/scripts/agent-stop.sh (linhas ~XXX)
+# Operação: Adicionar check IF closure_authorized_at != null ELSE FAIL
+
+# Status: TODO (escrever)
+```
+
+**Passo 2: Adicionar state tracking em session-briefing.md**
+```bash
+# Marcar sessão como "briefing_presented_to_user=false" até bem depois de Template F
+# Arquivo: .github/hooks/scripts/session-start.sh (linhas ~850-900)
+# Operação: Adicionar campo CTX.session.briefing_presented_to_user
+
+# Status: TODO (escrever)
+```
+
+**Passo 3: Adicionar PRÉ-CHECK em post-tool-use.sh**
+```bash
+# Validar que tool_name == "vscode_askQuestions" antes de processar response
+# Arquivo: .github/hooks/scripts/post-tool-use.sh (linhas ~XXX)
+# Operação: Adicionar IF [[ "$tool_name" == "vscode_askQuestions" ]] ELSE SKIP
+
+# Status: TODO (escrever)
+```
+
+**Passo 4: Atualizar GUIA-HOOKS-COPILOT.md**
+```bash
+# Adicionar seção "Protocol Violations & Consequences" com exemplo deste caso
+# Arquivo: DOCUMENTAÇÃO/HOOKS/GUIA-HOOKS-COPILOT.md
+# Operação: Adicionar exemplo explícito de como NÃO fazer closure
+
+# Status: TODO (escrever)
+```
+
+**Passo 5: Adicionar instruções explícitas em session-briefing.md**
+```bash
+# Adicionar bloco ANTES do close_key informando ao agente:
+# "DO NOT attempt to close this session directly.
+#  MUST invoke `vscode_askQuestions` Template F to properly request closure."
+# Arquivo: .github/hooks/scripts/session-start.sh (geração de briefing)
+# Operação: Adicionar block HTML comment visível apenas para LLM
+
+# Status: TODO (escrever)
+```
+
+### 10.7 Testes de Validação (Pós-Correção)
+
+**Teste 1: Agente não pode encerrar sem Template F**
+```bash
+# Simular: Agent tenta encerrar sem vscode_askQuestions
+# Esperado: agent-stop.sh emite erro, session continua ativa
+# Status: TODO (implementar)
+```
+
+**Teste 2: Template F é obrigatório**
+```bash
+# Simular: Low token budget heuristic ativado
+# Esperado: Agent converte em vscode_askQuestions Template D (checkpoint), NÃO fecha
+# Status: TODO (implementar)
+```
+
+**Teste 3: post-tool-use.sh valida origem de resposta**
+```bash
+# Simular: Outra tool envia resposta contendo "ENCERRAR-*" (false positive)
+# Esperado: Resposta ignorada, session NÃO fecha
+# Status: TODO (implementar)
+```
+
+### 10.8 Documentação Atualizada
+
+- [x] BUG-79 criado nesta seção (session-start.sh, post-tool-use.sh, agent-stop.sh)
+- [ ] Implementar guards (vide Passo 1-5 acima)
+- [ ] Executar testes (vide Testes 1-3 acima)
+- [ ] Marcar como RESOLVIDO após hardening completo
+
+---
+
+**BUG-79 criado e documentado em 2026-03-12T11:30:00Z. Bloqueador para continuação de Fases C+D.**

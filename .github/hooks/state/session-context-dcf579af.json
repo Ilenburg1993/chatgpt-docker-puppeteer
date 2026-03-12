@@ -1,0 +1,156 @@
+{
+  "session": {
+    "id": "dcf579af-502e-4bf2-9d92-75903f85b0a2",
+    "started_at": "2026-03-12T11:01:14Z",
+    "ended_at": null,
+    "end_reason": null,
+    "close_key": "ENCERRAR-112A46D8",
+    "close_key_validated": true,
+    "source": "auto_recovery",
+    "cwd": null
+  },
+  "session_stats": {
+    "turn_count": 2,
+    "turn_authorized": 2,
+    "turn_unauthorized": 0,
+    "tools_total": 552,
+    "tools_by_name": {
+      "replace_string_in_file": 56,
+      "manage_todo_list": 47,
+      "read_file": 221,
+      "run_in_terminal": 149,
+      "vscode_askQuestions": 13,
+      "runSubagent": 1,
+      "multi_replace_string_in_file": 11,
+      "list_dir": 1,
+      "grep_search": 46,
+      "get_terminal_output": 1,
+      "fetch_webpage": 2,
+      "file_search": 2,
+      "memory": 1,
+      "create_file": 1
+    },
+    "failures_detected": 1,
+    "errors_total": 0,
+    "subagent_calls": 0,
+    "section_count": 1,
+    "section_names": [
+      "recovery"
+    ],
+    "section_history": [],
+    "turn_history": [
+      {
+        "number": 1,
+        "section": "recovery",
+        "section_id": null,
+        "turn_id": null,
+        "section_turn": 1,
+        "duration_s": 5841,
+        "tools_count": 180,
+        "intent": null,
+        "auth": true,
+        "failures": 1,
+        "ts": "2026-03-12T12:38:35Z"
+      },
+      {
+        "number": 2,
+        "section": "recovery",
+        "section_id": null,
+        "turn_id": "turn_1773344534_3939",
+        "section_turn": 3,
+        "duration_s": 2088,
+        "tools_count": 75,
+        "intent": null,
+        "auth": true,
+        "failures": 0,
+        "ts": "2026-03-12T20:17:02Z"
+      }
+    ],
+    "push_count": 0,
+    "commit_history": [],
+    "pending_section_after_push": false,
+    "recovery_hints": {
+      "last_intent": null,
+      "last_section": "recovery",
+      "last_commit_sha": null,
+      "last_commit_ts": null
+    },
+    "turns_since_askQuestions": 0
+  },
+  "current_turn": {
+    "number": 3,
+    "started_at": "2026-03-12T20:18:10.848Z",
+    "tools_count": 43,
+    "tools_by_name": {
+      "manage_todo_list": 6,
+      "run_in_terminal": 10,
+      "read_file": 19,
+      "replace_string_in_file": 3,
+      "create_file": 1,
+      "grep_search": 4
+    },
+    "failures_count": 0,
+    "auth_requested": false,
+    "auth_requested_at": null,
+    "last_askquestions_response": null,
+    "section_name": "recovery",
+    "turn_id": "turn_1773346691_21403",
+    "section_turn": 4,
+    "block_count": 0,
+    "intent_declared": false,
+    "intent": null,
+    "todo_created": true,
+    "subagent_delegated": false,
+    "subagent_description": "Review UPG-AUDIT-01 implementation",
+    "agentStop_invocations": 0,
+    "section_id": null
+  },
+  "current_section": {
+    "name": "recovery",
+    "started_at": "2026-03-12T11:01:14Z",
+    "turn_start": 1,
+    "description": "Seção criada por auto-recovery (sessionStart não disparou)",
+    "section_number": 1,
+    "section_id": null,
+    "local_turn": 4,
+    "push_count": 0,
+    "tools_by_name": {
+      "replace_string_in_file": 56,
+      "manage_todo_list": 47,
+      "read_file": 221,
+      "run_in_terminal": 149,
+      "vscode_askQuestions": 13,
+      "runSubagent": 1,
+      "multi_replace_string_in_file": 11,
+      "list_dir": 1,
+      "grep_search": 46,
+      "get_terminal_output": 1,
+      "fetch_webpage": 2,
+      "file_search": 2,
+      "memory": 1,
+      "create_file": 1
+    },
+    "intent_history": [],
+    "failures_count": 0,
+    "blocked_turns": 0
+  },
+  "last_tool": {
+    "name": "run_in_terminal",
+    "ts": "2026-03-12T20:31:10.349Z",
+    "use_id": "toolu_vrtx_01MGQhPfcbKtoVz29oxe5dGs__vscode-1773344151020",
+    "result": null
+  },
+  "compliance": {
+    "last_turn_authorized": true,
+    "consecutive_unauthorized": 0,
+    "flag_file_exists": false
+  },
+  "quality_gates": {
+    "gate_format": {
+      "timestamp": "2026-03-12T12:29:35.632Z",
+      "result": "success"
+    }
+  },
+  "last_turn_ts": "2026-03-12T20:17:02Z",
+  "session_summary": "turn=2 dur=2088s tools=75"
+}
