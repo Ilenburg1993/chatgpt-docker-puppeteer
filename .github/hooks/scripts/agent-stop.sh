@@ -58,6 +58,76 @@ if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
+# ── Nível 3: MANDATE — Forçar vscode_askQuestions Template F Antes de Agent Stop ──
+# Objetivo: Agent NUNCA pode terminar sem que Template F (Session Close) tenha sido
+# invocado + close_key foi validado + usuário digitou a chave.
+#
+# Implicação: session.close_key_validated DEVE estar true ANTES de agent-stop.sh permitir
+# que o agente encerre seu execução. Se close_key_validated=false, BLOQUEAMOS com decision:block.
+#
+# Exceção: stop_hook_active=true (hook iniciou parada, não agente) — não bloqueamos nestes casos
+# pois o hook já passou por validação anterior.
+if [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
+    _N3_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+    _N3_CLOSE_KEY="$(jq -r '.session.close_key // "N/A"' "$CTX_FILE" 2> /dev/null || echo 'N/A')"
+    _N3_RECOVERY_CLOSE_MODE="$(jq -r '.recovery.close_mode // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    
+    # Condição: Se session está ativa (não foi encerrada por usuário), NÃO permitir agent-stop
+    # sem validação de close_key. MAS: Se recovery.close_mode="abrupt_no_key" (anomalia prev),
+    # e ainda estamos aguardando Template E+, talvez seja recuperação — permitir bypass.
+    _N3_ALLOW_UNSAFE_CLOSE="false"
+    if [ "$_N3_RECOVERY_CLOSE_MODE" = "abrupt_no_key" ]; then
+        # Anomalia detectada — verificar se Template E+ foi invocado (recovery_acknowledged)
+        _N3_RECOVERY_ACKNOWLEDGED="$(jq -r '.recovery.recovery_acknowledged // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+        if [ "$_N3_RECOVERY_ACKNOWLEDGED" = "true" ]; then
+            # Usuário viu a anomalia + confirmou (Template E+) — permitir close "seguro"
+            _N3_ALLOW_UNSAFE_CLOSE="true"
+        fi
+    fi
+    
+    # Guard principal: close_key_validated=false E não estamos em modo de recovery confirmada
+    if [ "$_N3_CLOSE_VALIDATED" != "true" ] && [ "$_N3_ALLOW_UNSAFE_CLOSE" != "true" ]; then
+        # Bloqueia agent-stop com decision:block
+        echo "[BLOCK] Agent-stop bloqueado: Nível 3 (MANDATE) — close_key_validated=false" >&2
+        
+        # Log da violação
+        jq -cn \
+            --arg event "agentStop_blocked_close_key_required" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')" \
+            --arg key "$_N3_CLOSE_KEY" \
+            '{
+                event:      $event,
+                session_id: $sid,
+                timestamp:  $ts,
+                close_key:  $key,
+                severity:   "CRITICAL",
+                message:    "Agent-stop foi bloqueado (Nível 3) — Session close_key_validated=false. Agente deve invocar Template F."
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+        
+        # Emite decision:block para parar o agente
+        jq -cn \
+            --arg key "$_N3_CLOSE_KEY" \
+            '{
+                decision: "block",
+                decisionReason: "Session closure authorization required",
+                systemMessage: (
+                    "🛑 AGENT-STOP BLOQUEADO (Nível 3 — MANDATE):\n\n" +
+                    "Sua execução foi bloqueada — você DEVE invocar vscode_askQuestions Template F " +
+                    "(Session Close) ANTES de poder encerrar esta SESSION.\n\n" +
+                    "Protocolo:\n" +
+                    "  (1) Chame vscode_askQuestions com Template F\n" +
+                    "  (2) Template exibirá a close_key: " + $key + "\n" +
+                    "  (3) Digite ENCERRAR-" + $key + " no campo de resposta\n" +
+                    "  (4) post-tool-use.sh detectará a KEY e executará session-close.sh automaticamente\n" +
+                    "  (5) Sessão encerrará com segurança\n\n" +
+                    "Se NÃO quer encerrar: simplesmente não invoque Template F — continue trabalhando."
+                )
+            }'
+        exit 0
+    fi
+fi
+
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
 # HARDENING v5: previne contaminação cruzada entre sessões.
 # F0.3: detecta contexto vazio (sessionStart não disparou ou state foi limpo)

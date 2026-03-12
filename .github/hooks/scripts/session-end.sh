@@ -220,6 +220,120 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
+# ── Nível 4: VALIDATE — Auditar Estado de Encerramento (Session Lifecycle Hardening) ──
+# Objetivo: Detectar quando session está encerrando de forma não autorizada + registrar anomalia
+# para recovery na próxima sessão.
+#
+# Lógica: Se REASON != "complete" (abort/error/timeout/user_exit) E close_key_validated=false,
+# isso indica que SESSION foi encerrada de forma NÃO AUTORIZADA via protocolo TODO v9.0.
+# Registrar como anomalia para que session-start.sh da próxima sessão execute recovery.
+#
+# Casos legítimos:
+#   - reason="complete" + close_key_validated=true → Normal (sessão completou + user autorizou close)
+#   - reason="complete" + close_key_validated=false → Possível (user completou sem formal close)
+#   - reason="abort" + close_key_validated=true → Normal (user forçou close via Template F)
+#   - reason="abort" + close_key_validated=false → ANOMALIA (user abortou sem Template F)
+#   - reason="timeout" + close_key_validated=* → ANOMALIA (session timeout — não autorizado)
+#   - reason="error" + close_key_validated=false → ANOMALIA (session error sem autorização)
+if [ -f "$CTX_FILE" ]; then
+    _N4_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+    _N4_CLOSE_MODE="$REASON"  # Usa REASON como base para determinar close_mode
+    _N4_DETECTED_ANOMALY=false
+    _N4_ANOMALY_TYPE=""
+    
+    case "$REASON" in
+        complete)
+            # Normal completion
+            if [ "$_N4_CLOSE_VALIDATED" = "true" ]; then
+                _N4_CLOSE_MODE="ok"  # Session properly closed with authorization
+            else
+                # Completion sem formal close_key validation — permissível mas não ideal
+                _N4_CLOSE_MODE="complete_no_formality"
+            fi
+            ;;
+        abort)
+            # User abortou — verificar autorização
+            if [ "$_N4_CLOSE_VALIDATED" != "true" ]; then
+                _N4_DETECTED_ANOMALY=true
+                _N4_ANOMALY_TYPE="abrupt_abort_no_auth"
+                _N4_CLOSE_MODE="abrupt_abort_no_auth"
+            else
+                _N4_CLOSE_MODE="abrupt_abort_authorized"
+            fi
+            ;;
+        timeout)
+            # Session timeout — NUNCA deve ser autorizado formalmente (não há tempo)
+            _N4_DETECTED_ANOMALY=true
+            _N4_ANOMALY_TYPE="timeout_session_boundary"
+            _N4_CLOSE_MODE="timeout"
+            ;;
+        error)
+            # Session error — anomalia se não autorizado
+            if [ "$_N4_CLOSE_VALIDATED" != "true" ]; then
+                _N4_DETECTED_ANOMALY=true
+                _N4_ANOMALY_TYPE="abrupt_error_no_auth"
+                _N4_CLOSE_MODE="abrupt_error_no_auth"
+            else
+                _N4_CLOSE_MODE="error_authorized"
+            fi
+            ;;
+        user_exit | *)
+            # User forced exit — anomalia se não validado
+            if [ "$_N4_CLOSE_VALIDATED" != "true" ]; then
+                _N4_DETECTED_ANOMALY=true
+                _N4_ANOMALY_TYPE="abrupt_user_exit_no_auth"
+                _N4_CLOSE_MODE="abrupt_user_exit_no_auth"
+            else
+                _N4_CLOSE_MODE="user_exit_authorized"
+            fi
+            ;;
+    esac
+    
+    # Registra close_mode no CTX para próxima sessão recovery
+    jq --arg close_mode "$_N4_CLOSE_MODE" \
+        '.session.close_mode = $close_mode' \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    
+    # Se anomalia detectada, loga CRÍTICA
+    if [ "$_N4_DETECTED_ANOMALY" = "true" ]; then
+        jq -cn \
+            --arg event "sessionEnd_unauthorized_termination_detected" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$NOW_MS" \
+            --arg reason "$REASON" \
+            --arg close_mode "$_N4_CLOSE_MODE" \
+            --arg anomaly_type "$_N4_ANOMALY_TYPE" \
+            --arg close_validated "$_N4_CLOSE_VALIDATED" \
+            '{
+                event:              $event,
+                session_id:         $sid,
+                timestamp:          $ts,
+                reason:             $reason,
+                close_mode:         $close_mode,
+                anomaly_type:       $anomaly_type,
+                close_key_validated: $close_validated,
+                severity:           "CRITICAL",
+                message:            ("Session encerrada de forma não autorizada: " + $anomaly_type + " — recovery necessária na próxima sessão")
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+    else
+        # Closes normais/esperados — log informativo
+        jq -cn \
+            --arg event "sessionEnd_validated" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$NOW_MS" \
+            --arg close_mode "$_N4_CLOSE_MODE" \
+            --arg reason "$REASON" \
+            '{
+                event:      $event,
+                session_id: $sid,
+                timestamp:  $ts,
+                reason:     $reason,
+                close_mode: $close_mode,
+                message:    ("Session encerrada normalmente com close_mode: " + $close_mode)
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+    fi
+fi
+
 # Append em audit.jsonl — evento de encerramento
 jq -cn \
     --arg event "sessionEnd" \

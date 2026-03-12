@@ -519,6 +519,93 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
     fi
 fi
 
+# ── Nível 2: ENFORCE — Git Push Guard (Session Closure Hardening) ──────────
+# Objetivo: Bloquear `git push` (ou similar ações terminais) sem Template F prévio
+# com close_key validado. Isso evita que o agente encerre a sessão sem autorização.
+#
+# Contexto: Um `git push` frequentemente precede session closure. Se o agente
+# tentar pushear SEM ter invocado Template F com close_key válido, bloqueamos.
+#
+# Lógica:
+#   1. Detecta se TOOL_NAME="run_in_terminal" e comando contém "git push"
+#   2. Verifica CTX para last_tool_name (foi vscode_askQuestions Template F?)
+#   3. Verifica se close_key_validated=true (usuário confirmou?)
+#   4. Se ambas falham, NEGA a ferramenta com mensagem explicativa
+#
+# Exceção: Se close_key_validated=true, o git push é permitido (fechamento
+# autorizado — permitir agente terminar trabalho e encerrar session com segurança)
+if [ "$TOOL_NAME" = "run_in_terminal" ] && [ -f "$CTX_FILE" ]; then
+    _N2_CMD="$(echo "$INPUT" | jq -r '.tool_input.command // ""' 2> /dev/null || echo '')"
+    
+    # Detecta padrões de git push (variações comuns)
+    if echo "$_N2_CMD" | grep -qE '^\s*git\s+(push|force-push|rebase)\b'; then
+        # Verifica se close_key foi validado PELA SESSÃO ATUAL
+        _N2_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+        _N2_CLOSE_KEY="$(jq -r '.session.close_key // "N/A"' "$CTX_FILE" 2> /dev/null || echo 'N/A')"
+        _N2_LAST_TOOL="$(jq -r '.current_turn.last_tool_name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        _N2_LAST_ASK_RESPONSE="$(jq -r '.current_turn.last_askquestions_response // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        
+        # Guard Nível 2: Permite git push APENAS se:
+        #   - close_key_validated=true (usuário confirmou chave), OU
+        #   - Estamos em modo "finalizar com segurança" (recovery.final_push_allowed)
+        _N2_FINAL_PUSH_ALLOWED="$(jq -r '.recovery.final_push_allowed // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+        
+        if [ "$_N2_CLOSE_VALIDATED" != "true" ] && [ "$_N2_FINAL_PUSH_ALLOWED" != "true" ]; then
+            # Bloqueia o git push e explica o protocolo
+            jq -cn \
+                --arg event "gitPush_blocked_no_closekey" \
+                --arg sid "$SESSION_ID" \
+                --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+                --arg cmd "$_N2_CMD" \
+                --arg tool "$TOOL_NAME" \
+                '{
+                    event:      $event,
+                    session_id: $sid,
+                    timestamp:  $ts,
+                    tool:       $tool,
+                    command:    $cmd,
+                    message:    "Git push bloqueado: close_key_validated=false — SESSION ainda não autorizada para encerramento"
+                }' >> "$AUDIT_FILE" 2> /dev/null || true
+            
+            # Emite permissionDecision:deny com contexto educativo
+            jq -cn \
+                --arg key "$_N2_CLOSE_KEY" \
+                '{
+                    permissionDecision: "deny",
+                    additionalContext: (
+                        "🚫 Git Push Bloqueado (Nível 2 — ENFORCE):\n\n" +
+                        "Uma ação de `git push` foi requisitada, MAS esta SESSION ainda não foi AUTORIZADA para encerramento.\n\n" +
+                        "Se você está pronto para ENCERRAR esta SESSION:\n" +
+                        "  (1) Invoque vscode_askQuestions com Template F (Session Close)\n" +
+                        "  (2) Template F exibirá a close_key: " + $key + "\n" +
+                        "  (3) Digite a chave no campo de resposta\n" +
+                        "  (4) Após confirmação, git push será permitido + SESSION encerrará\n\n" +
+                        "Se NÃO quer encerrar ainda:\n" +
+                        "  - Cancele o git push\n" +
+                        "  - Continuar trabalhando normalmente\n" +
+                        "  - SESSION permanecerá ativa para próximas tarefas"
+                    )
+                }'
+            exit 0
+        fi
+        
+        # Else: git push permitido (close_key_validated=true ou final_push_allowed=true)
+        # Log informativo apenas
+        jq -cn \
+            --arg event "gitPush_allowed_authorized" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+            --arg cmd "$_N2_CMD" \
+            '{
+                event:      $event,
+                session_id: $sid,
+                timestamp:  $ts,
+                command:    $cmd,
+                message:    "Git push permitido — close_key havia sido validado"
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+    fi
+fi
+
 # NÃO emite JSON de decision — autonomia total do agente.
 # Exit 0 garante que o agente nunca é bloqueado por este hook.
 exit 0
