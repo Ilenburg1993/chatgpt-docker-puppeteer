@@ -300,7 +300,7 @@ if [ -f "$CTX_FILE" ]; then
             echo "  Closure_authorized_at: (empty/missing)" >&2
             echo "  Protocolo violado: encerramento SEM Template F + close_key validation" >&2
             echo "  Requerido: vscode_askQuestions Template F com resposta contendo close_key" >&2
-            
+
             # Log violation event
             jq -cn \
                 --arg sid "$SESSION_ID" \
@@ -315,7 +315,7 @@ if [ -f "$CTX_FILE" ]; then
                     bug:        "BUG-79",
                     message:    "Tentativa de encerrar sessão sem autorização via vscode_askQuestions Template F"
                 }' >> "$AUDIT_FILE"
-            
+
             # Cria flag de violação para rastreamento na próxima sessão
             jq -cn \
                 --arg sid "$SESSION_ID" \
@@ -327,7 +327,7 @@ if [ -f "$CTX_FILE" ]; then
                     requires_investigation: true,
                     bug_reference:     "BUG-79"
                 }' > "$STATE_DIR/SESSION_CLOSE_VIOLATION.flag"
-            
+
             # BLOQUEADOR: Falha com exit code 1
             exit 1
         fi

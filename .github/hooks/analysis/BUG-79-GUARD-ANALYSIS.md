@@ -100,11 +100,11 @@ if [[ "${CTX.session.closure_authorized_at:-}" == "" ]]; then
     # Opções:
     # 1. Se agent está tentando fechar: BLOQUEAR e emitir erro
     # 2. Se agent está apenas terminando turno: permitir (normal)
-    
+
     # Como saber a diferença?
     # - Turno normal: último ato foi vscode_askQuestions (sem Template F)
     # - Closure attempt: agente tenta terminar conversation sem vscode_askQuestions
-    
+
     if [[ "$(jq -r '.session.ended_at // ""' "$CTX_FILE")" != "" ]]; then
         # Session já marcada como ended — closure sem autorização!
         echo "ERROR: Session closure sem autorização" >&2
@@ -130,7 +130,7 @@ fi
 if [ -n "$CURRENT_CLOSE_KEY" ] && echo "$TOOL_RESPONSE" | grep -qF "$CURRENT_CLOSE_KEY"; then
     # ❌ BUG: Não verifica que TOOL_NAME == "vscode_askQuestions"
     # Qualquer tool que enviar a chave triggeraria session-close.sh
-    
+
     # Deveria ser:
     if [ "$TOOL_NAME" != "vscode_askQuestions" ]; then
         # Log suspeito: chave detectada fora do contexto legítimo
@@ -362,14 +362,14 @@ Você DEVE seguir o Protocolo TODO v9.0 para encerramento:
 
 ## 6. Mapa de Implementação
 
-| Guard              | Arquivo                           | Tipo           | Complexidade | Bloqueador |
-|--------------------|-----------------------------------|----------------|--------------|-----------|
-| **GUARD-A**        | `agent-stop.sh`                   | PRÉ-CHECK      | Baixa        | 🟢         |
-| **GUARD-B**        | `pre-tool-use.sh`                 | AVISO          | Baixa        | 🟢         |
-| **GUARD-C**        | `post-tool-use.sh`                | LOG            | Baixa        | 🟢         |
-| **GUARD-D**        | `session-start.sh` (briefing)     | DOCUMENTAÇÃO   | Baixa        | 🟢         |
-| **Guard E** (STATE)| `session-context.json` schema     | NOVO CAMPO     | Média        | 🟡         |
-| **Raiz 2** (AUDIT) | `GUIA-HOOKS-COPILOT.md`           | DOCUMENTAÇÃO   | Baixa        | 🟢         |
+| Guard               | Arquivo                       | Tipo         | Complexidade | Bloqueador |
+| ------------------- | ----------------------------- | ------------ | ------------ | ---------- |
+| **GUARD-A**         | `agent-stop.sh`               | PRÉ-CHECK    | Baixa        | 🟢          |
+| **GUARD-B**         | `pre-tool-use.sh`             | AVISO        | Baixa        | 🟢          |
+| **GUARD-C**         | `post-tool-use.sh`            | LOG          | Baixa        | 🟢          |
+| **GUARD-D**         | `session-start.sh` (briefing) | DOCUMENTAÇÃO | Baixa        | 🟢          |
+| **Guard E** (STATE) | `session-context.json` schema | NOVO CAMPO   | Média        | 🟡          |
+| **Raiz 2** (AUDIT)  | `GUIA-HOOKS-COPILOT.md`       | DOCUMENTAÇÃO | Baixa        | 🟢          |
 
 ---
 

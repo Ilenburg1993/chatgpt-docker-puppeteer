@@ -2799,8 +2799,8 @@ Esses campos persistem indevidamente, distorcendo métricas e triggers da nova s
 
 ### Resumo da Seção 9.2
 
-| ID     | Descrição curta                                                 | Severidade | Grupo    |
-|--------|-----------------------------------------------------------------|------------|----------|
+| ID     | Descrição curta                                                | Severidade | Grupo    |
+| ------ | -------------------------------------------------------------- | ---------- | -------- |
 | BUG-49 | sessionStart timeout 15s → insuficiente (script 54KB)          | ALTA       | Timeout  |
 | BUG-50 | agentStop timeout 10s → insuficiente (lógica de bloqueio)      | ALTA       | Timeout  |
 | BUG-51 | userPromptSubmitted timeout 10s → insuficiente                 | MÉDIA      | Timeout  |
@@ -2808,8 +2808,8 @@ Esses campos persistem indevidamente, distorcendo métricas e triggers da nova s
 | BUG-53 | postToolUse timeout 15s → abaixo do default oficial 30s        | MÉDIA      | Timeout  |
 | BUG-54 | Hooks auxiliares todos a 10s (abaixo do default 30s)           | BAIXA      | Timeout  |
 | BUG-55 | postToolUseFailure: hook não oficial → script é código morto   | ALTA       | Schema   |
-| BUG-56 | subagentStart: não está nos docs oficiais                       | MÉDIA      | Schema   |
-| BUG-57 | preCompact: não está nos docs públicos oficiais                 | BAIXA      | Schema   |
+| BUG-56 | subagentStart: não está nos docs oficiais                      | MÉDIA      | Schema   |
+| BUG-57 | preCompact: não está nos docs públicos oficiais                | BAIXA      | Schema   |
 | BUG-58 | session_id: não está nos schemas oficiais (ext. empírica)      | INFO       | Schema   |
 | BUG-59 | agent-stop.sh: `date -d` sem fallback BSD (TURN_START_S)       | ALTA       | Portab.  |
 | BUG-60 | session-end.sh: `date -d` sem fallback BSD (2 chamadas)        | ALTA       | Portab.  |
@@ -2824,7 +2824,7 @@ Esses campos persistem indevidamente, distorcendo métricas e triggers da nova s
 | BUG-69 | error-occurred.sh: AUDIT_FILE só em bloco per-session          | MÉDIA      | Métricas |
 | BUG-70 | generate-daily-report.sh: sem merge de metrics per-session     | BAIXA      | Métricas |
 | BUG-71 | iso_to_epoch() duplicada; ausente de common.sh                 | BAIXA      | Código   |
-| BUG-72 | on-git-push.sh: `elif $# -ge 4` é código morto                | BAIXA      | Código   |
+| BUG-72 | on-git-push.sh: `elif $# -ge 4` é código morto                 | BAIXA      | Código   |
 | BUG-73 | inline_restart não reseta pending_section_after_push           | ALTA       | Lógica   |
 | BUG-74 | log-prompt.sh: novo close_key sem regenerar session-briefing   | MÉDIA      | Lógica   |
 | BUG-75 | pre-tool-use.sh: close_key herdada de briefing de sessão ant.  | MÉDIA      | Lógica   |
@@ -2879,7 +2879,7 @@ Nenhuma correção deve ser aplicada antes de aprovação via `vscode_askQuestio
 
 ### 10.1 O que aconteceu (Sequência de Eventos)
 
-**Contexto**: 
+**Contexto**:
 - Sessão ativa: `cd593a12-4938-4ba9-bef7-0b20b72d6b4f`
 - Close_key gerado por `session-start.sh`: `ENCERRAR-521D8562`
 - Session-briefing.md criado corretamente (contém close_key visível)
@@ -2911,7 +2911,7 @@ Nenhuma correção deve ser aplicada antes de aprovação via `vscode_askQuestio
    ❌ Apenas tentou "limpar conversa" implicitamente
 
 6. **DETECÇÃO DO BUG POR USUÁRIO**
-   🚨 Usuário intercepta e sinaliza: 
+   🚨 Usuário intercepta e sinaliza:
        "Você encerrou a sessão incorretamente (sem vscode e sem a chave correta)"
 ```
 
@@ -2953,7 +2953,7 @@ ENCERRAR-521D8562    ← usuário digita exatamente isto
 if [[ "$tool_response" =~ ^ENCERRAR-[A-F0-9]{8}$ ]]; then
     # Extrair chave
     CLOSE_KEY=$(echo "$tool_response" | grep -o "ENCERRAR-[A-F0-9]*")
-    
+
     # Validar contra sessão ativa
     if [[ "$CLOSE_KEY" == "$(jq -r .session.close_key "$SESSION_CONTEXT")" ]]; then
         # ✅ Chave válida — prosseguir
@@ -2971,15 +2971,15 @@ fi
 
 ### 10.3 O que REALMENTE aconteceu (vs. protocolo)
 
-| Etapa                                      | Esperado (Protocolo)                    | Realidade (Bug)                            | Status |
-|--------------------------------------------|-----------------------------------------|-------------------------------------------|--------|
-| **1. Agente decide encerrar**              | ✅ Detecta intenção corretamente        | ✅ Detecta intenção corretamente           | ✅ OK  |
-| **2. Agente invoca vscode_askQuestions**   | ✅ Template F obrigatório               | ❌ NÃO invocado                            | 🔴 BUG |
-| **3. Template F apresenta close_key**      | ✅ Exibido para usuário                | ❌ Não foi apresentado (step 2 pulado)    | 🔴 BUG |
-| **4. Usuário digita chave**                | ✅ Resposta esperada                    | ❌ Não houve resposta (step 3 impossível)  | 🔴 BUG |
-| **5. post-tool-use.sh valida**             | ✅ Detecta ENCERRAR-* pattern           | ❌ Nenhuma vscode_askQuestions para detectar | 🔴 BUG |
-| **6. session-close.sh executa**            | ✅ Fecha sessão com audit trail         | ❌ Nunca executado                         | 🔴 BUG |
-| **Resultado final**                        | ✅ Sessão fechada limpa e segura        | 🔴 Sessão em estado indefinido             | 🔴 BUG |
+| Etapa                                    | Esperado (Protocolo)            | Realidade (Bug)                             | Status |
+| ---------------------------------------- | ------------------------------- | ------------------------------------------- | ------ |
+| **1. Agente decide encerrar**            | ✅ Detecta intenção corretamente | ✅ Detecta intenção corretamente             | ✅ OK   |
+| **2. Agente invoca vscode_askQuestions** | ✅ Template F obrigatório        | ❌ NÃO invocado                              | 🔴 BUG  |
+| **3. Template F apresenta close_key**    | ✅ Exibido para usuário          | ❌ Não foi apresentado (step 2 pulado)       | 🔴 BUG  |
+| **4. Usuário digita chave**              | ✅ Resposta esperada             | ❌ Não houve resposta (step 3 impossível)    | 🔴 BUG  |
+| **5. post-tool-use.sh valida**           | ✅ Detecta ENCERRAR-* pattern    | ❌ Nenhuma vscode_askQuestions para detectar | 🔴 BUG  |
+| **6. session-close.sh executa**          | ✅ Fecha sessão com audit trail  | ❌ Nunca executado                           | 🔴 BUG  |
+| **Resultado final**                      | ✅ Sessão fechada limpa e segura | 🔴 Sessão em estado indefinido               | 🔴 BUG  |
 
 ### 10.4 Raízes Técnicas (Por que o código permitiu isto)
 
@@ -3012,7 +3012,7 @@ fi
 # O agente implementou lógica:
 #   if token_budget_low:
 #       summarize_and_wrap_up()  ← isto é ERRADO
-# 
+#
 # Deveria ser:
 #   if token_budget_low:
 #       emit_token_warning()
@@ -3021,13 +3021,13 @@ fi
 
 ### 10.5 Impacto desta Violação
 
-| Aspecto                    | Impacto                                                                          |
-|----------------------------|----------------------------------------------------------------------------------|
-| **Segurança**              | 🔴 CRÍTICO: Session boundary bypass (session nunca foi autorizado encerrar)     |
-| **Auditoria**              | 🔴 CRÍTICO: Audit trail incompleto (session-close.sh nunca executou)           |
-| **Estado de Sessão**       | 🟠 ALTO: session-context.json pode estar em estado inconsistente               |
-| **Confiabilidade**         | 🟠 ALTO: Próxima sessão pode sofrer RECONNECT issues (session anterior pendente)|
-| **Compliance (TODO v9.0)** | 🔴 CRÍTICO: Violação direta do Protocolo TODO v9.0 § Session Closure         |
+| Aspecto                    | Impacto                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| **Segurança**              | 🔴 CRÍTICO: Session boundary bypass (session nunca foi autorizado encerrar)      |
+| **Auditoria**              | 🔴 CRÍTICO: Audit trail incompleto (session-close.sh nunca executou)             |
+| **Estado de Sessão**       | 🟠 ALTO: session-context.json pode estar em estado inconsistente                 |
+| **Confiabilidade**         | 🟠 ALTO: Próxima sessão pode sofrer RECONNECT issues (session anterior pendente) |
+| **Compliance (TODO v9.0)** | 🔴 CRÍTICO: Violação direta do Protocolo TODO v9.0 § Session Closure             |
 
 ### 10.6 Plano de Correção (Fase 0 — Hardening Imediato)
 

@@ -256,42 +256,67 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         # Atualiza contexto com resposta e, se necessário, valida a close_key
         # REV4-06: setar auth_requested=true aqui também (defesa em profundidade — garante
         # que mesmo se preToolUse perdeu a janela, postToolUse confirma a autorização)
+        # BUG-80 FIX v1: Validar close_key ANTES de setar close_key_validated flag
+        # (evita false positive quando KEY é inválida mas flag é setada prematuramente)
         if [ "$KEY_FOUND" = "true" ]; then
             # Guard de idempotência: verifica se close_key_validated já está true
             # para evitar duplo sessionCloseAuthorized quando o usuário digita a key mais de uma vez.
             _ALREADY_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+
+            # Atualiza apenas auth_requested (sem setar close_key_validated ainda!)
             jq --arg result "$RESULT_TYPE" \
                 --arg response "$RESPONSE_STR" \
                 --arg ts "$TIMESTAMP" \
                 '.last_tool.result = $result
                  | .current_turn.last_askquestions_response = $response
                  | .current_turn.auth_requested = true
-                 | .current_turn.auth_requested_at = $ts
-                 | .session.close_key_validated = true' \
+                 | .current_turn.auth_requested_at = $ts' \
                 "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 
             if [ "$_ALREADY_VALIDATED" != "true" ]; then
-                # Log do evento de validação da chave (apenas 1x)
-                jq -cn \
-                    --arg sid "$SESSION_ID" \
-                    --arg ts "$TIMESTAMP" \
-                    --arg key "$CURRENT_CLOSE_KEY" \
-                    '{
-                        event:      "sessionClose_key_validated",
-                        session_id: $sid,
-                        timestamp:  $ts,
-                        close_key:  $key
-                    }' >> "$AUDIT_FILE"
-
-                # Auto-encerramento: chama session-close.sh para garantir que sessionCloseAuthorized
-                # seja registrado mesmo que o agente esqueça de chamar o script manualmente.
-                # Esta é a defesa-em-profundidade: Template F → KEY detectada → encerramento automático.
+                # Auto-encerramento: chama session-close.sh para VALIDAR close_key
+                # e setar close_key_validated=true (session-close.sh faz isso internamente)
+                # Esta é a defesa-em-profundidade: Template F → KEY detectada → validação → encerramento automático.
                 _SESSION_CLOSE_SCRIPT="$HOOK_DIR/scripts/session-close.sh"
+                _CLOSE_EXIT_CODE=0
                 if [ -f "$_SESSION_CLOSE_SCRIPT" ] && [ -x "$_SESSION_CLOSE_SCRIPT" ]; then
                     # BUG-24 fix: libera flock fd 9 antes de chamar session-close.sh
                     # (session-close.sh também tenta flock fd 9 no mesmo lock file — deadlock sem esta linha)
                     exec 9>&-
-                    bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" > /dev/null 2>&1 || true
+                    bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" > /dev/null 2>&1 || _CLOSE_EXIT_CODE=$?
+
+                    if [ $_CLOSE_EXIT_CODE -eq 0 ]; then
+                        # SUCCESS: session-close.sh validou KEY e setou close_key_validated=true
+                        # Confirmar no audit (log informativo apenas — session-close.sh já fez tudo)
+                        jq -cn \
+                            --arg sid "$SESSION_ID" \
+                            --arg ts "$TIMESTAMP" \
+                            --arg key "$CURRENT_CLOSE_KEY" \
+                            '{
+                                event:      "sessionClose_key_validated_confirmed",
+                                session_id: $sid,
+                                timestamp:  $ts,
+                                close_key:  $key,
+                                message:    "session-close.sh validou KEY com sucesso — close_key_validated ja esta true no contexto"
+                            }' >> "$AUDIT_FILE"
+                    else
+                        # FAILURE: session-close.sh rejetou KEY (exit code != 0)
+                        # Manter close_key_validated = false (nunca foi alterado do padrão)
+                        # Log da falha para auditoria
+                        jq -cn \
+                            --arg sid "$SESSION_ID" \
+                            --arg ts "$TIMESTAMP" \
+                            --arg key "$CURRENT_CLOSE_KEY" \
+                            --arg exit_code "$_CLOSE_EXIT_CODE" \
+                            '{
+                                event:      "sessionClose_key_validation_failed",
+                                session_id: $sid,
+                                timestamp:  $ts,
+                                close_key:  $key,
+                                session_close_exit_code: $exit_code,
+                                message:    "session-close.sh rejeitou KEY — close_key_validated permanece false"
+                            }' >> "$AUDIT_FILE"
+                    fi
                 fi
             else
                 # Chave já validada: log informativo sem chamar session-close.sh novamente
