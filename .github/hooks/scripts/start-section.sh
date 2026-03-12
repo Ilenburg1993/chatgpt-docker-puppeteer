@@ -146,13 +146,15 @@ if [ -n "$SECTION_DESC" ]; then
     _JQ_FILTER='.current_section = {name: $name, section_id: $section_id, started_at: $ts, turn_start: $turn, local_turn: 0, description: $desc, section_number: $section_num, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
                 | .session_stats.section_count = $section_num
                 | .session_stats.section_names += [$name]
-                | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: $name, section_id: $section_id, section_number: $section_num, started_at: $ts}] | if length > $cap then .[-($cap):] else . end)'
+                | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: $name, section_id: $section_id, section_number: $section_num, started_at: $ts}] | if length > $cap then .[-($cap):] else . end)
+                | .current_turn.section_turn = 0'
 else
     # shellcheck disable=SC2016
     _JQ_FILTER='.current_section = {name: $name, section_id: $section_id, started_at: $ts, turn_start: $turn, local_turn: 0, description: null, section_number: $section_num, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
                 | .session_stats.section_count = $section_num
                 | .session_stats.section_names += [$name]
-                | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: $name, section_id: $section_id, section_number: $section_num, started_at: $ts}] | if length > $cap then .[-($cap):] else . end)'
+                | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: $name, section_id: $section_id, section_number: $section_num, started_at: $ts}] | if length > $cap then .[-($cap):] else . end)
+                | .current_turn.section_turn = 0'
 fi
 
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then

@@ -1,9 +1,8 @@
 # Arquitetura Completa — Sistema de Hooks do Copilot
 
-**Versão**: 7.0 — Hardening Estrutural com `decision:block`
-**Data**: 2026-03-10
-**Fonte**: Documentação oficial VS Code + implementação local auditada
-**Status**: Documento canônico de referência para o sistema de hooks
+**Versão**: 8.0 — Ciclo Completo de Correções (24+ itens implementados) **Data**: 2026-03-12
+**Fonte**: Documentação oficial VS Code + implementação local auditada **Status**: Documento
+canônico de referência para o sistema de hooks
 
 ---
 
@@ -27,16 +26,21 @@
 
 ## 1. Por que hooks existem
 
-O sistema de hooks do VS Code Copilot permite executar **comandos determinísticos** em pontos específicos do ciclo de vida do agente. Ao contrário de instruções ou prompts personalizados (que apenas "guiam" o comportamento), **hooks executam código real com resultado garantido**.
+O sistema de hooks do VS Code Copilot permite executar **comandos determinísticos** em pontos
+específicos do ciclo de vida do agente. Ao contrário de instruções ou prompts personalizados (que
+apenas "guiam" o comportamento), **hooks executam código real com resultado garantido**.
 
 Casos de uso oficialmente suportados:
+
 - **Segurança**: bloquear comandos destrutivos antes que executem
 - **Qualidade de código**: rodar formatters/linters automaticamente
 - **Rastreamento**: criar trilhas de auditoria de cada ferramenta
 - **Injeção de contexto**: adicionar informações ao agente
-- **Controle de aprovação**: aprovar automaticamente operações seguras, exigir confirmação para sensíveis
+- **Controle de aprovação**: aprovar automaticamente operações seguras, exigir confirmação para
+  sensíveis
 
 No nosso caso, usamos hooks para:
+
 - Rastrear o ciclo de vida SESSION→SECTION→TURN
 - **Bloquear** (v7.0) o agente de encerrar turnos sem chamar `vscode_askQuestions`
 - Detectar e validar a chave de encerramento de SESSION
@@ -46,7 +50,9 @@ No nosso caso, usamos hooks para:
 
 ## 2. API oficial do VS Code Copilot Hooks
 
-> Fonte: [code.visualstudio.com/docs/copilot/customization/hooks](https://code.visualstudio.com/docs/copilot/customization/hooks) (acesso: 2026-03-10)
+> Fonte:
+> [code.visualstudio.com/docs/copilot/customization/hooks](https://code.visualstudio.com/docs/copilot/customization/hooks)
+> (acesso: 2026-03-10)
 
 ### 2.1 Os 8 eventos de ciclo de vida
 
@@ -61,7 +67,9 @@ No nosso caso, usamos hooks para:
 | `SubagentStop`     | `subagentStop`        | Um subagente completa                                    |
 | `Stop`             | `agentStop`           | Agente tenta **encerrar o turno current**                |
 
-> ⚠️ **CRÍTICO**: O evento `Stop` (= nosso `agentStop`) dispara **quando o agente encerra um TURN**, não quando a SESSION termina. A SESSION termina quando o usuário fecha o VS Code (sessionEnd, que não tem blocking).
+> ⚠️ **CRÍTICO**: O evento `Stop` (= nosso `agentStop`) dispara **quando o agente encerra um TURN**,
+> não quando a SESSION termina. A SESSION termina quando o usuário fecha o VS Code (sessionEnd, que
+> não tem blocking).
 
 ### 2.2 Localização dos arquivos de configuração
 
@@ -128,7 +136,8 @@ Agent-scoped:     frontmatter .agent.md
 | `stopReason`    | string  | Razão para parada (quando `continue: false`)                           |
 | `systemMessage` | string  | Mensagem de aviso exibida ao agente (não bloqueante)                   |
 
-> ⚠️ **`continue: false` encerra a SESSION inteira — NÃO use para bloquear turnos!** Para bloquear apenas o turno, use `hooks-specificOutput.decision: "block"` no hook `Stop`.
+> ⚠️ **`continue: false` encerra a SESSION inteira — NÃO use para bloquear turnos!** Para bloquear
+> apenas o turno, use `hooks-specificOutput.decision: "block"` no hook `Stop`.
 
 ### 2.6 Exit codes
 
@@ -141,6 +150,7 @@ Agent-scoped:     frontmatter .agent.md
 ### 2.7 API específica: PreToolUse
 
 **Input adicional**:
+
 ```json
 {
   "tool_name": "editFiles",
@@ -150,6 +160,7 @@ Agent-scoped:     frontmatter .agent.md
 ```
 
 **Output específico** (via `hookSpecificOutput`):
+
 ```json
 {
   "hookSpecificOutput": {
@@ -173,6 +184,7 @@ Agent-scoped:     frontmatter .agent.md
 ### 2.8 API específica: PostToolUse
 
 **Input adicional**:
+
 ```json
 {
   "tool_name": "editFiles",
@@ -183,6 +195,7 @@ Agent-scoped:     frontmatter .agent.md
 ```
 
 **Output específico** (blocking):
+
 ```json
 {
   "decision": "block",
@@ -197,6 +210,7 @@ Agent-scoped:     frontmatter .agent.md
 ### 2.9 API específica: Stop (= nosso agentStop) ← CRÍTICO
 
 **Input adicional**:
+
 ```json
 {
   "stop_hook_active": false
@@ -208,6 +222,7 @@ Agent-scoped:     frontmatter .agent.md
 | `stop_hook_active` | boolean | `true` quando o agente já está rodando por causa de um stop hook anterior. **VERIFICAR SEMPRE** para evitar loop infinito. |
 
 **Output específico** (blocking — FORMATO CORRETO v7.0):
+
 ```json
 {
   "hookSpecificOutput": {
@@ -223,7 +238,10 @@ Agent-scoped:     frontmatter .agent.md
 | `decision` | `"block"` | Impede o agente de encerrar o turno                                                          |
 | `reason`   | string    | **Obrigatório** quando `decision: "block"`. Mostrado ao agente como contexto para continuar. |
 
-> ⚠️ **PREVENÇÃO DE LOOP INFINITO**: Quando `stop_hook_active=true`, o hook **NUNCA deve retornar `decision:block`**. O `stop_hook_active` será `true` precisamente na segunda invocação depois de um block. Sempre verificar:
+> ⚠️ **PREVENÇÃO DE LOOP INFINITO**: Quando `stop_hook_active=true`, o hook **NUNCA deve retornar
+> `decision:block`**. O `stop_hook_active` será `true` precisamente na segunda invocação depois de
+> um block. Sempre verificar:
+>
 > ```bash
 > if [ "$STOP_HOOK_ACTIVE" = "true" ]; then exit 0; fi
 > ```
@@ -231,6 +249,7 @@ Agent-scoped:     frontmatter .agent.md
 ### 2.10 API específica: SessionStart
 
 **Output específico** (injetando contexto):
+
 ```json
 {
   "hookSpecificOutput": {
@@ -286,6 +305,7 @@ SESSION encerrada? → BLOQUEADA sem: Template F + KEY + bash session-close.sh K
 ### 3.4 Invariante: SESSION + SECTION + TURN sempre ativos
 
 O sistema garante que sempre há uma SESSION, uma SECTION e um TURN ativos simultaneamente:
+
 - `session-start.sh` cria a SECTION `"início"` automaticamente
 - `agent-stop.sh` auto-cria a seção `"retomada"` se a SECTION for null
 - `start-section.sh` fecha a seção anterior antes de abrir uma nova
@@ -297,11 +317,13 @@ O sistema garante que sempre há uma SESSION, uma SECTION e um TURN ativos simul
 ### 4.1 Por que esta tool é central
 
 No fluxo de trabalho real:
+
 1. O usuário envia **1 mensagem** pelo chatbox ao iniciar a SESSION
 2. Toda comunicação subsequente ocorre via **`vscode_askQuestions`**
 3. O usuário nunca digita no chatbox novamente durante a SESSION
 
 Isso significa que `vscode_askQuestions` é:
+
 - O canal de **checkpoint** periódico (Templates A, D)
 - O canal de **aprovação** de decisões arquiteturais (Template C)
 - O canal de **commit/push** authorization (Template G)
@@ -310,6 +332,7 @@ Isso significa que `vscode_askQuestions` é:
 ### 4.2 Como vscode_askQuestions funciona nos hooks
 
 Quando o agente chama `vscode_askQuestions`:
+
 1. Isso é uma **tool call** normal
 2. `preToolUse` hook dispara ANTES (pre-tool-use.sh registra)
 3. `postToolUse` hook dispara DEPOIS com a resposta do usuário
@@ -352,11 +375,13 @@ SESSION start (chatbox): [userPromptSubmitted disparara] ← RARO, só aqui
 
 ### 5.1 Definição oficial
 
-> `UserPromptSubmit` dispara quando o **usuário submete um prompt** — ou seja, quando mensagem é enviada pela **caixa de texto do chat** no VS Code.
+> `UserPromptSubmit` dispara quando o **usuário submete um prompt** — ou seja, quando mensagem é
+> enviada pela **caixa de texto do chat** no VS Code.
 
 ### 5.2 Evidência empírica
 
 Análise de correlação temporal em `audit.jsonl`:
+
 ```
 askQuestions_response @ 18:00  → SEM userPromptSubmitted subsequente imediato
 askQuestions_response @ 18:15  → SEM userPromptSubmitted
@@ -364,7 +389,8 @@ askQuestions_response @ 18:30  → SEM userPromptSubmitted
 userPromptSubmitted   @ 18:45  → usuário digitou nova mensagem NO CHATBOX
 ```
 
-**Conclusão**: `askQuestions_response` e `userPromptSubmitted` são **eventos completamente independentes**. Responder a `vscode_askQuestions` NÃO dispara `userPromptSubmitted`.
+**Conclusão**: `askQuestions_response` e `userPromptSubmitted` são **eventos completamente
+independentes**. Responder a `vscode_askQuestions` NÃO dispara `userPromptSubmitted`.
 
 ### 5.3 Frequência real em nossa SESSION
 
@@ -378,11 +404,14 @@ userPromptSubmitted   @ 18:45  → usuário digitou nova mensagem NO CHATBOX
 
 ### 5.4 Implicação arquitetural
 
-O hook mais confiável para injetar lembretes **periódicos** é `preToolUse`, não `userPromptSubmitted`. Por isso:
+O hook mais confiável para injetar lembretes **periódicos** é `preToolUse`, não
+`userPromptSubmitted`. Por isso:
+
 - **v6.2**: SESSION reminder injetado via `pre-tool-use.sh` a cada X tool calls
 - **v7.0**: Blocking via `agent-stop.sh` (Stop hook) que dispara ao fim de cada TURN
 
-`log-prompt.sh` (userPromptSubmitted) permanece válido para o contexto inicial da SESSION, mas não é o canal primário para lembretes.
+`log-prompt.sh` (userPromptSubmitted) permanece válido para o contexto inicial da SESSION, mas não é
+o canal primário para lembretes.
 
 ---
 
@@ -394,16 +423,16 @@ O hook mais confiável para injetar lembretes **periódicos** é `preToolUse`, n
 {
   "version": 1,
   "hooks": {
-    "sessionStart":        "./scripts/session-start.sh",
+    "sessionStart": "./scripts/session-start.sh",
     "userPromptSubmitted": "./scripts/log-prompt.sh",
-    "preToolUse":          "./scripts/pre-tool-use.sh",
-    "postToolUse":         "./scripts/post-tool-use.sh",
-    "agentStop":           "./scripts/agent-stop.sh",
-    "subagentStop":        "./scripts/subagent-stop.sh",
-    "subagentStart":       "./scripts/subagent-start.sh",
-    "postToolUseFailure":  "./scripts/tool-use-failure.sh",
-    "preCompact":          "./scripts/pre-compact.sh",
-    "sessionEnd":          "./scripts/session-end.sh"
+    "preToolUse": "./scripts/pre-tool-use.sh",
+    "postToolUse": "./scripts/post-tool-use.sh",
+    "agentStop": "./scripts/agent-stop.sh",
+    "subagentStop": "./scripts/subagent-stop.sh",
+    "subagentStart": "./scripts/subagent-start.sh",
+    "postToolUseFailure": "./scripts/tool-use-failure.sh",
+    "preCompact": "./scripts/pre-compact.sh",
+    "sessionEnd": "./scripts/session-end.sh"
   }
 }
 ```
@@ -462,7 +491,8 @@ if tool_name == "vscode_askQuestions":
         call session-close.sh automatically
 ```
 
-Isso garante que a KEY só pode ser validada via tool call real (`vscode_askQuestions`), nunca por texto plano.
+Isso garante que a KEY só pode ser validada via tool call real (`vscode_askQuestions`), nunca por
+texto plano.
 
 ---
 
@@ -551,11 +581,14 @@ Isso garante que a KEY só pode ser validada via tool call real (`vscode_askQues
 
 ### 9.1 O problema raiz
 
-Nas versões anteriores (v5.0-v6.2), o `agentStop` emitia apenas `systemMessage` (nudge informativo). **O agente podia ignorar o nudge e encerrar o turno sem chamar `vscode_askQuestions`**. Quando o usuário fechava o VS Code, a SESSION encerrava sem KEY → viola o protocolo.
+Nas versões anteriores (v5.0-v6.2), o `agentStop` emitia apenas `systemMessage` (nudge informativo).
+**O agente podia ignorar o nudge e encerrar o turno sem chamar `vscode_askQuestions`**. Quando o
+usuário fechava o VS Code, a SESSION encerrava sem KEY → viola o protocolo.
 
 ### 9.2 A solução: Stop hook com decision:block
 
-A documentação oficial do VS Code Copilot Hooks confirma: o hook `Stop` (= nosso `agentStop`) suporta:
+A documentação oficial do VS Code Copilot Hooks confirma: o hook `Stop` (= nosso `agentStop`)
+suporta:
 
 ```json
 {
@@ -568,6 +601,7 @@ A documentação oficial do VS Code Copilot Hooks confirma: o hook `Stop` (= nos
 ```
 
 Quando isso é retornado:
+
 1. O agente **não consegue encerrar o turno**
 2. O `reason` é injetado como contexto ao agente
 3. O agente continua rodando (pode chamar vscode_askQuestions, etc.)
@@ -589,6 +623,7 @@ agentStop dispara com input: {stop_hook_active, ...}
 ### 9.4 Garantia do sistema (v7.0)
 
 Com `decision:block`:
+
 - **Todo TURN que não chama `vscode_askQuestions` é bloqueado**
 - O agente tem **exatamente 1 chance** de chamar `vscode_askQuestions` antes de poder encerrar
 - Isso garante que o usuário é consultado em **cada checkpoint**
@@ -622,6 +657,7 @@ PASSO 3: Agente chama obrigatoriamente:
 ```
 
 > **Onde encontrar a close_key**:
+>
 > - `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO` (primeira seção)
 > - `session-context.json` → campo `session.close_key`
 > - `bash .github/hooks/scripts/session-reminder.sh`
@@ -638,9 +674,13 @@ PASSO 3: Agente chama obrigatoriamente:
 
 ### 10.3 Por que texto plano não conta
 
-A KEY **só é validada** quando aparece na **resposta de `vscode_askQuestions`** (capturada por `post-tool-use.sh`). Isso é detectado pelo campo `tool_name == "vscode_askQuestions"` na entrada do hook `postToolUse`.
+A KEY **só é validada** quando aparece na **resposta de `vscode_askQuestions`** (capturada por
+`post-tool-use.sh`). Isso é detectado pelo campo `tool_name == "vscode_askQuestions"` na entrada do
+hook `postToolUse`.
 
-Se o usuário simplesmente digitar `ENCERRAR-XXXXXXXX` no chatbox (sem ser via Template F do `vscode_askQuestions`), isso dispara `userPromptSubmitted` → `log-prompt.sh`, que NÃO faz validação de KEY. A KEY não seria validada.
+Se o usuário simplesmente digitar `ENCERRAR-XXXXXXXX` no chatbox (sem ser via Template F do
+`vscode_askQuestions`), isso dispara `userPromptSubmitted` → `log-prompt.sh`, que NÃO faz validação
+de KEY. A KEY não seria validada.
 
 ---
 
@@ -746,18 +786,19 @@ Para referência completa, veja `.github/AGENTS.md` → seção "Protocolo vscod
 
 ## 13. Histórico de versões
 
-| Versão   | Data           | Mudanças principais                                                                                                                                               |
-| -------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| v1.0     | 2026-02        | Sistema inicial de hooks                                                                                                                                          |
-| v2.0     | 2026-03-08     | Wave 1+2: infra base                                                                                                                                              |
-| v3.0     | 2026-03-09     | Análise de sessões abruptas                                                                                                                                       |
-| v4.x     | 2026-03-09     | decision:block INTRODUZIDO (agressivo)                                                                                                                            |
-| v5.0     | 2026-03-09     | TURN Autônomo: decision:block REMOVIDO                                                                                                                            |
-| v5.1     | 2026-03-09     | Threshold reduzido (5→3), UNAUTHORIZED flag                                                                                                                       |
-| v6.0     | 2026-03-10     | SESSION reminder em log-prompt.sh + agent-stop.sh always-on                                                                                                       |
-| v6.1     | 2026-03-10     | Caixa crítica em AGENTS.md + copilot-instructions.md                                                                                                              |
-| v6.2     | 2026-03-10     | SESSION reminder via preToolUse; TURN definição atualizada                                                                                                        |
-| **v7.0** | **2026-03-10** | **decision:block RESTAURADO** — formato correto Stop hook. Todo TURN exige vscode_askQuestions. Sem exceção (exceto stop_hook_active, primeiro turno, subagente). |
+| Versão   | Data           | Mudanças principais                                                                                                                                                                                                 |
+| -------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1.0     | 2026-02        | Sistema inicial de hooks                                                                                                                                                                                            |
+| v2.0     | 2026-03-08     | Wave 1+2: infra base                                                                                                                                                                                                |
+| v3.0     | 2026-03-09     | Análise de sessões abruptas                                                                                                                                                                                         |
+| v4.x     | 2026-03-09     | decision:block INTRODUZIDO (agressivo)                                                                                                                                                                              |
+| v5.0     | 2026-03-09     | TURN Autônomo: decision:block REMOVIDO                                                                                                                                                                              |
+| v5.1     | 2026-03-09     | Threshold reduzido (5→3), UNAUTHORIZED flag                                                                                                                                                                         |
+| v6.0     | 2026-03-10     | SESSION reminder em log-prompt.sh + agent-stop.sh always-on                                                                                                                                                         |
+| v6.1     | 2026-03-10     | Caixa crítica em AGENTS.md + copilot-instructions.md                                                                                                                                                                |
+| v6.2     | 2026-03-10     | SESSION reminder via preToolUse; TURN definição atualizada                                                                                                                                                          |
+| **v7.0** | **2026-03-10** | **decision:block RESTAURADO** — formato correto Stop hook. Todo TURN exige vscode_askQuestions. Sem exceção (exceto stop_hook_active, primeiro turno, subagente).                                                   |
+| **v8.0** | **2026-03-12** | **Fase 10 — Ciclo de correções completo**: BUG-01..BUG-17 + GAP-01..GAP-05 + ROB-B + GAP-O1. Guards session_id, HEAL v1/v2, schema completo, inline_restart cap, common.sh warning. Ver `PLANO-CORRECOES-HOOKS.md`. |
 
 ---
 

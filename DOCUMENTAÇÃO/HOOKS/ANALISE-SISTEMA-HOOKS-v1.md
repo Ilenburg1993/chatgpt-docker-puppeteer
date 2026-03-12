@@ -1,9 +1,7 @@
 # Análise Completa do Sistema de Hooks — v1
 
-> **Data**: 2026-03-09
-> **Branch**: `main` (HEAD: `b4847def`)
-> **Escopo**: Sistema completo de SESSION/SECTION/TURN, 24 scripts, 8 hooks configurados
-> **Status**: Diagnóstico + Plano de Evolução
+> **Data**: 2026-03-09 **Branch**: `main` (HEAD: `b4847def`) **Escopo**: Sistema completo de
+> SESSION/SECTION/TURN, 24 scripts, 8 hooks configurados **Status**: Diagnóstico + Plano de Evolução
 
 ---
 
@@ -48,8 +46,8 @@ SESSION (1 por Copilot Chat)
 
 ### 2.1. Hooks Configurados (`copilot-hooks.json`)
 
-| #   | Hook                  | Script              | Timeout | Frequência Observada | Status      |
-| --- | --------------------- | ------------------- | ------- | -------------------- | ----------- |
+| #   | Hook                  | Script              | Timeout | Frequência Observada | Status       |
+| --- | --------------------- | ------------------- | ------- | -------------------- | ------------ |
 | 1   | `sessionStart`        | `session-start.sh`  | 60s     | **0x esta sessão**   | ⚠️ FALHO     |
 | 2   | `userPromptSubmitted` | `log-prompt.sh`     | 10s     | ~4x/sessão (raro)    | ✅ Funcional |
 | 3   | `preToolUse`          | `pre-tool-use.sh`   | 15s     | ~1000x/sessão        | ✅ Funcional |
@@ -62,6 +60,7 @@ SESSION (1 por Copilot Chat)
 ### 2.2. Scripts (24 total, 4674 linhas)
 
 #### Automáticos (disparados pelo Copilot via hooks)
+
 | Script              | Linha | Trigger               | Função Principal                                          |
 | ------------------- | ----- | --------------------- | --------------------------------------------------------- |
 | `session-start.sh`  | 578   | `sessionStart` hook   | Cria estado completo, briefing, close_key, seção "início" |
@@ -74,6 +73,7 @@ SESSION (1 por Copilot Chat)
 | `session-end.sh`    | 312   | `sessionEnd` hook     | Close key validation, rotação, relatório                  |
 
 #### Manuais (chamados pelo agente ou operador)
+
 | Script                        | Linha | Quando Chamar                                                          |
 | ----------------------------- | ----- | ---------------------------------------------------------------------- |
 | `start-turn.sh`               | 72    | Primeiro ato de cada turno (intent enrichment)                         |
@@ -95,11 +95,11 @@ SESSION (1 por Copilot Chat)
 
 ### 2.3. Estado Atual (`.github/hooks/state/`)
 
-| Arquivo                   | Tamanho     | Status                              |
-| ------------------------- | ----------- | ----------------------------------- |
+| Arquivo                   | Tamanho     | Status                               |
+| ------------------------- | ----------- | ------------------------------------ |
 | `session-context.json`    | **0 bytes** | 🔴 **VAZIO — Sem sessão ativa**      |
-| `session-briefing.md`     | 4.570 B     | De sessão anterior (06:22:22Z)      |
-| `pending-tasks.md`        | 10.779 B    | Tarefas pendentes acumuladas        |
+| `session-briefing.md`     | 4.570 B     | De sessão anterior (06:22:22Z)       |
+| `pending-tasks.md`        | 10.779 B    | Tarefas pendentes acumuladas         |
 | `UNAUTHORIZED_CLOSE.flag` | 187 B       | ⚠️ Violação de sessão anterior ativa |
 
 ### 2.4. Logs (`.github/hooks/logs/`)
@@ -118,21 +118,23 @@ SESSION (1 por Copilot Chat)
 ### 🔴 D1 — `sessionStart` hook NÃO disparou para a sessão atual
 
 **Evidência**:
+
 - Sessão `a0be08af-7a26-42d8-b8a5-3c43206494c7` tem 2564 eventos no `audit.jsonl`
 - Primeiro evento: `preToolUse` em `2026-03-09T02:22:14Z` (NÃO `sessionStart`)
 - `rg '"sessionStart"' audit.jsonl | rg "a0be08af"` → **VAZIO** (0 resultados)
 - Os únicos `sessionStart` recentes são de testes: `sess_2026030910000`, `test-sess-001`
 
 **Consequência**:
+
 - `session-context.json` está vazio (0 bytes) → nenhum estado de sessão rastreado
 - Todos os `session_id guards` são ineficazes (CTX_ACTIVE_SID vazio = guard não bloqueia)
 - Métricas de turno, seção, compliance e ferramentas não acumulam
 - `agent-stop.sh` funciona parcialmente (fallback para scan direto do audit.jsonl)
 - `decision:block` FUNCIONA (lê audit.jsonl diretamente, não depende do contexto)
 
-**Causa raiz provável**:
-O `sessionStart` é o primeiro evento de uma sessão Copilot. Se o hook falha ou o evento não é
-emitido, não há como recuperar. Possibilidades:
+**Causa raiz provável**: O `sessionStart` é o primeiro evento de uma sessão Copilot. Se o hook falha
+ou o evento não é emitido, não há como recuperar. Possibilidades:
+
 1. A extensão Copilot não emitiu o evento `sessionStart` ao reopening do Codespace
 2. O `session-start.sh` executou mas crashou (improvável — o briefing existe mas de hora diferente)
 3. O Codespace reusou a sessão `a0be08af` sem emitir novo `sessionStart`
@@ -140,10 +142,11 @@ emitido, não há como recuperar. Possibilidades:
 ### 🔴 D2 — Guards de session_id ineficazes com contexto vazio
 
 **Mecanismo**: Todos os 6 hooks com guard fazem:
+
 ```bash
-CTX_ACTIVE_SID=$(jq -r '.session.id // ""' "$CTX_FILE" 2>/dev/null)
+CTX_ACTIVE_SID=$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null)
 if [ -n "$CTX_ACTIVE_SID" ] && [ "$INCOMING_SID" != "$CTX_ACTIVE_SID" ]; then
-    # BLOQUEIA — session_id não bate
+  # BLOQUEIA — session_id não bate
 fi
 ```
 
@@ -154,43 +157,42 @@ Isso significa que QUALQUER session_id passa, inclusive de testes. O sistema per
 
 ### 🔴 D3 — `section-end.sh` contém código duplicado
 
-**Evidência**: Arquivo tem 192 linhas com 4 `exit 0` (linhas 48, 106, 192, e uma em 136).
-O script está duplicado internamente — linhas 107-192 são uma cópia legada sem o campo
-`section_number` (Schema v4). A segunda cópia é dead code após `exit 0` na linha 106, mas:
+**Evidência**: Arquivo tem 192 linhas com 4 `exit 0` (linhas 48, 106, 192, e uma em 136). O script
+está duplicado internamente — linhas 107-192 são uma cópia legada sem o campo `section_number`
+(Schema v4). A segunda cópia é dead code após `exit 0` na linha 106, mas:
+
 - Infla o arquivo para o dobro do necessário
 - Indica erro de copy-paste durante desenvolvimento
 - Confunde manutenção futura
 
 ### 🟡 D4 — Hook `errorOccurred` nunca dispara
 
-**Evidência**: Zero ocorrências de `errorOccurred` no `audit.jsonl` em toda a história.
-O evento SDK provável é `PostToolUseFailure` (nome no array `Mti` da extensão), não
-`errorOccurred`. O mapeamento CLI camelCase→PascalCase pode não estar cobrindo este evento.
+**Evidência**: Zero ocorrências de `errorOccurred` no `audit.jsonl` em toda a história. O evento SDK
+provável é `PostToolUseFailure` (nome no array `Mti` da extensão), não `errorOccurred`. O mapeamento
+CLI camelCase→PascalCase pode não estar cobrindo este evento.
 
-**Impacto**: O script `error-occurred.sh` (89 linhas) é código inerte. Erros de ferramentas
-não são rastreados via este hook.
+**Impacto**: O script `error-occurred.sh` (89 linhas) é código inerte. Erros de ferramentas não são
+rastreados via este hook.
 
 ### 🟡 D5 — `userPromptSubmitted` é raro e não-confiável para detecção de turno
 
-**Evidência**: ~4 eventos por sessão inteira (de ~2564 totais). O evento `userPromptSubmitted`
-só dispara quando o usuário digita diretamente no chat, NÃO quando responde a
-`vscode_askQuestions`.
+**Evidência**: ~4 eventos por sessão inteira (de ~2564 totais). O evento `userPromptSubmitted` só
+dispara quando o usuário digita diretamente no chat, NÃO quando responde a `vscode_askQuestions`.
 
-**Impacto**: O `log-prompt.sh` que reseta o estado do turno (`current_turn.*`) é chamado
-raramente. A maioria dos turnos começa sem reset de estado.
+**Impacto**: O `log-prompt.sh` que reseta o estado do turno (`current_turn.*`) é chamado raramente.
+A maioria dos turnos começa sem reset de estado.
 
 ### 🟢 D6 — `chat.useClaudeHooks` está configurado
 
-**Evidência**: `rg -i "hooks" .vscode/settings.json` → linha 824:
-`"chat.useClaudeHooks": true`
+**Evidência**: `rg -i "hooks" .vscode/settings.json` → linha 824: `"chat.useClaudeHooks": true`
 
 Descoberta anterior indicava ausência — foi um falso positivo. A configuração ESTÁ presente.
 
 ### 🟢 D7 — `decision:block` funciona mesmo sem session-context
 
 O mecanismo `decision:block` em `agent-stop.sh` lê `audit.jsonl` diretamente para detectar
-`vscode_askQuestions`, não dependendo do `session-context.json`. Portanto, a proteção de
-autorização de turno FUNCIONA mesmo na situação degradada atual.
+`vscode_askQuestions`, não dependendo do `session-context.json`. Portanto, a proteção de autorização
+de turno FUNCIONA mesmo na situação degradada atual.
 
 ---
 
@@ -262,19 +264,21 @@ autorização de turno FUNCIONA mesmo na situação degradada atual.
 ### Fase 0: Correções Imediatas (Cirúrgicas) — ✅ IMPLEMENTADA (commit 4ceb3a52)
 
 #### F0.1 — Corrigir `section-end.sh` duplicado ✅
+
 - **Ação**: Remover linhas 107-192 (dead code legado)
 - **Risco**: Zero (code unreachable após `exit 0` na linha 106)
 - **Tempo**: Imediato
 
 #### F0.2 — Criar mecanismo de auto-recovery para session-context vazio ✅
+
 - **Problema**: Se `sessionStart` não disparar, o sistema inteiro fica degradado
 - **Ação**: Em `pre-tool-use.sh` (primeiro hook a disparar), adicionar:
   ```bash
   if [ ! -s "$CTX_FILE" ]; then
-      # session-context.json vazio ou inexistente — SESSION degraded
-      # Cria contexto mínimo de recovery com o session_id do evento atual
-      echo "[recovery] session-context.json vazio — criando estado mínimo" >&2
-      jq -n --arg sid "$SESSION_ID" --arg now "$NOW_ISO" '{
+    # session-context.json vazio ou inexistente — SESSION degraded
+    # Cria contexto mínimo de recovery com o session_id do evento atual
+    echo "[recovery] session-context.json vazio — criando estado mínimo" >&2
+    jq -n --arg sid "$SESSION_ID" --arg now "$NOW_ISO" '{
           session: { id: $sid, started_at: $now, mode: "recovery", ended_at: null },
           session_stats: { turn_count: 0, tools_total: 0, ... },
           current_turn: { ... },
@@ -288,12 +292,13 @@ autorização de turno FUNCIONA mesmo na situação degradada atual.
 - **Risco**: Baixo — o contexto de recovery é menos rico que o de session-start.sh, mas funcional
 
 #### F0.3 — Fortalecer session_id guard para contexto vazio ✅
+
 - **Problema**: Guard não bloqueia quando `CTX_ACTIVE_SID` está vazio
 - **Ação**: Em todos os 6 scripts com guard, adicionar:
   ```bash
   if [ ! -s "$CTX_FILE" ]; then
-      echo "[guard] session-context.json vazio — guard desabilitado (sem sessão)" >&2
-      # Permitir execução mas logar o estado degradado
+    echo "[guard] session-context.json vazio — guard desabilitado (sem sessão)" >&2
+    # Permitir execução mas logar o estado degradado
   fi
   ```
 - **Risco**: Baixo — é apenas log, não bloqueia funcionalidade
@@ -301,17 +306,20 @@ autorização de turno FUNCIONA mesmo na situação degradada atual.
 ### Fase 1: Aprimoramentos Funcionais — ✅ IMPLEMENTADA (commit 4ceb3a52)
 
 #### F1.1 — Remover ou remapear hook `errorOccurred` ✅
+
 - **Implementado**: Removido de `copilot-hooks.json`. Adicionados 3 novos hooks:
   - `postToolUseFailure` → `tool-use-failure.sh`
   - `subagentStart` → `subagent-start.sh`
   - `preCompact` → `pre-compact.sh`
 
 #### F1.2 — Compensar raridade do `userPromptSubmitted` ✅
+
 - **Implementado**: agent-stop.sh agora reseta `current_turn` completamente para o próximo turno
 
 #### F1.3 — Adicionar hooks não-configurados de alto valor ✅
+
 - **Implementado**: SubagentStart, PostToolUseFailure e PreCompact adicionados ao copilot-hooks.json
-Hooks SDK disponíveis mas não configurados:
+  Hooks SDK disponíveis mas não configurados:
 
 | Hook SDK             | Valor | Justificativa                                                    |
 | -------------------- | ----- | ---------------------------------------------------------------- |
@@ -321,6 +329,7 @@ Hooks SDK disponíveis mas não configurados:
 | `Notification`       | Baixo | Notificações do sistema (informativo)                            |
 
 #### F1.4 — Script de inicialização manual de sessão ✅
+
 - **Implementado**: `manual-session-init.sh` criado com auto-detecção de session_id
 - **Situação**: Quando `sessionStart` não dispara, o operador precisa de um caminho
 - **Ação**: Criar `manual-session-init.sh` que:
@@ -332,11 +341,13 @@ Hooks SDK disponíveis mas não configurados:
 ### Fase 2: Hardening e Robustez
 
 #### F2.1 — Timeout de sessão com watchdog
+
 - Adicionar detecção de sessão órfã (sessão sem `sessionEnd` por >4h)
 - Em `pre-tool-use.sh`: se `session.started_at` > 4h atrás e sem atividade recente → log warning
 - Evita acumulação infinita de métricas em sessões abandonadas
 
 #### F2.2 — Dashboard de compliance em tempo real
+
 - `compliance.sh` (novo script) que gera relatório rápido:
   ```
   Sessão: a0be08af | Modo: normal | Uptime: 7h12m
@@ -347,6 +358,7 @@ Hooks SDK disponíveis mas não configurados:
   ```
 
 #### F2.3 — Smoke-test que não contamina estado
+
 - **Bug atual**: smoke-test pode interferir com sessão real se não isolar corretamente
 - **Ação**: Verificar que o sandbox do smoke-test é 100% estanque:
   - `session-context.json` real nunca é tocado
@@ -356,16 +368,19 @@ Hooks SDK disponíveis mas não configurados:
 ### Fase 3: Evolução Arquitetural
 
 #### F3.1 — Schema v5: Recovery e Self-Healing
+
 - Adicionar campo `session.mode` com valores: `normal`, `recovery`, `manual_recovery`, `degraded`
 - Adicionar campo `session.recovery_attempted_at` para rastreio
 - Adicionar campo `session.health_status`: `healthy`, `degraded`, `critical`
 
 #### F3.2 — Migração de eventos para formato estruturado
+
 - Atualmente: text logging no stderr + JSONL no audit
 - Evolução: todos os outputs de hook em JSON (stdout para o Copilot, audit para persistência)
 - Permite que o Copilot consuma informações estruturadas dos hooks
 
 #### F3.3 — Hook configuration generator
+
 - Script que gera `copilot-hooks.json` a partir de metadados dos scripts
 - Cada script declara no cabeçalho: hook esperado, timeout, dependências
 - Garante que `copilot-hooks.json` e os scripts estejam sempre sincronizados
@@ -387,15 +402,15 @@ Hooks SDK disponíveis mas não configurados:
 ### Recomendação: Iniciar sessão manualmente
 
 **SIM, deve-se iniciar manualmente.** A sessão está em modo degradado desde `02:22:14Z` (~7 horas).
-O `decision:block` garante segurança mínima, mas sem estado, todo o rastreio de métricas,
-compliance e seções está perdido.
+O `decision:block` garante segurança mínima, mas sem estado, todo o rastreio de métricas, compliance
+e seções está perdido.
 
 **Procedimento recomendado**:
 
 ```bash
 # Opção 1: Executar session-start.sh com o session_id real
-echo '{"session_id":"a0be08af-7a26-42d8-b8a5-3c43206494c7"}' | \
-    bash .github/hooks/scripts/session-start.sh
+echo '{"session_id":"a0be08af-7a26-42d8-b8a5-3c43206494c7"}' \
+  | bash .github/hooks/scripts/session-start.sh
 
 # Opção 2: Implementar F0.2 (auto-recovery) primeiro, depois deixar o próximo
 # preToolUse criar o contexto automaticamente
@@ -516,8 +531,8 @@ a um one-shot manual que não previne recorrência.
 
 Eventos disponíveis na extensão Copilot (array `Mti`) que NÃO temos hooks:
 
-| Evento SDK           | Configurado?  | Recomendação                     |
-| -------------------- | ------------- | -------------------------------- |
+| Evento SDK           | Configurado?   | Recomendação                     |
+| -------------------- | -------------- | -------------------------------- |
 | `PreToolUse`         | ✅             | —                                |
 | `PostToolUse`        | ✅             | —                                |
 | `PostToolUseFailure` | ✅             | **Adicionado** (commit 4ceb3a52) |
@@ -539,4 +554,5 @@ Eventos disponíveis na extensão Copilot (array `Mti`) que NÃO temos hooks:
 
 ---
 
-*Documento gerado em 2026-03-09. Atualizado em 2026-03-10 após implementação das Fases 0 e 1 (commit 4ceb3a52).*
+_Documento gerado em 2026-03-09. Atualizado em 2026-03-10 após implementação das Fases 0 e 1 (commit
+4ceb3a52)._

@@ -1,6 +1,53 @@
 # Melhorias e Upgrades Propostos — Sistema de Hooks
 
-> **Status**: Backlog vivo | **Última atualização**: 2026-03-10 (sessão 8)
+> **Status**: Backlog vivo | **Última atualização**: 2026-03-12 (Fase 10 — correções completas)
+
+---
+
+## Melhorias Implementadas (Fase 10 — 2026-03-12)
+
+### Ciclo de Correções BUG-01..BUG-17 + GAP-01..GAP-05 + ROB-B + GAP-O1 ✅ IMPLEMENTADO
+
+**Motivação**: auditoria profunda (subagente haiku + revisão manual) identificou 24+ bugs e gaps nos
+11 scripts e na hooks-lib. Implementação incremental ao longo de 3 sessões.
+
+**Resumo dos principais itens**:
+
+1. **BUG-01..BUG-06**: Guards de session_id em todos os hooks principais (`log-prompt.sh`,
+   `pre-tool-use.sh`, `post-tool-use.sh`, `agent-stop.sh`). RECONNECT-01/02/03 em `log-prompt.sh`.
+   Inline_restart (BUG-06) adota CTX como fonte de verdade (PREMISSA 1).
+
+2. **GAP-01..GAP-04**: Counter `session_id_mismatches` em `session-start.sh`; log-prompt.sh
+   consistente com session-start.sh; HEAL extraído para `hooks-lib/common.sh` (heal_v1, heal_v2,
+   increment_mismatch, ctx_update, ensure_dirs, log_audit_event).
+
+3. **BUG-07..BUG-15**: Scripts secundários (`subagent-start.sh`, `subagent-stop.sh`,
+   `tool-use-failure.sh`, `pre-compact.sh`, `session-end.sh`) recebem guards + HEAL + mismatch
+   counter. Double-count `subagent_calls` corrigido. `subagent_delegated` reset implementado.
+
+4. **BUG-16**: Guard de session_id em `tool-use-failure.sh` movido para ANTES dos writes de
+   `audit.jsonl` e `errors.jsonl`.
+
+5. **BUG-17**: HEALs inline de `manual_recovery` em `pre-tool-use.sh` e `post-tool-use.sh` agora
+   atualizam `.session.vs_code_session_id`.
+
+6. **GAP-05**: Schema `session-start.sh` completo com 7 novos campos em `session_stats` e
+   `current_turn`.
+
+7. **ROB-B**: Sourcing de `common.sh` padronizado em 8 scripts com mensagem `[WARN]` quando a lib
+   não é encontrada.
+
+8. **GAP-O1**: Log `session_id_sync_inline_restart` limitado a 5 ocorrências em `pre-tool-use.sh` e
+   `post-tool-use.sh`. Após limite, emite evento `_cap`.
+
+9. **ROB-C** (confirmado já implementado): padrão `jq -r ... 2>/dev/null || echo 'default'` uniforme
+   em todos os scripts — nenhuma alteração necessária.
+
+**Backlog remanescente** (Seção 4 de STATUS-E-ROADMAP.md):
+
+- G10-01/INC-02: section_name default consistente
+- G10-02/INC-03: padrão único de CTX update (sponge vs mktemp)
+- G10-03/UPG-01: separação VS Code vs sessão lógica (Schema v9)
 
 ---
 
@@ -9,16 +56,16 @@
 ### Consolidação v3 — Hardening copilot-instructions + Guards completos ✅ IMPLEMENTADO
 
 **Motivação**: copilot-instructions.md não mencionava o sistema de hooks, o ciclo de vida
-SESSION/SECTION/TURN, ou os mecanismos de segurança. session_id guards cobriam apenas 3 de 6
-hooks auto-triggered que modificam estado.
+SESSION/SECTION/TURN, ou os mecanismos de segurança. session_id guards cobriam apenas 3 de 6 hooks
+auto-triggered que modificam estado.
 
 **Implementação (Plano de Consolidação v3)**:
 
 1. **copilot-instructions.md hardening**:
    - Adicionada seção "Ciclo de Vida — SESSION, SECTION, TURN" com glossário, invariante e
      comportamentos automáticos/manuais
-   - Seção ⛔ REGRA ABSOLUTA expandida com mecanismos de enforcement (decision:block,
-     session_id guards, flags)
+   - Seção ⛔ REGRA ABSOLUTA expandida com mecanismos de enforcement (decision:block, session_id
+     guards, flags)
    - Adicionado protocolo de encerramento de SESSION com close_key e Template F
    - Referências a AGENTS.md, PROTOCOLO-AUTORIZACAO.md e REFERENCIA-HOOKS.md
 
@@ -28,8 +75,8 @@ hooks auto-triggered que modificam estado.
    - `subagent-stop.sh` — valida antes de incrementar subagent_calls
    - Padrão idêntico aos 3 guards anteriores (agent-stop, pre-tool-use, post-tool-use)
 
-3. **PROTOCOLO-AUTORIZACAO.md v3.0**: documentados Layer 3.5 (decision:block com anti-recursão)
-   e Layer 3.6 (session_id guards com lista de 6 scripts cobertos)
+3. **PROTOCOLO-AUTORIZACAO.md v3.0**: documentados Layer 3.5 (decision:block com anti-recursão) e
+   Layer 3.6 (session_id guards com lista de 6 scripts cobertos)
 
 4. **PLANO-CONSOLIDACAO-v2.md**: marcado como ✅ CONCLUÍDO e superado por v3
 
@@ -37,9 +84,9 @@ hooks auto-triggered que modificam estado.
 
 ### Hardening v5 — decision:block + sandbox + session_id guards ✅ IMPLEMENTADO
 
-**Motivação**: diagnóstico de root cause revelou que testes inline contaminaram
-session-context.json com dados de sessão falsa (`test-sess-001`), fazendo close_key_validated=true
-incorretamente. Adicionalmente, `pre-tool-use.sh` sobrescrevia `.session.id` com dados do payload.
+**Motivação**: diagnóstico de root cause revelou que testes inline contaminaram session-context.json
+com dados de sessão falsa (`test-sess-001`), fazendo close_key_validated=true incorretamente.
+Adicionalmente, `pre-tool-use.sh` sobrescrevia `.session.id` com dados do payload.
 
 **Implementação** (commit 1469986e):
 
@@ -51,8 +98,8 @@ incorretamente. Adicionalmente, `pre-tool-use.sh` sobrescrevia `.session.id` com
    `post-tool-use.sh` validam `session_id` do payload contra o contexto ativo. Mismatch → log
    `session_id_mismatch` + skip state write.
 
-3. **Remoção de overwrite em pre-tool-use.sh**: removida linha que sobrescrevia `.session.id`
-   com o `session_id` do payload — agora session_id é APENAS definido por `session-start.sh`.
+3. **Remoção de overwrite em pre-tool-use.sh**: removida linha que sobrescrevia `.session.id` com o
+   `session_id` do payload — agora session_id é APENAS definido por `session-start.sh`.
 
 4. **Smoke-test sandbox**: testes funcionais agora usam `mktemp -d` com scripts symlinkados,
    verificando hash do estado real antes e depois para garantir zero contaminação.
@@ -64,9 +111,9 @@ incorretamente. Adicionalmente, `pre-tool-use.sh` sobrescrevia `.session.id` com
 ### Schema v4 — Fluxo canônico SESSION / SECTION / TURN ✅ IMPLEMENTADO
 
 **Motivação**: o Schema v3 inaugurou a SESSION CLOSE KEY, mas não havia um modelo invariante
-garantindo que SESSION, SECTION e TURN estivessem _sempre_ ativos simultaneamente. `current_section.name`
-podia ser `null`; não havia rastreamento de quantas seções ocorreram por sessão; TURNs não
-tinham início explícito.
+garantindo que SESSION, SECTION e TURN estivessem _sempre_ ativos simultaneamente.
+`current_section.name` podia ser `null`; não havia rastreamento de quantas seções ocorreram por
+sessão; TURNs não tinham início explícito.
 
 **Novos campos (Schema v4)**:
 
@@ -78,25 +125,30 @@ tinham início explícito.
 | `section_name`   | `current_turn`    | `"início"`    |
 
 **Scripts modificados**:
-- `session-start.sh` — inicializa Schema v4; cria seção padrão `"início"` e loga `sectionStart`; adicionado bloco `📍 Estado Ativo` no briefing com seção + turno em destaque
-- `start-section.sh` — auto-fecha seção anterior (full sectionEnd procedures) antes de abrir nova; incrementa `section_count`; appenda a `section_names[]`
+
+- `session-start.sh` — inicializa Schema v4; cria seção padrão `"início"` e loga `sectionStart`;
+  adicionado bloco `📍 Estado Ativo` no briefing com seção + turno em destaque
+- `start-section.sh` — auto-fecha seção anterior (full sectionEnd procedures) antes de abrir nova;
+  incrementa `section_count`; appenda a `section_names[]`
 - `log-prompt.sh` — inclui `section_name` no reset de `current_turn`; loga evento `turnStart`
 - `section-end.sh` — lê e inclui `section_number` no evento `sectionEnd`
 - `session-end.sh` — auto-fecha seção ativa antes de encerrar a sessão
 
-**Novo script**: `start-turn.sh` — enriquecimento explícito de início de TURN; loga `turnStart_enriched`
+**Novo script**: `start-turn.sh` — enriquecimento explícito de início de TURN; loga
+`turnStart_enriched`
 
 **Invariante garantida**: sempre deve haver SESSION + SECTION + TURN ativos. `"início"` é criada
 automaticamente na `sessionStart`; `start-section.sh` auto-fecha a anterior; `session-end.sh`
 auto-fecha a ativa.
 
 **Documentação atualizada**: `AUDIT-SCHEMA.md` (sectionStart v4 + evento `turnStart` adicionado);
-`README.md` (Schema v4 + tabela de campos); `AGENTS.md` (protocolo + invariante SECTION/TURN); `smoke-test.sh` (5 novas validações Schema v4)
+`README.md` (Schema v4 + tabela de campos); `AGENTS.md` (protocolo + invariante SECTION/TURN);
+`smoke-test.sh` (5 novas validações Schema v4)
 
 ---
 
 ### SESSION CLOSE KEY (sessão 7 Phase 1) ✅ IMPLEMENTADO — veja commit d3442cb8
->
+
 > Cada item classifica: prioridade, esforço (S/M/L), e categoria (fix/melhoria/upgrade profundo).
 
 ---
@@ -108,15 +160,15 @@ auto-fecha a ativa.
 **Problema**: com `set -euo pipefail`, se `START_ISO` estiver vazio, o script crashava pois
 `START_EPOCH` era definido somente dentro do bloco `if [ -n "$START_ISO" ]` mas usado fora dele.
 
-**Fix**: adicionado `START_EPOCH=0` antes do bloco `if`, garantindo valor seguro mesmo quando
-a sessão não tem `started_at` registrado.
+**Fix**: adicionado `START_EPOCH=0` antes do bloco `if`, garantindo valor seguro mesmo quando a
+sessão não tem `started_at` registrado.
 
 ---
 
 ### BUG-B — `end_at` escrito na raiz do JSON em vez de `.session.ended_at` ✅ CORRIGIDO
 
-**Problema**: `session-end.sh` usava `. + {end_at: $ts, end_reason: $reason}` que adiciona
-os campos à raiz do JSON, violando o schema canônico v2.
+**Problema**: `session-end.sh` usava `. + {end_at: $ts, end_reason: $reason}` que adiciona os campos
+à raiz do JSON, violando o schema canônico v2.
 
 **Fix**: expressão jq alterada para `.session.ended_at = $ts | .session.end_reason = $reason`.
 
@@ -124,8 +176,8 @@ os campos à raiz do JSON, violando o schema canônico v2.
 
 ### BUG-C — Arquivos de estado não gitignored ✅ CORRIGIDO
 
-**Problema**: `UNAUTHORIZED_CLOSE.flag`, `AUTHORIZED_CLOSE.flag` e `pending-tasks.md` não
-estavam no `.gitignore` e poderiam vazar estado volátil para o repositório.
+**Problema**: `UNAUTHORIZED_CLOSE.flag`, `AUTHORIZED_CLOSE.flag` e `pending-tasks.md` não estavam no
+`.gitignore` e poderiam vazar estado volátil para o repositório.
 
 **Fix**: os três adicionados ao `.gitignore`; `pending-tasks.md` destracado com `git rm --cached`.
 
@@ -143,11 +195,13 @@ estavam no `.gitignore` e poderiam vazar estado volátil para o repositório.
 
 ### AUTHORIZED_CLOSE.flag — Simetria de flags ✅ IMPLEMENTADO
 
-**Motivação**: existia `UNAUTHORIZED_CLOSE.flag` para sinalizar fechamentos não autorizados,
-mas não havia o equivalente positivo. Isso dificultava auditoria e inspeção de estado.
+**Motivação**: existia `UNAUTHORIZED_CLOSE.flag` para sinalizar fechamentos não autorizados, mas não
+havia o equivalente positivo. Isso dificultava auditoria e inspeção de estado.
 
 **Implementação** em `agent-stop.sh`:
-- Quando turno autorizado: cria `AUTHORIZED_CLOSE.flag` com `{authorized_at, session_id, turn_number}`
+
+- Quando turno autorizado: cria `AUTHORIZED_CLOSE.flag` com
+  `{authorized_at, session_id, turn_number}`
 - Quando não autorizado: remove `AUTHORIZED_CLOSE.flag` (limpa sinal positivo)
 - Ambos os flags são mutuamente exclusivos e sempre sincronizados
 
@@ -155,10 +209,11 @@ mas não havia o equivalente positivo. Isso dificultava auditoria e inspeção d
 
 ### `section-end.sh` — Novo script para fechar Seção Temática ✅ IMPLEMENTADO
 
-**Motivação**: `start-section.sh` abria Seções Temáticas, mas não havia contrapartida para
-fechá-las explicitamente. O encerramento implícito (abertura de nova seção) não logava duração.
+**Motivação**: `start-section.sh` abria Seções Temáticas, mas não havia contrapartida para fechá-las
+explicitamente. O encerramento implícito (abertura de nova seção) não logava duração.
 
 **Implementação** (`section-end.sh`):
+
 - Lê `current_section.{name, started_at}` do `session-context.json`
 - Calcula duração em segundos
 - Reseta `current_section` para todos os campos `null`
@@ -170,15 +225,17 @@ fechá-las explicitamente. O encerramento implícito (abertura de nova seção) 
 
 ### `smoke-test.sh` — Validação de integridade do sistema ✅ IMPLEMENTADO
 
-**Motivação**: não havia meio rápido de verificar se toda a infraestrutura de hooks estava
-íntegra antes de uma sessão ou após alterações.
+**Motivação**: não havia meio rápido de verificar se toda a infraestrutura de hooks estava íntegra
+antes de uma sessão ou após alterações.
 
 **Implementação** (`smoke-test.sh`) — **43 checks** em 7 seções:
+
 1. **Dependências**: jq, sponge, date, sha256sum, wc
 2. **Scripts**: 16 scripts — presença + bit executável
 3. **copilot-hooks.json**: parse jq + contagem de hooks
 4. **Diretórios**: state/, logs/
-5. **Schema**: 13 campos obrigatórios no `session-context.json` (usa `has()` para distinguir `null` de ausente)
+5. **Schema**: 13 campos obrigatórios no `session-context.json` (usa `has()` para distinguir `null`
+   de ausente)
 6. **Funcional**: `section-end.sh` sem seção ativa (dry-run)
 7. **shellcheck**: 5 scripts críticos
 
@@ -249,9 +306,10 @@ dificultando consultas, causando bugs sutis e tornando o contexto confuso para o
 | Sessão             | UUID gerado pelo Copilot       | `sessionStart` → `sessionEnd`                         |
 | Turno              | Ciclo completo prompt→resposta | `userPromptSubmitted` → `agentStop`                   |
 | Chamada            | Uso de uma ferramenta          | `preToolUse` → `postToolUse`                          |
-| **Seção Temática** | Fase lógica nomeada            | Declarada pelo agente via `start-section.sh` *(NOVO)* |
+| **Seção Temática** | Fase lógica nomeada            | Declarada pelo agente via `start-section.sh` _(NOVO)_ |
 
 **Estrutura do schema v2** (`session-context.json`) — campos canônicos verificados em 2026-03-09:
+
 ```json
 {
   "session":        { "id", "started_at", "date_short", "ended_at", "source", "cwd" },
@@ -267,16 +325,17 @@ dificultando consultas, causando bugs sutis e tornando o contexto confuso para o
 
 | #   | Mudança                                                                    | Scripts                               | Status |
 | --- | -------------------------------------------------------------------------- | ------------------------------------- | ------ |
-| —   | Schema v2: structs aninhadas substituem campo flat                         | todos                                 | ✅      |
-| B1  | Remove `tools_used[]` array ilimitado → substituído por `tools_by_name {}` | `session-start.sh`, `pre-tool-use.sh` | ✅      |
-| B2  | Remove `failure_count_unknown` fantasma → era campo inexistente no spec    | `post-tool-use.sh`                    | ✅      |
-| B3  | `turn_duration_s` usava `last_tool.ts` em vez de `current_turn.started_at` | `agent-stop.sh`                       | ✅      |
-| B4  | `session_summary` exibia dados de sessão acumulados, não do turno atual    | `agent-stop.sh`                       | ✅      |
-| B5  | `session-end.sh` não chamava `session-checkpoint.sh` antes de encerrar     | `session-end.sh`                      | ✅      |
-| B6  | Newline rogue em `log-prompt.sh` SESSION_ID read corrompía o UUID          | `log-prompt.sh`                       | ✅      |
-| —   | **Novo**: `start-section.sh` — agente declara Seção Temática nomeada       | novo `start-section.sh`               | ✅      |
+| —   | Schema v2: structs aninhadas substituem campo flat                         | todos                                 | ✅     |
+| B1  | Remove `tools_used[]` array ilimitado → substituído por `tools_by_name {}` | `session-start.sh`, `pre-tool-use.sh` | ✅     |
+| B2  | Remove `failure_count_unknown` fantasma → era campo inexistente no spec    | `post-tool-use.sh`                    | ✅     |
+| B3  | `turn_duration_s` usava `last_tool.ts` em vez de `current_turn.started_at` | `agent-stop.sh`                       | ✅     |
+| B4  | `session_summary` exibia dados de sessão acumulados, não do turno atual    | `agent-stop.sh`                       | ✅     |
+| B5  | `session-end.sh` não chamava `session-checkpoint.sh` antes de encerrar     | `session-end.sh`                      | ✅     |
+| B6  | Newline rogue em `log-prompt.sh` SESSION_ID read corrompía o UUID          | `log-prompt.sh`                       | ✅     |
+| —   | **Novo**: `start-section.sh` — agente declara Seção Temática nomeada       | novo `start-section.sh`               | ✅     |
 
 **Uso da Seção Temática**:
+
 ```bash
 bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
 # → grava current_section em session-context.json
@@ -287,8 +346,8 @@ bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
 
 ## Melhorias Implementadas (sessão 3 — 2026-03-09)
 
-| #   | Melhoria                                                            | Scripts                                                        | Status         |
-| --- | ------------------------------------------------------------------- | -------------------------------------------------------------- | -------------- |
+| #   | Melhoria                                                            | Scripts                                                        | Status          |
+| --- | ------------------------------------------------------------------- | -------------------------------------------------------------- | --------------- |
 | UP2 | Integração Findings ↔ Tasks (`--finding-id`, `--create-task`, sync) | `add-task.sh`, `save-finding.sh`, novo `sync-tasks-to-docs.sh` | ✅ Implementada |
 | UP4 | Checkpoint de tarefas com diff (SHA-256 hash + `tasks_changed`)     | `session-checkpoint.sh`                                        | ✅ Implementada |
 | UP5 | Exportação de métricas CSV/JSON                                     | novo `export-metrics.sh`                                       | ✅ Implementada |
@@ -300,8 +359,8 @@ bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
 
 ## Melhorias Implementadas (sessão 2 — 2026-03-09)
 
-| #   | Melhoria                                                    | Scripts                                                | Status         |
-| --- | ----------------------------------------------------------- | ------------------------------------------------------ | -------------- |
+| #   | Melhoria                                                    | Scripts                                                | Status          |
+| --- | ----------------------------------------------------------- | ------------------------------------------------------ | --------------- |
 | M1  | Lifecycle de Findings — `finding_id` + `resolve-finding.sh` | `save-finding.sh`, novo `resolve-finding.sh`           | ✅ Implementada |
 | M2  | Sumarização de `tools_used` array                           | `pre-tool-use.sh`, `session-start.sh`, `agent-stop.sh` | ✅ Implementada |
 | M3  | Alertas de Threshold escalonados                            | `session-start.sh`                                     | ✅ Implementada |
@@ -326,19 +385,25 @@ bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
 ### ~~M1 — Lifecycle de Findings~~ ✅ IMPLEMENTADA (sessão 2)
 
 **Implementação**:
+
 - `save-finding.sh` agora gera `finding_id` único (`f_<timestamp_ms>_<RANDOM>`) em cada achado
-- `resolve-finding.sh` (novo): marcação de resolução append-only no JSONL; idempotente; valida existência do ID
+- `resolve-finding.sh` (novo): marcação de resolução append-only no JSONL; idempotente; valida
+  existência do ID
 - `analytics.sh` exibe findings abertos vs resolvidos por severidade
 
-**Gate de aceitação**: ✅ `save-finding.sh` gera `finding_id`; `resolve-finding.sh` funciona; `analytics.sh` inclui seção de Findings.
+**Gate de aceitação**: ✅ `save-finding.sh` gera `finding_id`; `resolve-finding.sh` funciona;
+`analytics.sh` inclui seção de Findings.
 
 ---
 
 ### ~~M2 — Sumarização de `tools_used` array~~ ✅ IMPLEMENTADA (sessão 2)
 
 **Implementação**:
-- `pre-tool-use.sh`: array `tools_used[]` (crescia indefinidamente) → `tools_used_counts{}` (objeto de contagem) + `tools_used_recent[]` (janela deslizante de 20) + `tools_used_total` (int)
-- `session-start.sh`: inicialização atualizada; `failure_count_unknown` renomeado para `tool_responses_empty`
+
+- `pre-tool-use.sh`: array `tools_used[]` (crescia indefinidamente) → `tools_used_counts{}` (objeto
+  de contagem) + `tools_used_recent[]` (janela deslizante de 20) + `tools_used_total` (int)
+- `session-start.sh`: inicialização atualizada; `failure_count_unknown` renomeado para
+  `tool_responses_empty`
 - `agent-stop.sh`: `session_summary` usa `tools_used_total` ao invés de `length do array`
 
 **Gate de aceitação**: ✅ `session-context.json` não cresce com o número de chamadas de ferramenta.
@@ -348,6 +413,7 @@ bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
 ### ~~M3 — Alertas de Threshold~~ ✅ IMPLEMENTADA (sessão 2)
 
 **Implementação** em `session-start.sh`:
+
 - `consecutive_unauthorized_closes = 1`: `⛔ AVISO DE VIOLAÇÃO`
 - `consecutive_unauthorized_closes = 2`: `⛔⛔ SEGUNDA VIOLAÇÃO CONSECUTIVA`
 - `consecutive_unauthorized_closes >= 3`: `⛔⛔⛔ VIOLAÇÃO CRÍTICA REITERADA (Nx consecutivas)`
@@ -358,12 +424,13 @@ bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
 
 ### M4 — Quality Gates na Detecção de success/failure Reais (Backlog, Esforço L)
 
-**Problema**: `post-tool-use.sh` usa heurística de "body vazio = unknown" para determinar
-sucesso, pois o payload do Copilot não inclui campo `result_type` explícito.
+**Problema**: `post-tool-use.sh` usa heurística de "body vazio = unknown" para determinar sucesso,
+pois o payload do Copilot não inclui campo `result_type` explícito.
 
 **Proposta longo prazo**:
-- Monitorar o payload real de `postToolUse` em `raw-post-input.jsonl` para encontrar padrões
-  que indiquem falha real (e.g., erro de ferramenta na resposta)
+
+- Monitorar o payload real de `postToolUse` em `raw-post-input.jsonl` para encontrar padrões que
+  indiquem falha real (e.g., erro de ferramenta na resposta)
 - Atualizar a lógica quando o schema do Copilot evoluir para incluir indicador de falha
 
 **Status atual**: sem ação imediata — monitorar `raw-post-input.jsonl` para novos padrões.
@@ -372,10 +439,11 @@ sucesso, pois o payload do Copilot não inclui campo `result_type` explícito.
 
 ### M5 — `subagent-stop.sh` mais informativo (Backlog, Esforço S)
 
-**Problema**: `subagent-stop.sh` loga apenas `{event, session_id, timestamp}` — sem dados
-do subagente (nome, duração, resultado).
+**Problema**: `subagent-stop.sh` loga apenas `{event, session_id, timestamp}` — sem dados do
+subagente (nome, duração, resultado).
 
 **Proposta**:
+
 - Extrair campos do payload (se disponíveis): `subagent_name`, qualquer campo de resultado
 - Calcular duração aproximada usando `last_tool_ts`
 - Fazer referência ao `tool_use_id` do subagente se presente no payload
@@ -389,12 +457,15 @@ do subagente (nome, duração, resultado).
 ### ~~UP1 — Analytics Cross-Session~~ ✅ IMPLEMENTADA (sessão 2)
 
 **Implementação**: `analytics.sh` (novo):
+
 - Saída Markdown ou `--json` para automação
 - Seções: resumo global, top-10 ferramentas com % do total, performance P50/P95 por ferramenta,
-  compliance por sessão (✅/⚠️), findings por severidade com abertos vs resolvidos, atividade por dia
+  compliance por sessão (✅/⚠️), findings por severidade com abertos vs resolvidos, atividade por
+  dia
 - Uso: `bash analytics.sh` | `bash analytics.sh --output relatorio.md` | `bash analytics.sh --json`
 
-**Gate de aceitação**: ✅ Relatório gerado com todas as seções; `--json` mode para automação funcional.
+**Gate de aceitação**: ✅ Relatório gerado com todas as seções; `--json` mode para automação
+funcional.
 
 ---
 
@@ -404,36 +475,44 @@ do subagente (nome, duração, resultado).
 `DOCUMENTAÇÃO/BUGS/` ou com o tracker do GitHub Issues.
 
 **Proposta**:
+
 1. `sync-tasks-to-docs.sh` — exporta tarefas concluídas para `DOCUMENTAÇÃO/RELATORIOS/`
 2. Opção em `save-finding.sh` para criar automaticamente uma tarefa via `add-task.sh`
 3. Referência cruzada por ID entre findings e tasks
 
-**Gate de aceitação**: ao concluir uma tarefa tagueada com finding, o relatório de sessão mostra o link finding → task → resolved.
+**Gate de aceitação**: ao concluir uma tarefa tagueada com finding, o relatório de sessão mostra o
+link finding → task → resolved.
 
 ---
 
 ### ~~UP3 — Sistema de Health Check Contínuo~~ ✅ IMPLEMENTADA (sessão 2)
 
 **Implementação** em `session-start.sh`:
-- Verifica: `sponge` instalado (crítico), `jq` instalado (crítico), `audit.jsonl` tamanho (aviso >3000, crítico >4500), `session-context.json` com permissão de escrita, findings críticos/high abertos
+
+- Verifica: `sponge` instalado (crítico), `jq` instalado (crítico), `audit.jsonl` tamanho
+  (aviso >3000, crítico >4500), `session-context.json` com permissão de escrita, findings
+  críticos/high abertos
 - Nova seção "**Saúde do Sistema**" no `session-briefing.md`: status (✅/⚠️/⛔) + lista de problemas
 - Executa automaticamente a cada sessão sem overhead significativo
 
-**Gate de aceitação**: ✅ Máquina sem `sponge` exibe aviso; `audit.jsonl` > 4500 linhas exibe alerta crítico.
+**Gate de aceitação**: ✅ Máquina sem `sponge` exibe aviso; `audit.jsonl` > 4500 linhas exibe alerta
+crítico.
 
 ---
 
 ### UP4 — Checkpoint de Tarefas com Diff (Backlog, Esforço M)
 
-**Visão**: o `session-checkpoint.sh` captura o contagem de tarefas por prioridade, mas não
-quais tarefas foram adicionadas ou concluídas desde o checkpoint anterior.
+**Visão**: o `session-checkpoint.sh` captura o contagem de tarefas por prioridade, mas não quais
+tarefas foram adicionadas ou concluídas desde o checkpoint anterior.
 
 **Proposta**:
+
 - Adicionar ao checkpoint: hash SHA-256 do `pending-tasks.md` atual
 - Se hash changed VS checkpoint anterior: registrar `tasks_changed: true`
 - Opcional: capturar diff de tarefas (adicionadas/removidas)
 
-**Gate de aceitação**: checkpoint.json inclui `tasks_hash` e `tasks_changed`; diff disponível via comparação de checkpoints consecutivos.
+**Gate de aceitação**: checkpoint.json inclui `tasks_hash` e `tasks_changed`; diff disponível via
+comparação de checkpoints consecutivos.
 
 ---
 
@@ -442,11 +521,14 @@ quais tarefas foram adicionadas ou concluídas desde o checkpoint anterior.
 **Visão**: facilitar análise externa (Excel, Jupyter) das métricas de performance.
 
 **Proposta**:
+
 - `export-metrics.sh [formato: csv|json] [data_inicio] [data_fim]`
-- Exporta `tool-metrics.jsonl` filtrado por período em CSV: `timestamp,tool_name,duration_ms,result_type`
+- Exporta `tool-metrics.jsonl` filtrado por período em CSV:
+  `timestamp,tool_name,duration_ms,result_type`
 - Exporta summary de conformidade por sessão em CSV
 
-**Gate de aceitação**: `bash export-metrics.sh csv 2026-03-01 2026-03-09 > metricas.csv` gera CSV válido com cabeçalho.
+**Gate de aceitação**: `bash export-metrics.sh csv 2026-03-01 2026-03-09 > metricas.csv` gera CSV
+válido com cabeçalho.
 
 ---
 
@@ -467,6 +549,6 @@ quais tarefas foram adicionadas ou concluídas desde o checkpoint anterior.
 
 ---
 
-*Atualizar este documento ao aprovar ou implementar qualquer item.
-Para registrar novos achados de bug: `bash .github/hooks/scripts/save-finding.sh ...`
-Para nova tarefa aprovada: `bash .github/hooks/scripts/add-task.sh ...`*
+_Atualizar este documento ao aprovar ou implementar qualquer item. Para registrar novos achados de
+bug: `bash .github/hooks/scripts/save-finding.sh ...` Para nova tarefa aprovada:
+`bash .github/hooks/scripts/add-task.sh ...`_

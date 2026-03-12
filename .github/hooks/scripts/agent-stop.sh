@@ -415,15 +415,15 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f 
         # last_turn_ts atualizado mesmo em bloqueios: TURN_IDLE mede atividade, não autorização
         # EBH-M02: usa mktemp em vez de $CTX_FILE.tmp para evitar conflitos de nome estático
         # fix Haiku A4.1: valida mktemp antes de usar
-        if ! _BLOCK_CTX_TMP="$(mktemp 2>/dev/null)"; then
+        if ! _BLOCK_CTX_TMP="$(mktemp 2> /dev/null)"; then
             echo "[warn] agent-stop: mktemp falhou; consecutive_unauthorized não atualizado" >&2
         else
-        jq --argjson c "$_NEW_CONSEC" \
-            --arg now "$NOW_ISO" \
-            '.compliance.consecutive_unauthorized = $c | .compliance.last_turn_authorized = false | .last_turn_ts = $now' \
-            "$CTX_FILE" > "$_BLOCK_CTX_TMP" 2> /dev/null \
-            && mv "$_BLOCK_CTX_TMP" "$CTX_FILE" \
-            || rm -f "$_BLOCK_CTX_TMP" 2> /dev/null
+            jq --argjson c "$_NEW_CONSEC" \
+                --arg now "$NOW_ISO" \
+                '.compliance.consecutive_unauthorized = $c | .compliance.last_turn_authorized = false | .last_turn_ts = $now' \
+                "$CTX_FILE" > "$_BLOCK_CTX_TMP" 2> /dev/null \
+                && mv "$_BLOCK_CTX_TMP" "$CTX_FILE" \
+                || rm -f "$_BLOCK_CTX_TMP" 2> /dev/null
         fi
         # Registra flag para o próximo briefing
         printf '%s\n' "TURN_BLOCKED|$(date -u +%Y-%m-%dT%H:%M:%SZ)|consecutive=${_NEW_CONSEC}" > "$AUTH_FLAG_FILE"
@@ -771,7 +771,7 @@ if [ -z "$CURR_SECTION_CHECK" ] || [ "$CURR_SECTION_CHECK" = "null" ]; then
             --arg auto_section_id "$_AUTO_SECTION_ID" \
             --argjson snum "$_NEXT_SECTION_NUM" \
             --argjson tnum "${_NEXT_TURN_AUTO:-1}" \
-            '.current_section = {name: "retomada", section_id: $auto_section_id, started_at: $ts, turn_start: $tnum, description: "Seção automática criada pela invariante SESSION+SECTION+TURN", section_number: $snum, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
+            '.current_section = {name: "retomada", section_id: $auto_section_id, started_at: $ts, turn_start: $tnum, local_turn: 0, description: "Seção automática criada pela invariante SESSION+SECTION+TURN", section_number: $snum, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
              | .session_stats.section_count = $snum
              | .session_stats.section_names += ["retomada"]
              | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: "retomada", section_id: $auto_section_id, section_number: $snum, started_at: $ts}] | if length > 50 then .[-50:] else . end)

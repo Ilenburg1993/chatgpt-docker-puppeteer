@@ -229,6 +229,10 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                  | .session_stats.turn_count  = 0
                  | .session_stats.failures_detected = 0
                  | .session_stats.turns_since_askQuestions = 0
+                 | .session_stats.prev_turn_authorized = (.session_stats.turn_authorized // 0)
+                 | .session_stats.prev_turn_no_askQuestions = (.session_stats.turn_no_askQuestions // 0)
+                 | .session_stats.turn_authorized = 0
+                 | .session_stats.turn_no_askQuestions = 0
                  | .compliance.consecutive_unauthorized = 0
                  | .compliance.last_turn_authorized = true
                  | .current_turn = {number: 0, section_turn: 0, todo_created: false,
@@ -253,6 +257,10 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                  | .session_stats.turn_count  = 0
                  | .session_stats.failures_detected = 0
                  | .session_stats.turns_since_askQuestions = 0
+                 | .session_stats.prev_turn_authorized = (.session_stats.turn_authorized // 0)
+                 | .session_stats.prev_turn_no_askQuestions = (.session_stats.turn_no_askQuestions // 0)
+                 | .session_stats.turn_authorized = 0
+                 | .session_stats.turn_no_askQuestions = 0
                  | .compliance.consecutive_unauthorized = 0
                  | .compliance.last_turn_authorized = true
                  | .current_turn = {number: 0, section_turn: 0, todo_created: false,

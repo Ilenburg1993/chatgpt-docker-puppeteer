@@ -2,9 +2,9 @@
 
 > **Status**: Canônico | **Última atualização**: 2026-03-10 | **Versão**: 5.0
 
-> **v5.0 — TURN Autônomo**: TURNs encerram livremente. `vscode_askQuestions` é **recomendado**
-> por TURN, mas **obrigatório** apenas para encerramento de SESSION (Template F + close_key) e
-> operações git commit/push (Template G).
+> **v5.0 — TURN Autônomo**: TURNs encerram livremente. `vscode_askQuestions` é **recomendado** por
+> TURN, mas **obrigatório** apenas para encerramento de SESSION (Template F + close_key) e operações
+> git commit/push (Template G).
 
 ---
 
@@ -21,11 +21,11 @@
 
 ## Problema
 
-O agente pode encerrar cada turno sem perguntar ao usuário o que fazer a seguir.
-Isso interrompe o fluxo de trabalho e cria sessões que "morrem silenciosamente".
+O agente pode encerrar cada turno sem perguntar ao usuário o que fazer a seguir. Isso interrompe o
+fluxo de trabalho e cria sessões que "morrem silenciosamente".
 
-**A falha mais comum**: o agente escreve "O que deseja fazer a seguir?" como **texto plano** —
-isso NÃO equivale a chamar a ferramenta `vscode_askQuestions`.
+**A falha mais comum**: o agente escreve "O que deseja fazer a seguir?" como **texto plano** — isso
+NÃO equivale a chamar a ferramenta `vscode_askQuestions`.
 
 ---
 
@@ -34,13 +34,15 @@ isso NÃO equivale a chamar a ferramenta `vscode_askQuestions`.
 > **TURNs encerram livremente.** Não há obrigação de `vscode_askQuestions` por TURN.
 >
 > **Obrigatório apenas para:**
+>
 > 1. Encerramento de **SESSION**: Template F + close_key `ENCERRAR-XXXXXXXX`
 > 2. Operações de **git commit/push**: Template G (pré-autorização)
 
-**Recomendado (boa prática):** chamar `vscode_askQuestions` após concluir tarefas,
-a cada ~5 TURNs sem perguntar (nudge periódico), ao propor mudança arquitetural.
+**Recomendado (boa prática):** chamar `vscode_askQuestions` após concluir tarefas, a cada ~5 TURNs
+sem perguntar (nudge periódico), ao propor mudança arquitetural.
 
 **Monitoramento informativo (sem bloqueio):**
+
 - Turno sem `vscode_askQuestions` → `turnEnd_no_askQuestions` em `audit.jsonl`
 - Turno com `vscode_askQuestions` → `turnEnd_authorized`
 - Nudge via `systemMessage` a cada `HOOKS_TURN_NUDGE_INTERVAL` TURNs (padrão: 5)
@@ -52,16 +54,20 @@ a cada ~5 TURNs sem perguntar (nudge periódico), ao propor mudança arquitetura
 ### Layer 1 — Instrução no contexto primário
 
 A regra está inscrita nos arquivos lidos no início de cada sessão:
-- `.github/copilot-instructions.md` → seção `Protocolo de Comunicação` (TURN autônomo, SESSION obrigatório)
+
+- `.github/copilot-instructions.md` → seção `Protocolo de Comunicação` (TURN autônomo, SESSION
+  obrigatório)
 - `.github/AGENTS.md` → seção `Protocolo de encerramento por nível` (v5.0)
 - `.github/instructions/hooks-protocol.instructions.md` → `applyTo: '**/*'`
 
 ### Layer 2 — Rastreamento por preToolUse
 
 Quando `vscode_askQuestions` é chamado, o hook `pre-tool-use.sh` registra:
+
 ```json
-{"current_turn": {"auth_requested": true, "auth_requested_at": "<ISO timestamp>"}}
+{ "current_turn": { "auth_requested": true, "auth_requested_at": "<ISO timestamp>" } }
 ```
+
 em `state/session-context.json`.
 
 ### Layer 3 — Detecção por agentStop
@@ -92,8 +98,8 @@ Estratégia 4 — Delegação via subagente (Hardening v6):
 ```
 
 > **Nota (v4.0)**: Estratégias 1 e 2 aceitam `subagentStart` como sinal alternativo a
-> `vscode_askQuestions`. Isso resolve falsos UNAUTHORIZED quando o agente delega trabalho
-> a um subagente sem ter chamado `vscode_askQuestions` antes.
+> `vscode_askQuestions`. Isso resolve falsos UNAUTHORIZED quando o agente delega trabalho a um
+> subagente sem ter chamado `vscode_askQuestions` antes.
 
 ### Layer 3.5 — ~~decision:block~~ (REMOVIDO — Fase 10, v5.0)
 
@@ -118,9 +124,11 @@ Quando o agente invoca `runSubagent` ou `Task`, o hook `pre-tool-use.sh` detecta
 
 1. Seta `current_turn.subagent_delegated = true` e `current_turn.auth_requested = true` no contexto
 2. Incrementa `session_stats.subagent_calls`
-3. Loga evento `subagentStart` no `audit.jsonl` (reconhecido como sinal de auth pelas Estratégias 1+2)
+3. Loga evento `subagentStart` no `audit.jsonl` (reconhecido como sinal de auth pelas Estratégias
+   1+2)
 
 Ao fim do turno, `agent-stop.sh` detecta:
+
 - O evento `subagentStart` via Estratégias 1 e 2 (busca em audit.jsonl), **OU**
 - O flag `subagent_delegated = true` via Estratégia 4 (busca em contexto)
 
@@ -143,6 +151,7 @@ Todos os hooks que recebem payload com `session_id` validam contra o `session.id
 - O hook encerra com `exit 0` (não bloqueia a extensão)
 
 **Scripts com guard ativo** (6 de 8 hooks auto-triggered):
+
 - `pre-tool-use.sh` — valida antes de gravar tool use
 - `post-tool-use.sh` — valida antes de gravar resultado
 - `agent-stop.sh` — valida antes de processar fim de turno
@@ -151,18 +160,19 @@ Todos os hooks que recebem payload com `session_id` validam contra o `session.id
 - `subagent-stop.sh` — valida antes de incrementar subagent_calls
 
 **Scripts sem guard (por design)**:
+
 - `session-start.sh` — é o criador do session.id (cria o contexto)
 - `session-end.sh` — encerramento é legítimo mesmo com session_id diferente
 
 **Vetor de ataque mitigado**: testes inline ou prompts de outra sessão que sobrescreviam
-`session-context.json` com dados de uma sessão diferente. Agora, qualquer payload com
-`session_id` diferente do contexto ativo é ignorado silenciosamente (mas auditado).
+`session-context.json` com dados de uma sessão diferente. Agora, qualquer payload com `session_id`
+diferente do contexto ativo é ignorado silenciosamente (mas auditado).
 
 ### Layer 4 — Alerta na próxima sessão (informativo, v5.0)
 
-Se um `UNAUTHORIZED_CLOSE.flag` residual (de sessões anteriores ao v5.0) ou um `SESSION_CLOSE_NO_KEY.flag`
-for detectado, `session-start.sh` injeta aviso no `session-briefing.md`. Em v5.0, esse aviso é
-**informativo** — não exige ação obrigatória do agente:
+Se um `UNAUTHORIZED_CLOSE.flag` residual (de sessões anteriores ao v5.0) ou um
+`SESSION_CLOSE_NO_KEY.flag` for detectado, `session-start.sh` injeta aviso no `session-briefing.md`.
+Em v5.0, esse aviso é **informativo** — não exige ação obrigatória do agente:
 
 ```
 ⚡ AVISO — SESSÃO ANTERIOR ENCERRADA SEM session-end.sh
@@ -176,20 +186,21 @@ A close_key não pôde ser validada — encerramento não auditado.
 Ação recomendada: verificar se havia trabalho pendente.
 ```
 
-> **Obs.**: com o modelo TURN Autônomo (v5.0), o alerta de `UNAUTHORIZED_CLOSE` por TURN
-> não é mais gerado por `agent-stop.sh`. O único mecanismo residual é o `SESSION_CLOSE_NO_KEY.flag`
-> criado por `session-end.sh` quando a `close_key` não é fornecida.
+> **Obs.**: com o modelo TURN Autônomo (v5.0), o alerta de `UNAUTHORIZED_CLOSE` por TURN não é mais
+> gerado por `agent-stop.sh`. O único mecanismo residual é o `SESSION_CLOSE_NO_KEY.flag` criado por
+> `session-end.sh` quando a `close_key` não é fornecida.
 
 ---
 
 ## Reset de `current_turn.auth_requested` — Crítico
 
-O campo `current_turn.auth_requested` deve ser resetado para `false` entre turnos.
-Sem este reset, autorização do turno N vazaria para o turno N+1 (falso positivo).
+O campo `current_turn.auth_requested` deve ser resetado para `false` entre turnos. Sem este reset,
+autorização do turno N vazaria para o turno N+1 (falso positivo).
 
 **Dois pontos de reset (belt-and-suspenders):**
 
 1. `agent-stop.sh` → ao final do processamento de cada turno:
+
    ```bash
    jq '.current_turn.auth_requested = false | .current_turn.auth_requested_at = null' ...
    ```
@@ -206,43 +217,51 @@ Sem este reset, autorização do turno N vazaria para o turno N+1 (falso positiv
 ### `UNAUTHORIZED_CLOSE.flag`
 
 Presente quando há violação ativa. Schema:
+
 ```json
 {
-    "timestamp": "2026-03-09T03:15:08Z",
-    "session_id": "a0be08af-7a26-42d8-b8a5-3c43206494c7",
-    "turn_count": 2,
-    "violation": "Turno encerrado sem chamar vscode_askQuestions",
-    "severity": "critical"
+  "timestamp": "2026-03-09T03:15:08Z",
+  "session_id": "a0be08af-7a26-42d8-b8a5-3c43206494c7",
+  "turn_count": 2,
+  "violation": "Turno encerrado sem chamar vscode_askQuestions",
+  "severity": "critical"
 }
 ```
 
 **Ciclo de vida (v5.0)**:
-- **Criado**: por `session-end.sh` como safety net se SESSION encerra sem `close_key` → [HISTÓRICO: em v4.x era criado por `agent-stop.sh` a cada TURN sem autorização]
+
+- **Criado**: por `session-end.sh` como safety net se SESSION encerra sem `close_key` → [HISTÓRICO:
+  em v4.x era criado por `agent-stop.sh` a cada TURN sem autorização]
 - **Removido**: por `session-start.sh` se pertence a sessão diferente da atual (stale auto-cleanup)
 - **Reset manual**: `bash reset-auth-violation.sh "motivo"`
 
-> Em v5.0, `agent-stop.sh` **não cria** `UNAUTHORIZED_CLOSE.flag`. TURNs encerram livremente.
-> O flag pode existir como artefato de sessões anteriores ao v5.0 (limpeza automática no `session-start.sh`).
+> Em v5.0, `agent-stop.sh` **não cria** `UNAUTHORIZED_CLOSE.flag`. TURNs encerram livremente. O flag
+> pode existir como artefato de sessões anteriores ao v5.0 (limpeza automática no
+> `session-start.sh`).
 
 ---
 
 ### `SESSION_CLOSE_NO_KEY.flag` ← NEW (Schema v3)
 
 Presente quando a SESSION foi encerrada sem a `close_key` validada. Schema:
+
 ```json
 {
-    "session_id": "a0be08af-7a26-42d8-b8a5-3c43206494c7",
-    "timestamp": "2026-03-09T03:15:08Z",
-    "note": "SESSION encerrada sem close_key validada"
+  "session_id": "a0be08af-7a26-42d8-b8a5-3c43206494c7",
+  "timestamp": "2026-03-09T03:15:08Z",
+  "note": "SESSION encerrada sem close_key validada"
 }
 ```
 
 **Ciclo de vida**:
+
 - **Criado**: por `session-end.sh` quando `session.close_key_validated = false` ao encerrar
-- **Removido**: por `session-end.sh` quando `session.close_key_validated = true` — encerramento legítimo
+- **Removido**: por `session-end.sh` quando `session.close_key_validated = true` — encerramento
+  legítimo
 - **Alertado**: próximo `session-briefing.md` exibe bloco `🔑 ENCERRAMENTO SEM CHAVE`
 
 **O que fazer quando encontrar esta flag**:
+
 1. Verificar `audit.jsonl` para eventos `sessionEnd_no_key` — identificar a sessão
 2. Verificar se houve evento `sessionClose_key_validated` naquela sessão
 3. Se não houve → encerramento não autorizado — registrar finding e investigar causa
@@ -266,11 +285,14 @@ Fluxo de encerramento autorizado:
 ```
 
 **Geração da chave**:
-- `session-start.sh` gera: `ENCERRAR-$(head -c 4 /dev/urandom | xxd -p | tr 'a-z' 'A-Z' | head -c 8)`
+
+- `session-start.sh` gera:
+  `ENCERRAR-$(head -c 4 /dev/urandom | xxd -p | tr 'a-z' 'A-Z' | head -c 8)`
 - Ex: `ENCERRAR-7A3F2B1C` — 8 caracteres hexadecimais maiúsculos
 - Única por sessão — muda a cada `sessionStart`
 
 **Anúncio da chave**:
+
 - Exibida no `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO`
 - Disponível em `session-context.json` → campo `session.close_key`
 
@@ -298,15 +320,17 @@ Todos registrados em `logs/audit.jsonl`:
 ## Métricas de Conformidade
 
 O `generate-daily-report.sh` calcula:
+
 - `TURNS_AUTHORIZED` — turnos conformes no dia
 - `TURNS_VIOLATED` — turnos em violação no dia
 - Taxa de conformidade: `TURNS_AUTHORIZED / (TURNS_AUTHORIZED + TURNS_VIOLATED) * 100`
 
 Query manual:
+
 ```bash
 # Taxa de conformidade histórica
 jq -r 'select(.event | startswith("turnEnd")) | .event' \
-    .github/hooks/logs/audit.jsonl | sort | uniq -c
+  .github/hooks/logs/audit.jsonl | sort | uniq -c
 ```
 
 ---
@@ -317,27 +341,29 @@ jq -r 'select(.event | startswith("turnEnd")) | .event' \
 
 **Hardening v6** introduziu delegação automática: quando o agente invoca `runSubagent` ou `Task`,
 `pre-tool-use.sh` seta `current_turn.subagent_delegated = true` e loga `subagentStart` em
-`audit.jsonl`. O `agent-stop.sh` reconhece esse sinal como autorização implícita (Estratégias 1,
-2 e 4), evitando falsos UNAUTHORIZED.
+`audit.jsonl`. O `agent-stop.sh` reconhece esse sinal como autorização implícita (Estratégias 1, 2 e
+4), evitando falsos UNAUTHORIZED.
 
 **Subagentes em si** (via `subagent-stop.sh`) não implementam o protocolo de autorização — são
-processos temporários controlados pelo agente pai. A autorização é detectada no lado do pai via
-os mecanismos acima.
+processos temporários controlados pelo agente pai. A autorização é detectada no lado do pai via os
+mecanismos acima.
 
 ### Sessões que terminam abruptamente
 
-Quando o VS Code / Copilot é fechado sem chamar `session-end.sh`, a sessão encerra sem validar
-a `close_key`. O próximo `session-start.sh` detecta o encerramento abrupto verificando se há
-evento `sessionEnd` no `audit.jsonl` para a sessão anterior e exibe aviso no `session-briefing.md`.
+Quando o VS Code / Copilot é fechado sem chamar `session-end.sh`, a sessão encerra sem validar a
+`close_key`. O próximo `session-start.sh` detecta o encerramento abrupto verificando se há evento
+`sessionEnd` no `audit.jsonl` para a sessão anterior e exibe aviso no `session-briefing.md`.
 
-> **Hardening v5.0**: `session-start.sh` detecta abrupt close via ausência de `sessionEnd`
-> no audit para a sessão anterior, e injeta aviso `SESSION_ABRUPT_CLOSE` no briefing.
+> **Hardening v5.0**: `session-start.sh` detecta abrupt close via ausência de `sessionEnd` no audit
+> para a sessão anterior, e injeta aviso `SESSION_ABRUPT_CLOSE` no briefing.
 
 ### Restart do container
 
-`session-start.sh` recupera `session-context.json` existente (incluindo `consecutive_unauthorized_closes`).
-O `UNAUTHORIZED_CLOSE.flag` persiste em disco — sobrevive a restarts.
+`session-start.sh` recupera `session-context.json` existente (incluindo
+`consecutive_unauthorized_closes`). O `UNAUTHORIZED_CLOSE.flag` persiste em disco — sobrevive a
+restarts.
 
 ---
 
-*Para instruções ao agente, ver [.github/AGENTS.md](../../AGENTS.md) e [.github/copilot-instructions.md](../../copilot-instructions.md).*
+_Para instruções ao agente, ver [.github/AGENTS.md](../../AGENTS.md) e
+[.github/copilot-instructions.md](../../copilot-instructions.md)._

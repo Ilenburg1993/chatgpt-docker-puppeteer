@@ -1,10 +1,10 @@
 # Referência Definitiva — Hooks do GitHub Copilot Chat
 
-**Versão**: 1.0 — github.copilot-chat-0.38.2
-**Última atualização**: 2026-01
-**Status**: Canônico. Baseado em documentação oficial + análise empírica do source.
+**Versão**: 1.0 — github.copilot-chat-0.38.2 **Última atualização**: 2026-01 **Status**: Canônico.
+Baseado em documentação oficial + análise empírica do source.
 
 > Este documento combina:
+>
 > - Documentação oficial em `hooks.md` (bundled na extensão)
 > - Análise direta do source `extension.js` (~18MB) e `cli.js` (~12MB)
 > - Confirmação empírica via `audit.jsonl` (1990+ eventos de sessão real)
@@ -74,9 +74,9 @@
 └────────────────────────────────────────────────────────────┘
 ```
 
-**Ponto-chave**: A extensão VSCode só conhece PascalCase. O CLI faz a tradução.
-Mesmo que nosso `copilot-hooks.json` use camelCase/bash/timeoutSec, funciona
-porque a conversão ocorre no CLI **antes** de chegar à extensão.
+**Ponto-chave**: A extensão VSCode só conhece PascalCase. O CLI faz a tradução. Mesmo que nosso
+`copilot-hooks.json` use camelCase/bash/timeoutSec, funciona porque a conversão ocorre no CLI
+**antes** de chegar à extensão.
 
 ---
 
@@ -144,8 +144,8 @@ porque a conversão ocorre no CLI **antes** de chegar à extensão.
 | `subagentStart`       | `SubagentStart`      |
 | `preCompact`          | `PreCompact`         |
 
-> **errorOccurred** foi removido do copilot-hooks.json (commit 4ceb3a52) — nunca
-> disparava (não existe no array `Mti` do SDK). Substituído por `postToolUseFailure`.
+> **errorOccurred** foi removido do copilot-hooks.json (commit 4ceb3a52) — nunca disparava (não
+> existe no array `Mti` do SDK). Substituído por `postToolUseFailure`.
 
 ### 3.2 Formato .claude/settings.json (SDK nativo, PascalCase)
 
@@ -198,7 +198,7 @@ async executeHook(eventName, hooksMap, payload, sessionId, token) {
 }
 ```
 
-### 4.2 HookExecutor._spawn() — processo filho
+### 4.2 HookExecutor.\_spawn() — processo filho
 
 Localizado em `extension.js` (classe `gce`, pos ~17651125):
 
@@ -233,20 +233,21 @@ _spawn(hookConfig, payload, cancellationToken) {
 
 ```json
 {
-    "timestamp":       "2026-01-27T12:34:56.789Z",
-    "hook_event_name": "PreToolUse",
-    "session_id":      "a0be08af-7a26-42d8-b8a5-3c43206494c7",
-    "transcript_path": "/path/to/transcript.jsonl",
-    "cwd":             "/workspaces/chatgpt-docker-puppeteer"
+  "timestamp": "2026-01-27T12:34:56.789Z",
+  "hook_event_name": "PreToolUse",
+  "session_id": "a0be08af-7a26-42d8-b8a5-3c43206494c7",
+  "transcript_path": "/path/to/transcript.jsonl",
+  "cwd": "/workspaces/chatgpt-docker-puppeteer"
 }
 ```
 
-> **Nota**: `cwd` é adicionado apenas se configurado no hook (`hookConfig.cwd`).
-> `transcript_path` pode ser ausente se o transcript ainda não foi criado.
+> **Nota**: `cwd` é adicionado apenas se configurado no hook (`hookConfig.cwd`). `transcript_path`
+> pode ser ausente se o transcript ainda não foi criado.
 
 ### 5.2 Payloads específicos por hook
 
 #### PreToolUse
+
 ```json
 {
     "...campos_base...",
@@ -256,6 +257,7 @@ _spawn(hookConfig, payload, cancellationToken) {
 ```
 
 #### PostToolUse
+
 ```json
 {
     "...campos_base...",
@@ -266,6 +268,7 @@ _spawn(hookConfig, payload, cancellationToken) {
 ```
 
 #### PostToolUseFailure
+
 ```json
 {
     "...campos_base...",
@@ -277,6 +280,7 @@ _spawn(hookConfig, payload, cancellationToken) {
 ```
 
 #### PermissionRequest
+
 ```json
 {
     "...campos_base...",
@@ -287,6 +291,7 @@ _spawn(hookConfig, payload, cancellationToken) {
 ```
 
 #### UserPromptSubmit ⚠️ RARO
+
 ```json
 {
     "...campos_base...",
@@ -295,6 +300,7 @@ _spawn(hookConfig, payload, cancellationToken) {
 ```
 
 #### Stop (agentStop)
+
 ```json
 {
     "...campos_base...",
@@ -302,11 +308,11 @@ _spawn(hookConfig, payload, cancellationToken) {
 }
 ```
 
-> `stop_hook_active: true` significa que o Stop foi iniciado **por um hook**
-> (prevenção de recursão). O hook deve verificar este campo antes de tentar
-> bloquear novamente.
+> `stop_hook_active: true` significa que o Stop foi iniciado **por um hook** (prevenção de
+> recursão). O hook deve verificar este campo antes de tentar bloquear novamente.
 
 #### SubagentStart
+
 ```json
 {
     "...campos_base...",
@@ -316,6 +322,7 @@ _spawn(hookConfig, payload, cancellationToken) {
 ```
 
 #### SubagentStop
+
 ```json
 {
     "...campos_base...",
@@ -326,6 +333,7 @@ _spawn(hookConfig, payload, cancellationToken) {
 ```
 
 #### PreCompact
+
 ```json
 {
     "...campos_base...",
@@ -337,6 +345,7 @@ _spawn(hookConfig, payload, cancellationToken) {
 > `trigger`: `"manual"` ou `"auto"`.
 
 #### SessionStart
+
 ```json
 {
     "...campos_base...",
@@ -347,6 +356,7 @@ _spawn(hookConfig, payload, cancellationToken) {
 > `source`: `"startup"` | `"resume"` | `"clear"` | `"compact"`.
 
 #### SessionEnd
+
 ```json
 {
     "...campos_base...",
@@ -357,6 +367,7 @@ _spawn(hookConfig, payload, cancellationToken) {
 > `reason`: `"clear"` | `"logout"` | `"prompt_input_exit"` | `"other"`.
 
 #### Notification
+
 ```json
 {
     "...campos_base...",
@@ -376,9 +387,9 @@ O hook escreve JSON no stdout (exit 0). A extensão faz JSON.parse do stdout.
 
 ```json
 {
-    "continue":    true,
-    "stopReason":  "motivo opcional",
-    "systemMessage": "mensagem injetada no contexto do agente"
+  "continue": true,
+  "stopReason": "motivo opcional",
+  "systemMessage": "mensagem injetada no contexto do agente"
 }
 ```
 
@@ -388,9 +399,9 @@ O hook escreve JSON no stdout (exit 0). A extensão faz JSON.parse do stdout.
 
 ```json
 {
-    "hookSpecificOutput": {
-        "permissionDecision": "allow"
-    }
+  "hookSpecificOutput": {
+    "permissionDecision": "allow"
+  }
 }
 ```
 
@@ -400,7 +411,7 @@ O hook escreve JSON no stdout (exit 0). A extensão faz JSON.parse do stdout.
 
 ```json
 {
-    "decision": "block"
+  "decision": "block"
 }
 ```
 
@@ -410,20 +421,20 @@ O hook escreve JSON no stdout (exit 0). A extensão faz JSON.parse do stdout.
 
 ```json
 {
-    "decision": "block"
+  "decision": "block"
 }
 ```
 
-> `decision: "block"` → `shouldContinue: true` na extensão → **o agente continua rodando**
-> em vez de encerrar o turno. Use com cautela: pode criar loop infinito.
+> `decision: "block"` → `shouldContinue: true` na extensão → **o agente continua rodando** em vez de
+> encerrar o turno. Use com cautela: pode criar loop infinito.
 
 #### SessionStart — contexto adicional
 
 ```json
 {
-    "hookSpecificOutput": {
-        "additionalContext": "texto injetado no início da sessão"
-    }
+  "hookSpecificOutput": {
+    "additionalContext": "texto injetado no início da sessão"
+  }
 }
 ```
 
@@ -441,8 +452,8 @@ O hook escreve JSON no stdout (exit 0). A extensão faz JSON.parse do stdout.
 
 Lista completa extraída do source (array `Mti` em `extension.js`, pos ~1066861):
 
-| Evento SDK (PascalCase) | Documentado oficialmente       | Configurável em nosso hooks        |
-| ----------------------- | ------------------------------ | ---------------------------------- |
+| Evento SDK (PascalCase) | Documentado oficialmente        | Configurável em nosso hooks         |
+| ----------------------- | ------------------------------- | ----------------------------------- |
 | `SessionStart`          | ✅ Sim                          | ✅ via `sessionStart`               |
 | `UserPromptSubmit`      | ✅ Sim                          | ✅ via `userPromptSubmitted` (RARO) |
 | `PreToolUse`            | ✅ Sim                          | ✅ via `preToolUse`                 |
@@ -462,9 +473,9 @@ Lista completa extraída do source (array `Mti` em `extension.js`, pos ~1066861)
 | `WorktreeCreate`        | ❌ Não documentado              | ❌ não configurado                  |
 | `WorktreeRemove`        | ❌ Não documentado              | ❌ não configurado                  |
 
-> **errorOccurred** foi removido do copilot-hooks.json (commit 4ceb3a52).
-> Substituído por `postToolUseFailure` (SDK `PostToolUseFailure`).
-> O script `error-occurred.sh` permanece no filesystem como legacy.
+> **errorOccurred** foi removido do copilot-hooks.json (commit 4ceb3a52). Substituído por
+> `postToolUseFailure` (SDK `PostToolUseFailure`). O script `error-occurred.sh` permanece no
+> filesystem como legacy.
 
 ---
 
@@ -498,8 +509,8 @@ Lista completa extraída do source (array `Mti` em `extension.js`, pos ~1066861)
 | **Nosso script**       | `.github/hooks/scripts/log-prompt.sh`                                              |
 | **Uso atual**          | Registra prompt, marca `current_turn.started_at`                                   |
 
-**IMPORTANTE PARA ARQUITETURA**: Não usar `userPromptSubmitted` como marcador de início de turno.
-A maioria das interações (via `vscode_askQuestions`) **não dispara** este hook.
+**IMPORTANTE PARA ARQUITETURA**: Não usar `userPromptSubmitted` como marcador de início de turno. A
+maioria das interações (via `vscode_askQuestions`) **não dispara** este hook.
 
 **Confirmação empírica**: ~4 eventos vs 1990+ tool events na mesma sessão.
 
@@ -548,11 +559,12 @@ A maioria das interações (via `vscode_askQuestions`) **não dispara** este hoo
 | **Uso atual**        | Verifica autorização, registra fim de turno, reseta estado     |
 
 **`stop_hook_active` explicado**:
+
 - `false` → parada normal do agente (caso padrão)
 - `true` → esta parada foi iniciada **por um hook** (prevenção de recursão infinita)
 
-Se o seu Stop hook retornar `decision: block` quando `stop_hook_active: true`,
-causará recursão infinita. **Sempre verificar este campo antes de bloquear.**
+Se o seu Stop hook retornar `decision: block` quando `stop_hook_active: true`, causará recursão
+infinita. **Sempre verificar este campo antes de bloquear.**
 
 **Confirmação empírica**: 4 agentStop eventos em audit.jsonl — 1 por turno de agente.
 
@@ -580,8 +592,8 @@ causará recursão infinita. **Sempre verificar este campo antes de bloquear.**
 | **Nosso script**     | `.github/hooks/scripts/session-end.sh`                            |
 | **Uso atual**        | Gera relatório final da sessão                                    |
 
-**Nota**: `SessionEnd` não está na documentação oficial bundled (`hooks.md`),
-mas existe na lista `Mti` do source e funciona empiricamente.
+**Nota**: `SessionEnd` não está na documentação oficial bundled (`hooks.md`), mas existe na lista
+`Mti` do source e funciona empiricamente.
 
 ---
 
@@ -591,7 +603,7 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 | ------------------ | ---------------------------------------------------------------- |
 | **Quando dispara** | Após uma chamada de ferramenta falhar (erro, timeout)            |
 | **Mapeamento SDK** | `PostToolUseFailure` (confirmado no array `Mti`)                 |
-| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                                    |
+| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                                   |
 | **Nosso script**   | `.github/hooks/scripts/tool-use-failure.sh`                      |
 | **Funcionalidade** | Loga falha, incrementa failures_detected/errors_total no context |
 
@@ -601,7 +613,7 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 | ------------------ | --------------------------------------------------------- |
 | **Quando dispara** | Quando um subagente é iniciado pelo agente principal      |
 | **Mapeamento SDK** | `SubagentStart` (confirmado no array `Mti`)               |
-| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                             |
+| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                            |
 | **Nosso script**   | `.github/hooks/scripts/subagent-start.sh`                 |
 | **Funcionalidade** | Loga início, incrementa subagent_calls no session-context |
 
@@ -611,7 +623,7 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 | ------------------ | ------------------------------------------------------------- |
 | **Quando dispara** | Antes do Copilot compactar o contexto da conversa             |
 | **Mapeamento SDK** | `PreCompact` (confirmado no array `Mti`)                      |
-| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                                 |
+| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                                |
 | **Nosso script**   | `.github/hooks/scripts/pre-compact.sh`                        |
 | **Funcionalidade** | Cria checkpoint completo, incrementa compaction_count, alerta |
 
@@ -619,7 +631,7 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 
 | Aspecto             | Detalhe                                                     |
 | ------------------- | ----------------------------------------------------------- |
-| **Status**          | ❌ Removido do copilot-hooks.json (commit 4ceb3a52)          |
+| **Status**          | ❌ Removido do copilot-hooks.json (commit 4ceb3a52)         |
 | **Motivo**          | Não existe no array `Mti` do SDK — nunca disparava          |
 | **Substituído por** | `postToolUseFailure` → `tool-use-failure.sh`                |
 | **Script legacy**   | `error-occurred.sh` mantido no filesystem (não configurado) |
@@ -630,8 +642,8 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 
 Estado atual (`copilot-hooks.json` commitado, versão pós-8bacbd21):
 
-| Chave no JSON         | SDK PascalCase       | Nosso script          | Status  | Frequência       |
-| --------------------- | -------------------- | --------------------- | ------- | ---------------- |
+| Chave no JSON         | SDK PascalCase       | Nosso script          | Status   | Frequência       |
+| --------------------- | -------------------- | --------------------- | -------- | ---------------- |
 | `sessionStart`        | `SessionStart`       | `session-start.sh`    | ✅ ativo | 1/sessão         |
 | `userPromptSubmitted` | `UserPromptSubmit`   | `log-prompt.sh`       | ✅ ativo | Raro (~4/sessão) |
 | `preToolUse`          | `PreToolUse`         | `pre-tool-use.sh`     | ✅ ativo | ~1000/sessão     |
@@ -650,12 +662,12 @@ Estado atual (`copilot-hooks.json` commitado, versão pós-8bacbd21):
 ```json
 // .vscode/settings.json
 {
-    "chat.useClaudeHooks": true
+  "chat.useClaudeHooks": true
 }
 ```
 
-Esta configuração instrui o CLI (cli.js) a ler `.github/hooks/copilot-hooks.json`
-e repassar os hooks à extensão VSCode.
+Esta configuração instrui o CLI (cli.js) a ler `.github/hooks/copilot-hooks.json` e repassar os
+hooks à extensão VSCode.
 
 ---
 
@@ -663,8 +675,8 @@ e repassar os hooks à extensão VSCode.
 
 ### 10.1 Marcadores confiáveis de entrada/saída
 
-| Evento de ciclo        | Hook usado                                 | Confiabilidade            |
-| ---------------------- | ------------------------------------------ | ------------------------- |
+| Evento de ciclo        | Hook usado                                 | Confiabilidade             |
+| ---------------------- | ------------------------------------------ | -------------------------- |
 | Início de SESSION      | `sessionStart` → `session-start.sh`        | ✅ 100% (1/sessão)         |
 | Início de TURN         | `preToolUse` do 1º tool OU `start-turn.sh` | ⚠️ Indireto                |
 | Início de TURN (ideal) | `userPromptSubmitted`                      | ❌ Raro — só prompt direto |
@@ -674,18 +686,19 @@ e repassar os hooks à extensão VSCode.
 ### 10.2 Por que não usar userPromptSubmitted como start-turn
 
 `UserPromptSubmit` NÃO dispara quando:
+
 - O usuário responde a um `vscode_askQuestions` (o caso mais comum!)
 - A sessão retoma após compactação
 - O agente continua a partir de context injection
 
-**Conclusão**: O único marcador confiável de início de turno é inferir pelo
-`agentStop` anterior (o turno começa quando o turno anterior terminou).
-Ou usar `preToolUse` da primeira ferramenta como proxy.
+**Conclusão**: O único marcador confiável de início de turno é inferir pelo `agentStop` anterior (o
+turno começa quando o turno anterior terminou). Ou usar `preToolUse` da primeira ferramenta como
+proxy.
 
 ### 10.3 Detecção de vscode_askQuestions
 
-Usa `postToolUse`: quando `tool_name == "vscode_askQuestions"`,
-seta `current_turn.auth_requested = true`.
+Usa `postToolUse`: quando `tool_name == "vscode_askQuestions"`, seta
+`current_turn.auth_requested = true`.
 
 O `agentStop` então verifica este flag para determinar se o turno foi autorizado.
 
@@ -749,41 +762,35 @@ async executeSessionStartHook(payload, sessionId, hooks, token) {
 
 ```javascript
 // Chamado automaticamente antes de qualquer compactação
-await chatHookService.executeHook(
-    "PreCompact",
-    hooks,
-    { trigger: "auto" },
-    sessionId,
-    token
-);
+await chatHookService.executeHook('PreCompact', hooks, { trigger: 'auto' }, sessionId, token);
 ```
 
 ### 11.4 Lista HOOK_EVENTS completa (array Mti, pos ~1066861)
 
 ```javascript
 const Mti = [
-    "PreToolUse",       // ✅ documentado, suportado
-    "PostToolUse",      // ✅ documentado, suportado
-    "PostToolUseFailure", // ❌ não documentado
-    "Notification",     // ❌ não documentado
-    "UserPromptSubmit", // ✅ documentado, raro
-    "SessionStart",     // ✅ documentado, suportado
-    "SessionEnd",       // ✅ suportado (não na doc oficial)
-    "Stop",             // ✅ documentado (nosso agentStop)
-    "SubagentStart",    // ✅ documentado
-    "SubagentStop",     // ✅ documentado, suportado
-    "PreCompact",       // ✅ documentado
-    "PermissionRequest",// ❌ não documentado
-    "Setup",            // ❌ não documentado
-    "TeammateIdle",     // ❌ não documentado
-    "TaskCompleted",    // ❌ não documentado
-    "ConfigChange",     // ❌ não documentado
-    "WorktreeCreate",   // ❌ não documentado
-    "WorktreeRemove"    // ❌ não documentado
+  'PreToolUse', // ✅ documentado, suportado
+  'PostToolUse', // ✅ documentado, suportado
+  'PostToolUseFailure', // ❌ não documentado
+  'Notification', // ❌ não documentado
+  'UserPromptSubmit', // ✅ documentado, raro
+  'SessionStart', // ✅ documentado, suportado
+  'SessionEnd', // ✅ suportado (não na doc oficial)
+  'Stop', // ✅ documentado (nosso agentStop)
+  'SubagentStart', // ✅ documentado
+  'SubagentStop', // ✅ documentado, suportado
+  'PreCompact', // ✅ documentado
+  'PermissionRequest', // ❌ não documentado
+  'Setup', // ❌ não documentado
+  'TeammateIdle', // ❌ não documentado
+  'TaskCompleted', // ❌ não documentado
+  'ConfigChange', // ❌ não documentado
+  'WorktreeCreate', // ❌ não documentado
+  'WorktreeRemove', // ❌ não documentado
 ];
 ```
 
 ---
 
-*Baseado em análise de `github.copilot-chat-0.38.2` (extension.js ~18MB, cli.js ~12MB)
-e confirmação empírica com sessão real de 1990+ eventos.*
+_Baseado em análise de `github.copilot-chat-0.38.2` (extension.js ~18MB, cli.js ~12MB) e confirmação
+empírica com sessão real de 1990+ eventos._

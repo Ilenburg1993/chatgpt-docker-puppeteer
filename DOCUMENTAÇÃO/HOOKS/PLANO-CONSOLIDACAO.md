@@ -1,7 +1,7 @@
 # Plano de Consolidação — Sistema de Hooks (Sessão 7)
 
-> **Status**: Em elaboração | **Data**: 2026-03-09
-> **Decisões do usuário**: Registradas via vscode_askQuestions em 2026-03-09
+> **Status**: Em elaboração | **Data**: 2026-03-09 **Decisões do usuário**: Registradas via
+> vscode_askQuestions em 2026-03-09
 
 ---
 
@@ -82,15 +82,17 @@ SESSION (1 por dia — premium apenas na inicialização)
 
 ### Problema
 
-O `sessionEnd` é disparado pelo Copilot quando a janela fecha — **por qualquer razão**:
-crash, timeout, fechamento acidental, ou encerramento legítimo. Atualmente, não há
-distinção auditável entre esses casos.
+O `sessionEnd` é disparado pelo Copilot quando a janela fecha — **por qualquer razão**: crash,
+timeout, fechamento acidental, ou encerramento legítimo. Atualmente, não há distinção auditável
+entre esses casos.
 
 ### Solução: Chave Dinâmica por Sessão
 
 #### Decisões do usuário (2026-03-09):
+
 - **Formato**: `ENCERRAR-XXXXXXXX` (8 caracteres hex aleatórios, maiúsculos) — dinâmica por sessão
-- **Captura**: TODAS as respostas de `vscode_askQuestions` + última resposta no `session-context.json`
+- **Captura**: TODAS as respostas de `vscode_askQuestions` + última resposta no
+  `session-context.json`
 - **Sem chave**: `SESSION_CLOSE_NO_KEY.flag` + alerta no próximo briefing
 - **Anúncio**: Template E (Session Kickoff) + `session-briefing.md`
 
@@ -174,6 +176,7 @@ session-end.sh:
 ### Template E — Session Kickoff (ATUALIZADO)
 
 O Template E já existe no AGENTS.md. Adicionar:
+
 - Anúncio da `session.close_key` lida do `session-context.json`
 - Instrução: "Esta chave deve ser digitada ao encerrar a sessão"
 
@@ -184,10 +187,10 @@ O Template E já existe no AGENTS.md. Adicionar:
   "header": "Encerramento de Sessão",
   "question": "Para confirmar o encerramento, digite a CHAVE DE ENCERRAMENTO informada no início desta sessão.",
   "options": [
-    {"label": "Encerrar sem commitar — mudanças preservadas localmente"},
-    {"label": "Commitar e encerrar"},
-    {"label": "Não encerrar agora — continuar trabalhando"},
-    {"allowFreeformInput": true, "label": "Digite a CHAVE: ENCERRAR-XXXXXXXX"}
+    { "label": "Encerrar sem commitar — mudanças preservadas localmente" },
+    { "label": "Commitar e encerrar" },
+    { "label": "Não encerrar agora — continuar trabalhando" },
+    { "allowFreeformInput": true, "label": "Digite a CHAVE: ENCERRAR-XXXXXXXX" }
   ]
 }
 ```
@@ -227,15 +230,19 @@ O Template E já existe no AGENTS.md. Adicionar:
 ## 6. Arquivos Modificados
 
 ### Scripts
+
 - `.github/hooks/scripts/session-start.sh` — geração de close_key + alerta
 - `.github/hooks/scripts/post-tool-use.sh` — captura de respostas askQuestions
 - `.github/hooks/scripts/session-end.sh` — validação da close_key
 
 ### State files (novos/modificados)
-- `.github/hooks/state/session-context.json` — schema v3 (close_key, close_key_validated, last_askquestions_response)
+
+- `.github/hooks/state/session-context.json` — schema v3 (close_key, close_key_validated,
+  last_askquestions_response)
 - `.github/hooks/state/SESSION_CLOSE_NO_KEY.flag` — novo flag file (gitignored)
 
 ### Documentação
+
 - `DOCUMENTAÇÃO/HOOKS/AGENTS.md` — definições + Template F
 - `DOCUMENTAÇÃO/HOOKS/PROTOCOLO-AUTORIZACAO.md` — session close key
 - `DOCUMENTAÇÃO/HOOKS/README.md` — schema v3 + eventos
@@ -247,10 +254,11 @@ O Template E já existe no AGENTS.md. Adicionar:
 ## 7. Gitignore
 
 Adicionar ao `.gitignore`:
+
 ```
 .github/hooks/state/SESSION_CLOSE_NO_KEY.flag
 ```
 
 ---
 
-*Criado em 2026-03-09 durante sessão de consolidação arquitetural.*
+_Criado em 2026-03-09 durante sessão de consolidação arquitetural._

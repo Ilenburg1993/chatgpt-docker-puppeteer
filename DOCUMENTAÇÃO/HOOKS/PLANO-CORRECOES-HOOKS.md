@@ -1,15 +1,13 @@
 # Plano de Correções, Aprimoramentos e Upgrades do Sistema de Hooks
 
-**Versão**: 1.1
-**Data de criação**: 2026-03-11
-**Última atualização**: 2026-03-11 (Sessão de implementação — fase 1 concluída)
-**Status**: Ativo — documento vivo atualizado continuamente
+**Versão**: 1.1 **Data de criação**: 2026-03-11 **Última atualização**: 2026-03-11 (Sessão de
+implementação — fase 1 concluída) **Status**: Ativo — documento vivo atualizado continuamente
 **Complemento**: `GUIA-HOOKS-COPILOT.md` (arquitetura, fluxo, conceitos permanentes)
 
 > **Propósito**: Este documento registra todos os bugs identificados, correções propostas,
-> aprimoramentos e upgrades do sistema de hooks. Diferentemente do GUIA (que documenta a
-> arquitetura e os conceitos estáveis), este documento é evolutivo: cada sessão de trabalho
-> pode adicionar novas entradas, marcar itens como concluídos, e registrar decisões tomadas.
+> aprimoramentos e upgrades do sistema de hooks. Diferentemente do GUIA (que documenta a arquitetura
+> e os conceitos estáveis), este documento é evolutivo: cada sessão de trabalho pode adicionar novas
+> entradas, marcar itens como concluídos, e registrar decisões tomadas.
 
 ---
 
@@ -21,15 +19,20 @@
 
 **O `session_id` é SEMPRE fornecido pelo VS Code. Nunca o geramos.**
 
-- Variáveis **dadas pelo VS Code** (campo `session_id` em todos os hooks): devemos **capturar e registrar** para sincronizar o sistema.
-- Variáveis **criadas por nós** (ex: `close_key`, `section_id`, `logical_restart_count`): são nossa responsabilidade.
-- Quando há divergência entre o que o VS Code envia e o que nosso CTX tem, o VS Code é a **fonte da verdade**.
+- Variáveis **dadas pelo VS Code** (campo `session_id` em todos os hooks): devemos **capturar e
+  registrar** para sincronizar o sistema.
+- Variáveis **criadas por nós** (ex: `close_key`, `section_id`, `logical_restart_count`): são nossa
+  responsabilidade.
+- Quando há divergência entre o que o VS Code envia e o que nosso CTX tem, o VS Code é a **fonte da
+  verdade**.
 
-**Corolário**: Nunca criar UUIDs aleatórios para substituir ou simular um `session_id` do VS Code. Se o VS Code não enviou um novo `session_id`, o `session_id` atual se mantém.
+**Corolário**: Nunca criar UUIDs aleatórios para substituir ou simular um `session_id` do VS Code.
+Se o VS Code não enviou um novo `session_id`, o `session_id` atual se mantém.
 
 ### PREMISSA-2 — Integridade dos scripts auto-iniciados
 
-**Scripts invocados automaticamente pelo VS Code (via hooks) NUNCA devem ser chamados manualmente em produção.**
+**Scripts invocados automaticamente pelo VS Code (via hooks) NUNCA devem ser chamados manualmente em
+produção.**
 
 Isso se aplica a todos os 10 scripts registrados em `copilot-hooks.json`:
 
@@ -48,7 +51,9 @@ Isso se aplica a todos os 10 scripts registrados em `copilot-hooks.json`:
 
 **Exceção**: ambientes de sandbox para testes isolados, explicitamente marcados.
 
-**Corolário**: Qualquer lógica que dependa de "o usuário chamou manualmente" é uma forma de contornar este princípio. A única exceção documentada (`source: "manual_recovery"`) deve ser gradualmente eliminada ou restrita a fluxos de recuperação de desastre.
+**Corolário**: Qualquer lógica que dependa de "o usuário chamou manualmente" é uma forma de
+contornar este princípio. A única exceção documentada (`source: "manual_recovery"`) deve ser
+gradualmente eliminada ou restrita a fluxos de recuperação de desastre.
 
 ---
 
@@ -57,6 +62,7 @@ Isso se aplica a todos os 10 scripts registrados em `copilot-hooks.json`:
 ### 1.1 Confirmação da causa raiz (2026-03-11)
 
 **Evidência direta** do `audit.jsonl` atual:
+
 ```json
 {
   "event": "session_id_mismatch",
@@ -69,10 +75,12 @@ Isso se aplica a todos os 10 scripts registrados em `copilot-hooks.json`:
 }
 ```
 
-- **`expected`** (`9314ba83-...`): UUID gerado por **nosso código** (RECONNECT-02 em `log-prompt.sh`)
+- **`expected`** (`9314ba83-...`): UUID gerado por **nosso código** (RECONNECT-02 em
+  `log-prompt.sh`)
 - **`got`** (`dcf579af-...`): session_id **real do VS Code** — o que a plataforma realmente envia
 
-**Conclusão**: estamos bloqueando state writes porque nós mesmos geramos um UUID que o VS Code nunca conhece. O VS Code continua usando o session_id correto (`dcf579af-...`). Nós é que erramos.
+**Conclusão**: estamos bloqueando state writes porque nós mesmos geramos um UUID que o VS Code nunca
+conhece. O VS Code continua usando o session_id correto (`dcf579af-...`). Nós é que erramos.
 
 ### 1.2 Sequência exata do bug
 
@@ -106,16 +114,19 @@ Métricas do turno perdidas: tools_count, failures_count, intent, etc.
 
 ### 1.3 Por que o VS Code não dispara novo sessionStart
 
-Confirmado em GUIA-HOOKS-COPILOT.md Seção 3.1 (LIM-02) e evidenciado na sessão `dcf579af` (24h, 1892 preToolUse events, apenas 1 sessionStart):
+Confirmado em GUIA-HOOKS-COPILOT.md Seção 3.1 (LIM-02) e evidenciado na sessão `dcf579af` (24h, 1892
+preToolUse events, apenas 1 sessionStart):
 
-> `sessionStart` dispara **no máximo 1x por janela/aba de chat**. Se o usuário continua na mesma conversa após nosso `session-close.sh`, o VS Code NÃO abre nova sessão — ele mantém o mesmo `session_id` para sempre naquela janela.
+> `sessionStart` dispara **no máximo 1x por janela/aba de chat**. Se o usuário continua na mesma
+> conversa após nosso `session-close.sh`, o VS Code NÃO abre nova sessão — ele mantém o mesmo
+> `session_id` para sempre naquela janela.
 
 Isso é correto e esperado. **Nosso código é que deve se adaptar**, não o VS Code.
 
 ### 1.4 Cenários de ciclo de vida do session_id
 
-| Cenário                                                  | O que VS Code faz                                    | O que devemos fazer                               |
-| -------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------- |
+| Cenário                                                  | O que VS Code faz                                    | O que devemos fazer                                |
+| -------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------- |
 | Usuário abre nova aba de chat                            | Dispara `sessionStart` com novo `session_id`         | `session-start.sh` cria CTX com o novo ID ✅       |
 | Usuário continua na mesma aba (turnos normais)           | Dispara `userPromptSubmitted` com mesmo `session_id` | `log-prompt.sh` usa mesmo ID ✅                    |
 | VS Code inline compaction (token budget)                 | NÃO dispara `sessionStart`; `session_id` não muda    | RECONNECT-01 não dispara (IDs iguais) ✅           |
@@ -130,11 +141,11 @@ O único cenário com bug é o 4º — e é o mais comum no uso diário.
 
 ### BUG-01 [CRÍTICO] — RECONNECT-02 gera UUID aleatório em vez de usar session_id do VS Code
 
-**Arquivo**: `.github/hooks/scripts/log-prompt.sh`
-**Linhas**: 173–175
-**Status**: ✅ IMPLEMENTADO (2026-03-11)
+**Arquivo**: `.github/hooks/scripts/log-prompt.sh` **Linhas**: 173–175 **Status**: ✅ IMPLEMENTADO
+(2026-03-11)
 
 **Código atual (bugado)**:
+
 ```bash
 # ── Post-Close Recovery (RECONNECT-02) ──────────────────────────────────────
 # ...
@@ -148,58 +159,75 @@ if [ -n "$_ENDED_AT_RC" ] && [ "$_ENDED_AT_RC" != "null" ]; then
     fi
 ```
 
-**Impacto**: Cria UUID que o VS Code nunca enviará → todos os state writes bloqueados enquanto durar a divergência.
+**Impacto**: Cria UUID que o VS Code nunca enviará → todos os state writes bloqueados enquanto durar
+a divergência.
 
 **Código corrigido**:
+
 ```bash
-    # FIX BUG-01: usa session_id real do VS Code (Premissa-1: VS Code é a fonte da verdade)
-    # SESSION_ID_PAYLOAD = o que o VS Code enviou neste userPromptSubmitted
-    # O VS Code continuará enviando este mesmo ID em todos os hooks futuros.
-    # Gerar um UUID aqui causaria mismatch permanente com todos os hooks.
-    if [ -n "$SESSION_ID_PAYLOAD" ]; then
-        _NEW_SID="$SESSION_ID_PAYLOAD"
-    elif [ -f /proc/sys/kernel/random/uuid ]; then
-        # Fallback apenas quando VS Code não enviou session_id (caso improvável)
-        _NEW_SID="$(cat /proc/sys/kernel/random/uuid)"
-    else
-        _NEW_SID="sess_$(date +%s%N 2> /dev/null | sha256sum | head -c 32 || date +%s | head -c 32)"
-    fi
+# FIX BUG-01: usa session_id real do VS Code (Premissa-1: VS Code é a fonte da verdade)
+# SESSION_ID_PAYLOAD = o que o VS Code enviou neste userPromptSubmitted
+# O VS Code continuará enviando este mesmo ID em todos os hooks futuros.
+# Gerar um UUID aqui causaria mismatch permanente com todos os hooks.
+if [ -n "$SESSION_ID_PAYLOAD" ]; then
+  _NEW_SID="$SESSION_ID_PAYLOAD"
+elif [ -f /proc/sys/kernel/random/uuid ]; then
+  # Fallback apenas quando VS Code não enviou session_id (caso improvável)
+  _NEW_SID="$(cat /proc/sys/kernel/random/uuid)"
+else
+  _NEW_SID="sess_$(date +%s%N 2> /dev/null | sha256sum | head -c 32 || date +%s | head -c 32)"
+fi
 ```
 
-**Nota**: Com esta correção, o `session.id` no CTX será o mesmo `dcf579af-...` que a sessão anterior. Isso é **correto** — do ponto de vista do VS Code, é a mesma sessão. Nós apenas marcamos semanticamente como "nova sessão lógica" através dos campos `session.source = "inline_restart"`, `session.started_at` (novo timestamp), `session.prev_session_id` (para rastreabilidade).
+**Nota**: Com esta correção, o `session.id` no CTX será o mesmo `dcf579af-...` que a sessão
+anterior. Isso é **correto** — do ponto de vista do VS Code, é a mesma sessão. Nós apenas marcamos
+semanticamente como "nova sessão lógica" através dos campos `session.source = "inline_restart"`,
+`session.started_at` (novo timestamp), `session.prev_session_id` (para rastreabilidade).
 
 ---
 
 ### BUG-02 [ALTA] — HEAL v2 ausente em `pre-tool-use.sh` e `post-tool-use.sh`
 
-**Arquivos**: `pre-tool-use.sh` (linhas 189-213), `post-tool-use.sh` (linhas 83-130)
-**Status**: � Parcialmente coberto — ver BUG-06A e BUG-06B abaixo
+**Arquivos**: `pre-tool-use.sh` (linhas 189-213), `post-tool-use.sh` (linhas 83-130) **Status**: �
+Parcialmente coberto — ver BUG-06A e BUG-06B abaixo
 
-> **Nota atualizada**: O HEAL v2 genérico (contador de mismatches) não foi portado para pre/post-tool-use.sh. Em vez disso, implementamos um tratamento específico para o caso mais comum (inline_restart) via BUG-06. O HEAL v2 genérico permanece como debt para sessões com múltiplos reinícios rápidos.
+> **Nota atualizada**: O HEAL v2 genérico (contador de mismatches) não foi portado para
+> pre/post-tool-use.sh. Em vez disso, implementamos um tratamento específico para o caso mais comum
+> (inline_restart) via BUG-06. O HEAL v2 genérico permanece como debt para sessões com múltiplos
+> reinícios rápidos.
 
-**Contexto**: `agent-stop.sh` possui HEAL v2 — após 3 mismatches consecutivos com o mesmo `got` session_id, adota aquele ID como o correto. Porém `pre-tool-use.sh` e `post-tool-use.sh` não têm esse mecanismo.
+**Contexto**: `agent-stop.sh` possui HEAL v2 — após 3 mismatches consecutivos com o mesmo `got`
+session_id, adota aquele ID como o correto. Porém `pre-tool-use.sh` e `post-tool-use.sh` não têm
+esse mecanismo.
 
-**Impacto**: Mesmo após o BUG-01 ser corrigido, se ocorrer qualquer mismatch genuíno (ex: nova sessão real criada pelo VS Code), os primeiros 3 turnos terão state writes bloqueados até `agent-stop.sh` sanar via HEAL v2.
+**Impacto**: Mesmo após o BUG-01 ser corrigido, se ocorrer qualquer mismatch genuíno (ex: nova
+sessão real criada pelo VS Code), os primeiros 3 turnos terão state writes bloqueados até
+`agent-stop.sh` sanar via HEAL v2.
 
-**Correção**: Adicionar HEAL v2 em `pre-tool-use.sh` e `post-tool-use.sh` espelhando a lógica de `agent-stop.sh` (arquivo `.mismatch_track.json`). Ou melhor: extrair HEAL v2 para `hooks-lib/common.sh` como função compartilhada.
+**Correção**: Adicionar HEAL v2 em `pre-tool-use.sh` e `post-tool-use.sh` espelhando a lógica de
+`agent-stop.sh` (arquivo `.mismatch_track.json`). Ou melhor: extrair HEAL v2 para
+`hooks-lib/common.sh` como função compartilhada.
 
 ---
 
 ### BUG-03 [ALTA] — `search_subagent` não detectado como autorização implícita
 
-**Arquivo**: `.github/hooks/scripts/pre-tool-use.sh`
-**Linha**: 286
-**Status**: ✅ IMPLEMENTADO (2026-03-11)
+**Arquivo**: `.github/hooks/scripts/pre-tool-use.sh` **Linha**: 286 **Status**: ✅ IMPLEMENTADO
+(2026-03-11)
 
 **Código atual**:
+
 ```bash
 elif [ "$TOOL_NAME" = "runSubagent" ]; then
     # auth_requested=true, subagent_delegated=true
 ```
 
-**Problema**: `search_subagent` é categorialmente equivalente a `runSubagent` (ambos são ferramentas Core), mas não é detectado. Quando o agente usa `search_subagent`, o `agent-stop.sh` pode bloquear o turno por falta de `auth_requested`.
+**Problema**: `search_subagent` é categorialmente equivalente a `runSubagent` (ambos são ferramentas
+Core), mas não é detectado. Quando o agente usa `search_subagent`, o `agent-stop.sh` pode bloquear o
+turno por falta de `auth_requested`.
 
 **Código corrigido**:
+
 ```bash
 elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; then
     # auth_requested=true, subagent_delegated=true
@@ -209,55 +237,73 @@ elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; t
 
 ### BUG-04 [MÉDIA] — `subagent_calls` contado duas vezes
 
-**Arquivos**: `pre-tool-use.sh` (linha 322) E `subagent-start.sh`
-**Status**: ✅ IMPLEMENTADO (2026-03-11)
+**Arquivos**: `pre-tool-use.sh` (linha 322) E `subagent-start.sh` **Status**: ✅ IMPLEMENTADO
+(2026-03-11)
 
-> **Implementação**: Removido o incremento de `subagent_calls` de `pre-tool-use.sh`. Comentário FIX BUG-04 indica que `subagent-start.sh` é o local correto.
+> **Implementação**: Removido o incremento de `subagent_calls` de `pre-tool-use.sh`. Comentário FIX
+> BUG-04 indica que `subagent-start.sh` é o local correto.
 
-**Problema**: O contador `session_stats.subagent_calls` é incrementado em `pre-tool-use.sh` quando detecta `runSubagent`, E TAMBÉM em `subagent-start.sh` quando o subagente realmente inicia. Resultado: cada subagente conta 2x.
+**Problema**: O contador `session_stats.subagent_calls` é incrementado em `pre-tool-use.sh` quando
+detecta `runSubagent`, E TAMBÉM em `subagent-start.sh` quando o subagente realmente inicia.
+Resultado: cada subagente conta 2x.
 
-**Correção**: Remover o incremento de `subagent_calls` de `pre-tool-use.sh`. Manter apenas em `subagent-start.sh` (evento mais semânticamente correto — confirma que o subagente realmente começou).
+**Correção**: Remover o incremento de `subagent_calls` de `pre-tool-use.sh`. Manter apenas em
+`subagent-start.sh` (evento mais semânticamente correto — confirma que o subagente realmente
+começou).
 
 ---
 
 ### BUG-05 [BAIXA] — GUIA Section 3.1 conflação de dois `source` diferentes
 
-**Arquivo**: `DOCUMENTAÇÃO/HOOKS/GUIA-HOOKS-COPILOT.md`
-**Linha**: ~264
-**Status**: 🟡 Documentação — não quebra código
+**Arquivo**: `DOCUMENTAÇÃO/HOOKS/GUIA-HOOKS-COPILOT.md` **Linha**: ~264 **Status**: 🟡 Documentação
+— não quebra código
 
 **Texto atual**:
+
 > "O campo `source` é atualmente sempre `"new"` (a plataforma não distingue outros casos)."
 
-**Problema**: A afirmação é correta para o `source` enviado **pelo VS Code** no input do hook `sessionStart`. Porém o GUIA não distingue claramente este `source` do `session.source` que **nosso código** escreve no CTX (que pode ser `"inline_restart"`, `"reconnect_rollover"`, `"manual_recovery"`, `"healed_from_real_session"`, `"healed_from_consecutive_mismatch"`). Essa confusão levou à subestimação do bug.
+**Problema**: A afirmação é correta para o `source` enviado **pelo VS Code** no input do hook
+`sessionStart`. Porém o GUIA não distingue claramente este `source` do `session.source` que **nosso
+código** escreve no CTX (que pode ser `"inline_restart"`, `"reconnect_rollover"`,
+`"manual_recovery"`, `"healed_from_real_session"`, `"healed_from_consecutive_mismatch"`). Essa
+confusão levou à subestimação do bug.
 
 **Correção proposta**: Adicionar à Section 3.1 uma nota explícita distinguindo:
+
 - **`source` do VS Code** (payload de entrada do hook `sessionStart`): sempre `"new"`
-- **`session.source` do CTX** (campo escrito pelos nossos scripts): múltiplos valores — ver tabela em Seção X.Y
+- **`session.source` do CTX** (campo escrito pelos nossos scripts): múltiplos valores — ver tabela
+  em Seção X.Y
 
 ---
 
 ### BUG-06 [BAIXA] — `session.source = "manual_recovery"` viola a Premissa-2
 
-**Arquivos**: `pre-tool-use.sh`, `post-tool-use.sh`, `log-prompt.sh`
-**Status**: 🟡 Design debt — não urgente
+**Arquivos**: `pre-tool-use.sh`, `post-tool-use.sh`, `log-prompt.sh` **Status**: 🟡 Design debt —
+não urgente
 
-**Problema**: O mecanismo `manual_recovery` pressupõe que o agente pode criar um CTX manualmente (colocando `source: "manual_recovery"`), e os hooks o detectam e fazem HEAL. Isso viola a Premissa-2: "scripts auto-iniciados nunca devem ser iniciados manualmente".
+**Problema**: O mecanismo `manual_recovery` pressupõe que o agente pode criar um CTX manualmente
+(colocando `source: "manual_recovery"`), e os hooks o detectam e fazem HEAL. Isso viola a
+Premissa-2: "scripts auto-iniciados nunca devem ser iniciados manualmente".
 
-**Impacto**: Baixo impacto funcional — é um mecanismo de recuperação de desastre. Mas seu design conflita com as premissas.
+**Impacto**: Baixo impacto funcional — é um mecanismo de recuperação de desastre. Mas seu design
+conflita com as premissas.
 
-**Proposta a longo prazo**: Substituir o mecanismo de `manual_recovery` por um fluxo formal de recuperação via `session-start.sh sandbox` (para testar) ou um script dedicado `session-recover.sh` com validações explícitas.
+**Proposta a longo prazo**: Substituir o mecanismo de `manual_recovery` por um fluxo formal de
+recuperação via `session-start.sh sandbox` (para testar) ou um script dedicado `session-recover.sh`
+com validações explícitas.
 
 ---
 
 ### BUG-06A [CRÍTICO] — `session-start.sh` zereia CTX completo em `inline_restart`
 
-**Arquivo**: `.github/hooks/scripts/session-start.sh`
-**Status**: ✅ IMPLEMENTADO (2026-03-11)
+**Arquivo**: `.github/hooks/scripts/session-start.sh` **Status**: ✅ IMPLEMENTADO (2026-03-11)
 
-**Problema**: `session-start.sh` sempre criava um CTX vazio do zero (`jq -cn ... > session-context.json`), destruindo estatísticas acumuladas (turn_count, tools_total, section_history) quando o VS Code disparava `sessionStart` com `source = "inline_restart"`.
+**Problema**: `session-start.sh` sempre criava um CTX vazio do zero
+(`jq -cn ... > session-context.json`), destruindo estatísticas acumuladas (turn_count, tools_total,
+section_history) quando o VS Code disparava `sessionStart` com `source = "inline_restart"`.
 
 **Implementação**: Adicionado branch condicional antes do `jq -cn`:
+
 - `inline_restart` + CTX existente → atualização parcial (apenas `session.*` e `last_tool.ts`)
 - Outros casosos → reset completo (comportamento original preservado)
 - Fallback para reset completo se CTX corrompido no caminho de `inline_restart`
@@ -266,12 +312,15 @@ elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; t
 
 ### BUG-06B [ALTO] — HEAL `inline_restart` ausente em todos os scripts de hook
 
-**Arquivos**: `pre-tool-use.sh`, `post-tool-use.sh`, `agent-stop.sh`
-**Status**: ✅ IMPLEMENTADO (2026-03-11)
+**Arquivos**: `pre-tool-use.sh`, `post-tool-use.sh`, `agent-stop.sh` **Status**: ✅ IMPLEMENTADO
+(2026-03-11)
 
-**Problema**: Quando payload traz session_id stale (de sessão anterior) e CTX tem novo session_id do VS Code (`inline_restart`), os scripts bloqueavam em vez de sincronizar. Por PREMISSA-1, CTX (VS Code) é a fonte da verdade.
+**Problema**: Quando payload traz session_id stale (de sessão anterior) e CTX tem novo session_id do
+VS Code (`inline_restart`), os scripts bloqueavam em vez de sincronizar. Por PREMISSA-1, CTX (VS
+Code) é a fonte da verdade.
 
 **Implementação**: Adicionado ramo `inline_restart` no guard de todos os três scripts:
+
 - Adota `CTX_ACTIVE_SID` como `SESSION_ID` local
 - Loga evento `session_id_sync_inline_restart`
 - Não bloqueia (não faz `exit 0`)
@@ -281,12 +330,13 @@ elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; t
 
 ### BUG-06C [ALTO] — `search_subagent` não reforça `auth_requested` em `post-tool-use.sh`
 
-**Arquivo**: `.github/hooks/scripts/post-tool-use.sh`
-**Status**: ✅ IMPLEMENTADO (2026-03-11)
+**Arquivo**: `.github/hooks/scripts/post-tool-use.sh` **Status**: ✅ IMPLEMENTADO (2026-03-11)
 
-**Problema**: `post-tool-use.sh` não tratava `runSubagent` nem `search_subagent` — auth_requested ficava apenas no que pre-tool-use.sh setou, sem reforço pós-execução.
+**Problema**: `post-tool-use.sh` não tratava `runSubagent` nem `search_subagent` — auth_requested
+ficava apenas no que pre-tool-use.sh setou, sem reforço pós-execução.
 
-**Implementação**: Adicionado ramo `elif` para `runSubagent || search_subagent` que reforça `auth_requested=true` e `subagent_delegated=true` (defesa em profundidade).
+**Implementação**: Adicionado ramo `elif` para `runSubagent || search_subagent` que reforça
+`auth_requested=true` e `subagent_delegated=true` (defesa em profundidade).
 
 ---
 
@@ -294,9 +344,11 @@ elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; t
 
 ### GAP-01 — session_id não é a primeira verificação em `log-prompt.sh`
 
-**Contexto**: O usuário solicitou explicitamente que em `userPromptSubmitted`, a PRIMEIRA ação deve ser verificar se há novo `session_id` ou não.
+**Contexto**: O usuário solicitou explicitamente que em `userPromptSubmitted`, a PRIMEIRA ação deve
+ser verificar se há novo `session_id` ou não.
 
 **Situação atual** em `log-prompt.sh`:
+
 1. Lock de arquivo
 2. Leitura de INPUT
 3. Extração de campos básicos (TIMESTAMP, SESSION_ID_PAYLOAD, etc.)
@@ -304,17 +356,23 @@ elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; t
 5. ...processamento intermediário...
 6. **RECONNECT-02** (orphan session — linha ~158)
 
-**Proposta**: Após passo 3 (extração de campos), adicionar uma etapa explícita e comentada "PHASE 0 — SESSION_ID RECONCILIATION" que executa RECONNECT-01 e RECONNECT-02 em sequência, antes de qualquer outro processamento. O código já faz isso aproximadamente, mas a organização visual e a ordem podem ser melhoradas.
+**Proposta**: Após passo 3 (extração de campos), adicionar uma etapa explícita e comentada "PHASE 0
+— SESSION_ID RECONCILIATION" que executa RECONNECT-01 e RECONNECT-02 em sequência, antes de qualquer
+outro processamento. O código já faz isso aproximadamente, mas a organização visual e a ordem podem
+ser melhoradas.
 
 ---
 
 ### GAP-02 — Ausência de campo `session.vs_code_session_id` explícito
 
 **Contexto**: Hoje `session.id` no CTX pode ser:
+
 - O session_id real enviado pelo VS Code (quando `sessionStart` dispara)
 - Um UUID gerado por nós (raro após a correção do BUG-01, mas historicamente frequente)
 
-**Proposta**: Adicionar campo `session.vs_code_session_id` explícito que SEMPRE contém o último `session_id` enviado pelo VS Code. Isso permite:
+**Proposta**: Adicionar campo `session.vs_code_session_id` explícito que SEMPRE contém o último
+`session_id` enviado pelo VS Code. Isso permite:
+
 1. Auditoria clara de quando nosso `session.id` divergiu do `vs_code_session_id`
 2. Scripts poderem verificar rapidamente se há divergência
 3. Dashboard mostrar "VS Code session" vs "nossa sessão lógica" separadamente
@@ -325,24 +383,29 @@ elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; t
 
 **Contexto**: `session_id_mismatch` é logado apenas no `audit.jsonl`. Não há contador no CTX.
 
-**Proposta**: Adicionar `session_stats.session_id_mismatches` (contador) no CTX, incrementado por `pre-tool-use.sh` e `post-tool-use.sh` quando detectam mismatch. Valor visível para dashboards e session-briefing.
+**Proposta**: Adicionar `session_stats.session_id_mismatches` (contador) no CTX, incrementado por
+`pre-tool-use.sh` e `post-tool-use.sh` quando detectam mismatch. Valor visível para dashboards e
+session-briefing.
 
 ---
 
 ### GAP-04 — Lógica de HEAL não compartilhada via `hooks-lib/common.sh`
 
-**Contexto**: A lógica de HEAL (HEAL v1 para `manual_recovery`, HEAL v2 threshold-based) existe duplicada em `pre-tool-use.sh`, `post-tool-use.sh`, e `agent-stop.sh`.
+**Contexto**: A lógica de HEAL (HEAL v1 para `manual_recovery`, HEAL v2 threshold-based) existe
+duplicada em `pre-tool-use.sh`, `post-tool-use.sh`, e `agent-stop.sh`.
 
 **Proposta**: Criar função `heal_session_id_if_needed()` em `hooks-lib/common.sh`:
+
 ```bash
 # heal_session_id_if_needed SESSION_ID_PAYLOAD CTX_FILE
 # Returns: 0 se healed/ok, 1 se mismatch → caller deve exit 0
 heal_session_id_if_needed() {
-    local payload_sid="$1"
-    local ctx_file="$2"
-    # ... lógica unificada de HEAL v1 + HEAL v2 ...
+  local payload_sid="$1"
+  local ctx_file="$2"
+  # ... lógica unificada de HEAL v1 + HEAL v2 ...
 }
 ```
+
 Todos os scripts chamam essa única função. Elimina duplicação e garante consistência.
 
 ---
@@ -351,9 +414,11 @@ Todos os scripts chamam essa única função. Elimina duplicação e garante con
 
 ### UPG-01 — Separação explícita "identidade VS Code" vs "sessão lógica"
 
-**Motivação**: A confusão entre `session.id` (nosso) e `session_id` do VS Code é a causa raiz do BUG-01. Precisamos de vocabulário e campos distintos.
+**Motivação**: A confusão entre `session.id` (nosso) e `session_id` do VS Code é a causa raiz do
+BUG-01. Precisamos de vocabulário e campos distintos.
 
 **Proposta de campo**:
+
 ```json
 {
   "session": {
@@ -367,13 +432,16 @@ Todos os scripts chamam essa única função. Elimina duplicação e garante con
 }
 ```
 
-Com `session.id` sempre igual a `vs_code_session_id` (por Premissa-1), o campo `vs_code_session_id` seria redundante mas explícito. A questão é: como distinguir sessões lógicas múltiplas dentro da mesma janela de chat? Via `logical_session_number` e `logical_restart_at`.
+Com `session.id` sempre igual a `vs_code_session_id` (por Premissa-1), o campo `vs_code_session_id`
+seria redundante mas explícito. A questão é: como distinguir sessões lógicas múltiplas dentro da
+mesma janela de chat? Via `logical_session_number` e `logical_restart_at`.
 
 ---
 
 ### UPG-02 — Inventário formal de variáveis: "dadas pelo VS Code" vs "criadas por nós"
 
-**Motivação**: Premissa-1 exige que saibamos exatamente quais variáveis são do VS Code e quais são nossas.
+**Motivação**: Premissa-1 exige que saibamos exatamente quais variáveis são do VS Code e quais são
+nossas.
 
 **Inventário proposto**:
 
@@ -393,9 +461,12 @@ Com `session.id` sempre igual a `vs_code_session_id` (por Premissa-1), o campo `
 
 ### UPG-03 — Session-briefing.md deve distinguir "sessão VS Code" vs "sessão lógica"
 
-**Motivação**: Quando a sessão lógica é reiniciada (RECONNECT-02), o briefing atualmente apresenta como se fosse uma sessão completamente nova. Mas o VS Code está na mesma sessão.
+**Motivação**: Quando a sessão lógica é reiniciada (RECONNECT-02), o briefing atualmente apresenta
+como se fosse uma sessão completamente nova. Mas o VS Code está na mesma sessão.
 
-**Proposta**: Adicionar ao session-briefing (gerado por `session-start.sh` e RECONNECT-02) uma seção clara:
+**Proposta**: Adicionar ao session-briefing (gerado por `session-start.sh` e RECONNECT-02) uma seção
+clara:
+
 ```
 🔗 SESSÃO VS CODE: dcf579af-... (inalterada desde 09/03/2026)
 🔄 SESSÃO LÓGICA: #2 (reiniciada em 11/03/2026 após encerramento autorizado)
@@ -407,8 +478,8 @@ Com `session.id` sempre igual a `vs_code_session_id` (por Premissa-1), o campo `
 
 ### Ordem de prioridade
 
-| ID     | Fix                                                                                                                                                                                                        | Impacto                               | Arquivo                                                           | Complexidade          | Status                                                                                              |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------- |
+| ID     | Fix                                                                                                                                                                                                        | Impacto                               | Arquivo                                                           | Complexidade          | Status                                                                                               |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------- |
 | BUG-01 | RECONNECT-02 usa SESSION_ID_PAYLOAD                                                                                                                                                                        | CRÍTICO — elimina mismatches          | `log-prompt.sh` L173-175                                          | Baixa (3 linhas)      | ✅ CONCLUÍDO                                                                                         |
 | BUG-02 | inline_restart preserva stats                                                                                                                                                                              | ALTA (robustez)                       | `session-start.sh`                                                | Média                 | ✅ CONCLUÍDO                                                                                         |
 | BUG-03 | Detectar `search_subagent`                                                                                                                                                                                 | ALTA — evita false positives blocking | `pre-tool-use.sh` L286                                            | Muito baixa (1 linha) | ✅ CONCLUÍDO                                                                                         |
@@ -447,15 +518,22 @@ Com `session.id` sempre igual a `vs_code_session_id` (por Premissa-1), o campo `
 
 ### DECISÃO-01 (2026-03-11): BUG-01 — usar SESSION_ID_PAYLOAD no RECONNECT-02
 
-**Decisão**: Usar `SESSION_ID_PAYLOAD` como `_NEW_SID` no RECONNECT-02, em vez de gerar UUID aleatório.
+**Decisão**: Usar `SESSION_ID_PAYLOAD` como `_NEW_SID` no RECONNECT-02, em vez de gerar UUID
+aleatório.
 
 **Raciocínio**:
-1. Premissa-1: VS Code é fonte da verdade para `session_id`
-2. VS Code continuará enviando o mesmo `session_id` em todos os hooks futuros — não temos como mudar isso
-3. Nossa "nova sessão lógica" deve usar o mesmo ID que a plataforma usa
-4. A distinção "início de nova sessão lógica" é capturada por: `session.source = "inline_restart"`, `session.started_at` (novo), `session.prev_session_id`, `session.logical_session_number`
 
-**Alternativa rejeitada**: Criar um `session.vs_code_session_id` separado e manter `session.id` como nosso UUID. Rejeitada porque: (a) aumenta complexidade, (b) todos os guards de mismatch precisariam ser reescritos para comparar `vs_code_session_id` em vez de `session.id`, (c) viola Premissa-1 ao diferenciar nossa identidade da do VS Code.
+1. Premissa-1: VS Code é fonte da verdade para `session_id`
+2. VS Code continuará enviando o mesmo `session_id` em todos os hooks futuros — não temos como mudar
+   isso
+3. Nossa "nova sessão lógica" deve usar o mesmo ID que a plataforma usa
+4. A distinção "início de nova sessão lógica" é capturada por: `session.source = "inline_restart"`,
+   `session.started_at` (novo), `session.prev_session_id`, `session.logical_session_number`
+
+**Alternativa rejeitada**: Criar um `session.vs_code_session_id` separado e manter `session.id` como
+nosso UUID. Rejeitada porque: (a) aumenta complexidade, (b) todos os guards de mismatch precisariam
+ser reescritos para comparar `vs_code_session_id` em vez de `session.id`, (c) viola Premissa-1 ao
+diferenciar nossa identidade da do VS Code.
 
 ---
 
@@ -562,18 +640,22 @@ O agente **nunca** deve sobrescrever esses valores — são a fonte da verdade d
 
 **Severidade**: MÉDIA
 
-**Descrição**: O script `tool-use-failure.sh` escreve em `audit.jsonl` e `errors.jsonl` ANTES de verificar o session_id guard. Se houver mismatch, a falha é registrada com o session_id incorreto (payload), contaminando ambos os logs.
+**Descrição**: O script `tool-use-failure.sh` escreve em `audit.jsonl` e `errors.jsonl` ANTES de
+verificar o session_id guard. Se houver mismatch, a falha é registrada com o session_id incorreto
+(payload), contaminando ambos os logs.
 
 **Comportamento atual**:
+
 ```bash
 # ATUAL (ORDER ERRADA):
-jq -cn ... >> "$LOG_DIR/audit.jsonl"   # escreve ANTES do guard
-jq -cn ... >> "$LOG_DIR/errors.jsonl"  # escreve ANTES do guard
+jq -cn ... >> "$LOG_DIR/audit.jsonl"  # escreve ANTES do guard
+jq -cn ... >> "$LOG_DIR/errors.jsonl" # escreve ANTES do guard
 # ...
-if [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then exit 0; fi  # guard DEPOIS
+if [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then exit 0; fi # guard DEPOIS
 ```
 
-**Fix proposto**: Mover o guard para logo após a extração de campos, antes de qualquer escrita em logs.
+**Fix proposto**: Mover o guard para logo após a extração de campos, antes de qualquer escrita em
+logs.
 
 ---
 
@@ -581,12 +663,17 @@ if [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then exit 0; fi  # guard DEPOIS
 
 **Severidade**: BAIXA (inconsistência de código, não bug funcional)
 
-**Descrição**: `subagent-start.sh` extrai o session_id do payload como `SESSION_ID` (sem `_PAYLOAD`), enquanto todos os outros scripts usam `SESSION_ID_PAYLOAD` para o valor do VS Code e `SESSION_ID` para o valor efetivo (lido do CTX). Isso:
+**Descrição**: `subagent-start.sh` extrai o session_id do payload como `SESSION_ID` (sem
+`_PAYLOAD`), enquanto todos os outros scripts usam `SESSION_ID_PAYLOAD` para o valor do VS Code e
+`SESSION_ID` para o valor efetivo (lido do CTX). Isso:
+
 1. Quebra a convenção de nomenclatura estabelecida pelos outros scripts
 2. Impossibilita distinguir no código qual origem o valor tem
-3. Faz o guard comparar `SESSION_ID != CTX_ACTIVE_SID` usando o payload diretamente (funciona, mas é opaco)
+3. Faz o guard comparar `SESSION_ID != CTX_ACTIVE_SID` usando o payload diretamente (funciona, mas é
+   opaco)
 
-**Fix proposto**: Renomear para `SESSION_ID_PAYLOAD` e adicionar `SESSION_ID=$(jq -r '.session.id' CTX)` separado.
+**Fix proposto**: Renomear para `SESSION_ID_PAYLOAD` e adicionar
+`SESSION_ID=$(jq -r '.session.id' CTX)` separado.
 
 ---
 
@@ -594,15 +681,21 @@ if [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then exit 0; fi  # guard DEPOIS
 
 **Severidade**: ALTA
 
-**Scripts afetados**: `subagent-start.sh`, `subagent-stop.sh`, `tool-use-failure.sh`, `pre-compact.sh`
+**Scripts afetados**: `subagent-start.sh`, `subagent-stop.sh`, `tool-use-failure.sh`,
+`pre-compact.sh`
 
 **Descrição**: Estes 4 scripts têm guard de session_id que faz `exit 0` silencioso em mismatch, mas:
-1. **Não incrementam** `session_stats.session_id_mismatches` (GAP-03 implementado apenas em pre/post-tool-use.sh)
+
+1. **Não incrementam** `session_stats.session_id_mismatches` (GAP-03 implementado apenas em
+   pre/post-tool-use.sh)
 2. **Não tentam HEAL v1** quando `CTX.source = manual_recovery` ou `inline_restart`
 
-Resultado: mismatches nesses hooks passam invisíveis. O sistema pode estar em estado de mismatch persistente sem que os contadores reflitam isso, e o agente não recebe o contexto esperado após subagentStart ou postToolUseFailure.
+Resultado: mismatches nesses hooks passam invisíveis. O sistema pode estar em estado de mismatch
+persistente sem que os contadores reflitam isso, e o agente não recebe o contexto esperado após
+subagentStart ou postToolUseFailure.
 
-**Fix proposto**: Adicionar `source common.sh` + chamar `heal_v1` + `increment_mismatch` em todos os 4 scripts.
+**Fix proposto**: Adicionar `source common.sh` + chamar `heal_v1` + `increment_mismatch` em todos os
+4 scripts.
 
 ---
 
@@ -610,11 +703,15 @@ Resultado: mismatches nesses hooks passam invisíveis. O sistema pode estar em e
 
 **Severidade**: BAIXA (limitação do VS Code, não bug nosso)
 
-**Descrição**: O hook `sessionEnd` não inclui `session_id` no payload (apenas `timestamp`, `cwd`, `reason`). O `session-end.sh` lê o `session_id` do CTX. Se o CTX for corrompido ou deletado antes de `sessionEnd` disparar, todos os eventos são logados com `session_id="unknown"`.
+**Descrição**: O hook `sessionEnd` não inclui `session_id` no payload (apenas `timestamp`, `cwd`,
+`reason`). O `session-end.sh` lê o `session_id` do CTX. Se o CTX for corrompido ou deletado antes de
+`sessionEnd` disparar, todos os eventos são logados com `session_id="unknown"`.
 
-**Situação**: Esta é uma limitação da plataforma Copilot, não um bug nosso. Não temos como controlar o payload do VS Code.
+**Situação**: Esta é uma limitação da plataforma Copilot, não um bug nosso. Não temos como controlar
+o payload do VS Code.
 
-**Mitigação**: Sempre salvar checkpoint (`session-checkpoint.sh`) antes de qualquer operação de cleanup, garantindo que CTX sobreviva até `sessionEnd`.
+**Mitigação**: Sempre salvar checkpoint (`session-checkpoint.sh`) antes de qualquer operação de
+cleanup, garantindo que CTX sobreviva até `sessionEnd`.
 
 ---
 
@@ -622,9 +719,12 @@ Resultado: mismatches nesses hooks passam invisíveis. O sistema pode estar em e
 
 **Severidade**: BAIXA
 
-**Descrição**: `pre-compact.sh` usa `mktemp + mv` sem `flock` para incrementar `session_stats.compaction_count`. Se `preCompact` e `preToolUse` dispararem simultaneamente (edge case), há race condition na escrita do CTX. O `mv` pode sobrescrever resultado do outro script.
+**Descrição**: `pre-compact.sh` usa `mktemp + mv` sem `flock` para incrementar
+`session_stats.compaction_count`. Se `preCompact` e `preToolUse` dispararem simultaneamente (edge
+case), há race condition na escrita do CTX. O `mv` pode sobrescrever resultado do outro script.
 
-**Fix proposto**: Usar `sponge` (como os outros scripts) ou adicionar `flock` no bloco de incremento.
+**Fix proposto**: Usar `sponge` (como os outros scripts) ou adicionar `flock` no bloco de
+incremento.
 
 ---
 
@@ -632,11 +732,15 @@ Resultado: mismatches nesses hooks passam invisíveis. O sistema pode estar em e
 
 **Severidade**: BAIXA (observabilidade)
 
-**Descrição**: `subagent-stop.sh` usa `'.agentName // .subagent_name // .name // ""'` para tentar ler o nome do subagente — indicando que o schema real do payload `subagentStop` não está documentado e estamos tentando aliases. Isso:
+**Descrição**: `subagent-stop.sh` usa `'.agentName // .subagent_name // .name // ""'` para tentar
+ler o nome do subagente — indicando que o schema real do payload `subagentStop` não está documentado
+e estamos tentando aliases. Isso:
+
 1. Torna o código frágil a mudanças de schema no VS Code
 2. Impossibilita validação definitiva do campo
 
-**Proposta**: Verificar empiricamente qual campo o VS Code envia analisando `audit.jsonl` em sessões reais.
+**Proposta**: Verificar empiricamente qual campo o VS Code envia analisando `audit.jsonl` em sessões
+reais.
 
 ---
 
@@ -644,7 +748,9 @@ Resultado: mismatches nesses hooks passam invisíveis. O sistema pode estar em e
 
 **Severidade**: BAIXA (observabilidade)
 
-**Descrição**: O relatório gerado por `session-end.sh` usa `session_id` lido do CTX, mas não inclui `vs_code_session_id` explicitamente. Após as correções de GAP-02, o CTX tem ambos os campos, mas o relatório final não distingue.
+**Descrição**: O relatório gerado por `session-end.sh` usa `session_id` lido do CTX, mas não inclui
+`vs_code_session_id` explicitamente. Após as correções de GAP-02, o CTX tem ambos os campos, mas o
+relatório final não distingue.
 
 **Proposta**: Incluir `vs_code_session_id` nos campos do relatório de sessão.
 
@@ -655,10 +761,12 @@ Resultado: mismatches nesses hooks passam invisíveis. O sistema pode estar em e
 **Prioridade**: MÉDIA
 
 **Proposta**: Estabelecer e enforçar a convenção:
+
 - `SESSION_ID_PAYLOAD` = valor literal recebido do VS Code (nunca modificado)
 - `SESSION_ID` = valor efetivo que usamos (lido do CTX, ou SESSION_ID_PAYLOAD quando coincidem)
 
-Aplicar a `subagent-start.sh` (usa apenas `SESSION_ID`) e revisar `post-tool-use.sh` que usa `SESSION_ID` para o valor do payload.
+Aplicar a `subagent-start.sh` (usa apenas `SESSION_ID`) e revisar `post-tool-use.sh` que usa
+`SESSION_ID` para o valor do payload.
 
 ---
 
@@ -666,15 +774,17 @@ Aplicar a `subagent-start.sh` (usa apenas `SESSION_ID`) e revisar `post-tool-use
 
 **Prioridade**: ALTA
 
-**Proposta**: Após BUG-S03 corrigido, refatorar os guards de todos os scripts (primários e secundários) para:
+**Proposta**: Após BUG-S03 corrigido, refatorar os guards de todos os scripts (primários e
+secundários) para:
+
 ```bash
 source "$HOOK_DIR/hooks-lib/common.sh"
 # ...extração de campos...
 if heal_v1 "$SESSION_ID_PAYLOAD" "$TIMESTAMP"; then
-    SESSION_ID="$SESSION_ID_PAYLOAD"
+  SESSION_ID="$SESSION_ID_PAYLOAD"
 elif [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
-    increment_mismatch
-    exit 0
+  increment_mismatch
+  exit 0
 fi
 ```
 
@@ -687,6 +797,7 @@ Isso elimina code duplication e garante que HEAL v1 seja consistente em todos os
 **Prioridade**: ALTA
 
 **Proposta**: Criar suite de testes em `smoke-test.sh` que:
+
 1. Para cada hook, cria um payload JSON mínimo válido
 2. Chama o script correspondente via stdin
 3. Verifica estado do CTX e audit.jsonl após execução
@@ -699,31 +810,38 @@ Isso detectaria BUG-S01 (guard depois de log) automaticamente.
 
 **Prioridade**: BAIXA
 
-**Observação**: O `copilot-hooks.json` registra 10 hooks. O diretório `scripts/` tem 37 scripts. 27 scripts não são chamados pelo VS Code. Existem scripts órfãos (ex: `error-occurred.sh`) que podem ter sido criados para hooks que não existem mais. Convém auditá-los.
+**Observação**: O `copilot-hooks.json` registra 10 hooks. O diretório `scripts/` tem 37 scripts. 27
+scripts não são chamados pelo VS Code. Existem scripts órfãos (ex: `error-occurred.sh`) que podem
+ter sido criados para hooks que não existem mais. Convém auditá-los.
 
 ---
 
 ## Seção 7-C — Achados da Rodada EBH (2026-03-12, exploratory-bug-hunt)
 
-> Rodada proativa com 10 categorias adaptadas para shell scripts. Escopo: 11 hook scripts + common.sh.
+> Rodada proativa com 10 categorias adaptadas para shell scripts. Escopo: 11 hook scripts +
+> common.sh.
 
 ### EBH-M01 — `pre-tool-use.sh`: escrita não-atômica em CTX_FILE no caminho de auto-recovery ✅ CORRIGIDO
 
-**Severidade**: MÉDIA
-**Status**: ✅ CORRIGIDO (2026-03-12)
+**Severidade**: MÉDIA **Status**: ✅ CORRIGIDO (2026-03-12)
 
-**Problema**: No caminho `auto_recovery` de `pre-tool-use.sh`, `jq -cn ... > "$CTX_FILE"` escrevia diretamente no arquivo, sem swap atômico via mktemp. O operador `>` trunca o arquivo antes de jq escrever; se jq falhar, CTX_FILE fica com 0 bytes — piorando o estado já degradado.
+**Problema**: No caminho `auto_recovery` de `pre-tool-use.sh`, `jq -cn ... > "$CTX_FILE"` escrevia
+diretamente no arquivo, sem swap atômico via mktemp. O operador `>` trunca o arquivo antes de jq
+escrever; se jq falhar, CTX_FILE fica com 0 bytes — piorando o estado já degradado.
 
-**Fix aplicado**: Adicionado `_RECOVERY_CTX_TMP="$(mktemp)"` antes do `jq -cn`; saída vai para tmp; `mv` promove atomicamente; `rm -f` limpa em caso de falha.
+**Fix aplicado**: Adicionado `_RECOVERY_CTX_TMP="$(mktemp)"` antes do `jq -cn`; saída vai para tmp;
+`mv` promove atomicamente; `rm -f` limpa em caso de falha.
 
 ---
 
 ### EBH-M02 — `agent-stop.sh`: `$CTX_FILE.tmp` como nome estático de arquivo temporário ✅ CORRIGIDO
 
-**Severidade**: MÉDIA
-**Status**: ✅ CORRIGIDO (2026-03-12)
+**Severidade**: MÉDIA **Status**: ✅ CORRIGIDO (2026-03-12)
 
-**Problema**: Na linha que atualiza `consecutive_unauthorized` após bloqueio, o código usava `> "$CTX_FILE.tmp"` como temporário. Esse nome é previsível e estático — em caso de execuções concorrentes (subagentes), pode haver sobrescrita mútua do `.tmp`. Em falha de jq, o `.tmp` fica orphaned no diretório de estado.
+**Problema**: Na linha que atualiza `consecutive_unauthorized` após bloqueio, o código usava
+`> "$CTX_FILE.tmp"` como temporário. Esse nome é previsível e estático — em caso de execuções
+concorrentes (subagentes), pode haver sobrescrita mútua do `.tmp`. Em falha de jq, o `.tmp` fica
+orphaned no diretório de estado.
 
 **Fix aplicado**: Substituído por `_BLOCK_CTX_TMP="$(mktemp)"` com padrão `mv || rm -f`.
 
@@ -731,92 +849,142 @@ Isso detectaria BUG-S01 (guard depois de log) automaticamente.
 
 ### EBH-M03 — `session-start.sh` UPG-01: `LOGICAL_SESSION_NUMBER = 0` em edge case ✅ CORRIGIDO
 
-**Severidade**: MÉDIA
-**Status**: ✅ CORRIGIDO (2026-03-12)
+**Severidade**: MÉDIA **Status**: ✅ CORRIGIDO (2026-03-12)
 
-**Problema**: Quando `SOURCE = "inline_restart"` e CTX não existe (arquivo apagado antes da reconexão), `_PREV_LOGICAL_NUM = 0` → `LOGICAL_SESSION_NUMBER = 0`. O briefing exibiria "Sessão lógica: #0", que é inválido.
+**Problema**: Quando `SOURCE = "inline_restart"` e CTX não existe (arquivo apagado antes da
+reconexão), `_PREV_LOGICAL_NUM = 0` → `LOGICAL_SESSION_NUMBER = 0`. O briefing exibiria "Sessão
+lógica: #0", que é inválido.
 
-**Fix aplicado**: Guard adicionado no branch `inline_restart`: se `_PREV_LOGICAL_NUM` for 0 ou inválido, `LOGICAL_SESSION_NUMBER = 1` (mínimo semântico).
+**Fix aplicado**: Guard adicionado no branch `inline_restart`: se `_PREV_LOGICAL_NUM` for 0 ou
+inválido, `LOGICAL_SESSION_NUMBER = 1` (mínimo semântico).
 
 ---
 
 ### EBH-L01 — `subagent-start.sh` / `subagent-stop.sh`: sem fallback mktemp para CTX update
 
-**Severidade**: BAIXA
-**Status**: ✅ Aplicado (2026-03-12)
+**Severidade**: BAIXA **Status**: ✅ Aplicado (2026-03-12)
 
-**Problema**: Ambos os scripts só executam o incremento de `subagent_calls`/`subagent_completions` se `sponge` estiver disponível. Se `sponge` não estiver instalado, o contador nunca é atualizado silenciosamente. `sponge` é parte de `moreutils` — instalado no DevContainer (sem risco imediato), mas frágil em outros ambientes.
+**Problema**: Ambos os scripts só executam o incremento de `subagent_calls`/`subagent_completions`
+se `sponge` estiver disponível. Se `sponge` não estiver instalado, o contador nunca é atualizado
+silenciosamente. `sponge` é parte de `moreutils` — instalado no DevContainer (sem risco imediato),
+mas frágil em outros ambientes.
 
-**Fix aplicado**: Adicionado `else`-branch com padrão mktemp/mv em ambos os scripts. A condição `[ -s "$CTX_FILE" ]` (tamanho > 0) também foi adicionada para consistência com as demais guards.
+**Fix aplicado**: Adicionado `else`-branch com padrão mktemp/mv em ambos os scripts. A condição
+`[ -s "$CTX_FILE" ]` (tamanho > 0) também foi adicionada para consistência com as demais guards.
 
 ---
 
 ### EBH-L02 — `common.sh:ctx_update()`: injeção via `sh -c "jq '${expr}'"` (latente)
 
-**Severidade**: BAIXA (latente — não exploitável atualmente)
-**Status**: 🟡 Backlog
+**Severidade**: BAIXA (latente — não exploitável atualmente) **Status**: 🟡 Backlog
 
-**Problema**: A função interpola `${expr}` dentro de uma string `sh -c "jq '${expr}' ..."`. Se `expr` contiver aspas simples, a sintaxe do shell quebraria. Atualmente, `ctx_update` só é chamada com expressões hardcoded sem aspas simples.
+**Problema**: A função interpola `${expr}` dentro de uma string `sh -c "jq '${expr}' ..."`. Se
+`expr` contiver aspas simples, a sintaxe do shell quebraria. Atualmente, `ctx_update` só é chamada
+com expressões hardcoded sem aspas simples.
 
-**Fix proposto**: Usar `jq --args` ou escapar `${expr}` com `printf '%q'` antes de interpolar em `sh -c`.
+**Fix proposto**: Usar `jq --args` ou escapar `${expr}` com `printf '%q'` antes de interpolar em
+`sh -c`.
 
 ---
 
 ### EBH-L03 — `agent-stop.sh`: 40 chamadas `jq ... "$CTX_FILE"` (performance C9)
 
-**Severidade**: BAIXA (performance)
-**Status**: 🟡 Backlog
+**Severidade**: BAIXA (performance) **Status**: 🟡 Backlog
 
-**Problema**: `agent-stop.sh` contém 40 linhas que fazem `jq` no CTX_FILE. Cada chamada spawna um subshell, lê o arquivo, e processa. Em sessões longas com muitos `agentStop` disparados, essa sobrecarga é mensurável.
+**Problema**: `agent-stop.sh` contém 40 linhas que fazem `jq` no CTX_FILE. Cada chamada spawna um
+subshell, lê o arquivo, e processa. Em sessões longas com muitos `agentStop` disparados, essa
+sobrecarga é mensurável.
 
-**Fix proposto**: Fazer uma leitura consolidada do CTX no início do script usando `CTX_JSON="$(cat "$CTX_FILE")"` e passar as leituras via `echo "$CTX_JSON" | jq ...` ou usar múltiplos `--arg` em uma única chamada. Escritas continuam individualmente (atômicas).
+**Fix proposto**: Fazer uma leitura consolidada do CTX no início do script usando
+`CTX_JSON="$(cat "$CTX_FILE")"` e passar as leituras via `echo "$CTX_JSON" | jq ...` ou usar
+múltiplos `--arg` em uma única chamada. Escritas continuam individualmente (atômicas).
 
 ---
 
+| ---------- | ------ |
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| | 2026-03-11 | BUG-01 | `log-prompt.sh` RECONNECT-02 usa `SESSION_ID_PAYLOAD` em vez de UUID
+aleatório | | 2026-03-11 | BUG-02 | `session-start.sh` branch `inline_restart` preserva stats,
+atualiza apenas campos de identidade | | 2026-03-11 | BUG-03 | `pre-tool-use.sh` detecta
+`search_subagent` equivalente a `runSubagent` | | 2026-03-11 | BUG-04 | `pre-tool-use.sh` remove
+double-count de `subagent_calls` | | 2026-03-11 | BUG-05 | `post-tool-use.sh` adiciona bloco
+`search_subagent` com `auth_requested=true` | | 2026-03-11 | BUG-06 | HEAL v1 estendido para cobrir
+`source=inline_restart` em pre/post-tool-use.sh e agent-stop.sh | | 2026-03-11 | GAP-01 |
+`log-prompt.sh` cabeçalho "PHASE 0 — SESSION_ID RECONCILIATION" documenta ponto de reconciliação | |
+2026-03-11 | GAP-02 | Campo `session.vs_code_session_id` adicionado a todos os paths de atualização
+do CTX | | 2026-03-11 | GAP-03 | Contadores `session_id_mismatches` e `session_id_syncs_inline` no
+CTX + incrementadores nos scripts | | 2026-03-11 | GAP-04 | `hooks-lib/common.sh` expandido com
+`heal_v1()`, `heal_v2()`, `increment_mismatch()` | | 2026-03-11 | BUG-07 | `subagent-start.sh`:
+renomear `SESSION_ID` → `SESSION_ID_PAYLOAD`, source common.sh, HEAL v1, increment_mismatch | |
+2026-03-11 | BUG-08 | `subagent-stop.sh`: source common.sh, HEAL v1, increment_mismatch no bloco de
+mismatch | | 2026-03-11 | BUG-09 | `tool-use-failure.sh`: source common.sh, HEAL v1,
+increment_mismatch no bloco de mismatch | | 2026-03-11 | BUG-10 | `pre-compact.sh`: source
+common.sh, HEAL v1, increment_mismatch + sponge para CTX update atômico | | 2026-03-11 | BUG-11 |
+`session-end.sh`: corrigir query `ERRORS_COUNT` de `"errorOccurred"` → `"toolUseFailure"` | |
+2026-03-11 | BUG-12 | Assinatura errada de `heal_v1()` nos 4 scripts secundários: removidos args
+extras, usando `(SID, TIMESTAMP)` | | 2026-03-11 | BUG-13 | Double-count `subagent_calls`: removido
+de `subagent-stop.sh`, criado contador separado `subagent_completions` | | 2026-03-11 | BUG-14 |
+`current_turn.subagent_delegated` nunca resetado entre turnos: adicionado ao reset em
+`agent-stop.sh` | | 2026-03-11 | BUG-15 | `increment_mismatch` chamado com `$CTX_FILE` desnecessário
+em 4 scripts: removido (função usa variável global) | | 2026-03-12 | BUG-16 | `tool-use-failure.sh`:
+guard movido para ANTES dos writes — evita contaminar `audit.jsonl` com session_id errado; evento de
+mismatch renomeado para `session_id_mismatch_failure` c/ campos do tool | | 2026-03-12 | BUG-17 |
+HEALs inline de `manual_recovery` em `pre-tool-use.sh` e `post-tool-use.sh` agora atualizam também
+`.session.vs_code_session_id` (já correto em `common.sh`/`heal_v1`) | | 2026-03-12 | GAP-05 | Schema
+`session-start.sh` completado: `session_stats` recebe `subagent_completions` e
+`askquestions_api_failures`; `current_turn` recebe `section_turn`, `todo_created`, `block_count`,
+`agentStop_invocations` e `subagent_delegated` | | 2026-03-12 | ROB-B | Padronização do sourcing de
+`common.sh` em todos os 8 scripts de hook: padrão `if [ -f ]; then ... else echo "[WARN]" >&2; fi`
+ou `source ... \|\| echo "[WARN]" >&2` uniforme | | 2026-03-12 | GAP-O1 | Log
+`session_id_sync_inline_restart` limitado a 5 ocorrências em `pre-tool-use.sh` e `post-tool-use.sh`;
+6ª ocorrência emite evento `session_id_sync_inline_restart_cap`; contador CTX sempre incrementado |
+| 2026-03-12 | ROB-C | Confirmado: padrão `jq -r ... 2>/dev/null \|\| echo 'default'` já uniforme em
+todos os 11 scripts — nenhuma alteração necessária (eram 0 casos sem fallback) | | 2026-03-12 |
+INC-02 | Falso alarme — `"initial"` não existe no código; `"início"` e `"retomada"` são design
+intencional; PLANO atualizado | | 2026-03-12 | INC-03 | Falso alarme — 3 padrões de CTX update
+(flock/sponge/mktemp) são design intencional por nível de criticidade; PLANO atualizado | |
+2026-03-12 | BUG-05 | GUIA Section 3.1: adicionada tabela explícita distinguindo `source` do VS Code
+(sempre `"new"`) vs `session.source` do CTX (múltiplos valores) | | 2026-03-12 | UPG-03 |
+`session-start.sh`: tabela "Estado Ativo" do briefing expandida com "Origem da sessão" e
+"Estatísticas" (estado de preservação), com descrições por valor de `$SOURCE` | | 2026-03-12 |
+UPG-01 | `session-start.sh`: adicionados `session.logical_session_number` e
+`session.logical_restart_at` ao CTX; `logical_session_number` incrementa em sessões `source=new`,
+preservado em `inline_restart`; briefing exibe nova linha "Sessão lógica" | | 2026-03-12 | G9-11 |
+`hooks-lib/common.sh`: função `strip_sensitive_json_keys()` adicionada — redação estrutural por
+denylist de chaves JSON sensíveis (password, token, api_key, secret, close_key, etc.); integrada em
+`pre-tool-use.sh` como Camada 0 antes de `redact_credentials` | | 2026-03-12 | EBH-M01 |
+`pre-tool-use.sh`: escrita de recovery em CTX_FILE trocada para padrão atômico mktemp+mv; eliminado
+risco de truncamento em caso de falha do `jq -cn` | | 2026-03-12 | EBH-M02 | `agent-stop.sh`:
+`$CTX_FILE.tmp` substituído por `mktemp` no update de `consecutive_unauthorized`; eliminado nome
+estático de temporário e possível orphan | | 2026-03-12 | EBH-M03 | `session-start.sh` (UPG-01):
+guard adicionado para `LOGICAL_SESSION_NUMBER != 0` em `inline_restart` sem CTX prévio; mínimo
+semântico agora é 1 | | 2026-03-12 | EBH-L01 | `subagent-start.sh` + `subagent-stop.sh`: adicionado
+`else`-branch com mktemp/mv para garantir atualização do CTX mesmo sem `sponge`; guard
+`[ -s "$CTX_FILE" ]` adicionada por consistência | | 2026-03-12 | GUIA v2.1 | Footer do
+`GUIA-HOOKS-COPILOT.md` atualizado para v2.1 documentando BUG-05, UPG-01, UPG-03 e G9-11 | |
+2026-03-12 | FIX-01 | `log-prompt.sh` RECONNECT-02: adicionado reset de
+`session_stats.turns_since_askQuestions = 0` em ambos os branches (sponge e mktemp); eliminada falsa
+severidade ALERTA no primeiro turno após inline_restart | | 2026-03-12 | GUIA-CORR-01 | Seção 12.2
+do GUIA corrigida: afirmação "geramos um NOVO UUID" era incorreta desde BUG-01; o código usa
+`SESSION_ID_PAYLOAD` (VS Code session_id) diretamente em inline_restart | | 2026-03-12 | GAP-ARCH-01
+| Documentado que `prev_session_id === session.id` em RECONNECT-02 é comportamento esperado (mesma
+sessão VS Code; campo aponta para UUID idêntico) | | 2026-03-12 | GAP-ARCH-02 | Documentado que
+`turn_authorized`/`turn_unauthorized` são preservados em RECONNECT-02 (design intencional:
+continuidade histórica), enquanto `turn_count` é resetado | | 2026-03-12 | GAP-ARCH-03 | Documentado
+que RECONNECT-01 não limpa `ended_at`, podendo RECONNECT-02 disparar logo após no mesmo prompt
+(GAP-ARCH-05: duplo-firing); estado final correto | | 2026-03-12 | GUIA v2.2 | Seção 19 adicionada
+ao GUIA: taxonomia completa dos 6 cenários de ciclo de vida de prompt vs sessão, análise de gaps,
+evidência empírica |
 
-| ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-03-11 | BUG-01 | `log-prompt.sh` RECONNECT-02 usa `SESSION_ID_PAYLOAD` em vez de UUID aleatório                                                                                                                                                         |
-| 2026-03-11 | BUG-02 | `session-start.sh` branch `inline_restart` preserva stats, atualiza apenas campos de identidade                                                                                                                                        |
-| 2026-03-11 | BUG-03 | `pre-tool-use.sh` detecta `search_subagent` equivalente a `runSubagent`                                                                                                                                                                |
-| 2026-03-11 | BUG-04 | `pre-tool-use.sh` remove double-count de `subagent_calls`                                                                                                                                                                              |
-| 2026-03-11 | BUG-05 | `post-tool-use.sh` adiciona bloco `search_subagent` com `auth_requested=true`                                                                                                                                                          |
-| 2026-03-11 | BUG-06 | HEAL v1 estendido para cobrir `source=inline_restart` em pre/post-tool-use.sh e agent-stop.sh                                                                                                                                          |
-| 2026-03-11 | GAP-01 | `log-prompt.sh` cabeçalho "PHASE 0 — SESSION_ID RECONCILIATION" documenta ponto de reconciliação                                                                                                                                       |
-| 2026-03-11 | GAP-02 | Campo `session.vs_code_session_id` adicionado a todos os paths de atualização do CTX                                                                                                                                                   |
-| 2026-03-11 | GAP-03 | Contadores `session_id_mismatches` e `session_id_syncs_inline` no CTX + incrementadores nos scripts                                                                                                                                    |
-| 2026-03-11 | GAP-04 | `hooks-lib/common.sh` expandido com `heal_v1()`, `heal_v2()`, `increment_mismatch()`                                                                                                                                                   |
-| 2026-03-11 | BUG-07 | `subagent-start.sh`: renomear `SESSION_ID` → `SESSION_ID_PAYLOAD`, source common.sh, HEAL v1, increment_mismatch                                                                                                                       |
-| 2026-03-11 | BUG-08 | `subagent-stop.sh`: source common.sh, HEAL v1, increment_mismatch no bloco de mismatch                                                                                                                                                 |
-| 2026-03-11 | BUG-09 | `tool-use-failure.sh`: source common.sh, HEAL v1, increment_mismatch no bloco de mismatch                                                                                                                                              |
-| 2026-03-11 | BUG-10 | `pre-compact.sh`: source common.sh, HEAL v1, increment_mismatch + sponge para CTX update atômico                                                                                                                                       |
-| 2026-03-11 | BUG-11 | `session-end.sh`: corrigir query `ERRORS_COUNT` de `"errorOccurred"` → `"toolUseFailure"`                                                                                                                                              |
-| 2026-03-11 | BUG-12 | Assinatura errada de `heal_v1()` nos 4 scripts secundários: removidos args extras, usando `(SID, TIMESTAMP)`                                                                                                                           |
-| 2026-03-11 | BUG-13 | Double-count `subagent_calls`: removido de `subagent-stop.sh`, criado contador separado `subagent_completions`                                                                                                                         |
-| 2026-03-11 | BUG-14 | `current_turn.subagent_delegated` nunca resetado entre turnos: adicionado ao reset em `agent-stop.sh`                                                                                                                                  |
-| 2026-03-11 | BUG-15 | `increment_mismatch` chamado com `$CTX_FILE` desnecessário em 4 scripts: removido (função usa variável global)                                                                                                                         |
-| 2026-03-12 | BUG-16 | `tool-use-failure.sh`: guard movido para ANTES dos writes — evita contaminar `audit.jsonl` com session_id errado; evento de mismatch renomeado para `session_id_mismatch_failure` c/ campos do tool                                    |
-| 2026-03-12 | BUG-17 | HEALs inline de `manual_recovery` em `pre-tool-use.sh` e `post-tool-use.sh` agora atualizam também `.session.vs_code_session_id` (já correto em `common.sh`/`heal_v1`)                                                                 |
-| 2026-03-12 | GAP-05 | Schema `session-start.sh` completado: `session_stats` recebe `subagent_completions` e `askquestions_api_failures`; `current_turn` recebe `section_turn`, `todo_created`, `block_count`, `agentStop_invocations` e `subagent_delegated` |
-| 2026-03-12 | ROB-B  | Padronização do sourcing de `common.sh` em todos os 8 scripts de hook: padrão `if [ -f ]; then ... else echo "[WARN]" >&2; fi` ou `source ... \|\| echo "[WARN]" >&2` uniforme                                                         |
-| 2026-03-12 | GAP-O1 | Log `session_id_sync_inline_restart` limitado a 5 ocorrências em `pre-tool-use.sh` e `post-tool-use.sh`; 6ª ocorrência emite evento `session_id_sync_inline_restart_cap`; contador CTX sempre incrementado                             |
-| 2026-03-12 | ROB-C  | Confirmado: padrão `jq -r ... 2>/dev/null \|\| echo 'default'` já uniforme em todos os 11 scripts — nenhuma alteração necessária (eram 0 casos sem fallback)                                                                           |
-| 2026-03-12 | INC-02 | Falso alarme — `"initial"` não existe no código; `"início"` e `"retomada"` são design intencional; PLANO atualizado                                                                                                                    |
-| 2026-03-12 | INC-03 | Falso alarme — 3 padrões de CTX update (flock/sponge/mktemp) são design intencional por nível de criticidade; PLANO atualizado                                                                                                         |
-| 2026-03-12 | BUG-05 | GUIA Section 3.1: adicionada tabela explícita distinguindo `source` do VS Code (sempre `"new"`) vs `session.source` do CTX (múltiplos valores)                                                                                         |
-| 2026-03-12 | UPG-03 | `session-start.sh`: tabela "Estado Ativo" do briefing expandida com "Origem da sessão" e "Estatísticas" (estado de preservação), com descrições por valor de `$SOURCE`                                                                 |
-| 2026-03-12 | UPG-01 | `session-start.sh`: adicionados `session.logical_session_number` e `session.logical_restart_at` ao CTX; `logical_session_number` incrementa em sessões `source=new`, preservado em `inline_restart`; briefing exibe nova linha "Sessão lógica" |
-| 2026-03-12 | G9-11  | `hooks-lib/common.sh`: função `strip_sensitive_json_keys()` adicionada — redação estrutural por denylist de chaves JSON sensíveis (password, token, api_key, secret, close_key, etc.); integrada em `pre-tool-use.sh` como Camada 0 antes de `redact_credentials` |
-| 2026-03-12 | EBH-M01 | `pre-tool-use.sh`: escrita de recovery em CTX_FILE trocada para padrão atômico mktemp+mv; eliminado risco de truncamento em caso de falha do `jq -cn` |
-| 2026-03-12 | EBH-M02 | `agent-stop.sh`: `$CTX_FILE.tmp` substituído por `mktemp` no update de `consecutive_unauthorized`; eliminado nome estático de temporário e possível orphan |
-| 2026-03-12 | EBH-M03 | `session-start.sh` (UPG-01): guard adicionado para `LOGICAL_SESSION_NUMBER != 0` em `inline_restart` sem CTX prévio; mínimo semântico agora é 1 |
-| 2026-03-12 | EBH-L01 | `subagent-start.sh` + `subagent-stop.sh`: adicionado `else`-branch com mktemp/mv para garantir atualização do CTX mesmo sem `sponge`; guard `[ -s "$CTX_FILE" ]` adicionada por consistência |
-| 2026-03-12 | GUIA v2.1 | Footer do `GUIA-HOOKS-COPILOT.md` atualizado para v2.1 documentando BUG-05, UPG-01, UPG-03 e G9-11 |
-| 2026-03-12 | FIX-01 | `log-prompt.sh` RECONNECT-02: adicionado reset de `session_stats.turns_since_askQuestions = 0` em ambos os branches (sponge e mktemp); eliminada falsa severidade ALERTA no primeiro turno após inline_restart |
-| 2026-03-12 | GUIA-CORR-01 | Seção 12.2 do GUIA corrigida: afirmação "geramos um NOVO UUID" era incorreta desde BUG-01; o código usa `SESSION_ID_PAYLOAD` (VS Code session_id) diretamente em inline_restart |
-| 2026-03-12 | GAP-ARCH-01 | Documentado que `prev_session_id === session.id` em RECONNECT-02 é comportamento esperado (mesma sessão VS Code; campo aponta para UUID idêntico) |
-| 2026-03-12 | GAP-ARCH-02 | Documentado que `turn_authorized`/`turn_unauthorized` são preservados em RECONNECT-02 (design intencional: continuidade histórica), enquanto `turn_count` é resetado |
-| 2026-03-12 | GAP-ARCH-03 | Documentado que RECONNECT-01 não limpa `ended_at`, podendo RECONNECT-02 disparar logo após no mesmo prompt (GAP-ARCH-05: duplo-firing); estado final correto |
-| 2026-03-12 | GUIA v2.2 | Seção 19 adicionada ao GUIA: taxonomia completa dos 6 cenários de ciclo de vida de prompt vs sessão, análise de gaps, evidência empírica |
+| 2026-03-13 | BUG-S01 | agent-stop.sh: local_turn:0 ausente na secao auto-criada "retomada" pela
+invariante SESSION+SECTION+TURN | | 2026-03-13 | BUG-S02 | start-section.sh:
+current_turn.section_turn nao resetado a 0 ao abrir nova secao | | 2026-03-13 | BUG-S03 |
+log-prompt.sh RECONNECT-02: turn_authorized + turn_no_askQuestions nao resetados — corrigido com
+snapshot prev_turn_authorized | | 2026-03-13 | GAP-S01 | Documentado: session_stats.section_count
+nao resetado em RECONNECT-02 (design decision) | | 2026-03-13 | GAP-S02 | Documentado: secao
+transientemente null entre section-end.sh e start-section.sh (BUG-A.3) | | 2026-03-13 | GUIA v2.3 |
+Secao 20 adicionada: hierarquia SESSION/SECTION/TURN analise tecnica completa; BUG-S01/S02/S03
+documentados e corrigidos |
 
 ---
 
@@ -869,6 +1037,7 @@ Próximos preToolUse, postToolUse, agentStop:
 
 ---
 
-*Documento criado por investigação exaustiva conduzida em 2026-03-11.*
-*Scripts analisados: `session-start.sh` (1027L), `log-prompt.sh` (431L), `pre-tool-use.sh` (443L), `post-tool-use.sh` (342L), `agent-stop.sh` (780L).*
-*GUIA analisado: `GUIA-HOOKS-COPILOT.md` v1.9 (3115L), cobertura integral.*
+_Documento criado por investigação exaustiva conduzida em 2026-03-11._ _Scripts analisados:
+`session-start.sh` (1027L), `log-prompt.sh` (431L), `pre-tool-use.sh` (443L), `post-tool-use.sh`
+(342L), `agent-stop.sh` (780L)._ _GUIA analisado: `GUIA-HOOKS-COPILOT.md` v1.9 (3115L), cobertura
+integral._

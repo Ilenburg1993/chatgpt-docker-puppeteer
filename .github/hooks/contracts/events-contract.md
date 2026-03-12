@@ -2,8 +2,8 @@
 
 **Status**: Canônico. **Última atualização**: 2026-03-11. **Versão**: 1.1
 
-> Este documento é o contrato formal de todos os eventos que fluem pelo sistema de hooks.
-> Toda adição ou mudança de schema deve ser refletida aqui antes de ser implementada.
+> Este documento é o contrato formal de todos os eventos que fluem pelo sistema de hooks. Toda
+> adição ou mudança de schema deve ser refletida aqui antes de ser implementada.
 
 ---
 
@@ -29,16 +29,17 @@ SESSION
 ## Eventos Copilot (externos — input via stdin do hook)
 
 ### `sessionStart`
+
 - **Script**: `scripts/session-start.sh`
 - **Timeout**: 15s
 - **Input schema** (stdin JSON):
   ```json
   {
-    "timestamp":     "2026-03-10T06:00:00Z",
+    "timestamp": "2026-03-10T06:00:00Z",
     "hook_event_name": "SessionStart",
-    "session_id":    "uuid-v4",
-    "cwd":           "/workspaces/repo",
-    "source":        "new | resumed"
+    "session_id": "uuid-v4",
+    "cwd": "/workspaces/repo",
+    "source": "new | resumed"
   }
   ```
 - **Output** (fd 3 → additionalContext):
@@ -56,15 +57,16 @@ SESSION
 - **Invariante**: session "início" sempre criada como primeira SECTION
 
 ### `userPromptSubmitted`
+
 - **Script**: `scripts/log-prompt.sh`
 - **Timeout**: 10s
 - **Input schema** (stdin JSON):
   ```json
   {
-    "timestamp":       "2026-03-10T06:01:00Z",
+    "timestamp": "2026-03-10T06:01:00Z",
     "hook_event_name": "UserPromptSubmitted",
-    "session_id":      "uuid-v4",
-    "prompt":          "<texto do prompt do usuário>"
+    "session_id": "uuid-v4",
+    "prompt": "<texto do prompt do usuário>"
   }
   ```
 - **Output**: nenhum
@@ -74,20 +76,21 @@ SESSION
   - Loga `userPromptSubmitted` em `logs/audit.jsonl`
 
 ### `preToolUse`
+
 - **Script**: `scripts/pre-tool-use.sh`
 - **Timeout**: 15s
 - **Variável de ambiente**: `HOOKS_LOG_LEVEL=INFO`
 - **Input schema** (stdin JSON):
   ```json
   {
-    "timestamp":       "2026-03-10T06:01:05Z",
+    "timestamp": "2026-03-10T06:01:05Z",
     "hook_event_name": "PreToolUse",
-    "session_id":      "uuid-v4",
-    "tool_name":       "run_in_terminal",
-    "tool_input":      { "...": "..." },
-    "tool_use_id":     "tooluse_xxx",
+    "session_id": "uuid-v4",
+    "tool_name": "run_in_terminal",
+    "tool_input": { "...": "..." },
+    "tool_use_id": "tooluse_xxx",
     "transcript_path": "/path/to/transcript",
-    "cwd":             "/workspaces/repo"
+    "cwd": "/workspaces/repo"
   }
   ```
 - **Output**: nenhum (logging-only; nunca emite `permissionDecision:deny`)
@@ -96,22 +99,24 @@ SESSION
   - Loga `preToolUse` em `logs/audit.jsonl` com args redactados
   - Atualiza `current_turn.tools_count`, `tools_by_name`, `last_tool`
   - Detecta `vscode_askQuestions` → seta `current_turn.auth_requested = true`
-  - Detecta `runSubagent`/`Task` → seta `auth_requested=true`, `subagent_delegated=true`; loga `subagentStart` (hardening v6)
+  - Detecta `runSubagent`/`Task` → seta `auth_requested=true`, `subagent_delegated=true`; loga
+    `subagentStart` (hardening v6)
   - Session_id guard: ignora payload se session_id ≠ ctx ativo (v5)
 
 ### `postToolUse`
+
 - **Script**: `scripts/post-tool-use.sh`
 - **Timeout**: 15s
 - **Input schema** (stdin JSON):
   ```json
   {
-    "timestamp":       "2026-03-10T06:01:10Z",
+    "timestamp": "2026-03-10T06:01:10Z",
     "hook_event_name": "PostToolUse",
-    "session_id":      "uuid-v4",
-    "tool_name":       "run_in_terminal",
-    "tool_use_id":     "tooluse_xxx",
-    "tool_input":      { "...": "..." },
-    "tool_response":   { "...": "..." }
+    "session_id": "uuid-v4",
+    "tool_name": "run_in_terminal",
+    "tool_use_id": "tooluse_xxx",
+    "tool_input": { "...": "..." },
+    "tool_response": { "...": "..." }
   }
   ```
 - **Output**: nenhum
@@ -122,17 +127,18 @@ SESSION
   - Session_id guard ativo
 
 ### `postToolUseFailure`
+
 - **Script**: `scripts/tool-use-failure.sh`
 - **Timeout**: 10s
 - **Input schema** (stdin JSON):
   ```json
   {
-    "timestamp":       "2026-03-10T06:01:10Z",
+    "timestamp": "2026-03-10T06:01:10Z",
     "hook_event_name": "PostToolUseFailure",
-    "session_id":      "uuid-v4",
-    "tool_name":       "run_in_terminal",
-    "tool_use_id":     "tooluse_xxx",
-    "error":           "Error message"
+    "session_id": "uuid-v4",
+    "tool_name": "run_in_terminal",
+    "tool_use_id": "tooluse_xxx",
+    "error": "Error message"
   }
   ```
 - **Output**: nenhum
@@ -141,14 +147,15 @@ SESSION
   - Incrementa `current_turn.failures_count`
 
 ### `agentStop`
+
 - **Script**: `scripts/agent-stop.sh`
 - **Timeout**: 10s
 - **Input schema** (stdin JSON):
   ```json
   {
-    "timestamp":        "2026-03-10T06:05:00Z",
-    "hook_event_name":  "AgentStop",
-    "session_id":       "uuid-v4",
+    "timestamp": "2026-03-10T06:05:00Z",
+    "hook_event_name": "AgentStop",
+    "session_id": "uuid-v4",
     "stop_hook_active": false
   }
   ```
@@ -157,14 +164,15 @@ SESSION
   {
     "hookSpecificOutput": {
       "hookEventName": "Stop",
-      "decision":      "block",
-      "reason":        "Turno não autorizado — vscode_askQuestions não foi chamado"
+      "decision": "block",
+      "reason": "Turno não autorizado — vscode_askQuestions não foi chamado"
     },
     "systemMessage": "<mensagem rica com estado contextualizado>"
   }
   ```
 - **Lógica de autorização** (4 estratégias em cascata):
-  1. Busca `vscode_askQuestions` **ou** `subagentStart` após último `userPromptSubmitted` no audit.jsonl
+  1. Busca `vscode_askQuestions` **ou** `subagentStart` após último `userPromptSubmitted` no
+     audit.jsonl
   2. Fallback: últimas 150 linhas do audit.jsonl (aceita `vscode_askQuestions` ou `subagentStart`)
   3. Fallback: `current_turn.auth_requested` do session-context.json
   4. Fallback: `current_turn.subagent_delegated` do session-context.json (novo em v6)
@@ -173,7 +181,8 @@ SESSION
   - Session_id guard: bloqueia escrita se session_id ≠ ctx ativo
   - HEAL v1: cura session_id se source=`manual_recovery`
   - **HEAL v2** (G9-04): cura após 3 mismatches consecutivos com mesmo "got" session_id
-  - **Hardening v6**: aceita `subagentStart` como sinal de autorização (Strategy 4 + Strategies 1/2 atualizadas)
+  - **Hardening v6**: aceita `subagentStart` como sinal de autorização (Strategy 4 + Strategies 1/2
+    atualizadas)
 - **Efeitos colaterais**:
   - Loga `agentStop` sempre
   - Loga `turnEnd_authorized` ou `turnEnd_BLOCKED` ou `turnEnd_UNAUTHORIZED`
@@ -183,16 +192,20 @@ SESSION
   - Gera `turnStart_enriched_auto` se intent não declarado
 
 ### `subagentStart`
-- **Scripts**: `scripts/subagent-start.sh` (hook Copilot), `scripts/pre-tool-use.sh` (hardening v6 — quando `runSubagent`/`Task` detectado)
+
+- **Scripts**: `scripts/subagent-start.sh` (hook Copilot), `scripts/pre-tool-use.sh` (hardening v6 —
+  quando `runSubagent`/`Task` detectado)
 - **Timeout**: 10s
 - **Input schema**: `{ timestamp, hook_event_name, session_id }`
 - **Output**: nenhum
 - **Efeitos colaterais**:
   - Loga `subagentStart` em audit.jsonl com `tool_name`, `tool_use_id`, `message`
-  - Quando emitido por `pre-tool-use.sh`: seta `auth_requested=true`, `subagent_delegated=true` no contexto
+  - Quando emitido por `pre-tool-use.sh`: seta `auth_requested=true`, `subagent_delegated=true` no
+    contexto
 - **Consumido por**: `agent-stop.sh` — aceito como sinal de autorização nas Strategies 1 e 2
 
 ### `subagentStop`
+
 - **Script**: `scripts/subagent-stop.sh`
 - **Timeout**: 10s
 - **Input schema**: `{ timestamp, hook_event_name, session_id }`
@@ -200,13 +213,16 @@ SESSION
 - **Efeitos colaterais**: loga `subagentStop` em audit.jsonl; session_id guard ativo
 
 ### `preCompact`
+
 - **Script**: `scripts/pre-compact.sh`
 - **Timeout**: 10s
 - **Input schema**: `{ timestamp, hook_event_name, session_id }`
 - **Output**: nenhum
-- **Efeitos colaterais**: loga `preCompact` em audit.jsonl; incrementa `session_stats.compaction_count`
+- **Efeitos colaterais**: loga `preCompact` em audit.jsonl; incrementa
+  `session_stats.compaction_count`
 
 ### `sessionEnd`
+
 - **Script**: `scripts/session-end.sh`
 - **Timeout**: 60s
 - **Input schema**: `{ timestamp, hook_event_name, session_id, reason }`
@@ -223,6 +239,7 @@ SESSION
 ## Eventos internos (audit.jsonl)
 
 Todos os eventos em `logs/audit.jsonl` são JSON objects com pelo menos:
+
 ```json
 { "event": "...", "session_id": "uuid", "timestamp": "ISO-8601" }
 ```
@@ -270,6 +287,7 @@ Todos os eventos em `logs/audit.jsonl` são JSON objects com pelo menos:
 | `session_id_healed`            | `pre-tool-use.sh`                                  | —                                            | session_id corrigido por mecanismo auto-heal (HEAL v2)                                                                                        |
 
 ### Eventos de diagnóstico (raramente produzidos)
+
 | Evento                   | Produzido por              | Significado                       |
 | ------------------------ | -------------------------- | --------------------------------- |
 | `watchdog_run`           | `watchdog.sh`              | Resultado do watchdog             |
@@ -309,7 +327,8 @@ Todos os eventos em `logs/audit.jsonl` são JSON objects com pelo menos:
 
 1. **Nunca remover campos** de eventos já existentes — só adicionar opcionais.
 2. **Dual-read obrigatório**: `toolUseFailure` e `toolFailure` são equivalentes (legado).
-3. **session_id guard**: qualquer script que escreva em `session-context.json` deve verificar que o payload session_id corresponde ao contexto ativo (exceto `session-start.sh`).
+3. **session_id guard**: qualquer script que escreva em `session-context.json` deve verificar que o
+   payload session_id corresponde ao contexto ativo (exceto `session-start.sh`).
 4. **Schema version**: bumpar `session-context.json` version ao adicionar campos obrigatórios.
 5. **Redação**: todo log de `tool_input` / `tool_response` passa por redaction de credentials.
 

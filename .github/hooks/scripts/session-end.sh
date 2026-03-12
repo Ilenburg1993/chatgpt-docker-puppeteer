@@ -142,7 +142,7 @@ if [ -f "$AUDIT_FILE" ]; then
         'select(.session_id == $sid and .event == "preToolUse")' \
         "$AUDIT_FILE" 2> /dev/null | jq -s 'length' 2> /dev/null || echo 0)"
     ERRORS_COUNT="$(jq -r --arg sid "$SESSION_ID" \
-        'select(.session_id == $sid and .event == "errorOccurred")' \
+        'select(.session_id == $sid and .event == "toolUseFailure")' \
         "$AUDIT_FILE" 2> /dev/null | jq -s 'length' 2> /dev/null || echo 0)"
 fi
 

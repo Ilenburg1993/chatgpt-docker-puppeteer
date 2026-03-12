@@ -101,6 +101,27 @@ CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | tr '[:lower:]' '[:upper
 INITIAL_SECTION_ID="$(uuidgen 2> /dev/null || printf 'sect_%s_%s' "$(date +%s)" "$$")"
 INITIAL_TURN_ID="$(uuidgen 2> /dev/null || printf 'turn_%s_%s' "$(date +%s)" "$$")"
 
+# UPG-01: Calcula o número da sessão lógica
+# logical_session_number increments on every "new" sessionStart (not inline_restart).
+# Preserved as-is on inline_restart since that is a continuation of the same logical session.
+_PREV_LOGICAL_NUM=0
+if [ -f "$STATE_DIR/session-context.json" ] && command -v jq &> /dev/null; then
+    _PREV_LOGICAL_NUM="$(jq -r '.session.logical_session_number // 0' "$STATE_DIR/session-context.json" 2> /dev/null || echo 0)"
+    _PREV_LOGICAL_NUM="${_PREV_LOGICAL_NUM:-0}"
+fi
+if [ "$SOURCE" = "inline_restart" ]; then
+    # Preserva o número atual — mesma sessão lógica
+    # EBH-M03: guard contra 0 quando CTX estava inexistente antes do inline_restart
+    if [ "${_PREV_LOGICAL_NUM:-0}" -gt 0 ] 2> /dev/null; then
+        LOGICAL_SESSION_NUMBER="$_PREV_LOGICAL_NUM"
+    else
+        LOGICAL_SESSION_NUMBER=1
+    fi
+else
+    # Nova sessão lógica: incrementa
+    LOGICAL_SESSION_NUMBER=$((_PREV_LOGICAL_NUM + 1))
+fi
+
 # ── Persiste contexto inicial — Schema v4 (layered) ──────────────────────────
 # Estrutura em 6 blocos separados por âmbito:
 #   session       → imutável após sessionStart (identidade da sessão)
@@ -109,28 +130,77 @@ INITIAL_TURN_ID="$(uuidgen 2> /dev/null || printf 'turn_%s_%s' "$(date +%s)" "$$
 #   current_section → seção temática ativa (sempre >= 1 ativa — invariante Schema v4)
 #   last_tool     → metadados do último tool call (sobrescrito a cada preToolUse)
 #   compliance    → estado do protocolo de autorização
-jq -cn \
-    --arg sid "$SESSION_ID" \
-    --arg ts "$TIMESTAMP" \
-    --arg date "$SESSION_DATE" \
-    --arg date_short "$SESSION_DATE_SHORT" \
-    --arg source "$SOURCE" \
-    --arg cwd "$CWD" \
-    --arg close_key "$CLOSE_KEY" \
-    --arg initial_section_id "$INITIAL_SECTION_ID" \
-    --arg initial_turn_id "$INITIAL_TURN_ID" \
-    --argjson consec "$PREV_CONSEC_UNAUTH" \
-    '{
+#
+# FIX BUG-02 (PREMISSA 1): Para source=inline_restart, NÃO zeramos o CTX.
+# O VS Code reconectou a mesma conversa lógica — preservar estatísticas acumuladas
+# (turn_count, tools_total, section_count, etc.) garante continuidade.
+# Apenas os campos da session (id, timestamps, close_key) são atualizados.
+if [ "$SOURCE" = "inline_restart" ] \
+    && [ -f "$STATE_DIR/session-context.json" ] \
+    && [ -s "$STATE_DIR/session-context.json" ]; then
+    # Atualização parcial: apenas campos de identidade da sessão.
+    # Estatísticas, seções, histórico de turnos e compliance são PRESERVADOS.
+    _CTX_TMP="$(mktemp)"
+    if jq \
+        --arg sid "$SESSION_ID" \
+        --arg date "$SESSION_DATE" \
+        --arg date_short "$SESSION_DATE_SHORT" \
+        --arg source "$SOURCE" \
+        --arg cwd "$CWD" \
+        --arg close_key "$CLOSE_KEY" \
+        --arg ts "$TIMESTAMP" \
+        '.session.id                    = $sid
+         | .session.vs_code_session_id  = $sid
+         | .session.started_at          = $date
+         | .session.date_short          = $date_short
+         | .session.ended_at            = null
+         | .session.end_reason          = null
+         | .session.close_key           = $close_key
+         | .session.close_key_validated = false
+         | .session.source              = $source
+         | .session.cwd                 = $cwd
+         | .last_tool.ts                = $ts' \
+        "$STATE_DIR/session-context.json" > "$_CTX_TMP" 2> /dev/null; then
+        mv "$_CTX_TMP" "$STATE_DIR/session-context.json" 2> /dev/null \
+            || {
+                cp "$_CTX_TMP" "$STATE_DIR/session-context.json" 2> /dev/null
+                rm -f "$_CTX_TMP"
+            }
+    else
+        rm -f "$_CTX_TMP"
+        # Fallback: se a atualização parcial falhar (CTX corrompido), faz reset completo
+        echo "[session-start] WARN: CTX corrompido em inline_restart — fallback para reset completo" >&2
+        SOURCE="new" # força o branch de reset abaixo
+    fi
+fi
+
+if [ "$SOURCE" != "inline_restart" ]; then
+    jq -cn \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$TIMESTAMP" \
+        --arg date "$SESSION_DATE" \
+        --arg date_short "$SESSION_DATE_SHORT" \
+        --arg source "$SOURCE" \
+        --arg cwd "$CWD" \
+        --arg close_key "$CLOSE_KEY" \
+        --arg initial_section_id "$INITIAL_SECTION_ID" \
+        --arg initial_turn_id "$INITIAL_TURN_ID" \
+        --argjson consec "$PREV_CONSEC_UNAUTH" \
+        --argjson logical_num "$LOGICAL_SESSION_NUMBER" \
+        '{
         "session": {
-            "id":                  $sid,
-            "started_at":          $date,
-            "date_short":          $date_short,
-            "ended_at":            null,
-            "end_reason":          null,
-            "close_key":           $close_key,
-            "close_key_validated": false,
-            "source":              $source,
-            "cwd":                 $cwd
+            "id":                    $sid,
+            "vs_code_session_id":    $sid,
+            "logical_session_number": $logical_num,
+            "logical_restart_at":    $ts,
+            "started_at":            $date,
+            "date_short":            $date_short,
+            "ended_at":              null,
+            "end_reason":            null,
+            "close_key":             $close_key,
+            "close_key_validated":   false,
+            "source":                $source,
+            "cwd":                   $cwd
         },
         "session_stats": {
             "turn_count":         0,
@@ -138,9 +208,11 @@ jq -cn \
             "turn_unauthorized":  0,
             "tools_total":        0,
             "tools_by_name":      {},
-            "failures_detected":  0,
-            "errors_total":       0,
-            "subagent_calls":     0,
+            "failures_detected":        0,
+            "errors_total":             0,
+            "subagent_calls":           0,
+            "subagent_completions":     0,
+            "askquestions_api_failures": 0,
             "section_count":      1,
             "section_names":      ["início"],
             "section_history":    [{"name": "início", "section_id": $initial_section_id, "section_number": 1, "started_at": $date}],
@@ -150,6 +222,8 @@ jq -cn \
             "last_push_turn":     null,
             "pending_section_after_push": false,
             "commit_history":     [],
+            "session_id_mismatches": 0,
+            "session_id_syncs_inline": 0,
             "recovery_hints": {
                 "last_intent":      null,
                 "last_section":     null,
@@ -167,8 +241,13 @@ jq -cn \
             "auth_requested_at":           null,
             "last_askquestions_response":  null,
             "section_name":                "início",
+            "section_turn":                1,
             "intent_declared":             false,
             "intent":                      null,
+            "todo_created":                false,
+            "block_count":                 0,
+            "agentStop_invocations":       0,
+            "subagent_delegated":          false,
             "turn_id":                     $initial_turn_id
         },
         "current_section": {
@@ -200,6 +279,7 @@ jq -cn \
         "session_summary": null,
         "last_turn_ts":    null
     }' > "$STATE_DIR/session-context.json"
+fi
 
 # BUG-A.2: Limpa contador de mismatches de sessões anteriores (HEAL v2).
 # .mismatch_track.json contém estado do contador de sessão id mismatch.
@@ -803,6 +883,42 @@ ${CLOSE_KEY}
 
 CLOSE_KEY_EOF
 
+# ── Hardening 4: Alertar sobre falhas de API do vscode_askQuestions na sessão anterior ──
+# Lê session-context.json para verificar se houve falhas de askQuestions na sessão anterior.
+# Isso detecta o padrão "FAILED: Response contained no choices" e avisa o agente.
+_PREV_ASK_API_FAILURES=0
+_PREV_ASK_API_FAILURES="$(jq -r '.session_stats.askquestions_api_failures // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+if [ "${_PREV_ASK_API_FAILURES:-0}" -gt 0 ] 2> /dev/null; then
+    _PREV_ASK_ERROR_AT="$(jq -r '.current_turn.askquestions_api_error_at // "desconhecido"' "$CTX_FILE" 2> /dev/null || echo 'desconhecido')"
+    cat >> "$BRIEFING_FILE" << ASK_FAIL_EOF
+
+---
+
+## ⚠️ ALERTA — Falha de API do \`vscode_askQuestions\` na sessão anterior
+
+> O \`vscode_askQuestions\` falhou **${_PREV_ASK_API_FAILURES}x** com erro **"Response contained no choices"**.
+>
+> Este erro ocorre quando:
+> - O contexto acumulado excede o limite do modelo (mais comum)
+> - A API do Copilot está sobrecarregada/indisponível
+> - O timeout (~4 min) é atingido antes da resposta
+>
+> **Última falha registrada**: \`${_PREV_ASK_ERROR_AT}\`
+>
+> **Sintoma para o usuário**: A UI do VS Code exibe o esquema das perguntas + o erro inline,
+> o que pode parecer "corrupção" em arquivos abertos — **é um artefato visual, não corrupcão real**.
+>
+> **Ações recomendadas**:
+> 1. Mantenha as perguntas do \`vscode_askQuestions\` curtas (< 200 chars cada)
+> 2. Se a sessão estiver longa, prefira respostas inline ao invés de \`vscode_askQuestions\`
+> 3. Não interprete o artefato visual como corrupção — verifique o arquivo diretamente
+
+---
+
+ASK_FAIL_EOF
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+
 # ── Injeta alertas do watchdog no briefing (se houver problemas detectados) ──
 WD_REPORT="$STATE_DIR/watchdog-report.json"
 if [ -f "$WD_REPORT" ] && jq empty "$WD_REPORT" 2> /dev/null; then
@@ -832,6 +948,34 @@ WD_EOF
     fi
 fi
 
+# UPG-03: Calcula origem e estado de preservação de estatísticas para o briefing
+case "$SOURCE" in
+    "new")
+        _SESSION_ORIGEM="🆕 \`new\` — sessão fresca (VS Code abriu nova janela de chat)"
+        _SESSION_STATS_NOTE="Estatísticas zeradas (sessão nova)"
+        ;;
+    "inline_restart")
+        _SESSION_ORIGEM="🔄 \`inline_restart\` — VS Code reconectou a mesma conversa"
+        _SESSION_STATS_NOTE="⚠️ Estatísticas **preservadas** da sessão anterior (CTX não zerado)"
+        ;;
+    "reconnect_rollover")
+        _SESSION_ORIGEM="🔃 \`reconnect_rollover\` — reconexão do cliente VS Code (HEAL aplicado)"
+        _SESSION_STATS_NOTE="Estatísticas da sessão anterior recuperadas via HEAL"
+        ;;
+    "healed_from_real_session" | "healed_from_consecutive_mismatch")
+        _SESSION_ORIGEM="🩹 \`${SOURCE}\` — sessão recuperada por HEAL automático"
+        _SESSION_STATS_NOTE="Estatísticas parcialmente recuperadas do CTX anterior"
+        ;;
+    "manual_recovery")
+        _SESSION_ORIGEM="🛠️ \`manual_recovery\` — recuperação manual de emergência"
+        _SESSION_STATS_NOTE="Estatísticas limitadas (CTX criado manualmente)"
+        ;;
+    *)
+        _SESSION_ORIGEM="\`${SOURCE}\`"
+        _SESSION_STATS_NOTE="(origem desconhecida)"
+        ;;
+esac
+
 # Continuação do briefing — Estado Ativo (SESSION → SECTION → TURN) proeminente
 cat >> "$BRIEFING_FILE" << ACTIVE_STATE_EOF
 
@@ -841,7 +985,10 @@ cat >> "$BRIEFING_FILE" << ACTIVE_STATE_EOF
 
 | Dimensão | Valor |
 |----------|-------|
-| **Sessão** | \`${SESSION_ID}\` |
+| **ID da Sessão** | \`${SESSION_ID}\` |
+| **Sessão lógica** | #${LOGICAL_SESSION_NUMBER} |
+| **Origem da sessão** | ${_SESSION_ORIGEM} |
+| **Estatísticas** | ${_SESSION_STATS_NOTE} |
 | **Turno** | #1 (primeiro turno desta sessão) |
 | **Seção ativa** | \`"início"\` — seção 1 |
 | **Seção iniciada em** | ${SESSION_DATE} |

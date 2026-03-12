@@ -51,6 +51,38 @@ if [ -f "$CTX_FILE" ]; then
     TURN_ID="$(jq -r '.current_turn.turn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
+# ── Hardening 3: Verificar falha de API do askQuestions do turno anterior ──────
+# Se o turno anterior terminou com um erro de API do vscode_askQuestions,
+# emite alerta imediato para que o agente saiba e tome ação corretiva.
+if [ -f "$CTX_FILE" ]; then
+    _PREV_ASK_ERROR="$(jq -r '.current_turn.askquestions_api_error // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+    _PREV_ASK_FAILURES="$(jq -r '.session_stats.askquestions_api_failures // 0' "$CTX_FILE" 2> /dev/null || echo '0')"
+    if [ "$_PREV_ASK_ERROR" = "true" ]; then
+        echo "⚠️ [start-turn] ALERTA: vscode_askQuestions falhou no turno anterior com 'Response contained no choices'." >&2
+        echo "   Total de falhas de API (sessão): ${_PREV_ASK_FAILURES}" >&2
+        echo "   Causa provável: contexto muito grande ou Copilot API indisponível." >&2
+        echo "   Recomendação: reduza o tamanho das perguntas ou aguarde antes de chamar novamente." >&2
+        # Log no audit.jsonl
+        jq -cn \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$NOW_ISO" \
+            --argjson failures "$_PREV_ASK_FAILURES" \
+            '{
+                event:      "turnStart_askquestions_failure_detected",
+                session_id: $sid,
+                timestamp:  $ts,
+                prev_turn_had_askq_failure: true,
+                total_api_failures_session: $failures,
+                recommendation: "Reduce context size before calling vscode_askQuestions again"
+            }' >> "$LOG_DIR/audit.jsonl"
+        # Limpa flag para o próximo turno não herdar o alerta
+        if command -v sponge &> /dev/null; then
+            jq '.current_turn.askquestions_api_error = false' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        fi
+    fi
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Loga turnStart_enriched no audit.jsonl
 jq -cn \
     --arg event "turnStart_enriched" \
@@ -94,3 +126,13 @@ elif [ -f "$CTX_FILE" ]; then
              | if length > $cap then .[-($cap):] else . end)' \
         "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
 fi
+
+# ── Bridge: sincroniza erros do transcript nativo → audit.jsonl ──────────────
+# Roda de forma silenciosa (stderr apenas se houver erros a reportar).
+# Detecta falhas de ferramentas que não foram capturadas pelo post-tool-use.sh
+# (ex: get_terminal_output em terminal inexistente, grep_search sem resultados).
+_SYNC_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/sync-transcript-errors.sh"
+if [ -f "$_SYNC_SCRIPT" ] && [ -x "$_SYNC_SCRIPT" ]; then
+    bash "$_SYNC_SCRIPT" 2>&1 | grep -v "Nenhuma falha nova" || true
+fi
+# ─────────────────────────────────────────────────────────────────────────────

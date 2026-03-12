@@ -754,6 +754,7 @@
   },
   "chat.checkpoints.showFileChanges": true,
   "chat.customAgentInSubagent.enabled": true,
+  "chat.exploreAgent.model": "Claude Haiku 4.5 (copilot)",
   "chat.editing.autoAcceptDelay": 3,
   "chat.editing.explainChanges.enabled": true,
   "chat.editMode.hidden": false,

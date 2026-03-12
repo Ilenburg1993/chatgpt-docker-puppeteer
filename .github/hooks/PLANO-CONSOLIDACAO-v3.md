@@ -1,18 +1,18 @@
 # Plano de Consolidação v3 — Hardening e Documentação
 
-**Versão**: 3.0 | **Status**: ✅ CONCLUÍDO (commit 6de256b0, pushed)
-**Data**: 2026-03-10 | **Branch**: main
-**Predecessores**: Plano v2 (Schema v4, sessão 8) + Hardening v5 (commit 1469986e)
+**Versão**: 3.0 | **Status**: ✅ CONCLUÍDO (commit 6de256b0, pushed) **Data**: 2026-03-10 |
+**Branch**: main **Predecessores**: Plano v2 (Schema v4, sessão 8) + Hardening v5 (commit 1469986e)
 
 ---
 
 ## 1. Contexto
 
-O **Plano v2** (Schema v4) foi **integralmente implementado** no commit 8bacbd21 — todas as
-11 fases (A-K) estão concluídas: invariante SESSION/SECTION/TURN, `start-turn.sh`,
-auto-close de seções, briefing com estado ativo, smoke-test v4.
+O **Plano v2** (Schema v4) foi **integralmente implementado** no commit 8bacbd21 — todas as 11 fases
+(A-K) estão concluídas: invariante SESSION/SECTION/TURN, `start-turn.sh`, auto-close de seções,
+briefing com estado ativo, smoke-test v4.
 
 O **Hardening v5** (commit 1469986e) adicionou:
+
 - `decision:block` em `agent-stop.sh` — bloqueia turnos sem `vscode_askQuestions`
 - `session_id guards` em 3 scripts (agent-stop.sh, pre-tool-use.sh, post-tool-use.sh)
 - Remoção do overwrite de `.session.id` em pre-tool-use.sh
@@ -42,17 +42,17 @@ O **Hardening v5** (commit 1469986e) adicionou:
 
 ### 3.1 copilot-instructions.md — sem menção ao sistema de hooks
 
-| ID  | Problema                                           | Severidade |
-| --- | -------------------------------------------------- | ---------- |
-| H1  | Nenhuma menção a SESSION/SECTION/TURN              | 🔴 CRÍTICO  |
-| H2  | Sem referência a decision:block ou hardening v5    | 🔴 CRÍTICO  |
-| H3  | Sem referência a close_key ou Template F           | 🟡 MÉDIO    |
-| H4  | Regra ⛔ ABSOLUTA existe mas é vaga (sem mecanismo) | 🟡 MÉDIO    |
+| ID  | Problema                                            | Severidade |
+| --- | --------------------------------------------------- | ---------- |
+| H1  | Nenhuma menção a SESSION/SECTION/TURN               | 🔴 CRÍTICO |
+| H2  | Sem referência a decision:block ou hardening v5     | 🔴 CRÍTICO |
+| H3  | Sem referência a close_key ou Template F            | 🟡 MÉDIO   |
+| H4  | Regra ⛔ ABSOLUTA existe mas é vaga (sem mecanismo) | 🟡 MÉDIO   |
 
 ### 3.2 session_id guards incompletos
 
-| ID  | Script            | Estado atual    | Risco                                        |
-| --- | ----------------- | --------------- | -------------------------------------------- |
+| ID  | Script            | Estado atual     | Risco                                        |
+| --- | ----------------- | ---------------- | -------------------------------------------- |
 | S1  | error-occurred.sh | ❌ SEM guard     | Modifica state (failures_detected) via hook  |
 | S2  | subagent-stop.sh  | ❌ SEM guard     | Modifica state (subagent_calls) via hook     |
 | S3  | log-prompt.sh     | ❌ SEM guard     | Modifica state (current_turn reset) via hook |
@@ -78,8 +78,8 @@ O **Hardening v5** (commit 1469986e) adicionou:
 
 ### Fase 1 — Hardening do copilot-instructions.md (H1-H4)
 
-**Objetivo**: Tornar copilot-instructions.md o documento canônico de referência para agentes,
-com menção explícita ao sistema de hooks, lifecycle SESSION/SECTION/TURN, e mecanismos de segurança.
+**Objetivo**: Tornar copilot-instructions.md o documento canônico de referência para agentes, com
+menção explícita ao sistema de hooks, lifecycle SESSION/SECTION/TURN, e mecanismos de segurança.
 
 **Inserções planejadas** (após a ⛔ REGRA ABSOLUTA existente):
 
@@ -92,23 +92,26 @@ com menção explícita ao sistema de hooks, lifecycle SESSION/SECTION/TURN, e m
 
 **Aplicar o padrão já usado em agent-stop.sh/pre-tool-use.sh/post-tool-use.sh a:**
 
-1. `error-occurred.sh` — extrair session_id do payload, validar contra CTX_FILE, skip state write se mismatch
+1. `error-occurred.sh` — extrair session_id do payload, validar contra CTX_FILE, skip state write se
+   mismatch
 2. `subagent-stop.sh` — idem
-3. `log-prompt.sh` — idem (o mais crítico: reseta current_turn.*)
+3. `log-prompt.sh` — idem (o mais crítico: reseta current_turn.\*)
 
 **Padrão a aplicar** (copiar de agent-stop.sh):
+
 ```bash
 if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
-    CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
-        # log mismatch + exit 0
-    fi
+  CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+  if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
+    # log mismatch + exit 0
+  fi
 fi
 ```
 
 ### Fase 3 — PROTOCOLO-AUTORIZACAO.md → v3.0 (D1)
 
 **Mudanças**:
+
 - Renomear versão para 3.0
 - Adicionar Layer 3.5 (ou expandir Layer 3): "decision:block mechanism"
 - Documentar anti-recursão (stop_hook_active + block_count)
@@ -117,6 +120,7 @@ fi
 ### Fase 4 — MELHORIAS.md (D2)
 
 **Adicionar entry para Hardening v5**:
+
 - decision:block
 - session_id guards (3 scripts originais + 3 novos)
 - Remoção do overwrite em pre-tool-use.sh
@@ -124,12 +128,13 @@ fi
 
 ### Fase 5 — Marcar PLANO-CONSOLIDACAO-v2 como concluído (D3)
 
-**Mudança**: atualizar status de "Em implementação" para "✅ CONCLUÍDO — superado por v3".
-Adicionar nota no topo referenciando v3.
+**Mudança**: atualizar status de "Em implementação" para "✅ CONCLUÍDO — superado por v3". Adicionar
+nota no topo referenciando v3.
 
 ### Fase 6 — Smoke-test: novos checks (T1)
 
 **Adicionar verificações**:
+
 - `rg -c "session_id_mismatch"` nos 6 scripts que devem ter o guard
 - Validar que session-start.sh NÃO tem guard (é o criador do session_id)
 

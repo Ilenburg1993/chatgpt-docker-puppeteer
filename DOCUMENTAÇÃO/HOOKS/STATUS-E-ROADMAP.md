@@ -1,10 +1,11 @@
 # Status & Roadmap — Sistema de Hooks
-**Documento canônico de acompanhamento evolutivo do sistema de hooks do Copilot.**
-**Última atualização**: 2026-03-11 | **Versão do documento**: 2.1
 
-> Este arquivo é o guia vivo do sistema de hooks. Deve ser atualizado a cada fase concluída,
-> novo bug descoberto ou decisão arquitetural tomada. É a fonte primária de verdade sobre o
-> que está feito, o que está pendente e como evoluir o sistema.
+**Documento canônico de acompanhamento evolutivo do sistema de hooks do Copilot.** **Última
+atualização**: 2026-03-12 | **Versão do documento**: 3.0
+
+> Este arquivo é o guia vivo do sistema de hooks. Deve ser atualizado a cada fase concluída, novo
+> bug descoberto ou decisão arquitetural tomada. É a fonte primária de verdade sobre o que está
+> feito, o que está pendente e como evoluir o sistema.
 
 ---
 
@@ -27,9 +28,9 @@
 
 ### Propósito
 
-Sistema de automação de observabilidade e compliance para sessões do GitHub Copilot.
-Rastreia turnos, seções e sessões; garante autorização antes de encerramento; gera métricas,
-relatórios e alertas.
+Sistema de automação de observabilidade e compliance para sessões do GitHub Copilot. Rastreia
+turnos, seções e sessões; garante autorização antes de encerramento; gera métricas, relatórios e
+alertas.
 
 ### Componentes principais
 
@@ -49,6 +50,7 @@ relatórios e alertas.
 **Schema v8** (em produção desde commit `1674615b`)
 
 Estrutura canônica de `session-context.json`:
+
 ```
 .session.id          → UUID único da sessão
 .session_stats.*     → contadores agregados (turn_count, section_count, etc.)
@@ -75,25 +77,26 @@ SESSION (1 por dia, 1 por ativação Copilot)
 
 ## 2. Histórico de Fases
 
-| Fase             | Commit                             | Data       | Principais entregas                                                                                                                                                           |
-| ---------------- | ---------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fase 0+1         | `4ceb3a52`                         | ~2026-03   | Auto-recovery, 3 novos hooks, guards robustos, section-end cleanup                                                                                                            |
-| Fase 2+3         | `3c8a429a`                         | ~2026-03   | Watchdog, feedback dinâmico, invariante SESSION+SECTION+TURN                                                                                                                  |
-| Fase 4           | `0900bcfa`                         | ~2026-03   | Dual TURN numbering, git push auto-trigger, Template G                                                                                                                        |
-| Fase 5           | `aa3b64b0`                         | ~2026-03   | Section summaries, additionalContext, Schema v6, Stop format                                                                                                                  |
-| Fase 6           | `95e73001`                         | ~2026-03   | Metadata hardening, Schema v7, event enrichment                                                                                                                               |
-| Fase 7           | `1674615b`                         | 2026-03-09 | IDs UUID, rastreio commits, Schema v8, fix session_id_mismatch (HEAL v1)                                                                                                      |
-| Hardening v5     | `1469986e`                         | 2026-03-09 | decision:block, session_id guards em 3 scripts, smoke-test sandbox                                                                                                            |
-| Guards v2        | `90cd9592`                         | 2026-03-09 | Guards completos em error-occurred.sh, subagent-stop.sh, log-prompt.sh                                                                                                        |
-| Consolidação v3  | `6de256b0`                         | 2026-03-09 | copilot-instructions atualizado, docs PROTOCOLO-AUTORIZACAO, briefing                                                                                                         |
-| **Fase 8**       | `e22e8730`                         | 2026-03-09 | Hotfixes CODEX P0+P1: H-001,H-002,H-003,H-004,H-006,M-001,M-002,M-003                                                                                                         |
-| **Fase 9**       | `e22e8730` + `1674615b`→`3447fb73` | 2026-03-10 | G9-01..G9-10: pre-push reinstalado, rotate-audit, flag stale clear, HEAL v2, raw-logs deletados, contracts/events-contract.md, hooks-lib/common.sh, smoke-test seção 15       |
-| **Hardening v6** | `3447fb73`                         | 2026-03-11 | Subagente auth (3 camadas), REV4-01~08: auth_via_subagent_delegation, events-contract v1.1, smoke-test sandbox, ctx_guard_session_id removida, flock session-end, caps config |
+| Fase             | Commit                             | Data       | Principais entregas                                                                                                                                                            |
+| ---------------- | ---------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Fase 0+1         | `4ceb3a52`                         | ~2026-03   | Auto-recovery, 3 novos hooks, guards robustos, section-end cleanup                                                                                                             |
+| Fase 2+3         | `3c8a429a`                         | ~2026-03   | Watchdog, feedback dinâmico, invariante SESSION+SECTION+TURN                                                                                                                   |
+| Fase 4           | `0900bcfa`                         | ~2026-03   | Dual TURN numbering, git push auto-trigger, Template G                                                                                                                         |
+| Fase 5           | `aa3b64b0`                         | ~2026-03   | Section summaries, additionalContext, Schema v6, Stop format                                                                                                                   |
+| Fase 6           | `95e73001`                         | ~2026-03   | Metadata hardening, Schema v7, event enrichment                                                                                                                                |
+| Fase 7           | `1674615b`                         | 2026-03-09 | IDs UUID, rastreio commits, Schema v8, fix session_id_mismatch (HEAL v1)                                                                                                       |
+| Hardening v5     | `1469986e`                         | 2026-03-09 | decision:block, session_id guards em 3 scripts, smoke-test sandbox                                                                                                             |
+| Guards v2        | `90cd9592`                         | 2026-03-09 | Guards completos em error-occurred.sh, subagent-stop.sh, log-prompt.sh                                                                                                         |
+| Consolidação v3  | `6de256b0`                         | 2026-03-09 | copilot-instructions atualizado, docs PROTOCOLO-AUTORIZACAO, briefing                                                                                                          |
+| **Fase 8**       | `e22e8730`                         | 2026-03-09 | Hotfixes CODEX P0+P1: H-001,H-002,H-003,H-004,H-006,M-001,M-002,M-003                                                                                                          |
+| **Fase 9**       | `e22e8730` + `1674615b`→`3447fb73` | 2026-03-10 | G9-01..G9-10: pre-push reinstalado, rotate-audit, flag stale clear, HEAL v2, raw-logs deletados, contracts/events-contract.md, hooks-lib/common.sh, smoke-test seção 15        |
+| **Fase 10**      | (sem commit dedicado)              | 2026-03-12 | Ciclo de correções BUG-01..BUG-17 + GAP-01..GAP-05 + ROB-B + GAP-O1: 24+ itens corrigidos em 11 scripts/libs — healing, guards de session_id, schema completo, logging robusto |
+| **Hardening v6** | `3447fb73`                         | 2026-03-11 | Subagente auth (3 camadas), REV4-01~08: auth_via_subagent_delegation, events-contract v1.1, smoke-test sandbox, ctx_guard_session_id removida, flock session-end, caps config  |
 
 ### O que a Fase 8 resolveu
 
-| ID CODEX | Descrição                                       | Status Fase 8                                                                                                                 |
-| -------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| ID CODEX | Descrição                                       | Status Fase 8                                                                                                                  |
+| -------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | H-001    | Hook git `post-push` inválido                   | ✅ Script `install-git-hooks.sh` corrigido para `pre-push`                                                                     |
 | H-002    | `ERRORS_TODAY` indefinido em relatório diário   | ✅ Variável inicializada e calculada                                                                                           |
 | H-003    | Leitura de `.session_id` legado em scripts CRUD | ✅ Migrado com fallback `.session.id // .session_id // ""`                                                                     |
@@ -105,13 +108,13 @@ SESSION (1 por dia, 1 por ativação Copilot)
 | M-002    | Métricas de seção usam sessão inteira           | ✅ Filtro por `section_id` implementado                                                                                        |
 | M-003    | Timestamps inconsistentes                       | ✅ Normalizado; alguns eventos ainda legacy                                                                                    |
 | M-004    | Pre-commit apenas informativo                   | ⏳ Decidido: P3, não urgente                                                                                                   |
-| S-001    | Raw logs persistem dados sensíveis              | ✅ Resolvido (Fase 9): rotate-audit.sh purga raw-*.jsonl automáticamente                                                       |
+| S-001    | Raw logs persistem dados sensíveis              | ✅ Resolvido (Fase 9): rotate-audit.sh purga raw-\*.jsonl automáticamente                                                      |
 | S-002    | Redaction por regex insuficiente                | ⏳ Pendente (P3)                                                                                                               |
 
 ### O que o Hardening v6 (commit `3447fb73`) resolveu
 
-| ID      | Descrição                                                 | Status                                                                                                  |
-| ------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| ID      | Descrição                                                 | Status                                                                                                   |
+| ------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | HV6-01  | Sessão encerrada sem auth após `runSubagent`              | ✅ `pre-tool-use.sh` detecta `runSubagent`/`Task` → seta `subagent_delegated=true`, loga `subagentStart` |
 | HV6-02  | `agent-stop.sh` não reconhecia subagente como autorização | ✅ Strategies 1+2 aceitam `subagentStart`; Strategy 4 (nova): lê `subagent_delegated` do contexto        |
 | REV4-01 | `agentStop_invocations` não incrementava atomicamente     | ✅ `+= 1` via jq (atômico via sponge)                                                                    |
@@ -127,14 +130,15 @@ SESSION (1 por dia, 1 por ativação Copilot)
 
 ---
 
-## 3. Diagnóstico do Estado Atual (2026-03-11 → atualizado Hardening v6)
+## 3. Diagnóstico do Estado Atual (2026-03-12 → Ciclo de Correções completo)
 
 ### 3.1 O que está funcionando
 
 - ✅ Invariante SESSION/SECTION/TURN ativa e monitorada
 - ✅ `start-turn.sh` declara intenção; `vscode_askQuestions` enforcement via `decision:block`
 - ✅ `agent-stop.sh` bloqueia encerramento sem autorização (decision:block, hardening v5)
-- ✅ Session ID guards em `agent-stop.sh`, `pre-tool-use.sh`, `post-tool-use.sh`, `error-occurred.sh`, `subagent-stop.sh`, `log-prompt.sh`
+- ✅ Session ID guards em `agent-stop.sh`, `pre-tool-use.sh`, `post-tool-use.sh`,
+  `error-occurred.sh`, `subagent-stop.sh`, `log-prompt.sh`
 - ✅ `session-start.sh` gera briefing completo com estado ativo, backlog, watchdog
 - ✅ `generate-daily-report.sh` executa sem crash (ERRORS_TODAY calculado)
 - ✅ `reset-auth-violation.sh` atualiza campos `.compliance.*` corretos
@@ -153,10 +157,13 @@ SESSION (1 por dia, 1 por ativação Copilot)
 #### CRÍTICO — NÃO FUNCIONAL
 
 **G9-01 — Hook `pre-push` não está instalado em `.git/hooks/`**
-- ✅ **RESOLVIDO (Fase 9)**: `install-git-hooks.sh` reinstalado; `.git/hooks/pre-push` existe e é executável.
+
+- ✅ **RESOLVIDO (Fase 9)**: `install-git-hooks.sh` reinstalado; `.git/hooks/pre-push` existe e é
+  executável.
 - `on-git-push.sh` agora dispara automaticamente em `git push`.
 
 **G9-02 — `audit.jsonl` acima do limiar crítico (6315 > 5000 linhas)**
+
 - ✅ **RESOLVIDO (Fase 9)**: `rotate-audit.sh` criado e integrado em `session-start.sh`.
 - `audit.jsonl` rotacionado para `audit-20260310_064741.jsonl` (6371 linhas → arquivo).
 - Auto-rotação ativa: threshold=5000 linhas a cada início de sessão.
@@ -164,61 +171,80 @@ SESSION (1 por dia, 1 por ativação Copilot)
 #### ALTO — BUG ATIVO
 
 **G9-03 — `UNAUTHORIZED_CLOSE.flag` presente (sessão anterior)**
+
 - ✅ **RESOLVIDO (Fase 9)**: `session-start.sh` agora auto-limpa flags de sessões diferentes.
-- Flag de sessão anterior é detectado como stale e deletado com evento `authViolationFlag_stale_cleared`.
+- Flag de sessão anterior é detectado como stale e deletado com evento
+  `authViolationFlag_stale_cleared`.
 - Briefing diferencia "nota histórica" (stale) de "violação ativa" (sessão anterior imediata).
 
 **G9-04 — Estado órfão de sessão anterior no watchdog**
+
 - ✅ **RESOLVIDO (Fase 9)**: HEAL v2 implementado em `agent-stop.sh`.
-- Após N_HEAL_THRESHOLD=3 mismatches consecutivos com mesmo `got`, auto-heals com source `healed_auto_consecutive`.
+- Após N_HEAL_THRESHOLD=3 mismatches consecutivos com mesmo `got`, auto-heals com source
+  `healed_auto_consecutive`.
 - Reduz flood de `session_id_mismatch` em cenários de desincronização.
 
 #### ALTO — SEGURANÇA
 
 **G9-05 — Raw logs ativos (`raw-input.jsonl`, `raw-post-input.jsonl`)**
-- ✅ **RESOLVIDO (Fase 9)**: Arquivos deletados. `rotate-audit.sh` purga `raw-*.jsonl` a cada rotação.
+
+- ✅ **RESOLVIDO (Fase 9)**: Arquivos deletados. `rotate-audit.sh` purga `raw-*.jsonl` a cada
+  rotação.
 - Captura bruta não mais ativa em produção.
 
 #### MÉDIO — QUALIDADE/PRECISÃO
 
 **G9-06 — Ausência de `events-contract.md` centralizado**
+
 - ✅ **RESOLVIDO (Fase 9)**: `.github/hooks/contracts/events-contract.md` criado.
 - Documenta todos os 10 eventos Copilot + eventos internos com campos, produtores e consumidores.
 
 **G9-07 — Sem `hooks-lib/common.sh` (código duplicado)**
+
 - ✅ **RESOLVIDO (Fase 9)**: `hooks-lib/common.sh` criado com 7 funções utilitárias.
 - `hl_with_lock()` disponível para integração de flock (G9-08 pendente).
 
 **G9-08 — Sem locking transacional (`flock`) em escritas críticas**
+
 - ⏳ **PENDENTE**: `hl_with_lock()` existe em `common.sh` mas ainda não integrada nos scripts.
 - Múltiplos scripts escrevem `session-context.json` sem coordenação de lock.
 - `sponge` protege contra truncamento mas não contra race conditions de read-modify-write.
 - Fix: integrar `hl_with_lock` em `agent-stop.sh`, `post-tool-use.sh`, `log-prompt.sh`.
 
 **G9-09 — Documentação `DOCUMENTAÇÃO/HOOKS/README.md` desatualizada**
-- ⏳ **PENDENTE (G9-13)**: README ainda diz "v4.0 (Schema v4)"; sistema está em Schema v8+ com 33+ scripts.
+
+- ⏳ **PENDENTE (G9-13)**: README ainda diz "v4.0 (Schema v4)"; sistema está em Schema v8+ com 33+
+  scripts.
 - Fix: atualizar README para refletir Schema v8, hooks Fase 9, referências corretas.
 
 #### BAIXO — BACKLOG / REFACTOR
 
 **G9-10 — Smoke-test ainda com validações parcialmente textuais (M-001 residual)**
-- ✅ **RESOLVIDO (Fase 9)**: Seção 15 adicionada ao `smoke-test.sh` com 6 checks comportamentais para G9.
+
+- ✅ **RESOLVIDO (Fase 9)**: Seção 15 adicionada ao `smoke-test.sh` com 6 checks comportamentais
+  para G9.
 - Resultado: 106/106 PASS após todos os ajustes.
 
 **G9-11 — Redaction estrutural (S-002 residual)**
-- ⏳ **PENDENTE**: Redaction atual por regex em string serializada pode deixar campos sensíveis aninhados.
+
+- ⏳ **PENDENTE**: Redaction atual por regex em string serializada pode deixar campos sensíveis
+  aninhados.
 - Fix P3: allowlist de chaves logáveis com drop de campos não necessários por padrão.
 - `hl_redact()` já existe em `common.sh` como fundação.
 
 **G9-12 — Schemas JSON formais não existem**
-- ✅ **RESOLVIDO (Fase 9)**: `contracts/session-context.schema.json` criado em `.github/hooks/contracts/`.
+
+- ✅ **RESOLVIDO (Fase 9)**: `contracts/session-context.schema.json` criado em
+  `.github/hooks/contracts/`.
 - Fix P3: criar contratos formais para validar produtores e consumidores em CI.
 
 **G9-13 — README desatualizado para Schema v8**
+
 - ⏳ **PENDENTE**: `DOCUMENTAÇÃO/HOOKS/README.md` diz v4.0/Schema v4.
 - Fix P3: atualizar para refletir Schema v8, Fase 9 e referências corretas.
 
 **G9-14 — Pre-commit em modo apenas informativo (M-004)**
+
 - ⏳ **Decidido**: P3, não urgente. Modo configurável `warn/enforce` é backlog estrutural.
 - Fix P3: variável `HOOKS_PRE_COMMIT_MODE=warn|enforce` lida pelo hook.
 
@@ -228,37 +254,40 @@ SESSION (1 por dia, 1 por ativação Copilot)
 
 ### P0 — Fazer imediatamente (sistema parcialmente quebrado)
 
-| ID    | Issue                       | Script(s) afetado(s)                  | Fix                                             |
-| ----- | --------------------------- | ------------------------------------- | ----------------------------------------------- |
+| ID    | Issue                       | Script(s) afetado(s)                  | Fix                                              |
+| ----- | --------------------------- | ------------------------------------- | ------------------------------------------------ |
 | G9-01 | ~~pre-push não instalado~~  | `.git/hooks/`, `install-git-hooks.sh` | ✅ **RESOLVIDO Fase 9** — pre-push reinstalado   |
 | G9-02 | ~~audit.jsonl 6315 linhas~~ | `session-start.sh`, `watchdog.sh`     | ✅ **RESOLVIDO Fase 9** — rotate-audit.sh criado |
 
 ### P1 — Esta sessão ou próxima
 
-| ID    | Issue                       | Script(s) afetado(s) | Fix                                                         |
-| ----- | --------------------------- | -------------------- | ----------------------------------------------------------- |
+| ID    | Issue                       | Script(s) afetado(s) | Fix                                                          |
+| ----- | --------------------------- | -------------------- | ------------------------------------------------------------ |
 | G9-03 | ~~UNAUTHORIZED_CLOSE.flag~~ | `session-start.sh`   | ✅ **RESOLVIDO Fase 9** — auto-clear stale flag implementado |
 | G9-04 | ~~Sessão órfã no watchdog~~ | `agent-stop.sh`      | ✅ **RESOLVIDO Fase 9** — HEAL v2 implementado               |
 | G9-05 | ~~Raw logs ativos~~         | (logs deletados)     | ✅ **RESOLVIDO Fase 9** — deletados + purge no rotate        |
 
 ### P2 — Próximas sessões de melhoria
 
-| ID    | Issue                      | Script(s) afetado(s)                                 | Fix                                                                |
-| ----- | -------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------ |
-| G9-06 | ~~Sem events-contract.md~~ | `.github/hooks/contracts/`                           | ✅ **RESOLVIDO Fase 9** — events-contract.md criado                 |
-| G9-07 | ~~Sem common.sh~~          | `.github/hooks/hooks-lib/`                           | ✅ **RESOLVIDO Fase 9** — common.sh criado com 7 funções            |
-| G9-08 | Integrar flock             | `agent-stop.sh`, `post-tool-use.sh`, `log-prompt.sh` | ⏳ Parcial: `session-end.sh` tem flock (REV4-07); sponge nos demais |
-| G9-09 | Docs desatualizados        | `DOCUMENTAÇÃO/HOOKS/README.md`                       | ⏳ Atualizar após Fase 9 completa (coincide com G9-13)              |
+| ID    | Issue                      | Script(s) afetado(s)                                 | Fix                                                                           |
+| ----- | -------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| G9-06 | ~~Sem events-contract.md~~ | `.github/hooks/contracts/`                           | ✅ **RESOLVIDO Fase 9** — events-contract.md criado                           |
+| G9-07 | ~~Sem common.sh~~          | `.github/hooks/hooks-lib/`                           | ✅ **RESOLVIDO Fase 9** — common.sh criado com 7 funções                      |
+| G9-08 | Integrar flock             | `agent-stop.sh`, `post-tool-use.sh`, `log-prompt.sh` | ⏳ Parcial: `session-end.sh` tem flock (REV4-07); sponge nos demais           |
+| G9-09 | Docs desatualizados        | `DOCUMENTAÇÃO/HOOKS/README.md`                       | ✅ **RESOLVIDO Fase 10** — STATUS-E-ROADMAP v3.0, GUIA v2.0, PLANO atualizado |
 
 ### P3 — Backlog estrutural
 
-| ID    | Issue                     | Esforço | Valor                   | Status                                          |
-| ----- | ------------------------- | ------- | ----------------------- | ----------------------------------------------- |
-| G9-10 | ~~Smoke-test section 15~~ | Médio   | Prevenção de regressões | ✅ RESOLVIDO Fase 9                              |
-| G9-11 | Redaction estrutural      | Alto    | Segurança de logs       | ⏳ Pendente                                      |
-| G9-12 | Schemas JSON formais      | Médio   | Contrato versionado     | ✅ `session-context.schema.json` criado (Fase 9) |
-| G9-13 | README.md Schema v8       | Médio   | Documentação atualizada | ⏳ Pendente                                      |
-| G9-14 | Pre-commit configurável   | Baixo   | Governança leve         | ⏳ Pendente/Backlog                              |
+| ID     | Issue                                                  | Esforço | Valor                   | Status                                           |
+| ------ | ------------------------------------------------------ | ------- | ----------------------- | ------------------------------------------------ |
+| G9-10  | ~~Smoke-test section 15~~                              | Médio   | Prevenção de regressões | ✅ RESOLVIDO Fase 9                              |
+| G9-11  | Redaction estrutural                                   | Alto    | Segurança de logs       | ⏳ Pendente                                      |
+| G9-12  | Schemas JSON formais                                   | Médio   | Contrato versionado     | ✅ `session-context.schema.json` criado (Fase 9) |
+| G9-13  | README.md Schema v8                                    | Médio   | Documentação atualizada | ⏳ Pendente                                      |
+| G9-14  | Pre-commit configurável                                | Baixo   | Governança leve         | ⏳ Pendente/Backlog                              |
+| G10-01 | INC-02: section_name default inconsistente             | Baixo   | Consistência            | ⏳ Backlog                                       |
+| G10-02 | INC-03: dois padrões CTX update (sponge/mktemp)        | Baixo   | Debt técnico            | ⏳ Backlog                                       |
+| G10-03 | UPG-01: separação VS Code vs sessão lógica (Schema v9) | Alto    | Arquitetural            | ⏳ Futuro                                        |
 
 ---
 
@@ -269,6 +298,7 @@ SESSION (1 por dia, 1 por ativação Copilot)
 **objetivo**: restaurar rastreio de push e controlar crescimento de logs
 
 #### F9-01 — Reinstalar hook git `pre-push`
+
 ```bash
 bash .github/hooks/scripts/install-git-hooks.sh
 # Verificar: ls -la .git/hooks/pre-push
@@ -276,37 +306,43 @@ bash .github/hooks/scripts/install-git-hooks.sh
 ```
 
 #### F9-02 — Auto-rotação de `audit.jsonl` em `session-start.sh`
+
 - Threshold: 5000 linhas
 - Ação: mover para `logs/audit-YYYYMMDD.jsonl` e recriar `audit.jsonl` vazio
 - Localização do fix: início de `session-start.sh`, antes de qualquer query
-- Script auxiliar sugerido: `rotate-audit.sh` (chamado por session-start e pode ser usado manualmente)
+- Script auxiliar sugerido: `rotate-audit.sh` (chamado por session-start e pode ser usado
+  manualmente)
 
 ```bash
 # Exemplo de lógica:
 AUDIT_LINES=$(wc -l < "$AUDIT_FILE")
 if [ "$AUDIT_LINES" -gt 5000 ]; then
-    ARCHIVE="$LOGS_DIR/audit-$(date -u +%Y%m%d_%H%M%S).jsonl"
-    mv "$AUDIT_FILE" "$ARCHIVE"
-    touch "$AUDIT_FILE"
-    log "audit.jsonl rotacionado → $ARCHIVE ($AUDIT_LINES linhas)"
+  ARCHIVE="$LOGS_DIR/audit-$(date -u +%Y%m%d_%H%M%S).jsonl"
+  mv "$AUDIT_FILE" "$ARCHIVE"
+  touch "$AUDIT_FILE"
+  log "audit.jsonl rotacionado → $ARCHIVE ($AUDIT_LINES linhas)"
 fi
 ```
 
 #### F9-03 — Reset do flag UNAUTHORIZED_CLOSE (P1 operacional)
+
 ```bash
 bash .github/hooks/scripts/reset-auth-violation.sh
 ```
 
 #### F9-04 — Limpeza de sessão órfã no watchdog (P1)
-- Em `session-start.sh`: se watchdog detectar SESSION_STALE ao iniciar nova sessão,
-  registrar evento `sessionEnd_stale_cleanup` para a sessão antiga e limpar o flag.
+
+- Em `session-start.sh`: se watchdog detectar SESSION_STALE ao iniciar nova sessão, registrar evento
+  `sessionEnd_stale_cleanup` para a sessão antiga e limpar o flag.
 - Alternativa imediata: `bash .github/hooks/scripts/session-end.sh manual_cleanup`
 
 #### F9-05 — Desabilitar/limitar raw logs (P1 segurança)
+
 - Em `pre-tool-use.sh`: adicionar flag `HOOKS_RAW_LOG_ENABLED=${HOOKS_RAW_LOG_ENABLED:-false}`
 - Adicionar TTL: purge de arquivos raw com mais de 24h no início de cada sessão
 
 **Critérios de aceite da Fase 9 (P0+P1):**
+
 - [x] `.git/hooks/pre-push` existe e é executável ✅
 - [x] `git push` dispara `on-git-push.sh` e registra evento em `audit.jsonl` ✅
 - [x] `audit.jsonl` < 5000 linhas após o início da sessão ✅ (501 linhas pós-rotação)
@@ -327,27 +363,37 @@ bash .github/hooks/scripts/reset-auth-violation.sh
 ### Fase 10 — Qualidade e precisão (P2)
 
 #### F10-01 — ~~events-contract.md~~
+
 - ✅ **RESOLVIDO na Fase 9** (G9-06) — `.github/hooks/contracts/events-contract.md` criado
 
 #### F10-02 — ~~HEAL v2 (mismatch reconciliation)~~
+
 - ✅ **RESOLVIDO na Fase 9** (G9-04) — implementado em `agent-stop.sh` com N_HEAL_THRESHOLD=3
 
 #### F10-03 — flock granular em session-context.json
+
 Wrapper para escrita de `session-context.json`:
+
 ```bash
 with_ctx_lock() {
-    local lock_file="$CTX_FILE.lock"
-    (flock -x 9; "$@") 9>"$lock_file"
+  local lock_file="$CTX_FILE.lock"
+  (
+    flock -x 9
+    "$@"
+  ) 9> "$lock_file"
 }
 ```
+
 Aplicar apenas nas escritas (não leituras) dos scripts de maior frequência.
 
 #### F10-04 — Atualizar documentação DOCUMENTAÇÃO/HOOKS/
+
 - `README.md`: Schema v8, 31 scripts, hooks Git corretos (pre-push), versão atualizada
 - `REFERENCIA-HOOKS.md`: adicionar hooks novos (error-occurred, subagent-stop, etc.)
 - `AUDIT-SCHEMA.md`: refletir Schema v8
 
 **Critérios de aceite da Fase 10:**
+
 - [ ] `events-contract.md` criado e referenciado no README
 - [ ] HEAL v2 testado em sandbox com mismatches consecutivos
 - [ ] `flock` funcional sem regressão de latência (< 50ms overhead em teste local)
@@ -358,12 +404,16 @@ Aplicar apenas nas escritas (não leituras) dos scripts de maior frequência.
 ### Fase 11 — Refactor estrutural (P3)
 
 #### F11-01 — ~~`hooks-lib/common.sh`~~
+
 - ✅ **RESOLVIDO na Fase 9** (G9-07) — `hooks-lib/common.sh` criado com 7 funções (shellcheck OK)
-- Funções: `hl_iso_now`, `hl_get_session_id`, `hl_log_event`, `hl_write_ctx`, `hl_with_lock`, `hl_redact`, `hl_check_session_guard`
+- Funções: `hl_iso_now`, `hl_get_session_id`, `hl_log_event`, `hl_write_ctx`, `hl_with_lock`,
+  `hl_redact`, `hl_check_session_guard`
 - Integração nos scripts existentes permanece como item pendente (substituição incremental).
 
 #### F11-02 — Smoke-test comportamental
+
 Substituir checks textuais por cenários end-to-end em sandbox:
+
 1. `sessionStart` → arquivo de briefing gerado
 2. `userPromptSubmitted` + intenção → turn ativo no contexto
 3. `preToolUse` + `postToolUse` → métricas incrementadas
@@ -372,22 +422,27 @@ Substituir checks textuais por cenários end-to-end em sandbox:
 6. `sessionEnd` com close_key → encerramento limpo
 
 #### F11-03 — Schemas JSON formais
+
 Criar validadores de contrato:
+
 - `contracts/events.schema.json`: campos obrigatórios de cada evento
 - `contracts/session-context.schema.json`: estrutura de estado esperada
 - Script `hooks-verify-contracts.sh`: valida produtores e consumidores contra schemas
 
 #### F11-04 — Redaction estrutural
+
 Substituir regex em string por allowlist de chaves logáveis:
+
 ```bash
 LOGGABLE_FIELDS=("session_id" "tool_name" "event" "timestamp" "cwd")
 # Drop de qualquer campo não na allowlist antes de logar
 ```
 
 #### F11-05 — Pre-commit configurável
+
 ```bash
 # .github/hooks/hooks.env (ou variável de ambiente)
-HOOKS_PRE_COMMIT_MODE=warn   # warn | enforce
+HOOKS_PRE_COMMIT_MODE=warn # warn | enforce
 # No hook .git/hooks/pre-commit:
 [ "$HOOKS_PRE_COMMIT_MODE" = "enforce" ] && exit "$GATE_RESULT" || exit 0
 ```
@@ -397,12 +452,14 @@ HOOKS_PRE_COMMIT_MODE=warn   # warn | enforce
 ## 6. Critérios de Aceite por Nível
 
 ### Gate mínimo para qualquer mudança em scripts de hooks
+
 - `bash -n script.sh` → sem erros de sintaxe
 - `shellcheck -x script.sh` → 0 erros, 0 avisos relevantes
 - Smoke-test passa: `bash .github/hooks/scripts/smoke-test.sh`
 - Sem regressão funcional (verificar session-start + agent-stop manualmente)
 
 ### Gate para fase completa
+
 - Todos os critérios de aceite específicos da fase (ver seções acima)
 - 0 novos findings de severidade > medium introduzidos
 - Documentação atualizada (pelo menos REFERENCIA-HOOKS.md e este arquivo)
@@ -412,6 +469,7 @@ HOOKS_PRE_COMMIT_MODE=warn   # warn | enforce
 ## 7. Guia de Manutenção Contínua
 
 ### Rotina de início de sessão (para o agente)
+
 1. Ler `state/session-briefing.md`
 2. Ler este arquivo (`STATUS-E-ROADMAP.md`) para pegar o contexto atual
 3. Verificar `state/watchdog-report.json` para anomalias
@@ -419,21 +477,25 @@ HOOKS_PRE_COMMIT_MODE=warn   # warn | enforce
 5. Chamar `start-turn.sh` e `vscode_askQuestions` conforme protocolo
 
 ### Como registrar um novo bug descoberto
+
 ```bash
 bash .github/hooks/scripts/save-finding.sh \
-    ".github/hooks/scripts/nome-do-script.sh" \
-    "high" \
-    "bug" \
-    "Descrição clara do problema e impacto"
+  ".github/hooks/scripts/nome-do-script.sh" \
+  "high" \
+  "bug" \
+  "Descrição clara do problema e impacto"
 ```
+
 E adicionar à seção 4 deste arquivo com ID sequencial.
 
 ### Como registrar uma tarefa nova
+
 ```bash
 bash .github/hooks/scripts/add-task.sh "alta" "Título" "Descrição + gate de aceite"
 ```
 
 ### Como concluir uma fase
+
 1. Executar todos os critérios de aceite
 2. Marcar itens como ✅ nas seções 4 e 5 deste arquivo
 3. Atualizar a tabela de [Histórico de Fases](#2-histórico-de-fases)
@@ -451,12 +513,13 @@ bash .github/hooks/scripts/add-task.sh "alta" "Título" "Descrição + gate de a
 | `UNAUTHORIZED_CLOSE.flag` presente  | n/a    | n/a       | Qualquer |
 
 ### Rotação manual de audit.jsonl
+
 ```bash
 ARCHIVE=".github/hooks/logs/audit-$(date -u +%Y%m%d_%H%M%S).jsonl"
 cp .github/hooks/logs/audit.jsonl "$ARCHIVE"
-echo "[]" > .github/hooks/logs/audit.jsonl  # NÃO use > sozinho (trunca com race)
+echo "[]" > .github/hooks/logs/audit.jsonl # NÃO use > sozinho (trunca com race)
 # Ou preferir:
-jq -c '.' "$ARCHIVE" | tail -500 > .github/hooks/logs/audit.jsonl  # mantém 500 linhas recentes
+jq -c '.' "$ARCHIVE" | tail -500 > .github/hooks/logs/audit.jsonl # mantém 500 linhas recentes
 echo "Rotação concluída. Arquivo de arquivo: $ARCHIVE"
 ```
 
@@ -511,18 +574,18 @@ echo "Rotação concluída. Arquivo de arquivo: $ARCHIVE"
 
 ### Documentação associada
 
-| Documento                  | Localização                                            | Status                                | Relação                                   |
-| -------------------------- | ------------------------------------------------------ | ------------------------------------- | ----------------------------------------- |
+| Documento                  | Localização                                            | Status                                 | Relação                                   |
+| -------------------------- | ------------------------------------------------------ | -------------------------------------- | ----------------------------------------- |
 | README do sistema de hooks | `DOCUMENTAÇÃO/HOOKS/README.md`                         | ⚠️ Desatualizado (diz v4.0/Schema v4)  | Ponto de entrada para devs                |
 | Referência de hooks        | `DOCUMENTAÇÃO/HOOKS/REFERENCIA-HOOKS.md`               | ⚠️ Verificar atualidade                | Lista de todos os hooks e scripts         |
-| Protocolo de autorização   | `DOCUMENTAÇÃO/HOOKS/PROTOCOLO-AUTORIZACAO.md`          | Verificar                             | Spec técnico do fluxo de auth             |
+| Protocolo de autorização   | `DOCUMENTAÇÃO/HOOKS/PROTOCOLO-AUTORIZACAO.md`          | Verificar                              | Spec técnico do fluxo de auth             |
 | Audit schema               | `DOCUMENTAÇÃO/HOOKS/AUDIT-SCHEMA.md`                   | ⚠️ Pode estar em Schema v7 ou anterior | Schema de session-context.json            |
-| Melhorias                  | `DOCUMENTAÇÃO/HOOKS/MELHORIAS.md`                      | Verificar                             | Itens implementados nas fases anteriores  |
+| Melhorias                  | `DOCUMENTAÇÃO/HOOKS/MELHORIAS.md`                      | Verificar                              | Itens implementados nas fases anteriores  |
 | Hooks protocol             | `.github/instructions/hooks-protocol.instructions.md`  | ✅ Atualizado                          | Protocolo para agentes (regras absolutas) |
 | Copilot instructions       | `.github/copilot-instructions.md`                      | ✅ Atualizado                          | Contexto operacional geral                |
-| Auditoria CODEX            | `.github/hooks/AUDITORIA CODEX — Sistema de Hooks .md` | Histórico                             | Auditoria original de 2026-03-09          |
-| Upgrade Fase 8             | `.github/hooks/UPGRADE-PLAN-FASE8.md`                  | Histórico                             | Plano detalhado da Fase 8                 |
-| Consolidação v3            | `.github/hooks/PLANO-CONSOLIDACAO-v3.md`               | Concluído                             | Hardening v5 + documentação               |
+| Auditoria CODEX            | `.github/hooks/AUDITORIA CODEX — Sistema de Hooks .md` | Histórico                              | Auditoria original de 2026-03-09          |
+| Upgrade Fase 8             | `.github/hooks/UPGRADE-PLAN-FASE8.md`                  | Histórico                              | Plano detalhado da Fase 8                 |
+| Consolidação v3            | `.github/hooks/PLANO-CONSOLIDACAO-v3.md`               | Concluído                              | Hardening v5 + documentação               |
 
 ### Scripts e suas dependências
 
@@ -549,11 +612,13 @@ echo "Rotação concluída. Arquivo de arquivo: $ARCHIVE"
 | ---------- | ------ | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-03-10 | 1.0    | Agente (GitHub Copilot) | Criação inicial — consolida AUDITORIA CODEX, UPGRADE-PLAN-FASE8, PLANO-CONSOLIDACAO-v3 e diagnóstico fresh do estado do repositório em main/commit e22e8730                                           |
 | 2026-03-10 | 2.0    | Agente (GitHub Copilot) | Fase 9 concluída (G9-01..G9-10): pre-push reinstalado, rotate-audit, HEAL v2, flag stale clear, raw-logs deletados, events-contract.md, common.sh, smoke-test 106/106 PASS. G9-08/11/12/13 pendentes. |
+| 2026-03-12 | 3.0    | Agente (GitHub Copilot) | Fase 10 concluída: 24+ correções (BUG-01..BUG-17, GAP-01..GAP-05, ROB-B, GAP-O1). G9-09 resolvido (docs atualizados). Novos backlog items G10-01..G10-03.                                             |
 
 ---
 
-*Este documento deve ser atualizado sempre que:*
-- *Uma fase for concluída (marcar ✅ e registrar em Histórico de Fases)*
-- *Um novo bug for descoberto (adicionar à seção 4 com ID sequencial)*
-- *Uma decisão arquitetural for tomada (registrar em Guia de Manutenção)*
-- *Um contrato de evento for alterado (atualizar seção 8)*
+_Este documento deve ser atualizado sempre que:_
+
+- _Uma fase for concluída (marcar ✅ e registrar em Histórico de Fases)_
+- _Um novo bug for descoberto (adicionar à seção 4 com ID sequencial)_
+- _Uma decisão arquitetural for tomada (registrar em Guia de Manutenção)_
+- _Um contrato de evento for alterado (atualizar seção 8)_

@@ -14,7 +14,12 @@ LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
 # shellcheck disable=SC1091
-source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
+if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
+    source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null \
+        || echo "[warn] common.sh falhou ao carregar em post-tool-use.sh" >&2
+else
+    echo "[warn] common.sh não encontrado (post-tool-use.sh) — heal_v1/ctx functions indisponíveis" >&2
+fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 # G9-08: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
 _CTX_LOCK="${CTX_FILE}.lock"
@@ -77,6 +82,7 @@ if [ -f "$CTX_FILE" ] && [ ! -s "$CTX_FILE" ]; then
 fi
 # HARDENING v5: previne contaminação cruzada entre sessões.
 # HEAL v1: quando CTX_FILE é de manual_recovery, adota session_id real do Copilot.
+# FIX BUG-06: também trata inline_restart — CTX já tem o session_id correto do VS Code.
 # Se o payload carrega session_id diferente do contexto ativo,
 # logamos mismatch e NÃO modificamos session-context.json.
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
@@ -87,12 +93,12 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
             NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
             if command -v sponge &> /dev/null; then
                 jq --arg real_sid "$SESSION_ID" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
                     "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
             else
                 _TMP_HEAL="$(mktemp)"
                 if jq --arg real_sid "$SESSION_ID" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
                     "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
                     mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
                 else
@@ -110,6 +116,35 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                   message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
                 >> "$LOG_DIR/audit.jsonl"
             # SESSION_ID já tem o valor correto — continua
+        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
+            # FIX BUG-06: inline_restart — CTX tem o session_id correto do VS Code (PREMISSA 1).
+            # Payload está stale. Adotamos CTX como verdade; não bloqueamos.
+            SESSION_ID="$CTX_ACTIVE_SID"
+            # GAP-O1: limita log de inline_restart para evitar ruído excessivo
+            _SYNCS_INLINE="$(jq -r '.session_stats.session_id_syncs_inline // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+            if [ "$_SYNCS_INLINE" -lt 5 ]; then
+                jq -cn \
+                    --arg event "session_id_sync_inline_restart" \
+                    --arg stale "$SESSION_ID" \
+                    --arg adopted "$CTX_ACTIVE_SID" \
+                    --arg source "post-tool-use.sh" \
+                    --arg tool "$TOOL_NAME" \
+                    --arg ts "${TIMESTAMP:-}" \
+                    '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
+                      source: $source, tool: $tool, timestamp: $ts,
+                      message: "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"}' \
+                    >> "$LOG_DIR/audit.jsonl"
+            elif [ "$_SYNCS_INLINE" -eq 5 ]; then
+                jq -cn --arg event "session_id_sync_inline_restart_cap" --arg source "post-tool-use.sh" \
+                    '{event: $event, source: $source, message: "inline_restart sync count reached cap (5) — logs suprimidos daqui em diante"}' \
+                    >> "$LOG_DIR/audit.jsonl"
+            fi
+            # GAP-03: incrementa contador de syncs inline no CTX
+            if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+                jq '.session_stats.session_id_syncs_inline = ((.session_stats.session_id_syncs_inline // 0) + 1)' \
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            fi
+            # Continua normalmente
         else
             jq -cn \
                 --arg event "session_id_mismatch" \
@@ -127,6 +162,11 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                     timestamp: $ts,
                     message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
                 }' >> "$LOG_DIR/audit.jsonl"
+            # GAP-03: incrementa contador de mismatches no CTX antes de sair
+            if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+                jq '.session_stats.session_id_mismatches = ((.session_stats.session_id_mismatches // 0) + 1)' \
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            fi
             exit 0
         fi
     fi
@@ -143,6 +183,41 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         # tool_response para askQuestions é JSON: {answers:{...}} — normaliza para string
         RESPONSE_STR="$(echo "$TOOL_RESPONSE" | jq -c '.' 2> /dev/null || echo "$TOOL_RESPONSE")"
 
+        # ── Hardening 1: Detectar falha de API do askQuestions ───────────────────
+        # "FAILED: Response contained no choices" ocorre quando o contexto é grande
+        # demais ou a API do Copilot está sobrecarregada. O tool retorna success:true
+        # mas com erro interno — este bloco detecta e loga corretamente.
+        ASK_API_FAILED=false
+        if echo "$TOOL_RESPONSE" | grep -q "FAILED.*no choices\|contained no choices\|Response contained no choices"; then
+            ASK_API_FAILED=true
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$TIMESTAMP" \
+                --arg tool_use_id "$TOOL_USE_ID" \
+                --arg response "$(echo "$RESPONSE_STR" | head -c 300)" \
+                '{
+                    event:      "askQuestions_api_failure",
+                    session_id: $sid,
+                    timestamp:  $ts,
+                    tool_use_id: $tool_use_id,
+                    error:      "Response contained no choices",
+                    cause:      "Context too large or Copilot API unavailable",
+                    response_preview: $response
+                }' >> "$LOG_DIR/audit.jsonl"
+
+            # Atualiza session-context com flag de falha de API (Hardening 2)
+            jq --arg ts "$TIMESTAMP" \
+                '.current_turn.askquestions_api_error = true
+                 | .current_turn.askquestions_api_error_at = $ts
+                 | .session_stats.askquestions_api_failures = ((.session_stats.askquestions_api_failures // 0) + 1)' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+
+            echo "⚠️ [post-tool-use] vscode_askQuestions falhou com API error: 'Response contained no choices'" >&2
+            echo "   Causa provável: contexto muito grande ou Copilot API indisponível." >&2
+            echo "   Flag 'current_turn.askquestions_api_error' definido no session-context.json." >&2
+        fi
+        # ─────────────────────────────────────────────────────────────────────────
+
         # Lê close_key atual do contexto para verificar se a resposta contém a chave de encerramento
         CURRENT_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
         KEY_FOUND=false
@@ -158,19 +233,24 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
             --arg tool_use_id "$TOOL_USE_ID" \
             --arg response "$RESPONSE_TRUNCATED" \
             --argjson key_found "$KEY_FOUND" \
+            --argjson api_failed "$ASK_API_FAILED" \
             '{
                 event:        "askQuestions_response",
                 session_id:   $sid,
                 timestamp:    $ts,
                 tool_use_id:  $tool_use_id,
                 response:     $response,
-                close_key_found: $key_found
+                close_key_found: $key_found,
+                api_failed:   $api_failed
             }' >> "$LOG_DIR/audit.jsonl"
 
         # Atualiza contexto com resposta e, se necessário, valida a close_key
         # REV4-06: setar auth_requested=true aqui também (defesa em profundidade — garante
         # que mesmo se preToolUse perdeu a janela, postToolUse confirma a autorização)
         if [ "$KEY_FOUND" = "true" ]; then
+            # Guard de idempotência: verifica se close_key_validated já está true
+            # para evitar duplo sessionCloseAuthorized quando o usuário digita a key mais de uma vez.
+            _ALREADY_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
             jq --arg result "$RESULT_TYPE" \
                 --arg response "$RESPONSE_STR" \
                 --arg ts "$TIMESTAMP" \
@@ -181,24 +261,39 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                  | .session.close_key_validated = true' \
                 "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 
-            # Log do evento de validação da chave
-            jq -cn \
-                --arg sid "$SESSION_ID" \
-                --arg ts "$TIMESTAMP" \
-                --arg key "$CURRENT_CLOSE_KEY" \
-                '{
-                    event:      "sessionClose_key_validated",
-                    session_id: $sid,
-                    timestamp:  $ts,
-                    close_key:  $key
-                }' >> "$LOG_DIR/audit.jsonl"
+            if [ "$_ALREADY_VALIDATED" != "true" ]; then
+                # Log do evento de validação da chave (apenas 1x)
+                jq -cn \
+                    --arg sid "$SESSION_ID" \
+                    --arg ts "$TIMESTAMP" \
+                    --arg key "$CURRENT_CLOSE_KEY" \
+                    '{
+                        event:      "sessionClose_key_validated",
+                        session_id: $sid,
+                        timestamp:  $ts,
+                        close_key:  $key
+                    }' >> "$LOG_DIR/audit.jsonl"
 
-            # Auto-encerramento: chama session-close.sh para garantir que sessionCloseAuthorized
-            # seja registrado mesmo que o agente esqueça de chamar o script manualmente.
-            # Esta é a defesa-em-profundidade: Template F → KEY detectada → encerramento automático.
-            _SESSION_CLOSE_SCRIPT="$HOOK_DIR/scripts/session-close.sh"
-            if [ -f "$_SESSION_CLOSE_SCRIPT" ] && [ -x "$_SESSION_CLOSE_SCRIPT" ]; then
-                bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" > /dev/null 2>&1 || true
+                # Auto-encerramento: chama session-close.sh para garantir que sessionCloseAuthorized
+                # seja registrado mesmo que o agente esqueça de chamar o script manualmente.
+                # Esta é a defesa-em-profundidade: Template F → KEY detectada → encerramento automático.
+                _SESSION_CLOSE_SCRIPT="$HOOK_DIR/scripts/session-close.sh"
+                if [ -f "$_SESSION_CLOSE_SCRIPT" ] && [ -x "$_SESSION_CLOSE_SCRIPT" ]; then
+                    bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" > /dev/null 2>&1 || true
+                fi
+            else
+                # Chave já validada: log informativo sem chamar session-close.sh novamente
+                jq -cn \
+                    --arg sid "$SESSION_ID" \
+                    --arg ts "$TIMESTAMP" \
+                    --arg key "$CURRENT_CLOSE_KEY" \
+                    '{
+                        event:      "sessionClose_key_already_validated",
+                        session_id: $sid,
+                        timestamp:  $ts,
+                        close_key:  $key,
+                        message:    "close_key já validada anteriormente — encerramento idempotente, session-close.sh não re-executado"
+                    }' >> "$LOG_DIR/audit.jsonl"
             fi
         else
             jq --arg result "$RESULT_TYPE" \
@@ -221,6 +316,16 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         jq --arg result "$RESULT_TYPE" \
             '.last_tool.result = $result
              | .current_turn.todo_created = true' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; then
+        # FIX BUG-05: defesa em profundidade — reforça auth_requested após retorno do subagente.
+        # pre-tool-use.sh já seta auth_requested=true antes da execução; este bloco garante
+        # que o flag permanece verdadeiro mesmo se houve falha parcial de estado no pre-hook.
+        jq --arg result "$RESULT_TYPE" --arg ts "$TIMESTAMP" \
+            '.last_tool.result = $result
+             | .current_turn.auth_requested = true
+             | .current_turn.auth_requested_at = $ts
+             | .current_turn.subagent_delegated = true' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     else
         jq --arg result "$RESULT_TYPE" \

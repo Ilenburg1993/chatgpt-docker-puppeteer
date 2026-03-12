@@ -137,23 +137,36 @@ else
     SESSION_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SECTION_NAME_WD="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SECTION_ID_WD="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    # FIX v9.0: auto_recovery com ended_at não-nulo indica stale ended_at de fake sessionEnd
-    # (gerado por session-close.sh→session-end.sh antes do fix v8.1). Sessão auto_recovery
-    # é por definição ativa (agente ainda usando o mesmo session_id).
+    # Lê campos de close para distinguir close legítimo de stale
+    _CTX_END_REASON="$(jq -r '.session.end_reason // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    _CTX_KEY_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
 
-    # Sessão está ativa se ended_at é null/vazio OU se source é auto_recovery (stale ended_at fix)
+    # FIX v9.0: auto_recovery com ended_at não-nulo pode indicar:
+    #   (a) stale ended_at de fake sessionEnd pré-v8.1 → source=auto_recovery AND end_reason vazio
+    #   (b) close legítimo no mesmo VS Code session → close_key_validated=true AND end_reason=authorized_close
+    # FIX v9.1: distingue os dois casos para mensagem específica.
     _STALE_ENDED_AT_WARN=false
+    _LEGITIMATE_CLOSE_WARN=false
     if [ -z "$ENDED_AT" ] || [ "$ENDED_AT" = "null" ]; then
         SESSION_ACTIVE=true
-    elif [ "$SESSION_SOURCE" = "auto_recovery" ]; then
-        # auto_recovery + ended_at não-nulo = stale ended_at de fake sessionEnd pré-v8.1
-        # Trata como ativa e loga aviso para diagnóstico
+    elif [ "$_CTX_KEY_VALIDATED" = "true" ] && [ "$_CTX_END_REASON" = "authorized_close" ]; then
+        # Close LEGÍTIMO: close_key_validated=true e end_reason=authorized_close.
+        # Sessão foi encerrada corretamente pelo agente. Hooks ainda ativos (mesmo
+        # VS Code session). Novo prompt irá gerar sessionStart_inline via log-prompt.sh.
+        SESSION_ACTIVE=true
+        _LEGITIMATE_CLOSE_WARN=true
+    elif [ "$SESSION_SOURCE" = "auto_recovery" ] || [ "$SESSION_SOURCE" = "inline_restart" ]; then
+        # auto_recovery ou inline_restart + ended_at não-nulo = stale ended_at residual
+        # (gerado por session-close.sh pré-v8.1 ou por race condition no inline_restart)
         SESSION_ACTIVE=true
         _STALE_ENDED_AT_WARN=true
     fi
 
-    # Emite aviso de ended_at estagnado (stale) detectado em contexto auto_recovery
-    if [ "$_STALE_ENDED_AT_WARN" = "true" ]; then
+    # Emite aviso diferenciado conforme a causa do ended_at
+    if [ "$_LEGITIMATE_CLOSE_WARN" = "true" ]; then
+        alert_warn "SESSION_CLOSED_AWAITING_RESTART" \
+            "Sessão encerrada legitimamente (end_reason=authorized_close). Nova sessão será iniciada automaticamente ao próximo prompt do usuário via sessionStart_inline. Sessão anterior encerrada em: ${ENDED_AT}"
+    elif [ "$_STALE_ENDED_AT_WARN" = "true" ]; then
         alert_warn "STALE_ENDED_AT" \
             "session.ended_at contém valor residual de sessionEnd falso pré-v8.1 (source=auto_recovery). Sessão considerada ATIVA. Limpe ended_at no contexto para eliminar este aviso."
     fi

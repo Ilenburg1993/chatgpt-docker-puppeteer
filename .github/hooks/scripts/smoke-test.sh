@@ -1250,6 +1250,78 @@ else
     fail "V90-15: agent-stop.sh não encontrado"
 fi
 
+# V90-16: log-prompt.sh RECONNECT-02 — sessão com ended_at != null inicia sessão inline (BUG-PC-01)
+# Cria sandbox isolado: HOOK_DIR = $sandbox via dirname(BASH_SOURCE[0])
+_V16_DIR="$(mktemp -d)"
+_V16_SCRIPTS="$_V16_DIR/scripts"
+_V16_STATE="$_V16_DIR/state"
+_V16_LOGS="$_V16_DIR/logs"
+_V16_LIB="$_V16_DIR/hooks-lib"
+mkdir -p "$_V16_SCRIPTS" "$_V16_STATE" "$_V16_LOGS" "$_V16_LIB"
+cp -a "$SCRIPTS_DIR"/*.sh "$_V16_SCRIPTS/" 2> /dev/null || true
+cp -a "$HOOK_DIR/hooks-lib/"* "$_V16_LIB/" 2> /dev/null || true
+# Contexto com sessão encerrada: ended_at != null
+cat > "$_V16_STATE/session-context.json" << 'V16CTX'
+{
+  "schema_version": 9,
+  "session": {
+    "id": "v16-old-sid",
+    "close_key": "ENCERRAR-V16OLD",
+    "close_key_validated": true,
+    "started_at": "2026-01-01T00:00:00Z",
+    "ended_at": "2026-01-01T01:00:00Z",
+    "end_reason": "authorized_close",
+    "source": "auto_recovery"
+  },
+  "current_section": {"name": "test", "section_id": "v16-s1", "section_number": 1, "turn_start": 0},
+  "current_turn": {"number": 1, "section_turn": 1, "tools_count": 0, "auth_requested": false,
+    "intent": null, "intent_declared": false, "todo_created": false, "agentStop_invocations": 0,
+    "subagent_delegated": false},
+  "session_stats": {"turn_count": 1, "turn_authorized": 1, "turn_no_askQuestions": 0,
+    "turns_since_askQuestions": 0, "tools_total": 0, "push_count": 0,
+    "pending_section_after_push": false, "failures_detected": 0},
+  "compliance": {"consecutive_unauthorized": 0, "last_turn_authorized": true}
+}
+V16CTX
+touch "$_V16_LOGS/audit.jsonl"
+# Executa log-prompt.sh no sandbox (HOOK_DIR resolve para $_V16_DIR via dirname)
+_V16_INPUT='{"timestamp":"2026-01-01T02:00:00Z","cwd":"/tmp","prompt":"test v90-16","session_id":"v16-new-sid"}'
+echo "$_V16_INPUT" | bash "$_V16_SCRIPTS/log-prompt.sh" > /dev/null 2> /dev/null || true
+_V16_SRC="$(jq -r '.session.source // ""' "$_V16_STATE/session-context.json" 2> /dev/null || echo '')"
+_V16_EA="$(jq '.session.ended_at' "$_V16_STATE/session-context.json" 2> /dev/null || echo 'err')"
+_V16_EVT="$(grep -c '"sessionStart_inline"' "$_V16_LOGS/audit.jsonl" 2> /dev/null || echo 0)"
+if [ "$_V16_SRC" = "inline_restart" ] && [ "$_V16_EA" = "null" ] && [ "$_V16_EVT" -ge 1 ]; then
+    pass "V90-16: log-prompt.sh RECONNECT-02 — ended_at!=null inicia inline_restart (source=inline_restart, ended_at=null, sessionStart_inline logado)"
+else
+    fail "V90-16: log-prompt.sh RECONNECT-02 FAIL — source='$_V16_SRC', ended_at='$_V16_EA', sessionStart_inline_count=$_V16_EVT"
+fi
+rm -rf "$_V16_DIR"
+
+# V90-17: watchdog.sh distingue close legítimo (end_reason=authorized_close) de stale ended_at (BUG-PC-02)
+if [ -f "$WATCHDOG_SCRIPT" ]; then
+    if grep -q 'authorized_close' "$WATCHDOG_SCRIPT" \
+        && grep -q '_CTX_END_REASON\|end_reason' "$WATCHDOG_SCRIPT"; then
+        pass "V90-17: watchdog.sh BUG-PC-02 — STALE_ENDED_AT distingue authorized_close de stale real (guard end_reason presente)"
+    else
+        fail "V90-17: watchdog.sh SEM guard authorized_close no STALE_ENDED_AT — BUG-PC-02 não aplicado"
+    fi
+else
+    fail "V90-17: watchdog.sh não encontrado"
+fi
+
+# V90-18: post-tool-use.sh tem guard de idempotência para session-close.sh (BUG-PC-03)
+_PTU_SCRIPT="$SCRIPTS_DIR/post-tool-use.sh"
+if [ -f "$_PTU_SCRIPT" ]; then
+    if grep -q '_ALREADY_VALIDATED' "$_PTU_SCRIPT" \
+        && grep -q 'close_key_validated // false' "$_PTU_SCRIPT"; then
+        pass "V90-18: post-tool-use.sh BUG-PC-03 — guard de idempotência (_ALREADY_VALIDATED) previne duplo sessionCloseAuthorized"
+    else
+        fail "V90-18: post-tool-use.sh SEM guard de idempotência — BUG-PC-03 não aplicado"
+    fi
+else
+    fail "V90-18: post-tool-use.sh não encontrado"
+fi
+
 echo ""
 echo "══════════════════════════════════════════════════"
 TOTAL=$((PASS + FAIL))

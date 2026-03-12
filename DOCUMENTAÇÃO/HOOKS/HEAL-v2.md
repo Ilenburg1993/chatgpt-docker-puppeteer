@@ -6,16 +6,16 @@
 
 ## O que é o HEAL v2
 
-**HEAL v2** é o mecanismo de auto-reparo de `session_id` implementado no sistema de hooks do Copilot.
-Ele detecta e corrige automaticamente a divergência entre o `session_id` presente no payload de
-entrada dos hooks e o `session_id` ativo registrado em `session-context.json`.
+**HEAL v2** é o mecanismo de auto-reparo de `session_id` implementado no sistema de hooks do
+Copilot. Ele detecta e corrige automaticamente a divergência entre o `session_id` presente no
+payload de entrada dos hooks e o `session_id` ativo registrado em `session-context.json`.
 
 ### Problema que resolve
 
 Durante operação normal, cada hook recebe o `session_id` atual no campo `$.session_id` do payload.
-Em determinadas situações (principalmente ao retomar sessões após falha ou reinicialização do Copilot),
-o payload pode chegar com um `session_id` diferente do contexto ativo — criando uma **divergência
-(mismatch)** que, sem correção, causaria:
+Em determinadas situações (principalmente ao retomar sessões após falha ou reinicialização do
+Copilot), o payload pode chegar com um `session_id` diferente do contexto ativo — criando uma
+**divergência (mismatch)** que, sem correção, causaria:
 
 - Eventos de audit escritos com `session_id` errado
 - Contexto de sessão contaminado por dados de outra sessão
@@ -71,6 +71,7 @@ readonly HOOKS_HEAL_THRESHOLD="${HOOKS_HEAL_THRESHOLD:-3}"
 ```
 
 Para aumentar a tolerância (aceitar mais divergências antes de corrigir):
+
 ```bash
 HOOKS_HEAL_THRESHOLD=5 bash .github/hooks/scripts/pre-tool-use.sh
 ```
@@ -80,30 +81,32 @@ HOOKS_HEAL_THRESHOLD=5 bash .github/hooks/scripts/pre-tool-use.sh
 ## Eventos de Audit
 
 ### `session_auto_recovery`
+
 Emitido toda vez que um mismatch de `session_id` é detectado.
 
 ```json
 {
-    "event": "session_auto_recovery",
-    "session_id": "<active_id>",
-    "timestamp": "...",
-    "payload_session_id": "<id_do_payload>",
-    "active_session_id": "<id_no_contexto>",
-    "consecutive_mismatches": 2,
-    "threshold": 3
+  "event": "session_auto_recovery",
+  "session_id": "<active_id>",
+  "timestamp": "...",
+  "payload_session_id": "<id_do_payload>",
+  "active_session_id": "<id_no_contexto>",
+  "consecutive_mismatches": 2,
+  "threshold": 3
 }
 ```
 
 ### `session_id_healed`
+
 Emitido quando o threshold é atingido e o contexto é reparado.
 
 ```json
 {
-    "event": "session_id_healed",
-    "old_session_id": "<id_antigo>",
-    "new_session_id": "<id_do_payload>",
-    "timestamp": "...",
-    "heal_reason": "consecutive_mismatches_threshold_reached"
+  "event": "session_id_healed",
+  "old_session_id": "<id_antigo>",
+  "new_session_id": "<id_do_payload>",
+  "timestamp": "...",
+  "heal_reason": "consecutive_mismatches_threshold_reached"
 }
 ```
 
@@ -116,14 +119,14 @@ presente em `pre-tool-use.sh`, `post-tool-use.sh` e `agent-stop.sh`:
 
 ```bash
 # Exemplo de guard (ctx_guard_session_id em common.sh)
-ACTIVE_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+ACTIVE_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 if [ -n "$SESSION_ID" ] && [ -n "$ACTIVE_ID" ] && [ "$SESSION_ID" != "$ACTIVE_ID" ]; then
-    # mismatch → não modifica estado; dispara HEAL se threshold atingido
+  # mismatch → não modifica estado; dispara HEAL se threshold atingido
 fi
 ```
 
-O arquivo `state/.mismatch_track.json` é **sempre limpo** por `session-start.sh` ao iniciar uma
-nova sessão, garantindo que contagens de mismatches de sessões anteriores não contaminem a nova.
+O arquivo `state/.mismatch_track.json` é **sempre limpo** por `session-start.sh` ao iniciar uma nova
+sessão, garantindo que contagens de mismatches de sessões anteriores não contaminem a nova.
 
 ---
 
@@ -147,14 +150,14 @@ Para verificar heals ocorridos em uma sessão:
 ```bash
 # Listar todos os heals da sessão atual
 jq -c 'select(.event=="session_id_healed")' \
-    .github/hooks/state/audit.jsonl
+  .github/hooks/state/audit.jsonl
 
 # Contagem de mismatches detectados
 jq 'select(.event=="session_auto_recovery") | .consecutive_mismatches' \
-    .github/hooks/state/audit.jsonl
+  .github/hooks/state/audit.jsonl
 
 # Estado atual do tracker de mismatches
-cat .github/hooks/state/.mismatch_track.json 2>/dev/null || echo '{"consecutive": 0}'
+cat .github/hooks/state/.mismatch_track.json 2> /dev/null || echo '{"consecutive": 0}'
 ```
 
 ---

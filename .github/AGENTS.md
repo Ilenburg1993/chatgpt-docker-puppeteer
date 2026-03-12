@@ -10,35 +10,45 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 ---
 
 ## ╔══════════════════════════════════════════════════════════════════════╗
-## ║  ⚠️  SESSION PERSISTENTE — PRINCÍPIO FUNDAMENTAL (LEIA PRIMEIRO) ║
+
+## ║ ⚠️ SESSION PERSISTENTE — PRINCÍPIO FUNDAMENTAL (LEIA PRIMEIRO) ║
+
 ## ╚══════════════════════════════════════════════════════════════════════╝
 
-> **O encerramento de uma SESSION, se o sistema estiver funcionando corretamente,**
-> **deve ser um evento EXTREMAMENTE RARO.**
+> **O encerramento de uma SESSION, se o sistema estiver funcionando corretamente,** **deve ser um
+> evento EXTREMAMENTE RARO.**
 
-**REGRA ABSOLUTA**: O agente NUNCA deve chamar `session-close.sh` diretamente. Nem mesmo com a KEY correta. O único fluxo legítimo de encerramento é:
+**REGRA ABSOLUTA**: O agente NUNCA deve chamar `session-close.sh` diretamente. Nem mesmo com a KEY
+correta. O único fluxo legítimo de encerramento é:
 
 1. Agente invoca `vscode_askQuestions` com **Template F** (exibe a `close_key` ao usuário)
 2. Usuário digita `ENCERRAR-XXXXXXXX` no campo de resposta
-3. `post-tool-use.sh` detecta automaticamente a KEY na resposta → executa `session-close.sh` automaticamente
+3. `post-tool-use.sh` detecta automaticamente a KEY na resposta → executa `session-close.sh`
+   automaticamente
 
 > **Por que nunca chamar session-close.sh diretamente?**
-> - O hook `pre-tool-use.sh` (v8.0) **NEGA** qualquer chamada a `session-close.sh` via `run_in_terminal` enquanto `close_key_validated=false`.
-> - O agente pode halluciná a KEY ou ser manipulado — o fluxo via `vscode_askQuestions` é o único confiável.
-> - `post-tool-use.sh` detecta a KEY na resposta do usuário e aciona o encerramento de forma controlada.
+>
+> - O hook `pre-tool-use.sh` (v8.0) **NEGA** qualquer chamada a `session-close.sh` via
+>   `run_in_terminal` enquanto `close_key_validated=false`.
+> - O agente pode halluciná a KEY ou ser manipulado — o fluxo via `vscode_askQuestions` é o único
+>   confiável.
+> - `post-tool-use.sh` detecta a KEY na resposta do usuário e aciona o encerramento de forma
+>   controlada.
 
 **SESSION end = EVENTO EXTREMAMENTE RARO.** Toda SESSION deve ser mantida viva o máximo possível.
 
 ---
 
 ## ╔══════════════════════════════════════════════════════════════════╗
-## ║  🔐 PROTOCOLO CRÍTICO — ENCERRAMENTO DE SESSION  (LEIA PRIMEIRO) ║
+
+## ║ 🔐 PROTOCOLO CRÍTICO — ENCERRAMENTO DE SESSION (LEIA PRIMEIRO) ║
+
 ## ╚══════════════════════════════════════════════════════════════════╝
 
 > **SESSION ≠ SECTION ≠ TURN** — confundir estes três conceitos é o erro mais frequente.
 
-| Conceito    | O que é                       | Encerra com                           | Autorização       |
-| ----------- | ----------------------------- | ------------------------------------- | ----------------- |
+| Conceito    | O que é                       | Encerra com                           | Autorização        |
+| ----------- | ----------------------------- | ------------------------------------- | ------------------ |
 | **TURN**    | 1 ciclo prompt→resposta       | Livremente ao terminar a resposta     | ❌ Não precisa     |
 | **SECTION** | Fase lógica dentro da SESSION | `bash start-section.sh "nome"`        | ❌ Autônoma        |
 | **SESSION** | 1 ativação do Copilot Chat    | Template F + KEY + `session-close.sh` | ✅ **OBRIGATÓRIA** |
@@ -50,6 +60,7 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 3. **post-tool-use.sh chama `session-close.sh` automaticamente** (o agente não deve chamar)
 
 > **Onde encontrar a `close_key`:**
+>
 > - `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO`
 > - `session-context.json` → campo `session.close_key`
 > - Lembrete rápido: `bash .github/hooks/scripts/session-reminder.sh`
@@ -59,8 +70,8 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 > `SESSION_CLOSE_NO_KEY.flag` → alerta na próxima sessão.
 >
 > **Verificação automática:** o hook `postToolUse` detecta a close_key na resposta de
-> `vscode_askQuestions` e registra `sessionClose_key_validated` no audit.jsonl — confirmando
-> que a KEY foi enviada legitimamente via tool call, não por texto plano.
+> `vscode_askQuestions` e registra `sessionClose_key_validated` no audit.jsonl — confirmando que a
+> KEY foi enviada legitimamente via tool call, não por texto plano.
 
 ---
 
@@ -73,8 +84,10 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 > **Todo turno de trabalho significativo DEVE criar TODOs e terminar com vscode_askQuestions.**
 
 **Regras:**
+
 1. Use `manage_todo_list` ao **iniciar** qualquer turno de trabalho (crie a lista de tarefas).
-2. O último item da lista DEVE ser: `"Chamar vscode_askQuestions [Template A/D/E conforme contexto]"`.
+2. O último item da lista DEVE ser:
+   `"Chamar vscode_askQuestions [Template A/D/E conforme contexto]"`.
 3. Execute todos os TODOs em sequência — o último (vscode_askQuestions) NÃO pode ser pulado.
 4. `agent-stop.sh` emite `decision:block` quando `vscode_askQuestions` não foi chamado.
 
@@ -103,8 +116,8 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 4. Sem a chamada do script → `SESSION_CLOSE_NO_KEY.flag` → alerta de encerramento não autorizado
 
 > **Por que session-close.sh?** O evento `sessionEnd` da plataforma VS Code Copilot não dispara
-> quando a sessão termina abruptamente. O `session-close.sh` é o único mecanismo confiável:
-> valida a KEY, loga `sessionCloseAuthorized`, chama `session-end.sh` e gera o relatório final.
+> quando a sessão termina abruptamente. O `session-close.sh` é o único mecanismo confiável: valida a
+> KEY, loga `sessionCloseAuthorized`, chama `session-end.sh` e gera o relatório final.
 
 **Commit e/ou Push** — Protocolo obrigatório com Template G:
 
@@ -117,7 +130,8 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 O sistema registra chamadas de `vscode_askQuestions` para auditoria e enforcement:
 
 - `agent-stop.sh` detecta se `vscode_askQuestions` foi chamado no turno
-- Sem chamada: loga `turnEnd_no_askQuestions` + emite `decision:block` + incrementa `consecutive_unauthorized`
+- Sem chamada: loga `turnEnd_no_askQuestions` + emite `decision:block` + incrementa
+  `consecutive_unauthorized`
 - Com chamada: loga `turnEnd_authorized` e reseta `consecutive_unauthorized`
 - `manage_todo_list` não usado no turno: mencionado no `systemMessage` do block
 
@@ -222,8 +236,8 @@ usuário. O agente é um colaborador ativo e autônomo, não um executor passivo
 
 > **ENCERRAMENTO DE SESSION (extra-hardening)**: além do `vscode_askQuestions`, o usuário DEVE
 > digitar a chave `ENCERRAR-XXXXXXXX` no campo livre do **Template F**. A chave está no
-> `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO`. **Use sempre Template F**
-> (não Template A) ao encerrar a sessão.
+> `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO`. **Use sempre Template F** (não
+> Template A) ao encerrar a sessão.
 
 ---
 
@@ -253,65 +267,124 @@ momentos. **Sem exceção.**
 | Antes de qualquer commit e/ou push            | **G — Commit/Push**      | Antes de `git commit`/`push` |
 
 > **Nota de protocolo**: como primeiro ato de cada turno de trabalho, o agente deve chamar
-> `bash .github/hooks/scripts/start-turn.sh "intenção"` para declarar sua intenção antes de
-> invocar qualquer ferramenta. Isso gera o evento `turnStart_enriched` no audit.jsonl.
+> `bash .github/hooks/scripts/start-turn.sh "intenção"` para declarar sua intenção antes de invocar
+> qualquer ferramenta. Isso gera o evento `turnStart_enriched` no audit.jsonl.
 
 ---
 
-### Template E — Session Kickoff (sessão sem prompt)
+### Schema obrigatório do `vscode_askQuestions` — Referência de uso correto
+
+> ⚠️ **CRÍTICO**: usar campos errados (`id`, `prompt`, `type`) **não gera erro visível** mas pode
+> causar falhas silenciosas na API, respostas malformadas e interrupção da sessão. **Use sempre os
+> campos canônicos abaixo.**
+
+#### Campos por item de `questions` (array)
+
+| Campo                | Tipo   | Obrigatório | Limite      | Descrição                                                   |
+| -------------------- | ------ | ----------- | ----------- | ----------------------------------------------------------- |
+| `header`             | string | ✅ sim      | **≤50 ch**  | Chave da pergunta; aparece como título e índice no response |
+| `question`           | string | ✅ sim      | **≤200 ch** | Texto exibido ao usuário. Manter conciso — uma frase.       |
+| `allowFreeformInput` | bool   | ❌ não      | —           | `true` = habilita campo de texto livre                      |
+| `multiSelect`        | bool   | ❌ não      | —           | `true` = permite múltiplas seleções nas opções              |
+| `options`            | array  | ❌ não      | —           | Lista de opções clicáveis. Se omitido = só texto livre      |
+
+#### Campos por item de `options`
+
+| Campo         | Tipo   | Obrigatório | Descrição                    |
+| ------------- | ------ | ----------- | ---------------------------- |
+| `label`       | string | ✅ sim      | Texto clicável da opção      |
+| `description` | string | ❌ não      | Texto secundário (subtítulo) |
+| `recommended` | bool   | ❌ não      | Marca como opção sugerida    |
+
+#### Anti-padrões proibidos
+
+```json
+// ❌ ERRADO — campos antigos que a API não reconhece:
+{ "id": "x", "prompt": "...", "type": "selectOne", "options": ["string1"] }
+
+// ✅ CORRETO — schema canônico:
+{ "header": "Título curto ≤50", "question": "Pergunta concisa ≤200 chars?",
+  "options": [{ "label": "Opção A" }, { "label": "Opção B" }] }
+```
+
+#### Regras de hardening (obrigatórias)
+
+1. **`header` ≤50 chars** — violar este limite causa `FAILED: Response contained no choices`
+2. **`question` ≤200 chars** — superar este limite causa falha silenciosa da API
+3. **`options` = objetos** — nunca `"string"` diretamente; sempre `{ "label": "..." }`
+4. **Substituir placeholders** — `[CLOSE_KEY]`, `[N_MOD]`, etc. com valores reais antes de invocar
+5. **Verificar tamanho antes de invocar** — ao substituir placeholders, o `question` resultante deve
+   ainda caber em 200 chars
+6. **`allowFreeformInput`** — usar nos templates que pedem texto livre do usuário (F, G, D, A)
+
+#### Exemplo completo válido
 
 ```json
 [
   {
-    "id": "session_mode",
-    "prompt": "Sessão iniciada. Tenho [N_ALTA] tarefas de alta prioridade, [N_MEDIA] de média e [N_BACKLOG] no backlog. [N_FINDINGS] findings pendentes. Como devo proceder?",
-    "type": "selectOne",
+    "header": "Próxima ação",
+    "question": "✅ Concluí: Hardening do schema askQuestions. Atualizei AGENTS.md e GUIA v1.9. O que fazer agora?",
+    "allowFreeformInput": true,
     "options": [
-      "Trabalhar autonomamente — executar tarefas por prioridade (alta → média → backlog)",
-      "Auditoria profunda — escolher um módulo e auditar completamente",
-      "Focar em bugs — ler findings pendentes e corrigir os críticos primeiro",
-      "Proposta arquitetural — analisar o codebase e propor melhorias estruturais",
-      "Me mostre o estado atual completo e proponha um plano detalhado para esta sessão",
-      "Eu direi o que fazer — aguardar instrução"
+      { "label": "Próxima tarefa do backlog", "recommended": true },
+      { "label": "Fazer commit e push" },
+      { "label": "Encerrar sessão" }
+    ]
+  }
+]
+```
+
+---
+
+```json
+[
+  {
+    "header": "Modo da sessão",
+    "question": "Sessão iniciada. [N_ALTA] alta | [N_MEDIA] média | [N_BACKLOG] backlog | [N_FINDINGS] findings pendentes. Como proceder?",
+    "options": [
+      { "label": "Trabalhar autonomamente — alta → média → backlog" },
+      { "label": "Auditoria profunda — escolher módulo e auditar" },
+      { "label": "Focar em bugs — corrigir findings críticos primeiro" },
+      { "label": "Proposta arquitetural — analisar e propor melhorias" },
+      { "label": "Mostrar estado completo e propor plano detalhado" },
+      { "label": "Aguardar instrução do usuário" }
     ]
   },
   {
-    "id": "module_focus",
-    "prompt": "Há algum módulo ou área que devo priorizar nesta sessão?",
-    "type": "selectMany",
+    "header": "Foco em módulo",
+    "question": "Há módulo ou área prioritária nesta sessão? (seleção múltipla permitida)",
+    "multiSelect": true,
     "options": [
-      "src/kernel/ — motor de execução de tarefas",
-      "src/driver/ — automação de browser/Chrome",
-      "src/infra/ — pool, queue, storage, locks",
-      "src/server/ — API REST e dashboard realtime",
-      "src/nerv/ — barramento de eventos (IPC/telemetria)",
-      "src/agent/ — workers internos (missão, watchdog, controle)",
-      "tests/ — cobertura, qualidade e testes de regressão",
-      "DOCUMENTAÇÃO/ — arquitetura, bugs, operações",
-      "Sem preferência — deixar o agente decidir"
+      { "label": "src/kernel/ — motor de execução de tarefas" },
+      { "label": "src/driver/ — automação de browser/Chrome" },
+      { "label": "src/infra/ — pool, queue, storage, locks" },
+      { "label": "src/server/ — API REST e dashboard realtime" },
+      { "label": "src/nerv/ — barramento de eventos (IPC/telemetria)" },
+      { "label": "src/agent/ — workers internos (missão, watchdog, controle)" },
+      { "label": "tests/ — cobertura e testes de regressão" },
+      { "label": "DOCUMENTAÇÃO/ — arquitetura, bugs, operações" },
+      { "label": "Sem preferência — deixar o agente decidir" }
     ]
   },
   {
-    "id": "autonomy_level",
-    "prompt": "Quantos ciclos autônomos posso executar antes do próximo checkpoint interativo?",
-    "type": "selectOne",
+    "header": "Autonomia entre checkpoints",
+    "question": "Quantos ciclos posso executar antes do próximo checkpoint interativo?",
     "options": [
-      "1 ciclo — perguntar após cada tarefa concluída",
-      "3 ciclos — checkpoint a cada 3 tarefas",
-      "5 ciclos — checkpoint a cada 5 tarefas",
-      "Modo livre — só interromper quando encontrar algo crítico ou ambíguo",
-      "Modo máximo — executar indefinidamente, me notifique apenas de decisões irreversíveis"
+      { "label": "1 ciclo — perguntar após cada tarefa" },
+      { "label": "3 ciclos — checkpoint a cada 3 tarefas" },
+      { "label": "5 ciclos — checkpoint a cada 5 tarefas" },
+      { "label": "Modo livre — só interromper em casos críticos ou ambíguos" },
+      { "label": "Modo máximo — executar indefinidamente" }
     ]
   },
   {
-    "id": "audit_depth",
-    "prompt": "Qual profundidade de análise para esta sessão?",
-    "type": "selectOne",
+    "header": "Profundidade de análise",
+    "question": "Qual profundidade de análise para esta sessão?",
     "options": [
-      "Superficial — lint + typecheck, correções cirúrgicas",
-      "Normal — lint + typecheck + testes + JSDoc",
-      "Profunda — tudo acima + busca de bugs latentes + análise semântica de lógica",
-      "Máxima — auditoria exploratória irrestrita + propostas de upgrade + refactoring"
+      { "label": "Superficial — lint + typecheck, correções cirúrgicas" },
+      { "label": "Normal — lint + typecheck + testes + JSDoc" },
+      { "label": "Profunda — tudo + busca de bugs latentes + semântica" },
+      { "label": "Máxima — exploratória irrestrita + upgrades + refactoring" }
     ]
   }
 ]
@@ -321,31 +394,34 @@ momentos. **Sem exceção.**
 
 ### Template A — Next Step (pós-conclusão de tarefa)
 
+> **Schema**: `header` (≤50), `question` (≤200), `options` como objetos `{label, recommended?}`.
+> `allowFreeformInput: true` nos campos onde o usuário pode passar instruções livres.
+
 ```json
 [
   {
-    "id": "next_action",
-    "prompt": "✅ Concluí: [DESCREVER_TAREFA_CONCLUÍDA]. [RESUMO_DO_QUE_FOI_FEITO]. O que fazer agora?",
-    "type": "selectOne",
+    "header": "Próxima ação",
+    "question": "✅ Concluí: [TAREFA_CONCLUÍDA]. [RESUMO_1_LINHA]. O que fazer agora?",
+    "allowFreeformInput": true,
     "options": [
-      "Próxima tarefa do backlog (automático — sem interrução)",
-      "Auditoria profunda do módulo que acabei de tocar",
-      "Expandir o escopo — corrigir TODOS os bugs relacionados que identifiquei",
-      "Escrever testes para o código que modifiquei",
-      "Gerar relatório completo das mudanças e propor próximos upgrades",
-      "Propor refactoring arquitetural baseado no que observei",
-      "Pausar — aguardar instrução do usuário"
+      { "label": "Próxima tarefa do backlog (automático)", "recommended": true },
+      { "label": "Auditoria profunda do módulo tocado" },
+      { "label": "Expandir — corrigir TODOS os bugs relacionados" },
+      { "label": "Escrever testes para o código modificado" },
+      { "label": "Gerar relatório e propor próximos upgrades" },
+      { "label": "Propor refactoring arquitetural" },
+      { "label": "Pausar — aguardar instrução" }
     ]
   },
   {
-    "id": "findings_action",
-    "prompt": "Durante a tarefa, registrei [N] findings. O que fazer com eles?",
-    "type": "selectMany",
+    "header": "Findings registrados",
+    "question": "Registrei [N] findings durante a tarefa. O que fazer com eles?",
+    "multiSelect": true,
     "options": [
-      "Corrigir os críticos/high agora antes de prosseguir",
-      "Adicionar todos ao backlog para sessão dedicada",
-      "Gerar relatório de auditoria em DOCUMENTAÇÃO/AUDITORIAS/",
-      "Ignorar por enquanto — focar na próxima tarefa principal"
+      { "label": "Corrigir críticos/high agora antes de prosseguir" },
+      { "label": "Adicionar todos ao backlog para sessão dedicada" },
+      { "label": "Gerar relatório em DOCUMENTAÇÃO/AUDITORIAS/" },
+      { "label": "Ignorar por ora — focar na próxima tarefa" }
     ]
   }
 ]
@@ -358,26 +434,25 @@ momentos. **Sem exceção.**
 ```json
 [
   {
-    "id": "bug_action",
-    "prompt": "🔍 Encontrei [N] bugs em [MÓDULO]:\n[RESUMO_DOS_BUGS]. Como proceder?",
-    "type": "selectMany",
+    "header": "Ação sobre bugs",
+    "question": "🔍 [N] bugs em [MÓDULO]: [RESUMO_1_LINHA]. Como proceder?",
+    "multiSelect": true,
     "options": [
-      "Corrigir TODOS agora, nesta sessão",
-      "Corrigir apenas os críticos/high priority agora",
-      "Gerar relatório completo em DOCUMENTAÇÃO/AUDITORIAS/ e adicionar ao backlog",
-      "Corrigir + escrever testes de regressão para cada bug",
-      "Corrigir + propor refactoring para prevenir esta classe de bugs no futuro",
-      "Documentar apenas — não modificar código agora"
+      { "label": "Corrigir TODOS agora, nesta sessão" },
+      { "label": "Corrigir apenas críticos/high priority agora" },
+      { "label": "Gerar relatório em DOCUMENTAÇÃO/AUDITORIAS/ + backlog" },
+      { "label": "Corrigir + testes de regressão para cada bug" },
+      { "label": "Corrigir + refactoring preventivo desta classe de bug" },
+      { "label": "Documentar apenas — não modificar código agora" }
     ]
   },
   {
-    "id": "bug_report",
-    "prompt": "Devo gerar um relatório formal de auditoria para este módulo?",
-    "type": "selectOne",
+    "header": "Relatório de auditoria",
+    "question": "Gerar relatório formal de auditoria para este módulo?",
     "options": [
-      "Sim — gerar DOCUMENTAÇÃO/AUDITORIAS/audit-[YYYYMMDD]-[módulo].md",
-      "Não — só registrar em findings.jsonl",
-      "Sim — e adicionar tarefas derivadas ao pending-tasks.md automaticamente"
+      { "label": "Sim — gerar DOCUMENTAÇÃO/AUDITORIAS/audit-YYYYMMDD-módulo.md" },
+      { "label": "Não — registrar apenas em findings.jsonl" },
+      { "label": "Sim + adicionar tarefas derivadas ao pending-tasks.md" }
     ]
   }
 ]
@@ -390,27 +465,25 @@ momentos. **Sem exceção.**
 ```json
 [
   {
-    "id": "upgrade_scope",
-    "prompt": "💡 Identifiquei oportunidade de upgrade em [MÓDULO]: [DESCRIÇÃO_DA_PROPOSTA]. Impacto estimado: [N] arquivos afetados. Devo executar?",
-    "type": "selectOne",
+    "header": "Executar upgrade",
+    "question": "💡 Upgrade em [MÓDULO]: [DESCRIÇÃO_1_LINHA]. [N] arquivos afetados. Executar?",
     "options": [
-      "Sim — executar agora, sem interrupção",
-      "Sim — mas em etapas, com checkpoint após cada fase",
-      "Mostrar plano detalhado antes de decidir",
-      "Adicionar ao backlog como tarefa de alta prioridade e continuar outra coisa",
-      "Adicionar ao backlog de média prioridade",
-      "Não executar — descartado"
+      { "label": "Sim — executar agora, sem interrupção" },
+      { "label": "Sim — em etapas, com checkpoint após cada fase" },
+      { "label": "Mostrar plano detalhado antes de decidir" },
+      { "label": "Adicionar ao backlog como alta prioridade" },
+      { "label": "Adicionar ao backlog como média prioridade" },
+      { "label": "Não executar — descartado" }
     ]
   },
   {
-    "id": "upgrade_tests",
-    "prompt": "Se executar o upgrade, qual nível de teste incluo?",
-    "type": "selectOne",
+    "header": "Nível de testes",
+    "question": "Se executar o upgrade, qual nível de testes incluir?",
     "options": [
-      "Testes existentes passando (mínimo)",
-      "Testes existentes + testes unitários para o novo código",
-      "Suite completa: unit + integration + typecheck + lint",
-      "Suite completa + testes de performance (hyperfine)"
+      { "label": "Mínimo — testes existentes passando" },
+      { "label": "Existentes + unitários para o novo código" },
+      { "label": "Suite completa: unit + integration + typecheck + lint" },
+      { "label": "Suite completa + performance (hyperfine)" }
     ]
   }
 ]
@@ -423,15 +496,15 @@ momentos. **Sem exceção.**
 ```json
 [
   {
-    "id": "checkpoint",
-    "prompt": "📍 Checkpoint — executei [TURN_COUNT] turnos nesta sessão. Completei: [RESUMO_DO_PROGRESSO]. Devo continuar?",
-    "type": "selectOne",
+    "header": "Checkpoint de sessão",
+    "question": "📍 Checkpoint: executei [TURN_COUNT] turnos. Completei: [RESUMO_1_LINHA]. Continuar?",
+    "allowFreeformInput": true,
     "options": [
-      "Continuar — próxima tarefa do backlog",
-      "Continuar — mas mudar o foco para [módulo diferente]",
-      "Fazer um commit agora e continuar",
-      "Fazer um commit e encerrar a sessão",
-      "Encerrar sem commit (mudanças serão preservadas)"
+      { "label": "Continuar — próxima tarefa do backlog", "recommended": true },
+      { "label": "Continuar — mas mudar foco de módulo" },
+      { "label": "Fazer commit agora e continuar" },
+      { "label": "Fazer commit e encerrar a sessão" },
+      { "label": "Encerrar sem commit (mudanças preservadas)" }
     ]
   }
 ]
@@ -446,38 +519,45 @@ momentos. **Sem exceção.**
 > confirmação explícita com a chave dinâmica gerada no início da sessão.
 >
 > A chave está em:
+>
 > - `session-briefing.md` → seção `🔐 CHAVE DE ENCERRAMENTO DA SESSÃO`
 > - `session-context.json` → campo `session.close_key`
 >
 > **Protocolo obrigatório (3 passos)**:
+>
 > 1. Invocar este Template F via `vscode_askQuestions` (exibe a close_key ao usuário)
 > 2. Usuário digita a KEY no campo livre
 > 3. Agente extrai a KEY da resposta e chama **obrigatoriamente**:
 >    ```bash
 >    bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
 >    ```
-> **Por que o script é necessário?** O evento `sessionEnd` da plataforma VS Code Copilot não
-> dispara quando a sessão termina abruptamente. Sem chamar `session-close.sh`, o encerramento
-> nunca é registrado no sistema de auditoria e a próxima sessão detecta "encerramento abrupto".
+>    **Por que o script é necessário?** O evento `sessionEnd` da plataforma VS Code Copilot não
+>    dispara quando a sessão termina abruptamente. Sem chamar `session-close.sh`, o encerramento
+>    nunca é registrado no sistema de auditoria e a próxima sessão detecta "encerramento abrupto".
+>
+> **⚠️ SUBSTITUA `[CLOSE_KEY]` pela chave real antes de invocar.** A question deve ter ≤200 chars —
+> não adicione texto extra além do template abaixo.
 
 ```json
 [
   {
-    "id": "session_close_key",
-    "prompt": "🔐 Confirmação de encerramento de sessão\n\nEsta SESSION é um recurso premium — foi iniciada hoje e não pode ser reaberta facilmente. Para encerrar legitimamente, digite a chave exibida no session-briefing.md:\n\n  [INSERIR CLOSE_KEY AQUI — ex: ENCERRAR-7A3F2B1C]\n\nDigite a chave no campo abaixo (texto livre) ou escolha uma opção:",
+    "header": "🔐 Encerrar SESSION",
+    "question": "Close key desta sessão: [CLOSE_KEY]. Digite-a no campo livre para confirmar encerramento. Sem a key o encerramento NÃO é registrado.",
     "allowFreeformInput": true,
     "options": [
-      "Cancelar — quero continuar trabalhando",
-      "Salvar estado e encerrar (sem digitar a chave — encerramento NÃO será validado)"
+      { "label": "Cancelar — quero continuar trabalhando", "recommended": true },
+      { "label": "Encerrar sem key (encerramento NÃO será validado)" }
     ]
   }
 ]
 ```
 
 **Após receber a KEY do usuário**, o agente DEVE executar imediatamente:
+
 ```bash
 bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
 ```
+
 Substituindo `ENCERRAR-XXXXXXXX` pela KEY digitada pelo usuário. O script valida, loga
 `sessionCloseAuthorized` e chama `session-end.sh` internamente.
 
@@ -492,35 +572,35 @@ Substituindo `ENCERRAR-XXXXXXXX` pela KEY digitada pelo usuário. O script valid
 > **TURN/SECTION não requerem Template G** — apenas operações git (commit e push).
 >
 > **⚠️ OBRIGATÓRIO: o agente DEVE substituir todos os `[PLACEHOLDER]` com dados reais antes de
-> invocar a ferramenta.** Placeholders crus na tela do usuário são considerados violação de protocolo.
-> Use `git status --short | wc -l` para N_MODIFICADOS, `git diff --stat HEAD` para resumo, etc.
+> invocar a ferramenta.** Placeholders crus na tela do usuário são considerados violação de
+> protocolo. Use `git status --short | wc -l` para N_MOD, `git diff --stat HEAD` para resumo, etc. A
+> question deve ter ≤200 chars — use `[RESUMO_CURTO]` com ≤30 chars.
 
 ```json
 [
   {
-    "id": "commit_review",
-    "prompt": "🔀 Pré-autorização de commit e/ou push\n\nArquivos modificados: [N_MODIFICADOS] | Novos: [N_NOVOS] | Deletados: [N_DELETADOS]\nQuality gates: lint=[STATUS] | typecheck=[STATUS] | testes=[STATUS]\n\nResumo das mudanças: [RESUMO_BREVE]\n\nComo devo prosseguir?",
-    "type": "selectOne",
+    "header": "Pré-autorização commit/push",
+    "question": "Modificados: [N_MOD] | Novos: [N_NEW] | Del: [N_DEL] | lint=[L] typecheck=[T] testes=[T2]. [RESUMO_CURTO]. Prosseguir?",
     "allowFreeformInput": true,
     "options": [
-      "✅ Commitar + push agora (git add -A && git commit && git push)",
-      "✅ Apenas push (código já commitado localmente, só precisa de push)",
-      "🔍 Revisão de subagente → corrigir issues → commit + push",
-      "🔍 Revisão de subagente → corrigir issues → continuar melhorando (commit depois)",
-      "🚀 Prosseguir com mais melhorias e upgrades antes de commitar"
+      { "label": "✅ Commitar + push agora (git add -A && commit && push)" },
+      { "label": "✅ Apenas push (já commitado localmente)" },
+      { "label": "🔍 Revisão de subagente → corrigir → commit + push" },
+      { "label": "🔍 Revisão de subagente → corrigir → continuar (commit depois)" },
+      { "label": "🚀 Mais melhorias antes de commitar" }
     ]
   },
   {
-    "id": "commit_message_hint",
-    "prompt": "Se for commitar: qual o escopo principal das mudanças? (campo livre para instrução adicional ao agente)",
+    "header": "Escopo do commit",
+    "question": "Qual escopo principal para a mensagem do commit? (campo livre para instrução adicional)",
     "allowFreeformInput": true,
     "options": [
-      "feat: nova funcionalidade",
-      "fix: correção de bug",
-      "refactor: refatoração sem mudança de comportamento",
-      "docs: atualização de documentação",
-      "chore: manutenção, scripts, configuração",
-      "Deixar o agente decidir com base nas mudanças"
+      { "label": "feat: nova funcionalidade" },
+      { "label": "fix: correção de bug" },
+      { "label": "refactor: sem mudança de comportamento" },
+      { "label": "docs: atualização de documentação" },
+      { "label": "chore: manutenção, scripts, configuração" },
+      { "label": "Deixar o agente decidir com base nas mudanças" }
     ]
   }
 ]
@@ -712,8 +792,9 @@ inclui automaticamente as informações de continuidade no `session-briefing.md`
 6. **ENCERRAMENTO DE SESSION**: protocolo obrigatório de 3 passos:
    1. Invocar **Template F** (`vscode_askQuestions`) — exibe a chave `ENCERRAR-XXXXXXXX` ao usuário
    2. Usuário digita a chave
-   3. Agente chama **obrigatoriamente**: `bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"`
-   Sem o script → `SESSION_CLOSE_NO_KEY.flag` → alerta de encerramento não autorizado no próximo briefing.
+   3. Agente chama **obrigatoriamente**:
+      `bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"` Sem o script →
+      `SESSION_CLOSE_NO_KEY.flag` → alerta de encerramento não autorizado no próximo briefing.
 
 ---
 
@@ -751,8 +832,8 @@ inclui automaticamente as informações de continuidade no `session-briefing.md`
 
 #### SECTION — Gerenciamento de Seções Temáticas
 
-A seção `"início"` é criada **automaticamente** pelo `session-start.sh`. O agente deve abrir
-novas seções ao mudar de fase lógica de trabalho:
+A seção `"início"` é criada **automaticamente** pelo `session-start.sh`. O agente deve abrir novas
+seções ao mudar de fase lógica de trabalho:
 
 ```bash
 # Abre nova seção (fecha a anterior automaticamente, se houver)
@@ -764,24 +845,27 @@ bash .github/hooks/scripts/section-end.sh "tarefa concluída"
 ```
 
 **Quando usar `start-section.sh`**:
+
 - Ao mudar de fase lógica (ex: análise → implementação → revisão)
 - Ao iniciar um novo grupo temático de tarefas
 - Quando a seção atual ficou grande (> 5 turnos) e o contexto mudou substancialmente
 
 **Comportamento garantido**:
+
 - Se há seção ativa, `start-section.sh` a fecha com `sectionEnd` antes de abrir a nova
 - `session-end.sh` fecha automaticamente a última seção aberta (reason: `session_ended`)
 - `session_stats.section_count` e `section_names[]` rastreiam todas as seções da sessão
 
 #### TURN — Enriquecimento de Turnos
 
-> **IMPORTANTE**: `userPromptSubmitted` dispara SOMENTE quando o usuário digita na caixa de chat do VS Code.
-> Respostas ao `vscode_askQuestions` são **tool results** (processadas por `post-tool-use.sh`), NÃO novos prompts.
-> Em sessões onde o usuário interage principalmente via `vscode_askQuestions`, o hook `userPromptSubmitted`
-> dispara muito raramente (1x por SESSION ou menos). Use `preToolUse` para reminders confiáveis.
+> **IMPORTANTE**: `userPromptSubmitted` dispara SOMENTE quando o usuário digita na caixa de chat do
+> VS Code. Respostas ao `vscode_askQuestions` são **tool results** (processadas por
+> `post-tool-use.sh`), NÃO novos prompts. Em sessões onde o usuário interage principalmente via
+> `vscode_askQuestions`, o hook `userPromptSubmitted` dispara muito raramente (1x por SESSION ou
+> menos). Use `preToolUse` para reminders confiáveis.
 
-O início de cada turno é detectado **automaticamente** pelo hook `userPromptSubmitted`.
-O agente pode (e deve) enriquecer o turno chamando `start-turn.sh` como **primeiro ato**:
+O início de cada turno é detectado **automaticamente** pelo hook `userPromptSubmitted`. O agente
+pode (e deve) enriquecer o turno chamando `start-turn.sh` como **primeiro ato**:
 
 ```bash
 # Declaração de intenção do turno (opcional mas recomendada)
@@ -789,8 +873,8 @@ bash .github/hooks/scripts/start-turn.sh "Implementar Fase A + rodar smoke-test"
 bash .github/hooks/scripts/start-turn.sh
 ```
 
-**Quando usar `start-turn.sh`**: idealmente como primeiro ato de todo turno de trabalho real.
-Pode ser omitido em turnos puramente conversacionais (ex: responder uma pergunta simples).
+**Quando usar `start-turn.sh`**: idealmente como primeiro ato de todo turno de trabalho real. Pode
+ser omitido em turnos puramente conversacionais (ex: responder uma pergunta simples).
 
 ---
 

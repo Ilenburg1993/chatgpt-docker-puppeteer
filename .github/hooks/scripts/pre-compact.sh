@@ -12,7 +12,14 @@ STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
 
 mkdir -p "$LOG_DIR"
-
+# Carrega biblioteca de funções compartilhadas (heal_v1, increment_mismatch, etc.)
+if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
+    # shellcheck source=../.github/hooks/hooks-lib/common.sh
+    source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null \
+        || echo "[warn] common.sh falhou ao carregar em pre-compact.sh" >&2
+else
+    echo "[warn] common.sh não encontrado (pre-compact.sh) — heal_v1/increment_mismatch indisponíveis" >&2
+fi
 INPUT="$(cat 2> /dev/null || true)"
 
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
@@ -27,6 +34,15 @@ fi
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then
+        # HEAL v1: se source é manual_recovery ou inline_restart, sincroniza sem bloquear
+        CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        if [ "$CTX_SOURCE" = "manual_recovery" ] || [ "$CTX_SOURCE" = "inline_restart" ]; then
+            if command -v heal_v1 > /dev/null 2>&1; then
+                if heal_v1 "$SESSION_ID" "$TIMESTAMP"; then
+                    echo "[heal] HEAL v1 aplicado em pre-compact.sh" >&2
+                fi
+            fi
+        fi
         jq -cn \
             --arg event "session_id_mismatch" \
             --arg expected "$CTX_ACTIVE_SID" \
@@ -39,6 +55,10 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                 source:   $source,
                 message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
             }' >> "$LOG_DIR/audit.jsonl"
+        # GAP-03: incrementa contador de mismatches
+        if command -v increment_mismatch > /dev/null 2>&1; then
+            increment_mismatch
+        fi
         exit 0
     fi
 fi
@@ -62,14 +82,9 @@ jq -cn \
     }' >> "$LOG_DIR/audit.jsonl"
 
 # Incrementa contador de compactações no session-context.json
-if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
-    TMP_CTX="$(mktemp)"
-    if jq '.session_stats.compaction_count = ((.session_stats.compaction_count // 0) + 1)' \
-        "$CTX_FILE" > "$TMP_CTX" 2> /dev/null; then
-        mv "$TMP_CTX" "$CTX_FILE"
-    else
-        rm -f "$TMP_CTX"
-    fi
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && command -v sponge > /dev/null 2>&1; then
+    jq '.session_stats.compaction_count = ((.session_stats.compaction_count // 0) + 1)' \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
 echo "[compact] Compactação de contexto iminente — checkpoint criado" >&2

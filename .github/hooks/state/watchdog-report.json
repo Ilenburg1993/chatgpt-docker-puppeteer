@@ -1,1 +1,24 @@
-{"generated_at":"2026-03-11T01:39:45Z","status":"warning","summary":{"critical":0,"warnings":3},"session":{"id":"dcf579af-502e-4bf2-9d92-75903f85b0a2","active":true,"turn_count":13,"consec_unauth":6,"compaction_count":0,"section_name":"limpeza-alertas-remanescentes-watchdog","section_id":"sect_1773191299_51629"},"alerts":[{"level":"warn","code":"TURN_IDLE","message":"Último TURN há 2h sem atividade (limiar: 2h)."},{"level":"warn","code":"CONSEC_UNAUTH","message":"6 TURN(s) não-autorizado(s) consecutivos detectados na sessão atual."},{"level":"warn","code":"AUTH_FLAG_EXISTS","message":"UNAUTHORIZED_CLOSE.flag presente — houve encerramento não-autorizado anterior."}],"fixes":[],"infos":["audit.jsonl: 4379 linhas, 2041135 bytes","Reconexões VS Code: 0 (ok, limiar aviso: 5)"]}
+{
+  "generated_at": "2026-03-11T14:14:11Z",
+  "status": "warning",
+  "summary": { "critical": 0, "warnings": 2 },
+  "session": {
+    "id": "66abca9d-8655-4060-84b7-a1a3079c476d",
+    "active": true,
+    "turn_count": 0,
+    "consec_unauth": 0,
+    "compaction_count": 0,
+    "section_name": "pos-close-bugs",
+    "section_id": "sect_1773237683_6917"
+  },
+  "alerts": [
+    { "level": "warn", "code": "TURN_IDLE", "message": "Último TURN há 12h sem atividade (limiar: 2h)." },
+    {
+      "level": "warn",
+      "code": "STALE_ID_MISMATCHES",
+      "message": "46 eventos session_id_mismatch antigos detectados (pre-fix). Monitorar se regridem."
+    }
+  ],
+  "fixes": [],
+  "infos": ["audit.jsonl: 4634 linhas, 2141654 bytes", "Reconexões VS Code: 1 (ok, limiar aviso: 5)"]
+}
