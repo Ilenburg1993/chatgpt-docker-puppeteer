@@ -132,9 +132,14 @@ if [ -n "$CLOSE_SECTION_NAME" ]; then
     CLOSE_CURRENT_TURN=$((CLOSE_TURN_COUNT + 1))
 
     # Calcula duration_s da section via date -d (evita injeção de shell em subprocess Python)
+    # BUG-60 FIX: date -d é GNU-only; fallback para BSD (macOS)
     CLOSE_DURATION_S=0
     if [ -n "$CLOSE_SECTION_STARTED" ]; then
-        _ep_start="$(date -d "$CLOSE_SECTION_STARTED" '+%s' 2> /dev/null || echo 0)"
+        if date -d "$CLOSE_SECTION_STARTED" '+%s' >/dev/null 2>&1; then
+            _ep_start="$(date -d "$CLOSE_SECTION_STARTED" '+%s' 2> /dev/null || echo 0)"
+        else
+            _ep_start="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$CLOSE_SECTION_STARTED" '+%s' 2> /dev/null || echo 0)"
+        fi
         _ep_now="$(date -u '+%s' 2> /dev/null || echo 0)"
         if [ "$_ep_now" -gt "$_ep_start" ] 2> /dev/null; then
             CLOSE_DURATION_S=$((_ep_now - _ep_start))
@@ -181,10 +186,15 @@ if [ -n "$CLOSE_SECTION_NAME" ]; then
 fi
 
 # Calcula duração total da sessão (ISO → epoch → diff)
+# BUG-60 FIX: date -d é GNU-only; fallback para BSD (macOS)
 DURATION_S=0
 START_EPOCH=0 # inicializado aqui para evitar unbound variable se START_ISO vazio
 if [ -n "$START_ISO" ]; then
-    START_EPOCH="$(date -d "$START_ISO" '+%s' 2> /dev/null || echo 0)"
+    if date -d "$START_ISO" '+%s' >/dev/null 2>&1; then
+        START_EPOCH="$(date -d "$START_ISO" '+%s' 2> /dev/null || echo 0)"
+    else
+        START_EPOCH="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$START_ISO" '+%s' 2> /dev/null || echo 0)"
+    fi
     NOW_EPOCH="$(date -u '+%s' 2> /dev/null || echo 0)"
     if [ "$NOW_EPOCH" -gt "$START_EPOCH" ] 2> /dev/null; then
         DURATION_S=$((NOW_EPOCH - START_EPOCH))

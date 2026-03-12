@@ -189,8 +189,17 @@ TURN_STARTED_AT=""
 if [ -f "$CTX_FILE" ]; then
     TURN_STARTED_AT="$(jq -r '.current_turn.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$TURN_STARTED_AT" ] && [ -n "$NOW_ISO" ]; then
-        TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
-        NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
+        # BUG-59 FIX: date -d é GNU-only; fallback para BSD (macOS)
+        if date -d "$TURN_STARTED_AT" '+%s' >/dev/null 2>&1; then
+            TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
+        else
+            TURN_START_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$TURN_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
+        fi
+        if date -d "$NOW_ISO" '+%s' >/dev/null 2>&1; then
+            NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
+        else
+            NOW_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
+        fi
         if [ "$NOW_S" -gt "$TURN_START_S" ] 2> /dev/null; then
             TURN_DURATION_S=$((NOW_S - TURN_START_S))
         fi

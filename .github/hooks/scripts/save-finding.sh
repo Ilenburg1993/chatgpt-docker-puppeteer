@@ -55,8 +55,9 @@ while [ $# -gt 0 ]; do
 done
 NOW_MS="$(date -u +%s000 2> /dev/null || echo 0)"
 DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo 'unknown')"
-# ID único: timestamp_ms + RANDOM (bash built-in) garante unicidade mesmo no mesmo segundo
-FINDING_ID="f_$(date +%s%3N 2> /dev/null || echo 0)_${RANDOM}"
+# BUG-64 FIX: date +%s%3N não é suportado em BSD
+# ID único: timestamp_s + RANDOM + PID (bash built-in + processo) garante unicidade
+FINDING_ID="f_$(date +%s 2> /dev/null || echo 0)_${RANDOM}_$$"
 
 # Valida severity
 case "$SEVERITY" in

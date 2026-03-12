@@ -107,7 +107,7 @@ fi
 # O usuário DEVE digitar esta chave ao encerrar a sessão (vscode_askQuestions).
 # Detectada por post-tool-use.sh; validada por session-end.sh.
 # BUG-35 fix: fallback usa PID+nanosegundos para unicidade (evita colisão same-second)
-CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | tr '[:lower:]' '[:upper:]' || printf '%s%s' "$(date +%s%N 2>/dev/null || date +%s)" "$$" | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
+CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | tr '[:lower:]' '[:upper:]' || printf '%s%s' "$(date +%s%N 2> /dev/null || date +%s)" "$$" | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
 
 # Gera IDs UUID para a secão e turno iniciais
 INITIAL_SECTION_ID="$(uuidgen 2> /dev/null || printf 'sect_%s_%s' "$(date +%s)" "$$")"
@@ -171,7 +171,13 @@ if [ "$SOURCE" = "inline_restart" ] \
          | .session.close_key_validated = false
          | .session.source              = $source
          | .session.cwd                 = $cwd
-         | .last_tool.ts                = $ts' \
+         | .last_tool.ts                = $ts
+         | .session_stats.pending_section_after_push = false
+         | .session_stats.push_count    = 0
+         | .session_stats.last_push_at  = null
+         | .session_stats.last_push_turn = null
+         | .session_stats.session_id_mismatches = 0
+         | .session_stats.session_id_syncs_inline = 0' \
         "$STATE_DIR/session-context.json" > "$_CTX_TMP" 2> /dev/null; then
         # UPG-AUDIT-01: escreve no per-session file e recria symlink
         _PER_CTX_REAL="${STATE_DIR}/session-context-${SID_SHORT}.json"
@@ -480,7 +486,7 @@ while IFS= read -r -d '' _tf; do _TREND_SID_FILES+=("$_tf"); done \
     < <(find "$LOG_DIR" -maxdepth 1 -name 'audit-????????.jsonl' -print0 2> /dev/null | sort -z)
 if [ ${#_TREND_SID_FILES[@]} -gt 0 ] && _TREND_MERGED="$(mktemp 2> /dev/null)"; then
     # BUG-25 fix: encadeia trap EXIT em vez de sobrescrever trap anterior
-    _PREV_EXIT_TRAP="$(trap -p EXIT 2>/dev/null | sed "s/^trap -- '//;s/' EXIT$//")"
+    _PREV_EXIT_TRAP="$(trap -p EXIT 2> /dev/null | sed "s/^trap -- '//;s/' EXIT$//")"
     if [ -n "$_PREV_EXIT_TRAP" ]; then
         # shellcheck disable=SC2064
         trap "${_PREV_EXIT_TRAP}; rm -f \"${_TREND_MERGED:-}\"" EXIT

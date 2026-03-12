@@ -6,7 +6,7 @@
         "type": "command",
         "bash": "./scripts/session-start.sh",
         "cwd": ".github/hooks",
-        "timeoutSec": 15
+        "timeoutSec": 60
       }
     ],
     "userPromptSubmitted": [
@@ -14,7 +14,7 @@
         "type": "command",
         "bash": "./scripts/log-prompt.sh",
         "cwd": ".github/hooks",
-        "timeoutSec": 10
+        "timeoutSec": 30
       }
     ],
     "preToolUse": [
@@ -22,7 +22,7 @@
         "type": "command",
         "bash": "./scripts/pre-tool-use.sh",
         "cwd": ".github/hooks",
-        "timeoutSec": 15,
+        "timeoutSec": 30,
         "env": {
           "HOOKS_LOG_LEVEL": "INFO"
         }
@@ -33,7 +33,7 @@
         "type": "command",
         "bash": "./scripts/post-tool-use.sh",
         "cwd": ".github/hooks",
-        "timeoutSec": 15
+        "timeoutSec": 30
       }
     ],
     "agentStop": [
@@ -41,7 +41,7 @@
         "type": "command",
         "bash": "./scripts/agent-stop.sh",
         "cwd": ".github/hooks",
-        "timeoutSec": 10
+        "timeoutSec": 45
       }
     ],
     "subagentStop": [
@@ -49,7 +49,7 @@
         "type": "command",
         "bash": "./scripts/subagent-stop.sh",
         "cwd": ".github/hooks",
-        "timeoutSec": 10
+        "timeoutSec": 30
       }
     ],
     "subagentStart": [
@@ -57,15 +57,7 @@
         "type": "command",
         "bash": "./scripts/subagent-start.sh",
         "cwd": ".github/hooks",
-        "timeoutSec": 10
-      }
-    ],
-    "postToolUseFailure": [
-      {
-        "type": "command",
-        "bash": "./scripts/tool-use-failure.sh",
-        "cwd": ".github/hooks",
-        "timeoutSec": 10
+        "timeoutSec": 30
       }
     ],
     "preCompact": [
@@ -73,7 +65,7 @@
         "type": "command",
         "bash": "./scripts/pre-compact.sh",
         "cwd": ".github/hooks",
-        "timeoutSec": 10
+        "timeoutSec": 30
       }
     ],
     "sessionEnd": [

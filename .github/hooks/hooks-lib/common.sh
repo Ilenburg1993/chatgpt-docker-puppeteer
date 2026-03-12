@@ -88,7 +88,8 @@ ctx_read() {
 with_lock() {
     local lockfile="$1"
     shift
-    local _timeout="${HOOKS_FLOCK_TIMEOUT:-3}"
+    # BUG-67 FIX: Padronizar timeout para HOOKS_FLOCK_TIMEOUT (padrão 5s, consistente com config.sh)
+    local _timeout="${HOOKS_FLOCK_TIMEOUT:-5}"
     if command -v flock > /dev/null 2>&1; then
         # shellcheck disable=SC2094
         (
@@ -135,6 +136,30 @@ ctx_update() {
         fi
     fi
     return 0
+}
+
+# ── iso_to_epoch_portable ────────────────────────────────────────────────────
+# BUG-71 FIX: Converte timestamp ISO8601 para epoch segundos, com fallback BSD
+# Suporta GNU date -d e BSD date -j, garantindo portabilidade (Linux/macOS/BSD)
+#
+# Parâmetros: $1 = ISO timestamp (ex: "2026-03-11T14:30:45Z")
+# Retorno: epoch segundos (inteiro) ou 0 em caso de erro
+#
+# Uso: EPOCH="$(iso_to_epoch_portable "$ISO_TIMESTAMP")"
+iso_to_epoch_portable() {
+    local iso_ts="$1"
+    [ -z "$iso_ts" ] && echo 0 && return 0
+    
+    # Tenta GNU date -d primeiro (mais comum)
+    if date -d "$iso_ts" '+%s' >/dev/null 2>&1; then
+        date -d "$iso_ts" '+%s' 2> /dev/null || echo 0
+    # Fallback para BSD date -j (macOS, FreeBSD)
+    elif date -j -f '%Y-%m-%dT%H:%M:%SZ' "$iso_ts" '+%s' >/dev/null 2>&1; then
+        date -j -f '%Y-%m-%dT%H:%M:%SZ' "$iso_ts" '+%s' 2> /dev/null || echo 0
+    # Last resort: extrai segundos do timestamp e usa como epoch (degraded)
+    else
+        echo 0
+    fi
 }
 
 # ── log_event ────────────────────────────────────────────────────────────────

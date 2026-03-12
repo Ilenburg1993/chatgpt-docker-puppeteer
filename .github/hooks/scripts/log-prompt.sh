@@ -213,8 +213,8 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
         else
             _NEW_SID="sess_$(date +%s%N 2> /dev/null | sha256sum | head -c 32 || date +%s | head -c 32)"
         fi
-        # Gera novo close_key
-        _NEW_KEY="ENCERRAR-$(head -c 4 /dev/urandom 2> /dev/null | xxd -p -u 2> /dev/null | head -c 8 \
+        # Gera novo close_key (portável — sem xxd, usa sha256sum)
+        _NEW_KEY="ENCERRAR-$(date +%s%N 2> /dev/null | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]' \
             || date +%s | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
         # Atualiza contexto: nova sessão inline
         if command -v sponge &> /dev/null; then
@@ -311,6 +311,27 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
             }' >> "$AUDIT_FILE"
         SESSION_ID="$_NEW_SID"
         echo "[log-prompt] Sessão anterior encerrada (${_PREV_ENDED_AT}). Nova sessão inline: ${_NEW_SID} | close_key: ${_NEW_KEY}" >&2
+        
+        # BUG-74 FIX: Atualizar session-briefing.md com a nova close_key
+        # (RECONNECT-02 gera nova chave, briefing precisa refletir isso)
+        if [ -f "$STATE_DIR/session-briefing.md" ]; then
+            if command -v sd &> /dev/null; then
+                # Usa sd (mais seguro para replacement em arquivos)
+                sd -f m "(?s)### 🔐 CHAVE DE ENCERRAMENTO DA SESSÃO.*?(?=##|$)" \
+                    "### 🔐 CHAVE DE ENCERRAMENTO DA SESSÃO\n\n\`\`\`\n${_NEW_KEY}\n\`\`\`\n\n" \
+                    "$STATE_DIR/session-briefing.md" 2> /dev/null || true
+            else
+                # Fallback: sed portável
+                sed -i.bak '/^### 🔐 CHAVE/,/^###/ {
+                    /^### 🔐 CHAVE/a\
+\
+```\
+'"${_NEW_KEY}"'\
+```\
+                    /^### 🔐 CHAVE/,/^$/d
+                }' "$STATE_DIR/session-briefing.md" 2> /dev/null && rm -f "$STATE_DIR/session-briefing.md.bak" || true
+            fi
+        fi
     fi
 fi
 

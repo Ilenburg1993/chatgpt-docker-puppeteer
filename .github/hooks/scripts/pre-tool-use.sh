@@ -145,6 +145,20 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
     if [ -f "$BRIEFING_FILE_RECOVERY" ]; then
         _RECOVERY_CLOSE_KEY="$(grep -oP 'ENCERRAR-[A-F0-9]{8}' "$BRIEFING_FILE_RECOVERY" 2> /dev/null | head -1 || echo '')"
     fi
+    
+    # BUG-75 FIX: Validar que close_key do briefing não é stale
+    # Se uma cópia do CTX antigo ainda existe em um backup, comparar as chaves
+    if [ -n "$_RECOVERY_CLOSE_KEY" ]; then
+        _CTX_BACKUP_FILE="$STATE_DIR/session-context.json.bak"
+        if [ -f "$_CTX_BACKUP_FILE" ] && [ -s "$_CTX_BACKUP_FILE" ]; then
+            _BACKUP_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$_CTX_BACKUP_FILE" 2> /dev/null || echo '')"
+            if [ -n "$_BACKUP_CLOSE_KEY" ] && [ "$_RECOVERY_CLOSE_KEY" != "$_BACKUP_CLOSE_KEY" ]; then
+                echo "[pre-tool-use] AVISO BUG-75: close_key na briefing (${_RECOVERY_CLOSE_KEY}) != backup CTX (${_BACKUP_CLOSE_KEY}) — pode ser stale" >&2
+                # Usar chave do CTX backup como fonte da verdade (mais recente)
+                _RECOVERY_CLOSE_KEY="$_BACKUP_CLOSE_KEY"
+            fi
+        fi
+    fi
 
     # v8.1: herda close_key_validated do flag SESSION_CLOSE_AUTHORIZED se existir.
     # Evita perda do estado de autorização quando VS Code reinicia com mesmo session_id.

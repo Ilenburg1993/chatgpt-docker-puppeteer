@@ -59,9 +59,14 @@ if [ -z "$SECTION_NAME" ] || [ "$SECTION_NAME" = "null" ]; then
 fi
 
 # Calcula duração da seção em segundos
+# BUG-61 FIX: date -d é GNU-only; fallback para BSD (macOS)
 DURATION_S=0
 if [ -n "$SECTION_STARTED_AT" ] && [ "$SECTION_STARTED_AT" != "null" ]; then
-    SECTION_EPOCH="$(date -d "$SECTION_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
+    if date -d "$SECTION_STARTED_AT" '+%s' >/dev/null 2>&1; then
+        SECTION_EPOCH="$(date -d "$SECTION_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
+    else
+        SECTION_EPOCH="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$SECTION_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
+    fi
     NOW_EPOCH="$(date -u '+%s' 2> /dev/null || echo 0)"
     if [ "$NOW_EPOCH" -gt "$SECTION_EPOCH" ]; then
         DURATION_S=$((NOW_EPOCH - SECTION_EPOCH))
