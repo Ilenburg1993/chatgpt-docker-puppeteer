@@ -238,7 +238,15 @@ if [ -f "$AUDIT_FILE" ]; then
     if [ "$AUDIT_LINES" -gt "$AUDIT_MAX_LINES" ]; then
         AUDIT_ARCHIVE="$LOG_DIR/audit-archive-$(date -u '+%Y%m%d%H%M%S').jsonl"
         head -n $((AUDIT_LINES - AUDIT_MAX_LINES)) "$AUDIT_FILE" > "$AUDIT_ARCHIVE" 2> /dev/null || true
-        tail -n "$AUDIT_MAX_LINES" "$AUDIT_FILE" | sponge "$AUDIT_FILE" 2> /dev/null || true
+        # BUG-27 fix: cria backup antes do sponge para permitir restauração em caso de falha
+        _AUDIT_BAK="${AUDIT_FILE}.bak"
+        cp "$AUDIT_FILE" "$_AUDIT_BAK" 2> /dev/null || true
+        if ! tail -n "$AUDIT_MAX_LINES" "$AUDIT_FILE" | sponge "$AUDIT_FILE" 2> /dev/null; then
+            # Restaura backup se sponge falhou (evita perda total do audit.jsonl)
+            mv "$_AUDIT_BAK" "$AUDIT_FILE" 2> /dev/null || true
+        else
+            rm -f "$_AUDIT_BAK" 2> /dev/null || true
+        fi
     fi
 fi
 

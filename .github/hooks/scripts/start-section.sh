@@ -32,9 +32,18 @@ if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "
     AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
 fi
 
-mkdir -p "$LOG_DIR" "$STATE_DIR"
+# BUG-45 fix: função portável de conversão ISO→epoch (GNU date -d + BSD date -j fallback)
+_iso_to_epoch_ss() {
+    local iso="$1"
+    if [ -z "$iso" ] || [ "$iso" = "null" ]; then echo 0; return; fi
+    local normalized
+    normalized="$(echo "$iso" | sed 's/\.[0-9]*Z$/Z/' | sed 's/Z$//')"
+    date -u -d "${normalized}Z" '+%s' 2>/dev/null \
+        || date -u -j -f '%Y-%m-%dT%H:%M:%S' "$normalized" '+%s' 2>/dev/null \
+        || echo 0
+}
 
-SECTION_NAME="${1:-}"
+
 SECTION_DESC="${2:-}"
 
 if [ -z "$SECTION_NAME" ]; then
@@ -77,8 +86,8 @@ if [ -n "$PREV_SECTION_NAME" ]; then
     # Calcula duration_s da seção anterior (bash puro — sem dependência de python3)
     PREV_DURATION_S=0
     if [ -n "$PREV_SECTION_STARTED" ]; then
-        START_S="$(date -d "$PREV_SECTION_STARTED" '+%s' 2> /dev/null || echo 0)"
-        NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
+        START_S="$(_iso_to_epoch_ss "$PREV_SECTION_STARTED")"
+        NOW_S="$(_iso_to_epoch_ss "$NOW_ISO")"
         if [ "$NOW_S" -gt "$START_S" ] 2> /dev/null; then
             PREV_DURATION_S=$((NOW_S - START_S))
         fi

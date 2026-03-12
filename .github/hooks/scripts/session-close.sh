@@ -36,6 +36,11 @@ if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "
     _SID_SHORT="${_CURR_SID:0:8}"
     CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json"
     AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+    # BUG-29 fix: verifica se CTX_FILE per-session realmente existe antes de usar
+    if [ ! -f "$CTX_FILE" ]; then
+        echo "[session-close] CTX per-session não encontrado: $CTX_FILE — usando fallback" >&2
+        CTX_FILE="$STATE_DIR/session-context.json"
+    fi
 fi
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"

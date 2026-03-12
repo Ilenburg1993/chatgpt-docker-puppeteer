@@ -68,9 +68,9 @@ fi
 
 log "Iniciando rotação: ${CURRENT_LINES} linhas → threshold ${AUDIT_ROTATE_THRESHOLD}."
 
-# Gera nome do arquivo de arquivo com timestamp
+# BUG-48 fix: prefixo 'rotate-' differencia archives de rotação dos arquivos per-session
 ARCHIVE_DATE="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || date +%s)"
-ARCHIVE_FILE="$LOG_DIR/audit-${ARCHIVE_DATE}.jsonl"
+ARCHIVE_FILE="$LOG_DIR/audit-rotate-${ARCHIVE_DATE}.jsonl"
 
 # Atômica: copia para arquivo e recria com últimas N linhas
 # Usa sponge se disponível, senão mv + tail
@@ -90,9 +90,15 @@ log "Rotação concluída. Arquivo: $ARCHIVE_FILE (${CURRENT_LINES} linhas). Ati
 SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 NOW="$(iso_now)"
 
-# Registra evento auditRotated no arquivo ativo
-printf '{"event":"auditRotated","session_id":"%s","timestamp":"%s","archive_file":"%s","archived_lines":%d,"kept_lines":%d}\n' \
-    "$SESSION_ID" "$NOW" "$ARCHIVE_FILE" "$CURRENT_LINES" "$NEW_LINES" \
+# BUG-48 fix: usa jq para serializar o evento (evita falha de escaping com chars especiais)
+jq -cn \
+    --arg session_id "$SESSION_ID" \
+    --arg timestamp "$NOW" \
+    --arg archive_file "$ARCHIVE_FILE" \
+    --argjson archived_lines "$CURRENT_LINES" \
+    --argjson kept_lines "$NEW_LINES" \
+    '{event: "auditRotated", session_id: $session_id, timestamp: $timestamp,
+      archive_file: $archive_file, archived_lines: $archived_lines, kept_lines: $kept_lines}' \
     >> "$AUDIT_FILE"
 
 log "Evento auditRotated registrado. Rotação completa."

@@ -265,7 +265,8 @@ if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                 '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, tool: $tool, timestamp: $ts,
                   message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
                 >> "$AUDIT_FILE"
-            # SESSION_ID já tem o valor correto — continua        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
+            # SESSION_ID já tem o valor correto — continua
+        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
             # FIX BUG-06: inline_restart — CTX tem o session_id correto do VS Code (PREMISSA 1).
             # Payload está stale (compilado com contexto antigo). Adotamos CTX como verdade.
             # Não bloqueamos — apenas sincronizamos a variável local SESSION_ID ao CTX.

@@ -102,7 +102,8 @@ TOOLS_SUCCESS=0
 AVG_DURATION_MS=0
 if [ -f "$METRICS_FILE" ]; then
     TOOLS_SUCCESS="$(jq -rs '[.[] | select(.result_type == "success")] | length' "$METRICS_FILE" 2> /dev/null || echo 0)"
-    AVG_DURATION_MS="$(jq -rs 'if length > 0 then ([.[].duration_ms] | add / length | floor) else 0 end' "$METRICS_FILE" 2> /dev/null || echo 0)"
+    # BUG-44 fix: usa duration_ms // 0 para não quebrar quando campo é null
+    AVG_DURATION_MS="$(jq -rs 'if length > 0 then ([.[].duration_ms // 0] | add / length | floor) else 0 end' "$METRICS_FILE" 2> /dev/null || echo 0)"
 fi
 
 # ── Monta o snapshot ─────────────────────────────────────────────────────────

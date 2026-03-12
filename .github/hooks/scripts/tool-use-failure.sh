@@ -45,34 +45,41 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then
         # HEAL v1: se source é manual_recovery ou inline_restart, sincroniza sem bloquear
         CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-        if [ "$CTX_SOURCE" = "manual_recovery" ] || [ "$CTX_SOURCE" = "inline_restart" ]; then
+        if [ "$CTX_SOURCE" = "manual_recovery" ]; then
+            # BUG-22 fix: manual_recovery sincroniza SID e continua (não sai)
             if command -v heal_v1 > /dev/null 2>&1; then
                 if heal_v1 "$SESSION_ID" "$TIMESTAMP"; then
                     echo "[heal] HEAL v1 aplicado em tool-use-failure.sh" >&2
                 fi
             fi
+            SESSION_ID="$CTX_ACTIVE_SID"
+        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
+            # BUG-22 fix: inline_restart adota SID do contexto e continua (não sai)
+            SESSION_ID="$CTX_ACTIVE_SID"
+            echo "[guard] inline_restart: adotando SID do contexto em tool-use-failure.sh" >&2
+        else
+            # Log mismatch: inclui info da ferramenta que falhou, sem session_id de payload
+            jq -cn \
+                --arg event "session_id_mismatch_failure" \
+                --arg expected "$CTX_ACTIVE_SID" \
+                --arg got "$SESSION_ID" \
+                --arg tool "$TOOL_NAME" \
+                --arg error "$ERROR_MSG" \
+                '{
+                    event:     $event,
+                    expected:  $expected,
+                    got:       $got,
+                    tool_name: $tool,
+                    error:     $error,
+                    source:    "tool-use-failure.sh",
+                    message:   "Payload session_id diferente do contexto ativo — state write bloqueado"
+                }' >> "$AUDIT_FILE"
+            # GAP-03: incrementa contador de mismatches
+            if command -v increment_mismatch > /dev/null 2>&1; then
+                increment_mismatch
+            fi
+            exit 0
         fi
-        # Log mismatch: inclui info da ferramenta que falhou, sem session_id de payload
-        jq -cn \
-            --arg event "session_id_mismatch_failure" \
-            --arg expected "$CTX_ACTIVE_SID" \
-            --arg got "$SESSION_ID" \
-            --arg tool "$TOOL_NAME" \
-            --arg error "$ERROR_MSG" \
-            '{
-                event:     $event,
-                expected:  $expected,
-                got:       $got,
-                tool_name: $tool,
-                error:     $error,
-                source:    "tool-use-failure.sh",
-                message:   "Payload session_id diferente do contexto ativo — state write bloqueado"
-            }' >> "$AUDIT_FILE"
-        # GAP-03: incrementa contador de mismatches
-        if command -v increment_mismatch > /dev/null 2>&1; then
-            increment_mismatch
-        fi
-        exit 0
     fi
 fi
 

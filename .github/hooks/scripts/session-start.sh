@@ -106,7 +106,8 @@ fi
 # Chave dinâmica por sessão: ENCERRAR-XXXXXXXX (8 hex maiúsculos aleatórios)
 # O usuário DEVE digitar esta chave ao encerrar a sessão (vscode_askQuestions).
 # Detectada por post-tool-use.sh; validada por session-end.sh.
-CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | tr '[:lower:]' '[:upper:]' || date +%s | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
+# BUG-35 fix: fallback usa PID+nanosegundos para unicidade (evita colisão same-second)
+CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | tr '[:lower:]' '[:upper:]' || printf '%s%s' "$(date +%s%N 2>/dev/null || date +%s)" "$$" | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
 
 # Gera IDs UUID para a secão e turno iniciais
 INITIAL_SECTION_ID="$(uuidgen 2> /dev/null || printf 'sect_%s_%s' "$(date +%s)" "$$")"
@@ -347,11 +348,11 @@ if [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
     _AUDIT_TMP="${LOG_DIR}/audit-${_PREV_SID_SHORT}.jsonl"
     [ -f "$_AUDIT_TMP" ] || _AUDIT_TMP="$LOG_DIR/audit.jsonl"
     _FOUND_SESSION_END=false
-    # Padrão de grep: qualquer um dos dois eventos de encerramento limpo
-    _CLEAN_CLOSE_PATTERN='"sessionEnd"\|"sessionCloseAuthorized"'
+    # BUG-26 fix: usar -E (ERE) em vez de BRE \| (GNU-only) para portabilidade
+    _CLEAN_CLOSE_PATTERN='"sessionEnd"|"sessionCloseAuthorized"'
     # Verifica arquivo per-session da sessão anterior
-    if [ -f "$_AUDIT_TMP" ] && grep -q "$_CLEAN_CLOSE_PATTERN" "$_AUDIT_TMP" 2> /dev/null \
-        && grep "$_CLEAN_CLOSE_PATTERN" "$_AUDIT_TMP" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
+    if [ -f "$_AUDIT_TMP" ] && grep -qE "$_CLEAN_CLOSE_PATTERN" "$_AUDIT_TMP" 2> /dev/null \
+        && grep -E "$_CLEAN_CLOSE_PATTERN" "$_AUDIT_TMP" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
         _FOUND_SESSION_END=true
     fi
     # Se não encontrou, verifica outros arquivos per-session excluindo o atual (após rotação)
@@ -360,8 +361,8 @@ if [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
             ! -name "audit-${SID_SHORT}.jsonl" \
             -printf '%T@ %p\n' 2> /dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)"
         if [ -n "$_LATEST_ARCHIVE" ] && [ -f "$_LATEST_ARCHIVE" ] \
-            && grep -q "$_CLEAN_CLOSE_PATTERN" "$_LATEST_ARCHIVE" 2> /dev/null \
-            && grep "$_CLEAN_CLOSE_PATTERN" "$_LATEST_ARCHIVE" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
+            && grep -qE "$_CLEAN_CLOSE_PATTERN" "$_LATEST_ARCHIVE" 2> /dev/null \
+            && grep -E "$_CLEAN_CLOSE_PATTERN" "$_LATEST_ARCHIVE" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
             _FOUND_SESSION_END=true
         fi
     fi
@@ -478,7 +479,15 @@ _TREND_SID_FILES=()
 while IFS= read -r -d '' _tf; do _TREND_SID_FILES+=("$_tf"); done \
     < <(find "$LOG_DIR" -maxdepth 1 -name 'audit-????????.jsonl' -print0 2> /dev/null | sort -z)
 if [ ${#_TREND_SID_FILES[@]} -gt 0 ] && _TREND_MERGED="$(mktemp 2> /dev/null)"; then
-    trap 'rm -f "${_TREND_MERGED:-}"' EXIT
+    # BUG-25 fix: encadeia trap EXIT em vez de sobrescrever trap anterior
+    _PREV_EXIT_TRAP="$(trap -p EXIT 2>/dev/null | sed "s/^trap -- '//;s/' EXIT$//")"
+    if [ -n "$_PREV_EXIT_TRAP" ]; then
+        # shellcheck disable=SC2064
+        trap "${_PREV_EXIT_TRAP}; rm -f \"${_TREND_MERGED:-}\"" EXIT
+    else
+        # shellcheck disable=SC2064
+        trap 'rm -f "${_TREND_MERGED:-}"' EXIT
+    fi
     cat "${_TREND_SID_FILES[@]}" > "$_TREND_MERGED" 2> /dev/null || true
     AUDIT_FILE="$_TREND_MERGED"
 else
@@ -931,10 +940,14 @@ ${CLOSE_KEY}
 CLOSE_KEY_EOF
 
 # ── Hardening 4: Alertar sobre falhas de API do vscode_askQuestions na sessão anterior ──
-# Lê session-context.json para verificar se houve falhas de askQuestions na sessão anterior.
-# Isso detecta o padrão "FAILED: Response contained no choices" e avisa o agente.
+# BUG-33 fix: lê do CTX da sessão ANTERIOR (não do CTX da sessão nova que acabou de ser criado)
 _PREV_ASK_API_FAILURES=0
-_PREV_ASK_API_FAILURES="$(jq -r '.session_stats.askquestions_api_failures // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+if [ -n "$PREV_SESSION_ID_FROM_CTX" ]; then
+    _PREV_SID_SHORT_H4="${PREV_SESSION_ID_FROM_CTX:0:8}"
+    _PREV_CTX_H4="$STATE_DIR/session-context-${_PREV_SID_SHORT_H4}.json"
+    [ -f "$_PREV_CTX_H4" ] || _PREV_CTX_H4="$STATE_DIR/session-context.json"
+    _PREV_ASK_API_FAILURES="$(jq -r '.session_stats.askquestions_api_failures // 0' "$_PREV_CTX_H4" 2> /dev/null || echo 0)"
+fi
 if [ "${_PREV_ASK_API_FAILURES:-0}" -gt 0 ] 2> /dev/null; then
     _PREV_ASK_ERROR_AT="$(jq -r '.current_turn.askquestions_api_error_at // "desconhecido"' "$CTX_FILE" 2> /dev/null || echo 'desconhecido')"
     cat >> "$BRIEFING_FILE" << ASK_FAIL_EOF
@@ -1173,7 +1186,7 @@ fi
 if [ -f "$BRIEFING_FILE" ] && command -v jq &> /dev/null; then
     BRIEFING_CONDENSED="$(grep -v '^---$' "$BRIEFING_FILE" 2> /dev/null \
         | grep -v '^$' \
-        | head -80 \
+        | head -150 \
         | grep -v 'Gerado automaticamente' || true)"
     if [ -n "$BRIEFING_CONDENSED" ]; then
         printf '%s\n' \

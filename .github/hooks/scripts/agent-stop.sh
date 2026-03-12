@@ -72,12 +72,12 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
             NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
             if command -v sponge &> /dev/null; then
                 jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
                     "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
             else
                 _TMP_HEAL="$(mktemp)"
                 if jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
                     "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
                     mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
                 else
@@ -133,12 +133,12 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
                 if command -v sponge &> /dev/null; then
                     jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
-                        '.session.id = $real_sid | .session.source = "healed_from_consecutive_mismatch" | .session.healed_at = $ts' \
+                        '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_consecutive_mismatch" | .session.healed_at = $ts' \
                         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
                 else
                     _TMP_HEAL="$(mktemp)"
                     if jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
-                        '.session.id = $real_sid | .session.source = "healed_from_consecutive_mismatch" | .session.healed_at = $ts' \
+                        '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_consecutive_mismatch" | .session.healed_at = $ts' \
                         "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
                         mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
                     else

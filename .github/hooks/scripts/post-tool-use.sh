@@ -288,6 +288,9 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                 # Esta é a defesa-em-profundidade: Template F → KEY detectada → encerramento automático.
                 _SESSION_CLOSE_SCRIPT="$HOOK_DIR/scripts/session-close.sh"
                 if [ -f "$_SESSION_CLOSE_SCRIPT" ] && [ -x "$_SESSION_CLOSE_SCRIPT" ]; then
+                    # BUG-24 fix: libera flock fd 9 antes de chamar session-close.sh
+                    # (session-close.sh também tenta flock fd 9 no mesmo lock file — deadlock sem esta linha)
+                    exec 9>&-
                     bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" > /dev/null 2>&1 || true
                 fi
             else

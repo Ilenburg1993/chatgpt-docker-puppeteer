@@ -44,30 +44,37 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
         # HEAL v1: se source é manual_recovery ou inline_restart, sincroniza sem bloquear
         CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-        if [ "$CTX_SOURCE" = "manual_recovery" ] || [ "$CTX_SOURCE" = "inline_restart" ]; then
+        if [ "$CTX_SOURCE" = "manual_recovery" ]; then
+            # BUG-21 fix: manual_recovery sincroniza SID e continua (não sai)
             if command -v heal_v1 > /dev/null 2>&1; then
                 if heal_v1 "$SESSION_ID_PAYLOAD" "$TIMESTAMP"; then
                     echo "[heal] HEAL v1 aplicado em subagent-stop.sh" >&2
                 fi
             fi
+            SESSION_ID_PAYLOAD="$CTX_ACTIVE_SID"
+        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
+            # BUG-21 fix: inline_restart adota SID do contexto e continua (não sai)
+            SESSION_ID_PAYLOAD="$CTX_ACTIVE_SID"
+            echo "[guard] inline_restart: adotando SID do contexto em subagent-stop.sh" >&2
+        else
+            jq -cn \
+                --arg event "session_id_mismatch" \
+                --arg expected "$CTX_ACTIVE_SID" \
+                --arg got "$SESSION_ID_PAYLOAD" \
+                --arg source "subagent-stop.sh" \
+                '{
+                    event:   $event,
+                    expected: $expected,
+                    got:      $got,
+                    source:   $source,
+                    message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
+                }' >> "$AUDIT_FILE"
+            # GAP-03: incrementa contador de mismatches
+            if command -v increment_mismatch > /dev/null 2>&1; then
+                increment_mismatch
+            fi
+            exit 0
         fi
-        jq -cn \
-            --arg event "session_id_mismatch" \
-            --arg expected "$CTX_ACTIVE_SID" \
-            --arg got "$SESSION_ID_PAYLOAD" \
-            --arg source "subagent-stop.sh" \
-            '{
-                event:   $event,
-                expected: $expected,
-                got:      $got,
-                source:   $source,
-                message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-            }' >> "$AUDIT_FILE"
-        # GAP-03: incrementa contador de mismatches
-        if command -v increment_mismatch > /dev/null 2>&1; then
-            increment_mismatch
-        fi
-        exit 0
     fi
 fi
 
