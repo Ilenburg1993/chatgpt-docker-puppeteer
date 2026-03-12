@@ -986,6 +986,10 @@ transientemente null entre section-end.sh e start-section.sh (BUG-A.3) | | 2026-
 Secao 20 adicionada: hierarquia SESSION/SECTION/TURN analise tecnica completa; BUG-S01/S02/S03
 documentados e corrigidos |
 
+| 2026-03-13 | GAP-S01-FIX  | log-prompt.sh RECONNECT-02: section_count e section_names agora resetados a 0 com snapshot prev_section_count/prev_section_names |
+| 2026-03-13 | GAP-S04-FIX  | log-prompt.sh RECONNECT-02: logical_session_number incrementado; propagado aos eventos turnStart e sessionStart_inline em audit.jsonl |
+| 2026-03-13 | GUIA v2.4    | Secao 20.7 atualizada: GAP-S01 e GAP-S04 marcados como CORRIGIDOS com fundamentacao tecnica |
+
 ---
 
 ## Apêndice A — Mapa de Fluxo `session_id` (após correções)

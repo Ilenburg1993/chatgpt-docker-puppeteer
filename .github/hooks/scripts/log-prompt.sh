@@ -194,6 +194,8 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
         _PREV_SID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
         _PREV_END_REASON="$(jq -r '.session.end_reason // ""' "$CTX_FILE" 2> /dev/null || echo '')"
         _PREV_ENDED_AT="$_ENDED_AT_RC"
+        _PREV_LOGICAL_NUM="$(jq -r '.session.logical_session_number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+        _NEW_LOGICAL_NUM=$(( ${_PREV_LOGICAL_NUM:-1} + 1 ))
         # FIX BUG-01: usa session_id real do VS Code (Premissa-1: VS Code é a fonte da verdade).
         # O VS Code continuará enviando SESSION_ID_PAYLOAD em todos os hooks futuros —
         # gerar UUID aqui causaria mismatch permanente em pre-tool-use.sh e post-tool-use.sh.
@@ -215,6 +217,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
             jq --arg sid "$_NEW_SID" --arg key "$_NEW_KEY" --arg ts "$NOW_RESTART" \
                 --arg prev_sid "$_PREV_SID" --arg prev_ended "$_PREV_ENDED_AT" \
                 --arg prev_reason "$_PREV_END_REASON" \
+                --argjson new_logical_num "$_NEW_LOGICAL_NUM" \
                 '.session.id                  = $sid
                  | .session.vs_code_session_id = $sid
                  | .session.close_key         = $key
@@ -236,13 +239,19 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                  | .compliance.consecutive_unauthorized = 0
                  | .compliance.last_turn_authorized = true
                  | .current_turn = {number: 0, section_turn: 0, todo_created: false,
-                     tools_count: 0, auth_requested: false, intent: null, intent_declared: false}' \
+                     tools_count: 0, auth_requested: false, intent: null, intent_declared: false}
+                 | .session.logical_session_number             = $new_logical_num
+                 | .session_stats.prev_section_count           = (.session_stats.section_count // 0)
+                 | .session_stats.prev_section_names           = (.session_stats.section_names // [])
+                 | .session_stats.section_count               = 0
+                 | .session_stats.section_names               = []' \
                 "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
         else
             _TMP_RESTART="$(mktemp)"
             if jq --arg sid "$_NEW_SID" --arg key "$_NEW_KEY" --arg ts "$NOW_RESTART" \
                 --arg prev_sid "$_PREV_SID" --arg prev_ended "$_PREV_ENDED_AT" \
                 --arg prev_reason "$_PREV_END_REASON" \
+                --argjson new_logical_num "$_NEW_LOGICAL_NUM" \
                 '.session.id                  = $sid
                  | .session.vs_code_session_id = $sid
                  | .session.close_key         = $key
@@ -264,7 +273,12 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                  | .compliance.consecutive_unauthorized = 0
                  | .compliance.last_turn_authorized = true
                  | .current_turn = {number: 0, section_turn: 0, todo_created: false,
-                     tools_count: 0, auth_requested: false, intent: null, intent_declared: false}' \
+                     tools_count: 0, auth_requested: false, intent: null, intent_declared: false}
+                 | .session.logical_session_number             = $new_logical_num
+                 | .session_stats.prev_section_count           = (.session_stats.section_count // 0)
+                 | .session_stats.prev_section_names           = (.session_stats.section_names // [])
+                 | .session_stats.section_count               = 0
+                 | .session_stats.section_names               = []' \
                 "$CTX_FILE" > "$_TMP_RESTART" 2> /dev/null; then
                 mv "$_TMP_RESTART" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_RESTART"
             else
@@ -276,16 +290,20 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
             --arg sid "$_NEW_SID" --arg prev_sid "$_PREV_SID" --arg ts "$NOW_RESTART" \
             --arg key "$_NEW_KEY" --arg prev_ended "$_PREV_ENDED_AT" \
             --arg prev_reason "$_PREV_END_REASON" \
+            --argjson new_logical_num "$_NEW_LOGICAL_NUM" \
+            --argjson prev_logical_num "$_PREV_LOGICAL_NUM" \
             '{
-                event:           "sessionStart_inline",
-                session_id:      $sid,
-                prev_session_id: $prev_sid,
-                timestamp:       $ts,
-                close_key:       $key,
-                prev_ended_at:   $prev_ended,
-                prev_end_reason: $prev_reason,
-                source:          "log-prompt.sh",
-                message:         "Nova sessão inline após fechamento da sessão anterior"
+                event:                       "sessionStart_inline",
+                session_id:                  $sid,
+                prev_session_id:             $prev_sid,
+                timestamp:                   $ts,
+                close_key:                   $key,
+                prev_ended_at:               $prev_ended,
+                prev_end_reason:             $prev_reason,
+                logical_session_number:      $new_logical_num,
+                prev_logical_session_number: $prev_logical_num,
+                source:                      "log-prompt.sh",
+                message:                     "Nova sessão inline após fechamento da sessão anterior"
             }' >> "$LOG_DIR/audit.jsonl"
         SESSION_ID="$_NEW_SID"
         echo "[log-prompt] Sessão anterior encerrada (${_PREV_ENDED_AT}). Nova sessão inline: ${_NEW_SID} | close_key: ${_NEW_KEY}" >&2
@@ -395,6 +413,7 @@ elif [ -f "$CTX_FILE" ]; then
 fi
 
 # Loga evento turnStart (automático — complementado por start-turn.sh para intenção)
+LOGICAL_NUM="$(jq -r '.session.logical_session_number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
 jq -cn \
     --arg event "turnStart" \
     --arg sid "$SESSION_ID" \
@@ -404,15 +423,17 @@ jq -cn \
     --argjson section_turn "${SECTION_TURN:-1}" \
     --arg section_name "$SECTION_NAME" \
     --arg section_id "$SECTION_ID" \
+    --argjson logical_num "$LOGICAL_NUM" \
     '{
-        event:        $event,
-        session_id:   $sid,
-        timestamp:    $ts,
-        turn_id:      $turn_id,
-        turn_number:  $turn_number,
-        section_turn: $section_turn,
-        section_name: (if $section_name == "" then null else $section_name end),
-        section_id:   (if $section_id == "" then null else $section_id end)
+        event:                  $event,
+        session_id:             $sid,
+        timestamp:              $ts,
+        turn_id:                $turn_id,
+        turn_number:            $turn_number,
+        section_turn:           $section_turn,
+        section_name:           (if $section_name == "" then null else $section_name end),
+        section_id:             (if $section_id == "" then null else $section_id end),
+        logical_session_number: $logical_num
     }' >> "$LOG_DIR/audit.jsonl"
 
 # ── Hardening v6.0: systemMessage SESSION REMINDER em CADA TURN ──────────────
