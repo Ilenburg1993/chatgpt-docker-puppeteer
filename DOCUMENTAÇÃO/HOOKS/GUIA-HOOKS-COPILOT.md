@@ -1,6 +1,6 @@
 # Guia Completo de Hooks do GitHub Copilot (VS Code)
 
-**Versão**: 2.4 | **Data**: 2026-03-13 | **Status**: Canônico
+**Versão**: 2.5 | **Data**: 2026-03-13 | **Status**: Canônico
 
 > Este documento descreve o funcionamento dos hooks do GitHub Copilot no VS Code, distinguindo
 > rigorosamente o que é **nativo/automático** da plataforma VS Code Copilot e o que foi
@@ -553,8 +553,8 @@ agentStop  2026-03-10T10:21:07  stop_hook_active=true
 | -------------------- | --------------------------------------------- | ---------------------------------------------------- |
 | **Dispara quando**   | Fim de CADA turno do agente                   | Quando o chat panel é efetivamente fechado           |
 | **Frequência**       | 1x por turno (pode ser dezenas/dia)           | 1x por sessão (máximo)                               |
-| **Confiabilidade**   | ✅ Sempre dispara ao fim de cada turno         | ⚠️ Não dispara em crashes/reinicializações            |
-| **stop_hook_active** | ✅ Presente (para anti-loop)                   | ❌ Não presente                                       |
+| **Confiabilidade**   | ✅ Sempre dispara ao fim de cada turno        | ⚠️ Não dispara em crashes/reinicializações           |
+| **stop_hook_active** | ✅ Presente (para anti-loop)                  | ❌ Não presente                                      |
 | **Uso canônico**     | Auditoria de turno, bloqueio, nudge ao agente | Cleanup final de sessão (quando funciona)            |
 | **Nome cripto**      | Oficial: "Stop" / Nosso: "agentStop"          | Experimental / Copilot CLI (não está nos 8 oficiais) |
 
@@ -833,15 +833,15 @@ Propriedades `bash` e `powershell` são mapeadas para os equivalentes OS-especí
 
 | Propriedade | Tipo   | Obrigatório | Descrição                               |
 | ----------- | ------ | ----------- | --------------------------------------- |
-| `type`      | string | ✅           | Deve ser `"command"`                    |
-| `command`   | string | ✅\*         | Comando padrão (cross-platform)         |
-| `bash`      | string | ✅\*         | Alias Copilot CLI para `linux`+`osx`    |
-| `windows`   | string | ❌           | Comando para Windows                    |
-| `linux`     | string | ❌           | Comando para Linux                      |
-| `osx`       | string | ❌           | Comando para macOS                      |
-| `cwd`       | string | ❌           | Dir de trabalho relativo à raiz do repo |
-| `env`       | object | ❌           | Env vars adicionais                     |
-| `timeout`   | number | ❌           | Timeout em segundos (padrão: 30)        |
+| `type`      | string | ✅          | Deve ser `"command"`                    |
+| `command`   | string | ✅\*        | Comando padrão (cross-platform)         |
+| `bash`      | string | ✅\*        | Alias Copilot CLI para `linux`+`osx`    |
+| `windows`   | string | ❌          | Comando para Windows                    |
+| `linux`     | string | ❌          | Comando para Linux                      |
+| `osx`       | string | ❌          | Comando para macOS                      |
+| `cwd`       | string | ❌          | Dir de trabalho relativo à raiz do repo |
+| `env`       | object | ❌          | Env vars adicionais                     |
+| `timeout`   | number | ❌          | Timeout em segundos (padrão: 30)        |
 
 \* `command` ou `bash` (um deles obrigatório)
 
@@ -852,8 +852,8 @@ Propriedades `bash` e `powershell` são mapeadas para os equivalentes OS-especí
 O arquivo `copilot-hooks.json` deste repositório usa o **formato Copilot CLI** (lowerCamelCase).
 Tabela de correspondência com os nomes oficiais VS Code:
 
-| Nome local (copilot-hooks.json) | Nome oficial VS Code | Status        | Script local          |
-| ------------------------------- | -------------------- | ------------- | --------------------- |
+| Nome local (copilot-hooks.json) | Nome oficial VS Code | Status         | Script local          |
+| ------------------------------- | -------------------- | -------------- | --------------------- |
 | `sessionStart`                  | `SessionStart`       | ✅ Oficial     | `session-start.sh`    |
 | `userPromptSubmitted`           | `UserPromptSubmit`   | ✅ Oficial\*   | `log-prompt.sh`       |
 | `preToolUse`                    | `PreToolUse`         | ✅ Oficial     | `pre-tool-use.sh`     |
@@ -944,8 +944,8 @@ Nossos scripts:
 
 ### Distinção SESSION / SECTION / TURN:
 
-| Conceito    | Existe na plataforma?           | Como é gerenciado                                          |
-| ----------- | ------------------------------- | ---------------------------------------------------------- |
+| Conceito    | Existe na plataforma?            | Como é gerenciado                                          |
+| ----------- | -------------------------------- | ---------------------------------------------------------- |
 | **SESSION** | ✅ (sessionStart/End)            | platform-native + nosso `session-context.json` + close_key |
 | **SECTION** | ❌ (não existe)                  | 100% customizado — `start-section.sh` + state no JSON      |
 | **TURN**    | ✅ (Start=prompt, End=agentStop) | augmentado com metadados no `session-context.json`         |
@@ -1032,12 +1032,12 @@ Estes são os campos que **a plataforma insere** no JSON de stdin para cada even
 
 Uma confusão comum: **session_id do VS Code ≠ session.id do nosso session-context.json**.
 
-| Aspecto                  | `session_id` do VS Code                             | `session.id` no session-context.json                |
-| ------------------------ | --------------------------------------------------- | --------------------------------------------------- |
-| **Quem controla**        | Plataforma VS Code (imutável)                       | Nós (scripts)                                       |
-| **Quando muda**          | Apenas ao abrir nova conversa (nova sessão VS Code) | Quando criamos uma `inline_restart` session         |
-| **Pode ser modificado?** | ❌ Não — é a fonte de verdade da plataforma          | ✅ Sim — mas apenas localmente (não afeta o VS Code) |
-| **Formato**              | UUID: `66abca9d-8655-4060-84b7-a1a3079c476d`        | UUID: mesmo formato, mas pode ser diferente         |
+| Aspecto                  | `session_id` do VS Code                             | `session.id` no session-context.json                 |
+| ------------------------ | --------------------------------------------------- | ---------------------------------------------------- |
+| **Quem controla**        | Plataforma VS Code (imutável)                       | Nós (scripts)                                        |
+| **Quando muda**          | Apenas ao abrir nova conversa (nova sessão VS Code) | Quando criamos uma `inline_restart` session          |
+| **Pode ser modificado?** | ❌ Não — é a fonte de verdade da plataforma         | ✅ Sim — mas apenas localmente (não afeta o VS Code) |
+| **Formato**              | UUID: `66abca9d-8655-4060-84b7-a1a3079c476d`        | UUID: mesmo formato, mas pode ser diferente          |
 
 **O que acontece em inline_restart**: Quando `ended_at != null` é detectado em `log-prompt.sh`
 (RECONNECT-02), o `session.id` do CTX é atualizado para o `SESSION_ID_PAYLOAD` recebido do VS Code —
@@ -1266,12 +1266,12 @@ detecta e chama `session-close.sh` automaticamente.
 
 **R**: São eventos completamente diferentes em frequência, confiabilidade e propósito:
 
-| Critério       | `agentStop` (= `Stop`)                 | `sessionEnd`                              |
-| -------------- | -------------------------------------- | ----------------------------------------- |
-| Dispara quando | Fim de **cada turno** do agente        | Quando o chat panel fecha                 |
-| Frequência     | 1 a dezenas de vezes por sessão        | Máximo 1x por sessão                      |
+| Critério       | `agentStop` (= `Stop`)                  | `sessionEnd`                               |
+| -------------- | --------------------------------------- | ------------------------------------------ |
+| Dispara quando | Fim de **cada turno** do agente         | Quando o chat panel fecha                  |
+| Frequência     | 1 a dezenas de vezes por sessão         | Máximo 1x por sessão                       |
 | Confiável?     | ✅ Sim — sempre dispara ao fim de turno | ❌ Não — falha em crashes/reinicializações |
-| Uso neste repo | Bloqueio de turno, auditoria, métricas | Cleanup final (quando funciona)           |
+| Uso neste repo | Bloqueio de turno, auditoria, métricas  | Cleanup final (quando funciona)            |
 
 `agentStop` é para **audit dos turnos**. `sessionEnd` é para **cleanup de sessão** — mas por não ser
 confiável, o repositório usa `session-close.sh` como alternativa controlada.
@@ -1657,21 +1657,21 @@ sessão é compartilhada.
 
 | Campo           | Tipo   | Enviado nativamente? | Observação                                     |
 | --------------- | ------ | -------------------- | ---------------------------------------------- |
-| `session_id`    | string | ✅ Sim                | Mesmo session_id da sessão pai                 |
-| `timestamp`     | string | ✅ Sim                | ISO 8601 do evento                             |
-| `tool_use_id`   | string | ✅ Sim                | Mesmo tool_use_id do preToolUse do runSubagent |
-| `hookEventName` | string | ✅ Sim                | `"SubagentStart"`                              |
-| Outros campos   | —      | ❓ Não documentado    | Schema não publishado na doc oficial           |
+| `session_id`    | string | ✅ Sim               | Mesmo session_id da sessão pai                 |
+| `timestamp`     | string | ✅ Sim               | ISO 8601 do evento                             |
+| `tool_use_id`   | string | ✅ Sim               | Mesmo tool_use_id do preToolUse do runSubagent |
+| `hookEventName` | string | ✅ Sim               | `"SubagentStart"`                              |
+| Outros campos   | —      | ❓ Não documentado   | Schema não publishado na doc oficial           |
 
 **SubagentStop** (confirmado via audit.jsonl — todos os campos extras eram null):
 
 | Campo         | Tipo    | Enviado nativamente? | Observação                                          |
 | ------------- | ------- | -------------------- | --------------------------------------------------- |
-| `session_id`  | string  | ✅ Sim                | Mesmo session_id da sessão pai                      |
-| `timestamp`   | string  | ✅ Sim                | ISO 8601 do evento (pode ser epoch ms — ver LIM-04) |
-| `agentName`   | string? | ❓ Incerto            | `null` em todos os casos observados                 |
-| `result`      | string? | ❓ Incerto            | `null` em todos os casos observados                 |
-| `tool_use_id` | string? | ❓ Incerto            | `null` em todos os casos observados                 |
+| `session_id`  | string  | ✅ Sim               | Mesmo session_id da sessão pai                      |
+| `timestamp`   | string  | ✅ Sim               | ISO 8601 do evento (pode ser epoch ms — ver LIM-04) |
+| `agentName`   | string? | ❓ Incerto           | `null` em todos os casos observados                 |
+| `result`      | string? | ❓ Incerto           | `null` em todos os casos observados                 |
+| `tool_use_id` | string? | ❓ Incerto           | `null` em todos os casos observados                 |
 
 > A documentação oficial VS Code **não publica** o schema de SubagentStart/SubagentStop. O
 > `subagent-stop.sh` usa leitura defensiva com múltiplos fallbacks de nomes de campo.
@@ -1911,8 +1911,8 @@ Outros agentes nativos identificados na extensão:
 
 | Agente  | `disableModelInvocation` | `agents` (pode delegar) | Propósito                   |
 | ------- | ------------------------ | ----------------------- | --------------------------- |
-| Explore | ❌ (usa LLM)              | `[]`                    | Exploração rápida read-only |
-| Plan    | ✅ (NÃO usa LLM próprio)  | `["Explore"]`           | Planejamento arquitetural   |
+| Explore | ❌ (usa LLM)             | `[]`                    | Exploração rápida read-only |
+| Plan    | ✅ (NÃO usa LLM próprio) | `["Explore"]`           | Planejamento arquitetural   |
 
 > O campo `disableModelInvocation: true` do agente `Plan` é incomum — sugere que ele pode ser usado
 > como roteador/orquestrador que delega inteiramente ao `Explore`.
@@ -2025,9 +2025,10 @@ O `prompt` é **a única forma** do agente pai comunicar ao subagente. Não há:
 extensão). É o **único canal confiável de comunicação bidirecional** entre agente e usuário — toda
 autorização explícita do sistema de hooks (Templates A–G) passa por esta ferramenta.
 
-| **Categorias de ferramentas** extraídas de `extension.js` (`A7` object): | Ferramenta | Categoria |
-| ------------------------------------------------------------------------ | ---------- || `manage_todo_list` | Core | |
-`vscode_askQuestions` | VS Code Interaction | | `runSubagent` | Core | | `search_subagent` | Core |
+| **Categorias de ferramentas** extraídas de `extension.js` (`A7` object): | Ferramenta | Categoria
+| | ------------------------------------------------------------------------ | ---------- ||
+`manage_todo_list` | Core | | `vscode_askQuestions` | VS Code Interaction | | `runSubagent` | Core |
+| `search_subagent` | Core |
 
 **Contexto de uso**: Agentes da categoria `AskAgent` e `PlanAgent` incluem explicitamente
 `vscode/askQuestions` no array de ferramentas via `_buildCustomizedConfig()`. O `hook agent-stop.sh`
@@ -2062,12 +2063,12 @@ Quando o agente chama `vscode_askQuestions`, o input é o parâmetro `questions`
 
 | Campo                | Tipo   | Obrig. | Limite      | Falha se violado                              |
 | -------------------- | ------ | ------ | ----------- | --------------------------------------------- |
-| `header`             | string | ✅      | **≤50 ch**  | `FAILED: Response contained no choices`       |
-| `question`           | string | ✅      | **≤200 ch** | Falha silenciosa — resposta vazia ou truncada |
-| `allowFreeformInput` | bool   | ❌      | —           | —                                             |
-| `multiSelect`        | bool   | ❌      | —           | —                                             |
-| `options`            | array  | ❌      | —           | Sem opções = apenas campo livre               |
-| `options[].label`    | string | ✅\*    | —           | \* obrigatório dentro de options              |
+| `header`             | string | ✅     | **≤50 ch**  | `FAILED: Response contained no choices`       |
+| `question`           | string | ✅     | **≤200 ch** | Falha silenciosa — resposta vazia ou truncada |
+| `allowFreeformInput` | bool   | ❌     | —           | —                                             |
+| `multiSelect`        | bool   | ❌     | —           | —                                             |
+| `options`            | array  | ❌     | —           | Sem opções = apenas campo livre               |
+| `options[].label`    | string | ✅\*   | —           | \* obrigatório dentro de options              |
 
 #### Anti-padrões proibidos
 
@@ -2724,19 +2725,19 @@ por `t.name === "search_subagent"`).
 
 | Dado nativo                     | Campo no Debug Panel                      | Importância |
 | ------------------------------- | ----------------------------------------- | ----------- |
-| Tokens de prompt                | `promptTokens`                            | 🔴 Alta      |
-| Tokens de resposta              | `completionTokens`                        | 🔴 Alta      |
-| Tokens totais                   | `totalTokens`                             | 🔴 Alta      |
-| Tokens cacheados                | `cachedTokens`                            | 🟡 Média     |
-| Modelo por requisição           | `model` (ex: `"claude-sonnet-4-5"`)       | 🔴 Alta      |
-| Duração da requisição LLM       | `durationMs` por chamada                  | 🟡 Média     |
-| Tempo ao primeiro token         | `timeToFirstTokenMs`                      | 🟡 Média     |
-| Limite máximo de tokens         | `maxInputTokens`, `maxOutputTokens`       | 🟢 Baixa     |
-| Skill/instruction discovery     | eventos `discovery` (path, type, matched) | 🔴 Alta      |
-| Loop start/stop do agente       | `loopControl` (start, stop, iteration)    | 🟡 Média     |
-| Subagente start/stop granular   | `toolCall.isSubAgent: true`               | 🟡 Média     |
-| Step source (user/sys/agent)    | `loopControl.details.source`              | 🟢 Baixa     |
-| Detecção de erro por heurística | ENOENT / Error: no output da ferramenta   | 🟢 Baixa     |
+| Tokens de prompt                | `promptTokens`                            | 🔴 Alta     |
+| Tokens de resposta              | `completionTokens`                        | 🔴 Alta     |
+| Tokens totais                   | `totalTokens`                             | 🔴 Alta     |
+| Tokens cacheados                | `cachedTokens`                            | 🟡 Média    |
+| Modelo por requisição           | `model` (ex: `"claude-sonnet-4-5"`)       | 🔴 Alta     |
+| Duração da requisição LLM       | `durationMs` por chamada                  | 🟡 Média    |
+| Tempo ao primeiro token         | `timeToFirstTokenMs`                      | 🟡 Média    |
+| Limite máximo de tokens         | `maxInputTokens`, `maxOutputTokens`       | 🟢 Baixa    |
+| Skill/instruction discovery     | eventos `discovery` (path, type, matched) | 🔴 Alta     |
+| Loop start/stop do agente       | `loopControl` (start, stop, iteration)    | 🟡 Média    |
+| Subagente start/stop granular   | `toolCall.isSubAgent: true`               | 🟡 Média    |
+| Step source (user/sys/agent)    | `loopControl.details.source`              | 🟢 Baixa    |
+| Detecção de erro por heurística | ENOENT / Error: no output da ferramenta   | 🟢 Baixa    |
 
 #### O que NÓS rastreamos e o Debug Panel NÃO rastreia
 
@@ -2808,11 +2809,11 @@ agregados. Útil para relatórios mas não realtime.
 
 | Prioridade | Dado                        | Opção         | Esforço |
 | ---------- | --------------------------- | ------------- | ------- |
-| 🔴 Alta     | Token usage (in/out/cached) | A (hook POST) | Baixo   |
-| 🔴 Alta     | Modelo por requisição LLM   | A (hook POST) | Baixo   |
-| 🔴 Alta     | Skill/instruction reads     | B (hook POST) | Médio   |
-| 🟡 Média    | Duração de cada LLM call    | A (hook POST) | Baixo   |
-| 🟢 Baixa    | Trajectory export completo  | C (offline)   | Alto    |
+| 🔴 Alta    | Token usage (in/out/cached) | A (hook POST) | Baixo   |
+| 🔴 Alta    | Modelo por requisição LLM   | A (hook POST) | Baixo   |
+| 🔴 Alta    | Skill/instruction reads     | B (hook POST) | Médio   |
+| 🟡 Média   | Duração de cada LLM call    | A (hook POST) | Baixo   |
+| 🟢 Baixa   | Trajectory export completo  | C (offline)   | Alto    |
 
 ---
 
@@ -3211,8 +3212,8 @@ Esta seção documenta os achados da rodada de `exploratory-bug-hunt` (skill v2.
 
 ### 18.1 Sumário Executivo
 
-| ID      | Severidade | Script(s)                               | Categoria                     | Status        |
-| ------- | ---------- | --------------------------------------- | ----------------------------- | ------------- |
+| ID      | Severidade | Script(s)                               | Categoria                     | Status         |
+| ------- | ---------- | --------------------------------------- | ----------------------------- | -------------- |
 | EBH-M01 | MÉDIO      | `pre-tool-use.sh`                       | Escrita não-atômica           | ✅ Corrigido   |
 | EBH-M02 | MÉDIO      | `agent-stop.sh`                         | Nome estático de temporário   | ✅ Corrigido   |
 | EBH-M03 | MÉDIO      | `session-start.sh`                      | Valor semântico inválido      | ✅ Corrigido   |
@@ -3335,12 +3336,12 @@ diferente.
 
 | Cenário                             | session_id novo? | ended_at != null? | sessionStart disparou? | Resultado                                                          |
 | ----------------------------------- | ---------------- | ----------------- | ---------------------- | ------------------------------------------------------------------ |
-| **A — Nova aba de chat**            | ✅ Sim            | ❌ Não             | ✅ Sim (antes)          | CTX já criado pelo `sessionStart`; `log-prompt.sh` só reseta turno |
-| **B — Sessão ativa, prompt normal** | ❌ Não            | ❌ Não             | ✅ Sim                  | Caminho mais comum; apenas reset de `current_turn.*`               |
-| **C — Mesma aba, após close**       | ❌ Não            | ✅ Sim             | ❌ Não                  | **RECONNECT-02**: cria sessão inline (`inline_restart`)            |
-| **D — Reconexão VS Code, novo ID**  | ✅ Sim            | ❌ Não             | ❌ Não                  | **RECONNECT-01**: rollover com novo session_id                     |
-| **E — Inline compaction**           | ❌ Não (ou Sim)   | ❌ Não             | ❌ Não                  | Sub-caso de D; detectado via `compaction_count=0`                  |
-| **F — Recovery manual**             | qualquer         | qualquer          | ❌ Não                  | **HEAL v1**: adota SESSION_ID_PAYLOAD como fonte de verdade        |
+| **A — Nova aba de chat**            | ✅ Sim           | ❌ Não            | ✅ Sim (antes)         | CTX já criado pelo `sessionStart`; `log-prompt.sh` só reseta turno |
+| **B — Sessão ativa, prompt normal** | ❌ Não           | ❌ Não            | ✅ Sim                 | Caminho mais comum; apenas reset de `current_turn.*`               |
+| **C — Mesma aba, após close**       | ❌ Não           | ✅ Sim            | ❌ Não                 | **RECONNECT-02**: cria sessão inline (`inline_restart`)            |
+| **D — Reconexão VS Code, novo ID**  | ✅ Sim           | ❌ Não            | ❌ Não                 | **RECONNECT-01**: rollover com novo session_id                     |
+| **E — Inline compaction**           | ❌ Não (ou Sim)  | ❌ Não            | ❌ Não                 | Sub-caso de D; detectado via `compaction_count=0`                  |
+| **F — Recovery manual**             | qualquer         | qualquer          | ❌ Não                 | **HEAL v1**: adota SESSION_ID_PAYLOAD como fonte de verdade        |
 
 #### Caminho de Decisão no código (`log-prompt.sh` Fase 0)
 
@@ -3471,8 +3472,8 @@ corretamente.
 
 ### 19.4 Gaps Identificados e Status de Correção
 
-| ID               | Descrição                                                                                                                                                                                               | Severidade | Status                                                                           |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------- |
+| ID               | Descrição                                                                                                                                                                                               | Severidade | Status                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------- |
 | **FIX-01**       | `session_stats.turns_since_askQuestions` não resetado em RECONNECT-02: após um inline_restart, o campo carregava o valor da sessão anterior, causando falsa severidade ALERTA/CRITICO no primeiro turno | MÉDIO      | ✅ **Corrigido** em `log-prompt.sh` (2026-03-12)                                  |
 | **GUIA-CORR-01** | Seção 12.2 do GUIA afirmava "geramos um NOVO UUID" em inline_restart — incorreto desde a correção do BUG-01; o código usa `SESSION_ID_PAYLOAD` (VS Code session_id)                                     | MÉDIO      | ✅ **Corrigido** (2026-03-12)                                                     |
 | **GAP-ARCH-01**  | `prev_session_id === session.id` em RECONNECT-02: campo semanticamente confuso quando os dois UUIDs são idênticos; pode gerar estranheza ao ler o CTX                                                   | BAIXO      | 📋 **Documentado** (comportamento esperado; ver Seção 19.2-C)                     |
@@ -3833,8 +3834,8 @@ quando `AUTH_REQUESTED=false`. Também zerado no RECONNECT-02 (FIX-01). Usado no
 
 ### 20.6 Bugs Identificados e Corrigidos (v2.3)
 
-| ID      | Localização             | Descrição                                                              | Linha afetada | Status      |
-| ------- | ----------------------- | ---------------------------------------------------------------------- | ------------- | ----------- |
+| ID      | Localização             | Descrição                                                              | Linha afetada | Status       |
+| ------- | ----------------------- | ---------------------------------------------------------------------- | ------------- | ------------ |
 | BUG-S01 | `agent-stop.sh` L774    | Auto-"retomada" missing `local_turn: 0` no objeto                      | ~774          | ✅ Corrigido |
 | BUG-S02 | `start-section.sh` L150 | `current_turn.section_turn` stale após troca de seção                  | ~150, ~157    | ✅ Corrigido |
 | BUG-S03 | `log-prompt.sh` L234    | `turn_authorized`/`turn_no_askQuestions` não resetados em RECONNECT-02 | ~232, ~260    | ✅ Corrigido |
@@ -3860,29 +3861,51 @@ anterior). FIX: ambos os campos são resetados a 0; valores históricos são pre
 
 ### 20.7 Gaps de Design Documentados
 
-| ID      | Descrição                                                                            | Impacto | Resolução                                                          |
-| ------- | ------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------ |
-| GAP-S01 | `section_count`/`section_names` NÃO resetados em RECONNECT-02                        | Baixo   | **CORRIGIDO v2.4** — reset com snapshot `prev_section_count/names` |
-| GAP-S02 | `section-end.sh` deixa `current_section=null` (janela de violação da invariante)     | Baixo   | agent-stop.sh auto-cria "retomada" no próximo TURN                 |
-| GAP-S03 | Raio-de-heal do `session_id` não cobre todos os scripts de hook edge-case            | Médio   | Documentar + monitorar via audit.jsonl                             |
-| GAP-S04 | `logical_session_number` não propagado aos eventos `turnStart`/`sessionStart_inline` | Baixo   | **CORRIGIDO v2.4** — campo adicionado + incremento em RECONNECT-02 |
+| ID      | Descrição                                                                            | Impacto | Resolução                                                                       |
+| ------- | ------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------- |
+| GAP-S01 | `section_count`/`section_names` NÃO resetados em RECONNECT-02                        | Baixo   | **CORRIGIDO v2.4** — reset com snapshot `prev_section_count/names`              |
+| GAP-S02 | `section-end.sh` deixa `current_section=null` (janela de violação da invariante)     | Baixo   | **CORRIGIDO v2.5** — `is_closed=true` preserva nome; agent-stop.sh detecta flag |
+| GAP-S03 | Raio-de-heal do `session_id` não cobre todos os scripts de hook edge-case            | Médio   | **CORRIGIDO v2.5** — `session-end.sh` recebeu `SESSION_ID_PAYLOAD` + HEAL v1    |
+| GAP-S04 | `logical_session_number` não propagado aos eventos `turnStart`/`sessionStart_inline` | Baixo   | **CORRIGIDO v2.4** — campo adicionado + incremento em RECONNECT-02              |
 
 **GAP-S01 — Correção v2.4**: `section_count` e `section_names` agora são resetados em RECONNECT-02
-com snapshot em `prev_section_count`/`prev_section_names`. Isso garante consistência com `turn_count`
-(que já era resetado). O motivo da mudança: RECONNECT-02 inicia uma nova sessão lógica — seções devem
-começar a numerar do #1 novamente. Histórico preservado em `audit.jsonl` e nos snapshots `prev_*`.
+com snapshot em `prev_section_count`/`prev_section_names`. Isso garante consistência com
+`turn_count` (que já era resetado). O motivo da mudança: RECONNECT-02 inicia uma nova sessão lógica
+— seções devem começar a numerar do #1 novamente. Histórico preservado em `audit.jsonl` e nos
+snapshots `prev_*`.
 
-**GAP-S02 — Nota técnica**: Existe uma janela transitória entre `section-end.sh` e a próxima seção
-onde `current_section.name = null`. Durante essa janela, se alguma ferramenta for chamada, o
-`post-tool-use.sh` vai logar `section_name: null`. A invariante é restaurada pelo `agent-stop.sh`
-automaticamente no próximo `agentStop`. O script `section-end.sh` emite aviso explícito sobre this.
-**Ação recomendada**: sempre chamar `start-section.sh "nova-seção"` logo após `section-end.sh`.
+**GAP-S02 — Correção v2.5**: `section-end.sh` agora marca a seção com `is_closed=true` e
+`closed_at=<timestamp>` em vez de anular todos os campos de `current_section`. Isso preserva o
+`current_section.name` durante a janela transitória — ferramentas chamadas entre `section-end.sh` e
+`start-section.sh` continuam logando o nome correto da seção anterior. `agent-stop.sh` detecta
+`is_closed=true` como equivalente a `name=null` para fins de invariante, criando seção "retomada" se
+necessário. `start-section.sh` sobrescreve `current_section` completamente — o flag `is_closed` é
+limpo naturalmente ao abrir nova seção. **Ação recomendada**: sempre chamar
+`start-section.sh "nova-seção"` imediatamente após `section-end.sh`.
+
+**GAP-S03 — Correção v2.5**: `session-end.sh` era o único script invocado pelo VS Code via hook
+(`sessionEnd`) que não extraía `SESSION_ID_PAYLOAD` do payload nem aplicava HEAL v1. Todos os outros
+9 scripts VS Code-invocados já tinham HEAL. A correção adiciona:
+
+1. Extração de `SESSION_ID_PAYLOAD` do stdin (no bloco de parse do INPUT)
+2. Bloco HEAL v1: se payload != CTX e CTX.source == `"manual_recovery"`, atualiza CTX e loga evento
+3. Branch `inline_restart`: adota CTX como verdade (payload pode estar stale) Impacto: `sessionEnd`
+   agora usa o `session_id` correto em todos os eventos e relatórios finais, incluindo o resumo de
+   sessão, mesmo após cenários de manual_recovery.
 
 **GAP-S04 — Correção v2.4**: `logical_session_number` agora é:
+
 1. **Incrementado** em RECONNECT-02 (nova sessão lógica → número lógico aumenta)
 2. **Gravado no CTX** em `session.logical_session_number`
 3. **Propagado** ao evento `turnStart` em `audit.jsonl` (campo `logical_session_number`)
-4. **Propagado** ao evento `sessionStart_inline` com `logical_session_number` + `prev_logical_session_number`
+4. **Propagado** ao evento `sessionStart_inline` com `logical_session_number` +
+   `prev_logical_session_number`
+
+**UPG-AUDIT-01 — Planejado (não implementado)**: audit file isolado por `SESSION_ID`. O modelo atual
+usa `audit.jsonl` e `session-context.json` globais (compartilhados entre sessões). O upgrade
+produzirá `logs/audit-{SID_SHORT}.jsonl` e `state/session-context-{SID_SHORT}.json` por sessão, com
+symlinks backward-compat e `state/current-session-id.txt` como ponteiro global. Plano detalhado com
+36 sub-tarefas em `PLANO-CORRECOES-HOOKS.md` → Seção 8.
 
 ---
 
@@ -3955,13 +3978,78 @@ repositório NUNCA gera um UUID de sessão por conta própria.
 
 ---
 
-_Documento gerado em 2026-03-11. Versão 2.4 (2026-03-13): GAP-S01 corrigido — section_count e section_names agora resetados em RECONNECT-02 (com snapshot prev_section_count/prev_section_names). GAP-S04 corrigido — logical_session_number incrementado em RECONNECT-02 e propagado aos eventos turnStart e sessionStart_inline em audit.jsonl. Seção 20.7 atualizada (GAP-S01 e GAP-S04 marcados como FIXED). Versão 2.3 (2026-03-13): Seção 20 adicionada — hierarquia completa
-SESSION/SECTION/TURN: definições formais, ciclo de vida por responsável, tabelas de campos CTX,
-semântica de contadores, paths de sincronização de `session_id`. BUG-S01 corrigido (auto-"retomada"
-missing `local_turn:0` em `agent-stop.sh`). BUG-S02 corrigido (`current_turn.section_turn` stale
-após `start-section.sh` — ambos os branches). BUG-S03 corrigido
-(`turn_authorized`/`turn_no_askQuestions` não resetados em RECONNECT-02 — com snapshot
-`prev\__`). Referências renumeradas para Seção 21. TOC atualizado. Versão 2.2 (2026-03-12): Seção 18 adicionada — Achados de Auditoria Proativa (Exploratory Bug Hunt): EBH-M01 (pre-tool-use.sh auto_recovery — corrigido), EBH-M02 (agent-stop.sh CTX_FILE.tmp estático — corrigido), EBH-M03 (session-start.sh LOGICAL_SESSION_NUMBER poderia ser 0 — corrigido), EBH-L01 (subagent-start/stop.sh sem fallback mktemp — corrigido), EBH-L02 e EBH-L03 (baixa severidade — documentados). Seção 19 renomeada (era Seção 18 — Referências). Versão 2.1 (2026-03-12): BUG-05 aplicado em Seção 3.1 — distinção explícita entre `source`do VS Code (sempre`"new"`) e `session.source`do CTX (múltiplos valores); UPG-01 —`session.logical_session_number`e`session.logical_restart_at`adicionados ao CTX em`session-start.sh`(incrementa em sessões`source=new`, preservado em `inline_restart`; briefing exibe nova linha "Sessão lógica"); UPG-03 — tabela "Estado Ativo" do briefing expandida com "Origem da sessão" (com descrição por valor de `$SOURCE`) e estado de preservação de estatísticas; G9-11 — função `strip_sensitive_json_keys()`adicionada a`hooks-lib/common.sh`: redação estrutural por denylist de chaves JSON sensíveis (password, token, api_key, secret, close_key, etc.), integrada em `pre-tool-use.sh`como Camada 0 antes de`redact_credentials`. Versão 2.0 (2026-03-12): Ciclo completo de correções de bugs e gaps em 17 itens implementados (BUG-01 a BUG-17, GAP-01 a GAP-05) nos 10 scripts de hooks e em `hooks-lib/common.sh`, mais ROB-B e GAP-O1 adicionados nesta mesma versão. Principais correções desta versão: BUG-16 — guard de `session_id`em`tool-use-failure.sh`movido para ANTES dos writes de`audit.jsonl`e`errors.jsonl`(evita contaminação de log com session_id errado em caso de mismatch); BUG-17 — HEALs inline de`manual_recovery`em`pre-tool-use.sh`e`post-tool-use.sh`agora atualizam também o campo`.session.vs_code_session_id`(já correto em`common.sh`); GAP-05 — schema de `session-start.sh`completo:`session_stats`recebe`subagent_completions`e`askquestions_api_failures`; `current_turn`recebe`section_turn`, `todo_created`, `block_count`, `agentStop_invocations`e`subagent_delegated`; ROB-B — padronização do sourcing de `common.sh`em todos os 8 scripts de hook com mensagem`[WARN]`quando a lib não é encontrada (antes era silencioso); GAP-O1 — log`session_id_sync_inline_restart`em`pre-tool-use.sh`e`post-tool-use.sh`agora limitado a 5 ocorrências por sessão (6ª emite evento`\_cap`), eliminando ruído excessivo em sessões longas; ROB-C — confirmado que o padrão `jq
--r ... 2>/dev/null || echo
-'default'`já é uniforme em todos os scripts (nenhuma alteração necessária). Ver`DOCUMENTAÇÃO/HOOKS/PLANO-CORRECOES-HOOKS.md`para histórico completo de todos os 24+ itens implementados.`vscode_askQuestions`: todos os Templates A–G no AGENTS.md reescritos com campos canônicos (`header`≤50 chars,`question`≤200 chars,`options:
-[{label}]`, `multiSelect`, `allowFreeformInput`). Seção 16.2 reescrita com tabela de campos, anti-patterns, regras de hardening e exemplo completo. Seção 16.3 atualizada com exemplo de lookup correto (`question.header`como chave) e hardening de detecção de mismatch. Cabeçalho do documento atualizado de v1.6 para v1.9 (versões 1.7 e 1.8 não tinham atualizado o cabeçalho). (3115 linhas) Versão 2.2 (2026-03-12): Seção 19 adicionada — análise aprofundada do ciclo de vida de prompt vs sessão: taxonomia completa dos 6 cenários (A-F), fluxo de decisão de`log-prompt.sh`Fase 0, análise detalhada por cenário, gaps GAP-ARCH-01 a 05, tabela de status e evidência empírica. FIX-01 aplicado em`log-prompt.sh`: `session_stats.turns_since_askQuestions`agora resetado em RECONNECT-02 (inline_restart). Seção 12.2 corrigida (GUIA-CORR-01): afirmação incorreta sobre geração de UUID novo removida. Seção 20 (Referências, renumerada de 19). TOC atualizado. Versão 1.8 (2026-03-11): Seção 17.11 adicionada — diagnóstico empírico do erro`vscode_askQuestions`"Response contained no choices": padrão no transcript, artefato visual de "corrupção" na UI, causa raiz (contexto/API limit), 4 hardenings implementados + bridge. Investigação confirmou que GUIA v1.7 está limpo (2914 linhas) — o usuário viu artefato da UI, não corrupção real. Interrupção antes do prompt #14 foi "unauthorized turn end" (turn #135 encerrou sem askQuestions após série de read_file calls). Versão 1.7 (2026-03-11): Seção 17.10 adicionada — descoberta do Transcript JSONL como log filesystem acessível por LLMs; schemas completos dos 7 tipos de eventos, análise empírica de 6 sessões reais, padrão de falhas entre sessões, limitações do transcript vs. Debug Panel, e script`read-transcript.sh`(shellcheck limpo) criado em`.github/hooks/scripts/`. Investigação de interrupção confirmou: causa = compactação inline do contexto pelo VS Code (inline compaction), turno anterior encerrou com `turnEnd_authorized`. Versão 1.6 (2026-03-11): Seção 17 adicionada — investigação completa do Agent Debug Panel ("Chat Debug" view), incluindo arquitetura interna (classe UK, pipeline de eventos, trajectoryLogger), todas as 5 categorias de eventos com schemas completos (`loopControl`, `toolCall`, `llmRequest`, `error`, `discovery`), mapa de comandos de acesso, comparação com nosso audit.jsonl e recomendações de complementação. Baseado em análise direta do código-fonte de `github.copilot-chat-0.39.0/dist/extension.js`e`package.json`. Versão 1.5 (2026-03-11): Seções 15.10–15.16 adicionadas — investigação profunda do ciclo de vida de subagentes. Seção 16 adicionada: schemas de `vscode_askQuestions`e`manage_todo_list`, hardenings de inline compaction. Baseado em: documentação oficial VS Code (março/2026), evidência empírica do audit.jsonl e análise direta do código-fonte da extensão `github.copilot-chat-0.39.0`.\*
+\_Documento gerado em 2026-03-11. Versão 2.5 (2026-03-13): GAP-S02 corrigido — section-end.sh usa
+is_closed=true em vez de null; agent-stop.sh detecta is_closed para invariante. GAP-S03 corrigido —
+session-end.sh agora extrai SESSION_ID_PAYLOAD e aplica HEAL v1 (era o único hook VS Code invocado
+sem HEAL). UPG-AUDIT-01 planejado: audit file isolado por SESSION_ID, documentado na Seção 8 do
+PLANO (36 sub-tarefas, não implementado). Seção 20.7 atualizada. Versão 2.4 (2026-03-13): GAP-S01
+corrigido — section_count e section_names agora resetados em RECONNECT-02 (com snapshot
+prev_section_count/prev_section_names). GAP-S04 corrigido — logical_session_number incrementado em
+RECONNECT-02 e propagado aos eventos turnStart e sessionStart_inline em audit.jsonl. Seção 20.7
+atualizada (GAP-S01 e GAP-S04 marcados como FIXED). Versão 2.3 (2026-03-13): Seção 20 adicionada —
+hierarquia completa SESSION/SECTION/TURN: definições formais, ciclo de vida por responsável, tabelas
+de campos CTX, semântica de contadores, paths de sincronização de `session_id`. BUG-S01 corrigido
+(auto-"retomada" missing `local_turn:0` em `agent-stop.sh`). BUG-S02 corrigido
+(`current_turn.section_turn` stale após `start-section.sh` — ambos os branches). BUG-S03 corrigido
+(`turn_authorized`/`turn_no_askQuestions` não resetados em RECONNECT-02 — com snapshot `prev\__`).
+Referências renumeradas para Seção 21. TOC atualizado. Versão 2.2 (2026-03-12): Seção 18 adicionada
+— Achados de Auditoria Proativa (Exploratory Bug Hunt): EBH-M01 (pre-tool-use.sh auto_recovery —
+corrigido), EBH-M02 (agent-stop.sh CTX_FILE.tmp estático — corrigido), EBH-M03 (session-start.sh
+LOGICAL_SESSION_NUMBER poderia ser 0 — corrigido), EBH-L01 (subagent-start/stop.sh sem fallback
+mktemp — corrigido), EBH-L02 e EBH-L03 (baixa severidade — documentados). Seção 19 renomeada (era
+Seção 18 — Referências). Versão 2.1 (2026-03-12): BUG-05 aplicado em Seção 3.1 — distinção explícita
+entre `source`do VS Code (sempre`"new"`) e `session.source`do CTX (múltiplos valores); UPG-01
+—`session.logical_session_number`e`session.logical_restart_at`adicionados ao CTX
+em`session-start.sh`(incrementa em sessões`source=new`, preservado em `inline_restart`; briefing
+exibe nova linha "Sessão lógica"); UPG-03 — tabela "Estado Ativo" do briefing expandida com "Origem
+da sessão" (com descrição por valor de `$SOURCE`) e estado de preservação de estatísticas; G9-11 —
+função `strip_sensitive_json_keys()`adicionada a`hooks-lib/common.sh`: redação estrutural por
+denylist de chaves JSON sensíveis (password, token, api_key, secret, close_key, etc.), integrada em
+`pre-tool-use.sh`como Camada 0 antes de`redact_credentials`. Versão 2.0 (2026-03-12): Ciclo completo
+de correções de bugs e gaps em 17 itens implementados (BUG-01 a BUG-17, GAP-01 a GAP-05) nos 10
+scripts de hooks e em `hooks-lib/common.sh`, mais ROB-B e GAP-O1 adicionados nesta mesma versão.
+Principais correções desta versão: BUG-16 — guard de `session_id`em`tool-use-failure.sh`movido para
+ANTES dos writes de`audit.jsonl`e`errors.jsonl`(evita contaminação de log com session_id errado em
+caso de mismatch); BUG-17 — HEALs inline
+de`manual_recovery`em`pre-tool-use.sh`e`post-tool-use.sh`agora atualizam também o
+campo`.session.vs_code_session_id`(já correto em`common.sh`); GAP-05 — schema de
+`session-start.sh`completo:`session_stats`recebe`subagent_completions`e`askquestions_api_failures`;
+`current_turn`recebe`section_turn`, `todo_created`, `block_count`,
+`agentStop_invocations`e`subagent_delegated`; ROB-B — padronização do sourcing de `common.sh`em
+todos os 8 scripts de hook com mensagem`[WARN]`quando a lib não é encontrada (antes era silencioso);
+GAP-O1 — log`session_id_sync_inline_restart`em`pre-tool-use.sh`e`post-tool-use.sh`agora limitado a 5
+ocorrências por sessão (6ª emite evento`\_cap`), eliminando ruído excessivo em sessões longas; ROB-C
+— confirmado que o padrão `jq -r ... 2>/dev/null || echo 'default'`já é uniforme em todos os scripts
+(nenhuma alteração necessária). Ver`DOCUMENTAÇÃO/HOOKS/PLANO-CORRECOES-HOOKS.md`para histórico
+completo de todos os 24+ itens implementados.`vscode_askQuestions`: todos os Templates A–G no
+AGENTS.md reescritos com campos canônicos (`header`≤50 chars,`question`≤200
+chars,`options: [{label}]`, `multiSelect`, `allowFreeformInput`). Seção 16.2 reescrita com tabela de
+campos, anti-patterns, regras de hardening e exemplo completo. Seção 16.3 atualizada com exemplo de
+lookup correto (`question.header`como chave) e hardening de detecção de mismatch. Cabeçalho do
+documento atualizado de v1.6 para v1.9 (versões 1.7 e 1.8 não tinham atualizado o cabeçalho). (3115
+linhas) Versão 2.2 (2026-03-12): Seção 19 adicionada — análise aprofundada do ciclo de vida de
+prompt vs sessão: taxonomia completa dos 6 cenários (A-F), fluxo de decisão de`log-prompt.sh`Fase 0,
+análise detalhada por cenário, gaps GAP-ARCH-01 a 05, tabela de status e evidência empírica. FIX-01
+aplicado em`log-prompt.sh`: `session_stats.turns_since_askQuestions`agora resetado em RECONNECT-02
+(inline_restart). Seção 12.2 corrigida (GUIA-CORR-01): afirmação incorreta sobre geração de UUID
+novo removida. Seção 20 (Referências, renumerada de 19). TOC atualizado. Versão 1.8 (2026-03-11):
+Seção 17.11 adicionada — diagnóstico empírico do erro`vscode_askQuestions`"Response contained no
+choices": padrão no transcript, artefato visual de "corrupção" na UI, causa raiz (contexto/API
+limit), 4 hardenings implementados + bridge. Investigação confirmou que GUIA v1.7 está limpo (2914
+linhas) — o usuário viu artefato da UI, não corrupção real. Interrupção antes do prompt #14 foi
+"unauthorized turn end" (turn #135 encerrou sem askQuestions após série de read_file calls). Versão
+1.7 (2026-03-11): Seção 17.10 adicionada — descoberta do Transcript JSONL como log filesystem
+acessível por LLMs; schemas completos dos 7 tipos de eventos, análise empírica de 6 sessões reais,
+padrão de falhas entre sessões, limitações do transcript vs. Debug Panel, e
+script`read-transcript.sh`(shellcheck limpo) criado em`.github/hooks/scripts/`. Investigação de
+interrupção confirmou: causa = compactação inline do contexto pelo VS Code (inline compaction),
+turno anterior encerrou com `turnEnd_authorized`. Versão 1.6 (2026-03-11): Seção 17 adicionada —
+investigação completa do Agent Debug Panel ("Chat Debug" view), incluindo arquitetura interna
+(classe UK, pipeline de eventos, trajectoryLogger), todas as 5 categorias de eventos com schemas
+completos (`loopControl`, `toolCall`, `llmRequest`, `error`, `discovery`), mapa de comandos de
+acesso, comparação com nosso audit.jsonl e recomendações de complementação. Baseado em análise
+direta do código-fonte de `github.copilot-chat-0.39.0/dist/extension.js`e`package.json`. Versão 1.5
+(2026-03-11): Seções 15.10–15.16 adicionadas — investigação profunda do ciclo de vida de subagentes.
+Seção 16 adicionada: schemas de `vscode_askQuestions`e`manage_todo_list`, hardenings de inline
+compaction. Baseado em: documentação oficial VS Code (março/2026), evidência empírica do audit.jsonl
+e análise direta do código-fonte da extensão `github.copilot-chat-0.39.0`.\*

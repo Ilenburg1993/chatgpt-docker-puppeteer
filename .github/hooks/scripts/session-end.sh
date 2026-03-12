@@ -33,6 +33,8 @@ INPUT="$(cat 2> /dev/null || true)"
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
 CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 REASON="$(echo "$INPUT" | jq -r '.reason // "complete"' 2> /dev/null || echo 'complete')"
+# GAP-S03 FIX: extrai session_id do payload (VS Code inclui em sessionEnd, como nos demais hooks).
+SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 NOW_MS="$(date +%s000 2> /dev/null || echo "$TIMESTAMP")"
 SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || echo 'unknown')"
 SESSION_DATE_DAILY="$(date -u '+%Y-%m-%d' 2> /dev/null || echo 'unknown')"
@@ -49,6 +51,46 @@ START_ISO=""
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
     START_ISO="$(jq -r '.session.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+fi
+
+# GAP-S03 FIX — HEAL v1: sincroniza session_id se payload difere do CTX.
+# Contexto: session-end.sh era o único hook VS Code invocado sem HEAL.
+# Padrão: igual ao pre-tool-use.sh e demais scripts com HEAL v1.
+# Só aplica HEAL em fontes confiáveis (manual_recovery); inline_restart adota CTX.
+if [ -n "$SESSION_ID_PAYLOAD" ] && [ "$SESSION_ID_PAYLOAD" != "$SESSION_ID" ] && [ "$SESSION_ID" != "unknown" ]; then
+    _CTX_SOURCE_SE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    if [ "$_CTX_SOURCE_SE" = "manual_recovery" ]; then
+        _NOW_HEAL_SE="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        if command -v sponge > /dev/null 2>&1; then
+            jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$_NOW_HEAL_SE" \
+                '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        else
+            _TMP_HEAL_SE="$(mktemp)"
+            if jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$_NOW_HEAL_SE" \
+                '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                "$CTX_FILE" > "$_TMP_HEAL_SE" 2> /dev/null; then
+                mv "$_TMP_HEAL_SE" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL_SE"
+            else
+                rm -f "$_TMP_HEAL_SE"
+            fi
+        fi
+        SESSION_ID="$SESSION_ID_PAYLOAD"
+        jq -cn \
+            --arg event "session_id_healed" \
+            --arg old "" \
+            --arg new "$SESSION_ID" \
+            --arg source "session-end.sh" \
+            --arg ts "$_NOW_HEAL_SE" \
+            '{event: $event, new_session_id: $new, source: $source, timestamp: $ts,
+              message: "HEAL v1 em sessionEnd: manual_recovery adotou session_id do payload"}' \
+            >> "$LOG_DIR/audit.jsonl"
+        echo "[heal] HEAL v1 aplicado em session-end.sh — session_id atualizado" >&2
+    elif [ "$_CTX_SOURCE_SE" = "inline_restart" ]; then
+        # inline_restart: CTX tem o session_id correto do VS Code (PREMISSA 1).
+        # Payload pode estar stale. Adota CTX como verdade (sem modificar CTX).
+        SESSION_ID_PAYLOAD="$SESSION_ID"
+    fi
 fi
 
 # ── Fecha section ativa antes de encerrar sessão (Schema v4 — Fase C) ────────

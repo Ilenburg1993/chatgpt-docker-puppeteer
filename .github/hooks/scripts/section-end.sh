@@ -67,22 +67,27 @@ if [ "$TURNS_COVERED" -lt 0 ]; then
     TURNS_COVERED=0
 fi
 
-# Limpa current_section no session-context.json (Schema v4: inclui section_number)
+# GAP-S02 FIX: mantém dados de current_section mas marca como fechada com is_closed=true.
+# Antes: anulava todos os campos → section_name=null em eventos intermediários.
+# Agora: preserva name/started_at/etc. para audit log; agent-stop.sh detecta is_closed=true
+# para acionar criação de seção "retomada" se necessário.
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    jq '.current_section = {name: null, started_at: null, turn_start: null, description: null, section_number: null, section_id: null}' \
+    jq --arg ts "$NOW_ISO" \
+        '.current_section.is_closed = true | .current_section.closed_at = $ts' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 elif [ -f "$CTX_FILE" ]; then
     TMP="$(mktemp)"
-    jq '.current_section = {name: null, started_at: null, turn_start: null, description: null, section_number: null, section_id: null}' \
+    jq --arg ts "$NOW_ISO" \
+        '.current_section.is_closed = true | .current_section.closed_at = $ts' \
         "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
 fi
 
-# BUG-A.3: Aviso de invariante — current_section foi para null.
-# O invariante SESSION+SECTION+TURN exige que sempre haja uma seção ativa.
-# agent-stop.sh criará auto-seção "retomada" no próximo TURN se necessário,
-# mas o estado transitório sem seção pode causar eventos com section_name=null.
+# AVISO: invariante SESSION+SECTION+TURN em estado transitório.
+# current_section.is_closed=true até próximo start-section.sh.
+# agent-stop.sh detecta is_closed e cria seção "retomada" se necessário.
+# Ferramentas chamadas nesse intervalo ainda registram o nome correto da seção anterior.
 # AÇÃO RECOMENDADA: chame start-section.sh IMEDIATAMENTE após section-end.sh.
-echo "[seção][AVISO] Invariante SESSION+SECTION+TURN: current_section=null até próximo start-section.sh" >&2
+echo "[seção][AVISO] Seção \"${SECTION_NAME}\" marcada is_closed=true. Chame start-section.sh imediatamente." >&2
 
 # Registra evento sectionEnd no audit.jsonl (Schema v4: inclui section_number)
 jq -cn \

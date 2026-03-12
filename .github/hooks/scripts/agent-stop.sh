@@ -752,14 +752,18 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
-# ── Invariante SESSION+SECTION+TURN: auto-cria seção 'retomada' se null ──────
+# ── Invariante SESSION+SECTION+TURN: auto-cria seção 'retomada' se null/fechada ──
 # Garante que a invariante nunca seja violada mesmo após section-end.sh manual.
+# GAP-S02 FIX: também detecta is_closed=true (section-end.sh marca seção como fechada
+# em vez de nulá-la, preservando section_name em eventos intermediários).
 # A seção auto-criada recebe auto_open:true no evento sectionStart no audit.jsonl.
 CURR_SECTION_CHECK=""
+CURR_SECTION_CLOSED="false"
 if [ -f "$CTX_FILE" ]; then
     CURR_SECTION_CHECK="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    CURR_SECTION_CLOSED="$(jq -r '.current_section.is_closed // false' "$CTX_FILE" 2> /dev/null || echo false)"
 fi
-if [ -z "$CURR_SECTION_CHECK" ] || [ "$CURR_SECTION_CHECK" = "null" ]; then
+if [ -z "$CURR_SECTION_CHECK" ] || [ "$CURR_SECTION_CHECK" = "null" ] || [ "$CURR_SECTION_CLOSED" = "true" ]; then
     _AUTO_SECTION_NOW="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     _AUTO_SECTION_ID="$(uuidgen 2> /dev/null || printf 'sect_%s_%s' "$(date +%s)" "$$")"
     _NEXT_SECTION_NUM=1

@@ -195,7 +195,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
         _PREV_END_REASON="$(jq -r '.session.end_reason // ""' "$CTX_FILE" 2> /dev/null || echo '')"
         _PREV_ENDED_AT="$_ENDED_AT_RC"
         _PREV_LOGICAL_NUM="$(jq -r '.session.logical_session_number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-        _NEW_LOGICAL_NUM=$(( ${_PREV_LOGICAL_NUM:-1} + 1 ))
+        _NEW_LOGICAL_NUM=$((${_PREV_LOGICAL_NUM:-1} + 1))
         # FIX BUG-01: usa session_id real do VS Code (Premissa-1: VS Code é a fonte da verdade).
         # O VS Code continuará enviando SESSION_ID_PAYLOAD em todos os hooks futuros —
         # gerar UUID aqui causaria mismatch permanente em pre-tool-use.sh e post-tool-use.sh.

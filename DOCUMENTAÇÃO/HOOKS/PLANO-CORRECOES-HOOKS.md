@@ -901,8 +901,8 @@ múltiplos `--arg` em uma única chamada. Escritas continuam individualmente (at
 
 ---
 
-| ---------- | ------ |
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## | ---------- | ------ |
+
 | | 2026-03-11 | BUG-01 | `log-prompt.sh` RECONNECT-02 usa `SESSION_ID_PAYLOAD` em vez de UUID
 aleatório | | 2026-03-11 | BUG-02 | `session-start.sh` branch `inline_restart` preserva stats,
 atualiza apenas campos de identidade | | 2026-03-11 | BUG-03 | `pre-tool-use.sh` detecta
@@ -986,9 +986,244 @@ transientemente null entre section-end.sh e start-section.sh (BUG-A.3) | | 2026-
 Secao 20 adicionada: hierarquia SESSION/SECTION/TURN analise tecnica completa; BUG-S01/S02/S03
 documentados e corrigidos |
 
-| 2026-03-13 | GAP-S01-FIX  | log-prompt.sh RECONNECT-02: section_count e section_names agora resetados a 0 com snapshot prev_section_count/prev_section_names |
-| 2026-03-13 | GAP-S04-FIX  | log-prompt.sh RECONNECT-02: logical_session_number incrementado; propagado aos eventos turnStart e sessionStart_inline em audit.jsonl |
-| 2026-03-13 | GUIA v2.4    | Secao 20.7 atualizada: GAP-S01 e GAP-S04 marcados como CORRIGIDOS com fundamentacao tecnica |
+| 2026-03-13 | GAP-S01-FIX | log-prompt.sh RECONNECT-02: section_count e section_names agora
+resetados a 0 com snapshot prev_section_count/prev_section_names | | 2026-03-13 | GAP-S04-FIX |
+log-prompt.sh RECONNECT-02: logical_session_number incrementado; propagado aos eventos turnStart e
+sessionStart_inline em audit.jsonl | | 2026-03-13 | GUIA v2.4 | Secao 20.7 atualizada: GAP-S01 e
+GAP-S04 marcados como CORRIGIDOS com fundamentacao tecnica |
+
+| 2026-03-13 | GAP-S02-FIX | section-end.sh: substituído null por is_closed=true + closed_at em
+current_section; agent-stop.sh detecta is_closed=true para invariante | | 2026-03-13 | GAP-S03-FIX |
+session-end.sh: adicionada extração de SESSION_ID_PAYLOAD do payload + HEAL v1 (era o único hook VS
+Code invocado sem HEAL) | | 2026-03-13 | UPG-AUDIT-01 | Planejamento: audit file isolado por
+SESSION_ID — investigação completa documentada em Seção 8 do PLANO | | 2026-03-13 | GUIA v2.5 |
+Secao 20.7 atualizada: GAP-S02 e GAP-S03 marcados CORRIGIDOS; referência ao UPG-AUDIT-01 adicionada
+|
+
+---
+
+## Seção 8 — Planejamento de Upgrades Futuros
+
+> **Propósito**: seção exclusiva para planejamento antecipado de upgrades de alto impacto. Upgrades
+> listados aqui são **PLANEJADOS mas não implementados** — aguardam revisão e aprovação.
+
+---
+
+### UPG-AUDIT-01 — Audit File Isolado por SESSION_ID
+
+**Status**: PLANEJADO (não implementado) **Prioridade**: Alta **Data de planejamento**: 2026-03-13
+**Motivação**: Reportada pelo usuário — "cada SESSÃO (associada a um session_id determinado pelo
+Copilot GitHub) deve ter seu próprio audit file. Ao longo do tempo podemos retomar sessões (mesma
+janela), abrir novas sessões, voltar a outras, e podemos até mesmo ter mais de uma sessão ao mesmo
+tempo."
+
+---
+
+#### Contexto Técnico Atual
+
+O sistema de hooks usa **um único arquivo por tipo** para toda atividade do agente:
+
+| Arquivo                            | Uso                              | Escopo atual                 |
+| ---------------------------------- | -------------------------------- | ---------------------------- |
+| `logs/audit.jsonl`                 | Log de todos os eventos de hooks | Global (todas as sessões)    |
+| `state/session-context.json`       | Contexto vivo da sessão ativa    | Global (sessão mais recente) |
+| `logs/findings.jsonl`              | Findings de bugs/gaps            | Global                       |
+| `logs/tool-metrics.jsonl`          | Métricas de ferramentas          | Global                       |
+| `logs/audit-YYYYMMDD_HHMMSS.jsonl` | Rotações históricas              | Global                       |
+
+**Problemas do modelo atual**:
+
+1. Sessões concorrentes escrevem no mesmo `audit.jsonl` — interleaving de eventos
+2. Retomada de uma sessão sobrescreve `session-context.json` da sessão anterior
+3. Análises por sessão requerem filtro `select(.session_id == X)` em arquivo crescente
+4. `rotate-audit.sh` não distingue sessões — rotação pode truncar log ativo de sessão B enquanto
+   sessão A ainda está correndo
+
+---
+
+#### Escopo de Impacto (Inventário)
+
+**33 scripts** escrevem em `audit.jsonl`, **34 scripts** usam `session-context.json`.
+
+**Scripts VS Code-invocados** (recebem `SESSION_ID_PAYLOAD` por stdin — 10 scripts):
+
+| Script                | Hook                  | Tem HEAL?                      |
+| --------------------- | --------------------- | ------------------------------ |
+| `session-start.sh`    | `sessionStart`        | ✅ (cria sessão)               |
+| `log-prompt.sh`       | `userPromptSubmitted` | ✅ HEAL v1+v2                  |
+| `pre-tool-use.sh`     | `preToolUse`          | ✅ HEAL v1+v2                  |
+| `post-tool-use.sh`    | `postToolUse`         | ✅ HEAL v1+v2                  |
+| `agent-stop.sh`       | `agentStop`           | ✅ HEAL v2                     |
+| `subagent-start.sh`   | `subagentStart`       | ✅ HEAL v1                     |
+| `subagent-stop.sh`    | `subagentStop`        | ✅ HEAL v1                     |
+| `tool-use-failure.sh` | `postToolUseFailure`  | ✅ HEAL v1                     |
+| `pre-compact.sh`      | `preCompact`          | ✅ HEAL v1                     |
+| `session-end.sh`      | `sessionEnd`          | ✅ HEAL v1 (GAP-S03 corrigido) |
+
+**Scripts manualmente invocados** (leem SESSION_ID do CTX_FILE — 23 scripts): `start-section.sh`,
+`section-end.sh`, `start-turn.sh`, `continue-section.sh`, `add-task.sh`, `complete-task.sh`,
+`save-finding.sh`, `resolve-finding.sh`, `on-git-push.sh`, `session-checkpoint.sh`,
+`session-close.sh`, `analytics.sh`, `generate-session-summary.sh`, `generate-section-summary.sh`,
+`generate-daily-report.sh`, `export-metrics.sh`, `reset-auth-violation.sh`, `rotate-audit.sh`,
+`manual-session-init.sh`, `sync-transcript-errors.sh`, `read-transcript.sh`, `watchdog.sh`,
+`error-occurred.sh`.
+
+---
+
+#### Design Proposto
+
+**Princípio**: cada SESSION_ID tem seu próprio conjunto de arquivos.
+
+**Naming convention** (usar 8 primeiros chars do UUID para legibilidade):
+
+```
+SID_SHORT = primeiros 8 caracteres do session_id UUID
+           ex: "dcf579af" de "dcf579af-502e-4bf2-9d92-75903f85b0a2"
+
+logs/audit-{SID_SHORT}.jsonl           ← audit file por sessão
+state/session-context-{SID_SHORT}.json ← contexto por sessão
+logs/audit.jsonl (symlink)             ← aponta para sessão atual (compat)
+state/session-context.json (symlink)   ← aponta para sessão atual (compat)
+state/current-session-id.txt           ← session_id ativo para scripts manuais
+```
+
+**Sessões concorrentes**:
+
+- Cada hook VS Code recebe seu `SESSION_ID_PAYLOAD` → resolve seus próprios arquivos
+- Scripts manuais leem `state/current-session-id.txt` → sabem qual sessão usar
+- Quando o agente abre uma nova sessão, atualiza `current-session-id.txt`
+
+**Retomada de sessão**:
+
+- O `session_id` do VS Code é constante por janela — retomar = mesmo arquivo
+- Ao reconectar (`inline_restart`), o `session_id` é IGUAL → arquivo existente
+- `session-start.sh` detecta se `audit-{SID_SHORT}.jsonl` já existe → append
+
+**Compatibilidade retroativa**:
+
+- Os symlinks mantêm o comportamento atual para scripts que não foram migrados
+- Migração gradual: scripts VS Code-invocados migram primeiro (Fase 1)
+- Scripts manuais migram em Fase 2, usando `current-session-id.txt`
+
+---
+
+#### Sub-tarefas do Upgrade (sequência obrigatória)
+
+**Fase 0 — Preparação e migração de estado existente**:
+
+- [ ] T01: Criar script `scripts/migrate-to-per-session-audit.sh` que:
+  - Lê o `session_id` atual de `session-context.json`
+  - Copia `audit.jsonl` para `audit-{SID_SHORT}.jsonl`
+  - Cria `current-session-id.txt` com o session_id atual
+  - Cria os symlinks backward-compat
+- [ ] T02: Definir funções helper em `hooks-lib/common.sh`:
+  - `resolve_audit_file()` → `$LOG_DIR/audit-${SID_SHORT}.jsonl`
+  - `resolve_ctx_file()` → `$STATE_DIR/session-context-${SID_SHORT}.json`
+  - `get_current_session_id()` → lê `current-session-id.txt`
+  - `set_current_session_id(SID)` → escreve em `current-session-id.txt` (atômico)
+
+**Fase 1 — Scripts VS Code-invocados** (recebem SESSION_ID_PAYLOAD diretamente):
+
+- [ ] T03: `session-start.sh` — criar `session-context-{SID_SHORT}.json` em vez de
+      `session-context.json`; atualizar symlink + `current-session-id.txt`; criar
+      `audit-{SID_SHORT}.jsonl` (se não existir); manter append se já existir
+- [ ] T04: `log-prompt.sh` — resolver CTX_FILE e AUDIT_FILE via `SESSION_ID_PAYLOAD`
+- [ ] T05: `pre-tool-use.sh` — idem
+- [ ] T06: `post-tool-use.sh` — idem
+- [ ] T07: `agent-stop.sh` — idem; atualizar boundary detection (leitura de audit.jsonl) que hoje
+      usa `awk` em `AUDIT_FILE` (linha 291)
+- [ ] T08: `subagent-start.sh` — idem
+- [ ] T09: `subagent-stop.sh` — idem
+- [ ] T10: `tool-use-failure.sh` — idem
+- [ ] T11: `pre-compact.sh` — idem
+- [ ] T12: `session-end.sh` — usar per-session audit file; atualizar queries de `TOOLS_COUNT` e
+      `ERRORS_COUNT` (hoje filtra por `session_id` em audit.jsonl global)
+
+**Fase 2 — Scripts manuais** (leem SESSION_ID via `current-session-id.txt`):
+
+- [ ] T13: `start-section.sh` — usar `resolve_ctx_file()` e `resolve_audit_file()`
+- [ ] T14: `section-end.sh` — idem
+- [ ] T15: `start-turn.sh` — idem
+- [ ] T16: `continue-section.sh` — idem
+- [ ] T17: `on-git-push.sh` — idem
+- [ ] T18: `session-checkpoint.sh` — idem; checkpoint passa a ser por sessão
+- [ ] T19: `session-close.sh` — idem; fecha sessão específica (não a global)
+- [ ] T20: `add-task.sh`, `complete-task.sh`, `save-finding.sh`, `resolve-finding.sh`,
+      `reset-auth-violation.sh` — idem (escrita em audit file da sessão ativa)
+- [ ] T21: `error-occurred.sh` — recebe session_id do contexto; usar per-session file
+- [ ] T22: `manual-session-init.sh` — criar sessão com SID explícito; inicializar
+      `current-session-id.txt`
+
+**Fase 3 — Scripts de análise e relatórios**:
+
+- [ ] T23: `analytics.sh` — suportar `--session {SID}` para análise por sessão; modo `--all` agrega
+      todos os `audit-*.jsonl`
+- [ ] T24: `generate-session-summary.sh` — receber SID como argumento; ler `audit-{SID_SHORT}.jsonl`
+      em vez de global
+- [ ] T25: `generate-section-summary.sh` — idem
+- [ ] T26: `generate-daily-report.sh` — agregar todos os per-session audit files do dia
+- [ ] T27: `export-metrics.sh` — suportar por sessão e agregado
+
+**Fase 4 — Infraestrutura**:
+
+- [ ] T28: `rotate-audit.sh` — rotacionar por sessão: `audit-{SID_SHORT}-YYYYMMDD.jsonl`; nunca
+      rotacionar sessão ainda ativa (verificar via `current-session-id.txt`)
+- [ ] T29: `watchdog.sh` — escanear todos `session-context-*.json` para detectar sessões stale,
+      fantasmas ou concorrentes
+- [ ] T30: `sync-transcript-errors.sh` — receber SID e resolver transcript por sessão
+- [ ] T31: Session briefing (`session-briefing.md`) — gerado por sessão em
+      `state/session-briefing-{SID_SHORT}.md`; symlink `session-briefing.md` aponta para ativo
+
+**Fase 5 — Testes e smoke test**:
+
+- [ ] T32: `smoke-test.sh` — adicionar cenário multi-sessão: 2 sessões concorrentes com SIDs
+      distintos, verificar isolamento de arquivos
+- [ ] T33: Adicionar test para retomada: mesma SID reabre e faz append no mesmo arquivo
+- [ ] T34: Adicionar test para sessão obsoleta: session-end.sh não deleta o per-session file —
+      apenas fecha; arquivo persiste para histórico
+
+**Fase 6 — Documentação**:
+
+- [ ] T35: Atualizar GUIA seção 2, 3, 20 para descrever o modelo per-session
+- [ ] T36: Criar `DOCUMENTAÇÃO/HOOKS/MULTI-SESSION.md` com guia operacional
+
+---
+
+#### Riscos e Mitigações
+
+| Risco                                                                    | Impacto | Mitigação                                                                       |
+| ------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------- |
+| Script manual lê `current-session-id.txt` com SID errado                 | Médio   | Lock exclusivo ao escrever; validar que SID existe em CTX antes de usar         |
+| Race condition em sessões concorrentes escrevendo em ctx diferente       | Baixo   | Cada sessão tem seu próprio arquivo — sem compartilhamento                      |
+| `current-session-id.txt` aponta para sessão já encerrada                 | Médio   | `session-start.sh` sempre atualiza ao criar nova sessão; watchdog detecta stale |
+| Symlinks divergem do arquivo real                                        | Baixo   | Atualização atômica via temp + mv do próprio symlink                            |
+| rotate-audit rotaciona arquivo de sessão ativa                           | Alto    | Verificar `current-session-id.txt` antes de rotacionar — pular sessão ativa     |
+| Scripts externos (fora do sistema) quebrando ao ler `audit.jsonl` global | Médio   | Symlink backward-compat mantém `audit.jsonl` → sessão ativa                     |
+
+---
+
+#### Dependências entre Fases
+
+```
+Fase 0 (migração + helpers) → Fase 1 (VS Code hooks) → Fase 2 (scripts manuais)
+                            ↘ Fase 3 (análise) → Fase 4 (infra) → Fase 5 (testes)
+                                                                  → Fase 6 (docs)
+```
+
+**Ordem mínima**: T01+T02 → T03 → T04–T12 (paralelos) → T13–T22 (paralelos) → T23–T31 (paralelos) →
+T32–T34 → T35–T36
+
+---
+
+#### Estimativa de Escopo
+
+- **Arquivos modificados**: ~33–35 scripts + 1 helpers em common.sh + 1 novo script (migrate)
+- **Novos arquivos**: `scripts/migrate-to-per-session-audit.sh`,
+  `DOCUMENTAÇÃO/HOOKS/MULTI-SESSION.md`
+- **Linhas afetadas**: ~200–400 (mudanças de `$LOG_DIR/audit.jsonl` para `resolve_audit_file()`)
+- **Risco global**: Médio-Alto (escopo amplo; testar cada fase antes de commitar)
+
+---
 
 ---
 
