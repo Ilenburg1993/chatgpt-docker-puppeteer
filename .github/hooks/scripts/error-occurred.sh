@@ -22,6 +22,13 @@ SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || 
 # Obtém session_id do contexto persistido
 SESSION_ID=""
 CTX_FILE="$STATE_DIR/session-context.json"
+# UPG-AUDIT-01: resolve per-session paths (VS Code hook — usa SESSION_ID_PAYLOAD)
+if [ -n "${SESSION_ID_PAYLOAD:-}" ]; then
+    _SID_SHORT="${SESSION_ID_PAYLOAD:0:8}"
+    CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json"
+    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+    mkdir -p "$(dirname "$CTX_FILE")" 2> /dev/null || true
+fi
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
@@ -46,7 +53,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 got:      $got,
                 source:   $source,
                 message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-            }' >> "$LOG_DIR/audit.jsonl"
+            }' >> "$AUDIT_FILE"
         exit 0
     fi
 fi
@@ -64,7 +71,7 @@ jq -cn \
         timestamp:  $ts,
         errorName:  $name,
         errorMsg:   $msg
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 # Append em errors.jsonl (com stack completo para debug)
 jq -cn \

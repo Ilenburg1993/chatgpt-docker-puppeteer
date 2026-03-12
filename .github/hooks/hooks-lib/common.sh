@@ -122,7 +122,10 @@ ctx_update() {
         tmp="$(mktemp)" || return 1
         if with_lock "$lockfile" \
             sh -c "jq '${expr}' \"$CTX_FILE\" > \"$tmp\"" 2> /dev/null; then
-            mv "$tmp" "$CTX_FILE" 2> /dev/null || {
+            # UPG-AUDIT-01: resolve symlink antes de mv para não quebrar o pointeiro.
+            local _real_ctx
+            _real_ctx="$(readlink -f "$CTX_FILE" 2> /dev/null || echo "$CTX_FILE")"
+            mv "$tmp" "$_real_ctx" 2> /dev/null || {
                 rm -f "$tmp"
                 return 1
             }
@@ -413,4 +416,136 @@ heal_v2() {
 increment_mismatch() {
     ctx_update '.session_stats.session_id_mismatches = ((.session_stats.session_id_mismatches // 0) + 1)' \
         2> /dev/null || true
+}
+
+# ════════════════════════════════════════════════════════════════════════════
+# UPG-AUDIT-01 — Helpers per-session (v1.2)
+# Funções para resolução de caminhos per-SESSION_ID e gestão de symlinks
+# de compatibilidade retroativa.
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── sid_short ────────────────────────────────────────────────────────────────
+# Extrai os primeiros 8 caracteres de um session_id UUID (SID_SHORT).
+# Usado como sufixo de arquivos per-session: audit-{SID_SHORT}.jsonl
+#
+# Uso: SID_SHORT="$(sid_short "$SESSION_ID")"
+sid_short() {
+    local sid="${1:-}"
+    echo "${sid:0:8}"
+}
+
+# ── resolve_audit_file ────────────────────────────────────────────────────────
+# Retorna o caminho do audit file para um SID_SHORT.
+# Quando SID_SHORT está vazio, retorna o AUDIT_FILE global (backward compat).
+#
+# Uso: AUDIT="$(resolve_audit_file "$SID_SHORT")"
+resolve_audit_file() {
+    local sid_short="${1:-}"
+    if [ -n "$sid_short" ]; then
+        echo "${LOG_DIR}/audit-${sid_short}.jsonl"
+    else
+        echo "${AUDIT_FILE}"
+    fi
+}
+
+# ── resolve_ctx_file ──────────────────────────────────────────────────────────
+# Retorna o caminho do session-context para um SID_SHORT.
+# Quando SID_SHORT está vazio, retorna o CTX_FILE global (backward compat).
+#
+# Uso: CTX="$(resolve_ctx_file "$SID_SHORT")"
+resolve_ctx_file() {
+    local sid_short="${1:-}"
+    if [ -n "$sid_short" ]; then
+        echo "${STATE_DIR}/session-context-${sid_short}.json"
+    else
+        echo "${CTX_FILE}"
+    fi
+}
+
+# ── get_current_session_id ────────────────────────────────────────────────────
+# Lê o session_id da sessão ativa de state/current-session-id.txt.
+# Scripts manuais devem usar isso para descobrir a sessão ativa.
+# Fallback: lê do CTX_FILE global (compatibilidade com versão anterior).
+#
+# Uso: SID="$(get_current_session_id)"
+get_current_session_id() {
+    local sid_file="${STATE_DIR}/current-session-id.txt"
+    if [ -f "$sid_file" ] && [ -s "$sid_file" ]; then
+        tr -d '[:space:]' < "$sid_file" 2> /dev/null || echo ''
+    else
+        get_session_id
+    fi
+}
+
+# ── set_current_session_id ────────────────────────────────────────────────────
+# Escreve atomicamente o session_id ativo em state/current-session-id.txt.
+# Chamado por session-start.sh quando nova sessão começa.
+#
+# Uso: set_current_session_id "$SESSION_ID"
+set_current_session_id() {
+    local sid="${1:-}" sid_file="${STATE_DIR}/current-session-id.txt"
+    [ -n "$sid" ] || return 1
+    local tmp
+    tmp="$(mktemp)" || return 1
+    echo "$sid" > "$tmp"
+    mv "$tmp" "$sid_file" 2> /dev/null || {
+        rm -f "$tmp"
+        return 1
+    }
+}
+
+# ── update_compat_symlinks ────────────────────────────────────────────────────
+# Atualiza/cria symlinks de compatibilidade retroativa para a sessão ativa.
+# Garante que audit.jsonl aponta para audit-{SID_SHORT}.jsonl.
+# Garante que session-context.json aponta para session-context-{SID_SHORT}.json,
+# mas SÓ quando o arquivo per-session já existe (evita symlink quebrado).
+#
+# Uso: update_compat_symlinks "$SID_SHORT"
+update_compat_symlinks() {
+    local sid_short="${1:-}"
+    [ -n "$sid_short" ] || return 1
+
+    # audit.jsonl → audit-{SID_SHORT}.jsonl
+    local audit_target="${LOG_DIR}/audit-${sid_short}.jsonl"
+    touch "$audit_target" 2> /dev/null || true
+    # ln -sfn usa caminho relativo para portabilidade
+    (cd "$LOG_DIR" && ln -sfn "audit-${sid_short}.jsonl" "audit.jsonl" 2> /dev/null) || true
+
+    # session-context.json → session-context-{SID_SHORT}.json
+    # Só cria/atualiza o symlink quando o arquivo de destino já existe.
+    local ctx_target="${STATE_DIR}/session-context-${sid_short}.json"
+    if [ -f "$ctx_target" ]; then
+        (cd "$STATE_DIR" && ln -sfn "session-context-${sid_short}.json" "session-context.json" 2> /dev/null) || true
+    fi
+
+    return 0
+}
+
+# ── apply_per_session_paths ───────────────────────────────────────────────────
+# Resolve e sobreescreve CTX_FILE e AUDIT_FILE para caminhos per-session quando
+# o arquivo per-session já existe (criado por session-start.sh).
+# Operação segura: só troca se o arquivo per-session existir (backward compat).
+# Para uso em hooks VS Code-invocados (recebem SESSION_ID_PAYLOAD por stdin).
+#
+# Parâmetros: $1 = SESSION_ID_PAYLOAD (session_id do VS Code)
+# Saída: modifica CTX_FILE e AUDIT_FILE no escopo do chamador (via eval).
+# Retorna 0 se usou per-session, 1 se manteve global.
+#
+# Uso:
+#   apply_per_session_paths "$SESSION_ID_PAYLOAD"
+apply_per_session_paths() {
+    local sid_payload="${1:-}"
+    [ -n "$sid_payload" ] || return 1
+
+    local _ssh
+    _ssh="${sid_payload:0:8}"
+    local _per_ctx="${STATE_DIR}/session-context-${_ssh}.json"
+    local _per_audit="${LOG_DIR}/audit-${_ssh}.jsonl"
+
+    if [ -f "$_per_ctx" ]; then
+        CTX_FILE="$_per_ctx"
+        AUDIT_FILE="$_per_audit"
+        return 0
+    fi
+    return 1
 }

@@ -21,12 +21,7 @@ else
     echo "[warn] common.sh não encontrado (post-tool-use.sh) — heal_v1/ctx functions indisponíveis" >&2
 fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
-# G9-08: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
-_CTX_LOCK="${CTX_FILE}.lock"
-exec 9> "$_CTX_LOCK"
-if command -v flock > /dev/null 2>&1; then
-    flock -x -w 3 9 2> /dev/null
-fi
+# CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
 INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos usando o schema real (snake_case)
@@ -41,6 +36,20 @@ SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')
 # Fallback: se session_id não veio do payload, usa o do contexto
 if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+fi
+# UPG-AUDIT-01: resolve per-session paths ANTES do flock (override CTX_FILE, AUDIT_FILE)
+if command -v resolve_audit_file > /dev/null 2>&1 && [ -n "${SESSION_ID:-}" ]; then
+    _SID_SHORT="${SESSION_ID:0:8}"
+    CTX_FILE="$(resolve_ctx_file "$_SID_SHORT")"
+    AUDIT_FILE="$(resolve_audit_file "$_SID_SHORT")"
+    mkdir -p "$(dirname "$CTX_FILE")" "$(dirname "$AUDIT_FILE")" 2> /dev/null || true
+fi
+
+# G9-08: Lock exclusivo APÓS resolver CTX_FILE per-session
+_CTX_LOCK="${CTX_FILE}.lock"
+exec 9> "$_CTX_LOCK"
+if command -v flock > /dev/null 2>&1; then
+    flock -x -w 3 9 2> /dev/null
 fi
 
 # ── Determina result_type (heurística progressiva) ───────────────────────────
@@ -73,7 +82,7 @@ jq -cn \
         tool_name:    $tool,
         tool_use_id:  $tool_use_id,
         result_type:  $result
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
 # F0.3: detecta contexto vazio
@@ -114,7 +123,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                 --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
                 '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, tool: $tool, timestamp: $ts,
                   message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
-                >> "$LOG_DIR/audit.jsonl"
+                >> "$AUDIT_FILE"
             # SESSION_ID já tem o valor correto — continua
         elif [ "$CTX_SOURCE" = "inline_restart" ]; then
             # FIX BUG-06: inline_restart — CTX tem o session_id correto do VS Code (PREMISSA 1).
@@ -133,11 +142,11 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                     '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
                       source: $source, tool: $tool, timestamp: $ts,
                       message: "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"}' \
-                    >> "$LOG_DIR/audit.jsonl"
+                    >> "$AUDIT_FILE"
             elif [ "$_SYNCS_INLINE" -eq 5 ]; then
                 jq -cn --arg event "session_id_sync_inline_restart_cap" --arg source "post-tool-use.sh" \
                     '{event: $event, source: $source, message: "inline_restart sync count reached cap (5) — logs suprimidos daqui em diante"}' \
-                    >> "$LOG_DIR/audit.jsonl"
+                    >> "$AUDIT_FILE"
             fi
             # GAP-03: incrementa contador de syncs inline no CTX
             if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
@@ -161,7 +170,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                     tool:     $tool,
                     timestamp: $ts,
                     message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-                }' >> "$LOG_DIR/audit.jsonl"
+                }' >> "$AUDIT_FILE"
             # GAP-03: incrementa contador de mismatches no CTX antes de sair
             if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                 jq '.session_stats.session_id_mismatches = ((.session_stats.session_id_mismatches // 0) + 1)' \
@@ -203,7 +212,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                     error:      "Response contained no choices",
                     cause:      "Context too large or Copilot API unavailable",
                     response_preview: $response
-                }' >> "$LOG_DIR/audit.jsonl"
+                }' >> "$AUDIT_FILE"
 
             # Atualiza session-context com flag de falha de API (Hardening 2)
             jq --arg ts "$TIMESTAMP" \
@@ -242,7 +251,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                 response:     $response,
                 close_key_found: $key_found,
                 api_failed:   $api_failed
-            }' >> "$LOG_DIR/audit.jsonl"
+            }' >> "$AUDIT_FILE"
 
         # Atualiza contexto com resposta e, se necessário, valida a close_key
         # REV4-06: setar auth_requested=true aqui também (defesa em profundidade — garante
@@ -272,7 +281,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                         session_id: $sid,
                         timestamp:  $ts,
                         close_key:  $key
-                    }' >> "$LOG_DIR/audit.jsonl"
+                    }' >> "$AUDIT_FILE"
 
                 # Auto-encerramento: chama session-close.sh para garantir que sessionCloseAuthorized
                 # seja registrado mesmo que o agente esqueça de chamar o script manualmente.
@@ -293,7 +302,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                         timestamp:  $ts,
                         close_key:  $key,
                         message:    "close_key já validada anteriormente — encerramento idempotente, session-close.sh não re-executado"
-                    }' >> "$LOG_DIR/audit.jsonl"
+                    }' >> "$AUDIT_FILE"
             fi
         else
             jq --arg result "$RESULT_TYPE" \

@@ -29,6 +29,12 @@ STATE_DIR="$HOOK_DIR/state"
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 mkdir -p "$STATE_DIR"
 
+# UPG-AUDIT-01: carrega helpers per-session de common.sh
+# shellcheck disable=SC1091
+if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
+    source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
+fi
+
 # Lê o JSON de entrada de forma defensiva
 INPUT="$(cat 2> /dev/null || true)"
 
@@ -48,6 +54,11 @@ fi
 
 SESSION_DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo 'unknown')"
 SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || echo 'unknown')"
+
+# UPG-AUDIT-01: caminhos per-session (calculados logo que SESSION_ID é conhecido)
+SID_SHORT="${SESSION_ID:0:8}"
+PER_CTX_FILE="${STATE_DIR}/session-context-${SID_SHORT}.json"
+PER_AUDIT_FILE="${LOG_DIR}/audit-${SID_SHORT}.jsonl"
 
 # ── Lê valores de conformidade da sessão anterior ANTES de sobrescrever ──────
 # CRÍTICO: session-context.json é sobrescrito logo abaixo; precisamos dos dados
@@ -161,11 +172,18 @@ if [ "$SOURCE" = "inline_restart" ] \
          | .session.cwd                 = $cwd
          | .last_tool.ts                = $ts' \
         "$STATE_DIR/session-context.json" > "$_CTX_TMP" 2> /dev/null; then
-        mv "$_CTX_TMP" "$STATE_DIR/session-context.json" 2> /dev/null \
+        # UPG-AUDIT-01: escreve no per-session file e recria symlink
+        _PER_CTX_REAL="${STATE_DIR}/session-context-${SID_SHORT}.json"
+        mv "$_CTX_TMP" "$_PER_CTX_REAL" 2> /dev/null \
             || {
-                cp "$_CTX_TMP" "$STATE_DIR/session-context.json" 2> /dev/null
+                cp "$_CTX_TMP" "$_PER_CTX_REAL" 2> /dev/null
                 rm -f "$_CTX_TMP"
             }
+        # Atualiza symlink de compatibilidade retroativa
+        if [ -n "${SID_SHORT:-}" ]; then
+            update_compat_symlinks "$SID_SHORT" 2> /dev/null || true
+            set_current_session_id "$SESSION_ID" 2> /dev/null || true
+        fi
     else
         rm -f "$_CTX_TMP"
         # Fallback: se a atualização parcial falhar (CTX corrompido), faz reset completo
@@ -278,8 +296,16 @@ if [ "$SOURCE" != "inline_restart" ]; then
         "quality_gates":   {},
         "session_summary": null,
         "last_turn_ts":    null
-    }' > "$STATE_DIR/session-context.json"
+    }' > "$PER_CTX_FILE"
+    # UPG-AUDIT-01: após criar o per-session CTX, atualiza symlinks e current-session-id.txt
+    update_compat_symlinks "$SID_SHORT" 2> /dev/null || true
+    set_current_session_id "$SESSION_ID" 2> /dev/null || true
 fi
+
+# UPG-AUDIT-01: garante que CTX_FILE e AUDIT_FILE apontam para os per-session files
+CTX_FILE="$PER_CTX_FILE"
+AUDIT_FILE="$PER_AUDIT_FILE"
+touch "$AUDIT_FILE" 2> /dev/null || true
 
 # BUG-A.2: Limpa contador de mismatches de sessões anteriores (HEAL v2).
 # .mismatch_track.json contém estado do contador de sessão id mismatch.
@@ -316,18 +342,22 @@ fi
 # Encerramento limpo = `sessionEnd` OR `sessionCloseAuthorized` com o session_id correto.
 PREV_ABRUPT_CLOSE=false
 if [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
-    _AUDIT_TMP="$LOG_DIR/audit.jsonl"
+    # UPG-AUDIT-01: usa arquivo per-session da sessão anterior (não o symlink atualizado)
+    _PREV_SID_SHORT="${PREV_SESSION_ID:0:8}"
+    _AUDIT_TMP="${LOG_DIR}/audit-${_PREV_SID_SHORT}.jsonl"
+    [ -f "$_AUDIT_TMP" ] || _AUDIT_TMP="$LOG_DIR/audit.jsonl"
     _FOUND_SESSION_END=false
     # Padrão de grep: qualquer um dos dois eventos de encerramento limpo
     _CLEAN_CLOSE_PATTERN='"sessionEnd"\|"sessionCloseAuthorized"'
-    # Verifica arquivo ativo primeiro
+    # Verifica arquivo per-session da sessão anterior
     if [ -f "$_AUDIT_TMP" ] && grep -q "$_CLEAN_CLOSE_PATTERN" "$_AUDIT_TMP" 2> /dev/null \
         && grep "$_CLEAN_CLOSE_PATTERN" "$_AUDIT_TMP" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
         _FOUND_SESSION_END=true
     fi
-    # Se não encontrou, verifica o arquivo de audit mais recente (após rotação)
+    # Se não encontrou, verifica outros arquivos per-session excluindo o atual (após rotação)
     if [ "$_FOUND_SESSION_END" = "false" ]; then
-        _LATEST_ARCHIVE="$(find "$LOG_DIR" -maxdepth 1 -name 'audit-*.jsonl' \
+        _LATEST_ARCHIVE="$(find "$LOG_DIR" -maxdepth 1 -name 'audit-????????.jsonl' \
+            ! -name "audit-${SID_SHORT}.jsonl" \
             -printf '%T@ %p\n' 2> /dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)"
         if [ -n "$_LATEST_ARCHIVE" ] && [ -f "$_LATEST_ARCHIVE" ] \
             && grep -q "$_CLEAN_CLOSE_PATTERN" "$_LATEST_ARCHIVE" 2> /dev/null \
@@ -363,7 +393,9 @@ elif [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
     PREV_CLOSE_MODE="clean"
     # RECONNECT-01: verifica se o encerramento foi via rollover de reconexão
     # (sessionEnd sintético com close_mode:abrupt_reconnect gerado por log-prompt.sh)
-    _AUDIT_TMP="$LOG_DIR/audit.jsonl"
+    # UPG-AUDIT-01: usa arquivo per-session da sessão anterior (não symlink atualizado)
+    _AUDIT_TMP="${LOG_DIR}/audit-${_PREV_SID_SHORT:-${PREV_SESSION_ID:0:8}}.jsonl"
+    [ -f "$_AUDIT_TMP" ] || _AUDIT_TMP="$LOG_DIR/audit.jsonl"
     if [ -f "$_AUDIT_TMP" ] && grep -q '"sessionReconnect"' "$_AUDIT_TMP" 2> /dev/null \
         && grep '"sessionReconnect"' "$_AUDIT_TMP" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
         PREV_CLOSE_MODE="abrupt_reconnect"
@@ -387,7 +419,7 @@ jq -cn \
     --arg source "$SOURCE" \
     --arg cwd "$CWD" \
     '{event: $event, session_id: $sid, timestamp: $ts, date: $date, source: $source, cwd: $cwd}' \
-    >> "$LOG_DIR/audit.jsonl"
+    >> "$AUDIT_FILE"
 
 # ── Loga sectionStart da section padrão "início" (Schema v4 — invariante) ────
 jq -cn \
@@ -400,7 +432,7 @@ jq -cn \
       section_id: $section_id,
       section_number: 1, turn_number: 1, description: null, prev_section: null,
       auto_open: true}' \
-    >> "$LOG_DIR/audit.jsonl"
+    >> "$AUDIT_FILE"
 
 # ─────────────────────────────────────────────────────────────
 # Gera session-briefing.md — lido pelo LLM no início da sessão
@@ -436,9 +468,22 @@ fi
 TOTAL_OPEN=$((COUNT_ALTA + COUNT_MEDIA + COUNT_BACKLOG))
 
 # ─────────────────────────────────────────────────────────────
-# Análise de tendências históricas (audit.jsonl + tool-metrics.jsonl)
+# Análise de tendências históricas (audit*.jsonl + tool-metrics.jsonl)
+# UPG-AUDIT-01: merge cross-session para leitura histórica correta
 # ─────────────────────────────────────────────────────────────
-AUDIT_FILE="$LOG_DIR/audit.jsonl"
+_TREND_AUDIT_FILE_BKP="$AUDIT_FILE"  # salva arquivo per-session atual
+_TREND_MERGED=""
+# Merge de todos os per-session audits para análise cross-session
+_TREND_SID_FILES=()
+while IFS= read -r -d '' _tf; do _TREND_SID_FILES+=("$_tf"); done \
+    < <(find "$LOG_DIR" -maxdepth 1 -name 'audit-????????.jsonl' -print0 2>/dev/null | sort -z)
+if [ ${#_TREND_SID_FILES[@]} -gt 0 ] && _TREND_MERGED="$(mktemp 2>/dev/null)"; then
+    trap 'rm -f "${_TREND_MERGED:-}"' EXIT
+    cat "${_TREND_SID_FILES[@]}" > "$_TREND_MERGED" 2>/dev/null || true
+    AUDIT_FILE="$_TREND_MERGED"
+else
+    AUDIT_FILE="$LOG_DIR/audit.jsonl"
+fi
 METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"
 
 TREND_SESSIONS="N/D"
@@ -491,6 +536,8 @@ if [ -f "$METRICS_FILE" ] && [ -s "$METRICS_FILE" ]; then
         | sort -t'|' -k3 -rn | head -8 || true)"
     [ -z "$TREND_PERF_TABLE" ] && TREND_PERF_TABLE="| N/D | - | 0 |"
 fi
+
+AUDIT_FILE="$_TREND_AUDIT_FILE_BKP"  # UPG-AUDIT-01: restaura audit per-session após análise histórica
 
 # ── UP3: Health check do ambiente ─────────────────────────────────────────
 HEALTH_CRITICAL=""
@@ -607,7 +654,7 @@ if [ -f "$AUTH_FLAG_FILE" ]; then
                 old_session_id: $old_sid,
                 flag_timestamp: $flag_ts,
                 message:     "Flag UNAUTHORIZED_CLOSE de sessão diferente removido automaticamente"
-            }' >> "$LOG_DIR/audit.jsonl" 2> /dev/null || true
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
         # Stale: não acumula consecutive_unauthorized na nova sessão
         PREV_CONSEC_UNAUTH=0
     else
@@ -639,7 +686,7 @@ if [ "$PREV_UNAUTH_CLOSE" = "false" ] && [ "${PREV_CONSEC_UNAUTH:-0}" -gt 0 ]; t
             old_session_id:           $old_sid,
             consecutive_unauthorized: $consec,
             message:                  "Violação detectada via ctx fallback (sem flag file) — hardening v5.1"
-        }' >> "$LOG_DIR/audit.jsonl" 2> /dev/null || true
+        }' >> "$AUDIT_FILE" 2> /dev/null || true
 fi
 
 # ── Verifica encerramento sem SESSION CLOSE KEY ─────────────────────────────

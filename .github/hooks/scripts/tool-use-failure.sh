@@ -26,6 +26,13 @@ SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')
 TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // ""' 2> /dev/null || echo '')"
 TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2> /dev/null || echo '')"
 ERROR_MSG="$(echo "$INPUT" | jq -r '.error // .message // ""' 2> /dev/null || echo '')"
+# UPG-AUDIT-01: resolve per-session paths
+if command -v resolve_audit_file > /dev/null 2>&1 && [ -n "${SESSION_ID:-}" ]; then
+    _SID_SHORT="${SESSION_ID:0:8}"
+    CTX_FILE="$(resolve_ctx_file "$_SID_SHORT")"
+    AUDIT_FILE="$(resolve_audit_file "$_SID_SHORT")"
+    mkdir -p "$(dirname "$CTX_FILE")" "$(dirname "$AUDIT_FILE")" 2> /dev/null || true
+fi
 
 # ── Guard: session_id (executa ANTES de qualquer write de estado) ─────────────
 # BUG-S01: guard movido para antes dos writes para evitar contaminar audit.jsonl
@@ -60,7 +67,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                 error:     $error,
                 source:    "tool-use-failure.sh",
                 message:   "Payload session_id diferente do contexto ativo — state write bloqueado"
-            }' >> "$LOG_DIR/audit.jsonl"
+            }' >> "$AUDIT_FILE"
         # GAP-03: incrementa contador de mismatches
         if command -v increment_mismatch > /dev/null 2>&1; then
             increment_mismatch
@@ -84,7 +91,7 @@ jq -cn \
         tool_name:   $tool,
         tool_use_id: $tool_use_id,
         error:       $error
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 # Loga em errors.jsonl para rastreio separado
 jq -cn \

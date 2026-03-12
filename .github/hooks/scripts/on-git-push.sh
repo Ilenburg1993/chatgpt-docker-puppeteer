@@ -22,7 +22,15 @@ SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOKS_DIR="$(cd "$SCRIPTS_DIR/.." && pwd)"
 STATE_DIR="$HOOKS_DIR/state"
 LOG_DIR="$HOOKS_DIR/logs"
+AUDIT_FILE="$LOG_DIR/audit.jsonl"
 CTX_FILE="$STATE_DIR/session-context.json"
+# UPG-AUDIT-01: resolve per-session paths from current-session-id.txt
+_CSI_FILE="$STATE_DIR/current-session-id.txt"
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "$_CURR_SID" ]; then
+    _SID_SHORT="${_CURR_SID:0:8}"
+    CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json"
+    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+fi
 
 # ── Parâmetros ────────────────────────────────────────────────────────────────
 # Quando chamado pelo git hook: $1=remote, restante=<local-ref> <local-sha1> <remote-ref> <remote-sha1>
@@ -67,7 +75,7 @@ fi
 if [ -z "$SESSION_ID" ]; then
     mkdir -p "$LOG_DIR"
     jq -cn --arg msg "on-git-push.sh: SESSION_ID inválido ou jq indisponível — push não registrado" \
-        '{event:"gitPushRejected", error: $msg}' >> "$LOG_DIR/audit.jsonl" 2> /dev/null || true
+        '{event:"gitPushRejected", error: $msg}' >> "$AUDIT_FILE" 2> /dev/null || true
     echo "[on-git-push] AVISO: SESSION_ID vazio — push NÃO registrado no sistema de hooks (sessão inativa)." >&2
     exit 0
 fi
@@ -172,7 +180,7 @@ jq -cn \
         branch:         (if $branch == "" then null else $branch end),
         sha:            (if $sha == "" then null else $sha end),
         push_number:    $push_num
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 echo "[git-push] Push #${NEW_PUSH_COUNT} registrado (turno ~${CURRENT_TURN}, section: \"${SECTION_NAME}\") — agent-stop exigirá declaração de seção." >&2
 exit 0

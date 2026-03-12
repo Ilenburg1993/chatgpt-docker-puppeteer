@@ -30,19 +30,23 @@ else
     echo "[warn] common.sh não encontrado (agent-stop.sh) — heal_v1/ctx functions indisponíveis" >&2
 fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
-# G9-08: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
-# flock -w 3: aguarda até 3s; se não conseguir, continua sem lock (degraded mode).
-_CTX_LOCK="${CTX_FILE}.lock"
-exec 9> "$_CTX_LOCK"
-if command -v flock > /dev/null 2>&1; then
-    flock -x -w 3 9 2> /dev/null
-fi
+# CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
 INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos usando schema real
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
 SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+# UPG-AUDIT-01: resolve per-session files ANTES do flock (override CTX_FILE, AUDIT_FILE, _CTX_LOCK)
+apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
+
+# G9-08: Lock exclusivo APÓS resolver CTX_FILE per-session
+# flock -w 3: aguarda até 3s; se não conseguir, continua sem lock (degraded mode).
+_CTX_LOCK="${CTX_FILE}.lock"
+exec 9> "$_CTX_LOCK"
+if command -v flock > /dev/null 2>&1; then
+    flock -x -w 3 9 2> /dev/null
+fi
 
 # stop_hook_active: true quando esta parada foi iniciada por um hook (prevenção de recursão).
 # IMPORTANTE: não tentar bloquear (decision: block) quando stop_hook_active=true.
@@ -88,7 +92,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
                 '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, timestamp: $ts,
                   message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
-                >> "$LOG_DIR/audit.jsonl"
+                >> "$AUDIT_FILE"
             SESSION_ID="$SESSION_ID_PAYLOAD" # continua com ID correto
         elif [ "$CTX_SOURCE" = "inline_restart" ]; then
             # FIX BUG-06: inline_restart — CTX tem o session_id correto do VS Code (PREMISSA 1).
@@ -104,7 +108,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
                   source: $source, timestamp: $ts,
                   message: "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"}' \
-                >> "$LOG_DIR/audit.jsonl"
+                >> "$AUDIT_FILE"
             # Continua normalmente sem bloquear
         else
             # G9-04: HEAL v2 — rastreia mismatches consecutivos com o mesmo "got" session_id.
@@ -152,7 +156,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                     '{event: $event, old_session_id: $old, new_session_id: $new, source: $source,
                       timestamp: $ts, consecutive_mismatches: $count,
                       message: "HEAL v2: mismatch consecutivo (3x) — session_id sanado para ID recorrente"}' \
-                    >> "$LOG_DIR/audit.jsonl"
+                    >> "$AUDIT_FILE"
                 SESSION_ID="$SESSION_ID_PAYLOAD"
             else
                 jq -cn \
@@ -170,7 +174,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                         timestamp: $ts,
                         consecutive_count: $count,
                         message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-                    }' >> "$LOG_DIR/audit.jsonl"
+                    }' >> "$AUDIT_FILE"
                 exit 0
             fi
         fi
@@ -269,7 +273,7 @@ jq -cn \
         failures_count:         $failures_count,
         block_count:            $block_count,
         agentStop_invocations:  $agentStop_invocations
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 # ── Detecção de autorização ───────────────────────────────────────────────────
 # Estratégia em camadas (do mais preciso ao mais tolerante):
@@ -284,7 +288,6 @@ jq -cn \
 AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
 AUTHORIZED_FLAG_FILE="$STATE_DIR/AUTHORIZED_CLOSE.flag"
 AUTH_REQUESTED=false
-AUDIT_FILE="$LOG_DIR/audit.jsonl"
 
 if [ -f "$AUDIT_FILE" ]; then
     # Estratégia 1: fronteira por userPromptSubmitted
@@ -337,7 +340,7 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
                 timestamp:  $ts,
                 turn_id:    (if $turn_id == "" then null else $turn_id end),
                 message:    "Autorização concedida via delegação ao subagente (runSubagent)"
-            }' >> "$LOG_DIR/audit.jsonl"
+            }' >> "$AUDIT_FILE"
     fi
 fi
 
@@ -358,7 +361,7 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
             section_id: (if $section_id == "" then null else $section_id end),
             turn_id:    (if $turn_id == "" then null else $turn_id end),
             message:    "Turno sem vscode_askQuestions — avaliando bloqueio v7.0"
-        }' >> "$LOG_DIR/audit.jsonl"
+        }' >> "$AUDIT_FILE"
 fi
 
 # ── Hardening v7.0: BLOCKING estrutural via Stop hook (decision:block) ────────
@@ -393,7 +396,7 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f 
                 consecutive_unauthorized: $consec,
                 todo_created: $todo,
                 message:    "TURN bloqueado por hardening v9.0: vscode_askQuestions não chamado"
-            }' >> "$LOG_DIR/audit.jsonl"
+            }' >> "$AUDIT_FILE"
         # Loga evento extra quando manage_todo_list também não foi chamado (v9.0)
         if [ "$_BLOCK_TODO_CREATED" != "true" ]; then
             jq -cn \
@@ -409,7 +412,7 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f 
                     turn_id:    (if $turn_id == "" then null else $turn_id end),
                     consecutive_unauthorized: $consec,
                     message:    "manage_todo_list NÃO chamado neste turno — violação dupla do Protocolo v9.0"
-                }' >> "$LOG_DIR/audit.jsonl"
+                }' >> "$AUDIT_FILE"
         fi
         # Atualiza CTX: incrementa consecutive_unauthorized e registra atividade do turno
         # last_turn_ts atualizado mesmo em bloqueios: TURN_IDLE mede atividade, não autorização
@@ -466,7 +469,7 @@ if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
             --arg ts "$NOW_ISO" \
             --arg turn_id "$TURN_ID" \
             '{event: $event, session_id: $sid, timestamp: $ts, turn_id: (if $turn_id == "" then null else $turn_id end), message: "Agente chamou vscode_askQuestions após block — TURNO AUTORIZADO"}' \
-            >> "$LOG_DIR/audit.jsonl"
+            >> "$AUDIT_FILE"
     else
         jq -cn \
             --arg event "agentStop_unblocked_no_comply" \
@@ -474,7 +477,7 @@ if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
             --arg ts "$NOW_ISO" \
             --arg turn_id "$TURN_ID" \
             '{event: $event, session_id: $sid, timestamp: $ts, turn_id: (if $turn_id == "" then null else $turn_id end), message: "Agente NÃO chamou vscode_askQuestions após block — permit anti-loop (stop_hook_active=true)"}' \
-            >> "$LOG_DIR/audit.jsonl"
+            >> "$AUDIT_FILE"
     fi
 fi
 
@@ -594,7 +597,7 @@ if [ "$TURN_INTENT_DECLARED" = "false" ] && [ "$TURN_NUMBER" -gt 0 ]; then
             turn_id:        (if $turn_id == "" then null else $turn_id end),
             intent:         $intent,
             auto_generated: true
-        }' >> "$LOG_DIR/audit.jsonl"
+        }' >> "$AUDIT_FILE"
 fi
 
 # ── Registra resultado do turno e atualiza compliance ────────────────────────
@@ -640,7 +643,7 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
           turn_duration_s: $dur, tools_count: $tools,
           intent: (if $intent == "" then null else $intent end),
           failures_count: $failures, push_pending: $push_pending}' \
-        >> "$LOG_DIR/audit.jsonl"
+        >> "$AUDIT_FILE"
 else
     # Hardening v5.1: re-introduz UNAUTHORIZED_CLOSE.flag para rastreamento cross-session.
     # v5.0 removia silenciosamente este flag, impedindo session-start.sh de exibir alerta
@@ -798,7 +801,7 @@ if [ -z "$CURR_SECTION_CHECK" ] || [ "$CURR_SECTION_CHECK" = "null" ] || [ "$CUR
             section_number: $section_num,
             description:    "Seção automática criada pela invariante SESSION+SECTION+TURN",
             auto_open:      true
-        }' >> "$LOG_DIR/audit.jsonl"
+        }' >> "$AUDIT_FILE"
     echo "[invariante] Seção 'retomada' auto-criada para garantir SESSION+SECTION+TURN ativo" >&2
 fi
 

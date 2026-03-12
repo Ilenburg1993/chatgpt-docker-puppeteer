@@ -22,6 +22,14 @@ HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
 METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"
 AUDIT_FILE="$LOG_DIR/audit.jsonl"
+# UPG-AUDIT-01 Fase 3: merge all per-session audit files for cross-session export
+_SID_AUDIT_FILES=()
+for _f in "$LOG_DIR"/audit-????????.jsonl; do [ -f "$_f" ] && _SID_AUDIT_FILES+=("$_f"); done
+if [ ${#_SID_AUDIT_FILES[@]} -gt 0 ] && _MERGED_AUDIT="$(mktemp 2> /dev/null)"; then
+    trap 'rm -f "${_MERGED_AUDIT:-}"' EXIT
+    cat "${_SID_AUDIT_FILES[@]}" > "$_MERGED_AUDIT" 2> /dev/null || true
+    AUDIT_FILE="$_MERGED_AUDIT"
+fi
 
 FORMAT="${1:-csv}"
 DATE_START="${2:-}"

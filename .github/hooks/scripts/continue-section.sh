@@ -14,7 +14,15 @@ SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOKS_DIR="$(cd "$SCRIPTS_DIR/.." && pwd)"
 STATE_DIR="$HOOKS_DIR/state"
 LOG_DIR="$HOOKS_DIR/logs"
+AUDIT_FILE="$LOG_DIR/audit.jsonl"
 CTX_FILE="$STATE_DIR/session-context.json"
+# UPG-AUDIT-01: resolve per-session paths from current-session-id.txt
+_CSI_FILE="$STATE_DIR/current-session-id.txt"
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "$_CURR_SID" ]; then
+    _SID_SHORT="${_CURR_SID:0:8}"
+    CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json"
+    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+fi
 
 REASON="${1:-continuar na section atual}"
 
@@ -88,7 +96,7 @@ jq -cn \
         section_name: (if $section_name == "" then null else $section_name end),
         section_id:   (if $section_id == "" then null else $section_id end),
         reason:       $reason
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 echo "[continue-section] Section \"${SECTION_NAME}\" continuada após push — flag limpo." >&2
 exit 0

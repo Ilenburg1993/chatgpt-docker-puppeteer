@@ -24,6 +24,13 @@ STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
 # shellcheck disable=SC1091
 source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
+# UPG-AUDIT-01: resolve per-session paths from current-session-id.txt
+_CSI_FILE="$STATE_DIR/current-session-id.txt"
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "$_CURR_SID" ]; then
+    _SID_SHORT="${_CURR_SID:0:8}"
+    CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json"
+    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+fi
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 
@@ -108,7 +115,7 @@ if [ -n "$PREV_SECTION_NAME" ]; then
             turn_end:       $turn_end,
             turns_covered:  $turns_covered,
             duration_s:     $duration_s
-        }' >> "$LOG_DIR/audit.jsonl"
+        }' >> "$AUDIT_FILE"
 
     echo "[seção] Encerrando automaticamente: \"$PREV_SECTION_NAME\" (${PREV_DURATION_S}s, ${PREV_TURNS_COVERED} turno(s))" >&2
 
@@ -186,7 +193,7 @@ jq -cn \
         description:    (if $desc == "" then null else $desc end),
         prev_section:   (if $prev_section == "" then null else $prev_section end),
         auto_open:      false
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 if [ -n "$AUTO_CLOSED_PREV" ]; then
     echo "[seção] Iniciando: \"$SECTION_NAME\" (seção #${NEW_SECTION_NUMBER}, turno ~$CURRENT_TURN) — anterior encerrada automaticamente" >&2

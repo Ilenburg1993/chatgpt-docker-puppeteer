@@ -17,8 +17,16 @@ set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
+AUDIT_FILE="$LOG_DIR/audit.jsonl"
 STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
+# UPG-AUDIT-01: resolve per-session paths from current-session-id.txt
+_CSI_FILE="$STATE_DIR/current-session-id.txt"
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "$_CURR_SID" ]; then
+    _SID_SHORT="${_CURR_SID:0:8}"
+    CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json"
+    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+fi
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 
@@ -116,7 +124,7 @@ jq -cn \
         turn_end:       $turn_end,
         turns_covered:  $turns_covered,
         duration_s:     $duration_s
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 echo "[seção] Encerrada: \"$SECTION_NAME\" (seção #${SECTION_NUMBER}, ${TURNS_COVERED} turno(s), ${DURATION_S}s) — $REASON" >&2
 exit 0

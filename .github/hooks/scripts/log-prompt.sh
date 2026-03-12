@@ -34,12 +34,7 @@ else
     echo "[warn] common.sh não encontrado (log-prompt.sh) — heal_v1/ctx functions indisponíveis" >&2
 fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
-# G9-08: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
-_CTX_LOCK="${CTX_FILE}.lock"
-exec 9> "$_CTX_LOCK"
-if command -v flock > /dev/null 2>&1; then
-    flock -x -w 3 9 2> /dev/null
-fi
+# CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
 INPUT="$(cat 2> /dev/null || true)"
 
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
@@ -47,6 +42,15 @@ _LOCAL_TS="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
 CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 PROMPT_RAW="$(echo "$INPUT" | jq -r '.prompt // ""' 2> /dev/null || echo '')"
 SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+# UPG-AUDIT-01: resolve per-session files ANTES do flock (override CTX_FILE, AUDIT_FILE, _CTX_LOCK)
+apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
+
+# G9-08: Lock exclusivo APÓS resolver CTX_FILE per-session
+_CTX_LOCK="${CTX_FILE}.lock"
+exec 9> "$_CTX_LOCK"
+if command -v flock > /dev/null 2>&1; then
+    flock -x -w 3 9 2> /dev/null
+fi
 
 # Obtém session_id e section_id do contexto persistido — fix B6: sem quebra de linha invisível
 SESSION_ID=""
@@ -111,7 +115,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
                 '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, timestamp: $ts,
                   message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
-                >> "$LOG_DIR/audit.jsonl"
+                >> "$AUDIT_FILE"
             SESSION_ID="$SESSION_ID_PAYLOAD" # continua com o ID correto
         else
             # ── Rollover de reconexão (RECONNECT-01) ──────────────────────────────────
@@ -130,7 +134,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 '{event: $event, old_session_id: $old, new_session_id: $new,
                   source: $source, timestamp: $ts,
                   message: "Reconexão do cliente VS Code detectada — rollover para novo session_id"}' \
-                >> "$LOG_DIR/audit.jsonl"
+                >> "$AUDIT_FILE"
             # Detectar se o rollover pode ser causado por compactação inline (inline conversation summary)
             # Distinção crítica: inline_compact_summary ≠ preCompact hook event
             # Evidência: compaction_count=0 após rollover indica que preCompact nunca disparou
@@ -144,7 +148,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                       source: "log-prompt.sh",
                       message: "Rollover com compaction_count=0 sugere reinicio inline por orcamento de tokens (nao preCompact)",
                       note: "inline_conversation_summary != preCompact_hook — ver GUIA-HOOKS-COPILOT.md secao 16.9"}' \
-                    >> "$LOG_DIR/audit.jsonl"
+                    >> "$AUDIT_FILE"
             fi
             # 2) Gerar sessionEnd sintético para a sessão anterior
             jq -cn \
@@ -154,7 +158,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 --arg mode "abrupt_reconnect" \
                 '{event: $event, session_id: $sid, timestamp: $ts, close_mode: $mode,
                   message: "sessionEnd sintético gerado por log-prompt.sh (rollover de reconexão)"}' \
-                >> "$LOG_DIR/audit.jsonl"
+                >> "$AUDIT_FILE"
             # 3) Atualizar contexto para o novo session_id (não bloquear state write)
             if command -v sponge &> /dev/null; then
                 jq --arg new_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_RECONNECT" \
@@ -304,7 +308,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                 prev_logical_session_number: $prev_logical_num,
                 source:                      "log-prompt.sh",
                 message:                     "Nova sessão inline após fechamento da sessão anterior"
-            }' >> "$LOG_DIR/audit.jsonl"
+            }' >> "$AUDIT_FILE"
         SESSION_ID="$_NEW_SID"
         echo "[log-prompt] Sessão anterior encerrada (${_PREV_ENDED_AT}). Nova sessão inline: ${_NEW_SID} | close_key: ${_NEW_KEY}" >&2
     fi
@@ -338,7 +342,7 @@ jq -cn \
         prompt_hash:         $hash,
         prompt_len:          $len,
         section_id:  (if $section_id == "" then null else $section_id end)
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 # ── Reseta current_turn no início de cada novo turno do usuário ──────────────
 # Belt-and-suspenders: agent-stop.sh também reseta ao final do turno anterior,
@@ -434,7 +438,7 @@ jq -cn \
         section_name:           (if $section_name == "" then null else $section_name end),
         section_id:             (if $section_id == "" then null else $section_id end),
         logical_session_number: $logical_num
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 # ── Hardening v6.0: systemMessage SESSION REMINDER em CADA TURN ──────────────
 # CRÍTICO: Este é o único ponto onde o agente recebe lembrete ANTES de gerar sua

@@ -28,6 +28,13 @@ CTX_FILE="$STATE_DIR/session-context.json"
 SUMMARIES_DIR="$STATE_DIR/section-summaries"
 # shellcheck disable=SC1091
 source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
+# UPG-AUDIT-01: resolve per-session paths from current-session-id.txt
+_CSI_FILE="$STATE_DIR/current-session-id.txt"
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "$_CURR_SID" ]; then
+    _SID_SHORT="${_CURR_SID:0:8}"
+    CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json"
+    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+fi
 
 mkdir -p "$SUMMARIES_DIR"
 
@@ -64,7 +71,7 @@ SECTION_SLUG="$(echo "$SECTION_NAME" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0
 SUMMARY_FILE="$SUMMARIES_DIR/section-${SECTION_NUM}-${SECTION_SLUG}-${NOW_SHORT}.md"
 
 # ── Coleta métricas das ferramentas usadas nesta seção via audit.jsonl ────────
-AUDIT_FILE="$LOG_DIR/audit.jsonl"
+# AUDIT_FILE já definido pelo bloco per-session no topo (não sobrescrever)
 TOOLS_SUMMARY="(sem dados de audit.jsonl)"
 TOOLS_TOTAL=0
 TOOLS_TOP=""

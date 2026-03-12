@@ -23,6 +23,8 @@ INPUT="$(cat 2> /dev/null || true)"
 
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
 SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+# UPG-AUDIT-01: resolve per-session files se SESSION_ID_PAYLOAD disponível
+apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
 
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
 # F0.3: detecta contexto vazio
@@ -53,7 +55,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 got:      $got,
                 source:   $source,
                 message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-            }' >> "$LOG_DIR/audit.jsonl"
+            }' >> "$AUDIT_FILE"
         # GAP-03: incrementa contador de mismatches
         if command -v increment_mismatch > /dev/null 2>&1; then
             increment_mismatch
@@ -71,7 +73,7 @@ jq -cn \
         event:      $event,
         session_id: $sid,
         timestamp:  $ts
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 # Incrementa contagem de subagentes no session-context.json
 # EBH-L01: fallback mktemp quando sponge não disponível

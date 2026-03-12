@@ -24,6 +24,15 @@ LOG_DIR="$HOOK_DIR/logs"
 AUDIT_FILE="$LOG_DIR/audit.jsonl"
 METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"
 FINDINGS_FILE="$LOG_DIR/findings.jsonl"
+# UPG-AUDIT-01 Fase 3: merge all per-session audit files for cross-session analytics
+# Pattern audit-????????.jsonl matches SID_SHORT (8 hex chars), not archive files (contain '_')
+_SID_AUDIT_FILES=()
+for _f in "$LOG_DIR"/audit-????????.jsonl; do [ -f "$_f" ] && _SID_AUDIT_FILES+=("$_f"); done
+if [ ${#_SID_AUDIT_FILES[@]} -gt 0 ] && _MERGED_AUDIT="$(mktemp 2> /dev/null)"; then
+    trap 'rm -f "${_MERGED_AUDIT:-}"' EXIT
+    cat "${_SID_AUDIT_FILES[@]}" > "$_MERGED_AUDIT" 2> /dev/null || true
+    AUDIT_FILE="$_MERGED_AUDIT"
+fi
 
 OUTPUT_FILE=""
 OUTPUT_JSON=false

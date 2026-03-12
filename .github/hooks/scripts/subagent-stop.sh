@@ -27,6 +27,8 @@ SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || 
 
 SESSION_ID=""
 CTX_FILE="$STATE_DIR/session-context.json"
+# UPG-AUDIT-01: resolve per-session files se SESSION_ID_PAYLOAD disponível
+apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
@@ -60,7 +62,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 got:      $got,
                 source:   $source,
                 message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-            }' >> "$LOG_DIR/audit.jsonl"
+            }' >> "$AUDIT_FILE"
         # GAP-03: incrementa contador de mismatches
         if command -v increment_mismatch > /dev/null 2>&1; then
             increment_mismatch
@@ -103,7 +105,7 @@ jq -cn \
         result:       (if $result != "" then $result else null end),
         tool_use_id:  (if $tool_use_id != "" then $tool_use_id else null end),
         duration_s:   $duration_s
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 # Incrementa subagent_completions no contexto da sessão
 # NOTE: subagent_calls é incrementado em subagent-start.sh (invocação).

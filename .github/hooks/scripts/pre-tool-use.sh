@@ -32,14 +32,7 @@ else
     echo "[warn] common.sh não encontrado (pre-tool-use.sh) — funções compartilhadas indisponíveis" >&2
 fi
 
-# G9-08/BUG-A.1: Lock exclusivo para escritas em session-context.json
-# Garante que pre-tool-use.sh não corre com agent-stop.sh, post-tool-use.sh ou log-prompt.sh.
-_CTX_LOCK="${CTX_FILE}.lock"
-exec 9> "$_CTX_LOCK"
-if command -v flock > /dev/null 2>&1; then
-    flock -x -w 3 9 2> /dev/null
-fi
-
+# CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
 INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos usando o schema real (snake_case, não camelCase)
@@ -54,6 +47,21 @@ SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')
 # REV-06: fallback ao contexto ativo se payload não traz session_id
 if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+fi
+# UPG-AUDIT-01: resolve per-session paths ANTES do flock (override CTX_FILE, AUDIT_FILE)
+if command -v resolve_audit_file > /dev/null 2>&1 && [ -n "${SESSION_ID:-}" ]; then
+    _SID_SHORT="${SESSION_ID:0:8}"
+    CTX_FILE="$(resolve_ctx_file "$_SID_SHORT")"
+    AUDIT_FILE="$(resolve_audit_file "$_SID_SHORT")"
+    mkdir -p "$(dirname "$CTX_FILE")" "$(dirname "$AUDIT_FILE")" 2> /dev/null || true
+fi
+
+# G9-08/BUG-A.1: Lock exclusivo APÓS resolver CTX_FILE per-session
+# Garante que pre-tool-use.sh não corre com agent-stop.sh, post-tool-use.sh ou log-prompt.sh.
+_CTX_LOCK="${CTX_FILE}.lock"
+exec 9> "$_CTX_LOCK"
+if command -v flock > /dev/null 2>&1; then
+    flock -x -w 3 9 2> /dev/null
 fi
 
 # Serializa tool_input (objeto JSON) para string redactável
@@ -121,7 +129,7 @@ jq -cn \
         tool_name:   $tool,
         tool_use_id: $tool_use_id,
         tool_args:   $args
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 # ── Auto-recovery: cria contexto mínimo se session-context.json estiver vazio ─
 # Se sessionStart não disparou (bug conhecido), o sistema inteiro fica degradado.
@@ -214,7 +222,7 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
             trigger: $trigger,
             close_key_recovered: (if $close_key == "" then null else $close_key end),
             message: "session-context.json vazio — estado mínimo criado por auto-recovery (v6.0: close_key preservada do briefing)"
-        }' >> "$LOG_DIR/audit.jsonl"
+        }' >> "$AUDIT_FILE"
 
     echo "[recovery] session-context.json vazio — criado contexto mínimo para sessão $SESSION_ID" >&2
 fi
@@ -256,7 +264,7 @@ if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                 --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
                 '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, tool: $tool, timestamp: $ts,
                   message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
-                >> "$LOG_DIR/audit.jsonl"
+                >> "$AUDIT_FILE"
             # SESSION_ID já tem o valor correto — continua        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
             # FIX BUG-06: inline_restart — CTX tem o session_id correto do VS Code (PREMISSA 1).
             # Payload está stale (compilado com contexto antigo). Adotamos CTX como verdade.
@@ -275,11 +283,11 @@ if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                     '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
                       source: $source, tool: $tool, timestamp: $ts,
                       message: "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"}' \
-                    >> "$LOG_DIR/audit.jsonl"
+                    >> "$AUDIT_FILE"
             elif [ "$_SYNCS_INLINE" -eq 5 ]; then
                 jq -cn --arg event "session_id_sync_inline_restart_cap" --arg source "pre-tool-use.sh" \
                     '{event: $event, source: $source, message: "inline_restart sync count reached cap (5) — logs suprimidos daqui em diante"}' \
-                    >> "$LOG_DIR/audit.jsonl"
+                    >> "$AUDIT_FILE"
             fi
             # GAP-03: incrementa contador de syncs inline no CTX
             if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
@@ -303,7 +311,7 @@ if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                     tool:     $tool,
                     timestamp: $ts,
                     message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-                }' >> "$LOG_DIR/audit.jsonl"
+                }' >> "$AUDIT_FILE"
             # GAP-03: incrementa contador de mismatches no CTX antes de sair
             if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                 jq '.session_stats.session_id_mismatches = ((.session_stats.session_id_mismatches // 0) + 1)' \
@@ -361,7 +369,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                 description:    $description,
                 auth_implicit:  true,
                 message:        "runSubagent chamado — delegação legítima de trabalho (autorização implícita)"
-            }' >> "$LOG_DIR/audit.jsonl"
+            }' >> "$AUDIT_FILE"
         jq --arg ts "$TIMESTAMP" \
             --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
             --arg desc "$_SUBAGENT_DESCRIPTION" \
@@ -435,7 +443,7 @@ if [ "$TOOL_NAME" = "run_in_terminal" ]; then
                     tool:       $tool,
                     command:    $cmd,
                     message:    "BLOQUEADO: agente tentou chamar session-close.sh diretamente sem KEY validada"
-                }' >> "$LOG_DIR/audit.jsonl" 2> /dev/null || true
+                }' >> "$AUDIT_FILE" 2> /dev/null || true
             # Nega a ferramenta com contexto explicativo
             jq -cn \
                 --arg key "$_M5_KEY" \
@@ -485,7 +493,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                 tool_number: $tool_num,
                 close_key:  $key,
                 message:    "SESSION reminder emitido via preToolUse (intervalo de ferramentas)"
-            }' >> "$LOG_DIR/audit.jsonl" 2> /dev/null || true
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
         # Emite systemMessage para o agente (SESSION reminder conciso)
         jq -cn \
             --arg key "$_SR_CLOSE_KEY" \

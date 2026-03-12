@@ -15,12 +15,20 @@ set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
+AUDIT_FILE="$LOG_DIR/audit.jsonl"
 STATE_DIR="$HOOK_DIR/state"
 CHECKPOINT_DIR="$HOOK_DIR/checkpoints"
 CTX_FILE="$STATE_DIR/session-context.json"
 TASKS_FILE="$STATE_DIR/pending-tasks.md"
 FINDINGS_FILE="$LOG_DIR/findings.jsonl"
 METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"
+# UPG-AUDIT-01: resolve per-session paths from current-session-id.txt
+_CSI_FILE="$STATE_DIR/current-session-id.txt"
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "$_CURR_SID" ]; then
+    _SID_SHORT="${_CURR_SID:0:8}"
+    CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json"
+    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+fi
 
 MAX_CHECKPOINTS="${MAX_CHECKPOINTS:-30}"
 NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
@@ -187,7 +195,7 @@ jq -cn \
         turn_count:      $turn,
         tasks_open:      $tasks_open,
         checkpoint_file: $file
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 echo "[checkpoint] Snapshot turno $TURN_COUNT salvo: $CHECKPOINT_FILE" >&2
 exit 0

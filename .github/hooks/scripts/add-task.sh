@@ -24,6 +24,17 @@ HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TASKS_FILE="$HOOK_DIR/state/pending-tasks.md"
 LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
+AUDIT_FILE="$LOG_DIR/audit.jsonl"
+# UPG-AUDIT-01: resolve per-session paths from current-session-id.txt
+_UPG_CSI="${STATE_DIR}/current-session-id.txt"
+if [ -f "$_UPG_CSI" ]; then
+    _UPG_SID_FULL="$(cat "$_UPG_CSI" 2> /dev/null || true)"
+    _UPG_SID_SHORT="${_UPG_SID_FULL:0:8}"
+    if [ -n "$_UPG_SID_SHORT" ]; then
+        AUDIT_FILE="${LOG_DIR}/audit-${_UPG_SID_SHORT}.jsonl"
+        mkdir -p "$(dirname "$AUDIT_FILE")" 2> /dev/null || true
+    fi
+fi
 
 # Parsing de argumentos: posicionais + --finding-id opcional em qualquer posição
 PRIORITY=""
@@ -127,7 +138,7 @@ jq -cn \
         title:      $title,
         description: $desc,
         finding_id: (if $fid != "" then $fid else null end)
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 echo "✓ Tarefa adicionada ($PRIORITY): $TITLE"
 exit 0

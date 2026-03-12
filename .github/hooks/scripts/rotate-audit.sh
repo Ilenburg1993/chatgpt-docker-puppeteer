@@ -25,6 +25,13 @@ LOG_DIR="$HOOK_DIR/logs"
 CTX_FILE="$HOOK_DIR/state/session-context.json"
 
 AUDIT_FILE="$LOG_DIR/audit.jsonl"
+# UPG-AUDIT-01: rotate-audit opera no arquivo da sessão atual via current-session-id.txt
+_CSI_FILE="$HOOK_DIR/state/current-session-id.txt"
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "$_CURR_SID" ]; then
+    _SID_SHORT="${_CURR_SID:0:8}"
+    CTX_FILE="$HOOK_DIR/state/session-context-${_SID_SHORT}.json"
+    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+fi
 AUDIT_ROTATE_THRESHOLD="${AUDIT_ROTATE_THRESHOLD:-5000}"
 AUDIT_KEEP_RECENT="${AUDIT_KEEP_RECENT:-500}"
 

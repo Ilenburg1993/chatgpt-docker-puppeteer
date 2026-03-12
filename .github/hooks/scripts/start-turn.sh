@@ -29,6 +29,13 @@ STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
 # shellcheck disable=SC1091
 source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
+# UPG-AUDIT-01: resolve per-session paths from current-session-id.txt
+_CSI_FILE="$STATE_DIR/current-session-id.txt"
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "$_CURR_SID" ]; then
+    _SID_SHORT="${_CURR_SID:0:8}"
+    CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json"
+    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+fi
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 
@@ -74,7 +81,7 @@ if [ -f "$CTX_FILE" ]; then
                 prev_turn_had_askq_failure: true,
                 total_api_failures_session: $failures,
                 recommendation: "Reduce context size before calling vscode_askQuestions again"
-            }' >> "$LOG_DIR/audit.jsonl"
+            }' >> "$AUDIT_FILE"
         # Limpa flag para o próximo turno não herdar o alerta
         if command -v sponge &> /dev/null; then
             jq '.current_turn.askquestions_api_error = false' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
@@ -103,7 +110,7 @@ jq -cn \
         turn_id:      (if $turn_id == "" then null else $turn_id end),
         intent:       (if $intent == "" then null else $intent end),
         auto_generated: false
-    }' >> "$LOG_DIR/audit.jsonl"
+    }' >> "$AUDIT_FILE"
 
 # Sinaliza que a intenção foi declarada para o rastreamento de turno
 # e appenda a intenção ao intent_history da seção atual (cap configurável via config.sh)

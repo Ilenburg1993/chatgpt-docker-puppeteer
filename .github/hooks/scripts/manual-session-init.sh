@@ -18,6 +18,9 @@ LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$STATE_DIR/session-context.json"
 AUDIT_FILE="$LOG_DIR/audit.jsonl"
+# UPG-AUDIT-01: manual-session-init.sh cria explicitamente um novo arquivo per-session.
+# O SID é passado como argumento (ou gerado internamente), então a resolução ocorre
+# mais adiante no script — aqui mantemos os defaults até o SID ser determinado.
 
 echo "╔══════════════════════════════════════════════════════════════════╗" >&2
 echo "║       INICIALIZAÇÃO MANUAL DE SESSÃO — PROCEDIMENTO EXCEPCIONAL ║" >&2
@@ -54,6 +57,17 @@ echo "[info] Invocando session-start.sh com source=manual_recovery..." >&2
 # Invoca session-start.sh com o session_id detectado
 echo "{\"session_id\":\"$SESSION_ID\",\"timestamp\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\",\"source\":\"manual_recovery\",\"cwd\":\"$(pwd)\"}" \
     | bash "$HOOK_DIR/scripts/session-start.sh" 2>&1
+
+# MÉDIO-7 FIX: session-start.sh criou current-session-id.txt → atualiza AUDIT_FILE per-session
+_UPG_CSI_FRESH="${STATE_DIR}/current-session-id.txt"
+if [ -f "$_UPG_CSI_FRESH" ]; then
+    _UPG_SID_FULL_FRESH="$(cat "$_UPG_CSI_FRESH" 2> /dev/null || true)"
+    _UPG_SID_SHORT_FRESH="${_UPG_SID_FULL_FRESH:0:8}"
+    if [ -n "$_UPG_SID_SHORT_FRESH" ]; then
+        AUDIT_FILE="${LOG_DIR}/audit-${_UPG_SID_SHORT_FRESH}.jsonl"
+        mkdir -p "$(dirname "$AUDIT_FILE")" 2> /dev/null || true
+    fi
+fi
 
 # Loga o evento de recovery manual no audit.jsonl
 jq -cn \

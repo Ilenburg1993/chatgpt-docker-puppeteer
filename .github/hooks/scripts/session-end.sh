@@ -13,6 +13,14 @@ LOG_DIR="${HOOKS_LOG_DIR:-$HOOK_DIR/logs}"
 STATE_DIR="${HOOKS_STATE_DIR:-$HOOK_DIR/state}"
 DOCS_SESSIONS_DIR="${HOOKS_DOCS_DIR:-$REPO_ROOT/DOCUMENTAÇÃO/RELATORIOS/SESSIONS}"
 SCRIPTS_DIR="$HOOK_DIR/scripts"
+# shellcheck source=../../.github/hooks/hooks-lib/common.sh
+if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
+    source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null \
+        || {
+            echo "[session-end] WARN: common.sh não carregado" >&2
+            true
+        }
+fi
 
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 mkdir -p "$STATE_DIR"
@@ -20,14 +28,7 @@ mkdir -p "$DOCS_SESSIONS_DIR"
 
 CTX_FILE="$STATE_DIR/session-context.json"
 
-# REV4-07: Lock exclusivo para prevenir race conditions em escritas de session-context.json.
-# Mesmo esquema de agent-stop.sh, pre-tool-use.sh, post-tool-use.sh e log-prompt.sh.
-_CTX_LOCK="${CTX_FILE}.lock"
-exec 9> "$_CTX_LOCK"
-if command -v flock > /dev/null 2>&1; then
-    flock -x -w "${HOOKS_FLOCK_TIMEOUT:-5}" 9 2> /dev/null || true
-fi
-
+# CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
 INPUT="$(cat 2> /dev/null || true)"
 
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
@@ -35,6 +36,21 @@ CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 REASON="$(echo "$INPUT" | jq -r '.reason // "complete"' 2> /dev/null || echo 'complete')"
 # GAP-S03 FIX: extrai session_id do payload (VS Code inclui em sessionEnd, como nos demais hooks).
 SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+# UPG-AUDIT-01: resolve per-session paths ANTES do flock (override CTX_FILE, AUDIT_FILE, _CTX_LOCK)
+if command -v resolve_audit_file > /dev/null 2>&1 && [ -n "${SESSION_ID_PAYLOAD:-}" ]; then
+    _SID_SHORT="${SESSION_ID_PAYLOAD:0:8}"
+    CTX_FILE="$(resolve_ctx_file "$_SID_SHORT")"
+    AUDIT_FILE="$(resolve_audit_file "$_SID_SHORT")"
+    mkdir -p "$(dirname "$CTX_FILE")" "$(dirname "$AUDIT_FILE")" 2> /dev/null || true
+fi
+
+# REV4-07: Lock exclusivo APÓS resolver CTX_FILE per-session
+# Mesmo esquema de agent-stop.sh, pre-tool-use.sh, post-tool-use.sh e log-prompt.sh.
+_CTX_LOCK="${CTX_FILE}.lock"
+exec 9> "$_CTX_LOCK"
+if command -v flock > /dev/null 2>&1; then
+    flock -x -w "${HOOKS_FLOCK_TIMEOUT:-5}" 9 2> /dev/null || true
+fi
 NOW_MS="$(date +%s000 2> /dev/null || echo "$TIMESTAMP")"
 SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || echo 'unknown')"
 SESSION_DATE_DAILY="$(date -u '+%Y-%m-%d' 2> /dev/null || echo 'unknown')"
@@ -84,7 +100,7 @@ if [ -n "$SESSION_ID_PAYLOAD" ] && [ "$SESSION_ID_PAYLOAD" != "$SESSION_ID" ] &&
             --arg ts "$_NOW_HEAL_SE" \
             '{event: $event, new_session_id: $new, source: $source, timestamp: $ts,
               message: "HEAL v1 em sessionEnd: manual_recovery adotou session_id do payload"}' \
-            >> "$LOG_DIR/audit.jsonl"
+            >> "$AUDIT_FILE"
         echo "[heal] HEAL v1 aplicado em session-end.sh — session_id atualizado" >&2
     elif [ "$_CTX_SOURCE_SE" = "inline_restart" ]; then
         # inline_restart: CTX tem o session_id correto do VS Code (PREMISSA 1).
@@ -155,7 +171,7 @@ if [ -n "$CLOSE_SECTION_NAME" ]; then
             turn_end:       $turn_end,
             turns_covered:  $turns_covered,
             duration_s:     $duration_s
-        }' >> "$LOG_DIR/audit.jsonl"
+        }' >> "$AUDIT_FILE"
 
     # Limpa current_section no contexto
     if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
@@ -178,7 +194,6 @@ fi
 # Conta ferramentas e erros via audit.jsonl (defensivo)
 TOOLS_COUNT=0
 ERRORS_COUNT=0
-AUDIT_FILE="$LOG_DIR/audit.jsonl"
 if [ -f "$AUDIT_FILE" ]; then
     TOOLS_COUNT="$(jq -r --arg sid "$SESSION_ID" \
         'select(.session_id == $sid and .event == "preToolUse")' \
