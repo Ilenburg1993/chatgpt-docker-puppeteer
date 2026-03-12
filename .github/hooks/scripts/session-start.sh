@@ -109,6 +109,15 @@ fi
 # BUG-35 fix: fallback usa PID+nanosegundos para unicidade (evita colisão same-second)
 CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | tr '[:lower:]' '[:upper:]' || printf '%s%s' "$(date +%s%N 2> /dev/null || date +%s)" "$$" | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
 
+# Inicializa variáveis de Nível 1 (DETECT) que serão calculas após Recovery
+PREV_CLOSE_MODE="ok"
+PREV_RECONNECT_COUNT=0
+PREV_SESSION_ID=""
+PREV_CHECKPOINT_TS=""
+RECOVERY_ALERTS=()
+RECOVERY_ALERTS_REQUIRE_KICKOFF="false"
+_ALERTS_JSON="[]"
+
 # Gera IDs UUID para a secão e turno iniciais
 INITIAL_SECTION_ID="$(uuidgen 2> /dev/null || printf 'sect_%s_%s' "$(date +%s)" "$$")"
 INITIAL_TURN_ID="$(uuidgen 2> /dev/null || printf 'turn_%s_%s' "$(date +%s)" "$$")"
@@ -212,6 +221,11 @@ if [ "$SOURCE" != "inline_restart" ]; then
         --arg initial_turn_id "$INITIAL_TURN_ID" \
         --argjson consec "$PREV_CONSEC_UNAUTH" \
         --argjson logical_num "$LOGICAL_SESSION_NUMBER" \
+        --arg close_mode "${PREV_CLOSE_MODE:-ok}" \
+        --arg prev_sid "${PREV_SESSION_ID:-}" \
+        --arg prev_ts "${PREV_CHECKPOINT_TS:-}" \
+        --argjson alerts "$_ALERTS_JSON" \
+        --arg alerts_req "$RECOVERY_ALERTS_REQUIRE_KICKOFF" \
         '{
         "session": {
             "id":                    $sid,
@@ -299,6 +313,14 @@ if [ "$SOURCE" != "inline_restart" ]; then
             "last_turn_authorized":     null,
             "consecutive_unauthorized": $consec,
             "flag_file_exists":         false
+        },
+        "recovery": {
+            "close_mode":           $close_mode,
+            "prev_session_id":      $prev_sid,
+            "prev_session_ts":      $prev_ts,
+            "alerts":               $alerts,
+            "alerts_require_kickoff": ($alerts_req == "true"),
+            "detected_at":          $ts
         },
         "quality_gates":   {},
         "session_summary": null,
@@ -418,15 +440,53 @@ if [ -f "$STATE_DIR/SESSION_CLOSE_AUTHORIZED.flag" ]; then
         rm -f "$STATE_DIR/SESSION_CLOSE_AUTHORIZED.flag" 2> /dev/null || true
     fi
 fi
-jq -cn \
-    --arg event "sessionStart" \
-    --arg sid "$SESSION_ID" \
-    --arg ts "$TIMESTAMP" \
-    --arg date "$SESSION_DATE" \
-    --arg source "$SOURCE" \
-    --arg cwd "$CWD" \
-    '{event: $event, session_id: $sid, timestamp: $ts, date: $date, source: $source, cwd: $cwd}' \
-    >> "$AUDIT_FILE"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Nível 1 (DETECT): Anomaly Detection — gera alerts baseado no close_mode
+# ─────────────────────────────────────────────────────────────────────────────
+# PREV_CLOSE_MODE foi determinado na seção "Recovery" acima. Agora criamos os
+# arrays de alertas correspondentes para o contexto de sessão.
+RECOVERY_ALERTS=()
+RECOVERY_ALERTS_REQUIRE_KICKOFF="false"
+
+case "$PREV_CLOSE_MODE" in
+    abrupt_no_key)
+        RECOVERY_ALERTS+=("🚨 ANOMALY DETECTED: Previous session ended WITHOUT close-key authorization")
+        RECOVERY_ALERTS+=("REASON: Either crash, timeout, or unauthorized closure attempt (BUG-79 pattern)")
+        RECOVERY_ALERTS+=("IMPACT: Agent cannot resume from exact previous state; some context may be lost")
+        RECOVERY_ALERTS+=("ACTION: Will require Template E+ (Multi-Decision Checkpoint) before proceeding")
+        RECOVERY_ALERTS_REQUIRE_KICKOFF="true"
+        ;;
+    key_validated)
+        RECOVERY_ALERTS+=("⚠️  WARNING: Previous session had close_key validated but session-close.sh incomplete")
+        RECOVERY_ALERTS+=("REASON: BUG-80 pattern — key validation ordered incorrectly")
+        RECOVERY_ALERTS+=("IMPACT: Session may have been marked authorized but final shutdown did not occur")
+        RECOVERY_ALERTS+=("ACTION: Proceeding normally but monitoring for re-occurrence")
+        RECOVERY_ALERTS_REQUIRE_KICKOFF="false"
+        ;;
+    abrupt_reconnect)
+        RECOVERY_ALERTS+=("ℹ️   INFO: Previous session ended via network reconnection (${PREV_RECONNECT_COUNT} reconnects detected)")
+        RECOVERY_ALERTS+=("REASON: Normal expected behavior during VS Code connection loss")
+        RECOVERY_ALERTS+=("IMPACT: Context preserved automatically by inline_restart mechanism")
+        RECOVERY_ALERTS+=("ACTION: No special action required — informational only")
+        RECOVERY_ALERTS_REQUIRE_KICKOFF="false"
+        ;;
+    clean)
+        # Clean closure — no alerts needed
+        RECOVERY_ALERTS_REQUIRE_KICKOFF="false"
+        ;;
+    ok)
+        # No previous session detected
+        RECOVERY_ALERTS_REQUIRE_KICKOFF="false"
+        ;;
+esac
+
+# Converte array bash em JSON array para jq
+_ALERTS_JSON="[]"
+if [ ${#RECOVERY_ALERTS[@]} -gt 0 ]; then
+    _ALERTS_JSON="$(printf '%s\n' "${RECOVERY_ALERTS[@]}" | \
+        jq -R '.' | jq -s '.' 2> /dev/null || echo '[]')"
+fi
 
 # ── Loga sectionStart da section padrão "início" (Schema v4 — invariante) ────
 jq -cn \
