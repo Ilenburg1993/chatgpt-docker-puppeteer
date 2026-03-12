@@ -35,15 +35,20 @@ fi
 # BUG-45 fix: função portável de conversão ISO→epoch (GNU date -d + BSD date -j fallback)
 _iso_to_epoch_ss() {
     local iso="$1"
-    if [ -z "$iso" ] || [ "$iso" = "null" ]; then echo 0; return; fi
+    if [ -z "$iso" ] || [ "$iso" = "null" ]; then
+        echo 0
+        return
+    fi
     local normalized
     normalized="$(echo "$iso" | sed 's/\.[0-9]*Z$/Z/' | sed 's/Z$//')"
-    date -u -d "${normalized}Z" '+%s' 2>/dev/null \
-        || date -u -j -f '%Y-%m-%dT%H:%M:%S' "$normalized" '+%s' 2>/dev/null \
+    date -u -d "${normalized}Z" '+%s' 2> /dev/null \
+        || date -u -j -f '%Y-%m-%dT%H:%M:%S' "$normalized" '+%s' 2> /dev/null \
         || echo 0
 }
 
+mkdir -p "$LOG_DIR" "$STATE_DIR"
 
+SECTION_NAME="${1:-}"
 SECTION_DESC="${2:-}"
 
 if [ -z "$SECTION_NAME" ]; then
