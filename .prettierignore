@@ -59,3 +59,7 @@ backups/
 scripts/dist/
 DOCUMENTAÇÃO/PLANOS/LEGADO_PLANO/
 *.tsbuildinfo
+
+# Hooks state files — gerados automaticamente em runtime, não formatar
+.github/hooks/state/
+.github/hooks/logs/

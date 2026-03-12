@@ -471,15 +471,15 @@ TOTAL_OPEN=$((COUNT_ALTA + COUNT_MEDIA + COUNT_BACKLOG))
 # Análise de tendências históricas (audit*.jsonl + tool-metrics.jsonl)
 # UPG-AUDIT-01: merge cross-session para leitura histórica correta
 # ─────────────────────────────────────────────────────────────
-_TREND_AUDIT_FILE_BKP="$AUDIT_FILE"  # salva arquivo per-session atual
+_TREND_AUDIT_FILE_BKP="$AUDIT_FILE" # salva arquivo per-session atual
 _TREND_MERGED=""
 # Merge de todos os per-session audits para análise cross-session
 _TREND_SID_FILES=()
 while IFS= read -r -d '' _tf; do _TREND_SID_FILES+=("$_tf"); done \
-    < <(find "$LOG_DIR" -maxdepth 1 -name 'audit-????????.jsonl' -print0 2>/dev/null | sort -z)
-if [ ${#_TREND_SID_FILES[@]} -gt 0 ] && _TREND_MERGED="$(mktemp 2>/dev/null)"; then
+    < <(find "$LOG_DIR" -maxdepth 1 -name 'audit-????????.jsonl' -print0 2> /dev/null | sort -z)
+if [ ${#_TREND_SID_FILES[@]} -gt 0 ] && _TREND_MERGED="$(mktemp 2> /dev/null)"; then
     trap 'rm -f "${_TREND_MERGED:-}"' EXIT
-    cat "${_TREND_SID_FILES[@]}" > "$_TREND_MERGED" 2>/dev/null || true
+    cat "${_TREND_SID_FILES[@]}" > "$_TREND_MERGED" 2> /dev/null || true
     AUDIT_FILE="$_TREND_MERGED"
 else
     AUDIT_FILE="$LOG_DIR/audit.jsonl"
@@ -537,7 +537,7 @@ if [ -f "$METRICS_FILE" ] && [ -s "$METRICS_FILE" ]; then
     [ -z "$TREND_PERF_TABLE" ] && TREND_PERF_TABLE="| N/D | - | 0 |"
 fi
 
-AUDIT_FILE="$_TREND_AUDIT_FILE_BKP"  # UPG-AUDIT-01: restaura audit per-session após análise histórica
+AUDIT_FILE="$_TREND_AUDIT_FILE_BKP" # UPG-AUDIT-01: restaura audit per-session após análise histórica
 
 # ── UP3: Health check do ambiente ─────────────────────────────────────────
 HEALTH_CRITICAL=""
