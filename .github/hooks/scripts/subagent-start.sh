@@ -83,20 +83,25 @@ jq -cn \
     }' >> "$AUDIT_FILE"
 
 # Incrementa contagem de subagentes no session-context.json
+# Também registra o timestamp de início para cálculo posterior de duration_s
 # EBH-L01: fallback mktemp quando sponge não disponível
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
     if command -v sponge &> /dev/null; then
-        jq '.session_stats.subagent_calls = ((.session_stats.subagent_calls // 0) + 1)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        jq "
+            .session_stats.subagent_calls = ((.session_stats.subagent_calls // 0) + 1) |
+            .session_stats.last_subagent_start_ts = \"${TIMESTAMP:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}\"
+        " "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     else
         # Valida mktemp antes de usar (fix Haiku S1.1: se mktemp falhar, _SA_START_TMP fica vazio)
         if _SA_START_TMP="$(mktemp 2> /dev/null)"; then
-            jq '.session_stats.subagent_calls = ((.session_stats.subagent_calls // 0) + 1)' \
-                "$CTX_FILE" > "$_SA_START_TMP" 2> /dev/null \
+            jq "
+                .session_stats.subagent_calls = ((.session_stats.subagent_calls // 0) + 1) |
+                .session_stats.last_subagent_start_ts = \"${TIMESTAMP:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}\"
+            " "$CTX_FILE" > "$_SA_START_TMP" 2> /dev/null \
                 && mv "$_SA_START_TMP" "$CTX_FILE" \
                 || rm -f "$_SA_START_TMP" 2> /dev/null
         else
-            echo "[warn] subagent-start: mktemp falhou; subagent_calls não incrementado" >&2
+            echo "[warn] subagent-start: mktemp falhou; subagent_calls e last_subagent_start_ts não atualizados" >&2
         fi
     fi
 fi

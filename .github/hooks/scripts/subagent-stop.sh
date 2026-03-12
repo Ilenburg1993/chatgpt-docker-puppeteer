@@ -83,24 +83,27 @@ SUBAGENT_NAME="$(echo "$INPUT" | jq -r '.agentName // .subagent_name // .name //
 SUBAGENT_RESULT="$(echo "$INPUT" | jq -r '.result // .status // ""' 2> /dev/null || echo '')"
 TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // .toolUseId // ""' 2> /dev/null || echo '')"
 
-# Calcula duração aproximada usando last_tool_ts do contexto
+# Calcula duração do subagent usando seu timestamp de início (não last_tool.ts do pai)
+# BUG-77 FIX: Use last_subagent_start_ts registrado por subagent-start.sh
 # BUG-62 FIX: date -d é GNU-only; fallback para BSD (macOS)
 DURATION_S=0
 if [ -f "$CTX_FILE" ]; then
-    LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    if [ -n "$LAST_TOOL_TS" ] && [ -n "$NOW_ISO" ]; then
-        if date -d "$LAST_TOOL_TS" '+%s' > /dev/null 2>&1; then
-            LAST_S="$(date -d "$LAST_TOOL_TS" '+%s' 2> /dev/null || echo 0)"
+    # Preferência: last_subagent_start_ts (timestamp preciso do início do subagent)
+    # Fallback: last_tool.ts (menos preciso, mas disponível)
+    SUBAGENT_START_TS="$(jq -r '.session_stats.last_subagent_start_ts // .last_tool.ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    if [ -n "$SUBAGENT_START_TS" ] && [ -n "$NOW_ISO" ]; then
+        if date -d "$SUBAGENT_START_TS" '+%s' > /dev/null 2>&1; then
+            START_S="$(date -d "$SUBAGENT_START_TS" '+%s' 2> /dev/null || echo 0)"
         else
-            LAST_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$LAST_TOOL_TS" '+%s' 2> /dev/null || echo 0)"
+            START_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$SUBAGENT_START_TS" '+%s' 2> /dev/null || echo 0)"
         fi
         if date -d "$NOW_ISO" '+%s' > /dev/null 2>&1; then
             NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
         else
             NOW_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
         fi
-        if [ "$NOW_S" -gt "$LAST_S" ] 2> /dev/null; then
-            DURATION_S=$((NOW_S - LAST_S))
+        if [ "$NOW_S" -gt "$START_S" ] 2> /dev/null; then
+            DURATION_S=$((NOW_S - START_S))
         fi
     fi
 fi

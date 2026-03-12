@@ -240,6 +240,11 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                  | .session_stats.prev_turn_no_askQuestions = (.session_stats.turn_no_askQuestions // 0)
                  | .session_stats.turn_authorized = 0
                  | .session_stats.turn_no_askQuestions = 0
+                 | .session_stats.pending_section_after_push = false
+                 | .session_stats.session_id_mismatches = 0
+                 | .session_stats.push_count = 0
+                 | .session_stats.last_push_at = null
+                 | .session_stats.last_push_turn = null
                  | .compliance.consecutive_unauthorized = 0
                  | .compliance.last_turn_authorized = true
                  | .current_turn = {number: 0, section_turn: 0, todo_created: false,
@@ -274,6 +279,11 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                  | .session_stats.prev_turn_no_askQuestions = (.session_stats.turn_no_askQuestions // 0)
                  | .session_stats.turn_authorized = 0
                  | .session_stats.turn_no_askQuestions = 0
+                 | .session_stats.pending_section_after_push = false
+                 | .session_stats.session_id_mismatches = 0
+                 | .session_stats.push_count = 0
+                 | .session_stats.last_push_at = null
+                 | .session_stats.last_push_turn = null
                  | .compliance.consecutive_unauthorized = 0
                  | .compliance.last_turn_authorized = true
                  | .current_turn = {number: 0, section_turn: 0, todo_created: false,
@@ -315,21 +325,43 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
         # BUG-74 FIX: Atualizar session-briefing.md com a nova close_key
         # (RECONNECT-02 gera nova chave, briefing precisa refletir isso)
         if [ -f "$STATE_DIR/session-briefing.md" ]; then
-            if command -v sd &> /dev/null; then
-                # Usa sd (mais seguro para replacement em arquivos)
-                sd -f m "(?s)### 🔐 CHAVE DE ENCERRAMENTO DA SESSÃO.*?(?=##|$)" \
-                    "### 🔐 CHAVE DE ENCERRAMENTO DA SESSÃO\n\n\`\`\`\n${_NEW_KEY}\n\`\`\`\n\n" \
-                    "$STATE_DIR/session-briefing.md" 2> /dev/null || true
+            # Estratégia robusta: regenera a seção de close_key com awk/sed portável
+            # Localiza "### 🔐 CHAVE DE ENCERRAMENTO" e substitui bloco até próxima seção
+            if command -v sponge > /dev/null 2>&1; then
+                awk -v new_key="$_NEW_KEY" '
+                    /^### 🔐 CHAVE DE ENCERRAMENTO DA SESSÃO/ {
+                        print $0
+                        print ""
+                        print "```"
+                        print new_key
+                        print "```"
+                        print ""
+                        # Pula linhas até próxima seção (^##)
+                        found=1
+                        next
+                    }
+                    found && /^##/ { found=0 }
+                    !found { print }
+                ' "$STATE_DIR/session-briefing.md" | sponge "$STATE_DIR/session-briefing.md" 2> /dev/null || true
             else
-                # Fallback: sed portável
-                sed -i.bak '/^### 🔐 CHAVE/,/^###/ {
-                    /^### 🔐 CHAVE/a\
-\
-```\
-'"${_NEW_KEY}"'\
-```\
-                    /^### 🔐 CHAVE/,/^$/d
-                }' "$STATE_DIR/session-briefing.md" 2> /dev/null && rm -f "$STATE_DIR/session-briefing.md.bak" || true
+                # Fallback sem sponge: cria arquivo temporário
+                tmp_briefing="$(mktemp)" || true
+                [ -z "$tmp_briefing" ] && tmp_briefing="${STATE_DIR}/session-briefing.md.tmp"
+                awk -v new_key="$_NEW_KEY" '
+                    /^### 🔐 CHAVE DE ENCERRAMENTO DA SESSÃO/ {
+                        print $0
+                        print ""
+                        print "```"
+                        print new_key
+                        print "```"
+                        print ""
+                        found=1
+                        next
+                    }
+                    found && /^##/ { found=0 }
+                    !found { print }
+                ' "$STATE_DIR/session-briefing.md" > "$tmp_briefing" 2> /dev/null && \
+                mv "$tmp_briefing" "$STATE_DIR/session-briefing.md" 2> /dev/null || true
             fi
         fi
     fi

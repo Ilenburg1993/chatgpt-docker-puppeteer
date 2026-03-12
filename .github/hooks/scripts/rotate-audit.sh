@@ -72,15 +72,39 @@ log "Iniciando rotação: ${CURRENT_LINES} linhas → threshold ${AUDIT_ROTATE_T
 ARCHIVE_DATE="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || date +%s)"
 ARCHIVE_FILE="$LOG_DIR/audit-rotate-${ARCHIVE_DATE}.jsonl"
 
-# Atômica: copia para arquivo e recria com últimas N linhas
-# Usa sponge se disponível, senão mv + tail
-if command -v sponge > /dev/null 2>&1; then
-    cp "$AUDIT_FILE" "$ARCHIVE_FILE"
-    tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" | sponge "$AUDIT_FILE"
+# BUG-66 FIX: Adiciona flock EXCLUSIVO antes da operação atômica para evitar race condition
+# Múltiplas sessões podem chamar rotate-audit.sh simultaneamente; sem lock temos corrupção.
+_AUDIT_LOCK="${AUDIT_FILE}.lock"
+if command -v flock > /dev/null 2>&1; then
+    (
+        # fd 9: descritore de lock, exclusive (-x), timeout 5s (-w 5)
+        flock -x -w 5 9 2> /dev/null || {
+            log "[erro] Falha ao adquirir lock para rotação."
+            exit 1
+        }
+
+        # Atômica: copia para arquivo e recria com últimas N linhas
+        # Usa sponge se disponível, senão mv + tail
+        if command -v sponge > /dev/null 2>&1; then
+            cp "$AUDIT_FILE" "$ARCHIVE_FILE"
+            tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" | sponge "$AUDIT_FILE"
+        else
+            cp "$AUDIT_FILE" "$ARCHIVE_FILE"
+            tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" > "${AUDIT_FILE}.tmp"
+            mv "${AUDIT_FILE}.tmp" "$AUDIT_FILE"
+        fi
+    ) 9> "$_AUDIT_LOCK" || exit 1
 else
-    cp "$AUDIT_FILE" "$ARCHIVE_FILE"
-    tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" > "${AUDIT_FILE}.tmp"
-    mv "${AUDIT_FILE}.tmp" "$AUDIT_FILE"
+    # flock não disponível — executa sem lock (degraded mode, com warning)
+    log "[warn] flock não disponível; rotação sem proteção de lock (degraded mode)"
+    if command -v sponge > /dev/null 2>&1; then
+        cp "$AUDIT_FILE" "$ARCHIVE_FILE"
+        tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" | sponge "$AUDIT_FILE"
+    else
+        cp "$AUDIT_FILE" "$ARCHIVE_FILE"
+        tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" > "${AUDIT_FILE}.tmp"
+        mv "${AUDIT_FILE}.tmp" "$AUDIT_FILE"
+    fi
 fi
 
 NEW_LINES="$(wc -l < "$AUDIT_FILE" | tr -d ' ')"
