@@ -341,18 +341,7 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
         SUBAGENT_LAST_TOOL="$(jq -r '.last_tool.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
         if [ "$SUBAGENT_LAST_TOOL" = "runSubagent" ] || [ "$SUBAGENT_LAST_TOOL" = "search_subagent" ]; then
             AUTH_REQUESTED=true
-            jq -cn \
-                --arg event "auth_via_subagent_delegation" \
-                --arg sid "$SESSION_ID" \
-                --arg ts "$NOW_ISO" \
-                --arg turn_id "$TURN_ID" \
-                '{
-                    event:      $event,
-                    session_id: $sid,
-                    timestamp:  $ts,
-                    turn_id:    (if $turn_id == "" then null else $turn_id end),
-                    message:    "Autorização concedida via delegação imediata ao subagente"
-                }' >> "$AUDIT_FILE"
+            log_auth_via_subagent_delegation_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$TURN_ID"
         fi
     fi
 fi
@@ -393,20 +382,7 @@ fi
 # Loga turnEnd_no_askQuestions antes de decidir se bloqueia.
 # Não loga quando stop_hook_active=true (segunda invocação após block).
 if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
-    jq -cn \
-        --arg event "turnEnd_no_askQuestions" \
-        --arg sid "$SESSION_ID" \
-        --arg ts "$NOW_ISO" \
-        --arg section_id "$SECTION_ID" \
-        --arg turn_id "$TURN_ID" \
-        '{
-            event:      $event,
-            session_id: $sid,
-            timestamp:  $ts,
-            section_id: (if $section_id == "" then null else $section_id end),
-            turn_id:    (if $turn_id == "" then null else $turn_id end),
-            message:    "Turno sem vscode_askQuestions — avaliando bloqueio v7.0"
-        }' >> "$AUDIT_FILE"
+    log_turn_end_no_askquestions_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$SECTION_ID" "$TURN_ID"
 fi
 
 # ── Hardening v7.0: BLOCKING estrutural via Stop hook (decision:block) ────────
@@ -426,55 +402,26 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f 
     _NEW_CONSEC=$((_BLOCK_CONSECUTIVE + 1))
     _NEW_BLOCK_COUNT=$((_BLOCK_COUNT_CURR + 1))
     # Loga o evento de bloqueio (v9.0: inclui todo_created + block_count)
-    jq -cn \
-        --arg event "agentStop_blocked" \
-        --arg sid "$SESSION_ID" \
-        --arg ts "$NOW_ISO" \
-        --arg turn_id "$TURN_ID" \
-        --argjson consec "$_NEW_CONSEC" \
-        --argjson todo "$_BLOCK_TODO_CREATED" \
-        --argjson block_count "$_NEW_BLOCK_COUNT" \
-        '{
-            event:      $event,
-            session_id: $sid,
-            timestamp:  $ts,
-            turn_id:    (if $turn_id == "" then null else $turn_id end),
-            consecutive_unauthorized: $consec,
-            todo_created: $todo,
-            block_count: $block_count,
-            message:    "TURN bloqueado por hardening v9.0: vscode_askQuestions não chamado"
-        }' >> "$AUDIT_FILE"
+    log_agent_stop_blocked_event \
+        "$AUDIT_FILE" \
+        "$SESSION_ID" \
+        "$NOW_ISO" \
+        "$TURN_ID" \
+        "$_NEW_CONSEC" \
+        "$_BLOCK_TODO_CREATED" \
+        "$_NEW_BLOCK_COUNT"
     # Loga evento extra quando manage_todo_list também não foi chamado (v9.0)
     if [ "$_BLOCK_TODO_CREATED" != "true" ]; then
-        jq -cn \
-            --arg event "agentStop_blocked_no_todo" \
-            --arg sid "$SESSION_ID" \
-            --arg ts "$NOW_ISO" \
-            --arg turn_id "$TURN_ID" \
-            --argjson consec "$_NEW_CONSEC" \
-            '{
-                event:      $event,
-                session_id: $sid,
-                timestamp:  $ts,
-                turn_id:    (if $turn_id == "" then null else $turn_id end),
-                consecutive_unauthorized: $consec,
-                message:    "manage_todo_list NÃO chamado neste turno — violação dupla do Protocolo v9.0"
-            }' >> "$AUDIT_FILE"
+        log_agent_stop_blocked_no_todo_event \
+            "$AUDIT_FILE" \
+            "$SESSION_ID" \
+            "$NOW_ISO" \
+            "$TURN_ID" \
+            "$_NEW_CONSEC"
     fi
     # Atualiza CTX: incrementa consecutive_unauthorized + block_count e registra atividade
-    if ! _BLOCK_CTX_TMP="$(mktemp 2> /dev/null)"; then
+    if ! update_blocked_turn_context "$CTX_FILE" "$_NEW_CONSEC" "$_NEW_BLOCK_COUNT" "$NOW_ISO"; then
         echo "[warn] agent-stop: mktemp falhou; consecutive_unauthorized não atualizado" >&2
-    else
-        jq --argjson c "$_NEW_CONSEC" \
-            --argjson bc "$_NEW_BLOCK_COUNT" \
-            --arg now "$NOW_ISO" \
-            '.compliance.consecutive_unauthorized = $c
-             | .compliance.last_turn_authorized = false
-             | .last_turn_ts = $now
-             | .current_turn.block_count = $bc' \
-            "$CTX_FILE" > "$_BLOCK_CTX_TMP" 2> /dev/null \
-            && mv "$_BLOCK_CTX_TMP" "$CTX_FILE" \
-            || rm -f "$_BLOCK_CTX_TMP" 2> /dev/null
     fi
     # Registra flag para o próximo briefing (schema JSON canônico)
     _BLOCK_TURN_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
@@ -618,26 +565,15 @@ if [ "$TURN_INTENT_DECLARED" = "false" ] && [ "$TURN_NUMBER" -gt 0 ]; then
             "$CTX_FILE" 2> /dev/null || echo '')"
         [ -n "$TOP_TOOLS" ] && AUTO_INTENT="ferramentas: ${TOP_TOOLS}"
     fi
-    jq -cn \
-        --arg event "turnStart_enriched_auto" \
-        --arg sid "$SESSION_ID" \
-        --arg ts "$NOW_ISO" \
-        --argjson turn_number "$TURN_NUMBER" \
-        --arg section_name "$SECTION_NAME" \
-        --arg section_id "$SECTION_ID" \
-        --arg turn_id "$TURN_ID" \
-        --arg intent "$AUTO_INTENT" \
-        '{
-            event:          $event,
-            session_id:     $sid,
-            timestamp:      $ts,
-            turn_number:    $turn_number,
-            section_name:   (if $section_name == "" then null else $section_name end),
-            section_id:     (if $section_id == "" then null else $section_id end),
-            turn_id:        (if $turn_id == "" then null else $turn_id end),
-            intent:         $intent,
-            auto_generated: true
-        }' >> "$AUDIT_FILE"
+    log_turn_start_enriched_auto_event \
+        "$AUDIT_FILE" \
+        "$SESSION_ID" \
+        "$NOW_ISO" \
+        "$TURN_NUMBER" \
+        "$SECTION_NAME" \
+        "$SECTION_ID" \
+        "$TURN_ID" \
+        "$AUTO_INTENT"
 fi
 
 # ── Registra resultado do turno e atualiza compliance ────────────────────────
@@ -645,22 +581,8 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
     rm -f "$AUTH_FLAG_FILE" 2> /dev/null || true
     # Cria flag de autorização (simétrico ao UNAUTHORIZED_CLOSE.flag para auditoria bidirecional)
     TURN_COUNT_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-    jq -cn \
-        --arg ts "$NOW_ISO" \
-        --arg sid "$SESSION_ID" \
-        --argjson turn "$TURN_COUNT_NOW" \
-        '{
-            timestamp:  $ts,
-            session_id: $sid,
-            turn_count: $turn,
-            authorized: true
-        }' > "$AUTHORIZED_FLAG_FILE"
-    if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-        jq '.compliance.last_turn_authorized     = true
-             | .compliance.consecutive_unauthorized = 0
-             | .compliance.flag_file_exists        = false' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-    fi
+    write_authorized_close_flag "$AUTHORIZED_FLAG_FILE" "$NOW_ISO" "$SESSION_ID" "$TURN_COUNT_NOW"
+    mark_turn_authorized_in_context "$CTX_FILE"
     _TURN_AUTH_PUSH_PENDING="$(jq -r '.session_stats.pending_section_after_push // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
     log_turn_end_authorized_event \
         "$AUDIT_FILE" \
@@ -691,31 +613,14 @@ else
     else
         _CONSEC_FOR_FLAG="$((_CONSEC_NOW + 1))"
     fi
-    jq -cn \
-        --arg ts "$NOW_ISO" \
-        --arg sid "$SESSION_ID" \
-        --argjson turn "${_TURN_NOW:-0}" \
-        --argjson consec "${_CONSEC_FOR_FLAG:-$_CONSEC_NOW}" \
-        --arg intent "$TURN_INTENT" \
-        '{
-            timestamp:                $ts,
-            session_id:               $sid,
-            turn_count:               $turn,
-            consecutive_unauthorized: $consec,
-            intent:                   (if $intent == "" then null else $intent end),
-            message:                  "Turno encerrado sem vscode_askQuestions — hardening v5.1"
-        }' > "$AUTH_FLAG_FILE" 2> /dev/null || true
-    if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-        # FIX v9.0: guarda anti-duplo-incremento via --arg stop_hook
-        jq --arg stop_hook "$STOP_HOOK_ACTIVE" \
-            '.compliance.last_turn_authorized = false
-             | .compliance.consecutive_unauthorized = (
-                 if $stop_hook == "true" then (.compliance.consecutive_unauthorized // 0)
-                 else (.compliance.consecutive_unauthorized // 0) + 1
-                 end)
-             | .compliance.flag_file_exists = true' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-    fi
+    write_unauthorized_close_flag \
+        "$AUTH_FLAG_FILE" \
+        "$NOW_ISO" \
+        "$SESSION_ID" \
+        "${_TURN_NOW:-0}" \
+        "${_CONSEC_FOR_FLAG:-$_CONSEC_NOW}" \
+        "$TURN_INTENT"
+    mark_turn_unauthorized_in_context "$CTX_FILE" "$STOP_HOOK_ACTIVE"
     # Nota: o evento turnEnd_no_askQuestions já foi emitido anteriormente (seção de auditoria informativa).
 fi
 

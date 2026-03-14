@@ -364,6 +364,36 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
   mensagem para o helper.
 - Revalidação pós-extração de nudge: `smoke-test.sh --quiet` → **201/201 PASS**.
 
+### 5.18 Retomada da modularização (logs e flags)
+
+- Nova rodada de desacoplamento no eixo `agent-stop.sh` → `hooks-lib/agent-stop-lib.sh`, com extração de
+  blocos de serialização/logging ainda remanescentes no script principal:
+  - `log_auth_via_subagent_delegation_event`
+  - `log_turn_end_no_askquestions_event`
+  - `log_agent_stop_blocked_event`
+  - `log_agent_stop_blocked_no_todo_event`
+  - `log_turn_start_enriched_auto_event`
+  - `write_authorized_close_flag`
+  - `write_unauthorized_close_flag`
+- `agent-stop.sh` foi reduzido em pontos de repetição de `jq -cn`, mantendo a semântica de runtime e
+  preservando os motivos de block/telemetria existentes.
+- `smoke-test.sh` foi ajustado para reconhecer extrações de eventos agora concentradas no
+  `agent-stop-lib.sh` (checks de `auth_via_subagent_delegation`, `agentStop_blocked` e
+  `agentStop_blocked_no_todo`).
+- Revalidação pós-retomada: `smoke-test.sh --quiet`.
+
+### 5.19 Continuação da modularização (mutações de contexto)
+
+- Extraídas mutações de contexto ainda inline no `agent-stop.sh` para helpers dedicados em
+  `hooks-lib/agent-stop-lib.sh`:
+  - `update_blocked_turn_context`
+  - `mark_turn_authorized_in_context`
+  - `mark_turn_unauthorized_in_context`
+- `agent-stop.sh` passa a atuar mais como orquestrador de fluxo, enquanto a camada de helper
+  concentra escrita de estado (`compliance.*`, `last_turn_ts`, `current_turn.block_count`).
+- Objetivo desta fase: reduzir repetição de `jq` mutável e preparar base para eventual quebra por
+  submódulos funcionais (`auth`, `state-write`, `session-guard`).
+
 ---
 
 ## 6) Proposta de upgrades (completo e profundo)

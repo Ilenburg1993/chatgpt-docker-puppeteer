@@ -449,6 +449,265 @@ log_turn_end_authorized_event() {
         >> "$audit_file"
 }
 
+# Loga autorização implícita via delegação imediata ao subagente.
+log_auth_via_subagent_delegation_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local turn_id="$4"
+
+    jq -cn \
+        --arg event "auth_via_subagent_delegation" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg turn_id "$turn_id" \
+        '{
+            event:      $event,
+            session_id: $sid,
+            timestamp:  $ts,
+            turn_id:    (if $turn_id == "" then null else $turn_id end),
+            message:    "Autorização concedida via delegação imediata ao subagente"
+        }' >> "$audit_file"
+}
+
+# Loga auditoria informativa de turno sem vscode_askQuestions.
+log_turn_end_no_askquestions_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local section_id="$4"
+    local turn_id="$5"
+
+    jq -cn \
+        --arg event "turnEnd_no_askQuestions" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg section_id "$section_id" \
+        --arg turn_id "$turn_id" \
+        '{
+            event:      $event,
+            session_id: $sid,
+            timestamp:  $ts,
+            section_id: (if $section_id == "" then null else $section_id end),
+            turn_id:    (if $turn_id == "" then null else $turn_id end),
+            message:    "Turno sem vscode_askQuestions — avaliando bloqueio v7.0"
+        }' >> "$audit_file"
+}
+
+# Loga evento de bloqueio principal do Stop (v9.0).
+log_agent_stop_blocked_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local turn_id="$4"
+    local consecutive_unauthorized="$5"
+    local todo_created="$6"
+    local block_count="$7"
+
+    jq -cn \
+        --arg event "agentStop_blocked" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg turn_id "$turn_id" \
+        --argjson consec "$consecutive_unauthorized" \
+        --argjson todo "$todo_created" \
+        --argjson block_count "$block_count" \
+        '{
+            event:      $event,
+            session_id: $sid,
+            timestamp:  $ts,
+            turn_id:    (if $turn_id == "" then null else $turn_id end),
+            consecutive_unauthorized: $consec,
+            todo_created: $todo,
+            block_count: $block_count,
+            message:    "TURN bloqueado por hardening v9.0: vscode_askQuestions não chamado"
+        }' >> "$audit_file"
+}
+
+# Loga evento adicional quando manage_todo_list não foi chamado (violação dupla).
+log_agent_stop_blocked_no_todo_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local turn_id="$4"
+    local consecutive_unauthorized="$5"
+
+    jq -cn \
+        --arg event "agentStop_blocked_no_todo" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg turn_id "$turn_id" \
+        --argjson consec "$consecutive_unauthorized" \
+        '{
+            event:      $event,
+            session_id: $sid,
+            timestamp:  $ts,
+            turn_id:    (if $turn_id == "" then null else $turn_id end),
+            consecutive_unauthorized: $consec,
+            message:    "manage_todo_list NÃO chamado neste turno — violação dupla do Protocolo v9.0"
+        }' >> "$audit_file"
+}
+
+# Loga auto-enrich de intenção quando start-turn.sh não foi chamado.
+log_turn_start_enriched_auto_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local turn_number="$4"
+    local section_name="$5"
+    local section_id="$6"
+    local turn_id="$7"
+    local intent="$8"
+
+    jq -cn \
+        --arg event "turnStart_enriched_auto" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --argjson turn_number "$turn_number" \
+        --arg section_name "$section_name" \
+        --arg section_id "$section_id" \
+        --arg turn_id "$turn_id" \
+        --arg intent "$intent" \
+        '{
+            event:          $event,
+            session_id:     $sid,
+            timestamp:      $ts,
+            turn_number:    $turn_number,
+            section_name:   (if $section_name == "" then null else $section_name end),
+            section_id:     (if $section_id == "" then null else $section_id end),
+            turn_id:        (if $turn_id == "" then null else $turn_id end),
+            intent:         $intent,
+            auto_generated: true
+        }' >> "$audit_file"
+}
+
+# Escreve AUTHORIZED_CLOSE.flag no schema JSON canônico.
+write_authorized_close_flag() {
+    local flag_file="$1"
+    local ts="$2"
+    local sid="$3"
+    local turn_count="$4"
+
+    jq -cn \
+        --arg ts "$ts" \
+        --arg sid "$sid" \
+        --argjson turn "$turn_count" \
+        '{
+            timestamp:  $ts,
+            session_id: $sid,
+            turn_count: $turn,
+            authorized: true
+        }' > "$flag_file"
+}
+
+# Escreve UNAUTHORIZED_CLOSE.flag no schema JSON canônico.
+write_unauthorized_close_flag() {
+    local flag_file="$1"
+    local ts="$2"
+    local sid="$3"
+    local turn_count="$4"
+    local consecutive_unauthorized="$5"
+    local intent="$6"
+
+    jq -cn \
+        --arg ts "$ts" \
+        --arg sid "$sid" \
+        --argjson turn "${turn_count:-0}" \
+        --argjson consec "${consecutive_unauthorized:-0}" \
+        --arg intent "$intent" \
+        '{
+            timestamp:                $ts,
+            session_id:               $sid,
+            turn_count:               $turn,
+            consecutive_unauthorized: $consec,
+            intent:                   (if $intent == "" then null else $intent end),
+            message:                  "Turno encerrado sem vscode_askQuestions — hardening v5.1"
+        }' > "$flag_file"
+}
+
+# Atualiza contexto ao bloquear um TURN por ausência de autorização.
+update_blocked_turn_context() {
+    local ctx_file="$1"
+    local new_consecutive_unauthorized="$2"
+    local new_block_count="$3"
+    local now_iso="$4"
+
+    local tmp_ctx
+    if ! tmp_ctx="$(mktemp 2> /dev/null)"; then
+        return 1
+    fi
+
+    jq --argjson c "$new_consecutive_unauthorized" \
+        --argjson bc "$new_block_count" \
+        --arg now "$now_iso" \
+        '.compliance.consecutive_unauthorized = $c
+         | .compliance.last_turn_authorized = false
+         | .last_turn_ts = $now
+         | .current_turn.block_count = $bc' \
+        "$ctx_file" > "$tmp_ctx" 2> /dev/null \
+        && mv "$tmp_ctx" "$ctx_file" \
+        || rm -f "$tmp_ctx" 2> /dev/null
+}
+
+# Marca o contexto como autorizado ao final do TURN.
+mark_turn_authorized_in_context() {
+    local ctx_file="$1"
+    if [ ! -f "$ctx_file" ]; then
+        return 0
+    fi
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq '.compliance.last_turn_authorized = true
+             | .compliance.consecutive_unauthorized = 0
+             | .compliance.flag_file_exists = false' \
+            "$ctx_file" | sponge "$ctx_file" 2> /dev/null || true
+    else
+        local tmp_ctx
+        if tmp_ctx="$(mktemp 2> /dev/null)"; then
+            jq '.compliance.last_turn_authorized = true
+                 | .compliance.consecutive_unauthorized = 0
+                 | .compliance.flag_file_exists = false' \
+                "$ctx_file" > "$tmp_ctx" 2> /dev/null \
+                && mv "$tmp_ctx" "$ctx_file" \
+                || rm -f "$tmp_ctx" 2> /dev/null
+        fi
+    fi
+}
+
+# Marca o contexto como não autorizado ao final do TURN.
+mark_turn_unauthorized_in_context() {
+    local ctx_file="$1"
+    local stop_hook_active="$2"
+    if [ ! -f "$ctx_file" ]; then
+        return 0
+    fi
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq --arg stop_hook "$stop_hook_active" \
+            '.compliance.last_turn_authorized = false
+             | .compliance.consecutive_unauthorized = (
+                 if $stop_hook == "true" then (.compliance.consecutive_unauthorized // 0)
+                 else (.compliance.consecutive_unauthorized // 0) + 1
+                 end)
+             | .compliance.flag_file_exists = true' \
+            "$ctx_file" | sponge "$ctx_file" 2> /dev/null || true
+    else
+        local tmp_ctx
+        if tmp_ctx="$(mktemp 2> /dev/null)"; then
+            jq --arg stop_hook "$stop_hook_active" \
+                '.compliance.last_turn_authorized = false
+                 | .compliance.consecutive_unauthorized = (
+                     if $stop_hook == "true" then (.compliance.consecutive_unauthorized // 0)
+                     else (.compliance.consecutive_unauthorized // 0) + 1
+                     end)
+                 | .compliance.flag_file_exists = true' \
+                "$ctx_file" > "$tmp_ctx" 2> /dev/null \
+                && mv "$tmp_ctx" "$ctx_file" \
+                || rm -f "$tmp_ctx" 2> /dev/null
+        fi
+    fi
+}
+
 # Estratégia 1: detecta sinal de autorização no audit após último userPromptSubmitted.
 audit_has_turn_auth_signal() {
     local audit_file="$1"

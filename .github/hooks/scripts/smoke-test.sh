@@ -635,7 +635,8 @@ else
 fi
 
 # Hardening subagente v6 — auth_via_subagent_delegation logado
-if grep -q 'auth_via_subagent_delegation' "$HOOK_DIR/scripts/agent-stop.sh"; then
+if grep -q 'auth_via_subagent_delegation' "$HOOK_DIR/scripts/agent-stop.sh" 2> /dev/null \
+    || grep -q 'auth_via_subagent_delegation' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; then
     pass "Hardening v6: agent-stop.sh loga auth_via_subagent_delegation (Strategy 4)"
 else
     fail "Hardening v6: agent-stop.sh não loga auth_via_subagent_delegation"
@@ -948,7 +949,8 @@ ASJSON
     fi
 
     # Teste AS-6: agentStop_blocked é logado quando bloqueia
-    if grep -q 'agentStop_blocked' "$_AS_SCRIPT" 2> /dev/null; then
+    if grep -q 'agentStop_blocked' "$_AS_SCRIPT" 2> /dev/null \
+        || grep -q 'agentStop_blocked' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; then
         pass "AS-6: agent-stop.sh loga evento agentStop_blocked em audit.jsonl"
     else
         fail "AS-6: agent-stop.sh NÃO loga agentStop_blocked"
@@ -1229,7 +1231,8 @@ fi
 
 # V90-4: agent-stop.sh emite agentStop_blocked_no_todo quando todo_created=false
 if [ -f "$_AG_STOP" ]; then
-    if grep -q 'agentStop_blocked_no_todo' "$_AG_STOP"; then
+    if grep -q 'agentStop_blocked_no_todo' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'agentStop_blocked_no_todo' "$_AG_STOP_LIB" 2> /dev/null; then
         pass "V90-4: agent-stop.sh emite evento agentStop_blocked_no_todo quando manage_todo_list ausente"
     else
         fail "V90-4: agent-stop.sh NÃO emite agentStop_blocked_no_todo — sem observabilidade de violação dupla"
@@ -1299,7 +1302,8 @@ fi
 
 # V90-10: agent-stop.sh não incrementa consecutive_unauthorized quando stop_hook_active=true (anti-double-increment)
 if [ -f "$_AG_STOP" ]; then
-    if grep -q 'STOP_HOOK_ACTIVE.*consecutive\|stop_hook.*consecutive_unauthorized\|if \$stop_hook' "$_AG_STOP"; then
+    if grep -q 'STOP_HOOK_ACTIVE.*consecutive\|stop_hook.*consecutive_unauthorized\|if \$stop_hook' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'mark_turn_unauthorized_in_context\|if \$stop_hook' "$_AG_STOP_LIB" 2> /dev/null; then
         pass "V90-10: agent-stop.sh usa guarda anti-duplo-incremento de consecutive_unauthorized (fix v9.0)"
     else
         fail "V90-10: agent-stop.sh NÃO tem guarda anti-duplo-incremento — bug: cada turn bloqueado conta 2x consecutivos"
@@ -1361,10 +1365,10 @@ fi
 
 # V90-15: agent-stop.sh atualiza last_turn_ts mesmo em turnos bloqueados (TURN_IDLE mede atividade)
 if [ -f "$_AG_STOP" ]; then
-    if grep -q 'last_turn_ts.*now\|last_turn_ts.*NOW' "$_AG_STOP" 2> /dev/null \
-        &&
-        # Verifica que last_turn_ts aparece tanto no bloco de bloqueio (jq compliance) quanto no fim de turno
-        [ "$(grep -c 'last_turn_ts.*now\|last_turn_ts.*NOW' "$_AG_STOP" 2> /dev/null)" -ge 2 ]; then
+    _V90_15_COUNT_MAIN="$(grep -c 'last_turn_ts.*now\|last_turn_ts.*NOW' "$_AG_STOP" 2> /dev/null || echo 0)"
+    _V90_15_COUNT_LIB="$(grep -c 'last_turn_ts.*now\|last_turn_ts.*NOW' "$_AG_STOP_LIB" 2> /dev/null || echo 0)"
+    _V90_15_COUNT_TOTAL=$((_V90_15_COUNT_MAIN + _V90_15_COUNT_LIB))
+    if [ "$_V90_15_COUNT_TOTAL" -ge 2 ]; then
         pass "V90-15: agent-stop.sh atualiza last_turn_ts em bloqueios E em turnos normais (TURN_IDLE preciso)"
     else
         fail "V90-15: agent-stop.sh NÃO atualiza last_turn_ts em turnos bloqueados — TURN_IDLE falso-positivo"
