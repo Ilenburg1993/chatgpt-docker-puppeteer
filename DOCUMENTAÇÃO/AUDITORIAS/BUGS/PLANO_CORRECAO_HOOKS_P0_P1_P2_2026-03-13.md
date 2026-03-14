@@ -11,7 +11,7 @@ normalizar contrato e métricas (P1), e finalizar com hardening de qualidade/she
 
 ## Status de execução (atual)
 
-- **P0**: 🔄 Em andamento (H001, H004, H005 concluídos + novo foco H049/H050/H051)
+- **P0**: 🔄 Em andamento (H001, H004, H005 concluídos + novo foco H049/H050/H051/H052)
 - **P1**: ⏳ Pendente
 - **P2**: ⏳ Pendente
 
@@ -31,6 +31,12 @@ normalizar contrato e métricas (P1), e finalizar com hardening de qualidade/she
 - **P0-H051 — Divergência semântica TURN x SESSION em docs de referência**
 	- Gap: critérios de encerramento legítimo de TURN variam entre documentos canônicos e implementação atual.
 	- Impacto: interpretações inconsistentes de “turno encerrado corretamente” e risco de regressão de protocolo.
+
+- **P0-H052 — Falso positivo no guard de `session-close.sh` (Mechanism 5)**
+	- Sintoma: evento `sessionClose_direct_blocked` disparado em comando legítimo de `git add` apenas por citar o caminho
+		do arquivo `session-close.sh` como argumento.
+	- Causa: detecção textual ampla (substring) tratava qualquer ocorrência de `session-close.sh` como execução direta.
+	- Impacto: bloqueios indevidos, ruído de auditoria e diagnóstico incorreto de tentativa de encerramento de sessão.
 
 ### Evidências rápidas da P0
 
@@ -56,6 +62,7 @@ normalizar contrato e métricas (P1), e finalizar com hardening de qualidade/she
 4. **H049** — `session-start.sh`: ignorar checkpoints sintéticos (`sess_test*`) na detecção de sessão anterior.
 5. **H050** — `session-start.sh`: descartar checkpoints com `checkpoint_ts` no futuro (sanity check).
 6. **H051** — harmonizar semântica de encerramento TURN/SESSION entre contrato executável e docs de referência.
+7. **H052** — `pre-tool-use.sh`: restringir bloqueio do Mechanism 5 apenas a invocação direta de `session-close.sh`.
 
 ### Entregáveis técnicos
 
@@ -65,6 +72,7 @@ normalizar contrato e métricas (P1), e finalizar com hardening de qualidade/she
 - Hardening de recovery em `session-start.sh` com filtro anti-fixture + validação temporal de checkpoint.
 - Novo cenário de regressão no `test-level1-detect.sh` garantindo que checkpoint sintético não contamina recovery.
 - Matriz de convergência TURN/SESSION baseada nos documentos de referência canônicos.
+- Regressão no smoke-test garantindo: (a) `session-close.sh` como argumento **não bloqueia**; (b) chamada direta continua **bloqueada**.
 
 ### Critérios de aceite
 
@@ -74,6 +82,7 @@ normalizar contrato e métricas (P1), e finalizar com hardening de qualidade/she
 - Checkpoint sintético em runtime não altera `recovery.close_mode` (permanece `ok` sem sessão válida anterior).
 - Checkpoint com timestamp futuro não é usado para inferência de sessão anterior.
 - Semântica de legitimidade de encerramento alinhada entre implementação e docs canônicos.
+- Guard anti-M5 não gera falso positivo quando `session-close.sh` aparece apenas como argumento de outro comando.
 
 ### Validação
 

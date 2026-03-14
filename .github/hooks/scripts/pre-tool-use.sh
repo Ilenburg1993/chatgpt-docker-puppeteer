@@ -437,7 +437,13 @@ fi
 # pode executar o script automaticamente ou o agente pode fazê-lo como fallback.
 if [ "$TOOL_NAME" = "run_in_terminal" ]; then
     _M5_CMD="$(echo "$INPUT" | jq -r '.tool_input.command // ""' 2> /dev/null || echo '')"
-    if echo "$_M5_CMD" | grep -q "session-close\.sh"; then
+    _M5_DIRECT_CALL=false
+    if printf '%s\n' "$_M5_CMD" | grep -Eq '(^|[;&]|&&|\|\|)[[:space:]]*(bash|sh|zsh)[[:space:]]+([^;&|[:space:]]*/)?session-close\.sh([[:space:]]|$)'; then
+        _M5_DIRECT_CALL=true
+    elif printf '%s\n' "$_M5_CMD" | grep -Eq '(^|[;&]|&&|\|\|)[[:space:]]*([^;&|[:space:]]*/)?session-close\.sh([[:space:]]|$)'; then
+        _M5_DIRECT_CALL=true
+    fi
+    if [ "$_M5_DIRECT_CALL" = "true" ]; then
         _M5_VALIDATED=false
         if [ -f "$CTX_FILE" ]; then
             _M5_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"

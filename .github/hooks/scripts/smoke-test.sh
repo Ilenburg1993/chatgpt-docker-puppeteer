@@ -1002,6 +1002,68 @@ if [ -f "$_PTU_SCRIPT" ]; then
     else
         fail "PR-6: pre-tool-use.sh NÃO verifica tool_name run_in_terminal"
     fi
+
+    # Teste PR-7/PR-8: regressão de falso positivo no guard de session-close.sh
+    _PTU_SB="$(mktemp -d)"
+    _PTU_SB_SCRIPTS="$_PTU_SB/scripts"
+    _PTU_SB_STATE="$_PTU_SB/state"
+    _PTU_SB_LOGS="$_PTU_SB/logs"
+    _PTU_SB_LIB="$_PTU_SB/hooks-lib"
+    mkdir -p "$_PTU_SB_SCRIPTS" "$_PTU_SB_STATE" "$_PTU_SB_LOGS" "$_PTU_SB_LIB"
+    cp -a "$HOOK_DIR/scripts/pre-tool-use.sh" "$_PTU_SB_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_PTU_SB_LIB/" 2> /dev/null || true
+
+    cat > "$_PTU_SB_STATE/session-context.json" << 'PTUCTX'
+{
+    "session": {
+        "id": "ptu-guard-test-001",
+        "close_key": "ENCERRAR-PTUTEST",
+        "close_key_validated": false,
+        "started_at": "2026-01-01T00:00:00Z"
+    },
+    "session_stats": {
+        "tools_total": 0,
+        "tools_by_name": {}
+    },
+    "current_turn": {
+        "tools_count": 0,
+        "tools_by_name": {},
+        "auth_requested": false,
+        "section_name": "teste"
+    },
+    "current_section": {
+        "name": "teste",
+        "tools_by_name": {}
+    },
+    "last_tool": {
+        "name": null,
+        "ts": null,
+        "use_id": null,
+        "result": null
+    },
+    "compliance": {
+        "consecutive_unauthorized": 0
+    }
+}
+PTUCTX
+
+    _PTU_PAYLOAD_ARG='{"timestamp":"2026-01-01T00:00:00Z","session_id":"ptu-guard-test-001","cwd":"/tmp","tool_name":"run_in_terminal","tool_use_id":"ptu-u1","tool_input":{"command":"git add .github/hooks/scripts/session-close.sh README.md"}}'
+    _PTU_OUT_ARG="$(echo "$_PTU_PAYLOAD_ARG" | bash "$_PTU_SB_SCRIPTS/pre-tool-use.sh" 2> /dev/null || true)"
+    if echo "$_PTU_OUT_ARG" | grep -q '"permissionDecision"[[:space:]]*:[[:space:]]*"deny"'; then
+        fail "PR-7: falso positivo — comando com session-close.sh como argumento foi bloqueado"
+    else
+        pass "PR-7: sem falso positivo — argumento contendo session-close.sh NÃO bloqueia"
+    fi
+
+    _PTU_PAYLOAD_DIRECT='{"timestamp":"2026-01-01T00:00:00Z","session_id":"ptu-guard-test-001","cwd":"/tmp","tool_name":"run_in_terminal","tool_use_id":"ptu-u2","tool_input":{"command":"bash .github/hooks/scripts/session-close.sh ENCERRAR-PTUTEST"}}'
+    _PTU_OUT_DIRECT="$(echo "$_PTU_PAYLOAD_DIRECT" | bash "$_PTU_SB_SCRIPTS/pre-tool-use.sh" 2> /dev/null || true)"
+    if echo "$_PTU_OUT_DIRECT" | grep -q '"permissionDecision"[[:space:]]*:[[:space:]]*"deny"'; then
+        pass "PR-8: chamada direta de session-close.sh continua bloqueada"
+    else
+        fail "PR-8: chamada direta de session-close.sh NÃO foi bloqueada"
+    fi
+
+    rm -rf "$_PTU_SB"
 else
     fail "PR-0: pre-tool-use.sh não encontrado em $HOOK_DIR/scripts/"
 fi
