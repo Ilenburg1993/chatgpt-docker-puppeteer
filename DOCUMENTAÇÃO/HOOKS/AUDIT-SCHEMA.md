@@ -224,7 +224,7 @@ Cada linha é um objeto JSON independente (JSONL). Campos comuns a todos os even
 
 - Emitido automaticamente por `log-prompt.sh` (hook `userPromptSubmitted`)
 - `section_name`: seção ativa no momento do início do turno (`null` se nenhuma — não deve ocorrer
-  com Schema v4)
+  com o schema vigente)
 
 #### `turnStart_enriched`
 
@@ -257,11 +257,11 @@ Cada linha é um objeto JSON independente (JSONL). Campos comuns a todos os even
 }
 ```
 
-#### `turnEnd_UNAUTHORIZED`
+#### `turnEnd_no_askQuestions`
 
 ```json
 {
-  "event": "turnEnd_UNAUTHORIZED",
+  "event": "turnEnd_no_askQuestions",
   "session_id": "...",
   "timestamp": "2026-03-09T...",
   "message": "VIOLAÇÃO: turno encerrado sem vscode_askQuestions. Flag gravada em UNAUTHORIZED_CLOSE.flag"

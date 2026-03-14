@@ -35,18 +35,18 @@ de silent session close) **Status**: ATIVO — Implementação em curso **Chave 
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Conceito    | O que é                                                                                | Quem controla                    | Como fecha                                                      | Autorização                   |
-| ----------- | -------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------- | ----------------------------- |
-| **SESSION** | 1 ativação do Copilot Chat. Tem ID único, close_key, compliance tracking               | Hook `sessionStart`/`sessionEnd` | Template F + usuário digita chave + `bash session-close.sh KEY` | **OBRIGATÓRIA** — sem exceção |
-| **SECTION** | Fase lógica de trabalho **dentro** de uma SESSION                                      | Agente via `start-section.sh`    | Automaticamente ao abrir nova seção, ou `section-end.sh`        | Autônoma                      |
-| **TURN**    | Ciclo único prompt→resposta. Começa com `userPromptSubmitted`, termina com `agentStop` | Hook automático                  | Livre — `agentStop` dispara limpo                               | Livre                         |
+| Conceito    | O que é                                                                                | Quem controla                    | Como fecha                                                                     | Autorização                   |
+| ----------- | -------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------ | ----------------------------- |
+| **SESSION** | 1 ativação do Copilot Chat. Tem ID único, close_key, compliance tracking               | Hook `sessionStart`/`sessionEnd` | Template F + usuário digita chave + execução automática via `post-tool-use.sh` | **OBRIGATÓRIA** — sem exceção |
+| **SECTION** | Fase lógica de trabalho **dentro** de uma SESSION                                      | Agente via `start-section.sh`    | Automaticamente ao abrir nova seção, ou `section-end.sh`                       | Autônoma                      |
+| **TURN**    | Ciclo único prompt→resposta. Começa com `userPromptSubmitted`, termina com `agentStop` | Hook automático                  | Exige `vscode_askQuestions` ao final (ou `decision:block`)                     | Obrigatória (v9.0)            |
 
 ### Regra de Ouro do Encerramento
 
 ```
-TURN encerrado?     → LIVRE. Apenas logar intenção no início.
+TURN encerrado?     → Exige `vscode_askQuestions` (ou `decision:block` impede o fim do turno).
 SECTION encerrada?  → LIVRE. Agente decide quando mudar de fase.
-SESSION encerrada?  → BLOQUEADA sem: vscode_askQuestions (Template F) + KEY digitada pelo usuário + bash session-close.sh KEY
+SESSION encerrada?  → BLOQUEADA sem: vscode_askQuestions (Template F) + KEY digitada pelo usuário + execução automática em `post-tool-use.sh`
 ```
 
 **O problema recorrente**: O agente confunde "terminar de responder um TURN" com "encerrar a
@@ -196,7 +196,7 @@ F + KEY.
 
 ```json
 {
-  "systemMessage": "🔐 SESSION ATIVA: ENCERRAR-XXXXXX | TURN N/M | SECTION: nome\n⚠️ SESSÃO não pode encerrar sem: vscode_askQuestions Template F + usuário digita KEY + bash session-close.sh KEY\n📌 TURN encerrado livremente. SESSION requer autorização explícita."
+  "systemMessage": "🔐 SESSION ATIVA: ENCERRAR-XXXXXX | TURN N/M | SECTION: nome\n⚠️ SESSÃO não pode encerrar sem: vscode_askQuestions Template F + usuário digita KEY + execução automática em post-tool-use.sh\n📌 TURN exige vscode_askQuestions. SESSION requer autorização explícita."
 }
 ```
 
@@ -230,7 +230,7 @@ Formato padrão proposto:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 → TURN termina LIVREMENTE (sem autorização)
 → SECTION muda via: bash start-section.sh "nome" (autônomo)
-→ SESSION fecha SOMENTE com Template F + KEY + bash session-close.sh KEY
+→ SESSION fecha SOMENTE com Template F + KEY + execução automática via post-tool-use.sh
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -290,7 +290,7 @@ Após implementação, uma sessão bem-sucedida deve:
 - [ ] Ver close_key em TODOS os nudges do agent-stop.sh
 - [ ] Distinguir claramente SESSION/SECTION/TURN em todas as mensagens
 - [ ] `consecutive_unauthorized` nunca chegar a > 0 em sessão nova
-- [ ] SESSION sempre fechada com `bash session-close.sh ENCERRAR-XXXXXX`
+- [ ] SESSION sempre fechada via fluxo automático (`post-tool-use.sh` → `session-close.sh`)
 
 ---
 
@@ -324,8 +324,8 @@ injeção para ANTES da resposta (`userPromptSubmitted` / `preToolUse`).
 A distinção SESSION/SECTION/TURN também precisa ser mais explícita em cada mensagem do sistema, para
 que o agente nunca confunda "terminar de escrever uma resposta de TURN" com "encerrar a SESSION".
 
-**A SESSION só encerra quando o usuário digita a chave `ENCERRAR-XXXXXXXX` e o agente chama
-`bash session-close.sh`.**
+**A SESSION só encerra quando o usuário digita a chave `ENCERRAR-XXXXXXXX` no Template F e o
+`post-tool-use.sh` executa `session-close.sh` automaticamente.**
 
 ---
 
@@ -443,15 +443,15 @@ SESSION end: [usuário digita ENCERRAR-KEY em askQuestions → post-tool-use.sh 
 
 ### 10.4 Mudanças Implementadas (v6.2)
 
-| Arquivo                                               | Mudança                                                                                                         |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `.github/copilot-instructions.md`                     | Ciclo de vida TURN: nota que askQuestions responses são tool results (postToolUse), NÃO novos prompts           |
+| Arquivo                                               | Mudança                                                                                                        |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `.github/copilot-instructions.md`                     | Ciclo de vida TURN: nota que askQuestions responses são tool results (postToolUse), NÃO novos prompts          |
 | `.github/copilot-instructions.md`                     | Adicionada nota `⚠️ userPromptSubmitted dispara SOMENTE para chatbox` antes da seção de comportamento do agente |
-| `.github/AGENTS.md`                                   | Tabela de eventos: `userPromptSubmitted` agora descreve corretamente sua frequência real                        |
-| `.github/AGENTS.md`                                   | Seção TURN: nota explícita sobre semântica do hook vs workflow real                                             |
-| `.github/instructions/hooks-protocol.instructions.md` | Tabela conceitos: nota sobre `userPromptSubmitted` vs tool results                                              |
-| `.github/instructions/hooks-protocol.instructions.md` | Seção TURN: bloco de "Semântica real" adicionado                                                                |
-| `.github/hooks/scripts/pre-tool-use.sh`               | SESSION reminder a cada 30 tool calls (preToolUse é o hook mais confiável no workflow real)                     |
+| `.github/AGENTS.md`                                   | Tabela de eventos: `userPromptSubmitted` agora descreve corretamente sua frequência real                       |
+| `.github/AGENTS.md`                                   | Seção TURN: nota explícita sobre semântica do hook vs workflow real                                            |
+| `.github/instructions/hooks-protocol.instructions.md` | Tabela conceitos: nota sobre `userPromptSubmitted` vs tool results                                             |
+| `.github/instructions/hooks-protocol.instructions.md` | Seção TURN: bloco de "Semântica real" adicionado                                                               |
+| `.github/hooks/scripts/pre-tool-use.sh`               | SESSION reminder a cada 30 tool calls (preToolUse é o hook mais confiável no workflow real)                    |
 
 ### 10.5 Métricas de Sucesso v6.2
 
@@ -610,13 +610,13 @@ Cobre:
 
 ### 12.2 Mecanismos de Encerramento Mapeados
 
-| #     | Mecanismo                                                            | Status Anterior                        | Status v8.0               |
-| ----- | -------------------------------------------------------------------- | -------------------------------------- | ------------------------- |
-| 1     | Agente termina TURN silentemente → usuário fecha VS Code             | ✅ Mitigado (v7.0 decision:block)      | ✅ Mantido                |
-| 2     | Usuário force-fecha VS Code durante diálogo                          | — Limitação de plataforma              | — Limitação de plataforma |
-| 3     | Strategy 2 falso positivo autoriza SESSION indevidamente             | ✅ Corrigido (v7.0)                    | ✅ Mantido                |
-| 4     | Agente não chama vscode_askQuestions em turnos subsequentes          | ✅ Mitigado (decision:block por turno) | ✅ Mantido                |
-| **5** | **Agente chama session-close.sh diretamente (hallucination de KEY)** | ❌ Gap crítico                         | **✅ BLOQUEADO (v8.0)**   |
+| #     | Mecanismo                                                            | Status Anterior                       | Status v8.0               |
+| ----- | -------------------------------------------------------------------- | ------------------------------------- | ------------------------- |
+| 1     | Agente termina TURN silentemente → usuário fecha VS Code             | ✅ Mitigado (v7.0 decision:block)      | ✅ Mantido                 |
+| 2     | Usuário force-fecha VS Code durante diálogo                          | — Limitação de plataforma             | — Limitação de plataforma |
+| 3     | Strategy 2 falso positivo autoriza SESSION indevidamente             | ✅ Corrigido (v7.0)                    | ✅ Mantido                 |
+| 4     | Agente não chama vscode_askQuestions em turnos subsequentes          | ✅ Mitigado (decision:block por turno) | ✅ Mantido                 |
+| **5** | **Agente chama session-close.sh diretamente (hallucination de KEY)** | ❌ Gap crítico                         | **✅ BLOQUEADO (v8.0)**    |
 
 ### 12.3 Implementações v8.0
 

@@ -1359,7 +1359,7 @@ sponge/mktemp + HEAL v2 consecutive_mismatch × 2 ramos sponge/mktemp) atualizav
 '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts'
 ```
 
-O campo `vs_code_session_id` é parte do schema canônico do CTX (Schema v4) e deve permanecer
+O campo `vs_code_session_id` é parte do schema canônico do CTX (schema legado v4) e deve permanecer
 sincronizado com `session.id` após qualquer HEAL. Os demais scripts que implementam HEAL inline
 (`pre-tool-use.sh`, `post-tool-use.sh`, `session-end.sh`) e a função `heal_v1()` de `common.sh` já
 incluíam `.session.vs_code_session_id = $real_sid` corretamente.

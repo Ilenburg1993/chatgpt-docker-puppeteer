@@ -108,14 +108,14 @@ Adicionalmente, `pre-tool-use.sh` sobrescrevia `.session.id` com dados do payloa
 
 ## Melhorias Implementadas (sessão 7 Phase 2 — 2026-03-10)
 
-### Schema v4 — Fluxo canônico SESSION / SECTION / TURN ✅ IMPLEMENTADO
+### Schema legado (v4) — Fluxo canônico SESSION / SECTION / TURN ✅ IMPLEMENTADO
 
 **Motivação**: o Schema v3 inaugurou a SESSION CLOSE KEY, mas não havia um modelo invariante
 garantindo que SESSION, SECTION e TURN estivessem _sempre_ ativos simultaneamente.
 `current_section.name` podia ser `null`; não havia rastreamento de quantas seções ocorreram por
 sessão; TURNs não tinham início explícito.
 
-**Novos campos (Schema v4)**:
+**Novos campos (schema legado v4)**:
 
 | Campo            | Localização       | Valor inicial |
 | ---------------- | ----------------- | ------------- |
@@ -126,7 +126,7 @@ sessão; TURNs não tinham início explícito.
 
 **Scripts modificados**:
 
-- `session-start.sh` — inicializa Schema v4; cria seção padrão `"início"` e loga `sectionStart`;
+- `session-start.sh` — inicializa schema legado (v4); cria seção padrão `"início"` e loga `sectionStart`;
   adicionado bloco `📍 Estado Ativo` no briefing com seção + turno em destaque
 - `start-section.sh` — auto-fecha seção anterior (full sectionEnd procedures) antes de abrir nova;
   incrementa `section_count`; appenda a `section_names[]`
@@ -142,8 +142,8 @@ automaticamente na `sessionStart`; `start-section.sh` auto-fecha a anterior; `se
 auto-fecha a ativa.
 
 **Documentação atualizada**: `AUDIT-SCHEMA.md` (sectionStart v4 + evento `turnStart` adicionado);
-`README.md` (Schema v4 + tabela de campos); `AGENTS.md` (protocolo + invariante SECTION/TURN);
-`smoke-test.sh` (5 novas validações Schema v4)
+`README.md` (schema legado v4 + tabela de campos); `AGENTS.md` (protocolo + invariante SECTION/TURN);
+`smoke-test.sh` (5 novas validações do schema legado v4)
 
 ---
 
@@ -325,14 +325,14 @@ dificultando consultas, causando bugs sutis e tornando o contexto confuso para o
 
 | #   | Mudança                                                                    | Scripts                               | Status |
 | --- | -------------------------------------------------------------------------- | ------------------------------------- | ------ |
-| —   | Schema v2: structs aninhadas substituem campo flat                         | todos                                 | ✅     |
-| B1  | Remove `tools_used[]` array ilimitado → substituído por `tools_by_name {}` | `session-start.sh`, `pre-tool-use.sh` | ✅     |
-| B2  | Remove `failure_count_unknown` fantasma → era campo inexistente no spec    | `post-tool-use.sh`                    | ✅     |
-| B3  | `turn_duration_s` usava `last_tool.ts` em vez de `current_turn.started_at` | `agent-stop.sh`                       | ✅     |
-| B4  | `session_summary` exibia dados de sessão acumulados, não do turno atual    | `agent-stop.sh`                       | ✅     |
-| B5  | `session-end.sh` não chamava `session-checkpoint.sh` antes de encerrar     | `session-end.sh`                      | ✅     |
-| B6  | Newline rogue em `log-prompt.sh` SESSION_ID read corrompía o UUID          | `log-prompt.sh`                       | ✅     |
-| —   | **Novo**: `start-section.sh` — agente declara Seção Temática nomeada       | novo `start-section.sh`               | ✅     |
+| —   | Schema v2: structs aninhadas substituem campo flat                         | todos                                 | ✅      |
+| B1  | Remove `tools_used[]` array ilimitado → substituído por `tools_by_name {}` | `session-start.sh`, `pre-tool-use.sh` | ✅      |
+| B2  | Remove `failure_count_unknown` fantasma → era campo inexistente no spec    | `post-tool-use.sh`                    | ✅      |
+| B3  | `turn_duration_s` usava `last_tool.ts` em vez de `current_turn.started_at` | `agent-stop.sh`                       | ✅      |
+| B4  | `session_summary` exibia dados de sessão acumulados, não do turno atual    | `agent-stop.sh`                       | ✅      |
+| B5  | `session-end.sh` não chamava `session-checkpoint.sh` antes de encerrar     | `session-end.sh`                      | ✅      |
+| B6  | Newline rogue em `log-prompt.sh` SESSION_ID read corrompía o UUID          | `log-prompt.sh`                       | ✅      |
+| —   | **Novo**: `start-section.sh` — agente declara Seção Temática nomeada       | novo `start-section.sh`               | ✅      |
 
 **Uso da Seção Temática**:
 
@@ -346,8 +346,8 @@ bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
 
 ## Melhorias Implementadas (sessão 3 — 2026-03-09)
 
-| #   | Melhoria                                                            | Scripts                                                        | Status          |
-| --- | ------------------------------------------------------------------- | -------------------------------------------------------------- | --------------- |
+| #   | Melhoria                                                            | Scripts                                                        | Status         |
+| --- | ------------------------------------------------------------------- | -------------------------------------------------------------- | -------------- |
 | UP2 | Integração Findings ↔ Tasks (`--finding-id`, `--create-task`, sync) | `add-task.sh`, `save-finding.sh`, novo `sync-tasks-to-docs.sh` | ✅ Implementada |
 | UP4 | Checkpoint de tarefas com diff (SHA-256 hash + `tasks_changed`)     | `session-checkpoint.sh`                                        | ✅ Implementada |
 | UP5 | Exportação de métricas CSV/JSON                                     | novo `export-metrics.sh`                                       | ✅ Implementada |
@@ -359,8 +359,8 @@ bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
 
 ## Melhorias Implementadas (sessão 2 — 2026-03-09)
 
-| #   | Melhoria                                                    | Scripts                                                | Status          |
-| --- | ----------------------------------------------------------- | ------------------------------------------------------ | --------------- |
+| #   | Melhoria                                                    | Scripts                                                | Status         |
+| --- | ----------------------------------------------------------- | ------------------------------------------------------ | -------------- |
 | M1  | Lifecycle de Findings — `finding_id` + `resolve-finding.sh` | `save-finding.sh`, novo `resolve-finding.sh`           | ✅ Implementada |
 | M2  | Sumarização de `tools_used` array                           | `pre-tool-use.sh`, `session-start.sh`, `agent-stop.sh` | ✅ Implementada |
 | M3  | Alertas de Threshold escalonados                            | `session-start.sh`                                     | ✅ Implementada |

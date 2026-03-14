@@ -84,7 +84,7 @@ deixa de emitir `{"decision":"block"}` na ausência de `vscode_askQuestions`.
 
 **O que permanece**:
 
-- Toda a lógica de auditoria (`turnEnd_authorized`, `turnEnd_UNAUTHORIZED` → renomear)
+- Toda a lógica de auditoria (`turnEnd_authorized`, `turnEnd` não autorizado (legado) → renomear)
 - Auto-enrichment (`turnStart_enriched_auto` quando intenção não declarada)
 - Reset de `current_turn.*` e incremento de `session_stats.*`
 - Geração de seção automática `"retomada"` quando `current_section == null`
@@ -92,12 +92,12 @@ deixa de emitir `{"decision":"block"}` na ausência de `vscode_askQuestions`.
 
 **O que muda nos eventos de auditoria**:
 
-| Evento anterior         | Evento novo                  | Significado                                              |
-| ----------------------- | ---------------------------- | -------------------------------------------------------- |
-| `turnEnd_authorized`    | `turnEnd_completed`          | Turno encerrado normalmente                              |
-| `turnEnd_UNAUTHORIZED`  | `turnEnd_no_askQuestions`    | Informativo — turno sem `vscode_askQuestions` (sem flag) |
-| `turnEnd_BLOCKED`       | _(removido)_                 | Não existe mais                                          |
-| `AUTH_REQUESTED = true` | `askQuestions_called = true` | Semântica mais clara                                     |
+| Evento anterior                   | Evento novo                  | Significado                                              |
+| --------------------------------- | ---------------------------- | -------------------------------------------------------- |
+| `turnEnd_authorized`              | `turnEnd_completed`          | Turno encerrado normalmente                              |
+| `turnEnd` não autorizado (legado) | `turnEnd_no_askQuestions`    | Informativo — turno sem `vscode_askQuestions` (sem flag) |
+| `turnEnd` bloqueado (legado)      | _(removido)_                 | Não existe mais                                          |
+| `AUTH_REQUESTED = true`           | `askQuestions_called = true` | Semântica mais clara                                     |
 
 ### 3.2 `agent-stop.sh` — systemMessage informativo (não bloqueante)
 

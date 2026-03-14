@@ -47,7 +47,7 @@ SESSION
   { "hookSpecificOutput": { "hookEventName": "SessionStart", "additionalContext": "<briefing>" } }
   ```
 - **Efeitos colaterais**:
-  - Cria/sobrescreve `state/session-context.json` (Schema v8)
+  - Cria/sobrescreve `state/session-context.json` (Schema v9)
   - Gera `state/session-briefing.md`
   - Roda `watchdog.sh --quiet` → `state/watchdog-report.json`
   - Roda `rotate-audit.sh` (auto-rotação se > 5000 linhas)
@@ -177,7 +177,7 @@ SESSION
   3. Fallback: `current_turn.auth_requested` do session-context.json
   4. Fallback: `current_turn.subagent_delegated` do session-context.json (novo em v6)
 - **Hardening v5**:
-  - `decision:block` quando sem autorização E `stop_hook_active=false` E `block_count < 1`
+  - `decision:block` quando sem autorização e `stop_hook_active=false`
   - Session_id guard: bloqueia escrita se session_id ≠ ctx ativo
   - HEAL v1: cura session_id se source=`manual_recovery`
   - **HEAL v2** (G9-04): cura após 3 mismatches consecutivos com mesmo "got" session_id
@@ -185,7 +185,8 @@ SESSION
     atualizadas)
 - **Efeitos colaterais**:
   - Loga `agentStop` sempre
-  - Loga `turnEnd_authorized` ou `turnEnd_BLOCKED` ou `turnEnd_UNAUTHORIZED`
+  - Loga `turnEnd_authorized` ou `turnEnd_no_askQuestions`
+  - Loga `agentStop_blocked`/`agentStop_blocked_no_todo` quando bloqueia encerramento
   - Loga `auth_via_subagent_delegation` quando Strategy 4 é ativada
   - Remove ou cria `state/UNAUTHORIZED_CLOSE.flag`
   - Reseta `current_turn.*` e incrementa `session_stats.*`
@@ -255,8 +256,9 @@ Todos os eventos em `logs/audit.jsonl` são JSON objects com pelo menos:
 | `toolUseFailure`               | `tool-use-failure.sh`                              | —                                            | `tool_name`, `error`                                                                                                                          |
 | `agentStop`                    | `agent-stop.sh`                                    | —                                            | `turn_duration_s`, `stop_hook_active`, `tools_count`                                                                                          |
 | `turnEnd_authorized`           | `agent-stop.sh`                                    | `generate-session-summary.sh`                | `turn_number`, `section_turn`, `turn_duration_s`                                                                                              |
-| `turnEnd_BLOCKED`              | `agent-stop.sh`                                    | —                                            | `block_count`, `turn_id`                                                                                                                      |
-| `turnEnd_UNAUTHORIZED`         | `agent-stop.sh`                                    | `watchdog.sh`                                | `turn_number`                                                                                                                                 |
+| `turnEnd_no_askQuestions`      | `agent-stop.sh`                                    | `watchdog.sh`, `analytics.sh`                | `turn_number`, `turn_id`                                                                                                                      |
+| `agentStop_blocked`            | `agent-stop.sh`                                    | `watchdog.sh`                                | `consecutive_unauthorized`, `block_count`                                                                                                     |
+| `agentStop_blocked_no_todo`    | `agent-stop.sh`                                    | `watchdog.sh`                                | `consecutive_unauthorized`                                                                                                                    |
 | `turnStart_enriched_auto`      | `agent-stop.sh`                                    | —                                            | `intent`, `auto_generated: true`                                                                                                              |
 | `turnStart_enriched`           | `start-turn.sh`                                    | —                                            | `intent`, `intent_declared: true`                                                                                                             |
 | `sectionStart`                 | `start-section.sh`                                 | `generate-section-summary.sh`                | `section_name`, `section_id`, `section_number`                                                                                                |
@@ -300,7 +302,7 @@ Todos os eventos em `logs/audit.jsonl` são JSON objects com pelo menos:
 
 | Arquivo                     | Proprietário                      | Descrição                                     | TTL                                                      |
 | --------------------------- | --------------------------------- | --------------------------------------------- | -------------------------------------------------------- |
-| `session-context.json`      | `session-start.sh`                | Estado vivo da sessão (Schema v8)             | 1 sessão                                                 |
+| `session-context.json`      | `session-start.sh`                | Estado vivo da sessão (Schema v9)             | 1 sessão                                                 |
 | `session-briefing.md`       | `session-start.sh`                | Briefing injetado no LLM                      | 1 sessão                                                 |
 | `watchdog-report.json`      | `watchdog.sh`                     | Último relatório de saúde                     | 1 run                                                    |
 | `pending-tasks.md`          | `add-task.sh`, `complete-task.sh` | Backlog canônico                              | Permanente                                               |

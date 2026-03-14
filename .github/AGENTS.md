@@ -47,8 +47,8 @@ correta. O único fluxo legítimo de encerramento é:
 
 > **SESSION ≠ SECTION ≠ TURN** — confundir estes três conceitos é o erro mais frequente.
 
-| Conceito    | O que é                       | Encerra com                           | Autorização        |
-| ----------- | ----------------------------- | ------------------------------------- | ------------------ |
+| Conceito    | O que é                       | Encerra com                           | Autorização       |
+| ----------- | ----------------------------- | ------------------------------------- | ----------------- |
 | **TURN**    | 1 ciclo prompt→resposta       | Livremente ao terminar a resposta     | ❌ Não precisa     |
 | **SECTION** | Fase lógica dentro da SESSION | `bash start-section.sh "nome"`        | ❌ Autônoma        |
 | **SESSION** | 1 ativação do Copilot Chat    | Template F + KEY + `session-close.sh` | ✅ **OBRIGATÓRIA** |
@@ -105,19 +105,19 @@ correta. O único fluxo legítimo de encerramento é:
 - O agente abre e fecha seções com `start-section.sh "nome"` / `section-end.sh "motivo"`
 - A mudança de contexto semântico é decisão do agente — sem necessidade de pedir permissão.
 
-**SESSION (sessão)** — Autorização explícita **obrigatória** com close_key + session-close.sh:
+**SESSION (sessão)** — Autorização explícita **obrigatória** com close_key + validação automática:
 
 1. Invocar `vscode_askQuestions` com Template F (exibe a `close_key` da sessão)
 2. Usuário digita a chave `ENCERRAR-XXXXXXXX` no campo livre
-3. Agente extrai a KEY da resposta e chama **obrigatoriamente**:
-   ```bash
-   bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
-   ```
-4. Sem a chamada do script → `SESSION_CLOSE_NO_KEY.flag` → alerta de encerramento não autorizado
+3. `post-tool-use.sh` detecta a KEY na resposta e executa `session-close.sh` automaticamente
+  (o agente **não** chama o script diretamente)
+4. Sem validação automática da KEY → `SESSION_CLOSE_NO_KEY.flag` → alerta de encerramento não
+  autorizado
 
 > **Por que session-close.sh?** O evento `sessionEnd` da plataforma VS Code Copilot não dispara
-> quando a sessão termina abruptamente. O `session-close.sh` é o único mecanismo confiável: valida a
-> KEY, loga `sessionCloseAuthorized`, chama `session-end.sh` e gera o relatório final.
+> quando a sessão termina abruptamente. O `session-close.sh` continua sendo o mecanismo confiável de
+> fechamento, mas sua execução deve ocorrer pelo fluxo automático de hooks após `vscode_askQuestions`
+> + KEY válida.
 
 **Commit e/ou Push** — Protocolo obrigatório com Template G:
 
@@ -282,19 +282,19 @@ momentos. **Sem exceção.**
 
 | Campo                | Tipo   | Obrigatório | Limite      | Descrição                                                   |
 | -------------------- | ------ | ----------- | ----------- | ----------------------------------------------------------- |
-| `header`             | string | ✅ sim      | **≤50 ch**  | Chave da pergunta; aparece como título e índice no response |
-| `question`           | string | ✅ sim      | **≤200 ch** | Texto exibido ao usuário. Manter conciso — uma frase.       |
-| `allowFreeformInput` | bool   | ❌ não      | —           | `true` = habilita campo de texto livre                      |
-| `multiSelect`        | bool   | ❌ não      | —           | `true` = permite múltiplas seleções nas opções              |
-| `options`            | array  | ❌ não      | —           | Lista de opções clicáveis. Se omitido = só texto livre      |
+| `header`             | string | ✅ sim       | **≤50 ch**  | Chave da pergunta; aparece como título e índice no response |
+| `question`           | string | ✅ sim       | **≤200 ch** | Texto exibido ao usuário. Manter conciso — uma frase.       |
+| `allowFreeformInput` | bool   | ❌ não       | —           | `true` = habilita campo de texto livre                      |
+| `multiSelect`        | bool   | ❌ não       | —           | `true` = permite múltiplas seleções nas opções              |
+| `options`            | array  | ❌ não       | —           | Lista de opções clicáveis. Se omitido = só texto livre      |
 
 #### Campos por item de `options`
 
 | Campo         | Tipo   | Obrigatório | Descrição                    |
 | ------------- | ------ | ----------- | ---------------------------- |
-| `label`       | string | ✅ sim      | Texto clicável da opção      |
-| `description` | string | ❌ não      | Texto secundário (subtítulo) |
-| `recommended` | bool   | ❌ não      | Marca como opção sugerida    |
+| `label`       | string | ✅ sim       | Texto clicável da opção      |
+| `description` | string | ❌ não       | Texto secundário (subtítulo) |
+| `recommended` | bool   | ❌ não       | Marca como opção sugerida    |
 
 #### Anti-padrões proibidos
 
@@ -527,13 +527,9 @@ momentos. **Sem exceção.**
 >
 > 1. Invocar este Template F via `vscode_askQuestions` (exibe a close_key ao usuário)
 > 2. Usuário digita a KEY no campo livre
-> 3. Agente extrai a KEY da resposta e chama **obrigatoriamente**:
->    ```bash
->    bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
->    ```
->    **Por que o script é necessário?** O evento `sessionEnd` da plataforma VS Code Copilot não
->    dispara quando a sessão termina abruptamente. Sem chamar `session-close.sh`, o encerramento
->    nunca é registrado no sistema de auditoria e a próxima sessão detecta "encerramento abrupto".
+> 3. `post-tool-use.sh` valida a KEY na resposta e executa `session-close.sh` automaticamente
+>
+> **Importante:** chamada manual de `session-close.sh` pelo agente é proibida neste repositório.
 >
 > **⚠️ SUBSTITUA `[CLOSE_KEY]` pela chave real antes de invocar.** A question deve ter ≤200 chars —
 > não adicione texto extra além do template abaixo.
@@ -552,14 +548,8 @@ momentos. **Sem exceção.**
 ]
 ```
 
-**Após receber a KEY do usuário**, o agente DEVE executar imediatamente:
-
-```bash
-bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
-```
-
-Substituindo `ENCERRAR-XXXXXXXX` pela KEY digitada pelo usuário. O script valida, loga
-`sessionCloseAuthorized` e chama `session-end.sh` internamente.
+**Após receber a KEY do usuário**, o agente deve apenas concluir o fluxo via `vscode_askQuestions`.
+O `post-tool-use.sh` fará a validação e a execução de `session-close.sh` automaticamente.
 
 ---
 
@@ -790,11 +780,11 @@ inclui automaticamente as informações de continuidade no `session-briefing.md`
 5. Findings em `findings.jsonl` são cumulativos — nunca deletar; usar `resolve-finding.sh` se
    disponível
 6. **ENCERRAMENTO DE SESSION**: protocolo obrigatório de 3 passos:
-   1. Invocar **Template F** (`vscode_askQuestions`) — exibe a chave `ENCERRAR-XXXXXXXX` ao usuário
-   2. Usuário digita a chave
-   3. Agente chama **obrigatoriamente**:
-      `bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"` Sem o script →
-      `SESSION_CLOSE_NO_KEY.flag` → alerta de encerramento não autorizado no próximo briefing.
+  1. Invocar **Template F** (`vscode_askQuestions`) — exibe a chave `ENCERRAR-XXXXXXXX` ao usuário
+  2. Usuário digita a chave
+  3. `post-tool-use.sh` detecta e valida a chave, executando `session-close.sh` automaticamente
+    (sem chamada manual do agente). Sem validação → `SESSION_CLOSE_NO_KEY.flag` → alerta no
+    próximo briefing.
 
 ---
 

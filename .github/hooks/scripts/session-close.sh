@@ -1,24 +1,23 @@
 #!/bin/bash
-# session-close.sh — Encerramento autorizado de SESSION pelo agente (chamada manual)
+# session-close.sh — Encerramento autorizado de SESSION (fluxo automático via post-tool-use)
 # ────────────────────────────────────────────────────────────────────────────────
 # Uso: bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
 #
 # Propósito:
 #   O evento `sessionEnd` da plataforma VS Code Copilot não dispara de forma
-#   confiável (sessões terminam abruptamente). Este script é o mecanismo MANUAL
-#   que o agente DEVE invocar após receber a close_key do usuário via Template F
-#   (vscode_askQuestions). Substitui a dependência no evento automático.
+#   confiável (sessões terminam abruptamente). Este script é acionado pelo fluxo
+#   automático em `post-tool-use.sh` após o usuário responder o Template F com a
+#   close_key correta.
 #
 # Protocolo de encerramento de SESSION:
 #   1. Agente invoca vscode_askQuestions com Template F (exibe close_key)
 #   2. Usuário digita a KEY no campo de resposta
-#   3. Agente extrai a KEY da resposta do usuário
-#   4. Agente chama: bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXX"
-#   5. Script valida a KEY, loga sessionCloseAuthorized, chama session-end.sh
-#   6. Apenas após sucesso: agente encerra o turno
+#   3. post-tool-use.sh valida a resposta e aciona este script
+#   4. Script valida a KEY e loga sessionCloseAuthorized
+#   5. sessionEnd nativo do VS Code encerra a sessão e chama session-end.sh
 #
 # Exit codes:
-#   0 — KEY válida, sessionEnd registrado com sucesso
+#   0 — KEY válida, sessão autorizada para encerramento
 #   1 — KEY ausente ou inválida (encerramento BLOQUEADO — deve ser reportado ao usuário)
 # ────────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -26,8 +25,6 @@ set -euo pipefail
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_DIR="${HOOKS_STATE_DIR:-$HOOK_DIR/state}"
 LOG_DIR="${HOOKS_LOG_DIR:-$HOOK_DIR/logs}"
-SCRIPTS_DIR="$HOOK_DIR/scripts"
-
 CTX_FILE="$STATE_DIR/session-context.json"
 AUDIT_FILE="$LOG_DIR/audit.jsonl"
 # UPG-AUDIT-01: resolve per-session paths from current-session-id.txt
@@ -67,7 +64,7 @@ fi
 # ── Validação: KEY ausente ────────────────────────────────────────────────────
 if [ -z "$PROVIDED_KEY" ]; then
     echo "❌ ERRO: close_key não fornecida." >&2
-    echo "   Uso: bash session-close.sh \"ENCERRAR-XXXXXXXX\"" >&2
+    echo "   Uso interno: session-close.sh \"ENCERRAR-XXXXXXXX\"" >&2
     echo "   A close_key da sessão atual é exibida no session-briefing.md" >&2
     jq -cn \
         --arg sid "$SESSION_ID" \
@@ -150,7 +147,7 @@ jq -cn \
         session_id: $sid,
         timestamp:  $ts,
         close_key:  $key,
-        method:     "manual_agent_call"
+        method:     "post_tool_use_auto"
     }' >> "$AUDIT_FILE"
 
 # Cria flag de encerramento autorizado (lido por session-start.sh na próxima sessão)
@@ -163,7 +160,7 @@ jq -cn \
         session_id:  $sid,
         closed_at:   $ts,
         close_key:   $key,
-        method:      "manual_agent_call"
+        method:      "post_tool_use_auto"
     }' > "$SESSION_AUTHORIZED_FLAG"
 
 # Remove flag de encerramento SEM key (se existir)

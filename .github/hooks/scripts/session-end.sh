@@ -237,15 +237,15 @@ fi
 #   - reason="error" + close_key_validated=false → ANOMALIA (session error sem autorização)
 if [ -f "$CTX_FILE" ]; then
     _N4_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-    _N4_CLOSE_MODE="$REASON"  # Usa REASON como base para determinar close_mode
+    _N4_CLOSE_MODE="$REASON" # Usa REASON como base para determinar close_mode
     _N4_DETECTED_ANOMALY=false
     _N4_ANOMALY_TYPE=""
-    
+
     case "$REASON" in
         complete)
             # Normal completion
             if [ "$_N4_CLOSE_VALIDATED" = "true" ]; then
-                _N4_CLOSE_MODE="ok"  # Session properly closed with authorization
+                _N4_CLOSE_MODE="ok" # Session properly closed with authorization
             else
                 # Completion sem formal close_key validation — permissível mas não ideal
                 _N4_CLOSE_MODE="complete_no_formality"
@@ -288,12 +288,12 @@ if [ -f "$CTX_FILE" ]; then
             fi
             ;;
     esac
-    
+
     # Registra close_mode no CTX para próxima sessão recovery
     jq --arg close_mode "$_N4_CLOSE_MODE" \
         '.session.close_mode = $close_mode' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-    
+
     # Se anomalia detectada, loga CRÍTICA
     if [ "$_N4_DETECTED_ANOMALY" = "true" ]; then
         jq -cn \
@@ -426,7 +426,7 @@ if [ "$SESSION_AUTH_COMPLIANT" = "true" ] && [ -f "$AUDIT_FILE" ]; then
         'select(.event == "turnEnd_authorized" and .session_id == $sid)' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     SESSION_VIOLATION_COUNT="$(jq -r --arg sid "$SESSION_ID" \
-        'select(.event == "turnEnd_UNAUTHORIZED" and .session_id == $sid)' \
+        'select(.event == "turnEnd_no_askQuestions" and .session_id == $sid)' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     jq -cn \
         --arg event "sessionEnd_compliance" \

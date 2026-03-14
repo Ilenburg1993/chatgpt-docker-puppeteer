@@ -286,7 +286,7 @@ GUARD_EXCLUDED=(session-start.sh session-end.sh)
 for s in "${GUARD_REQUIRED[@]}"; do
     f="$SCRIPTS_DIR/$s"
     # Guard válido: script loga session_id_mismatch (bloqueia) OU sessionReconnect (rollover RECONNECT-01)
-    if [ -f "$f" ] && (rg -q "session_id_mismatch" "$f" 2> /dev/null || rg -q "sessionReconnect" "$f" 2> /dev/null); then
+    if [ -f "$f" ] && (rg -q '"session_id_mismatch(_[A-Za-z0-9]+)?"' "$f" 2> /dev/null || rg -q "sessionReconnect" "$f" 2> /dev/null); then
         pass "session_id guard presente: $s"
     elif [ -f "$f" ]; then
         fail "session_id guard AUSENTE: $s — vulnerável a contaminação cruzada"
@@ -295,7 +295,7 @@ done
 
 for s in "${GUARD_EXCLUDED[@]}"; do
     f="$SCRIPTS_DIR/$s"
-    if [ -f "$f" ] && ! rg -q "session_id_mismatch" "$f" 2> /dev/null; then
+    if [ -f "$f" ] && ! rg -q '"session_id_mismatch(_[A-Za-z0-9]+)?"' "$f" 2> /dev/null; then
         pass "session_id guard ausente (correto): $s"
     elif [ -f "$f" ]; then
         fail "session_id guard encontrado onde não deveria: $s"

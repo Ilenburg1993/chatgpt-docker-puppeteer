@@ -140,7 +140,7 @@ Quando o turno termina sem `vscode_askQuestions`:
 
 1. `UNAUTHORIZED_CLOSE.flag` é gravado em `state/` com
    `{timestamp, session_id, turn_count, severity: "critical"}`
-2. `turnEnd_UNAUTHORIZED` é appendado em `audit.jsonl` 3. `session-context.json` →
+2. `turnEnd_no_askQuestions` é appendado em `audit.jsonl` 3. `session-context.json` →
    `compliance.consecutive_unauthorized + 1`
 3. **Na próxima sessão**: `session-start.sh` detecta o flag e injeta bloco `⛔⛔⛔ VIOLAÇÃO CRÍTICA`
    no topo do `session-briefing.md`, com instrução de pedir desculpas e chamar `vscode_askQuestions`
@@ -183,7 +183,7 @@ localmente (não veio de payload do Copilot que não inclui session_id no evento
 1. Loga `agentStop` em audit.jsonl com duração do turno
 2. Detecta autorização (3 estratégias — veja seção Protocolo)
 3. Grava/remove `UNAUTHORIZED_CLOSE.flag` conforme resultado
-4. Loga `turnEnd_authorized` ou `turnEnd_UNAUTHORIZED`
+4. Loga `turnEnd_authorized` ou `turnEnd_no_askQuestions`
 
 - **Reseta `current_turn.auth_requested = false`** e incrementa `session_stats.turn_count`
 
@@ -285,13 +285,13 @@ de `start-section.sh` para lifecycle completo com duração calculada.
 **O que faz**:
 
 - **Schema v3**: lê `session.close_key_validated` de `session-context.json`
-- **Schema v4**: `current_section.name` nunca é `null` (seção `"início"` criada automaticamente);
+- **Schema v9**: `current_section.name` nunca é `null` (seção `"início"` criada automaticamente);
   `current_turn.section_name` rastreia a seção ativa no turno; `session_stats.section_count` e
   `section_names[]` acumulam histórico de seções
   - Se `true` → remove `SESSION_CLOSE_NO_KEY.flag`; loga `sessionEnd_authorized_close`
   - Se `false` → cria `SESSION_CLOSE_NO_KEY.flag`; loga `sessionEnd_no_key`
 - Chama `generate-session-summary.sh` → grava relatório Markdown em `state/`
-- Conta `turnEnd_authorized` vs `turnEnd_UNAUTHORIZED` nessa sessão → conformidade
+- Conta `turnEnd_authorized` vs `turnEnd_no_askQuestions` nessa sessão → conformidade
 - Se nenhum turno autorizado: grava `UNAUTHORIZED_CLOSE.flag` como safety net
 - Loga `sessionEnd_compliance` com `{authorized_turns, violation_turns, fully_compliant}`
 - Rotação de `audit.jsonl` quando >5000 linhas → arquiva excesso
@@ -438,7 +438,7 @@ agentStop (fim de turno)
             │ log agentStop
             │ detect authorization (3 strategies)
             │ write/remove UNAUTHORIZED_CLOSE.flag
-            │ log turnEnd_authorized OR turnEnd_UNAUTHORIZED
+            │ log turnEnd_authorized OR turnEnd_no_askQuestions
             │ reset current_turn.auth_requested=false
             │ increment session_stats.turn_count
             └─► session-checkpoint.sh
@@ -465,7 +465,7 @@ sessionStart (nova sessão)
 
 ## Estado Persistido
 
-### `session-context.json` — Schema v4 ← atualizado (2026-03-10)
+### `session-context.json` — Schema v9 ← atualizado (2026-03-13)
 
 O arquivo é inicializado por `session-start.sh` e atualizado atomicamente por cada hook. Usa
 `sponge` para evitar arquivos parcialmente escritos.
@@ -591,7 +591,7 @@ Todos os campos são presentes em cada linha mas alguns podem ser `""` ou `null`
 | `errorOccurred`               | error-occurred.sh     | `errorName`, `errorMsg`                                  |
 | `sessionCheckpoint`           | session-checkpoint.sh | `turn_count`, `tasks_open`, `checkpoint_file`            |
 | `turnEnd_authorized`          | agent-stop.sh         | —                                                        |
-| `turnEnd_UNAUTHORIZED`        | agent-stop.sh         | `message`                                                |
+| `turnEnd_no_askQuestions`     | agent-stop.sh         | `message`                                                |
 | `askQuestions_response`       | post-tool-use.sh      | `response_length`, `close_key_found` ← v3                |
 | `sessionClose_key_validated`  | post-tool-use.sh      | `close_key` ← v3                                         |
 | `sessionEnd_authorized_close` | session-end.sh        | `close_key_validated: true` ← v3                         |
@@ -641,7 +641,7 @@ Todos os campos são presentes em cada linha mas alguns podem ser `""` ou `null`
 jq -r '.event' .github/hooks/logs/audit.jsonl | sort | uniq -c | sort -rn
 
 # Turnos sem autorização
-jq -r 'select(.event == "turnEnd_UNAUTHORIZED")' .github/hooks/logs/audit.jsonl
+jq -r 'select(.event == "turnEnd_no_askQuestions")' .github/hooks/logs/audit.jsonl
 
 # Top 10 ferramentas por duração média
 jq -s 'group_by(.tool_name) | map({tool: .[0].tool_name, avg_ms: (map(.duration_ms) | add / length | floor)}) | sort_by(-.avg_ms)[:10]' \

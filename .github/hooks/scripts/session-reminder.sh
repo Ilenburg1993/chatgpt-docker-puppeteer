@@ -23,7 +23,7 @@ echo "╚═══════════════════════�
 echo ""
 echo "  CONCEITOS (distinção obrigatória):"
 echo "  ─────────────────────────────────"
-echo "  TURN    → Ciclo prompt→resposta. Encerra LIVREMENTE (sem autorização)."
+echo "  TURN    → Ciclo prompt→resposta. Encerra com vscode_askQuestions (obrigatório)."
 echo "  SECTION → Fase lógica dentro da SESSION. Agente decide autonomamente:"
 echo "            bash .github/hooks/scripts/start-section.sh \"nome-da-fase\""
 echo "  SESSION → 1 ativação do Copilot Chat. Fecha SOMENTE com protocolo de 3 etapas:"
@@ -32,7 +32,7 @@ echo "  PROTOCOLO DE 3 ETAPAS PARA ENCERRAR A SESSION:"
 echo "  ──────────────────────────────────────────────"
 echo "    1. Agente chama vscode_askQuestions com Template F"
 echo "    2. Usuário digita a chave SESSION no campo livre"
-echo "    3. Agente executa: bash .github/hooks/scripts/session-close.sh \"KEY\""
+echo "    3. post-tool-use valida a KEY e executa session-close.sh automaticamente"
 echo ""
 
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
@@ -50,7 +50,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
     echo "  Session ID : $SESSION_ID"
     echo "  Close Key  : $CLOSE_KEY"
     if [ "$CLOSE_VALIDATED" = "true" ]; then
-        echo "  Status KEY : ✅ VALIDADA (session-close.sh pode ser chamado)"
+        echo "  Status KEY : ✅ VALIDADA (fluxo de encerramento autorizado)"
     else
         echo "  Status KEY : ⏳ PENDENTE (aguardando Template F + usuário digitar a KEY)"
     fi
@@ -69,8 +69,8 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
         echo "     → Prefira chamar vscode_askQuestions ao final desta resposta"
     fi
     echo ""
-    echo "  COMANDO PARA ENCERRAR A SESSION:"
-    echo "  bash .github/hooks/scripts/session-close.sh \"${CLOSE_KEY}\""
+    echo "  FLUXO PARA ENCERRAR A SESSION:"
+    echo "  vscode_askQuestions (Template F) → usuário digita ${CLOSE_KEY} → post-tool-use finaliza"
     echo ""
 else
     echo "  ⚠️  session-context.json não encontrado ou vazio"
@@ -79,6 +79,6 @@ fi
 
 echo "╔══════════════════════════════════════════════════════════════════════════╗"
 echo "║  REGRA: Terminar uma resposta ≠ encerrar a SESSION.                     ║"
-echo "║  A SESSION só encerra com a KEY + session-close.sh.                    ║"
+echo "║  A SESSION só encerra com Template F + KEY + validação automática.      ║"
 echo "╚══════════════════════════════════════════════════════════════════════════╝"
 echo ""

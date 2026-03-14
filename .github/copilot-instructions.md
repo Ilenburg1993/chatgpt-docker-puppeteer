@@ -101,15 +101,13 @@ O encerramento de SESSION exige **protocolo explícito obrigatório** (3 passos)
 
 1. Agente invoca `vscode_askQuestions` com **Template F** (exibe a `close_key` da sessão)
 2. Usuário digita a chave `ENCERRAR-XXXXXXXX` na resposta
-3. Agente extrai a KEY da resposta e chama **obrigatoriamente**:
-   ```bash
-   bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
-   ```
+3. `post-tool-use.sh` detecta a KEY na resposta e executa `session-close.sh` automaticamente (o
+   agente não deve chamar o script diretamente)
 
 **Rationale**: O evento `sessionEnd` da plataforma VS Code Copilot **não dispara** quando a sessão
-termina abruptamente (crash/restart/timeout). O `session-close.sh` é o único mecanismo confiável de
+termina abruptamente (crash/restart/timeout). O `session-close.sh` é o mecanismo confiável de
 encerramento autorizado — valida a KEY, loga `sessionCloseAuthorized`, chama `session-end.sh` e gera
-o relatório final.
+o relatório final, dentro do fluxo automático de hooks.
 
 Sem esse script: `SESSION_CLOSE_NO_KEY.flag` → alerta de encerramento não autorizado no próximo
 briefing.

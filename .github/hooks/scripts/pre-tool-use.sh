@@ -514,95 +514,58 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
             --arg key "$_SR_CLOSE_KEY" \
             --argjson n "$_SR_TOOLS_TOTAL" \
             --arg interval "$_SR_INTERVAL" \
-            '{systemMessage: ("🔐 SESSION REMINDER [tool #" + ($n|tostring) + "] — SESSION≠SECTION≠TURN. Para encerrar esta SESSION: (1) vscode_askQuestions Template F exibindo a KEY (2) usuário digita " + $key + " (3) bash .github/hooks/scripts/session-close.sh \"" + $key + "\". Texto plano não conta — apenas tool call real. Próximo reminder em " + ($n + ($interval|tonumber) | tostring) + " ferramentas.")}' 2> /dev/null || true
+            '{systemMessage: ("🔐 SESSION REMINDER [tool #" + ($n|tostring) + "] — SESSION≠SECTION≠TURN. Para encerrar esta SESSION: (1) vscode_askQuestions Template F exibindo a KEY (2) usuário digita " + $key + " (3) post-tool-use valida a KEY e executa session-close.sh automaticamente. Texto plano não conta — apenas tool call real. Próximo reminder em " + ($n + ($interval|tonumber) | tostring) + " ferramentas.")}' 2> /dev/null || true
         exit 0
     fi
 fi
 
-# ── Nível 2: ENFORCE — Git Push Guard (Session Closure Hardening) ──────────
-# Objetivo: Bloquear `git push` (ou similar ações terminais) sem Template F prévio
-# com close_key validado. Isso evita que o agente encerre a sessão sem autorização.
-#
-# Contexto: Um `git push` frequentemente precede session closure. Se o agente
-# tentar pushear SEM ter invocado Template F com close_key válido, bloqueamos.
-#
-# Lógica:
-#   1. Detecta se TOOL_NAME="run_in_terminal" e comando contém "git push"
-#   2. Verifica CTX para last_tool_name (foi vscode_askQuestions Template F?)
-#   3. Verifica se close_key_validated=true (usuário confirmou?)
-#   4. Se ambas falham, NEGA a ferramenta com mensagem explicativa
-#
-# Exceção: Se close_key_validated=true, o git push é permitido (fechamento
-# autorizado — permitir agente terminar trabalho e encerrar session com segurança)
+# ── Nível 2: Telemetria de Git Push (desacoplado de session close) ──────────
+# Objetivo: detectar `git push` e registrar contexto, sem acoplar push ao
+# encerramento de SESSION (close_key_validated). O push é parte normal do fluxo
+# de trabalho e não deve ser bloqueado por estado de close da sessão.
 if [ "$TOOL_NAME" = "run_in_terminal" ] && [ -f "$CTX_FILE" ]; then
     _N2_CMD="$(echo "$INPUT" | jq -r '.tool_input.command // ""' 2> /dev/null || echo '')"
-    
+
     # Detecta padrões de git push (variações comuns)
     if echo "$_N2_CMD" | grep -qE '^\s*git\s+(push|force-push|rebase)\b'; then
-        # Verifica se close_key foi validado PELA SESSÃO ATUAL
         _N2_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-        _N2_CLOSE_KEY="$(jq -r '.session.close_key // "N/A"' "$CTX_FILE" 2> /dev/null || echo 'N/A')"
-        _N2_LAST_TOOL="$(jq -r '.current_turn.last_tool_name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-        _N2_LAST_ASK_RESPONSE="$(jq -r '.current_turn.last_askquestions_response // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-        
-        # Guard Nível 2: Permite git push APENAS se:
-        #   - close_key_validated=true (usuário confirmou chave), OU
-        #   - Estamos em modo "finalizar com segurança" (recovery.final_push_allowed)
         _N2_FINAL_PUSH_ALLOWED="$(jq -r '.recovery.final_push_allowed // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-        
-        if [ "$_N2_CLOSE_VALIDATED" != "true" ] && [ "$_N2_FINAL_PUSH_ALLOWED" != "true" ]; then
-            # Bloqueia o git push e explica o protocolo
-            jq -cn \
-                --arg event "gitPush_blocked_no_closekey" \
-                --arg sid "$SESSION_ID" \
-                --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
-                --arg cmd "$_N2_CMD" \
-                --arg tool "$TOOL_NAME" \
-                '{
-                    event:      $event,
-                    session_id: $sid,
-                    timestamp:  $ts,
-                    tool:       $tool,
-                    command:    $cmd,
-                    message:    "Git push bloqueado: close_key_validated=false — SESSION ainda não autorizada para encerramento"
-                }' >> "$AUDIT_FILE" 2> /dev/null || true
-            
-            # Emite permissionDecision:deny com contexto educativo
-            jq -cn \
-                --arg key "$_N2_CLOSE_KEY" \
-                '{
-                    permissionDecision: "deny",
-                    additionalContext: (
-                        "🚫 Git Push Bloqueado (Nível 2 — ENFORCE):\n\n" +
-                        "Uma ação de `git push` foi requisitada, MAS esta SESSION ainda não foi AUTORIZADA para encerramento.\n\n" +
-                        "Se você está pronto para ENCERRAR esta SESSION:\n" +
-                        "  (1) Invoque vscode_askQuestions com Template F (Session Close)\n" +
-                        "  (2) Template F exibirá a close_key: " + $key + "\n" +
-                        "  (3) Digite a chave no campo de resposta\n" +
-                        "  (4) Após confirmação, git push será permitido + SESSION encerrará\n\n" +
-                        "Se NÃO quer encerrar ainda:\n" +
-                        "  - Cancele o git push\n" +
-                        "  - Continuar trabalhando normalmente\n" +
-                        "  - SESSION permanecerá ativa para próximas tarefas"
-                    )
-                }'
-            exit 0
+        _N2_PUSH_AUTHORIZED=false
+        if [ "$_N2_CLOSE_VALIDATED" = "true" ] || [ "$_N2_FINAL_PUSH_ALLOWED" = "true" ]; then
+            _N2_PUSH_AUTHORIZED=true
         fi
-        
-        # Else: git push permitido (close_key_validated=true ou final_push_allowed=true)
-        # Log informativo apenas
+
+        # Log principal de detecção de push (sem bloqueio)
         jq -cn \
-            --arg event "gitPush_allowed_authorized" \
+            --arg event "gitPush_detected" \
             --arg sid "$SESSION_ID" \
             --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
             --arg cmd "$_N2_CMD" \
+            --argjson push_authorized "$_N2_PUSH_AUTHORIZED" \
             '{
                 event:      $event,
                 session_id: $sid,
                 timestamp:  $ts,
                 command:    $cmd,
-                message:    "Git push permitido — close_key havia sido validado"
+                push_authorized: $push_authorized,
+                message:    "Git push detectado — sem bloqueio por close_key"
             }' >> "$AUDIT_FILE" 2> /dev/null || true
+
+        # Alerta observável quando push ocorre sem autorização explícita de fechamento
+        if [ "$_N2_PUSH_AUTHORIZED" != "true" ]; then
+            jq -cn \
+                --arg event "gitPush_requires_template_g" \
+                --arg sid "$SESSION_ID" \
+                --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+                --arg cmd "$_N2_CMD" \
+                '{
+                    event:      $event,
+                    session_id: $sid,
+                    timestamp:  $ts,
+                    command:    $cmd,
+                    message:    "Git push sem bloqueio por close_key; recomenda-se autorização via Template G"
+                }' >> "$AUDIT_FILE" 2> /dev/null || true
+        fi
     fi
 fi
 

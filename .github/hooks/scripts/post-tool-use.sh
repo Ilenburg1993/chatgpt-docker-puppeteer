@@ -227,11 +227,35 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         fi
         # ─────────────────────────────────────────────────────────────────────────
 
-        # Lê close_key atual do contexto para verificar se a resposta contém a chave de encerramento
+        # Lê close_key atual do contexto e valida de forma estruturada no payload de answers
         CURRENT_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
         KEY_FOUND=false
-        if [ -n "$CURRENT_CLOSE_KEY" ] && echo "$TOOL_RESPONSE" | grep -qF "$CURRENT_CLOSE_KEY"; then
-            KEY_FOUND=true
+        if [ -n "$CURRENT_CLOSE_KEY" ]; then
+            # Formato esperado do vscode_askQuestions:
+            # {"answers": {"Pergunta": {"selected": [...], "freeText": "..."}, ...}}
+            # Aceita KEY apenas quando encontrada exatamente em freeText/selected.
+            if echo "$TOOL_RESPONSE" | jq -e --arg key "$CURRENT_CLOSE_KEY" '
+                                [
+                                    (.answers? // {})
+                                    | to_entries[]?
+                                    | .value
+                                    | if type == "object" then
+                                            (([.freeText?] + (.selected? // [])))
+                                        elif type == "string" then
+                                            [.]
+                                        else
+                                            []
+                                        end
+                                    | .[]
+                                    | select(type == "string")
+                                ]
+                                | any(. == $key)
+                        ' > /dev/null 2>&1; then
+                KEY_FOUND=true
+            elif [ "$(printf '%s' "$TOOL_RESPONSE" | tr -d '\r\n')" = "$CURRENT_CLOSE_KEY" ]; then
+                # Fallback compatível para respostas legadas em texto puro
+                KEY_FOUND=true
+            fi
         fi
 
         # Log da resposta no audit.jsonl (sem dados sensíveis excessivos — truncada a 500 chars)

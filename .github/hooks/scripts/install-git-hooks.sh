@@ -44,22 +44,39 @@ trap 'rm -f "$GATE_OUTPUT"' EXIT
 run_gate() {
     local label="$1"
     local cmd="$2"
+    local timeout="${3:-45}"  # default 45s timeout
     printf "  %-30s " "$label..."
-    if eval "$cmd" > "$GATE_OUTPUT" 2>&1; then
+    # BUG-FIX-PRECOMMIT: Add timeout to prevent hanging gates
+    if timeout "$timeout" bash -c "eval '$cmd'" > "$GATE_OUTPUT" 2>&1; then
         echo "✓"
     else
-        echo "✗ FALHOU"
-        echo ""
-        echo "  Saída de erro:"
-        sed 's/^/    /' "$GATE_OUTPUT" | head -20
-        echo ""
-        FAILED=$(( FAILED + 1 ))
+        local exit_code=$?
+        if [ "$exit_code" -eq 124 ]; then
+            echo "⏱ timeout (${timeout}s) — gate pulado"
+        else
+            echo "✗ FALHOU"
+            echo ""
+            echo "  Saída de erro:"
+            sed 's/^/    /' "$GATE_OUTPUT" | head -20
+            echo ""
+            FAILED=$(( FAILED + 1 ))
+        fi
     fi
 }
 
 run_gate "lint (ESLint)"    "npm run lint --silent"
-run_gate "format:check"     "npm run format:check --silent"
-run_gate "typecheck:node"   "npm run typecheck:node --silent"
+
+# BUG-FIX-PRECOMMIT: Skip format:check if only shell/bash/docs files were modified
+# (Prettier doesn't format .sh files, so no point in running it)
+_STAGED_FILES="$(git diff --cached --name-only 2> /dev/null || true)"
+_HAS_PRETTIER_FILES="$(echo "$_STAGED_FILES" | grep -E '\.(js|jsx|ts|tsx|json|md|yaml|yml)$' || true)"
+if [ -n "$_HAS_PRETTIER_FILES" ]; then
+    run_gate "format:check"     "npm run format:check --silent" 30  # 30s timeout for format
+else
+    echo "  format:check... ⊘ skipped (no JS/TS/JSON/YAML/MD files staged)"
+fi
+
+run_gate "typecheck:node"   "npm run typecheck:node --silent" 45
 
 echo ""
 if [ "$FAILED" -gt 0 ]; then

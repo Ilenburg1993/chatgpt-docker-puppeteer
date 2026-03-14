@@ -288,18 +288,18 @@ Agent-scoped:     frontmatter .agent.md
 
 ### 3.2 Tabela de diferenças
 
-| Conceito    | O que é                                                                                                                   | Encerra com                                    | Autorização                                   | Script de controle                       |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------- | ---------------------------------------- |
-| **SESSION** | 1 ativação do Copilot Chat. Tem ID único e `close_key`.                                                                   | Template F + KEY + `session-close.sh`          | **OBRIGATÓRIA** — sem exceção                 | `session-start.sh` / `session-end.sh`    |
-| **SECTION** | Fase lógica de trabalho dentro da SESSION.                                                                                | Próxima `start-section.sh` ou `section-end.sh` | **Autônoma** — agente decide                  | `start-section.sh` / `section-end.sh`    |
-| **TURN**    | Ciclo agente-trabalha → `Stop` hook dispara. Dentro de um TURN ocorrem N tool calls e N chamadas a `vscode_askQuestions`. | `agentStop` hook (Stop event)                  | **Requer** `vscode_askQuestions` antes (v7.0) | `start-turn.sh` (declaração de intenção) |
+| Conceito    | O que é                                                                                                                   | Encerra com                                                  | Autorização                                   | Script de controle                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------- | ---------------------------------------- |
+| **SESSION** | 1 ativação do Copilot Chat. Tem ID único e `close_key`.                                                                   | Template F + KEY + execução automática de `session-close.sh` | **OBRIGATÓRIA** — sem exceção                 | `session-start.sh` / `session-end.sh`    |
+| **SECTION** | Fase lógica de trabalho dentro da SESSION.                                                                                | Próxima `start-section.sh` ou `section-end.sh`               | **Autônoma** — agente decide                  | `start-section.sh` / `section-end.sh`    |
+| **TURN**    | Ciclo agente-trabalha → `Stop` hook dispara. Dentro de um TURN ocorrem N tool calls e N chamadas a `vscode_askQuestions`. | `agentStop` hook (Stop event)                                | **Requer** `vscode_askQuestions` antes (v7.0) | `start-turn.sh` (declaração de intenção) |
 
 ### 3.3 Regra de ouro
 
 ```
 TURN encerrado?    → Requer vscode_askQuestions (v7.0, ou agentStop bloqueia)
 SECTION encerrada? → Autônoma. Agente abre nova seção com start-section.sh
-SESSION encerrada? → BLOQUEADA sem: Template F + KEY + bash session-close.sh KEY
+SESSION encerrada? → BLOQUEADA sem: Template F + KEY + execução automática via `post-tool-use.sh`
 ```
 
 ### 3.4 Invariante: SESSION + SECTION + TURN sempre ativos
@@ -652,8 +652,7 @@ PASSO 1: Agente chama vscode_askQuestions com Template F
 PASSO 2: Usuário digita a chave ENCERRAR-XXXXXXXX no campo da tool
          (postToolUse detecta KEY automaticamente → valida em CTX)
     │
-PASSO 3: Agente chama obrigatoriamente:
-         bash .github/hooks/scripts/session-close.sh "ENCERRAR-XXXXXXXX"
+PASSO 3: `post-tool-use.sh` detecta a KEY e executa `session-close.sh` automaticamente
 ```
 
 > **Onde encontrar a close_key**:

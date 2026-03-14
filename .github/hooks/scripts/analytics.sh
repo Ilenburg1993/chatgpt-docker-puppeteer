@@ -72,7 +72,7 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
     TOTAL_TOOLS="$(jq -r 'select(.event == "preToolUse") | .event' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     TOTAL_ERRORS="$(jq -r 'select(.event == "toolUseFailure") | .event' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     TOTAL_AUTH="$(jq -r 'select(.event == "turnEnd_authorized") | .event' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
-    TOTAL_UNAUTH="$(jq -r 'select(.event == "turnEnd_UNAUTHORIZED") | .event' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
+    TOTAL_UNAUTH="$(jq -r 'select(.event == "turnEnd_no_askQuestions") | .event' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
 fi
 
 TOTAL_TURNS=$((TOTAL_AUTH + TOTAL_UNAUTH))
@@ -204,7 +204,7 @@ generate_report() {
                 'select(.event == "turnEnd_authorized" and .session_id == $sid) | .event' \
                 "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
             S_UNAUTH="$(jq -r --arg sid "$sid" \
-                'select(.event == "turnEnd_UNAUTHORIZED" and .session_id == $sid) | .event' \
+                'select(.event == "turnEnd_no_askQuestions" and .session_id == $sid) | .event' \
                 "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
             S_TOTAL=$((S_AUTH + S_UNAUTH))
             [ "$S_TOTAL" -eq 0 ] 2> /dev/null && continue

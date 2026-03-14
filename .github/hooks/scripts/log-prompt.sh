@@ -9,9 +9,9 @@
 # ║                                                                          ║
 # ║  SESSION  ≠  SECTION  ≠  TURN                                           ║
 # ║  ─────────────────────────────────────────────────────────────────────   ║
-# ║  TURN    → encerra LIVREMENTE (sem autorização)                         ║
+# ║  TURN    → encerra com vscode_askQuestions (autorização obrigatória)    ║
 # ║  SECTION → agente decide autonomamente via start-section.sh             ║
-# ║  SESSION → SOMENTE com Template F + KEY digitada + session-close.sh KEY  ║
+# ║  SESSION → Template F + KEY digitada + execução automática de close      ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 #
 # PRIVACIDADE: o texto completo do prompt NÃO é logado.
@@ -360,8 +360,8 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                     }
                     found && /^##/ { found=0 }
                     !found { print }
-                ' "$STATE_DIR/session-briefing.md" > "$tmp_briefing" 2> /dev/null && \
-                mv "$tmp_briefing" "$STATE_DIR/session-briefing.md" 2> /dev/null || true
+                ' "$STATE_DIR/session-briefing.md" > "$tmp_briefing" 2> /dev/null \
+                    && mv "$tmp_briefing" "$STATE_DIR/session-briefing.md" 2> /dev/null || true
             fi
         fi
     fi
@@ -498,9 +498,9 @@ jq -cn \
 # resposta. Todos os outros lembretes (agent-stop.sh) são POST-HOC e chegam tarde.
 #
 # SESSION ≠ SECTION ≠ TURN:
-#   TURN    → encerra LIVREMENTE (agentStop automático)
+#   TURN    → encerra com autorização via vscode_askQuestions
 #   SECTION → agente decide mudança via start-section.sh (autônomo)
-#   SESSION → SOMENTE com vscode_askQuestions Template F + KEY + bash session-close.sh KEY
+#   SESSION → SOMENTE com vscode_askQuestions Template F + KEY (close automático)
 _SESSION_REMINDER_MSG=""
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
     _SR_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
@@ -539,10 +539,10 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
 
     _SESSION_REMINDER_MSG="${_SR_ICON} TURN INICIADO | SECTION: \"${_SR_SECTION}\" | ${_SR_SESSION_LINE}${_SR_VIOLATION}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  TURN    → encerra LIVREMENTE (sem autorização necessária)
+    TURN    → encerra com vscode_askQuestions (obrigatório)
   SECTION → muda via: bash .github/hooks/scripts/start-section.sh \"nome\" (autônomo)
   SESSION → fecha SOMENTE com: vscode_askQuestions (Template F) + usuário digita KEY
-                               + bash .github/hooks/scripts/session-close.sh KEY
+                                                             + post-tool-use valida e executa session-close.sh
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Ao CONCLUIR esta resposta: chame vscode_askQuestions para comunicar o resultado."
 fi

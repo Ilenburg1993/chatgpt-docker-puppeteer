@@ -349,9 +349,59 @@ PREV_SESSION_ID=""
 PREV_TURN_COUNT=0
 PREV_TASKS_OPEN=0
 
-# Busca o checkpoint mais recente de qualquer sessão anterior
+# Busca o checkpoint mais recente de qualquer sessão anterior.
+# P0-HOOKS: ignora artefatos sintéticos de teste e checkpoints com timestamp
+# no futuro para evitar falsos positivos de recovery (abrupt_no_key indevido).
 if [ -d "$CHECKPOINT_DIR" ]; then
-    PREV_CHECKPOINT="$(find "$CHECKPOINT_DIR" -maxdepth 1 -name 'sess_*_turn*.json' -printf '%T@ %p\n' 2> /dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)"
+    while IFS= read -r _CP_FILE; do
+        [ -z "$_CP_FILE" ] && continue
+
+        _CP_BASENAME="$(basename "$_CP_FILE" 2> /dev/null || echo '')"
+        _CP_SESSION_ID="$(jq -r '.session_id // ""' "$_CP_FILE" 2> /dev/null || echo '')"
+        _CP_CHECKPOINT_TS="$(jq -r '.checkpoint_ts // ""' "$_CP_FILE" 2> /dev/null || echo '')"
+        _CP_SKIP_REASON=""
+
+        # Artefato sintético de testes (ex.: sess_test123_turn10.json)
+        case "$_CP_BASENAME" in
+            sess_test*) _CP_SKIP_REASON="synthetic_test_checkpoint" ;;
+        esac
+
+        # Segurança: checkpoint sem session_id válido não participa do recovery
+        if [ -z "$_CP_SKIP_REASON" ] && [ -z "$_CP_SESSION_ID" ]; then
+            _CP_SKIP_REASON="missing_session_id"
+        fi
+
+        # Segurança: ignora checkpoint datado no futuro (clock skew/fixture)
+        if [ -z "$_CP_SKIP_REASON" ] && [ -n "$_CP_CHECKPOINT_TS" ]; then
+            _NOW_EPOCH="$(date -u +%s 2> /dev/null || echo 0)"
+            _CP_EPOCH="$(date -u -d "$_CP_CHECKPOINT_TS" +%s 2> /dev/null || echo '')"
+            if [ -n "$_CP_EPOCH" ] && [ "$_CP_EPOCH" -gt $((_NOW_EPOCH + 300)) ]; then
+                _CP_SKIP_REASON="future_checkpoint_ts"
+            fi
+        fi
+
+        if [ -n "$_CP_SKIP_REASON" ]; then
+            jq -cn \
+                --arg event "recovery_checkpoint_ignored" \
+                --arg sid "$SESSION_ID" \
+                --arg ts "${TIMESTAMP:-$SESSION_DATE}" \
+                --arg file "$_CP_BASENAME" \
+                --arg reason "$_CP_SKIP_REASON" \
+                --arg prev_sid "$_CP_SESSION_ID" \
+                '{
+                    event: $event,
+                    session_id: $sid,
+                    timestamp: $ts,
+                    checkpoint_file: $file,
+                    reason: $reason,
+                    ignored_session_id: $prev_sid
+                }' >> "$AUDIT_FILE" 2> /dev/null || true
+            continue
+        fi
+
+        PREV_CHECKPOINT="$_CP_FILE"
+        break
+    done < <(find "$CHECKPOINT_DIR" -maxdepth 1 -name 'sess_*_turn*.json' -printf '%T@ %p\n' 2> /dev/null | sort -rn | cut -d' ' -f2-)
 fi
 
 if [ -n "$PREV_CHECKPOINT" ] && [ -f "$PREV_CHECKPOINT" ]; then
@@ -366,8 +416,8 @@ fi
 # Detecção de encerramento abrupto: sessão anterior sem sessionEnd nem sessionCloseAuthorized
 # Nota: o evento `sessionEnd` da plataforma VS Code Copilot não dispara quando a
 # sessão termina abruptamente (crash/restart/timeout). O mecanismo correto de
-# encerramento é o agente chamar session-close.sh manualmente após validar a KEY,
-# o que gera o evento `sessionCloseAuthorized` E depois chama session-end.sh.
+# encerramento é o fluxo automático via post-tool-use após validação da KEY no
+# vscode_askQuestions (Template F), que aciona session-close.sh e session-end.sh.
 # Encerramento limpo = `sessionEnd` OR `sessionCloseAuthorized` com o session_id correto.
 PREV_ABRUPT_CLOSE=false
 if [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
@@ -376,11 +426,10 @@ if [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
     _AUDIT_TMP="${LOG_DIR}/audit-${_PREV_SID_SHORT}.jsonl"
     [ -f "$_AUDIT_TMP" ] || _AUDIT_TMP="$LOG_DIR/audit.jsonl"
     _FOUND_SESSION_END=false
-    # BUG-26 fix: usar -E (ERE) em vez de BRE \| (GNU-only) para portabilidade
-    _CLEAN_CLOSE_PATTERN='"sessionEnd"|"sessionCloseAuthorized"'
     # Verifica arquivo per-session da sessão anterior
-    if [ -f "$_AUDIT_TMP" ] && grep -qE "$_CLEAN_CLOSE_PATTERN" "$_AUDIT_TMP" 2> /dev/null \
-        && grep -E "$_CLEAN_CLOSE_PATTERN" "$_AUDIT_TMP" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
+    if [ -f "$_AUDIT_TMP" ] && jq -s -e --arg sid "$PREV_SESSION_ID" \
+        'any(.[]; ((.event == "sessionEnd" or .event == "sessionCloseAuthorized") and ((.session_id // "") == $sid)))' \
+        "$_AUDIT_TMP" > /dev/null 2> /dev/null; then
         _FOUND_SESSION_END=true
     fi
     # Se não encontrou, verifica outros arquivos per-session excluindo o atual (após rotação)
@@ -389,8 +438,9 @@ if [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
             ! -name "audit-${SID_SHORT}.jsonl" \
             -printf '%T@ %p\n' 2> /dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)"
         if [ -n "$_LATEST_ARCHIVE" ] && [ -f "$_LATEST_ARCHIVE" ] \
-            && grep -qE "$_CLEAN_CLOSE_PATTERN" "$_LATEST_ARCHIVE" 2> /dev/null \
-            && grep -E "$_CLEAN_CLOSE_PATTERN" "$_LATEST_ARCHIVE" 2> /dev/null | grep -q "$PREV_SESSION_ID"; then
+            && jq -s -e --arg sid "$PREV_SESSION_ID" \
+                'any(.[]; ((.event == "sessionEnd" or .event == "sessionCloseAuthorized") and ((.session_id // "") == $sid)))' \
+                "$_LATEST_ARCHIVE" > /dev/null 2> /dev/null; then
             _FOUND_SESSION_END=true
         fi
     fi
@@ -484,8 +534,41 @@ esac
 # Converte array bash em JSON array para jq
 _ALERTS_JSON="[]"
 if [ ${#RECOVERY_ALERTS[@]} -gt 0 ]; then
-    _ALERTS_JSON="$(printf '%s\n' "${RECOVERY_ALERTS[@]}" | \
-        jq -R '.' | jq -s '.' 2> /dev/null || echo '[]')"
+    _ALERTS_JSON="$(printf '%s\n' "${RECOVERY_ALERTS[@]}" \
+        | jq -R '.' | jq -s '.' 2> /dev/null || echo '[]')"
+fi
+
+# Persistência tardia do bloco recovery:
+# o contexto-base é criado antes da etapa de Recovery por motivos históricos,
+# portanto atualizamos o objeto .recovery aqui com os valores efetivamente detectados.
+_RECOVERY_TARGET_FILE="$PER_CTX_FILE"
+if [ -f "$_RECOVERY_TARGET_FILE" ] && command -v jq &> /dev/null; then
+    _RECOVERY_TMP="$(mktemp)"
+    _RECOVERY_TS="${TIMESTAMP:-$SESSION_DATE}"
+    if jq \
+        --arg close_mode "${PREV_CLOSE_MODE:-ok}" \
+        --arg prev_sid "${PREV_SESSION_ID:-}" \
+        --arg prev_ts "${PREV_CHECKPOINT_TS:-}" \
+        --arg detected_at "$_RECOVERY_TS" \
+        --arg alerts_req "$RECOVERY_ALERTS_REQUIRE_KICKOFF" \
+        --argjson alerts "$_ALERTS_JSON" \
+        '.recovery = ((.recovery // {}) + {
+            close_mode: $close_mode,
+            prev_session_id: $prev_sid,
+            prev_session_ts: $prev_ts,
+            alerts: $alerts,
+            alerts_require_kickoff: ($alerts_req == "true"),
+            detected_at: $detected_at
+        })' \
+        "$_RECOVERY_TARGET_FILE" > "$_RECOVERY_TMP" 2> /dev/null; then
+        mv "$_RECOVERY_TMP" "$_RECOVERY_TARGET_FILE" 2> /dev/null \
+            || {
+                cp "$_RECOVERY_TMP" "$_RECOVERY_TARGET_FILE" 2> /dev/null
+                rm -f "$_RECOVERY_TMP"
+            }
+    else
+        rm -f "$_RECOVERY_TMP"
+    fi
 fi
 
 # ── Loga sectionStart da section padrão "início" (Schema v4 — invariante) ────
@@ -811,9 +894,9 @@ cat > "$BRIEFING_FILE" << BRIEFING_EOF
 
 | Conceito    | Encerra como?                           | Autorização    |
 |-------------|------------------------------------------|----------------|
-| **TURN**    | Livremente ao terminar a resposta        | **Nenhuma**    |
+| **TURN**    | Com \`vscode_askQuestions\` como último ato | **OBRIGATÓRIA** |
 | **SECTION** | \`bash start-section.sh "nome"\` (autônomo)| **Nenhuma**    |
-| **SESSION** | Template F + KEY digitada + \`bash session-close.sh KEY\` | **OBRIGATÓRIA**|
+| **SESSION** | Template F + KEY digitada + execução automática de \`session-close.sh\` | **OBRIGATÓRIA**|
 
 > ⚠️ **Terminar de escrever uma resposta = encerrar um TURN, NÃO a SESSION.**
 > A SESSION só encerra quando o usuário explicitamente digita a chave abaixo.
@@ -850,10 +933,10 @@ cat > "$BRIEFING_FILE" << BRIEFING_EOF
 - O agente não toma decisões autônomas de encerramento
 
 ### 📋 **Referência rápida:**
-- **Encerrar SESSION**: \`vscode_askQuestions\` Template F + KEY + \`session-close.sh\`
+- **Encerrar SESSION**: \`vscode_askQuestions\` Template F + KEY + execução automática em \`post-tool-use.sh\`
 - **Avisar sobre token budget**: \`vscode_askQuestions\` Template D (Checkpoint)
 - **Trocar de fase**: \`bash start-section.sh "nome-nova-fase"\`
-- **Terminar TURN normal**: levemente — sem protocolo especial
+- **Terminar TURN**: obrigatório chamar \`vscode_askQuestions\` como último ato do turno
 
 ---
 
@@ -866,7 +949,7 @@ ${CLOSE_KEY}
 ### Fluxo de encerramento de SESSION (3 etapas obrigatórias):
 1. Agente chama \`vscode_askQuestions\` com **Template F** (exibe a chave acima)
 2. Usuário digita a chave \`${CLOSE_KEY}\` no campo livre
-3. Agente executa: \`bash .github/hooks/scripts/session-close.sh "${CLOSE_KEY}"\`
+3. \`post-tool-use.sh\` valida a chave e executa \`session-close.sh\` automaticamente
 
 ---
 
@@ -1038,8 +1121,9 @@ cat >> "$BRIEFING_FILE" << CLOSE_KEY_EOF
 ${CLOSE_KEY}
 \`\`\`
 
-> SESSION fecha com: **Template F** → usuário digita KEY → \`bash session-close.sh "${CLOSE_KEY}"\`
-> TURN encerra livremente. SECTION muda via \`start-section.sh\` (autônomo).
+> SESSION fecha com: **Template F** → usuário digita KEY → execução automática de \`session-close.sh\`.
+> TURN fecha com \`vscode_askQuestions\` (obrigatório) e **não pode ser retomado** após fechamento.
+> A SESSION pode ser retomada com novo prompt no mesmo chat.
 
 ---
 

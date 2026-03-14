@@ -212,13 +212,13 @@ AUTH_COMPLIANCE_RATE="N/D"
 if [ -f "$AUDIT_FILE" ]; then
     AUTH_AUTHORIZED_TOTAL="$(jq -r 'select(.event == "turnEnd_authorized")' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
-    AUTH_UNAUTHORIZED_TOTAL="$(jq -r 'select(.event == "turnEnd_UNAUTHORIZED")' \
+    AUTH_UNAUTHORIZED_TOTAL="$(jq -r 'select(.event == "turnEnd_no_askQuestions")' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     AUTH_AUTHORIZED_TODAY="$(jq -r --arg d "${TODAY}" \
         'select(.event == "turnEnd_authorized" and (.timestamp // "" | startswith($d)))' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     AUTH_UNAUTHORIZED_TODAY="$(jq -r --arg d "${TODAY}" \
-        'select(.event == "turnEnd_UNAUTHORIZED" and (.timestamp // "" | startswith($d)))' \
+        'select(.event == "turnEnd_no_askQuestions" and (.timestamp // "" | startswith($d)))' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     AUTH_TOTAL=$((AUTH_AUTHORIZED_TOTAL + AUTH_UNAUTHORIZED_TOTAL))
     if [ "$AUTH_TOTAL" -gt 0 ]; then
@@ -346,7 +346,7 @@ ${PERF_CHART}
 | Métrica | Hoje | Histórico |
 |---|---|---|
 | Turnos autorizados | ${AUTH_AUTHORIZED_TODAY} | ${AUTH_AUTHORIZED_TOTAL} |
-| Violações (turnEnd_UNAUTHORIZED) | ${AUTH_UNAUTHORIZED_TODAY} | ${AUTH_UNAUTHORIZED_TOTAL} |
+| Violações (turnEnd_no_askQuestions) | ${AUTH_UNAUTHORIZED_TODAY} | ${AUTH_UNAUTHORIZED_TOTAL} |
 | Taxa de conformidade | — | ${AUTH_COMPLIANCE_RATE} |
 | Violações consecutivas (agora) | — | ${AUTH_CONSECUTIVE} |
 | Flag UNAUTHORIZED_CLOSE ativo | ${AUTH_FLAG_EXISTS} | — |

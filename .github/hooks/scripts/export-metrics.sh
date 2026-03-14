@@ -108,7 +108,7 @@ export_compliance() {
         jq -r \
             "
             $PERIOD_FILTER |
-            select(.event == \"turnEnd_UNAUTHORIZED\" or .event == \"turnEnd_authorized\") |
+            select(.event == \"turnEnd_no_askQuestions\" or .event == \"turnEnd_authorized\") |
             [
                 (.timestamp // \"\"),
                 (.session_id // \"\"),
@@ -122,7 +122,7 @@ export_compliance() {
             "
             [ .[] |
               $PERIOD_FILTER |
-              select(.event == \"turnEnd_UNAUTHORIZED\" or .event == \"turnEnd_authorized\") |
+                            select(.event == \"turnEnd_no_askQuestions\" or .event == \"turnEnd_authorized\") |
               {
                 timestamp:   (.timestamp // \"\"),
                 session_id:  (.session_id // \"\"),
