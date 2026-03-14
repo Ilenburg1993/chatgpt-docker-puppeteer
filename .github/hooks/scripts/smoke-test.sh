@@ -1063,6 +1063,62 @@ PTUCTX
         fail "PR-8: chamada direta de session-close.sh NÃO foi bloqueada"
     fi
 
+    cat > "$_PTU_SB_STATE/session-context.json" << 'PTUCTX_STALE'
+{
+    "session": {
+        "id": "ptu-guard-test-001",
+        "close_key": "ENCERRAR-PTUTEST",
+        "close_key_validated": false,
+        "started_at": "2026-01-01T00:00:00Z"
+    },
+    "session_stats": {
+        "tools_total": 0,
+        "tools_by_name": {}
+    },
+    "current_turn": {
+        "tools_count": 0,
+        "tools_by_name": {},
+        "auth_requested": false,
+        "section_name": "teste"
+    },
+    "current_section": {
+        "name": "teste",
+        "tools_by_name": {}
+    },
+    "last_tool": {
+        "name": null,
+        "ts": null,
+        "use_id": null,
+        "result": null
+    },
+    "compliance": {
+        "consecutive_unauthorized": 0
+    },
+    "recovery": {
+        "close_mode": "abrupt_no_key",
+        "prev_session_id": "sess_test123_old",
+        "prev_session_ts": "2026-03-15T09:55:00Z",
+        "alerts": ["alerta fake"],
+        "alerts_require_kickoff": true,
+        "detected_at": "2026-03-15T10:00:00Z"
+    }
+}
+PTUCTX_STALE
+
+    cp "$_PTU_SB_STATE/session-context.json" "$_PTU_SB_STATE/session-context-ptu-guar.json" 2> /dev/null || true
+
+    _PTU_PAYLOAD_STALE='{"timestamp":"2026-01-01T00:00:00Z","session_id":"ptu-guard-test-001","cwd":"/tmp","tool_name":"run_in_terminal","tool_use_id":"ptu-u3","tool_input":{"command":"echo ok"}}'
+    echo "$_PTU_PAYLOAD_STALE" | bash "$_PTU_SB_SCRIPTS/pre-tool-use.sh" > /dev/null 2>&1 || true
+    _PTU_STALE_CTX_FILE="$_PTU_SB_STATE/session-context-ptu-guar.json"
+    _PTU_STALE_MODE="$(jq -r '.recovery.close_mode // ""' "$_PTU_STALE_CTX_FILE" 2> /dev/null || echo '')"
+    _PTU_STALE_PREV_SID="$(jq -r '.recovery.prev_session_id // ""' "$_PTU_STALE_CTX_FILE" 2> /dev/null || echo '')"
+    _PTU_STALE_ALERTS_REQ="$(jq -r '.recovery.alerts_require_kickoff' "$_PTU_STALE_CTX_FILE" 2> /dev/null || echo true)"
+    if [ "$_PTU_STALE_MODE" = "ok" ] && [ -z "$_PTU_STALE_PREV_SID" ] && [ "$_PTU_STALE_ALERTS_REQ" = "false" ]; then
+        pass "PR-9: pre-tool-use sanitiza recovery stale contaminado (sess_test*)"
+    else
+        fail "PR-9: pre-tool-use NÃO sanitizou recovery stale (mode=$_PTU_STALE_MODE sid=$_PTU_STALE_PREV_SID kickoff=$_PTU_STALE_ALERTS_REQ)"
+    fi
+
     rm -rf "$_PTU_SB"
 else
     fail "PR-0: pre-tool-use.sh não encontrado em $HOOK_DIR/scripts/"

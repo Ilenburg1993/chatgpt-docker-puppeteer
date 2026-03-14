@@ -332,8 +332,155 @@ if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
                 jq '.session_stats.session_id_mismatches = ((.session_stats.session_id_mismatches // 0) + 1)' \
                     "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
             fi
+
+            # P0-H053: mesmo em mismatch, saneia recovery stale do CTX ativo.
+            # Isso evita perpetuar alertas falsos quando o bloco recovery foi
+            # contaminado por fixture antiga (sess_test*) ou timestamps futuros.
+            _MM_RCV_MODE="$(jq -r '.recovery.close_mode // "ok"' "$CTX_FILE" 2> /dev/null || echo 'ok')"
+            _MM_RCV_SID="$(jq -r '.recovery.prev_session_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+            _MM_RCV_TS="$(jq -r '.recovery.prev_session_ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+            _MM_RCV_DET="$(jq -r '.recovery.detected_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+            _MM_SAN=false
+            _MM_REASON=""
+
+            case "$_MM_RCV_SID" in
+                sess_test*)
+                    _MM_SAN=true
+                    _MM_REASON="synthetic_prev_session_id"
+                    ;;
+            esac
+
+            _MM_NOW_EPOCH="$(date -u +%s 2> /dev/null || echo 0)"
+            if [ "$_MM_SAN" = "false" ] && [ -n "$_MM_RCV_TS" ]; then
+                _MM_RCV_EPOCH="$(date -u -d "$_MM_RCV_TS" +%s 2> /dev/null || echo '')"
+                if [ -n "$_MM_RCV_EPOCH" ] && [ "$_MM_RCV_EPOCH" -gt $((_MM_NOW_EPOCH + 300)) ]; then
+                    _MM_SAN=true
+                    _MM_REASON="future_prev_session_ts"
+                fi
+            fi
+            if [ "$_MM_SAN" = "false" ] && [ -n "$_MM_RCV_DET" ]; then
+                _MM_DET_EPOCH="$(date -u -d "$_MM_RCV_DET" +%s 2> /dev/null || echo '')"
+                if [ -n "$_MM_DET_EPOCH" ] && [ "$_MM_DET_EPOCH" -gt $((_MM_NOW_EPOCH + 300)) ]; then
+                    _MM_SAN=true
+                    _MM_REASON="future_detected_at"
+                fi
+            fi
+
+            if [ "$_MM_SAN" = "true" ] && [ "$_MM_RCV_MODE" != "ok" ]; then
+                _MM_TS_NOW="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+                if command -v sponge &> /dev/null; then
+                    jq --arg now "$_MM_TS_NOW" '
+                        .recovery.close_mode = "ok"
+                        | .recovery.prev_session_id = ""
+                        | .recovery.prev_session_ts = ""
+                        | .recovery.alerts = []
+                        | .recovery.alerts_require_kickoff = false
+                        | .recovery.detected_at = $now' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+                fi
+                jq -cn \
+                    --arg event "recovery_stale_sanitized" \
+                    --arg sid "$CTX_ACTIVE_SID" \
+                    --arg ts "$_MM_TS_NOW" \
+                    --arg reason "$_MM_REASON" \
+                    --arg old_close_mode "$_MM_RCV_MODE" \
+                    --arg old_prev_sid "$_MM_RCV_SID" \
+                    '{
+                        event: $event,
+                        session_id: $sid,
+                        timestamp: $ts,
+                        reason: $reason,
+                        old_close_mode: $old_close_mode,
+                        old_prev_session_id: $old_prev_sid,
+                        message: "Recovery stale detectado e neutralizado durante session_id_mismatch"
+                    }' >> "$AUDIT_FILE" 2> /dev/null || true
+            fi
+
             exit 0
         fi
+    fi
+fi
+
+# ── Sanitização de recovery stale (anti-contaminação persistida) ───────────
+# Objetivo: neutralizar blocos .recovery antigos/contaminados que ficaram no
+# contexto ativo (ex.: prev_session_id sintético sess_test* ou datas futuras).
+if [ -f "$CTX_FILE" ] && command -v jq > /dev/null 2>&1; then
+    _RCV_CLOSE_MODE="$(jq -r '.recovery.close_mode // "ok"' "$CTX_FILE" 2> /dev/null || echo 'ok')"
+    _RCV_PREV_SID="$(jq -r '.recovery.prev_session_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    _RCV_PREV_TS="$(jq -r '.recovery.prev_session_ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    _RCV_DETECTED_AT="$(jq -r '.recovery.detected_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+
+    _RCV_SANITIZE=false
+    _RCV_REASON=""
+
+    if [ -n "$_RCV_PREV_SID" ]; then
+        case "$_RCV_PREV_SID" in
+            sess_test*)
+                _RCV_SANITIZE=true
+                _RCV_REASON="synthetic_prev_session_id"
+                ;;
+        esac
+    fi
+
+    _RCV_NOW_EPOCH="$(date -u +%s 2> /dev/null || echo 0)"
+    if [ "$_RCV_SANITIZE" = "false" ] && [ -n "$_RCV_PREV_TS" ]; then
+        _RCV_PREV_EPOCH="$(date -u -d "$_RCV_PREV_TS" +%s 2> /dev/null || echo '')"
+        if [ -n "$_RCV_PREV_EPOCH" ] && [ "$_RCV_PREV_EPOCH" -gt $((_RCV_NOW_EPOCH + 300)) ]; then
+            _RCV_SANITIZE=true
+            _RCV_REASON="future_prev_session_ts"
+        fi
+    fi
+
+    if [ "$_RCV_SANITIZE" = "false" ] && [ -n "$_RCV_DETECTED_AT" ]; then
+        _RCV_DETECTED_EPOCH="$(date -u -d "$_RCV_DETECTED_AT" +%s 2> /dev/null || echo '')"
+        if [ -n "$_RCV_DETECTED_EPOCH" ] && [ "$_RCV_DETECTED_EPOCH" -gt $((_RCV_NOW_EPOCH + 300)) ]; then
+            _RCV_SANITIZE=true
+            _RCV_REASON="future_detected_at"
+        fi
+    fi
+
+    if [ "$_RCV_SANITIZE" = "true" ] && [ "$_RCV_CLOSE_MODE" != "ok" ]; then
+        _RCV_TS_NOW="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo "${TIMESTAMP:-}")"
+        if command -v sponge &> /dev/null; then
+            jq --arg now "$_RCV_TS_NOW" '
+                .recovery.close_mode = "ok"
+                | .recovery.prev_session_id = ""
+                | .recovery.prev_session_ts = ""
+                | .recovery.alerts = []
+                | .recovery.alerts_require_kickoff = false
+                | .recovery.detected_at = $now' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        else
+            _RCV_TMP="$(mktemp 2> /dev/null || echo '')"
+            if [ -n "$_RCV_TMP" ]; then
+                if jq --arg now "$_RCV_TS_NOW" '
+                    .recovery.close_mode = "ok"
+                    | .recovery.prev_session_id = ""
+                    | .recovery.prev_session_ts = ""
+                    | .recovery.alerts = []
+                    | .recovery.alerts_require_kickoff = false
+                    | .recovery.detected_at = $now' "$CTX_FILE" > "$_RCV_TMP" 2> /dev/null; then
+                    mv "$_RCV_TMP" "$CTX_FILE" 2> /dev/null || rm -f "$_RCV_TMP"
+                else
+                    rm -f "$_RCV_TMP"
+                fi
+            fi
+        fi
+
+        jq -cn \
+            --arg event "recovery_stale_sanitized" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$_RCV_TS_NOW" \
+            --arg reason "$_RCV_REASON" \
+            --arg old_close_mode "$_RCV_CLOSE_MODE" \
+            --arg old_prev_sid "$_RCV_PREV_SID" \
+            '{
+                event: $event,
+                session_id: $sid,
+                timestamp: $ts,
+                reason: $reason,
+                old_close_mode: $old_close_mode,
+                old_prev_session_id: $old_prev_sid,
+                message: "Recovery stale detectado e neutralizado para evitar falso alerta persistente"
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
     fi
 fi
 

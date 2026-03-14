@@ -11,7 +11,7 @@ normalizar contrato e métricas (P1), e finalizar com hardening de qualidade/she
 
 ## Status de execução (atual)
 
-- **P0**: 🔄 Em andamento (H001, H004, H005 concluídos + novo foco H049/H050/H051/H052)
+- **P0**: 🔄 Em andamento (H001, H004, H005 concluídos + novo foco H049/H050/H051/H052/H053)
 - **P1**: ⏳ Pendente
 - **P2**: ⏳ Pendente
 
@@ -38,6 +38,12 @@ normalizar contrato e métricas (P1), e finalizar com hardening de qualidade/she
 	- Causa: detecção textual ampla (substring) tratava qualquer ocorrência de `session-close.sh` como execução direta.
 	- Impacto: bloqueios indevidos, ruído de auditoria e diagnóstico incorreto de tentativa de encerramento de sessão.
 
+- **P0-H053 — Recovery stale persistido no contexto ativo**
+	- Sintoma: `session-context` permanece com `recovery.close_mode=abrupt_no_key` e `prev_session_id` sintético mesmo após
+		correções no `session-start.sh`.
+	- Causa: o bloco `recovery` contaminado em sessão antiga não era reavaliado/neutralizado durante o ciclo normal de tools.
+	- Impacto: briefing e telemetria seguem sinalizando incidente já mitigado, gerando ações operacionais indevidas.
+
 ### Evidências rápidas da P0
 
 - `agent-stop.sh`: Nível 3 agora é **opt-in** via `session.enforce_close_key_on_stop`.
@@ -63,6 +69,7 @@ normalizar contrato e métricas (P1), e finalizar com hardening de qualidade/she
 5. **H050** — `session-start.sh`: descartar checkpoints com `checkpoint_ts` no futuro (sanity check).
 6. **H051** — harmonizar semântica de encerramento TURN/SESSION entre contrato executável e docs de referência.
 7. **H052** — `pre-tool-use.sh`: restringir bloqueio do Mechanism 5 apenas a invocação direta de `session-close.sh`.
+8. **H053** — `pre-tool-use.sh`: sanitizar `recovery` stale já persistido (sessão antiga contaminada).
 
 ### Entregáveis técnicos
 
@@ -73,6 +80,7 @@ normalizar contrato e métricas (P1), e finalizar com hardening de qualidade/she
 - Novo cenário de regressão no `test-level1-detect.sh` garantindo que checkpoint sintético não contamina recovery.
 - Matriz de convergência TURN/SESSION baseada nos documentos de referência canônicos.
 - Regressão no smoke-test garantindo: (a) `session-close.sh` como argumento **não bloqueia**; (b) chamada direta continua **bloqueada**.
+- Regressão no smoke-test garantindo saneamento de `recovery` contaminado no runtime (sess_test* → `close_mode=ok`).
 
 ### Critérios de aceite
 
@@ -83,6 +91,7 @@ normalizar contrato e métricas (P1), e finalizar com hardening de qualidade/she
 - Checkpoint com timestamp futuro não é usado para inferência de sessão anterior.
 - Semântica de legitimidade de encerramento alinhada entre implementação e docs canônicos.
 - Guard anti-M5 não gera falso positivo quando `session-close.sh` aparece apenas como argumento de outro comando.
+- Contexto ativo não mantém `recovery` contaminado após a primeira execução de ferramenta.
 
 ### Validação
 
