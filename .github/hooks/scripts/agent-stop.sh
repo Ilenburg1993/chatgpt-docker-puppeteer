@@ -29,6 +29,17 @@ if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
 else
     echo "[warn] common.sh não encontrado (agent-stop.sh) — heal_v1/ctx functions indisponíveis" >&2
 fi
+if [ -f "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" ]; then
+    # shellcheck disable=SC1091
+    source "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null \
+        || {
+            echo "[error] agent-stop-lib.sh falhou ao carregar em agent-stop.sh" >&2
+            exit 1
+        }
+else
+    echo "[error] agent-stop-lib.sh não encontrado (agent-stop.sh)" >&2
+    exit 1
+fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 # CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
 INPUT="$(cat 2> /dev/null || true)"
@@ -58,6 +69,8 @@ if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
+# Helpers estruturais carregados de hooks-lib/agent-stop-lib.sh
+
 # ── Nível 3: MANDATE (opt-in) — close_key no encerramento de SESSION ─────────
 # Objetivo: opcionalmente exigir close_key_validated=true no Stop.
 #
@@ -66,66 +79,10 @@ fi
 # encerrar a SESSION.
 #
 # Exceção: stop_hook_active=true (hook iniciou parada, não agente) — não bloqueamos.
-if [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
-    _N3_ENFORCE_ON_STOP="$(jq -r '.session.enforce_close_key_on_stop // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-    _N3_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-    _N3_CLOSE_KEY="$(jq -r '.session.close_key // "N/A"' "$CTX_FILE" 2> /dev/null || echo 'N/A')"
-    _N3_RECOVERY_CLOSE_MODE="$(jq -r '.recovery.close_mode // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-
-    # Condição: Se session está ativa (não foi encerrada por usuário), NÃO permitir agent-stop
-    # sem validação de close_key. MAS: Se recovery.close_mode="abrupt_no_key" (anomalia prev),
-    # e ainda estamos aguardando Template E+, talvez seja recuperação — permitir bypass.
-    _N3_ALLOW_UNSAFE_CLOSE="false"
-    if [ "$_N3_RECOVERY_CLOSE_MODE" = "abrupt_no_key" ]; then
-        # Anomalia detectada — verificar se Template E+ foi invocado (recovery_acknowledged)
-        _N3_RECOVERY_ACKNOWLEDGED="$(jq -r '.recovery.recovery_acknowledged // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-        if [ "$_N3_RECOVERY_ACKNOWLEDGED" = "true" ]; then
-            # Usuário viu a anomalia + confirmou (Template E+) — permitir close "seguro"
-            _N3_ALLOW_UNSAFE_CLOSE="true"
-        fi
-    fi
-
-    # Guard principal: close_key_validated=false E não estamos em modo de recovery confirmada
-    if [ "$_N3_ENFORCE_ON_STOP" = "true" ] && [ "$_N3_CLOSE_VALIDATED" != "true" ] && [ "$_N3_ALLOW_UNSAFE_CLOSE" != "true" ]; then
-        # Bloqueia agent-stop com decision:block
-        echo "[BLOCK] Agent-stop bloqueado: Nível 3 (MANDATE) — close_key_validated=false" >&2
-
-        # Log da violação
-        jq -cn \
-            --arg event "agentStop_blocked_close_key_required" \
-            --arg sid "$SESSION_ID" \
-            --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')" \
-            --arg key "$_N3_CLOSE_KEY" \
-            '{
-                event:      $event,
-                session_id: $sid,
-                timestamp:  $ts,
-                close_key:  $key,
-                severity:   "CRITICAL",
-                message:    "Agent-stop foi bloqueado (Nível 3) — Session close_key_validated=false. Agente deve invocar Template F."
-            }' >> "$AUDIT_FILE" 2> /dev/null || true
-
-        # Emite decision:block para parar o agente
-        jq -cn \
-            --arg key "$_N3_CLOSE_KEY" \
-            '{
-                decision: "block",
-                decisionReason: "Session closure authorization required",
-                systemMessage: (
-                    "🛑 AGENT-STOP BLOQUEADO (Nível 3 — MANDATE):\n\n" +
-                    "Sua execução foi bloqueada — você DEVE invocar vscode_askQuestions Template F " +
-                    "(Session Close) ANTES de poder encerrar esta SESSION.\n\n" +
-                    "Protocolo:\n" +
-                    "  (1) Chame vscode_askQuestions com Template F\n" +
-                    "  (2) Template exibirá a close_key: " + $key + "\n" +
-                    "  (3) Digite ENCERRAR-" + $key + " no campo de resposta\n" +
-                    "  (4) post-tool-use.sh detectará a KEY e executará session-close.sh automaticamente\n" +
-                    "  (5) Sessão encerrará com segurança\n\n" +
-                    "Se NÃO quer encerrar: simplesmente não invoque Template F — continue trabalhando."
-                )
-            }'
-        exit 0
-    fi
+_N3_GUARD_RC=0
+enforce_level3_close_key_mandate "$CTX_FILE" "$AUDIT_FILE" "$SESSION_ID" "$STOP_HOOK_ACTIVE" "${TIMESTAMP:-$NOW_ISO}" "$NOW_ISO" || _N3_GUARD_RC=$?
+if [ "$_N3_GUARD_RC" -eq 10 ]; then
+    exit 0
 fi
 
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
@@ -184,19 +141,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
             # G9-04: HEAL v2 — rastreia mismatches consecutivos com o mesmo "got" session_id.
             # Após 3 ocorrências do mesmo "got", auto-heal (CTX provavelmente defasado).
             MISMATCH_TRACK_FILE="$STATE_DIR/.mismatch_track.json"
-            PREV_GOT=""
-            PREV_COUNT=0
-            if [ -f "$MISMATCH_TRACK_FILE" ]; then
-                PREV_GOT="$(jq -r '.got // ""' "$MISMATCH_TRACK_FILE" 2> /dev/null || echo '')"
-                PREV_COUNT="$(jq -r '.count // 0' "$MISMATCH_TRACK_FILE" 2> /dev/null || echo 0)"
-            fi
-            if [ "$PREV_GOT" = "$SESSION_ID_PAYLOAD" ]; then
-                NEW_COUNT=$((PREV_COUNT + 1))
-            else
-                NEW_COUNT=1
-            fi
-            jq -cn --arg got "$SESSION_ID_PAYLOAD" --argjson count "$NEW_COUNT" \
-                '{got: $got, count: $count}' > "$MISMATCH_TRACK_FILE" 2> /dev/null || true
+            NEW_COUNT="$(update_mismatch_tracker "$MISMATCH_TRACK_FILE" "$SESSION_ID_PAYLOAD")"
 
             if [ "$NEW_COUNT" -ge 3 ]; then
                 # HEAL v2: ID recorrente → trust como real e sanar o contexto
@@ -245,6 +190,13 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                         consecutive_count: $count,
                         message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
                     }' >> "$AUDIT_FILE"
+
+                # Hardening v9.2: mismatch pendente NÃO pode encerrar TURN silenciosamente.
+                # Se ainda não houve heal (count < 3), bloqueia este Stop para evitar
+                # fechamento não autorizado em contexto inconsistente.
+                if [ "$STOP_HOOK_ACTIVE" != "true" ]; then
+                    emit_unresolved_session_mismatch_block "$CTX_ACTIVE_SID" "$SESSION_ID_PAYLOAD" "$NEW_COUNT"
+                fi
                 exit 0
             fi
         fi
@@ -318,90 +270,31 @@ if [ -f "$CTX_FILE" ]; then
 fi
 
 # Append em audit.jsonl — registra o fim do turno
-jq -cn \
-    --arg event "agentStop" \
-    --arg sid "$SESSION_ID" \
-    --arg ts "${TIMESTAMP:-$NOW_ISO}" \
-    --argjson dur "$TURN_DURATION_S" \
-    --argjson stop_hook_active "$STOP_HOOK_ACTIVE" \
-    --argjson turn_number "$TURN_NUMBER" \
-    --argjson section_turn "$SECTION_TURN" \
-    --arg section_name "$SECTION_NAME" \
-    --arg section_id "$SECTION_ID" \
-    --arg turn_id "$TURN_ID" \
-    --arg intent "$TURN_INTENT" \
-    --argjson intent_declared "${TURN_INTENT_DECLARED:-false}" \
-    --argjson tools_count "$TURN_TOOLS_COUNT" \
-    --argjson failures_count "$TURN_FAILURES_COUNT" \
-    --argjson block_count "$TURN_BLOCK_COUNT" \
-    --argjson agentStop_invocations "$AGENTST_INVOCATIONS" \
-    '{
-        event:                  $event,
-        session_id:             $sid,
-        timestamp:              $ts,
-        turn_duration_s:        $dur,
-        stop_hook_active:       $stop_hook_active,
-        turn_number:            $turn_number,
-        section_turn:           $section_turn,
-        section_name:           (if $section_name == "" then null else $section_name end),
-        section_id:             (if $section_id == "" then null else $section_id end),
-        turn_id:                (if $turn_id == "" then null else $turn_id end),
-        intent:                 (if $intent == "" then null else $intent end),
-        intent_declared:        $intent_declared,
-        tools_count:            $tools_count,
-        failures_count:         $failures_count,
-        block_count:            $block_count,
-        agentStop_invocations:  $agentStop_invocations
-    }' >> "$AUDIT_FILE"
+log_agent_stop_event \
+    "$AUDIT_FILE" \
+    "$SESSION_ID" \
+    "${TIMESTAMP:-$NOW_ISO}" \
+    "$TURN_DURATION_S" \
+    "$STOP_HOOK_ACTIVE" \
+    "$TURN_NUMBER" \
+    "$SECTION_TURN" \
+    "$SECTION_NAME" \
+    "$SECTION_ID" \
+    "$TURN_ID" \
+    "$TURN_INTENT" \
+    "${TURN_INTENT_DECLARED:-false}" \
+    "$TURN_TOOLS_COUNT" \
+    "$TURN_FAILURES_COUNT" \
+    "$TURN_BLOCK_COUNT" \
+    "$AGENTST_INVOCATIONS"
 
 # ── BUG-79 GUARD: SESSION CLOSURE authorization (PRÉ-CLOSE validation) ────────
 # Hardening Fase 0: Detecta tentativa não autorizada de encerrar sessão
 # Protocolo TODO v9.0: SESSION closure APENAS via vscode_askQuestions Template F + close_key
 # Se session.ended_at != null e closure_authorized_at == null → VIOLAÇÃO
-if [ -f "$CTX_FILE" ]; then
-    SESSION_ENDED_AT="$(jq -r '.session.ended_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    if [ -n "$SESSION_ENDED_AT" ]; then
-        # Session foi marcada como ended — verificar se autorização veio via Template F
-        CLOSURE_AUTHORIZED_AT="$(jq -r '.session.closure_authorized_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-        if [ -z "$CLOSURE_AUTHORIZED_AT" ]; then
-            # ❌ VIOLAÇÃO: Session ended SEM autorização via vscode_askQuestions Template F
-            echo "[ERROR] SESSION CLOSURE VIOLATION (BUG-79 Guard)" >&2
-            echo "  Session.ended_at: $SESSION_ENDED_AT" >&2
-            echo "  Closure_authorized_at: (empty/missing)" >&2
-            echo "  Protocolo violado: encerramento SEM Template F + close_key validation" >&2
-            echo "  Requerido: vscode_askQuestions Template F com resposta contendo close_key" >&2
-
-            # Log violation event
-            jq -cn \
-                --arg sid "$SESSION_ID" \
-                --arg ts "$NOW_ISO" \
-                --arg ended_at "$SESSION_ENDED_AT" \
-                '{
-                    event:      "sessionClose_VIOLATION_unauthorized",
-                    session_id: $sid,
-                    timestamp:  $ts,
-                    session_ended_at: $ended_at,
-                    closure_authorized_at: null,
-                    bug:        "BUG-79",
-                    message:    "Tentativa de encerrar sessão sem autorização via vscode_askQuestions Template F"
-                }' >> "$AUDIT_FILE"
-
-            # Cria flag de violação para rastreamento na próxima sessão
-            jq -cn \
-                --arg sid "$SESSION_ID" \
-                --arg ts "$NOW_ISO" \
-                '{
-                    session_id:        $sid,
-                    violation_detected_at: $ts,
-                    violation_type:    "unauthorized_session_close",
-                    requires_investigation: true,
-                    bug_reference:     "BUG-79"
-                }' > "$STATE_DIR/SESSION_CLOSE_VIOLATION.flag"
-
-            # BLOQUEADOR: Falha com exit code 1
-            exit 1
-        fi
-    fi
+if ! enforce_session_closure_authorization_guard "$CTX_FILE" "$AUDIT_FILE" "$STATE_DIR" "$SESSION_ID" "$NOW_ISO"; then
+    # BLOQUEADOR: Falha com exit code 1
+    exit 1
 fi
 
 # ── Detecção de autorização ───────────────────────────────────────────────────
@@ -417,22 +310,12 @@ fi
 AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
 AUTHORIZED_FLAG_FILE="$STATE_DIR/AUTHORIZED_CLOSE.flag"
 AUTH_REQUESTED=false
+AUTH_INVALID_REASON=""
 
 if [ -f "$AUDIT_FILE" ]; then
     # Estratégia 1: fronteira por userPromptSubmitted
-    LAST_PROMPT_LINE="$(awk '/"userPromptSubmitted"/{last=NR} END{print last+0}' "$AUDIT_FILE")"
-    TOTAL_LINES="$(wc -l < "$AUDIT_FILE")"
-
-    if [ "$LAST_PROMPT_LINE" -gt 0 ] && [ "$TOTAL_LINES" -gt "$LAST_PROMPT_LINE" ]; then
-        LINES_SINCE_PROMPT=$((TOTAL_LINES - LAST_PROMPT_LINE))
-        # Hardening defensivo: garante LINES_SINCE_PROMPT > 0 antes de chamar tail -n 0
-        # (matematicamente redundante dado a condição acima, mas previne tail -n 0 acidental)
-        if [ "$LINES_SINCE_PROMPT" -gt 0 ]; then
-            if tail -n "$LINES_SINCE_PROMPT" "$AUDIT_FILE" \
-                | jq -re 'select(.tool_name == "vscode_askQuestions" or .event == "subagentStart")' > /dev/null 2>&1; then
-                AUTH_REQUESTED=true
-            fi
-        fi
+    if audit_has_turn_auth_signal "$AUDIT_FILE"; then
+        AUTH_REQUESTED=true
     fi
 
     # Estratégia 2 REMOVIDA em v7.0 (falso positivo cross-turn).
@@ -442,11 +325,9 @@ fi
 # Estratégia 3 (fallback de contexto): lê flag do session-context.json
 # Schema v2: current_turn.auth_requested; legado: auth_requested_this_turn
 if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
-    CTX_FLAG="$(jq -r '
-        .current_turn.auth_requested //
-        .auth_requested_this_turn //
-        false' "$CTX_FILE" 2> /dev/null || echo false)"
-    if [ "$CTX_FLAG" = "true" ]; then AUTH_REQUESTED=true; fi
+    if context_turn_auth_requested "$CTX_FILE"; then
+        AUTH_REQUESTED=true
+    fi
 fi
 
 # Estratégia 4: delegação ao subagente = autorização implícita
@@ -457,19 +338,54 @@ fi
 if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
     SUBAGENT_DELEGATED="$(jq -r '.current_turn.subagent_delegated // false' "$CTX_FILE" 2> /dev/null || echo false)"
     if [ "$SUBAGENT_DELEGATED" = "true" ]; then
-        AUTH_REQUESTED=true
-        jq -cn \
-            --arg event "auth_via_subagent_delegation" \
-            --arg sid "$SESSION_ID" \
-            --arg ts "$NOW_ISO" \
-            --arg turn_id "$TURN_ID" \
-            '{
-                event:      $event,
-                session_id: $sid,
-                timestamp:  $ts,
-                turn_id:    (if $turn_id == "" then null else $turn_id end),
-                message:    "Autorização concedida via delegação ao subagente (runSubagent)"
-            }' >> "$AUDIT_FILE"
+        SUBAGENT_LAST_TOOL="$(jq -r '.last_tool.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        if [ "$SUBAGENT_LAST_TOOL" = "runSubagent" ] || [ "$SUBAGENT_LAST_TOOL" = "search_subagent" ]; then
+            AUTH_REQUESTED=true
+            jq -cn \
+                --arg event "auth_via_subagent_delegation" \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$NOW_ISO" \
+                --arg turn_id "$TURN_ID" \
+                '{
+                    event:      $event,
+                    session_id: $sid,
+                    timestamp:  $ts,
+                    turn_id:    (if $turn_id == "" then null else $turn_id end),
+                    message:    "Autorização concedida via delegação imediata ao subagente"
+                }' >> "$AUDIT_FILE"
+        fi
+    fi
+fi
+
+# ── Hardening v9.1: askQuestions deve ser o ÚLTIMO ato do TURN ─────────────
+# Protocolo TODO v9.0 exige que o último passo do turno seja vscode_askQuestions.
+# Sem isso, chamadas antigas de askQuestions no mesmo turno não autorizam o fechamento.
+if [ "$AUTH_REQUESTED" = "true" ] && [ -f "$CTX_FILE" ]; then
+    _AUTH_LAST_TOOL_NAME="$(jq -r '.last_tool.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    _AUTH_SUBAGENT_DELEGATED="$(jq -r '.current_turn.subagent_delegated // false' "$CTX_FILE" 2> /dev/null || echo false)"
+    _AUTH_ASK_API_ERROR="$(jq -r '.current_turn.askquestions_api_error // false' "$CTX_FILE" 2> /dev/null || echo false)"
+    _AUTH_LAST_RESPONSE="$(jq -r '.current_turn.last_askquestions_response // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    _AUTH_LAST_NON_BOOKKEEPING_TOOL=""
+
+    _AUTH_LAST_NON_BOOKKEEPING_TOOL="$(last_non_bookkeeping_tool_since_prompt "$AUDIT_FILE")"
+
+    AUTH_INVALID_REASON="$(determine_turn_auth_invalid_reason \
+        "$_AUTH_LAST_TOOL_NAME" \
+        "$_AUTH_SUBAGENT_DELEGATED" \
+        "$_AUTH_ASK_API_ERROR" \
+        "$_AUTH_LAST_RESPONSE" \
+        "$_AUTH_LAST_NON_BOOKKEEPING_TOOL")"
+
+    if [ -n "$AUTH_INVALID_REASON" ]; then
+        AUTH_REQUESTED=false
+        log_turn_auth_invalidated_event \
+            "$AUDIT_FILE" \
+            "$SESSION_ID" \
+            "$NOW_ISO" \
+            "$AUTH_INVALID_REASON" \
+            "$_AUTH_LAST_TOOL_NAME" \
+            "$_AUTH_LAST_NON_BOOKKEEPING_TOOL" \
+            "$TURN_ID"
     fi
 fi
 
@@ -501,12 +417,12 @@ fi
 if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f "$CTX_FILE" ]; then
     _BLOCK_CLOSE_KEY="$(jq -r '.session.close_key // "N/A"' "$CTX_FILE" 2> /dev/null || echo 'N/A')"
     _BLOCK_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-    _BLOCK_CONSECUTIVE="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _BLOCK_CONSECUTIVE_RAW="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     _BLOCK_TODO_CREATED="$(jq -r '.current_turn.todo_created // false' "$CTX_FILE" 2> /dev/null || echo false)"
-    _BLOCK_COUNT_CURR="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _BLOCK_COUNT_CURR_RAW="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     # fix Haiku A4.6: guard numérica — valor corrompido no CTX não causa comportamento imprevisível
-    [[ "$_BLOCK_CONSECUTIVE" =~ ^[0-9]+$ ]] || _BLOCK_CONSECUTIVE=0
-    [[ "$_BLOCK_COUNT_CURR" =~ ^[0-9]+$ ]] || _BLOCK_COUNT_CURR=0
+    _BLOCK_CONSECUTIVE="$(sanitize_nonnegative_int "$_BLOCK_CONSECUTIVE_RAW")"
+    _BLOCK_COUNT_CURR="$(sanitize_nonnegative_int "$_BLOCK_COUNT_CURR_RAW")"
     _NEW_CONSEC=$((_BLOCK_CONSECUTIVE + 1))
     _NEW_BLOCK_COUNT=$((_BLOCK_COUNT_CURR + 1))
     # Loga o evento de bloqueio (v9.0: inclui todo_created + block_count)
@@ -560,32 +476,23 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f 
             && mv "$_BLOCK_CTX_TMP" "$CTX_FILE" \
             || rm -f "$_BLOCK_CTX_TMP" 2> /dev/null
     fi
-    # Registra flag para o próximo briefing
-    printf '%s\n' "TURN_BLOCKED|$(date -u +%Y-%m-%dT%H:%M:%SZ)|consecutive=${_NEW_CONSEC}" > "$AUTH_FLAG_FILE"
+    # Registra flag para o próximo briefing (schema JSON canônico)
+    _BLOCK_TURN_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    write_turn_block_flag_json \
+        "$AUTH_FLAG_FILE" \
+        "$NOW_ISO" \
+        "$SESSION_ID" \
+        "${_BLOCK_TURN_NOW:-0}" \
+        "${_NEW_CONSEC:-0}" \
+        "turn_blocked_no_askquestions" \
+        "Turno bloqueado em agent-stop por ausência de autorização válida"
     # Constrói o reason com instrução completa para o agente
-    _BLOCK_SESSION_INFO=""
-    if [ "$_BLOCK_CLOSE_VALIDATED" != "true" ] && [ "$_BLOCK_CLOSE_KEY" != "N/A" ]; then
-        _BLOCK_SESSION_INFO=" Para encerrar esta SESSION ao terminar: (1) chame vscode_askQuestions com Template F exibindo a close_key [${_BLOCK_CLOSE_KEY}], (2) aguarde o usuário digitar a chave, (3) post-tool-use.sh validará a KEY e executará session-close.sh automaticamente."
-    fi
-    if [ "$_BLOCK_TODO_CREATED" != "true" ]; then
-        _BLOCK_REASON="🚨 DUPLA VIOLAÇÃO DO PROTOCOLO v9.0: (1) manage_todo_list NÃO foi chamado neste turno — toda resposta DEVE começar com manage_todo_list criando/atualizando a lista de tarefas. (2) vscode_askQuestions NÃO foi chamado — todo turno DEVE terminar com vscode_askQuestions. AÇÕES OBRIGATÓRIAS NESTA ORDEM: chame PRIMEIRO manage_todo_list (criar TODOs com último item = 'Chamar vscode_askQuestions'), depois execute as tarefas, e ao FINAL chame vscode_askQuestions (Template A ou D).${_BLOCK_SESSION_INFO}"
-        _BLOCK_SYS_MSG="🚨 DUPLA VIOLAÇÃO (v9.0): (1) manage_todo_list NÃO chamado. (2) vscode_askQuestions NÃO chamado. Protocolo obrigatório: COMECE com manage_todo_list → execute tarefas → TERMINE com vscode_askQuestions (Template A ou D)."
-    else
-        _BLOCK_REASON="Protocolo v9.0: este TURN encerrou sem chamar vscode_askQuestions. manage_todo_list foi chamado (correto), mas o último TODO (vscode_askQuestions) foi pulado. Ação obrigatória AGORA: chame vscode_askQuestions. Use Template A (tarefa concluída) ou Template D (checkpoint). vscode_askQuestions é o canal primário de comunicação — texto plano no chatbox NÃO é suficiente.${_BLOCK_SESSION_INFO}"
-        _BLOCK_SYS_MSG="🚨 TURN BLOQUEADO (v9.0): manage_todo_list foi chamado (✓) mas vscode_askQuestions NÃO foi chamado. Chame agora (Template A ou D) antes de encerrar."
-    fi
+    _BLOCK_SESSION_INFO="$(build_session_close_hint "$_BLOCK_CLOSE_VALIDATED" "$_BLOCK_CLOSE_KEY")"
+    _BLOCK_PAYLOAD="$(build_turn_block_payload "$_BLOCK_TODO_CREATED" "$AUTH_INVALID_REASON" "$_BLOCK_SESSION_INFO")"
+    _BLOCK_REASON="${_BLOCK_PAYLOAD%%|*}"
+    _BLOCK_SYS_MSG="${_BLOCK_PAYLOAD#*|}"
     # Emite o block: hookSpecificOutput.decision=block + systemMessage visível
-    jq -cn \
-        --arg reason "$_BLOCK_REASON" \
-        --arg sysmsg "$_BLOCK_SYS_MSG" \
-        '{
-            hookSpecificOutput: {
-                hookEventName: "Stop",
-                decision: "block",
-                reason: $reason
-            },
-            systemMessage: $sysmsg
-        }'
+    emit_stop_block "$_BLOCK_REASON" "$_BLOCK_SYS_MSG"
     exit 0
 fi
 
@@ -594,39 +501,18 @@ fi
 # Verificamos se ele cumpriu o protocolo e logamos o resultado.
 if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
     if [ "$AUTH_REQUESTED" = "true" ]; then
-        jq -cn \
-            --arg event "agentStop_unblocked_complied" \
-            --arg sid "$SESSION_ID" \
-            --arg ts "$NOW_ISO" \
-            --arg turn_id "$TURN_ID" \
-            '{event: $event, session_id: $sid, timestamp: $ts, turn_id: (if $turn_id == "" then null else $turn_id end), message: "Agente chamou vscode_askQuestions após block — TURNO AUTORIZADO"}' \
-            >> "$AUDIT_FILE"
+        log_unblocked_complied_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$TURN_ID"
     else
-        _REBLOCK_COUNT_CURR="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-        [[ "$_REBLOCK_COUNT_CURR" =~ ^[0-9]+$ ]] || _REBLOCK_COUNT_CURR=0
+        _REBLOCK_COUNT_CURR_RAW="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+        _REBLOCK_COUNT_CURR="$(sanitize_nonnegative_int "$_REBLOCK_COUNT_CURR_RAW")"
         _REBLOCK_COUNT_NEXT=$((_REBLOCK_COUNT_CURR + 1))
         if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
             jq --argjson bc "$_REBLOCK_COUNT_NEXT" '.current_turn.block_count = $bc' \
                 "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
         fi
-        jq -cn \
-            --arg event "agentStop_reblocked_no_comply" \
-            --arg sid "$SESSION_ID" \
-            --arg ts "$NOW_ISO" \
-            --arg turn_id "$TURN_ID" \
-            --argjson block_count "$_REBLOCK_COUNT_NEXT" \
-            '{event: $event, session_id: $sid, timestamp: $ts, turn_id: (if $turn_id == "" then null else $turn_id end), block_count: $block_count, message: "Agente não cumpriu autorização após block — reblock aplicado para impedir fechamento ilegítimo"}' \
-            >> "$AUDIT_FILE"
+        log_reblocked_no_comply_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$TURN_ID" "$_REBLOCK_COUNT_NEXT"
 
-        jq -cn \
-            '{
-                hookSpecificOutput: {
-                    hookEventName: "Stop",
-                    decision: "block",
-                    reason: "Turno ainda sem autorização válida. É obrigatório chamar vscode_askQuestions antes de encerrar."
-                },
-                systemMessage: "🚫 Encerramento ilegítimo bloqueado novamente: chame vscode_askQuestions agora para autorizar o fim do TURN."
-            }'
+        emit_reblock_stop_block
         exit 0
     fi
 fi
@@ -649,10 +535,9 @@ if [ -f "$CTX_FILE" ]; then
     _TURNS_SINCE_ASK="$(jq -r '.session_stats.turns_since_askQuestions // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     _CONSECUTIVE_UNAUTH="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 fi
-[ "$_PUSH_PENDING" = "true" ] && _EMIT_CONTEXT_MSG=true
-{ [ "$_TURNS_SINCE_ASK" -ge 3 ] 2> /dev/null; } && [ "$AUTH_REQUESTED" = "false" ] && _EMIT_CONTEXT_MSG=true
-# Hardening v5.1: sempre emite nudge após qualquer violação anterior (consecutive >= 1)
-{ [ "$_CONSECUTIVE_UNAUTH" -ge 1 ] 2> /dev/null; } && [ "$AUTH_REQUESTED" = "false" ] && _EMIT_CONTEXT_MSG=true
+if should_emit_context_nudge "$_PUSH_PENDING" "$_TURNS_SINCE_ASK" "$_CONSECUTIVE_UNAUTH" "$AUTH_REQUESTED"; then
+    _EMIT_CONTEXT_MSG=true
+fi
 
 if [ "$_EMIT_CONTEXT_MSG" = "true" ] && [ -f "$CTX_FILE" ]; then
     _CTX_SECTION="$(jq -r '.current_section.name // "(nenhuma)"' "$CTX_FILE" 2> /dev/null || echo '(nenhuma)')"
@@ -709,13 +594,18 @@ if [ "$_EMIT_CONTEXT_MSG" = "true" ] && [ -f "$CTX_FILE" ]; then
     Para encerrar SESSION: vscode_askQuestions (Template F) → usuário digita KEY → post-tool-use valida e executa session-close.sh"
     fi
     # ── Hardening v6.0: formato com distinção explícita SESSION/SECTION/TURN ──
-    _CTX_MSG="━━━ TURN ${_CTX_SECTION_TURN}/${_CTX_TURN} | SECTION: \"${_CTX_SECTION}\" (#${_CTX_SECTION_NUM}) ━━━
-  Backlog: ${_CTX_ALTA} alta | ${_CTX_MEDIA} média | ${_CTX_BACKLOG} backlog | Próxima: ${_CTX_NEXT_TASK}
-─────────────────────────────────────────────────────────────────────────────
-    TURN encerra → SOMENTE com vscode_askQuestions (autorização obrigatória)
-  SECTION muda  → autônomo: bash start-section.sh \"nome\"
-    SESSION fecha → SOMENTE: Template F + KEY digitada + execução automática de session-close.sh
-─────────────────────────────────────────────────────────────────────────────${_CTX_PUSH_MSG}${_CTX_VIOLATION_MSG}${_CTX_SESSION_CLOSE_MSG}"
+    _CTX_MSG="$(build_context_system_message \
+        "$_CTX_SECTION_TURN" \
+        "$_CTX_TURN" \
+        "$_CTX_SECTION" \
+        "$_CTX_SECTION_NUM" \
+        "$_CTX_ALTA" \
+        "$_CTX_MEDIA" \
+        "$_CTX_BACKLOG" \
+        "$_CTX_NEXT_TASK" \
+        "$_CTX_PUSH_MSG" \
+        "$_CTX_VIOLATION_MSG" \
+        "$_CTX_SESSION_CLOSE_MSG")"
     printf '%s\n' "{\"systemMessage\":$(printf '%s' "$_CTX_MSG" | jq -Rs .)}"
 fi
 
@@ -771,29 +661,21 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
              | .compliance.flag_file_exists        = false' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
-    jq -cn \
-        --arg event "turnEnd_authorized" \
-        --arg sid "$SESSION_ID" \
-        --arg ts "$NOW_ISO" \
-        --argjson turn_number "$TURN_NUMBER" \
-        --argjson section_turn "$SECTION_TURN" \
-        --arg section_name "$SECTION_NAME" \
-        --arg section_id "$SECTION_ID" \
-        --arg turn_id "$TURN_ID" \
-        --argjson dur "$TURN_DURATION_S" \
-        --argjson tools "$TURN_TOOLS_COUNT" \
-        --arg intent "$TURN_INTENT" \
-        --argjson failures "$TURN_FAILURES_COUNT" \
-        --argjson push_pending "$(jq -r '.session_stats.pending_section_after_push // false' "$CTX_FILE" 2> /dev/null || echo 'false')" \
-        '{event: $event, session_id: $sid, timestamp: $ts,
-          turn_number: $turn_number, section_turn: $section_turn,
-          section_name: (if $section_name == "" then null else $section_name end),
-          section_id:   (if $section_id == "" then null else $section_id end),
-          turn_id:      (if $turn_id == "" then null else $turn_id end),
-          turn_duration_s: $dur, tools_count: $tools,
-          intent: (if $intent == "" then null else $intent end),
-          failures_count: $failures, push_pending: $push_pending}' \
-        >> "$AUDIT_FILE"
+    _TURN_AUTH_PUSH_PENDING="$(jq -r '.session_stats.pending_section_after_push // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+    log_turn_end_authorized_event \
+        "$AUDIT_FILE" \
+        "$SESSION_ID" \
+        "$NOW_ISO" \
+        "$TURN_NUMBER" \
+        "$SECTION_TURN" \
+        "$SECTION_NAME" \
+        "$SECTION_ID" \
+        "$TURN_ID" \
+        "$TURN_DURATION_S" \
+        "$TURN_TOOLS_COUNT" \
+        "$TURN_INTENT" \
+        "$TURN_FAILURES_COUNT" \
+        "$_TURN_AUTH_PUSH_PENDING"
 else
     # Hardening v5.1: re-introduz UNAUTHORIZED_CLOSE.flag para rastreamento cross-session.
     # v5.0 removia silenciosamente este flag, impedindo session-start.sh de exibir alerta
@@ -843,8 +725,8 @@ fi
 # session_summary usa métricas DO TURNO ATUAL (fix B4), não totais da sessão.
 # Schema v7: appenda turn_history (cap 20) e atualiza recovery_hints.
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    SESSION_SUMMARY="turn=${TURN_NUMBER} dur=${TURN_DURATION_S}s tools=${TURN_TOOLS_COUNT}"
-    AUTH_INCR_FIELD="$([ "$AUTH_REQUESTED" = "true" ] && echo 'turn_authorized' || echo 'turn_no_askQuestions')"
+    SESSION_SUMMARY="$(build_turn_session_summary "$TURN_NUMBER" "$TURN_DURATION_S" "$TURN_TOOLS_COUNT")"
+    AUTH_INCR_FIELD="$(select_auth_increment_field "$AUTH_REQUESTED")"
     NEXT_TURN=$((TURN_NUMBER + 1))
     jq --arg now "$NOW_ISO" \
         --arg summary "$SESSION_SUMMARY" \
@@ -900,70 +782,23 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.section_name      = $section
          | .current_turn.intent_declared   = false
          | .current_turn.intent            = null
+         | .current_turn.askquestions_api_error = false
+         | .current_turn.askquestions_api_error_at = null
          | .current_turn.todo_created      = false
          | .current_turn.subagent_delegated = false' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
 # ── Invariante SESSION+SECTION+TURN: auto-cria seção 'retomada' se null/fechada ──
-# Garante que a invariante nunca seja violada mesmo após section-end.sh manual.
-# GAP-S02 FIX: também detecta is_closed=true (section-end.sh marca seção como fechada
-# em vez de nulá-la, preservando section_name em eventos intermediários).
-# A seção auto-criada recebe auto_open:true no evento sectionStart no audit.jsonl.
-CURR_SECTION_CHECK=""
-CURR_SECTION_CLOSED="false"
-if [ -f "$CTX_FILE" ]; then
-    CURR_SECTION_CHECK="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    CURR_SECTION_CLOSED="$(jq -r '.current_section.is_closed // false' "$CTX_FILE" 2> /dev/null || echo false)"
-fi
-if [ -z "$CURR_SECTION_CHECK" ] || [ "$CURR_SECTION_CHECK" = "null" ] || [ "$CURR_SECTION_CLOSED" = "true" ]; then
-    _AUTO_SECTION_NOW="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-    _AUTO_SECTION_ID="$(uuidgen 2> /dev/null || printf 'sect_%s_%s' "$(date +%s)" "$$")"
-    _NEXT_SECTION_NUM=1
-    _NEXT_TURN_AUTO=1
-    if [ -f "$CTX_FILE" ]; then
-        _NEXT_SECTION_NUM="$(jq -r '(.session_stats.section_count // 0) + 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-        _NEXT_TURN_AUTO="$(jq -r '(.session_stats.turn_count // 0) + 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-        jq --arg ts "$_AUTO_SECTION_NOW" \
-            --arg auto_section_id "$_AUTO_SECTION_ID" \
-            --argjson snum "$_NEXT_SECTION_NUM" \
-            --argjson tnum "${_NEXT_TURN_AUTO:-1}" \
-            '.current_section = {name: "retomada", section_id: $auto_section_id, started_at: $ts, turn_start: $tnum, local_turn: 0, description: "Seção automática criada pela invariante SESSION+SECTION+TURN", section_number: $snum, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
-             | .session_stats.section_count = $snum
-             | .session_stats.section_names += ["retomada"]
-             | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: "retomada", section_id: $auto_section_id, section_number: $snum, started_at: $ts}] | if length > 50 then .[-50:] else . end)
-             | .current_turn.section_turn = 1
-             | .current_turn.agentStop_invocations = 0' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-    fi
-    jq -cn \
-        --arg event "sectionStart" \
-        --arg sid "$SESSION_ID" \
-        --arg ts "$_AUTO_SECTION_NOW" \
-        --arg auto_section_id "$_AUTO_SECTION_ID" \
-        --argjson section_num "$_NEXT_SECTION_NUM" \
-        '{
-            event:          $event,
-            session_id:     $sid,
-            timestamp:      $ts,
-            section_name:   "retomada",
-            section_id:     $auto_section_id,
-            section_number: $section_num,
-            description:    "Seção automática criada pela invariante SESSION+SECTION+TURN",
-            auto_open:      true
-        }' >> "$AUDIT_FILE"
-    echo "[invariante] Seção 'retomada' auto-criada para garantir SESSION+SECTION+TURN ativo" >&2
-fi
+ensure_section_invariant_retomada "$CTX_FILE" "$AUDIT_FILE" "$SESSION_ID"
 
 # ── Checkpoint de estado do turno ────────────────────────────────────────────
 CHECKPOINT_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/session-checkpoint.sh"
-if [ -f "$CHECKPOINT_SCRIPT" ]; then
-    bash "$CHECKPOINT_SCRIPT" 2> /dev/null || true
-fi
+run_optional_hook_script "$CHECKPOINT_SCRIPT"
 
 # ── Sync automático de tarefas para DOCUMENTACAO/ (a cada 5 turnos) ──────────
 TURN_COUNT_SYNC="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 SYNC_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/sync-tasks-to-docs.sh"
-if [ -f "$SYNC_SCRIPT" ] && [ $((TURN_COUNT_SYNC % 5)) -eq 0 ] && [ "$TURN_COUNT_SYNC" -gt 0 ]; then
-    bash "$SYNC_SCRIPT" 2> /dev/null || true
+if should_sync_tasks_to_docs_every_five_turns "$TURN_COUNT_SYNC"; then
+    run_optional_hook_script "$SYNC_SCRIPT"
 fi

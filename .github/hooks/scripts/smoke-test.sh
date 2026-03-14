@@ -359,7 +359,8 @@ if grep -q 'turnStart_enriched_auto' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; 
 else
     fail "agent-stop.sh não tem auto-enrich de intenção"
 fi
-if grep -q '"retomada"' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+if grep -q '"retomada"' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null \
+    || grep -q '"retomada"' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; then
     pass "agent-stop.sh auto-cria seção 'retomada' para garantir invariante"
 else
     fail "agent-stop.sh não implementa invariante SESSION+SECTION+TURN"
@@ -624,8 +625,10 @@ else
 fi
 
 # Hardening subagente v6 — agent-stop.sh aceita subagentStart nas Strategies 1+2
-if grep -q 'subagentStart' "$HOOK_DIR/scripts/agent-stop.sh" \
-    && grep -q 'subagent_delegated' "$HOOK_DIR/scripts/agent-stop.sh"; then
+if { grep -q 'subagentStart' "$HOOK_DIR/scripts/agent-stop.sh" 2> /dev/null \
+    || grep -q 'subagentStart' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; } \
+    && { grep -q 'subagent_delegated' "$HOOK_DIR/scripts/agent-stop.sh" 2> /dev/null \
+        || grep -q 'subagent_delegated' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; }; then
     pass "Hardening v6: agent-stop.sh aceita subagentStart + Strategy 4 (subagent_delegated)"
 else
     fail "Hardening v6: agent-stop.sh faltando subagentStart ou Strategy 4"
@@ -936,7 +939,8 @@ ASJSON
     fi
 
     # Teste AS-5: decision:block tem reason obrigatório (campo FORA do hookSpecificOutput também)
-    if grep -q 'reason: \$reason' "$_AS_SCRIPT" 2> /dev/null \
+    if { grep -q 'reason: \$reason' "$_AS_SCRIPT" 2> /dev/null \
+        || grep -q 'reason: \$reason' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; } \
         && grep -q '_BLOCK_REASON=' "$_AS_SCRIPT" 2> /dev/null; then
         pass "AS-5: decision:block tem campo reason obrigatório (_BLOCK_REASON)"
     else
@@ -1185,6 +1189,7 @@ echo ""
 echo "── Grupo 21: Protocolo TODO Obrigatório v9.0 ──────────────────────────────"
 
 _AG_STOP="$SCRIPTS_DIR/agent-stop.sh"
+_AG_STOP_LIB="$HOOK_DIR/hooks-lib/agent-stop-lib.sh"
 _LOG_PROMPT="$SCRIPTS_DIR/log-prompt.sh"
 _POST_TOOL="$SCRIPTS_DIR/post-tool-use.sh"
 _REPO_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
@@ -1235,7 +1240,7 @@ fi
 
 # V90-5: agent-stop.sh inclui DUPLA VIOLAÇÃO na mensagem quando todo_created=false
 if [ -f "$_AG_STOP" ]; then
-    if grep -q 'DUPLA' "$_AG_STOP"; then
+    if grep -q 'DUPLA' "$_AG_STOP" 2> /dev/null || grep -q 'DUPLA' "$_AG_STOP_LIB" 2> /dev/null; then
         pass "V90-5: agent-stop.sh usa mensagem de DUPLA VIOLAÇÃO quando manage_todo_list ausente"
     else
         fail "V90-5: agent-stop.sh NÃO diferencia mensagem de dupla violação"
@@ -1407,7 +1412,9 @@ _V16_INPUT='{"timestamp":"2026-01-01T02:00:00Z","cwd":"/tmp","prompt":"test v90-
 echo "$_V16_INPUT" | bash "$_V16_SCRIPTS/log-prompt.sh" > /dev/null 2> /dev/null || true
 _V16_SRC="$(jq -r '.session.source // ""' "$_V16_STATE/session-context.json" 2> /dev/null || echo '')"
 _V16_EA="$(jq '.session.ended_at' "$_V16_STATE/session-context.json" 2> /dev/null || echo 'err')"
-_V16_EVT="$(grep -c '"sessionStart_inline"' "$_V16_LOGS/audit.jsonl" 2> /dev/null || echo 0)"
+_V16_EVT_RAW="$(grep -c '"sessionStart_inline"' "$_V16_LOGS/audit.jsonl" 2> /dev/null || true)"
+_V16_EVT="$(printf '%s\n' "${_V16_EVT_RAW:-0}" | tail -1 | tr -d '[:space:]')"
+[ -z "$_V16_EVT" ] && _V16_EVT=0
 if [ "$_V16_SRC" = "inline_restart" ] && [ "$_V16_EA" = "null" ] && [ "$_V16_EVT" -ge 1 ]; then
     pass "V90-16: log-prompt.sh RECONNECT-02 — ended_at!=null inicia inline_restart (source=inline_restart, ended_at=null, sessionStart_inline logado)"
 else
@@ -1438,6 +1445,404 @@ if [ -f "$_PTU_SCRIPT" ]; then
     fi
 else
     fail "V90-18: post-tool-use.sh não encontrado"
+fi
+
+# V90-19: agent-stop.sh invalida auth quando vscode_askQuestions não é a última ferramenta (v9.1)
+if [ -f "$_AG_STOP" ]; then
+    if { grep -q 'askquestions_not_last_tool' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'askquestions_not_last_tool' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; } \
+        && grep -q 'last_tool.name' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-19: agent-stop.sh invalida auth quando vscode_askQuestions não é a última ferramenta"
+    else
+        fail "V90-19: agent-stop.sh NÃO valida regra de último ato para vscode_askQuestions"
+    fi
+else
+    fail "V90-19: agent-stop.sh não encontrado"
+fi
+
+# V90-25: agent-stop.sh permite manage_todo_list após askQuestions (bookkeeping permitido)
+if [ -f "$_AG_STOP" ]; then
+    if { grep -q '_AUTH_LAST_NON_BOOKKEEPING_TOOL' "$_AG_STOP" 2> /dev/null \
+        && grep -q 'is_bookkeeping_after_askquestions' "$_AG_STOP" 2> /dev/null; } \
+        || { grep -q 'is_bookkeeping_after_askquestions' "$_AG_STOP_LIB" 2> /dev/null \
+            && grep -q 'manage_todo_list' "$_AG_STOP_LIB" 2> /dev/null \
+            && grep -q 'vscode_askQuestions' "$_AG_STOP_LIB" 2> /dev/null; }; then
+        pass "V90-25: agent-stop.sh aceita sequência askQuestions -> manage_todo_list (bookkeeping)"
+    else
+        fail "V90-25: agent-stop.sh NÃO cobre exceção de bookkeeping após askQuestions"
+    fi
+else
+    fail "V90-25: agent-stop.sh não encontrado"
+fi
+
+# V90-26: agent-stop.sh não duplica prefixo ENCERRAR- na instrução de close_key
+if [ -f "$_AG_STOP" ]; then
+    if { grep -q 'Digite " + \$key + " no campo de resposta' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'Digite \${_N3_CLOSE_KEY} no campo de resposta' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'Digite \${n3_close_key} no campo de resposta' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; } \
+        && ! grep -q 'ENCERRAR-ENCERRAR-' "$_AG_STOP" 2> /dev/null \
+        && ! grep -q 'Digite ENCERRAR-" + \$key' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-26: instrução de close_key usa chave completa sem duplicar prefixo"
+    else
+        fail "V90-26: instrução de close_key ainda duplica prefixo ENCERRAR-"
+    fi
+else
+    fail "V90-26: agent-stop.sh não encontrado"
+fi
+
+# V90-27: agent-stop.sh grava UNAUTHORIZED_CLOSE.flag em JSON canônico no block path
+if [ -f "$_AG_STOP" ]; then
+    if grep -q 'turn_blocked_no_askquestions' "$_AG_STOP" 2> /dev/null \
+        && grep -q 'consecutive_unauthorized' "$_AG_STOP" 2> /dev/null \
+        && ! grep -Fq 'TURN_BLOCKED|' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-27: UNAUTHORIZED_CLOSE.flag usa schema JSON no caminho de bloqueio"
+    else
+        fail "V90-27: UNAUTHORIZED_CLOSE.flag ainda usa formato texto legado no block path"
+    fi
+else
+    fail "V90-27: agent-stop.sh não encontrado"
+fi
+
+# V90-28: log-prompt.sh sincroniza current-session-id e symlinks por TURN (P1)
+if [ -f "$_LOG_PROMPT" ]; then
+    if grep -q 'set_current_session_id' "$_LOG_PROMPT" 2> /dev/null; then
+        pass "V90-28: log-prompt.sh sincroniza ponteiro current-session-id por TURN"
+    else
+        fail "V90-28: log-prompt.sh não sincroniza current-session-id"
+    fi
+else
+    fail "V90-28: log-prompt.sh não encontrado"
+fi
+
+# V90-29: teste comportamental — sequência askQuestions -> manage_todo_list deve autorizar TURN
+if [ -f "$_AG_STOP" ]; then
+    _V29_DIR="$(mktemp -d)"
+    _V29_SCRIPTS="$_V29_DIR/scripts"
+    _V29_LIB="$_V29_DIR/hooks-lib"
+    _V29_STATE="$_V29_DIR/state"
+    _V29_LOGS="$_V29_DIR/logs"
+    mkdir -p "$_V29_SCRIPTS" "$_V29_LIB" "$_V29_STATE" "$_V29_LOGS"
+    cp -a "$HOOK_DIR/scripts/agent-stop.sh" "$_V29_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/scripts/session-checkpoint.sh" "$_V29_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V29_LIB/" 2> /dev/null || true
+
+    cat > "$_V29_STATE/session-context.json" << 'V29CTX'
+{
+  "session": {"id": "v90-29-sid", "close_key": "ENCERRAR-V90T29", "close_key_validated": false, "started_at": "2026-01-01T00:00:00Z"},
+  "current_section": {"name": "teste", "section_id": "v29-sec", "section_number": 1, "turn_start": 1, "local_turn": 1},
+  "current_turn": {
+    "number": 2,
+    "section_turn": 2,
+    "started_at": "2026-01-01T00:01:00Z",
+    "intent": "smoke v90-29",
+    "intent_declared": true,
+    "tools_count": 2,
+    "failures_count": 0,
+    "block_count": 0,
+    "auth_requested": true,
+    "auth_requested_at": "2026-01-01T00:01:20Z",
+    "last_askquestions_response": "{\"answers\":{\"Template A\":{\"selected\":[\"ok\"],\"freeText\":null,\"skipped\":false}}}",
+    "todo_created": true,
+    "agentStop_invocations": 0,
+    "subagent_delegated": false,
+    "turn_id": "v29-turn"
+  },
+  "session_stats": {
+    "turn_count": 1,
+    "turn_authorized": 1,
+    "turn_no_askQuestions": 0,
+    "turns_since_askQuestions": 0,
+    "tools_total": 4,
+    "push_count": 0,
+    "pending_section_after_push": false,
+    "section_count": 1,
+    "section_names": ["teste"],
+    "recovery_hints": {}
+  },
+  "last_tool": {"name": "manage_todo_list", "ts": "2026-01-01T00:01:30Z", "use_id": "v29-tool", "result": "success"},
+  "compliance": {"consecutive_unauthorized": 0, "last_turn_authorized": true, "flag_file_exists": false}
+}
+V29CTX
+
+    cat > "$_V29_LOGS/audit.jsonl" << 'V29AUDIT'
+{"event":"userPromptSubmitted","session_id":"v90-29-sid","timestamp":"2026-01-01T00:01:00Z"}
+{"event":"postToolUse","session_id":"v90-29-sid","timestamp":"2026-01-01T00:01:20Z","tool_name":"vscode_askQuestions"}
+{"event":"postToolUse","session_id":"v90-29-sid","timestamp":"2026-01-01T00:01:30Z","tool_name":"manage_todo_list"}
+V29AUDIT
+
+    _V29_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-29-sid","stop_hook_active":false}' | bash "$_V29_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
+    if echo "$_V29_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"'; then
+        fail "V90-29: sequência askQuestions->manage_todo_list foi bloqueada indevidamente"
+    elif grep -q '"event":"turnEnd_authorized"' "$_V29_LOGS/audit.jsonl" 2> /dev/null; then
+        pass "V90-29: sequência askQuestions->manage_todo_list autoriza TURN (teste comportamental)"
+    else
+        fail "V90-29: turnEnd_authorized não foi registrado no cenário válido"
+    fi
+
+    rm -rf "$_V29_DIR"
+else
+    fail "V90-29: agent-stop.sh não encontrado"
+fi
+
+# V90-30: teste comportamental — askQuestions seguido de outra tool deve bloquear TURN
+if [ -f "$_AG_STOP" ]; then
+    _V30_DIR="$(mktemp -d)"
+    _V30_SCRIPTS="$_V30_DIR/scripts"
+    _V30_LIB="$_V30_DIR/hooks-lib"
+    _V30_STATE="$_V30_DIR/state"
+    _V30_LOGS="$_V30_DIR/logs"
+    mkdir -p "$_V30_SCRIPTS" "$_V30_LIB" "$_V30_STATE" "$_V30_LOGS"
+    cp -a "$HOOK_DIR/scripts/agent-stop.sh" "$_V30_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/scripts/session-checkpoint.sh" "$_V30_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V30_LIB/" 2> /dev/null || true
+
+    cat > "$_V30_STATE/session-context.json" << 'V30CTX'
+{
+  "session": {"id": "v90-30-sid", "close_key": "ENCERRAR-V90T30", "close_key_validated": false, "started_at": "2026-01-01T00:00:00Z"},
+  "current_section": {"name": "teste", "section_id": "v30-sec", "section_number": 1, "turn_start": 1, "local_turn": 1},
+  "current_turn": {
+    "number": 2,
+    "section_turn": 2,
+    "started_at": "2026-01-01T00:01:00Z",
+    "intent": "smoke v90-30",
+    "intent_declared": true,
+    "tools_count": 3,
+    "failures_count": 0,
+    "block_count": 0,
+    "auth_requested": true,
+    "auth_requested_at": "2026-01-01T00:01:20Z",
+    "last_askquestions_response": "{\"answers\":{\"Template A\":{\"selected\":[\"ok\"],\"freeText\":null,\"skipped\":false}}}",
+    "todo_created": true,
+    "agentStop_invocations": 0,
+    "subagent_delegated": false,
+    "turn_id": "v30-turn"
+  },
+  "session_stats": {
+    "turn_count": 1,
+    "turn_authorized": 1,
+    "turn_no_askQuestions": 0,
+    "turns_since_askQuestions": 0,
+    "tools_total": 5,
+    "push_count": 0,
+    "pending_section_after_push": false,
+    "section_count": 1,
+    "section_names": ["teste"],
+    "recovery_hints": {}
+  },
+  "last_tool": {"name": "run_in_terminal", "ts": "2026-01-01T00:01:40Z", "use_id": "v30-tool", "result": "success"},
+  "compliance": {"consecutive_unauthorized": 0, "last_turn_authorized": true, "flag_file_exists": false}
+}
+V30CTX
+
+    cat > "$_V30_LOGS/audit.jsonl" << 'V30AUDIT'
+{"event":"userPromptSubmitted","session_id":"v90-30-sid","timestamp":"2026-01-01T00:01:00Z"}
+{"event":"postToolUse","session_id":"v90-30-sid","timestamp":"2026-01-01T00:01:20Z","tool_name":"vscode_askQuestions"}
+{"event":"postToolUse","session_id":"v90-30-sid","timestamp":"2026-01-01T00:01:40Z","tool_name":"run_in_terminal"}
+V30AUDIT
+
+    _V30_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-30-sid","stop_hook_active":false}' | bash "$_V30_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
+    if echo "$_V30_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
+        && grep -q '"event":"turnAuth_invalidated"' "$_V30_LOGS/audit.jsonl" 2> /dev/null; then
+        pass "V90-30: askQuestions seguido de outra tool bloqueia TURN (teste comportamental)"
+    else
+        fail "V90-30: cenário inválido não bloqueou TURN como esperado"
+    fi
+
+    rm -rf "$_V30_DIR"
+else
+    fail "V90-30: agent-stop.sh não encontrado"
+fi
+
+# V90-31: session-start.sh registra evento canônico sessionStart no audit
+_SESSION_START_SCRIPT="$SCRIPTS_DIR/session-start.sh"
+if [ -f "$_SESSION_START_SCRIPT" ]; then
+    if grep -q 'event "sessionStart"' "$_SESSION_START_SCRIPT" 2> /dev/null \
+        && grep -q 'Hook sessionStart processado' "$_SESSION_START_SCRIPT" 2> /dev/null; then
+        pass "V90-31: session-start.sh loga evento canônico sessionStart em audit.jsonl"
+    else
+        fail "V90-31: session-start.sh NÃO loga evento canônico sessionStart"
+    fi
+else
+    fail "V90-31: session-start.sh não encontrado"
+fi
+
+# V90-32: log-prompt.sh detecta retomada via userPromptSubmitted e incrementa resume_count
+if [ -f "$_LOG_PROMPT" ]; then
+    if grep -q 'sessionResumeDetected' "$_LOG_PROMPT" 2> /dev/null \
+        && grep -q 'session_stats.resume_count' "$_LOG_PROMPT" 2> /dev/null; then
+        pass "V90-32: log-prompt.sh detecta retomada de sessão existente e contabiliza resume_count"
+    else
+        fail "V90-32: log-prompt.sh NÃO implementa detecção de retomada via userPromptSubmitted"
+    fi
+else
+    fail "V90-32: log-prompt.sh não encontrado"
+fi
+
+# V90-33: log-prompt.sh implementa prompt_auto_recovery quando CTX está ausente
+if [ -f "$_LOG_PROMPT" ]; then
+    if grep -q 'session_auto_recovery_prompt' "$_LOG_PROMPT" 2> /dev/null \
+        && grep -q 'prompt_auto_recovery' "$_LOG_PROMPT" 2> /dev/null; then
+        pass "V90-33: log-prompt.sh tem auto-recovery no userPromptSubmitted (prompt_auto_recovery)"
+    else
+        fail "V90-33: log-prompt.sh NÃO implementa auto-recovery no userPromptSubmitted"
+    fi
+else
+    fail "V90-33: log-prompt.sh não encontrado"
+fi
+
+# V90-34: teste comportamental — sem CTX, log-prompt cria contexto mínimo e loga session_auto_recovery_prompt
+if [ -f "$_LOG_PROMPT" ]; then
+    _V34_DIR="$(mktemp -d)"
+    _V34_SCRIPTS="$_V34_DIR/scripts"
+    _V34_LIB="$_V34_DIR/hooks-lib"
+    _V34_STATE="$_V34_DIR/state"
+    _V34_LOGS="$_V34_DIR/logs"
+    mkdir -p "$_V34_SCRIPTS" "$_V34_LIB" "$_V34_STATE" "$_V34_LOGS"
+    cp -a "$HOOK_DIR/scripts/log-prompt.sh" "$_V34_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V34_LIB/" 2> /dev/null || true
+    touch "$_V34_LOGS/audit.jsonl"
+
+    _V34_INPUT='{"timestamp":"2026-01-02T00:00:00Z","cwd":"/tmp","prompt":"test v90-34","session_id":"v34-sid"}'
+    echo "$_V34_INPUT" | bash "$_V34_SCRIPTS/log-prompt.sh" > /dev/null 2> /dev/null || true
+
+    _V34_SRC="$(jq -r '.session.source // ""' "$_V34_STATE/session-context.json" 2> /dev/null || echo '')"
+    _V34_SID="$(jq -r '.session.id // ""' "$_V34_STATE/session-context.json" 2> /dev/null || echo '')"
+    _V34_EVT="$(grep -c '"session_auto_recovery_prompt"' "$_V34_LOGS/audit.jsonl" 2> /dev/null || echo 0)"
+    if [ "$_V34_SRC" = "prompt_auto_recovery" ] && [ "$_V34_SID" = "v34-sid" ] && [ "$_V34_EVT" -ge 1 ]; then
+        pass "V90-34: log-prompt.sh cria CTX mínimo + loga session_auto_recovery_prompt quando sessionStart não dispara"
+    else
+        fail "V90-34: auto-recovery no userPromptSubmitted falhou (source=$_V34_SRC sid=$_V34_SID evt=$_V34_EVT)"
+    fi
+
+    rm -rf "$_V34_DIR"
+else
+    fail "V90-34: log-prompt.sh não encontrado"
+fi
+
+# V90-35: teste comportamental — sessionResumeDetected + incremento de resume_count
+if [ -f "$_LOG_PROMPT" ]; then
+    _V35_DIR="$(mktemp -d)"
+    _V35_SCRIPTS="$_V35_DIR/scripts"
+    _V35_LIB="$_V35_DIR/hooks-lib"
+    _V35_STATE="$_V35_DIR/state"
+    _V35_LOGS="$_V35_DIR/logs"
+    mkdir -p "$_V35_SCRIPTS" "$_V35_LIB" "$_V35_STATE" "$_V35_LOGS"
+    cp -a "$HOOK_DIR/scripts/log-prompt.sh" "$_V35_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V35_LIB/" 2> /dev/null || true
+    cat > "$_V35_STATE/session-context.json" << 'V35CTX'
+{
+  "session": {"id": "v35-sid", "source": "new", "close_key": "ENCERRAR-V35"},
+  "session_stats": {"turn_count": 2, "resume_count": 0, "tools_total": 0, "turns_since_askQuestions": 0},
+  "current_section": {"name": "início", "section_id": "v35-sec", "local_turn": 2},
+  "current_turn": {"number": 3, "section_turn": 3, "tools_count": 0, "auth_requested": false},
+  "last_turn_ts": "2026-01-01T00:00:00Z"
+}
+V35CTX
+    touch "$_V35_LOGS/audit.jsonl"
+    _V35_INPUT='{"timestamp":"2026-01-01T00:10:00Z","cwd":"/tmp","prompt":"test v90-35","session_id":"v35-sid"}'
+    echo "$_V35_INPUT" | bash "$_V35_SCRIPTS/log-prompt.sh" > /dev/null 2> /dev/null || true
+    _V35_EVT="$(grep -c '"sessionResumeDetected"' "$_V35_LOGS/audit.jsonl" 2> /dev/null || echo 0)"
+    _V35_RC="$(jq -r '.session_stats.resume_count // -1' "$_V35_STATE/session-context.json" 2> /dev/null || echo -1)"
+    if [ "$_V35_EVT" -ge 1 ] && [ "$_V35_RC" -ge 1 ]; then
+        pass "V90-35: log-prompt.sh registra sessionResumeDetected e incrementa resume_count"
+    else
+        fail "V90-35: retomada não contabilizada corretamente (evt=$_V35_EVT resume_count=$_V35_RC)"
+    fi
+    rm -rf "$_V35_DIR"
+else
+    fail "V90-35: log-prompt.sh não encontrado"
+fi
+
+# V90-36: teste comportamental — session-start.sh escreve evento sessionStart no audit
+_SESSION_START_SCRIPT="$SCRIPTS_DIR/session-start.sh"
+if [ -f "$_SESSION_START_SCRIPT" ]; then
+    _V36_DIR="$(mktemp -d)"
+    _V36_SCRIPTS="$_V36_DIR/scripts"
+    _V36_LIB="$_V36_DIR/hooks-lib"
+    _V36_STATE="$_V36_DIR/state"
+    _V36_LOGS="$_V36_DIR/logs"
+    mkdir -p "$_V36_SCRIPTS" "$_V36_LIB" "$_V36_STATE" "$_V36_LOGS"
+    cp -a "$HOOK_DIR/scripts/"*.sh "$_V36_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V36_LIB/" 2> /dev/null || true
+    touch "$_V36_LOGS/audit.jsonl"
+    _V36_INPUT='{"timestamp":"2026-01-02T00:00:00Z","cwd":"/tmp","source":"new","session_id":"v36-sid"}'
+    echo "$_V36_INPUT" | bash "$_V36_SCRIPTS/session-start.sh" > /dev/null 2> /dev/null || true
+    _V36_EVT_RAW="$(grep -h '"event":"sessionStart"' "$_V36_LOGS"/audit*.jsonl 2> /dev/null | wc -l | tr -d '[:space:]' || true)"
+    _V36_EVT="$(printf '%s\n' "${_V36_EVT_RAW:-0}" | tail -1 | tr -d '[:space:]')"
+    [ -z "$_V36_EVT" ] && _V36_EVT=0
+    if [ "$_V36_EVT" -ge 1 ]; then
+        pass "V90-36: session-start.sh grava evento sessionStart no audit"
+    else
+        fail "V90-36: session-start.sh não gravou evento sessionStart no audit"
+    fi
+    rm -rf "$_V36_DIR"
+else
+    fail "V90-36: session-start.sh não encontrado"
+fi
+
+# V90-20: agent-stop.sh invalida auth quando askQuestions falhou na API (no choices)
+if [ -f "$_AG_STOP" ]; then
+    if grep -q 'askquestions_api_error' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-20: agent-stop.sh invalida auth quando current_turn.askquestions_api_error=true"
+    else
+        fail "V90-20: agent-stop.sh NÃO trata askquestions_api_error no fechamento do turno"
+    fi
+else
+    fail "V90-20: agent-stop.sh não encontrado"
+fi
+
+# V90-21: agent-stop.sh reseta flags de erro API de askQuestions no reset de turno
+if [ -f "$_AG_STOP" ]; then
+    if grep -q 'current_turn.askquestions_api_error.*=.*false' "$_AG_STOP" 2> /dev/null \
+        && grep -q 'current_turn.askquestions_api_error_at.*=.*null' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-21: agent-stop.sh reseta flags askquestions_api_error no fim do turno"
+    else
+        fail "V90-21: agent-stop.sh NÃO reseta flags askquestions_api_error no fim do turno"
+    fi
+else
+    fail "V90-21: agent-stop.sh não encontrado"
+fi
+
+# V90-22: agent-stop.sh invalida auth quando askQuestions retorna skip/resposta vazia
+if [ -f "$_AG_STOP" ]; then
+    if { grep -q 'askquestions_skipped_or_empty' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'askquestions_skipped_or_empty' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; } \
+        && { grep -q '_AUTH_HAS_USER_ANSWER' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'askquestions_has_user_answer' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; }; then
+        pass "V90-22: agent-stop.sh exige resposta explícita do usuário em askQuestions"
+    else
+        fail "V90-22: agent-stop.sh NÃO valida skip/vazio em askQuestions"
+    fi
+else
+    fail "V90-22: agent-stop.sh não encontrado"
+fi
+
+# V90-23: agent-stop.sh bloqueia Stop quando session_id mismatch permanece sem heal
+if [ -f "$_AG_STOP" ]; then
+    if { grep -q 'Session ID mismatch unresolved' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'Session ID mismatch unresolved' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; } \
+        && { grep -q 'TURN BLOQUEADO (v9.2)' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'TURN BLOQUEADO (v9.2)' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; }; then
+        pass "V90-23: agent-stop.sh bloqueia fechamento silencioso em session_id mismatch pendente"
+    else
+        fail "V90-23: agent-stop.sh NÃO bloqueia Stop em mismatch pendente"
+    fi
+else
+    fail "V90-23: agent-stop.sh não encontrado"
+fi
+
+# V90-24: agent-stop.sh só aceita auth implícita de subagente quando delegação é imediata
+if [ -f "$_AG_STOP" ]; then
+    if { grep -q '_AUTH_SUBAGENT_IMMEDIATE' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'is_immediate_subagent_delegation' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; } \
+        && grep -q 'last_tool.name' "$_AG_STOP" 2> /dev/null \
+        && grep -q 'auth_via_subagent_delegation' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-24: auth de subagente limitada a delegação imediata (sem bypass stale)"
+    else
+        fail "V90-24: agent-stop.sh NÃO limita auth de subagente à delegação imediata"
+    fi
+else
+    fail "V90-24: agent-stop.sh não encontrado"
 fi
 
 echo ""

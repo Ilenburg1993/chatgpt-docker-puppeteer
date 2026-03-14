@@ -1,6 +1,7 @@
 #!/bin/bash
 # session-start.sh — Hook sessionStart do Copilot (Schema v8)
-# Executado quando uma nova sessão inicia ou é retomada.
+# Executado quando o hook sessionStart dispara (tipicamente nova sessão/painel).
+# Retomadas de chat existente normalmente geram novo TURN via userPromptSubmitted.
 # Input JSON (stdin): {timestamp, cwd, source, initialPrompt}
 # Output (stdout, fd 3): {"hookSpecificOutput": {"hookEventName": "SessionStart",
 #   "additionalContext": "..."}} — injeta session-briefing.md condensado no LLM.
@@ -245,6 +246,7 @@ if [ "$SOURCE" != "inline_restart" ]; then
             "turn_count":         0,
             "turn_authorized":    0,
             "turn_unauthorized":  0,
+            "resume_count":       0,
             "tools_total":        0,
             "tools_by_name":      {},
             "failures_detected":        0,
@@ -571,6 +573,28 @@ if [ -f "$_RECOVERY_TARGET_FILE" ] && command -v jq &> /dev/null; then
     fi
 fi
 
+# ── Loga sessionStart canônico + sectionStart inicial ────────────────────────
+jq -cn \
+    --arg event "sessionStart" \
+    --arg sid "$SESSION_ID" \
+    --arg ts "${TIMESTAMP:-$SESSION_DATE}" \
+    --arg source "$SOURCE" \
+    --arg cwd "$CWD" \
+    --arg close_key "$CLOSE_KEY" \
+    --arg section_id "$INITIAL_SECTION_ID" \
+    --argjson logical_num "$LOGICAL_SESSION_NUMBER" \
+    '{
+        event: $event,
+        session_id: $sid,
+        timestamp: $ts,
+        source: $source,
+        cwd: $cwd,
+        close_key: $close_key,
+        section_id: $section_id,
+        logical_session_number: $logical_num,
+        message: "Hook sessionStart processado — sessão inicializada"
+    }' >> "$AUDIT_FILE"
+
 # ── Loga sectionStart da section padrão "início" (Schema v4 — invariante) ────
 jq -cn \
     --arg event "sectionStart" \
@@ -853,12 +877,60 @@ PREV_NO_KEY_CLOSE=false
 PREV_NO_KEY_TS=""
 PREV_NO_KEY_SID=""
 PREV_NO_KEY_TURNS=0
+PREV_NO_KEY_FLAG_STALE=false
 
 if [ -f "$NO_KEY_FLAG_FILE" ]; then
     PREV_NO_KEY_CLOSE=true
     PREV_NO_KEY_TS="$(jq -r '.timestamp // ""' "$NO_KEY_FLAG_FILE" 2> /dev/null || echo '')"
     PREV_NO_KEY_SID="$(jq -r '.session_id // ""' "$NO_KEY_FLAG_FILE" 2> /dev/null || echo '')"
     PREV_NO_KEY_TURNS="$(jq -r '.turn_count // 0' "$NO_KEY_FLAG_FILE" 2> /dev/null || echo 0)"
+
+    # Hardening: ignora artefatos sintéticos e remove flag stale automaticamente.
+    case "$PREV_NO_KEY_SID" in
+        "")
+            PREV_NO_KEY_FLAG_STALE=true
+            ;;
+        sess_test*)
+            PREV_NO_KEY_FLAG_STALE=true
+            ;;
+    esac
+
+    if [ "$PREV_NO_KEY_FLAG_STALE" = "true" ]; then
+        PREV_NO_KEY_CLOSE=false
+        jq -cn \
+            --arg event "session_no_key_flag_stale_cleared" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "${TIMESTAMP:-$SESSION_DATE}" \
+            --arg old_sid "$PREV_NO_KEY_SID" \
+            --arg flag_ts "$PREV_NO_KEY_TS" \
+            '{
+                event: $event,
+                session_id: $sid,
+                timestamp: $ts,
+                stale_session_id: $old_sid,
+                stale_flag_timestamp: $flag_ts,
+                message: "SESSION_CLOSE_NO_KEY.flag sintético/stale removido automaticamente"
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+        rm -f "$NO_KEY_FLAG_FILE" 2> /dev/null || true
+    else
+        # One-shot: consome a flag após leitura para evitar vazamento de alerta
+        # em sessões futuras não relacionadas.
+        jq -cn \
+            --arg event "session_no_key_flag_consumed" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "${TIMESTAMP:-$SESSION_DATE}" \
+            --arg old_sid "$PREV_NO_KEY_SID" \
+            --arg flag_ts "$PREV_NO_KEY_TS" \
+            ' {
+                event: $event,
+                session_id: $sid,
+                timestamp: $ts,
+                previous_session_id: $old_sid,
+                previous_timestamp: $flag_ts,
+                message: "SESSION_CLOSE_NO_KEY.flag consumido (one-shot)"
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+        rm -f "$NO_KEY_FLAG_FILE" 2> /dev/null || true
+    fi
 fi
 
 # Conta violações consecutivas — preservado da sessão anterior em PREV_CONSEC_UNAUTH

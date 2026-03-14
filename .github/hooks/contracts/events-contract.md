@@ -1,6 +1,6 @@
 # Events Contract — Sistema de Hooks
 
-**Status**: Canônico. **Última atualização**: 2026-03-11. **Versão**: 1.1
+**Status**: Canônico. **Última atualização**: 2026-03-14. **Versão**: 1.3
 
 > Este documento é o contrato formal de todos os eventos que fluem pelo sistema de hooks. Toda
 > adição ou mudança de schema deve ser refletida aqui antes de ser implementada.
@@ -12,6 +12,7 @@
 ```
 SESSION
   └── userPromptSubmitted        → log-prompt.sh
+  └── sessionResumeDetected      → log-prompt.sh
   └── SECTION
         └── TURN
               ├── preToolUse     → pre-tool-use.sh       (um por tool call)
@@ -31,7 +32,9 @@ SESSION
 ### `sessionStart`
 
 - **Script**: `scripts/session-start.sh`
-- **Timeout**: 15s
+- **Timeout**: 60s
+- **Semântica**: hook de início de sessão/painel; não é fronteira de todo prompt.
+  Retomadas de chat existente são detectadas em `userPromptSubmitted`.
 - **Input schema** (stdin JSON):
   ```json
   {
@@ -39,7 +42,7 @@ SESSION
     "hook_event_name": "SessionStart",
     "session_id": "uuid-v4",
     "cwd": "/workspaces/repo",
-    "source": "new | resumed"
+    "source": "new | inline_restart | reconnect_rollover | auto_recovery | ..."
   }
   ```
 - **Output** (fd 3 → additionalContext):
@@ -56,10 +59,21 @@ SESSION
   - Loga `sessionStart` em `logs/audit.jsonl`
 - **Invariante**: session "início" sempre criada como primeira SECTION
 
+### `sessionResumeDetected`
+
+- **Script**: `scripts/log-prompt.sh`
+- **Quando ocorre**: `userPromptSubmitted` com `session_stats.turn_count > 0` (novo TURN em SESSION já ativa)
+- **Input schema**: derivado de `userPromptSubmitted`
+- **Output**: nenhum
+- **Efeitos colaterais**:
+  - Loga `sessionResumeDetected` em `logs/audit.jsonl`
+  - Inclui `previous_turn_count`, `previous_turn_ts`, `resume_gap_s`, `detected_by`
+  - Incrementa `session_stats.resume_count`
+
 ### `userPromptSubmitted`
 
 - **Script**: `scripts/log-prompt.sh`
-- **Timeout**: 10s
+- **Timeout**: 30s
 - **Input schema** (stdin JSON):
   ```json
   {
@@ -69,16 +83,23 @@ SESSION
     "prompt": "<texto do prompt do usuário>"
   }
   ```
-- **Output**: nenhum
+- **Output** (opcional):
+  ```json
+  {
+    "systemMessage": "<lembrete de protocolo TURN/SECTION/SESSION>"
+  }
+  ```
 - **Efeitos colaterais**:
   - Reseta `current_turn.*` em `session-context.json`
-  - Incrementa `session_stats.turn_count`
+  - Reinicia `current_turn` para o próximo TURN (número calculado a partir de `session_stats.turn_count + 1`)
+  - Sincroniza `state/current-session-id.txt` com `session_id` reconciliado
   - Loga `userPromptSubmitted` em `logs/audit.jsonl`
+  - Pode logar `sessionResumeDetected` quando o prompt inicia novo TURN em sessão existente
 
 ### `preToolUse`
 
 - **Script**: `scripts/pre-tool-use.sh`
-- **Timeout**: 15s
+- **Timeout**: 30s
 - **Variável de ambiente**: `HOOKS_LOG_LEVEL=INFO`
 - **Input schema** (stdin JSON):
   ```json
@@ -93,7 +114,7 @@ SESSION
     "cwd": "/workspaces/repo"
   }
   ```
-- **Output**: nenhum (logging-only; nunca emite `permissionDecision:deny`)
+- **Output**: pode emitir `permissionDecision: "deny"` em cenários de hardening (ex.: bloqueio de chamada direta a `session-close.sh` sem validação de close key).
 - **Efeitos colaterais**:
   - Redacta credentials (GitHub tokens, Bearer, etc.) antes de log
   - Loga `preToolUse` em `logs/audit.jsonl` com args redactados
@@ -101,12 +122,12 @@ SESSION
   - Detecta `vscode_askQuestions` → seta `current_turn.auth_requested = true`
   - Detecta `runSubagent`/`Task` → seta `auth_requested=true`, `subagent_delegated=true`; loga
     `subagentStart` (hardening v6)
-  - Session_id guard: ignora payload se session_id ≠ ctx ativo (v5)
+  - Session_id guard: valida payload contra contexto ativo (com paths de heal/sync e bloqueio de escrita quando necessário)
 
 ### `postToolUse`
 
 - **Script**: `scripts/post-tool-use.sh`
-- **Timeout**: 15s
+- **Timeout**: 30s
 - **Input schema** (stdin JSON):
   ```json
   {
@@ -122,8 +143,10 @@ SESSION
 - **Output**: nenhum
 - **Efeitos colaterais**:
   - Loga `postToolUse` em `logs/audit.jsonl`
-  - Atualiza `session_stats.tool_calls_total`
-  - Detecta close_key em tool_response → seta `session_stats.close_key_confirmed`
+  - Atualiza `last_tool.result` e contadores de falha (`current_turn.failures_count`, `session_stats.failures_detected`)
+  - Captura resposta de `vscode_askQuestions` em `current_turn.last_askquestions_response`
+  - Marca `current_turn.askquestions_api_error=true` quando há falha de API (`Response contained no choices`)
+  - Detecta close_key em `vscode_askQuestions` e aciona `session-close.sh` (idempotente)
   - Session_id guard ativo
 
 ### `postToolUseFailure`
@@ -149,7 +172,7 @@ SESSION
 ### `agentStop`
 
 - **Script**: `scripts/agent-stop.sh`
-- **Timeout**: 10s
+- **Timeout**: 45s
 - **Input schema** (stdin JSON):
   ```json
   {
@@ -162,31 +185,36 @@ SESSION
 - **Output** (stdout, apenas quando NÃO autorizado):
   ```json
   {
+    "decision": "block",
+    "decisionReason": "<reason>",
     "hookSpecificOutput": {
       "hookEventName": "Stop",
       "decision": "block",
-      "reason": "Turno não autorizado — vscode_askQuestions não foi chamado"
+      "reason": "<reason>"
     },
     "systemMessage": "<mensagem rica com estado contextualizado>"
   }
   ```
-- **Lógica de autorização** (4 estratégias em cascata):
-  1. Busca `vscode_askQuestions` **ou** `subagentStart` após último `userPromptSubmitted` no
-     audit.jsonl
-  2. Fallback: últimas 150 linhas do audit.jsonl (aceita `vscode_askQuestions` ou `subagentStart`)
-  3. Fallback: `current_turn.auth_requested` do session-context.json
-  4. Fallback: `current_turn.subagent_delegated` do session-context.json (novo em v6)
+- **Lógica de autorização** (v9.1/v10):
+  1. Busca `vscode_askQuestions` **ou** `subagentStart` após último `userPromptSubmitted` no `audit.jsonl`
+  2. Fallback de contexto: `current_turn.auth_requested`
+  3. Delegação imediata: `current_turn.subagent_delegated=true` + `last_tool.name in {runSubagent, search_subagent}`
+  4. Validação de último ato (obrigatória):
+     - `vscode_askQuestions` deve ser o último passo válido do TURN;
+     - exceção permitida: `manage_todo_list` imediatamente após `vscode_askQuestions` (bookkeeping);
+     - resposta do usuário em askQuestions deve ser válida (não skip/vazia);
+     - `askquestions_api_error=true` invalida autorização.
 - **Hardening v5**:
   - `decision:block` quando sem autorização e `stop_hook_active=false`
-  - Session_id guard: bloqueia escrita se session_id ≠ ctx ativo
+  - Session_id guard: bloqueia escrita se session_id ≠ ctx ativo (com HEAL v1/v2)
   - HEAL v1: cura session_id se source=`manual_recovery`
   - **HEAL v2** (G9-04): cura após 3 mismatches consecutivos com mesmo "got" session_id
-  - **Hardening v6**: aceita `subagentStart` como sinal de autorização (Strategy 4 + Strategies 1/2
-    atualizadas)
+  - **Hardening v9.2**: mismatch pendente sem heal pode bloquear o `Stop` (`Session ID mismatch unresolved`)
 - **Efeitos colaterais**:
   - Loga `agentStop` sempre
   - Loga `turnEnd_authorized` ou `turnEnd_no_askQuestions`
   - Loga `agentStop_blocked`/`agentStop_blocked_no_todo` quando bloqueia encerramento
+  - Loga `turnAuth_invalidated` quando askQuestions não cumpre regra de último ato
   - Loga `auth_via_subagent_delegation` quando Strategy 4 é ativada
   - Remove ou cria `state/UNAUTHORIZED_CLOSE.flag`
   - Reseta `current_turn.*` e incrementa `session_stats.*`
@@ -250,6 +278,7 @@ Todos os eventos em `logs/audit.jsonl` são JSON objects com pelo menos:
 | Evento                         | Produzido por                                      | Consumido por                                | Campos obrigatórios extras                                                                                                                    |
 | ------------------------------ | -------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sessionStart`                 | `session-start.sh`                                 | `generate-session-summary.sh`                | `close_key`, `source`, `section_id`                                                                                                           |
+| `sessionResumeDetected`        | `log-prompt.sh`                                    | `watchdog.sh`, `analytics.sh`                | `previous_turn_count`, `previous_turn_ts`, `resume_gap_s`, `detected_by`                                                                      |
 | `userPromptSubmitted`          | `log-prompt.sh`                                    | `agent-stop.sh` (fronteira)                  | `turn_number`, `section_turn`, `section_id`                                                                                                   |
 | `preToolUse`                   | `pre-tool-use.sh`                                  | `export-metrics.sh`                          | `tool_name`, `tool_use_id`, `args` (redacted)                                                                                                 |
 | `postToolUse`                  | `post-tool-use.sh`                                 | `export-metrics.sh`, `analytics.sh`          | `tool_name`, `tool_use_id`, `duration_ms`                                                                                                     |
@@ -284,6 +313,7 @@ Todos os eventos em `logs/audit.jsonl` são JSON objects com pelo menos:
 | `task_added`                   | `add-task.sh`                                      | —                                            | `priority`, `title`                                                                                                                           |
 | `task_completed`               | `complete-task.sh`                                 | —                                            | `title`                                                                                                                                       |
 | `session_auto_recovery`        | `pre-tool-use.sh`                                  | —                                            | `source: "auto_recovery"` — sessionStart não disparou; contexto mínimo criado                                                                 |
+| `session_auto_recovery_prompt` | `log-prompt.sh`                                    | —                                            | `source: "prompt_auto_recovery"` — contexto mínimo criado no `userPromptSubmitted` quando sessionStart não dispara                            |
 | `askQuestions_response`        | `post-tool-use.sh`                                 | —                                            | `response`, `tool_use_id` — resposta do usuário ao vscode_askQuestions                                                                        |
 | `sectionEnd_orphan`            | `section-end.sh`                                   | —                                            | Aviso: section-end.sh chamado sem abrir nova seção imediatamente; `current_section.name` ficará null até agent-stop.sh criar seção `retomada` |
 | `session_id_healed`            | `pre-tool-use.sh`                                  | —                                            | session_id corrigido por mecanismo auto-heal (HEAL v2)                                                                                        |
@@ -338,7 +368,9 @@ Todos os eventos em `logs/audit.jsonl` são JSON objects com pelo menos:
 
 ## Versionamento deste contrato
 
-| Versão | Data       | Mudança                                                                                                                                                                                                                                                                                                                                                                    |
-| ------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.0    | 2026-03-10 | Criação inicial (Fase 9 — G9-06)                                                                                                                                                                                                                                                                                                                                           |
-| 1.1    | 2026-03-11 | REV4-02: 7 eventos adicionados (`sectionContinued`, `auth_via_subagent_delegation`, `turnStart_enriched`, `sessionClose_key_validated`, `errorOccurred`, `errorDetail`, `session_manual_recovery`); corrigido `turnStart` → `turnStart_enriched`; `subagentStart` atualizado com producer/consumer do hardening v6; `agentStop` atualizado: 3→4 estratégias de autorização |
+| Versão | Data       | Mudança                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0    | 2026-03-10 | Criação inicial (Fase 9 — G9-06)                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 1.1    | 2026-03-11 | REV4-02: 7 eventos adicionados (`sectionContinued`, `auth_via_subagent_delegation`, `turnStart_enriched`, `sessionClose_key_validated`, `errorOccurred`, `errorDetail`, `session_manual_recovery`); corrigido `turnStart` → `turnStart_enriched`; `subagentStart` atualizado com producer/consumer do hardening v6; `agentStop` atualizado: 3→4 estratégias de autorização                                                         |
+| 1.2    | 2026-03-14 | Alinhamento com runtime atual: timeouts reais de `copilot-hooks.json` (`sessionStart=60s`, `userPromptSubmitted=30s`, `preToolUse=30s`, `postToolUse=30s`, `agentStop=45s`), documentação de `permissionDecision:deny` em `preToolUse`, remoção da estratégia legada de 150 linhas no `agentStop`, inclusão da regra v9.1 (último ato do TURN) e do output canônico de block (com `hookSpecificOutput` + compat legada top-level). |
+| 1.3    | 2026-03-14 | Semântica de retomada refinada: `sessionStart` documentado como hook de início de sessão/painel (não fronteira de todo prompt), novo evento `sessionResumeDetected` em `log-prompt.sh` para retomada via `userPromptSubmitted`, inclusão de `resume_count` no estado operacional e novo `session_auto_recovery_prompt` para ausência de `sessionStart`.                                                                            |

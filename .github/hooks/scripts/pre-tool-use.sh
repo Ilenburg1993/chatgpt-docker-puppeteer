@@ -187,6 +187,7 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
             },
             session_stats: {
                 turn_count: 0, turn_authorized: 0, turn_unauthorized: 0,
+                resume_count: 0,
                 tools_total: 0, tools_by_name: {}, failures_detected: 0,
                 errors_total: 0, subagent_calls: 0, section_count: 1,
                 section_names: ["recovery"],

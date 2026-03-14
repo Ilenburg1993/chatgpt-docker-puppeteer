@@ -517,6 +517,15 @@ set_current_session_id() {
         rm -f "$tmp"
         return 1
     }
+
+    # UPG-AUDIT-02: manter ponteiros de compatibilidade alinhados à sessão ativa.
+    # Evita split-brain onde current-session-id aponta para uma sessão e os symlinks
+    # (session-context.json/audit.jsonl) continuam apontando para outra.
+    local sid_short
+    sid_short="${sid:0:8}"
+    if command -v update_compat_symlinks > /dev/null 2>&1; then
+        update_compat_symlinks "$sid_short" 2> /dev/null || true
+    fi
 }
 
 # ── update_compat_symlinks ────────────────────────────────────────────────────
@@ -532,9 +541,14 @@ update_compat_symlinks() {
 
     # audit.jsonl → audit-{SID_SHORT}.jsonl
     local audit_target="${LOG_DIR}/audit-${sid_short}.jsonl"
-    touch "$audit_target" 2> /dev/null || true
-    # ln -sfn usa caminho relativo para portabilidade
-    (cd "$LOG_DIR" && ln -sfn "audit-${sid_short}.jsonl" "audit.jsonl" 2> /dev/null) || true
+    # Hardening: não sobrescrever audit.jsonl regular (arquivo) em fluxos onde o
+    # per-session audit ainda não existe, pois isso pode ocultar eventos recém-logados
+    # no mesmo script. Só relinka quando o alvo já existe ou quando audit.jsonl já é symlink.
+    if [ -f "$audit_target" ] || [ -L "${LOG_DIR}/audit.jsonl" ]; then
+        touch "$audit_target" 2> /dev/null || true
+        # ln -sfn usa caminho relativo para portabilidade
+        (cd "$LOG_DIR" && ln -sfn "audit-${sid_short}.jsonl" "audit.jsonl" 2> /dev/null) || true
+    fi
 
     # session-context.json → session-context-{SID_SHORT}.json
     # Só cria/atualiza o symlink quando o arquivo de destino já existe.

@@ -25,7 +25,9 @@ set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
+STATE_DIR="$HOOK_DIR/state"
 CTX_FILE="$HOOK_DIR/state/session-context.json"
+AUDIT_FILE="$HOOK_DIR/logs/audit.jsonl"
 # shellcheck disable=SC1091
 if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
     source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null \
@@ -34,6 +36,7 @@ else
     echo "[warn] common.sh não encontrado (log-prompt.sh) — heal_v1/ctx functions indisponíveis" >&2
 fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
+mkdir -p "$STATE_DIR" && chmod 700 "$STATE_DIR"
 # CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
 INPUT="$(cat 2> /dev/null || true)"
 
@@ -52,12 +55,137 @@ if command -v flock > /dev/null 2>&1; then
     flock -x -w 3 9 2> /dev/null
 fi
 
+# ── Auto-recovery no próprio userPromptSubmitted ─────────────────────────────
+# sessionStart pode não disparar em retomadas/reconexões. Quando isso ocorre,
+# o primeiro sinal confiável é userPromptSubmitted; criamos contexto mínimo aqui
+# para preservar semântica de TURN/SESSION desde o início.
+if [ -n "$SESSION_ID_PAYLOAD" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; then
+    NOW_PROMPT_RECOVERY="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo "${TIMESTAMP:-}")"
+    PROMPT_RECOVERY_CLOSE_KEY=""
+    if [ -f "$STATE_DIR/session-briefing.md" ]; then
+        PROMPT_RECOVERY_CLOSE_KEY="$(grep -oE 'ENCERRAR-[A-F0-9]{8}' "$STATE_DIR/session-briefing.md" 2> /dev/null | head -1 || echo '')"
+    fi
+    if [ -z "$PROMPT_RECOVERY_CLOSE_KEY" ]; then
+        PROMPT_RECOVERY_CLOSE_KEY="ENCERRAR-$(date +%s%N 2> /dev/null | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
+    fi
+
+    _PROMPT_RECOVERY_TMP="$(mktemp 2> /dev/null || echo '')"
+    if [ -n "$_PROMPT_RECOVERY_TMP" ]; then
+        if jq -cn \
+            --arg sid "$SESSION_ID_PAYLOAD" \
+            --arg now "$NOW_PROMPT_RECOVERY" \
+            --arg close_key "$PROMPT_RECOVERY_CLOSE_KEY" \
+            '{
+                session: {
+                    id: $sid,
+                    vs_code_session_id: $sid,
+                    started_at: $now,
+                    ended_at: null,
+                    end_reason: null,
+                    close_key: $close_key,
+                    close_key_validated: false,
+                    source: "prompt_auto_recovery",
+                    cwd: null
+                },
+                session_stats: {
+                    turn_count: 0,
+                    turn_authorized: 0,
+                    turn_unauthorized: 0,
+                    resume_count: 0,
+                    tools_total: 0,
+                    tools_by_name: {},
+                    failures_detected: 0,
+                    errors_total: 0,
+                    subagent_calls: 0,
+                    section_count: 1,
+                    section_names: ["recovery"],
+                    section_history: [],
+                    turn_history: [],
+                    push_count: 0,
+                    commit_history: [],
+                    pending_section_after_push: false,
+                    recovery_hints: {
+                        last_intent: null,
+                        last_section: null,
+                        last_commit_sha: null,
+                        last_commit_ts: null
+                    }
+                },
+                current_turn: {
+                    number: 1,
+                    started_at: $now,
+                    tools_count: 0,
+                    tools_by_name: {},
+                    failures_count: 0,
+                    auth_requested: false,
+                    auth_requested_at: null,
+                    last_askquestions_response: null,
+                    section_name: "recovery",
+                    turn_id: null,
+                    section_turn: 1,
+                    block_count: 0,
+                    intent_declared: false,
+                    intent: null,
+                    todo_created: false,
+                    agentStop_invocations: 0,
+                    subagent_delegated: false
+                },
+                current_section: {
+                    name: "recovery",
+                    started_at: $now,
+                    turn_start: 1,
+                    description: "Seção criada por auto-recovery em userPromptSubmitted",
+                    section_number: 1,
+                    section_id: null,
+                    local_turn: 0,
+                    push_count: 0,
+                    tools_by_name: {},
+                    intent_history: [],
+                    failures_count: 0,
+                    blocked_turns: 0
+                },
+                last_tool: {
+                    name: null,
+                    ts: $now,
+                    use_id: null,
+                    result: null
+                },
+                compliance: {
+                    last_turn_authorized: null,
+                    consecutive_unauthorized: 0,
+                    flag_file_exists: false
+                }
+            }' > "$_PROMPT_RECOVERY_TMP" 2> /dev/null; then
+            mv "$_PROMPT_RECOVERY_TMP" "$CTX_FILE" 2> /dev/null || rm -f "$_PROMPT_RECOVERY_TMP"
+            jq -cn \
+                --arg event "session_auto_recovery_prompt" \
+                --arg sid "$SESSION_ID_PAYLOAD" \
+                --arg ts "${TIMESTAMP:-$NOW_PROMPT_RECOVERY}" \
+                --arg key "$PROMPT_RECOVERY_CLOSE_KEY" \
+                '{
+                    event: $event,
+                    session_id: $sid,
+                    timestamp: $ts,
+                    close_key: $key,
+                    source: "log-prompt.sh",
+                    message: "sessionStart ausente — contexto mínimo criado no userPromptSubmitted"
+                }' >> "$AUDIT_FILE"
+        else
+            rm -f "$_PROMPT_RECOVERY_TMP"
+        fi
+    fi
+fi
+
 # Obtém session_id e section_id do contexto persistido — fix B6: sem quebra de linha invisível
 SESSION_ID=""
 SECTION_ID_PRE=""
+PREV_TURN_COUNT=0
+PREV_LAST_TURN_TS=""
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SECTION_ID_PRE="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    PREV_TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    PREV_LAST_TURN_TS="$(jq -r '.last_turn_ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -367,6 +495,15 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
     fi
 fi
 
+# ── P1: Sincroniza ponteiro da sessão ativa (current-session-id) ────────────
+# Mantém watchdog e ferramentas de diagnóstico alinhados ao session_id reconciliado
+# no início do TURN. Evita split-brain entre ponteiro ativo e arquivos per-session.
+if [ -n "$SESSION_ID" ]; then
+    if command -v set_current_session_id > /dev/null 2>&1; then
+        set_current_session_id "$SESSION_ID" 2> /dev/null || true
+    fi
+fi
+
 # Calcula hash SHA-256 truncado do prompt (jamais loga o texto completo)
 PROMPT_HASH=""
 PROMPT_LEN="${#PROMPT_RAW}"
@@ -397,6 +534,41 @@ jq -cn \
         section_id:  (if $section_id == "" then null else $section_id end)
     }' >> "$AUDIT_FILE"
 
+# ── Session resume semantics (evidência operacional) ─────────────────────────
+# userPromptSubmitted é o sinal mais confiável de retomada de chat existente
+# (novo TURN dentro de SESSION já ativa). sessionStart pode não disparar em
+# retomadas/reconexões do painel.
+_IS_SESSION_RESUME=false
+if [[ "${PREV_TURN_COUNT:-0}" =~ ^[0-9]+$ ]] && [ "${PREV_TURN_COUNT:-0}" -gt 0 ]; then
+    _IS_SESSION_RESUME=true
+    _RESUME_GAP_S=null
+    if [ -n "$PREV_LAST_TURN_TS" ]; then
+        _NOW_EPOCH="$(date -u -d "${TIMESTAMP:-$_LOCAL_TS}" +%s 2> /dev/null || echo '')"
+        _PREV_EPOCH="$(date -u -d "$PREV_LAST_TURN_TS" +%s 2> /dev/null || echo '')"
+        if [ -n "$_NOW_EPOCH" ] && [ -n "$_PREV_EPOCH" ] && [ "$_NOW_EPOCH" -ge "$_PREV_EPOCH" ] 2> /dev/null; then
+            _RESUME_GAP_S=$((_NOW_EPOCH - _PREV_EPOCH))
+        fi
+    fi
+
+    jq -cn \
+        --arg event "sessionResumeDetected" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+        --arg prev_turn_ts "$PREV_LAST_TURN_TS" \
+        --argjson prev_turn_count "${PREV_TURN_COUNT:-0}" \
+        --argjson gap_s "${_RESUME_GAP_S}" \
+        ' {
+            event: $event,
+            session_id: $sid,
+            timestamp: $ts,
+            previous_turn_count: $prev_turn_count,
+            previous_turn_ts: (if $prev_turn_ts == "" then null else $prev_turn_ts end),
+            resume_gap_s: $gap_s,
+            detected_by: "userPromptSubmitted",
+            message: "Retomada de chat existente detectada (novo TURN em SESSION ativa)"
+        }' >> "$AUDIT_FILE"
+fi
+
 # ── Reseta current_turn no início de cada novo turno do usuário ──────────────
 # Belt-and-suspenders: agent-stop.sh também reseta ao final do turno anterior,
 # mas se agentStop não disparar, este reset garante que o próximo turno
@@ -414,6 +586,7 @@ TURN_ID="$(uuidgen 2> /dev/null || printf 'turn_%s_%s' "$(date +%s)" "$$")"
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq --arg ts "${TIMESTAMP:-$NOW_ISO}" \
         --arg turn_id "$TURN_ID" \
+        --argjson is_resume "$_IS_SESSION_RESUME" \
         '.current_turn.started_at                = $ts
          | .current_turn.turn_id                  = $turn_id
          | .current_turn.tools_count               = 0
@@ -430,6 +603,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.block_count               = 0
          | .current_turn.agentStop_invocations     = 0
          | .current_turn.todo_created              = false
+         | .session_stats.resume_count             = ((.session_stats.resume_count // 0) + (if $is_resume then 1 else 0 end))
          | .current_section.local_turn             = ((.current_section.local_turn // 0) + 1)
          | .current_turn.section_turn              = (.current_section.local_turn // 1)' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
@@ -443,6 +617,7 @@ elif [ -f "$CTX_FILE" ]; then
     TMP="$(mktemp)"
     jq --arg ts "${TIMESTAMP:-$NOW_ISO}" \
         --arg turn_id "$TURN_ID" \
+        --argjson is_resume "$_IS_SESSION_RESUME" \
         '.current_turn.started_at                = $ts
          | .current_turn.turn_id                  = $turn_id
          | .current_turn.tools_count               = 0
@@ -459,6 +634,7 @@ elif [ -f "$CTX_FILE" ]; then
          | .current_turn.block_count               = 0
          | .current_turn.agentStop_invocations     = 0
          | .current_turn.todo_created              = false
+         | .session_stats.resume_count             = ((.session_stats.resume_count // 0) + (if $is_resume then 1 else 0 end))
          | .current_section.local_turn             = ((.current_section.local_turn // 0) + 1)
          | .current_turn.section_turn              = (.current_section.local_turn // 1)' \
         "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
