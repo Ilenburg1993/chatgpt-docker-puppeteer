@@ -1,7 +1,7 @@
 # Nível 5: MONITOR + Context Compaction Strategy
 
-**Status**: 🟡 DESIGN (NOT IMPLEMENTED YET)  
-**Data**: 2026-03-15  
+**Status**: 🟡 DESIGN (NOT IMPLEMENTED YET)
+**Data**: 2026-03-15
 **Prioridade**: MÉDIA (Bom ter, não bloqueante)
 
 ---
@@ -30,7 +30,7 @@ Exibir indicadores visuais em tempo real no dashboard sobre status de SESSION CL
     <span v-else class="status-active">
       🔒 SESSION ATIVA
     </span>
-    
+
     <!-- Botão rápido para Template F se não autorizado -->
     <button v-if="!isAuthorized" @click="promptCloseKey" class="btn-close-session">
       Encerrar Sessão
@@ -176,12 +176,12 @@ export class SessionMonitor extends EventEmitter {
   checkSessionStatus() {
     try {
       const ctx = JSON.parse(fs.readFileSync(this.ctxFile, 'utf-8'));
-      
+
       // Check 1: close_key_validated status
       if (!ctx.session.close_key_validated && this.isSessionActive(ctx)) {
         // Normal — session aberta, sem close_key
       }
-      
+
       // Check 2: recovery anomalies
       if (ctx.recovery?.close_mode === 'abrupt_no_key') {
         this.emitAnomaly({
@@ -192,7 +192,7 @@ export class SessionMonitor extends EventEmitter {
           detected_at: new Date().toISOString(),
         });
       }
-      
+
       // Check 3: timeout risk (session running too long)
       const maxSessionDuration = 8 * 3600 * 1000; // 8 hours
       const sessionAge = Date.now() - new Date(ctx.session.started_at).getTime();
@@ -205,7 +205,7 @@ export class SessionMonitor extends EventEmitter {
           detected_at: new Date().toISOString(),
         });
       }
-      
+
       // Broadcast anomalies to all connected clients
       if (this.anomalyBuffer.length > 0) {
         this.io.emit('session:anomalies_detected', {
@@ -289,14 +289,14 @@ export class TokenBudgetMonitor {
     const auditSize = this._estimateAuditSize();
     const briefingSize = this._estimateBriefingSize();
     const ctxSize = this._estimateContextSize();
-    
+
     const totalEstimate = (auditSize + briefingSize + ctxSize) / 4;
     const percent = totalEstimate / this.maxBudget;
-    
+
     let status = 'ok';
     if (percent >= this.criticalThreshold) status = 'critical';
     else if (percent >= this.warningThreshold) status = 'warning';
-    
+
     return {
       used: totalEstimate,
       total: this.maxBudget,
@@ -311,14 +311,14 @@ export class TokenBudgetMonitor {
    */
   checkAndAlert() {
     const status = this.getStatus();
-    
+
     if (status.status === 'warning') {
       this.nerv.emit('context:budget_warning', {
         percent: status.percent,
         message: `Token budget at ${status.percent}% — consider invoking /compact`,
       });
     }
-    
+
     if (status.status === 'critical') {
       this.nerv.emit('context:budget_critical', {
         percent: status.percent,
@@ -367,7 +367,7 @@ export class TokenBudgetMonitor {
 2. Agente está entre tarefas (não mid-execution)
 3. Não há git push pendente imediatamente
 
-**Implementação**: 
+**Implementação**:
 
 ```bash
 # Adicionar em agent-stop.sh, ANTES do exit final:
@@ -377,10 +377,10 @@ export class TokenBudgetMonitor {
 if command -v get_token_budget_status > /dev/null; then
     _TOKEN_STATUS="$(get_token_budget_status)"
     _TOKEN_PERCENT="$(echo "$_TOKEN_STATUS" | jq -r '.percent // 0')"
-    
+
     if [ "$_TOKEN_PERCENT" -gt 80 ]; then
         echo "[context-compaction] Token budget at ${_TOKEN_PERCENT}% — triggering /compact" >&2
-        
+
         # Log event
         jq -cn \
             --arg event "context_auto_compact_triggered" \
@@ -392,7 +392,7 @@ if command -v get_token_budget_status > /dev/null; then
                 token_percent: $percent,
                 trigger: "agent-stop automated check"
             }' >> "$AUDIT_FILE" 2> /dev/null || true
-        
+
         # Emite systemMessage pedindo compaction
         jq -cn \
             --arg percent "$_TOKEN_PERCENT" \
@@ -423,16 +423,16 @@ export const compactRouter = Router();
 compactRouter.post('/', async (req, res) => {
   try {
     const { section_id, reason } = req.body;
-    
+
     // 1. Gara checkpoint final da seção atual
     const checkpoint = await generateSectionCheckpoint(section_id);
-    
+
     // 2. Rotaciona audit.jsonl — move eventos antigos para arquivo
     const rotated = await rotateAudit({
       keepLatest: 2000,
       archivePrefix: `audit-archive-${Date.now()}`,
     });
-    
+
     // 3. Resume contexto — remove histórico detalhado, mantém estado essencial
     const briefingContent = await generateCompressedBriefing({
       section_id,
@@ -440,7 +440,7 @@ compactRouter.post('/', async (req, res) => {
       includeTurnHistory: false,
     });
     await updateBriefing(briefingContent);
-    
+
     // 4. Log da compaction
     jq -cn \
       --arg event "context_compacted" \
@@ -453,7 +453,7 @@ compactRouter.post('/', async (req, res) => {
         reason: "' + reason + '",
         timestamp: "'$(date -u '+%Y-%m-%dT%H:%M:%S' Z)'"
       }' >> AUDIT_FILE
-    
+
     res.json({
       success: true,
       message: 'Context compacted',
@@ -553,10 +553,10 @@ User/Agent Response:
 
 1. **Não invocar compaction enquanto git push está pendente**
    - Verificar CTX.current_turn.pending_git_push antes de compaction suggest
-   
+
 2. **Não invocar Template E+ se último tool foi próprio Template E+**
    - Evitar loop de Templates — user primeiro responde a Template E+
-   
+
 3. **Compaction NÃO é obrigatória**
    - Se agente não responder a compaction suggestion, continua normalmente
    - Apenas quando atingir 95% crítico, forçar bloqueio de novas ferramentas
@@ -591,7 +591,7 @@ User/Agent Response:
 
 ---
 
-**Discussão Aberta**: 
+**Discussão Aberta**:
 - Timing ideal para Template E+: début/mid-turn vs end-turn?
 - Token estimation: usar audit.jsonl size ou hook para Anthropic token counter?
 - Dashboard priority: real-time alerts vs periodic polling?

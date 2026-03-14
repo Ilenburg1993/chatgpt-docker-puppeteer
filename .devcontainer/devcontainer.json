@@ -266,59 +266,73 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        // ========================================================
-        // EXTENSIONS AUTO-INSTALL — v5.2 GROUPED BY CATEGORY
-        // ========================================================
-        // Critério de inclusão:
-        // ✔ VS Code não faz isso nativamente (ou faz pior)
-        // ✔ Copilot não substitui essa funcionalidade
-        // ✔ Melhora confiabilidade, legibilidade ou diagnóstico
-        //
-        // Funcionalidades NATIVAS do VS Code (não requerem extensões):
-        // - Auto Close/Rename Tags (builtin)
-        // - Bracket Pair Colorization (settings.json)
-        // - Indent Guides (builtin)
-        // - NPM Scripts Explorer (builtin)
-        // - Node.js Debugger (builtin)
-        // ========================================================
-        // === AI & CODE INTELLIGENCE ===
-        //"GitHub.copilot", // Assistente IA (contexto de código) - Extensão preterida, substituída por copilot-chat
-        "GitHub.copilot-chat", // Chat contextual com IA
-        // === CODE QUALITY & LINTING ===
-        "dbaeumer.vscode-eslint", // Linting JS/Node (strict mode)
-        "esbenp.prettier-vscode", // Formatação (integrada ao ESLint)
-        "usernamehw.errorlens", // Erros e warnings inline (feedback visual)
-        // === INFRASTRUCTURE & DEVOPS ===
-        "ms-azuretools.vscode-docker", // Docker / DevContainer DX
-        "ms-vscode.makefile-tools", // Makefile como árbitro do sistema
-        // === GIT & VERSION CONTROL ===
-        "eamodio.gitlens", // Histórico avançado, blame, graph
-        // === NAVIGATION & AUTOCOMPLETE ===
-        "christian-kohler.path-intellisense", // Autocomplete de paths
-        "christian-kohler.npm-intellisense", // Autocomplete de módulos npm
-        // === FILE TYPES & SYNTAX ===
-        "timonwong.shellcheck", // Validação de scripts bash/sh
-        "redhat.vscode-yaml", // YAML syntax + schema validation
-        // === TESTING & DEBUGGING ===
-        "hbenl.vscode-test-explorer", // Test Explorer UI (universal runner)
-        "ryanluker.vscode-coverage-gutters", // Cobertura inline
-        // === DATA & API ===
-        "humao.rest-client", // HTTP client (alternativa ao Postman)
-        "ZainChen.json", // JSON advanced tools
-        // === PRODUCTIVITY & UI ===
-        "oderwat.indent-rainbow", // Indentação colorida (Python/YAML)
-        "aaron-bond.better-comments", // Highlight TODO, FIXME, NOTE
-        "PKief.material-icon-theme", // Ícones de arquivos (legibilidade)
-        // === DOCUMENTATION & SPELL CHECK ===
-        "yzhang.markdown-all-in-one", // Documentação Markdown viva
-        "streetsidesoftware.code-spell-checker", // Correção ortográfica (EN)
-        "streetsidesoftware.code-spell-checker-portuguese-brazilian", // PT-BR
-        // === PRODUCTIVITY TOOLS ===
-        "gruntfuggly.todo-tree", // Visão global de TODOs
-        "pflannery.vscode-versionlens", // Visibilidade de versões de deps
-        "EditorConfig.EditorConfig", // Consistência editorial (.editorconfig)
-        // === POWERSHELL (INSTRUMENTAL SHELL) ===
-        "ms-vscode.powershell" // PowerShell IntelliSense + debug
+        "GitHub.copilot-chat",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "usernamehw.errorlens",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode.makefile-tools",
+        "eamodio.gitlens",
+        "christian-kohler.path-intellisense",
+        "christian-kohler.npm-intellisense",
+        "timonwong.shellcheck",
+        "redhat.vscode-yaml",
+        "hbenl.vscode-test-explorer",
+        "ryanluker.vscode-coverage-gutters",
+        "humao.rest-client",
+        "ZainChen.json",
+        "oderwat.indent-rainbow",
+        "aaron-bond.better-comments",
+        "PKief.material-icon-theme",
+        "yzhang.markdown-all-in-one",
+        "streetsidesoftware.code-spell-checker",
+        "streetsidesoftware.code-spell-checker-portuguese-brazilian",
+        "gruntfuggly.todo-tree",
+        "pflannery.vscode-versionlens",
+        "EditorConfig.EditorConfig",
+        "ms-vscode.powershell",
+        "MS-CEINTL.vscode-language-pack-pt-BR",
+        "ms-vscode.azure-repos",
+        "Anthropic.claude-code",
+        "coderabbit.coderabbit-vscode",
+        "openai.chatgpt",
+        "ms-azuretools.vscode-containers",
+        "ms-vscode-remote.remote-containers",
+        "ms-vscode-remote.vscode-remote-extensionpack",
+        "docker.docker",
+        "ms-vscode.remote-explorer",
+        "google.geminicodeassist",
+        "mhutchie.git-graph",
+        "github.vscode-github-actions",
+        "GitHub.codespaces",
+        "vscjava.migrate-java-to-azure",
+        "ms-vscode.vscode-github-issue-notebooks",
+        "GitHub.github-vscode-theme",
+        "tintinweb.graphviz-interactive-preview",
+        "HuggingFace.huggingface-vscode-chat",
+        "cmstead.js-codeformer",
+        "cmstead.jsrefactor",
+        "kilocode.kilo-code",
+        "bierner.markdown-preview-github-styles",
+        "bierner.markdown-mermaid",
+        "DavidAnson.vscode-markdownlint",
+        "MermaidChart.vscode-mermaid-chart",
+        "chris-noring.node-snippets",
+        "howardzuo.vscode-npm-dependency",
+        "sst-dev.opencode",
+        "GitHub.vscode-pull-request-github",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        "ms-vscode-remote.remote-ssh",
+        "ms-vscode-remote.remote-ssh-edit",
+        "ms-vscode.remote-server",
+        "GitHub.remotehub",
+        "ms-vscode.remote-repositories",
+        "Gruntfuggly.todo-tree",
+        "jasonnutter.search-node-modules",
+        "Vue.volar",
+        "ms-vscode-remote.remote-wsl"
       ],
       "settings": {
         // In DevContainer, Codex must run in-container instead of being redirected to host-side WSL.

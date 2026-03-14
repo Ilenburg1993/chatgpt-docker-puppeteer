@@ -31,7 +31,8 @@
         "PKief.material-icon-theme",
         "streetsidesoftware.code-spell-checker",
         "oderwat.indent-rainbow",
-        "ms-vscode-remote.vscode-remote-extensionpack" // Cores arco-íris por nível de indentação (funcionalidade única)
+        "ms-vscode-remote.vscode-remote-extensionpack",
+        "ms-ceintl.vscode-language-pack-pt-br" // Cores arco-íris por nível de indentação (funcionalidade única)
     ],
     "unwantedRecommendations": [
         // Language servers não relevantes para Node.js project
