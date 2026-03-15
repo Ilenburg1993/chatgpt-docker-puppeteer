@@ -659,7 +659,7 @@ de orquestração de runtime, auditoria e integração entre guards.
 - [x] **F7.9** Consolidar documentação de domínio por subpasta (`README` + regras de naming).
 - [ ] **F7.10** Integrar verificador estrutural ao fluxo padrão de validação.
 - [x] **F8.1** Versionar contratos executáveis de policy e stop.
-- [ ] **F8.2** Cobrir reason codes e payloads obrigatórios via smoke.
+- [x] **F8.2** Cobrir reason codes e payloads obrigatórios via smoke.
 - [ ] **F8.3** Validar compatibilidade retroativa dos contratos.
 - [ ] **F9.1** Fatiar checks V90/AS em suítes menores por domínio.
 - [ ] **F9.2** Criar harness padrão de fixtures reutilizáveis.
@@ -752,6 +752,15 @@ de orquestração de runtime, auditoria e integração entre guards.
   - **Gate**: regressão estrutural detectada automaticamente antes de merge.
 
 ### Pacote F8 (contratos executáveis)
+
+**Status F8.2 (concluído em 2026-03-15)**: cobertura contratual adicionada em
+`.github/hooks/scripts/smoke-test.sh` (legacy) e
+`.github/hooks/scripts/smoke-domains/smoke-policy.sh` (domínio policy), incluindo:
+
+- validação de presença/parse de `contracts/contract-registry.json` e `contracts/stop-decision.schema.json`;
+- assert de referência `stop-decision-output` no registry;
+- assert de campos mínimos obrigatórios do schema (`decision`, `reason`, `hookSpecificOutput`);
+- checks explícitos de reason codes obrigatórios e payload mínimo de `emit_stop_block`.
 
 - **F8.1 — Versionar contratos críticos**
   - **Entrada**: regras atuais de policy/stop.

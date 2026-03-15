@@ -526,7 +526,7 @@ F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A part
 - [x] F7.9 Consolidar `README`/governança de naming por subpasta.
 - [ ] F7.10 Integrar gate estrutural ao fluxo padrão de validação.
 - [x] F8.1 Versionamento de contratos executáveis críticos.
-- [ ] F8.2 Cobertura de reason codes/payloads no smoke.
+- [x] F8.2 Cobertura de reason codes/payloads no smoke.
 - [ ] F8.3 Verificação de compatibilidade retroativa.
 - [ ] F9.1 Split fino dos checks V90/AS por domínio.
 - [ ] F9.2 Harness padrão de fixtures/sandbox.
@@ -587,6 +587,10 @@ F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A part
 - backlog sincronizado em `pending-tasks.md`.
 
 ### F8 — Contratos executáveis
+
+> Status F8.2 (concluído em 2026-03-15): checks contratuais adicionados em
+> `scripts/smoke-test.sh` e `scripts/smoke-domains/smoke-policy.sh` para
+> reason codes obrigatórios e payload mínimo de stop block.
 
 - **F8.1**: versionar contratos de autorização/continuidade/close em `contracts/`.
 - **F8.2**: criar cobertura de reason codes e payloads mínimos na suíte smoke.

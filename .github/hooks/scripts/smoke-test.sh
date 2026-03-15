@@ -582,6 +582,94 @@ else
     fail "GAP-C.2: contracts/session-context.schema.json não encontrado"
 fi
 
+# F8.2: cobertura contratual de reason codes e payload mínimo do stop block
+_F82_CONTRACT_REGISTRY="$HOOK_DIR/contracts/contract-registry.json"
+_F82_STOP_SCHEMA="$HOOK_DIR/contracts/stop-decision.schema.json"
+_F82_AGENT_STOP_LIB="$HOOK_DIR/hooks-lib/agent-stop-lib.sh"
+
+if [ -f "$_F82_CONTRACT_REGISTRY" ]; then
+    if jq empty "$_F82_CONTRACT_REGISTRY" 2> /dev/null; then
+        pass "F8.2: contract-registry.json existe e é JSON válido"
+    else
+        fail "F8.2: contract-registry.json é JSON inválido"
+    fi
+else
+    fail "F8.2: contract-registry.json não encontrado"
+fi
+
+if [ -f "$_F82_STOP_SCHEMA" ]; then
+    if jq empty "$_F82_STOP_SCHEMA" 2> /dev/null; then
+        pass "F8.2: stop-decision.schema.json existe e é JSON válido"
+    else
+        fail "F8.2: stop-decision.schema.json é JSON inválido"
+    fi
+else
+    fail "F8.2: stop-decision.schema.json não encontrado"
+fi
+
+if [ -f "$_F82_CONTRACT_REGISTRY" ] && jq -e '.contracts | any(.id == "stop-decision-output" and .path == "contracts/stop-decision.schema.json")' "$_F82_CONTRACT_REGISTRY" > /dev/null 2>&1; then
+    pass "F8.2: contract-registry referencia stop-decision-output"
+else
+    fail "F8.2: contract-registry sem referência consistente para stop-decision-output"
+fi
+
+if [ -f "$_F82_STOP_SCHEMA" ] && jq -e '.required | index("decision") and index("reason") and index("hookSpecificOutput")' "$_F82_STOP_SCHEMA" > /dev/null 2>&1; then
+    pass "F8.2: schema exige decision/reason/hookSpecificOutput"
+else
+    fail "F8.2: schema sem campos mínimos obrigatórios"
+fi
+
+for _f82_reason_code in \
+    strict_context_missing \
+    askquestions_not_last_tool \
+    askquestions_api_error \
+    askquestions_skipped_or_empty \
+    auto_audit_required_not_started \
+    required_docs_not_read \
+    non_template_f_continuation_mandatory \
+    askquestions_missing_template_f_option \
+    template_f_called_without_prior_request \
+    turn_close_requires_template_f \
+    turn_close_key_missing_or_invalid \
+    turn_auth_context_invalid; do
+    if grep -q "${_f82_reason_code}" "$_F82_AGENT_STOP_LIB" 2> /dev/null; then
+        pass "F8.2: reason code obrigatório presente (${_f82_reason_code})"
+    else
+        fail "F8.2: reason code obrigatório ausente (${_f82_reason_code})"
+    fi
+done
+
+if grep -q 'decision:[[:space:]]*"block"' "$_F82_AGENT_STOP_LIB" 2> /dev/null; then
+    pass "F8.2: payload stop inclui decision=block"
+else
+    fail "F8.2: payload stop sem decision=block"
+fi
+if grep -q 'decisionReason:[[:space:]]*\$reason' "$_F82_AGENT_STOP_LIB" 2> /dev/null; then
+    pass "F8.2: payload stop inclui decisionReason legado"
+else
+    fail "F8.2: payload stop sem decisionReason legado"
+fi
+if grep -q 'reason:[[:space:]]*\$reason' "$_F82_AGENT_STOP_LIB" 2> /dev/null; then
+    pass "F8.2: payload stop inclui reason canônico"
+else
+    fail "F8.2: payload stop sem reason canônico"
+fi
+if grep -q 'hookSpecificOutput:[[:space:]]*{' "$_F82_AGENT_STOP_LIB" 2> /dev/null; then
+    pass "F8.2: payload stop inclui hookSpecificOutput"
+else
+    fail "F8.2: payload stop sem hookSpecificOutput"
+fi
+if grep -q 'hookEventName:[[:space:]]*"Stop"' "$_F82_AGENT_STOP_LIB" 2> /dev/null; then
+    pass "F8.2: payload stop inclui hookEventName=Stop"
+else
+    fail "F8.2: payload stop sem hookEventName=Stop"
+fi
+if grep -q 'systemMessage:[[:space:]]*\$system_message' "$_F82_AGENT_STOP_LIB" 2> /dev/null; then
+    pass "F8.2: payload stop inclui systemMessage"
+else
+    fail "F8.2: payload stop sem systemMessage"
+fi
+
 # smoke-test fix: --absolute-git-dir
 if grep -q 'absolute-git-dir' "$SCRIPTS_DIR/smoke-test.sh" 2> /dev/null; then
     pass "Smoke-test usa --absolute-git-dir (path resolution fix)"
