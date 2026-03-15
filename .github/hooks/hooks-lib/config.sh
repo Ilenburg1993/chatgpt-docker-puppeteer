@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+
+# F7.7 shim canônico: root delega para runtime/config.sh.
+if [[ "${HOOKS_LIB_BYPASS_CONFIG_SHIM:-0}" != "1" ]]; then
+    _hooks_lib_root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # shellcheck disable=SC1091
+    source "${_hooks_lib_root_dir}/runtime/config.sh"
+    return 0
+fi
+
 # ============================================================
 # hooks-lib/config.sh — Tunáveis centralizados do sistema de hooks
 # ============================================================

@@ -33,7 +33,8 @@ Quando houver divergência textual entre arquivos de instrução, use esta prece
 ### Regras do Protocolo TODO (v9.0)
 
 1. **Criar TODOs no início** — ao iniciar qualquer turno de trabalho, use `manage_todo_list` para
-   criar a lista de tarefas. Não comece a trabalhar sem TODOs.
+   criar a lista de tarefas. Não comece a trabalhar sem TODOs. Busque ter no mínimo 10 TODOs no
+   backlog para manter o ciclo de trabalho fluindo.
 2. **Último TODO = vscode_askQuestions** — o último item da lista DEVE ser:
    `"Chamar vscode_askQuestions [Template de CONTINUAÇÃO: A/D/E; Template F apenas por escalonamento explícito para fechamento de SESSION]"`
 3. **Marcar e executar** — ao concluir cada tarefa, marque como `completed`. O último TODO
@@ -48,10 +49,14 @@ Quando houver divergência textual entre arquivos de instrução, use esta prece
 7. **Exceção única de bookkeeping** — `manage_todo_list` imediatamente após `vscode_askQuestions` é
    permitido apenas para fechamento do checklist; qualquer outra ferramenta exige novo
    `vscode_askQuestions` final.
-8. **Template F + KEY correta apenas no fechamento de SESSION** — Templates de continuidade (A/D/E)
-   servem para seguir o trabalho e **não autorizam fechamento de TURN**. O fechamento autorizado
-   exige Template F com escalonamento explícito para encerramento de SESSION e validação da
-   `close_key`.
+8. **Template F + KEY correta apenas no fechamento de SESSION/TURN** — Templates de continuidade
+   (A/D/E) servem para seguir o trabalho e **não autorizam fechamento de TURN**. O fechamento
+   autorizado exige Template F com escalonamento explícito para encerramento de SESSION e validação
+   da `close_key`.
+9. É terminantemente proibido tentar encerrar um turno de trabalho sem seguir este protocolo, seja
+   pulando a chamada de `vscode_askQuestions`, seja utilizando o template errado, seja não validando
+   a KEY correta que deve ser inserida pelo usuário. O sistema de hooks é projetado para bloquear
+   essas violações, mas o agente deve seguir o protocolo por iniciativa própria.
 
 > **Por que isso é crítico?** O hook `agent-stop.sh` emite `decision:block` quando
 > `vscode_askQuestions` não foi chamado. Mas mesmo sem o block ser efetivo, o padrão de
@@ -72,7 +77,11 @@ Quando houver divergência textual entre arquivos de instrução, use esta prece
 - O único fluxo legítimo: `vscode_askQuestions` Template F → usuário digita KEY → `post-tool-use.sh`
   executa `session-close.sh` automaticamente.
 
-**SESSION end = EVENTO EXTREMAMENTE RARO. Toda SESSION deve ser mantida viva o máximo possível.**
+**SESSION end = EVENTO EXTREMAMENTE RARO. Toda SESSION deve ser mantida viva o máximo possível,
+assim como os turns; por default, NUNCA encerre uma session ou turn .** O agente deve buscar
+resolver tudo dentro da mesma sessão, utilizando seções e turns para organizar o trabalho, e sempre
+atualizando os TODOS, mas mantendo a continuidade. O encerramento de sessão ou TURN só deve ocorrer
+quando absolutamente necessário, e sempre seguindo o protocolo correto.
 
 ---
 
@@ -137,14 +146,14 @@ NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions.
 **Templates obrigatórios por contexto:**
 
 - Tarefa concluída → Template A (próximo passo de conversa; não autoriza fechamento de TURN)
-- Checkpoint periódico a cada ~5 TURNs → Template D
+- Checkpoint periódico a cada ~15 TURNs → Template D
 - Proposta arquitetural → Template C
 - Sessão ociosa → Template E
 
 **Regra de fechamento em modo estrito (não ambígua):**
 
 - Em `session.strict_turn_close_requires_key=true`, o TURN continua exigindo `vscode_askQuestions`
-  válido como último ato, com resposta explícita do usuário.
+  válido como último ato, com resposta explícita do usuário, que DEVE inserir a chave correta.
 - Templates A/D/E são templates de continuidade e não autorizam fechamento de TURN/subturn.
 - Template F só deve ser usado quando houver escalonamento explícito para fechamento de SESSION; com
   Template F, a `close_key` correta permanece obrigatória.

@@ -5,6 +5,11 @@
 > Este documento é o contrato formal de todos os eventos que fluem pelo sistema de hooks. Toda
 > adição ou mudança de schema deve ser refletida aqui antes de ser implementada.
 
+> Registro e governança de versão (F8.1):
+>
+> - `contracts/contract-registry.json`
+> - `contracts/CONTRACT_VERSIONING_POLICY.md`
+
 ---
 
 ## Hierarquia de eventos

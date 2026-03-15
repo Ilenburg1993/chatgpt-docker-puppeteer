@@ -351,14 +351,297 @@ camadas, com rollout em fases e critérios de aceite objetivos.
 
 ---
 
-## Conclusão e próximos passos
+## Status atual e continuidade do programa
 
-1. Aprovar este plano faseado (principalmente Fases 1-3 como MVP de modularização).
-2. Definir ordem de implementação inicial: **Fase 1 → Fase 2 → Fase 3**.
-3. Iniciar execução com PR pequeno por fase, usando modo sombra quando aplicável.
+F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A partir daqui, o foco passa a ser
+**refatoração rigorosa de segunda onda**, orientada por redução estrutural e governança contínua.
 
-## Perguntas de continuidade
+> Referências vivas obrigatórias neste ciclo:
+>
+> - `DOCUMENTAÇÃO/PLANOS/PLANO-MODULARIZACAO-HOOKS-SYSTEM-CODE-AUDIT.md` (este documento)
+> - `DOCUMENTAÇÃO/PLANOS/ROADMAP_MODULARIZACAO_HOOKS_CODE_AUDIT_2026-03-15.md`
 
-- Você quer que eu abra agora a **Fase 1** com a proposta de estrutura de pastas/arquivos alvo?
-- Deseja que eu já traga uma matriz de “arquivo atual → módulo destino” para cada hook automático?
-- Quer priorizar primeiro os hooks mais críticos (`pre/post/agent-stop`) antes de `session-start/end`?
+### Classificação operacional de scripts (base para F7)
+
+**1) Hooks automáticos (gatilho direto do runtime Copilot):**
+
+- `session-start.sh`, `log-prompt.sh`, `pre-tool-use.sh`, `post-tool-use.sh`, `agent-stop.sh`,
+  `subagent-start.sh`, `subagent-stop.sh`, `pre-compact.sh`, `session-end.sh`.
+
+**2) Scripts manuais executados internamente por hooks automáticos:**
+
+- `watchdog.sh`, `rotate-audit.sh`, `session-close.sh`, `session-checkpoint.sh`,
+  `sync-tasks-to-docs.sh`, `generate-session-summary.sh`.
+
+**3) Scripts manuais de uso direto (operação/usuário/manutenção):**
+
+- Orquestração: `start-turn.sh`, `start-section.sh`, `continue-section.sh`, `section-end.sh`,
+  `session-reminder.sh`, `manual-session-init.sh`.
+- Backlog/findings: `add-task.sh`, `complete-task.sh`, `save-finding.sh`, `resolve-finding.sh`.
+- Diagnóstico/manutenção: `smoke-test.sh`, `smoke-test-domains.sh`, `verify-hook-delivery.sh`,
+  `export-metrics.sh`, `analytics.sh`, `sync-transcript-errors.sh`,
+  `migrate-per-session-audit.sh`, `install-git-hooks.sh`, `on-git-push.sh`.
+
+### Diretriz mandatória Script↔Lib
+
+- Cada script em `.github/hooks/scripts/*.sh` deve mapear para ao menos uma lib em
+  `.github/hooks/hooks-lib/`.
+- Onde não houver referência explícita atual, criar backlog de adequação com owner, prioridade e
+  prazo.
+- Esta regularização é requisito de entrada de F7 e é executada primeiro em **F7.0**.
+- Regra mandatória adicional: todo script órfão deve receber arquivo lib dedicado (wrapper inicial),
+  seguido de migração progressiva da lógica para a lib.
+
+### Estrutura-alvo de subpastas `hooks-lib/`
+
+- `hooks-lib/runtime/`
+- `hooks-lib/context/`
+- `hooks-lib/policy/`
+- `hooks-lib/lifecycle/`
+- `hooks-lib/audit/`
+- `hooks-lib/maintenance/`
+- `hooks-lib/testing/`
+
+> Objetivo: reduzir colisão semântica em arquivos monolíticos e tornar ownership por domínio
+> explicitamente verificável.
+
+## Nova trilha abrangente (F7→F12)
+
+### F7 — Auditoria sistêmica profunda
+
+**Objetivo:** mapear acoplamentos técnicos reais e risco de mudança.
+
+**Subfases:**
+
+- F7.0 Consolidação estrutural inicial (pastas/taxonomia/matriz Script↔Lib) — **primeira etapa executável do pacote F7**.
+
+- F7.1 Inventário de dependências internas (scripts/libs/contracts).
+- F7.2 Matriz de acoplamento por domínio + severidade.
+- F7.3 Priorização P0/P1/P2 com backlog executável.
+- F7.4 Criar libs dedicadas para scripts sem relação explícita Script↔Lib.
+- F7.5 Migrar `hooks-lib/` para subpastas canônicas com compatibilidade incremental.
+- F7.6 Implementar verificador estrutural Script↔Lib e taxonomia de subpastas.
+- F7.7 Migrar módulos legados no root de `hooks-lib/` para subpastas por domínio com shims.
+- F7.8 Publicar índice machine-readable `script/lib/domínio/owner`.
+- F7.9 Consolidar governança de diretórios (`README` por subpasta + naming).
+- F7.10 Integrar gate estrutural em task/pipeline de validação.
+
+**Critérios de aceite:**
+
+- Matriz publicada e revisada.
+- Hotspots com owner e estratégia de mitigação.
+- Backlog pronto para execução técnica.
+
+### F8 — Contratos executáveis de policy e stop
+
+**Objetivo:** transformar regras críticas em contratos verificáveis e versionados.
+
+**Subfases:**
+
+- F8.1 Versionar contratos de autorização/continuidade/close.
+- F8.2 Cobrir reason codes e payloads obrigatórios no smoke.
+- F8.3 Garantir compatibilidade retroativa dos campos legados.
+
+**Critérios de aceite:**
+
+- Contratos versionados com changelog.
+- Paridade policy ↔ contrato sem drift.
+- Quebra retroativa detectada por check automatizado.
+
+### F9 — Reengenharia da suíte smoke
+
+**Objetivo:** maximizar diagnóstico e reduzir tempo de triagem.
+
+**Subfases:**
+
+- F9.1 Quebrar grupos V90/AS em módulos menores por domínio.
+- F9.2 Criar harness de fixtures/sandbox reutilizável.
+- F9.3 Gerar relatório por domínio com causa provável.
+
+**Critérios de aceite:**
+
+- Falha mapeada ao domínio em um único salto.
+- Triagem de falha em até 5 minutos.
+- Compatibilidade preservada com `--quiet`, `--domains`, `--all`.
+
+### F10 — Decomposição final dos módulos monolíticos
+
+**Objetivo:** reduzir arquivos críticos e consolidar responsabilidade única.
+
+**Subfases:**
+
+- F10.1 Fatiar `agent-stop-lib.sh` por domínio funcional.
+- F10.2 Fatiar `common.sh` por domínio operacional.
+- F10.3 Padronizar APIs internas e documentação JSDoc.
+
+**Critérios de aceite:**
+
+- Redução mensurável de complexidade/volume nos hotspots.
+- Entry points de hooks mais finos e previsíveis.
+- Smoke e contratos verdes após cada extração.
+
+### F11 — Observabilidade e SLO da refatoração
+
+**Objetivo:** operar a evolução com métricas objetivas.
+
+**Subfases:**
+
+- F11.1 Definir KPIs/SLOs (falhas, tempo, divergência).
+- F11.2 Persistir histórico de métricas.
+- F11.3 Publicar tendências e alertas de regressão.
+
+**Critérios de aceite:**
+
+- Painel de métricas versionado no repositório.
+- Alertas de regressão definidos.
+- Revisão periódica operacional institucionalizada.
+
+### F12 — Rollout final e governança permanente
+
+**Objetivo:** concluir corte legado com segurança e manter evolução contínua.
+
+**Subfases:**
+
+- F12.1 Janela de estabilização com gates/rollback explícitos.
+- F12.2 Corte/depreciação de legado residual.
+- F12.3 Rotina obrigatória de sincronismo ROADMAP/PLANO/backlog.
+
+**Critérios de aceite:**
+
+- Janela estável sem divergência crítica.
+- Legado residual oficialmente encerrado.
+- Governança contínua formalizada.
+
+## TODO mestre completo (F7→F12)
+
+- [x] F7.0 Consolidação estrutural de pastas/scripts e pareamento obrigatório Script↔Lib.
+- [x] F7.1 Inventário de dependências internas do hooks system.
+- [x] F7.2 Matriz de acoplamento por domínio + severidade.
+- [x] F7.3 Backlog priorizado P0/P1/P2 com owners.
+- [x] F7.4 Criar arquivos lib para scripts ainda órfãos (100% de cobertura Script↔Lib).
+- [x] F7.5 Criar subpastas canônicas em `hooks-lib/` e migrar libs por domínio.
+- [x] F7.6 Adicionar check automatizado de conformidade estrutural Script↔Lib.
+- [x] F7.7 Migrar módulos legados do root para subpastas com compatibilidade.
+- [x] F7.8 Publicar índice canônico machine-readable da F7.
+- [x] F7.9 Consolidar `README`/governança de naming por subpasta.
+- [ ] F7.10 Integrar gate estrutural ao fluxo padrão de validação.
+- [x] F8.1 Versionamento de contratos executáveis críticos.
+- [ ] F8.2 Cobertura de reason codes/payloads no smoke.
+- [ ] F8.3 Verificação de compatibilidade retroativa.
+- [ ] F9.1 Split fino dos checks V90/AS por domínio.
+- [ ] F9.2 Harness padrão de fixtures/sandbox.
+- [ ] F9.3 Relatório de triagem por domínio.
+- [ ] F10.1 Decomposição de `agent-stop-lib.sh`.
+- [ ] F10.2 Decomposição de `common.sh`.
+- [ ] F10.3 Padronização final de APIs internas/JSDoc.
+- [ ] F11.1 Definição de KPIs/SLOs de refatoração.
+- [ ] F11.2 Histórico de métricas persistido e validado.
+- [ ] F11.3 Relatório periódico de tendência publicado.
+- [ ] F12.1 Execução da janela de estabilização final.
+- [ ] F12.2 Corte/depreciação do legado residual.
+- [ ] F12.3 Governança contínua ROADMAP/PLANO/backlog ativa.
+
+## Quadro técnico profundo por subfase (como executar)
+
+### Artefatos executados na F7
+
+- `DOCUMENTAÇÃO/HOOKS/F7-INVENTARIO-SCRIPT-LIB-2026-03-16.md`
+- `DOCUMENTAÇÃO/HOOKS/F7-MATRIZ-ACOPLAMENTO-2026-03-16.md`
+- `.github/hooks/scripts/verify-script-lib-coverage.sh`
+- `.github/hooks/scripts/export-script-lib-index.sh`
+- `.github/hooks/hooks-lib/testing/export-script-lib-index-lib.sh`
+- `.github/hooks/state/f7-script-lib-index.json`
+- Entradas canônicas por subpasta criadas para módulos legados (`runtime/common|config`, `policy/policy`, `lifecycle/session-*`).
+
+> Status F7.7: **concluído** (contrapartes canônicas disponíveis e inversão root->shim aplicada).
+>
+> Status F7.8: **concluído** (índice machine-readable publicado e validado com `scripts_total=42` e `coverage.none=0`).
+>
+> Status F7.9: **concluído** (`hooks-lib/README.md` e `hooks-lib/*/README.md` padronizados com naming canônico).
+
+### F7 — Auditoria sistêmica
+
+- **F7.0**: consolidar taxonomia estrutural (auto, manual-runtime, manual-user, manutenção),
+  publicar matriz Script↔Lib e registrar gaps de scripts sem lib explícita.
+- **F7.1**: gerar inventário de dependências reais (`scripts`, `hooks-lib`, `contracts`) e marcar funções públicas sem consumidor explícito.
+- **F7.2**: construir matriz de acoplamento com risco/impacto/rollback por domínio.
+- **F7.3**: converter matriz em backlog acionável com owner, prioridade e sequência.
+- **F7.4**: criar arquivo lib dedicado para cada script órfão e preparar migração incremental de responsabilidades.
+- **F7.5**: materializar subpastas canônicas em `hooks-lib/` e realocar módulos por domínio com shims de compatibilidade.
+- **F7.6**: implantar verificação automatizada para impedir novos scripts sem lib relacionada e libs fora da taxonomia.
+- **F7.7**: migrar módulos legados do root (`common/config/policy/session-*`) para subpastas alvo com shims de transição.
+- **F7.8**: gerar índice machine-readable com rastreio completo script/lib/domínio/owner.
+- **F7.9**: consolidar documentação de domínio por subpasta e regra única de naming.
+- **F7.10**: plugar verificador estrutural em rotina padrão de validação (task local e/ou pipeline).
+
+**Done Definition F7**:
+
+- taxonomia estrutural publicada e versionada,
+- matriz Script↔Lib completa com gaps/owners,
+- libs dedicadas criadas para scripts órfãos,
+- árvore `hooks-lib/` reorganizada por subpastas canônicas,
+- módulos legados de root migrados ou shims explicitamente controlados,
+- índice machine-readable publicado e versionado,
+- inventário publicado,
+- matriz P0/P1/P2 fechada,
+- backlog sincronizado em `pending-tasks.md`.
+
+### F8 — Contratos executáveis
+
+- **F8.1**: versionar contratos de autorização/continuidade/close em `contracts/`.
+- **F8.2**: criar cobertura de reason codes e payloads mínimos na suíte smoke.
+- **F8.3**: validar retrocompatibilidade (campos top-level + `hookSpecificOutput`).
+
+**Done Definition F8**:
+
+- contratos versionados com changelog,
+- checks contratuais verdes,
+- regressão de contrato detectável automaticamente.
+
+### F9 — Smoke granular e diagnóstico rápido
+
+- **F9.1**: separar V90/AS em suites menores por domínio funcional.
+- **F9.2**: padronizar harness de fixtures/sandbox (seed + teardown + replay).
+- **F9.3**: produzir relatório de triagem por domínio com causa provável.
+
+**Done Definition F9**:
+
+- split completo sem perda de cobertura,
+- reutilização de fixture padrão,
+- triagem de falha em até 5 minutos.
+
+### F10 — Decomposição monolítica final
+
+- **F10.1**: fatiar `agent-stop-lib.sh` em módulos de responsabilidade única.
+- **F10.2**: fatiar `common.sh` por domínio operacional.
+- **F10.3**: consolidar APIs internas e documentação JSDoc.
+
+**Done Definition F10**:
+
+- redução real de complexidade nos hotspots,
+- entry points mais magros,
+- paridade funcional preservada no smoke.
+
+### F11 — Observabilidade/SLO de evolução
+
+- **F11.1**: definir KPIs e SLOs oficiais do programa de refatoração.
+- **F11.2**: persistir histórico de métricas por janela.
+- **F11.3**: emitir relatório periódico com tendência e alertas.
+
+**Done Definition F11**:
+
+- metas e fontes de métricas explícitas,
+- histórico auditável versionado,
+- alertas operacionais acionáveis.
+
+### F12 — Fechamento rigoroso e governança contínua
+
+- **F12.1**: executar janela de estabilização com critérios de gate e rollback.
+- **F12.2**: cortar/deprecar legado residual com checklist formal.
+- **F12.3**: institucionalizar sincronismo contínuo ROADMAP/PLANO/backlog.
+
+**Done Definition F12**:
+
+- estabilidade comprovada na janela final,
+- legado residual removido/deprecado de forma segura,
+- rotina contínua de atualização documental ativa.

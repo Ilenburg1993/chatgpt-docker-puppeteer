@@ -1,0 +1,347 @@
+{
+  "generated_at": "2026-03-15T13:21:30Z",
+  "scripts_total": 42,
+  "coverage": {
+    "dedicated_lib": 29,
+    "inline_relation": 13,
+    "none": 0
+  },
+  "index": [
+    {
+      "script": "add-task.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/add-task-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "agent-stop.sh",
+      "trigger_type": "automatic",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/agent-stop-lib.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "analytics.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/analytics-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "complete-task.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/complete-task-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "continue-section.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/lifecycle/continue-section-lib.sh",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "error-occurred.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/audit/error-occurred-lib.sh",
+      "domain": "audit",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "export-metrics.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/export-metrics-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "export-script-lib-index.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/testing/export-script-lib-index-lib.sh",
+      "domain": "testing",
+      "owner": "hooks-quality"
+    },
+    {
+      "script": "generate-daily-report.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/audit/generate-daily-report-lib.sh",
+      "domain": "audit",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "generate-section-summary.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "generate-session-summary.sh",
+      "trigger_type": "manual-runtime",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/audit/generate-session-summary-lib.sh",
+      "domain": "audit",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "install-git-hooks.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/install-git-hooks-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "log-prompt.sh",
+      "trigger_type": "automatic",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "manual-session-init.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/lifecycle/manual-session-init-lib.sh",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "migrate-per-session-audit.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/migrate-per-session-audit-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "on-git-push.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/lifecycle/on-git-push-lib.sh",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "post-tool-use.sh",
+      "trigger_type": "automatic",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "pre-compact.sh",
+      "trigger_type": "automatic",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "pre-tool-use.sh",
+      "trigger_type": "automatic",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "read-transcript.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/audit/read-transcript-lib.sh",
+      "domain": "audit",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "reset-auth-violation.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/policy/reset-auth-violation-lib.sh",
+      "domain": "policy",
+      "owner": "hooks-policy"
+    },
+    {
+      "script": "resolve-finding.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/resolve-finding-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "rotate-audit.sh",
+      "trigger_type": "manual-runtime",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/rotate-audit-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "save-finding.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/save-finding-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "section-end.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/lifecycle/section-end-lib.sh",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "session-checkpoint.sh",
+      "trigger_type": "manual-runtime",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/lifecycle/session-checkpoint-lib.sh",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "session-close.sh",
+      "trigger_type": "manual-runtime",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/lifecycle/session-close-lib.sh",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "session-end.sh",
+      "trigger_type": "automatic",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "session-reminder.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/lifecycle/session-reminder-lib.sh",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "session-start.sh",
+      "trigger_type": "automatic",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "smoke-test-domains.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/testing/smoke-test-domains-lib.sh",
+      "domain": "testing",
+      "owner": "hooks-quality"
+    },
+    {
+      "script": "smoke-test.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/agent-stop-lib.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "start-section.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "start-turn.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "subagent-start.sh",
+      "trigger_type": "automatic",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "subagent-stop.sh",
+      "trigger_type": "automatic",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "sync-tasks-to-docs.sh",
+      "trigger_type": "manual-runtime",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/sync-tasks-to-docs-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "sync-transcript-errors.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/audit/sync-transcript-errors-lib.sh",
+      "domain": "audit",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "tool-use-failure.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "inline-relation",
+      "related_lib": "hooks-lib/common.sh",
+      "domain": "legacy-root",
+      "owner": "hooks-runtime"
+    },
+    {
+      "script": "verify-hook-delivery.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/verify-hook-delivery-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    },
+    {
+      "script": "verify-script-lib-coverage.sh",
+      "trigger_type": "manual-user",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/testing/verify-script-lib-coverage-lib.sh",
+      "domain": "testing",
+      "owner": "hooks-quality"
+    },
+    {
+      "script": "watchdog.sh",
+      "trigger_type": "manual-runtime",
+      "relation_type": "dedicated-lib",
+      "related_lib": "hooks-lib/maintenance/watchdog-lib.sh",
+      "domain": "maintenance",
+      "owner": "hooks-ops"
+    }
+  ]
+}

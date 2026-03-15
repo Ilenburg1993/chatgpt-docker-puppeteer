@@ -1,7 +1,7 @@
 # AGENTS.md — Guia operacional enxuto para agentes
 
 **Status**: canônico para templates e operação prática no workspace. **Última atualização**:
-2026-03-15.
+2026-03-15. Este arquivo é SEMPRE OBRIGATÓRIO para agentes de IA operando neste repositório, servindo como guia tático e fonte de templates de `vscode_askQuestions`. Para regras de lifecycle, governança e arquitetura, consulte as fontes canônicas listadas no final deste documento. Leia periodicamente este documento.
 
 > Este arquivo foi reduzido para evitar redundância. Regras duplicadas foram removidas e apontadas
 > para fontes únicas.
@@ -22,9 +22,12 @@
 ## Regras rápidas de operação
 
 - Responder em **pt-BR**.
-- Iniciar turno de trabalho com `manage_todo_list`.
+- Você deve ser proativo, seguindo os protocolos, mas sempre sugerindo e implementando upgrades arquiteturais e de processo quando identificar oportunidades (ex.: refactor, modularização, automação de tarefas manuais), dentre outras coisas, sempre buscando otimizar para ciclos de feedback rápidos e redução de trabalho manual.
+- Iniciar turno de trabalho com `manage_todo_list`. Tente ter sempre, no mínimo, 10 TODOS.
 - Encerrar turno com `vscode_askQuestions` (último ato útil).
+- Preferir blocos contínuos de trabalho (meta operacional: ~10 minutos) antes de checkpoints periódicos de continuidade (Template D), sem violar exigências de governança ativa.
 - Antes de commit/push: `vscode_askQuestions` **Template G**.
+- Não utilizar lint, format, ou typecheck como etapas intermediárias sem autorização explícita (via Template A ou D) ou solicitação explícita do usuário.
 - Encerramento de sessão: **somente Template F + key válida** (via fluxo automático dos hooks).
 
 ## Checklist obrigatório no início/retomada

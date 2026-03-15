@@ -1,4 +1,13 @@
 #!/bin/bash
+
+# F7.7 shim canônico: root delega para lifecycle/session-end-aux.sh.
+if [[ "${HOOKS_LIB_BYPASS_SESSION_END_AUX_SHIM:-0}" != "1" ]]; then
+    _hooks_lib_root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # shellcheck disable=SC1091
+    source "${_hooks_lib_root_dir}/lifecycle/session-end-aux.sh"
+    return 0
+fi
+
 # shellcheck shell=bash
 # session-end-aux.sh — pós-processamento auxiliar (fail-open) de session-end
 

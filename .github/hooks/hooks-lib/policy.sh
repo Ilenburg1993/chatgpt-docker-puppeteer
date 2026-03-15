@@ -1,4 +1,13 @@
 #!/bin/bash
+
+# F7.7 shim canônico: root delega para policy/policy.sh.
+if [[ "${HOOKS_LIB_BYPASS_POLICY_SHIM:-0}" != "1" ]]; then
+    _hooks_lib_root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # shellcheck disable=SC1091
+    source "${_hooks_lib_root_dir}/policy/policy.sh"
+    return 0
+fi
+
 # hooks-lib/policy.sh — Núcleo canônico de policy de autorização/continuidade.
 #
 # Este módulo concentra funções de classificação/validação usadas por:

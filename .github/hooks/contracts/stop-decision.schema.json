@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/.github/hooks/contracts/stop-decision.schema.json",
+  "title": "Stop Decision Output Contract",
+  "description": "Contrato executável do payload de decisão do hook agentStop (modo block), incluindo shape top-level legado e hookSpecificOutput canônico.",
+  "type": "object",
+  "required": ["decision", "reason", "hookSpecificOutput"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["block"]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decisionReason": {
+      "type": ["string", "null"],
+      "description": "Campo top-level legado para compatibilidade com runtimes antigos."
+    },
+    "hookSpecificOutput": {
+      "type": "object",
+      "required": ["hookEventName", "decision", "reason"],
+      "properties": {
+        "hookEventName": {
+          "type": "string",
+          "enum": ["Stop"]
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["block"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "systemMessage": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": true
+}

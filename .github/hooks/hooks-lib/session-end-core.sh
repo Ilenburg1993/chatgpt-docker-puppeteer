@@ -1,4 +1,13 @@
 #!/bin/bash
+
+# F7.7 shim canônico: root delega para lifecycle/session-end-core.sh.
+if [[ "${HOOKS_LIB_BYPASS_SESSION_END_CORE_SHIM:-0}" != "1" ]]; then
+    _hooks_lib_root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # shellcheck disable=SC1091
+    source "${_hooks_lib_root_dir}/lifecycle/session-end-core.sh"
+    return 0
+fi
+
 # shellcheck shell=bash
 # session-end-core.sh — núcleo crítico de lifecycle do session-end
 
