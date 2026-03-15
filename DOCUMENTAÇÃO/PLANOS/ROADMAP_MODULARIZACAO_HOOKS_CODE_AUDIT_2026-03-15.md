@@ -875,6 +875,10 @@ de orquestração de runtime, auditoria e integração entre guards.
 **Status F13.1 (concluído em 2026-03-15)**: contrato canônico materializado em
 `DOCUMENTAÇÃO/HOOKS/F13-1-CONTRATO-ENTRYPOINT-HOOKS-AUTOMATICOS.md`.
 
+**Status F13.2 (concluído em 2026-03-15)**: matriz dedicada publicada em
+`DOCUMENTAÇÃO/HOOKS/F13-2-MATRIZ-HOOK-SCRIPT-LIB-OWNER-2026-03-15.md` e artefato
+machine-readable em `.github/hooks/state/f13-hook-script-lib-owner.json`.
+
 - **F13.1** Congelar contrato canônico de script automático (`bootstrap + source libs + dispatch + saída padronizada`).
 - **F13.2** Publicar matriz `hook automático -> script -> lib(s) -> owner -> domínio`.
 - **F13.3** Definir regra objetiva de “script fino” (limite de responsabilidade inline por script).
@@ -908,7 +912,7 @@ de orquestração de runtime, auditoria e integração entre guards.
 ### TODO mestre (novo pacote F13→F16)
 
 - [x] **F13.1** Contrato canônico de entrypoint para hooks automáticos.
-- [ ] **F13.2** Matriz completa `hook->script->libs->owner` publicada.
+- [x] **F13.2** Matriz completa `hook->script->libs->owner` publicada.
 - [ ] **F13.3** Critério objetivo de “script fino” formalizado.
 - [ ] **F14.1** Criar libs dedicadas faltantes para todos os hooks automáticos.
 - [ ] **F14.2** Migrar lógica de negócio dos scripts automáticos para libs dedicadas.

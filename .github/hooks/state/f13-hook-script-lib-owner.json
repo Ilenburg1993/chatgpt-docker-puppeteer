@@ -1,0 +1,122 @@
+{
+  "generated_at": "2026-03-15T00:00:00Z",
+  "phase": "F13.2",
+  "source": ".github/hooks/copilot-hooks.json",
+  "entries": [
+    {
+      "hook": "sessionStart",
+      "script": "scripts/session-start.sh",
+      "libs_loaded": [
+        "hooks-lib/common.sh",
+        "hooks-lib/session-start-aux.sh",
+        "hooks-lib/session-start-core.sh"
+      ],
+      "target_entry_lib": "hooks-lib/lifecycle/session-start-lib.sh",
+      "target_entry_function": "run_session_start_hook",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime",
+      "status": "needs-entry-lib"
+    },
+    {
+      "hook": "userPromptSubmitted",
+      "script": "scripts/log-prompt.sh",
+      "libs_loaded": [
+        "hooks-lib/common.sh"
+      ],
+      "target_entry_lib": "hooks-lib/lifecycle/log-prompt-lib.sh",
+      "target_entry_function": "run_log_prompt_hook",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime",
+      "status": "needs-entry-lib"
+    },
+    {
+      "hook": "preToolUse",
+      "script": "scripts/pre-tool-use.sh",
+      "libs_loaded": [
+        "hooks-lib/common.sh",
+        "hooks-lib/policy.sh"
+      ],
+      "target_entry_lib": "hooks-lib/policy/pre-tool-use-lib.sh",
+      "target_entry_function": "run_pre_tool_use_hook",
+      "domain": "policy",
+      "owner": "hooks-policy",
+      "status": "needs-entry-lib"
+    },
+    {
+      "hook": "postToolUse",
+      "script": "scripts/post-tool-use.sh",
+      "libs_loaded": [
+        "hooks-lib/common.sh",
+        "hooks-lib/policy.sh"
+      ],
+      "target_entry_lib": "hooks-lib/policy/post-tool-use-lib.sh",
+      "target_entry_function": "run_post_tool_use_hook",
+      "domain": "policy",
+      "owner": "hooks-policy",
+      "status": "needs-entry-lib"
+    },
+    {
+      "hook": "agentStop",
+      "script": "scripts/agent-stop.sh",
+      "libs_loaded": [
+        "hooks-lib/agent-stop-lib.sh",
+        "hooks-lib/common.sh"
+      ],
+      "target_entry_lib": "hooks-lib/agent-stop-lib.sh",
+      "target_entry_function": "run_agent_stop_hook",
+      "domain": "policy",
+      "owner": "hooks-policy",
+      "status": "entry-lib-exists-modularize-later"
+    },
+    {
+      "hook": "subagentStart",
+      "script": "scripts/subagent-start.sh",
+      "libs_loaded": [
+        "hooks-lib/common.sh"
+      ],
+      "target_entry_lib": "hooks-lib/lifecycle/subagent-start-lib.sh",
+      "target_entry_function": "run_subagent_start_hook",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime",
+      "status": "needs-entry-lib"
+    },
+    {
+      "hook": "subagentStop",
+      "script": "scripts/subagent-stop.sh",
+      "libs_loaded": [
+        "hooks-lib/common.sh"
+      ],
+      "target_entry_lib": "hooks-lib/lifecycle/subagent-stop-lib.sh",
+      "target_entry_function": "run_subagent_stop_hook",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime",
+      "status": "needs-entry-lib"
+    },
+    {
+      "hook": "preCompact",
+      "script": "scripts/pre-compact.sh",
+      "libs_loaded": [
+        "hooks-lib/common.sh"
+      ],
+      "target_entry_lib": "hooks-lib/lifecycle/pre-compact-lib.sh",
+      "target_entry_function": "run_pre_compact_hook",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime",
+      "status": "needs-entry-lib"
+    },
+    {
+      "hook": "sessionEnd",
+      "script": "scripts/session-end.sh",
+      "libs_loaded": [
+        "hooks-lib/common.sh",
+        "hooks-lib/session-end-aux.sh",
+        "hooks-lib/session-end-core.sh"
+      ],
+      "target_entry_lib": "hooks-lib/lifecycle/session-end-lib.sh",
+      "target_entry_function": "run_session_end_hook",
+      "domain": "lifecycle",
+      "owner": "hooks-runtime",
+      "status": "needs-entry-lib"
+    }
+  ]
+}

@@ -673,6 +673,10 @@ com `agent-stop.sh` como referência de integração. A decomposição de
 
 > Status F13.1 (concluído em 2026-03-15): contrato canônico publicado em
 > `DOCUMENTAÇÃO/HOOKS/F13-1-CONTRATO-ENTRYPOINT-HOOKS-AUTOMATICOS.md`.
+>
+> Status F13.2 (concluído em 2026-03-15): matriz dedicada publicada em
+> `DOCUMENTAÇÃO/HOOKS/F13-2-MATRIZ-HOOK-SCRIPT-LIB-OWNER-2026-03-15.md` e JSON
+> machine-readable em `.github/hooks/state/f13-hook-script-lib-owner.json`.
 
 - Definir contrato canônico de script automático (bootstrap, source de libs, dispatch único, output).
 - Publicar matriz `hook->script->libs->owner` para os 9 hooks automáticos.
@@ -699,7 +703,7 @@ com `agent-stop.sh` como referência de integração. A decomposição de
 #### TODO mestre incremental (F13→F16)
 
 - [x] F13.1 Contrato canônico de entrypoint dos hooks automáticos.
-- [ ] F13.2 Matriz `hook->script->libs->owner` concluída para 9 hooks.
+- [x] F13.2 Matriz `hook->script->libs->owner` concluída para 9 hooks.
 - [ ] F13.3 Critério de “script fino” formalizado e medível.
 - [ ] F14.1 Lib dedicada criada para cada hook automático ainda sem entrypoint dedicado.
 - [ ] F14.2 Migração da lógica de domínio para libs dedicadas.
