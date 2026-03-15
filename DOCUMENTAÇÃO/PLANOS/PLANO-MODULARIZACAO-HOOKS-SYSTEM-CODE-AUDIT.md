@@ -671,6 +671,9 @@ com `agent-stop.sh` como referência de integração. A decomposição de
 
 #### F13 — Baseline do padrão de entrypoint
 
+> Status F13.1 (concluído em 2026-03-15): contrato canônico publicado em
+> `DOCUMENTAÇÃO/HOOKS/F13-1-CONTRATO-ENTRYPOINT-HOOKS-AUTOMATICOS.md`.
+
 - Definir contrato canônico de script automático (bootstrap, source de libs, dispatch único, output).
 - Publicar matriz `hook->script->libs->owner` para os 9 hooks automáticos.
 - Formalizar critério de “script fino” (limite de responsabilidade inline).
@@ -695,7 +698,7 @@ com `agent-stop.sh` como referência de integração. A decomposição de
 
 #### TODO mestre incremental (F13→F16)
 
-- [ ] F13.1 Contrato canônico de entrypoint dos hooks automáticos.
+- [x] F13.1 Contrato canônico de entrypoint dos hooks automáticos.
 - [ ] F13.2 Matriz `hook->script->libs->owner` concluída para 9 hooks.
 - [ ] F13.3 Critério de “script fino” formalizado e medível.
 - [ ] F14.1 Lib dedicada criada para cada hook automático ainda sem entrypoint dedicado.

@@ -872,6 +872,9 @@ de orquestração de runtime, auditoria e integração entre guards.
 
 ### F13 — Baseline e contratos de entrypoint (auto hooks)
 
+**Status F13.1 (concluído em 2026-03-15)**: contrato canônico materializado em
+`DOCUMENTAÇÃO/HOOKS/F13-1-CONTRATO-ENTRYPOINT-HOOKS-AUTOMATICOS.md`.
+
 - **F13.1** Congelar contrato canônico de script automático (`bootstrap + source libs + dispatch + saída padronizada`).
 - **F13.2** Publicar matriz `hook automático -> script -> lib(s) -> owner -> domínio`.
 - **F13.3** Definir regra objetiva de “script fino” (limite de responsabilidade inline por script).
@@ -904,7 +907,7 @@ de orquestração de runtime, auditoria e integração entre guards.
 
 ### TODO mestre (novo pacote F13→F16)
 
-- [ ] **F13.1** Contrato canônico de entrypoint para hooks automáticos.
+- [x] **F13.1** Contrato canônico de entrypoint para hooks automáticos.
 - [ ] **F13.2** Matriz completa `hook->script->libs->owner` publicada.
 - [ ] **F13.3** Critério objetivo de “script fino” formalizado.
 - [ ] **F14.1** Criar libs dedicadas faltantes para todos os hooks automáticos.
