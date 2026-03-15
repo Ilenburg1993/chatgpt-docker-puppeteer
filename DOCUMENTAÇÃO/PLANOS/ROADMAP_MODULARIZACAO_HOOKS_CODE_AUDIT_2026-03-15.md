@@ -849,3 +849,70 @@ de orquestração de runtime, auditoria e integração entre guards.
   - **Entrega**: rito contínuo de atualização ROADMAP/PLANO/backlog.
   - **Evidência**: cadence definida (ex.: semanal) com responsáveis.
   - **Gate**: documentação sempre consistente com estado real.
+
+## Pacote de fases — Convergência Lib-First dos hooks automáticos (F13→F16)
+
+> Diretriz solicitada: todos os hooks automáticos do `copilot-hooks.json` devem operar no modelo
+> **script-orquestrador + libs de domínio**, usando `agent-stop.sh` como referência de integração
+> com lib dedicada. A decomposição interna de `agent-stop-lib.sh` permanece planejada para depois.
+
+### Escopo-alvo (hooks ativados automaticamente)
+
+| Hook Copilot | Script | Estado atual | Meta desta trilha |
+| --- | --- | --- | --- |
+| `sessionStart` | `session-start.sh` | usa `common.sh` + `session-start-core/aux.sh` | consolidar `session-start-lib.sh` como entrypoint dedicado + script fino |
+| `userPromptSubmitted` | `log-prompt.sh` | usa apenas `common.sh` | criar `log-prompt-lib.sh` e migrar lógica de domínio |
+| `preToolUse` | `pre-tool-use.sh` | usa `common.sh` + `policy.sh` | criar `pre-tool-use-lib.sh` e deixar script como bootstrap/dispatch |
+| `postToolUse` | `post-tool-use.sh` | usa `common.sh` + `policy.sh` | criar `post-tool-use-lib.sh` e reduzir lógica inline |
+| `agentStop` | `agent-stop.sh` | usa `common.sh` + `agent-stop-lib.sh` | manter como padrão de referência; modularizar `agent-stop-lib.sh` só em fase posterior |
+| `subagentStart` | `subagent-start.sh` | usa apenas `common.sh` | criar `subagent-start-lib.sh` e mover regras de negócio |
+| `subagentStop` | `subagent-stop.sh` | usa apenas `common.sh` | criar `subagent-stop-lib.sh` e mover regras de negócio |
+| `preCompact` | `pre-compact.sh` | usa apenas `common.sh` | criar `pre-compact-lib.sh` e mover regras de negócio |
+| `sessionEnd` | `session-end.sh` | usa `common.sh` + `session-end-core/aux.sh` | consolidar `session-end-lib.sh` como entrypoint dedicado + script fino |
+
+### F13 — Baseline e contratos de entrypoint (auto hooks)
+
+- **F13.1** Congelar contrato canônico de script automático (`bootstrap + source libs + dispatch + saída padronizada`).
+- **F13.2** Publicar matriz `hook automático -> script -> lib(s) -> owner -> domínio`.
+- **F13.3** Definir regra objetiva de “script fino” (limite de responsabilidade inline por script).
+
+**Gate F13**: todos os 9 hooks automáticos mapeados com contrato explícito de entrada/saída e owner.
+
+### F14 — Migração script-orquestrador + lib dedicada por hook
+
+- **F14.1** Criar libs dedicadas faltantes (`log-prompt-lib.sh`, `pre-tool-use-lib.sh`, `post-tool-use-lib.sh`, `subagent-start-lib.sh`, `subagent-stop-lib.sh`, `pre-compact-lib.sh`, `session-start-lib.sh`, `session-end-lib.sh`).
+- **F14.2** Migrar regras de negócio de cada script automático para sua lib dedicada.
+- **F14.3** Padronizar dispatch em todos os scripts automáticos para chamada única da função pública da lib.
+
+**Gate F14**: 100% dos hooks automáticos com lib dedicada e script atuando como entrypoint fino.
+
+### F15 — Redução de complexidade e modularização posterior do Stop
+
+- **F15.1** Consolidar padrão dos 8 hooks automáticos não-Stop já no modelo lib-first.
+- **F15.2** Iniciar decomposição interna de `agent-stop-lib.sh` em módulos menores (`stop-auth`, `stop-block`, `stop-subturn`, `stop-observability`).
+- **F15.3** Manter `agent-stop.sh` como orquestrador estável durante toda a quebra interna da lib.
+
+**Gate F15**: `agent-stop.sh` preservado como padrão de entrada; modularização interna da lib avançando sem regressão de contrato.
+
+### F16 — Enforcement estrutural e rollout
+
+- **F16.1** Expandir `verify-script-lib-coverage.sh` para exigir lib dedicada também para hooks automáticos (não só relação Script↔Lib genérica).
+- **F16.2** Adicionar checks no smoke (`legacy` + `domains`) validando padrão de entrypoint lib-first em todos os scripts automáticos.
+- **F16.3** Integrar gate no fluxo padrão (task local/CI) e registrar métricas de aderência por rodada.
+
+**Gate F16**: regressão de padrão lib-first em hooks automáticos bloqueada automaticamente antes de merge.
+
+### TODO mestre (novo pacote F13→F16)
+
+- [ ] **F13.1** Contrato canônico de entrypoint para hooks automáticos.
+- [ ] **F13.2** Matriz completa `hook->script->libs->owner` publicada.
+- [ ] **F13.3** Critério objetivo de “script fino” formalizado.
+- [ ] **F14.1** Criar libs dedicadas faltantes para todos os hooks automáticos.
+- [ ] **F14.2** Migrar lógica de negócio dos scripts automáticos para libs dedicadas.
+- [ ] **F14.3** Padronizar dispatch único por script automático.
+- [ ] **F15.1** Consolidar 8 hooks não-Stop no padrão lib-first.
+- [ ] **F15.2** Modularizar internamente `agent-stop-lib.sh` em módulos menores.
+- [ ] **F15.3** Preservar estabilidade contratual de `agent-stop.sh` durante a quebra da lib.
+- [ ] **F16.1** Enforcement no verificador estrutural para hooks automáticos.
+- [ ] **F16.2** Cobertura smoke de aderência lib-first para hooks automáticos.
+- [ ] **F16.3** Gate integrado em fluxo padrão com métricas de aderência.

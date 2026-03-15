@@ -649,3 +649,61 @@ F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A part
 - estabilidade comprovada na janela final,
 - legado residual removido/deprecado de forma segura,
 - rotina contínua de atualização documental ativa.
+
+### F13–F16 — Convergência lib-first para hooks automáticos
+
+Diretriz desta trilha: todos os hooks ativados automaticamente via
+`.github/hooks/copilot-hooks.json` devem seguir padrão **script-orquestrador + lib dedicada**,
+com `agent-stop.sh` como referência de integração. A decomposição de
+`agent-stop-lib.sh` fica explicitamente para fase posterior.
+
+#### Hooks no escopo
+
+- `session-start.sh`
+- `log-prompt.sh`
+- `pre-tool-use.sh`
+- `post-tool-use.sh`
+- `agent-stop.sh`
+- `subagent-start.sh`
+- `subagent-stop.sh`
+- `pre-compact.sh`
+- `session-end.sh`
+
+#### F13 — Baseline do padrão de entrypoint
+
+- Definir contrato canônico de script automático (bootstrap, source de libs, dispatch único, output).
+- Publicar matriz `hook->script->libs->owner` para os 9 hooks automáticos.
+- Formalizar critério de “script fino” (limite de responsabilidade inline).
+
+#### F14 — Migração dos hooks automáticos para libs dedicadas
+
+- Criar libs dedicadas faltantes por hook automático.
+- Migrar lógica de domínio para libs dedicadas.
+- Reduzir scripts automáticos a orquestração + chamadas de lib.
+
+#### F15 — Continuidade com foco no Stop
+
+- Consolidar padrão lib-first nos 8 hooks não-Stop.
+- Iniciar modularização interna de `agent-stop-lib.sh` (módulos menores).
+- Manter `agent-stop.sh` estável como entrypoint de referência durante a quebra.
+
+#### F16 — Enforcement e rollout
+
+- Expandir verificador estrutural para exigir padrão lib-first nos hooks automáticos.
+- Cobrir aderência no smoke (`legacy` + `domains`).
+- Integrar gate no fluxo padrão (local/CI) com métrica de aderência por rodada.
+
+#### TODO mestre incremental (F13→F16)
+
+- [ ] F13.1 Contrato canônico de entrypoint dos hooks automáticos.
+- [ ] F13.2 Matriz `hook->script->libs->owner` concluída para 9 hooks.
+- [ ] F13.3 Critério de “script fino” formalizado e medível.
+- [ ] F14.1 Lib dedicada criada para cada hook automático ainda sem entrypoint dedicado.
+- [ ] F14.2 Migração da lógica de domínio para libs dedicadas.
+- [ ] F14.3 Scripts automáticos padronizados como orquestradores finos.
+- [ ] F15.1 Consolidação dos 8 hooks não-Stop no padrão lib-first.
+- [ ] F15.2 Modularização interna de `agent-stop-lib.sh` em módulos menores.
+- [ ] F15.3 Estabilidade contratual de `agent-stop.sh` preservada durante decomposição.
+- [ ] F16.1 Enforcement estrutural obrigatório para hooks automáticos.
+- [ ] F16.2 Cobertura smoke de aderência lib-first para auto hooks.
+- [ ] F16.3 Gate integrado em fluxo padrão + rastreio de aderência.
