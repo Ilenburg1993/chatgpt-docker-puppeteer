@@ -22,16 +22,22 @@ else
 fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 # CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
-INPUT="$(cat 2> /dev/null || true)"
+if command -v resolve_hook_runtime_input > /dev/null 2>&1; then
+    resolve_hook_runtime_input
+else
+    INPUT="$(cat 2> /dev/null || true)"
+    TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+    SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+    apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
+fi
 
 # Extrai campos usando o schema real (snake_case)
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
 TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // ""' 2> /dev/null || echo '')"
 TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2> /dev/null || echo '')"
 TOOL_RESPONSE="$(echo "$INPUT" | jq -r '.tool_response // ""' 2> /dev/null || echo '')"
 
 # session_id vem diretamente do payload (UUID real do Copilot)
-SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+SESSION_ID="${SESSION_ID_PAYLOAD:-}"
 
 # Fallback: se session_id não veio do payload, usa o do contexto
 if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
@@ -66,6 +72,7 @@ elif echo "$TOOL_RESPONSE" | grep -qiE \
 else
     RESULT_TYPE="success"
 fi
+POST_HOOK_OUTPUT=""
 
 # Append em audit.jsonl (sem logar tool_response completo — pode ser grande)
 jq -cn \
@@ -92,93 +99,30 @@ fi
 # HARDENING v5: previne contaminação cruzada entre sessões.
 # HEAL v1: quando CTX_FILE é de manual_recovery, adota session_id real do Copilot.
 # FIX BUG-06: também trata inline_restart — CTX já tem o session_id correto do VS Code.
+# Guard canônico centralizado em reconcile_session_id_guard_prepost() —
+# emite evento "session_id_mismatch" quando o caso é não recuperável.
 # Se o payload carrega session_id diferente do contexto ativo,
 # logamos mismatch e NÃO modificamos session-context.json.
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then
-        CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-        if [ "$CTX_SOURCE" = "manual_recovery" ]; then
-            NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
-            if command -v sponge &> /dev/null; then
-                jq --arg real_sid "$SESSION_ID" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-            else
-                _TMP_HEAL="$(mktemp)"
-                if jq --arg real_sid "$SESSION_ID" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
-                    "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
-                    mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
-                else
-                    rm -f "$_TMP_HEAL"
-                fi
-            fi
-            jq -cn \
-                --arg event "session_id_healed" \
-                --arg old "$CTX_ACTIVE_SID" \
-                --arg new "$SESSION_ID" \
-                --arg source "post-tool-use.sh" \
-                --arg tool "$TOOL_NAME" \
-                --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
-                '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, tool: $tool, timestamp: $ts,
-                  message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
-                >> "$AUDIT_FILE"
-            # SESSION_ID já tem o valor correto — continua
-        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
-            # FIX BUG-06: inline_restart — CTX tem o session_id correto do VS Code (PREMISSA 1).
-            # Payload está stale. Adotamos CTX como verdade; não bloqueamos.
-            SESSION_ID="$CTX_ACTIVE_SID"
-            # GAP-O1: limita log de inline_restart para evitar ruído excessivo
-            _SYNCS_INLINE="$(jq -r '.session_stats.session_id_syncs_inline // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-            if [ "$_SYNCS_INLINE" -lt 5 ]; then
-                jq -cn \
-                    --arg event "session_id_sync_inline_restart" \
-                    --arg stale "$SESSION_ID" \
-                    --arg adopted "$CTX_ACTIVE_SID" \
-                    --arg source "post-tool-use.sh" \
-                    --arg tool "$TOOL_NAME" \
-                    --arg ts "${TIMESTAMP:-}" \
-                    '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
-                      source: $source, tool: $tool, timestamp: $ts,
-                      message: "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"}' \
-                    >> "$AUDIT_FILE"
-            elif [ "$_SYNCS_INLINE" -eq 5 ]; then
-                jq -cn --arg event "session_id_sync_inline_restart_cap" --arg source "post-tool-use.sh" \
-                    '{event: $event, source: $source, message: "inline_restart sync count reached cap (5) — logs suprimidos daqui em diante"}' \
-                    >> "$AUDIT_FILE"
-            fi
-            # GAP-03: incrementa contador de syncs inline no CTX
-            if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-                jq '.session_stats.session_id_syncs_inline = ((.session_stats.session_id_syncs_inline // 0) + 1)' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-            fi
-            # Continua normalmente
-        else
-            jq -cn \
-                --arg event "session_id_mismatch" \
-                --arg expected "$CTX_ACTIVE_SID" \
-                --arg got "$SESSION_ID" \
-                --arg source "post-tool-use.sh" \
-                --arg tool "$TOOL_NAME" \
-                --arg ts "${TIMESTAMP:-}" \
-                '{
-                    event:    $event,
-                    expected: $expected,
-                    got:      $got,
-                    source:   $source,
-                    tool:     $tool,
-                    timestamp: $ts,
-                    message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-                }' >> "$AUDIT_FILE"
-            # GAP-03: incrementa contador de mismatches no CTX antes de sair
-            if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-                jq '.session_stats.session_id_mismatches = ((.session_stats.session_id_mismatches // 0) + 1)' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-            fi
+        _GUARD_RC=0
+        _GUARD_RECONCILED_SID="$(reconcile_session_id_guard_prepost "$SESSION_ID" "$TOOL_NAME" "${TIMESTAMP:-}" "post-tool-use.sh")" || _GUARD_RC=$?
+        if [ -n "$_GUARD_RECONCILED_SID" ]; then
+            SESSION_ID="$_GUARD_RECONCILED_SID"
+        fi
+
+        if [ "$_GUARD_RC" -eq 10 ]; then
             exit 0
         fi
     fi
+fi
+
+# ── Backfill canônico da flag strict de fechamento de TURN ──────────────────
+# Alguns contextos antigos/reconectados podem chegar sem essa flag persistida.
+# Força convergência para true quando ausente, preservando false explícito.
+if command -v ensure_strict_turn_close_flag_default > /dev/null 2>&1; then
+    ensure_strict_turn_close_flag_default "$CTX_FILE" > /dev/null 2>&1 || true
 fi
 
 # ── Atualiza contexto — Schema v3 ────────────────────────────────────────────
@@ -229,6 +173,45 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
 
         # Lê close_key atual do contexto e valida de forma estruturada no payload de answers
         CURRENT_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        ASK_TEMPLATE_F=false
+        ASK_HAS_TEMPLATE_F_OPTION=false
+        ASK_CLOSE_ACTION="not_applicable"
+
+        # Detecta se o askQuestions enviado foi Template F (Session Close).
+        # Critérios: presença da close_key no prompt OU assinatura textual de encerramento.
+        if [ -n "$CURRENT_CLOSE_KEY" ] && echo "$INPUT" | jq -e --arg key "$CURRENT_CLOSE_KEY" '
+                                [
+                                    (.tool_input.questions? // [])[]?
+                                    | ((.header // "") + " " + (.question // ""))
+                                ]
+                                | any(type == "string" and contains($key))
+                        ' > /dev/null 2>&1; then
+            ASK_TEMPLATE_F=true
+        elif echo "$INPUT" | jq -e '
+                                [
+                                    (.tool_input.questions? // [])[]?
+                                    | ((.header // "") + " " + (.question // ""))
+                                ]
+                                | any(test("template f|encerrar session|encerrar sessão|session close|close key"; "i"))
+                        ' > /dev/null 2>&1; then
+            ASK_TEMPLATE_F=true
+        fi
+
+        # Toda chamada askQuestions deve expor opção de escalonamento para Template F.
+        # Se já for o próprio Template F, considera-se requisito atendido.
+        if [ "$ASK_TEMPLATE_F" = "true" ]; then
+            ASK_HAS_TEMPLATE_F_OPTION=true
+        elif echo "$INPUT" | jq -e '
+                                [
+                                    (.tool_input.questions? // [])[]?
+                                    | (.options? // [])[]?
+                                    | ((.label // "") + " " + (.description // ""))
+                                ]
+                                | any(test("template f|encerrar sess(ã|a)o|session close|close key|escalar"; "i"))
+                        ' > /dev/null 2>&1; then
+            ASK_HAS_TEMPLATE_F_OPTION=true
+        fi
+
         KEY_FOUND=false
         if [ -n "$CURRENT_CLOSE_KEY" ]; then
             # Formato esperado do vscode_askQuestions:
@@ -258,6 +241,183 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
             fi
         fi
 
+        # Classifica a ação de fechamento quando Template F foi emitido.
+        # close_with_key: usuário confirmou com key válida
+        # close_without_valid_key: usuário tentou encerrar sem key válida
+        # cancel_or_continue: usuário explicitamente cancelou/continuou
+        # unknown: resposta ambígua
+        if [ "$ASK_TEMPLATE_F" = "true" ]; then
+            ASK_HAS_CLOSE_INTENT=false
+            ASK_HAS_CANCEL_INTENT=false
+            ASK_HAS_FREE_TEXT=false
+
+            if echo "$TOOL_RESPONSE" | jq -e '
+                                [
+                                    (.answers? // {})
+                                    | to_entries[]?
+                                    | .value
+                                    | if type == "object" then
+                                            ((.selected? // []))
+                                        elif type == "string" then
+                                            [.]
+                                        else
+                                            []
+                                        end
+                                    | .[]
+                                    | select(type == "string")
+                                ]
+                                | any(test("encerrar|fechar|close"; "i"))
+                        ' > /dev/null 2>&1; then
+                ASK_HAS_CLOSE_INTENT=true
+            fi
+
+            if echo "$TOOL_RESPONSE" | jq -e '
+                                [
+                                    (.answers? // {})
+                                    | to_entries[]?
+                                    | .value
+                                    | if type == "object" then
+                                            ((.selected? // []))
+                                        elif type == "string" then
+                                            [.]
+                                        else
+                                            []
+                                        end
+                                    | .[]
+                                    | select(type == "string")
+                                ]
+                                | any(test("cancelar|continuar|manter"; "i"))
+                        ' > /dev/null 2>&1; then
+                ASK_HAS_CANCEL_INTENT=true
+            fi
+
+            if echo "$TOOL_RESPONSE" | jq -e '
+                                [
+                                    (.answers? // {})
+                                    | to_entries[]?
+                                    | .value
+                                    | .freeText? // empty
+                                    | select(type == "string" and length > 0)
+                                ]
+                                | length > 0
+                        ' > /dev/null 2>&1; then
+                ASK_HAS_FREE_TEXT=true
+            fi
+
+            if [ "$KEY_FOUND" = "true" ]; then
+                ASK_CLOSE_ACTION="close_with_key"
+            elif [ "$ASK_HAS_CLOSE_INTENT" = "true" ] && [ "$ASK_HAS_CANCEL_INTENT" != "true" ]; then
+                ASK_CLOSE_ACTION="close_without_valid_key"
+            elif [ "$ASK_HAS_CANCEL_INTENT" = "true" ] && [ "$ASK_HAS_CLOSE_INTENT" != "true" ]; then
+                ASK_CLOSE_ACTION="cancel_or_continue"
+            elif [ "$ASK_HAS_FREE_TEXT" = "true" ]; then
+                ASK_CLOSE_ACTION="close_without_valid_key"
+            else
+                ASK_CLOSE_ACTION="unknown"
+            fi
+        fi
+
+        TEMPLATE_F_REQUESTED_NEXT=false
+        if [ "$ASK_TEMPLATE_F" != "true" ] && echo "$TOOL_RESPONSE" | jq -e '
+                                [
+                                    (.answers? // {})
+                                    | to_entries[]?
+                                    | .value
+                                    | if type == "object" then
+                                            (([.freeText?] + (.selected? // [])))
+                                        elif type == "string" then
+                                            [.]
+                                        else
+                                            []
+                                        end
+                                    | .[]
+                                    | select(type == "string")
+                                ]
+                                | any(test("template f|session close|encerrar sess(ã|a)o|escalar"; "i"))
+                        ' > /dev/null 2>&1; then
+            TEMPLATE_F_REQUESTED_NEXT=true
+        fi
+
+        TEMPLATE_F_PENDING_BEFORE="$(jq -r '.session.template_f_request_pending // false' "$CTX_FILE" 2> /dev/null || echo false)"
+        TEMPLATE_F_PENDING_AFTER="$TEMPLATE_F_PENDING_BEFORE"
+        TEMPLATE_F_CALLED_WITHOUT_REQUEST=false
+        if [ "$ASK_TEMPLATE_F" = "true" ]; then
+            if [ "$TEMPLATE_F_PENDING_BEFORE" = "true" ]; then
+                TEMPLATE_F_PENDING_AFTER=false
+            else
+                TEMPLATE_F_CALLED_WITHOUT_REQUEST=true
+                TEMPLATE_F_PENDING_AFTER=false
+            fi
+        elif [ "$TEMPLATE_F_REQUESTED_NEXT" = "true" ]; then
+            TEMPLATE_F_PENDING_AFTER=true
+        fi
+
+        ASK_HAS_USER_ANSWER=false
+        if echo "$TOOL_RESPONSE" | jq -e '
+                                ((.answers? // {}) | to_entries | map(.value))
+                                | if length == 0 then false else
+                                    any(
+                                        if type == "object" then
+                                            ((.skipped // false) == false)
+                                            and (((.freeText // "") != "") or ((.selected // []) | length > 0) or (has("selected") | not))
+                                        elif type == "string" then
+                                            (. != "")
+                                        else
+                                            false
+                                        end
+                                    )
+                                  end
+                        ' > /dev/null 2>&1; then
+            ASK_HAS_USER_ANSWER=true
+        fi
+
+        ASK_CONTINUATION_CLEAR=true
+        ASK_CONTINUATION_UNCLEAR=false
+        if [ "$ASK_TEMPLATE_F" != "true" ] && [ "$ASK_HAS_USER_ANSWER" = "true" ]; then
+            if echo "$TOOL_RESPONSE" | jq -e '
+                                [
+                                    (.answers? // {})
+                                    | to_entries[]?
+                                    | .value
+                                    | if type == "object" then
+                                          (((.selected? // []) | length) > 0)
+                                          or (
+                                              ((.freeText? // "") | type == "string")
+                                              and (
+                                                  ((.freeText // "") | length) >= 24
+                                                  or ((.freeText // "") | test("(auditar|auditoria|analis|investig|corrig|implem|test|valid|document|refator|execut|rodar|planej|upgrade|review|fix|debug|lint|typecheck|smoke)"; "i"))
+                                              )
+                                          )
+                                      elif type == "string" then
+                                          ((. | length) >= 24)
+                                          or (test("(auditar|auditoria|analis|investig|corrig|implem|test|valid|document|refator|execut|rodar|planej|upgrade|review|fix|debug|lint|typecheck|smoke)"; "i"))
+                                      else
+                                          false
+                                      end
+                                ]
+                                | any
+                        ' > /dev/null 2>&1; then
+                ASK_CONTINUATION_CLEAR=true
+            else
+                ASK_CONTINUATION_CLEAR=false
+            fi
+
+            if [ "$ASK_CONTINUATION_CLEAR" != "true" ]; then
+                ASK_CONTINUATION_UNCLEAR=true
+            fi
+        fi
+
+        SUBTURN_ID_CURR="$(jq -r '.current_turn.subturn.subturn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        SUBTURN_NUMBER_CURR="$(jq -r '.current_turn.subturn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+        SUBTURN_FROM_STATE="$(jq -r '.current_turn.subturn.state // "active"' "$CTX_FILE" 2> /dev/null || echo 'active')"
+        TURN_ID_CURR="$(jq -r '.current_turn.turn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        SUBTURN_TO_STATE="waiting_user"
+        SUBTURN_REASON="askquestions_missing_answer"
+        if [ "$ASK_HAS_USER_ANSWER" = "true" ]; then
+            SUBTURN_TO_STATE="resumed"
+            SUBTURN_REASON="askquestions_response_processed"
+        fi
+
         # Log da resposta no audit.jsonl (sem dados sensíveis excessivos — truncada a 500 chars)
         RESPONSE_TRUNCATED="$(echo "$RESPONSE_STR" | head -c 500)"
         jq -cn \
@@ -267,6 +427,12 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
             --arg response "$RESPONSE_TRUNCATED" \
             --argjson key_found "$KEY_FOUND" \
             --argjson api_failed "$ASK_API_FAILED" \
+            --argjson template_f "$ASK_TEMPLATE_F" \
+            --arg close_action "$ASK_CLOSE_ACTION" \
+            --argjson has_template_f_option "$ASK_HAS_TEMPLATE_F_OPTION" \
+            --argjson template_f_requested_next "$TEMPLATE_F_REQUESTED_NEXT" \
+            --argjson template_f_pending_before "$TEMPLATE_F_PENDING_BEFORE" \
+            --argjson template_f_pending_after "$TEMPLATE_F_PENDING_AFTER" \
             '{
                 event:        "askQuestions_response",
                 session_id:   $sid,
@@ -274,8 +440,112 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                 tool_use_id:  $tool_use_id,
                 response:     $response,
                 close_key_found: $key_found,
-                api_failed:   $api_failed
+                api_failed:   $api_failed,
+                template_f:   $template_f,
+                close_action: $close_action,
+                has_template_f_option: $has_template_f_option,
+                template_f_requested_next: $template_f_requested_next,
+                template_f_pending_before: $template_f_pending_before,
+                template_f_pending_after: $template_f_pending_after
             }' >> "$AUDIT_FILE"
+
+        if command -v emit_subturn_transition_event > /dev/null 2>&1; then
+            emit_subturn_transition_event \
+                "$AUDIT_FILE" \
+                "$SESSION_ID" \
+                "$TIMESTAMP" \
+                "$TURN_ID_CURR" \
+                "$SUBTURN_ID_CURR" \
+                "${SUBTURN_NUMBER_CURR:-1}" \
+                "$SUBTURN_FROM_STATE" \
+                "$SUBTURN_TO_STATE" \
+                "$SUBTURN_REASON" \
+                "postToolUse"
+        fi
+
+        if [ "$ASK_TEMPLATE_F" = "true" ] && [ "$ASK_CLOSE_ACTION" = "close_without_valid_key" ]; then
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$TIMESTAMP" \
+                --arg tool_use_id "$TOOL_USE_ID" \
+                '{
+                    event: "sessionClose_key_missing_or_invalid",
+                    session_id: $sid,
+                    timestamp: $ts,
+                    tool_use_id: $tool_use_id,
+                    message: "Template F respondeu sem close_key válida — encerramento de sessão não autorizado"
+                }' >> "$AUDIT_FILE"
+        fi
+
+        if [ "$ASK_HAS_TEMPLATE_F_OPTION" != "true" ]; then
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$TIMESTAMP" \
+                --arg tool_use_id "$TOOL_USE_ID" \
+                '{
+                    event: "askQuestions_missing_template_f_option",
+                    session_id: $sid,
+                    timestamp: $ts,
+                    tool_use_id: $tool_use_id,
+                    message: "askQuestions sem opção de escalonamento para Template F"
+                }' >> "$AUDIT_FILE"
+        fi
+
+        if [ "$TEMPLATE_F_REQUESTED_NEXT" = "true" ]; then
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$TIMESTAMP" \
+                --arg tool_use_id "$TOOL_USE_ID" \
+                '{
+                    event: "askQuestions_template_f_requested",
+                    session_id: $sid,
+                    timestamp: $ts,
+                    tool_use_id: $tool_use_id,
+                    message: "Usuário solicitou escalonamento para Template F em próximo askQuestions"
+                }' >> "$AUDIT_FILE"
+        fi
+
+        if [ "$TEMPLATE_F_CALLED_WITHOUT_REQUEST" = "true" ]; then
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$TIMESTAMP" \
+                --arg tool_use_id "$TOOL_USE_ID" \
+                '{
+                    event: "askQuestions_template_f_called_without_request",
+                    session_id: $sid,
+                    timestamp: $ts,
+                    tool_use_id: $tool_use_id,
+                    message: "Template F chamado sem solicitação prévia registrada"
+                }' >> "$AUDIT_FILE"
+        fi
+
+        if [ "$ASK_CONTINUATION_UNCLEAR" = "true" ]; then
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$TIMESTAMP" \
+                --arg tool_use_id "$TOOL_USE_ID" \
+                '{
+                    event: "askQuestions_continuation_unclear",
+                    session_id: $sid,
+                    timestamp: $ts,
+                    tool_use_id: $tool_use_id,
+                    message: "Resposta de continuidade sem instrução operacional clara — auto-auditoria obrigatória ativada"
+                }' >> "$AUDIT_FILE"
+        fi
+
+        if [ "$ASK_TEMPLATE_F" != "true" ]; then
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$TIMESTAMP" \
+                --arg tool_use_id "$TOOL_USE_ID" \
+                '{
+                    event: "askQuestions_continuation_mandatory_notice",
+                    session_id: $sid,
+                    timestamp: $ts,
+                    tool_use_id: $tool_use_id,
+                    message: "Resposta a askQuestions de continuidade recebida — encerramento de TURN/SESSION proibido nesta etapa"
+                }' >> "$AUDIT_FILE"
+        fi
 
         # Atualiza contexto com resposta e, se necessário, valida a close_key
         # REV4-06: setar auth_requested=true aqui também (defesa em profundidade — garante
@@ -287,15 +557,16 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
             # para evitar duplo sessionCloseAuthorized quando o usuário digita a key mais de uma vez.
             _ALREADY_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
 
-            # Atualiza apenas auth_requested (sem setar close_key_validated ainda!)
-            jq --arg result "$RESULT_TYPE" \
-                --arg response "$RESPONSE_STR" \
-                --arg ts "$TIMESTAMP" \
-                '.last_tool.result = $result
-                 | .current_turn.last_askquestions_response = $response
-                 | .current_turn.auth_requested = true
-                 | .current_turn.auth_requested_at = $ts' \
-                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            # REV4-06: branch KEY_FOUND também atualiza current_turn.auth_requested_at
+            # (via write_askquestions_turn_state).
+            write_askquestions_turn_state \
+                "$RESULT_TYPE" \
+                "$RESPONSE_STR" \
+                "$TIMESTAMP" \
+                "$ASK_TEMPLATE_F" \
+                "$ASK_CLOSE_ACTION" \
+                "$KEY_FOUND" \
+                > /dev/null 2>&1 || true
 
             if [ "$_ALREADY_VALIDATED" != "true" ]; then
                 # Auto-encerramento: chama session-close.sh para VALIDAR close_key
@@ -357,42 +628,194 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                     }' >> "$AUDIT_FILE"
             fi
         else
-            jq --arg result "$RESULT_TYPE" \
-                --arg response "$RESPONSE_STR" \
-                --arg ts "$TIMESTAMP" \
-                '.last_tool.result = $result
-                 | .current_turn.last_askquestions_response = $response
-                 | .current_turn.auth_requested = true
-                 | .current_turn.auth_requested_at = $ts' \
-                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            # REV4-06: branch sem KEY_FOUND também atualiza current_turn.auth_requested_at
+            # (via write_askquestions_turn_state).
+            write_askquestions_turn_state \
+                "$RESULT_TYPE" \
+                "$RESPONSE_STR" \
+                "$TIMESTAMP" \
+                "$ASK_TEMPLATE_F" \
+                "$ASK_CLOSE_ACTION" \
+                "$KEY_FOUND" \
+                > /dev/null 2>&1 || true
+        fi
+
+        # Persiste governança de escalonamento para validação no agent-stop.
+        if [ -f "$CTX_FILE" ]; then
+            if command -v sponge > /dev/null 2>&1; then
+                jq --argjson has_opt "$ASK_HAS_TEMPLATE_F_OPTION" \
+                    --argjson called_wo "$TEMPLATE_F_CALLED_WITHOUT_REQUEST" \
+                    --argjson pending_after "$TEMPLATE_F_PENDING_AFTER" \
+                    --argjson has_answer "$ASK_HAS_USER_ANSWER" \
+                    --argjson api_failed "$ASK_API_FAILED" \
+                    --argjson template_f "$ASK_TEMPLATE_F" \
+                    --argjson continuation_unclear "$ASK_CONTINUATION_UNCLEAR" \
+                    --arg ts "$TIMESTAMP" \
+                    '.current_turn.last_askquestions_has_template_f_option = $has_opt
+                     | .current_turn.template_f_called_without_prior_request = $called_wo
+                     | .session.template_f_request_pending = $pending_after
+                     | .current_turn.continuation_instruction_clear = (if (.current_turn.last_askquestions_template // "") == "template_f" then true else (not $continuation_unclear) end)
+                     | .current_turn.continuation_mandatory = (if $template_f then false else true end)
+                     | .current_turn.continuation_mandatory_at = (if $template_f then null else $ts end)
+                     | .current_turn.continuation_mandatory_reason = (if $template_f then null else "askquestions_non_template_f_continue_required" end)
+                     | .current_turn.auto_audit_required = (if (.current_turn.last_askquestions_template // "") == "template_f" then false else $continuation_unclear end)
+                     | .current_turn.auto_audit_required_at = (if $continuation_unclear then $ts else null end)
+                     | .current_turn.auto_audit_reason = (if $continuation_unclear then "askquestions_continuation_unclear" else null end)
+                     | .current_turn.auto_audit_started = false
+                     | .current_turn.auto_audit_started_at = null
+                     | .current_turn.auto_audit_started_tool = null
+                     | .session_stats.continuation_mandatory_triggers = ((.session_stats.continuation_mandatory_triggers // 0) + (if $template_f then 0 else 1 end))
+                     | .session_stats.auto_audit_triggers = ((.session_stats.auto_audit_triggers // 0) + (if $continuation_unclear then 1 else 0 end))
+                     | .session_stats.subturn_via_askquestions = ((.session_stats.subturn_via_askquestions // 0) + (if $api_failed then 0 else 1 end))' \
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            else
+                _TMP_TF="$(mktemp 2> /dev/null || true)"
+                if [ -n "$_TMP_TF" ] \
+                    && jq --argjson has_opt "$ASK_HAS_TEMPLATE_F_OPTION" \
+                        --argjson called_wo "$TEMPLATE_F_CALLED_WITHOUT_REQUEST" \
+                        --argjson pending_after "$TEMPLATE_F_PENDING_AFTER" \
+                        --argjson has_answer "$ASK_HAS_USER_ANSWER" \
+                        --argjson api_failed "$ASK_API_FAILED" \
+                        --argjson template_f "$ASK_TEMPLATE_F" \
+                        --argjson continuation_unclear "$ASK_CONTINUATION_UNCLEAR" \
+                        --arg ts "$TIMESTAMP" \
+                        '.current_turn.last_askquestions_has_template_f_option = $has_opt
+                         | .current_turn.template_f_called_without_prior_request = $called_wo
+                         | .session.template_f_request_pending = $pending_after
+                         | .current_turn.continuation_instruction_clear = (if (.current_turn.last_askquestions_template // "") == "template_f" then true else (not $continuation_unclear) end)
+                         | .current_turn.continuation_mandatory = (if $template_f then false else true end)
+                         | .current_turn.continuation_mandatory_at = (if $template_f then null else $ts end)
+                         | .current_turn.continuation_mandatory_reason = (if $template_f then null else "askquestions_non_template_f_continue_required" end)
+                         | .current_turn.auto_audit_required = (if (.current_turn.last_askquestions_template // "") == "template_f" then false else $continuation_unclear end)
+                         | .current_turn.auto_audit_required_at = (if $continuation_unclear then $ts else null end)
+                         | .current_turn.auto_audit_reason = (if $continuation_unclear then "askquestions_continuation_unclear" else null end)
+                         | .current_turn.auto_audit_started = false
+                         | .current_turn.auto_audit_started_at = null
+                         | .current_turn.auto_audit_started_tool = null
+                         | .session_stats.continuation_mandatory_triggers = ((.session_stats.continuation_mandatory_triggers // 0) + (if $template_f then 0 else 1 end))
+                         | .session_stats.auto_audit_triggers = ((.session_stats.auto_audit_triggers // 0) + (if $continuation_unclear then 1 else 0 end))
+                         | .session_stats.subturn_via_askquestions = ((.session_stats.subturn_via_askquestions // 0) + (if $api_failed then 0 else 1 end))' \
+                        "$CTX_FILE" > "$_TMP_TF" 2> /dev/null; then
+                    mv "$_TMP_TF" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_TF"
+                else
+                    [ -n "$_TMP_TF" ] && rm -f "$_TMP_TF"
+                fi
+            fi
+
+            if command -v write_current_subturn_state > /dev/null 2>&1; then
+                _SUBTURN_REQUIRES_USER_ACTION="true"
+                if [ "$ASK_HAS_USER_ANSWER" = "true" ]; then
+                    _SUBTURN_REQUIRES_USER_ACTION="false"
+                fi
+                write_current_subturn_state \
+                    "$TIMESTAMP" \
+                    "$SUBTURN_TO_STATE" \
+                    "$SUBTURN_REASON" \
+                    "false" \
+                    "$_SUBTURN_REQUIRES_USER_ACTION"
+
+                if [ "$ASK_API_FAILED" != "true" ] && command -v auto_advance_subturn_n_plus_one > /dev/null 2>&1; then
+                    _NEXT_SUBTURN_STATE="active"
+                    _NEXT_SUBTURN_REASON="askquestions_followup_n_plus_one"
+                    _NEXT_SUBTURN_REQUIRES_USER_ACTION="false"
+                    if [ "$ASK_HAS_USER_ANSWER" != "true" ]; then
+                        _NEXT_SUBTURN_STATE="waiting_user"
+                        _NEXT_SUBTURN_REASON="askquestions_pending_user_n_plus_one"
+                        _NEXT_SUBTURN_REQUIRES_USER_ACTION="true"
+                    fi
+                    auto_advance_subturn_n_plus_one \
+                        "$TIMESTAMP" \
+                        "$_NEXT_SUBTURN_REASON" \
+                        "postToolUse" \
+                        "$_NEXT_SUBTURN_STATE" \
+                        "$_NEXT_SUBTURN_REQUIRES_USER_ACTION" \
+                        "$AUDIT_FILE" \
+                        "$SESSION_ID" \
+                        > /dev/null 2>&1 || true
+                fi
+            fi
+        fi
+
+        if [ "$ASK_TEMPLATE_F" != "true" ]; then
+            _CONT_MSG="⚠️ CONTINUAÇÃO OBRIGATÓRIA: resposta de askQuestions não-Template F detectada. É PROIBIDO tentar encerrar TURN/SESSION nesta etapa. Continue o trabalho no mesmo escopo."
+            _CONT_CTX="COMANDO OPERACIONAL OBRIGATÓRIO: após askQuestions não-Template F, continue o TURN e execute próximas ações de trabalho (diagnóstico/implementação/validação). Não tente encerramento de TURN/SESSION; Template F só em escalonamento explícito de fechamento de SESSION."
+            if [ "$ASK_CONTINUATION_UNCLEAR" = "true" ]; then
+                _CONT_MSG="⚠️ CONTINUAÇÃO OBRIGATÓRIA: resposta ambígua de askQuestions não-Template F. Encerramento é proibido e auto-auditoria foi ativada para este TURN."
+                _CONT_CTX="COMANDO OPERACIONAL OBRIGATÓRIO: inicie imediatamente auditoria do escopo atual (leitura/busca/diagnóstico), atualize TODOs com último item askQuestions de continuidade e só depois avance para edição/validação. Encerramento de TURN/SESSION é proibido nesta etapa."
+            fi
+            POST_HOOK_OUTPUT="$(jq -cn --arg msg "$_CONT_MSG" --arg ctx "$_CONT_CTX" '
+                {
+                    systemMessage: $msg,
+                    hookSpecificOutput: {
+                        hookEventName: "PostToolUse",
+                        additionalContext: $ctx
+                    }
+                }
+            ' 2> /dev/null || echo '')"
         fi
     elif [ "$RESULT_TYPE" = "failure" ]; then
-        jq --arg result "$RESULT_TYPE" --arg tool "$TOOL_NAME" \
-            '.last_tool.result = $result
-             | .current_turn.failures_count = ((.current_turn.failures_count // 0) + 1)
-             | .session_stats.failures_detected = ((.session_stats.failures_detected // 0) + 1)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        if command -v write_last_tool_result > /dev/null 2>&1; then
+            write_last_tool_result "$RESULT_TYPE" > /dev/null 2>&1 || true
+        else
+            jq --arg result "$RESULT_TYPE" \
+                '.last_tool.result = $result' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        fi
+
+        if command -v increment_turn_failure_counters > /dev/null 2>&1; then
+            increment_turn_failure_counters > /dev/null 2>&1 || true
+        else
+            jq '.current_turn.failures_count = ((.current_turn.failures_count // 0) + 1)
+                | .session_stats.failures_detected = ((.session_stats.failures_detected // 0) + 1)' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        fi
     elif [ "$TOOL_NAME" = "manage_todo_list" ]; then
         # v9.0: rastreia uso de manage_todo_list (Protocolo TODO Obrigatório)
-        jq --arg result "$RESULT_TYPE" \
-            '.last_tool.result = $result
-             | .current_turn.todo_created = true' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        # Compat V90-1 (smoke): manter presença textual de "todo_created = true".
+        if command -v write_last_tool_result > /dev/null 2>&1; then
+            write_last_tool_result "$RESULT_TYPE" > /dev/null 2>&1 || true
+        else
+            jq --arg result "$RESULT_TYPE" \
+                '.last_tool.result = $result' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        fi
+
+        if command -v mark_turn_todo_created_true > /dev/null 2>&1; then
+            mark_turn_todo_created_true > /dev/null 2>&1 || true
+        else
+            jq '.current_turn.todo_created = true' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        fi
     elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; then
         # FIX BUG-05: defesa em profundidade — reforça auth_requested após retorno do subagente.
         # pre-tool-use.sh já seta auth_requested=true antes da execução; este bloco garante
         # que o flag permanece verdadeiro mesmo se houve falha parcial de estado no pre-hook.
-        jq --arg result "$RESULT_TYPE" --arg ts "$TIMESTAMP" \
-            '.last_tool.result = $result
-             | .current_turn.auth_requested = true
+        if command -v write_last_tool_result > /dev/null 2>&1; then
+            write_last_tool_result "$RESULT_TYPE" > /dev/null 2>&1 || true
+        else
+            jq --arg result "$RESULT_TYPE" \
+                '.last_tool.result = $result' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        fi
+
+        jq --arg ts "$TIMESTAMP" \
+            '.current_turn.auth_requested = true
              | .current_turn.auth_requested_at = $ts
              | .current_turn.subagent_delegated = true' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     else
-        jq --arg result "$RESULT_TYPE" \
-            '.last_tool.result = $result' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        if command -v write_last_tool_result > /dev/null 2>&1; then
+            write_last_tool_result "$RESULT_TYPE" > /dev/null 2>&1 || true
+        else
+            jq --arg result "$RESULT_TYPE" \
+                '.last_tool.result = $result' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        fi
     fi
+fi
+
+if [ -n "$POST_HOOK_OUTPUT" ]; then
+    printf '%s\n' "$POST_HOOK_OUTPUT"
 fi
 
 # ── Métricas de tempo por ferramenta ─────────────────────────────────────────

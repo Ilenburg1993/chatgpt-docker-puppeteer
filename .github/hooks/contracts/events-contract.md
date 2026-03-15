@@ -1,6 +1,6 @@
 # Events Contract — Sistema de Hooks
 
-**Status**: Canônico. **Última atualização**: 2026-03-14. **Versão**: 1.3
+**Status**: Canônico. **Última atualização**: 2026-03-14. **Versão**: 1.4
 
 > Este documento é o contrato formal de todos os eventos que fluem pelo sistema de hooks. Toda
 > adição ou mudança de schema deve ser refletida aqui antes de ser implementada.
@@ -15,6 +15,7 @@ SESSION
   └── sessionResumeDetected      → log-prompt.sh
   └── SECTION
         └── TURN
+      ├── subturnStart / subturnTransition / subturnResume / subturnEnd / subturnAutoAdvance (eventos internos)
               ├── preToolUse     → pre-tool-use.sh       (um por tool call)
               └── postToolUse    → post-tool-use.sh       (um por tool call)
               └── postToolUseFailure → tool-use-failure.sh
@@ -119,7 +120,9 @@ SESSION
   - Redacta credentials (GitHub tokens, Bearer, etc.) antes de log
   - Loga `preToolUse` em `logs/audit.jsonl` com args redactados
   - Atualiza `current_turn.tools_count`, `tools_by_name`, `last_tool`
+  - Atualiza `current_turn.last_non_bookkeeping_tool` (último tool não-`manage_todo_list` no turno)
   - Detecta `vscode_askQuestions` → seta `current_turn.auth_requested = true`
+  - Valida template de TODO (`manage_todo_list`) e registra conformidade do último item em `todoProtocol_checked`
   - Detecta `runSubagent`/`Task` → seta `auth_requested=true`, `subagent_delegated=true`; loga
     `subagentStart` (hardening v6)
   - Session_id guard: valida payload contra contexto ativo (com paths de heal/sync e bloqueio de escrita quando necessário)
@@ -145,6 +148,10 @@ SESSION
   - Loga `postToolUse` em `logs/audit.jsonl`
   - Atualiza `last_tool.result` e contadores de falha (`current_turn.failures_count`, `session_stats.failures_detected`)
   - Captura resposta de `vscode_askQuestions` em `current_turn.last_askquestions_response`
+  - Classifica clareza de continuidade; quando ambígua ativa auto-auditoria (`current_turn.auto_audit_required=true`) e injeta comando operacional em `additionalContext`
+  - Avança SubTurn automaticamente em `n+1` após ciclo de `vscode_askQuestions` (mesmo TURN/SESSION)
+  - Classifica resposta de Session Close em `current_turn.last_askquestions_template`, `current_turn.last_askquestions_close_action` e `current_turn.last_askquestions_close_key_found`
+  - Registra governança de escalonamento para Template F (`current_turn.last_askquestions_has_template_f_option`, `current_turn.template_f_called_without_prior_request`, `session.template_f_request_pending`)
   - Marca `current_turn.askquestions_api_error=true` quando há falha de API (`Response contained no choices`)
   - Detecta close_key em `vscode_askQuestions` e aciona `session-close.sh` (idempotente)
   - Session_id guard ativo
@@ -187,6 +194,7 @@ SESSION
   {
     "decision": "block",
     "decisionReason": "<reason>",
+    "reason": "<reason>",
     "hookSpecificOutput": {
       "hookEventName": "Stop",
       "decision": "block",
@@ -195,6 +203,8 @@ SESSION
     "systemMessage": "<mensagem rica com estado contextualizado>"
   }
   ```
+  > Observação: para compatibilidade entre runtimes, o payload canônico deve incluir **ambos**:
+  > campos top-level (`decision`, `decisionReason`) e `hookSpecificOutput` para `Stop`.
 - **Lógica de autorização** (v9.1/v10):
   1. Busca `vscode_askQuestions` **ou** `subagentStart` após último `userPromptSubmitted` no `audit.jsonl`
   2. Fallback de contexto: `current_turn.auth_requested`
@@ -202,8 +212,11 @@ SESSION
   4. Validação de último ato (obrigatória):
      - `vscode_askQuestions` deve ser o último passo válido do TURN;
      - exceção permitida: `manage_todo_list` imediatamente após `vscode_askQuestions` (bookkeeping);
+      - fonte primária para a exceção: `current_turn.last_non_bookkeeping_tool` (fallback no audit);
      - resposta do usuário em askQuestions deve ser válida (não skip/vazia);
+    - se `current_turn.auto_audit_required=true`, o TURN só fecha após `current_turn.auto_audit_started=true`.
      - `askquestions_api_error=true` invalida autorização.
+    - quando o último askQuestions for Template F com intenção de fechamento, a autorização exige close_key válida e confirmação `session.close_key_validated=true`.
 - **Hardening v5**:
   - `decision:block` quando sem autorização e `stop_hook_active=false`
   - Session_id guard: bloqueia escrita se session_id ≠ ctx ativo (com HEAL v1/v2)
@@ -212,7 +225,8 @@ SESSION
   - **Hardening v9.2**: mismatch pendente sem heal pode bloquear o `Stop` (`Session ID mismatch unresolved`)
 - **Efeitos colaterais**:
   - Loga `agentStop` sempre
-  - Loga `turnEnd_authorized` ou `turnEnd_no_askQuestions`
+  - Loga `turnEnd_authorized`, `turnEnd_no_askQuestions` ou `turnEnd_invalid_authorization`
+  - Emite eventos internos de rodada (`subturnStart`, `subturnTransition`, `subturnResume`, `subturnEnd`) quando o fluxo de Stop reentra, bloqueia ou encerra o TURN
   - Loga `agentStop_blocked`/`agentStop_blocked_no_todo` quando bloqueia encerramento
   - Loga `turnAuth_invalidated` quando askQuestions não cumpre regra de último ato
   - Loga `auth_via_subagent_delegation` quando Strategy 4 é ativada
@@ -275,50 +289,73 @@ Todos os eventos em `logs/audit.jsonl` são JSON objects com pelo menos:
 
 ### Tabela canônica de eventos
 
-| Evento                         | Produzido por                                      | Consumido por                                | Campos obrigatórios extras                                                                                                                    |
-| ------------------------------ | -------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sessionStart`                 | `session-start.sh`                                 | `generate-session-summary.sh`                | `close_key`, `source`, `section_id`                                                                                                           |
-| `sessionResumeDetected`        | `log-prompt.sh`                                    | `watchdog.sh`, `analytics.sh`                | `previous_turn_count`, `previous_turn_ts`, `resume_gap_s`, `detected_by`                                                                      |
-| `userPromptSubmitted`          | `log-prompt.sh`                                    | `agent-stop.sh` (fronteira)                  | `turn_number`, `section_turn`, `section_id`                                                                                                   |
-| `preToolUse`                   | `pre-tool-use.sh`                                  | `export-metrics.sh`                          | `tool_name`, `tool_use_id`, `args` (redacted)                                                                                                 |
-| `postToolUse`                  | `post-tool-use.sh`                                 | `export-metrics.sh`, `analytics.sh`          | `tool_name`, `tool_use_id`, `duration_ms`                                                                                                     |
-| `toolUseFailure`               | `tool-use-failure.sh`                              | —                                            | `tool_name`, `error`                                                                                                                          |
-| `agentStop`                    | `agent-stop.sh`                                    | —                                            | `turn_duration_s`, `stop_hook_active`, `tools_count`                                                                                          |
-| `turnEnd_authorized`           | `agent-stop.sh`                                    | `generate-session-summary.sh`                | `turn_number`, `section_turn`, `turn_duration_s`                                                                                              |
-| `turnEnd_no_askQuestions`      | `agent-stop.sh`                                    | `watchdog.sh`, `analytics.sh`                | `turn_number`, `turn_id`                                                                                                                      |
-| `agentStop_blocked`            | `agent-stop.sh`                                    | `watchdog.sh`                                | `consecutive_unauthorized`, `block_count`                                                                                                     |
-| `agentStop_blocked_no_todo`    | `agent-stop.sh`                                    | `watchdog.sh`                                | `consecutive_unauthorized`                                                                                                                    |
-| `turnStart_enriched_auto`      | `agent-stop.sh`                                    | —                                            | `intent`, `auto_generated: true`                                                                                                              |
-| `turnStart_enriched`           | `start-turn.sh`                                    | —                                            | `intent`, `intent_declared: true`                                                                                                             |
-| `sectionStart`                 | `start-section.sh`                                 | `generate-section-summary.sh`                | `section_name`, `section_id`, `section_number`                                                                                                |
-| `sectionEnd`                   | `section-end.sh`, `start-section.sh`               | `generate-section-summary.sh`                | `section_id`, `reason`                                                                                                                        |
-| `sessionEnd`                   | `session-end.sh`                                   | —                                            | `reason`, `close_key_valid`                                                                                                                   |
-| `sessionEnd_no_key`            | `session-end.sh`                                   | —                                            | —                                                                                                                                             |
-| `session_id_mismatch`          | `agent-stop.sh`                                    | `watchdog.sh`                                | `expected`, `got`, `consecutive_count`                                                                                                        |
-| `session_id_healed`            | `agent-stop.sh`                                    | —                                            | `old_session_id`, `new_session_id`, `source`                                                                                                  |
-| `authViolation_reset`          | `reset-auth-violation.sh`                          | —                                            | `reason`, `original_flag_ts`                                                                                                                  |
-| `authViolation_stale_cleared`  | `session-start.sh`                                 | —                                            | `old_session_id`, `flag_timestamp`                                                                                                            |
-| `auditRotated`                 | `rotate-audit.sh`                                  | —                                            | `archive_file`, `archived_lines`, `kept_lines`                                                                                                |
-| `gitPush`                      | `on-git-push.sh`                                   | `agent-stop.sh` (pending_section_after_push) | `branch`, `ref`                                                                                                                               |
-| `preCompact`                   | `pre-compact.sh`                                   | —                                            | `compaction_count`                                                                                                                            |
-| `subagentStart`                | `subagent-start.sh`, `pre-tool-use.sh` (hardening) | `agent-stop.sh` (Strategy 1+2 autorização)   | `tool_name`, `tool_use_id`, `message`                                                                                                         |
-| `subagentStop`                 | `subagent-stop.sh`                                 | —                                            | —                                                                                                                                             |
-| `auth_via_subagent_delegation` | `agent-stop.sh`                                    | —                                            | `message` — indica que Strategy 4 autorizou o turno via flag `subagent_delegated`                                                             |
-| `sectionContinued`             | `continue-section.sh`                              | —                                            | `turn_number`, `section_name`, `section_id`, `reason` — seção mantida após `git push` (flag `pending_section_after_push` limpo)               |
-| `sessionClose_key_validated`   | `post-tool-use.sh`                                 | —                                            | `close_key` — chave de encerramento de sessão validada com sucesso no vscode_askQuestions                                                     |
-| `errorOccurred`                | `error-occurred.sh`                                | `session-end.sh` (contagem)                  | `errorName`, `errorMsg` — log resumido em `audit.jsonl`                                                                                       |
-| `errorDetail`                  | `error-occurred.sh`                                | —                                            | `errorName`, `errorMsg`, `stack` — log completo em `errors.jsonl` (não em audit.jsonl)                                                        |
-| `session_manual_recovery`      | `manual-session-init.sh`                           | —                                            | `message` — sessão inicializada manualmente quando sessionStart não disparou                                                                  |
-| `finding_saved`                | `save-finding.sh`                                  | `watchdog.sh`                                | `module`, `severity`, `type`                                                                                                                  |
-| `task_added`                   | `add-task.sh`                                      | —                                            | `priority`, `title`                                                                                                                           |
-| `task_completed`               | `complete-task.sh`                                 | —                                            | `title`                                                                                                                                       |
-| `session_auto_recovery`        | `pre-tool-use.sh`                                  | —                                            | `source: "auto_recovery"` — sessionStart não disparou; contexto mínimo criado                                                                 |
-| `session_auto_recovery_prompt` | `log-prompt.sh`                                    | —                                            | `source: "prompt_auto_recovery"` — contexto mínimo criado no `userPromptSubmitted` quando sessionStart não dispara                            |
-| `askQuestions_response`        | `post-tool-use.sh`                                 | —                                            | `response`, `tool_use_id` — resposta do usuário ao vscode_askQuestions                                                                        |
-| `sectionEnd_orphan`            | `section-end.sh`                                   | —                                            | Aviso: section-end.sh chamado sem abrir nova seção imediatamente; `current_section.name` ficará null até agent-stop.sh criar seção `retomada` |
-| `session_id_healed`            | `pre-tool-use.sh`                                  | —                                            | session_id corrigido por mecanismo auto-heal (HEAL v2)                                                                                        |
+| Evento                                           | Produzido por                                          | Consumido por                                | Campos obrigatórios extras                                                                                                                                                 |
+| ------------------------------------------------ | ------------------------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sessionStart`                                   | `session-start.sh`                                     | `generate-session-summary.sh`                | `close_key`, `source`, `section_id`                                                                                                                                        |
+| `sessionResumeDetected`                          | `log-prompt.sh`                                        | `watchdog.sh`, `analytics.sh`                | `previous_turn_count`, `previous_turn_ts`, `resume_gap_s`, `detected_by`                                                                                                   |
+| `userPromptSubmitted`                            | `log-prompt.sh`                                        | `agent-stop.sh` (fronteira)                  | `turn_number`, `section_turn`, `section_id`                                                                                                                                |
+| `preToolUse`                                     | `pre-tool-use.sh`                                      | `export-metrics.sh`                          | `tool_name`, `tool_use_id`, `args` (redacted)                                                                                                                              |
+| `postToolUse`                                    | `post-tool-use.sh`                                     | `export-metrics.sh`, `analytics.sh`          | `tool_name`, `tool_use_id`, `duration_ms`                                                                                                                                  |
+| `toolUseFailure`                                 | `tool-use-failure.sh`                                  | —                                            | `tool_name`, `error`                                                                                                                                                       |
+| `agentStop`                                      | `agent-stop.sh`                                        | —                                            | `turn_duration_s`, `stop_hook_active`, `tools_count`                                                                                                                       |
+| `turnEnd_authorized`                             | `agent-stop.sh`                                        | `generate-session-summary.sh`                | `turn_number`, `section_turn`, `turn_duration_s`                                                                                                                           |
+| `turnEnd_no_askQuestions`                        | `agent-stop.sh`                                        | `watchdog.sh`, `analytics.sh`                | `turn_number`, `turn_id`                                                                                                                                                   |
+| `turnEnd_invalid_authorization`                  | `agent-stop.sh`                                        | `watchdog.sh`, `analytics.sh`                | `turn_id`, `reason`                                                                                                                                                        |
+| `agentStop_blocked`                              | `agent-stop.sh`                                        | `watchdog.sh`                                | `consecutive_unauthorized`, `block_count`, `block_reason`, `invalid_reason` (quando `block_reason=invalid_authorization`), `turn_authorized=false`, `session_closed=false` |
+| `agentStop_blocked_no_todo`                      | `agent-stop.sh`                                        | `watchdog.sh`                                | `consecutive_unauthorized`                                                                                                                                                 |
+| `strictTurnMode_forced`                          | `agent-stop.sh`                                        | `watchdog.sh`, `analytics.sh`                | `turn_id`, `previous_value`, `forced_value=true`                                                                                                                           |
+| `turnStart_enriched_auto`                        | `agent-stop.sh`                                        | —                                            | `intent`, `auto_generated: true`                                                                                                                                           |
+| `turnStart_enriched`                             | `start-turn.sh`                                        | —                                            | `intent`, `intent_declared: true`                                                                                                                                          |
+| `sectionStart`                                   | `start-section.sh`                                     | `generate-section-summary.sh`                | `section_name`, `section_id`, `section_number`                                                                                                                             |
+| `sectionEnd`                                     | `section-end.sh`, `start-section.sh`                   | `generate-section-summary.sh`                | `section_id`, `reason`                                                                                                                                                     |
+| `sessionEnd`                                     | `session-end.sh`                                       | —                                            | `reason`, `close_key_valid`                                                                                                                                                |
+| `sessionEnd_no_key`                              | `session-end.sh`                                       | —                                            | —                                                                                                                                                                          |
+| `session_id_mismatch`                            | `agent-stop.sh`                                        | `watchdog.sh`                                | `expected`, `got`, `consecutive_count`                                                                                                                                     |
+| `session_id_healed`                              | `agent-stop.sh`                                        | —                                            | `old_session_id`, `new_session_id`, `source`                                                                                                                               |
+| `authViolation_reset`                            | `reset-auth-violation.sh`                              | —                                            | `reason`, `original_flag_ts`                                                                                                                                               |
+| `authViolation_stale_cleared`                    | `session-start.sh`                                     | —                                            | `old_session_id`, `flag_timestamp`                                                                                                                                         |
+| `auditRotated`                                   | `rotate-audit.sh`                                      | —                                            | `archive_file`, `archived_lines`, `kept_lines`                                                                                                                             |
+| `gitPush`                                        | `on-git-push.sh`                                       | `agent-stop.sh` (pending_section_after_push) | `branch`, `ref`                                                                                                                                                            |
+| `preCompact`                                     | `pre-compact.sh`                                       | —                                            | `compaction_count`                                                                                                                                                         |
+| `subagentStart`                                  | `subagent-start.sh`, `pre-tool-use.sh` (hardening)     | `agent-stop.sh` (Strategy 1+2 autorização)   | `tool_name`, `tool_use_id`, `message`                                                                                                                                      |
+| `subagentStop`                                   | `subagent-stop.sh`                                     | —                                            | —                                                                                                                                                                          |
+| `auth_via_subagent_delegation`                   | `agent-stop.sh`                                        | —                                            | `message` — indica que Strategy 4 autorizou o turno via flag `subagent_delegated`                                                                                          |
+| `subturnStart`                                   | `log-prompt.sh`, `agent-stop.sh`                       | `analytics.sh`, `watchdog.sh`                | `turn_id`, `subturn_id`, `subturn_number`, `parent_turn_id`, `reason`, `state`                                                                                             |
+| `subturnTransition`                              | `pre-tool-use.sh`, `post-tool-use.sh`, `agent-stop.sh` | `analytics.sh`, `watchdog.sh`                | `turn_id`, `subturn_id`, `subturn_number`, `parent_turn_id`, `from_state`, `to_state`, `reason`, `trigger_event`                                                           |
+| `subturnResume`                                  | `agent-stop.sh`, `post-tool-use.sh`                    | `analytics.sh`, `watchdog.sh`                | `turn_id`, `subturn_id`, `subturn_number`, `parent_turn_id`, `reason`, `trigger_event`                                                                                     |
+| `subturnEnd`                                     | `agent-stop.sh`                                        | `analytics.sh`, `watchdog.sh`                | `turn_id`, `subturn_id`, `subturn_number`, `parent_turn_id`, `reason`, `duration_ms`, `final_state`                                                                        |
+| `subturnAutoAdvance`                             | `post-tool-use.sh`                                     | `analytics.sh`, `watchdog.sh`                | `turn_id`, `from_subturn_id`, `to_subturn_id`, `from_subturn_number`, `to_subturn_number`, `parent_turn_id`                                                                |
+| `todoProtocol_checked`                           | `pre-tool-use.sh`                                      | `watchdog.sh`, `agent-stop.sh`               | `tool_use_id`, `last_item`, `compliant`                                                                                                                                    |
+| `todoProtocol_violation_last_item`               | `pre-tool-use.sh`                                      | `watchdog.sh`, `agent-stop.sh`               | `tool_use_id`, `last_item`                                                                                                                                                 |
+| `sectionContinued`                               | `continue-section.sh`                                  | —                                            | `turn_number`, `section_name`, `section_id`, `reason` — seção mantida após `git push` (flag `pending_section_after_push` limpo)                                            |
+| `sessionClose_key_validated`                     | `post-tool-use.sh`                                     | —                                            | `close_key` — chave de encerramento de sessão validada com sucesso no vscode_askQuestions                                                                                  |
+| `errorOccurred`                                  | `error-occurred.sh`                                    | `session-end.sh` (contagem)                  | `errorName`, `errorMsg` — log resumido em `audit.jsonl`                                                                                                                    |
+| `errorDetail`                                    | `error-occurred.sh`                                    | —                                            | `errorName`, `errorMsg`, `stack` — log completo em `errors.jsonl` (não em audit.jsonl)                                                                                     |
+| `session_manual_recovery`                        | `manual-session-init.sh`                               | —                                            | `message` — sessão inicializada manualmente quando sessionStart não disparou                                                                                               |
+| `finding_saved`                                  | `save-finding.sh`                                      | `watchdog.sh`                                | `module`, `severity`, `type`                                                                                                                                               |
+| `task_added`                                     | `add-task.sh`                                          | —                                            | `priority`, `title`                                                                                                                                                        |
+| `task_completed`                                 | `complete-task.sh`                                     | —                                            | `title`                                                                                                                                                                    |
+| `session_auto_recovery`                          | `pre-tool-use.sh`                                      | —                                            | `source: "auto_recovery"` — sessionStart não disparou; contexto mínimo criado                                                                                              |
+| `session_auto_recovery_prompt`                   | `log-prompt.sh`                                        | —                                            | `source: "prompt_auto_recovery"` — contexto mínimo criado no `userPromptSubmitted` quando sessionStart não dispara                                                         |
+| `askQuestions_response`                          | `post-tool-use.sh`                                     | —                                            | `response`, `tool_use_id`, `template_f`, `close_action`, `has_template_f_option`, `template_f_requested_next`                                                              |
+| `askQuestions_continuation_unclear`              | `post-tool-use.sh`                                     | `pre-tool-use.sh`, `agent-stop.sh`           | `tool_use_id` — resposta de continuidade sem instrução operacional clara; auto-auditoria obrigatória ativada                                                               |
+| `askQuestions_missing_template_f_option`         | `post-tool-use.sh`                                     | `agent-stop.sh`, `watchdog.sh`               | `tool_use_id` — askQuestions sem opção de escalonamento para Template F                                                                                                    |
+| `askQuestions_template_f_requested`              | `post-tool-use.sh`                                     | `agent-stop.sh`                              | `tool_use_id` — usuário solicitou explicitamente Template F para próximo passo                                                                                             |
+| `askQuestions_template_f_called_without_request` | `post-tool-use.sh`                                     | `agent-stop.sh`, `watchdog.sh`               | `tool_use_id` — Template F foi chamado sem solicitação prévia registrada                                                                                                   |
+| `autoAudit_started`                              | `pre-tool-use.sh`                                      | `agent-stop.sh`, `verify-hook-delivery.sh`   | `tool_name`, `tool_use_id` — kickoff de auditoria obrigatório iniciado por ferramenta de diagnóstico                                                                       |
+| `autoAudit_pretool_deny`                         | `pre-tool-use.sh`                                      | `watchdog.sh`, `verify-hook-delivery.sh`     | `tool_name`, `tool_use_id` — desvio bloqueado enquanto auto-auditoria obrigatória não foi iniciada                                                                         |
+| `sectionEnd_orphan`                              | `section-end.sh`                                       | —                                            | Aviso: section-end.sh chamado sem abrir nova seção imediatamente; `current_section.name` ficará null até agent-stop.sh criar seção `retomada`                              |
+| `session_id_healed`                              | `pre-tool-use.sh`                                      | —                                            | session_id corrigido por mecanismo auto-heal (HEAL v2)                                                                                                                     |
 
 ### Eventos de diagnóstico (raramente produzidos)
+
+### Semântica temporal canônica (P3/P4)
+
+- **SESSION**: pode durar longos períodos (dias, semanas ou meses) com muitos TURNs.
+- **TURN**: pode durar períodos extensos (incluindo muitas horas), sem quebrar a SESSION.
+- **SUBTURN**: rodada interna curta, tipicamente de alguns minutos a dezenas de minutos, sempre subordinada ao TURN.
+- **Ciclo automático n+1**: após cada `vscode_askQuestions` processado, o SubTurn atual é encerrado e o próximo SubTurn é iniciado automaticamente dentro do mesmo TURN.
+- **Invariante obrigatório**: todo evento `subturn*` deve carregar `parent_turn_id` e ele deve corresponder ao `turn_id` do contexto ativo.
 
 | Evento                   | Produzido por              | Significado                       |
 | ------------------------ | -------------------------- | --------------------------------- |
@@ -374,3 +411,4 @@ Todos os eventos em `logs/audit.jsonl` são JSON objects com pelo menos:
 | 1.1    | 2026-03-11 | REV4-02: 7 eventos adicionados (`sectionContinued`, `auth_via_subagent_delegation`, `turnStart_enriched`, `sessionClose_key_validated`, `errorOccurred`, `errorDetail`, `session_manual_recovery`); corrigido `turnStart` → `turnStart_enriched`; `subagentStart` atualizado com producer/consumer do hardening v6; `agentStop` atualizado: 3→4 estratégias de autorização                                                         |
 | 1.2    | 2026-03-14 | Alinhamento com runtime atual: timeouts reais de `copilot-hooks.json` (`sessionStart=60s`, `userPromptSubmitted=30s`, `preToolUse=30s`, `postToolUse=30s`, `agentStop=45s`), documentação de `permissionDecision:deny` em `preToolUse`, remoção da estratégia legada de 150 linhas no `agentStop`, inclusão da regra v9.1 (último ato do TURN) e do output canônico de block (com `hookSpecificOutput` + compat legada top-level). |
 | 1.3    | 2026-03-14 | Semântica de retomada refinada: `sessionStart` documentado como hook de início de sessão/painel (não fronteira de todo prompt), novo evento `sessionResumeDetected` em `log-prompt.sh` para retomada via `userPromptSubmitted`, inclusão de `resume_count` no estado operacional e novo `session_auto_recovery_prompt` para ausência de `sessionStart`.                                                                            |
+| 1.4    | 2026-03-14 | P0 do upgrade de rodadas/SubTurn: contrato expande hierarquia TURN com eventos internos `subturnStart`, `subturnTransition`, `subturnResume` e `subturnEnd`; seção de `agentStop` documenta emissão desses eventos em cenários de block/reentrada/encerramento.                                                                                                                                                                    |

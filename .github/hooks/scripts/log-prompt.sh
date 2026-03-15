@@ -38,15 +38,19 @@ fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 mkdir -p "$STATE_DIR" && chmod 700 "$STATE_DIR"
 # CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
-INPUT="$(cat 2> /dev/null || true)"
+if command -v resolve_hook_runtime_input > /dev/null 2>&1; then
+    resolve_hook_runtime_input
+else
+    INPUT="$(cat 2> /dev/null || true)"
+    TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+    SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+    NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+    apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
+fi
 
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
-_LOCAL_TS="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+_LOCAL_TS="${NOW_ISO:-$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')}"
 CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 PROMPT_RAW="$(echo "$INPUT" | jq -r '.prompt // ""' 2> /dev/null || echo '')"
-SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
-# UPG-AUDIT-01: resolve per-session files ANTES do flock (override CTX_FILE, AUDIT_FILE, _CTX_LOCK)
-apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
 
 # G9-08: Lock exclusivo APÓS resolver CTX_FILE per-session
 _CTX_LOCK="${CTX_FILE}.lock"
@@ -84,6 +88,7 @@ if [ -n "$SESSION_ID_PAYLOAD" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" 
                     end_reason: null,
                     close_key: $close_key,
                     close_key_validated: false,
+                    strict_turn_close_requires_key: true,
                     source: "prompt_auto_recovery",
                     cwd: null
                 },
@@ -128,7 +133,25 @@ if [ -n "$SESSION_ID_PAYLOAD" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" 
                     intent: null,
                     todo_created: false,
                     agentStop_invocations: 0,
-                    subagent_delegated: false
+                    subagent_delegated: false,
+                    last_non_bookkeeping_tool: null,
+                    last_askquestions_template: null,
+                    last_askquestions_close_action: null,
+                    last_askquestions_close_key_found: false,
+                    todo_last_item_label: null,
+                    todo_last_item_is_askquestions_continuation: false,
+                    todo_last_item_checked_at: null,
+                    todo_protocol_version: null,
+                    continuation_instruction_clear: null,
+                    continuation_mandatory: false,
+                    continuation_mandatory_at: null,
+                    continuation_mandatory_reason: null,
+                    auto_audit_required: false,
+                    auto_audit_required_at: null,
+                    auto_audit_reason: null,
+                    auto_audit_started: false,
+                    auto_audit_started_at: null,
+                    auto_audit_started_tool: null
                 },
                 current_section: {
                     name: "recovery",
@@ -154,7 +177,16 @@ if [ -n "$SESSION_ID_PAYLOAD" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" 
                     last_turn_authorized: null,
                     consecutive_unauthorized: 0,
                     flag_file_exists: false
-                }
+                },
+                hook_observability: {
+                    sessionStart_count: 0,
+                    userPromptSubmitted_count: 1,
+                    last_sessionStart_at: null,
+                    last_sessionStart_source: null,
+                    last_userPromptSubmitted_at: $now,
+                    last_userPromptSubmitted_hash: null
+                },
+                quality_gates: {}
             }' > "$_PROMPT_RECOVERY_TMP" 2> /dev/null; then
             mv "$_PROMPT_RECOVERY_TMP" "$CTX_FILE" 2> /dev/null || rm -f "$_PROMPT_RECOVERY_TMP"
             jq -cn \
@@ -219,32 +251,13 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
         CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
         if [ "$CTX_SOURCE" = "manual_recovery" ]; then
-            # Auto-heal: sessão real do Copilot detectada após init manual — adota o novo ID
-            NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
-            if command -v sponge &> /dev/null; then
-                jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            # Auto-heal: sessão real do Copilot detectada após init manual — usa helper canônico.
+            _HEALED_SID="$(handle_manual_recovery_session_id "$SESSION_ID_PAYLOAD" "userPromptSubmitted" "${TIMESTAMP:-$NOW_ISO}" "log-prompt.sh" 2> /dev/null || true)"
+            if [ -n "$_HEALED_SID" ]; then
+                SESSION_ID="$_HEALED_SID"
             else
-                _TMP_HEAL="$(mktemp)"
-                if jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
-                    "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
-                    mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
-                else
-                    rm -f "$_TMP_HEAL"
-                fi
+                SESSION_ID="$SESSION_ID_PAYLOAD"
             fi
-            jq -cn \
-                --arg event "session_id_healed" \
-                --arg old "$CTX_ACTIVE_SID" \
-                --arg new "$SESSION_ID_PAYLOAD" \
-                --arg source "log-prompt.sh" \
-                --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
-                '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, timestamp: $ts,
-                  message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
-                >> "$AUDIT_FILE"
-            SESSION_ID="$SESSION_ID_PAYLOAD" # continua com o ID correto
         else
             # ── Rollover de reconexão (RECONNECT-01) ──────────────────────────────────
             # O cliente VS Code desconectou e reconectou, gerando novo session_id.
@@ -292,6 +305,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 jq --arg new_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_RECONNECT" \
                     '.session.id = $new_sid
                      | .session.vs_code_session_id = $new_sid
+                     | .session.strict_turn_close_requires_key = (if (.session.strict_turn_close_requires_key == null) then true else .session.strict_turn_close_requires_key end)
                      | .session.reconnect_at = $ts
                      | .session.source = "reconnect_rollover"' \
                     "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
@@ -300,6 +314,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; the
                 if jq --arg new_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_RECONNECT" \
                     '.session.id = $new_sid
                      | .session.vs_code_session_id = $new_sid
+                     | .session.strict_turn_close_requires_key = (if (.session.strict_turn_close_requires_key == null) then true else .session.strict_turn_close_requires_key end)
                      | .session.reconnect_at = $ts
                      | .session.source = "reconnect_rollover"' \
                     "$CTX_FILE" > "$_TMP_RC" 2> /dev/null; then
@@ -354,6 +369,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                  | .session.vs_code_session_id = $sid
                  | .session.close_key         = $key
                  | .session.close_key_validated = false
+                 | .session.strict_turn_close_requires_key = true
                  | .session.started_at        = $ts
                  | .session.ended_at          = null
                  | .session.end_reason        = null
@@ -376,7 +392,25 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                  | .compliance.consecutive_unauthorized = 0
                  | .compliance.last_turn_authorized = true
                  | .current_turn = {number: 0, section_turn: 0, todo_created: false,
-                     tools_count: 0, auth_requested: false, intent: null, intent_declared: false}
+                     tools_count: 0, auth_requested: false, intent: null, intent_declared: false,
+                     last_non_bookkeeping_tool: null,
+                     last_askquestions_template: null,
+                     last_askquestions_close_action: null,
+                     last_askquestions_close_key_found: false,
+                     todo_last_item_label: null,
+                     todo_last_item_is_askquestions_continuation: false,
+                     todo_last_item_checked_at: null,
+                     todo_protocol_version: null,
+                     continuation_instruction_clear: null,
+                     continuation_mandatory: false,
+                     continuation_mandatory_at: null,
+                     continuation_mandatory_reason: null,
+                     auto_audit_required: false,
+                     auto_audit_required_at: null,
+                     auto_audit_reason: null,
+                     auto_audit_started: false,
+                     auto_audit_started_at: null,
+                     auto_audit_started_tool: null}
                  | .session.logical_session_number             = $new_logical_num
                  | .session_stats.prev_section_count           = (.session_stats.section_count // 0)
                  | .session_stats.prev_section_names           = (.session_stats.section_names // [])
@@ -393,6 +427,7 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                  | .session.vs_code_session_id = $sid
                  | .session.close_key         = $key
                  | .session.close_key_validated = false
+                 | .session.strict_turn_close_requires_key = true
                  | .session.started_at        = $ts
                  | .session.ended_at          = null
                  | .session.end_reason        = null
@@ -415,7 +450,25 @@ if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
                  | .compliance.consecutive_unauthorized = 0
                  | .compliance.last_turn_authorized = true
                  | .current_turn = {number: 0, section_turn: 0, todo_created: false,
-                     tools_count: 0, auth_requested: false, intent: null, intent_declared: false}
+                     tools_count: 0, auth_requested: false, intent: null, intent_declared: false,
+                     last_non_bookkeeping_tool: null,
+                     last_askquestions_template: null,
+                     last_askquestions_close_action: null,
+                     last_askquestions_close_key_found: false,
+                     todo_last_item_label: null,
+                     todo_last_item_is_askquestions_continuation: false,
+                     todo_last_item_checked_at: null,
+                     todo_protocol_version: null,
+                     continuation_instruction_clear: null,
+                     continuation_mandatory: false,
+                     continuation_mandatory_at: null,
+                     continuation_mandatory_reason: null,
+                     auto_audit_required: false,
+                     auto_audit_required_at: null,
+                     auto_audit_reason: null,
+                     auto_audit_started: false,
+                     auto_audit_started_at: null,
+                     auto_audit_started_tool: null}
                  | .session.logical_session_number             = $new_logical_num
                  | .session_stats.prev_section_count           = (.session_stats.section_count // 0)
                  | .session_stats.prev_section_names           = (.session_stats.section_names // [])
@@ -504,6 +557,12 @@ if [ -n "$SESSION_ID" ]; then
     fi
 fi
 
+# ── Backfill canônico da flag strict de fechamento de TURN ──────────────────
+# Mantém coerência em retomadas/reconexões e contextos legados sem esse campo.
+if command -v ensure_strict_turn_close_flag_default > /dev/null 2>&1; then
+    ensure_strict_turn_close_flag_default "$CTX_FILE" > /dev/null 2>&1 || true
+fi
+
 # Calcula hash SHA-256 truncado do prompt (jamais loga o texto completo)
 PROMPT_HASH=""
 PROMPT_LEN="${#PROMPT_RAW}"
@@ -532,6 +591,28 @@ jq -cn \
         prompt_hash:         $hash,
         prompt_len:          $len,
         section_id:  (if $section_id == "" then null else $section_id end)
+    }' >> "$AUDIT_FILE"
+
+# Evento explícito de classificação do gatilho do hook para auditoria semântica.
+# userPromptSubmitted é disparado por prompt no chat box (não por respostas de askQuestions).
+_TURN_CLASSIFICATION="new_session_first_prompt"
+if [[ "${PREV_TURN_COUNT:-0}" =~ ^[0-9]+$ ]] && [ "${PREV_TURN_COUNT:-0}" -gt 0 ]; then
+    _TURN_CLASSIFICATION="session_resume_or_continuation"
+fi
+jq -cn \
+    --arg event "hookInvocation_userPromptSubmitted" \
+    --arg sid "$SESSION_ID" \
+    --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+    --arg classification "$_TURN_CLASSIFICATION" \
+    --argjson prev_turn_count "${PREV_TURN_COUNT:-0}" \
+    '{
+        event: $event,
+        session_id: $sid,
+        timestamp: $ts,
+        classification: $classification,
+        previous_turn_count: $prev_turn_count,
+        semantic_note: "Dispara ao enviar prompt na caixa de chat; respostas de askQuestions sao postToolUse",
+        evidence_scope: "hook_runtime_classification"
     }' >> "$AUDIT_FILE"
 
 # ── Session resume semantics (evidência operacional) ─────────────────────────
@@ -582,10 +663,14 @@ SECTION_NAME=""
 SECTION_ID=""
 # Gera turn_id UUID para rastreio único deste turno
 TURN_ID="$(uuidgen 2> /dev/null || printf 'turn_%s_%s' "$(date +%s)" "$$")"
+SUBTURN_ID="${TURN_ID}_st1"
+SUBTURN_NUMBER=1
 
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq --arg ts "${TIMESTAMP:-$NOW_ISO}" \
         --arg turn_id "$TURN_ID" \
+        --arg subturn_id "$SUBTURN_ID" \
+        --arg hash "$PROMPT_HASH" \
         --argjson is_resume "$_IS_SESSION_RESUME" \
         '.current_turn.started_at                = $ts
          | .current_turn.turn_id                  = $turn_id
@@ -603,7 +688,57 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.block_count               = 0
          | .current_turn.agentStop_invocations     = 0
          | .current_turn.todo_created              = false
+         | .current_turn.last_non_bookkeeping_tool = null
+         | .current_turn.last_askquestions_template = null
+         | .current_turn.last_askquestions_close_action = null
+         | .current_turn.last_askquestions_close_key_found = false
+         | .current_turn.todo_last_item_label = null
+         | .current_turn.todo_last_item_is_askquestions_continuation = false
+         | .current_turn.todo_last_item_checked_at = null
+         | .current_turn.todo_protocol_version = null
+         | .current_turn.continuation_instruction_clear = null
+         | .current_turn.continuation_mandatory = false
+         | .current_turn.continuation_mandatory_at = null
+         | .current_turn.continuation_mandatory_reason = null
+         | .current_turn.auto_audit_required = false
+         | .current_turn.auto_audit_required_at = null
+         | .current_turn.auto_audit_reason = null
+         | .current_turn.auto_audit_started = false
+         | .current_turn.auto_audit_started_at = null
+         | .current_turn.auto_audit_started_tool = null
+         | .current_turn.subturn = {
+             number: 1,
+             subturn_id: $subturn_id,
+             state: "active",
+             reason: "turn_start",
+             started_at: $ts,
+             last_transition_at: $ts,
+             parent_turn_id: $turn_id,
+             expected_window_minutes: 15,
+             stop_hook_active: false,
+             requires_user_action: false,
+             authorization_snapshot: {
+                 auth_requested: false,
+                 ask_template: null,
+                 close_key_found: false,
+                 close_key_validated: false
+             }
+         }
+         | .current_turn.subturn_history = []
          | .session_stats.resume_count             = ((.session_stats.resume_count // 0) + (if $is_resume then 1 else 0 end))
+         | .session_stats.subturn_count            = ((.session_stats.subturn_count // 0) + 1)
+         | .session_stats.subturn_blocked          = (.session_stats.subturn_blocked // 0)
+         | .session_stats.subturn_resumed          = (.session_stats.subturn_resumed // 0)
+         | .session_stats.subturn_via_subagent     = (.session_stats.subturn_via_subagent // 0)
+         | .session_stats.subturn_via_askquestions = (.session_stats.subturn_via_askquestions // 0)
+         | .hook_observability = ((.hook_observability // {}) + {
+             sessionStart_count: (.hook_observability.sessionStart_count // 0),
+             userPromptSubmitted_count: ((.hook_observability.userPromptSubmitted_count // 0) + 1),
+             last_sessionStart_at: (.hook_observability.last_sessionStart_at // null),
+             last_sessionStart_source: (.hook_observability.last_sessionStart_source // null),
+             last_userPromptSubmitted_at: $ts,
+             last_userPromptSubmitted_hash: (if $hash == "" then null else $hash end)
+         })
          | .current_section.local_turn             = ((.current_section.local_turn // 0) + 1)
          | .current_turn.section_turn              = (.current_section.local_turn // 1)' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
@@ -613,10 +748,13 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
     SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SUBTURN_NUMBER="$(jq -r '.current_turn.subturn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
 elif [ -f "$CTX_FILE" ]; then
     TMP="$(mktemp)"
     jq --arg ts "${TIMESTAMP:-$NOW_ISO}" \
         --arg turn_id "$TURN_ID" \
+        --arg subturn_id "$SUBTURN_ID" \
+        --arg hash "$PROMPT_HASH" \
         --argjson is_resume "$_IS_SESSION_RESUME" \
         '.current_turn.started_at                = $ts
          | .current_turn.turn_id                  = $turn_id
@@ -634,7 +772,57 @@ elif [ -f "$CTX_FILE" ]; then
          | .current_turn.block_count               = 0
          | .current_turn.agentStop_invocations     = 0
          | .current_turn.todo_created              = false
+         | .current_turn.last_non_bookkeeping_tool = null
+         | .current_turn.last_askquestions_template = null
+         | .current_turn.last_askquestions_close_action = null
+         | .current_turn.last_askquestions_close_key_found = false
+         | .current_turn.todo_last_item_label = null
+         | .current_turn.todo_last_item_is_askquestions_continuation = false
+         | .current_turn.todo_last_item_checked_at = null
+         | .current_turn.todo_protocol_version = null
+         | .current_turn.continuation_instruction_clear = null
+         | .current_turn.continuation_mandatory = false
+         | .current_turn.continuation_mandatory_at = null
+         | .current_turn.continuation_mandatory_reason = null
+         | .current_turn.auto_audit_required = false
+         | .current_turn.auto_audit_required_at = null
+         | .current_turn.auto_audit_reason = null
+         | .current_turn.auto_audit_started = false
+         | .current_turn.auto_audit_started_at = null
+         | .current_turn.auto_audit_started_tool = null
+         | .current_turn.subturn = {
+             number: 1,
+             subturn_id: $subturn_id,
+             state: "active",
+             reason: "turn_start",
+             started_at: $ts,
+             last_transition_at: $ts,
+             parent_turn_id: $turn_id,
+             expected_window_minutes: 15,
+             stop_hook_active: false,
+             requires_user_action: false,
+             authorization_snapshot: {
+                 auth_requested: false,
+                 ask_template: null,
+                 close_key_found: false,
+                 close_key_validated: false
+             }
+         }
+         | .current_turn.subturn_history = []
          | .session_stats.resume_count             = ((.session_stats.resume_count // 0) + (if $is_resume then 1 else 0 end))
+         | .session_stats.subturn_count            = ((.session_stats.subturn_count // 0) + 1)
+         | .session_stats.subturn_blocked          = (.session_stats.subturn_blocked // 0)
+         | .session_stats.subturn_resumed          = (.session_stats.subturn_resumed // 0)
+         | .session_stats.subturn_via_subagent     = (.session_stats.subturn_via_subagent // 0)
+         | .session_stats.subturn_via_askquestions = (.session_stats.subturn_via_askquestions // 0)
+         | .hook_observability = ((.hook_observability // {}) + {
+             sessionStart_count: (.hook_observability.sessionStart_count // 0),
+             userPromptSubmitted_count: ((.hook_observability.userPromptSubmitted_count // 0) + 1),
+             last_sessionStart_at: (.hook_observability.last_sessionStart_at // null),
+             last_sessionStart_source: (.hook_observability.last_sessionStart_source // null),
+             last_userPromptSubmitted_at: $ts,
+             last_userPromptSubmitted_hash: (if $hash == "" then null else $hash end)
+         })
          | .current_section.local_turn             = ((.current_section.local_turn // 0) + 1)
          | .current_turn.section_turn              = (.current_section.local_turn // 1)' \
         "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
@@ -643,6 +831,7 @@ elif [ -f "$CTX_FILE" ]; then
     SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
     SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SUBTURN_NUMBER="$(jq -r '.current_turn.subturn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
 fi
 
 # Loga evento turnStart (automático — complementado por start-turn.sh para intenção)
@@ -668,6 +857,19 @@ jq -cn \
         section_id:             (if $section_id == "" then null else $section_id end),
         logical_session_number: $logical_num
     }' >> "$AUDIT_FILE"
+
+if command -v emit_subturn_start_event > /dev/null 2>&1; then
+    emit_subturn_start_event \
+        "$AUDIT_FILE" \
+        "$SESSION_ID" \
+        "${TIMESTAMP:-$NOW_ISO}" \
+        "$TURN_ID" \
+        "$SUBTURN_ID" \
+        "${SUBTURN_NUMBER:-1}" \
+        "turn_start" \
+        "active" \
+        "userPromptSubmitted"
+fi
 
 # ── Hardening v6.0: systemMessage SESSION REMINDER em CADA TURN ──────────────
 # CRÍTICO: Este é o único ponto onde o agente recebe lembrete ANTES de gerar sua

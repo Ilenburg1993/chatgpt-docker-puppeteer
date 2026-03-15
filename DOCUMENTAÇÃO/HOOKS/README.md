@@ -111,6 +111,10 @@ eventos do ciclo de vida do agente disparam scripts shell correspondentes:
 > **Regra absoluta**: o agente DEVE chamar o **tool call real** `vscode_askQuestions` antes de
 > encerrar qualquer turno. Texto plano NÃO equivale a autorização.
 
+> **Hotfix 2026-03-14 (hardening estrito de TURN)**: `session.strict_turn_close_requires_key`
+> permanece **habilitado por padrão** (`true`). Fechamento de TURN exige autorização explícita via
+> `vscode_askQuestions` com **Template F + close_key válida** no último ato.
+
 ### Mecanismo (3 camadas em cascata)
 
 O `agent-stop.sh` detecta autorização via:
@@ -678,14 +682,15 @@ tail -20 .github/hooks/logs/audit.jsonl | jq -r '[.timestamp, .event, .tool_name
 
 ## Documentos Relacionados
 
-| Documento                                                        | Conteúdo                                  |
-| ---------------------------------------------------------------- | ----------------------------------------- |
-| [SCRIPTS.md](./SCRIPTS.md)                                       | Referência detalhada de cada script       |
-| [PROTOCOLO-AUTORIZACAO.md](./PROTOCOLO-AUTORIZACAO.md)           | Spec completo do protocolo de autorização |
-| [AUDIT-SCHEMA.md](./AUDIT-SCHEMA.md)                             | Schema completo de audit.jsonl            |
-| [MELHORIAS.md](./MELHORIAS.md)                                   | Backlog de melhorias e upgrades propostos |
-| [.github/AGENTS.md](../../AGENTS.md)                             | Instruções para agentes de IA             |
-| [.github/copilot-instructions.md](../../copilot-instructions.md) | Instruções principais do Copilot          |
+| Documento                                                                            | Conteúdo                                                         |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| [SCRIPTS.md](./SCRIPTS.md)                                                           | Referência detalhada de cada script                              |
+| [PROTOCOLO-AUTORIZACAO.md](./PROTOCOLO-AUTORIZACAO.md)                               | Spec completo do protocolo de autorização                        |
+| [AUDIT-SCHEMA.md](./AUDIT-SCHEMA.md)                                                 | Schema completo de audit.jsonl                                   |
+| [PROPOSTA-UPGRADE-RODADAS-SUBTURNS-v1.md](./PROPOSTA-UPGRADE-RODADAS-SUBTURNS-v1.md) | Proposta completa de rodadas/SubTurns com alternativas e rollout |
+| [MELHORIAS.md](./MELHORIAS.md)                                                       | Backlog de melhorias e upgrades propostos                        |
+| [.github/AGENTS.md](../../AGENTS.md)                                                 | Instruções para agentes de IA                                    |
+| [.github/copilot-instructions.md](../../copilot-instructions.md)                     | Instruções principais do Copilot                                 |
 
 ---
 

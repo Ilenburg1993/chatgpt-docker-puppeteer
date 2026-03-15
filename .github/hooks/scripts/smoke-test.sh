@@ -76,6 +76,7 @@ REQUIRED_SCRIPTS=(
     "add-task.sh"
     "complete-task.sh"
     "save-finding.sh"
+    "verify-hook-delivery.sh"
     "smoke-test.sh"
 )
 for s in "${REQUIRED_SCRIPTS[@]}"; do
@@ -286,7 +287,12 @@ GUARD_EXCLUDED=(session-start.sh session-end.sh)
 for s in "${GUARD_REQUIRED[@]}"; do
     f="$SCRIPTS_DIR/$s"
     # Guard válido: script loga session_id_mismatch (bloqueia) OU sessionReconnect (rollover RECONNECT-01)
-    if [ -f "$f" ] && (rg -q '"session_id_mismatch(_[A-Za-z0-9]+)?"' "$f" 2> /dev/null || rg -q "sessionReconnect" "$f" 2> /dev/null); then
+    if [ -f "$f" ] && (
+        rg -q '"session_id_mismatch(_[A-Za-z0-9]+)?"' "$f" 2> /dev/null \
+            || rg -q "sessionReconnect" "$f" 2> /dev/null \
+            || rg -q 'reconcile_session_id_guard_(prepost|stop)' "$f" 2> /dev/null \
+            || rg -q 'handle_manual_recovery_session_id' "$f" 2> /dev/null
+    ); then
         pass "session_id guard presente: $s"
     elif [ -f "$f" ]; then
         fail "session_id guard AUSENTE: $s — vulnerável a contaminação cruzada"
@@ -365,8 +371,9 @@ if grep -q '"retomada"' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null \
 else
     fail "agent-stop.sh não implementa invariante SESSION+SECTION+TURN"
 fi
-if grep -q '_CTX_SECTION' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
-    pass "agent-stop.sh emite systemMessage rico com estado contextualizado"
+if grep -q 'build_context_nudge_message' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null \
+    || grep -q 'build_context_system_message' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; then
+    pass "agent-stop.sh emite systemMessage rico com estado contextualizado (inline ou modularizado)"
 else
     fail "agent-stop.sh usa systemMessage genérico (não contextualizado)"
 fi
@@ -384,8 +391,9 @@ if grep -q 'section_turn' "$SCRIPTS_DIR/log-prompt.sh" 2> /dev/null; then
 else
     fail "log-prompt.sh não calcula section_turn"
 fi
-if grep -q '_CTX_SECTION_TURN' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
-    pass "agent-stop.sh exibe TURN local/global no systemMessage"
+if grep -q '_CTX_SECTION_TURN' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null \
+    || grep -Fq 'TURN ${section_turn}/${turn_number}' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; then
+    pass "agent-stop.sh exibe TURN local/global no systemMessage (inline ou modularizado)"
 else
     fail "agent-stop.sh não exibe dual turn no systemMessage"
 fi
@@ -456,11 +464,12 @@ else
     fail "G9-03: session-start.sh não implementa auto-clear de flag stale"
 fi
 
-# G9-04: HEAL v2 em agent-stop.sh
-if grep -q 'mismatch_track\|HEAL v2\|healed_from_consecutive_mismatch' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
-    pass "G9-04: agent-stop.sh implementa HEAL v2 (mismatch consecutivo)"
+# G9-04: HEAL v2 em agent-stop (inline ou helper)
+if grep -q 'mismatch_track\|HEAL v2\|healed_from_consecutive_mismatch\|reconcile_session_id_guard_stop' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null \
+    || grep -q 'mismatch_track\|HEAL v2\|healed_from_consecutive_mismatch\|reconcile_session_id_guard_stop' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; then
+    pass "G9-04: agent-stop implementa HEAL v2 (inline ou helper)"
 else
-    fail "G9-04: agent-stop.sh não tem HEAL v2"
+    fail "G9-04: agent-stop não tem HEAL v2"
 fi
 
 # G9-05: raw-*.jsonl não devem existir (arquivos de diagnóstico obsoletos)
@@ -549,9 +558,10 @@ fi
 echo ""
 echo "17. Segunda revisão — REV-09 / REV-11 / config.sh / HEAL v2"
 
-# REV-09: agent-stop.sh incrementa agentStop_invocations
-if grep -q 'agentStop_invocations' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
-    pass "REV-09: agent-stop.sh rastreia agentStop_invocations"
+# REV-09: agent-stop.sh incrementa agentStop_invocations (inline ou via helper modularizado)
+if grep -q 'agentStop_invocations' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null \
+    || grep -q 'increment_agentstop_invocations_in_context' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+    pass "REV-09: agent-stop.sh rastreia agentStop_invocations (inclui caminho modularizado)"
 else
     fail "REV-09: agentStop_invocations ausente em agent-stop.sh"
 fi
@@ -1314,7 +1324,8 @@ fi
 
 # V90-11: agent-stop.sh reseta todo_created=false no jq de fim de turno (reset canônico)
 if [ -f "$_AG_STOP" ]; then
-    if grep -q 'current_turn.todo_created.*=.*false' "$_AG_STOP"; then
+    if grep -q 'current_turn.todo_created.*=.*false' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'current_turn.todo_created.*=.*false' "$_AG_STOP_LIB" 2> /dev/null; then
         pass "V90-11: agent-stop.sh reseta current_turn.todo_created=false no reset de fim de turno"
     else
         fail "V90-11: agent-stop.sh NÃO reseta todo_created no fim de turno — campo fica sujo no contexto"
@@ -1365,8 +1376,12 @@ fi
 
 # V90-15: agent-stop.sh atualiza last_turn_ts mesmo em turnos bloqueados (TURN_IDLE mede atividade)
 if [ -f "$_AG_STOP" ]; then
-    _V90_15_COUNT_MAIN="$(grep -c 'last_turn_ts.*now\|last_turn_ts.*NOW' "$_AG_STOP" 2> /dev/null || echo 0)"
-    _V90_15_COUNT_LIB="$(grep -c 'last_turn_ts.*now\|last_turn_ts.*NOW' "$_AG_STOP_LIB" 2> /dev/null || echo 0)"
+    _V90_15_COUNT_MAIN_RAW="$(grep -c 'last_turn_ts.*now\|last_turn_ts.*NOW' "$_AG_STOP" 2> /dev/null || true)"
+    _V90_15_COUNT_LIB_RAW="$(grep -c 'last_turn_ts.*now\|last_turn_ts.*NOW' "$_AG_STOP_LIB" 2> /dev/null || true)"
+    _V90_15_COUNT_MAIN="$(printf '%s\n' "${_V90_15_COUNT_MAIN_RAW:-0}" | head -1 | tr -d '[:space:]')"
+    _V90_15_COUNT_LIB="$(printf '%s\n' "${_V90_15_COUNT_LIB_RAW:-0}" | head -1 | tr -d '[:space:]')"
+    [ -z "$_V90_15_COUNT_MAIN" ] && _V90_15_COUNT_MAIN=0
+    [ -z "$_V90_15_COUNT_LIB" ] && _V90_15_COUNT_LIB=0
     _V90_15_COUNT_TOTAL=$((_V90_15_COUNT_MAIN + _V90_15_COUNT_LIB))
     if [ "$_V90_15_COUNT_TOTAL" -ge 2 ]; then
         pass "V90-15: agent-stop.sh atualiza last_turn_ts em bloqueios E em turnos normais (TURN_IDLE preciso)"
@@ -1426,6 +1441,45 @@ else
 fi
 rm -rf "$_V16_DIR"
 
+# V90-16B: log-prompt.sh RECONNECT-01 backfilla strict_turn_close_requires_key quando contexto legado não possui o campo
+_V16B_DIR="$(mktemp -d)"
+_V16B_SCRIPTS="$_V16B_DIR/scripts"
+_V16B_STATE="$_V16B_DIR/state"
+_V16B_LOGS="$_V16B_DIR/logs"
+_V16B_LIB="$_V16B_DIR/hooks-lib"
+mkdir -p "$_V16B_SCRIPTS" "$_V16B_STATE" "$_V16B_LOGS" "$_V16B_LIB"
+cp -a "$SCRIPTS_DIR"/*.sh "$_V16B_SCRIPTS/" 2> /dev/null || true
+cp -a "$HOOK_DIR/hooks-lib/"* "$_V16B_LIB/" 2> /dev/null || true
+cat > "$_V16B_STATE/session-context.json" << 'V16BCTX'
+{
+    "session": {
+        "id": "v16b-old-sid",
+        "close_key": "ENCERRAR-V16BOLD",
+        "close_key_validated": false,
+        "started_at": "2026-01-01T00:00:00Z",
+        "ended_at": null,
+        "end_reason": null,
+        "source": "auto_recovery"
+    },
+    "current_section": {"name": "test", "section_id": "v16b-s1", "section_number": 1, "turn_start": 0, "local_turn": 0},
+    "current_turn": {"number": 1, "section_turn": 1, "tools_count": 0, "auth_requested": false, "intent": null, "intent_declared": false, "todo_created": false, "agentStop_invocations": 0, "subagent_delegated": false},
+    "session_stats": {"turn_count": 1, "turn_authorized": 1, "turn_no_askQuestions": 0, "turns_since_askQuestions": 0, "tools_total": 0, "push_count": 0, "pending_section_after_push": false, "failures_detected": 0, "section_count": 1, "section_names": ["test"]},
+    "compliance": {"consecutive_unauthorized": 0, "last_turn_authorized": true}
+}
+V16BCTX
+touch "$_V16B_LOGS/audit.jsonl"
+_V16B_INPUT='{"timestamp":"2026-01-01T02:00:00Z","cwd":"/tmp","prompt":"test v90-16b","session_id":"v16b-new-sid"}'
+echo "$_V16B_INPUT" | bash "$_V16B_SCRIPTS/log-prompt.sh" > /dev/null 2> /dev/null || true
+_V16B_SRC="$(jq -r '.session.source // ""' "$_V16B_STATE/session-context.json" 2> /dev/null || echo '')"
+_V16B_SID="$(jq -r '.session.id // ""' "$_V16B_STATE/session-context.json" 2> /dev/null || echo '')"
+_V16B_STRICT="$(jq -r '.session.strict_turn_close_requires_key // "MISSING"' "$_V16B_STATE/session-context.json" 2> /dev/null || echo 'MISSING')"
+if [ "$_V16B_SRC" = "reconnect_rollover" ] && [ "$_V16B_SID" = "v16b-new-sid" ] && [ "$_V16B_STRICT" = "true" ]; then
+    pass "V90-16B: reconnect_rollover faz backfill de strict_turn_close_requires_key em contexto legado"
+else
+    fail "V90-16B: reconnect_rollover sem backfill strict (source='$_V16B_SRC', sid='$_V16B_SID', strict='$_V16B_STRICT')"
+fi
+rm -rf "$_V16B_DIR"
+
 # V90-17: watchdog.sh distingue close legítimo (end_reason=authorized_close) de stale ended_at (BUG-PC-02)
 if [ -f "$WATCHDOG_SCRIPT" ]; then
     if grep -q 'authorized_close' "$WATCHDOG_SCRIPT" \
@@ -1451,11 +1505,50 @@ else
     fail "V90-18: post-tool-use.sh não encontrado"
 fi
 
+# V90-18B: post-tool-use.sh aplica backfill de strict_turn_close_requires_key (anti-lacuna em contextos legados)
+if [ -f "$_PTU_SCRIPT" ]; then
+    if grep -q 'ensure_strict_turn_close_flag_default' "$_PTU_SCRIPT" 2> /dev/null; then
+        pass "V90-18B: post-tool-use.sh aplica backfill da flag strict_turn_close_requires_key"
+    else
+        fail "V90-18B: post-tool-use.sh NÃO aplica backfill da flag strict_turn_close_requires_key"
+    fi
+else
+    fail "V90-18B: post-tool-use.sh não encontrado"
+fi
+
+# V90-18C: log-prompt.sh preserva/força strict_turn_close_requires_key no reconnect_rollover e backfill geral
+if [ -f "$_LOG_PROMPT" ]; then
+    if grep -q 'strict_turn_close_requires_key = (if (.session.strict_turn_close_requires_key == null) then true else .session.strict_turn_close_requires_key end)' "$_LOG_PROMPT" 2> /dev/null \
+        && grep -q 'ensure_strict_turn_close_flag_default' "$_LOG_PROMPT" 2> /dev/null; then
+        pass "V90-18C: log-prompt.sh garante strict_turn_close_requires_key em reconnect_rollover + backfill"
+    else
+        fail "V90-18C: log-prompt.sh NÃO garante strict_turn_close_requires_key em reconnect_rollover/backfill"
+    fi
+else
+    fail "V90-18C: log-prompt.sh não encontrado"
+fi
+
+# V90-18D: backfill strict também presente em session-close.sh, session-end.sh e agent-stop.sh
+_SE_SCRIPT="$SCRIPTS_DIR/session-end.sh"
+_SC_SCRIPT="$SCRIPTS_DIR/session-close.sh"
+if [ -f "$_SE_SCRIPT" ] && [ -f "$_SC_SCRIPT" ] && [ -f "$_AG_STOP" ]; then
+    if grep -q 'ensure_strict_turn_close_flag_default' "$_SE_SCRIPT" 2> /dev/null \
+        && grep -q 'strict_turn_close_requires_key' "$_SC_SCRIPT" 2> /dev/null \
+        && grep -q 'ensure_strict_turn_close_flag_default' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-18D: backfill strict coberto em session-close/session-end/agent-stop"
+    else
+        fail "V90-18D: cobertura de backfill strict incompleta em session-close/session-end/agent-stop"
+    fi
+else
+    fail "V90-18D: scripts necessários não encontrados"
+fi
+
 # V90-19: agent-stop.sh invalida auth quando vscode_askQuestions não é a última ferramenta (v9.1)
 if [ -f "$_AG_STOP" ]; then
     if { grep -q 'askquestions_not_last_tool' "$_AG_STOP" 2> /dev/null \
         || grep -q 'askquestions_not_last_tool' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; } \
-        && grep -q 'last_tool.name' "$_AG_STOP" 2> /dev/null; then
+        && { grep -q 'last_tool.name' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'evaluate_turn_authorization' "$_AG_STOP" 2> /dev/null; }; then
         pass "V90-19: agent-stop.sh invalida auth quando vscode_askQuestions não é a última ferramenta"
     else
         fail "V90-19: agent-stop.sh NÃO valida regra de último ato para vscode_askQuestions"
@@ -1518,7 +1611,7 @@ else
     fail "V90-28: log-prompt.sh não encontrado"
 fi
 
-# V90-29: teste comportamental — sequência askQuestions -> manage_todo_list deve autorizar TURN
+# V90-29: teste comportamental — sequência Template F + KEY -> manage_todo_list deve autorizar TURN
 if [ -f "$_AG_STOP" ]; then
     _V29_DIR="$(mktemp -d)"
     _V29_SCRIPTS="$_V29_DIR/scripts"
@@ -1532,7 +1625,7 @@ if [ -f "$_AG_STOP" ]; then
 
     cat > "$_V29_STATE/session-context.json" << 'V29CTX'
 {
-  "session": {"id": "v90-29-sid", "close_key": "ENCERRAR-V90T29", "close_key_validated": false, "started_at": "2026-01-01T00:00:00Z"},
+    "session": {"id": "v90-29-sid", "close_key": "ENCERRAR-V90T29", "close_key_validated": true, "strict_turn_close_requires_key": true, "template_f_request_pending": true, "started_at": "2026-01-01T00:00:00Z"},
   "current_section": {"name": "teste", "section_id": "v29-sec", "section_number": 1, "turn_start": 1, "local_turn": 1},
   "current_turn": {
     "number": 2,
@@ -1545,8 +1638,16 @@ if [ -f "$_AG_STOP" ]; then
     "block_count": 0,
     "auth_requested": true,
     "auth_requested_at": "2026-01-01T00:01:20Z",
-    "last_askquestions_response": "{\"answers\":{\"Template A\":{\"selected\":[\"ok\"],\"freeText\":null,\"skipped\":false}}}",
+    "last_askquestions_response": "{\"answers\":{\"Session Close\":{\"selected\":[\"Encerrar sessão\"],\"freeText\":\"ENCERRAR-V90T29\",\"skipped\":false}}}",
+    "last_askquestions_template": "template_f",
+    "last_askquestions_close_action": "close_with_key",
+    "last_askquestions_close_key_found": true,
+    "last_non_bookkeeping_tool": "vscode_askQuestions",
     "todo_created": true,
+    "todo_last_item_label": "Chamar vscode_askQuestions [Template A - continuidade]",
+    "todo_last_item_is_askquestions_continuation": true,
+    "todo_last_item_checked_at": "2026-01-01T00:01:30Z",
+    "todo_protocol_version": "subturn_v1",
     "agentStop_invocations": 0,
     "subagent_delegated": false,
     "turn_id": "v29-turn"
@@ -1576,9 +1677,9 @@ V29AUDIT
 
     _V29_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-29-sid","stop_hook_active":false}' | bash "$_V29_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
     if echo "$_V29_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"'; then
-        fail "V90-29: sequência askQuestions->manage_todo_list foi bloqueada indevidamente"
+        fail "V90-29: sequência Template F+KEY->manage_todo_list foi bloqueada indevidamente"
     elif grep -q '"event":"turnEnd_authorized"' "$_V29_LOGS/audit.jsonl" 2> /dev/null; then
-        pass "V90-29: sequência askQuestions->manage_todo_list autoriza TURN (teste comportamental)"
+        pass "V90-29: sequência Template F+KEY->manage_todo_list autoriza TURN (teste comportamental)"
     else
         fail "V90-29: turnEnd_authorized não foi registrado no cenário válido"
     fi
@@ -1602,7 +1703,7 @@ if [ -f "$_AG_STOP" ]; then
 
     cat > "$_V30_STATE/session-context.json" << 'V30CTX'
 {
-  "session": {"id": "v90-30-sid", "close_key": "ENCERRAR-V90T30", "close_key_validated": false, "started_at": "2026-01-01T00:00:00Z"},
+    "session": {"id": "v90-30-sid", "close_key": "ENCERRAR-V90T30", "close_key_validated": false, "strict_turn_close_requires_key": true, "started_at": "2026-01-01T00:00:00Z"},
   "current_section": {"name": "teste", "section_id": "v30-sec", "section_number": 1, "turn_start": 1, "local_turn": 1},
   "current_turn": {
     "number": 2,
@@ -1657,6 +1758,83 @@ else
     fail "V90-30: agent-stop.sh não encontrado"
 fi
 
+# V90-37: askQuestions de continuação sem opção de escalonamento para Template F deve bloquear TURN
+if [ -f "$_AG_STOP" ]; then
+    _V37_DIR="$(mktemp -d)"
+    _V37_SCRIPTS="$_V37_DIR/scripts"
+    _V37_LIB="$_V37_DIR/hooks-lib"
+    _V37_STATE="$_V37_DIR/state"
+    _V37_LOGS="$_V37_DIR/logs"
+    mkdir -p "$_V37_SCRIPTS" "$_V37_LIB" "$_V37_STATE" "$_V37_LOGS"
+    cp -a "$HOOK_DIR/scripts/agent-stop.sh" "$_V37_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/scripts/session-checkpoint.sh" "$_V37_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V37_LIB/" 2> /dev/null || true
+
+    cat > "$_V37_STATE/session-context.json" << 'V37CTX'
+{
+  "session": {"id": "v90-37-sid", "close_key": "ENCERRAR-V90T37", "close_key_validated": false, "strict_turn_close_requires_key": true, "started_at": "2026-01-01T00:00:00Z"},
+  "current_section": {"name": "teste", "section_id": "v37-sec", "section_number": 1, "turn_start": 1, "local_turn": 1},
+  "current_turn": {
+    "number": 2,
+    "section_turn": 2,
+    "started_at": "2026-01-01T00:01:00Z",
+    "intent": "smoke v90-37",
+    "intent_declared": true,
+    "tools_count": 1,
+    "failures_count": 0,
+    "block_count": 0,
+    "auth_requested": true,
+    "auth_requested_at": "2026-01-01T00:01:20Z",
+    "last_askquestions_response": "{\"answers\":{\"Template A\":{\"selected\":[\"ok\"],\"freeText\":null,\"skipped\":false}}}",
+    "last_askquestions_template": "other",
+    "last_askquestions_close_action": "not_applicable",
+    "last_askquestions_close_key_found": false,
+    "last_non_bookkeeping_tool": "vscode_askQuestions",
+    "last_askquestions_has_template_f_option": false,
+    "todo_created": true,
+    "todo_last_item_label": "Chamar vscode_askQuestions [Template A - continuidade]",
+    "todo_last_item_is_askquestions_continuation": true,
+    "todo_last_item_checked_at": "2026-01-01T00:01:20Z",
+    "todo_protocol_version": "subturn_v1",
+    "agentStop_invocations": 0,
+    "subagent_delegated": false,
+    "turn_id": "v37-turn"
+  },
+  "session_stats": {
+    "turn_count": 1,
+    "turn_authorized": 1,
+    "turn_no_askQuestions": 0,
+    "turns_since_askQuestions": 0,
+    "tools_total": 3,
+    "push_count": 0,
+    "pending_section_after_push": false,
+    "section_count": 1,
+    "section_names": ["teste"],
+    "recovery_hints": {}
+  },
+  "last_tool": {"name": "vscode_askQuestions", "ts": "2026-01-01T00:01:20Z", "use_id": "v37-tool", "result": "success"},
+  "compliance": {"consecutive_unauthorized": 0, "last_turn_authorized": true, "flag_file_exists": false}
+}
+V37CTX
+
+    cat > "$_V37_LOGS/audit.jsonl" << 'V37AUDIT'
+{"event":"userPromptSubmitted","session_id":"v90-37-sid","timestamp":"2026-01-01T00:01:00Z"}
+{"event":"postToolUse","session_id":"v90-37-sid","timestamp":"2026-01-01T00:01:20Z","tool_name":"vscode_askQuestions"}
+V37AUDIT
+
+    _V37_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-37-sid","stop_hook_active":false}' | bash "$_V37_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
+    if echo "$_V37_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
+        && grep -q '"reason":"askquestions_missing_template_f_option"' "$_V37_LOGS/audit.jsonl" 2> /dev/null; then
+        pass "V90-37: askQuestions sem opção de escalonamento para Template F é bloqueado"
+    else
+        fail "V90-37: ausência de opção de escalonamento para Template F não foi bloqueada"
+    fi
+
+    rm -rf "$_V37_DIR"
+else
+    fail "V90-37: agent-stop.sh não encontrado"
+fi
+
 # V90-31: session-start.sh registra evento canônico sessionStart no audit
 _SESSION_START_SCRIPT="$SCRIPTS_DIR/session-start.sh"
 if [ -f "$_SESSION_START_SCRIPT" ]; then
@@ -1668,6 +1846,589 @@ if [ -f "$_SESSION_START_SCRIPT" ]; then
     fi
 else
     fail "V90-31: session-start.sh não encontrado"
+fi
+
+# V90-38: teste comportamental — Template F sem KEY + manage_todo_list deve bloquear TURN (sem bypass de bookkeeping)
+if [ -f "$_AG_STOP" ]; then
+    _V38_DIR="$(mktemp -d)"
+    _V38_SCRIPTS="$_V38_DIR/scripts"
+    _V38_LIB="$_V38_DIR/hooks-lib"
+    _V38_STATE="$_V38_DIR/state"
+    _V38_LOGS="$_V38_DIR/logs"
+    mkdir -p "$_V38_SCRIPTS" "$_V38_LIB" "$_V38_STATE" "$_V38_LOGS"
+    cp -a "$HOOK_DIR/scripts/agent-stop.sh" "$_V38_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/scripts/session-checkpoint.sh" "$_V38_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V38_LIB/" 2> /dev/null || true
+
+    cat > "$_V38_STATE/session-context.json" << 'V38CTX'
+{
+  "session": {"id": "v90-38-sid", "close_key": "ENCERRAR-V90T38", "close_key_validated": false, "strict_turn_close_requires_key": true, "started_at": "2026-01-01T00:00:00Z"},
+  "current_section": {"name": "teste", "section_id": "v38-sec", "section_number": 1, "turn_start": 1, "local_turn": 1},
+  "current_turn": {
+    "number": 2,
+    "section_turn": 2,
+    "started_at": "2026-01-01T00:01:00Z",
+    "intent": "smoke v90-38",
+    "intent_declared": true,
+    "tools_count": 2,
+    "failures_count": 0,
+    "block_count": 0,
+    "auth_requested": true,
+    "auth_requested_at": "2026-01-01T00:01:20Z",
+    "last_askquestions_response": "{\"answers\":{\"Template F — Session Close\":{\"selected\":[\"Continuar sessão\"],\"freeText\":null,\"skipped\":false}}}",
+    "last_askquestions_template": "template_f",
+    "last_askquestions_close_action": "cancel_or_continue",
+    "last_askquestions_close_key_found": false,
+    "last_non_bookkeeping_tool": "vscode_askQuestions",
+    "todo_created": true,
+    "agentStop_invocations": 0,
+    "subagent_delegated": false,
+    "turn_id": "v38-turn"
+  },
+  "session_stats": {
+    "turn_count": 1,
+    "turn_authorized": 1,
+    "turn_no_askQuestions": 0,
+    "turns_since_askQuestions": 0,
+    "tools_total": 4,
+    "push_count": 0,
+    "pending_section_after_push": false,
+    "section_count": 1,
+    "section_names": ["teste"],
+    "recovery_hints": {}
+  },
+  "last_tool": {"name": "manage_todo_list", "ts": "2026-01-01T00:01:30Z", "use_id": "v38-tool", "result": "success"},
+  "compliance": {"consecutive_unauthorized": 0, "last_turn_authorized": true, "flag_file_exists": false}
+}
+V38CTX
+
+    cat > "$_V38_LOGS/audit.jsonl" << 'V38AUDIT'
+{"event":"userPromptSubmitted","session_id":"v90-38-sid","timestamp":"2026-01-01T00:01:00Z"}
+{"event":"postToolUse","session_id":"v90-38-sid","timestamp":"2026-01-01T00:01:20Z","tool_name":"vscode_askQuestions"}
+{"event":"postToolUse","session_id":"v90-38-sid","timestamp":"2026-01-01T00:01:30Z","tool_name":"manage_todo_list"}
+V38AUDIT
+
+    _V38_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-38-sid","stop_hook_active":false}' | bash "$_V38_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
+    if echo "$_V38_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
+        && grep -q '"event":"turnAuth_invalidated"' "$_V38_LOGS/audit.jsonl" 2> /dev/null; then
+        pass "V90-38: modo estrito bloqueia Template F sem KEY mesmo com manage_todo_list no fim"
+    else
+        fail "V90-38: bypass de bookkeeping permitiu fechamento sem KEY válida"
+    fi
+
+    rm -rf "$_V38_DIR"
+else
+    fail "V90-38: agent-stop.sh não encontrado"
+fi
+
+# V90-39: agentStop_blocked diferencia ausência de askQuestions vs autorização inválida
+if [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
+    if grep -q 'block_reason' "$_AG_STOP_LIB" 2> /dev/null \
+        && grep -q 'invalid_reason' "$_AG_STOP_LIB" 2> /dev/null \
+        && grep -q 'turn_blocked_invalid_authorization' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-39: observabilidade do bloqueio distingue no_askquestions de invalid_authorization"
+    else
+        fail "V90-39: sem campos de causa em agentStop_blocked/UNAUTHORIZED_CLOSE.flag"
+    fi
+else
+    fail "V90-39: agent-stop.sh ou agent-stop-lib.sh não encontrado"
+fi
+
+# V90-40: continuidade não-Template F deve bloquear fechamento mesmo com strict=false
+if [ -f "$_AG_STOP" ]; then
+    _V40_DIR="$(mktemp -d)"
+    _V40_SCRIPTS="$_V40_DIR/scripts"
+    _V40_LIB="$_V40_DIR/hooks-lib"
+    _V40_STATE="$_V40_DIR/state"
+    _V40_LOGS="$_V40_DIR/logs"
+    mkdir -p "$_V40_SCRIPTS" "$_V40_LIB" "$_V40_STATE" "$_V40_LOGS"
+    cp -a "$HOOK_DIR/scripts/agent-stop.sh" "$_V40_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/scripts/session-checkpoint.sh" "$_V40_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V40_LIB/" 2> /dev/null || true
+
+    cat > "$_V40_STATE/session-context.json" << 'V40CTX'
+{
+  "session": {"id": "v90-40-sid", "close_key": "ENCERRAR-V90T40", "close_key_validated": false, "strict_turn_close_requires_key": false, "started_at": "2026-01-01T00:00:00Z"},
+  "current_section": {"name": "teste", "section_id": "v40-sec", "section_number": 1, "turn_start": 1, "local_turn": 1},
+  "current_turn": {
+    "number": 2,
+    "section_turn": 2,
+    "started_at": "2026-01-01T00:01:00Z",
+    "intent": "smoke v90-40",
+    "intent_declared": true,
+    "tools_count": 1,
+    "failures_count": 0,
+    "block_count": 0,
+    "auth_requested": true,
+    "auth_requested_at": "2026-01-01T00:01:20Z",
+    "last_askquestions_response": "{\"answers\":{\"Template A\":{\"selected\":[\"ok\"],\"freeText\":null,\"skipped\":false}}}",
+    "last_askquestions_template": "other",
+    "last_askquestions_close_action": "not_applicable",
+    "last_askquestions_close_key_found": false,
+    "last_non_bookkeeping_tool": "vscode_askQuestions",
+    "todo_created": true,
+    "todo_last_item_label": "Chamar vscode_askQuestions [Template A - continuidade]",
+    "todo_last_item_is_askquestions_continuation": true,
+    "todo_last_item_checked_at": "2026-01-01T00:01:20Z",
+    "todo_protocol_version": "subturn_v1",
+    "agentStop_invocations": 0,
+    "subagent_delegated": false,
+    "turn_id": "v40-turn"
+  },
+  "session_stats": {
+    "turn_count": 1,
+    "turn_authorized": 1,
+    "turn_no_askQuestions": 0,
+    "turns_since_askQuestions": 0,
+    "tools_total": 3,
+    "push_count": 0,
+    "pending_section_after_push": false,
+    "section_count": 1,
+    "section_names": ["teste"],
+    "recovery_hints": {}
+  },
+  "last_tool": {"name": "vscode_askQuestions", "ts": "2026-01-01T00:01:20Z", "use_id": "v40-tool", "result": "success"},
+  "compliance": {"consecutive_unauthorized": 0, "last_turn_authorized": true, "flag_file_exists": false}
+}
+V40CTX
+
+    cat > "$_V40_LOGS/audit.jsonl" << 'V40AUDIT'
+{"event":"userPromptSubmitted","session_id":"v90-40-sid","timestamp":"2026-01-01T00:01:00Z"}
+{"event":"postToolUse","session_id":"v90-40-sid","timestamp":"2026-01-01T00:01:20Z","tool_name":"vscode_askQuestions"}
+V40AUDIT
+
+    _V40_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-40-sid","stop_hook_active":false}' | bash "$_V40_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
+    if echo "$_V40_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
+        && grep -q '"reason":"non_template_f_continuation_mandatory"' "$_V40_LOGS/audit.jsonl" 2> /dev/null; then
+        pass "V90-40: continuidade não-Template F bloqueia fechamento mesmo com strict=false"
+    else
+        fail "V90-40: continuidade não-Template F deveria bloquear fechamento mesmo com strict=false"
+    fi
+
+    rm -rf "$_V40_DIR"
+else
+    fail "V90-40: agent-stop.sh não encontrado"
+fi
+
+# V90-41: Template F com KEY válida sem solicitação prévia deve bloquear TURN
+if [ -f "$_AG_STOP" ]; then
+    _V41_DIR="$(mktemp -d)"
+    _V41_SCRIPTS="$_V41_DIR/scripts"
+    _V41_LIB="$_V41_DIR/hooks-lib"
+    _V41_STATE="$_V41_DIR/state"
+    _V41_LOGS="$_V41_DIR/logs"
+    mkdir -p "$_V41_SCRIPTS" "$_V41_LIB" "$_V41_STATE" "$_V41_LOGS"
+    cp -a "$HOOK_DIR/scripts/agent-stop.sh" "$_V41_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/scripts/session-checkpoint.sh" "$_V41_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V41_LIB/" 2> /dev/null || true
+
+    cat > "$_V41_STATE/session-context.json" << 'V41CTX'
+{
+  "session": {"id": "v90-41-sid", "close_key": "ENCERRAR-V90T41", "close_key_validated": true, "strict_turn_close_requires_key": true, "template_f_request_pending": false, "started_at": "2026-01-01T00:00:00Z"},
+  "current_section": {"name": "teste", "section_id": "v41-sec", "section_number": 1, "turn_start": 1, "local_turn": 1},
+  "current_turn": {
+    "number": 2,
+    "section_turn": 2,
+    "started_at": "2026-01-01T00:01:00Z",
+    "intent": "smoke v90-41",
+    "intent_declared": true,
+    "tools_count": 1,
+    "failures_count": 0,
+    "block_count": 0,
+    "auth_requested": true,
+    "auth_requested_at": "2026-01-01T00:01:20Z",
+    "last_askquestions_response": "{\"answers\":{\"Session Close\":{\"selected\":[\"Encerrar sessão\"],\"freeText\":\"ENCERRAR-V90T41\",\"skipped\":false}}}",
+    "last_askquestions_template": "template_f",
+    "last_askquestions_close_action": "close_with_key",
+    "last_askquestions_close_key_found": true,
+    "last_askquestions_has_template_f_option": true,
+    "last_non_bookkeeping_tool": "vscode_askQuestions",
+    "todo_created": true,
+    "todo_last_item_label": "Chamar vscode_askQuestions [Template A - continuidade]",
+    "todo_last_item_is_askquestions_continuation": true,
+    "todo_last_item_checked_at": "2026-01-01T00:01:20Z",
+    "todo_protocol_version": "subturn_v1",
+    "agentStop_invocations": 0,
+    "subagent_delegated": false,
+    "turn_id": "v41-turn"
+  },
+  "session_stats": {
+    "turn_count": 1,
+    "turn_authorized": 1,
+    "turn_no_askQuestions": 0,
+    "turns_since_askQuestions": 0,
+    "tools_total": 3,
+    "push_count": 0,
+    "pending_section_after_push": false,
+    "section_count": 1,
+    "section_names": ["teste"],
+    "recovery_hints": {}
+  },
+  "last_tool": {"name": "vscode_askQuestions", "ts": "2026-01-01T00:01:20Z", "use_id": "v41-tool", "result": "success"},
+  "compliance": {"consecutive_unauthorized": 0, "last_turn_authorized": true, "flag_file_exists": false}
+}
+V41CTX
+
+    cat > "$_V41_LOGS/audit.jsonl" << 'V41AUDIT'
+{"event":"userPromptSubmitted","session_id":"v90-41-sid","timestamp":"2026-01-01T00:01:00Z"}
+{"event":"postToolUse","session_id":"v90-41-sid","timestamp":"2026-01-01T00:01:20Z","tool_name":"vscode_askQuestions"}
+V41AUDIT
+
+    _V41_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-41-sid","stop_hook_active":false}' | bash "$_V41_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
+    if echo "$_V41_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
+        && grep -q '"reason":"template_f_called_without_prior_request"' "$_V41_LOGS/audit.jsonl" 2> /dev/null; then
+        pass "V90-41: Template F sem solicitação prévia é bloqueado mesmo com KEY válida"
+    else
+        fail "V90-41: Template F sem solicitação prévia não foi bloqueado como esperado"
+    fi
+
+    rm -rf "$_V41_DIR"
+else
+    fail "V90-41: agent-stop.sh não encontrado"
+fi
+
+# V90-42: em modo estrito, continuidade não-Template F com opção de escalonamento deve bloquear fechamento
+if [ -f "$_AG_STOP" ]; then
+    _V42_DIR="$(mktemp -d)"
+    _V42_SCRIPTS="$_V42_DIR/scripts"
+    _V42_LIB="$_V42_DIR/hooks-lib"
+    _V42_STATE="$_V42_DIR/state"
+    _V42_LOGS="$_V42_DIR/logs"
+    mkdir -p "$_V42_SCRIPTS" "$_V42_LIB" "$_V42_STATE" "$_V42_LOGS"
+    cp -a "$HOOK_DIR/scripts/agent-stop.sh" "$_V42_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/scripts/session-checkpoint.sh" "$_V42_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V42_LIB/" 2> /dev/null || true
+
+    cat > "$_V42_STATE/session-context.json" << 'V42CTX'
+{
+  "session": {"id": "v90-42-sid", "close_key": "ENCERRAR-V90T42", "close_key_validated": false, "strict_turn_close_requires_key": true, "template_f_request_pending": false, "started_at": "2026-01-01T00:00:00Z"},
+  "current_section": {"name": "teste", "section_id": "v42-sec", "section_number": 1, "turn_start": 1, "local_turn": 1},
+  "current_turn": {
+    "number": 2,
+    "section_turn": 2,
+    "started_at": "2026-01-01T00:01:00Z",
+    "intent": "smoke v90-42",
+    "intent_declared": true,
+    "tools_count": 1,
+    "failures_count": 0,
+    "block_count": 0,
+    "auth_requested": true,
+    "auth_requested_at": "2026-01-01T00:01:20Z",
+    "last_askquestions_response": "{\"answers\":{\"Template A\":{\"selected\":[\"ok\"],\"freeText\":null,\"skipped\":false}}}",
+    "last_askquestions_template": "other",
+    "last_askquestions_close_action": "not_applicable",
+    "last_askquestions_close_key_found": false,
+    "last_askquestions_has_template_f_option": true,
+    "last_non_bookkeeping_tool": "vscode_askQuestions",
+    "todo_created": true,
+    "todo_last_item_label": "Chamar vscode_askQuestions [Template A - continuidade]",
+    "todo_last_item_is_askquestions_continuation": true,
+    "todo_last_item_checked_at": "2026-01-01T00:01:20Z",
+    "todo_protocol_version": "subturn_v1",
+    "agentStop_invocations": 0,
+    "subagent_delegated": false,
+    "turn_id": "v42-turn"
+  },
+  "session_stats": {
+    "turn_count": 1,
+    "turn_authorized": 1,
+    "turn_no_askQuestions": 0,
+    "turns_since_askQuestions": 0,
+    "tools_total": 3,
+    "push_count": 0,
+    "pending_section_after_push": false,
+    "section_count": 1,
+    "section_names": ["teste"],
+    "recovery_hints": {}
+  },
+  "last_tool": {"name": "vscode_askQuestions", "ts": "2026-01-01T00:01:20Z", "use_id": "v42-tool", "result": "success"},
+  "compliance": {"consecutive_unauthorized": 0, "last_turn_authorized": true, "flag_file_exists": false}
+}
+V42CTX
+
+    cat > "$_V42_LOGS/audit.jsonl" << 'V42AUDIT'
+{"event":"userPromptSubmitted","session_id":"v90-42-sid","timestamp":"2026-01-01T00:01:00Z"}
+{"event":"postToolUse","session_id":"v90-42-sid","timestamp":"2026-01-01T00:01:20Z","tool_name":"vscode_askQuestions"}
+V42AUDIT
+
+    _V42_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-42-sid","stop_hook_active":false}' | bash "$_V42_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
+    if echo "$_V42_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
+        && grep -q '"reason":"non_template_f_continuation_mandatory"' "$_V42_LOGS/audit.jsonl" 2> /dev/null; then
+        pass "V90-42: modo estrito bloqueia fechamento após continuidade não-Template F"
+    else
+        fail "V90-42: continuidade não-Template F com escalonamento deveria bloquear fechamento"
+    fi
+
+    rm -rf "$_V42_DIR"
+else
+    fail "V90-42: agent-stop.sh não encontrado"
+fi
+
+# V90-43: sem CTX, mesmo com sinal de askQuestions no audit, TURN deve bloquear
+if [ -f "$_AG_STOP" ]; then
+    _V43_DIR="$(mktemp -d)"
+    _V43_SCRIPTS="$_V43_DIR/scripts"
+    _V43_LIB="$_V43_DIR/hooks-lib"
+    _V43_STATE="$_V43_DIR/state"
+    _V43_LOGS="$_V43_DIR/logs"
+    mkdir -p "$_V43_SCRIPTS" "$_V43_LIB" "$_V43_STATE" "$_V43_LOGS"
+    cp -a "$HOOK_DIR/scripts/agent-stop.sh" "$_V43_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/scripts/session-checkpoint.sh" "$_V43_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V43_LIB/" 2> /dev/null || true
+
+    # Deliberadamente NÃO cria session-context.json
+    cat > "$_V43_LOGS/audit.jsonl" << 'V43AUDIT'
+{"event":"userPromptSubmitted","session_id":"v90-43-sid","timestamp":"2026-01-01T00:01:00Z"}
+{"event":"postToolUse","session_id":"v90-43-sid","timestamp":"2026-01-01T00:01:20Z","tool_name":"vscode_askQuestions"}
+V43AUDIT
+
+    _V43_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-43-sid","stop_hook_active":false}' | bash "$_V43_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
+    if echo "$_V43_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
+        && echo "$_V43_OUT" | grep -q '"hookEventName"[[:space:]]*:[[:space:]]*"Stop"'; then
+        pass "V90-43: sem CTX não existe autorização legítima — block obrigatório aplicado"
+    else
+        fail "V90-43: sem CTX o TURN não foi bloqueado como deveria"
+    fi
+
+    rm -rf "$_V43_DIR"
+else
+    fail "V90-43: agent-stop.sh não encontrado"
+fi
+
+# V90-44: P7.1 — pre-tool-use registra turnClose_prevented_dual_lock no lock primário
+_PRE_TOOL_SCRIPT="$SCRIPTS_DIR/pre-tool-use.sh"
+if [ -f "$_PRE_TOOL_SCRIPT" ]; then
+    if grep -q 'turnClose_prevented_dual_lock' "$_PRE_TOOL_SCRIPT" 2> /dev/null \
+        && grep -q 'lock_stage.*preToolUse\|"preToolUse"' "$_PRE_TOOL_SCRIPT" 2> /dev/null; then
+        pass "V90-44: pre-tool-use implementa lock primário e loga turnClose_prevented_dual_lock"
+    else
+        fail "V90-44: pre-tool-use não loga turnClose_prevented_dual_lock no lock primário"
+    fi
+else
+    fail "V90-44: pre-tool-use.sh não encontrado"
+fi
+
+# V90-45: P7.1/P7.5 — agent-stop implementa lock secundário + decisionTrace em block
+if [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
+    if { grep -q 'turnClose_prevented_dual_lock' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'turnClose_prevented_dual_lock' "$_AG_STOP_LIB" 2> /dev/null; } \
+        && grep -q 'decisionTrace\|build_decision_trace_json' "$_AG_STOP_LIB" 2> /dev/null; then
+        pass "V90-45: agent-stop implementa lock secundário e decisão explicável (decisionTrace)"
+    else
+        fail "V90-45: agent-stop sem lock secundário ou sem decisionTrace"
+    fi
+else
+    fail "V90-45: agent-stop.sh ou agent-stop-lib.sh não encontrado"
+fi
+
+# V90-46: P7.2 — budget anti-loop de reblock está presente
+if [ -f "$_AG_STOP" ]; then
+    if grep -q 'stop_block_budget_max\|stop_block_budget_exceeded' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-46: agent-stop possui budget anti-loop para reblock (P7.2)"
+    else
+        fail "V90-46: agent-stop não possui budget anti-loop para reblock"
+    fi
+else
+    fail "V90-46: agent-stop.sh não encontrado"
+fi
+
+# V90-47: P7.3 — schema de contexto de autorização existe e é JSON válido
+_TURN_AUTH_SCHEMA="$HOOK_DIR/contracts/turn-authorization-context.schema.json"
+if [ -f "$_TURN_AUTH_SCHEMA" ]; then
+    if jq empty "$_TURN_AUTH_SCHEMA" 2> /dev/null; then
+        pass "V90-47: turn-authorization-context.schema.json existe e é JSON válido"
+    else
+        fail "V90-47: turn-authorization-context.schema.json existe mas é inválido"
+    fi
+else
+    fail "V90-47: schema turn-authorization-context não encontrado"
+fi
+
+# V90-48: P7.3 — agent-stop valida contrato de autorização e bloqueia em contexto inválido
+if [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
+    if { grep -q 'validate_turn_authorization_context_json' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'apply_turn_authorization_contract_guard' "$_AG_STOP" 2> /dev/null; } \
+        && grep -q 'turn_auth_context_invalid' "$_AG_STOP_LIB" 2> /dev/null; then
+        pass "V90-48: contrato de autorização é validado e possui reason de bloqueio dedicado"
+    else
+        fail "V90-48: validação/razão de contrato inválido não encontrada no fluxo do Stop"
+    fi
+else
+    fail "V90-48: agent-stop.sh ou agent-stop-lib.sh não encontrado"
+fi
+
+# V90-52: M4 — guard contratual modularizado via helper único
+if [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
+    if grep -q 'apply_turn_authorization_contract_guard' "$_AG_STOP" 2> /dev/null \
+        && grep -q 'apply_turn_authorization_contract_guard' "$_AG_STOP_LIB" 2> /dev/null; then
+        pass "V90-52: guard contratual do TURN foi modularizado (agent-stop -> helper)"
+    else
+        fail "V90-52: guard contratual ainda não está modularizado conforme M4"
+    fi
+else
+    fail "V90-52: agent-stop.sh ou agent-stop-lib.sh não encontrado"
+fi
+
+# V90-56: mensagem de block em modo estrito orienta fechamento com Template F + KEY válida
+if [ -f "$_AG_STOP_LIB" ]; then
+    if grep -q 'required_turn_close_action="Template F + KEY válida"' "$_AG_STOP_LIB" 2> /dev/null \
+        && grep -q 'Fechamento legítimo deste TURN exige \${required_turn_close_action}' "$_AG_STOP_LIB" 2> /dev/null; then
+        pass "V90-56: helper de block orienta explicitamente Template F + KEY válida no modo estrito"
+    else
+        fail "V90-56: helper de block não orienta explicitamente Template F + KEY válida"
+    fi
+else
+    fail "V90-56: agent-stop-lib.sh não encontrado"
+fi
+
+# V90-57: agent-stop propaga strict_turn_close_requires_key ao payload builder
+if [ -f "$_AG_STOP" ]; then
+    if grep -q 'build_turn_block_payload "\$_BLOCK_TODO_CREATED" "\$AUTH_INVALID_REASON" "\$_BLOCK_SESSION_INFO" "\$_BLOCK_STRICT_MODE"' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-57: agent-stop envia flag strict para build_turn_block_payload"
+    else
+        fail "V90-57: agent-stop não propaga strict mode ao payload de block"
+    fi
+else
+    fail "V90-57: agent-stop.sh não encontrado"
+fi
+
+# V90-58: payload Stop preserva compatibilidade top-level (decision/decisionReason)
+if [ -f "$_AG_STOP_LIB" ]; then
+    if grep -q 'decision: "block"' "$_AG_STOP_LIB" 2> /dev/null \
+        && grep -q 'decisionReason: \$reason' "$_AG_STOP_LIB" 2> /dev/null; then
+        pass "V90-58: emit_stop_block mantém campos top-level de decisão para compatibilidade"
+    else
+        fail "V90-58: emit_stop_block sem campos top-level de decisão (risco de block ignorado)"
+    fi
+else
+    fail "V90-58: agent-stop-lib.sh não encontrado"
+fi
+
+# V90-59: payload Stop mantém hookSpecificOutput do evento Stop
+if [ -f "$_AG_STOP_LIB" ]; then
+    if grep -q 'hookEventName: "Stop"' "$_AG_STOP_LIB" 2> /dev/null \
+        && grep -q 'hookSpecificOutput' "$_AG_STOP_LIB" 2> /dev/null; then
+        pass "V90-59: emit_stop_block mantém hookSpecificOutput para Stop"
+    else
+        fail "V90-59: emit_stop_block sem hookSpecificOutput de Stop"
+    fi
+else
+    fail "V90-59: agent-stop-lib.sh não encontrado"
+fi
+
+# V90-55: M4 — atualização de subturn bloqueado modularizada em helper
+if [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
+    if grep -q 'record_blocked_subturn_and_schedule_resume' "$_AG_STOP" 2> /dev/null \
+        && grep -q 'record_blocked_subturn_and_schedule_resume' "$_AG_STOP_LIB" 2> /dev/null; then
+        pass "V90-55: bloco de subturn bloqueado foi extraído para helper M4"
+    else
+        fail "V90-55: bloco de subturn bloqueado ainda não está modularizado"
+    fi
+else
+    fail "V90-55: agent-stop.sh ou agent-stop-lib.sh não encontrado"
+fi
+
+# V90-51: semântica explícita — decision:block no Stop bloqueia fechamento e força continuação
+if [ -f "$_AG_STOP_LIB" ]; then
+    if grep -q 'hookEventName: "Stop"' "$_AG_STOP_LIB" 2> /dev/null \
+        && grep -q 'FECHAMENTO DO TURN BLOQUEADO' "$_AG_STOP_LIB" 2> /dev/null; then
+        pass "V90-51: semântica de block explícita (bloqueia fechamento, agente continua)"
+    else
+        fail "V90-51: semântica de block vs continuação ainda ambígua no payload do Stop"
+    fi
+else
+    fail "V90-51: agent-stop-lib.sh não encontrado"
+fi
+
+# V90-49: P7.6 — baseline de segurança em .vscode/settings.json (quando presente)
+_VSCODE_SETTINGS="$HOOK_DIR/../../.vscode/settings.json"
+if [ -f "$_VSCODE_SETTINGS" ]; then
+    if jq empty "$_VSCODE_SETTINGS" 2> /dev/null; then
+        _S_GLOBAL_AUTO="$(jq -r '."chat.tools.global.autoApprove" // false' "$_VSCODE_SETTINGS" 2> /dev/null || echo false)"
+        _S_TERM_AUTO="$(jq -r '."chat.tools.terminal.enableAutoApprove" // false' "$_VSCODE_SETTINGS" 2> /dev/null || echo false)"
+        _S_HOOKS_ON="$(jq -r 'if has("chat.useHooks") then ."chat.useHooks" else true end' "$_VSCODE_SETTINGS" 2> /dev/null || echo true)"
+        if [ "$_S_GLOBAL_AUTO" != "true" ] && [ "$_S_TERM_AUTO" != "true" ] && [ "$_S_HOOKS_ON" = "true" ]; then
+            pass "V90-49: baseline de segurança OK (auto-approve global/terminal desativado; hooks ativos)"
+        else
+            fail "V90-49: baseline inseguro em .vscode/settings.json (globalAuto=$_S_GLOBAL_AUTO terminalAuto=$_S_TERM_AUTO hooks=$_S_HOOKS_ON)"
+        fi
+    else
+        pass "V90-49: .vscode/settings.json em JSONC/não parseável por jq — baseline local não validado por smoke"
+    fi
+else
+    pass "V90-49: .vscode/settings.json ausente (baseline local não aplicável neste workspace)"
+fi
+
+# V90-50: P7.7 — teste comportamental: contrato de autorização inválido deve bloquear TURN
+if [ -f "$_AG_STOP" ]; then
+    _V50_DIR="$(mktemp -d)"
+    _V50_SCRIPTS="$_V50_DIR/scripts"
+    _V50_LIB="$_V50_DIR/hooks-lib"
+    _V50_STATE="$_V50_DIR/state"
+    _V50_LOGS="$_V50_DIR/logs"
+    mkdir -p "$_V50_SCRIPTS" "$_V50_LIB" "$_V50_STATE" "$_V50_LOGS"
+    cp -a "$HOOK_DIR/scripts/agent-stop.sh" "$_V50_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/scripts/session-checkpoint.sh" "$_V50_SCRIPTS/" 2> /dev/null || true
+    cp -a "$HOOK_DIR/hooks-lib/"* "$_V50_LIB/" 2> /dev/null || true
+
+    cat > "$_V50_STATE/session-context.json" << 'V50CTX'
+{
+  "session": {"id": "", "close_key": "ENCERRAR-V90T50", "close_key_validated": false, "strict_turn_close_requires_key": true, "started_at": "2026-01-01T00:00:00Z"},
+  "current_section": {"name": "teste", "section_id": "v50-sec", "section_number": 1, "turn_start": 1, "local_turn": 1},
+  "current_turn": {
+    "number": 2,
+    "section_turn": 2,
+    "started_at": "2026-01-01T00:01:00Z",
+    "intent": "smoke v90-50",
+    "intent_declared": true,
+    "tools_count": 1,
+    "failures_count": 0,
+    "block_count": 0,
+    "auth_requested": true,
+    "auth_requested_at": "2026-01-01T00:01:20Z",
+    "last_askquestions_response": "{\"answers\":{\"Template A\":{\"selected\":[\"ok\"],\"freeText\":null,\"skipped\":false}}}",
+    "last_askquestions_template": "other",
+    "last_askquestions_close_action": "not_applicable",
+    "last_askquestions_close_key_found": false,
+    "last_non_bookkeeping_tool": "vscode_askQuestions",
+    "todo_created": true,
+    "agentStop_invocations": 0,
+    "subagent_delegated": false,
+    "turn_id": "v50-turn"
+  },
+  "session_stats": {
+    "turn_count": 1,
+    "turn_authorized": 1,
+    "turn_no_askQuestions": 0,
+    "turns_since_askQuestions": 0,
+    "tools_total": 3,
+    "push_count": 0,
+    "pending_section_after_push": false,
+    "section_count": 1,
+    "section_names": ["teste"],
+    "recovery_hints": {}
+  },
+  "last_tool": {"name": "vscode_askQuestions", "ts": "2026-01-01T00:01:20Z", "use_id": "v50-tool", "result": "success"},
+  "compliance": {"consecutive_unauthorized": 0, "last_turn_authorized": true, "flag_file_exists": false}
+}
+V50CTX
+
+    cat > "$_V50_LOGS/audit.jsonl" << 'V50AUDIT'
+{"event":"userPromptSubmitted","session_id":"","timestamp":"2026-01-01T00:01:00Z"}
+{"event":"postToolUse","session_id":"","timestamp":"2026-01-01T00:01:20Z","tool_name":"vscode_askQuestions"}
+V50AUDIT
+
+    _V50_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"","stop_hook_active":false}' | bash "$_V50_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
+    if echo "$_V50_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
+        && grep -q '"event":"turnAuth_context_invalid"' "$_V50_LOGS/audit.jsonl" 2> /dev/null; then
+        pass "V90-50: contrato inválido força block com evento turnAuth_context_invalid"
+    else
+        fail "V90-50: contrato inválido não forçou block como esperado"
+    fi
+
+    rm -rf "$_V50_DIR"
+else
+    fail "V90-50: agent-stop.sh não encontrado"
 fi
 
 # V90-32: log-prompt.sh detecta retomada via userPromptSubmitted e incrementa resume_count
@@ -1786,7 +2547,8 @@ fi
 
 # V90-20: agent-stop.sh invalida auth quando askQuestions falhou na API (no choices)
 if [ -f "$_AG_STOP" ]; then
-    if grep -q 'askquestions_api_error' "$_AG_STOP" 2> /dev/null; then
+    if grep -q 'askquestions_api_error' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'askquestions_api_error' "$_AG_STOP_LIB" 2> /dev/null; then
         pass "V90-20: agent-stop.sh invalida auth quando current_turn.askquestions_api_error=true"
     else
         fail "V90-20: agent-stop.sh NÃO trata askquestions_api_error no fechamento do turno"
@@ -1797,8 +2559,10 @@ fi
 
 # V90-21: agent-stop.sh reseta flags de erro API de askQuestions no reset de turno
 if [ -f "$_AG_STOP" ]; then
-    if grep -q 'current_turn.askquestions_api_error.*=.*false' "$_AG_STOP" 2> /dev/null \
-        && grep -q 'current_turn.askquestions_api_error_at.*=.*null' "$_AG_STOP" 2> /dev/null; then
+    if { grep -q 'current_turn.askquestions_api_error.*=.*false' "$_AG_STOP" 2> /dev/null \
+        && grep -q 'current_turn.askquestions_api_error_at.*=.*null' "$_AG_STOP" 2> /dev/null; } \
+        || { grep -q 'current_turn.askquestions_api_error.*=.*false' "$_AG_STOP_LIB" 2> /dev/null \
+            && grep -q 'current_turn.askquestions_api_error_at.*=.*null' "$_AG_STOP_LIB" 2> /dev/null; }; then
         pass "V90-21: agent-stop.sh reseta flags askquestions_api_error no fim do turno"
     else
         fail "V90-21: agent-stop.sh NÃO reseta flags askquestions_api_error no fim do turno"
@@ -1839,14 +2603,171 @@ fi
 if [ -f "$_AG_STOP" ]; then
     if { grep -q '_AUTH_SUBAGENT_IMMEDIATE' "$_AG_STOP" 2> /dev/null \
         || grep -q 'is_immediate_subagent_delegation' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; } \
-        && grep -q 'last_tool.name' "$_AG_STOP" 2> /dev/null \
-        && grep -q 'auth_via_subagent_delegation' "$_AG_STOP" 2> /dev/null; then
+        && { grep -q 'last_tool.name' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'evaluate_turn_authorization' "$_AG_STOP" 2> /dev/null; } \
+        && { grep -q 'auth_via_subagent_delegation' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'auth_via_subagent_delegation' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; }; then
         pass "V90-24: auth de subagente limitada a delegação imediata (sem bypass stale)"
     else
         fail "V90-24: agent-stop.sh NÃO limita auth de subagente à delegação imediata"
     fi
 else
     fail "V90-24: agent-stop.sh não encontrado"
+fi
+
+# V90-44: session-context.schema.json define bloco current_turn.subturn e subturn_history
+_SCHEMA_FILE="$HOOK_DIR/contracts/session-context.schema.json"
+if [ -f "$_SCHEMA_FILE" ]; then
+    if jq -e '.properties.current_turn.properties.subturn and .properties.current_turn.properties.subturn_history' "$_SCHEMA_FILE" > /dev/null 2>&1; then
+        pass "V90-44: schema possui current_turn.subturn e current_turn.subturn_history"
+    else
+        fail "V90-44: schema NÃO possui current_turn.subturn/subturn_history"
+    fi
+else
+    fail "V90-44: session-context.schema.json não encontrado"
+fi
+
+# V90-45: events-contract documenta eventos subturnStart/subturnTransition/subturnResume/subturnEnd
+_EVENTS_CONTRACT="$HOOK_DIR/contracts/events-contract.md"
+if [ -f "$_EVENTS_CONTRACT" ]; then
+    if grep -q 'subturnStart' "$_EVENTS_CONTRACT" 2> /dev/null \
+        && grep -q 'subturnTransition' "$_EVENTS_CONTRACT" 2> /dev/null \
+        && grep -q 'subturnResume' "$_EVENTS_CONTRACT" 2> /dev/null \
+        && grep -q 'subturnEnd' "$_EVENTS_CONTRACT" 2> /dev/null; then
+        pass "V90-45: events-contract documenta eventos canônicos de SubTurn"
+    else
+        fail "V90-45: events-contract não documenta todos os eventos de SubTurn"
+    fi
+else
+    fail "V90-45: events-contract.md não encontrado"
+fi
+
+# V90-46: log-prompt.sh inicializa current_turn.subturn no início do TURN
+if [ -f "$_LOG_PROMPT" ]; then
+    if grep -q 'current_turn.subturn' "$_LOG_PROMPT" 2> /dev/null \
+        && { grep -q 'subturnStart' "$_LOG_PROMPT" 2> /dev/null \
+            || grep -q 'emit_subturn_start_event' "$_LOG_PROMPT" 2> /dev/null; }; then
+        pass "V90-46: log-prompt.sh inicializa subturn e emite subturnStart"
+    else
+        fail "V90-46: log-prompt.sh não inicializa/loga subturn no turn start"
+    fi
+else
+    fail "V90-46: log-prompt.sh não encontrado"
+fi
+
+# V90-47: pre-tool-use.sh registra transição de subturn em delegação para subagente
+if [ -f "$_PTU_SCRIPT" ]; then
+    if { grep -q 'subturnTransition' "$_PTU_SCRIPT" 2> /dev/null \
+        || grep -q 'emit_subturn_transition_event' "$_PTU_SCRIPT" 2> /dev/null; } \
+        && grep -q 'subagent_delegate' "$_PTU_SCRIPT" 2> /dev/null; then
+        pass "V90-47: pre-tool-use.sh registra subturnTransition para subagent_delegate"
+    else
+        fail "V90-47: pre-tool-use.sh não registra transição de subturn para subagente"
+    fi
+else
+    fail "V90-47: pre-tool-use.sh não encontrado"
+fi
+
+# V90-48: post-tool-use.sh atualiza estado de subturn no fluxo askQuestions
+if [ -f "$_POST_TOOL" ]; then
+    if grep -q 'SUBTURN_TO_STATE' "$_POST_TOOL" 2> /dev/null \
+        && grep -q 'session_stats.subturn_via_askquestions' "$_POST_TOOL" 2> /dev/null; then
+        pass "V90-48: post-tool-use.sh atualiza estado/counter de subturn via askQuestions"
+    else
+        fail "V90-48: post-tool-use.sh não atualiza subturn no fluxo askQuestions"
+    fi
+else
+    fail "V90-48: post-tool-use.sh não encontrado"
+fi
+
+# V90-49: agent-stop.sh registra eventos de ciclo de subturn (start/resume/end)
+if [ -f "$_AG_STOP" ]; then
+    if { grep -q 'subturnStart' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'emit_subturn_start_event' "$_AG_STOP" 2> /dev/null; } \
+        && { grep -q 'subturnResume' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'emit_subturn_resume_event' "$_AG_STOP" 2> /dev/null; } \
+        && { grep -q 'subturnEnd' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'emit_subturn_end_event' "$_AG_STOP" 2> /dev/null; }; then
+        pass "V90-49: agent-stop.sh registra ciclo de eventos de SubTurn"
+    else
+        fail "V90-49: agent-stop.sh não registra todos os eventos de SubTurn"
+    fi
+else
+    fail "V90-49: agent-stop.sh não encontrado"
+fi
+
+# V90-50: contrato de eventos explicita parent_turn_id e semântica temporal SESSION/TURN/SUBTURN
+if [ -f "$_EVENTS_CONTRACT" ]; then
+    if grep -q 'parent_turn_id' "$_EVENTS_CONTRACT" 2> /dev/null \
+        && grep -q 'Semântica temporal canônica' "$_EVENTS_CONTRACT" 2> /dev/null \
+        && grep -q 'dias, semanas ou meses' "$_EVENTS_CONTRACT" 2> /dev/null; then
+        pass "V90-50: events-contract reforça parent_turn_id e semântica temporal canônica"
+    else
+        fail "V90-50: events-contract sem parent_turn_id ou semântica temporal SESSION/TURN/SUBTURN"
+    fi
+else
+    fail "V90-50: events-contract.md não encontrado"
+fi
+
+# V90-51: hooks de subturn emitem parent_turn_id nos eventos
+if [ -f "$_LOG_PROMPT" ] && [ -f "$_PTU_SCRIPT" ] && [ -f "$_POST_TOOL" ] && [ -f "$_AG_STOP" ]; then
+    if grep -q 'parent_turn_id' "$_LOG_PROMPT" 2> /dev/null \
+        && { grep -q 'parent_turn_id' "$_PTU_SCRIPT" 2> /dev/null \
+            || grep -q 'write_current_subturn_state' "$_PTU_SCRIPT" 2> /dev/null; } \
+        && { grep -q 'parent_turn_id' "$_POST_TOOL" 2> /dev/null \
+            || grep -q 'write_current_subturn_state' "$_POST_TOOL" 2> /dev/null; } \
+        && grep -q 'parent_turn_id' "$_AG_STOP" 2> /dev/null \
+        && grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null; then
+        pass "V90-51: eventos subturn nos hooks incluem parent_turn_id"
+    else
+        fail "V90-51: algum hook de subturn não emite parent_turn_id"
+    fi
+else
+    fail "V90-51: arquivos de hooks necessários não encontrados"
+fi
+
+# V90-52: estado de subturn mantém vínculo parent_turn_id no contexto
+if [ -f "$_SCHEMA_FILE" ] && [ -f "$_PTU_SCRIPT" ] && [ -f "$_POST_TOOL" ] && [ -f "$_AG_STOP" ]; then
+    if jq -e '.properties.current_turn.properties.subturn.properties.parent_turn_id' "$_SCHEMA_FILE" > /dev/null 2>&1 \
+        && grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null \
+        && { grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$_PTU_SCRIPT" 2> /dev/null \
+            || grep -q 'write_current_subturn_state' "$_PTU_SCRIPT" 2> /dev/null; } \
+        && { grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$_POST_TOOL" 2> /dev/null \
+            || grep -q 'write_current_subturn_state' "$_POST_TOOL" 2> /dev/null; } \
+        && grep -q 'subturn_rebound_to_current_turn' "$_AG_STOP" 2> /dev/null; then
+        pass "V90-52: contexto de subturn mantém e repara vínculo parent_turn_id -> current_turn.turn_id"
+    else
+        fail "V90-52: vínculo parent_turn_id no contexto está incompleto"
+    fi
+else
+    fail "V90-52: arquivos necessários para validar parent_turn_id não encontrados"
+fi
+
+# V90-53: agent-stop.sh persiste parent_turn_id também no subturn_history (não só no estado vivo)
+if [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
+    if { grep -q 'subturn_history' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'subturn_history' "$_AG_STOP_LIB" 2> /dev/null; } \
+        && { grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$_AG_STOP_LIB" 2> /dev/null; }; then
+        pass "V90-53: agent-stop.sh persiste parent_turn_id em entradas de subturn_history"
+    else
+        fail "V90-53: subturn_history sem parent_turn_id em agent-stop.sh"
+    fi
+else
+    fail "V90-53: agent-stop.sh/agent-stop-lib.sh não encontrado"
+fi
+
+# V90-54: janela temporal esperada de SubTurn (minutos) está explícita no estado criado pelos hooks
+if [ -f "$_LOG_PROMPT" ] && [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
+    if grep -q 'expected_window_minutes: 15' "$_LOG_PROMPT" 2> /dev/null \
+        && { grep -q 'expected_window_minutes: 15' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'expected_window_minutes: 15' "$_AG_STOP_LIB" 2> /dev/null; }; then
+        pass "V90-54: hooks definem expected_window_minutes=15 para SubTurn"
+    else
+        fail "V90-54: expected_window_minutes ausente em inicialização/retomada de SubTurn"
+    fi
+else
+    fail "V90-54: arquivos necessários não encontrados"
 fi
 
 echo ""

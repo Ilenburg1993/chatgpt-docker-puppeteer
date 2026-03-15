@@ -87,9 +87,21 @@ correta. O único fluxo legítimo de encerramento é:
 
 1. Use `manage_todo_list` ao **iniciar** qualquer turno de trabalho (crie a lista de tarefas).
 2. O último item da lista DEVE ser:
-   `"Chamar vscode_askQuestions [Template A/D/E conforme contexto]"`.
+  `"Chamar vscode_askQuestions [Template de CONTINUAÇÃO: A/D/E; Template F apenas por escalonamento de SESSION]"`.
 3. Execute todos os TODOs em sequência — o último (vscode_askQuestions) NÃO pode ser pulado.
 4. `agent-stop.sh` emite `decision:block` quando `vscode_askQuestions` não foi chamado.
+
+**Checklist anti-violação (obrigatório antes de encerrar o TURN):**
+
+1. Confirmar que o último TODO (`vscode_askQuestions`) foi realmente executado.
+2. Garantir que `vscode_askQuestions` foi o último ato útil do TURN.
+3. Se qualquer ferramenta de trabalho rodar depois dessa chamada, considerar autorização invalidada
+  e chamar `vscode_askQuestions` novamente.
+4. Única exceção permitida: `manage_todo_list` imediatamente após `vscode_askQuestions` apenas
+  para fechamento do checklist.
+5. Em **Template F** (Session Close), só considerar fluxo autorizado se a `close_key` correta foi
+  validada (`session.close_key_validated=true`); chamar `vscode_askQuestions` sem key válida não
+  autoriza encerramento.
 
 ### O que se aplica — por nível
 
@@ -99,6 +111,14 @@ correta. O único fluxo legítimo de encerramento é:
 - `vscode_askQuestions` é **obrigatório** ao final de qualquer turno com trabalho realizado.
 - Templates por contexto: tarefa concluída → Template A; checkpoint a cada ~5 TURNs → Template D;
   proposta arquitetural → Template C; sessão ociosa → Template E.
+
+**Regra de fechamento em modo estrito (prioritária):**
+
+- Se `session.strict_turn_close_requires_key=true`, o TURN exige `vscode_askQuestions` válido como
+  último ato, com resposta explícita do usuário.
+- Templates A/D/E são o padrão de continuidade para encerrar TURN/subturn.
+- **Template F** é reservado ao fechamento de SESSION (mediante escalonamento explícito) e continua
+  exigindo `close_key` correta + `session.close_key_validated=true`.
 
 **SECTION (seção temática)** — Autônoma, sem autorização do usuário:
 

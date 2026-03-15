@@ -9,18 +9,58 @@
 emit_stop_block() {
     local reason="$1"
     local system_message="$2"
+    local reason_code="${3:-unknown_block_reason}"
+    local decision_trace_json="${4:-}"
+    local concise_reason="$reason"
+    local concise_system_message="⛔ FECHAMENTO DO TURN BLOQUEADO (agente continua): ${system_message}"
+
+    # Compatibilidade operacional: payload mínimo do hook Stop.
+    # Em algumas execuções, payloads extensos do block podem ser ignorados pelo runtime.
+    # Mantemos apenas o núcleo documentado + limites de tamanho para reduzir truncation.
+    [ ${#concise_reason} -gt 280 ] && concise_reason="${concise_reason:0:277}..."
+    [ ${#concise_system_message} -gt 900 ] && concise_system_message="${concise_system_message:0:897}..."
+    [ -n "$reason_code" ] && concise_reason="[$reason_code] $concise_reason"
+    [ -n "$decision_trace_json" ] && :
+
     jq -cn \
-        --arg reason "$reason" \
-        --arg system_message "$system_message" \
+        --arg reason "$concise_reason" \
+        --arg system_message "$concise_system_message" \
         '{
             decision: "block",
             decisionReason: $reason,
+            reason: $reason,
             hookSpecificOutput: {
                 hookEventName: "Stop",
                 decision: "block",
                 reason: $reason
             },
             systemMessage: $system_message
+        }'
+}
+
+# Constrói decision trace canônico para blocks do Stop.
+build_decision_trace_json() {
+    local rule_id="$1"
+    local auth_strategy="$2"
+    local invalid_reason="$3"
+    local strict_mode="$4"
+    local stop_hook_active="$5"
+    local block_count="$6"
+
+    jq -cn \
+        --arg rule_id "$rule_id" \
+        --arg auth_strategy "$auth_strategy" \
+        --arg invalid_reason "$invalid_reason" \
+        --arg strict_mode "$strict_mode" \
+        --arg stop_hook_active "$stop_hook_active" \
+        --argjson block_count "$(sanitize_nonnegative_int "$block_count")" \
+        '{
+            rule_id: $rule_id,
+            auth_strategy: $auth_strategy,
+            invalid_reason: (if $invalid_reason == "" then null else $invalid_reason end),
+            strict_mode: ($strict_mode == "true"),
+            stop_hook_active: ($stop_hook_active == "true"),
+            block_count: $block_count
         }'
 }
 
@@ -110,6 +150,203 @@ sanitize_nonnegative_int() {
     fi
 }
 
+# Lê campo via jq com fallback para valor padrão (sem falhar o script).
+safe_jq_read() {
+    local file_path="$1"
+    local jq_query="$2"
+    local default_value="$3"
+
+    if [ ! -f "$file_path" ]; then
+        printf '%s\n' "$default_value"
+        return 0
+    fi
+
+    local value
+    value="$(jq -r "$jq_query // \"\"" "$file_path" 2> /dev/null || echo '')"
+    if [ -z "$value" ]; then
+        printf '%s\n' "$default_value"
+    else
+        printf '%s\n' "$value"
+    fi
+}
+
+# Lê campo numérico via jq + sanitização não-negativa.
+safe_jq_read_int() {
+    local file_path="$1"
+    local jq_query="$2"
+    local default_value="$3"
+    local raw
+    raw="$(safe_jq_read "$file_path" "$jq_query" "$default_value")"
+    sanitize_nonnegative_int "$raw"
+}
+
+# Converte ISO UTC para epoch seconds (GNU/BSD fallback). Retorna 0 se inválido.
+iso_to_epoch_utc() {
+    local iso_ts="$1"
+    if [ -z "$iso_ts" ]; then
+        printf '0\n'
+        return 0
+    fi
+
+    if date -d "$iso_ts" '+%s' > /dev/null 2>&1; then
+        date -d "$iso_ts" '+%s' 2> /dev/null || printf '0\n'
+    else
+        date -j -f '%Y-%m-%dT%H:%M:%SZ' "$iso_ts" '+%s' 2> /dev/null || printf '0\n'
+    fi
+}
+
+# Calcula duração de turno em segundos a partir de dois timestamps ISO UTC.
+compute_turn_duration_seconds() {
+    local started_at="$1"
+    local now_iso="$2"
+    local start_epoch now_epoch
+
+    start_epoch="$(iso_to_epoch_utc "$started_at")"
+    now_epoch="$(iso_to_epoch_utc "$now_iso")"
+
+    if [ "$now_epoch" -gt "$start_epoch" ] 2> /dev/null; then
+        printf '%s\n' "$((now_epoch - start_epoch))"
+    else
+        printf '0\n'
+    fi
+}
+
+# Calcula consecutive_unauthorized para escrita de flag no fim do turno.
+compute_consecutive_for_unauthorized_flag() {
+    local stop_hook_active="$1"
+    local consecutive_now="$2"
+    local consecutive_sanitized
+    consecutive_sanitized="$(sanitize_nonnegative_int "$consecutive_now")"
+
+    if [ "$stop_hook_active" = "true" ]; then
+        printf '%s\n' "$consecutive_sanitized"
+    else
+        printf '%s\n' "$((consecutive_sanitized + 1))"
+    fi
+}
+
+# Extrai top ferramentas do turno para auto-intent (fallback textual).
+build_auto_intent_from_turn_tools() {
+    local ctx_file="$1"
+    if [ ! -f "$ctx_file" ]; then
+        printf '%s\n' ""
+        return 0
+    fi
+    jq -r '.current_turn.tools_by_name | to_entries | sort_by(-.value) | .[0:3] | map(.key) | join(", ")' \
+        "$ctx_file" 2> /dev/null || printf '%s\n' ""
+}
+
+# Incrementa current_turn.agentStop_invocations no contexto e retorna o valor atualizado.
+# Retorna 1 quando arquivo/contexto indisponível.
+increment_agentstop_invocations_in_context() {
+    local ctx_file="$1"
+    local count=1
+
+    if [ ! -f "$ctx_file" ]; then
+        printf '1\n'
+        return 0
+    fi
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq '.current_turn.agentStop_invocations = ((.current_turn.agentStop_invocations // 0) + 1)' \
+            "$ctx_file" | sponge "$ctx_file" 2> /dev/null || true
+        count="$(jq -r '.current_turn.agentStop_invocations // 1' "$ctx_file" 2> /dev/null || echo 1)"
+    else
+        local tmp_inv
+        if tmp_inv="$(mktemp 2> /dev/null)"; then
+            if jq '.current_turn.agentStop_invocations = ((.current_turn.agentStop_invocations // 0) + 1)' \
+                "$ctx_file" > "$tmp_inv" 2> /dev/null; then
+                mv "$tmp_inv" "$ctx_file" 2> /dev/null || rm -f "$tmp_inv"
+            else
+                rm -f "$tmp_inv"
+            fi
+        fi
+        count="$(jq -r '.current_turn.agentStop_invocations // 1' "$ctx_file" 2> /dev/null || echo 1)"
+    fi
+
+    if ! [[ "$count" =~ ^[0-9]+$ ]]; then
+        count=1
+    fi
+    printf '%s\n' "$count"
+}
+
+# Extrai resumo de backlog de pending-tasks.md no formato: alta|media|backlog|next_task
+extract_pending_tasks_summary() {
+    local tasks_file="$1"
+    local alta=0
+    local media=0
+    local backlog=0
+    local next_task="(sem tarefas)"
+
+    if [ -f "$tasks_file" ]; then
+        alta="$(grep -c '^- \[ \].*\[alta\]' "$tasks_file" 2> /dev/null || echo 0)"
+        media="$(grep -c '^- \[ \].*\[media\]' "$tasks_file" 2> /dev/null || echo 0)"
+        backlog="$(grep -c '^- \[ \].*\[backlog\]' "$tasks_file" 2> /dev/null || echo 0)"
+        next_task="$(grep '^- \[ \].*\[alta\]' "$tasks_file" 2> /dev/null | head -1 | sed 's/^- \[ \] //' || echo '(sem tarefas alta)')"
+    fi
+
+    printf '%s|%s|%s|%s\n' "$alta" "$media" "$backlog" "$next_task"
+}
+
+# Mensagem de push pendente no nudge contextual.
+build_push_pending_message() {
+    local push_pending="$1"
+    local push_count="$2"
+    if [ "$push_pending" = "true" ]; then
+        printf '%s' "
+🔀 GIT PUSH DETECTADO (push #${push_count}):
+  → Declarar nova fase:  bash .github/hooks/scripts/start-section.sh \"nome-da-fase\"
+  → Continuar na seção:  npm run hooks:continue-section"
+    else
+        printf '%s' ""
+    fi
+}
+
+# Mensagem de violação de protocolo no nudge contextual.
+build_violation_message() {
+    local auth_requested="$1"
+    local consecutive_unauth="$2"
+    local turns_since_ask="$3"
+
+    if [ "$auth_requested" = "false" ]; then
+        if { [ "$consecutive_unauth" -ge 3 ] 2> /dev/null; }; then
+            printf '%s' "
+🚨 CRÍTICO: ${consecutive_unauth} TURNs CONSECUTIVOS sem vscode_askQuestions!
+  ⛔ SESSION em risco de encerramento não-autorizado.
+  → Chame vscode_askQuestions AGORA (Template A, D, ou C conforme o contexto)"
+            return 0
+        fi
+        if { [ "$consecutive_unauth" -ge 2 ] 2> /dev/null; }; then
+            printf '%s' "
+⛔ ALERTA: ${consecutive_unauth} TURNs CONSECUTIVOS sem vscode_askQuestions!
+  Esta violação será registrada no briefing da próxima sessão.
+  → Template A (tarefa concluída) | Template D (checkpoint) | Template C (proposta)"
+            return 0
+        fi
+        if { [ "$consecutive_unauth" -ge 1 ] 2> /dev/null; } || { [ "$turns_since_ask" -ge 3 ] 2> /dev/null; }; then
+            printf '%s' "
+⚠ Turno encerrado sem vscode_askQuestions (${turns_since_ask} desde o último).
+  → Template A se concluiu tarefa | Template D para checkpoint periódico"
+            return 0
+        fi
+    fi
+
+    printf '%s' ""
+}
+
+# Mensagem de close key para SESSION ativa no nudge contextual.
+build_session_close_nudge_message() {
+    local close_validated="$1"
+    local close_key="$2"
+    if [ "$close_validated" = "false" ] && [ -n "$close_key" ]; then
+        printf '%s' "
+🔐 SESSION close key: ${close_key}
+    Para encerrar SESSION: vscode_askQuestions (Template F) → usuário digita KEY → post-tool-use valida e executa session-close.sh"
+    else
+        printf '%s' ""
+    fi
+}
+
 # Informa se a delegação de subagente é imediata no último tool do turno.
 is_immediate_subagent_delegation() {
     local delegated="${1:-false}"
@@ -145,27 +382,87 @@ build_turn_block_payload() {
     local todo_created="${1:-false}"
     local auth_invalid_reason="${2:-}"
     local session_hint="${3:-}"
+    local strict_turn_close_requires_key="${4:-true}"
     local reason=""
     local system_message=""
+    local reason_code=""
+    local required_turn_close_action="Template F + KEY válida"
 
-    if [ "$todo_created" != "true" ]; then
-        reason="🚨 DUPLA VIOLAÇÃO DO PROTOCOLO v9.0: (1) manage_todo_list NÃO foi chamado neste turno — toda resposta DEVE começar com manage_todo_list criando/atualizando a lista de tarefas. (2) vscode_askQuestions NÃO foi chamado — todo turno DEVE terminar com vscode_askQuestions. AÇÕES OBRIGATÓRIAS NESTA ORDEM: chame PRIMEIRO manage_todo_list (criar TODOs com último item = 'Chamar vscode_askQuestions'), depois execute as tarefas, e ao FINAL chame vscode_askQuestions (Template A ou D).${session_hint}"
-        system_message="🚨 DUPLA VIOLAÇÃO (v9.0): (1) manage_todo_list NÃO chamado. (2) vscode_askQuestions NÃO chamado. Protocolo obrigatório: COMECE com manage_todo_list → execute tarefas → TERMINE com vscode_askQuestions (Template A ou D)."
+    if [ "$strict_turn_close_requires_key" != "true" ]; then
+        required_turn_close_action="Template A ou D"
+    fi
+
+    if [ "$auth_invalid_reason" = "strict_context_missing" ]; then
+        reason_code="strict_context_missing"
+        reason="Política estrita de sessão/turno: sem session-context válido não existe autorização legítima para encerrar TURN. Fechamento só é legítimo com Template F + KEY correta validada.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: contexto ausente/inválido para validar Template F + KEY."
+    elif [ "$todo_created" != "true" ]; then
+        reason_code="double_protocol_violation"
+        reason="🚨 DUPLA VIOLAÇÃO DO PROTOCOLO v9.0: (1) manage_todo_list NÃO foi chamado neste turno — toda resposta DEVE começar com manage_todo_list criando/atualizando a lista de tarefas. (2) vscode_askQuestions NÃO foi chamado — todo turno DEVE terminar com vscode_askQuestions. AÇÕES OBRIGATÓRIAS NESTA ORDEM: chame PRIMEIRO manage_todo_list (criar TODOs com último item = 'Chamar vscode_askQuestions'), depois execute as tarefas, e ao FINAL chame vscode_askQuestions (${required_turn_close_action}).${session_hint}"
+        system_message="🚨 DUPLA VIOLAÇÃO (v9.0): (1) manage_todo_list NÃO chamado. (2) vscode_askQuestions NÃO chamado. Protocolo obrigatório: COMECE com manage_todo_list → execute tarefas → TERMINE com vscode_askQuestions (${required_turn_close_action})."
+    elif [ "$auth_invalid_reason" = "todo_last_item_not_continuation" ]; then
+        reason_code="todo_last_item_not_continuation"
+        reason="Protocolo de SubTurn/TODO: o último item do checklist deve ser uma chamada de vscode_askQuestions de continuação do TURN (Template A/D/E). Ajuste o manage_todo_list para fechar com esse item e execute novamente o fluxo final.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: último TODO não é askQuestions de continuação. Refaça o checklist e finalize com vscode_askQuestions."
     elif [ "$auth_invalid_reason" = "askquestions_not_last_tool" ]; then
-        reason="Protocolo v9.1: vscode_askQuestions até foi chamado, porém não ficou como último passo válido do TURN. Regra: último passo deve ser vscode_askQuestions; exceção única permitida é manage_todo_list imediatamente após askQuestions para fechamento de checklist.${session_hint}"
-        system_message="🚫 TURN BLOQUEADO (v9.1): sequência final inválida. Refaça vscode_askQuestions como último passo válido (Template A ou D)."
+        reason_code="askquestions_not_last_tool"
+        reason="Protocolo v9.1: vscode_askQuestions até foi chamado, porém não ficou como último passo válido do TURN. Regra: último passo deve ser vscode_askQuestions; exceção única permitida é manage_todo_list imediatamente após askQuestions para fechamento de checklist. Em modo estrito, o último askQuestions válido deve usar Template F + KEY correta.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO (v9.1): sequência final inválida. Refaça vscode_askQuestions como último passo válido (${required_turn_close_action})."
     elif [ "$auth_invalid_reason" = "askquestions_api_error" ]; then
+        reason_code="askquestions_api_error"
         reason="Protocolo v9.1: a chamada de vscode_askQuestions falhou na API (sem choices), então o turno não está autorizado. Repita vscode_askQuestions e finalize somente após resposta válida do usuário.${session_hint}"
         system_message="🚫 TURN BLOQUEADO (v9.1): falha de API em vscode_askQuestions. Refaça a chamada e finalize com resposta válida."
     elif [ "$auth_invalid_reason" = "askquestions_skipped_or_empty" ]; then
+        reason_code="askquestions_skipped_or_empty"
         reason="Protocolo v9.1: vscode_askQuestions foi chamado, mas não houve resposta válida do usuário (skip/vazio). O TURN só pode encerrar com autorização explícita do usuário.${session_hint}"
         system_message="🚫 TURN BLOQUEADO (v9.1): resposta de autorização ausente/inválida. Refaça vscode_askQuestions e aguarde resposta válida."
+    elif [ "$auth_invalid_reason" = "auto_audit_required_not_started" ]; then
+        reason_code="auto_audit_required_not_started"
+        reason="Fluxo de continuidade com resposta ambígua exige auto-auditoria obrigatória antes de seguir para edição/novo fechamento. Inicie auditoria com leitura/busca/diagnóstico e só depois continue o TURN.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: auto-auditoria obrigatória ainda não iniciada após continuidade ambígua."
+    elif [ "$auth_invalid_reason" = "non_template_f_continuation_mandatory" ]; then
+        reason_code="non_template_f_continuation_mandatory"
+        reason="Resposta ao vscode_askQuestions em modo de continuidade (Template A/D/E) NÃO autoriza encerramento. Política de hardening: após askQuestions não-Template F, o TURN/SSESSION deve obrigatoriamente continuar e é proibido tentar encerramento nesta etapa. Continue a execução de trabalho; use Template F apenas quando houver solicitação explícita do usuário para fechamento de SESSION.${session_hint}"
+        system_message="🚫 CONTINUAÇÃO OBRIGATÓRIA: askQuestions não-Template F não permite encerrar TURN/SESSION. Continue o trabalho."
+    elif [ "$auth_invalid_reason" = "askquestions_missing_template_f_option" ]; then
+        reason_code="askquestions_missing_template_f_option"
+        reason="Upgrade de governança do askQuestions: toda chamada deve oferecer opção explícita para solicitar escalonamento ao Template F no próximo passo. Sem essa opção, o TURN não pode encerrar.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: askQuestions sem opção de escalonar para Template F. Refaça a pergunta incluindo essa opção."
+    elif [ "$auth_invalid_reason" = "template_f_called_without_prior_request" ]; then
+        reason_code="template_f_called_without_prior_request"
+        reason="Upgrade de governança do Template F: o Template F só pode ser chamado quando uma resposta de askQuestions anterior tiver solicitado esse escalonamento. Faça um askQuestions intermediário, obtenha solicitação explícita do usuário e só então chame Template F.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: Template F chamado sem solicitação prévia registrada no askQuestions anterior."
+    elif [ "$auth_invalid_reason" = "turn_close_requires_template_f" ]; then
+        reason_code="turn_close_requires_template_f"
+        reason="Hardening estrito de TURN: o fechamento agora exige vscode_askQuestions com Template F no último ato do turno. Templates A/D/E não autorizam encerramento em modo estrito.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO (strict): use Template F no último askQuestions para encerrar o turno."
+    elif [ "$auth_invalid_reason" = "turn_close_key_missing_or_invalid" ]; then
+        reason_code="turn_close_key_missing_or_invalid"
+        reason="Hardening estrito de TURN: o usuário não inseriu a close_key correta no askQuestions final. Encerramento do turno exige KEY válida digitada pelo usuário no Template F.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO (strict): KEY ausente/inválida no askQuestions final."
+    elif [ "$auth_invalid_reason" = "subagent_chain_invalid" ]; then
+        reason_code="subagent_chain_invalid"
+        reason="Delegação de subagente detectada sem cadeia auditável íntegra (subagentStart/parent_turn). Sem proveniência válida, a delegação não autoriza fechamento.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: delegação de subagente sem trilha auditável válida."
+    elif [ "$auth_invalid_reason" = "session_close_key_missing_or_invalid" ]; then
+        reason_code="session_close_key_missing_or_invalid"
+        reason="Protocolo de fechamento de SESSION: Template F foi usado com intenção de encerrar, mas a close_key está ausente ou inválida. Encerramento exige chave correta digitada pelo usuário e validação automática via post-tool-use/session-close.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: fluxo de SESSION Close inválido (KEY ausente/inválida). Refaça Template F e aguarde a KEY correta."
+    elif [ "$auth_invalid_reason" = "session_close_validation_not_confirmed" ]; then
+        reason_code="session_close_validation_not_confirmed"
+        reason="Protocolo de fechamento de SESSION: a key foi informada, porém a validação final (close_key_validated=true) não foi confirmada no contexto. O TURN não pode encerrar até confirmação do fluxo completo.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: validação final de fechamento não confirmada. Refaça Template F ou verifique sessão antes de encerrar."
+    elif [ "$auth_invalid_reason" = "turn_auth_context_invalid" ]; then
+        reason_code="turn_auth_context_invalid"
+        reason="Contrato executável de autorização do TURN inválido: payload de contexto de autorização está ausente/corrompido. Sem contrato válido, o fechamento não é permitido.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: contrato de autorização inválido. Refaça o fluxo final com vscode_askQuestions e tente novamente."
     else
-        reason="Protocolo v9.0: este TURN encerrou sem chamar vscode_askQuestions. manage_todo_list foi chamado (correto), mas o último TODO (vscode_askQuestions) foi pulado. Ação obrigatória AGORA: chame vscode_askQuestions. Use Template A (tarefa concluída) ou Template D (checkpoint). vscode_askQuestions é o canal primário de comunicação — texto plano no chatbox NÃO é suficiente.${session_hint}"
-        system_message="🚨 TURN BLOQUEADO (v9.0): manage_todo_list foi chamado (✓) mas vscode_askQuestions NÃO foi chamado. Chame agora (Template A ou D) antes de encerrar."
+        reason_code="askquestions_not_called"
+        reason="Protocolo v9.0: este TURN encerrou sem chamar vscode_askQuestions. manage_todo_list foi chamado (correto), mas o último TODO (vscode_askQuestions) foi pulado. Ação obrigatória AGORA: chame vscode_askQuestions. Fechamento legítimo deste TURN exige ${required_turn_close_action}. vscode_askQuestions é o canal primário de comunicação — texto plano no chatbox NÃO é suficiente.${session_hint}"
+        system_message="🚨 TURN BLOQUEADO (v9.0): manage_todo_list foi chamado (✓) mas vscode_askQuestions NÃO foi chamado. Chame agora (${required_turn_close_action}) antes de encerrar."
     fi
 
-    printf '%s|%s\n' "$reason" "$system_message"
+    printf '%s|%s|%s\n' "$reason" "$system_message" "$reason_code"
 }
 
 # Atualiza tracker de mismatch (HEAL v2) e retorna a contagem consecutiva.
@@ -189,6 +486,99 @@ update_mismatch_tracker() {
         '{got: $got, count: $count}' > "$track_file" 2> /dev/null || true
 
     printf '%s\n' "$new_count"
+}
+
+# Reconciliador de session_id específico do agent-stop.
+# Retornos:
+#   0  => segue fluxo normal; stdout = session_id reconciliado
+#   10 => mismatch não saneado (block já emitido quando aplicável)
+reconcile_session_id_guard_stop() {
+    local ctx_file="$1"
+    local audit_file="$2"
+    local state_dir="$3"
+    local session_id_payload="$4"
+    local current_session_id="$5"
+    local stop_hook_active="$6"
+    local timestamp="$7"
+    local now_iso="$8"
+
+    if [ ! -f "$ctx_file" ] || [ ! -s "$ctx_file" ] || [ -z "$session_id_payload" ]; then
+        printf '%s\n' "$current_session_id"
+        return 0
+    fi
+
+    local ctx_active_sid
+    ctx_active_sid="$(jq -r '.session.id // ""' "$ctx_file" 2> /dev/null || echo '')"
+    if [ -z "$ctx_active_sid" ] || [ "$session_id_payload" = "$ctx_active_sid" ]; then
+        printf '%s\n' "$current_session_id"
+        return 0
+    fi
+
+    local ctx_source
+    ctx_source="$(jq -r '.session.source // ""' "$ctx_file" 2> /dev/null || echo '')"
+
+    if [ "$ctx_source" = "manual_recovery" ]; then
+        local now_heal
+        now_heal="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo "$now_iso")"
+        write_session_identity_in_context "$ctx_file" "$session_id_payload" "healed_from_real_session" "$now_heal"
+        log_session_id_healed_event \
+            "$audit_file" \
+            "$ctx_active_sid" \
+            "$session_id_payload" \
+            "agent-stop.sh" \
+            "${timestamp:-$now_heal}" \
+            "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"
+        printf '%s\n' "$session_id_payload"
+        return 0
+    fi
+
+    if [ "$ctx_source" = "inline_restart" ]; then
+        log_session_id_sync_inline_restart_event \
+            "$audit_file" \
+            "$session_id_payload" \
+            "$ctx_active_sid" \
+            "agent-stop.sh" \
+            "${timestamp:-}" \
+            "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"
+        printf '%s\n' "$ctx_active_sid"
+        return 0
+    fi
+
+    local mismatch_track_file new_count
+    mismatch_track_file="$state_dir/.mismatch_track.json"
+    new_count="$(update_mismatch_tracker "$mismatch_track_file" "$session_id_payload")"
+
+    if [ "$new_count" -ge 3 ]; then
+        local now_heal
+        now_heal="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo "$now_iso")"
+        write_session_identity_in_context "$ctx_file" "$session_id_payload" "healed_from_consecutive_mismatch" "$now_heal"
+        rm -f "$mismatch_track_file" 2> /dev/null || true
+        log_session_id_healed_event \
+            "$audit_file" \
+            "$ctx_active_sid" \
+            "$session_id_payload" \
+            "agent-stop.sh:heal_v2" \
+            "${timestamp:-$now_heal}" \
+            "HEAL v2: mismatch consecutivo (3x) — session_id sanado para ID recorrente" \
+            "$new_count"
+        printf '%s\n' "$session_id_payload"
+        return 0
+    fi
+
+    log_session_id_mismatch_event \
+        "$audit_file" \
+        "$ctx_active_sid" \
+        "$session_id_payload" \
+        "agent-stop.sh" \
+        "${timestamp:-}" \
+        "$new_count" \
+        "Payload session_id diferente do contexto ativo — state write bloqueado"
+
+    if [ "$stop_hook_active" != "true" ]; then
+        emit_unresolved_session_mismatch_block "$ctx_active_sid" "$session_id_payload" "$new_count"
+    fi
+
+    return 10
 }
 
 # Decide se deve emitir systemMessage contextual no fim do TURN.
@@ -236,6 +626,116 @@ should_sync_tasks_to_docs_every_five_turns() {
         return 0
     fi
     return 1
+}
+
+# Finaliza estado do turno no session-context (incrementa stats + reset current_turn).
+finalize_turn_context_state() {
+    local ctx_file="$1"
+    local now_iso="$2"
+    local session_summary="$3"
+    local auth_incr_field="$4"
+    local next_turn="$5"
+    local section_name="$6"
+    local section_id="$7"
+    local turn_id="$8"
+    local turn_number="$9"
+    local section_turn="${10}"
+    local turn_duration_s="${11}"
+    local turn_tools_count="${12}"
+    local turn_intent="${13}"
+    local auth_requested="${14}"
+    local turn_failures_count="${15}"
+
+    if [ ! -f "$ctx_file" ] || ! command -v sponge > /dev/null 2>&1; then
+        return 0
+    fi
+
+    jq --arg now "$now_iso" \
+        --arg summary "$session_summary" \
+        --arg auth_field "$auth_incr_field" \
+        --argjson next_turn "$next_turn" \
+        --arg section "$section_name" \
+        --arg sec_id "$section_id" \
+        --arg turn_id_s "$turn_id" \
+        --argjson turn_num "$turn_number" \
+        --argjson sec_turn "$section_turn" \
+        --argjson dur_s "$turn_duration_s" \
+        --argjson tools_n "$turn_tools_count" \
+        --arg intent_s "$turn_intent" \
+        --arg auth_s "$auth_requested" \
+        --argjson fail_n "$turn_failures_count" \
+        '.session_stats.turn_count    = (.session_stats.turn_count // 0) + 1
+         | .session_stats[$auth_field] = (.session_stats[$auth_field] // 0) + 1
+         | .session_stats.turns_since_askQuestions = (
+             if $auth_s == "true" then 0
+             else (.session_stats.turns_since_askQuestions // 0) + 1
+             end)
+         | .session_stats.subturn_count = (.session_stats.subturn_count // 0)
+         | .session_stats.subturn_blocked = (.session_stats.subturn_blocked // 0)
+         | .session_stats.subturn_resumed = (.session_stats.subturn_resumed // 0)
+         | .session_stats.subturn_via_subagent = (.session_stats.subturn_via_subagent // 0)
+         | .session_stats.subturn_via_askquestions = (.session_stats.subturn_via_askquestions // 0)
+         | .last_turn_ts              = $now
+         | .session_summary           = $summary
+         | .session_stats.turn_history = (
+             (.session_stats.turn_history // []) + [{
+                 number:       $turn_num,
+                 section:      $section,
+                 section_id:   (if $sec_id == "" then null else $sec_id end),
+                 turn_id:      (if $turn_id_s == "" then null else $turn_id_s end),
+                 section_turn: $sec_turn,
+                 duration_s:   $dur_s,
+                 tools_count:  $tools_n,
+                 intent:       (if $intent_s == "" then null else $intent_s end),
+                 auth:         ($auth_s == "true"),
+                 failures:     $fail_n,
+                 ts:           $now
+             }]
+             | if length > 20 then .[-20:] else . end)
+         | .session_stats.recovery_hints.last_section = $section
+         | .session_stats.recovery_hints.last_intent  = (
+             if $intent_s != "" then $intent_s
+             else (.session_stats.recovery_hints.last_intent // null)
+             end)
+         | .current_turn.number            = $next_turn
+         | .current_turn.started_at        = $now
+         | .current_turn.tools_count       = 0
+         | .current_turn.tools_by_name     = {}
+         | .current_turn.failures_count    = 0
+         | .current_turn.auth_requested    = false
+         | .current_turn.auth_requested_at = null
+         | .current_turn.last_askquestions_response = null
+         | .current_turn.block_count       = 0
+         | .current_turn.section_name      = $section
+         | .current_turn.intent_declared   = false
+         | .current_turn.intent            = null
+         | .current_turn.askquestions_api_error = false
+         | .current_turn.askquestions_api_error_at = null
+         | .current_turn.todo_created      = false
+         | .current_turn.subagent_delegated = false
+         | .current_turn.last_non_bookkeeping_tool = null
+         | .current_turn.last_askquestions_template = null
+         | .current_turn.last_askquestions_close_action = null
+         | .current_turn.last_askquestions_close_key_found = false
+         | .current_turn.last_askquestions_has_template_f_option = true
+         | .current_turn.template_f_called_without_prior_request = false
+         | .current_turn.todo_last_item_label = null
+         | .current_turn.todo_last_item_is_askquestions_continuation = false
+         | .current_turn.todo_last_item_checked_at = null
+         | .current_turn.todo_protocol_version = null
+         | .current_turn.continuation_instruction_clear = null
+         | .current_turn.auto_audit_required = false
+         | .current_turn.auto_audit_required_at = null
+         | .current_turn.auto_audit_reason = null
+         | .current_turn.auto_audit_started = false
+         | .current_turn.auto_audit_started_at = null
+         | .current_turn.auto_audit_started_tool = null
+         | .current_turn.continuation_mandatory = false
+         | .current_turn.continuation_mandatory_at = null
+         | .current_turn.continuation_mandatory_reason = null
+         | .current_turn.subturn = null
+         | .current_turn.subturn_history = []' \
+        "$ctx_file" | sponge "$ctx_file" 2> /dev/null || true
 }
 
 # Executa script opcional sem propagar erro.
@@ -408,6 +908,152 @@ log_turn_auth_invalidated_event() {
         }' >> "$audit_file"
 }
 
+# Constrói contexto canônico de autorização do TURN (P7.3).
+build_turn_authorization_context_json() {
+    local ctx_file="$1"
+    local session_id="$2"
+    local turn_id="$3"
+    local auth_requested="$4"
+    local auth_invalid_reason="$5"
+    local stop_hook_active="$6"
+    local timestamp_iso="$7"
+
+    local last_tool_name=""
+    local last_non_bookkeeping_tool=""
+    local ask_template=""
+    local ask_close_action=""
+    local ask_close_key_found="false"
+    local ask_response_present="false"
+    local close_key_validated="false"
+    local strict_mode="true"
+
+    if [ -f "$ctx_file" ]; then
+        last_tool_name="$(jq -r '.last_tool.name // ""' "$ctx_file" 2> /dev/null || echo '')"
+        last_non_bookkeeping_tool="$(jq -r '.current_turn.last_non_bookkeeping_tool // ""' "$ctx_file" 2> /dev/null || echo '')"
+        ask_template="$(jq -r '.current_turn.last_askquestions_template // ""' "$ctx_file" 2> /dev/null || echo '')"
+        ask_close_action="$(jq -r '.current_turn.last_askquestions_close_action // ""' "$ctx_file" 2> /dev/null || echo '')"
+        ask_close_key_found="$(jq -r '.current_turn.last_askquestions_close_key_found // false' "$ctx_file" 2> /dev/null || echo 'false')"
+        close_key_validated="$(jq -r '.session.close_key_validated // false' "$ctx_file" 2> /dev/null || echo 'false')"
+        strict_mode="$(jq -r '(.session.strict_turn_close_requires_key | if . == null then true else . end)' "$ctx_file" 2> /dev/null || echo 'true')"
+
+        if [ "$(jq -r '.current_turn.last_askquestions_response // ""' "$ctx_file" 2> /dev/null || echo '')" != "" ]; then
+            ask_response_present="true"
+        fi
+    fi
+
+    jq -cn \
+        --arg schema_version "1.0.0" \
+        --arg sid "$session_id" \
+        --arg turn_id "$turn_id" \
+        --arg ts "$timestamp_iso" \
+        --arg last_tool_name "$last_tool_name" \
+        --arg last_non_bookkeeping_tool "$last_non_bookkeeping_tool" \
+        --arg auth_requested "$auth_requested" \
+        --arg auth_invalid_reason "$auth_invalid_reason" \
+        --arg ask_template "$ask_template" \
+        --arg ask_close_action "$ask_close_action" \
+        --arg ask_close_key_found "$ask_close_key_found" \
+        --arg ask_response_present "$ask_response_present" \
+        --arg close_key_validated "$close_key_validated" \
+        --arg strict_mode "$strict_mode" \
+        --arg stop_hook_active "$stop_hook_active" \
+        '{
+            schema_version: $schema_version,
+            session_id: $sid,
+            turn_id: (if $turn_id == "" then null else $turn_id end),
+            timestamp: $ts,
+            last_tool_name: (if $last_tool_name == "" then null else $last_tool_name end),
+            last_non_bookkeeping_tool: (if $last_non_bookkeeping_tool == "" then null else $last_non_bookkeeping_tool end),
+            auth_requested: ($auth_requested == "true"),
+            auth_invalid_reason: (if $auth_invalid_reason == "" then null else $auth_invalid_reason end),
+            askquestions: {
+                response_present: ($ask_response_present == "true"),
+                template: (if $ask_template == "" then null else $ask_template end),
+                close_action: (if $ask_close_action == "" then null else $ask_close_action end),
+                close_key_found: ($ask_close_key_found == "true")
+            },
+            strict_mode: ($strict_mode == "true"),
+            session_close_key_validated: ($close_key_validated == "true"),
+            stop_hook_active: ($stop_hook_active == "true")
+        }'
+}
+
+# Valida contrato mínimo do contexto de autorização do TURN (P7.3).
+validate_turn_authorization_context_json() {
+    local context_json="$1"
+    printf '%s\n' "$context_json" | jq -e '
+        (.schema_version == "1.0.0")
+        and (.session_id | type == "string" and length > 0)
+        and (.timestamp | type == "string" and length > 0)
+        and (.auth_requested | type == "boolean")
+        and (.strict_mode | type == "boolean")
+        and (.session_close_key_validated | type == "boolean")
+        and (.stop_hook_active | type == "boolean")
+        and (.askquestions | type == "object")
+        and (.askquestions.response_present | type == "boolean")
+        and (.askquestions.close_key_found | type == "boolean")
+    ' > /dev/null 2>&1
+}
+
+# Loga evento quando contrato executável de autorização está inválido.
+log_turn_auth_context_invalid_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local turn_id="$4"
+
+    jq -cn \
+        --arg event "turnAuth_context_invalid" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg turn_id "$turn_id" \
+        '{
+            event: $event,
+            session_id: $sid,
+            timestamp: $ts,
+            turn_id: (if $turn_id == "" then null else $turn_id end),
+            message: "Contrato de contexto de autorização inválido; fechamento do TURN forçado para block"
+        }' >> "$audit_file"
+}
+
+# Aplica guard do contrato executável de autorização do TURN (P7.3/M4).
+# Escreve snapshot em state/turn-authorization-context.json e retorna
+# stdout no formato: "<auth_requested>|<auth_invalid_reason>".
+apply_turn_authorization_contract_guard() {
+    local ctx_file="$1"
+    local audit_file="$2"
+    local state_dir="$3"
+    local session_id="$4"
+    local turn_id="$5"
+    local now_iso="$6"
+    local stop_hook_active="$7"
+    local auth_requested_in="$8"
+    local auth_invalid_reason_in="$9"
+
+    local auth_requested="$auth_requested_in"
+    local auth_invalid_reason="$auth_invalid_reason_in"
+    local context_file="$state_dir/turn-authorization-context.json"
+    local context_json
+
+    context_json="$(build_turn_authorization_context_json \
+        "$ctx_file" \
+        "$session_id" \
+        "$turn_id" \
+        "$auth_requested" \
+        "$auth_invalid_reason" \
+        "$stop_hook_active" \
+        "$now_iso")"
+    printf '%s\n' "$context_json" > "$context_file" 2> /dev/null || true
+
+    if ! validate_turn_authorization_context_json "$context_json"; then
+        auth_requested="false"
+        auth_invalid_reason="turn_auth_context_invalid"
+        log_turn_auth_context_invalid_event "$audit_file" "$session_id" "$now_iso" "$turn_id"
+    fi
+
+    printf '%s|%s\n' "$auth_requested" "$auth_invalid_reason"
+}
+
 # Loga evento de fechamento autorizado do turno.
 log_turn_end_authorized_event() {
     local audit_file="$1"
@@ -494,6 +1140,33 @@ log_turn_end_no_askquestions_event() {
         }' >> "$audit_file"
 }
 
+# Loga auditoria informativa de turno com askQuestions inválido (ex.: KEY ausente no modo estrito).
+log_turn_end_invalid_authorization_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local section_id="$4"
+    local turn_id="$5"
+    local reason="$6"
+
+    jq -cn \
+        --arg event "turnEnd_invalid_authorization" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg section_id "$section_id" \
+        --arg turn_id "$turn_id" \
+        --arg reason "$reason" \
+        '{
+            event:      $event,
+            session_id: $sid,
+            timestamp:  $ts,
+            section_id: (if $section_id == "" then null else $section_id end),
+            turn_id:    (if $turn_id == "" then null else $turn_id end),
+            reason:     (if $reason == "" then null else $reason end),
+            message:    "Turno com tentativa de autorizacao invalida — vscode_askQuestions presente, mas fluxo de fechamento rejeitado"
+        }' >> "$audit_file"
+}
+
 # Loga evento de bloqueio principal do Stop (v9.0).
 log_agent_stop_blocked_event() {
     local audit_file="$1"
@@ -503,6 +1176,14 @@ log_agent_stop_blocked_event() {
     local consecutive_unauthorized="$5"
     local todo_created="$6"
     local block_count="$7"
+    local auth_invalid_reason="${8:-}"
+    local block_reason="no_askquestions"
+    local message="TURN bloqueado por hardening v9.0: vscode_askQuestions não chamado"
+
+    if [ -n "$auth_invalid_reason" ]; then
+        block_reason="invalid_authorization"
+        message="TURN bloqueado por hardening v9.2: vscode_askQuestions presente, mas autorização inválida"
+    fi
 
     jq -cn \
         --arg event "agentStop_blocked" \
@@ -512,6 +1193,9 @@ log_agent_stop_blocked_event() {
         --argjson consec "$consecutive_unauthorized" \
         --argjson todo "$todo_created" \
         --argjson block_count "$block_count" \
+        --arg block_reason "$block_reason" \
+        --arg invalid_reason "$auth_invalid_reason" \
+        --arg message "$message" \
         '{
             event:      $event,
             session_id: $sid,
@@ -520,7 +1204,39 @@ log_agent_stop_blocked_event() {
             consecutive_unauthorized: $consec,
             todo_created: $todo,
             block_count: $block_count,
-            message:    "TURN bloqueado por hardening v9.0: vscode_askQuestions não chamado"
+            block_reason: $block_reason,
+            invalid_reason: (if $invalid_reason == "" then null else $invalid_reason end),
+            turn_authorized: false,
+            session_closed: false,
+            requires_user_action: true,
+            message:    $message
+        }' >> "$audit_file"
+}
+
+# Loga evento canônico de duplo lock (P7.1): bloqueio por lock de preToolUse/Stop.
+log_turn_close_prevented_dual_lock_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local lock_stage="$4"
+    local turn_id="$5"
+    local reason="$6"
+
+    jq -cn \
+        --arg event "turnClose_prevented_dual_lock" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg lock_stage "$lock_stage" \
+        --arg turn_id "$turn_id" \
+        --arg reason "$reason" \
+        '{
+            event: $event,
+            session_id: $sid,
+            timestamp: $ts,
+            lock_stage: $lock_stage,
+            turn_id: (if $turn_id == "" then null else $turn_id end),
+            reason: (if $reason == "" then null else $reason end),
+            message: "Fechamento de turno/sessão prevenido por duplo lock (PreToolUse + Stop)"
         }' >> "$audit_file"
 }
 
@@ -625,6 +1341,122 @@ write_unauthorized_close_flag() {
         }' > "$flag_file"
 }
 
+# Atualiza identidade de sessão no contexto, com fallback sem sponge.
+write_session_identity_in_context() {
+    local ctx_file="$1"
+    local real_sid="$2"
+    local source="$3"
+    local ts="$4"
+
+    if [ ! -f "$ctx_file" ]; then
+        return 1
+    fi
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq --arg real_sid "$real_sid" --arg src "$source" --arg ts "$ts" \
+            '.session.id = $real_sid
+             | .session.vs_code_session_id = $real_sid
+             | .session.source = $src
+             | .session.healed_at = $ts' \
+            "$ctx_file" | sponge "$ctx_file" 2> /dev/null || true
+    else
+        local tmp_ctx
+        if tmp_ctx="$(mktemp 2> /dev/null)"; then
+            jq --arg real_sid "$real_sid" --arg src "$source" --arg ts "$ts" \
+                '.session.id = $real_sid
+                 | .session.vs_code_session_id = $real_sid
+                 | .session.source = $src
+                 | .session.healed_at = $ts' \
+                "$ctx_file" > "$tmp_ctx" 2> /dev/null \
+                && mv "$tmp_ctx" "$ctx_file" \
+                || rm -f "$tmp_ctx" 2> /dev/null
+        fi
+    fi
+}
+
+# Loga evento session_id_healed, com contador opcional.
+log_session_id_healed_event() {
+    local audit_file="$1"
+    local old_sid="$2"
+    local new_sid="$3"
+    local source="$4"
+    local ts="$5"
+    local message="$6"
+    local consecutive_count="${7:-}"
+
+    if [ -n "$consecutive_count" ]; then
+        jq -cn \
+            --arg event "session_id_healed" \
+            --arg old "$old_sid" \
+            --arg new "$new_sid" \
+            --arg source "$source" \
+            --arg ts "$ts" \
+            --argjson count "$consecutive_count" \
+            --arg message "$message" \
+            '{event: $event, old_session_id: $old, new_session_id: $new, source: $source,
+              timestamp: $ts, consecutive_mismatches: $count, message: $message}' >> "$audit_file"
+    else
+        jq -cn \
+            --arg event "session_id_healed" \
+            --arg old "$old_sid" \
+            --arg new "$new_sid" \
+            --arg source "$source" \
+            --arg ts "$ts" \
+            --arg message "$message" \
+            '{event: $event, old_session_id: $old, new_session_id: $new, source: $source,
+              timestamp: $ts, message: $message}' >> "$audit_file"
+    fi
+}
+
+# Loga sincronização de payload stale em inline_restart.
+log_session_id_sync_inline_restart_event() {
+    local audit_file="$1"
+    local stale_sid="$2"
+    local adopted_sid="$3"
+    local source="$4"
+    local ts="$5"
+    local message="$6"
+
+    jq -cn \
+        --arg event "session_id_sync_inline_restart" \
+        --arg stale "$stale_sid" \
+        --arg adopted "$adopted_sid" \
+        --arg source "$source" \
+        --arg ts "$ts" \
+        --arg message "$message" \
+        '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
+          source: $source, timestamp: $ts, message: $message}' >> "$audit_file"
+}
+
+# Loga mismatch entre payload e contexto ativo.
+log_session_id_mismatch_event() {
+    local audit_file="$1"
+    local expected_sid="$2"
+    local got_sid="$3"
+    local source="$4"
+    local ts="$5"
+    local consecutive_count="$6"
+    local message="$7"
+
+    jq -cn \
+        --arg event "session_id_mismatch" \
+        --arg expected "$expected_sid" \
+        --arg got "$got_sid" \
+        --arg source "$source" \
+        --arg ts "$ts" \
+        --argjson count "$consecutive_count" \
+        --arg message "$message" \
+        '{
+            event:   $event,
+            expected: $expected,
+            got:      $got,
+            source:   $source,
+            timestamp: $ts,
+            consecutive_count: $count,
+            message:  $message
+        }' >> "$audit_file"
+}
+
 # Atualiza contexto ao bloquear um TURN por ausência de autorização.
 update_blocked_turn_context() {
     local ctx_file="$1"
@@ -647,6 +1479,105 @@ update_blocked_turn_context() {
         "$ctx_file" > "$tmp_ctx" 2> /dev/null \
         && mv "$tmp_ctx" "$ctx_file" \
         || rm -f "$tmp_ctx" 2> /dev/null
+}
+
+# Registra subturn bloqueado no histórico e agenda próximo subturn de resume.
+record_blocked_subturn_and_schedule_resume() {
+    local ctx_file="$1"
+    local now_iso="$2"
+    local subturn_id="$3"
+    local subturn_number="$4"
+    local next_subturn_id="$5"
+    local next_subturn="$6"
+    local subturn_duration_ms="$7"
+
+    [ -f "$ctx_file" ] || return 0
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq --arg ts "$now_iso" \
+            --arg subturn_id "$subturn_id" \
+            --argjson subturn_number "${subturn_number:-1}" \
+            --arg next_subturn_id "$next_subturn_id" \
+            --argjson next_subturn "$next_subturn" \
+            --argjson duration_ms "$subturn_duration_ms" \
+            '.current_turn.subturn_history = ((.current_turn.subturn_history // []) + [{
+                number: $subturn_number,
+                subturn_id: $subturn_id,
+                parent_turn_id: (.current_turn.turn_id // null),
+                state: "blocked",
+                reason: "stop_blocked",
+                started_at: (.current_turn.subturn.started_at // null),
+                ended_at: $ts,
+                duration_ms: $duration_ms
+             }] | if length > 20 then .[-20:] else . end)
+             | .current_turn.subturn = {
+                number: $next_subturn,
+                subturn_id: $next_subturn_id,
+                state: "blocked",
+                reason: "stop_block_resume_pending",
+                started_at: $ts,
+                last_transition_at: $ts,
+                parent_turn_id: (.current_turn.turn_id // null),
+                expected_window_minutes: 15,
+                stop_hook_active: false,
+                requires_user_action: true,
+                authorization_snapshot: {
+                    auth_requested: (.current_turn.auth_requested // false),
+                    ask_template: (.current_turn.last_askquestions_template // null),
+                    close_key_found: (.current_turn.last_askquestions_close_key_found // false),
+                    close_key_validated: (.session.close_key_validated // false)
+                }
+             }
+             | .session_stats.subturn_blocked = ((.session_stats.subturn_blocked // 0) + 1)
+             | .session_stats.subturn_count = ((.session_stats.subturn_count // 0) + 1)' \
+            "$ctx_file" | sponge "$ctx_file" 2> /dev/null || true
+        return 0
+    fi
+
+    local tmp_subturn_block
+    if tmp_subturn_block="$(mktemp 2> /dev/null)"; then
+        if jq --arg ts "$now_iso" \
+            --arg subturn_id "$subturn_id" \
+            --argjson subturn_number "${subturn_number:-1}" \
+            --arg next_subturn_id "$next_subturn_id" \
+            --argjson next_subturn "$next_subturn" \
+            --argjson duration_ms "$subturn_duration_ms" \
+            '.current_turn.subturn_history = ((.current_turn.subturn_history // []) + [{
+                number: $subturn_number,
+                subturn_id: $subturn_id,
+                parent_turn_id: (.current_turn.turn_id // null),
+                state: "blocked",
+                reason: "stop_blocked",
+                started_at: (.current_turn.subturn.started_at // null),
+                ended_at: $ts,
+                duration_ms: $duration_ms
+             }] | if length > 20 then .[-20:] else . end)
+             | .current_turn.subturn = {
+                number: $next_subturn,
+                subturn_id: $next_subturn_id,
+                state: "blocked",
+                reason: "stop_block_resume_pending",
+                started_at: $ts,
+                last_transition_at: $ts,
+                parent_turn_id: (.current_turn.turn_id // null),
+                expected_window_minutes: 15,
+                stop_hook_active: false,
+                requires_user_action: true,
+                authorization_snapshot: {
+                    auth_requested: (.current_turn.auth_requested // false),
+                    ask_template: (.current_turn.last_askquestions_template // null),
+                    close_key_found: (.current_turn.last_askquestions_close_key_found // false),
+                    close_key_validated: (.session.close_key_validated // false)
+                }
+             }
+             | .session_stats.subturn_blocked = ((.session_stats.subturn_blocked // 0) + 1)
+             | .session_stats.subturn_count = ((.session_stats.subturn_count // 0) + 1)' \
+            "$ctx_file" > "$tmp_subturn_block" 2> /dev/null; then
+            mv "$tmp_subturn_block" "$ctx_file" 2> /dev/null || rm -f "$tmp_subturn_block"
+        else
+            rm -f "$tmp_subturn_block"
+        fi
+    fi
 }
 
 # Marca o contexto como autorizado ao final do TURN.
@@ -728,6 +1659,26 @@ audit_has_turn_auth_signal() {
     return 1
 }
 
+# Verifica existência de subagentStart após o último userPromptSubmitted.
+audit_has_subagent_start_since_prompt() {
+    local audit_file="$1"
+    [ -f "$audit_file" ] || return 1
+
+    local last_prompt_line total_lines lines_since_prompt
+    last_prompt_line="$(awk '/"userPromptSubmitted"/{last=NR} END{print last+0}' "$audit_file" 2> /dev/null || echo 0)"
+    total_lines="$(wc -l < "$audit_file" 2> /dev/null || echo 0)"
+
+    if [ "$last_prompt_line" -gt 0 ] && [ "$total_lines" -gt "$last_prompt_line" ]; then
+        lines_since_prompt=$((total_lines - last_prompt_line))
+        if [ "$lines_since_prompt" -gt 0 ] && tail -n "$lines_since_prompt" "$audit_file" \
+            | jq -re 'select(.event == "subagentStart")' > /dev/null 2>&1; then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
 # Estratégia 3 (fallback): auth flag no contexto do turno atual.
 context_turn_auth_requested() {
     local ctx_file="$1"
@@ -740,6 +1691,160 @@ context_turn_auth_requested() {
     [ "$ctx_flag" = "true" ]
 }
 
+# Avalia autorização do TURN (estratégias 1/3/4 + invalidação v9.1).
+# Saída (stdout): "<auth_requested>|<auth_invalid_reason>"
+evaluate_turn_authorization() {
+    local audit_file="$1"
+    local ctx_file="$2"
+    local session_id="$3"
+    local now_iso="$4"
+    local turn_id="$5"
+
+    local auth_requested="false"
+    local auth_invalid_reason=""
+
+    if [ -f "$audit_file" ] && audit_has_turn_auth_signal "$audit_file"; then
+        auth_requested="true"
+    fi
+
+    if [ "$auth_requested" = "false" ] && [ -f "$ctx_file" ] && context_turn_auth_requested "$ctx_file"; then
+        auth_requested="true"
+    fi
+
+    if [ "$auth_requested" = "false" ] && [ -f "$ctx_file" ]; then
+        local subagent_delegated subagent_last_tool subagent_last_non_bookkeeping_tool
+        local subagent_parent_turn_id subagent_chain_valid subagent_chain_claimed
+        subagent_delegated="$(jq -r '.current_turn.subagent_delegated // false' "$ctx_file" 2> /dev/null || echo false)"
+        if [ "$subagent_delegated" = "true" ]; then
+            subagent_last_tool="$(jq -r '.last_tool.name // ""' "$ctx_file" 2> /dev/null || echo '')"
+            subagent_last_non_bookkeeping_tool="$(jq -r '.current_turn.last_non_bookkeeping_tool // ""' "$ctx_file" 2> /dev/null || echo '')"
+            subagent_parent_turn_id="$(jq -r '.current_turn.subturn.parent_turn_id // ""' "$ctx_file" 2> /dev/null || echo '')"
+            subagent_chain_valid="false"
+            subagent_chain_claimed="false"
+
+            if [ "$subagent_last_tool" = "runSubagent" ] || [ "$subagent_last_tool" = "search_subagent" ] \
+                || [ "$subagent_last_non_bookkeeping_tool" = "runSubagent" ] || [ "$subagent_last_non_bookkeeping_tool" = "search_subagent" ]; then
+                subagent_chain_claimed="true"
+            fi
+
+            if [ -n "$turn_id" ] \
+                && [ "$subagent_parent_turn_id" = "$turn_id" ] \
+                && audit_has_subagent_start_since_prompt "$audit_file"; then
+                subagent_chain_valid="true"
+            fi
+
+            if [ "$subagent_chain_claimed" = "true" ] \
+                && [ "$subagent_chain_valid" = "true" ]; then
+                auth_requested="true"
+                log_auth_via_subagent_delegation_event "$audit_file" "$session_id" "$now_iso" "$turn_id"
+            elif [ "$subagent_chain_claimed" = "true" ] \
+                && [ "$subagent_chain_valid" != "true" ] \
+                && [ -n "$turn_id" ]; then
+                auth_invalid_reason="subagent_chain_invalid"
+            fi
+        fi
+    fi
+
+    if [ "$auth_requested" = "true" ] && [ -f "$ctx_file" ]; then
+        local auth_last_tool_name auth_subagent_delegated auth_ask_api_error auth_last_response
+        local auth_last_non_bookkeeping_tool_ctx auth_last_ask_template auth_last_ask_close_action
+        local auth_last_ask_close_key_found auth_last_ask_has_template_f_option auth_template_f_pending
+        local auth_session_close_key_validated auth_strict_key_mode auth_template_f_called_without_request
+        local auth_todo_last_item_is_continuation auth_auto_audit_required auth_auto_audit_started
+        local auth_last_non_bookkeeping_tool_aud auth_last_non_bookkeeping_tool
+
+        auth_last_tool_name="$(jq -r '.last_tool.name // ""' "$ctx_file" 2> /dev/null || echo '')"
+        auth_subagent_delegated="$(jq -r '.current_turn.subagent_delegated // false' "$ctx_file" 2> /dev/null || echo false)"
+        auth_ask_api_error="$(jq -r '.current_turn.askquestions_api_error // false' "$ctx_file" 2> /dev/null || echo false)"
+        auth_last_response="$(jq -r '.current_turn.last_askquestions_response // ""' "$ctx_file" 2> /dev/null || echo '')"
+        auth_last_non_bookkeeping_tool_ctx="$(jq -r '.current_turn.last_non_bookkeeping_tool // ""' "$ctx_file" 2> /dev/null || echo '')"
+        auth_last_ask_template="$(jq -r '.current_turn.last_askquestions_template // ""' "$ctx_file" 2> /dev/null || echo '')"
+        auth_last_ask_close_action="$(jq -r '.current_turn.last_askquestions_close_action // ""' "$ctx_file" 2> /dev/null || echo '')"
+        auth_last_ask_close_key_found="$(jq -r '.current_turn.last_askquestions_close_key_found // false' "$ctx_file" 2> /dev/null || echo false)"
+        auth_last_ask_has_template_f_option="$(jq -r '(.current_turn.last_askquestions_has_template_f_option | if . == null then true else . end)' "$ctx_file" 2> /dev/null || echo true)"
+        auth_template_f_pending="$(jq -r '.session.template_f_request_pending // false' "$ctx_file" 2> /dev/null || echo false)"
+        auth_session_close_key_validated="$(jq -r '.session.close_key_validated // false' "$ctx_file" 2> /dev/null || echo false)"
+        auth_strict_key_mode="$(jq -r '(.session.strict_turn_close_requires_key | if . == null then true else . end)' "$ctx_file" 2> /dev/null || echo true)"
+        auth_todo_last_item_is_continuation="$(jq -r '.current_turn.todo_last_item_is_askquestions_continuation // false' "$ctx_file" 2> /dev/null || echo false)"
+        auth_auto_audit_required="$(jq -r '.current_turn.auto_audit_required // false' "$ctx_file" 2> /dev/null || echo false)"
+        auth_auto_audit_started="$(jq -r '.current_turn.auto_audit_started // false' "$ctx_file" 2> /dev/null || echo false)"
+        auth_template_f_called_without_request="false"
+        auth_last_non_bookkeeping_tool_aud=""
+        auth_last_non_bookkeeping_tool=""
+
+        auth_last_non_bookkeeping_tool_aud="$(last_non_bookkeeping_tool_since_prompt "$audit_file")"
+        if [ -n "$auth_last_non_bookkeeping_tool_ctx" ]; then
+            auth_last_non_bookkeeping_tool="$auth_last_non_bookkeeping_tool_ctx"
+        else
+            auth_last_non_bookkeeping_tool="$auth_last_non_bookkeeping_tool_aud"
+        fi
+
+        if [ -z "$auth_last_non_bookkeeping_tool" ] \
+            && [ "$auth_last_tool_name" = "manage_todo_list" ] \
+            && askquestions_has_user_answer "$auth_last_response"; then
+            auth_last_non_bookkeeping_tool="vscode_askQuestions"
+        fi
+
+        if [ "$auth_last_ask_template" = "template_f" ] && [ "$auth_template_f_pending" != "true" ]; then
+            auth_template_f_called_without_request="true"
+        fi
+
+        if [ "$auth_strict_key_mode" != "true" ] && [ "$auth_strict_key_mode" != "false" ]; then
+            auth_strict_key_mode="true"
+        fi
+
+        if [ "$auth_strict_key_mode" = "true" ]; then
+            auth_strict_key_mode="true"
+        else
+            auth_strict_key_mode="false"
+        fi
+
+        auth_invalid_reason="$(determine_turn_auth_invalid_reason \
+            "$auth_last_tool_name" \
+            "$auth_subagent_delegated" \
+            "$auth_ask_api_error" \
+            "$auth_last_response" \
+            "$auth_last_non_bookkeeping_tool" \
+            "$auth_last_ask_template" \
+            "$auth_last_ask_close_action" \
+            "$auth_last_ask_close_key_found" \
+            "$auth_session_close_key_validated" \
+            "$auth_strict_key_mode" \
+            "$auth_last_ask_has_template_f_option" \
+            "$auth_template_f_called_without_request" \
+            "$auth_todo_last_item_is_continuation" \
+            "$auth_auto_audit_required" \
+            "$auth_auto_audit_started")"
+
+        if [ -n "$auth_invalid_reason" ]; then
+            auth_requested="false"
+            log_turn_auth_invalidated_event \
+                "$audit_file" \
+                "$session_id" \
+                "$now_iso" \
+                "$auth_invalid_reason" \
+                "$auth_last_tool_name" \
+                "$auth_last_non_bookkeeping_tool" \
+                "$turn_id"
+        fi
+    fi
+
+    if [ "$auth_requested" = "true" ] && [ ! -f "$ctx_file" ]; then
+        auth_requested="false"
+        auth_invalid_reason="strict_context_missing"
+        log_turn_auth_invalidated_event \
+            "$audit_file" \
+            "$session_id" \
+            "$now_iso" \
+            "$auth_invalid_reason" \
+            "(ctx_missing)" \
+            "(ctx_missing)" \
+            "$turn_id"
+    fi
+
+    printf '%s|%s\n' "$auth_requested" "$auth_invalid_reason"
+}
+
 # Avalia invalidação v9.1 e retorna reason vazio quando auth continua válida.
 determine_turn_auth_invalid_reason() {
     local last_tool_name="$1"
@@ -747,8 +1852,19 @@ determine_turn_auth_invalid_reason() {
     local ask_api_error="$3"
     local last_response_json="$4"
     local last_non_bookkeeping_tool="$5"
+    local ask_template="$6"
+    local ask_close_action="$7"
+    local ask_close_key_found="$8"
+    local session_close_key_validated="$9"
+    local strict_turn_close_requires_key="${10:-true}"
+    local ask_has_template_f_option="${11:-true}"
+    local template_f_called_without_request="${12:-false}"
+    local todo_last_item_is_continuation="${13:-false}"
+    local auto_audit_required="${14:-false}"
+    local auto_audit_started="${15:-false}"
+    local effective_last_tool_name="$last_tool_name"
 
-    if is_immediate_subagent_delegation "$subagent_delegated" "$last_tool_name"; then
+    if [ "$strict_turn_close_requires_key" != "true" ] && is_immediate_subagent_delegation "$subagent_delegated" "$last_tool_name"; then
         printf '%s\n' ""
         return 0
     fi
@@ -759,11 +1875,10 @@ determine_turn_auth_invalid_reason() {
     fi
 
     if is_bookkeeping_after_askquestions "$last_tool_name" "$last_non_bookkeeping_tool"; then
-        printf '%s\n' ""
-        return 0
+        effective_last_tool_name="vscode_askQuestions"
     fi
 
-    if [ "$last_tool_name" != "vscode_askQuestions" ]; then
+    if [ "$effective_last_tool_name" != "vscode_askQuestions" ]; then
         printf '%s\n' "askquestions_not_last_tool"
         return 0
     fi
@@ -771,6 +1886,49 @@ determine_turn_auth_invalid_reason() {
     if ! askquestions_has_user_answer "$last_response_json"; then
         printf '%s\n' "askquestions_skipped_or_empty"
         return 0
+    fi
+
+    if [ "$todo_last_item_is_continuation" != "true" ]; then
+        printf '%s\n' "todo_last_item_not_continuation"
+        return 0
+    fi
+
+    if [ "$auto_audit_required" = "true" ] && [ "$auto_audit_started" != "true" ]; then
+        printf '%s\n' "auto_audit_required_not_started"
+        return 0
+    fi
+
+    # Governança de escalonamento: templates de continuidade devem permitir
+    # escalar para Template F; chamar Template F sem solicitação prévia invalida.
+    if [ "$ask_template" != "template_f" ] && [ "$ask_has_template_f_option" != "true" ]; then
+        printf '%s\n' "askquestions_missing_template_f_option"
+        return 0
+    fi
+
+    # Hardening de continuidade: respostas de askQuestions não-Template F
+    # SEMPRE exigem continuação do TURN e proíbem encerramento nesta etapa.
+    if [ "$ask_template" != "template_f" ]; then
+        printf '%s\n' "non_template_f_continuation_mandatory"
+        return 0
+    fi
+
+    if [ "$ask_template" = "template_f" ] && [ "$template_f_called_without_request" = "true" ]; then
+        printf '%s\n' "template_f_called_without_prior_request"
+        return 0
+    fi
+
+    # Se Template F foi usado, validar fluxo de key (encerramento de sessão).
+    if [ "$ask_template" = "template_f" ]; then
+        if [ "$ask_close_action" = "close_without_valid_key" ] \
+            || { [ "$ask_close_action" = "close_with_key" ] && [ "$ask_close_key_found" != "true" ]; }; then
+            printf '%s\n' "session_close_key_missing_or_invalid"
+            return 0
+        fi
+
+        if [ "$ask_close_action" = "close_with_key" ] && [ "$session_close_key_validated" != "true" ]; then
+            printf '%s\n' "session_close_validation_not_confirmed"
+            return 0
+        fi
     fi
 
     printf '%s\n' ""
@@ -908,7 +2066,7 @@ emit_unresolved_session_mismatch_block() {
     local mismatch_count="$3"
     local reason="Session ID mismatch unresolved"
     local message="🚫 TURN BLOQUEADO (v9.2): session_id mismatch ainda não saneado. expected=${expected_sid} got=${got_sid} (count=${mismatch_count}). Não é seguro encerrar o TURN com contexto inconsistente."
-    emit_stop_block "$reason" "$message"
+    emit_stop_block "$reason" "$message" "unresolved_session_mismatch"
 }
 
 # Loga reblock quando agente não cumpre autorização após stop_hook_active=true.
@@ -931,9 +2089,11 @@ log_reblocked_no_comply_event() {
 
 # Emite block padrão de reblock pós stop_hook_active.
 emit_reblock_stop_block() {
-    emit_stop_block \
-        "Turno ainda sem autorização válida. É obrigatório chamar vscode_askQuestions antes de encerrar." \
-        "🚫 Encerramento ilegítimo bloqueado novamente: chame vscode_askQuestions agora para autorizar o fim do TURN."
+    local reason="${1:-Turno ainda sem autorização válida. Encerramento legítimo só com Template F + KEY correta validada.}"
+    local system_message="${2:-🚫 Encerramento ilegítimo bloqueado novamente: faça askQuestions com opção de escalar para Template F e só encerre após Template F + KEY válida.}"
+    local reason_code="${3:-reblock_no_authorization}"
+    local decision_trace_json="${4:-}"
+    emit_stop_block "$reason" "$system_message" "$reason_code" "$decision_trace_json"
 }
 
 # Loga conformidade após unblock (stop_hook_active=true e auth válida).
@@ -973,4 +2133,64 @@ build_context_system_message() {
     SECTION muda  → autônomo: bash start-section.sh \"nome\"
         SESSION fecha → SOMENTE: Template F + KEY digitada + execução automática de session-close.sh
 ─────────────────────────────────────────────────────────────────────────────${push_msg}${violation_msg}${session_close_msg}"
+}
+
+# Monta nudge contextual completo do agent-stop quando aplicável.
+# Retorna string vazia quando não há necessidade de emitir systemMessage.
+build_context_nudge_message() {
+    local ctx_file="$1"
+    local state_dir="$2"
+    local auth_requested="$3"
+
+    [ -f "$ctx_file" ] || {
+        printf '%s\n' ""
+        return 0
+    }
+
+    local push_pending turns_since_ask consecutive_unauth
+    push_pending="$(safe_jq_read "$ctx_file" '.session_stats.pending_section_after_push' 'false')"
+    turns_since_ask="$(safe_jq_read_int "$ctx_file" '.session_stats.turns_since_askQuestions' 0)"
+    consecutive_unauth="$(safe_jq_read_int "$ctx_file" '.compliance.consecutive_unauthorized' 0)"
+
+    if ! should_emit_context_nudge "$push_pending" "$turns_since_ask" "$consecutive_unauth" "$auth_requested"; then
+        printf '%s\n' ""
+        return 0
+    fi
+
+    local section section_num turn_num section_turn push_count
+    section="$(safe_jq_read "$ctx_file" '.current_section.name' '(nenhuma)')"
+    section_num="$(safe_jq_read_int "$ctx_file" '.current_section.section_number' 1)"
+    turn_num="$(safe_jq_read_int "$ctx_file" '.current_turn.number' 1)"
+    section_turn="$(safe_jq_read_int "$ctx_file" '.current_turn.section_turn' 1)"
+    push_count="$(safe_jq_read_int "$ctx_file" '.session_stats.push_count' 0)"
+
+    local tasks_file tasks_summary alta media backlog next_task
+    tasks_file="$state_dir/pending-tasks.md"
+    tasks_summary="$(extract_pending_tasks_summary "$tasks_file")"
+    alta="${tasks_summary%%|*}"
+    tasks_summary="${tasks_summary#*|}"
+    media="${tasks_summary%%|*}"
+    tasks_summary="${tasks_summary#*|}"
+    backlog="${tasks_summary%%|*}"
+    next_task="${tasks_summary#*|}"
+
+    local push_msg violation_msg close_msg close_key close_validated
+    push_msg="$(build_push_pending_message "$push_pending" "$push_count")"
+    violation_msg="$(build_violation_message "$auth_requested" "$consecutive_unauth" "$turns_since_ask")"
+    close_key="$(safe_jq_read "$ctx_file" '.session.close_key' '')"
+    close_validated="$(safe_jq_read "$ctx_file" '.session.close_key_validated' 'false')"
+    close_msg="$(build_session_close_nudge_message "$close_validated" "$close_key")"
+
+    build_context_system_message \
+        "$section_turn" \
+        "$turn_num" \
+        "$section" \
+        "$section_num" \
+        "$alta" \
+        "$media" \
+        "$backlog" \
+        "$next_task" \
+        "$push_msg" \
+        "$violation_msg" \
+        "$close_msg"
 }

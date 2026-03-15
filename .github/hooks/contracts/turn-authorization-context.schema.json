@@ -1,0 +1,79 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/.github/hooks/contracts/turn-authorization-context.schema.json",
+    "title": "Turn Authorization Context",
+    "description": "Contrato executável do contexto de autorização do TURN para o hook Stop.",
+    "type": "object",
+    "required": [
+        "schema_version",
+        "session_id",
+        "timestamp",
+        "auth_requested",
+        "askquestions",
+        "strict_mode",
+        "session_close_key_validated",
+        "stop_hook_active"
+    ],
+    "properties": {
+        "schema_version": {
+            "const": "1.0.0"
+        },
+        "session_id": {
+            "type": "string",
+            "minLength": 1
+        },
+        "turn_id": {
+            "type": ["string", "null"]
+        },
+        "timestamp": {
+            "type": "string",
+            "minLength": 1
+        },
+        "last_tool_name": {
+            "type": ["string", "null"]
+        },
+        "last_non_bookkeeping_tool": {
+            "type": ["string", "null"]
+        },
+        "auth_requested": {
+            "type": "boolean"
+        },
+        "auth_invalid_reason": {
+            "type": ["string", "null"]
+        },
+        "askquestions": {
+            "type": "object",
+            "required": [
+                "response_present",
+                "template",
+                "close_action",
+                "close_key_found"
+            ],
+            "properties": {
+                "response_present": {
+                    "type": "boolean"
+                },
+                "template": {
+                    "type": ["string", "null"]
+                },
+                "close_action": {
+                    "type": ["string", "null"]
+                },
+                "close_key_found": {
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": true
+        },
+        "strict_mode": {
+            "type": "boolean"
+        },
+        "session_close_key_validated": {
+            "type": "boolean"
+        },
+        "stop_hook_active": {
+            "type": "boolean"
+        }
+    },
+    "additionalProperties": true
+}

@@ -83,10 +83,17 @@ NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions.
 
 **Cases válidos por contexto:**
 
-- Tarefa concluída → Template A (próximo passo)
+- Tarefa concluída → Template A (próximo passo de conversa; não fecha TURN em modo estrito)
 - Checkpoint periódico a cada ~5 TURNs sem perguntar → Template D
 - Proposta arquitetural → Template C
 - Sessão completamente ociosa → Template E
+
+**Regra de fechamento em modo estrito (prioritária):**
+
+- Em `session.strict_turn_close_requires_key=true`, o fechamento do TURN só é válido com chamada
+  final em **Template F** + `close_key` correta + `session.close_key_validated=true`.
+- Templates A/D/E podem ser usados para continuidade da conversa, mas **não autorizam** fechamento
+  de TURN nesse modo.
 
 **Enforcement (v7.0+):**
 
@@ -94,6 +101,18 @@ NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions.
   logado
 - `consecutive_unauthorized` incrementado a cada violação
 - `manage_todo_list` não usado no turno → mencionado no systemMessage do block
+
+**Checklist anti-violação de último ato (obrigatório):**
+
+1. Antes de encerrar resposta, confirmar que o último TODO foi executado com `vscode_askQuestions`.
+2. Não executar ferramenta de trabalho após essa chamada final.
+3. Se qualquer ação ocorrer depois, considerar autorização invalidada e repetir
+   `vscode_askQuestions`.
+4. Exceção única: `manage_todo_list` imediatamente após `vscode_askQuestions`, apenas para
+   fechamento do checklist do turno.
+5. Em modo estrito, o fechamento do TURN só é válido com chamada final em **Template F**,
+   `close_key` correta e `session.close_key_validated=true`; sem isso, o turno deve ser tratado como
+   não autorizado.
 
 ### SESSION — Autorização obrigatória (close_key + session-close.sh)
 

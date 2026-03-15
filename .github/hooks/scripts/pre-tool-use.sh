@@ -33,17 +33,24 @@ else
 fi
 
 # CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
-INPUT="$(cat 2> /dev/null || true)"
+if command -v resolve_hook_runtime_input > /dev/null 2>&1; then
+    resolve_hook_runtime_input
+else
+    INPUT="$(cat 2> /dev/null || true)"
+    TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+    SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+    NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+    apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
+fi
 
 # Extrai campos usando o schema real (snake_case, não camelCase)
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
-_LOCAL_TS="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+_LOCAL_TS="${NOW_ISO:-$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')}"
 CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // ""' 2> /dev/null || echo '')"
 TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2> /dev/null || echo '')"
 
 # session_id vem diretamente do payload (UUID real do Copilot)
-SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+SESSION_ID="${SESSION_ID_PAYLOAD:-}"
 # REV-06: fallback ao contexto ativo se payload não traz session_id
 if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
@@ -66,6 +73,20 @@ fi
 
 # Serializa tool_input (objeto JSON) para string redactável
 TOOL_INPUT_RAW="$(echo "$INPUT" | jq -c '.tool_input // {}' 2> /dev/null || echo '{}')"
+
+TODO_LAST_ITEM_LABEL=""
+TODO_LAST_ITEM_IS_CONTINUATION="false"
+TODO_LAST_ITEM_IS_ASKQUESTIONS="false"
+if [ "$TOOL_NAME" = "manage_todo_list" ]; then
+    TODO_LAST_ITEM_LABEL="$(echo "$INPUT" | jq -r '.tool_input.todoList[-1].title // ""' 2> /dev/null || echo '')"
+    if printf '%s\n' "$TODO_LAST_ITEM_LABEL" | grep -qiE 'vscode_askQuestions'; then
+        TODO_LAST_ITEM_IS_ASKQUESTIONS="true"
+    fi
+    if [ "$TODO_LAST_ITEM_IS_ASKQUESTIONS" = "true" ] \
+        && printf '%s\n' "$TODO_LAST_ITEM_LABEL" | grep -qiE 'continua|continuacao|template[[:space:]]*(a|d|e)|next[[:space:]]*step|checkpoint'; then
+        TODO_LAST_ITEM_IS_CONTINUATION="true"
+    fi
+fi
 
 # G9-11 Camada 0: Redaction estrutural — remove chaves JSON sensíveis por denylist.
 # Opera antes da redact_credentials (regex) para cobrir campos aninhados não pegáveis por regex.
@@ -131,6 +152,138 @@ jq -cn \
         tool_args:   $args
     }' >> "$AUDIT_FILE"
 
+if [ "$TOOL_NAME" = "manage_todo_list" ]; then
+    jq -cn \
+        --arg event "todoProtocol_checked" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+        --arg tool_use_id "$TOOL_USE_ID" \
+        --arg last_item "$TODO_LAST_ITEM_LABEL" \
+        --argjson compliant "$TODO_LAST_ITEM_IS_CONTINUATION" \
+        '{
+            event: $event,
+            session_id: $sid,
+            timestamp: $ts,
+            tool_use_id: $tool_use_id,
+            last_item: (if $last_item == "" then null else $last_item end),
+            compliant: $compliant,
+            message: "Checklist de TODO validado: último item deve ser askQuestions de continuação"
+        }' >> "$AUDIT_FILE" 2> /dev/null || true
+
+    if [ "$TODO_LAST_ITEM_IS_CONTINUATION" != "true" ]; then
+        jq -cn \
+            --arg event "todoProtocol_violation_last_item" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+            --arg tool_use_id "$TOOL_USE_ID" \
+            --arg last_item "$TODO_LAST_ITEM_LABEL" \
+            '{
+                event: $event,
+                session_id: $sid,
+                timestamp: $ts,
+                tool_use_id: $tool_use_id,
+                last_item: (if $last_item == "" then null else $last_item end),
+                message: "Violação do template de TODO: último item não é askQuestions de continuação"
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+
+        jq -cn \
+            --arg event "todoProtocol_pretool_deny_last_item" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+            --arg tool_use_id "$TOOL_USE_ID" \
+            --arg last_item "$TODO_LAST_ITEM_LABEL" \
+            '{
+                event: $event,
+                session_id: $sid,
+                timestamp: $ts,
+                tool_use_id: $tool_use_id,
+                last_item: (if $last_item == "" then null else $last_item end),
+                message: "Bloqueado no preToolUse: último TODO precisa ser askQuestions de continuação"
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+
+        jq -cn \
+            '{
+                permissionDecision: "deny",
+                additionalContext: "Protocolo TODO v9.0: o último item do manage_todo_list deve ser chamada de vscode_askQuestions de continuação (Template A/D/E). Ajuste a lista e tente novamente."
+            }'
+        exit 0
+    fi
+fi
+
+if [ "$TOOL_NAME" = "vscode_askQuestions" ]; then
+    ASK_TEMPLATE_F_PRE=false
+    ASK_HAS_TEMPLATE_F_OPTION_PRE=false
+
+    if echo "$INPUT" | jq -e '
+            [
+                (.tool_input.questions? // [])[]?
+                | ((.header // "") + " " + (.question // ""))
+            ]
+            | any(test("template f|encerrar session|encerrar sessão|session close|close key"; "i"))
+        ' > /dev/null 2>&1; then
+        ASK_TEMPLATE_F_PRE=true
+        ASK_HAS_TEMPLATE_F_OPTION_PRE=true
+    elif echo "$INPUT" | jq -e '
+            [
+                (.tool_input.questions? // [])[]?
+                | (.options? // [])[]?
+                | ((.label // "") + " " + (.description // ""))
+            ]
+            | any(test("template f|encerrar sess(ã|a)o|session close|close key|escalar"; "i"))
+        ' > /dev/null 2>&1; then
+        ASK_HAS_TEMPLATE_F_OPTION_PRE=true
+    fi
+
+    TEMPLATE_F_PENDING_PRE="false"
+    if [ -f "$CTX_FILE" ]; then
+        TEMPLATE_F_PENDING_PRE="$(jq -r '.session.template_f_request_pending // false' "$CTX_FILE" 2> /dev/null || echo false)"
+    fi
+
+    if [ "$ASK_TEMPLATE_F_PRE" != "true" ] && [ "$ASK_HAS_TEMPLATE_F_OPTION_PRE" != "true" ]; then
+        jq -cn \
+            --arg event "askQuestions_pretool_deny_missing_template_f_option" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+            --arg tool_use_id "$TOOL_USE_ID" \
+            '{
+                event: $event,
+                session_id: $sid,
+                timestamp: $ts,
+                tool_use_id: $tool_use_id,
+                message: "Bloqueado no preToolUse: askQuestions sem opção de escalonamento para Template F"
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+
+        jq -cn \
+            '{
+                permissionDecision: "deny",
+                additionalContext: "Governança de continuidade: inclua no askQuestions uma opção explícita para escalonar ao Template F (fechamento de SESSION) antes de enviar novamente."
+            }'
+        exit 0
+    fi
+
+    if [ "$ASK_TEMPLATE_F_PRE" = "true" ] && [ "$TEMPLATE_F_PENDING_PRE" != "true" ]; then
+        jq -cn \
+            --arg event "askQuestions_pretool_deny_template_f_without_request" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+            --arg tool_use_id "$TOOL_USE_ID" \
+            '{
+                event: $event,
+                session_id: $sid,
+                timestamp: $ts,
+                tool_use_id: $tool_use_id,
+                message: "Bloqueado no preToolUse: Template F sem solicitação prévia registrada"
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+
+        jq -cn \
+            '{
+                permissionDecision: "deny",
+                additionalContext: "Template F só pode ser chamado após solicitação explícita de escalonamento em askQuestions anterior. Use Template A/D/E com opção de escalonamento e aguarde a solicitação do usuário."
+            }'
+        exit 0
+    fi
+fi
+
 # ── Auto-recovery: cria contexto mínimo se session-context.json estiver vazio ─
 # Se sessionStart não disparou (bug conhecido), o sistema inteiro fica degradado.
 # Detectamos isso aqui (preToolUse é o primeiro hook frequente) e criamos um
@@ -183,6 +336,7 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
                 id: $sid, started_at: $now, ended_at: null, end_reason: null,
                 close_key: (if $close_key == "" then null else $close_key end),
                 close_key_validated: $key_validated,
+                strict_turn_close_requires_key: true,
                 source: "auto_recovery", cwd: null
             },
             session_stats: {
@@ -201,7 +355,11 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
                 failures_count: 0, auth_requested: false, auth_requested_at: null,
                 last_askquestions_response: null, section_name: "recovery",
                 turn_id: null, section_turn: 1, block_count: 0,
-                intent_declared: false, intent: null
+                intent_declared: false, intent: null,
+                last_non_bookkeeping_tool: null,
+                last_askquestions_template: null,
+                last_askquestions_close_action: null,
+                last_askquestions_close_key_found: false
             },
             current_section: {
                 name: "recovery", started_at: $now, turn_start: 1,
@@ -214,7 +372,10 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
             compliance: {
                 last_turn_authorized: null, consecutive_unauthorized: 0,
                 flag_file_exists: false
-            }
+            },
+            quality_gates: {},
+            session_summary: null,
+            last_turn_ts: null
         }' 2> /dev/null > "$_RECOVERY_CTX_TMP" \
             && mv "$_RECOVERY_CTX_TMP" "$CTX_FILE" 2> /dev/null \
             || rm -f "$_RECOVERY_CTX_TMP" 2> /dev/null
@@ -242,98 +403,41 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
     echo "[recovery] session-context.json vazio — criado contexto mínimo para sessão $SESSION_ID" >&2
 fi
 
+# ── Backfill canônico da flag strict de fechamento de TURN ──────────────────
+# Contextos legados podem não ter session.strict_turn_close_requires_key.
+# Em modo hardening, a ausência deve convergir para true e ficar persistida.
+if command -v ensure_strict_turn_close_flag_default > /dev/null 2>&1; then
+    ensure_strict_turn_close_flag_default "$CTX_FILE" > /dev/null 2>&1 || true
+fi
+
+# ── Backfill canônico de campos de resumo de sessão ────────────────────────
+# Alguns contextos legados podem não conter estes campos esperados pelo smoke.
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+    jq '.session_summary = (.session_summary // null)
+        | .last_turn_ts = (.last_turn_ts // null)' \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+fi
+
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
 # HARDENING v5: previne contaminação cruzada entre sessões.
 # HEAL v1: quando CTX_FILE é de manual_recovery, adota session_id real do Copilot.
 # FIX BUG-06: também trata inline_restart — CTX já tem o session_id correto do VS Code
 # (BUG-02 garante isso); o payload está stale (sessão anterior). Per PREMISSA 1:
 # adotamos SESSION_ID do CTX (VS Code) em vez de bloquear.
+# Guard canônico centralizado em reconcile_session_id_guard_prepost() —
+# emite evento "session_id_mismatch" quando o caso é não recuperável.
 # Se o payload carrega session_id diferente do contexto ativo,
 # ainda loga no audit.jsonl (read-append), mas NÃO modifica session-context.json.
 if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then
-        CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-        if [ "$CTX_SOURCE" = "manual_recovery" ]; then
-            NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
-            if command -v sponge &> /dev/null; then
-                jq --arg real_sid "$SESSION_ID" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-            else
-                _TMP_HEAL="$(mktemp)"
-                if jq --arg real_sid "$SESSION_ID" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
-                    "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
-                    mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
-                else
-                    rm -f "$_TMP_HEAL"
-                fi
-            fi
-            jq -cn \
-                --arg event "session_id_healed" \
-                --arg old "$CTX_ACTIVE_SID" \
-                --arg new "$SESSION_ID" \
-                --arg source "pre-tool-use.sh" \
-                --arg tool "$TOOL_NAME" \
-                --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
-                '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, tool: $tool, timestamp: $ts,
-                  message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
-                >> "$AUDIT_FILE"
-            # SESSION_ID já tem o valor correto — continua
-        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
-            # FIX BUG-06: inline_restart — CTX tem o session_id correto do VS Code (PREMISSA 1).
-            # Payload está stale (compilado com contexto antigo). Adotamos CTX como verdade.
-            # Não bloqueamos — apenas sincronizamos a variável local SESSION_ID ao CTX.
-            SESSION_ID="$CTX_ACTIVE_SID"
-            # GAP-O1: limita log de inline_restart para evitar ruído excessivo
-            _SYNCS_INLINE="$(jq -r '.session_stats.session_id_syncs_inline // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-            if [ "$_SYNCS_INLINE" -lt 5 ]; then
-                jq -cn \
-                    --arg event "session_id_sync_inline_restart" \
-                    --arg stale "$SESSION_ID" \
-                    --arg adopted "$CTX_ACTIVE_SID" \
-                    --arg source "pre-tool-use.sh" \
-                    --arg tool "$TOOL_NAME" \
-                    --arg ts "${TIMESTAMP:-}" \
-                    '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
-                      source: $source, tool: $tool, timestamp: $ts,
-                      message: "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"}' \
-                    >> "$AUDIT_FILE"
-            elif [ "$_SYNCS_INLINE" -eq 5 ]; then
-                jq -cn --arg event "session_id_sync_inline_restart_cap" --arg source "pre-tool-use.sh" \
-                    '{event: $event, source: $source, message: "inline_restart sync count reached cap (5) — logs suprimidos daqui em diante"}' \
-                    >> "$AUDIT_FILE"
-            fi
-            # GAP-03: incrementa contador de syncs inline no CTX
-            if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-                jq '.session_stats.session_id_syncs_inline = ((.session_stats.session_id_syncs_inline // 0) + 1)' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-            fi
-            # Continua normalmente — SESSION_ID agora reflete o CTX correto
-        else
-            jq -cn \
-                --arg event "session_id_mismatch" \
-                --arg expected "$CTX_ACTIVE_SID" \
-                --arg got "$SESSION_ID" \
-                --arg source "pre-tool-use.sh" \
-                --arg tool "$TOOL_NAME" \
-                --arg ts "${TIMESTAMP:-}" \
-                '{
-                    event:   $event,
-                    expected: $expected,
-                    got:      $got,
-                    source:   $source,
-                    tool:     $tool,
-                    timestamp: $ts,
-                    message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-                }' >> "$AUDIT_FILE"
-            # GAP-03: incrementa contador de mismatches no CTX antes de sair
-            if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-                jq '.session_stats.session_id_mismatches = ((.session_stats.session_id_mismatches // 0) + 1)' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-            fi
+        _GUARD_RC=0
+        _GUARD_RECONCILED_SID="$(reconcile_session_id_guard_prepost "$SESSION_ID" "$TOOL_NAME" "${TIMESTAMP:-}" "pre-tool-use.sh")" || _GUARD_RC=$?
+        if [ -n "$_GUARD_RECONCILED_SID" ]; then
+            SESSION_ID="$_GUARD_RECONCILED_SID"
+        fi
 
+        if [ "$_GUARD_RC" -eq 10 ]; then
             # P0-H053: mesmo em mismatch, saneia recovery stale do CTX ativo.
             # Isso evita perpetuar alertas falsos quando o bloco recovery foi
             # contaminado por fixture antiga (sess_test*) ou timestamps futuros.
@@ -485,6 +589,14 @@ if [ -f "$CTX_FILE" ] && command -v jq > /dev/null 2>&1; then
     fi
 fi
 
+# ── Hardening de schema mínimo do contexto ─────────────────────────────────
+# Garante campos-base exigidos por smoke/checks mesmo em contextos recuperados
+# de versões antigas ou sessões interrompidas abruptamente.
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+    jq '.quality_gates = (.quality_gates // {})' \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+fi
+
 # ── Atualiza contexto — Schema v2 ────────────────────────────────────────────
 # Atualiza 3 blocos separados:
 #   last_tool.*       → sobrescrito a cada chamada (âmbito: chamada)
@@ -503,6 +615,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .last_tool.result = null
              | .current_turn.auth_requested    = true
              | .current_turn.auth_requested_at = $ts
+             | .current_turn.last_non_bookkeeping_tool = $tool
              | .current_turn.tools_count   = ((.current_turn.tools_count // 0) + 1)
              | .current_turn.tools_by_name = ((.current_turn.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
@@ -518,6 +631,11 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         # e logamos evento "subagentStart" no audit.jsonl como sinal de autorização.
         # FIX BUG-03: search_subagent agora também é reconhecido (equivalente a runSubagent).
         _SUBAGENT_DESCRIPTION="$(echo "$INPUT" | jq -r '.tool_input.description // .tool_input.prompt // "(sem descrição)"' 2> /dev/null | head -c 200 || echo '(sem descrição)')"
+        _SUBTURN_ID="$(jq -r '.current_turn.subturn.subturn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        _SUBTURN_NUMBER="$(jq -r '.current_turn.subturn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+        if [ -z "$_SUBTURN_ID" ]; then
+            _SUBTURN_ID="subturn_${TOOL_USE_ID:-unknown}"
+        fi
         jq -cn \
             --arg event "subagentStart" \
             --arg sid "$SESSION_ID" \
@@ -533,6 +651,20 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                 auth_implicit:  true,
                 message:        "runSubagent chamado — delegação legítima de trabalho (autorização implícita)"
             }' >> "$AUDIT_FILE"
+        _SUBTURN_TURN_ID="$(jq -r '.current_turn.turn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        if command -v emit_subturn_transition_event > /dev/null 2>&1; then
+            emit_subturn_transition_event \
+                "$AUDIT_FILE" \
+                "$SESSION_ID" \
+                "${TIMESTAMP:-$_LOCAL_TS}" \
+                "$_SUBTURN_TURN_ID" \
+                "$_SUBTURN_ID" \
+                "${_SUBTURN_NUMBER:-1}" \
+                "active" \
+                "delegated" \
+                "subagent_delegate" \
+                "preToolUse"
+        fi
         jq --arg ts "$TIMESTAMP" \
             --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
             --arg desc "$_SUBAGENT_DESCRIPTION" \
@@ -544,6 +676,8 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .current_turn.auth_requested_at    = $ts
              | .current_turn.subagent_delegated   = true
              | .current_turn.subagent_description = $desc
+             | .session_stats.subturn_via_subagent = ((.session_stats.subturn_via_subagent // 0) + 1)
+             | .current_turn.last_non_bookkeeping_tool = $tool
              | .current_turn.tools_count   = ((.current_turn.tools_count // 0) + 1)
              | .current_turn.tools_by_name = ((.current_turn.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
@@ -552,19 +686,132 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+
+        if command -v write_current_subturn_state > /dev/null 2>&1; then
+            write_current_subturn_state \
+                "${TIMESTAMP:-$_LOCAL_TS}" \
+                "delegated" \
+                "subagent_delegate" \
+                "false" \
+                "false" \
+                "$_SUBTURN_ID" \
+                "${_SUBTURN_NUMBER:-1}" \
+                "15"
+        fi
     else
         jq --arg ts "$TIMESTAMP" \
             --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
+            --arg todo_last_item "$TODO_LAST_ITEM_LABEL" \
+            --arg todo_last_item_is_cont "$TODO_LAST_ITEM_IS_CONTINUATION" \
             '.last_tool.name   = $tool
              | .last_tool.ts     = $ts
              | .last_tool.use_id = $id
              | .last_tool.result = null
+             | .current_turn.todo_last_item_label = (
+                 if $tool == "manage_todo_list" then (if $todo_last_item == "" then null else $todo_last_item end)
+                 else (.current_turn.todo_last_item_label // null)
+                 end)
+             | .current_turn.todo_last_item_is_askquestions_continuation = (
+                 if $tool == "manage_todo_list" then ($todo_last_item_is_cont == "true")
+                 else (.current_turn.todo_last_item_is_askquestions_continuation // false)
+                 end)
+             | .current_turn.todo_last_item_checked_at = (
+                 if $tool == "manage_todo_list" then $ts
+                 else (.current_turn.todo_last_item_checked_at // null)
+                 end)
+             | .current_turn.todo_protocol_version = (
+                 if $tool == "manage_todo_list" then "subturn_v1"
+                 else (.current_turn.todo_protocol_version // null)
+                 end)
+             | .current_turn.last_non_bookkeeping_tool = (
+                 if $tool == "manage_todo_list" then (.current_turn.last_non_bookkeeping_tool // null)
+                 else $tool
+                 end)
              | .current_turn.tools_count   = ((.current_turn.tools_count // 0) + 1)
              | .current_turn.tools_by_name = ((.current_turn.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    fi
+fi
+
+# ── Hardening v8.0: BLOQUEIO do Mecanismo 5 — session-close.sh sem KEY ───────
+# ── Enforcement: auto-auditoria obrigatória após continuidade ambígua ─────────
+# Quando postToolUse marca auto_audit_required=true por resposta ambígua de
+# askQuestions de continuidade, este preToolUse:
+#   1) considera iniciado ao usar ferramentas de leitura/busca/diagnóstico;
+#   2) bloqueia desvios prematuros (novo askQuestions ou edição direta) até kickoff.
+if [ -f "$CTX_FILE" ]; then
+    _AA_REQUIRED="$(jq -r '.current_turn.auto_audit_required // false' "$CTX_FILE" 2> /dev/null || echo false)"
+    _AA_STARTED="$(jq -r '.current_turn.auto_audit_started // false' "$CTX_FILE" 2> /dev/null || echo false)"
+
+    if [ "$_AA_REQUIRED" = "true" ] && [ "$_AA_STARTED" != "true" ]; then
+        _AA_IS_AUDIT_START=false
+        case "$TOOL_NAME" in
+            read_file | grep_search | semantic_search | get_errors | file_search | vscode_listCodeUsages)
+                _AA_IS_AUDIT_START=true
+                ;;
+        esac
+
+        if [ "$_AA_IS_AUDIT_START" = "true" ]; then
+            if command -v sponge > /dev/null 2>&1; then
+                jq --arg ts "${TIMESTAMP:-$_LOCAL_TS}" --arg tool "$TOOL_NAME" \
+                    '.current_turn.auto_audit_started = true
+                     | .current_turn.auto_audit_started_at = $ts
+                     | .current_turn.auto_audit_started_tool = $tool' \
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            else
+                _AA_TMP_START="$(mktemp 2> /dev/null || true)"
+                if [ -n "$_AA_TMP_START" ] \
+                    && jq --arg ts "${TIMESTAMP:-$_LOCAL_TS}" --arg tool "$TOOL_NAME" \
+                        '.current_turn.auto_audit_started = true
+                         | .current_turn.auto_audit_started_at = $ts
+                         | .current_turn.auto_audit_started_tool = $tool' \
+                        "$CTX_FILE" > "$_AA_TMP_START" 2> /dev/null; then
+                    mv "$_AA_TMP_START" "$CTX_FILE" 2> /dev/null || rm -f "$_AA_TMP_START"
+                else
+                    [ -n "$_AA_TMP_START" ] && rm -f "$_AA_TMP_START"
+                fi
+            fi
+
+            jq -cn \
+                --arg event "autoAudit_started" \
+                --arg sid "$SESSION_ID" \
+                --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+                --arg tool "$TOOL_NAME" \
+                --arg tool_use_id "$TOOL_USE_ID" \
+                '{
+                    event: $event,
+                    session_id: $sid,
+                    timestamp: $ts,
+                    tool_name: $tool,
+                    tool_use_id: $tool_use_id,
+                    message: "Auto-auditoria obrigatória iniciada por ferramenta de diagnóstico"
+                }' >> "$AUDIT_FILE" 2> /dev/null || true
+        elif [ "$TOOL_NAME" = "vscode_askQuestions" ] || [ "$TOOL_NAME" = "apply_patch" ] || [ "$TOOL_NAME" = "create_file" ]; then
+            jq -cn \
+                --arg event "autoAudit_pretool_deny" \
+                --arg sid "$SESSION_ID" \
+                --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+                --arg tool "$TOOL_NAME" \
+                --arg tool_use_id "$TOOL_USE_ID" \
+                '{
+                    event: $event,
+                    session_id: $sid,
+                    timestamp: $ts,
+                    tool_name: $tool,
+                    tool_use_id: $tool_use_id,
+                    message: "Desvio bloqueado: auto-auditoria obrigatória ainda não iniciada"
+                }' >> "$AUDIT_FILE" 2> /dev/null || true
+
+            jq -cn \
+                '{
+                    permissionDecision: "deny",
+                    additionalContext: "Auto-auditoria obrigatória está pendente (resposta de continuidade ambígua). Antes de novo askQuestions ou edição, inicie auditoria com leitura/busca/diagnóstico e atualize os TODOs conforme protocolo."
+                }'
+            exit 0
+        fi
     fi
 fi
 
@@ -587,6 +834,8 @@ if [ "$TOOL_NAME" = "run_in_terminal" ]; then
     _M5_CMD="$(echo "$INPUT" | jq -r '.tool_input.command // ""' 2> /dev/null || echo '')"
     _M5_DIRECT_CALL=false
     if printf '%s\n' "$_M5_CMD" | grep -Eq '(^|[;&]|&&|\|\|)[[:space:]]*(bash|sh|zsh)[[:space:]]+([^;&|[:space:]]*/)?session-close\.sh([[:space:]]|$)'; then
+        _M5_DIRECT_CALL=true
+    elif printf '%s\n' "$_M5_CMD" | grep -Eq '(^|[;&]|&&|\|\|)[[:space:]]*(source|\.)[[:space:]]+([^;&|[:space:]]*/)?session-close\.sh([[:space:]]|$)'; then
         _M5_DIRECT_CALL=true
     elif printf '%s\n' "$_M5_CMD" | grep -Eq '(^|[;&]|&&|\|\|)[[:space:]]*([^;&|[:space:]]*/)?session-close\.sh([[:space:]]|$)'; then
         _M5_DIRECT_CALL=true
@@ -612,6 +861,24 @@ if [ "$TOOL_NAME" = "run_in_terminal" ]; then
                     tool:       $tool,
                     command:    $cmd,
                     message:    "BLOQUEADO: agente tentou chamar session-close.sh diretamente sem KEY validada"
+                }' >> "$AUDIT_FILE" 2> /dev/null || true
+
+            # P7.1: lock primário (PreToolUse) no mecanismo de duplo lock
+            jq -cn \
+                --arg event "turnClose_prevented_dual_lock" \
+                --arg sid "$SESSION_ID" \
+                --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+                --arg reason "session_close_direct_pretool_deny" \
+                --arg cmd "$_M5_CMD" \
+                '{
+                    event: $event,
+                    session_id: $sid,
+                    timestamp: $ts,
+                    lock_stage: "preToolUse",
+                    reason: $reason,
+                    tool: "run_in_terminal",
+                    command: $cmd,
+                    message: "Fechamento prevenido por lock primário (preToolUse)"
                 }' >> "$AUDIT_FILE" 2> /dev/null || true
             # Nega a ferramenta com contexto explicativo
             jq -cn \

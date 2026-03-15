@@ -44,6 +44,21 @@ TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
 CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 SOURCE="$(echo "$INPUT" | jq -r '.source // "new"' 2> /dev/null || echo 'new')"
 
+# Classificação explícita do gatilho de sessionStart para auditoria posterior.
+# Importante: sessionStart é evento de ciclo de sessão do Copilot (não evento de TURN).
+SESSIONSTART_TRIGGER_KIND="new_chat_or_panel_activation"
+case "$SOURCE" in
+    inline_restart)
+        SESSIONSTART_TRIGGER_KIND="inline_restart_same_logical_session"
+        ;;
+    reconnect_rollover)
+        SESSIONSTART_TRIGGER_KIND="reconnect_rollover_or_heal"
+        ;;
+    manual_recovery)
+        SESSIONSTART_TRIGGER_KIND="manual_recovery"
+        ;;
+esac
+
 # session_id: usa o UUID real enviado pelo Copilot; fallback para timestamp-based
 SESSION_ID_RAW="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 if [ -n "$SESSION_ID_RAW" ]; then
@@ -178,7 +193,8 @@ if [ "$SOURCE" = "inline_restart" ] \
          | .session.ended_at            = null
          | .session.end_reason          = null
          | .session.close_key           = $close_key
-         | .session.close_key_validated = false
+        | .session.close_key_validated = false
+        | .session.strict_turn_close_requires_key = true
          | .session.source              = $source
          | .session.cwd                 = $cwd
          | .last_tool.ts                = $ts
@@ -187,7 +203,15 @@ if [ "$SOURCE" = "inline_restart" ] \
          | .session_stats.last_push_at  = null
          | .session_stats.last_push_turn = null
          | .session_stats.session_id_mismatches = 0
-         | .session_stats.session_id_syncs_inline = 0' \
+         | .session_stats.session_id_syncs_inline = 0
+         | .hook_observability = ((.hook_observability // {}) + {
+             sessionStart_count: ((.hook_observability.sessionStart_count // 0) + 1),
+             userPromptSubmitted_count: (.hook_observability.userPromptSubmitted_count // 0),
+             last_sessionStart_at: $ts,
+             last_sessionStart_source: $source,
+             last_userPromptSubmitted_at: (.hook_observability.last_userPromptSubmitted_at // null),
+             last_userPromptSubmitted_hash: (.hook_observability.last_userPromptSubmitted_hash // null)
+         })' \
         "$STATE_DIR/session-context.json" > "$_CTX_TMP" 2> /dev/null; then
         # UPG-AUDIT-01: escreve no per-session file e recria symlink
         _PER_CTX_REAL="${STATE_DIR}/session-context-${SID_SHORT}.json"
@@ -239,6 +263,7 @@ if [ "$SOURCE" != "inline_restart" ]; then
             "end_reason":            null,
             "close_key":             $close_key,
             "close_key_validated":   false,
+            "strict_turn_close_requires_key": true,
             "source":                $source,
             "cwd":                   $cwd
         },
@@ -289,6 +314,10 @@ if [ "$SOURCE" != "inline_restart" ]; then
             "block_count":                 0,
             "agentStop_invocations":       0,
             "subagent_delegated":          false,
+            "last_non_bookkeeping_tool":   null,
+            "last_askquestions_template":  null,
+            "last_askquestions_close_action": null,
+            "last_askquestions_close_key_found": false,
             "turn_id":                     $initial_turn_id
         },
         "current_section": {
@@ -323,6 +352,14 @@ if [ "$SOURCE" != "inline_restart" ]; then
             "alerts":               $alerts,
             "alerts_require_kickoff": ($alerts_req == "true"),
             "detected_at":          $ts
+        },
+        "hook_observability": {
+            "sessionStart_count": 1,
+            "userPromptSubmitted_count": 0,
+            "last_sessionStart_at": $ts,
+            "last_sessionStart_source": $source,
+            "last_userPromptSubmitted_at": null,
+            "last_userPromptSubmitted_hash": null
         },
         "quality_gates":   {},
         "session_summary": null,
@@ -579,6 +616,7 @@ jq -cn \
     --arg sid "$SESSION_ID" \
     --arg ts "${TIMESTAMP:-$SESSION_DATE}" \
     --arg source "$SOURCE" \
+    --arg trigger_kind "$SESSIONSTART_TRIGGER_KIND" \
     --arg cwd "$CWD" \
     --arg close_key "$CLOSE_KEY" \
     --arg section_id "$INITIAL_SECTION_ID" \
@@ -588,6 +626,8 @@ jq -cn \
         session_id: $sid,
         timestamp: $ts,
         source: $source,
+        trigger_kind: $trigger_kind,
+        semantic_note: "sessionStart representa abertura/reativacao de sessao, nao inicio de TURN",
         cwd: $cwd,
         close_key: $close_key,
         section_id: $section_id,

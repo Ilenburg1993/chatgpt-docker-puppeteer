@@ -22,11 +22,22 @@ applyTo: '**/*'
 1. **Criar TODOs no início** — ao iniciar qualquer turno de trabalho, use `manage_todo_list` para
    criar a lista de tarefas. Não comece a trabalhar sem TODOs.
 2. **Último TODO = vscode_askQuestions** — o último item da lista DEVE ser:
-   `"Chamar vscode_askQuestions [Template A/D/E conforme contexto]"`
+   `"Chamar vscode_askQuestions [Template de CONTINUAÇÃO: A/D/E; Template F apenas por escalonamento explícito para fechamento de SESSION]"`
 3. **Marcar e executar** — ao concluir cada tarefa, marque como `completed`. O último TODO
    (vscode_askQuestions) DEVE ser executado — não pulado.
 4. **Não é opcional** — este é o único mecanismo confiável que garante comunicação com o usuário.
    Encerrar um turno sem chamar vscode_askQuestions viola o protocolo.
+5. **Checklist de último ato (obrigatório)** — antes de encerrar resposta, confirmar: (a) o último
+   TODO foi executado, (b) a chamada final foi `vscode_askQuestions`, (c) não haverá outra ação de
+   trabalho após essa chamada.
+6. **Se executar ferramenta após askQuestions final** — a autorização do TURN deve ser considerada
+   invalidada; chame `vscode_askQuestions` novamente ao fim.
+7. **Exceção única de bookkeeping** — `manage_todo_list` imediatamente após `vscode_askQuestions` é
+   permitido apenas para fechamento do checklist; qualquer outra ferramenta exige novo
+   `vscode_askQuestions` final.
+8. **Template F + KEY correta apenas no fechamento de SESSION** — o TURN é autorizado por
+   `vscode_askQuestions` válido (incluindo continuidade A/D/E). Template F fica reservado ao fluxo
+   de encerramento de SESSION, mediante escalonamento explícito e validação da `close_key`.
 
 > **Por que isso é crítico?** O hook `agent-stop.sh` emite `decision:block` quando
 > `vscode_askQuestions` não foi chamado. Mas mesmo sem o block ser efetivo, o padrão de
@@ -111,10 +122,19 @@ NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions.
 
 **Templates obrigatórios por contexto:**
 
-- Tarefa concluída → Template A (próximo passo)
+- Tarefa concluída → Template A (próximo passo de conversa; não autoriza fechamento de TURN em modo
+  estrito)
 - Checkpoint periódico a cada ~5 TURNs → Template D
 - Proposta arquitetural → Template C
 - Sessão ociosa → Template E
+
+**Regra de fechamento em modo estrito (não ambígua):**
+
+- Em `session.strict_turn_close_requires_key=true`, o TURN continua exigindo `vscode_askQuestions`
+  válido como último ato, com resposta explícita do usuário.
+- Templates A/D/E são o padrão para fechamento de TURN/subturn de continuidade.
+- Template F só deve ser usado quando houver escalonamento explícito para fechamento de SESSION; com
+  Template F, a `close_key` correta permanece obrigatória.
 
 **Mecanismo de enforcement (v7.0+):** O hook `agent-stop.sh` emite `decision:block` quando
 `vscode_askQuestions` não foi chamado. O consecutive_unauthorized é incrementado a cada violação.
@@ -202,15 +222,15 @@ Quando o agente executa `git push` com sucesso:
 
 ## Protocolo vscode_askQuestions — Templates obrigatórios
 
-| Quando usar                             | Template                                |
-| --------------------------------------- | --------------------------------------- |
-| Sessão sem prompt explícito             | **E** — Session Kickoff                 |
-| Tarefa concluída                        | **A** — Next Step                       |
-| ≥ 3 bugs encontrados                    | **B** — Bug Discovery                   |
-| Proposta de upgrade arquitetural        | **C** — Upgrade Proposal                |
-| `turn_count % 3 == 0 && turn_count > 0` | **D** — Checkpoint periódico            |
-| Encerramento de sessão                  | **F** — Session Close (exige close_key) |
-| Antes de commit e/ou push               | **G** — Commit/Push Pre-Authorization   |
+| Quando usar                             | Template                                                                   |
+| --------------------------------------- | -------------------------------------------------------------------------- |
+| Sessão sem prompt explícito             | **E** — Session Kickoff                                                    |
+| Tarefa concluída                        | **A** — Next Step (não fecha TURN em modo estrito)                         |
+| ≥ 3 bugs encontrados                    | **B** — Bug Discovery                                                      |
+| Proposta de upgrade arquitetural        | **C** — Upgrade Proposal                                                   |
+| `turn_count % 3 == 0 && turn_count > 0` | **D** — Checkpoint periódico                                               |
+| Encerramento de sessão                  | **F** — Session Close (exige close_key; também fecha TURN em modo estrito) |
+| Antes de commit e/ou push               | **G** — Commit/Push Pre-Authorization                                      |
 
 Templates completos em `.github/AGENTS.md` → seção "Protocolo vscode_askQuestions".
 

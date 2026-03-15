@@ -57,6 +57,21 @@ NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 SESSION_ID="unknown"
 STORED_KEY=""
 if [ -f "$CTX_FILE" ]; then
+    # Hardening adicional: backfill da flag strict em contextos legados.
+    if command -v sponge > /dev/null 2>&1; then
+        jq '.session.strict_turn_close_requires_key = (if (.session.strict_turn_close_requires_key == null) then true else .session.strict_turn_close_requires_key end)' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        _TMP_STRICT_SC="$(mktemp 2> /dev/null || echo '')"
+        if [ -n "$_TMP_STRICT_SC" ] && jq \
+            '.session.strict_turn_close_requires_key = (if (.session.strict_turn_close_requires_key == null) then true else .session.strict_turn_close_requires_key end)' \
+            "$CTX_FILE" > "$_TMP_STRICT_SC" 2> /dev/null; then
+            mv "$_TMP_STRICT_SC" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_STRICT_SC"
+        else
+            [ -n "$_TMP_STRICT_SC" ] && rm -f "$_TMP_STRICT_SC"
+        fi
+    fi
+
     SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
     STORED_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
@@ -119,20 +134,26 @@ fi
 # ── KEY CORRETA: autoriza encerramento ────────────────────────────────────────
 echo "✅ close_key validada. Encerrando SESSION com autorização: $STORED_KEY"
 
-# Seta close_key_validated=true no contexto
+# Marca autorização de fechamento no contexto.
+# Importante: não define session.ended_at aqui. O encerramento real da sessão é
+# responsabilidade do hook sessionEnd (session-end.sh), acionado pelo VS Code.
 if [ -f "$CTX_FILE" ]; then
     if command -v sponge > /dev/null 2>&1; then
-        jq --arg ts "$NOW_ISO" \
+        jq --arg ts "$NOW_ISO" --arg key "$STORED_KEY" \
             '.session.close_key_validated = true
-             | .session.ended_at = $ts
-             | .session.end_reason = "authorized_close"' \
+             | .session.closure_authorized_at = $ts
+             | .session.closure_authorized_by = "post_tool_use_auto"
+             | .session.closure_authorized_key = $key
+             | .session.end_reason = "authorized_close_requested"' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     else
         _TMP="$(mktemp)"
-        jq --arg ts "$NOW_ISO" \
+        jq --arg ts "$NOW_ISO" --arg key "$STORED_KEY" \
             '.session.close_key_validated = true
-             | .session.ended_at = $ts
-             | .session.end_reason = "authorized_close"' \
+             | .session.closure_authorized_at = $ts
+             | .session.closure_authorized_by = "post_tool_use_auto"
+             | .session.closure_authorized_key = $key
+             | .session.end_reason = "authorized_close_requested"' \
             "$CTX_FILE" > "$_TMP" && mv "$_TMP" "$CTX_FILE"
     fi
 fi

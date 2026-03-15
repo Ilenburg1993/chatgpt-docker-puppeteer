@@ -109,6 +109,11 @@ if [ -n "$SESSION_ID_PAYLOAD" ] && [ "$SESSION_ID_PAYLOAD" != "$SESSION_ID" ] &&
     fi
 fi
 
+# Hardening adicional: persiste strict_turn_close_requires_key em contextos legados.
+if command -v ensure_strict_turn_close_flag_default > /dev/null 2>&1; then
+    ensure_strict_turn_close_flag_default "$CTX_FILE" > /dev/null 2>&1 || true
+fi
+
 # ── Fecha section ativa antes de encerrar sessão (Schema v4 — Fase C) ────────
 # INVARIANTE: sempre deve haver SESSION+SECTION+TURN ativos.
 # Antes de fechar a sessão, fechamos a section em andamento para emitir sectionEnd.

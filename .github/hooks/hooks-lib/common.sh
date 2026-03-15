@@ -138,6 +138,660 @@ ctx_update() {
     return 0
 }
 
+# ── resolve_hook_runtime_input ──────────────────────────────────────────────
+# Lê stdin do hook, extrai campos-base de runtime e resolve paths per-session.
+# Exporta variáveis globais esperadas pelos scripts de hook:
+#   INPUT, TIMESTAMP, SESSION_ID_PAYLOAD, NOW_ISO
+# Também aplica apply_per_session_paths quando SESSION_ID_PAYLOAD está presente.
+resolve_hook_runtime_input() {
+    INPUT="$(cat 2> /dev/null || true)"
+    TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+    SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+    NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+
+    if [ -n "${SESSION_ID_PAYLOAD:-}" ] && command -v apply_per_session_paths > /dev/null 2>&1; then
+        apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
+    fi
+
+    export INPUT TIMESTAMP SESSION_ID_PAYLOAD NOW_ISO
+    return 0
+}
+
+# ── write_askquestions_turn_state ───────────────────────────────────────────
+# Writer unificado para atualizar estado do current_turn após vscode_askQuestions.
+# Reduz duplicação em hooks que persistem auth_requested + metadados de Template F.
+#
+# Parâmetros:
+#   $1 = result (success|failure|unknown)
+#   $2 = response_json (string JSON serializada)
+#   $3 = timestamp ISO
+#   $4 = ask_template_f ("true"|"false")
+#   $5 = ask_close_action
+#   $6 = ask_close_key_found ("true"|"false")
+#
+# Retorno: 0 em sucesso best-effort (não-fatal), 1 se CTX inexistente
+write_askquestions_turn_state() {
+    local result="${1:-unknown}"
+    local response_json="${2:-}"
+    local ts="${3:-$(iso_now)}"
+    local ask_template_f="${4:-false}"
+    local ask_close_action="${5:-not_applicable}"
+    local ask_close_key_found="${6:-false}"
+
+    [ -f "$CTX_FILE" ] || return 1
+
+    local jq_expr
+    jq_expr='.last_tool.result = $result
+        | .current_turn.last_askquestions_response = $response
+        | .current_turn.auth_requested = true
+        | .current_turn.auth_requested_at = $ts
+        | .current_turn.last_askquestions_template = (if $ask_template_f == "true" then "template_f" else "other" end)
+        | .current_turn.last_askquestions_close_action = $ask_close_action
+        | .current_turn.last_askquestions_close_key_found = ($ask_close_key_found == "true")'
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq \
+            --arg result "$result" \
+            --arg response "$response_json" \
+            --arg ts "$ts" \
+            --arg ask_template_f "$ask_template_f" \
+            --arg ask_close_action "$ask_close_action" \
+            --arg ask_close_key_found "$ask_close_key_found" \
+            "$jq_expr" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_waq
+        if _tmp_waq="$(mktemp 2> /dev/null)"; then
+            if jq \
+                --arg result "$result" \
+                --arg response "$response_json" \
+                --arg ts "$ts" \
+                --arg ask_template_f "$ask_template_f" \
+                --arg ask_close_action "$ask_close_action" \
+                --arg ask_close_key_found "$ask_close_key_found" \
+                "$jq_expr" "$CTX_FILE" > "$_tmp_waq" 2> /dev/null; then
+                mv "$_tmp_waq" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_waq"
+            else
+                rm -f "$_tmp_waq"
+            fi
+        fi
+    fi
+
+    return 0
+}
+
+# ── write_last_tool_result ──────────────────────────────────────────────────
+# Atualiza apenas .last_tool.result no session-context.
+write_last_tool_result() {
+    local result="${1:-unknown}"
+    [ -f "$CTX_FILE" ] || return 1
+    if command -v sponge > /dev/null 2>&1; then
+        jq --arg result "$result" '.last_tool.result = $result' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_wltr
+        if _tmp_wltr="$(mktemp 2> /dev/null)"; then
+            if jq --arg result "$result" '.last_tool.result = $result' "$CTX_FILE" > "$_tmp_wltr" 2> /dev/null; then
+                mv "$_tmp_wltr" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_wltr"
+            else
+                rm -f "$_tmp_wltr"
+            fi
+        fi
+    fi
+    return 0
+}
+
+# ── increment_turn_failure_counters ─────────────────────────────────────────
+# Incrementa contadores de falha do turno e da sessão.
+increment_turn_failure_counters() {
+    [ -f "$CTX_FILE" ] || return 1
+    if command -v sponge > /dev/null 2>&1; then
+        jq '.current_turn.failures_count = ((.current_turn.failures_count // 0) + 1)
+            | .session_stats.failures_detected = ((.session_stats.failures_detected // 0) + 1)' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_ifc
+        if _tmp_ifc="$(mktemp 2> /dev/null)"; then
+            if jq '.current_turn.failures_count = ((.current_turn.failures_count // 0) + 1)
+                | .session_stats.failures_detected = ((.session_stats.failures_detected // 0) + 1)' \
+                "$CTX_FILE" > "$_tmp_ifc" 2> /dev/null; then
+                mv "$_tmp_ifc" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_ifc"
+            else
+                rm -f "$_tmp_ifc"
+            fi
+        fi
+    fi
+    return 0
+}
+
+# ── mark_turn_todo_created_true ─────────────────────────────────────────────
+# Marca flag current_turn.todo_created=true.
+mark_turn_todo_created_true() {
+    [ -f "$CTX_FILE" ] || return 1
+    if command -v sponge > /dev/null 2>&1; then
+        jq '.current_turn.todo_created = true' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_todo
+        if _tmp_todo="$(mktemp 2> /dev/null)"; then
+            if jq '.current_turn.todo_created = true' "$CTX_FILE" > "$_tmp_todo" 2> /dev/null; then
+                mv "$_tmp_todo" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_todo"
+            else
+                rm -f "$_tmp_todo"
+            fi
+        fi
+    fi
+    return 0
+}
+
+# ── ensure_strict_turn_close_flag_default ──────────────────────────────────
+# Garante que session.strict_turn_close_requires_key exista no contexto.
+# Regra: se ausente/null -> true; se já for false/true explícito, preserva.
+# Útil para backfill de contextos legados criados antes do hardening estrito.
+#
+# Parâmetros:
+#   $1 = caminho opcional do contexto (default: $CTX_FILE)
+#
+# Retorno:
+#   0 quando o backfill foi tentado com sucesso best-effort
+#   1 quando o arquivo não existe
+ensure_strict_turn_close_flag_default() {
+    local ctx_file="${1:-$CTX_FILE}"
+    [ -f "$ctx_file" ] || return 1
+
+    local jq_expr
+    jq_expr='.session = ((.session // {}) + {
+        strict_turn_close_requires_key: (
+            if (.session.strict_turn_close_requires_key == null)
+            then true
+            else .session.strict_turn_close_requires_key
+            end
+        )
+    })'
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq "$jq_expr" "$ctx_file" | sponge "$ctx_file" 2> /dev/null || true
+    else
+        local _tmp_strict
+        if _tmp_strict="$(mktemp 2> /dev/null)"; then
+            if jq "$jq_expr" "$ctx_file" > "$_tmp_strict" 2> /dev/null; then
+                mv "$_tmp_strict" "$ctx_file" 2> /dev/null || rm -f "$_tmp_strict"
+            else
+                rm -f "$_tmp_strict"
+            fi
+        fi
+    fi
+
+    return 0
+}
+
+# ── emit_subturn_transition_event ──────────────────────────────────────────
+# Emite evento canônico subturnTransition no audit.
+emit_subturn_transition_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local turn_id="$4"
+    local subturn_id="$5"
+    local subturn_number="${6:-1}"
+    local from_state="${7:-active}"
+    local to_state="${8:-active}"
+    local reason="${9:-unspecified}"
+    local trigger_event="${10:-unknown}"
+
+    jq -cn \
+        --arg event "subturnTransition" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg turn_id "$turn_id" \
+        --arg subturn_id "$subturn_id" \
+        --argjson subturn_number "${subturn_number:-1}" \
+        --arg from_state "$from_state" \
+        --arg to_state "$to_state" \
+        --arg reason "$reason" \
+        --arg trigger_event "$trigger_event" \
+        ' {
+            event: $event,
+            session_id: $sid,
+            timestamp: $ts,
+            turn_id: (if $turn_id == "" then null else $turn_id end),
+            parent_turn_id: (if $turn_id == "" then null else $turn_id end),
+            subturn_id: (if $subturn_id == "" then null else $subturn_id end),
+            subturn_number: $subturn_number,
+            from_state: $from_state,
+            to_state: $to_state,
+            reason: $reason,
+            trigger_event: $trigger_event
+        }' >> "$audit_file"
+}
+
+# ── emit_subturn_start_event ───────────────────────────────────────────────
+# Emite evento canônico subturnStart no audit.
+emit_subturn_start_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local turn_id="$4"
+    local subturn_id="$5"
+    local subturn_number="${6:-1}"
+    local reason="${7:-turn_start}"
+    local state="${8:-active}"
+    local trigger_event="${9:-unknown}"
+
+    jq -cn \
+        --arg event "subturnStart" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg turn_id "$turn_id" \
+        --arg subturn_id "$subturn_id" \
+        --argjson subturn_number "${subturn_number:-1}" \
+        --arg reason "$reason" \
+        --arg state "$state" \
+        --arg trigger_event "$trigger_event" \
+        ' {
+            event: $event,
+            session_id: $sid,
+            timestamp: $ts,
+            turn_id: (if $turn_id == "" then null else $turn_id end),
+            parent_turn_id: (if $turn_id == "" then null else $turn_id end),
+            subturn_id: (if $subturn_id == "" then null else $subturn_id end),
+            subturn_number: $subturn_number,
+            reason: $reason,
+            state: $state,
+            trigger_event: $trigger_event
+        }' >> "$audit_file"
+}
+
+# ── emit_subturn_resume_event ──────────────────────────────────────────────
+# Emite evento canônico subturnResume no audit.
+emit_subturn_resume_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local turn_id="$4"
+    local subturn_id="$5"
+    local subturn_number="${6:-1}"
+    local reason="${7:-resume}"
+    local trigger_event="${8:-unknown}"
+
+    jq -cn \
+        --arg event "subturnResume" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg turn_id "$turn_id" \
+        --arg subturn_id "$subturn_id" \
+        --argjson subturn_number "${subturn_number:-1}" \
+        --arg reason "$reason" \
+        --arg trigger_event "$trigger_event" \
+        ' {
+            event: $event,
+            session_id: $sid,
+            timestamp: $ts,
+            turn_id: (if $turn_id == "" then null else $turn_id end),
+            parent_turn_id: (if $turn_id == "" then null else $turn_id end),
+            subturn_id: (if $subturn_id == "" then null else $subturn_id end),
+            subturn_number: $subturn_number,
+            reason: $reason,
+            trigger_event: $trigger_event
+        }' >> "$audit_file"
+}
+
+# ── emit_subturn_end_event ─────────────────────────────────────────────────
+# Emite evento canônico subturnEnd no audit.
+emit_subturn_end_event() {
+    local audit_file="$1"
+    local sid="$2"
+    local ts="$3"
+    local turn_id="$4"
+    local subturn_id="$5"
+    local subturn_number="${6:-1}"
+    local from_state="${7:-active}"
+    local from_reason="${8:-unspecified}"
+    local reason="${9:-completed}"
+    local final_state="${10:-closed}"
+    local duration_ms="${11:-null}"
+
+    if ! echo "$duration_ms" | grep -Eq '^(null|-?[0-9]+(\.[0-9]+)?)$'; then
+        duration_ms="null"
+    fi
+
+    jq -cn \
+        --arg event "subturnEnd" \
+        --arg sid "$sid" \
+        --arg ts "$ts" \
+        --arg turn_id "$turn_id" \
+        --arg subturn_id "$subturn_id" \
+        --argjson subturn_number "${subturn_number:-1}" \
+        --arg from_state "$from_state" \
+        --arg from_reason "$from_reason" \
+        --arg reason "$reason" \
+        --arg final_state "$final_state" \
+        --argjson duration_ms "$duration_ms" \
+        ' {
+            event: $event,
+            session_id: $sid,
+            timestamp: $ts,
+            turn_id: (if $turn_id == "" then null else $turn_id end),
+            parent_turn_id: (if $turn_id == "" then null else $turn_id end),
+            subturn_id: (if $subturn_id == "" then null else $subturn_id end),
+            subturn_number: $subturn_number,
+            from_state: $from_state,
+            from_reason: $from_reason,
+            reason: $reason,
+            final_state: $final_state,
+            duration_ms: $duration_ms
+        }' >> "$audit_file"
+}
+
+# ── write_current_subturn_state ────────────────────────────────────────────
+# Atualiza current_turn.subturn com estado/razão/temporalidade e snapshot de autorização.
+# Params:
+#   $1 ts, $2 state, $3 reason, $4 stop_hook_active(true|false), $5 requires_user_action(true|false)
+#   $6 subturn_id(optional), $7 subturn_number(optional), $8 expected_window_minutes(optional)
+write_current_subturn_state() {
+    local ts="${1:-$(iso_now)}"
+    local state="${2:-active}"
+    local reason="${3:-unspecified}"
+    local stop_hook_active="${4:-false}"
+    local requires_user_action="${5:-false}"
+    local subturn_id="${6:-}"
+    local subturn_number="${7:-}"
+    local expected_window_minutes="${8:-}"
+
+    [ -f "$CTX_FILE" ] || return 1
+
+    local jq_expr
+    jq_expr='.current_turn.subturn = ((.current_turn.subturn // {}) + {
+            parent_turn_id: (.current_turn.turn_id // null),
+            state: $state,
+            reason: $reason,
+            last_transition_at: $ts,
+            stop_hook_active: ($stop_hook_active == "true"),
+            requires_user_action: ($requires_user_action == "true"),
+            authorization_snapshot: {
+                auth_requested: (.current_turn.auth_requested // false),
+                ask_template: (.current_turn.last_askquestions_template // null),
+                close_key_found: (.current_turn.last_askquestions_close_key_found // false),
+                close_key_validated: (.session.close_key_validated // false)
+            }
+         }
+         + (if $subturn_id == "" then {} else {subturn_id: $subturn_id} end)
+         + (if $subturn_number == "" then {} else {number: ($subturn_number|tonumber)} end)
+         + (if $expected_window_minutes == "" then {} else {expected_window_minutes: ($expected_window_minutes|tonumber)} end))'
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq \
+            --arg ts "$ts" \
+            --arg state "$state" \
+            --arg reason "$reason" \
+            --arg stop_hook_active "$stop_hook_active" \
+            --arg requires_user_action "$requires_user_action" \
+            --arg subturn_id "$subturn_id" \
+            --arg subturn_number "$subturn_number" \
+            --arg expected_window_minutes "$expected_window_minutes" \
+            "$jq_expr" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_ws
+        if _tmp_ws="$(mktemp 2> /dev/null)"; then
+            if jq \
+                --arg ts "$ts" \
+                --arg state "$state" \
+                --arg reason "$reason" \
+                --arg stop_hook_active "$stop_hook_active" \
+                --arg requires_user_action "$requires_user_action" \
+                --arg subturn_id "$subturn_id" \
+                --arg subturn_number "$subturn_number" \
+                --arg expected_window_minutes "$expected_window_minutes" \
+                "$jq_expr" "$CTX_FILE" > "$_tmp_ws" 2> /dev/null; then
+                mv "$_tmp_ws" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_ws"
+            else
+                rm -f "$_tmp_ws"
+            fi
+        fi
+    fi
+
+    return 0
+}
+
+# ── auto_advance_subturn_n_plus_one ───────────────────────────────────────
+# Encerra o SubTurn atual e abre automaticamente o próximo (n+1) no mesmo TURN.
+# Fluxo canônico para askQuestions de continuidade: mantém SESSION/TURN e evolui
+# apenas a rodada interna.
+#
+# Params:
+#   $1 ts (ISO)
+#   $2 next_reason
+#   $3 trigger_event
+#   $4 next_state (default: active)
+#   $5 next_requires_user_action (true|false)
+#   $6 audit_file (optional; default AUDIT_FILE)
+#   $7 session_id (optional)
+auto_advance_subturn_n_plus_one() {
+    local ts="${1:-$(iso_now)}"
+    local next_reason="${2:-askquestions_followup_n_plus_one}"
+    local trigger_event="${3:-postToolUse}"
+    local next_state="${4:-active}"
+    local next_requires_user_action="${5:-false}"
+    local audit_file="${6:-$AUDIT_FILE}"
+    local session_id="${7:-$(get_session_id)}"
+
+    [ -f "$CTX_FILE" ] || return 1
+
+    local curr_subturn_number curr_subturn_id curr_state curr_reason curr_started_at curr_turn_id
+    curr_subturn_number="$(jq -r '.current_turn.subturn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    curr_subturn_id="$(jq -r '.current_turn.subturn.subturn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    curr_state="$(jq -r '.current_turn.subturn.state // "active"' "$CTX_FILE" 2> /dev/null || echo 'active')"
+    curr_reason="$(jq -r '.current_turn.subturn.reason // "turn_runtime"' "$CTX_FILE" 2> /dev/null || echo 'turn_runtime')"
+    curr_started_at="$(jq -r '.current_turn.subturn.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    curr_turn_id="$(jq -r '.current_turn.turn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+
+    if ! [[ "$curr_subturn_number" =~ ^[0-9]+$ ]]; then
+        curr_subturn_number=1
+    fi
+
+    if [ -z "$curr_subturn_id" ]; then
+        curr_subturn_id="${curr_turn_id:-turn_unknown}_st${curr_subturn_number}"
+    fi
+
+    local next_subturn_number next_subturn_id
+    next_subturn_number=$((curr_subturn_number + 1))
+    next_subturn_id="${curr_turn_id:-turn_unknown}_st${next_subturn_number}"
+
+    local duration_ms="null"
+    if [ -n "$curr_started_at" ]; then
+        local _st_epoch _end_epoch
+        _st_epoch="$(iso_to_epoch_portable "$curr_started_at")"
+        _end_epoch="$(iso_to_epoch_portable "$ts")"
+        if [[ "$_st_epoch" =~ ^[0-9]+$ ]] && [[ "$_end_epoch" =~ ^[0-9]+$ ]] && [ "$_end_epoch" -ge "$_st_epoch" ] 2> /dev/null; then
+            duration_ms="$(((_end_epoch - _st_epoch) * 1000))"
+        fi
+    fi
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq \
+            --arg ts "$ts" \
+            --arg curr_subturn_id "$curr_subturn_id" \
+            --argjson curr_subturn_number "$curr_subturn_number" \
+            --arg curr_state "$curr_state" \
+            --arg curr_reason "$curr_reason" \
+            --arg curr_started_at "$curr_started_at" \
+            --argjson duration_ms "$duration_ms" \
+            --arg next_subturn_id "$next_subturn_id" \
+            --argjson next_subturn_number "$next_subturn_number" \
+            --arg next_state "$next_state" \
+            --arg next_reason "$next_reason" \
+            --arg next_requires_user_action "$next_requires_user_action" \
+            '.current_turn.subturn_history = ((.current_turn.subturn_history // []) + [{
+                number: $curr_subturn_number,
+                subturn_id: $curr_subturn_id,
+                parent_turn_id: (.current_turn.turn_id // null),
+                state: $curr_state,
+                reason: $curr_reason,
+                started_at: (if $curr_started_at == "" then null else $curr_started_at end),
+                ended_at: $ts,
+                duration_ms: $duration_ms
+             }] | if length > 20 then .[-20:] else . end)
+             | .current_turn.subturn = {
+                number: $next_subturn_number,
+                subturn_id: $next_subturn_id,
+                state: $next_state,
+                reason: $next_reason,
+                started_at: $ts,
+                last_transition_at: $ts,
+                parent_turn_id: (.current_turn.turn_id // null),
+                expected_window_minutes: 15,
+                stop_hook_active: false,
+                requires_user_action: ($next_requires_user_action == "true"),
+                authorization_snapshot: {
+                    auth_requested: (.current_turn.auth_requested // false),
+                    ask_template: (.current_turn.last_askquestions_template // null),
+                    close_key_found: (.current_turn.last_askquestions_close_key_found // false),
+                    close_key_validated: (.session.close_key_validated // false)
+                }
+             }
+             | .session_stats.subturn_count = ((.session_stats.subturn_count // 0) + 1)
+             | .session_stats.subturn_resumed = ((.session_stats.subturn_resumed // 0) + (if $next_state == "active" then 1 else 0 end))' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_subturn_next
+        if _tmp_subturn_next="$(mktemp 2> /dev/null)"; then
+            if jq \
+                --arg ts "$ts" \
+                --arg curr_subturn_id "$curr_subturn_id" \
+                --argjson curr_subturn_number "$curr_subturn_number" \
+                --arg curr_state "$curr_state" \
+                --arg curr_reason "$curr_reason" \
+                --arg curr_started_at "$curr_started_at" \
+                --argjson duration_ms "$duration_ms" \
+                --arg next_subturn_id "$next_subturn_id" \
+                --argjson next_subturn_number "$next_subturn_number" \
+                --arg next_state "$next_state" \
+                --arg next_reason "$next_reason" \
+                --arg next_requires_user_action "$next_requires_user_action" \
+                '.current_turn.subturn_history = ((.current_turn.subturn_history // []) + [{
+                    number: $curr_subturn_number,
+                    subturn_id: $curr_subturn_id,
+                    parent_turn_id: (.current_turn.turn_id // null),
+                    state: $curr_state,
+                    reason: $curr_reason,
+                    started_at: (if $curr_started_at == "" then null else $curr_started_at end),
+                    ended_at: $ts,
+                    duration_ms: $duration_ms
+                 }] | if length > 20 then .[-20:] else . end)
+                 | .current_turn.subturn = {
+                    number: $next_subturn_number,
+                    subturn_id: $next_subturn_id,
+                    state: $next_state,
+                    reason: $next_reason,
+                    started_at: $ts,
+                    last_transition_at: $ts,
+                    parent_turn_id: (.current_turn.turn_id // null),
+                    expected_window_minutes: 15,
+                    stop_hook_active: false,
+                    requires_user_action: ($next_requires_user_action == "true"),
+                    authorization_snapshot: {
+                        auth_requested: (.current_turn.auth_requested // false),
+                        ask_template: (.current_turn.last_askquestions_template // null),
+                        close_key_found: (.current_turn.last_askquestions_close_key_found // false),
+                        close_key_validated: (.session.close_key_validated // false)
+                    }
+                 }
+                 | .session_stats.subturn_count = ((.session_stats.subturn_count // 0) + 1)
+                 | .session_stats.subturn_resumed = ((.session_stats.subturn_resumed // 0) + (if $next_state == "active" then 1 else 0 end))' \
+                "$CTX_FILE" > "$_tmp_subturn_next" 2> /dev/null; then
+                mv "$_tmp_subturn_next" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_subturn_next"
+            else
+                rm -f "$_tmp_subturn_next"
+            fi
+        fi
+    fi
+
+    if [ -n "$session_id" ] && [ -n "$audit_file" ]; then
+        if command -v emit_subturn_end_event > /dev/null 2>&1; then
+            emit_subturn_end_event \
+                "$audit_file" \
+                "$session_id" \
+                "$ts" \
+                "$curr_turn_id" \
+                "$curr_subturn_id" \
+                "$curr_subturn_number" \
+                "$curr_state" \
+                "$curr_reason" \
+                "askquestions_cycle_closed" \
+                "closed" \
+                "$duration_ms"
+        fi
+        if command -v emit_subturn_start_event > /dev/null 2>&1; then
+            emit_subturn_start_event \
+                "$audit_file" \
+                "$session_id" \
+                "$ts" \
+                "$curr_turn_id" \
+                "$next_subturn_id" \
+                "$next_subturn_number" \
+                "$next_reason" \
+                "$next_state" \
+                "$trigger_event"
+        fi
+        jq -cn \
+            --arg event "subturnAutoAdvance" \
+            --arg sid "$session_id" \
+            --arg ts "$ts" \
+            --arg turn_id "$curr_turn_id" \
+            --arg from_subturn_id "$curr_subturn_id" \
+            --argjson from_subturn_number "$curr_subturn_number" \
+            --arg to_subturn_id "$next_subturn_id" \
+            --argjson to_subturn_number "$next_subturn_number" \
+            --arg reason "$next_reason" \
+            --arg trigger_event "$trigger_event" \
+            '{
+                event: $event,
+                session_id: $sid,
+                timestamp: $ts,
+                turn_id: (if $turn_id == "" then null else $turn_id end),
+                parent_turn_id: (if $turn_id == "" then null else $turn_id end),
+                from_subturn_id: $from_subturn_id,
+                from_subturn_number: $from_subturn_number,
+                to_subturn_id: $to_subturn_id,
+                to_subturn_number: $to_subturn_number,
+                reason: $reason,
+                trigger_event: $trigger_event,
+                message: "SubTurn avançado automaticamente em n+1 após ciclo de askQuestions"
+            }' >> "$audit_file" 2> /dev/null || true
+    fi
+
+    return 0
+}
+
+# ── bind_current_subturn_parent_turn_id ───────────────────────────────────
+# Reata parent_turn_id da subturn ao current_turn.turn_id ativo.
+# Útil em fluxos de retomada/rebind no agent-stop para evitar drift de vínculo.
+# Params:
+#   $1 ts (optional)
+bind_current_subturn_parent_turn_id() {
+    local ts="${1:-$(iso_now)}"
+
+    [ -f "$CTX_FILE" ] || return 1
+
+    local jq_expr
+    jq_expr='.current_turn.subturn = ((.current_turn.subturn // {}) + {
+            parent_turn_id: (.current_turn.turn_id // null),
+            last_transition_at: $ts
+         })'
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq --arg ts "$ts" "$jq_expr" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_bind
+        if _tmp_bind="$(mktemp 2> /dev/null)"; then
+            if jq --arg ts "$ts" "$jq_expr" "$CTX_FILE" > "$_tmp_bind" 2> /dev/null; then
+                mv "$_tmp_bind" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_bind"
+            else
+                rm -f "$_tmp_bind"
+            fi
+        fi
+    fi
+
+    return 0
+}
+
 # ── iso_to_epoch_portable ────────────────────────────────────────────────────
 # BUG-71 FIX: Converte timestamp ISO8601 para epoch segundos, com fallback BSD
 # Suporta GNU date -d e BSD date -j, garantindo portabilidade (Linux/macOS/BSD)
@@ -441,6 +1095,241 @@ heal_v2() {
 increment_mismatch() {
     ctx_update '.session_stats.session_id_mismatches = ((.session_stats.session_id_mismatches // 0) + 1)' \
         2> /dev/null || true
+}
+
+# ── handle_manual_recovery_session_id ────────────────────────────────────────
+# R1.3: rotina canônica para guard de session_id em source=manual_recovery.
+# Quando payload SID diverge do CTX em sessão manualmente recuperada,
+# adota o SID real do payload e registra evento canônico de heal.
+#
+# Parâmetros:
+#   $1 = payload_sid   (session_id recebido no payload do hook)
+#   $2 = tool_name     (nome da ferramenta atual)
+#   $3 = timestamp     (ISO)
+#   $4 = source_script (ex.: pre-tool-use.sh)
+#
+# Saída:
+#   stdout: SID adotado (payload_sid) quando tratado com sucesso
+#   return 0: mismatch manual_recovery tratado
+#   return 1: cenário não elegível
+handle_manual_recovery_session_id() {
+    local payload_sid="${1:-}"
+    local tool_name="${2:-}"
+    local ts="${3:-$(iso_now)}"
+    local source_script="${4:-unknown-script}"
+
+    [ -n "$payload_sid" ] || return 1
+    [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] || return 1
+
+    local ctx_sid ctx_source
+    ctx_sid="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    ctx_source="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+
+    [ -n "$ctx_sid" ] || return 1
+    [ "$payload_sid" != "$ctx_sid" ] || return 1
+    [ "$ctx_source" = "manual_recovery" ] || return 1
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq --arg real_sid "$payload_sid" --arg heal_ts "$ts" \
+            '.session.id = $real_sid
+             | .session.vs_code_session_id = $real_sid
+             | .session.source = "healed_from_real_session"
+             | .session.healed_at = $heal_ts' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_manual
+        if _tmp_manual="$(mktemp 2> /dev/null)"; then
+            if jq --arg real_sid "$payload_sid" --arg heal_ts "$ts" \
+                '.session.id = $real_sid
+                 | .session.vs_code_session_id = $real_sid
+                 | .session.source = "healed_from_real_session"
+                 | .session.healed_at = $heal_ts' \
+                "$CTX_FILE" > "$_tmp_manual" 2> /dev/null; then
+                mv "$_tmp_manual" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_manual"
+            else
+                rm -f "$_tmp_manual"
+            fi
+        fi
+    fi
+
+    log_event "$(jq -cn \
+        --arg event "session_id_healed" \
+        --arg old "$ctx_sid" \
+        --arg new "$payload_sid" \
+        --arg source "$source_script" \
+        --arg tool "$tool_name" \
+        --arg ts "$ts" \
+        '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, tool: $tool, timestamp: $ts,
+          message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}')"
+
+    echo "$payload_sid"
+    return 0
+}
+
+# ── handle_inline_restart_stale_payload_sid ─────────────────────────────────
+# R1.2: rotina canônica para guard de session_id em source=inline_restart.
+# Quando payload SID está stale e CTX já possui o SID correto do VS Code,
+# adota o SID do CTX, registra evento com cap de ruído e incrementa contador.
+#
+# Parâmetros:
+#   $1 = payload_sid   (session_id recebido no payload do hook)
+#   $2 = tool_name     (nome da ferramenta atual)
+#   $3 = timestamp     (ISO)
+#   $4 = source_script (ex.: pre-tool-use.sh)
+#
+# Saída:
+#   stdout: SID adotado (ctx_sid) quando tratado com sucesso
+#   return 0: mismatch inline_restart tratado
+#   return 1: cenário não elegível (não inline_restart / sem mismatch)
+handle_inline_restart_stale_payload_sid() {
+    local payload_sid="${1:-}"
+    local tool_name="${2:-}"
+    local ts="${3:-$(iso_now)}"
+    local source_script="${4:-unknown-script}"
+
+    [ -n "$payload_sid" ] || return 1
+    [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] || return 1
+
+    local ctx_sid ctx_source syncs_inline
+    ctx_sid="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    ctx_source="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+
+    [ -n "$ctx_sid" ] || return 1
+    [ "$payload_sid" != "$ctx_sid" ] || return 1
+    [ "$ctx_source" = "inline_restart" ] || return 1
+
+    syncs_inline="$(jq -r '.session_stats.session_id_syncs_inline // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+
+    if [ "$syncs_inline" -lt 5 ]; then
+        log_event "$(jq -cn \
+            --arg event "session_id_sync_inline_restart" \
+            --arg stale "$payload_sid" \
+            --arg adopted "$ctx_sid" \
+            --arg source "$source_script" \
+            --arg tool "$tool_name" \
+            --arg ts "$ts" \
+            '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
+              source: $source, tool: $tool, timestamp: $ts,
+              message: "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"}')"
+    elif [ "$syncs_inline" -eq 5 ]; then
+        log_event "$(jq -cn --arg event "session_id_sync_inline_restart_cap" --arg source "$source_script" \
+            '{event: $event, source: $source, message: "inline_restart sync count reached cap (5) — logs suprimidos daqui em diante"}')"
+    fi
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq '.session_stats.session_id_syncs_inline = ((.session_stats.session_id_syncs_inline // 0) + 1)' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_inline
+        if _tmp_inline="$(mktemp 2> /dev/null)"; then
+            if jq '.session_stats.session_id_syncs_inline = ((.session_stats.session_id_syncs_inline // 0) + 1)' \
+                "$CTX_FILE" > "$_tmp_inline" 2> /dev/null; then
+                mv "$_tmp_inline" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_inline"
+            else
+                rm -f "$_tmp_inline"
+            fi
+        fi
+    fi
+
+    echo "$ctx_sid"
+    return 0
+}
+
+# ── record_unrecoverable_session_id_mismatch ───────────────────────────────
+# Registra mismatch não recuperável (source diferente de manual_recovery/inline_restart)
+# e incrementa contador de mismatches no contexto.
+#
+# Parâmetros:
+#   $1 = expected_sid
+#   $2 = got_sid
+#   $3 = tool_name
+#   $4 = timestamp
+#   $5 = source_script
+record_unrecoverable_session_id_mismatch() {
+    local expected_sid="${1:-}"
+    local got_sid="${2:-}"
+    local tool_name="${3:-}"
+    local ts="${4:-$(iso_now)}"
+    local source_script="${5:-unknown-script}"
+
+    [ -n "$expected_sid" ] && [ -n "$got_sid" ] || return 1
+
+    log_event "$(jq -cn \
+        --arg event "session_id_mismatch" \
+        --arg expected "$expected_sid" \
+        --arg got "$got_sid" \
+        --arg source "$source_script" \
+        --arg tool "$tool_name" \
+        --arg ts "$ts" \
+        '{event: $event, expected: $expected, got: $got, source: $source, tool: $tool, timestamp: $ts,
+          message: "Payload session_id diferente do contexto ativo — state write bloqueado"}')"
+
+    increment_mismatch
+    return 0
+}
+
+# ── reconcile_session_id_guard_prepost ──────────────────────────────────────
+# Orquestra guard de session_id para pre/post hooks, unificando a lógica:
+#   - sem mismatch: mantém payload_sid
+#   - manual_recovery: heal para payload_sid
+#   - inline_restart: adota SID do CTX
+#   - demais casos: registra mismatch não recuperável
+#
+# Parâmetros:
+#   $1 = payload_sid
+#   $2 = tool_name
+#   $3 = timestamp
+#   $4 = source_script
+#
+# Saída:
+#   stdout: sid reconciliado
+#   return 0: continuar normalmente
+#   return 10: mismatch não recuperável (state write deve ser bloqueado)
+reconcile_session_id_guard_prepost() {
+    local payload_sid="${1:-}"
+    local tool_name="${2:-}"
+    local ts="${3:-$(iso_now)}"
+    local source_script="${4:-unknown-script}"
+
+    [ -n "$payload_sid" ] || {
+        echo ""
+        return 0
+    }
+    [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] || {
+        echo "$payload_sid"
+        return 0
+    }
+
+    local ctx_sid ctx_source reconciled_sid
+    ctx_sid="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    ctx_source="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+
+    if [ -z "$ctx_sid" ] || [ "$payload_sid" = "$ctx_sid" ]; then
+        echo "$payload_sid"
+        return 0
+    fi
+
+    if [ "$ctx_source" = "manual_recovery" ]; then
+        if reconciled_sid="$(handle_manual_recovery_session_id "$payload_sid" "$tool_name" "$ts" "$source_script")"; then
+            echo "$reconciled_sid"
+            return 0
+        fi
+        echo "$payload_sid"
+        return 0
+    fi
+
+    if [ "$ctx_source" = "inline_restart" ]; then
+        if reconciled_sid="$(handle_inline_restart_stale_payload_sid "$payload_sid" "$tool_name" "$ts" "$source_script")"; then
+            echo "$reconciled_sid"
+            return 0
+        fi
+        echo "$ctx_sid"
+        return 0
+    fi
+
+    record_unrecoverable_session_id_mismatch "$ctx_sid" "$payload_sid" "$tool_name" "$ts" "$source_script" > /dev/null 2>&1 || true
+    echo "$payload_sid"
+    return 10
 }
 
 # ════════════════════════════════════════════════════════════════════════════

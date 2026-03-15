@@ -4,7 +4,8 @@
 # Input JSON (stdin): {timestamp, hook_event_name, session_id, stop_hook_active, ...}
 #
 # PROTOCOLO DE ENCERRAMENTO (v7.0 — BLOCKING ESTRUTURAL via decision:block):
-#   - TURNs SÃO BLOQUEADOS quando AUTH_REQUESTED=false e stop_hook_active=false.
+#   - TURNs têm o FECHAMENTO bloqueado quando AUTH_REQUESTED=false e stop_hook_active=false.
+#     (Semântica oficial do Stop: decision:block impede parar e força continuação do agente.)
 #   - O agente é forçado a chamar vscode_askQuestions antes de encerrar o TURN.
 #   - Exceções: stop_hook_active=true (anti-loop controlado com reblock),
 #     AUTH_REQUESTED=true (askQuestions já foi chamado), subagente delegado.
@@ -42,14 +43,15 @@ else
 fi
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 # CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
-INPUT="$(cat 2> /dev/null || true)"
-
-# Extrai campos usando schema real
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
-SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
-NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
-# UPG-AUDIT-01: resolve per-session files ANTES do flock (override CTX_FILE, AUDIT_FILE, _CTX_LOCK)
-apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
+if command -v resolve_hook_runtime_input > /dev/null 2>&1; then
+    resolve_hook_runtime_input
+else
+    INPUT="$(cat 2> /dev/null || true)"
+    TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+    SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+    NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+    apply_per_session_paths "${SESSION_ID_PAYLOAD:-}" 2> /dev/null || true
+fi
 
 # G9-08: Lock exclusivo APÓS resolver CTX_FILE per-session
 # flock -w 3: aguarda até 3s; se não conseguir, continua sem lock (degraded mode).
@@ -91,116 +93,28 @@ fi
 if [ -f "$CTX_FILE" ] && [ ! -s "$CTX_FILE" ]; then
     echo "[guard] session-context.json vazio — guard desabilitado (aguardando auto-recovery via preToolUse)" >&2
 fi
-if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
-    CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
-        CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-        if [ "$CTX_SOURCE" = "manual_recovery" ]; then
-            NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
-            if command -v sponge &> /dev/null; then
-                jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-            else
-                _TMP_HEAL="$(mktemp)"
-                if jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
-                    '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
-                    "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
-                    mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
-                else
-                    rm -f "$_TMP_HEAL"
-                fi
-            fi
-            jq -cn \
-                --arg event "session_id_healed" \
-                --arg old "$CTX_ACTIVE_SID" \
-                --arg new "$SESSION_ID_PAYLOAD" \
-                --arg source "agent-stop.sh" \
-                --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
-                '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, timestamp: $ts,
-                  message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
-                >> "$AUDIT_FILE"
-            SESSION_ID="$SESSION_ID_PAYLOAD" # continua com ID correto
-        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
-            # FIX BUG-06: inline_restart — CTX tem o session_id correto do VS Code (PREMISSA 1).
-            # Payload está stale (compilado com contexto antigo). Adotamos CTX como verdade.
-            # Não executamos HEAL v2 (que heala na direção errada); apenas sincronizamos SESSION_ID.
-            SESSION_ID="$CTX_ACTIVE_SID"
-            jq -cn \
-                --arg event "session_id_sync_inline_restart" \
-                --arg stale "$SESSION_ID_PAYLOAD" \
-                --arg adopted "$CTX_ACTIVE_SID" \
-                --arg source "agent-stop.sh" \
-                --arg ts "${TIMESTAMP:-}" \
-                '{event: $event, stale_payload_sid: $stale, adopted_ctx_sid: $adopted,
-                  source: $source, timestamp: $ts,
-                  message: "inline_restart: payload stale — adotado session_id do CTX (VS Code, PREMISSA 1)"}' \
-                >> "$AUDIT_FILE"
-            # Continua normalmente sem bloquear
-        else
-            # G9-04: HEAL v2 — rastreia mismatches consecutivos com o mesmo "got" session_id.
-            # Após 3 ocorrências do mesmo "got", auto-heal (CTX provavelmente defasado).
-            MISMATCH_TRACK_FILE="$STATE_DIR/.mismatch_track.json"
-            NEW_COUNT="$(update_mismatch_tracker "$MISMATCH_TRACK_FILE" "$SESSION_ID_PAYLOAD")"
+_STOP_GUARD_RC=0
+_STOP_GUARD_SESSION_ID="$(reconcile_session_id_guard_stop \
+    "$CTX_FILE" \
+    "$AUDIT_FILE" \
+    "$STATE_DIR" \
+    "$SESSION_ID_PAYLOAD" \
+    "$SESSION_ID" \
+    "$STOP_HOOK_ACTIVE" \
+    "${TIMESTAMP:-}" \
+    "$NOW_ISO")" || _STOP_GUARD_RC=$?
 
-            if [ "$NEW_COUNT" -ge 3 ]; then
-                # HEAL v2: ID recorrente → trust como real e sanar o contexto
-                NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
-                if command -v sponge &> /dev/null; then
-                    jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
-                        '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_consecutive_mismatch" | .session.healed_at = $ts' \
-                        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-                else
-                    _TMP_HEAL="$(mktemp)"
-                    if jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
-                        '.session.id = $real_sid | .session.vs_code_session_id = $real_sid | .session.source = "healed_from_consecutive_mismatch" | .session.healed_at = $ts' \
-                        "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
-                        mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
-                    else
-                        rm -f "$_TMP_HEAL"
-                    fi
-                fi
-                rm -f "$MISMATCH_TRACK_FILE" 2> /dev/null || true
-                jq -cn \
-                    --arg event "session_id_healed" \
-                    --arg old "$CTX_ACTIVE_SID" \
-                    --arg new "$SESSION_ID_PAYLOAD" \
-                    --arg source "agent-stop.sh:heal_v2" \
-                    --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
-                    --argjson count "$NEW_COUNT" \
-                    '{event: $event, old_session_id: $old, new_session_id: $new, source: $source,
-                      timestamp: $ts, consecutive_mismatches: $count,
-                      message: "HEAL v2: mismatch consecutivo (3x) — session_id sanado para ID recorrente"}' \
-                    >> "$AUDIT_FILE"
-                SESSION_ID="$SESSION_ID_PAYLOAD"
-            else
-                jq -cn \
-                    --arg event "session_id_mismatch" \
-                    --arg expected "$CTX_ACTIVE_SID" \
-                    --arg got "$SESSION_ID_PAYLOAD" \
-                    --arg source "agent-stop.sh" \
-                    --arg ts "${TIMESTAMP:-}" \
-                    --argjson count "$NEW_COUNT" \
-                    '{
-                        event:   $event,
-                        expected: $expected,
-                        got:      $got,
-                        source:   $source,
-                        timestamp: $ts,
-                        consecutive_count: $count,
-                        message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-                    }' >> "$AUDIT_FILE"
+if [ -n "$_STOP_GUARD_SESSION_ID" ]; then
+    SESSION_ID="$_STOP_GUARD_SESSION_ID"
+fi
 
-                # Hardening v9.2: mismatch pendente NÃO pode encerrar TURN silenciosamente.
-                # Se ainda não houve heal (count < 3), bloqueia este Stop para evitar
-                # fechamento não autorizado em contexto inconsistente.
-                if [ "$STOP_HOOK_ACTIVE" != "true" ]; then
-                    emit_unresolved_session_mismatch_block "$CTX_ACTIVE_SID" "$SESSION_ID_PAYLOAD" "$NEW_COUNT"
-                fi
-                exit 0
-            fi
-        fi
-    fi
+if [ "$_STOP_GUARD_RC" -eq 10 ]; then
+    exit 0
+fi
+
+# Hardening adicional: persiste strict_turn_close_requires_key em contextos legados.
+if command -v ensure_strict_turn_close_flag_default > /dev/null 2>&1; then
+    ensure_strict_turn_close_flag_default "$CTX_FILE" > /dev/null 2>&1 || true
 fi
 
 # ── Calcula duração do turno — fix B3 ────────────────────────────────────────
@@ -209,22 +123,9 @@ fi
 TURN_DURATION_S=0
 TURN_STARTED_AT=""
 if [ -f "$CTX_FILE" ]; then
-    TURN_STARTED_AT="$(jq -r '.current_turn.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    TURN_STARTED_AT="$(safe_jq_read "$CTX_FILE" '.current_turn.started_at' '')"
     if [ -n "$TURN_STARTED_AT" ] && [ -n "$NOW_ISO" ]; then
-        # BUG-59 FIX: date -d é GNU-only; fallback para BSD (macOS)
-        if date -d "$TURN_STARTED_AT" '+%s' > /dev/null 2>&1; then
-            TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
-        else
-            TURN_START_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$TURN_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
-        fi
-        if date -d "$NOW_ISO" '+%s' > /dev/null 2>&1; then
-            NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
-        else
-            NOW_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
-        fi
-        if [ "$NOW_S" -gt "$TURN_START_S" ] 2> /dev/null; then
-            TURN_DURATION_S=$((NOW_S - TURN_START_S))
-        fi
+        TURN_DURATION_S="$(compute_turn_duration_seconds "$TURN_STARTED_AT" "$NOW_ISO")"
     fi
 fi
 
@@ -239,33 +140,89 @@ TURN_ID=""
 TURN_TOOLS_COUNT=0
 TURN_FAILURES_COUNT=0
 TURN_BLOCK_COUNT=0
+SUBTURN_ID=""
+SUBTURN_NUMBER=1
+SUBTURN_STATE="active"
+SUBTURN_REASON="turn_runtime"
+SUBTURN_STARTED_AT=""
+SUBTURN_PARENT_TURN_ID=""
+SUBTURN_DURATION_MS="null"
 if [ -f "$CTX_FILE" ]; then
-    TURN_NUMBER="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-    SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-    SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    TURN_INTENT="$(jq -r '.current_turn.intent // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    TURN_INTENT_DECLARED="$(jq -r '.current_turn.intent_declared // false' "$CTX_FILE" 2> /dev/null || echo false)"
-    TURN_ID="$(jq -r '.current_turn.turn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    TURN_TOOLS_COUNT="$(jq -r '.current_turn.tools_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-    TURN_FAILURES_COUNT="$(jq -r '.current_turn.failures_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-    TURN_BLOCK_COUNT="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    TURN_NUMBER="$(safe_jq_read_int "$CTX_FILE" '.current_turn.number' 1)"
+    SECTION_TURN="$(safe_jq_read_int "$CTX_FILE" '.current_turn.section_turn' 1)"
+    SECTION_NAME="$(safe_jq_read "$CTX_FILE" '.current_section.name' '')"
+    SECTION_ID="$(safe_jq_read "$CTX_FILE" '.current_section.section_id' '')"
+    TURN_INTENT="$(safe_jq_read "$CTX_FILE" '.current_turn.intent' '')"
+    TURN_INTENT_DECLARED="$(safe_jq_read "$CTX_FILE" '.current_turn.intent_declared' 'false')"
+    TURN_ID="$(safe_jq_read "$CTX_FILE" '.current_turn.turn_id' '')"
+    TURN_TOOLS_COUNT="$(safe_jq_read_int "$CTX_FILE" '.current_turn.tools_count' 0)"
+    TURN_FAILURES_COUNT="$(safe_jq_read_int "$CTX_FILE" '.current_turn.failures_count' 0)"
+    TURN_BLOCK_COUNT="$(safe_jq_read_int "$CTX_FILE" '.current_turn.block_count' 0)"
+    SUBTURN_ID="$(safe_jq_read "$CTX_FILE" '.current_turn.subturn.subturn_id' '')"
+    SUBTURN_NUMBER="$(safe_jq_read_int "$CTX_FILE" '.current_turn.subturn.number' 1)"
+    SUBTURN_STATE="$(safe_jq_read "$CTX_FILE" '.current_turn.subturn.state' 'active')"
+    SUBTURN_REASON="$(safe_jq_read "$CTX_FILE" '.current_turn.subturn.reason' 'turn_runtime')"
+    SUBTURN_STARTED_AT="$(safe_jq_read "$CTX_FILE" '.current_turn.subturn.started_at' '')"
+    SUBTURN_PARENT_TURN_ID="$(safe_jq_read "$CTX_FILE" '.current_turn.subturn.parent_turn_id' '')"
 fi
 
 # ── REV-09: contador cumulativo de invocações de agentStop por turno ─────────
 # REV4-01: operação atômica via jq (read+increment+write em uma única expressão).
 # Elimina race condition de leitura-modificação-escrita em 3 passos separados.
 AGENTST_INVOCATIONS=1
-if [ -f "$CTX_FILE" ]; then
-    if command -v sponge &> /dev/null; then
-        jq '.current_turn.agentStop_invocations = ((.current_turn.agentStop_invocations // 0) + 1)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-        AGENTST_INVOCATIONS="$(jq -r '.current_turn.agentStop_invocations // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-    else
-        _TMP_INV="$(mktemp)"
-        jq '.current_turn.agentStop_invocations = ((.current_turn.agentStop_invocations // 0) + 1)' \
-            "$CTX_FILE" > "$_TMP_INV" && mv "$_TMP_INV" "$CTX_FILE" || true
-        AGENTST_INVOCATIONS="$(jq -r '.current_turn.agentStop_invocations // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+if command -v increment_agentstop_invocations_in_context > /dev/null 2>&1; then
+    AGENTST_INVOCATIONS="$(increment_agentstop_invocations_in_context "$CTX_FILE")"
+fi
+
+# P2 (dual-read): fallback para sessões legadas sem current_turn.subturn explícito.
+if [ -z "${SUBTURN_ID:-}" ]; then
+    SUBTURN_ID="${TURN_ID:-turn_unknown}_st${AGENTST_INVOCATIONS:-1}"
+fi
+if [ -z "${SUBTURN_NUMBER:-}" ] || [ "${SUBTURN_NUMBER:-0}" -le 0 ] 2> /dev/null; then
+    SUBTURN_NUMBER="${AGENTST_INVOCATIONS:-1}"
+fi
+
+# P3/P4: SubTurn sempre subordinado ao TURN ativo.
+if [ -n "$TURN_ID" ] && { [ -z "${SUBTURN_PARENT_TURN_ID:-}" ] || [ "$SUBTURN_PARENT_TURN_ID" != "$TURN_ID" ]; }; then
+    SUBTURN_PARENT_TURN_ID="$TURN_ID"
+    if [ -f "$CTX_FILE" ]; then
+        if command -v bind_current_subturn_parent_turn_id > /dev/null 2>&1; then
+            bind_current_subturn_parent_turn_id "$NOW_ISO" > /dev/null 2>&1 || true
+        else
+            _TMP_SUBTURN_BIND="$(mktemp 2> /dev/null || true)"
+            if [ -n "$_TMP_SUBTURN_BIND" ] \
+                && jq --arg turn_id "$TURN_ID" --arg ts "$NOW_ISO" \
+                    '.current_turn.subturn = ((.current_turn.subturn // {}) + {
+                        parent_turn_id: $turn_id,
+                        last_transition_at: $ts
+                     })' \
+                    "$CTX_FILE" > "$_TMP_SUBTURN_BIND" 2> /dev/null; then
+                mv "$_TMP_SUBTURN_BIND" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_SUBTURN_BIND"
+            else
+                [ -n "$_TMP_SUBTURN_BIND" ] && rm -f "$_TMP_SUBTURN_BIND"
+            fi
+        fi
+    fi
+    if command -v emit_subturn_transition_event > /dev/null 2>&1; then
+        emit_subturn_transition_event \
+            "$AUDIT_FILE" \
+            "$SESSION_ID" \
+            "$NOW_ISO" \
+            "$TURN_ID" \
+            "$SUBTURN_ID" \
+            "${SUBTURN_NUMBER:-1}" \
+            "${SUBTURN_STATE:-active}" \
+            "${SUBTURN_STATE:-active}" \
+            "subturn_rebound_to_current_turn" \
+            "agentStop"
+    fi
+fi
+
+if [ -n "${SUBTURN_STARTED_AT:-}" ] && [ -n "$NOW_ISO" ]; then
+    _SUBTURN_START_EPOCH="$(iso_to_epoch_utc "$SUBTURN_STARTED_AT")"
+    _SUBTURN_NOW_EPOCH="$(iso_to_epoch_utc "$NOW_ISO")"
+    if [ "$_SUBTURN_NOW_EPOCH" -ge "$_SUBTURN_START_EPOCH" ] 2> /dev/null; then
+        SUBTURN_DURATION_MS="$(((_SUBTURN_NOW_EPOCH - _SUBTURN_START_EPOCH) * 1000))"
     fi
 fi
 
@@ -309,98 +266,60 @@ fi
 # setada por post-tool-use.sh quando askQuestions é chamado, resetada aqui no fim do turno.
 AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
 AUTHORIZED_FLAG_FILE="$STATE_DIR/AUTHORIZED_CLOSE.flag"
-AUTH_REQUESTED=false
+AUTH_REQUESTED="false"
 AUTH_INVALID_REASON=""
+_AUTH_EVAL="$(evaluate_turn_authorization "$AUDIT_FILE" "$CTX_FILE" "$SESSION_ID" "$NOW_ISO" "$TURN_ID")"
+AUTH_REQUESTED="${_AUTH_EVAL%%|*}"
+AUTH_INVALID_REASON="${_AUTH_EVAL#*|}"
 
-if [ -f "$AUDIT_FILE" ]; then
-    # Estratégia 1: fronteira por userPromptSubmitted
-    if audit_has_turn_auth_signal "$AUDIT_FILE"; then
-        AUTH_REQUESTED=true
-    fi
-
-    # Estratégia 2 REMOVIDA em v7.0 (falso positivo cross-turn).
-    # Estratégia 3 (session-context.json) é o fallback correto abaixo.
-fi
-
-# Estratégia 3 (fallback de contexto): lê flag do session-context.json
-# Schema v2: current_turn.auth_requested; legado: auth_requested_this_turn
-if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
-    if context_turn_auth_requested "$CTX_FILE"; then
-        AUTH_REQUESTED=true
-    fi
-fi
-
-# Estratégia 4: delegação ao subagente = autorização implícita
-# runSubagent dispara agentStop no agente pai antes do subagente iniciar.
-# pre-tool-use.sh seta subagent_delegated=true quando detecta a chamada.
-# Esta estratégia captura o caso em que o contexto foi atualizado mas o audit.jsonl
-# ainda não tinha o evento (race window mínima mas possível).
-if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
-    SUBAGENT_DELEGATED="$(jq -r '.current_turn.subagent_delegated // false' "$CTX_FILE" 2> /dev/null || echo false)"
-    if [ "$SUBAGENT_DELEGATED" = "true" ]; then
-        SUBAGENT_LAST_TOOL="$(jq -r '.last_tool.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-        if [ "$SUBAGENT_LAST_TOOL" = "runSubagent" ] || [ "$SUBAGENT_LAST_TOOL" = "search_subagent" ]; then
-            AUTH_REQUESTED=true
-            log_auth_via_subagent_delegation_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$TURN_ID"
-        fi
-    fi
-fi
-
-# ── Hardening v9.1: askQuestions deve ser o ÚLTIMO ato do TURN ─────────────
-# Protocolo TODO v9.0 exige que o último passo do turno seja vscode_askQuestions.
-# Sem isso, chamadas antigas de askQuestions no mesmo turno não autorizam o fechamento.
-if [ "$AUTH_REQUESTED" = "true" ] && [ -f "$CTX_FILE" ]; then
-    _AUTH_LAST_TOOL_NAME="$(jq -r '.last_tool.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    _AUTH_SUBAGENT_DELEGATED="$(jq -r '.current_turn.subagent_delegated // false' "$CTX_FILE" 2> /dev/null || echo false)"
-    _AUTH_ASK_API_ERROR="$(jq -r '.current_turn.askquestions_api_error // false' "$CTX_FILE" 2> /dev/null || echo false)"
-    _AUTH_LAST_RESPONSE="$(jq -r '.current_turn.last_askquestions_response // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    _AUTH_LAST_NON_BOOKKEEPING_TOOL=""
-
-    _AUTH_LAST_NON_BOOKKEEPING_TOOL="$(last_non_bookkeeping_tool_since_prompt "$AUDIT_FILE")"
-
-    AUTH_INVALID_REASON="$(determine_turn_auth_invalid_reason \
-        "$_AUTH_LAST_TOOL_NAME" \
-        "$_AUTH_SUBAGENT_DELEGATED" \
-        "$_AUTH_ASK_API_ERROR" \
-        "$_AUTH_LAST_RESPONSE" \
-        "$_AUTH_LAST_NON_BOOKKEEPING_TOOL")"
-
-    if [ -n "$AUTH_INVALID_REASON" ]; then
-        AUTH_REQUESTED=false
-        log_turn_auth_invalidated_event \
-            "$AUDIT_FILE" \
-            "$SESSION_ID" \
-            "$NOW_ISO" \
-            "$AUTH_INVALID_REASON" \
-            "$_AUTH_LAST_TOOL_NAME" \
-            "$_AUTH_LAST_NON_BOOKKEEPING_TOOL" \
-            "$TURN_ID"
-    fi
-fi
+# ── P7.3/M4: guard contratual de autorização do TURN (modularizado) ─────────
+_AUTH_GUARD_EVAL="$(apply_turn_authorization_contract_guard \
+    "$CTX_FILE" \
+    "$AUDIT_FILE" \
+    "$STATE_DIR" \
+    "$SESSION_ID" \
+    "$TURN_ID" \
+    "$NOW_ISO" \
+    "$STOP_HOOK_ACTIVE" \
+    "$AUTH_REQUESTED" \
+    "$AUTH_INVALID_REASON")"
+AUTH_REQUESTED="${_AUTH_GUARD_EVAL%%|*}"
+AUTH_INVALID_REASON="${_AUTH_GUARD_EVAL#*|}"
 
 # ── Auditoria de turno sem vscode_askQuestions (informativo) ────────────────
 # Loga turnEnd_no_askQuestions antes de decidir se bloqueia.
 # Não loga quando stop_hook_active=true (segunda invocação após block).
 if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
-    log_turn_end_no_askquestions_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$SECTION_ID" "$TURN_ID"
+    if [ -n "$AUTH_INVALID_REASON" ]; then
+        log_turn_end_invalid_authorization_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$SECTION_ID" "$TURN_ID" "$AUTH_INVALID_REASON"
+    else
+        log_turn_end_no_askquestions_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$SECTION_ID" "$TURN_ID"
+    fi
 fi
 
 # ── Hardening v7.0: BLOCKING estrutural via Stop hook (decision:block) ────────
-# Quando AUTH_REQUESTED=false E stop_hook_active=false: BLOQUEIA o turno.
+# Quando AUTH_REQUESTED=false E stop_hook_active=false: BLOQUEIA O FECHAMENTO do turno.
 # Isso força o agente a chamar vscode_askQuestions antes de poder encerrar.
 # CRÍTICO: se stop_hook_active=true, NUNCA bloquear (prevenção de loop infinito).
 # Referência: https://code.visualstudio.com/docs/copilot/customization/hooks
-if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f "$CTX_FILE" ]; then
+if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
     _BLOCK_CLOSE_KEY="$(jq -r '.session.close_key // "N/A"' "$CTX_FILE" 2> /dev/null || echo 'N/A')"
     _BLOCK_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-    _BLOCK_CONSECUTIVE_RAW="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _BLOCK_STRICT_MODE="$(jq -r '(.session.strict_turn_close_requires_key | if . == null then true else . end)' "$CTX_FILE" 2> /dev/null || echo 'true')"
+    _BLOCK_CONSECUTIVE_RAW="$(safe_jq_read_int "$CTX_FILE" '.compliance.consecutive_unauthorized' 0)"
     _BLOCK_TODO_CREATED="$(jq -r '.current_turn.todo_created // false' "$CTX_FILE" 2> /dev/null || echo false)"
-    _BLOCK_COUNT_CURR_RAW="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    _BLOCK_COUNT_CURR_RAW="$(safe_jq_read_int "$CTX_FILE" '.current_turn.block_count' 0)"
     # fix Haiku A4.6: guard numérica — valor corrompido no CTX não causa comportamento imprevisível
     _BLOCK_CONSECUTIVE="$(sanitize_nonnegative_int "$_BLOCK_CONSECUTIVE_RAW")"
     _BLOCK_COUNT_CURR="$(sanitize_nonnegative_int "$_BLOCK_COUNT_CURR_RAW")"
     _NEW_CONSEC=$((_BLOCK_CONSECUTIVE + 1))
     _NEW_BLOCK_COUNT=$((_BLOCK_COUNT_CURR + 1))
+    _BLOCK_FLAG_REASON="turn_blocked_no_askquestions"
+    _BLOCK_FLAG_MESSAGE="Turno bloqueado em agent-stop por ausência de autorização válida"
+    if [ -n "$AUTH_INVALID_REASON" ]; then
+        _BLOCK_FLAG_REASON="turn_blocked_invalid_authorization"
+        _BLOCK_FLAG_MESSAGE="Turno bloqueado em agent-stop por autorização inválida: $AUTH_INVALID_REASON"
+    fi
     # Loga o evento de bloqueio (v9.0: inclui todo_created + block_count)
     log_agent_stop_blocked_event \
         "$AUDIT_FILE" \
@@ -409,7 +328,32 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f 
         "$TURN_ID" \
         "$_NEW_CONSEC" \
         "$_BLOCK_TODO_CREATED" \
-        "$_NEW_BLOCK_COUNT"
+        "$_NEW_BLOCK_COUNT" \
+        "$AUTH_INVALID_REASON"
+
+    # P7.1: lock secundário no Stop (duplo lock preToolUse + Stop)
+    log_turn_close_prevented_dual_lock_event \
+        "$AUDIT_FILE" \
+        "$SESSION_ID" \
+        "$NOW_ISO" \
+        "stopHook" \
+        "$TURN_ID" \
+        "${AUTH_INVALID_REASON:-askquestions_not_called}"
+
+    if command -v emit_subturn_end_event > /dev/null 2>&1; then
+        emit_subturn_end_event \
+            "$AUDIT_FILE" \
+            "$SESSION_ID" \
+            "$NOW_ISO" \
+            "$TURN_ID" \
+            "$SUBTURN_ID" \
+            "${SUBTURN_NUMBER:-1}" \
+            "$SUBTURN_STATE" \
+            "$SUBTURN_REASON" \
+            "stop_blocked" \
+            "blocked" \
+            "$SUBTURN_DURATION_MS"
+    fi
     # Loga evento extra quando manage_todo_list também não foi chamado (v9.0)
     if [ "$_BLOCK_TODO_CREATED" != "true" ]; then
         log_agent_stop_blocked_no_todo_event \
@@ -423,6 +367,30 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f 
     if ! update_blocked_turn_context "$CTX_FILE" "$_NEW_CONSEC" "$_NEW_BLOCK_COUNT" "$NOW_ISO"; then
         echo "[warn] agent-stop: mktemp falhou; consecutive_unauthorized não atualizado" >&2
     fi
+
+    _NEXT_SUBTURN=$((SUBTURN_NUMBER + 1))
+    _NEXT_SUBTURN_ID="${TURN_ID:-turn_unknown}_st${_NEXT_SUBTURN}"
+    record_blocked_subturn_and_schedule_resume \
+        "$CTX_FILE" \
+        "$NOW_ISO" \
+        "$SUBTURN_ID" \
+        "${SUBTURN_NUMBER:-1}" \
+        "$_NEXT_SUBTURN_ID" \
+        "$_NEXT_SUBTURN" \
+        "$SUBTURN_DURATION_MS"
+
+    if command -v emit_subturn_start_event > /dev/null 2>&1; then
+        emit_subturn_start_event \
+            "$AUDIT_FILE" \
+            "$SESSION_ID" \
+            "$NOW_ISO" \
+            "$TURN_ID" \
+            "$_NEXT_SUBTURN_ID" \
+            "$_NEXT_SUBTURN" \
+            "stop_block_resume_pending" \
+            "blocked" \
+            "agentStop"
+    fi
     # Registra flag para o próximo briefing (schema JSON canônico)
     _BLOCK_TURN_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     write_turn_block_flag_json \
@@ -431,15 +399,27 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ] && [ -f 
         "$SESSION_ID" \
         "${_BLOCK_TURN_NOW:-0}" \
         "${_NEW_CONSEC:-0}" \
-        "turn_blocked_no_askquestions" \
-        "Turno bloqueado em agent-stop por ausência de autorização válida"
+        "$_BLOCK_FLAG_REASON" \
+        "$_BLOCK_FLAG_MESSAGE"
     # Constrói o reason com instrução completa para o agente
     _BLOCK_SESSION_INFO="$(build_session_close_hint "$_BLOCK_CLOSE_VALIDATED" "$_BLOCK_CLOSE_KEY")"
-    _BLOCK_PAYLOAD="$(build_turn_block_payload "$_BLOCK_TODO_CREATED" "$AUTH_INVALID_REASON" "$_BLOCK_SESSION_INFO")"
+    _BLOCK_PAYLOAD="$(build_turn_block_payload "$_BLOCK_TODO_CREATED" "$AUTH_INVALID_REASON" "$_BLOCK_SESSION_INFO" "$_BLOCK_STRICT_MODE")"
     _BLOCK_REASON="${_BLOCK_PAYLOAD%%|*}"
-    _BLOCK_SYS_MSG="${_BLOCK_PAYLOAD#*|}"
+    _BLOCK_REST="${_BLOCK_PAYLOAD#*|}"
+    _BLOCK_SYS_MSG="${_BLOCK_REST%%|*}"
+    _BLOCK_REASON_CODE="${_BLOCK_REST#*|}"
+    if [ -z "$_BLOCK_REASON_CODE" ] || [ "$_BLOCK_REASON_CODE" = "$_BLOCK_REST" ]; then
+        _BLOCK_REASON_CODE="unknown_block_reason"
+    fi
+    _BLOCK_DECISION_TRACE="$(build_decision_trace_json \
+        "stop_dual_lock_main" \
+        "multi_strategy_v9_1" \
+        "${AUTH_INVALID_REASON:-askquestions_not_called}" \
+        "$_BLOCK_STRICT_MODE" \
+        "$STOP_HOOK_ACTIVE" \
+        "$_NEW_BLOCK_COUNT")"
     # Emite o block: hookSpecificOutput.decision=block + systemMessage visível
-    emit_stop_block "$_BLOCK_REASON" "$_BLOCK_SYS_MSG"
+    emit_stop_block "$_BLOCK_REASON" "$_BLOCK_SYS_MSG" "$_BLOCK_REASON_CODE" "$_BLOCK_DECISION_TRACE"
     exit 0
 fi
 
@@ -447,19 +427,127 @@ fi
 # Quando stop_hook_active=true, o agente já foi desbloqueado pelo hook anterior.
 # Verificamos se ele cumpriu o protocolo e logamos o resultado.
 if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+    if command -v emit_subturn_resume_event > /dev/null 2>&1; then
+        emit_subturn_resume_event \
+            "$AUDIT_FILE" \
+            "$SESSION_ID" \
+            "$NOW_ISO" \
+            "$TURN_ID" \
+            "$SUBTURN_ID" \
+            "${SUBTURN_NUMBER:-1}" \
+            "stop_hook_active_resume" \
+            "agentStop"
+    fi
+
+    if [ -f "$CTX_FILE" ]; then
+        if command -v write_current_subturn_state > /dev/null 2>&1; then
+            write_current_subturn_state \
+                "$NOW_ISO" \
+                "resumed" \
+                "stop_hook_active_resume" \
+                "true" \
+                "false"
+        fi
+
+        if command -v sponge > /dev/null 2>&1; then
+            jq '.session_stats.subturn_resumed = ((.session_stats.subturn_resumed // 0) + 1)' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        else
+            _TMP_SUBTURN_RESUME="$(mktemp 2> /dev/null || true)"
+            if [ -n "$_TMP_SUBTURN_RESUME" ] && jq \
+                '.session_stats.subturn_resumed = ((.session_stats.subturn_resumed // 0) + 1)' \
+                "$CTX_FILE" > "$_TMP_SUBTURN_RESUME" 2> /dev/null; then
+                mv "$_TMP_SUBTURN_RESUME" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_SUBTURN_RESUME"
+            else
+                [ -n "$_TMP_SUBTURN_RESUME" ] && rm -f "$_TMP_SUBTURN_RESUME"
+            fi
+        fi
+    fi
+
     if [ "$AUTH_REQUESTED" = "true" ]; then
         log_unblocked_complied_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$TURN_ID"
     else
         _REBLOCK_COUNT_CURR_RAW="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
         _REBLOCK_COUNT_CURR="$(sanitize_nonnegative_int "$_REBLOCK_COUNT_CURR_RAW")"
         _REBLOCK_COUNT_NEXT=$((_REBLOCK_COUNT_CURR + 1))
+        _REBLOCK_BUDGET_MAX_RAW="$(jq -r '.session.stop_block_budget_max // 2' "$CTX_FILE" 2> /dev/null || echo 2)"
+        _REBLOCK_BUDGET_MAX="$(sanitize_nonnegative_int "$_REBLOCK_BUDGET_MAX_RAW")"
+        _REBLOCK_BUDGET_ALREADY_EXCEEDED="$(jq -r '.current_turn.stop_block_budget_exceeded // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+        if [ "$_REBLOCK_BUDGET_MAX" -lt 1 ] 2> /dev/null; then
+            _REBLOCK_BUDGET_MAX=1
+        fi
+        _REBLOCK_STRICT_MODE="$(jq -r '(.session.strict_turn_close_requires_key | if . == null then true else . end)' "$CTX_FILE" 2> /dev/null || echo 'true')"
         if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
             jq --argjson bc "$_REBLOCK_COUNT_NEXT" '.current_turn.block_count = $bc' \
                 "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
         fi
         log_reblocked_no_comply_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$TURN_ID" "$_REBLOCK_COUNT_NEXT"
 
-        emit_reblock_stop_block
+        # P7.1: lock secundário também no caminho de reblock
+        log_turn_close_prevented_dual_lock_event \
+            "$AUDIT_FILE" \
+            "$SESSION_ID" \
+            "$NOW_ISO" \
+            "stopHook_reblock" \
+            "$TURN_ID" \
+            "reblock_no_authorization"
+
+        if [ "$_REBLOCK_COUNT_NEXT" -gt "$_REBLOCK_BUDGET_MAX" ] 2> /dev/null; then
+            if [ "$_REBLOCK_BUDGET_ALREADY_EXCEEDED" != "true" ]; then
+                jq -cn \
+                    --arg event "stop_block_budget_exceeded" \
+                    --arg sid "$SESSION_ID" \
+                    --arg ts "$NOW_ISO" \
+                    --arg turn_id "$TURN_ID" \
+                    --argjson block_count "$_REBLOCK_COUNT_NEXT" \
+                    --argjson budget_max "$_REBLOCK_BUDGET_MAX" \
+                    '{
+                        event: $event,
+                        session_id: $sid,
+                        timestamp: $ts,
+                        turn_id: (if $turn_id == "" then null else $turn_id end),
+                        block_count: $block_count,
+                        budget_max: $budget_max,
+                        message: "Budget de reblock excedido; mantendo bloqueio estrito para evitar fechamento ilegítimo"
+                    }' >> "$AUDIT_FILE"
+            fi
+
+            if [ -f "$CTX_FILE" ] && command -v sponge > /dev/null 2>&1; then
+                jq --arg ts "$NOW_ISO" --argjson bc "$_REBLOCK_COUNT_NEXT" --argjson bm "$_REBLOCK_BUDGET_MAX" \
+                    '.current_turn.stop_block_budget_exceeded = true
+                     | .current_turn.stop_block_budget_exceeded_at = $ts
+                     | .current_turn.stop_block_budget_exceeded_count = $bc
+                     | .current_turn.stop_block_budget_max = $bm' \
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            fi
+
+            _BUDGET_TRACE="$(build_decision_trace_json \
+                "stop_reblock_budget" \
+                "multi_strategy_v9_1" \
+                "budget_exceeded" \
+                "$_REBLOCK_STRICT_MODE" \
+                "$STOP_HOOK_ACTIVE" \
+                "$_REBLOCK_COUNT_NEXT")"
+            emit_reblock_stop_block \
+                "Budget de reblock excedido sem autorização válida. Encerramento segue bloqueado até Template F + KEY correta validada." \
+                "🚫 BLOQUEIO MANTIDO (budget excedido): pare de iterar ferramentas de trabalho e finalize corretamente com Template F + KEY válida." \
+                "stop_block_budget_exceeded" \
+                "$_BUDGET_TRACE"
+            exit 0
+        fi
+
+        _REBLOCK_TRACE="$(build_decision_trace_json \
+            "stop_reblock" \
+            "multi_strategy_v9_1" \
+            "reblock_no_authorization" \
+            "$_REBLOCK_STRICT_MODE" \
+            "$STOP_HOOK_ACTIVE" \
+            "$_REBLOCK_COUNT_NEXT")"
+        emit_reblock_stop_block \
+            "Turno ainda sem autorização válida. Encerramento legítimo só com Template F + KEY correta validada." \
+            "🚫 Encerramento ilegítimo bloqueado novamente: faça askQuestions com opção de escalar para Template F e só encerre após Template F + KEY válida." \
+            "reblock_no_authorization" \
+            "$_REBLOCK_TRACE"
         exit 0
     fi
 fi
@@ -473,86 +561,8 @@ fi
 #   1. pending_section_after_push == true  (git push sem declaração de seção)
 #   2. turns_since_askQuestions >= 3       (raramente alcançado com blocking ativo)
 #   3. consecutive_unauthorized >= 1       (SEMPRE emite após qualquer violação)
-_EMIT_CONTEXT_MSG=false
-_PUSH_PENDING="false"
-_TURNS_SINCE_ASK=0
-_CONSECUTIVE_UNAUTH=0
-if [ -f "$CTX_FILE" ]; then
-    _PUSH_PENDING="$(jq -r '.session_stats.pending_section_after_push // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-    _TURNS_SINCE_ASK="$(jq -r '.session_stats.turns_since_askQuestions // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-    _CONSECUTIVE_UNAUTH="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-fi
-if should_emit_context_nudge "$_PUSH_PENDING" "$_TURNS_SINCE_ASK" "$_CONSECUTIVE_UNAUTH" "$AUTH_REQUESTED"; then
-    _EMIT_CONTEXT_MSG=true
-fi
-
-if [ "$_EMIT_CONTEXT_MSG" = "true" ] && [ -f "$CTX_FILE" ]; then
-    _CTX_SECTION="$(jq -r '.current_section.name // "(nenhuma)"' "$CTX_FILE" 2> /dev/null || echo '(nenhuma)')"
-    _CTX_SECTION_NUM="$(jq -r '.current_section.section_number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-    _CTX_TURN="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-    _CTX_SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-    _CTX_PUSH_COUNT="$(jq -r '.session_stats.push_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-    _CTX_ALTA=0
-    _CTX_MEDIA=0
-    _CTX_BACKLOG=0
-    _CTX_NEXT_TASK="(sem tarefas)"
-    TASKS_FILE_RT="$STATE_DIR/pending-tasks.md"
-    if [ -f "$TASKS_FILE_RT" ]; then
-        _CTX_ALTA="$(grep -c '^- \[ \].*\[alta\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
-        _CTX_MEDIA="$(grep -c '^- \[ \].*\[media\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
-        _CTX_BACKLOG="$(grep -c '^- \[ \].*\[backlog\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
-        _CTX_NEXT_TASK="$(grep '^- \[ \].*\[alta\]' "$TASKS_FILE_RT" 2> /dev/null | head -1 | sed 's/^- \[ \] //' || echo '(sem tarefas alta)')"
-    fi
-    _CTX_PUSH_MSG=""
-    if [ "$_PUSH_PENDING" = "true" ]; then
-        _CTX_PUSH_MSG="
-🔀 GIT PUSH DETECTADO (push #${_CTX_PUSH_COUNT}):
-  → Declarar nova fase:  bash .github/hooks/scripts/start-section.sh \"nome-da-fase\"
-  → Continuar na seção:  npm run hooks:continue-section"
-    fi
-    # Hardening v5.1: mensagem de violação escalona por gravidade
-    _CTX_VIOLATION_MSG=""
-    if [ "$AUTH_REQUESTED" = "false" ]; then
-        if { [ "$_CONSECUTIVE_UNAUTH" -ge 3 ] 2> /dev/null; }; then
-            _CTX_VIOLATION_MSG="
-🚨 CRÍTICO: ${_CONSECUTIVE_UNAUTH} TURNs CONSECUTIVOS sem vscode_askQuestions!
-  ⛔ SESSION em risco de encerramento não-autorizado.
-  → Chame vscode_askQuestions AGORA (Template A, D, ou C conforme o contexto)"
-        elif { [ "$_CONSECUTIVE_UNAUTH" -ge 2 ] 2> /dev/null; }; then
-            _CTX_VIOLATION_MSG="
-⛔ ALERTA: ${_CONSECUTIVE_UNAUTH} TURNs CONSECUTIVOS sem vscode_askQuestions!
-  Esta violação será registrada no briefing da próxima sessão.
-  → Template A (tarefa concluída) | Template D (checkpoint) | Template C (proposta)"
-        elif { [ "$_CONSECUTIVE_UNAUTH" -ge 1 ] 2> /dev/null; } || { [ "$_TURNS_SINCE_ASK" -ge 3 ] 2> /dev/null; }; then
-            _CTX_VIOLATION_MSG="
-⚠ Turno encerrado sem vscode_askQuestions (${_TURNS_SINCE_ASK} desde o último).
-  → Template A se concluiu tarefa | Template D para checkpoint periódico"
-        fi
-    fi
-    # ── Hardening v6.0: SESSION close key SEMPRE visível no nudge ────────────
-    # Removida condição >= 10 turnos que tornava o lembrete ineficaz.
-    # A close_key é exibida em TODOS os nudges enquanto SESSION não for encerrada.
-    _CTX_SESSION_CLOSE_MSG=""
-    _CTX_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    _CTX_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-    if [ "$_CTX_CLOSE_VALIDATED" = "false" ] && [ -n "$_CTX_CLOSE_KEY" ]; then
-        _CTX_SESSION_CLOSE_MSG="
-🔐 SESSION close key: ${_CTX_CLOSE_KEY}
-    Para encerrar SESSION: vscode_askQuestions (Template F) → usuário digita KEY → post-tool-use valida e executa session-close.sh"
-    fi
-    # ── Hardening v6.0: formato com distinção explícita SESSION/SECTION/TURN ──
-    _CTX_MSG="$(build_context_system_message \
-        "$_CTX_SECTION_TURN" \
-        "$_CTX_TURN" \
-        "$_CTX_SECTION" \
-        "$_CTX_SECTION_NUM" \
-        "$_CTX_ALTA" \
-        "$_CTX_MEDIA" \
-        "$_CTX_BACKLOG" \
-        "$_CTX_NEXT_TASK" \
-        "$_CTX_PUSH_MSG" \
-        "$_CTX_VIOLATION_MSG" \
-        "$_CTX_SESSION_CLOSE_MSG")"
+_CTX_MSG="$(build_context_nudge_message "$CTX_FILE" "$STATE_DIR" "$AUTH_REQUESTED")"
+if [ -n "$_CTX_MSG" ]; then
     printf '%s\n' "{\"systemMessage\":$(printf '%s' "$_CTX_MSG" | jq -Rs .)}"
 fi
 
@@ -561,8 +571,7 @@ if [ "$TURN_INTENT_DECLARED" = "false" ] && [ "$TURN_NUMBER" -gt 0 ]; then
     AUTO_INTENT="(não declarada)"
     if [ -f "$CTX_FILE" ]; then
         # Usa as ferramentas do turno como proxy de intenção
-        TOP_TOOLS="$(jq -r '.current_turn.tools_by_name | to_entries | sort_by(-.value) | .[0:3] | map(.key) | join(", ")' \
-            "$CTX_FILE" 2> /dev/null || echo '')"
+        TOP_TOOLS="$(build_auto_intent_from_turn_tools "$CTX_FILE")"
         [ -n "$TOP_TOOLS" ] && AUTO_INTENT="ferramentas: ${TOP_TOOLS}"
     fi
     log_turn_start_enriched_auto_event \
@@ -598,6 +607,21 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
         "$TURN_INTENT" \
         "$TURN_FAILURES_COUNT" \
         "$_TURN_AUTH_PUSH_PENDING"
+
+    if command -v emit_subturn_end_event > /dev/null 2>&1; then
+        emit_subturn_end_event \
+            "$AUDIT_FILE" \
+            "$SESSION_ID" \
+            "$NOW_ISO" \
+            "$TURN_ID" \
+            "$SUBTURN_ID" \
+            "${SUBTURN_NUMBER:-1}" \
+            "$SUBTURN_STATE" \
+            "$SUBTURN_REASON" \
+            "turn_closed_authorized" \
+            "closed" \
+            "$SUBTURN_DURATION_MS"
+    fi
 else
     # Hardening v5.1: re-introduz UNAUTHORIZED_CLOSE.flag para rastreamento cross-session.
     # v5.0 removia silenciosamente este flag, impedindo session-start.sh de exibir alerta
@@ -608,11 +632,7 @@ else
     _TURN_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     # FIX v9.0: Quando stop_hook_active=true, o bloco de primeira invocação JÁ incrementou
     # consecutive_unauthorized. Não incrementar novamente aqui (evita double-increment).
-    if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-        _CONSEC_FOR_FLAG="$_CONSEC_NOW"
-    else
-        _CONSEC_FOR_FLAG="$((_CONSEC_NOW + 1))"
-    fi
+    _CONSEC_FOR_FLAG="$(compute_consecutive_for_unauthorized_flag "$STOP_HOOK_ACTIVE" "$_CONSEC_NOW")"
     write_unauthorized_close_flag \
         "$AUTH_FLAG_FILE" \
         "$NOW_ISO" \
@@ -633,65 +653,22 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     SESSION_SUMMARY="$(build_turn_session_summary "$TURN_NUMBER" "$TURN_DURATION_S" "$TURN_TOOLS_COUNT")"
     AUTH_INCR_FIELD="$(select_auth_increment_field "$AUTH_REQUESTED")"
     NEXT_TURN=$((TURN_NUMBER + 1))
-    jq --arg now "$NOW_ISO" \
-        --arg summary "$SESSION_SUMMARY" \
-        --arg auth_field "$AUTH_INCR_FIELD" \
-        --argjson next_turn "$NEXT_TURN" \
-        --arg section "$SECTION_NAME" \
-        --arg sec_id "$SECTION_ID" \
-        --arg turn_id_s "$TURN_ID" \
-        --argjson turn_num "$TURN_NUMBER" \
-        --argjson sec_turn "$SECTION_TURN" \
-        --argjson dur_s "$TURN_DURATION_S" \
-        --argjson tools_n "$TURN_TOOLS_COUNT" \
-        --arg intent_s "$TURN_INTENT" \
-        --arg auth_s "$AUTH_REQUESTED" \
-        --argjson fail_n "$TURN_FAILURES_COUNT" \
-        '.session_stats.turn_count    = (.session_stats.turn_count // 0) + 1
-         | .session_stats[$auth_field] = (.session_stats[$auth_field] // 0) + 1
-         | .session_stats.turns_since_askQuestions = (
-             if $auth_s == "true" then 0
-             else (.session_stats.turns_since_askQuestions // 0) + 1
-             end)
-         | .last_turn_ts              = $now
-         | .session_summary           = $summary
-         | .session_stats.turn_history = (
-             (.session_stats.turn_history // []) + [{
-                 number:       $turn_num,
-                 section:      $section,
-                 section_id:   (if $sec_id == "" then null else $sec_id end),
-                 turn_id:      (if $turn_id_s == "" then null else $turn_id_s end),
-                 section_turn: $sec_turn,
-                 duration_s:   $dur_s,
-                 tools_count:  $tools_n,
-                 intent:       (if $intent_s == "" then null else $intent_s end),
-                 auth:         ($auth_s == "true"),
-                 failures:     $fail_n,
-                 ts:           $now
-             }]
-             | if length > 20 then .[-20:] else . end)
-         | .session_stats.recovery_hints.last_section = $section
-         | .session_stats.recovery_hints.last_intent  = (
-             if $intent_s != "" then $intent_s
-             else (.session_stats.recovery_hints.last_intent // null)
-             end)
-         | .current_turn.number            = $next_turn
-         | .current_turn.started_at        = $now
-         | .current_turn.tools_count       = 0
-         | .current_turn.tools_by_name     = {}
-         | .current_turn.failures_count    = 0
-         | .current_turn.auth_requested    = false
-         | .current_turn.auth_requested_at = null
-         | .current_turn.last_askquestions_response = null
-         | .current_turn.block_count       = 0
-         | .current_turn.section_name      = $section
-         | .current_turn.intent_declared   = false
-         | .current_turn.intent            = null
-         | .current_turn.askquestions_api_error = false
-         | .current_turn.askquestions_api_error_at = null
-         | .current_turn.todo_created      = false
-         | .current_turn.subagent_delegated = false' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    finalize_turn_context_state \
+        "$CTX_FILE" \
+        "$NOW_ISO" \
+        "$SESSION_SUMMARY" \
+        "$AUTH_INCR_FIELD" \
+        "$NEXT_TURN" \
+        "$SECTION_NAME" \
+        "$SECTION_ID" \
+        "$TURN_ID" \
+        "$TURN_NUMBER" \
+        "$SECTION_TURN" \
+        "$TURN_DURATION_S" \
+        "$TURN_TOOLS_COUNT" \
+        "$TURN_INTENT" \
+        "$AUTH_REQUESTED" \
+        "$TURN_FAILURES_COUNT"
 fi
 
 # ── Invariante SESSION+SECTION+TURN: auto-cria seção 'retomada' se null/fechada ──
