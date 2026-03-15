@@ -1,10 +1,8 @@
 # .github/instructions
 
 **Propósito**: Instruções permanentes para assistentes de IA — baseline canônico e convenções do
-repositório aplicadas a todos os arquivos.  
-**Status**: Canônico.  
-**Público**: Assistentes de IA (Copilot, Claude, etc.) e mantenedores.  
-**Última atualização**: 2 de março de 2026.
+repositório aplicadas a todos os arquivos. **Status**: Canônico. **Público**: Assistentes de IA
+(Copilot, Claude, etc.) e mantenedores. **Última atualização**: 2 de março de 2026.
 
 ## Entradas principais
 
@@ -12,6 +10,19 @@ repositório aplicadas a todos os arquivos.
 | ------------------------------- | --------------------------------------------------------------------- |
 | `project-canon.instructions.md` | Baseline canônico curto e estável do projeto (aplicado a `**/*`)      |
 | `sample.instructions.md`        | Convenções JS/TS (`// @ts-check`, `const`/`let`, validação de params) |
+
+## Precedência recomendada
+
+Para evitar conflito entre arquivos de instrução:
+
+1. Hooks executáveis (`.github/hooks/scripts/*`, `.github/hooks/hooks-lib/*`)
+2. `hooks-protocol.instructions.md`
+3. `project-canon.instructions.md`
+4. `.github/AGENTS.md`
+5. `.github/copilot-instructions.md`
+
+> Regra de manutenção: regras operacionais de SESSION/SECTION/TURN devem viver em **uma fonte
+> única** (`hooks-protocol.instructions.md`).
 
 ## Regras de manutenção
 

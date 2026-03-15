@@ -59,6 +59,34 @@ if command -v flock > /dev/null 2>&1; then
     flock -x -w 3 9 2> /dev/null
 fi
 
+ctx_apply_expr() {
+    local expr="${1:-}"
+    shift || true
+
+    [ -n "$expr" ] || return 1
+    [ -f "$CTX_FILE" ] || return 1
+
+    if command -v ctx_apply_jq_expr_best_effort > /dev/null 2>&1; then
+        ctx_apply_jq_expr_best_effort "$expr" "$@" > /dev/null 2>&1 || true
+        return 0
+    fi
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq "$@" "$expr" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_ctx
+        if _tmp_ctx="$(mktemp 2> /dev/null)"; then
+            if jq "$@" "$expr" "$CTX_FILE" > "$_tmp_ctx" 2> /dev/null; then
+                mv "$_tmp_ctx" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_ctx"
+            else
+                rm -f "$_tmp_ctx"
+            fi
+        fi
+    fi
+
+    return 0
+}
+
 # ── Auto-recovery no próprio userPromptSubmitted ─────────────────────────────
 # sessionStart pode não disparar em retomadas/reconexões. Quando isso ocorre,
 # o primeiro sinal confiável é userPromptSubmitted; criamos contexto mínimo aqui
@@ -706,6 +734,10 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.auto_audit_started = false
          | .current_turn.auto_audit_started_at = null
          | .current_turn.auto_audit_started_tool = null
+         | .current_turn.required_docs_pending = []
+         | .current_turn.required_docs_read_log = []
+         | .current_turn.required_docs_obligation = null
+         | .current_turn.required_docs_status = "not_required"
          | .current_turn.subturn = {
              number: 1,
              subturn_id: $subturn_id,
@@ -790,6 +822,10 @@ elif [ -f "$CTX_FILE" ]; then
          | .current_turn.auto_audit_started = false
          | .current_turn.auto_audit_started_at = null
          | .current_turn.auto_audit_started_tool = null
+         | .current_turn.required_docs_pending = []
+         | .current_turn.required_docs_read_log = []
+         | .current_turn.required_docs_obligation = null
+         | .current_turn.required_docs_status = "not_required"
          | .current_turn.subturn = {
              number: 1,
              subturn_id: $subturn_id,
@@ -832,6 +868,32 @@ elif [ -f "$CTX_FILE" ]; then
     SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SUBTURN_NUMBER="$(jq -r '.current_turn.subturn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+fi
+
+# No primeiro turno da sessão (inclui starts e retomadas inline), exige releitura
+# dos documentos-base para garantir contexto canônico atualizado.
+if [ -f "$CTX_FILE" ] && [ "${TURN_NUMBER:-0}" -eq 1 ] 2> /dev/null; then
+    ctx_apply_expr \
+        '.current_turn.required_docs_pending = ["session-briefing.md", "pending-tasks.md", "session-context.json"]
+         | .current_turn.required_docs_obligation = "session_start_or_resume"
+         | .current_turn.required_docs_status = "pending"
+         | .current_turn.required_docs_read_log = []
+         | .current_turn.required_docs_set_at = $ts' \
+        --arg ts "${TIMESTAMP:-$NOW_ISO}"
+
+    jq -cn \
+        --arg event "requiredDocs_obligation_set" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "${TIMESTAMP:-$NOW_ISO}" \
+        --arg turn_id "$TURN_ID" \
+        '{
+            event: $event,
+            session_id: $sid,
+            timestamp: $ts,
+            turn_id: (if $turn_id == "" then null else $turn_id end),
+            required_docs: ["session-briefing.md", "pending-tasks.md", "session-context.json"],
+            message: "Checklist de leitura obrigatória ativado para início/retomada"
+        }' >> "$AUDIT_FILE" 2> /dev/null || true
 fi
 
 # Loga evento turnStart (automático — complementado por start-turn.sh para intenção)

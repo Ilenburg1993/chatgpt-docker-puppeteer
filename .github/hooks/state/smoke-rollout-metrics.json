@@ -1,0 +1,1 @@
+{"timestamp":"2026-03-15T11:57:51Z","smoke_mode":"all","rollout_flag":"shadow","domains_execution_mode":"shadow","legacy":{"status":"pass","failures":0},"domains":{"status":"pass","failures":0},"divergence_detected":false}

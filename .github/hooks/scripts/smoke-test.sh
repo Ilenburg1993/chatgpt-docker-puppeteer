@@ -7,7 +7,7 @@
 #   - Schema canônico está correto (session-context.json)
 #   - Chamadas de script não crasham com inputs mínimos
 #
-# Uso: bash smoke-test.sh [--quiet]
+# Uso: bash smoke-test.sh [--quiet] [--domains|--all]
 # Saída: PASS/FAIL por teste; exit code = número de falhas
 set -euo pipefail
 
@@ -16,7 +16,42 @@ SCRIPTS_DIR="$HOOK_DIR/scripts"
 STATE_DIR="$HOOK_DIR/state"
 LOG_DIR="$HOOK_DIR/logs"
 CTX_FILE="$STATE_DIR/session-context.json"
-QUIET="${1:-}"
+ROLLOUT_METRICS_FILE="$STATE_DIR/smoke-rollout-metrics.json"
+
+# shellcheck disable=SC1091
+if [ -f "$HOOK_DIR/hooks-lib/config.sh" ]; then
+    source "$HOOK_DIR/hooks-lib/config.sh" 2> /dev/null || true
+fi
+
+QUIET=""
+SMOKE_MODE="legacy"
+SMOKE_DOMAINS_FLAG="${HOOKS_FF_SMOKE_DOMAINS:-shadow}"
+
+for arg in "$@"; do
+    case "$arg" in
+        --quiet)
+            QUIET="--quiet"
+            ;;
+        --domains)
+            SMOKE_MODE="domains"
+            ;;
+        --all)
+            SMOKE_MODE="all"
+            ;;
+    esac
+done
+
+if [ "$SMOKE_DOMAINS_FLAG" != "off" ] && [ "$SMOKE_DOMAINS_FLAG" != "shadow" ] && [ "$SMOKE_DOMAINS_FLAG" != "on" ]; then
+    SMOKE_DOMAINS_FLAG="shadow"
+fi
+
+if [ "$SMOKE_MODE" = "domains" ]; then
+    if [ "$SMOKE_DOMAINS_FLAG" = "off" ]; then
+        echo "[smoke-domains] rollout desativado por HOOKS_FF_SMOKE_DOMAINS=off"
+        exit 0
+    fi
+    exec bash "$SCRIPTS_DIR/smoke-test-domains.sh" "$QUIET"
+fi
 
 PASS=0
 FAIL=0
@@ -949,13 +984,15 @@ ASJSON
         pass "AS-4: shellcheck não disponível (skip)"
     fi
 
-    # Teste AS-5: decision:block tem reason obrigatório (campo FORA do hookSpecificOutput também)
+    # Teste AS-5: decision:block tem reason obrigatório e código de razão canônico
     if { grep -q 'reason: \$reason' "$_AS_SCRIPT" 2> /dev/null \
         || grep -q 'reason: \$reason' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; } \
-        && grep -q '_BLOCK_REASON=' "$_AS_SCRIPT" 2> /dev/null; then
-        pass "AS-5: decision:block tem campo reason obrigatório (_BLOCK_REASON)"
+        && { grep -q '_BLOCK_REASON=' "$_AS_SCRIPT" 2> /dev/null \
+            || grep -q 'local reason_code=' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null \
+            || grep -q 'block_reason=' "$HOOK_DIR/hooks-lib/agent-stop-lib.sh" 2> /dev/null; }; then
+        pass "AS-5: decision:block tem campo reason obrigatório + razão canônica (modularizado)"
     else
-        fail "AS-5: decision:block NÃO tem campo reason (falta reason: \$reason ou _BLOCK_REASON=)"
+        fail "AS-5: decision:block NÃO tem campo reason/razão canônica (falta reason: \$reason + reason_code/block_reason)"
     fi
 
     # Teste AS-6: agentStop_blocked é logado quando bloqueia
@@ -1228,12 +1265,13 @@ else
     fail "V90-2: log-prompt.sh não encontrado"
 fi
 
-# V90-3: agent-stop.sh lê _BLOCK_TODO_CREATED do contexto
+# V90-3: fluxo de block lê todo_created do contexto (inline ou helper)
 if [ -f "$_AG_STOP" ]; then
-    if grep -q '_BLOCK_TODO_CREATED' "$_AG_STOP"; then
-        pass "V90-3: agent-stop.sh lê _BLOCK_TODO_CREATED do contexto"
+    if grep -q '_BLOCK_TODO_CREATED\|block_todo_created' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'block_todo_created' "$_AG_STOP_LIB" 2> /dev/null; then
+        pass "V90-3: fluxo do Stop lê todo_created do contexto (inline/helper)"
     else
-        fail "V90-3: agent-stop.sh NÃO lê _BLOCK_TODO_CREATED — sem distinção de violação dupla"
+        fail "V90-3: fluxo do Stop NÃO lê todo_created — sem distinção de violação dupla"
     fi
 else
     fail "V90-3: agent-stop.sh não encontrado"
@@ -1587,12 +1625,15 @@ else
     fail "V90-26: agent-stop.sh não encontrado"
 fi
 
-# V90-27: agent-stop.sh grava UNAUTHORIZED_CLOSE.flag em JSON canônico no block path
+# V90-27: fluxo do Stop grava UNAUTHORIZED_CLOSE.flag em JSON canônico no block path
 if [ -f "$_AG_STOP" ]; then
-    if grep -q 'turn_blocked_no_askquestions' "$_AG_STOP" 2> /dev/null \
-        && grep -q 'consecutive_unauthorized' "$_AG_STOP" 2> /dev/null \
-        && ! grep -Fq 'TURN_BLOCKED|' "$_AG_STOP" 2> /dev/null; then
-        pass "V90-27: UNAUTHORIZED_CLOSE.flag usa schema JSON no caminho de bloqueio"
+    if { grep -q 'turn_blocked_no_askquestions' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'turn_blocked_no_askquestions' "$_AG_STOP_LIB" 2> /dev/null; } \
+        && { grep -q 'consecutive_unauthorized' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'consecutive_unauthorized' "$_AG_STOP_LIB" 2> /dev/null; } \
+        && ! grep -Fq 'TURN_BLOCKED|' "$_AG_STOP" 2> /dev/null \
+        && ! grep -Fq 'TURN_BLOCKED|' "$_AG_STOP_LIB" 2> /dev/null; then
+        pass "V90-27: UNAUTHORIZED_CLOSE.flag usa schema JSON no caminho de bloqueio (inline/helper)"
     else
         fail "V90-27: UNAUTHORIZED_CLOSE.flag ainda usa formato texto legado no block path"
     fi
@@ -1925,7 +1966,8 @@ fi
 if [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
     if grep -q 'block_reason' "$_AG_STOP_LIB" 2> /dev/null \
         && grep -q 'invalid_reason' "$_AG_STOP_LIB" 2> /dev/null \
-        && grep -q 'turn_blocked_invalid_authorization' "$_AG_STOP" 2> /dev/null; then
+        && { grep -q 'turn_blocked_invalid_authorization' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'turn_blocked_invalid_authorization' "$_AG_STOP_LIB" 2> /dev/null; }; then
         pass "V90-39: observabilidade do bloqueio distingue no_askquestions de invalid_authorization"
     else
         fail "V90-39: sem campos de causa em agentStop_blocked/UNAUTHORIZED_CLOSE.flag"
@@ -2223,7 +2265,8 @@ fi
 
 # V90-46: P7.2 — budget anti-loop de reblock está presente
 if [ -f "$_AG_STOP" ]; then
-    if grep -q 'stop_block_budget_max\|stop_block_budget_exceeded' "$_AG_STOP" 2> /dev/null; then
+    if grep -q 'stop_block_budget_max\|stop_block_budget_exceeded' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'stop_block_budget_max\|stop_block_budget_exceeded' "$_AG_STOP_LIB" 2> /dev/null; then
         pass "V90-46: agent-stop possui budget anti-loop para reblock (P7.2)"
     else
         fail "V90-46: agent-stop não possui budget anti-loop para reblock"
@@ -2283,7 +2326,8 @@ fi
 
 # V90-57: agent-stop propaga strict_turn_close_requires_key ao payload builder
 if [ -f "$_AG_STOP" ]; then
-    if grep -q 'build_turn_block_payload "\$_BLOCK_TODO_CREATED" "\$AUTH_INVALID_REASON" "\$_BLOCK_SESSION_INFO" "\$_BLOCK_STRICT_MODE"' "$_AG_STOP" 2> /dev/null; then
+    if grep -q 'build_turn_block_payload "\$_BLOCK_TODO_CREATED" "\$AUTH_INVALID_REASON" "\$_BLOCK_SESSION_INFO" "\$_BLOCK_STRICT_MODE"' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'build_turn_block_payload .*block_todo_created.*auth_invalid_reason.*block_session_info.*block_strict_mode' "$_AG_STOP_LIB" 2> /dev/null; then
         pass "V90-57: agent-stop envia flag strict para build_turn_block_payload"
     else
         fail "V90-57: agent-stop não propaga strict mode ao payload de block"
@@ -2318,8 +2362,9 @@ fi
 
 # V90-55: M4 — atualização de subturn bloqueado modularizada em helper
 if [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
-    if grep -q 'record_blocked_subturn_and_schedule_resume' "$_AG_STOP" 2> /dev/null \
-        && grep -q 'record_blocked_subturn_and_schedule_resume' "$_AG_STOP_LIB" 2> /dev/null; then
+    if grep -q 'record_blocked_subturn_and_schedule_resume' "$_AG_STOP_LIB" 2> /dev/null \
+        && { grep -q 'record_blocked_subturn_and_schedule_resume' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'handle_main_stop_block_branch' "$_AG_STOP" 2> /dev/null; }; then
         pass "V90-55: bloco de subturn bloqueado foi extraído para helper M4"
     else
         fail "V90-55: bloco de subturn bloqueado ainda não está modularizado"
@@ -2682,12 +2727,12 @@ fi
 
 # V90-49: agent-stop.sh registra eventos de ciclo de subturn (start/resume/end)
 if [ -f "$_AG_STOP" ]; then
-    if { grep -q 'subturnStart' "$_AG_STOP" 2> /dev/null \
-        || grep -q 'emit_subturn_start_event' "$_AG_STOP" 2> /dev/null; } \
-        && { grep -q 'subturnResume' "$_AG_STOP" 2> /dev/null \
-            || grep -q 'emit_subturn_resume_event' "$_AG_STOP" 2> /dev/null; } \
-        && { grep -q 'subturnEnd' "$_AG_STOP" 2> /dev/null \
-            || grep -q 'emit_subturn_end_event' "$_AG_STOP" 2> /dev/null; }; then
+    if { grep -q 'subturnStart\|emit_subturn_start_event' "$_AG_STOP" 2> /dev/null \
+        || grep -q 'subturnStart\|emit_subturn_start_event' "$_AG_STOP_LIB" 2> /dev/null; } \
+        && { grep -q 'subturnResume\|emit_subturn_resume_event' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'subturnResume\|emit_subturn_resume_event' "$_AG_STOP_LIB" 2> /dev/null; } \
+        && { grep -q 'subturnEnd\|emit_subturn_end_event' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'subturnEnd\|emit_subturn_end_event' "$_AG_STOP_LIB" 2> /dev/null; }; then
         pass "V90-49: agent-stop.sh registra ciclo de eventos de SubTurn"
     else
         fail "V90-49: agent-stop.sh não registra todos os eventos de SubTurn"
@@ -2716,7 +2761,8 @@ if [ -f "$_LOG_PROMPT" ] && [ -f "$_PTU_SCRIPT" ] && [ -f "$_POST_TOOL" ] && [ -
             || grep -q 'write_current_subturn_state' "$_PTU_SCRIPT" 2> /dev/null; } \
         && { grep -q 'parent_turn_id' "$_POST_TOOL" 2> /dev/null \
             || grep -q 'write_current_subturn_state' "$_POST_TOOL" 2> /dev/null; } \
-        && grep -q 'parent_turn_id' "$_AG_STOP" 2> /dev/null \
+        && { grep -q 'parent_turn_id' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'parent_turn_id' "$_AG_STOP_LIB" 2> /dev/null; } \
         && grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null; then
         pass "V90-51: eventos subturn nos hooks incluem parent_turn_id"
     else
@@ -2734,7 +2780,8 @@ if [ -f "$_SCHEMA_FILE" ] && [ -f "$_PTU_SCRIPT" ] && [ -f "$_POST_TOOL" ] && [ 
             || grep -q 'write_current_subturn_state' "$_PTU_SCRIPT" 2> /dev/null; } \
         && { grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$_POST_TOOL" 2> /dev/null \
             || grep -q 'write_current_subturn_state' "$_POST_TOOL" 2> /dev/null; } \
-        && grep -q 'subturn_rebound_to_current_turn' "$_AG_STOP" 2> /dev/null; then
+        && { grep -q 'subturn_rebound_to_current_turn' "$_AG_STOP" 2> /dev/null \
+            || grep -q 'subturn_rebound_to_current_turn' "$_AG_STOP_LIB" 2> /dev/null; }; then
         pass "V90-52: contexto de subturn mantém e repara vínculo parent_turn_id -> current_turn.turn_id"
     else
         fail "V90-52: vínculo parent_turn_id no contexto está incompleto"
@@ -2768,6 +2815,73 @@ if [ -f "$_LOG_PROMPT" ] && [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
     fi
 else
     fail "V90-54: arquivos necessários não encontrados"
+fi
+
+if [ "$SMOKE_MODE" = "all" ]; then
+    echo ""
+    echo "── Grupo extra: agregador de domínios (F5.2) ───────────────────────────────"
+    LEGACY_FAIL_BEFORE_DOMAINS="$FAIL"
+    DOMAINS_RC=0
+    DOMAINS_EXECUTION_MODE="skipped"
+
+    if [ "$SMOKE_DOMAINS_FLAG" = "off" ]; then
+        DOMAINS_EXECUTION_MODE="off"
+        pass "F6.1: agregador de domínios desativado por feature flag (off)"
+    else
+        if bash "$SCRIPTS_DIR/smoke-test-domains.sh" "$QUIET" > /dev/null 2>&1; then
+            DOMAINS_RC=0
+            DOMAINS_EXECUTION_MODE="$SMOKE_DOMAINS_FLAG"
+            pass "F5.2/F6.1: smoke-test-domains.sh executou sem falhas (flag=$SMOKE_DOMAINS_FLAG)"
+        else
+            DOMAINS_RC=$?
+            DOMAINS_EXECUTION_MODE="$SMOKE_DOMAINS_FLAG"
+            if [ "$SMOKE_DOMAINS_FLAG" = "shadow" ]; then
+                pass "F6.1: smoke-domains executou em shadow com falhas (sem quebrar gate legado)"
+            else
+                fail "F6.1: smoke-test-domains.sh retornou falhas em modo on"
+            fi
+        fi
+    fi
+
+    if command -v jq > /dev/null 2>&1; then
+        LEGACY_STATUS="pass"
+        DOMAINS_STATUS="pass"
+        DIVERGENCE=false
+
+        if [ "$LEGACY_FAIL_BEFORE_DOMAINS" -gt 0 ] 2> /dev/null; then
+            LEGACY_STATUS="fail"
+        fi
+
+        if [ "$DOMAINS_RC" -gt 0 ] 2> /dev/null; then
+            DOMAINS_STATUS="fail"
+        fi
+
+        if [ "$DOMAINS_EXECUTION_MODE" = "on" ] || [ "$DOMAINS_EXECUTION_MODE" = "shadow" ]; then
+            if [ "$LEGACY_STATUS" != "$DOMAINS_STATUS" ]; then
+                DIVERGENCE=true
+            fi
+        fi
+
+        jq -cn \
+            --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            --arg smoke_mode "$SMOKE_MODE" \
+            --arg rollout_flag "$SMOKE_DOMAINS_FLAG" \
+            --arg domains_exec_mode "$DOMAINS_EXECUTION_MODE" \
+            --arg legacy_status "$LEGACY_STATUS" \
+            --arg domains_status "$DOMAINS_STATUS" \
+            --argjson legacy_failures "${LEGACY_FAIL_BEFORE_DOMAINS:-0}" \
+            --argjson domains_failures "${DOMAINS_RC:-0}" \
+            --argjson divergence "$DIVERGENCE" \
+            '{
+                timestamp: $ts,
+                smoke_mode: $smoke_mode,
+                rollout_flag: $rollout_flag,
+                domains_execution_mode: $domains_exec_mode,
+                legacy: {status: $legacy_status, failures: $legacy_failures},
+                domains: {status: $domains_status, failures: $domains_failures},
+                divergence_detected: $divergence
+            }' > "$ROLLOUT_METRICS_FILE" 2> /dev/null || true
+    fi
 fi
 
 echo ""

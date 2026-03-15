@@ -36,7 +36,7 @@
     "failures_detected": 0,
     "errors_total": 0,
     "subagent_calls": 1,
-    "section_count": 21,
+    "section_count": 22,
     "section_names": [
       "recovery",
       "analise-session-close-hardening",
@@ -58,7 +58,8 @@
       "sprint-6-upg-audit-01",
       "pos-sprint-6",
       "auditoria-exaustiva-hooks",
-      "auditoria-exaustiva-hooks-v2"
+      "auditoria-exaustiva-hooks-v2",
+      "execucao-roadmap-hooks"
     ],
     "section_history": [
       {
@@ -274,7 +275,18 @@
         "name": "auditoria-exaustiva-hooks-v2",
         "section_id": "sect_1773337074_44162",
         "section_number": 21,
-        "started_at": "2026-03-12T17:37:54Z"
+        "started_at": "2026-03-12T17:37:54Z",
+        "turns": 1,
+        "duration_s": 229521,
+        "pushes": 0,
+        "summary_file": "section-summaries/section-21-auditoria-exaustiva-hooks-v2-20260315_092316.md",
+        "closed_at": "2026-03-15T09:23:16Z"
+      },
+      {
+        "name": "execucao-roadmap-hooks",
+        "section_id": "sect_1773566596_32274",
+        "section_number": 22,
+        "started_at": "2026-03-15T09:23:15Z"
       }
     ],
     "turn_history": [
@@ -614,7 +626,7 @@
     "todo_created": false,
     "tools_count": 0,
     "auth_requested": false,
-    "intent": "Auditoria geral v2: leitura de scripts e catalogação de 30+ findings para Section 9.2",
+    "intent": "Continuar F1.3 da modularização dos hooks, convergindo pre-tool-use para helpers comuns",
     "intent_declared": true,
     "started_at": "2026-03-12T11:20:44.377Z",
     "turn_id": "turn_1773314444_79762",
@@ -630,17 +642,17 @@
     "subagent_description": "Code review patches Sprint 4"
   },
   "current_section": {
-    "name": "auditoria-exaustiva-hooks-v2",
-    "section_id": "sect_1773337074_44162",
-    "started_at": "2026-03-12T17:37:54Z",
+    "name": "execucao-roadmap-hooks",
+    "section_id": "sect_1773566596_32274",
+    "started_at": "2026-03-15T09:23:15Z",
     "turn_start": 1,
     "local_turn": 0,
-    "description": "Segunda rodada de auditoria exaustiva",
-    "section_number": 21,
+    "description": "Execução contínua do roadmap F1→F6 sem commit/push e sem quality gates automáticos",
+    "section_number": 22,
     "push_count": 0,
     "tools_by_name": {},
     "intent_history": [
-      "Auditoria geral v2: leitura de scripts e catalogação de 30+ findings para Section 9.2"
+      "Continuar F1.3 da modularização dos hooks, convergindo pre-tool-use para helpers comuns"
     ],
     "failures_count": 0,
     "blocked_turns": 0

@@ -36,11 +36,28 @@ if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
     source "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null || true
 fi
 
-# Lê o JSON de entrada de forma defensiva
-INPUT="$(cat 2> /dev/null || true)"
+# Núcleo crítico de lifecycle (F3.1)
+# shellcheck disable=SC1091
+if [ -f "$HOOK_DIR/hooks-lib/session-start-core.sh" ]; then
+    source "$HOOK_DIR/hooks-lib/session-start-core.sh" 2> /dev/null || true
+fi
+
+# Blocos auxiliares de session-start (briefing/backlog/health/trends) em modo fail-open (F3.2)
+# shellcheck disable=SC1091
+if [ -f "$HOOK_DIR/hooks-lib/session-start-aux.sh" ]; then
+    source "$HOOK_DIR/hooks-lib/session-start-aux.sh" 2> /dev/null || true
+fi
+
+# Lê runtime input de forma canônica (com fallback local)
+if command -v resolve_hook_runtime_input > /dev/null 2>&1; then
+    resolve_hook_runtime_input
+else
+    INPUT="$(cat 2> /dev/null || true)"
+    TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+    SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+fi
 
 # Extrai campos com fallback seguro
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
 CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 SOURCE="$(echo "$INPUT" | jq -r '.source // "new"' 2> /dev/null || echo 'new')"
 
@@ -60,7 +77,10 @@ case "$SOURCE" in
 esac
 
 # session_id: usa o UUID real enviado pelo Copilot; fallback para timestamp-based
-SESSION_ID_RAW="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+SESSION_ID_RAW="${SESSION_ID_PAYLOAD:-}"
+if [ -z "$SESSION_ID_RAW" ]; then
+    SESSION_ID_RAW="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+fi
 if [ -n "$SESSION_ID_RAW" ]; then
     SESSION_ID="$SESSION_ID_RAW"
 else
@@ -70,6 +90,38 @@ fi
 
 SESSION_DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo 'unknown')"
 SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || echo 'unknown')"
+: "${SESSION_DATE_SHORT}"
+
+ctx_apply_expr_file() {
+    local target_file="${1:-}"
+    local expr="${2:-}"
+    shift 2 || true
+
+    [ -n "$target_file" ] || return 1
+    [ -n "$expr" ] || return 1
+    [ -f "$target_file" ] || return 1
+
+    local _ctx_prev="${CTX_FILE:-}"
+    CTX_FILE="$target_file"
+
+    if command -v ctx_apply_jq_expr_best_effort > /dev/null 2>&1; then
+        ctx_apply_jq_expr_best_effort "$expr" "$@" > /dev/null 2>&1 || true
+    elif command -v sponge > /dev/null 2>&1; then
+        jq "$@" "$expr" "$target_file" | sponge "$target_file" 2> /dev/null || true
+    else
+        local _tmp_ctx
+        if _tmp_ctx="$(mktemp 2> /dev/null)"; then
+            if jq "$@" "$expr" "$target_file" > "$_tmp_ctx" 2> /dev/null; then
+                mv "$_tmp_ctx" "$target_file" 2> /dev/null || rm -f "$_tmp_ctx"
+            else
+                rm -f "$_tmp_ctx"
+            fi
+        fi
+    fi
+
+    CTX_FILE="$_ctx_prev"
+    return 0
+}
 
 # UPG-AUDIT-01: caminhos per-session (calculados logo que SESSION_ID é conhecido)
 SID_SHORT="${SESSION_ID:0:8}"
@@ -137,26 +189,13 @@ _ALERTS_JSON="[]"
 # Gera IDs UUID para a secão e turno iniciais
 INITIAL_SECTION_ID="$(uuidgen 2> /dev/null || printf 'sect_%s_%s' "$(date +%s)" "$$")"
 INITIAL_TURN_ID="$(uuidgen 2> /dev/null || printf 'turn_%s_%s' "$(date +%s)" "$$")"
+: "${INITIAL_TURN_ID}"
 
 # UPG-01: Calcula o número da sessão lógica
 # logical_session_number increments on every "new" sessionStart (not inline_restart).
 # Preserved as-is on inline_restart since that is a continuation of the same logical session.
-_PREV_LOGICAL_NUM=0
-if [ -f "$STATE_DIR/session-context.json" ] && command -v jq &> /dev/null; then
-    _PREV_LOGICAL_NUM="$(jq -r '.session.logical_session_number // 0' "$STATE_DIR/session-context.json" 2> /dev/null || echo 0)"
-    _PREV_LOGICAL_NUM="${_PREV_LOGICAL_NUM:-0}"
-fi
-if [ "$SOURCE" = "inline_restart" ]; then
-    # Preserva o número atual — mesma sessão lógica
-    # EBH-M03: guard contra 0 quando CTX estava inexistente antes do inline_restart
-    if [ "${_PREV_LOGICAL_NUM:-0}" -gt 0 ] 2> /dev/null; then
-        LOGICAL_SESSION_NUMBER="$_PREV_LOGICAL_NUM"
-    else
-        LOGICAL_SESSION_NUMBER=1
-    fi
-else
-    # Nova sessão lógica: incrementa
-    LOGICAL_SESSION_NUMBER=$((_PREV_LOGICAL_NUM + 1))
+if ! session_start_compute_logical_session_number "$STATE_DIR" "$SOURCE"; then
+    LOGICAL_SESSION_NUMBER=1
 fi
 
 # ── Persiste contexto inicial — Schema v4 (layered) ──────────────────────────
@@ -167,208 +206,7 @@ fi
 #   current_section → seção temática ativa (sempre >= 1 ativa — invariante Schema v4)
 #   last_tool     → metadados do último tool call (sobrescrito a cada preToolUse)
 #   compliance    → estado do protocolo de autorização
-#
-# FIX BUG-02 (PREMISSA 1): Para source=inline_restart, NÃO zeramos o CTX.
-# O VS Code reconectou a mesma conversa lógica — preservar estatísticas acumuladas
-# (turn_count, tools_total, section_count, etc.) garante continuidade.
-# Apenas os campos da session (id, timestamps, close_key) são atualizados.
-if [ "$SOURCE" = "inline_restart" ] \
-    && [ -f "$STATE_DIR/session-context.json" ] \
-    && [ -s "$STATE_DIR/session-context.json" ]; then
-    # Atualização parcial: apenas campos de identidade da sessão.
-    # Estatísticas, seções, histórico de turnos e compliance são PRESERVADOS.
-    _CTX_TMP="$(mktemp)"
-    if jq \
-        --arg sid "$SESSION_ID" \
-        --arg date "$SESSION_DATE" \
-        --arg date_short "$SESSION_DATE_SHORT" \
-        --arg source "$SOURCE" \
-        --arg cwd "$CWD" \
-        --arg close_key "$CLOSE_KEY" \
-        --arg ts "$TIMESTAMP" \
-        '.session.id                    = $sid
-         | .session.vs_code_session_id  = $sid
-         | .session.started_at          = $date
-         | .session.date_short          = $date_short
-         | .session.ended_at            = null
-         | .session.end_reason          = null
-         | .session.close_key           = $close_key
-        | .session.close_key_validated = false
-        | .session.strict_turn_close_requires_key = true
-         | .session.source              = $source
-         | .session.cwd                 = $cwd
-         | .last_tool.ts                = $ts
-         | .session_stats.pending_section_after_push = false
-         | .session_stats.push_count    = 0
-         | .session_stats.last_push_at  = null
-         | .session_stats.last_push_turn = null
-         | .session_stats.session_id_mismatches = 0
-         | .session_stats.session_id_syncs_inline = 0
-         | .hook_observability = ((.hook_observability // {}) + {
-             sessionStart_count: ((.hook_observability.sessionStart_count // 0) + 1),
-             userPromptSubmitted_count: (.hook_observability.userPromptSubmitted_count // 0),
-             last_sessionStart_at: $ts,
-             last_sessionStart_source: $source,
-             last_userPromptSubmitted_at: (.hook_observability.last_userPromptSubmitted_at // null),
-             last_userPromptSubmitted_hash: (.hook_observability.last_userPromptSubmitted_hash // null)
-         })' \
-        "$STATE_DIR/session-context.json" > "$_CTX_TMP" 2> /dev/null; then
-        # UPG-AUDIT-01: escreve no per-session file e recria symlink
-        _PER_CTX_REAL="${STATE_DIR}/session-context-${SID_SHORT}.json"
-        mv "$_CTX_TMP" "$_PER_CTX_REAL" 2> /dev/null \
-            || {
-                cp "$_CTX_TMP" "$_PER_CTX_REAL" 2> /dev/null
-                rm -f "$_CTX_TMP"
-            }
-        # Atualiza symlink de compatibilidade retroativa
-        if [ -n "${SID_SHORT:-}" ]; then
-            update_compat_symlinks "$SID_SHORT" 2> /dev/null || true
-            set_current_session_id "$SESSION_ID" 2> /dev/null || true
-        fi
-    else
-        rm -f "$_CTX_TMP"
-        # Fallback: se a atualização parcial falhar (CTX corrompido), faz reset completo
-        echo "[session-start] WARN: CTX corrompido em inline_restart — fallback para reset completo" >&2
-        SOURCE="new" # força o branch de reset abaixo
-    fi
-fi
-
-if [ "$SOURCE" != "inline_restart" ]; then
-    jq -cn \
-        --arg sid "$SESSION_ID" \
-        --arg ts "$TIMESTAMP" \
-        --arg date "$SESSION_DATE" \
-        --arg date_short "$SESSION_DATE_SHORT" \
-        --arg source "$SOURCE" \
-        --arg cwd "$CWD" \
-        --arg close_key "$CLOSE_KEY" \
-        --arg initial_section_id "$INITIAL_SECTION_ID" \
-        --arg initial_turn_id "$INITIAL_TURN_ID" \
-        --argjson consec "$PREV_CONSEC_UNAUTH" \
-        --argjson logical_num "$LOGICAL_SESSION_NUMBER" \
-        --arg close_mode "${PREV_CLOSE_MODE:-ok}" \
-        --arg prev_sid "${PREV_SESSION_ID:-}" \
-        --arg prev_ts "${PREV_CHECKPOINT_TS:-}" \
-        --argjson alerts "$_ALERTS_JSON" \
-        --arg alerts_req "$RECOVERY_ALERTS_REQUIRE_KICKOFF" \
-        '{
-        "session": {
-            "id":                    $sid,
-            "vs_code_session_id":    $sid,
-            "logical_session_number": $logical_num,
-            "logical_restart_at":    $ts,
-            "started_at":            $date,
-            "date_short":            $date_short,
-            "ended_at":              null,
-            "end_reason":            null,
-            "close_key":             $close_key,
-            "close_key_validated":   false,
-            "strict_turn_close_requires_key": true,
-            "source":                $source,
-            "cwd":                   $cwd
-        },
-        "session_stats": {
-            "turn_count":         0,
-            "turn_authorized":    0,
-            "turn_unauthorized":  0,
-            "resume_count":       0,
-            "tools_total":        0,
-            "tools_by_name":      {},
-            "failures_detected":        0,
-            "errors_total":             0,
-            "subagent_calls":           0,
-            "subagent_completions":     0,
-            "askquestions_api_failures": 0,
-            "section_count":      1,
-            "section_names":      ["início"],
-            "section_history":    [{"name": "início", "section_id": $initial_section_id, "section_number": 1, "started_at": $date}],
-            "turn_history":       [],
-            "push_count":         0,
-            "last_push_at":       null,
-            "last_push_turn":     null,
-            "pending_section_after_push": false,
-            "commit_history":     [],
-            "session_id_mismatches": 0,
-            "session_id_syncs_inline": 0,
-            "recovery_hints": {
-                "last_intent":      null,
-                "last_section":     null,
-                "last_commit_sha":  null,
-                "last_commit_ts":   null
-            }
-        },
-        "current_turn": {
-            "number":                      1,
-            "started_at":                  $date,
-            "tools_count":                 0,
-            "tools_by_name":               {},
-            "failures_count":              0,
-            "auth_requested":              false,
-            "auth_requested_at":           null,
-            "last_askquestions_response":  null,
-            "section_name":                "início",
-            "section_turn":                1,
-            "intent_declared":             false,
-            "intent":                      null,
-            "todo_created":                false,
-            "block_count":                 0,
-            "agentStop_invocations":       0,
-            "subagent_delegated":          false,
-            "last_non_bookkeeping_tool":   null,
-            "last_askquestions_template":  null,
-            "last_askquestions_close_action": null,
-            "last_askquestions_close_key_found": false,
-            "turn_id":                     $initial_turn_id
-        },
-        "current_section": {
-            "name":           "início",
-            "started_at":     $date,
-            "turn_start":     1,
-            "local_turn":     0,
-            "description":    null,
-            "section_number": 1,
-            "section_id":     $initial_section_id,
-            "push_count":     0,
-            "tools_by_name":  {},
-            "intent_history": [],
-            "failures_count": 0,
-            "blocked_turns":  0
-        },
-        "last_tool": {
-            "name":   null,
-            "ts":     $ts,
-            "use_id": null,
-            "result": null
-        },
-        "compliance": {
-            "last_turn_authorized":     null,
-            "consecutive_unauthorized": $consec,
-            "flag_file_exists":         false
-        },
-        "recovery": {
-            "close_mode":           $close_mode,
-            "prev_session_id":      $prev_sid,
-            "prev_session_ts":      $prev_ts,
-            "alerts":               $alerts,
-            "alerts_require_kickoff": ($alerts_req == "true"),
-            "detected_at":          $ts
-        },
-        "hook_observability": {
-            "sessionStart_count": 1,
-            "userPromptSubmitted_count": 0,
-            "last_sessionStart_at": $ts,
-            "last_sessionStart_source": $source,
-            "last_userPromptSubmitted_at": null,
-            "last_userPromptSubmitted_hash": null
-        },
-        "quality_gates":   {},
-        "session_summary": null,
-        "last_turn_ts":    null
-    }' > "$PER_CTX_FILE"
-    # UPG-AUDIT-01: após criar o per-session CTX, atualiza symlinks e current-session-id.txt
-    update_compat_symlinks "$SID_SHORT" 2> /dev/null || true
-    set_current_session_id "$SESSION_ID" 2> /dev/null || true
-fi
+session_start_persist_initial_context || true
 
 # UPG-AUDIT-01: garante que CTX_FILE e AUDIT_FILE apontam para os per-session files
 CTX_FILE="$PER_CTX_FILE"
@@ -582,15 +420,9 @@ fi
 # portanto atualizamos o objeto .recovery aqui com os valores efetivamente detectados.
 _RECOVERY_TARGET_FILE="$PER_CTX_FILE"
 if [ -f "$_RECOVERY_TARGET_FILE" ] && command -v jq &> /dev/null; then
-    _RECOVERY_TMP="$(mktemp)"
     _RECOVERY_TS="${TIMESTAMP:-$SESSION_DATE}"
-    if jq \
-        --arg close_mode "${PREV_CLOSE_MODE:-ok}" \
-        --arg prev_sid "${PREV_SESSION_ID:-}" \
-        --arg prev_ts "${PREV_CHECKPOINT_TS:-}" \
-        --arg detected_at "$_RECOVERY_TS" \
-        --arg alerts_req "$RECOVERY_ALERTS_REQUIRE_KICKOFF" \
-        --argjson alerts "$_ALERTS_JSON" \
+    if ctx_apply_expr_file \
+        "$_RECOVERY_TARGET_FILE" \
         '.recovery = ((.recovery // {}) + {
             close_mode: $close_mode,
             prev_session_id: $prev_sid,
@@ -599,14 +431,13 @@ if [ -f "$_RECOVERY_TARGET_FILE" ] && command -v jq &> /dev/null; then
             alerts_require_kickoff: ($alerts_req == "true"),
             detected_at: $detected_at
         })' \
-        "$_RECOVERY_TARGET_FILE" > "$_RECOVERY_TMP" 2> /dev/null; then
-        mv "$_RECOVERY_TMP" "$_RECOVERY_TARGET_FILE" 2> /dev/null \
-            || {
-                cp "$_RECOVERY_TMP" "$_RECOVERY_TARGET_FILE" 2> /dev/null
-                rm -f "$_RECOVERY_TMP"
-            }
-    else
-        rm -f "$_RECOVERY_TMP"
+        --arg close_mode "${PREV_CLOSE_MODE:-ok}" \
+        --arg prev_sid "${PREV_SESSION_ID:-}" \
+        --arg prev_ts "${PREV_CHECKPOINT_TS:-}" \
+        --arg detected_at "$_RECOVERY_TS" \
+        --arg alerts_req "$RECOVERY_ALERTS_REQUIRE_KICKOFF" \
+        --argjson alerts "$_ALERTS_JSON"; then
+        :
     fi
 fi
 
@@ -655,192 +486,38 @@ TASKS_FILE="$STATE_DIR/pending-tasks.md"
 FINDINGS_FILE="$LOG_DIR/findings.jsonl"
 BRIEFING_FILE="$STATE_DIR/session-briefing.md"
 
-# Conta tarefas por prioridade
+# Conta tarefas/findings (bloco auxiliar, fail-open)
 COUNT_ALTA=0
 COUNT_MEDIA=0
 COUNT_BACKLOG=0
 NEXT_TASK=""
-
-if [ -f "$TASKS_FILE" ]; then
-    # Contagens por seção
-    COUNT_ALTA="$(awk '/^## Alta Prioridade/{f=1} /^## / && !/^## Alta/{f=0} f && /^\- \[ \]/' "$TASKS_FILE" | wc -l | tr -d ' ')"
-    COUNT_MEDIA="$(awk '/^## Média Prioridade/{f=1} /^## / && !/^## Média/{f=0} f && /^\- \[ \]/' "$TASKS_FILE" | wc -l | tr -d ' ')"
-    COUNT_BACKLOG="$(awk '/^## Backlog/{f=1} /^## / && !/^## Backlog/{f=0} f && /^\- \[ \]/' "$TASKS_FILE" | wc -l | tr -d ' ')"
-    # Próxima tarefa sugerida (primeira não concluída de Alta Prioridade)
-    NEXT_TASK="$(awk '/^## Alta Prioridade/{f=1} /^## / && !/^## Alta/{f=0} f && /^\- \[ \]/{print; exit}' "$TASKS_FILE" | sed 's/^- \[ \] //')"
-    [ -z "$NEXT_TASK" ] && NEXT_TASK="(nenhuma tarefa de Alta Prioridade — verificar Média Prioridade)"
-fi
-
-# Conta findings não resolvidos (da sessão atual ou anteriores)
 OPEN_FINDINGS=0
 CRITICAL_FINDINGS=0
-if [ -f "$FINDINGS_FILE" ]; then
-    OPEN_FINDINGS="$(wc -l < "$FINDINGS_FILE" 2> /dev/null | tr -d ' ')"
-    CRITICAL_FINDINGS="$(jq -r 'select(.severity == "critical" or .severity == "high")' "$FINDINGS_FILE" 2> /dev/null | jq -s 'length' 2> /dev/null || echo 0)"
-fi
-
-TOTAL_OPEN=$((COUNT_ALTA + COUNT_MEDIA + COUNT_BACKLOG))
+TOTAL_OPEN=0
+run_aux_block "session-start:backlog-findings" "${HOOKS_AUX_TIMEOUT_S:-5}" \
+    session_start_collect_backlog_and_findings "$TASKS_FILE" "$FINDINGS_FILE" > /dev/null 2>&1 || true
 
 # ─────────────────────────────────────────────────────────────
-# Análise de tendências históricas (audit*.jsonl + tool-metrics.jsonl)
-# UPG-AUDIT-01: merge cross-session para leitura histórica correta
+# Análise de tendências históricas (bloco auxiliar, fail-open)
 # ─────────────────────────────────────────────────────────────
-_TREND_AUDIT_FILE_BKP="$AUDIT_FILE" # salva arquivo per-session atual
-_TREND_MERGED=""
-# Merge de todos os per-session audits para análise cross-session
-_TREND_SID_FILES=()
-while IFS= read -r -d '' _tf; do _TREND_SID_FILES+=("$_tf"); done \
-    < <(find "$LOG_DIR" -maxdepth 1 -name 'audit-????????.jsonl' -print0 2> /dev/null | sort -z)
-if [ ${#_TREND_SID_FILES[@]} -gt 0 ] && _TREND_MERGED="$(mktemp 2> /dev/null)"; then
-    # BUG-25 fix: encadeia trap EXIT em vez de sobrescrever trap anterior
-    _PREV_EXIT_TRAP="$(trap -p EXIT 2> /dev/null | sed "s/^trap -- '//;s/' EXIT$//")"
-    if [ -n "$_PREV_EXIT_TRAP" ]; then
-        # shellcheck disable=SC2064
-        trap "${_PREV_EXIT_TRAP}; rm -f \"${_TREND_MERGED:-}\"" EXIT
-    else
-        # shellcheck disable=SC2064
-        trap 'rm -f "${_TREND_MERGED:-}"' EXIT
-    fi
-    cat "${_TREND_SID_FILES[@]}" > "$_TREND_MERGED" 2> /dev/null || true
-    AUDIT_FILE="$_TREND_MERGED"
-else
-    AUDIT_FILE="$LOG_DIR/audit.jsonl"
-fi
-METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"
-
 TREND_SESSIONS="N/D"
 TREND_TOTAL_TOOLS="N/D"
 TREND_ERROR_RATE="N/D"
 TREND_TOP_TOOLS_TABLE=""
 TREND_TOP_FAILURES="- (nenhuma falha registrada)"
 TREND_PERF_TABLE=""
+run_aux_block "session-start:trends" "${HOOKS_AUX_TIMEOUT_S:-5}" \
+    session_start_compute_trends > /dev/null 2>&1 || true
 
-if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
-    TREND_SESSIONS="$(jq -r '.session_id // empty' "$AUDIT_FILE" 2> /dev/null \
-        | sort -u | awk 'NF{n++} END{print n+0}' || echo 'N/D')"
-
-    TREND_TOTAL_TOOLS="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null \
-        | wc -l | tr -d ' ' || echo '0')"
-
-    TOTAL_FAILURES="$(jq -r 'select((.event == "toolFailure" or .event == "toolUseFailure") and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null \
-        | wc -l | tr -d ' ' || echo '0')"
-
-    if [ "$TREND_TOTAL_TOOLS" -gt 0 ] 2> /dev/null; then
-        TREND_ERROR_RATE="$(echo "$TOTAL_FAILURES $TREND_TOTAL_TOOLS" \
-            | awk '{printf "%.1f%% (%d/%d)", ($1/$2)*100, $1, $2}')"
-    fi
-
-    TREND_TOP_TOOLS_TABLE="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null \
-        | sort | uniq -c | sort -rn | head -6 \
-        | awk '{printf "| `%-35s` | %5d |\n", $2, $1}' || true)"
-    [ -z "$TREND_TOP_TOOLS_TABLE" ] && TREND_TOP_TOOLS_TABLE="| N/D | 0 |"
-
-    TREND_TOP_FAILURES="$(jq -r 'select((.event == "toolFailure" or .event == "toolUseFailure") and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' \
-        "$AUDIT_FILE" 2> /dev/null \
-        | sort | uniq -c | sort -rn | head -3 \
-        | awk '{printf "- `%s`: %d falha(s)\n", $2, $1}' || true)"
-    [ -z "$TREND_TOP_FAILURES" ] && TREND_TOP_FAILURES="- (nenhuma falha registrada)"
-fi
-
-if [ -f "$METRICS_FILE" ] && [ -s "$METRICS_FILE" ]; then
-    TREND_PERF_TABLE="$(jq -r '(.tool_name // .toolName)' "$METRICS_FILE" 2> /dev/null \
-        | sort -u \
-        | while read -r tool; do
-            AVG_MS="$(jq -r --arg t "$tool" \
-                'select((.tool_name // .toolName) == $t) | .duration_ms' \
-                "$METRICS_FILE" 2> /dev/null \
-                | awk '{s+=$1; n++} END {if(n>0) printf "%.0f", s/n; else print "N/D"}')"
-            COUNT_T="$(jq -r --arg t "$tool" \
-                'select((.tool_name // .toolName) == $t) | (.tool_name // .toolName)' \
-                "$METRICS_FILE" 2> /dev/null | wc -l | tr -d ' ')"
-            printf "| \`%-35s\` | %6s ms | %4d |\n" "$tool" "$AVG_MS" "$COUNT_T"
-        done \
-        | sort -t'|' -k3 -rn | head -8 || true)"
-    [ -z "$TREND_PERF_TABLE" ] && TREND_PERF_TABLE="| N/D | - | 0 |"
-fi
-
-AUDIT_FILE="$_TREND_AUDIT_FILE_BKP" # UPG-AUDIT-01: restaura audit per-session após análise histórica
-
-# ── UP3: Health check do ambiente ─────────────────────────────────────────
+# ── UP3: Health check do ambiente (bloco auxiliar, fail-open) ──────────────
 HEALTH_CRITICAL=""
 HEALTH_WARNINGS=""
-
-# sponge é crítico: sem ele nenhuma atualização do session-context.json funciona
-if ! command -v sponge &> /dev/null; then
-    HEALTH_CRITICAL="${HEALTH_CRITICAL}
-- ⛔ **sponge não instalado** — instale com \`sudo apt install moreutils\`. Atualizações de estado da sessão inoperantes."
-fi
-
-# jq é crítico: sem ele nenhum hook funciona
-if ! command -v jq &> /dev/null; then
-    HEALTH_CRITICAL="${HEALTH_CRITICAL}
-- ⛔ **jq não instalado** — instale com \`sudo apt install jq\`. Sistema de hooks completamente inoperante."
-fi
-
-# audit.jsonl: rotação automática ocorre em 5000 linhas (rotate-audit.sh, chamado por session-start.sh)
-AUDIT_LINES=0
-if [ -f "$AUDIT_FILE" ]; then
-    AUDIT_LINES="$(wc -l < "$AUDIT_FILE" | tr -d ' ')"
-    if [ "${AUDIT_LINES}" -gt 4500 ] 2> /dev/null; then
-        HEALTH_CRITICAL="${HEALTH_CRITICAL}
-- ⛔ **audit.jsonl crítico** (${AUDIT_LINES}/5000 linhas). Rotação iminente — arquive logs antigos urgentemente."
-    elif [ "${AUDIT_LINES}" -gt 3000 ] 2> /dev/null; then
-        HEALTH_WARNINGS="${HEALTH_WARNINGS}
-- ⚠️ **audit.jsonl crescendo** (${AUDIT_LINES}/5000 linhas). Rotação automática em breve."
-    fi
-fi
-
-# session-context.json: verifica permissão de escrita
-if [ -f "$STATE_DIR/session-context.json" ] && [ ! -w "$STATE_DIR/session-context.json" ]; then
-    HEALTH_CRITICAL="${HEALTH_CRITICAL}
-- ⛔ **session-context.json sem permissão de escrita** — estado da sessão não pode ser atualizado."
-fi
-
-# Findings críticos/high abertos requerem atenção antes de nova tarefa
-if [ "${CRITICAL_FINDINGS:-0}" -gt 0 ] 2> /dev/null; then
-    HEALTH_WARNINGS="${HEALTH_WARNINGS}
-- ⚠️ **${CRITICAL_FINDINGS} finding(s) crítico/high abertos** — verifique \`logs/findings.jsonl\` antes de iniciar nova tarefa."
-fi
-
-# ── Health check de REDE (v5.5 — Session Robustness) ──────────────────────
-# Detecta problemas de conectividade que causam desconexões/reconexões VS Code.
-# Referência: DOCUMENTAÇÃO/HOOKS/ANALISE-SESSOES-ABRUPTAS.md §5.5
-NET_CHECK_HOST="${HEALTH_CHECK_HOST:-140.82.112.22}" # GitHub (IPs estáticos)
-NET_TIMEOUT=3
-NET_OK=false
-if ping -c 1 -W "$NET_TIMEOUT" "$NET_CHECK_HOST" &> /dev/null 2>&1; then
-    NET_OK=true
-fi
-
-# Verifica taxa de reconexões recentes (sessionReconnect no audit.jsonl)
-RECENT_RECONNECT_COUNT=0
-if [ -f "$AUDIT_FILE" ] && command -v jq &> /dev/null; then
-    RECENT_RECONNECT_COUNT="$(
-        jq -r 'select(.event == "sessionReconnect") | .timestamp' "$AUDIT_FILE" 2> /dev/null \
-            | tail -50 | wc -l | tr -d ' '
-    )"
-fi
-RECENT_RECONNECT_COUNT="${RECENT_RECONNECT_COUNT:-0}"
-
-if [ "$NET_OK" = "false" ]; then
-    HEALTH_CRITICAL="${HEALTH_CRITICAL}
-- ⛔ **Sem conectividade de rede** (ping ${NET_CHECK_HOST} falhou). VS Code pode desconectar. Verifique WSL2/Docker network."
-fi
-
-if [ "${RECENT_RECONNECT_COUNT}" -ge 20 ] 2> /dev/null; then
-    HEALTH_CRITICAL="${HEALTH_CRITICAL}
-- ⛔ **Taxa crítica de reconexões VS Code** (${RECENT_RECONNECT_COUNT} reconexões detectadas). Instabilidade de conexão severa."
-elif [ "${RECENT_RECONNECT_COUNT}" -ge 5 ] 2> /dev/null; then
-    HEALTH_WARNINGS="${HEALTH_WARNINGS}
-- ⚠️ **Taxa elevada de reconexões VS Code** (${RECENT_RECONNECT_COUNT} reconexões). Verifique: extensões auto-update, rede/DNS, sleep do host."
-fi
-
 HEALTH_STATUS="✅ Sistema operacional"
-if [ -n "$HEALTH_CRITICAL" ]; then
-    HEALTH_STATUS="⛔ CRÍTICO — verificação imediata necessária"
-elif [ -n "$HEALTH_WARNINGS" ]; then
-    HEALTH_STATUS="⚠️ Avisos presentes"
-fi
+NET_CHECK_HOST="${HEALTH_CHECK_HOST:-140.82.112.22}"
+NET_OK=false
+RECENT_RECONNECT_COUNT=0
+run_aux_block "session-start:health" "${HOOKS_AUX_TIMEOUT_S:-5}" \
+    session_start_compute_health > /dev/null 2>&1 || true
 
 # ── Verifica violação de autorização da sessão anterior ────────────────────
 # G9-03: Flag de sessão diferente (obsoleto) é removido automaticamente com audit.

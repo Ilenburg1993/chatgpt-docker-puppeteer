@@ -7,6 +7,7 @@
 #
 # Variáveis exportadas (readonly para evitar redefinição acidental):
 #   HOOKS_FLOCK_TIMEOUT      — timeout flock em segundos
+#   HOOKS_AUX_TIMEOUT_S      — timeout padrão (segundos) para blocos auxiliares fail-open
 #   HOOKS_HEAL_THRESHOLD     — mismatches consecutivos para ativar HEAL v2
 #   HOOKS_MAX_BLOCK_PER_TURN — máximo de decision:block por turno
 #   HOOKS_CONSEC_WARNING     — violações consecutivas para alerta WARNING
@@ -15,6 +16,7 @@
 #   HOOKS_SECTION_HISTORY_CAP — máximo de entradas em section_history (rolante)
 #   HOOKS_AUDIT_MAX_MB       — tamanho máximo de audit.jsonl antes de rotate (MB)
 #   HOOKS_SCHEMA_VERSION     — versão canônica do session-context.json
+#   HOOKS_FF_SMOKE_DOMAINS   — flag de rollout da suíte smoke por domínios (off|shadow|on)
 # ============================================================
 
 # Não re-exportar se já carregado (idempotente)
@@ -24,6 +26,10 @@
 # Timeout (segundos) que flock aguarda para obter lock exclusivo.
 # REV-08: aumentado de 3s para 5s para tolerar jq+sponge em arquivos grandes (>5k linhas).
 readonly HOOKS_FLOCK_TIMEOUT="${HOOKS_FLOCK_TIMEOUT:-5}"
+
+# Timeout padrão para execução de blocos auxiliares (briefing, trends, summary, etc.).
+# Mantém o fluxo crítico resiliente, evitando bloqueio por jobs não críticos.
+readonly HOOKS_AUX_TIMEOUT_S="${HOOKS_AUX_TIMEOUT_S:-5}"
 
 # ── HEAL v2 ──────────────────────────────────────────────────────────────────
 # Número de mismatches consecutivos de session_id para ativar auto-heal.
@@ -52,6 +58,12 @@ readonly HOOKS_AUDIT_MAX_MB="${HOOKS_AUDIT_MAX_MB:-5}"
 
 # ── Schema ───────────────────────────────────────────────────────────────────
 readonly HOOKS_SCHEMA_VERSION="${HOOKS_SCHEMA_VERSION:-8}"
+
+# ── Feature flags de rollout controlado ─────────────────────────────────────
+# off    => caminho desativado
+# shadow => executa em paralelo sem quebrar gate principal
+# on     => executa com efeito de gate
+readonly HOOKS_FF_SMOKE_DOMAINS="${HOOKS_FF_SMOKE_DOMAINS:-shadow}"
 
 HOOKS_CONFIG_LOADED=1
 export HOOKS_CONFIG_LOADED

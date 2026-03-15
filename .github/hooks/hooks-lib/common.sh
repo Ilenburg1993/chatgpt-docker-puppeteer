@@ -102,6 +102,57 @@ with_lock() {
     fi
 }
 
+# ── run_aux_block ───────────────────────────────────────────────────────────
+# Executa bloco auxiliar em subshell com timeout e log de falha.
+# Não deve ser usado para fluxo crítico de lifecycle; apenas jobs fail-open.
+#
+# Parâmetros:
+#   $1 = nome lógico do bloco (ex.: "session-start:trends")
+#   $2 = timeout em segundos (inteiro >= 1)
+#   $3... = comando/função + args
+#
+# Retorno:
+#   0 em sucesso
+#   124 em timeout
+#   rc do comando em falha
+run_aux_block() {
+    local block_name="${1:-aux-block}"
+    local timeout_s="${2:-5}"
+    shift 2 || true
+
+    if ! [[ "$timeout_s" =~ ^[0-9]+$ ]] || [ "$timeout_s" -lt 1 ]; then
+        timeout_s=5
+    fi
+
+    [ $# -gt 0 ] || return 1
+
+    (
+        "$@"
+    ) &
+    local pid=$!
+    local elapsed=0
+
+    while kill -0 "$pid" 2> /dev/null; do
+        if [ "$elapsed" -ge "$timeout_s" ]; then
+            kill -TERM "$pid" 2> /dev/null || true
+            sleep 1
+            kill -KILL "$pid" 2> /dev/null || true
+            wait "$pid" 2> /dev/null || true
+            log_warn "aux timeout" "block=${block_name}" "timeout_s=${timeout_s}"
+            return 124
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+
+    wait "$pid"
+    local rc=$?
+    if [ "$rc" -ne 0 ]; then
+        log_warn "aux failure" "block=${block_name}" "rc=${rc}"
+    fi
+    return "$rc"
+}
+
 # ── ctx_update ───────────────────────────────────────────────────────────────
 # Atualiza session-context.json atomicamente com flock.
 # Parâmetros: $1 = expressão jq de transformação (ex: '.current_turn.number += 1')
@@ -135,6 +186,41 @@ ctx_update() {
             return 1
         fi
     fi
+    return 0
+}
+
+# ── ctx_apply_jq_expr_best_effort ─────────────────────────────────────────
+# Aplica uma expressão jq no CTX_FILE sem gerenciar lock internamente.
+# Uso recomendado: cenários onde o lock já foi obtido no script chamador.
+#
+# Parâmetros:
+#   $1 = expressão jq
+#   $@ (restante) = argumentos opcionais para jq (--arg/--argjson/...)
+#
+# Retorno:
+#   0 em best-effort (mesmo com falhas não fatais), 1 se CTX ausente/expr vazia
+ctx_apply_jq_expr_best_effort() {
+    local expr="${1:-}"
+    shift || true
+
+    [ -n "$expr" ] || return 1
+    [ -f "$CTX_FILE" ] || return 1
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq "$@" "$expr" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_ctx
+        if _tmp_ctx="$(mktemp 2> /dev/null)"; then
+            if jq "$@" "$expr" "$CTX_FILE" > "$_tmp_ctx" 2> /dev/null; then
+                local _real_ctx
+                _real_ctx="$(readlink -f "$CTX_FILE" 2> /dev/null || echo "$CTX_FILE")"
+                mv "$_tmp_ctx" "$_real_ctx" 2> /dev/null || rm -f "$_tmp_ctx"
+            else
+                rm -f "$_tmp_ctx"
+            fi
+        fi
+    fi
+
     return 0
 }
 

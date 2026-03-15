@@ -32,6 +32,14 @@ else
     echo "[warn] common.sh não encontrado (pre-tool-use.sh) — funções compartilhadas indisponíveis" >&2
 fi
 
+# shellcheck disable=SC1091
+if [ -f "$HOOK_DIR/hooks-lib/policy.sh" ]; then
+    source "$HOOK_DIR/hooks-lib/policy.sh" 2> /dev/null \
+        || echo "[warn] policy.sh falhou ao carregar em pre-tool-use.sh" >&2
+else
+    echo "[warn] policy.sh não encontrado (pre-tool-use.sh) — helpers de policy indisponíveis" >&2
+fi
+
 # CRÍTICO-1 FIX: lê stdin e resolve per-session ANTES de abrir o flock (fd 9)
 if command -v resolve_hook_runtime_input > /dev/null 2>&1; then
     resolve_hook_runtime_input
@@ -71,8 +79,83 @@ if command -v flock > /dev/null 2>&1; then
     flock -x -w 3 9 2> /dev/null
 fi
 
+ctx_apply_expr() {
+    local expr="${1:-}"
+    shift || true
+
+    [ -n "$expr" ] || return 1
+    [ -f "$CTX_FILE" ] || return 1
+
+    if command -v ctx_apply_jq_expr_best_effort > /dev/null 2>&1; then
+        ctx_apply_jq_expr_best_effort "$expr" "$@" > /dev/null 2>&1 || true
+        return 0
+    fi
+
+    if command -v sponge > /dev/null 2>&1; then
+        jq "$@" "$expr" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    else
+        local _tmp_ctx
+        if _tmp_ctx="$(mktemp 2> /dev/null)"; then
+            if jq "$@" "$expr" "$CTX_FILE" > "$_tmp_ctx" 2> /dev/null; then
+                mv "$_tmp_ctx" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_ctx"
+            else
+                rm -f "$_tmp_ctx"
+            fi
+        fi
+    fi
+
+    return 0
+}
+
 # Serializa tool_input (objeto JSON) para string redactável
 TOOL_INPUT_RAW="$(echo "$INPUT" | jq -c '.tool_input // {}' 2> /dev/null || echo '{}')"
+
+# ── Compliance de leitura obrigatória (início/retomada de sessão) ──────────
+# Marca documentos obrigatórios como lidos quando o agente usa read_file
+# em session-briefing.md, pending-tasks.md e session-context.json.
+if [ "$TOOL_NAME" = "read_file" ] && [ -f "$CTX_FILE" ]; then
+    READ_FILE_PATH="$(echo "$INPUT" | jq -r '.tool_input.filePath // ""' 2> /dev/null || echo '')"
+    REQUIRED_DOC_KEY=""
+    case "$READ_FILE_PATH" in
+        */.github/hooks/state/session-briefing.md)
+            REQUIRED_DOC_KEY="session-briefing.md"
+            ;;
+        */.github/hooks/state/pending-tasks.md)
+            REQUIRED_DOC_KEY="pending-tasks.md"
+            ;;
+        */.github/hooks/state/session-context.json)
+            REQUIRED_DOC_KEY="session-context.json"
+            ;;
+    esac
+
+    if [ -n "$REQUIRED_DOC_KEY" ]; then
+        ctx_apply_expr \
+            '.current_turn.required_docs_pending = ((.current_turn.required_docs_pending // []) | map(select(. != $doc)))
+             | .current_turn.required_docs_read_log = ((.current_turn.required_docs_read_log // []) + [{doc: $doc, path: $path, ts: $ts}] | if length > 20 then .[-20:] else . end)
+             | .current_turn.required_docs_last_read_at = $ts
+             | .current_turn.required_docs_status = (if ((.current_turn.required_docs_pending // []) | length) == 0 then "completed" else "pending" end)' \
+            --arg doc "$REQUIRED_DOC_KEY" \
+            --arg path "$READ_FILE_PATH" \
+            --arg ts "${TIMESTAMP:-$_LOCAL_TS}"
+
+        jq -cn \
+            --arg event "requiredDoc_read" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+            --arg doc "$REQUIRED_DOC_KEY" \
+            --arg path "$READ_FILE_PATH" \
+            --arg tool_use_id "$TOOL_USE_ID" \
+            '{
+                event: $event,
+                session_id: $sid,
+                timestamp: $ts,
+                required_doc: $doc,
+                file_path: $path,
+                tool_use_id: $tool_use_id,
+                message: "Documento obrigatório de sessão lido"
+            }' >> "$AUDIT_FILE" 2> /dev/null || true
+    fi
+fi
 
 TODO_LAST_ITEM_LABEL=""
 TODO_LAST_ITEM_IS_CONTINUATION="false"
@@ -214,7 +297,11 @@ if [ "$TOOL_NAME" = "vscode_askQuestions" ]; then
     ASK_TEMPLATE_F_PRE=false
     ASK_HAS_TEMPLATE_F_OPTION_PRE=false
 
-    if echo "$INPUT" | jq -e '
+    if command -v policy_input_is_template_f > /dev/null 2>&1 \
+        && policy_input_is_template_f "$INPUT"; then
+        ASK_TEMPLATE_F_PRE=true
+        ASK_HAS_TEMPLATE_F_OPTION_PRE=true
+    elif echo "$INPUT" | jq -e '
             [
                 (.tool_input.questions? // [])[]?
                 | ((.header // "") + " " + (.question // ""))
@@ -222,6 +309,12 @@ if [ "$TOOL_NAME" = "vscode_askQuestions" ]; then
             | any(test("template f|encerrar session|encerrar sessão|session close|close key"; "i"))
         ' > /dev/null 2>&1; then
         ASK_TEMPLATE_F_PRE=true
+        ASK_HAS_TEMPLATE_F_OPTION_PRE=true
+    fi
+
+    if [ "$ASK_HAS_TEMPLATE_F_OPTION_PRE" != "true" ] \
+        && command -v policy_input_has_template_f_option > /dev/null 2>&1 \
+        && policy_input_has_template_f_option "$INPUT"; then
         ASK_HAS_TEMPLATE_F_OPTION_PRE=true
     elif echo "$INPUT" | jq -e '
             [
@@ -412,10 +505,9 @@ fi
 
 # ── Backfill canônico de campos de resumo de sessão ────────────────────────
 # Alguns contextos legados podem não conter estes campos esperados pelo smoke.
-if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    jq '.session_summary = (.session_summary // null)
-        | .last_turn_ts = (.last_turn_ts // null)' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+if [ -f "$CTX_FILE" ]; then
+    ctx_apply_expr '.session_summary = (.session_summary // null)
+        | .last_turn_ts = (.last_turn_ts // null)'
 fi
 
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
@@ -473,15 +565,14 @@ if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
 
             if [ "$_MM_SAN" = "true" ] && [ "$_MM_RCV_MODE" != "ok" ]; then
                 _MM_TS_NOW="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
-                if command -v sponge &> /dev/null; then
-                    jq --arg now "$_MM_TS_NOW" '
-                        .recovery.close_mode = "ok"
-                        | .recovery.prev_session_id = ""
-                        | .recovery.prev_session_ts = ""
-                        | .recovery.alerts = []
-                        | .recovery.alerts_require_kickoff = false
-                        | .recovery.detected_at = $now' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-                fi
+                ctx_apply_expr \
+                    '.recovery.close_mode = "ok"
+                     | .recovery.prev_session_id = ""
+                     | .recovery.prev_session_ts = ""
+                     | .recovery.alerts = []
+                     | .recovery.alerts_require_kickoff = false
+                     | .recovery.detected_at = $now' \
+                    --arg now "$_MM_TS_NOW"
                 jq -cn \
                     --arg event "recovery_stale_sanitized" \
                     --arg sid "$CTX_ACTIVE_SID" \
@@ -545,30 +636,14 @@ if [ -f "$CTX_FILE" ] && command -v jq > /dev/null 2>&1; then
 
     if [ "$_RCV_SANITIZE" = "true" ] && [ "$_RCV_CLOSE_MODE" != "ok" ]; then
         _RCV_TS_NOW="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo "${TIMESTAMP:-}")"
-        if command -v sponge &> /dev/null; then
-            jq --arg now "$_RCV_TS_NOW" '
-                .recovery.close_mode = "ok"
-                | .recovery.prev_session_id = ""
-                | .recovery.prev_session_ts = ""
-                | .recovery.alerts = []
-                | .recovery.alerts_require_kickoff = false
-                | .recovery.detected_at = $now' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-        else
-            _RCV_TMP="$(mktemp 2> /dev/null || echo '')"
-            if [ -n "$_RCV_TMP" ]; then
-                if jq --arg now "$_RCV_TS_NOW" '
-                    .recovery.close_mode = "ok"
-                    | .recovery.prev_session_id = ""
-                    | .recovery.prev_session_ts = ""
-                    | .recovery.alerts = []
-                    | .recovery.alerts_require_kickoff = false
-                    | .recovery.detected_at = $now' "$CTX_FILE" > "$_RCV_TMP" 2> /dev/null; then
-                    mv "$_RCV_TMP" "$CTX_FILE" 2> /dev/null || rm -f "$_RCV_TMP"
-                else
-                    rm -f "$_RCV_TMP"
-                fi
-            fi
-        fi
+        ctx_apply_expr \
+            '.recovery.close_mode = "ok"
+             | .recovery.prev_session_id = ""
+             | .recovery.prev_session_ts = ""
+             | .recovery.alerts = []
+             | .recovery.alerts_require_kickoff = false
+             | .recovery.detected_at = $now' \
+            --arg now "$_RCV_TS_NOW"
 
         jq -cn \
             --arg event "recovery_stale_sanitized" \
@@ -592,9 +667,8 @@ fi
 # ── Hardening de schema mínimo do contexto ─────────────────────────────────
 # Garante campos-base exigidos por smoke/checks mesmo em contextos recuperados
 # de versões antigas ou sessões interrompidas abruptamente.
-if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    jq '.quality_gates = (.quality_gates // {})' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+if [ -f "$CTX_FILE" ]; then
+    ctx_apply_expr '.quality_gates = (.quality_gates // {})'
 fi
 
 # ── Atualiza contexto — Schema v2 ────────────────────────────────────────────
@@ -605,10 +679,9 @@ fi
 # Quando vscode_askQuestions: seta current_turn.auth_requested = true
 # NOTA: NÃO sobrescreve .session.id (removido no HARDENING v5 — session_id é
 #       definido apenas por session-start.sh; sobrescrever aqui causava contaminação).
-if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+if [ -f "$CTX_FILE" ]; then
     if [ "$TOOL_NAME" = "vscode_askQuestions" ]; then
-        jq --arg ts "$TIMESTAMP" \
-            --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
+        ctx_apply_expr \
             '.last_tool.name   = $tool
              | .last_tool.ts     = $ts
              | .last_tool.use_id = $id
@@ -621,7 +694,9 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            --arg ts "$TIMESTAMP" \
+            --arg tool "$TOOL_NAME" \
+            --arg id "$TOOL_USE_ID"
     elif [ "$TOOL_NAME" = "runSubagent" ] || [ "$TOOL_NAME" = "search_subagent" ]; then
         # ── HARDENING: delegação ao subagente = autorização implícita ─────────
         # runSubagent e search_subagent (ambas ferramentas Core) disparam agentStop
@@ -665,9 +740,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                 "subagent_delegate" \
                 "preToolUse"
         fi
-        jq --arg ts "$TIMESTAMP" \
-            --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
-            --arg desc "$_SUBAGENT_DESCRIPTION" \
+        ctx_apply_expr \
             '.last_tool.name   = $tool
              | .last_tool.ts     = $ts
              | .last_tool.use_id = $id
@@ -685,7 +758,10 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              # (evita double-count: pre-tool-use.sh + subagent-start.sh = 2x por subagente)
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            --arg ts "$TIMESTAMP" \
+            --arg tool "$TOOL_NAME" \
+            --arg id "$TOOL_USE_ID" \
+            --arg desc "$_SUBAGENT_DESCRIPTION"
 
         if command -v write_current_subturn_state > /dev/null 2>&1; then
             write_current_subturn_state \
@@ -699,10 +775,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                 "15"
         fi
     else
-        jq --arg ts "$TIMESTAMP" \
-            --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
-            --arg todo_last_item "$TODO_LAST_ITEM_LABEL" \
-            --arg todo_last_item_is_cont "$TODO_LAST_ITEM_IS_CONTINUATION" \
+        ctx_apply_expr \
             '.last_tool.name   = $tool
              | .last_tool.ts     = $ts
              | .last_tool.use_id = $id
@@ -732,7 +805,11 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .current_section.tools_by_name = ((.current_section.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            --arg ts "$TIMESTAMP" \
+            --arg tool "$TOOL_NAME" \
+            --arg id "$TOOL_USE_ID" \
+            --arg todo_last_item "$TODO_LAST_ITEM_LABEL" \
+            --arg todo_last_item_is_cont "$TODO_LAST_ITEM_IS_CONTINUATION"
     fi
 fi
 
@@ -755,25 +832,12 @@ if [ -f "$CTX_FILE" ]; then
         esac
 
         if [ "$_AA_IS_AUDIT_START" = "true" ]; then
-            if command -v sponge > /dev/null 2>&1; then
-                jq --arg ts "${TIMESTAMP:-$_LOCAL_TS}" --arg tool "$TOOL_NAME" \
-                    '.current_turn.auto_audit_started = true
-                     | .current_turn.auto_audit_started_at = $ts
-                     | .current_turn.auto_audit_started_tool = $tool' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-            else
-                _AA_TMP_START="$(mktemp 2> /dev/null || true)"
-                if [ -n "$_AA_TMP_START" ] \
-                    && jq --arg ts "${TIMESTAMP:-$_LOCAL_TS}" --arg tool "$TOOL_NAME" \
-                        '.current_turn.auto_audit_started = true
-                         | .current_turn.auto_audit_started_at = $ts
-                         | .current_turn.auto_audit_started_tool = $tool' \
-                        "$CTX_FILE" > "$_AA_TMP_START" 2> /dev/null; then
-                    mv "$_AA_TMP_START" "$CTX_FILE" 2> /dev/null || rm -f "$_AA_TMP_START"
-                else
-                    [ -n "$_AA_TMP_START" ] && rm -f "$_AA_TMP_START"
-                fi
-            fi
+            ctx_apply_expr \
+                '.current_turn.auto_audit_started = true
+                 | .current_turn.auto_audit_started_at = $ts
+                 | .current_turn.auto_audit_started_tool = $tool' \
+                --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
+                --arg tool "$TOOL_NAME"
 
             jq -cn \
                 --arg event "autoAudit_started" \

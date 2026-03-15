@@ -82,7 +82,7 @@ fi
 #
 # Exceção: stop_hook_active=true (hook iniciou parada, não agente) — não bloqueamos.
 _N3_GUARD_RC=0
-enforce_level3_close_key_mandate "$CTX_FILE" "$AUDIT_FILE" "$SESSION_ID" "$STOP_HOOK_ACTIVE" "${TIMESTAMP:-$NOW_ISO}" "$NOW_ISO" || _N3_GUARD_RC=$?
+enforce_level3_close_key_mandate "$CTX_FILE" "$AUDIT_FILE" "$SESSION_ID" "$STOP_HOOK_ACTIVE" "$NOW_ISO" || _N3_GUARD_RC=$?
 if [ "$_N3_GUARD_RC" -eq 10 ]; then
     exit 0
 fi
@@ -109,6 +109,7 @@ if [ -n "$_STOP_GUARD_SESSION_ID" ]; then
 fi
 
 if [ "$_STOP_GUARD_RC" -eq 10 ]; then
+    echo "[BLOCKED] agent-stop: session_id_guard detectou incompatibilidade não saneada" >&2
     exit 0
 fi
 
@@ -130,41 +131,25 @@ if [ -f "$CTX_FILE" ]; then
 fi
 
 # ── Lê metadados do turno atual para enriquecimento de todos os eventos ───────
-TURN_NUMBER=1
-SECTION_TURN=1
-SECTION_NAME=""
-SECTION_ID=""
-TURN_INTENT=""
-TURN_INTENT_DECLARED=false
-TURN_ID=""
-TURN_TOOLS_COUNT=0
-TURN_FAILURES_COUNT=0
-TURN_BLOCK_COUNT=0
-SUBTURN_ID=""
-SUBTURN_NUMBER=1
-SUBTURN_STATE="active"
-SUBTURN_REASON="turn_runtime"
-SUBTURN_STARTED_AT=""
-SUBTURN_PARENT_TURN_ID=""
 SUBTURN_DURATION_MS="null"
-if [ -f "$CTX_FILE" ]; then
-    TURN_NUMBER="$(safe_jq_read_int "$CTX_FILE" '.current_turn.number' 1)"
-    SECTION_TURN="$(safe_jq_read_int "$CTX_FILE" '.current_turn.section_turn' 1)"
-    SECTION_NAME="$(safe_jq_read "$CTX_FILE" '.current_section.name' '')"
-    SECTION_ID="$(safe_jq_read "$CTX_FILE" '.current_section.section_id' '')"
-    TURN_INTENT="$(safe_jq_read "$CTX_FILE" '.current_turn.intent' '')"
-    TURN_INTENT_DECLARED="$(safe_jq_read "$CTX_FILE" '.current_turn.intent_declared' 'false')"
-    TURN_ID="$(safe_jq_read "$CTX_FILE" '.current_turn.turn_id' '')"
-    TURN_TOOLS_COUNT="$(safe_jq_read_int "$CTX_FILE" '.current_turn.tools_count' 0)"
-    TURN_FAILURES_COUNT="$(safe_jq_read_int "$CTX_FILE" '.current_turn.failures_count' 0)"
-    TURN_BLOCK_COUNT="$(safe_jq_read_int "$CTX_FILE" '.current_turn.block_count' 0)"
-    SUBTURN_ID="$(safe_jq_read "$CTX_FILE" '.current_turn.subturn.subturn_id' '')"
-    SUBTURN_NUMBER="$(safe_jq_read_int "$CTX_FILE" '.current_turn.subturn.number' 1)"
-    SUBTURN_STATE="$(safe_jq_read "$CTX_FILE" '.current_turn.subturn.state' 'active')"
-    SUBTURN_REASON="$(safe_jq_read "$CTX_FILE" '.current_turn.subturn.reason' 'turn_runtime')"
-    SUBTURN_STARTED_AT="$(safe_jq_read "$CTX_FILE" '.current_turn.subturn.started_at' '')"
-    SUBTURN_PARENT_TURN_ID="$(safe_jq_read "$CTX_FILE" '.current_turn.subturn.parent_turn_id' '')"
-fi
+IFS=$'\x1f' read -r \
+    TURN_NUMBER \
+    SECTION_TURN \
+    SECTION_NAME \
+    SECTION_ID \
+    TURN_INTENT \
+    TURN_INTENT_DECLARED \
+    TURN_ID \
+    TURN_TOOLS_COUNT \
+    TURN_FAILURES_COUNT \
+    TURN_BLOCK_COUNT \
+    SUBTURN_ID \
+    SUBTURN_NUMBER \
+    SUBTURN_STATE \
+    SUBTURN_REASON \
+    SUBTURN_STARTED_AT \
+    SUBTURN_PARENT_TURN_ID \
+    < <(populate_agent_stop_metadata_from_ctx "$CTX_FILE")
 
 # ── REV-09: contador cumulativo de invocações de agentStop por turno ─────────
 # REV4-01: operação atômica via jq (read+increment+write em uma única expressão).
@@ -174,57 +159,24 @@ if command -v increment_agentstop_invocations_in_context > /dev/null 2>&1; then
     AGENTST_INVOCATIONS="$(increment_agentstop_invocations_in_context "$CTX_FILE")"
 fi
 
-# P2 (dual-read): fallback para sessões legadas sem current_turn.subturn explícito.
-if [ -z "${SUBTURN_ID:-}" ]; then
-    SUBTURN_ID="${TURN_ID:-turn_unknown}_st${AGENTST_INVOCATIONS:-1}"
-fi
-if [ -z "${SUBTURN_NUMBER:-}" ] || [ "${SUBTURN_NUMBER:-0}" -le 0 ] 2> /dev/null; then
-    SUBTURN_NUMBER="${AGENTST_INVOCATIONS:-1}"
-fi
-
-# P3/P4: SubTurn sempre subordinado ao TURN ativo.
-if [ -n "$TURN_ID" ] && { [ -z "${SUBTURN_PARENT_TURN_ID:-}" ] || [ "$SUBTURN_PARENT_TURN_ID" != "$TURN_ID" ]; }; then
-    SUBTURN_PARENT_TURN_ID="$TURN_ID"
-    if [ -f "$CTX_FILE" ]; then
-        if command -v bind_current_subturn_parent_turn_id > /dev/null 2>&1; then
-            bind_current_subturn_parent_turn_id "$NOW_ISO" > /dev/null 2>&1 || true
-        else
-            _TMP_SUBTURN_BIND="$(mktemp 2> /dev/null || true)"
-            if [ -n "$_TMP_SUBTURN_BIND" ] \
-                && jq --arg turn_id "$TURN_ID" --arg ts "$NOW_ISO" \
-                    '.current_turn.subturn = ((.current_turn.subturn // {}) + {
-                        parent_turn_id: $turn_id,
-                        last_transition_at: $ts
-                     })' \
-                    "$CTX_FILE" > "$_TMP_SUBTURN_BIND" 2> /dev/null; then
-                mv "$_TMP_SUBTURN_BIND" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_SUBTURN_BIND"
-            else
-                [ -n "$_TMP_SUBTURN_BIND" ] && rm -f "$_TMP_SUBTURN_BIND"
-            fi
-        fi
-    fi
-    if command -v emit_subturn_transition_event > /dev/null 2>&1; then
-        emit_subturn_transition_event \
-            "$AUDIT_FILE" \
-            "$SESSION_ID" \
-            "$NOW_ISO" \
-            "$TURN_ID" \
-            "$SUBTURN_ID" \
-            "${SUBTURN_NUMBER:-1}" \
-            "${SUBTURN_STATE:-active}" \
-            "${SUBTURN_STATE:-active}" \
-            "subturn_rebound_to_current_turn" \
-            "agentStop"
-    fi
-fi
-
-if [ -n "${SUBTURN_STARTED_AT:-}" ] && [ -n "$NOW_ISO" ]; then
-    _SUBTURN_START_EPOCH="$(iso_to_epoch_utc "$SUBTURN_STARTED_AT")"
-    _SUBTURN_NOW_EPOCH="$(iso_to_epoch_utc "$NOW_ISO")"
-    if [ "$_SUBTURN_NOW_EPOCH" -ge "$_SUBTURN_START_EPOCH" ] 2> /dev/null; then
-        SUBTURN_DURATION_MS="$(((_SUBTURN_NOW_EPOCH - _SUBTURN_START_EPOCH) * 1000))"
-    fi
-fi
+IFS=$'\x1f' read -r \
+    SUBTURN_ID \
+    SUBTURN_NUMBER \
+    SUBTURN_PARENT_TURN_ID \
+    SUBTURN_DURATION_MS \
+    < <(normalize_agent_stop_subturn_state \
+        "$CTX_FILE" \
+        "$AUDIT_FILE" \
+        "$SESSION_ID" \
+        "$NOW_ISO" \
+        "$AGENTST_INVOCATIONS" \
+        "$TURN_ID" \
+        "$SUBTURN_ID" \
+        "$SUBTURN_NUMBER" \
+        "$SUBTURN_STATE" \
+        "$SUBTURN_REASON" \
+        "$SUBTURN_STARTED_AT" \
+        "$SUBTURN_PARENT_TURN_ID")
 
 # Append em audit.jsonl — registra o fim do turno
 log_agent_stop_event \
@@ -302,254 +254,47 @@ fi
 # Isso força o agente a chamar vscode_askQuestions antes de poder encerrar.
 # CRÍTICO: se stop_hook_active=true, NUNCA bloquear (prevenção de loop infinito).
 # Referência: https://code.visualstudio.com/docs/copilot/customization/hooks
-if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
-    _BLOCK_CLOSE_KEY="$(jq -r '.session.close_key // "N/A"' "$CTX_FILE" 2> /dev/null || echo 'N/A')"
-    _BLOCK_CLOSE_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-    _BLOCK_STRICT_MODE="$(jq -r '(.session.strict_turn_close_requires_key | if . == null then true else . end)' "$CTX_FILE" 2> /dev/null || echo 'true')"
-    _BLOCK_CONSECUTIVE_RAW="$(safe_jq_read_int "$CTX_FILE" '.compliance.consecutive_unauthorized' 0)"
-    _BLOCK_TODO_CREATED="$(jq -r '.current_turn.todo_created // false' "$CTX_FILE" 2> /dev/null || echo false)"
-    _BLOCK_COUNT_CURR_RAW="$(safe_jq_read_int "$CTX_FILE" '.current_turn.block_count' 0)"
-    # fix Haiku A4.6: guard numérica — valor corrompido no CTX não causa comportamento imprevisível
-    _BLOCK_CONSECUTIVE="$(sanitize_nonnegative_int "$_BLOCK_CONSECUTIVE_RAW")"
-    _BLOCK_COUNT_CURR="$(sanitize_nonnegative_int "$_BLOCK_COUNT_CURR_RAW")"
-    _NEW_CONSEC=$((_BLOCK_CONSECUTIVE + 1))
-    _NEW_BLOCK_COUNT=$((_BLOCK_COUNT_CURR + 1))
-    _BLOCK_FLAG_REASON="turn_blocked_no_askquestions"
-    _BLOCK_FLAG_MESSAGE="Turno bloqueado em agent-stop por ausência de autorização válida"
-    if [ -n "$AUTH_INVALID_REASON" ]; then
-        _BLOCK_FLAG_REASON="turn_blocked_invalid_authorization"
-        _BLOCK_FLAG_MESSAGE="Turno bloqueado em agent-stop por autorização inválida: $AUTH_INVALID_REASON"
-    fi
-    # Loga o evento de bloqueio (v9.0: inclui todo_created + block_count)
-    log_agent_stop_blocked_event \
-        "$AUDIT_FILE" \
-        "$SESSION_ID" \
-        "$NOW_ISO" \
-        "$TURN_ID" \
-        "$_NEW_CONSEC" \
-        "$_BLOCK_TODO_CREATED" \
-        "$_NEW_BLOCK_COUNT" \
-        "$AUTH_INVALID_REASON"
-
-    # P7.1: lock secundário no Stop (duplo lock preToolUse + Stop)
-    log_turn_close_prevented_dual_lock_event \
-        "$AUDIT_FILE" \
-        "$SESSION_ID" \
-        "$NOW_ISO" \
-        "stopHook" \
-        "$TURN_ID" \
-        "${AUTH_INVALID_REASON:-askquestions_not_called}"
-
-    if command -v emit_subturn_end_event > /dev/null 2>&1; then
-        emit_subturn_end_event \
-            "$AUDIT_FILE" \
-            "$SESSION_ID" \
-            "$NOW_ISO" \
-            "$TURN_ID" \
-            "$SUBTURN_ID" \
-            "${SUBTURN_NUMBER:-1}" \
-            "$SUBTURN_STATE" \
-            "$SUBTURN_REASON" \
-            "stop_blocked" \
-            "blocked" \
-            "$SUBTURN_DURATION_MS"
-    fi
-    # Loga evento extra quando manage_todo_list também não foi chamado (v9.0)
-    if [ "$_BLOCK_TODO_CREATED" != "true" ]; then
-        log_agent_stop_blocked_no_todo_event \
-            "$AUDIT_FILE" \
-            "$SESSION_ID" \
-            "$NOW_ISO" \
-            "$TURN_ID" \
-            "$_NEW_CONSEC"
-    fi
-    # Atualiza CTX: incrementa consecutive_unauthorized + block_count e registra atividade
-    if ! update_blocked_turn_context "$CTX_FILE" "$_NEW_CONSEC" "$_NEW_BLOCK_COUNT" "$NOW_ISO"; then
-        echo "[warn] agent-stop: mktemp falhou; consecutive_unauthorized não atualizado" >&2
-    fi
-
-    _NEXT_SUBTURN=$((SUBTURN_NUMBER + 1))
-    _NEXT_SUBTURN_ID="${TURN_ID:-turn_unknown}_st${_NEXT_SUBTURN}"
-    record_blocked_subturn_and_schedule_resume \
-        "$CTX_FILE" \
-        "$NOW_ISO" \
-        "$SUBTURN_ID" \
-        "${SUBTURN_NUMBER:-1}" \
-        "$_NEXT_SUBTURN_ID" \
-        "$_NEXT_SUBTURN" \
-        "$SUBTURN_DURATION_MS"
-
-    if command -v emit_subturn_start_event > /dev/null 2>&1; then
-        emit_subturn_start_event \
-            "$AUDIT_FILE" \
-            "$SESSION_ID" \
-            "$NOW_ISO" \
-            "$TURN_ID" \
-            "$_NEXT_SUBTURN_ID" \
-            "$_NEXT_SUBTURN" \
-            "stop_block_resume_pending" \
-            "blocked" \
-            "agentStop"
-    fi
-    # Registra flag para o próximo briefing (schema JSON canônico)
-    _BLOCK_TURN_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-    write_turn_block_flag_json \
-        "$AUTH_FLAG_FILE" \
-        "$NOW_ISO" \
-        "$SESSION_ID" \
-        "${_BLOCK_TURN_NOW:-0}" \
-        "${_NEW_CONSEC:-0}" \
-        "$_BLOCK_FLAG_REASON" \
-        "$_BLOCK_FLAG_MESSAGE"
-    # Constrói o reason com instrução completa para o agente
-    _BLOCK_SESSION_INFO="$(build_session_close_hint "$_BLOCK_CLOSE_VALIDATED" "$_BLOCK_CLOSE_KEY")"
-    _BLOCK_PAYLOAD="$(build_turn_block_payload "$_BLOCK_TODO_CREATED" "$AUTH_INVALID_REASON" "$_BLOCK_SESSION_INFO" "$_BLOCK_STRICT_MODE")"
-    _BLOCK_REASON="${_BLOCK_PAYLOAD%%|*}"
-    _BLOCK_REST="${_BLOCK_PAYLOAD#*|}"
-    _BLOCK_SYS_MSG="${_BLOCK_REST%%|*}"
-    _BLOCK_REASON_CODE="${_BLOCK_REST#*|}"
-    if [ -z "$_BLOCK_REASON_CODE" ] || [ "$_BLOCK_REASON_CODE" = "$_BLOCK_REST" ]; then
-        _BLOCK_REASON_CODE="unknown_block_reason"
-    fi
-    _BLOCK_DECISION_TRACE="$(build_decision_trace_json \
-        "stop_dual_lock_main" \
-        "multi_strategy_v9_1" \
-        "${AUTH_INVALID_REASON:-askquestions_not_called}" \
-        "$_BLOCK_STRICT_MODE" \
-        "$STOP_HOOK_ACTIVE" \
-        "$_NEW_BLOCK_COUNT")"
-    # Emite o block: hookSpecificOutput.decision=block + systemMessage visível
-    emit_stop_block "$_BLOCK_REASON" "$_BLOCK_SYS_MSG" "$_BLOCK_REASON_CODE" "$_BLOCK_DECISION_TRACE"
+_MAIN_BLOCK_BRANCH_RC=0
+handle_main_stop_block_branch \
+    "$CTX_FILE" \
+    "$AUDIT_FILE" \
+    "$STATE_DIR" \
+    "$SESSION_ID" \
+    "$NOW_ISO" \
+    "$TURN_ID" \
+    "$SUBTURN_ID" \
+    "$SUBTURN_NUMBER" \
+    "$SUBTURN_STATE" \
+    "$SUBTURN_REASON" \
+    "$SUBTURN_DURATION_MS" \
+    "$AUTH_INVALID_REASON" \
+    "$AUTH_REQUESTED" \
+    "$STOP_HOOK_ACTIVE" \
+    || _MAIN_BLOCK_BRANCH_RC=$?
+if [ "$_MAIN_BLOCK_BRANCH_RC" -eq 10 ]; then
     exit 0
 fi
 
 # ── stop_hook_active=true: segunda invocação após block — loga resultado ──────
 # Quando stop_hook_active=true, o agente já foi desbloqueado pelo hook anterior.
 # Verificamos se ele cumpriu o protocolo e logamos o resultado.
-if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-    if command -v emit_subturn_resume_event > /dev/null 2>&1; then
-        emit_subturn_resume_event \
-            "$AUDIT_FILE" \
-            "$SESSION_ID" \
-            "$NOW_ISO" \
-            "$TURN_ID" \
-            "$SUBTURN_ID" \
-            "${SUBTURN_NUMBER:-1}" \
-            "stop_hook_active_resume" \
-            "agentStop"
-    fi
-
-    if [ -f "$CTX_FILE" ]; then
-        if command -v write_current_subturn_state > /dev/null 2>&1; then
-            write_current_subturn_state \
-                "$NOW_ISO" \
-                "resumed" \
-                "stop_hook_active_resume" \
-                "true" \
-                "false"
-        fi
-
-        if command -v sponge > /dev/null 2>&1; then
-            jq '.session_stats.subturn_resumed = ((.session_stats.subturn_resumed // 0) + 1)' \
-                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-        else
-            _TMP_SUBTURN_RESUME="$(mktemp 2> /dev/null || true)"
-            if [ -n "$_TMP_SUBTURN_RESUME" ] && jq \
-                '.session_stats.subturn_resumed = ((.session_stats.subturn_resumed // 0) + 1)' \
-                "$CTX_FILE" > "$_TMP_SUBTURN_RESUME" 2> /dev/null; then
-                mv "$_TMP_SUBTURN_RESUME" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_SUBTURN_RESUME"
-            else
-                [ -n "$_TMP_SUBTURN_RESUME" ] && rm -f "$_TMP_SUBTURN_RESUME"
-            fi
-        fi
-    fi
-
-    if [ "$AUTH_REQUESTED" = "true" ]; then
-        log_unblocked_complied_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$TURN_ID"
-    else
-        _REBLOCK_COUNT_CURR_RAW="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-        _REBLOCK_COUNT_CURR="$(sanitize_nonnegative_int "$_REBLOCK_COUNT_CURR_RAW")"
-        _REBLOCK_COUNT_NEXT=$((_REBLOCK_COUNT_CURR + 1))
-        _REBLOCK_BUDGET_MAX_RAW="$(jq -r '.session.stop_block_budget_max // 2' "$CTX_FILE" 2> /dev/null || echo 2)"
-        _REBLOCK_BUDGET_MAX="$(sanitize_nonnegative_int "$_REBLOCK_BUDGET_MAX_RAW")"
-        _REBLOCK_BUDGET_ALREADY_EXCEEDED="$(jq -r '.current_turn.stop_block_budget_exceeded // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
-        if [ "$_REBLOCK_BUDGET_MAX" -lt 1 ] 2> /dev/null; then
-            _REBLOCK_BUDGET_MAX=1
-        fi
-        _REBLOCK_STRICT_MODE="$(jq -r '(.session.strict_turn_close_requires_key | if . == null then true else . end)' "$CTX_FILE" 2> /dev/null || echo 'true')"
-        if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-            jq --argjson bc "$_REBLOCK_COUNT_NEXT" '.current_turn.block_count = $bc' \
-                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-        fi
-        log_reblocked_no_comply_event "$AUDIT_FILE" "$SESSION_ID" "$NOW_ISO" "$TURN_ID" "$_REBLOCK_COUNT_NEXT"
-
-        # P7.1: lock secundário também no caminho de reblock
-        log_turn_close_prevented_dual_lock_event \
-            "$AUDIT_FILE" \
-            "$SESSION_ID" \
-            "$NOW_ISO" \
-            "stopHook_reblock" \
-            "$TURN_ID" \
-            "reblock_no_authorization"
-
-        if [ "$_REBLOCK_COUNT_NEXT" -gt "$_REBLOCK_BUDGET_MAX" ] 2> /dev/null; then
-            if [ "$_REBLOCK_BUDGET_ALREADY_EXCEEDED" != "true" ]; then
-                jq -cn \
-                    --arg event "stop_block_budget_exceeded" \
-                    --arg sid "$SESSION_ID" \
-                    --arg ts "$NOW_ISO" \
-                    --arg turn_id "$TURN_ID" \
-                    --argjson block_count "$_REBLOCK_COUNT_NEXT" \
-                    --argjson budget_max "$_REBLOCK_BUDGET_MAX" \
-                    '{
-                        event: $event,
-                        session_id: $sid,
-                        timestamp: $ts,
-                        turn_id: (if $turn_id == "" then null else $turn_id end),
-                        block_count: $block_count,
-                        budget_max: $budget_max,
-                        message: "Budget de reblock excedido; mantendo bloqueio estrito para evitar fechamento ilegítimo"
-                    }' >> "$AUDIT_FILE"
-            fi
-
-            if [ -f "$CTX_FILE" ] && command -v sponge > /dev/null 2>&1; then
-                jq --arg ts "$NOW_ISO" --argjson bc "$_REBLOCK_COUNT_NEXT" --argjson bm "$_REBLOCK_BUDGET_MAX" \
-                    '.current_turn.stop_block_budget_exceeded = true
-                     | .current_turn.stop_block_budget_exceeded_at = $ts
-                     | .current_turn.stop_block_budget_exceeded_count = $bc
-                     | .current_turn.stop_block_budget_max = $bm' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-            fi
-
-            _BUDGET_TRACE="$(build_decision_trace_json \
-                "stop_reblock_budget" \
-                "multi_strategy_v9_1" \
-                "budget_exceeded" \
-                "$_REBLOCK_STRICT_MODE" \
-                "$STOP_HOOK_ACTIVE" \
-                "$_REBLOCK_COUNT_NEXT")"
-            emit_reblock_stop_block \
-                "Budget de reblock excedido sem autorização válida. Encerramento segue bloqueado até Template F + KEY correta validada." \
-                "🚫 BLOQUEIO MANTIDO (budget excedido): pare de iterar ferramentas de trabalho e finalize corretamente com Template F + KEY válida." \
-                "stop_block_budget_exceeded" \
-                "$_BUDGET_TRACE"
-            exit 0
-        fi
-
-        _REBLOCK_TRACE="$(build_decision_trace_json \
-            "stop_reblock" \
-            "multi_strategy_v9_1" \
-            "reblock_no_authorization" \
-            "$_REBLOCK_STRICT_MODE" \
-            "$STOP_HOOK_ACTIVE" \
-            "$_REBLOCK_COUNT_NEXT")"
-        emit_reblock_stop_block \
-            "Turno ainda sem autorização válida. Encerramento legítimo só com Template F + KEY correta validada." \
-            "🚫 Encerramento ilegítimo bloqueado novamente: faça askQuestions com opção de escalar para Template F e só encerre após Template F + KEY válida." \
-            "reblock_no_authorization" \
-            "$_REBLOCK_TRACE"
-        exit 0
-    fi
+_STOP_HOOK_BRANCH_RC=0
+handle_stop_hook_active_branch \
+    "$CTX_FILE" \
+    "$AUDIT_FILE" \
+    "$SESSION_ID" \
+    "$NOW_ISO" \
+    "$TURN_ID" \
+    "$SUBTURN_ID" \
+    "$SUBTURN_NUMBER" \
+    "$SUBTURN_STATE" \
+    "$SUBTURN_REASON" \
+    "$SUBTURN_DURATION_MS" \
+    "$STOP_HOOK_ACTIVE" \
+    "$AUTH_REQUESTED" \
+    || _STOP_HOOK_BRANCH_RC=$?
+if [ "$_STOP_HOOK_BRANCH_RC" -eq 10 ]; then
+    exit 0
 fi
 
 # ── systemMessage contextual — nudge periódico (complementar ao blocking) ─────

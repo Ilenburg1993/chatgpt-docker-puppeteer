@@ -19,11 +19,17 @@ if [ -f "$HOOK_DIR/hooks-lib/common.sh" ]; then
 else
     echo "[warn] common.sh não encontrado (subagent-stop.sh) — heal_v1/increment_mismatch indisponíveis" >&2
 fi
-INPUT="$(cat 2> /dev/null || true)"
-
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
-NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
-SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+# F1.2: runtime input padronizado via helper canônico
+if command -v resolve_hook_runtime_input > /dev/null 2>&1; then
+    resolve_hook_runtime_input
+else
+    INPUT="$(cat 2> /dev/null || true)"
+    TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+    NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+    SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+fi
+[ -n "${NOW_ISO:-}" ] || NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+[ -n "$TIMESTAMP" ] || TIMESTAMP="$NOW_ISO"
 
 SESSION_ID=""
 CTX_FILE="$STATE_DIR/session-context.json"
@@ -33,49 +39,26 @@ if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
-# ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
-# F0.3: detecta contexto vazio
+# ── Guard canônico: reconcilia session_id no runtime comum ────────────────────
 if [ -f "$CTX_FILE" ] && [ ! -s "$CTX_FILE" ]; then
     echo "[guard] session-context.json vazio — guard desabilitado (aguardando auto-recovery)" >&2
 fi
-# HARDENING v5: previne contaminação cruzada entre SESSIONs.
-if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
-    CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
-        # HEAL v1: se source é manual_recovery ou inline_restart, sincroniza sem bloquear
-        CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-        if [ "$CTX_SOURCE" = "manual_recovery" ]; then
-            # BUG-21 fix: manual_recovery sincroniza SID e continua (não sai)
-            if command -v heal_v1 > /dev/null 2>&1; then
-                if heal_v1 "$SESSION_ID_PAYLOAD" "$TIMESTAMP"; then
-                    echo "[heal] HEAL v1 aplicado em subagent-stop.sh" >&2
-                fi
-            fi
-            SESSION_ID_PAYLOAD="$CTX_ACTIVE_SID"
-        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
-            # BUG-21 fix: inline_restart adota SID do contexto e continua (não sai)
-            SESSION_ID_PAYLOAD="$CTX_ACTIVE_SID"
-            echo "[guard] inline_restart: adotando SID do contexto em subagent-stop.sh" >&2
-        else
-            jq -cn \
-                --arg event "session_id_mismatch" \
-                --arg expected "$CTX_ACTIVE_SID" \
-                --arg got "$SESSION_ID_PAYLOAD" \
-                --arg source "subagent-stop.sh" \
-                '{
-                    event:   $event,
-                    expected: $expected,
-                    got:      $got,
-                    source:   $source,
-                    message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-                }' >> "$AUDIT_FILE"
-            # GAP-03: incrementa contador de mismatches
-            if command -v increment_mismatch > /dev/null 2>&1; then
-                increment_mismatch
-            fi
-            exit 0
-        fi
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ] \
+    && command -v reconcile_session_id_guard_prepost > /dev/null 2>&1; then
+    set +e
+    _RECONCILED_SID="$(reconcile_session_id_guard_prepost "$SESSION_ID_PAYLOAD" "subagentStop" "${TIMESTAMP:-$NOW_ISO}" "subagent-stop.sh")"
+    _RECONCILE_RC=$?
+    set -e
+    if [ "$_RECONCILE_RC" -eq 10 ]; then
+        exit 0
     fi
+    if [ -n "${_RECONCILED_SID:-}" ]; then
+        SESSION_ID_PAYLOAD="$_RECONCILED_SID"
+    fi
+fi
+
+if [ -f "$CTX_FILE" ]; then
+    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # Extrai campos do payload do subagente (schema não documentado — tratamento defensivo)
@@ -128,23 +111,10 @@ jq -cn \
 
 # Incrementa subagent_completions no contexto da sessão
 # NOTE: subagent_calls é incrementado em subagent-start.sh (invocação).
-# Aqui incrementamos subagent_completions para rastrear conclusões separadamente.
-# EBH-L01: fallback mktemp quando sponge não disponível
-if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
-    if command -v sponge &> /dev/null; then
-        jq '.session_stats.subagent_completions = (.session_stats.subagent_completions // 0) + 1' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
-    else
-        # Valida mktemp antes de usar (fix Haiku S2.1: se mktemp falhar, _SA_STOP_TMP fica vazio)
-        if _SA_STOP_TMP="$(mktemp 2> /dev/null)"; then
-            jq '.session_stats.subagent_completions = (.session_stats.subagent_completions // 0) + 1' \
-                "$CTX_FILE" > "$_SA_STOP_TMP" 2> /dev/null \
-                && mv "$_SA_STOP_TMP" "$CTX_FILE" \
-                || rm -f "$_SA_STOP_TMP" 2> /dev/null
-        else
-            echo "[warn] subagent-stop: mktemp falhou; subagent_completions não incrementado" >&2
-        fi
-    fi
+# F1: escrita transacional via ctx_update (com lock canônico)
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && command -v ctx_update > /dev/null 2>&1; then
+    ctx_update '.session_stats.subagent_completions = (.session_stats.subagent_completions // 0) + 1' \
+        2> /dev/null || true
 fi
 
 exit 0

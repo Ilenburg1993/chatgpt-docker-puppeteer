@@ -11,6 +11,19 @@ applyTo: '**/*'
 
 > Todo agente executando em sessão Copilot neste repositório DEVE seguir este protocolo.
 
+## Hierarquia canônica (anti-conflito)
+
+Quando houver divergência textual entre arquivos de instrução, use esta precedência:
+
+1. Hooks executáveis (`.github/hooks/scripts/*`, `.github/hooks/hooks-lib/*`)
+2. Este protocolo (`.github/instructions/hooks-protocol.instructions.md`)
+3. Baseline técnico (`.github/instructions/project-canon.instructions.md`)
+4. Templates operacionais (`.github/AGENTS.md`)
+5. Contexto complementar (`.github/copilot-instructions.md`)
+
+> Política de governança: evitar duplicação de regras longas fora deste protocolo. Outros arquivos
+> devem apontar para esta fonte em vez de reescrever as mesmas regras.
+
 ---
 
 ## ╔═══ PROTOCOLO TODO OBRIGATÓRIO (v9.0) — LEIA PRIMEIRO ═══╗
@@ -35,9 +48,10 @@ applyTo: '**/*'
 7. **Exceção única de bookkeeping** — `manage_todo_list` imediatamente após `vscode_askQuestions` é
    permitido apenas para fechamento do checklist; qualquer outra ferramenta exige novo
    `vscode_askQuestions` final.
-8. **Template F + KEY correta apenas no fechamento de SESSION** — o TURN é autorizado por
-   `vscode_askQuestions` válido (incluindo continuidade A/D/E). Template F fica reservado ao fluxo
-   de encerramento de SESSION, mediante escalonamento explícito e validação da `close_key`.
+8. **Template F + KEY correta apenas no fechamento de SESSION** — Templates de continuidade (A/D/E)
+   servem para seguir o trabalho e **não autorizam fechamento de TURN**. O fechamento autorizado
+   exige Template F com escalonamento explícito para encerramento de SESSION e validação da
+   `close_key`.
 
 > **Por que isso é crítico?** O hook `agent-stop.sh` emite `decision:block` quando
 > `vscode_askQuestions` não foi chamado. Mas mesmo sem o block ser efetivo, o padrão de
@@ -122,8 +136,7 @@ NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions.
 
 **Templates obrigatórios por contexto:**
 
-- Tarefa concluída → Template A (próximo passo de conversa; não autoriza fechamento de TURN em modo
-  estrito)
+- Tarefa concluída → Template A (próximo passo de conversa; não autoriza fechamento de TURN)
 - Checkpoint periódico a cada ~5 TURNs → Template D
 - Proposta arquitetural → Template C
 - Sessão ociosa → Template E
@@ -132,7 +145,7 @@ NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions.
 
 - Em `session.strict_turn_close_requires_key=true`, o TURN continua exigindo `vscode_askQuestions`
   válido como último ato, com resposta explícita do usuário.
-- Templates A/D/E são o padrão para fechamento de TURN/subturn de continuidade.
+- Templates A/D/E são templates de continuidade e não autorizam fechamento de TURN/subturn.
 - Template F só deve ser usado quando houver escalonamento explícito para fechamento de SESSION; com
   Template F, a `close_key` correta permanece obrigatória.
 
@@ -225,7 +238,7 @@ Quando o agente executa `git push` com sucesso:
 | Quando usar                             | Template                                                                   |
 | --------------------------------------- | -------------------------------------------------------------------------- |
 | Sessão sem prompt explícito             | **E** — Session Kickoff                                                    |
-| Tarefa concluída                        | **A** — Next Step (não fecha TURN em modo estrito)                         |
+| Tarefa concluída                        | **A** — Next Step (continuidade; não fecha TURN)                           |
 | ≥ 3 bugs encontrados                    | **B** — Bug Discovery                                                      |
 | Proposta de upgrade arquitetural        | **C** — Upgrade Proposal                                                   |
 | `turn_count % 3 == 0 && turn_count > 0` | **D** — Checkpoint periódico                                               |
