@@ -35,10 +35,12 @@ Cada skill canônica deve ter:
 - `audit-runbook-observability`: baseline e operação do pipeline
 - `reactive-bug-audit`: bug reportado / incidente com pista inicial
 - `exploratory-bug-hunt`: caça proativa sem pista inicial (grep-first, padrões)
-- `code-audit-and-fix`: ciclo completo exploração + patches (padrões + aplicação)
-- **`semantic-logic-audit`: auditoria profunda de lógica e semântica — verifica se o código faz o
-  que deve, independente de padrões ou lint. Use para fluxos completos, state machines,
-  invariantes.**
+- `code-audit`: auditoria manual profunda com **foco em diagnóstico e relatório formal** em duas
+  partes (issues + upgrades), sem depender de ferramentas automáticas de análise
+- **`semantic-logic-audit`**: auditoria profunda de lógica e semântica para validar **fluxos
+  completos, state machines e invariantes** (ênfase em correção comportamental ponta a ponta)
+- `code-audit-and-fix`: ciclo completo de exploração + patches (descobre, prioriza e corrige no
+  mesmo ciclo)
 - `audit-proposal-deep-triage`: causa-raiz e proposta P0/P1
 - `audit-contracts-v3-ops`: contratos e governança
 - `audit-system-analysis-planning`: análise e planejamento arquitetural

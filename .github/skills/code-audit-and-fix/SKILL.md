@@ -1,6 +1,6 @@
 ---
 name: code-audit-and-fix
-user-invokable: true
+user-invocable: true
 description:
   'Skill canônica para auditar código e aplicar correções diretamente. Combina exploração proativa,
   triagem de severidade e aplicação cirúrgica de patches com validação automática. Use quando o
@@ -30,6 +30,8 @@ e testado, não apenas um relatório.
 - Não usar para exploração apenas (use `exploratory-bug-hunt`).
 - Não usar para um bug específico já conhecido (use `reactive-bug-audit`).
 - Não usar quando o risco de regressão é alto sem testes de integração disponíveis.
+- Não usar quando a solicitação for diagnóstico formal com relatório estruturado (issues + upgrades)
+  sem aplicação imediata de patch; nesse caso, usar `code-audit`.
 
 ## Inputs / Preconditions
 
@@ -120,6 +122,8 @@ Confirmar: sem regressões (pass >= baseline, fail <= baseline).
 
 ## Related Skills
 
+- `code-audit` — diagnóstico manual profundo com entrega formal em duas partes, sem obrigação de
+  corrigir no mesmo ciclo.
 - `exploratory-bug-hunt` — exploração sem correção.
 - `reactive-bug-audit` — correção a partir de bug conhecido.
 - `security-checklist` — foco em C7 (segurança).

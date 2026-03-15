@@ -1,6 +1,6 @@
 ---
 name: semantic-logic-audit
-user-invokable: true
+user-invocable: true
 description: >-
   Skill para auditoria profunda de lógica e semântica: verifica se o código faz o que deveria fazer,
   independente de sintaxe, padrões ou lint. Lê código com profundidade para detectar bugs de lógica,
@@ -50,6 +50,8 @@ código para entender o que ele deve fazer e verificar se realmente faz.
 - **Não** usar para encontrar bugs de padrão (use `code-audit-and-fix` ou `exploratory-bug-hunt`).
 - **Não** usar sem delimitar claramente o escopo — leitura profunda exige foco.
 - **Não** usar se o objetivo é apenas melhorar estilo/formatação.
+- **Não** usar quando a entrega pedida for um relatório formal em duas partes (issues + upgrades)
+  para compartilhamento executivo/técnico; nesse cenário, usar `code-audit`.
 
 ## Inputs / Preconditions
 
@@ -260,6 +262,8 @@ Use como checklist mental ao ler cada módulo:
 
 ## Related Skills
 
+- `code-audit` — quando a prioridade for diagnóstico formal estruturado (Parte I issues + Parte II
+  upgrades) sem obrigatoriedade de patch no mesmo ciclo.
 - `code-audit-and-fix` — complementar para bugs de padrão pós-auditoria semântica.
 - `reactive-bug-audit` — quando há sintoma concreto para investigar.
 - `audit-proposal-deep-triage` — para proposta P0/P1 após descoberta crítica.

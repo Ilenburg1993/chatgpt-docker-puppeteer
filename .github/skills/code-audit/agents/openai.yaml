@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Audit"
+  short_description: "Auditoria manual profunda com relatório de issues e upgrades."
+  default_prompt: "Use $code-audit para auditar manualmente um escopo, produzir relatório técnico com severidade e propor upgrades pertinentes sem depender de ferramentas automáticas de análise."
