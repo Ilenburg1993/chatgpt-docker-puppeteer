@@ -15,7 +15,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "UUID v4 único da sessão (gerado por openssl rand -hex 16).",
+          "description": "UUID v4 único da sessão (payload VS Code quando válido; fallback UUID local quando ausente/inválido).",
           "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         },
         "started_at": {
@@ -50,7 +50,7 @@
         },
         "source": {
           "type": "string",
-          "description": "Origem da sessão: 'new', 'manual_recovery', 'healed_from_real_session', 'healed_auto_consecutive'."
+          "description": "Origem da sessão: 'new', 'inline_restart', 'reconnect_rollover', 'manual_recovery', 'auto_recovery', 'healed_from_real_session', 'healed_from_consecutive_mismatch'."
         },
         "cwd": {
           "type": "string",

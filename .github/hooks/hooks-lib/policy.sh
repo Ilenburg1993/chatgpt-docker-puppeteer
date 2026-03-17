@@ -82,7 +82,7 @@ policy_input_is_template_f() {
             (.tool_input.questions? // [])[]?
             | ((.header // "") + " " + (.question // ""))
         ]
-        | any(test("template f|encerrar session|encerrar sessão|session close|close key"; "i"))
+        | any(test("encerrar[^\\n]{0,60}sess(ã|a)o|encerrar session|session close|close key|chave de encerramento|ENCERRAR-[A-F0-9]{8}"; "i"))
     ' > /dev/null 2>&1
 }
 
@@ -124,7 +124,10 @@ policy_response_requests_template_f() {
             | .[]
             | select(type == "string")
         ]
-        | any(test("template f|session close|encerrar sess(ã|a)o|escalar"; "i"))
+                | any(
+                        test("encerrar sess(ã|a)o|session close|close key|chave de encerramento|ENCERRAR-[A-F0-9]{8}"; "i")
+                        or test("escalar[^\\n]{0,40}template f|template f[^\\n]{0,40}(agora|sim|encerrar|session close|escalar)"; "i")
+                    )
     ' > /dev/null 2>&1
 }
 
@@ -237,6 +240,7 @@ policy_determine_turn_auth_invalid_reason() {
     local todo_last_item_is_continuation="${13:-false}"
     local auto_audit_required="${14:-false}"
     local auto_audit_started="${15:-false}"
+    local todo_refresh_required="${16:-false}"
     local effective_last_tool_name="$last_tool_name"
 
     ask_template="$(policy_normalize_auth_invalid_reason "$ask_template")"
@@ -271,6 +275,11 @@ policy_determine_turn_auth_invalid_reason() {
         return 0
     fi
 
+    if [ "$todo_refresh_required" = "true" ]; then
+        printf '%s\n' "askquestions_todo_refresh_pending"
+        return 0
+    fi
+
     if [ "$auto_audit_required" = "true" ] && [ "$auto_audit_started" != "true" ]; then
         printf '%s\n' "auto_audit_required_not_started"
         return 0
@@ -282,7 +291,7 @@ policy_determine_turn_auth_invalid_reason() {
     fi
 
     if [ "$ask_template" != "template_f" ]; then
-        printf '%s\n' "non_template_f_continuation_mandatory"
+        printf '%s\n' ""
         return 0
     fi
 

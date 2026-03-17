@@ -53,9 +53,9 @@ session_start_compute_trends() {
     TREND_TOP_FAILURES="- (nenhuma falha registrada)"
     TREND_PERF_TABLE=""
 
-    local trend_audit_file_bkp="${AUDIT_FILE:-}"
     local trend_merged=""
     local metrics_file="${LOG_DIR}/tool-metrics.jsonl"
+    local trend_source_file="${LOG_DIR}/audit.jsonl"
     local trend_files=()
 
     while IFS= read -r -d '' _tf; do
@@ -64,27 +64,25 @@ session_start_compute_trends() {
 
     if [ ${#trend_files[@]} -gt 0 ] && trend_merged="$(mktemp 2> /dev/null)"; then
         cat "${trend_files[@]}" > "$trend_merged" 2> /dev/null || true
-        AUDIT_FILE="$trend_merged"
-    else
-        AUDIT_FILE="$LOG_DIR/audit.jsonl"
+        trend_source_file="$trend_merged"
     fi
 
-    if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
-        TREND_SESSIONS="$(jq -r '.session_id // empty' "$AUDIT_FILE" 2> /dev/null | sort -u | awk 'NF{n++} END{print n+0}' || echo 'N/D')"
+    if [ -f "$trend_source_file" ] && [ -s "$trend_source_file" ]; then
+        TREND_SESSIONS="$(jq -r '.session_id // empty' "$trend_source_file" 2> /dev/null | sort -u | awk 'NF{n++} END{print n+0}' || echo 'N/D')"
 
-        TREND_TOTAL_TOOLS="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo '0')"
+        TREND_TOTAL_TOOLS="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$trend_source_file" 2> /dev/null | wc -l | tr -d ' ' || echo '0')"
 
         local total_failures
-        total_failures="$(jq -r 'select((.event == "toolFailure" or .event == "toolUseFailure") and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo '0')"
+        total_failures="$(jq -r 'select((.event == "toolFailure" or .event == "toolUseFailure") and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$trend_source_file" 2> /dev/null | wc -l | tr -d ' ' || echo '0')"
 
         if [ "$TREND_TOTAL_TOOLS" -gt 0 ] 2> /dev/null; then
             TREND_ERROR_RATE="$(echo "$total_failures $TREND_TOTAL_TOOLS" | awk '{printf "%.1f%% (%d/%d)", ($1/$2)*100, $1, $2}')"
         fi
 
-        TREND_TOP_TOOLS_TABLE="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null | sort | uniq -c | sort -rn | head -6 | awk '{printf "| `%-35s` | %5d |\n", $2, $1}' || true)"
+        TREND_TOP_TOOLS_TABLE="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$trend_source_file" 2> /dev/null | sort | uniq -c | sort -rn | head -6 | awk '{printf "| \`%-35s\` | %5d |\n", $2, $1}' || true)"
         [ -z "$TREND_TOP_TOOLS_TABLE" ] && TREND_TOP_TOOLS_TABLE="| N/D | 0 |"
 
-        TREND_TOP_FAILURES="$(jq -r 'select((.event == "toolFailure" or .event == "toolUseFailure") and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null | sort | uniq -c | sort -rn | head -3 | awk '{printf "- `%s`: %d falha(s)\n", $2, $1}' || true)"
+        TREND_TOP_FAILURES="$(jq -r 'select((.event == "toolFailure" or .event == "toolUseFailure") and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$trend_source_file" 2> /dev/null | sort | uniq -c | sort -rn | head -3 | awk '{printf "- `%s`: %d falha(s)\n", $2, $1}' || true)"
         [ -z "$TREND_TOP_FAILURES" ] && TREND_TOP_FAILURES="- (nenhuma falha registrada)"
     fi
 
@@ -97,7 +95,6 @@ session_start_compute_trends() {
         [ -z "$TREND_PERF_TABLE" ] && TREND_PERF_TABLE="| N/D | - | 0 |"
     fi
 
-    AUDIT_FILE="$trend_audit_file_bkp"
     [ -n "$trend_merged" ] && rm -f "$trend_merged" 2> /dev/null || true
 
     export TREND_SESSIONS TREND_TOTAL_TOOLS TREND_ERROR_RATE TREND_TOP_TOOLS_TABLE TREND_TOP_FAILURES TREND_PERF_TABLE
@@ -142,9 +139,13 @@ session_start_compute_health() {
 
     NET_CHECK_HOST="${HEALTH_CHECK_HOST:-140.82.112.22}"
     NET_TIMEOUT=3
-    NET_OK=false
-    if ping -c 1 -W "$NET_TIMEOUT" "$NET_CHECK_HOST" > /dev/null 2>&1; then
-        NET_OK=true
+    NET_CHECK_ENABLED="${HOOKS_HEALTH_NET_CHECK_ENABLED:-true}"
+    NET_OK=true
+    if [ "$NET_CHECK_ENABLED" = "true" ]; then
+        NET_OK=false
+        if ping -c 1 -W "$NET_TIMEOUT" "$NET_CHECK_HOST" > /dev/null 2>&1; then
+            NET_OK=true
+        fi
     fi
 
     RECENT_RECONNECT_COUNT=0
@@ -154,9 +155,12 @@ session_start_compute_health() {
     fi
     RECENT_RECONNECT_COUNT="${RECENT_RECONNECT_COUNT:-0}"
 
-    if [ "$NET_OK" = "false" ]; then
+    if [ "$NET_CHECK_ENABLED" = "true" ] && [ "$NET_OK" = "false" ]; then
         HEALTH_CRITICAL="${HEALTH_CRITICAL}
 - ⛔ **Sem conectividade de rede** (ping ${NET_CHECK_HOST} falhou). VS Code pode desconectar. Verifique WSL2/Docker network."
+    elif [ "$NET_CHECK_ENABLED" != "true" ]; then
+        HEALTH_WARNINGS="${HEALTH_WARNINGS}
+- ℹ️ **Health check de rede desabilitado** via HOOKS_HEALTH_NET_CHECK_ENABLED=false."
     fi
 
     if [ "${RECENT_RECONNECT_COUNT}" -ge 20 ] 2> /dev/null; then
@@ -174,6 +178,6 @@ session_start_compute_health() {
         HEALTH_STATUS="⚠️ Avisos presentes"
     fi
 
-    export HEALTH_CRITICAL HEALTH_WARNINGS HEALTH_STATUS AUDIT_LINES NET_CHECK_HOST NET_OK RECENT_RECONNECT_COUNT
+    export HEALTH_CRITICAL HEALTH_WARNINGS HEALTH_STATUS AUDIT_LINES NET_CHECK_HOST NET_OK NET_CHECK_ENABLED RECENT_RECONNECT_COUNT
     return 0
 }

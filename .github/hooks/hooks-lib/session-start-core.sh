@@ -68,6 +68,7 @@ session_start_persist_initial_context() {
              | .session.close_key           = $close_key
             | .session.close_key_validated = false
             | .session.strict_turn_close_requires_key = true
+             | .session.template_f_request_pending = false
              | .session.source              = $source
              | .session.cwd                 = $cwd
              | .last_tool.ts                = $ts
@@ -77,6 +78,30 @@ session_start_persist_initial_context() {
              | .session_stats.last_push_turn = null
              | .session_stats.session_id_mismatches = 0
              | .session_stats.session_id_syncs_inline = 0
+             | .session_stats.turn_no_askQuestions = (.session_stats.turn_no_askQuestions // .session_stats.turn_unauthorized // 0)
+             | .session_stats.turn_unauthorized = (.session_stats.turn_unauthorized // .session_stats.turn_no_askQuestions // 0)
+             | .session_stats.turns_since_askQuestions = 0
+             | .current_turn.started_at = $date
+             | .current_turn.tools_count = 0
+             | .current_turn.tools_by_name = {}
+             | .current_turn.failures_count = 0
+             | .current_turn.auth_requested = false
+             | .current_turn.auth_requested_at = null
+             | .current_turn.last_askquestions_response = null
+             | .current_turn.todo_created = false
+             | .current_turn.last_non_bookkeeping_tool = null
+             | .current_turn.last_askquestions_template = null
+             | .current_turn.last_askquestions_close_action = null
+             | .current_turn.last_askquestions_close_key_found = false
+             | .current_turn.continuation_mandatory = false
+             | .current_turn.continuation_mandatory_at = null
+             | .current_turn.continuation_mandatory_reason = null
+             | .current_turn.auto_audit_required = false
+             | .current_turn.auto_audit_required_at = null
+             | .current_turn.auto_audit_reason = null
+             | .current_turn.auto_audit_started = false
+             | .current_turn.auto_audit_started_at = null
+             | .current_turn.auto_audit_started_tool = null
              | .hook_observability = ((.hook_observability // {}) + {
                  sessionStart_count: ((.hook_observability.sessionStart_count // 0) + 1),
                  userPromptSubmitted_count: (.hook_observability.userPromptSubmitted_count // 0),
@@ -101,10 +126,25 @@ session_start_persist_initial_context() {
             rm -f "$_ctx_tmp"
             echo "[session-start] WARN: CTX corrompido em inline_restart — fallback para reset completo" >&2
             SOURCE="new"
+            local _fallback_prev_logical=0
+            if command -v jq > /dev/null 2>&1 && [ -f "$STATE_DIR/session-context.json" ]; then
+                _fallback_prev_logical="$(jq -r '.session.logical_session_number // 0' "$STATE_DIR/session-context.json" 2> /dev/null || echo 0)"
+            fi
+            if [[ "${_fallback_prev_logical:-0}" =~ ^[0-9]+$ ]]; then
+                LOGICAL_SESSION_NUMBER=$((_fallback_prev_logical + 1))
+            else
+                LOGICAL_SESSION_NUMBER=1
+            fi
+            export LOGICAL_SESSION_NUMBER
         fi
     fi
 
     if [ "$SOURCE" != "inline_restart" ]; then
+        local _alerts_json
+        local _alerts_req
+        _alerts_json="${_ALERTS_JSON:-[]}"
+        _alerts_req="${RECOVERY_ALERTS_REQUIRE_KICKOFF:-false}"
+
         jq -cn \
             --arg sid "$SESSION_ID" \
             --arg ts "$TIMESTAMP" \
@@ -120,9 +160,10 @@ session_start_persist_initial_context() {
             --arg close_mode "${PREV_CLOSE_MODE:-ok}" \
             --arg prev_sid "${PREV_SESSION_ID:-}" \
             --arg prev_ts "${PREV_CHECKPOINT_TS:-}" \
-            --argjson alerts "$_ALERTS_JSON" \
-            --arg alerts_req "$RECOVERY_ALERTS_REQUIRE_KICKOFF" \
+            --argjson alerts "$_alerts_json" \
+            --arg alerts_req "$_alerts_req" \
             '{
+            "schema_version": "9",
             "session": {
                 "id":                    $sid,
                 "vs_code_session_id":    $sid,
@@ -141,7 +182,9 @@ session_start_persist_initial_context() {
             "session_stats": {
                 "turn_count":         0,
                 "turn_authorized":    0,
+                "turn_no_askQuestions":  0,
                 "turn_unauthorized":  0,
+                "turns_since_askQuestions": 0,
                 "resume_count":       0,
                 "tools_total":        0,
                 "tools_by_name":      {},

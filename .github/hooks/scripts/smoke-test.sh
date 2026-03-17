@@ -18,6 +18,21 @@ LOG_DIR="$HOOK_DIR/logs"
 CTX_FILE="$STATE_DIR/session-context.json"
 ROLLOUT_METRICS_FILE="$STATE_DIR/smoke-rollout-metrics.json"
 
+AGENT_STOP_LIB="$HOOK_DIR/hooks-lib/agent-stop-lib.sh"
+PRE_TOOL_USE_LIB="$HOOK_DIR/hooks-lib/policy/pre-tool-use-lib.sh"
+POST_TOOL_USE_LIB="$HOOK_DIR/hooks-lib/policy/post-tool-use-lib.sh"
+LOG_PROMPT_LIB="$HOOK_DIR/hooks-lib/lifecycle/log-prompt-lib.sh"
+SESSION_START_LIB="$HOOK_DIR/hooks-lib/lifecycle/session-start-lib.sh"
+SESSION_START_RUNTIME_LIB="$HOOK_DIR/hooks-lib/lifecycle/session-start-runtime.sh"
+SESSION_START_EVENTS_LIB="$HOOK_DIR/hooks-lib/lifecycle/session-start-events.sh"
+SESSION_START_VIOLATIONS_LIB="$HOOK_DIR/hooks-lib/lifecycle/session-start-violations.sh"
+SESSION_END_LIB="$HOOK_DIR/hooks-lib/lifecycle/session-end-lib.sh"
+SUBAGENT_START_LIB="$HOOK_DIR/hooks-lib/lifecycle/subagent-start-lib.sh"
+SUBAGENT_STOP_LIB="$HOOK_DIR/hooks-lib/lifecycle/subagent-stop-lib.sh"
+PRE_COMPACT_LIB="$HOOK_DIR/hooks-lib/lifecycle/pre-compact-lib.sh"
+ERROR_OCCURRED_LIB="$HOOK_DIR/hooks-lib/audit/error-occurred-lib.sh"
+COMMON_LIB="$HOOK_DIR/hooks-lib/common.sh"
+
 # shellcheck disable=SC1091
 if [ -f "$HOOK_DIR/hooks-lib/config.sh" ]; then
     source "$HOOK_DIR/hooks-lib/config.sh" 2> /dev/null || true
@@ -64,6 +79,36 @@ pass() {
 fail() {
     FAIL=$((FAIL + 1))
     echo "  ✗ $1"
+}
+
+contains_pattern_in_files() {
+    local pattern="$1"
+    shift || true
+
+    local file
+    for file in "$@"; do
+        [ -f "$file" ] || continue
+        if grep -qE "$pattern" "$file" 2> /dev/null; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+count_pattern_in_files() {
+    local pattern="$1"
+    shift || true
+
+    local file count total=0
+    for file in "$@"; do
+        [ -f "$file" ] || continue
+        count="$(grep -cE "$pattern" "$file" 2> /dev/null || echo 0)"
+        count="${count:-0}"
+        total=$((total + count))
+    done
+
+    printf '%s\n' "$total"
 }
 
 banner() {
@@ -321,12 +366,40 @@ GUARD_EXCLUDED=(session-start.sh session-end.sh)
 
 for s in "${GUARD_REQUIRED[@]}"; do
     f="$SCRIPTS_DIR/$s"
+    companion_lib=""
+    case "$s" in
+        agent-stop.sh)
+            companion_lib="$AGENT_STOP_LIB"
+            ;;
+        pre-tool-use.sh)
+            companion_lib="$PRE_TOOL_USE_LIB"
+            ;;
+        post-tool-use.sh)
+            companion_lib="$POST_TOOL_USE_LIB"
+            ;;
+        log-prompt.sh)
+            companion_lib="$LOG_PROMPT_LIB"
+            ;;
+        error-occurred.sh)
+            companion_lib="$ERROR_OCCURRED_LIB"
+            ;;
+        subagent-start.sh)
+            companion_lib="$SUBAGENT_START_LIB"
+            ;;
+        subagent-stop.sh)
+            companion_lib="$SUBAGENT_STOP_LIB"
+            ;;
+        pre-compact.sh)
+            companion_lib="$PRE_COMPACT_LIB"
+            ;;
+    esac
+
     # Guard válido: script loga session_id_mismatch (bloqueia) OU sessionReconnect (rollover RECONNECT-01)
     if [ -f "$f" ] && (
-        rg -q '"session_id_mismatch(_[A-Za-z0-9]+)?"' "$f" 2> /dev/null \
-            || rg -q "sessionReconnect" "$f" 2> /dev/null \
-            || rg -q 'reconcile_session_id_guard_(prepost|stop)' "$f" 2> /dev/null \
-            || rg -q 'handle_manual_recovery_session_id' "$f" 2> /dev/null
+        contains_pattern_in_files '"session_id_mismatch(_[A-Za-z0-9]+)?"' "$f" "$companion_lib" \
+            || contains_pattern_in_files 'sessionReconnect' "$f" "$companion_lib" \
+            || contains_pattern_in_files 'reconcile_session_id_guard_(prepost|stop)' "$f" "$companion_lib" \
+            || contains_pattern_in_files 'handle_manual_recovery_session_id' "$f" "$companion_lib"
     ); then
         pass "session_id guard presente: $s"
     elif [ -f "$f" ]; then
@@ -386,7 +459,7 @@ if grep -q 'intent_declared' "$SCRIPTS_DIR/start-turn.sh" 2> /dev/null; then
 else
     fail "start-turn.sh não define intent_declared"
 fi
-if grep -q 'intent_declared' "$SCRIPTS_DIR/log-prompt.sh" 2> /dev/null; then
+if contains_pattern_in_files 'intent_declared' "$SCRIPTS_DIR/log-prompt.sh" "$LOG_PROMPT_LIB"; then
     pass "log-prompt.sh reseta intent_declared no início do turno"
 else
     fail "log-prompt.sh não reseta intent_declared"
@@ -421,7 +494,7 @@ if grep -q 'local_turn' "$SCRIPTS_DIR/start-section.sh" 2> /dev/null; then
 else
     fail "start-section.sh não reseta local_turn na nova section"
 fi
-if grep -q 'section_turn' "$SCRIPTS_DIR/log-prompt.sh" 2> /dev/null; then
+if contains_pattern_in_files 'section_turn' "$SCRIPTS_DIR/log-prompt.sh" "$LOG_PROMPT_LIB"; then
     pass "log-prompt.sh calcula current_turn.section_turn (numeração local)"
 else
     fail "log-prompt.sh não calcula section_turn"
@@ -486,14 +559,14 @@ else
 fi
 
 # G9-02: session-start.sh chama rotate-audit.sh
-if grep -q 'rotate-audit.sh' "$SCRIPTS_DIR/session-start.sh" 2> /dev/null; then
+if contains_pattern_in_files 'rotate-audit.sh' "$SCRIPTS_DIR/session-start.sh" "$SESSION_START_RUNTIME_LIB"; then
     pass "G9-02: session-start.sh integra rotate-audit.sh"
 else
     fail "G9-02: session-start.sh não chama rotate-audit.sh"
 fi
 
 # G9-03: session-start.sh faz auto-clear de flag stale
-if grep -q 'authViolation_stale_cleared' "$SCRIPTS_DIR/session-start.sh" 2> /dev/null; then
+if contains_pattern_in_files 'authViolation_stale_cleared' "$SCRIPTS_DIR/session-start.sh" "$SESSION_START_VIOLATIONS_LIB"; then
     pass "G9-03: session-start.sh auto-limpa UNAUTHORIZED_CLOSE.flag de sessões diferentes"
 else
     fail "G9-03: session-start.sh não implementa auto-clear de flag stale"
@@ -530,14 +603,14 @@ echo ""
 echo "16. Solidificação pós-review (bugs críticos/altos + gaps)"
 
 # BUG-A.1: pre-tool-use.sh tem flock
-if grep -q 'flock.*CTX.*lock\|CTX.*lock.*flock\|\.lock.*exec.*9\|exec.*9.*CTX' "$SCRIPTS_DIR/pre-tool-use.sh" 2> /dev/null; then
+if contains_pattern_in_files 'flock.*CTX.*lock|CTX.*lock.*flock|\.lock.*exec.*9|exec.*9.*CTX|flock -x -w' "$SCRIPTS_DIR/pre-tool-use.sh" "$PRE_TOOL_USE_LIB"; then
     pass "BUG-A.1: pre-tool-use.sh tem flock (race condition corrigido)"
 else
     fail "BUG-A.1: pre-tool-use.sh sem flock — race condition em session-context.json"
 fi
 
 # BUG-A.2: session-start.sh limpa .mismatch_track.json
-if grep -q 'mismatch_track' "$SCRIPTS_DIR/session-start.sh" 2> /dev/null; then
+if contains_pattern_in_files 'mismatch_track' "$SCRIPTS_DIR/session-start.sh" "$SESSION_START_LIB"; then
     pass "BUG-A.2: session-start.sh limpa .mismatch_track.json (HEAL v2 anti-contaminação)"
 else
     fail "BUG-A.2: session-start.sh não limpa .mismatch_track.json — HEAL v2 pode herdar estado de sessão anterior"
@@ -565,7 +638,7 @@ else
 fi
 
 # GAP-C.1: pre-tool-use.sh usa common.sh
-if grep -q 'source.*common.sh\|\. .*common.sh' "$SCRIPTS_DIR/pre-tool-use.sh" 2> /dev/null; then
+if contains_pattern_in_files 'source.*common.sh|\. .*common.sh|COMMON_LIB=' "$SCRIPTS_DIR/pre-tool-use.sh" "$PRE_TOOL_USE_LIB"; then
     pass "GAP-C.1: pre-tool-use.sh carrega hooks-lib/common.sh"
 else
     fail "GAP-C.1: pre-tool-use.sh não integra hooks-lib/common.sh"
@@ -690,7 +763,7 @@ else
 fi
 
 # REV-09: log-prompt.sh reseta agentStop_invocations no início do turno
-if grep -q 'agentStop_invocations.*=.*0' "$SCRIPTS_DIR/log-prompt.sh" 2> /dev/null; then
+if contains_pattern_in_files 'agentStop_invocations.*=.*0' "$SCRIPTS_DIR/log-prompt.sh" "$LOG_PROMPT_LIB"; then
     pass "REV-09: log-prompt.sh reseta agentStop_invocations = 0"
 else
     fail "REV-09: log-prompt.sh não reseta agentStop_invocations"
@@ -750,8 +823,8 @@ echo ""
 echo "[ Fase 7 — hardening subagente + REV4-03~07 ]"
 
 # Hardening subagente v6 — pre-tool-use.sh
-if grep -q 'subagent_delegated' "$HOOK_DIR/scripts/pre-tool-use.sh" \
-    && grep -q 'subagentStart' "$HOOK_DIR/scripts/pre-tool-use.sh"; then
+if contains_pattern_in_files 'subagent_delegated' "$HOOK_DIR/scripts/pre-tool-use.sh" "$PRE_TOOL_USE_LIB" \
+    && contains_pattern_in_files 'subagentStart' "$HOOK_DIR/scripts/pre-tool-use.sh" "$PRE_TOOL_USE_LIB"; then
     pass "Hardening v6: pre-tool-use.sh detecta runSubagent/Task e loga subagentStart"
 else
     fail "Hardening v6: pre-tool-use.sh faltando detecção de subagente/subagentStart"
@@ -798,14 +871,14 @@ else
 fi
 
 # REV4-06: post-tool-use.sh seta auth_requested_at em ambos os branches
-if [ "$(grep -c 'auth_requested_at' "$HOOK_DIR/scripts/post-tool-use.sh")" -ge 2 ]; then
+if [ "$(count_pattern_in_files 'auth_requested_at' "$HOOK_DIR/scripts/post-tool-use.sh" "$POST_TOOL_USE_LIB")" -ge 2 ]; then
     pass "REV4-06: post-tool-use.sh seta auth_requested_at nos dois branches"
 else
     fail "REV4-06: post-tool-use.sh seta auth_requested_at em menos de 2 branches"
 fi
 
 # REV4-07: session-end.sh tem flock
-if grep -q 'flock' "$HOOK_DIR/scripts/session-end.sh"; then
+if contains_pattern_in_files 'flock' "$HOOK_DIR/scripts/session-end.sh" "$SESSION_END_LIB"; then
     pass "REV4-07: session-end.sh tem flock para prevenir race condition"
 else
     fail "REV4-07: session-end.sh sem flock"
@@ -1103,28 +1176,28 @@ echo "── Grupo 19: pre-tool-use.sh — SESSION persistente v8.0 ────
 _PTU_SCRIPT="$HOOK_DIR/scripts/pre-tool-use.sh"
 if [ -f "$_PTU_SCRIPT" ]; then
     # Teste PR-1: pre-tool-use.sh contém guard do Mecanismo 5 (session-close.sh bloqueio)
-    if grep -q 'sessionClose_direct_blocked\|session-close\.sh\|Mechanism 5' "$_PTU_SCRIPT" 2> /dev/null; then
+    if contains_pattern_in_files 'sessionClose_direct_blocked|session-close\.sh|Mechanism 5' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB"; then
         pass "PR-1: pre-tool-use.sh contém guard do Mecanismo 5 (session-close.sh)"
     else
         fail "PR-1: pre-tool-use.sh NÃO contém guard do Mecanismo 5"
     fi
 
     # Teste PR-2: pre-tool-use.sh emite permissionDecision:deny para session-close.sh
-    if grep -q 'permissionDecision.*deny\|"deny"' "$_PTU_SCRIPT" 2> /dev/null; then
+    if contains_pattern_in_files 'permissionDecision.*deny|"deny"' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB"; then
         pass "PR-2: pre-tool-use.sh emite permissionDecision:deny quando necessário"
     else
         fail "PR-2: pre-tool-use.sh NÃO emite permissionDecision:deny"
     fi
 
     # Teste PR-3: intervalo de reminder é 10 (padrão v8.0)
-    if grep -q 'HOOKS_SESSION_REMINDER_TOOL_INTERVAL:-10' "$_PTU_SCRIPT" 2> /dev/null; then
+    if contains_pattern_in_files 'HOOKS_SESSION_REMINDER_TOOL_INTERVAL:-10' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB"; then
         pass "PR-3: intervalo de SESSION reminder é 10 (padrão v8.0)"
     else
         fail "PR-3: intervalo de SESSION reminder NÃO é 10 (esperado v8.0)"
     fi
 
     # Teste PR-4: pre-tool-use.sh verifica close_key_validated antes de bloquear
-    if grep -q '_M5_VALIDATED\|close_key_validated' "$_PTU_SCRIPT" 2> /dev/null; then
+    if contains_pattern_in_files '_M5_VALIDATED|close_key_validated' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB"; then
         pass "PR-4: pre-tool-use.sh verifica close_key_validated antes de bloquear"
     else
         fail "PR-4: pre-tool-use.sh NÃO verifica close_key_validated"
@@ -1138,7 +1211,7 @@ if [ -f "$_PTU_SCRIPT" ]; then
     fi
 
     # Teste PR-6: guard verifica tool_name = run_in_terminal antes de bloquear
-    if grep -q 'run_in_terminal' "$_PTU_SCRIPT" 2> /dev/null; then
+    if contains_pattern_in_files 'run_in_terminal' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB"; then
         pass "PR-6: pre-tool-use.sh verifica tool_name run_in_terminal no Mecanismo 5"
     else
         fail "PR-6: pre-tool-use.sh NÃO verifica tool_name run_in_terminal"
@@ -1298,14 +1371,14 @@ fi
 _PTU_SCRIPT2="$HOOK_DIR/scripts/pre-tool-use.sh"
 if [ -f "$_PTU_SCRIPT2" ]; then
     # Teste V81-4: auto_recovery herda close_key_validated do SESSION_CLOSE_AUTHORIZED.flag (v8.1)
-    if grep -q 'SESSION_CLOSE_AUTHORIZED\|_AUTH_FLAG\|_RECOVERY_KEY_VALIDATED' "$_PTU_SCRIPT2" 2> /dev/null; then
+    if contains_pattern_in_files 'SESSION_CLOSE_AUTHORIZED|_AUTH_FLAG|_RECOVERY_KEY_VALIDATED' "$_PTU_SCRIPT2" "$PRE_TOOL_USE_LIB"; then
         pass "V81-4: auto_recovery herda close_key_validated de SESSION_CLOSE_AUTHORIZED.flag"
     else
         fail "V81-4: auto_recovery NÃO herda close_key_validated (v8.1 não aplicado)"
     fi
 
     # Teste V81-5: auto_recovery usa _RECOVERY_KEY_VALIDATED como argjson (não string fixa false)
-    if grep -q 'argjson key_validated\|key_validated.*RECOVERY' "$_PTU_SCRIPT2" 2> /dev/null; then
+    if contains_pattern_in_files 'argjson key_validated|key_validated.*RECOVERY' "$_PTU_SCRIPT2" "$PRE_TOOL_USE_LIB"; then
         pass "V81-5: auto_recovery usa _RECOVERY_KEY_VALIDATED como argjson"
     else
         fail "V81-5: auto_recovery NÃO usa _RECOVERY_KEY_VALIDATED corretamente"
@@ -1333,7 +1406,8 @@ _REPO_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
 
 # V90-1: post-tool-use.sh rastreia manage_todo_list → todo_created=true
 if [ -f "$_POST_TOOL" ]; then
-    if grep -q 'manage_todo_list' "$_POST_TOOL" && grep -q 'todo_created.*true' "$_POST_TOOL"; then
+    if contains_pattern_in_files 'manage_todo_list' "$_POST_TOOL" "$POST_TOOL_USE_LIB" \
+        && contains_pattern_in_files 'todo_created.*true' "$_POST_TOOL" "$POST_TOOL_USE_LIB"; then
         pass "V90-1: post-tool-use.sh seta todo_created=true quando manage_todo_list é chamado"
     else
         fail "V90-1: post-tool-use.sh NÃO rastreia manage_todo_list → todo_created"
@@ -1344,7 +1418,7 @@ fi
 
 # V90-2: log-prompt.sh reseta todo_created=false no início de cada turno
 if [ -f "$_LOG_PROMPT" ]; then
-    if grep -q 'todo_created.*false' "$_LOG_PROMPT"; then
+    if contains_pattern_in_files 'todo_created.*false' "$_LOG_PROMPT" "$LOG_PROMPT_LIB"; then
         pass "V90-2: log-prompt.sh reseta todo_created=false no início de cada turno"
     else
         fail "V90-2: log-prompt.sh NÃO reseta todo_created — campo fica sujo entre TURNs"
@@ -1414,7 +1488,7 @@ fi
 
 # V90-8: log-prompt.sh emite session_id_in_payload no evento userPromptSubmitted
 if [ -f "$_LOG_PROMPT" ]; then
-    if grep -q 'session_id_in_payload' "$_LOG_PROMPT"; then
+    if contains_pattern_in_files 'session_id_in_payload' "$_LOG_PROMPT" "$LOG_PROMPT_LIB"; then
         pass "V90-8: log-prompt.sh inclui session_id_in_payload no evento userPromptSubmitted"
     else
         fail "V90-8: log-prompt.sh NÃO emite session_id_in_payload — perda de observabilidade"
@@ -1621,8 +1695,8 @@ fi
 # V90-18: post-tool-use.sh tem guard de idempotência para session-close.sh (BUG-PC-03)
 _PTU_SCRIPT="$SCRIPTS_DIR/post-tool-use.sh"
 if [ -f "$_PTU_SCRIPT" ]; then
-    if grep -q '_ALREADY_VALIDATED' "$_PTU_SCRIPT" \
-        && grep -q 'close_key_validated // false' "$_PTU_SCRIPT"; then
+    if contains_pattern_in_files '_ALREADY_VALIDATED' "$_PTU_SCRIPT" "$POST_TOOL_USE_LIB" \
+        && contains_pattern_in_files 'close_key_validated // false' "$_PTU_SCRIPT" "$POST_TOOL_USE_LIB"; then
         pass "V90-18: post-tool-use.sh BUG-PC-03 — guard de idempotência (_ALREADY_VALIDATED) previne duplo sessionCloseAuthorized"
     else
         fail "V90-18: post-tool-use.sh SEM guard de idempotência — BUG-PC-03 não aplicado"
@@ -1633,7 +1707,7 @@ fi
 
 # V90-18B: post-tool-use.sh aplica backfill de strict_turn_close_requires_key (anti-lacuna em contextos legados)
 if [ -f "$_PTU_SCRIPT" ]; then
-    if grep -q 'ensure_strict_turn_close_flag_default' "$_PTU_SCRIPT" 2> /dev/null; then
+    if contains_pattern_in_files 'ensure_strict_turn_close_flag_default' "$_PTU_SCRIPT" "$POST_TOOL_USE_LIB"; then
         pass "V90-18B: post-tool-use.sh aplica backfill da flag strict_turn_close_requires_key"
     else
         fail "V90-18B: post-tool-use.sh NÃO aplica backfill da flag strict_turn_close_requires_key"
@@ -1644,8 +1718,8 @@ fi
 
 # V90-18C: log-prompt.sh preserva/força strict_turn_close_requires_key no reconnect_rollover e backfill geral
 if [ -f "$_LOG_PROMPT" ]; then
-    if grep -q 'strict_turn_close_requires_key = (if (.session.strict_turn_close_requires_key == null) then true else .session.strict_turn_close_requires_key end)' "$_LOG_PROMPT" 2> /dev/null \
-        && grep -q 'ensure_strict_turn_close_flag_default' "$_LOG_PROMPT" 2> /dev/null; then
+    if contains_pattern_in_files 'strict_turn_close_requires_key = \(if \(\.session\.strict_turn_close_requires_key == null\) then true else \.session\.strict_turn_close_requires_key end\)' "$_LOG_PROMPT" "$LOG_PROMPT_LIB" \
+        && contains_pattern_in_files 'ensure_strict_turn_close_flag_default' "$_LOG_PROMPT" "$LOG_PROMPT_LIB"; then
         pass "V90-18C: log-prompt.sh garante strict_turn_close_requires_key em reconnect_rollover + backfill"
     else
         fail "V90-18C: log-prompt.sh NÃO garante strict_turn_close_requires_key em reconnect_rollover/backfill"
@@ -1658,9 +1732,9 @@ fi
 _SE_SCRIPT="$SCRIPTS_DIR/session-end.sh"
 _SC_SCRIPT="$SCRIPTS_DIR/session-close.sh"
 if [ -f "$_SE_SCRIPT" ] && [ -f "$_SC_SCRIPT" ] && [ -f "$_AG_STOP" ]; then
-    if grep -q 'ensure_strict_turn_close_flag_default' "$_SE_SCRIPT" 2> /dev/null \
+    if contains_pattern_in_files 'ensure_strict_turn_close_flag_default' "$_SE_SCRIPT" "$SESSION_END_LIB" 2> /dev/null \
         && grep -q 'strict_turn_close_requires_key' "$_SC_SCRIPT" 2> /dev/null \
-        && grep -q 'ensure_strict_turn_close_flag_default' "$_AG_STOP" 2> /dev/null; then
+        && contains_pattern_in_files 'ensure_strict_turn_close_flag_default' "$_AG_STOP" "$AGENT_STOP_LIB"; then
         pass "V90-18D: backfill strict coberto em session-close/session-end/agent-stop"
     else
         fail "V90-18D: cobertura de backfill strict incompleta em session-close/session-end/agent-stop"
@@ -1731,7 +1805,7 @@ fi
 
 # V90-28: log-prompt.sh sincroniza current-session-id e symlinks por TURN (P1)
 if [ -f "$_LOG_PROMPT" ]; then
-    if grep -q 'set_current_session_id' "$_LOG_PROMPT" 2> /dev/null; then
+    if contains_pattern_in_files 'set_current_session_id' "$_LOG_PROMPT" "$LOG_PROMPT_LIB"; then
         pass "V90-28: log-prompt.sh sincroniza ponteiro current-session-id por TURN"
     else
         fail "V90-28: log-prompt.sh não sincroniza current-session-id"
@@ -1967,8 +2041,8 @@ fi
 # V90-31: session-start.sh registra evento canônico sessionStart no audit
 _SESSION_START_SCRIPT="$SCRIPTS_DIR/session-start.sh"
 if [ -f "$_SESSION_START_SCRIPT" ]; then
-    if grep -q 'event "sessionStart"' "$_SESSION_START_SCRIPT" 2> /dev/null \
-        && grep -q 'Hook sessionStart processado' "$_SESSION_START_SCRIPT" 2> /dev/null; then
+    if contains_pattern_in_files 'event "sessionStart"' "$_SESSION_START_SCRIPT" "$SESSION_START_EVENTS_LIB" \
+        && contains_pattern_in_files 'Hook sessionStart processado' "$_SESSION_START_SCRIPT" "$SESSION_START_EVENTS_LIB"; then
         pass "V90-31: session-start.sh loga evento canônico sessionStart em audit.jsonl"
     else
         fail "V90-31: session-start.sh NÃO loga evento canônico sessionStart"
@@ -2064,7 +2138,7 @@ else
     fail "V90-39: agent-stop.sh ou agent-stop-lib.sh não encontrado"
 fi
 
-# V90-40: continuidade não-Template F deve bloquear fechamento mesmo com strict=false
+# V90-40: continuidade não-Template F deve autorizar fechamento de TURN mesmo com strict=false
 if [ -f "$_AG_STOP" ]; then
     _V40_DIR="$(mktemp -d)"
     _V40_SCRIPTS="$_V40_DIR/scripts"
@@ -2128,11 +2202,11 @@ V40CTX
 V40AUDIT
 
     _V40_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-40-sid","stop_hook_active":false}' | bash "$_V40_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
-    if echo "$_V40_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
-        && grep -q '"reason":"non_template_f_continuation_mandatory"' "$_V40_LOGS/audit.jsonl" 2> /dev/null; then
-        pass "V90-40: continuidade não-Template F bloqueia fechamento mesmo com strict=false"
+    if ! echo "$_V40_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
+        && grep -q '"event":"turnEnd_authorized"' "$_V40_LOGS/audit.jsonl" 2> /dev/null; then
+        pass "V90-40: continuidade não-Template F autoriza fechamento de TURN com strict=false"
     else
-        fail "V90-40: continuidade não-Template F deveria bloquear fechamento mesmo com strict=false"
+        fail "V90-40: continuidade não-Template F deveria autorizar fechamento de TURN com strict=false"
     fi
 
     rm -rf "$_V40_DIR"
@@ -2217,7 +2291,7 @@ else
     fail "V90-41: agent-stop.sh não encontrado"
 fi
 
-# V90-42: em modo estrito, continuidade não-Template F com opção de escalonamento deve bloquear fechamento
+# V90-42: em modo estrito, continuidade não-Template F com opção de escalonamento autoriza fechamento de TURN
 if [ -f "$_AG_STOP" ]; then
     _V42_DIR="$(mktemp -d)"
     _V42_SCRIPTS="$_V42_DIR/scripts"
@@ -2282,11 +2356,11 @@ V42CTX
 V42AUDIT
 
     _V42_OUT="$(echo '{"timestamp":"2026-01-01T00:02:00Z","session_id":"v90-42-sid","stop_hook_active":false}' | bash "$_V42_SCRIPTS/agent-stop.sh" 2> /dev/null || true)"
-    if echo "$_V42_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
-        && grep -q '"reason":"non_template_f_continuation_mandatory"' "$_V42_LOGS/audit.jsonl" 2> /dev/null; then
-        pass "V90-42: modo estrito bloqueia fechamento após continuidade não-Template F"
+    if ! echo "$_V42_OUT" | grep -q '"decision"[[:space:]]*:[[:space:]]*"block"' \
+        && grep -q '"event":"turnEnd_authorized"' "$_V42_LOGS/audit.jsonl" 2> /dev/null; then
+        pass "V90-42: modo estrito autoriza fechamento de TURN após continuidade não-Template F válida"
     else
-        fail "V90-42: continuidade não-Template F com escalonamento deveria bloquear fechamento"
+        fail "V90-42: continuidade não-Template F válida deveria autorizar fechamento de TURN"
     fi
 
     rm -rf "$_V42_DIR"
@@ -2328,8 +2402,8 @@ fi
 # V90-44: P7.1 — pre-tool-use registra turnClose_prevented_dual_lock no lock primário
 _PRE_TOOL_SCRIPT="$SCRIPTS_DIR/pre-tool-use.sh"
 if [ -f "$_PRE_TOOL_SCRIPT" ]; then
-    if grep -q 'turnClose_prevented_dual_lock' "$_PRE_TOOL_SCRIPT" 2> /dev/null \
-        && grep -q 'lock_stage.*preToolUse\|"preToolUse"' "$_PRE_TOOL_SCRIPT" 2> /dev/null; then
+    if contains_pattern_in_files 'turnClose_prevented_dual_lock' "$_PRE_TOOL_SCRIPT" "$PRE_TOOL_USE_LIB" \
+        && contains_pattern_in_files 'lock_stage.*preToolUse|"preToolUse"' "$_PRE_TOOL_SCRIPT" "$PRE_TOOL_USE_LIB"; then
         pass "V90-44: pre-tool-use implementa lock primário e loga turnClose_prevented_dual_lock"
     else
         fail "V90-44: pre-tool-use não loga turnClose_prevented_dual_lock no lock primário"
@@ -2400,13 +2474,13 @@ else
     fail "V90-52: agent-stop.sh ou agent-stop-lib.sh não encontrado"
 fi
 
-# V90-56: mensagem de block em modo estrito orienta fechamento com Template F + KEY válida
+# V90-56: mensagem de block em modo estrito orienta fechamento com askQuestions de continuidade (A/D/E)
 if [ -f "$_AG_STOP_LIB" ]; then
-    if grep -q 'required_turn_close_action="Template F + KEY válida"' "$_AG_STOP_LIB" 2> /dev/null \
+    if grep -q 'required_turn_close_action="vscode_askQuestions de continuidade \(Template A/D/E\)"' "$_AG_STOP_LIB" 2> /dev/null \
         && grep -q 'Fechamento legítimo deste TURN exige \${required_turn_close_action}' "$_AG_STOP_LIB" 2> /dev/null; then
-        pass "V90-56: helper de block orienta explicitamente Template F + KEY válida no modo estrito"
+        pass "V90-56: helper de block orienta explicitamente askQuestions de continuidade (A/D/E) no modo estrito"
     else
-        fail "V90-56: helper de block não orienta explicitamente Template F + KEY válida"
+        fail "V90-56: helper de block não orienta explicitamente askQuestions de continuidade (A/D/E)"
     fi
 else
     fail "V90-56: agent-stop-lib.sh não encontrado"
@@ -2566,8 +2640,8 @@ fi
 
 # V90-32: log-prompt.sh detecta retomada via userPromptSubmitted e incrementa resume_count
 if [ -f "$_LOG_PROMPT" ]; then
-    if grep -q 'sessionResumeDetected' "$_LOG_PROMPT" 2> /dev/null \
-        && grep -q 'session_stats.resume_count' "$_LOG_PROMPT" 2> /dev/null; then
+    if contains_pattern_in_files 'sessionResumeDetected' "$_LOG_PROMPT" "$LOG_PROMPT_LIB" \
+        && contains_pattern_in_files 'session_stats.resume_count' "$_LOG_PROMPT" "$LOG_PROMPT_LIB"; then
         pass "V90-32: log-prompt.sh detecta retomada de sessão existente e contabiliza resume_count"
     else
         fail "V90-32: log-prompt.sh NÃO implementa detecção de retomada via userPromptSubmitted"
@@ -2578,8 +2652,8 @@ fi
 
 # V90-33: log-prompt.sh implementa prompt_auto_recovery quando CTX está ausente
 if [ -f "$_LOG_PROMPT" ]; then
-    if grep -q 'session_auto_recovery_prompt' "$_LOG_PROMPT" 2> /dev/null \
-        && grep -q 'prompt_auto_recovery' "$_LOG_PROMPT" 2> /dev/null; then
+    if contains_pattern_in_files 'session_auto_recovery_prompt' "$_LOG_PROMPT" "$LOG_PROMPT_LIB" \
+        && contains_pattern_in_files 'prompt_auto_recovery' "$_LOG_PROMPT" "$LOG_PROMPT_LIB"; then
         pass "V90-33: log-prompt.sh tem auto-recovery no userPromptSubmitted (prompt_auto_recovery)"
     else
         fail "V90-33: log-prompt.sh NÃO implementa auto-recovery no userPromptSubmitted"
@@ -2777,9 +2851,9 @@ fi
 
 # V90-46: log-prompt.sh inicializa current_turn.subturn no início do TURN
 if [ -f "$_LOG_PROMPT" ]; then
-    if grep -q 'current_turn.subturn' "$_LOG_PROMPT" 2> /dev/null \
-        && { grep -q 'subturnStart' "$_LOG_PROMPT" 2> /dev/null \
-            || grep -q 'emit_subturn_start_event' "$_LOG_PROMPT" 2> /dev/null; }; then
+    if contains_pattern_in_files 'current_turn.subturn' "$_LOG_PROMPT" "$LOG_PROMPT_LIB" \
+        && { contains_pattern_in_files 'subturnStart' "$_LOG_PROMPT" "$LOG_PROMPT_LIB" \
+            || contains_pattern_in_files 'emit_subturn_start_event' "$_LOG_PROMPT" "$LOG_PROMPT_LIB"; }; then
         pass "V90-46: log-prompt.sh inicializa subturn e emite subturnStart"
     else
         fail "V90-46: log-prompt.sh não inicializa/loga subturn no turn start"
@@ -2790,9 +2864,9 @@ fi
 
 # V90-47: pre-tool-use.sh registra transição de subturn em delegação para subagente
 if [ -f "$_PTU_SCRIPT" ]; then
-    if { grep -q 'subturnTransition' "$_PTU_SCRIPT" 2> /dev/null \
-        || grep -q 'emit_subturn_transition_event' "$_PTU_SCRIPT" 2> /dev/null; } \
-        && grep -q 'subagent_delegate' "$_PTU_SCRIPT" 2> /dev/null; then
+    if { contains_pattern_in_files 'subturnTransition' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB" \
+        || contains_pattern_in_files 'emit_subturn_transition_event' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB"; } \
+        && contains_pattern_in_files 'subagent_delegate' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB"; then
         pass "V90-47: pre-tool-use.sh registra subturnTransition para subagent_delegate"
     else
         fail "V90-47: pre-tool-use.sh não registra transição de subturn para subagente"
@@ -2803,8 +2877,8 @@ fi
 
 # V90-48: post-tool-use.sh atualiza estado de subturn no fluxo askQuestions
 if [ -f "$_POST_TOOL" ]; then
-    if grep -q 'SUBTURN_TO_STATE' "$_POST_TOOL" 2> /dev/null \
-        && grep -q 'session_stats.subturn_via_askquestions' "$_POST_TOOL" 2> /dev/null; then
+    if contains_pattern_in_files 'SUBTURN_TO_STATE' "$_POST_TOOL" "$POST_TOOL_USE_LIB" \
+        && contains_pattern_in_files 'session_stats.subturn_via_askquestions' "$_POST_TOOL" "$POST_TOOL_USE_LIB"; then
         pass "V90-48: post-tool-use.sh atualiza estado/counter de subturn via askQuestions"
     else
         fail "V90-48: post-tool-use.sh não atualiza subturn no fluxo askQuestions"
@@ -2844,14 +2918,14 @@ fi
 
 # V90-51: hooks de subturn emitem parent_turn_id nos eventos
 if [ -f "$_LOG_PROMPT" ] && [ -f "$_PTU_SCRIPT" ] && [ -f "$_POST_TOOL" ] && [ -f "$_AG_STOP" ]; then
-    if grep -q 'parent_turn_id' "$_LOG_PROMPT" 2> /dev/null \
-        && { grep -q 'parent_turn_id' "$_PTU_SCRIPT" 2> /dev/null \
-            || grep -q 'write_current_subturn_state' "$_PTU_SCRIPT" 2> /dev/null; } \
-        && { grep -q 'parent_turn_id' "$_POST_TOOL" 2> /dev/null \
-            || grep -q 'write_current_subturn_state' "$_POST_TOOL" 2> /dev/null; } \
+    if contains_pattern_in_files 'parent_turn_id' "$_LOG_PROMPT" "$LOG_PROMPT_LIB" \
+        && { contains_pattern_in_files 'parent_turn_id' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB" \
+            || contains_pattern_in_files 'write_current_subturn_state' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB"; } \
+        && { contains_pattern_in_files 'parent_turn_id' "$_POST_TOOL" "$POST_TOOL_USE_LIB" \
+            || contains_pattern_in_files 'write_current_subturn_state' "$_POST_TOOL" "$POST_TOOL_USE_LIB"; } \
         && { grep -q 'parent_turn_id' "$_AG_STOP" 2> /dev/null \
             || grep -q 'parent_turn_id' "$_AG_STOP_LIB" 2> /dev/null; } \
-        && grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null; then
+        && grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$COMMON_LIB" 2> /dev/null; then
         pass "V90-51: eventos subturn nos hooks incluem parent_turn_id"
     else
         fail "V90-51: algum hook de subturn não emite parent_turn_id"
@@ -2863,11 +2937,11 @@ fi
 # V90-52: estado de subturn mantém vínculo parent_turn_id no contexto
 if [ -f "$_SCHEMA_FILE" ] && [ -f "$_PTU_SCRIPT" ] && [ -f "$_POST_TOOL" ] && [ -f "$_AG_STOP" ]; then
     if jq -e '.properties.current_turn.properties.subturn.properties.parent_turn_id' "$_SCHEMA_FILE" > /dev/null 2>&1 \
-        && grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$HOOK_DIR/hooks-lib/common.sh" 2> /dev/null \
-        && { grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$_PTU_SCRIPT" 2> /dev/null \
-            || grep -q 'write_current_subturn_state' "$_PTU_SCRIPT" 2> /dev/null; } \
-        && { grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$_POST_TOOL" 2> /dev/null \
-            || grep -q 'write_current_subturn_state' "$_POST_TOOL" 2> /dev/null; } \
+        && grep -q 'parent_turn_id: (.current_turn.turn_id // null)' "$COMMON_LIB" 2> /dev/null \
+        && { contains_pattern_in_files 'parent_turn_id: (.current_turn.turn_id // null)' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB" \
+            || contains_pattern_in_files 'write_current_subturn_state' "$_PTU_SCRIPT" "$PRE_TOOL_USE_LIB"; } \
+        && { contains_pattern_in_files 'parent_turn_id: (.current_turn.turn_id // null)' "$_POST_TOOL" "$POST_TOOL_USE_LIB" \
+            || contains_pattern_in_files 'write_current_subturn_state' "$_POST_TOOL" "$POST_TOOL_USE_LIB"; } \
         && { grep -q 'subturn_rebound_to_current_turn' "$_AG_STOP" 2> /dev/null \
             || grep -q 'subturn_rebound_to_current_turn' "$_AG_STOP_LIB" 2> /dev/null; }; then
         pass "V90-52: contexto de subturn mantém e repara vínculo parent_turn_id -> current_turn.turn_id"
@@ -2894,7 +2968,7 @@ fi
 
 # V90-54: janela temporal esperada de SubTurn (minutos) está explícita no estado criado pelos hooks
 if [ -f "$_LOG_PROMPT" ] && [ -f "$_AG_STOP" ] && [ -f "$_AG_STOP_LIB" ]; then
-    if grep -q 'expected_window_minutes: 15' "$_LOG_PROMPT" 2> /dev/null \
+    if contains_pattern_in_files 'expected_window_minutes: 15' "$_LOG_PROMPT" "$LOG_PROMPT_LIB" \
         && { grep -q 'expected_window_minutes: 15' "$_AG_STOP" 2> /dev/null \
             || grep -q 'expected_window_minutes: 15' "$_AG_STOP_LIB" 2> /dev/null; }; then
         pass "V90-54: hooks definem expected_window_minutes=15 para SubTurn"

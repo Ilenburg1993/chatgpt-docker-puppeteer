@@ -282,7 +282,9 @@ write_askquestions_turn_state() {
         | .current_turn.auth_requested_at = $ts
         | .current_turn.last_askquestions_template = (if $ask_template_f == "true" then "template_f" else "other" end)
         | .current_turn.last_askquestions_close_action = $ask_close_action
-        | .current_turn.last_askquestions_close_key_found = ($ask_close_key_found == "true")'
+        | .current_turn.last_askquestions_close_key_found = ($ask_close_key_found == "true")
+        | .current_turn.todo_refresh_required = true
+        | .current_turn.todo_refresh_required_at = $ts'
 
     if command -v sponge > /dev/null 2>&1; then
         jq \
@@ -360,13 +362,28 @@ increment_turn_failure_counters() {
 # ── mark_turn_todo_created_true ─────────────────────────────────────────────
 # Marca flag current_turn.todo_created=true.
 mark_turn_todo_created_true() {
+    local ts="${1:-$(iso_now)}"
     [ -f "$CTX_FILE" ] || return 1
     if command -v sponge > /dev/null 2>&1; then
-        jq '.current_turn.todo_created = true' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        jq --arg ts "$ts" '
+            .current_turn.todo_created = true
+            | (if (.current_turn.todo_refresh_required // false)
+                then .current_turn.todo_refresh_required = false
+                else .
+               end)
+            | .current_turn.todo_refresh_done_at = $ts
+        ' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     else
         local _tmp_todo
         if _tmp_todo="$(mktemp 2> /dev/null)"; then
-            if jq '.current_turn.todo_created = true' "$CTX_FILE" > "$_tmp_todo" 2> /dev/null; then
+            if jq --arg ts "$ts" '
+                .current_turn.todo_created = true
+                | (if (.current_turn.todo_refresh_required // false)
+                    then .current_turn.todo_refresh_required = false
+                    else .
+                   end)
+                | .current_turn.todo_refresh_done_at = $ts
+            ' "$CTX_FILE" > "$_tmp_todo" 2> /dev/null; then
                 mv "$_tmp_todo" "$CTX_FILE" 2> /dev/null || rm -f "$_tmp_todo"
             else
                 rm -f "$_tmp_todo"

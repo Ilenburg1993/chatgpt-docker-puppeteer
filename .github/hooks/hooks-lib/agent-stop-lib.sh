@@ -560,16 +560,12 @@ build_turn_block_payload() {
     local reason=""
     local system_message=""
     local reason_code=""
-    local required_turn_close_action="Template F + KEY válida"
-
-    if [ "$strict_turn_close_requires_key" != "true" ]; then
-        required_turn_close_action="Template A ou D"
-    fi
+    local required_turn_close_action="vscode_askQuestions de continuidade (Template A/D/E)"
 
     if [ "$auth_invalid_reason" = "strict_context_missing" ]; then
         reason_code="strict_context_missing"
-        reason="Política estrita de sessão/turno: sem session-context válido não existe autorização legítima para encerrar TURN. Fechamento só é legítimo com Template F + KEY correta validada.${session_hint}"
-        system_message="🚫 TURN BLOQUEADO: contexto ausente/inválido para validar Template F + KEY."
+        reason="Política estrita de sessão/turno: sem session-context válido não existe autorização legítima para encerrar TURN. Fechamento exige chamada válida de vscode_askQuestions.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: contexto ausente/inválido para validar autorização do TURN."
     elif [ "$todo_created" != "true" ]; then
         reason_code="double_protocol_violation"
         reason="🚨 DUPLA VIOLAÇÃO DO PROTOCOLO v9.0: (1) manage_todo_list NÃO foi chamado neste turno — toda resposta DEVE começar com manage_todo_list criando/atualizando a lista de tarefas. (2) vscode_askQuestions NÃO foi chamado — todo turno DEVE terminar com vscode_askQuestions. AÇÕES OBRIGATÓRIAS NESTA ORDEM: chame PRIMEIRO manage_todo_list (criar TODOs com último item = 'Chamar vscode_askQuestions'), depois execute as tarefas, e ao FINAL chame vscode_askQuestions (${required_turn_close_action}).${session_hint}"
@@ -578,9 +574,13 @@ build_turn_block_payload() {
         reason_code="todo_last_item_not_continuation"
         reason="Protocolo de SubTurn/TODO: o último item do checklist deve ser uma chamada de vscode_askQuestions de continuação do TURN (Template A/D/E). Ajuste o manage_todo_list para fechar com esse item e execute novamente o fluxo final.${session_hint}"
         system_message="🚫 TURN BLOQUEADO: último TODO não é askQuestions de continuação. Refaça o checklist e finalize com vscode_askQuestions."
+    elif [ "$auth_invalid_reason" = "askquestions_todo_refresh_pending" ]; then
+        reason_code="askquestions_todo_refresh_pending"
+        reason="Protocolo TODO hardening: após chamar vscode_askQuestions, o refresh imediato via manage_todo_list é obrigatório. Este TURN não pode encerrar enquanto o checklist não for atualizado. Depois do refresh, se houver nova ferramenta de trabalho, um novo vscode_askQuestions final será obrigatório.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO: pendência de refresh de TODO após askQuestions. Execute manage_todo_list agora."
     elif [ "$auth_invalid_reason" = "askquestions_not_last_tool" ]; then
         reason_code="askquestions_not_last_tool"
-        reason="Protocolo v9.1: vscode_askQuestions até foi chamado, porém não ficou como último passo válido do TURN. Regra: último passo deve ser vscode_askQuestions; exceção única permitida é manage_todo_list imediatamente após askQuestions para fechamento de checklist. Em modo estrito, o último askQuestions válido deve usar Template F + KEY correta.${session_hint}"
+        reason="Protocolo v9.1: vscode_askQuestions até foi chamado, porém não ficou como último passo válido do TURN. Regra: último passo deve ser vscode_askQuestions; exceção única permitida é manage_todo_list imediatamente após askQuestions para fechamento de checklist.${session_hint}"
         system_message="🚫 TURN BLOQUEADO (v9.1): sequência final inválida. Refaça vscode_askQuestions como último passo válido (${required_turn_close_action})."
     elif [ "$auth_invalid_reason" = "askquestions_api_error" ]; then
         reason_code="askquestions_api_error"
@@ -612,12 +612,12 @@ build_turn_block_payload() {
         system_message="🚫 TURN BLOQUEADO: Template F chamado sem solicitação prévia registrada no askQuestions anterior."
     elif [ "$auth_invalid_reason" = "turn_close_requires_template_f" ]; then
         reason_code="turn_close_requires_template_f"
-        reason="Hardening estrito de TURN: o fechamento agora exige vscode_askQuestions com Template F no último ato do turno. Templates A/D/E não autorizam encerramento em modo estrito.${session_hint}"
-        system_message="🚫 TURN BLOQUEADO (strict): use Template F no último askQuestions para encerrar o turno."
+        reason="Hardening estrito de TURN: fechamento requer vscode_askQuestions válido no último ato do turno. Template F permanece reservado para fechamento de SESSION.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO (strict): use vscode_askQuestions válido para encerrar o turno."
     elif [ "$auth_invalid_reason" = "turn_close_key_missing_or_invalid" ]; then
         reason_code="turn_close_key_missing_or_invalid"
-        reason="Hardening estrito de TURN: o usuário não inseriu a close_key correta no askQuestions final. Encerramento do turno exige KEY válida digitada pelo usuário no Template F.${session_hint}"
-        system_message="🚫 TURN BLOQUEADO (strict): KEY ausente/inválida no askQuestions final."
+        reason="Fluxo de SESSION Close inválido: close_key ausente/inválida quando houve tentativa de fechamento de sessão com Template F.${session_hint}"
+        system_message="🚫 TURN BLOQUEADO (strict): KEY ausente/inválida no fluxo de SESSION Close."
     elif [ "$auth_invalid_reason" = "subagent_chain_invalid" ]; then
         reason_code="subagent_chain_invalid"
         reason="Delegação de subagente detectada sem cadeia auditável íntegra (subagentStart/parent_turn). Sem proveniência válida, a delegação não autoriza fechamento.${session_hint}"
@@ -890,6 +890,9 @@ finalize_turn_context_state() {
          | .current_turn.askquestions_api_error = false
          | .current_turn.askquestions_api_error_at = null
          | .current_turn.todo_created      = false
+         | .current_turn.todo_refresh_required = false
+         | .current_turn.todo_refresh_required_at = null
+         | .current_turn.todo_refresh_done_at = null
          | .current_turn.subagent_delegated = false
          | .current_turn.last_non_bookkeeping_tool = null
          | .current_turn.last_askquestions_template = null
@@ -1821,7 +1824,7 @@ mark_turn_unauthorized_in_context() {
     fi
 }
 
-# Trata o ramo stop_hook_active=true (resume/reblock) do agent-stop.
+# Trata o ramo stop_hook_active=true (resume/reblock suprimido) do agent-stop.
 # Retornos:
 #   0  => fluxo concluído sem novo block
 #   10 => block emitido (script chamador deve encerrar com exit 0)
@@ -1888,97 +1891,42 @@ handle_stop_hook_active_branch() {
 
     local reblock_count_curr_raw
     local reblock_count_curr
-    local reblock_count_next
+    local reblock_last_tool_name
     local reblock_budget_max_raw
     local reblock_budget_max
-    local reblock_budget_already_exceeded
-    local reblock_strict_mode
 
     reblock_count_curr_raw="$(jq -r '.current_turn.block_count // 0' "$ctx_file" 2> /dev/null || echo 0)"
     reblock_count_curr="$(sanitize_nonnegative_int "$reblock_count_curr_raw")"
-    reblock_count_next=$((reblock_count_curr + 1))
+    reblock_last_tool_name="$(jq -r '.last_tool.name // ""' "$ctx_file" 2> /dev/null || echo '')"
     reblock_budget_max_raw="$(jq -r '.session.stop_block_budget_max // 2' "$ctx_file" 2> /dev/null || echo 2)"
     reblock_budget_max="$(sanitize_nonnegative_int "$reblock_budget_max_raw")"
-    reblock_budget_already_exceeded="$(jq -r '.current_turn.stop_block_budget_exceeded // false' "$ctx_file" 2> /dev/null || echo 'false')"
     if [ "$reblock_budget_max" -lt 1 ] 2> /dev/null; then
         reblock_budget_max=1
     fi
-    reblock_strict_mode="$(jq -r '(.session.strict_turn_close_requires_key | if . == null then true else . end)' "$ctx_file" 2> /dev/null || echo 'true')"
 
-    if [ -f "$ctx_file" ] && command -v sponge > /dev/null 2>&1; then
-        jq --argjson bc "$reblock_count_next" '.current_turn.block_count = $bc' \
-            "$ctx_file" | sponge "$ctx_file" 2> /dev/null || true
-    fi
+    # Hotfix operacional: suprime reblock em stop_hook_active=true para evitar
+    # loops de bloqueio recorrente (reblock_no_authorization/stop_block_budget_exceeded)
+    # que interrompem a continuidade de turnos.
+    jq -cn \
+        --arg event "agentStop_reblock_suppressed_no_authorization" \
+        --arg sid "$session_id" \
+        --arg ts "$now_iso" \
+        --arg turn_id "$turn_id" \
+        --arg last_tool "$reblock_last_tool_name" \
+        --argjson block_count "$reblock_count_curr" \
+        --argjson budget_max "$reblock_budget_max" \
+        '{
+            event: $event,
+            session_id: $sid,
+            timestamp: $ts,
+            turn_id: (if $turn_id == "" then null else $turn_id end),
+            last_tool: (if $last_tool == "" then null else $last_tool end),
+            block_count: $block_count,
+            budget_max: $budget_max,
+            message: "Reblock suprimido em stop_hook_active=true para evitar bloqueio recorrente"
+        }' >> "$audit_file"
 
-    log_reblocked_no_comply_event "$audit_file" "$session_id" "$now_iso" "$turn_id" "$reblock_count_next"
-
-    log_turn_close_prevented_dual_lock_event \
-        "$audit_file" \
-        "$session_id" \
-        "$now_iso" \
-        "stopHook_reblock" \
-        "$turn_id" \
-        "reblock_no_authorization"
-
-    if [ "$reblock_count_next" -gt "$reblock_budget_max" ] 2> /dev/null; then
-        if [ "$reblock_budget_already_exceeded" != "true" ]; then
-            jq -cn \
-                --arg event "stop_block_budget_exceeded" \
-                --arg sid "$session_id" \
-                --arg ts "$now_iso" \
-                --arg turn_id "$turn_id" \
-                --argjson block_count "$reblock_count_next" \
-                --argjson budget_max "$reblock_budget_max" \
-                '{
-                    event: $event,
-                    session_id: $sid,
-                    timestamp: $ts,
-                    turn_id: (if $turn_id == "" then null else $turn_id end),
-                    block_count: $block_count,
-                    budget_max: $budget_max,
-                    message: "Budget de reblock excedido; mantendo bloqueio estrito para evitar fechamento ilegítimo"
-                }' >> "$audit_file"
-        fi
-
-        if [ -f "$ctx_file" ] && command -v sponge > /dev/null 2>&1; then
-            jq --arg ts "$now_iso" --argjson bc "$reblock_count_next" --argjson bm "$reblock_budget_max" \
-                '.current_turn.stop_block_budget_exceeded = true
-                 | .current_turn.stop_block_budget_exceeded_at = $ts
-                 | .current_turn.stop_block_budget_exceeded_count = $bc
-                 | .current_turn.stop_block_budget_max = $bm' \
-                "$ctx_file" | sponge "$ctx_file" 2> /dev/null || true
-        fi
-
-        local budget_trace
-        budget_trace="$(build_decision_trace_json \
-            "stop_reblock_budget" \
-            "multi_strategy_v9_1" \
-            "budget_exceeded" \
-            "$reblock_strict_mode" \
-            "$stop_hook_active" \
-            "$reblock_count_next")"
-        emit_reblock_stop_block \
-            "Budget de reblock excedido sem autorização válida. Encerramento segue bloqueado até Template F + KEY correta validada." \
-            "🚫 BLOQUEIO MANTIDO (budget excedido): pare de iterar ferramentas de trabalho e finalize corretamente com Template F + KEY válida." \
-            "stop_block_budget_exceeded" \
-            "$budget_trace"
-        return 10
-    fi
-
-    local reblock_trace
-    reblock_trace="$(build_decision_trace_json \
-        "stop_reblock" \
-        "multi_strategy_v9_1" \
-        "reblock_no_authorization" \
-        "$reblock_strict_mode" \
-        "$stop_hook_active" \
-        "$reblock_count_next")"
-    emit_reblock_stop_block \
-        "Turno ainda sem autorização válida. Encerramento legítimo só com Template F + KEY correta validada." \
-        "🚫 Encerramento ilegítimo bloqueado novamente: faça askQuestions com opção de escalar para Template F e só encerre após Template F + KEY válida." \
-        "reblock_no_authorization" \
-        "$reblock_trace"
-    return 10
+    return 0
 }
 
 # Trata o bloco principal de hardening do Stop:
@@ -2147,14 +2095,36 @@ audit_has_turn_auth_signal() {
     local audit_file="$1"
     [ -f "$audit_file" ] || return 1
 
-    local last_prompt_line total_lines lines_since_prompt
+    local last_prompt_line last_turn_end_line total_lines lines_since_boundary boundary_line
     last_prompt_line="$(awk '/"userPromptSubmitted"/{last=NR} END{print last+0}' "$audit_file" 2> /dev/null || echo 0)"
+    last_turn_end_line="$(awk '/"turnEnd_authorized"|"turnEnd_no_askQuestions"|"turnEnd_invalid_authorization"/{last=NR} END{print last+0}' "$audit_file" 2> /dev/null || echo 0)"
     total_lines="$(wc -l < "$audit_file" 2> /dev/null || echo 0)"
+    boundary_line=0
 
-    if [ "$last_prompt_line" -gt 0 ] && [ "$total_lines" -gt "$last_prompt_line" ]; then
-        lines_since_prompt=$((total_lines - last_prompt_line))
-        if [ "$lines_since_prompt" -gt 0 ] && tail -n "$lines_since_prompt" "$audit_file" \
-            | jq -re 'select(.tool_name == "vscode_askQuestions" or .event == "subagentStart")' > /dev/null 2>&1; then
+    if [ "$last_prompt_line" -gt "$boundary_line" ] 2> /dev/null; then
+        boundary_line="$last_prompt_line"
+    fi
+    if [ "$last_turn_end_line" -gt "$boundary_line" ] 2> /dev/null; then
+        boundary_line="$last_turn_end_line"
+    fi
+
+    if [ "$boundary_line" -gt 0 ] && [ "$total_lines" -gt "$boundary_line" ]; then
+        lines_since_boundary=$((total_lines - boundary_line))
+        if [ "$lines_since_boundary" -gt 0 ] && tail -n "$lines_since_boundary" "$audit_file" \
+            | jq -re 'select((.event == "postToolUse" and (.tool_name // "") == "vscode_askQuestions") or .event == "askQuestions_response" or .event == "subagentStart")' > /dev/null 2>&1; then
+            return 0
+        fi
+    fi
+
+    # Fallback defensivo para sessões sem userPromptSubmitted no audit corrente
+    # (ex.: fluxo predominantemente via askQuestions/tool results).
+    if [ "$boundary_line" -le 0 ] && [ "$total_lines" -gt 0 ]; then
+        local window_lines=200
+        if [ "$total_lines" -lt "$window_lines" ] 2> /dev/null; then
+            window_lines="$total_lines"
+        fi
+        if [ "$window_lines" -gt 0 ] && tail -n "$window_lines" "$audit_file" \
+            | jq -re 'select((.event == "postToolUse" and (.tool_name // "") == "vscode_askQuestions") or .event == "askQuestions_response" or .event == "subagentStart")' > /dev/null 2>&1; then
             return 0
         fi
     fi
@@ -2167,13 +2137,33 @@ audit_has_subagent_start_since_prompt() {
     local audit_file="$1"
     [ -f "$audit_file" ] || return 1
 
-    local last_prompt_line total_lines lines_since_prompt
+    local last_prompt_line last_turn_end_line total_lines lines_since_boundary boundary_line
     last_prompt_line="$(awk '/"userPromptSubmitted"/{last=NR} END{print last+0}' "$audit_file" 2> /dev/null || echo 0)"
+    last_turn_end_line="$(awk '/"turnEnd_authorized"|"turnEnd_no_askQuestions"|"turnEnd_invalid_authorization"/{last=NR} END{print last+0}' "$audit_file" 2> /dev/null || echo 0)"
     total_lines="$(wc -l < "$audit_file" 2> /dev/null || echo 0)"
+    boundary_line=0
 
-    if [ "$last_prompt_line" -gt 0 ] && [ "$total_lines" -gt "$last_prompt_line" ]; then
-        lines_since_prompt=$((total_lines - last_prompt_line))
-        if [ "$lines_since_prompt" -gt 0 ] && tail -n "$lines_since_prompt" "$audit_file" \
+    if [ "$last_prompt_line" -gt "$boundary_line" ] 2> /dev/null; then
+        boundary_line="$last_prompt_line"
+    fi
+    if [ "$last_turn_end_line" -gt "$boundary_line" ] 2> /dev/null; then
+        boundary_line="$last_turn_end_line"
+    fi
+
+    if [ "$boundary_line" -gt 0 ] && [ "$total_lines" -gt "$boundary_line" ]; then
+        lines_since_boundary=$((total_lines - boundary_line))
+        if [ "$lines_since_boundary" -gt 0 ] && tail -n "$lines_since_boundary" "$audit_file" \
+            | jq -re 'select(.event == "subagentStart")' > /dev/null 2>&1; then
+            return 0
+        fi
+    fi
+
+    if [ "$boundary_line" -le 0 ] && [ "$total_lines" -gt 0 ]; then
+        local window_lines=200
+        if [ "$total_lines" -lt "$window_lines" ] 2> /dev/null; then
+            window_lines="$total_lines"
+        fi
+        if [ "$window_lines" -gt 0 ] && tail -n "$window_lines" "$audit_file" \
             | jq -re 'select(.event == "subagentStart")' > /dev/null 2>&1; then
             return 0
         fi
@@ -2254,6 +2244,7 @@ evaluate_turn_authorization() {
         local auth_last_ask_close_key_found auth_last_ask_has_template_f_option auth_template_f_pending
         local auth_session_close_key_validated auth_strict_key_mode auth_template_f_called_without_request
         local auth_todo_last_item_is_continuation auth_auto_audit_required auth_auto_audit_started
+        local auth_todo_refresh_required
         local auth_required_docs_pending_count
         local auth_last_non_bookkeeping_tool_aud auth_last_non_bookkeeping_tool
 
@@ -2270,6 +2261,7 @@ evaluate_turn_authorization() {
         auth_session_close_key_validated="$(jq -r '.session.close_key_validated // false' "$ctx_file" 2> /dev/null || echo false)"
         auth_strict_key_mode="$(jq -r '(.session.strict_turn_close_requires_key | if . == null then true else . end)' "$ctx_file" 2> /dev/null || echo true)"
         auth_todo_last_item_is_continuation="$(jq -r '.current_turn.todo_last_item_is_askquestions_continuation // false' "$ctx_file" 2> /dev/null || echo false)"
+        auth_todo_refresh_required="$(jq -r '.current_turn.todo_refresh_required // false' "$ctx_file" 2> /dev/null || echo false)"
         auth_auto_audit_required="$(jq -r '.current_turn.auto_audit_required // false' "$ctx_file" 2> /dev/null || echo false)"
         auth_auto_audit_started="$(jq -r '.current_turn.auto_audit_started // false' "$ctx_file" 2> /dev/null || echo false)"
         auth_required_docs_pending_count="$(jq -r '(.current_turn.required_docs_pending // []) | length' "$ctx_file" 2> /dev/null || echo 0)"
@@ -2319,7 +2311,8 @@ evaluate_turn_authorization() {
             "$auth_template_f_called_without_request" \
             "$auth_todo_last_item_is_continuation" \
             "$auth_auto_audit_required" \
-            "$auth_auto_audit_started")"
+            "$auth_auto_audit_started" \
+            "$auth_todo_refresh_required")"
 
         if [ "${auth_required_docs_pending_count:-0}" -gt 0 ] 2> /dev/null; then
             auth_invalid_reason="required_docs_not_read"
@@ -2375,6 +2368,7 @@ determine_turn_auth_invalid_reason() {
     local todo_last_item_is_continuation="${13:-false}"
     local auto_audit_required="${14:-false}"
     local auto_audit_started="${15:-false}"
+    local todo_refresh_required="${16:-false}"
 
     if command -v policy_determine_turn_auth_invalid_reason > /dev/null 2>&1; then
         policy_determine_turn_auth_invalid_reason \
@@ -2392,7 +2386,8 @@ determine_turn_auth_invalid_reason() {
             "$template_f_called_without_request" \
             "$todo_last_item_is_continuation" \
             "$auto_audit_required" \
-            "$auto_audit_started"
+            "$auto_audit_started" \
+            "$todo_refresh_required"
         return 0
     fi
 
@@ -2427,6 +2422,11 @@ determine_turn_auth_invalid_reason() {
         return 0
     fi
 
+    if [ "$todo_refresh_required" = "true" ]; then
+        printf '%s\n' "askquestions_todo_refresh_pending"
+        return 0
+    fi
+
     if [ "$auto_audit_required" = "true" ] && [ "$auto_audit_started" != "true" ]; then
         printf '%s\n' "auto_audit_required_not_started"
         return 0
@@ -2439,10 +2439,10 @@ determine_turn_auth_invalid_reason() {
         return 0
     fi
 
-    # Hardening de continuidade: respostas de askQuestions não-Template F
-    # SEMPRE exigem continuação do TURN e proíbem encerramento nesta etapa.
+    # Turn close padrão: askQuestions de continuidade (A/D/E) é válido para
+    # encerrar o TURN. Template F é reservado para fechamento de SESSION.
     if [ "$ask_template" != "template_f" ]; then
-        printf '%s\n' "non_template_f_continuation_mandatory"
+        printf '%s\n' ""
         return 0
     fi
 
@@ -2623,8 +2623,8 @@ log_reblocked_no_comply_event() {
 
 # Emite block padrão de reblock pós stop_hook_active.
 emit_reblock_stop_block() {
-    local reason="${1:-Turno ainda sem autorização válida. Encerramento legítimo só com Template F + KEY correta validada.}"
-    local system_message="${2:-🚫 Encerramento ilegítimo bloqueado novamente: faça askQuestions com opção de escalar para Template F e só encerre após Template F + KEY válida.}"
+    local reason="${1:-Turno ainda sem autorização válida. Encerramento legítimo exige chamada final de vscode_askQuestions com resposta válida do usuário.}"
+    local system_message="${2:-🚫 Encerramento ilegítimo bloqueado novamente: finalize com vscode_askQuestions. Use Template F somente se o objetivo for encerrar a SESSION.}"
     local reason_code="${3:-reblock_no_authorization}"
     local decision_trace_json="${4:-}"
     emit_stop_block "$reason" "$system_message" "$reason_code" "$decision_trace_json"
