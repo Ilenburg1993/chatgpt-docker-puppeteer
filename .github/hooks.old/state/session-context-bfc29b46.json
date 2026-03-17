@@ -1,0 +1,191 @@
+{
+  "session": {
+    "id": "bfc29b46-2292-473e-9050-a2b52129b639",
+    "started_at": "2026-03-15T10:39:05Z",
+    "ended_at": null,
+    "end_reason": null,
+    "close_key": "ENCERRAR-B23FDC82",
+    "close_key_validated": false,
+    "strict_turn_close_requires_key": true,
+    "source": "auto_recovery",
+    "cwd": null
+  },
+  "session_stats": {
+    "turn_count": 0,
+    "turn_authorized": 0,
+    "turn_unauthorized": 0,
+    "resume_count": 0,
+    "tools_total": 30,
+    "tools_by_name": {
+      "read_file": 22,
+      "grep_search": 8
+    },
+    "failures_detected": 0,
+    "errors_total": 0,
+    "subagent_calls": 0,
+    "section_count": 2,
+    "section_names": [
+      "recovery",
+      "f8.2-cobertura-contratual-smoke"
+    ],
+    "section_history": [
+      {
+        "name": "recovery",
+        "section_number": 1,
+        "section_id": null,
+        "turns": 1,
+        "duration_s": 11816,
+        "pushes": 2,
+        "summary_file": "section-summaries/section-1-recovery-20260315_135601.md",
+        "closed_at": "2026-03-15T13:56:01Z"
+      },
+      {
+        "name": "f8.2-cobertura-contratual-smoke",
+        "section_id": "sect_1773582962_81273",
+        "section_number": 2,
+        "started_at": "2026-03-15T13:56:01Z"
+      }
+    ],
+    "turn_history": [],
+    "push_count": 6,
+    "commit_history": [
+      {
+        "sha": "b4f52b9e",
+        "branch": "main",
+        "ts": "2026-03-15T12:03:12Z",
+        "push_n": 1,
+        "section_name": "recovery",
+        "section_id": null,
+        "section_number": 1,
+        "turn_id": null
+      },
+      {
+        "sha": "a8b42932",
+        "branch": "main",
+        "ts": "2026-03-15T13:55:50Z",
+        "push_n": 2,
+        "section_name": "recovery",
+        "section_id": null,
+        "section_number": 1,
+        "turn_id": null
+      },
+      {
+        "sha": "da612b35",
+        "branch": "main",
+        "ts": "2026-03-15T14:00:35Z",
+        "push_n": 3,
+        "section_name": "f8.2-cobertura-contratual-smoke",
+        "section_id": "sect_1773582962_81273",
+        "section_number": 2,
+        "turn_id": null
+      },
+      {
+        "sha": "7b6b1202",
+        "branch": "main",
+        "ts": "2026-03-15T14:07:55Z",
+        "push_n": 4,
+        "section_name": "f8.2-cobertura-contratual-smoke",
+        "section_id": "sect_1773582962_81273",
+        "section_number": 2,
+        "turn_id": null
+      },
+      {
+        "sha": "999054e1",
+        "branch": "main",
+        "ts": "2026-03-15T14:11:56Z",
+        "push_n": 5,
+        "section_name": "f8.2-cobertura-contratual-smoke",
+        "section_id": "sect_1773582962_81273",
+        "section_number": 2,
+        "turn_id": null
+      },
+      {
+        "sha": "2c020edb",
+        "branch": "main",
+        "ts": "2026-03-15T14:15:32Z",
+        "push_n": 6,
+        "section_name": "f8.2-cobertura-contratual-smoke",
+        "section_id": "sect_1773582962_81273",
+        "section_number": 2,
+        "turn_id": null
+      }
+    ],
+    "pending_section_after_push": false,
+    "recovery_hints": {
+      "last_intent": null,
+      "last_section": null,
+      "last_commit_sha": "2c020edb",
+      "last_commit_ts": "2026-03-15T14:15:32Z"
+    },
+    "subagent_completions": 1,
+    "last_push_at": "2026-03-15T14:15:32Z",
+    "last_push_turn": 1
+  },
+  "current_turn": {
+    "number": 1,
+    "started_at": "2026-03-15T10:39:05Z",
+    "tools_count": 30,
+    "tools_by_name": {
+      "read_file": 22,
+      "grep_search": 8
+    },
+    "failures_count": 0,
+    "auth_requested": false,
+    "auth_requested_at": null,
+    "last_askquestions_response": null,
+    "section_name": "recovery",
+    "turn_id": null,
+    "section_turn": 0,
+    "block_count": 0,
+    "intent_declared": true,
+    "intent": "Finalizar F13.3: rubric JSON + sincronização de roadmap/plano sem commit/push",
+    "last_non_bookkeeping_tool": "read_file",
+    "last_askquestions_template": null,
+    "last_askquestions_close_action": null,
+    "last_askquestions_close_key_found": false,
+    "todo_last_item_label": null,
+    "todo_last_item_is_askquestions_continuation": false,
+    "todo_last_item_checked_at": null,
+    "todo_protocol_version": null,
+    "required_docs_pending": [],
+    "required_docs_read_log": [
+      {
+        "doc": "pending-tasks.md",
+        "path": "/workspaces/chatgpt-docker-puppeteer/.github/hooks/state/pending-tasks.md",
+        "ts": "2026-03-15T10:39:04.977Z"
+      }
+    ],
+    "required_docs_last_read_at": "2026-03-15T10:39:04.977Z",
+    "required_docs_status": "completed"
+  },
+  "current_section": {
+    "name": "f8.2-cobertura-contratual-smoke",
+    "section_id": "sect_1773582962_81273",
+    "started_at": "2026-03-15T13:56:01Z",
+    "turn_start": 1,
+    "local_turn": 0,
+    "description": "Retomar execução da fase F8.2 com checks de reason codes e payloads obrigatórios no smoke",
+    "section_number": 2,
+    "push_count": 4,
+    "tools_by_name": {},
+    "intent_history": [
+      "Finalizar F13.3: rubric JSON + sincronização de roadmap/plano sem commit/push"
+    ],
+    "failures_count": 0,
+    "blocked_turns": 0
+  },
+  "last_tool": {
+    "name": "read_file",
+    "ts": "2026-03-15T10:40:25.184Z",
+    "use_id": "toolu_vrtx_01WES1voCuZeaumB2naFyVQP__vscode-1773554210416",
+    "result": "unknown"
+  },
+  "compliance": {
+    "last_turn_authorized": null,
+    "consecutive_unauthorized": 0,
+    "flag_file_exists": false
+  },
+  "quality_gates": {},
+  "session_summary": null,
+  "last_turn_ts": null
+}

@@ -677,6 +677,24 @@ com `agent-stop.sh` como referência de integração. A decomposição de
 > Status F13.2 (concluído em 2026-03-15): matriz dedicada publicada em
 > `DOCUMENTAÇÃO/HOOKS/F13-2-MATRIZ-HOOK-SCRIPT-LIB-OWNER-2026-03-15.md` e JSON
 > machine-readable em `.github/hooks/state/f13-hook-script-lib-owner.json`.
+>
+> Status F13.3 (concluído em 2026-03-15): critério objetivo de “script fino” publicado em
+> `DOCUMENTAÇÃO/HOOKS/F13-3-CRITERIO-SCRIPT-FINO-2026-03-15.md` e rubric machine-readable em
+> `.github/hooks/state/f13-script-fino-rubric.json`.
+>
+> Status F14.1 (concluído em 2026-03-15): libs dedicadas faltantes criadas para hooks automáticos
+> em `DOCUMENTAÇÃO/HOOKS/F14-1-LIBS-DEDICADAS-HOOKS-AUTOMATICOS-2026-03-15.md`, com status
+> machine-readable em `.github/hooks/state/f14-auto-hook-entry-lib-status.json`.
+>
+> Status F14.2 (concluído em 2026-03-15): lógica migrada para os 8 hooks automáticos aplicáveis
+> (`sessionStart`, `userPromptSubmitted`, `preToolUse`, `postToolUse`, `subagentStart`,
+> `subagentStop`, `preCompact`, `sessionEnd`); `agentStop` mantido como referência de entry-lib.
+> Evidência: `DOCUMENTAÇÃO/HOOKS/F14-2-PROGRESSO-PARCIAL-HOOKS-AUTOMATICOS-2026-03-15.md`.
+>
+> Status F14.3 (concluído em 2026-03-15): scripts automáticos padronizados como orquestradores
+> finos com dispatch único para função pública da entry-lib; `session-end.sh` reduzido ao padrão
+> bootstrap + source + dispatch, com carga de core/aux internalizada em
+> `hooks-lib/lifecycle/session-end-lib.sh`.
 
 - Definir contrato canônico de script automático (bootstrap, source de libs, dispatch único, output).
 - Publicar matriz `hook->script->libs->owner` para os 9 hooks automáticos.
@@ -700,17 +718,77 @@ com `agent-stop.sh` como referência de integração. A decomposição de
 - Cobrir aderência no smoke (`legacy` + `domains`).
 - Integrar gate no fluxo padrão (local/CI) com métrica de aderência por rodada.
 
-#### TODO mestre incremental (F13→F16)
+#### F17 — Modularização aprofundada de libs (file-by-file)
+
+> Status F17.0 (planejamento concluído em 2026-03-15): plano operacional publicado em
+> `DOCUMENTAÇÃO/HOOKS/F17-PLANO-MODULARIZACAO-LIBS-FILE-BY-FILE-2026-03-15.md` e artefato
+> machine-readable em `.github/hooks/state/f17-file-by-file-modularization-plan.json`.
+>
+> Status F17.1 (concluída em 2026-03-15): delimitação técnica de `sessionStart` publicada em
+> `DOCUMENTAÇÃO/HOOKS/F17-1-SESSION-START-DELIMITACAO-2026-03-15.md`; extração inicial da subfase
+> F17.1B aplicada com `hooks-lib/lifecycle/session-start-runtime.sh` e delegação em
+> `hooks-lib/lifecycle/session-start-lib.sh`, seguida da extração de recovery para
+> `hooks-lib/lifecycle/session-start-recovery.sh` e da extração de output/observabilidade para
+> `hooks-lib/lifecycle/session-start-observability.sh`; slice 4 teve mapeamento dos blocos de
+> briefing, extração do bloco base para `hooks-lib/lifecycle/session-start-briefing.sh` e corte
+> do primeiro bloco condicional (`PREV_UNAUTH_CLOSE`) para helper dedicado; em seguida,
+> extração adicional de `PREV_NO_KEY_CLOSE`, `PREV_ABRUPT_CLOSE`, `abrupt_reconnect` e
+> `CLOSE_KEY_EOF`; e no slice 6 extração adicional de `ASK_FAIL_EOF` e `WD_EOF`.
+> No slice 7, extração adicional de `ACTIVE_STATE_EOF`, `BRIEFING_BODY_EOF` e labels de origem
+> da sessão para renderer dedicado. No slice 8, normalização do bootstrap com loader único de
+> módulos auxiliares (`session_start_load_support_modules`). No slice 9, checklist final
+> validou ausência de blocos de briefing inline e diagnósticos limpos. No slice 10, emissão de
+> `sessionStart`/`sectionStart` extraída para `session-start-events.sh`. No slice 11,
+> detecção/consumo das flags de violação + cálculo de severidade extraídos para
+> `session-start-violations.sh`. No slice 12, classificação de close anterior/reconnect
+> extraída para `session-start-recovery.sh`. No slice 13, alertas de runtime do briefing
+> (ask-fail/watchdog) extraídos para `session-start-briefing.sh`. No slice 14,
+> montagem/persistência de recovery alerts extraída para `session-start-recovery.sh`.
+> No slice 15, parsing de input/trigger/session-id extraído para
+> `session-start-input.sh`. No slice 16, leitura de snapshot de contexto anterior
+> extraída para `session-start-violations.sh`. No slice 17, bootstrap de metadados de sessão
+> extraído para `session-start-bootstrap.sh`. No slice 18, montagem completa do briefing
+> consolidada em `session_start_render_full_briefing` (`session-start-briefing.sh`).
+
+- F17.0 Preparação transversal (rubric + template por arquivo + gates).
+- F17.1 `sessionStart`.
+- F17.2 `userPromptSubmitted`.
+- F17.3 `preToolUse`.
+- F17.4 `postToolUse`.
+- F17.5 `agentStop`.
+- F17.6 `subagentStart`.
+- F17.7 `subagentStop`.
+- F17.8 `preCompact`.
+- F17.9 `sessionEnd`.
+
+**Done Definition F17**:
+
+- scripts automáticos operando como wrappers sem lógica de domínio residual,
+- entry-libs concentrando a orquestração de cada hook,
+- extrações compartilhadas reduzindo duplicação entre hooks irmãos,
+- documentação e estado machine-readable sincronizados por fase.
+
+#### TODO mestre incremental (F13→F17)
 
 - [x] F13.1 Contrato canônico de entrypoint dos hooks automáticos.
 - [x] F13.2 Matriz `hook->script->libs->owner` concluída para 9 hooks.
-- [ ] F13.3 Critério de “script fino” formalizado e medível.
-- [ ] F14.1 Lib dedicada criada para cada hook automático ainda sem entrypoint dedicado.
-- [ ] F14.2 Migração da lógica de domínio para libs dedicadas.
-- [ ] F14.3 Scripts automáticos padronizados como orquestradores finos.
+- [x] F13.3 Critério de “script fino” formalizado e medível.
+- [x] F14.1 Lib dedicada criada para cada hook automático ainda sem entrypoint dedicado.
+- [x] F14.2 Migração da lógica de domínio para libs dedicadas.
+- [x] F14.3 Scripts automáticos padronizados como orquestradores finos.
 - [ ] F15.1 Consolidação dos 8 hooks não-Stop no padrão lib-first.
 - [ ] F15.2 Modularização interna de `agent-stop-lib.sh` em módulos menores.
 - [ ] F15.3 Estabilidade contratual de `agent-stop.sh` preservada durante decomposição.
 - [ ] F16.1 Enforcement estrutural obrigatório para hooks automáticos.
 - [ ] F16.2 Cobertura smoke de aderência lib-first para auto hooks.
 - [ ] F16.3 Gate integrado em fluxo padrão + rastreio de aderência.
+- [x] F17.0 Planejamento file-by-file publicado (doc + JSON).
+- [x] F17.1 Execução file-by-file de `sessionStart`.
+- [ ] F17.2 Execução file-by-file de `userPromptSubmitted`.
+- [ ] F17.3 Execução file-by-file de `preToolUse`.
+- [ ] F17.4 Execução file-by-file de `postToolUse`.
+- [ ] F17.5 Execução file-by-file de `agentStop`.
+- [ ] F17.6 Execução file-by-file de `subagentStart`.
+- [ ] F17.7 Execução file-by-file de `subagentStop`.
+- [ ] F17.8 Execução file-by-file de `preCompact`.
+- [ ] F17.9 Execução file-by-file de `sessionEnd`.

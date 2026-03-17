@@ -1,7 +1,7 @@
 # F13.2 — Matriz Hook -> Script -> Lib(s) -> Owner (2026-03-15)
 
-**Fase**: F13.2 (pacote lib-first para hooks automáticos)  
-**Fonte de verdade de entrada**: `.github/hooks/copilot-hooks.json`  
+**Fase**: F13.2 (pacote lib-first para hooks automáticos)
+**Fonte de verdade de entrada**: `.github/hooks/copilot-hooks.json`
 **Artefato machine-readable correlato**: `.github/hooks/state/f13-hook-script-lib-owner.json`
 
 ## Resumo executivo

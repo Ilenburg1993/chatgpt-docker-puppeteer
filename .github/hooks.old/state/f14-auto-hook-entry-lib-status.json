@@ -1,0 +1,77 @@
+{
+  "generated_at": "2026-03-15T00:00:00Z",
+  "phase": "F14.2",
+  "source": ".github/hooks/copilot-hooks.json",
+  "summary": {
+    "automatic_hooks_total": 9,
+    "dedicated_entry_lib_created": 9,
+    "ready_for_f14_2_migration": 0,
+    "migrated_in_f14_2": 8,
+    "already_existing_reference": 1
+  },
+  "entries": [
+    {
+      "hook": "sessionStart",
+      "script": "scripts/session-start.sh",
+      "entry_lib": "hooks-lib/lifecycle/session-start-lib.sh",
+      "entry_function": "run_session_start_hook",
+      "status": "logic-migrated-f14.2"
+    },
+    {
+      "hook": "userPromptSubmitted",
+      "script": "scripts/log-prompt.sh",
+      "entry_lib": "hooks-lib/lifecycle/log-prompt-lib.sh",
+      "entry_function": "run_log_prompt_hook",
+      "status": "logic-migrated-f14.2"
+    },
+    {
+      "hook": "preToolUse",
+      "script": "scripts/pre-tool-use.sh",
+      "entry_lib": "hooks-lib/policy/pre-tool-use-lib.sh",
+      "entry_function": "run_pre_tool_use_hook",
+      "status": "logic-migrated-f14.2"
+    },
+    {
+      "hook": "postToolUse",
+      "script": "scripts/post-tool-use.sh",
+      "entry_lib": "hooks-lib/policy/post-tool-use-lib.sh",
+      "entry_function": "run_post_tool_use_hook",
+      "status": "logic-migrated-f14.2"
+    },
+    {
+      "hook": "agentStop",
+      "script": "scripts/agent-stop.sh",
+      "entry_lib": "hooks-lib/agent-stop-lib.sh",
+      "entry_function": "run_agent_stop_hook",
+      "status": "entry-lib-existed-reference"
+    },
+    {
+      "hook": "subagentStart",
+      "script": "scripts/subagent-start.sh",
+      "entry_lib": "hooks-lib/lifecycle/subagent-start-lib.sh",
+      "entry_function": "run_subagent_start_hook",
+      "status": "logic-migrated-f14.2"
+    },
+    {
+      "hook": "subagentStop",
+      "script": "scripts/subagent-stop.sh",
+      "entry_lib": "hooks-lib/lifecycle/subagent-stop-lib.sh",
+      "entry_function": "run_subagent_stop_hook",
+      "status": "logic-migrated-f14.2"
+    },
+    {
+      "hook": "preCompact",
+      "script": "scripts/pre-compact.sh",
+      "entry_lib": "hooks-lib/lifecycle/pre-compact-lib.sh",
+      "entry_function": "run_pre_compact_hook",
+      "status": "logic-migrated-f14.2"
+    },
+    {
+      "hook": "sessionEnd",
+      "script": "scripts/session-end.sh",
+      "entry_lib": "hooks-lib/lifecycle/session-end-lib.sh",
+      "entry_function": "run_session_end_hook",
+      "status": "logic-migrated-f14.2"
+    }
+  ]
+}

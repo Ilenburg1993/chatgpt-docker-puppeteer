@@ -1,0 +1,121 @@
+{
+  "session": {
+    "id": "cfcebd21-b557-4b5c-af90-8fdc91c0be3d",
+    "started_at": "2026-03-15T15:28:22Z",
+    "ended_at": null,
+    "end_reason": null,
+    "close_key": "ENCERRAR-E9D3E8AF",
+    "close_key_validated": false,
+    "strict_turn_close_requires_key": true,
+    "source": "auto_recovery",
+    "cwd": null
+  },
+  "session_stats": {
+    "turn_count": 0,
+    "turn_authorized": 0,
+    "turn_unauthorized": 0,
+    "resume_count": 0,
+    "tools_total": 12,
+    "tools_by_name": {
+      "read_file": 11,
+      "apply_patch": 1
+    },
+    "failures_detected": 0,
+    "errors_total": 0,
+    "subagent_calls": 0,
+    "section_count": 1,
+    "section_names": [
+      "recovery"
+    ],
+    "section_history": [],
+    "turn_history": [],
+    "push_count": 0,
+    "commit_history": [],
+    "pending_section_after_push": false,
+    "recovery_hints": {
+      "last_intent": null,
+      "last_section": null,
+      "last_commit_sha": null,
+      "last_commit_ts": null
+    },
+    "subagent_completions": 1
+  },
+  "current_turn": {
+    "number": 1,
+    "started_at": "2026-03-15T15:28:22Z",
+    "tools_count": 12,
+    "tools_by_name": {
+      "read_file": 11,
+      "apply_patch": 1
+    },
+    "failures_count": 0,
+    "auth_requested": false,
+    "auth_requested_at": null,
+    "last_askquestions_response": null,
+    "section_name": "recovery",
+    "turn_id": null,
+    "section_turn": 1,
+    "block_count": 0,
+    "intent_declared": false,
+    "intent": null,
+    "last_non_bookkeeping_tool": "apply_patch",
+    "last_askquestions_template": null,
+    "last_askquestions_close_action": null,
+    "last_askquestions_close_key_found": false,
+    "todo_last_item_label": null,
+    "todo_last_item_is_askquestions_continuation": false,
+    "todo_last_item_checked_at": null,
+    "todo_protocol_version": null,
+    "required_docs_pending": [],
+    "required_docs_read_log": [
+      {
+        "doc": "session-briefing.md",
+        "path": "/workspaces/chatgpt-docker-puppeteer/.github/hooks/state/session-briefing.md",
+        "ts": "2026-03-15T15:28:38.249Z"
+      },
+      {
+        "doc": "session-context.json",
+        "path": "/workspaces/chatgpt-docker-puppeteer/.github/hooks/state/session-context.json",
+        "ts": "2026-03-15T15:28:38.297Z"
+      },
+      {
+        "doc": "pending-tasks.md",
+        "path": "/workspaces/chatgpt-docker-puppeteer/.github/hooks/state/pending-tasks.md",
+        "ts": "2026-03-15T15:28:38.282Z"
+      }
+    ],
+    "required_docs_last_read_at": "2026-03-15T15:28:38.282Z",
+    "required_docs_status": "completed"
+  },
+  "current_section": {
+    "name": "recovery",
+    "started_at": "2026-03-15T15:28:22Z",
+    "turn_start": 1,
+    "description": "Seção criada por auto-recovery (sessionStart não disparou)",
+    "section_number": 1,
+    "section_id": null,
+    "local_turn": 0,
+    "push_count": 0,
+    "tools_by_name": {
+      "read_file": 11,
+      "apply_patch": 1
+    },
+    "intent_history": [],
+    "failures_count": 0,
+    "blocked_turns": 0
+  },
+  "last_tool": {
+    "name": "apply_patch",
+    "ts": "2026-03-15T15:31:03.873Z",
+    "use_id": "call_wGnMccW9qdbTavn7nyqJbNX6__vscode-1773587316070",
+    "result": "unknown"
+  },
+  "compliance": {
+    "last_turn_authorized": null,
+    "consecutive_unauthorized": 0,
+    "flag_file_exists": false
+  },
+  "quality_gates": {},
+  "session_summary": null,
+  "last_turn_ts": null
+}

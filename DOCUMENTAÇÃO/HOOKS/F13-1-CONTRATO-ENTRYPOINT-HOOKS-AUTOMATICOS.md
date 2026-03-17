@@ -1,7 +1,7 @@
 # F13.1 — Contrato Canônico de Entrypoint para Hooks Automáticos
 
-**Data**: 2026-03-15  
-**Escopo**: hooks automáticos acionados por `.github/hooks/copilot-hooks.json`  
+**Data**: 2026-03-15
+**Escopo**: hooks automáticos acionados por `.github/hooks/copilot-hooks.json`
 **Status**: canônico para a trilha F13→F16
 
 ## Objetivo

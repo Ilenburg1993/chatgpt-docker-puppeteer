@@ -1,0 +1,222 @@
+{
+  "schema_version": "9",
+  "session": {
+    "id": "78550eda-cc66-4b16-a0b9-59416b9a364e",
+    "vs_code_session_id": "78550eda-cc66-4b16-a0b9-59416b9a364e",
+    "logical_session_number": 1,
+    "logical_restart_at": "2026-03-17T00:41:33.379Z",
+    "started_at": "2026-03-17T00:41:33Z",
+    "date_short": "20260317_004133",
+    "ended_at": null,
+    "end_reason": null,
+    "close_key": "ENCERRAR-EBB86D1A",
+    "close_key_validated": false,
+    "strict_turn_close_requires_key": true,
+    "source": "new",
+    "cwd": "/workspaces/chatgpt-docker-puppeteer/.github/hooks"
+  },
+  "session_stats": {
+    "turn_count": 3,
+    "turn_authorized": 0,
+    "turn_no_askQuestions": 3,
+    "turn_unauthorized": 0,
+    "turns_since_askQuestions": 3,
+    "resume_count": 2,
+    "tools_total": 12,
+    "tools_by_name": {
+      "read_file": 7,
+      "manage_todo_list": 3,
+      "run_in_terminal": 1,
+      "grep_search": 1
+    },
+    "failures_detected": 0,
+    "errors_total": 0,
+    "subagent_calls": 0,
+    "subagent_completions": 0,
+    "askquestions_api_failures": 0,
+    "section_count": 1,
+    "section_names": [
+      "início"
+    ],
+    "section_history": [
+      {
+        "name": "início",
+        "section_id": "sect_1773708093_96172",
+        "section_number": 1,
+        "started_at": "2026-03-17T00:41:33Z"
+      }
+    ],
+    "turn_history": [
+      {
+        "number": 1,
+        "section": "início",
+        "section_id": "sect_1773708093_96172",
+        "turn_id": "turn_1773708533_971",
+        "section_turn": 2,
+        "duration_s": 758,
+        "tools_count": 3,
+        "intent": null,
+        "auth": false,
+        "failures": 0,
+        "ts": "2026-03-17T01:01:31Z"
+      },
+      {
+        "number": 2,
+        "section": "início",
+        "section_id": "sect_1773708093_96172",
+        "turn_id": "turn_1773709330_5498",
+        "section_turn": 3,
+        "duration_s": 92,
+        "tools_count": 0,
+        "intent": null,
+        "auth": false,
+        "failures": 0,
+        "ts": "2026-03-17T01:03:41Z"
+      },
+      {
+        "number": 3,
+        "section": "início",
+        "section_id": "sect_1773708093_96172",
+        "turn_id": "turn_1773709450_6459",
+        "section_turn": 4,
+        "duration_s": 224,
+        "tools_count": 0,
+        "intent": null,
+        "auth": false,
+        "failures": 0,
+        "ts": "2026-03-17T01:07:54Z"
+      }
+    ],
+    "push_count": 0,
+    "last_push_at": null,
+    "last_push_turn": null,
+    "pending_section_after_push": false,
+    "commit_history": [],
+    "session_id_mismatches": 0,
+    "session_id_syncs_inline": 0,
+    "recovery_hints": {
+      "last_intent": null,
+      "last_section": "início",
+      "last_commit_sha": null,
+      "last_commit_ts": null
+    },
+    "subturn_count": 8,
+    "subturn_blocked": 4,
+    "subturn_resumed": 6,
+    "subturn_via_subagent": 0,
+    "subturn_via_askquestions": 0
+  },
+  "current_turn": {
+    "number": 4,
+    "started_at": "2026-03-17T01:07:54Z",
+    "tools_count": 0,
+    "tools_by_name": {},
+    "failures_count": 0,
+    "auth_requested": false,
+    "auth_requested_at": null,
+    "last_askquestions_response": null,
+    "section_name": "início",
+    "section_turn": 4,
+    "intent_declared": false,
+    "intent": null,
+    "todo_created": false,
+    "block_count": 0,
+    "agentStop_invocations": 2,
+    "subagent_delegated": false,
+    "last_non_bookkeeping_tool": null,
+    "last_askquestions_template": null,
+    "last_askquestions_close_action": null,
+    "last_askquestions_close_key_found": false,
+    "required_docs_pending": [],
+    "required_docs_read_log": [],
+    "required_docs_obligation": null,
+    "required_docs_status": "not_required",
+    "turn_id": "turn_1773709450_6459",
+    "section_id": "sect_1773708093_96172",
+    "todo_last_item_label": null,
+    "todo_last_item_is_askquestions_continuation": false,
+    "todo_last_item_checked_at": null,
+    "todo_protocol_version": null,
+    "continuation_instruction_clear": null,
+    "continuation_mandatory": false,
+    "continuation_mandatory_at": null,
+    "continuation_mandatory_reason": null,
+    "auto_audit_required": false,
+    "auto_audit_required_at": null,
+    "auto_audit_reason": null,
+    "auto_audit_started": false,
+    "auto_audit_started_at": null,
+    "auto_audit_started_tool": null,
+    "subturn": null,
+    "subturn_history": [],
+    "required_docs_set_at": "2026-03-17T00:48:53.481Z",
+    "todo_refresh_done_at": null,
+    "required_docs_last_read_at": "2026-03-17T00:43:07.346Z",
+    "stop_block_budget_exceeded": true,
+    "stop_block_budget_exceeded_at": "2026-03-17T00:59:08Z",
+    "stop_block_budget_exceeded_count": 3,
+    "stop_block_budget_max": 2,
+    "askquestions_api_error": false,
+    "askquestions_api_error_at": null,
+    "todo_refresh_required": false,
+    "todo_refresh_required_at": null,
+    "last_askquestions_has_template_f_option": true,
+    "template_f_called_without_prior_request": false
+  },
+  "current_section": {
+    "name": "início",
+    "started_at": "2026-03-17T00:41:33Z",
+    "turn_start": 1,
+    "local_turn": 4,
+    "description": null,
+    "section_number": 1,
+    "section_id": "sect_1773708093_96172",
+    "push_count": 0,
+    "tools_by_name": {
+      "read_file": 7,
+      "manage_todo_list": 3,
+      "run_in_terminal": 1,
+      "grep_search": 1
+    },
+    "intent_history": [
+      "Investigar bloqueio recorrente de fechamento de TURN e desativar mensagem indevida"
+    ],
+    "failures_count": 0,
+    "blocked_turns": 0
+  },
+  "last_tool": {
+    "name": "read_file",
+    "ts": "2026-03-17T00:50:33.586Z",
+    "use_id": "call_BCxW3AVUn6czgyToG6iQcaN0__vscode-1773701831863",
+    "result": "unknown"
+  },
+  "compliance": {
+    "last_turn_authorized": false,
+    "consecutive_unauthorized": 4,
+    "flag_file_exists": true
+  },
+  "recovery": {
+    "close_mode": "abrupt_no_key",
+    "prev_session_id": "8c19c988-b622-44ee-8207-717464587212",
+    "prev_session_ts": "2026-03-14T16:06:22Z",
+    "alerts": [
+      "🚨 ANOMALY DETECTED: Previous session ended WITHOUT close-key authorization",
+      "REASON: Either crash, timeout, or unauthorized closure attempt (BUG-79 pattern)",
+      "IMPACT: Agent cannot resume from exact previous state; some context may be lost",
+      "ACTION: Will require Template E+ (Multi-Decision Checkpoint) before proceeding"
+    ],
+    "alerts_require_kickoff": true,
+    "detected_at": "2026-03-17T00:41:33.379Z"
+  },
+  "hook_observability": {
+    "sessionStart_count": 1,
+    "userPromptSubmitted_count": 4,
+    "last_sessionStart_at": "2026-03-17T00:41:33.379Z",
+    "last_sessionStart_source": "new",
+    "last_userPromptSubmitted_at": "2026-03-17T01:04:10.140Z",
+    "last_userPromptSubmitted_hash": "b9e10688be012d8b"
+  },
+  "quality_gates": {},
+  "session_summary": "turn=3 dur=224s tools=0",
+  "last_turn_ts": "2026-03-17T01:07:54Z"
+}

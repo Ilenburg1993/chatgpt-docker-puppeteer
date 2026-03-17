@@ -1,0 +1,138 @@
+{
+  "phase": "F13.3",
+  "version": "1.0.0",
+  "generated_at": "2026-03-15T00:00:00Z",
+  "scope": {
+    "source": ".github/hooks/copilot-hooks.json",
+    "hook_count": 9
+  },
+  "hard_gates": [
+    {
+      "id": "HG-1",
+      "name": "dedicated_entry_lib_loaded",
+      "required": true,
+      "description": "Script automático deve carregar lib dedicada definida na matriz F13.2"
+    },
+    {
+      "id": "HG-2",
+      "name": "canonical_public_function_invoked",
+      "required": true,
+      "description": "Script automático deve invocar função pública canônica de entrypoint"
+    },
+    {
+      "id": "HG-3",
+      "name": "fail_fast_on_contract_break",
+      "required": true,
+      "description": "Ausência de lib/função/entrada mínima precisa falhar explicitamente"
+    }
+  ],
+  "score_metrics": [
+    {
+      "id": "M1",
+      "name": "bootstrap_io_compactness",
+      "weight": 20,
+      "target": ">=60_percent_bootstrap_content",
+      "scoring": {
+        "max": "bootstrap_content_percent >= 60",
+        "partial": "bootstrap_content_percent >= 45 && bootstrap_content_percent < 60",
+        "min": "bootstrap_content_percent < 45",
+        "partial_score": 10
+      }
+    },
+    {
+      "id": "M2",
+      "name": "inline_domain_logic_blocks",
+      "weight": 25,
+      "target": "<=3_blocks",
+      "scoring": {
+        "max": "inline_domain_logic_blocks <= 3",
+        "partial": "inline_domain_logic_blocks >= 4 && inline_domain_logic_blocks <= 6",
+        "min": "inline_domain_logic_blocks >= 7",
+        "partial_score": 10
+      }
+    },
+    {
+      "id": "M3",
+      "name": "canonical_single_dispatch",
+      "weight": 20,
+      "target": "exactly_1_primary_dispatch",
+      "scoring": {
+        "max": "primary_dispatch_count == 1 && no_competing_primary_dispatch",
+        "partial": "primary_dispatch_count == 1 && competing_non_critical_dispatch_present",
+        "min": "primary_dispatch_count != 1",
+        "partial_score": 10
+      }
+    },
+    {
+      "id": "M4",
+      "name": "inline_state_persistence",
+      "weight": 20,
+      "target": "0_direct_persistence_ops_or_documented_exception",
+      "scoring": {
+        "max": "inline_persistence_ops == 0",
+        "partial": "inline_persistence_ops == 1 && documented_exception == true",
+        "min": "inline_persistence_ops > 1 || (inline_persistence_ops == 1 && documented_exception == false)",
+        "partial_score": 10
+      }
+    },
+    {
+      "id": "M5",
+      "name": "duplication_with_dedicated_lib",
+      "weight": 15,
+      "target": "0_critical_duplications",
+      "scoring": {
+        "max": "critical_duplication_count == 0 && minor_duplication_count == 0",
+        "partial": "critical_duplication_count == 0 && minor_duplication_count > 0",
+        "min": "critical_duplication_count > 0",
+        "partial_score": 5
+      }
+    }
+  ],
+  "score_formula": {
+    "expression": "score_final = M1 + M2 + M3 + M4 + M5",
+    "minimum": 0,
+    "maximum": 100
+  },
+  "conformance_levels": {
+    "green": {
+      "score_min": 85,
+      "requires_hard_gates": true
+    },
+    "yellow": {
+      "score_min": 70,
+      "score_max": 84,
+      "requires_hard_gates": true
+    },
+    "red": {
+      "score_max": 69,
+      "or_hard_gate_failure": true
+    }
+  },
+  "special_cases": [
+    {
+      "script": "scripts/agent-stop.sh",
+      "policy": "temporarily_allow_larger_orchestration_surface",
+      "until_phase": "F15.2",
+      "note": "Still subject to hard gates HG-1/HG-2/HG-3"
+    }
+  ],
+  "evaluation_flow": [
+    "resolve_mapping_from_f13_2",
+    "evaluate_hard_gates_hg1_hg2_hg3",
+    "if_any_hard_gate_fails_mark_red",
+    "if_hard_gates_pass_compute_score_m1_to_m5",
+    "classify_by_conformance_levels",
+    "persist_evidence_and_open_backlog_if_needed"
+  ],
+  "evidence_output": {
+    "required_fields": [
+      "script",
+      "hook",
+      "hard_gates_status",
+      "metric_scores",
+      "score_final",
+      "conformance_level",
+      "timestamp"
+    ]
+  }
+}

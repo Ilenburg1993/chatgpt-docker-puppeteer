@@ -1,0 +1,130 @@
+{
+  "session": {
+    "id": "b1675e8e-ae64-4cf8-a0a7-810c9168b2dd",
+    "started_at": "2026-03-15T15:34:47Z",
+    "ended_at": null,
+    "end_reason": null,
+    "close_key": "ENCERRAR-E9D3E8AF",
+    "close_key_validated": false,
+    "strict_turn_close_requires_key": true,
+    "source": "auto_recovery",
+    "cwd": null
+  },
+  "session_stats": {
+    "turn_count": 0,
+    "turn_authorized": 0,
+    "turn_unauthorized": 0,
+    "resume_count": 0,
+    "tools_total": 24,
+    "tools_by_name": {
+      "get_errors": 3,
+      "run_in_terminal": 2,
+      "read_file": 12,
+      "manage_todo_list": 4,
+      "runSubagent": 3
+    },
+    "failures_detected": 0,
+    "errors_total": 0,
+    "subagent_calls": 0,
+    "section_count": 1,
+    "section_names": [
+      "recovery"
+    ],
+    "section_history": [],
+    "turn_history": [],
+    "push_count": 0,
+    "commit_history": [],
+    "pending_section_after_push": false,
+    "recovery_hints": {
+      "last_intent": null,
+      "last_section": null,
+      "last_commit_sha": null,
+      "last_commit_ts": null
+    },
+    "subturn_via_subagent": 3
+  },
+  "current_turn": {
+    "number": 1,
+    "started_at": "2026-03-15T15:34:47Z",
+    "tools_count": 24,
+    "tools_by_name": {
+      "get_errors": 3,
+      "run_in_terminal": 2,
+      "read_file": 12,
+      "manage_todo_list": 4,
+      "runSubagent": 3
+    },
+    "failures_count": 0,
+    "auth_requested": true,
+    "auth_requested_at": "2026-03-15T15:58:49.765Z",
+    "last_askquestions_response": null,
+    "section_name": "recovery",
+    "turn_id": null,
+    "section_turn": 1,
+    "block_count": 0,
+    "intent_declared": false,
+    "intent": null,
+    "last_non_bookkeeping_tool": "runSubagent",
+    "last_askquestions_template": null,
+    "last_askquestions_close_action": null,
+    "last_askquestions_close_key_found": false,
+    "todo_last_item_label": "Chamar vscode_askQuestions [Template de CONTINUAÇÃO: A/D/E; Template F apenas por escalonamento explícito para fechamento de SESSION]",
+    "todo_last_item_is_askquestions_continuation": true,
+    "todo_last_item_checked_at": "2026-03-15T15:58:34.651Z",
+    "todo_protocol_version": "subturn_v1",
+    "todo_created": true,
+    "subagent_delegated": true,
+    "subagent_description": "F14.2 session-start isolado",
+    "subturn": {
+      "parent_turn_id": null,
+      "state": "delegated",
+      "reason": "subagent_delegate",
+      "last_transition_at": "2026-03-15T15:58:49.765Z",
+      "stop_hook_active": false,
+      "requires_user_action": false,
+      "authorization_snapshot": {
+        "auth_requested": true,
+        "ask_template": null,
+        "close_key_found": false,
+        "close_key_validated": false
+      },
+      "subturn_id": "subturn_call_Bcc5yq2O5pOTLLKUrp6qpTx1__vscode-1773587316087",
+      "number": 1,
+      "expected_window_minutes": 15
+    }
+  },
+  "current_section": {
+    "name": "recovery",
+    "started_at": "2026-03-15T15:34:47Z",
+    "turn_start": 1,
+    "description": "Seção criada por auto-recovery (sessionStart não disparou)",
+    "section_number": 1,
+    "section_id": null,
+    "local_turn": 0,
+    "push_count": 0,
+    "tools_by_name": {
+      "get_errors": 3,
+      "run_in_terminal": 2,
+      "read_file": 12,
+      "manage_todo_list": 4,
+      "runSubagent": 3
+    },
+    "intent_history": [],
+    "failures_count": 0,
+    "blocked_turns": 0
+  },
+  "last_tool": {
+    "name": "runSubagent",
+    "ts": "2026-03-15T15:58:49.765Z",
+    "use_id": "call_n3UQ2UAG5cBQYTNuoh8EUWmq__vscode-1773587316148",
+    "result": null
+  },
+  "compliance": {
+    "last_turn_authorized": null,
+    "consecutive_unauthorized": 0,
+    "flag_file_exists": false
+  },
+  "quality_gates": {},
+  "session_summary": null,
+  "last_turn_ts": null
+}
