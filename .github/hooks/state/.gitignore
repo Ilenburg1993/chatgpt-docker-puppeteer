@@ -1,0 +1,14 @@
+# Arquivos gerados em runtime — não commitar estado de sessão live
+audit.jsonl
+session-briefing.md
+session-final-report.md
+session-checkpoint.json
+pending-tasks.md
+.state.*
+# Estado vivo da sessão atual
+session.json
+session-context.json
+# Checkpoints automáticos
+checkpoints/
+# Payloads de debug
+debug/payloads/

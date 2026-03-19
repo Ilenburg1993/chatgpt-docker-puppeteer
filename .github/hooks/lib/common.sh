@@ -1,0 +1,552 @@
+#!/usr/bin/env bash
+# common.sh — Funções compartilhadas por todos os hooks
+# Deve ser sourceado como PRIMEIRO passo de cada lib.
+# Não usar set -euo pipefail aqui (libs são sourceadas, não executadas).
+
+# ---------------------------------------------------------------------------
+# Caminhos fundamentais (calculados a partir deste arquivo, independente do cwd)
+# ---------------------------------------------------------------------------
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Permite override do diretório de state para testes (NUNCA usar em produção)
+if [ -n "${HOOKS_TEST_STATE_DIR:-}" ]; then
+    STATE_DIR="$HOOKS_TEST_STATE_DIR"
+else
+    STATE_DIR="$HOOK_DIR/state"
+fi
+
+STATE_FILE="$STATE_DIR/session.json"
+AUDIT_FILE="$STATE_DIR/audit.jsonl"
+
+# ---------------------------------------------------------------------------
+# Verificação de dependência crítica
+# ---------------------------------------------------------------------------
+if ! command -v jq > /dev/null 2>&1; then
+    printf 'ERROR[hooks/common.sh]: jq is required but not installed\n' >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Funções de estado
+# ---------------------------------------------------------------------------
+
+# Retorna 0 se session.json existe e é JSON válido
+state_exists() {
+    [ -f "$STATE_FILE" ] && jq -e . "$STATE_FILE" > /dev/null 2>&1
+}
+
+# Le campo do session.json via jq path (ex: ".current_turn.number")
+# AVISO: usa `// empty` para retornar "" para campos null/ausentes.
+# LIMITACAO: boolean `false` tambem retorna "" (falsy para o operador // do jq).
+# Para leitura de booleanos, o caller deve tratar "" como "false".
+read_field() {
+    local path="$1"
+    jq -r "${path} // empty" "$STATE_FILE" 2> /dev/null
+}
+
+# Atualiza campo de raiz STRING no session.json atomicamente
+# CUIDADO: não usar para booleanos nem campos aninhados
+update_state() {
+    local key="$1" val="$2"
+    local tmp
+    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    jq --arg k "$key" --arg v "$val" '.[$k] = $v' "$STATE_FILE" > "$tmp"
+    mv -f "$tmp" "$STATE_FILE"
+}
+
+# Atualiza campo de raiz BOOLEANO no session.json atomicamente
+# val deve ser a string "true" ou "false"
+update_state_bool() {
+    local key="$1" val="$2"
+    local tmp
+    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    jq --arg k "$key" --argjson v "$val" '.[$k] = $v' "$STATE_FILE" > "$tmp"
+    mv -f "$tmp" "$STATE_FILE"
+}
+
+# Atualiza campo aninhado no session.json via jq path syntax
+# Detecta automaticamente tipo: bool (true|false), número (só dígitos), string (demais)
+# Uso: update_nested_state "current_turn.ask_questions_called" "true"
+#      update_nested_state "session_stats.turn_count" "5"
+#      update_nested_state "current_turn.turn_id" "uuid-abc"
+update_nested_state() {
+    local key_path="$1" val="$2"
+    local tmp jq_path
+    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    jq_path=".${key_path}"
+
+    case "$val" in
+        true | false)
+            jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp"
+            ;;
+        '' | *[!0-9]*)
+            # String vazia ou contém não-dígito: tratar como string
+            jq --arg v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp"
+            ;;
+        *)
+            # Apenas dígitos: tratar como número inteiro
+            jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp"
+            ;;
+    esac
+
+    mv -f "$tmp" "$STATE_FILE"
+}
+
+# Substitui session.json inteiro pelo JSON fornecido
+write_state() {
+    local json="$1"
+    mkdir -p "$STATE_DIR"
+    printf '%s\n' "$json" > "$STATE_FILE"
+}
+
+# Cria state/session.json com zero state para nova sessão
+# Uso: init_state "sessionId" ["new"|"reconnect"]
+init_state() {
+    local session_id="${1:-unknown}"
+    local source="${2:-new}"
+    local close_key now
+
+    close_key=$(make_close_key)
+    now=$(now_iso)
+
+    mkdir -p "$STATE_DIR"
+
+    jq -n \
+        --arg sid "$session_id" \
+        --arg start "$now" \
+        --arg key "$close_key" \
+        --arg src "$source" \
+        '{
+            "_comment": "gerado por session-start.sh",
+            "vs_code_session_id": $sid,
+            "session_id": $sid,
+            "started_at": $start,
+            "ended_at": null,
+            "close_key": $key,
+            "source": $src,
+            "pending_session_close": false,
+            "strict_turn_close": true,
+            "current_turn": {
+                "number": 0,
+                "turn_id": null,
+                "started_at": null,
+                "ask_questions_called": false,
+                "subturn_count": 0,
+                "tools_count": 0
+            },
+            "current_subturn": {
+                "number": 0,
+                "subturn_id": null,
+                "started_at": null,
+                "response_at": null
+            },
+            "session_stats": {
+                "turn_count": 0,
+                "turn_authorized": 0,
+                "turn_unauthorized": 0,
+                "subturn_total": 0,
+                "tools_total": 0
+            },
+            "compliance": {
+                "consecutive_unauthorized": 0,
+                "last_turn_authorized": true
+            }
+        }' > "$STATE_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# Função de log de auditoria (canônica — Parte 10.10 do plano)
+# Usa jq -n --arg para prevenir JSON injection.
+# Assinatura posicional: log_audit "event" [key1 value1 key2 value2 ...]
+# ---------------------------------------------------------------------------
+log_audit() {
+    local event="$1"
+    shift
+    local ts sid json_obj k v
+
+    ts="$(now_iso)"
+    sid="${SESSION_ID:-$([ -f "$STATE_FILE" ] && jq -r '.session_id // "unknown"' "$STATE_FILE" 2> /dev/null || echo "unknown")}"
+
+    json_obj=$(jq -cn \
+        --arg ts "$ts" \
+        --arg ev "$event" \
+        --arg sid "$sid" \
+        '{ts: $ts, event: $ev, session_id: $sid}')
+
+    # Adicionar campos extras via jq (seguro contra injection)
+    while [ "$#" -ge 2 ]; do
+        k="$1" v="$2"
+        shift 2
+        json_obj=$(printf '%s' "$json_obj" | jq -c --arg k "$k" --arg v "$v" '. + {($k): $v}')
+    done
+
+    mkdir -p "$STATE_DIR"
+    printf '%s\n' "$json_obj" >> "$AUDIT_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# Funções de output JSON para o VS Code
+# ---------------------------------------------------------------------------
+
+# Emite JSON de bloqueio para o Stop hook (hookSpecificOutput)
+# reason é escapado via jq -Rs para evitar JSON inválido
+emit_stop_block() {
+    local reason="$1"
+    local escaped
+    escaped=$(printf '%s' "$reason" | jq -Rs .)
+    printf '{"hookSpecificOutput":{"hookEventName":"Stop","decision":"block","reason":%s},"systemMessage":%s}\n' \
+        "$escaped" "$escaped"
+}
+
+# Emite additionalContext para o SessionStart hook
+emit_additional_context() {
+    local ctx="$1"
+    local escaped
+    escaped="$(printf '%s' "$ctx" | jq -Rs .)"
+    printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":%s}}\n' \
+        "$escaped"
+}
+
+# Emite permissionDecision=deny para o PreToolUse hook
+emit_permission_deny() {
+    local reason="$1"
+    local escaped
+    escaped=$(printf '%s' "$reason" | jq -Rs .)
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\n' \
+        "$escaped"
+}
+
+# Emite decision:block no nível raiz (PostToolUse / SubagentStop)
+emit_post_tool_block() {
+    local reason="$1"
+    local escaped
+    escaped=$(printf '%s' "$reason" | jq -Rs .)
+    printf '{"decision":"block","reason":%s}\n' "$escaped"
+}
+
+# ---------------------------------------------------------------------------
+# Funções auxiliares
+# ---------------------------------------------------------------------------
+
+# Retorna timestamp ISO 8601 em UTC
+now_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+# Gera close_key aleatória no formato ENCERRAR-XXXXXXXX (8 chars hex maiúsculos)
+make_close_key() {
+    local hex
+    # Prefere /proc/sys/kernel/random/uuid (Linux — disponível sem uuidgen/xxd)
+    if [ -r /proc/sys/kernel/random/uuid ]; then
+        hex=$(tr -d '-' < /proc/sys/kernel/random/uuid | tr '[:lower:]' '[:upper:]' | cut -c1-8)
+    elif command -v od > /dev/null 2>&1; then
+        hex=$(od -An -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' | head -c8 | tr '[:lower:]' '[:upper:]')
+    else
+        # Último recurso: derivado do timestamp (menos aleatório, mas funcional)
+        hex=$(date +%s%N 2>/dev/null | tr -d '[:space:]' | head -c8 | tr '[:lower:]' '[:upper:]')
+    fi
+    printf 'ENCERRAR-%s' "$hex"
+}
+
+# Extrai campo de JSON passado como string (seguro com input não-confiável)
+# Uso: jq_field "$input" ".tool_name"
+jq_field() {
+    printf '%s' "$1" | jq -r "${2} // empty"
+}
+
+# ---------------------------------------------------------------------------
+# Identificadores e IDs portáveis
+# ---------------------------------------------------------------------------
+
+# Gera UUID v4 sem depender do binário `uuidgen` (usa /dev/urandom + awk)
+# Fallback: timestamp + random se /dev/urandom falhar
+uuidgen_safe() {
+    if command -v uuidgen > /dev/null 2>&1; then
+        uuidgen | tr '[:upper:]' '[:lower:]'
+    else
+        local rnd
+        rnd=$(cat /proc/sys/kernel/random/uuid 2> /dev/null || true)
+        if [ -n "$rnd" ]; then
+            printf '%s' "$rnd"
+        else
+            # Fallback: hex aleatório formatado como UUID
+            local b
+            b=$(head -c16 /dev/urandom | xxd -p 2> /dev/null || date +%s%N)
+            printf '%s-%s-%s-%s-%s\n' \
+                "${b:0:8}" "${b:8:4}" "4${b:13:3}" "${b:16:4}" "${b:20:12}"
+        fi
+    fi
+}
+
+# Gera ID de seção canônico: "seção-XXXXXXXX" (8 hex chars)
+generate_section_id() {
+    local name="${1:-unknown}"
+    local suffix
+    suffix=$(head -c4 /dev/urandom | xxd -p | head -c8)
+    printf '%s-%s' "$(printf '%s' "$name" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')" "$suffix"
+}
+
+# ---------------------------------------------------------------------------
+# Leitura de payload (stdin)
+# ---------------------------------------------------------------------------
+
+# Lê o payload JSON do stdin e armazena em HOOK_INPUT global.
+# Retorna 0 se parseable, 1 se stdin vazio ou inválido (HOOK_INPUT = "{}").
+# Se debug capture estiver ativo (state/debug/capture.enabled), salva o payload.
+# Uso: load_payload; tool_name=$(jq_field "$HOOK_INPUT" ".tool_name")
+load_payload() {
+    HOOK_INPUT=$(cat /dev/stdin 2> /dev/null || true)
+    if [ -z "$HOOK_INPUT" ]; then
+        HOOK_INPUT='{}'
+        return 1
+    fi
+    if ! printf '%s' "$HOOK_INPUT" | jq -e . > /dev/null 2>&1; then
+        HOOK_INPUT='{}'
+        return 1
+    fi
+    # Captura automática se debug mode ativo
+    maybe_capture_debug "$HOOK_INPUT"
+    return 0
+}
+
+# Salva payload para diagnóstico se STATE_DIR/debug/capture.enabled existir.
+# Nunca falha — erros são silenciosos para não impactar o hook principal.
+# Uso: maybe_capture_debug "$payload"
+maybe_capture_debug() {
+    local payload="$1"
+    local flag="$STATE_DIR/debug/capture.enabled"
+    [ -f "$flag" ] || return 0
+
+    local event ts_slug debug_dir
+    event=$(printf '%s' "$payload" | jq -r '.hookEventName // "unknown"' 2>/dev/null || echo "unknown")
+    ts_slug=$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null || date +%s)
+    debug_dir="$STATE_DIR/debug/payloads"
+    mkdir -p "$debug_dir" 2>/dev/null || return 0
+
+    printf '%s' "$payload" | jq '.' > "$debug_dir/${event}-${ts_slug}.json" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
+# Operações atômicas em campos numéricos
+# ---------------------------------------------------------------------------
+
+# Incrementa campo numérico aninhado atomicamente e retorna o novo valor
+# Uso: new_val=$(increment_field ".session_stats.turn_count")
+increment_field() {
+    local path="$1"
+    local current new_val tmp
+    current=$(read_field "$path")
+    new_val=$((${current:-0} + 1))
+    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp"
+    mv -f "$tmp" "$STATE_FILE"
+    printf '%d' "$new_val"
+}
+
+# Decrementa campo numérico para zero (nunca negativo)
+# Uso: decrement_field_floor0 ".compliance.consecutive_unauthorized"
+decrement_field_floor0() {
+    local path="$1"
+    local current new_val tmp
+    current=$(read_field "$path")
+    new_val=$(( ${current:-0} > 0 ? ${current:-0} - 1 : 0 ))
+    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp"
+    mv -f "$tmp" "$STATE_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# Detecção de close_key
+# ---------------------------------------------------------------------------
+
+# Verifica se a close_key da sessão aparece no texto fornecido.
+# Retorna 0 se encontrar, 1 se não encontrar ou close_key ausente no state.
+# Uso: detect_close_key_in_text "$tool_response"
+detect_close_key_in_text() {
+    local text="$1"
+    local close_key
+    close_key=$(read_field ".close_key")
+    [ -z "$close_key" ] || [ "$close_key" = "null" ] && return 1
+    printf '%s' "$text" | grep -qF "$close_key"
+}
+
+# ---------------------------------------------------------------------------
+# Detecção de turno órfão
+# ---------------------------------------------------------------------------
+
+# Retorna 0 se o turno atual é órfão (iniciou mas não encerrou em threshold segundos)
+# Uso: if turn_is_orphaned 300; then heal_orphaned_turn; fi
+turn_is_orphaned() {
+    local threshold="${1:-300}"  # default: 5 minutos
+    local started_at now_epoch started_epoch delta
+
+    started_at=$(read_field ".current_turn.started_at")
+    [ -z "$started_at" ] || [ "$started_at" = "null" ] && return 1
+
+    # Converte ISO 8601 para epoch via date (portável em Linux)
+    started_epoch=$(date -d "$started_at" +%s 2> /dev/null) || return 1
+    now_epoch=$(date -u +%s)
+    delta=$(( now_epoch - started_epoch ))
+
+    [ "$delta" -gt "$threshold" ]
+}
+
+# Fecha turno órfão e registra evento de healing no audit.jsonl
+heal_orphaned_turn() {
+    local turn_num turn_id
+    turn_num=$(read_field ".current_turn.number")
+    turn_id=$(read_field ".current_turn.turn_id")
+
+    update_nested_state "current_turn.ask_questions_called" "false"
+    log_audit "turnEnd_orphan_healed" "turn" "${turn_num:-0}" "turn_id" "${turn_id:-unknown}"
+}
+
+# ---------------------------------------------------------------------------
+# Lifecycle de TURN (userPromptSubmit)
+# ---------------------------------------------------------------------------
+
+# Abre novo TURN: incrementa contador, gera turn_id, seta started_at, reseta flags.
+# Retorna o novo número de turno via stdout.
+# Uso: turn_num=$(open_new_turn)
+open_new_turn() {
+    local turn_num turn_id now
+    now=$(now_iso)
+    turn_id=$(uuidgen_safe)
+
+    # Incrementa turn_count e turn_number
+    turn_num=$(increment_field ".session_stats.turn_count")
+    update_nested_state "current_turn.number" "$turn_num"
+    update_nested_state "current_turn.turn_id" "$turn_id"
+    update_nested_state "current_turn.started_at" "$now"
+    update_nested_state "current_turn.ask_questions_called" "false"
+    update_nested_state "current_turn.subturn_count" "0"
+    update_nested_state "current_turn.tools_count" "0"
+
+    printf '%d' "$turn_num"
+}
+
+# ---------------------------------------------------------------------------
+# Lifecycle de SUBTURN (preToolUse)
+# ---------------------------------------------------------------------------
+
+# Abre novo SUBTURN: incrementa contadores, gera subturn_id, seta started_at.
+# Retorna o novo número de subturn via stdout.
+# Uso: subturn_num=$(open_new_subturn)
+open_new_subturn() {
+    local subturn_id now
+    now=$(now_iso)
+    subturn_id=$(uuidgen_safe)
+
+    # Incrementa subturn global e local
+    increment_field ".session_stats.subturn_total" > /dev/null
+    local local_count
+    local_count=$(increment_field ".current_turn.subturn_count")
+
+    update_nested_state "current_subturn.number" "$local_count"
+    update_nested_state "current_subturn.subturn_id" "$subturn_id"
+    update_nested_state "current_subturn.started_at" "$now"
+    update_nested_state "current_subturn.response_at" "null"
+
+    printf '%d' "$local_count"
+}
+
+# Incrementa tools_count do turno atual e tools_total da sessão.
+# Retorna o total de ferramentas do turno atual.
+# Uso: tool_num=$(count_tool_use)
+count_tool_use() {
+    increment_field ".session_stats.tools_total" > /dev/null
+    increment_field ".current_turn.tools_count"
+}
+
+# ---------------------------------------------------------------------------
+# Geração de session-briefing.md
+# ---------------------------------------------------------------------------
+
+BRIEFING_FILE="$STATE_DIR/session-briefing.md"
+PENDING_TASKS_FILE="$STATE_DIR/pending-tasks.md"
+
+# Gera (ou regenera) $BRIEFING_FILE com base no estado atual da sessão.
+# O arquivo é usado pelo agente como contexto de início/retomada de sessão.
+generate_session_briefing() {
+    local state session_id close_key started_at source
+    local turn_count turn_auth turn_unauth consecutive_unauth
+    local pending_tasks_content
+
+    state="$(cat "$STATE_FILE" 2> /dev/null || echo '{}')"
+    session_id=$(printf '%s' "$state" | jq -r '.session_id // "unknown"')
+    close_key=$(printf '%s' "$state" | jq -r '.close_key // "N/A"')
+    started_at=$(printf '%s' "$state" | jq -r '.started_at // "N/A"')
+    source=$(printf '%s' "$state" | jq -r '.source // "unknown"')
+    turn_count=$(printf '%s' "$state" | jq -r '.session_stats.turn_count // 0')
+    turn_auth=$(printf '%s' "$state" | jq -r '.session_stats.turn_authorized // 0')
+    turn_unauth=$(printf '%s' "$state" | jq -r '.session_stats.turn_unauthorized // 0')
+    consecutive_unauth=$(printf '%s' "$state" | jq -r '.compliance.consecutive_unauthorized // 0')
+
+    # Lê pending-tasks.md se existir
+    if [ -f "$PENDING_TASKS_FILE" ]; then
+        pending_tasks_content="$(cat "$PENDING_TASKS_FILE")"
+    else
+        pending_tasks_content="*(sem tarefas pendentes registradas)*"
+    fi
+
+    mkdir -p "$STATE_DIR"
+    cat > "$BRIEFING_FILE" << EOF
+# Session Briefing
+
+**Gerado em**: $(now_iso)
+**Session ID**: \`${session_id}\`
+**Iniciada em**: ${started_at}
+**Fonte**: ${source}
+
+## Chave de Encerramento
+
+Para encerrar esta sessão, use o Template F com a chave:
+> \`${close_key}\`
+
+## Estatísticas do Turno
+
+| Métrica | Valor |
+|--------|-------|
+| Turnos totais | ${turn_count} |
+| Autorizados | ${turn_auth} |
+| Não-autorizados | ${turn_unauth} |
+| Consecutivos sem askQuestions | ${consecutive_unauth} |
+
+## Tarefas Pendentes
+
+${pending_tasks_content}
+
+## Lembretes Operacionais
+
+- Declare sua intenção com \`bash .github/hooks/scripts/start-turn.sh "intenção"\`
+- Chame \`vscode_askQuestions\` ao final de cada turno de trabalho
+- Use Template D a cada ~15 turnos para checkpoint periódico
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Construção de contexto adicional (SessionStart / PreCompact)
+# ---------------------------------------------------------------------------
+
+# Formata um bloco de contexto com título e corpo (para uso em additionalContext)
+# Uso: context_block "## Título" "Conteúdo do bloco"
+context_block() {
+    printf '%s\n%s\n\n' "$1" "$2"
+}
+
+# Lê session-briefing.md e retorna conteúdo (ou mensagem padrão se não existir)
+read_briefing() {
+    if [ -f "$BRIEFING_FILE" ]; then
+        cat "$BRIEFING_FILE"
+    else
+        printf 'Session briefing não disponível.\n'
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Variáveis de ambiente seguras (charset)
+# ---------------------------------------------------------------------------
+
+# Garante LANG=C.UTF-8 para tratamento correto de unicode em jq/date/printf
+export_lang_utf8() {
+    export LANG="${LANG:-C.UTF-8}"
+    export LC_ALL="${LC_ALL:-C.UTF-8}"
+}
