@@ -3,8 +3,8 @@
 **Versão do documento**: 3.6-modular
 **Data**: 2026-03-21
 **Arquivo de entrada**: `.github/hooks/lib/hook-payload-api.sh` (loader)
-**Módulos**: `.github/hooks/lib/api/` (13 módulos)
-**Status atual**: v2.4 — State Versioning e Migração de Schema · 310 smoke tests PASS · 111 integration tests PASS
+**Módulos**: `.github/hooks/lib/api/` (14 módulos)
+**Status atual**: v2.5 — Strict Validation Schemas · 335 smoke tests PASS · 111 integration tests PASS
 
 > Este documento é a fonte canônica de evolução da `hook-payload-api.sh`.
 > Ele documenta o contrato OFICIAL da plataforma (o que o VS Code fornece),
@@ -1811,7 +1811,7 @@ PROJEÇÃO v3.0: ~54 + 102 = ~156 funções | ~3000 linhas | ~65 variáveis expo
 | v2.2   | Subagente aninhado 3 níveis: depth=3 detectado corretamente                                                                                                                                                         |
 | v2.3   | `hook_compact_ctx_full()` em sessão com 20 turnos cabe em 2000 chars                                                                                                                                                |
 | v2.4   | Migração de state v0.9→v1.0→v1.1 sem perda de dados em smoke test                                                                                                                                                   |
-| v2.5   | Payload com campo errado rejeita via `hook_validate_*`; payload correto passa                                                                                                                                       |
+| v2.5   | ✅ **CONCLUÍDO** — `14-validate-events.sh` implementado (7 funções); 335/335 smoke PASS; ShellCheck limpo. Validators para todos os 8 eventos.
 | v3.0   | Motor de política processa `hooks-policy.json` de 10 regras; policy audit logado                                                                                                                                    |
 
 ---
