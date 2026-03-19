@@ -1541,6 +1541,97 @@ STATE_FILE="$_SA_STATE_FILE"
 rm -rf "$_SA_TMP_DIR"
 
 # ===========================================================================
+# v2.4 — State Versioning (T-154 a T-165)
+# ===========================================================================
+_SV_TMP_DIR="$(mktemp -d)"
+_SV_STATE_FILE="$_SV_TMP_DIR/session.json"
+
+# Fixture com state_schema_version presente
+cat > "$_SV_STATE_FILE" <<'EOF_SV'
+{
+  "session_id": "sv-test-session",
+  "state_schema_version": "1",
+  "session_stats": {
+    "subagents_active": 0,
+    "subagents_total": 3
+  },
+  "strict_turn_close": false,
+  "close_key": {"value": "ENCERRAR-SVTEST01", "generated_at": "2026-01-01T00:00:00Z"}
+}
+EOF_SV
+
+STATE_DIR="$_SV_TMP_DIR"
+STATE_FILE="$_SV_STATE_FILE"
+read_field() { local path="$1"; jq -r "${path} // empty" "$STATE_FILE" 2>/dev/null; }
+
+info "T-154 hook_state_version — retorna versão registrada"
+assert_eq "T-154a version=1" "1" "$(hook_state_version)"
+
+info "T-155 hook_state_version_current — retorna versão canônica atual"
+HOOK_STATE_SCHEMA_CURRENT="1"
+assert_eq "T-155a current=1" "1" "$(hook_state_version_current)"
+
+info "T-156 hook_state_schema_ok — true quando versão == atual"
+HOOK_STATE_SCHEMA_CURRENT="1"
+assert_eq "T-156a schema_ok" "yes" "$(hook_state_schema_ok && echo yes || echo no)"
+
+info "T-157 hook_state_needs_migration — false quando schema atualizado"
+HOOK_STATE_SCHEMA_CURRENT="1"
+assert_eq "T-157a no migration needed" "no" "$(hook_state_needs_migration && echo yes || echo no)"
+
+info "T-158 hook_state_is_legacy — false quando schema=1"
+assert_eq "T-158a not legacy" "no" "$(hook_state_is_legacy && echo yes || echo no)"
+
+# Fixture com state legado (sem state_schema_version)
+cat > "$_SV_STATE_FILE" <<'EOF_SV_LEGACY'
+{
+  "session_id": "legacy-session",
+  "session_stats": {
+    "subagents_active": 0,
+    "subagents_total": 0
+  }
+}
+EOF_SV_LEGACY
+
+info "T-159 hook_state_version — retorna '0' quando campo ausente (legado)"
+assert_eq "T-159a version absent=0" "0" "$(hook_state_version)"
+
+info "T-160 hook_state_is_legacy — true quando sem state_schema_version"
+assert_eq "T-160a is legacy" "yes" "$(hook_state_is_legacy && echo yes || echo no)"
+
+info "T-161 hook_state_needs_migration — true quando versão < atual"
+HOOK_STATE_SCHEMA_CURRENT="1"
+assert_eq "T-161a migration needed" "yes" "$(hook_state_needs_migration && echo yes || echo no)"
+
+info "T-162 hook_state_schema_ok — false quando legado"
+HOOK_STATE_SCHEMA_CURRENT="1"
+assert_eq "T-162a schema not ok" "no" "$(hook_state_schema_ok && echo yes || echo no)"
+
+update_nested_state() { local path="$1" val="$2"; jq --argjson v "$val" "${path} = \$v" "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"; }
+
+info "T-163 hook_state_migrate — aplica migração 0→1 e atualiza campo"
+HOOK_STATE_SCHEMA_CURRENT="1"
+hook_state_migrate
+SV_NEW="$(hook_state_version)"
+assert_eq "T-163a version after migrate=1" "1" "$SV_NEW"
+
+info "T-164 hook_state_migrate — idempotente na segunda chamada"
+hook_state_migrate
+assert_eq "T-164a idempotent" "1" "$(hook_state_version)"
+
+info "T-165 hook_state_version_load — popula HOOK_STATE_VERSION e MIGRATION_NEEDED"
+cat > "$_SV_STATE_FILE" <<'EOF_SV_LOAD'
+{"session_id":"load-test","state_schema_version":"1"}
+EOF_SV_LOAD
+HOOK_STATE_SCHEMA_CURRENT="1"
+hook_state_version_load
+assert_eq "T-165a HOOK_STATE_VERSION=1" "1" "$HOOK_STATE_VERSION"
+assert_eq "T-165b MIGRATION_NEEDED=false" "false" "$HOOK_STATE_MIGRATION_NEEDED"
+
+# Cleanup
+rm -rf "$_SV_TMP_DIR"
+
+# ===========================================================================
 # RESULTADO FINAL (todos)
 # ===========================================================================
 printf '\n'
