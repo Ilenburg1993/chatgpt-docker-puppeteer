@@ -16,6 +16,7 @@
 # ║   api/07-state.sh      — hook_close_key_in_response + hook_api_record  ║
 # ║   api/08-risk.sh       — hook_tool_risk_level + hook_is_bypass_attempt ║
 # ║   api/09-metrics.sh    — hook_stat_* + hook_compliance_* + predicados  ║
+# ║   api/10-close-key.sh  — hook_close_key_generate/rotate/validate       ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 #
 # ENTRYPOINT PÚBLICO definido aqui (neste arquivo):
@@ -70,6 +71,10 @@ source "$_HOOK_API_MODULES_DIR/07-state.sh"
 source "$_HOOK_API_MODULES_DIR/08-risk.sh"
 # shellcheck disable=SC1091
 source "$_HOOK_API_MODULES_DIR/09-metrics.sh"
+# shellcheck disable=SC1091
+source "$_HOOK_API_MODULES_DIR/10-close-key.sh"
+# shellcheck disable=SC1091
+source "$_HOOK_API_MODULES_DIR/11-compact-context.sh"
 
 # ─── ENTRYPOINT PRINCIPAL ────────────────────────────────────────────────────
 

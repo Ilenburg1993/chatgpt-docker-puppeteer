@@ -1254,6 +1254,190 @@ assert_eq "T-111a ask_called=false (boolean false)" "false" "$(hook_turn_ask_cal
 rm -rf "$_METRICS_TMP_DIR"
 
 # ===========================================================================
+# T-112 a T-126 — v2.1: Gestão de close_key (10-close-key.sh)
+# Setup: close_key fixture em STATE_FILE temporário
+# ===========================================================================
+
+_CK_TMP_DIR="$(mktemp -d)"
+_CK_STATE_FILE="$_CK_TMP_DIR/session.json"
+cat > "$_CK_STATE_FILE" <<'CK_EOF'
+{
+  "session_id": "test-ck-session",
+  "close_key": "ENCERRAR-ABCDEF12"
+}
+CK_EOF
+STATE_FILE="$_CK_STATE_FILE"
+export STATE_FILE
+
+info "T-112 hook_close_key_read"
+assert_eq "T-112a close_key_read=ENCERRAR-ABCDEF12" "ENCERRAR-ABCDEF12" "$(hook_close_key_read)"
+
+info "T-113 hook_close_key_valid_format — formato válido explícito"
+assert_eq "T-113a valid_format true" "yes" "$(hook_close_key_valid_format 'ENCERRAR-ABCDEF12' && echo yes || echo no)"
+
+info "T-114 hook_close_key_valid_format — formato inválido (minúsculas)"
+assert_eq "T-114a valid_format false (lowercase)" "no" "$(hook_close_key_valid_format 'ENCERRAR-abcdef12' && echo yes || echo no)"
+
+info "T-115 hook_close_key_valid_format — formato inválido (curto)"
+assert_eq "T-115a valid_format false (short)" "no" "$(hook_close_key_valid_format 'ENCERRAR-ABC' && echo yes || echo no)"
+
+info "T-116 hook_close_key_valid_format — formato inválido (sem prefixo)"
+assert_eq "T-116a valid_format false (no prefix)" "no" "$(hook_close_key_valid_format 'ABCDEF12' && echo yes || echo no)"
+
+info "T-117 hook_close_key_valid_format — sem argumento (lê do STATE_FILE)"
+assert_eq "T-117a valid_format true (from state)" "yes" "$(hook_close_key_valid_format && echo yes || echo no)"
+
+info "T-118 hook_close_key_matches — match correto"
+assert_eq "T-118a matches true" "yes" "$(hook_close_key_matches 'ENCERRAR-ABCDEF12' && echo yes || echo no)"
+
+info "T-119 hook_close_key_matches — não match"
+assert_eq "T-119a matches false" "no" "$(hook_close_key_matches 'ENCERRAR-00000000' && echo yes || echo no)"
+
+info "T-120 hook_close_key_matches — argumento vazio"
+assert_eq "T-120a matches false (empty)" "no" "$(hook_close_key_matches '' && echo yes || echo no)"
+
+info "T-121 hook_close_key_generate — gera chave no formato correto"
+_CK_GENERATED="$(hook_close_key_generate)"
+assert_eq "T-121a generate format valid" "yes" "$(hook_close_key_valid_format "$_CK_GENERATED" && echo yes || echo no)"
+
+info "T-122 hook_close_key_generate — chaves únicas (2 geradas são diferentes)"
+_CK_KEY1="$(hook_close_key_generate)"
+_CK_KEY2="$(hook_close_key_generate)"
+if [ "$_CK_KEY1" != "$_CK_KEY2" ]; then
+    ok "T-122a generate produz chaves únicas"
+else
+    fail "T-122a generate produz chaves únicas — obtidas iguais: $_CK_KEY1"
+fi
+
+info "T-123 hook_close_key_rotate — gera + persiste nova key"
+_CK_OLD="$(hook_close_key_read)"
+_CK_NEW="$(hook_close_key_rotate)"
+assert_eq "T-123a rotate: novo formato válido" "yes" "$(hook_close_key_valid_format "$_CK_NEW" && echo yes || echo no)"
+_CK_PERSISTED="$(hook_close_key_read)"
+assert_eq "T-123b rotate: persistido no STATE_FILE" "$_CK_NEW" "$_CK_PERSISTED"
+
+info "T-124 hook_close_key_rotate — nova key é diferente da antiga"
+if [ "$_CK_OLD" != "$_CK_NEW" ]; then
+    ok "T-124a rotate produz key diferente da anterior"
+else
+    fail "T-124a rotate produz key diferente da anterior — OLD=$_CK_OLD NEW=$_CK_NEW"
+fi
+
+info "T-125 hook_close_key_load — popula HOOK_CLOSE_KEY_VALUE"
+hook_close_key_load
+assert_eq "T-125a HOOK_CLOSE_KEY_VALUE populado" "$_CK_NEW" "$HOOK_CLOSE_KEY_VALUE"
+
+info "T-126 hook_close_key_read com STATE_FILE ausente"
+STATE_FILE="/tmp/does-not-exist-ck-$$.json"
+_CK_ABSENT="$(hook_close_key_read)"
+assert_eq "T-126a read absent=empty" "" "$_CK_ABSENT"
+STATE_FILE="$_CK_STATE_FILE"
+
+# Cleanup
+rm -rf "$_CK_TMP_DIR"
+
+# ===========================================================================
+# v2.3 — Context Builder para PreCompact (11-compact-context.sh)
+# T-127 a T-138
+# ===========================================================================
+printf '\n─── v2.3: compact-context (T-127..T-138) ───\n'
+
+# Setup: STATE_FILE com fixture de sessão
+_CTX_TMP_DIR="$(mktemp -d)"
+_CTX_STATE_FILE="$_CTX_TMP_DIR/session.json"
+STATE_FILE="$_CTX_STATE_FILE"
+STATE_DIR="$_CTX_TMP_DIR"
+
+cat > "$_CTX_STATE_FILE" <<'CTXJSON'
+{
+  "close_key": "ENCERRAR-CAFEBABE",
+  "session_stats": {
+    "turn_count": 7,
+    "turn_authorized": 5,
+    "turn_unauthorized": 2,
+    "subturn_total": 22,
+    "tools_total": 88
+  },
+  "current_turn": {
+    "number": 7,
+    "ask_questions_called": false,
+    "started_at": "2026-01-01T10:00:00Z"
+  },
+  "compliance": {
+    "consecutive_unauthorized": 2,
+    "last_turn_authorized": false
+  }
+}
+CTXJSON
+
+# Override read_field para usar o STATE_FILE temporário em todo módulo 09
+read_field() {
+    local path="$1"
+    jq -r "${path} // empty" "$STATE_FILE" 2>/dev/null
+}
+
+info "T-127 hook_compact_ctx_close_key — contém close_key"
+_CTX_CK="$(hook_compact_ctx_close_key)"
+assert_contains "T-127a close_key present" "ENCERRAR-CAFEBABE" "$_CTX_CK"
+
+info "T-128 hook_compact_ctx_close_key — é string não vazia"
+if [ -n "$_CTX_CK" ]; then
+    ok "T-128a close_key section não vazia"
+else
+    fail "T-128a close_key section não vazia — obtido vazio"
+fi
+
+info "T-129 hook_compact_ctx_session_summary — contém turn_count"
+_CTX_SS="$(hook_compact_ctx_session_summary)"
+assert_contains "T-129a summary contém turn count" "7" "$_CTX_SS"
+
+info "T-130 hook_compact_ctx_session_summary — contém warning de compliance"
+assert_contains "T-130a summary contém aviso compliance" "2 turno" "$_CTX_SS"
+
+info "T-131 hook_compact_ctx_session_summary — contém autorizados"
+assert_contains "T-131a summary contém autorizados" "5" "$_CTX_SS"
+
+info "T-132 hook_compact_ctx_pending_tasks — sem pending-tasks.md retorna fallback"
+_CTX_PT="$(hook_compact_ctx_pending_tasks)"
+assert_contains "T-132a pending tasks fallback" "Nenhuma" "$_CTX_PT"
+
+info "T-133 hook_compact_ctx_pending_tasks — com arquivo retorna conteúdo"
+printf -- '- [ ] Tarefa pendente de teste\n' > "$_CTX_TMP_DIR/pending-tasks.md"
+_CTX_PT2="$(hook_compact_ctx_pending_tasks)"
+assert_contains "T-133a pending tasks do arquivo" "Tarefa pendente de teste" "$_CTX_PT2"
+rm -f "$_CTX_TMP_DIR/pending-tasks.md"
+
+info "T-134 hook_compact_ctx_protocol_reminder — contém vscode_askQuestions"
+_CTX_PR="$(hook_compact_ctx_protocol_reminder)"
+assert_contains "T-134a reminder contém askQuestions" "vscode_askQuestions" "$_CTX_PR"
+
+info "T-135 hook_compact_ctx_protocol_reminder — contém Template F"
+assert_contains "T-135a reminder contém Template F" "Template F" "$_CTX_PR"
+
+info "T-136 hook_compact_ctx_full — string não vazia"
+_CTX_FULL="$(hook_compact_ctx_full)"
+if [ -n "$_CTX_FULL" ]; then
+    ok "T-136a full context não vazio"
+else
+    fail "T-136a full context não vazio — obtido vazio"
+fi
+
+info "T-137 hook_compact_ctx_full — popula HOOK_COMPACT_CONTEXT_BYTES"
+hook_compact_ctx_full > /dev/null
+if [ "${HOOK_COMPACT_CONTEXT_BYTES:-0}" -gt 0 ]; then
+    ok "T-137a HOOK_COMPACT_CONTEXT_BYTES > 0 (${HOOK_COMPACT_CONTEXT_BYTES})"
+else
+    fail "T-137a HOOK_COMPACT_CONTEXT_BYTES > 0 — obtido: ${HOOK_COMPACT_CONTEXT_BYTES:-0}"
+fi
+
+info "T-138 hook_compact_ctx_full — contém close_key e stats"
+assert_contains "T-138a full contém close_key" "ENCERRAR-CAFEBABE" "$_CTX_FULL"
+assert_contains "T-138b full contém turn count" "7" "$_CTX_FULL"
+
+# Cleanup
+rm -rf "$_CTX_TMP_DIR"
+
+# ===========================================================================
 # RESULTADO FINAL (todos)
 # ===========================================================================
 printf '\n'
