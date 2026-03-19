@@ -75,6 +75,8 @@ source "$_HOOK_API_MODULES_DIR/09-metrics.sh"
 source "$_HOOK_API_MODULES_DIR/10-close-key.sh"
 # shellcheck disable=SC1091
 source "$_HOOK_API_MODULES_DIR/11-compact-context.sh"
+# shellcheck disable=SC1091
+source "$_HOOK_API_MODULES_DIR/12-subagent.sh"
 
 # ─── ENTRYPOINT PRINCIPAL ────────────────────────────────────────────────────
 

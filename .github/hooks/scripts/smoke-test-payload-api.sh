@@ -1438,6 +1438,109 @@ assert_contains "T-138b full contém turn count" "7" "$_CTX_FULL"
 rm -rf "$_CTX_TMP_DIR"
 
 # ===========================================================================
+# v2.2 — API de Subagente e Grafo de Agentes (12-subagent.sh)
+# T-139 a T-153
+# ===========================================================================
+printf '\n─── v2.2: subagent API (T-139..T-153) ───\n'
+
+# Setup: STATE_FILE com fixture que inclui subagents_*
+_SA_TMP_DIR="$(mktemp -d)"
+_SA_STATE_FILE="$_SA_TMP_DIR/session.json"
+STATE_FILE="$_SA_STATE_FILE"
+STATE_DIR="$_SA_TMP_DIR"
+
+cat > "$_SA_STATE_FILE" <<'SAJSON'
+{
+  "session_stats": {
+    "subagents_active": 2,
+    "subagents_total": 5
+  },
+  "current_turn": {
+    "number": 3,
+    "subagents_started": 1
+  }
+}
+SAJSON
+
+# Override read_field para usar o STATE_FILE temporário
+read_field() {
+    local path="$1"
+    jq -r "${path} // empty" "$STATE_FILE" 2>/dev/null
+}
+
+# Pre-set HOOK_AGENT_ID + HOOK_AGENT_TYPE como se fossem de um payload
+HOOK_AGENT_ID="subagent-test-42"
+HOOK_AGENT_TYPE="Plan"
+HOOK_SESSION_ID="sess-test-parent"
+HOOK_SUBAGENT_BUDGET_LIMIT="50"
+
+info "T-139 hook_subagent_depth — retorna subagents_active"
+assert_eq "T-139a depth=2" "2" "$(hook_subagent_depth)"
+
+info "T-140 hook_subagent_is_nested — true quando active > 0"
+assert_eq "T-140a is_nested true" "yes" "$(hook_subagent_is_nested && echo yes || echo no)"
+
+info "T-141 hook_subagent_is_nested — false quando active = 0"
+cat > "$_SA_STATE_FILE" <<'SAJSON2'
+{"session_stats":{"subagents_active":0,"subagents_total":5},"current_turn":{"number":3,"subagents_started":1}}
+SAJSON2
+assert_eq "T-141a is_nested false" "no" "$(hook_subagent_is_nested && echo yes || echo no)"
+# Restaurar active=2
+cat > "$_SA_STATE_FILE" <<'SAJSON3'
+{"session_stats":{"subagents_active":2,"subagents_total":5},"current_turn":{"number":3,"subagents_started":1}}
+SAJSON3
+
+info "T-142 hook_subagent_parent_id — retorna session_id quando nested"
+assert_eq "T-142a parent_id" "sess-test-parent" "$(hook_subagent_parent_id)"
+
+info "T-143 hook_subagent_count_session — retorna subagents_total"
+assert_eq "T-143a count_session=5" "5" "$(hook_subagent_count_session)"
+
+info "T-144 hook_subagent_count_turn — retorna current_turn.subagents_started"
+assert_eq "T-144a count_turn=1" "1" "$(hook_subagent_count_turn)"
+
+info "T-145 hook_subagent_budget_ok — true quando total < limite"
+HOOK_SUBAGENT_BUDGET_LIMIT="50"
+assert_eq "T-145a budget_ok 5<50" "yes" "$(hook_subagent_budget_ok && echo yes || echo no)"
+
+info "T-146 hook_subagent_budget_ok — false quando total >= limite"
+HOOK_SUBAGENT_BUDGET_LIMIT="5"
+assert_eq "T-146a budget_ok 5>=5 false" "no" "$(hook_subagent_budget_ok && echo yes || echo no)"
+HOOK_SUBAGENT_BUDGET_LIMIT="50"
+
+info "T-147 hook_subagent_budget_remaining — calcula restante"
+HOOK_SUBAGENT_BUDGET_LIMIT="50"
+assert_eq "T-147a remaining=45" "45" "$(hook_subagent_budget_remaining)"
+
+info "T-148 hook_subagent_current_id — retorna HOOK_AGENT_ID"
+assert_eq "T-148a current_id" "subagent-test-42" "$(hook_subagent_current_id)"
+
+info "T-149 hook_subagent_current_type — retorna HOOK_AGENT_TYPE"
+assert_eq "T-149a current_type" "Plan" "$(hook_subagent_current_type)"
+
+info "T-150 hook_subagent_is_known_type — Plan é tipo conhecido"
+HOOK_AGENT_TYPE="Plan"
+assert_eq "T-150a Plan is known" "yes" "$(hook_subagent_is_known_type && echo yes || echo no)"
+
+info "T-151 hook_subagent_is_known_type — tipo desconhecido"
+HOOK_AGENT_TYPE="UnknownAgent"
+assert_eq "T-151a UnknownAgent not known" "no" "$(hook_subagent_is_known_type && echo yes || echo no)"
+HOOK_AGENT_TYPE="Plan"
+
+info "T-152 hook_subagent_load — popula HOOK_SUBAGENT_DEPTH e COUNT_SESSION"
+hook_subagent_load
+assert_eq "T-152a HOOK_SUBAGENT_DEPTH=2" "2" "$HOOK_SUBAGENT_DEPTH"
+assert_eq "T-152b HOOK_SUBAGENT_COUNT_SESSION=5" "5" "$HOOK_SUBAGENT_COUNT_SESSION"
+
+info "T-153 hook_subagent_depth com state ausente"
+STATE_FILE="/tmp/does-not-exist-sa-$$.json"
+assert_eq "T-153a depth absent=0" "0" "$(hook_subagent_depth)"
+STATE_FILE="$_SA_STATE_FILE"
+
+# Cleanup
+rm -rf "$_SA_TMP_DIR"
+
+# ===========================================================================
 # RESULTADO FINAL (todos)
 # ===========================================================================
 printf '\n'
