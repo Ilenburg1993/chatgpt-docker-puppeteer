@@ -1,10 +1,10 @@
 # API HOOKS — Situação Atual e Roadmap Completo
 
-**Versão do documento**: 3.5-modular
+**Versão do documento**: 3.6-modular
 **Data**: 2026-03-21
 **Arquivo de entrada**: `.github/hooks/lib/hook-payload-api.sh` (loader)
-**Módulos**: `.github/hooks/lib/api/` (11 módulos)
-**Status atual**: v2.3 — Context Builder para PreCompact · 281 smoke tests PASS · 111 integration tests PASS
+**Módulos**: `.github/hooks/lib/api/` (12 módulos)
+**Status atual**: v2.2 — API de Subagente e Grafo de Agentes · 297 smoke tests PASS · 111 integration tests PASS
 
 > Este documento é a fonte canônica de evolução da `hook-payload-api.sh`.
 > Ele documenta o contrato OFICIAL da plataforma (o que o VS Code fornece),
@@ -1062,7 +1062,7 @@ PROJEÇÃO v3.0:
 | v1.5   | `hook_session_is_healthy()` funciona end-to-end (lifecycle test T-I-22)               |
 | v2.0   | Transcript de 50 msgs parseado em < 2s; 3 predicados transcript corretos              |
 | v2.1   | Round-trip generate→check→rotate funciona + formato ENCERRAR-XXXXXXXX validado        | ✅ CONCLUÍDO |
-| v2.2   | Subagente aninhado 3 níveis: depth=3 detectado; budget limit respeitado               |
+| v2.2   | Subagente aninhado 3 níveis: depth=3 detectado; budget limit respeitado               | ✅ CONCLUÍDO |
 | v2.3   | `hook_compact_ctx_full()` com 20 turnos cabe em 2000 chars                            | ✅ CONCLUÍDO |
 | v2.4   | Migração state v0→v1 sem perda de dados (smoke test)                                  |
 | v2.5   | Payload com campo errado rejeitado; payload correto passa — para todos os 7 eventos   |
@@ -1102,6 +1102,7 @@ PROJEÇÃO v3.0:
 | 3.5    | 2026-03-22 | **v1.5 implementada**: `09-metrics.sh` com 16 funções getters de `session.json` (`hook_stat_*`, `hook_turn_*`, `hook_compliance_*`) e predicados de saúde (`hook_session_is_healthy`, `hook_compliance_ok`, `hook_needs_askquestions`, `hook_is_orphan_turn`). `HOOK_STAT_*` / `HOOK_COMPLIANCE_*` / `HOOK_TURN_*` populados em `_hook_api_reset`. 223→252 smoke tests (29 novos T-91→T-111). SC_EXIT=0. |
 | 3.6    | 2026-03-22 | **v2.1 implementada**: `10-close-key.sh` com 6 funções (`hook_close_key_generate`, `hook_close_key_rotate`, `hook_close_key_read`, `hook_close_key_valid_format`, `hook_close_key_matches`, `hook_close_key_load`). Gestão atômica do ciclo de vida da `close_key` via `session.json`. `HOOK_CLOSE_KEY_VALUE` e `HOOK_CLOSE_KEY_IN_PAYLOAD` adicionadas. 252→268 smoke tests (16 novos T-112→T-126). SC_EXIT=0. |
 | 3.7    | 2026-03-22 | **v2.3 implementada**: `11-compact-context.sh` com 6 funções composíveis (`hook_compact_ctx_session_summary`, `hook_compact_ctx_pending_tasks`, `hook_compact_ctx_close_key`, `hook_compact_ctx_protocol_reminder`, `hook_compact_ctx_full`, `hook_compact_ctx_briefing_full`). `pre-compact-lib.sh` refatorado: `build_compact_context()` virou thin wrapper. `HOOK_COMPACT_CONTEXT_BYTES` adicionada. Correção `printf --` para bash builtin. 268→281 smoke tests (13 novos T-127→T-138). SC_EXIT=0. |
+| 3.8    | 2026-03-22 | **v2.2 implementada**: `12-subagent.sh` com 10 funções de subagent tracking (`hook_subagent_depth`, `hook_subagent_is_nested`, `hook_subagent_parent_id`, `hook_subagent_count_session`, `hook_subagent_count_turn`, `hook_subagent_budget_ok/remaining`, `hook_subagent_current_id/type`, `hook_subagent_is_known_type`, `hook_subagent_load`). `HOOK_SUBAGENT_DEPTH`, `HOOK_SUBAGENT_COUNT_SESSION`, `HOOK_SUBAGENT_BUDGET_LIMIT` adicionadas. 281→297 smoke tests (16 novos T-139→T-153). SC_EXIT=0. |
 
 
 ---
