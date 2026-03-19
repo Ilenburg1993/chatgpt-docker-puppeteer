@@ -76,7 +76,7 @@ pre_compact_main() {
     # --- Passo 2: Emitir additionalContext com briefing completo ---
     local ctx
     ctx=$(build_compact_context)
-    emit_additional_context "$ctx"
+    emit_additional_context "$ctx" "PreCompact"
 
     exit 0
 }

@@ -100,14 +100,14 @@ hook_state_migrate() {
         # Garante session_stats{subagents_active,subagents_total} se ausente
         local sub_act; sub_act="$(read_field '.session_stats.subagents_active' 2>/dev/null)"
         if [[ -z "$sub_act" || "$sub_act" == "null" ]]; then
-            update_nested_state '.session_stats.subagents_active' '0' 2>/dev/null || true
-            update_nested_state '.session_stats.subagents_total' '0' 2>/dev/null || true
+            update_nested_state 'session_stats.subagents_active' '0' 2>/dev/null || true
+            update_nested_state 'session_stats.subagents_total' '0' 2>/dev/null || true
         fi
 
         # Garante strict_turn_close se ausente
         local stc; stc="$(read_field '.strict_turn_close' 2>/dev/null)"
         if [[ -z "$stc" || "$stc" == "null" ]]; then
-            update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
+            update_nested_state 'strict_turn_close' 'false' 2>/dev/null || true
         fi
 
         recorded="1"

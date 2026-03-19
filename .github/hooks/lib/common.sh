@@ -92,11 +92,14 @@ update_nested_state() {
     mv -f "$tmp" "$STATE_FILE"
 }
 
-# Substitui session.json inteiro pelo JSON fornecido
+# Substitui session.json inteiro pelo JSON fornecido (escrita atômica via mktemp)
 write_state() {
     local json="$1"
+    local tmp
     mkdir -p "$STATE_DIR"
-    printf '%s\n' "$json" > "$STATE_FILE"
+    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    printf '%s\n' "$json" > "$tmp"
+    mv -f "$tmp" "$STATE_FILE"
 }
 
 # Cria state/session.json com zero state para nova sessão
@@ -145,7 +148,9 @@ init_state() {
                 "turn_authorized": 0,
                 "turn_unauthorized": 0,
                 "subturn_total": 0,
-                "tools_total": 0
+                "tools_total": 0,
+                "subagents_active": 0,
+                "subagents_total": 0
             },
             "compliance": {
                 "consecutive_unauthorized": 0,
@@ -198,13 +203,16 @@ emit_stop_block() {
         "$escaped" "$escaped"
 }
 
-# Emite additionalContext para o SessionStart hook
+# Emite additionalContext para um hook específico.
+# Parâmetros: ctx (conteúdo), event_name (padrão: "SessionStart")
+# Uso correto: emit_additional_context "$ctx" "PreCompact"
 emit_additional_context() {
     local ctx="$1"
+    local event_name="${2:-SessionStart}"
     local escaped
     escaped="$(printf '%s' "$ctx" | jq -Rs .)"
-    printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":%s}}\n' \
-        "$escaped"
+    printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":%s}}\n' \
+        "$event_name" "$escaped"
 }
 
 # Emite permissionDecision=deny para o PreToolUse hook
@@ -419,6 +427,7 @@ open_new_turn() {
     update_nested_state "current_turn.ask_questions_called" "false"
     update_nested_state "current_turn.subturn_count" "0"
     update_nested_state "current_turn.tools_count" "0"
+    update_nested_state "current_turn.intent" ""
 
     printf '%d' "$turn_num"
 }

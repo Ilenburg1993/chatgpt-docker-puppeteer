@@ -73,8 +73,8 @@ Quando houver divergência textual entre arquivos de instrução, use esta prece
 **REGRA ABSOLUTA — NUNCA VIOLAR:**
 
 - O agente **NUNCA** deve chamar `session-close.sh` diretamente via `run_in_terminal`.
-- Nem mesmo com a KEY correta. O `pre-tool-use.sh` (v8.0) **NEGA** essa chamada quando
-  `close_key_validated=false`.
+- Nem mesmo com a KEY correta. O `pre-tool-use.sh` detecta e bloqueia qualquer tentativa de
+  chamar `session-close.sh` via ferramenta (via `hook_is_bypass_attempt()` em `08-risk.sh`).
 - O único fluxo legítimo: `vscode_askQuestions` Template F → usuário digita KEY → `post-tool-use.sh`
   executa `session-close.sh` automaticamente.
 
