@@ -46,33 +46,10 @@ save_checkpoint() {
 # ---------------------------------------------------------------------------
 
 # Monta o additionalContext a ser injetado após a compactação.
-# Inclui: briefing completo + resumo de tarefas + lembrete de protocolo
+# Inclui: briefing completo + stats + close_key + tarefas + protocolo
+# Delega para hook_compact_ctx_briefing_full() do módulo 11-compact-context.sh
 build_compact_context() {
-    local briefing turn_count consecutive close_key
-
-    # Lê estado atual
-    turn_count=$(read_field ".session_stats.turn_count")
-    consecutive=$(read_field ".compliance.consecutive_unauthorized")
-    close_key=$(read_field ".close_key")
-
-    # Aviso de violações pendentes (se houver)
-    local violation_warning=""
-    if [ -n "$consecutive" ] && [ "$consecutive" != "0" ] && [ "$consecutive" != "null" ]; then
-        violation_warning="⚠️ **${consecutive} turno(s) consecutivos sem vscode_askQuestions**"$'\n'
-    fi
-
-    # Briefing completo (regenerado para garantir atualização)
-    generate_session_briefing
-    briefing=$(read_briefing)
-
-    printf '%s\n%s\n%s' \
-        "$briefing" \
-        "$(context_block "## Status Pós-Compactação" \
-            "${violation_warning}Turnos: ${turn_count:-0} totais | Chave: \`${close_key:-N/A}\`
-O contexto acima foi preservado automaticamente antes da compactação.")" \
-        "$(context_block "## Ação Imediata" \
-            "Continue o trabalho a partir do estado acima. Se houver tarefas em progresso,
-retome pelo último TODO marcado como \`in-progress\`.")"
+    hook_compact_ctx_briefing_full
 }
 
 # ---------------------------------------------------------------------------
