@@ -1099,6 +1099,161 @@ parse '{"hookEventName":"PreToolUse","sessionId":"s","tool_name":"run_in_termina
 assert_eq "T-90a bypass_attempt false (echo)" "no" "$(hook_is_bypass_attempt && echo yes || echo no)"
 
 # ===========================================================================
+# T-91 a T-111 — v1.5: API de Métricas de Sessão (09-metrics.sh)
+# Setup: cria um session.json temporário e define read_field local para isolamento
+# ===========================================================================
+
+_METRICS_TMP_DIR="$(mktemp -d)"
+_METRICS_STATE_FILE="$_METRICS_TMP_DIR/session.json"
+
+# session.json fixture para testes de métricas
+cat > "$_METRICS_STATE_FILE" <<'METRICS_EOF'
+{
+  "session_id": "test-metrics-session",
+  "started_at": "2026-03-21T10:00:00Z",
+  "ended_at": null,
+  "close_key": "ENCERRAR-ABCD1234",
+  "strict_turn_close": true,
+  "current_turn": {
+    "number": 5,
+    "turn_id": "turn-uuid-001",
+    "started_at": "2026-03-21T12:00:00Z",
+    "ask_questions_called": true,
+    "subturn_count": 42,
+    "tools_count": 42
+  },
+  "session_stats": {
+    "turn_count": 5,
+    "turn_authorized": 3,
+    "turn_unauthorized": 2,
+    "subturn_total": 200,
+    "tools_total": 200
+  },
+  "compliance": {
+    "consecutive_unauthorized": 0,
+    "last_turn_authorized": true
+  }
+}
+METRICS_EOF
+
+# Override read_field para usar nosso session.json temporário nos testes
+read_field() {
+    local path="$1"
+    jq -r "${path} // empty" "${STATE_FILE:-$_METRICS_STATE_FILE}" 2>/dev/null
+}
+export -f read_field
+STATE_FILE="$_METRICS_STATE_FILE"
+export STATE_FILE
+
+info "T-91 hook_stat_turn_count"
+assert_eq "T-91a turn_count=5" "5" "$(hook_stat_turn_count)"
+
+info "T-92 hook_stat_turn_authorized"
+assert_eq "T-92a turn_authorized=3" "3" "$(hook_stat_turn_authorized)"
+
+info "T-93 hook_stat_turn_unauthorized"
+assert_eq "T-93a turn_unauthorized=2" "2" "$(hook_stat_turn_unauthorized)"
+
+info "T-94 hook_stat_subturn_total"
+assert_eq "T-94a subturn_total=200" "200" "$(hook_stat_subturn_total)"
+
+info "T-95 hook_stat_tools_total"
+assert_eq "T-95a tools_total=200" "200" "$(hook_stat_tools_total)"
+
+info "T-96 hook_turn_number"
+assert_eq "T-96a turn_number=5" "5" "$(hook_turn_number)"
+
+info "T-97 hook_turn_ask_called"
+assert_eq "T-97a ask_called=true" "true" "$(hook_turn_ask_called)"
+
+info "T-98 hook_turn_started_at"
+assert_eq "T-98a started_at" "2026-03-21T12:00:00Z" "$(hook_turn_started_at)"
+
+info "T-99 hook_compliance_consecutive"
+assert_eq "T-99a consecutive_unauthorized=0" "0" "$(hook_compliance_consecutive)"
+
+info "T-100 hook_compliance_last_authorized"
+assert_eq "T-100a last_authorized=true" "true" "$(hook_compliance_last_authorized)"
+
+info "T-101 hook_session_close_key"
+assert_eq "T-101a close_key=ENCERRAR-ABCD1234" "ENCERRAR-ABCD1234" "$(hook_session_close_key)"
+
+info "T-102 hook_compliance_ok (consecutive=0)"
+assert_eq "T-102a compliance_ok=yes" "yes" "$(hook_compliance_ok && echo yes || echo no)"
+
+info "T-103 hook_needs_askquestions (ask_called=true → false)"
+assert_eq "T-103a needs_askquestions=no (already called)" "no" "$(hook_needs_askquestions && echo yes || echo no)"
+
+info "T-104 hook_needs_askquestions (ask_called=false → true)"
+# Cria fixture alternativo com ask_questions_called=false
+cat > "$_METRICS_STATE_FILE" <<'METRICS2_EOF'
+{
+  "close_key": "ENCERRAR-ABCD1234",
+  "current_turn": { "number": 3, "ask_questions_called": false, "started_at": "2026-03-21T11:00:00Z" },
+  "session_stats": { "turn_count": 3, "turn_authorized": 1, "turn_unauthorized": 1, "subturn_total": 50, "tools_total": 50 },
+  "compliance": { "consecutive_unauthorized": 1, "last_turn_authorized": false }
+}
+METRICS2_EOF
+assert_eq "T-104a needs_askquestions=yes" "yes" "$(hook_needs_askquestions && echo yes || echo no)"
+
+info "T-105 hook_compliance_ok false (consecutive=1)"
+assert_eq "T-105a compliance_ok=no (consecutive=1)" "no" "$(hook_compliance_ok && echo yes || echo no)"
+
+info "T-106 hook_session_is_healthy false (non-compliant)"
+assert_eq "T-106a session_is_healthy=no" "no" "$(hook_session_is_healthy && echo yes || echo no)"
+
+info "T-107 hook_metrics_load popula variáveis"
+# Restaura fixture saudável
+cat > "$_METRICS_STATE_FILE" <<'METRICS3_EOF'
+{
+  "close_key": "ENCERRAR-FFFF9999",
+  "current_turn": { "number": 7, "ask_questions_called": true, "started_at": "2026-03-21T13:00:00Z" },
+  "session_stats": { "turn_count": 7, "turn_authorized": 5, "turn_unauthorized": 2, "subturn_total": 300, "tools_total": 300 },
+  "compliance": { "consecutive_unauthorized": 0, "last_turn_authorized": true }
+}
+METRICS3_EOF
+hook_metrics_load
+assert_eq "T-107a HOOK_STAT_TURN_COUNT=7" "7" "$HOOK_STAT_TURN_COUNT"
+assert_eq "T-107b HOOK_STAT_TURN_AUTHORIZED=5" "5" "$HOOK_STAT_TURN_AUTHORIZED"
+assert_eq "T-107c HOOK_TURN_NUMBER=7" "7" "$HOOK_TURN_NUMBER"
+assert_eq "T-107d HOOK_TURN_ASK_CALLED=true" "true" "$HOOK_TURN_ASK_CALLED"
+assert_eq "T-107e HOOK_SESSION_CLOSE_KEY=ENCERRAR-FFFF9999" "ENCERRAR-FFFF9999" "$HOOK_SESSION_CLOSE_KEY"
+assert_eq "T-107f HOOK_COMPLIANCE_CONSECUTIVE=0" "0" "$HOOK_COMPLIANCE_CONSECUTIVE"
+
+info "T-108 hook_session_is_healthy true"
+assert_eq "T-108a session_is_healthy=yes" "yes" "$(hook_session_is_healthy && echo yes || echo no)"
+
+info "T-109 hook_session_is_healthy false when authorized=0 but count>0"
+cat > "$_METRICS_STATE_FILE" <<'METRICS4_EOF'
+{
+  "close_key": "ENCERRAR-ZZZZ0000",
+  "current_turn": { "number": 2, "ask_questions_called": false, "started_at": "2026-03-21T10:01:00Z" },
+  "session_stats": { "turn_count": 2, "turn_authorized": 0, "turn_unauthorized": 2, "subturn_total": 10, "tools_total": 10 },
+  "compliance": { "consecutive_unauthorized": 0, "last_turn_authorized": false }
+}
+METRICS4_EOF
+assert_eq "T-109a session_is_healthy=no (no authorized turns)" "no" "$(hook_session_is_healthy && echo yes || echo no)"
+
+info "T-110 hook_stat_turn_count returns 0 when session.json absent"
+_ORIG_STATE_FILE="$STATE_FILE"
+STATE_FILE="/tmp/does-not-exist-$$.json"
+assert_eq "T-110a turn_count=0 (absent)" "0" "$(hook_stat_turn_count)"
+STATE_FILE="$_ORIG_STATE_FILE"
+
+info "T-111 hook_turn_ask_called returns false for non-boolean empty"
+cat > "$_METRICS_STATE_FILE" <<'METRICS5_EOF'
+{
+  "current_turn": { "number": 1, "ask_questions_called": false, "started_at": "2026-03-21T10:00:01Z" },
+  "session_stats": { "turn_count": 1, "turn_authorized": 0, "turn_unauthorized": 1, "subturn_total": 1, "tools_total": 1 },
+  "compliance": { "consecutive_unauthorized": 1, "last_turn_authorized": false }
+}
+METRICS5_EOF
+assert_eq "T-111a ask_called=false (boolean false)" "false" "$(hook_turn_ask_called)"
+
+# Cleanup do state temporário
+rm -rf "$_METRICS_TMP_DIR"
+
+# ===========================================================================
 # RESULTADO FINAL (todos)
 # ===========================================================================
 printf '\n'

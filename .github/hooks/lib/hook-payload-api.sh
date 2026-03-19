@@ -13,6 +13,9 @@
 # ║   api/04-predicates.sh — hook_is_* + hook_response_has_error + meta    ║
 # ║   api/05-output.sh     — hook_out_* output builders (protocolo 🟦)     ║
 # ║   api/06-query.sh      — hook_get_* + hook_summary + hook_api_record   ║
+# ║   api/07-state.sh      — hook_close_key_in_response + hook_api_record  ║
+# ║   api/08-risk.sh       — hook_tool_risk_level + hook_is_bypass_attempt ║
+# ║   api/09-metrics.sh    — hook_stat_* + hook_compliance_* + predicados  ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 #
 # ENTRYPOINT PÚBLICO definido aqui (neste arquivo):
@@ -65,6 +68,8 @@ source "$_HOOK_API_MODULES_DIR/06-query.sh"
 source "$_HOOK_API_MODULES_DIR/07-state.sh"
 # shellcheck disable=SC1091
 source "$_HOOK_API_MODULES_DIR/08-risk.sh"
+# shellcheck disable=SC1091
+source "$_HOOK_API_MODULES_DIR/09-metrics.sh"
 
 # ─── ENTRYPOINT PRINCIPAL ────────────────────────────────────────────────────
 

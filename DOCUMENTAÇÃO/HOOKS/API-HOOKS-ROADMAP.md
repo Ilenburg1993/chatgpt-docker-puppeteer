@@ -1,10 +1,10 @@
 # API HOOKS — Situação Atual e Roadmap Completo
 
-**Versão do documento**: 3.2-modular
+**Versão do documento**: 3.3-modular
 **Data**: 2026-03-21
 **Arquivo de entrada**: `.github/hooks/lib/hook-payload-api.sh` (loader)
-**Módulos**: `.github/hooks/lib/api/` (8 módulos)
-**Status atual**: v1.3 — camada de risco + política · 223 smoke tests PASS · 111 integration tests PASS
+**Módulos**: `.github/hooks/lib/api/` (9 módulos)
+**Status atual**: v1.5 — API de Métricas de Sessão · 252 smoke tests PASS · 111 integration tests PASS
 
 > Este documento é a fonte canônica de evolução da `hook-payload-api.sh`.
 > Ele documenta o contrato OFICIAL da plataforma (o que o VS Code fornece),
@@ -1800,7 +1800,7 @@ PROJEÇÃO v3.0: ~54 + 102 = ~156 funções | ~3000 linhas | ~65 variáveis expo
 | v1.2   | Casos de injection/path-traversal detectados em testes; score 0 para payloads limpos                                                                                                                                |
 | v1.3   | `hook_tool_risk_level()` retorna correto para 15 ferramentas diferentes                                                                                                                                             |
 | v1.4   | ✅ **CONCLUÍDO** — Todos os 7 fat libs integrados com `hook_api_parse()`; `hook_is_bypass_attempt()` implementada; 226/226 smoke PASS; 111/111 integration PASS; ShellCheck limpo. (Templates A-G movidos para v1.5) |
-| v1.5   | `hook_session_is_healthy()` funciona em lifecycle completo (integration test T-I-22)                                                                                                                                |
+| v1.5   | ✅ **CONCLUÍDO** — `09-metrics.sh` implementado (15 funções + `hook_metrics_load`); 252/252 smoke PASS; ShellCheck limpo. Lifecycle test T-I-22 pendente para próxima fase. |
 | v2.0   | Transcript de 50+ mensagens parseado em < 2s; `hook_tx_had_askquestions_in_turn()` correto                                                                                                                          |
 | v2.1   | `hook_close_key_generate()` produz chaves únicas; round-trip generate→check→rotate funciona                                                                                                                         |
 | v2.2   | Subagente aninhado 3 níveis: depth=3 detectado corretamente                                                                                                                                                         |
@@ -1838,3 +1838,4 @@ PROJEÇÃO v3.0: ~54 + 102 = ~156 funções | ~3000 linhas | ~65 variáveis expo
 | 1.2    | 2026-03-18 | Implementadas 7 funções de segurança + vars: `hook_is_command_injection`, `hook_is_path_traversal`, `hook_is_prompt_injection`, `hook_security_flags_str`, `hook_sanitize_for_log`, `hook_security_is_safe`, `hook_security_is_high_risk`. Compute: `_hook_security_compute`. Smoke: 223 PASS (shared c/ v1.1).                                                                                                      |
 | 1.3    | 2026-03-18 | Implementadas 9 funções de risco/categoria + vars `HOOK_RISK_LEVEL` / `HOOK_TOOL_CATEGORY`: `hook_tool_risk_level`, `hook_tool_category`, `hook_is_ai_tool`, `hook_is_file_tool`, `hook_is_shell_tool`, `hook_is_network_tool`, `hook_is_editor_tool`, `hook_is_search_tool`, `hook_is_unknown_tool`. Arquivo `08-risk.sh`. Smoke: 223 PASS.                                                                         |
 | 1.4    | 2026-03-19 | **Consolidação Phase 7 — Integração Fat Libs**: todos os 7 fat libs (`pre-tool-use-lib.sh`, `post-tool-use-lib.sh`, `stop-lib.sh`, `session-start-lib.sh`, `subagent-lib.sh`, `user-prompt-submit-lib.sh`, `pre-compact-lib.sh`) refatorados para usar `hook_api_parse()` + vars `HOOK_*`. Adicionada `hook_is_bypass_attempt()` em `08-risk.sh`. Smoke: **226 PASS**. Integration: **111 PASS**. ShellCheck: limpo. |
+| 1.5    | 2026-03-21 | **API de Métricas de Sessão** — Novo módulo `09-metrics.sh` (15 funções + `hook_metrics_load`): getters lazy de `session_stats`, `current_turn`, `compliance`, `close_key` + predicados `hook_session_is_healthy`, `hook_compliance_ok`, `hook_needs_askquestions`, `hook_is_orphan_turn`. Novas vars `HOOK_STAT_*`, `HOOK_COMPLIANCE_*`, `HOOK_TURN_*`, `HOOK_SESSION_CLOSE_KEY` em `01-vars.sh`. Smoke: **252 PASS**. ShellCheck: limpo. |
