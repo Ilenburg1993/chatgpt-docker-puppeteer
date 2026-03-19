@@ -1632,6 +1632,125 @@ assert_eq "T-165b MIGRATION_NEEDED=false" "false" "$HOOK_STATE_MIGRATION_NEEDED"
 rm -rf "$_SV_TMP_DIR"
 
 # ===========================================================================
+# v2.5 — Strict Validation Schemas (T-166 a T-185)
+# ===========================================================================
+# Reseta estado de validação interno antes dos testes
+_HV_ERRORS=""
+_HV_WARNINGS=""
+
+info "T-166 hook_validate_payload — SessionStart válido"
+HOOK_EVENT="SessionStart"; HOOK_SESSION_ID="sess-001"; HOOK_SOURCE="new"
+hook_validate_payload
+assert_eq "T-166a SessionStart ok (sem erros)" "no" "$(hook_validate_has_errors && echo yes || echo no)"
+# deve retornar 0 sem erros
+hook_validate_payload && _T166_OK="yes" || _T166_OK="no"
+assert_eq "T-166b exit_code=ok" "yes" "$_T166_OK"
+
+info "T-167 hook_validate_payload — SessionStart source inválido"
+HOOK_EVENT="SessionStart"; HOOK_SESSION_ID="sess-001"; HOOK_SOURCE="invalid"
+hook_validate_payload || true
+assert_eq "T-167a has errors" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
+assert_eq "T-167b error_count>=1" "1" "$(hook_validate_error_count)"
+
+info "T-168 hook_validate_payload — UserPromptSubmit sem prompt"
+HOOK_EVENT="UserPromptSubmit"; HOOK_PROMPT=""
+hook_validate_payload || true
+assert_eq "T-168a prompt missing = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
+
+info "T-169 hook_validate_payload — UserPromptSubmit válido"
+HOOK_EVENT="UserPromptSubmit"; HOOK_PROMPT="Olá mundo"
+hook_validate_payload && _T169_OK="yes" || _T169_OK="no"
+assert_eq "T-169a UserPrompt válido" "yes" "$_T169_OK"
+
+info "T-170 hook_validate_payload — PreToolUse sem tool_name"
+HOOK_EVENT="PreToolUse"; HOOK_TOOL_NAME=""; HOOK_TOOL_USE_ID="tid-01"; HOOK_TOOL_INPUT="{}"
+hook_validate_payload || true
+assert_eq "T-170a tool_name missing = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
+
+info "T-171 hook_validate_payload — PreToolUse válido"
+HOOK_EVENT="PreToolUse"; HOOK_TOOL_NAME="read_file"; HOOK_TOOL_USE_ID="tid-02"; HOOK_TOOL_INPUT="{}"
+hook_validate_payload && _T171_OK="yes" || _T171_OK="no"
+assert_eq "T-171a PreToolUse válido" "yes" "$_T171_OK"
+
+info "T-172 hook_validate_payload — PreToolUse run_in_terminal sem command"
+HOOK_EVENT="PreToolUse"; HOOK_TOOL_NAME="run_in_terminal"; HOOK_TOOL_USE_ID="tid-03"; HOOK_TOOL_COMMAND=""
+hook_validate_payload || true
+assert_eq "T-172a run_in_terminal sem command = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
+
+info "T-173 hook_validate_payload — PostToolUse válido"
+HOOK_EVENT="PostToolUse"; HOOK_TOOL_NAME="read_file"; HOOK_TOOL_USE_ID="tid-04"; HOOK_TOOL_RESPONSE="content"
+hook_validate_payload && _T173_OK="yes" || _T173_OK="no"
+assert_eq "T-173a PostToolUse válido" "yes" "$_T173_OK"
+
+info "T-174 hook_validate_payload — Stop com stop_hook_active=true"
+HOOK_EVENT="Stop"; HOOK_STOP_HOOK_ACTIVE="true"
+hook_validate_payload && _T174_OK="yes" || _T174_OK="no"
+assert_eq "T-174a Stop válido" "yes" "$_T174_OK"
+
+info "T-175 hook_validate_payload — Stop com stop_hook_active inválido"
+HOOK_EVENT="Stop"; HOOK_STOP_HOOK_ACTIVE="maybe"
+hook_validate_payload || true
+assert_eq "T-175a Stop inválido = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
+
+info "T-176 hook_validate_payload — SubagentStart sem agent_id"
+HOOK_EVENT="SubagentStart"; HOOK_AGENT_ID=""; HOOK_AGENT_TYPE="Plan"
+hook_validate_payload || true
+assert_eq "T-176a SubagentStart sem agent_id = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
+
+info "T-177 hook_validate_payload — SubagentStop válido"
+HOOK_EVENT="SubagentStop"; HOOK_AGENT_ID="agent-42"; HOOK_AGENT_TYPE="SWE"; HOOK_STOP_HOOK_ACTIVE="false"
+hook_validate_payload && _T177_OK="yes" || _T177_OK="no"
+assert_eq "T-177a SubagentStop válido" "yes" "$_T177_OK"
+
+info "T-178 hook_validate_payload — PreCompact válido (trigger=auto)"
+HOOK_EVENT="PreCompact"; HOOK_COMPACT_TRIGGER="auto"
+hook_validate_payload && _T178_OK="yes" || _T178_OK="no"
+assert_eq "T-178a PreCompact válido" "yes" "$_T178_OK"
+
+info "T-179 hook_validate_payload — PreCompact trigger incomum (warning, não error)"
+HOOK_EVENT="PreCompact"; HOOK_COMPACT_TRIGGER="emergency"
+hook_validate_payload && _T179_OK="yes" || _T179_OK="no"
+assert_eq "T-179a PreCompact trigger incomum = warning only (exit 0)" "yes" "$_T179_OK"
+assert_eq "T-179b tem warning" "yes" "$(hook_validate_has_warnings && echo yes || echo no)"
+
+info "T-180 hook_validate_errors_json — JSON array de erros"
+HOOK_EVENT="PreToolUse"; HOOK_TOOL_NAME=""; HOOK_TOOL_USE_ID=""
+hook_validate_payload || true
+ERR_JSON="$(hook_validate_errors_json)"
+assert_eq "T-180a json valid array" "array" "$(printf '%s' "$ERR_JSON" | jq -r 'type' 2>/dev/null)"
+assert_eq "T-180b array não vazio" "yes" "$(printf '%s' "$ERR_JSON" | jq -e 'length > 0' >/dev/null 2>&1 && echo yes || echo no)"
+
+info "T-181 hook_validate_warnings_json — JSON array vazio quando sem warnings"
+HOOK_EVENT="SessionStart"; HOOK_SESSION_ID="sess-x"; HOOK_SOURCE="new"
+hook_validate_payload
+WARN_JSON="$(hook_validate_warnings_json)"
+assert_eq "T-181a warnings empty array" "[]" "$WARN_JSON"
+
+info "T-182 hook_validate_error_count — conta erros corretamente"
+HOOK_EVENT="Stop"; HOOK_STOP_HOOK_ACTIVE="bad"
+hook_validate_payload || true
+assert_eq "T-182a error_count=1" "1" "$(hook_validate_error_count)"
+
+info "T-183 hook_validate_warning_count — conta warnings corretamente"
+HOOK_EVENT="PreCompact"; HOOK_COMPACT_TRIGGER="emergency"
+hook_validate_payload || true
+assert_eq "T-183a warning_count=1" "1" "$(hook_validate_warning_count)"
+
+info "T-184 hook_validate_load — popula HOOK_VALIDATION_ERRORS_JSON e WARNINGS_JSON"
+HOOK_EVENT="UserPromptSubmit"; HOOK_PROMPT=""
+hook_validate_load
+assert_eq "T-184a ERRORS_JSON não vazio" "yes" "$(printf '%s' "$HOOK_VALIDATION_ERRORS_JSON" | jq -e 'length > 0' >/dev/null 2>&1 && echo yes || echo no)"
+assert_eq "T-184b WARNINGS_JSON é array" "array" "$(printf '%s' "$HOOK_VALIDATION_WARNINGS_JSON" | jq -r 'type' 2>/dev/null)"
+
+info "T-185 hook_validate_payload — evento Unknown/ausente = erro"
+HOOK_EVENT="Unknown"
+hook_validate_payload || true
+assert_eq "T-185a Unknown event = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
+
+# Limpar estado de validação após testes
+_HV_ERRORS=""; _HV_WARNINGS=""
+
+# ===========================================================================
 # RESULTADO FINAL (todos)
 # ===========================================================================
 printf '\n'

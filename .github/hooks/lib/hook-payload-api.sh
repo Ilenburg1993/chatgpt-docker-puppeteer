@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # hook-payload-api.sh — LOADER: carrega módulos api/ e expõe hook_api_parse
-# v2.4-modular — 2026-03-18
+# v2.5-modular — 2026-03-18
 #
 # Ponto de entrada backward-compatible para o sistema modular de parsing.
 # Scripts que fazem `source hook-payload-api.sh` continuam funcionando sem mudanças.
@@ -20,6 +20,7 @@
 # ║   api/11-compact-context.sh — hook_compact_ctx_* (PreCompact context)  ║
 # ║   api/12-subagent.sh   — hook_subagent_* (tracking e budget)           ║
 # ║   api/13-state-version.sh — hook_state_version/needs_migration/migrate ║
+# ║   api/14-validate-events.sh — hook_validate_payload/errors_json/load   ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 #
 # ENTRYPOINT PÚBLICO definido aqui (neste arquivo):
@@ -82,6 +83,8 @@ source "$_HOOK_API_MODULES_DIR/11-compact-context.sh"
 source "$_HOOK_API_MODULES_DIR/12-subagent.sh"
 # shellcheck disable=SC1091
 source "$_HOOK_API_MODULES_DIR/13-state-version.sh"
+# shellcheck disable=SC1091
+source "$_HOOK_API_MODULES_DIR/14-validate-events.sh"
 
 # ─── ENTRYPOINT PRINCIPAL ────────────────────────────────────────────────────
 
