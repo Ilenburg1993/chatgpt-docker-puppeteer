@@ -354,6 +354,7 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     wget \
     netcat-openbsd \
     dnsutils \
+    libnss3-tools \
     iproute2 \
     iputils-ping \
     traceroute \
@@ -1086,7 +1087,38 @@ RUN chmod 0444 /etc/profile.d/20-devcontainer-ux.sh
 
 
 # =============================================================================
-# SECTION 10 — HANDOFF FINAL (RUNTIME)
+# SECTION 9.6 — BASH HARDENING (.bashrc persistent overrides) — v1.0
+#
+# Problema: ~/.bashrc vem da base image (node) e define HISTSIZE=1000.
+# Em login shells (ordem: profile.d → .profile → .bashrc), o .bashrc do
+# base image SOBRESCREVE as configurações de 20-devcontainer-ux.sh (HISTSIZE=10000).
+# Este bloco append ao .bashrc com late-binding: garante que as configurações
+# corretas persistam após rebuilds, ganhando de qualquer valor anterior.
+#
+# Itens:
+#   • HISTSIZE=10000   — sobrescreve padrão 1000 do base image
+#   • HISTFILESIZE=20000
+#   • HISTTIMEFORMAT  — timestamps para rastreio de comandos pós-crash
+#   • ulimit -S -s unlimited — expande stack de 8 MB (padrão bash) p/ ilimitado
+#     (hard limit já é unlimited; previne stack overflow em call-stacks profundos
+#     do extension host e do Copilot agent durante sessões intensas)
+# =============================================================================
+RUN cat >> "${HOME_DIR}/.bashrc" <<'BASH_HARDENING'
+
+# === DevContainer bash hardening (v1.0 — appended by Dockerfile) ===
+# Applied last in .bashrc → these always win over profile.d (20-devcontainer-ux.sh)
+# and the base-image defaults. Do NOT remove — needed for DevContainer stability.
+HISTSIZE=10000
+HISTFILESIZE=20000
+HISTTIMEFORMAT="%F %T "
+# Expand soft stack limit from 8 MB (bash default) to unlimited.
+# Hard limit is already unlimited; prevents stack overflow in deep
+# Node.js/Copilot agent call-stacks during intensive coding sessions.
+ulimit -S -s unlimited 2>/dev/null || true
+BASH_HARDENING
+
+
+
 #
 # Regras:
 #   • ENTRYPOINT = dumb-init + nss-gatekeeper

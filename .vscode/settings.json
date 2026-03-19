@@ -87,6 +87,25 @@
   "files.trimFinalNewlines": true,
   "files.trimTrailingWhitespace": true,
   "files.watcherExclude": {
+    // --- Módulos e artefatos de build (alta densidade de arquivos) ---
+    // node_modules: ~953 pacotes, ~100 k+ arquivos, 1,1 GB. Nunca mudam durante
+    // o trabalho; observá-los consome ~40-60% das cotas de inotify e gera
+    // eventos constantes que atravessam VS Code → Copilot. Exclusão obrigatória.
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/backups/**": true,
+    // --- Diretórios de runtime do projeto (escrita frequente durante sessões) ---
+    // Cada linha escrita em logs/ ou arquivo criado em fila/respostas/ dispara
+    // um evento inotify → VS Code processa → overhead em sessões de coding ativo.
+    // Estes dirs são gerados/consumidos pelo agente, não são código-fonte.
+    "**/logs/**": true,
+    "**/fila/**": true,
+    "**/respostas/**": true,
+    "**/tmp/**": true,
+    // Estado interno dos hooks: escrito em toda tool call do Copilot →
+    // excluir evita feedback loop de eventos durante a própria sessão.
+    "**/.github/hooks/state/**": true,
+    // --- Ambientes e caches Python ---
     "**/.venv/**": true,
     "**/.codex/sessions/**": true,
     "**/.codex/shell_snapshots/**": true,
@@ -591,7 +610,14 @@
     "**/.mypy_cache": true,
     "**/.ruff_cache": true,
     "**/dist": true,
-    "**/build": true
+    "**/build": true,
+    // Dirs de runtime: log/queue/output files — jamais úteis em Ctrl+Shift+F
+    "**/logs": true,
+    "**/fila": true,
+    "**/respostas": true,
+    "**/backups": true,
+    "**/tmp": true,
+    "**/.github/hooks/state": true
   },
   "search.followSymlinks": false,
   "search.location": "panel",
@@ -672,7 +698,7 @@
   // Observabilidade do editor e execucao de tarefas.
   // ===========================================================================
   // Subfase 17.1) Debug e problemas
-  "debug.javascript.autoAttachFilter": "always",
+  "debug.javascript.autoAttachFilter": "onlyWithFlag",
   "debug.focusEditorOnBreak": true,
   "debug.inlineValues": "on",
   "debug.showBreakpointsInOverviewRuler": true,
@@ -720,8 +746,12 @@
   },
   "terminal.integrated.fontFamily": "monospace",
   "terminal.integrated.fontSize": 13,
-  "terminal.integrated.gpuAcceleration": "auto",
-  "terminal.integrated.localEchoEnabled": "auto",
+  // "canvas" usa Canvas 2D (estável em DevContainers virtuais; evita falha WebGL).
+  // "auto" tentaria WebGL primeiro, com risco de fallback lento para DOM.
+  "terminal.integrated.gpuAcceleration": "canvas",
+  // "off" em DevContainer: toda entrada vai direto ao container remoto;
+  // local echo nunca ajuda aqui e pode causar glitches visuais (eco duplicado).
+  "terminal.integrated.localEchoEnabled": "off",
   // "always": restaura a sessão mesmo após desconexão limpa (reconnect VS Code)
   // "onExit": apenas restaura se processo morreu — insuficiente para reconnects
   // Referência: DOCUMENTAÇÃO/HOOKS/ANALISE-SESSOES-ABRUPTAS.md §5.4
@@ -743,7 +773,8 @@
   // ===========================================================================
   // Subfase 19.1) Chat e agentes
   "chat.agent.enabled": true,
-  "chat.agent.maxRequests": 1000,
+  // Perfil doméstico: limitar fan-out de requests para reduzir risco de timeout em sessões longas.
+  "chat.agent.maxRequests": 500,
   "chat.agent.thinking.collapsedTools": "always",
   "chat.agent.thinkingStyle": "fixedScrolling",
   "chat.agentsControl.clickBehavior": "cycle",
@@ -830,6 +861,8 @@
       ]
     }
   },
+  // Em requisições concorrentes, prioriza fila em vez de "steer" para reduzir colisões.
+  "chat.requestQueuing.defaultAction": "queue",
   "chat.renderRelatedFiles": true,
   "chat.tips.enabled": true,
   "chat.tools.global.autoApprove": true,
@@ -878,13 +911,17 @@
   "github.copilot.chat.githubMcpServer.enabled": true,
   "github.copilot.chat.languageContext.fix.typescript.enabled": true,
   "github.copilot.chat.languageContext.inline.typescript.enabled": true,
-  "github.copilot.chat.languageContext.typescript.cacheTimeout": 500,
+  // 2000 ms: base padrão recomendada para projetos ≥ 10 k LOC (este tem ~21 k).
+  // 500 ms gerava reconstruções excessivas do grafo de contexto durante sessões
+  // de edição ativa → latência perceptível nas sugestões inline.
+  "github.copilot.chat.languageContext.typescript.cacheTimeout": 2000,
   "github.copilot.chat.languageContext.typescript.enabled": true,
   "github.copilot.chat.languageContext.typescript.includeDocumentation": true,
   "github.copilot.chat.localeOverride": "pt-br",
   "github.copilot.chat.nesFetcher": "electron-fetch",
   "github.copilot.chat.newWorkspace.useContext7": true,
   "github.copilot.chat.newWorkspaceCreation.enabled": true,
+  // Esforço médio reduz latência percebida sem desabilitar raciocínio.
   "github.copilot.chat.responsesApiReasoningEffort": "high",
   "github.copilot.chat.reviewSelection.enabled": true,
   "github.copilot.chat.summarizeAgentConversationHistory.enabled": true,

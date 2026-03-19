@@ -36,29 +36,28 @@ Quando houver divergência textual entre arquivos de instrução, use esta prece
    criar a lista de tarefas. Não comece a trabalhar sem TODOs. Busque ter no mínimo 10 TODOs no
    backlog para manter o ciclo de trabalho fluindo.
 2. **Último TODO = vscode_askQuestions** — o último item da lista DEVE ser:
-   `"Chamar vscode_askQuestions [Template de CONTINUAÇÃO: A/D/E; Template F apenas por escalonamento explícito para fechamento de SESSION]"`
+   `"Chamar vscode_askQuestions [Template de CONTINUAÇÃO: A/D/E; Template F apenas por escalonamento explícito para fechamento de SESSION/TURN]"`
 3. **Marcar e executar** — ao concluir cada tarefa, marque como `completed`. O último TODO
    (vscode_askQuestions) DEVE ser executado — não pulado.
 4. **Não é opcional** — este é o único mecanismo confiável que garante comunicação com o usuário.
    Encerrar um turno sem chamar vscode_askQuestions viola o protocolo.
 5. **Checklist de último ato (obrigatório)** — antes de encerrar resposta, confirmar: (a) o último
    TODO foi executado, (b) a chamada final foi `vscode_askQuestions`, (c) não haverá outra ação de
-   trabalho após essa chamada.
-6. **Se executar ferramenta após askQuestions final** — a autorização do TURN deve ser considerada
-   invalidada; chame `vscode_askQuestions` novamente ao fim.
-7. **Refresh imediato de TODO após askQuestions (obrigatório)** — após qualquer chamada de
+   trabalho após essa chamada. Por DEFAULT, é PROIBIDO O AGENTE encerrar session/turn sem pedido
+   autorização expressa do USUÁRIO.
+6. **Refresh imediato de TODO após askQuestions (obrigatório)** — após qualquer chamada de
    `vscode_askQuestions`, o próximo passo de ferramenta deve ser `manage_todo_list` para atualizar
-   imediatamente o checklist (marcando execução do item e estado do turno).
-8. **Exceção única de bookkeeping** — após esse `manage_todo_list` imediato, qualquer ferramenta de
+   imediatamente o checklist, atualizando totalmente os TODOS conforme a resposta dada pelo usuário.
+7. **Exceção única de bookkeeping** — após esse `manage_todo_list` imediato, qualquer ferramenta de
    trabalho (não-bookkeeping) exige novo `vscode_askQuestions` ao fim do ciclo.
-9. **Template F + KEY correta apenas no fechamento de SESSION/TURN** — Templates de continuidade
+8. **Template F + KEY correta apenas no fechamento de SESSION/TURN** — Templates de continuidade
    (A/D/E) servem para seguir o trabalho e **não autorizam fechamento de TURN**. O fechamento
    autorizado exige Template F com escalonamento explícito para encerramento de SESSION e validação
    da `close_key`.
-10. É terminantemente proibido tentar encerrar um turno de trabalho sem seguir este protocolo, seja
-    pulando a chamada de `vscode_askQuestions`, seja utilizando o template errado, seja não
-    validando a KEY correta que deve ser inserida pelo usuário. O sistema de hooks é projetado para
-    bloquear essas violações, mas o agente deve seguir o protocolo por iniciativa própria.
+9. É terminantemente proibido tentar encerrar um turno de trabalho sem seguir este protocolo, seja
+   pulando a chamada de `vscode_askQuestions`, seja utilizando o template errado, seja não validando
+   a KEY correta que deve ser inserida pelo usuário. O sistema de hooks é projetado para bloquear
+   essas violações, mas o agente deve seguir o protocolo por iniciativa própria.
 
 > **Por que isso é crítico?** O hook `agent-stop.sh` emite `decision:block` quando
 > `vscode_askQuestions` não foi chamado. Mas mesmo sem o block ser efetivo, o padrão de
@@ -79,11 +78,12 @@ Quando houver divergência textual entre arquivos de instrução, use esta prece
 - O único fluxo legítimo: `vscode_askQuestions` Template F → usuário digita KEY → `post-tool-use.sh`
   executa `session-close.sh` automaticamente.
 
-**SESSION end = EVENTO EXTREMAMENTE RARO. Toda SESSION deve ser mantida viva o máximo possível,
-assim como os turns; por default, NUNCA encerre uma session ou turn .** O agente deve buscar
-resolver tudo dentro da mesma sessão, utilizando seções e turns para organizar o trabalho, e sempre
-atualizando os TODOS, mas mantendo a continuidade. O encerramento de sessão ou TURN só deve ocorrer
-quando absolutamente necessário, e sempre seguindo o protocolo correto.
+**SESSION ou TURN end = EVENTO EXTREMAMENTE RARO. Toda SESSION deve ser mantida viva o máximo
+possível, assim como os turns; por default, NUNCA encerre uma session ou turn .** O agente deve
+buscar resolver tudo dentro da mesma sessão, utilizando seções e turns para organizar o trabalho, e
+sempre atualizando os TODOS, mas mantendo a continuidade. O encerramento de sessão ou TURN só deve
+ocorrer quando absolutamente necessário, e sempre seguindo o protocolo correto, isto é, SEMPRE COM
+AUTORIZAÇÃO OU PEDIDO EXPRESSOS DO USUÁRIO.
 
 ---
 
@@ -105,10 +105,10 @@ SESSION  ≠  SECTION  ≠  TURN
 > **SESSION** | 1 ativação do Copilot Chat | Template F + KEY + session-close.sh | ✅
 > **OBRIGATÓRIA** |
 
-> ⚠️ **REGRA DE OURO**: Terminar de escrever uma resposta = encerrar um **TURN**, NÃO a **SESSION**.
-> A SESSION continua ativa enquanto a janela do chat estiver aberta. A SESSION só encerra quando:
-> (1) usuário digita a chave `ENCERRAR-XXXXXXXX`, (2) `post-tool-use.sh` detecta KEY em
-> `vscode_askQuestions` e chama `session-close.sh`.
+> ⚠️ **REGRA DE OURO**: Terminar de escrever uma resposta = encerrar um **SUBTURN**, NÃO a
+> **SESSION**. A SESSION continua ativa enquanto a janela do chat estiver aberta. A SESSION só
+> encerra quando: (1) usuário digita a chave `ENCERRAR-XXXXXXXX`, (2) `post-tool-use.sh` detecta KEY
+> em `vscode_askQuestions` e chama `session-close.sh`.
 
 ### Fluxo de Encerramento de SESSION (3 etapas obrigatórias):
 
@@ -137,18 +137,21 @@ bash .github/hooks/scripts/session-reminder.sh
 ### TURN — Protocolo TODO obrigatório (v9.0)
 
 **TURNs com trabalho realizado DEVEM incluir chamada a `vscode_askQuestions` ao final.** O agente
-NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions.
+NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions e sem AUTORIZAÇÃO OU PEDIDO
+EXPRESSO DO USUÁRIO.
 
 **Protocolo TODO obrigatório em todo turno:**
 
 1. Use `manage_todo_list` ao iniciar o turno — lista de tarefas é obrigatória
 2. Inclua sempre como ÚLTIMO TODO: `"Chamar vscode_askQuestions [Template X]"`
 3. Execute todos os TODOs em sequência — o último (vscode_askQuestions) não pode ser pulado
+4. Após o usuário dar a resposta ao vscode_askQuestions, atualizar IMEDIATAMENTE OS TODOS, COM
+   'manage_todo_list', de acordo com a resposta fornecida pelo usuário.
 
 **Templates obrigatórios por contexto:**
 
 - Tarefa concluída → Template A (próximo passo de conversa; não autoriza fechamento de TURN)
-- Checkpoint periódico a cada ~15 TURNs → Template D
+- Checkpoint periódico a cada ~15 SUBTURNs → Template D
 - Proposta arquitetural → Template C
 - Sessão ociosa → Template E
 
@@ -160,17 +163,7 @@ NÃO deve encerrar um turno de trabalho sem chamar vscode_askQuestions.
 - Template F só deve ser usado quando houver escalonamento explícito para fechamento de SESSION; com
   Template F, a `close_key` correta permanece obrigatória.
 
-**Mecanismo de enforcement (v7.0+):** O hook `agent-stop.sh` emite `decision:block` quando
-`vscode_askQuestions` não foi chamado. O consecutive_unauthorized é incrementado a cada violação.
-Violações são logadas como `agentStop_blocked` e `turnEnd_no_askQuestions` em `audit.jsonl`.
-
-### SECTION — Autônoma (sem autorização do usuário)
-
-O agente abre e fecha seções temáticas **autonomamente**, com base no contexto semântico do
-trabalho. Não é necessário pedir autorização ao usuário — a decisão de mudar de fase
-(`start-section.sh "nome"`) é tomada pelo próprio agente quando o escopo muda.
-
-### SESSION — Autorização explícita obrigatória (chave de encerramento)
+### SESSION ou TURN — Autorização explícita obrigatória (chave de encerramento)
 
 **Única ação que exige autorização expressa do usuário.** Requer:
 
@@ -194,55 +187,15 @@ melhorando, etc.
 
 ---
 
-## Ciclo de vida: SESSION → SECTION → TURN
+## Ciclo de vida: SESSION → TURN
 
-**Invariante absoluto**: sempre deve haver SESSION + SECTION + TURN ativos simultaneamente.
+**Invariante absoluto**: sempre deve haver SESSION + TURN ativos simultaneamente.
 
 ### SESSION
 
 - Criada pelo hook `sessionStart` (`session-start.sh`) — automático
 - Encerrada pelo hook `sessionEnd` (`session-end.sh`) — automático
 - Exige `vscode_askQuestions` Template F + close_key antes de encerrar
-
-### SECTION (fase lógica nomeada)
-
-- Aberta automaticamente: seção `"início"` criada em toda nova sessão com `local_turn=0`
-- **Mudar de fase = abrir nova seção**: `bash .github/hooks/scripts/start-section.sh "nome"`
-- Fecha automaticamente a anterior antes de abrir a nova
-- **Resetar o turn local**: toda nova SECTION reseta `local_turn=0` → próximo TURN começa em
-  `section_turn=1`
-- Se `current_section == null`, `agent-stop.sh` auto-cria seção `"retomada"` (invariante)
-- Exemplos de quando criar: análise → implementação → revisão → debug
-
-### TURN (ciclo prompt→resposta)
-
-> **Semântica real**: `userPromptSubmitted` dispara apenas quando o usuário digita na **caixa de
-> chat** do VS Code — não para respostas ao `vscode_askQuestions`. Em sessões onde o fluxo principal
-> é via `vscode_askQuestions`, este hook dispara ≲1x por SESSION. As respostas ao askQuestions são
-> registradas como `askQuestions_response` no `audit.jsonl` pelo `post-tool-use.sh`.
-
-- Início automático: `userPromptSubmitted` → `log-prompt.sh` loga `turnStart` com `section_turn` e
-  `turn_number`
-- `current_turn.section_turn` = turno local dentro da SECTION atual (reseta p/ 1 em cada nova
-  section)
-- `current_turn.number` = turno global na SESSION (nunca reseta)
-- Display canônico no systemMessage: `TURN: <section_turn>/<global_turn>` (local/global)
-- **Declarar intenção** como PRIMEIRO ato: `bash .github/hooks/scripts/start-turn.sh "intenção"`
-- Fim automático: `agentStop` → `agent-stop.sh` gera `turnStart_enriched_auto` se intent não
-  declarado
-
-### Git Push — Gatilho de fase (NOVO)
-
-Quando o agente executa `git push` com sucesso:
-
-1. `.git/hooks/post-push` → `on-git-push.sh` loga evento `gitPush` em `audit.jsonl`
-2. `session_stats.pending_section_after_push = true` é definido no contexto
-3. Em `agent-stop.sh`: se esse flag estiver ativo, o systemMessage exige decisão:
-   - **Abrir nova section**: `bash .github/hooks/scripts/start-section.sh "nome-da-fase"`
-   - **Continuar na mesma**: `bash .github/hooks/scripts/continue-section.sh "motivo"`
-4. Push como entrega → nova SECTION é recomendado semânticamente
-
----
 
 ## Protocolo vscode_askQuestions — Templates obrigatórios
 
@@ -260,39 +213,6 @@ Templates completos em `.github/AGENTS.md` → seção "Protocolo vscode_askQues
 
 ---
 
-## Scripts de controle de fluxo (chamar via terminal)
-
-```bash
-# Declara intenção do turno — PRIMEIRO ato de todo turno de trabalho
-bash .github/hooks/scripts/start-turn.sh "descrição da intenção"
-
-# Abre nova seção temática (fecha a anterior, se houver; reseta section_turn p/ 1)
-bash .github/hooks/scripts/start-section.sh "nome" ["descrição opcional"]
-
-# Fecha seção manualmente com motivo
-bash .github/hooks/scripts/section-end.sh "motivo"
-
-# Confirma continuação na section atual após git push (limpa flag pending_section_after_push)
-bash .github/hooks/scripts/continue-section.sh ["motivo"]
-
-# Salva checkpoint antes de mudanças críticas
-bash .github/hooks/scripts/session-checkpoint.sh
-
-# Verifica saúde do sistema (watchdog)
-bash .github/hooks/scripts/watchdog.sh --json
-
-# Adiciona tarefa ao backlog
-bash .github/hooks/scripts/add-task.sh alta "Título" "Descrição + gate de aceitação"
-
-# Conclui tarefa
-bash .github/hooks/scripts/complete-task.sh "padrão do título"
-
-# Salva finding (bug/gap/melhoria)
-bash .github/hooks/scripts/save-finding.sh "módulo" "severity" "type" "descrição"
-```
-
----
-
 ## Leitura obrigatória no início de cada sessão
 
 1. `.github/hooks/state/session-briefing.md` — gerado pelo `sessionStart`
@@ -301,19 +221,7 @@ bash .github/hooks/scripts/save-finding.sh "módulo" "severity" "type" "descriç
 
 ---
 
-## Feedback dinâmico — o que o sistema envia ao agente
-
-| Momento                    | Mecanismo                                   | Conteúdo                                                       |
-| -------------------------- | ------------------------------------------- | -------------------------------------------------------------- |
-| Turno sem askQuestions     | `agent-stop.sh` → `decision:block`          | Estado atual: seção, TURN local/global, backlog, push pendente |
-| Turno sem intent declarado | `agent-stop.sh` → `turnStart_enriched_auto` | Ferramentas usadas como proxy de intenção                      |
-| Início de sessão           | `session-start.sh` → alerta no briefing     | Status watchdog, violations anteriores                         |
-| `current_section == null`  | `agent-stop.sh` → auto-section              | Seção `"retomada"` criada automaticamente                      |
-| `git push` bem-sucedido    | `post-push` → `on-git-push.sh`              | Evento `gitPush` + flag `pending_section_after_push`           |
-
----
-
-## Encerramento de SESSION (extra-hardening)
+## Encerramento de SESSION/TURN (extra-hardening)
 
 1. Chamar `vscode_askQuestions` com Template F
 2. Usuário deve digitar a chave `ENCERRAR-XXXXXXXX` (exibida no `session-briefing.md`)

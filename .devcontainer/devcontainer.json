@@ -488,14 +488,23 @@
         "terminal.integrated.detectLocale": "off",
         // "terminal.integrated.drawBoldTextInInvertedColors" removido: setting deprecado no VS Code 1.100+
         "terminal.integrated.enableMultiLinePasteWarning": "never",
-        "terminal.integrated.gpuAcceleration": "auto",
+        // canvas: renderização estável em containers Linux (sem WebGL/GPU real).
+        // Consistente com .vscode/settings.json que também define "canvas".
+        "terminal.integrated.gpuAcceleration": "canvas",
         "terminal.integrated.inheritEnv": true,
         "terminal.integrated.profiles.linux": {
           // ----------------------------------------------------
           // Bash — SHELL CANÔNICO (infra, automação, build)
           // ----------------------------------------------------
           "bash": {
-            "args": [],
+            // "-l" (login shell): garante que /etc/profile.d/*.sh seja carregado
+            // em cada terminal integrado. Crítico para:
+            //   • 10-gatekeeper-nss.sh → LD_PRELOAD com caminho absoluto
+            //     (evita erros de linker em spawns intensivos de subprocesso)
+            //   • 00-restore-env.sh → PATH correto com nvm/npm-global
+            // Sem -l, containerEnv só passa libnss_wrapper.so (sem path), que
+            // o linker às vezes não consegue resolver em sessões de alta carga.
+            "args": ["-l"],
             "icon": "terminal-bash",
             "path": "/bin/bash"
           },
@@ -993,6 +1002,12 @@
     "LD_PRELOAD": "${containerEnv:LD_PRELOAD}",
     "NSS_WRAPPER_PASSWD": "${containerEnv:NSS_WRAPPER_PASSWD}",
     "NSS_WRAPPER_GROUP": "${containerEnv:NSS_WRAPPER_GROUP}",
+    // NODE_EXTRA_CA_CERTS: expõe o bundle de CAs do sistema ao extension host e
+    // terminais geridos pelo VS Code. Node.js usa apenas seu bundle compilado por
+    // padrão — CAs corporativos ou auto-assinados instalados via
+    // update-ca-certificates seriam silenciosamente ignorados sem esta variável.
+    // Referência: https://nodejs.org/api/cli.html#node_extra_ca_certsfile
+    "NODE_EXTRA_CA_CERTS": "/etc/ssl/certs/ca-certificates.crt",
     // Keep Codex state consistent across terminal + extension processes in-container.
     // Contract: this overrides the Dockerfile fallback and must match
     // .vscode/settings.json terminal.integrated.env.linux.CODEX_HOME.
@@ -1083,6 +1098,30 @@
     // STABILITY: Evita erro de "Too many open files" no VS Code/Node
     "--ulimit",
     "nofile=262144:262144",
+    // DNS: Estratégia em duas camadas para garantir resolução confiável.
+    //
+    // Camada 1 — Docker runtime (aqui):
+    //   --dns configura os nameservers do resolver interno do Docker Desktop.
+    //   Em Docker Desktop (macOS/Windows), o resolv.conf do container ainda
+    //   aponta para 192.168.65.7 (resolver interno), que encaminha para os
+    //   servidores abaixo. O arquivo em si não é modificado pelos --dns flags.
+    //
+    // Camada 2 — post-start.sh:
+    //   fix_dns() sobrescreve /etc/resolv.conf diretamente a cada container
+    //   start, garantindo acesso direto a 1.1.1.1 e 8.8.8.8 independente do
+    //   comportamento do Docker Desktop.
+    //
+    // Referência: https://docs.docker.com/reference/cli/docker/container/run/#dns
+    "--dns=1.1.1.1",
+    "--dns=8.8.8.8",
+    // --dns-opt repassa as opções de query para o resolv.conf inicial gerado
+    // pelo Docker (antes do post-start.sh sobrescrever o arquivo).
+    // timeout:1  → 1 segundo por query (padrão: 5s)
+    // attempts:2 → 2 tentativas por servidor (padrão: 2)
+    // rotate     → alterna entre servidores a cada query
+    "--dns-opt=timeout:1",
+    "--dns-opt=attempts:2",
+    "--dns-opt=rotate",
     // ============================================================================
     // IDENTITY & SECURITY: Docker CLI Access
     // ============================================================================
@@ -1149,6 +1188,7 @@
     "net.ipv4.tcp_keepalive_probes=3",
     "--sysctl",
     "net.ipv4.tcp_fin_timeout=30",
+    "--network=bridge",
     // METADATA: Sincronizado com a Section 0 do Dockerfile
     "--label",
     "project=chatgpt-docker-puppeteer",

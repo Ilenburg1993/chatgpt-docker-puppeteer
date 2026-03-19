@@ -11,7 +11,7 @@
 1. **Comportamento executável dos hooks** (`.github/hooks/scripts/*`, `.github/hooks/hooks-lib/*`)
    - É o enforcement real (bloqueios, decisões, auditoria).
 2. **Protocolo de lifecycle** (`.github/instructions/hooks-protocol.instructions.md`)
-   - Fonte de verdade para SESSION/SECTION/TURN.
+   - Fonte de verdade para SESSION/TURN/SUBTURN.
 3. **Baseline técnico do projeto** (`.github/instructions/project-canon.instructions.md`)
    - Runtime, arquitetura, estilo, quality gates.
 4. **Este arquivo (`.github/AGENTS.md`)**
@@ -19,7 +19,7 @@
 5. **Contexto complementar** (`.github/copilot-instructions.md`)
    - Visão geral do repositório, sem re-declarar protocolo inteiro.
 
-## Regras rápidas de operação
+## Regras rápidas de operação, OBRIGATÓRIAS.
 
 - Responder em **pt-BR**.
 - Você deve ser proativo, seguindo os protocolos, mas sempre sugerindo e implementando upgrades arquiteturais e de processo quando identificar oportunidades (ex.: refactor, modularização, automação de tarefas manuais), dentre outras coisas, sempre buscando otimizar para ciclos de feedback rápidos e redução de trabalho manual.
@@ -32,6 +32,11 @@
 - Antes de commit/push: `vscode_askQuestions` **Template G**.
 - Não utilizar lint, format, ou typecheck como etapas intermediárias sem autorização explícita (via Template A ou D) ou solicitação explícita do usuário.
 - Encerramento de sessão: **somente Template F + key válida** (via fluxo automático dos hooks).
+- É OBRIGATÓRIO, SEMPRE, ATUALIZAR OS TODOS IMEDIATAMENTE APÓS O USUÁRIO DAR A RESPOSTA AO vscode_askQuestions, DE ACORDO COM A RESPOSTA FORNECIDA PELO USUÁRIO.
+
+## É TERMINANTEMENTE PROIBIDO, SEMPRE.
+
+- CONCLUIR UMA SESSION/TURN SEM AUTORIZAÇÃO OU PEDIDO EXPRESSO DO USUÁRIO ATRAVÉS DE SELEÇÃO DE OPÇÃO OU FREETEXT ATRAVÉS DA TOOL VSCODE_ASKQUESTIONS. POR DEFAULT, UMA SESSION/TURN NUNCA PODE SER ENCERRADO POR DECISÃO AUTÔNOMA DO AGENTE.
 
 ## Checklist obrigatório no início/retomada
 

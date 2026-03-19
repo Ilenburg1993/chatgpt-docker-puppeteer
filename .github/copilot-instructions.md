@@ -21,8 +21,7 @@ Para evitar ambiguidade, use esta ordem:
 ## Sessão, seção e turno (visão curta)
 
 - **SESSION**: unidade longa de trabalho; encerramento é raro e exige fluxo autorizado.
-- **SECTION**: fase lógica (análise, implementação, revisão, debug).
-- **TURN**: ciclo de resposta.
+- **TURN**: só pode ser encerrado com autorização ou pedido expresso do usuário.
 
 Para regras completas (templates, chave de encerramento, blocks):
 
