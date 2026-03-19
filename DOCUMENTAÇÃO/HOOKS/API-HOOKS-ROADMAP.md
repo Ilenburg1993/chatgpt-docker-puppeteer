@@ -1844,3 +1844,10 @@ PROJEÇÃO v3.0: ~54 + 102 = ~156 funções | ~3000 linhas | ~65 variáveis expo
 | 1.3    | 2026-03-18 | Implementadas 9 funções de risco/categoria + vars `HOOK_RISK_LEVEL` / `HOOK_TOOL_CATEGORY`: `hook_tool_risk_level`, `hook_tool_category`, `hook_is_ai_tool`, `hook_is_file_tool`, `hook_is_shell_tool`, `hook_is_network_tool`, `hook_is_editor_tool`, `hook_is_search_tool`, `hook_is_unknown_tool`. Arquivo `08-risk.sh`. Smoke: 223 PASS.                                                                         |
 | 1.4    | 2026-03-19 | **Consolidação Phase 7 — Integração Fat Libs**: todos os 7 fat libs (`pre-tool-use-lib.sh`, `post-tool-use-lib.sh`, `stop-lib.sh`, `session-start-lib.sh`, `subagent-lib.sh`, `user-prompt-submit-lib.sh`, `pre-compact-lib.sh`) refatorados para usar `hook_api_parse()` + vars `HOOK_*`. Adicionada `hook_is_bypass_attempt()` em `08-risk.sh`. Smoke: **226 PASS**. Integration: **111 PASS**. ShellCheck: limpo. |
 | 1.5    | 2026-03-21 | **API de Métricas de Sessão** — Novo módulo `09-metrics.sh` (15 funções + `hook_metrics_load`): getters lazy de `session_stats`, `current_turn`, `compliance`, `close_key` + predicados `hook_session_is_healthy`, `hook_compliance_ok`, `hook_needs_askquestions`, `hook_is_orphan_turn`. Novas vars `HOOK_STAT_*`, `HOOK_COMPLIANCE_*`, `HOOK_TURN_*`, `HOOK_SESSION_CLOSE_KEY` em `01-vars.sh`. Smoke: **252 PASS**. ShellCheck: limpo. |
+| 1.6 (auditoria) | 2026-03-19 | Auditoria geral do sistema concluída: 62 gaps identificados (9 CRÍTICOS, 23 ALTOS, 22 MÉDIOS, 8 BAIXOS). Ver [AUDITORIA-GERAL-HOOKS-2026-03-19.md](AUDITORIA-GERAL-HOOKS-2026-03-19.md) para lista completa com descrição, localização, severidade e proposta de correção. |
+
+---
+
+## Auditoria Geral do Sistema
+
+Ver relatório completo em **[AUDITORIA-GERAL-HOOKS-2026-03-19.md](AUDITORIA-GERAL-HOOKS-2026-03-19.md)** — 62 gaps identificados: bugs silenciosos, módulos v2.x ociosos, enforcement desativado, instruções ao agente desatualizadas, e gaps de cobertura de testes.
