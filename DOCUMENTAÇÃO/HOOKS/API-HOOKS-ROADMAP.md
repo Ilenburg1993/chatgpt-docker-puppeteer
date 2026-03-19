@@ -1,10 +1,10 @@
 # API HOOKS — Situação Atual e Roadmap Completo
 
-**Versão do documento**: 3.3-modular
+**Versão do documento**: 3.5-modular
 **Data**: 2026-03-21
 **Arquivo de entrada**: `.github/hooks/lib/hook-payload-api.sh` (loader)
-**Módulos**: `.github/hooks/lib/api/` (9 módulos)
-**Status atual**: v1.5 — API de Métricas de Sessão · 252 smoke tests PASS · 111 integration tests PASS
+**Módulos**: `.github/hooks/lib/api/` (11 módulos)
+**Status atual**: v2.3 — Context Builder para PreCompact · 281 smoke tests PASS · 111 integration tests PASS
 
 > Este documento é a fonte canônica de evolução da `hook-payload-api.sh`.
 > Ele documenta o contrato OFICIAL da plataforma (o que o VS Code fornece),
@@ -1061,9 +1061,9 @@ PROJEÇÃO v3.0:
 | v1.4   | Todos os Templates A-G detectados em fixtures realistas (1 fixture por template)      |
 | v1.5   | `hook_session_is_healthy()` funciona end-to-end (lifecycle test T-I-22)               |
 | v2.0   | Transcript de 50 msgs parseado em < 2s; 3 predicados transcript corretos              |
-| v2.1   | Round-trip generate→check→rotate funciona + formato ENCERRAR-XXXXXXXX validado        |
+| v2.1   | Round-trip generate→check→rotate funciona + formato ENCERRAR-XXXXXXXX validado        | ✅ CONCLUÍDO |
 | v2.2   | Subagente aninhado 3 níveis: depth=3 detectado; budget limit respeitado               |
-| v2.3   | `hook_compact_ctx_full()` com 20 turnos cabe em 2000 chars                            |
+| v2.3   | `hook_compact_ctx_full()` com 20 turnos cabe em 2000 chars                            | ✅ CONCLUÍDO |
 | v2.4   | Migração state v0→v1 sem perda de dados (smoke test)                                  |
 | v2.5   | Payload com campo errado rejeitado; payload correto passa — para todos os 7 eventos   |
 | v3.0   | Motor de política processa 10 regras + audit log correto + integration test lifecycle |
@@ -1099,6 +1099,9 @@ PROJEÇÃO v3.0:
 | 3.2    | 2026-03-18 | **v1.2 implementada**: 7 funções de segurança (`hook_input_is_path_traversal`, `hook_has_network_access`, `hook_is_within_workspace`, `hook_sanitize_for_log`, `hook_input_has_injection`, `hook_input_command_score`, `hook_is_secret_exposure_risk`), `_hook_security_compute`, `HOOK_SECURITY_SCORE`, `HOOK_SECURITY_FLAGS`. 185→205 smoke tests (20 novos).                                       |
 | 3.3    | 2026-03-21 | **Refactor 🟧 isolation**: criado `07-state.sh` com as 3 funções que dependem de estado externo (`hook_close_key_in_response`, `hook_is_template_f_proposed`, `hook_api_record`). Removidas de `04-predicates.sh` e `06-query.sh`. Loader atualizado para 7 módulos. SC_EXIT=0, 205/205 smoke, 111/111 integration.                                                                                    |
 | 3.4    | 2026-03-21 | **v1.3 implementada**: `08-risk.sh` com `hook_tool_risk_level` (0..5), `hook_tool_category` (5 categorias), `hook_is_high_risk`, `hook_is_medium_risk`, `hook_requires_confirmation`, `hook_policy_allow`, `hook_policy_reason`, `_hook_risk_compute`. `HOOK_RISK_LEVEL` e `HOOK_TOOL_CATEGORY` populados automaticamente após `hook_api_parse`. 205→223 smoke tests (18 novos T-76→T-87). SC_EXIT=0. |
+| 3.5    | 2026-03-22 | **v1.5 implementada**: `09-metrics.sh` com 16 funções getters de `session.json` (`hook_stat_*`, `hook_turn_*`, `hook_compliance_*`) e predicados de saúde (`hook_session_is_healthy`, `hook_compliance_ok`, `hook_needs_askquestions`, `hook_is_orphan_turn`). `HOOK_STAT_*` / `HOOK_COMPLIANCE_*` / `HOOK_TURN_*` populados em `_hook_api_reset`. 223→252 smoke tests (29 novos T-91→T-111). SC_EXIT=0. |
+| 3.6    | 2026-03-22 | **v2.1 implementada**: `10-close-key.sh` com 6 funções (`hook_close_key_generate`, `hook_close_key_rotate`, `hook_close_key_read`, `hook_close_key_valid_format`, `hook_close_key_matches`, `hook_close_key_load`). Gestão atômica do ciclo de vida da `close_key` via `session.json`. `HOOK_CLOSE_KEY_VALUE` e `HOOK_CLOSE_KEY_IN_PAYLOAD` adicionadas. 252→268 smoke tests (16 novos T-112→T-126). SC_EXIT=0. |
+| 3.7    | 2026-03-22 | **v2.3 implementada**: `11-compact-context.sh` com 6 funções composíveis (`hook_compact_ctx_session_summary`, `hook_compact_ctx_pending_tasks`, `hook_compact_ctx_close_key`, `hook_compact_ctx_protocol_reminder`, `hook_compact_ctx_full`, `hook_compact_ctx_briefing_full`). `pre-compact-lib.sh` refatorado: `build_compact_context()` virou thin wrapper. `HOOK_COMPACT_CONTEXT_BYTES` adicionada. Correção `printf --` para bash builtin. 268→281 smoke tests (13 novos T-127→T-138). SC_EXIT=0. |
 
 
 ---
