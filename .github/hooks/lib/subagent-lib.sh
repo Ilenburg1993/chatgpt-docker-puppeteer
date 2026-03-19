@@ -95,7 +95,7 @@ subagent_start_main() {
     local active_count
     active_count=$(subagent_start_counters)
 
-    log_audit "subagentStart" \
+    hook_log_audit "subagentStart" \
         "subagent_id" "${SUBAGENT_ID:-unknown}" \
         "subagent_type" "${SUBAGENT_TYPE:-unknown}" \
         "turn" "${turn_num:-0}" \
@@ -124,7 +124,7 @@ subagent_stop_main() {
     local active_count
     active_count=$(subagent_stop_counters)
 
-    log_audit "subagentStop" \
+    hook_log_audit "subagentStop" \
         "subagent_id" "${SUBAGENT_ID:-unknown}" \
         "subagent_type" "${SUBAGENT_TYPE:-unknown}" \
         "turn" "${turn_num:-0}" \

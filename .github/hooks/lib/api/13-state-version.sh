@@ -27,7 +27,7 @@
 # Retorna string numérica. Retorna "0" se campo ausente (estado legado).
 hook_state_version() {
     local ver
-    ver="$(read_field '.state_schema_version' 2>/dev/null)"
+    ver="$(read_field '.state_schema_version' 2> /dev/null)"
     if [[ -z "$ver" || "$ver" == "null" ]]; then
         printf '%s' "0"
     else
@@ -49,7 +49,7 @@ hook_state_needs_migration() {
     local current recorded
     current="$(hook_state_version_current)"
     recorded="$(hook_state_version)"
-    [[ "$recorded" -lt "$current" ]] 2>/dev/null && return 0
+    [[ "$recorded" -lt "$current" ]] 2> /dev/null && return 0
     return 1
 }
 
@@ -61,7 +61,8 @@ hook_state_schema_ok() {
 
 # 🟧 hook_state_is_legacy — true se versão == "0" (estado legado sem campo)
 hook_state_is_legacy() {
-    local ver; ver="$(hook_state_version)"
+    local ver
+    ver="$(hook_state_version)"
     [[ "$ver" == "0" ]] && return 0
     return 1
 }
@@ -83,38 +84,41 @@ hook_state_migrate() {
     current="$(hook_state_version_current)"
 
     # Nada a fazer se já atualizado
-    if [[ "$recorded" -ge "$current" ]] 2>/dev/null; then
+    if [[ "$recorded" -ge "$current" ]] 2> /dev/null; then
         return 0
     fi
 
     # ── Migração 0 → 1 ──────────────────────────────────────────────────────
     # Adiciona campos ausentes no schema legado ("0" ou sem campo)
-    if [[ "$recorded" -lt "1" ]] 2>/dev/null; then
+    if [[ "$recorded" -lt "1" ]] 2> /dev/null; then
         # Garante close_key{value,generated_at} se ausente
-        local ck_val; ck_val="$(read_field '.close_key.value' 2>/dev/null)"
+        local ck_val
+        ck_val="$(read_field '.close_key.value' 2> /dev/null)"
         if [[ -z "$ck_val" || "$ck_val" == "null" ]]; then
-            update_nested_state '.close_key.value' '""' 2>/dev/null || true
-            update_nested_state '.close_key.generated_at' '""' 2>/dev/null || true
+            update_nested_state '.close_key.value' '""' 2> /dev/null || true
+            update_nested_state '.close_key.generated_at' '""' 2> /dev/null || true
         fi
 
         # Garante session_stats{subagents_active,subagents_total} se ausente
-        local sub_act; sub_act="$(read_field '.session_stats.subagents_active' 2>/dev/null)"
+        local sub_act
+        sub_act="$(read_field '.session_stats.subagents_active' 2> /dev/null)"
         if [[ -z "$sub_act" || "$sub_act" == "null" ]]; then
-            update_nested_state 'session_stats.subagents_active' '0' 2>/dev/null || true
-            update_nested_state 'session_stats.subagents_total' '0' 2>/dev/null || true
+            update_nested_state 'session_stats.subagents_active' '0' 2> /dev/null || true
+            update_nested_state 'session_stats.subagents_total' '0' 2> /dev/null || true
         fi
 
         # Garante strict_turn_close se ausente
-        local stc; stc="$(read_field '.strict_turn_close' 2>/dev/null)"
+        local stc
+        stc="$(read_field '.strict_turn_close' 2> /dev/null)"
         if [[ -z "$stc" || "$stc" == "null" ]]; then
-            update_nested_state 'strict_turn_close' 'false' 2>/dev/null || true
+            update_nested_state 'strict_turn_close' 'false' 2> /dev/null || true
         fi
 
         recorded="1"
     fi
 
     # Persiste a versão migrada
-    update_nested_state '.state_schema_version' "\"$recorded\"" 2>/dev/null || true
+    update_nested_state '.state_schema_version' "\"$recorded\"" 2> /dev/null || true
     HOOK_STATE_VERSION="$recorded"
     export HOOK_STATE_VERSION
     return 0

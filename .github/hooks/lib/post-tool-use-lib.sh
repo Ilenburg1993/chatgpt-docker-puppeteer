@@ -40,12 +40,12 @@ post_tool_use_main() {
             # ** Seta ask_questions_called = true (pós-resposta, não no PreToolUse) **
             update_nested_state "current_turn.ask_questions_called" "true"
 
-            log_audit "subturnEnd" "turn" "$turn_num"
-            log_audit "askQuestions_responded" "turn" "$turn_num"
+            hook_log_audit "subturnEnd" "turn" "$turn_num"
+            hook_log_audit "askQuestions_responded" "turn" "$turn_num"
 
             # --- Detecta close_key na resposta (via API — elimina parse manual) ---
             if hook_close_key_in_response; then
-                log_audit "sessionCloseAuthorized" "turn" "$turn_num"
+                hook_log_audit "sessionCloseAuthorized" "turn" "$turn_num"
                 update_state_bool "pending_session_close" "true"
             fi
         fi

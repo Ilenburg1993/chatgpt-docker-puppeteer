@@ -129,22 +129,22 @@ session_start_main() {
     if is_reconnect "$session_id"; then
         # --- Reconexão: mantém estado existente ---
         source="reconnect"
-        log_audit "sessionStart_reconnect" "session_id" "$session_id"
+        hook_log_audit "sessionStart_reconnect" "session_id" "$session_id"
     else
         # --- Nova sessão: inicializa state zerado ---
         source="new"
         init_state "$session_id" "new"
-        log_audit "sessionStart_new" "session_id" "$session_id"
+        hook_log_audit "sessionStart_new" "session_id" "$session_id"
     fi
 
     # Gera/regenera o session-briefing.md
     generate_session_briefing
-    log_audit "briefing_generated"
+    hook_log_audit "briefing_generated"
 
     # Monta e emite additionalContext
     local additional_ctx
     additional_ctx=$(build_additional_context "$source")
-    emit_additional_context "$additional_ctx"
+    hook_out_additional_context "SessionStart" "$additional_ctx"
 
     exit 0
 }

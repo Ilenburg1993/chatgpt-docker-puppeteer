@@ -24,7 +24,7 @@ ensure_state_initialized() {
     local session_id="${1:-unknown}"
     if ! state_exists; then
         init_state "$session_id" "auto-init"
-        log_audit "state_auto_init_on_prompt"
+        hook_log_audit "state_auto_init_on_prompt"
     fi
 }
 
@@ -48,8 +48,8 @@ maybe_heal_orphaned_turn() {
     [ -z "$started_at" ] || [ "$started_at" = "null" ] && return 0
     [ -z "$turn_count" ] || [ "$turn_count" -eq 0 ] 2> /dev/null && return 0
 
-    if turn_is_orphaned "$ORPHAN_THRESHOLD_SECONDS"; then
-        heal_orphaned_turn
+    if hook_turn_is_orphaned "$ORPHAN_THRESHOLD_SECONDS"; then
+        hook_heal_orphaned_turn
     fi
 }
 
@@ -107,7 +107,7 @@ user_prompt_submit_main() {
     turn_id=$(read_field ".current_turn.turn_id")
     section_turn=$(read_field ".current_turn.number") # Neste modelo, number = global turn
 
-    log_audit "turnStart" \
+    hook_log_audit "turnStart" \
         "turn" "${turn_num}" \
         "turn_id" "${turn_id:-unknown}" \
         "section_turn" "${section_turn:-0}" \

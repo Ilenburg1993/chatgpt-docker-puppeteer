@@ -5,6 +5,8 @@
 
 # shellcheck source=common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+# shellcheck source=hook-payload-api.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/hook-payload-api.sh"
 
 export LANG=C.UTF-8
 
@@ -69,7 +71,7 @@ session_close_main() {
     local ended_at
     ended_at=$(read_field ".ended_at")
     if [ -n "$ended_at" ] && [ "$ended_at" != "null" ]; then
-        log_audit "session_close_noop"
+        hook_log_audit "session_close_noop"
         exit 0
     fi
 
@@ -77,7 +79,7 @@ session_close_main() {
     local pending
     pending=$(read_field ".pending_session_close")
     if [ "$pending" != "true" ]; then
-        log_audit "session_close_unexpected"
+        hook_log_audit "session_close_unexpected"
         exit 0
     fi
 
@@ -90,7 +92,7 @@ session_close_main() {
     # --- Passo 4: Loga sessionEnd ---
     local turn_count
     turn_count=$(read_field ".session_stats.turn_count")
-    log_audit "sessionEnd" "turn_count" "${turn_count:-0}"
+    hook_log_audit "sessionEnd" "turn_count" "${turn_count:-0}"
 
     # --- Passo 5: Gera relatório final ---
     _generate_final_report

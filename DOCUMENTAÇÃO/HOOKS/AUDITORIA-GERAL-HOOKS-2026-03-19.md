@@ -1,9 +1,9 @@
 # Auditoria Geral do Sistema de Hooks — 2026-03-19
 
-**Versão**: 1.1  
-**Data**: 2026-03-19 (v1.1 — análise arquitetural common.sh→API adicionada)  
-**Escopo**: Todo o sistema de hooks — fat libs, módulos API (01–14), scripts, instruções ao agente, lifecycle session→turn→subturn, cobertura de testes, infraestrutura operacional  
-**Status**: 62 gaps + análise arquitetural de common.sh  
+**Versão**: 1.1
+**Data**: 2026-03-19 (v1.1 — análise arquitetural common.sh→API adicionada)
+**Escopo**: Todo o sistema de hooks — fat libs, módulos API (01–14), scripts, instruções ao agente, lifecycle session→turn→subturn, cobertura de testes, infraestrutura operacional
+**Status**: 62 gaps + análise arquitetural de common.sh
 **Produzido por**: GitHub Copilot (Claude Sonnet 4.6), auditoria pós-push do v2.5
 
 ---
@@ -60,77 +60,77 @@ fat libs             →  sourceia ambos
 
 ### Mapa atual de `common.sh` (38 funções em 552 linhas)
 
-| Função | Camada atual | Proposta | Destino |
-|--------|-------------|---------|---------|
-| `state_exists()` | Infrastructure | **Manter** | `common.sh` — depende de `$STATE_FILE` |
-| `read_field()` | Infrastructure | **Manter** | `common.sh` — base usada pela API |
-| `write_state()` | Infrastructure | **Manter** (+ fix GAP-01) | `common.sh` |
-| `update_state()` | Infrastructure | **Manter** | `common.sh` |
-| `update_state_bool()` | Infrastructure | **Manter** | `common.sh` |
-| `update_nested_state()` | Infrastructure | **Manter** | `common.sh` |
-| `increment_field()` | Infrastructure | **Manter** | `common.sh` |
-| `decrement_field_floor0()` | Infrastructure | **Manter** | `common.sh` |
-| `log_audit()` | Infrastructure | **Manter** | `common.sh` — usada pela API também |
-| `now_iso()` | Utility | **Manter** | `common.sh` — primitiva |
-| `jq_field()` | Utility | **Manter** | `common.sh` — primitiva |
-| `uuidgen_safe()` | Utility | **Manter** | `common.sh` — primitiva |
-| `jq_safe()` | Utility | **Manter** | `common.sh` — primitiva |
-| `load_payload()` | Hook bootstrap | **Migrar** | `02-parse.sh` — é parsing de payload |
-| `maybe_capture_debug()` | Hook debug | **Migrar** | novo `15-debug.sh` ou `02-parse.sh` |
-| `init_state()` | State schema | **Migrar** | `13-state-version.sh` — é o "version 1 schema" |
-| `make_close_key()` | Business logic | **Migrar** | `10-close-key.sh` — já tem `hook_close_key_generate()` (duplicata!) |
-| `detect_close_key_in_text()` | Business logic | **Migrar** | `07-state.sh` — já tem `hook_close_key_in_response()` (duplicata!) |
-| `generate_section_id()` | Utility | **Migrar** | `01-vars.sh` ou novo `15-lifecycle.sh` |
-| `emit_additional_context()` | Output | **Migrar** | `05-output.sh` — já tem `hook_out_session_start_context()` (substituto!) |
-| `emit_stop_block()` | Output | **Migrar** | `05-output.sh` — já tem `hook_out_stop_block()` (substituto!) |
-| `emit_permission_deny()` | Output | **Migrar** | `05-output.sh` — já tem `hook_out_pre_deny()` (substituto!) |
-| `emit_post_tool_block()` | Output | **Migrar** | `05-output.sh` — já tem `hook_out_post_block()` (substituto!) |
-| `open_new_turn()` | Lifecycle | **Migrar** | novo `15-lifecycle.sh` |
-| `open_new_subturn()` | Lifecycle | **Migrar** | novo `15-lifecycle.sh` |
-| `count_tool_use()` | Lifecycle | **Migrar** | novo `15-lifecycle.sh` |
-| `turn_is_orphaned()` | Lifecycle | **Migrar** | novo `15-lifecycle.sh` |
-| `heal_orphaned_turn()` | Lifecycle | **Migrar** | novo `15-lifecycle.sh` |
-| `maybe_heal_orphaned_turn()` | Lifecycle | **Migrar** | novo `15-lifecycle.sh` |
-| `generate_session_briefing()` | Context generation | **Migrar** | novo `16-briefing.sh` (muita lógica!) |
-| `context_block()` | Context generation | **Migrar** | novo `16-briefing.sh` |
-| `read_briefing()` | Context generation | **Migrar** | novo `16-briefing.sh` |
+| Função                        | Camada atual       | Proposta                  | Destino                                                                  |
+| ----------------------------- | ------------------ | ------------------------- | ------------------------------------------------------------------------ |
+| `state_exists()`              | Infrastructure     | **Manter**                | `common.sh` — depende de `$STATE_FILE`                                   |
+| `read_field()`                | Infrastructure     | **Manter**                | `common.sh` — base usada pela API                                        |
+| `write_state()`               | Infrastructure     | **Manter** (+ fix GAP-01) | `common.sh`                                                              |
+| `update_state()`              | Infrastructure     | **Manter**                | `common.sh`                                                              |
+| `update_state_bool()`         | Infrastructure     | **Manter**                | `common.sh`                                                              |
+| `update_nested_state()`       | Infrastructure     | **Manter**                | `common.sh`                                                              |
+| `increment_field()`           | Infrastructure     | **Manter**                | `common.sh`                                                              |
+| `decrement_field_floor0()`    | Infrastructure     | **Manter**                | `common.sh`                                                              |
+| `log_audit()`                 | Infrastructure     | **Manter**                | `common.sh` — usada pela API também                                      |
+| `now_iso()`                   | Utility            | **Manter**                | `common.sh` — primitiva                                                  |
+| `jq_field()`                  | Utility            | **Manter**                | `common.sh` — primitiva                                                  |
+| `uuidgen_safe()`              | Utility            | **Manter**                | `common.sh` — primitiva                                                  |
+| `jq_safe()`                   | Utility            | **Manter**                | `common.sh` — primitiva                                                  |
+| `load_payload()`              | Hook bootstrap     | **Migrar**                | `02-parse.sh` — é parsing de payload                                     |
+| `maybe_capture_debug()`       | Hook debug         | **Migrar**                | novo `15-debug.sh` ou `02-parse.sh`                                      |
+| `init_state()`                | State schema       | **Migrar**                | `13-state-version.sh` — é o "version 1 schema"                           |
+| `make_close_key()`            | Business logic     | **Migrar**                | `10-close-key.sh` — já tem `hook_close_key_generate()` (duplicata!)      |
+| `detect_close_key_in_text()`  | Business logic     | **Migrar**                | `07-state.sh` — já tem `hook_close_key_in_response()` (duplicata!)       |
+| `generate_section_id()`       | Utility            | **Migrar**                | `01-vars.sh` ou novo `15-lifecycle.sh`                                   |
+| `emit_additional_context()`   | Output             | **Migrar**                | `05-output.sh` — já tem `hook_out_session_start_context()` (substituto!) |
+| `emit_stop_block()`           | Output             | **Migrar**                | `05-output.sh` — já tem `hook_out_stop_block()` (substituto!)            |
+| `emit_permission_deny()`      | Output             | **Migrar**                | `05-output.sh` — já tem `hook_out_pre_deny()` (substituto!)              |
+| `emit_post_tool_block()`      | Output             | **Migrar**                | `05-output.sh` — já tem `hook_out_post_block()` (substituto!)            |
+| `open_new_turn()`             | Lifecycle          | **Migrar**                | novo `15-lifecycle.sh`                                                   |
+| `open_new_subturn()`          | Lifecycle          | **Migrar**                | novo `15-lifecycle.sh`                                                   |
+| `count_tool_use()`            | Lifecycle          | **Migrar**                | novo `15-lifecycle.sh`                                                   |
+| `turn_is_orphaned()`          | Lifecycle          | **Migrar**                | novo `15-lifecycle.sh`                                                   |
+| `heal_orphaned_turn()`        | Lifecycle          | **Migrar**                | novo `15-lifecycle.sh`                                                   |
+| `maybe_heal_orphaned_turn()`  | Lifecycle          | **Migrar**                | novo `15-lifecycle.sh`                                                   |
+| `generate_session_briefing()` | Context generation | **Migrar**                | novo `16-briefing.sh` (muita lógica!)                                    |
+| `context_block()`             | Context generation | **Migrar**                | novo `16-briefing.sh`                                                    |
+| `read_briefing()`             | Context generation | **Migrar**                | novo `16-briefing.sh`                                                    |
 
 ### Duplicatas confirmadas entre `common.sh` e API
 
-| Função em `common.sh` | Equivalente na API | Ação |
-|---|---|---|
-| `make_close_key()` | `hook_close_key_generate()` em `10-close-key.sh` | Remover de common.sh, fat libs usam a API |
-| `detect_close_key_in_text()` | `hook_close_key_in_response()` em `07-state.sh` | Remover de common.sh, fat libs usam a API |
-| `emit_stop_block()` | `hook_out_stop_block()` em `05-output.sh` | Remover de common.sh, fat libs usam a API |
-| `emit_permission_deny()` | `hook_out_pre_deny()` em `05-output.sh` | Remover de common.sh, fat libs usam a API |
-| `emit_post_tool_block()` | `hook_out_post_block()` em `05-output.sh` | Remover de common.sh, fat libs usam a API |
-| `emit_additional_context()` | `hook_out_session_start_context()` em `05-output.sh` | Remover de common.sh (fix GAP-02 incluso) |
+| Função em `common.sh`        | Equivalente na API                                   | Ação                                      |
+| ---------------------------- | ---------------------------------------------------- | ----------------------------------------- |
+| `make_close_key()`           | `hook_close_key_generate()` em `10-close-key.sh`     | Remover de common.sh, fat libs usam a API |
+| `detect_close_key_in_text()` | `hook_close_key_in_response()` em `07-state.sh`      | Remover de common.sh, fat libs usam a API |
+| `emit_stop_block()`          | `hook_out_stop_block()` em `05-output.sh`            | Remover de common.sh, fat libs usam a API |
+| `emit_permission_deny()`     | `hook_out_pre_deny()` em `05-output.sh`              | Remover de common.sh, fat libs usam a API |
+| `emit_post_tool_block()`     | `hook_out_post_block()` em `05-output.sh`            | Remover de common.sh, fat libs usam a API |
+| `emit_additional_context()`  | `hook_out_session_start_context()` em `05-output.sh` | Remover de common.sh (fix GAP-02 incluso) |
 
 ### Novos módulos propostos
 
-| Módulo | Conteúdo | Justificativa |
-|--------|----------|---------------|
-| `15-lifecycle.sh` | `open_new_turn`, `open_new_subturn`, `count_tool_use`, `turn_is_orphaned`, `heal_orphaned_turn`, `maybe_heal_orphaned_turn`, `generate_section_id` | Lifecycle de turn/subturn é domínio da API, não de infraestrutura |
-| `16-briefing.sh` | `generate_session_briefing`, `context_block`, `read_briefing` | Geração de briefing é lógica de negócio complexa, merece módulo próprio |
+| Módulo            | Conteúdo                                                                                                                                           | Justificativa                                                           |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `15-lifecycle.sh` | `open_new_turn`, `open_new_subturn`, `count_tool_use`, `turn_is_orphaned`, `heal_orphaned_turn`, `maybe_heal_orphaned_turn`, `generate_section_id` | Lifecycle de turn/subturn é domínio da API, não de infraestrutura       |
+| `16-briefing.sh`  | `generate_session_briefing`, `context_block`, `read_briefing`                                                                                      | Geração de briefing é lógica de negócio complexa, merece módulo próprio |
 
-> `init_state()` deve migrar para `13-state-version.sh` — é literalmente o "schema versão 1".  
+> `init_state()` deve migrar para `13-state-version.sh` — é literalmente o "schema versão 1".
 > `load_payload()` e `maybe_capture_debug()` devem migrar para `02-parse.sh` — são parsing/debug de payload.
 
 ### Resultado esperado após refactor
 
-`common.sh` final teria apenas **infrastructure pura** (~200 linhas):  
+`common.sh` final teria apenas **infrastructure pura** (~200 linhas):
 `state_exists`, `read_field`, `write_state`, `update_*`, `increment_field`, `decrement_field_floor0`, `log_audit`, `now_iso`, `jq_field`, `jq_safe`, `uuidgen_safe` — todas as funções que o próprio API precisa para operar.
 
 ### Decisão sobre STOP enforcement
 
-> **⛔ STOP enforcement permanece DESATIVADO intencionalmente.**  
->  
-> `emit_stop_block()` NÃO será reativado neste ciclo. O hook Stop classifica turnos  
-> (autorizado/não-autorizado) e registra no audit, mas não emite `decision:block`.  
-> Essa decisão é deliberada para evitar regressões até que o sistema de lifecycle  
-> esteja estabilizado com os novos módulos `15-lifecycle.sh` e `16-briefing.sh`.  
->  
-> **Revisão de reativação**: após módulos 15-16 estabilizados e integração de  
+> **⛔ STOP enforcement permanece DESATIVADO intencionalmente.**
+>
+> `emit_stop_block()` NÃO será reativado neste ciclo. O hook Stop classifica turnos
+> (autorizado/não-autorizado) e registra no audit, mas não emite `decision:block`.
+> Essa decisão é deliberada para evitar regressões até que o sistema de lifecycle
+> esteja estabilizado com os novos módulos `15-lifecycle.sh` e `16-briefing.sh`.
+>
+> **Revisão de reativação**: após módulos 15-16 estabilizados e integração de
 > `strict_turn_close` no stop-lib.sh devidamente testada.
 
 ---

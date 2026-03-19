@@ -27,7 +27,7 @@
 # Alias canônico para hook_session_close_key (09-metrics.sh), mais explícito
 # Retorna string "ENCERRAR-XXXXXXXX" ou vazio se ausente
 hook_close_key_read() {
-    read_field '.close_key' 2>/dev/null || printf ''
+    read_field '.close_key' 2> /dev/null || printf ''
 }
 
 # ─── SEÇÃO 10B: VALIDAÇÃO ─────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ hook_close_key_generate() {
         if [ -r /proc/sys/kernel/random/uuid ]; then
             hex=$(tr -d '-' < /proc/sys/kernel/random/uuid | tr '[:lower:]' '[:upper:]' | cut -c1-8)
         else
-            hex=$(od -An -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' | head -c8 | tr '[:lower:]' '[:upper:]')
+            hex=$(od -An -tx1 /dev/urandom 2> /dev/null | tr -d ' \n' | head -c8 | tr '[:lower:]' '[:upper:]')
         fi
         printf 'ENCERRAR-%s' "${hex:-DEADBEEF}"
     fi
@@ -87,7 +87,7 @@ hook_close_key_rotate() {
     local new_key
     new_key=$(hook_close_key_generate)
     if declare -f update_state > /dev/null 2>&1 && [ -f "${STATE_FILE:-}" ]; then
-        update_state 'close_key' "$new_key" 2>/dev/null || return 1
+        update_state 'close_key' "$new_key" 2> /dev/null || return 1
     fi
     printf '%s' "$new_key"
 }
@@ -99,4 +99,14 @@ hook_close_key_rotate() {
 hook_close_key_load() {
     HOOK_CLOSE_KEY_VALUE=$(hook_close_key_read)
     export HOOK_CLOSE_KEY_VALUE
+}
+
+# ─── SEÇÃO 10E: DETECÇÃO EM TEXTO ────────────────────────────────────────────
+
+# 🟧 hook_close_key_detect_in_text — API pública canônica para detect_close_key_in_text()
+# Verifica se a close_key da sessão aparece no texto fornecido.
+# Retorna 0 se encontrar, 1 se não encontrar ou close_key ausente no state.
+# Uso: hook_close_key_detect_in_text "$tool_response_text"
+hook_close_key_detect_in_text() {
+    detect_close_key_in_text "$@"
 }

@@ -24,14 +24,14 @@ stop_main() {
 
     # --- Passo 1: Anti-loop — sai imediatamente se stop_hook_active=true ---
     if hook_is_stop_active; then
-        log_audit "turnEnd_loop"
+        hook_log_audit "turnEnd_loop"
         exit 0
     fi
 
     # --- Passo 2: Auto-init se state não existe ---
     if ! state_exists; then
         init_state "$SESSION_ID"
-        log_audit "state_auto_init"
+        hook_log_audit "state_auto_init"
         exit 0
     fi
 
@@ -56,7 +56,7 @@ stop_main() {
         auth=$(read_field ".session_stats.turn_authorized")
         auth=$((${auth:-0} + 1))
         update_nested_state "session_stats.turn_authorized" "$auth"
-        log_audit "turnEnd_authorized" "turn" "${turn_num:-0}"
+        hook_log_audit "turnEnd_authorized" "turn" "${turn_num:-0}"
     else
         # Turno não-autorizado: rastreia sem bloquear
         # [ENFORCEMENT DESATIVADO — emit_stop_block não é chamado aqui]
@@ -69,7 +69,7 @@ stop_main() {
         unauth=$(read_field ".session_stats.turn_unauthorized")
         unauth=$((${unauth:-0} + 1))
         update_nested_state "session_stats.turn_unauthorized" "$unauth"
-        log_audit "turnEnd_unauthorized" "turn" "${turn_num:-0}"
+        hook_log_audit "turnEnd_unauthorized" "turn" "${turn_num:-0}"
     fi
 
     # --- Passo 5: Se pending_session_close → chamar session-close.sh ---

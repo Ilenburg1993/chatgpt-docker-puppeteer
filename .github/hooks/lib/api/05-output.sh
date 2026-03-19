@@ -258,8 +258,28 @@ hook_out_subagent_stop_safe_block() {
 }
 
 # ─── 8.8 PreCompact ──────────────────────────────────────────────────────────
-# PreCompact não suporta hookSpecificOutput, apenas o formato comum
-# Usa hook_out_system_message ou hook_out_continue
+
+# hook_out_pre_compact_context — injeta contexto no PreCompact hook
+# Nota: PreCompact suporta hookSpecificOutput.additionalContext (mesmo que v1
+#       da documentação diga apenas formato comum — comportamento real confirmado)
+# Uso: hook_out_pre_compact_context "texto de contexto"
+hook_out_pre_compact_context() {
+    local ctx
+    ctx=$(_hook_json_str "$1")
+    printf '{"hookSpecificOutput":{"hookEventName":"PreCompact","additionalContext":%s}}\n' "$ctx"
+}
+
+# hook_out_additional_context — versão genérica paramétrica de additionalContext
+# Equivalente ao emit_additional_context() do common.sh, mas com prefixo hook_*
+# Parâmetros: event_name ctx
+# Uso: hook_out_additional_context "SessionStart" "texto"
+#      hook_out_additional_context "PreCompact" "texto"
+hook_out_additional_context() {
+    local event_name="${1:-SessionStart}"
+    local ctx
+    ctx=$(_hook_json_str "$2")
+    printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":%s}}\n' "$event_name" "$ctx"
+}
 
 # ─── 8.9 Output Builders v1.1 ────────────────────────────────────────────────
 

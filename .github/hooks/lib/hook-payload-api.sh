@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # hook-payload-api.sh — LOADER: carrega módulos api/ e expõe hook_api_parse
-# v2.5-modular — 2026-03-18
+# v3.0-modular — 2026-03-19 (migração arquitetural: +15-audit, +16-lifecycle)
 #
 # Ponto de entrada backward-compatible para o sistema modular de parsing.
 # Scripts que fazem `source hook-payload-api.sh` continuam funcionando sem mudanças.
@@ -21,6 +21,8 @@
 # ║   api/12-subagent.sh   — hook_subagent_* (tracking e budget)           ║
 # ║   api/13-state-version.sh — hook_state_version/needs_migration/migrate ║
 # ║   api/14-validate-events.sh — hook_validate_payload/errors_json/load   ║
+# ║   api/15-audit.sh      — hook_log_audit() (wrapper público de log_audit)║
+# ║   api/16-lifecycle.sh  — hook_turn_is_orphaned + hook_heal_orphaned_turn║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 #
 # ENTRYPOINT PÚBLICO definido aqui (neste arquivo):
@@ -85,6 +87,10 @@ source "$_HOOK_API_MODULES_DIR/12-subagent.sh"
 source "$_HOOK_API_MODULES_DIR/13-state-version.sh"
 # shellcheck disable=SC1091
 source "$_HOOK_API_MODULES_DIR/14-validate-events.sh"
+# shellcheck disable=SC1091
+source "$_HOOK_API_MODULES_DIR/15-audit.sh"
+# shellcheck disable=SC1091
+source "$_HOOK_API_MODULES_DIR/16-lifecycle.sh"
 
 # ─── ENTRYPOINT PRINCIPAL ────────────────────────────────────────────────────
 

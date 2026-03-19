@@ -32,7 +32,7 @@ maybe_capture_turn_intent() {
 
     if [ -n "$intent" ]; then
         update_nested_state "current_turn.intent" "$intent"
-        log_audit "turnIntent_declared" "intent" "$intent"
+        hook_log_audit "turnIntent_declared" "intent" "$intent"
     fi
 }
 
@@ -45,10 +45,10 @@ ensure_state_for_tool() {
     local session_id="${1:-unknown}"
     if ! state_exists; then
         init_state "$session_id" "auto-init"
-        log_audit "state_auto_init_on_tool"
+        hook_log_audit "state_auto_init_on_tool"
         # Abre também um turn sintético para não deixar tools sem turno
         open_new_turn > /dev/null
-        log_audit "turnStart_synthetic"
+        hook_log_audit "turnStart_synthetic"
     fi
 }
 
@@ -68,10 +68,10 @@ pre_tool_use_main() {
 
     # --- Passo 1: Proteção de segurança (via API) ---
     if hook_is_bypass_attempt; then
-        log_audit "preToolUse_blocked_protected" \
+        hook_log_audit "preToolUse_blocked_protected" \
             "tool" "${HOOK_TOOL_NAME:-}" \
             "reason" "chamada direta a script protegido"
-        emit_permission_deny "session-close.sh não pode ser chamado diretamente. Use o fluxo: vscode_askQuestions (Template F) → usuário digita a close_key."
+        hook_out_pre_deny "session-close.sh não pode ser chamado diretamente. Use o fluxo: vscode_askQuestions (Template F) → usuário digita a close_key."
         exit 0
     fi
 
@@ -94,7 +94,7 @@ pre_tool_use_main() {
     subturn_id=$(read_field ".current_subturn.subturn_id")
     turn_num=$(read_field ".current_turn.number")
 
-    log_audit "subturnStart" \
+    hook_log_audit "subturnStart" \
         "subturn" "${subturn_num:-0}" \
         "subturn_id" "${subturn_id:-unknown}" \
         "turn" "${turn_num:-0}" \

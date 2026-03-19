@@ -33,8 +33,10 @@ Para regras completas (templates, chave de encerramento, blocks):
 Antes de atuar no código, ler:
 
 1. `.github/hooks/state/session-briefing.md` — extrair `close_key`, turno atual, tarefas pendentes
-2. `.github/hooks/state/pending-tasks.md` — se existir, retomar primeira tarefa `in-progress`; se não existir, sem tarefas pendentes registradas
-3. `.github/hooks/state/session.json` — verificar `pending_session_close`, `compliance.consecutive_unauthorized`
+2. `.github/hooks/state/pending-tasks.md` — se existir, retomar primeira tarefa `in-progress`; se
+   não existir, sem tarefas pendentes registradas
+3. `.github/hooks/state/session.json` — verificar `pending_session_close`,
+   `compliance.consecutive_unauthorized`
 
 ## Projeto em uma frase
 

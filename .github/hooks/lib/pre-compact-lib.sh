@@ -71,12 +71,12 @@ pre_compact_main() {
 
     # --- Passo 1: Salvar checkpoint ---
     save_checkpoint
-    log_audit "preCompact_checkpoint_saved"
+    hook_log_audit "preCompact_checkpoint_saved"
 
     # --- Passo 2: Emitir additionalContext com briefing completo ---
     local ctx
     ctx=$(build_compact_context)
-    emit_additional_context "$ctx" "PreCompact"
+    hook_out_additional_context "PreCompact" "$ctx"
 
     exit 0
 }

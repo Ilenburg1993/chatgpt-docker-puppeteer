@@ -161,8 +161,10 @@ init_state() {
 
 # ---------------------------------------------------------------------------
 # Função de log de auditoria (canônica — Parte 10.10 do plano)
+# [LEGADO — DEPRECADO] Use hook_log_audit() de api/15-audit.sh
 # Usa jq -n --arg para prevenir JSON injection.
 # Assinatura posicional: log_audit "event" [key1 value1 key2 value2 ...]
+# @deprecated Use hook_log_audit() de api/15-audit.sh
 # ---------------------------------------------------------------------------
 log_audit() {
     local event="$1"
@@ -191,10 +193,15 @@ log_audit() {
 
 # ---------------------------------------------------------------------------
 # Funções de output JSON para o VS Code
+# [LEGADO — DEPRECADO] Use os equivalentes na API: hook-payload-api.sh
+#   emit_stop_block()       → hook_out_stop_block()     (05-output.sh)
+#   emit_additional_context() → hook_out_additional_context() (05-output.sh)
+#   emit_permission_deny()  → hook_out_pre_deny()        (05-output.sh)
+#   emit_post_tool_block()  → hook_out_post_block()      (05-output.sh)
+# Mantidas para backward-compatibility — remover após migração completa das fat libs.
 # ---------------------------------------------------------------------------
 
-# Emite JSON de bloqueio para o Stop hook (hookSpecificOutput)
-# reason é escapado via jq -Rs para evitar JSON inválido
+# @deprecated Use hook_out_stop_block() de 05-output.sh
 emit_stop_block() {
     local reason="$1"
     local escaped
@@ -203,9 +210,8 @@ emit_stop_block() {
         "$escaped" "$escaped"
 }
 
-# Emite additionalContext para um hook específico.
+# @deprecated Use hook_out_additional_context() de 05-output.sh
 # Parâmetros: ctx (conteúdo), event_name (padrão: "SessionStart")
-# Uso correto: emit_additional_context "$ctx" "PreCompact"
 emit_additional_context() {
     local ctx="$1"
     local event_name="${2:-SessionStart}"
@@ -215,7 +221,7 @@ emit_additional_context() {
         "$event_name" "$escaped"
 }
 
-# Emite permissionDecision=deny para o PreToolUse hook
+# @deprecated Use hook_out_pre_deny() de 05-output.sh
 emit_permission_deny() {
     local reason="$1"
     local escaped
@@ -224,7 +230,7 @@ emit_permission_deny() {
         "$escaped"
 }
 
-# Emite decision:block no nível raiz (PostToolUse / SubagentStop)
+# @deprecated Use hook_out_post_block() de 05-output.sh
 emit_post_tool_block() {
     local reason="$1"
     local escaped
@@ -246,10 +252,10 @@ make_close_key() {
     if [ -r /proc/sys/kernel/random/uuid ]; then
         hex=$(tr -d '-' < /proc/sys/kernel/random/uuid | tr '[:lower:]' '[:upper:]' | cut -c1-8)
     elif command -v od > /dev/null 2>&1; then
-        hex=$(od -An -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' | head -c8 | tr '[:lower:]' '[:upper:]')
+        hex=$(od -An -tx1 /dev/urandom 2> /dev/null | tr -d ' \n' | head -c8 | tr '[:lower:]' '[:upper:]')
     else
         # Último recurso: derivado do timestamp (menos aleatório, mas funcional)
-        hex=$(date +%s%N 2>/dev/null | tr -d '[:space:]' | head -c8 | tr '[:lower:]' '[:upper:]')
+        hex=$(date +%s%N 2> /dev/null | tr -d '[:space:]' | head -c8 | tr '[:lower:]' '[:upper:]')
     fi
     printf 'ENCERRAR-%s' "$hex"
 }
@@ -324,12 +330,12 @@ maybe_capture_debug() {
     [ -f "$flag" ] || return 0
 
     local event ts_slug debug_dir
-    event=$(printf '%s' "$payload" | jq -r '.hookEventName // "unknown"' 2>/dev/null || echo "unknown")
-    ts_slug=$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null || date +%s)
+    event=$(printf '%s' "$payload" | jq -r '.hookEventName // "unknown"' 2> /dev/null || echo "unknown")
+    ts_slug=$(date -u +%Y%m%dT%H%M%SZ 2> /dev/null || date +%s)
     debug_dir="$STATE_DIR/debug/payloads"
-    mkdir -p "$debug_dir" 2>/dev/null || return 0
+    mkdir -p "$debug_dir" 2> /dev/null || return 0
 
-    printf '%s' "$payload" | jq '.' > "$debug_dir/${event}-${ts_slug}.json" 2>/dev/null || true
+    printf '%s' "$payload" | jq '.' > "$debug_dir/${event}-${ts_slug}.json" 2> /dev/null || true
 }
 
 # ---------------------------------------------------------------------------
@@ -355,7 +361,7 @@ decrement_field_floor0() {
     local path="$1"
     local current new_val tmp
     current=$(read_field "$path")
-    new_val=$(( ${current:-0} > 0 ? ${current:-0} - 1 : 0 ))
+    new_val=$((${current:-0} > 0 ? ${current:-0} - 1 : 0))
     tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
     jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp"
     mv -f "$tmp" "$STATE_FILE"
@@ -363,11 +369,12 @@ decrement_field_floor0() {
 
 # ---------------------------------------------------------------------------
 # Detecção de close_key
+# [LEGADO — DEPRECADO] Use hook_close_key_detect_in_text() de 10-close-key.sh
 # ---------------------------------------------------------------------------
 
+# @deprecated Use hook_close_key_detect_in_text() de api/10-close-key.sh
 # Verifica se a close_key da sessão aparece no texto fornecido.
 # Retorna 0 se encontrar, 1 se não encontrar ou close_key ausente no state.
-# Uso: detect_close_key_in_text "$tool_response"
 detect_close_key_in_text() {
     local text="$1"
     local close_key
@@ -378,12 +385,13 @@ detect_close_key_in_text() {
 
 # ---------------------------------------------------------------------------
 # Detecção de turno órfão
+# [LEGADO — DEPRECADO] Use hook_turn_is_orphaned() de api/16-lifecycle.sh
 # ---------------------------------------------------------------------------
 
+# @deprecated Use hook_turn_is_orphaned() de api/16-lifecycle.sh
 # Retorna 0 se o turno atual é órfão (iniciou mas não encerrou em threshold segundos)
-# Uso: if turn_is_orphaned 300; then heal_orphaned_turn; fi
 turn_is_orphaned() {
-    local threshold="${1:-300}"  # default: 5 minutos
+    local threshold="${1:-300}" # default: 5 minutos
     local started_at now_epoch started_epoch delta
 
     started_at=$(read_field ".current_turn.started_at")
@@ -392,11 +400,12 @@ turn_is_orphaned() {
     # Converte ISO 8601 para epoch via date (portável em Linux)
     started_epoch=$(date -d "$started_at" +%s 2> /dev/null) || return 1
     now_epoch=$(date -u +%s)
-    delta=$(( now_epoch - started_epoch ))
+    delta=$((now_epoch - started_epoch))
 
     [ "$delta" -gt "$threshold" ]
 }
 
+# @deprecated Use hook_heal_orphaned_turn() de api/16-lifecycle.sh
 # Fecha turno órfão e registra evento de healing no audit.jsonl
 heal_orphaned_turn() {
     local turn_num turn_id
