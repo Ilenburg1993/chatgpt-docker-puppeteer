@@ -91,13 +91,14 @@ hook_state_migrate() {
     # ── Migração 0 → 1 ──────────────────────────────────────────────────────
     # Adiciona campos ausentes no schema legado ("0" ou sem campo)
     if [[ "$recorded" -lt "1" ]] 2> /dev/null; then
-        # Garante close_key{value,generated_at} se ausente
-        local ck_val
-        ck_val="$(read_field '.close_key.value' 2> /dev/null)"
-        if [[ -z "$ck_val" || "$ck_val" == "null" ]]; then
-            update_nested_state '.close_key.value' '""' 2> /dev/null || true
-            update_nested_state '.close_key.generated_at' '""' 2> /dev/null || true
+        # Garante close_key como string (schema canônico usa string direta, não objeto)
+        local ck_raw
+        ck_raw="$(read_field '.close_key' 2> /dev/null)"
+        if [[ -z "$ck_raw" || "$ck_raw" == "null" ]]; then
+            # close_key ausente: inicializar como string vazia
+            update_nested_state 'close_key' '' 2> /dev/null || true
         fi
+        # Se close_key já é string válida (incluindo "ENCERRAR-*"), preservar como está
 
         # Garante session_stats{subagents_active,subagents_total} se ausente
         local sub_act
@@ -118,7 +119,7 @@ hook_state_migrate() {
     fi
 
     # Persiste a versão migrada
-    update_nested_state '.state_schema_version' "\"$recorded\"" 2> /dev/null || true
+    update_nested_state 'state_schema_version' "$recorded" 2> /dev/null || true
     HOOK_STATE_VERSION="$recorded"
     export HOOK_STATE_VERSION
     return 0

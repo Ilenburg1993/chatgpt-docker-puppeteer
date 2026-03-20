@@ -30,14 +30,12 @@ post_tool_use_main() {
         turn_num="${turn_num:-0}"
     fi
 
-    # --- Detecta resposta de vscode_askQuestions (via API) ---
-    if hook_is_ask_questions; then
+    if state_exists; then
+        # GAP-07: sempre fechar o subturn, independente do tipo de ferramenta
+        update_nested_state "current_subturn.response_at" "$(now_iso)"
 
-        if state_exists; then
-            # Fecha current_subturn
-            update_nested_state "current_subturn.response_at" "$(now_iso)"
-
-            # ** Seta ask_questions_called = true (pós-resposta, não no PreToolUse) **
+        if hook_is_ask_questions; then
+            # Seta ask_questions_called = true (pós-resposta, não no PreToolUse)
             update_nested_state "current_turn.ask_questions_called" "true"
 
             hook_log_audit "subturnEnd" "turn" "$turn_num"
@@ -48,6 +46,9 @@ post_tool_use_main() {
                 hook_log_audit "sessionCloseAuthorized" "turn" "$turn_num"
                 update_state_bool "pending_session_close" "true"
             fi
+        else
+            # Ferramenta regular: apenas fecha o subturn
+            hook_log_audit "subturnEnd" "turn" "$turn_num"
         fi
     fi
 

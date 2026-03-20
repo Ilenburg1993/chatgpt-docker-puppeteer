@@ -77,15 +77,15 @@ update_nested_state() {
 
     case "$val" in
         true | false)
-            jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp"
+            jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
             ;;
         '' | *[!0-9]*)
             # String vazia ou contém não-dígito: tratar como string
-            jq --arg v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp"
+            jq --arg v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
             ;;
         *)
             # Apenas dígitos: tratar como número inteiro
-            jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp"
+            jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
             ;;
     esac
 
@@ -133,6 +133,8 @@ init_state() {
                 "number": 0,
                 "turn_id": null,
                 "started_at": null,
+                "ended_at": null,
+                "intent": "",
                 "ask_questions_called": false,
                 "subturn_count": 0,
                 "tools_count": 0
@@ -413,6 +415,8 @@ heal_orphaned_turn() {
     turn_id=$(read_field ".current_turn.turn_id")
 
     update_nested_state "current_turn.ask_questions_called" "false"
+    update_nested_state "current_turn.started_at" "null"     # GAP-04: evita re-heal na próxima UserPromptSubmit
+    update_nested_state "current_turn.ended_at" "$(now_iso)" # GAP-10: registra temporalmente quando terminou
     log_audit "turnEnd_orphan_healed" "turn" "${turn_num:-0}" "turn_id" "${turn_id:-unknown}"
 }
 
@@ -433,6 +437,7 @@ open_new_turn() {
     update_nested_state "current_turn.number" "$turn_num"
     update_nested_state "current_turn.turn_id" "$turn_id"
     update_nested_state "current_turn.started_at" "$now"
+    update_nested_state "current_turn.ended_at" "null"
     update_nested_state "current_turn.ask_questions_called" "false"
     update_nested_state "current_turn.subturn_count" "0"
     update_nested_state "current_turn.tools_count" "0"

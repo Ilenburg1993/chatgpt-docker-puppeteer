@@ -1107,7 +1107,7 @@ _METRICS_TMP_DIR="$(mktemp -d)"
 _METRICS_STATE_FILE="$_METRICS_TMP_DIR/session.json"
 
 # session.json fixture para testes de métricas
-cat > "$_METRICS_STATE_FILE" <<'METRICS_EOF'
+cat > "$_METRICS_STATE_FILE" << 'METRICS_EOF'
 {
   "session_id": "test-metrics-session",
   "started_at": "2026-03-21T10:00:00Z",
@@ -1139,7 +1139,7 @@ METRICS_EOF
 # Override read_field para usar nosso session.json temporário nos testes
 read_field() {
     local path="$1"
-    jq -r "${path} // empty" "${STATE_FILE:-$_METRICS_STATE_FILE}" 2>/dev/null
+    jq -r "${path} // empty" "${STATE_FILE:-$_METRICS_STATE_FILE}" 2> /dev/null
 }
 export -f read_field
 STATE_FILE="$_METRICS_STATE_FILE"
@@ -1186,7 +1186,7 @@ assert_eq "T-103a needs_askquestions=no (already called)" "no" "$(hook_needs_ask
 
 info "T-104 hook_needs_askquestions (ask_called=false → true)"
 # Cria fixture alternativo com ask_questions_called=false
-cat > "$_METRICS_STATE_FILE" <<'METRICS2_EOF'
+cat > "$_METRICS_STATE_FILE" << 'METRICS2_EOF'
 {
   "close_key": "ENCERRAR-ABCD1234",
   "current_turn": { "number": 3, "ask_questions_called": false, "started_at": "2026-03-21T11:00:00Z" },
@@ -1204,7 +1204,7 @@ assert_eq "T-106a session_is_healthy=no" "no" "$(hook_session_is_healthy && echo
 
 info "T-107 hook_metrics_load popula variáveis"
 # Restaura fixture saudável
-cat > "$_METRICS_STATE_FILE" <<'METRICS3_EOF'
+cat > "$_METRICS_STATE_FILE" << 'METRICS3_EOF'
 {
   "close_key": "ENCERRAR-FFFF9999",
   "current_turn": { "number": 7, "ask_questions_called": true, "started_at": "2026-03-21T13:00:00Z" },
@@ -1224,7 +1224,7 @@ info "T-108 hook_session_is_healthy true"
 assert_eq "T-108a session_is_healthy=yes" "yes" "$(hook_session_is_healthy && echo yes || echo no)"
 
 info "T-109 hook_session_is_healthy false when authorized=0 but count>0"
-cat > "$_METRICS_STATE_FILE" <<'METRICS4_EOF'
+cat > "$_METRICS_STATE_FILE" << 'METRICS4_EOF'
 {
   "close_key": "ENCERRAR-ZZZZ0000",
   "current_turn": { "number": 2, "ask_questions_called": false, "started_at": "2026-03-21T10:01:00Z" },
@@ -1241,7 +1241,7 @@ assert_eq "T-110a turn_count=0 (absent)" "0" "$(hook_stat_turn_count)"
 STATE_FILE="$_ORIG_STATE_FILE"
 
 info "T-111 hook_turn_ask_called returns false for non-boolean empty"
-cat > "$_METRICS_STATE_FILE" <<'METRICS5_EOF'
+cat > "$_METRICS_STATE_FILE" << 'METRICS5_EOF'
 {
   "current_turn": { "number": 1, "ask_questions_called": false, "started_at": "2026-03-21T10:00:01Z" },
   "session_stats": { "turn_count": 1, "turn_authorized": 0, "turn_unauthorized": 1, "subturn_total": 1, "tools_total": 1 },
@@ -1260,7 +1260,7 @@ rm -rf "$_METRICS_TMP_DIR"
 
 _CK_TMP_DIR="$(mktemp -d)"
 _CK_STATE_FILE="$_CK_TMP_DIR/session.json"
-cat > "$_CK_STATE_FILE" <<'CK_EOF'
+cat > "$_CK_STATE_FILE" << 'CK_EOF'
 {
   "session_id": "test-ck-session",
   "close_key": "ENCERRAR-ABCDEF12"
@@ -1348,7 +1348,7 @@ _CTX_STATE_FILE="$_CTX_TMP_DIR/session.json"
 STATE_FILE="$_CTX_STATE_FILE"
 STATE_DIR="$_CTX_TMP_DIR"
 
-cat > "$_CTX_STATE_FILE" <<'CTXJSON'
+cat > "$_CTX_STATE_FILE" << 'CTXJSON'
 {
   "close_key": "ENCERRAR-CAFEBABE",
   "session_stats": {
@@ -1373,7 +1373,7 @@ CTXJSON
 # Override read_field para usar o STATE_FILE temporário em todo módulo 09
 read_field() {
     local path="$1"
-    jq -r "${path} // empty" "$STATE_FILE" 2>/dev/null
+    jq -r "${path} // empty" "$STATE_FILE" 2> /dev/null
 }
 
 info "T-127 hook_compact_ctx_close_key — contém close_key"
@@ -1449,7 +1449,7 @@ _SA_STATE_FILE="$_SA_TMP_DIR/session.json"
 STATE_FILE="$_SA_STATE_FILE"
 STATE_DIR="$_SA_TMP_DIR"
 
-cat > "$_SA_STATE_FILE" <<'SAJSON'
+cat > "$_SA_STATE_FILE" << 'SAJSON'
 {
   "session_stats": {
     "subagents_active": 2,
@@ -1465,7 +1465,7 @@ SAJSON
 # Override read_field para usar o STATE_FILE temporário
 read_field() {
     local path="$1"
-    jq -r "${path} // empty" "$STATE_FILE" 2>/dev/null
+    jq -r "${path} // empty" "$STATE_FILE" 2> /dev/null
 }
 
 # Pre-set HOOK_AGENT_ID + HOOK_AGENT_TYPE como se fossem de um payload
@@ -1481,12 +1481,12 @@ info "T-140 hook_subagent_is_nested — true quando active > 0"
 assert_eq "T-140a is_nested true" "yes" "$(hook_subagent_is_nested && echo yes || echo no)"
 
 info "T-141 hook_subagent_is_nested — false quando active = 0"
-cat > "$_SA_STATE_FILE" <<'SAJSON2'
+cat > "$_SA_STATE_FILE" << 'SAJSON2'
 {"session_stats":{"subagents_active":0,"subagents_total":5},"current_turn":{"number":3,"subagents_started":1}}
 SAJSON2
 assert_eq "T-141a is_nested false" "no" "$(hook_subagent_is_nested && echo yes || echo no)"
 # Restaurar active=2
-cat > "$_SA_STATE_FILE" <<'SAJSON3'
+cat > "$_SA_STATE_FILE" << 'SAJSON3'
 {"session_stats":{"subagents_active":2,"subagents_total":5},"current_turn":{"number":3,"subagents_started":1}}
 SAJSON3
 
@@ -1547,7 +1547,7 @@ _SV_TMP_DIR="$(mktemp -d)"
 _SV_STATE_FILE="$_SV_TMP_DIR/session.json"
 
 # Fixture com state_schema_version presente
-cat > "$_SV_STATE_FILE" <<'EOF_SV'
+cat > "$_SV_STATE_FILE" << 'EOF_SV'
 {
   "session_id": "sv-test-session",
   "state_schema_version": "1",
@@ -1562,7 +1562,10 @@ EOF_SV
 
 STATE_DIR="$_SV_TMP_DIR"
 STATE_FILE="$_SV_STATE_FILE"
-read_field() { local path="$1"; jq -r "${path} // empty" "$STATE_FILE" 2>/dev/null; }
+read_field() {
+    local path="$1"
+    jq -r "${path} // empty" "$STATE_FILE" 2> /dev/null
+}
 
 info "T-154 hook_state_version — retorna versão registrada"
 assert_eq "T-154a version=1" "1" "$(hook_state_version)"
@@ -1583,7 +1586,7 @@ info "T-158 hook_state_is_legacy — false quando schema=1"
 assert_eq "T-158a not legacy" "no" "$(hook_state_is_legacy && echo yes || echo no)"
 
 # Fixture com state legado (sem state_schema_version)
-cat > "$_SV_STATE_FILE" <<'EOF_SV_LEGACY'
+cat > "$_SV_STATE_FILE" << 'EOF_SV_LEGACY'
 {
   "session_id": "legacy-session",
   "session_stats": {
@@ -1607,7 +1610,10 @@ info "T-162 hook_state_schema_ok — false quando legado"
 HOOK_STATE_SCHEMA_CURRENT="1"
 assert_eq "T-162a schema not ok" "no" "$(hook_state_schema_ok && echo yes || echo no)"
 
-update_nested_state() { local path="$1" val="$2"; jq --argjson v "$val" "${path} = \$v" "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"; }
+update_nested_state() {
+    local path="$1" val="$2"
+    jq --argjson v "$val" ".${path} = \$v" "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+}
 
 info "T-163 hook_state_migrate — aplica migração 0→1 e atualiza campo"
 HOOK_STATE_SCHEMA_CURRENT="1"
@@ -1620,7 +1626,7 @@ hook_state_migrate
 assert_eq "T-164a idempotent" "1" "$(hook_state_version)"
 
 info "T-165 hook_state_version_load — popula HOOK_STATE_VERSION e MIGRATION_NEEDED"
-cat > "$_SV_STATE_FILE" <<'EOF_SV_LOAD'
+cat > "$_SV_STATE_FILE" << 'EOF_SV_LOAD'
 {"session_id":"load-test","state_schema_version":"1"}
 EOF_SV_LOAD
 HOOK_STATE_SCHEMA_CURRENT="1"
@@ -1639,7 +1645,9 @@ _HV_ERRORS=""
 _HV_WARNINGS=""
 
 info "T-166 hook_validate_payload — SessionStart válido"
-HOOK_EVENT="SessionStart"; HOOK_SESSION_ID="sess-001"; HOOK_SOURCE="new"
+HOOK_EVENT="SessionStart"
+HOOK_SESSION_ID="sess-001"
+HOOK_SOURCE="new"
 hook_validate_payload
 assert_eq "T-166a SessionStart ok (sem erros)" "no" "$(hook_validate_has_errors && echo yes || echo no)"
 # deve retornar 0 sem erros
@@ -1647,100 +1655,132 @@ hook_validate_payload && _T166_OK="yes" || _T166_OK="no"
 assert_eq "T-166b exit_code=ok" "yes" "$_T166_OK"
 
 info "T-167 hook_validate_payload — SessionStart source inválido"
-HOOK_EVENT="SessionStart"; HOOK_SESSION_ID="sess-001"; HOOK_SOURCE="invalid"
+HOOK_EVENT="SessionStart"
+HOOK_SESSION_ID="sess-001"
+HOOK_SOURCE="invalid"
 hook_validate_payload || true
 assert_eq "T-167a has errors" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
 assert_eq "T-167b error_count>=1" "1" "$(hook_validate_error_count)"
 
 info "T-168 hook_validate_payload — UserPromptSubmit sem prompt"
-HOOK_EVENT="UserPromptSubmit"; HOOK_PROMPT=""
+HOOK_EVENT="UserPromptSubmit"
+HOOK_PROMPT=""
 hook_validate_payload || true
 assert_eq "T-168a prompt missing = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
 
 info "T-169 hook_validate_payload — UserPromptSubmit válido"
-HOOK_EVENT="UserPromptSubmit"; HOOK_PROMPT="Olá mundo"
+HOOK_EVENT="UserPromptSubmit"
+HOOK_PROMPT="Olá mundo"
 hook_validate_payload && _T169_OK="yes" || _T169_OK="no"
 assert_eq "T-169a UserPrompt válido" "yes" "$_T169_OK"
 
 info "T-170 hook_validate_payload — PreToolUse sem tool_name"
-HOOK_EVENT="PreToolUse"; HOOK_TOOL_NAME=""; HOOK_TOOL_USE_ID="tid-01"; HOOK_TOOL_INPUT="{}"
+HOOK_EVENT="PreToolUse"
+HOOK_TOOL_NAME=""
+HOOK_TOOL_USE_ID="tid-01"
+HOOK_TOOL_INPUT="{}"
 hook_validate_payload || true
 assert_eq "T-170a tool_name missing = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
 
 info "T-171 hook_validate_payload — PreToolUse válido"
-HOOK_EVENT="PreToolUse"; HOOK_TOOL_NAME="read_file"; HOOK_TOOL_USE_ID="tid-02"; HOOK_TOOL_INPUT="{}"
+HOOK_EVENT="PreToolUse"
+HOOK_TOOL_NAME="read_file"
+HOOK_TOOL_USE_ID="tid-02"
+HOOK_TOOL_INPUT="{}"
 hook_validate_payload && _T171_OK="yes" || _T171_OK="no"
 assert_eq "T-171a PreToolUse válido" "yes" "$_T171_OK"
 
 info "T-172 hook_validate_payload — PreToolUse run_in_terminal sem command"
-HOOK_EVENT="PreToolUse"; HOOK_TOOL_NAME="run_in_terminal"; HOOK_TOOL_USE_ID="tid-03"; HOOK_TOOL_COMMAND=""
+HOOK_EVENT="PreToolUse"
+HOOK_TOOL_NAME="run_in_terminal"
+HOOK_TOOL_USE_ID="tid-03"
+HOOK_TOOL_COMMAND=""
 hook_validate_payload || true
 assert_eq "T-172a run_in_terminal sem command = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
 
 info "T-173 hook_validate_payload — PostToolUse válido"
-HOOK_EVENT="PostToolUse"; HOOK_TOOL_NAME="read_file"; HOOK_TOOL_USE_ID="tid-04"; HOOK_TOOL_RESPONSE="content"
+HOOK_EVENT="PostToolUse"
+HOOK_TOOL_NAME="read_file"
+HOOK_TOOL_USE_ID="tid-04"
+HOOK_TOOL_RESPONSE="content"
 hook_validate_payload && _T173_OK="yes" || _T173_OK="no"
 assert_eq "T-173a PostToolUse válido" "yes" "$_T173_OK"
 
 info "T-174 hook_validate_payload — Stop com stop_hook_active=true"
-HOOK_EVENT="Stop"; HOOK_STOP_HOOK_ACTIVE="true"
+HOOK_EVENT="Stop"
+HOOK_STOP_HOOK_ACTIVE="true"
 hook_validate_payload && _T174_OK="yes" || _T174_OK="no"
 assert_eq "T-174a Stop válido" "yes" "$_T174_OK"
 
 info "T-175 hook_validate_payload — Stop com stop_hook_active inválido"
-HOOK_EVENT="Stop"; HOOK_STOP_HOOK_ACTIVE="maybe"
+HOOK_EVENT="Stop"
+HOOK_STOP_HOOK_ACTIVE="maybe"
 hook_validate_payload || true
 assert_eq "T-175a Stop inválido = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
 
 info "T-176 hook_validate_payload — SubagentStart sem agent_id"
-HOOK_EVENT="SubagentStart"; HOOK_AGENT_ID=""; HOOK_AGENT_TYPE="Plan"
+HOOK_EVENT="SubagentStart"
+HOOK_AGENT_ID=""
+HOOK_AGENT_TYPE="Plan"
 hook_validate_payload || true
 assert_eq "T-176a SubagentStart sem agent_id = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
 
 info "T-177 hook_validate_payload — SubagentStop válido"
-HOOK_EVENT="SubagentStop"; HOOK_AGENT_ID="agent-42"; HOOK_AGENT_TYPE="SWE"; HOOK_STOP_HOOK_ACTIVE="false"
+HOOK_EVENT="SubagentStop"
+HOOK_AGENT_ID="agent-42"
+HOOK_AGENT_TYPE="SWE"
+HOOK_STOP_HOOK_ACTIVE="false"
 hook_validate_payload && _T177_OK="yes" || _T177_OK="no"
 assert_eq "T-177a SubagentStop válido" "yes" "$_T177_OK"
 
 info "T-178 hook_validate_payload — PreCompact válido (trigger=auto)"
-HOOK_EVENT="PreCompact"; HOOK_COMPACT_TRIGGER="auto"
+HOOK_EVENT="PreCompact"
+HOOK_COMPACT_TRIGGER="auto"
 hook_validate_payload && _T178_OK="yes" || _T178_OK="no"
 assert_eq "T-178a PreCompact válido" "yes" "$_T178_OK"
 
 info "T-179 hook_validate_payload — PreCompact trigger incomum (warning, não error)"
-HOOK_EVENT="PreCompact"; HOOK_COMPACT_TRIGGER="emergency"
+HOOK_EVENT="PreCompact"
+HOOK_COMPACT_TRIGGER="emergency"
 hook_validate_payload && _T179_OK="yes" || _T179_OK="no"
 assert_eq "T-179a PreCompact trigger incomum = warning only (exit 0)" "yes" "$_T179_OK"
 assert_eq "T-179b tem warning" "yes" "$(hook_validate_has_warnings && echo yes || echo no)"
 
 info "T-180 hook_validate_errors_json — JSON array de erros"
-HOOK_EVENT="PreToolUse"; HOOK_TOOL_NAME=""; HOOK_TOOL_USE_ID=""
+HOOK_EVENT="PreToolUse"
+HOOK_TOOL_NAME=""
+HOOK_TOOL_USE_ID=""
 hook_validate_payload || true
 ERR_JSON="$(hook_validate_errors_json)"
-assert_eq "T-180a json valid array" "array" "$(printf '%s' "$ERR_JSON" | jq -r 'type' 2>/dev/null)"
-assert_eq "T-180b array não vazio" "yes" "$(printf '%s' "$ERR_JSON" | jq -e 'length > 0' >/dev/null 2>&1 && echo yes || echo no)"
+assert_eq "T-180a json valid array" "array" "$(printf '%s' "$ERR_JSON" | jq -r 'type' 2> /dev/null)"
+assert_eq "T-180b array não vazio" "yes" "$(printf '%s' "$ERR_JSON" | jq -e 'length > 0' > /dev/null 2>&1 && echo yes || echo no)"
 
 info "T-181 hook_validate_warnings_json — JSON array vazio quando sem warnings"
-HOOK_EVENT="SessionStart"; HOOK_SESSION_ID="sess-x"; HOOK_SOURCE="new"
+HOOK_EVENT="SessionStart"
+HOOK_SESSION_ID="sess-x"
+HOOK_SOURCE="new"
 hook_validate_payload
 WARN_JSON="$(hook_validate_warnings_json)"
 assert_eq "T-181a warnings empty array" "[]" "$WARN_JSON"
 
 info "T-182 hook_validate_error_count — conta erros corretamente"
-HOOK_EVENT="Stop"; HOOK_STOP_HOOK_ACTIVE="bad"
+HOOK_EVENT="Stop"
+HOOK_STOP_HOOK_ACTIVE="bad"
 hook_validate_payload || true
 assert_eq "T-182a error_count=1" "1" "$(hook_validate_error_count)"
 
 info "T-183 hook_validate_warning_count — conta warnings corretamente"
-HOOK_EVENT="PreCompact"; HOOK_COMPACT_TRIGGER="emergency"
+HOOK_EVENT="PreCompact"
+HOOK_COMPACT_TRIGGER="emergency"
 hook_validate_payload || true
 assert_eq "T-183a warning_count=1" "1" "$(hook_validate_warning_count)"
 
 info "T-184 hook_validate_load — popula HOOK_VALIDATION_ERRORS_JSON e WARNINGS_JSON"
-HOOK_EVENT="UserPromptSubmit"; HOOK_PROMPT=""
+HOOK_EVENT="UserPromptSubmit"
+HOOK_PROMPT=""
 hook_validate_load
-assert_eq "T-184a ERRORS_JSON não vazio" "yes" "$(printf '%s' "$HOOK_VALIDATION_ERRORS_JSON" | jq -e 'length > 0' >/dev/null 2>&1 && echo yes || echo no)"
-assert_eq "T-184b WARNINGS_JSON é array" "array" "$(printf '%s' "$HOOK_VALIDATION_WARNINGS_JSON" | jq -r 'type' 2>/dev/null)"
+assert_eq "T-184a ERRORS_JSON não vazio" "yes" "$(printf '%s' "$HOOK_VALIDATION_ERRORS_JSON" | jq -e 'length > 0' > /dev/null 2>&1 && echo yes || echo no)"
+assert_eq "T-184b WARNINGS_JSON é array" "array" "$(printf '%s' "$HOOK_VALIDATION_WARNINGS_JSON" | jq -r 'type' 2> /dev/null)"
 
 info "T-185 hook_validate_payload — evento Unknown/ausente = erro"
 HOOK_EVENT="Unknown"
@@ -1748,7 +1788,8 @@ hook_validate_payload || true
 assert_eq "T-185a Unknown event = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
 
 # Limpar estado de validação após testes
-_HV_ERRORS=""; _HV_WARNINGS=""
+_HV_ERRORS=""
+_HV_WARNINGS=""
 
 # ===========================================================================
 # RESULTADO FINAL (todos)

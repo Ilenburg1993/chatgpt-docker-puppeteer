@@ -90,6 +90,17 @@ subagent_start_main() {
         exit 0 # Sem state → não há nada a rastrear
     fi
 
+    # GAP-24: carregar variáveis do módulo 12-subagent.sh e verificar budget
+    hook_subagent_load
+    if ! hook_subagent_budget_ok; then
+        hook_log_audit "subagentStart_budget_exceeded" \
+            "subagent_id" "${SUBAGENT_ID:-unknown}" \
+            "limit" "${HOOK_SUBAGENT_BUDGET_LIMIT:-50}" \
+            "count" "$(hook_subagent_count_session)"
+        # Budget excedido: notifica mas não bloqueia (soft enforcement)
+        hook_out_system_message "Atenção: limite de subagentes da sessão atingido (${HOOK_SUBAGENT_BUDGET_LIMIT:-50}). Evite lançar novos subagentes."
+    fi
+
     local turn_num
     turn_num=$(read_field ".current_turn.number")
     local active_count
@@ -100,6 +111,14 @@ subagent_start_main() {
         "subagent_type" "${SUBAGENT_TYPE:-unknown}" \
         "turn" "${turn_num:-0}" \
         "active_count" "${active_count:-1}"
+
+    # GAP-29: injetar contexto de sessão no subagente ao iniciar
+    local _session_id _close_key _turn_num _depth
+    _session_id=$(read_field ".session_id")
+    _close_key=$(read_field ".close_key")
+    _turn_num=$(read_field ".current_turn.number")
+    _depth=$(hook_subagent_depth)
+    hook_out_subagent_start_context "Sessão: ${_session_id:-?}. Turno: ${_turn_num:-0}. Profundidade de subagente: ${_depth}. Protocolo de hooks ativo. Briefing em .github/hooks/state/session-briefing.md."
 
     exit 0
 }

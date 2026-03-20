@@ -129,6 +129,8 @@ session_start_main() {
     if is_reconnect "$session_id"; then
         # --- Reconexão: mantém estado existente ---
         source="reconnect"
+        # GAP-25: executar migração de schema se necessário (estado legado)
+        if hook_state_needs_migration; then hook_state_migrate; fi
         hook_log_audit "sessionStart_reconnect" "session_id" "$session_id"
     else
         # --- Nova sessão: inicializa state zerado ---

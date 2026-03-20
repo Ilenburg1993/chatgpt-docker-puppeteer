@@ -20,12 +20,15 @@ export_lang_utf8
 # ---------------------------------------------------------------------------
 
 # Inicializa state se necessário (edge case: UserPromptSubmit sem SessionStart)
+# Retorna 0 se state já existia, 1 se foi criado agora (auto-init)
 ensure_state_initialized() {
     local session_id="${1:-unknown}"
     if ! state_exists; then
         init_state "$session_id" "auto-init"
         hook_log_audit "state_auto_init_on_prompt"
+        return 1 # sinaliza: state recém criado
     fi
+    return 0
 }
 
 # ---------------------------------------------------------------------------
@@ -92,7 +95,16 @@ user_prompt_submit_main() {
     export SESSION_ID="$session_id"
 
     # --- Passo 1: Garante state inicializado ---
-    ensure_state_initialized "$session_id"
+    local _was_auto_init=0
+    ensure_state_initialized "$session_id" || _was_auto_init=1
+
+    # GAP-15: Se sessão foi auto-inicializada aqui (sem SessionStart), emitir systemMessage
+    # para que o agente saiba que o sistema de hooks está ativo e há regras de sessão.
+    if [ "$_was_auto_init" -eq 1 ]; then
+        local _close_key
+        _close_key=$(read_field ".close_key")
+        hook_out_system_message "Sessão iniciada automaticamente pelo sistema de hooks. Protocolo de session ativo. Close-key registrada. Use vscode_askQuestions para autorizar encerramento de turno."
+    fi
 
     # --- Passo 2: Cura turno órfão se necessário ---
     maybe_heal_orphaned_turn

@@ -176,5 +176,19 @@ hook_api_parse() {
     # === Cômputo de risco e categoria (v1.3) ===
     _hook_risk_compute
 
+    # === Validação rica por evento (módulo 14) — GAP-26 ===
+    # Só executa quando state existe (evita overhead em payloads iniciais sem sessão)
+    local _val_result
+    _val_result=$(hook_validate_payload 2> /dev/null || true)
+    if [ -n "$_val_result" ]; then
+        local _val_errors
+        _val_errors=$(printf '%s' "$_val_result" | jq -r '.error_count // 0' 2> /dev/null || echo "0")
+        if [ "${_val_errors:-0}" -gt 0 ] && type log_audit > /dev/null 2>&1; then
+            log_audit "payload_validation_warnings" \
+                "event" "${HOOK_EVENT:-unknown}" \
+                "error_count" "$_val_errors"
+        fi
+    fi
+
     [ "$HOOK_VALIDATION_OK" = "true" ]
 }

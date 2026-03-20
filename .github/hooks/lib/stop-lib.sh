@@ -50,6 +50,7 @@ stop_main() {
     if [ "$ask_q" = "true" ]; then
         # Turno autorizado: reseta flags e acumula contador
         update_nested_state "current_turn.ask_questions_called" "false"
+        update_nested_state "current_turn.ended_at" "$(now_iso)" # GAP-13
         update_nested_state "compliance.consecutive_unauthorized" "0"
         update_nested_state "compliance.last_turn_authorized" "true"
         local auth
@@ -60,6 +61,7 @@ stop_main() {
     else
         # Turno não-autorizado: rastreia sem bloquear
         # [ENFORCEMENT DESATIVADO — emit_stop_block não é chamado aqui]
+        update_nested_state "current_turn.ended_at" "$(now_iso)" # GAP-13
         local consec
         consec=$(read_field ".compliance.consecutive_unauthorized")
         consec=$((${consec:-0} + 1))
