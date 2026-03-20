@@ -744,7 +744,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-46 — Integration tests não cobrem módulos v2.x (09-14)
 
 **Severidade**: 🟠 ALTO
-**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `4a364019`
 **Localização**: `scripts/integration-test-hooks.sh`
 
 **Descrição**: Os 111 integration tests cobrem eventos básicos, lifecycle, predicados e outputs. Não há um único test de integração para: `hook_metrics_load()`, `hook_close_key_rotate()`, `hook_compact_ctx_*()`, `hook_subagent_*()`, `hook_state_migrate()`, ou `hook_validate_payload()`. Os módulos 09-14 são testados apenas nos smoke tests unitários.
@@ -756,7 +756,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-47 — Sem teste de lifecycle completo com `SubagentStart → SubagentStop`
 
 **Severidade**: 🟡 MÉDIO
-**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `4a364019`
 **Localização**: `scripts/integration-test-hooks.sh:T-I-22`
 
 **Descrição**: O lifecycle test (T-I-22) cobre `SessionStart → UserPromptSubmit → PreToolUse → PostToolUse → Stop`. Não inclui `SubagentStart → SubagentStop` no meio do ciclo. O counter `subagents_active` nunca é testado em contexto de lifecycle real.
@@ -768,7 +768,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-48 — Sem teste de `write_state()` com simulação de interrupção
 
 **Severidade**: 🟡 MÉDIO
-**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `4a364019`
 **Localização**: `scripts/smoke-test-payload-api.sh`, `scripts/integration-test-hooks.sh`
 
 **Descrição**: Dado que `write_state()` não é atômico (GAP-01), não há teste que verifique o comportamento do sistema após uma escrita parcial do `session.json`. Deveria haver um teste que corrompe o state e verifica a recuperação.
@@ -780,7 +780,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-49 — Sem teste de sessão de longa duração (100+ turnos)
 
 **Severidade**: 🟢 BAIXO
-**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `4a364019`
 **Localização**: Suíte de testes geral
 
 **Descrição**: Os testes cobrem lifecycle de 1 turno com poucos subturns. Não há teste de stress com 100+ turnos verificando: (a) não-acumulação de arquivos temporários, (b) audit.jsonl crescimento controlado, (c) performance de `read_field()` com arquivo de state grande.
@@ -792,7 +792,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-50 — `smoke-test-payload-api.sh` não testa `hook_validate_payload` com payload real do VS Code
 
 **Severidade**: 🟡 MÉDIO
-**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `4a364019`
 **Localização**: `scripts/smoke-test-payload-api.sh:T-166-T-185`
 
 **Descrição**: Os testes T-166-T-185 do módulo 14 usam payloads artificiais construídos diretamente com variáveis HOOK_*. Não há teste comparando com payloads reais capturados da plataforma VS Code (que estariam em `state/debug/payloads/`) para garantir que a validação não rejeita payloads legítimos.
@@ -804,7 +804,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-51 — Sem teste E2E do fluxo completo de encerramento de sessão
 
 **Severidade**: 🟠 ALTO
-**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `4a364019`
 **Localização**: `scripts/integration-test-hooks.sh`
 
 **Descrição**: O lifecycle test (T-I-22) não cobre: `PostToolUse com close_key na resposta → pending_session_close=true → Stop → session-close.sh`. O caminho crítico de encerramento autorizado não é testado de ponta a ponta em nenhum arquivo de teste.
