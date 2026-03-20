@@ -1787,6 +1787,50 @@ HOOK_EVENT="Unknown"
 hook_validate_payload || true
 assert_eq "T-185a Unknown event = error" "yes" "$(hook_validate_has_errors && echo yes || echo no)"
 
+# ===========================================================================
+# T-186+ (GAP-50): hook_validate_payload com payloads reais de debug-capture
+# Só executa se existirem payloads capturados em state/debug/payloads/
+# ===========================================================================
+info "T-186: GAP-50 — hook_validate_payload com payloads reais (se disponíveis)"
+
+DEBUG_PAYLOADS_DIR="$SCRIPT_DIR/../state/debug/payloads"
+if [ -d "$DEBUG_PAYLOADS_DIR" ] && [ -n "$(find "$DEBUG_PAYLOADS_DIR" -name '*.json' 2>/dev/null | head -1)" ]; then
+    REAL_PASS=0
+    REAL_FAIL=0
+    REAL_TESTED=0
+    REAL_SKIPPED=0
+
+    while IFS= read -r -d '' pfile; do
+        REAL_TESTED=$((REAL_TESTED + 1))
+        payload_json="$(cat "$pfile" 2>/dev/null)"
+        if [ -z "$payload_json" ]; then
+            REAL_SKIPPED=$((REAL_SKIPPED + 1))
+            continue
+        fi
+        hook_api_parse "$payload_json" 2>/dev/null
+        hook_validate_payload 2>/dev/null || true
+
+        if hook_validate_has_errors 2>/dev/null; then
+            # Payload real com erros de validação é inesperado (falso positivo)
+            EC_REAL=$(hook_validate_error_count 2>/dev/null)
+            ERR_JSON=$(hook_validate_errors_json 2>/dev/null)
+            fail "T-186: payload real com erros ($EC_REAL): $(basename "$pfile") — $ERR_JSON"
+            REAL_FAIL=$((REAL_FAIL + 1))
+        else
+            REAL_PASS=$((REAL_PASS + 1))
+        fi
+    done < <(find "$DEBUG_PAYLOADS_DIR" -name '*.json' -print0 2>/dev/null)
+
+    if [ "$REAL_TESTED" -gt 0 ]; then
+        ok "T-186a ${REAL_PASS}/${REAL_TESTED} payloads reais passaram na validação (${REAL_SKIPPED} vazios)"
+    else
+        ok "T-186a nenhum payload encontrado em debug/payloads/ (ok)"
+    fi
+else
+    ok "T-186a debug/payloads/ ausente — sem payloads reais para validar (ok)"
+    ok "T-186b teste pulado (GAP-50 requer debug-capture ativo)"
+fi
+
 # Limpar estado de validação após testes
 _HV_ERRORS=""
 _HV_WARNINGS=""

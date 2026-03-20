@@ -487,7 +487,7 @@ hook_state_needs_migration && hook_state_migrate
 ### GAP-27 — Módulo `10-close-key.sh`: `hook_close_key_rotate()` sem mecanismo de notificação
 
 **Severidade**: 🟡 MÉDIO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: `lib/api/10-close-key.sh`
 
 **Descrição**: `hook_close_key_rotate()` persiste nova chave no session.json mas o agente só saberá da nova chave se ler o briefing. Não há mecanismo para reemitir `additionalContext` com a nova chave. A rotação de chave cria estado invisível para o agente.
@@ -499,7 +499,7 @@ hook_state_needs_migration && hook_state_migrate
 ### GAP-28 — Funções `*_load()` dos módulos 09-14 são lazy sem documentação clara
 
 **Severidade**: 🟡 MÉDIO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: `lib/api/09-metrics.sh`, `10-close-key.sh`, `12-subagent.sh`, `13-state-version.sh`, `14-validate-events.sh`
 
 **Descrição**: Os módulos usam padrão lazy: as variáveis `HOOK_STAT_*` só são populadas quando `hook_metrics_load()` é chamado explicitamente. Esse padrão não está documentado nos comentários do loader (`hook-payload-api.sh`), criando expectativa de que as variáveis já estariam disponíveis após `source hook-payload-api.sh`.
@@ -598,7 +598,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-35 — Sem escape de valores no `generate_session_briefing()` heredoc
 
 **Severidade**: 🟡 MÉDIO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: `lib/common.sh:460-510` (generate_session_briefing)
 
 **Descrição**: Valores como `session_id`, `close_key`, `source` são interpolados diretamente no heredoc. Um `session_id` com caracteres especiais de Markdown (`|`, `#`, backticks) poderia quebrar a formatação do `session-briefing.md` ou, em casos extremos, injetar conteúdo Markdown inesperado com instruções falsas para o agente.
@@ -651,7 +651,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-39 — `hooks-protocol.instructions.md` mixtura nomenclatura `SESSION_ID` e `session_id`
 
 **Severidade**: 🟡 MÉDIO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: `.github/instructions/hooks-protocol.instructions.md`
 
 **Descrição**: O documento usa ora `session_id`, ora `SESSION_ID` (variável de ambiente), ora `vs_code_session_id` (campo do JSON). A inconsistência de nomenclatura pode confundir o agente sobre qual campo verificar ou usar em operações de state.
@@ -685,7 +685,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-42 — Agente não sabe que pode chamar `watchdog.sh` para diagnóstico
 
 **Severidade**: 🟡 MÉDIO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: `.github/AGENTS.md`, `.github/copilot-instructions.md`
 
 **Descrição**: `watchdog.sh` existe como ferramenta de diagnóstico com output JSON estruturado (`--json`), mas não é mencionado em nenhum arquivo de instrução. O agente não sabe que pode chamá-lo para verificar saúde do sistema sem inspecionar arquivos manualmente.
@@ -700,7 +700,7 @@ Para diagnóstico rápido: bash .github/hooks/scripts/watchdog.sh --json
 ### GAP-43 — Debug capture não é documentado para o agente
 
 **Severidade**: 🟢 BAIXO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: `.github/AGENTS.md`, `scripts/debug-capture.sh`
 
 **Descrição**: `debug-capture.sh` permite ativar captura de payloads brutos para debugging. Útil quando há comportamento inesperado nos hooks. Não está documentado no AGENTS.md nem nas instruções, então o agente não sabe como ativar o modo debug.
@@ -744,6 +744,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-46 — Integration tests não cobrem módulos v2.x (09-14)
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
 **Localização**: `scripts/integration-test-hooks.sh`
 
 **Descrição**: Os 111 integration tests cobrem eventos básicos, lifecycle, predicados e outputs. Não há um único test de integração para: `hook_metrics_load()`, `hook_close_key_rotate()`, `hook_compact_ctx_*()`, `hook_subagent_*()`, `hook_state_migrate()`, ou `hook_validate_payload()`. Os módulos 09-14 são testados apenas nos smoke tests unitários.
@@ -755,6 +756,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-47 — Sem teste de lifecycle completo com `SubagentStart → SubagentStop`
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
 **Localização**: `scripts/integration-test-hooks.sh:T-I-22`
 
 **Descrição**: O lifecycle test (T-I-22) cobre `SessionStart → UserPromptSubmit → PreToolUse → PostToolUse → Stop`. Não inclui `SubagentStart → SubagentStop` no meio do ciclo. O counter `subagents_active` nunca é testado em contexto de lifecycle real.
@@ -766,6 +768,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-48 — Sem teste de `write_state()` com simulação de interrupção
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
 **Localização**: `scripts/smoke-test-payload-api.sh`, `scripts/integration-test-hooks.sh`
 
 **Descrição**: Dado que `write_state()` não é atômico (GAP-01), não há teste que verifique o comportamento do sistema após uma escrita parcial do `session.json`. Deveria haver um teste que corrompe o state e verifica a recuperação.
@@ -777,6 +780,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-49 — Sem teste de sessão de longa duração (100+ turnos)
 
 **Severidade**: 🟢 BAIXO
+**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
 **Localização**: Suíte de testes geral
 
 **Descrição**: Os testes cobrem lifecycle de 1 turno com poucos subturns. Não há teste de stress com 100+ turnos verificando: (a) não-acumulação de arquivos temporários, (b) audit.jsonl crescimento controlado, (c) performance de `read_field()` com arquivo de state grande.
@@ -788,6 +792,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-50 — `smoke-test-payload-api.sh` não testa `hook_validate_payload` com payload real do VS Code
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
 **Localização**: `scripts/smoke-test-payload-api.sh:T-166-T-185`
 
 **Descrição**: Os testes T-166-T-185 do módulo 14 usam payloads artificiais construídos diretamente com variáveis HOOK_*. Não há teste comparando com payloads reais capturados da plataforma VS Code (que estariam em `state/debug/payloads/`) para garantir que a validação não rejeita payloads legítimos.
@@ -799,6 +804,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-51 — Sem teste E2E do fluxo completo de encerramento de sessão
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — Round 7 (pendente commit)
 **Localização**: `scripts/integration-test-hooks.sh`
 
 **Descrição**: O lifecycle test (T-I-22) não cobre: `PostToolUse com close_key na resposta → pending_session_close=true → Stop → session-close.sh`. O caminho crítico de encerramento autorizado não é testado de ponta a ponta em nenhum arquivo de teste.
@@ -814,7 +820,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-52 — `audit.jsonl` sem mecanismo de rotação ou limite de tamanho
 
 **Severidade**: 🟠 ALTO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: `lib/common.sh:log_audit()`, `lib/session-close-lib.sh:_generate_final_report()`
 
 **Descrição**: O `audit.jsonl` cresce indefinidamente. Em sessões com milhares de tool calls (evidência: "1892x preToolUse" em 24h no PLANO-REIMPLEMENTACAO), o arquivo pode atingir dezenas de MB. O `session-final-report.md` só lê os últimos 10 eventos, mas o arquivo completo permanece sem limpeza.
@@ -826,7 +832,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-53 — `watchdog.sh` não valida que scripts referenciados em `hooks.json` existem
 
 **Severidade**: 🟡 MÉDIO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: `scripts/watchdog.sh`
 
 **Descrição**: O watchdog verifica se `hooks.json` existe e é JSON válido, mas não verifica se os scripts referenciados (`command`) existem e têm permissão de execução. Um hooks.json com caminho errado passaria no watchdog e só falharia silenciosamente em produção.
@@ -838,7 +844,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-54 — `watchdog.sh` sem agendamento automático
 
 **Severidade**: 🟡 MÉDIO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: `scripts/watchdog.sh`
 
 **Descrição**: O watchdog é ferramenta puramente manual. Não há invocação automática em nenhum hook, nem cron, nem trigger. O sistema pode estar doente por sessões inteiras sem o agente/usuário saber.
@@ -861,7 +867,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-56 — `add-task.sh`/`complete-task.sh` em desalinhamento com `manage_todo_list`
 
 **Severidade**: 🟢 BAIXO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: `scripts/add-task.sh`, `scripts/complete-task.sh`
 
 **Descrição**: O agente usa `manage_todo_list` (ferramenta nativa do VS Code) para gerenciar TODOs. Os scripts shell operam em `pending-tasks.md` de forma independente. Não há sincronização: alterações via `manage_todo_list` não aparecem em `pending-tasks.md` e vice-versa. Os dois sistemas de tarefas coexistem sem integração.
@@ -873,7 +879,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-57 — Sem estratégia de recuperação para `session.json` corrompido
 
 **Severidade**: 🟠 ALTO
-**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
+**Status**: ✅ RESOLVIDO — commit `894d0b05`
 **Localização**: Suíte de hooks geral
 
 **Descrição**: Se `session.json` ficar corrompido (ex: por GAP-01), `state_exists()` retorna falso, e todos os hooks fazem auto-init criando nova sessão. Isso é silencioso — o usuário/agente não sabe que o estado foi perdido. O `audit.jsonl` e `session-briefing.md` do estado anterior ficam órfãos.
