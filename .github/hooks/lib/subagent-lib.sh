@@ -71,7 +71,7 @@ extract_subagent_meta() {
     # Fallbacks defensivos para compatibilidade com variações de implementação
     SUBAGENT_ID=$(jq_field "$input" ".agent_id // .subagentId // .id // \"unknown\"")
     SUBAGENT_TYPE=$(jq_field "$input" ".agent_type // .subagentType // .type // \"unknown\"")
-    SUBAGENT_PROMPT=$(jq_field "$input" ".prompt // .description // \"\"" | head -c80)
+    SUBAGENT_PROMPT=$(jq_field "$input" ".prompt // .description // \"\"" | cut -c1-80)  # GAP-12: cut preserva fronteiras UTF-8
     export SUBAGENT_ID SUBAGENT_TYPE SUBAGENT_PROMPT
 }
 

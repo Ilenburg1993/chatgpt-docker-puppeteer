@@ -146,7 +146,7 @@ session_start_main() {
     # Monta e emite additionalContext
     local additional_ctx
     additional_ctx=$(build_additional_context "$source")
-    hook_out_additional_context "SessionStart" "$additional_ctx"
+    hook_out_session_start_context "$additional_ctx"  # GAP-61
 
     exit 0
 }

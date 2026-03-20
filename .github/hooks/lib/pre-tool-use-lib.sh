@@ -46,8 +46,8 @@ ensure_state_for_tool() {
     if ! state_exists; then
         init_state "$session_id" "auto-init"
         hook_log_audit "state_auto_init_on_tool"
-        # Abre também um turn sintético para não deixar tools sem turno
-        open_new_turn > /dev/null
+        # Abre também um turn sintético para não deixar tools sem turno (GAP-17: source=synthetic)
+        open_new_turn "synthetic" > /dev/null
         hook_log_audit "turnStart_synthetic"
     fi
 }
@@ -68,6 +68,10 @@ pre_tool_use_main() {
 
     # --- Passo 1: Proteção de segurança (via API) ---
     if hook_is_bypass_attempt; then
+        # GAP-20: contabiliza tools bloqueadas por bypass
+        if state_exists; then
+            increment_field ".session_stats.tools_blocked" > /dev/null || true
+        fi
         hook_log_audit "preToolUse_blocked_protected" \
             "tool" "${HOOK_TOOL_NAME:-}" \
             "reason" "chamada direta a script protegido"

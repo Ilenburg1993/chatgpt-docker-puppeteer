@@ -176,6 +176,9 @@ hook_api_parse() {
     # === Cômputo de risco e categoria (v1.3) ===
     _hook_risk_compute
 
+    # === Métricas da sessão (GAP-23): popula HOOK_STAT_* / HOOK_COMPLIANCE_* ===
+    hook_api_load_metrics
+
     # === Validação rica por evento (módulo 14) — GAP-26 ===
     # Só executa quando state existe (evita overhead em payloads iniciais sem sessão)
     local _val_result
@@ -191,4 +194,15 @@ hook_api_parse() {
     fi
 
     [ "$HOOK_VALIDATION_OK" = "true" ]
+}
+
+# ---------------------------------------------------------------------------
+# hook_api_load_metrics — carrega métricas do state após hook_api_parse
+# Chamado automaticamente por hook_api_parse quando state existe.
+# Garante que HOOK_STAT_* e HOOK_COMPLIANCE_* estejam populadas. (GAP-23)
+# ---------------------------------------------------------------------------
+hook_api_load_metrics() {
+    if type hook_metrics_load > /dev/null 2>&1 && type state_exists > /dev/null 2>&1 && state_exists 2> /dev/null; then
+        hook_metrics_load 2> /dev/null || true
+    fi
 }

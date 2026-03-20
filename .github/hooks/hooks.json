@@ -4,7 +4,7 @@
       {
         "type": "command",
         "command": ".github/hooks/scripts/session-start.sh",
-        "timeout": 60
+        "timeout": 90
       }
     ],
     "UserPromptSubmit": [
@@ -32,7 +32,7 @@
       {
         "type": "command",
         "command": ".github/hooks/scripts/pre-compact.sh",
-        "timeout": 30
+        "timeout": 60
       }
     ],
     "SubagentStart": [
@@ -54,6 +54,13 @@
         "type": "command",
         "command": ".github/hooks/scripts/stop.sh",
         "timeout": 45
+      }
+    ],
+    "SessionEnd": [
+      {
+        "type": "command",
+        "command": ".github/hooks/scripts/session-end.sh",
+        "timeout": 30
       }
     ]
   }

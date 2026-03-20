@@ -50,8 +50,8 @@ update_state() {
     local key="$1" val="$2"
     local tmp
     tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
-    jq --arg k "$key" --arg v "$val" '.[$k] = $v' "$STATE_FILE" > "$tmp"
-    mv -f "$tmp" "$STATE_FILE"
+    jq --arg k "$key" --arg v "$val" '.[$k] = $v' "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
 }
 
 # Atualiza campo de raiz BOOLEANO no session.json atomicamente
@@ -60,8 +60,8 @@ update_state_bool() {
     local key="$1" val="$2"
     local tmp
     tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
-    jq --arg k "$key" --argjson v "$val" '.[$k] = $v' "$STATE_FILE" > "$tmp"
-    mv -f "$tmp" "$STATE_FILE"
+    jq --arg k "$key" --argjson v "$val" '.[$k] = $v' "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
 }
 
 # Atualiza campo aninhado no session.json via jq path syntax
@@ -77,19 +77,25 @@ update_nested_state() {
 
     case "$val" in
         true | false)
+            # GAP-34: booleano → argjson
             jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
             ;;
-        '' | *[!0-9]*)
-            # String vazia ou contém não-dígito: tratar como string
-            jq --arg v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+        null)
+            # GAP-34: null literal → sem arg (injetado direto no jq filter)
+            jq "${jq_path} = null" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
             ;;
         *)
-            # Apenas dígitos: tratar como número inteiro
-            jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+            # GAP-34: número (int positivo, negativo, float) → argjson; o resto → string
+            if printf '%s' "$val" | grep -qE '^-?[0-9]+(\.[0-9]+)?$'; then
+                jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+            else
+                jq --arg v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+            fi
             ;;
     esac
 
-    mv -f "$tmp" "$STATE_FILE"
+    # GAP-36: cleanup de temp file em falha de mv
+    mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
 }
 
 # Substitui session.json inteiro pelo JSON fornecido (escrita atômica via mktemp)
@@ -135,6 +141,7 @@ init_state() {
                 "started_at": null,
                 "ended_at": null,
                 "intent": "",
+                "source": "unknown",
                 "ask_questions_called": false,
                 "subturn_count": 0,
                 "tools_count": 0
@@ -152,6 +159,7 @@ init_state() {
                 "turn_unauthorized": 0,
                 "subturn_total": 0,
                 "tools_total": 0,
+                "tools_blocked": 0,
                 "subagents_active": 0,
                 "subagents_total": 0
             },
@@ -254,10 +262,18 @@ make_close_key() {
     # Prefere /proc/sys/kernel/random/uuid (Linux — disponível sem uuidgen/xxd)
     if [ -r /proc/sys/kernel/random/uuid ]; then
         hex=$(tr -d '-' < /proc/sys/kernel/random/uuid | tr '[:lower:]' '[:upper:]' | cut -c1-8)
-    elif command -v od > /dev/null 2>&1; then
+    elif command -v od > /dev/null 2>&1 && [ -r /dev/urandom ]; then
         hex=$(od -An -tx1 /dev/urandom 2> /dev/null | tr -d ' \n' | head -c8 | tr '[:lower:]' '[:upper:]')
-    else
-        # Último recurso: derivado do timestamp (menos aleatório, mas funcional)
+    elif [ -r /dev/urandom ]; then
+        # GAP-09: fallback com dd quando od não está disponível (evita timestamp previsível)
+        hex=$(dd if=/dev/urandom bs=4 count=1 2> /dev/null | od -An -tx1 2> /dev/null | tr -d ' \n' | cut -c1-8 | tr '[:lower:]' '[:upper:]')
+        # Se dd+od falhar, tenta via awk seed de /dev/urandom
+        if [ -z "$hex" ]; then
+            hex=$(awk 'BEGIN{srand();printf "%08X\n",int(rand()*4294967295)}' /dev/null 2> /dev/null || true)
+        fi
+    fi
+    # Último recurso: derivado do timestamp (menos aleatório, mas funcional)
+    if [ -z "$hex" ]; then
         hex=$(date +%s%N 2> /dev/null | tr -d '[:space:]' | head -c8 | tr '[:lower:]' '[:upper:]')
     fi
     printf 'ENCERRAR-%s' "$hex"
@@ -428,8 +444,9 @@ heal_orphaned_turn() {
 
 # Abre novo TURN: incrementa contador, gera turn_id, seta started_at, reseta flags.
 # Retorna o novo número de turno via stdout.
-# Uso: turn_num=$(open_new_turn)
+# Uso: turn_num=$(open_new_turn [source])
 open_new_turn() {
+    local turn_source="${1:-userPromptSubmit}"
     local turn_num turn_id now
     now=$(now_iso)
     turn_id=$(uuidgen_safe)
@@ -440,6 +457,7 @@ open_new_turn() {
     update_nested_state "current_turn.turn_id" "$turn_id"
     update_nested_state "current_turn.started_at" "$now"
     update_nested_state "current_turn.ended_at" "null"
+    update_nested_state "current_turn.source" "$turn_source"
     update_nested_state "current_turn.ask_questions_called" "false"
     update_nested_state "current_turn.subturn_count" "0"
     update_nested_state "current_turn.tools_count" "0"
@@ -500,19 +518,39 @@ PENDING_TASKS_FILE="$STATE_DIR/pending-tasks.md"
 # Gera (ou regenera) $BRIEFING_FILE com base no estado atual da sessão.
 # O arquivo é usado pelo agente como contexto de início/retomada de sessão.
 generate_session_briefing() {
-    local state session_id close_key started_at source
+    local session_id close_key started_at source
     local turn_count turn_auth turn_unauth consecutive_unauth
+    local current_turn_num current_turn_source tools_total tools_blocked subagents_total
     local pending_tasks_content
 
-    state="$(cat "$STATE_FILE" 2> /dev/null || echo '{}')"
-    session_id=$(printf '%s' "$state" | jq -r '.session_id // "unknown"')
-    close_key=$(printf '%s' "$state" | jq -r '.close_key // "N/A"')
-    started_at=$(printf '%s' "$state" | jq -r '.started_at // "N/A"')
-    source=$(printf '%s' "$state" | jq -r '.source // "unknown"')
-    turn_count=$(printf '%s' "$state" | jq -r '.session_stats.turn_count // 0')
-    turn_auth=$(printf '%s' "$state" | jq -r '.session_stats.turn_authorized // 0')
-    turn_unauth=$(printf '%s' "$state" | jq -r '.session_stats.turn_unauthorized // 0')
-    consecutive_unauth=$(printf '%s' "$state" | jq -r '.compliance.consecutive_unauthorized // 0')
+    session_id=$(read_field ".session_id")
+    close_key=$(read_field ".close_key")
+    started_at=$(read_field ".started_at")
+    source=$(read_field ".source")
+    turn_count=$(read_field ".session_stats.turn_count")
+    turn_auth=$(read_field ".session_stats.turn_authorized")
+    turn_unauth=$(read_field ".session_stats.turn_unauthorized")
+    consecutive_unauth=$(read_field ".compliance.consecutive_unauthorized")
+    current_turn_num=$(read_field ".current_turn.number")
+    current_turn_source=$(read_field ".current_turn.source")
+    tools_total=$(read_field ".session_stats.tools_total")
+    tools_blocked=$(read_field ".session_stats.tools_blocked")
+    subagents_total=$(read_field ".session_stats.subagents_total")
+
+    # Valores padrão para campos ausentes (retrocompatibilidade com state antigo)
+    session_id="${session_id:-unknown}"
+    close_key="${close_key:-N/A}"
+    started_at="${started_at:-N/A}"
+    source="${source:-unknown}"
+    turn_count="${turn_count:-0}"
+    turn_auth="${turn_auth:-0}"
+    turn_unauth="${turn_unauth:-0}"
+    consecutive_unauth="${consecutive_unauth:-0}"
+    current_turn_num="${current_turn_num:-0}"
+    current_turn_source="${current_turn_source:-unknown}"
+    tools_total="${tools_total:-0}"
+    tools_blocked="${tools_blocked:-0}"
+    subagents_total="${subagents_total:-0}"
 
     # Lê pending-tasks.md se existir
     if [ -f "$PENDING_TASKS_FILE" ]; then
@@ -535,7 +573,14 @@ generate_session_briefing() {
 Para encerrar esta sessão, use o Template F com a chave:
 > \`${close_key}\`
 
-## Estatísticas do Turno
+## Turno Atual
+
+| Campo | Valor |
+|-------|-------|
+| Número do turno | ${current_turn_num} |
+| Fonte | ${current_turn_source} |
+
+## Estatísticas da Sessão
 
 | Métrica | Valor |
 |--------|-------|
@@ -543,6 +588,9 @@ Para encerrar esta sessão, use o Template F com a chave:
 | Autorizados | ${turn_auth} |
 | Não-autorizados | ${turn_unauth} |
 | Consecutivos sem askQuestions | ${consecutive_unauth} |
+| Tools executadas (total) | ${tools_total} |
+| Tools bloqueadas (bypass) | ${tools_blocked} |
+| Subagentes invocados | ${subagents_total} |
 
 ## Tarefas Pendentes
 

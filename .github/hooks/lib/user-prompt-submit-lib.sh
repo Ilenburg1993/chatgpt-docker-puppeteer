@@ -70,19 +70,6 @@ extract_prompt_preview() {
     printf '%s' "$prompt" | head -c80
 }
 
-# Detecta se o prompt parece ser resposta a um vscode_askQuestions anterior
-# (heurística: payloads de resposta têm campos específicos)
-is_ask_questions_response() {
-    local input="$1"
-    # Tool results chegam via PostToolUse, não UserPromptSubmit
-    # Aqui queremos detectar se existe um campo indicando que é continuação de tool
-    local tool_name
-    tool_name=$(jq_field "$input" ".tool_name")
-    # Se tool_name estiver presente no payload de UserPromptSubmit, é suspeito —
-    # mas na prática UserPromptSubmit não carrega tool_name; retorna false
-    [ -n "$tool_name" ] && [ "$tool_name" != "null" ]
-}
-
 # ---------------------------------------------------------------------------
 # Entrypoint principal do UserPromptSubmit
 # ---------------------------------------------------------------------------
