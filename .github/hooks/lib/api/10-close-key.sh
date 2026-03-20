@@ -92,10 +92,10 @@ hook_close_key_rotate() {
     fi
     # GAP-27: regenerar briefing para que a nova chave seja visível ao agente
     if declare -f generate_session_briefing > /dev/null 2>&1; then
-        generate_session_briefing 2>/dev/null || true
+        generate_session_briefing 2> /dev/null || true
     fi
     if declare -f hook_log_audit > /dev/null 2>&1; then
-        hook_log_audit "close_key_rotated" "new_key_prefix" "${new_key:0:14}" 2>/dev/null || true
+        hook_log_audit "close_key_rotated" "new_key_prefix" "${new_key:0:14}" 2> /dev/null || true
     fi
     printf '%s' "$new_key"
 }

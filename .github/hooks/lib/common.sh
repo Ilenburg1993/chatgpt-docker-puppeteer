@@ -50,8 +50,14 @@ update_state() {
     local key="$1" val="$2"
     local tmp
     tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
-    jq --arg k "$key" --arg v "$val" '.[$k] = $v' "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
-    mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
+    jq --arg k "$key" --arg v "$val" '.[$k] = $v' "$STATE_FILE" > "$tmp" || {
+        rm -f "$tmp"
+        return 1
+    }
+    mv -f "$tmp" "$STATE_FILE" || {
+        rm -f "$tmp"
+        return 1
+    }
 }
 
 # Atualiza campo de raiz BOOLEANO no session.json atomicamente
@@ -60,8 +66,14 @@ update_state_bool() {
     local key="$1" val="$2"
     local tmp
     tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
-    jq --arg k "$key" --argjson v "$val" '.[$k] = $v' "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
-    mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
+    jq --arg k "$key" --argjson v "$val" '.[$k] = $v' "$STATE_FILE" > "$tmp" || {
+        rm -f "$tmp"
+        return 1
+    }
+    mv -f "$tmp" "$STATE_FILE" || {
+        rm -f "$tmp"
+        return 1
+    }
 }
 
 # Atualiza campo aninhado no session.json via jq path syntax
@@ -78,24 +90,39 @@ update_nested_state() {
     case "$val" in
         true | false)
             # GAP-34: booleano → argjson
-            jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+            jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || {
+                rm -f "$tmp"
+                return 1
+            }
             ;;
         null)
             # GAP-34: null literal → sem arg (injetado direto no jq filter)
-            jq "${jq_path} = null" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+            jq "${jq_path} = null" "$STATE_FILE" > "$tmp" || {
+                rm -f "$tmp"
+                return 1
+            }
             ;;
         *)
             # GAP-34: número (int positivo, negativo, float) → argjson; o resto → string
             if printf '%s' "$val" | grep -qE '^-?[0-9]+(\.[0-9]+)?$'; then
-                jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+                jq --argjson v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || {
+                    rm -f "$tmp"
+                    return 1
+                }
             else
-                jq --arg v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+                jq --arg v "$val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || {
+                    rm -f "$tmp"
+                    return 1
+                }
             fi
             ;;
     esac
 
     # GAP-36: cleanup de temp file em falha de mv
-    mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$STATE_FILE" || {
+        rm -f "$tmp"
+        return 1
+    }
 }
 
 # Substitui session.json inteiro pelo JSON fornecido (escrita atômica via mktemp)
@@ -179,7 +206,7 @@ recover_or_init_state() {
     local source="${2:-new}"
 
     # Se state já existe e é válido, nada a recuperar
-    if state_exists 2>/dev/null; then
+    if state_exists 2> /dev/null; then
         return 0
     fi
 
@@ -190,15 +217,15 @@ recover_or_init_state() {
         local best_cp=""
         # Mais recente primeiro (ls -t)
         while IFS= read -r cp; do
-            if jq empty "$cp" 2>/dev/null; then
+            if jq empty "$cp" 2> /dev/null; then
                 best_cp="$cp"
                 break
             fi
-        done < <(ls -t "$checkpoint_dir"/session-*.json 2>/dev/null)
+        done < <(ls -t "$checkpoint_dir"/session-*.json 2> /dev/null)
 
         if [ -n "$best_cp" ]; then
-            cp "$best_cp" "$STATE_FILE" 2>/dev/null || true
-            if state_exists 2>/dev/null; then
+            cp "$best_cp" "$STATE_FILE" 2> /dev/null || true
+            if state_exists 2> /dev/null; then
                 hook_log_audit "state_recovered_from_checkpoint" \
                     "checkpoint" "$(basename "$best_cp")" \
                     "session_id" "$session_id"
@@ -346,7 +373,7 @@ uuidgen_safe() {
         else
             # Fallback: hex aleatório formatado como UUID
             local b
-            b=$(od -An -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' | head -c32 || date +%s%N | tr -d '[:space:]')
+            b=$(od -An -tx1 /dev/urandom 2> /dev/null | tr -d ' \n' | head -c32 || date +%s%N | tr -d '[:space:]')
             printf '%s-%s-%s-%s-%s\n' \
                 "${b:0:8}" "${b:8:4}" "4${b:13:3}" "${b:16:4}" "${b:20:12}"
         fi
@@ -358,7 +385,7 @@ generate_section_id() {
     local name="${1:-unknown}"
     local suffix
     # GAP-11: usa od em vez de xxd (od é padrão POSIX, xxd não está em todas distros)
-    suffix=$(od -An -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' | head -c8)
+    suffix=$(od -An -tx1 /dev/urandom 2> /dev/null | tr -d ' \n' | head -c8)
     printf '%s-%s' "$(printf '%s' "$name" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')" "$suffix"
 }
 
@@ -521,7 +548,7 @@ open_new_subturn() {
     # GAP-21: guard — sem turno ativo, não abre subturn
     local _guard_turn
     _guard_turn=$(read_field '.current_turn.number')
-    if [ -z "$_guard_turn" ] || [ "$_guard_turn" = 'null' ] || [ "${_guard_turn:-0}" -eq 0 ] 2>/dev/null; then
+    if [ -z "$_guard_turn" ] || [ "$_guard_turn" = 'null' ] || [ "${_guard_turn:-0}" -eq 0 ] 2> /dev/null; then
         printf '0'
         return 0
     fi
@@ -538,7 +565,7 @@ open_new_subturn() {
     update_nested_state "current_subturn.number" "$local_count"
     update_nested_state "current_subturn.subturn_id" "$subturn_id"
     update_nested_state "current_subturn.started_at" "$now"
-    update_nested_state "current_subturn.ended_at" "null"  # GAP-14
+    update_nested_state "current_subturn.ended_at" "null" # GAP-14
     update_nested_state "current_subturn.response_at" "null"
 
     printf '%d' "$local_count"

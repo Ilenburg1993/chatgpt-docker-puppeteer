@@ -81,8 +81,8 @@ check_hooks_json() {
 # GAP-53: verifica que cada comando referenciado em hooks.json existe e é executável
 check_hook_commands() {
     local hooks_json="$HOOK_DIR/hooks.json"
-    [ -f "$hooks_json" ] || return 0  # check_hooks_json já reportou
-    jq -e . "$hooks_json" > /dev/null 2>&1 || return 0  # JSON inválido já reportado
+    [ -f "$hooks_json" ] || return 0                   # check_hooks_json já reportou
+    jq -e . "$hooks_json" > /dev/null 2>&1 || return 0 # JSON inválido já reportado
 
     local cmd resolved
     while IFS= read -r cmd; do
@@ -101,7 +101,7 @@ check_hook_commands() {
         elif [ ! -x "$exe" ]; then
             ISSUES+=("Comando do hooks.json não é executável: $exe")
         fi
-    done < <(jq -r '.[].hooks[].command // empty' "$hooks_json" 2>/dev/null)
+    done < <(jq -r '.[].hooks[].command // empty' "$hooks_json" 2> /dev/null)
 }
 
 check_pending_session_close() {
@@ -155,7 +155,7 @@ if [ "$JSON_MODE" -eq 1 ]; then
         local_warnings='[]'
     fi
     jq -n \
-        --argjson healthy "$( [ "$HEALTHY" -eq 1 ] && echo true || echo false )" \
+        --argjson healthy "$([ "$HEALTHY" -eq 1 ] && echo true || echo false)" \
         --argjson issues "$local_issues" \
         --argjson warnings "$local_warnings" \
         --arg ts "$(now_iso)" \
@@ -188,4 +188,4 @@ else
     printf '\n'
 fi
 
-exit $(( 1 - HEALTHY ))
+exit $((1 - HEALTHY))

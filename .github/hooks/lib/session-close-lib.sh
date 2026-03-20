@@ -86,7 +86,7 @@ session_close_main() {
     # --- Passo 1b: GAP-32 — Revalida close_key: deve haver audit entry sessionCloseAuthorized ---
     local close_authorized=false
     if [ -f "$AUDIT_FILE" ]; then
-        if grep -q '"sessionCloseAuthorized"' "$AUDIT_FILE" 2>/dev/null; then
+        if grep -q '"sessionCloseAuthorized"' "$AUDIT_FILE" 2> /dev/null; then
             close_authorized=true
         fi
     fi
@@ -127,10 +127,10 @@ _rotate_audit_log() {
     fi
 
     local ts
-    ts=$(date +%Y%m%d-%H%M%S 2>/dev/null || date +%s)
+    ts=$(date +%Y%m%d-%H%M%S 2> /dev/null || date +%s)
     local rotated="${AUDIT_FILE%.jsonl}-${ts}.jsonl"
 
-    if mv -f "$AUDIT_FILE" "$rotated" 2>/dev/null; then
+    if mv -f "$AUDIT_FILE" "$rotated" 2> /dev/null; then
         hook_log_audit "audit_log_rotated" "file" "$(basename "$rotated")" >> "$AUDIT_FILE" || true
     fi
 
@@ -140,12 +140,12 @@ _rotate_audit_log() {
     audit_dir="$(dirname "$AUDIT_FILE")"
     # Lista ordenada do mais antigo para o mais novo; remove além do limite
     local count
-    count=$(find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2>/dev/null | wc -l)
+    count=$(find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2> /dev/null | wc -l)
     if [ "${count:-0}" -gt "$max_files" ]; then
-        find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2>/dev/null \
-            | sort | head -n $(( count - max_files )) \
+        find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2> /dev/null \
+            | sort | head -n $((count - max_files)) \
             | while IFS= read -r old_log; do
-                rm -f "$old_log" 2>/dev/null || true
+                rm -f "$old_log" 2> /dev/null || true
             done
     fi
 }

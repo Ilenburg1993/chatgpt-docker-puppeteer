@@ -41,16 +41,16 @@ Antes de atuar no código, ler **e agir conforme** cada item:
    shell; tarefas Via `manage_todo_list` são independentes deste arquivo).
 3. `.github/hooks/state/session.json` — verificar:
    - `pending_session_close=true` → se true, aguardar encerramento via Template F com close_key
-   - `compliance.consecutive_unauthorized` → se ≥ 3, regularizar compliance com Template D antes
-     de trabalho novo
+   - `compliance.consecutive_unauthorized` → se ≥ 3, regularizar compliance com Template D antes de
+     trabalho novo
    - `strict_turn_close=true` (padrão) → confirmar que cada turno termina com `vscode_askQuestions`
 
 ### Política para `compliance.consecutive_unauthorized ≥ 3`
 
-Se detectar `consecutive_unauthorized ≥ 3` (via briefing ou `session.json`): **interromper
-trabalho em andamento** e chamar `vscode_askQuestions Template D` imediatamente para regularizar
-compliance antes de continuar. Não acumular violações — o hook `Stop` emitirá `decision:block`
-em turnos sem `vscode_askQuestions` quando `strict_turn_close=true`.
+Se detectar `consecutive_unauthorized ≥ 3` (via briefing ou `session.json`): **interromper trabalho
+em andamento** e chamar `vscode_askQuestions Template D` imediatamente para regularizar compliance
+antes de continuar. Não acumular violações — o hook `Stop` emitirá `decision:block` em turnos sem
+`vscode_askQuestions` quando `strict_turn_close=true`.
 
 ## Projeto em uma frase
 

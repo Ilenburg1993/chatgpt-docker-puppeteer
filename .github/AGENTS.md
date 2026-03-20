@@ -189,14 +189,14 @@ bash .github/hooks/scripts/watchdog.sh --json
 **Exit code:** `0` = saudável · `1` = problemas encontrados
 
 **Checks realizados:**
-| Check | O que verifica |
-|-------|---------------|
-| `check_jq` | `jq` está disponível no PATH |
-| `check_state_file` | `session.json` existe e é JSON válido |
-| `check_scripts_executable` | todos `.sh` em `scripts/` têm bit executável |
-| `check_audit_writable` | `audit.jsonl` e seu diretório são graváveis |
-| `check_hooks_json` | `hooks.json` existe e é JSON válido |
-| `check_pending_session_close` | alerta se `pending_session_close=true` |
+| Check                          | O que verifica                                 |
+| ------------------------------ | ---------------------------------------------- |
+| `check_jq`                     | `jq` está disponível no PATH                   |
+| `check_state_file`             | `session.json` existe e é JSON válido          |
+| `check_scripts_executable`     | todos `.sh` em `scripts/` têm bit executável   |
+| `check_audit_writable`         | `audit.jsonl` e seu diretório são graváveis    |
+| `check_hooks_json`             | `hooks.json` existe e é JSON válido            |
+| `check_pending_session_close`  | alerta se `pending_session_close=true`         |
 | `check_consecutive_violations` | alerta se ≥ 5 turnos sem `vscode_askQuestions` |
 
 **Exemplo de output JSON:**

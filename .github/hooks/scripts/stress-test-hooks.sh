@@ -22,8 +22,14 @@ TURNS="${1:-20}"
 PASS_COUNT=0
 FAIL_COUNT=0
 
-ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; PASS_COUNT=$((PASS_COUNT + 1)); }
-fail() { printf '  \033[31m✗\033[0m %s\n' "$1"; FAIL_COUNT=$((FAIL_COUNT + 1)); }
+ok() {
+    printf '  \033[32m✓\033[0m %s\n' "$1"
+    PASS_COUNT=$((PASS_COUNT + 1))
+}
+fail() {
+    printf '  \033[31m✗\033[0m %s\n' "$1"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+}
 info() { printf '\n\033[1m▶ %s\033[0m\n' "$1"; }
 
 # Ambiente isolado
@@ -56,7 +62,7 @@ fi
 info "Simulando $TURNS ciclos turno completo"
 
 for i in $(seq 1 "$TURNS"); do
-    TS="2026-01-01T$(printf '%02d' $((i / 3600))):%02d:%02d" 2>/dev/null || TS="2026-01-01T${i}:00:00Z"
+    TS="2026-01-01T$(printf '%02d' $((i / 3600))):%02d:%02d" 2> /dev/null || TS="2026-01-01T${i}:00:00Z"
     TS="2026-01-01T00:00:${i}Z"
     P_PROMPT="{\"hookEventName\":\"UserPromptSubmit\",\"sessionId\":\"$SESSION_ID\",\"timestamp\":\"$TS\",\"prompt\":\"turno $i\",\"cwd\":\"/workspaces\"}"
     P_PRE="{\"hookEventName\":\"PreToolUse\",\"sessionId\":\"$SESSION_ID\",\"timestamp\":\"$TS\",\"tool_name\":\"read_file\",\"tool_use_id\":\"t-${i}\",\"tool_input\":{\"filePath\":\"/x\"}}"
@@ -83,7 +89,7 @@ info "Verificações pós-stress"
 STATE_FILE="$STRESS_STATE/session.json"
 
 # a) session.json deve ser JSON válido
-if [ -f "$STATE_FILE" ] && jq empty "$STATE_FILE" 2>/dev/null; then
+if [ -f "$STATE_FILE" ] && jq empty "$STATE_FILE" 2> /dev/null; then
     ok "session.json válido após $TURNS ciclos"
 else
     fail "session.json inválido ou ausente após $TURNS ciclos"
@@ -91,23 +97,23 @@ fi
 
 # b) turn_count deve ser >= TURNS
 if [ -f "$STATE_FILE" ]; then
-    TC=$(jq -r '.session_stats.turn_count // 0' "$STATE_FILE" 2>/dev/null)
-    if [ "${TC:-0}" -ge "$TURNS" ] 2>/dev/null; then
+    TC=$(jq -r '.session_stats.turn_count // 0' "$STATE_FILE" 2> /dev/null)
+    if [ "${TC:-0}" -ge "$TURNS" ] 2> /dev/null; then
         ok "turn_count=$TC >= $TURNS"
     else
         fail "turn_count=$TC < $TURNS (ciclos não contabilizados corretamente)"
     fi
 
     # c) turn_authorized deve ser >= TURNS (todos com askQ)
-    AUTH=$(jq -r '.session_stats.turn_authorized // 0' "$STATE_FILE" 2>/dev/null)
-    if [ "${AUTH:-0}" -ge "$TURNS" ] 2>/dev/null; then
+    AUTH=$(jq -r '.session_stats.turn_authorized // 0' "$STATE_FILE" 2> /dev/null)
+    if [ "${AUTH:-0}" -ge "$TURNS" ] 2> /dev/null; then
         ok "turn_authorized=$AUTH >= $TURNS"
     else
         fail "turn_authorized=$AUTH < $TURNS"
     fi
 
     # d) sem arquivos .state.* temporários acumulados (escrita atômica limpa)
-    TEMP_COUNT=$(find "$STRESS_STATE" -name '.state.*' 2>/dev/null | wc -l)
+    TEMP_COUNT=$(find "$STRESS_STATE" -name '.state.*' 2> /dev/null | wc -l)
     if [ "${TEMP_COUNT:-0}" -eq 0 ]; then
         ok "Sem arquivos .state.* temporários acumulados ($TEMP_COUNT)"
     else
@@ -117,7 +123,7 @@ if [ -f "$STATE_FILE" ]; then
     # e) audit.jsonl deve existir e ser não-vazio
     AUDIT_FILE="$STRESS_STATE/audit.jsonl"
     if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
-        AUDIT_LINES=$(wc -l < "$AUDIT_FILE" 2>/dev/null || echo 0)
+        AUDIT_LINES=$(wc -l < "$AUDIT_FILE" 2> /dev/null || echo 0)
         ok "audit.jsonl existe com $AUDIT_LINES linhas"
     else
         fail "audit.jsonl ausente ou vazio após $TURNS ciclos"
@@ -125,15 +131,15 @@ if [ -f "$STATE_FILE" ]; then
 fi
 
 # f) Desempenho de read_field: deve completar em tempo razoável
-source "$HOOKS_DIR/lib/hook-payload-api.sh" 2>/dev/null || true
+source "$HOOKS_DIR/lib/hook-payload-api.sh" 2> /dev/null || true
 if declare -f read_field > /dev/null 2>&1; then
-    START_NS=$(date +%s%N 2>/dev/null || echo 0)
+    START_NS=$(date +%s%N 2> /dev/null || echo 0)
     for _ in $(seq 1 100); do
         read_field '.session_stats.turn_count' > /dev/null 2>&1
     done
-    END_NS=$(date +%s%N 2>/dev/null || echo 0)
-    ELAPSED_MS=$(( (END_NS - START_NS) / 1000000 ))
-    if [ "$ELAPSED_MS" -lt 5000 ] 2>/dev/null; then
+    END_NS=$(date +%s%N 2> /dev/null || echo 0)
+    ELAPSED_MS=$(((END_NS - START_NS) / 1000000))
+    if [ "$ELAPSED_MS" -lt 5000 ] 2> /dev/null; then
         ok "100x read_field em ${ELAPSED_MS}ms (< 5000ms)"
     else
         fail "100x read_field em ${ELAPSED_MS}ms (muito lento — possível regressão)"

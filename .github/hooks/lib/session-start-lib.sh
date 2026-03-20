@@ -115,11 +115,11 @@ Leia \`.github/hooks/state/session-briefing.md\` para detalhes completos.")
 # de alerta ao BRIEFING_FILE para que o agente veja imediatamente ao iniciar.
 _session_start_append_watchdog_alerts() {
     local watchdog_script="$HOOK_DIR/scripts/watchdog.sh"
-    [ -x "$watchdog_script" ] || return 0  # watchdog ausente: OK, não bloquear
+    [ -x "$watchdog_script" ] || return 0 # watchdog ausente: OK, não bloquear
     [ -f "${BRIEFING_FILE:-}" ] || return 0
 
     local wdog_json
-    wdog_json=$(bash "$watchdog_script" --json 2>/dev/null) || true
+    wdog_json=$(bash "$watchdog_script" --json 2> /dev/null) || true
     [ -z "$wdog_json" ] && return 0
 
     local healthy issues_count warnings_count
@@ -128,21 +128,21 @@ _session_start_append_watchdog_alerts() {
     warnings_count=$(printf '%s' "$wdog_json" | jq '.warnings | length // 0')
 
     # Só anexa se houver algo a reportar
-    if [ "$healthy" = "true" ] && [ "$warnings_count" -eq 0 ] 2>/dev/null; then
+    if [ "$healthy" = "true" ] && [ "$warnings_count" -eq 0 ] 2> /dev/null; then
         return 0
     fi
 
     {
         printf '\n---\n\n'
         printf '## ⚠️ Alertas do Watchdog\n\n'
-        if [ "$healthy" = "false" ] && [ "$issues_count" -gt 0 ] 2>/dev/null; then
+        if [ "$healthy" = "false" ] && [ "$issues_count" -gt 0 ] 2> /dev/null; then
             printf '### 🔴 Problemas críticos (%s)\n\n' "$issues_count"
             printf '%s' "$wdog_json" | jq -r '.issues[]?' | while IFS= read -r issue; do
                 printf '- %s\n' "$issue"
             done
             printf '\n'
         fi
-        if [ "$warnings_count" -gt 0 ] 2>/dev/null; then
+        if [ "$warnings_count" -gt 0 ] 2> /dev/null; then
             printf '### ⚠️ Avisos (%s)\n\n' "$warnings_count"
             printf '%s' "$wdog_json" | jq -r '.warnings[]?' | while IFS= read -r warn; do
                 printf '- %s\n' "$warn"
@@ -153,7 +153,7 @@ _session_start_append_watchdog_alerts() {
     } >> "$BRIEFING_FILE"
 
     hook_log_audit "watchdog_alerts_appended" \
-        "issues" "$issues_count" "warnings" "$warnings_count" 2>/dev/null || true
+        "issues" "$issues_count" "warnings" "$warnings_count" 2> /dev/null || true
 }
 
 # ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ session_start_main() {
     # Monta e emite additionalContext
     local additional_ctx
     additional_ctx=$(build_additional_context "$source")
-    hook_out_session_start_context "$additional_ctx"  # GAP-61
+    hook_out_session_start_context "$additional_ctx" # GAP-61
 
     exit 0
 }

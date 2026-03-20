@@ -34,9 +34,9 @@ save_checkpoint() {
 
     # GAP-55: prune cross-platform usando ls -t (compativel com macOS/BSD e Linux)
     local count
-    count=$(ls "$CHECKPOINT_DIR"/session-*.json 2>/dev/null | wc -l)
+    count=$(ls "$CHECKPOINT_DIR"/session-*.json 2> /dev/null | wc -l)
     if [ "$count" -gt "$MAX_CHECKPOINTS" ]; then
-        ls -t "$CHECKPOINT_DIR"/session-*.json 2>/dev/null \
+        ls -t "$CHECKPOINT_DIR"/session-*.json 2> /dev/null \
             | tail -n "+$((MAX_CHECKPOINTS + 1))" \
             | xargs rm -f
     fi

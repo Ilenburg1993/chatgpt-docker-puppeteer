@@ -144,6 +144,7 @@ fat libs             →  sourceia ambos
 ### GAP-01 — `write_state()` não é atômico
 
 **Severidade**: 🔴 CRÍTICO
+**Status**: ✅ RESOLVIDO — commit `d88159da`
 **Localização**: `lib/common.sh:96-100`
 
 **Descrição**: A função `write_state()` escreve o JSON diretamente em `$STATE_FILE` com `printf '%s\n' "$json" > "$STATE_FILE"`, sem arquivo temporário intermediário. Se o processo for interrompido durante a escrita (preempção de OS, kill, timeout do hook), o `session.json` ficará truncado ou corrompido.
@@ -167,6 +168,7 @@ write_state() {
 ### GAP-02 — `emit_additional_context()` usa `hookEventName: SessionStart` hardcoded
 
 **Severidade**: 🔴 CRÍTICO
+**Status**: ✅ RESOLVIDO — commit `d88159da`
 **Localização**: `lib/common.sh:202-207`, `lib/pre-compact-lib.sh:79`
 
 **Descrição**: A função `emit_additional_context()` produz sempre `"hookEventName":"SessionStart"` no output JSON, independente do evento real. O `pre-compact-lib.sh` chama esta função, resultando em payload PreCompact com event name "SessionStart". Isso pode confundir o parser do VS Code e causar injeção de contexto incorreto.
@@ -183,6 +185,7 @@ printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext
 ### GAP-03 — `strict_turn_close` nunca é lido pelo stop-lib.sh
 
 **Severidade**: 🔴 CRÍTICO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `lib/stop-lib.sh`, `lib/common.sh:128`, `.github/instructions/hooks-protocol.instructions.md:160`
 
 **Descrição**: O campo `strict_turn_close: true` é gravado no `init_state()` e documentado no protocolo como mecanismo que exige `vscode_askQuestions` para encerrar turno. Porém nenhuma linha em `stop-lib.sh` lê este campo. O enforcement de closure do turno é ignorado completamente.
@@ -196,6 +199,7 @@ printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext
 ### GAP-04 — `heal_orphaned_turn()` não reseta `current_turn.started_at`
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/common.sh:395-401`
 
 **Descrição**: A função `heal_orphaned_turn()` atualiza `current_turn.ask_questions_called = false` e faz log de auditoria, mas não reseta `current_turn.started_at = null`. Na próxima execução de `UserPromptSubmit`, `maybe_heal_orphaned_turn()` pode identificar novamente o mesmo "turno anterior" como órfão e tentar healar duas vezes.
@@ -215,6 +219,7 @@ heal_orphaned_turn() {
 ### GAP-05 — `open_new_turn()` não limpa `current_turn.intent`
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `d88159da`
 **Localização**: `lib/common.sh:411-422`
 
 **Descrição**: A função `open_new_turn()` reseta `ask_questions_called`, `subturn_count`, `tools_count`, mas não limpa `current_turn.intent`. A intenção declarada no turno anterior (via `start-turn.sh`) persiste para o turno seguinte, podendo causar associação errada de intenção no audit log.
@@ -226,6 +231,7 @@ heal_orphaned_turn() {
 ### GAP-06 — `hook_state_migrate()` usa path com duplo ponto (jq inválido)
 
 **Severidade**: 🔴 CRÍTICO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/api/13-state-version.sh:110`
 
 **Descrição**: A chamada `update_nested_state '.strict_turn_close' 'false'` passa o path com ponto inicial. A função `update_nested_state` constrói `jq_path=".${key_path}"`, resultando em `..strict_turn_close` — path jq inválido. O erro é silenciado por `2>/dev/null || true`, então a migração de `strict_turn_close` **silenciosamente não se aplica**.
@@ -244,6 +250,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-07 — `post-tool-use-lib.sh` não fecha subturn para ferramentas não-askQuestions
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/post-tool-use-lib.sh`
 
 **Descrição**: `post_tool_use_main()` só atualiza `current_subturn.response_at` quando `hook_is_ask_questions()` é verdadeiro. Para todas as demais ferramentas (read_file, run_in_terminal, etc.), o subturn aberto em `PreToolUse` nunca recebe `response_at`. A estrutura `current_subturn` fica em estado inconsistente até o próximo `PreToolUse` sobrescrever.
@@ -255,6 +262,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-08 — `subagents_active` e `subagents_total` ausentes do `init_state()`
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `d88159da`
 **Localização**: `lib/common.sh:110-155` (init_state), `lib/subagent-lib.sh`
 
 **Descrição**: Os campos `session_stats.subagents_active` e `session_stats.subagents_total` são usados por `subagent_start_counters()` e `subagent_stop_counters()`, mas não são declarados em `init_state()`. Dependem de fallback `${current:-0}` que funciona, mas significa que um `jq .session_stats` do estado inicial não listará esses campos, e ferramentas que esperam schema completo falharão silenciosamente.
@@ -282,6 +290,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-10 — `log_audit()` com `log_audit "turnEnd_orphan_healed"` não registra `ended_at`
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/common.sh:395-401` (heal_orphaned_turn)
 
 **Descrição**: O healing de turno órfão registra o evento no audit log, mas não registra nenhum `ended_at` no `current_turn`. Um turno órfão "curado" não deixa rastro temporal concreto de quando foi encerrado no state — apenas no audit log.
@@ -293,6 +302,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-11 — `generate_section_id()` usa `xxd` que pode não estar instalado
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `lib/common.sh:271-276`
 
 **Descrição**: `head -c4 /dev/urandom | xxd -p | head -c8` requer `xxd`. Em imagens Alpine mínimas ou Debian slim, `xxd` pode não estar disponível (`xxd` é parte do pacote `vim-common` no Debian). Sem `xxd`, o sufixo aleatório da seção ID pode ser vazio ou causar erro silencioso.
@@ -320,6 +330,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-13 — `current_turn.ended_at` não existe na schema
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/common.sh` (open_new_turn, stop-lib.sh), `DOCUMENTAÇÃO/HOOKS/ARQUITETURA-CANONICA-SESSION-SECTION-TURN-SUBTURN.md`
 
 **Descrição**: O `current_turn` tiene `started_at` mas nenhum `ended_at`. O Stop hook classifica e fecha o turno (autorizado/não-autorizado) mas não registra quando o turno terminou no state. Para reconstrução forense do timeline, isso é uma lacuna.
@@ -331,6 +342,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-14 — Não há `current_subturn.ended_at` na schema
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `lib/common.sh:130-135` (schema de current_subturn)
 
 **Descrição**: `current_subturn` tem `started_at` e `response_at` mas não `ended_at`. O PostToolUse atualiza `response_at` para asks, mas para as demais ferramentas nem isso acontece (GAP-07). Não há campo explícito de encerramento do subturn.
@@ -342,6 +354,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-15 — `UserPromptSubmit` não injeta additionalContext ao agente
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/user-prompt-submit-lib.sh`
 
 **Descrição**: No cenário de auto-init (sessão criada ao primeiro prompt sem SessionStart), o estado é inicializado mas zero contexto é enviado ao agente. O agente começa o turno sem saber que existe um sistema de hooks ativo, sem a close_key, sem o briefing. Apenas o SessionStart injeta contexto.
@@ -377,6 +390,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-18 — Sem limite configurável de `ORPHAN_THRESHOLD_SECONDS`
 
 **Severidade**: 🟢 BAIXO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `lib/user-prompt-submit-lib.sh:41`
 
 **Descrição**: `ORPHAN_THRESHOLD_SECONDS=600` é hardcoded. Não há como configurar via arquivo de configuração ou variável de ambiente. Em sessões com respostas rápidas, 10 minutos pode ser longo demais ou curto demais dependendo do contexto.
@@ -388,6 +402,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-19 — Reconexão em `session-start-lib.sh` não verifica migração de schema
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/session-start-lib.sh:127-133` (session_start_main)
 
 **Descrição**: Ao reconectar (`is_reconnect=true`), o state existente é mantido sem verificar se precisa de migração. Se o state foi criado com versão anterior (schema 0), os novos campos adicionados na migração 0→1 (`strict_turn_close`, `compliance`, etc.) podem estar ausentes.
@@ -411,6 +426,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-21 — `open_new_subturn()` não verifica se há turn ativo
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `lib/common.sh:430-450`
 
 **Descrição**: `open_new_subturn()` incrementa contadores sem verificar `current_turn.number > 0`. Se um `PreToolUse` ocorrer sem `UserPromptSubmit` anterior (além do auto-init), pode criar subturns associados ao turn 0, quebrando a hierarquia.
@@ -450,6 +466,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-24 — Módulo `12-subagent.sh` não integrado em `subagent-lib.sh`
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/api/12-subagent.sh`, `lib/subagent-lib.sh`
 
 **Descrição**: O módulo implementa `hook_subagent_depth()`, `hook_subagent_is_nested()`, `hook_subagent_budget_ok()` etc. Mas `subagent-lib.sh` usa seus próprios contadores manuais (`subagent_start_counters()`) sem aproveitar a API do módulo 12. Há duplicação de lógica e a validação de budget nunca é verificada.
@@ -461,6 +478,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-25 — Módulo `13-state-version.sh`: migração nunca é executada automaticamente
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/api/13-state-version.sh`, todos os fat libs
 
 **Descrição**: O sistema de versionamento e migração existe e está testado, mas nenhum fat lib chama `hook_state_needs_migration()` ou `hook_state_migrate()`. Estados legados nunca são migrados automaticamente, mesmo que a migração fosse necessária.
@@ -476,6 +494,7 @@ hook_state_needs_migration && hook_state_migrate
 ### GAP-26 — Módulo `14-validate-events.sh`: validação de payload nunca ocorre em produção
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/api/14-validate-events.sh`, todos os fat libs
 
 **Descrição**: O módulo de validação de schema está implementado com 8 funções e 335 smoke tests passando, mas nenhum hook real chama `hook_validate_payload()`. Payloads malformados chegam ao sistema sem qualquer validação de schema.
@@ -511,6 +530,7 @@ hook_state_needs_migration && hook_state_migrate
 ### GAP-29 — `SubagentStart` não injeta `additionalContext` no subagente
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `bfdc07a3`
 **Localização**: `lib/subagent-lib.sh:subagent_start_main()`
 
 **Descrição**: A API (`05-output.sh`) tem `hook_out_subagent_start_context()` que permite injetar contexto no subagente. Mas `subagent_start_main()` não o chama — subagentes iniciam sem receber o briefing da sessão pai, a close_key, nem o protocolo de operação. Isso é especialmente crítico pois subagentes podem executar turnos completos sem saber das regras de sessão.
@@ -531,6 +551,7 @@ hook_out_subagent_start_context "$ctx"
 ### GAP-30 — Enforcement de `vscode_askQuestions` permanentemente desativado
 
 **Severidade**: 🔴 CRÍTICO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `lib/stop-lib.sh:44-47`
 
 **Descrição**: O comentário `[ENFORCEMENT DESATIVADO — emit_stop_block não é chamado aqui]` indica decisão de desativar o bloqueio de turno indefinidamente. Porém o `hooks-protocol.instructions.md` especifica claramente que turnos devem ser bloqueados quando `vscode_askQuestions` não foi chamado. Há contradição fundamental entre protocolo declarado e implementação real.
@@ -544,6 +565,7 @@ hook_out_subagent_start_context "$ctx"
 ### GAP-31 — `_HOOK_BYPASS_PATTERNS` tem apenas 2 padrões insuficientes
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `lib/api/08-risk.sh`
 
 **Descrição**: Os padrões de bypass cobrem apenas `"session-close.sh"` e `"close_key_validated=true"`. Não cobrem: paths absolutos (`/workspaces/.github/hooks/scripts/session-close.sh`), variações de chamada (`bash session-close.sh`, `sh ./session-close.sh`), nem outros scripts sensíveis como `session-start.sh`.
@@ -564,6 +586,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-32 — `session_close_main()` não revalida a `close_key` no momento do fechamento
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `lib/session-close-lib.sh`
 
 **Descrição**: O `session-close.sh` executa quando `pending_session_close=true`, mas não verifica novamente a `close_key`. Qualquer processo que consiga setar `pending_session_close=true` no state (inclusive bugs em outros hooks) pode acionar o encerramento sem a chave correta. O `stop-lib.sh` é quem chama `session-close.sh` quando detecta `pending=true`, mas sem segunda validação.
@@ -575,6 +598,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-33 — `v8.0` referenciado no protocolo mas não implementado
 
 **Severidade**: 🔴 CRÍTICO (instrução)
+**Status**: ✅ RESOLVIDO — commit `d88159da`
 **Localização**: `.github/instructions/hooks-protocol.instructions.md:76-77`
 
 **Descrição**: O protocolo afirma: `"O pre-tool-use.sh (v8.0) NEGA essa chamada quando close_key_validated=false"`. O campo `close_key_validated` **não existe** em nenhum módulo, script ou state schema. O `pre-tool-use.sh` bloqueia via pattern matching (`session-close.sh`), não via `close_key_validated`. A instrução descreve um mecanismo fantasma.
@@ -626,6 +650,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-37 — `session-context.json` referenciado mas não existe
 
 **Severidade**: 🔴 CRÍTICO (instrução)
+**Status**: ✅ RESOLVIDO — commit `d88159da`
 **Localização**: `.github/copilot-instructions.md:37`
 
 **Descrição**: O checklist de início/retomada instrui o agente a ler `.github/hooks/state/session-context.json` como terceiro item obrigatório. O arquivo **não existe** — `ls state/` mostra apenas `audit.jsonl`, `checkpoints/`, `session-briefing.md`, `session.json`. Nenhum hook gera `session-context.json`. O agente segue instrução impossível.
@@ -637,6 +662,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-38 — Instruções de checklist não dizem o que fazer com as informações lidas
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `.github/copilot-instructions.md:34-38`
 
 **Descrição**: O checklist de início/retomada lista 3 arquivos para ler, mas não especifica o que o agente deve fazer com cada um. Sem instrução de ação, diferentes agentes/modelos interpretarão de forma diferente. A instrução é declarativa ("ler X") sem ser prescritiva ("após ler X, fazer Y").
@@ -663,6 +689,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-40 — `pending-tasks.md` pode não existir sem alertar o agente
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `.github/copilot-instructions.md:36`, `lib/common.sh` (generate_session_briefing)
 
 **Descrição**: A instrução manda o agente ler `state/pending-tasks.md`, mas o arquivo pode não existir em sessões sem tarefas. O briefing trata a ausência graciosamente (`*(nenhuma tarefa registrada)*`), mas a instrução direta de leitura não tem fallback explícito. O agente pode interpretar a ausência do arquivo como erro.
@@ -674,6 +701,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-41 — Protocolo declara `strict_turn_close_requires_key` mas JSON tem `strict_turn_close`
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `.github/instructions/hooks-protocol.instructions.md:160`, `lib/common.sh:128`
 
 **Descrição**: O protocolo usa `session.strict_turn_close_requires_key=true` como nome de campo. O `session.json` real tem o campo como `strict_turn_close: true`. Além de ser campo diferente, a semântica "requires_key" implica que o encerramento de turn exige KEY, mas o campo real apenas sinaliza modo strict.
@@ -717,6 +745,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-44 — Nenhuma instrução sobre o que fazer com `compliance.consecutive_unauthorized > 3`
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `.github/instructions/hooks-protocol.instructions.md`, `.github/AGENTS.md`
 
 **Descrição**: O sistema rastreia `consecutive_unauthorized` no state e o watchdog avisa quando ≥5. Mas nenhuma instrução explica ao agente o que fazer quando ele próprio detectar o valor alto (ex: via `hook_compliance_consecutive()`). O agente deveria saber que alto `consecutive_unauthorized` indica violação de protocolo que requer ação corretiva imediata.
@@ -856,6 +885,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-55 — `save_checkpoint()` usa `find -printf` incompatível com BSD/macOS
 
 **Severidade**: 🟡 MÉDIO (portabilidade)
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `lib/pre-compact-lib.sh:31-38`
 
 **Descrição**: `find "$CHECKPOINT_DIR" -maxdepth 1 -name 'session-*.json' -printf '%T@ %p\n'` usa a flag `-printf` disponível apenas no GNU find (Linux). Em macOS/BSD, `-printf` não existe e o comando falha silenciosamente (por causa do `|| true`), tornando a poda de checkpoints inoperante no macOS.
@@ -895,6 +925,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-58 — `stop-lib.sh` duplica lógica de incremento em vez de usar `increment_field()`
 
 **Severidade**: 🟢 BAIXO
+**Status**: ✅ RESOLVIDO — commit `9e0a7a70`
 **Localização**: `lib/stop-lib.sh:61-70`
 
 **Descrição**: `stop-lib.sh` incrementa `consecutive_unauthorized`, `turn_authorized` e `turn_unauthorized` com padrão manual (`read → calc → update_nested_state`) em vez de usar `increment_field()` já disponível em `common.sh`. Duplicação desnecessária e mais frágil.

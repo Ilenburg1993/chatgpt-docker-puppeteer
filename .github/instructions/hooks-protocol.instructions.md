@@ -234,14 +234,14 @@ Templates completos em `.github/AGENTS.md` → seção "Protocolo vscode_askQues
 
 <!-- GAP-39: distingue unambiguamente os identificadores de sessão -->
 
-| Símbolo | Escopo | Definição |
-|---------|--------|-----------|
-| `SESSION_ID` | Variável de ambiente (`export`) | UUID gerado pelo hook `sessionStart` e exportado para todos os sub-shells durante a execução do hook. Só existe enquanto o processo do hook está rodando. Formato: `session-<uuid>` ou UUID puro (dependendo da plataforma). |
-| `session_id` | Campo no `session.json` | Cópia persistida do `SESSION_ID` dentro do arquivo de estado. Sobrevive entre invocações de hooks. Lido via `read_field ".session_id"`. |
-| `HOOK_SESSION_ID` | Variável interna da API | Populado por `hook_api_parse()` a partir do campo `session.id` do payload JSON recebido da plataforma. Pode divergir de `SESSION_ID` em edge cases de reconexão. |
-| `close_key` | Campo no `session.json` | Chave de encerramento da sessão. Gerada na inicialização, rotacionada por `hook_close_key_rotate()`. Nunca igual entre sessions. |
-| `SECTION_ID` | Não existe como var | Seções são identificadas por nome (string), não por ID numérico. Use `read_field ".current_section"`. |
+| Símbolo           | Escopo                          | Definição                                                                                                                                                                                                                    |
+| ----------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SESSION_ID`      | Variável de ambiente (`export`) | UUID gerado pelo hook `sessionStart` e exportado para todos os sub-shells durante a execução do hook. Só existe enquanto o processo do hook está rodando. Formato: `session-<uuid>` ou UUID puro (dependendo da plataforma). |
+| `session_id`      | Campo no `session.json`         | Cópia persistida do `SESSION_ID` dentro do arquivo de estado. Sobrevive entre invocações de hooks. Lido via `read_field ".session_id"`.                                                                                      |
+| `HOOK_SESSION_ID` | Variável interna da API         | Populado por `hook_api_parse()` a partir do campo `session.id` do payload JSON recebido da plataforma. Pode divergir de `SESSION_ID` em edge cases de reconexão.                                                             |
+| `close_key`       | Campo no `session.json`         | Chave de encerramento da sessão. Gerada na inicialização, rotacionada por `hook_close_key_rotate()`. Nunca igual entre sessions.                                                                                             |
+| `SECTION_ID`      | Não existe como var             | Seções são identificadas por nome (string), não por ID numérico. Use `read_field ".current_section"`.                                                                                                                        |
 
-> **Regra prática:** quando precisar do identificador da sessão ativa, use `read_field ".session_id"`
-> (persistido), não a variável `$SESSION_ID` (só disponível durante a execução do hook).
-
+> **Regra prática:** quando precisar do identificador da sessão ativa, use
+> `read_field ".session_id"` (persistido), não a variável `$SESSION_ID` (só disponível durante a
+> execução do hook).
