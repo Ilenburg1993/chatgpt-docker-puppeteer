@@ -155,19 +155,54 @@ _HOOK_BYPASS_PATTERNS=(
 )
 
 # 🔵 Retorna 0 se a chamada atual tenta contornar o ciclo de sessão.
-# Verifica HOOK_TOOL_NAME (deve ser ferramenta de shell) e HOOK_TOOL_INPUT.
+# Verifica HOOK_TOOL_NAME (ferramenta de shell OU de escrita de arquivo) e HOOK_TOOL_INPUT.
 hook_is_bypass_attempt() {
-    # Só aplica a ferramentas de execução de shell/terminal
     case "${HOOK_TOOL_NAME:-}" in
-        *run_in_terminal* | *bash* | *shell* | *execute*) ;;
+        # Ferramentas de execução de shell/terminal
+        *run_in_terminal* | *bash* | *shell* | *execute*)
+            local pattern
+            for pattern in "${_HOOK_BYPASS_PATTERNS[@]}"; do
+                if printf '%s' "${HOOK_TOOL_INPUT:-}" | grep -qF "$pattern"; then
+                    return 0
+                fi
+            done
+            return 1
+            ;;
+        # NEW-E: ferramentas de escrita de arquivo — delega para verificação dedicada
+        create_file | replace_string_in_file | multi_replace_string_in_file)
+            hook_is_file_write_bypass
+            ;;
         *) return 1 ;;
     esac
+}
+
+# 🔵 NEW-E: detecta bypass via ferramentas de escrita de arquivo.
+# Retorna 0 (bypass detectado) se:
+#   a) O arquivo alvo está dentro de .github/hooks/state/ (modificação direta de state)
+#   b) O conteúdo inclui padrões de bypass (close_key injection via arquivo)
+hook_is_file_write_bypass() {
+    case "${HOOK_TOOL_NAME:-}" in
+        create_file | replace_string_in_file | multi_replace_string_in_file) ;;
+        *) return 1 ;;
+    esac
+
+    local input="${HOOK_TOOL_INPUT:-}"
+
+    # a) Checar se o filePath alvo é arquivo de state do hook
+    local file_path
+    file_path=$(printf '%s' "$input" | jq -r '.filePath // .replacements[0].filePath // ""' 2> /dev/null || true)
+    if printf '%s' "${file_path:-}" | grep -q '\.github/hooks/state/'; then
+        return 0 # Bypass: tentativa de modificar state file diretamente
+    fi
+
+    # b) Checar conteúdo por padrões de bypass (injecting close_key, pending_session_close etc.)
     local pattern
     for pattern in "${_HOOK_BYPASS_PATTERNS[@]}"; do
-        if printf '%s' "${HOOK_TOOL_INPUT:-}" | grep -qF "$pattern"; then
+        if printf '%s' "$input" | grep -qF "$pattern"; then
             return 0
         fi
     done
+
     return 1
 }
 

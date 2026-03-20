@@ -70,7 +70,7 @@ hook_compact_ctx_close_key() {
     local close_key
     close_key=$(hook_close_key_read)
     if [ -z "$close_key" ]; then
-        return 0  # sem close_key → sem seção
+        return 0 # sem close_key → sem seção
     fi
     printf '## Chave de Encerramento de Sessão\n'
     printf 'Para encerrar a sessão, o protocolo exige que o usuário digite esta chave no Template F:\n\n'
@@ -115,8 +115,8 @@ hook_compact_ctx_briefing_full() {
     local briefing ctx
     if declare -f generate_session_briefing > /dev/null 2>&1 \
         && declare -f read_briefing > /dev/null 2>&1; then
-        generate_session_briefing 2>/dev/null || true
-        briefing=$(read_briefing 2>/dev/null || printf '')
+        generate_session_briefing 2> /dev/null || true
+        briefing=$(read_briefing 2> /dev/null || printf '')
     fi
 
     if [ -n "${briefing:-}" ]; then
@@ -128,4 +128,37 @@ hook_compact_ctx_briefing_full() {
     HOOK_COMPACT_CONTEXT_BYTES="${#ctx}"
     export HOOK_COMPACT_CONTEXT_BYTES
     printf '%s' "$ctx"
+}
+
+# ─── SEÇÃO 11C: WRITE SIDE — sincronização de pending-tasks.md ───────────────
+
+# 🟧 hook_sync_pending_tasks — NEW-M: implementa o lado de escrita do pending-tasks.md.
+# Deve ser chamado no PostToolUse quando HOOK_TOOL_NAME == "manage_todo_list".
+# Lê HOOK_TODO_LIST_JSON (populado por 02-parse.sh) e sobrescreve pending-tasks.md
+# com os itens ainda não concluídos, mantendo o arquivo sincronizado para que
+# hook_compact_ctx_pending_tasks e session-start-lib.sh possam lê-lo corretamente.
+# Idempotente: chamar múltiplas vezes com o mesmo estado produz o mesmo arquivo.
+hook_sync_pending_tasks() {
+    [ "${HOOK_TOOL_NAME:-}" = "manage_todo_list" ] || return 0
+
+    local pending_file="${STATE_DIR:-/tmp}/pending-tasks.md"
+    local todo_json="${HOOK_TODO_LIST_JSON:-[]}"
+
+    # Extrai itens não concluídos como linhas de markdown via jq
+    local items
+    items=$(printf '%s' "$todo_json" \
+        | jq -r '.[] | select(.status != "completed") |
+            if .status == "in-progress" then
+                "- 🔄 [" + (.id | tostring) + "] " + .title + " _(em andamento)_"
+            else
+                "- ⏳ [" + (.id | tostring) + "] " + .title
+            end' 2> /dev/null || true)
+
+    mkdir -p "$(dirname "$pending_file")"
+    if [ -n "$items" ]; then
+        printf '# Tarefas Pendentes\n\n%s\n' "$items" > "$pending_file"
+    else
+        # Todos concluídos ou lista vazia: remove o arquivo (sem tarefas pendentes)
+        rm -f "$pending_file"
+    fi
 }

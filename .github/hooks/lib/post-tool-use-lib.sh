@@ -38,6 +38,9 @@ post_tool_use_main() {
         update_nested_state "current_subturn.response_at" "$_now_ts"
         update_nested_state "current_subturn.ended_at" "$_now_ts"
 
+        # NEW-M: sincroniza pending-tasks.md quando manage_todo_list é chamado
+        hook_sync_pending_tasks 2> /dev/null || true
+
         if hook_is_ask_questions; then
             # Seta ask_questions_called = true (pós-resposta, não no PreToolUse)
             update_nested_state "current_turn.ask_questions_called" "true"
