@@ -78,6 +78,32 @@ check_hooks_json() {
     return 0
 }
 
+# GAP-53: verifica que cada comando referenciado em hooks.json existe e é executável
+check_hook_commands() {
+    local hooks_json="$HOOK_DIR/hooks.json"
+    [ -f "$hooks_json" ] || return 0  # check_hooks_json já reportou
+    jq -e . "$hooks_json" > /dev/null 2>&1 || return 0  # JSON inválido já reportado
+
+    local cmd resolved
+    while IFS= read -r cmd; do
+        [ -z "$cmd" ] || [ "$cmd" = "null" ] && continue
+        # Resolve caminho relativo ao HOOK_DIR se não for absoluto
+        if [[ "$cmd" != /* ]]; then
+            resolved="$HOOK_DIR/$cmd"
+        else
+            resolved="$cmd"
+        fi
+        # Extrai apenas o executável (primeiro token antes de espaço)
+        local exe
+        exe="${resolved%% *}"
+        if [ ! -f "$exe" ]; then
+            ISSUES+=("Comando do hooks.json não encontrado: $exe")
+        elif [ ! -x "$exe" ]; then
+            ISSUES+=("Comando do hooks.json não é executável: $exe")
+        fi
+    done < <(jq -r '.[].hooks[].command // empty' "$hooks_json" 2>/dev/null)
+}
+
 check_pending_session_close() {
     if ! state_exists; then return 0; fi
     local pending
@@ -104,6 +130,7 @@ check_state_file || true
 check_scripts_executable || true
 check_audit_writable || true
 check_hooks_json || true
+check_hook_commands || true
 check_pending_session_close || true
 check_consecutive_violations || true
 

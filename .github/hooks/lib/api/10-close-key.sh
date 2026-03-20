@@ -81,6 +81,7 @@ hook_close_key_generate() {
 
 # 🟧 hook_close_key_rotate — gera nova close_key E persiste no session.json
 # Atualiza .close_key atomicamente via update_state (common.sh)
+# GAP-27: após rotação, regenera session-briefing.md para o agente ver a nova chave
 # Retorna 0 se rotação OK, 1 se falhou
 # Uso: new_key=$(hook_close_key_rotate) → retorna a nova key
 hook_close_key_rotate() {
@@ -88,6 +89,13 @@ hook_close_key_rotate() {
     new_key=$(hook_close_key_generate)
     if declare -f update_state > /dev/null 2>&1 && [ -f "${STATE_FILE:-}" ]; then
         update_state 'close_key' "$new_key" 2> /dev/null || return 1
+    fi
+    # GAP-27: regenerar briefing para que a nova chave seja visível ao agente
+    if declare -f generate_session_briefing > /dev/null 2>&1; then
+        generate_session_briefing 2>/dev/null || true
+    fi
+    if declare -f hook_log_audit > /dev/null 2>&1; then
+        hook_log_audit "close_key_rotated" "new_key_prefix" "${new_key:0:14}" 2>/dev/null || true
     fi
     printf '%s' "$new_key"
 }

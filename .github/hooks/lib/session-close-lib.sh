@@ -111,7 +111,43 @@ session_close_main() {
     # --- Passo 5: Gera relatório final ---
     _generate_final_report
 
+    # --- Passo 6: Rotação do audit.jsonl (GAP-52) ---
+    _rotate_audit_log
+
     exit 0
+}
+
+# ---------------------------------------------------------------------------
+# _rotate_audit_log — renomeia audit.jsonl para audit-YYYYMMDD-HHMMSS.jsonl (GAP-52)
+# Mantém apenas os últimos HOOKS_AUDIT_MAX_FILES (padrão: 5) arquivos históricos.
+# ---------------------------------------------------------------------------
+_rotate_audit_log() {
+    if [ ! -f "$AUDIT_FILE" ]; then
+        return 0
+    fi
+
+    local ts
+    ts=$(date +%Y%m%d-%H%M%S 2>/dev/null || date +%s)
+    local rotated="${AUDIT_FILE%.jsonl}-${ts}.jsonl"
+
+    if mv -f "$AUDIT_FILE" "$rotated" 2>/dev/null; then
+        hook_log_audit "audit_log_rotated" "file" "$(basename "$rotated")" >> "$AUDIT_FILE" || true
+    fi
+
+    # Manter apenas os últimos N arquivos históricos (padrão: 5)
+    local max_files="${HOOKS_AUDIT_MAX_FILES:-5}"
+    local audit_dir
+    audit_dir="$(dirname "$AUDIT_FILE")"
+    # Lista ordenada do mais antigo para o mais novo; remove além do limite
+    local count
+    count=$(find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2>/dev/null | wc -l)
+    if [ "${count:-0}" -gt "$max_files" ]; then
+        find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2>/dev/null \
+            | sort | head -n $(( count - max_files )) \
+            | while IFS= read -r old_log; do
+                rm -f "$old_log" 2>/dev/null || true
+            done
+    fi
 }
 
 main() { session_close_main; }

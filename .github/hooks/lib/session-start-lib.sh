@@ -111,6 +111,51 @@ Leia \`.github/hooks/state/session-briefing.md\` para detalhes completos.")
     printf '%s\n%s\n%s' "$session_info" "$pending_section" "$protocol_section"
 }
 
+# GAP-54: executa watchdog --json e, se houver issues ou warnings, anexa seção
+# de alerta ao BRIEFING_FILE para que o agente veja imediatamente ao iniciar.
+_session_start_append_watchdog_alerts() {
+    local watchdog_script="$HOOK_DIR/scripts/watchdog.sh"
+    [ -x "$watchdog_script" ] || return 0  # watchdog ausente: OK, não bloquear
+    [ -f "${BRIEFING_FILE:-}" ] || return 0
+
+    local wdog_json
+    wdog_json=$(bash "$watchdog_script" --json 2>/dev/null) || true
+    [ -z "$wdog_json" ] && return 0
+
+    local healthy issues_count warnings_count
+    healthy=$(printf '%s' "$wdog_json" | jq -r '.healthy // true')
+    issues_count=$(printf '%s' "$wdog_json" | jq '.issues | length // 0')
+    warnings_count=$(printf '%s' "$wdog_json" | jq '.warnings | length // 0')
+
+    # Só anexa se houver algo a reportar
+    if [ "$healthy" = "true" ] && [ "$warnings_count" -eq 0 ] 2>/dev/null; then
+        return 0
+    fi
+
+    {
+        printf '\n---\n\n'
+        printf '## ⚠️ Alertas do Watchdog\n\n'
+        if [ "$healthy" = "false" ] && [ "$issues_count" -gt 0 ] 2>/dev/null; then
+            printf '### 🔴 Problemas críticos (%s)\n\n' "$issues_count"
+            printf '%s' "$wdog_json" | jq -r '.issues[]?' | while IFS= read -r issue; do
+                printf '- %s\n' "$issue"
+            done
+            printf '\n'
+        fi
+        if [ "$warnings_count" -gt 0 ] 2>/dev/null; then
+            printf '### ⚠️ Avisos (%s)\n\n' "$warnings_count"
+            printf '%s' "$wdog_json" | jq -r '.warnings[]?' | while IFS= read -r warn; do
+                printf '- %s\n' "$warn"
+            done
+            printf '\n'
+        fi
+        printf '_Verifique com: `bash .github/hooks/scripts/watchdog.sh`_\n'
+    } >> "$BRIEFING_FILE"
+
+    hook_log_audit "watchdog_alerts_appended" \
+        "issues" "$issues_count" "warnings" "$warnings_count" 2>/dev/null || true
+}
+
 # ---------------------------------------------------------------------------
 # Entrypoint principal do SessionStart
 # ---------------------------------------------------------------------------
@@ -142,6 +187,9 @@ session_start_main() {
     # Gera/regenera o session-briefing.md
     generate_session_briefing
     hook_log_audit "briefing_generated"
+
+    # GAP-54: auto-run watchdog e anota alertas no briefing se houver issues
+    _session_start_append_watchdog_alerts
 
     # Monta e emite additionalContext
     local additional_ctx

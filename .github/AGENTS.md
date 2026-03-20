@@ -172,12 +172,146 @@ Ler com `read_file`:
 ]
 ```
 
+## Ferramentas de diagnóstico dos hooks
+
+### `scripts/watchdog.sh` — Validação de saúde do sistema
+
+Verifica integridade do ambiente de hooks: dependências, permissões, estado e compliance.
+
+```bash
+# Saída legível por humanos
+bash .github/hooks/scripts/watchdog.sh
+
+# Saída JSON (para automação / integração com briefing)
+bash .github/hooks/scripts/watchdog.sh --json
+```
+
+**Exit code:** `0` = saudável · `1` = problemas encontrados
+
+**Checks realizados:**
+| Check | O que verifica |
+|-------|---------------|
+| `check_jq` | `jq` está disponível no PATH |
+| `check_state_file` | `session.json` existe e é JSON válido |
+| `check_scripts_executable` | todos `.sh` em `scripts/` têm bit executável |
+| `check_audit_writable` | `audit.jsonl` e seu diretório são graváveis |
+| `check_hooks_json` | `hooks.json` existe e é JSON válido |
+| `check_pending_session_close` | alerta se `pending_session_close=true` |
+| `check_consecutive_violations` | alerta se ≥ 5 turnos sem `vscode_askQuestions` |
+
+**Exemplo de output JSON:**
+```json
+{
+  "healthy": true,
+  "issues": [],
+  "warnings": ["pending_session_close=true — sessão aguardando encerramento"],
+  "checked_at": "2026-03-20T14:00:00Z"
+}
+```
+
+**Quando usar:**
+- No início de uma sessão para confirmar que o ambiente está íntegro
+- Após erros ou comportamentos inesperados nos hooks
+- Em automação: `bash watchdog.sh --json | jq -e '.healthy'`
+
+---
+
+### `scripts/debug-capture.sh` — Captura de payloads para depuração
+
+Quando ativado, cada hook salva seu payload completo em
+`.github/hooks/state/debug/payloads/<evento>-<timestamp>.json`.
+
+> ⚠️ **Segurança:** nunca commitar payloads — podem conter conteúdo do usuário.
+> O diretório `state/` já deve estar no `.gitignore`.
+
+```bash
+# Ativar captura
+bash .github/hooks/scripts/debug-capture.sh on
+
+# Desativar captura
+bash .github/hooks/scripts/debug-capture.sh off
+
+# Ver status atual + contagem de arquivos
+bash .github/hooks/scripts/debug-capture.sh status
+
+# Listar todos os payloads capturados
+bash .github/hooks/scripts/debug-capture.sh show
+
+# Ver payloads de um evento específico
+bash .github/hooks/scripts/debug-capture.sh show PreToolUse
+
+# Limpar todos os payloads
+bash .github/hooks/scripts/debug-capture.sh clear
+```
+
+**Eventos disponíveis:** `SessionStart` · `UserPromptSubmit` · `PreToolUse` · `PostToolUse` ·
+`Stop` · `PreCompact` · `SubagentStart` · `SubagentStop`
+
+**Quando usar:**
+- Para inspecionar exatamente o que a plataforma envia no payload de um hook
+- Para depurar falhas de parse ou campos inesperadamente ausentes
+- Para validar que o hook recebe os dados corretos após uma mudança de schema
+
+---
+
 ## Quality gates mínimos
 
 1. `npm run lint`
 2. `npm run format:check`
 3. `npm run test:unit`
 4. Se tocar `driver`/`kernel`/`server`: `npm run test:integration`
+
+## Ferramentas de gerenciamento de tarefas e sessão
+
+Estas ferramentas complementam o `manage_todo_list` com persistência em arquivos de estado.
+
+### `scripts/add-task.sh` — Adicionar tarefa ao backlog
+
+```bash
+bash .github/hooks/scripts/add-task.sh <prioridade> "Título" "Descrição + gate de aceitação"
+# Prioridade: alta | media | baixa
+# Arquivo: state/pending-tasks.md + loga task_added no audit.jsonl
+```
+
+**Exemplo:**
+```bash
+bash .github/hooks/scripts/add-task.sh alta "Corrigir GAP-53" "watchdog valida scripts do hooks.json; gate: smoke-test passa"
+```
+
+### `scripts/complete-task.sh` — Marcar tarefa como concluída
+
+```bash
+bash .github/hooks/scripts/complete-task.sh "padrão do título"
+# Busca substring case-insensitive em pending-tasks.md e adiciona [✅ DONE]
+```
+
+### `scripts/save-finding.sh` — Registrar finding (bug/gap/melhoria)
+
+```bash
+bash .github/hooks/scripts/save-finding.sh "módulo" "severity" "type" "descrição"
+# severity: critical | high | medium | low | info
+# type: bug | gap | improvement | security | performance
+# Arquivo: state/findings.md
+```
+
+### `scripts/session-checkpoint.sh` — Salvar checkpoint do estado
+
+```bash
+bash .github/hooks/scripts/session-checkpoint.sh ["motivo"]
+# Copia session.json → state/checkpoints/session-TIMESTAMP.json
+# Mantém apenas os 10 mais recentes (MAX_CHECKPOINTS)
+```
+
+Use antes de operações críticas ou quando quiser ponto de recuperação (`recover_or_init_state()`).
+
+### `scripts/session-reminder.sh` — Lembrete rápido de protocolo
+
+```bash
+bash .github/hooks/scripts/session-reminder.sh
+# Exibe: close_key, turno atual, consecutive_unauthorized, pending_session_close
+```
+
+---
 
 ## Referências canônicas
 

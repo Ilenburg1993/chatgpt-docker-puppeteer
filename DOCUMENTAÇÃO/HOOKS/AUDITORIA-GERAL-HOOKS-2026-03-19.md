@@ -270,6 +270,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-09 — `make_close_key()` fallback de timestamp é previsível
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/common.sh:238-248`
 
 **Descrição**: O último recurso para gerar a close_key usa `date +%s%N` (epoch em nanossegundos). Se o sistema não tiver `/proc/sys/kernel/random/uuid` nem `od`, a chave gerada é derivada de timestamp — potencialmente previsível se o atacante souber o momento de criação da sessão. Em ambientes DevContainer padrão (Linux) isso não é problema, mas é uma fragilidade latente.
@@ -303,6 +304,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-12 — `extract_subagent_meta()` trunca prompt com `head -c80` — risco UTF-8
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/subagent-lib.sh`
 
 **Descrição**: `printf '%s' "$input" | jq -r '...' | head -c80` trunca no 80º byte, podendo cortar no meio de um caractere UTF-8 multibyte. Se `SUBAGENT_PROMPT` for usado em JSON posterior, pode produzir sequência UTF-8 inválida.
@@ -351,6 +353,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-16 — `is_ask_questions_response()` em user-prompt-submit-lib.sh é dead code
 
 **Severidade**: 🟢 BAIXO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/user-prompt-submit-lib.sh:66-75`
 
 **Descrição**: A função `is_ask_questions_response()` é definida mas nunca chamada em `user_prompt_submit_main()`. Constitui dead code que adiciona confusão sem funcionalidade.
@@ -362,6 +365,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-17 — Stop hook classifica turn sem verificar se `UserPromptSubmit` ocorreu
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/stop-lib.sh:33-43`
 
 **Descrição**: O Stop só pula a classificação se `turn_count = 0`. Se um turno sintético foi criado por `ensure_state_for_tool` (auto-init no PreToolUse), esse turno não foi gerado por `UserPromptSubmit` real — mas o Stop o classificará normalmente como autorizado ou não. A origem do turno (real vs sintético) não é rastreada.
@@ -395,6 +399,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-20 — Bypass-bloqueado não incrementa `tools_count` nem `subturn_count`
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/pre-tool-use-lib.sh:50-59`
 
 **Descrição**: Quando `hook_is_bypass_attempt()` detecta tentativa de bypass, o `emit_permission_deny` é emitido e o script sai com `exit 0`. O subturn nunca é aberto e `tools_count` não é incrementado. A tentativa de bypass fica registrada apenas no audit log, mas os contadores de ferramentas subestimam o número real de invocações.
@@ -417,6 +422,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-22 — `session-close-lib.sh` não usa `hook-payload-api.sh`
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/session-close-lib.sh:7-8`
 
 **Descrição**: É o único fat lib que não faz `source hook-payload-api.sh` e não chama `hook_api_parse()`. Enquanto o session-close é chamado internamente (não diretamente pelo VS Code), a inconsistência do padrão cria confusão para mantenedores e impossibilita uso das funções da API.
@@ -432,6 +438,7 @@ update_nested_state '.strict_turn_close' 'false' 2>/dev/null || true
 ### GAP-23 — Módulo `09-metrics.sh` carregado mas nunca chamado em produção
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/api/09-metrics.sh`, todos os fat libs
 
 **Descrição**: O módulo implementa 15 funções de métricas (`hook_stat_*`, `hook_turn_*`, `hook_compliance_*`) e `hook_metrics_load()`. Porém nenhum fat lib chama `hook_metrics_load()`. As variáveis `HOOK_STAT_*` permanecem com valores padrão zero. O módulo está funcional nos testes mas inoperante em produção.
@@ -480,6 +487,7 @@ hook_state_needs_migration && hook_state_migrate
 ### GAP-27 — Módulo `10-close-key.sh`: `hook_close_key_rotate()` sem mecanismo de notificação
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: `lib/api/10-close-key.sh`
 
 **Descrição**: `hook_close_key_rotate()` persiste nova chave no session.json mas o agente só saberá da nova chave se ler o briefing. Não há mecanismo para reemitir `additionalContext` com a nova chave. A rotação de chave cria estado invisível para o agente.
@@ -491,6 +499,7 @@ hook_state_needs_migration && hook_state_migrate
 ### GAP-28 — Funções `*_load()` dos módulos 09-14 são lazy sem documentação clara
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: `lib/api/09-metrics.sh`, `10-close-key.sh`, `12-subagent.sh`, `13-state-version.sh`, `14-validate-events.sh`
 
 **Descrição**: Os módulos usam padrão lazy: as variáveis `HOOK_STAT_*` só são populadas quando `hook_metrics_load()` é chamado explicitamente. Esse padrão não está documentado nos comentários do loader (`hook-payload-api.sh`), criando expectativa de que as variáveis já estariam disponíveis após `source hook-payload-api.sh`.
@@ -577,6 +586,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-34 — `update_nested_state()` com paths negativos (floats, booleans inválidos)
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/common.sh:69-95`
 
 **Descrição**: A detecção de tipo em `update_nested_state` usa `case "$val" in` com padrão `'' | *[!0-9]*)` de string e `*)` como número. Isso trata `"-1"` como string (contém não-dígito), `"3.14"` como string, e `"007"` como número (apenas dígitos). Não há suporte para floats ou inteiros negativos como JSON numbers.
@@ -588,6 +598,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-35 — Sem escape de valores no `generate_session_briefing()` heredoc
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: `lib/common.sh:460-510` (generate_session_briefing)
 
 **Descrição**: Valores como `session_id`, `close_key`, `source` são interpolados diretamente no heredoc. Um `session_id` com caracteres especiais de Markdown (`|`, `#`, backticks) poderia quebrar a formatação do `session-briefing.md` ou, em casos extremos, injetar conteúdo Markdown inesperado com instruções falsas para o agente.
@@ -599,6 +610,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-36 — Sem limpeza de arquivos temporários `.state.XXXXXX` em caso de falha de jq
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/common.sh:52, 62, 75, 338, 351`
 
 **Descrição**: O padrão `tmp=$(mktemp); jq ... > "$tmp" && mv -f "$tmp" "$STATE_FILE"` não usa `trap` para limpar `$tmp` se `jq` falhar. Em caso de falha de jq, o arquivo temporário `.state.XXXXXX` fica no `STATE_DIR`. Em hooks com alta frequência (PreToolUse), isso pode acumular muitos arquivos temporários orphaned.
@@ -639,6 +651,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-39 — `hooks-protocol.instructions.md` mixtura nomenclatura `SESSION_ID` e `session_id`
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: `.github/instructions/hooks-protocol.instructions.md`
 
 **Descrição**: O documento usa ora `session_id`, ora `SESSION_ID` (variável de ambiente), ora `vs_code_session_id` (campo do JSON). A inconsistência de nomenclatura pode confundir o agente sobre qual campo verificar ou usar em operações de state.
@@ -672,6 +685,7 @@ _HOOK_BYPASS_PATTERNS=(
 ### GAP-42 — Agente não sabe que pode chamar `watchdog.sh` para diagnóstico
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: `.github/AGENTS.md`, `.github/copilot-instructions.md`
 
 **Descrição**: `watchdog.sh` existe como ferramenta de diagnóstico com output JSON estruturado (`--json`), mas não é mencionado em nenhum arquivo de instrução. O agente não sabe que pode chamá-lo para verificar saúde do sistema sem inspecionar arquivos manualmente.
@@ -686,6 +700,7 @@ Para diagnóstico rápido: bash .github/hooks/scripts/watchdog.sh --json
 ### GAP-43 — Debug capture não é documentado para o agente
 
 **Severidade**: 🟢 BAIXO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: `.github/AGENTS.md`, `scripts/debug-capture.sh`
 
 **Descrição**: `debug-capture.sh` permite ativar captura de payloads brutos para debugging. Útil quando há comportamento inesperado nos hooks. Não está documentado no AGENTS.md nem nas instruções, então o agente não sabe como ativar o modo debug.
@@ -713,6 +728,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-45 — `session-briefing.md` não inclui número do subturn atual nem status de subagentes
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/common.sh:460-510` (generate_session_briefing)
 
 **Descrição**: O briefing mostra `turn_count`, `turn_authorized`, `turn_unauthorized`, `consecutive_unauthorized`, mas não mostra: (a) `current_turn.number` (turno corrente), (b) `current_turn.tools_count`, (c) `session_stats.subagents_total`, (d) a intenção atual do turno (`current_turn.intent`). O agente não tem visibilidade do estado granular atual do turno em curso.
@@ -798,6 +814,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-52 — `audit.jsonl` sem mecanismo de rotação ou limite de tamanho
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: `lib/common.sh:log_audit()`, `lib/session-close-lib.sh:_generate_final_report()`
 
 **Descrição**: O `audit.jsonl` cresce indefinidamente. Em sessões com milhares de tool calls (evidência: "1892x preToolUse" em 24h no PLANO-REIMPLEMENTACAO), o arquivo pode atingir dezenas de MB. O `session-final-report.md` só lê os últimos 10 eventos, mas o arquivo completo permanece sem limpeza.
@@ -809,6 +826,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-53 — `watchdog.sh` não valida que scripts referenciados em `hooks.json` existem
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: `scripts/watchdog.sh`
 
 **Descrição**: O watchdog verifica se `hooks.json` existe e é JSON válido, mas não verifica se os scripts referenciados (`command`) existem e têm permissão de execução. Um hooks.json com caminho errado passaria no watchdog e só falharia silenciosamente em produção.
@@ -820,6 +838,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-54 — `watchdog.sh` sem agendamento automático
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: `scripts/watchdog.sh`
 
 **Descrição**: O watchdog é ferramenta puramente manual. Não há invocação automática em nenhum hook, nem cron, nem trigger. O sistema pode estar doente por sessões inteiras sem o agente/usuário saber.
@@ -842,6 +861,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-56 — `add-task.sh`/`complete-task.sh` em desalinhamento com `manage_todo_list`
 
 **Severidade**: 🟢 BAIXO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: `scripts/add-task.sh`, `scripts/complete-task.sh`
 
 **Descrição**: O agente usa `manage_todo_list` (ferramenta nativa do VS Code) para gerenciar TODOs. Os scripts shell operam em `pending-tasks.md` de forma independente. Não há sincronização: alterações via `manage_todo_list` não aparecem em `pending-tasks.md` e vice-versa. Os dois sistemas de tarefas coexistem sem integração.
@@ -853,6 +873,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-57 — Sem estratégia de recuperação para `session.json` corrompido
 
 **Severidade**: 🟠 ALTO
+**Status**: ✅ RESOLVIDO — Round 6 (pendente commit)
 **Localização**: Suíte de hooks geral
 
 **Descrição**: Se `session.json` ficar corrompido (ex: por GAP-01), `state_exists()` retorna falso, e todos os hooks fazem auto-init criando nova sessão. Isso é silencioso — o usuário/agente não sabe que o estado foi perdido. O `audit.jsonl` e `session-briefing.md` do estado anterior ficam órfãos.
@@ -879,6 +900,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-59 — `generate_session_briefing()` duplica `read_field()` com `jq` inline
 
 **Severidade**: 🟢 BAIXO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/common.sh:460-510`
 
 **Descrição**: A função lê `state=$(cat "$STATE_FILE")` e então usa `printf '%s' "$state" | jq -r '...'` repetidamente, em vez de usar `read_field()` já disponível. Duplicação de código e parsing redundante do arquivo.
@@ -890,6 +912,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-60 — Ausência de `SessionEnd` em `hooks.json`
 
 **Severidade**: 🟢 BAIXO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `.github/hooks/hooks.json`
 
 **Descrição**: O evento `SessionEnd` existe no formato Copilot CLI mas não está registrado. Mesmo reconhecendo que é instável (LIM-01), registrá-lo com um handler simples de logging permitiria capturar os casos em que o evento funciona corretamente — fornecendo dados empíricos sobre sua confiabilidade.
@@ -901,6 +924,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-61 — `session-start-lib.sh` não usa módulo 05-output.sh para emitir additionalContext
 
 **Severidade**: 🟢 BAIXO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `lib/session-start-lib.sh:133-137`
 
 **Descrição**: `session_start_main()` chama `emit_additional_context()` de `common.sh` em vez de `hook_out_session_start_context()` de `05-output.sh`. As duas funções produzem output idêntico, mas o código novo deveria usar a API unificada do módulo 05 para consistência.
@@ -912,6 +936,7 @@ ls .github/hooks/state/debug/payloads/              # ver capturas
 ### GAP-62 — Sem validação de que `hooks.json` timeout é adequado para cada operação
 
 **Severidade**: 🟡 MÉDIO
+**Status**: ✅ RESOLVIDO — commit `666329eb`
 **Localização**: `.github/hooks/hooks.json`
 
 **Descrição**: Todos os hooks têm timeout de 30s, exceto `SessionStart` (60s) e `Stop` (45s). Porém `SessionStart` executa `init_state()` + `generate_session_briefing()` + `build_additional_context()` + múltiplos `jq` + I/O de arquivo. Em sistemas lentos (DevContainer cold start), pode exceder 60s. `PreCompact` pode processar estado grande e também tem apenas 30s.

@@ -170,6 +170,50 @@ init_state() {
         }' > "$STATE_FILE"
 }
 
+# recover_or_init_state — GAP-57: tenta recuperar state de checkpoint antes de init_state()
+# Se session.json não existe/está corrompido: restaura do checkpoint mais recente válido,
+# ou faz init_state limpo. Registra no audit.jsonl o que aconteceu.
+# Uso: recover_or_init_state "session_id" ["new"|"reconnect"]
+recover_or_init_state() {
+    local session_id="${1:-unknown}"
+    local source="${2:-new}"
+
+    # Se state já existe e é válido, nada a recuperar
+    if state_exists 2>/dev/null; then
+        return 0
+    fi
+
+    local checkpoint_dir="$STATE_DIR/checkpoints"
+
+    # Tenta o checkpoint mais recente que seja JSON válido
+    if [ -d "$checkpoint_dir" ]; then
+        local best_cp=""
+        # Mais recente primeiro (ls -t)
+        while IFS= read -r cp; do
+            if jq empty "$cp" 2>/dev/null; then
+                best_cp="$cp"
+                break
+            fi
+        done < <(ls -t "$checkpoint_dir"/session-*.json 2>/dev/null)
+
+        if [ -n "$best_cp" ]; then
+            cp "$best_cp" "$STATE_FILE" 2>/dev/null || true
+            if state_exists 2>/dev/null; then
+                hook_log_audit "state_recovered_from_checkpoint" \
+                    "checkpoint" "$(basename "$best_cp")" \
+                    "session_id" "$session_id"
+                return 0
+            fi
+        fi
+    fi
+
+    # Nenhum checkpoint válido — init limpo
+    init_state "$session_id" "$source"
+    hook_log_audit "state_initialized_clean" \
+        "session_id" "$session_id" \
+        "source" "$source"
+}
+
 # ---------------------------------------------------------------------------
 # Função de log de auditoria (canônica — Parte 10.10 do plano)
 # [LEGADO — DEPRECADO] Use hook_log_audit() de api/15-audit.sh
@@ -515,6 +559,12 @@ count_tool_use() {
 BRIEFING_FILE="$STATE_DIR/session-briefing.md"
 PENDING_TASKS_FILE="$STATE_DIR/pending-tasks.md"
 
+# sanitize_md — remove chars que quebrariam formatação Markdown em heredoc (GAP-35)
+# Remove: backticks, pipe, hash inicial, backslash de escape
+sanitize_md() {
+    printf '%s' "${1:-}" | tr -d '`\\' | tr '|' '-' | tr -d '\r'
+}
+
 # Gera (ou regenera) $BRIEFING_FILE com base no estado atual da sessão.
 # O arquivo é usado pelo agente como contexto de início/retomada de sessão.
 generate_session_briefing() {
@@ -551,6 +601,13 @@ generate_session_briefing() {
     tools_total="${tools_total:-0}"
     tools_blocked="${tools_blocked:-0}"
     subagents_total="${subagents_total:-0}"
+
+    # GAP-35: sanitizar campos string para evitar injeção de Markdown no heredoc
+    session_id=$(sanitize_md "$session_id")
+    close_key=$(sanitize_md "$close_key")
+    started_at=$(sanitize_md "$started_at")
+    source=$(sanitize_md "$source")
+    current_turn_source=$(sanitize_md "$current_turn_source")
 
     # Lê pending-tasks.md se existir
     if [ -f "$PENDING_TASKS_FILE" ]; then
