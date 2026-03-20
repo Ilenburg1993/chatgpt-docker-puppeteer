@@ -170,21 +170,25 @@ init_state() {
                 "intent": "",
                 "source": "unknown",
                 "ask_questions_called": false,
+                "ask_questions_turn_pos": 0,
                 "subturn_count": 0,
-                "tools_count": 0
+                "tools_count": 0,
+                "subagents_started": 0
             },
             "current_subturn": {
                 "number": 0,
                 "subturn_id": null,
                 "started_at": null,
                 "ended_at": null,
-                "response_at": null
+                "response_at": null,
+                "duration_ms": 0
             },
             "session_stats": {
                 "turn_count": 0,
                 "turn_authorized": 0,
                 "turn_unauthorized": 0,
                 "subturn_total": 0,
+                "subturn_duration_total_ms": 0,
                 "tools_total": 0,
                 "tools_blocked": 0,
                 "subagents_active": 0,
@@ -441,8 +445,14 @@ increment_field() {
     current=$(read_field "$path")
     new_val=$((${current:-0} + 1))
     tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
-    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
-    mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
+    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp" || {
+        rm -f "$tmp"
+        return 1
+    }
+    mv -f "$tmp" "$STATE_FILE" || {
+        rm -f "$tmp"
+        return 1
+    }
     printf '%d' "$new_val"
 }
 
@@ -452,10 +462,16 @@ decrement_field_floor0() {
     local path="$1"
     local current new_val tmp
     current=$(read_field "$path")
-    new_val=$(( ${current:-0} > 0 ? ${current:-0} - 1 : 0 ))
+    new_val=$((${current:-0} > 0 ? ${current:-0} - 1 : 0))
     tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
-    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
-    mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
+    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp" || {
+        rm -f "$tmp"
+        return 1
+    }
+    mv -f "$tmp" "$STATE_FILE" || {
+        rm -f "$tmp"
+        return 1
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -530,9 +546,11 @@ open_new_turn() {
     update_nested_state "current_turn.ended_at" "null"
     update_nested_state "current_turn.source" "$turn_source"
     update_nested_state "current_turn.ask_questions_called" "false"
+    update_nested_state "current_turn.ask_questions_turn_pos" "0"
     update_nested_state "current_turn.subturn_count" "0"
     update_nested_state "current_turn.tools_count" "0"
     update_nested_state "current_turn.intent" ""
+    update_nested_state "current_turn.subagents_started" "0"
 
     printf '%d' "$turn_num"
 }

@@ -87,16 +87,22 @@ user_prompt_submit_main() {
     local _was_auto_init=0
     ensure_state_initialized "$session_id" || _was_auto_init=1
 
-    # GAP-15: Se sessão foi auto-inicializada aqui (sem SessionStart), emitir systemMessage
-    # para que o agente saiba que o sistema de hooks está ativo e há regras de sessão.
-    if [ "$_was_auto_init" -eq 1 ]; then
+    # --- Passo 2: Cura turno órfão se necessário ---
+    maybe_heal_orphaned_turn
+
+    # --- Passo 2b: UP-03 — alerta proativo de compliance ---
+    # Se consecutive_unauthorized >= 2, emite systemMessage de alerta imediato
+    # (antes de abrir o novo turno, enquanto o counter ainda reflete o estado anterior)
+    local _consec
+    _consec=$(read_field ".compliance.consecutive_unauthorized" 2> /dev/null || printf '0')
+    _consec="${_consec:-0}"
+    if [ "${_consec}" -ge 2 ] 2> /dev/null; then
+        hook_out_system_message "⚠️ COMPLIANCE: ${_consec} turnos consecutivos sem vscode_askQuestions. Chame Template D AGORA antes de qualquer trabalho novo. Turno atual não pode ser encerrado sem essa chamada (stop hook bloqueará se ativo)."
+    elif [ "$_was_auto_init" -eq 1 ]; then
         local _close_key
         _close_key=$(read_field ".close_key")
         hook_out_system_message "Sessão iniciada automaticamente pelo sistema de hooks. Protocolo de session ativo. Close-key registrada. Use vscode_askQuestions para autorizar encerramento de turno."
     fi
-
-    # --- Passo 2: Cura turno órfão se necessário ---
-    maybe_heal_orphaned_turn
 
     # --- Passo 3: Abre novo TURN ---
     local turn_num

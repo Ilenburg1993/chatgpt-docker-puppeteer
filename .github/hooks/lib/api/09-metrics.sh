@@ -31,7 +31,7 @@
 # Retorna integer (string) de .session_stats.turn_count; 0 se ausente
 hook_stat_turn_count() {
     local val
-    val=$(read_field '.session_stats.turn_count' 2>/dev/null || printf '0')
+    val=$(read_field '.session_stats.turn_count' 2> /dev/null || printf '0')
     printf '%s' "${val:-0}"
 }
 
@@ -39,7 +39,7 @@ hook_stat_turn_count() {
 # Retorna integer string de .session_stats.turn_authorized; 0 se ausente
 hook_stat_turn_authorized() {
     local val
-    val=$(read_field '.session_stats.turn_authorized' 2>/dev/null || printf '0')
+    val=$(read_field '.session_stats.turn_authorized' 2> /dev/null || printf '0')
     printf '%s' "${val:-0}"
 }
 
@@ -47,7 +47,7 @@ hook_stat_turn_authorized() {
 # Retorna integer string de .session_stats.turn_unauthorized; 0 se ausente
 hook_stat_turn_unauthorized() {
     local val
-    val=$(read_field '.session_stats.turn_unauthorized' 2>/dev/null || printf '0')
+    val=$(read_field '.session_stats.turn_unauthorized' 2> /dev/null || printf '0')
     printf '%s' "${val:-0}"
 }
 
@@ -55,7 +55,7 @@ hook_stat_turn_unauthorized() {
 # Retorna integer string de .session_stats.subturn_total; 0 se ausente
 hook_stat_subturn_total() {
     local val
-    val=$(read_field '.session_stats.subturn_total' 2>/dev/null || printf '0')
+    val=$(read_field '.session_stats.subturn_total' 2> /dev/null || printf '0')
     printf '%s' "${val:-0}"
 }
 
@@ -63,7 +63,7 @@ hook_stat_subturn_total() {
 # Retorna integer string de .session_stats.tools_total; 0 se ausente
 hook_stat_tools_total() {
     local val
-    val=$(read_field '.session_stats.tools_total' 2>/dev/null || printf '0')
+    val=$(read_field '.session_stats.tools_total' 2> /dev/null || printf '0')
     printf '%s' "${val:-0}"
 }
 
@@ -73,7 +73,7 @@ hook_stat_tools_total() {
 # Retorna integer string de .current_turn.number; 0 se ausente
 hook_turn_number() {
     local val
-    val=$(read_field '.current_turn.number' 2>/dev/null || printf '0')
+    val=$(read_field '.current_turn.number' 2> /dev/null || printf '0')
     printf '%s' "${val:-0}"
 }
 
@@ -81,7 +81,7 @@ hook_turn_number() {
 # Retorna "true" ou "false"
 hook_turn_ask_called() {
     local val
-    val=$(read_field '.current_turn.ask_questions_called' 2>/dev/null || printf 'false')
+    val=$(read_field '.current_turn.ask_questions_called' 2> /dev/null || printf 'false')
     case "${val:-false}" in
         true) printf 'true' ;;
         *) printf 'false' ;;
@@ -91,7 +91,7 @@ hook_turn_ask_called() {
 # 🟧 hook_turn_started_at — ISO8601 de quando o turno atual começou
 # Retorna string ou vazio se ausente
 hook_turn_started_at() {
-    read_field '.current_turn.started_at' 2>/dev/null || printf ''
+    read_field '.current_turn.started_at' 2> /dev/null || printf ''
 }
 
 # ─── SEÇÃO 9C: GETTERS DE compliance ─────────────────────────────────────────
@@ -100,7 +100,7 @@ hook_turn_started_at() {
 # Retorna integer string de .compliance.consecutive_unauthorized; 0 se ausente
 hook_compliance_consecutive() {
     local val
-    val=$(read_field '.compliance.consecutive_unauthorized' 2>/dev/null || printf '0')
+    val=$(read_field '.compliance.consecutive_unauthorized' 2> /dev/null || printf '0')
     printf '%s' "${val:-0}"
 }
 
@@ -108,7 +108,7 @@ hook_compliance_consecutive() {
 # Retorna "true" ou "false"
 hook_compliance_last_authorized() {
     local val
-    val=$(read_field '.compliance.last_turn_authorized' 2>/dev/null || printf 'false')
+    val=$(read_field '.compliance.last_turn_authorized' 2> /dev/null || printf 'false')
     case "${val:-false}" in
         true) printf 'true' ;;
         *) printf 'false' ;;
@@ -120,7 +120,7 @@ hook_compliance_last_authorized() {
 # 🟧 hook_session_close_key — retorna a close_key armazenada no session.json
 # Retorna string "ENCERRAR-XXXXXXXX" ou vazio se ausente
 hook_session_close_key() {
-    read_field '.close_key' 2>/dev/null || printf ''
+    read_field '.close_key' 2> /dev/null || printf ''
 }
 
 # ─── SEÇÃO 9E: PREDICADOS DE SAÚDE ───────────────────────────────────────────
@@ -140,19 +140,52 @@ hook_needs_askquestions() {
     [ "${turn_num:-0}" -gt 0 ] && [ "$ask_called" = "false" ]
 }
 
+# ─── UTILITÁRIO INTERNO: conversão epoch portável ────────────────────────────
+
+# UP-07: helper portável para obter epoch de uma string ISO-8601.
+# Tenta GNU date -d, depois BSD date -j, depois awk como último recurso POSIX.
+# Retorna epoch em segundos (inteiro), ou "0" em caso de falha.
+# Uso: epoch=$(_iso_to_epoch "2026-03-20T10:00:00Z")
+_iso_to_epoch() {
+    local ts="$1"
+    local epoch
+
+    # GNU date (Linux)
+    epoch=$(date -d "$ts" '+%s' 2> /dev/null) && [ -n "$epoch" ] && printf '%s' "$epoch" && return
+
+    # BSD date (macOS)
+    # Converte "2026-03-20T10:00:00Z" → "20260320100000" para -j -f
+    local ts_bsd
+    ts_bsd=$(printf '%s' "$ts" | tr -d ':-' | cut -c1-14)
+    epoch=$(date -j -f '%Y%m%d%H%M%S' "$ts_bsd" '+%s' 2> /dev/null) \
+        && [ -n "$epoch" ] && printf '%s' "$epoch" && return
+
+    # Fallback awk (POSIX puro — via mktime se disponível em gawk/nawk/mawk)
+    epoch=$(awk -v ts="$ts" 'BEGIN {
+        gsub(/[-T:Z]/, " ", ts)
+        split(ts, a, " ")
+        printf "%d\n", mktime(a[1]" "a[2]" "a[3]" "a[4]" "a[5]" "a[6]) + 0
+    }' /dev/null 2> /dev/null)
+    [ -n "$epoch" ] && [ "$epoch" != "0" ] && printf '%s' "$epoch" && return
+
+    # Último recurso: retorna 0 (não será falso-positivo — só não vai detectar órfãos)
+    printf '0'
+}
+
 # 🟧 hook_is_orphan_turn — retorna 0 se turno está aberto há mais de ORPHAN_THRESHOLD segundos
 # Turno órfão: started_at existe + elapsed > threshold (default: 3600 segundos = 1h)
 # Uso: HOOK_ORPHAN_THRESHOLD=7200 hook_is_orphan_turn  (para customizar)
+# UP-07: usa _iso_to_epoch() portável (GNU+BSD+awk) em vez de date -d literal
 hook_is_orphan_turn() {
-    local started_at threshold now elapsed
+    local started_at threshold now elapsed epoch_start
     started_at=$(hook_turn_started_at)
-    [ -z "$started_at" ] && return 1  # sem started_at → não é órfão
+    [ -z "$started_at" ] && return 1 # sem started_at → não é órfão
 
     threshold="${HOOK_ORPHAN_THRESHOLD:-3600}"
 
-    # Converte ISO8601 para epoch usando date
-    now=$(date '+%s' 2>/dev/null || printf '0')
-    elapsed=$(( now - $(date -d "$started_at" '+%s' 2>/dev/null || printf "$now") ))
+    now=$(date '+%s' 2> /dev/null || printf '0')
+    epoch_start=$(_iso_to_epoch "$started_at")
+    elapsed=$((now - epoch_start))
 
     [ "$elapsed" -gt "$threshold" ]
 }

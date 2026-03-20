@@ -130,12 +130,14 @@ hook_is_git_commit() {
 }
 
 # 🔵 PreToolUse de ferramentas potencialmente destrutivas (precisa atenção especial)
-# Inclui: rm -rf/-f, git reset --hard, git push --force, git clean -f, DROP TABLE, truncate, dd
+# Inclui: rm -rf/-f, git reset --hard, git push --force/--force-with-lease/--force-if-includes,
+#         git clean -f(d), DROP TABLE, truncate, dd
 # NEW-C: padrão ampliado para capturar rm -f, git clean -f(d), dd if=/dev/...
+# UP-08: adicionado --force-with-lease e --force-if-includes (reescrita de histórico equivalente)
 hook_is_destructive_cmd() {
     hook_is_run_in_terminal || return 1
     printf '%s' "$HOOK_TOOL_COMMAND" \
-        | grep -qE '\brm\s+-[a-zA-Z]*[fr][a-zA-Z]*\b|git\s+reset\s+--hard|git\s+push\s+.*--force|git\s+clean\s+.*-[a-zA-Z]*f|DROP\s+TABLE|truncate\s+/|\bdd\b.*\bof='
+        | grep -qE '\brm\s+-[a-zA-Z]*[fr][a-zA-Z]*\b|git\s+reset\s+--hard|git\s+push\s+.*(--force|--force-with-lease|--force-if-includes)|git\s+clean\s+.*-[a-zA-Z]*f|DROP\s+TABLE|truncate\s+/|\bdd\b.*\bof='
 }
 
 # 🔵 PreToolUse de semantic_search ou runSubagent (ferramentas com custo de IA)

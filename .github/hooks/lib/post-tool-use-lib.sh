@@ -38,15 +38,39 @@ post_tool_use_main() {
         update_nested_state "current_subturn.response_at" "$_now_ts"
         update_nested_state "current_subturn.ended_at" "$_now_ts"
 
+        # UP-04: calcula e acumula duração do subturn em ms (se started_at disponível)
+        local _st_ms _et_ms _dur_ms _prev_total _prev_count _new_total
+        _st_ms=$(read_field '.current_subturn.started_at' 2> /dev/null)
+        if [ -n "$_st_ms" ] && [ "$_st_ms" != "null" ]; then
+            # usa _iso_to_epoch (portável, UP-07) + transforma em ms via multiplicação
+            _st_ms_epoch=$(_iso_to_epoch "$_st_ms" 2> /dev/null || printf '0')
+            _et_ms_epoch=$(_iso_to_epoch "$_now_ts" 2> /dev/null || printf '0')
+            _dur_ms=$(((_et_ms_epoch - _st_ms_epoch) * 1000))
+            if [ "$_dur_ms" -ge 0 ] 2> /dev/null; then
+                _prev_total=$(read_field '.session_stats.subturn_duration_total_ms' 2> /dev/null || printf '0')
+                _prev_count=$(read_field '.session_stats.subturn_total' 2> /dev/null || printf '1')
+                _prev_total="${_prev_total:-0}"
+                _prev_count="${_prev_count:-1}"
+                _new_total=$((_prev_total + _dur_ms))
+                update_nested_state "session_stats.subturn_duration_total_ms" "$_new_total"
+                update_nested_state "current_subturn.duration_ms" "$_dur_ms"
+            fi
+        fi
+
         # NEW-M: sincroniza pending-tasks.md quando manage_todo_list é chamado
         hook_sync_pending_tasks 2> /dev/null || true
 
         if hook_is_ask_questions; then
+            # UP-11: registra posição (tools_count) em que ask_questions foi chamado neste turno
+            local _turn_tool_pos
+            _turn_tool_pos=$(read_field '.current_turn.tools_count' 2> /dev/null || printf '0')
+            update_nested_state "current_turn.ask_questions_turn_pos" "${_turn_tool_pos:-0}"
+
             # Seta ask_questions_called = true (pós-resposta, não no PreToolUse)
             update_nested_state "current_turn.ask_questions_called" "true"
 
             hook_log_audit "subturnEnd" "turn" "$turn_num"
-            hook_log_audit "askQuestions_responded" "turn" "$turn_num"
+            hook_log_audit "askQuestions_responded" "turn" "$turn_num" "turn_pos" "${_turn_tool_pos:-0}"
 
             # --- Detecta close_key na resposta (via API — elimina parse manual) ---
             if hook_close_key_in_response; then

@@ -169,6 +169,13 @@ session_start_main() {
     [ -z "$session_id" ] && session_id="session-$(uuidgen_safe)"
     export SESSION_ID="$session_id"
 
+    # UP-09: limpeza defensiva de arquivos .state.XXXXXX órfãos (crashes anteriores)
+    # Remove qualquer temp file criado por write_state() que ficou abandonado
+    find "$STATE_DIR" -maxdepth 1 -name '.state.*' -type f 2> /dev/null | while IFS= read -r _tf; do
+        rm -f "$_tf" 2> /dev/null || true
+        hook_log_audit "stale_temp_cleaned" "file" "$_tf" 2> /dev/null || true
+    done
+
     local source
 
     if is_reconnect "$session_id"; then

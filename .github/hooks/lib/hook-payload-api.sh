@@ -185,11 +185,11 @@ hook_api_parse() {
     # _HV_ERRORS/_HV_WARNINGS sejam acessíveis no processo atual após a chamada.
     # Antes (bugado): _val_result=$(hook_validate_payload ...) → _val_result sempre vazio
     if type hook_validate_payload > /dev/null 2>&1; then
-        hook_validate_payload 2>/dev/null || true
-        if hook_validate_has_errors 2>/dev/null && type log_audit > /dev/null 2>&1; then
+        hook_validate_payload 2> /dev/null || true
+        if hook_validate_has_errors 2> /dev/null && type log_audit > /dev/null 2>&1; then
             log_audit "payload_validation_warnings" \
                 "event" "${HOOK_EVENT:-unknown}" \
-                "error_count" "$(hook_validate_error_count 2>/dev/null || printf '0')"
+                "error_count" "$(hook_validate_error_count 2> /dev/null || printf '0')"
         fi
     fi
 

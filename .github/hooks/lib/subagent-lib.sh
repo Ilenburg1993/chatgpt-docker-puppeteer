@@ -25,12 +25,15 @@ export_lang_utf8
 # ---------------------------------------------------------------------------
 
 # Incrementa subagents_active e subagents_total no state
+# Também incrementa current_turn.subagents_started (UP-U: campo antes nunca populado)
 # Retorna o novo valor de subagents_active
 # NEW-I: refatorado para usar increment_field (atômico, consistente com common.sh)
 subagent_start_counters() {
     local new_active
     new_active=$(increment_field '.session_stats.subagents_active')
     increment_field '.session_stats.subagents_total' > /dev/null
+    # UP-U: incrementa contador de subagentes por turno (alimenta hook_subagent_count_turn)
+    increment_field '.current_turn.subagents_started' > /dev/null 2>&1 || true
     printf '%d' "${new_active:-1}"
 }
 

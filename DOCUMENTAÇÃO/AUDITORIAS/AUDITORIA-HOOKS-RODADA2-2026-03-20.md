@@ -1,6 +1,6 @@
 # Auditoria de Hooks — 2ª Rodada (2026-03-20)
 
-**Status**: Em progresso → RESOLVIDO  
+**Status**: Em progresso → RESOLVIDO
 **Contexto**: Esta é a segunda rodada de auditoria do sistema de hooks. A primeira (62 GAPs) foi
 concluída e todos os itens estão marcados como RESOLVIDO no documento
 `AUDITORIA-GERAL-HOOKS-2026-03-19.md`.
@@ -16,19 +16,19 @@ concluída e todos os itens estão marcados como RESOLVIDO no documento
 
 ## Resumo Executivo
 
-| Severidade | Quantidade | Status      |
-|------------|-----------|-------------|
-| HIGH       | 1         | RESOLVIDO   |
-| MEDIUM     | 5         | RESOLVIDO   |
-| LOW        | 5         | RESOLVIDO   |
-| **Total**  | **11**    |             |
+| Severidade | Quantidade | Status    |
+| ---------- | ---------- | --------- |
+| HIGH       | 1          | RESOLVIDO |
+| MEDIUM     | 5          | RESOLVIDO |
+| LOW        | 5          | RESOLVIDO |
+| **Total**  | **11**     |           |
 
 ---
 
 ## NEW-J — HIGH: `hook_validate_payload` chamado em subshell (validação rica morta)
 
-**Arquivo**: `.github/hooks/lib/hook-payload-api.sh`  
-**Severidade**: HIGH  
+**Arquivo**: `.github/hooks/lib/hook-payload-api.sh`
+**Severidade**: HIGH
 **Tipo**: Bug silencioso (comportamento incorreto, código compila sem erro)
 
 ### Descrição
@@ -72,8 +72,8 @@ _val_result=$(hook_validate_load 2>/dev/null || true)
 
 ## NEW-K — MEDIUM: Migração de schema define `strict_turn_close=false`
 
-**Arquivo**: `.github/hooks/lib/api/13-state-version.sh`  
-**Severidade**: MEDIUM  
+**Arquivo**: `.github/hooks/lib/api/13-state-version.sh`
+**Severidade**: MEDIUM
 **Tipo**: Bug de lógica — viola invariante do protocolo
 
 ### Descrição
@@ -106,8 +106,8 @@ update_nested_state 'strict_turn_close' 'true' 2>/dev/null || true
 
 ## NEW-A — MEDIUM: `increment_field` e `decrement_field_floor0` sem cleanup de temp file
 
-**Arquivo**: `.github/hooks/lib/common.sh`  
-**Severidade**: MEDIUM  
+**Arquivo**: `.github/hooks/lib/common.sh`
+**Severidade**: MEDIUM
 **Tipo**: Inconsistência de tratamento de erros / possível corrupção de state
 
 ### Descrição
@@ -145,8 +145,8 @@ mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
 
 ## NEW-C — MEDIUM: `hook_is_destructive_cmd` regex incompleto
 
-**Arquivo**: `.github/hooks/lib/api/04-predicates.sh`  
-**Severidade**: MEDIUM  
+**Arquivo**: `.github/hooks/lib/api/04-predicates.sh`
+**Severidade**: MEDIUM
 **Tipo**: Segurança — comandos destrutivos não detectados
 
 ### Descrição
@@ -179,7 +179,7 @@ Ampliar o padrão de regex para incluir estas variantes:
 
 ## NEW-I — MEDIUM: `subagent_start/stop_counters` usam read-modify-write manual
 
-**Arquivo**: `.github/hooks/lib/subagent-lib.sh`  
+**Arquivo**: `.github/hooks/lib/subagent-lib.sh`
 **Severidade**: MEDIUM (baixo impacto prático mas inconsistência arquitetural)
 **Tipo**: Inconsistência — deveria usar `increment_field`/`decrement_field_floor0`
 
@@ -223,8 +223,8 @@ subagent_stop_counters() {
 
 ## NEW-L — MEDIUM: `extract_prompt_preview` usa `head -c80` (não UTF-8 safe)
 
-**Arquivo**: `.github/hooks/lib/user-prompt-submit-lib.sh`  
-**Severidade**: MEDIUM  
+**Arquivo**: `.github/hooks/lib/user-prompt-submit-lib.sh`
+**Severidade**: MEDIUM
 **Tipo**: Regressão — GAP-12 foi corrigido em `subagent-lib.sh` mas não aqui
 
 ### Descrição
@@ -253,8 +253,8 @@ printf '%s' "$prompt" | cut -c1-80
 
 ## NEW-D — LOW: `hook_response_has_error` — padrões apenas em inglês
 
-**Arquivo**: `.github/hooks/lib/api/04-predicates.sh`  
-**Severidade**: LOW  
+**Arquivo**: `.github/hooks/lib/api/04-predicates.sh`
+**Severidade**: LOW
 **Tipo**: Completude — não detecta erros em português
 
 ### Descrição
@@ -282,8 +282,8 @@ grep -qiE '\berror\b|\bfail\b|\bexception\b|\bfatal\b|\berro\b|\bfalha\b|\bfalho
 
 ## NEW-F — LOW: `\x27` em bracket expression não porta em todos os shells
 
-**Arquivo**: `.github/hooks/lib/pre-tool-use-lib.sh`  
-**Severidade**: LOW  
+**Arquivo**: `.github/hooks/lib/pre-tool-use-lib.sh`
+**Severidade**: LOW
 **Tipo**: Portabilidade de shell
 
 ### Descrição
@@ -312,8 +312,8 @@ Usar a aspa literal escapada por variável ou usar `'"'"'` para incluir aspas si
 
 ## NEW-G — LOW: Comparação `turn_count -eq 0` frágil com `2>/dev/null` parcial
 
-**Arquivo**: `.github/hooks/lib/stop-lib.sh`  
-**Severidade**: LOW  
+**Arquivo**: `.github/hooks/lib/stop-lib.sh`
+**Severidade**: LOW
 **Tipo**: Robustez — edge case de estado corrompido
 
 ### Descrição
@@ -344,8 +344,8 @@ Usar aritmética defensiva com fallback:
 
 ## NEW-H — LOW: `wc -l` produz output com espaços à esquerda em alguns sistemas
 
-**Arquivo**: `.github/hooks/lib/session-close-lib.sh`  
-**Severidade**: LOW  
+**Arquivo**: `.github/hooks/lib/session-close-lib.sh`
+**Severidade**: LOW
 **Tipo**: Portabilidade
 
 ### Descrição
