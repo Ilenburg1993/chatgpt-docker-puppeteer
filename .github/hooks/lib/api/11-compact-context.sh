@@ -48,6 +48,21 @@ hook_compact_ctx_session_summary() {
     printf -- '- Chave de encerramento: `%s`\n' "${close_key:-N/A}"
 }
 
+# 🟧 hook_compact_ctx_tools_histogram — UP-10: histograma top-10 de ferramentas usadas
+# Lê session_stats.tools_by_type e formata ranking markdown
+# Retorna string markdown (sem trailing newline)
+hook_compact_ctx_tools_histogram() {
+    local tools_json
+    tools_json=$(read_field '.session_stats.tools_by_type' 2> /dev/null || printf '{}')
+    if [ -z "$tools_json" ] || [ "$tools_json" = "null" ] || [ "$tools_json" = "{}" ]; then
+        return 0
+    fi
+    printf '## Top Ferramentas Usadas\n'
+    printf '%s' "$tools_json" \
+        | jq -r 'to_entries | sort_by(-.value) | .[:10] | .[] | "- \(.key): \(.value)"' \
+            2> /dev/null || true
+}
+
 # 🟧 hook_compact_ctx_pending_tasks — seção markdown com tarefas pendentes
 # Lê pending-tasks.md do STATE_DIR; se ausente, retorna linha indicativa
 # Retorna string markdown
@@ -95,10 +110,13 @@ hook_compact_ctx_protocol_reminder() {
 # Retorna string markdown pronta para ser usada como additionalContext
 # Também popula HOOK_COMPACT_CONTEXT_BYTES com o tamanho em bytes
 hook_compact_ctx_full() {
-    local ctx
+    local ctx histogram
     ctx="$(hook_compact_ctx_session_summary)"$'\n\n'
     ctx+="$(hook_compact_ctx_close_key)"$'\n\n'
     ctx+="$(hook_compact_ctx_pending_tasks)"$'\n\n'
+    # UP-10: inclui histograma de ferramentas se disponível
+    histogram="$(hook_compact_ctx_tools_histogram 2> /dev/null)"
+    [ -n "$histogram" ] && ctx+="${histogram}"$'\n\n'
     ctx+="$(hook_compact_ctx_protocol_reminder)"
 
     HOOK_COMPACT_CONTEXT_BYTES="${#ctx}"

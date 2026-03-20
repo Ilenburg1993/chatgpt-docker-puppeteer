@@ -74,6 +74,16 @@ pre_compact_main() {
     save_checkpoint
     hook_log_audit "preCompact_checkpoint_saved"
 
+    # --- Passo 1b: UP-15 — warning se turno atual não chamou vscode_askQuestions ---
+    local _aq_called _turn_num
+    _aq_called=$(read_field '.current_turn.ask_questions_called' 2> /dev/null || printf 'false')
+    _turn_num=$(read_field '.current_turn.number' 2> /dev/null || printf '0')
+    if [ "${_aq_called}" = "false" ] && [ "${_turn_num:-0}" -gt 0 ]; then
+        hook_log_audit "preCompact_ask_questions_missing" \
+            "turn" "${_turn_num}" \
+            "warning" "vscode_askQuestions não chamado antes da compactação"
+    fi
+
     # --- Passo 2: Emitir additionalContext com briefing completo ---
     local ctx
     ctx=$(build_compact_context)

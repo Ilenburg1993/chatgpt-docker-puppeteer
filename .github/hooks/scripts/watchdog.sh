@@ -122,6 +122,20 @@ check_consecutive_violations() {
     fi
 }
 
+# UP-17: coerência entre session_stats.turn_count e eventos turnStart no audit.jsonl
+check_audit_coherence() {
+    if ! state_exists; then return 0; fi
+    [ -f "$AUDIT_FILE" ] || return 0
+    local state_turns audit_turns diff
+    state_turns=$(read_field ".session_stats.turn_count" 2> /dev/null || printf '0')
+    audit_turns=$(grep -c '"event":"turnStart"' "$AUDIT_FILE" 2> /dev/null || printf '0')
+    diff=$((state_turns - audit_turns))
+    [ "$diff" -lt 0 ] && diff=$((-diff))
+    if [ "$diff" -gt 2 ]; then
+        WARNINGS+=("Incoerência audit: turn_count no state ($state_turns) vs turnStart no audit ($audit_turns), diff=$diff")
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # Executar checks (|| true para não abortar em set -e quando encontra issues)
 # ---------------------------------------------------------------------------
@@ -133,6 +147,7 @@ check_hooks_json || true
 check_hook_commands || true
 check_pending_session_close || true
 check_consecutive_violations || true
+check_audit_coherence || true
 
 HEALTHY=1
 [ "${#ISSUES[@]}" -gt 0 ] && HEALTHY=0

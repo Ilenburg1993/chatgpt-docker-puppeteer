@@ -362,3 +362,55 @@ _hook_security_compute() {
     HOOK_SECURITY_SCORE=$(hook_input_command_score)
     export HOOK_SECURITY_FLAGS HOOK_SECURITY_SCORE
 }
+
+# ---------------------------------------------------------------------------
+# UP-12: GRUPOS SEMÂNTICOS DE FERRAMENTAS
+# ---------------------------------------------------------------------------
+
+# 🔵 Ferramentas de busca/leitura (não modificam estado)
+hook_is_search_tool() {
+    [ "$HOOK_EVENT" = "PreToolUse" ] || return 1
+    case "${HOOK_TOOL_NAME:-}" in
+        grep_search | semantic_search | file_search | tool_search_tool_regex | \
+            read_file | list_dir | get_errors) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# 🔵 Ferramentas de edição de código (criam ou modificam arquivos)
+hook_is_code_edit_tool() {
+    [ "$HOOK_EVENT" = "PreToolUse" ] || return 1
+    case "${HOOK_TOOL_NAME:-}" in
+        create_file | replace_string_in_file | multi_replace_string_in_file | \
+            edit_notebook_file) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# 🔵 Ferramentas de execução de processo/terminal
+hook_is_exec_tool() {
+    [ "$HOOK_EVENT" = "PreToolUse" ] || return 1
+    case "${HOOK_TOOL_NAME:-}" in
+        run_in_terminal | get_terminal_output | run_notebook_cell | \
+            run_playwright_code) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# 🔵 Ferramentas de comunicação com o usuário
+hook_is_communication_tool() {
+    [ "$HOOK_EVENT" = "PreToolUse" ] || return 1
+    case "${HOOK_TOOL_NAME:-}" in
+        vscode_askQuestions | memory) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# 🔵 Ferramentas de subagente/delegação
+hook_is_subagent_tool() {
+    [ "$HOOK_EVENT" = "PreToolUse" ] || return 1
+    case "${HOOK_TOOL_NAME:-}" in
+        runSubagent | search_subagent | switch_agent) return 0 ;;
+        *) return 1 ;;
+    esac
+}

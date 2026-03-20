@@ -67,6 +67,18 @@ hook_stat_tools_total() {
     printf '%s' "${val:-0}"
 }
 
+# 🟧 hook_stat_session_duration_seconds — duração da sessão em segundos (UP-18)
+# Retorna integer de (now - started_at); 0 se sessão não iniciada ou epoch indisponível
+hook_stat_session_duration_seconds() {
+    local started_at
+    started_at=$(read_field '.started_at' 2> /dev/null || printf '')
+    [ -z "$started_at" ] || [ "$started_at" = "null" ] && printf '0' && return 0
+    local now epoch_start
+    now=$(date +%s 2> /dev/null || printf '0')
+    epoch_start=$(_iso_to_epoch "$started_at" 2> /dev/null || printf "$now")
+    printf '%d' $((now - epoch_start))
+}
+
 # ─── SEÇÃO 9B: GETTERS DE current_turn ───────────────────────────────────────
 
 # 🟧 hook_turn_number — número do turno atual

@@ -171,6 +171,7 @@ init_state() {
                 "source": "unknown",
                 "ask_questions_called": false,
                 "ask_questions_turn_pos": 0,
+                "last_template": "",
                 "subturn_count": 0,
                 "tools_count": 0,
                 "subagents_started": 0
@@ -189,14 +190,20 @@ init_state() {
                 "turn_unauthorized": 0,
                 "subturn_total": 0,
                 "subturn_duration_total_ms": 0,
+                "subturn_count_timed": 0,
                 "tools_total": 0,
                 "tools_blocked": 0,
+                "tools_by_type": {},
                 "subagents_active": 0,
                 "subagents_total": 0
             },
             "compliance": {
                 "consecutive_unauthorized": 0,
-                "last_turn_authorized": true
+                "last_turn_authorized": true,
+                "template_usage": {"A":0,"B":0,"C":0,"D":0,"E":0,"F":0,"G":0},
+                "last_template": "",
+                "template_usage": {"A":0,"B":0,"C":0,"D":0,"E":0,"F":0,"G":0},
+                "last_template": ""
             }
         }' > "$STATE_FILE"
 }
@@ -284,45 +291,8 @@ log_audit() {
 #   emit_additional_context() → hook_out_additional_context() (05-output.sh)
 #   emit_permission_deny()  → hook_out_pre_deny()        (05-output.sh)
 #   emit_post_tool_block()  → hook_out_post_block()      (05-output.sh)
-# Mantidas para backward-compatibility — remover após migração completa das fat libs.
+# UP-16: funções depreciadas removidas — migração completa para 05-output.sh.
 # ---------------------------------------------------------------------------
-
-# @deprecated Use hook_out_stop_block() de 05-output.sh
-emit_stop_block() {
-    local reason="$1"
-    local escaped
-    escaped=$(printf '%s' "$reason" | jq -Rs .)
-    printf '{"hookSpecificOutput":{"hookEventName":"Stop","decision":"block","reason":%s},"systemMessage":%s}\n' \
-        "$escaped" "$escaped"
-}
-
-# @deprecated Use hook_out_additional_context() de 05-output.sh
-# Parâmetros: ctx (conteúdo), event_name (padrão: "SessionStart")
-emit_additional_context() {
-    local ctx="$1"
-    local event_name="${2:-SessionStart}"
-    local escaped
-    escaped="$(printf '%s' "$ctx" | jq -Rs .)"
-    printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":%s}}\n' \
-        "$event_name" "$escaped"
-}
-
-# @deprecated Use hook_out_pre_deny() de 05-output.sh
-emit_permission_deny() {
-    local reason="$1"
-    local escaped
-    escaped=$(printf '%s' "$reason" | jq -Rs .)
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\n' \
-        "$escaped"
-}
-
-# @deprecated Use hook_out_post_block() de 05-output.sh
-emit_post_tool_block() {
-    local reason="$1"
-    local escaped
-    escaped=$(printf '%s' "$reason" | jq -Rs .)
-    printf '{"decision":"block","reason":%s}\n' "$escaped"
-}
 
 # ---------------------------------------------------------------------------
 # Funções auxiliares
@@ -547,6 +517,7 @@ open_new_turn() {
     update_nested_state "current_turn.source" "$turn_source"
     update_nested_state "current_turn.ask_questions_called" "false"
     update_nested_state "current_turn.ask_questions_turn_pos" "0"
+    update_nested_state "current_turn.last_template" ""
     update_nested_state "current_turn.subturn_count" "0"
     update_nested_state "current_turn.tools_count" "0"
     update_nested_state "current_turn.intent" ""
@@ -589,11 +560,60 @@ open_new_subturn() {
     printf '%d' "$local_count"
 }
 
+# increment_tools_by_type — UP-01: incrementa contador por tipo de ferramenta
+# Uso: increment_tools_by_type "read_file"
+increment_tools_by_type() {
+    local tool_name="${1:-unknown}"
+    # Sanitiza: mantém apenas [a-zA-Z0-9_-] para evitar injeção de chaves jq
+    local safe_name
+    safe_name=$(printf '%s' "$tool_name" | tr -cd 'a-zA-Z0-9_-' | cut -c1-64)
+    [ -n "$safe_name" ] || safe_name="unknown"
+    local current new_val tmp
+    current=$(jq -r ".session_stats.tools_by_type[\"${safe_name}\"] // 0" "$STATE_FILE" 2> /dev/null || printf '0')
+    new_val=$((${current:-0} + 1))
+    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    jq --arg k "$safe_name" --argjson v "$new_val" \
+        '.session_stats.tools_by_type[$k] = $v' "$STATE_FILE" > "$tmp" || {
+        rm -f "$tmp"
+        return 0 # falha silenciosa — não crítico
+    }
+    mv -f "$tmp" "$STATE_FILE" || {
+        rm -f "$tmp"
+        return 0
+    }
+}
+
+# _increment_template_usage — UP-02: incrementa contador de uso por template (A-G)
+# Uso: _increment_template_usage "A"
+_increment_template_usage() {
+    local tmpl="${1:-}"
+    # Aceita apenas letras A-G
+    case "$tmpl" in
+        A | B | C | D | E | F | G) ;;
+        *) return 0 ;;
+    esac
+    local current new_val tmp
+    current=$(jq -r ".compliance.template_usage[\"${tmpl}\"] // 0" "$STATE_FILE" 2> /dev/null || printf '0')
+    new_val=$((${current:-0} + 1))
+    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    jq --arg k "$tmpl" --argjson v "$new_val" \
+        '.compliance.template_usage[$k] = $v' "$STATE_FILE" > "$tmp" || {
+        rm -f "$tmp"
+        return 0
+    }
+    mv -f "$tmp" "$STATE_FILE" || {
+        rm -f "$tmp"
+        return 0
+    }
+}
+
 # Incrementa tools_count do turno atual e tools_total da sessão.
 # Retorna o total de ferramentas do turno atual.
 # Uso: tool_num=$(count_tool_use)
 count_tool_use() {
     increment_field ".session_stats.tools_total" > /dev/null
+    # UP-01: rastreia contagem por tipo de ferramenta (HOOK_TOOL_NAME do payload)
+    [ -n "${HOOK_TOOL_NAME:-}" ] && increment_tools_by_type "$HOOK_TOOL_NAME" > /dev/null || true
     increment_field ".current_turn.tools_count"
 }
 

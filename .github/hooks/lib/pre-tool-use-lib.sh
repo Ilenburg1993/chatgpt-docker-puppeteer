@@ -86,6 +86,22 @@ pre_tool_use_main() {
     # --- Passo 3: Captura intenção do turno se start-turn.sh foi chamado ---
     maybe_capture_turn_intent "$HOOK_TOOL_INPUT"
 
+    # --- Passo 3b: UP-06 — rate limiting por turno ---
+    local _rl_limit="${HOOKS_TOOLS_LIMIT:-150}"
+    if state_exists; then
+        local _rl_cur
+        _rl_cur=$(read_field '.current_turn.tools_count' 2> /dev/null || printf '0')
+        if [ "${_rl_cur:-0}" -ge "$_rl_limit" ] 2> /dev/null; then
+            increment_field ".session_stats.tools_blocked" > /dev/null || true
+            hook_log_audit "preToolUse_rate_limited" \
+                "tool" "${HOOK_TOOL_NAME:-unknown}" \
+                "tools_count" "${_rl_cur}" \
+                "limit" "${_rl_limit}"
+            hook_out_pre_deny "⚠️ Rate limit: ${_rl_limit} chamadas de ferramenta por turno atingido. Chame vscode_askQuestions para encerrar o turno."
+            exit 0
+        fi
+    fi
+
     # --- Passo 4: Abre novo SUBTURN ---
     local subturn_num
     subturn_num=$(open_new_subturn)
@@ -93,6 +109,26 @@ pre_tool_use_main() {
     # --- Passo 5: Contabiliza tool use ---
     local tool_num
     tool_num=$(count_tool_use)
+
+    # UP-02: detecta template de vscode_askQuestions (A-G) pelo header da primeira pergunta
+    if [ "$HOOK_TOOL_NAME" = "vscode_askQuestions" ] && state_exists; then
+        local _tpl_header _tpl_id
+        _tpl_header=$(printf '%s' "${HOOK_ASK_QUESTIONS_JSON:-[]}" \
+            | jq -r '.[0].header // ""' 2> /dev/null || printf '')
+        case "$_tpl_header" in
+            "Proposta de upgrade"*) _tpl_id="C" ;;
+            "Próxima ação"*) _tpl_id="A" ;;
+            "Ação sobre bugs" | *"bugs"*) _tpl_id="B" ;;
+            "Checkpoint"*) _tpl_id="D" ;;
+            "Kickoff"*) _tpl_id="E" ;;
+            *"Encerrar"* | *"SESSION"*) _tpl_id="F" ;;
+            "Pré-autorização"*) _tpl_id="G" ;;
+            *) _tpl_id="" ;;
+        esac
+        if [ -n "$_tpl_id" ]; then
+            _increment_template_usage "$_tpl_id" > /dev/null || true
+        fi
+    fi
 
     # --- Passo 6: Log do subturnStart + toolUse ---
     local subturn_id turn_num

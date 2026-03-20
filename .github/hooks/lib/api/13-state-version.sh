@@ -20,6 +20,8 @@
 #                      completo, sem state_schema_version
 #   "1"              — v1.0: schema canônico com close_key, session_stats,
 #                      compliance, strict_turn_close, state_schema_version
+#   "2"              — v2.0 (UP-14): tools_by_type, template_usage, last_template,
+#                      subagents_started, ask_questions_turn_pos, duration_ms
 
 # ─── SEÇÃO 13A: LEITURA DE VERSÃO ────────────────────────────────────────────
 
@@ -117,6 +119,54 @@ hook_state_migrate() {
         fi
 
         recorded="1"
+    fi
+
+    # ── Migração 1 → 2 ──────────────────────────────────────────────────────
+    # Adiciona campos de Round 2: tools_by_type, template_usage, last_template, etc.
+    if [[ "$recorded" -lt "2" ]] 2> /dev/null; then
+        # session_stats.tools_by_type
+        local tbt
+        tbt="$(read_field '.session_stats.tools_by_type' 2> /dev/null)"
+        [[ -z "$tbt" || "$tbt" == "null" ]] \
+            && update_nested_state 'session_stats.tools_by_type' '{}' 2> /dev/null || true
+
+        # compliance.template_usage
+        local tmpl_usage
+        tmpl_usage="$(read_field '.compliance.template_usage' 2> /dev/null)"
+        [[ -z "$tmpl_usage" || "$tmpl_usage" == "null" ]] \
+            && update_nested_state 'compliance.template_usage' '{}' 2> /dev/null || true
+
+        # compliance.last_template
+        local last_tpl
+        last_tpl="$(read_field '.compliance.last_template' 2> /dev/null)"
+        [[ -z "$last_tpl" || "$last_tpl" == "null" ]] \
+            && update_nested_state 'compliance.last_template' '' 2> /dev/null || true
+
+        # current_turn.last_template
+        local ct_last_tpl
+        ct_last_tpl="$(read_field '.current_turn.last_template' 2> /dev/null)"
+        [[ -z "$ct_last_tpl" || "$ct_last_tpl" == "null" ]] \
+            && update_nested_state 'current_turn.last_template' '' 2> /dev/null || true
+
+        # current_turn.subagents_started
+        local sub_started
+        sub_started="$(read_field '.current_turn.subagents_started' 2> /dev/null)"
+        [[ -z "$sub_started" || "$sub_started" == "null" ]] \
+            && update_nested_state 'current_turn.subagents_started' '0' 2> /dev/null || true
+
+        # current_subturn.duration_ms
+        local dur_ms
+        dur_ms="$(read_field '.current_subturn.duration_ms' 2> /dev/null)"
+        [[ -z "$dur_ms" || "$dur_ms" == "null" ]] \
+            && update_nested_state 'current_subturn.duration_ms' '0' 2> /dev/null || true
+
+        # session_stats.subturn_duration_total_ms
+        local sdt_ms
+        sdt_ms="$(read_field '.session_stats.subturn_duration_total_ms' 2> /dev/null)"
+        [[ -z "$sdt_ms" || "$sdt_ms" == "null" ]] \
+            && update_nested_state 'session_stats.subturn_duration_total_ms' '0' 2> /dev/null || true
+
+        recorded="2"
     fi
 
     # Persiste a versão migrada

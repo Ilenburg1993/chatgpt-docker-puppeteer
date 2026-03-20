@@ -128,9 +128,12 @@ _hook_api_reset() {
     HOOK_SUBAGENT_BUDGET_LIMIT="50"
 
     # v2.4 — state versioning (populadas via hook_state_version_load)
-    HOOK_STATE_SCHEMA_CURRENT="1"   # versão canônica atual do schema
-    HOOK_STATE_VERSION="0"          # versão registrada no state (0 = legado)
+    HOOK_STATE_SCHEMA_CURRENT="2" # versão canônica atual do schema
+    HOOK_STATE_VERSION="0"        # versão registrada no state (0 = legado)
     HOOK_STATE_MIGRATION_NEEDED="false"
+
+    # v2.6 — rate limiting (UP-06)
+    HOOKS_TOOLS_LIMIT="${HOOKS_TOOLS_LIMIT:-150}"
 
     # v2.5 — strict validation schemas (populadas via hook_validate_load)
     HOOK_VALIDATION_ERRORS_JSON="[]"
