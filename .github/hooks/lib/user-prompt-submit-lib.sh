@@ -104,6 +104,11 @@ user_prompt_submit_main() {
         hook_out_system_message "Sessão iniciada automaticamente pelo sistema de hooks. Protocolo de session ativo. Close-key registrada. Use vscode_askQuestions para autorizar encerramento de turno."
     fi
 
+    # --- Passo 2c: UP-H4 — reforço de protocolo ao abrir cada turno ---
+    # Injeta systemMessage com lembrete de task_complete vs vscode_askQuestions
+    # Sempre ativo — compensa degradação de atenção em contextos longos
+    hook_out_system_message "📋 PROTOCOLO HOOKS (lembrete automático): Ao concluir trabalho neste turno → chame vscode_askQuestions (Template A/D/G) ANTES de task_complete. task_complete sem vscode_askQuestions anterior será BLOQUEADO pelo PreToolUse hook. Isso é incontornável."
+
     # --- Passo 3: Abre novo TURN ---
     local turn_num
     turn_num=$(open_new_turn)

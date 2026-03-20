@@ -38,6 +38,10 @@
 
 - CONCLUIR UMA SESSION/TURN SEM AUTORIZAÇÃO OU PEDIDO EXPRESSO DO USUÁRIO ATRAVÉS DE SELEÇÃO DE OPÇÃO OU FREETEXT ATRAVÉS DA TOOL VSCODE_ASKQUESTIONS. POR DEFAULT, UMA SESSION/TURN NUNCA PODE SER ENCERRADO POR DECISÃO AUTÔNOMA DO AGENTE.
 
+- CHAMAR `task_complete` SEM ANTES CHAMAR `vscode_askQuestions` NO MESMO TURNO. **O PreToolUse hook bloqueia automaticamente `task_complete` quando `vscode_askQuestions` não foi chamado.** Isso inclui turnos após git push, após commit, após último TODO concluído, após qualquer trabalho finalizado.
+
+- INTERPRETAR A INSTRUÇÃO DO VS CODE COPILOT DE CHAMAR `task_complete` QUANDO A TAREFA ESTÁ PRONTA COMO UMA AUTORIZAÇÃO PARA PULAR vscode_askQuestions. A sequência CORRETA É: concluir trabalho → chamar vscode_askQuestions (Template A) → aguardar usuário → depois task_complete.
+
 ## Checklist obrigatório no início/retomada
 
 Ler com `read_file`:

@@ -80,6 +80,25 @@ pre_tool_use_main() {
         exit 0
     fi
 
+    # --- Passo 1b: UP-H1 — bloqueia task_complete sem vscode_askQuestions ---
+    # task_complete sinaliza encerramento de turno para o VS Code Copilot.
+    # Se ask_questions_called=false, o turno ainda não foi autorizado pelo usuário.
+    # Esta camada é a mais confiável pois atua ANTES do signal de encerramento.
+    if [ "${HOOK_TOOL_NAME:-}" = "task_complete" ] && state_exists; then
+        local _h1_aq
+        _h1_aq=$(read_field '.current_turn.ask_questions_called' 2> /dev/null || printf 'false')
+        if [ "${_h1_aq:-false}" != "true" ]; then
+            increment_field ".session_stats.tools_blocked" > /dev/null || true
+            hook_log_audit "preToolUse_task_complete_blocked" \
+                "tool" "task_complete" \
+                "reason" "ask_questions_not_called_before_turn_close"
+            hook_out_pre_deny \
+                "🚫 task_complete bloqueado: você DEVE chamar vscode_askQuestions ANTES de encerrar o turno (Protocolo TODO v9.0)." \
+                "⚠️ PROTOCOLO OBRIGATÓRIO: Chame vscode_askQuestions (Template A para tarefa concluída, Template D para checkpoint) AGORA. task_complete NÃO substitui vscode_askQuestions — são dois sinais diferentes. Só após a resposta do usuário ao vscode_askQuestions você pode chamar task_complete."
+            exit 0
+        fi
+    fi
+
     # --- Passo 2: Garante state inicializado ---
     ensure_state_for_tool "$session_id"
 
@@ -109,6 +128,23 @@ pre_tool_use_main() {
     # --- Passo 5: Contabiliza tool use ---
     local tool_num
     tool_num=$(count_tool_use)
+
+    # UP-H3: injeção periódica de contexto a cada 15 ferramentas no turno
+    # Lembra o LLM do protocolo quando o contexto longo pode ter diminuído atenção
+    if state_exists; then
+        local _h3_tc _h3_aq
+        _h3_tc=$(read_field '.current_turn.tools_count' 2> /dev/null || printf '0')
+        _h3_aq=$(read_field '.current_turn.ask_questions_called' 2> /dev/null || printf 'false')
+        # Dispara no múltiplo de 15 (exceto zero) e apenas se turno ainda não autorizado
+        if [ "${_h3_tc:-0}" -gt 0 ] && [ "${_h3_aq:-false}" != "true" ] 2> /dev/null; then
+            if [ $((_h3_tc % 15)) -eq 0 ] 2> /dev/null; then
+                hook_log_audit "preToolUse_periodic_reminder" "tools_count" "${_h3_tc}"
+                hook_out_pre_allow \
+                    "⚠️ Lembrete de protocolo (tool #${_h3_tc} neste turno): ao concluir o trabalho deste turno, você DEVE chamar vscode_askQuestions ANTES de task_complete ou de encerrar. task_complete sem vscode_askQuestions ESTÁ BLOQUEADO. Use Template A para tarefas concluídas."
+                exit 0
+            fi
+        fi
+    fi
 
     # UP-02: detecta template de vscode_askQuestions (A-G) pelo header da primeira pergunta
     if [ "$HOOK_TOOL_NAME" = "vscode_askQuestions" ] && state_exists; then

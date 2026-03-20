@@ -7,9 +7,37 @@ applyTo: '**/*'
 # Hooks Protocol — Protocolo Operacional Obrigatório
 
 **Propósito**: regras de operação do sistema de hooks para agentes de IA. **Status**: Canônico.
-**Última atualização**: 2026-03-11 (v9.0 — Protocolo TODO Obrigatório).
+**Última atualização**: 2026-03-20 (v9.1 — Hardening task_complete + reforço proximal).
 
 > Todo agente executando em sessão Copilot neste repositório DEVE seguir este protocolo.
+
+---
+
+## ⛔ REGRA CRÍTICA — task_complete NÃO substitui vscode_askQuestions
+
+> **Esta é a violação mais comum. Leia antes de qualquer outra coisa.**
+
+O VS Code Copilot instrui o agente a chamar `task_complete` quando a tarefa está concluída.
+**Essa instrução NOT SUPERA o protocolo de hooks.** A sequência correta OBRIGATÓRIA é:
+
+```
+1. Concluir trabalho
+2. Chamar vscode_askQuestions (Template A ou G)   ← OBRIGATÓRIO PRIMEIRO
+3. Aguardar resposta do usuário
+4. Atualizar manage_todo_list
+5. Chamar task_complete (se apropriado)           ← APENAS após step 2-4
+```
+
+**O PreToolUse hook BLOQUEIA `task_complete` se `ask_questions_called=false`.**
+Não há como bypass — você receberá um `permissionDecision: deny` e deverá chamar vscode_askQuestions.
+
+**Cenários onde esta regra é MAIS frequentemente violada:**
+- Após `git push origin main` bem-sucedido
+- Após commit + push de um conjunto de mudanças
+- Após completar o último item da lista de TODOs
+- Quando o turno foi muito longo e contexto está comprimido
+
+---
 
 ## Hierarquia canônica (anti-conflito)
 

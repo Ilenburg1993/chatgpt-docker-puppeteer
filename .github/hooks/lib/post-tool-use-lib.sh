@@ -60,6 +60,24 @@ post_tool_use_main() {
         # NEW-M: sincroniza pending-tasks.md quando manage_todo_list é chamado
         hook_sync_pending_tasks 2> /dev/null || true
 
+        # --- UP-H2: injetar reminder após git push/commit (operações de fechamento) ---
+        # Detecta run_in_terminal com padrões de ciclo de trabalho encerrado e
+        # injeta additionalContext lembrando o LLM de chamar vscode_askQuestions.
+        if [ "${HOOK_TOOL_NAME:-}" = "run_in_terminal" ]; then
+            local _h2_aq _h2_input
+            _h2_aq=$(read_field '.current_turn.ask_questions_called' 2> /dev/null || printf 'false')
+            _h2_input="${HOOK_TOOL_INPUT:-}"
+            if [ "${_h2_aq:-false}" != "true" ]; then
+                if printf '%s' "$_h2_input" | grep -qiE '(git\s+push|git\s+commit|git\s+push\s+origin)'; then
+                    hook_log_audit "postToolUse_git_closure_reminder" \
+                        "tool" "run_in_terminal" "pattern" "git_push_or_commit"
+                    hook_out_post_context \
+                        "⚠️ PROTOCOLO TODO v9.0 — AÇÃO OBRIGATÓRIA AGORA: Você executou git push/commit. Antes de chamar task_complete ou encerrar o turno, DEVE chamar vscode_askQuestions. Use Template A (tarefa concluída) ou Template G (pré-autorização). AVISO: task_complete sem vscode_askQuestions está bloqueado pelo PreToolUse hook."
+                    exit 0
+                fi
+            fi
+        fi
+
         if hook_is_ask_questions; then
             # UP-11: registra posição (tools_count) em que ask_questions foi chamado neste turno
             local _turn_tool_pos

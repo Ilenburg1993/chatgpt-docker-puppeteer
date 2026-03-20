@@ -28,6 +28,18 @@ Para regras completas (templates, chave de encerramento, blocks):
 - `.github/instructions/hooks-protocol.instructions.md`
 - `.github/AGENTS.md`
 
+## ⛔ REGRA CRÍTICA — task_complete sem vscode_askQuestions está BLOQUEADO
+
+> Esta regra se aplica **sempre**, inclusive após `git push`, commit, ou último TODO.
+
+**Sequência obrigatória ao concluir qualquer trabalho:**
+1. Chamar `vscode_askQuestions` (Template A ou G)
+2. Aguardar resposta do usuário
+3. Apenas em seguida: `task_complete` (se aplicável)
+
+O PreToolUse hook **bloqueia automaticamente** qualquer chamada a `task_complete` se
+`vscode_askQuestions` não foi chamado neste turno. Não há como contornar isso.
+
 ## Checklist de início/retomada
 
 Antes de atuar no código, ler **e agir conforme** cada item:
