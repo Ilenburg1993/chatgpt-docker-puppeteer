@@ -441,8 +441,8 @@ increment_field() {
     current=$(read_field "$path")
     new_val=$((${current:-0} + 1))
     tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
-    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp"
-    mv -f "$tmp" "$STATE_FILE"
+    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
     printf '%d' "$new_val"
 }
 
@@ -452,10 +452,10 @@ decrement_field_floor0() {
     local path="$1"
     local current new_val tmp
     current=$(read_field "$path")
-    new_val=$((${current:-0} > 0 ? ${current:-0} - 1 : 0))
+    new_val=$(( ${current:-0} > 0 ? ${current:-0} - 1 : 0 ))
     tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
-    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp"
-    mv -f "$tmp" "$STATE_FILE"
+    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
 }
 
 # ---------------------------------------------------------------------------

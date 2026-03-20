@@ -67,7 +67,8 @@ extract_prompt_preview() {
     local prompt
     prompt=$(jq_field "$input" ".userPrompt // .prompt // \"\"")
     # Trunca para 80 chars para evitar logs enormes
-    printf '%s' "$prompt" | head -c80
+    # NEW-L: cut -c1-80 preserva fronteiras UTF-8 (head -c80 trunca em bytes)
+    printf '%s' "$prompt" | cut -c1-80
 }
 
 # ---------------------------------------------------------------------------

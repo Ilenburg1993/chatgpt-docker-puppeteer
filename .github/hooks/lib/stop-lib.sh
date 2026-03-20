@@ -38,7 +38,10 @@ stop_main() {
     # --- Passo 3: Guard — sem turnos registrados ainda (edge case) ---
     local turn_count
     turn_count=$(read_field ".session_stats.turn_count")
-    if [ -z "$turn_count" ] || [ "$turn_count" = "null" ] || [ "$turn_count" -eq 0 ] 2> /dev/null; then
+    # NEW-G: usar comparação de string em vez de aritmética para turn_count
+    # [ "$x" -eq 0 ] com $x="null" ou vazios pode ter comportamento imprevisível
+    turn_count="${turn_count:-0}"
+    if [ "$turn_count" = "null" ] || [ "$turn_count" = "0" ] || [ "$turn_count" = "" ]; then
         exit 0
     fi
 

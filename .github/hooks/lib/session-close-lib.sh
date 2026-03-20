@@ -140,7 +140,8 @@ _rotate_audit_log() {
     audit_dir="$(dirname "$AUDIT_FILE")"
     # Lista ordenada do mais antigo para o mais novo; remove além do limite
     local count
-    count=$(find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2> /dev/null | wc -l)
+    # NEW-H: tr -d ' ' normaliza whitespace à esquerda que wc -l produz em BSD/macOS
+    count=$(find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2> /dev/null | wc -l | tr -d ' ')
     if [ "${count:-0}" -gt "$max_files" ]; then
         find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2> /dev/null \
             | sort | head -n $((count - max_files)) \

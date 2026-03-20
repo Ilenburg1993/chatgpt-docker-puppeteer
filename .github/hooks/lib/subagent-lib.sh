@@ -26,37 +26,21 @@ export_lang_utf8
 
 # Incrementa subagents_active e subagents_total no state
 # Retorna o novo valor de subagents_active
+# NEW-I: refatorado para usar increment_field (atômico, consistente com common.sh)
 subagent_start_counters() {
-    # Garante que os campos existem (cria com 0 se ausente)
-    local current_active
-    current_active=$(read_field ".session_stats.subagents_active")
-    [ -z "$current_active" ] || [ "$current_active" = "null" ] && current_active=0
-
     local new_active
-    new_active=$((current_active + 1))
-    update_nested_state "session_stats.subagents_active" "$new_active"
-
-    # Total acumulado (nunca decrementa)
-    local total
-    total=$(read_field ".session_stats.subagents_total")
-    [ -z "$total" ] || [ "$total" = "null" ] && total=0
-    update_nested_state "session_stats.subagents_total" "$((total + 1))"
-
-    printf '%d' "$new_active"
+    new_active=$(increment_field '.session_stats.subagents_active')
+    increment_field '.session_stats.subagents_total' > /dev/null
+    printf '%d' "${new_active:-1}"
 }
 
 # Decrementa subagents_active (floor 0)
 # Retorna o novo valor de subagents_active
+# NEW-I: refatorado para usar decrement_field_floor0 (atômico, consistente com common.sh)
 subagent_stop_counters() {
-    local current_active
-    current_active=$(read_field ".session_stats.subagents_active")
-    [ -z "$current_active" ] || [ "$current_active" = "null" ] && current_active=0
-
     local new_active
-    new_active=$((current_active > 0 ? current_active - 1 : 0))
-    update_nested_state "session_stats.subagents_active" "$new_active"
-
-    printf '%d' "$new_active"
+    new_active=$(decrement_field_floor0 '.session_stats.subagents_active')
+    printf '%d' "${new_active:-0}"
 }
 
 # ---------------------------------------------------------------------------

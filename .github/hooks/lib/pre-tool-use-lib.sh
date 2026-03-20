@@ -27,8 +27,9 @@ maybe_capture_turn_intent() {
     local intent
 
     # Detecta padrão: bash .github/hooks/scripts/start-turn.sh "intenção"
-    intent=$(printf '%s' "$tool_input" | grep -oE 'start-turn\.sh[[:space:]]+["\x27]([^"\x27]+)["\x27]' \
-        | sed -E 's/start-turn\.sh[[:space:]]+["\x27]([^"\x27]+)["\x27]/\1/' || true)
+    # NEW-F: usar ['"] em vez de ["\x27] — \x27 não é portável em bracket expressions POSIX
+    intent=$(printf '%s' "$tool_input" | grep -oE "start-turn\\.sh[[:space:]]+[\"']([^\"']+)[\"']" \
+        | sed -E "s/start-turn\\.sh[[:space:]]+[\"']([^\"']+)[\"']/\\1/" || true)
 
     if [ -n "$intent" ]; then
         update_nested_state "current_turn.intent" "$intent"

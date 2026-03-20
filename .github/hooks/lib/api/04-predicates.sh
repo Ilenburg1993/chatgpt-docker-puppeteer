@@ -130,11 +130,12 @@ hook_is_git_commit() {
 }
 
 # 🔵 PreToolUse de ferramentas potencialmente destrutivas (precisa atenção especial)
-# Inclui: rm, git reset --hard, git push --force, DROP TABLE, etc.
+# Inclui: rm -rf/-f, git reset --hard, git push --force, git clean -f, DROP TABLE, truncate, dd
+# NEW-C: padrão ampliado para capturar rm -f, git clean -f(d), dd if=/dev/...
 hook_is_destructive_cmd() {
     hook_is_run_in_terminal || return 1
     printf '%s' "$HOOK_TOOL_COMMAND" \
-        | grep -qE '\brm\s+-rf?\b|git\s+reset\s+--hard|git\s+push\s+.*--force|DROP\s+TABLE|truncate\s+/'
+        | grep -qE '\brm\s+-[a-zA-Z]*[fr][a-zA-Z]*\b|git\s+reset\s+--hard|git\s+push\s+.*--force|git\s+clean\s+.*-[a-zA-Z]*f|DROP\s+TABLE|truncate\s+/|\bdd\b.*\bof='
 }
 
 # 🔵 PreToolUse de semantic_search ou runSubagent (ferramentas com custo de IA)
@@ -148,9 +149,10 @@ hook_is_ai_tool() {
 
 # 🔵 PostToolUse: verifica se a resposta da ferramenta indica erro
 # (run_in_terminal: contém "Error:", "error:", "FAIL"  / get_errors: array não-vazio)
+# NEW-D: adicionados termos em pt-BR: erro, falha, falhou
 hook_response_has_error() {
     [ "$HOOK_EVENT" = "PostToolUse" ] || return 1
-    printf '%s' "$HOOK_TOOL_RESPONSE_TEXT" | grep -qiE '\berror\b|\bfail\b|\bexception\b|\bfatal\b'
+    printf '%s' "$HOOK_TOOL_RESPONSE_TEXT" | grep -qiE '\berror\b|\bfail\b|\bexception\b|\bfatal\b|\berro\b|\bfalha\b|\bfalhou\b'
 }
 
 # ─── SEÇÃO 5C: PARSING ADICIONAL DO tool_response (PostToolUse) ─────────────

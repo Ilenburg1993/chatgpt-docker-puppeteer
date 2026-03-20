@@ -109,10 +109,11 @@ hook_state_migrate() {
         fi
 
         # Garante strict_turn_close se ausente
+        # NEW-K: usar 'true' (consistente com init_state) — legado não deve ter enforcement desligado
         local stc
         stc="$(read_field '.strict_turn_close' 2> /dev/null)"
         if [[ -z "$stc" || "$stc" == "null" ]]; then
-            update_nested_state 'strict_turn_close' 'false' 2> /dev/null || true
+            update_nested_state 'strict_turn_close' 'true' 2> /dev/null || true
         fi
 
         recorded="1"
