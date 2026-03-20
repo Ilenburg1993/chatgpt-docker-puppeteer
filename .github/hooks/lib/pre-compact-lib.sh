@@ -32,12 +32,13 @@ save_checkpoint() {
     filename="$CHECKPOINT_DIR/session-${ts}.json"
     cp "$STATE_FILE" "$filename" 2> /dev/null || true
 
-    # Prune: mantém apenas os últimos MAX_CHECKPOINTS checkpoints
+    # GAP-55: prune cross-platform usando ls -t (compativel com macOS/BSD e Linux)
     local count
-    count=$(find "$CHECKPOINT_DIR" -maxdepth 1 -name 'session-*.json' 2> /dev/null | wc -l)
+    count=$(ls "$CHECKPOINT_DIR"/session-*.json 2>/dev/null | wc -l)
     if [ "$count" -gt "$MAX_CHECKPOINTS" ]; then
-        find "$CHECKPOINT_DIR" -maxdepth 1 -name 'session-*.json' -printf '%T@ %p\n' 2> /dev/null \
-            | sort -rn | tail -n "+$((MAX_CHECKPOINTS + 1))" | awk '{print $2}' | xargs rm -f
+        ls -t "$CHECKPOINT_DIR"/session-*.json 2>/dev/null \
+            | tail -n "+$((MAX_CHECKPOINTS + 1))" \
+            | xargs rm -f
     fi
 }
 

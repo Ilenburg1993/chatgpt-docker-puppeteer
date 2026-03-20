@@ -157,8 +157,9 @@ EXPRESSO DO USUÁRIO.
 
 **Regra de fechamento em modo estrito (não ambígua):**
 
-- Em `session.strict_turn_close_requires_key=true`, o TURN continua exigindo `vscode_askQuestions`
-  válido como último ato, com resposta explícita do usuário.
+- Em `session.strict_turn_close=true` (campo canônico no JSON de estado), o TURN continua exigindo
+  `vscode_askQuestions` válido como último ato — o hook `Stop` emitirá `decision:block` se não
+  chamado. O alias `strict_turn_close_requires_key` em documentação antiga é sinônimo.
 - Templates A/D/E são o fluxo padrão de continuidade/fechamento de TURN.
 - Template F só deve ser usado quando houver escalonamento explícito para fechamento de SESSION; com
   Template F, a `close_key` correta permanece obrigatória.

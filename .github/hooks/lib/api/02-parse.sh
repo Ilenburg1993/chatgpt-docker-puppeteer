@@ -180,8 +180,21 @@ _hook_api_parse_post_tool_use() {
     _hook_api_parse_response_meta
 
     # Se for resposta de vscode_askQuestions, extrai campos específicos
-    if [ "$HOOK_TOOL_NAME" = "vscode_askQuestions" ] && [ "$HOOK_TOOL_RESPONSE_IS_JSON" = "true" ]; then
-        _hook_api_parse_ask_questions_response "$HOOK_TOOL_RESPONSE"
+    # Suporta tanto objeto JSON direto quanto string contendo JSON serializado
+    # (VS Code por vezes serializa a resposta como string JSON)
+    if [ "$HOOK_TOOL_NAME" = "vscode_askQuestions" ]; then
+        local resp_json=""
+        if [ "$HOOK_TOOL_RESPONSE_IS_JSON" = "true" ]; then
+            resp_json="$HOOK_TOOL_RESPONSE"
+        elif [ -n "$HOOK_TOOL_RESPONSE" ] && printf '%s' "$HOOK_TOOL_RESPONSE" | jq -e . > /dev/null 2>&1; then
+            # String contendo JSON serializado — promove para IS_JSON=true
+            resp_json="$HOOK_TOOL_RESPONSE"
+            HOOK_TOOL_RESPONSE_IS_JSON="true"
+            export HOOK_TOOL_RESPONSE_IS_JSON
+        fi
+        if [ -n "$resp_json" ]; then
+            _hook_api_parse_ask_questions_response "$resp_json"
+        fi
     fi
 }
 

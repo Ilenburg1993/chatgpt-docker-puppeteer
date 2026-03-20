@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# stop-lib.sh — Lógica do Stop hook (rastreamento de lifecycle, sem enforcement)
-# NOTA: enforcement (emit_stop_block) desativado — stop registra turnos e encerra sessões,
-#       mas não bloqueia o agente por ausência de vscode_askQuestions.
+# stop-lib.sh — Lógica do Stop hook (rastreamento de lifecycle + enforcement opcional)
+# GAP-03: strict_turn_close agora é lido e enforcement é ativado quando =true.
+# GAP-58: usa increment_field() em vez de aritmética manual.
 # Sourceado por scripts/stop.sh
 
 # shellcheck source=common.sh
@@ -17,8 +17,8 @@ stop_main() {
     local input="$1"
     maybe_capture_debug "$input"
 
-    # Popula HOOK_* vars a partir do payload
-    hook_api_parse "$input"
+    # Popula HOOK_* vars a partir do payload (tolera parse parcial)
+    hook_api_parse "$input" || true
 
     export SESSION_ID="${HOOK_SESSION_ID:-unknown}"
 
@@ -53,25 +53,26 @@ stop_main() {
         update_nested_state "current_turn.ended_at" "$(now_iso)" # GAP-13
         update_nested_state "compliance.consecutive_unauthorized" "0"
         update_nested_state "compliance.last_turn_authorized" "true"
-        local auth
-        auth=$(read_field ".session_stats.turn_authorized")
-        auth=$((${auth:-0} + 1))
-        update_nested_state "session_stats.turn_authorized" "$auth"
+        # GAP-58: usa increment_field() em vez de aritmética manual
+        increment_field ".session_stats.turn_authorized" > /dev/null
         hook_log_audit "turnEnd_authorized" "turn" "${turn_num:-0}"
     else
-        # Turno não-autorizado: rastreia sem bloquear
-        # [ENFORCEMENT DESATIVADO — emit_stop_block não é chamado aqui]
+        # Turno não-autorizado: rastreia e aplica enforcement se strict_turn_close=true
         update_nested_state "current_turn.ended_at" "$(now_iso)" # GAP-13
-        local consec
-        consec=$(read_field ".compliance.consecutive_unauthorized")
-        consec=$((${consec:-0} + 1))
-        update_nested_state "compliance.consecutive_unauthorized" "$consec"
+        # GAP-58: usa increment_field() em vez de aritmética manual
+        increment_field ".compliance.consecutive_unauthorized" > /dev/null
         update_nested_state "compliance.last_turn_authorized" "false"
-        local unauth
-        unauth=$(read_field ".session_stats.turn_unauthorized")
-        unauth=$((${unauth:-0} + 1))
-        update_nested_state "session_stats.turn_unauthorized" "$unauth"
+        increment_field ".session_stats.turn_unauthorized" > /dev/null
         hook_log_audit "turnEnd_unauthorized" "turn" "${turn_num:-0}"
+
+        # GAP-03: Enforcement — bloqueia fim de turno se strict_turn_close=true
+        local strict
+        strict=$(read_field ".strict_turn_close")
+        if [ "${strict:-false}" = "true" ]; then
+            hook_out_stop_safe_block \
+                "Protocolo violado: turno encerrado sem chamar vscode_askQuestions" \
+                "Chame vscode_askQuestions antes de encerrar o turno. Use Template A para tarefas concluídas ou Template D para checkpoint."
+        fi
     fi
 
     # --- Passo 5: Se pending_session_close → chamar session-close.sh ---

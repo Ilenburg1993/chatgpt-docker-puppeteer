@@ -111,7 +111,7 @@ _log "=== stop.sh ==="
 # T01: Anti-loop — stop_hook_active=true → exit 0 + SEM block
 setup
 begin_test "T01: anti-loop stop_hook_active=true → exit 0 sem block"
-run_hook "stop.sh" '{"stop_hook_active":true,"sessionId":"test-123"}'
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":true,"sessionId":"test-123"}'
 if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q '"block"'; then
     pass
 else
@@ -122,7 +122,7 @@ teardown
 # T02: Sem state → auto-init, cria session.json, exit 0
 setup
 begin_test "T02: sem state → auto-init session.json + exit 0"
-run_hook "stop.sh" '{"stop_hook_active":false,"sessionId":"test-123"}'
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":false,"sessionId":"test-123"}'
 if [ "$RC" -eq 0 ] && [ -f "$TEST_DIR/session.json" ]; then
     pass
 else
@@ -145,7 +145,7 @@ write_state "$(jq -n '{
     "compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}
 }')"
 begin_test "T03: turn_count=0 → exit 0 sem block (edge case)"
-run_hook "stop.sh" '{"stop_hook_active":false,"sessionId":"sid"}'
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":false,"sessionId":"sid"}'
 if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q '"block"'; then
     pass
 else
@@ -153,15 +153,27 @@ else
 fi
 teardown
 
-# T04: ask_questions_called=false + strict_turn_close=true → SEM block (enforcement desativado)
+# T04: ask_questions_called=false + strict_turn_close=true → EMITE block (GAP-03)
 setup
 write_state "$(_state_aq_false 1)"
-begin_test "T04: ask_questions_called=false + strict → sem block (enforcement off)"
-run_hook "stop.sh" '{"stop_hook_active":false,"sessionId":"sid"}'
+begin_test "T04: ask_questions_called=false + strict_turn_close=true → emite block"
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":false,"sessionId":"sid"}'
+if printf '%s' "$OUT" | grep -q '"block"'; then
+    pass
+else
+    fail "T04" "rc=$RC output=$OUT (esperado: block emitido)"
+fi
+teardown
+
+# T04b: ask_questions_called=false + strict_turn_close=false → sem block
+setup
+write_state "$(printf '%s' "$(_state_aq_false 1)" | jq '.strict_turn_close = false')"
+begin_test "T04b: ask_questions_called=false + strict_turn_close=false → sem block"
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":false,"sessionId":"sid"}'
 if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q '"block"'; then
     pass
 else
-    fail "T04" "rc=$RC output=$OUT (esperado: rc=0 sem block)"
+    fail "T04b" "rc=$RC output=$OUT (esperado: rc=0 sem block)"
 fi
 teardown
 
@@ -169,7 +181,7 @@ teardown
 setup
 write_state "$(_state_aq_false 1)"
 begin_test "T05: turno não-autorizado → incrementa turn_unauthorized"
-run_hook "stop.sh" '{"stop_hook_active":false,"sessionId":"sid"}'
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":false,"sessionId":"sid"}'
 UNAUTH=$(read_state_field ".session_stats.turn_unauthorized")
 if [ "$UNAUTH" -ge 1 ] 2> /dev/null; then
     pass
@@ -182,7 +194,7 @@ teardown
 setup
 write_state "$(_state_aq_false 1)"
 begin_test "T06: turno não-autorizado → incrementa consecutive_unauthorized"
-run_hook "stop.sh" '{"stop_hook_active":false,"sessionId":"sid"}'
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":false,"sessionId":"sid"}'
 CONSEC=$(read_state_field ".compliance.consecutive_unauthorized")
 if [ "$CONSEC" -ge 1 ] 2> /dev/null; then
     pass
@@ -195,7 +207,7 @@ teardown
 setup
 write_state "$(_state_aq_true)"
 begin_test "T07: ask_questions_called=true → exit 0 sem block"
-run_hook "stop.sh" '{"stop_hook_active":false,"sessionId":"sid"}'
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":false,"sessionId":"sid"}'
 if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q '"block"'; then
     pass
 else
@@ -207,7 +219,7 @@ teardown
 setup
 write_state "$(_state_aq_true)"
 begin_test "T08: turno autorizado reseta ask_questions_called para false"
-run_hook "stop.sh" '{"stop_hook_active":false,"sessionId":"sid"}'
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":false,"sessionId":"sid"}'
 FIELD=$(read_state_field ".current_turn.ask_questions_called")
 if [ "$FIELD" = "false" ]; then
     pass
@@ -220,7 +232,7 @@ teardown
 setup
 write_state "$(_state_aq_false 3)"
 begin_test "T09: block incrementa compliance.consecutive_unauthorized"
-run_hook "stop.sh" '{"stop_hook_active":false,"sessionId":"sid"}'
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":false,"sessionId":"sid"}'
 CONSEC=$(read_state_field ".compliance.consecutive_unauthorized")
 if [ "${CONSEC:-0}" -ge 1 ]; then
     pass
@@ -233,7 +245,7 @@ teardown
 setup
 write_state "$(printf '%s' "$(_state_aq_true)" | jq '.compliance.consecutive_unauthorized = 3')"
 begin_test "T10: turno autorizado zera consecutive_unauthorized"
-run_hook "stop.sh" '{"stop_hook_active":false,"sessionId":"sid"}'
+run_hook "stop.sh" '{"hookEventName":"Stop","stop_hook_active":false,"sessionId":"sid"}'
 CONSEC=$(read_state_field ".compliance.consecutive_unauthorized")
 if [ "${CONSEC:-99}" -eq 0 ]; then
     pass
@@ -253,7 +265,7 @@ setup
 write_state "$(_state_aq_false 1)"
 begin_test "T11: vscode_askQuestions → ask_questions_called=true"
 run_hook "post-tool-use.sh" \
-    '{"tool_name":"vscode_askQuestions","tool_input":{},"tool_response":"{\"answers\":{\"0\":{\"freeText\":\"ok\"}}}","sessionId":"sid"}'
+    '{"hookEventName":"PostToolUse","tool_name":"vscode_askQuestions","tool_input":{},"tool_response":"{\"answers\":{\"0\":{\"freeText\":\"ok\"}}}","sessionId":"sid"}'
 FIELD=$(read_state_field ".current_turn.ask_questions_called")
 if [ "$FIELD" = "true" ]; then
     pass
@@ -267,7 +279,7 @@ setup
 write_state "$(_state_aq_false 1)"
 begin_test "T12: close_key detectada → pending_session_close=true"
 run_hook "post-tool-use.sh" \
-    '{"tool_name":"vscode_askQuestions","tool_input":{},"tool_response":"{\"answers\":{\"0\":{\"freeText\":\"ENCERRAR-AABBCCDD\"}}}","sessionId":"sid"}'
+    '{"hookEventName":"PostToolUse","tool_name":"vscode_askQuestions","tool_input":{},"tool_response":"{\"answers\":{\"0\":{\"freeText\":\"ENCERRAR-AABBCCDD\"}}}","sessionId":"sid"}'
 FIELD=$(read_state_field ".pending_session_close")
 if [ "$FIELD" = "true" ]; then
     pass
@@ -281,7 +293,7 @@ setup
 write_state "$(_state_aq_false 1)"
 begin_test "T13: read_file não altera ask_questions_called"
 run_hook "post-tool-use.sh" \
-    '{"tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"tool_response":"conteudo","sessionId":"sid"}'
+    '{"hookEventName":"PostToolUse","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"tool_response":"conteudo","sessionId":"sid"}'
 FIELD=$(read_state_field ".current_turn.ask_questions_called")
 if [ "$FIELD" = "false" ]; then
     pass
@@ -295,7 +307,7 @@ setup
 write_state "$(_state_aq_false 1)"
 begin_test "T14: close_key incorreta não seta pending_session_close"
 run_hook "post-tool-use.sh" \
-    '{"tool_name":"vscode_askQuestions","tool_input":{},"tool_response":"{\"answers\":{\"0\":{\"freeText\":\"ENCERRAR-ERRADA00\"}}}","sessionId":"sid"}'
+    '{"hookEventName":"PostToolUse","tool_name":"vscode_askQuestions","tool_input":{},"tool_response":"{\"answers\":{\"0\":{\"freeText\":\"ENCERRAR-ERRADA00\"}}}","sessionId":"sid"}'
 FIELD=$(read_state_field ".pending_session_close")
 if [ "$FIELD" = "false" ]; then
     pass
@@ -309,7 +321,7 @@ setup
 write_state "$(_state_aq_false 1)"
 begin_test "T15: post-tool-use.sh exit 0 para ferramenta comum"
 run_hook "post-tool-use.sh" \
-    '{"tool_name":"run_in_terminal","tool_input":{"command":"echo hi"},"tool_response":"hi","sessionId":"sid"}'
+    '{"hookEventName":"PostToolUse","tool_name":"run_in_terminal","tool_input":{"command":"echo hi"},"tool_response":"hi","sessionId":"sid"}'
 if [ "$RC" -eq 0 ]; then
     pass
 else
@@ -321,7 +333,7 @@ teardown
 setup
 begin_test "T16: sem state previo → post-tool-use.sh exit 0"
 run_hook "post-tool-use.sh" \
-    '{"tool_name":"read_file","tool_input":{},"tool_response":"ok","sessionId":"sid"}'
+    '{"hookEventName":"PostToolUse","tool_name":"read_file","tool_input":{},"tool_response":"ok","sessionId":"sid"}'
 if [ "$RC" -eq 0 ]; then
     pass
 else

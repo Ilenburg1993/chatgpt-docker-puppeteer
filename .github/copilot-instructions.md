@@ -30,13 +30,27 @@ Para regras completas (templates, chave de encerramento, blocks):
 
 ## Checklist de início/retomada
 
-Antes de atuar no código, ler:
+Antes de atuar no código, ler **e agir conforme** cada item:
 
-1. `.github/hooks/state/session-briefing.md` — extrair `close_key`, turno atual, tarefas pendentes
-2. `.github/hooks/state/pending-tasks.md` — se existir, retomar primeira tarefa `in-progress`; se
-   não existir, sem tarefas pendentes registradas
-3. `.github/hooks/state/session.json` — verificar `pending_session_close`,
-   `compliance.consecutive_unauthorized`
+1. `.github/hooks/state/session-briefing.md` — extrair:
+   - `close_key` → memorizar para uso no Template F quando solicitado encerramento
+   - `consecutive_unauthorized` → se ≥ 3, chamar `vscode_askQuestions Template D` imediatamente
+   - turno atual e tarefas pendentes → continuar de onde parou
+2. `.github/hooks/state/pending-tasks.md` — se existir: retomar a primeira tarefa com status
+   `in-progress`. Se **não existir**: prosseguir normalmente (sem tarefas pendentes registradas em
+   shell; tarefas Via `manage_todo_list` são independentes deste arquivo).
+3. `.github/hooks/state/session.json` — verificar:
+   - `pending_session_close=true` → se true, aguardar encerramento via Template F com close_key
+   - `compliance.consecutive_unauthorized` → se ≥ 3, regularizar compliance com Template D antes
+     de trabalho novo
+   - `strict_turn_close=true` (padrão) → confirmar que cada turno termina com `vscode_askQuestions`
+
+### Política para `compliance.consecutive_unauthorized ≥ 3`
+
+Se detectar `consecutive_unauthorized ≥ 3` (via briefing ou `session.json`): **interromper
+trabalho em andamento** e chamar `vscode_askQuestions Template D` imediatamente para regularizar
+compliance antes de continuar. Não acumular violações — o hook `Stop` emitirá `decision:block`
+em turnos sem `vscode_askQuestions` quando `strict_turn_close=true`.
 
 ## Projeto em uma frase
 

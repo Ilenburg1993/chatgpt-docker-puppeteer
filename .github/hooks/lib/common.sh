@@ -143,6 +143,7 @@ init_state() {
                 "number": 0,
                 "subturn_id": null,
                 "started_at": null,
+                "ended_at": null,
                 "response_at": null
             },
             "session_stats": {
@@ -285,7 +286,7 @@ uuidgen_safe() {
         else
             # Fallback: hex aleatório formatado como UUID
             local b
-            b=$(head -c16 /dev/urandom | xxd -p 2> /dev/null || date +%s%N)
+            b=$(od -An -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' | head -c32 || date +%s%N | tr -d '[:space:]')
             printf '%s-%s-%s-%s-%s\n' \
                 "${b:0:8}" "${b:8:4}" "4${b:13:3}" "${b:16:4}" "${b:20:12}"
         fi
@@ -296,7 +297,8 @@ uuidgen_safe() {
 generate_section_id() {
     local name="${1:-unknown}"
     local suffix
-    suffix=$(head -c4 /dev/urandom | xxd -p | head -c8)
+    # GAP-11: usa od em vez de xxd (od é padrão POSIX, xxd não está em todas distros)
+    suffix=$(od -An -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' | head -c8)
     printf '%s-%s' "$(printf '%s' "$name" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')" "$suffix"
 }
 
@@ -454,6 +456,14 @@ open_new_turn() {
 # Retorna o novo número de subturn via stdout.
 # Uso: subturn_num=$(open_new_subturn)
 open_new_subturn() {
+    # GAP-21: guard — sem turno ativo, não abre subturn
+    local _guard_turn
+    _guard_turn=$(read_field '.current_turn.number')
+    if [ -z "$_guard_turn" ] || [ "$_guard_turn" = 'null' ] || [ "${_guard_turn:-0}" -eq 0 ] 2>/dev/null; then
+        printf '0'
+        return 0
+    fi
+
     local subturn_id now
     now=$(now_iso)
     subturn_id=$(uuidgen_safe)
@@ -466,6 +476,7 @@ open_new_subturn() {
     update_nested_state "current_subturn.number" "$local_count"
     update_nested_state "current_subturn.subturn_id" "$subturn_id"
     update_nested_state "current_subturn.started_at" "$now"
+    update_nested_state "current_subturn.ended_at" "null"  # GAP-14
     update_nested_state "current_subturn.response_at" "null"
 
     printf '%d' "$local_count"

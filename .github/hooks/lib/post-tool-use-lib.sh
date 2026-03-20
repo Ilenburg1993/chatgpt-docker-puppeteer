@@ -19,8 +19,8 @@ post_tool_use_main() {
     local input="$1"
     maybe_capture_debug "$input"
 
-    # Popula HOOK_* vars a partir do payload (session_id, tool_name, tool_response, etc.)
-    hook_api_parse "$input"
+    # Popula HOOK_* vars a partir do payload (tolera parse parcial)
+    hook_api_parse "$input" || true
 
     export SESSION_ID="${HOOK_SESSION_ID:-unknown}"
 
@@ -32,7 +32,11 @@ post_tool_use_main() {
 
     if state_exists; then
         # GAP-07: sempre fechar o subturn, independente do tipo de ferramenta
-        update_nested_state "current_subturn.response_at" "$(now_iso)"
+        # GAP-14: registra ended_at além de response_at
+        local _now_ts
+        _now_ts="$(now_iso)"
+        update_nested_state "current_subturn.response_at" "$_now_ts"
+        update_nested_state "current_subturn.ended_at" "$_now_ts"
 
         if hook_is_ask_questions; then
             # Seta ask_questions_called = true (pós-resposta, não no PreToolUse)

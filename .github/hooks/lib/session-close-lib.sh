@@ -83,6 +83,20 @@ session_close_main() {
         exit 0
     fi
 
+    # --- Passo 1b: GAP-32 — Revalida close_key: deve haver audit entry sessionCloseAuthorized ---
+    local close_authorized=false
+    if [ -f "$AUDIT_FILE" ]; then
+        if grep -q '"sessionCloseAuthorized"' "$AUDIT_FILE" 2>/dev/null; then
+            close_authorized=true
+        fi
+    fi
+    if [ "$close_authorized" != "true" ]; then
+        hook_log_audit "session_close_no_key_validation"
+        # Limpa pending_session_close para evitar reentrada em loops futuros
+        update_state_bool "pending_session_close" "false"
+        exit 0
+    fi
+
     # --- Passo 2: Registra ended_at ---
     update_state "ended_at" "$(now_iso)"
 

@@ -142,9 +142,16 @@ hook_policy_reason() {
 # ferramenta de shell/terminal, pois contornariam o fluxo de encerramento de
 # sessão ou validação da close_key.
 # Usado por hook_is_bypass_attempt() e herdado por pre-tool-use-lib.sh.
+# GAP-31: lista expandida com todos os padrões relevantes
 _HOOK_BYPASS_PATTERNS=(
     "session-close.sh"
     "close_key_validated=true"
+    "session-close"
+    "pending_session_close=true"
+    "pending_session_close\":\"true"
+    "ENCERRAR-"
+    ".github/hooks/scripts/session-close"
+    "sessionClose"
 )
 
 # 🔵 Retorna 0 se a chamada atual tenta contornar o ciclo de sessão.

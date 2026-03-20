@@ -40,7 +40,8 @@ ensure_state_initialized() {
 #   - started_at está definido (turno foi aberto)
 #   - O tempo decorrido excede ORPHAN_THRESHOLD_SECONDS
 # O healing apenas registra o encerramento e ajusta flags — sem bloquear.
-ORPHAN_THRESHOLD_SECONDS=600 # 10 minutos
+# GAP-18: ORPHAN_THRESHOLD_SECONDS respeitável via env (default: 10 minutos)
+ORPHAN_THRESHOLD_SECONDS="${ORPHAN_THRESHOLD_SECONDS:-600}"
 
 maybe_heal_orphaned_turn() {
     # Só healer se houve turno anterior (turn_count > 0 e started_at não é null)
