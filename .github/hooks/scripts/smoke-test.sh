@@ -409,6 +409,34 @@ else
 fi
 teardown
 
+# T21: Guard B — task_complete bloqueado quando summary contém "?" (após askQ OK)
+setup
+begin_test "T21: Guard B — task_complete bloqueado com perguntas no summary"
+write_state "$(_state_aq_true)"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t-gb-001","tool_name":"task_complete","tool_input":{"summary":"Tarefa concluída. Devo também corrigir o lint? Quer que eu continue?"},"sessionId":"sid"}'
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+if [ "${DECISION}" = "deny" ]; then
+    pass
+else
+    fail "T21" "permissionDecision='${DECISION}' esperado='deny' (Guard B: summary com '?') out='${OUT}'"
+fi
+teardown
+
+# T22: Guard B — task_complete PERMITIDO quando summary não tem "?"
+setup
+begin_test "T22: Guard B — task_complete permitido com summary sem perguntas"
+write_state "$(_state_aq_true)"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t-gb-002","tool_name":"task_complete","tool_input":{"summary":"Tarefa concluída com sucesso. Todos os testes passam."},"sessionId":"sid"}'
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+if [ "${DECISION}" != "deny" ]; then
+    pass
+else
+    fail "T22" "permissionDecision='${DECISION}' task_complete sem perguntas no summary deveria ser permitido"
+fi
+teardown
+
 # ---------------------------------------------------------------------------
 # === Resultado Final ===
 # ---------------------------------------------------------------------------

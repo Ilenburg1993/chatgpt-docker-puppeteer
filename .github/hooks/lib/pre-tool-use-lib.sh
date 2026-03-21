@@ -125,6 +125,23 @@ pre_tool_use_main() {
                 "⚠️ PROTOCOLO: Chame vscode_askQuestions AGORA como ÚLTIMO ATO. Após a resposta do usuário, só manage_todo_list é permitido antes de task_complete."
             exit 0
         fi
+
+        # Camada 3 (Guard B): task_complete.summary contém perguntas → requer novo askQ
+        # Detecta agentes que tentam fazer perguntas em texto simples em vez de usar vscode_askQuestions.
+        local _gb_summary _gb_qmarks
+        _gb_summary=$(printf '%s' "${HOOK_TOOL_INPUT:-{}}" | jq -r '.summary // empty' 2> /dev/null || printf '')
+        _gb_qmarks=$(printf '%s' "${_gb_summary}" | tr -cd '?' | wc -c | tr -d ' ')
+        if [ "${_gb_qmarks:-0}" -ge 1 ] 2> /dev/null; then
+            increment_field ".session_stats.tools_blocked" > /dev/null || true
+            hook_log_audit "preToolUse_task_complete_blocked" \
+                "tool" "task_complete" \
+                "reason" "guard_b_questions_in_summary" \
+                "question_marks" "${_gb_qmarks}"
+            hook_out_pre_deny \
+                "🚫 Guard B: task_complete.summary contém ${_gb_qmarks} pergunta(s) em texto simples." \
+                "⚠️ PROTOCOLO: Se tem perguntas para o usuário, use vscode_askQuestions (Template A) — não embuta perguntas no summary. Chame vscode_askQuestions AGORA com as perguntas relevantes."
+            exit 0
+        fi
     fi
 
     # --- Passo 2: Garante state inicializado ---
