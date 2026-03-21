@@ -528,6 +528,15 @@ open_new_turn() {
     update_nested_state "current_turn.tools_after_ask_questions" "0"
     update_nested_state "current_turn.last_tool_after_ask_questions" ""
 
+    # GAP-SUBTURN-RESET: limpa current_subturn ao abrir novo turno para evitar
+    # que dados residuais do subturn anterior (de turno encerrado abruptamente)
+    # contaminem leituras antes do primeiro preToolUse do novo turno.
+    update_nested_state "current_subturn.number" "0"
+    update_nested_state "current_subturn.subturn_id" "null"
+    update_nested_state "current_subturn.started_at" "null"
+    update_nested_state "current_subturn.ended_at" "null"
+    update_nested_state "current_subturn.response_at" "null"
+
     printf '%d' "$turn_num"
 }
 
