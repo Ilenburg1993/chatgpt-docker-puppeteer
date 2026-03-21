@@ -87,6 +87,11 @@ user_prompt_submit_main() {
     local _was_auto_init=0
     ensure_state_initialized "$session_id" || _was_auto_init=1
 
+    # --- Passo 1b: GAP-SCHEMA-V3-UPS —migração defensiva de schema ---
+    # Garante que fields introduzidos em versões posteriores existam antes de
+    # qualquer leitura/incremento. Idempotente — sem custo se já migrado.
+    hook_state_migrate 2> /dev/null || true
+
     # --- Passo 2: Cura turno órfão se necessário ---
     maybe_heal_orphaned_turn
 

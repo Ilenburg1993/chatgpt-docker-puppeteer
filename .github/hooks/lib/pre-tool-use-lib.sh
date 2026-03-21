@@ -163,6 +163,10 @@ pre_tool_use_main() {
     # --- Passo 2: Garante state inicializado ---
     ensure_state_for_tool "$session_id"
 
+    # --- Passo 2b: migração defensiva de schema (idempotente) ---
+    # Garante que campos do UP-H1b/Guards B/C existam antes de leitura/incremento.
+    hook_state_migrate 2> /dev/null || true
+
     # --- Passo 3: Captura intenção do turno se start-turn.sh foi chamado ---
     maybe_capture_turn_intent "$HOOK_TOOL_INPUT"
 
