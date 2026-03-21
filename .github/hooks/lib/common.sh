@@ -522,6 +522,11 @@ open_new_turn() {
     update_nested_state "current_turn.tools_count" "0"
     update_nested_state "current_turn.intent" ""
     update_nested_state "current_turn.subagents_started" "0"
+    # UP-H1b: reseta contadores de tools pós-askQ no início de cada turno.
+    # Sem este reset, valores do turno anterior propagavam para o próximo
+    # causando falsos positivos no UP-H1b (task_complete bloqueado indevidamente).
+    update_nested_state "current_turn.tools_after_ask_questions" "0"
+    update_nested_state "current_turn.last_tool_after_ask_questions" ""
 
     printf '%d' "$turn_num"
 }

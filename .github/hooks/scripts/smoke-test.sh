@@ -480,6 +480,36 @@ else
 fi
 teardown
 
+# T26: open_new_turn reseta tools_after_ask_questions para 0 (sem carry-over entre turnos)
+setup
+begin_test "T26: open_new_turn reseta tools_after_ask_questions entre turnos"
+# Estado com turno anterior que deixou tools_after=3 e started_at=null para evitar healing
+write_state '{
+    "vs_code_session_id":"sid","session_id":"sid",
+    "started_at":"2026-01-01T00:00:00Z","ended_at":null,
+    "close_key":"ENCERRAR-AABBCCDD","source":"new",
+    "pending_session_close":false,"strict_turn_close":true,
+    "current_turn":{"number":1,"turn_id":"t1","started_at":null,
+        "ask_questions_called":false,"subturn_count":0,"tools_count":2,
+        "tools_after_ask_questions":3,"last_tool_after_ask_questions":"read_file",
+        "subagents_started":0,"intent":""},
+    "current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null},
+    "session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,
+        "subturn_total":0,"tools_total":2},
+    "compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}
+}'
+# user-prompt-submit abre novo turno via open_new_turn — deve zerar os contadores UP-H1b
+run_hook "user-prompt-submit.sh" \
+    '{"hookEventName":"UserPromptSubmit","sessionId":"sid","prompt":"nova tarefa"}'
+VAL_TAAQ=$(read_state_field ".current_turn.tools_after_ask_questions")
+VAL_LAST=$(read_state_field ".current_turn.last_tool_after_ask_questions")
+if [ "${VAL_TAAQ}" = "0" ] && { [ "${VAL_LAST:-}" = "" ] || [ "${VAL_LAST:-}" = "null" ]; }; then
+    pass
+else
+    fail "T26" "tools_after='${VAL_TAAQ}' last='${VAL_LAST}' esperado=0/'' (carry-over entre turnos deve ser zerado)"
+fi
+teardown
+
 _log ""
 _log "==================================================="
 TOTAL=$((PASS + FAIL))
