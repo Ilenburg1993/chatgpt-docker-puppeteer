@@ -94,12 +94,28 @@ pre_tool_use_main() {
         # Camada 1: ask_questions ainda não foi chamado neste turno
         if [ "${_h1_aq:-false}" != "true" ]; then
             increment_field ".session_stats.tools_blocked" > /dev/null || true
-            hook_log_audit "preToolUse_task_complete_blocked" \
-                "tool" "task_complete" \
-                "reason" "ask_questions_not_called_this_turn"
+
+            # Guard C: detecta heurísticas de completude no summary (✅, "completo", "finalizado", etc.)
+            # Permite mensagem mais específica quando o agente sinaliza "terminei" sem askQ.
+            local _gc_summary _gc_hit _gc_msg
+            _gc_summary=$(printf '%s' "${HOOK_TOOL_INPUT:-{}}" | jq -r '.summary // empty' 2> /dev/null || printf '')
+            _gc_hit=$(printf '%s' "${_gc_summary}" \
+                | grep -ciE '[✅☑️✔️]|complet[ao]|finaliz[ao]|conclu[íi]d[ao]|entregue|pronto|done\b|finish' \
+                    2> /dev/null || printf '0')
+            if [ "${_gc_hit:-0}" -gt 0 ] 2> /dev/null; then
+                _gc_msg="⚠️ Guard C: seu summary indica conclusão de tarefa mas vscode_askQuestions não foi chamado. Chame Template A (tarefa concluída) AGORA antes de task_complete."
+                hook_log_audit "preToolUse_task_complete_blocked" \
+                    "tool" "task_complete" \
+                    "reason" "guard_c_completion_heuristic_no_askq"
+            else
+                _gc_msg="⚠️ PROTOCOLO OBRIGATÓRIO: Chame vscode_askQuestions (Template A para tarefa concluída, Template D para checkpoint) AGORA. task_complete NÃO substitui vscode_askQuestions."
+                hook_log_audit "preToolUse_task_complete_blocked" \
+                    "tool" "task_complete" \
+                    "reason" "ask_questions_not_called_this_turn"
+            fi
             hook_out_pre_deny \
                 "🚫 task_complete bloqueado: você DEVE chamar vscode_askQuestions ANTES de encerrar o turno (Protocolo TODO v9.0)." \
-                "⚠️ PROTOCOLO OBRIGATÓRIO: Chame vscode_askQuestions (Template A para tarefa concluída, Template D para checkpoint) AGORA. task_complete NÃO substitui vscode_askQuestions."
+                "${_gc_msg}"
             exit 0
         fi
 

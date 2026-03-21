@@ -351,7 +351,7 @@ _state_aq_true | jq \
     > "$TEST_DIR/session.json"
 run_hook "pre-tool-use.sh" \
     '{"hookEventName":"PreToolUse","tool_use_id":"t-h1b-001","tool_name":"task_complete","tool_input":{},"sessionId":"sid"}'
-DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
 if [ "${DECISION}" = "deny" ]; then
     pass
 else
@@ -368,7 +368,7 @@ _state_aq_true | jq \
     > "$TEST_DIR/session.json"
 run_hook "pre-tool-use.sh" \
     '{"hookEventName":"PreToolUse","tool_use_id":"t-h1b-002","tool_name":"task_complete","tool_input":{},"sessionId":"sid"}'
-DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
 if [ "${DECISION}" != "deny" ]; then
     pass
 else
@@ -385,7 +385,7 @@ _state_aq_true | jq \
     > "$TEST_DIR/session.json"
 run_hook "pre-tool-use.sh" \
     '{"hookEventName":"PreToolUse","tool_use_id":"t-h1b-003","tool_name":"task_complete","tool_input":{},"sessionId":"sid"}'
-DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
 if [ "${DECISION}" != "deny" ]; then
     pass
 else
@@ -415,7 +415,7 @@ begin_test "T21: Guard B — task_complete bloqueado com perguntas no summary"
 write_state "$(_state_aq_true)"
 run_hook "pre-tool-use.sh" \
     '{"hookEventName":"PreToolUse","tool_use_id":"t-gb-001","tool_name":"task_complete","tool_input":{"summary":"Tarefa concluída. Devo também corrigir o lint? Quer que eu continue?"},"sessionId":"sid"}'
-DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
 if [ "${DECISION}" = "deny" ]; then
     pass
 else
@@ -429,7 +429,7 @@ begin_test "T22: Guard B — task_complete permitido com summary sem perguntas"
 write_state "$(_state_aq_true)"
 run_hook "pre-tool-use.sh" \
     '{"hookEventName":"PreToolUse","tool_use_id":"t-gb-002","tool_name":"task_complete","tool_input":{"summary":"Tarefa concluída com sucesso. Todos os testes passam."},"sessionId":"sid"}'
-DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
 if [ "${DECISION}" != "deny" ]; then
     pass
 else
@@ -437,9 +437,34 @@ else
 fi
 teardown
 
-# ---------------------------------------------------------------------------
-# === Resultado Final ===
-# ---------------------------------------------------------------------------
+# T23: Guard C — deny com razao guard_c quando summary tem heuristica de conclusao (sem askQ)
+setup
+begin_test "T23: Guard C — deny com heuristica de conclusao no summary"
+write_state "$(_state_aq_false)"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t-gc-001","tool_name":"task_complete","tool_input":{"summary":"✅ Todos os TODOs completos. Tarefa finalizada com sucesso."},"sessionId":"sid"}'
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
+if [ "${DECISION}" = "deny" ]; then
+    pass
+else
+    fail "T23" "permissionDecision='${DECISION}' esperado='deny' (Guard C: heuristica de conclusao) out='${OUT}'"
+fi
+teardown
+
+# T24: Guard C — deny padrao quando summary nao tem heuristica de conclusao (sem askQ)
+setup
+begin_test "T24: Guard C — deny padrao quando summary sem heuristica (sem askQ)"
+write_state "$(_state_aq_false)"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t-gc-002","tool_name":"task_complete","tool_input":{"summary":"Trabalhei na refatoracao do arquivo."},"sessionId":"sid"}'
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
+if [ "${DECISION}" = "deny" ]; then
+    pass
+else
+    fail "T24" "permissionDecision='${DECISION}' esperado='deny' (UP-H1 normal) out='${OUT}'"
+fi
+teardown
+
 _log ""
 _log "==================================================="
 TOTAL=$((PASS + FAIL))
