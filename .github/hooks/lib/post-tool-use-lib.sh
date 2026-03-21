@@ -117,7 +117,10 @@ post_tool_use_main() {
             if [ "${_h1b_exempt}" = "false" ]; then
                 local _h1b_taaq
                 _h1b_taaq=$(read_field '.current_turn.tools_after_ask_questions' 2> /dev/null || printf '0')
-                _h1b_taaq=$((_h1b_taaq + 1))
+                # GAP-SCHEMA-V3: se campo ausente, read_field retorna "" via "// empty".
+                # "|| printf '0'" não protege pois jq sai com código 0.
+                # Usar expansão com default antes da aritmética.
+                _h1b_taaq=$(("${_h1b_taaq:-0}" + 1))
                 update_nested_state "current_turn.tools_after_ask_questions" "${_h1b_taaq}"
                 update_nested_state "current_turn.last_tool_after_ask_questions" "${HOOK_TOOL_NAME:-unknown}"
             fi
