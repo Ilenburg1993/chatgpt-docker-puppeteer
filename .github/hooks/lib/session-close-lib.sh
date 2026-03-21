@@ -34,17 +34,17 @@ _generate_final_report() {
     local report_file="$STATE_DIR/session-final-report.md"
 
     {
-        printf '# Session Final Report — %s\n\n' "$(date -u +%Y-%m-%d)"
+        printf '%s\n\n' "# Session Final Report — $(date -u +%Y-%m-%d)"
         printf '**Session ID**: %s\n' "$session_id"
         printf '**Iniciada em**: %s\n' "$started_at"
         printf '**Encerrada em**: %s\n\n' "$ended_at"
         printf '## Estatísticas\n\n'
-        printf '- Turnos totais: %s\n' "$turn_count"
-        printf '- Turnos autorizados: %s\n' "$turn_authorized"
-        printf '- Turnos NÃO-autorizados: %s\n' "$turn_unauthorized"
-        printf '- SUBTURNs totais: %s\n' "$subturn_total"
-        printf '- Ferramentas invocadas: %s\n' "$tools_total"
-        printf '- Violações consecutivas (no encerramento): %s\n\n' "$consec"
+        printf -- '- Turnos totais: %s\n' "$turn_count"
+        printf -- '- Turnos autorizados: %s\n' "$turn_authorized"
+        printf -- '- Turnos NÃO-autorizados: %s\n' "$turn_unauthorized"
+        printf -- '- SUBTURNs totais: %s\n' "$subturn_total"
+        printf -- '- Ferramentas invocadas: %s\n' "$tools_total"
+        printf -- '- Violações consecutivas (no encerramento): %s\n\n' "$consec"
         printf '## Últimos 10 eventos (audit.jsonl)\n\n```\n'
         if [ -f "$AUDIT_FILE" ]; then
             tail -10 "$AUDIT_FILE"

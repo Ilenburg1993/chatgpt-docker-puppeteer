@@ -77,9 +77,11 @@ pre_compact_main() {
 
     # --- Passo 1b: UP-15 — warning se turno atual não chamou vscode_askQuestions ---
     local _aq_called _turn_num
-    _aq_called=$(read_field '.current_turn.ask_questions_called' 2> /dev/null || printf 'false')
+    # Usa != "true" em vez de = "false" porque read_field retorna vazio (não "false")
+    # para booleans JSON false, devido ao comportamento do operador // empty do jq
+    _aq_called=$(read_field '.current_turn.ask_questions_called' 2> /dev/null)
     _turn_num=$(read_field '.current_turn.number' 2> /dev/null || printf '0')
-    if [ "${_aq_called}" = "false" ] && [ "${_turn_num:-0}" -gt 0 ]; then
+    if [ "${_aq_called}" != "true" ] && [ "${_turn_num:-0}" -gt 0 ]; then
         hook_log_audit "preCompact_ask_questions_missing" \
             "turn" "${_turn_num}" \
             "warning" "vscode_askQuestions não chamado antes da compactação"
