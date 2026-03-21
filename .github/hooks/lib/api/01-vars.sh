@@ -137,6 +137,19 @@ _hook_api_reset() {
     # v2.6 — rate limiting (UP-06)
     HOOKS_TOOLS_LIMIT="${HOOKS_TOOLS_LIMIT:-150}"
 
+    # UP-AUDIT: controle de verbosidade e tamanho do audit log
+    #   HOOK_AUDIT_LEVEL: verbose|normal|minimal (default: normal)
+    #     verbose  → grava todos os eventos (comportamento original)
+    #     normal   → omite subturnStart/subturnEnd de baixo valor
+    #     minimal  → só lifecycle crítico e compliance
+    #   HOOKS_AUDIT_MAX_LINES: cap mid-session (default: 5000)
+    #   HOOKS_AUDIT_LOG_DIR: diretório histórico (default: <hook_dir>/logs)
+    #   HOOKS_CHECKPOINT_MAX: máx. checkpoints retidos (default: 10)
+    HOOK_AUDIT_LEVEL="${HOOK_AUDIT_LEVEL:-normal}"
+    HOOKS_AUDIT_MAX_LINES="${HOOKS_AUDIT_MAX_LINES:-5000}"
+    HOOKS_AUDIT_LOG_DIR="${HOOKS_AUDIT_LOG_DIR:-}"
+    HOOKS_CHECKPOINT_MAX="${HOOKS_CHECKPOINT_MAX:-10}"
+
     # v2.5 — strict validation schemas (populadas via hook_validate_load)
     HOOK_VALIDATION_ERRORS_JSON="[]"
     HOOK_VALIDATION_WARNINGS_JSON="[]"
@@ -177,4 +190,6 @@ _hook_api_reset() {
         HOOK_SUBAGENT_HARD_ENFORCEMENT
     export HOOK_STATE_SCHEMA_CURRENT HOOK_STATE_VERSION HOOK_STATE_MIGRATION_NEEDED
     export HOOK_VALIDATION_ERRORS_JSON HOOK_VALIDATION_WARNINGS_JSON
+    # UP-AUDIT
+    export HOOK_AUDIT_LEVEL HOOKS_AUDIT_MAX_LINES HOOKS_AUDIT_LOG_DIR HOOKS_CHECKPOINT_MAX
 }

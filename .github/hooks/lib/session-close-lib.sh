@@ -146,8 +146,9 @@ session_close_main() {
 }
 
 # ---------------------------------------------------------------------------
-# _rotate_audit_log — renomeia audit.jsonl para audit-YYYYMMDD-HHMMSS.jsonl (GAP-52)
-# Mantém apenas os últimos HOOKS_AUDIT_MAX_FILES (padrão: 5) arquivos históricos.
+# _rotate_audit_log — move audit.jsonl para logs/ com timestamp (GAP-52, UP-AUDIT)
+# Mantém apenas os últimos HOOKS_AUDIT_MAX_FILES (padrão: 5) arquivos históricos
+# no diretório de logs (HOOKS_AUDIT_LOG_DIR ou <hook_dir>/logs).
 # ---------------------------------------------------------------------------
 _rotate_audit_log() {
     if [ ! -f "$AUDIT_FILE" ]; then
@@ -156,7 +157,18 @@ _rotate_audit_log() {
 
     local ts
     ts=$(date +%Y%m%d-%H%M%S 2> /dev/null || date +%s)
-    local rotated="${AUDIT_FILE%.jsonl}-${ts}.jsonl"
+
+    # UP-AUDIT: histórico vai para logs/ em vez de state/ (mantém state/ limpo)
+    local log_dir
+    if [ -n "${HOOKS_AUDIT_LOG_DIR:-}" ]; then
+        log_dir="$HOOKS_AUDIT_LOG_DIR"
+    elif [ -n "${HOOK_DIR:-}" ]; then
+        log_dir="$HOOK_DIR/logs"
+    else
+        log_dir="$(dirname "$AUDIT_FILE")"
+    fi
+    mkdir -p "$log_dir" 2> /dev/null || true
+    local rotated="$log_dir/audit-${ts}.jsonl"
 
     if mv -f "$AUDIT_FILE" "$rotated" 2> /dev/null; then
         hook_log_audit "audit_log_rotated" "file" "$(basename "$rotated")" >> "$AUDIT_FILE" || true
@@ -164,14 +176,11 @@ _rotate_audit_log() {
 
     # Manter apenas os últimos N arquivos históricos (padrão: 5)
     local max_files="${HOOKS_AUDIT_MAX_FILES:-5}"
-    local audit_dir
-    audit_dir="$(dirname "$AUDIT_FILE")"
-    # Lista ordenada do mais antigo para o mais novo; remove além do limite
-    local count
     # NEW-H: tr -d ' ' normaliza whitespace à esquerda que wc -l produz em BSD/macOS
-    count=$(find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2> /dev/null | wc -l | tr -d ' ')
+    local count
+    count=$(find "$log_dir" -maxdepth 1 -name 'audit-*.jsonl' 2> /dev/null | wc -l | tr -d ' ')
     if [ "${count:-0}" -gt "$max_files" ]; then
-        find "$audit_dir" -maxdepth 1 -name 'audit-*.jsonl' 2> /dev/null \
+        find "$log_dir" -maxdepth 1 -name 'audit-*.jsonl' 2> /dev/null \
             | sort | head -n $((count - max_files)) \
             | while IFS= read -r old_log; do
                 rm -f "$old_log" 2> /dev/null || true

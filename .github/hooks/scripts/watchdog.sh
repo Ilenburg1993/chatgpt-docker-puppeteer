@@ -133,8 +133,8 @@ check_stale_session() {
     laa_ts=$(date -u -d "$laa" +%s 2> /dev/null) || return 0
     elapsed=$((now_ts - laa_ts))
     if [ "$elapsed" -gt "$stale_threshold" ]; then
-        local elapsed_h=$(( elapsed / 3600 ))
-        local elapsed_m=$(( (elapsed % 3600) / 60 ))
+        local elapsed_h=$((elapsed / 3600))
+        local elapsed_m=$(((elapsed % 3600) / 60))
         WARNINGS+=("Sessão inativa há ${elapsed_h}h${elapsed_m}m (última atividade: $laa)")
     fi
 }
@@ -158,6 +158,37 @@ check_audit_coherence() {
     fi
 }
 
+# UP-AUDIT: remover checkpoints além de HOOKS_CHECKPOINT_MAX (default: 10)
+check_checkpoint_cleanup() {
+    local checkpoint_dir="$STATE_DIR/checkpoints"
+    [ -d "$checkpoint_dir" ] || return 0
+    local max="${HOOKS_CHECKPOINT_MAX:-10}"
+    local count
+    count=$(find "$checkpoint_dir" -maxdepth 1 -name 'session-*.json' 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${count:-0}" -gt "$max" ]; then
+        local excess=$((count - max))
+        # Remove os mais antigos (sort crescente = mais antigo primeiro)
+        find "$checkpoint_dir" -maxdepth 1 -name 'session-*.json' 2>/dev/null \
+            | sort | head -n "$excess" \
+            | while IFS= read -r old_cp; do
+                rm -f "$old_cp" 2>/dev/null || true
+            done
+        WARNINGS+=("Checkpoints limpos: $excess removidos, mantidos últimos $max")
+    fi
+}
+
+# UP-AUDIT: verificar tamanho do audit.jsonl ativo
+check_audit_size() {
+    [ -f "$AUDIT_FILE" ] || return 0
+    local max="${HOOKS_AUDIT_MAX_LINES:-5000}"
+    local count
+    count=$(wc -l < "$AUDIT_FILE" 2>/dev/null | tr -d ' ') || return 0
+    local pct=$(( (count * 100) / (max > 0 ? max : 1) ))
+    if [ "$pct" -ge 80 ]; then
+        WARNINGS+=("audit.jsonl com ${count} linhas (${pct}% do cap de ${max})")
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # Executar checks (|| true para não abortar em set -e quando encontra issues)
 # ---------------------------------------------------------------------------
@@ -171,6 +202,8 @@ check_pending_session_close || true
 check_consecutive_violations || true
 check_stale_session || true
 check_audit_coherence || true
+check_checkpoint_cleanup || true
+check_audit_size || true
 
 HEALTHY=1
 [ "${#ISSUES[@]}" -gt 0 ] && HEALTHY=0

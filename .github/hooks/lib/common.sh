@@ -262,10 +262,77 @@ recover_or_init_state() {
 # Assinatura posicional: log_audit "event" [key1 value1 key2 value2 ...]
 # @deprecated Use hook_log_audit() de api/15-audit.sh
 # ---------------------------------------------------------------------------
+
+# UP-AUDIT: tabela de categorias de eventos por nível mínimo de gravação
+# Eventos omitidos em HOOK_AUDIT_LEVEL=normal: subturnStart, subturnEnd
+# Eventos gravados apenas em HOOK_AUDIT_LEVEL=verbose: payload_validation_warnings
+# Eventos críticos (gravados em todos os níveis): turnStart, turnEnd, sessionStart,
+#   sessionEnd, state_initialized_clean, state_recovered_from_checkpoint,
+#   compliance/block decisions
+_audit_event_is_suppressed() {
+    local event="$1" level="${HOOK_AUDIT_LEVEL:-normal}"
+    case "$level" in
+        verbose) return 1 ;;  # grava tudo
+        minimal)
+            # minimal: só lifecycle crítico e compliance — omite operacionais
+            case "$event" in
+                turnStart|turnEnd_authorized|turnEnd_unauthorized|\
+                sessionStart|sessionStart_new|sessionStart_reconnect|\
+                sessionEnd|sessionClose|\
+                state_initialized_clean|state_recovered_from_checkpoint|\
+                briefing_generated|compliance_block|task_complete_blocked|\
+                audit_log_rotated|audit_log_capped)
+                    return 1 ;;  # não suprimir (gravar)
+                *) return 0 ;;  # suprimir
+            esac
+            ;;
+        *)  # normal (padrão): suprime subturns e validation_warnings de baixo valor
+            case "$event" in
+                subturnStart|subturnEnd|payload_validation_warnings)
+                    return 0 ;;  # suprimir
+                *) return 1 ;;  # gravar
+            esac
+            ;;
+    esac
+}
+
+# UP-AUDIT: verifica se audit.jsonl ativo excedeu HOOKS_AUDIT_MAX_LINES e rotaciona
+_audit_cap_check() {
+    [ -f "$AUDIT_FILE" ] || return 0
+    local max="${HOOKS_AUDIT_MAX_LINES:-5000}"
+    # Leitura rápida de linecount sem invocar jq
+    local count
+    count=$(wc -l < "$AUDIT_FILE" 2> /dev/null | tr -d ' ') || return 0
+    [ "${count:-0}" -lt "$max" ] && return 0
+
+    # Cap atingido — rotacionar para logs/ (ou state/ se logs/ inacessível)
+    local ts
+    ts=$(date +%Y%m%d-%H%M%S 2> /dev/null || date +%s)
+    local log_dir
+    if [ -n "${HOOKS_AUDIT_LOG_DIR:-}" ]; then
+        log_dir="$HOOKS_AUDIT_LOG_DIR"
+    elif [ -n "${HOOK_DIR:-}" ]; then
+        log_dir="$HOOK_DIR/logs"
+    else
+        log_dir="$(dirname "$AUDIT_FILE")"
+    fi
+    mkdir -p "$log_dir" 2>/dev/null || true
+    local rotated="$log_dir/audit-${ts}.jsonl"
+    if mv -f "$AUDIT_FILE" "$rotated" 2>/dev/null; then
+        # Registrar no novo arquivo que houve rotação por cap
+        printf '{"ts":"%s","event":"audit_log_capped","session_id":"%s","lines":%s,"file":"%s"}\n' \
+            "$(now_iso)" "${SESSION_ID:-unknown}" "$count" "$(basename "$rotated")" \
+            >> "$AUDIT_FILE" || true
+    fi
+}
+
 log_audit() {
     local event="$1"
     shift
     local ts sid json_obj k v
+
+    # UP-AUDIT: filtrar eventos de baixo valor conforme HOOK_AUDIT_LEVEL
+    _audit_event_is_suppressed "$event" && return 0
 
     ts="$(now_iso)"
     sid="${SESSION_ID:-$([ -f "$STATE_FILE" ] && jq -r '.session_id // "unknown"' "$STATE_FILE" 2> /dev/null || echo "unknown")}"
@@ -285,6 +352,9 @@ log_audit() {
 
     mkdir -p "$STATE_DIR"
     printf '%s\n' "$json_obj" >> "$AUDIT_FILE"
+
+    # UP-AUDIT: verificar cap mid-session após gravar (leve — só executa acima do limite)
+    _audit_cap_check || true
 }
 
 # ---------------------------------------------------------------------------

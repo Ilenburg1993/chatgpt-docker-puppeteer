@@ -117,7 +117,7 @@ _record_turn_duration() {
     now_ts=$(now_iso)
     start_epoch=$(date -u -d "$turn_started" +%s 2> /dev/null) || return 0
     now_epoch=$(date -u +%s 2> /dev/null) || return 0
-    dur_ms=$(( (now_epoch - start_epoch) * 1000 ))
+    dur_ms=$(((now_epoch - start_epoch) * 1000))
     [ "$dur_ms" -lt 0 ] 2> /dev/null && return 0
 
     update_nested_state "current_turn.duration_ms" "$dur_ms"
@@ -125,7 +125,7 @@ _record_turn_duration() {
     prev_total=$(read_field ".session_stats.turn_duration_total_ms" 2> /dev/null)
     prev_total="${prev_total:-0}"
     [ "$prev_total" = "null" ] && prev_total=0
-    new_total=$(( prev_total + dur_ms ))
+    new_total=$((prev_total + dur_ms))
     update_nested_state "session_stats.turn_duration_total_ms" "$new_total"
 }
 
