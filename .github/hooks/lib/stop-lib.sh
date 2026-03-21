@@ -56,12 +56,16 @@ stop_main() {
         update_nested_state "current_turn.ended_at" "$(now_iso)" # GAP-13
         update_nested_state "compliance.consecutive_unauthorized" "0"
         update_nested_state "compliance.last_turn_authorized" "true"
+        # GAP-ABRUPT-SUBTURN: fecha subturn ativo (se houver) antes de emitir turnEnd
+        _close_active_subturn_if_open
         # GAP-58: usa increment_field() em vez de aritmética manual
         increment_field ".session_stats.turn_authorized" > /dev/null
         hook_log_audit "turnEnd_authorized" "turn" "${turn_num:-0}"
     else
         # Turno não-autorizado: rastreia e aplica enforcement se strict_turn_close=true
         update_nested_state "current_turn.ended_at" "$(now_iso)" # GAP-13
+        # GAP-ABRUPT-SUBTURN: fecha subturn ativo (se houver) antes de emitir turnEnd
+        _close_active_subturn_if_open
         # GAP-58: usa increment_field() em vez de aritmética manual
         increment_field ".compliance.consecutive_unauthorized" > /dev/null
         update_nested_state "compliance.last_turn_authorized" "false"
@@ -86,6 +90,32 @@ stop_main() {
     fi
 
     exit 0
+}
+
+# ---------------------------------------------------------------------------
+# _close_active_subturn_if_open — fecha subturn ativo se ended_at = null
+# GAP-ABRUPT-SUBTURN: garante que o audit trail tenha subturnEnd antes de turnEnd
+# Emite evento subturnEnd_abrupt se o subturn não foi fechado normalmente
+# ---------------------------------------------------------------------------
+_close_active_subturn_if_open() {
+    local subturn_num subturn_ended
+    subturn_num=$(read_field ".current_subturn.number" 2>/dev/null || printf '0')
+    subturn_num="${subturn_num:-0}"
+    [ "$subturn_num" = "0" ] || [ "$subturn_num" = "null" ] && return 0
+
+    subturn_ended=$(read_field ".current_subturn.ended_at" 2>/dev/null || printf '')
+    # Se já tem ended_at, subturn foi fechado normalmente pelo post-tool-use
+    if [ -n "$subturn_ended" ] && [ "$subturn_ended" != "null" ]; then
+        return 0
+    fi
+
+    # Subturn ativo sem ended_at — fecha agora
+    local now_ts
+    now_ts=$(now_iso)
+    update_nested_state "current_subturn.ended_at" "$now_ts"
+    hook_log_audit "subturnEnd_abrupt" \
+        "subturn" "${subturn_num}" \
+        "reason" "stop_without_post_tool_use"
 }
 
 main() { stop_main "$1"; }

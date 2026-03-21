@@ -97,21 +97,49 @@ session_close_main() {
         exit 0
     fi
 
-    # --- Passo 2: Registra ended_at ---
+    # --- Passo 2: GAP-ABRUPT-SESSION-CLOSE — fecha turn/subturn ativos (se houver) ---
+    local _sc_turn_num _sc_turn_ended _sc_subturn_num _sc_subturn_ended
+    _sc_turn_num=$(read_field ".current_turn.number" 2>/dev/null || printf '0')
+    _sc_turn_num="${_sc_turn_num:-0}"
+    _sc_turn_ended=$(read_field ".current_turn.ended_at" 2>/dev/null || printf '')
+
+    if [ "${_sc_turn_num}" != "0" ] && [ "${_sc_turn_num}" != "null" ] \
+       && ([ -z "${_sc_turn_ended}" ] || [ "${_sc_turn_ended}" = "null" ]); then
+
+        # Fecha subturn ativo (se houver)
+        _sc_subturn_num=$(read_field ".current_subturn.number" 2>/dev/null || printf '0')
+        _sc_subturn_num="${_sc_subturn_num:-0}"
+        _sc_subturn_ended=$(read_field ".current_subturn.ended_at" 2>/dev/null || printf '')
+        if [ "${_sc_subturn_num}" != "0" ] && [ "${_sc_subturn_num}" != "null" ] \
+           && ([ -z "${_sc_subturn_ended}" ] || [ "${_sc_subturn_ended}" = "null" ]); then
+            update_nested_state "current_subturn.ended_at" "$(now_iso)"
+            hook_log_audit "subturnEnd_abrupt" \
+                "subturn" "${_sc_subturn_num}" \
+                "reason" "session_close_forced"
+        fi
+
+        # Fecha turn ativo
+        update_nested_state "current_turn.ended_at" "$(now_iso)"
+        hook_log_audit "turnEnd_abrupt" \
+            "turn" "${_sc_turn_num}" \
+            "reason" "session_close_forced"
+    fi
+
+    # --- Passo 3: Registra ended_at ---
     update_state "ended_at" "$(now_iso)"
 
-    # --- Passo 3: Reseta pending_session_close ---
+    # --- Passo 4: Reseta pending_session_close ---
     update_state_bool "pending_session_close" "false"
 
-    # --- Passo 4: Loga sessionEnd ---
+    # --- Passo 5: Loga sessionEnd ---
     local turn_count
     turn_count=$(read_field ".session_stats.turn_count")
     hook_log_audit "sessionEnd" "turn_count" "${turn_count:-0}"
 
-    # --- Passo 5: Gera relatório final ---
+    # --- Passo 6: Gera relatório final ---
     _generate_final_report
 
-    # --- Passo 6: Rotação do audit.jsonl (GAP-52) ---
+    # --- Passo 7: Rotação do audit.jsonl (GAP-52) ---
     _rotate_audit_log
 
     exit 0
