@@ -128,7 +128,12 @@ check_audit_coherence() {
     [ -f "$AUDIT_FILE" ] || return 0
     local state_turns audit_turns diff
     state_turns=$(read_field ".session_stats.turn_count" 2> /dev/null || printf '0')
+    # GAP-SCHEMA-V3: read_field retorna "" para campos null/ausentes (jq // empty).
+    # o || printf '0' acima não dispara pois jq sai com código 0.
+    # ${:-0} garante que aritmética use 0 em vez de string vazia.
+    state_turns="${state_turns:-0}"
     audit_turns=$(grep -c '"event":"turnStart"' "$AUDIT_FILE" 2> /dev/null || printf '0')
+    audit_turns="${audit_turns:-0}"
     diff=$((state_turns - audit_turns))
     [ "$diff" -lt 0 ] && diff=$((-diff))
     if [ "$diff" -gt 2 ]; then
