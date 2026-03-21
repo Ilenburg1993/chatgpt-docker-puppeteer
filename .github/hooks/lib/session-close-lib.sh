@@ -8,7 +8,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 # shellcheck source=hook-payload-api.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/hook-payload-api.sh"
 
-export LANG=C.UTF-8
+export_lang_utf8
 
 # ---------------------------------------------------------------------------
 # Gera session-final-report.md a partir do state + tail do audit.jsonl

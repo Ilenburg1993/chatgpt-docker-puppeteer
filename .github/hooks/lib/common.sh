@@ -44,6 +44,14 @@ read_field() {
     jq -r "${path} // empty" "$STATE_FILE" 2> /dev/null
 }
 
+# Leitura segura de campos booleanos do session.json.
+# Retorna a string "true" ou "false" independente do valor JSON (evita
+# o bug de read_field() que retorna "" para boolean false via "// empty").
+read_field_bool() {
+    local path="$1"
+    jq -r "if ${path} then \"true\" else \"false\" end" "$STATE_FILE" 2> /dev/null || echo "false"
+}
+
 # Atualiza campo de raiz STRING no session.json atomicamente
 # CUIDADO: não usar para booleanos nem campos aninhados
 update_state() {
@@ -798,9 +806,9 @@ generate_session_briefing() {
     source=$(sanitize_md "$source")
     current_turn_source=$(sanitize_md "$current_turn_source")
 
-    # Lê pending-tasks.md se existir
+    # Lê pending-tasks.md se existir (envolvido em bloco para evitar injeção de Markdown)
     if [ -f "$PENDING_TASKS_FILE" ]; then
-        pending_tasks_content="$(cat "$PENDING_TASKS_FILE")"
+        pending_tasks_content="$(printf '```\n%s\n```' "$(cat "$PENDING_TASKS_FILE")")"
     else
         pending_tasks_content="*(sem tarefas pendentes registradas)*"
     fi

@@ -52,7 +52,7 @@ if ! declare -f maybe_capture_debug > /dev/null 2>&1; then
     maybe_capture_debug() { :; }
 fi
 if ! declare -f export_lang_utf8 > /dev/null 2>&1; then
-    export_lang_utf8() { export LANG="C.UTF-8" LC_ALL="C.UTF-8"; }
+    export_lang_utf8() { export LANG="${LANG:-C.UTF-8}"; }
 fi
 
 export_lang_utf8

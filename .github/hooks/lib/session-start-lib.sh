@@ -138,14 +138,14 @@ _session_start_append_watchdog_alerts() {
         if [ "$healthy" = "false" ] && [ "$issues_count" -gt 0 ] 2> /dev/null; then
             printf '### 🔴 Problemas críticos (%s)\n\n' "$issues_count"
             printf '%s' "$wdog_json" | jq -r '.issues[]?' | while IFS= read -r issue; do
-                printf '- %s\n' "$issue"
+                printf -- '- %s\n' "$issue"
             done
             printf '\n'
         fi
         if [ "$warnings_count" -gt 0 ] 2> /dev/null; then
             printf '### ⚠️ Avisos (%s)\n\n' "$warnings_count"
             printf '%s' "$wdog_json" | jq -r '.warnings[]?' | while IFS= read -r warn; do
-                printf '- %s\n' "$warn"
+                printf -- '- %s\n' "$warn"
             done
             printf '\n'
         fi
