@@ -549,6 +549,22 @@ else
 fi
 teardown
 
+# T30: migração v2→v3 — session com schema_version=2 recebe tools_after_ask_questions=0
+setup
+begin_test "T30: schema v2→v3 — migração adiciona tools_after_ask_questions em state legado"
+# State com schema_version=2 (sem tools_after_ask_questions nem last_tool_after_ask_questions)
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"2","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","source":"reconnect","pending_session_close":false,"strict_turn_close":true,"current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":false,"subturn_count":0,"tools_count":0,"subagents_started":0,"intent":"","last_template":""},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+run_hook "user-prompt-submit.sh" \
+    '{"hookEventName":"UserPromptSubmit","sessionId":"sid","prompt":"continuar trabalho"}'
+# Após o hook, state deve ter sido migrado para v3 com o campo tools_after_ask_questions
+_taaq=$(grep -o '"tools_after_ask_questions":[0-9]*' "$TEST_DIR/session.json" 2>/dev/null | head -1)
+if [ -n "$_taaq" ]; then
+    pass
+else
+    fail "T30" "esperado campo 'tools_after_ask_questions' no state após migração v2→v3, mas não encontrado"
+fi
+teardown
+
 _log ""
 _log "==================================================="
 TOTAL=$((PASS + FAIL))

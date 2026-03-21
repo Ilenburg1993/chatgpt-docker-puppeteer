@@ -128,7 +128,7 @@ _hook_api_reset() {
     HOOK_SUBAGENT_BUDGET_LIMIT="50"
 
     # v2.4 — state versioning (populadas via hook_state_version_load)
-    HOOK_STATE_SCHEMA_CURRENT="2" # versão canônica atual do schema
+    HOOK_STATE_SCHEMA_CURRENT="3" # versão canônica atual do schema
     HOOK_STATE_VERSION="0"        # versão registrada no state (0 = legado)
     HOOK_STATE_MIGRATION_NEEDED="false"
 

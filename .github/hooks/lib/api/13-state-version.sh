@@ -22,6 +22,8 @@
 #                      compliance, strict_turn_close, state_schema_version
 #   "2"              — v2.0 (UP-14): tools_by_type, template_usage, last_template,
 #                      subagents_started, ask_questions_turn_pos, duration_ms
+#   "3"              — v3.0 (UP-H1b): tools_after_ask_questions,
+#                      last_tool_after_ask_questions
 
 # ─── SEÇÃO 13A: LEITURA DE VERSÃO ────────────────────────────────────────────
 
@@ -167,6 +169,25 @@ hook_state_migrate() {
             && update_nested_state 'session_stats.subturn_duration_total_ms' '0' 2> /dev/null || true
 
         recorded="2"
+    fi
+
+    # ── Migração 2 → 3 ──────────────────────────────────────────────────────
+    # Adiciona campos do UP-H1b: contadores de tools pós-askQ por turno.
+    # Sem estes campos, sessões legadas causam erro aritmético no Guard B/C/UP-H1b.
+    if [[ "$recorded" -lt "3" ]] 2> /dev/null; then
+        # current_turn.tools_after_ask_questions
+        local taaq
+        taaq="$(read_field '.current_turn.tools_after_ask_questions' 2> /dev/null)"
+        [[ -z "$taaq" || "$taaq" == "null" ]] \
+            && update_nested_state 'current_turn.tools_after_ask_questions' '0' 2> /dev/null || true
+
+        # current_turn.last_tool_after_ask_questions
+        local ltaaq
+        ltaaq="$(read_field '.current_turn.last_tool_after_ask_questions' 2> /dev/null)"
+        [[ -z "$ltaaq" || "$ltaaq" == "null" ]] \
+            && update_nested_state 'current_turn.last_tool_after_ask_questions' '' 2> /dev/null || true
+
+        recorded="3"
     fi
 
     # Persiste a versão migrada
