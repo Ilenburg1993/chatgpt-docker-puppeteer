@@ -1295,11 +1295,12 @@ setup
 begin_test "T68: session-close noop quando sessao ja encerrada (idempotencia)"
 write_state "$(_state_session_open false | jq '.ended_at = "2026-01-01T01:00:00Z"')"
 _t68_rc=0
-export HOOKS_TEST_STATE_DIR="$TEST_DIR" && bash "$HOOK_DIR/scripts/session-close.sh" > /dev/null 2>&1 || _t68_rc=$?; unset HOOKS_TEST_STATE_DIR
+export HOOKS_TEST_STATE_DIR="$TEST_DIR" && bash "$HOOK_DIR/scripts/session-close.sh" > /dev/null 2>&1 || _t68_rc=$?
+unset HOOKS_TEST_STATE_DIR
 if [ "$_t68_rc" -eq 0 ] && grep -q '"event":"session_close_noop"' "$TEST_DIR/audit.jsonl" 2> /dev/null; then
     pass
 else
-    fail "T68" "esperado session_close_noop quando ja encerrada; RC=$_t68_rc audit=$(cat "$TEST_DIR/audit.jsonl" 2>/dev/null)"
+    fail "T68" "esperado session_close_noop quando ja encerrada; RC=$_t68_rc audit=$(cat "$TEST_DIR/audit.jsonl" 2> /dev/null)"
 fi
 teardown
 
@@ -1308,11 +1309,12 @@ setup
 begin_test "T69: session-close emite session_close_unexpected quando pending=false"
 write_state "$(_state_session_open false)"
 _t69_rc=0
-export HOOKS_TEST_STATE_DIR="$TEST_DIR" && bash "$HOOK_DIR/scripts/session-close.sh" > /dev/null 2>&1 || _t69_rc=$?; unset HOOKS_TEST_STATE_DIR
+export HOOKS_TEST_STATE_DIR="$TEST_DIR" && bash "$HOOK_DIR/scripts/session-close.sh" > /dev/null 2>&1 || _t69_rc=$?
+unset HOOKS_TEST_STATE_DIR
 if [ "$_t69_rc" -eq 0 ] && grep -q '"event":"session_close_unexpected"' "$TEST_DIR/audit.jsonl" 2> /dev/null; then
     pass
 else
-    fail "T69" "esperado session_close_unexpected com pending=false; RC=$_t69_rc audit=$(cat "$TEST_DIR/audit.jsonl" 2>/dev/null)"
+    fail "T69" "esperado session_close_unexpected com pending=false; RC=$_t69_rc audit=$(cat "$TEST_DIR/audit.jsonl" 2> /dev/null)"
 fi
 teardown
 
@@ -1322,11 +1324,12 @@ begin_test "T70: session-close emite session_close_no_key_validation sem audit k
 write_state "$(_state_session_open true)"
 # audit.jsonl vazio (nenhum sessionCloseAuthorized)
 _t70_rc=0
-export HOOKS_TEST_STATE_DIR="$TEST_DIR" && bash "$HOOK_DIR/scripts/session-close.sh" > /dev/null 2>&1 || _t70_rc=$?; unset HOOKS_TEST_STATE_DIR
+export HOOKS_TEST_STATE_DIR="$TEST_DIR" && bash "$HOOK_DIR/scripts/session-close.sh" > /dev/null 2>&1 || _t70_rc=$?
+unset HOOKS_TEST_STATE_DIR
 if grep -q '"event":"session_close_no_key_validation"' "$TEST_DIR/audit.jsonl" 2> /dev/null; then
     pass
 else
-    fail "T70" "esperado session_close_no_key_validation; RC=$_t70_rc audit=$(cat "$TEST_DIR/audit.jsonl" 2>/dev/null)"
+    fail "T70" "esperado session_close_no_key_validation; RC=$_t70_rc audit=$(cat "$TEST_DIR/audit.jsonl" 2> /dev/null)"
 fi
 teardown
 
@@ -1336,7 +1339,8 @@ begin_test "T71: session-close completo — sessionEnd no audit e ended_at no st
 write_state "$(_state_session_open true)"
 printf '{"ts":"2026-01-01T00:00:30Z","event":"sessionCloseAuthorized","session_id":"sid"}\n' > "$TEST_DIR/audit.jsonl"
 _t71_rc=0
-export HOOKS_TEST_STATE_DIR="$TEST_DIR" && bash "$HOOK_DIR/scripts/session-close.sh" > /dev/null 2>&1 || _t71_rc=$?; unset HOOKS_TEST_STATE_DIR
+export HOOKS_TEST_STATE_DIR="$TEST_DIR" && bash "$HOOK_DIR/scripts/session-close.sh" > /dev/null 2>&1 || _t71_rc=$?
+unset HOOKS_TEST_STATE_DIR
 _t71_ended=$(read_state_field ".ended_at")
 # sessionEnd pode estar no audit.jsonl rotacionado (audit-*.jsonl) depois do fechamento
 _t71_session_end=$(grep -rl '"event":"sessionEnd"' "$TEST_DIR"/ 2> /dev/null | head -1)
@@ -1345,7 +1349,7 @@ if [ "$_t71_rc" -eq 0 ] \
     && [ -n "$_t71_ended" ] && [ "$_t71_ended" != "null" ]; then
     pass
 else
-    fail "T71" "esperado sessionEnd+ended_at; RC=$_t71_rc ended_at=$_t71_ended session_end_in=$(echo "$_t71_session_end") audit=$(cat "$TEST_DIR"/audit*.jsonl 2>/dev/null | tail -3)"
+    fail "T71" "esperado sessionEnd+ended_at; RC=$_t71_rc ended_at=$_t71_ended session_end_in=$(echo "$_t71_session_end") audit=$(cat "$TEST_DIR"/audit*.jsonl 2> /dev/null | tail -3)"
 fi
 teardown
 
@@ -1358,7 +1362,7 @@ run_hook "pre-compact.sh" '{"hookEventName":"PreCompact","sessionId":"sid"}' || 
 if [ "$RC" -eq 0 ] && [ ! -f "$TEST_DIR/audit.jsonl" ]; then
     pass
 else
-    fail "T72" "pre-compact sem state deveria sair RC=0 sem audit; RC=$RC audit=$(cat "$TEST_DIR/audit.jsonl" 2>/dev/null)"
+    fail "T72" "pre-compact sem state deveria sair RC=0 sem audit; RC=$RC audit=$(cat "$TEST_DIR/audit.jsonl" 2> /dev/null)"
 fi
 teardown
 
@@ -1373,7 +1377,7 @@ if [ "$RC" -eq 0 ] \
     && [ "${_t73_chk:-0}" -gt 0 ]; then
     pass
 else
-    fail "T73" "esperado checkpoint+audit; RC=$RC chk=$_t73_chk audit=$(cat "$TEST_DIR/audit.jsonl" 2>/dev/null)"
+    fail "T73" "esperado checkpoint+audit; RC=$RC chk=$_t73_chk audit=$(cat "$TEST_DIR/audit.jsonl" 2> /dev/null)"
 fi
 teardown
 
@@ -1385,7 +1389,7 @@ run_hook "pre-compact.sh" '{"hookEventName":"PreCompact","sessionId":"sid"}'
 if [ "$RC" -eq 0 ] && grep -q '"event":"preCompact_ask_questions_missing"' "$TEST_DIR/audit.jsonl" 2> /dev/null; then
     pass
 else
-    fail "T74" "UP-15 deveria emitir preCompact_ask_questions_missing; RC=$RC audit=$(cat "$TEST_DIR/audit.jsonl" 2>/dev/null)"
+    fail "T74" "UP-15 deveria emitir preCompact_ask_questions_missing; RC=$RC audit=$(cat "$TEST_DIR/audit.jsonl" 2> /dev/null)"
 fi
 teardown
 

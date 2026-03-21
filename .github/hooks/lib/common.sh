@@ -188,6 +188,7 @@ init_state() {
         --arg src "$source" \
         '{
             "_comment": "gerado por session-start.sh",
+            "state_schema_version": "3",
             "vs_code_session_id": $sid,
             "session_id": $sid,
             "started_at": $start,
@@ -241,6 +242,7 @@ init_state() {
                 "last_template": ""
             }
         }' > "$STATE_FILE"
+    chmod 600 "$STATE_FILE" 2> /dev/null || true # R-09: close_key não deve ser world-readable
 }
 
 # recover_or_init_state — GAP-57: tenta recuperar state de checkpoint antes de init_state()

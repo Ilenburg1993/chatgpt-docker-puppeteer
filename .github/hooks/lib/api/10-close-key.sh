@@ -7,7 +7,7 @@
 # Todas as funções desta camada dependem de session.json via read_field/STATE_FILE.
 #
 # Depende de:
-#   common.sh  — make_close_key, detect_close_key_in_text, read_field, STATE_FILE
+#   common.sh  — make_close_key, read_field, STATE_FILE
 #   01-vars.sh — HOOK_CLOSE_KEY_VALUE, HOOK_CLOSE_KEY_IN_PAYLOAD
 #
 # Contexto do protocolo:
@@ -111,10 +111,14 @@ hook_close_key_load() {
 
 # ─── SEÇÃO 10E: DETECÇÃO EM TEXTO ────────────────────────────────────────────
 
-# 🟧 hook_close_key_detect_in_text — API pública canônica para detect_close_key_in_text()
+# 🟧 hook_close_key_detect_in_text — API pública canônica (R-06: sem legado)
 # Verifica se a close_key da sessão aparece no texto fornecido.
 # Retorna 0 se encontrar, 1 se não encontrar ou close_key ausente no state.
 # Uso: hook_close_key_detect_in_text "$tool_response_text"
 hook_close_key_detect_in_text() {
-    detect_close_key_in_text "$@"
+    local text="$1"
+    local close_key
+    close_key=$(read_field ".close_key" 2> /dev/null || true)
+    [ -z "$close_key" ] || [ "$close_key" = "null" ] && return 1
+    printf '%s' "$text" | grep -qF "$close_key"
 }

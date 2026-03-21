@@ -6,7 +6,7 @@
 # 🟧 CAMADA 3 — NOSSO SISTEMA (funções que leem/escrevem estado em disco)
 #
 # Depende de: 01-vars.sh, 02-parse.sh, 04-predicates.sh, 06-query.sh
-# Usa de common.sh: detect_close_key_in_text, read_field, STATE_DIR
+# Usa de common.sh: read_field, STATE_DIR
 #
 # SEPARAÇÃO DE RESPONSABILIDADES:
 #   06-query.sh  → funções puras (getters, dump, summary) — somente leitura de vars
@@ -20,7 +20,11 @@
 # Anteriormente em: 04-predicates.sh
 hook_close_key_in_response() {
     hook_is_ask_questions || return 1
-    detect_close_key_in_text "$HOOK_ASK_ALL_TEXT"
+    # R-06: lógica inline, sem dependência de detect_close_key_in_text() legado
+    local stored_key
+    stored_key=$(read_field ".close_key" 2> /dev/null || true)
+    [ -n "$stored_key" ] && [ "$stored_key" != "null" ] || return 1
+    printf '%s' "$HOOK_ASK_ALL_TEXT" | grep -qF "$stored_key"
 }
 
 # 🟧 Template F detectado na proposta (PreToolUse de vscode_askQuestions com close_key)

@@ -8,8 +8,7 @@
 # A implementação real reside em common.sh.
 #
 # Depende de:
-#   common.sh  — turn_is_orphaned(), heal_orphaned_turn(), read_field,
-#                update_nested_state, log_audit, now_iso
+#   common.sh  — read_field, update_nested_state, log_audit, now_iso
 #
 # Motivação:
 #   turn_is_orphaned() e heal_orphaned_turn() são funções de lógica de negócio
@@ -23,16 +22,34 @@
 # Parâmetro: threshold em segundos (padrão: 300)
 # Uso: if hook_turn_is_orphaned 300; then hook_heal_orphaned_turn; fi
 hook_turn_is_orphaned() {
-    turn_is_orphaned "$@"
+    # R-07: implementação direta, sem dependência de turn_is_orphaned() legado
+    local threshold="${1:-300}"
+    local started_at started_epoch now_epoch delta
+
+    started_at=$(read_field ".current_turn.started_at" 2> /dev/null)
+    [ -z "$started_at" ] || [ "$started_at" = "null" ] && return 1
+
+    started_epoch=$(date -d "$started_at" +%s 2> /dev/null) || return 1
+    now_epoch=$(date -u +%s)
+    delta=$((now_epoch - started_epoch))
+    [ "$delta" -gt "$threshold" ]
 }
 
-# ─── SEÇÃO 16B: CURA DE TURNO ÓRFÃO ─────────────────────────────────────────
+# ─── SEÇÃO 16B: CURA DE TURNO ÓRFÃO ─────────────────────────────────────────────
 
 # hook_heal_orphaned_turn — fecha turno órfão e registra no audit.jsonl
 # Deve ser chamado após hook_turn_is_orphaned retornar 0.
 # Uso: hook_heal_orphaned_turn
 hook_heal_orphaned_turn() {
-    heal_orphaned_turn "$@"
+    # R-07: implementação direta, sem dependência de heal_orphaned_turn() legado
+    local turn_num turn_id
+    turn_num=$(read_field ".current_turn.number" 2> /dev/null)
+    turn_id=$(read_field ".current_turn.turn_id" 2> /dev/null)
+
+    update_nested_state "current_turn.ask_questions_called" "false"
+    update_nested_state "current_turn.started_at" "null"
+    update_nested_state "current_turn.ended_at" "$(now_iso)"
+    log_audit "turnEnd_orphan_healed" "turn" "${turn_num:-0}" "turn_id" "${turn_id:-unknown}"
 }
 
 # ─── SEÇÃO 16C: HEARTBEAT DE SESSÃO ─────────────────────────────────────────
