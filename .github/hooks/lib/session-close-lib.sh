@@ -99,19 +99,19 @@ session_close_main() {
 
     # --- Passo 2: GAP-ABRUPT-SESSION-CLOSE — fecha turn/subturn ativos (se houver) ---
     local _sc_turn_num _sc_turn_ended _sc_subturn_num _sc_subturn_ended
-    _sc_turn_num=$(read_field ".current_turn.number" 2>/dev/null || printf '0')
+    _sc_turn_num=$(read_field ".current_turn.number" 2> /dev/null || printf '0')
     _sc_turn_num="${_sc_turn_num:-0}"
-    _sc_turn_ended=$(read_field ".current_turn.ended_at" 2>/dev/null || printf '')
+    _sc_turn_ended=$(read_field ".current_turn.ended_at" 2> /dev/null || printf '')
 
     if [ "${_sc_turn_num}" != "0" ] && [ "${_sc_turn_num}" != "null" ] \
-       && ([ -z "${_sc_turn_ended}" ] || [ "${_sc_turn_ended}" = "null" ]); then
+        && ([ -z "${_sc_turn_ended}" ] || [ "${_sc_turn_ended}" = "null" ]); then
 
         # Fecha subturn ativo (se houver)
-        _sc_subturn_num=$(read_field ".current_subturn.number" 2>/dev/null || printf '0')
+        _sc_subturn_num=$(read_field ".current_subturn.number" 2> /dev/null || printf '0')
         _sc_subturn_num="${_sc_subturn_num:-0}"
-        _sc_subturn_ended=$(read_field ".current_subturn.ended_at" 2>/dev/null || printf '')
+        _sc_subturn_ended=$(read_field ".current_subturn.ended_at" 2> /dev/null || printf '')
         if [ "${_sc_subturn_num}" != "0" ] && [ "${_sc_subturn_num}" != "null" ] \
-           && ([ -z "${_sc_subturn_ended}" ] || [ "${_sc_subturn_ended}" = "null" ]); then
+            && ([ -z "${_sc_subturn_ended}" ] || [ "${_sc_subturn_ended}" = "null" ]); then
             update_nested_state "current_subturn.ended_at" "$(now_iso)"
             hook_log_audit "subturnEnd_abrupt" \
                 "subturn" "${_sc_subturn_num}" \

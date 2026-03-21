@@ -644,19 +644,18 @@ begin_test "T36: stop.sh reseta subagents_active quando há subagente órfão (G
 write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","pending_session_close":false,"strict_turn_close":false,"current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":true,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":1,"intent":"","last_template":"A","ended_at":null},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null,"ended_at":null},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0,"subagents_active":2,"subagents_total":2},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
 run_hook "stop.sh" \
     '{"hookEventName":"Stop","sessionId":"sid","stop_hook_active":false}'
-if grep -q '"event":"subagentOrphan_turnclosed"' "$TEST_DIR/audit.jsonl" 2>/dev/null; then
+if grep -q '"event":"subagentOrphan_turnclosed"' "$TEST_DIR/audit.jsonl" 2> /dev/null; then
     # Verificar que subagents_active foi zerado no state
-    active=$(jq -r '.session_stats.subagents_active // 99' "$TEST_DIR/session.json" 2>/dev/null)
+    active=$(jq -r '.session_stats.subagents_active // 99' "$TEST_DIR/session.json" 2> /dev/null)
     if [ "${active:-99}" = "0" ]; then
         pass
     else
         fail "T36" "stop.sh emitiu subagentOrphan_turnclosed mas subagents_active=$active (esperado 0)"
     fi
 else
-    fail "T36" "stop.sh deveria emitir subagentOrphan_turnclosed com 2 subagentes órfãos; audit=$(cat "$TEST_DIR/audit.jsonl" 2>/dev/null)"
+    fail "T36" "stop.sh deveria emitir subagentOrphan_turnclosed com 2 subagentes órfãos; audit=$(cat "$TEST_DIR/audit.jsonl" 2> /dev/null)"
 fi
 teardown
-
 
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"

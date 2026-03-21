@@ -131,7 +131,7 @@ _close_active_subturn_if_open() {
 # ---------------------------------------------------------------------------
 _reset_active_subagents_if_needed() {
     local active
-    active=$(read_field ".session_stats.subagents_active" 2>/dev/null || printf '0')
+    active=$(read_field ".session_stats.subagents_active" 2> /dev/null || printf '0')
     active="${active:-0}"
     [ "$active" = "0" ] || [ "$active" = "null" ] && return 0
 
