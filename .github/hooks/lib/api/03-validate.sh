@@ -22,9 +22,8 @@ _hook_api_add_error() {
 _hook_api_require() {
     local var_name="$1"
     local field_desc="${2:-$var_name}"
-    # Expansão indireta portável em bash 4+
-    local val
-    val=$(eval "printf '%s' \"\${${var_name}:-}\"")
+    # Expansão indireta nativa bash 4+ (sem eval)
+    local val="${!var_name:-}"
     if [ -z "$val" ] || [ "$val" = "null" ]; then
         _hook_api_add_error "campo obrigatório ausente: ${field_desc}"
         return 1
@@ -35,8 +34,8 @@ _hook_api_require() {
 # Verifica que uma variável é "true" ou "false" (boolean serializado)
 _hook_api_require_bool() {
     local var_name="$1"
-    local val
-    val=$(eval "printf '%s' \"\${${var_name}:-}\"")
+    # Expansão indireta nativa bash 4+ (sem eval)
+    local val="${!var_name:-}"
     case "$val" in
         true | false) return 0 ;;
         *) _hook_api_add_error "${var_name} deve ser true ou false, obtido: '${val}'" ;;
