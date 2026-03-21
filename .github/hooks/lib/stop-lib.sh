@@ -58,6 +58,9 @@ stop_main() {
         update_nested_state "compliance.last_turn_authorized" "true"
         # GAP-ABRUPT-SUBTURN: fecha subturn ativo (se houver) antes de emitir turnEnd
         _close_active_subturn_if_open
+        # GAP-SUBAGENT-ORPHAN: reseta subagents_active=0 ao fechar turno
+        # (subagentes não cruzam fronteiras de turno; Stop limpa qualquer orphan)
+        _reset_active_subagents_if_needed
         # GAP-58: usa increment_field() em vez de aritmética manual
         increment_field ".session_stats.turn_authorized" > /dev/null
         hook_log_audit "turnEnd_authorized" "turn" "${turn_num:-0}"
@@ -66,6 +69,8 @@ stop_main() {
         update_nested_state "current_turn.ended_at" "$(now_iso)" # GAP-13
         # GAP-ABRUPT-SUBTURN: fecha subturn ativo (se houver) antes de emitir turnEnd
         _close_active_subturn_if_open
+        # GAP-SUBAGENT-ORPHAN: reseta subagents_active=0 ao fechar turno
+        _reset_active_subagents_if_needed
         # GAP-58: usa increment_field() em vez de aritmética manual
         increment_field ".compliance.consecutive_unauthorized" > /dev/null
         update_nested_state "compliance.last_turn_authorized" "false"
@@ -99,11 +104,11 @@ stop_main() {
 # ---------------------------------------------------------------------------
 _close_active_subturn_if_open() {
     local subturn_num subturn_ended
-    subturn_num=$(read_field ".current_subturn.number" 2>/dev/null || printf '0')
+    subturn_num=$(read_field ".current_subturn.number" 2> /dev/null || printf '0')
     subturn_num="${subturn_num:-0}"
     [ "$subturn_num" = "0" ] || [ "$subturn_num" = "null" ] && return 0
 
-    subturn_ended=$(read_field ".current_subturn.ended_at" 2>/dev/null || printf '')
+    subturn_ended=$(read_field ".current_subturn.ended_at" 2> /dev/null || printf '')
     # Se já tem ended_at, subturn foi fechado normalmente pelo post-tool-use
     if [ -n "$subturn_ended" ] && [ "$subturn_ended" != "null" ]; then
         return 0
@@ -116,6 +121,25 @@ _close_active_subturn_if_open() {
     hook_log_audit "subturnEnd_abrupt" \
         "subturn" "${subturn_num}" \
         "reason" "stop_without_post_tool_use"
+}
+
+# ---------------------------------------------------------------------------
+# _reset_active_subagents_if_needed — reseta subagents_active=0 se > 0 no Stop
+# GAP-SUBAGENT-ORPHAN: subagentes não cruzam fronteiras de turno.
+# Se subagents_active > 0 ao fechar o turno, um SubagentStop foi perdido.
+# Emite evento subagentOrphan_turnclosed para cada subagente órfão.
+# ---------------------------------------------------------------------------
+_reset_active_subagents_if_needed() {
+    local active
+    active=$(read_field ".session_stats.subagents_active" 2>/dev/null || printf '0')
+    active="${active:-0}"
+    [ "$active" = "0" ] || [ "$active" = "null" ] && return 0
+
+    # Há subagentes com SubagentStop perdido — reseta para evitar estado corrompido
+    update_nested_state "session_stats.subagents_active" "0"
+    hook_log_audit "subagentOrphan_turnclosed" \
+        "orphaned_count" "${active}" \
+        "reason" "SubagentStop_not_received_before_turn_end"
 }
 
 main() { stop_main "$1"; }
