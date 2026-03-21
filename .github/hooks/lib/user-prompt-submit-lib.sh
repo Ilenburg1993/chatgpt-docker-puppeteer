@@ -90,6 +90,16 @@ user_prompt_submit_main() {
     # --- Passo 2: Cura turno órfão se necessário ---
     maybe_heal_orphaned_turn
 
+    # --- Passo 2b: GAP-UPS1 — aviso de encerramento de sessão pendente ---
+    # Quando pending_session_close=true (usuário já enviou close_key), o stop hook
+    # encerrará a sessão ao final deste turno. O agente deve ser informado imediatamente
+    # para não iniciar trabalho novo que seria perdido após o encerramento.
+    local _psc
+    _psc=$(read_field ".pending_session_close" 2> /dev/null || printf 'false')
+    if [ "${_psc:-false}" = "true" ]; then
+        hook_out_system_message "⛔ ENCERRAMENTO PENDENTE: A chave de encerramento foi recebida. Esta sessão será encerrada pelo stop hook ao final deste turno. NÃO inicie trabalho novo. Se deseja cancelar o encerramento, reporte ao mantenedor."
+    fi
+
     # --- Passo 2b: UP-03 — alerta proativo de compliance ---
     # Se consecutive_unauthorized >= 2, emite systemMessage de alerta imediato
     # (antes de abrir o novo turno, enquanto o counter ainda reflete o estado anterior)
