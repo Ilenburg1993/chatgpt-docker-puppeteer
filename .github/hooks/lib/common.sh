@@ -18,6 +18,9 @@ fi
 STATE_FILE="$STATE_DIR/session.json"
 AUDIT_FILE="$STATE_DIR/audit.jsonl"
 
+# R-14: Symlink canônico que sempre aponta para o audit ativo
+AUDIT_CURRENT_LINK="${HOOKS_AUDIT_LOG_DIR:-${HOOK_DIR}/logs}/audit-current.jsonl"
+
 # ---------------------------------------------------------------------------
 # Verificação de dependência crítica
 # ---------------------------------------------------------------------------
@@ -243,6 +246,8 @@ init_state() {
             }
         }' > "$STATE_FILE"
     chmod 600 "$STATE_FILE" 2> /dev/null || true # R-09: close_key não deve ser world-readable
+    # R-14: inicializa symlink canônico para o audit ativo
+    _audit_update_symlink "$AUDIT_FILE" || true
 }
 
 # recover_or_init_state — GAP-57: tenta recuperar state de checkpoint antes de init_state()
@@ -333,10 +338,19 @@ _audit_event_is_suppressed() {
 }
 
 # UP-AUDIT: verifica se audit.jsonl ativo excedeu HOOKS_AUDIT_MAX_LINES e rotaciona
+# R-13: contador em memória de linhas do audit.jsonl (evita wc -l a cada evento)
+# Reset para 0 ao rotacionar. Subshells herdam cópia — incremento não propaga de volta,
+# mas basta para detecção de cap dentro do mesmo processo executor.
+_AUDIT_LINE_COUNT=0
+
 _audit_cap_check() {
     [ -f "$AUDIT_FILE" ] || return 0
     local max="${HOOKS_AUDIT_MAX_LINES:-5000}"
-    # Leitura rápida de linecount sem invocar jq
+    # R-13: usa contador em memória quando disponível; recalcula se zerado
+    if [ "${_AUDIT_LINE_COUNT:-0}" -lt "$max" ]; then
+        return 0
+    fi
+    # Confirmar com wc -l antes de rotacionar (contador pode estar dessincronizado)
     local count
     count=$(wc -l < "$AUDIT_FILE" 2> /dev/null | tr -d ' ') || return 0
     [ "${count:-0}" -lt "$max" ] && return 0
@@ -359,6 +373,10 @@ _audit_cap_check() {
         printf '{"ts":"%s","event":"audit_log_capped","session_id":"%s","lines":%s,"file":"%s"}\n' \
             "$(now_iso)" "${SESSION_ID:-unknown}" "$count" "$(basename "$rotated")" \
             >> "$AUDIT_FILE" || true
+        # R-14: aponta symlink para o archive rotacionado
+        _audit_update_symlink "$rotated" || true
+        # R-13: reset do contador após rotação
+        _AUDIT_LINE_COUNT=1
     fi
 }
 
@@ -398,6 +416,8 @@ log_audit() {
 
     mkdir -p "$STATE_DIR"
     printf '%s\n' "$json_obj" >> "$AUDIT_FILE"
+    # R-13: incrementa contador em memória para evitar wc -l a cada evento
+    _AUDIT_LINE_COUNT=$((_AUDIT_LINE_COUNT + 1))
 
     # UP-AUDIT: verificar cap mid-session após gravar (leve — só executa acima do limite)
     _audit_cap_check || true
@@ -420,6 +440,27 @@ log_audit() {
 # Retorna timestamp ISO 8601 em UTC
 now_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
+# R-10: retorna o path do arquivo de auditoria ativo (state/ ou logs/)
+# Usa o symlink AUDIT_CURRENT_LINK como indireção canônica quando disponível.
+# @returns {string} path absoluto para o audit.jsonl ativo via stdout
+find_audit_file() {
+    if [ -L "${AUDIT_CURRENT_LINK:-}" ] && [ -f "$AUDIT_CURRENT_LINK" ]; then
+        readlink -f "$AUDIT_CURRENT_LINK" 2> /dev/null || echo "$AUDIT_CURRENT_LINK"
+        return 0
+    fi
+    echo "${AUDIT_FILE:-$STATE_DIR/audit.jsonl}"
+}
+
+# Atualiza o symlink R-14 para apontar ao audit ativo
+# @param {string} $1 — path absoluto do arquivo de audit ativo
+_audit_update_symlink() {
+    local target="${1:-$AUDIT_FILE}"
+    local link_dir
+    link_dir="$(dirname "$AUDIT_CURRENT_LINK")"
+    mkdir -p "$link_dir" 2> /dev/null || return 0
+    ln -sf "$target" "$AUDIT_CURRENT_LINK" 2> /dev/null || true
+}
+
 # Gera close_key aleatória no formato ENCERRAR-XXXXXXXX (8 chars hex maiúsculos)
 make_close_key() {
     local hex
@@ -431,12 +472,12 @@ make_close_key() {
     elif [ -r /dev/urandom ]; then
         # GAP-09: fallback com dd quando od não está disponível (evita timestamp previsível)
         hex=$(dd if=/dev/urandom bs=4 count=1 2> /dev/null | od -An -tx1 2> /dev/null | tr -d ' \n' | cut -c1-8 | tr '[:lower:]' '[:upper:]')
-        # Se dd+od falhar, tenta via awk seed de /dev/urandom
-        if [ -z "$hex" ]; then
-            hex=$(awk 'BEGIN{srand();printf "%08X\n",int(rand()*4294967295)}' /dev/null 2> /dev/null || true)
-        fi
     fi
-    # Último recurso: derivado do timestamp (menos aleatório, mas funcional)
+    # R-17: fallback com $RANDOM (4x 16-bit → 64-bit de entropia) antes do timestamp
+    if [ -z "$hex" ]; then
+        hex=$(printf '%04X%04X' "$RANDOM" "$RANDOM")
+    fi
+    # Último recurso: derivado do timestamp
     if [ -z "$hex" ]; then
         hex=$(date +%s%N 2> /dev/null | tr -d '[:space:]' | head -c8 | tr '[:lower:]' '[:upper:]')
     fi

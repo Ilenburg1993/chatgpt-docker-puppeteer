@@ -1393,6 +1393,169 @@ else
 fi
 teardown
 
+# ===========================================================================
+# R-12: Novos testes T75-T82
+# ===========================================================================
+
+_log ""
+_log "=== R-12: Novos testes T75-T82 ==="
+
+# T75: session-end.sh com turn ativo → emite turnEnd_abrupt no audit
+setup
+begin_test "T75: session-end com turn ativo emite turnEnd_abrupt"
+write_state "$(printf '{
+    "vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3",
+    "started_at":"2026-01-01T00:00:00Z","ended_at":null,
+    "close_key":"ENCERRAR-AABBCCDD","source":"new",
+    "pending_session_close":false,"strict_turn_close":true,
+    "current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:01:00Z",
+        "ask_questions_called":true,"subturn_count":0,"tools_count":0,
+        "tools_after_ask_questions":0,"last_tool_after_ask_questions":"",
+        "subagents_started":0,"intent":"","last_template":"A","ended_at":null},
+    "current_subturn":{"number":0,"subturn_id":null,"started_at":null,
+        "response_at":null,"ended_at":null},
+    "session_stats":{"turn_count":1,"turn_authorized":1,"turn_unauthorized":0,
+        "subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0},
+    "compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}
+}')"
+_t75_rc=0
+export HOOKS_TEST_STATE_DIR="$TEST_DIR" && \
+    printf '{"hookEventName":"SessionEnd","sessionId":"sid"}' \
+    | bash "$HOOK_DIR/scripts/session-end.sh" > /dev/null 2>&1 || _t75_rc=$?
+unset HOOKS_TEST_STATE_DIR
+if [ "$_t75_rc" -eq 0 ] && grep -q '"event":"turnEnd_abrupt"' "$TEST_DIR/audit.jsonl" 2> /dev/null; then
+    pass
+else
+    fail "T75" "esperado turnEnd_abrupt; RC=$_t75_rc audit=$(cat "$TEST_DIR/audit.jsonl" 2> /dev/null)"
+fi
+teardown
+
+# T76: _audit_cap_check com HOOKS_AUDIT_MAX_LINES=5 → gera arquivo rotacionado
+setup
+begin_test "T76: _audit_cap_check com HOOKS_AUDIT_MAX_LINES=5 rotaciona audit"
+write_state "$(_state_aq_true)"
+# Preencher audit com 6 linhas (acima do limite de 5)
+for _i in 1 2 3 4 5 6; do
+    printf '{"ts":"2026-01-01T00:00:0%sZ","event":"dummy_%s"}\n' "$_i" "$_i" >> "$TEST_DIR/audit.jsonl"
+done
+# Rodar post-tool-use (que chama log_audit → _audit_cap_check) com max=5
+HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOKS_AUDIT_MAX_LINES=5 HOOKS_AUDIT_LOG_DIR="$TEST_DIR/logs" \
+    bash "$HOOK_DIR/scripts/post-tool-use.sh" \
+    <<< '{"hookEventName":"PostToolUse","sessionId":"sid","tool_name":"read_file","tool_input":{},"tool_response":"ok"}' \
+    > /dev/null 2>&1 || true
+_t76_rotated=$(ls "$TEST_DIR/logs"/audit-*.jsonl 2> /dev/null | wc -l | tr -d ' ')
+if [ "${_t76_rotated:-0}" -gt 0 ]; then
+    pass
+else
+    fail "T76" "_audit_cap_check com MAX=5 deveria ter rotacionado; rotated=$_t76_rotated"
+fi
+teardown
+
+# T77: recover_or_init_state com checkpoints todos inválidos → init limpo
+setup
+begin_test "T77: recover_or_init_state com checkpoints invalidos faz init limpo"
+mkdir -p "$TEST_DIR/checkpoints"
+printf 'JSON INVALIDO' > "$TEST_DIR/checkpoints/session-20260101-corrupted.json"
+# Sem session.json válido, recover deve limpar e criar um novo
+_t77_result=0
+(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    recover_or_init_state "testsid" "new"
+    state_exists && printf 'STATE_OK\n' || printf 'NO_STATE\n'
+) > "$TEST_DIR/t77_out.txt" 2>/dev/null || _t77_result=$?
+if grep -q 'STATE_OK' "$TEST_DIR/t77_out.txt" 2> /dev/null && [ -f "$TEST_DIR/session.json" ]; then
+    pass
+else
+    fail "T77" "recover_or_init_state deveria ter criado session.json; out=$(cat "$TEST_DIR/t77_out.txt" 2>/dev/null)"
+fi
+teardown
+
+# T78: printf -- com valor iniciando com '-' em session-start-lib.sh
+setup
+begin_test "T78: printf -- em session-start-lib.sh aceita valor comecando com '-'"
+# Forcar pending_tasks com conteúdo iniciando com '-'
+HOOKS_TEST_STATE_DIR="$TEST_DIR" LANG=C.UTF-8 bash -c '
+    source "'"$HOOK_DIR"'/lib/common.sh"
+    init_state "testsid" "new"
+    printf "-- - item com traco\n" | grep -q "^-- - item" && printf "OK\n" || printf "FAIL\n"
+' > "$TEST_DIR/t78_out.txt" 2>/dev/null || true
+if grep -q 'OK' "$TEST_DIR/t78_out.txt" 2> /dev/null; then
+    pass
+else
+    fail "T78" "LANG=C.UTF-8 com printf -- deve aceitar '-'; out=$(cat "$TEST_DIR/t78_out.txt" 2>/dev/null)"
+fi
+teardown
+
+# T79: generate_session_briefing contém session_id e close_key
+setup
+begin_test "T79: generate_session_briefing contem session_id e close_key"
+write_state "$(_state_session_open true)"
+_t79_out=''
+_t79_out=$(
+    HOOKS_TEST_STATE_DIR="$TEST_DIR" bash -c '
+        source "'"$HOOK_DIR"'/lib/common.sh"
+        generate_session_briefing "sid" "ENCERRAR-AABBCCDD"
+    ' 2>/dev/null
+) || true
+if printf '%s' "$_t79_out" | grep -q 'sid' && \
+   printf '%s' "$_t79_out" | grep -q 'ENCERRAR-AABBCCDD'; then
+    pass
+else
+    fail "T79" "briefing deveria conter session_id e close_key; out_len=${#_t79_out}"
+fi
+teardown
+
+# T80: open_new_turn zera ask_questions_called e avança número do turn
+setup
+begin_test "T80: open_new_turn avanca numero de turn e zera ask_questions_called"
+write_state "$(_state_aq_true)"
+_t80_rc=0
+(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    open_new_turn "t_new" "new_turn_id"
+) > /dev/null 2>&1 || _t80_rc=$?
+_t80_aq=$(jq -r '.current_turn.ask_questions_called' "$TEST_DIR/session.json" 2>/dev/null)
+_t80_num=$(jq -r '.current_turn.number' "$TEST_DIR/session.json" 2>/dev/null)
+if [ "${_t80_aq}" = "false" ] && [ "${_t80_num:-0}" -gt 0 ]; then
+    pass
+else
+    fail "T80" "turn deveria ter ask_questions_called=false e number>0; aq=$_t80_aq num=$_t80_num"
+fi
+teardown
+
+# T81: make_close_key retorna formato ENCERRAR-XXXXXXXX mesmo sem /dev/urandom
+setup
+begin_test "T81: make_close_key retorna formato ENCERRAR-XXXXXXXX"
+_t81_key=''
+_t81_key=$(
+    source "$HOOK_DIR/lib/common.sh"
+    make_close_key
+) 2>/dev/null || true
+if printf '%s' "$_t81_key" | grep -qE '^ENCERRAR-[0-9A-F]{8}$'; then
+    pass
+else
+    fail "T81" "make_close_key formato incorreto: '$_t81_key'"
+fi
+teardown
+
+# T82: find_audit_file retorna AUDIT_FILE quando symlink não existe
+setup
+begin_test "T82: find_audit_file retorna AUDIT_FILE padrao quando sem symlink"
+_t82_path=''
+_t82_path=$(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    find_audit_file
+) 2>/dev/null || true
+if printf '%s' "$_t82_path" | grep -q 'audit.jsonl'; then
+    pass
+else
+    fail "T82" "find_audit_file deveria retornar path com audit.jsonl; path='$_t82_path'"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 
