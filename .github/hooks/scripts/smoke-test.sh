@@ -597,6 +597,47 @@ else
 fi
 teardown
 
+# T33: GAP-ABRUPT-SUBTURN — stop.sh deve emitir subturnEnd_abrupt quando subturn ativo sem ended_at
+setup
+begin_test "T33: stop.sh fecha subturn ativo sem ended_at antes do turnEnd (GAP-ABRUPT-SUBTURN)"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","pending_session_close":false,"strict_turn_close":false,"current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":true,"subturn_count":1,"tools_count":1,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":"","last_template":"A"},"current_subturn":{"number":1,"subturn_id":"st1","started_at":"2026-01-01T00:00:00Z","response_at":null,"ended_at":null},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":1,"tools_total":1,"subturn_duration_total_ms":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+run_hook "stop.sh" \
+    '{"hookEventName":"Stop","sessionId":"sid","reason":"normal"}'
+if [ -f "$TEST_DIR/audit.jsonl" ] && grep -q '"event":"subturnEnd_abrupt"' "$TEST_DIR/audit.jsonl"; then
+    pass
+else
+    fail "T33" "esperado evento subturnEnd_abrupt no audit.jsonl ao stop com subturn ativo, mas não encontrado; RC=$RC"
+fi
+teardown
+
+# T34: GAP-ABRUPT-TURN-END — session-end.sh deve emitir turnEnd_abrupt quando turn ativo sem ended_at
+setup
+begin_test "T34: session-end.sh fecha turn/subturn ativos (GAP-ABRUPT-TURN-END)"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","pending_session_close":false,"strict_turn_close":false,"current_turn":{"number":2,"turn_id":"t2","started_at":"2026-01-01T00:01:00Z","ask_questions_called":false,"subturn_count":1,"tools_count":3,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":"","last_template":""},"current_subturn":{"number":1,"subturn_id":"st1","started_at":"2026-01-01T00:01:00Z","response_at":null,"ended_at":null},"session_stats":{"turn_count":2,"turn_authorized":1,"turn_unauthorized":0,"subturn_total":2,"tools_total":3,"subturn_duration_total_ms":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+run_hook "session-end.sh" \
+    '{"hookEventName":"SessionEnd","sessionId":"sid"}'
+if [ -f "$TEST_DIR/audit.jsonl" ] && \
+   grep -q '"event":"turnEnd_abrupt"' "$TEST_DIR/audit.jsonl" && \
+   grep -q '"event":"subturnEnd_abrupt"' "$TEST_DIR/audit.jsonl"; then
+    pass
+else
+    fail "T34" "esperado eventos turnEnd_abrupt e subturnEnd_abrupt no audit.jsonl; RC=$RC; audit=$(cat "$TEST_DIR/audit.jsonl" 2>/dev/null)"
+fi
+teardown
+
+# T35: session-end.sh sem turn ativo não deve emitir turnEnd_abrupt (guard de idempotência)
+setup
+begin_test "T35: session-end.sh sem turn ativo não emite turnEnd_abrupt (idempotência)"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","pending_session_close":false,"strict_turn_close":false,"current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":true,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":"","last_template":"A","ended_at":"2026-01-01T00:00:59Z"},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null,"ended_at":null},"session_stats":{"turn_count":1,"turn_authorized":1,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+run_hook "session-end.sh" \
+    '{"hookEventName":"SessionEnd","sessionId":"sid"}'
+if [ -f "$TEST_DIR/audit.jsonl" ] && ! grep -q '"event":"turnEnd_abrupt"' "$TEST_DIR/audit.jsonl"; then
+    pass
+else
+    fail "T35" "session-end.sh não deveria emitir turnEnd_abrupt quando turn já encerrado; RC=$RC; audit=$(cat "$TEST_DIR/audit.jsonl" 2>/dev/null)"
+fi
+teardown
+
 _log ""
 _log "==================================================="
 TOTAL=$((PASS + FAIL))
