@@ -33,6 +33,7 @@ Para regras completas (templates, chave de encerramento, blocks):
 > Esta regra se aplica **sempre**, inclusive após `git push`, commit, ou último TODO.
 
 **Sequência obrigatória ao concluir qualquer trabalho:**
+
 1. Chamar `vscode_askQuestions` (Template A ou G)
 2. Aguardar resposta do usuário
 3. Apenas em seguida: `task_complete` (se aplicável)

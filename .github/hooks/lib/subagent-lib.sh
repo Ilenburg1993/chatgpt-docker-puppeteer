@@ -146,7 +146,7 @@ subagent_stop_main() {
     local enforcement="${HOOK_SUBAGENT_STOP_ENFORCEMENT:-soft}"
 
     # Detectar stop órfão: se antes do decremento já era 0, não há start correspondente
-    if [ "${active_before:-0}" -le 0 ] 2>/dev/null; then
+    if [ "${active_before:-0}" -le 0 ] 2> /dev/null; then
         hook_log_audit "subagentStop_orphan" \
             "subagent_id" "${SUBAGENT_ID:-unknown}" \
             "subagent_type" "${SUBAGENT_TYPE:-unknown}" \
@@ -155,7 +155,7 @@ subagent_stop_main() {
         case "$enforcement" in
             hard)
                 # hard: bloqueia retorno do subagente
-                if ! hook_is_stop_active 2>/dev/null; then
+                if ! hook_is_stop_active 2> /dev/null; then
                     hook_out_subagent_stop_block \
                         "SubagentStop órfão detectado (subagents_active=0). Subagente ${SUBAGENT_ID:-unknown} não tinha SubagentStart correspondente."
                 fi
@@ -166,7 +166,7 @@ subagent_stop_main() {
                 hook_out_system_message \
                     "Aviso: SubagentStop órfão detectado (subagents_active=0). Subagente ${SUBAGENT_ID:-unknown} finalizou sem SubagentStart correspondente."
                 ;;
-            none|*)
+            none | *)
                 # none: só auditado — sem output
                 ;;
         esac

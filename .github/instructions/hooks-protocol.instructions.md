@@ -17,8 +17,8 @@ applyTo: '**/*'
 
 > **Esta é a violação mais comum. Leia antes de qualquer outra coisa.**
 
-O VS Code Copilot instrui o agente a chamar `task_complete` quando a tarefa está concluída.
-**Essa instrução NOT SUPERA o protocolo de hooks.** A sequência correta OBRIGATÓRIA é:
+O VS Code Copilot instrui o agente a chamar `task_complete` quando a tarefa está concluída. **Essa
+instrução NOT SUPERA o protocolo de hooks.** A sequência correta OBRIGATÓRIA é:
 
 ```
 1. Concluir trabalho
@@ -28,10 +28,11 @@ O VS Code Copilot instrui o agente a chamar `task_complete` quando a tarefa est�
 5. Chamar task_complete (se apropriado)           ← APENAS após step 2-4
 ```
 
-**O PreToolUse hook BLOQUEIA `task_complete` se `ask_questions_called=false`.**
-Não há como bypass — você receberá um `permissionDecision: deny` e deverá chamar vscode_askQuestions.
+**O PreToolUse hook BLOQUEIA `task_complete` se `ask_questions_called=false`.** Não há como bypass —
+você receberá um `permissionDecision: deny` e deverá chamar vscode_askQuestions.
 
 **Cenários onde esta regra é MAIS frequentemente violada:**
+
 - Após `git push origin main` bem-sucedido
 - Após commit + push de um conjunto de mudanças
 - Após completar o último item da lista de TODOs

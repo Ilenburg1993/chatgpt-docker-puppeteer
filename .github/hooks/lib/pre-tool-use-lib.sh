@@ -91,7 +91,7 @@ pre_tool_use_main() {
     # (task_complete já tem seu próprio gate UP-H1; não duplicar block aqui).
     if state_exists; then
         local _h4_consec _h4_soft _h4_hard _h4_tool
-        _h4_consec=$(read_field '.compliance.consecutive_unauthorized' 2>/dev/null || printf '0')
+        _h4_consec=$(read_field '.compliance.consecutive_unauthorized' 2> /dev/null || printf '0')
         _h4_soft="${HOOK_CONSEC_UNAUTH_SOFT:-1}"
         _h4_hard="${HOOK_CONSEC_UNAUTH_HARD:-3}"
         _h4_tool="${HOOK_TOOL_NAME:-}"
@@ -99,10 +99,10 @@ pre_tool_use_main() {
         # Exemptions — estas ferramentas nunca são bloqueadas por UP-H4
         local _h4_exempt="false"
         case "${_h4_tool}" in
-            vscode_askQuestions|manage_todo_list|task_complete) _h4_exempt="true" ;;
+            vscode_askQuestions | manage_todo_list | task_complete) _h4_exempt="true" ;;
         esac
 
-        if [ "${_h4_exempt}" != "true" ] && [ "${_h4_consec:-0}" -ge "${_h4_hard}" ] 2>/dev/null; then
+        if [ "${_h4_exempt}" != "true" ] && [ "${_h4_consec:-0}" -ge "${_h4_hard}" ] 2> /dev/null; then
             # Hard enforcement: bloqueia até compliance ser regularizado
             hook_log_audit "preToolUse_h4_hard_block" \
                 "tool" "${_h4_tool}" \
@@ -114,12 +114,12 @@ pre_tool_use_main() {
             exit 0
         fi
 
-        if [ "${_h4_exempt}" != "true" ] && [ "${_h4_consec:-0}" -ge "${_h4_soft}" ] 2>/dev/null; then
+        if [ "${_h4_exempt}" != "true" ] && [ "${_h4_consec:-0}" -ge "${_h4_soft}" ] 2> /dev/null; then
             # Soft enforcement: injeta reminder + deixa a tool prosseguir (hook_out_pre_allow)
             # Só dispara na PRIMEIRA tool de cada turno (tools_count == 0) para não poluir
             local _h4_tc
-            _h4_tc=$(read_field '.current_turn.tools_count' 2>/dev/null || printf '1')
-            if [ "${_h4_tc:-1}" -eq 0 ] 2>/dev/null; then
+            _h4_tc=$(read_field '.current_turn.tools_count' 2> /dev/null || printf '1')
+            if [ "${_h4_tc:-1}" -eq 0 ] 2> /dev/null; then
                 hook_log_audit "preToolUse_h4_soft_reminder" \
                     "tool" "${_h4_tool}" \
                     "consecutive_unauthorized" "${_h4_consec}" \

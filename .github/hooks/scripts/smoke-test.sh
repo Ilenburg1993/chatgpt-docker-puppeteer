@@ -876,12 +876,12 @@ write_state "$(_state_aq_false 1)"
 _T48_OUT="" _T48_RC=0
 _T48_OUT=$(printf '%s' '{"hookEventName":"PreToolUse","tool_use_id":"t48","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"sid"}' \
     | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_AUDIT_LEVEL=verbose \
-        bash "$HOOK_DIR/scripts/pre-tool-use.sh" 2>/dev/null) || _T48_RC=$?
+        bash "$HOOK_DIR/scripts/pre-tool-use.sh" 2> /dev/null) || _T48_RC=$?
 _T48_AUDIT="$TEST_DIR/audit.jsonl"
-if [ -f "$_T48_AUDIT" ] && grep -q '"event"' "$_T48_AUDIT" 2>/dev/null; then
+if [ -f "$_T48_AUDIT" ] && grep -q '"event"' "$_T48_AUDIT" 2> /dev/null; then
     pass
 else
-    fail "T48" "audit.jsonl ausente ou sem campo event com HOOK_AUDIT_LEVEL=verbose; RC=$_T48_RC file=$(ls "$TEST_DIR" 2>/dev/null | tr '\n' ' ')"
+    fail "T48" "audit.jsonl ausente ou sem campo event com HOOK_AUDIT_LEVEL=verbose; RC=$_T48_RC file=$(ls "$TEST_DIR" 2> /dev/null | tr '\n' ' ')"
 fi
 teardown
 
@@ -894,7 +894,7 @@ _T49_CNT=$(bash -c "
     AUDIT_FILE='$TEST_DIR/audit.jsonl'
     . '$HOOK_DIR/lib/api/15-audit.sh' 2>/dev/null
     hook_audit_count 'turnStart'
-" 2>/dev/null)
+" 2> /dev/null)
 if [ "${_T49_CNT:-0}" = "0" ]; then
     pass
 else
@@ -912,7 +912,7 @@ bash -c "
     AUDIT_FILE='$TEST_DIR/audit.jsonl'
     . '$HOOK_DIR/lib/api/15-audit.sh' 2>/dev/null
     hook_audit_has 'turnEnd_authorized'
-" 2>/dev/null || _T50_RC=$?
+" 2> /dev/null || _T50_RC=$?
 if [ "$_T50_RC" -ne 0 ]; then
     pass
 else
@@ -930,7 +930,7 @@ _T51_VAL=$(bash -c "
     AUDIT_FILE='$TEST_DIR/audit.jsonl'
     . '$HOOK_DIR/lib/api/15-audit.sh' 2>/dev/null
     hook_audit_last 'turnStart' 'turn'
-" 2>/dev/null)
+" 2> /dev/null)
 if [ "${_T51_VAL}" = "2" ]; then
     pass
 else
@@ -948,9 +948,9 @@ _T52_OUT=$(bash -c "
     AUDIT_FILE='$TEST_DIR/audit.jsonl'
     . '$HOOK_DIR/lib/api/15-audit.sh' 2>/dev/null
     hook_audit_events_since '2026-01-01T12:00:00Z'
-" 2>/dev/null)
-if printf '%s' "$_T52_OUT" | grep -q 'turnEnd_authorized' && \
-   ! printf '%s' "$_T52_OUT" | grep -q '"turnStart"'; then
+" 2> /dev/null)
+if printf '%s' "$_T52_OUT" | grep -q 'turnEnd_authorized' \
+    && ! printf '%s' "$_T52_OUT" | grep -q '"turnStart"'; then
     pass
 else
     fail "T52" "hook_audit_events_since deveria retornar apenas turnEnd_authorized; got='${_T52_OUT}'"
@@ -974,11 +974,11 @@ _T53_HAS_ENRICH=$(HOOK_AUDIT_ENRICH=false bash -c "
     . '$HOOK_DIR/lib/api/15-audit.sh' 2>/dev/null
     _audit_write_event 'test_no_enrich'
     grep -c '\"turn_id\"' '$TEST_DIR/audit.jsonl' 2>/dev/null || echo 0
-" 2>/dev/null)
+" 2> /dev/null)
 # Se enrich=false, turn_id não deve aparecer nesse evento específico
 # (audit.jsonl pode já ter eventos de run_hook acima — verificamos o último)
-_T53_LAST=$(tail -1 "$TEST_DIR/audit.jsonl" 2>/dev/null)
-if ! printf '%s' "$_T53_LAST" | grep -q '"turn_id"' 2>/dev/null; then
+_T53_LAST=$(tail -1 "$TEST_DIR/audit.jsonl" 2> /dev/null)
+if ! printf '%s' "$_T53_LAST" | grep -q '"turn_id"' 2> /dev/null; then
     pass
 else
     fail "T53" "evento com HOOK_AUDIT_ENRICH=false nao deveria ter turn_id; last='${_T53_LAST}'"
@@ -1006,7 +1006,7 @@ _state_consec_unauth() {
     "session_stats":{"turn_count":%s,"turn_authorized":0,"turn_unauthorized":%s,
         "subturn_total":0,"tools_total":0},
     "compliance":{"consecutive_unauthorized":%s,"last_turn_authorized":false}
-}' "$((n+1))" "$((n+1))" "$n" "$n"
+}' "$((n + 1))" "$((n + 1))" "$n" "$n"
 }
 
 # T54: UP-H4 soft — 1 turno não-autorizado, tools_count=0 → reminder injetado para read_file
@@ -1017,7 +1017,7 @@ run_hook "pre-tool-use.sh" \
     '{"hookEventName":"PreToolUse","tool_use_id":"t54","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"sid"}'
 # Soft não bloqueia (sem "deny") mas injeta mensagem via hook_out_pre_allow
 # RC=0 e output contém o reminder (qualquer saída JSON indica que saiu pelo allow path)
-if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q '"deny"' 2>/dev/null; then
+if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q '"deny"' 2> /dev/null; then
     pass
 else
     fail "T54" "UP-H4 soft deveria permitir com reminder; RC=$RC OUT=$OUT"
@@ -1045,7 +1045,7 @@ begin_test "T56: UP-H4 hard (consec=3) → read_file bloqueado"
 write_state "$(_state_consec_unauth 3)"
 run_hook "pre-tool-use.sh" \
     '{"hookEventName":"PreToolUse","tool_use_id":"t56","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"sid"}'
-DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
 if [ "${DECISION}" = "deny" ]; then
     pass
 else
@@ -1059,7 +1059,7 @@ begin_test "T57: UP-H4 hard (consec=3) → vscode_askQuestions é exempto"
 write_state "$(_state_consec_unauth 3)"
 run_hook "pre-tool-use.sh" \
     '{"hookEventName":"PreToolUse","tool_use_id":"t57","tool_name":"vscode_askQuestions","tool_input":{"questions":[{"header":"Próxima ação","question":"O que fazer?","options":["A","B"]}]},"sessionId":"sid"}'
-DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
 if [ "${DECISION}" != "deny" ]; then
     pass
 else
@@ -1073,7 +1073,7 @@ begin_test "T58: UP-H4 hard (consec=3) → manage_todo_list é exempto"
 write_state "$(_state_consec_unauth 3)"
 run_hook "pre-tool-use.sh" \
     '{"hookEventName":"PreToolUse","tool_use_id":"t58","tool_name":"manage_todo_list","tool_input":{"todoList":[]},"sessionId":"sid"}'
-DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
 if [ "${DECISION}" != "deny" ]; then
     pass
 else
@@ -1088,8 +1088,8 @@ write_state "$(_state_consec_unauth 2)"
 _T59_OUT="" _T59_RC=0
 _T59_OUT=$(printf '%s' '{"hookEventName":"PreToolUse","tool_use_id":"t59","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"sid"}' \
     | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_CONSEC_UNAUTH_HARD=3 \
-        bash "$HOOK_DIR/scripts/pre-tool-use.sh" 2>/dev/null) || _T59_RC=$?
-_T59_DEC=$(printf '%s' "$_T59_OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+        bash "$HOOK_DIR/scripts/pre-tool-use.sh" 2> /dev/null) || _T59_RC=$?
+_T59_DEC=$(printf '%s' "$_T59_OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2> /dev/null)
 if [ "${_T59_DEC}" != "deny" ]; then
     pass
 else
