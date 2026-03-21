@@ -23,7 +23,8 @@ CHECKPOINT_DIR="$STATE_DIR/checkpoints"
 
 # Salva cópia timestampada do session.json em state/checkpoints/
 # Mantém no máximo MAX_CHECKPOINTS arquivos (remove os mais antigos)
-MAX_CHECKPOINTS=10
+# Configurável via env: HOOKS_CHECKPOINT_MAX (default: 10)
+MAX_CHECKPOINTS="${HOOKS_CHECKPOINT_MAX:-10}"
 
 save_checkpoint() {
     mkdir -p "$CHECKPOINT_DIR"

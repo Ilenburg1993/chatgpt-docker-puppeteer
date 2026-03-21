@@ -112,7 +112,9 @@ _hook_api_parse_tool_input_subfields() {
     HOOK_MEMORY_PATH=$(printf '%s' "$input" | jq -r '.path // empty')
 
     # --- v1.1: fetch_webpage ---
-    HOOK_FETCH_URL=$(printf '%s' "$input" | jq -r '.url // empty')
+    # Compatibilidade: alguns clients usam "url" (string) e outros "urls" (array)
+    HOOK_FETCH_URL=$(printf '%s' "$input" | jq -r '.url // (.urls[0] // empty)')
+    HOOK_FETCH_URLS_JSON=$(printf '%s' "$input" | jq -c '.urls // []')
 
     export HOOK_TOOL_COMMAND HOOK_TOOL_EXPLANATION HOOK_TOOL_GOAL
     export HOOK_TOOL_IS_BG HOOK_TOOL_TIMEOUT
@@ -126,7 +128,7 @@ _hook_api_parse_tool_input_subfields() {
     export HOOK_MR_REPLACEMENTS_COUNT HOOK_MR_FIRST_FILE_PATH
     export HOOK_GET_ERRORS_PATHS_JSON
     export HOOK_MEMORY_COMMAND HOOK_MEMORY_PATH
-    export HOOK_FETCH_URL
+    export HOOK_FETCH_URL HOOK_FETCH_URLS_JSON
 }
 
 # Campos comuns a PreToolUse e PostToolUse

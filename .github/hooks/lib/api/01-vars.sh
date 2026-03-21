@@ -94,6 +94,7 @@ _hook_api_reset() {
 
     # v1.1 — fetch_webpage
     HOOK_FETCH_URL=""
+    HOOK_FETCH_URLS_JSON="[]"
 
     # v1.2 — segurança (derivadas do stdin)
     HOOK_SECURITY_SCORE="0"
@@ -176,6 +177,27 @@ _hook_api_reset() {
     HOOK_CONSEC_UNAUTH_SOFT="${HOOK_CONSEC_UNAUTH_SOFT:-1}"
     HOOK_CONSEC_UNAUTH_HARD="${HOOK_CONSEC_UNAUTH_HARD:-3}"
 
+    # UP-SUBAGENT-U9: upgrade completo do sistema de subagentes
+    #
+    #   UP-DEPTH-LIMIT: profundidade máxima de nesting de subagentes
+    #     HOOK_SUBAGENT_DEPTH_LIMIT: inteiro (default: 3)
+    #     SubagentStart é bloqueado se hook_subagent_depth() >= HOOK_SUBAGENT_DEPTH_LIMIT
+    HOOK_SUBAGENT_DEPTH_LIMIT="${HOOK_SUBAGENT_DEPTH_LIMIT:-3}"
+    #
+    #   UP-COMPLIANCE: enforcement de protocolo no SubagentStop
+    #     Verifica se o subagente chamou vscode_askQuestions antes de encerrar.
+    #     HOOK_SUBAGENT_COMPLIANCE_ENFORCEMENT: none|soft|hard (default: soft)
+    #       none → só auditado, sem output
+    #       soft → systemMessage de aviso ao usuário
+    #       hard → decision:block (bloqueia encerramento até compliance)
+    HOOK_SUBAGENT_COMPLIANCE_ENFORCEMENT="${HOOK_SUBAGENT_COMPLIANCE_ENFORCEMENT:-soft}"
+    #
+    #   UP-CONTEXT-RICH: contexto enriquecido injetado no SubagentStart
+    #     HOOK_SUBAGENT_CONTEXT_RICH: true|false (default: true)
+    #       true  → injeta contexto específico por agent_type + regras operacionais
+    #       false → comportamento legado (contexto genérico)
+    HOOK_SUBAGENT_CONTEXT_RICH="${HOOK_SUBAGENT_CONTEXT_RICH:-true}"
+
     # v2.5 — strict validation schemas (populadas via hook_validate_load)
     HOOK_VALIDATION_ERRORS_JSON="[]"
     HOOK_VALIDATION_WARNINGS_JSON="[]"
@@ -203,7 +225,7 @@ _hook_api_reset() {
     export HOOK_MR_REPLACEMENTS_COUNT HOOK_MR_FIRST_FILE_PATH
     export HOOK_GET_ERRORS_PATHS_JSON
     export HOOK_MEMORY_COMMAND HOOK_MEMORY_PATH
-    export HOOK_FETCH_URL
+    export HOOK_FETCH_URL HOOK_FETCH_URLS_JSON
     export HOOK_SECURITY_SCORE HOOK_SECURITY_FLAGS
     export HOOK_RISK_LEVEL HOOK_TOOL_CATEGORY
     export HOOK_STAT_TURN_COUNT HOOK_STAT_TURN_AUTHORIZED HOOK_STAT_TURN_UNAUTHORIZED
@@ -224,4 +246,6 @@ _hook_api_reset() {
     export HOOK_SUBAGENT_STOP_ENFORCEMENT
     # UP-H4 (U8A): consecutive-unauthorized enforcement
     export HOOK_CONSEC_UNAUTH_SOFT HOOK_CONSEC_UNAUTH_HARD
+    # UP-SUBAGENT-U9: depth limit, compliance enforcement, rich context
+    export HOOK_SUBAGENT_DEPTH_LIMIT HOOK_SUBAGENT_COMPLIANCE_ENFORCEMENT HOOK_SUBAGENT_CONTEXT_RICH
 }

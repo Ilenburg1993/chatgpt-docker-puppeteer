@@ -9,7 +9,7 @@ canônico (resumo executivo). **Última atualização**: 2026-03-15.
 
 Para evitar ambiguidade, use esta ordem:
 
-1. **Hooks executáveis** em `.github/hooks/scripts/*` e `.github/hooks/hooks-lib/*`
+1. **Hooks executáveis** em `.github/hooks/scripts/*` e `.github/hooks/lib/*`
 2. **Protocolo de hooks** em `.github/instructions/hooks-protocol.instructions.md`
 3. **Baseline técnico** em `.github/instructions/project-canon.instructions.md`
 4. **Templates operacionais** em `.github/AGENTS.md`

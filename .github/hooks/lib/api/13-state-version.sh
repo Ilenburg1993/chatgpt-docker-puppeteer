@@ -130,13 +130,16 @@ hook_state_migrate() {
         local tbt
         tbt="$(read_field '.session_stats.tools_by_type' 2> /dev/null)"
         [[ -z "$tbt" || "$tbt" == "null" ]] \
-            && update_nested_state 'session_stats.tools_by_type' '{}' 2> /dev/null || true
+            && update_nested_state_json 'session_stats.tools_by_type' '{}' 2> /dev/null || true
 
         # compliance.template_usage
         local tmpl_usage
         tmpl_usage="$(read_field '.compliance.template_usage' 2> /dev/null)"
         [[ -z "$tmpl_usage" || "$tmpl_usage" == "null" ]] \
-            && update_nested_state 'compliance.template_usage' '{}' 2> /dev/null || true
+            && update_nested_state_json \
+                'compliance.template_usage' \
+                '{"A":0,"B":0,"C":0,"D":0,"E":0,"F":0,"G":0}' \
+                2> /dev/null || true
 
         # compliance.last_template
         local last_tpl

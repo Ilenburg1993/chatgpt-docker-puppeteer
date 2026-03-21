@@ -107,13 +107,42 @@ hook_subagent_current_type() {
 }
 
 # 🟧 hook_subagent_is_known_type — true se agent_type é um tipo reconhecido
-# Tipos conhecidos: "Plan", "SWE", "Explore", "QA", "RUG"
+# Tipos conhecidos (doc VS Code mar/2026): built-in e custom agents comuns
+# - Plan, SWE, Explore, QA, RUG: tipos built-in do VS Code
+# - Padrão custom: camelCase capitalizado (ex: "Planner", "Reviewer", "Implementer")
+# String vazia é aceita (agente principal sem subagente)
 hook_subagent_is_known_type() {
-    local t; t="${HOOK_AGENT_TYPE:-}"
+    local t
+    t="${HOOK_AGENT_TYPE:-}"
     case "$t" in
-        Plan|SWE|Explore|QA|RUG|"") return 0 ;;
+        # Built-in VS Code agents
+        Plan | SWE | Explore | QA | RUG) return 0 ;;
+        # Custom agents (PascalCase single-word)
+        Planner | Reviewer | Implementer | Architect | Researcher | Coder) return 0 ;;
+        # String vazia = agente principal
+        "") return 0 ;;
+        # Qualquer outro tipo não é reconhecido
         *) return 1 ;;
     esac
+}
+
+# 🟧 hook_subagent_depth_ok — true se a profundidade atual está abaixo do limite
+# Compara hook_subagent_depth() com HOOK_SUBAGENT_DEPTH_LIMIT
+# Retorna 0 (true) se depth < limit, 1 (false) se atingiu/ultrapassou
+hook_subagent_depth_ok() {
+    local depth limit
+    depth=$(hook_subagent_depth)
+    limit="${HOOK_SUBAGENT_DEPTH_LIMIT:-3}"
+    [ "$depth" -lt "$limit" ]
+}
+
+# 🟧 hook_subagent_depth_remaining — quantos níveis de nesting ainda são possíveis
+# Retorna inteiro (pode ser 0 ou negativo se ultrapassou o limite)
+hook_subagent_depth_remaining() {
+    local depth limit
+    depth=$(hook_subagent_depth)
+    limit="${HOOK_SUBAGENT_DEPTH_LIMIT:-3}"
+    printf '%d' "$((limit - depth))"
 }
 
 # ─── SEÇÃO 12E: LOADER (popula variáveis HOOK_SUBAGENT_*) ────────────────────

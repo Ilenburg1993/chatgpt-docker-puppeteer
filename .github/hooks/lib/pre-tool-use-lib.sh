@@ -58,6 +58,7 @@ ensure_state_for_tool() {
 # ---------------------------------------------------------------------------
 pre_tool_use_main() {
     local input="$1"
+    local _pre_allow_context=""
     maybe_capture_debug "$input"
 
     # Popula HOOK_* vars a partir do payload (session_id, tool_name, tool_input, etc.)
@@ -124,9 +125,7 @@ pre_tool_use_main() {
                     "tool" "${_h4_tool}" \
                     "consecutive_unauthorized" "${_h4_consec}" \
                     "threshold_soft" "${_h4_soft}"
-                hook_out_pre_allow \
-                    "⚠️ UP-H4: O turno anterior NÃO foi autorizado (${_h4_consec} consecutivo(s) sem vscode_askQuestions). LEMBRETE URGENTE: ao concluir este turno, você DEVE chamar vscode_askQuestions ANTES de encerrar. Protocolo TODO v9.0 obrigatório."
-                exit 0
+                _pre_allow_context="⚠️ UP-H4: O turno anterior NÃO foi autorizado (${_h4_consec} consecutivo(s) sem vscode_askQuestions). LEMBRETE URGENTE: ao concluir este turno, você DEVE chamar vscode_askQuestions ANTES de encerrar. Protocolo TODO v9.0 obrigatório."
             fi
         fi
     fi
@@ -255,9 +254,9 @@ pre_tool_use_main() {
         if [ "${_h3_tc:-0}" -gt 0 ] && [ "${_h3_aq:-false}" != "true" ] 2> /dev/null; then
             if [ $((_h3_tc % 15)) -eq 0 ] 2> /dev/null; then
                 hook_log_audit "preToolUse_periodic_reminder" "tools_count" "${_h3_tc}"
-                hook_out_pre_allow \
-                    "⚠️ Lembrete de protocolo (tool #${_h3_tc} neste turno): ao concluir o trabalho deste turno, você DEVE chamar vscode_askQuestions ANTES de task_complete ou de encerrar. task_complete sem vscode_askQuestions ESTÁ BLOQUEADO. Use Template A para tarefas concluídas."
-                exit 0
+                if [ -z "$_pre_allow_context" ]; then
+                    _pre_allow_context="⚠️ Lembrete de protocolo (tool #${_h3_tc} neste turno): ao concluir o trabalho deste turno, você DEVE chamar vscode_askQuestions ANTES de task_complete ou de encerrar. task_complete sem vscode_askQuestions ESTÁ BLOQUEADO. Use Template A para tarefas concluídas."
+                fi
             fi
         fi
     fi
@@ -293,6 +292,10 @@ pre_tool_use_main() {
         "turn" "${turn_num:-0}" \
         "tool" "${HOOK_TOOL_NAME:-unknown}" \
         "tool_call_num" "${tool_num:-0}"
+
+    if [ -n "$_pre_allow_context" ]; then
+        hook_out_pre_allow "$_pre_allow_context"
+    fi
 
     exit 0
 }

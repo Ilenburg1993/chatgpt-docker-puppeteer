@@ -20,7 +20,7 @@ _generate_final_report() {
     local session_id started_at ended_at
     local turn_count turn_authorized turn_unauthorized subturn_total tools_total
 
-    session_id=$(printf '%s' "$state" | jq -r '.vs_code_session_id // "unknown"')
+    session_id=$(printf '%s' "$state" | jq -r '.session_id // .vs_code_session_id // "unknown"')
     started_at=$(printf '%s' "$state" | jq -r '.started_at // "unknown"')
     ended_at=$(printf '%s' "$state" | jq -r '.ended_at // "unknown"')
     turn_count=$(printf '%s' "$state" | jq -r '.session_stats.turn_count // 0')

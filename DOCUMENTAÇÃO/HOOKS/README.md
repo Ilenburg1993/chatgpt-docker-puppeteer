@@ -9,6 +9,11 @@
 Sistema de hooks do GitHub Copilot que automatiza: rastreabilidade de sessões, protocolo de
 autorização de encerramento, métricas de ferramentas, checkpoints de estado e relatórios.
 
+> ⚠️ **Nota de nomenclatura (runtime atual)**: a implementação ativa usa `stop.sh` (evento `Stop`) e
+> biblioteca em `.github/hooks/lib/`. Referências legadas como `agent-stop.sh` e `hooks-lib/`
+> permanecem neste documento em alguns trechos por contexto histórico e serão gradualmente
+> harmonizadas.
+
 ---
 
 ## Índice

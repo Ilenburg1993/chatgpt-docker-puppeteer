@@ -31,6 +31,7 @@ post_tool_use_main() {
     fi
 
     if state_exists; then
+        local _post_additional_context=""
         # GAP-07: sempre fechar o subturn, independente do tipo de ferramenta
         # GAP-14: registra ended_at além de response_at
         local _now_ts
@@ -71,12 +72,7 @@ post_tool_use_main() {
                 if printf '%s' "$_h2_input" | grep -qiE '(git\s+push|git\s+commit|git\s+push\s+origin)'; then
                     hook_log_audit "postToolUse_git_closure_reminder" \
                         "tool" "run_in_terminal" "pattern" "git_push_or_commit"
-                    # GAP-UP-H2: fechar subturn antes do exit antecipado para manter
-                    # consistência do audit trail (subturnStart foi emitido no PreToolUse)
-                    hook_log_audit "subturnEnd" "turn" "$turn_num"
-                    hook_out_post_context \
-                        "⚠️ PROTOCOLO TODO v9.0 — AÇÃO OBRIGATÓRIA AGORA: Você executou git push/commit. Antes de chamar task_complete ou encerrar o turno, DEVE chamar vscode_askQuestions. Use Template A (tarefa concluída) ou Template G (pré-autorização). AVISO: task_complete sem vscode_askQuestions está bloqueado pelo PreToolUse hook."
-                    exit 0
+                    _post_additional_context="⚠️ PROTOCOLO TODO v9.0 — AÇÃO OBRIGATÓRIA AGORA: Você executou git push/commit. Antes de chamar task_complete ou encerrar o turno, DEVE chamar vscode_askQuestions. Use Template A (tarefa concluída) ou Template G (pré-autorização). AVISO: task_complete sem vscode_askQuestions está bloqueado pelo PreToolUse hook."
                 fi
             fi
         fi
@@ -124,6 +120,10 @@ post_tool_use_main() {
                 update_nested_state "current_turn.tools_after_ask_questions" "${_h1b_taaq}"
                 update_nested_state "current_turn.last_tool_after_ask_questions" "${HOOK_TOOL_NAME:-unknown}"
             fi
+        fi
+
+        if [ -n "${_post_additional_context:-}" ]; then
+            hook_out_post_context "$_post_additional_context"
         fi
     fi
 

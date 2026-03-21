@@ -1097,6 +1097,171 @@ else
 fi
 teardown
 
+# ---------------------------------------------------------------------------
+# T60-T67: UP-SUBAGENT-U9 — depth limit, compliance, context-rich, types
+# ---------------------------------------------------------------------------
+_log ""
+_log "=== UP-SUBAGENT-U9: depth limit, compliance, context-rich, types ==="
+
+# T60: UP-DEPTH-LIMIT — SubagentStart bloqueado quando depth >= limit
+setup
+begin_test "T60: UP-DEPTH-LIMIT bloquia SubagentStart quando depth >= limite"
+write_state "$(printf '%s' "$(_state_aq_false 1)" | jq '
+    .session_stats.subagents_active = 3 |
+    .session_stats.subagents_total = 3 |
+    .current_turn.subagents_started = 3')"
+_t60_out="" _t60_rc=0
+_t60_out=$(printf '%s' '{"hookEventName":"SubagentStart","sessionId":"sid","agent_id":"sub-depth","agent_type":"Plan"}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_DEPTH_LIMIT=3 \
+        bash "$HOOK_DIR/scripts/subagent-start.sh" 2> /dev/null) || _t60_rc=$?
+_t60_decision=$(printf '%s' "$_t60_out" | jq -r '.decision // empty' 2> /dev/null)
+_t60_has_audit=0
+grep -q '"event":"subagentStart_depth_exceeded"' "$TEST_DIR/audit.jsonl" 2> /dev/null && _t60_has_audit=1
+if [ "$_t60_decision" = "block" ] && [ "$_t60_has_audit" = "1" ]; then
+    pass
+else
+    fail "T60" "depth>=limit deveria bloquear; decision='$_t60_decision' audit=$_t60_has_audit OUT=$_t60_out"
+fi
+teardown
+
+# T61: UP-DEPTH-LIMIT — SubagentStart permitido quando depth < limit
+setup
+begin_test "T61: UP-DEPTH-LIMIT permite SubagentStart quando depth < limite"
+write_state "$(printf '%s' "$(_state_aq_false 1)" | jq '
+    .session_stats.subagents_active = 2 |
+    .session_stats.subagents_total = 2 |
+    .current_turn.subagents_started = 2')"
+_t61_out="" _t61_rc=0
+_t61_out=$(printf '%s' '{"hookEventName":"SubagentStart","sessionId":"sid","agent_id":"sub-ok","agent_type":"Plan"}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_DEPTH_LIMIT=3 \
+        bash "$HOOK_DIR/scripts/subagent-start.sh" 2> /dev/null) || _t61_rc=$?
+_t61_decision=$(printf '%s' "$_t61_out" | jq -r '.decision // empty' 2> /dev/null)
+if [ "$_t61_decision" != "block" ]; then
+    pass
+else
+    fail "T61" "depth<limit nao deveria bloquear; decision='$_t61_decision' OUT=$_t61_out"
+fi
+teardown
+
+# T62: UP-TYPES — hook_subagent_is_known_type reconhece tipos built-in
+setup
+begin_test "T62: UP-TYPES hook_subagent_is_known_type reconhece Plan/SWE/Explore/QA/RUG"
+_t62_ok=1
+for _t62_type in Plan SWE Explore QA RUG; do
+    _t62_result=$(bash -c "
+        source '$HOOK_DIR/lib/api/01-vars.sh'
+        hook_api_vars_init
+        source '$HOOK_DIR/lib/api/12-subagent.sh'
+        HOOK_AGENT_TYPE='$_t62_type'
+        hook_subagent_is_known_type && echo ok || echo fail
+    " 2> /dev/null)
+    [ "$_t62_result" = "ok" ] || _t62_ok=0
+done
+if [ "$_t62_ok" = "1" ]; then
+    pass
+else
+    fail "T62" "hook_subagent_is_known_type falhou para algum tipo built-in"
+fi
+teardown
+
+# T63: UP-TYPES — hook_subagent_is_known_type retorna 1 para tipo desconhecido
+setup
+begin_test "T63: UP-TYPES hook_subagent_is_known_type retorna false p/ tipo desconhecido"
+_t63_result=$(bash -c "
+    source '$HOOK_DIR/lib/api/01-vars.sh'
+    hook_api_vars_init
+    source '$HOOK_DIR/lib/api/12-subagent.sh'
+    HOOK_AGENT_TYPE='XyzUnknownAgent'
+    hook_subagent_is_known_type && echo ok || echo fail
+" 2> /dev/null)
+if [ "$_t63_result" = "fail" ]; then
+    pass
+else
+    fail "T63" "tipo 'XyzUnknownAgent' deveria retornar false; got='$_t63_result'"
+fi
+teardown
+
+# T64: UP-COMPLIANCE soft — ask_questions_called=false → systemMessage de violação
+setup
+begin_test "T64: UP-COMPLIANCE soft emite systemMessage quando subagente nao chamou askQuestions"
+write_state "$(printf '%s' "$(_state_aq_false 1)" | jq '
+    .session_stats.subagents_active = 1 |
+    .session_stats.subagents_total = 1 |
+    .current_turn.subagents_started = 1 |
+    .current_turn.ask_questions_called = false')"
+_t64_out="" _t64_rc=0
+_t64_out=$(printf '%s' '{"hookEventName":"SubagentStop","sessionId":"sid","agent_id":"sub-nc","agent_type":"Plan"}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_COMPLIANCE_ENFORCEMENT=soft \
+        bash "$HOOK_DIR/scripts/subagent-stop.sh" 2> /dev/null) || _t64_rc=$?
+_t64_has_audit=0
+grep -q '"event":"subagentStop_protocol_violation"' "$TEST_DIR/audit.jsonl" 2> /dev/null && _t64_has_audit=1
+_t64_sys=$(printf '%s' "$_t64_out" | jq -r '.systemMessage // empty' 2>/dev/null)
+if [ "$_t64_has_audit" = "1" ] && [ -n "$_t64_sys" ]; then
+    pass
+else
+    fail "T64" "compliance soft deveria auditar+systemMessage; audit=$_t64_has_audit sys='$_t64_sys' out=$_t64_out"
+fi
+teardown
+
+# T65: UP-COMPLIANCE none — ask_questions_called=false → só audit, sem output
+setup
+begin_test "T65: UP-COMPLIANCE none nao emite output (so audit) quando violacao"
+write_state "$(printf '%s' "$(_state_aq_false 1)" | jq '
+    .session_stats.subagents_active = 1 |
+    .session_stats.subagents_total = 1 |
+    .current_turn.subagents_started = 1 |
+    .current_turn.ask_questions_called = false')"
+_t65_out="" _t65_rc=0
+_t65_out=$(printf '%s' '{"hookEventName":"SubagentStop","sessionId":"sid","agent_id":"sub-nc","agent_type":"QA"}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_COMPLIANCE_ENFORCEMENT=none \
+        bash "$HOOK_DIR/scripts/subagent-stop.sh" 2> /dev/null) || _t65_rc=$?
+# Com "none" o output deve estar vazio (sem systemMessage nem block)
+_t65_sys=$(printf '%s' "$_t65_out" | jq -r '.systemMessage // empty' 2>/dev/null)
+_t65_dec=$(printf '%s' "$_t65_out" | jq -r '.decision // empty' 2> /dev/null)
+if [ -z "$_t65_sys" ] && [ "$_t65_dec" != "block" ]; then
+    pass
+else
+    fail "T65" "compliance none nao devia emitir output; sys='$_t65_sys' dec='$_t65_dec' out=$_t65_out"
+fi
+teardown
+
+# T66: UP-COMPLIANCE — compliant (ask_questions_called=true) nao gera violacao
+setup
+begin_test "T66: UP-COMPLIANCE nao gera violacao quando ask_questions_called=true"
+write_state "$(printf '%s' "$(_state_aq_true)" | jq '
+    .session_stats.subagents_active = 1 |
+    .session_stats.subagents_total = 1 |
+    .current_turn.subagents_started = 1 |
+    .current_turn.ask_questions_called = true')"
+_t66_out="" _t66_rc=0
+_t66_out=$(printf '%s' '{"hookEventName":"SubagentStop","sessionId":"sid","agent_id":"sub-ok","agent_type":"SWE"}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_COMPLIANCE_ENFORCEMENT=soft \
+        bash "$HOOK_DIR/scripts/subagent-stop.sh" 2> /dev/null) || _t66_rc=$?
+_t66_has_viol=0
+grep -q '"event":"subagentStop_protocol_violation"' "$TEST_DIR/audit.jsonl" 2> /dev/null && _t66_has_viol=1
+if [ "$_t66_has_viol" = "0" ]; then
+    pass
+else
+    fail "T66" "subagente compliant nao deveria gerar violacao no audit; OUT=$_t66_out"
+fi
+teardown
+
+# T67: UP-CONTEXT-RICH — SubagentStart com type=Plan injeta regras especificas de Plan
+setup
+begin_test "T67: UP-CONTEXT-RICH injeta contexto especifico para agent_type=Plan"
+write_state "$(_state_aq_false 1)"
+_t67_out="" _t67_rc=0
+_t67_out=$(printf '%s' '{"hookEventName":"SubagentStart","sessionId":"sid","agent_id":"sub-plan","agent_type":"Plan"}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_CONTEXT_RICH=true \
+        bash "$HOOK_DIR/scripts/subagent-start.sh" 2> /dev/null) || _t67_rc=$?
+_t67_ctx=$(printf '%s' "$_t67_out" | jq -r '.hookSpecificOutput.additionalContext // empty' 2> /dev/null)
+if printf '%s' "$_t67_ctx" | grep -q 'PAPEL=Plan'; then
+    pass
+else
+    fail "T67" "context-rich deveria conter 'PAPEL=Plan'; ctx='$_t67_ctx' out=$_t67_out"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 

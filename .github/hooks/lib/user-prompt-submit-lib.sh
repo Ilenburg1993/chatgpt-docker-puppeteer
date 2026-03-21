@@ -15,6 +15,16 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/hook-payload-api.sh"
 
 export_lang_utf8
 
+# Anexa mensagens de sistema em buffer único para emitir apenas 1 JSON de saída
+_ups_append_msg() {
+    local cur="$1" msg="$2"
+    if [ -z "$cur" ]; then
+        printf '%s' "$msg"
+    else
+        printf '%s\n\n%s' "$cur" "$msg"
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # Guardrail: garante que state existe antes de processar o turno
 # ---------------------------------------------------------------------------
@@ -100,9 +110,12 @@ user_prompt_submit_main() {
     # encerrará a sessão ao final deste turno. O agente deve ser informado imediatamente
     # para não iniciar trabalho novo que seria perdido após o encerramento.
     local _psc
+    local _ups_system_message=""
     _psc=$(read_field ".pending_session_close" 2> /dev/null || printf 'false')
     if [ "${_psc:-false}" = "true" ]; then
-        hook_out_system_message "⛔ ENCERRAMENTO PENDENTE: A chave de encerramento foi recebida. Esta sessão será encerrada pelo stop hook ao final deste turno. NÃO inicie trabalho novo. Se deseja cancelar o encerramento, reporte ao mantenedor."
+        _ups_system_message=$(_ups_append_msg \
+            "$_ups_system_message" \
+            "⛔ ENCERRAMENTO PENDENTE: A chave de encerramento foi recebida. Esta sessão será encerrada pelo stop hook ao final deste turno. NÃO inicie trabalho novo. Se deseja cancelar o encerramento, reporte ao mantenedor.")
     fi
 
     # --- Passo 2b: UP-03 — alerta proativo de compliance ---
@@ -112,17 +125,23 @@ user_prompt_submit_main() {
     _consec=$(read_field ".compliance.consecutive_unauthorized" 2> /dev/null || printf '0')
     _consec="${_consec:-0}"
     if [ "${_consec}" -ge 2 ] 2> /dev/null; then
-        hook_out_system_message "⚠️ COMPLIANCE: ${_consec} turnos consecutivos sem vscode_askQuestions. Chame Template D AGORA antes de qualquer trabalho novo. Turno atual não pode ser encerrado sem essa chamada (stop hook bloqueará se ativo)."
+        _ups_system_message=$(_ups_append_msg \
+            "$_ups_system_message" \
+            "⚠️ COMPLIANCE: ${_consec} turnos consecutivos sem vscode_askQuestions. Chame Template D AGORA antes de qualquer trabalho novo. Turno atual não pode ser encerrado sem essa chamada (stop hook bloqueará se ativo).")
     elif [ "$_was_auto_init" -eq 1 ]; then
         local _close_key
         _close_key=$(read_field ".close_key")
-        hook_out_system_message "Sessão iniciada automaticamente pelo sistema de hooks. Protocolo de session ativo. Close-key registrada. Use vscode_askQuestions para autorizar encerramento de turno."
+        _ups_system_message=$(_ups_append_msg \
+            "$_ups_system_message" \
+            "Sessão iniciada automaticamente pelo sistema de hooks. Protocolo de session ativo. Close-key registrada. Use vscode_askQuestions para autorizar encerramento de turno.")
     fi
 
     # --- Passo 2c: UP-H4 — reforço de protocolo ao abrir cada turno ---
     # Injeta systemMessage com lembrete de task_complete vs vscode_askQuestions
     # Sempre ativo — compensa degradação de atenção em contextos longos
-    hook_out_system_message "📋 PROTOCOLO HOOKS (lembrete automático): Ao concluir trabalho neste turno → chame vscode_askQuestions (Template A/D/G) ANTES de task_complete. task_complete sem vscode_askQuestions anterior será BLOQUEADO pelo PreToolUse hook. Isso é incontornável."
+    _ups_system_message=$(_ups_append_msg \
+        "$_ups_system_message" \
+        "📋 PROTOCOLO HOOKS (lembrete automático): Ao concluir trabalho neste turno → chame vscode_askQuestions (Template A/D/G) ANTES de task_complete. task_complete sem vscode_askQuestions anterior será BLOQUEADO pelo PreToolUse hook. Isso é incontornável.")
 
     # --- Passo 3: Abre novo TURN ---
     local turn_num
@@ -139,6 +158,10 @@ user_prompt_submit_main() {
         "turn_id" "${turn_id:-unknown}" \
         "section_turn" "${section_turn:-0}" \
         "prompt_preview" "${prompt_preview}"
+
+    if [ -n "$_ups_system_message" ]; then
+        hook_out_system_message "$_ups_system_message"
+    fi
 
     exit 0
 }

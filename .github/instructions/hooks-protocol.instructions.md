@@ -44,7 +44,7 @@ você receberá um `permissionDecision: deny` e deverá chamar vscode_askQuestio
 
 Quando houver divergência textual entre arquivos de instrução, use esta precedência:
 
-1. Hooks executáveis (`.github/hooks/scripts/*`, `.github/hooks/hooks-lib/*`)
+1. Hooks executáveis (`.github/hooks/scripts/*`, `.github/hooks/lib/*`)
 2. Este protocolo (`.github/instructions/hooks-protocol.instructions.md`)
 3. Baseline técnico (`.github/instructions/project-canon.instructions.md`)
 4. Templates operacionais (`.github/AGENTS.md`)

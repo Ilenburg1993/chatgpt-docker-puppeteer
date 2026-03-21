@@ -125,6 +125,32 @@ update_nested_state() {
     }
 }
 
+# Atualiza campo aninhado no session.json usando JSON literal (argjson)
+# Uso: update_nested_state_json "session_stats.tools_by_type" '{}'
+#      update_nested_state_json "compliance.template_usage" '{"A":0,"B":0,"C":0,"D":0,"E":0,"F":0,"G":0}'
+update_nested_state_json() {
+    local key_path="$1" json_val="$2"
+    local tmp jq_path
+    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    jq_path=".${key_path}"
+
+    # Validação defensiva: precisa ser JSON válido
+    if ! printf '%s' "$json_val" | jq -e . > /dev/null 2>&1; then
+        rm -f "$tmp"
+        return 1
+    fi
+
+    jq --argjson v "$json_val" "${jq_path} = \$v" "$STATE_FILE" > "$tmp" || {
+        rm -f "$tmp"
+        return 1
+    }
+
+    mv -f "$tmp" "$STATE_FILE" || {
+        rm -f "$tmp"
+        return 1
+    }
+}
+
 # Substitui session.json inteiro pelo JSON fornecido (escrita atômica via mktemp)
 write_state() {
     local json="$1"
@@ -203,8 +229,6 @@ init_state() {
             "compliance": {
                 "consecutive_unauthorized": 0,
                 "last_turn_authorized": true,
-                "template_usage": {"A":0,"B":0,"C":0,"D":0,"E":0,"F":0,"G":0},
-                "last_template": "",
                 "template_usage": {"A":0,"B":0,"C":0,"D":0,"E":0,"F":0,"G":0},
                 "last_template": ""
             }
