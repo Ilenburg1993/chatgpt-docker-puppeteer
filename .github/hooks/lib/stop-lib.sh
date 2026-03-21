@@ -63,6 +63,8 @@ stop_main() {
         _reset_active_subagents_if_needed
         # UP-HEARTBEAT: registra timestamp de atividade para watchdog
         update_nested_state "last_activity_at" "$(now_iso)"
+        # UP-DURATION: calcula e grava duração do turno em ms
+        _record_turn_duration
         # GAP-58: usa increment_field() em vez de aritmética manual
         increment_field ".session_stats.turn_authorized" > /dev/null
         hook_log_audit "turnEnd_authorized" "turn" "${turn_num:-0}"
@@ -75,6 +77,8 @@ stop_main() {
         _reset_active_subagents_if_needed
         # UP-HEARTBEAT: registra timestamp de atividade mesmo em turnos não-autorizados
         update_nested_state "last_activity_at" "$(now_iso)"
+        # UP-DURATION: calcula e grava duração do turno em ms
+        _record_turn_duration
         # GAP-58: usa increment_field() em vez de aritmética manual
         increment_field ".compliance.consecutive_unauthorized" > /dev/null
         update_nested_state "compliance.last_turn_authorized" "false"
@@ -99,6 +103,30 @@ stop_main() {
     fi
 
     exit 0
+}
+
+# ---------------------------------------------------------------------------
+# _record_turn_duration — calcula e grava current_turn.duration_ms + acumula
+# UP-DURATION: duração do turno para métricas de desempenho (UP-U5)
+# ---------------------------------------------------------------------------
+_record_turn_duration() {
+    local turn_started dur_ms prev_total new_total now_ts start_epoch now_epoch
+    turn_started=$(read_field ".current_turn.started_at" 2> /dev/null)
+    [ -z "$turn_started" ] || [ "$turn_started" = "null" ] && return 0
+
+    now_ts=$(now_iso)
+    start_epoch=$(date -u -d "$turn_started" +%s 2> /dev/null) || return 0
+    now_epoch=$(date -u +%s 2> /dev/null) || return 0
+    dur_ms=$(( (now_epoch - start_epoch) * 1000 ))
+    [ "$dur_ms" -lt 0 ] 2> /dev/null && return 0
+
+    update_nested_state "current_turn.duration_ms" "$dur_ms"
+
+    prev_total=$(read_field ".session_stats.turn_duration_total_ms" 2> /dev/null)
+    prev_total="${prev_total:-0}"
+    [ "$prev_total" = "null" ] && prev_total=0
+    new_total=$(( prev_total + dur_ms ))
+    update_nested_state "session_stats.turn_duration_total_ms" "$new_total"
 }
 
 # ---------------------------------------------------------------------------

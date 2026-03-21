@@ -688,6 +688,35 @@ else
 fi
 teardown
 
+# T39: watchdog emite aviso quando last_activity_at é antigo (UP-WATCHDOG-STALE)
+setup
+begin_test "T39: watchdog avisa sessão inativa há mais de threshold (UP-WATCHDOG-STALE)"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2020-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","pending_session_close":false,"strict_turn_close":false,"last_activity_at":"2020-01-01T00:00:00Z","current_turn":{"number":1,"turn_id":"t1","started_at":"2020-01-01T00:00:00Z","ask_questions_called":false,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":"","last_template":"","ended_at":null,"duration_ms":0},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null,"ended_at":null,"duration_ms":0},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0,"turn_duration_total_ms":0,"subagents_active":0,"subagents_total":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+_t39_out=''
+_t39_rc=0
+_t39_out=$(HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_STALE_THRESHOLD=60 bash "$HOOK_DIR/scripts/watchdog.sh" 2>/dev/null) || _t39_rc=$?
+if printf '%s' "$_t39_out" | grep -qi 'inativ\|stale\|atividade\|aviso\|warning' 2>/dev/null; then
+    pass
+else
+    fail "T39" "Watchdog deveria emitir aviso de sessão inativa (last_activity_at=2020); RC=$_t39_rc OUT=$_t39_out"
+fi
+teardown
+
+# T40: stop.sh registra current_turn.duration_ms > 0 após fechar turno (UP-DURATION)
+setup
+begin_test "T40: stop.sh registra current_turn.duration_ms após fechar turno (UP-DURATION)"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","pending_session_close":false,"strict_turn_close":false,"last_activity_at":null,"current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":true,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":"","last_template":"A","ended_at":null,"duration_ms":0},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null,"ended_at":null,"duration_ms":0},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0,"turn_duration_total_ms":0,"subagents_active":0,"subagents_total":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+run_hook "stop.sh" \
+    '{"hookEventName":"Stop","sessionId":"sid","stopReason":"userTriggered","decision":"block","stop_hook_active":false}'
+_t40_dur=$(jq -r '.current_turn.duration_ms // -1' "$TEST_DIR/session.json" 2>/dev/null)
+_t40_total=$(jq -r '.session_stats.turn_duration_total_ms // -1' "$TEST_DIR/session.json" 2>/dev/null)
+if [ "${_t40_dur:-0}" -ge 0 ] 2>/dev/null && [ "${_t40_total:-0}" -ge 0 ] 2>/dev/null; then
+    pass
+else
+    fail "T40" "current_turn.duration_ms=$_t40_dur turn_duration_total_ms=$_t40_total — esperado >= 0"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 

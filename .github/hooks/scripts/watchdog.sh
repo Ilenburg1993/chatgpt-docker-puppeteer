@@ -122,6 +122,23 @@ check_consecutive_violations() {
     fi
 }
 
+# UP-WATCHDOG-STALE: sessão sem atividade há mais de STALE_THRESHOLD segundos
+check_stale_session() {
+    if ! state_exists; then return 0; fi
+    local laa stale_threshold="${HOOK_STALE_THRESHOLD:-7200}" # 2 horas por padrão
+    laa=$(read_field '.last_activity_at' 2> /dev/null)
+    [ -z "$laa" ] || [ "$laa" = "null" ] && return 0 # sem dados: não verificar
+    local now_ts laa_ts elapsed
+    now_ts=$(date -u +%s 2> /dev/null) || return 0
+    laa_ts=$(date -u -d "$laa" +%s 2> /dev/null) || return 0
+    elapsed=$((now_ts - laa_ts))
+    if [ "$elapsed" -gt "$stale_threshold" ]; then
+        local elapsed_h=$(( elapsed / 3600 ))
+        local elapsed_m=$(( (elapsed % 3600) / 60 ))
+        WARNINGS+=("Sessão inativa há ${elapsed_h}h${elapsed_m}m (última atividade: $laa)")
+    fi
+}
+
 # UP-17: coerência entre session_stats.turn_count e eventos turnStart no audit.jsonl
 check_audit_coherence() {
     if ! state_exists; then return 0; fi
@@ -152,6 +169,7 @@ check_hooks_json || true
 check_hook_commands || true
 check_pending_session_close || true
 check_consecutive_violations || true
+check_stale_session || true
 check_audit_coherence || true
 
 HEALTHY=1

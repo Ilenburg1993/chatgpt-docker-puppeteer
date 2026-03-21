@@ -168,6 +168,7 @@ init_state() {
                 "turn_id": null,
                 "started_at": null,
                 "ended_at": null,
+                "duration_ms": 0,
                 "intent": "",
                 "source": "unknown",
                 "ask_questions_called": false,
@@ -196,7 +197,8 @@ init_state() {
                 "tools_blocked": 0,
                 "tools_by_type": {},
                 "subagents_active": 0,
-                "subagents_total": 0
+                "subagents_total": 0,
+                "turn_duration_total_ms": 0
             },
             "compliance": {
                 "consecutive_unauthorized": 0,

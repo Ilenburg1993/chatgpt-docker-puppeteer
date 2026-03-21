@@ -197,6 +197,15 @@ hook_state_migrate() {
             update_nested_state 'last_activity_at' "${sa:-null}" 2> /dev/null || true
         fi
 
+        # UP-DURATION: current_turn.duration_ms e session_stats.turn_duration_total_ms
+        local tdur ctdur
+        ctdur="$(read_field '.current_turn.duration_ms' 2> /dev/null)"
+        [[ -z "$ctdur" || "$ctdur" == "null" ]] \
+            && update_nested_state 'current_turn.duration_ms' '0' 2> /dev/null || true
+        tdur="$(read_field '.session_stats.turn_duration_total_ms' 2> /dev/null)"
+        [[ -z "$tdur" || "$tdur" == "null" ]] \
+            && update_nested_state 'session_stats.turn_duration_total_ms' '0' 2> /dev/null || true
+
         recorded="3"
     fi
 
