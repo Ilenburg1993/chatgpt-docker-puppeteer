@@ -523,6 +523,19 @@ else
 fi
 teardown
 
+# T28: user-prompt-submit emite alerta UP-03 quando consecutive_unauthorized >= 2
+setup
+begin_test "T28: UP-03 — alerta compliance quando consecutive_unauthorized >= 2"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","source":"new","pending_session_close":false,"strict_turn_close":true,"current_turn":{"number":2,"turn_id":"t2","started_at":null,"ask_questions_called":false,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":""},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null},"session_stats":{"turn_count":2,"turn_authorized":0,"turn_unauthorized":2,"subturn_total":0,"tools_total":0},"compliance":{"consecutive_unauthorized":2,"last_turn_authorized":false}}'
+run_hook "user-prompt-submit.sh" \
+    '{"hookEventName":"UserPromptSubmit","sessionId":"sid","prompt":"outra tarefa"}'
+if printf '%s' "$OUT" | grep -qi "COMPLIANCE"; then
+    pass
+else
+    fail "T28" "esperado aviso 'COMPLIANCE' na saída para consecutive_unauthorized=2, mas não encontrado. Saída: $(printf '%s' "$OUT" | head -c 200)"
+fi
+teardown
+
 _log ""
 _log "==================================================="
 TOTAL=$((PASS + FAIL))
