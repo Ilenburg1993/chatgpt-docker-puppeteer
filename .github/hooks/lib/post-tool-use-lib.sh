@@ -105,12 +105,19 @@ post_tool_use_main() {
             hook_log_audit "subturnEnd" "turn" "$turn_num"
 
             # UP-H1b: incrementa contador de tools chamadas após último vscode_askQuestions
-            # Isso permite que o PreToolUse detecte se task_complete chega tarde demais
-            local _h1b_taaq
-            _h1b_taaq=$(read_field '.current_turn.tools_after_ask_questions' 2> /dev/null || printf '0')
-            _h1b_taaq=$((_h1b_taaq + 1))
-            update_nested_state "current_turn.tools_after_ask_questions" "${_h1b_taaq}"
-            update_nested_state "current_turn.last_tool_after_ask_questions" "${HOOK_TOOL_NAME:-unknown}"
+            # Ferramentas bookkeeping (manage_todo_list, task_complete) são isentas —
+            # são passos do protocolo e não indicam "trabalho novo" após askQ.
+            local _h1b_exempt=false
+            case "${HOOK_TOOL_NAME:-}" in
+                manage_todo_list | task_complete) _h1b_exempt=true ;;
+            esac
+            if [ "${_h1b_exempt}" = "false" ]; then
+                local _h1b_taaq
+                _h1b_taaq=$(read_field '.current_turn.tools_after_ask_questions' 2> /dev/null || printf '0')
+                _h1b_taaq=$((_h1b_taaq + 1))
+                update_nested_state "current_turn.tools_after_ask_questions" "${_h1b_taaq}"
+                update_nested_state "current_turn.last_tool_after_ask_questions" "${HOOK_TOOL_NAME:-unknown}"
+            fi
         fi
     fi
 

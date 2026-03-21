@@ -465,6 +465,21 @@ else
 fi
 teardown
 
+# T25: manage_todo_list nao incrementa tools_after_ask_questions (bookkeeping exemption)
+setup
+begin_test "T25: manage_todo_list isento de tools_after_ask_questions"
+_state_aq_false | jq '.current_turn.tools_after_ask_questions = 0' \
+    > "$TEST_DIR/session.json"
+run_hook "post-tool-use.sh" \
+    '{"hookEventName":"PostToolUse","tool_use_id":"t-h1b-exempt","tool_name":"manage_todo_list","tool_input":{"todoList":[]},"tool_response":"{}","sessionId":"sid"}'
+VAL=$(read_state_field ".current_turn.tools_after_ask_questions")
+if [ "${VAL}" = "0" ]; then
+    pass
+else
+    fail "T25" "tools_after_ask_questions='${VAL}' esperado=0 (manage_todo_list deve ser isento)"
+fi
+teardown
+
 _log ""
 _log "==================================================="
 TOTAL=$((PASS + FAIL))
