@@ -341,6 +341,74 @@ else
 fi
 teardown
 
+# T17: UP-H1b — task_complete bloqueado quando tools_after_ask_questions > 1
+setup
+begin_test "T17: UP-H1b — task_complete bloqueado se tools extras após askQ"
+# ask_questions_called=true mas tools_after=2 (ask → manage_todo_list → read_file)
+_state_aq_true | jq \
+    '.current_turn.tools_after_ask_questions = 2 |
+     .current_turn.last_tool_after_ask_questions = "read_file"' \
+    > "$TEST_DIR/session.json"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t-h1b-001","tool_name":"task_complete","tool_input":{},"sessionId":"sid"}'
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+if [ "${DECISION}" = "deny" ]; then
+    pass
+else
+    fail "T17" "permissionDecision='${DECISION}' esperado='deny' (tools_after=2) out='${OUT}'"
+fi
+teardown
+
+# T18: UP-H1b — task_complete PERMITIDO após askQ + manage_todo_list (bookkeeping exception)
+setup
+begin_test "T18: UP-H1b — task_complete permitido após askQ + manage_todo_list"
+_state_aq_true | jq \
+    '.current_turn.tools_after_ask_questions = 1 |
+     .current_turn.last_tool_after_ask_questions = "manage_todo_list"' \
+    > "$TEST_DIR/session.json"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t-h1b-002","tool_name":"task_complete","tool_input":{},"sessionId":"sid"}'
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+if [ "${DECISION}" != "deny" ]; then
+    pass
+else
+    fail "T18" "permissionDecision='${DECISION}' task_complete com tools_after=1,last=manage_todo_list deveria ser permitido"
+fi
+teardown
+
+# T19: UP-H1b — task_complete direto após askQ (tools_after=0) é permitido
+setup
+begin_test "T19: UP-H1b — task_complete direto após askQ (tools_after=0) é permitido"
+_state_aq_true | jq \
+    '.current_turn.tools_after_ask_questions = 0 |
+     .current_turn.last_tool_after_ask_questions = ""' \
+    > "$TEST_DIR/session.json"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t-h1b-003","tool_name":"task_complete","tool_input":{},"sessionId":"sid"}'
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+if [ "${DECISION}" != "deny" ]; then
+    pass
+else
+    fail "T19" "permissionDecision='${DECISION}' task_complete direto após askQ (tools_after=0) deveria ser permitido"
+fi
+teardown
+
+# T20: post-tool-use.sh — vscode_askQuestions reseta tools_after_ask_questions para 0
+setup
+begin_test "T20: askQuestions reseta tools_after_ask_questions=0"
+# Pré-existente: tools_after=3 (de ferramentas anteriores no turno)
+_state_aq_false | jq '.current_turn.tools_after_ask_questions = 3' \
+    > "$TEST_DIR/session.json"
+run_hook "post-tool-use.sh" \
+    '{"hookEventName":"PostToolUse","tool_use_id":"t-h1b-004","tool_name":"vscode_askQuestions","tool_input":{"questions":[{"header":"H","question":"Q"}]},"tool_response":"{\"answers\":{}}","sessionId":"sid"}'
+VAL=$(read_state_field ".current_turn.tools_after_ask_questions")
+if [ "${VAL}" = "0" ]; then
+    pass
+else
+    fail "T20" "tools_after_ask_questions='${VAL}' esperado=0"
+fi
+teardown
+
 # ---------------------------------------------------------------------------
 # === Resultado Final ===
 # ---------------------------------------------------------------------------

@@ -80,21 +80,49 @@ pre_tool_use_main() {
         exit 0
     fi
 
-    # --- Passo 1b: UP-H1 — bloqueia task_complete sem vscode_askQuestions ---
-    # task_complete sinaliza encerramento de turno para o VS Code Copilot.
-    # Se ask_questions_called=false, o turno ainda não foi autorizado pelo usuário.
-    # Esta camada é a mais confiável pois atua ANTES do signal de encerramento.
+    # --- Passo 1b: UP-H1/H1b — bloqueia task_complete sem vscode_askQuestions proximal ---
+    # Camada 1 (UP-H1):  ask_questions_called=false → turno nunca autorizado.
+    # Camada 2 (UP-H1b): ask_questions foi chamado mas outras ferramentas foram usadas DEPOIS,
+    #                     indicando que o protocolo "último ato" foi violado.
+    #   Permitido: askQ → task_complete (direto, tools_after=0)
+    #   Permitido: askQ → manage_todo_list (bookkeeping, 1x) → task_complete (tools_after=1, last=manage_todo_list)
+    #   Bloqueado: qualquer outro caso (tools_after > 1, ou last != manage_todo_list)
     if [ "${HOOK_TOOL_NAME:-}" = "task_complete" ] && state_exists; then
         local _h1_aq
         _h1_aq=$(read_field '.current_turn.ask_questions_called' 2> /dev/null || printf 'false')
+
+        # Camada 1: ask_questions ainda não foi chamado neste turno
         if [ "${_h1_aq:-false}" != "true" ]; then
             increment_field ".session_stats.tools_blocked" > /dev/null || true
             hook_log_audit "preToolUse_task_complete_blocked" \
                 "tool" "task_complete" \
-                "reason" "ask_questions_not_called_before_turn_close"
+                "reason" "ask_questions_not_called_this_turn"
             hook_out_pre_deny \
                 "🚫 task_complete bloqueado: você DEVE chamar vscode_askQuestions ANTES de encerrar o turno (Protocolo TODO v9.0)." \
-                "⚠️ PROTOCOLO OBRIGATÓRIO: Chame vscode_askQuestions (Template A para tarefa concluída, Template D para checkpoint) AGORA. task_complete NÃO substitui vscode_askQuestions — são dois sinais diferentes. Só após a resposta do usuário ao vscode_askQuestions você pode chamar task_complete."
+                "⚠️ PROTOCOLO OBRIGATÓRIO: Chame vscode_askQuestions (Template A para tarefa concluída, Template D para checkpoint) AGORA. task_complete NÃO substitui vscode_askQuestions."
+            exit 0
+        fi
+
+        # Camada 2: ask_questions foi chamado mas há tools não-bookkeeping depois dele
+        local _h1b_taaq _h1b_last _h1b_blocked
+        _h1b_taaq=$(read_field '.current_turn.tools_after_ask_questions' 2> /dev/null || printf '0')
+        _h1b_last=$(read_field '.current_turn.last_tool_after_ask_questions' 2> /dev/null || printf '')
+        _h1b_blocked="false"
+        if [ "${_h1b_taaq:-0}" -gt 1 ] 2> /dev/null; then
+            _h1b_blocked="true"
+        elif [ "${_h1b_taaq:-0}" -eq 1 ] && [ "${_h1b_last:-}" != "manage_todo_list" ] 2> /dev/null; then
+            _h1b_blocked="true"
+        fi
+        if [ "${_h1b_blocked}" = "true" ]; then
+            increment_field ".session_stats.tools_blocked" > /dev/null || true
+            hook_log_audit "preToolUse_task_complete_blocked" \
+                "tool" "task_complete" \
+                "reason" "tools_called_after_ask_questions" \
+                "tools_after" "${_h1b_taaq:-0}" \
+                "last_tool" "${_h1b_last:-unknown}"
+            hook_out_pre_deny \
+                "🚫 task_complete bloqueado (UP-H1b): vscode_askQuestions foi chamado mas ${_h1b_taaq:-?} ferramenta(s) foram usadas depois (última: '${_h1b_last:-?}')." \
+                "⚠️ PROTOCOLO: Chame vscode_askQuestions AGORA como ÚLTIMO ATO. Após a resposta do usuário, só manage_todo_list é permitido antes de task_complete."
             exit 0
         fi
     fi

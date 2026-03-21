@@ -87,6 +87,11 @@ post_tool_use_main() {
             # Seta ask_questions_called = true (pós-resposta, não no PreToolUse)
             update_nested_state "current_turn.ask_questions_called" "true"
 
+            # UP-H1b: reseta contador de tools chamadas após este vscode_askQuestions
+            # Permite detectar se task_complete está sendo chamado sem ser o próximo ato
+            update_nested_state "current_turn.tools_after_ask_questions" "0"
+            update_nested_state "current_turn.last_tool_after_ask_questions" ""
+
             hook_log_audit "subturnEnd" "turn" "$turn_num"
             hook_log_audit "askQuestions_responded" "turn" "$turn_num" "turn_pos" "${_turn_tool_pos:-0}"
 
@@ -98,6 +103,14 @@ post_tool_use_main() {
         else
             # Ferramenta regular: apenas fecha o subturn
             hook_log_audit "subturnEnd" "turn" "$turn_num"
+
+            # UP-H1b: incrementa contador de tools chamadas após último vscode_askQuestions
+            # Isso permite que o PreToolUse detecte se task_complete chega tarde demais
+            local _h1b_taaq
+            _h1b_taaq=$(read_field '.current_turn.tools_after_ask_questions' 2> /dev/null || printf '0')
+            _h1b_taaq=$((_h1b_taaq + 1))
+            update_nested_state "current_turn.tools_after_ask_questions" "${_h1b_taaq}"
+            update_nested_state "current_turn.last_tool_after_ask_questions" "${HOOK_TOOL_NAME:-unknown}"
         fi
     fi
 
