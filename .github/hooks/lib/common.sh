@@ -162,6 +162,7 @@ init_state() {
             "source": $src,
             "pending_session_close": false,
             "strict_turn_close": true,
+            "last_activity_at": $start,
             "current_turn": {
                 "number": 0,
                 "turn_id": null,

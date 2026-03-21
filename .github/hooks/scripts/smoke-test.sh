@@ -657,6 +657,37 @@ else
 fi
 teardown
 
+# T37: stop.sh registra last_activity_at no state ao fechar turno autorizado (UP-HEARTBEAT)
+setup
+begin_test "T37: stop.sh registra last_activity_at ao fechar turno autorizado (UP-HEARTBEAT)"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","pending_session_close":false,"strict_turn_close":false,"last_activity_at":null,"current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":true,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":"","last_template":"A","ended_at":null},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null,"ended_at":null},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0,"subagents_active":0,"subagents_total":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+run_hook "stop.sh" \
+    '{"hookEventName":"Stop","sessionId":"sid","stopReason":"userTriggered","decision":"block","stop_hook_active":false}'
+laa=$(jq -r '.last_activity_at // "null"' "$TEST_DIR/session.json" 2> /dev/null)
+if [ "${laa:-null}" != "null" ] && [ "${laa:-}" != "" ]; then
+    pass
+else
+    fail "T37" "last_activity_at deveria ser um timestamp ISO8601 após Stop; got='$laa'"
+fi
+teardown
+
+# T38: subagent-lib.sh emite block quando HOOK_SUBAGENT_HARD_ENFORCEMENT=true e budget excedido (UP-BUDGET)
+setup
+begin_test "T38: subagent bloqueia com hard enforcement quando budget excedido (UP-BUDGET)"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","pending_session_close":false,"strict_turn_close":false,"last_activity_at":null,"current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":false,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":"","last_template":"","ended_at":null},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null,"ended_at":null},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0,"subagents_active":1,"subagents_total":51},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+export HOOK_SUBAGENT_HARD_ENFORCEMENT=true HOOK_SUBAGENT_BUDGET_LIMIT=50
+_t38_out=''
+_t38_rc=0
+_t38_out=$(printf '%s' '{"hookEventName":"SubagentStart","sessionId":"sid","subagentId":"sub-42","subagentType":"subagent"}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" bash "$HOOK_DIR/scripts/subagent-start.sh" 2> /dev/null) || _t38_rc=$?
+unset HOOK_SUBAGENT_HARD_ENFORCEMENT HOOK_SUBAGENT_BUDGET_LIMIT
+if printf '%s' "${_t38_out}" | grep -q '"decision":"block"' 2> /dev/null; then
+    pass
+else
+    fail "T38" "Esperava block com HOOK_SUBAGENT_HARD_ENFORCEMENT=true e 51 subagentes; RC=$_t38_rc OUT=$_t38_out"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 

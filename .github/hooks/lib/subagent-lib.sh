@@ -84,8 +84,16 @@ subagent_start_main() {
             "subagent_id" "${SUBAGENT_ID:-unknown}" \
             "limit" "${HOOK_SUBAGENT_BUDGET_LIMIT:-50}" \
             "count" "$(hook_subagent_count_session)"
-        # Budget excedido: notifica mas não bloqueia (soft enforcement)
-        hook_out_system_message "Atenção: limite de subagentes da sessão atingido (${HOOK_SUBAGENT_BUDGET_LIMIT:-50}). Evite lançar novos subagentes."
+        # UP-BUDGET: hard enforcement via HOOK_SUBAGENT_HARD_ENFORCEMENT=true
+        if [ "${HOOK_SUBAGENT_HARD_ENFORCEMENT:-false}" = "true" ]; then
+            hook_out_subagent_start_block \
+                "Limite de subagentes da sessão atingido (${HOOK_SUBAGENT_BUDGET_LIMIT:-50}). Subagente bloqueado." \
+                "Reduza o uso de runSubagent ou aumente HOOK_SUBAGENT_BUDGET_LIMIT."
+            exit 0
+        else
+            # Soft enforcement (padrão): notifica sem bloquear
+            hook_out_system_message "Atenção: limite de subagentes da sessão atingido (${HOOK_SUBAGENT_BUDGET_LIMIT:-50}). Evite lançar novos subagentes."
+        fi
     fi
 
     local turn_num

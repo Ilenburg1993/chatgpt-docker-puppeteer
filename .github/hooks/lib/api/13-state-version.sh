@@ -187,6 +187,16 @@ hook_state_migrate() {
         [[ -z "$ltaaq" || "$ltaaq" == "null" ]] \
             && update_nested_state 'current_turn.last_tool_after_ask_questions' '' 2> /dev/null || true
 
+        # UP-HEARTBEAT: last_activity_at — registra última atividade para watchdog
+        local laa
+        laa="$(read_field '.last_activity_at' 2> /dev/null)"
+        if [[ -z "$laa" || "$laa" == "null" ]]; then
+            # Usa started_at como valor inicial quando o campo não existe
+            local sa
+            sa="$(read_field '.started_at' 2> /dev/null)"
+            update_nested_state 'last_activity_at' "${sa:-null}" 2> /dev/null || true
+        fi
+
         recorded="3"
     fi
 

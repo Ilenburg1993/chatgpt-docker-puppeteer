@@ -61,6 +61,8 @@ stop_main() {
         # GAP-SUBAGENT-ORPHAN: reseta subagents_active=0 ao fechar turno
         # (subagentes não cruzam fronteiras de turno; Stop limpa qualquer orphan)
         _reset_active_subagents_if_needed
+        # UP-HEARTBEAT: registra timestamp de atividade para watchdog
+        update_nested_state "last_activity_at" "$(now_iso)"
         # GAP-58: usa increment_field() em vez de aritmética manual
         increment_field ".session_stats.turn_authorized" > /dev/null
         hook_log_audit "turnEnd_authorized" "turn" "${turn_num:-0}"
@@ -71,6 +73,8 @@ stop_main() {
         _close_active_subturn_if_open
         # GAP-SUBAGENT-ORPHAN: reseta subagents_active=0 ao fechar turno
         _reset_active_subagents_if_needed
+        # UP-HEARTBEAT: registra timestamp de atividade mesmo em turnos não-autorizados
+        update_nested_state "last_activity_at" "$(now_iso)"
         # GAP-58: usa increment_field() em vez de aritmética manual
         increment_field ".compliance.consecutive_unauthorized" > /dev/null
         update_nested_state "compliance.last_turn_authorized" "false"

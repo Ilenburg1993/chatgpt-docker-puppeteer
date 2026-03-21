@@ -240,6 +240,22 @@ hook_out_subagent_start_context() {
     printf '{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":%s}}\n' "$ctx"
 }
 
+# hook_out_subagent_start_block — bloqueia o início de um subagente
+# Uso: hook_out_subagent_start_block "motivo" [systemMessage]
+hook_out_subagent_start_block() {
+    local reason="${1:?hook_out_subagent_start_block: motivo obrigatório}"
+    local sys_msg="${2:-}"
+    local json_reason json_sys
+    json_reason=$(_hook_json_str "$reason")
+    if [ -n "$sys_msg" ]; then
+        json_sys=$(_hook_json_str "$sys_msg")
+        printf '{"decision":"block","reason":%s,"systemMessage":%s}\n' \
+            "$json_reason" "$json_sys"
+    else
+        printf '{"decision":"block","reason":%s}\n' "$json_reason"
+    fi
+}
+
 # hook_out_subagent_stop_block — bloqueia encerramento de subagente (nível raiz)
 # DEVE verificar HOOK_STOP_HOOK_ACTIVE antes de chamar
 # Uso: hook_out_subagent_stop_block "motivo"

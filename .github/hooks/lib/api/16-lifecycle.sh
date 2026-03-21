@@ -34,3 +34,34 @@ hook_turn_is_orphaned() {
 hook_heal_orphaned_turn() {
     heal_orphaned_turn "$@"
 }
+
+# ─── SEÇÃO 16C: HEARTBEAT DE SESSÃO ─────────────────────────────────────────
+
+# hook_session_last_activity — retorna o ISO8601 do último Stop registrado
+# Retorna string vazia se campo ausente ou null.
+# Uso: laa=$(hook_session_last_activity)
+hook_session_last_activity() {
+    local v
+    v=$(read_field '.last_activity_at' 2> /dev/null)
+    if [ -n "$v" ] && [ "$v" != "null" ]; then
+        printf '%s' "$v"
+    fi
+}
+
+# hook_session_is_stale — retorna 0 (true) se last_activity_at ultrapassou N segundos
+# $1 = threshold em segundos (padrão: 3600 = 1 hora)
+# Retorna 1 se campo ausente (não detecta como stale se não há dados)
+# Uso: if hook_session_is_stale 1800; then echo "sessão inativa"; fi
+hook_session_is_stale() {
+    local threshold="${1:-3600}"
+    local laa now_ts laa_ts elapsed
+
+    laa=$(hook_session_last_activity)
+    [ -z "$laa" ] && return 1 # sem dados: não stale
+
+    now_ts=$(date -u +%s 2> /dev/null) || return 1
+    laa_ts=$(date -u -d "$laa" +%s 2> /dev/null) || return 1
+
+    elapsed=$((now_ts - laa_ts))
+    [ "${elapsed}" -gt "${threshold}" ]
+}
