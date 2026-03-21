@@ -135,11 +135,12 @@ _hook_api_parse_tool_input_subfields() {
 _hook_api_parse_tool_fields() {
     local raw="$1"
 
-    # tool_name: doc oficial usa snake_case; aceita também camelCase como fallback
-    HOOK_TOOL_NAME=$(printf '%s' "$raw" | jq -r '.tool_name // .toolName // empty')
-    HOOK_TOOL_USE_ID=$(printf '%s' "$raw" | jq -r '.tool_use_id // .toolUseId // empty')
+    # tool_name: doc oficial usa snake_case; aceita também camelCase e o formato
+    # aninhado {"tool":{"name":"...","input":{...}}} usado pelo VS Code Copilot
+    HOOK_TOOL_NAME=$(printf '%s' "$raw" | jq -r '.tool_name // .toolName // .tool.name // empty')
+    HOOK_TOOL_USE_ID=$(printf '%s' "$raw" | jq -r '.tool_use_id // .toolUseId // .tool.use_id // empty')
     # tool_input armazenado como JSON string compacta
-    HOOK_TOOL_INPUT=$(printf '%s' "$raw" | jq -c '.tool_input // .toolInput // {}')
+    HOOK_TOOL_INPUT=$(printf '%s' "$raw" | jq -c '.tool_input // .toolInput // .tool.input // {}')
 
     export HOOK_TOOL_NAME HOOK_TOOL_USE_ID HOOK_TOOL_INPUT
 
@@ -152,8 +153,9 @@ _hook_api_parse_post_tool_use() {
     _hook_api_parse_tool_fields "$raw"
 
     # tool_response: pode ser string, objeto JSON, array, ou null
+    # Aceita também formato aninhado .tool.response (VS Code Copilot)
     local resp_raw resp_type
-    resp_raw=$(printf '%s' "$raw" | jq '.tool_response // null')
+    resp_raw=$(printf '%s' "$raw" | jq '.tool_response // .tool.response // null')
     resp_type=$(printf '%s' "$resp_raw" | jq -r 'type')
 
     case "$resp_type" in
