@@ -150,6 +150,13 @@ _hook_api_reset() {
     HOOKS_AUDIT_LOG_DIR="${HOOKS_AUDIT_LOG_DIR:-}"
     HOOKS_CHECKPOINT_MAX="${HOOKS_CHECKPOINT_MAX:-10}"
 
+    # UP-SUBAGENT-STOP (U7): enforcement no SubagentStop
+    #   HOOK_SUBAGENT_STOP_ENFORCEMENT: none|soft|hard (default: soft)
+    #     none → só registra, sem notificação
+    #     soft → audit + systemMessage quando stop órfão detectado
+    #     hard → bloqueia retorno de subagente órfão (decision:block)
+    HOOK_SUBAGENT_STOP_ENFORCEMENT="${HOOK_SUBAGENT_STOP_ENFORCEMENT:-soft}"
+
     # v2.5 — strict validation schemas (populadas via hook_validate_load)
     HOOK_VALIDATION_ERRORS_JSON="[]"
     HOOK_VALIDATION_WARNINGS_JSON="[]"
@@ -192,4 +199,6 @@ _hook_api_reset() {
     export HOOK_VALIDATION_ERRORS_JSON HOOK_VALIDATION_WARNINGS_JSON
     # UP-AUDIT
     export HOOK_AUDIT_LEVEL HOOKS_AUDIT_MAX_LINES HOOKS_AUDIT_LOG_DIR HOOKS_CHECKPOINT_MAX
+    # UP-SUBAGENT-STOP (U7)
+    export HOOK_SUBAGENT_STOP_ENFORCEMENT
 }

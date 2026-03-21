@@ -804,6 +804,65 @@ else
 fi
 teardown
 
+# ---------------------------------------------------------------------------
+# === UP-SUBAGENT-STOP (U7): enforcement no SubagentStop ===
+# ---------------------------------------------------------------------------
+
+# T45: SubagentStop normal (subagents_active > 0) decrementa contador e emite subagentStop
+setup
+begin_test "T45: SubagentStop normal decrementa subagents_active e emite subagentStop (UP-SUBAGENT-STOP)"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"X","pending_session_close":false,"strict_turn_close":false,"last_activity_at":"2026-01-01T00:00:00Z","current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":false,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":1,"intent":"","last_template":"","ended_at":null,"duration_ms":0},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null,"ended_at":null,"duration_ms":0},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0,"turn_duration_total_ms":0,"subagents_active":1,"subagents_total":1},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+_t45_out=''
+_t45_rc=0
+_t45_out=$(printf '%s' '{"hookEventName":"SubagentStop","sessionId":"sid","agent_id":"sub-t45","agent_type":"subagent","stop_hook_active":false}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_STOP_ENFORCEMENT=soft \
+      bash "$HOOK_DIR/scripts/subagent-stop.sh" 2>/dev/null) || _t45_rc=$?
+_t45_active=$(jq -r '.session_stats.subagents_active // 99' "$TEST_DIR/session.json" 2>/dev/null)
+_t45_has_stop=0
+grep -q '"event":"subagentStop"' "$TEST_DIR/audit.jsonl" 2>/dev/null && _t45_has_stop=1
+if [ "${_t45_active:-99}" = "0" ] && [ "$_t45_has_stop" = "1" ]; then
+    pass
+else
+    fail "T45" "subagents_active=$_t45_active (esperado 0); subagentStop no audit=$_t45_has_stop; OUT=$_t45_out"
+fi
+teardown
+
+# T46: SubagentStop órfão (subagents_active=0) com soft enforcement emite subagentStop_orphan + systemMessage
+setup
+begin_test "T46: SubagentStop orfao com soft enforcement emite subagentStop_orphan (UP-SUBAGENT-STOP)"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"X","pending_session_close":false,"strict_turn_close":false,"last_activity_at":"2026-01-01T00:00:00Z","current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":false,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":"","last_template":"","ended_at":null,"duration_ms":0},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null,"ended_at":null,"duration_ms":0},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0,"turn_duration_total_ms":0,"subagents_active":0,"subagents_total":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+_t46_out=''
+_t46_rc=0
+_t46_out=$(printf '%s' '{"hookEventName":"SubagentStop","sessionId":"sid","agent_id":"sub-t46","agent_type":"subagent","stop_hook_active":false}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_STOP_ENFORCEMENT=soft \
+      bash "$HOOK_DIR/scripts/subagent-stop.sh" 2>/dev/null) || _t46_rc=$?
+_t46_orphan=0
+grep -q '"event":"subagentStop_orphan"' "$TEST_DIR/audit.jsonl" 2>/dev/null && _t46_orphan=1
+_t46_sys=0
+printf '%s' "$_t46_out" | grep -q '"systemMessage"' 2>/dev/null && _t46_sys=1
+if [ "$_t46_orphan" = "1" ] && [ "$_t46_sys" = "1" ]; then
+    pass
+else
+    fail "T46" "orphan_audit=$_t46_orphan sys_msg=$_t46_sys (esperado ambos=1); OUT=$_t46_out"
+fi
+teardown
+
+# T47: SubagentStop órfão com hard enforcement emite decision:block
+setup
+begin_test "T47: SubagentStop orfao com hard enforcement emite decision:block (UP-SUBAGENT-STOP)"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"X","pending_session_close":false,"strict_turn_close":false,"last_activity_at":"2026-01-01T00:00:00Z","current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":false,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":"","last_template":"","ended_at":null,"duration_ms":0},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null,"ended_at":null,"duration_ms":0},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0,"turn_duration_total_ms":0,"subagents_active":0,"subagents_total":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+_t47_out=''
+_t47_rc=0
+_t47_out=$(printf '%s' '{"hookEventName":"SubagentStop","sessionId":"sid","agent_id":"sub-t47","agent_type":"subagent","stop_hook_active":false}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_STOP_ENFORCEMENT=hard \
+      bash "$HOOK_DIR/scripts/subagent-stop.sh" 2>/dev/null) || _t47_rc=$?
+if printf '%s' "$_t47_out" | grep -q '"decision":"block"' 2>/dev/null; then
+    pass
+else
+    fail "T47" "SubagentStop orfao com hard enforcement deveria emitir block; RC=$_t47_rc OUT=$_t47_out"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 

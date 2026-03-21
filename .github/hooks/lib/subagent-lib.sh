@@ -135,17 +135,48 @@ subagent_stop_main() {
 
     local turn_num
     turn_num=$(read_field ".current_turn.number")
+
+    # UP-SUBAGENT-STOP (U7): verificar coerência antes de decrementar
+    local active_before
+    active_before=$(read_field ".session_stats.subagents_active // 0")
+
     local active_count
     active_count=$(subagent_stop_counters)
+
+    local enforcement="${HOOK_SUBAGENT_STOP_ENFORCEMENT:-soft}"
+
+    # Detectar stop órfão: se antes do decremento já era 0, não há start correspondente
+    if [ "${active_before:-0}" -le 0 ] 2>/dev/null; then
+        hook_log_audit "subagentStop_orphan" \
+            "subagent_id" "${SUBAGENT_ID:-unknown}" \
+            "subagent_type" "${SUBAGENT_TYPE:-unknown}" \
+            "turn" "${turn_num:-0}" \
+            "enforcement" "$enforcement"
+        case "$enforcement" in
+            hard)
+                # hard: bloqueia retorno do subagente
+                if ! hook_is_stop_active 2>/dev/null; then
+                    hook_out_subagent_stop_block \
+                        "SubagentStop órfão detectado (subagents_active=0). Subagente ${SUBAGENT_ID:-unknown} não tinha SubagentStart correspondente."
+                fi
+                exit 0
+                ;;
+            soft)
+                # soft: notifica e deixa passar
+                hook_out_system_message \
+                    "Aviso: SubagentStop órfão detectado (subagents_active=0). Subagente ${SUBAGENT_ID:-unknown} finalizou sem SubagentStart correspondente."
+                ;;
+            none|*)
+                # none: só auditado — sem output
+                ;;
+        esac
+    fi
 
     hook_log_audit "subagentStop" \
         "subagent_id" "${SUBAGENT_ID:-unknown}" \
         "subagent_type" "${SUBAGENT_TYPE:-unknown}" \
         "turn" "${turn_num:-0}" \
         "active_count" "${active_count:-0}"
-
-    # NOTE: SubagentStop NÃO emite block — enforcement desativado por ora.
-    # Futuro: verificar se o subagente seguiu protocolo antes de permitir retorno.
 
     exit 0
 }
