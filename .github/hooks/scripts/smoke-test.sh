@@ -536,6 +536,19 @@ else
 fi
 teardown
 
+# T29: UP-H2 — post-tool-use emite subturnEnd quando git push dispara reminder (GAP-UP-H2)
+setup
+begin_test "T29: UP-H2 — subturnEnd no audit log quando git push detectado"
+write_state '{"vs_code_session_id":"sid","session_id":"sid","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","source":"new","pending_session_close":false,"strict_turn_close":true,"current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":false,"subturn_count":1,"tools_count":1,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":""},"current_subturn":{"number":1,"subturn_id":"st1","started_at":"2026-01-01T00:00:00Z","response_at":null,"ended_at":null},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":1,"tools_total":1},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+run_hook "post-tool-use.sh" \
+    '{"hookEventName":"PostToolUse","sessionId":"sid","tool":{"name":"run_in_terminal","use_id":"u1","input":{"command":"git push origin main"},"response":{"output":"Branch pushed"}}}'
+if [ -f "$TEST_DIR/audit.jsonl" ] && grep -q '"event":"subturnEnd"' "$TEST_DIR/audit.jsonl"; then
+    pass
+else
+    fail "T29" "esperado evento subturnEnd no audit.jsonl após git push com UP-H2, mas não encontrado"
+fi
+teardown
+
 _log ""
 _log "==================================================="
 TOTAL=$((PASS + FAIL))
