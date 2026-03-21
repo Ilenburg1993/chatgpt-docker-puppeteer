@@ -557,7 +557,7 @@ write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_versio
 run_hook "user-prompt-submit.sh" \
     '{"hookEventName":"UserPromptSubmit","sessionId":"sid","prompt":"continuar trabalho"}'
 # Após o hook, state deve ter sido migrado para v3 com o campo tools_after_ask_questions
-_taaq=$(grep -o '"tools_after_ask_questions":[0-9]*' "$TEST_DIR/session.json" 2>/dev/null | head -1)
+_taaq=$(grep -o '"tools_after_ask_questions":[0-9]*' "$TEST_DIR/session.json" 2> /dev/null | head -1)
 if [ -n "$_taaq" ]; then
     pass
 else
@@ -576,6 +576,24 @@ if [ "$RC" -eq 0 ]; then
     pass
 else
     fail "T31" "post-tool-use falhou (RC=$RC) com state sem tools_after_ask_questions — possível erro aritmético; saída: $OUT"
+fi
+teardown
+
+# T32: watchdog tolera state sem session_stats.turn_count (arith safety)
+setup
+begin_test "T32: watchdog tolera state sem session_stats.turn_count (arith safety)"
+# State sem session_stats (schema antigo ou corrompido) — simula que turn_count ausente
+write_state '{"vs_code_session_id":"sid","session_id":"sid","started_at":"2026-01-01T00:00:00Z","close_key":"ENCERRAR-AABBCCDD","pending_session_close":false}'
+# Criar audit.jsonl no TEST_DIR para que check_audit_coherence tente ler
+printf '{"ts":"2026-01-01T00:00:01Z","event":"turnStart","turn":1}\n' > "$TEST_DIR/audit.jsonl"
+# Rodar watchdog — deve completar sem erro aritmético; RC pode ser 0 ou 1 (tem problemas)
+OUT='' RC=0
+OUT=$(HOOKS_TEST_STATE_DIR="$TEST_DIR" bash "$HOOK_DIR/scripts/watchdog.sh" 2> /dev/null) || RC=$?
+# Aceitar RC=0 (saudável) ou RC=1 (issues encontrados) — mas NÃO crash (ex: RC=139 ou arith)
+if [ "$RC" -le 1 ]; then
+    pass
+else
+    fail "T32" "watchdog saiu com RC=$RC (esperado <=1) — possível crash ou erro aritmético; saída: $OUT"
 fi
 teardown
 
