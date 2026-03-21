@@ -80,6 +80,57 @@ pre_tool_use_main() {
         exit 0
     fi
 
+    # --- Passo 1c: UP-H4 — enforcement retroativo por turnos consecutivos não-autorizados ---
+    # Quando o turno ANTERIOR foi encerrado sem vscode_askQuestions (turno não-autorizado),
+    # esta camada injeta pressão crescente logo no PRIMEIRO tool do turno atual:
+    #   soft (consecutive >= HOOK_CONSEC_UNAUTH_SOFT, default=1): injection de reminder contextual;
+    #   hard (consecutive >= HOOK_CONSEC_UNAUTH_HARD, default=3): bloqueia TODOS os tools
+    #     exceto vscode_askQuestions e manage_todo_list, até o agente regularizar compliance.
+    #
+    # Exemptions (nunca bloqueados): vscode_askQuestions, manage_todo_list, task_complete
+    # (task_complete já tem seu próprio gate UP-H1; não duplicar block aqui).
+    if state_exists; then
+        local _h4_consec _h4_soft _h4_hard _h4_tool
+        _h4_consec=$(read_field '.compliance.consecutive_unauthorized' 2>/dev/null || printf '0')
+        _h4_soft="${HOOK_CONSEC_UNAUTH_SOFT:-1}"
+        _h4_hard="${HOOK_CONSEC_UNAUTH_HARD:-3}"
+        _h4_tool="${HOOK_TOOL_NAME:-}"
+
+        # Exemptions — estas ferramentas nunca são bloqueadas por UP-H4
+        local _h4_exempt="false"
+        case "${_h4_tool}" in
+            vscode_askQuestions|manage_todo_list|task_complete) _h4_exempt="true" ;;
+        esac
+
+        if [ "${_h4_exempt}" != "true" ] && [ "${_h4_consec:-0}" -ge "${_h4_hard}" ] 2>/dev/null; then
+            # Hard enforcement: bloqueia até compliance ser regularizado
+            hook_log_audit "preToolUse_h4_hard_block" \
+                "tool" "${_h4_tool}" \
+                "consecutive_unauthorized" "${_h4_consec}" \
+                "threshold_hard" "${_h4_hard}"
+            hook_out_pre_deny \
+                "🚫 UP-H4 HARD: ${_h4_consec} turnos consecutivos sem vscode_askQuestions (limite: ${_h4_hard})." \
+                "⚠️ COMPLIANCE BLOQUEADO: Você DEVE chamar vscode_askQuestions (Template A ou D) AGORA para regularizar. Ferramentas de trabalho estão suspensas até regularização."
+            exit 0
+        fi
+
+        if [ "${_h4_exempt}" != "true" ] && [ "${_h4_consec:-0}" -ge "${_h4_soft}" ] 2>/dev/null; then
+            # Soft enforcement: injeta reminder + deixa a tool prosseguir (hook_out_pre_allow)
+            # Só dispara na PRIMEIRA tool de cada turno (tools_count == 0) para não poluir
+            local _h4_tc
+            _h4_tc=$(read_field '.current_turn.tools_count' 2>/dev/null || printf '1')
+            if [ "${_h4_tc:-1}" -eq 0 ] 2>/dev/null; then
+                hook_log_audit "preToolUse_h4_soft_reminder" \
+                    "tool" "${_h4_tool}" \
+                    "consecutive_unauthorized" "${_h4_consec}" \
+                    "threshold_soft" "${_h4_soft}"
+                hook_out_pre_allow \
+                    "⚠️ UP-H4: O turno anterior NÃO foi autorizado (${_h4_consec} consecutivo(s) sem vscode_askQuestions). LEMBRETE URGENTE: ao concluir este turno, você DEVE chamar vscode_askQuestions ANTES de encerrar. Protocolo TODO v9.0 obrigatório."
+                exit 0
+            fi
+        fi
+    fi
+
     # --- Passo 1b: UP-H1/H1b — bloqueia task_complete sem vscode_askQuestions proximal ---
     # Camada 1 (UP-H1):  ask_questions_called=false → turno nunca autorizado.
     # Camada 2 (UP-H1b): ask_questions foi chamado mas outras ferramentas foram usadas DEPOIS,

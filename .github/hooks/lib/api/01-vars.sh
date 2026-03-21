@@ -157,6 +157,25 @@ _hook_api_reset() {
     #     hard → bloqueia retorno de subagente órfão (decision:block)
     HOOK_SUBAGENT_STOP_ENFORCEMENT="${HOOK_SUBAGENT_STOP_ENFORCEMENT:-soft}"
 
+    # UP-AUDIT-ENRICH (U8): auto-enrichment de contexto em eventos de auditoria
+    #   HOOK_AUDIT_ENRICH: true|false (default: true)
+    #     true  → enriquece automaticamente cada evento com turn, turn_id,
+    #             subturn_id e tool_name lidos do state (um único jq call)
+    #     false → desativa enrich (útil em testes unitários de baixo custo)
+    #   HOOKS_AUDIT_MAX_FILES: máx. arquivos históricos mantidos em logs/ (default: 5)
+    HOOK_AUDIT_ENRICH="${HOOK_AUDIT_ENRICH:-true}"
+    HOOKS_AUDIT_MAX_FILES="${HOOKS_AUDIT_MAX_FILES:-5}"
+
+    # UP-H4 (U8A): enforcement retroativo por turnos consecutivos não-autorizados
+    #   Disparado no PreToolUse quando o turno ANTERIOR foi encerrado sem vscode_askQuestions.
+    #   HOOK_CONSEC_UNAUTH_SOFT: threshold (inclusive) para injetar reminder no 1º tool do turno
+    #   HOOK_CONSEC_UNAUTH_HARD: threshold (inclusive) para bloquear TODOS os tools
+    #                             (exceto vscode_askQuestions e manage_todo_list)
+    #   Valores padrão: soft=1 (ativa após 1 turno não-autorizado)
+    #                   hard=3 (bloqueia após 3 turnos consecutivos não-autorizados)
+    HOOK_CONSEC_UNAUTH_SOFT="${HOOK_CONSEC_UNAUTH_SOFT:-1}"
+    HOOK_CONSEC_UNAUTH_HARD="${HOOK_CONSEC_UNAUTH_HARD:-3}"
+
     # v2.5 — strict validation schemas (populadas via hook_validate_load)
     HOOK_VALIDATION_ERRORS_JSON="[]"
     HOOK_VALIDATION_WARNINGS_JSON="[]"
@@ -199,6 +218,10 @@ _hook_api_reset() {
     export HOOK_VALIDATION_ERRORS_JSON HOOK_VALIDATION_WARNINGS_JSON
     # UP-AUDIT
     export HOOK_AUDIT_LEVEL HOOKS_AUDIT_MAX_LINES HOOKS_AUDIT_LOG_DIR HOOKS_CHECKPOINT_MAX
+    # UP-AUDIT-ENRICH (U8)
+    export HOOK_AUDIT_ENRICH HOOKS_AUDIT_MAX_FILES
     # UP-SUBAGENT-STOP (U7)
     export HOOK_SUBAGENT_STOP_ENFORCEMENT
+    # UP-H4 (U8A): consecutive-unauthorized enforcement
+    export HOOK_CONSEC_UNAUTH_SOFT HOOK_CONSEC_UNAUTH_HARD
 }

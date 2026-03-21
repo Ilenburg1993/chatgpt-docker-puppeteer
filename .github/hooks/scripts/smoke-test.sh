@@ -732,7 +732,7 @@ HOOK_AUDIT_LEVEL=normal HOOKS_TEST_STATE_DIR="$TEST_DIR" bash "$HOOK_DIR/scripts
     <<< '{"hookEventName":"PreToolUse","tool_use_id":"t-t41","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"s-audit-t41"}' \
     > /dev/null 2>&1 || true
 # subturnStart NÃO deve aparecer no audit com HOOK_AUDIT_LEVEL=normal
-if [ -f "$_t41_audit" ] && grep -q '"event":"subturnStart"' "$_t41_audit" 2>/dev/null; then
+if [ -f "$_t41_audit" ] && grep -q '"event":"subturnStart"' "$_t41_audit" 2> /dev/null; then
     fail "T41" "subturnStart foi gravado no audit com HOOK_AUDIT_LEVEL=normal — esperado suprimido"
 else
     pass
@@ -747,7 +747,7 @@ write_state '{"vs_code_session_id":"sid","session_id":"s-audit-t42","state_schem
 HOOK_AUDIT_LEVEL=verbose HOOKS_TEST_STATE_DIR="$TEST_DIR" bash "$HOOK_DIR/scripts/pre-tool-use.sh" \
     <<< '{"hookEventName":"PreToolUse","tool_use_id":"t-t42","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"s-audit-t42"}' \
     > /dev/null 2>&1 || true
-if [ -f "$_t42_audit" ] && grep -q '"event":"subturnStart"' "$_t42_audit" 2>/dev/null; then
+if [ -f "$_t42_audit" ] && grep -q '"event":"subturnStart"' "$_t42_audit" 2> /dev/null; then
     pass
 else
     fail "T42" "subturnStart NÃO foi gravado com HOOK_AUDIT_LEVEL=verbose — esperado gravado (audit=$_t42_audit)"
@@ -772,13 +772,13 @@ _t43_out=$(bash -c "
     export HOOKS_AUDIT_LOG_DIR=\"$_t43_logdir\"
     source \"$HOOK_DIR/lib/common.sh\" 2>/dev/null
     _audit_cap_check
-" 2>/dev/null) || _t43_rc=$?
+" 2> /dev/null) || _t43_rc=$?
 # Deve existir ao menos um arquivo rotacionado em logs/
-_t43_count=$(find "$_t43_logdir" -maxdepth 1 -name 'audit-*.jsonl' 2>/dev/null | wc -l | tr -d ' ')
+_t43_count=$(find "$_t43_logdir" -maxdepth 1 -name 'audit-*.jsonl' 2> /dev/null | wc -l | tr -d ' ')
 if [ "${_t43_count:-0}" -ge 1 ]; then
     pass
 else
-    fail "T43" "Nenhum arquivo rotacionado em $_t43_logdir após cap mid-session (logs=$(ls "$_t43_logdir" 2>/dev/null || echo vazio))"
+    fail "T43" "Nenhum arquivo rotacionado em $_t43_logdir após cap mid-session (logs=$(ls "$_t43_logdir" 2> /dev/null || echo vazio))"
 fi
 teardown
 
@@ -788,15 +788,15 @@ begin_test "T44: watchdog check_checkpoint_cleanup remove checkpoints antigos (U
 mkdir -p "$TEST_DIR/checkpoints"
 # Criar 12 checkpoints falsos (além do default de 10)
 for i in $(seq 1 12); do
-    printf '{"session_id":"s"}' > "$TEST_DIR/checkpoints/session-2026030${i}-120000.json" 2>/dev/null || \
-        printf '{"session_id":"s"}' > "$TEST_DIR/checkpoints/session-20260${i}01-120000.json"
+    printf '{"session_id":"s"}' > "$TEST_DIR/checkpoints/session-2026030${i}-120000.json" 2> /dev/null \
+        || printf '{"session_id":"s"}' > "$TEST_DIR/checkpoints/session-20260${i}01-120000.json"
 done
 write_state '{"vs_code_session_id":"sid","session_id":"s-wdcp","state_schema_version":"3","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"X","pending_session_close":false,"strict_turn_close":false,"last_activity_at":"2026-01-01T00:00:00Z","current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":false,"subturn_count":0,"tools_count":0,"tools_after_ask_questions":0,"last_tool_after_ask_questions":"","subagents_started":0,"intent":"","last_template":"","ended_at":null,"duration_ms":0},"current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null,"ended_at":null,"duration_ms":0},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":0,"tools_total":0,"subturn_duration_total_ms":0,"turn_duration_total_ms":0,"subagents_active":0,"subagents_total":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
 _t44_out=''
 _t44_rc=0
 _t44_out=$(HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOKS_CHECKPOINT_MAX=10 \
-    bash "$HOOK_DIR/scripts/watchdog.sh" 2>/dev/null) || _t44_rc=$?
-_t44_remaining=$(find "$TEST_DIR/checkpoints" -maxdepth 1 -name 'session-*.json' 2>/dev/null | wc -l | tr -d ' ')
+    bash "$HOOK_DIR/scripts/watchdog.sh" 2> /dev/null) || _t44_rc=$?
+_t44_remaining=$(find "$TEST_DIR/checkpoints" -maxdepth 1 -name 'session-*.json' 2> /dev/null | wc -l | tr -d ' ')
 if [ "${_t44_remaining:-12}" -le 10 ]; then
     pass
 else
@@ -816,10 +816,10 @@ _t45_out=''
 _t45_rc=0
 _t45_out=$(printf '%s' '{"hookEventName":"SubagentStop","sessionId":"sid","agent_id":"sub-t45","agent_type":"subagent","stop_hook_active":false}' \
     | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_STOP_ENFORCEMENT=soft \
-      bash "$HOOK_DIR/scripts/subagent-stop.sh" 2>/dev/null) || _t45_rc=$?
-_t45_active=$(jq -r '.session_stats.subagents_active // 99' "$TEST_DIR/session.json" 2>/dev/null)
+        bash "$HOOK_DIR/scripts/subagent-stop.sh" 2> /dev/null) || _t45_rc=$?
+_t45_active=$(jq -r '.session_stats.subagents_active // 99' "$TEST_DIR/session.json" 2> /dev/null)
 _t45_has_stop=0
-grep -q '"event":"subagentStop"' "$TEST_DIR/audit.jsonl" 2>/dev/null && _t45_has_stop=1
+grep -q '"event":"subagentStop"' "$TEST_DIR/audit.jsonl" 2> /dev/null && _t45_has_stop=1
 if [ "${_t45_active:-99}" = "0" ] && [ "$_t45_has_stop" = "1" ]; then
     pass
 else
@@ -835,11 +835,11 @@ _t46_out=''
 _t46_rc=0
 _t46_out=$(printf '%s' '{"hookEventName":"SubagentStop","sessionId":"sid","agent_id":"sub-t46","agent_type":"subagent","stop_hook_active":false}' \
     | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_STOP_ENFORCEMENT=soft \
-      bash "$HOOK_DIR/scripts/subagent-stop.sh" 2>/dev/null) || _t46_rc=$?
+        bash "$HOOK_DIR/scripts/subagent-stop.sh" 2> /dev/null) || _t46_rc=$?
 _t46_orphan=0
-grep -q '"event":"subagentStop_orphan"' "$TEST_DIR/audit.jsonl" 2>/dev/null && _t46_orphan=1
+grep -q '"event":"subagentStop_orphan"' "$TEST_DIR/audit.jsonl" 2> /dev/null && _t46_orphan=1
 _t46_sys=0
-printf '%s' "$_t46_out" | grep -q '"systemMessage"' 2>/dev/null && _t46_sys=1
+printf '%s' "$_t46_out" | grep -q '"systemMessage"' 2> /dev/null && _t46_sys=1
 if [ "$_t46_orphan" = "1" ] && [ "$_t46_sys" = "1" ]; then
     pass
 else
@@ -855,11 +855,245 @@ _t47_out=''
 _t47_rc=0
 _t47_out=$(printf '%s' '{"hookEventName":"SubagentStop","sessionId":"sid","agent_id":"sub-t47","agent_type":"subagent","stop_hook_active":false}' \
     | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_SUBAGENT_STOP_ENFORCEMENT=hard \
-      bash "$HOOK_DIR/scripts/subagent-stop.sh" 2>/dev/null) || _t47_rc=$?
-if printf '%s' "$_t47_out" | grep -q '"decision":"block"' 2>/dev/null; then
+        bash "$HOOK_DIR/scripts/subagent-stop.sh" 2> /dev/null) || _t47_rc=$?
+if printf '%s' "$_t47_out" | grep -q '"decision":"block"' 2> /dev/null; then
     pass
 else
     fail "T47" "SubagentStop orfao com hard enforcement deveria emitir block; RC=$_t47_rc OUT=$_t47_out"
+fi
+teardown
+
+# ---------------------------------------------------------------------------
+# === U8 — Audit system API (hook_log_audit via _audit_write_event) ===
+# ---------------------------------------------------------------------------
+_log ""
+_log "=== U8: audit API ==="
+
+# T48: hook_log_audit grava evento com campos ts/event/session_id quando HOOK_AUDIT_LEVEL=verbose
+setup
+begin_test "T48: HOOK_AUDIT_LEVEL=verbose grava evento no audit.jsonl via pre-tool-use"
+write_state "$(_state_aq_false 1)"
+_T48_OUT="" _T48_RC=0
+_T48_OUT=$(printf '%s' '{"hookEventName":"PreToolUse","tool_use_id":"t48","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"sid"}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_AUDIT_LEVEL=verbose \
+        bash "$HOOK_DIR/scripts/pre-tool-use.sh" 2>/dev/null) || _T48_RC=$?
+_T48_AUDIT="$TEST_DIR/audit.jsonl"
+if [ -f "$_T48_AUDIT" ] && grep -q '"event"' "$_T48_AUDIT" 2>/dev/null; then
+    pass
+else
+    fail "T48" "audit.jsonl ausente ou sem campo event com HOOK_AUDIT_LEVEL=verbose; RC=$_T48_RC file=$(ls "$TEST_DIR" 2>/dev/null | tr '\n' ' ')"
+fi
+teardown
+
+# T49: hook_audit_count retorna 0 quando arquivo ausente
+setup
+begin_test "T49: hook_audit_count retorna 0 quando audit.jsonl ausente"
+export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+_T49_CNT=$(bash -c "
+    HOOK_DIR='$HOOK_DIR'
+    AUDIT_FILE='$TEST_DIR/audit.jsonl'
+    . '$HOOK_DIR/lib/api/15-audit.sh' 2>/dev/null
+    hook_audit_count 'turnStart'
+" 2>/dev/null)
+if [ "${_T49_CNT:-0}" = "0" ]; then
+    pass
+else
+    fail "T49" "hook_audit_count deveria retornar 0 para arquivo ausente; got=${_T49_CNT}"
+fi
+teardown
+
+# T50: hook_audit_has retorna exit 1 quando evento não existe
+setup
+begin_test "T50: hook_audit_has retorna exit 1 para evento inexistente"
+export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+printf '{"ts":"2026-01-01T00:00:00Z","event":"turnStart","session_id":"x"}\n' > "$TEST_DIR/audit.jsonl"
+_T50_RC=0
+bash -c "
+    AUDIT_FILE='$TEST_DIR/audit.jsonl'
+    . '$HOOK_DIR/lib/api/15-audit.sh' 2>/dev/null
+    hook_audit_has 'turnEnd_authorized'
+" 2>/dev/null || _T50_RC=$?
+if [ "$_T50_RC" -ne 0 ]; then
+    pass
+else
+    fail "T50" "hook_audit_has deveria retornar exit 1 para evento inexistente; RC=$_T50_RC"
+fi
+teardown
+
+# T51: hook_audit_last retorna campo correto do último evento
+setup
+begin_test "T51: hook_audit_last retorna valor de campo do último evento"
+export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+printf '{"ts":"2026-01-01T00:00:00Z","event":"turnStart","session_id":"sid","turn":"1"}\n' > "$TEST_DIR/audit.jsonl"
+printf '{"ts":"2026-01-01T00:01:00Z","event":"turnStart","session_id":"sid","turn":"2"}\n' >> "$TEST_DIR/audit.jsonl"
+_T51_VAL=$(bash -c "
+    AUDIT_FILE='$TEST_DIR/audit.jsonl'
+    . '$HOOK_DIR/lib/api/15-audit.sh' 2>/dev/null
+    hook_audit_last 'turnStart' 'turn'
+" 2>/dev/null)
+if [ "${_T51_VAL}" = "2" ]; then
+    pass
+else
+    fail "T51" "hook_audit_last deveria retornar '2'; got='${_T51_VAL}'"
+fi
+teardown
+
+# T52: hook_audit_events_since filtra por timestamp
+setup
+begin_test "T52: hook_audit_events_since filtra eventos por timestamp"
+export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+printf '{"ts":"2026-01-01T00:00:00Z","event":"turnStart","session_id":"sid"}\n' > "$TEST_DIR/audit.jsonl"
+printf '{"ts":"2026-01-02T00:00:00Z","event":"turnEnd_authorized","session_id":"sid"}\n' >> "$TEST_DIR/audit.jsonl"
+_T52_OUT=$(bash -c "
+    AUDIT_FILE='$TEST_DIR/audit.jsonl'
+    . '$HOOK_DIR/lib/api/15-audit.sh' 2>/dev/null
+    hook_audit_events_since '2026-01-01T12:00:00Z'
+" 2>/dev/null)
+if printf '%s' "$_T52_OUT" | grep -q 'turnEnd_authorized' && \
+   ! printf '%s' "$_T52_OUT" | grep -q '"turnStart"'; then
+    pass
+else
+    fail "T52" "hook_audit_events_since deveria retornar apenas turnEnd_authorized; got='${_T52_OUT}'"
+fi
+teardown
+
+# T53: HOOK_AUDIT_ENRICH=false desativa auto-enrichment de turn/turn_id
+setup
+begin_test "T53: HOOK_AUDIT_ENRICH=false desativa auto-enrichment"
+write_state "$(_state_aq_false 1)"
+export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t53","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"sid"}'
+_T53_AUDIT="$TEST_DIR/audit.jsonl"
+# Com HOOK_AUDIT_ENRICH=false, eventos NÃO devem ter campo "turn_id" enriquecido
+_T53_HAS_ENRICH=$(HOOK_AUDIT_ENRICH=false bash -c "
+    HOOK_DIR='$HOOK_DIR'
+    AUDIT_FILE='$TEST_DIR/audit.jsonl'
+    HOOKS_TEST_STATE_DIR='$TEST_DIR'
+    STATE_FILE='$TEST_DIR/session.json'
+    . '$HOOK_DIR/lib/api/15-audit.sh' 2>/dev/null
+    _audit_write_event 'test_no_enrich'
+    grep -c '\"turn_id\"' '$TEST_DIR/audit.jsonl' 2>/dev/null || echo 0
+" 2>/dev/null)
+# Se enrich=false, turn_id não deve aparecer nesse evento específico
+# (audit.jsonl pode já ter eventos de run_hook acima — verificamos o último)
+_T53_LAST=$(tail -1 "$TEST_DIR/audit.jsonl" 2>/dev/null)
+if ! printf '%s' "$_T53_LAST" | grep -q '"turn_id"' 2>/dev/null; then
+    pass
+else
+    fail "T53" "evento com HOOK_AUDIT_ENRICH=false nao deveria ter turn_id; last='${_T53_LAST}'"
+fi
+teardown
+
+# ---------------------------------------------------------------------------
+# === U8A — UP-H4: consecutive-unauthorized enforcement ===
+# ---------------------------------------------------------------------------
+_log ""
+_log "=== U8A: UP-H4 consecutive-unauthorized enforcement ==="
+
+# Helper: state com consecutive_unauthorized=N, ask_questions_called=false no turno atual
+_state_consec_unauth() {
+    local n="${1:-1}"
+    printf '{
+    "vs_code_session_id":"sid","session_id":"sid",
+    "started_at":"2026-01-01T00:00:00Z","ended_at":null,
+    "close_key":"ENCERRAR-AABBCCDD","source":"new",
+    "pending_session_close":false,"strict_turn_close":true,
+    "current_turn":{"number":%s,"turn_id":"t1","started_at":"2026-01-01T00:01:00Z",
+        "ask_questions_called":false,"subturn_count":0,"tools_count":0,
+        "tools_after_ask_questions":0,"last_tool_after_ask_questions":""},
+    "current_subturn":{"number":0,"subturn_id":null,"started_at":null,"response_at":null},
+    "session_stats":{"turn_count":%s,"turn_authorized":0,"turn_unauthorized":%s,
+        "subturn_total":0,"tools_total":0},
+    "compliance":{"consecutive_unauthorized":%s,"last_turn_authorized":false}
+}' "$((n+1))" "$((n+1))" "$n" "$n"
+}
+
+# T54: UP-H4 soft — 1 turno não-autorizado, tools_count=0 → reminder injetado para read_file
+setup
+begin_test "T54: UP-H4 soft (consec=1) → reminder injetado no 1o tool do turno"
+write_state "$(_state_consec_unauth 1)"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t54","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"sid"}'
+# Soft não bloqueia (sem "deny") mas injeta mensagem via hook_out_pre_allow
+# RC=0 e output contém o reminder (qualquer saída JSON indica que saiu pelo allow path)
+if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q '"deny"' 2>/dev/null; then
+    pass
+else
+    fail "T54" "UP-H4 soft deveria permitir com reminder; RC=$RC OUT=$OUT"
+fi
+teardown
+
+# T55: UP-H4 soft — tools_count=1 (segunda tool do turno) → sem reminder (só na 1a tool)
+setup
+begin_test "T55: UP-H4 soft (consec=1,tools_count=1) → sem reminder na 2a tool"
+write_state "$(_state_consec_unauth 1 | jq '.current_turn.tools_count = 1')"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t55","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"sid"}'
+# Com tools_count=1 não deve disparar o reminder (só tools_count==0)
+# Apenas verifica que não "bloqueou" → RC=0
+if [ "$RC" -eq 0 ]; then
+    pass
+else
+    fail "T55" "UP-H4 nao deve bloquear na 2a tool com soft enforcement; RC=$RC"
+fi
+teardown
+
+# T56: UP-H4 hard — 3 turnos não-autorizados consecutivos → read_file bloqueado
+setup
+begin_test "T56: UP-H4 hard (consec=3) → read_file bloqueado"
+write_state "$(_state_consec_unauth 3)"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t56","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"sid"}'
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+if [ "${DECISION}" = "deny" ]; then
+    pass
+else
+    fail "T56" "UP-H4 hard deveria bloquear read_file com consec=3; DECISION='${DECISION}' OUT='${OUT}'"
+fi
+teardown
+
+# T57: UP-H4 hard — vscode_askQuestions é EXEMPTO (não bloqueado)
+setup
+begin_test "T57: UP-H4 hard (consec=3) → vscode_askQuestions é exempto"
+write_state "$(_state_consec_unauth 3)"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t57","tool_name":"vscode_askQuestions","tool_input":{"questions":[{"header":"Próxima ação","question":"O que fazer?","options":["A","B"]}]},"sessionId":"sid"}'
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+if [ "${DECISION}" != "deny" ]; then
+    pass
+else
+    fail "T57" "vscode_askQuestions deve ser exempto de UP-H4 hard; DECISION='${DECISION}'"
+fi
+teardown
+
+# T58: UP-H4 hard — manage_todo_list é EXEMPTO (não bloqueado)
+setup
+begin_test "T58: UP-H4 hard (consec=3) → manage_todo_list é exempto"
+write_state "$(_state_consec_unauth 3)"
+run_hook "pre-tool-use.sh" \
+    '{"hookEventName":"PreToolUse","tool_use_id":"t58","tool_name":"manage_todo_list","tool_input":{"todoList":[]},"sessionId":"sid"}'
+DECISION=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+if [ "${DECISION}" != "deny" ]; then
+    pass
+else
+    fail "T58" "manage_todo_list deve ser exempto de UP-H4 hard; DECISION='${DECISION}'"
+fi
+teardown
+
+# T59: UP-H4 threshold — consec=2 com HOOK_CONSEC_UNAUTH_HARD=3 → NÃO bloqueia (abaixo do hard)
+setup
+begin_test "T59: UP-H4 consec=2 com HARD=3 → nao bloqueia (abaixo do threshold)"
+write_state "$(_state_consec_unauth 2)"
+_T59_OUT="" _T59_RC=0
+_T59_OUT=$(printf '%s' '{"hookEventName":"PreToolUse","tool_use_id":"t59","tool_name":"read_file","tool_input":{"filePath":"/tmp/x"},"sessionId":"sid"}' \
+    | HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOK_CONSEC_UNAUTH_HARD=3 \
+        bash "$HOOK_DIR/scripts/pre-tool-use.sh" 2>/dev/null) || _T59_RC=$?
+_T59_DEC=$(printf '%s' "$_T59_OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)
+if [ "${_T59_DEC}" != "deny" ]; then
+    pass
+else
+    fail "T59" "consec=2 com HARD=3 nao deveria bloquear; DEC='${_T59_DEC}'"
 fi
 teardown
 

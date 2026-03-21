@@ -272,25 +272,27 @@ recover_or_init_state() {
 _audit_event_is_suppressed() {
     local event="$1" level="${HOOK_AUDIT_LEVEL:-normal}"
     case "$level" in
-        verbose) return 1 ;;  # grava tudo
+        verbose) return 1 ;; # grava tudo
         minimal)
             # minimal: só lifecycle crítico e compliance — omite operacionais
             case "$event" in
-                turnStart|turnEnd_authorized|turnEnd_unauthorized|\
-                sessionStart|sessionStart_new|sessionStart_reconnect|\
-                sessionEnd|sessionClose|\
-                state_initialized_clean|state_recovered_from_checkpoint|\
-                briefing_generated|compliance_block|task_complete_blocked|\
-                audit_log_rotated|audit_log_capped)
-                    return 1 ;;  # não suprimir (gravar)
-                *) return 0 ;;  # suprimir
+                turnStart | turnEnd_authorized | turnEnd_unauthorized | \
+                    sessionStart | sessionStart_new | sessionStart_reconnect | \
+                    sessionEnd | sessionClose | \
+                    state_initialized_clean | state_recovered_from_checkpoint | \
+                    briefing_generated | compliance_block | task_complete_blocked | \
+                    audit_log_rotated | audit_log_capped)
+                    return 1
+                    ;;         # não suprimir (gravar)
+                *) return 0 ;; # suprimir
             esac
             ;;
-        *)  # normal (padrão): suprime subturns e validation_warnings de baixo valor
+        *) # normal (padrão): suprime subturns e validation_warnings de baixo valor
             case "$event" in
-                subturnStart|subturnEnd|payload_validation_warnings)
-                    return 0 ;;  # suprimir
-                *) return 1 ;;  # gravar
+                subturnStart | subturnEnd | payload_validation_warnings)
+                    return 0
+                    ;;         # suprimir
+                *) return 1 ;; # gravar
             esac
             ;;
     esac
@@ -316,9 +318,9 @@ _audit_cap_check() {
     else
         log_dir="$(dirname "$AUDIT_FILE")"
     fi
-    mkdir -p "$log_dir" 2>/dev/null || true
+    mkdir -p "$log_dir" 2> /dev/null || true
     local rotated="$log_dir/audit-${ts}.jsonl"
-    if mv -f "$AUDIT_FILE" "$rotated" 2>/dev/null; then
+    if mv -f "$AUDIT_FILE" "$rotated" 2> /dev/null; then
         # Registrar no novo arquivo que houve rotação por cap
         printf '{"ts":"%s","event":"audit_log_capped","session_id":"%s","lines":%s,"file":"%s"}\n' \
             "$(now_iso)" "${SESSION_ID:-unknown}" "$count" "$(basename "$rotated")" \
@@ -330,6 +332,16 @@ log_audit() {
     local event="$1"
     shift
     local ts sid json_obj k v
+
+    # UP-U8: delega para implementação canônica em 15-audit.sh quando carregado.
+    # _audit_write_event oferece: 1 jq fork (vs 1+N), auto-enrichment de contexto.
+    if declare -f _audit_write_event > /dev/null 2>&1; then
+        _audit_write_event "$event" "$@"
+        return $?
+    fi
+
+    # Fallback: implementação legada (executa apenas quando 15-audit.sh ainda não
+    # foi sourceado — raramente ocorre em produção; mantida por segurança).
 
     # UP-AUDIT: filtrar eventos de baixo valor conforme HOOK_AUDIT_LEVEL
     _audit_event_is_suppressed "$event" && return 0
