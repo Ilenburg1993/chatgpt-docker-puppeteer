@@ -565,6 +565,20 @@ else
 fi
 teardown
 
+# T31: GAP-SCHEMA-V3-PTU — post-tool-use tolera state legado sem tools_after_ask_questions (proteção :-0)
+setup
+begin_test "T31: post-tool-use tolera state sem tools_after_ask_questions (arith safety)"
+# State v2 sem o campo tools_after_ask_questions — simula state legado ANTES da migração
+write_state '{"vs_code_session_id":"sid","session_id":"sid","state_schema_version":"2","started_at":"2026-01-01T00:00:00Z","ended_at":null,"close_key":"ENCERRAR-AABBCCDD","source":"new","pending_session_close":false,"strict_turn_close":true,"current_turn":{"number":1,"turn_id":"t1","started_at":"2026-01-01T00:00:00Z","ask_questions_called":false,"subturn_count":0,"tools_count":5,"subagents_started":0,"intent":"","last_template":""},"current_subturn":{"number":1,"subturn_id":"sub1","started_at":"2026-01-01T00:00:00Z","response_at":null},"session_stats":{"turn_count":1,"turn_authorized":0,"turn_unauthorized":0,"subturn_total":1,"tools_total":5,"subturn_duration_total_ms":0},"compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}}'
+run_hook "post-tool-use.sh" \
+    '{"hookEventName":"PostToolUse","sessionId":"sid","tool":{"name":"read_file","use_id":"u1","input":{"file_path":"/tmp/x.txt"},"response":{"output":"conteudo"}}}'
+if [ "$RC" -eq 0 ]; then
+    pass
+else
+    fail "T31" "post-tool-use falhou (RC=$RC) com state sem tools_after_ask_questions — possível erro aritmético; saída: $OUT"
+fi
+teardown
+
 _log ""
 _log "==================================================="
 TOTAL=$((PASS + FAIL))
