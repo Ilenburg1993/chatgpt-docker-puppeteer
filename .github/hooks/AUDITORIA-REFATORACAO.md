@@ -169,43 +169,36 @@ Linhas 811-880:  Briefing (generate_session_briefing, context_block, export_lang
 
 ---
 
-### 2.2 Bug Potencial: `printf '- ...'` em `session-start-lib.sh` — PENDENTE
+### 2.2 Bug Potencial: `printf '- ...'` em `session-start-lib.sh` — ✅ RESOLVIDO
 
-**Status**: ⚠️ **Não corrigido**
+**Status**: ✅ **Resolvido** (verificado Sprint 10)
 **Arquivo**: `lib/session-start-lib.sh:141` e `:148`
-**Evidência**:
+**Evidência atual**:
 ```bash
-printf '- %s\n' "$issue"   # linha 141
-printf '- %s\n' "$warn"    # linha 148
+printf -- '- %s\n' "$issue"   # linha 141 — flag -- adicionado
+printf -- '- %s\n' "$warn"    # linha 148 — flag -- adicionado
 ```
 
-**Análise**: O contexto aqui é diferente de `session-close-lib.sh` — o `LANG` não é hardcoded antes dessas chamadas nesse arquivo. Contudo, como `export_lang_utf8()` é chamada globalmente e `LANG=C.UTF-8` pode propagar, existe risco real.
-**Risco**: Baixo em produção (valores de `$issue` e `$warn` não começam com `-`), mas a forma incorreta permanece.
-**Ação recomendada**: Alterar para `printf -- '- %s\n'` por consistência e segurança defensiva.
+**Análise**: Ambas as chamadas já usam `printf --` corretamente. Resolvido em Sprint anterior.
+**Cobertura de teste**: T78 verifica o comportamento.
 
 ---
 
-### 2.3 Problema Documentado: `read_field()` e Boolean False
+### 2.3 Problema Documentado: `read_field()` e Boolean False — ✅ RESOLVIDO
 
-**Status**: ⚠️ Documentado, workaround ativo, mas pervasivo
-**Arquivo**: `lib/common.sh:53` (read_field usa `// empty`)
-**Comportamento**: `jq -r '.campo // empty'` retorna string vazia `""` quando o valor JSON é `false` (booleano)
-
+**Status**: ✅ **Resolvido** (verificado Sprint 10)
+**Arquivo**: `lib/state-crud.sh:32-36`
+**Implementação atual**:
 ```bash
-read_field() { jq -r "${1} // empty" "$STATE_FILE" 2>/dev/null || true; }
-# Exemplo: JSON tem "strict_turn_close": false
-# read_field ".strict_turn_close" → retorna ""  (não "false")
+# read_field_bool — avoids bug where read_field returns "" for boolean false
+read_field_bool() {
+    local path="$1"
+    jq -r "if ${path} then \"true\" else \"false\" end" "$STATE_FILE" 2>/dev/null || echo "false"
+}
 ```
 
-**Workaround aplicado**: Código compara `!= "true"` em vez de `= "false"` (`pre-compact-lib.sh` corrigido)
-**Locais com risco de comparação incorreta**:
-- Qualquer lugar que compare `read_field ".campo_booleano"` com string `"false"`
-- Especialmente: `strict_turn_close`, `pending_session_close`, `ask_questions_called`
-
-**Refatoração proposta**: Criar `read_field_bool()` que retorna literalmente `true` ou `false`:
-```bash
-read_field_bool() { jq -r "if ${1} then \"true\" else \"false\" end" "$STATE_FILE" 2>/dev/null || echo "false"; }
-```
+**Resolução**: `read_field_bool()` implementada em `state-crud.sh` e exposta via `common.sh`. Retorna literalmente `"true"` ou `"false"` para qualquer booleano JSON.
+**Cobertura de teste**: T84 verifica o comportamento diretamente.
 
 ---
 
@@ -261,18 +254,19 @@ fi
 
 ---
 
-### 2.7 `LANG=C.UTF-8` com Estratégias Inconsistentes entre Arquivos
+### 2.7 `LANG=C.UTF-8` com Estratégias Inconsistentes entre Arquivos — ✅ RESOLVIDO
 
-**Problema**: Três abordagens diferentes para garantir LANG:
+**Status**: ✅ **Resolvido** (verificado Sprint 10)
+**Situação atual**:
 
-| Arquivo                       | Abordagem                                        | Risco                                                   |
-| ----------------------------- | ------------------------------------------------ | ------------------------------------------------------- |
-| `session-close-lib.sh:11`     | `export LANG=C.UTF-8` (hardcoded, incondicional) | **Alto** — sobrescreve qualquer configuração do usuário |
-| `common.sh:878`               | `export LANG="${LANG:-C.UTF-8}"` (condicional)   | Baixo — respeita variável já definida                   |
-| `hook-payload-api.sh:55`      | `export LANG="C.UTF-8"` (hardcoded)              | **Alto** — stub sem guard                               |
-| `smoke-test-payload-api.sh:6` | `export LANG="C.UTF-8"`                          | Aceitável em contexto de teste                          |
+| Arquivo                       | Abordagem                                      | Status                                     |
+| ----------------------------- | ---------------------------------------------- | ------------------------------------------ |
+| `session-close-lib.sh:11`     | Chama `export_lang_utf8` (condicional)         | ✅ Correto                                  |
+| `common.sh:878`               | `export LANG="${LANG:-C.UTF-8}"` (condicional) | ✅ Correto                                  |
+| `hook-payload-api.sh:55`      | `export_lang_utf8()` — stub seguro com guard   | ✅ Correto (usa `${LANG:-C.UTF-8}`)         |
+| `smoke-test-payload-api.sh:6` | `export LANG="C.UTF-8"`                       | Aceitável em contexto de teste isolado     |
 
-**Refatoração proposta**: Padronizar todos para usar `export_lang_utf8()` de `common.sh` (que usa `${LANG:-C.UTF-8}`).
+**Resolução**: `session-close-lib.sh` migrou para `export_lang_utf8`; `hook-payload-api.sh` stub já usa `${LANG:-C.UTF-8}`. Padrão consistente aplicado.
 
 ---
 
@@ -404,18 +398,30 @@ O `GAP-ABRUPT-TURN-END` é implementado em `session-end.sh` mas sem teste automa
 
 O `scripts/watchdog.sh` (262 linhas) não tem nenhum teste de regressão. Ele é invocado externamente via cron/scheduler para detectar sessões travadas.
 
-### 3.4 Sugestão de Novos Testes (Prioritários)
+### 3.4 Testes Implementados (Sprint 10) ✅
 
-| ID Proposto | Descrição                                                                  | Prioridade |
-| ----------- | -------------------------------------------------------------------------- | ---------- |
-| T76         | `session-end.sh` com turn ativo → verifica `turnEnd_abrupt` em audit       | Alta       |
-| T77         | `_audit_cap_check()` com HOOKS_AUDIT_MAX_LINES=5 → verifica rotação        | Alta       |
-| T78         | `recover_or_init_state()` com checkpoints todos inválidos → init limpo     | Alta       |
-| T79         | `printf -- '- %s\n'` em `session-start-lib.sh` com valor iniciando com `-` | Média      |
-| T80         | `generate_session_briefing()` output contém session_id e close_key         | Média      |
-| T81         | `open_new_turn()` zera corretamente todos os 13 campos                     | Média      |
-| T82         | Watchdog detecta sessão travada > threshold e registra evento              | Baixa      |
-| T83         | `make_close_key()` fallback sem /dev/urandom → retorna formato correto     | Baixa      |
+| ID   | Descrição                                                                    | Status            |
+| ---- | ---------------------------------------------------------------------------- | ----------------- |
+| T76  | `session-end.sh` com turn ativo → verifica `turnEnd_abrupt` em audit        | ✅ Implementado    |
+| T77  | `_audit_cap_check()` com HOOKS_AUDIT_MAX_LINES=5 → verifica rotação         | ✅ Implementado    |
+| T78  | `printf -- '- %s\n'` em `session-start-lib.sh` com valor iniciando com `-`  | ✅ Implementado    |
+| T79  | `generate_session_briefing()` output contém session_id e close_key          | ✅ Implementado    |
+| T80  | `open_new_turn()` avança número do turn e zera ask_questions_called          | ✅ Implementado    |
+| T81  | `make_close_key()` retorna formato ENCERRAR-XXXXXXXX                         | ✅ Implementado    |
+| T82  | `find_audit_file()` retorna AUDIT_FILE padrão quando sem symlink             | ✅ Implementado    |
+| T84  | `read_field_bool()` retorna `"true"`/`"false"` para booleanos JSON           | ✅ Sprint 10       |
+| T85  | `uuidgen_safe()` retorna formato UUID 8-4-4-4-12 válido                     | ✅ Sprint 10       |
+| T86  | `open_new_turn_batch()` avança turn number e zera ask_questions_called       | ✅ Sprint 10       |
+
+### 3.5 Gaps Remanescentes (Baixa Prioridade)
+
+| Módulo                        | Gap Identificado                                  | Prioridade |
+| ----------------------------- | ------------------------------------------------- | ---------- |
+| `api/09-metrics.sh`           | Sem testes de cálculo de métricas de duração      | Baixa      |
+| `api/11-compact-context.sh`   | Pouco coverage de serialização de contexto        | Baixa      |
+| `api/12-subagent.sh`          | Budget/depth limits só testados indiretamente     | Baixa      |
+| `api/13-state-version.sh`     | Migration de versão de schema não testada         | Baixa      |
+| `scripts/watchdog.sh`         | Zero testes automatizados do watchdog             | Baixa      |
 
 ---
 

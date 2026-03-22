@@ -1558,6 +1558,63 @@ else
 fi
 teardown
 
+# T84: read_field_bool() retorna "true"/"false" para booleanos JSON
+setup
+begin_test "T84: read_field_bool retorna true/false para booleanos JSON"
+write_state "$(_state_aq_true | jq '.check_bool_true = true | .check_bool_false = false')"
+_t84_true=''
+_t84_false=''
+_t84_true=$(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    read_field_bool ".check_bool_true"
+) 2>/dev/null || true
+_t84_false=$(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    read_field_bool ".check_bool_false"
+) 2>/dev/null || true
+if [[ "$_t84_true" = "true" ]] && [[ "$_t84_false" = "false" ]]; then
+    pass
+else
+    fail "T84" "read_field_bool incorreto: true='$_t84_true' false='$_t84_false'"
+fi
+teardown
+
+# T85: uuidgen_safe() retorna formato UUID 8-4-4-4-12 válido
+setup
+begin_test "T85: uuidgen_safe retorna formato UUID valido"
+_t85_uuid=''
+_t85_uuid=$(
+    source "$HOOK_DIR/lib/common.sh"
+    uuidgen_safe
+) 2>/dev/null || true
+if printf '%s' "$_t85_uuid" | grep -qE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
+    pass
+else
+    fail "T85" "uuidgen_safe formato incorreto: '$_t85_uuid'"
+fi
+teardown
+
+# T86: open_new_turn_batch() avança número do turno e zera ask_questions_called
+setup
+begin_test "T86: open_new_turn_batch avanca turn e zera ask_questions_called"
+write_state "$(_state_aq_true)"
+_t86_rc=0
+(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    open_new_turn_batch "batch_test" "batch_turn_id"
+) >/dev/null 2>&1 || _t86_rc=$?
+_t86_aq=$(jq -r '.current_turn.ask_questions_called' "$TEST_DIR/session.json" 2>/dev/null)
+_t86_num=$(jq -r '.current_turn.number' "$TEST_DIR/session.json" 2>/dev/null)
+if [[ "${_t86_aq}" = "false" ]] && [[ "${_t86_num:-0}" -gt 0 ]]; then
+    pass
+else
+    fail "T86" "open_new_turn_batch incorreto: aq=$_t86_aq num=$_t86_num rc=$_t86_rc"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 
