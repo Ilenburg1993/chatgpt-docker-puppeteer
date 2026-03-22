@@ -148,7 +148,10 @@ write_state() {
     mkdir -p "$STATE_DIR"
     tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
     printf '%s\n' "$json" > "$tmp"
-    mv -f "$tmp" "$STATE_FILE"
+    mv -f "$tmp" "$STATE_FILE" || {
+        rm -f "$tmp"
+        return 1
+    }
 }
 
 # Cria state/session.json com zero state para nova sessão

@@ -34,7 +34,11 @@ fi
 # (adiciona ✅ DONE antes do padrão encontrado)
 TMPFILE="$(mktemp "$STATE_DIR/.tasks.XXXXXX")"
 sed -E "s/(##[^#].*${PATTERN}.*)/\1 [✅ DONE]/gI" "$PENDING_TASKS_FILE" > "$TMPFILE"
-mv -f "$TMPFILE" "$PENDING_TASKS_FILE"
+mv -f "$TMPFILE" "$PENDING_TASKS_FILE" || {
+    rm -f "$TMPFILE"
+    printf '[complete-task] ERRO: falha ao substituir pending-tasks.md\n' >&2
+    exit 1
+}
 
 # Log no audit
 if state_exists; then

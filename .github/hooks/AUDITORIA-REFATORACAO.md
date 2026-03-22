@@ -435,17 +435,16 @@ Esses hooks são chamados **a cada ferramenta invocada** pelo agente — potenci
 
 **Refatoração de alto impacto**: Ler o estado uma única vez (`jq -c '.'` para string), fazer todas as operações sobre a string em memória e escrever uma vez. Redução esperada: de ~15 forks para 2-3.
 
-### 4.3 `update_nested_state()` — Análise de Atomicidade
+### 4.3 `update_nested_state()` — Análise de Atomicidade — ✅ RESOLVIDO (Sprint 13)
 
 **Mecanismo atual** (correto para single-writer):
 ```bash
 tmp=$(mktemp "$STATE_DIR/.state.XXXXXX")
 jq ... "$STATE_FILE" > "$tmp"
-mv -f "$tmp" "$STATE_FILE"
+mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
 ```
 
-**Ponto cego**: `mv -f` é atômico apenas quando origem e destino estão no mesmo filesystem. Se `STATE_DIR` for um bind mount ou NFS (improvável mas possível em DevContainer), a atomicidade não é garantida.
-**Verificação sugerida**: Adicionar `|| { rm -f "$tmp"; return 1; }` após mv — já está presente em alguns locais mas não em todos.
+**Sprint 13**: `write_state()` em `state-crud.sh:145` e `complete-task.sh:37` corrigidos para incluir `|| { rm -f "$tmp"; return 1; }` após `mv -f`. Todos os 7 `mv -f` em `state-crud.sh` e 3 em `turn-lifecycle.sh` agora têm guard de erro.
 
 ### 4.4 `_audit_cap_check()` — Chamada após Cada Evento
 
