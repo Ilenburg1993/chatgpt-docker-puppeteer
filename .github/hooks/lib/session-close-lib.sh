@@ -46,7 +46,7 @@ _generate_final_report() {
         printf -- '- Ferramentas invocadas: %s\n' "$tools_total"
         printf -- '- Violações consecutivas (no encerramento): %s\n\n' "$consec"
         printf '## Últimos 10 eventos (audit.jsonl)\n\n```\n'
-        if [ -f "$AUDIT_FILE" ]; then
+        if [[ -f "$AUDIT_FILE" ]]; then
             tail -10 "$AUDIT_FILE"
         else
             printf '(nenhum evento registrado)\n'
@@ -70,7 +70,7 @@ session_close_main() {
     # --- Passo 0: Idempotência — se já foi encerrada, nada a fazer ---
     local ended_at
     ended_at=$(read_field ".ended_at")
-    if [ -n "$ended_at" ] && [ "$ended_at" != "null" ]; then
+    if [[ -n "$ended_at" ]] && [[ "$ended_at" != "null" ]]; then
         hook_log_audit "session_close_noop"
         exit 0
     fi
@@ -78,19 +78,19 @@ session_close_main() {
     # --- Passo 1: Guard — pending_session_close deve ser true ---
     local pending
     pending=$(read_field ".pending_session_close")
-    if [ "$pending" != "true" ]; then
+    if [[ "$pending" != "true" ]]; then
         hook_log_audit "session_close_unexpected"
         exit 0
     fi
 
     # --- Passo 1b: GAP-32 — Revalida close_key: deve haver audit entry sessionCloseAuthorized ---
     local close_authorized=false
-    if [ -f "$AUDIT_FILE" ]; then
+    if [[ -f "$AUDIT_FILE" ]]; then
         if grep -q '"sessionCloseAuthorized"' "$AUDIT_FILE" 2> /dev/null; then
             close_authorized=true
         fi
     fi
-    if [ "$close_authorized" != "true" ]; then
+    if [[ "$close_authorized" != "true" ]]; then
         hook_log_audit "session_close_no_key_validation"
         # Limpa pending_session_close para evitar reentrada em loops futuros
         update_state_bool "pending_session_close" "false"
@@ -103,15 +103,15 @@ session_close_main() {
     _sc_turn_num="${_sc_turn_num:-0}"
     _sc_turn_ended=$(read_field ".current_turn.ended_at" 2> /dev/null || printf '')
 
-    if [ "${_sc_turn_num}" != "0" ] && [ "${_sc_turn_num}" != "null" ] \
-        && ([ -z "${_sc_turn_ended}" ] || [ "${_sc_turn_ended}" = "null" ]); then
+    if [[ "${_sc_turn_num}" != "0" ]] && [[ "${_sc_turn_num}" != "null" ]] \
+        && ([[ -z "${_sc_turn_ended}" ]] || [[ "${_sc_turn_ended}" = "null" ]]); then
 
         # Fecha subturn ativo (se houver)
         _sc_subturn_num=$(read_field ".current_subturn.number" 2> /dev/null || printf '0')
         _sc_subturn_num="${_sc_subturn_num:-0}"
         _sc_subturn_ended=$(read_field ".current_subturn.ended_at" 2> /dev/null || printf '')
-        if [ "${_sc_subturn_num}" != "0" ] && [ "${_sc_subturn_num}" != "null" ] \
-            && ([ -z "${_sc_subturn_ended}" ] || [ "${_sc_subturn_ended}" = "null" ]); then
+        if [[ "${_sc_subturn_num}" != "0" ]] && [[ "${_sc_subturn_num}" != "null" ]] \
+            && ([[ -z "${_sc_subturn_ended}" ]] || [[ "${_sc_subturn_ended}" = "null" ]]); then
             update_nested_state "current_subturn.ended_at" "$(now_iso)"
             hook_log_audit "subturnEnd_abrupt" \
                 "subturn" "${_sc_subturn_num}" \
@@ -151,7 +151,7 @@ session_close_main() {
 # no diretório de logs (HOOKS_AUDIT_LOG_DIR ou <hook_dir>/logs).
 # ---------------------------------------------------------------------------
 _rotate_audit_log() {
-    if [ ! -f "$AUDIT_FILE" ]; then
+    if [[ ! -f "$AUDIT_FILE" ]]; then
         return 0
     fi
 
@@ -160,9 +160,9 @@ _rotate_audit_log() {
 
     # UP-AUDIT: histórico vai para logs/ em vez de state/ (mantém state/ limpo)
     local log_dir
-    if [ -n "${HOOKS_AUDIT_LOG_DIR:-}" ]; then
+    if [[ -n "${HOOKS_AUDIT_LOG_DIR:-}" ]]; then
         log_dir="$HOOKS_AUDIT_LOG_DIR"
-    elif [ -n "${HOOK_DIR:-}" ]; then
+    elif [[ -n "${HOOK_DIR:-}" ]]; then
         log_dir="$HOOK_DIR/logs"
     else
         log_dir="$(dirname "$AUDIT_FILE")"

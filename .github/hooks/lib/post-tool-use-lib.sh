@@ -42,7 +42,7 @@ post_tool_use_main() {
         # UP-04: calcula e acumula duração do subturn em ms (se started_at disponível)
         local _st_ms _et_ms _dur_ms _prev_total _prev_count _new_total
         _st_ms=$(read_field '.current_subturn.started_at' 2> /dev/null)
-        if [ -n "$_st_ms" ] && [ "$_st_ms" != "null" ]; then
+        if [[ -n "$_st_ms" ]] && [[ "$_st_ms" != "null" ]]; then
             # usa _iso_to_epoch (portável, UP-07) + transforma em ms via multiplicação
             _st_ms_epoch=$(_iso_to_epoch "$_st_ms" 2> /dev/null || printf '0')
             _et_ms_epoch=$(_iso_to_epoch "$_now_ts" 2> /dev/null || printf '0')
@@ -64,11 +64,11 @@ post_tool_use_main() {
         # --- UP-H2: injetar reminder após git push/commit (operações de fechamento) ---
         # Detecta run_in_terminal com padrões de ciclo de trabalho encerrado e
         # injeta additionalContext lembrando o LLM de chamar vscode_askQuestions.
-        if [ "${HOOK_TOOL_NAME:-}" = "run_in_terminal" ]; then
+        if [[ "${HOOK_TOOL_NAME:-}" = "run_in_terminal" ]]; then
             local _h2_aq _h2_input
             _h2_aq=$(read_field '.current_turn.ask_questions_called' 2> /dev/null || printf 'false')
             _h2_input="${HOOK_TOOL_INPUT:-}"
-            if [ "${_h2_aq:-false}" != "true" ]; then
+            if [[ "${_h2_aq:-false}" != "true" ]]; then
                 if printf '%s' "$_h2_input" | grep -qiE '(git\s+push|git\s+commit|git\s+push\s+origin)'; then
                     hook_log_audit "postToolUse_git_closure_reminder" \
                         "tool" "run_in_terminal" "pattern" "git_push_or_commit"
@@ -110,7 +110,7 @@ post_tool_use_main() {
             case "${HOOK_TOOL_NAME:-}" in
                 manage_todo_list | task_complete) _h1b_exempt=true ;;
             esac
-            if [ "${_h1b_exempt}" = "false" ]; then
+            if [[ "${_h1b_exempt}" = "false" ]]; then
                 local _h1b_taaq
                 _h1b_taaq=$(read_field '.current_turn.tools_after_ask_questions' 2> /dev/null || printf '0')
                 # GAP-SCHEMA-V3: se campo ausente, read_field retorna "" via "// empty".
@@ -122,7 +122,7 @@ post_tool_use_main() {
             fi
         fi
 
-        if [ -n "${_post_additional_context:-}" ]; then
+        if [[ -n "${_post_additional_context:-}" ]]; then
             hook_out_post_context "$_post_additional_context"
         fi
     fi

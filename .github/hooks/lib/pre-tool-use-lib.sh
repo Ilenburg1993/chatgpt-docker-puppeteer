@@ -31,7 +31,7 @@ maybe_capture_turn_intent() {
     intent=$(printf '%s' "$tool_input" | grep -oE "start-turn\\.sh[[:space:]]+[\"']([^\"']+)[\"']" \
         | sed -E "s/start-turn\\.sh[[:space:]]+[\"']([^\"']+)[\"']/\\1/" || true)
 
-    if [ -n "$intent" ]; then
+    if [[ -n "$intent" ]]; then
         update_nested_state "current_turn.intent" "$intent"
         hook_log_audit "turnIntent_declared" "intent" "$intent"
     fi
@@ -103,7 +103,7 @@ pre_tool_use_main() {
             vscode_askQuestions | manage_todo_list | task_complete) _h4_exempt="true" ;;
         esac
 
-        if [ "${_h4_exempt}" != "true" ] && [ "${_h4_consec:-0}" -ge "${_h4_hard}" ] 2> /dev/null; then
+        if [[ "${_h4_exempt}" != "true" ]] && [ "${_h4_consec:-0}" -ge "${_h4_hard}" ] 2> /dev/null; then
             # Hard enforcement: bloqueia até compliance ser regularizado
             hook_log_audit "preToolUse_h4_hard_block" \
                 "tool" "${_h4_tool}" \
@@ -115,7 +115,7 @@ pre_tool_use_main() {
             exit 0
         fi
 
-        if [ "${_h4_exempt}" != "true" ] && [ "${_h4_consec:-0}" -ge "${_h4_soft}" ] 2> /dev/null; then
+        if [[ "${_h4_exempt}" != "true" ]] && [ "${_h4_consec:-0}" -ge "${_h4_soft}" ] 2> /dev/null; then
             # Soft enforcement: injeta reminder + deixa a tool prosseguir (hook_out_pre_allow)
             # Só dispara na PRIMEIRA tool de cada turno (tools_count == 0) para não poluir
             local _h4_tc
@@ -137,12 +137,12 @@ pre_tool_use_main() {
     #   Permitido: askQ → task_complete (direto, tools_after=0)
     #   Permitido: askQ → manage_todo_list (bookkeeping, 1x) → task_complete (tools_after=1, last=manage_todo_list)
     #   Bloqueado: qualquer outro caso (tools_after > 1, ou last != manage_todo_list)
-    if [ "${HOOK_TOOL_NAME:-}" = "task_complete" ] && state_exists; then
+    if [[ "${HOOK_TOOL_NAME:-}" = "task_complete" ]] && state_exists; then
         local _h1_aq
         _h1_aq=$(read_field '.current_turn.ask_questions_called' 2> /dev/null || printf 'false')
 
         # Camada 1: ask_questions ainda não foi chamado neste turno
-        if [ "${_h1_aq:-false}" != "true" ]; then
+        if [[ "${_h1_aq:-false}" != "true" ]]; then
             increment_field ".session_stats.tools_blocked" > /dev/null || true
 
             # Guard C: detecta heurísticas de completude no summary (✅, "completo", "finalizado", etc.)
@@ -176,10 +176,10 @@ pre_tool_use_main() {
         _h1b_blocked="false"
         if [ "${_h1b_taaq:-0}" -gt 1 ] 2> /dev/null; then
             _h1b_blocked="true"
-        elif [ "${_h1b_taaq:-0}" -eq 1 ] && [ "${_h1b_last:-}" != "manage_todo_list" ] 2> /dev/null; then
+        elif [ "${_h1b_taaq:-0}" -eq 1 ] && [[ "${_h1b_last:-}" != "manage_todo_list" ]] 2> /dev/null; then
             _h1b_blocked="true"
         fi
-        if [ "${_h1b_blocked}" = "true" ]; then
+        if [[ "${_h1b_blocked}" = "true" ]]; then
             increment_field ".session_stats.tools_blocked" > /dev/null || true
             hook_log_audit "preToolUse_task_complete_blocked" \
                 "tool" "task_complete" \
@@ -251,10 +251,10 @@ pre_tool_use_main() {
         _h3_tc=$(read_field '.current_turn.tools_count' 2> /dev/null || printf '0')
         _h3_aq=$(read_field '.current_turn.ask_questions_called' 2> /dev/null || printf 'false')
         # Dispara no múltiplo de 15 (exceto zero) e apenas se turno ainda não autorizado
-        if [ "${_h3_tc:-0}" -gt 0 ] && [ "${_h3_aq:-false}" != "true" ] 2> /dev/null; then
+        if [ "${_h3_tc:-0}" -gt 0 ] && [[ "${_h3_aq:-false}" != "true" ]] 2> /dev/null; then
             if [ $((_h3_tc % 15)) -eq 0 ] 2> /dev/null; then
                 hook_log_audit "preToolUse_periodic_reminder" "tools_count" "${_h3_tc}"
-                if [ -z "$_pre_allow_context" ]; then
+                if [[ -z "$_pre_allow_context" ]]; then
                     _pre_allow_context="⚠️ Lembrete de protocolo (tool #${_h3_tc} neste turno): ao concluir o trabalho deste turno, você DEVE chamar vscode_askQuestions ANTES de task_complete ou de encerrar. task_complete sem vscode_askQuestions ESTÁ BLOQUEADO. Use Template A para tarefas concluídas."
                 fi
             fi
@@ -262,7 +262,7 @@ pre_tool_use_main() {
     fi
 
     # UP-02: detecta template de vscode_askQuestions (A-G) pelo header da primeira pergunta
-    if [ "$HOOK_TOOL_NAME" = "vscode_askQuestions" ] && state_exists; then
+    if [[ "$HOOK_TOOL_NAME" = "vscode_askQuestions" ]] && state_exists; then
         local _tpl_header _tpl_id
         _tpl_header=$(printf '%s' "${HOOK_ASK_QUESTIONS_JSON:-[]}" \
             | jq -r '.[0].header // ""' 2> /dev/null || printf '')
@@ -276,7 +276,7 @@ pre_tool_use_main() {
             "Pré-autorização"*) _tpl_id="G" ;;
             *) _tpl_id="" ;;
         esac
-        if [ -n "$_tpl_id" ]; then
+        if [[ -n "$_tpl_id" ]]; then
             _increment_template_usage "$_tpl_id" > /dev/null || true
         fi
     fi
@@ -293,7 +293,7 @@ pre_tool_use_main() {
         "tool" "${HOOK_TOOL_NAME:-unknown}" \
         "tool_call_num" "${tool_num:-0}"
 
-    if [ -n "$_pre_allow_context" ]; then
+    if [[ -n "$_pre_allow_context" ]]; then
         hook_out_pre_allow "$_pre_allow_context"
     fi
 

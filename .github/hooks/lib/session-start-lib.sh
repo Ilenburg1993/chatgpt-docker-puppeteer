@@ -28,7 +28,7 @@ is_reconnect() {
     if ! state_exists; then return 1; fi
     local stored
     stored=$(read_field ".session_id")
-    [ -n "$stored" ] && [ "$stored" != "null" ] && [ "$stored" = "$incoming" ]
+    [[ -n "$stored" ]] && [[ "$stored" != "null" ]] && [[ "$stored" = "$incoming" ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ Chave de encerramento: \`${close_key}\`
 
 # Retorna uma seção de tarefas pendentes formatada para o briefing
 section_pending_tasks() {
-    if [ -f "$PENDING_TASKS_FILE" ] && [ -s "$PENDING_TASKS_FILE" ]; then
+    if [[ -f "$PENDING_TASKS_FILE" ]] && [[ -s "$PENDING_TASKS_FILE" ]]; then
         context_block "## Tarefas Pendentes" "$(cat "$PENDING_TASKS_FILE")"
     else
         context_block "## Tarefas Pendentes" "*(nenhuma tarefa registrada)*"
@@ -96,7 +96,7 @@ build_additional_context() {
     local session_info
     local pending_section protocol_section
 
-    if [ "$source" = "reconnect" ]; then
+    if [[ "$source" = "reconnect" ]]; then
         session_info=$(build_reconnect_context)
     else
         session_info=$(build_new_session_context)
@@ -115,12 +115,12 @@ Leia \`.github/hooks/state/session-briefing.md\` para detalhes completos.")
 # de alerta ao BRIEFING_FILE para que o agente veja imediatamente ao iniciar.
 _session_start_append_watchdog_alerts() {
     local watchdog_script="$HOOK_DIR/scripts/watchdog.sh"
-    [ -x "$watchdog_script" ] || return 0 # watchdog ausente: OK, não bloquear
-    [ -f "${BRIEFING_FILE:-}" ] || return 0
+    [[ -x "$watchdog_script" ]] || return 0 # watchdog ausente: OK, não bloquear
+    [[ -f "${BRIEFING_FILE:-}" ]] || return 0
 
     local wdog_json
     wdog_json=$(bash "$watchdog_script" --json 2> /dev/null) || true
-    [ -z "$wdog_json" ] && return 0
+    [[ -z "$wdog_json" ]] && return 0
 
     local healthy issues_count warnings_count
     healthy=$(printf '%s' "$wdog_json" | jq -r '.healthy // true')
@@ -128,14 +128,14 @@ _session_start_append_watchdog_alerts() {
     warnings_count=$(printf '%s' "$wdog_json" | jq '.warnings | length // 0')
 
     # Só anexa se houver algo a reportar
-    if [ "$healthy" = "true" ] && [ "$warnings_count" -eq 0 ] 2> /dev/null; then
+    if [[ "$healthy" = "true" ]] && [ "$warnings_count" -eq 0 ] 2> /dev/null; then
         return 0
     fi
 
     {
         printf '\n---\n\n'
         printf '## ⚠️ Alertas do Watchdog\n\n'
-        if [ "$healthy" = "false" ] && [ "$issues_count" -gt 0 ] 2> /dev/null; then
+        if [[ "$healthy" = "false" ]] && [ "$issues_count" -gt 0 ] 2> /dev/null; then
             printf '### 🔴 Problemas críticos (%s)\n\n' "$issues_count"
             printf '%s' "$wdog_json" | jq -r '.issues[]?' | while IFS= read -r issue; do
                 printf -- '- %s\n' "$issue"
@@ -166,7 +166,7 @@ session_start_main() {
     # Popula HOOK_* vars e extrai session_id
     hook_api_parse "$input"
     local session_id="${HOOK_SESSION_ID:-}"
-    [ -z "$session_id" ] && session_id="session-$(uuidgen_safe)"
+    [[ -z "$session_id" ]] && session_id="session-$(uuidgen_safe)"
     export SESSION_ID="$session_id"
 
     # UP-09: limpeza defensiva de arquivos .state.XXXXXX órfãos (crashes anteriores)

@@ -41,7 +41,7 @@ stop_main() {
     # NEW-G: usar comparação de string em vez de aritmética para turn_count
     # [ "$x" -eq 0 ] com $x="null" ou vazios pode ter comportamento imprevisível
     turn_count="${turn_count:-0}"
-    if [ "$turn_count" = "null" ] || [ "$turn_count" = "0" ] || [ "$turn_count" = "" ]; then
+    if [[ "$turn_count" = "null" ]] || [[ "$turn_count" = "0" ]] || [[ "$turn_count" = "" ]]; then
         exit 0
     fi
 
@@ -50,7 +50,7 @@ stop_main() {
     ask_q=$(read_field ".current_turn.ask_questions_called")
     turn_num=$(read_field ".current_turn.number")
 
-    if [ "$ask_q" = "true" ]; then
+    if [[ "$ask_q" = "true" ]]; then
         # Turno autorizado: reseta flags e acumula contador
         update_nested_state "current_turn.ask_questions_called" "false"
         update_nested_state "current_turn.ended_at" "$(now_iso)" # GAP-13
@@ -88,7 +88,7 @@ stop_main() {
         # GAP-03: Enforcement — bloqueia fim de turno se strict_turn_close=true
         local strict
         strict=$(read_field ".strict_turn_close")
-        if [ "${strict:-false}" = "true" ]; then
+        if [[ "${strict:-false}" = "true" ]]; then
             hook_out_stop_safe_block \
                 "Protocolo violado: turno encerrado sem chamar vscode_askQuestions" \
                 "Chame vscode_askQuestions antes de encerrar o turno. Use Template A para tarefas concluídas ou Template D para checkpoint."
@@ -98,7 +98,7 @@ stop_main() {
     # --- Passo 5: Se pending_session_close → chamar session-close.sh ---
     local pending
     pending=$(read_field ".pending_session_close")
-    if [ "$pending" = "true" ]; then
+    if [[ "$pending" = "true" ]]; then
         bash "$HOOK_DIR/scripts/session-close.sh" || true
     fi
 
@@ -112,7 +112,7 @@ stop_main() {
 _record_turn_duration() {
     local turn_started dur_ms prev_total new_total now_ts start_epoch now_epoch
     turn_started=$(read_field ".current_turn.started_at" 2> /dev/null)
-    [ -z "$turn_started" ] || [ "$turn_started" = "null" ] && return 0
+    [[ -z "$turn_started" ]] || [[ "$turn_started" = "null" ]] && return 0
 
     now_ts=$(now_iso)
     start_epoch=$(date -u -d "$turn_started" +%s 2> /dev/null) || return 0
@@ -124,7 +124,7 @@ _record_turn_duration() {
 
     prev_total=$(read_field ".session_stats.turn_duration_total_ms" 2> /dev/null)
     prev_total="${prev_total:-0}"
-    [ "$prev_total" = "null" ] && prev_total=0
+    [[ "$prev_total" = "null" ]] && prev_total=0
     new_total=$((prev_total + dur_ms))
     update_nested_state "session_stats.turn_duration_total_ms" "$new_total"
 }
@@ -138,11 +138,11 @@ _close_active_subturn_if_open() {
     local subturn_num subturn_ended
     subturn_num=$(read_field ".current_subturn.number" 2> /dev/null || printf '0')
     subturn_num="${subturn_num:-0}"
-    [ "$subturn_num" = "0" ] || [ "$subturn_num" = "null" ] && return 0
+    [[ "$subturn_num" = "0" ]] || [[ "$subturn_num" = "null" ]] && return 0
 
     subturn_ended=$(read_field ".current_subturn.ended_at" 2> /dev/null || printf '')
     # Se já tem ended_at, subturn foi fechado normalmente pelo post-tool-use
-    if [ -n "$subturn_ended" ] && [ "$subturn_ended" != "null" ]; then
+    if [[ -n "$subturn_ended" ]] && [[ "$subturn_ended" != "null" ]]; then
         return 0
     fi
 
@@ -165,7 +165,7 @@ _reset_active_subagents_if_needed() {
     local active
     active=$(read_field ".session_stats.subagents_active" 2> /dev/null || printf '0')
     active="${active:-0}"
-    [ "$active" = "0" ] || [ "$active" = "null" ] && return 0
+    [[ "$active" = "0" ]] || [[ "$active" = "null" ]] && return 0
 
     # Há subagentes com SubagentStop perdido — reseta para evitar estado corrompido
     update_nested_state "session_stats.subagents_active" "0"

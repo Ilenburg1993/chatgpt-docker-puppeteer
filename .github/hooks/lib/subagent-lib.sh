@@ -115,9 +115,9 @@ _subagent_check_compliance() {
     local ask_called
     ask_called=$(read_field ".current_turn.ask_questions_called // false" 2> /dev/null || printf 'unknown')
     # Se o campo retornar "unknown" (erro de leitura), assumir compliant para evitar falso positivo
-    [ "$ask_called" = "unknown" ] && return 0
+    [[ "$ask_called" = "unknown" ]] && return 0
     # Se ask_questions_called = true → compliant
-    [ "$ask_called" = "true" ] && return 0
+    [[ "$ask_called" = "true" ]] && return 0
     # Se ask_questions_called = false → violação
     return 1
 }
@@ -153,7 +153,7 @@ subagent_start_main() {
     extract_subagent_meta "$input"
     hook_api_parse "$input" # popula HOOK_SESSION_ID
 
-    [ -z "${SESSION_ID:-}" ] && export SESSION_ID="${HOOK_SESSION_ID:-unknown}"
+    [[ -z "${SESSION_ID:-}" ]] && export SESSION_ID="${HOOK_SESSION_ID:-unknown}"
 
     if ! state_exists; then
         exit 0 # Sem state → não há nada a rastrear
@@ -167,7 +167,7 @@ subagent_start_main() {
             "limit" "${HOOK_SUBAGENT_BUDGET_LIMIT:-50}" \
             "count" "$(hook_subagent_count_session)"
         # UP-BUDGET: hard enforcement via HOOK_SUBAGENT_HARD_ENFORCEMENT=true
-        if [ "${HOOK_SUBAGENT_HARD_ENFORCEMENT:-false}" = "true" ]; then
+        if [[ "${HOOK_SUBAGENT_HARD_ENFORCEMENT:-false}" = "true" ]]; then
             hook_out_subagent_start_block \
                 "Limite de subagentes da sessão atingido (${HOOK_SUBAGENT_BUDGET_LIMIT:-50}). Subagente bloqueado." \
                 "Reduza o uso de runSubagent ou aumente HOOK_SUBAGENT_BUDGET_LIMIT."
@@ -212,7 +212,7 @@ subagent_start_main() {
     _turn_num=$(read_field ".current_turn.number")
     _depth=$(hook_subagent_depth)
 
-    if [ "${HOOK_SUBAGENT_CONTEXT_RICH:-true}" = "true" ]; then
+    if [[ "${HOOK_SUBAGENT_CONTEXT_RICH:-true}" = "true" ]]; then
         _ctx=$(_subagent_build_context "$_session_id" "$_turn_num" "$_depth" "$_close_key")
     else
         # Fallback legado: contexto genérico
@@ -232,7 +232,7 @@ subagent_stop_main() {
     extract_subagent_meta "$input"
     hook_api_parse "$input" # popula HOOK_SESSION_ID
 
-    [ -z "${SESSION_ID:-}" ] && export SESSION_ID="${HOOK_SESSION_ID:-unknown}"
+    [[ -z "${SESSION_ID:-}" ]] && export SESSION_ID="${HOOK_SESSION_ID:-unknown}"
 
     if ! state_exists; then
         exit 0
@@ -280,7 +280,7 @@ subagent_stop_main() {
     # UP-COMPLIANCE (U9-C): verificar se o subagente cumpriu o protocolo de hooks
     # (chamou vscode_askQuestions antes de encerrar)
     local compliance_enforcement="${HOOK_SUBAGENT_COMPLIANCE_ENFORCEMENT:-soft}"
-    if [ "$compliance_enforcement" != "none" ]; then
+    if [[ "$compliance_enforcement" != "none" ]]; then
         if ! _subagent_check_compliance; then
             hook_log_audit "subagentStop_protocol_violation" \
                 "subagent_id" "${SUBAGENT_ID:-unknown}" \
@@ -290,7 +290,7 @@ subagent_stop_main() {
                 "enforcement" "$compliance_enforcement"
             _subagent_emit_compliance_violation "$compliance_enforcement" "${SUBAGENT_ID:-unknown}"
             # hard: retorna imediatamente após bloquear (evita duplo output)
-            [ "$compliance_enforcement" = "hard" ] && exit 0
+            [[ "$compliance_enforcement" = "hard" ]] && exit 0
         fi
     fi
 

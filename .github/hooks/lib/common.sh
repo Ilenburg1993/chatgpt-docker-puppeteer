@@ -9,7 +9,7 @@
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Permite override do diretório de state para testes (NUNCA usar em produção)
-if [ -n "${HOOKS_TEST_STATE_DIR:-}" ]; then
+if [[ -n "${HOOKS_TEST_STATE_DIR:-}" ]]; then
     STATE_DIR="$HOOKS_TEST_STATE_DIR"
 else
     STATE_DIR="$HOOK_DIR/state"
@@ -35,7 +35,7 @@ fi
 
 # Retorna 0 se session.json existe e é JSON válido
 state_exists() {
-    [ -f "$STATE_FILE" ] && jq -e . "$STATE_FILE" > /dev/null 2>&1
+    [[ -f "$STATE_FILE" ]] && jq -e . "$STATE_FILE" > /dev/null 2>&1
 }
 
 # Le campo do session.json via jq path (ex: ".current_turn.number")
@@ -266,7 +266,7 @@ recover_or_init_state() {
     local checkpoint_dir="$STATE_DIR/checkpoints"
 
     # Tenta o checkpoint mais recente que seja JSON válido
-    if [ -d "$checkpoint_dir" ]; then
+    if [[ -d "$checkpoint_dir" ]]; then
         local best_cp=""
         # Mais recente primeiro (ls -t)
         while IFS= read -r cp; do
@@ -276,7 +276,7 @@ recover_or_init_state() {
             fi
         done < <(ls -t "$checkpoint_dir"/session-*.json 2> /dev/null)
 
-        if [ -n "$best_cp" ]; then
+        if [[ -n "$best_cp" ]]; then
             cp "$best_cp" "$STATE_FILE" 2> /dev/null || true
             if state_exists 2> /dev/null; then
                 hook_log_audit "state_recovered_from_checkpoint" \
@@ -344,7 +344,7 @@ _audit_event_is_suppressed() {
 _AUDIT_LINE_COUNT=0
 
 _audit_cap_check() {
-    [ -f "$AUDIT_FILE" ] || return 0
+    [[ -f "$AUDIT_FILE" ]] || return 0
     local max="${HOOKS_AUDIT_MAX_LINES:-5000}"
     # R-13: usa contador em memória quando disponível; recalcula se zerado
     if [ "${_AUDIT_LINE_COUNT:-0}" -lt "$max" ]; then
@@ -359,9 +359,9 @@ _audit_cap_check() {
     local ts
     ts=$(date +%Y%m%d-%H%M%S 2> /dev/null || date +%s)
     local log_dir
-    if [ -n "${HOOKS_AUDIT_LOG_DIR:-}" ]; then
+    if [[ -n "${HOOKS_AUDIT_LOG_DIR:-}" ]]; then
         log_dir="$HOOKS_AUDIT_LOG_DIR"
-    elif [ -n "${HOOK_DIR:-}" ]; then
+    elif [[ -n "${HOOK_DIR:-}" ]]; then
         log_dir="$HOOK_DIR/logs"
     else
         log_dir="$(dirname "$AUDIT_FILE")"
@@ -399,7 +399,7 @@ log_audit() {
     _audit_event_is_suppressed "$event" && return 0
 
     ts="$(now_iso)"
-    sid="${SESSION_ID:-$([ -f "$STATE_FILE" ] && jq -r '.session_id // "unknown"' "$STATE_FILE" 2> /dev/null || echo "unknown")}"
+    sid="${SESSION_ID:-$([[ -f "$STATE_FILE" ]] && jq -r '.session_id // "unknown"' "$STATE_FILE" 2> /dev/null || echo "unknown")}"
 
     json_obj=$(jq -cn \
         --arg ts "$ts" \
@@ -444,7 +444,7 @@ now_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 # Usa o symlink AUDIT_CURRENT_LINK como indireção canônica quando disponível.
 # @returns {string} path absoluto para o audit.jsonl ativo via stdout
 find_audit_file() {
-    if [ -L "${AUDIT_CURRENT_LINK:-}" ] && [ -f "$AUDIT_CURRENT_LINK" ]; then
+    if [[ -L "${AUDIT_CURRENT_LINK:-}" ]] && [[ -f "$AUDIT_CURRENT_LINK" ]]; then
         readlink -f "$AUDIT_CURRENT_LINK" 2> /dev/null || echo "$AUDIT_CURRENT_LINK"
         return 0
     fi
@@ -465,20 +465,20 @@ _audit_update_symlink() {
 make_close_key() {
     local hex
     # Prefere /proc/sys/kernel/random/uuid (Linux — disponível sem uuidgen/xxd)
-    if [ -r /proc/sys/kernel/random/uuid ]; then
+    if [[ -r /proc/sys/kernel/random/uuid ]]; then
         hex=$(tr -d '-' < /proc/sys/kernel/random/uuid | tr '[:lower:]' '[:upper:]' | cut -c1-8)
-    elif command -v od > /dev/null 2>&1 && [ -r /dev/urandom ]; then
+    elif command -v od > /dev/null 2>&1 && [[ -r /dev/urandom ]]; then
         hex=$(od -An -tx1 /dev/urandom 2> /dev/null | tr -d ' \n' | head -c8 | tr '[:lower:]' '[:upper:]')
-    elif [ -r /dev/urandom ]; then
+    elif [[ -r /dev/urandom ]]; then
         # GAP-09: fallback com dd quando od não está disponível (evita timestamp previsível)
         hex=$(dd if=/dev/urandom bs=4 count=1 2> /dev/null | od -An -tx1 2> /dev/null | tr -d ' \n' | cut -c1-8 | tr '[:lower:]' '[:upper:]')
     fi
     # R-17: fallback com $RANDOM (4x 16-bit → 64-bit de entropia) antes do timestamp
-    if [ -z "$hex" ]; then
+    if [[ -z "$hex" ]]; then
         hex=$(printf '%04X%04X' "$RANDOM" "$RANDOM")
     fi
     # Último recurso: derivado do timestamp
-    if [ -z "$hex" ]; then
+    if [[ -z "$hex" ]]; then
         hex=$(date +%s%N 2> /dev/null | tr -d '[:space:]' | head -c8 | tr '[:lower:]' '[:upper:]')
     fi
     printf 'ENCERRAR-%s' "$hex"
@@ -502,7 +502,7 @@ uuidgen_safe() {
     else
         local rnd
         rnd=$(cat /proc/sys/kernel/random/uuid 2> /dev/null || true)
-        if [ -n "$rnd" ]; then
+        if [[ -n "$rnd" ]]; then
             printf '%s' "$rnd"
         else
             # Fallback: hex aleatório formatado como UUID
@@ -533,7 +533,7 @@ generate_section_id() {
 # Uso: load_payload; tool_name=$(jq_field "$HOOK_INPUT" ".tool_name")
 load_payload() {
     HOOK_INPUT=$(cat /dev/stdin 2> /dev/null || true)
-    if [ -z "$HOOK_INPUT" ]; then
+    if [[ -z "$HOOK_INPUT" ]]; then
         HOOK_INPUT='{}'
         return 1
     fi
@@ -552,7 +552,7 @@ load_payload() {
 maybe_capture_debug() {
     local payload="$1"
     local flag="$STATE_DIR/debug/capture.enabled"
-    [ -f "$flag" ] || return 0
+    [[ -f "$flag" ]] || return 0
 
     local event ts_slug debug_dir
     event=$(printf '%s' "$payload" | jq -r '.hookEventName // "unknown"' 2> /dev/null || echo "unknown")
@@ -617,7 +617,7 @@ detect_close_key_in_text() {
     local text="$1"
     local close_key
     close_key=$(read_field ".close_key")
-    [ -z "$close_key" ] || [ "$close_key" = "null" ] && return 1
+    [[ -z "$close_key" ]] || [[ "$close_key" = "null" ]] && return 1
     printf '%s' "$text" | grep -qF "$close_key"
 }
 
@@ -633,7 +633,7 @@ turn_is_orphaned() {
     local started_at now_epoch started_epoch delta
 
     started_at=$(read_field ".current_turn.started_at")
-    [ -z "$started_at" ] || [ "$started_at" = "null" ] && return 1
+    [[ -z "$started_at" ]] || [[ "$started_at" = "null" ]] && return 1
 
     # Converte ISO 8601 para epoch via date (portável em Linux)
     started_epoch=$(date -d "$started_at" +%s 2> /dev/null) || return 1
@@ -767,7 +767,7 @@ open_new_subturn() {
     # GAP-21: guard — sem turno ativo, não abre subturn
     local _guard_turn
     _guard_turn=$(read_field '.current_turn.number')
-    if [ -z "$_guard_turn" ] || [ "$_guard_turn" = 'null' ] || [ "${_guard_turn:-0}" -eq 0 ] 2> /dev/null; then
+    if [[ -z "$_guard_turn" ]] || [[ "$_guard_turn" = 'null' ]] || [ "${_guard_turn:-0}" -eq 0 ] 2> /dev/null; then
         printf '0'
         return 0
     fi
@@ -797,7 +797,7 @@ increment_tools_by_type() {
     # Sanitiza: mantém apenas [a-zA-Z0-9_-] para evitar injeção de chaves jq
     local safe_name
     safe_name=$(printf '%s' "$tool_name" | tr -cd 'a-zA-Z0-9_-' | cut -c1-64)
-    [ -n "$safe_name" ] || safe_name="unknown"
+    [[ -n "$safe_name" ]] || safe_name="unknown"
     local current new_val tmp
     current=$(jq -r ".session_stats.tools_by_type[\"${safe_name}\"] // 0" "$STATE_FILE" 2> /dev/null || printf '0')
     new_val=$((${current:-0} + 1))
@@ -843,7 +843,7 @@ _increment_template_usage() {
 count_tool_use() {
     increment_field ".session_stats.tools_total" > /dev/null
     # UP-01: rastreia contagem por tipo de ferramenta (HOOK_TOOL_NAME do payload)
-    [ -n "${HOOK_TOOL_NAME:-}" ] && increment_tools_by_type "$HOOK_TOOL_NAME" > /dev/null || true
+    [[ -n "${HOOK_TOOL_NAME:-}" ]] && increment_tools_by_type "$HOOK_TOOL_NAME" > /dev/null || true
     increment_field ".current_turn.tools_count"
 }
 
@@ -905,7 +905,7 @@ generate_session_briefing() {
     current_turn_source=$(sanitize_md "$current_turn_source")
 
     # Lê pending-tasks.md se existir (envolvido em bloco para evitar injeção de Markdown)
-    if [ -f "$PENDING_TASKS_FILE" ]; then
+    if [[ -f "$PENDING_TASKS_FILE" ]]; then
         pending_tasks_content="$(printf '```\n%s\n```' "$(cat "$PENDING_TASKS_FILE")")"
     else
         pending_tasks_content="*(sem tarefas pendentes registradas)*"
@@ -968,7 +968,7 @@ context_block() {
 
 # Lê session-briefing.md e retorna conteúdo (ou mensagem padrão se não existir)
 read_briefing() {
-    if [ -f "$BRIEFING_FILE" ]; then
+    if [[ -f "$BRIEFING_FILE" ]]; then
         cat "$BRIEFING_FILE"
     else
         printf 'Session briefing não disponível.\n'
