@@ -375,7 +375,7 @@ O `GAP-ABRUPT-TURN-END` em `session-end.sh` é testado via T76, que executa `pos
 O `scripts/watchdog.sh` (262 linhas) tem cobertura básica via T94 (Sprint 19): verifica que `--json` emite JSON com campo `healthy` booleano.
 
 
-### 3.4 Testes Implementados (Sprints 10-19) ✅
+### 3.4 Testes Implementados (Sprints 10-24) ✅
 
 | ID  | Descrição                                                                  | Status         |
 | --- | -------------------------------------------------------------------------- | -------------- |
@@ -397,6 +397,7 @@ O `scripts/watchdog.sh` (262 linhas) tem cobertura básica via T94 (Sprint 19): 
 | T92 | `hook_subagent_depth()` retorna 0 sem subagentes ativos (api/12)           | ✅ Sprint 18    |
 | T93 | `hook_compact_ctx_session_summary()` emite markdown com stats (api/11)     | ✅ Sprint 18    |
 | T94 | `watchdog.sh --json` emite JSON com campo `healthy` booleano               | ✅ Sprint 19    |
+| T95 | `hooks-report.sh --json` retorna JSON válido (com ou sem state)              | ✅ Sprint 24    |
 
 ### 3.5 Gaps Remanescentes (Baixa Prioridade)
 
@@ -680,7 +681,7 @@ Sprint 3 (testes e robustez — 4-6h):
 | `scripts/user-prompt-submit.sh`     | ~10    | Entry point UserPromptSubmit             | —                                             |
 | `scripts/pre-compact.sh`            | ~10    | Entry point PreCompact                   | —                                             |
 | `scripts/watchdog.sh`               | 262    | Watchdog externo                         | ✅ T94 (Sprint 19) — JSON + boolean 'healthy'  |
-| `scripts/hooks-report.sh`           | ~80    | Relatório de estado                      | Zero testes (baixa prio.)                     |
+| `scripts/hooks-report.sh`           | ~80    | Relatório de estado                      | ✅ T95 (Sprint 24)                             |
 | `scripts/smoke-test.sh`             | 1.790  | 94 testes unitários                      | Cobertura principal                           |
 | `scripts/smoke-test-payload-api.sh` | 1.846  | Testes da API layer                      | —                                             |
 | `scripts/integration-test-hooks.sh` | 1.066  | Testes de integração                     | —                                             |

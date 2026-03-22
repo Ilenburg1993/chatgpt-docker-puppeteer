@@ -1772,6 +1772,22 @@ else
 fi
 teardown
 
+# T95: hooks-report.sh --json retorna JSON ou {"error":"state_not_found"} (cobertura hooks-report)
+setup
+begin_test "T95: hooks-report.sh --json retorna JSON válido (sem state ou com state)"
+_t95_out=''
+_t95_out=$(
+    HOOKS_TEST_STATE_DIR="$TEST_DIR" \
+    bash "$HOOK_DIR/scripts/hooks-report.sh" --json 2>/dev/null
+) || true  # exit não-zero aceitável (state ausente em env de teste)
+_t95_valid=$(printf '%s' "${_t95_out:-}" | jq -e . > /dev/null 2>&1 && printf 'ok' || printf 'no')
+if [[ "${_t95_valid:-}" = "ok" ]]; then
+    pass
+else
+    fail "T95" "hooks-report --json não retornou JSON válido: out='${_t95_out:0:80}'"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 
