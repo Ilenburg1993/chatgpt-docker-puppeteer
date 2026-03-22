@@ -72,7 +72,7 @@ hook_stat_tools_total() {
 hook_stat_session_duration_seconds() {
     local started_at
     started_at=$(read_field '.started_at' 2> /dev/null || printf '')
-    [ -z "$started_at" ] || [ "$started_at" = "null" ] && printf '0' && return 0
+    [[ -z "$started_at"  ]] || [[ "$started_at" = "null"  ]] && printf '0' && return 0
     local now epoch_start
     now=$(date +%s 2> /dev/null || printf '0')
     epoch_start=$(_iso_to_epoch "$started_at" 2> /dev/null || printf "$now")
@@ -140,7 +140,7 @@ hook_session_close_key() {
 # 🟧 hook_compliance_ok — retorna 0 (sucesso) se consecutive_unauthorized == 0
 # Útil como: if hook_compliance_ok; then ... fi
 hook_compliance_ok() {
-    [ "$(hook_compliance_consecutive)" = "0" ]
+    [[ "$(hook_compliance_consecutive)" = "0"  ]]
 }
 
 # 🟧 hook_needs_askquestions — retorna 0 se turno está aberto e askQuestions NÃO foi chamado
@@ -149,7 +149,7 @@ hook_needs_askquestions() {
     local turn_num ask_called
     turn_num=$(hook_turn_number)
     ask_called=$(hook_turn_ask_called)
-    [ "${turn_num:-0}" -gt 0 ] && [ "$ask_called" = "false" ]
+    [ "${turn_num:-0}" -gt 0 ] && [[ "$ask_called" = "false"  ]]
 }
 
 # ─── UTILITÁRIO INTERNO: conversão epoch portável ────────────────────────────
@@ -163,14 +163,14 @@ _iso_to_epoch() {
     local epoch
 
     # GNU date (Linux)
-    epoch=$(date -d "$ts" '+%s' 2> /dev/null) && [ -n "$epoch" ] && printf '%s' "$epoch" && return
+    epoch=$(date -d "$ts" '+%s' 2> /dev/null) && [[ -n "$epoch"  ]] && printf '%s' "$epoch" && return
 
     # BSD date (macOS)
     # Converte "2026-03-20T10:00:00Z" → "20260320100000" para -j -f
     local ts_bsd
     ts_bsd=$(printf '%s' "$ts" | tr -d ':-' | cut -c1-14)
     epoch=$(date -j -f '%Y%m%d%H%M%S' "$ts_bsd" '+%s' 2> /dev/null) \
-        && [ -n "$epoch" ] && printf '%s' "$epoch" && return
+        && [[ -n "$epoch"  ]] && printf '%s' "$epoch" && return
 
     # Fallback awk (POSIX puro — via mktime se disponível em gawk/nawk/mawk)
     epoch=$(awk -v ts="$ts" 'BEGIN {
@@ -178,7 +178,7 @@ _iso_to_epoch() {
         split(ts, a, " ")
         printf "%d\n", mktime(a[1]" "a[2]" "a[3]" "a[4]" "a[5]" "a[6]) + 0
     }' /dev/null 2> /dev/null)
-    [ -n "$epoch" ] && [ "$epoch" != "0" ] && printf '%s' "$epoch" && return
+    [[ -n "$epoch"  ]] && [[ "$epoch" != "0"  ]] && printf '%s' "$epoch" && return
 
     # Último recurso: retorna 0 (não será falso-positivo — só não vai detectar órfãos)
     printf '0'
@@ -191,7 +191,7 @@ _iso_to_epoch() {
 hook_is_orphan_turn() {
     local started_at threshold now elapsed epoch_start
     started_at=$(hook_turn_started_at)
-    [ -z "$started_at" ] && return 1 # sem started_at → não é órfão
+    [[ -z "$started_at"  ]] && return 1 # sem started_at → não é órfão
 
     threshold="${HOOK_ORPHAN_THRESHOLD:-3600}"
 

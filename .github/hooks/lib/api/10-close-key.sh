@@ -40,10 +40,10 @@ hook_close_key_read() {
 #      hook_close_key_valid_format  (usa close_key do session.json)
 hook_close_key_valid_format() {
     local key="${1:-}"
-    if [ -z "$key" ]; then
+    if [[ -z "$key"  ]]; then
         key=$(hook_close_key_read)
     fi
-    [ -z "$key" ] && return 1
+    [[ -z "$key"  ]] && return 1
     printf '%s' "$key" | grep -qE '^ENCERRAR-[0-9A-F]{8}$'
 }
 
@@ -52,11 +52,11 @@ hook_close_key_valid_format() {
 # Uso: hook_close_key_matches "ENCERRAR-ABCD1234"
 hook_close_key_matches() {
     local provided="${1:-}"
-    [ -z "$provided" ] && return 1
+    [[ -z "$provided"  ]] && return 1
     local stored
     stored=$(hook_close_key_read)
-    [ -z "$stored" ] && return 1
-    [ "$provided" = "$stored" ]
+    [[ -z "$stored"  ]] && return 1
+    [[ "$provided" = "$stored"  ]]
 }
 
 # ─── SEÇÃO 10C: GERAÇÃO E ROTAÇÃO ────────────────────────────────────────────
@@ -70,7 +70,7 @@ hook_close_key_generate() {
     else
         # Fallback inline se make_close_key não estiver disponível (testes isolados)
         local hex
-        if [ -r /proc/sys/kernel/random/uuid ]; then
+        if [[ -r /proc/sys/kernel/random/uuid  ]]; then
             hex=$(tr -d '-' < /proc/sys/kernel/random/uuid | tr '[:lower:]' '[:upper:]' | cut -c1-8)
         else
             hex=$(od -An -tx1 /dev/urandom 2> /dev/null | tr -d ' \n' | head -c8 | tr '[:lower:]' '[:upper:]')
@@ -87,7 +87,7 @@ hook_close_key_generate() {
 hook_close_key_rotate() {
     local new_key
     new_key=$(hook_close_key_generate)
-    if declare -f update_state > /dev/null 2>&1 && [ -f "${STATE_FILE:-}" ]; then
+    if declare -f update_state > /dev/null 2>&1 && [[ -f "${STATE_FILE:-}"  ]]; then
         update_state 'close_key' "$new_key" 2> /dev/null || return 1
     fi
     # GAP-27: regenerar briefing para que a nova chave seja visível ao agente
@@ -119,6 +119,6 @@ hook_close_key_detect_in_text() {
     local text="$1"
     local close_key
     close_key=$(read_field ".close_key" 2> /dev/null || true)
-    [ -z "$close_key" ] || [ "$close_key" = "null" ] && return 1
+    [[ -z "$close_key"  ]] || [[ "$close_key" = "null"  ]] && return 1
     printf '%s' "$text" | grep -qF "$close_key"
 }

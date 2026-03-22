@@ -23,7 +23,7 @@ hook_close_key_in_response() {
     # R-06: lógica inline, sem dependência de detect_close_key_in_text() legado
     local stored_key
     stored_key=$(read_field ".close_key" 2> /dev/null || true)
-    [ -n "$stored_key" ] && [ "$stored_key" != "null" ] || return 1
+    [[ -n "$stored_key"  ]] && [[ "$stored_key" != "null"  ]] || return 1
     printf '%s' "$HOOK_ASK_ALL_TEXT" | grep -qF "$stored_key"
 }
 
@@ -32,14 +32,14 @@ hook_close_key_in_response() {
 # Requer session.json com .close_key preenchido
 # Anteriormente em: 04-predicates.sh
 hook_is_template_f_proposed() {
-    [ "$HOOK_EVENT" = "PreToolUse" ] || return 1
-    [ "$HOOK_TOOL_NAME" = "vscode_askQuestions" ] || return 1
+    [[ "$HOOK_EVENT" = "PreToolUse"  ]] || return 1
+    [[ "$HOOK_TOOL_NAME" = "vscode_askQuestions"  ]] || return 1
     # Checa se a close_key aparece nas perguntas (o agente está propondo encerramento)
     local stored_key
     if declare -f read_field > /dev/null 2>&1; then
         stored_key=$(read_field ".close_key" 2> /dev/null || true)
     fi
-    [ -n "$stored_key" ] && printf '%s' "$HOOK_ASK_QUESTIONS_JSON" | grep -qF "$stored_key"
+    [[ -n "$stored_key"  ]] && printf '%s' "$HOOK_ASK_QUESTIONS_JSON" | grep -qF "$stored_key"
 }
 
 # ─── SEÇÃO 7B: OPERAÇÕES DE ESCRITA EM STATE_DIR ────────────────────────────

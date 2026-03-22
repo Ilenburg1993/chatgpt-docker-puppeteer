@@ -54,7 +54,7 @@ hook_compact_ctx_session_summary() {
 hook_compact_ctx_tools_histogram() {
     local tools_json
     tools_json=$(read_field '.session_stats.tools_by_type' 2> /dev/null || printf '{}')
-    if [ -z "$tools_json" ] || [ "$tools_json" = "null" ] || [ "$tools_json" = "{}" ]; then
+    if [[ -z "$tools_json"  ]] || [[ "$tools_json" = "null"  ]] || [[ "$tools_json" = "{}"  ]]; then
         return 0
     fi
     printf '## Top Ferramentas Usadas\n'
@@ -69,7 +69,7 @@ hook_compact_ctx_tools_histogram() {
 hook_compact_ctx_pending_tasks() {
     local pending_file
     pending_file="${STATE_DIR:-/tmp}/pending-tasks.md"
-    if [ -f "$pending_file" ] && [ -s "$pending_file" ]; then
+    if [[ -f "$pending_file"  ]] && [[ -s "$pending_file"  ]]; then
         printf '## Tarefas Pendentes\n'
         cat "$pending_file"
     else
@@ -84,7 +84,7 @@ hook_compact_ctx_pending_tasks() {
 hook_compact_ctx_close_key() {
     local close_key
     close_key=$(hook_close_key_read)
-    if [ -z "$close_key" ]; then
+    if [[ -z "$close_key"  ]]; then
         return 0 # sem close_key → sem seção
     fi
     printf '## Chave de Encerramento de Sessão\n'
@@ -116,7 +116,7 @@ hook_compact_ctx_full() {
     ctx+="$(hook_compact_ctx_pending_tasks)"$'\n\n'
     # UP-10: inclui histograma de ferramentas se disponível
     histogram="$(hook_compact_ctx_tools_histogram 2> /dev/null)"
-    [ -n "$histogram" ] && ctx+="${histogram}"$'\n\n'
+    [[ -n "$histogram"  ]] && ctx+="${histogram}"$'\n\n'
     ctx+="$(hook_compact_ctx_protocol_reminder)"
 
     HOOK_COMPACT_CONTEXT_BYTES="${#ctx}"
@@ -137,7 +137,7 @@ hook_compact_ctx_briefing_full() {
         briefing=$(read_briefing 2> /dev/null || printf '')
     fi
 
-    if [ -n "${briefing:-}" ]; then
+    if [[ -n "${briefing:-}"  ]]; then
         ctx="${briefing}"$'\n\n'"$(hook_compact_ctx_full)"
     else
         ctx="$(hook_compact_ctx_full)"
@@ -157,7 +157,7 @@ hook_compact_ctx_briefing_full() {
 # hook_compact_ctx_pending_tasks e session-start-lib.sh possam lê-lo corretamente.
 # Idempotente: chamar múltiplas vezes com o mesmo estado produz o mesmo arquivo.
 hook_sync_pending_tasks() {
-    [ "${HOOK_TOOL_NAME:-}" = "manage_todo_list" ] || return 0
+    [[ "${HOOK_TOOL_NAME:-}" = "manage_todo_list"  ]] || return 0
 
     local pending_file="${STATE_DIR:-/tmp}/pending-tasks.md"
     local todo_json="${HOOK_TODO_LIST_JSON:-[]}"
@@ -173,7 +173,7 @@ hook_sync_pending_tasks() {
             end' 2> /dev/null || true)
 
     mkdir -p "$(dirname "$pending_file")"
-    if [ -n "$items" ]; then
+    if [[ -n "$items"  ]]; then
         printf '# Tarefas Pendentes\n\n%s\n' "$items" > "$pending_file"
     else
         # Todos concluídos ou lista vazia: remove o arquivo (sem tarefas pendentes)

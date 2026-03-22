@@ -49,7 +49,7 @@ _audit_write_event() {
 
     # --- Auto-enrichment: UM jq call para ler todos os campos de contexto ---
     local _ae_turn="" _ae_turn_id="" _ae_subturn_id="" _ae_tool=""
-    if [ "${HOOK_AUDIT_ENRICH:-true}" = "true" ] && [ -f "${STATE_FILE:-}" ]; then
+    if [[ "${HOOK_AUDIT_ENRICH:-true}" = "true"  ]] && [[ -f "${STATE_FILE:-}"  ]]; then
         local _ae_tsv
         _ae_tsv=$(jq -rj '
             ((.current_turn.number // 0) | if . > 0 then tostring else "" end), "\t",
@@ -58,7 +58,7 @@ _audit_write_event() {
         ' "${STATE_FILE}" 2> /dev/null || printf '\t\t')
         IFS=$'\t' read -r _ae_turn _ae_turn_id _ae_subturn_id <<< "${_ae_tsv}"
         # tool_name já populado pelo hook_api_parse (sem fork adicional)
-        [ -n "${HOOK_TOOL_NAME:-}" ] && _ae_tool="${HOOK_TOOL_NAME}"
+        [[ -n "${HOOK_TOOL_NAME:-}"  ]] && _ae_tool="${HOOK_TOOL_NAME}"
     fi
 
     # --- Coletar todos os pares key→value em arrays bash ---
@@ -66,11 +66,11 @@ _audit_write_event() {
     local -a _vals=("${ts}" "${event}" "${sid}")
 
     # Auto-enrich (somente se não-vazio; caller pode override por reescrever o campo depois)
-    if [ "${HOOK_AUDIT_ENRICH:-true}" = "true" ]; then
-        [ -n "${_ae_turn}" ] && _keys+=("turn") && _vals+=("${_ae_turn}")
-        [ -n "${_ae_turn_id}" ] && _keys+=("turn_id") && _vals+=("${_ae_turn_id}")
-        [ -n "${_ae_subturn_id}" ] && _keys+=("subturn_id") && _vals+=("${_ae_subturn_id}")
-        [ -n "${_ae_tool}" ] && _keys+=("tool_name") && _vals+=("${_ae_tool}")
+    if [[ "${HOOK_AUDIT_ENRICH:-true}" = "true"  ]]; then
+        [[ -n "${_ae_turn}"  ]] && _keys+=("turn") && _vals+=("${_ae_turn}")
+        [[ -n "${_ae_turn_id}"  ]] && _keys+=("turn_id") && _vals+=("${_ae_turn_id}")
+        [[ -n "${_ae_subturn_id}"  ]] && _keys+=("subturn_id") && _vals+=("${_ae_subturn_id}")
+        [[ -n "${_ae_tool}"  ]] && _keys+=("tool_name") && _vals+=("${_ae_tool}")
     fi
 
     # Campos do caller (adicionados depois → sobrescrevem auto-enrich via jq .+{(...):...})
@@ -122,7 +122,7 @@ hook_log_audit() {
 # @returns {string}   integer (ex: "3"); "0" se não encontrado ou arquivo ausente
 hook_audit_count() {
     local event="$1"
-    [ -f "${AUDIT_FILE:-}" ] || {
+    [[ -f "${AUDIT_FILE:-}"  ]] || {
         printf '0'
         return 0
     }
@@ -137,7 +137,7 @@ hook_audit_count() {
 # @returns {int}      0 se encontrado, 1 se não encontrado ou arquivo ausente
 hook_audit_has() {
     local event="$1"
-    [ -f "${AUDIT_FILE:-}" ] || return 1
+    [[ -f "${AUDIT_FILE:-}"  ]] || return 1
     grep -q "\"event\":\"${event}\"" "${AUDIT_FILE}" 2> /dev/null
 }
 
@@ -148,17 +148,17 @@ hook_audit_has() {
 # @returns {string}   valor do campo, "" se evento ou campo ausente
 hook_audit_last() {
     local event="$1" field="${2:-}"
-    [ -f "${AUDIT_FILE:-}" ] || {
+    [[ -f "${AUDIT_FILE:-}"  ]] || {
         printf ''
         return 0
     }
     local last_line
     last_line=$(grep "\"event\":\"${event}\"" "${AUDIT_FILE}" 2> /dev/null | tail -1)
-    [ -z "${last_line}" ] && {
+    [[ -z "${last_line}"  ]] && {
         printf ''
         return 0
     }
-    if [ -z "${field}" ]; then
+    if [[ -z "${field}"  ]]; then
         printf '%s' "${last_line}"
     else
         printf '%s' "${last_line}" | jq -r --arg f "${field}" '.[$f] // ""' 2> /dev/null \
@@ -174,7 +174,7 @@ hook_audit_last() {
 # @returns {string}   linhas JSONL filtradas (pode ser vazio)
 hook_audit_events_since() {
     local since="$1"
-    [ -f "${AUDIT_FILE:-}" ] || {
+    [[ -f "${AUDIT_FILE:-}"  ]] || {
         printf ''
         return 0
     }

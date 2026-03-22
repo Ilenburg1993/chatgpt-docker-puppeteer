@@ -11,7 +11,7 @@
 # ─── SEÇÃO 4: VALIDAÇÃO ─────────────────────────────────────────────────────
 
 _hook_api_add_error() {
-    if [ -z "$HOOK_VALIDATION_ERR" ]; then
+    if [[ -z "$HOOK_VALIDATION_ERR"  ]]; then
         HOOK_VALIDATION_ERR="$1"
     else
         HOOK_VALIDATION_ERR="${HOOK_VALIDATION_ERR} | $1"
@@ -24,7 +24,7 @@ _hook_api_require() {
     local field_desc="${2:-$var_name}"
     # Expansão indireta nativa bash 4+ (sem eval)
     local val="${!var_name:-}"
-    if [ -z "$val" ] || [ "$val" = "null" ]; then
+    if [[ -z "$val"  ]] || [[ "$val" = "null"  ]]; then
         _hook_api_add_error "campo obrigatório ausente: ${field_desc}"
         return 1
     fi
@@ -88,5 +88,5 @@ _hook_api_validate_by_event() {
 # hook_api_validate — verifica estado atual das variáveis HOOK_*
 # Retorna 0 somente se PARSE_OK=true E VALIDATION_OK=true
 hook_api_validate() {
-    [ "$HOOK_PARSE_OK" = "true" ] && [ "$HOOK_VALIDATION_OK" = "true" ]
+    [[ "$HOOK_PARSE_OK" = "true"  ]] && [[ "$HOOK_VALIDATION_OK" = "true"  ]]
 }

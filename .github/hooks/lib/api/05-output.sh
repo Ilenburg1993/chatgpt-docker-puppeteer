@@ -25,7 +25,7 @@ _hook_json_str() {
 # Utilitário interno: valida se string é JSON válido, retorna '{}' se não for
 _hook_json_or_empty() {
     local raw="$1"
-    if [ -z "$raw" ]; then
+    if [[ -z "$raw"  ]]; then
         printf '{}'
         return
     fi
@@ -91,7 +91,7 @@ hook_out_session_start_context() {
 # Uso: hook_out_pre_allow [additionalContext]
 hook_out_pre_allow() {
     local ctx="${1:-}"
-    if [ -z "$ctx" ]; then
+    if [[ -z "$ctx"  ]]; then
         printf '{}\n'
     else
         local json_ctx
@@ -108,7 +108,7 @@ hook_out_pre_deny() {
     local ctx="${2:-}"
     local json_reason json_ctx
     json_reason=$(_hook_json_str "$reason")
-    if [ -n "$ctx" ]; then
+    if [[ -n "$ctx"  ]]; then
         json_ctx=$(_hook_json_str "$ctx")
         printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s,"additionalContext":%s}}\n' \
             "$json_reason" "$json_ctx"
@@ -122,7 +122,7 @@ hook_out_pre_deny() {
 # Uso: hook_out_pre_ask [additionalContext]
 hook_out_pre_ask() {
     local ctx="${1:-}"
-    if [ -n "$ctx" ]; then
+    if [[ -n "$ctx"  ]]; then
         local json_ctx
         json_ctx=$(_hook_json_str "$ctx")
         printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","additionalContext":%s}}\n' \
@@ -140,7 +140,7 @@ hook_out_pre_update_input() {
     local ctx="${2:-}"
     local validated_input
     validated_input=$(_hook_json_or_empty "$new_input")
-    if [ -n "$ctx" ]; then
+    if [[ -n "$ctx"  ]]; then
         local json_ctx
         json_ctx=$(_hook_json_str "$ctx")
         printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","updatedInput":%s,"additionalContext":%s}}\n' \
@@ -165,15 +165,15 @@ hook_out_pre_full() {
     hso=$(jq -cn --arg ev "PreToolUse" --arg dec "$decision" \
         '{"hookEventName":$ev,"permissionDecision":$dec}')
 
-    if [ -n "$reason" ]; then
+    if [[ -n "$reason"  ]]; then
         hso=$(printf '%s' "$hso" | jq -c \
             --arg r "$reason" '. + {"permissionDecisionReason": $r}')
     fi
-    if [ -n "$ctx" ]; then
+    if [[ -n "$ctx"  ]]; then
         hso=$(printf '%s' "$hso" | jq -c \
             --arg c "$ctx" '. + {"additionalContext": $c}')
     fi
-    if [ -n "$new_input" ]; then
+    if [[ -n "$new_input"  ]]; then
         local validated
         validated=$(_hook_json_or_empty "$new_input")
         hso=$(printf '%s' "$hso" | jq -c \
@@ -210,7 +210,7 @@ hook_out_stop_block() {
     local sys_msg="${2:-}"
     local json_reason json_sys
     json_reason=$(_hook_json_str "$reason")
-    if [ -n "$sys_msg" ]; then
+    if [[ -n "$sys_msg"  ]]; then
         json_sys=$(_hook_json_str "$sys_msg")
         printf '{"hookSpecificOutput":{"hookEventName":"Stop","decision":"block","reason":%s},"systemMessage":%s}\n' \
             "$json_reason" "$json_sys"
@@ -247,7 +247,7 @@ hook_out_subagent_start_block() {
     local sys_msg="${2:-}"
     local json_reason json_sys
     json_reason=$(_hook_json_str "$reason")
-    if [ -n "$sys_msg" ]; then
+    if [[ -n "$sys_msg"  ]]; then
         json_sys=$(_hook_json_str "$sys_msg")
         printf '{"decision":"block","reason":%s,"systemMessage":%s}\n' \
             "$json_reason" "$json_sys"

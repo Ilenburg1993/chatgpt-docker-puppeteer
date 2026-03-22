@@ -38,7 +38,7 @@ hook_get_tool_input_field() {
 # 🔵 hook_get_response_field — extrai um campo específico do tool_response via jq
 # Uso: hook_get_response_field ".answers.Template_A.freeText"
 hook_get_response_field() {
-    if [ "$HOOK_TOOL_RESPONSE_IS_JSON" = "true" ]; then
+    if [[ "$HOOK_TOOL_RESPONSE_IS_JSON" = "true"  ]]; then
         printf '%s' "$HOOK_TOOL_RESPONSE" | jq -r "${1} // empty"
     else
         printf ''
@@ -75,7 +75,7 @@ hook_api_dump() {
         printf '│ HOOK_TIMESTAMP      = %-34s│\n' "${HOOK_TIMESTAMP:0:34}"
         printf '│ HOOK_PARSE_OK       = %-34s│\n' "$HOOK_PARSE_OK"
         printf '│ HOOK_VALIDATION_OK  = %-34s│\n' "$HOOK_VALIDATION_OK"
-        if [ -n "$HOOK_VALIDATION_ERR" ]; then
+        if [[ -n "$HOOK_VALIDATION_ERR"  ]]; then
             printf '│ HOOK_VALIDATION_ERR = %-34s│\n' "${HOOK_VALIDATION_ERR:0:34}"
         fi
         printf '├── campos do evento ────────────────────────────────────┤\n'
@@ -93,7 +93,7 @@ hook_api_dump() {
                 printf '│ HOOK_TOOL_FILE_PATH = %-34s│\n' "${HOOK_TOOL_FILE_PATH:0:34}"
                 printf '│ HOOK_TOOL_IS_BG     = %-34s│\n' "$HOOK_TOOL_IS_BG"
                 printf '│ HOOK_TODO_COUNT     = %-34s│\n' "$HOOK_TODO_COUNT"
-                if [ -n "$HOOK_TODO_LAST_TITLE" ]; then
+                if [[ -n "$HOOK_TODO_LAST_TITLE"  ]]; then
                     printf '│ HOOK_TODO_LAST      = [%s] %s\n' \
                         "$HOOK_TODO_LAST_STATUS" "${HOOK_TODO_LAST_TITLE:0:28}"
                 fi
@@ -116,7 +116,7 @@ hook_api_dump() {
             SubagentStart | SubagentStop)
                 printf '│ HOOK_AGENT_ID       = %-34s│\n' "${HOOK_AGENT_ID:0:34}"
                 printf '│ HOOK_AGENT_TYPE     = %-34s│\n' "$HOOK_AGENT_TYPE"
-                if [ "$HOOK_EVENT" = "SubagentStop" ]; then
+                if [[ "$HOOK_EVENT" = "SubagentStop"  ]]; then
                     printf '│ HOOK_STOP_HOOK_ACT  = %-34s│\n' "$HOOK_STOP_HOOK_ACTIVE"
                 fi
                 ;;
@@ -129,7 +129,7 @@ hook_api_dump() {
 # Uso: hook_api_from_file ".github/hooks/state/debug/payloads/PreToolUse-...json"
 hook_api_from_file() {
     local file="$1"
-    if [ ! -f "$file" ]; then
+    if [[ ! -f "$file"  ]]; then
         printf 'hook_api_from_file: arquivo não encontrado: %s\n' "$file" >&2
         return 1
     fi
@@ -142,12 +142,12 @@ hook_api_from_file() {
 # 🔵 hook_api_list_captures — lista arquivos de captura disponíveis
 hook_api_list_captures() {
     local debug_dir
-    if declare -f read_field > /dev/null 2>&1 && [ -n "${STATE_DIR:-}" ]; then
+    if declare -f read_field > /dev/null 2>&1 && [[ -n "${STATE_DIR:-}"  ]]; then
         debug_dir="${STATE_DIR}/debug/payloads"
     else
         debug_dir="${HOOKS_TEST_STATE_DIR:-/tmp}/debug/payloads"
     fi
-    if [ ! -d "$debug_dir" ] || [ -z "$(ls -A "$debug_dir" 2> /dev/null)" ]; then
+    if [[ ! -d "$debug_dir"  ]] || [[ -z "$(ls -A "$debug_dir" 2> /dev/null)"  ]]; then
         printf '(nenhum payload capturado — use: bash debug-capture.sh on)\n'
         return 0
     fi

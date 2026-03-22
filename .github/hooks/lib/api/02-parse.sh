@@ -186,17 +186,17 @@ _hook_api_parse_post_tool_use() {
     # Se for resposta de vscode_askQuestions, extrai campos específicos
     # Suporta tanto objeto JSON direto quanto string contendo JSON serializado
     # (VS Code por vezes serializa a resposta como string JSON)
-    if [ "$HOOK_TOOL_NAME" = "vscode_askQuestions" ]; then
+    if [[ "$HOOK_TOOL_NAME" = "vscode_askQuestions"  ]]; then
         local resp_json=""
-        if [ "$HOOK_TOOL_RESPONSE_IS_JSON" = "true" ]; then
+        if [[ "$HOOK_TOOL_RESPONSE_IS_JSON" = "true"  ]]; then
             resp_json="$HOOK_TOOL_RESPONSE"
-        elif [ -n "$HOOK_TOOL_RESPONSE" ] && printf '%s' "$HOOK_TOOL_RESPONSE" | jq -e . > /dev/null 2>&1; then
+        elif [[ -n "$HOOK_TOOL_RESPONSE"  ]] && printf '%s' "$HOOK_TOOL_RESPONSE" | jq -e . > /dev/null 2>&1; then
             # String contendo JSON serializado — promove para IS_JSON=true
             resp_json="$HOOK_TOOL_RESPONSE"
             HOOK_TOOL_RESPONSE_IS_JSON="true"
             export HOOK_TOOL_RESPONSE_IS_JSON
         fi
-        if [ -n "$resp_json" ]; then
+        if [[ -n "$resp_json"  ]]; then
             _hook_api_parse_ask_questions_response "$resp_json"
         fi
     fi
@@ -250,7 +250,7 @@ _hook_api_parse_subagent() {
     HOOK_AGENT_TYPE=$(printf '%s' "$raw" | jq -r '.agent_type // .subagentType // .type // empty')
 
     # SubagentStop também carrega stop_hook_active
-    if [ "$HOOK_EVENT" = "SubagentStop" ]; then
+    if [[ "$HOOK_EVENT" = "SubagentStop"  ]]; then
         HOOK_STOP_HOOK_ACTIVE=$(printf '%s' "$raw" | jq -r '.stop_hook_active // false')
         export HOOK_STOP_HOOK_ACTIVE
     fi

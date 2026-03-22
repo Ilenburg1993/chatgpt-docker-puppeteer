@@ -27,7 +27,7 @@ hook_turn_is_orphaned() {
     local started_at started_epoch now_epoch delta
 
     started_at=$(read_field ".current_turn.started_at" 2> /dev/null)
-    [ -z "$started_at" ] || [ "$started_at" = "null" ] && return 1
+    [[ -z "$started_at"  ]] || [[ "$started_at" = "null"  ]] && return 1
 
     started_epoch=$(date -d "$started_at" +%s 2> /dev/null) || return 1
     now_epoch=$(date -u +%s)
@@ -61,7 +61,7 @@ hook_heal_orphaned_turn() {
 hook_session_last_activity() {
     local v
     v=$(read_field '.last_activity_at' 2> /dev/null)
-    if [ -n "$v" ] && [ "$v" != "null" ]; then
+    if [[ -n "$v"  ]] && [[ "$v" != "null"  ]]; then
         printf '%s' "$v"
     fi
 }
@@ -75,7 +75,7 @@ hook_session_is_stale() {
     local laa now_ts laa_ts elapsed
 
     laa=$(hook_session_last_activity)
-    [ -z "$laa" ] && return 1 # sem dados: não stale
+    [[ -z "$laa"  ]] && return 1 # sem dados: não stale
 
     now_ts=$(date -u +%s 2> /dev/null) || return 1
     laa_ts=$(date -u -d "$laa" +%s 2> /dev/null) || return 1
