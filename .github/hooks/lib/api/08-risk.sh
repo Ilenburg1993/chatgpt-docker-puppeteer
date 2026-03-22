@@ -105,12 +105,12 @@ hook_tool_category() {
 
 # 🔵 true se risk_level >= 4 (run_in_terminal ou fetch_webpage)
 hook_is_high_risk() {
-    [ "$(hook_tool_risk_level)" -ge 4 ]
+    [[ "$(hook_tool_risk_level)" -ge 4 ]]
 }
 
 # 🔵 true se risk_level == 3 (replace, multi_replace, runSubagent, switch_agent)
 hook_is_medium_risk() {
-    [ "$(hook_tool_risk_level)" -eq 3 ]
+    [[ "$(hook_tool_risk_level)" -eq 3 ]]
 }
 
 # 🔵 true se a tool é candidata a exigir confirmação explícita (risk >= 4)
@@ -124,12 +124,12 @@ hook_requires_confirmation() {
 
 # 🟧 true se a tool call é permitida pela política padrão
 hook_policy_allow() {
-    [ "${HOOK_SECURITY_SCORE:-0}" -lt 75 ]
+    [[ "${HOOK_SECURITY_SCORE:-0}" -lt 75 ]]
 }
 
 # 🟧 Razão da decisão de política (string legível)
 hook_policy_reason() {
-    if [ "${HOOK_SECURITY_SCORE:-0}" -ge 75 ]; then
+    if [[ "${HOOK_SECURITY_SCORE:-0}" -ge 75 ]]; then
         printf 'blocked: security score too high (%s)' "${HOOK_SECURITY_SCORE:-0}"
     else
         printf 'allowed: security score within threshold (%s)' "${HOOK_SECURITY_SCORE:-0}"

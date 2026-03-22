@@ -35,7 +35,7 @@ hook_subagent_depth() {
 # 🟧 hook_subagent_is_nested — true se depth > 0 (estamos dentro de um subagente)
 # Retorna 0 (true) se depth > 0, 1 (false) caso contrário
 hook_subagent_is_nested() {
-    [ "$(hook_subagent_depth)" -gt 0 ]
+    [[ "$(hook_subagent_depth)" -gt 0 ]]
 }
 
 # 🟦 hook_subagent_parent_id — agent_id do pai (do payload atual)
@@ -80,7 +80,7 @@ hook_subagent_budget_ok() {
     local count limit
     count=$(hook_subagent_count_session)
     limit="${HOOK_SUBAGENT_BUDGET_LIMIT:-50}"
-    [ "$count" -lt "$limit" ]
+    [[ "$count" -lt "$limit" ]]
 }
 
 # 🟧 hook_subagent_budget_remaining — quantos subagentes ainda são permitidos
@@ -133,7 +133,7 @@ hook_subagent_depth_ok() {
     local depth limit
     depth=$(hook_subagent_depth)
     limit="${HOOK_SUBAGENT_DEPTH_LIMIT:-3}"
-    [ "$depth" -lt "$limit" ]
+    [[ "$depth" -lt "$limit" ]]
 }
 
 # 🟧 hook_subagent_depth_remaining — quantos níveis de nesting ainda são possíveis

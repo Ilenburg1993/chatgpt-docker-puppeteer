@@ -251,7 +251,7 @@ subagent_stop_main() {
     local enforcement="${HOOK_SUBAGENT_STOP_ENFORCEMENT:-soft}"
 
     # Detectar stop órfão: se antes do decremento já era 0, não há start correspondente
-    if [ "${active_before:-0}" -le 0 ] 2> /dev/null; then
+    if [[ "${active_before:-0}" -le 0 ]] 2> /dev/null; then
         hook_log_audit "subagentStop_orphan" \
             "subagent_id" "${SUBAGENT_ID:-unknown}" \
             "subagent_type" "${SUBAGENT_TYPE:-unknown}" \

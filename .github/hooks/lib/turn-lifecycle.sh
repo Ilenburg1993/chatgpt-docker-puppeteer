@@ -44,7 +44,7 @@ turn_is_orphaned() {
     now_epoch=$(date -u +%s)
     delta=$((now_epoch - started_epoch))
 
-    [ "$delta" -gt "$threshold" ]
+    [[ "$delta" -gt "$threshold" ]]
 }
 
 # @deprecated Use hook_heal_orphaned_turn() de api/16-lifecycle.sh
@@ -171,7 +171,7 @@ open_new_subturn() {
     # GAP-21: guard — sem turno ativo, não abre subturn
     local _guard_turn
     _guard_turn=$(read_field '.current_turn.number')
-    if [[ -z "$_guard_turn" ]] || [[ "$_guard_turn" = 'null' ]] || [ "${_guard_turn:-0}" -eq 0 ] 2> /dev/null; then
+    if [[ -z "$_guard_turn" ]] || [[ "$_guard_turn" = 'null' ]] || [[ "${_guard_turn:-0}" -eq 0 ]] 2> /dev/null; then
         printf '0'
         return 0
     fi

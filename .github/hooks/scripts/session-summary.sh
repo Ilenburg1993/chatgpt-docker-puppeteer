@@ -30,7 +30,7 @@ close_key=$(read_field '.close_key' 2> /dev/null || printf 'N/A')
 # Lê started_at e calcula duração se disponível
 started_at=$(read_field '.started_at' 2> /dev/null || printf '')
 dur_m='?'
-if [ -n "$started_at" ] && [ "$started_at" != "null" ]; then
+if [[ -n "$started_at" ]] && [[ "$started_at" != "null" ]]; then
     now=$(date +%s 2> /dev/null || printf '0')
     epoch_start=$(date -d "$started_at" +%s 2> /dev/null \
         || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$started_at" +%s 2> /dev/null \

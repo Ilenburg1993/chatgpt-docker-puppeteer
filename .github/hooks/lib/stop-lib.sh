@@ -118,7 +118,7 @@ _record_turn_duration() {
     start_epoch=$(date -u -d "$turn_started" +%s 2> /dev/null) || return 0
     now_epoch=$(date -u +%s 2> /dev/null) || return 0
     dur_ms=$(((now_epoch - start_epoch) * 1000))
-    [ "$dur_ms" -lt 0 ] 2> /dev/null && return 0
+    [[ "$dur_ms" -lt 0 ]] 2> /dev/null && return 0
 
     update_nested_state "current_turn.duration_ms" "$dur_ms"
 

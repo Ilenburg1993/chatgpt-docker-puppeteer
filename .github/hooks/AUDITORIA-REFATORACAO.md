@@ -1,7 +1,7 @@
 # Auditoria de Refatoração — Hook System
-**Versão**: 1.0 | **Data**: 2026-03-20 | **Commit base**: `a53925b3`
+**Versão**: 1.0 | **Data**: 2026-03-22 | **Commit base**: `a53925b3`
 **Escopo**: 54 arquivos, 11.393 linhas (`.github/hooks/`)
-**Status**: Documento canônico de débitos técnicos e plano de refatoração
+**Status**: ✅ TODOS OS ITENS R-01 a R-17 CONCLUÍDOS — Sprint 9 finalizado (2026-03-22)
 
 ---
 
@@ -602,25 +602,25 @@ GAP-42, GAP-43, GAP-44, GAP-45, GAP-56, GAP-62, GAP-63, GAP-64, GAP-65
 
 #### Nível 2 — Refatoração Estrutural (Médio Prazo)
 
-| #    | Ação                                                                                                                                                         | Impacto Esperado                     |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
-| R-06 | ✅ Dividir `common.sh` em módulos menores — `state-crud.sh`, `audit-lib.sh`, `utils.sh`, `turn-lifecycle.sh`, `briefing.sh`; `common.sh` → 48-line aggregator | Manutenibilidade ↑                   |
-| R-07 | Criar `open_new_turn_batch()` com jq único                                                                                                                   | Performance: -80% I/O no turn open   |
-| R-08 | Migrar `log_audit()` em `common.sh:605` para `hook_log_audit()`                                                                                              | Consistência API                     |
-| R-09 | Implementar `hook_turn_is_orphaned` nativamente em `16-lifecycle.sh`                                                                                         | Eliminar indireção dupla             |
-| R-10 | Criar `find_audit_file()` canônico                                                                                                                           | Fix estrutural da questão de rotação |
-| R-11 | Criar `lib/loader.sh` centralizado                                                                                                                           | Ordem de carregamento garantida      |
+| #    | Ação                                                                                                                                                                                                           | Impacto Esperado                     |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| R-06 | ✅ Dividir `common.sh` em módulos menores — `state-crud.sh`, `audit-lib.sh`, `utils.sh`, `turn-lifecycle.sh`, `briefing.sh`; `common.sh` → 48-line aggregator                                                   | Manutenibilidade ↑                   |
+| R-07 | ✅ Criar `open_new_turn_batch()` com jq único — implementado em `lib/turn-lifecycle.sh` (Sprint 8)                                                                                                              | Performance: -80% I/O no turn open   |
+| R-08 | ✅ Migrar `log_audit()` em `common.sh:605` para `hook_log_audit()` — implementado em `lib/turn-lifecycle.sh` (`heal_orphaned_turn()` usa `hook_log_audit()`; confirmado via `# R-08:` em `api/16-lifecycle.sh`) | Consistência API                     |
+| R-09 | ✅ Implementar `hook_turn_is_orphaned` nativamente em `16-lifecycle.sh` — implementado sem delegar ao legado `turn_is_orphaned()` (comentário `# R-07:` confirma implementação direta)                          | Eliminar indireção dupla             |
+| R-10 | ✅ Criar `find_audit_file()` canônico — implementado em `lib/audit-lib.sh` (Sprint 8)                                                                                                                           | Fix estrutural da questão de rotação |
+| R-11 | ✅ Criar `lib/loader.sh` centralizado — já existe em `lib/loader.sh`                                                                                                                                            | Ordem de carregamento garantida      |
 
 #### Nível 3 — Melhorias de Robustez (Longo Prazo)
 
-| #    | Ação                                                        | Benefício                                   |
-| ---- | ----------------------------------------------------------- | ------------------------------------------- |
-| R-12 | Adicionar testes T76-T83 (ver Fase 3.4)                     | Cobertura de edge cases                     |
-| R-13 | Contador em memória para `_audit_cap_check`                 | ~50% menos I/O em sessões longas            |
-| R-14 | Adicionar index `logs/audit-current.jsonl` symlink          | Acesso canônico ao audit ativo              |
-| R-15 | Restringir permissão de `state/session.json` para 0600      | Segurança: close_key não legível por outros |
-| R-16 | Padronizar `[[ ]]` para toda a base (lint pass)             | Consistência POSIX/bash                     |
-| R-17 | Substituir awk fallback em `make_close_key()` por `$RANDOM` | Entropia levemente melhor                   |
+| #    | Ação                                                                                                                                                                                                                                                                                                                                                                         | Benefício                                   |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| R-12 | ✅ Adicionar testes T76-T83 — implementados, 83/83 passando (Sprint 7)                                                                                                                                                                                                                                                                                                        | Cobertura de edge cases                     |
+| R-13 | ✅ Contador em memória para `_audit_cap_check` — implementado via `_AUDIT_LINE_COUNT` global em `lib/audit-lib.sh`; reset após rotação, sincronizado com `wc -l` quando zerado                                                                                                                                                                                                | ~50% menos I/O em sessões longas            |
+| R-14 | ✅ Adicionar index `logs/audit-current.jsonl` symlink — `_audit_update_symlink()` em `lib/audit-lib.sh` (Sprint 8)                                                                                                                                                                                                                                                            | Acesso canônico ao audit ativo              |
+| R-15 | ✅ Restringir permissão de `state/session.json` para 0600 — implementado em `lib/state-crud.sh:227` via `chmod 600 "$STATE_FILE"` após criação                                                                                                                                                                                                                                | Segurança: close_key não legível por outros |
+| R-16 | ✅ Padronizar `[[ ]]` para toda a base (lint pass) — 19 substituições em `lib/` e `scripts/`: `turn-lifecycle.sh`, `stop-lib.sh`, `subagent-lib.sh`, `api/04-predicates.sh`, `api/08-risk.sh`, `api/09-metrics.sh`, `api/11-compact-context.sh`, `api/12-subagent.sh`, `api/15-audit.sh`, `api/16-lifecycle.sh`, `session-summary.sh`, `smoke-test-payload-api.sh` (Sprint 9) | Consistência POSIX/bash                     |
+| R-17 | ✅ Substituir awk fallback em `make_close_key()` por `$RANDOM` — implementado em `lib/utils.sh` (Sprint 8)                                                                                                                                                                                                                                                                    | Entropia levemente melhor                   |
 
 ### 7.2 Sequência de Execução Recomendada
 
