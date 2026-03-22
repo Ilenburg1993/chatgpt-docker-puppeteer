@@ -5,6 +5,9 @@
 #
 # Uso: bash .github/hooks/scripts/smoke-test.sh [--quiet]
 #
+# shellcheck disable=SC2015  # pass/fail em && || é padrão de teste intencional
+# shellcheck disable=SC2030  # export HOOKS_TEST_STATE_DIR em subshell () é intencional (isolamento de teste)
+# shellcheck disable=SC2031  # idem — modificação local ao subshell é o objetivo
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -1349,7 +1352,7 @@ if [ "$_t71_rc" -eq 0 ] \
     && [ -n "$_t71_ended" ] && [ "$_t71_ended" != "null" ]; then
     pass
 else
-    fail "T71" "esperado sessionEnd+ended_at; RC=$_t71_rc ended_at=$_t71_ended session_end_in=$(echo "$_t71_session_end") audit=$(cat "$TEST_DIR"/audit*.jsonl 2> /dev/null | tail -3)"
+    fail "T71" "esperado sessionEnd+ended_at; RC=$_t71_rc ended_at=$_t71_ended session_end_in=$_t71_session_end audit=$(cat "$TEST_DIR"/audit*.jsonl 2> /dev/null | tail -3)"
 fi
 teardown
 

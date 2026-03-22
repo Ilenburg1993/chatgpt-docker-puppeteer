@@ -26,6 +26,7 @@ if state_exists; then
     _turn_num="${_turn_num:-0}"
     _turn_ended=$(read_field ".current_turn.ended_at" 2> /dev/null || printf '')
 
+    # shellcheck disable=SC2235 # agrupamento booleano () intencional — evita ambiguidade com &&
     if [ "${_turn_num}" != "0" ] && [ "${_turn_num}" != "null" ] \
         && ([ -z "${_turn_ended}" ] || [ "${_turn_ended}" = "null" ]); then
 
@@ -33,6 +34,7 @@ if state_exists; then
         _subturn_num=$(read_field ".current_subturn.number" 2> /dev/null || printf '0')
         _subturn_num="${_subturn_num:-0}"
         _subturn_ended=$(read_field ".current_subturn.ended_at" 2> /dev/null || printf '')
+        # shellcheck disable=SC2235 # agrupamento booleano () intencional — evita ambiguidade com &&
         if [ "${_subturn_num}" != "0" ] && [ "${_subturn_num}" != "null" ] \
             && ([ -z "${_subturn_ended}" ] || [ "${_subturn_ended}" = "null" ]); then
             _now=$(now_iso)

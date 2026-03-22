@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # smoke-test-payload-api.sh — Suite de testes para hook-payload-api.sh
 # Cobre: todos os 8 eventos, validação de campos, predicados, edge cases
+# shellcheck disable=SC2015  # A && ok || fail é padrão intencional de teste — sem risco real
+# shellcheck disable=SC2016  # single quotes intencionais em fixtures de teste ($(cmd) literal)
 
 set -euo pipefail
 export LANG="C.UTF-8" LC_ALL="C.UTF-8"

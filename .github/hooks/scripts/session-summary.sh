@@ -34,7 +34,7 @@ if [[ -n "$started_at" ]] && [[ "$started_at" != "null" ]]; then
     now=$(date +%s 2> /dev/null || printf '0')
     epoch_start=$(date -d "$started_at" +%s 2> /dev/null \
         || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$started_at" +%s 2> /dev/null \
-        || printf "$now")
+        || printf '%s' "$now")
     dur_s=$((now - epoch_start))
     dur_m=$((dur_s / 60))
 fi

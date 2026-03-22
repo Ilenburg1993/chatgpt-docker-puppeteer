@@ -105,6 +105,7 @@ _print_md_report() {
     printf -- '| Campo | Valor |\n|---|---|\n'
     printf -- '| Inicio | %s |\n' "${start_at:-N/A}"
     printf -- '| Duração | %dm %ds |\n' "$duration_min" "$duration_sec"
+    # shellcheck disable=SC2016 # backticks são markdown literal no formato printf — não são subshell
     printf -- '| Chave de encerramento | `%s` |\n\n' "${close_key:-N/A}"
 
     printf '## Turnos\n'

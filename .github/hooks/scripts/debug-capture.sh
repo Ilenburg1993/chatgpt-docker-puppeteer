@@ -41,7 +41,7 @@ case "${1:-status}" in
         echo "=== Payloads capturados ==="
         if [ -n "$local_event" ]; then
             # Filtrar por evento
-            for f in "$DEBUG_DIR"/${local_event}*.json; do
+            for f in "$DEBUG_DIR/${local_event}"*.json; do
                 [ -f "$f" ] || continue
                 echo ""
                 echo "--- $(basename "$f") ---"
