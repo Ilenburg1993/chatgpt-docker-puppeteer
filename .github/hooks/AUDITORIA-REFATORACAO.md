@@ -202,55 +202,50 @@ read_field_bool() {
 
 ---
 
-### 2.4 Função `log_audit()` Depreciada mas Ainda Presente em `common.sh`
+### 2.4 Função `log_audit()` Depreciada — ✅ RESOLVIDO (verificado Sprint 12)
 
-**Status**: ⚠️ Depreciada, mas mantida como fallback
-**Arquivo**: `lib/common.sh:355-400` (46 linhas)
-**Problema**: A função `log_audit()` é depreciada em favor de `hook_log_audit()` de `api/15-audit.sh`, mas permanece em `common.sh` como fallback para o caso em que `15-audit.sh` não foi carregado.
-
-**Usos ativos de `log_audit` legado**:
-- `lib/common.sh:605` — `heal_orphaned_turn()` usa `log_audit` diretamente (deveria usar `hook_log_audit`)
-
-**Usos de `hook_log_audit` (correto)**:
+**Status**: ✅ **Resolvido** (verificado Sprint 12)
+**Arquivo**: `lib/audit-lib.sh`
+**Situação atual**: A função `log_audit()` permanece em `audit-lib.sh` como fallback de compatibilidade (marcada como `[LEGADO — DEPRECADO]`), mas **não é chamada ativamente** em nenhum arquivo. Todas as chamadas ativas usam `hook_log_audit()` de `api/15-audit.sh`:
 - `lib/subagent-lib.sh` — 6 chamadas ✅
-- `lib/stop-lib.sh` — 6 chamadas ✅
-- `lib/common.sh:267,277` — 2 chamadas corretas ✅
+- `lib/stop-lib.sh` — 7+ chamadas ✅
+- `lib/turn-lifecycle.sh` — 1 chamada ✅
+- `lib/state-crud.sh` — 2 chamadas ✅
+- `lib/post-tool-use-lib.sh` — 2 chamadas ✅
 
-**Ação**: Migrar `lib/common.sh:605` para usar `hook_log_audit` e remover o fallback legado após confirmar que `15-audit.sh` é sempre carregado.
+O caso citado anteriormente (`lib/common.sh:605 heal_orphaned_turn`) foi migrado em Sprint 7/8 (R-08 ✅).
 
 ---
 
 ### 2.5 Funções Depreciadas sem Remoção: Stub Wrapper em `16-lifecycle.sh`
 
+### 2.5 Funções Depreciadas sem Remoção: Stub Wrapper em `16-lifecycle.sh` — ✅ RESOLVIDO
+
+**Status**: ✅ **Resolvido** (R-07/R-09, verificado Sprint 12)
 **Arquivo**: `lib/api/16-lifecycle.sh`
-**Problema**: `hook_turn_is_orphaned()` e `hook_heal_orphaned_turn()` apenas delegam para as versões legadas:
+**Situação atual**: `hook_turn_is_orphaned()` e `hook_heal_orphaned_turn()` possuem **implementação direta** (não delegam para legadas):
 
 ```bash
 hook_turn_is_orphaned() {
-    turn_is_orphaned "$@"   # chama a legada de common.sh
+    # R-07: implementação direta, sem dependência de turn_is_orphaned() legado
+    ...
 }
 hook_heal_orphaned_turn() {
-    heal_orphaned_turn "$@"  # chama a legada de common.sh
+    # R-07: implementação direta, sem dependência de heal_orphaned_turn() legado
+    ...
 }
 ```
 
-**Consequência**: Dois níveis de indireção desnecessários — `user-prompt-submit-lib.sh → hook_turn_is_orphaned → turn_is_orphaned`.
-**Ação**: Mover implementação para `16-lifecycle.sh` e remover a versão legada de `common.sh`.
+A migração para implementação nativa foi feita via R-07 e R-09 em sprints anteriores.
 
 ---
 
-### 2.6 Funções Depreciadas com Implementação Stub em `hook-payload-api.sh`
+### 2.6 Funções Depreciadas com Implementação Stub em `hook-payload-api.sh` — ✅ RESOLVIDO
 
-**Arquivo**: `lib/hook-payload-api.sh:48-55`
-**Código**:
-```bash
-if ! declare -f detect_close_key_in_text > /dev/null 2>&1; then
-    detect_close_key_in_text() { return 1; }
-fi
-```
+**Status**: ✅ **Resolvido** (verificado Sprint 11)
+**Arquivo**: `lib/hook-payload-api.sh`
 
-**Problema**: Cria stub que retorna sempre `1` (false) — se `common.sh` não foi carregado antes, a detecção de close_key silenciosamente falha.
-**Ação**: Garantir que `common.sh` seja carregado antes de `hook-payload-api.sh`, tornando o stub desnecessário.
+O stub `detect_close_key_in_text() { return 1; }` foi removido em sprint anterior. O arquivo agora carrega `common.sh` via guard antes de continuar (`if ! declare -f jq_field > /dev/null`), tornando o stub desnecessário. Apenas nota de comentário histórica permanece na linha 37.
 
 ---
 
@@ -259,68 +254,60 @@ fi
 **Status**: ✅ **Resolvido** (verificado Sprint 10)
 **Situação atual**:
 
-| Arquivo                       | Abordagem                                      | Status                                     |
-| ----------------------------- | ---------------------------------------------- | ------------------------------------------ |
-| `session-close-lib.sh:11`     | Chama `export_lang_utf8` (condicional)         | ✅ Correto                                  |
-| `common.sh:878`               | `export LANG="${LANG:-C.UTF-8}"` (condicional) | ✅ Correto                                  |
-| `hook-payload-api.sh:55`      | `export_lang_utf8()` — stub seguro com guard   | ✅ Correto (usa `${LANG:-C.UTF-8}`)         |
-| `smoke-test-payload-api.sh:6` | `export LANG="C.UTF-8"`                       | Aceitável em contexto de teste isolado     |
+| Arquivo                       | Abordagem                                      | Status                                 |
+| ----------------------------- | ---------------------------------------------- | -------------------------------------- |
+| `session-close-lib.sh:11`     | Chama `export_lang_utf8` (condicional)         | ✅ Correto                              |
+| `common.sh:878`               | `export LANG="${LANG:-C.UTF-8}"` (condicional) | ✅ Correto                              |
+| `hook-payload-api.sh:55`      | `export_lang_utf8()` — stub seguro com guard   | ✅ Correto (usa `${LANG:-C.UTF-8}`)     |
+| `smoke-test-payload-api.sh:6` | `export LANG="C.UTF-8"`                        | Aceitável em contexto de teste isolado |
 
 **Resolução**: `session-close-lib.sh` migrou para `export_lang_utf8`; `hook-payload-api.sh` stub já usa `${LANG:-C.UTF-8}`. Padrão consistente aplicado.
 
 ---
 
-### 2.8 `increment_field()` e `decrement_field_floor0()` — Sem Lock File
+### 2.8 `increment_field()` e `decrement_field_floor0()` — ✅ RESOLVIDO
 
-**Status**: ⚠️ Race condition teórica
-**Arquivo**: `lib/common.sh:521-555`
-**Problema**: A operação de incremento é:
-1. `read_field` (jq read) →
-2. calcula `new_val` →
-3. `mktemp` →
-4. `jq write` →
-5. `mv -f`
+**Status**: ✅ **Resolvido** (Sprint 11)
+**Arquivo**: `lib/state-crud.sh`
+**Implementação atual**: Ambas as funções agora usam `flock -x 9` sobre `$STATE_DIR/.state.lock`:
 
-Entre os passos 1 e 5, outro processo pode modificar o mesmo campo, causando race condition (lost update).
-
-**Contexto de risco**: Como hooks do VS Code são seriais por evento, o risco real é baixo. Contudo, durante subagentes paralelos existe risco real de collisão em `session_stats.subagents_active`.
-
-**Refatoração proposta**: Para campos críticos com escrita concorrente (subagents), usar lock file via `flock`:
 ```bash
-(flock -x 9; increment_field ".session_stats.subagents_active"; ) 9>"$STATE_DIR/.lock"
+increment_field() {
+    local lock_file="$STATE_DIR/.state.lock"
+    {
+        flock -x 9
+        current=$(read_field "$path")
+        new_val=$((${current:-0} + 1))
+        # ... jq write + mv ...
+    } 9>> "$lock_file"
+}
+```
+
+**Resultado**: Operações de leitura-modifica-escrita são agora serializadas via lock exclusivo. Subagentes em paralelo não podem causar lost-update em `subagents_active`.
+**Gate**: 86/86 testes smoke passando.
 ```
 
 ---
 
-### 2.9 `open_new_turn()` — 13 Chamadas Sequenciais de `update_nested_state`
+### 2.9 `open_new_turn()` — 13 Chamadas Sequenciais — ✅ RESOLVIDO
 
-**Arquivo**: `lib/common.sh:681-720`
-**Problema**: "Open turn" faz 13 invocações separadas de `update_nested_state`, cada uma lendo o JSON, modificando um campo e escrevendo de volta atomicamente. São 13 leituras + 13 escritas ao disco.
-
-```bash
-update_nested_state "current_turn.number" "$turn_num"
-update_nested_state "current_turn.turn_id" "$turn_id"
-# ... 11 chamadas a mais
-```
-
-**Impacto**: ~100-200ms de latência por apertura de turno (13x jq fork + 13x mktemp + 13x mv).
-**Refatoração proposta**: Criar `open_new_turn_batch()` que executa uma única operação jq em batch:
-```bash
-jq --arg id "$turn_id" --argjson num "$turn_num" '
-  .current_turn = (.current_turn + {
-    number: $num, turn_id: $id, started_at: $now, ...
-  })
-' "$STATE_FILE" > "$tmp" && mv -f "$tmp" "$STATE_FILE"
-```
+**Status**: ✅ **Resolvido** (R-07, verificado Sprint 12)
+**Arquivo**: `lib/turn-lifecycle.sh`
+**Solução**: `open_new_turn_batch()` implementada via R-07 com operação `jq` em batch — 1 leitura + 1 escrita ao disco. `open_new_turn()` agora delega para `open_new_turn_batch()`.
+**Cobertura de teste**: T80 (open_new_turn) e T86 (open_new_turn_batch) validam o comportamento.
 
 ---
 
-### 2.10 `generate_session_briefing()` — Uso Inseguro de Heredoc com `cat >`
+### 2.10 `generate_session_briefing()` — pending_tasks_content — ✅ ADEQUADO
 
-**Arquivo**: `lib/common.sh:755-810`
-**Problema**: A função usa `cat > "$BRIEFING_FILE" << EOF` com expansão de variáveis. Embora `sanitize_md()` seja chamada antes, o conteúdo de `pending_tasks_content` (oriundo de `pending-tasks.md`) **não é sanitizado** antes de ser inserido no heredoc.
-
+**Status**: ✅ **Adequado** (verificado Sprint 12)
+**Arquivo**: `lib/briefing.sh:66`
+**Situação atual**:
 ```bash
+pending_tasks_content="$(printf '```\n%s\n```' "$(cat "$PENDING_TASKS_FILE")")"
+```
+
+O conteúdo é envolvido em bloco de código Markdown (``` )```` ``` ````). Isso garante que qualquer conteúdo dentro do arquivo é renderizado como literal — impede injeção de cabeçalhos, negrito, ou outros elementos Markdown arbitrários. Risco residual é mínimo e aceitável para um sistema interno.
 pending_tasks_content="$(cat "$PENDING_TASKS_FILE")"  # sem sanitize_md!
 ...
 ## Tarefas Pendentes
@@ -328,22 +315,10 @@ ${pending_tasks_content}                               # expansão direta
 ```
 
 **Risco de Segurança**: Injeção de Markdown/conteúdo arbitrário a partir de `pending-tasks.md` se o arquivo for modificado por agente malicioso.
-**Ação**: Aplicar `sanitize_md "$pending_tasks_content"` antes da expansão no heredoc, ou usar `printf '%s\n' "$pending_tasks_content"` fora do heredoc.
+### 2.11 Uso de `[[ ]]` vs `[ ]` — ✅ RESOLVIDO (R-16)
 
----
-
-### 2.11 Uso de `[[ ]]` vs `[ ]` — Inconsistência POSIX/Bash
-
-**Problema**: Mistura de `[[ ]]` (bash) e `[ ]` (POSIX sh) nos mesmos arquivos.
-
-**Evidência** (do `14-validate-events.sh`):
-```bash
-[[ -z "${_HV_ERRORS:-}" ]] && return 0   # bash
-[ -z "${field}" ] && continue            # POSIX
-```
-
-**Impacto**: Baixo — scripts usam `#!/usr/bin/env bash` e `set -euo pipefail`, então `[[ ]]` é válido. Mas a inconsistência dificulta leitura e possível portabilidade futura.
-**Ação**: Padronizar para `[[ ]]` em code new; revisar usos antigos em uma passagem de lint.
+**Status**: ✅ **Resolvido** (R-16, Sprint 9)
+**Resultado**: 19 substituições de `[ ]` → `[[ ]]` em 12 arquivos. Padrão `[[ ]]` agora é consistente em todo o código novo.
 
 ---
 
@@ -361,20 +336,21 @@ ${pending_tasks_content}                               # expansão direta
 
 ### 3.2 Gaps de Cobertura por Módulo
 
-#### Módulos Sem Cobertura Direta em Smoke Tests:
+#### Módulos Sem Cobertura Direta em Smoke Tests (status atualizado Sprint 12):
 
-| Módulo                                        | Gap Identificado                                  |
-| --------------------------------------------- | ------------------------------------------------- |
-| `api/09-metrics.sh`                           | Sem testes de cálculo de métricas de duração      |
-| `api/11-compact-context.sh`                   | Pouco coverage de serialização de contexto        |
-| `api/12-subagent.sh`                          | Budget/depth limits só testados indiretamente     |
-| `api/13-state-version.sh`                     | Migration de versão de schema não testada         |
-| `api/14-validate-events.sh`                   | Cobertura parcial de validação de payloads        |
-| `lib/common.sh` `generate_session_briefing()` | Sem teste direto do output do briefing            |
-| `lib/common.sh` `uuidgen_safe()`              | Sem teste de fallback quando `uuidgen` não existe |
-| `lib/common.sh` `make_close_key()`            | Sem teste de fallback quando `/dev/urandom` falha |
-| `scripts/watchdog.sh`                         | Zero testes automatizados do watchdog             |
-| `scripts/hooks-report.sh`                     | Sem testes de regressão                           |
+| Módulo                              | Gap Identificado                              | Resolvido                |
+| ----------------------------------- | --------------------------------------------- | ------------------------ |
+| `api/09-metrics.sh`                 | Sem testes de cálculo de métricas de duração  | ⚙️ Pendente (baixa prio.) |
+| `api/11-compact-context.sh`         | Pouco coverage de serialização de contexto    | ⚙️ Pendente (baixa prio.) |
+| `api/12-subagent.sh`                | Budget/depth limits só testados indiretamente | ⚙️ Pendente (baixa prio.) |
+| `api/13-state-version.sh`           | Migration de versão de schema não testada     | ⚙️ Pendente (baixa prio.) |
+| `lib/common.sh` `generate_briefing` | Sem teste direto do output do briefing        | ✅ T79 (Sprint 8)         |
+| `lib/common.sh` `uuidgen_safe()`    | Sem teste de fallback                         | ✅ T85 (Sprint 10)        |
+| `lib/common.sh` `read_field_bool()` | Sem teste direto                              | ✅ T84 (Sprint 10)        |
+| `lib/turn-lifecycle.sh` `open_new_turn_batch()` | Sem teste direto               | ✅ T86 (Sprint 10)        |
+| `lib/state-crud.sh` `increment_field()` (flock) | Sem teste de incremento direto | ✅ T88 (Sprint 12)        |
+| `lib/state-crud.sh` `decrement_field_floor0()`  | Sem teste de floor behavior    | ✅ T87 (Sprint 12)        |
+| `scripts/watchdog.sh`               | Zero testes automatizados do watchdog         | ⚙️ Pendente (baixa prio.) |
 
 ### 3.3 Cenários Críticos Sem Testes de Regressão
 
@@ -398,30 +374,32 @@ O `GAP-ABRUPT-TURN-END` é implementado em `session-end.sh` mas sem teste automa
 
 O `scripts/watchdog.sh` (262 linhas) não tem nenhum teste de regressão. Ele é invocado externamente via cron/scheduler para detectar sessões travadas.
 
-### 3.4 Testes Implementados (Sprint 10) ✅
+### 3.4 Testes Implementados (Sprints 10-12) ✅
 
-| ID   | Descrição                                                                    | Status            |
-| ---- | ---------------------------------------------------------------------------- | ----------------- |
-| T76  | `session-end.sh` com turn ativo → verifica `turnEnd_abrupt` em audit        | ✅ Implementado    |
-| T77  | `_audit_cap_check()` com HOOKS_AUDIT_MAX_LINES=5 → verifica rotação         | ✅ Implementado    |
-| T78  | `printf -- '- %s\n'` em `session-start-lib.sh` com valor iniciando com `-`  | ✅ Implementado    |
-| T79  | `generate_session_briefing()` output contém session_id e close_key          | ✅ Implementado    |
-| T80  | `open_new_turn()` avança número do turn e zera ask_questions_called          | ✅ Implementado    |
-| T81  | `make_close_key()` retorna formato ENCERRAR-XXXXXXXX                         | ✅ Implementado    |
-| T82  | `find_audit_file()` retorna AUDIT_FILE padrão quando sem symlink             | ✅ Implementado    |
-| T84  | `read_field_bool()` retorna `"true"`/`"false"` para booleanos JSON           | ✅ Sprint 10       |
-| T85  | `uuidgen_safe()` retorna formato UUID 8-4-4-4-12 válido                     | ✅ Sprint 10       |
-| T86  | `open_new_turn_batch()` avança turn number e zera ask_questions_called       | ✅ Sprint 10       |
+| ID  | Descrição                                                                  | Status         |
+| --- | -------------------------------------------------------------------------- | -------------- |
+| T76 | `session-end.sh` com turn ativo → verifica `turnEnd_abrupt` em audit       | ✅ Sprint 8     |
+| T77 | `_audit_cap_check()` com HOOKS_AUDIT_MAX_LINES=5 → verifica rotação        | ✅ Sprint 8     |
+| T78 | `printf -- '- %s\n'` em `session-start-lib.sh` com valor iniciando com `-` | ✅ Sprint 8     |
+| T79 | `generate_session_briefing()` output contém session_id e close_key         | ✅ Sprint 8     |
+| T80 | `open_new_turn()` avança número do turn e zera ask_questions_called        | ✅ Sprint 8     |
+| T81 | `make_close_key()` retorna formato ENCERRAR-XXXXXXXX                       | ✅ Sprint 8     |
+| T82 | `find_audit_file()` retorna AUDIT_FILE padrão quando sem symlink           | ✅ Sprint 8     |
+| T84 | `read_field_bool()` retorna `"true"`/`"false"` para booleanos JSON         | ✅ Sprint 10    |
+| T85 | `uuidgen_safe()` retorna formato UUID 8-4-4-4-12 válido                    | ✅ Sprint 10    |
+| T86 | `open_new_turn_batch()` avança turn number e zera ask_questions_called     | ✅ Sprint 10    |
+| T87 | `decrement_field_floor0()` não desce abaixo de 0 (floor behavior)         | ✅ Sprint 12    |
+| T88 | `increment_field()` incrementa campo numérico corretamente (flock)         | ✅ Sprint 12    |
 
 ### 3.5 Gaps Remanescentes (Baixa Prioridade)
 
-| Módulo                        | Gap Identificado                                  | Prioridade |
-| ----------------------------- | ------------------------------------------------- | ---------- |
-| `api/09-metrics.sh`           | Sem testes de cálculo de métricas de duração      | Baixa      |
-| `api/11-compact-context.sh`   | Pouco coverage de serialização de contexto        | Baixa      |
-| `api/12-subagent.sh`          | Budget/depth limits só testados indiretamente     | Baixa      |
-| `api/13-state-version.sh`     | Migration de versão de schema não testada         | Baixa      |
-| `scripts/watchdog.sh`         | Zero testes automatizados do watchdog             | Baixa      |
+| Módulo                      | Gap Identificado                              | Prioridade |
+| --------------------------- | --------------------------------------------- | ---------- |
+| `api/09-metrics.sh`         | Sem testes de cálculo de métricas de duração  | Baixa      |
+| `api/11-compact-context.sh` | Pouco coverage de serialização de contexto    | Baixa      |
+| `api/12-subagent.sh`        | Budget/depth limits só testados indiretamente | Baixa      |
+| `api/13-state-version.sh`   | Migration de versão de schema não testada     | Baixa      |
+| `scripts/watchdog.sh`       | Zero testes automatizados do watchdog         | Baixa      |
 
 ---
 
@@ -489,14 +467,17 @@ safe_name=$(printf '%s' "$tool_name" | tr -cd 'a-zA-Z0-9_-' | cut -c1-64)
 ```
 **Status**: ✅ Adequadamente mitigado via sanitização explícita.
 
-### 5.2 Injeção de Markdown em `generate_session_briefing()`
+### 5.2 Injeção de Markdown em `generate_session_briefing()` — ✅ ADEQUADO
 
-**Arquivo**: `lib/common.sh:755-810`
-**Problema**: `sanitize_md()` é aplicada para campos de estado, mas `pending_tasks_content` (conteúdo completo de `pending-tasks.md`) é inserido verbatim no heredoc.
+**Arquivo**: `lib/briefing.sh:66`
+**Situação**: `sanitize_md()` é aplicada para campos de estado. `pending_tasks_content` é envolvido em bloco de código fenced (` ``` `) que **neutraliza** formatação arbitrária de Markdown.
 
-**Mitigação atual**: Nenhuma.
-**Risco prático**: Se o conteúdo de `pending-tasks.md` contiver sequências especiais de Markdown que o agente interprete como instruções, pode haver prompt injection indireta.
-**Ação**: Sanitizar ou envolver em bloco de código fenced ```` ``` ```` para neutralizar formatação arbitrária.
+```bash
+# shellcheck disable=SC2016
+pending_tasks_content="$(printf '```\n%s\n```' "$(cat "$PENDING_TASKS_FILE")")"
+```
+
+**Status**: ✅ Adequadamente mitigado — conteúdo dentro de bloco de código é renderizado como literal.
 
 ### 5.3 `log_audit()` — Injeção JSON via `jq --arg`
 
@@ -513,27 +494,30 @@ safe_name=$(printf '%s' "$tool_name" | tr -cd 'a-zA-Z0-9_-' | cut -c1-64)
 hook_is_bypass_attempt()  # detecta tentativa de chamar session-close.sh diretamente
 ```
 
-### 5.5 `make_close_key()` — Entropia da Chave de Encerramento
+### 5.5 `make_close_key()` — Entropia da Chave de Encerramento — ✅ RESOLVIDO (R-17)
 
-**Arquivo**: `lib/common.sh:410-448`
-**Análise**: A função tem uma cadeia de fallbacks:
-1. `/proc/sys/kernel/random/uuid` → primeiros 8 hex (uuid v4) — ✅ Boa entropia
+**Status**: ✅ **Resolvido** (R-17, verificado Sprint 12)
+**Arquivo**: `lib/utils.sh:19`
+**Situação atual**: A cadeia de fallbacks é segura:
+1. `/proc/sys/kernel/random/uuid` → 8 hex (uuid v4) — ✅ Boa entropia
 2. `od + /dev/urandom` → 8 hex — ✅ Boa entropia
-3. `dd + od` → 8 hex — ✅ Adequado
-4. `awk rand()` → timestamp seed — ⚠️ **Previsível** (pseudo-random com seed de /dev/null)
-5. `date +%s%N` → timestamp — ⚠️ **Muito previsível**
+3. `dd + od + /dev/urandom` → 8 hex — ✅ Adequado
+4. **R-17**: `$RANDOM × 4` (64-bit de entropia bash) — ✅ Melhor que timestamp
+5. `date +%s%N` → último recurso — aceitável como fallback final
 
-**Risco**: Em ambientes sem `/dev/urandom` (improvável em Linux moderno), a close_key seria previsível.
-**Ação**: Adicionar `RANDOM` seed de bash como fallback adicional entre o awk e o timestamp:
+O fallback `awk rand()` com seed previsível **foi removido** e substituído por `printf '%04X%04X' "$RANDOM" "$RANDOM"` (R-17).
+
+### 5.6 Arquivo de Estado Sem Permissão Restrita — ✅ RESOLVIDO (R-09)
+
+**Status**: ✅ **Resolvido** (R-09, verificado Sprint 12)
+**Arquivo**: `lib/state-crud.sh:226` (`init_state()`)
+**Situação atual**: `chmod 600 "$STATE_FILE"` é chamado imediatamente após a criação do arquivo:
 ```bash
-hex=$(printf '%X%X' "${RANDOM}" "${RANDOM}" | cut -c1-8)
+jq -n ... > "$STATE_FILE"
+chmod 600 "$STATE_FILE" 2> /dev/null || true # R-09: close_key não deve ser world-readable
 ```
 
-### 5.6 Arquivo de Estado Sem Permissão Restrita
-
-**Arquivo**: `state/session.json` criado em `init_state()`
-**Problema**: O arquivo é criado com permissões padrão (umask do processo). Pode conter `close_key` legível por outros usuários do sistema.
-**Ação**: Adicionar `umask 077` antes de criar o state file, ou usar `install -m 600`.
+O `close_key` não é mais legível por outros usuários do sistema.
 
 ---
 

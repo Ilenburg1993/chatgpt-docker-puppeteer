@@ -1568,12 +1568,12 @@ _t84_true=$(
     export HOOKS_TEST_STATE_DIR="$TEST_DIR"
     source "$HOOK_DIR/lib/common.sh"
     read_field_bool ".check_bool_true"
-) 2>/dev/null || true
+) 2> /dev/null || true
 _t84_false=$(
     export HOOKS_TEST_STATE_DIR="$TEST_DIR"
     source "$HOOK_DIR/lib/common.sh"
     read_field_bool ".check_bool_false"
-) 2>/dev/null || true
+) 2> /dev/null || true
 if [[ "$_t84_true" = "true" ]] && [[ "$_t84_false" = "false" ]]; then
     pass
 else
@@ -1588,7 +1588,7 @@ _t85_uuid=''
 _t85_uuid=$(
     source "$HOOK_DIR/lib/common.sh"
     uuidgen_safe
-) 2>/dev/null || true
+) 2> /dev/null || true
 if printf '%s' "$_t85_uuid" | grep -qE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
     pass
 else
@@ -1605,13 +1605,49 @@ _t86_rc=0
     export HOOKS_TEST_STATE_DIR="$TEST_DIR"
     source "$HOOK_DIR/lib/common.sh"
     open_new_turn_batch "batch_test" "batch_turn_id"
-) >/dev/null 2>&1 || _t86_rc=$?
-_t86_aq=$(jq -r '.current_turn.ask_questions_called' "$TEST_DIR/session.json" 2>/dev/null)
-_t86_num=$(jq -r '.current_turn.number' "$TEST_DIR/session.json" 2>/dev/null)
+) > /dev/null 2>&1 || _t86_rc=$?
+_t86_aq=$(jq -r '.current_turn.ask_questions_called' "$TEST_DIR/session.json" 2> /dev/null)
+_t86_num=$(jq -r '.current_turn.number' "$TEST_DIR/session.json" 2> /dev/null)
 if [[ "${_t86_aq}" = "false" ]] && [[ "${_t86_num:-0}" -gt 0 ]]; then
     pass
 else
     fail "T86" "open_new_turn_batch incorreto: aq=$_t86_aq num=$_t86_num rc=$_t86_rc"
+fi
+teardown
+
+# T87: decrement_field_floor0() não desce abaixo de 0 (floor behavior)
+setup
+begin_test "T87: decrement_field_floor0 nao desce abaixo de zero"
+write_state "$(_state_aq_false 0)"
+_t87_val=''
+_t87_val=$(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    decrement_field_floor0 ".session_stats.turn_count"
+) 2>/dev/null || true
+_t87_json=$(jq -r '.session_stats.turn_count' "$TEST_DIR/session.json" 2>/dev/null)
+if [[ "${_t87_val:-}" = "0" ]] && [[ "${_t87_json:-}" = "0" ]]; then
+    pass
+else
+    fail "T87" "decrement_field_floor0 floor incorreto: retornou='$_t87_val' json='$_t87_json'"
+fi
+teardown
+
+# T88: increment_field() incrementa campo numérico corretamente
+setup
+begin_test "T88: increment_field incrementa turno corretamente"
+write_state "$(_state_aq_false 0)"
+_t88_val=''
+_t88_val=$(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    increment_field ".session_stats.turn_count"
+) 2>/dev/null || true
+_t88_json=$(jq -r '.session_stats.turn_count' "$TEST_DIR/session.json" 2>/dev/null)
+if [[ "${_t88_val:-}" = "1" ]] && [[ "${_t88_json:-}" = "1" ]]; then
+    pass
+else
+    fail "T88" "increment_field incorreto: retornou='$_t88_val' json='$_t88_json'"
 fi
 teardown
 
