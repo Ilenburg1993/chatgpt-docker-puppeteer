@@ -607,8 +607,8 @@ GAP-42, GAP-43, GAP-44, GAP-45, GAP-56, GAP-62, GAP-63, GAP-64, GAP-65
 
 | #    | Ação                                                                                              | Arquivo                       | Risco se não feito       |
 | ---- | ------------------------------------------------------------------------------------------------- | ----------------------------- | ------------------------ |
-| R-01 | Deletar `hook-payload-api.sh.bak`                                                                 | `lib/hook-payload-api.sh.bak` | Confusão e ~51KB stale   |
-| R-02 | Corrigir `printf '- %s\n'` em `session-start-lib.sh:141,148`                                      | `lib/session-start-lib.sh`    | Bug printf LANG          |
+| R-01 | ✅ Deletar `hook-payload-api.sh.bak` — **Resolvido Sprint 9**                                                | `lib/hook-payload-api.sh.bak` | Arquivo deletado           |
+| R-02 | ✅ Corrigir `printf -- '- %s\n'` em `session-start-lib.sh:141,148` — **Resolvido Sprint 8**                   | `lib/session-start-lib.sh`    | Fix aplicado               |
 | R-03 | Sanitizar `pending_tasks_content` em `generate_session_briefing()`                                | `lib/common.sh:793`           | Markdown injection       |
 | R-04 | Padronizar LANG para `export_lang_utf8()` em `session-close-lib.sh:11` e `hook-payload-api.sh:55` | Dois arquivos                 | Inconsistência LANG      |
 | R-05 | Criar `read_field_bool()` para leitura de campos booleanos                                        | `lib/common.sh`               | Bug bool false pervasivo |
@@ -686,12 +686,12 @@ Sprint 3 (testes e robustez — 4-6h):
 | `scripts/integration-test-hooks.sh` | 1.066  | Testes de integração                     | —                                             |
 | `scripts/stress-test-hooks.sh`      | 165    | Stress tests                             | Pouco coverage                                |
 | `lib/common.sh`                     | 880    | Base compartilhada                       | Monolito, depreciados, perf                   |
-| `lib/hook-payload-api.sh`           | 208    | Bootstrap módulos api/                   | Stub inseguro, LANG hardcoded                 |
+| `lib/hook-payload-api.sh`           | 208    | Bootstrap módulos api/                   | OK — export_lang_utf8() usa fallback `${LANG:-C.UTF-8}` |
 | `lib/hook-payload-api.sh.bak`       | —      | **ARQUIVO STALE**                        | **Deletado (R-01, Sprint 9)**                 |
 | `lib/post-tool-use-lib.sh`          | 133    | Lógica PostToolUse                       | OK                                            |
 | `lib/pre-compact-lib.sh`            | 98     | Lógica PreCompact                        | Corrigido (bool fix)                          |
 | `lib/pre-tool-use-lib.sh`           | 303    | Lógica PreToolUse                        | OK                                            |
-| `lib/session-close-lib.sh`          | 191    | Lógica de encerramento                   | Corrigido (printf fix), LANG hardcoded        |
+| `lib/session-close-lib.sh`          | 191    | Lógica de encerramento                   | OK — export_lang_utf8() via common.sh           |
 | `lib/session-start-lib.sh`          | 209    | Lógica de início de sessão               | OK — `printf -- '- %s\n'` corrigido (R-02)   |
 | `lib/stop-lib.sh`                   | 177    | Lógica Stop hook                         | OK                                            |
 | `lib/subagent-lib.sh`               | 313    | Lógica Subagent Start/Stop               | OK                                            |
@@ -709,9 +709,9 @@ Sprint 3 (testes e robustez — 4-6h):
 | `lib/api/11-compact-context.sh`     | 182    | Contexto para PreCompact                 | OK                                            |
 | `lib/api/12-subagent.sh`            | 156    | Gestão de subagentes                     | OK                                            |
 | `lib/api/13-state-version.sh`       | 234    | Versionamento de schema                  | ✅ T91 (Sprint 17) — retorna inteiro de versão  |
-| `lib/api/14-validate-events.sh`     | 236    | Validação de payloads                    | Cobertura parcial e usa `[[ ]]` + `[ ]` misto |
+| `lib/api/14-validate-events.sh`     | 236    | Validação de payloads                    | Cobertura parcial (usa apenas `[[ ]]` — OK)   |
 | `lib/api/15-audit.sh`               | 183    | Implementação canônica de audit          | OK                                            |
-| `lib/api/16-lifecycle.sh`           | 67     | Lifecycle de turn/subturn                | Stubs delegam para legados                    |
+| `lib/api/16-lifecycle.sh`           | 67     | Lifecycle de turn/subturn                | OK — R-07/R-08 implementados inline           |
 
 ### A.2 Matriz de Dependências de Source
 
