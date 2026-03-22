@@ -884,6 +884,7 @@ _T48_AUDIT="$TEST_DIR/audit.jsonl"
 if [ -f "$_T48_AUDIT" ] && grep -q '"event"' "$_T48_AUDIT" 2> /dev/null; then
     pass
 else
+    # shellcheck disable=SC2012
     fail "T48" "audit.jsonl ausente ou sem campo event com HOOK_AUDIT_LEVEL=verbose; RC=$_T48_RC file=$(ls "$TEST_DIR" 2> /dev/null | tr '\n' ' ')"
 fi
 teardown
@@ -1374,6 +1375,7 @@ setup
 begin_test "T73: pre-compact com state salva checkpoint e emite preCompact_checkpoint_saved"
 write_state "$(_state_aq_true)"
 run_hook "pre-compact.sh" '{"hookEventName":"PreCompact","sessionId":"sid"}'
+# shellcheck disable=SC2012
 _t73_chk=$(ls "$TEST_DIR/checkpoints"/session-*.json 2> /dev/null | wc -l | tr -d ' ')
 if [ "$RC" -eq 0 ] \
     && grep -q '"event":"preCompact_checkpoint_saved"' "$TEST_DIR/audit.jsonl" 2> /dev/null \
@@ -1449,6 +1451,7 @@ HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOKS_AUDIT_MAX_LINES=5 HOOKS_AUDIT_LOG_DIR="$T
     bash "$HOOK_DIR/scripts/post-tool-use.sh" \
     <<< '{"hookEventName":"PostToolUse","sessionId":"sid","tool_name":"read_file","tool_input":{},"tool_response":"ok"}' \
     > /dev/null 2>&1 || true
+# shellcheck disable=SC2012
 _t76_rotated=$(ls "$TEST_DIR/logs"/audit-*.jsonl 2> /dev/null | wc -l | tr -d ' ')
 if [ "${_t76_rotated:-0}" -gt 0 ]; then
     pass

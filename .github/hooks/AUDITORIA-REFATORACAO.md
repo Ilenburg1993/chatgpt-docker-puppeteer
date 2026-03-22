@@ -374,7 +374,7 @@ O `GAP-ABRUPT-TURN-END` é implementado em `session-end.sh` mas sem teste automa
 
 O `scripts/watchdog.sh` (262 linhas) não tem nenhum teste de regressão. Ele é invocado externamente via cron/scheduler para detectar sessões travadas.
 
-### 3.4 Testes Implementados (Sprints 10-12) ✅
+### 3.4 Testes Implementados (Sprints 10-14) ✅
 
 | ID  | Descrição                                                                  | Status         |
 | --- | -------------------------------------------------------------------------- | -------------- |
@@ -390,6 +390,7 @@ O `scripts/watchdog.sh` (262 linhas) não tem nenhum teste de regressão. Ele é
 | T86 | `open_new_turn_batch()` avança turn number e zera ask_questions_called     | ✅ Sprint 10    |
 | T87 | `decrement_field_floor0()` não desce abaixo de 0 (floor behavior)         | ✅ Sprint 12    |
 | T88 | `increment_field()` incrementa campo numérico corretamente (flock)         | ✅ Sprint 12    |
+| T89 | `log_audit()` grava linha no audit.jsonl e habilita contador R-13          | ✅ Sprint 14    |
 
 ### 3.5 Gaps Remanescentes (Baixa Prioridade)
 

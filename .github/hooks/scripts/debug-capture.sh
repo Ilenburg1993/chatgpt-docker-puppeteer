@@ -68,6 +68,7 @@ case "${1:-status}" in
 
     status)
         if [ -f "$CAPTURE_FLAG" ]; then
+            # shellcheck disable=SC2012
             COUNT=$(ls "$DEBUG_DIR"/*.json 2>/dev/null | wc -l)
             echo "Captura: ATIVA | Payloads: $COUNT arquivos em $DEBUG_DIR"
         else
