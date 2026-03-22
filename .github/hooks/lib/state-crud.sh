@@ -282,18 +282,22 @@ recover_or_init_state() {
 increment_field() {
     local path="$1"
     local current new_val tmp
-    current=$(read_field "$path")
-    new_val=$((${current:-0} + 1))
-    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
-    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp" || {
-        rm -f "$tmp"
-        return 1
-    }
-    mv -f "$tmp" "$STATE_FILE" || {
-        rm -f "$tmp"
-        return 1
-    }
-    printf '%d' "$new_val"
+    local lock_file="$STATE_DIR/.state.lock"
+    {
+        flock -x 9
+        current=$(read_field "$path")
+        new_val=$((${current:-0} + 1))
+        tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+        jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp" || {
+            rm -f "$tmp"
+            return 1
+        }
+        mv -f "$tmp" "$STATE_FILE" || {
+            rm -f "$tmp"
+            return 1
+        }
+        printf '%d' "$new_val"
+    } 9>> "$lock_file"
 }
 
 # Decrementa campo numérico para zero (nunca negativo)
@@ -301,16 +305,20 @@ increment_field() {
 decrement_field_floor0() {
     local path="$1"
     local current new_val tmp
-    current=$(read_field "$path")
-    new_val=$((${current:-0} > 0 ? ${current:-0} - 1 : 0))
-    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
-    jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp" || {
-        rm -f "$tmp"
-        return 1
-    }
-    mv -f "$tmp" "$STATE_FILE" || {
-        rm -f "$tmp"
-        return 1
-    }
-    printf '%d' "$new_val"
+    local lock_file="$STATE_DIR/.state.lock"
+    {
+        flock -x 9
+        current=$(read_field "$path")
+        new_val=$((${current:-0} > 0 ? ${current:-0} - 1 : 0))
+        tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+        jq --argjson v "$new_val" "${path} = \$v" "$STATE_FILE" > "$tmp" || {
+            rm -f "$tmp"
+            return 1
+        }
+        mv -f "$tmp" "$STATE_FILE" || {
+            rm -f "$tmp"
+            return 1
+        }
+        printf '%d' "$new_val"
+    } 9>> "$lock_file"
 }
