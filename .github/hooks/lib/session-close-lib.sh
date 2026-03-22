@@ -103,6 +103,7 @@ session_close_main() {
     _sc_turn_num="${_sc_turn_num:-0}"
     _sc_turn_ended=$(read_field ".current_turn.ended_at" 2> /dev/null || printf '')
 
+    # shellcheck disable=SC2235 # agrupamento booleano com () é intencional — evita ambiguidade com &&
     if [[ "${_sc_turn_num}" != "0" ]] && [[ "${_sc_turn_num}" != "null" ]] \
         && ([[ -z "${_sc_turn_ended}" ]] || [[ "${_sc_turn_ended}" = "null" ]]); then
 
@@ -110,6 +111,7 @@ session_close_main() {
         _sc_subturn_num=$(read_field ".current_subturn.number" 2> /dev/null || printf '0')
         _sc_subturn_num="${_sc_subturn_num:-0}"
         _sc_subturn_ended=$(read_field ".current_subturn.ended_at" 2> /dev/null || printf '')
+        # shellcheck disable=SC2235 # agrupamento booleano com () é intencional — evita ambiguidade com &&
         if [[ "${_sc_subturn_num}" != "0" ]] && [[ "${_sc_subturn_num}" != "null" ]] \
             && ([[ -z "${_sc_subturn_ended}" ]] || [[ "${_sc_subturn_ended}" = "null" ]]); then
             update_nested_state "current_subturn.ended_at" "$(now_iso)"

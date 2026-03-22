@@ -1651,6 +1651,27 @@ else
 fi
 teardown
 
+# T89: log_audit() grava linha no audit.jsonl via common.sh (integração R-13 — contador em memória)
+setup
+begin_test "T89: log_audit grava no audit.jsonl e habilita contador R-13"
+write_state "$(_state_aq_false 1)"
+_t89_audit="$TEST_DIR/audit.jsonl"
+_t89_before=0
+[[ -f "$_t89_audit" ]] && _t89_before=$(wc -l < "$_t89_audit" 2>/dev/null | tr -d ' ') || _t89_before=0
+(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    log_audit "test_event_t89" "key" "val" 2>/dev/null || true
+) 2>/dev/null || true
+_t89_after=0
+[[ -f "$_t89_audit" ]] && _t89_after=$(wc -l < "$_t89_audit" 2>/dev/null | tr -d ' ') || _t89_after=0
+if [[ "${_t89_after:-0}" -gt "${_t89_before:-0}" ]]; then
+    pass
+else
+    fail "T89" "log_audit nao gravou linha: before=$_t89_before after=$_t89_after"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 

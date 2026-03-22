@@ -149,6 +149,7 @@ _session_start_append_watchdog_alerts() {
             done
             printf '\n'
         fi
+        # shellcheck disable=SC2016 # backticks literais para markdown — não são expansão de comando
         printf '_Verifique com: `bash .github/hooks/scripts/watchdog.sh`_\n'
     } >> "$BRIEFING_FILE"
 

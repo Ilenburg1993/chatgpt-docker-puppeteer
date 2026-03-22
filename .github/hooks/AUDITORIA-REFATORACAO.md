@@ -446,12 +446,29 @@ mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
 
 **Sprint 13**: `write_state()` em `state-crud.sh:145` e `complete-task.sh:37` corrigidos para incluir `|| { rm -f "$tmp"; return 1; }` após `mv -f`. Todos os 7 `mv -f` em `state-crud.sh` e 3 em `turn-lifecycle.sh` agora têm guard de erro.
 
-### 4.4 `_audit_cap_check()` — Chamada após Cada Evento
+### 4.4 `_audit_cap_check()` — Chamada após Cada Evento — ✅ RESOLVIDO (Sprint 14)
 
-**Arquivo**: `lib/common.sh:315-340`
-**Problema**: `_audit_cap_check()` usa `wc -l` para contar linhas após cada evento gravado. Em sessões longas (> 5000 linhas), isso é potencialmente lento pois lê o arquivo inteiro.
+**Arquivo**: `lib/audit-lib.sh:56-91`
+**Problema original**: `_audit_cap_check()` usava `wc -l` para contar linhas após cada evento gravado. Em sessões longas (> 5000 linhas), isso é potencialmente lento pois lê o arquivo inteiro.
 
-**Alternativa**: Manter contador em memória (variável global `_AUDIT_LINE_COUNT`) e incrementar na função `log_audit`; só chamar `wc -l` na inicialização para sincronizar.
+**Solução implementada (R-13)**: Contador em memória `_AUDIT_LINE_COUNT` (global, init=0) é
+incrementado em `hook_log_audit` após cada escrita (linha 159). `_audit_cap_check()` só chama
+`wc -l` quando o contador é 0 (primeira chamada, pós-rotação ou subshell sem herança). Após
+rotação, o contador é resetado para 1.
+
+```bash
+# audit-lib.sh:61 — fast path: contador em memória
+if [[ "${_AUDIT_LINE_COUNT:-0}" -gt 0 ]] && [[ "${_AUDIT_LINE_COUNT:-0}" -lt "$max" ]]; then
+    return 0
+fi
+# cai aqui apenas no init (contador=0) ou quando próximo ao cap (≥ max)
+count=$(wc -l < "$AUDIT_FILE" 2>/dev/null | tr -d ' ') || return 0
+# ...
+# audit-lib.sh:159 — incremento por evento
+_AUDIT_LINE_COUNT=$((_AUDIT_LINE_COUNT + 1))
+```
+
+**Status**: ✅ Resolvido — R-13 implementado em `audit-lib.sh`.
 
 ---
 
