@@ -1716,6 +1716,46 @@ else
 fi
 teardown
 
+# T92: hook_subagent_depth retorna 0 quando subagents_active=0 (api/12-subagent.sh)
+setup
+begin_test "T92: hook_subagent_depth retorna 0 sem subagentes ativos"
+write_state "$(_state_aq_false 1)"  # state sem subagents_active
+_t92_val=''
+_t92_val=$(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    source "$HOOK_DIR/lib/api/01-vars.sh"
+    source "$HOOK_DIR/lib/api/12-subagent.sh"
+    hook_subagent_depth
+) 2>/dev/null || true
+if [[ "${_t92_val:-}" = "0" ]]; then
+    pass
+else
+    fail "T92" "hook_subagent_depth esperado=0 obtido='$_t92_val'"
+fi
+teardown
+
+# T93: hook_compact_ctx_session_summary emite markdown com turnos (api/11-compact-context.sh)
+setup
+begin_test "T93: hook_compact_ctx_session_summary inclui stats em markdown"
+write_state "$(_state_aq_false 2)"
+_t93_out=''
+_t93_out=$(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    source "$HOOK_DIR/lib/api/01-vars.sh"
+    source "$HOOK_DIR/lib/api/09-metrics.sh"
+    source "$HOOK_DIR/lib/api/10-close-key.sh"
+    source "$HOOK_DIR/lib/api/11-compact-context.sh"
+    hook_compact_ctx_session_summary
+) 2>/dev/null || true
+if printf '%s' "${_t93_out:-}" | grep -q 'Turnos totais'; then
+    pass
+else
+    fail "T93" "hook_compact_ctx_session_summary sem 'Turnos totais': '${_t93_out:0:80}'"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 
