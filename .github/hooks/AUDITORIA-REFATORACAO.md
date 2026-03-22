@@ -609,9 +609,9 @@ GAP-42, GAP-43, GAP-44, GAP-45, GAP-56, GAP-62, GAP-63, GAP-64, GAP-65
 | ---- | ------------------------------------------------------------------------------------------------- | ----------------------------- | ------------------------ |
 | R-01 | ✅ Deletar `hook-payload-api.sh.bak` — **Resolvido Sprint 9**                                                | `lib/hook-payload-api.sh.bak` | Arquivo deletado           |
 | R-02 | ✅ Corrigir `printf -- '- %s\n'` em `session-start-lib.sh:141,148` — **Resolvido Sprint 8**                   | `lib/session-start-lib.sh`    | Fix aplicado               |
-| R-03 | Sanitizar `pending_tasks_content` em `generate_session_briefing()`                                | `lib/common.sh:793`           | Markdown injection       |
-| R-04 | Padronizar LANG para `export_lang_utf8()` em `session-close-lib.sh:11` e `hook-payload-api.sh:55` | Dois arquivos                 | Inconsistência LANG      |
-| R-05 | Criar `read_field_bool()` para leitura de campos booleanos                                        | `lib/common.sh`               | Bug bool false pervasivo |
+| R-03 | ✅ Sanitizar `pending_tasks_content` em `generate_session_briefing()` — **Resolvido Sprint 8** via bloco de código em `briefing.sh:66` | `lib/briefing.sh:66`          | Markdown injection bloqueada |
+| R-04 | ✅ Padronizar LANG via `export_lang_utf8()` — **Resolvido Sprint 8** — definido em `utils.sh:132`, chamado em todos os entry points | Todos os entry points         | Consistente                  |
+| R-05 | ✅ Criar `read_field_bool()` para leitura de campos booleanos — **Resolvido Sprint 8** em `lib/state-crud.sh:32` | `lib/state-crud.sh:32`        | Bug bool false eliminado     |
 
 #### Nível 2 — Refatoração Estrutural (Médio Prazo)
 
