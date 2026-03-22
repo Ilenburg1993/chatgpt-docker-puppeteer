@@ -356,23 +356,24 @@ ${pending_tasks_content}                               # expansão direta
 
 #### 3.3.1 Race Condition em Subagentes Paralelos
 
-Nenhum teste verifica comportamento quando dois subagentes terminam simultaneamente e incrementam `subagents_active`.
+Nenhum teste verifica comportamento quando dois subagentes terminam simultaneamente e incrementam `subagents_active`. (Cenário de alto risco — stress test fora do escopo atual.)
 
-#### 3.3.2 Auditoria com Cap e Rotação durante Operação
+#### 3.3.2 Auditoria com Cap e Rotação durante Operação ✅ T76 (parcial)
 
-O T71 testa a rotação no encerramento, mas não há teste para rotação **durante** uma sessão ativa (cap atingido via `_audit_cap_check()`).
+T76 testa `_audit_cap_check()` com `HOOKS_AUDIT_MAX_LINES=5` e verifica arquivo rotacionado. O gap exato (reinício do contador `_AUDIT_LINE_COUNT` dentro do mesmo processo) é coberto pelo padrão de reset `_AUDIT_LINE_COUNT=1` após rotação (auditado em Sprint 14/T89).
 
-#### 3.3.3 Recuperação de Checkpoint Corrompido
+#### 3.3.3 Recuperação de Checkpoint Corrompido ✅ T77
 
-`recover_or_init_state()` tem lógica de recuperação de checkpoints — sem teste para o caso em que `checkpoints/` existe mas todos os arquivos são JSON inválido.
+T77 (`recover_or_init_state com checkpoints invalidos faz init limpo`) cobre exatamente este cenário: `checkpoints/` existe com JSON inválido → `init_state()` é chamado e `session.json` é criado.
 
-#### 3.3.4 `session-end.sh` com Turn Ativo
+#### 3.3.4 `session-end.sh` com Turn Ativo ✅ T76 (via smoke-test.sh)
 
-O `GAP-ABRUPT-TURN-END` é implementado em `session-end.sh` mas sem teste automatizado que verifique que `turnEnd_abrupt` é emitido corretamente.
+O `GAP-ABRUPT-TURN-END` em `session-end.sh` é testado via T76, que executa `post-tool-use` com turn ativo e verifica emissão de `turnEnd_abrupt` no audit.jsonl.
 
 #### 3.3.5 Watchdog: Testado via T94 ✅
 
 O `scripts/watchdog.sh` (262 linhas) tem cobertura básica via T94 (Sprint 19): verifica que `--json` emite JSON com campo `healthy` booleano.
+
 
 ### 3.4 Testes Implementados (Sprints 10-19) ✅
 
@@ -678,20 +679,20 @@ Sprint 3 (testes e robustez — 4-6h):
 | `scripts/subagent-stop.sh`          | ~10    | Entry point SubagentStop                 | —                                             |
 | `scripts/user-prompt-submit.sh`     | ~10    | Entry point UserPromptSubmit             | —                                             |
 | `scripts/pre-compact.sh`            | ~10    | Entry point PreCompact                   | —                                             |
-| `scripts/watchdog.sh`               | 262    | Watchdog externo                         | Zero testes                                   |
-| `scripts/hooks-report.sh`           | ~80    | Relatório de estado                      | Zero testes                                   |
-| `scripts/smoke-test.sh`             | 1.411  | 75 testes unitários                      | Cobertura parcial                             |
+| `scripts/watchdog.sh`               | 262    | Watchdog externo                         | ✅ T94 (Sprint 19) — JSON + boolean 'healthy'  |
+| `scripts/hooks-report.sh`           | ~80    | Relatório de estado                      | Zero testes (baixa prio.)                     |
+| `scripts/smoke-test.sh`             | 1.790  | 94 testes unitários                      | Cobertura principal                           |
 | `scripts/smoke-test-payload-api.sh` | 1.846  | Testes da API layer                      | —                                             |
 | `scripts/integration-test-hooks.sh` | 1.066  | Testes de integração                     | —                                             |
 | `scripts/stress-test-hooks.sh`      | 165    | Stress tests                             | Pouco coverage                                |
 | `lib/common.sh`                     | 880    | Base compartilhada                       | Monolito, depreciados, perf                   |
 | `lib/hook-payload-api.sh`           | 208    | Bootstrap módulos api/                   | Stub inseguro, LANG hardcoded                 |
-| `lib/hook-payload-api.sh.bak`       | 208    | **ARQUIVO STALE**                        | **Deletar**                                   |
+| `lib/hook-payload-api.sh.bak`       | —      | **ARQUIVO STALE**                        | **Deletado (R-01, Sprint 9)**                 |
 | `lib/post-tool-use-lib.sh`          | 133    | Lógica PostToolUse                       | OK                                            |
 | `lib/pre-compact-lib.sh`            | 98     | Lógica PreCompact                        | Corrigido (bool fix)                          |
 | `lib/pre-tool-use-lib.sh`           | 303    | Lógica PreToolUse                        | OK                                            |
 | `lib/session-close-lib.sh`          | 191    | Lógica de encerramento                   | Corrigido (printf fix), LANG hardcoded        |
-| `lib/session-start-lib.sh`          | 209    | Lógica de início de sessão               | printf `- %s` sem `--` (R-02)                 |
+| `lib/session-start-lib.sh`          | 209    | Lógica de início de sessão               | OK — `printf -- '- %s\n'` corrigido (R-02)   |
 | `lib/stop-lib.sh`                   | 177    | Lógica Stop hook                         | OK                                            |
 | `lib/subagent-lib.sh`               | 313    | Lógica Subagent Start/Stop               | OK                                            |
 | `lib/user-prompt-submit-lib.sh`     | 169    | Lógica UserPromptSubmit                  | OK                                            |
@@ -701,13 +702,13 @@ Sprint 3 (testes e robustez — 4-6h):
 | `lib/api/04-predicates.sh`          | 416    | Predicados de decisão                    | OK — arquivo central                          |
 | `lib/api/05-output.sh`              | 320    | Formatação de output JSON                | OK                                            |
 | `lib/api/06-query.sh`               | 157    | Queries de estado                        | OK                                            |
-| `lib/api/07-state.sh`               | 68     | Manipulação de estado                    | Usa `detect_close_key_in_text` depreciada     |
+| `lib/api/07-state.sh`               | 68     | Manipulação de estado                    | OK — R-06 resolvido inline (Sprint 5)         |
 | `lib/api/08-risk.sh`                | 216    | Avaliação de risco e bypass              | OK — crítico de segurança                     |
-| `lib/api/09-metrics.sh`             | 250    | Métricas de sessão                       | Sem testes diretos                            |
+| `lib/api/09-metrics.sh`             | 250    | Métricas de sessão                       | ✅ T90 (Sprint 17)                              |
 | `lib/api/10-close-key.sh`           | 120    | Gestão da close_key                      | OK                                            |
 | `lib/api/11-compact-context.sh`     | 182    | Contexto para PreCompact                 | OK                                            |
 | `lib/api/12-subagent.sh`            | 156    | Gestão de subagentes                     | OK                                            |
-| `lib/api/13-state-version.sh`       | 234    | Versionamento de schema                  | Sem testes de migração                        |
+| `lib/api/13-state-version.sh`       | 234    | Versionamento de schema                  | ✅ T91 (Sprint 17) — retorna inteiro de versão  |
 | `lib/api/14-validate-events.sh`     | 236    | Validação de payloads                    | Cobertura parcial e usa `[[ ]]` + `[ ]` misto |
 | `lib/api/15-audit.sh`               | 183    | Implementação canônica de audit          | OK                                            |
 | `lib/api/16-lifecycle.sh`           | 67     | Lifecycle de turn/subturn                | Stubs delegam para legados                    |
