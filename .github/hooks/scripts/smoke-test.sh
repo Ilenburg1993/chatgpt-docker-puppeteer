@@ -1678,6 +1678,44 @@ else
 fi
 teardown
 
+# T90: hook_stat_turn_count retorna inteiro do session.json (api/09-metrics.sh)
+setup
+begin_test "T90: hook_stat_turn_count retorna turn_count do state"
+write_state "$(_state_aq_false 3)"  # turn_count=3 via _state_aq_false
+_t90_val=''
+_t90_val=$(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    source "$HOOK_DIR/lib/api/01-vars.sh"
+    source "$HOOK_DIR/lib/api/09-metrics.sh"
+    hook_stat_turn_count
+) 2>/dev/null || true
+if [[ "${_t90_val:-}" = "3" ]]; then
+    pass
+else
+    fail "T90" "hook_stat_turn_count esperado=3 obtido='$_t90_val'"
+fi
+teardown
+
+# T91: hook_state_version retorna versão do schema do session.json (api/13-state-version.sh)
+setup
+begin_test "T91: hook_state_version retorna state_schema_version do state"
+write_state "$(_state_aq_false 1)"  # _state_aq_false gera state_schema_version=3
+_t91_val=''
+_t91_val=$(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    source "$HOOK_DIR/lib/api/01-vars.sh"
+    source "$HOOK_DIR/lib/api/13-state-version.sh"
+    hook_state_version
+) 2>/dev/null || true
+if [[ "${_t91_val:-}" =~ ^[0-9]+$ ]]; then
+    pass
+else
+    fail "T91" "hook_state_version nao retornou inteiro: '$_t91_val'"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 
