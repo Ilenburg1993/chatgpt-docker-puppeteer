@@ -328,29 +328,29 @@ ${pending_tasks_content}                               # expansão direta
 
 | Arquivo de Teste            | Linhas    | Casos    | Foco                                               |
 | --------------------------- | --------- | -------- | -------------------------------------------------- |
-| `smoke-test.sh`             | 1.411     | 75       | Stop hook, estado core, session-close, pre-compact |
-| `smoke-test-payload-api.sh` | 1.846     | ~60+     | Módulos api/ (parse, validate, output, etc.)       |
+| `smoke-test.sh`             | 1.790     | 94       | Stop hook, estado core, session-close, pre-compact, watchdog |
+| `smoke-test-payload-api.sh` | 1.848     | ~60+     | Módulos api/ (parse, validate, output, etc.)       |
 | `integration-test-hooks.sh` | 1.066     | ~30+     | Integração entre hooks                             |
 | `stress-test-hooks.sh`      | 165       | ~10      | Concorrência e stress                              |
-| **Total**                   | **4.488** | **~175** | —                                                  |
+| **Total**                   | **4.869** | **~194** | —                                                  |
 
 ### 3.2 Gaps de Cobertura por Módulo
 
-#### Módulos Sem Cobertura Direta em Smoke Tests (status atualizado Sprint 12):
+#### Módulos Sem Cobertura Direta em Smoke Tests (status atualizado Sprint 19):
 
 | Módulo                              | Gap Identificado                              | Resolvido                |
 | ----------------------------------- | --------------------------------------------- | ------------------------ |
-| `api/09-metrics.sh`                 | Sem testes de cálculo de métricas de duração  | ⚙️ Pendente (baixa prio.) |
-| `api/11-compact-context.sh`         | Pouco coverage de serialização de contexto    | ⚙️ Pendente (baixa prio.) |
-| `api/12-subagent.sh`                | Budget/depth limits só testados indiretamente | ⚙️ Pendente (baixa prio.) |
-| `api/13-state-version.sh`           | Migration de versão de schema não testada     | ⚙️ Pendente (baixa prio.) |
+| `api/09-metrics.sh`                 | Sem testes de cálculo de métricas de duração  | ✅ T90 (Sprint 17)        |
+| `api/11-compact-context.sh`         | Pouco coverage de serialização de contexto    | ✅ T93 (Sprint 18)        |
+| `api/12-subagent.sh`                | Budget/depth limits só testados indiretamente | ✅ T92 (Sprint 18)        |
+| `api/13-state-version.sh`           | Migration de versão de schema não testada     | ✅ T91 (Sprint 17)        |
 | `lib/common.sh` `generate_briefing` | Sem teste direto do output do briefing        | ✅ T79 (Sprint 8)         |
 | `lib/common.sh` `uuidgen_safe()`    | Sem teste de fallback                         | ✅ T85 (Sprint 10)        |
 | `lib/common.sh` `read_field_bool()` | Sem teste direto                              | ✅ T84 (Sprint 10)        |
 | `lib/turn-lifecycle.sh` `open_new_turn_batch()` | Sem teste direto               | ✅ T86 (Sprint 10)        |
 | `lib/state-crud.sh` `increment_field()` (flock) | Sem teste de incremento direto | ✅ T88 (Sprint 12)        |
 | `lib/state-crud.sh` `decrement_field_floor0()`  | Sem teste de floor behavior    | ✅ T87 (Sprint 12)        |
-| `scripts/watchdog.sh`               | Zero testes automatizados do watchdog         | ⚙️ Pendente (baixa prio.) |
+| `scripts/watchdog.sh`               | Zero testes automatizados do watchdog         | ✅ T94 (Sprint 19)        |
 
 ### 3.3 Cenários Críticos Sem Testes de Regressão
 
@@ -370,9 +370,9 @@ O T71 testa a rotação no encerramento, mas não há teste para rotação **dur
 
 O `GAP-ABRUPT-TURN-END` é implementado em `session-end.sh` mas sem teste automatizado que verifique que `turnEnd_abrupt` é emitido corretamente.
 
-#### 3.3.5 Watchdog: Nenhum Teste
+#### 3.3.5 Watchdog: Testado via T94 ✅
 
-O `scripts/watchdog.sh` (262 linhas) não tem nenhum teste de regressão. Ele é invocado externamente via cron/scheduler para detectar sessões travadas.
+O `scripts/watchdog.sh` (262 linhas) tem cobertura básica via T94 (Sprint 19): verifica que `--json` emite JSON com campo `healthy` booleano.
 
 ### 3.4 Testes Implementados (Sprints 10-19) ✅
 
