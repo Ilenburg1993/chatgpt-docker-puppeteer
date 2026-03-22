@@ -602,14 +602,14 @@ GAP-42, GAP-43, GAP-44, GAP-45, GAP-56, GAP-62, GAP-63, GAP-64, GAP-65
 
 #### Nível 2 — Refatoração Estrutural (Médio Prazo)
 
-| #    | Ação                                                                 | Impacto Esperado                     |
-| ---- | -------------------------------------------------------------------- | ------------------------------------ |
-| R-06 | Dividir `common.sh` em módulos menores                               | Manutenibilidade ↑                   |
-| R-07 | Criar `open_new_turn_batch()` com jq único                           | Performance: -80% I/O no turn open   |
-| R-08 | Migrar `log_audit()` em `common.sh:605` para `hook_log_audit()`      | Consistência API                     |
-| R-09 | Implementar `hook_turn_is_orphaned` nativamente em `16-lifecycle.sh` | Eliminar indireção dupla             |
-| R-10 | Criar `find_audit_file()` canônico                                   | Fix estrutural da questão de rotação |
-| R-11 | Criar `lib/loader.sh` centralizado                                   | Ordem de carregamento garantida      |
+| #    | Ação                                                                                                                                                         | Impacto Esperado                     |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| R-06 | ✅ Dividir `common.sh` em módulos menores — `state-crud.sh`, `audit-lib.sh`, `utils.sh`, `turn-lifecycle.sh`, `briefing.sh`; `common.sh` → 48-line aggregator | Manutenibilidade ↑                   |
+| R-07 | Criar `open_new_turn_batch()` com jq único                                                                                                                   | Performance: -80% I/O no turn open   |
+| R-08 | Migrar `log_audit()` em `common.sh:605` para `hook_log_audit()`                                                                                              | Consistência API                     |
+| R-09 | Implementar `hook_turn_is_orphaned` nativamente em `16-lifecycle.sh`                                                                                         | Eliminar indireção dupla             |
+| R-10 | Criar `find_audit_file()` canônico                                                                                                                           | Fix estrutural da questão de rotação |
+| R-11 | Criar `lib/loader.sh` centralizado                                                                                                                           | Ordem de carregamento garantida      |
 
 #### Nível 3 — Melhorias de Robustez (Longo Prazo)
 
