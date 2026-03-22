@@ -346,8 +346,9 @@ _AUDIT_LINE_COUNT=0
 _audit_cap_check() {
     [[ -f "$AUDIT_FILE" ]] || return 0
     local max="${HOOKS_AUDIT_MAX_LINES:-5000}"
-    # R-13: usa contador em memória quando disponível; recalcula se zerado
-    if [ "${_AUDIT_LINE_COUNT:-0}" -lt "$max" ]; then
+    # R-13: usa contador em memória quando disponível; ignora otimização se zerado
+    # (contador 0 = subshell sem herança ou pós-rotação imediata; usa wc -l em vez disso)
+    if [[ "${_AUDIT_LINE_COUNT:-0}" -gt 0 ]] && [[ "${_AUDIT_LINE_COUNT:-0}" -lt "$max" ]]; then
         return 0
     fi
     # Confirmar com wc -l antes de rotacionar (contador pode estar dessincronizado)

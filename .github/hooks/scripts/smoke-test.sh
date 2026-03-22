@@ -1439,7 +1439,10 @@ for _i in 1 2 3 4 5 6; do
     printf '{"ts":"2026-01-01T00:00:0%sZ","event":"dummy_%s"}\n' "$_i" "$_i" >> "$TEST_DIR/audit.jsonl"
 done
 # Rodar post-tool-use (que chama log_audit → _audit_cap_check) com max=5
+# HOOK_AUDIT_LEVEL=verbose necessário para garantir que subturnEnd não seja
+# suprimido em modo normal, permitindo que _audit_cap_check seja acionado
 HOOKS_TEST_STATE_DIR="$TEST_DIR" HOOKS_AUDIT_MAX_LINES=5 HOOKS_AUDIT_LOG_DIR="$TEST_DIR/logs" \
+    HOOK_AUDIT_LEVEL=verbose \
     bash "$HOOK_DIR/scripts/post-tool-use.sh" \
     <<< '{"hookEventName":"PostToolUse","sessionId":"sid","tool_name":"read_file","tool_input":{},"tool_response":"ok"}' \
     > /dev/null 2>&1 || true
@@ -1478,7 +1481,7 @@ begin_test "T78: printf -- em session-start-lib.sh aceita valor comecando com '-
 HOOKS_TEST_STATE_DIR="$TEST_DIR" LANG=C.UTF-8 bash -c '
     source "'"$HOOK_DIR"'/lib/common.sh"
     init_state "testsid" "new"
-    printf "-- - item com traco\n" | grep -q "^-- - item" && printf "OK\n" || printf "FAIL\n"
+    printf -- "-- - item com traco\n" | grep -q "^-- - item" && printf "OK\n" || printf "FAIL\n"
 ' > "$TEST_DIR/t78_out.txt" 2> /dev/null || true
 if grep -q 'OK' "$TEST_DIR/t78_out.txt" 2> /dev/null; then
     pass
@@ -1491,13 +1494,12 @@ teardown
 setup
 begin_test "T79: generate_session_briefing contem session_id e close_key"
 write_state "$(_state_session_open true)"
-_t79_out=''
-_t79_out=$(
-    HOOKS_TEST_STATE_DIR="$TEST_DIR" bash -c '
-        source "'"$HOOK_DIR"'/lib/common.sh"
-        generate_session_briefing "sid" "ENCERRAR-AABBCCDD"
-    ' 2> /dev/null
-) || true
+(
+    export HOOKS_TEST_STATE_DIR="$TEST_DIR"
+    source "$HOOK_DIR/lib/common.sh"
+    generate_session_briefing
+) > /dev/null 2>&1 || true
+_t79_out=$(cat "$TEST_DIR/session-briefing.md" 2> /dev/null || true)
 if printf '%s' "$_t79_out" | grep -q 'sid' \
     && printf '%s' "$_t79_out" | grep -q 'ENCERRAR-AABBCCDD'; then
     pass

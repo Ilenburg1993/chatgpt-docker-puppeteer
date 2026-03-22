@@ -32,8 +32,10 @@
 #   hook_api_from_file <f>     — definido em 06-query.sh
 #   hook_api_list_captures     — definido em 06-query.sh
 #
-# DEPENDÊNCIA: common.sh (jq_field, detect_close_key_in_text, maybe_capture_debug)
+# DEPENDÊNCIA: common.sh (jq_field, maybe_capture_debug)
 # Se não estiver disponível, fallbacks inline são usados automaticamente.
+# Nota: detect_close_key_in_text() [legada] era dependência até Sprint 5;
+# substituída por hook_close_key_detect_in_text() em api/10-close-key.sh.
 
 # shellcheck source=common.sh
 _HOOK_API_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,9 +46,6 @@ fi
 # Fallbacks inline se common.sh não estiver disponível
 if ! declare -f jq_field > /dev/null 2>&1; then
     jq_field() { printf '%s' "$1" | jq -r "${2} // empty"; }
-fi
-if ! declare -f detect_close_key_in_text > /dev/null 2>&1; then
-    detect_close_key_in_text() { return 1; }
 fi
 if ! declare -f maybe_capture_debug > /dev/null 2>&1; then
     maybe_capture_debug() { :; }
