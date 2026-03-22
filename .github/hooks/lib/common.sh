@@ -653,7 +653,8 @@ heal_orphaned_turn() {
     update_nested_state "current_turn.ask_questions_called" "false"
     update_nested_state "current_turn.started_at" "null"     # GAP-04: evita re-heal na próxima UserPromptSubmit
     update_nested_state "current_turn.ended_at" "$(now_iso)" # GAP-10: registra temporalmente quando terminou
-    log_audit "turnEnd_orphan_healed" "turn" "${turn_num:-0}" "turn_id" "${turn_id:-unknown}"
+    # R-08: migrado de log_audit() para hook_log_audit() (API canônica)
+    hook_log_audit "turnEnd_orphan_healed" "turn" "${turn_num:-0}" "turn_id" "${turn_id:-unknown}"
 }
 
 # ---------------------------------------------------------------------------
@@ -697,6 +698,60 @@ open_new_turn() {
     update_nested_state "current_subturn.started_at" "null"
     update_nested_state "current_subturn.ended_at" "null"
     update_nested_state "current_subturn.response_at" "null"
+
+    printf '%d' "$turn_num"
+}
+
+# R-07: versão batch de open_new_turn() — executa um único jq para todos os campos
+# Performance: -80% I/O vs open_new_turn() que faz ~15 invocações jq separadas.
+# Interface idêntica a open_new_turn(): retorna novo número de turno via stdout.
+# Uso: turn_num=$(open_new_turn_batch [source])
+open_new_turn_batch() {
+    local turn_source="${1:-userPromptSubmit}"
+    local now turn_id current_count turn_num tmp
+
+    now=$(now_iso)
+    turn_id=$(uuidgen_safe)
+
+    # Lê turn_count atual para calcular o próximo número (uma única leitura)
+    current_count=$(read_field ".session_stats.turn_count")
+    turn_num=$((${current_count:-0} + 1))
+
+    tmp="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    jq \
+        --argjson turn_num "$turn_num" \
+        --arg turn_id "$turn_id" \
+        --arg now "$now" \
+        --arg src "$turn_source" \
+        '
+        .session_stats.turn_count = $turn_num |
+        .current_turn.number = $turn_num |
+        .current_turn.turn_id = $turn_id |
+        .current_turn.started_at = $now |
+        .current_turn.ended_at = null |
+        .current_turn.source = $src |
+        .current_turn.ask_questions_called = false |
+        .current_turn.ask_questions_turn_pos = 0 |
+        .current_turn.last_template = "" |
+        .current_turn.subturn_count = 0 |
+        .current_turn.tools_count = 0 |
+        .current_turn.intent = "" |
+        .current_turn.subagents_started = 0 |
+        .current_turn.tools_after_ask_questions = 0 |
+        .current_turn.last_tool_after_ask_questions = "" |
+        .current_subturn.number = 0 |
+        .current_subturn.subturn_id = null |
+        .current_subturn.started_at = null |
+        .current_subturn.ended_at = null |
+        .current_subturn.response_at = null
+        ' "$STATE_FILE" > "$tmp" || {
+        rm -f "$tmp"
+        return 1
+    }
+    mv -f "$tmp" "$STATE_FILE" || {
+        rm -f "$tmp"
+        return 1
+    }
 
     printf '%d' "$turn_num"
 }

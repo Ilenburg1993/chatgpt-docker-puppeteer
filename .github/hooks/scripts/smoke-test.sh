@@ -1419,8 +1419,8 @@ write_state "$(printf '{
     "compliance":{"consecutive_unauthorized":0,"last_turn_authorized":true}
 }')"
 _t75_rc=0
-export HOOKS_TEST_STATE_DIR="$TEST_DIR" && \
-    printf '{"hookEventName":"SessionEnd","sessionId":"sid"}' \
+export HOOKS_TEST_STATE_DIR="$TEST_DIR" \
+    && printf '{"hookEventName":"SessionEnd","sessionId":"sid"}' \
     | bash "$HOOK_DIR/scripts/session-end.sh" > /dev/null 2>&1 || _t75_rc=$?
 unset HOOKS_TEST_STATE_DIR
 if [ "$_t75_rc" -eq 0 ] && grep -q '"event":"turnEnd_abrupt"' "$TEST_DIR/audit.jsonl" 2> /dev/null; then
@@ -1463,11 +1463,11 @@ _t77_result=0
     source "$HOOK_DIR/lib/common.sh"
     recover_or_init_state "testsid" "new"
     state_exists && printf 'STATE_OK\n' || printf 'NO_STATE\n'
-) > "$TEST_DIR/t77_out.txt" 2>/dev/null || _t77_result=$?
+) > "$TEST_DIR/t77_out.txt" 2> /dev/null || _t77_result=$?
 if grep -q 'STATE_OK' "$TEST_DIR/t77_out.txt" 2> /dev/null && [ -f "$TEST_DIR/session.json" ]; then
     pass
 else
-    fail "T77" "recover_or_init_state deveria ter criado session.json; out=$(cat "$TEST_DIR/t77_out.txt" 2>/dev/null)"
+    fail "T77" "recover_or_init_state deveria ter criado session.json; out=$(cat "$TEST_DIR/t77_out.txt" 2> /dev/null)"
 fi
 teardown
 
@@ -1479,11 +1479,11 @@ HOOKS_TEST_STATE_DIR="$TEST_DIR" LANG=C.UTF-8 bash -c '
     source "'"$HOOK_DIR"'/lib/common.sh"
     init_state "testsid" "new"
     printf "-- - item com traco\n" | grep -q "^-- - item" && printf "OK\n" || printf "FAIL\n"
-' > "$TEST_DIR/t78_out.txt" 2>/dev/null || true
+' > "$TEST_DIR/t78_out.txt" 2> /dev/null || true
 if grep -q 'OK' "$TEST_DIR/t78_out.txt" 2> /dev/null; then
     pass
 else
-    fail "T78" "LANG=C.UTF-8 com printf -- deve aceitar '-'; out=$(cat "$TEST_DIR/t78_out.txt" 2>/dev/null)"
+    fail "T78" "LANG=C.UTF-8 com printf -- deve aceitar '-'; out=$(cat "$TEST_DIR/t78_out.txt" 2> /dev/null)"
 fi
 teardown
 
@@ -1496,10 +1496,10 @@ _t79_out=$(
     HOOKS_TEST_STATE_DIR="$TEST_DIR" bash -c '
         source "'"$HOOK_DIR"'/lib/common.sh"
         generate_session_briefing "sid" "ENCERRAR-AABBCCDD"
-    ' 2>/dev/null
+    ' 2> /dev/null
 ) || true
-if printf '%s' "$_t79_out" | grep -q 'sid' && \
-   printf '%s' "$_t79_out" | grep -q 'ENCERRAR-AABBCCDD'; then
+if printf '%s' "$_t79_out" | grep -q 'sid' \
+    && printf '%s' "$_t79_out" | grep -q 'ENCERRAR-AABBCCDD'; then
     pass
 else
     fail "T79" "briefing deveria conter session_id e close_key; out_len=${#_t79_out}"
@@ -1516,8 +1516,8 @@ _t80_rc=0
     source "$HOOK_DIR/lib/common.sh"
     open_new_turn "t_new" "new_turn_id"
 ) > /dev/null 2>&1 || _t80_rc=$?
-_t80_aq=$(jq -r '.current_turn.ask_questions_called' "$TEST_DIR/session.json" 2>/dev/null)
-_t80_num=$(jq -r '.current_turn.number' "$TEST_DIR/session.json" 2>/dev/null)
+_t80_aq=$(jq -r '.current_turn.ask_questions_called' "$TEST_DIR/session.json" 2> /dev/null)
+_t80_num=$(jq -r '.current_turn.number' "$TEST_DIR/session.json" 2> /dev/null)
 if [ "${_t80_aq}" = "false" ] && [ "${_t80_num:-0}" -gt 0 ]; then
     pass
 else
@@ -1532,7 +1532,7 @@ _t81_key=''
 _t81_key=$(
     source "$HOOK_DIR/lib/common.sh"
     make_close_key
-) 2>/dev/null || true
+) 2> /dev/null || true
 if printf '%s' "$_t81_key" | grep -qE '^ENCERRAR-[0-9A-F]{8}$'; then
     pass
 else
@@ -1548,7 +1548,7 @@ _t82_path=$(
     export HOOKS_TEST_STATE_DIR="$TEST_DIR"
     source "$HOOK_DIR/lib/common.sh"
     find_audit_file
-) 2>/dev/null || true
+) 2> /dev/null || true
 if printf '%s' "$_t82_path" | grep -q 'audit.jsonl'; then
     pass
 else

@@ -49,7 +49,8 @@ hook_heal_orphaned_turn() {
     update_nested_state "current_turn.ask_questions_called" "false"
     update_nested_state "current_turn.started_at" "null"
     update_nested_state "current_turn.ended_at" "$(now_iso)"
-    log_audit "turnEnd_orphan_healed" "turn" "${turn_num:-0}" "turn_id" "${turn_id:-unknown}"
+    # R-08: migrado de log_audit() para hook_log_audit() (API canônica)
+    hook_log_audit "turnEnd_orphan_healed" "turn" "${turn_num:-0}" "turn_id" "${turn_id:-unknown}"
 }
 
 # ─── SEÇÃO 16C: HEARTBEAT DE SESSÃO ─────────────────────────────────────────
