@@ -374,7 +374,7 @@ O `GAP-ABRUPT-TURN-END` é implementado em `session-end.sh` mas sem teste automa
 
 O `scripts/watchdog.sh` (262 linhas) não tem nenhum teste de regressão. Ele é invocado externamente via cron/scheduler para detectar sessões travadas.
 
-### 3.4 Testes Implementados (Sprints 10-18) ✅
+### 3.4 Testes Implementados (Sprints 10-19) ✅
 
 | ID  | Descrição                                                                  | Status         |
 | --- | -------------------------------------------------------------------------- | -------------- |
@@ -395,6 +395,7 @@ O `scripts/watchdog.sh` (262 linhas) não tem nenhum teste de regressão. Ele é
 | T91 | `hook_state_version()` retorna inteiro de state_schema_version (api/13)    | ✅ Sprint 17    |
 | T92 | `hook_subagent_depth()` retorna 0 sem subagentes ativos (api/12)           | ✅ Sprint 18    |
 | T93 | `hook_compact_ctx_session_summary()` emite markdown com stats (api/11)     | ✅ Sprint 18    |
+| T94 | `watchdog.sh --json` emite JSON com campo `healthy` booleano               | ✅ Sprint 19    |
 
 ### 3.5 Gaps Remanescentes (Baixa Prioridade)
 
@@ -404,7 +405,7 @@ O `scripts/watchdog.sh` (262 linhas) não tem nenhum teste de regressão. Ele é
 | `api/11-compact-context.sh` | Pouco coverage de serialização de contexto    | Baixa      | ✅ T93 (S18) |
 | `api/12-subagent.sh`        | Budget/depth limits só testados indiretamente | Baixa      | ✅ T92 (S18) |
 | `api/13-state-version.sh`   | Migration de versão de schema não testada     | Baixa      | ✅ T91 (S17) |
-| `scripts/watchdog.sh`       | Zero testes automatizados do watchdog         | Baixa      | Aberto      |
+| `scripts/watchdog.sh`       | Zero testes automatizados do watchdog         | Baixa      | ✅ T94 (S19) |
 
 ---
 

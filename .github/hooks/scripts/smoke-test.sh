@@ -1756,6 +1756,22 @@ else
 fi
 teardown
 
+# T94: watchdog.sh --json retorna JSON válido com campo "healthy" (boolean)
+setup
+begin_test "T94: watchdog.sh --json retorna JSON com campo 'healthy' (boolean)"
+_t94_out=''
+_t94_out=$(
+    HOOKS_TEST_STATE_DIR="$TEST_DIR" \
+    bash "$HOOK_DIR/scripts/watchdog.sh" --json 2>/dev/null
+) || true  # exit não-zero aceitável (deps ausentes no env de teste)
+_t94_healthy=$(printf '%s' "${_t94_out:-}" | jq -r 'if (.healthy | type) == "boolean" then "ok" else "no" end' 2>/dev/null || true)
+if [[ "${_t94_healthy:-}" = "ok" ]]; then
+    pass
+else
+    fail "T94" "watchdog --json sem booleano 'healthy': out='${_t94_out:0:80}'"
+fi
+teardown
+
 TOTAL=$((PASS + FAIL))
 _log "$(printf 'RESULTADO: %d/%d testes passaram' "$PASS" "$TOTAL")"
 
