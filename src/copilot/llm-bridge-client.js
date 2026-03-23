@@ -166,7 +166,7 @@ export class LlmBridgeClient {
                 role: 'assistant',
                 content: responseStr,
                 timestamp: Date.now(),
-                taskId: activeTaskId ?? undefined,
+                ...(activeTaskId != null ? { taskId: activeTaskId } : {}),
                 responseLen: responseStr.length,
             });
 
