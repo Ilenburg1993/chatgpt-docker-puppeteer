@@ -14,6 +14,7 @@ import { gitTools } from './git-tools.js';
 import { hookTools } from './hook-tools.js';
 import { introspectionTools, registerForIntrospection, setTelemetryStore } from './introspection-tools.js';
 import { sessionTools } from './session-tools.js';
+import { shellTools } from './shell-tools.js';
 import { taskTools } from './task-tools.js';
 
 /**
@@ -29,6 +30,7 @@ export const allTools = [
     ...hookTools,
     ...introspectionTools,
     ...fileTools,
+    ...shellTools,
 ];
 
 export {
@@ -42,5 +44,6 @@ export {
     registerForIntrospection,
     sessionTools,
     setTelemetryStore,
+    shellTools,
     taskTools,
 };

@@ -40,6 +40,7 @@ import {
     registerForIntrospection,
     sessionTools,
     setTelemetryStore,
+    shellTools,
     taskTools,
 } from './tools/index.js';
 
@@ -255,6 +256,10 @@ export class AlwaysAliveAgent extends EventEmitter {
             registerTools(this.#toolsRegistry, fileWriteTools, {
                 category: 'file',
                 tags: ['filesystem', 'io', 'write'],
+            });
+            registerTools(this.#toolsRegistry, shellTools, {
+                category: 'shell',
+                tags: ['exec', 'system', 'npm', 'node'],
             });
             // MCP tools registradas sem categoria específica pois são dinâmicas
             if (mcpTools.length > 0) {

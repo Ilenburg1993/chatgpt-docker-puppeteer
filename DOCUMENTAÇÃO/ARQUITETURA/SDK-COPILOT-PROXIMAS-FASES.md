@@ -11,8 +11,8 @@ revisado após auditoria SDK v0.2.0 (npm), auditorias de código e Sprints 15-16
 
 ### Estado atual da base de código (pós-Sprint 16c — commit 7ebb2843)
 
-| Módulo                         | Status                    | Sprint  |
-| ------------------------------ | ------------------------- | ------- |
+| Módulo                         | Status                   | Sprint  |
+| ------------------------------ | ------------------------ | ------- |
 | `lib/client.js`                | ✅ Implementado           | 10      |
 | `lib/session.js`               | ✅ Implementado           | 10      |
 | `lib/permissions.js`           | ✅ Implementado           | 10      |
@@ -118,36 +118,22 @@ revisado após auditoria SDK v0.2.0 (npm), auditorias de código e Sprints 15-16
 
 ---
 
-### Sprint 17 — File Tools ★ CRÍTICO (gap mais urgente)
+### Sprint 17 — File Tools ★ CRÍTICO ✅ CONCLUÍDO
 
-**Objetivo**: dar acesso ao filesystem para o LLM-B. **ROI**: mais alto de todos — sem file access,
-LLM-B é limitado. **Duração estimada**: 1 sprint.
+**Status**: ✅ Concluído em 2026-03-24 | Commit: `f6ec3970`
 
-#### Novas tools a criar em `src/copilot/tools/file-tools.js`
+**Implementado**:
 
-| Tool                 | Operação                  | skipPermission |
-| -------------------- | ------------------------- | -------------- |
-| `read_file_content`  | Ler conteúdo de arquivo   | ✅ sim         |
-| `write_file_content` | Escrever conteúdo         | ❌ não         |
-| `create_file`        | Criar novo arquivo        | ❌ não         |
-| `delete_file`        | Deletar arquivo           | ❌ não         |
-| `list_directory`     | Listar diretório          | ✅ sim         |
-| `search_in_file`     | Grep em arquivo/diretório | ✅ sim         |
-| `copy_file`          | Copiar arquivo            | ❌ não         |
-| `move_file`          | Mover/renomear arquivo    | ❌ não         |
+- `src/copilot/tools/file-tools.js` com 8 ferramentas de filesystem
+- `fileReadTools` (skipPermission: true): `read_file_content`, `list_directory`, `search_in_files`
+- `fileWriteTools` (skipPermission: false): `write_file_content`, `create_file`, `delete_file`, `copy_file`, `move_file`
+- `validatePath()`: previne traversal e bloqueia `.env`, `.git/`, `node_modules/`
+- `sdkParam` helper: resolve `ToolHandler<unknown>` type conflict
+- `tools/index.js`: fileTools incluídos em allTools; exports granulares por categoria
+- `always-alive.js`: registro por categoria (file-read/file-write) em vez de `{ category: 'all' }`
+- 41 testes unitários: 41/41 passando (`tests/unit/copilot/test_file_tools.spec.js`)
 
-**Restrições de segurança obrigatórias**:
-
-- `onPreToolUse` hook: restringir a `/workspaces/` e caminhos relativos
-- Bloquear acesso a `.env`, `*.pem`, `*.key`, `*secret*`
-- `write_file_content`/`create_file`/`delete_file`: requerer aprovação por default
-- `search_in_file`: suportar glob + regex; limitar output a 500 linhas
-
-**Critério de aceite**:
-
-- LLM-B lê `src/copilot/tools/index.js` sem pedir permissão
-- LLM-B escreve arquivo com confirmação do hook
-- Tests unitários em `tests/copilot/tools/file-tools.test.js`
+**Baseline de testes pós-Sprint 17**: 1319/1319 passando
 
 ---
 
@@ -189,132 +175,63 @@ import { SYSTEM_PROMPT_SECTIONS, CopilotClient } from '@github/copilot-sdk';
 
 ---
 
-### Sprint 19 — Session API Extensions ★ ALTO
+### Sprint 19 — Session API Extensions ★ ALTO ✅ CONCLUÍDO
 
-**Objetivo**: expor via API HTTP os novos métodos de sessão do SDK v0.2.0. **ROI**: alto — fecha
-gaps de API documentados. **Duração**: 0.5 sprint.
+**Status**: ✅ Concluído em 2026-03-24 | Commit: `f6ec3970`
 
-#### Novos endpoints em `sdk-api.js`
+**Implementado** (todos disponíveis em SDK v0.1.32):
 
-```js
-// POST /sessions/:id/abort
-// Abortar processamento atual
-router.post('/sessions/:id/abort', async (req, res) => {
-  const session = getActiveSession(req.params.id);
-  await session.abort();
-  res.json({ aborted: true });
-});
+| Endpoint                       | Método SDK                          | Notas                      |
+| ------------------------------ | ----------------------------------- | -------------------------- |
+| `POST /sessions/:id/abort`     | `session.abort()`                   | Aborta turn ativo          |
+| `GET /sessions/:id/messages`   | `session.getMessages()`             | Histórico completo         |
+| `GET /sessions/foreground`     | `client.getForegroundSessionId()`   | Antes de `/:id` no router  |
+| `PUT /sessions/foreground/:id` | `client.setForegroundSessionId(id)` | —                          |
+| `GET /agent/state`             | `client.getState()`                 | Retorna `ConnectionState`  |
+| `GET /agent/stream`            | `client.on()`                       | SSE de lifecycle do client |
 
-// GET /sessions/:id/messages
-// Obter todos os eventos/mensagens da sessão
-router.get('/sessions/:id/messages', async (req, res) => {
-  const session = getActiveSession(req.params.id);
-  const messages = await session.getMessages();
-  res.json({ messages });
-});
+- 13 novos testes em `tests/unit/copilot/test_sdk_api.spec.js` (suite Sprint 19)
+- Rotas `foreground` posicionadas antes de `/:id` para evitar captura incorreta pelo Express
 
-// GET /sessions/foreground
-router.get('/sessions/foreground', async (req, res) => {
-  const id = await client.getForegroundSessionId();
-  res.json({ sessionId: id ?? null });
-});
-
-// PUT /sessions/foreground/:id
-router.put('/sessions/foreground/:id', async (req, res) => {
-  await client.setForegroundSessionId(req.params.id);
-  res.json({ ok: true });
-});
-
-// GET /agent/state
-router.get('/agent/state', (req, res) => {
-  const state = client.getState();
-  res.json({ state });
-});
-
-// POST /client/force-stop
-router.post('/client/force-stop', async (req, res) => {
-  await client.forceStop();
-  res.json({ ok: true });
-});
-```
-
-#### Melhorias nos endpoints existentes
-
-- `GET /ping` → retornar `{ message, timestamp }` (tipagem correta do SDK)
-- `POST /sessions/:id/send` → retornar `{ messageId }` quando disponível
-- `POST /sessions/:id/send` → aceitar `timeout` na query string para `sendAndWait`
-- `GET /sessions/:id` → incluir `workspacePath` da sessão quando disponível
-
-**Critério de aceite**: todos os novos endpoints respondem 200; abort cancela o turn ativo
+**Baseline de testes pós-Sprint 19**: 1332/1332 passando
 
 ---
 
-### Sprint 20 — Agent Lifecycle Stream ★ MÉDIO
+### Sprint 20 — Agent Lifecycle Stream ★ MÉDIO ✅ CONCLUÍDO (incluído na Sprint 19)
 
-**Objetivo**: criar endpoint SSE para eventos de lifecycle do cliente (`client.on()`). **ROI**:
-médio — permite monitoramento em tempo real de qualquer session. **Duração**: 0.5 sprint.
+**Status**: ✅ Concluído em 2026-03-24 como parte da Sprint 19 | Commit: `f6ec3970`
 
-#### Novo endpoint `GET /agent/stream`
-
-```js
-router.get('/agent/stream', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  const handler = (event) => {
-    res.write(`event: ${event.type}\n`);
-    res.write(`data: ${JSON.stringify(event)}\n\n`);
-  };
-
-  // Eventos de lifecycle: session.created, session.deleted,
-  // session.updated, session.foreground, session.background
-  client.on(handler);
-
-  req.on('close', () => client.off?.(handler));
-});
-```
-
-#### Eventos a expor via SSE
-
-| Evento                        | Quando dispara                     |
-| ----------------------------- | ---------------------------------- |
-| `session.created`             | Nova sessão criada                 |
-| `session.deleted`             | Sessão deletada                    |
-| `session.updated`             | Sessão atualizada (modelo, estado) |
-| `session.foreground`          | Sessão tornada foreground (TUI)    |
-| `session.background`          | Sessão colocada em background      |
-| `session.compaction_start`    | Início de compactação de contexto  |
-| `session.compaction_complete` | Compactação concluída              |
-| `agent.connected`             | Cliente reconectou                 |
-| `agent.disconnected`          | Cliente desconectou                |
+**Implementado**: `GET /agent/stream` — SSE de eventos de lifecycle do `CopilotClient`. Ver Sprint 19 acima.
 
 ---
 
-### Sprint 21 — Shell Tools ★ MÉDIO
+### Sprint 21 — Shell Tools ★ MÉDIO ✅ CONCLUÍDO
 
-**Objetivo**: LLM-B pode executar comandos shell com sandboxing. **ROI**: médio — permite
-diagnósticos, execução de scripts, linting inline. **Duração**: 0.5 sprint.
+**Status**: ✅ Concluído em 2026-03-24 | Baseline: 1371/1371 testes passando
 
-#### Novas tools em `src/copilot/tools/shell-tools.js`
+**Implementado** em `src/copilot/tools/shell-tools.js`:
 
-| Tool             | Operação                   | skipPermission |
-| ---------------- | -------------------------- | -------------- |
-| `exec_command`   | Executa comando arbitrário | ❌ não         |
-| `run_npm_script` | Executa `npm run <script>` | ❌ não         |
-| `run_node_file`  | Executa `node <file>`      | ❌ não         |
+| Tool             | Operação                   | skipPermission | Segurança                                       |
+| ---------------- | -------------------------- | -------------- | ----------------------------------------------- |
+| `exec_command`   | Executa comando arbitrário | ❌ não          | Blocklist 15+ padrões, cwd restrito             |
+| `run_npm_script` | Executa `npm run <script>` | ❌ não          | Whitelist explícita de 20 scripts               |
+| `run_node_file`  | Executa `node <file>`      | ❌ não          | Ext. permitidas (.js/.mjs/.cjs), workspace only |
 
-**Restrições obrigatórias**:
+**Restrições de segurança embutidas**:
 
-- Timeout máximo configurável (default: 30s)
-- Blocklist de comandos perigosos (`rm -rf`, `dd`, `mkfs`, etc.)
-- Cwd restrito a `/workspaces/`
-- Output truncado a 10.000 chars
-- Não executar como root
+- Blocklist de comandos perigosos: `rm -rf`, `dd`, `mkfs`, `sudo`, `curl|bash`, etc.
+- Cwd restrito ao workspace (`/workspaces/chatgpt-docker-puppeteer/`)
+- Timeout máximo: 120s; default 30s (exec/node) / 60s (npm)
+- Output truncado a 10.000 bytes com aviso
+- Variáveis de ambiente sensíveis removidas do sub-processo (GITHUB_TOKEN, NPM_TOKEN, etc.)
+- `execFile` (não `exec`) para evitar injeção via shell interpolation
 
-**Nota sobre `session.rpc.shell.exec()`**: API experimental do SDK que pode ser equivalente mas não
-está documentada no npm oficial. Usar `child_process.spawn` ou `execa` como implementação base até
-confirmação.
+**Artefatos**:
+
+- `src/copilot/tools/shell-tools.js` — 3 tools
+- `tests/unit/copilot/test_shell_tools.spec.js` — 39 testes (39/39 passando)
+- `src/copilot/tools/index.js` — `shellTools` adicionado ao `allTools`
+- `src/copilot/always-alive.js` — registrado com `{category: 'shell', tags: ['exec', 'system', 'npm', 'node']}`
 
 ---
 
@@ -440,23 +357,29 @@ manutenção — sem testes, refactors são perigosos. **Duração**: 1-2 sprint
 
 ## Tabela de Prioridades e Dependências
 
-| Sprint | Título                 | Prioridade | Depende de | Estimativa  |
-| ------ | ---------------------- | ---------- | ---------- | ----------- |
-| 17     | File Tools             | CRÍTICO    | —          | 1 sprint    |
-| 18     | SDK v0.2.0 Upgrade     | ALTO       | —          | 0.5 sprint  |
-| 19     | Session API Extensions | ALTO       | 18         | 0.5 sprint  |
-| 20     | Agent Lifecycle Stream | MÉDIO      | 18/19      | 0.5 sprint  |
-| 21     | Shell Tools            | MÉDIO      | 17         | 0.5 sprint  |
-| 22     | System Message Upgrade | MÉDIO      | 18         | 0.5 sprint  |
-| 23     | OpenTelemetry Nativo   | BAIXO      | 18         | 0.5 sprint  |
-| 24     | Testes de Integração   | ALTO (QA)  | 17-22      | 1-2 sprints |
+| Sprint | Título                 | Status      | Prioridade | Depende de | Commit     |
+| ------ | ---------------------- | ----------- | ---------- | ---------- | ---------- |
+| 17     | File Tools             | ✅ CONCLUÍDO | CRÍTICO    | —          | `f6ec3970` |
+| 18     | SDK v0.2.0 Upgrade     | ⚠️ BLOQUEADO | ALTO       | —          | —          |
+| 19     | Session API Extensions | ✅ CONCLUÍDO | ALTO       | 18*        | `f6ec3970` |
+| 20     | Agent Lifecycle Stream | ✅ CONCLUÍDO | MÉDIO      | 18*/19     | `f6ec3970` |
+| 21     | Shell Tools            | ✅ CONCLUÍDO | MÉDIO      | 17         | próximo    |
+| 22     | System Message Upgrade | ⏳ PENDENTE  | MÉDIO      | 18         | —          |
+| 23     | OpenTelemetry Nativo   | ⏳ PENDENTE  | BAIXO      | 18         | —          |
+| 24     | Testes de Integração   | ⏳ PENDENTE  | ALTO (QA)  | 17-22      | —          |
 
-**Ordem de execução recomendada**:
+> \* Sprints 19 e 20 implementados com SDK v0.1.32 (sem necessidade de v0.2.0).
 
-1. Sprint 17 (File Tools) — gap mais urgente, LLM-B precisa disso agora
-2. Sprint 18 (SDK Upgrade) — pré-requisito para 19, 22, 23; sem breaking changes
-3. Sprint 19 (Session API) — fecha gaps de API rápido
-4. Sprint 24 (Testes) — paralelizável com qualquer sprint
+**Ordem de execução recomendada (restante)**:
+
+1. ~~Sprint 17 (File Tools)~~ — ✅ done
+2. ~~Sprint 18 (SDK Upgrade)~~ — ⚠️ BLOQUEADO, monitorar npm
+3. ~~Sprint 19 (Session API)~~ — ✅ done
+4. ~~Sprint 20 (Agent Stream)~~ — ✅ done (via Sprint 19)
+5. ~~Sprint 21 (Shell Tools)~~ — ✅ done
+6. **Sprint 24 (Testes)** — paralelizável com qualquer sprint
+7. Sprint 22 (System Message) — aguarda Sprint 18 para usar `SYSTEM_PROMPT_SECTIONS`
+8. Sprint 23 (OpenTelemetry) — baixa prioridade
 
 ---
 
@@ -589,8 +512,8 @@ const shellRestrictionsHook = async (input) => {
 
 ### Estado atual da base de código
 
-| Módulo                   | Status              | Testes     |
-| ------------------------ | ------------------- | ---------- |
+| Módulo                   | Status             | Testes     |
+| ------------------------ | ------------------ | ---------- |
 | `lib/client.js`          | ✅ Implementado     | Sprint 10  |
 | `lib/session.js`         | ✅ Implementado     | Sprint 10  |
 | `lib/permissions.js`     | ✅ Implementado     | Sprint 10  |
@@ -760,8 +683,8 @@ se conectem a "servidores de contexto" que fornecem **tools**, **resources** e *
 
 ### Capacidades do protocolo MCP que ainda não usamos
 
-| Capacidade MCP           | Status neste projeto       | Oportunidade                                   |
-| ------------------------ | -------------------------- | ---------------------------------------------- |
+| Capacidade MCP           | Status neste projeto      | Oportunidade                                   |
+| ------------------------ | ------------------------- | ---------------------------------------------- |
 | `tools/list`             | ✅ Usado (mcp-tool-bridge) | —                                              |
 | `tools/call`             | ✅ Usado (mcp-tool-bridge) | —                                              |
 | `resources/list`         | ❌ Não implementado        | LLM-B acessa arquivos via MCP resource!        |
