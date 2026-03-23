@@ -117,7 +117,7 @@ function buildZodSchema(inputSchema) {
                 field = z.array(z.unknown()).describe(description);
                 break;
             case 'object':
-                field = z.record(z.unknown()).describe(description);
+                field = z.record(z.string(), z.unknown()).describe(description);
                 break;
             default:
                 field = z.string().describe(description);

@@ -50,14 +50,14 @@ const gitStatusTool = defineTool('git_status', {
  */
 const gitDiffTool = defineTool('git_diff', {
     description: 'Mostra o diff dos arquivos modificados. Use para revisar mudanças antes de commitar.',
-    parameters: z.object({
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
         staged: z
             .boolean()
             .optional()
             .default(false)
             .describe('Se true, mostra apenas as mudanças já staged (git diff --staged)'),
         path: z.string().optional().describe('Caminho específico para ver diff'),
-    }),
+    }))),
     handler: async (/** @type {{ staged?: boolean; path?: string }} */ { staged, path: filePath }) => {
         const flag = staged ? '--staged' : '';
         const target = filePath ?? '';
@@ -72,14 +72,14 @@ const gitDiffTool = defineTool('git_diff', {
  */
 const gitCommitTool = defineTool('git_commit', {
     description: 'Adiciona arquivos e realiza um commit Git. Por segurança, requer confirmação prévia via ask_user.',
-    parameters: z.object({
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
         message: z.string().describe('Mensagem do commit (formato: "tipo: descrição")'),
         paths: z
             .array(z.string())
             .optional()
             .describe('Arquivos a adicionar (omitir = add somente arquivos já tracked modificados)'),
         all: z.boolean().optional().default(false).describe('Se true, executa git add -A (adiciona tudo)'),
-    }),
+    }))),
     handler: async (/** @type {{ message: string; paths?: string[]; all?: boolean }} */ { message, paths, all }) => {
         if (all) {
             safeGit('git add -A');

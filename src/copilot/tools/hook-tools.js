@@ -112,7 +112,7 @@ const requestUserInputTool = defineTool('request_user_input', {
         'OBRIGATÓRIO: use SEMPRE ao final de cada resposta para perguntar qual é o próximo passo. ' +
         'Nunca encerre uma resposta sem chamar esta ferramenta — ela garante a continuidade da sessão. ' +
         'É o equivalente ao vscode_askQuestions do protocolo de hooks: o agente não avança sem resposta.',
-    parameters: z.object({
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
         question: z.string().describe('Pergunta principal ao usuário (clara e objetiva)'),
         context: z.string().optional().describe('Contexto adicional — resumo do que foi feito para o usuário avaliar'),
         choices: z
@@ -124,7 +124,7 @@ const requestUserInputTool = defineTool('request_user_input', {
             .optional()
             .default(false)
             .describe('Se true, o usuário DEVE escolher uma das choices (sem texto livre)'),
-    }),
+    }))),
     handler: async (
         /** @type {{ question: string; context?: string; choices?: string[]; requires_selection?: boolean }} */ {
             question,

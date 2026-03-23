@@ -21,6 +21,9 @@
       "path": "./config/typing/strict/tsconfig.strict.src.audit_agent.json"
     },
     {
+      "path": "./config/typing/strict/tsconfig.strict.src.copilot.json"
+    },
+    {
       "path": "./config/typing/strict/tsconfig.strict.src.core.json"
     },
     {

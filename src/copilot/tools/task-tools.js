@@ -18,10 +18,10 @@ import { z } from 'zod';
  */
 const getTasksTool = defineTool('get_tasks', {
     description: 'Lista as tarefas mais recentes do sistema. Use para verificar estado atual da fila.',
-    parameters: z.object({
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
         status: z.string().optional().describe('Filtrar por status (pending, running, done, failed)'),
         limit: z.number().int().min(1).max(50).optional().default(10).describe('Número máximo de tarefas a retornar'),
-    }),
+    }))),
     handler: async (/** @type {{ status?: string; limit?: number }} */ { status, limit }) => {
         try {
             // Usar a API REST interna (não importar DB diretamente para evitar acoplamento)
@@ -45,12 +45,12 @@ const getTasksTool = defineTool('get_tasks', {
  */
 const addTaskTool = defineTool('add_task', {
     description: 'Cria e enfileira uma nova tarefa no sistema de missões. A tarefa será executada pelo kernel.',
-    parameters: z.object({
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
         target: z.string().describe('URL ou identificador do alvo da tarefa'),
         user_message: z.string().describe('Instrução da tarefa (o que o agente deve fazer)'),
         priority: z.number().int().min(0).max(100).optional().default(50).describe('Prioridade (0=baixa, 100=urgente)'),
         model: z.string().optional().describe('Modelo a usar nesta tarefa (ex: gpt-4.1)'),
-    }),
+    }))),
     handler: async (
         /** @type {{ target: string; user_message: string; priority?: number; model?: string }} */ {
             target,

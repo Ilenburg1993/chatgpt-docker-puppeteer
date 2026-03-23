@@ -35,11 +35,11 @@ const readBriefingTool = defineTool('read_briefing', {
  */
 const writePendingTaskTool = defineTool('write_pending_task', {
     description: 'Adiciona uma tarefa pendente ao arquivo pending-tasks.md do Hook System.',
-    parameters: z.object({
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
         title: z.string().describe('Título da tarefa pendente'),
         description: z.string().optional().describe('Descrição detalhada'),
         priority: z.enum(['high', 'medium', 'low']).optional().default('medium'),
-    }),
+    }))),
     handler: async (
         /** @type {{ title: string; description?: string; priority?: string }} */ { title, description, priority },
     ) => {

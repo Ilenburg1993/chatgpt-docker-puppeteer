@@ -45,10 +45,10 @@ function safeExec(cmd, timeoutMs = 60000) {
  */
 const lintCheckTool = defineTool('lint_check', {
     description: 'Executa ESLint no projeto para detectar erros de estilo/qualidade. Retorna erros encontrados.',
-    parameters: z.object({
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
         fix: z.boolean().optional().default(false).describe('Se true, aplica correções automáticas (--fix)'),
         path: z.string().optional().describe('Caminho específico para lintar (ex: src/copilot)'),
-    }),
+    }))),
     handler: async (/** @type {{ fix?: boolean; path?: string }} */ { fix, path: filePath }) => {
         const fixFlag = fix ? '--fix' : '';
         const target = filePath ?? '.';
