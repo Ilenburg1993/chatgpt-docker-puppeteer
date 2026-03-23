@@ -32,6 +32,8 @@
   "type": "module",
   "imports": {
     "#agent/*": "./src/agent/*.js",
+    "#copilot/lib/*": "./src/copilot/lib/*.js",
+    "#copilot/*": "./src/copilot/*.js",
     "#core/constants": "./src/core/constants/index.ts",
     "#core/constants/browser": "./src/core/constants/browser.ts",
     "#core/constants/logging": "./src/core/constants/logging.ts",
@@ -188,7 +190,7 @@
     "hooks:trace:recent": "bash scripts/trace-commit.sh --recent 10",
     "inference-gateway:run": "node src/inference_gateway/main.js",
     "preinstall": "NODE_OPTIONS= node --input-type=module -e \"if(process.env.npm_execpath.includes('yarn')) throw new Error('Use npm instead of yarn')\"",
-    "postinstall": "echo '✅ Dependencies installed successfully'",
+    "postinstall": "node scripts/postinstall.mjs && echo '✅ Dependencies installed successfully'",
     "jsdoc:coverage": "node scripts/analysis/jsdoc_coverage_cli.mjs --scope full --format console",
     "jsdoc:coverage:gaps": "node scripts/analysis/jsdoc_coverage_cli.mjs --scope full --format console --gaps",
     "jsdoc:coverage:json": "node scripts/analysis/jsdoc_coverage_cli.mjs --scope full --format json",
@@ -332,6 +334,7 @@
   "dependencies": {
     "@babel/parser": "^7.29.0",
     "@babel/traverse": "^7.29.0",
+    "@github/copilot-sdk": "^0.1.32",
     "@lancedb/lancedb": "^0.26.2",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "axios": "^1.13.5",
@@ -363,6 +366,7 @@
     "turndown": "^7.2.2",
     "user-agents": "^1.1.669",
     "uuid": "^13.0.0",
+    "vscode-jsonrpc": "^8.2.1",
     "ws": "^8.19.0",
     "xxhash-wasm": "^1.1.0",
     "zod": "^4.3.6"
