@@ -11,6 +11,8 @@
  * - hooks — factories de SessionHooks (createHooks, createAuditHooks, ...)
  * - permissions — factories de PermissionHandler (createApproveAllPermission, ...)
  * - session — operações de sessão (createSession, resumeOrCreate, ...)
+ * - agents — factories de CustomAgentConfig (createAgent, createReadOnlyAgent, ...)
+ * - models — helpers de modelos (listModels, pickModel, buildReasoningConfig, ...)
  *
  * @module copilot/lib
  */
@@ -65,3 +67,29 @@ export {
     resumeOrCreate,
     resumeSession,
 } from '#copilot/lib/session';
+
+export {
+    READ_ONLY_TOOLS,
+    buildAgentList,
+    createAgent,
+    createAnalystAgent,
+    createFullAccessAgent,
+    createReadOnlyAgent,
+    filterInferableAgents,
+    isValidAgentName,
+} from '#copilot/lib/agents';
+
+export {
+    buildReasoningConfig,
+    filterEnabledModels,
+    filterReasoningModels,
+    filterVisionModels,
+    getContextWindowSize,
+    getModelById,
+    getSupportedReasoningEfforts,
+    indexModelsById,
+    listModels,
+    pickModel,
+    resolveModelId,
+    supportsReasoning,
+} from '#copilot/lib/models';
