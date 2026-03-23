@@ -18,10 +18,9 @@
  * GET /api/sdk/webhooks — Lista webhooks registrados POST /api/sdk/webhooks — Registra novo webhook DELETE
  * /api/sdk/webhooks/:id — Remove webhook registrado
  *
- * GET /api/sdk/agent/info — Info do agente (status, uptime, PID, sessionId)
- * GET /api/sdk/agent/tools — ToolsRegistry rico com metadados
- * GET /api/sdk/agent/telemetry — Resumo de telemetria (sessões, erros)
- * POST /api/sdk/agent/telemetry/clear — Reseta store de telemetria
+ * GET /api/sdk/agent/info — Info do agente (status, uptime, PID, sessionId) GET /api/sdk/agent/tools — ToolsRegistry
+ * rico com metadados GET /api/sdk/agent/telemetry — Resumo de telemetria (sessões, erros) POST
+ * /api/sdk/agent/telemetry/clear — Reseta store de telemetria
  *
  * @module copilot/sdk-api
  */
@@ -523,14 +522,39 @@ router.post('/client/stop', (req, res) => {
 /**
  * GET /tools
  *
- * Lista as ferramentas disponíveis registradas em src/copilot/tools/.
+ * Lista as ferramentas disponíveis. Se o agente está iniciado, usa o ToolsRegistry
+ * rico (com categoria, tags, readOnly, skipPermission). Caso contrário, usa allTools estático.
  */
 router.get('/tools', (_req, res) => {
+    const registry = /** @type {any} */ (alwaysAliveAgent).toolsRegistry;
+
+    if (registry?.entries instanceof Map && registry.entries.size > 0) {
+        // Registry rico disponível
+        const list = [];
+        for (const [name, entry] of registry.entries) {
+            list.push({
+                name,
+                description: /** @type {any} */ (entry.tool).description ?? null,
+                category: entry.category ?? 'uncategorized',
+                tags: entry.tags ?? [],
+                readOnly: entry.readOnly ?? false,
+                skipPermission: /** @type {any} */ (entry.tool).skipPermission ?? false,
+            });
+        }
+        res.json({ ok: true, source: 'registry', count: list.length, tools: list });
+        return;
+    }
+
+    // Fallback: allTools estático (agente não iniciado)
     const list = allTools.map((tool) => ({
         name: /** @type {any} */ (tool).name ?? '(unknown)',
         description: /** @type {any} */ (tool).description ?? null,
+        category: 'uncategorized',
+        tags: [],
+        readOnly: false,
+        skipPermission: /** @type {any} */ (tool).skipPermission ?? false,
     }));
-    res.json({ ok: true, count: list.length, tools: list });
+    res.json({ ok: true, source: 'static', count: list.length, tools: list });
 });
 
 // ─── Webhooks ──────────────────────────────────────────────────────────────
