@@ -59,20 +59,20 @@ export function buildAlwaysAliveConfig(options = {}) {
         onPermissionRequest = approveAll,
         onUserInputRequest,
         hookContextContent,
-    } = options;
+    } = /** @type {any} */ (options);
 
     /** @type {any} */
     const hooks = createHooks({
-        onSessionStart: (ev) => {
+        onSessionStart: (/** @type {any} */ ev) => {
             void ev; // handled by AlwaysAliveAgent
         },
-        onSessionEnd: (ev) => {
+        onSessionEnd: (/** @type {any} */ ev) => {
             void ev; // handled by AlwaysAliveAgent
         },
     });
 
     /** @type {SessionConfig} */
-    const config = {
+    const config = /** @type {any} */ ({
         ...BASE_CONFIG,
         model,
         tools,
@@ -81,18 +81,13 @@ export function buildAlwaysAliveConfig(options = {}) {
         hooks,
         ...(hookContextContent
             ? {
-                  systemMessage: {
-                      mode: 'customize',
-                      sections: {
-                          guidelines: {
-                              action: 'append',
-                              content: hookContextContent,
-                          },
-                      },
-                  },
+                  systemMessage: /** @type {import('@github/copilot-sdk').SystemMessageConfig} */ ({
+                      mode: 'append',
+                      guidelines: hookContextContent,
+                  }),
               }
             : {}),
-    };
+    });
 
     return config;
 }
@@ -132,17 +127,17 @@ export function buildReadOnlyConfig(options = {}) {
  * @param {object} [options={}] Default is `{}`
  * @param {string} [options.model='gpt-4.1'] - Modelo a usar. Default is `'gpt-4.1'`
  * @param {Tool[]} [options.tools=[]] - Custom tools a registrar. Default is `[]`
- * @param {string[]} [options.allowedTools=[]] - Nomes de tools que podem executar sem confirmação. Default is `[]`
+ * @param {string[]} [options.denyTools=[]] - Nomes de tools que devem ser bloqueadas (restante aprovado). Default is `[]`
  * @returns {SessionConfig}
  */
 export function buildFullAccessConfig(options = {}) {
-    const { model = 'gpt-4.1', tools = [], allowedTools = [] } = options;
+    const { model = 'gpt-4.1', tools = [], denyTools = [] } = options;
 
     return /** @type {SessionConfig} */ ({
         ...BASE_CONFIG,
         model,
         tools,
-        onPermissionRequest: createSafePermission({ allowedTools }),
+        onPermissionRequest: createSafePermission(denyTools),
     });
 }
 
