@@ -88,8 +88,7 @@ export async function createSdkSession(config) {
         onPermissionRequest: approveAll,
         ...config,
     });
-    const result = await createClientSession(fullConfig);
-    return result.session;
+    return createClientSession(fullConfig);
 }
 
 /**
@@ -105,8 +104,7 @@ export async function resumeSdkSession(sessionId, config = {}) {
         onPermissionRequest: approveAll,
         ...config,
     });
-    const result = await resumeClientSession(sessionId, fullConfig);
-    return result.session;
+    return resumeClientSession(sessionId, fullConfig);
 }
 
 /**

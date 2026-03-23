@@ -14,31 +14,44 @@
 import { log } from '#core/logger';
 
 /**
- * @typedef {import('@github/copilot-sdk').SessionHooks} SessionHooks
+ * Tipos de hooks do Copilot SDK. Nota: os tipos abaixo são estruturalmente equivalentes aos do SDK mas definidos
+ * localmente pois @github/copilot-sdk não re-exporta esses tipos a partir do seu entry point principal.
  *
- * @typedef {import('@github/copilot-sdk').PreToolUseHandler} PreToolUseHandler
+ * @typedef {object} SessionHooks Configuração de hooks para uma sessão Copilot SDK.
+ * @property {PreToolUseHandler} [onPreToolUse]
+ * @property {PostToolUseHandler} [onPostToolUse]
+ * @property {UserPromptSubmittedHandler} [onUserPromptSubmitted]
+ * @property {SessionStartHandler} [onSessionStart]
+ * @property {SessionEndHandler} [onSessionEnd]
+ * @property {ErrorOccurredHandler} [onErrorOccurred]
  *
- * @typedef {import('@github/copilot-sdk').PostToolUseHandler} PostToolUseHandler
+ * @typedef {Function} PreToolUseHandler (input: PreToolUseHookInput, invocation: {sessionId:string}) =>
+ *   PreToolUseHookOutput|void|Promise<...>
  *
- * @typedef {import('@github/copilot-sdk').UserPromptSubmittedHandler} UserPromptSubmittedHandler
+ * @typedef {Function} PostToolUseHandler (input: PostToolUseHookInput, invocation: {sessionId:string}) =>
+ *   PostToolUseHookOutput|void|Promise<...>
  *
- * @typedef {import('@github/copilot-sdk').SessionStartHandler} SessionStartHandler
+ * @typedef {Function} UserPromptSubmittedHandler (input, invocation) => void|Promise<void>
  *
- * @typedef {import('@github/copilot-sdk').SessionEndHandler} SessionEndHandler
+ * @typedef {Function} SessionStartHandler (input, invocation) => object|void|Promise<...>
  *
- * @typedef {import('@github/copilot-sdk').ErrorOccurredHandler} ErrorOccurredHandler
+ * @typedef {Function} SessionEndHandler (input, invocation) => void|Promise<void>
  *
- * @typedef {import('@github/copilot-sdk').PreToolUseHookInput} PreToolUseHookInput
+ * @typedef {Function} ErrorOccurredHandler (input, invocation) => object|void|Promise<...>
  *
- * @typedef {import('@github/copilot-sdk').PostToolUseHookInput} PostToolUseHookInput
+ * @typedef {{ toolName: string; toolArgs: object; timestamp: number; cwd: string }} PreToolUseHookInput
  *
- * @typedef {import('@github/copilot-sdk').UserPromptSubmittedHookInput} UserPromptSubmittedHookInput
+ * @typedef {{ toolName: string; toolArgs: object; toolResult: unknown; timestamp: number; cwd: string }} PostToolUseHookInput
  *
- * @typedef {import('@github/copilot-sdk').SessionStartHookInput} SessionStartHookInput
+ * @typedef {{ prompt: string; timestamp: number; cwd: string }} UserPromptSubmittedHookInput
  *
- * @typedef {import('@github/copilot-sdk').SessionEndHookInput} SessionEndHookInput
+ * @typedef {{ source: 'startup' | 'resume' | 'new'; initialPrompt?: string; timestamp: number; cwd: string }} SessionStartHookInput
  *
- * @typedef {import('@github/copilot-sdk').ErrorOccurredHookInput} ErrorOccurredHookInput
+ * @typedef {{ reason: string; finalMessage?: string; error?: Error; timestamp: number; cwd: string }} SessionEndHookInput
+ *
+ * @typedef {{ error: Error; errorContext: string; recoverable: boolean; timestamp: number; cwd: string }} ErrorOccurredHookInput
+ *
+ * @typedef {{ sessionId: string }} InvocationContext
  */
 
 /**
@@ -110,7 +123,10 @@ export function createHooks(cfg = {}) {
     if (cfg.onPreToolUse) {
         hooks.onPreToolUse = cfg.onPreToolUse;
     } else {
-        const preToolFn = async (/** @type {PreToolUseHookInput} */ input, invocation) => {
+        const preToolFn = async (
+            /** @type {PreToolUseHookInput} */ input,
+            /** @type {InvocationContext} */ invocation,
+        ) => {
             const toolName = input.toolName ?? 'unknown';
             const decision = resolveToolDecision(toolName, allowTools, denyTools, denyPatterns);
 
@@ -130,7 +146,10 @@ export function createHooks(cfg = {}) {
     if (cfg.onPostToolUse) {
         hooks.onPostToolUse = cfg.onPostToolUse;
     } else if (auditLog) {
-        const postToolFn = async (/** @type {PostToolUseHookInput} */ input, invocation) => {
+        const postToolFn = async (
+            /** @type {PostToolUseHookInput} */ input,
+            /** @type {InvocationContext} */ invocation,
+        ) => {
             log('DEBUG', `[lib/hooks] onPostToolUse: tool='${input.toolName}' sessionId='${invocation?.sessionId}'`);
         };
         hooks.onPostToolUse = /** @type {PostToolUseHandler} */ (postToolFn);
@@ -140,7 +159,10 @@ export function createHooks(cfg = {}) {
     if (cfg.onUserPromptSubmitted) {
         hooks.onUserPromptSubmitted = cfg.onUserPromptSubmitted;
     } else if (auditLog) {
-        const promptFn = async (/** @type {UserPromptSubmittedHookInput} */ input, invocation) => {
+        const promptFn = async (
+            /** @type {UserPromptSubmittedHookInput} */ input,
+            /** @type {InvocationContext} */ invocation,
+        ) => {
             const preview = String(input.prompt ?? '').slice(0, 80);
             log(
                 'DEBUG',
@@ -154,7 +176,10 @@ export function createHooks(cfg = {}) {
     if (cfg.onSessionStart) {
         hooks.onSessionStart = cfg.onSessionStart;
     } else if (auditLog) {
-        const startFn = async (/** @type {SessionStartHookInput} */ input, invocation) => {
+        const startFn = async (
+            /** @type {SessionStartHookInput} */ input,
+            /** @type {InvocationContext} */ invocation,
+        ) => {
             log('DEBUG', `[lib/hooks] onSessionStart: source='${input.source}' sessionId='${invocation?.sessionId}'`);
         };
         hooks.onSessionStart = /** @type {SessionStartHandler} */ (startFn);
@@ -164,7 +189,7 @@ export function createHooks(cfg = {}) {
     if (cfg.onSessionEnd) {
         hooks.onSessionEnd = cfg.onSessionEnd;
     } else if (auditLog) {
-        const endFn = async (/** @type {SessionEndHookInput} */ input, invocation) => {
+        const endFn = async (/** @type {SessionEndHookInput} */ input, /** @type {InvocationContext} */ invocation) => {
             log('DEBUG', `[lib/hooks] onSessionEnd: reason='${input.reason}' sessionId='${invocation?.sessionId}'`);
         };
         hooks.onSessionEnd = /** @type {SessionEndHandler} */ (endFn);
@@ -174,7 +199,10 @@ export function createHooks(cfg = {}) {
     if (cfg.onErrorOccurred) {
         hooks.onErrorOccurred = cfg.onErrorOccurred;
     } else {
-        const errorFn = async (/** @type {ErrorOccurredHookInput} */ input, invocation) => {
+        const errorFn = async (
+            /** @type {ErrorOccurredHookInput} */ input,
+            /** @type {InvocationContext} */ invocation,
+        ) => {
             log(
                 'WARN',
                 `[lib/hooks] onErrorOccurred: error='${input.error}' context='${input.errorContext}' recoverable=${input.recoverable} sessionId='${invocation?.sessionId}'`,
@@ -244,7 +272,10 @@ export function createSafeHooks(extraAllowed = []) {
  * @returns {PreToolUseHandler}
  */
 export function composePreToolUseHandlers(...handlers) {
-    const composedFn = async (/** @type {PreToolUseHookInput} */ input, invocation) => {
+    const composedFn = async (
+        /** @type {PreToolUseHookInput} */ input,
+        /** @type {InvocationContext} */ invocation,
+    ) => {
         for (const handler of handlers) {
             const result = await handler(input, invocation);
             if (result?.permissionDecision) return result;
@@ -257,11 +288,11 @@ export function composePreToolUseHandlers(...handlers) {
 /**
  * Constrói um hook onErrorOccurred que notifica via callback customizado.
  *
- * @param {(error: string, context: string, recoverable: boolean, sessionId: string) => void | Promise<void>} onError
+ * @param {(error: Error, context: string, recoverable: boolean, sessionId: string) => void | Promise<void>} onError
  * @returns {ErrorOccurredHandler}
  */
 export function createErrorNotifierHook(onError) {
-    const fn = async (/** @type {ErrorOccurredHookInput} */ input, invocation) => {
+    const fn = async (/** @type {ErrorOccurredHookInput} */ input, /** @type {InvocationContext} */ invocation) => {
         await onError(input.error, input.errorContext, input.recoverable, invocation?.sessionId ?? '');
     };
     return /** @type {ErrorOccurredHandler} */ (fn);
