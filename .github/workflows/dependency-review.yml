@@ -31,7 +31,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Dependency review
-        uses: actions/dependency-review-action@v4.8.3
+        uses: actions/dependency-review-action@v4.9.0
         with:
           fail-on-severity: high
 
