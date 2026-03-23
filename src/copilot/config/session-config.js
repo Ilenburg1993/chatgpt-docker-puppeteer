@@ -8,6 +8,7 @@
  * @module copilot/config/session-config
  */
 
+import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
 import {
     createApproveAllPermission,
     createAuditOnlyPermission,
@@ -81,10 +82,7 @@ export function buildAlwaysAliveConfig(options = {}) {
         hooks,
         ...(hookContextContent
             ? {
-                  systemMessage: /** @type {import('@github/copilot-sdk').SystemMessageConfig} */ ({
-                      mode: 'append',
-                      guidelines: hookContextContent,
-                  }),
+                  systemMessage: buildHookContextAppendMessage(hookContextContent),
               }
             : {}),
     });

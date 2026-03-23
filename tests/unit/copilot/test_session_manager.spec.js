@@ -218,8 +218,8 @@ describe('session-manager › initOrResumeSession › injectHookContext', () => 
         // systemMessage só é passado se buildHookSystemContext() retornar string não-vazia;
         // no CI sem arquivos de hook, pode ou não estar presente — verificamos apenas a estrutura
         if (created.opts?.systemMessage) {
-            assert.strictEqual(created.opts.systemMessage.mode, 'customize');
-            assert.ok(created.opts.systemMessage.sections?.guidelines);
+            assert.strictEqual(created.opts.systemMessage.mode, 'append');
+            assert.ok(typeof created.opts.systemMessage.content === 'string');
         }
     });
 

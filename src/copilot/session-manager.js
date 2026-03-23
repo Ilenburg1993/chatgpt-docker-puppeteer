@@ -8,6 +8,7 @@
  * @module copilot/session-manager
  */
 
+import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
 import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -152,18 +153,8 @@ export async function initOrResumeSession(client, sessionOptions) {
     const model = sessionOptions.model ?? 'gpt-4.1';
     const injectContext = sessionOptions.injectHookContext !== false;
 
-    /** @type {object | undefined} */
-    const systemMessage = injectContext
-        ? {
-              mode: 'customize',
-              sections: {
-                  guidelines: {
-                      action: 'append',
-                      content: buildHookSystemContext(),
-                  },
-              },
-          }
-        : undefined;
+    /** @type {import('@github/copilot-sdk').SystemMessageConfig | undefined} */
+    const systemMessage = injectContext ? buildHookContextAppendMessage(buildHookSystemContext()) : undefined;
 
     /** @type {any} */
     const opts = {

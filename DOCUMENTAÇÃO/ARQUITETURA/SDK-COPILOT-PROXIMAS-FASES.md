@@ -235,12 +235,35 @@ import { SYSTEM_PROMPT_SECTIONS, CopilotClient } from '@github/copilot-sdk';
 
 ---
 
-### Sprint 22 — System Message Upgrade ★ MÉDIO
+### Sprint 22 — System Message Upgrade ★ MÉDIO ✅ CONCLUÍDO (parcial — SDK v0.1.32)
+
+> **Commit**: `PENDING_SPRINT22` | **Implementação parcial**: usa `mode: "append"` e `mode: "replace"` do SDK v0.1.32.
+> **Aguardando SDK v0.2.0** para `mode: "customize"` com seções nomeadas (bloqueado como Sprint 18).
 
 **Objetivo**: usar `mode: "customize"` com todas as 10 seções do SDK v0.2.0. **ROI**: médio —
 permite fine-grained control do system prompt. **Duração**: 0.5 sprint.
 
-#### Refatorar `config/session-config.js`
+#### O que foi implementado (v0.1.32 parcial)
+
+**Novo arquivo `src/copilot/config/system-prompt.js`**:
+
+- Constante `SYSTEM_PROMPT_SECTIONS` — 10 chaves nomeadas, pronta para migração a `@github/copilot-sdk v0.2.0`
+- Constantes de texto: `AGENT_IDENTITY`, `AGENT_TONE`, `TOOL_EFFICIENCY`, `ENVIRONMENT_CONTEXT`, `CODE_CHANGE_RULES`, `AGENT_GUIDELINES`, `LAST_INSTRUCTIONS`
+- `buildAppendSystemMessage(content)` — `mode: "append"` tipado
+- `buildReplaceSystemMessage(content)` — `mode: "replace"` tipado
+- `buildAlwaysAliveSystemMessage(opts)` — system prompt completo com 7 seções em `mode: "replace"`
+- `buildHookContextAppendMessage(hookContext)` — injeção do briefing operacional em `mode: "append"`
+
+**Correções de API**:
+
+- `session-manager.js`: substituiu `mode: "customize"` (não existe no v0.1.32, era cast `any`) por `buildHookContextAppendMessage` tipada
+- `session-config.js`: substituiu campo `guidelines` (inválido) por `content` via `buildHookContextAppendMessage`
+
+**Testes**: 24 novos testes em `tests/unit/copilot/test_system_prompt.spec.js` | Baseline: 1395 pass
+
+#### Migração para v0.2.0 (quando disponível)
+
+Substituir `buildHookContextAppendMessage` por `mode: "customize"` com `SYSTEM_PROMPT_SECTIONS`:
 
 ```js
 import { SYSTEM_PROMPT_SECTIONS } from '@github/copilot-sdk';
@@ -260,19 +283,19 @@ export function buildAlwaysAliveConfig(opts = {}) {
       sections: {
         [SECTIONS.identity]: {
           action: 'replace',
-          content: 'Você é LLM-B, agente autônomo...',
+          content: AGENT_IDENTITY,
         },
         [SECTIONS.guidelines]: {
           action: 'append',
-          content: '* Sempre emita eventos NERV para ações significativas.',
+          content: AGENT_GUIDELINES,
         },
         [SECTIONS.code_change_rules]: {
           action: 'append',
-          content: '* Prefira edições cirúrgicas a reescritas.',
+          content: CODE_CHANGE_RULES,
         },
         [SECTIONS.last_instructions]: {
           action: 'replace',
-          content: 'Antes de finalizar, atualize manage_todo_list.',
+          content: LAST_INSTRUCTIONS,
         },
       },
     },
@@ -357,18 +380,18 @@ manutenção — sem testes, refactors são perigosos. **Duração**: 1-2 sprint
 
 ## Tabela de Prioridades e Dependências
 
-| Sprint | Título                 | Status      | Prioridade | Depende de | Commit     |
-| ------ | ---------------------- | ----------- | ---------- | ---------- | ---------- |
-| 17     | File Tools             | ✅ CONCLUÍDO | CRÍTICO    | —          | `f6ec3970` |
-| 18     | SDK v0.2.0 Upgrade     | ⚠️ BLOQUEADO | ALTO       | —          | —          |
-| 19     | Session API Extensions | ✅ CONCLUÍDO | ALTO       | 18*        | `f6ec3970` |
-| 20     | Agent Lifecycle Stream | ✅ CONCLUÍDO | MÉDIO      | 18*/19     | `f6ec3970` |
-| 21     | Shell Tools            | ✅ CONCLUÍDO | MÉDIO      | 17         | próximo    |
-| 22     | System Message Upgrade | ⏳ PENDENTE  | MÉDIO      | 18         | —          |
-| 23     | OpenTelemetry Nativo   | ⏳ PENDENTE  | BAIXO      | 18         | —          |
-| 24     | Testes de Integração   | ⏳ PENDENTE  | ALTO (QA)  | 17-22      | —          |
+| Sprint | Título                 | Status           | Prioridade | Depende de | Commit     |
+| ------ | ---------------------- | ---------------- | ---------- | ---------- | ---------- |
+| 17     | File Tools             | ✅ CONCLUÍDO      | CRÍTICO    | —          | `f6ec3970` |
+| 18     | SDK v0.2.0 Upgrade     | ⚠️ BLOQUEADO      | ALTO       | —          | —          |
+| 19     | Session API Extensions | ✅ CONCLUÍDO      | ALTO       | 18*        | `f6ec3970` |
+| 20     | Agent Lifecycle Stream | ✅ CONCLUÍDO      | MÉDIO      | 18*/19     | `f6ec3970` |
+| 21     | Shell Tools            | ✅ CONCLUÍDO      | MÉDIO      | 17         | `dbb778bf` |
+| 22     | System Message Upgrade | ✅ CONCLUÍDO (p.) | MÉDIO      | 18*        | próximo    |
+| 23     | OpenTelemetry Nativo   | ⏳ PENDENTE       | BAIXO      | 18         | —          |
+| 24     | Testes de Integração   | ⏳ PENDENTE       | ALTO (QA)  | 17-22      | —          |
 
-> \* Sprints 19 e 20 implementados com SDK v0.1.32 (sem necessidade de v0.2.0).
+> \* Sprint 22 implementado parcialmente com SDK v0.1.32 (`mode: "append"/"replace"`); migração para `mode: "customize"` aguarda SDK v0.2.0.
 
 **Ordem de execução recomendada (restante)**:
 
@@ -377,8 +400,8 @@ manutenção — sem testes, refactors são perigosos. **Duração**: 1-2 sprint
 3. ~~Sprint 19 (Session API)~~ — ✅ done
 4. ~~Sprint 20 (Agent Stream)~~ — ✅ done (via Sprint 19)
 5. ~~Sprint 21 (Shell Tools)~~ — ✅ done
-6. **Sprint 24 (Testes)** — paralelizável com qualquer sprint
-7. Sprint 22 (System Message) — aguarda Sprint 18 para usar `SYSTEM_PROMPT_SECTIONS`
+6. ~~Sprint 22 (System Message)~~ — ✅ done (parcial v0.1.32; migração futura → v0.2.0)
+7. **Sprint 24 (Testes)** — paralelizável com qualquer sprint
 8. Sprint 23 (OpenTelemetry) — baixa prioridade
 
 ---
