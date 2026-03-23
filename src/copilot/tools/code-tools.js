@@ -13,6 +13,15 @@ import { defineTool } from '@github/copilot-sdk';
 import { execSync } from 'node:child_process';
 import { z } from 'zod';
 
+/**
+ * Marca uma tool como skip-permission (SDK v0.2.0+). Forward-compat: campo ignorado silenciosamente em SDK v0.1.x.
+ *
+ * @template {import('@github/copilot-sdk').Tool<any>} T
+ * @param {T} tool
+ * @returns {T}
+ */
+const withSkipPermission = (tool) => Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
+
 const ROOT = new URL('../../..', import.meta.url).pathname;
 
 /**
@@ -45,10 +54,14 @@ function safeExec(cmd, timeoutMs = 60000) {
  */
 const lintCheckTool = defineTool('lint_check', {
     description: 'Executa ESLint no projeto para detectar erros de estilo/qualidade. Retorna erros encontrados.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
-        fix: z.boolean().optional().default(false).describe('Se true, aplica correções automáticas (--fix)'),
-        path: z.string().optional().describe('Caminho específico para lintar (ex: src/copilot)'),
-    }))),
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                fix: z.boolean().optional().default(false).describe('Se true, aplica correções automáticas (--fix)'),
+                path: z.string().optional().describe('Caminho específico para lintar (ex: src/copilot)'),
+            })
+        )
+    ),
     handler: async (/** @type {{ fix?: boolean; path?: string }} */ { fix, path: filePath }) => {
         const fixFlag = fix ? '--fix' : '';
         const target = filePath ?? '.';
@@ -106,4 +119,8 @@ const typecheckTool = defineTool('typecheck', {
 /**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const codeTools = [lintCheckTool, runTestsTool, typecheckTool];
+export const codeTools = [
+    withSkipPermission(lintCheckTool),
+    withSkipPermission(runTestsTool),
+    withSkipPermission(typecheckTool),
+];

@@ -13,6 +13,15 @@ import { defineTool } from '@github/copilot-sdk';
 import { execSync } from 'node:child_process';
 import { z } from 'zod';
 
+/**
+ * Marca uma tool como skip-permission (SDK v0.2.0+). Forward-compat: campo ignorado silenciosamente em SDK v0.1.x.
+ *
+ * @template {import('@github/copilot-sdk').Tool<any>} T
+ * @param {T} tool
+ * @returns {T}
+ */
+const withSkipPermission = (tool) => Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
+
 const ROOT = new URL('../../..', import.meta.url).pathname;
 
 /**
@@ -50,14 +59,18 @@ const gitStatusTool = defineTool('git_status', {
  */
 const gitDiffTool = defineTool('git_diff', {
     description: 'Mostra o diff dos arquivos modificados. Use para revisar mudanças antes de commitar.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
-        staged: z
-            .boolean()
-            .optional()
-            .default(false)
-            .describe('Se true, mostra apenas as mudanças já staged (git diff --staged)'),
-        path: z.string().optional().describe('Caminho específico para ver diff'),
-    }))),
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                staged: z
+                    .boolean()
+                    .optional()
+                    .default(false)
+                    .describe('Se true, mostra apenas as mudanças já staged (git diff --staged)'),
+                path: z.string().optional().describe('Caminho específico para ver diff'),
+            })
+        )
+    ),
     handler: async (/** @type {{ staged?: boolean; path?: string }} */ { staged, path: filePath }) => {
         const flag = staged ? '--staged' : '';
         const target = filePath ?? '';
@@ -72,14 +85,18 @@ const gitDiffTool = defineTool('git_diff', {
  */
 const gitCommitTool = defineTool('git_commit', {
     description: 'Adiciona arquivos e realiza um commit Git. Por segurança, requer confirmação prévia via ask_user.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
-        message: z.string().describe('Mensagem do commit (formato: "tipo: descrição")'),
-        paths: z
-            .array(z.string())
-            .optional()
-            .describe('Arquivos a adicionar (omitir = add somente arquivos já tracked modificados)'),
-        all: z.boolean().optional().default(false).describe('Se true, executa git add -A (adiciona tudo)'),
-    }))),
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                message: z.string().describe('Mensagem do commit (formato: "tipo: descrição")'),
+                paths: z
+                    .array(z.string())
+                    .optional()
+                    .describe('Arquivos a adicionar (omitir = add somente arquivos já tracked modificados)'),
+                all: z.boolean().optional().default(false).describe('Se true, executa git add -A (adiciona tudo)'),
+            })
+        )
+    ),
     handler: async (/** @type {{ message: string; paths?: string[]; all?: boolean }} */ { message, paths, all }) => {
         if (all) {
             safeGit('git add -A');
@@ -112,4 +129,9 @@ const gitChangedFilesTool = defineTool('git_changed_files', {
 /**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const gitTools = [gitStatusTool, gitDiffTool, gitCommitTool, gitChangedFilesTool];
+export const gitTools = [
+    withSkipPermission(gitStatusTool),
+    withSkipPermission(gitDiffTool),
+    gitCommitTool,
+    withSkipPermission(gitChangedFilesTool),
+];

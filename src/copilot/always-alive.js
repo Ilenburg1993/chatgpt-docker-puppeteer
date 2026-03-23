@@ -16,12 +16,19 @@
  * @module copilot/always-alive
  */
 
+import {
+    createRegistry,
+    createTelemetry,
+    recordSessionEnd,
+    recordSessionStart,
+    registerTools,
+} from '#copilot/lib/index';
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
 import { buildMcpTools } from './mcp-tool-bridge.js';
 import { initOrResumeSession, readState, writeState } from './session-manager.js';
-import { allTools } from './tools/index.js';
+import { allTools, registerForIntrospection, setTelemetryStore } from './tools/index.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -88,6 +95,12 @@ export class AlwaysAliveAgent extends EventEmitter {
 
     /** @type {Map<string, string>} Map de id → URL de webhook registrado */
     #webhookUrls = new Map();
+
+    /** @type {import('#copilot/lib/telemetry').TelemetryStore} */
+    #telemetry = createTelemetry();
+
+    /** @type {import('#copilot/lib/tools-registry').ToolRegistry} */
+    #toolsRegistry = createRegistry();
 
     /**
      * @param {{ model?: string }} [options]
@@ -162,6 +175,24 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Retorna o store de telemetria da sessão atual.
+     *
+     * @returns {import('#copilot/lib/telemetry').TelemetryStore}
+     */
+    get telemetry() {
+        return this.#telemetry;
+    }
+
+    /**
+     * Retorna o registry de tools da sessão atual.
+     *
+     * @returns {import('#copilot/lib/tools-registry').ToolRegistry}
+     */
+    get toolsRegistry() {
+        return this.#toolsRegistry;
+    }
+
+    /**
      * Inicializa o agente: conecta ao CLI e cria/retoma sessão.
      *
      * @returns {Promise<void>}
@@ -183,6 +214,17 @@ export class AlwaysAliveAgent extends EventEmitter {
             if (mcpTools.length > 0) {
                 log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
             }
+
+            // Inicializa telemetria e registry para esta sessão
+            this.#telemetry = createTelemetry();
+            this.#toolsRegistry = createRegistry();
+            registerTools(this.#toolsRegistry, tools, { category: 'all' });
+
+            // Expõe registry/telemetria para introspection tools
+            registerForIntrospection(tools);
+            setTelemetryStore(this.#telemetry);
+
+            log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
 
             const { session, isResumed } = await initOrResumeSession(this.#client, {
                 model: this.#model,
@@ -736,6 +778,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
      */
     async #onSessionStart(_input) {
         log('INFO', `[AlwaysAlive] SessionStart hook: ${_input.sessionId}`);
+        recordSessionStart(this.#telemetry, _input.sessionId);
         await this.#emitWebhook('session.start', { sessionId: _input.sessionId });
         return {};
     }
@@ -745,6 +788,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
      */
     async #onSessionEnd(_input) {
         log('INFO', `[AlwaysAlive] SessionEnd hook: ${_input.sessionId}`);
+        recordSessionEnd(this.#telemetry, _input.sessionId);
         await this.#emitWebhook('session.end', { sessionId: _input.sessionId });
     }
 }

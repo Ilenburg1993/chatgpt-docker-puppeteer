@@ -27,6 +27,15 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 /**
+ * Marca uma tool como skip-permission (SDK v0.2.0+). Forward-compat: campo ignorado silenciosamente em SDK v0.1.x.
+ *
+ * @template {import('@github/copilot-sdk').Tool<any>} T
+ * @param {T} tool
+ * @returns {T}
+ */
+const withSkipPermission = (tool) => Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
+
+/**
  * Raiz do repositório — calculada em relação a este arquivo (src/copilot/tools/).
  *
  * @type {string}
@@ -112,19 +121,28 @@ const requestUserInputTool = defineTool('request_user_input', {
         'OBRIGATÓRIO: use SEMPRE ao final de cada resposta para perguntar qual é o próximo passo. ' +
         'Nunca encerre uma resposta sem chamar esta ferramenta — ela garante a continuidade da sessão. ' +
         'É o equivalente ao vscode_askQuestions do protocolo de hooks: o agente não avança sem resposta.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
-        question: z.string().describe('Pergunta principal ao usuário (clara e objetiva)'),
-        context: z.string().optional().describe('Contexto adicional — resumo do que foi feito para o usuário avaliar'),
-        choices: z
-            .array(z.string())
-            .optional()
-            .describe('Opções predefinidas. Se fornecido, o usuário escolhe entre estas opções ou escreve texto livre'),
-        requires_selection: z
-            .boolean()
-            .optional()
-            .default(false)
-            .describe('Se true, o usuário DEVE escolher uma das choices (sem texto livre)'),
-    }))),
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                question: z.string().describe('Pergunta principal ao usuário (clara e objetiva)'),
+                context: z
+                    .string()
+                    .optional()
+                    .describe('Contexto adicional — resumo do que foi feito para o usuário avaliar'),
+                choices: z
+                    .array(z.string())
+                    .optional()
+                    .describe(
+                        'Opções predefinidas. Se fornecido, o usuário escolhe entre estas opções ou escreve texto livre',
+                    ),
+                requires_selection: z
+                    .boolean()
+                    .optional()
+                    .default(false)
+                    .describe('Se true, o usuário DEVE escolher uma das choices (sem texto livre)'),
+            })
+        )
+    ),
     handler: async (
         /** @type {{ question: string; context?: string; choices?: string[]; requires_selection?: boolean }} */ {
             question,
@@ -202,6 +220,6 @@ const hookGetPendingTasksTool = defineTool('hook_get_pending_tasks', {
  *
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const hookTools = [hookGetAuditTailTool, requestUserInputTool, hookGetPendingTasksTool];
+export const hookTools = [withSkipPermission(hookGetAuditTailTool), requestUserInputTool, hookGetPendingTasksTool];
 
 export { hookGetAuditTailTool, hookGetPendingTasksTool, requestUserInputTool };

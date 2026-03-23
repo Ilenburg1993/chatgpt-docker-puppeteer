@@ -13,6 +13,15 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 
+/**
+ * Marca uma tool como skip-permission (SDK v0.2.0+). Forward-compat: campo ignorado silenciosamente em SDK v0.1.x.
+ *
+ * @template {import('@github/copilot-sdk').Tool<any>} T
+ * @param {T} tool
+ * @returns {T}
+ */
+const withSkipPermission = (tool) => Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
+
 const ROOT = resolve(new URL('../..', import.meta.url).pathname, '..');
 const HOOKS_STATE = join(ROOT, '.github', 'hooks', 'state');
 
@@ -35,11 +44,15 @@ const readBriefingTool = defineTool('read_briefing', {
  */
 const writePendingTaskTool = defineTool('write_pending_task', {
     description: 'Adiciona uma tarefa pendente ao arquivo pending-tasks.md do Hook System.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (z.object({
-        title: z.string().describe('Título da tarefa pendente'),
-        description: z.string().optional().describe('Descrição detalhada'),
-        priority: z.enum(['high', 'medium', 'low']).optional().default('medium'),
-    }))),
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                title: z.string().describe('Título da tarefa pendente'),
+                description: z.string().optional().describe('Descrição detalhada'),
+                priority: z.enum(['high', 'medium', 'low']).optional().default('medium'),
+            })
+        )
+    ),
     handler: async (
         /** @type {{ title: string; description?: string; priority?: string }} */ { title, description, priority },
     ) => {
@@ -60,4 +73,4 @@ const writePendingTaskTool = defineTool('write_pending_task', {
 /**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const sessionTools = [readBriefingTool, writePendingTaskTool];
+export const sessionTools = [withSkipPermission(readBriefingTool), writePendingTaskTool];
