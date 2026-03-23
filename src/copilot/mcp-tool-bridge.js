@@ -22,7 +22,6 @@
 
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
-import { execSync } from 'node:child_process';
 import { z } from 'zod';
 
 /** Porta do servidor local (fallback: 3008). */
@@ -41,9 +40,9 @@ const MCP_BASE = `http://127.0.0.1:${MCP_PORT}/api/mcp`;
  *
  * @param {string} method - Método JSON-RPC (ex: 'tools/list', 'tools/call')
  * @param {unknown} [params] - Parâmetros do método
- * @returns {unknown} Resultado do campo `result` ou lança Error em caso de falha
+ * @returns {Promise<unknown>} Resultado do campo `result` ou lança Error em caso de falha
  */
-function rpcCall(method, params) {
+async function rpcCall(method, params) {
     const body = JSON.stringify({
         jsonrpc: '2.0',
         id: Date.now(),
@@ -51,29 +50,35 @@ function rpcCall(method, params) {
         params: params ?? {},
     });
 
-    const raw = execSync(
-        `curl -sf -X POST -H "Content-Type: application/json" -d '${body.replace(/'/g, "\\'")}' "${MCP_BASE}"`,
-        { encoding: 'utf8', timeout: 8000 },
-    );
+    const response = await fetch(MCP_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(8000),
+    });
 
-    const response = JSON.parse(raw);
-
-    if (response.error) {
-        throw new Error(`MCP RPC error [${method}]: ${JSON.stringify(response.error)}`);
+    if (!response.ok) {
+        throw new Error(`MCP HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return response.result;
+    const json = /** @type {any} */ (await response.json());
+
+    if (json.error) {
+        throw new Error(`MCP RPC error [${method}]: ${JSON.stringify(json.error)}`);
+    }
+
+    return json.result;
 }
 
 /**
  * Lista as tools disponíveis no MCP Tool Registry local.
  *
- * @returns {McpToolMeta[]} Array de metadados de tools
+ * @returns {Promise<McpToolMeta[]>} Array de metadados de tools
  */
-export function listMcpTools() {
+export async function listMcpTools() {
     try {
         /** @type {any} */
-        const result = rpcCall('tools/list', {});
+        const result = await rpcCall('tools/list', {});
         const tools = /** @type {McpToolMeta[]} */ (result?.tools ?? []);
         return tools.filter((t) => t && typeof t.name === 'string');
     } catch (/** @type {any} */ e) {
@@ -145,7 +150,7 @@ function createSdkToolFromMcp(mcpTool) {
         handler: async (/** @type {Record<string, unknown>} */ params) => {
             try {
                 /** @type {any} */
-                const result = rpcCall('tools/call', {
+                const result = await rpcCall('tools/call', {
                     name: mcpTool.name,
                     arguments: params,
                 });
@@ -173,10 +178,10 @@ function createSdkToolFromMcp(mcpTool) {
  * Consulta dinamicamente o endpoint MCP para descobrir as tools disponíveis e gera uma Custom Tool SDK para cada uma,
  * prefixada com `mcp_`.
  *
- * @returns {import('@github/copilot-sdk').Tool[]} Array de Custom Tools prontas para registro no SDK
+ * @returns {Promise<import('@github/copilot-sdk').Tool[]>} Array de Custom Tools prontas para registro no SDK
  */
-export function buildMcpTools() {
-    const mcpTools = listMcpTools();
+export async function buildMcpTools() {
+    const mcpTools = await listMcpTools();
 
     if (mcpTools.length === 0) {
         log('INFO', '[mcp-tool-bridge] Nenhuma tool MCP disponível (servidor offline ou MCP_ENABLED=false).');

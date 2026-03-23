@@ -26,6 +26,7 @@ import {
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
+import { buildMcpConfig } from './config/mcp-servers.js';
 import { buildMcpTools } from './mcp-tool-bridge.js';
 import { initOrResumeSession, readState, writeState } from './session-manager.js';
 import { allTools, registerForIntrospection, setTelemetryStore } from './tools/index.js';
@@ -209,7 +210,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         try {
             this.#client = new CopilotClient();
 
-            const mcpTools = buildMcpTools();
+            const mcpTools = await buildMcpTools();
             const tools = [...allTools, ...mcpTools];
             if (mcpTools.length > 0) {
                 log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
@@ -235,6 +236,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                     onSessionEnd: this.#onSessionEnd.bind(this),
                 },
                 tools,
+                mcpServers: buildMcpConfig(),
                 injectHookContext: true,
             });
 
@@ -657,7 +659,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
             await new Promise((r) => setTimeout(r, delay));
 
             try {
-                const mcpTools = buildMcpTools();
+                const mcpTools = await buildMcpTools();
                 const tools = [...allTools, ...mcpTools];
                 const { session, isResumed } = await initOrResumeSession(this.#client, {
                     model: this.#model,
@@ -668,6 +670,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                         onSessionEnd: this.#onSessionEnd.bind(this),
                     },
                     tools,
+                    mcpServers: buildMcpConfig(),
                     injectHookContext: true,
                 });
                 this.#session = session;

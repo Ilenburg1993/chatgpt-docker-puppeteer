@@ -21,18 +21,18 @@ import { buildMcpTools, listMcpTools } from '../../../src/copilot/mcp-tool-bridg
 // ---------------------------------------------------------------------------
 
 describe('mcp-tool-bridge › listMcpTools (sem servidor)', () => {
-    it('retorna array vazio quando servidor está offline', () => {
-        // No ambiente de teste, curl falha → must return []
-        const result = listMcpTools();
+    it('retorna array vazio quando servidor está offline', async () => {
+        // No ambiente de teste, fetch falha → must return []
+        const result = await listMcpTools();
         assert.ok(Array.isArray(result), 'deve retornar um array');
     });
 
-    it('retorna [] sem lançar erro (graceful degradation)', () => {
+    it('retorna [] sem lançar erro (graceful degradation)', async () => {
         // Chamar duas vezes para garantir idempotência
         let threw = false;
         try {
-            listMcpTools();
-            listMcpTools();
+            await listMcpTools();
+            await listMcpTools();
         } catch {
             threw = true;
         }
@@ -45,25 +45,25 @@ describe('mcp-tool-bridge › listMcpTools (sem servidor)', () => {
 // ---------------------------------------------------------------------------
 
 describe('mcp-tool-bridge › buildMcpTools (sem servidor)', () => {
-    it('retorna array vazio quando servidor está offline', () => {
-        const tools = buildMcpTools();
+    it('retorna array vazio quando servidor está offline', async () => {
+        const tools = await buildMcpTools();
         assert.ok(Array.isArray(tools), 'deve retornar array');
     });
 
-    it('não lança erro quando servidor está offline', () => {
+    it('não lança erro quando servidor está offline', async () => {
         let threw = false;
         try {
-            buildMcpTools();
+            await buildMcpTools();
         } catch {
             threw = true;
         }
         assert.equal(threw, false, 'graceful degradation obrigatória');
     });
 
-    it('cada tool retornada tem .name e .handler', () => {
+    it('cada tool retornada tem .name e .handler', async () => {
         // Se servidor estiver rodando, vamos validar o formato
         // Se não estiver, o array estará vazio — ambos os casos são válidos
-        const tools = buildMcpTools();
+        const tools = await buildMcpTools();
         for (const tool of tools) {
             const t = /** @type {any} */ (tool);
             assert.ok(typeof t.name === 'string', `tool.name deve ser string, recebeu: ${typeof t.name}`);
@@ -72,8 +72,8 @@ describe('mcp-tool-bridge › buildMcpTools (sem servidor)', () => {
         }
     });
 
-    it('cada tool retornada tem .description com prefixo [MCP]', () => {
-        const tools = buildMcpTools();
+    it('cada tool retornada tem .description com prefixo [MCP]', async () => {
+        const tools = await buildMcpTools();
         for (const tool of tools) {
             const t = /** @type {any} */ (tool);
             assert.ok(
@@ -83,8 +83,8 @@ describe('mcp-tool-bridge › buildMcpTools (sem servidor)', () => {
         }
     });
 
-    it('cada tool retornada tem .parameters (Zod schema)', () => {
-        const tools = buildMcpTools();
+    it('cada tool retornada tem .parameters (Zod schema)', async () => {
+        const tools = await buildMcpTools();
         for (const tool of tools) {
             const t = /** @type {any} */ (tool);
             assert.ok(t.parameters !== undefined, 'tool deve ter parameters (Zod schema)');
@@ -119,5 +119,3 @@ describe('mcp-tool-bridge › smoke tests', () => {
         assert.ok(exports.includes('buildMcpTools'), 'deve exportar buildMcpTools');
     });
 });
-
-const result = listMcpTools();

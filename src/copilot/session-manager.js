@@ -144,6 +144,7 @@ export function clearState() {
  * @param {object} [sessionOptions.hooks]
  * @param {import('@github/copilot-sdk').Tool[]} [sessionOptions.tools] - Custom Tools a registrar na sessão
  * @param {boolean} [sessionOptions.injectHookContext] - Injetar contexto do hook system (default: true)
+ * @param {Record<string, unknown>} [sessionOptions.mcpServers] - Configurações de servidores MCP nativos
  * @returns {Promise<{ session: CopilotSession; isResumed: boolean }>}
  */
 export async function initOrResumeSession(client, sessionOptions) {
@@ -177,6 +178,7 @@ export async function initOrResumeSession(client, sessionOptions) {
             : {}),
         ...(sessionOptions.hooks !== undefined ? { hooks: sessionOptions.hooks } : {}),
         ...(sessionOptions.tools !== undefined ? { tools: sessionOptions.tools } : {}),
+        ...(sessionOptions.mcpServers !== undefined ? { mcpServers: sessionOptions.mcpServers } : {}),
         ...(systemMessage !== undefined ? { systemMessage } : {}),
     };
 
