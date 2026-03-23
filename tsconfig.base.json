@@ -28,6 +28,8 @@
       "#kernel/*": ["src/kernel/*"],
       "#driver/*": ["src/driver/*"],
       "#agent/*": ["src/agent/*"],
+      "#copilot/lib/*": ["src/copilot/lib/*"],
+      "#copilot/*": ["src/copilot/*"],
       "#infra/*": ["src/infra/*"],
       "#integration/*": ["src/integration/*"],
       "#types/*": ["src/types/*"],

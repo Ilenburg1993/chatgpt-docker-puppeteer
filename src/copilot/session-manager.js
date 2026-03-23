@@ -8,6 +8,7 @@
  * @module copilot/session-manager
  */
 
+import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -163,40 +164,8 @@ export async function initOrResumeSession(client, sessionOptions) {
           }
         : undefined;
 
-    if (state?.sessionId) {
-        log('INFO', `[PersistentSession] Tentando retomar sessão: ${state.sessionId}`);
-        try {
-            /** @type {any} */
-            const resumeConfig = {
-                streaming: true,
-                ...(sessionOptions.onPermissionRequest !== undefined
-                    ? { onPermissionRequest: sessionOptions.onPermissionRequest }
-                    : {}),
-                ...(sessionOptions.onUserInputRequest !== undefined
-                    ? { onUserInputRequest: sessionOptions.onUserInputRequest }
-                    : {}),
-                ...(sessionOptions.hooks !== undefined ? { hooks: sessionOptions.hooks } : {}),
-                ...(sessionOptions.tools !== undefined ? { tools: sessionOptions.tools } : {}),
-                ...(systemMessage !== undefined ? { systemMessage } : {}),
-            };
-            const session = await client.resumeSession(state.sessionId, resumeConfig);
-            writeState({
-                resumedAt: Date.now(),
-                resumeCount: (state.resumeCount ?? 0) + 1,
-            });
-            log('INFO', `[PersistentSession] Sessão retomada com sucesso (retomada #${(state.resumeCount ?? 0) + 1}).`);
-            return { session, isResumed: true };
-        } catch (/** @type {any} */ e) {
-            log(
-                'WARN',
-                `[PersistentSession] Falha ao retomar sessão '${state.sessionId}': ${e.message}. Criando nova.`,
-            );
-        }
-    }
-
-    log('INFO', `[PersistentSession] Criando nova sessão com modelo '${model}'...`);
     /** @type {any} */
-    const createConfig = {
+    const opts = {
         model,
         streaming: true,
         infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 },
@@ -210,17 +179,28 @@ export async function initOrResumeSession(client, sessionOptions) {
         ...(sessionOptions.tools !== undefined ? { tools: sessionOptions.tools } : {}),
         ...(systemMessage !== undefined ? { systemMessage } : {}),
     };
-    const session = await client.createSession(createConfig);
 
-    writeState({
-        sessionId: session.sessionId,
-        startedAt: Date.now(),
-        resumedAt: Date.now(),
-        resumeCount: 0,
-        sendCount: 0,
-        model,
-        pendingQuestion: null,
-    });
-    log('INFO', `[PersistentSession] Nova sessão criada: ${session.sessionId}`);
-    return { session, isResumed: false };
+    // Delega para lib/session.resumeOrCreate — tenta retomar, cria se falhar
+    const result = await resumeOrCreate(client, state?.sessionId ?? null, opts);
+
+    if (result.isResumed) {
+        writeState({
+            resumedAt: Date.now(),
+            resumeCount: (state?.resumeCount ?? 0) + 1,
+        });
+        log('INFO', `[PersistentSession] Sessão retomada com sucesso (retomada #${(state?.resumeCount ?? 0) + 1}).`);
+    } else {
+        writeState({
+            sessionId: result.sessionId,
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 0,
+            sendCount: 0,
+            model,
+            pendingQuestion: null,
+        });
+        log('INFO', `[PersistentSession] Nova sessão criada: ${result.sessionId}`);
+    }
+
+    return { session: result.session, isResumed: result.isResumed };
 }
