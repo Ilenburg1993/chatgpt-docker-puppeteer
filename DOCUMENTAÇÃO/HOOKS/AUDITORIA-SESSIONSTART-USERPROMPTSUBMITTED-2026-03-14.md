@@ -1,7 +1,7 @@
 # Auditoria Profunda — `sessionStart` vs `userPromptSubmitted`
 
-**Data:** 2026-03-14
-**Escopo:**
+**Data:** 2026-03-14 **Escopo:**
+
 - `.github/hooks/scripts/session-start.sh`
 - `.github/hooks/scripts/log-prompt.sh`
 - `.github/hooks/copilot-hooks.json`
@@ -11,8 +11,8 @@
 
 ## 1) Objetivo
 
-Validar com alta confiança **quando cada hook dispara**, eliminar ambiguidades de lifecycle e aplicar
-upgrades estruturais para rastreabilidade/auditoria contínua.
+Validar com alta confiança **quando cada hook dispara**, eliminar ambiguidades de lifecycle e
+aplicar upgrades estruturais para rastreabilidade/auditoria contínua.
 
 ---
 
@@ -20,8 +20,8 @@ upgrades estruturais para rastreabilidade/auditoria contínua.
 
 ## ✅ `sessionStart`
 
-Dispara no evento de sessão do Copilot (início/reativação de sessão no ciclo da plataforma), **não** em
-cada turno.
+Dispara no evento de sessão do Copilot (início/reativação de sessão no ciclo da plataforma), **não**
+em cada turno.
 
 ### Evidências
 
@@ -30,13 +30,13 @@ cada turno.
 2. Semântica de protocolo no repositório:
    - `hooks-protocol.instructions.md` define SESSION como `sessionStart -> sessionEnd`.
 3. Evidência empírica nos logs atuais:
-   - sessão `8c19c988-b622-44ee-8207-717464587212`: `sessionStart=0`,
-     `userPromptSubmitted=7` (ou seja: vários turnos sem novo `sessionStart`).
+   - sessão `8c19c988-b622-44ee-8207-717464587212`: `sessionStart=0`, `userPromptSubmitted=7` (ou
+     seja: vários turnos sem novo `sessionStart`).
 
 ### Conclusão técnica
 
-`sessionStart` **não é hook de turno**. É hook de lifecycle de sessão e pode ser raro em sessões longas
-ou retomadas.
+`sessionStart` **não é hook de turno**. É hook de lifecycle de sessão e pode ser raro em sessões
+longas ou retomadas.
 
 ---
 
@@ -59,8 +59,8 @@ Dispara quando o usuário envia prompt na **caixa de chat** do VS Code, abrindo 
 
 ### Conclusão técnica
 
-Sua leitura está correta: `userPromptSubmitted` é o gatilho confiável para início de TURN via chat box,
-inclusive em retomadas de sessão.
+Sua leitura está correta: `userPromptSubmitted` é o gatilho confiável para início de TURN via chat
+box, inclusive em retomadas de sessão.
 
 ---
 

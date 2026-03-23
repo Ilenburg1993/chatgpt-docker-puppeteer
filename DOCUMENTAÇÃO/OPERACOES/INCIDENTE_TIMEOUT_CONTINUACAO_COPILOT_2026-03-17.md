@@ -1,21 +1,23 @@
 # Incidente — Timeout na continuação de turnos do Copilot Chat (2026-03-17)
 
-**Status**: Aberto com mitigação aplicada (monitoramento ativo)
-**Severidade**: Alta (interrupção recorrente de fluxo de trabalho)
-**Escopo**: VS Code + Copilot Chat (não relacionado ao sistema de hooks do repositório)
-**Data**: 2026-03-17
+**Status**: Aberto com mitigação aplicada (monitoramento ativo) **Severidade**: Alta (interrupção
+recorrente de fluxo de trabalho) **Escopo**: VS Code + Copilot Chat (não relacionado ao sistema de
+hooks do repositório) **Data**: 2026-03-17
 
 ## 1) Resumo executivo
 
-Foi investigada uma falha recorrente na continuação de turnos do Copilot Chat, com sintomas compatíveis com `request timeout` (incluindo cenário de `408 user_request_timeout`).
+Foi investigada uma falha recorrente na continuação de turnos do Copilot Chat, com sintomas
+compatíveis com `request timeout` (incluindo cenário de `408 user_request_timeout`).
 
-Ponto crítico confirmado durante a investigação: **os hooks locais estão desativados no caminho ativo**, então a causa não deve ser atribuída ao pipeline de hooks do projeto.
+Ponto crítico confirmado durante a investigação: **os hooks locais estão desativados no caminho
+ativo**, então a causa não deve ser atribuída ao pipeline de hooks do projeto.
 
 Como mitigação imediata, foi criado um diagnóstico operacional de rede dedicado:
 
 - `scripts/ops/copilot-network-diagnose.sh`
 
-Esse script valida os endpoints principais do Copilot, mede latências por etapa (DNS/TCP/TLS/TTFB/total) e gera saída acionável para triagem.
+Esse script valida os endpoints principais do Copilot, mede latências por etapa
+(DNS/TCP/TLS/TTFB/total) e gera saída acionável para triagem.
 
 ---
 
@@ -41,7 +43,9 @@ Consulta da API pública de status retornou componentes em estado operacional no
 
 ### 2.3 Contexto estrutural do workspace
 
-No diretório ativo de hooks (`.github/hooks`) há apenas `logs/`. A implementação antiga existe em `.github/hooks.old/`, reforçando que o incidente atual de timeout não depende do fluxo legado de hooks.
+No diretório ativo de hooks (`.github/hooks`) há apenas `logs/`. A implementação antiga existe em
+`.github/hooks.old/`, reforçando que o incidente atual de timeout não depende do fluxo legado de
+hooks.
 
 ---
 
@@ -67,9 +71,9 @@ No diretório ativo de hooks (`.github/hooks`) há apenas `logs/`. A implementa�
 - Criado `scripts/ops/copilot-network-diagnose.sh` para validação rápida e repetível.
 - Atualizado `scripts/ops/README.md` para indexar o novo utilitário.
 - Ajustado `.vscode/settings.json` para perfil mais estável em ambiente doméstico:
-   - `chat.agent.maxRequests`: `1000` → `25`
-   - `chat.requestQueuing.defaultAction`: `"queue"` (explicitado)
-   - `github.copilot.chat.responsesApiReasoningEffort`: `"high"` → `"medium"`
+  - `chat.agent.maxRequests`: `1000` → `25`
+  - `chat.requestQueuing.defaultAction`: `"queue"` (explicitado)
+  - `github.copilot.chat.responsesApiReasoningEffort`: `"high"` → `"medium"`
 
 ### 4.2 Playbook de resposta rápida
 
@@ -86,10 +90,13 @@ Quando ocorrer timeout novamente:
 ## 5) Medidas preventivas recomendadas
 
 1. **Padronizar checklist de rede para incidente Copilot** (já iniciado com script).
-2. **Eliminar proxy herdado desnecessário** no ambiente local (variáveis `HTTP_PROXY`/`HTTPS_PROXY` só quando realmente necessário).
-3. **Manter trust store padrão íntegro** no Linux (`/etc/ssl/certs`), sem relaxar SSL como configuração permanente.
+2. **Eliminar proxy herdado desnecessário** no ambiente local (variáveis `HTTP_PROXY`/`HTTPS_PROXY`
+   só quando realmente necessário).
+3. **Manter trust store padrão íntegro** no Linux (`/etc/ssl/certs`), sem relaxar SSL como
+   configuração permanente.
 4. **Manter VS Code + Copilot Chat atualizados** para evitar incompatibilidade de protocolo/UI.
-5. **Reduzir risco de timeout por payload excessivo** em prompts longos (dividir solicitações quando necessário).
+5. **Reduzir risco de timeout por payload excessivo** em prompts longos (dividir solicitações quando
+   necessário).
 
 ### 5.0 Perfil recomendado para este caso (usuário doméstico)
 
@@ -97,7 +104,8 @@ Quando ocorrer timeout novamente:
 - **SSL estrito mantido** (`http.proxyStrictSSL = true`, quando aplicável).
 - **Fila de requests habilitada** (`chat.requestQueuing.defaultAction = "queue"`).
 - **Menor fan-out de agente** (`chat.agent.maxRequests = 25`).
-- **Esforço de raciocínio balanceado** (`github.copilot.chat.responsesApiReasoningEffort = "medium"`).
+- **Esforço de raciocínio balanceado**
+  (`github.copilot.chat.responsesApiReasoningEffort = "medium"`).
 
 Esses ajustes já foram aplicados no workspace atual.
 
@@ -114,7 +122,8 @@ Esses ajustes já foram aplicados no workspace atual.
 | G. Reautenticar sessão Copilot                     | Sign out/in + `Developer: Reload Window`                                   | Resolve token/sessão degradada                        | Baixo    | Falhas sem sintoma claro de rede          |
 | H. Desabilitar validação SSL do proxy (temporário) | `http.proxyStrictSSL = false`                                              | Pode desbloquear diagnóstico em ambiente quebrado     | **Alto** | Somente teste controlado, nunca padrão    |
 
-> Observação oficial: proxy `https://` para Copilot não é suportado; use proxy `http://` e TLS tratado pelo túnel/proxy conforme política corporativa.
+> Observação oficial: proxy `https://` para Copilot não é suportado; use proxy `http://` e TLS
+> tratado pelo túnel/proxy conforme política corporativa.
 
 ### 5.2 Ordem recomendada de aplicação (menor risco → maior impacto)
 
@@ -124,7 +133,8 @@ Esses ajustes já foram aplicados no workspace atual.
 4. Ajustar Kerberos SPN se aplicável (C).
 5. Corrigir cadeia de certificados (D/E).
 6. Ajustar comportamento de fila do chat (F).
-7. `http.proxyStrictSSL = false` somente como experimento curto para confirmar hipótese de certificado (H).
+7. `http.proxyStrictSSL = false` somente como experimento curto para confirmar hipótese de
+   certificado (H).
 
 ### 5.3 Exemplo de baseline de configuração (VS Code + ambiente)
 
@@ -132,10 +142,10 @@ Esses ajustes já foram aplicados no workspace atual.
 
 ```json
 {
-   "http.proxy": "http://proxy.example.com:3128",
-   "http.proxyStrictSSL": true,
-   "chat.requestQueuing.defaultAction": "queue",
-   "http.proxyKerberosServicePrincipal": "HTTP/proxy.example.com"
+  "http.proxy": "http://proxy.example.com:3128",
+  "http.proxyStrictSSL": true,
+  "chat.requestQueuing.defaultAction": "queue",
+  "http.proxyKerberosServicePrincipal": "HTTP/proxy.example.com"
 }
 ```
 
@@ -168,4 +178,6 @@ export NODE_EXTRA_CA_CERTS="/etc/ssl/certs/corporate-root-ca.pem"
 
 ## 7) Próximo passo recomendado
 
-Se o erro reaparecer apesar de rede `_ping` saudável e status global operacional, abrir incidente com pacote de evidências (Chat Diagnostics + logs TRACE + timestamps + output do script), para escalonamento técnico com maior precisão.
+Se o erro reaparecer apesar de rede `_ping` saudável e status global operacional, abrir incidente
+com pacote de evidências (Chat Diagnostics + logs TRACE + timestamps + output do script), para
+escalonamento técnico com maior precisão.

@@ -1,14 +1,14 @@
 # Arquitetura Canônica — SESSION, SECTION, TURN e SUBTURN (Hooks Copilot)
 
-**Status**: Proposta canônica para consolidação (pré-onda P1/P2)
-**Data**: 2026-03-13
-**Escopo**: comportamento semântico e contrato operacional do ciclo de vida em hooks
+**Status**: Proposta canônica para consolidação (pré-onda P1/P2) **Data**: 2026-03-13 **Escopo**:
+comportamento semântico e contrato operacional do ciclo de vida em hooks
 
 ---
 
 ## 1) Fontes normativas usadas
 
-1. **VS Code (oficial, Preview)** — Agent hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PreCompact`, `SubagentStart`, `SubagentStop`, `Stop`) e `stop_hook_active`.
+1. **VS Code (oficial, Preview)** — Agent hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`,
+   `PostToolUse`, `PreCompact`, `SubagentStart`, `SubagentStop`, `Stop`) e `stop_hook_active`.
 2. **GitHub Docs** — hooks configuration e boas práticas operacionais.
 3. **Documentação interna** — `DOCUMENTAÇÃO/HOOKS/GUIA-HOOKS-COPILOT.md`.
 4. **Verdade executável (As-Is)** — scripts:
@@ -25,7 +25,8 @@
    - `.github/hooks/scripts/subagent-start.sh`
    - `.github/hooks/scripts/subagent-stop.sh`
 
-> Princípio de precedência: **comportamento real dos scripts + eventos nativos do VS Code** prevalece sobre texto instrucional divergente.
+> Princípio de precedência: **comportamento real dos scripts + eventos nativos do VS Code**
+> prevalece sobre texto instrucional divergente.
 
 ---
 
@@ -39,13 +40,16 @@
 - `SessionStart` abre sessão nova (tipicamente via Nova Conversa).
 - `SessionEnd` pode ocorrer no fechamento, mas é menos confiável em encerramentos abruptos.
 
-**Regra canônica S1**: nenhum componente local deve “inventar” identidade de sessão quando o `session_id` nativo está disponível.
+**Regra canônica S1**: nenhum componente local deve “inventar” identidade de sessão quando o
+`session_id` nativo está disponível.
 
 ### 2.2 SESSION lógica (nível repositório)
 
-O projeto mantém `session-context*.json` com metadados de governança (close key, stats, seção atual, etc.).
+O projeto mantém `session-context*.json` com metadados de governança (close key, stats, seção atual,
+etc.).
 
-**Regra canônica S2**: `session.id` local deve ser tratado como espelho do `session_id` do VS Code sempre que possível; qualquer `heal` deve convergir para esse valor.
+**Regra canônica S2**: `session.id` local deve ser tratado como espelho do `session_id` do VS Code
+sempre que possível; qualquer `heal` deve convergir para esse valor.
 
 **Regra canônica S3**: no modelo operacional deste repositório, o fim de TURN interrompe a sessão de
 execução corrente, que pode ser retomada no mesmo chat por novo prompt (mesmo `session_id` de
@@ -53,41 +57,47 @@ plataforma).
 
 ### 2.3 SECTION (nível semântico)
 
-**SECTION** é fase de trabalho nomeada (ex.: análise, implementação, revisão). Não existe nativamente na plataforma.
+**SECTION** é fase de trabalho nomeada (ex.: análise, implementação, revisão). Não existe
+nativamente na plataforma.
 
 - Abertura principal: `start-section.sh`.
 - Fechamento: `section-end.sh` (manual) ou auto-fecho por `start-section.sh` / `session-end.sh`.
 
-**Regra canônica C1**: SECTION é autônoma do agente (não depende de autorização do usuário para transição).
+**Regra canônica C1**: SECTION é autônoma do agente (não depende de autorização do usuário para
+transição).
 
 ### 2.4 TURN (nível de ciclo de execução)
 
 **TURN** é um ciclo de execução do agente até o evento `Stop`.
 
-- `UserPromptSubmit` pode iniciar TURN, mas não é o único gatilho observável em fluxos com ferramentas interativas.
+- `UserPromptSubmit` pode iniciar TURN, mas não é o único gatilho observável em fluxos com
+  ferramentas interativas.
 - `Stop` representa ponto de término do ciclo atual do agente.
 - O encerramento legítimo de TURN exige `vscode_askQuestions` como último ato do turno **e**
   validação da key correta da sessão no fluxo autorizado.
 - Após fechado, o TURN **não pode ser retomado**.
 
 **Regra canônica T1**: TURN é encerramento operacional do ciclo do agente, distinto de SESSION.
-**Regra canônica T2**: fim de TURN interrompe a sessão de execução corrente.
-**Regra canônica T3**: retomada ocorre por novo TURN na mesma SESSION (novo prompt/novo ciclo), nunca por reabertura de TURN fechado.
+**Regra canônica T2**: fim de TURN interrompe a sessão de execução corrente. **Regra canônica T3**:
+retomada ocorre por novo TURN na mesma SESSION (novo prompt/novo ciclo), nunca por reabertura de
+TURN fechado.
 
 ### 2.5 SUBTURN (nível interno do TURN)
 
-**SUBTURN** é uma subdivisão interna do TURN para modelar reentrâncias e continuidade dentro do mesmo turno lógico.
+**SUBTURN** é uma subdivisão interna do TURN para modelar reentrâncias e continuidade dentro do
+mesmo turno lógico.
 
 Casos típicos:
+
 1. `Stop` bloqueado (`decision:block`) e retomada posterior (`stop_hook_active=true`).
 2. Delegação para subagente (`runSubagent`/`search_subagent`) com retomada do pai.
 3. Espera por retorno de ferramenta interativa sem iniciar nova sessão.
 
-**Regra canônica ST1**: SUBTURN **não** cria novo TURN; é iteração do mesmo TURN.
-**Regra canônica ST2**: SUBTURN é sempre subordinado ao TURN pai e nunca pode ultrapassar o ciclo
-de vida do TURN.
+**Regra canônica ST1**: SUBTURN **não** cria novo TURN; é iteração do mesmo TURN. **Regra canônica
+ST2**: SUBTURN é sempre subordinado ao TURN pai e nunca pode ultrapassar o ciclo de vida do TURN.
 
-**Representação atual (As-Is)**: parcialmente via `current_turn.agentStop_invocations`, `stop_hook_active` e eventos de subagente.
+**Representação atual (As-Is)**: parcialmente via `current_turn.agentStop_invocations`,
+`stop_hook_active` e eventos de subagente.
 
 ---
 
@@ -106,7 +116,8 @@ de vida do TURN.
 ### I3 — Continuidade com rastreabilidade
 
 - Toda transição relevante deve deixar trilha em `audit*.jsonl`.
-- Se estado local divergir do payload, a divergência deve ser logada e tratada, nunca silenciosamente ignorada sem auditoria.
+- Se estado local divergir do payload, a divergência deve ser logada e tratada, nunca
+  silenciosamente ignorada sem auditoria.
 
 ### I4 — Anti-loop de Stop
 
@@ -171,17 +182,18 @@ Após esse fechamento, o TURN não pode ser retomado. A continuidade ocorre em n
 
 ### 5.2 Encerramento legítimo de SESSION
 
-Encerramento de SESSION exige confirmação explícita do usuário por close key da sessão, com validação no fluxo de hooks e registro de autorização.
+Encerramento de SESSION exige confirmação explícita do usuário por close key da sessão, com
+validação no fluxo de hooks e registro de autorização.
 
-> TURN nunca deve ser tratado como fechamento implícito de SESSION.
-> Encerrar TURN interrompe a execução corrente da sessão, mas a SESSION permanece retomável.
+> TURN nunca deve ser tratado como fechamento implícito de SESSION. Encerrar TURN interrompe a
+> execução corrente da sessão, mas a SESSION permanece retomável.
 
 ---
 
 ## 6) Contrato proposto para SUBTURN (novo)
 
-> **Status atual**: conceito arquitetural **ainda não implementado** no runtime; existe apenas sinalização
-> parcial por `agentStop_invocations`/`stop_hook_active`.
+> **Status atual**: conceito arquitetural **ainda não implementado** no runtime; existe apenas
+> sinalização parcial por `agentStop_invocations`/`stop_hook_active`.
 
 Adicionar bloco explícito ao contexto:
 
@@ -200,6 +212,7 @@ Adicionar bloco explícito ao contexto:
 ```
 
 Eventos sugeridos em audit:
+
 - `subturnStart`
 - `subturnEnd`
 - `subturnResume`
@@ -224,21 +237,28 @@ Benefício: elimina ambiguidades atuais entre “novo turno” e “continuaçã
 
 ## 8) Gaps arquiteturais observados (prioridade para P1)
 
-1. **Divergência documental** sobre quem aciona `session-close.sh` (auto vs chamada direta do agente em diferentes textos).
-2. **Regra estrita de TURN (askQuestions + key)** ainda não está plenamente implementada em todos
-  os scripts/runtime.
-3. **Semântica de TURN x SUBTURN não formalizada** no schema atual (há sinais, mas sem contrato explícito).
-4. **Estado transitório de SECTION fechada** (`is_closed=true`) ainda permite janela de inconsistência até nova abertura.
-5. **Conjuntos de valores de `reason/source`** variam entre docs e implementação, exigindo normalização de dicionário canônico.
+1. **Divergência documental** sobre quem aciona `session-close.sh` (auto vs chamada direta do agente
+   em diferentes textos).
+2. **Regra estrita de TURN (askQuestions + key)** ainda não está plenamente implementada em todos os
+   scripts/runtime.
+3. **Semântica de TURN x SUBTURN não formalizada** no schema atual (há sinais, mas sem contrato
+   explícito).
+4. **Estado transitório de SECTION fechada** (`is_closed=true`) ainda permite janela de
+   inconsistência até nova abertura.
+5. **Conjuntos de valores de `reason/source`** variam entre docs e implementação, exigindo
+   normalização de dicionário canônico.
 
 ---
 
 ## 9) Decisões canônicas para continuidade das correções
 
 1. **Adotar este documento como referência de semântica** para P1/P2.
-2. **Não avançar em hardening adicional** sem alinhar `AGENTS.md`, instruções e scripts ao mesmo contrato.
-3. **Implementar SUBTURN como conceito explícito** (schema + audit) antes de mudanças mais agressivas de bloqueio/autorizações.
-4. **Padronizar vocabulário**: Session (plataforma), Session lógica (local), Section (semântica), Turn (ciclo), SubTurn (iteração intra-turno).
+2. **Não avançar em hardening adicional** sem alinhar `AGENTS.md`, instruções e scripts ao mesmo
+   contrato.
+3. **Implementar SUBTURN como conceito explícito** (schema + audit) antes de mudanças mais
+   agressivas de bloqueio/autorizações.
+4. **Padronizar vocabulário**: Session (plataforma), Session lógica (local), Section (semântica),
+   Turn (ciclo), SubTurn (iteração intra-turno).
 
 ---
 
@@ -247,7 +267,8 @@ Benefício: elimina ambiguidades atuais entre “novo turno” e “continuaçã
 - Existe uma definição única e não ambígua de SESSION/SECTION/TURN/SUBTURN.
 - O papel de `session_id` nativo como fonte de verdade está explícito.
 - O fechamento de SESSION está separado semanticamente do fechamento de TURN.
-- O fluxo de subagente está modelado como continuidade de TURN (via SUBTURN), não como novo TURN implícito.
+- O fluxo de subagente está modelado como continuidade de TURN (via SUBTURN), não como novo TURN
+  implícito.
 
 ---
 
@@ -255,7 +276,8 @@ Benefício: elimina ambiguidades atuais entre “novo turno” e “continuaçã
 
 1. Alinhar documentação operacional (`AGENTS.md`, instruções e protocolos) com este contrato.
 2. Introduzir schema de SUBTURN no `session-context` e eventos correspondentes no `audit`.
-3. Revisar pontos de inconsistência em `section-end.sh`/`agent-stop.sh` para manter invariante de seção ativa com janela mínima.
+3. Revisar pontos de inconsistência em `section-end.sh`/`agent-stop.sh` para manter invariante de
+   seção ativa com janela mínima.
 4. Rodar smoke tests de ciclo completo (session start → turn com block → subagent → session close).
 
 ---
@@ -298,18 +320,21 @@ Benefício: elimina ambiguidades atuais entre “novo turno” e “continuaçã
 Detecção canônica usa combinação de `session_id` + `source` + estado local:
 
 1. **Nova sessão de plataforma**
-  - `session_id` novo no payload de `sessionStart`;
-  - `source=new` (ou equivalente de sessão nova);
-  - `logical_session_number` incrementa.
+
+- `session_id` novo no payload de `sessionStart`;
+- `source=new` (ou equivalente de sessão nova);
+- `logical_session_number` incrementa.
 
 2. **Retomada da mesma conversa/sessão lógica**
-  - mesmo `session_id` de plataforma;
-  - `source=inline_restart` (ou reconexão equivalente);
-  - contexto agregado é preservado (não reset total).
+
+- mesmo `session_id` de plataforma;
+- `source=inline_restart` (ou reconexão equivalente);
+- contexto agregado é preservado (não reset total).
 
 3. **Retomada operacional após fim de TURN**
-  - novo prompt no mesmo chat abre novo TURN (`turn + 1`);
-  - TURN anterior permanece encerrado e não retomável.
+
+- novo prompt no mesmo chat abre novo TURN (`turn + 1`);
+- TURN anterior permanece encerrado e não retomável.
 
 ---
 
@@ -361,4 +386,5 @@ Indicadores de TURN ilegítimo:
 
 ---
 
-_Este documento consolida a arquitetura alvo para destravar as próximas ondas de correção com semântica estável e auditável._
+_Este documento consolida a arquitetura alvo para destravar as próximas ondas de correção com
+semântica estável e auditável._

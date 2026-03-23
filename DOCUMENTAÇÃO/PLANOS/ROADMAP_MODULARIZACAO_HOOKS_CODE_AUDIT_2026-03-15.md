@@ -64,12 +64,11 @@ reduzindo acoplamento estrutural.
 ## Ordem recomendada imediata
 
 1. **Concluir pendências transversais de governança**: F7.10 (gate estrutural no fluxo padrão) e
-  F8.3 (compatibilidade retroativa de contratos).
+   F8.3 (compatibilidade retroativa de contratos).
 2. **Retomar a trilha file-by-file** com F17.2 (`userPromptSubmitted`).
 3. Na sequência, **executar F17.3 e F17.4** (`preToolUse` e `postToolUse`) para consolidar domínio
-  `policy` com fronteiras explícitas de entry-lib.
-4. Com os hooks não-Stop estáveis, **iniciar F15.2** (decomposição interna de
-  `agent-stop-lib.sh`).
+   `policy` com fronteiras explícitas de entry-lib.
+4. Com os hooks não-Stop estáveis, **iniciar F15.2** (decomposição interna de `agent-stop-lib.sh`).
 5. Encerrar o ciclo com **F16.1→F16.3** (enforcement + smoke de aderência + gate integrado).
 
 ## Backlog operacional (F0→F6)
@@ -142,8 +141,8 @@ sincronizadas.
 
 ### Painel consolidado (todos os F em execução)
 
-| Fase | Status      | Objetivo macro                        | Próxima ação objetiva                |
-| ---- | ----------- | ------------------------------------- | ------------------------------------ |
+| Fase | Status       | Objetivo macro                        | Próxima ação objetiva                |
+| ---- | ------------ | ------------------------------------- | ------------------------------------ |
 | F0   | ✅ Concluída | Congelar baseline comportamental      | Mantida como referência de regressão |
 | F1   | ✅ Concluída | Runtime comum + contexto transacional | Sem ação pendente                    |
 | F2   | ✅ Concluída | Policy engine canônico                | Sem ação pendente                    |
@@ -157,10 +156,14 @@ sincronizadas.
 - [x] **F1.1** Inventariar uso atual de runtime/helpers por hook (`resolve_hook_runtime_input`,
       `apply_per_session_paths`, `ctx_update`, `flock`).
 - [x] **F1.2** Definir mapa “hook atual → helper canônico” para parsing, path per-session e lock.
-- [x] **F1.3** Migrar `pre-tool-use.sh` para uso estrito dos helpers comuns (reduzindo lógica inline repetida).
-- [x] **F1.4** Migrar `post-tool-use.sh` para uso estrito dos helpers comuns (paridade com pre-tool-use).
-- [x] **F1.5** Migrar `log-prompt.sh` e `session-start.sh` para o mesmo contrato de runtime transacional.
-- [x] **F1.6** Migrar `subagent-start.sh`, `subagent-stop.sh` e `pre-compact.sh` para o mesmo contrato.
+- [x] **F1.3** Migrar `pre-tool-use.sh` para uso estrito dos helpers comuns (reduzindo lógica inline
+      repetida).
+- [x] **F1.4** Migrar `post-tool-use.sh` para uso estrito dos helpers comuns (paridade com
+      pre-tool-use).
+- [x] **F1.5** Migrar `log-prompt.sh` e `session-start.sh` para o mesmo contrato de runtime
+      transacional.
+- [x] **F1.6** Migrar `subagent-start.sh`, `subagent-stop.sh` e `pre-compact.sh` para o mesmo
+      contrato.
 - [x] **F1.7** Fechar checklist de paridade comportamental F1 (sem alterar policy de autorização).
 
 #### Snapshot técnico F1.1 (inventário inicial)
@@ -180,8 +183,10 @@ sincronizadas.
 **Leitura operacional do snapshot**:
 
 - Base comum já existe em `.github/hooks/hooks-lib/common.sh` e está funcional.
-- A principal dívida de F1 está em **padronização de escrita transacional** e redução de blocos inline `jq/sponge` em scripts centrais.
-- Próximo passo objetivo: executar F1.3 com foco em convergência de `pre-tool-use.sh` para helpers comuns.
+- A principal dívida de F1 está em **padronização de escrita transacional** e redução de blocos
+  inline `jq/sponge` em scripts centrais.
+- Próximo passo objetivo: executar F1.3 com foco em convergência de `pre-tool-use.sh` para helpers
+  comuns.
 
 **Atualização de execução (F1.2)**:
 
@@ -190,16 +195,16 @@ sincronizadas.
 
 **Atualização de execução (F1.3/F1.4)**:
 
-- `pre-tool-use.sh` e `post-tool-use.sh` convergiram para o helper local `ctx_apply_expr`,
-  apoiado pelo helper compartilhado `ctx_apply_jq_expr_best_effort` em `hooks-lib/common.sh`.
+- `pre-tool-use.sh` e `post-tool-use.sh` convergiram para o helper local `ctx_apply_expr`, apoiado
+  pelo helper compartilhado `ctx_apply_jq_expr_best_effort` em `hooks-lib/common.sh`.
 - Redução efetiva de duplicação `jq + sponge + mktemp`, preservando comportamento de negócio
   (autorização, guardas e eventos).
 - **F1.5 iniciada**: `session-start.sh` já passou a consumir `resolve_hook_runtime_input` como
   entrada canônica de runtime (com fallback compatível).
 - `log-prompt.sh` recebeu `ctx_apply_expr` e já convergiu o bloco de obrigação de leitura
   (`required_docs_*`) para contrato transacional compartilhado.
-- `session-start.sh` ganhou `ctx_apply_expr_file` e já convergiu o update tardio de `recovery`
-  para a mesma abordagem transacional/fallback.
+- `session-start.sh` ganhou `ctx_apply_expr_file` e já convergiu o update tardio de `recovery` para
+  a mesma abordagem transacional/fallback.
 - Próxima subfase ativa: iniciar F2.1 (mapa de regras duplicadas entre `pre-tool-use`,
   `post-tool-use` e `agent-stop`).
 
@@ -241,29 +246,29 @@ sincronizadas.
 **Atualização de execução (F2.2/F2.3/F2.4)**:
 
 - Novo módulo canônico criado: `.github/hooks/hooks-lib/policy.sh`.
-- `pre-tool-use.sh` e `post-tool-use.sh` passaram a consumir helpers de policy para detecção
-  de Template F/opções de escalonamento e parsing de resposta de `vscode_askQuestions`
-  (com fallback compatível para manter comportamento legado).
-- `agent-stop-lib.sh` passou a consumir `policy_determine_turn_auth_invalid_reason`
-  (com fallback local) e normalização de reason codes via `policy_normalize_auth_invalid_reason`.
+- `pre-tool-use.sh` e `post-tool-use.sh` passaram a consumir helpers de policy para detecção de
+  Template F/opções de escalonamento e parsing de resposta de `vscode_askQuestions` (com fallback
+  compatível para manter comportamento legado).
+- `agent-stop-lib.sh` passou a consumir `policy_determine_turn_auth_invalid_reason` (com fallback
+  local) e normalização de reason codes via `policy_normalize_auth_invalid_reason`.
 - Resultado: redução de drift semântico entre pre/post/stop com manutenção dos contratos externos.
 
 ### F3 — Fatiamento de session-start/session-end
 
 - [x] **F3.0** Avaliar granularidade e necessidade de subfases adicionais para reduzir risco de
-  regressão no lifecycle.
+      regressão no lifecycle.
 - [x] **F3.1** Extrair núcleo crítico de `session-start` (init de contexto mínimo, close key,
-  recovery essencial e auditoria obrigatória).
+      recovery essencial e auditoria obrigatória).
 - [x] **F3.2** Isolar briefing/health/trends/backlog em blocos auxiliares **fail-open** em
-  `session-start`.
+      `session-start`.
 - [x] **F3.3** Extrair núcleo crítico de `session-end` (checkpoint final, sectionEnd/sessionEnd,
-  compliance e flags de fechamento).
+      compliance e flags de fechamento).
 - [x] **F3.4** Isolar pós-processamento de `session-end` (sumário, espelho em
-  `DOCUMENTAÇÃO/RELATORIOS/SESSIONS`, nota em pending-tasks) como auxiliares tolerantes a falha.
+      `DOCUMENTAÇÃO/RELATORIOS/SESSIONS`, nota em pending-tasks) como auxiliares tolerantes a falha.
 - [x] **F3.5** Padronizar wrappers de execução auxiliar (timeout curto + log de falha sem abortar
-  fluxo crítico).
+      fluxo crítico).
 - [x] **F3.6** Consolidar wiring final de lifecycle e validar paridade funcional sem alterar
-  contratos externos.
+      contratos externos.
 
 #### Nota de avaliação F3 (subfases adicionais)
 
@@ -276,8 +281,8 @@ sincronizadas.
 #### Atualização de execução (F3.1)
 
 - Novo módulo criado: `.github/hooks/hooks-lib/session-start-core.sh`.
-- `session-start.sh` agora delega cálculo de sessão lógica e persistência inicial de contexto para
-  o módulo core.
+- `session-start.sh` agora delega cálculo de sessão lógica e persistência inicial de contexto para o
+  módulo core.
 - Resultado esperado: reduzir lógica inline do fluxo crítico sem alterar contratos externos.
 
 #### Atualização de execução (F3.2)
@@ -297,15 +302,15 @@ sincronizadas.
 #### Atualização de execução (F3.4)
 
 - Novo módulo auxiliar criado: `.github/hooks/hooks-lib/session-end-aux.sh`.
-- `session-end.sh` passou a delegar geração de summary/espelhamento e anotação em pending-tasks
-  para helpers auxiliares em modo **fail-open**.
+- `session-end.sh` passou a delegar geração de summary/espelhamento e anotação em pending-tasks para
+  helpers auxiliares em modo **fail-open**.
 - Resultado esperado: evitar que falhas de relatório bloqueiem o encerramento crítico da sessão.
 
 #### Atualização de execução (F3.5)
 
 - Novo wrapper canônico em `hooks-lib/common.sh`: `run_aux_block`.
-- `session-start.sh` e `session-end.sh` passaram a executar rotinas auxiliares via
-  `run_aux_block` com timeout e log de falha.
+- `session-start.sh` e `session-end.sh` passaram a executar rotinas auxiliares via `run_aux_block`
+  com timeout e log de falha.
 - Novo tunável centralizado: `HOOKS_AUX_TIMEOUT_S` em `hooks-lib/config.sh`.
 
 #### Atualização de execução (F3.6)
@@ -322,15 +327,15 @@ sincronizadas.
 - [x] **F4.1** Extrair blocos remanescentes de metadados/subturn para módulos dedicados.
 - [x] **F4.2** Reduzir `agent-stop.sh` para perfil mais orquestrador nos fluxos extraídos.
 - [x] **F4.3** Revisar invariantes SESSION/SECTION/TURN/SubTurn após extrações iniciais.
-- [x] **F4.4** Extrair o bloco principal de bloqueio (`AUTH_REQUESTED=false && stop_hook_active=false`)
-      para helper dedicado.
+- [x] **F4.4** Extrair o bloco principal de bloqueio
+      (`AUTH_REQUESTED=false && stop_hook_active=false`) para helper dedicado.
 
 #### Nota de avaliação F4 (subfases adicionais)
 
-- `agent-stop.sh` ainda concentra o bloco principal de decisão de bloqueio; para reduzir risco,
-  a modularização final foi quebrada em F4.0→F4.4.
-- Decisão: executar extrações em etapas pequenas (metadados/subturn → ramo stop_hook_active →
-  bloco principal de block), preservando paridade comportamental.
+- `agent-stop.sh` ainda concentra o bloco principal de decisão de bloqueio; para reduzir risco, a
+  modularização final foi quebrada em F4.0→F4.4.
+- Decisão: executar extrações em etapas pequenas (metadados/subturn → ramo stop_hook_active → bloco
+  principal de block), preservando paridade comportamental.
 
 #### Atualização de execução (F4.1)
 
@@ -346,8 +351,8 @@ sincronizadas.
 
 #### Atualização de execução (F4.3)
 
-- `agent-stop-lib.sh` ganhou `handle_stop_hook_active_branch`, encapsulando o fluxo
-  resume/reblock de `stop_hook_active=true`.
+- `agent-stop-lib.sh` ganhou `handle_stop_hook_active_branch`, encapsulando o fluxo resume/reblock
+  de `stop_hook_active=true`.
 - Paridade local validada por `get_errors` (sem erros) e checagens estruturais de integração.
 
 #### Atualização de execução (F4.4)
@@ -359,8 +364,8 @@ sincronizadas.
 - Validação local: `get_errors` sem erros em `agent-stop.sh` e `agent-stop-lib.sh` após extração.
 
 **Escopo explícito de fechamento da F4**: a fase cobre a extração dos blocos remanescentes de
-bloqueio/subturn e o enxugamento das decisões principais; o entrypoint ainda mantém responsabilidades
-de orquestração de runtime, auditoria e integração entre guards.
+bloqueio/subturn e o enxugamento das decisões principais; o entrypoint ainda mantém
+responsabilidades de orquestração de runtime, auditoria e integração entre guards.
 
 ✅ **F4 encerrada** com subfases F4.0→F4.4 concluídas.
 
@@ -416,8 +421,8 @@ de orquestração de runtime, auditoria e integração entre guards.
 
 - `smoke-test.sh --all` passou a medir paridade legado x domínios e persistir métricas em:
   - `.github/hooks/state/smoke-rollout-metrics.json`
-- Métricas registradas: status/falhas do caminho legado, status/falhas do caminho por domínios,
-  modo de execução (`off|shadow|on`) e flag `divergence_detected`.
+- Métricas registradas: status/falhas do caminho legado, status/falhas do caminho por domínios, modo
+  de execução (`off|shadow|on`) e flag `divergence_detected`.
 
 #### Atualização de execução (F6.3)
 
@@ -425,14 +430,14 @@ de orquestração de runtime, auditoria e integração entre guards.
   - `DOCUMENTAÇÃO/HOOKS/PLANO-ESTABILIZACAO-E-CORTE-LEGADO-SMOKE.md`
 - Janela proposta formalizada com etapas `shadow` → `on` → corte e critérios de saída/rollback.
 
-✅ **F6 encerrada** (F6.1→F6.3 concluídas).
-✅ **Roadmap F0→F6 concluído integralmente**.
+✅ **F6 encerrada** (F6.1→F6.3 concluídas). ✅ **Roadmap F0→F6 concluído integralmente**.
 
 ### Governança contínua durante execução
 
 - [ ] Atualizar este roadmap ao concluir cada subfase.
 - [ ] Sincronizar `.github/hooks/state/pending-tasks.md` com o andamento real.
-- [ ] Encerrar cada turno com `vscode_askQuestions` de continuidade (Template A/D/E; Template F só para fechamento de SESSION).
+- [ ] Encerrar cada turno com `vscode_askQuestions` de continuidade (Template A/D/E; Template F só
+      para fechamento de SESSION).
 
 ## Auditoria plano x execução + validações pré-commit (2026-03-15)
 
@@ -446,8 +451,10 @@ de orquestração de runtime, auditoria e integração entre guards.
 ### Gaps objetivos identificados após validação
 
 1. **Inconsistência de automação de testes rápidos**: tasks e scripts não convergem (`test:fast`).
-2. **Falha real em integração**: `test_contract_e2e.spec.js` quebra por JSON malformado no modo híbrido.
-3. **Smoke legacy parcialmente desalinhado** com a refatoração modular atual (falsos/obsoletos V90/AS).
+2. **Falha real em integração**: `test_contract_e2e.spec.js` quebra por JSON malformado no modo
+   híbrido.
+3. **Smoke legacy parcialmente desalinhado** com a refatoração modular atual (falsos/obsoletos
+   V90/AS).
 4. **Débito de formatação amplo** fora do escopo estrito do roadmap F0→F6.
 
 ### Decisão de readiness para commit/push
@@ -479,7 +486,8 @@ de orquestração de runtime, auditoria e integração entre guards.
   - `.github/hooks/scripts/post-tool-use.sh`: **895 linhas**
 - Cobertura operacional (baseline pré-F7): `scripts_count=40`, `hooks_lib_count=8`.
 - Cobertura operacional (estado pós-F7): `scripts_count=41`, `hooks_lib_count=36`.
-- Estado funcional: hardening e suíte smoke verdes; dívida principal é **complexidade residual** e **governança contínua de contratos**.
+- Estado funcional: hardening e suíte smoke verdes; dívida principal é **complexidade residual** e
+  **governança contínua de contratos**.
 
 ### Classificação atual de scripts (auto x manual)
 
@@ -506,19 +514,24 @@ de orquestração de runtime, auditoria e integração entre guards.
 
 **C) Scripts manuais não acionados automaticamente por hooks (uso usuário/operação)**
 
-- Orquestração humana: `start-turn.sh`, `start-section.sh`, `continue-section.sh`, `section-end.sh`, `session-reminder.sh`, `manual-session-init.sh`.
+- Orquestração humana: `start-turn.sh`, `start-section.sh`, `continue-section.sh`, `section-end.sh`,
+  `session-reminder.sh`, `manual-session-init.sh`.
 - Backlog/auditoria: `add-task.sh`, `complete-task.sh`, `save-finding.sh`, `resolve-finding.sh`.
-- Operação/diagnóstico: `smoke-test.sh`, `smoke-test-domains.sh`, `verify-hook-delivery.sh`, `export-metrics.sh`, `analytics.sh`, `sync-transcript-errors.sh`, `migrate-per-session-audit.sh`, `install-git-hooks.sh`.
+- Operação/diagnóstico: `smoke-test.sh`, `smoke-test-domains.sh`, `verify-hook-delivery.sh`,
+  `export-metrics.sh`, `analytics.sh`, `sync-transcript-errors.sh`, `migrate-per-session-audit.sh`,
+  `install-git-hooks.sh`.
 - Automação externa (git hook): `on-git-push.sh`.
 
 ### Padronização mandatória Script↔Lib (nova diretriz)
 
-- Todo script em `.github/hooks/scripts/*.sh` deve ter **ao menos uma lib relacionada** em `.github/hooks/hooks-lib/`.
+- Todo script em `.github/hooks/scripts/*.sh` deve ter **ao menos uma lib relacionada** em
+  `.github/hooks/hooks-lib/`.
 - Desenho obrigatório por convenção:
   - script = entrypoint/orquestração,
   - lib = regras reutilizáveis, IO, contrato e helpers.
 - Lacuna atual: há scripts sem referência explícita a `hooks-lib/`; regularização entra em **F7.0**.
-- Regra de execução adicionada: para cada script sem lib relacionada, deve ser criado arquivo lib dedicado (mesmo que wrapper inicial), com migração incremental do conteúdo.
+- Regra de execução adicionada: para cada script sem lib relacionada, deve ser criado arquivo lib
+  dedicado (mesmo que wrapper inicial), com migração incremental do conteúdo.
 
 ### Estrutura-alvo de subpastas em `hooks-lib/` (F7)
 
@@ -533,18 +546,26 @@ de orquestração de runtime, auditoria e integração entre guards.
 ### Riscos prioritários remanescentes (P0/P1/P2)
 
 1. **P0 — Complexidade crítica em `agent-stop-lib.sh` e `smoke-test.sh`**
-  - Alto custo de revisão e risco de regressão por mudanças aparentemente pequenas.
+
+- Alto custo de revisão e risco de regressão por mudanças aparentemente pequenas.
+
 2. **P1 — `common.sh` ainda concentrando domínios heterogêneos**
-  - Runtime, contexto, subturn e recovery coexistem no mesmo arquivo.
+
+- Runtime, contexto, subturn e recovery coexistem no mesmo arquivo.
+
 3. **P1 — Governança documental e operacional distribuída**
-  - Necessidade de sincronismo rígido entre `ROADMAP`, `PLANO` e backlog de hooks.
+
+- Necessidade de sincronismo rígido entre `ROADMAP`, `PLANO` e backlog de hooks.
+
 4. **P2 — Gap de observabilidade para KPIs de refatoração**
-  - Falta painel objetivo com métricas de regressão por fase (tempo de execução, divergência, contratos violados).
+
+- Falta painel objetivo com métricas de regressão por fase (tempo de execução, divergência,
+  contratos violados).
 
 ## Programa abrangente de refatoração rigorosa (F7→F12)
 
-> Este programa continua o ciclo F0→F6 com foco em redução estrutural, contratos executáveis e rollout governado.
-> Referências vivas obrigatórias: este roadmap +
+> Este programa continua o ciclo F0→F6 com foco em redução estrutural, contratos executáveis e
+> rollout governado. Referências vivas obrigatórias: este roadmap +
 > `DOCUMENTAÇÃO/PLANOS/PLANO-MODULARIZACAO-HOOKS-SYSTEM-CODE-AUDIT.md`.
 
 ### F7 — Auditoria sistêmica profunda e mapa de acoplamentos
@@ -553,15 +574,18 @@ de orquestração de runtime, auditoria e integração entre guards.
 
 **Subfases**:
 
-- **F7.0** Consolidação estrutural inicial (pastas, taxonomia de scripts e matriz Script↔Lib) — **primeira execução obrigatória do pacote F7**.
+- **F7.0** Consolidação estrutural inicial (pastas, taxonomia de scripts e matriz Script↔Lib) —
+  **primeira execução obrigatória do pacote F7**.
 
 - **F7.1** Inventário de funções/exportações por script/lib (quem chama quem).
-- **F7.2** Matriz de acoplamento por domínio (`runtime`, `policy`, `recovery`, `events`, `reporting`).
+- **F7.2** Matriz de acoplamento por domínio (`runtime`, `policy`, `recovery`, `events`,
+  `reporting`).
 - **F7.3** Ranking de hotspots por severidade (mudança, teste, rollback).
 - **F7.4** Criar libs dedicadas para scripts sem relação explícita Script↔Lib.
 - **F7.5** Migrar `hooks-lib/` para subpastas canônicas com camada de compatibilidade.
 - **F7.6** Definir e aplicar verificador estático Script↔Lib + taxonomia de subpastas.
-- **F7.7** Migrar módulos legados no root de `hooks-lib/` para subpastas de domínio com shims compatíveis.
+- **F7.7** Migrar módulos legados no root de `hooks-lib/` para subpastas de domínio com shims
+  compatíveis.
 - **F7.8** Publicar índice canônico machine-readable (`script -> lib -> domínio -> owner`).
 - **F7.9** Formalizar governança de diretórios (`README` por domínio + convenção de naming).
 - **F7.10** Integrar gate estrutural Script↔Lib na rotina operacional (task/CI/local).
@@ -580,7 +604,8 @@ de orquestração de runtime, auditoria e integração entre guards.
 
 - **F8.1** Consolidar contratos JSON/Markdown em `contracts/` com versionamento explícito.
 - **F8.2** Criar checks de conformidade para reason codes obrigatórios.
-- **F8.3** Introduzir validação de compatibilidade retroativa (campos top-level + `hookSpecificOutput`).
+- **F8.3** Introduzir validação de compatibilidade retroativa (campos top-level +
+  `hookSpecificOutput`).
 
 **Critérios de saída**:
 
@@ -610,7 +635,8 @@ de orquestração de runtime, auditoria e integração entre guards.
 
 **Subfases**:
 
-- **F10.1** Fatiar `agent-stop-lib.sh` em `stop-block`, `stop-auth`, `stop-subturn`, `stop-observability`.
+- **F10.1** Fatiar `agent-stop-lib.sh` em `stop-block`, `stop-auth`, `stop-subturn`,
+  `stop-observability`.
 - **F10.2** Fatiar `common.sh` por domínio (`ctx`, `runtime`, `subturn`, `session-id-guard`).
 - **F10.3** Revisão de contratos públicos dos helpers e camada de compatibilidade.
 
@@ -654,7 +680,8 @@ de orquestração de runtime, auditoria e integração entre guards.
 
 ## TODO mestre completo (F7→F12)
 
-- [x] **F7.0** Consolidar estrutura de diretórios/scripts e mapear pareamento Script↔Lib obrigatório.
+- [x] **F7.0** Consolidar estrutura de diretórios/scripts e mapear pareamento Script↔Lib
+      obrigatório.
 - [x] **F7.1** Inventário completo de dependências internas dos hooks.
 - [x] **F7.2** Matriz de acoplamento por domínio com severidade.
 - [x] **F7.3** Backlog priorizado P0/P1/P2 para execução técnica.
@@ -693,19 +720,25 @@ de orquestração de runtime, auditoria e integração entre guards.
 - `.github/hooks/scripts/export-script-lib-index.sh`
 - `.github/hooks/hooks-lib/testing/export-script-lib-index-lib.sh`
 - `.github/hooks/state/f7-script-lib-index.json`
-- Entradas canônicas criadas em subpastas: `hooks-lib/runtime/*.sh`, `hooks-lib/policy/policy.sh`, `hooks-lib/lifecycle/session-*.sh`.
+- Entradas canônicas criadas em subpastas: `hooks-lib/runtime/*.sh`, `hooks-lib/policy/policy.sh`,
+  `hooks-lib/lifecycle/session-*.sh`.
 
-**Status F7.7 (concluído)**: inversão root->shim aplicada e contrapartes canônicas ativas nas subpastas de domínio.
+**Status F7.7 (concluído)**: inversão root->shim aplicada e contrapartes canônicas ativas nas
+subpastas de domínio.
 
-**Status F7.8 (concluído)**: índice machine-readable publicado com schema validado e cobertura total (`scripts_total=42`, `coverage.none=0`).
+**Status F7.8 (concluído)**: índice machine-readable publicado com schema validado e cobertura total
+(`scripts_total=42`, `coverage.none=0`).
 
-**Status F7.9 (concluído)**: governança de diretórios/naming publicada em `hooks-lib/README.md` e em todos os `hooks-lib/*/README.md`.
+**Status F7.9 (concluído)**: governança de diretórios/naming publicada em `hooks-lib/README.md` e em
+todos os `hooks-lib/*/README.md`.
 
 - **F7.0 — Consolidação estrutural inicial (fase de abertura)**
   - **Entrada**: árvore atual de `scripts/` e `hooks-lib/` + classificação auto/manual.
-  - **Entrega**: matriz Script↔Lib (1:N), taxonomia formal (auto, manual-runtime, manual-user, manutenção) e gap-list dos scripts sem lib explícita.
+  - **Entrega**: matriz Script↔Lib (1:N), taxonomia formal (auto, manual-runtime, manual-user,
+    manutenção) e gap-list dos scripts sem lib explícita.
   - **Evidência**: roadmap/plano/pending-tasks sincronizados com o novo mapeamento estrutural.
-  - **Gate**: nenhum script sem lib relacionada definida (direta ou via backlog de migração com owner e prazo).
+  - **Gate**: nenhum script sem lib relacionada definida (direta ou via backlog de migração com
+    owner e prazo).
 
 - **F7.1 — Inventário de dependências internas**
   - **Entrada**: árvore atual de `scripts/`, `hooks-lib/`, `contracts/`.
@@ -724,12 +757,14 @@ de orquestração de runtime, auditoria e integração entre guards.
   - **Gate**: backlog pronto para execução sem ambiguidades.
 - **F7.4 — Criação de libs faltantes por script**
   - **Entrada**: gap-list F7.0/F7.1.
-  - **Entrega**: arquivo lib dedicado para cada script sem relação explícita (wrapper inicial + TODO técnico de migração).
+  - **Entrega**: arquivo lib dedicado para cada script sem relação explícita (wrapper inicial + TODO
+    técnico de migração).
   - **Evidência**: cobertura Script↔Lib em 100% dos scripts monitorados.
   - **Gate**: zero script sem arquivo lib correspondente.
 - **F7.5 — Subpastas canônicas em `hooks-lib/`**
   - **Entrada**: inventário de libs atuais.
-  - **Entrega**: reorganização por domínio (`runtime`, `context`, `policy`, `lifecycle`, `audit`, `maintenance`, `testing`) com shims de compatibilidade temporários.
+  - **Entrega**: reorganização por domínio (`runtime`, `context`, `policy`, `lifecycle`, `audit`,
+    `maintenance`, `testing`) com shims de compatibilidade temporários.
   - **Evidência**: árvore de pastas publicada e dif de migração documentado.
   - **Gate**: nenhuma quebra de source/import durante migração incremental.
 - **F7.6 — Verificador de conformidade estrutural**
@@ -738,19 +773,25 @@ de orquestração de runtime, auditoria e integração entre guards.
   - **Evidência**: execução do check com relatório e saída determinística.
   - **Gate**: check aprovado e integrado ao fluxo operacional.
 - **F7.7 — Migração dos módulos legados de root**
-  - **Entrada**: lista de módulos legados detectados no root (`common`, `config`, `policy`, `session-start/end-*`).
+  - **Entrada**: lista de módulos legados detectados no root (`common`, `config`, `policy`,
+    `session-start/end-*`).
   - **Entrega**: realocação para subpastas de domínio + shims de compatibilidade no root.
   - **Evidência**: modo `--strict-legacy-root` com contagem decrescente controlada.
   - **Gate**: `legacy_root_modules_unmapped_count=0` em modo estrito.
 - **F7.8 — Índice machine-readable da fase F7**
   - **Entrada**: inventário final Script↔Lib.
   - **Entrega**: artefato versionado (`json`/`md`) com mapeamento script/lib/domínio/owner.
-  - **Evidência**: `bash .github/hooks/scripts/export-script-lib-index.sh` gerando `.github/hooks/state/f7-script-lib-index.json`; schema validado e sincronismo com `verify-script-lib-coverage.sh --strict-legacy-root` (`missing_relation_count=0`, `legacy_root_modules_unmapped_count=0`).
+  - **Evidência**: `bash .github/hooks/scripts/export-script-lib-index.sh` gerando
+    `.github/hooks/state/f7-script-lib-index.json`; schema validado e sincronismo com
+    `verify-script-lib-coverage.sh --strict-legacy-root` (`missing_relation_count=0`,
+    `legacy_root_modules_unmapped_count=0`).
   - **Gate**: rastreabilidade de 100% dos scripts em formato automatizável.
 - **F7.9 — Governança de diretórios e naming**
   - **Entrada**: árvore `hooks-lib/` pós-migração.
   - **Entrega**: `README` por domínio e convenções de nome de wrappers/helpers.
-  - **Evidência**: READMEs atualizados em `hooks-lib/{runtime,context,policy,lifecycle,audit,maintenance,testing}/README.md` + convenção central em `hooks-lib/README.md`.
+  - **Evidência**: READMEs atualizados em
+    `hooks-lib/{runtime,context,policy,lifecycle,audit,maintenance,testing}/README.md` + convenção
+    central em `hooks-lib/README.md`.
   - **Gate**: nenhuma subpasta crítica sem documentação mínima.
 - **F7.10 — Integração do gate estrutural**
   - **Entrada**: verificador F7.6 estável.
@@ -764,7 +805,8 @@ de orquestração de runtime, auditoria e integração entre guards.
 `.github/hooks/scripts/smoke-test.sh` (legacy) e
 `.github/hooks/scripts/smoke-domains/smoke-policy.sh` (domínio policy), incluindo:
 
-- validação de presença/parse de `contracts/contract-registry.json` e `contracts/stop-decision.schema.json`;
+- validação de presença/parse de `contracts/contract-registry.json` e
+  `contracts/stop-decision.schema.json`;
 - assert de referência `stop-decision-output` no registry;
 - assert de campos mínimos obrigatórios do schema (`decision`, `reason`, `hookSpecificOutput`);
 - checks explícitos de reason codes obrigatórios e payload mínimo de `emit_stop_block`.
@@ -772,7 +814,9 @@ de orquestração de runtime, auditoria e integração entre guards.
 - **F8.1 — Versionar contratos críticos**
   - **Entrada**: regras atuais de policy/stop.
   - **Entrega**: contratos versionados (`vX.Y`) + changelog.
-  - **Evidência**: `contracts/contract-registry.json` (registro central), `contracts/stop-decision.schema.json` (contrato executável stop) e `contracts/CONTRACT_VERSIONING_POLICY.md` (regras de compatibilidade semver).
+  - **Evidência**: `contracts/contract-registry.json` (registro central),
+    `contracts/stop-decision.schema.json` (contrato executável stop) e
+    `contracts/CONTRACT_VERSIONING_POLICY.md` (regras de compatibilidade semver).
   - **Gate**: contrato parseável e referenciado no smoke.
 - **F8.2 — Cobrir reason codes/payloads no smoke**
   - **Entrada**: contrato F8.1.
@@ -883,29 +927,30 @@ de orquestração de runtime, auditoria e integração entre guards.
 `DOCUMENTAÇÃO/HOOKS/F13-1-CONTRATO-ENTRYPOINT-HOOKS-AUTOMATICOS.md`.
 
 **Status F13.2 (concluído em 2026-03-15)**: matriz dedicada publicada em
-`DOCUMENTAÇÃO/HOOKS/F13-2-MATRIZ-HOOK-SCRIPT-LIB-OWNER-2026-03-15.md` e artefato
-machine-readable em `.github/hooks/state/f13-hook-script-lib-owner.json`.
+`DOCUMENTAÇÃO/HOOKS/F13-2-MATRIZ-HOOK-SCRIPT-LIB-OWNER-2026-03-15.md` e artefato machine-readable em
+`.github/hooks/state/f13-hook-script-lib-owner.json`.
 
 **Status F13.3 (concluído em 2026-03-15)**: critério objetivo de “script fino” publicado em
 `DOCUMENTAÇÃO/HOOKS/F13-3-CRITERIO-SCRIPT-FINO-2026-03-15.md` com rubric machine-readable em
 `.github/hooks/state/f13-script-fino-rubric.json`.
 
-**Status F14.1 (concluído em 2026-03-15)**: libs dedicadas faltantes criadas para hooks
-automáticos em `DOCUMENTAÇÃO/HOOKS/F14-1-LIBS-DEDICADAS-HOOKS-AUTOMATICOS-2026-03-15.md`, com
-status machine-readable em `.github/hooks/state/f14-auto-hook-entry-lib-status.json`.
+**Status F14.1 (concluído em 2026-03-15)**: libs dedicadas faltantes criadas para hooks automáticos
+em `DOCUMENTAÇÃO/HOOKS/F14-1-LIBS-DEDICADAS-HOOKS-AUTOMATICOS-2026-03-15.md`, com status
+machine-readable em `.github/hooks/state/f14-auto-hook-entry-lib-status.json`.
 
-**Status F14.2 (concluído em 2026-03-15)**: migração de lógica concluída para os 8 hooks
-automáticos aplicáveis (`sessionStart`, `userPromptSubmitted`, `preToolUse`, `postToolUse`,
-`subagentStart`, `subagentStop`, `preCompact`, `sessionEnd`); `agentStop` permanece como
-referência com entry-lib já existente. Evidência:
-`DOCUMENTAÇÃO/HOOKS/F14-2-PROGRESSO-PARCIAL-HOOKS-AUTOMATICOS-2026-03-15.md`.
-Plano Batch 2 executado e preservado para rastreabilidade: `DOCUMENTAÇÃO/HOOKS/F14-2-BATCH2-PLANO-MIGRACAO-2026-03-15.md`.
+**Status F14.2 (concluído em 2026-03-15)**: migração de lógica concluída para os 8 hooks automáticos
+aplicáveis (`sessionStart`, `userPromptSubmitted`, `preToolUse`, `postToolUse`, `subagentStart`,
+`subagentStop`, `preCompact`, `sessionEnd`); `agentStop` permanece como referência com entry-lib já
+existente. Evidência: `DOCUMENTAÇÃO/HOOKS/F14-2-PROGRESSO-PARCIAL-HOOKS-AUTOMATICOS-2026-03-15.md`.
+Plano Batch 2 executado e preservado para rastreabilidade:
+`DOCUMENTAÇÃO/HOOKS/F14-2-BATCH2-PLANO-MIGRACAO-2026-03-15.md`.
 
 **Status F14.3 (concluído em 2026-03-15)**: dispatch único padronizado nos scripts automáticos
 orquestradores; `session-end.sh` foi ajustado para padrão entrypoint fino, delegando carga de
 `session-end-core`/`session-end-aux` para a entry-lib `hooks-lib/lifecycle/session-end-lib.sh`.
 
-- **F13.1** Congelar contrato canônico de script automático (`bootstrap + source libs + dispatch + saída padronizada`).
+- **F13.1** Congelar contrato canônico de script automático
+  (`bootstrap + source libs + dispatch + saída padronizada`).
 - **F13.2** Publicar matriz `hook automático -> script -> lib(s) -> owner -> domínio`.
 - **F13.3** Definir regra objetiva de “script fino” (limite de responsabilidade inline por script).
 
@@ -913,27 +958,36 @@ orquestradores; `session-end.sh` foi ajustado para padrão entrypoint fino, dele
 
 ### F14 — Migração script-orquestrador + lib dedicada por hook
 
-- **F14.1** Criar libs dedicadas faltantes (`log-prompt-lib.sh`, `pre-tool-use-lib.sh`, `post-tool-use-lib.sh`, `subagent-start-lib.sh`, `subagent-stop-lib.sh`, `pre-compact-lib.sh`, `session-start-lib.sh`, `session-end-lib.sh`).
+- **F14.1** Criar libs dedicadas faltantes (`log-prompt-lib.sh`, `pre-tool-use-lib.sh`,
+  `post-tool-use-lib.sh`, `subagent-start-lib.sh`, `subagent-stop-lib.sh`, `pre-compact-lib.sh`,
+  `session-start-lib.sh`, `session-end-lib.sh`).
 - **F14.2** Migrar regras de negócio de cada script automático para sua lib dedicada.
-- **F14.3** Padronizar dispatch em todos os scripts automáticos para chamada única da função pública da lib.
+- **F14.3** Padronizar dispatch em todos os scripts automáticos para chamada única da função pública
+  da lib.
 
 **Gate F14**: 100% dos hooks automáticos com lib dedicada e script atuando como entrypoint fino.
 
 ### F15 — Redução de complexidade e modularização posterior do Stop
 
 - **F15.1** Consolidar padrão dos 8 hooks automáticos não-Stop já no modelo lib-first.
-- **F15.2** Iniciar decomposição interna de `agent-stop-lib.sh` em módulos menores (`stop-auth`, `stop-block`, `stop-subturn`, `stop-observability`).
+- **F15.2** Iniciar decomposição interna de `agent-stop-lib.sh` em módulos menores (`stop-auth`,
+  `stop-block`, `stop-subturn`, `stop-observability`).
 - **F15.3** Manter `agent-stop.sh` como orquestrador estável durante toda a quebra interna da lib.
 
-**Gate F15**: `agent-stop.sh` preservado como padrão de entrada; modularização interna da lib avançando sem regressão de contrato.
+**Gate F15**: `agent-stop.sh` preservado como padrão de entrada; modularização interna da lib
+avançando sem regressão de contrato.
 
 ### F16 — Enforcement estrutural e rollout
 
-- **F16.1** Expandir `verify-script-lib-coverage.sh` para exigir lib dedicada também para hooks automáticos (não só relação Script↔Lib genérica).
-- **F16.2** Adicionar checks no smoke (`legacy` + `domains`) validando padrão de entrypoint lib-first em todos os scripts automáticos.
-- **F16.3** Integrar gate no fluxo padrão (task local/CI) e registrar métricas de aderência por rodada.
+- **F16.1** Expandir `verify-script-lib-coverage.sh` para exigir lib dedicada também para hooks
+  automáticos (não só relação Script↔Lib genérica).
+- **F16.2** Adicionar checks no smoke (`legacy` + `domains`) validando padrão de entrypoint
+  lib-first em todos os scripts automáticos.
+- **F16.3** Integrar gate no fluxo padrão (task local/CI) e registrar métricas de aderência por
+  rodada.
 
-**Gate F16**: regressão de padrão lib-first em hooks automáticos bloqueada automaticamente antes de merge.
+**Gate F16**: regressão de padrão lib-first em hooks automáticos bloqueada automaticamente antes de
+merge.
 
 ### F17 — Modularização aprofundada de libs (file-by-file)
 
@@ -946,21 +1000,20 @@ machine-readable publicado em `.github/hooks/state/f17-file-by-file-modularizati
 extração do módulo `hooks-lib/lifecycle/session-start-runtime.sh` e delegação de runtime no
 `session-start-lib.sh`, seguida da extração do módulo
 `hooks-lib/lifecycle/session-start-recovery.sh` para encapsular a varredura de checkpoints e da
-extração de output/observabilidade para `hooks-lib/lifecycle/session-start-observability.sh`;
-slice 4 mapeou os blocos de briefing e já extraiu o bloco base para
+extração de output/observabilidade para `hooks-lib/lifecycle/session-start-observability.sh`; slice
+4 mapeou os blocos de briefing e já extraiu o bloco base para
 `hooks-lib/lifecycle/session-start-briefing.sh`, além do primeiro bloco condicional
-(`PREV_UNAUTH_CLOSE`) para helper dedicado; no slice 5 foram extraídos também
-`PREV_NO_KEY_CLOSE`, `PREV_ABRUPT_CLOSE`, `abrupt_reconnect` e `CLOSE_KEY_EOF`; no
-slice 6 foram extraídos também `ASK_FAIL_EOF` e `WD_EOF`; no slice 7 foram extraídos
-`ACTIVE_STATE_EOF`, `BRIEFING_BODY_EOF` e labels de origem da sessão; no slice 8,
-bootstrap normalizado via `session_start_load_support_modules`; no slice 9, checklist
-de fechamento validou ausência de heredocs de briefing no entry-lib e diagnósticos limpos;
-no slice 10, emissão dos eventos `sessionStart`/`sectionStart` extraída para
-`session-start-events.sh`; no slice 11, detecção/consumo de flags de violação e cálculo de
-severidade extraídos para `session-start-violations.sh`; no slice 12, classificação de
-encerramento abrupto/reconexão extraída para `session-start-recovery.sh`; no slice 13,
-alertas runtime de briefing (ask-fail/watchdog) extraídos para `session-start-briefing.sh`;
-no slice 14, montagem/persistência de recovery alerts extraída para
+(`PREV_UNAUTH_CLOSE`) para helper dedicado; no slice 5 foram extraídos também `PREV_NO_KEY_CLOSE`,
+`PREV_ABRUPT_CLOSE`, `abrupt_reconnect` e `CLOSE_KEY_EOF`; no slice 6 foram extraídos também
+`ASK_FAIL_EOF` e `WD_EOF`; no slice 7 foram extraídos `ACTIVE_STATE_EOF`, `BRIEFING_BODY_EOF` e
+labels de origem da sessão; no slice 8, bootstrap normalizado via
+`session_start_load_support_modules`; no slice 9, checklist de fechamento validou ausência de
+heredocs de briefing no entry-lib e diagnósticos limpos; no slice 10, emissão dos eventos
+`sessionStart`/`sectionStart` extraída para `session-start-events.sh`; no slice 11, detecção/consumo
+de flags de violação e cálculo de severidade extraídos para `session-start-violations.sh`; no slice
+12, classificação de encerramento abrupto/reconexão extraída para `session-start-recovery.sh`; no
+slice 13, alertas runtime de briefing (ask-fail/watchdog) extraídos para
+`session-start-briefing.sh`; no slice 14, montagem/persistência de recovery alerts extraída para
 `session-start-recovery.sh`; no slice 15, parsing de input/trigger/session-id extraído para
 `session-start-input.sh`; no slice 16, leitura de snapshot de contexto anterior extraída para
 `session-start-violations.sh`; no slice 17, bootstrap de metadados de sessão extraído para
@@ -978,8 +1031,8 @@ no slice 14, montagem/persistência de recovery alerts extraída para
 - **F17.8** `preCompact` — consolidar checkpoint/recovery com persistência transacional única.
 - **F17.9** `sessionEnd` — consolidar fechamento crítico + pós-processamento modular.
 
-**Gate F17**: 100% dos hooks automáticos com fronteiras explícitas (`script wrapper`, `entry-lib`
-e `libs compartilhadas`) e sem lógica de domínio residual no script principal.
+**Gate F17**: 100% dos hooks automáticos com fronteiras explícitas (`script wrapper`, `entry-lib` e
+`libs compartilhadas`) e sem lógica de domínio residual no script principal.
 
 ### TODO mestre (novo pacote F13→F17)
 
@@ -1029,15 +1082,18 @@ e `libs compartilhadas`) e sem lógica de domínio residual no script principal.
 
 - [ ] **R1.1** Integrar `verify-script-lib-coverage.sh` no fluxo padrão (task local/CI) — F7.10.
 - [ ] **R1.2** Publicar matriz de compatibilidade retroativa de contratos policy/stop — F8.3.
-- [ ] **R1.3** Sincronizar `ROADMAP`, `PLANO` e `.github/hooks/state/pending-tasks.md` após cada subfase concluída.
-- [ ] **R2.1** Executar F17.2 (`userPromptSubmitted`) com checklist de fronteira script vs entry-lib.
+- [ ] **R1.3** Sincronizar `ROADMAP`, `PLANO` e `.github/hooks/state/pending-tasks.md` após cada
+      subfase concluída.
+- [ ] **R2.1** Executar F17.2 (`userPromptSubmitted`) com checklist de fronteira script vs
+      entry-lib.
 - [ ] **R2.2** Executar F17.3 (`preToolUse`) com extração incremental para domínio `policy/`.
 - [ ] **R2.3** Executar F17.4 (`postToolUse`) com validação de paridade comportamental.
 - [ ] **R2.4** Atualizar artefatos de rastreabilidade F17 (doc + JSON) ao fim de cada arquivo.
 - [ ] **R3.1** Executar F17.6/F17.7 com padronização de correlação e contador de subagentes.
 - [ ] **R3.2** Executar F17.8 com consolidação transacional de checkpoint/recovery.
 - [ ] **R3.3** Executar F17.9 com fechamento crítico + pós-processamento modular completo.
-- [ ] **R4.1** Iniciar F15.2 em slices controlados (`stop-auth` → `stop-block` → `stop-subturn` → `stop-observability`).
+- [ ] **R4.1** Iniciar F15.2 em slices controlados (`stop-auth` → `stop-block` → `stop-subturn` →
+      `stop-observability`).
 - [ ] **R4.2** Fechar F15.3 com checklist de estabilidade contratual de `agent-stop.sh`.
 - [ ] **R4.3** Fechar F16.1/F16.2/F16.3 com enforcement automático no fluxo padrão.
 

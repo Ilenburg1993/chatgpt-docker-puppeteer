@@ -1,5 +1,6 @@
 /**
  * # ============================================================================
+ *
  * GitHub Models — GPT-5-Mini Agent Loop (Node.js)
  *
  * Requirements: npm install openai
@@ -11,8 +12,7 @@
  * - Safe (no eval)
  * - Deterministic
  * - Agent-ready (tool dispatch)
- * - Optimized for reasoning models (gpt-5-mini)
- *   ============================================================================
+ * - # Optimized for reasoning models (gpt-5-mini)
  */
 
 import OpenAI from 'openai';

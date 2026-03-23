@@ -1,16 +1,18 @@
 # F17 — Modularização orientada por arquivo (hooks automáticos)
 
-**Data**: 2026-03-15
-**Escopo**: `.github/hooks/copilot-hooks.json` (9 hooks automáticos)
-**Objetivo**: avançar da convergência lib-first (F13→F16) para uma modularização rígida, arquivo por arquivo, com fronteiras explícitas entre `script principal`, `entry-lib` e `libs compartilhadas`.
+**Data**: 2026-03-15 **Escopo**: `.github/hooks/copilot-hooks.json` (9 hooks automáticos)
+**Objetivo**: avançar da convergência lib-first (F13→F16) para uma modularização rígida, arquivo por
+arquivo, com fronteiras explícitas entre `script principal`, `entry-lib` e `libs compartilhadas`.
 
 ## Princípio central da F17
 
 Cada hook automático terá uma fase dedicada, com critérios de extração e governança homogêneos.
 
-- **Script principal**: bootstrap, validações mínimas de contrato, `source` de libs e dispatch único.
+- **Script principal**: bootstrap, validações mínimas de contrato, `source` de libs e dispatch
+  único.
 - **Entry-lib**: orquestração do fluxo de domínio do hook, sem duplicar infra comum.
-- **Libs compartilhadas** (`runtime/context/policy/lifecycle/audit/maintenance/testing`): utilitários reutilizáveis, operações transversais e helpers de baixo nível.
+- **Libs compartilhadas** (`runtime/context/policy/lifecycle/audit/maintenance/testing`):
+  utilitários reutilizáveis, operações transversais e helpers de baixo nível.
 
 ## Fronteira de responsabilidades (norma F17)
 
@@ -123,7 +125,8 @@ Cada hook automático terá uma fase dedicada, com critérios de extração e go
 
 1. 100% dos scripts automáticos no perfil wrapper (sem regras de domínio inline).
 2. 100% das entry-libs com função pública canônica `run_*_hook` e contratos explícitos.
-3. Duplicações críticas entre hooks (`pre/post/stop`, `start/end`) reduzidas por extração compartilhada.
+3. Duplicações críticas entre hooks (`pre/post/stop`, `start/end`) reduzidas por extração
+   compartilhada.
 4. Verificador estrutural capaz de detectar regressão de fronteira script/lib.
 5. Documentação e artefatos machine-readable sincronizados por fase.
 
@@ -142,4 +145,5 @@ Cada hook automático terá uma fase dedicada, com critérios de extração e go
 4. F17.9 (encerramento lifecycle)
 5. F17.5 (stop interno profundo com janela dedicada)
 
-> Nota: `agent-stop` permanece no final da trilha por risco estrutural mais alto e maior superfície de regressão.
+> Nota: `agent-stop` permanece no final da trilha por risco estrutural mais alto e maior superfície
+> de regressão.

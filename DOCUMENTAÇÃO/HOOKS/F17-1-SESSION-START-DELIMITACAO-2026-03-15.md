@@ -1,8 +1,6 @@
 # F17.1 — Delimitação técnica do `sessionStart` (file-by-file)
 
-**Data**: 2026-03-15
-**Fase**: F17.1 (iniciada)
-**Arquivos-alvo**:
+**Data**: 2026-03-15 **Fase**: F17.1 (iniciada) **Arquivos-alvo**:
 
 - `scripts/session-start.sh`
 - `hooks-lib/lifecycle/session-start-lib.sh`
@@ -95,10 +93,10 @@ Blocos grandes que devem evoluir para módulos menores reutilizáveis:
 **Atualização desta rodada (F17.1B — slice 2):**
 
 - helper dedicado criado: `hooks-lib/lifecycle/session-start-recovery.sh`.
-- varredura/seleção de checkpoint anterior e hidratação de metadados de recovery
-  foram extraídas de `session-start-lib.sh` para `session_start_find_previous_checkpoint`.
-- resultado: bloco de recovery ficou encapsulado para evolução posterior
-  (`session-start-recovery` como módulo de domínio).
+- varredura/seleção de checkpoint anterior e hidratação de metadados de recovery foram extraídas de
+  `session-start-lib.sh` para `session_start_find_previous_checkpoint`.
+- resultado: bloco de recovery ficou encapsulado para evolução posterior (`session-start-recovery`
+  como módulo de domínio).
 
 **Atualização desta rodada (F17.1B — slice 3):**
 
@@ -169,15 +167,16 @@ Blocos grandes que devem evoluir para módulos menores reutilizáveis:
   - `case "$SOURCE"` (labels de origem),
   - `ACTIVE_STATE_EOF`,
   - `BRIEFING_BODY_EOF`.
-- contrato explícito de variáveis de snapshot exportado no `session-start-lib.sh` para consumo do renderer.
+- contrato explícito de variáveis de snapshot exportado no `session-start-lib.sh` para consumo do
+  renderer.
 
 **Atualização desta rodada (F17.1B — slice 8):**
 
 - bootstrap normalizado com loader único de suporte em
   `hooks-lib/lifecycle/session-start-runtime.sh`:
   - `session_start_load_support_modules`.
-- `session-start-lib.sh` deixou de carregar recovery/observability/briefing diretamente,
-  passando a delegar ao loader único.
+- `session-start-lib.sh` deixou de carregar recovery/observability/briefing diretamente, passando a
+  delegar ao loader único.
 
 **Atualização desta rodada (F17.1B — slice 9, fechamento):**
 
@@ -203,8 +202,7 @@ Blocos grandes que devem evoluir para módulos menores reutilizáveis:
   - `UNAUTHORIZED_CLOSE.flag`,
   - `SESSION_CLOSE_NO_KEY.flag`,
   - cálculo de `VIOLATION_EMOJIS`/`VIOLATION_LEVEL`.
-- `session-start-lib.sh` agora delega esse fluxo para
-  `session_start_prepare_violation_state`.
+- `session-start-lib.sh` agora delega esse fluxo para `session_start_prepare_violation_state`.
 - `session-start-runtime.sh` atualizado para carregar o módulo de violações.
 
 **Atualização desta rodada (F17.1B — slice 12, extra):**
@@ -213,7 +211,8 @@ Blocos grandes que devem evoluir para módulos menores reutilizáveis:
 - extração do bloco residual de classificação de encerramento anterior:
   - detecção de `sessionEnd/sessionCloseAuthorized` em audit atual/arquivado,
   - fallback por `SESSION_CLOSE_AUTHORIZED.flag`,
-  - classificação de `PREV_CLOSE_MODE` (`key_validated`, `abrupt_no_key`, `clean`, `abrupt_reconnect`),
+  - classificação de `PREV_CLOSE_MODE` (`key_validated`, `abrupt_no_key`, `clean`,
+    `abrupt_reconnect`),
   - contagem de reconexões e limpeza de flag autorizada stale.
 - `session-start-lib.sh` passou a delegar esse fluxo para
   `session_start_prepare_abrupt_close_state`.
@@ -234,8 +233,7 @@ Blocos grandes que devem evoluir para módulos menores reutilizáveis:
   - montagem de `RECOVERY_ALERTS` por `PREV_CLOSE_MODE`,
   - cálculo de `alerts_require_kickoff`,
   - persistência de `.recovery` no `session-context-*.json`.
-- `session-start-lib.sh` passou a delegar esse fluxo para
-  `session_start_prepare_recovery_alerts`.
+- `session-start-lib.sh` passou a delegar esse fluxo para `session_start_prepare_recovery_alerts`.
 
 **Atualização desta rodada (F17.1B — slice 15, extra):**
 
@@ -244,8 +242,7 @@ Blocos grandes que devem evoluir para módulos menores reutilizáveis:
   - leitura de `timestamp/cwd/source`,
   - resolução de `SESSIONSTART_TRIGGER_KIND`,
   - resolução de `SESSION_ID` (payload ou fallback temporal).
-- `session-start-lib.sh` agora delega para
-  `session_start_parse_hook_input`.
+- `session-start-lib.sh` agora delega para `session_start_parse_hook_input`.
 - `session-start-runtime.sh` atualizado para carregar o módulo de input.
 
 **Atualização desta rodada (F17.1B — slice 16, extra):**
@@ -256,8 +253,7 @@ Blocos grandes que devem evoluir para módulos menores reutilizáveis:
   - `PREV_SESSION_ID_FROM_CTX`,
   - `PREV_LAST_TURN_TS_FROM_CTX`,
   - `PREV_TURN_NUMBER_FROM_CTX`.
-- `session-start-lib.sh` agora delega para
-  `session_start_load_previous_context_snapshot`.
+- `session-start-lib.sh` agora delega para `session_start_load_previous_context_snapshot`.
 
 **Atualização desta rodada (F17.1B — slice 17, extra):**
 
@@ -267,8 +263,7 @@ Blocos grandes que devem evoluir para módulos menores reutilizáveis:
   - `SID_SHORT` + paths de contexto/audit por sessão,
   - geração de `CLOSE_KEY`,
   - geração de `INITIAL_SECTION_ID` e `INITIAL_TURN_ID`.
-- `session-start-lib.sh` passou a delegar para
-  `session_start_prepare_session_metadata`.
+- `session-start-lib.sh` passou a delegar para `session_start_prepare_session_metadata`.
 - `session-start-runtime.sh` atualizado para carregar o módulo de bootstrap.
 
 **Atualização desta rodada (F17.1B — slice 18, extra):**
@@ -276,8 +271,8 @@ Blocos grandes que devem evoluir para módulos menores reutilizáveis:
 - helper expandido: `hooks-lib/lifecycle/session-start-briefing.sh`.
 - criação de agregador de montagem do briefing:
   - `session_start_render_full_briefing` encapsula base + seções condicionais + alertas + corpo.
-- `session-start-lib.sh` passou a delegar a renderização completa para esse helper,
-  removendo sequência longa de condicionais inline.
+- `session-start-lib.sh` passou a delegar a renderização completa para esse helper, removendo
+  sequência longa de condicionais inline.
 
 ### C — Normalização
 

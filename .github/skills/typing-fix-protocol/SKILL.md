@@ -342,14 +342,16 @@ print('done')
 Objeto mais complexo que `any[]` simples. Use o typedef inline completo no construtor:
 
 ```js
-/** @type {{
-  unused: any[];
-  duplicates: any[];
-  magicValues: any[];
-  redundantLet: any[];
-  enumCandidates: any[];
-  typeCandidates: any[];
-}} */
+/**
+ * @type {{
+ *   unused: any[];
+ *   duplicates: any[];
+ *   magicValues: any[];
+ *   redundantLet: any[];
+ *   enumCandidates: any[];
+ *   typeCandidates: any[];
+ * }}
+ */
 this.issues = {
   unused: [],
   duplicates: [],

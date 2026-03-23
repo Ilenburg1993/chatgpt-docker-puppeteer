@@ -1,17 +1,15 @@
 # Guia Operacional — Copilot SDK
 
-**Status**: ✅ Implementado (Sprint 25)
-**Última atualização**: 2026-07-27
-**Módulo**: `src/copilot/`
-**API base**: `http://localhost:3008/api/sdk`
+**Status**: ✅ Implementado (Sprint 25) **Última atualização**: 2026-07-27 **Módulo**:
+`src/copilot/` **API base**: `http://localhost:3008/api/sdk`
 
 ---
 
 ## O que é e como funciona
 
-O `@github/copilot-sdk` é uma **biblioteca Node.js que controla o GitHub Copilot CLI** via
-JSON-RPC. Ele NÃO é uma chamada direta à API da OpenAI/Anthropic — ele delega para o processo
-`gh copilot` local, que por sua vez se comunica com o LLM (GPT-5, Claude Sonnet, Ollama, etc.).
+O `@github/copilot-sdk` é uma **biblioteca Node.js que controla o GitHub Copilot CLI** via JSON-RPC.
+Ele NÃO é uma chamada direta à API da OpenAI/Anthropic — ele delega para o processo `gh copilot`
+local, que por sua vez se comunica com o LLM (GPT-5, Claude Sonnet, Ollama, etc.).
 
 ```
 Sua aplicação (Express)
@@ -29,8 +27,8 @@ GitHub Copilot CLI (processo local, spawned automaticamente)
 LLM (GitHub-hosted: GPT-5, Claude Sonnet; ou BYOK: Ollama, Azure, etc.)
 ```
 
-**Sim, é através do GitHub CLI (gh).** O SDK faz o `gh` (ou o binário `copilot`) funcionar
-como um servidor local. Autenticação = a mesma conta do `gh auth login`.
+**Sim, é através do GitHub CLI (gh).** O SDK faz o `gh` (ou o binário `copilot`) funcionar como um
+servidor local. Autenticação = a mesma conta do `gh auth login`.
 
 ---
 
@@ -146,21 +144,21 @@ curl -s -X POST http://localhost:3008/api/sdk/sessions/minha-sessao-sonnet/send 
 const es = new EventSource('http://localhost:3008/api/sdk/sessions/minha-sessao-sonnet/stream');
 
 es.addEventListener('message', (e) => {
-    const event = JSON.parse(e.data);
-    if (event.type === 'assistant.message') {
-        console.log(event.data.content);   // resposta completa
-    }
-    if (event.type === 'assistant.message_delta') {
-        process.stdout.write(event.data.deltaContent); // streaming incremental
-    }
+  const event = JSON.parse(e.data);
+  if (event.type === 'assistant.message') {
+    console.log(event.data.content); // resposta completa
+  }
+  if (event.type === 'assistant.message_delta') {
+    process.stdout.write(event.data.deltaContent); // streaming incremental
+  }
 });
 
 es.addEventListener('heartbeat', (e) => {
-    console.log('keepalive', JSON.parse(e.data).ts);
+  console.log('keepalive', JSON.parse(e.data).ts);
 });
 
 es.addEventListener('connected', (e) => {
-    console.log('SSE conectado', JSON.parse(e.data));
+  console.log('SSE conectado', JSON.parse(e.data));
 });
 ```
 
@@ -242,9 +240,7 @@ curl -s -X DELETE http://localhost:3008/api/sdk/sessions/minha-sessao-sonnet
   "prompt": "Analise o arquivo src/copilot/sdk-api.js e liste as rotas.",
   "waitForResponse": true,
   "timeoutMs": 60000,
-  "attachments": [
-    { "type": "file", "path": "src/copilot/sdk-api.js", "displayName": "sdk-api.js" }
-  ]
+  "attachments": [{ "type": "file", "path": "src/copilot/sdk-api.js", "displayName": "sdk-api.js" }]
 }
 ```
 
@@ -302,9 +298,9 @@ curl -s -X POST http://localhost:3008/api/sdk/sessions \
 
 ## Ferramentas disponíveis
 
-As ferramentas em `src/copilot/tools/` são injetadas automaticamente quando você cria uma
-sessão via `createSdkSession()`. Cada ferramenta permite que o modelo LLM chame de volta o
-seu processo para executar ações reais:
+As ferramentas em `src/copilot/tools/` são injetadas automaticamente quando você cria uma sessão via
+`createSdkSession()`. Cada ferramenta permite que o modelo LLM chame de volta o seu processo para
+executar ações reais:
 
 | Ferramenta         | Módulo             | O que faz                                          |
 | ------------------ | ------------------ | -------------------------------------------------- |
@@ -388,13 +384,13 @@ O AlwaysAliveAgent fica em loop aguardando por `onUserInputRequest` (padrão "as
 
 ```bash
 # 1. Autenticação
-gh auth status                                   # deve mostrar login ativo
+gh auth status # deve mostrar login ativo
 
 # 2. Servidor rodando
-curl -s http://localhost:3008/health             # deve responder {"ok":true}
+curl -s http://localhost:3008/health # deve responder {"ok":true}
 
 # 3. SDK disponível
-curl -s http://localhost:3008/api/sdk/ping       # latência do CLI
+curl -s http://localhost:3008/api/sdk/ping # latência do CLI
 
 # 4. Modelos disponíveis (inclui Sonnet?)
 curl -s http://localhost:3008/api/sdk/models | jq '[.models[].id]'
@@ -417,8 +413,10 @@ curl -s -X POST http://localhost:3008/api/sdk/sessions/$SESSION_ID/disconnect
 
 ## Referências
 
-- [SDK README](../node_modules/@github/copilot-sdk/README.md) — documentação oficial do `@github/copilot-sdk`
-- [Arquitetura profunda](ARQUITETURA/SDK-COPILOT-ARQUITETURA-PROFUNDA.md) — análise completa (18 seções)
+- [SDK README](../node_modules/@github/copilot-sdk/README.md) — documentação oficial do
+  `@github/copilot-sdk`
+- [Arquitetura profunda](ARQUITETURA/SDK-COPILOT-ARQUITETURA-PROFUNDA.md) — análise completa (18
+  seções)
 - [sdk-client.js](../src/copilot/sdk-client.js) — singleton e registry
 - [sdk-api.js](../src/copilot/sdk-api.js) — router Express (16 rotas)
 - [always-alive.js](../src/copilot/always-alive.js) — AlwaysAliveAgent

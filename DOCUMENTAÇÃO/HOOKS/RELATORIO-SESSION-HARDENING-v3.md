@@ -443,15 +443,15 @@ SESSION end: [usuário digita ENCERRAR-KEY em askQuestions → post-tool-use.sh 
 
 ### 10.4 Mudanças Implementadas (v6.2)
 
-| Arquivo                                               | Mudança                                                                                                        |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `.github/copilot-instructions.md`                     | Ciclo de vida TURN: nota que askQuestions responses são tool results (postToolUse), NÃO novos prompts          |
+| Arquivo                                               | Mudança                                                                                                         |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `.github/copilot-instructions.md`                     | Ciclo de vida TURN: nota que askQuestions responses são tool results (postToolUse), NÃO novos prompts           |
 | `.github/copilot-instructions.md`                     | Adicionada nota `⚠️ userPromptSubmitted dispara SOMENTE para chatbox` antes da seção de comportamento do agente |
-| `.github/AGENTS.md`                                   | Tabela de eventos: `userPromptSubmitted` agora descreve corretamente sua frequência real                       |
-| `.github/AGENTS.md`                                   | Seção TURN: nota explícita sobre semântica do hook vs workflow real                                            |
-| `.github/instructions/hooks-protocol.instructions.md` | Tabela conceitos: nota sobre `userPromptSubmitted` vs tool results                                             |
-| `.github/instructions/hooks-protocol.instructions.md` | Seção TURN: bloco de "Semântica real" adicionado                                                               |
-| `.github/hooks/scripts/pre-tool-use.sh`               | SESSION reminder a cada 30 tool calls (preToolUse é o hook mais confiável no workflow real)                    |
+| `.github/AGENTS.md`                                   | Tabela de eventos: `userPromptSubmitted` agora descreve corretamente sua frequência real                        |
+| `.github/AGENTS.md`                                   | Seção TURN: nota explícita sobre semântica do hook vs workflow real                                             |
+| `.github/instructions/hooks-protocol.instructions.md` | Tabela conceitos: nota sobre `userPromptSubmitted` vs tool results                                              |
+| `.github/instructions/hooks-protocol.instructions.md` | Seção TURN: bloco de "Semântica real" adicionado                                                                |
+| `.github/hooks/scripts/pre-tool-use.sh`               | SESSION reminder a cada 30 tool calls (preToolUse é o hook mais confiável no workflow real)                     |
 
 ### 10.5 Métricas de Sucesso v6.2
 
@@ -610,13 +610,13 @@ Cobre:
 
 ### 12.2 Mecanismos de Encerramento Mapeados
 
-| #     | Mecanismo                                                            | Status Anterior                       | Status v8.0               |
-| ----- | -------------------------------------------------------------------- | ------------------------------------- | ------------------------- |
-| 1     | Agente termina TURN silentemente → usuário fecha VS Code             | ✅ Mitigado (v7.0 decision:block)      | ✅ Mantido                 |
-| 2     | Usuário force-fecha VS Code durante diálogo                          | — Limitação de plataforma             | — Limitação de plataforma |
-| 3     | Strategy 2 falso positivo autoriza SESSION indevidamente             | ✅ Corrigido (v7.0)                    | ✅ Mantido                 |
-| 4     | Agente não chama vscode_askQuestions em turnos subsequentes          | ✅ Mitigado (decision:block por turno) | ✅ Mantido                 |
-| **5** | **Agente chama session-close.sh diretamente (hallucination de KEY)** | ❌ Gap crítico                         | **✅ BLOQUEADO (v8.0)**    |
+| #     | Mecanismo                                                            | Status Anterior                        | Status v8.0               |
+| ----- | -------------------------------------------------------------------- | -------------------------------------- | ------------------------- |
+| 1     | Agente termina TURN silentemente → usuário fecha VS Code             | ✅ Mitigado (v7.0 decision:block)      | ✅ Mantido                |
+| 2     | Usuário force-fecha VS Code durante diálogo                          | — Limitação de plataforma              | — Limitação de plataforma |
+| 3     | Strategy 2 falso positivo autoriza SESSION indevidamente             | ✅ Corrigido (v7.0)                    | ✅ Mantido                |
+| 4     | Agente não chama vscode_askQuestions em turnos subsequentes          | ✅ Mitigado (decision:block por turno) | ✅ Mantido                |
+| **5** | **Agente chama session-close.sh diretamente (hallucination de KEY)** | ❌ Gap crítico                         | **✅ BLOQUEADO (v8.0)**   |
 
 ### 12.3 Implementações v8.0
 

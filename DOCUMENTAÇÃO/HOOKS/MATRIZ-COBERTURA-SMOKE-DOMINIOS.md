@@ -1,7 +1,6 @@
 # Matriz de Cobertura — Smoke por Domínios (F5.3)
 
-**Data**: 2026-03-15
-**Escopo**: consolidar a cobertura da decomposição da suíte smoke por domínio.
+**Data**: 2026-03-15 **Escopo**: consolidar a cobertura da decomposição da suíte smoke por domínio.
 
 ## Entrypoints
 
@@ -30,5 +29,6 @@
 ## Observações de compatibilidade
 
 - O fluxo legado foi preservado (modo padrão de `smoke-test.sh`).
-- A decomposição por domínios é incremental e não substitui de imediato os checks legados de alta granularidade.
+- A decomposição por domínios é incremental e não substitui de imediato os checks legados de alta
+  granularidade.
 - `--all` permite coexistência e comparação contínua entre legado e domínio durante rollout.

@@ -57,18 +57,18 @@ hook_api_parse "$INPUT"
 
 # Lazy: só carrega métricas se o evento envolver uma tool call
 if is_tool_use; then
-    hook_metrics_load
-    hook_api_load_metrics
+  hook_metrics_load
+  hook_api_load_metrics
 fi
 
 # Lazy: só carrega close-key se o evento for PostToolUse de vscode_askQuestions
 if is_ask_questions_post; then
-    hook_close_key_load
-    hook_close_key_validate "$HOOK_RESPONSE_TEXT"
+  hook_close_key_load
+  hook_close_key_validate "$HOOK_RESPONSE_TEXT"
 fi
 ```
 
 ### Regra geral
 
-> Chame `hook_<modulo>_load()` uma única vez por invocação de hook, antes de usar qualquer função
-> do módulo. A função é idempotente: chamá-la duas vezes não causa efeito colateral.
+> Chame `hook_<modulo>_load()` uma única vez por invocação de hook, antes de usar qualquer função do
+> módulo. A função é idempotente: chamá-la duas vezes não causa efeito colateral.

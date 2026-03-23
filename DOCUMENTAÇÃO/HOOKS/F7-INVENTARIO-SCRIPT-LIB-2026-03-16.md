@@ -116,8 +116,10 @@ Validação usada: `.github/hooks/scripts/verify-script-lib-coverage.sh`.
 
 ## Observações
 
-- `agent-stop.sh` segue vinculado ao legado canônico `hooks-lib/agent-stop-lib.sh` (root permitido temporariamente).
-- Scripts que já tinham integração direta com `hooks-lib` permanecem com relação **inline** e não exigiram wrapper adicional.
+- `agent-stop.sh` segue vinculado ao legado canônico `hooks-lib/agent-stop-lib.sh` (root permitido
+  temporariamente).
+- Scripts que já tinham integração direta com `hooks-lib` permanecem com relação **inline** e não
+  exigiram wrapper adicional.
 
 ## Lacunas remanescentes (consolidação F7)
 

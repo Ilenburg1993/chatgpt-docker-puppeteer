@@ -46,8 +46,8 @@ SESSION (1 por Copilot Chat)
 
 ### 2.1. Hooks Configurados (`copilot-hooks.json`)
 
-| #   | Hook                  | Script              | Timeout | Frequência Observada | Status      |
-| --- | --------------------- | ------------------- | ------- | -------------------- | ----------- |
+| #   | Hook                  | Script              | Timeout | Frequência Observada | Status       |
+| --- | --------------------- | ------------------- | ------- | -------------------- | ------------ |
 | 1   | `sessionStart`        | `session-start.sh`  | 60s     | **0x esta sessão**   | ⚠️ FALHO     |
 | 2   | `userPromptSubmitted` | `log-prompt.sh`     | 10s     | ~4x/sessão (raro)    | ✅ Funcional |
 | 3   | `preToolUse`          | `pre-tool-use.sh`   | 15s     | ~1000x/sessão        | ✅ Funcional |
@@ -95,11 +95,11 @@ SESSION (1 por Copilot Chat)
 
 ### 2.3. Estado Atual (`.github/hooks/state/`)
 
-| Arquivo                   | Tamanho     | Status                              |
-| ------------------------- | ----------- | ----------------------------------- |
+| Arquivo                   | Tamanho     | Status                               |
+| ------------------------- | ----------- | ------------------------------------ |
 | `session-context.json`    | **0 bytes** | 🔴 **VAZIO — Sem sessão ativa**      |
-| `session-briefing.md`     | 4.570 B     | De sessão anterior (06:22:22Z)      |
-| `pending-tasks.md`        | 10.779 B    | Tarefas pendentes acumuladas        |
+| `session-briefing.md`     | 4.570 B     | De sessão anterior (06:22:22Z)       |
+| `pending-tasks.md`        | 10.779 B    | Tarefas pendentes acumuladas         |
 | `UNAUTHORIZED_CLOSE.flag` | 187 B       | ⚠️ Violação de sessão anterior ativa |
 
 ### 2.4. Logs (`.github/hooks/logs/`)
@@ -531,8 +531,8 @@ a um one-shot manual que não previne recorrência.
 
 Eventos disponíveis na extensão Copilot (array `Mti`) que NÃO temos hooks:
 
-| Evento SDK           | Configurado?  | Recomendação                     |
-| -------------------- | ------------- | -------------------------------- |
+| Evento SDK           | Configurado?   | Recomendação                     |
+| -------------------- | -------------- | -------------------------------- |
 | `PreToolUse`         | ✅             | —                                |
 | `PostToolUse`        | ✅             | —                                |
 | `PostToolUseFailure` | ✅             | **Adicionado** (commit 4ceb3a52) |

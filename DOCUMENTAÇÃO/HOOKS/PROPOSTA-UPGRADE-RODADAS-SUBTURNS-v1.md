@@ -1,15 +1,15 @@
 # Proposta Completa — Upgrade de Rodadas/SubTurns no ciclo TURN
 
-**Status**: Proposta técnica para implementação
-**Data**: 2026-03-14
-**Escopo**: modelagem explícita de rodadas (SubTurns), consolidação de schema/contratos e plano de rollout
+**Status**: Proposta técnica para implementação **Data**: 2026-03-14 **Escopo**: modelagem explícita
+de rodadas (SubTurns), consolidação de schema/contratos e plano de rollout
 
 ---
 
 ## 1) Contexto e problema
 
-Hoje o runtime já possui sinais de “subturnização” (ex.: `stop_hook_active`, `current_turn.agentStop_invocations`,
-`subagent_delegated`), mas sem um **contrato explícito único** para rodadas internas do TURN.
+Hoje o runtime já possui sinais de “subturnização” (ex.: `stop_hook_active`,
+`current_turn.agentStop_invocations`, `subagent_delegated`), mas sem um **contrato explícito único**
+para rodadas internas do TURN.
 
 Isso gera ambiguidades operacionais em cenários críticos:
 
@@ -18,8 +18,9 @@ Isso gera ambiguidades operacionais em cenários críticos:
 3. múltiplos `vscode_askQuestions` no mesmo TURN;
 4. distinção entre “novo TURN” vs “continuação do TURN”.
 
-Além disso, o modo estrito atual de fechamento (Template F + KEY válida) é altamente sensível à ordem de eventos.
-Sem um modelo explícito de rodadas, o diagnóstico fica difuso e o custo de manutenção sobe.
+Além disso, o modo estrito atual de fechamento (Template F + KEY válida) é altamente sensível à
+ordem de eventos. Sem um modelo explícito de rodadas, o diagnóstico fica difuso e o custo de
+manutenção sobe.
 
 ---
 
@@ -87,8 +88,8 @@ Adicionar apenas:
 - `current_turn.subturn_number`;
 - `session_stats.subturn_total`.
 
-**Prós**: baixo custo, pouca mudança de código.
-**Contras**: pobre para forense e replays; sem estado de rodada; sem motivo de transição.
+**Prós**: baixo custo, pouca mudança de código. **Contras**: pobre para forense e replays; sem
+estado de rodada; sem motivo de transição.
 
 ---
 
@@ -96,8 +97,8 @@ Adicionar apenas:
 
 Toda rodada só em `audit.jsonl` (`subturnStart`, `subturnTransition`, `subturnEnd`).
 
-**Prós**: trilha rica e append-only.
-**Contras**: leitura operacional cara; scripts de decisão ficam dependentes de varredura de log.
+**Prós**: trilha rica e append-only. **Contras**: leitura operacional cara; scripts de decisão ficam
+dependentes de varredura de log.
 
 ---
 
@@ -253,7 +254,8 @@ Transições típicas:
 
 ## 7.4 `agent-stop.sh`
 
-- Em block (`decision:block`): encerrar rodada atual (`subturnEnd reason=stop_blocked`) e abrir próxima rodada;
+- Em block (`decision:block`): encerrar rodada atual (`subturnEnd reason=stop_blocked`) e abrir
+  próxima rodada;
 - Em `stop_hook_active=true`: registrar `subturnResume`;
 - Em fechamento legítimo de TURN: encerrar última rodada (`reason=turn_closed_authorized`).
 

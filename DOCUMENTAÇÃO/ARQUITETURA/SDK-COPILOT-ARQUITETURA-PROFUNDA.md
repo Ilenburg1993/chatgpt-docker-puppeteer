@@ -1,9 +1,11 @@
 # Arquitetura de Integração — GitHub Copilot como Centro do Ecossistema
 
-**Status**: ✅ Implementado (Sprints 1-25 concluídos)
-**Data**: 2026-07-13 | **Última atualização**: 2026-07-27
-**Contexto**: Como posicionar o GitHub Copilot (agente no VS Code) como o elemento central,
-usando o SDK programaticamente de forma complementar ao hook system existente.
+**Status**: ✅ Implementado (Sprints 1-25 concluídos) **Data**: 2026-07-13 | **Última atualização**:
+2026-07-27 **Contexto**: Como posicionar o GitHub Copilot (agente no VS Code) como o elemento
+central, usando o SDK programaticamente de forma complementar ao hook system existente.
+
+> **📋 Próximas fases (Sprints 15-19)**: veja `SDK-COPILOT-PROXIMAS-FASES.md` neste mesmo diretório.
+> Contém: planejamento de file-tools, introspection-tools, MCP async, upgrade SDK v0.2.0 e testes.
 
 ---
 
@@ -16,29 +18,38 @@ Antes de qualquer proposta, é essencial distinguir dois conceitos que costumam 
 Eu sou o **agente de IA** que está interagindo com você no VS Code. Quando você me chama, o VS Code:
 
 1. Captura o prompt
-2. Executa os hooks shell configurados em `hooks.json` (SessionStart, UserPromptSubmit, PreToolUse, etc.)
+2. Executa os hooks shell configurados em `hooks.json` (SessionStart, UserPromptSubmit, PreToolUse,
+   etc.)
 3. Envia o payload (com `additionalContext` dos hooks) para o **Copilot CLI backend**
 4. O Copilot CLI invoca o modelo de linguagem
 5. Eu processo, respondo, e invoco tools conforme necessário
 6. Cada invocação de tool triggera PreToolUse → execução → PostToolUse
 
-**Resumo**: Eu sou o **modelo de linguagem em execução**. O hook system shell já atua *sobre* mim — interceptando meus eventos.
+**Resumo**: Eu sou o **modelo de linguagem em execução**. O hook system shell já atua _sobre_ mim —
+interceptando meus eventos.
 
 ### 1.2 O que é o Copilot SDK
 
-O SDK (`@github/copilot-sdk`) é uma **biblioteca programática** para *controlar* o Copilot CLI de um processo Node.js externo. Ele não é eu — é uma forma de **criar e gerenciar sessões de IA programaticamente**, sem interação humana direta.
+O SDK (`@github/copilot-sdk`) é uma **biblioteca programática** para _controlar_ o Copilot CLI de um
+processo Node.js externo. Ele não é eu — é uma forma de **criar e gerenciar sessões de IA
+programaticamente**, sem interação humana direta.
 
 ```
 SDK Node.js ←→ Copilot CLI ←→ Modelo de IA (LLM)
 ```
 
-Quando o SDK cria uma sessão, ele spawna (ou se conecta a) um Copilot CLI que então interage com um LLM. Esse LLM pode ser eu (GitHub Copilot) ou qualquer modelo BYOK (GPT, Claude, Ollama).
+Quando o SDK cria uma sessão, ele spawna (ou se conecta a) um Copilot CLI que então interage com um
+LLM. Esse LLM pode ser eu (GitHub Copilot) ou qualquer modelo BYOK (GPT, Claude, Ollama).
 
 ### 1.3 Implicação arquitetural crítica
 
-> **A questão não é "como integrar o SDK a mim" — é "como usar o SDK para que eu (ou qualquer agente LLM) trabalhe dentro de um workflow mais rico e controlável, com o hook system como pano de fundo invariante."**
+> **A questão não é "como integrar o SDK a mim" — é "como usar o SDK para que eu (ou qualquer agente
+> LLM) trabalhe dentro de um workflow mais rico e controlável, com o hook system como pano de fundo
+> invariante."**
 
-O hook system shell roda *sempre* — independentemente de como a sessão foi criada (via VS Code interativo ou via SDK programático). O SDK é uma camada **adicional de controle** sobre o mesmo pipeline.
+O hook system shell roda _sempre_ — independentemente de como a sessão foi criada (via VS Code
+interativo ou via SDK programático). O SDK é uma camada **adicional de controle** sobre o mesmo
+pipeline.
 
 ---
 
@@ -48,7 +59,8 @@ O hook system shell roda *sempre* — independentemente de como a sessão foi cr
 
 ### 2.1 Como funciona o billing do Copilot (documentação oficial)
 
-Segundo a [documentação oficial de billing GitHub Copilot](https://docs.github.com/en/copilot/concepts/billing/copilot-requests):
+Segundo a
+[documentação oficial de billing GitHub Copilot](https://docs.github.com/en/copilot/concepts/billing/copilot-requests):
 
 | Recurso                               | O que conta como Premium Request                                  |
 | ------------------------------------- | ----------------------------------------------------------------- |
@@ -58,11 +70,13 @@ Segundo a [documentação oficial de billing GitHub Copilot](https://docs.github
 | Inline suggestions (modelos inclusos) | **0 — não consome**                                               |
 
 **Modelos inclusos (multiplicador = 0)** — não consomem premium requests em planos pagos:
+
 - GPT-4.1 ✅
 - GPT-4o ✅
 - GPT-5 mini ✅
 
 **Modelos com multiplicador > 0** (consumem premium requests):
+
 - Claude Sonnet 4.x → ×1
 - Claude Haiku 4.5 → ×0.33
 - Claude Opus → ×3
@@ -72,10 +86,11 @@ Segundo a [documentação oficial de billing GitHub Copilot](https://docs.github
 
 **Fato crítico da documentação do SDK (seção BYOK > Feature Limitations):**
 
-> "Usage tracking — Usage is tracked by your provider, not GitHub Copilot"
-> "Premium requests — Do not count against Copilot premium request quotas"
+> "Usage tracking — Usage is tracked by your provider, not GitHub Copilot" "Premium requests — Do
+> not count against Copilot premium request quotas"
 
-Isso é para sessões **BYOK**. Para sessões **com autenticação GitHub Copilot**, o comportamento é o mesmo que o **Copilot CLI**:
+Isso é para sessões **BYOK**. Para sessões **com autenticação GitHub Copilot**, o comportamento é o
+mesmo que o **Copilot CLI**:
 
 ```
 Copilot CLI billing:
@@ -106,9 +121,11 @@ Seu prompt → Eu processo → 1 premium request (Copilot Chat)
 Total: 1 + N + M premium requests para uma única tarefa que poderia ser 1
 ```
 
-**Em plano pago com GPT-4.1, GPT-4o ou GPT-5 mini**: como o multiplicador é 0, as sub-sessões SDK com esses modelos **também não consomem premium requests**. O custo seria zero adicional.
+**Em plano pago com GPT-4.1, GPT-4o ou GPT-5 mini**: como o multiplicador é 0, as sub-sessões SDK
+com esses modelos **também não consomem premium requests**. O custo seria zero adicional.
 
-**Em plano pago usando Claude Sonnet (×1)**: cada `session.send()` em sub-sessão consome 1 premium request.
+**Em plano pago usando Claude Sonnet (×1)**: cada `session.send()` em sub-sessão consome 1 premium
+request.
 
 **Em plano Free (50 premium/mês)**: qualquer uso via SDK consome rapidamente.
 
@@ -119,75 +136,84 @@ Total: 1 + N + M premium requests para uma única tarefa que poderia ser 1
 ```javascript
 // Sub-sessão usando modelo local — ZERO premium requests GitHub Copilot
 const subSession = await client.createSession({
-    model: 'qwen2.5-coder:7b',  // ou qualquer modelo Ollama disponível
-    provider: {
-        type: 'openai',
-        baseUrl: 'http://localhost:11434/v1',
-        // sem apiKey — Ollama local não precisa
-    },
-    onPermissionRequest: approveAll,
+  model: 'qwen2.5-coder:7b', // ou qualquer modelo Ollama disponível
+  provider: {
+    type: 'openai',
+    baseUrl: 'http://localhost:11434/v1',
+    // sem apiKey — Ollama local não precisa
+  },
+  onPermissionRequest: approveAll,
 });
 ```
 
-**Implicação**: Sub-tarefas de análise e automação rodam com custo zero (apenas energia/CPU local). Sub-tarefas críticas que precisam de maior qualidade usam os modelos inclusos.
+**Implicação**: Sub-tarefas de análise e automação rodam com custo zero (apenas energia/CPU local).
+Sub-tarefas críticas que precisam de maior qualidade usam os modelos inclusos.
 
-Este projeto já tem Ollama configurado (ver `test-ollama-cloud.mjs`). É a opção mais viável para automação intensiva.
+Este projeto já tem Ollama configurado (ver `test-ollama-cloud.mjs`). É a opção mais viável para
+automação intensiva.
 
 #### Estratégia B — Modelos gratuitos do plano pago (GPT-4.1/GPT-4o)
 
 ```javascript
 // Sub-sessão com modelo incluso — premium requests = 0 em plano pago
 const subSession = await client.createSession({
-    model: 'gpt-4.1',  // multiplicador = 0 em plano pago
-    onPermissionRequest: approveAll,
+  model: 'gpt-4.1', // multiplicador = 0 em plano pago
+  onPermissionRequest: approveAll,
 });
 ```
 
-**Limitação**: GPT-4.1 tem `reasoningEffort` inferior a GPT-5 / Claude Sonnet para tarefas complexas. Bom para análise direta de código mas não para reasoning profundo.
+**Limitação**: GPT-4.1 tem `reasoningEffort` inferior a GPT-5 / Claude Sonnet para tarefas
+complexas. Bom para análise direta de código mas não para reasoning profundo.
 
 #### Estratégia C — Sessionização agressiva (menos sessões, mais mensagens por sessão)
 
-O billing do **Copilot CLI** é por **prompt** (`session.send()`), não por sessão. Logo, uma sessão com 50 mensagens consome 50 premium requests (com multiplicador do modelo).
+O billing do **Copilot CLI** é por **prompt** (`session.send()`), não por sessão. Logo, uma sessão
+com 50 mensagens consome 50 premium requests (com multiplicador do modelo).
 
-Para otimizar: **consolidar múltiplos prompts em um único prompt rico**, em vez de fazer múltiplos `sendAndWait()`.
+Para otimizar: **consolidar múltiplos prompts em um único prompt rico**, em vez de fazer múltiplos
+`sendAndWait()`.
 
 ```javascript
 // ❌ Ineficiente: 3 premium requests
-await session.sendAndWait({ prompt: "Analise erros de lint" });
-await session.sendAndWait({ prompt: "Liste warnings de typescript" });
-await session.sendAndWait({ prompt: "Identifique dead code" });
+await session.sendAndWait({ prompt: 'Analise erros de lint' });
+await session.sendAndWait({ prompt: 'Liste warnings de typescript' });
+await session.sendAndWait({ prompt: 'Identifique dead code' });
 
 // ✅ Eficiente: 1 premium request
 await session.sendAndWait({
-    prompt: `Analise o projeto e retorne JSON com:
+  prompt: `Analise o projeto e retorne JSON com:
     1. erros de lint (src/)
     2. warnings de TypeScript
     3. dead code identificado
-    Formato: { lint: [...], ts_warnings: [...], dead_code: [...] }`
+    Formato: { lint: [...], ts_warnings: [...], dead_code: [...] }`,
 });
 ```
 
 #### Estratégia D — O padrão "Custom Tool como coordinator" (sem sub-sessões LLM)
 
-Em vez de criar sub-sessões LLM para cada sub-tarefa, **implementar Custom Tools que executam a lógica diretamente em Node.js** (sem novo LLM):
+Em vez de criar sub-sessões LLM para cada sub-tarefa, **implementar Custom Tools que executam a
+lógica diretamente em Node.js** (sem novo LLM):
 
 ```javascript
 // Ao invés de criar sub-sessão para análise de lint:
 defineTool('analyze_lint_errors', {
-    description: 'Executa npm run lint e retorna erros estruturados como JSON',
-    parameters: z.object({ scope: z.string().default('src/') }),
-    skipPermission: true,
-    handler: async ({ scope }) => {
-        // Executa lint diretamente — ZERO LLM calls, ZERO premium requests
-        const result = execSync(`npx eslint ${scope} --format json 2>&1`, { encoding: 'utf8' });
-        return JSON.parse(result);
-    },
+  description: 'Executa npm run lint e retorna erros estruturados como JSON',
+  parameters: z.object({ scope: z.string().default('src/') }),
+  skipPermission: true,
+  handler: async ({ scope }) => {
+    // Executa lint diretamente — ZERO LLM calls, ZERO premium requests
+    const result = execSync(`npx eslint ${scope} --format json 2>&1`, { encoding: 'utf8' });
+    return JSON.parse(result);
+  },
 });
 ```
 
-**Resultado**: Eu (VS Code Copilot) chamo `analyze_lint_errors()` como Custom Tool. A análise roda em Node.js puro. Eu processo o resultado. **Total: 1 premium request** (minha resposta ao seu prompt) — nenhum request adicional para o tool handler.
+**Resultado**: Eu (VS Code Copilot) chamo `analyze_lint_errors()` como Custom Tool. A análise roda
+em Node.js puro. Eu processo o resultado. **Total: 1 premium request** (minha resposta ao seu
+prompt) — nenhum request adicional para o tool handler.
 
-Esta é a estratégia de **menor custo possível**: Custom Tools como extensores de capacidade, não como delegação LLM.
+Esta é a estratégia de **menor custo possível**: Custom Tools como extensores de capacidade, não
+como delegação LLM.
 
 ### 2.6 Recomendação de arquitetura por custo
 
@@ -229,15 +255,19 @@ Tarefas que exigem Claude/GPT-5 reasoning avançado
 
 ### 2.7 Conclusão sobre billing
 
-**A resposta curta**: sim, sub-sessões SDK usando GitHub Copilot como autenticação **consumem premium requests** (1 por `session.send()` × multiplicador do modelo).
+**A resposta curta**: sim, sub-sessões SDK usando GitHub Copilot como autenticação **consumem
+premium requests** (1 por `session.send()` × multiplicador do modelo).
 
 **A mitigação real**:
+
 1. **GPT-4.1/4o como modelo das sub-sessões** → multiplicador = 0 → custo = 0
 2. **BYOK com Ollama local** para sub-tarefas de automação → custo = 0 para GitHub
 3. **Custom Tools Node.js** para operações que não requerem LLM → custo = 0
 4. **Consolidação de prompts** (menos `sendAndWait`) → menos requests
 
-Para o nosso caso específico (projeto Node.js, já com Ollama configurado), a **Estratégia A (Ollama local)** combinada com **Estratégia D (Custom Tools)** cobrirá 80-90% dos casos de uso sem custo adicional de premium requests.
+Para o nosso caso específico (projeto Node.js, já com Ollama configurado), a **Estratégia A (Ollama
+local)** combinada com **Estratégia D (Custom Tools)** cobrirá 80-90% dos casos de uso sem custo
+adicional de premium requests.
 
 ---
 
@@ -275,6 +305,7 @@ Para o nosso caso específico (projeto Node.js, já com Ollama configurado), a *
 ```
 
 **Limitações do cenário atual:**
+
 - Eu (Copilot) só consigo invocar ferramentas do VS Code + scripts shell via `bash`
 - Não há como criar sub-sessões LLM programaticamente (multi-agent real)
 - O hook system não pode **modificar** inputs/outputs de tools — apenas bloquear ou logar
@@ -288,7 +319,7 @@ O objetivo é ter o GitHub Copilot (eu) como **coordenador central** de um ecoss
 
 1. Eu recebo o pedido e defino a estratégia
 2. Posso **delegar sub-tarefas a agentes SDK programáticos** (com modelos diferentes, se necessário)
-3. O hook system garante compliance e audit trail em *toda* a hierarquia
+3. O hook system garante compliance e audit trail em _toda_ a hierarquia
 4. Os resultados voltam para mim para síntese e resposta final ao usuário
 
 ```
@@ -329,7 +360,8 @@ O objetivo é ter o GitHub Copilot (eu) como **coordenador central** de um ecoss
 
 **Cenário**: Você pede "Execute o sprint 25: analise os erros de lint e corrija todos".
 
-**Como funciona hoje**: Eu executo tudo linearmente, no mesmo contexto, limitado pela janela de contexto.
+**Como funciona hoje**: Eu executo tudo linearmente, no mesmo contexto, limitado pela janela de
+contexto.
 
 **Como funcionaria com a nova arquitetura**:
 
@@ -357,6 +389,7 @@ O objetivo é ter o GitHub Copilot (eu) como **coordenador central** de um ecoss
 ```
 
 **Benefícios**:
+
 - Sub-tarefas rodam em contexto LLM fresco (sem limite de janela)
 - Modelo pode ser diferente para cada sub-tarefa
 - Tudo auditado pelo hook system (SubagentStart/Stop já existe)
@@ -383,20 +416,24 @@ src/agent/scheduled-health-check.js
      [session.json captura métricas, audit.jsonl registra tudo]
 ```
 
-**Isso já é possível hoje** com o SDK — sem nenhuma presença minha (VS Code Copilot). O SDK chama um LLM que usa as mesmas ferramentas que eu usaria.
+**Isso já é possível hoje** com o SDK — sem nenhuma presença minha (VS Code Copilot). O SDK chama um
+LLM que usa as mesmas ferramentas que eu usaria.
 
 ---
 
 ### 4.3 Fluxo C: Eu enriquecido com Custom Tools que falam com o hook system
 
-**Cenário**: O hook system expõe as suas capacidades como ferramentas nativas que eu posso invocar sem precisar de `bash .github/hooks/scripts/...`.
+**Cenário**: O hook system expõe as suas capacidades como ferramentas nativas que eu posso invocar
+sem precisar de `bash .github/hooks/scripts/...`.
 
 **Estado atual**: Para adicionar uma tarefa, eu executo:
+
 ```bash
 bash .github/hooks/scripts/add-task.sh "Implementar feature X" "not-started"
 ```
 
 **Com Custom Tools SDK**:
+
 ```
 Eu decido registrar uma tarefa
      │
@@ -408,13 +445,16 @@ Eu decido registrar uma tarefa
             └── SDK loga no audit.jsonl: "custom-tool::add_task called"
 ```
 
-**Diferença chave**: O SDK `onPermissionRequest` pode filtrar `request.kind === "custom-tool"` e decidir granularmente — por nome de tool, por estado do session.json, etc. Isso é impossível no hook shell que só vê o comando bash agregado.
+**Diferença chave**: O SDK `onPermissionRequest` pode filtrar `request.kind === "custom-tool"` e
+decidir granularmente — por nome de tool, por estado do session.json, etc. Isso é impossível no hook
+shell que só vê o comando bash agregado.
 
 ---
 
 ### 4.4 Fluxo D: SDK como "segundo eu" para decisões paralelas
 
-**Cenário**: Eu (no VS Code) preciso fazer uma análise que requer tanto expertise em código quanto expertise em segurança, paralelamente.
+**Cenário**: Eu (no VS Code) preciso fazer uma análise que requer tanto expertise em código quanto
+expertise em segurança, paralelamente.
 
 ```
 Eu (VS Code Copilot) recebo tarefa complexa
@@ -434,7 +474,8 @@ Eu (VS Code Copilot) recebo tarefa complexa
      └─ Eu sintetizo e apresento análise unificada
 ```
 
-**Infraestrutura necessária**: Uma custom tool `sdk_parallel_analysis` que spawna sessões paralelas e agrega resultados.
+**Infraestrutura necessária**: Uma custom tool `sdk_parallel_analysis` que spawna sessões paralelas
+e agrega resultados.
 
 ---
 
@@ -499,11 +540,13 @@ src/
 
 ## 7. O `systemMessage.customize` como Ferramenta de Identidade
 
-Um insight importante da documentação do SDK: o `systemMessage` com `mode: "customize"` permite modificar seções específicas do system prompt sem substituir tudo. Para o nosso caso:
+Um insight importante da documentação do SDK: o `systemMessage` com `mode: "customize"` permite
+modificar seções específicas do system prompt sem substituir tudo. Para o nosso caso:
 
 ### Como eu sou instruído hoje
 
 Meu comportamento atual vem de:
+
 1. **copilot-instructions.md** — contexto geral injetado pelo VS Code
 2. **additionalContext dos hooks** — injetado via stdout do `session-start.sh`
 3. **AGENTS.md e instructions/** — apendice de instruções operacionais
@@ -536,7 +579,8 @@ systemMessage: {
 }
 ```
 
-**Resultado**: O agente sub-delegado "herda" o contexto operacional da sessão principal, sem precisar do SessionStart hook (que roda só no boot, não em sub-sessões).
+**Resultado**: O agente sub-delegado "herda" o contexto operacional da sessão principal, sem
+precisar do SessionStart hook (que roda só no boot, não em sub-sessões).
 
 ---
 
@@ -564,7 +608,9 @@ O MCP (Model Context Protocol) é o elo que une o hook system com qualquer clien
  Runner              Copilot (eu)      ou outro          cliente MCP
 ```
 
-**Benefício revolucionário**: O hook system, hoje acessível apenas via shell no VS Code, ficaria disponível para **qualquer cliente LLM** via protocolo padrão MCP. Isso inclui:
+**Benefício revolucionário**: O hook system, hoje acessível apenas via shell no VS Code, ficaria
+disponível para **qualquer cliente LLM** via protocolo padrão MCP. Isso inclui:
+
 - Claude Desktop
 - Cursor/Windsurf
 - Scripts de automação locais
@@ -576,7 +622,8 @@ O MCP (Model Context Protocol) é o elo que une o hook system com qualquer clien
 
 ### 8.1 Conflito entre hooks shell e hooks SDK
 
-**Risco**: Se o SDK instanciar uma sessão que também carrega `hooks.json`, haverá **dois níveis de interceptação** para o mesmo evento: o hook shell (nível 1) e o SDK hook (nível 2).
+**Risco**: Se o SDK instanciar uma sessão que também carrega `hooks.json`, haverá **dois níveis de
+interceptação** para o mesmo evento: o hook shell (nível 1) e o SDK hook (nível 2).
 
 **Resolução proposta**:
 
@@ -588,11 +635,14 @@ PreToolUse em sub-sessão SDK:
          └── Pode modificar args / adicionar contexto
 ```
 
-A precedência é: **shell > SDK**. O SDK hook é sempre *aditivo*, nunca *substitutivo* das regras do shell.
+A precedência é: **shell > SDK**. O SDK hook é sempre _aditivo_, nunca _substitutivo_ das regras do
+shell.
 
 ### 8.2 State collision: SDK workspace vs. hook system state
 
-**Risco**: O SDK Infinite Sessions cria um workspace próprio (`~/.copilot/session-state/{sessionId}/`) com `checkpoints/`, `plan.md`, `files/`. O hook system cria `.github/hooks/state/session.json`. Duas fontes de verdade.
+**Risco**: O SDK Infinite Sessions cria um workspace próprio
+(`~/.copilot/session-state/{sessionId}/`) com `checkpoints/`, `plan.md`, `files/`. O hook system
+cria `.github/hooks/state/session.json`. Duas fontes de verdade.
 
 **Resolução proposta**:
 
@@ -603,7 +653,8 @@ Hierarquia de state:
                                          Nunca ler como fonte de verdade de compliance
 ```
 
-A SDK session-bridge deve sempre ler `.github/hooks/state/session.json` para dados de compliance. O SDK workspace é apenas para context window management (compactação, checkpoints de LLM).
+A SDK session-bridge deve sempre ler `.github/hooks/state/session.json` para dados de compliance. O
+SDK workspace é apenas para context window management (compactação, checkpoints de LLM).
 
 ### 8.3 Loop de sub-delegação
 
@@ -616,25 +667,28 @@ A SDK session-bridge deve sempre ler `.github/hooks/state/session.json` para dad
 const MAX_DELEGATION_DEPTH = 2;
 
 export async function createSubSession(depth = 0, config) {
-    if (depth >= MAX_DELEGATION_DEPTH) {
-        throw new Error(`Delegation depth limit (${MAX_DELEGATION_DEPTH}) exceeded`);
-    }
-    // ... cria sessão com depth+1 injetado no systemMessage
+  if (depth >= MAX_DELEGATION_DEPTH) {
+    throw new Error(`Delegation depth limit (${MAX_DELEGATION_DEPTH}) exceeded`);
+  }
+  // ... cria sessão com depth+1 injetado no systemMessage
 }
 ```
 
-O nível de delegação atual é rastreado no `session.json` (campo `subagent_depth`) via SubagentStart/Stop hooks.
+O nível de delegação atual é rastreado no `session.json` (campo `subagent_depth`) via
+SubagentStart/Stop hooks.
 
 ### 8.4 Autenticação em diferentes contextos
 
-**Risco**: Eu (VS Code Copilot) uso credenciais do usuário logado no VS Code. Sub-sessões SDK precisam de token válido.
+**Risco**: Eu (VS Code Copilot) uso credenciais do usuário logado no VS Code. Sub-sessões SDK
+precisam de token válido.
 
-**Resolução**: Usar a variável de ambiente `GITHUB_TOKEN` (já disponível no devcontainer) como autenticação das sub-sessões SDK. O devcontainer já tem o token do usuário logado via `gh auth`.
+**Resolução**: Usar a variável de ambiente `GITHUB_TOKEN` (já disponível no devcontainer) como
+autenticação das sub-sessões SDK. O devcontainer já tem o token do usuário logado via `gh auth`.
 
 ```javascript
 const client = new CopilotClient({
-    githubToken: process.env.GITHUB_TOKEN,
-    useLoggedInUser: false,
+  githubToken: process.env.GITHUB_TOKEN,
+  useLoggedInUser: false,
 });
 ```
 
@@ -644,7 +698,8 @@ const client = new CopilotClient({
 
 ### 9.1 Injeção de contexto do hook system em todo SDK session
 
-Toda sessão SDK deve receber o contexto atual do hook system via `systemMessage`. Esse é o elo fundamental entre mim (coordenador) e os sub-agentes:
+Toda sessão SDK deve receber o contexto atual do hook system via `systemMessage`. Esse é o elo
+fundamental entre mim (coordenador) e os sub-agentes:
 
 ```javascript
 // src/agent/session-factory.js
@@ -655,45 +710,47 @@ const BRIEFING = '.github/hooks/state/session-briefing.md';
 const STATE = '.github/hooks/state/session.json';
 
 function buildSystemMessageContent() {
-    const parts = [];
+  const parts = [];
 
-    if (existsSync(BRIEFING)) {
-        parts.push('## Contexto da Sessão\n\n' + readFileSync(BRIEFING, 'utf8'));
-    }
+  if (existsSync(BRIEFING)) {
+    parts.push('## Contexto da Sessão\n\n' + readFileSync(BRIEFING, 'utf8'));
+  }
 
-    if (existsSync(STATE)) {
-        const state = JSON.parse(readFileSync(STATE, 'utf8'));
-        const consecutive = state?.compliance?.consecutive_unauthorized ?? 0;
-        const turnNum = state?.current_turn?.number ?? 0;
-        const closeKey = state?.close_key ?? 'N/A';
+  if (existsSync(STATE)) {
+    const state = JSON.parse(readFileSync(STATE, 'utf8'));
+    const consecutive = state?.compliance?.consecutive_unauthorized ?? 0;
+    const turnNum = state?.current_turn?.number ?? 0;
+    const closeKey = state?.close_key ?? 'N/A';
 
-        parts.push([
-            '\n## Estado de Compliance',
-            `- Turno atual: #${turnNum}`,
-            `- Consecutivos sem vscode_askQuestions: ${consecutive}`,
-            `- close_key: \`${closeKey}\``,
-            '',
-            '**Protocolo obrigatório**: Encerre cada turno com `vscode_askQuestions`.',
-        ].join('\n'));
-    }
+    parts.push(
+      [
+        '\n## Estado de Compliance',
+        `- Turno atual: #${turnNum}`,
+        `- Consecutivos sem vscode_askQuestions: ${consecutive}`,
+        `- close_key: \`${closeKey}\``,
+        '',
+        '**Protocolo obrigatório**: Encerre cada turno com `vscode_askQuestions`.',
+      ].join('\n'),
+    );
+  }
 
-    return parts.join('\n\n');
+  return parts.join('\n\n');
 }
 
 export async function createEnrichedSession(client, config = {}) {
-    return client.createSession({
-        ...config,
-        model: config.model ?? 'gpt-4.1',
-        systemMessage: {
-            mode: 'customize',
-            sections: {
-                guidelines: {
-                    action: 'append',
-                    content: buildSystemMessageContent(),
-                },
-            },
+  return client.createSession({
+    ...config,
+    model: config.model ?? 'gpt-4.1',
+    systemMessage: {
+      mode: 'customize',
+      sections: {
+        guidelines: {
+          action: 'append',
+          content: buildSystemMessageContent(),
         },
-    });
+      },
+    },
+  });
 }
 ```
 
@@ -709,50 +766,66 @@ import { readFileSync } from 'node:fs';
 const HOOK_DIR = '.github/hooks';
 
 export const addTask = defineTool('hook_add_task', {
-    description: 'Adiciona tarefa ao pending-tasks.md do hook system. Use em vez de bash add-task.sh.',
-    parameters: z.object({
-        title: z.string().describe('Título da tarefa'),
-        status: z.enum(['not-started', 'in-progress', 'completed']).default('not-started'),
-    }),
-    skipPermission: true,
-    handler: async ({ title, status }) => {
-        const result = execFileSync(
-            `${HOOK_DIR}/scripts/add-task.sh`,
-            [title, status ?? 'not-started'],
-            { encoding: 'utf8', timeout: 10_000 }
-        );
-        return { success: true, output: result.trim() };
-    },
+  description:
+    'Adiciona tarefa ao pending-tasks.md do hook system. Use em vez de bash add-task.sh.',
+  parameters: z.object({
+    title: z.string().describe('Título da tarefa'),
+    status: z.enum(['not-started', 'in-progress', 'completed']).default('not-started'),
+  }),
+  skipPermission: true,
+  handler: async ({ title, status }) => {
+    const result = execFileSync(
+      `${HOOK_DIR}/scripts/add-task.sh`,
+      [title, status ?? 'not-started'],
+      { encoding: 'utf8', timeout: 10_000 },
+    );
+    return { success: true, output: result.trim() };
+  },
 });
 
 export const getSessionState = defineTool('hook_get_session_state', {
-    description: 'Lê o session.json atual do hook system. Retorna compliance, turn count, close_key.',
-    parameters: z.object({
-        fields: z.array(z.string()).optional().describe('Campos específicos (jq paths). Ex: [".close_key", ".compliance"]'),
-    }),
-    skipPermission: true,
-    handler: async ({ fields }) => {
-        const state = JSON.parse(readFileSync(`${HOOK_DIR}/state/session.json`, 'utf8'));
-        if (!fields?.length) {
-            return state;
-        }
-        return Object.fromEntries(
-            fields.map(f => [f, execSync(`jq -r '${f}' ${HOOK_DIR}/state/session.json`, { encoding: 'utf8' }).trim()])
-        );
-    },
+  description: 'Lê o session.json atual do hook system. Retorna compliance, turn count, close_key.',
+  parameters: z.object({
+    fields: z
+      .array(z.string())
+      .optional()
+      .describe('Campos específicos (jq paths). Ex: [".close_key", ".compliance"]'),
+  }),
+  skipPermission: true,
+  handler: async ({ fields }) => {
+    const state = JSON.parse(readFileSync(`${HOOK_DIR}/state/session.json`, 'utf8'));
+    if (!fields?.length) {
+      return state;
+    }
+    return Object.fromEntries(
+      fields.map((f) => [
+        f,
+        execSync(`jq -r '${f}' ${HOOK_DIR}/state/session.json`, { encoding: 'utf8' }).trim(),
+      ]),
+    );
+  },
 });
 
 export const getAuditTail = defineTool('hook_get_audit_tail', {
-    description: 'Retorna as últimas N linhas do audit.jsonl',
-    parameters: z.object({ lines: z.number().int().min(1).max(100).default(20) }),
-    skipPermission: true,
-    handler: async ({ lines }) => {
-        const result = execSync(
-            `tail -${lines} ${HOOK_DIR}/logs/audit.jsonl 2>/dev/null || echo '[]'`,
-            { encoding: 'utf8' }
-        );
-        return result.trim().split('\n').map(l => { try { return JSON.parse(l); } catch { return l; } });
-    },
+  description: 'Retorna as últimas N linhas do audit.jsonl',
+  parameters: z.object({ lines: z.number().int().min(1).max(100).default(20) }),
+  skipPermission: true,
+  handler: async ({ lines }) => {
+    const result = execSync(
+      `tail -${lines} ${HOOK_DIR}/logs/audit.jsonl 2>/dev/null || echo '[]'`,
+      { encoding: 'utf8' },
+    );
+    return result
+      .trim()
+      .split('\n')
+      .map((l) => {
+        try {
+          return JSON.parse(l);
+        } catch {
+          return l;
+        }
+      });
+  },
 });
 ```
 
@@ -765,40 +838,40 @@ import { readFileSync, existsSync } from 'node:fs';
 const STATE_FILE = '.github/hooks/state/session.json';
 
 function readComplianceState() {
-    if (!existsSync(STATE_FILE)) return { consecutive: 0 };
-    try {
-        const state = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
-        return {
-            consecutive: state?.compliance?.consecutive_unauthorized ?? 0,
-            strictClose: state?.strict_turn_close ?? true,
-            pendingClose: state?.pending_session_close ?? false,
-        };
-    } catch {
-        return { consecutive: 0 };
-    }
+  if (!existsSync(STATE_FILE)) return { consecutive: 0 };
+  try {
+    const state = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+    return {
+      consecutive: state?.compliance?.consecutive_unauthorized ?? 0,
+      strictClose: state?.strict_turn_close ?? true,
+      pendingClose: state?.pending_session_close ?? false,
+    };
+  } catch {
+    return { consecutive: 0 };
+  }
 }
 
 export function createHookAwarePermissionHandler() {
-    return (request, invocation) => {
-        const compliance = readComplianceState();
+  return (request, invocation) => {
+    const compliance = readComplianceState();
 
-        // Bloquear se sessão pendente de fechar
-        if (compliance.pendingClose && request.kind === 'shell') {
-            return { kind: 'denied-by-rules' };
-        }
+    // Bloquear se sessão pendente de fechar
+    if (compliance.pendingClose && request.kind === 'shell') {
+      return { kind: 'denied-by-rules' };
+    }
 
-        // Bloquear tool_complete equivalente sem ask_questions (analogia)
-        if (request.toolName === 'task_complete' && compliance.consecutive >= 3) {
-            return { kind: 'denied-by-rules' };
-        }
+    // Bloquear tool_complete equivalente sem ask_questions (analogia)
+    if (request.toolName === 'task_complete' && compliance.consecutive >= 3) {
+      return { kind: 'denied-by-rules' };
+    }
 
-        // Negar comandos shell suspeitos (mesmo que hooks shell também bloqueiem)
-        if (request.kind === 'shell' && request.fullCommandText?.includes('session-close.sh')) {
-            return { kind: 'denied-by-rules' };
-        }
+    // Negar comandos shell suspeitos (mesmo que hooks shell também bloqueiem)
+    if (request.kind === 'shell' && request.fullCommandText?.includes('session-close.sh')) {
+      return { kind: 'denied-by-rules' };
+    }
 
-        return { kind: 'approved' };
-    };
+    return { kind: 'approved' };
+  };
 }
 ```
 
@@ -868,7 +941,8 @@ src/tools/hook-tools.js             # 5 Custom Tools do hook system
 src/agent/permission-handler.js     # Handler ciente de compliance
 ```
 
-**Resultado**: Eu (Copilot) posso chamar `hook_add_task()`, `hook_get_session_state()`, etc. como tools nativas — sem precisar de `bash .github/hooks/scripts/...`.
+**Resultado**: Eu (Copilot) posso chamar `hook_add_task()`, `hook_get_session_state()`, etc. como
+tools nativas — sem precisar de `bash .github/hooks/scripts/...`.
 
 ### Fase 2 — Sub-delegação LLM (2-3 dias)
 
@@ -878,7 +952,8 @@ src/tools/analysis-tools.js          # sdk_run_analysis_task, sdk_parallel_analy
 src/missions/sdk-mission.js          # Missão que usa SDK como executor
 ```
 
-**Resultado**: Eu posso delegar sub-tarefas a sub-agentes LLM via tool call, receber resultado estruturado, e coordenar o resultado final.
+**Resultado**: Eu posso delegar sub-tarefas a sub-agentes LLM via tool call, receber resultado
+estruturado, e coordenar o resultado final.
 
 ### Fase 3 — MCP Server (1 semana)
 
@@ -896,7 +971,8 @@ src/agent/scheduled-missions.js      # Agendamento via PM2/cron
 src/server/sdk-events.js             # Streaming de eventos SDK para o dashboard
 ```
 
-**Resultado**: Missões executadas automaticamente sem presença humana; dashboard mostra progresso em tempo real.
+**Resultado**: Missões executadas automaticamente sem presença humana; dashboard mostra progresso em
+tempo real.
 
 ---
 
@@ -904,12 +980,16 @@ src/server/sdk-events.js             # Streaming de eventos SDK para o dashboard
 
 ### O erro conceitual a evitar
 
-Um erro seria pensar que "integrar o SDK" significa substituir os hooks shell por hooks JavaScript. Isso quebraria o compliance enforcement (que depende de shell para ser invariante à linguagem usada pelo agente).
+Um erro seria pensar que "integrar o SDK" significa substituir os hooks shell por hooks JavaScript.
+Isso quebraria o compliance enforcement (que depende de shell para ser invariante à linguagem usada
+pelo agente).
 
 ### O design correto
 
-1. **Hook system shell = infra invariante** — corre em qualquer sessão, qualquer modelo, não pode ser bypass
-2. **Eu (VS Code Copilot) = coordenador** — decido estratégia, tenho visão holística, sintetizo resultados
+1. **Hook system shell = infra invariante** — corre em qualquer sessão, qualquer modelo, não pode
+   ser bypass
+2. **Eu (VS Code Copilot) = coordenador** — decido estratégia, tenho visão holística, sintetizo
+   resultados
 3. **SDK Node.js = executor programático** — para sub-tarefas, automação, testes de longa duração
 4. **Custom Tools SDK = interface tipada** — eu acesso o hook system sem `bash`, com validação Zod
 5. **MCP Server = ponte universal** — qualquer cliente LLM pode usar o hook system
@@ -939,11 +1019,15 @@ A documentação oficial de billing do GitHub Copilot classifica assim:
 | **Copilot coding agent**     | 1 PR por **sessão** (não por mensagem!)                |
 | **BYOK (qualquer provider)** | Não conta para GitHub — cobrado no provider externo    |
 
-**Implicação para o SDK**: quando usa autenticação GitHub Copilot (não BYOK), o SDK comunica via Copilot CLI → billing é **por prompt enviado**, não por sessão criada.
+**Implicação para o SDK**: quando usa autenticação GitHub Copilot (não BYOK), o SDK comunica via
+Copilot CLI → billing é **por prompt enviado**, não por sessão criada.
 
-O `resumeSession()` reutiliza a sessão persistida em disco, mas cada `session.send()` dentro dela ainda conta como 1 novo premium request.
+O `resumeSession()` reutiliza a sessão persistida em disco, mas cada `session.send()` dentro dela
+ainda conta como 1 novo premium request.
 
-**Única exceção**: se o SDK fosse classificado como "Copilot coding agent", seriam 1 PR por sessão — mas atualmente a documentação não classifica o SDK nessa categoria separada. Trata-se de CLI billing.
+**Única exceção**: se o SDK fosse classificado como "Copilot coding agent", seriam 1 PR por sessão —
+mas atualmente a documentação não classifica o SDK nessa categoria separada. Trata-se de CLI
+billing.
 
 ### 14.2 Mapa de custo: o que custa e o que não custa
 
@@ -967,9 +1051,11 @@ CUSTO > 0 — modelos premium via Copilot auth:
 
 ### 14.3 Padrão "Sessão Extremamente Persistente"
 
-O objetivo é: **criar a sessão uma vez e reutilizá-la por dias ou semanas**, sem custo de criação recorrente.
+O objetivo é: **criar a sessão uma vez e reutilizá-la por dias ou semanas**, sem custo de criação
+recorrente.
 
-O SDK tem `resumeSession()` exatamente para isso. Com **Infinite Sessions habilitado**, o CLI gerencia a compactação de contexto automaticamente — a sessão pode durar indefinidamente.
+O SDK tem `resumeSession()` exatamente para isso. Com **Infinite Sessions habilitado**, o CLI
+gerencia a compactação de contexto automaticamente — a sessão pode durar indefinidamente.
 
 ```javascript
 // src/agent/persistent-session-manager.js
@@ -979,71 +1065,78 @@ import { CopilotClient, approveAll } from '@github/copilot-sdk';
 const SESSION_ID_FILE = '.github/hooks/state/sdk-session-id.json';
 
 export class PersistentSessionManager {
-    #client = null;
-    #session = null;
+  #client = null;
+  #session = null;
 
-    async initialize() {
-        this.#client = new CopilotClient({
-            // BYOK Ollama: custo zero garantido
-            // Remover para usar GPT-4.1 (custo zero em plano pago)
+  async initialize() {
+    this.#client = new CopilotClient({
+      // BYOK Ollama: custo zero garantido
+      // Remover para usar GPT-4.1 (custo zero em plano pago)
+    });
+    await this.#client.start();
+  }
+
+  async getOrCreateSession(config = {}) {
+    const savedState = this.#readSavedSession();
+
+    if (savedState?.sessionId) {
+      try {
+        // REUTILIZA sessão existente — não cria nova
+        this.#session = await this.#client.resumeSession(savedState.sessionId, {
+          onPermissionRequest: approveAll,
+          ...config,
         });
-        await this.#client.start();
-    }
-
-    async getOrCreateSession(config = {}) {
-        const savedState = this.#readSavedSession();
-
-        if (savedState?.sessionId) {
-            try {
-                // REUTILIZA sessão existente — não cria nova
-                this.#session = await this.#client.resumeSession(savedState.sessionId, {
-                    onPermissionRequest: approveAll,
-                    ...config,
-                });
-                return this.#session;
-            } catch {
-                // Sessão expirou ou foi deletada — cria nova
-            }
-        }
-
-        // Cria sessão nova
-        this.#session = await this.#client.createSession({
-            model: 'gpt-4.1',             // Custo zero em plano pago
-            onPermissionRequest: approveAll,
-            infiniteSessions: {
-                enabled: true,
-                backgroundCompactionThreshold: 0.75, // Compacta aos 75%
-                bufferExhaustionThreshold: 0.95,
-            },
-            ...config,
-        });
-
-        // Persiste ID para reutilizações futuras
-        this.#saveSavedSession({ sessionId: this.#session.sessionId });
         return this.#session;
+      } catch {
+        // Sessão expirou ou foi deletada — cria nova
+      }
     }
 
-    #readSavedSession() {
-        if (!existsSync(SESSION_ID_FILE)) return null;
-        try { return JSON.parse(readFileSync(SESSION_ID_FILE, 'utf8')); } catch { return null; }
-    }
+    // Cria sessão nova
+    this.#session = await this.#client.createSession({
+      model: 'gpt-4.1', // Custo zero em plano pago
+      onPermissionRequest: approveAll,
+      infiniteSessions: {
+        enabled: true,
+        backgroundCompactionThreshold: 0.75, // Compacta aos 75%
+        bufferExhaustionThreshold: 0.95,
+      },
+      ...config,
+    });
 
-    #saveSavedSession(data) {
-        writeFileSync(SESSION_ID_FILE, JSON.stringify(data, null, 2));
-    }
+    // Persiste ID para reutilizações futuras
+    this.#saveSavedSession({ sessionId: this.#session.sessionId });
+    return this.#session;
+  }
 
-    async stop() {
-        if (this.#session) await this.#session.disconnect(); // Preserva dados em disco
-        if (this.#client) await this.#client.stop();
+  #readSavedSession() {
+    if (!existsSync(SESSION_ID_FILE)) return null;
+    try {
+      return JSON.parse(readFileSync(SESSION_ID_FILE, 'utf8'));
+    } catch {
+      return null;
     }
+  }
+
+  #saveSavedSession(data) {
+    writeFileSync(SESSION_ID_FILE, JSON.stringify(data, null, 2));
+  }
+
+  async stop() {
+    if (this.#session) await this.#session.disconnect(); // Preserva dados em disco
+    if (this.#client) await this.#client.stop();
+  }
 }
 ```
 
-**Resultado**: A sessão persiste entre execuções. No próximo dia, semana, ou mês, `resumeSession()` retoma do ponto onde parou. O Infinite Sessions gerencia a compactação de contexto automatically. **Custo de criação: 1× por vida da sessão**.
+**Resultado**: A sessão persiste entre execuções. No próximo dia, semana, ou mês, `resumeSession()`
+retoma do ponto onde parou. O Infinite Sessions gerencia a compactação de contexto automatically.
+**Custo de criação: 1× por vida da sessão**.
 
 ### 14.4 Padrão "Zero-Cost Tool Execution" — Custom Tools como handlers puros
 
-A ideia central: **80% das operações que eu precisaria delegar ao LLM são executáveis em Node.js puro**, sem LLM algum. Apenas Custom Tools.
+A ideia central: **80% das operações que eu precisaria delegar ao LLM são executáveis em Node.js
+puro**, sem LLM algum. Apenas Custom Tools.
 
 ```
 Tarefa: "Identifique todos os arquivos com erros de lint"
@@ -1056,30 +1149,31 @@ Tarefa: "Identifique todos os arquivos com erros de lint"
           Custo: 0 PRs (é apenas meu tool call, não uma sessão nova)
 ```
 
-O custo de **invocar um Custom Tool** é **zero** — o tool handler roda localmente, e o resultado volta para mim (o coordenador) para síntese. A única PR consumida é minha resposta ao usuário.
+O custo de **invocar um Custom Tool** é **zero** — o tool handler roda localmente, e o resultado
+volta para mim (o coordenador) para síntese. A única PR consumida é minha resposta ao usuário.
 
 ```javascript
 // Tabela de decisão: quando usar LLM vs Custom Tool Node.js
 const ZERO_COST_OPERATIONS = [
-    'lint_check',           // execSync npm run lint
-    'typecheck',            // execSync npx tsc --noEmit
-    'run_tests',            // execSync npm test
-    'read_session_state',   // readFileSync session.json
-    'add_task',             // execFileSync add-task.sh
-    'complete_task',        // execFileSync complete-task.sh
-    'get_audit_trail',      // readFileSync audit.jsonl
-    'git_status',           // execSync git status
-    'git_diff',             // execSync git diff
-    'file_search',          // glob/fs.readdirSync
-    'grep_code',            // execSync grep -r ...
+  'lint_check', // execSync npm run lint
+  'typecheck', // execSync npx tsc --noEmit
+  'run_tests', // execSync npm test
+  'read_session_state', // readFileSync session.json
+  'add_task', // execFileSync add-task.sh
+  'complete_task', // execFileSync complete-task.sh
+  'get_audit_trail', // readFileSync audit.jsonl
+  'git_status', // execSync git status
+  'git_diff', // execSync git diff
+  'file_search', // glob/fs.readdirSync
+  'grep_code', // execSync grep -r ...
 ];
 
 // Apenas chama sub-sessão LLM quando necessário interpretação semântica
 const NEEDS_LLM = [
-    'semantic_code_review',
-    'architecture_analysis',
-    'security_audit',
-    'refactoring_suggestions',
+  'semantic_code_review',
+  'architecture_analysis',
+  'security_audit',
+  'refactoring_suggestions',
 ];
 ```
 
@@ -1090,20 +1184,21 @@ Para operações que **precisam** de raciocínio LLM mas não exigem máxima qua
 ```javascript
 // src/agent/ollama-session-factory.js
 export async function createOllamaSession(client, config = {}) {
-    return client.createSession({
-        model: process.env.OLLAMA_MODEL ?? 'qwen2.5-coder:7b',
-        provider: {
-            type: 'openai',
-            baseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434/v1',
-        },
-        infiniteSessions: { enabled: true },
-        onPermissionRequest: approveAll,
-        ...config,
-    });
+  return client.createSession({
+    model: process.env.OLLAMA_MODEL ?? 'qwen2.5-coder:7b',
+    provider: {
+      type: 'openai',
+      baseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434/v1',
+    },
+    infiniteSessions: { enabled: true },
+    onPermissionRequest: approveAll,
+    ...config,
+  });
 }
 ```
 
 **Casos de uso ideais para Ollama (custo zero, qualidade adequada)**:
+
 - Geração de sumários de código
 - Identificação de padrões e anomalias em JSON/logs
 - Geração de mensagens de commit
@@ -1164,7 +1259,8 @@ export async function createOllamaSession(client, config = {}) {
 | Minha resposta final        | 1 PR                  | 1 PR                       |
 | **Total**                   | **~15-25 PRs**        | **~2 PRs**                 |
 
-**A redução é de 85-90% de premium requests** para um sprint típico, mantendo a qualidade das decisões estratégicas (ainda resolvidas por mim — o coordenador de máxima qualidade).
+**A redução é de 85-90% de premium requests** para um sprint típico, mantendo a qualidade das
+decisões estratégicas (ainda resolvidas por mim — o coordenador de máxima qualidade).
 
 ### 14.8 Sessão SDK "eternas" via Infinite Sessions
 
@@ -1173,20 +1269,20 @@ O SDK explicitamente suporta sessões de longa duração com compactação de co
 ```javascript
 // Sessão que pode durar semanas sem expirar
 const session = await client.createSession({
-    model: 'gpt-4.1',     // custo zero
-    infiniteSessions: {
-        enabled: true,
-        backgroundCompactionThreshold: 0.75,  // Compacta silenciosamente
-        bufferExhaustionThreshold: 0.95,
-    },
+  model: 'gpt-4.1', // custo zero
+  infiniteSessions: {
+    enabled: true,
+    backgroundCompactionThreshold: 0.75, // Compacta silenciosamente
+    bufferExhaustionThreshold: 0.95,
+  },
 });
 
 // Eventos de compactação para monitoramento
 session.on('session.compaction_start', () => {
-    console.log('Compactando contexto em background...');
+  console.log('Compactando contexto em background...');
 });
 session.on('session.compaction_complete', (event) => {
-    console.log(`Compactado: ${event.data.tokensFreed} tokens liberados`);
+  console.log(`Compactado: ${event.data.tokensFreed} tokens liberados`);
 });
 
 // Salva ID para retomar depois
@@ -1195,19 +1291,21 @@ const sessionId = session.sessionId;
 
 // No dia seguinte:
 const resumed = await client.resumeSession(sessionId, {
-    onPermissionRequest: approveAll,
+  onPermissionRequest: approveAll,
 });
 // O contexto da semana anterior ainda está disponível (compactado, mas acessível)
 ```
 
 **Propriedades de uma sessão "eterna"**:
+
 - Persiste em `~/.copilot/session-state/{sessionId}/` — sobrevive a reboot do container
 - `checkpoints/` contém snapshots de estado
 - `plan.md` — o agente pode manter um plano de longo prazo atualizado automaticamente
 - `files/` — arquivos intermediários de trabalho
 - Compactação automática = sem limite de contexto na prática
 
-**Integração com o hook system**: o `session-briefing.md` atual seria injetado como contexto na retomada, garantindo que a sessão eterna conhece o estado de compliance atual.
+**Integração com o hook system**: o `session-briefing.md` atual seria injetado como contexto na
+retomada, garantindo que a sessão eterna conhece o estado de compliance atual.
 
 ### 14.9 LLMs de custo zero recomendados para este projeto
 
@@ -1221,9 +1319,11 @@ Com base nos modelos disponíveis via Ollama (já testados no projeto):
 | `phi4-mini`             | ~2GB VRAM  | Raciocínio rápido           | 0            |
 | `deepseek-coder-v2:16b` | ~10GB VRAM | Code review avançado        | 0            |
 
-**Todos os modelos Ollama têm custo zero para GitHub Copilot** — qualquer inferência local não consome premium requests.
+**Todos os modelos Ollama têm custo zero para GitHub Copilot** — qualquer inferência local não
+consome premium requests.
 
-**Para automações noturnas/programadas**: usar `qwen2.5-coder:14b` via Ollama — zero custo, qualidade adequada para análise de sprint, geração de relatórios, health checks automáticos.
+**Para automações noturnas/programadas**: usar `qwen2.5-coder:14b` via Ollama — zero custo,
+qualidade adequada para análise de sprint, geração de relatórios, health checks automáticos.
 
 ### 14.10 Conclusão da análise de custo zero
 
@@ -1237,6 +1337,7 @@ Com base nos modelos disponíveis via Ollama (já testados no projeto):
 | Sessão persistida + resume | Reutilização multi-dia                 | **0 PRs** adicionais para criar |
 
 **A arquitetura ideal para custo zero**:
+
 1. Eu (VS Code) sou o único ponto onde PRs são consumidos (1 por turno seu)
 2. Custom Tools cobrem 70% das operações — custo sempre zero
 3. Ollama BYOK cobre 20% (operações que precisam de LLM, sem custo GitHub)
@@ -1247,8 +1348,8 @@ Com base nos modelos disponíveis via Ollama (já testados no projeto):
 
 ## 15. Arquitetura "Sessão Suspensa" — Inspirada em `vscode_askQuestions`
 
-> Esta seção analisa o padrão mais poderoso e inovador para redução de custo: a **sessão como
-> estado suspenso**, onde o modelo aguarda input sem consumir novos PRs.
+> Esta seção analisa o padrão mais poderoso e inovador para redução de custo: a **sessão como estado
+> suspenso**, onde o modelo aguarda input sem consumir novos PRs.
 
 ### 15.1 O que `vscode_askQuestions` revela sobre billing
 
@@ -1279,7 +1380,9 @@ Você → Eu (1 PR consumido no início do turno)
        [um único PR pode sustentar dezenas de iterações]
 ```
 
-**Em um dia de trabalho**: você envia **1 prompt inicial** pela manhã. Eu processo, trabalho, pergunto, você responde, eu trabalho mais, pergunto de novo — **tudo no mesmo PR**. O billing é pelo prompt inicial, não pelas iterações.
+**Em um dia de trabalho**: você envia **1 prompt inicial** pela manhã. Eu processo, trabalho,
+pergunto, você responde, eu trabalho mais, pergunto de novo — **tudo no mesmo PR**. O billing é pelo
+prompt inicial, não pelas iterações.
 
 ### 15.2 A estrutura técnica da "sessão suspensa"
 
@@ -1293,23 +1396,23 @@ O mecanismo equivalente no SDK é o `onUserInputRequest`:
 
 ```javascript
 const session = await client.createSession({
-    model: 'gpt-4.1',   // custo zero (mulitplicador = 0)
+  model: 'gpt-4.1', // custo zero (mulitplicador = 0)
 
-    // Este handler é o equivalente SDK do vscode_askQuestions
-    // Quando o modelo invoca ask_user(), este callback é chamado
-    // O modelo espera — sem consumir novo PR
-    onUserInputRequest: async (request, invocation) => {
-        // O modelo está "suspenso" aqui — aguardando input
-        // Sem novo PR sendo consumido enquanto aguarda
+  // Este handler é o equivalente SDK do vscode_askQuestions
+  // Quando o modelo invoca ask_user(), este callback é chamado
+  // O modelo espera — sem consumir novo PR
+  onUserInputRequest: async (request, invocation) => {
+    // O modelo está "suspenso" aqui — aguardando input
+    // Sem novo PR sendo consumido enquanto aguarda
 
-        console.log(`Modelo pergunta: ${request.question}`);
+    console.log(`Modelo pergunta: ${request.question}`);
 
-        // Em cenário interativo: lê do stdin do usuário
-        // Em cenário automatizado: responde com dados de contexto
-        const userAnswer = await readFromUserOrContext(request);
+    // Em cenário interativo: lê do stdin do usuário
+    // Em cenário automatizado: responde com dados de contexto
+    const userAnswer = await readFromUserOrContext(request);
 
-        return { answer: userAnswer, wasFreeform: true };
-    },
+    return { answer: userAnswer, wasFreeform: true };
+  },
 });
 ```
 
@@ -1353,53 +1456,53 @@ import { createInterface } from 'node:readline';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 export class LongRunningWorker {
-    #client;
-    #session;
-    #interactionCount = 0;
-    #prConsumed = 0;
+  #client;
+  #session;
+  #interactionCount = 0;
+  #prConsumed = 0;
 
-    async start(initialPrompt, { sessionId } = {}) {
-        this.#client = new CopilotClient();
-        await this.#client.start();
+  async start(initialPrompt, { sessionId } = {}) {
+    this.#client = new CopilotClient();
+    await this.#client.start();
 
-        if (sessionId) {
-            // Reutiliza sessão existente — 0 PRs adicionais para criar
-            this.#session = await this.#client.resumeSession(sessionId, {
-                onPermissionRequest: approveAll,
-                onUserInputRequest: this.#handleUserInput.bind(this),
-            });
-        } else {
-            this.#session = await this.#client.createSession({
-                model: 'gpt-4.1',        // Custo 0 (multiplicador zero)
-                onPermissionRequest: approveAll,
-                onUserInputRequest: this.#handleUserInput.bind(this), // ← CHAVE
-                infiniteSessions: { enabled: true },
-            });
-        }
-
-        // 1 PR consumido aqui — e apenas aqui
-        this.#prConsumed = 1;
-        await this.#session.sendAndWait({ prompt: initialPrompt });
+    if (sessionId) {
+      // Reutiliza sessão existente — 0 PRs adicionais para criar
+      this.#session = await this.#client.resumeSession(sessionId, {
+        onPermissionRequest: approveAll,
+        onUserInputRequest: this.#handleUserInput.bind(this),
+      });
+    } else {
+      this.#session = await this.#client.createSession({
+        model: 'gpt-4.1', // Custo 0 (multiplicador zero)
+        onPermissionRequest: approveAll,
+        onUserInputRequest: this.#handleUserInput.bind(this), // ← CHAVE
+        infiniteSessions: { enabled: true },
+      });
     }
 
-    // Este método é chamado quando o modelo "suspende" aguardando input
-    // Sem novo PR — estamos dentro do mesmo turno
-    async #handleUserInput(request) {
-        this.#interactionCount++;
-        console.log(`\n[Iteração #${this.#interactionCount}] Modelo pergunta:`);
-        console.log(request.question);
+    // 1 PR consumido aqui — e apenas aqui
+    this.#prConsumed = 1;
+    await this.#session.sendAndWait({ prompt: initialPrompt });
+  }
 
-        // Pode ser: readline interativo, webhook, polling de arquivo, etc.
-        const answer = await this.#readFromChannel(request);
-        return { answer, wasFreeform: true };
-    }
+  // Este método é chamado quando o modelo "suspende" aguardando input
+  // Sem novo PR — estamos dentro do mesmo turno
+  async #handleUserInput(request) {
+    this.#interactionCount++;
+    console.log(`\n[Iteração #${this.#interactionCount}] Modelo pergunta:`);
+    console.log(request.question);
 
-    async #readFromChannel(request) {
-        // Opção A: interativo (readline)
-        // Opção B: ler de arquivo de "mailbox" (veja Seção 15.5)
-        // Opção C: webhook HTTP (veja Seção 15.6)
-        return readMailboxOrConversation(request.question);
-    }
+    // Pode ser: readline interativo, webhook, polling de arquivo, etc.
+    const answer = await this.#readFromChannel(request);
+    return { answer, wasFreeform: true };
+  }
+
+  async #readFromChannel(request) {
+    // Opção A: interativo (readline)
+    // Opção B: ler de arquivo de "mailbox" (veja Seção 15.5)
+    // Opção C: webhook HTTP (veja Seção 15.6)
+    return readMailboxOrConversation(request.question);
+  }
 }
 ```
 
@@ -1416,30 +1519,34 @@ const MAILBOX = '.github/hooks/state/sdk-mailbox.json';
 const RESPONSE_FILE = '.github/hooks/state/sdk-response.json';
 
 async function readMailboxOrConversation(question) {
-    // Escreve a pergunta para que sistemas externos possam respondê-la
-    writeFileSync(MAILBOX, JSON.stringify({
-        question,
-        timestamp: new Date().toISOString(),
-        waiting: true,
-    }));
+  // Escreve a pergunta para que sistemas externos possam respondê-la
+  writeFileSync(
+    MAILBOX,
+    JSON.stringify({
+      question,
+      timestamp: new Date().toISOString(),
+      waiting: true,
+    }),
+  );
 
-    // Polling: aguarda resposta no arquivo (max 24h)
-    const deadline = Date.now() + 24 * 60 * 60 * 1000;
-    while (Date.now() < deadline) {
-        if (existsSync(RESPONSE_FILE)) {
-            const response = JSON.parse(readFileSync(RESPONSE_FILE, 'utf8'));
-            if (response.timestamp > question_timestamp) {
-                unlinkSync(RESPONSE_FILE);
-                return response.answer;
-            }
-        }
-        await new Promise(r => setTimeout(r, 2000)); // Verifica a cada 2s
+  // Polling: aguarda resposta no arquivo (max 24h)
+  const deadline = Date.now() + 24 * 60 * 60 * 1000;
+  while (Date.now() < deadline) {
+    if (existsSync(RESPONSE_FILE)) {
+      const response = JSON.parse(readFileSync(RESPONSE_FILE, 'utf8'));
+      if (response.timestamp > question_timestamp) {
+        unlinkSync(RESPONSE_FILE);
+        return response.answer;
+      }
     }
-    return 'Timeout — continuar com melhor julgamento disponível';
+    await new Promise((r) => setTimeout(r, 2000)); // Verifica a cada 2s
+  }
+  return 'Timeout — continuar com melhor julgamento disponível';
 }
 ```
 
-**Implicação**: O modelo SDK pode ficar suspenso por **horas ou dias**, aguardando input via arquivo, sem custo adicional. Um shell script ou webhook escreve a resposta, e o modelo retorna.
+**Implicação**: O modelo SDK pode ficar suspenso por **horas ou dias**, aguardando input via
+arquivo, sem custo adicional. Um shell script ou webhook escreve a resposta, e o modelo retorna.
 
 ### 15.6 Padrão "HTTP Bridge" — sessão SDK controlada via API local
 
@@ -1467,7 +1574,9 @@ async function readMailboxOrConversation(question) {
 └────────────────────────────────────────────────────────────┘
 ```
 
-**Resultado revolucionário**: Uma única sessão SDK criada na segunda-feira de manhã pode durar **a semana inteira**, com você interagindo via dashboard/HTTP quando necessário. O modelo processa autonomamente entre suas intervenções. **Total de PRs para a semana: 1**.
+**Resultado revolucionário**: Uma única sessão SDK criada na segunda-feira de manhã pode durar **a
+semana inteira**, com você interagindo via dashboard/HTTP quando necessário. O modelo processa
+autonomamente entre suas intervenções. **Total de PRs para a semana: 1**.
 
 ### 15.7 Arquitetura de "Orquestração em Camadas Suspensas"
 
@@ -1508,15 +1617,15 @@ Pode processar centenas de tasks com 1 PR
 // Um agente que fica rodando permanentemente, processando tarefas de uma fila
 
 export class AlwaysAliveAgent {
-    // Criado uma vez — 1 PR total
-    // Processa N tarefas da fila sem novo PR (via onUserInputRequest)
+  // Criado uma vez — 1 PR total
+  // Processa N tarefas da fila sem novo PR (via onUserInputRequest)
 
-    async run() {
-        const session = await this.#getOrCreateSession(); // resumeSession se possível
+  async run() {
+    const session = await this.#getOrCreateSession(); // resumeSession se possível
 
-        // O agente é iniciado uma única vez com uma "meta-instrução"
-        await session.send({
-            prompt: `Você é um worker de processamento de tarefas.
+    // O agente é iniciado uma única vez com uma "meta-instrução"
+    await session.send({
+      prompt: `Você é um worker de processamento de tarefas.
 
 Sua operação:
 1. Invoque ask_user("READY") para sinalizar que está pronto
@@ -1526,36 +1635,37 @@ Sua operação:
 5. Volte para o passo 1 (loop infinito de processamento)
 
 Nunca saia do loop. Sempre invoque ask_user para comunicar estado.`,
-        });
+    });
 
-        // O modelo agora está em loop, consumindo tasks da fila
-        // Cada processamento: modelo invoca ask_user → SDK responde com próxima task
-        // Nenhum send() adicional necessário — o loop é auto-sustentado
+    // O modelo agora está em loop, consumindo tasks da fila
+    // Cada processamento: modelo invoca ask_user → SDK responde com próxima task
+    // Nenhum send() adicional necessário — o loop é auto-sustentado
+  }
+
+  async #handleUserInput(request) {
+    if (request.question === 'READY') {
+      // Modelo está pronto — fornece próxima tarefa da fila
+      const nextTask = await this.#taskQueue.dequeue();
+      if (!nextTask) {
+        await this.#taskQueue.waitForTask(5 * 60 * 1000); // espera 5 min
+        return { answer: (await this.#taskQueue.dequeue()) ?? 'STANDBY' };
+      }
+      return { answer: JSON.stringify(nextTask) };
     }
 
-    async #handleUserInput(request) {
-        if (request.question === 'READY') {
-            // Modelo está pronto — fornece próxima tarefa da fila
-            const nextTask = await this.#taskQueue.dequeue();
-            if (!nextTask) {
-                await this.#taskQueue.waitForTask(5 * 60 * 1000); // espera 5 min
-                return { answer: await this.#taskQueue.dequeue() ?? 'STANDBY' };
-            }
-            return { answer: JSON.stringify(nextTask) };
-        }
-
-        if (request.question.startsWith('RESULT:')) {
-            const result = JSON.parse(request.question.slice(7));
-            await this.#resultHandler(result);
-            return { answer: 'ACK' };  // Confirma, modelo volta para loop
-        }
-
-        return { answer: 'CONTINUE' };
+    if (request.question.startsWith('RESULT:')) {
+      const result = JSON.parse(request.question.slice(7));
+      await this.#resultHandler(result);
+      return { answer: 'ACK' }; // Confirma, modelo volta para loop
     }
+
+    return { answer: 'CONTINUE' };
+  }
 }
 ```
 
 **Este padrão cria um agente que:**
+
 1. É criado com **1 PR total** (ou 0 se resumindo sessão existente)
 2. Processa **ilimitadas tarefas** sem nenhum PR adicional
 3. Fica vivo permanentemente, aguardando novas tarefas via fila
@@ -1640,13 +1750,17 @@ Retorna: { answer: string, wasFreeform: boolean }
 2. O SDK intercepta essa chamada de ferramenta e chama o `onUserInputRequest` callback
 3. O processo Node.js aguarda o retorno do callback **sem consumir novo PR**
 4. O callback pode esperar milissegundos ou **horas** — o modelo simplesmente aguarda
-5. Quando o callback retorna, o modelo retoma processamento com a resposta como contexto de ferramenta
+5. Quando o callback retorna, o modelo retoma processamento com a resposta como contexto de
+   ferramenta
 
-**Isso é exatamente o mecanismo do `vscode_askQuestions`**: o modelo "suspende" aguardando input externo, sem billing adicional.
+**Isso é exatamente o mecanismo do `vscode_askQuestions`**: o modelo "suspende" aguardando input
+externo, sem billing adicional.
 
 ### 16.2 Por que usar Claude Sonnet (premium) pode ainda ser custo-zero no design correto
 
-**A questão do usuário é profunda**: se usar Sonnet (multiplicador 1×), cada `session.send()` custa 1 PR. Mas o design correto **elimina a necessidade de `session.send()` múltiplos** via o loop `ask_user`.
+**A questão do usuário é profunda**: se usar Sonnet (multiplicador 1×), cada `session.send()` custa
+1 PR. Mas o design correto **elimina a necessidade de `session.send()` múltiplos** via o loop
+`ask_user`.
 
 ```
 Design ERRADO (múltiplos sends):
@@ -1670,7 +1784,9 @@ Total: 1 PR independente de N
 
 **Com Claude Sonnet**: 1 PR para N tarefas. O custo é fixo, não variável com o trabalho.
 
-**Caveat importante**: Infinite Sessions compacta o contexto, mas se a sessão for interrompida (processo Node morto, reinicialização), o `session.send()` inicial precisará ser reenviado → 1 novo PR para reiniciar o loop. Estratégia para minimizar isso na seção 16.5.
+**Caveat importante**: Infinite Sessions compacta o contexto, mas se a sessão for interrompida
+(processo Node morto, reinicialização), o `session.send()` inicial precisará ser reenviado → 1 novo
+PR para reiniciar o loop. Estratégia para minimizar isso na seção 16.5.
 
 ### 16.3 Modelo completo: "Always-Alive Agent" com Sonnet
 
@@ -1691,79 +1807,78 @@ const SESSION_FILE = resolve(STATE_DIR, 'sdk-always-alive.json');
 
 // Fila de tarefas em memória (persistida em arquivo)
 export class AlwaysAliveAgent extends EventEmitter {
-    #client = null;
-    #session = null;
-    #taskQueue = [];
-    #pendingQuestion = null;
-    #pendingResolve = null;
-    #httpServer = null;
-    #state = { sessionId: null, totalTasksProcessed: 0, restartCount: 0 };
+  #client = null;
+  #session = null;
+  #taskQueue = [];
+  #pendingQuestion = null;
+  #pendingResolve = null;
+  #httpServer = null;
+  #state = { sessionId: null, totalTasksProcessed: 0, restartCount: 0 };
 
-    /** Inicializa ou retoma o agente. */
-    async start() {
-        this.#loadState();
-        mkdirSync(STATE_DIR, { recursive: true });
+  /** Inicializa ou retoma o agente. */
+  async start() {
+    this.#loadState();
+    mkdirSync(STATE_DIR, { recursive: true });
 
-        this.#client = new CopilotClient();
-        await this.#client.start();
+    this.#client = new CopilotClient();
+    await this.#client.start();
 
-        // Inicia servidor HTTP de controle (porta local)
-        this.#startHttpServer(9988);
+    // Inicia servidor HTTP de controle (porta local)
+    this.#startHttpServer(9988);
 
-        if (this.#state.sessionId) {
-            await this.#resumeOrRestart();
-        } else {
-            await this.#bootFresh();
-        }
+    if (this.#state.sessionId) {
+      await this.#resumeOrRestart();
+    } else {
+      await this.#bootFresh();
     }
+  }
 
-    /**
-     * Tenta retomar sessão existente.
-     * Se falhar (sessão expirada, etc.), reinicia do zero.
-     */
-    async #resumeOrRestart() {
-        try {
-            console.log(`[AlwaysAlive] Retomando sessão ${this.#state.sessionId}...`);
-            this.#session = await this.#client.resumeSession(this.#state.sessionId, {
-                onPermissionRequest: approveAll,
-                onUserInputRequest: this.#handleInput.bind(this),
-            });
+  /**
+   * Tenta retomar sessão existente. Se falhar (sessão expirada, etc.), reinicia do zero.
+   */
+  async #resumeOrRestart() {
+    try {
+      console.log(`[AlwaysAlive] Retomando sessão ${this.#state.sessionId}...`);
+      this.#session = await this.#client.resumeSession(this.#state.sessionId, {
+        onPermissionRequest: approveAll,
+        onUserInputRequest: this.#handleInput.bind(this),
+      });
 
-            // Sessão retomada — informa ao modelo que reinicializamos
-            // Este send() adicional custa 1 PR, mas só ocorre em reinicializações
-            await this.#session.sendAndWait({
-                prompt: 'SYSTEM_RESTART: O processo Node.js reiniciou. Retome o loop de tarefas.',
-            });
-            this.#state.restartCount++;
-            this.#saveState();
-        } catch (err) {
-            console.warn(`[AlwaysAlive] Retomada falhou (${err.message}). Criando nova sessão.`);
-            this.#state.sessionId = null;
-            await this.#bootFresh();
-        }
+      // Sessão retomada — informa ao modelo que reinicializamos
+      // Este send() adicional custa 1 PR, mas só ocorre em reinicializações
+      await this.#session.sendAndWait({
+        prompt: 'SYSTEM_RESTART: O processo Node.js reiniciou. Retome o loop de tarefas.',
+      });
+      this.#state.restartCount++;
+      this.#saveState();
+    } catch (err) {
+      console.warn(`[AlwaysAlive] Retomada falhou (${err.message}). Criando nova sessão.`);
+      this.#state.sessionId = null;
+      await this.#bootFresh();
     }
+  }
 
-    /**
-     * Cria sessão nova e inicializa o loop de trabalho.
-     * Consome 1 PR — esperamos que isso ocorra raramente (a cada dias/semanas).
-     */
-    async #bootFresh() {
-        console.log('[AlwaysAlive] Criando nova sessão (1 PR consumido)...');
-        this.#session = await this.#client.createSession({
-            model: 'claude-sonnet-4.5',   // ← Sonnet: máxima qualidade
-            onPermissionRequest: approveAll,
-            onUserInputRequest: this.#handleInput.bind(this),
-            infiniteSessions: {
-                enabled: true,
-                backgroundCompactionThreshold: 0.75,
-                bufferExhaustionThreshold: 0.90,
-            },
-            systemMessage: {
-                mode: 'customize',
-                sections: {
-                    identity: {
-                        action: 'replace',
-                        content: `Você é um agente de trabalho autônomo sempre ativo.
+  /**
+   * Cria sessão nova e inicializa o loop de trabalho. Consome 1 PR — esperamos que isso ocorra raramente (a cada
+   * dias/semanas).
+   */
+  async #bootFresh() {
+    console.log('[AlwaysAlive] Criando nova sessão (1 PR consumido)...');
+    this.#session = await this.#client.createSession({
+      model: 'claude-sonnet-4.5', // ← Sonnet: máxima qualidade
+      onPermissionRequest: approveAll,
+      onUserInputRequest: this.#handleInput.bind(this),
+      infiniteSessions: {
+        enabled: true,
+        backgroundCompactionThreshold: 0.75,
+        bufferExhaustionThreshold: 0.9,
+      },
+      systemMessage: {
+        mode: 'customize',
+        sections: {
+          identity: {
+            action: 'replace',
+            content: `Você é um agente de trabalho autônomo sempre ativo.
 
 Seu protocolo de operação:
 1. Chame ask_user("READY") para sinalizar que está pronto para receber tarefas.
@@ -1772,187 +1887,195 @@ Seu protocolo de operação:
 4. Retorne ao passo 1. NUNCA interrompa o loop.
 5. Se receber "SYSTEM_RESTART", retome imediatamente do seu último estado.
 6. Se receber "USER_MESSAGE: " + mensagem, processe como instrução direta do usuário.`,
-                    },
-                },
-            },
-        });
+          },
+        },
+      },
+    });
 
-        this.#state.sessionId = this.#session.sessionId;
-        this.#saveState();
+    this.#state.sessionId = this.#session.sessionId;
+    this.#saveState();
 
-        // Inicia o loop — este é o único `sendAndWait` "de boot"
-        await this.#session.sendAndWait({
-            prompt: 'Inicie o loop de trabalho agora. Chame ask_user("READY") imediatamente.',
-        });
+    // Inicia o loop — este é o único `sendAndWait` "de boot"
+    await this.#session.sendAndWait({
+      prompt: 'Inicie o loop de trabalho agora. Chame ask_user("READY") imediatamente.',
+    });
+  }
+
+  /**
+   * Handler de ask_user — o coração do Always-Alive. Chamado quando o modelo invoca ask_user(question). O modelo
+   * aguarda esta resposta sem custo adicional.
+   */
+  async #handleInput(request) {
+    const question = request.question;
+
+    if (question === 'READY') {
+      return this.#sendNextTask();
     }
 
-    /**
-     * Handler de ask_user — o coração do Always-Alive.
-     * Chamado quando o modelo invoca ask_user(question).
-     * O modelo aguarda esta resposta sem custo adicional.
-     */
-    async #handleInput(request) {
-        const question = request.question;
-
-        if (question === 'READY') {
-            return this.#sendNextTask();
-        }
-
-        if (question.startsWith('DONE:')) {
-            const result = this.#parseResult(question.slice(5));
-            this.#state.totalTasksProcessed++;
-            this.#saveState();
-            this.emit('task:complete', result);
-            console.log(`[AlwaysAlive] Tarefa completada. Total: ${this.#state.totalTasksProcessed}`);
-            return this.#sendNextTask();
-        }
-
-        // Pergunta genérica do modelo — expõe para HTTP Bridge
-        this.#pendingQuestion = question;
-        return new Promise(resolve => {
-            this.#pendingResolve = answer => {
-                this.#pendingQuestion = null;
-                this.#pendingResolve = null;
-                resolve({ answer, wasFreeform: true });
-            };
-        });
+    if (question.startsWith('DONE:')) {
+      const result = this.#parseResult(question.slice(5));
+      this.#state.totalTasksProcessed++;
+      this.#saveState();
+      this.emit('task:complete', result);
+      console.log(`[AlwaysAlive] Tarefa completada. Total: ${this.#state.totalTasksProcessed}`);
+      return this.#sendNextTask();
     }
 
-    /** Envia próxima tarefa da fila, ou suspende aguardando nova tarefa. */
-    async #sendNextTask() {
-        if (this.#taskQueue.length > 0) {
-            const task = this.#taskQueue.shift();
-            console.log(`[AlwaysAlive] Enviando tarefa: ${task.type}`);
-            return { answer: JSON.stringify(task), wasFreeform: false };
-        }
+    // Pergunta genérica do modelo — expõe para HTTP Bridge
+    this.#pendingQuestion = question;
+    return new Promise((resolve) => {
+      this.#pendingResolve = (answer) => {
+        this.#pendingQuestion = null;
+        this.#pendingResolve = null;
+        resolve({ answer, wasFreeform: true });
+      };
+    });
+  }
 
-        // Fila vazia — suspende até nova tarefa (sem PR)
-        console.log('[AlwaysAlive] Fila vazia. Aguardando nova tarefa...');
-        return new Promise(resolve => {
-            this.once('task:queued', task => {
-                this.#taskQueue.shift(); // Remove o que foi emitido
-                resolve({ answer: JSON.stringify(task), wasFreeform: false });
-            });
-        });
+  /** Envia próxima tarefa da fila, ou suspende aguardando nova tarefa. */
+  async #sendNextTask() {
+    if (this.#taskQueue.length > 0) {
+      const task = this.#taskQueue.shift();
+      console.log(`[AlwaysAlive] Enviando tarefa: ${task.type}`);
+      return { answer: JSON.stringify(task), wasFreeform: false };
     }
 
-    /** Adiciona tarefa à fila (chamado externamente ou via HTTP). */
-    enqueueTask(task) {
-        this.#taskQueue.push(task);
-        this.emit('task:queued', task);
-    }
+    // Fila vazia — suspende até nova tarefa (sem PR)
+    console.log('[AlwaysAlive] Fila vazia. Aguardando nova tarefa...');
+    return new Promise((resolve) => {
+      this.once('task:queued', (task) => {
+        this.#taskQueue.shift(); // Remove o que foi emitido
+        resolve({ answer: JSON.stringify(task), wasFreeform: false });
+      });
+    });
+  }
 
-    /** Inicia servidor HTTP para controle externo (usuário, VS Code, scripts). */
-    #startHttpServer(port) {
-        this.#httpServer = createServer((req, res) => {
-            res.setHeader('Content-Type', 'application/json');
+  /** Adiciona tarefa à fila (chamado externamente ou via HTTP). */
+  enqueueTask(task) {
+    this.#taskQueue.push(task);
+    this.emit('task:queued', task);
+  }
 
-            if (req.method === 'GET' && req.url === '/status') {
-                res.end(JSON.stringify({
-                    sessionId: this.#state.sessionId,
-                    totalTasksProcessed: this.#state.totalTasksProcessed,
-                    restartCount: this.#state.restartCount,
-                    queueLength: this.#taskQueue.length,
-                    pendingQuestion: this.#pendingQuestion,
-                    model: 'claude-sonnet-4.5',
-                }));
-                return;
+  /** Inicia servidor HTTP para controle externo (usuário, VS Code, scripts). */
+  #startHttpServer(port) {
+    this.#httpServer = createServer((req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+
+      if (req.method === 'GET' && req.url === '/status') {
+        res.end(
+          JSON.stringify({
+            sessionId: this.#state.sessionId,
+            totalTasksProcessed: this.#state.totalTasksProcessed,
+            restartCount: this.#state.restartCount,
+            queueLength: this.#taskQueue.length,
+            pendingQuestion: this.#pendingQuestion,
+            model: 'claude-sonnet-4.5',
+          }),
+        );
+        return;
+      }
+
+      if (req.method === 'GET' && req.url === '/question') {
+        res.end(JSON.stringify({ question: this.#pendingQuestion }));
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/answer') {
+        let body = '';
+        req.on('data', (chunk) => (body += chunk));
+        req.on('end', () => {
+          try {
+            const { answer } = JSON.parse(body);
+            if (this.#pendingResolve) {
+              this.#pendingResolve(answer);
+              res.end(JSON.stringify({ ok: true }));
+            } else {
+              res.statusCode = 409;
+              res.end(JSON.stringify({ error: 'Sem pergunta pendente' }));
             }
-
-            if (req.method === 'GET' && req.url === '/question') {
-                res.end(JSON.stringify({ question: this.#pendingQuestion }));
-                return;
-            }
-
-            if (req.method === 'POST' && req.url === '/answer') {
-                let body = '';
-                req.on('data', chunk => body += chunk);
-                req.on('end', () => {
-                    try {
-                        const { answer } = JSON.parse(body);
-                        if (this.#pendingResolve) {
-                            this.#pendingResolve(answer);
-                            res.end(JSON.stringify({ ok: true }));
-                        } else {
-                            res.statusCode = 409;
-                            res.end(JSON.stringify({ error: 'Sem pergunta pendente' }));
-                        }
-                    } catch {
-                        res.statusCode = 400;
-                        res.end(JSON.stringify({ error: 'JSON inválido' }));
-                    }
-                });
-                return;
-            }
-
-            if (req.method === 'POST' && req.url === '/task') {
-                let body = '';
-                req.on('data', chunk => body += chunk);
-                req.on('end', () => {
-                    try {
-                        const task = JSON.parse(body);
-                        this.enqueueTask(task);
-                        res.end(JSON.stringify({ ok: true, queueLength: this.#taskQueue.length }));
-                    } catch {
-                        res.statusCode = 400;
-                        res.end(JSON.stringify({ error: 'JSON inválido' }));
-                    }
-                });
-                return;
-            }
-
-            if (req.method === 'POST' && req.url === '/user-message') {
-                let body = '';
-                req.on('data', chunk => body += chunk);
-                req.on('end', () => {
-                    const { message } = JSON.parse(body);
-                    // Injeta mensagem direta do usuário como próxima resposta ao ask_user
-                    if (this.#pendingResolve) {
-                        this.#pendingResolve(`USER_MESSAGE: ${message}`);
-                        res.end(JSON.stringify({ ok: true, mode: 'directed' }));
-                    } else {
-                        // Agenda como tarefa especial de mensagem direta
-                        this.enqueueTask({ type: 'user_message', message });
-                        res.end(JSON.stringify({ ok: true, mode: 'queued' }));
-                    }
-                });
-                return;
-            }
-
-            res.statusCode = 404;
-            res.end(JSON.stringify({ error: 'Rota não encontrada' }));
+          } catch {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'JSON inválido' }));
+          }
         });
+        return;
+      }
 
-        this.#httpServer.listen(port, '127.0.0.1', () => {
-            console.log(`[AlwaysAlive] HTTP control server: http://127.0.0.1:${port}`);
+      if (req.method === 'POST' && req.url === '/task') {
+        let body = '';
+        req.on('data', (chunk) => (body += chunk));
+        req.on('end', () => {
+          try {
+            const task = JSON.parse(body);
+            this.enqueueTask(task);
+            res.end(JSON.stringify({ ok: true, queueLength: this.#taskQueue.length }));
+          } catch {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'JSON inválido' }));
+          }
         });
-    }
+        return;
+      }
 
-    #parseResult(str) {
-        try { return JSON.parse(str.trim()); } catch { return { raw: str.trim() }; }
-    }
+      if (req.method === 'POST' && req.url === '/user-message') {
+        let body = '';
+        req.on('data', (chunk) => (body += chunk));
+        req.on('end', () => {
+          const { message } = JSON.parse(body);
+          // Injeta mensagem direta do usuário como próxima resposta ao ask_user
+          if (this.#pendingResolve) {
+            this.#pendingResolve(`USER_MESSAGE: ${message}`);
+            res.end(JSON.stringify({ ok: true, mode: 'directed' }));
+          } else {
+            // Agenda como tarefa especial de mensagem direta
+            this.enqueueTask({ type: 'user_message', message });
+            res.end(JSON.stringify({ ok: true, mode: 'queued' }));
+          }
+        });
+        return;
+      }
 
-    #loadState() {
-        if (existsSync(SESSION_FILE)) {
-            try { this.#state = { ...this.#state, ...JSON.parse(readFileSync(SESSION_FILE, 'utf8')) }; } catch {}
-        }
-    }
+      res.statusCode = 404;
+      res.end(JSON.stringify({ error: 'Rota não encontrada' }));
+    });
 
-    #saveState() {
-        writeFileSync(SESSION_FILE, JSON.stringify(this.#state, null, 2));
-    }
+    this.#httpServer.listen(port, '127.0.0.1', () => {
+      console.log(`[AlwaysAlive] HTTP control server: http://127.0.0.1:${port}`);
+    });
+  }
 
-    async stop() {
-        this.#httpServer?.close();
-        if (this.#session) await this.#session.disconnect(); // Preserva dados no disco
-        if (this.#client) await this.#client.stop();
+  #parseResult(str) {
+    try {
+      return JSON.parse(str.trim());
+    } catch {
+      return { raw: str.trim() };
     }
+  }
+
+  #loadState() {
+    if (existsSync(SESSION_FILE)) {
+      try {
+        this.#state = { ...this.#state, ...JSON.parse(readFileSync(SESSION_FILE, 'utf8')) };
+      } catch {}
+    }
+  }
+
+  #saveState() {
+    writeFileSync(SESSION_FILE, JSON.stringify(this.#state, null, 2));
+  }
+
+  async stop() {
+    this.#httpServer?.close();
+    if (this.#session) await this.#session.disconnect(); // Preserva dados no disco
+    if (this.#client) await this.#client.stop();
+  }
 }
 ```
 
 ### 16.4 Persistência total: sobrevivência a reinicialização do PC
 
-**O desafio**: quando o processo Node.js é encerrado (shutdown, crash, reboot), a sessão SDK "desaparece" da memória — mas os dados estão em disco.
+**O desafio**: quando o processo Node.js é encerrado (shutdown, crash, reboot), a sessão SDK
+"desaparece" da memória — mas os dados estão em disco.
 
 **Por que isso funciona para persistência**:
 
@@ -1984,7 +2107,8 @@ PC inicia
                                      └── Modelo retoma loop de trabalho
 ```
 
-**Custo total de uma reinicialização**: 1 PR (o `SYSTEM_RESTART` send). Em uma semana com 2 reinicializações, são 2-3 PRs totais (1 boot inicial + 2 reinicializações).
+**Custo total de uma reinicialização**: 1 PR (o `SYSTEM_RESTART` send). Em uma semana com 2
+reinicializações, são 2-3 PRs totais (1 boot inicial + 2 reinicializações).
 
 ### 16.5 Estratégia "Zero-Restart Cost": CLI como Processo Separado
 
@@ -2006,13 +2130,13 @@ Se o processo SDK reiniciar (2 morre):
 ```javascript
 // Com CLI em modo servidor separado:
 const client = new CopilotClient({
-    cliUrl: 'localhost:4321',  // CLI já está rodando como processo PM2 separado
+  cliUrl: 'localhost:4321', // CLI já está rodando como processo PM2 separado
 });
 await client.start(); // Apenas conecta, não spawna novo CLI
 
 const session = await client.resumeSession(savedSessionId, {
-    onPermissionRequest: approveAll,
-    onUserInputRequest: this.#handleInput.bind(this),
+  onPermissionRequest: approveAll,
+  onUserInputRequest: this.#handleInput.bind(this),
 });
 // O modelo estava aguardando no ask_user — resposta vai chegar do próximo ask_user event
 // Nenhum PR consumido para reconectar!
@@ -2022,31 +2146,32 @@ const session = await client.resumeSession(savedSessionId, {
 
 ```javascript
 module.exports = {
-    apps: [
-        {
-            name: 'copilot-cli-server',
-            script: 'copilot',
-            args: ['--headless', '--port', '4321'],
-            autorestart: true,
-            restart_delay: 2000,
-            watch: false,
-            // CLI persiste: processo sempre ativo
-        },
-        {
-            name: 'always-alive-agent',
-            script: 'src/agent/always-alive-agent.js',
-            autorestart: true,
-            restart_delay: 3000, // Aguarda CLI estar pronto
-            watch: false,
-            env: {
-                COPILOT_CLI_URL: 'localhost:4321',
-            },
-        },
-    ],
+  apps: [
+    {
+      name: 'copilot-cli-server',
+      script: 'copilot',
+      args: ['--headless', '--port', '4321'],
+      autorestart: true,
+      restart_delay: 2000,
+      watch: false,
+      // CLI persiste: processo sempre ativo
+    },
+    {
+      name: 'always-alive-agent',
+      script: 'src/agent/always-alive-agent.js',
+      autorestart: true,
+      restart_delay: 3000, // Aguarda CLI estar pronto
+      watch: false,
+      env: {
+        COPILOT_CLI_URL: 'localhost:4321',
+      },
+    },
+  ],
 };
 ```
 
-**Com esta arquitetura**: o processo CLI (e portanto a sessão do modelo) **nunca morre** mesmo que o SDK reinicie. O SDK apenas reconecta. **Custo de reconexão: 0 PRs**.
+**Com esta arquitetura**: o processo CLI (e portanto a sessão do modelo) **nunca morre** mesmo que o
+SDK reinicie. O SDK apenas reconecta. **Custo de reconexão: 0 PRs**.
 
 **Única exceção**: reinicialização do PC → CLI morre → 1 PR para reiniciar loop.
 
@@ -2084,34 +2209,35 @@ curl -X POST http://127.0.0.1:9988/user-message \
 ```javascript
 // Custom Tool para eu (VS Code Copilot) interagir com o Always-Alive Agent
 const alwaysAliveStatus = defineTool('always_alive_status', {
-    description: 'Verifica status do Always-Alive Agent e pergunta pendente',
-    parameters: z.object({}),
-    skipPermission: true,
-    handler: async () => {
-        const [status, question] = await Promise.all([
-            fetch('http://127.0.0.1:9988/status').then(r => r.json()),
-            fetch('http://127.0.0.1:9988/question').then(r => r.json()),
-        ]);
-        return { ...status, pendingQuestion: question.question };
-    },
+  description: 'Verifica status do Always-Alive Agent e pergunta pendente',
+  parameters: z.object({}),
+  skipPermission: true,
+  handler: async () => {
+    const [status, question] = await Promise.all([
+      fetch('http://127.0.0.1:9988/status').then((r) => r.json()),
+      fetch('http://127.0.0.1:9988/question').then((r) => r.json()),
+    ]);
+    return { ...status, pendingQuestion: question.question };
+  },
 });
 
 const alwaysAliveAnswer = defineTool('always_alive_answer', {
-    description: 'Responde à pergunta pendente do Always-Alive Agent',
-    parameters: z.object({ answer: z.string() }),
-    skipPermission: true,
-    handler: async ({ answer }) => {
-        const res = await fetch('http://127.0.0.1:9988/answer', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ answer }),
-        });
-        return res.json();
-    },
+  description: 'Responde à pergunta pendente do Always-Alive Agent',
+  parameters: z.object({ answer: z.string() }),
+  skipPermission: true,
+  handler: async ({ answer }) => {
+    const res = await fetch('http://127.0.0.1:9988/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answer }),
+    });
+    return res.json();
+  },
 });
 ```
 
-**Resultado**: eu (VS Code Copilot) posso verificar o estado do agente e responder às suas perguntas via Custom Tools — sem sair da conversa e sem custo adicional.
+**Resultado**: eu (VS Code Copilot) posso verificar o estado do agente e responder às suas perguntas
+via Custom Tools — sem sair da conversa e sem custo adicional.
 
 ### 16.7 Diagrama completo: sistema Always-Alive com máxima persistência
 
@@ -2187,19 +2313,28 @@ Sessões do VS Code Copilot (você):
 
 ### 16.9 Limitações honestas e mitigações
 
-1. **`ask_user` é uma opção do modelo, não obrigatório**: o Sonnet pode decidir não invocar `ask_user` em certas situações e encerrar o turno. **Mitigação**: instrução explícita no systemMessage que o loop é obrigatório + `onSessionEnd` hook para reiniciar se o modelo encerrar.
+1. **`ask_user` é uma opção do modelo, não obrigatório**: o Sonnet pode decidir não invocar
+   `ask_user` em certas situações e encerrar o turno. **Mitigação**: instrução explícita no
+   systemMessage que o loop é obrigatório + `onSessionEnd` hook para reiniciar se o modelo encerrar.
 
-2. **Compactação de contexto remove informação**: com Infinite Sessions, o contexto antigo é resumido. O modelo pode "esquecer" detalhes anteriores. **Mitigação**: `plan.md` persiste o plano estruturado; hooks podem injetar contexto relevante na retomada.
+2. **Compactação de contexto remove informação**: com Infinite Sessions, o contexto antigo é
+   resumido. O modelo pode "esquecer" detalhes anteriores. **Mitigação**: `plan.md` persiste o plano
+   estruturado; hooks podem injetar contexto relevante na retomada.
 
-3. **PM2 + CLI separado adiciona complexidade**: dois processos para gerenciar. **Mitigação**: é a mesma complexidade que já temos (PM2 já está no projeto via `ecosystem.config.cjs`).
+3. **PM2 + CLI separado adiciona complexidade**: dois processos para gerenciar. **Mitigação**: é a
+   mesma complexidade que já temos (PM2 já está no projeto via `ecosystem.config.cjs`).
 
-4. **Latência do `ask_user` loop**: cada tarefa tem round-trip de IPC. **Mitigação**: para tarefas batch, enfileirar múltiplas de uma vez.
+4. **Latência do `ask_user` loop**: cada tarefa tem round-trip de IPC. **Mitigação**: para tarefas
+   batch, enfileirar múltiplas de uma vez.
 
-5. **Sonnet pode ter problemas com loop infinito por design**: modelos são treinados para encerrar conversas naturalmente. **Mitigação alternativa**: usar GPT-4.1 (custo zero) que pode ser mais receptivo a loops longos sem custo de preocupação.
+5. **Sonnet pode ter problemas com loop infinito por design**: modelos são treinados para encerrar
+   conversas naturalmente. **Mitigação alternativa**: usar GPT-4.1 (custo zero) que pode ser mais
+   receptivo a loops longos sem custo de preocupação.
 
 ### 16.10 Recomendação final de implementação
 
 **Fase 1 (MVP — menor complexidade)**:
+
 ```
 CLI auto-gerenciado (sem --headless separado) + GPT-4.1 (custo zero)
 Resultado: agente funcional, custo zero, sobrevive a crash de processo
@@ -2207,6 +2342,7 @@ Não sobrevive a reboot do PC (1 PR para reiniciar após reboot)
 ```
 
 **Fase 2 (Produção — máxima persistência)**:
+
 ```
 CLI como serviço PM2 separado + Sonnet (1 PR para vida inteira da sessão)
 cliUrl: conecta SDK ao CLI existente → sobrevive a crash SDK sem PR
@@ -2215,6 +2351,7 @@ HTTP Bridge: controle total em runtime
 ```
 
 **Fase 3 (Opcional — máxima qualidade + custo zero)**:
+
 ```
 Fase 2, mas com GPT-4.1 como modelo default
 Sonnet reservado para tarefas críticas (via task type "critical")
@@ -2225,8 +2362,8 @@ Resultado: custo praticamente zero mesmo com máxima persistência
 
 ## 17. Roadmap de Integração — Always-Alive Agent no Projeto Existente
 
-> Esta seção avalia a estrutura atual do projeto e define o plano de integração completo, com
-> fases, dependências, refatorações necessárias e decisões arquiteturais.
+> Esta seção avalia a estrutura atual do projeto e define o plano de integração completo, com fases,
+> dependências, refatorações necessárias e decisões arquiteturais.
 
 ### 17.1 Inventário do projeto atual
 
@@ -2242,8 +2379,10 @@ Resultado: custo praticamente zero mesmo com máxima persistência
 | `audit-agent`            | Agente de auditoria                        | 3098             |
 
 **Servidor Express** (`src/server/`):
+
 - `src/server/engine/server.js` — servidor HTTP/HTTPS, port-hunting a partir de 3008
-- `src/server/api/router.js` — routes: `/api/tasks`, `/api/missions`, `/api/health`, `/api/artifacts`, `/api/system`, `/api/mcp`, etc.
+- `src/server/api/router.js` — routes: `/api/tasks`, `/api/missions`, `/api/health`,
+  `/api/artifacts`, `/api/system`, `/api/mcp`, etc.
 - `src/server/handlers/mcp-handler.js` — servidor MCP (JSON-RPC 2.0) em `/api/mcp`
 - `src/server/engine/socket.js` — Socket.IO (realtime)
 
@@ -2257,8 +2396,8 @@ Resultado: custo praticamente zero mesmo com máxima persistência
 
 ### 17.2 Gaps identificados entre o que existe e o que precisamos
 
-| Necessidade                                 | Status    | Observação                               |
-| ------------------------------------------- | --------- | ---------------------------------------- |
+| Necessidade                                 | Status     | Observação                               |
+| ------------------------------------------- | ---------- | ---------------------------------------- |
 | SDK `@github/copilot-sdk` instalado         | ❌ ausente | Precisa ser adicionado ao `package.json` |
 | Copilot CLI no PATH                         | ❌ ausente | Precisa ser instalado no container/host  |
 | Processo Always-Alive no PM2                | ❌ ausente | Novo app no `ecosystem.config.cjs`       |
@@ -2271,6 +2410,7 @@ Resultado: custo praticamente zero mesmo com máxima persistência
 | Telemetria SDK → NERV                       | ❌ ausente | Bridge para eventos SDK                  |
 
 **Reutilizável sem mudança**:
+
 - PM2 infrastructure (apenas adicionar apps)
 - Servidor Express (apenas adicionar rotas)
 - NERV event bus (SDK pode publicar eventos nele)
@@ -2281,7 +2421,8 @@ Resultado: custo praticamente zero mesmo com máxima persistência
 
 ### 17.3 Decisão crítica: como o Always-Alive se integra ao NERV
 
-O NERV é o event bus central do projeto. O Always-Alive Agent deve se tornar um **participante do NERV** — publicando e consumindo eventos como qualquer outro subsistema:
+O NERV é o event bus central do projeto. O Always-Alive Agent deve se tornar um **participante do
+NERV** — publicando e consumindo eventos como qualquer outro subsistema:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -2308,6 +2449,7 @@ O NERV é o event bus central do projeto. O Always-Alive Agent deve se tornar um
 ```
 
 **Tipos de eventos NERV a criar**:
+
 - `copilot.task.queued` — nova tarefa para o agente
 - `copilot.task.started` — agente iniciou processamento
 - `copilot.task.completed` — tarefa finalizada com resultado
@@ -2365,38 +2507,44 @@ Ao invés de um servidor separado na porta 9988, integrar ao servidor Express ex
 // GET  /api/copilot/history     — histórico de tarefas processadas
 ```
 
-**Via Socket.IO (realtime)**: eventos `copilot.question`, `copilot.status`, `copilot.task.result` emitidos para todos os clients do dashboard.
+**Via Socket.IO (realtime)**: eventos `copilot.question`, `copilot.status`, `copilot.task.result`
+emitidos para todos os clients do dashboard.
 
 ### 17.6 Integração com MCP server existente
 
-O projeto já tem um MCP server em `/api/mcp`. O Always-Alive Agent pode consumir esse servidor como seus próprios recursos:
+O projeto já tem um MCP server em `/api/mcp`. O Always-Alive Agent pode consumir esse servidor como
+seus próprios recursos:
 
 ```javascript
 // always-alive.js — session config com MCP server local
 const session = await client.createSession({
-    model: 'claude-sonnet-4.5',
-    mcpServers: {
-        // Consome o MCP server local do projeto:
-        'chatgpt-docker': {
-            type: 'http',
-            url: `http://127.0.0.1:${process.env.PORT ?? 3008}/api/mcp`,
-        },
+  model: 'claude-sonnet-4.5',
+  mcpServers: {
+    // Consome o MCP server local do projeto:
+    'chatgpt-docker': {
+      type: 'http',
+      url: `http://127.0.0.1:${process.env.PORT ?? 3008}/api/mcp`,
     },
-    // E também Custom Tools diretos:
-    tools: [...coreCustomTools],
-    onPermissionRequest: approveAll,
-    onUserInputRequest: handleInput,
+  },
+  // E também Custom Tools diretos:
+  tools: [...coreCustomTools],
+  onPermissionRequest: approveAll,
+  onUserInputRequest: handleInput,
 });
 ```
 
-**Benefício**: o agente SDK tem acesso automático a TODAS as ferramentas já expostas pelo MCP server do projeto (tarefas, missões, health, etc.) sem código adicional.
+**Benefício**: o agente SDK tem acesso automático a TODAS as ferramentas já expostas pelo MCP server
+do projeto (tarefas, missões, health, etc.) sem código adicional.
 
 ### 17.7 Integração com o Hook System (`.github/hooks/`)
 
-O hook system atual funciona **independentemente** do SDK e deve continuar assim. A integração é via:
+O hook system atual funciona **independentemente** do SDK e deve continuar assim. A integração é
+via:
 
-1. **Hook → SDK**: no `PostToolUse` hook, emitir evento NERV `copilot.task.queued` se resultado indica sub-tarefa para o agente
-2. **SDK → Hook state**: o Always-Alive Agent lê e escreve em `.github/hooks/state/` via Custom Tools
+1. **Hook → SDK**: no `PostToolUse` hook, emitir evento NERV `copilot.task.queued` se resultado
+   indica sub-tarefa para o agente
+2. **SDK → Hook state**: o Always-Alive Agent lê e escreve em `.github/hooks/state/` via Custom
+   Tools
 3. **systemMessage**: injetar conteúdo do `session-briefing.md` no `onSessionStart` hook do SDK
 
 ```javascript
@@ -2418,6 +2566,7 @@ onSessionStart: async (input) => {
 **Objetivo**: instalar dependências e validar que o SDK funciona no container.
 
 **Tarefas**:
+
 - [ ] `npm install @github/copilot-sdk` — adicionar ao `package.json`
 - [ ] Instalar Copilot CLI no container: `npm install -g @github/copilot-cli` ou via apt
 - [ ] Validar autenticação GitHub Copilot no container (`copilot --version`)
@@ -2433,8 +2582,10 @@ onSessionStart: async (input) => {
 **Objetivo**: base funcional com sessão persistente e Custom Tools integrados à infra.
 
 **Tarefas**:
+
 - [ ] `src/copilot/session-manager.js` — PersistentSessionManager com `resumeSession`
-- [ ] `src/copilot/tools/task-tools.js` — `add_task`, `complete_task`, `get_tasks`, `get_session_state`
+- [ ] `src/copilot/tools/task-tools.js` — `add_task`, `complete_task`, `get_tasks`,
+      `get_session_state`
 - [ ] `src/copilot/tools/code-tools.js` — `lint_check`, `run_tests`, `typecheck`
 - [ ] `src/copilot/tools/git-tools.js` — `git_status`, `git_diff`, `git_commit`
 - [ ] `src/copilot/tools/index.js` — registry com Zod schemas
@@ -2448,6 +2599,7 @@ onSessionStart: async (input) => {
 **Objetivo**: agente sempre ativo, integrado ao event bus, controlável via API.
 
 **Tarefas**:
+
 - [ ] `src/copilot/always-alive.js` — AlwaysAliveAgent com `onUserInputRequest` loop
 - [ ] `src/copilot/nerv-bridge.js` — traduz eventos NERV ↔ SDK
 - [ ] `src/copilot/http-control-server.js` — integrado ao Express (não porta separada)
@@ -2463,7 +2615,9 @@ onSessionStart: async (input) => {
 **Objetivo**: arquitetura de persistência total (sobrevive a reboot).
 
 **Tarefas**:
-- [ ] `ecosystem.config.cjs`: adicionar processo `copilot-cli-server` (`copilot --headless --port 4321`)
+
+- [ ] `ecosystem.config.cjs`: adicionar processo `copilot-cli-server`
+      (`copilot --headless --port 4321`)
 - [ ] Migrar `AlwaysAliveAgent` para usar `cliUrl: 'localhost:4321'`
 - [ ] Migrar modelo de `gpt-4.1` para `claude-sonnet-4.5`
 - [ ] `pm2 startup` — garantir que CLI e agente iniciam no boot do sistema
@@ -2478,6 +2632,7 @@ onSessionStart: async (input) => {
 **Objetivo**: visibilidade completa no dashboard e integração MCP bidirecional.
 
 **Tarefas**:
+
 - [ ] Dashboard UI: nova view `CopilotAgentView` (status, fila, pergunta pendente, histórico)
 - [ ] Consumir MCP server local no `createSession` (acesso automático a todas as tools)
 - [ ] Telemetria SDK → NERV (spans OpenTelemetry → eventos NERV)
@@ -2490,16 +2645,19 @@ onSessionStart: async (input) => {
 ### 17.9 Decisão sobre onde rodar o Always-Alive: processo dedicado vs agente-gpt
 
 **Opção A**: Integrar ao processo `agente-gpt` existente
+
 - Prós: menos processos, compartilha memória com kernel
 - Contras: crash de um afeta o outro; complexidade de inicialização
 - **Recomendado para**: Fase 1 e 2
 
 **Opção B**: Processo PM2 separado (`copilot-agent`)
+
 - Prós: isolamento total, podem reiniciar independentemente
 - Contras: mais overhead de processo
 - **Recomendado para**: Fase 3 em diante
 
 **Opção C**: CLI como processo separado + SDK como parte do `agente-gpt`
+
 - Prós: CLI fica sempre ativo (sobrevive a crash do `agente-gpt`)
 - Contras: dois processos para gerenciar
 - **Recomendado para**: Fase 3 (máxima resiliência)
@@ -2517,7 +2675,8 @@ onSessionStart: async (input) => {
 | `package.json`             | Adicionar alias `#copilot/*`            | Import path consistency |
 | `.github/hooks/state/`     | Novo arquivo `sdk-always-alive.json`    | Estado persistido       |
 
-**Nenhuma refatoração destrutiva**: todas as mudanças são aditivas. O hook system, NERV, kernel e agent workers continuam sem alteração.
+**Nenhuma refatoração destrutiva**: todas as mudanças são aditivas. O hook system, NERV, kernel e
+agent workers continuam sem alteração.
 
 ### 17.11 Riscos e mitigações
 
@@ -2533,15 +2692,17 @@ onSessionStart: async (input) => {
 
 ---
 
-*Documento de arquitetura — v5.0. Seções: 1-13 (análise fundamental), 14 (custo zero), 15 (sessão suspensa), 16 (Always-Alive com Sonnet), 17 (roadmap de integração). Próximo passo: Fase 0 (pré-requisitos).*
+_Documento de arquitetura — v5.0. Seções: 1-13 (análise fundamental), 14 (custo zero), 15 (sessão
+suspensa), 16 (Always-Alive com Sonnet), 17 (roadmap de integração). Próximo passo: Fase 0
+(pré-requisitos)._
 
 ---
 
 ## 18. Estado Real da Implementação — Sprint 25
 
-> **Sprint 25 concluído em 2026-07-27.** Esta seção documenta o que está implementado, testado
-> e integrado ao servidor Express. A análise das seções 1-17 permanece como referência canônica
-> de design; esta seção é o "estado atual".
+> **Sprint 25 concluído em 2026-07-27.** Esta seção documenta o que está implementado, testado e
+> integrado ao servidor Express. A análise das seções 1-17 permanece como referência canônica de
+> design; esta seção é o "estado atual".
 
 ### 18.1 Inventário de arquivos implementados
 
@@ -2635,8 +2796,8 @@ src/copilot/
 | Proposto (§5.1/§17.4)                  | Implementado                             | Motivo                                           |
 | -------------------------------------- | ---------------------------------------- | ------------------------------------------------ |
 | `sdk-bridge.js` como único entry point | `sdk-client.js` + `sdk-api.js` separados | Melhor SRP — cliente vs. API HTTP                |
-| POST /client/start e /client/stop      | ✅ Implementado em sdk-api.js             | `getClient()` é lazy; start explícito adicionado |
-| GET /tools                             | ✅ Implementado em sdk-api.js             | Usa `allTools` de `tools/index.js`               |
+| POST /client/start e /client/stop      | ✅ Implementado em sdk-api.js            | `getClient()` é lazy; start explícito adicionado |
+| GET /tools                             | ✅ Implementado em sdk-api.js            | Usa `allTools` de `tools/index.js`               |
 | GET /sessions/last                     | `/sessions/active` em vez disso          | Mais útil: mostra todas as ativas em RAM         |
 | `onPermissionRequest` configurável     | `approveAll` hard-coded por padrão       | Simples e seguro para uso interno                |
 | SessionHooks como webhooks externos    | Hooks internos via callback do SDK       | Evita surface de ataque desnecessária            |
@@ -2662,7 +2823,7 @@ tests/unit/copilot/
 | Média      | MCP tools bridge via sdk-api                   | Novo `mcp-tool-bridge.js`                                 |
 | Média      | SessionHooks expostos como webhooks HTTP       | `sdk-api.js` + config                                     |
 | Média      | Testes de integração reais (CLI mock)          | `tests/integration/copilot/`                              |
-| Baixa      | Dashboard UI para /api/sdk/*                   | `src/server/`                                             |
+| Baixa      | Dashboard UI para /api/sdk/\*                  | `src/server/`                                             |
 | Baixa      | Métricas de sessão via NERV                    | `sdk-client.js` + NERV                                    |
 
 ### 18.7 Integração com o servidor principal
@@ -2671,40 +2832,43 @@ O módulo está integrado ao servidor Express via `src/server/api/router.js`:
 
 ```javascript
 // src/server/api/router.js
-import copilotBridge from '#copilot/http-bridge';   // Always-Alive Agent
-import sdkApi from '#copilot/sdk-api';               // Multi-Session SDK API
+import copilotBridge from '#copilot/http-bridge'; // Always-Alive Agent
+import sdkApi from '#copilot/sdk-api'; // Multi-Session SDK API
 
 // Ambos habilitados quando COPILOT_SDK_ENABLED !== 'false' (padrão: habilitado)
-app.use('/api/copilot', apiLimiter, copilotBridge);  // Port: 3008/api/copilot
-app.use('/api/sdk', apiLimiter, sdkApi);             // Port: 3008/api/sdk
+app.use('/api/copilot', apiLimiter, copilotBridge); // Port: 3008/api/copilot
+app.use('/api/sdk', apiLimiter, sdkApi); // Port: 3008/api/sdk
 ```
 
-O processo PM2 `copilot-sdk-agent` definido em `ecosystem.config.cjs` é o processo separado
-do always-alive agent — ele é independente do servidor Express principal.
+O processo PM2 `copilot-sdk-agent` definido em `ecosystem.config.cjs` é o processo separado do
+always-alive agent — ele é independente do servidor Express principal.
 
 ---
 
-*Documento de arquitetura — v6.0. Seções 1-17: design e análise. Seção 18: estado de implementação real (Sprint 25, 2026-07-27).*
+_Documento de arquitetura — v6.0. Seções 1-17: design e análise. Seção 18: estado de implementação
+real (Sprint 25, 2026-07-27)._
 
 ---
 
 ## 19. Ambiente de Interação Contínua LLM↔Usuário — Análise Profunda e Roadmap
 
-**Data**: 2026-03-22
-**Contexto**: Sprints 26-28 — Upgrades 1-4 implementados, Upgrades 5-6 planejados. Objetivo: "ambiente
-completo em que você (LLM) e eu (usuário) interagem continuamente, em sessões persistentes (infinitas),
-seguindo o modelo análogo ao vscode_askQuestions".
+**Data**: 2026-03-22 **Contexto**: Sprints 26-28 — Upgrades 1-4 implementados, Upgrades 5-6
+planejados. Objetivo: "ambiente completo em que você (LLM) e eu (usuário) interagem continuamente,
+em sessões persistentes (infinitas), seguindo o modelo análogo ao vscode_askQuestions".
 
 ### 19.1 Enunciado do problema: o que é "interação contínua infinita"?
 
-O modelo `vscode_askQuestions` que o hook system implementa tem uma característica fundamental: o **agente não encerra o turno sem antes perguntar ao usuário**. Esse padrão garante:
+O modelo `vscode_askQuestions` que o hook system implementa tem uma característica fundamental: o
+**agente não encerra o turno sem antes perguntar ao usuário**. Esse padrão garante:
 
-1. **Continuidade**: o usuário sempre recebe uma pergunta de acompanhamento antes de o agente "dormir"
+1. **Continuidade**: o usuário sempre recebe uma pergunta de acompanhamento antes de o agente
+   "dormir"
 2. **Controle**: o usuário guia explicitamente o próximo passo
 3. **Contexto persistente**: o histórico de conversação é acumulado entre turnos
 4. **Prevenção de perda de estado**: o agente nunca sai sem salvar progresso
 
-O objetivo declarado é replicar esse padrão no ambiente SDK — ou seja, criar uma "sessão viva infinita" entre:
+O objetivo declarado é replicar esse padrão no ambiente SDK — ou seja, criar uma "sessão viva
+infinita" entre:
 
 ```
 Usuário ←──────→ LLM-A (este agente: GitHub Copilot)
@@ -2714,12 +2878,13 @@ Usuário ←──────→ LLM-A (este agente: GitHub Copilot)
                   LLM-B (sessão SDK Always-Alive: gpt-4.1, claude-sonnet, etc.)
 ```
 
-Onde LLM-B é uma segunda LLM que **o usuário interage através da interface deste agente** — e essa sessão com LLM-B é **persistente e infinita**.
+Onde LLM-B é uma segunda LLM que **o usuário interage através da interface deste agente** — e essa
+sessão com LLM-B é **persistente e infinita**.
 
 ### 19.2 Estado atual: o que já temos (inventário real pós-Sprint 28)
 
-| Componente                       | Arquivo                                  | Estado         | Capacidade                                                              |
-| -------------------------------- | ---------------------------------------- | -------------- | ----------------------------------------------------------------------- |
+| Componente                       | Arquivo                                  | Estado          | Capacidade                                                              |
+| -------------------------------- | ---------------------------------------- | --------------- | ----------------------------------------------------------------------- |
 | Always-Alive Agent               | `src/copilot/always-alive.js`            | ✅ Implementado | Singleton que roda LLM-B, persiste sessão, processa fila de mensagens   |
 | Session Manager                  | `src/copilot/session-manager.js`         | ✅ Implementado | Persiste sessionId em disco, retoma sessão em restart                   |
 | HTTP Bridge                      | `src/copilot/http-bridge.js`             | ✅ Implementado | Expõe `POST /api/copilot/send` para enviar mensagem ao agente           |
@@ -2737,7 +2902,9 @@ Onde LLM-B é uma segunda LLM que **o usuário interage através da interface de
 
 O coração da "interação contínua infinita" já está implementado no SDK: **`onUserInputRequest`**.
 
-Quando LLM-B precisa da opinião do usuário, ela invoca a tool `ask_user` internamente. O SDK intercepta isso e chama o handler `onUserInputRequest` registrado, que **bloqueia a execução do agente** até que uma resposta chegue.
+Quando LLM-B precisa da opinião do usuário, ela invoca a tool `ask_user` internamente. O SDK
+intercepta isso e chama o handler `onUserInputRequest` registrado, que **bloqueia a execução do
+agente** até que uma resposta chegue.
 
 O `AlwaysAliveAgent` já implementa isso:
 
@@ -2761,6 +2928,7 @@ async #handleUserInputRequest({ question, choices, allowFreeform }) {
 ```
 
 E o endpoint HTTP para responder:
+
 ```http
 POST /api/copilot/answer
 { "answer": "texto da resposta do usuário" }
@@ -2780,21 +2948,30 @@ POST /api/copilot/answer
 
 #### Gap 1 — Interface de usuário em tempo real
 
-Atualmente, o usuário saberia que LLM-B tem uma pergunta **somente se fizer polling** em `GET /api/copilot/status`. Não há notificação push.
+Atualmente, o usuário saberia que LLM-B tem uma pergunta **somente se fizer polling** em
+`GET /api/copilot/status`. Não há notificação push.
 
-**Solução**: O SSE endpoint `GET /api/sdk/sessions/:id/stream` já emite todos os eventos do SDK. Falta um cliente de frontend que consuma esse stream e apresente perguntas pendentes automaticamente.
+**Solução**: O SSE endpoint `GET /api/sdk/sessions/:id/stream` já emite todos os eventos do SDK.
+Falta um cliente de frontend que consuma esse stream e apresente perguntas pendentes
+automaticamente.
 
 #### Gap 2 — A fila de mensagens é "fire-and-forget"
 
-O `sendMessage()` atual: coloca na fila, espera resposta. Não há noção de **turno interativo**. O usuário não pode intervir no meio do processamento de uma tarefa.
+O `sendMessage()` atual: coloca na fila, espera resposta. Não há noção de **turno interativo**. O
+usuário não pode intervir no meio do processamento de uma tarefa.
 
-**Solução**: Implementar `sendAndListen()` — uma operação que envia uma mensagem e retorna um `AsyncIterator` de eventos, permitindo streaming de resposta parcial ao usuário.
+**Solução**: Implementar `sendAndListen()` — uma operação que envia uma mensagem e retorna um
+`AsyncIterator` de eventos, permitindo streaming de resposta parcial ao usuário.
 
 #### Gap 3 — Sem loop "sempre pergunta"
 
-O padrão `vscode_askQuestions` exige que o agente **sempre** termine chamando a ferramenta de pergunta. LLM-B não tem esse protocolo imposto — ela pode simplesmente responder e parar.
+O padrão `vscode_askQuestions` exige que o agente **sempre** termine chamando a ferramenta de
+pergunta. LLM-B não tem esse protocolo imposto — ela pode simplesmente responder e parar.
 
-**Solução** (Upgrade 6 — hook-tools): Criar uma Custom Tool `request_user_input` com `skipPermission: true` e **injetar no system prompt** de LLM-B a instrução: "Ao final de cada resposta, se não houver mais análise a fazer, SEMPRE use a ferramenta `request_user_input` para perguntar ao usuário qual é o próximo passo."
+**Solução** (Upgrade 6 — hook-tools): Criar uma Custom Tool `request_user_input` com
+`skipPermission: true` e **injetar no system prompt** de LLM-B a instrução: "Ao final de cada
+resposta, se não houver mais análise a fazer, SEMPRE use a ferramenta `request_user_input` para
+perguntar ao usuário qual é o próximo passo."
 
 Isso replica o protocolo de hooks para LLM-B:
 
@@ -2809,15 +2986,20 @@ Isso replica o protocolo de hooks para LLM-B:
 
 #### Gap 4 — Sem persistência de contexto "de conversa" entre sessões
 
-O `session-manager.js` persiste o `sessionId`, permitindo resume. Porém se o CLI morrer (ex: restart do devcontainer), a sessão é perdida mesmo com o ID salvo.
+O `session-manager.js` persiste o `sessionId`, permitindo resume. Porém se o CLI morrer (ex: restart
+do devcontainer), a sessão é perdida mesmo com o ID salvo.
 
-**Solução**: O SDK tem `infinite sessions` com compactação automática. Para spans maiores, implementar "checkpoint de conversa" — salvar o último N tokens de contexto em arquivo e injetar via `systemMessage` na próxima sessão.
+**Solução**: O SDK tem `infinite sessions` com compactação automática. Para spans maiores,
+implementar "checkpoint de conversa" — salvar o último N tokens de contexto em arquivo e injetar via
+`systemMessage` na próxima sessão.
 
 #### Gap 5 — NERV não sabe que LLM-B existe (Upgrade 5)
 
-O NERV event bus do projeto não recebe nenhum evento do ciclo de vida de LLM-B. O sistema principal não "vê" o que está acontecendo na sessão Copilot.
+O NERV event bus do projeto não recebe nenhum evento do ciclo de vida de LLM-B. O sistema principal
+não "vê" o que está acontecendo na sessão Copilot.
 
 **Solução**: Upgrade 5 — emitir eventos NERV nos pontos-chave de `always-alive.js`:
+
 - `copilot.session.started` → quando sessão é criada/retomada
 - `copilot.message.sent` → quando mensagem é enviada a LLM-B
 - `copilot.message.received` → quando LLM-B responde
@@ -2858,8 +3040,8 @@ O NERV event bus do projeto não recebe nenhum evento do ciclo de vida de LLM-B.
 
 **Propriedades do ambiente ideal**:
 
-| Propriedade             | Mecanismo                                       | Status         |
-| ----------------------- | ----------------------------------------------- | -------------- |
+| Propriedade             | Mecanismo                                       | Status          |
+| ----------------------- | ----------------------------------------------- | --------------- |
 | Sessão infinita         | SDK infinite sessions + sessionId persistido    | ✅ Implementado |
 | Contexto injetado       | `session-briefing.md` via `onSessionStart`      | ✅ Implementado |
 | Tools para LLM-B        | `defineTool` + MCP bridge                       | ✅ Implementado |
@@ -2878,6 +3060,7 @@ O NERV event bus do projeto não recebe nenhum evento do ciclo de vida de LLM-B.
 **Objetivo**: Integrar o ciclo de vida do Always-Alive Agent no event bus NERV.
 
 **Arquivos**:
+
 - `src/copilot/always-alive.js` — emitir eventos em `#setStatus()` e em callbacks
 - `src/copilot/sdk-client.js` — emitir em `createSdkSession` / `disconnectSdkSession`
 
@@ -2892,16 +3075,18 @@ nerv.emit('copilot.question.pending', { question, choices });
 nerv.emit('copilot.question.answered', { answer });
 ```
 
-**Benefício**: O dashboard web (`src/server/`) e qualquer subscriber NERV verão o estado em tempo real. Correlation IDs permitem rastrear o fluxo completo de uma missão.
+**Benefício**: O dashboard web (`src/server/`) e qualquer subscriber NERV verão o estado em tempo
+real. Correlation IDs permitem rastrear o fluxo completo de uma missão.
 
-**Estimativa**: 3-4h
-**Testes**: 6 novos testes unitários em `tests/unit/copilot/test_nerv_metrics.spec.js`
+**Estimativa**: 3-4h **Testes**: 6 novos testes unitários em
+`tests/unit/copilot/test_nerv_metrics.spec.js`
 
 ---
 
 #### Upgrade 6 — hook-tools Custom Tools (4-6h)
 
-**Objetivo**: Criar ferramentas que LLM-B pode usar para interagir diretamente com o hook system do projeto.
+**Objetivo**: Criar ferramentas que LLM-B pode usar para interagir diretamente com o hook system do
+projeto.
 
 **Arquivo**: `src/copilot/tools/hook-tools.js`
 
@@ -2916,24 +3101,28 @@ nerv.emit('copilot.question.answered', { answer });
 | `hook_get_pending_tasks` | Lista tarefas pendentes                                                  | `readFileSync`            |
 | `request_user_input`     | Pede entrada ao usuário (análogo ask_user, mas com choices estruturadas) | `onUserInputRequest`      |
 
-**A tool `request_user_input`** é a mais crítica — ela implementa o padrão `vscode_askQuestions` para LLM-B:
+**A tool `request_user_input`** é a mais crítica — ela implementa o padrão `vscode_askQuestions`
+para LLM-B:
 
 ```javascript
 export const requestUserInput = defineTool('request_user_input', {
-    description: `Solicita input ao usuário. Use OBRIGATORIAMENTE ao final de cada resposta para
+  description: `Solicita input ao usuário. Use OBRIGATORIAMENTE ao final de cada resposta para
 perguntar qual é o próximo passo. Nunca encerre sem chamar esta ferramenta.`,
-    parameters: z.object({
-        question: z.string().describe('Pergunta principal'),
-        choices: z.array(z.string()).optional().describe('Opções predefinidas (a exibir ao usuário)'),
-        requiresSelection: z.boolean().default(false).describe('Se true, usuário DEVE escolher uma das choices'),
-    }),
-    skipPermission: true,
-    handler: async ({ question, choices, requiresSelection }) => {
-        // Redireciona para onUserInputRequest do AlwaysAliveAgent
-        // O handler é injetado pelo session-manager.js via onUserInputRequest
-        // O SDK automaticamente suspende e aguarda resposta
-        return { question, choices, allowFreeform: !requiresSelection };
-    },
+  parameters: z.object({
+    question: z.string().describe('Pergunta principal'),
+    choices: z.array(z.string()).optional().describe('Opções predefinidas (a exibir ao usuário)'),
+    requiresSelection: z
+      .boolean()
+      .default(false)
+      .describe('Se true, usuário DEVE escolher uma das choices'),
+  }),
+  skipPermission: true,
+  handler: async ({ question, choices, requiresSelection }) => {
+    // Redireciona para onUserInputRequest do AlwaysAliveAgent
+    // O handler é injetado pelo session-manager.js via onUserInputRequest
+    // O SDK automaticamente suspende e aguarda resposta
+    return { question, choices, allowFreeform: !requiresSelection };
+  },
 });
 ```
 
@@ -2947,14 +3136,14 @@ Nunca encerre uma resposta sem chamar `request_user_input`.
 Este é o mecanismo de continuidade da sessão.
 ```
 
-**Estimativa**: 5-6h
-**Testes**: 10 novos testes em `tests/unit/copilot/test_hook_tools.spec.js`
+**Estimativa**: 5-6h **Testes**: 10 novos testes em `tests/unit/copilot/test_hook_tools.spec.js`
 
 ---
 
 #### Upgrade 7 — Dashboard Web em Tempo Real (1-2 dias)
 
-**Objetivo**: Interface web que exibe o estado em tempo real de LLM-B, perguntas pendentes, e permite ao usuário responder via browser.
+**Objetivo**: Interface web que exibe o estado em tempo real de LLM-B, perguntas pendentes, e
+permite ao usuário responder via browser.
 
 **Arquitetura**:
 
@@ -2972,10 +3161,10 @@ Servidor (src/server/)
      └── Envia resposta via POST automático
 ```
 
-**Reutilização**: `src/server/` já tem o Express + Socket.io. A única adição é servir um arquivo HTML estático e registrar uma rota `/copilot-dashboard`.
+**Reutilização**: `src/server/` já tem o Express + Socket.io. A única adição é servir um arquivo
+HTML estático e registrar uma rota `/copilot-dashboard`.
 
-**Estimativa**: 4-8h
-**Este é o passo que completa o ambiente ideal descrito em §19.1**
+**Estimativa**: 4-8h **Este é o passo que completa o ambiente ideal descrito em §19.1**
 
 ---
 
@@ -2995,10 +3184,12 @@ O protocolo `vscode_askQuestions` tem 4 propriedades essenciais:
 
 1. **Suspensão bloqueante** — o agente para de trabalhar até ter resposta
 2. **Apresentação estruturada** — choices ou freeform, com header descritivo
-3. **Ciclicidade forçada** — o protocolo TODO exige que o último item SEMPRE seja "chamar vscode_askQuestions"
+3. **Ciclicidade forçada** — o protocolo TODO exige que o último item SEMPRE seja "chamar
+   vscode_askQuestions"
 4. **Persistência de contexto** — o estado é salvo antes de suspender
 
-O SDK `onUserInputRequest` + `AlwaysAliveAgent` já implementa (1), (2) e (4). O que falta é (3) — a ciclicidade **não é imposta ao LLM-B** ainda.
+O SDK `onUserInputRequest` + `AlwaysAliveAgent` já implementa (1), (2) e (4). O que falta é (3) — a
+ciclicidade **não é imposta ao LLM-B** ainda.
 
 O **Upgrade 6** (hook-tools `request_user_input` + system prompt instrução) fecha esse gap:
 
@@ -3012,7 +3203,8 @@ LLM-B processa tarefa
     → [loop infinito]
 ```
 
-Esse loop implementa o padrão "sessão persistente infinita" onde **nunca há encerramento implícito** — apenas pausas esperando input, exatamente como o protocolo de hooks para LLM-A.
+Esse loop implementa o padrão "sessão persistente infinita" onde **nunca há encerramento implícito**
+— apenas pausas esperando input, exatamente como o protocolo de hooks para LLM-A.
 
 ### 19.8 Testes após Upgrades 5-6
 
@@ -3037,23 +3229,27 @@ Esse loop implementa o padrão "sessão persistente infinita" onde **nunca há e
 
 ---
 
-*Seção §19 adicionada em 2026-03-22 — v7.0. Análise do ambiente de interação contínua LLM↔Usuário e roadmap de Upgrades 5-8.*
+_Seção §19 adicionada em 2026-03-22 — v7.0. Análise do ambiente de interação contínua LLM↔Usuário e
+roadmap de Upgrades 5-8._
 
 ---
 
 ## 20. Terminal Efetivo de Interação Contínua com LLM-B — Análise Profunda Expandida (Upgrade 9)
 
-**Data**: 2026-03-22
-**Contexto**: Upgrades 5 (NERV metrics) e 6 (hook-tools + `request_user_input`) implementados.
-**Requisito do usuário**: "um terminal efetivo em que você (LLM-A) ou eu (usuário) pode interagir continuamente com LLM-B".
+**Data**: 2026-03-22 **Contexto**: Upgrades 5 (NERV metrics) e 6 (hook-tools + `request_user_input`)
+implementados. **Requisito do usuário**: "um terminal efetivo em que você (LLM-A) ou eu (usuário)
+pode interagir continuamente com LLM-B".
 
 ### 20.1 O problema central: assimetria de canais
 
-O sistema atual tem dois atores que precisam interagir com LLM-B, mas não existe um canal **unificado e bidirecional em tempo real**.
+O sistema atual tem dois atores que precisam interagir com LLM-B, mas não existe um canal
+**unificado e bidirecional em tempo real**.
 
 **Atores**:
+
 1. **Usuário humano** — quer digitar mensagens e ver respostas na tela, como um chat
-2. **LLM-A** (este agente Copilot) — quer programaticamente enviar mensagens, ler respostas, e responder perguntas automaticamente
+2. **LLM-A** (este agente Copilot) — quer programaticamente enviar mensagens, ler respostas, e
+   responder perguntas automaticamente
 
 **O que existe hoje**:
 
@@ -3068,44 +3264,54 @@ LLM-A         POST /api/copilot/answer      ❌ Não sabe quando pergunta aparec
 
 O **envio** funciona. O **recebimento/notificação** é o gap crítico.
 
-Adicionalmente, a assimetria entre LLM-A e usuário humano cria um segundo problema: como garantir que **apenas um** responde a uma pergunta pendente, sem race condition?
+Adicionalmente, a assimetria entre LLM-A e usuário humano cria um segundo problema: como garantir
+que **apenas um** responde a uma pergunta pendente, sem race condition?
 
 ### 20.2 Análise das alternativas de terminal
 
 #### Alternativa A — SSE Stream do AlwaysAliveAgent (reativa, sem estado no cliente)
 
-**Ideia**: Adicionar endpoint `GET /api/copilot/stream` que emite eventos do `alwaysAliveAgent` via SSE. O cliente se conecta uma vez e recebe tudo em tempo real.
+**Ideia**: Adicionar endpoint `GET /api/copilot/stream` que emite eventos do `alwaysAliveAgent` via
+SSE. O cliente se conecta uma vez e recebe tudo em tempo real.
 
 **Implementação mínima** (20 linhas, adicionar em `http-bridge.js`):
 
 ```javascript
 // GET /stream — SSE stream do AlwaysAliveAgent
 bridge.get('/stream', (req, res) => {
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
 
-    const send = (evt, data) => res.write(`event: ${evt}\ndata: ${JSON.stringify(data)}\n\n`);
-    send('connected', { status: alwaysAliveAgent.status, ts: Date.now() });
+  const send = (evt, data) => res.write(`event: ${evt}\ndata: ${JSON.stringify(data)}\n\n`);
+  send('connected', { status: alwaysAliveAgent.status, ts: Date.now() });
 
-    const events = ['status', 'task.queued', 'task.started', 'task.completed',
-                    'task.error', 'question.pending', 'question.answered'];
-    const handlers = events.map(evt => {
-        const fn = (data) => send(evt, data ?? {});
-        alwaysAliveAgent.on(evt, fn);
-        return [evt, fn];
-    });
+  const events = [
+    'status',
+    'task.queued',
+    'task.started',
+    'task.completed',
+    'task.error',
+    'question.pending',
+    'question.answered',
+  ];
+  const handlers = events.map((evt) => {
+    const fn = (data) => send(evt, data ?? {});
+    alwaysAliveAgent.on(evt, fn);
+    return [evt, fn];
+  });
 
-    const hb = setInterval(() => send('heartbeat', { ts: Date.now() }), 15000);
-    req.on('close', () => {
-        clearInterval(hb);
-        handlers.forEach(([evt, fn]) => alwaysAliveAgent.off(evt, fn));
-    });
+  const hb = setInterval(() => send('heartbeat', { ts: Date.now() }), 15000);
+  req.on('close', () => {
+    clearInterval(hb);
+    handlers.forEach(([evt, fn]) => alwaysAliveAgent.off(evt, fn));
+  });
 });
 ```
 
 **Uso como terminal via `curl -N`** (CLI puro):
+
 ```bash
 # Terminal 1 — receber eventos em tempo real
 curl -N http://localhost:3008/api/copilot/stream
@@ -3117,8 +3323,9 @@ xh POST localhost:3008/api/copilot/send message="Analisa o arquivo src/main.js"
 xh POST localhost:3008/api/copilot/answer answer="Continua com o próximo arquivo"
 ```
 
-**Prós**: Simples, já funciona com `curl -N`, nenhuma dependência nova, consistente com o SSE de sdk-api.js.
-**Contras**: Interface raw (JSON puro no terminal), não tem comando REPL interativo, dois terminais.
+**Prós**: Simples, já funciona com `curl -N`, nenhuma dependência nova, consistente com o SSE de
+sdk-api.js. **Contras**: Interface raw (JSON puro no terminal), não tem comando REPL interativo,
+dois terminais.
 
 **Quanto falta**: 20-30 linhas em `http-bridge.js` + 6 novos testes.
 
@@ -3126,7 +3333,8 @@ xh POST localhost:3008/api/copilot/answer answer="Continua com o próximo arquiv
 
 #### Alternativa B — CLI REPL interativo (`scripts/copilot-repl.mjs`)
 
-**Ideia**: Um script Node.js standalone que funciona como "terminal de chat" — o usuário digita, o agente responde, perguntas são exibidas automaticamente e aguardam input do teclado.
+**Ideia**: Um script Node.js standalone que funciona como "terminal de chat" — o usuário digita, o
+agente responde, perguntas são exibidas automaticamente e aguardam input do teclado.
 
 **Implementação** (script `scripts/copilot-repl.mjs`):
 
@@ -3141,41 +3349,50 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const stream = await fetch(`${BASE}/stream`);
 const reader = stream.body.getReader();
 (async () => {
-    const decoder = new TextDecoder();
-    while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const lines = decoder.decode(value).split('\n');
-        for (const line of lines) {
-            if (line.startsWith('data:')) {
-                const event = JSON.parse(line.slice(5));
-                // Exibe resposta do modelo
-                if (event.response) console.log(`\n🤖 ${event.response}\n`);
-                // Exibe pergunta pendente e aguarda input
-                if (event.question) {
-                    const answer = await rl.question(`\n❓ ${event.question}\n> `);
-                    await fetch(`${BASE}/answer`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ answer }) });
-                }
-            }
+  const decoder = new TextDecoder();
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    const lines = decoder.decode(value).split('\n');
+    for (const line of lines) {
+      if (line.startsWith('data:')) {
+        const event = JSON.parse(line.slice(5));
+        // Exibe resposta do modelo
+        if (event.response) console.log(`\n🤖 ${event.response}\n`);
+        // Exibe pergunta pendente e aguarda input
+        if (event.question) {
+          const answer = await rl.question(`\n❓ ${event.question}\n> `);
+          await fetch(`${BASE}/answer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answer }),
+          });
         }
+      }
     }
+  }
 })();
 
 // Loop de input do usuário
 while (true) {
-    const msg = await rl.question('\n> ');
-    if (msg === '/quit') break;
-    await fetch(`${BASE}/send`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ message: msg }) });
+  const msg = await rl.question('\n> ');
+  if (msg === '/quit') break;
+  await fetch(`${BASE}/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: msg }),
+  });
 }
 ```
 
 **Uso**:
+
 ```bash
 node scripts/copilot-repl.mjs
 > Qual é a arquitetura do projeto?
 
 🤖 O projeto usa Node.js 24+ com ESM, arquitetura event-driven centralizada no
-   módulo NERV. As camadas principais são...
+módulo NERV. As camadas principais são...
 
 ❓ Quer que eu explore alguma pasta específica?
 > Sim, explore src/kernel/
@@ -3183,10 +3400,12 @@ node scripts/copilot-repl.mjs
 🤖 A pasta src/kernel/ contém...
 ```
 
-**Prós**: Experiência de chat real em terminal, funciona para usuário humano, nenhuma dependência de frontend.
-**Contras**: Não funciona como canal para LLM-A programaticamente (conflito de stdin), só um usuário de cada vez.
+**Prós**: Experiência de chat real em terminal, funciona para usuário humano, nenhuma dependência de
+frontend. **Contras**: Não funciona como canal para LLM-A programaticamente (conflito de stdin), só
+um usuário de cada vez.
 
-**Quanto falta**: 1 script (`scripts/copilot-repl.mjs`, ~60 linhas) + Alternativa A como pre-requisito.
+**Quanto falta**: 1 script (`scripts/copilot-repl.mjs`, ~60 linhas) + Alternativa A como
+pre-requisito.
 
 ---
 
@@ -3203,16 +3422,19 @@ node scripts/copilot-repl.mjs
 }
 ```
 
-Isso transforma o terminal em uma ferramenta de primeira classe do projeto, acessível via `npm run copilot:chat`.
+Isso transforma o terminal em uma ferramenta de primeira classe do projeto, acessível via
+`npm run copilot:chat`.
 
 ---
 
 #### Alternativa D — WebSocket bidirecional (Socket.io)
 
 **Ideia**: O servidor já tem Socket.io. Adicionar um namespace `/copilot` onde:
+
 - LLM-B envia eventos via `socket.emit('llm.message', { content })`
 - Usuário envia `socket.emit('user.message', { content })`
-- Pergunta pendente: `socket.emit('llm.question', { question, choices })` → usuário responde `socket.emit('user.answer', { answer })`
+- Pergunta pendente: `socket.emit('llm.question', { question, choices })` → usuário responde
+  `socket.emit('user.answer', { answer })`
 
 **Prós**: Bidirecional real, reconexão automática, suporte a múltiplos clientes simultâneos.
 **Contras**: Mais complexo, requer cliente Socket.io, não funciona com `curl` puro.
@@ -3224,13 +3446,14 @@ Isso transforma o terminal em uma ferramenta de primeira classe do projeto, aces
 #### Alternativa E — Dashboard HTML minimal (Upgrade 7 da §19)
 
 **Ideia**: Servir uma página HTML estática via `GET /copilot-dashboard` com:
+
 - Input de texto + botão "Enviar"
 - Área de chat com histórico (alternando mensagens usuário / LLM-B)
 - Popup/modal automático quando pergunta pendente aparece
 - Consumindo SSE internamente
 
-**Prós**: Interface completa sem dependência de framework frontend.
-**Contras**: Requer HTML/JS frontend (100-200 linhas), LLM-A não pode usar diretamente.
+**Prós**: Interface completa sem dependência de framework frontend. **Contras**: Requer HTML/JS
+frontend (100-200 linhas), LLM-A não pode usar diretamente.
 
 ---
 
@@ -3238,13 +3461,15 @@ Isso transforma o terminal em uma ferramenta de primeira classe do projeto, aces
 
 | Alternativa              | Usuário humano | LLM-A (prog.) | Complexidade | Dependências novas | Tempo de implementação |
 | ------------------------ | :------------: | :-----------: | :----------: | :----------------: | :--------------------: |
-| A — SSE stream `/stream` |  ✅ `curl -N`   |  ✅ fetch SSE  |    Baixa     |         0          |           2h           |
-| B — REPL CLI             |  ✅ Interativo  | ❌ stdin lock  |    Média     |         0          |     3h (requer A)      |
-| C — npm scripts          |  ✅ `npm run`   | ❌ stdin lock  |    Baixa     |         0          |    30min (requer B)    |
-| D — WebSocket Socket.io  | ✅ Com cliente  |  ✅ socket.io  |     Alta     | Cliente Socket.io  |          5-8h          |
-| E — Dashboard HTML       |   ✅ Browser    |   ❌ Manual    |    Média     |      HTML/JS       |    4-6h (requer A)     |
+| A — SSE stream `/stream` |  ✅ `curl -N`  | ✅ fetch SSE  |    Baixa     |         0          |           2h           |
+| B — REPL CLI             | ✅ Interativo  | ❌ stdin lock |    Média     |         0          |     3h (requer A)      |
+| C — npm scripts          |  ✅ `npm run`  | ❌ stdin lock |    Baixa     |         0          |    30min (requer B)    |
+| D — WebSocket Socket.io  | ✅ Com cliente | ✅ socket.io  |     Alta     | Cliente Socket.io  |          5-8h          |
+| E — Dashboard HTML       |   ✅ Browser   |   ❌ Manual   |    Média     |      HTML/JS       |    4-6h (requer A)     |
 
-**Recomendação**: Implementar A + B + C em sequência. Isso entrega em ~5h um terminal completo que funciona tanto para LLM-A (fetch SSE programático) quanto para usuário humano (REPL CLI interativo), sem nenhuma dependência externa.
+**Recomendação**: Implementar A + B + C em sequência. Isso entrega em ~5h um terminal completo que
+funciona tanto para LLM-A (fetch SSE programático) quanto para usuário humano (REPL CLI interativo),
+sem nenhuma dependência externa.
 
 ### 20.4 Design do terminal ideal (A + B + C em detalhes)
 
@@ -3277,8 +3502,10 @@ const reader = response.body.getReader();
 #### Camada 2 — REPL CLI (`scripts/copilot-repl.mjs`)
 
 **Funcionalidades**:
+
 - `> <mensagem>` → POST /api/copilot/send → aguarda `task.completed` via SSE
-- Quando `question.pending` chega → suspende input → exibe pergunta → aguarda digitação → POST /api/copilot/answer
+- Quando `question.pending` chega → suspende input → exibe pergunta → aguarda digitação → POST
+  /api/copilot/answer
 - `/status` → GET /api/copilot/status (formatado)
 - `/quit` → encerra o REPL
 - `/history N` → exibe últimas N mensagens trocadas (log local)
@@ -3320,73 +3547,81 @@ const reader = response.body.getReader();
 ```
 
 **Uso**:
+
 ```bash
-npm run copilot:chat              # REPL interativo completo
-npm run copilot:stream            # Monitor de eventos brutos (jq formatado)
-npm run copilot:send "analisa X"  # Envio one-shot aguardando resposta
+npm run copilot:chat             # REPL interativo completo
+npm run copilot:stream           # Monitor de eventos brutos (jq formatado)
+npm run copilot:send "analisa X" # Envio one-shot aguardando resposta
 ```
 
 ### 20.5 O canal de LLM-A → LLM-B (programático)
 
-Para que LLM-A (este agente Copilot) consiga interagir com LLM-B eficientemente, o fluxo recomendado é:
+Para que LLM-A (este agente Copilot) consiga interagir com LLM-B eficientemente, o fluxo recomendado
+é:
 
 ```javascript
 // Uso pelo LLM-A durante um turno de trabalho (exemplo canonico)
 
 // 1. Enviar mensagem a LLM-B e aguardar resposta via SSE
 async function askLLMB(message, timeoutMs = 120000) {
-    // Abre SSE stream
-    const stream = await fetch('http://localhost:3008/api/copilot/stream');
-    const reader = stream.body.getReader();
+  // Abre SSE stream
+  const stream = await fetch('http://localhost:3008/api/copilot/stream');
+  const reader = stream.body.getReader();
 
-    // Envia mensagem
-    await fetch('http://localhost:3008/api/copilot/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
-    });
+  // Envia mensagem
+  await fetch('http://localhost:3008/api/copilot/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
 
-    // Aguarda task.completed no stream SSE
-    const decoder = new TextDecoder();
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const lines = decoder.decode(value).split('\n');
-        for (const line of lines) {
-            if (!line.startsWith('data:')) continue;
-            const event = JSON.parse(line.slice(5));
-            if (event.response !== undefined) {
-                reader.cancel();
-                return event.response;
-            }
-            // Se LLM-B fizer pergunta ao usuário, LLM-A pode responder automaticamente
-            if (event.question) {
-                await fetch('http://localhost:3008/api/copilot/answer', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ answer: 'continue com a análise autonomamente' }),
-                });
-            }
-        }
+  // Aguarda task.completed no stream SSE
+  const decoder = new TextDecoder();
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    const lines = decoder.decode(value).split('\n');
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const event = JSON.parse(line.slice(5));
+      if (event.response !== undefined) {
+        reader.cancel();
+        return event.response;
+      }
+      // Se LLM-B fizer pergunta ao usuário, LLM-A pode responder automaticamente
+      if (event.question) {
+        await fetch('http://localhost:3008/api/copilot/answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answer: 'continue com a análise autonomamente' }),
+        });
+      }
     }
-    throw new Error(`Timeout aguardando resposta de LLM-B (${timeoutMs}ms)`);
+  }
+  throw new Error(`Timeout aguardando resposta de LLM-B (${timeoutMs}ms)`);
 }
 
 // Em uso por LLM-A:
-const analysis = await askLLMB('Analise os erros TypeScript em src/kernel/ e liste os 5 mais críticos');
+const analysis = await askLLMB(
+  'Analise os erros TypeScript em src/kernel/ e liste os 5 mais críticos',
+);
 // → analysis: "Os 5 erros mais críticos são: ..."
 ```
 
-Esse padrão permite que **este agente (LLM-A) delegue subtarefas para LLM-B** de forma assíncrona, sem depender de polling ou timeouts fixos.
+Esse padrão permite que **este agente (LLM-A) delegue subtarefas para LLM-B** de forma assíncrona,
+sem depender de polling ou timeouts fixos.
 
 ### 20.6 Garantia de exclusividade de resposta (anti-race condition)
 
-Quando tanto LLM-A quanto o usuário humano podem responder a `onUserInputRequest`, surge um problema de race condition: ambos podem chamar `POST /api/copilot/answer` ao mesmo tempo.
+Quando tanto LLM-A quanto o usuário humano podem responder a `onUserInputRequest`, surge um problema
+de race condition: ambos podem chamar `POST /api/copilot/answer` ao mesmo tempo.
 
-**Solução atual (http-bridge.js)**: `answerPendingQuestion()` é idempotente — a segunda chamada retorna `false` e o endpoint retorna `409 Conflict`. Isso é suficiente para evitar dupla resposta.
+**Solução atual (http-bridge.js)**: `answerPendingQuestion()` é idempotente — a segunda chamada
+retorna `false` e o endpoint retorna `409 Conflict`. Isso é suficiente para evitar dupla resposta.
 
-**Melhoria recomendada**: Adicionar um campo `answeredBy: 'user' | 'llm-a' | 'system'` no payload de `/answer` para auditoria:
+**Melhoria recomendada**: Adicionar um campo `answeredBy: 'user' | 'llm-a' | 'system'` no payload de
+`/answer` para auditoria:
 
 ```javascript
 // POST /api/copilot/answer
@@ -3397,13 +3632,15 @@ E registrar no audit.jsonl quem respondeu cada pergunta — útil para debugging
 
 ### 20.7 Multi-usuário e sessões paralelas (futuro)
 
-O design atual suporta apenas 1 sessão `alwaysAliveAgent` (singleton). No futuro, para múltiplos usuários:
+O design atual suporta apenas 1 sessão `alwaysAliveAgent` (singleton). No futuro, para múltiplos
+usuários:
 
 - `alwaysAliveAgent` → `agentPool` (mapa de `userId → AlwaysAliveAgent`)
 - SSE stream → `GET /api/copilot/:userId/stream`
 - `POST /api/copilot/:userId/send`, `/answer`
 
-Isso reutilizaria toda a infraestrutura sem quebrar compatibilidade via um parâmetro de rota opcional com fallback para o singleton atual.
+Isso reutilizaria toda a infraestrutura sem quebrar compatibilidade via um parâmetro de rota
+opcional com fallback para o singleton atual.
 
 ### 20.8 Tabela de implementação do Upgrade 9
 
@@ -3411,14 +3648,16 @@ Isso reutilizaria toda a infraestrutura sem quebrar compatibilidade via um parâ
 | ---------------------------- | ------------------------------------ | ------- | -------------- |
 | SSE `/stream` no http-bridge | `src/copilot/http-bridge.js`         | 2h      | 4 testes SSE   |
 | REPL CLI interativo          | `scripts/copilot-repl.mjs`           | 3h      | Manual / E2E   |
-| npm scripts copilot:*        | `package.json`                       | 30min   | 0 (config)     |
+| npm scripts copilot:\*       | `package.json`                       | 30min   | 0 (config)     |
 | `answeredBy` no /answer      | `http-bridge.js` + `always-alive.js` | 1h      | 2 testes       |
 | `askLLMB()` utilitário LLM-A | `src/copilot/llm-bridge-client.mjs`  | 2h      | 4 testes       |
 | **Total Upgrade 9**          |                                      | **~8h** | **~10 testes** |
 
 ### 20.9 Próxima ação: implementar Upgrade 9 — SSE stream primeiro
 
-O artefato de maior impacto e menor risco é o **SSE stream do alwaysAliveAgent** (`GET /api/copilot/stream`). Ele é:
+O artefato de maior impacto e menor risco é o **SSE stream do alwaysAliveAgent**
+(`GET /api/copilot/stream`). Ele é:
+
 - Pré-requisito para o REPL CLI (Camada 2)
 - Pré-requisito para o `askLLMB()` utilitário do LLM-A
 - Já tem padrão estabelecido em `sdk-api.js` (`GET /sessions/:id/stream`)
@@ -3426,23 +3665,27 @@ O artefato de maior impacto e menor risco é o **SSE stream do alwaysAliveAgent*
 
 ---
 
-*Seção §20 adicionada em 2026-03-22 — v8.0. Design e proposta do terminal efetivo de interação contínua com LLM-B (Upgrade 9: SSE stream + REPL CLI + npm scripts).*
+_Seção §20 adicionada em 2026-03-22 — v8.0. Design e proposta do terminal efetivo de interação
+contínua com LLM-B (Upgrade 9: SSE stream + REPL CLI + npm scripts)._
 
 ---
 
 ## 21. Arquitetura de Sessão Verdadeiramente Infinita — Análise do SDK, Gaps e Upgrade 10
 
-**Data**: 2026-03-22 (segunda iteração — pós-leitura da documentação oficial)
-**Estímulo**: Aprofundamento sobre "conversa contínua" e "sessão infinita" real.
-**Fontes consultadas**: README oficial `@github/copilot-sdk v0.1.32`, código de `always-alive.js`, `session-manager.js`.
+**Data**: 2026-03-22 (segunda iteração — pós-leitura da documentação oficial) **Estímulo**:
+Aprofundamento sobre "conversa contínua" e "sessão infinita" real. **Fontes consultadas**: README
+oficial `@github/copilot-sdk v0.1.32`, código de `always-alive.js`, `session-manager.js`.
 
 ### 21.1 O que o SDK realmente oferece para sessions infinitas
 
-Após leitura da documentação oficial, ficou claro que o SDK já tem **suporte nativo** a duas funcionalidades críticas que NÃO estão sendo plenamente exploradas na arquitetura atual:
+Após leitura da documentação oficial, ficou claro que o SDK já tem **suporte nativo** a duas
+funcionalidades críticas que NÃO estão sendo plenamente exploradas na arquitetura atual:
 
 #### A) InfiniteSessions com compactação automática (JÁ ATIVO, mas silencioso)
 
-O `session-manager.js` já configura `infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 }`. Isso significa que:
+O `session-manager.js` já configura
+`infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 }`. Isso significa que:
+
 - Quando o contexto atinge 75% do limite da janela, o SDK inicia compactação em background
 - A sessão **nunca morre por estouro de contexto** — é compactada silenciosamente
 - Um `workspacePath` é criado em `~/.copilot/session-state/{sessionId}/` com checkpoints
@@ -3452,44 +3695,53 @@ O `session-manager.js` já configura `infiniteSessions: { enabled: true, backgro
 ```javascript
 // Eventos que existem mas não estão sendo subscritos em always-alive.js:
 session.on('session.compaction_start', (event) => {
-    // event.data contém token counts antes da compactação
+  // event.data contém token counts antes da compactação
 });
 session.on('session.compaction_complete', (event) => {
-    // event.data contém token counts depois da compactação
+  // event.data contém token counts depois da compactação
 });
 ```
 
-Sem esses listeners, o sistema não sabe quando está compactando, não pode alertar o usuário, e não tem métricas de uso de contexto.
+Sem esses listeners, o sistema não sabe quando está compactando, não pode alertar o usuário, e não
+tem métricas de uso de contexto.
 
 #### B) Streaming de tokens (`assistant.message_delta`) — NÃO CONFIGURADO
 
-O SDK suporta `streaming: true` em `createSession()`, que habilita o evento `assistant.message_delta` com `deltaContent` — tokens chegando incrementalmente como no ChatGPT web.
+O SDK suporta `streaming: true` em `createSession()`, que habilita o evento
+`assistant.message_delta` com `deltaContent` — tokens chegando incrementalmente como no ChatGPT web.
 
-**Estado atual**: `always-alive.js` usa `sendAndWait()` **sem streaming** — a resposta só chega quando o modelo termina completamente. Para conversas longas (análise de código, geração de arquivos), isso pode significar 30-120 segundos sem nenhum feedback para o usuário.
+**Estado atual**: `always-alive.js` usa `sendAndWait()` **sem streaming** — a resposta só chega
+quando o modelo termina completamente. Para conversas longas (análise de código, geração de
+arquivos), isso pode significar 30-120 segundos sem nenhum feedback para o usuário.
 
-**Estado ideal**: Com streaming ativo, cada token aparece imediatamente no terminal/interface, como `process.stdout.write(event.data.deltaContent)`.
+**Estado ideal**: Com streaming ativo, cada token aparece imediatamente no terminal/interface, como
+`process.stdout.write(event.data.deltaContent)`.
 
 #### C) `sendAndWait()` trunca a resposta em 500 chars (BUG ATUAL)
 
 No `always-alive.js` linha 325:
+
 ```javascript
 this.emit('task.completed', { taskId: task.id, response: text.slice(0, 500) });
 ```
 
-A resposta emitida via evento e enviada para o cliente HTTP é truncada em 500 chars. O `task.resolve(text)` recebe o texto completo, mas **o SSE event e o http-bridge recebem apenas os primeiros 500 caracteres**. Para o "terminal efetivo", isso é um problema grave — respostas longas chegam cortadas.
+A resposta emitida via evento e enviada para o cliente HTTP é truncada em 500 chars. O
+`task.resolve(text)` recebe o texto completo, mas **o SSE event e o http-bridge recebem apenas os
+primeiros 500 caracteres**. Para o "terminal efetivo", isso é um problema grave — respostas longas
+chegam cortadas.
 
 ### 21.2 Mapa completo de gaps entre o atual e o ideal
 
 | Capacidade                   | SDK suporta? | always-alive.js? | Gap                                        | Impacto                   |
 | ---------------------------- | :----------: | :--------------: | ------------------------------------------ | ------------------------- |
-| Sessão persistente em disco  |    ✅ sim     |      ✅ sim       | —                                          | —                         |
-| Compactação automática       |    ✅ sim     |   ✅ habilitada   | Eventos não capturados, sem métricas       | Médio (visibilidade)      |
-| Streaming de tokens          |    ✅ sim     |      ❌ não       | Sem `streaming: true`, sem `message_delta` | **Alto** (UX fatal)       |
-| Resposta completa ao cliente |    ✅ sim     |  ❌ trunca 500ch  | `text.slice(0, 500)` em task.completed     | **Alto** (dados perdidos) |
-| SSE stream global do agente  |  ✅ via Node  |   ❌ não existe   | Nenhum endpoint `/api/copilot/stream`      | **Alto** (sem canal push) |
-| Eventos de compactação       | ✅ SDK emite  | ❌ não subscrito  | `session.compaction_start/complete`        | Médio (observabilidade)   |
-| `workspacePath` exposto      |    ✅ sim     |  ❌ não exposto   | Campo não retornado em nenhuma rota        | Baixo                     |
-| Múltiplos modelos em sessões |    ✅ sim     | ❌ fixo `#model`  | Não pode alterar modelo sem nova sessão    | Baixo                     |
+| Sessão persistente em disco  |    ✅ sim    |      ✅ sim      | —                                          | —                         |
+| Compactação automática       |    ✅ sim    |  ✅ habilitada   | Eventos não capturados, sem métricas       | Médio (visibilidade)      |
+| Streaming de tokens          |    ✅ sim    |      ❌ não      | Sem `streaming: true`, sem `message_delta` | **Alto** (UX fatal)       |
+| Resposta completa ao cliente |    ✅ sim    | ❌ trunca 500ch  | `text.slice(0, 500)` em task.completed     | **Alto** (dados perdidos) |
+| SSE stream global do agente  | ✅ via Node  |  ❌ não existe   | Nenhum endpoint `/api/copilot/stream`      | **Alto** (sem canal push) |
+| Eventos de compactação       | ✅ SDK emite | ❌ não subscrito | `session.compaction_start/complete`        | Médio (observabilidade)   |
+| `workspacePath` exposto      |    ✅ sim    |  ❌ não exposto  | Campo não retornado em nenhuma rota        | Baixo                     |
+| Múltiplos modelos em sessões |    ✅ sim    | ❌ fixo `#model` | Não pode alterar modelo sem nova sessão    | Baixo                     |
 
 ### 21.3 Proposta de arquitetura para conversa infinita LLM-A ↔ LLM-B
 
@@ -3588,6 +3840,7 @@ Para habilitar streaming real de tokens, o `#processQueue()` deve ser reescrito 
 ```
 
 **Mudanças chave**:
+
 - Novo evento `task.delta` com `{ taskId, chunk }` para streaming
 - Remoção do `.slice(0, 500)` em `task.completed`
 - Adição de `responseLen` para auditoria sem truncamento
@@ -3599,13 +3852,19 @@ Em `session-manager.js`, após criar/retomar a sessão, adicionar listeners para
 ```javascript
 // APÓS session = await client.createSession(createConfig) ou client.resumeSession():
 session.on('session.compaction_start', (event) => {
-    log('INFO', `[PersistentSession] Compactando contexto... tokens antes: ${event.data?.tokensBefore ?? '?'}`);
-    // Emite evento para que AlwaysAliveAgent possa repassar ao stream SSE
-    sessionOptions.onCompactionStart?.(event.data);
+  log(
+    'INFO',
+    `[PersistentSession] Compactando contexto... tokens antes: ${event.data?.tokensBefore ?? '?'}`,
+  );
+  // Emite evento para que AlwaysAliveAgent possa repassar ao stream SSE
+  sessionOptions.onCompactionStart?.(event.data);
 });
 session.on('session.compaction_complete', (event) => {
-    log('INFO', `[PersistentSession] Compactação completa. tokens depois: ${event.data?.tokensAfter ?? '?'}`);
-    sessionOptions.onCompactionComplete?.(event.data);
+  log(
+    'INFO',
+    `[PersistentSession] Compactação completa. tokens depois: ${event.data?.tokensAfter ?? '?'}`,
+  );
+  sessionOptions.onCompactionComplete?.(event.data);
 });
 ```
 
@@ -3613,9 +3872,9 @@ E no `always-alive.js`, adicionar handlers:
 
 ```javascript
 const { session, isResumed } = await initOrResumeSession(this.#client, {
-    // ... config atual ...
-    onCompactionStart: (data) => this.emit('session.compaction_start', data),
-    onCompactionComplete: (data) => this.emit('session.compaction_complete', data),
+  // ... config atual ...
+  onCompactionStart: (data) => this.emit('session.compaction_start', data),
+  onCompactionComplete: (data) => this.emit('session.compaction_complete', data),
 });
 ```
 
@@ -3656,6 +3915,7 @@ data: {"ts":1742000015000}
 ```
 
 Isso permite:
+
 - **Cliente REPL**: `process.stdout.write(chunk)` para simular streaming visual
 - **LLM-A**: acumular `chunk`s até `task.completed` para ter resposta completa
 - **Frontend**: atualizar UI incrementalmente como ChatGPT web
@@ -3669,20 +3929,19 @@ Este módulo é o artefato mais importante para **LLM-A conversar com LLM-B de f
 /**
  * Cliente de conversa para LLM-A interagir com LLM-B via http-bridge + SSE.
  *
- * Permite conversas de múltiplos turnos, com streaming, respostas automáticas
- * a perguntas e timeout configurável.
+ * Permite conversas de múltiplos turnos, com streaming, respostas automáticas a perguntas e timeout configurável.
  *
  * @example
- * // Turno simples
- * const response = await askLLMB('Analisa src/kernel/**');
+ *   // Turno simples
+ *   const response = await askLLMB('Analisa src/kernel/**');
  *
- * // Com opções avançadas
- * const response = await askLLMB('Lê e corrige os TypeScript errors', {
- *     maxTurns: 10,          // Continua até 10 turnos de conversa
- *     autoAnswer: true,       // Responde automaticamente a perguntas do modelo
+ *   // Com opções avançadas
+ *   const response = await askLLMB('Lê e corrige os TypeScript errors', {
+ *     maxTurns: 10, // Continua até 10 turnos de conversa
+ *     autoAnswer: true, // Responde automaticamente a perguntas do modelo
  *     onDelta: process.stdout.write.bind(process.stdout), // Streaming visual
- *     timeoutMs: 300_000,    // 5 minutos para tarefas longas
- * });
+ *     timeoutMs: 300_000, // 5 minutos para tarefas longas
+ *   });
  */
 
 const BASE = 'http://localhost:3008/api/copilot';
@@ -3700,119 +3959,122 @@ const BASE = 'http://localhost:3008/api/copilot';
  * @returns {Promise<string>}
  */
 export async function askLLMB(message, opts = {}) {
-    const {
-        maxTurns = 1,
-        autoAnswer = true,
-        onDelta,
-        onQuestion,
-        timeoutMs = 120_000,
-        answeredBy = 'llm-a',
-    } = opts;
+  const {
+    maxTurns = 1,
+    autoAnswer = true,
+    onDelta,
+    onQuestion,
+    timeoutMs = 120_000,
+    answeredBy = 'llm-a',
+  } = opts;
 
-    // 1. Abre SSE stream antes de enviar mensagem
-    const streamRes = await fetch(`${BASE}/stream`);
-    const reader = streamRes.body.getReader();
-    const decoder = new TextDecoder();
+  // 1. Abre SSE stream antes de enviar mensagem
+  const streamRes = await fetch(`${BASE}/stream`);
+  const reader = streamRes.body.getReader();
+  const decoder = new TextDecoder();
 
-    // 2. Envia mensagem
-    await fetch(`${BASE}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
-    });
+  // 2. Envia mensagem
+  await fetch(`${BASE}/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
 
-    // 3. Lê stream até task.completed ou timeout
-    let accumulator = '';
-    const deadline = Date.now() + timeoutMs;
-    let turnsLeft = maxTurns;
-    let buffer = '';
+  // 3. Lê stream até task.completed ou timeout
+  let accumulator = '';
+  const deadline = Date.now() + timeoutMs;
+  let turnsLeft = maxTurns;
+  let buffer = '';
 
-    while (Date.now() < deadline && turnsLeft >= 0) {
-        const { value, done } = await reader.read();
-        if (done) break;
+  while (Date.now() < deadline && turnsLeft >= 0) {
+    const { value, done } = await reader.read();
+    if (done) break;
 
-        buffer += decoder.decode(value);
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? ''; // última linha pode estar incompleta
+    buffer += decoder.decode(value);
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? ''; // última linha pode estar incompleta
 
-        for (const line of lines) {
-            if (!line.startsWith('data:')) continue;
-            let event;
-            try { event = JSON.parse(line.slice(5).trim()); } catch { continue; }
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      let event;
+      try {
+        event = JSON.parse(line.slice(5).trim());
+      } catch {
+        continue;
+      }
 
-            // Streaming de token
-            if (event.chunk !== undefined && onDelta) {
-                onDelta(event.chunk);
-                accumulator += event.chunk;
-            }
+      // Streaming de token
+      if (event.chunk !== undefined && onDelta) {
+        onDelta(event.chunk);
+        accumulator += event.chunk;
+      }
 
-            // Pergunta pendente do modelo
-            if (event.question !== undefined) {
-                let answer = 'Continue autonomamente.';
-                if (onQuestion) {
-                    answer = await onQuestion({ question: event.question, choices: event.choices });
-                } else if (autoAnswer && event.choices?.length > 0) {
-                    answer = event.choices[0]; // primeiro choice como default
-                }
-                await fetch(`${BASE}/answer`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ answer, answeredBy }),
-                });
-                turnsLeft--;
-            }
-
-            // Resposta final completa
-            if (event.response !== undefined) {
-                reader.cancel();
-                return event.response || accumulator;
-            }
-
-            // Erro
-            if (event.error !== undefined) {
-                reader.cancel();
-                throw new Error(`LLM-B error: ${event.error}`);
-            }
+      // Pergunta pendente do modelo
+      if (event.question !== undefined) {
+        let answer = 'Continue autonomamente.';
+        if (onQuestion) {
+          answer = await onQuestion({ question: event.question, choices: event.choices });
+        } else if (autoAnswer && event.choices?.length > 0) {
+          answer = event.choices[0]; // primeiro choice como default
         }
-    }
+        await fetch(`${BASE}/answer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answer, answeredBy }),
+        });
+        turnsLeft--;
+      }
 
-    reader.cancel();
-    if (accumulator) return accumulator;
-    throw new Error(`Timeout de ${timeoutMs}ms aguardando LLM-B`);
+      // Resposta final completa
+      if (event.response !== undefined) {
+        reader.cancel();
+        return event.response || accumulator;
+      }
+
+      // Erro
+      if (event.error !== undefined) {
+        reader.cancel();
+        throw new Error(`LLM-B error: ${event.error}`);
+      }
+    }
+  }
+
+  reader.cancel();
+  if (accumulator) return accumulator;
+  throw new Error(`Timeout de ${timeoutMs}ms aguardando LLM-B`);
 }
 
 /**
  * Conversa de múltiplos turnos — envia N mensagens sequencialmente.
  *
- * @param {Array<string>} messages
+ * @param {string[]} messages
  * @param {Parameters<typeof askLLMB>[1]} [opts]
- * @returns {Promise<Array<{ question: string; answer: string }>>}
+ * @returns {Promise<{ question: string; answer: string }[]>}
  */
 export async function converseLLMB(messages, opts = {}) {
-    const conversation = [];
-    for (const message of messages) {
-        const answer = await askLLMB(message, opts);
-        conversation.push({ question: message, answer });
-    }
-    return conversation;
+  const conversation = [];
+  for (const message of messages) {
+    const answer = await askLLMB(message, opts);
+    conversation.push({ question: message, answer });
+  }
+  return conversation;
 }
 
 /**
- * Delega uma sub-tarefa para LLM-B e aguarda conclusão.
- * Ideal para uso em fluxos autônomos de LLM-A.
+ * Delega uma sub-tarefa para LLM-B e aguarda conclusão. Ideal para uso em fluxos autônomos de LLM-A.
  *
  * @param {string} task - Descrição da tarefa para LLM-B
  * @param {string} [context] - Contexto adicional opcional
  * @returns {Promise<string>}
  */
 export async function delegateToLLMB(task, context = '') {
-    const prompt = context ? `Contexto: ${context}\n\nTarefa: ${task}` : task;
-    return askLLMB(prompt, {
-        maxTurns: 5,
-        autoAnswer: true,
-        timeoutMs: 300_000, // 5 minutos
-        answeredBy: 'llm-a',
-    });
+  const prompt = context ? `Contexto: ${context}\n\nTarefa: ${task}` : task;
+  return askLLMB(prompt, {
+    maxTurns: 5,
+    autoAnswer: true,
+    timeoutMs: 300_000, // 5 minutos
+    answeredBy: 'llm-a',
+  });
 }
 ```
 
@@ -3829,83 +4091,89 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 
 // SSE stream para receber eventos em tempo real
 async function* sseEvents(url) {
-    const res = await fetch(url);
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value);
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-            if (line.startsWith('event:')) continue; // pula linha de evento
-            if (!line.startsWith('data:')) continue;
-            try { yield JSON.parse(line.slice(5).trim()); } catch { /* skip */ }
-        }
+  const res = await fetch(url);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value);
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      if (line.startsWith('event:')) continue; // pula linha de evento
+      if (!line.startsWith('data:')) continue;
+      try {
+        yield JSON.parse(line.slice(5).trim());
+      } catch {
+        /* skip */
+      }
     }
+  }
 }
 
 console.log('\x1b[36m╔══════════════════════════════════════╗');
 console.log('║  🤖  Copilot Terminal — LLM-B        ║');
 console.log('╚══════════════════════════════════════╝\x1b[0m\n');
 
-const statusRes = await fetch(`${BASE}/status`).then(r => r.json());
-console.log(`\x1b[90mStatus: ${statusRes.status} | Session: ${statusRes.sessionId?.slice(0, 12)}...\x1b[0m\n`);
+const statusRes = await fetch(`${BASE}/status`).then((r) => r.json());
+console.log(
+  `\x1b[90mStatus: ${statusRes.status} | Session: ${statusRes.sessionId?.slice(0, 12)}...\x1b[0m\n`,
+);
 
 // Inicia leitura de stream em background
 let questionResolver = null;
 (async () => {
-    for await (const event of sseEvents(`${BASE}/stream`)) {
-        if (event.chunk !== undefined) {
-            process.stdout.write('\x1b[32m' + event.chunk + '\x1b[0m');
-        }
-        if (event.response !== undefined) {
-            process.stdout.write('\n\n');
-        }
-        if (event.question !== undefined) {
-            process.stdout.write(`\n\x1b[33m❓ ${event.question}\x1b[0m`);
-            if (event.choices?.length) {
-                event.choices.forEach((c, i) => process.stdout.write(`\n   [${i+1}] ${c}`));
-            }
-            // Sinaliza para o REPL que há uma pergunta aguardando
-            questionResolver?.(event);
-        }
-        if (event.tokensBefore !== undefined) {
-            console.log(`\x1b[90m\n[Compactando contexto... ${event.tokensBefore} → aguarde]\x1b[0m`);
-        }
-        if (event.tokensAfter !== undefined) {
-            console.log(`\x1b[90m[Compactação completa. ${event.tokensAfter} tokens no contexto]\x1b[0m`);
-        }
+  for await (const event of sseEvents(`${BASE}/stream`)) {
+    if (event.chunk !== undefined) {
+      process.stdout.write('\x1b[32m' + event.chunk + '\x1b[0m');
     }
+    if (event.response !== undefined) {
+      process.stdout.write('\n\n');
+    }
+    if (event.question !== undefined) {
+      process.stdout.write(`\n\x1b[33m❓ ${event.question}\x1b[0m`);
+      if (event.choices?.length) {
+        event.choices.forEach((c, i) => process.stdout.write(`\n   [${i + 1}] ${c}`));
+      }
+      // Sinaliza para o REPL que há uma pergunta aguardando
+      questionResolver?.(event);
+    }
+    if (event.tokensBefore !== undefined) {
+      console.log(`\x1b[90m\n[Compactando contexto... ${event.tokensBefore} → aguarde]\x1b[0m`);
+    }
+    if (event.tokensAfter !== undefined) {
+      console.log(`\x1b[90m[Compactação completa. ${event.tokensAfter} tokens no contexto]\x1b[0m`);
+    }
+  }
 })();
 
 while (true) {
-    const input = await rl.question('\x1b[34m> \x1b[0m');
-    const msg = input.trim();
+  const input = await rl.question('\x1b[34m> \x1b[0m');
+  const msg = input.trim();
 
-    if (!msg) continue;
-    if (msg === '/quit' || msg === '/q') break;
-    if (msg === '/status') {
-        const s = await fetch(`${BASE}/status`).then(r => r.json());
-        console.log(JSON.stringify(s, null, 2));
-        continue;
-    }
-    if (msg.startsWith('/answer ')) {
-        await fetch(`${BASE}/answer`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ answer: msg.slice(8), answeredBy: 'user' }),
-        });
-        continue;
-    }
-
-    await fetch(`${BASE}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg }),
+  if (!msg) continue;
+  if (msg === '/quit' || msg === '/q') break;
+  if (msg === '/status') {
+    const s = await fetch(`${BASE}/status`).then((r) => r.json());
+    console.log(JSON.stringify(s, null, 2));
+    continue;
+  }
+  if (msg.startsWith('/answer ')) {
+    await fetch(`${BASE}/answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answer: msg.slice(8), answeredBy: 'user' }),
     });
+    continue;
+  }
+
+  await fetch(`${BASE}/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: msg }),
+  });
 }
 
 rl.close();
@@ -3916,14 +4184,14 @@ console.log('\x1b[90m[Terminal encerrado]\x1b[0m');
 
 | Item                               | Arquivo                                  | Esforço  | Testes   | Prioridade |
 | ---------------------------------- | ---------------------------------------- | -------- | -------- | ---------- |
-| Corrigir truncamento 500ch         | `always-alive.js` linha ~325             | 30min    | 1 teste  | 🔴 CRÍTICO  |
-| Adicionar `task.delta` (streaming) | `always-alive.js` #processQueue          | 2h       | 3 testes | 🔴 CRÍTICO  |
-| Evento compactação em always-alive | `always-alive.js` + `session-manager.js` | 1h       | 2 testes | 🟡 MÉDIO    |
-| SSE `/stream` em http-bridge       | `http-bridge.js`                         | 2h       | 4 testes | 🔴 CRÍTICO  |
-| `llm-bridge-client.mjs`            | `src/copilot/llm-bridge-client.mjs`      | 3h       | 4 testes | 🔴 CRÍTICO  |
-| REPL CLI com streaming visual      | `scripts/copilot-repl.mjs`               | 2h       | Manual   | 🟡 MÉDIO    |
-| npm scripts `copilot:*`            | `package.json`                           | 20min    | 0        | 🟢 BAIXO    |
-| `workspacePath` em GET /session    | `http-bridge.js`                         | 20min    | 1 teste  | 🟢 BAIXO    |
+| Corrigir truncamento 500ch         | `always-alive.js` linha ~325             | 30min    | 1 teste  | 🔴 CRÍTICO |
+| Adicionar `task.delta` (streaming) | `always-alive.js` #processQueue          | 2h       | 3 testes | 🔴 CRÍTICO |
+| Evento compactação em always-alive | `always-alive.js` + `session-manager.js` | 1h       | 2 testes | 🟡 MÉDIO   |
+| SSE `/stream` em http-bridge       | `http-bridge.js`                         | 2h       | 4 testes | 🔴 CRÍTICO |
+| `llm-bridge-client.mjs`            | `src/copilot/llm-bridge-client.mjs`      | 3h       | 4 testes | 🔴 CRÍTICO |
+| REPL CLI com streaming visual      | `scripts/copilot-repl.mjs`               | 2h       | Manual   | 🟡 MÉDIO   |
+| npm scripts `copilot:*`            | `package.json`                           | 20min    | 0        | 🟢 BAIXO   |
+| `workspacePath` em GET /session    | `http-bridge.js`                         | 20min    | 1 teste  | 🟢 BAIXO   |
 | **Total Upgrade 10**               |                                          | **~11h** | **~15**  |            |
 
 ### 21.10 Sequência de implementação recomendada (ordem de impacto)
@@ -3951,15 +4219,22 @@ Sprint 4 (UX completo, ~2h):
 
 ### 21.11 Reflexão final — "sessão infinita" é mais que contexto: é continuidade de conversação
 
-A verdadeira sessão infinita com LLM-B não é apenas "não estoura a janela de contexto" (isso o SDK já resolve com `infiniteSessions`). É:
+A verdadeira sessão infinita com LLM-B não é apenas "não estoura a janela de contexto" (isso o SDK
+já resolve com `infiniteSessions`). É:
 
-1. **Continuidade de identidade**: LLM-B sempre sabe quem é, qual o projeto, qual o estado atual — via `systemMessage` injetado com `injectHookContext: true`
-2. **Continuidade de memória**: Os `checkpoints/` em `workspacePath` contêm o histórico compactado — LLM-B pode ser "relembrada" do que fez antes via `/ler checkpoints/`
-3. **Continuidade de contexto técnico**: A sessão resume exatamente de onde parou — arquivos modificados, erros conhecidos, tarefas pendentes — tudo persiste em disco
-4. **Continuidade de interação**: O SSE stream + REPL CLI garantem que **já conversa intermediária** não é perdida — LLM-A ou o usuário pode retomar do ponto exato
-5. **Continuidade semântica da conversa**: LLM-B não "esquece" — a compactação resume, não apaga. O modelo pode ser perguntado "O que você fez antes?" e responderá com base no checkpoint compactado
+1. **Continuidade de identidade**: LLM-B sempre sabe quem é, qual o projeto, qual o estado atual —
+   via `systemMessage` injetado com `injectHookContext: true`
+2. **Continuidade de memória**: Os `checkpoints/` em `workspacePath` contêm o histórico compactado —
+   LLM-B pode ser "relembrada" do que fez antes via `/ler checkpoints/`
+3. **Continuidade de contexto técnico**: A sessão resume exatamente de onde parou — arquivos
+   modificados, erros conhecidos, tarefas pendentes — tudo persiste em disco
+4. **Continuidade de interação**: O SSE stream + REPL CLI garantem que **já conversa intermediária**
+   não é perdida — LLM-A ou o usuário pode retomar do ponto exato
+5. **Continuidade semântica da conversa**: LLM-B não "esquece" — a compactação resume, não apaga. O
+   modelo pode ser perguntado "O que você fez antes?" e responderá com base no checkpoint compactado
 
 Para LLM-A (este agente), a "sessão infinita com LLM-B" significa:
+
 - Poder **delegar subtarefas longas** (`delegateToLLMB(task)`) sem timeout
 - Poder **monitorar progresso** via stream (`task.delta`)
 - Poder **responder perguntas automaticamente** (`autoAnswer: true`)
@@ -3968,19 +4243,24 @@ Para LLM-A (este agente), a "sessão infinita com LLM-B" significa:
 
 ---
 
-*Seção §21 adicionada em 2026-03-22 — v9.0. Análise profunda dos gaps entre SDK 0.1.32 e implementação atual; proposta completa de Upgrade 10 (streaming + SSE + llm-bridge-client + REPL CLI) para sessão verdadeiramente infinita e terminal efetivo LLM-A↔LLM-B.*
+_Seção §21 adicionada em 2026-03-22 — v9.0. Análise profunda dos gaps entre SDK 0.1.32 e
+implementação atual; proposta completa de Upgrade 10 (streaming + SSE + llm-bridge-client + REPL
+CLI) para sessão verdadeiramente infinita e terminal efetivo LLM-A↔LLM-B._
 
 ---
 
 ## 22. Sprints 7–9: Shutdown Gracioso, Health Check e Dialog Loop (2026)
 
-*Adicionado em 2026-03-23 — v10.0. Documentação das implementações de produção dos Sprints 7, 8 e 9: graceful shutdown, health check endpoint e o arquiteturalmente central Dialog Loop (padrão §15.8 em produção).*
+_Adicionado em 2026-03-23 — v10.0. Documentação das implementações de produção dos Sprints 7, 8 e 9:
+graceful shutdown, health check endpoint e o arquiteturalmente central Dialog Loop (padrão §15.8 em
+produção)._
 
 ---
 
 ### 22.1 Sprint 7 — Graceful Shutdown com Drenagem de Fila
 
-**Problema:** O `AlwaysAliveAgent` não tinha encerramento controlado. Ao receber sinal de parada (`/stop`), mensagens em processamento eram descartadas silenciosamente.
+**Problema:** O `AlwaysAliveAgent` não tinha encerramento controlado. Ao receber sinal de parada
+(`/stop`), mensagens em processamento eram descartadas silenciosamente.
 
 **Solução implementada em `src/copilot/always-alive.js`:**
 
@@ -4010,6 +4290,7 @@ async stop() {
 ```
 
 **Garantias:**
+
 - Task in-flight recebe no máximo 30s para concluir antes do force-stop
 - Fila pendente é drenada com rejeição limpa (sem perda silenciosa)
 - Idempotente: múltiplas chamadas a `stop()` são seguras
@@ -4035,7 +4316,8 @@ sendMessage(content) {
 }
 ```
 
-**Comportamento:** Rejeita imediatamente com erro descritivo quando fila cheia. O caller é responsável por backpressure (retry com espera).
+**Comportamento:** Rejeita imediatamente com erro descritivo quando fila cheia. O caller é
+responsável por backpressure (retry com espera).
 
 #### Endpoint `GET /health`
 
@@ -4044,20 +4326,21 @@ Endpoint padronizado para probes de liveness/readiness:
 ```javascript
 // GET /health — 200 (healthy) | 503 (unhealthy)
 bridge.get('/health', (_req, res) => {
-    const status = alwaysAliveAgent.getStatus();
-    const healthy = status === 'idle' || status === 'processing';
-    res.status(healthy ? 200 : 503).json({
-        healthy,
-        status,
-        sessionId: alwaysAliveAgent.getSessionId() ?? null,
-        queueSize: alwaysAliveAgent.getQueueSize(),
-        starvationAlert: alwaysAliveAgent.isStarvationAlert(),
-        uptime: alwaysAliveAgent.getUptime() ?? null,
-    });
+  const status = alwaysAliveAgent.getStatus();
+  const healthy = status === 'idle' || status === 'processing';
+  res.status(healthy ? 200 : 503).json({
+    healthy,
+    status,
+    sessionId: alwaysAliveAgent.getSessionId() ?? null,
+    queueSize: alwaysAliveAgent.getQueueSize(),
+    starvationAlert: alwaysAliveAgent.isStarvationAlert(),
+    uptime: alwaysAliveAgent.getUptime() ?? null,
+  });
 });
 ```
 
 **Semântica:**
+
 - `200`: agent `idle` ou `processing` — apto a receber mensagens
 - `503`: agent `stopped`, `starting` ou `stopping` — não pronto
 - Campos extras permitem dashboards de monitoramento sem polling `/status`
@@ -4068,11 +4351,13 @@ bridge.get('/health', (_req, res) => {
 
 ### 22.3 Sprint 9 — Dialog Loop: Conversa Multi-Turno com Zero PRs Adicionais
 
-Esta é a implementação mais arquiteturalmente significativa das três: o **Dialog Loop** resolve o problema fundamental de interação LLM-A↔LLM-B de forma eficiente em PRs.
+Esta é a implementação mais arquiteturalmente significativa das três: o **Dialog Loop** resolve o
+problema fundamental de interação LLM-A↔LLM-B de forma eficiente em PRs.
 
 #### 22.3.1 O Problema: Custo de PR por Turno
 
-Na arquitetura anterior, cada mensagem enviada à LLM-B consumia **1 PR (Pull Request)** do GitHub Copilot:
+Na arquitetura anterior, cada mensagem enviada à LLM-B consumia **1 PR (Pull Request)** do GitHub
+Copilot:
 
 ```
 LLM-A: sendMessage("Quais arquivos você modificou?")  → 1 PR usado
@@ -4084,7 +4369,8 @@ Para 50 turnos de conversa: **50 PRs consumidos**.
 
 #### 22.3.2 A Solução: Protocolo ask_user em Loop Infinito
 
-Baseado no padrão §15 (Arquitetura 'Sessão Suspensa'), a LLM-B pode entrar em um loop infinito de `ask_user()` que consome **1 único PR** para toda a sessão de diálogo:
+Baseado no padrão §15 (Arquitetura 'Sessão Suspensa'), a LLM-B pode entrar em um loop infinito de
+`ask_user()` que consome **1 único PR** para toda a sessão de diálogo:
 
 ```javascript
 // Boot prompt enviado à LLM-B (1 PR total)
@@ -4101,17 +4387,18 @@ Inicie o loop agora.
 `;
 ```
 
-**Cada `ask_user()` invocado pela LLM-B é interceptado pelo handler `#handleUserInputRequest`**, que funciona como ponte entre o loop da LLM-B e o código Node.js do caller.
+**Cada `ask_user()` invocado pela LLM-B é interceptado pelo handler `#handleUserInputRequest`**, que
+funciona como ponte entre o loop da LLM-B e o código Node.js do caller.
 
 #### 22.3.3 Protocolo de Sinalização
 
 O Dialog Loop usa um protocolo de mensagens estruturadas via `ask_user`:
 
-| Prefixo da pergunta | Significado | Ação do handler |
-|---|---|---|
-| `READY:` | LLM-B sinalizou que está pronta para receber input | Emite `dialog.ready`, aguarda `sendDialogTurn()` |
-| `REPLY: {texto}` | LLM-B enviou uma resposta ao último turno | Emite `dialog.reply`, extrai texto após `REPLY:` |
-| `STOP_DIALOG` | Confirmação de encerramento | Emite `dialog.stopped`, retorna `{ answer: 'OK' }` |
+| Prefixo da pergunta | Significado                                        | Ação do handler                                    |
+| ------------------- | -------------------------------------------------- | -------------------------------------------------- |
+| `READY:`            | LLM-B sinalizou que está pronta para receber input | Emite `dialog.ready`, aguarda `sendDialogTurn()`   |
+| `REPLY: {texto}`    | LLM-B enviou uma resposta ao último turno          | Emite `dialog.reply`, extrai texto após `REPLY:`   |
+| `STOP_DIALOG`       | Confirmação de encerramento                        | Emite `dialog.stopped`, retorna `{ answer: 'OK' }` |
 
 #### 22.3.4 Implementação: `#handleUserInputRequest` Modificado
 
@@ -4155,7 +4442,7 @@ Inicia o loop infinito na LLM-B. Retorna quando LLM-B sinaliza `READY:` pela pri
 
 ```javascript
 agent.on('dialog.ready', ({ reply }) => {
-    console.log('LLM-B pronta:', reply);
+  console.log('LLM-B pronta:', reply);
 });
 
 await agent.startDialogLoop(`
@@ -4192,12 +4479,12 @@ await agent.stopDialogLoop();
 const client = new LlmBridgeClient(alwaysAliveAgent);
 
 await client.startDialogMode(bootPrompt, {
-    onReady: (msg) => console.log('[READY]', msg),
-    onReply: (reply) => console.log('[LLM-B]', reply),
-    onDone: () => console.log('[DONE] Loop encerrado'),
+  onReady: (msg) => console.log('[READY]', msg),
+  onReply: (reply) => console.log('[LLM-B]', reply),
+  onDone: () => console.log('[DONE] Loop encerrado'),
 });
 
-const r1 = await client.dialogTurn('Olá!');        // → "Olá! Como posso ajudar?"
+const r1 = await client.dialogTurn('Olá!'); // → "Olá! Como posso ajudar?"
 const r2 = await client.dialogTurn('Qual hora é?'); // → "Não tenho acesso ao relógio..."
 await client.stopDialogMode();
 ```
@@ -4213,6 +4500,7 @@ POST /api/copilot/dialog/stop   — Encerra loop
 ```
 
 **POST /dialog/start:**
+
 ```json
 // Request:
 { "bootPrompt": "string — instruções para LLM-B" }
@@ -4228,6 +4516,7 @@ POST /api/copilot/dialog/stop   — Encerra loop
 ```
 
 **POST /dialog/turn:**
+
 ```json
 // Request:
 { "message": "string", "timeoutMs": 60000 }
@@ -4243,6 +4532,7 @@ POST /api/copilot/dialog/stop   — Encerra loop
 ```
 
 **POST /dialog/stop:**
+
 ```json
 // Response 200:
 { "ok": true, "message": "Modo diálogo encerrado." }
@@ -4254,14 +4544,15 @@ O stream SSE (`GET /stream`) transmite eventos em tempo real do dialog loop:
 
 ```javascript
 const AGENT_EVENTS = [
-    // ... eventos existentes ...
-    'dialog.ready',    // LLM-B sinalizou pronta (após startDialogLoop)
-    'dialog.reply',    // LLM-B enviou reply (após sendDialogTurn)
-    'dialog.stopped',  // Loop encerrado (após stopDialogLoop)
+  // ... eventos existentes ...
+  'dialog.ready', // LLM-B sinalizou pronta (após startDialogLoop)
+  'dialog.reply', // LLM-B enviou reply (após sendDialogTurn)
+  'dialog.stopped', // Loop encerrado (após stopDialogLoop)
 ];
 ```
 
 **Payload dos eventos:**
+
 ```json
 // dialog.ready
 { "type": "dialog.ready" }
@@ -4306,25 +4597,25 @@ Economia: ~80% vs método anterior (5 PRs)
 
 #### 22.3.10 Cobertura de Testes
 
-| Arquivo | Testes | Cobertura |
-|---|---|---|
-| `test_always_alive_dialog_loop.spec.js` | 23 | startDialogLoop, sendDialogTurn, stopDialogLoop, interceptação READY/REPLY/STOP_DIALOG, timeout, guards |
-| `test_http_bridge_dialog.spec.js` | 22 | POST /dialog/*, validação 400, error handling 503, SSE events |
-| **Total Sprint 9** | **45** | — |
+| Arquivo                                 | Testes | Cobertura                                                                                               |
+| --------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| `test_always_alive_dialog_loop.spec.js` | 23     | startDialogLoop, sendDialogTurn, stopDialogLoop, interceptação READY/REPLY/STOP_DIALOG, timeout, guards |
+| `test_http_bridge_dialog.spec.js`       | 22     | POST /dialog/\*, validação 400, error handling 503, SSE events                                          |
+| **Total Sprint 9**                      | **45** | —                                                                                                       |
 
 ---
 
 ### 22.4 Evolução da Contagem de Testes
 
-| Sprint | Incremento | Total |
-|---|---|---|
-| Base (pré-sessão) | — | 903 |
-| Sprints 1–6 (streaming, diagnostics, backoff) | +79 | 982 |
-| Sprint 7 (graceful shutdown) | +12 | 994 |
-| Sprint 8 (MAX_QUEUE_SIZE + /health) | +24 | 1018 |
-| Sprint 9a (dialog loop — always-alive) | +23 | 1041 |
-| Sprint 9b (http routes dialog) | +19 | 1060 |
-| Sprint 9c (SSE dialog events) | +3 | **1063** |
+| Sprint                                        | Incremento | Total    |
+| --------------------------------------------- | ---------- | -------- |
+| Base (pré-sessão)                             | —          | 903      |
+| Sprints 1–6 (streaming, diagnostics, backoff) | +79        | 982      |
+| Sprint 7 (graceful shutdown)                  | +12        | 994      |
+| Sprint 8 (MAX_QUEUE_SIZE + /health)           | +24        | 1018     |
+| Sprint 9a (dialog loop — always-alive)        | +23        | 1041     |
+| Sprint 9b (http routes dialog)                | +19        | 1060     |
+| Sprint 9c (SSE dialog events)                 | +3         | **1063** |
 
 ---
 
@@ -4366,4 +4657,152 @@ LLM-A (Node.js)               AlwaysAliveAgent          LLM-B (Copilot)
 
 ---
 
-*Seção §22 adicionada em 2026-03-23 — v10.0. Sprints 7–9 documentados: graceful shutdown com drenagem de fila, MAX_QUEUE_SIZE + /health endpoint, e Dialog Loop (padrão §15.8) com zero PRs adicionais por turno. 1063 testes, E2E validado.*
+_Seção §22 adicionada em 2026-03-23 — v10.0. Sprints 7–9 documentados: graceful shutdown com
+drenagem de fila, MAX_QUEUE_SIZE + /health endpoint, e Dialog Loop (padrão §15.8) com zero PRs
+adicionais por turno. 1063 testes, E2E validado._
+
+---
+
+## 23. Sprint 10 — Arquitetura de Lib Completa: `src/copilot/lib/`
+
+> **Data**: 2026-07-15 **Versão**: v11.0 **Contexto**: Após investigação profunda da API do SDK
+> v0.1.32 atualmente instalado, identificamos que a arquitetura atual mistura lógica de negócio nos
+> pontos de entrada. Esta seção documenta a migração para uma camada de lib pura — similar ao padrão
+> do hook system.
+
+### 23.1 Diagnóstico: Gap Atual
+
+A estrutura atual tem dois problemas fundamentais:
+
+1. **Sem separação lib/app**: `always-alive.js` (757 linhas) carrega ao mesmo tempo a abstração de
+   dialog loop E a lógica concreta do agente. `sdk-api.js` (587 linhas) faz operações de domínio
+   diretamente nos handlers Express.
+
+2. **APIs do SDK não cobertas** (lista dos gaps identificados via inspeção do `types.d.ts`):
+
+| Campo/Método SDK                      | Disponível desde | Status no projeto                 |
+| ------------------------------------- | ---------------- | --------------------------------- |
+| `CopilotClientOptions.cliUrl`         | v0.1.x           | ❌ não usado                      |
+| `SessionConfig.sessionId?`            | v0.1.x           | ❌ não usado                      |
+| `SessionConfig.clientName?`           | v0.1.x           | ❌ não usado                      |
+| `SessionConfig.reasoningEffort?`      | v0.1.x           | ❌ não usado                      |
+| `SessionConfig.configDir?`            | v0.1.x           | ❌ não usado                      |
+| `SessionConfig.availableTools?`       | v0.1.x           | ❌ não usado                      |
+| `SessionConfig.excludedTools?`        | v0.1.x           | ❌ não usado                      |
+| `SessionConfig.provider?` (BYOK)      | v0.1.x           | ❌ não usado                      |
+| `SessionConfig.hooks?` (SessionHooks) | v0.1.x           | ❌ **zero cobertura**             |
+| `SessionConfig.workingDirectory?`     | v0.1.x           | ❌ não usado                      |
+| `SessionConfig.mcpServers?`           | v0.1.x           | ❌ não usado                      |
+| `SessionConfig.customAgents?`         | v0.1.x           | ❌ não usado                      |
+| `client.deleteSession(id)`            | v0.1.x           | ❌ sem rota REST                  |
+| `session.registerTools(tools?)`       | v0.1.x           | ❌ hot-reload não impl            |
+| `onPreToolUse` / `onPostToolUse`      | v0.1.x           | ❌ desconectado do hook system    |
+| `onUserPromptSubmitted`               | v0.1.x           | ❌ injection de contexto não impl |
+| `onSessionStart/End/Error`            | v0.1.x           | ❌ sem telemetria SDK             |
+
+### 23.2 Estrutura da Lib Proposta
+
+```
+src/copilot/lib/
+├── client.js          # CopilotClient singleton + lifecycle (extrai de sdk-client.js)
+├── session.js         # createSession / resumeSession / lifecycle (extrai session-manager.js)
+├── permissions.js     # PermissionHandler granular — substitui approveAll hardcoded (NOVO)
+├── hooks.js           # SessionHooks builders (Sprint 11 — NOVO)
+├── providers.js       # BYOK factory — Ollama, Azure, OpenAI custom (Sprint 12 — NOVO)
+├── mcp.js             # MCPServerConfig builders — local (stdio) e remote (Sprint 12 — NOVO)
+├── agents.js          # CustomAgentConfig builders (Sprint 13 — NOVO)
+├── models.js          # listModels, routing, reasoningEffort helpers (Sprint 13 — NOVO)
+├── tools-registry.js  # ToolRegistry dinâmico + hot-reload (Sprint 14 — NOVO)
+├── telemetry.js       # Session lifecycle → NERV events (Sprint 14 — NOVO)
+└── index.js           # Barrel de re-exportação
+```
+
+### 23.3 Regras arquiteturais da camada `/lib`
+
+1. **Puro, sem side effects no import**: Sem singletons auto-inicializados, sem `log()` no nível do
+   módulo, sem bootstrap automático.
+2. **Factory functions** (não classes), salvo quando estado interno é necessário (`ToolRegistry`).
+3. **Tipagem JSDoc total** com referências a `@github/copilot-sdk` types.
+4. **Zero `execSync`/`curl`** — usar `fetch()` nativo do Node.js 24.
+5. **Aliases `#copilot/lib/*`** adicionados ao `package.json` imports e `tsconfig.json` paths.
+6. **Backward compatible**: `sdk-client.js` e `session-manager.js` continuam exportando as mesmas
+   assinaturas (delegam para a lib).
+7. **Cada arquivo de lib** tem arquivo de test correspondente em `tests/unit/copilot/`.
+
+### 23.4 Sprint 10 — Descrição Completa
+
+**Objetivo**: Implementar `lib/client.js`, `lib/session.js`, `lib/permissions.js` + padrão `cliUrl`
+(CLI como processo PM2 separado — §16.5).
+
+#### 23.4.1 `lib/client.js`
+
+Responsabilidades:
+
+- Singleton `CopilotClient` com suporte a `cliUrl` (conecta a CLI já em execução)
+- `getClient(options?)` — cria ou retorna instância conectada
+- `stopClient()` — encerramento gracioso com cleanup de sessões
+- `forceStopClient()` — encerramento de emergência
+- Registry em memória de sessões ativas: `Map<sessionId, SessionEntry>`
+- `registerSessionLifecycleHandler(handler)` — escuta eventos de lifecycle
+- `getClientState()` — status da conexão atual
+- `incrementMessageCount(sessionId)` — contador de mensagens enviadas
+- Suporte a `cliUrl` via env `COPILOT_CLI_URL` (PM2: CLI process separado)
+
+#### 23.4.2 `lib/session.js`
+
+Responsabilidades:
+
+- `createManagedSession(client, options)` — cria sessão com injeção de contexto + persiste ID em
+  disco
+- `resumeManagedSession(client, sessionId, options)` — retoma sessão preservando state
+- `initOrResumeManagedSession(client, options)` — tenta resumir, cria se falhar (fluxo canônico)
+- `listAllSessions(client)` — integra disco + memória
+- `deleteManagedSession(client, sessionId)` — remove de disco + registry
+- `buildSystemMessage(options)` — factory de `systemMessage` com seções tipadas
+- State persistence: `readState()`, `writeState(updates)`, `clearState()`
+- Context injection: lê `session-briefing.md` + `session.json` para injetar no `systemMessage`
+
+#### 23.4.3 `lib/permissions.js`
+
+Responsabilidades:
+
+- `createPermissionHandler(config)` → `PermissionHandler`:
+  - `allowAll` — equivalente ao `approveAll` atual
+  - `allowTools: string[]` — whitelist por nome de tool
+  - `denyTools: string[]` — blacklist por nome
+  - `denyPatterns: RegExp[]` — deny por regex no nome da tool
+  - `onRequest?: (req) => Promise<bool | 'deny-and-log'>` — override callback
+  - `auditMode: boolean` — aprova tudo mas loga cada permission request
+- `createAuditOnlyPermission()` — helper: aprova tudo, loga tudo
+- `createRestrictedPermission(allowedTools)` — helper: whitelist rígida
+
+#### 23.4.4 Padrão `cliUrl` (Zero-Restart-Cost — §16.5)
+
+```
+PM2 gerencia dois processos:
+  1. copilot --headless --port 4321      ← CLI persistente
+  2. node src/copilot/agent.js           ← SDK conecta via cliUrl
+
+Se SDK reiniciar: CLI continua vivo → SDK reconecta → 0 PRs adicionais
+Se PC reiniciar: CLI reinicia → 1 PR para reboot do loop
+```
+
+Configuração via env `COPILOT_CLI_URL=localhost:4321`. Quando presente, `lib/client.js` passa
+`{ cliUrl: process.env.COPILOT_CLI_URL }` ao construtor do `CopilotClient`.
+
+### 23.5 Roadmap Sprint 10–15
+
+| Sprint | Meta                                                       | Testes (acumulado) |
+| ------ | ---------------------------------------------------------- | ------------------ |
+| **10** | `lib/client`, `lib/session`, `lib/permissions`, cliUrl     | ~1123              |
+| **11** | `lib/hooks.js` — SessionHooks completo + prompt injection  | ~1173              |
+| **12** | `lib/providers.js`, `lib/mcp.js`, refactor mcp-tool-bridge | ~1228              |
+| **13** | `lib/agents.js`, `lib/models.js`, reasoningEffort          | ~1273              |
+| **14** | `lib/telemetry.js`, `lib/tools-registry.js`, hot-reload    | ~1323              |
+| **15** | §24 doc, refator entrypoints finais, aliases completos     | ~1353              |
+
+---
+
+_Seção §23 adicionada em 2026-07-15 — v11.0. Diagnóstico de gaps API SDK v0.1.32, estrutura lib/
+planejada, Sprint 10–15 roadmap. Decisão: cliUrl (§16.5) incluído no Sprint 10; BYOK Ollama opcional
+(não padrão)._

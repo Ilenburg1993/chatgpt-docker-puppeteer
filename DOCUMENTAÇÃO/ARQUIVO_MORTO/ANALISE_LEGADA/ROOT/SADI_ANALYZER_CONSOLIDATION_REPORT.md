@@ -534,7 +534,6 @@ return best
  * @param {string} [langCode='en'] - Language code for i18n keywords (en, pt, es, etc.). Default is `'en'`
  * @returns {Promise<Object | null>} Detection result with protocol and confidence
  *
- *
  * @typedef {Object} DetectionResult
  * @property {Object} protocol - Element protocol (selector, framePath, etc.)
  * @property {number} confidence - Confidence score (0-500+)

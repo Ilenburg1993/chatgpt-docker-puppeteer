@@ -1,13 +1,12 @@
 # F13.3 — Critério Objetivo de “Script Fino” para Hooks Automáticos
 
-**Data**: 2026-03-15
-**Escopo**: 9 hooks automáticos de `.github/hooks/copilot-hooks.json`
+**Data**: 2026-03-15 **Escopo**: 9 hooks automáticos de `.github/hooks/copilot-hooks.json`
 **Dependências**: F13.1 (contrato canônico), F13.2 (matriz hook->script->libs->owner)
 
 ## Objetivo
 
-Transformar “script fino” em um critério **mensurável e auditável**, apto para
-enforcement automático no F16.
+Transformar “script fino” em um critério **mensurável e auditável**, apto para enforcement
+automático no F16.
 
 ## Conceito operacional
 
@@ -33,13 +32,13 @@ Se qualquer hard gate falhar, o script é **não conforme** independentemente da
 
 ## Rubric quantitativo (0 a 100)
 
-| Métrica | Peso | Regra de medição | Faixa ideal |
-| --- | ---: | --- | --- |
-| M1 Bootstrap/IO enxuto | 20 | % de linhas de bootstrap versus total do script | >= 60% do conteúdo total |
-| M2 Acoplamento a domínio | 25 | quantidade de blocos de lógica de negócio inline | <= 3 blocos |
-| M3 Dispatch canônico | 20 | presença de dispatch único para função pública da lib | 1 dispatch principal |
-| M4 Persistência inline | 20 | operações de escrita de estado diretamente no script | 0 (ou exceção documentada) |
-| M5 Duplicação com lib | 15 | padrões redundantes já existentes na lib dedicada | 0 duplicações críticas |
+| Métrica                  | Peso | Regra de medição                                      | Faixa ideal                |
+| ------------------------ | ---: | ----------------------------------------------------- | -------------------------- |
+| M1 Bootstrap/IO enxuto   |   20 | % de linhas de bootstrap versus total do script       | >= 60% do conteúdo total   |
+| M2 Acoplamento a domínio |   25 | quantidade de blocos de lógica de negócio inline      | <= 3 blocos                |
+| M3 Dispatch canônico     |   20 | presença de dispatch único para função pública da lib | 1 dispatch principal       |
+| M4 Persistência inline   |   20 | operações de escrita de estado diretamente no script  | 0 (ou exceção documentada) |
+| M5 Duplicação com lib    |   15 | padrões redundantes já existentes na lib dedicada     | 0 duplicações críticas     |
 
 ## Método de pontuação operacional
 
@@ -51,25 +50,25 @@ Pontuação final:
 ### Regras de cálculo por métrica
 
 - **M1 (20)**
-   - 20 pontos: bootstrap/IO >= 60% das linhas úteis do script.
-   - 10 pontos: bootstrap/IO entre 45% e 59%.
-   - 0 ponto: bootstrap/IO < 45%.
+  - 20 pontos: bootstrap/IO >= 60% das linhas úteis do script.
+  - 10 pontos: bootstrap/IO entre 45% e 59%.
+  - 0 ponto: bootstrap/IO < 45%.
 - **M2 (25)**
-   - 25 pontos: <= 3 blocos de lógica de domínio inline.
-   - 10 pontos: 4 a 6 blocos.
-   - 0 ponto: >= 7 blocos.
+  - 25 pontos: <= 3 blocos de lógica de domínio inline.
+  - 10 pontos: 4 a 6 blocos.
+  - 0 ponto: >= 7 blocos.
 - **M3 (20)**
-   - 20 pontos: exatamente 1 dispatch principal para função pública canônica da lib.
-   - 10 pontos: dispatch principal existe, mas com ramificações concorrentes não críticas.
-   - 0 ponto: ausência de dispatch canônico único.
+  - 20 pontos: exatamente 1 dispatch principal para função pública canônica da lib.
+  - 10 pontos: dispatch principal existe, mas com ramificações concorrentes não críticas.
+  - 0 ponto: ausência de dispatch canônico único.
 - **M4 (20)**
-   - 20 pontos: 0 persistências inline.
-   - 10 pontos: 1 persistência inline com exceção documentada.
-   - 0 ponto: > 1 persistência inline ou sem justificativa.
+  - 20 pontos: 0 persistências inline.
+  - 10 pontos: 1 persistência inline com exceção documentada.
+  - 0 ponto: > 1 persistência inline ou sem justificativa.
 - **M5 (15)**
-   - 15 pontos: 0 duplicações críticas com a lib dedicada.
-   - 5 pontos: duplicações leves não críticas.
-   - 0 ponto: qualquer duplicação crítica.
+  - 15 pontos: 0 duplicações críticas com a lib dedicada.
+  - 5 pontos: duplicações leves não críticas.
+  - 0 ponto: qualquer duplicação crítica.
 
 ## Níveis de conformidade
 
@@ -103,7 +102,8 @@ Pontuação final:
 ## Critérios de aceite de F13.3
 
 1. Rubric objetivo publicado (este documento).
-2. Artefato machine-readable correspondente publicado (`.github/hooks/state/f13-script-fino-rubric.json`).
+2. Artefato machine-readable correspondente publicado
+   (`.github/hooks/state/f13-script-fino-rubric.json`).
 3. Níveis de conformidade definidos com limiar de bloqueio para F16.
 4. ROADMAP/PLANO/pending-tasks sincronizados.
 5. Método de cálculo e fluxo de avaliação explícitos para automação posterior.

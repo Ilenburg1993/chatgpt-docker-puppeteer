@@ -442,14 +442,16 @@ class ReportGenerator {
 Type annotation completa no construtor elimina cascata de `never[]` em todos os `.push()`:
 
 ```js
-/** @type {{
-  unused: any[];
-  duplicates: any[];
-  magicValues: any[];
-  redundantLet: any[];
-  enumCandidates: any[];
-  typeCandidates: any[];
-}} */
+/**
+ * @type {{
+ *   unused: any[];
+ *   duplicates: any[];
+ *   magicValues: any[];
+ *   redundantLet: any[];
+ *   enumCandidates: any[];
+ *   typeCandidates: any[];
+ * }}
+ */
 this.issues = {
   unused: [],
   duplicates: [],

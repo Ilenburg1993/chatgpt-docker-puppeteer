@@ -1,11 +1,13 @@
 # Plano de Estabilização e Corte de Legado — Smoke Hooks (F6.3)
 
-**Data**: 2026-03-15
-**Escopo**: finalizar rollout da decomposição da suíte smoke por domínio com corte controlado do caminho legado.
+**Data**: 2026-03-15 **Escopo**: finalizar rollout da decomposição da suíte smoke por domínio com
+corte controlado do caminho legado.
 
 ## Objetivo
 
-Executar um rollout seguro da suíte por domínios (`smoke-test-domains.sh`) preservando rastreabilidade e rollback simples, até o ponto em que o caminho legado deixe de ser necessário como gate primário.
+Executar um rollout seguro da suíte por domínios (`smoke-test-domains.sh`) preservando
+rastreabilidade e rollback simples, até o ponto em que o caminho legado deixe de ser necessário como
+gate primário.
 
 ## Pré-requisitos
 

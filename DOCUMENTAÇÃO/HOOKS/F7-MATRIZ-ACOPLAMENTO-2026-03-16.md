@@ -2,7 +2,8 @@
 
 ## Escopo
 
-Análise do acoplamento do sistema de hooks entre `scripts/` e `hooks-lib/`, com foco em risco de regressão e custo de rollback.
+Análise do acoplamento do sistema de hooks entre `scripts/` e `hooks-lib/`, com foco em risco de
+regressão e custo de rollback.
 
 ## Matriz
 
@@ -21,7 +22,8 @@ Análise do acoplamento do sistema de hooks entre `scripts/` e `hooks-lib/`, com
 2. **P0** `scripts/smoke-test.sh` — volume alto e diagnóstico ainda concentrado.
 3. **P1** `hooks-lib/common.sh` — domínio híbrido (runtime/context/recovery/subturn).
 4. **P1** `scripts/session-start.sh` e `scripts/session-end.sh` — coordenação lifecycle + side-jobs.
-5. **P2** scripts operacionais manuais — baixa criticidade, mas agora com cobertura Script↔Lib formalizada.
+5. **P2** scripts operacionais manuais — baixa criticidade, mas agora com cobertura Script↔Lib
+   formalizada.
 
 ## Resultado
 

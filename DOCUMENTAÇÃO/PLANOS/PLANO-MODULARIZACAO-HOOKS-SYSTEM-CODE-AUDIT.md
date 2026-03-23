@@ -2,9 +2,10 @@
 
 ## Sumário executivo
 
-O sistema de hooks está funcional e robusto em regras de negócio (autorização, lifecycle e hardening),
-mas atingiu **complexidade estrutural alta**. O principal risco não é falta de feature; é **acoplamento
-acidental entre políticas, persistência, recovery e telemetria** dentro dos mesmos scripts.
+O sistema de hooks está funcional e robusto em regras de negócio (autorização, lifecycle e
+hardening), mas atingiu **complexidade estrutural alta**. O principal risco não é falta de feature;
+é **acoplamento acidental entre políticas, persistência, recovery e telemetria** dentro dos mesmos
+scripts.
 
 Hotspots objetivos por tamanho:
 
@@ -17,8 +18,8 @@ Hotspots objetivos por tamanho:
 - `.github/hooks/scripts/post-tool-use.sh`: **876 linhas**
 - `.github/hooks/scripts/agent-stop.sh`: **686 linhas**
 
-Conclusão: há base madura para hardening, porém a manutenção evolutiva pede modularização explícita por
-camadas, com rollout em fases e critérios de aceite objetivos.
+Conclusão: há base madura para hardening, porém a manutenção evolutiva pede modularização explícita
+por camadas, com rollout em fases e critérios de aceite objetivos.
 
 ## Contexto da auditoria
 
@@ -66,17 +67,15 @@ camadas, com rollout em fases e critérios de aceite objetivos.
   - `.github/hooks/scripts/agent-stop.sh:1-686`
 - **Categoria:** Arquitetura
 - **Severidade:** Alta
-- **Descrição:**
-  Cada script mistura inicialização de contexto, regras de negócio, detecção de anomalia,
-  serialização de eventos, formatting de mensagens e side-effects externos. Isso aumenta o custo de
-  mudança e reduz previsibilidade de impacto.
-- **Cenário de manifestação:**
-  Uma alteração pequena em policy (ex.: fechamento de turno) exige editar blocos longos em scripts
-  diferentes, com alto risco de regressão cruzada.
-- **Impacto:**
-  Maior lead time de manutenção, dificuldade de revisão e risco de regressão funcional em hardening.
-- **Proposta de correção:**
-  Extrair domínio por módulos em `hooks-lib/` e manter scripts como *entrypoints magros* (orquestração).
+- **Descrição:** Cada script mistura inicialização de contexto, regras de negócio, detecção de
+  anomalia, serialização de eventos, formatting de mensagens e side-effects externos. Isso aumenta o
+  custo de mudança e reduz previsibilidade de impacto.
+- **Cenário de manifestação:** Uma alteração pequena em policy (ex.: fechamento de turno) exige
+  editar blocos longos em scripts diferentes, com alto risco de regressão cruzada.
+- **Impacto:** Maior lead time de manutenção, dificuldade de revisão e risco de regressão funcional
+  em hardening.
+- **Proposta de correção:** Extrair domínio por módulos em `hooks-lib/` e manter scripts como
+  _entrypoints magros_ (orquestração).
 
 ### [ID: GAP-002] Regras de askQuestions espalhadas em múltiplos pontos com risco de drift
 
@@ -86,16 +85,13 @@ camadas, com rollout em fases e critérios de aceite objetivos.
   - `.github/hooks/hooks-lib/agent-stop-lib.sh`
 - **Categoria:** Governança/Políticas
 - **Severidade:** Alta
-- **Descrição:**
-  A governança de Template F, continuidade A/D/E, invalidação de autorização e auto-auditoria está
-  distribuída entre pre/post/stop, com regras parcialmente duplicadas.
-- **Cenário de manifestação:**
-  Atualização de regra em um ponto (ex.: `template_f_request_pending`) sem sincronização exata nos
-  demais gera comportamentos contraditórios.
-- **Impacto:**
-  Bloqueios falsos, bypass involuntário ou mensagens conflitantes ao agente.
-- **Proposta de correção:**
-  Criar `hooks-lib/policy/turn-authorization.sh` + `hooks-lib/policy/askquestions.sh` como fonte única.
+- **Descrição:** A governança de Template F, continuidade A/D/E, invalidação de autorização e
+  auto-auditoria está distribuída entre pre/post/stop, com regras parcialmente duplicadas.
+- **Cenário de manifestação:** Atualização de regra em um ponto (ex.: `template_f_request_pending`)
+  sem sincronização exata nos demais gera comportamentos contraditórios.
+- **Impacto:** Bloqueios falsos, bypass involuntário ou mensagens conflitantes ao agente.
+- **Proposta de correção:** Criar `hooks-lib/policy/turn-authorization.sh` +
+  `hooks-lib/policy/askquestions.sh` como fonte única.
 
 ### [ID: GAP-003] Guard de session_id parcialmente duplicado apesar de helpers
 
@@ -106,31 +102,31 @@ camadas, com rollout em fases e critérios de aceite objetivos.
   - `.github/hooks/hooks-lib/common.sh`
 - **Categoria:** Confiabilidade
 - **Severidade:** Média
-- **Descrição:**
-  Existem helpers canônicos em `common.sh`, mas parte do guard continua em implementações ad-hoc por script.
-- **Cenário de manifestação:**
-  Um fix de reconciliação aplicado no caminho canônico não cobre todos os hooks auxiliares.
-- **Impacto:**
-  Inconsistência de recuperação, aumento de divergência entre scripts e retrabalho.
-- **Proposta de correção:**
-  Centralizar reconciliação em função única obrigatória por hook (`guard_or_reconcile_session_context`).
+- **Descrição:** Existem helpers canônicos em `common.sh`, mas parte do guard continua em
+  implementações ad-hoc por script.
+- **Cenário de manifestação:** Um fix de reconciliação aplicado no caminho canônico não cobre todos
+  os hooks auxiliares.
+- **Impacto:** Inconsistência de recuperação, aumento de divergência entre scripts e retrabalho.
+- **Proposta de correção:** Centralizar reconciliação em função única obrigatória por hook
+  (`guard_or_reconcile_session_context`).
 
 ### [ID: GAP-004] Cobertura de lock (`flock`) inconsistente em scripts automáticos
 
 - **Arquivo/Linhas:**
-  - Sem lock explícito: `.github/hooks/scripts/session-start.sh`, `.github/hooks/scripts/subagent-start.sh`, `.github/hooks/scripts/subagent-stop.sh`, `.github/hooks/scripts/pre-compact.sh`
-  - Com lock explícito: `log-prompt.sh`, `pre-tool-use.sh`, `post-tool-use.sh`, `agent-stop.sh`, `session-end.sh`
+  - Sem lock explícito: `.github/hooks/scripts/session-start.sh`,
+    `.github/hooks/scripts/subagent-start.sh`, `.github/hooks/scripts/subagent-stop.sh`,
+    `.github/hooks/scripts/pre-compact.sh`
+  - Com lock explícito: `log-prompt.sh`, `pre-tool-use.sh`, `post-tool-use.sh`, `agent-stop.sh`,
+    `session-end.sh`
 - **Categoria:** Concorrência/Estado
 - **Severidade:** Alta
-- **Descrição:**
-  Parte do pipeline transacional usa lock, parte não. Isso cria janelas de race em updates do
-  `session-context` durante eventos concorrentes.
-- **Cenário de manifestação:**
-  Subagente inicia/encerra enquanto hooks de tool e stop atualizam o mesmo contexto.
-- **Impacto:**
-  Estado não determinístico, contadores incorretos e sinais falsos de conformidade.
-- **Proposta de correção:**
-  Padronizar lock em todo script que escreve contexto, via helper único de escrita transacional.
+- **Descrição:** Parte do pipeline transacional usa lock, parte não. Isso cria janelas de race em
+  updates do `session-context` durante eventos concorrentes.
+- **Cenário de manifestação:** Subagente inicia/encerra enquanto hooks de tool e stop atualizam o
+  mesmo contexto.
+- **Impacto:** Estado não determinístico, contadores incorretos e sinais falsos de conformidade.
+- **Proposta de correção:** Padronizar lock em todo script que escreve contexto, via helper único de
+  escrita transacional.
 
 ### [ID: GAP-005] Lifecycle e relatórios pesados no caminho crítico de start/end
 
@@ -139,29 +135,26 @@ camadas, com rollout em fases e critérios de aceite objetivos.
   - `.github/hooks/scripts/session-end.sh:1-514`
 - **Categoria:** Separação de responsabilidades
 - **Severidade:** Média
-- **Descrição:**
-  Session start/end agregam tarefas de briefing, watchdog, tendências e geração de relatórios no
-  mesmo fluxo do lifecycle primário.
-- **Cenário de manifestação:**
-  Latência ou falha em componente documental/analítico interfere no ciclo de sessão.
-- **Impacto:**
-  Menor resiliência operacional e aumento do tempo de startup/teardown.
-- **Proposta de correção:**
-  Separar “lifecycle mínimo” de “jobs auxiliares” (pós-evento assíncrono ou best-effort isolado).
+- **Descrição:** Session start/end agregam tarefas de briefing, watchdog, tendências e geração de
+  relatórios no mesmo fluxo do lifecycle primário.
+- **Cenário de manifestação:** Latência ou falha em componente documental/analítico interfere no
+  ciclo de sessão.
+- **Impacto:** Menor resiliência operacional e aumento do tempo de startup/teardown.
+- **Proposta de correção:** Separar “lifecycle mínimo” de “jobs auxiliares” (pós-evento assíncrono
+  ou best-effort isolado).
 
 ### [ID: GAP-006] Teste de fumaça monolítico reduz foco de regressão
 
 - **Arquivo/Linhas:** `.github/hooks/scripts/smoke-test.sh:1-2785`
 - **Categoria:** Testabilidade
 - **Severidade:** Média
-- **Descrição:**
-  O smoke atual cobre muita coisa, mas concentrado em um único arquivo grande com checks heterogêneos.
-- **Cenário de manifestação:**
-  Regressão em política de autorização é mascarada por ruído de outros checks; debug lento.
-- **Impacto:**
-  Menor velocidade para diagnosticar e corrigir falhas.
-- **Proposta de correção:**
-  Dividir em suites (`smoke-core`, `smoke-policy`, `smoke-recovery`, `smoke-session-close`, `smoke-git-push`).
+- **Descrição:** O smoke atual cobre muita coisa, mas concentrado em um único arquivo grande com
+  checks heterogêneos.
+- **Cenário de manifestação:** Regressão em política de autorização é mascarada por ruído de outros
+  checks; debug lento.
+- **Impacto:** Menor velocidade para diagnosticar e corrigir falhas.
+- **Proposta de correção:** Dividir em suites (`smoke-core`, `smoke-policy`, `smoke-recovery`,
+  `smoke-session-close`, `smoke-git-push`).
 
 ---
 
@@ -171,93 +164,78 @@ camadas, com rollout em fases e critérios de aceite objetivos.
 
 - **Categoria:** Manutenibilidade
 - **Prioridade:** Alta
-- **Motivação:**
-  Reduzir acoplamento e tornar cada regra rastreável em um único módulo.
-- **Implementação proposta:**
-  Criar subpastas:
+- **Motivação:** Reduzir acoplamento e tornar cada regra rastreável em um único módulo.
+- **Implementação proposta:** Criar subpastas:
   - `hooks-lib/runtime/` (input parsing, path resolution, locks)
   - `hooks-lib/context/` (read/write transacional, migração de schema)
   - `hooks-lib/policy/` (askQuestions, turn/session authorization)
   - `hooks-lib/events/` (emitters canônicos de audit)
   - `hooks-lib/recovery/` (heal v1/v2, reconnect rollover)
   - `hooks-lib/reporting/` (briefing e sumários)
-- **Trade-offs e riscos:**
-  Aumento inicial de arquivos e curva de migração; mitigado com rollout faseado.
+- **Trade-offs e riscos:** Aumento inicial de arquivos e curva de migração; mitigado com rollout
+  faseado.
 
 ### [ID: UPG-002] API transacional única para `session-context`
 
 - **Categoria:** Confiabilidade
 - **Prioridade:** Alta
-- **Motivação:**
-  Evitar padrões diferentes de `jq + sponge + mktemp + mv` espalhados nos scripts.
-- **Implementação proposta:**
-  Introduzir wrappers como:
+- **Motivação:** Evitar padrões diferentes de `jq + sponge + mktemp + mv` espalhados nos scripts.
+- **Implementação proposta:** Introduzir wrappers como:
   - `ctx_tx_read`
   - `ctx_tx_update`
   - `ctx_tx_update_with_guard`
-  - `ctx_tx_merge`
-  Todos com lock obrigatório, fallback portável e logs de falha padronizados.
-- **Trade-offs e riscos:**
-  Mudança ampla de chamadas; pede migração por script com validação incremental.
+  - `ctx_tx_merge` Todos com lock obrigatório, fallback portável e logs de falha padronizados.
+- **Trade-offs e riscos:** Mudança ampla de chamadas; pede migração por script com validação
+  incremental.
 
 ### [ID: UPG-003] Policy engine dedicado para autorização de TURN/SESSION
 
 - **Categoria:** Segurança/Governança
 - **Prioridade:** Alta
-- **Motivação:**
-  Eliminar drift entre pre/post/stop na mesma regra de negócio.
-- **Implementação proposta:**
-  Consolidar regra em funções puras:
+- **Motivação:** Eliminar drift entre pre/post/stop na mesma regra de negócio.
+- **Implementação proposta:** Consolidar regra em funções puras:
   - `policy_eval_askquestions_input`
   - `policy_eval_askquestions_response`
   - `policy_eval_turn_close`
-  - `policy_eval_session_close`
-  E manter scripts apenas como orquestração e emissão.
-- **Trade-offs e riscos:**
-  Exige snapshots de contrato e testes de não-regressão para cada regra crítica.
+  - `policy_eval_session_close` E manter scripts apenas como orquestração e emissão.
+- **Trade-offs e riscos:** Exige snapshots de contrato e testes de não-regressão para cada regra
+  crítica.
 
 ### [ID: UPG-004] Contrato de eventos e emitters canônicos
 
 - **Categoria:** Observabilidade
 - **Prioridade:** Média
-- **Motivação:**
-  Garantir shape consistente dos eventos (`audit.jsonl`) e facilitar analytics.
-- **Implementação proposta:**
-  Definir `event-contracts.json` + helper `emit_event <type> <payload>` com validação mínima.
-- **Trade-offs e riscos:**
-  Pequeno overhead de validação; ganho em qualidade de dados supera custo.
+- **Motivação:** Garantir shape consistente dos eventos (`audit.jsonl`) e facilitar analytics.
+- **Implementação proposta:** Definir `event-contracts.json` + helper `emit_event <type> <payload>`
+  com validação mínima.
+- **Trade-offs e riscos:** Pequeno overhead de validação; ganho em qualidade de dados supera custo.
 
 ### [ID: UPG-005] Testes por domínio + contrato
 
 - **Categoria:** Testabilidade
 - **Prioridade:** Alta
-- **Motivação:**
-  Melhorar diagnóstico e velocidade de regressão.
-- **Implementação proposta:**
-  Estruturar:
+- **Motivação:** Melhorar diagnóstico e velocidade de regressão.
+- **Implementação proposta:** Estruturar:
   - `smoke-core.sh`
   - `smoke-policy.sh`
   - `smoke-recovery.sh`
   - `smoke-close.sh`
   - `smoke-git-push.sh`
-  + `smoke-all.sh` agregador.
-- **Trade-offs e riscos:**
-  Mais arquivos de teste para manter; compensado por isolamento e foco.
+  * `smoke-all.sh` agregador.
+- **Trade-offs e riscos:** Mais arquivos de teste para manter; compensado por isolamento e foco.
 
 ### [ID: UPG-006] Migração com dual-path e feature flags
 
 - **Categoria:** Modernização
 - **Prioridade:** Média
-- **Motivação:**
-  Reduzir risco de regressão durante refactor profundo.
-- **Implementação proposta:**
-  Introduzir flags:
+- **Motivação:** Reduzir risco de regressão durante refactor profundo.
+- **Implementação proposta:** Introduzir flags:
   - `HOOKS_ENABLE_MODULAR_RUNTIME`
   - `HOOKS_ENABLE_MODULAR_POLICY`
-  - `HOOKS_ENABLE_MODULAR_REPORTING`
-  Executar modo sombra (legacy + modular em paralelo) antes de corte final.
-- **Trade-offs e riscos:**
-  Período de convivência aumenta complexidade temporária; reduz risco de indisponibilidade.
+  - `HOOKS_ENABLE_MODULAR_REPORTING` Executar modo sombra (legacy + modular em paralelo) antes de
+    corte final.
+- **Trade-offs e riscos:** Período de convivência aumenta complexidade temporária; reduz risco de
+  indisponibilidade.
 
 ---
 
@@ -268,10 +246,12 @@ camadas, com rollout em fases e critérios de aceite objetivos.
 **Objetivo:** capturar comportamento atual como contrato de regressão.
 
 **Entregáveis:**
+
 - Matriz de eventos esperados por hook automático
 - Snapshot de regras críticas (askQuestions / close_key / session_id)
 
 **Critérios de aceite:**
+
 - Smoke atual verde
 - Documento de contrato baseline aprovado
 
@@ -280,10 +260,12 @@ camadas, com rollout em fases e critérios de aceite objetivos.
 **Objetivo:** mover parsing/lock/path/update para `hooks-lib/runtime` e `hooks-lib/context`.
 
 **Entregáveis:**
+
 - API transacional única de contexto
 - Adaptação dos 9 hooks automáticos para wrappers comuns
 
 **Critérios de aceite:**
+
 - 100% dos hooks automáticos escrevendo contexto via API única
 - Nenhum `jq|sponge` ad-hoc restante nos entrypoints
 
@@ -292,11 +274,13 @@ camadas, com rollout em fases e critérios de aceite objetivos.
 **Objetivo:** centralizar decisões de autorização e continuidade.
 
 **Entregáveis:**
+
 - `hooks-lib/policy/askquestions.sh`
 - `hooks-lib/policy/turn-close.sh`
 - `hooks-lib/policy/session-close.sh`
 
 **Critérios de aceite:**
+
 - Regras de Template F, continuação A/D/E e close_key em fonte única
 - Sem duplicação de regra em pre/post/stop (apenas chamadas ao módulo)
 
@@ -305,11 +289,13 @@ camadas, com rollout em fases e critérios de aceite objetivos.
 **Objetivo:** separar lifecycle mínimo de jobs auxiliares (briefing/reporting/analytics).
 
 **Entregáveis:**
+
 - `session-lifecycle-core.sh`
 - `session-briefing-builder.sh`
 - `session-reporting-jobs.sh`
 
 **Critérios de aceite:**
+
 - Caminho crítico de start/end reduzido
 - Falha de job auxiliar não quebra lifecycle principal
 
@@ -318,10 +304,12 @@ camadas, com rollout em fases e critérios de aceite objetivos.
 **Objetivo:** completar extração de blocos ainda remanescentes no `agent-stop.sh`.
 
 **Entregáveis:**
+
 - `hooks-lib/policy/stop-block.sh`
 - `hooks-lib/subturn/subturn-lifecycle.sh`
 
 **Critérios de aceite:**
+
 - `agent-stop.sh` focado em orquestração (baixo volume de lógica inline)
 - Cobertura de cenários de block/reblock mantida
 
@@ -330,10 +318,12 @@ camadas, com rollout em fases e critérios de aceite objetivos.
 **Objetivo:** dividir o smoke monolítico por domínio e criar suite agregadora.
 
 **Entregáveis:**
+
 - Suites modulares + runner único
 - Fixtures de contrato por hook
 
 **Critérios de aceite:**
+
 - Diagnóstico por domínio (< 2 min para identificar classe de falha)
 - Paridade funcional com cobertura atual
 
@@ -342,10 +332,12 @@ camadas, com rollout em fases e critérios de aceite objetivos.
 **Objetivo:** ativar módulos novos por flag e remover legado após estabilização.
 
 **Entregáveis:**
+
 - Modo sombra + relatório de divergência
 - Corte de legado após janela estável
 
 **Critérios de aceite:**
+
 - 0 divergências críticas por N sessões consecutivas (definir N=20 recomendado)
 - Flags legadas removidas com documentação atualizada
 
@@ -353,8 +345,9 @@ camadas, com rollout em fases e critérios de aceite objetivos.
 
 ## Status atual e continuidade do programa
 
-F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A partir daqui, o foco passa a ser
-**refatoração rigorosa de segunda onda**, orientada por redução estrutural e governança contínua.
+F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A partir daqui, o foco passa a
+ser **refatoração rigorosa de segunda onda**, orientada por redução estrutural e governança
+contínua.
 
 > Referências vivas obrigatórias neste ciclo:
 >
@@ -379,8 +372,8 @@ F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A part
   `session-reminder.sh`, `manual-session-init.sh`.
 - Backlog/findings: `add-task.sh`, `complete-task.sh`, `save-finding.sh`, `resolve-finding.sh`.
 - Diagnóstico/manutenção: `smoke-test.sh`, `smoke-test-domains.sh`, `verify-hook-delivery.sh`,
-  `export-metrics.sh`, `analytics.sh`, `sync-transcript-errors.sh`,
-  `migrate-per-session-audit.sh`, `install-git-hooks.sh`, `on-git-push.sh`.
+  `export-metrics.sh`, `analytics.sh`, `sync-transcript-errors.sh`, `migrate-per-session-audit.sh`,
+  `install-git-hooks.sh`, `on-git-push.sh`.
 
 ### Diretriz mandatória Script↔Lib
 
@@ -413,7 +406,8 @@ F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A part
 
 **Subfases:**
 
-- F7.0 Consolidação estrutural inicial (pastas/taxonomia/matriz Script↔Lib) — **primeira etapa executável do pacote F7**.
+- F7.0 Consolidação estrutural inicial (pastas/taxonomia/matriz Script↔Lib) — **primeira etapa
+  executável do pacote F7**.
 
 - F7.1 Inventário de dependências internas (scripts/libs/contracts).
 - F7.2 Matriz de acoplamento por domínio + severidade.
@@ -551,25 +545,33 @@ F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A part
 - `.github/hooks/scripts/export-script-lib-index.sh`
 - `.github/hooks/hooks-lib/testing/export-script-lib-index-lib.sh`
 - `.github/hooks/state/f7-script-lib-index.json`
-- Entradas canônicas por subpasta criadas para módulos legados (`runtime/common|config`, `policy/policy`, `lifecycle/session-*`).
+- Entradas canônicas por subpasta criadas para módulos legados (`runtime/common|config`,
+  `policy/policy`, `lifecycle/session-*`).
 
 > Status F7.7: **concluído** (contrapartes canônicas disponíveis e inversão root->shim aplicada).
 >
-> Status F7.8: **concluído** (índice machine-readable publicado e validado com `scripts_total=42` e `coverage.none=0`).
+> Status F7.8: **concluído** (índice machine-readable publicado e validado com `scripts_total=42` e
+> `coverage.none=0`).
 >
-> Status F7.9: **concluído** (`hooks-lib/README.md` e `hooks-lib/*/README.md` padronizados com naming canônico).
+> Status F7.9: **concluído** (`hooks-lib/README.md` e `hooks-lib/*/README.md` padronizados com
+> naming canônico).
 
 ### F7 — Auditoria sistêmica
 
 - **F7.0**: consolidar taxonomia estrutural (auto, manual-runtime, manual-user, manutenção),
   publicar matriz Script↔Lib e registrar gaps de scripts sem lib explícita.
-- **F7.1**: gerar inventário de dependências reais (`scripts`, `hooks-lib`, `contracts`) e marcar funções públicas sem consumidor explícito.
+- **F7.1**: gerar inventário de dependências reais (`scripts`, `hooks-lib`, `contracts`) e marcar
+  funções públicas sem consumidor explícito.
 - **F7.2**: construir matriz de acoplamento com risco/impacto/rollback por domínio.
 - **F7.3**: converter matriz em backlog acionável com owner, prioridade e sequência.
-- **F7.4**: criar arquivo lib dedicado para cada script órfão e preparar migração incremental de responsabilidades.
-- **F7.5**: materializar subpastas canônicas em `hooks-lib/` e realocar módulos por domínio com shims de compatibilidade.
-- **F7.6**: implantar verificação automatizada para impedir novos scripts sem lib relacionada e libs fora da taxonomia.
-- **F7.7**: migrar módulos legados do root (`common/config/policy/session-*`) para subpastas alvo com shims de transição.
+- **F7.4**: criar arquivo lib dedicado para cada script órfão e preparar migração incremental de
+  responsabilidades.
+- **F7.5**: materializar subpastas canônicas em `hooks-lib/` e realocar módulos por domínio com
+  shims de compatibilidade.
+- **F7.6**: implantar verificação automatizada para impedir novos scripts sem lib relacionada e libs
+  fora da taxonomia.
+- **F7.7**: migrar módulos legados do root (`common/config/policy/session-*`) para subpastas alvo
+  com shims de transição.
 - **F7.8**: gerar índice machine-readable com rastreio completo script/lib/domínio/owner.
 - **F7.9**: consolidar documentação de domínio por subpasta e regra única de naming.
 - **F7.10**: plugar verificador estrutural em rotina padrão de validação (task local e/ou pipeline).
@@ -588,9 +590,9 @@ F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A part
 
 ### F8 — Contratos executáveis
 
-> Status F8.2 (concluído em 2026-03-15): checks contratuais adicionados em
-> `scripts/smoke-test.sh` e `scripts/smoke-domains/smoke-policy.sh` para
-> reason codes obrigatórios e payload mínimo de stop block.
+> Status F8.2 (concluído em 2026-03-15): checks contratuais adicionados em `scripts/smoke-test.sh` e
+> `scripts/smoke-domains/smoke-policy.sh` para reason codes obrigatórios e payload mínimo de stop
+> block.
 
 - **F8.1**: versionar contratos de autorização/continuidade/close em `contracts/`.
 - **F8.2**: criar cobertura de reason codes e payloads mínimos na suíte smoke.
@@ -653,9 +655,9 @@ F0→F6 foi concluído com estabilização do smoke legado/domínios/all. A part
 ### F13–F16 — Convergência lib-first para hooks automáticos
 
 Diretriz desta trilha: todos os hooks ativados automaticamente via
-`.github/hooks/copilot-hooks.json` devem seguir padrão **script-orquestrador + lib dedicada**,
-com `agent-stop.sh` como referência de integração. A decomposição de
-`agent-stop-lib.sh` fica explicitamente para fase posterior.
+`.github/hooks/copilot-hooks.json` devem seguir padrão **script-orquestrador + lib dedicada**, com
+`agent-stop.sh` como referência de integração. A decomposição de `agent-stop-lib.sh` fica
+explicitamente para fase posterior.
 
 #### Hooks no escopo
 
@@ -675,15 +677,15 @@ com `agent-stop.sh` como referência de integração. A decomposição de
 > `DOCUMENTAÇÃO/HOOKS/F13-1-CONTRATO-ENTRYPOINT-HOOKS-AUTOMATICOS.md`.
 >
 > Status F13.2 (concluído em 2026-03-15): matriz dedicada publicada em
-> `DOCUMENTAÇÃO/HOOKS/F13-2-MATRIZ-HOOK-SCRIPT-LIB-OWNER-2026-03-15.md` e JSON
-> machine-readable em `.github/hooks/state/f13-hook-script-lib-owner.json`.
+> `DOCUMENTAÇÃO/HOOKS/F13-2-MATRIZ-HOOK-SCRIPT-LIB-OWNER-2026-03-15.md` e JSON machine-readable em
+> `.github/hooks/state/f13-hook-script-lib-owner.json`.
 >
 > Status F13.3 (concluído em 2026-03-15): critério objetivo de “script fino” publicado em
 > `DOCUMENTAÇÃO/HOOKS/F13-3-CRITERIO-SCRIPT-FINO-2026-03-15.md` e rubric machine-readable em
 > `.github/hooks/state/f13-script-fino-rubric.json`.
 >
-> Status F14.1 (concluído em 2026-03-15): libs dedicadas faltantes criadas para hooks automáticos
-> em `DOCUMENTAÇÃO/HOOKS/F14-1-LIBS-DEDICADAS-HOOKS-AUTOMATICOS-2026-03-15.md`, com status
+> Status F14.1 (concluído em 2026-03-15): libs dedicadas faltantes criadas para hooks automáticos em
+> `DOCUMENTAÇÃO/HOOKS/F14-1-LIBS-DEDICADAS-HOOKS-AUTOMATICOS-2026-03-15.md`, com status
 > machine-readable em `.github/hooks/state/f14-auto-hook-entry-lib-status.json`.
 >
 > Status F14.2 (concluído em 2026-03-15): lógica migrada para os 8 hooks automáticos aplicáveis
@@ -691,12 +693,13 @@ com `agent-stop.sh` como referência de integração. A decomposição de
 > `subagentStop`, `preCompact`, `sessionEnd`); `agentStop` mantido como referência de entry-lib.
 > Evidência: `DOCUMENTAÇÃO/HOOKS/F14-2-PROGRESSO-PARCIAL-HOOKS-AUTOMATICOS-2026-03-15.md`.
 >
-> Status F14.3 (concluído em 2026-03-15): scripts automáticos padronizados como orquestradores
-> finos com dispatch único para função pública da entry-lib; `session-end.sh` reduzido ao padrão
+> Status F14.3 (concluído em 2026-03-15): scripts automáticos padronizados como orquestradores finos
+> com dispatch único para função pública da entry-lib; `session-end.sh` reduzido ao padrão
 > bootstrap + source + dispatch, com carga de core/aux internalizada em
 > `hooks-lib/lifecycle/session-end-lib.sh`.
 
-- Definir contrato canônico de script automático (bootstrap, source de libs, dispatch único, output).
+- Definir contrato canônico de script automático (bootstrap, source de libs, dispatch único,
+  output).
 - Publicar matriz `hook->script->libs->owner` para os 9 hooks automáticos.
 - Formalizar critério de “script fino” (limite de responsabilidade inline).
 
@@ -730,25 +733,24 @@ com `agent-stop.sh` como referência de integração. A decomposição de
 > `hooks-lib/lifecycle/session-start-lib.sh`, seguida da extração de recovery para
 > `hooks-lib/lifecycle/session-start-recovery.sh` e da extração de output/observabilidade para
 > `hooks-lib/lifecycle/session-start-observability.sh`; slice 4 teve mapeamento dos blocos de
-> briefing, extração do bloco base para `hooks-lib/lifecycle/session-start-briefing.sh` e corte
-> do primeiro bloco condicional (`PREV_UNAUTH_CLOSE`) para helper dedicado; em seguida,
-> extração adicional de `PREV_NO_KEY_CLOSE`, `PREV_ABRUPT_CLOSE`, `abrupt_reconnect` e
-> `CLOSE_KEY_EOF`; e no slice 6 extração adicional de `ASK_FAIL_EOF` e `WD_EOF`.
-> No slice 7, extração adicional de `ACTIVE_STATE_EOF`, `BRIEFING_BODY_EOF` e labels de origem
-> da sessão para renderer dedicado. No slice 8, normalização do bootstrap com loader único de
-> módulos auxiliares (`session_start_load_support_modules`). No slice 9, checklist final
-> validou ausência de blocos de briefing inline e diagnósticos limpos. No slice 10, emissão de
-> `sessionStart`/`sectionStart` extraída para `session-start-events.sh`. No slice 11,
-> detecção/consumo das flags de violação + cálculo de severidade extraídos para
-> `session-start-violations.sh`. No slice 12, classificação de close anterior/reconnect
-> extraída para `session-start-recovery.sh`. No slice 13, alertas de runtime do briefing
-> (ask-fail/watchdog) extraídos para `session-start-briefing.sh`. No slice 14,
-> montagem/persistência de recovery alerts extraída para `session-start-recovery.sh`.
-> No slice 15, parsing de input/trigger/session-id extraído para
-> `session-start-input.sh`. No slice 16, leitura de snapshot de contexto anterior
-> extraída para `session-start-violations.sh`. No slice 17, bootstrap de metadados de sessão
-> extraído para `session-start-bootstrap.sh`. No slice 18, montagem completa do briefing
-> consolidada em `session_start_render_full_briefing` (`session-start-briefing.sh`).
+> briefing, extração do bloco base para `hooks-lib/lifecycle/session-start-briefing.sh` e corte do
+> primeiro bloco condicional (`PREV_UNAUTH_CLOSE`) para helper dedicado; em seguida, extração
+> adicional de `PREV_NO_KEY_CLOSE`, `PREV_ABRUPT_CLOSE`, `abrupt_reconnect` e `CLOSE_KEY_EOF`; e no
+> slice 6 extração adicional de `ASK_FAIL_EOF` e `WD_EOF`. No slice 7, extração adicional de
+> `ACTIVE_STATE_EOF`, `BRIEFING_BODY_EOF` e labels de origem da sessão para renderer dedicado. No
+> slice 8, normalização do bootstrap com loader único de módulos auxiliares
+> (`session_start_load_support_modules`). No slice 9, checklist final validou ausência de blocos de
+> briefing inline e diagnósticos limpos. No slice 10, emissão de `sessionStart`/`sectionStart`
+> extraída para `session-start-events.sh`. No slice 11, detecção/consumo das flags de violação +
+> cálculo de severidade extraídos para `session-start-violations.sh`. No slice 12, classificação de
+> close anterior/reconnect extraída para `session-start-recovery.sh`. No slice 13, alertas de
+> runtime do briefing (ask-fail/watchdog) extraídos para `session-start-briefing.sh`. No slice 14,
+> montagem/persistência de recovery alerts extraída para `session-start-recovery.sh`. No slice 15,
+> parsing de input/trigger/session-id extraído para `session-start-input.sh`. No slice 16, leitura
+> de snapshot de contexto anterior extraída para `session-start-violations.sh`. No slice 17,
+> bootstrap de metadados de sessão extraído para `session-start-bootstrap.sh`. No slice 18, montagem
+> completa do briefing consolidada em `session_start_render_full_briefing`
+> (`session-start-briefing.sh`).
 
 - F17.0 Preparação transversal (rubric + template por arquivo + gates).
 - F17.1 `sessionStart`.

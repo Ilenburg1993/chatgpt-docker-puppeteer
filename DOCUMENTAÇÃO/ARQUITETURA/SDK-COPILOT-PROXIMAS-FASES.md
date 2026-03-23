@@ -1141,3 +1141,121 @@ LLM-A (GitHub Copilot — VS Code)
 
 _Documento criado em 2026-07-27 após auditoria completa de `src/copilot` + pesquisa SDK v0.2.0 + MCP
 specification v2025-11-25._
+
+---
+
+## Sprints Pós-22 — Planejamento LLM-A ↔ LLM-B (2026-03-23)
+
+> **Sessão colaborativa**: LLM-A (GitHub Copilot) conversou com LLM-B (gpt-4.1 via AlwaysAliveAgent)
+> em 5 turnos para planejar os próximos sprints. Resultados abaixo.
+
+### Status pós-Sprint 22
+
+- ✅ AlwaysAliveAgent inicializa standalone (sem servidor Express)
+- ✅ LLM-B responde: model=gpt-4.1, 30 tools registradas
+- ✅ LLM-B executou `npm run test:unit`: 0 falhas confirmadas
+- ✅ Protocolo de comunicação estruturada definido colaborativamente
+
+### Ordem de prioridade técnica (definida por LLM-B)
+
+| #   | Sprint                             | Escopo                | Justificativa LLM-B                                                   |
+| --- | ---------------------------------- | --------------------- | --------------------------------------------------------------------- |
+| 1   | **A — Structured Dialog Protocol** | LlmBridgeClient       | Base para comunicação robusta, padroniza fluxo, facilita extensões    |
+| 2   | **C — Tool Call Auditing**         | tools/ + hooks        | Com protocolo estruturado, auditoria fica mais simples e confiável    |
+| 3   | **24 — Integration Tests**         | tests/copilot/        | Alta prioridade, base de confiança para todos os módulos copilot      |
+| 4   | **D — Parallel Task Queue**        | always-alive + bridge | Depende de protocolo estruturado e auditoria para consolidação segura |
+| 5   | **B — Session Persistence v2**     | session-manager       | Útil mas menos crítico; incrementar após protocolo estáveis           |
+
+---
+
+### Sprint A — Structured Dialog Protocol
+
+**Objetivo**: Protocolo JSON estruturado para comunicação LLM-A ↔ LLM-B com parsing robusto.
+
+**Schema definido por LLM-B:**
+
+```javascript
+/**
+ * @typedef {Object} StructuredMessage
+ * @property {string} context     - Resumo do estado atual ou briefing relevante
+ * @property {string} intent      - Objetivo principal da mensagem
+ * @property {'low'|'medium'|'high'} priority  - Prioridade da ação
+ * @property {'diagnostic'|'plan'|'code'|'question'} responseType - Tipo de resposta
+ * @property {string} output      - Conteúdo principal (diagnóstico, plano, código, etc)
+ */
+```
+
+**Serialização**: JSON puro, sem envelope textual. LLM-B deve sempre responder com JSON puro
+`StructuredMessage`.
+
+**Campo `responseType`**:
+- `'diagnostic'` — diagnósticos de sistema/testes
+- `'plan'` — planejamento de sprints/tarefas
+- `'code'` — código a implementar
+- `'question'` — pergunta para LLM-A
+
+**Arquivos a criar/modificar**:
+- `src/copilot/types/structured-message.js` — definição do tipo + validador Zod
+- `src/copilot/llm-bridge-client.js` — `chatStructured(msg: StructuredMessage)` method
+- `tests/unit/copilot/test_structured_message.spec.js` — testes de schema + serialização
+
+---
+
+### Sprint C — Tool Call Auditing
+
+**Objetivo**: Registrar cada chamada de ferramenta com contexto completo para auditoria e debugging.
+
+**Formato do log** (`.github/hooks/state/tool-audit.jsonl`):
+
+```jsonl
+{"ts":1774304482417,"tool":"exec_command","args":{"command":"npm run test:unit"},"result":{"exitCode":0},"durationMs":53750,"sessionId":"d9c7e155-..."}
+```
+
+**Arquivos a criar/modificar**:
+- `src/copilot/lib/tool-auditor.js` — serviço de auditoria com append a JSONL
+- Patch em cada tool existente (`shell-tools.js`, `file-tools.js`, `hook-tools.js`) para chamar auditor
+- `tests/unit/copilot/test_tool_auditor.spec.js`
+
+---
+
+### Sprint 24 — Integration Tests (já planejado)
+
+**Objetivo**: Testes de integração cobrindo fluxo completo do módulo copilot.
+
+**Arquivos a criar**:
+- `tests/integration/copilot/test_sdk_api.spec.js`
+- `tests/integration/copilot/test_tools_file.spec.js`
+- `tests/integration/copilot/test_tools_shell.spec.js`
+- `tests/integration/copilot/test_config_builders.spec.js`
+
+---
+
+### Sprint D — Parallel Task Queue
+
+**Pré-requisito**: Sprint A (Structured Dialog Protocol) concluído.
+
+**Objetivo**: LLM-A enfileira múltiplas tasks simultaneamente; LLM-B responde em paralelo com
+consolidação de resultados.
+
+**Arquivos a criar/modificar**:
+- `src/copilot/parallel-task-queue.js` — fila de tasks com `Promise.allSettled`
+- `src/copilot/llm-bridge-client.js` — `chatBatch(messages: StructuredMessage[])` method
+
+---
+
+### Sprint B — Session Persistence v2
+
+**Pré-requisito**: Sprint A concluído.
+
+**Objetivo**: LLM-B recebe os últimos N turnos como contexto ao retomar uma sessão.
+
+**Arquivos a modificar**:
+- `src/copilot/session-manager.js` — persistir turnos em SQLite (já disponível)
+- `src/copilot/always-alive.js` — injetar histórico ao `initOrResumeSession`
+
+---
+
+### Script de conversa (artefato criado)
+
+`src/copilot/llm-a-conversation.mjs` — script de 5 turnos para conversas programáticas LLM-A ↔ LLM-B.
+Execução: `node --strip-types src/copilot/llm-a-conversation.mjs`

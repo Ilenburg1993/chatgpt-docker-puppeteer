@@ -11,6 +11,7 @@
  * - Histórico de conversa estruturado (turn-by-turn)
  * - Resposta automática ou manual a perguntas pendentes (onUserInputRequest)
  * - Callbacks por evento: onDelta, onComplete, onQuestion
+ * - Protocolo StructuredMessage (Sprint A): chatStructured() para comunicação tipada LLM-A ↔ LLM-B
  *
  * @module copilot/llm-bridge-client
  *
@@ -22,9 +23,23 @@
  *     const reply = await bridge.chat('Explique monads em uma linha.');
  *     console.log(reply.response);
  *     console.log(bridge.history);
+ *
+ *     // Protocolo estruturado:
+ *     const result = await bridge.chatStructured({
+ *         context: 'Sprint A implementado.',
+ *         intent: 'Confirmar que novos testes passam',
+ *         priority: 'high',
+ *         responseType: 'diagnostic',
+ *     });
+ *     if (result.structured) console.log('Diagnóstico:', result.structured.output);
  *     ```;
  */
 
+import {
+    buildStructuredRequest,
+    parseStructuredResponse,
+    serializeStructuredMessage,
+} from '#copilot/types/structured-message';
 import { log } from '#core/logger';
 import { alwaysAliveAgent } from './always-alive.js';
 
@@ -193,10 +208,67 @@ export class LlmBridgeClient {
     }
 
     /**
-     * Inicia a LLM-B em modo de "diálogo direto" (Dialog Loop).
+     * Envia uma mensagem estruturada (protocolo Sprint A) para LLM-B e tenta parsear a resposta.
      *
-     * Neste modo, a LLM-B usa ask_user em loop (padrão §15.8), permitindo iteração multitarefa dentro do mesmo PR —
-     * custo zero de tokens adicionais.
+     * Serializa o StructuredMessageInput como JSON com instrução de protocolo, envia via chat(), e tenta parsear a
+     * resposta como StructuredMessage. Se LLM-B responder com texto puro (fallback), `result.structured` será `null` e
+     * `result.raw` conterá a resposta.
+     *
+     * @example
+     *     ```js
+     *     const result = await bridge.chatStructured({
+     *         context: 'Sprint A implementado. 1419 testes passando.',
+     *         intent: 'Confirmar que novos testes passam sem regressão',
+     *         priority: 'high',
+     *         responseType: 'diagnostic',
+     *     }, { onDelta: (chunk) => process.stdout.write(chunk) });
+     *
+     *     if (result.structured) {
+     *         console.log('Tipo:', result.structured.responseType);
+     *         console.log('Output:', result.structured.output);
+     *     }
+     *     ```;
+     *
+     * @param {import('#copilot/types/structured-message').StructuredMessageInput} input - Campos da mensagem
+     *   estruturada
+     * @param {ChatOptions & { turnNumber?: number; sessionId?: string }} [opts] - Opções de callback e metadata
+     * @returns {Promise<import('#copilot/types/structured-message').StructuredChatResult>} Resultado com campo
+     *   `structured`
+     * @throws {Error} Se o agente não estiver ativo ou a tarefa falhar
+     */
+    async chatStructured(input, opts = {}) {
+        const { turnNumber, sessionId, ...chatOpts } = opts;
+
+        const snap = /** @type {{ sessionId?: string }} */ (alwaysAliveAgent.getStatusSnapshot());
+        const msg = buildStructuredRequest({
+            ...input,
+            ...(turnNumber !== undefined ? { turnNumber } : {}),
+            ...((sessionId ?? snap.sessionId) ? { sessionId: sessionId ?? snap.sessionId } : {}),
+        });
+
+        const serialized = serializeStructuredMessage(msg);
+        const chatResult = await this.chat(serialized, chatOpts);
+
+        const structured = parseStructuredResponse(chatResult.response);
+
+        log(
+            'INFO',
+            `[LlmBridgeClient] chatStructured: responseType=${structured?.responseType ?? 'UNSTRUCTURED'}, ` +
+                `output=${structured?.output?.length ?? 0} chars`,
+        );
+
+        return {
+            structured,
+            raw: chatResult.response,
+            taskId: chatResult.taskId,
+            responseLen: chatResult.responseLen,
+            chunks: chatResult.chunks,
+            durationMs: chatResult.durationMs,
+        };
+    }
+
+    /**
+     * Inicia a LLM-B em modo de "diálogo direto" (Dialog Loop).
      *
      * @param {string} [bootPrompt] - Prompt de boot (usa padrão §15.8 quando omitido)
      * @param {{

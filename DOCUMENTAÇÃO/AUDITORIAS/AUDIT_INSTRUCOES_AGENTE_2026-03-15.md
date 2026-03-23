@@ -1,14 +1,16 @@
 # Auditoria de Governança das Instruções do Agente
 
-**Data**: 2026-03-15
-**Escopo**: `.github/AGENTS.md`, `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, hooks de enforcement (`pre-tool-use`, `post-tool-use`, `agent-stop`, `log-prompt`, `session-start`).
+**Data**: 2026-03-15 **Escopo**: `.github/AGENTS.md`, `.github/copilot-instructions.md`,
+`.github/instructions/*.instructions.md`, hooks de enforcement (`pre-tool-use`, `post-tool-use`,
+`agent-stop`, `log-prompt`, `session-start`).
 
 ## Parte 1 — Achados (code-audit)
 
 ## 1) Redundância documental crítica entre AGENTS, copilot-instructions e protocolo
 
 - **Severidade**: alta
-- **Sintoma**: o mesmo conteúdo de lifecycle (SESSION/SECTION/TURN, templates, regras de fechamento) aparecia replicado em múltiplos arquivos longos.
+- **Sintoma**: o mesmo conteúdo de lifecycle (SESSION/SECTION/TURN, templates, regras de fechamento)
+  aparecia replicado em múltiplos arquivos longos.
 - **Risco**: drift de política e manutenção cara; conflito silencioso entre regras textuais.
 - **Evidências**:
   - `.github/AGENTS.md` (versão anterior extensa)
@@ -22,8 +24,10 @@
 ## 2) Conflito semântico entre protocolo textual e enforcement em hooks
 
 - **Severidade**: alta
-- **Sintoma**: o protocolo textual declarava continuidade por A/D/E, mas a validação de autorização de TURN invalidava qualquer `askQuestions` não-Template F.
-- **Risco**: bloqueios indevidos, loop operacional e inconsistência entre documentação e comportamento real.
+- **Sintoma**: o protocolo textual declarava continuidade por A/D/E, mas a validação de autorização
+  de TURN invalidava qualquer `askQuestions` não-Template F.
+- **Risco**: bloqueios indevidos, loop operacional e inconsistência entre documentação e
+  comportamento real.
 - **Evidências**:
   - `.github/instructions/hooks-protocol.instructions.md`
   - `.github/hooks/hooks-lib/agent-stop-lib.sh` (função `determine_turn_auth_invalid_reason`)
@@ -35,10 +39,12 @@
 ## 3) Ausência de verificação técnica de leitura dos docs obrigatórios
 
 - **Severidade**: média/alta
-- **Sintoma**: existia regra textual de leitura no início/retomada, mas sem comprovação técnica consistente no ciclo de TURN.
+- **Sintoma**: existia regra textual de leitura no início/retomada, mas sem comprovação técnica
+  consistente no ciclo de TURN.
 - **Risco**: agente iniciar trabalho sem contexto mínimo, violando o próprio protocolo.
 - **Evidências**:
-  - Regras em `hooks-protocol.instructions.md` e docs correlatos sem obrigação técnica explícita de leitura no fechamento do TURN.
+  - Regras em `hooks-protocol.instructions.md` e docs correlatos sem obrigação técnica explícita de
+    leitura no fechamento do TURN.
 - **Correção aplicada**:
   - `log-prompt.sh` agora ativa checklist obrigatório no TURN 1 (start/resume).
   - `pre-tool-use.sh` marca cada documento como lido ao detectar `read_file`.

@@ -361,7 +361,6 @@ sudo apt-get update && sudo apt-get install -y gdb heaptrack
 
 ```dockerfile
 # CORE (manter)
-fonts-noto-color-emoji \
 
 # REMOVER (raramente usado)
 # fonts-ipafont-gothic      # Japonês

@@ -1,8 +1,8 @@
 # Auditoria Profunda — `agent-stop.sh`
 
-**Data**: 2026-03-14
-**Escopo principal**: `.github/hooks/scripts/agent-stop.sh`
-**Arquivos correlatos analisados**:
+**Data**: 2026-03-14 **Escopo principal**: `.github/hooks/scripts/agent-stop.sh` **Arquivos
+correlatos analisados**:
+
 - `.github/hooks/scripts/pre-tool-use.sh`
 - `.github/hooks/scripts/post-tool-use.sh`
 - `.github/hooks/scripts/log-prompt.sh`
@@ -16,7 +16,9 @@
 
 ## 1) Resumo executivo
 
-O `agent-stop.sh` está funcional e robusto em vários pontos críticos (bloqueio estrutural, guards de mismatch, rastreabilidade), mas apresenta **acoplamento alto**, **drift documental** e **algumas inconsistências de protocolo/mensagem** que podem gerar confusão operacional e manutenção cara.
+O `agent-stop.sh` está funcional e robusto em vários pontos críticos (bloqueio estrutural, guards de
+mismatch, rastreabilidade), mas apresenta **acoplamento alto**, **drift documental** e **algumas
+inconsistências de protocolo/mensagem** que podem gerar confusão operacional e manutenção cara.
 
 ### Estado atual (alto nível)
 
@@ -33,8 +35,10 @@ O `agent-stop.sh` está funcional e robusto em vários pontos críticos (bloquei
 
 Foram usadas três frentes:
 
-1. **Leitura integral dos scripts** de ciclo de vida (`session-start`, `log-prompt`, `pre/post-tool-use`, `agent-stop`, `session-end`).
-2. **Correlacionamento de estado real** (`session-context*.json`, `audit*.jsonl`, `current-session-id.txt`, flags).
+1. **Leitura integral dos scripts** de ciclo de vida (`session-start`, `log-prompt`,
+   `pre/post-tool-use`, `agent-stop`, `session-end`).
+2. **Correlacionamento de estado real** (`session-context*.json`, `audit*.jsonl`,
+   `current-session-id.txt`, flags).
 3. **Evidências por linhas** (grep/rg + inspeção dos eventos de auditoria).
 
 ---
@@ -43,36 +47,39 @@ Foram usadas três frentes:
 
 ## 3.1 Crítico — Mensagem com instrução de chave duplicada (erro de protocolo)
 
-**Evidência**: `agent-stop.sh:121`
-Trecho atual compõe a instrução como:
+**Evidência**: `agent-stop.sh:121` Trecho atual compõe a instrução como:
 
 - `Digite ENCERRAR-` + `$key`
 
-Como `$key` já está no formato `ENCERRAR-XXXXXXXX`, a instrução final pode virar `ENCERRAR-ENCERRAR-XXXXXXXX`.
+Como `$key` já está no formato `ENCERRAR-XXXXXXXX`, a instrução final pode virar
+`ENCERRAR-ENCERRAR-XXXXXXXX`.
 
 **Impacto**:
+
 - Risco de usuário inserir chave inválida por instrução errada.
 - Aumenta chance de rejeição de `session-close.sh` e fricção no encerramento legítimo.
 
 **Correção proposta**:
+
 - Exibir diretamente `$key`, sem prefixar `ENCERRAR-` novamente.
 
 ---
 
 ## 3.2 Alto — Formato inconsistente de `UNAUTHORIZED_CLOSE.flag`
 
-**Evidência**: `agent-stop.sh:678`
-No caminho de bloqueio, o arquivo é gravado como texto simples:
+**Evidência**: `agent-stop.sh:678` No caminho de bloqueio, o arquivo é gravado como texto simples:
 
 - `TURN_BLOCKED|<timestamp>|consecutive=<n>`
 
 Em outros fluxos, o ecossistema espera JSON (lido com `jq` em `session-start.sh`).
 
 **Impacto**:
+
 - Parsing inconsistente em recuperação/briefing.
 - Metadados podem ficar vazios ou parcialmente perdidos.
 
 **Correção proposta**:
+
 - Padronizar **sempre JSON** para `UNAUTHORIZED_CLOSE.flag`.
 - Manter backward compatibility por 1 ciclo (reader tolerante a texto legado).
 
@@ -81,20 +88,26 @@ Em outros fluxos, o ecossistema espera JSON (lido com `jq` em `session-start.sh`
 ## 3.3 Alto — Split-brain potencial entre `current-session-id` e roteamento por payload
 
 **Evidências**:
+
 - `session-start.sh` atualiza `current-session-id.txt` (`session-start.sh:201`, `:331`)
 - `log-prompt.sh` usa `apply_per_session_paths` (`log-prompt.sh:46`)
 - `common.sh` define `apply_per_session_paths` sem atualizar ponteiro global (`common.sh:561+`)
 
 **Comportamento observado**:
-- É possível ter `current-session-id.txt` apontando para sessão A e atividade real (`pre/postToolUse`) caindo em sessão B.
+
+- É possível ter `current-session-id.txt` apontando para sessão A e atividade real
+  (`pre/postToolUse`) caindo em sessão B.
 
 **Impacto**:
+
 - `watchdog.sh` pode analisar o contexto “ativo” errado.
 - Relatórios e diagnósticos ficam ambíguos.
 
 **Correção proposta**:
+
 - Definir regra canônica de ownership do ponteiro ativo:
-  - Opção A (recomendada): `log-prompt.sh` sincroniza `current-session-id` com `SESSION_ID` reconciliado no início de cada TURN.
+  - Opção A (recomendada): `log-prompt.sh` sincroniza `current-session-id` com `SESSION_ID`
+    reconciliado no início de cada TURN.
   - Opção B: sincronização central via helper comum, com trava e critérios anti-thrashing.
 
 ---
@@ -102,19 +115,24 @@ Em outros fluxos, o ecossistema espera JSON (lido com `jq` em `session-start.sh`
 ## 3.4 Alto — Drift do contrato de eventos (`events-contract.md`)
 
 **Evidências documentais** (`events-contract.md`):
+
 - `:176` ainda menciona fallback de “últimas 150 linhas” (Estratégia 2) como parte do contrato.
 - `:96` diz que preToolUse “nunca emite permissionDecision:deny”.
-- `:104` afirma “session_id guard: ignora payload...”, mas o comportamento real é mais complexo (heal, sync, bloqueio por caminho etc.).
+- `:104` afirma “session_id guard: ignora payload...”, mas o comportamento real é mais complexo
+  (heal, sync, bloqueio por caminho etc.).
 
 **Evidências de implementação**:
+
 - `pre-tool-use.sh:619` emite `permissionDecision: "deny"` no guard do `session-close.sh`.
 - `agent-stop.sh` comentário explicita Estratégia 2 removida (`agent-stop.sh:12`, `:461`).
 
 **Impacto**:
+
 - Onboarding e manutenção ficam perigosos (documento diz uma coisa, runtime faz outra).
 - Revisões futuras podem introduzir regressões por confiar no contrato defasado.
 
 **Correção proposta**:
+
 - Atualizar contrato para refletir estado real (v1.2+):
   - remover referência da Estratégia 2,
   - documentar explicitamente guard de deny em preToolUse,
@@ -124,30 +142,36 @@ Em outros fluxos, o ecossistema espera JSON (lido com `jq` em `session-start.sh`
 
 ## 3.5 Médio — Custo de processamento por turno em arquivo de audit
 
-**Evidências**: `agent-stop.sh:446-455`, `:515-520`
-Há múltiplos scans com `awk + wc + tail + jq` por fechamento de turno.
+**Evidências**: `agent-stop.sh:446-455`, `:515-520` Há múltiplos scans com `awk + wc + tail + jq`
+por fechamento de turno.
 
 **Impacto**:
+
 - Com logs maiores e sessões longas, custo cresce por turno.
 - Ainda aceitável hoje por rotação, mas tende a escalar mal.
 
 **Correção proposta**:
-- Introduzir índice leve de turno no contexto (`turn.last_prompt_offset`/`turn.last_posttool_offsets`) para evitar re-scan repetitivo.
+
+- Introduzir índice leve de turno no contexto
+  (`turn.last_prompt_offset`/`turn.last_posttool_offsets`) para evitar re-scan repetitivo.
 
 ---
 
 ## 3.6 Médio — Monoliticidade extrema / alta carga cognitiva
 
 **Métrica objetiva**:
+
 - `agent-stop.sh`: **1094 linhas**
 - Core relacionado (`pre/post/log/session-start/session-end`): 4725 linhas somadas
 
 **Impacto**:
+
 - Mais risco de regressão a cada ajuste.
 - Revisão e debugging custosos.
 - Testes tendem a ficar superficiais (grep estático em vez de cenário comportamental).
 
 **Correção proposta**:
+
 - Extrair `agent-stop.sh` em módulos por responsabilidade:
   1. `auth-evaluator.sh`
   2. `mismatch-guard.sh`
@@ -160,12 +184,16 @@ Há múltiplos scans com `awk + wc + tail + jq` por fechamento de turno.
 ## 3.7 Médio — Cobertura de testes ainda muito “estrutural”
 
 **Evidência**:
-- `smoke-test.sh` possui muitos checks por `grep`, úteis, porém não suficientes para validar comportamento interativo completo.
+
+- `smoke-test.sh` possui muitos checks por `grep`, úteis, porém não suficientes para validar
+  comportamento interativo completo.
 
 **Impacto**:
+
 - Regressões lógicas podem passar no smoke (especialmente em fluxos com combinação de estados).
 
 **Correção proposta**:
+
 - Adicionar suíte de cenários comportamentais sandbox para `agent-stop`:
   - askQuestions válido + resposta + manage_todo_list final,
   - askQuestions sem resposta,
@@ -183,7 +211,8 @@ No caso investigado, o bloqueio ocorreu por:
 2. seguido de `turnEnd_no_askQuestions`;
 3. seguido de `agentStop_blocked`.
 
-Não houve evidência de `sessionEnd`/`sessionCloseAuthorized` no recorte analisado desse incidente. Ou seja, o problema era de **autorização de TURN**, não de encerramento real de SESSION.
+Não houve evidência de `sessionEnd`/`sessionCloseAuthorized` no recorte analisado desse incidente.
+Ou seja, o problema era de **autorização de TURN**, não de encerramento real de SESSION.
 
 ---
 
@@ -192,7 +221,9 @@ Não houve evidência de `sessionEnd`/`sessionCloseAuthorized` no recorte analis
 ### 5.1 Regra v9.1 refinada para “bookkeeping permitido”
 
 Implementado em `agent-stop.sh`:
-- Agora a sequência final **`vscode_askQuestions -> manage_todo_list`** é aceita quando `manage_todo_list` é apenas fechamento de checklist.
+
+- Agora a sequência final **`vscode_askQuestions -> manage_todo_list`** é aceita quando
+  `manage_todo_list` é apenas fechamento de checklist.
 - Foi adicionado tracking de `last_non_bookkeeping_tool` para evitar falso bloqueio.
 
 Também foi atualizado `smoke-test.sh` com check específico dessa exceção.
@@ -204,8 +235,10 @@ Também foi atualizado `smoke-test.sh` com check específico dessa exceção.
 
 ### 5.3 P1 implementado (sincronização de ponteiro ativo)
 
-- `log-prompt.sh` agora sincroniza `current-session-id.txt` com o `session_id` reconciliado no início de cada TURN.
-- Mantido design seguro sem troca de symlink em runtime de TURN (evita perda de eventos em fluxo inline).
+- `log-prompt.sh` agora sincroniza `current-session-id.txt` com o `session_id` reconciliado no
+  início de cada TURN.
+- Mantido design seguro sem troca de symlink em runtime de TURN (evita perda de eventos em fluxo
+  inline).
 
 ### 5.4 P2 implementado (testes comportamentais)
 
@@ -221,20 +254,23 @@ Foram adicionados cenários comportamentais no `smoke-test.sh`:
 
 ### 5.6 Upgrade estrutural v10 aplicado (fase inicial)
 
-Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoração estrutural** dentro do `agent-stop.sh`:
+Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoração estrutural** dentro
+do `agent-stop.sh`:
 
 - Extração de helpers locais para reduzir duplicação e acoplamento:
   - `emit_stop_block` (payload canônico de bloqueio para `Stop`);
   - `write_turn_block_flag_json` (writer único para `UNAUTHORIZED_CLOSE.flag`);
   - `last_non_bookkeeping_tool_since_prompt` (consulta reutilizável no audit);
   - `askquestions_has_user_answer` (validação reutilizável de resposta de usuário).
-- Padronização de saída de bloqueio com `hookSpecificOutput` para `Stop`, mantendo campos legados top-level por compatibilidade.
+- Padronização de saída de bloqueio com `hookSpecificOutput` para `Stop`, mantendo campos legados
+  top-level por compatibilidade.
 - Reuso dos helpers nos blocos de:
   - mandato Nível 3 (close key);
   - mismatch não saneado (v9.2);
   - bloqueio principal de TURN sem autorização;
   - reblock quando `stop_hook_active=true` e sem compliance.
-- Atualização do smoke (`V90-26`) para aceitar as duas formas válidas de composição da mensagem de close key (interpolação jq e interpolação shell), mantendo o guard contra `ENCERRAR-ENCERRAR-`.
+- Atualização do smoke (`V90-26`) para aceitar as duas formas válidas de composição da mensagem de
+  close key (interpolação jq e interpolação shell), mantendo o guard contra `ENCERRAR-ENCERRAR-`.
 
 ### 5.7 Fase 2 concluída (modularização + contrato)
 
@@ -243,7 +279,8 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
   - `write_turn_block_flag_json`
   - `last_non_bookkeeping_tool_since_prompt`
   - `askquestions_has_user_answer`
-- `agent-stop.sh` passou a carregar explicitamente o módulo (`source hooks-lib/agent-stop-lib.sh`) com fail-fast caso ausente/inválido.
+- `agent-stop.sh` passou a carregar explicitamente o módulo (`source hooks-lib/agent-stop-lib.sh`)
+  com fail-fast caso ausente/inválido.
 - `events-contract.md` foi atualizado para **v1.2**, alinhando:
   - timeouts reais de `copilot-hooks.json`;
   - possibilidade de `permissionDecision: deny` em `preToolUse`;
@@ -263,13 +300,16 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
 - `agent-stop.sh` passou a consumir esses helpers na prática em três áreas centrais:
   - **mismatch/heal track** (HEAL v2): cálculo e persistência do contador consecutivo;
   - **auth v9.1**: validação de delegação imediata e exceção de bookkeeping pós-askQuestions;
-  - **block path**: normalização numérica, composição de hint de session close e escolha de mensagens de block.
-- `smoke-test.sh` foi ajustado para reconhecer a extração de strings/regras para `agent-stop-lib.sh` nos checks `V90-5` e `V90-25`.
+  - **block path**: normalização numérica, composição de hint de session close e escolha de
+    mensagens de block.
+- `smoke-test.sh` foi ajustado para reconhecer a extração de strings/regras para `agent-stop-lib.sh`
+  nos checks `V90-5` e `V90-25`.
 - Revalidação pós-fase 3: `smoke-test.sh --quiet` → **201/201 PASS**.
 
 ### 5.9 Fase 4 concluída (reset/nudge/checkpoint)
 
-- `hooks-lib/agent-stop-lib.sh` recebeu helpers para a etapa de desacoplamento do pós-processamento de turno:
+- `hooks-lib/agent-stop-lib.sh` recebeu helpers para a etapa de desacoplamento do pós-processamento
+  de turno:
   - `should_emit_context_nudge`
   - `build_turn_session_summary`
   - `select_auth_increment_field`
@@ -277,9 +317,11 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
   - `run_optional_hook_script`
 - `agent-stop.sh` passou a reutilizar esses helpers em três regiões:
   - decisão de emissão do `systemMessage` contextual (nudge);
-  - construção de `session_summary` e seleção do campo de contagem (`turn_authorized`/`turn_no_askQuestions`);
+  - construção de `session_summary` e seleção do campo de contagem
+    (`turn_authorized`/`turn_no_askQuestions`);
   - execução de `session-checkpoint.sh` e sincronização periódica `sync-tasks-to-docs.sh`.
-- Resultado: redução de duplicação e maior clareza de fluxo no fechamento do TURN, preservando comportamento.
+- Resultado: redução de duplicação e maior clareza de fluxo no fechamento do TURN, preservando
+  comportamento.
 - Revalidação pós-fase 4: `smoke-test.sh --quiet` → **201/201 PASS**.
 
 ### 5.10 Fase 5 concluída (invariante de seção)
@@ -292,7 +334,8 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
   - reset de `current_turn.section_turn` e `agentStop_invocations`;
   - emissão de evento `sectionStart` com `auto_open: true`;
   - aviso operacional no stderr.
-- `smoke-test.sh` foi ajustado para reconhecer a string canônica `"retomada"` no arquivo modularizado.
+- `smoke-test.sh` foi ajustado para reconhecer a string canônica `"retomada"` no arquivo
+  modularizado.
 - Revalidação pós-fase 5: `smoke-test.sh --quiet` → **201/201 PASS**.
 
 ### 5.11 Fase 6 concluída (telemetria/event logging)
@@ -301,8 +344,10 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
   - `log_agent_stop_event`
   - `log_turn_auth_invalidated_event`
   - `log_turn_end_authorized_event`
-- `agent-stop.sh` passou a consumir os helpers para reduzir blocos `jq -cn` inline em pontos de alta repetição.
-- `smoke-test.sh` foi ajustado para aceitar a presença de `reason: $reason` no módulo extraído (check `AS-5`).
+- `agent-stop.sh` passou a consumir os helpers para reduzir blocos `jq -cn` inline em pontos de alta
+  repetição.
+- `smoke-test.sh` foi ajustado para aceitar a presença de `reason: $reason` no módulo extraído
+  (check `AS-5`).
 - Revalidação pós-fase 6: `smoke-test.sh --quiet` → **201/201 PASS**.
 
 ### 5.12 Fase 7 concluída (autorização restante)
@@ -314,8 +359,10 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
 - `agent-stop.sh` passou a consumir esses helpers para:
   - estratégia 1 (sinal pós `userPromptSubmitted` no audit);
   - fallback de contexto (`current_turn.auth_requested`);
-  - decisão de invalidação v9.1 (`askquestions_not_last_tool`, `askquestions_api_error`, `askquestions_skipped_or_empty`).
-- `smoke-test.sh` recebeu ajustes de compatibilidade para checks estruturais após extrações para `agent-stop-lib.sh` (Hardening v6, V90-19, V90-22, V90-24).
+  - decisão de invalidação v9.1 (`askquestions_not_last_tool`, `askquestions_api_error`,
+    `askquestions_skipped_or_empty`).
+- `smoke-test.sh` recebeu ajustes de compatibilidade para checks estruturais após extrações para
+  `agent-stop-lib.sh` (Hardening v6, V90-19, V90-22, V90-24).
 - Revalidação pós-fase 7: `smoke-test.sh --quiet` → **201/201 PASS**.
 
 ### 5.13 Fase 8 concluída (guard de fechamento de sessão)
@@ -323,7 +370,8 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
 - O bloco inline do **BUG-79 guard** foi extraído para helper dedicado:
   - `enforce_session_closure_authorization_guard` em `hooks-lib/agent-stop-lib.sh`.
 - `agent-stop.sh` agora chama o helper para validar `session.ended_at` sem
-  `session.closure_authorized_at`, mantendo o comportamento de bloqueio (`exit 1`) quando houver violação.
+  `session.closure_authorized_at`, mantendo o comportamento de bloqueio (`exit 1`) quando houver
+  violação.
 - O helper preserva:
   - logs de erro no stderr;
   - evento `sessionClose_VIOLATION_unauthorized` em `audit.jsonl`;
@@ -334,10 +382,12 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
 
 - Extraído mandate de close key (Nível 3) para helper:
   - `enforce_level3_close_key_mandate` em `hooks-lib/agent-stop-lib.sh`.
-- `agent-stop.sh` agora delega a decisão de block Nível 3 ao helper, preservando saída `decision:block`.
+- `agent-stop.sh` agora delega a decisão de block Nível 3 ao helper, preservando saída
+  `decision:block`.
 - Extraído helper de block para mismatch pendente:
   - `emit_unresolved_session_mismatch_block`.
-- `smoke-test.sh` atualizado para aceitar checks estruturais movidos para `hooks-lib` (V90-23 e V90-26).
+- `smoke-test.sh` atualizado para aceitar checks estruturais movidos para `hooks-lib` (V90-23 e
+  V90-26).
 - Revalidação pós-extrações contínuas: `smoke-test.sh --quiet` → **201/201 PASS**.
 
 ### 5.15 Continuação contínua (reblock path)
@@ -366,8 +416,8 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
 
 ### 5.18 Retomada da modularização (logs e flags)
 
-- Nova rodada de desacoplamento no eixo `agent-stop.sh` → `hooks-lib/agent-stop-lib.sh`, com extração de
-  blocos de serialização/logging ainda remanescentes no script principal:
+- Nova rodada de desacoplamento no eixo `agent-stop.sh` → `hooks-lib/agent-stop-lib.sh`, com
+  extração de blocos de serialização/logging ainda remanescentes no script principal:
   - `log_auth_via_subagent_delegation_event`
   - `log_turn_end_no_askquestions_event`
   - `log_agent_stop_blocked_event`
@@ -404,8 +454,8 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
   - `log_session_id_mismatch_event`
 - Efeito prático: o fluxo de decisão permanece no `agent-stop.sh`, mas serialização de eventos e
   escrita de identidade de sessão foram desacopladas para helpers reutilizáveis.
-- Resultado esperado desta fase: reduzir risco de regressão em ajustes futuros de HEAL/manual_recovery
-  e facilitar a futura extração integral do guard para submódulo dedicado.
+- Resultado esperado desta fase: reduzir risco de regressão em ajustes futuros de
+  HEAL/manual_recovery e facilitar a futura extração integral do guard para submódulo dedicado.
 
 ### 5.21 Upgrades de utilitários e hardening numérico
 
@@ -484,13 +534,15 @@ Além dos ajustes funcionais anteriores, foi aplicada uma etapa de **refatoraç�
 ## 8) Conclusão
 
 O sistema já está com hardening relevante, porém a combinação de:
+
 - script monolítico,
 - contrato parcialmente desatualizado,
 - e inconsistências de estado/ponteiro
 
 cria terreno para incidentes de percepção ("encerrou errado") e manutenção frágil.
 
-A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refatoração por módulos, dá para elevar bastante previsibilidade, auditabilidade e confiança operacional do protocolo.
+A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refatoração por módulos, dá
+para elevar bastante previsibilidade, auditabilidade e confiança operacional do protocolo.
 
 ---
 
@@ -499,7 +551,8 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 ### 9.1 Inventário de complexidade (scripts críticos)
 
 - `agent-stop.sh`: **623 linhas** (queda relevante vs baseline histórico de >1k linhas).
-- `hooks-lib/agent-stop-lib.sh`: **1255 linhas** (crescimento esperado por extração de responsabilidades).
+- `hooks-lib/agent-stop-lib.sh`: **1255 linhas** (crescimento esperado por extração de
+  responsabilidades).
 - `pre-tool-use.sh`: **728 linhas**.
 - `post-tool-use.sh`: **453 linhas**.
 - `log-prompt.sh`: **730 linhas**.
@@ -509,27 +562,37 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 ### 9.2 Diagnóstico de maturidade por eixo
 
 1. **Modularização do Stop**
-  - Estado: **avançado** no `agent-stop` (orquestração), porém ainda **intermediário** no ecossistema,
-    pois `pre-tool-use`, `post-tool-use` e `log-prompt` mantêm blocos grandes de guard/recovery.
+
+- Estado: **avançado** no `agent-stop` (orquestração), porém ainda **intermediário** no ecossistema,
+  pois `pre-tool-use`, `post-tool-use` e `log-prompt` mantêm blocos grandes de guard/recovery.
+
 2. **Governança de estado (`session-context`/`audit`)**
-  - Estado: **bom**, mas com fragilidade operacional local por symlink quebrável (`session-context.json`
-    apontando para alvo ausente no ambiente de teste).
+
+- Estado: **bom**, mas com fragilidade operacional local por symlink quebrável
+  (`session-context.json` apontando para alvo ausente no ambiente de teste).
+
 3. **Contratos e observabilidade**
-  - Estado: **bom** com contrato v1.3 alinhado; falta evolução para contrato versionado por schema
-    executável (lint de contrato + testes de conformidade automáticos).
+
+- Estado: **bom** com contrato v1.3 alinhado; falta evolução para contrato versionado por schema
+  executável (lint de contrato + testes de conformidade automáticos).
+
 4. **Qualidade de teste**
-  - Estado: **forte** no smoke (207/207), ainda com dependência parcial de checks estruturais por
-    string (`grep`) que exigem manutenção sempre que há extrações para libs.
+
+- Estado: **forte** no smoke (207/207), ainda com dependência parcial de checks estruturais por
+  string (`grep`) que exigem manutenção sempre que há extrações para libs.
 
 ### 9.3 Principais gaps remanescentes (priorizados)
 
 - **GAP-G1 (Alto)**: lógica de HEAL/mismatch ainda distribuída em `pre-tool-use`, `post-tool-use` e
   `log-prompt`, com duplicação de intenção de correção.
-- **GAP-G2 (Alto)**: ausência de camada canônica única para escrita/leitura de `session-context` em todos
-  os scripts (há helpers, mas não cobertura total).
-- **GAP-G3 (Médio)**: smoke depende de estado local (`session-context` symlink) para alguns checks de schema.
-- **GAP-G4 (Médio)**: contrato formal ainda textual (Markdown), sem JSON Schema por evento com validação CI.
-- **GAP-G5 (Médio)**: surface de mensagens de protocolo ainda espalhada (templates/nudges distribuídos).
+- **GAP-G2 (Alto)**: ausência de camada canônica única para escrita/leitura de `session-context` em
+  todos os scripts (há helpers, mas não cobertura total).
+- **GAP-G3 (Médio)**: smoke depende de estado local (`session-context` symlink) para alguns checks
+  de schema.
+- **GAP-G4 (Médio)**: contrato formal ainda textual (Markdown), sem JSON Schema por evento com
+  validação CI.
+- **GAP-G5 (Médio)**: surface de mensagens de protocolo ainda espalhada (templates/nudges
+  distribuídos).
 
 ---
 
@@ -541,84 +604,105 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 ### 10.1 Trilha A — Consolidação de Session Guard (curto prazo)
 
 **Escopo**
+
 - Unificar semântica de mismatch/heal em todos os scripts que escrevem contexto.
 
 **Entregáveis**
+
 - Helper canônico único para guard de sessão (biblioteca compartilhada).
 - Chamadas padronizadas em `agent-stop`, `pre-tool-use`, `post-tool-use`, `log-prompt`.
 
 **Critérios de aceite**
+
 - 0 duplicações de blocos de HEAL/mismatch fora da biblioteca canônica.
 - smoke 100% verde + testes comportamentais de mismatch em sandbox.
 
 **Risco principal**
+
 - Regressão em fluxos `inline_restart`/`manual_recovery`.
 
 **Mitigação**
+
 - Testes de snapshot de `session-context` por cenário + replay de audit.
 
 ### 10.2 Trilha B — Writer canônico de estado (curto/médio prazo)
 
 **Escopo**
+
 - Centralizar escrita de campos críticos (`compliance`, `current_turn`, `session_stats`, flags).
 
 **Entregáveis**
+
 - API shell única de state-write (helpers versionados).
 - Eliminação de writes ad-hoc com `jq` espalhados.
 
 **Critérios de aceite**
+
 - ≥80% das mutações críticas usando helpers padronizados.
 - Queda mensurável de `jq` inline nos scripts críticos.
 
 ### 10.3 Trilha C — Contratos executáveis (médio prazo)
 
 **Escopo**
+
 - Evoluir de contrato textual para contrato validável por schema.
 
 **Entregáveis**
+
 - `contracts/v2/*.jsonschema` por evento crítico.
 - Validador de conformidade em pipeline local/CI.
 
 **Critérios de aceite**
+
 - Build falha quando evento emitido viola schema.
 - `events-contract.md` passa a ser visão humana de schemas versionados.
 
 ### 10.4 Trilha D — Test harness comportamental (médio prazo)
 
 **Escopo**
+
 - Expandir cobertura de comportamento fim-a-fim com fixtures de sessão.
 
 **Entregáveis**
+
 - Suite de cenários para TURN/SECTION/SESSION (incluindo stop_hook_active, reblock, mismatch).
 - Runner de replay offline de `audit.jsonl`.
 
 **Critérios de aceite**
+
 - Cobertura de cenários críticos publicada no relatório de auditoria.
 - Redução de checks puramente estruturais no smoke.
 
 ### 10.5 Trilha E — Governança operacional de symlink/state (médio prazo)
 
 **Escopo**
-- Tornar robusto o ciclo de `current-session-id` + symlinks compat (`session-context.json`, `audit.jsonl`).
+
+- Tornar robusto o ciclo de `current-session-id` + symlinks compat (`session-context.json`,
+  `audit.jsonl`).
 
 **Entregáveis**
+
 - Política explícita de ownership do ponteiro ativo.
 - Auto-heal de symlink quebrado com evento observável.
 
 **Critérios de aceite**
+
 - 0 falsos negativos de schema por alvo ausente em ambiente local.
 - Eventos de auto-heal rastreáveis no audit.
 
 ### 10.6 Trilha F — UX de protocolo e mensagens (médio/longo prazo)
 
 **Escopo**
+
 - Consolidar copy de mensagens de block/nudge/session close em helpers de domínio.
 
 **Entregáveis**
+
 - Catálogo de mensagens por contexto (turn block, session close mandate, mismatch block).
 - Matriz de mensagens com invariantes (último ato, askQuestions válido, etc.).
 
 **Critérios de aceite**
+
 - Sem inconsistência textual entre scripts para o mesmo tipo de violação.
 - Mudança de copy em 1 lugar refletindo no fluxo inteiro.
 
@@ -627,20 +711,29 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 ## 11) Plano de execução incremental (ordem recomendada)
 
 1. **R1 — Session Guard Unificado**
-  - Meta: consolidar mismatch/heal cross-scripts.
-  - Gate: smoke 100% + cenários de guard pass.
+
+- Meta: consolidar mismatch/heal cross-scripts.
+- Gate: smoke 100% + cenários de guard pass.
+
 2. **R2 — State Writer Unificado**
-  - Meta: reduzir mutação inline e side-effects divergentes.
-  - Gate: diff de `jq` inline reduzido e sem regressão funcional.
+
+- Meta: reduzir mutação inline e side-effects divergentes.
+- Gate: diff de `jq` inline reduzido e sem regressão funcional.
+
 3. **R3 — Contrato v2 executável**
-  - Meta: schema por evento + validador automático.
-  - Gate: falha automática em evento fora do contrato.
+
+- Meta: schema por evento + validador automático.
+- Gate: falha automática em evento fora do contrato.
+
 4. **R4 — Test harness comportamental**
-  - Meta: replay e cenários ponta-a-ponta.
-  - Gate: cobertura mínima de cenários críticos acordada.
+
+- Meta: replay e cenários ponta-a-ponta.
+- Gate: cobertura mínima de cenários críticos acordada.
+
 5. **R5 — Hardening operacional final**
-  - Meta: symlink/state resiliente + UX de protocolo consolidada.
-  - Gate: 0 incidentes de split-brain/symlink quebrado nos ciclos de validação.
+
+- Meta: symlink/state resiliente + UX de protocolo consolidada.
+- Gate: 0 incidentes de split-brain/symlink quebrado nos ciclos de validação.
 
 ---
 
@@ -739,22 +832,27 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 #### Evidência objetiva (audit)
 
 - Janela forense do TURN `turn_1773500083_29925` mostrou:
-  - `askQuestions_response` com `template_f=false`, `close_action="not_applicable"`, `close_key_found=false`
+  - `askQuestions_response` com `template_f=false`, `close_action="not_applicable"`,
+    `close_key_found=false`
   - seguida de `agentStop` + `turnEnd_authorized`.
 - Ou seja: o turno foi autorizado sem KEY no ato final.
 
 #### Causa-raiz confirmada
 
-- A regra de invalidação em `determine_turn_auth_invalid_reason` só exigia validação de KEY quando o último ask era `Template F`.
-- Para `Template A/D/E`, o TURN permanecia autorizável com resposta válida de askQuestions (sem KEY).
-- Resultado: o enforcement de KEY estava efetivamente em modo **condicional por template**, não estrito por TURN.
+- A regra de invalidação em `determine_turn_auth_invalid_reason` só exigia validação de KEY quando o
+  último ask era `Template F`.
+- Para `Template A/D/E`, o TURN permanecia autorizável com resposta válida de askQuestions (sem
+  KEY).
+- Resultado: o enforcement de KEY estava efetivamente em modo **condicional por template**, não
+  estrito por TURN.
 
 ### R2.4 — Hardening estrito de fechamento de TURN (aplicado)
 
 #### Mudanças no core de autorização
 
 - `hooks-lib/agent-stop-lib.sh`
-  - `determine_turn_auth_invalid_reason` passou a suportar modo estrito (`strict_turn_close_requires_key`, default=true).
+  - `determine_turn_auth_invalid_reason` passou a suportar modo estrito
+    (`strict_turn_close_requires_key`, default=true).
   - Em modo estrito, o TURN só é autorizado quando o último askQuestions é:
     - `Template F`,
     - `close_action="close_with_key"`,
@@ -798,13 +896,13 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 #### Correção aplicada
 
 - `hooks-lib/agent-stop-lib.sh`
-  - `determine_turn_auth_invalid_reason` foi ajustada para, em modo estrito,
-    bloquear fechamento apenas por critérios de autorização efetiva:
+  - `determine_turn_auth_invalid_reason` foi ajustada para, em modo estrito, bloquear fechamento
+    apenas por critérios de autorização efetiva:
     - último ask não é Template F;
     - close_action/close_key inválidos;
     - validação final da KEY ausente (`close_key_validated != true`).
-  - Regras de governança (opção de escalonamento/solicitação prévia) permanecem auditáveis,
-    mas não invalidam o TURN por si só.
+  - Regras de governança (opção de escalonamento/solicitação prévia) permanecem auditáveis, mas não
+    invalidam o TURN por si só.
 
 - `scripts/agent-stop.sh`
   - leitura de `session.strict_turn_close_requires_key` corrigida para preservar `false` explícito
@@ -829,8 +927,8 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 #### Entregável
 
 - `hooks-lib/common.sh`
-  - novo helper de bootstrap de hooks: `resolve_hook_runtime_input`
-    (stdin + `timestamp` + `session_id` + `NOW_ISO` + paths per-session).
+  - novo helper de bootstrap de hooks: `resolve_hook_runtime_input` (stdin + `timestamp` +
+    `session_id` + `NOW_ISO` + paths per-session).
 
 #### Adoção
 
@@ -885,8 +983,8 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
   - bloco inline de guard/reconcile foi substituído por chamada única ao helper.
 
 - `scripts/smoke-test.sh`
-  - checks estruturais de guard/HEAL v2 atualizados para aceitar implementação modularizada
-    (inline **ou** helper), evitando falso negativo de arquitetura.
+  - checks estruturais de guard/HEAL v2 atualizados para aceitar implementação modularizada (inline
+    **ou** helper), evitando falso negativo de arquitetura.
 
 #### Validação
 
@@ -920,20 +1018,21 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 
 ### Propostas adicionais (base: docs oficiais VS Code Hooks/Security)
 
-> Referências lidas: Hooks (`Stop`, `PreToolUse`, `PostToolUse`), Tools/Approvals,
-> Subagents, Security e AI enterprise settings da documentação oficial VS Code (mar/2026).
+> Referências lidas: Hooks (`Stop`, `PreToolUse`, `PostToolUse`), Tools/Approvals, Subagents,
+> Security e AI enterprise settings da documentação oficial VS Code (mar/2026).
 
 #### P7.1 — Duplo lock de encerramento (Stop + PreToolUse)
 
 **Objetivo**: tornar ainda mais difícil qualquer fechamento sem fluxo legítimo.
 
 - Manter o lock atual no `Stop` (`decision:block` quando não houver autorização válida).
-- Reforçar no `PreToolUse` um deny explícito para qualquer tentativa de execução de
-  fechamento fora do caminho canônico (já existente para `session-close.sh`, ampliar validações
-  de contexto para chamadas equivalentes indiretas).
+- Reforçar no `PreToolUse` um deny explícito para qualquer tentativa de execução de fechamento fora
+  do caminho canônico (já existente para `session-close.sh`, ampliar validações de contexto para
+  chamadas equivalentes indiretas).
 - Em caso de violação, registrar evento único canônico `turnClose_prevented_dual_lock`.
 
 **Critério de aceite**:
+
 - Tentativas de fechamento indevido falham tanto antes da execução da tool quanto no `Stop` final.
 
 #### P7.2 — Budget anti-loop com teto de blocks por TURN
@@ -941,10 +1040,11 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 **Objetivo**: aderir ao guidance oficial de `stop_hook_active` e evitar iteração infinita.
 
 - Introduzir `current_turn.stop_block_budget` (ex.: máximo 2 blocks por TURN).
-- Ao exceder budget, emitir block com razão operacional explícita e obrigar fluxo de recuperação
-  via `vscode_askQuestions` (Template F) sem seguir em loop.
+- Ao exceder budget, emitir block com razão operacional explícita e obrigar fluxo de recuperação via
+  `vscode_askQuestions` (Template F) sem seguir em loop.
 
 **Critério de aceite**:
+
 - Nenhum cenário de reblock infinito em smoke; contador e motivo auditáveis.
 
 #### P7.3 — Contrato executável do payload de autorização
@@ -958,6 +1058,7 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 - Validar schema no smoke e em testes de replay de `audit.jsonl`.
 
 **Critério de aceite**:
+
 - Falha determinística quando qualquer campo crítico vier ausente/inválido.
 
 #### P7.4 — Hardening específico para subagentes
@@ -969,6 +1070,7 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
   `SubagentStart -> SubagentStop -> agentStop` não esteja íntegra.
 
 **Critério de aceite**:
+
 - Subagente só autoriza quando trilha auditável está completa e correlacionada.
 
 #### P7.5 — Telemetria de decisão (explainability de block)
@@ -980,6 +1082,7 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 - Incluir resumo compacto no `systemMessage` para reduzir ambiguidades de operação.
 
 **Critério de aceite**:
+
 - Todo block possui explicação mínima reproduzível sem inspeção manual extensa de logs.
 
 #### P7.6 — Gate de configuração segura no ambiente
@@ -993,6 +1096,7 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 - Adicionar health-check que alerta quando settings estão incompatíveis com o protocolo estrito.
 
 **Critério de aceite**:
+
 - Diagnóstico mostra `PASS/FAIL` de baseline de segurança operacional dos hooks.
 
 #### P7.7 — Testes comportamentais de encerramento (matriz completa)
@@ -1004,9 +1108,11 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
   2. `Template F + key ausente/inválida` -> block.
   3. `Template A/D/E como último ato` -> block (modo estrito).
   4. `askQuestions` seguido de ferramenta de trabalho -> block.
-  5. `askQuestions` seguido de `manage_todo_list` (bookkeeping only) + requisitos estritos -> regra definida explicitamente.
+  5. `askQuestions` seguido de `manage_todo_list` (bookkeeping only) + requisitos estritos -> regra
+     definida explicitamente.
 
 **Critério de aceite**:
+
 - Matriz verde no smoke + suíte comportamental dedicada.
 
 ### Execução prática (lote inicial P7) — P7.1 + P7.2 + P7.5
@@ -1025,14 +1131,15 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 
 - `agent-stop.sh`
   - novo budget configurável por sessão: `session.stop_block_budget_max` (default `2`).
-  - quando excedido, registra `stop_block_budget_exceeded` e mantém bloqueio estrito
-    com reason code dedicado (`stop_block_budget_exceeded`).
+  - quando excedido, registra `stop_block_budget_exceeded` e mantém bloqueio estrito com reason code
+    dedicado (`stop_block_budget_exceeded`).
 
 #### P7.5 — Telemetria de decisão explicável
 
 - `agent-stop-lib.sh`
   - `emit_stop_block` agora aceita `decisionTrace` opcional.
-  - novo helper: `build_decision_trace_json(rule_id, auth_strategy, invalid_reason, strict_mode, stop_hook_active, block_count)`.
+  - novo helper:
+    `build_decision_trace_json(rule_id, auth_strategy, invalid_reason, strict_mode, stop_hook_active, block_count)`.
   - `agent-stop.sh` passa `decisionTrace` nos blocks principais/reblocks.
 
 #### Smoke / validação
@@ -1055,7 +1162,8 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 - `scripts/agent-stop.sh`:
   - passa a gerar snapshot em `state/turn-authorization-context.json`;
   - valida contrato antes da decisão final;
-  - em contrato inválido, força `AUTH_REQUESTED=false` + `AUTH_INVALID_REASON=turn_auth_context_invalid`.
+  - em contrato inválido, força `AUTH_REQUESTED=false` +
+    `AUTH_INVALID_REASON=turn_auth_context_invalid`.
 
 #### Smoke / validação
 
@@ -1078,7 +1186,8 @@ A boa notícia: com correções pequenas e cirúrgicas + uma etapa curta de refa
 
 - `smoke-test.sh`
   - novo check `V90-49` para baseline de segurança em `.vscode/settings.json` quando aplicável.
-  - fallback não-bloqueante para workspaces com JSONC (não parseável via `jq`), evitando falso negativo.
+  - fallback não-bloqueante para workspaces com JSONC (não parseável via `jq`), evitando falso
+    negativo.
 
 #### P7.7 — Expansão da matriz comportamental
 
@@ -1125,14 +1234,16 @@ Para remover ambiguidade operacional, foi aplicado:
   - agora delega ao helper único de M4.
 
 - `smoke-test.sh`
-  - novo check `V90-52` para garantir integração `agent-stop -> apply_turn_authorization_contract_guard`.
+  - novo check `V90-52` para garantir integração
+    `agent-stop -> apply_turn_authorization_contract_guard`.
 
 #### Lote seguinte da M4
 
 - `hooks-lib/agent-stop-lib.sh`
   - novo helper: `record_blocked_subturn_and_schedule_resume`.
 - `scripts/agent-stop.sh`
-  - removeu bloco inline grande de atualização `subturn_history/current_turn.subturn` no caminho de block.
+  - removeu bloco inline grande de atualização `subturn_history/current_turn.subturn` no caminho de
+    block.
 - `smoke-test.sh`
   - novo check `V90-53` para garantir uso do helper.
 
@@ -1140,8 +1251,8 @@ Para remover ambiguidade operacional, foi aplicado:
 
 ### 15.1 Sintoma observado em produção
 
-- O `audit.jsonl` mostrava `turnAuth_invalidated` + `agentStop_blocked` repetidamente,
-  porém o usuário seguia percebendo “turno encerrado indevidamente”.
+- O `audit.jsonl` mostrava `turnAuth_invalidated` + `agentStop_blocked` repetidamente, porém o
+  usuário seguia percebendo “turno encerrado indevidamente”.
 
 ### 15.2 Evidência forense objetiva
 
@@ -1168,7 +1279,8 @@ Sem `decision`/`decisionReason` top-level.
 **Compatibilidade parcial do payload de block no evento `Stop`.**
 
 Embora `hookSpecificOutput.decision="block"` estivesse presente, a ausência dos campos top-level
-(`decision`, `decisionReason`) reduzia compatibilidade entre runtimes/versões, permitindo cenário de:
+(`decision`, `decisionReason`) reduzia compatibilidade entre runtimes/versões, permitindo cenário
+de:
 
 - block registrado no audit,
 - mas não necessariamente honrado como bloqueio efetivo de fechamento no cliente.

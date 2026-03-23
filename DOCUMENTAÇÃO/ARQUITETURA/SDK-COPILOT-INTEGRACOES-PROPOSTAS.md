@@ -1,10 +1,9 @@
 # Propostas de Integração — GitHub Copilot SDK × Hook System
 
-**Status**: Análise e propostas (não implementado)
-**Data**: 2026-07-13
-**Autor**: GitHub Copilot (Claude Sonnet 4.6)
-**Referência SDK**: https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md
-**Referência Hook System**: `.github/hooks/`
+**Status**: Análise e propostas (não implementado) **Data**: 2026-07-13 **Autor**: GitHub Copilot
+(Claude Sonnet 4.6) **Referência SDK**:
+https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md **Referência Hook System**:
+`.github/hooks/`
 
 ---
 
@@ -12,11 +11,15 @@
 
 ### 1.1 O que é o Copilot SDK
 
-O **GitHub Copilot SDK** (`@github/copilot-sdk`) é uma biblioteca TypeScript/Node.js que expõe controle programático completo do Copilot CLI via JSON-RPC. Ele permite:
+O **GitHub Copilot SDK** (`@github/copilot-sdk`) é uma biblioteca TypeScript/Node.js que expõe
+controle programático completo do Copilot CLI via JSON-RPC. Ele permite:
 
-- Criar sessões de LLM com modelos configuraveis (`gpt-4.1`, `gpt-5`, `claude-sonnet-4.5`, modelos locais via Ollama, Azure OpenAI, etc.)
+- Criar sessões de LLM com modelos configuraveis (`gpt-4.1`, `gpt-5`, `claude-sonnet-4.5`, modelos
+  locais via Ollama, Azure OpenAI, etc.)
 - Registro de **Custom Tools** tipadas com Zod que o agente pode invocar
-- **Session Hooks** (onPreToolUse, onPostToolUse, onSessionStart, onSessionEnd, etc.) em JavaScript — análogos aos hooks shell do `.github/hooks/`, mas com capacidade de modificar argumentos e resultados
+- **Session Hooks** (onPreToolUse, onPostToolUse, onSessionStart, onSessionEnd, etc.) em JavaScript
+  — análogos aos hooks shell do `.github/hooks/`, mas com capacidade de modificar argumentos e
+  resultados
 - **Custom Agents** com prompts de sistema customizáveis por seção granular
 - Streaming de respostas com eventos tipados
 - **MCP Servers** (Model Context Protocol) locais ou remotos
@@ -30,7 +33,7 @@ O hook system existente (`hooks.json` + `.github/hooks/`) intercepta **9 eventos
 | Hook               | Responsabilidade atual                                             |
 | ------------------ | ------------------------------------------------------------------ |
 | `SessionStart`     | Inicializa/reconecta state, emite `additionalContext` com briefing |
-| `UserPromptSubmit` | Abre novo TURN, detecta close\_key, emite contexto de compliance   |
+| `UserPromptSubmit` | Abre novo TURN, detecta close_key, emite contexto de compliance    |
 | `PreToolUse`       | Abre SUBTURN, conta ferramentas, bloqueia chamadas proibidas       |
 | `PostToolUse`      | Fecha SUBTURN, registra resultados no audit.jsonl                  |
 | `PreCompact`       | Salva checkpoint antes de compactação de contexto                  |
@@ -39,11 +42,15 @@ O hook system existente (`hooks.json` + `.github/hooks/`) intercepta **9 eventos
 | `Stop`             | Protocolo autorizado de encerramento da sessão                     |
 | `SessionEnd`       | Limpeza final e relatório                                          |
 
-O hook system produz um `session.json` rico com estatísticas, compliance, audit trail, e emite `additionalContext` para o agente via stdout. A arquitetura é **shell puro** (bash), o que é robusto mas tem limitações.
+O hook system produz um `session.json` rico com estatísticas, compliance, audit trail, e emite
+`additionalContext` para o agente via stdout. A arquitetura é **shell puro** (bash), o que é robusto
+mas tem limitações.
 
 ### 1.3 Gap identificado
 
-O hook system shell **não tem acesso** ao SDK — ele reage a eventos, mas não pode **iniciá-los** nem **parametrizar a sessão** de forma programática. O SDK, por outro lado, permite controle programático completo antes e durante a sessão, mas nosso projeto **não usa o SDK diretamente**.
+O hook system shell **não tem acesso** ao SDK — ele reage a eventos, mas não pode **iniciá-los** nem
+**parametrizar a sessão** de forma programática. O SDK, por outro lado, permite controle
+programático completo antes e durante a sessão, mas nosso projeto **não usa o SDK diretamente**.
 
 ---
 
@@ -51,8 +58,8 @@ O hook system shell **não tem acesso** ao SDK — ele reage a eventos, mas não
 
 ### 2.1 Funcionalidades sobrepostas (hook shell vs. SDK hooks)
 
-| Capacidade               | Hook System (shell)              | SDK (JavaScript)                     | Observação                                             |
-| ------------------------ | -------------------------------- | ------------------------------------ | ------------------------------------------------------ |
+| Capacidade               | Hook System (shell)               | SDK (JavaScript)                      | Observação                                             |
+| ------------------------ | --------------------------------- | ------------------------------------- | ------------------------------------------------------ |
 | Interceptar PreToolUse   | ✅ `pre-tool-use.sh`              | ✅ `onPreToolUse`                     | SDK permite modificar args; shell apenas bloqueia/loga |
 | Interceptar PostToolUse  | ✅ `post-tool-use.sh`             | ✅ `onPostToolUse`                    | SDK pode modificar resultado; shell apenas loga        |
 | Contexto no SessionStart | ✅ `additionalContext` via stdout | ✅ `onSessionStart` + `systemMessage` | SDK mais poderoso (altera prompt base)                 |
@@ -84,7 +91,7 @@ O hook system shell **não tem acesso** ao SDK — ele reage a eventos, mas não
 | ------------------------------------------------------- | ------------------------------------------------------------------ |
 | **Estado persistente entre sessões** (`session.json`)   | O SDK pode ler/escrever arquivos, mas não tem state machine nativa |
 | **Audit trail JSONL** formatado por evento              | Customizável ao nosso domínio                                      |
-| **Compliance enforcement** (consecutive\_unauthorized)  | Lógica de negócio específica do nosso protocolo                    |
+| **Compliance enforcement** (consecutive_unauthorized)   | Lógica de negócio específica do nosso protocolo                    |
 | **Close-key rotation**                                  | Protocolo proprietário de autorização de encerramento              |
 | **Briefing markdown** gerado dinamicamente              | Context window enrichment específico                               |
 | **Session checkpoints** antes de compactação            | Preserve state durante PreCompact                                  |
@@ -96,7 +103,8 @@ O hook system shell **não tem acesso** ao SDK — ele reage a eventos, mas não
 
 ### Proposta P-01 — SDK Wrapper Programático (Nível 1: Baixo Esforço)
 
-**Objetivo**: Criar um módulo Node.js ESM que encapsula o SDK e expõe uma API programática para controle de sessões Copilot, aproveitando o ecossistema Node.js 24 já presente no projeto.
+**Objetivo**: Criar um módulo Node.js ESM que encapsula o SDK e expõe uma API programática para
+controle de sessões Copilot, aproveitando o ecossistema Node.js 24 já presente no projeto.
 
 **Descrição**:
 
@@ -105,12 +113,14 @@ src/agent/copilot-sdk-wrapper.js
 ```
 
 Um wrapper simples que:
+
 1. Instancia `CopilotClient` com configuração centralizada
 2. Lê `config.json` para modelo, tokens, provider
 3. Expõe `createManagedSession()` que injeta o `systemMessage` com o briefing do hook system
 4. Conecta eventos do SDK ao sistema de logging do projeto (`src/nerv/`)
 
-**Sinergia com hooks**: O `session-briefing.md` gerado pelo `SessionStart` hook pode ser lido e injetado como `systemMessage.content` na criação da sessão SDK.
+**Sinergia com hooks**: O `session-briefing.md` gerado pelo `SessionStart` hook pode ser lido e
+injetado como `systemMessage.content` na criação da sessão SDK.
 
 **Exemplo conceitual**:
 
@@ -122,34 +132,36 @@ import { readFileSync, existsSync } from 'node:fs';
 const BRIEFING_PATH = '.github/hooks/state/session-briefing.md';
 
 export async function createManagedSession(config = {}) {
-    const briefing = existsSync(BRIEFING_PATH)
-        ? readFileSync(BRIEFING_PATH, 'utf8')
-        : '';
+  const briefing = existsSync(BRIEFING_PATH) ? readFileSync(BRIEFING_PATH, 'utf8') : '';
 
-    const client = new CopilotClient({ autoStart: true });
+  const client = new CopilotClient({ autoStart: true });
 
-    return client.createSession({
-        model: config.model ?? 'gpt-4.1',
-        onPermissionRequest: approveAll,
-        systemMessage: {
-            content: briefing ? `\n\n${briefing}` : '',
-        },
-        ...config,
-    });
+  return client.createSession({
+    model: config.model ?? 'gpt-4.1',
+    onPermissionRequest: approveAll,
+    systemMessage: {
+      content: briefing ? `\n\n${briefing}` : '',
+    },
+    ...config,
+  });
 }
 ```
 
-**Estimativa de esforço**: 2-4h
-**Dependências**: `npm install @github/copilot-sdk`
-**Risco**: Baixo — não altera hooks existentes
+**Estimativa de esforço**: 2-4h **Dependências**: `npm install @github/copilot-sdk` **Risco**: Baixo
+— não altera hooks existentes
 
 ---
 
 ### Proposta P-02 — Hook Tools Expostas como Custom Tools SDK (Nível 2: Médio Esforço)
 
-**Objetivo**: Expor as ferramentas de gerenciamento do hook system (add-task, complete-task, save-finding, etc.) como **Custom Tools** nativas do SDK, eliminando a necessidade de o agente chamar `bash scripts/...` via terminal.
+**Objetivo**: Expor as ferramentas de gerenciamento do hook system (add-task, complete-task,
+save-finding, etc.) como **Custom Tools** nativas do SDK, eliminando a necessidade de o agente
+chamar `bash scripts/...` via terminal.
 
-**Motivação**: Atualmente o agente invoca scripts como `bash .github/hooks/scripts/add-task.sh "..."`. Com Custom Tools SDK, o agente invoca `add_task({ title: "...", status: "..." })` diretamente — sem passar por terminal, com validação de schema Zod, e com rastreabilidade.
+**Motivação**: Atualmente o agente invoca scripts como
+`bash .github/hooks/scripts/add-task.sh "..."`. Com Custom Tools SDK, o agente invoca
+`add_task({ title: "...", status: "..." })` diretamente — sem passar por terminal, com validação de
+schema Zod, e com rastreabilidade.
 
 **Tools propostas**:
 
@@ -170,34 +182,35 @@ import { z } from 'zod';
 import { execFileSync } from 'node:child_process';
 
 export const hookAddTask = defineTool('hook_add_task', {
-    description: 'Adiciona uma tarefa ao pending-tasks.md do hook system',
-    parameters: z.object({
-        title: z.string().describe('Título da tarefa'),
-        status: z.enum(['not-started', 'in-progress', 'completed']),
-    }),
-    skipPermission: true,
-    handler: async ({ title, status }) => {
-        const result = execFileSync(
-            '.github/hooks/scripts/add-task.sh',
-            [title, status],
-            { encoding: 'utf8', timeout: 10_000 }
-        );
-        return { success: true, output: result.trim() };
-    },
+  description: 'Adiciona uma tarefa ao pending-tasks.md do hook system',
+  parameters: z.object({
+    title: z.string().describe('Título da tarefa'),
+    status: z.enum(['not-started', 'in-progress', 'completed']),
+  }),
+  skipPermission: true,
+  handler: async ({ title, status }) => {
+    const result = execFileSync('.github/hooks/scripts/add-task.sh', [title, status], {
+      encoding: 'utf8',
+      timeout: 10_000,
+    });
+    return { success: true, output: result.trim() };
+  },
 });
 ```
 
-**Benefício adicional**: O `onPermissionRequest` handler pode filtrar por `request.kind === "custom-tool"` e logar chamadas às hook tools no `audit.jsonl` automaticamente.
+**Benefício adicional**: O `onPermissionRequest` handler pode filtrar por
+`request.kind === "custom-tool"` e logar chamadas às hook tools no `audit.jsonl` automaticamente.
 
-**Estimativa de esforço**: 1-2 dias
-**Dependências**: P-01 + `zod`
-**Risco**: Médio — precisa de testes de integração entre SDK e scripts shell
+**Estimativa de esforço**: 1-2 dias **Dependências**: P-01 + `zod` **Risco**: Médio — precisa de
+testes de integração entre SDK e scripts shell
 
 ---
 
 ### Proposta P-03 — SDK Session Hooks como Camada de Enriquecimento (Nível 2)
 
-**Objetivo**: Usar os **Session Hooks** do SDK (`onPreToolUse`, `onPostToolUse`, `onUserPromptSubmitted`) em camada *adicional* sobre os hooks shell, para adicionar capacidades que o shell não suporta: modificação de argumentos e resultados.
+**Objetivo**: Usar os **Session Hooks** do SDK (`onPreToolUse`, `onPostToolUse`,
+`onUserPromptSubmitted`) em camada _adicional_ sobre os hooks shell, para adicionar capacidades que
+o shell não suporta: modificação de argumentos e resultados.
 
 **Caso de uso principal — Filtro de dados sensíveis em PostToolUse**:
 
@@ -236,7 +249,8 @@ hooks: {
 
 **Caso de uso — Bloqueio avançado em PreToolUse**:
 
-O SDK `onPreToolUse` permite retornar `permissionDecision: "deny"` com mensagem customizada, mais expressivo que o bloco via exit code do shell:
+O SDK `onPreToolUse` permite retornar `permissionDecision: "deny"` com mensagem customizada, mais
+expressivo que o bloco via exit code do shell:
 
 ```javascript
 hooks: {
@@ -256,56 +270,65 @@ hooks: {
 }
 ```
 
-**Estimativa de esforço**: 2-3 dias
-**Dependências**: P-01
-**Risco**: Médio — duplicação de lógica com hooks shell (precisa de política de precedência clara)
+**Estimativa de esforço**: 2-3 dias **Dependências**: P-01 **Risco**: Médio — duplicação de lógica
+com hooks shell (precisa de política de precedência clara)
 
 ---
 
 ### Proposta P-04 — Custom Agent "Hook Auditor" (Nível 3: Alto Esforço)
 
-**Objetivo**: Criar um **Custom Agent** SDK dedicado ao papel de "auditor de sessão", com persona, system prompt e ferramentas específicas para análise de conformidade do protocolo de hooks.
+**Objetivo**: Criar um **Custom Agent** SDK dedicado ao papel de "auditor de sessão", com persona,
+system prompt e ferramentas específicas para análise de conformidade do protocolo de hooks.
 
 **Conceito**:
 
 ```javascript
 const session = await client.createSession({
-    customAgents: [{
-        name: 'hook-auditor',
-        displayName: 'Hook Auditor',
-        description: 'Analisa conformidade do protocolo de hooks e sugere correções',
-        prompt: `Você é um auditor especializado no protocolo de hooks deste projeto.
+  customAgents: [
+    {
+      name: 'hook-auditor',
+      displayName: 'Hook Auditor',
+      description: 'Analisa conformidade do protocolo de hooks e sugere correções',
+      prompt: `Você é um auditor especializado no protocolo de hooks deste projeto.
                  Você conhece os eventos SessionStart, PreToolUse, PostToolUse, UserPromptSubmit,
                  PreCompact, SubagentStart/Stop, Stop e SessionEnd.
                  Analise sempre o session.json, audit.jsonl e session-briefing.md antes de qualquer resposta.
                  Nunca encerre um turno sem chamar vscode_askQuestions.`,
-    }],
-    agent: 'hook-auditor',
-    tools: [hookGetSessionState, hookGetAuditTail, hookAddTask],
-    systemMessage: {
-        mode: 'customize',
-        sections: {
-            tone: { action: 'replace', content: 'Seja preciso, conciso e técnico. Use markdown e tabelas.' },
-            guidelines: { action: 'append', content: '\n* Sempre citar linha do audit.jsonl ao identificar violações.' },
-        },
     },
+  ],
+  agent: 'hook-auditor',
+  tools: [hookGetSessionState, hookGetAuditTail, hookAddTask],
+  systemMessage: {
+    mode: 'customize',
+    sections: {
+      tone: {
+        action: 'replace',
+        content: 'Seja preciso, conciso e técnico. Use markdown e tabelas.',
+      },
+      guidelines: {
+        action: 'append',
+        content: '\n* Sempre citar linha do audit.jsonl ao identificar violações.',
+      },
+    },
+  },
 });
 ```
 
 **Casos de uso**:
+
 - Análise on-demand de conformidade sem mudar de contexto
 - "Qual é o estado atual da sessão?" → agente lê session.json e responde estruturadamente
 - "Houve violações de compliance hoje?" → analisa audit.jsonl e produz relatório
 
-**Estimativa de esforço**: 3-5 dias (inclui design de prompt e testes)
-**Dependências**: P-01, P-02, P-03
-**Risco**: Alto — dependência de prompt engineering e comportamento do modelo
+**Estimativa de esforço**: 3-5 dias (inclui design de prompt e testes) **Dependências**: P-01, P-02,
+P-03 **Risco**: Alto — dependência de prompt engineering e comportamento do modelo
 
 ---
 
 ### Proposta P-05 — MCP Server para o Hook System (Nível 3)
 
-**Objetivo**: Expor o hook system como um **MCP Server local** (stdio), tornando as ferramentas do projeto acessíveis a qualquer cliente MCP — não apenas ao SDK Copilot.
+**Objetivo**: Expor o hook system como um **MCP Server local** (stdio), tornando as ferramentas do
+projeto acessíveis a qualquer cliente MCP — não apenas ao SDK Copilot.
 
 **Arquitetura proposta**:
 
@@ -324,51 +347,53 @@ src/mcp/
 
 ```javascript
 const session = await client.createSession({
-    mcpServers: {
-        'hook-system': {
-            type: 'local',
-            command: 'node',
-            args: ['src/mcp/hook-mcp-server.js'],
-            cwd: process.cwd(),
-            tools: ['*'],
-            env: {
-                STATE_DIR: '.github/hooks/state',
-                HOOK_DIR: '.github/hooks',
-            },
-        },
+  mcpServers: {
+    'hook-system': {
+      type: 'local',
+      command: 'node',
+      args: ['src/mcp/hook-mcp-server.js'],
+      cwd: process.cwd(),
+      tools: ['*'],
+      env: {
+        STATE_DIR: '.github/hooks/state',
+        HOOK_DIR: '.github/hooks',
+      },
     },
+  },
 });
 ```
 
 **Vantagens sobre P-02**:
+
 - Reutilizável em outros clientes MCP (VS Code MCP extension, Cursor, etc.)
 - Protocolo padronizado e extensível
 - Isolamento de processo (crash do MCP server não derruba o SDK)
 - Pode ser exposto via HTTP para uso remoto
 
-**Estimativa de esforço**: 1 semana
-**Dependências**: P-01 + SDK MCP docs
-**Risco**: Médio — MCP é feature em evolução no SDK ("Note: This is an evolving feature")
+**Estimativa de esforço**: 1 semana **Dependências**: P-01 + SDK MCP docs **Risco**: Médio — MCP é
+feature em evolução no SDK ("Note: This is an evolving feature")
 
 ---
 
 ### Proposta P-06 — Telemetria e Observabilidade com OpenTelemetry (Nível 2)
 
-**Objetivo**: Substituir/complementar o `audit.jsonl` com **OpenTelemetry distributed tracing**, permitindo correlacionar spans do SDK com spans dos hooks shell.
+**Objetivo**: Substituir/complementar o `audit.jsonl` com **OpenTelemetry distributed tracing**,
+permitindo correlacionar spans do SDK com spans dos hooks shell.
 
 **Arquitetura**:
 
 ```javascript
 const client = new CopilotClient({
-    telemetry: {
-        filePath: '.github/hooks/logs/otel-traces.jsonl',
-        exporterType: 'file',
-        captureContent: false, // sem capturar conteúdo por privacidade
-    },
+  telemetry: {
+    filePath: '.github/hooks/logs/otel-traces.jsonl',
+    exporterType: 'file',
+    captureContent: false, // sem capturar conteúdo por privacidade
+  },
 });
 ```
 
-Cada tool call do SDK gera um span. Com `captureContent: false`, apenas metadados de timing e tool name são gravados — sem risco de vazar conteúdo sensível.
+Cada tool call do SDK gera um span. Com `captureContent: false`, apenas metadados de timing e tool
+name são gravados — sem risco de vazar conteúdo sensível.
 
 **Integração com audit.jsonl**:
 
@@ -390,15 +415,14 @@ hooks: {
 }
 ```
 
-**Estimativa de esforço**: 1-2 dias
-**Dependências**: P-01 + `@opentelemetry/api`
-**Risco**: Baixo
+**Estimativa de esforço**: 1-2 dias **Dependências**: P-01 + `@opentelemetry/api` **Risco**: Baixo
 
 ---
 
 ### Proposta P-07 — Sistema BYOK Multi-Modelo (Nível 2)
 
-**Objetivo**: Aproveitar o suporte BYOK do SDK para criar um sistema de roteamento de tarefas por modelo — usando o melhor modelo para cada tipo de tarefa.
+**Objetivo**: Aproveitar o suporte BYOK do SDK para criar um sistema de roteamento de tarefas por
+modelo — usando o melhor modelo para cada tipo de tarefa.
 
 **Conceito de roteamento**:
 
@@ -416,34 +440,37 @@ hooks: {
 import { createManagedSession } from './copilot-sdk-wrapper.js';
 
 const MODEL_PROFILES = {
-    analysis: { model: 'claude-sonnet-4.5' },
-    codegen: { model: 'gpt-4.1' },
-    reasoning: { model: 'gpt-5', reasoningEffort: 'high' },
-    local: {
-        model: 'qwen3:8b',
-        provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1' },
-    },
+  analysis: { model: 'claude-sonnet-4.5' },
+  codegen: { model: 'gpt-4.1' },
+  reasoning: { model: 'gpt-5', reasoningEffort: 'high' },
+  local: {
+    model: 'qwen3:8b',
+    provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1' },
+  },
 };
 
 export async function createSessionForTask(taskType) {
-    const profile = MODEL_PROFILES[taskType] ?? MODEL_PROFILES.codegen;
-    return createManagedSession(profile);
+  const profile = MODEL_PROFILES[taskType] ?? MODEL_PROFILES.codegen;
+  return createManagedSession(profile);
 }
 ```
 
-**Sinergia com o projeto**: O projeto já tem `test-qwen3-cloud.mjs`, `test-ollama-cloud.mjs`, etc. — evidência de que múltiplos backends já são usados experimentalmente. P-07 formaliza isso como infraestrutura.
+**Sinergia com o projeto**: O projeto já tem `test-qwen3-cloud.mjs`, `test-ollama-cloud.mjs`, etc. —
+evidência de que múltiplos backends já são usados experimentalmente. P-07 formaliza isso como
+infraestrutura.
 
-**Estimativa de esforço**: 1-2 dias
-**Dependências**: P-01
-**Risco**: Baixo
+**Estimativa de esforço**: 1-2 dias **Dependências**: P-01 **Risco**: Baixo
 
 ---
 
 ### Proposta P-08 — Session Resume + Continuidade de Missão (Nível 3)
 
-**Objetivo**: Usar `resumeSession()` do SDK para retomar sessões interrompidas, integrado com o sistema de checkpoints do hook system (`session-checkpoint.sh`).
+**Objetivo**: Usar `resumeSession()` do SDK para retomar sessões interrompidas, integrado com o
+sistema de checkpoints do hook system (`session-checkpoint.sh`).
 
-**Problema atual**: Quando uma sessão é interrompida (crash, restart), o hook system gera um `session-briefing.md` que o agente lê no próximo `SessionStart`. Porém o **contexto de LLM** é perdido — o agente começa do zero.
+**Problema atual**: Quando uma sessão é interrompida (crash, restart), o hook system gera um
+`session-briefing.md` que o agente lê no próximo `SessionStart`. Porém o **contexto de LLM** é
+perdido — o agente começa do zero.
 
 **Solução proposta**:
 
@@ -456,33 +483,33 @@ const STATE_FILE = '.github/hooks/state/session.json';
 const SESSION_STORE = '.github/hooks/state/sdk-session-id.txt';
 
 export async function getOrResumeSession(client, config) {
-    // Verifica se existe sessão SDK persistida
-    if (existsSync(SESSION_STORE)) {
-        const sessionId = readFileSync(SESSION_STORE, 'utf8').trim();
-        try {
-            return await client.resumeSession(sessionId, {
-                onPermissionRequest: config.onPermissionRequest,
-            });
-        } catch {
-            // Sessão expirada ou inválida — cria nova
-        }
+  // Verifica se existe sessão SDK persistida
+  if (existsSync(SESSION_STORE)) {
+    const sessionId = readFileSync(SESSION_STORE, 'utf8').trim();
+    try {
+      return await client.resumeSession(sessionId, {
+        onPermissionRequest: config.onPermissionRequest,
+      });
+    } catch {
+      // Sessão expirada ou inválida — cria nova
     }
+  }
 
-    // Nova sessão
-    const session = await client.createSession(config);
+  // Nova sessão
+  const session = await client.createSession(config);
 
-    // Persiste session ID para retomada futura
-    writeFileSync(SESSION_STORE, session.sessionId);
+  // Persiste session ID para retomada futura
+  writeFileSync(SESSION_STORE, session.sessionId);
 
-    return session;
+  return session;
 }
 ```
 
-**Integração com hook system**: O `session-checkpoint.sh` já salva estado. P-08 adiciona a camada de persistência de sessão SDK, permitindo que o LLM "lembre" o contexto de conversação entre restarts.
+**Integração com hook system**: O `session-checkpoint.sh` já salva estado. P-08 adiciona a camada de
+persistência de sessão SDK, permitindo que o LLM "lembre" o contexto de conversação entre restarts.
 
-**Estimativa de esforço**: 2-3 dias
-**Dependências**: P-01
-**Risco**: Médio — infinite sessions do SDK têm comportamento de checkpoint próprio; pode conflitar com `pre-compact.sh`
+**Estimativa de esforço**: 2-3 dias **Dependências**: P-01 **Risco**: Médio — infinite sessions do
+SDK têm comportamento de checkpoint próprio; pode conflitar com `pre-compact.sh`
 
 ---
 
@@ -521,25 +548,31 @@ P-04 Custom Agent "Hook Auditor"
 
 ### 5.1 Hierarquia shell > SDK
 
-O hook system shell é a **fonte de verdade** para compliance e state. O SDK JavaScript é uma camada de **enriquecimento** sobre ele. Em caso de conflito, o `pre-tool-use.sh` e `stop.sh` têm precedência absoluta.
+O hook system shell é a **fonte de verdade** para compliance e state. O SDK JavaScript é uma camada
+de **enriquecimento** sobre ele. Em caso de conflito, o `pre-tool-use.sh` e `stop.sh` têm
+precedência absoluta.
 
 ### 5.2 Sem duplicação de estado
 
-O `session.json` e `audit.jsonl` são os artefatos canônicos. O SDK não deve criar um estado paralelo — ele deve ler e escrever **nesse mesmo state** quando precisar de persistência.
+O `session.json` e `audit.jsonl` são os artefatos canônicos. O SDK não deve criar um estado paralelo
+— ele deve ler e escrever **nesse mesmo state** quando precisar de persistência.
 
 ### 5.3 Fail-open para o SDK
 
-Se o SDK wrapper falhar (ex: Copilot CLI não disponível), o agente continua operando normalmente via hooks shell. A integração SDK deve ser opt-in, não obrigatória.
+Se o SDK wrapper falhar (ex: Copilot CLI não disponível), o agente continua operando normalmente via
+hooks shell. A integração SDK deve ser opt-in, não obrigatória.
 
 ### 5.4 ESM e Node.js 24+
 
-Todo código do SDK wrapper deve usar `import`/`export` ESM, 4 espaços, aspas simples, ponto-e-vírgula. Alinhar com as convenções do `copilot-instructions.md`.
+Todo código do SDK wrapper deve usar `import`/`export` ESM, 4 espaços, aspas simples,
+ponto-e-vírgula. Alinhar com as convenções do `copilot-instructions.md`.
 
 ### 5.5 Segurança
 
 - **Nunca** logar conteúdo de mensagens no audit.jsonl via SDK (usar `captureContent: false`)
 - O `onPermissionRequest` handler deve ser conservador: negar por padrão, aprovar explicitamente
-- Custom Tools que invocam scripts shell devem usar `execFileSync` (não `exec`/`spawn` com shell=true) para evitar injeção de comandos
+- Custom Tools que invocam scripts shell devem usar `execFileSync` (não `exec`/`spawn` com
+  shell=true) para evitar injeção de comandos
 - BYOK tokens devem vir de variáveis de ambiente, nunca hardcoded
 
 ---
@@ -548,8 +581,8 @@ Todo código do SDK wrapper deve usar `import`/`export` ESM, 4 espaços, aspas s
 
 ### 6.1 Pré-requisitos para adoção do SDK
 
-| Requisito                       | Status atual                        | Ação necessária                                     |
-| ------------------------------- | ----------------------------------- | --------------------------------------------------- |
+| Requisito                       | Status atual                         | Ação necessária                                     |
+| ------------------------------- | ------------------------------------ | --------------------------------------------------- |
 | Node.js 24+                     | ✅ Projeto usa Node.js 24            | —                                                   |
 | ESM (`"type": "module"`)        | ✅ package.json já tem               | —                                                   |
 | GitHub Copilot CLI na PATH      | ❓ Precisa verificar no devcontainer | `npm install -g @github/copilot-cli` ou equivalente |
@@ -559,11 +592,13 @@ Todo código do SDK wrapper deve usar `import`/`export` ESM, 4 espaços, aspas s
 
 ### 6.2 Compatibilidade com arquitetura existente
 
-O projeto usa aliases (`#core/*`, `#infra/*`, `#driver/*`) e importações ESM. O wrapper SDK deve ser colocado em `src/agent/` e acessado via `#agent/copilot-sdk-wrapper.js`.
+O projeto usa aliases (`#core/*`, `#infra/*`, `#driver/*`) e importações ESM. O wrapper SDK deve ser
+colocado em `src/agent/` e acessado via `#agent/copilot-sdk-wrapper.js`.
 
 ### 6.3 Impacto nos testes existentes
 
-As propostas **não afetam** o `smoke-test.sh` nem `smoke-test-payload-api.sh`. São módulos novos que requerem testes de integração dedicados em `tests/integration/sdk/` ou equivalente.
+As propostas **não afetam** o `smoke-test.sh` nem `smoke-test-payload-api.sh`. São módulos novos que
+requerem testes de integração dedicados em `tests/integration/sdk/` ou equivalente.
 
 ---
 
@@ -571,7 +606,9 @@ As propostas **não afetam** o `smoke-test.sh` nem `smoke-test-payload-api.sh`. 
 
 ### 7.1 Dashboard de Sessão em Tempo Real
 
-Combinando SDK streaming events + `src/server/` (já existente no projeto), seria possível criar um dashboard Web que exibe:
+Combinando SDK streaming events + `src/server/` (já existente no projeto), seria possível criar um
+dashboard Web que exibe:
+
 - Streaming de respostas do Copilot em tempo real
 - Estado atual de compliance (do session.json)
 - Tool calls em execução
@@ -579,7 +616,8 @@ Combinando SDK streaming events + `src/server/` (já existente no projeto), seri
 
 ### 7.2 Pipeline de Automação de Missões
 
-O projeto já tem `src/missions/` e `src/orchestrator/`. O SDK pode ser o **driver** programático dessas missões — substituindo a invocação manual por automação total:
+O projeto já tem `src/missions/` e `src/orchestrator/`. O SDK pode ser o **driver** programático
+dessas missões — substituindo a invocação manual por automação total:
 
 ```
 orchestrator → SDK session → missão executada → resultado gravado → session.json atualizado
@@ -587,7 +625,9 @@ orchestrator → SDK session → missão executada → resultado gravado → ses
 
 ### 7.3 Multi-Agent com SubagentStart/Stop
 
-O hook system já rastreia subagentes. Com o SDK, seria possível criar um **coordenador multi-agente** que:
+O hook system já rastreia subagentes. Com o SDK, seria possível criar um **coordenador
+multi-agente** que:
+
 1. Cria sessões paralelas para subtarefas
 2. Coleta resultados via eventos
 3. Coordena resultado final
@@ -597,15 +637,22 @@ O hook system já rastreia subagentes. Com o SDK, seria possível criar um **coo
 
 ## 8. Conclusão
 
-O **GitHub Copilot SDK** e nosso **hook system shell** são tecnologias complementares, não concorrentes. O hook system oferece compliance enforcement, audit trail e state machine persistente — coisas que o SDK não replica. O SDK oferece controle programático, modificação de argumentos/resultados, custom tools tipadas e integração padronizada via MCP — coisas que o shell não faz.
+O **GitHub Copilot SDK** e nosso **hook system shell** são tecnologias complementares, não
+concorrentes. O hook system oferece compliance enforcement, audit trail e state machine persistente
+— coisas que o SDK não replica. O SDK oferece controle programático, modificação de
+argumentos/resultados, custom tools tipadas e integração padronizada via MCP — coisas que o shell
+não faz.
 
 A integração mais impactante com menor risco é a **Fase 1**:
+
 1. `P-01` — SDK wrapper que injeta o session-briefing gerado pelos hooks
 2. `P-07` — Roteamento multi-modelo para tarefas diferentes
 3. `P-06` — Telemetria OTel complementando o audit.jsonl
 
-Essas três propostas juntas criam um ambiente de desenvolvimento significativamente mais poderoso sem mexer no que já funciona.
+Essas três propostas juntas criam um ambiente de desenvolvimento significativamente mais poderoso
+sem mexer no que já funciona.
 
 ---
 
-*Documento gerado por análise comparativa entre o SDK docs (GitHub) e o estado atual do hook system em `.github/hooks/`. Nenhuma implementação foi realizada.*
+_Documento gerado por análise comparativa entre o SDK docs (GitHub) e o estado atual do hook system
+em `.github/hooks/`. Nenhuma implementação foi realizada._

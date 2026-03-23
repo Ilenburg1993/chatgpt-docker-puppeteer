@@ -1,8 +1,7 @@
 # Fase 0 — Baseline e Contratos Comportamentais do Hooks System
 
-**Data**: 2026-03-15
-**Status**: ✅ Concluída
-**Escopo**: congelar o comportamento atual dos hooks automáticos como referência de não-regressão.
+**Data**: 2026-03-15 **Status**: ✅ Concluída **Escopo**: congelar o comportamento atual dos hooks
+automáticos como referência de não-regressão.
 
 ## Objetivo da F0
 

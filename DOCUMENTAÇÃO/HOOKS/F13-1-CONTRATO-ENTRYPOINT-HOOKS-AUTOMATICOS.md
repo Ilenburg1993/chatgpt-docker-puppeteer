@@ -1,13 +1,12 @@
 # F13.1 — Contrato Canônico de Entrypoint para Hooks Automáticos
 
-**Data**: 2026-03-15
-**Escopo**: hooks automáticos acionados por `.github/hooks/copilot-hooks.json`
+**Data**: 2026-03-15 **Escopo**: hooks automáticos acionados por `.github/hooks/copilot-hooks.json`
 **Status**: canônico para a trilha F13→F16
 
 ## Objetivo
 
-Padronizar todos os scripts automáticos no modelo **script-orquestrador + lib dedicada**,
-reduzindo lógica inline, acoplamento e risco de regressão.
+Padronizar todos os scripts automáticos no modelo **script-orquestrador + lib dedicada**, reduzindo
+lógica inline, acoplamento e risco de regressão.
 
 ## Hooks automáticos cobertos
 
@@ -49,23 +48,24 @@ Cada script automático deve cumprir, na ordem:
 
 ## Matriz alvo script -> lib dedicada -> função pública
 
-| Script automático | Lib dedicada alvo | Função pública canônica |
-| --- | --- | --- |
-| `session-start.sh` | `hooks-lib/lifecycle/session-start-lib.sh` | `run_session_start_hook` |
-| `log-prompt.sh` | `hooks-lib/lifecycle/log-prompt-lib.sh` | `run_log_prompt_hook` |
-| `pre-tool-use.sh` | `hooks-lib/policy/pre-tool-use-lib.sh` | `run_pre_tool_use_hook` |
-| `post-tool-use.sh` | `hooks-lib/policy/post-tool-use-lib.sh` | `run_post_tool_use_hook` |
-| `agent-stop.sh` | `hooks-lib/agent-stop-lib.sh` | `run_agent_stop_hook` *(a consolidar sem quebrar contrato atual)* |
-| `subagent-start.sh` | `hooks-lib/lifecycle/subagent-start-lib.sh` | `run_subagent_start_hook` |
-| `subagent-stop.sh` | `hooks-lib/lifecycle/subagent-stop-lib.sh` | `run_subagent_stop_hook` |
-| `pre-compact.sh` | `hooks-lib/lifecycle/pre-compact-lib.sh` | `run_pre_compact_hook` |
-| `session-end.sh` | `hooks-lib/lifecycle/session-end-lib.sh` | `run_session_end_hook` |
+| Script automático   | Lib dedicada alvo                           | Função pública canônica                                           |
+| ------------------- | ------------------------------------------- | ----------------------------------------------------------------- |
+| `session-start.sh`  | `hooks-lib/lifecycle/session-start-lib.sh`  | `run_session_start_hook`                                          |
+| `log-prompt.sh`     | `hooks-lib/lifecycle/log-prompt-lib.sh`     | `run_log_prompt_hook`                                             |
+| `pre-tool-use.sh`   | `hooks-lib/policy/pre-tool-use-lib.sh`      | `run_pre_tool_use_hook`                                           |
+| `post-tool-use.sh`  | `hooks-lib/policy/post-tool-use-lib.sh`     | `run_post_tool_use_hook`                                          |
+| `agent-stop.sh`     | `hooks-lib/agent-stop-lib.sh`               | `run_agent_stop_hook` _(a consolidar sem quebrar contrato atual)_ |
+| `subagent-start.sh` | `hooks-lib/lifecycle/subagent-start-lib.sh` | `run_subagent_start_hook`                                         |
+| `subagent-stop.sh`  | `hooks-lib/lifecycle/subagent-stop-lib.sh`  | `run_subagent_stop_hook`                                          |
+| `pre-compact.sh`    | `hooks-lib/lifecycle/pre-compact-lib.sh`    | `run_pre_compact_hook`                                            |
+| `session-end.sh`    | `hooks-lib/lifecycle/session-end-lib.sh`    | `run_session_end_hook`                                            |
 
 ## Regra de “script fino” (critério objetivo)
 
 Um script automático será considerado **fino** quando atender simultaneamente:
 
-1. Não contém regra de negócio de domínio extensa; apenas bootstrap + validações de entrada + dispatch.
+1. Não contém regra de negócio de domínio extensa; apenas bootstrap + validações de entrada +
+   dispatch.
 2. A maior parte da lógica (decisão, transformação, persistência) reside em lib(s) dedicada(s).
 3. A função pública da lib cobre o fluxo principal de execução do hook.
 4. O script não replica regras já presentes na lib dedicada.

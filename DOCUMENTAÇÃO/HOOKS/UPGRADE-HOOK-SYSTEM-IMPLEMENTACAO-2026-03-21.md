@@ -12,7 +12,8 @@ Este documento registra a implementação prática do upgrade do sistema de hook
 
 ## Base de trabalho
 
-A implementação foi guiada por leitura direta de código (scripts + libs + API modular de hooks) e pela documentação oficial de hooks do VS Code/GitHub, sem depender apenas de documentação interna.
+A implementação foi guiada por leitura direta de código (scripts + libs + API modular de hooks) e
+pela documentação oficial de hooks do VS Code/GitHub, sem depender apenas de documentação interna.
 
 ## Mudanças aplicadas
 
@@ -53,7 +54,8 @@ A implementação foi guiada por leitura direta de código (scripts + libs + API
 **Arquivo:** `.github/hooks/lib/user-prompt-submit-lib.sh`
 
 - Introduzido buffer `_ups_system_message` + helper `_ups_append_msg()`.
-- Múltiplos lembretes passaram a ser agregados e emitidos em um único `hook_out_system_message` por execução.
+- Múltiplos lembretes passaram a ser agregados e emitidos em um único `hook_out_system_message` por
+  execução.
 
 ### 6) Parse de `fetch_webpage` compatível com `urls[]`
 
@@ -72,14 +74,17 @@ A implementação foi guiada por leitura direta de código (scripts + libs + API
 ### 8) Remoção de early-exit em reminders permissivos
 
 **Arquivos:**
+
 - `.github/hooks/lib/pre-tool-use-lib.sh`
 - `.github/hooks/lib/post-tool-use-lib.sh`
 
 **PreToolUse**
+
 - Reminders `allow` (soft/protocol) deixaram de encerrar prematuramente.
 - Contexto passa a ser agregado em `_pre_allow_context` e emitido no fim da execução.
 
 **PostToolUse**
+
 - Reminder de `git push/commit` não faz mais `exit` antecipado.
 - Contexto extra é emitido ao final via `_post_additional_context`.
 
@@ -106,13 +111,14 @@ A implementação foi guiada por leitura direta de código (scripts + libs + API
 ### 12) Redução de drift documental mínimo (paths canônicos)
 
 **Arquivos:**
+
 - `.github/instructions/hooks-protocol.instructions.md`
 - `.github/copilot-instructions.md`
 - `DOCUMENTAÇÃO/HOOKS/README.md`
 
 - Atualizado path canônico de biblioteca para `.github/hooks/lib/*` nas instruções principais.
-- Inserida nota de compatibilidade no README de hooks para distinguir nomes legados (`agent-stop.sh`,
-  `hooks-lib`) do runtime atual (`stop.sh`, `lib/`).
+- Inserida nota de compatibilidade no README de hooks para distinguir nomes legados
+  (`agent-stop.sh`, `hooks-lib`) do runtime atual (`stop.sh`, `lib/`).
 
 ## Arquivos alterados
 
@@ -139,12 +145,17 @@ A implementação foi guiada por leitura direta de código (scripts + libs + API
 
 ## Itens pendentes (não bloqueantes)
 
-1. Atualização ampla de documentação histórica com nomes legados (`agent-stop.sh`, `hooks-lib`) para refletir runtime atual (`stop.sh`, `lib/`).
+1. Atualização ampla de documentação histórica com nomes legados (`agent-stop.sh`, `hooks-lib`) para
+   refletir runtime atual (`stop.sh`, `lib/`).
 2. Revalidação completa da suíte de smoke/integration dos hooks após merge das mudanças.
-3. Fortalecer testes de contrato para “single output” em `UserPromptSubmit` e para parse de `fetch_webpage` com múltiplas URLs.
+3. Fortalecer testes de contrato para “single output” em `UserPromptSubmit` e para parse de
+   `fetch_webpage` com múltiplas URLs.
 
 ## Nota operacional sobre memória do agente
 
-Foi solicitado registrar de forma persistente a regra de **não encerrar turn/session sem autorização/pedido expresso via fluxo de pergunta interativa**. O ambiente desta execução não expôs caminho gravável de memória persistente (`/memories/*`) via filesystem.
+Foi solicitado registrar de forma persistente a regra de **não encerrar turn/session sem
+autorização/pedido expresso via fluxo de pergunta interativa**. O ambiente desta execução não expôs
+caminho gravável de memória persistente (`/memories/*`) via filesystem.
 
-A diretriz foi mantida operacionalmente nesta implementação e documentada neste artefato para rastreabilidade.
+A diretriz foi mantida operacionalmente nesta implementação e documentada neste artefato para
+rastreabilidade.

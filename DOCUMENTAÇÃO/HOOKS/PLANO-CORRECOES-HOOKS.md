@@ -125,8 +125,8 @@ Isso é correto e esperado. **Nosso código é que deve se adaptar**, não o VS 
 
 ### 1.4 Cenários de ciclo de vida do session_id
 
-| Cenário                                                  | O que VS Code faz                                    | O que devemos fazer                               |
-| -------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------- |
+| Cenário                                                  | O que VS Code faz                                    | O que devemos fazer                                |
+| -------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------- |
 | Usuário abre nova aba de chat                            | Dispara `sessionStart` com novo `session_id`         | `session-start.sh` cria CTX com o novo ID ✅       |
 | Usuário continua na mesma aba (turnos normais)           | Dispara `userPromptSubmitted` com mesmo `session_id` | `log-prompt.sh` usa mesmo ID ✅                    |
 | VS Code inline compaction (token budget)                 | NÃO dispara `sessionStart`; `session_id` não muda    | RECONNECT-01 não dispara (IDs iguais) ✅           |
@@ -478,8 +478,8 @@ clara:
 
 ### Ordem de prioridade
 
-| ID     | Fix                                                                                                                                                                                                        | Impacto                               | Arquivo                                                           | Complexidade          | Status                                                                                              |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------- |
+| ID     | Fix                                                                                                                                                                                                        | Impacto                               | Arquivo                                                           | Complexidade          | Status                                                                                               |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------- |
 | BUG-01 | RECONNECT-02 usa SESSION_ID_PAYLOAD                                                                                                                                                                        | CRÍTICO — elimina mismatches          | `log-prompt.sh` L173-175                                          | Baixa (3 linhas)      | ✅ CONCLUÍDO                                                                                         |
 | BUG-02 | inline_restart preserva stats                                                                                                                                                                              | ALTA (robustez)                       | `session-start.sh`                                                | Média                 | ✅ CONCLUÍDO                                                                                         |
 | BUG-03 | Detectar `search_subagent`                                                                                                                                                                                 | ALTA — evita false positives blocking | `pre-tool-use.sh` L286                                            | Muito baixa (1 linha) | ✅ CONCLUÍDO                                                                                         |
@@ -1047,8 +1047,8 @@ O sistema de hooks usa **um único arquivo por tipo** para toda atividade do age
 
 **Scripts VS Code-invocados** (recebem `SESSION_ID_PAYLOAD` por stdin — 10 scripts):
 
-| Script                | Hook                  | Tem HEAL?                     |
-| --------------------- | --------------------- | ----------------------------- |
+| Script                | Hook                  | Tem HEAL?                      |
+| --------------------- | --------------------- | ------------------------------ |
 | `session-start.sh`    | `sessionStart`        | ✅ (cria sessão)               |
 | `log-prompt.sh`       | `userPromptSubmitted` | ✅ HEAL v1+v2                  |
 | `pre-tool-use.sh`     | `preToolUse`          | ✅ HEAL v1+v2                  |
@@ -1285,8 +1285,8 @@ integral._
 
 ## Seção 9 — Auditoria Pós-Sprint-6 (2026-03-12)
 
-> Auditoria completa realizada após merge do Sprint 6 (UPG-AUDIT-01, commit `fcb47883`).
-> Scripts inspecionados: `common.sh` (551L), `log-prompt.sh` (501L), `pre-tool-use.sh` (509L),
+> Auditoria completa realizada após merge do Sprint 6 (UPG-AUDIT-01, commit `fcb47883`). Scripts
+> inspecionados: `common.sh` (551L), `log-prompt.sh` (501L), `pre-tool-use.sh` (509L),
 > `post-tool-use.sh` (401L), `agent-stop.sh` (819L). Dois bugs críticos/médios encontrados e
 > corrigidos no mesmo ciclo. Observações de baixa severidade documentadas abaixo.
 
@@ -1294,25 +1294,23 @@ integral._
 
 ### BUG-18 — `pre-tool-use.sh`: branch `inline_restart` acidentalmente comentada
 
-**Severidade**: CRÍTICA (regressão silenciosa de BUG-06)
-**Status**: ✅ CORRIGIDO (2026-03-12)
+**Severidade**: CRÍTICA (regressão silenciosa de BUG-06) **Status**: ✅ CORRIGIDO (2026-03-12)
 **Commit**: pós-Sprint-6
 
-**Descrição**:
-Em `pre-tool-use.sh`, após o bloco de HEAL v1 (`manual_recovery`), a linha que encerra o `if` e
-inicia o `elif` estava fundida em um único comentário:
+**Descrição**: Em `pre-tool-use.sh`, após o bloco de HEAL v1 (`manual_recovery`), a linha que
+encerra o `if` e inicia o `elif` estava fundida em um único comentário:
 
 ```bash
 # ANTES (quebrado):
-            # SESSION_ID já tem o valor correto — continua        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
+# SESSION_ID já tem o valor correto — continua        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
 ```
 
 O `elif [ "$CTX_SOURCE" = "inline_restart" ]; then` estava embutido ao final da linha de comentário,
 tornando-se texto inerte. Resultado:
 
-1. **`CTX_SOURCE = "manual_recovery"`**: o bloco de heal executava corretamente, **mas** o código
-   da branch `inline_restart` (que deveria ser `elif`) também executava na sequência — dentro do
-   mesmo bloco `if`, incluindo `SESSION_ID="$CTX_ACTIVE_SID"` e os logs de sincronização. Isso era
+1. **`CTX_SOURCE = "manual_recovery"`**: o bloco de heal executava corretamente, **mas** o código da
+   branch `inline_restart` (que deveria ser `elif`) também executava na sequência — dentro do mesmo
+   bloco `if`, incluindo `SESSION_ID="$CTX_ACTIVE_SID"` e os logs de sincronização. Isso era
    funcionalmente benigno para esse caso, pois após o heal `SESSION_ID == CTX_ACTIVE_SID`.
 
 2. **`CTX_SOURCE = "inline_restart"`**: a condição `if [ "$CTX_SOURCE" = "manual_recovery" ]` era
@@ -1321,16 +1319,18 @@ tornando-se texto inerte. Resultado:
    `SESSION_ID` ao CTX nunca ocorria.
 
 **Causa Raiz**: refatoração via `multi_replace_string_in_file` que não separou corretamente o
-comentário final do bloco `manual_recovery` do início do `elif`. A indentação enganosa (`        elif`
-com espaços antes do `elif`) não gerava erro de syntax — o bash interpretava tudo como parte do
-comentário.
+comentário final do bloco `manual_recovery` do início do `elif`. A indentação enganosa
+(`        elif` com espaços antes do `elif`) não gerava erro de syntax — o bash interpretava tudo
+como parte do comentário.
 
 **Fix aplicado**:
+
 ```bash
 # DEPOIS (corrigido):
             # SESSION_ID já tem o valor correto — continua
         elif [ "$CTX_SOURCE" = "inline_restart" ]; then
 ```
+
 Linha única dividida em duas: comentário encerra o bloco `manual_recovery`, `elif` inicia
 `inline_restart` como código executável.
 
@@ -1345,12 +1345,10 @@ imediatamente após inline_restart, antes do prompt).
 
 ### BUG-19 — `agent-stop.sh`: HEAL inline não atualizava `vs_code_session_id`
 
-**Severidade**: MÉDIA (inconsistência de schema CTX)
-**Status**: ✅ CORRIGIDO (2026-03-12)
+**Severidade**: MÉDIA (inconsistência de schema CTX) **Status**: ✅ CORRIGIDO (2026-03-12)
 **Commit**: pós-Sprint-6
 
-**Descrição**:
-Em `agent-stop.sh`, as 4 invocações de HEAL inline (HEAL v1 manual_recovery × 2 ramos
+**Descrição**: Em `agent-stop.sh`, as 4 invocações de HEAL inline (HEAL v1 manual_recovery × 2 ramos
 sponge/mktemp + HEAL v2 consecutive_mismatch × 2 ramos sponge/mktemp) atualizavam apenas
 `.session.id`, omitindo `.session.vs_code_session_id`:
 
@@ -1366,6 +1364,7 @@ incluíam `.session.vs_code_session_id = $real_sid` corretamente.
 
 **Fix aplicado**: adicionado `| .session.vs_code_session_id = $real_sid` nas 4 expressões jq de HEAL
 em `agent-stop.sh`:
+
 - HEAL v1 / manual_recovery / branch sponge
 - HEAL v1 / manual_recovery / branch mktemp
 - HEAL v2 / consecutive_mismatch / branch sponge
@@ -1385,8 +1384,8 @@ em `agent-stop.sh`:
 
 ### Resumo da Auditoria Pós-Sprint-6 (Fase 1)
 
-| Categoria                        | Quantidade        | Status                                |
-| -------------------------------- | ----------------- | ------------------------------------- |
+| Categoria                        | Quantidade        | Status                                 |
+| -------------------------------- | ----------------- | -------------------------------------- |
 | Bugs críticos                    | 1 (BUG-18)        | ✅ Corrigido                           |
 | Bugs médios                      | 1 (BUG-19)        | ✅ Corrigido                           |
 | Observações                      | 3 (INFO-01/02/03) | 📝 Documentado — sem correção imediata |
@@ -1396,14 +1395,14 @@ em `agent-stop.sh`:
 
 ## Seção 9.1 — Auditoria Exaustiva do Sistema de Hooks (2026-03-12)
 
-> Auditoria aprofundada com cobertura de **todos** os scripts do sistema. Scripts inspecionados
-> além dos da Fase 1: `subagent-start.sh`, `subagent-stop.sh`, `tool-use-failure.sh`,
-> `pre-compact.sh`, `session-start.sh` (1185L completo), `session-end.sh` (377L completo),
-> `session-close.sh` (182L completo), `watchdog.sh` (434L), `rotate-audit.sh` (109L),
-> `session-checkpoint.sh` (201L), `start-section.sh` (203L), `start-turn.sh` (120L+).
+> Auditoria aprofundada com cobertura de **todos** os scripts do sistema. Scripts inspecionados além
+> dos da Fase 1: `subagent-start.sh`, `subagent-stop.sh`, `tool-use-failure.sh`, `pre-compact.sh`,
+> `session-start.sh` (1185L completo), `session-end.sh` (377L completo), `session-close.sh` (182L
+> completo), `watchdog.sh` (434L), `rotate-audit.sh` (109L), `session-checkpoint.sh` (201L),
+> `start-section.sh` (203L), `start-turn.sh` (120L+).
 >
-> **25 findings novos (BUG-20 a BUG-44):** 4 críticos, 3 altos, 9 médios, 9 baixos.
-> **Status**: ⏳ Pendente de aprovação — nenhum corrigido ainda.
+> **25 findings novos (BUG-20 a BUG-44):** 4 críticos, 3 altos, 9 médios, 9 baixos. **Status**: ⏳
+> Pendente de aprovação — nenhum corrigido ainda.
 
 ### Índice rápido
 
@@ -1422,7 +1421,7 @@ em `agent-stop.sh`:
 | BUG-30 | MÉDIA   | session-end.sh         | ~277     | TOOLS_COUNT zerado quando SESSION_ID="unknown"   |
 | BUG-31 | MÉDIA   | múltiplos              | vários   | Inconsistência apply_per_session_paths()         |
 | BUG-32 | MÉDIA   | session-close.sh       | ~115     | Consequência de BUG-28: flag authorized ausente  |
-| BUG-33 | MÉDIA   | session-start.sh       | ~940     | _PREV_ASK_API_FAILURES zerado para source=new    |
+| BUG-33 | MÉDIA   | session-start.sh       | ~940     | \_PREV_ASK_API_FAILURES zerado para source=new   |
 | BUG-34 | MÉDIA   | session-start.sh       | ~1157    | Alerts críticos cortados pelo head -80 do ctx    |
 | BUG-35 | BAIXA   | session-start.sh       | ~342     | GNU grep `\|` sem -E (não portável)              |
 | BUG-36 | BAIXA   | watchdog.sh            | ~220     | Mesmo GNU grep `\|` sem -E                       |
@@ -1439,41 +1438,40 @@ em `agent-stop.sh`:
 
 ### BUG-20 / BUG-21 / BUG-22 / BUG-23 — Guard pattern incorreto: `inline_restart` tratado como mismatch após HEAL
 
-**Severidade**: CRÍTICA (×4 scripts)
-**Status**: ⏳ Pendente
-**Scripts afetados**:
+**Severidade**: CRÍTICA (×4 scripts) **Status**: ⏳ Pendente **Scripts afetados**:
+
 - `subagent-start.sh` linhas 42–58
 - `subagent-stop.sh` linhas 42–63
 - `tool-use-failure.sh` linhas 43–65
 - `pre-compact.sh` linhas 44–66
 
-**Descrição**:
-Todos os 4 scripts têm o mesmo bug estrutural no guard de session_id. O padrão correto (usado em
-`post-tool-use.sh` e `log-prompt.sh`) é `if/elif/else` separando `manual_recovery`,
-`inline_restart`, e o caso de mismatch genuíno. Os 4 scripts afetados usam `if || else` combinando
-`manual_recovery` E `inline_restart` no mesmo bloco, mas depois SEMPRE caem no código de mismatch e
-`exit 0`, regardless de a heal ter sido aplicada:
+**Descrição**: Todos os 4 scripts têm o mesmo bug estrutural no guard de session_id. O padrão
+correto (usado em `post-tool-use.sh` e `log-prompt.sh`) é `if/elif/else` separando
+`manual_recovery`, `inline_restart`, e o caso de mismatch genuíno. Os 4 scripts afetados usam
+`if || else` combinando `manual_recovery` E `inline_restart` no mesmo bloco, mas depois SEMPRE caem
+no código de mismatch e `exit 0`, regardless de a heal ter sido aplicada:
 
 ```bash
 # ANTES (quebrado — idêntico nos 4 scripts, exemplo do subagent-start.sh):
-        if [ "$CTX_SOURCE" = "manual_recovery" ] || [ "$CTX_SOURCE" = "inline_restart" ]; then
-            if command -v heal_v1 > /dev/null 2>&1; then
-                if heal_v1 "$SESSION_ID_PAYLOAD" "$TIMESTAMP"; then
-                    echo "[heal] HEAL v1 aplicado em subagent-start.sh" >&2
-                fi
-            fi
-        fi
-        # Este bloco SEMPRE executa — mesmo após heal de inline_restart:
-        jq -cn \
-            --arg event "session_id_mismatch" \
-            ... >> "$AUDIT_FILE"
-        increment_mismatch
-        exit 0  # ← bloqueia toda a operação normal do script
+if [ "$CTX_SOURCE" = "manual_recovery" ] || [ "$CTX_SOURCE" = "inline_restart" ]; then
+  if command -v heal_v1 > /dev/null 2>&1; then
+    if heal_v1 "$SESSION_ID_PAYLOAD" "$TIMESTAMP"; then
+      echo "[heal] HEAL v1 aplicado em subagent-start.sh" >&2
+    fi
+  fi
+fi
+# Este bloco SEMPRE executa — mesmo após heal de inline_restart:
+jq -cn \
+  --arg event "session_id_mismatch" \
+  ... >> "$AUDIT_FILE"
+increment_mismatch
+exit 0 # ← bloqueia toda a operação normal do script
 ```
 
 **Impacto por script**:
-- **BUG-20** (`subagent-start.sh`): o evento `subagentStart` nunca é logado; contadores de
-  subagente não incrementados durante `inline_restart`.
+
+- **BUG-20** (`subagent-start.sh`): o evento `subagentStart` nunca é logado; contadores de subagente
+  não incrementados durante `inline_restart`.
 - **BUG-21** (`subagent-stop.sh`): `subagent_completions` não incrementado; evento `subagentStop`
   não logado; duração do subagente não calculada.
 - **BUG-22** (`tool-use-failure.sh`): falhas de ferramenta durante `inline_restart` não
@@ -1485,32 +1483,32 @@ Todos os 4 scripts têm o mesmo bug estrutural no guard de session_id. O padrão
 
 ```bash
 # DEPOIS (correto — separar manual_recovery de inline_restart com if/elif/else):
-        if [ "$CTX_SOURCE" = "manual_recovery" ]; then
-            # heal e continua normalmente (sem exit)
-            if command -v heal_v1 > /dev/null 2>&1; then
-                heal_v1 "$SESSION_ID_PAYLOAD" "$TIMESTAMP" || true
-            fi
-            SESSION_ID_PAYLOAD="$CTX_ACTIVE_SID"
-            jq -cn \
-                --arg event "session_id_healed" \
-                --arg sid "$CTX_ACTIVE_SID" \
-                --arg ts "$TIMESTAMP" \
-                --arg src "$HOOK_SCRIPT_NAME" \
-                '{event: $event, session_id: $sid, timestamp: $ts, source: $src}' \
-                >> "$AUDIT_FILE" 2>/dev/null || true
-            # NÃO usa exit — continua para a operação normal do script
-        elif [ "$CTX_SOURCE" = "inline_restart" ]; then
-            # adota o session_id do CTX e continua normalmente
-            SESSION_ID_PAYLOAD="$CTX_ACTIVE_SID"
-            # NÃO usa exit — continua para a operação normal do script
-        else
-            # mismatch genuíno — loga e sai
-            jq -cn \
-                --arg event "session_id_mismatch" \
-                ... >> "$AUDIT_FILE"
-            increment_mismatch
-            exit 0
-        fi
+if [ "$CTX_SOURCE" = "manual_recovery" ]; then
+  # heal e continua normalmente (sem exit)
+  if command -v heal_v1 > /dev/null 2>&1; then
+    heal_v1 "$SESSION_ID_PAYLOAD" "$TIMESTAMP" || true
+  fi
+  SESSION_ID_PAYLOAD="$CTX_ACTIVE_SID"
+  jq -cn \
+    --arg event "session_id_healed" \
+    --arg sid "$CTX_ACTIVE_SID" \
+    --arg ts "$TIMESTAMP" \
+    --arg src "$HOOK_SCRIPT_NAME" \
+    '{event: $event, session_id: $sid, timestamp: $ts, source: $src}' \
+    >> "$AUDIT_FILE" 2> /dev/null || true
+  # NÃO usa exit — continua para a operação normal do script
+elif [ "$CTX_SOURCE" = "inline_restart" ]; then
+  # adota o session_id do CTX e continua normalmente
+  SESSION_ID_PAYLOAD="$CTX_ACTIVE_SID"
+  # NÃO usa exit — continua para a operação normal do script
+else
+  # mismatch genuíno — loga e sai
+  jq -cn \
+    --arg event "session_id_mismatch" \
+    ... >> "$AUDIT_FILE"
+  increment_mismatch
+  exit 0
+fi
 ```
 
 **Referência**: `post-tool-use.sh` linhas ~113–180 implementa corretamente o padrão `if/elif/else`.
@@ -1519,46 +1517,40 @@ Todos os 4 scripts têm o mesmo bug estrutural no guard de session_id. O padrão
 
 ### BUG-24 — `post-tool-use.sh`: Deadlock potencial ao chamar `session-close.sh` com `flock` ativo
 
-**Severidade**: ALTA
-**Status**: ⏳ Pendente
-**Arquivo**: `post-tool-use.sh`, linha ~295
+**Severidade**: ALTA **Status**: ⏳ Pendente **Arquivo**: `post-tool-use.sh`, linha ~295
 
-**Descrição**:
-`post-tool-use.sh` adquire `flock -x -w 3 9` no arquivo `CTX_FILE.lock` no início da execução (via
-`exec 9> "$_CTX_LOCK"; flock -x -w 3 9`). Quando detecta a `close_key` na resposta do
+**Descrição**: `post-tool-use.sh` adquire `flock -x -w 3 9` no arquivo `CTX_FILE.lock` no início da
+execução (via `exec 9> "$_CTX_LOCK"; flock -x -w 3 9`). Quando detecta a `close_key` na resposta do
 `vscode_askQuestions`, chama `session-close.sh` de forma síncrona:
 
 ```bash
 bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" > /dev/null 2>&1 || true
 ```
 
-`session-close.sh` (linha ~45) em seguida tenta adquirir o **mesmo lock** (`flock -x -w 5 9`).
-Como `post-tool-use.sh` ainda detém o lock, `session-close.sh` espera 5 segundos, expira, e
-continua **sem o lock**. Resultado: `session-close.sh` escreve no CTX e cria flags sem garantia de
+`session-close.sh` (linha ~45) em seguida tenta adquirir o **mesmo lock** (`flock -x -w 5 9`). Como
+`post-tool-use.sh` ainda detém o lock, `session-close.sh` espera 5 segundos, expira, e continua
+**sem o lock**. Resultado: `session-close.sh` escreve no CTX e cria flags sem garantia de
 atomicidade — condição de corrida com qualquer outro hook concorrente, e o arquivo de log pode
 receber eventos fora de ordem.
 
 ```bash
 # DEPOIS (libera lock antes de chamar session-close.sh):
-        exec 9>&-   # fecha e libera o file descriptor do lock
-        bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" > /dev/null 2>&1 || true
-        # Não é necessário reabrir o lock: após session-close.sh, post-tool-use.sh encerra
+exec 9>&- # fecha e libera o file descriptor do lock
+bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" > /dev/null 2>&1 || true
+# Não é necessário reabrir o lock: após session-close.sh, post-tool-use.sh encerra
 ```
 
 ---
 
 ### BUG-25 — `session-start.sh`: `trap ... EXIT` sobrescreve trap anterior (trap clobbering)
 
-**Severidade**: ALTA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-start.sh`, linha ~490
+**Severidade**: ALTA **Status**: ⏳ Pendente **Arquivo**: `session-start.sh`, linha ~490
 
-**Descrição**:
-Na seção de análise de tendências históricas, o script cria um arquivo temporário e instala um trap
-para limpá-lo:
+**Descrição**: Na seção de análise de tendências históricas, o script cria um arquivo temporário e
+instala um trap para limpá-lo:
 
 ```bash
-_TREND_MERGED="$(mktemp 2>/dev/null)"
+_TREND_MERGED="$(mktemp 2> /dev/null)"
 trap 'rm -f "${_TREND_MERGED:-}"' EXIT
 ```
 
@@ -1571,13 +1563,15 @@ problema real é o clobbering.
 
 ```bash
 # DEPOIS (preserva trap anterior):
-_TREND_MERGED="$(mktemp 2>/dev/null)"
+_TREND_MERGED="$(mktemp 2> /dev/null)"
 # Cleanup explícito ao final da seção, sem sobrescrever trap:
 _TREND_CLEANUP_NEEDED=true
 ```
+
 E ao final da seção de trend:
+
 ```bash
-rm -f "${_TREND_MERGED:-}" 2>/dev/null || true
+rm -f "${_TREND_MERGED:-}" 2> /dev/null || true
 _TREND_CLEANUP_NEEDED=false
 ```
 
@@ -1585,13 +1579,10 @@ _TREND_CLEANUP_NEEDED=false
 
 ### BUG-26 — `session-end.sh`: `tail | sponge` pode esvaziar audit.jsonl em falha de pipe
 
-**Severidade**: ALTA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-end.sh`, linhas ~225–230
+**Severidade**: ALTA **Status**: ⏳ Pendente **Arquivo**: `session-end.sh`, linhas ~225–230
 
-**Descrição**:
-Quando o audit.jsonl per-session ultrapassa `AUDIT_MAX_LINES` (5000 linhas), session-end.sh executa
-rotação inline:
+**Descrição**: Quando o audit.jsonl per-session ultrapassa `AUDIT_MAX_LINES` (5000 linhas),
+session-end.sh executa rotação inline:
 
 ```bash
 tail -n "$AUDIT_MAX_LINES" "$AUDIT_FILE" | sponge "$AUDIT_FILE"
@@ -1605,10 +1596,10 @@ no final apenas suprime o código de saída, sem prevenir a escrita vazia.
 ```bash
 # DEPOIS (atômico via arquivo temporário):
 _AUDIT_TMP="$(mktemp "${AUDIT_FILE}.XXXXXX")"
-if tail -n "$AUDIT_MAX_LINES" "$AUDIT_FILE" > "$_AUDIT_TMP" 2>/dev/null; then
-    mv "$_AUDIT_TMP" "$AUDIT_FILE"
+if tail -n "$AUDIT_MAX_LINES" "$AUDIT_FILE" > "$_AUDIT_TMP" 2> /dev/null; then
+  mv "$_AUDIT_TMP" "$AUDIT_FILE"
 else
-    rm -f "$_AUDIT_TMP" 2>/dev/null || true
+  rm -f "$_AUDIT_TMP" 2> /dev/null || true
 fi
 ```
 
@@ -1616,19 +1607,16 @@ fi
 
 ### BUG-27 — `session-start.sh`: `AUDIT_FILE` temporário pode não ser restaurado em falha antecipada
 
-**Severidade**: MÉDIA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-start.sh`, linhas ~485–558
+**Severidade**: MÉDIA **Status**: ⏳ Pendente **Arquivo**: `session-start.sh`, linhas ~485–558
 
-**Descrição**:
-Durante a análise de tendências históricas, `AUDIT_FILE` é temporariamente sobrescrito para apontar
-ao arquivo merged:
+**Descrição**: Durante a análise de tendências históricas, `AUDIT_FILE` é temporariamente
+sobrescrito para apontar ao arquivo merged:
 
 ```bash
 _TREND_AUDIT_FILE_BKP="$AUDIT_FILE"
-AUDIT_FILE="$_TREND_MERGED"           # ← aponta para temp file
+AUDIT_FILE="$_TREND_MERGED" # ← aponta para temp file
 # ... análise de tendências (muitas linhas) ...
-AUDIT_FILE="$_TREND_AUDIT_FILE_BKP"  # ← restaura ao final
+AUDIT_FILE="$_TREND_AUDIT_FILE_BKP" # ← restaura ao final
 ```
 
 Se qualquer comando entre os dois assignments falhar com `set -eo pipefail` (sem `|| true`),
@@ -1640,31 +1628,28 @@ seria gerado.
 
 ```bash
 # DEPOIS (garante restauração via variável de guarda):
-_TREND_MERGED="$(mktemp 2>/dev/null)"
+_TREND_MERGED="$(mktemp 2> /dev/null)"
 _TREND_AUDIT_FILE_BKP="$AUDIT_FILE"
 AUDIT_FILE="$_TREND_MERGED"
 # ... análise (toda com || true) ...
-AUDIT_FILE="$_TREND_AUDIT_FILE_BKP"  # restaura imediatamente antes de qualquer uso
-rm -f "${_TREND_MERGED:-}" 2>/dev/null || true  # cleanup explícito (sem depender de trap)
+AUDIT_FILE="$_TREND_AUDIT_FILE_BKP"             # restaura imediatamente antes de qualquer uso
+rm -f "${_TREND_MERGED:-}" 2> /dev/null || true # cleanup explícito (sem depender de trap)
 ```
 
 ---
 
 ### BUG-28 — `session-close.sh`: CTX per-session não verificado após leitura de `current-session-id.txt`
 
-**Severidade**: MÉDIA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-close.sh`, linhas 52–60
+**Severidade**: MÉDIA **Status**: ⏳ Pendente **Arquivo**: `session-close.sh`, linhas 52–60
 
-**Descrição**:
-`session-close.sh` resolve o path do CTX per-session a partir do `current-session-id.txt`, mas não
-verifica se o arquivo resultante existe antes de usá-lo:
+**Descrição**: `session-close.sh` resolve o path do CTX per-session a partir do
+`current-session-id.txt`, mas não verifica se o arquivo resultante existe antes de usá-lo:
 
 ```bash
 if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE")"; then
-    _SID_SHORT="${_CURR_SID:0:8}"
-    CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json"   # ← sem verificação de existência
-    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+  _SID_SHORT="${_CURR_SID:0:8}"
+  CTX_FILE="$STATE_DIR/session-context-${_SID_SHORT}.json" # ← sem verificação de existência
+  AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
 fi
 ```
 
@@ -1675,15 +1660,15 @@ correta.
 
 ```bash
 # DEPOIS (verifica existência):
-if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2>/dev/null)" && [ -n "$_CURR_SID" ]; then
-    _SID_SHORT="${_CURR_SID:0:8}"
-    _CANDIDATE_CTX="$STATE_DIR/session-context-${_SID_SHORT}.json"
-    if [ -f "$_CANDIDATE_CTX" ]; then
-        CTX_FILE="$_CANDIDATE_CTX"
-        AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
-    else
-        echo "[session-close] AVISO: CTX per-session não encontrado (${_SID_SHORT}) — usando fallback genérico." >&2
-    fi
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "$_CURR_SID" ]; then
+  _SID_SHORT="${_CURR_SID:0:8}"
+  _CANDIDATE_CTX="$STATE_DIR/session-context-${_SID_SHORT}.json"
+  if [ -f "$_CANDIDATE_CTX" ]; then
+    CTX_FILE="$_CANDIDATE_CTX"
+    AUDIT_FILE="$LOG_DIR/audit-${_SID_SHORT}.jsonl"
+  else
+    echo "[session-close] AVISO: CTX per-session não encontrado (${_SID_SHORT}) — usando fallback genérico." >&2
+  fi
 fi
 ```
 
@@ -1691,12 +1676,10 @@ fi
 
 ### BUG-29 — `session-end.sh`: Arquivos rotacionados com nome fora do padrão per-session
 
-**Severidade**: MÉDIA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-end.sh`, linhas ~220–235
+**Severidade**: MÉDIA **Status**: ⏳ Pendente **Arquivo**: `session-end.sh`, linhas ~220–235
 
-**Descrição**:
-Quando `session-end.sh` rotaciona o audit per-session por tamanho, o arquivo de arquivo é nomeado:
+**Descrição**: Quando `session-end.sh` rotaciona o audit per-session por tamanho, o arquivo de
+arquivo é nomeado:
 
 ```bash
 ARCHIVE_FILE="$LOG_DIR/audit-archive-$(date -u '+%Y%m%d_%H%M%S').jsonl"
@@ -1704,8 +1687,8 @@ ARCHIVE_FILE="$LOG_DIR/audit-archive-$(date -u '+%Y%m%d_%H%M%S').jsonl"
 
 O padrão per-session (UPG-AUDIT-01) usa `audit-{SID_SHORT}.jsonl`. O arquivo rotacionado não inclui
 o `SID_SHORT`, então não é encontrado por `ls "$LOG_DIR"/audit-*.jsonl | head -10` usado em
-`session-start.sh` para análise de tendências históricas (esse glob só captura `audit-{SID}.jsonl`
-e não `audit-archive-*.jsonl`). Dados históricos rotacionados ficam invisíveis na análise de
+`session-start.sh` para análise de tendências históricas (esse glob só captura `audit-{SID}.jsonl` e
+não `audit-archive-*.jsonl`). Dados históricos rotacionados ficam invisíveis na análise de
 tendências.
 
 **Fix**: Incluir `SID_SHORT` no nome do arquivo de rotação:
@@ -1719,28 +1702,25 @@ ARCHIVE_FILE="$LOG_DIR/audit-archive-${SID_SHORT}-$(date -u '+%Y%m%d_%H%M%S').js
 
 ### BUG-30 — `session-end.sh`: `TOOLS_COUNT` zerado quando `SESSION_ID = "unknown"`
 
-**Severidade**: MÉDIA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-end.sh`, linhas ~277–285
+**Severidade**: MÉDIA **Status**: ⏳ Pendente **Arquivo**: `session-end.sh`, linhas ~277–285
 
-**Descrição**:
-`session-end.sh` conta ferramentas e erros filtrando por `session_id` no audit.jsonl:
+**Descrição**: `session-end.sh` conta ferramentas e erros filtrando por `session_id` no audit.jsonl:
 
 ```bash
 TOOLS_COUNT="$(jq -rs '[.[] | select(.session_id == $sid)] | length' --arg sid "$SESSION_ID" "$AUDIT_FILE")"
 ```
 
-Se `CTX_FILE` não existir ou estiver corrompido, `SESSION_ID` é `"unknown"`. Nenhum evento no
-audit tem `session_id: "unknown"`, então `TOOLS_COUNT = 0` e `ERRORS_COUNT = 0`. O evento
-`sessionEnd` registra 0 ferramentas e 0 erros, mesmo que a sessão tenha feito centenas de chamadas.
+Se `CTX_FILE` não existir ou estiver corrompido, `SESSION_ID` é `"unknown"`. Nenhum evento no audit
+tem `session_id: "unknown"`, então `TOOLS_COUNT = 0` e `ERRORS_COUNT = 0`. O evento `sessionEnd`
+registra 0 ferramentas e 0 erros, mesmo que a sessão tenha feito centenas de chamadas.
 
 **Fix**: adicionar fallback que conta TODOS os eventos quando SESSION_ID é desconhecido:
 
 ```bash
 if [ "$SESSION_ID" = "unknown" ] || [ -z "$SESSION_ID" ]; then
-    TOOLS_COUNT="$(jq -rs 'length' "$AUDIT_FILE" 2>/dev/null || echo 0)"
+  TOOLS_COUNT="$(jq -rs 'length' "$AUDIT_FILE" 2> /dev/null || echo 0)"
 else
-    TOOLS_COUNT="$(jq -rs --arg sid "$SESSION_ID" '[.[] | select(.session_id == $sid)] | length' "$AUDIT_FILE" 2>/dev/null || echo 0)"
+  TOOLS_COUNT="$(jq -rs --arg sid "$SESSION_ID" '[.[] | select(.session_id == $sid)] | length' "$AUDIT_FILE" 2> /dev/null || echo 0)"
 fi
 ```
 
@@ -1748,13 +1728,11 @@ fi
 
 ### BUG-31 — Inconsistência: `apply_per_session_paths()` vs chamadas diretas
 
-**Severidade**: MÉDIA
-**Status**: ⏳ Pendente
-**Scripts afetados**: `post-tool-use.sh`, `pre-tool-use.sh`, `tool-use-failure.sh`, `pre-compact.sh`, `session-end.sh`
+**Severidade**: MÉDIA **Status**: ⏳ Pendente **Scripts afetados**: `post-tool-use.sh`,
+`pre-tool-use.sh`, `tool-use-failure.sh`, `pre-compact.sh`, `session-end.sh`
 
-**Descrição**:
-Cinco scripts resolvem `CTX_FILE` e `AUDIT_FILE` com chamadas diretas a `resolve_ctx_file()` e
-`resolve_audit_file()`:
+**Descrição**: Cinco scripts resolvem `CTX_FILE` e `AUDIT_FILE` com chamadas diretas a
+`resolve_ctx_file()` e `resolve_audit_file()`:
 
 ```bash
 CTX_FILE="$(resolve_ctx_file)"
@@ -1782,16 +1760,13 @@ apply_per_session_paths
 
 ### BUG-32 — `session-close.sh`: Consequência do BUG-28 — `SESSION_CLOSE_AUTHORIZED.flag` com `session_id = "unknown"`
 
-**Severidade**: MÉDIA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-close.sh`, linhas ~115–130
+**Severidade**: MÉDIA **Status**: ⏳ Pendente **Arquivo**: `session-close.sh`, linhas ~115–130
 
-**Descrição**:
-Quando BUG-28 causa `SESSION_ID = "unknown"` (SID obsoleto em `current-session-id.txt`),
-`session-close.sh` não loga `sessionCloseAuthorized` (pois `STORED_KEY` é vazio e exit 1 ocorre
-antes). O `SESSION_CLOSE_AUTHORIZED.flag` nunca é criado. Na próxima sessão, `session-start.sh`
-detecta encerramento abrupto sem key validation — mesmo que o usuário tenha corretamente digitado a
-chave, e o sistema tenha encerrado com Template F.
+**Descrição**: Quando BUG-28 causa `SESSION_ID = "unknown"` (SID obsoleto em
+`current-session-id.txt`), `session-close.sh` não loga `sessionCloseAuthorized` (pois `STORED_KEY` é
+vazio e exit 1 ocorre antes). O `SESSION_CLOSE_AUTHORIZED.flag` nunca é criado. Na próxima sessão,
+`session-start.sh` detecta encerramento abrupto sem key validation — mesmo que o usuário tenha
+corretamente digitado a chave, e o sistema tenha encerrado com Template F.
 
 **Fix**: dependente da correção de BUG-28 — após verificar existência do CTX e fallback ao genérico,
 a lógica segue normalmente.
@@ -1800,85 +1775,77 @@ a lógica segue normalmente.
 
 ### BUG-33 — `session-start.sh`: `_PREV_ASK_API_FAILURES` sempre 0 para `source=new`
 
-**Severidade**: MÉDIA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-start.sh`, linha ~940
+**Severidade**: MÉDIA **Status**: ⏳ Pendente **Arquivo**: `session-start.sh`, linha ~940
 
-**Descrição**:
-O alerta de falha de API do `vscode_askQuestions` no briefing é gerado com base em:
+**Descrição**: O alerta de falha de API do `vscode_askQuestions` no briefing é gerado com base em:
 
 ```bash
 _PREV_ASK_API_FAILURES="$(jq -r '.session_stats.askquestions_api_failures // 0' "$CTX_FILE" ...)"
 ```
 
-Esta leitura ocorre APÓS o novo CTX ser escrito em `$PER_CTX_FILE` e o symlink `session-context.json`
-atualizado. Para `source=new`, o novo CTX tem `askquestions_api_failures: 0`. A leitura retorna
-sempre 0 — o alerta NUNCA dispara para sessões novas, mesmo que a sessão anterior tenha acumulado
-muitas falhas.
+Esta leitura ocorre APÓS o novo CTX ser escrito em `$PER_CTX_FILE` e o symlink
+`session-context.json` atualizado. Para `source=new`, o novo CTX tem `askquestions_api_failures: 0`.
+A leitura retorna sempre 0 — o alerta NUNCA dispara para sessões novas, mesmo que a sessão anterior
+tenha acumulado muitas falhas.
 
 Para `source=inline_restart`, o CTX é preservado (não zerado), então o campo persiste corretamente.
 
 **Fix**: ler `_PREV_ASK_API_FAILURES` ANTES de escrever o novo CTX (junto com os demais campos
-PREV_* que são lidos da CTX anterior):
+PREV\_\* que são lidos da CTX anterior):
 
 ```bash
 # Mover para a seção de leitura de variáveis prev (linhas ~130-180):
-_PREV_ASK_API_FAILURES="$(jq -r '.session_stats.askquestions_api_failures // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+_PREV_ASK_API_FAILURES="$(jq -r '.session_stats.askquestions_api_failures // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 ```
 
 ---
 
 ### BUG-34 — `session-start.sh`: Alerts críticos no briefing cortados pelo `head -80` do `additionalContext`
 
-**Severidade**: MÉDIA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-start.sh`, linhas ~1157–1165
+**Severidade**: MÉDIA **Status**: ⏳ Pendente **Arquivo**: `session-start.sh`, linhas ~1157–1165
 
-**Descrição**:
-O `additionalContext` injetado no LLM usa as primeiras 80 linhas (não-vazias, sem `---`) do
-briefing:
+**Descrição**: O `additionalContext` injetado no LLM usa as primeiras 80 linhas (não-vazias, sem
+`---`) do briefing:
 
 ```bash
-BRIEFING_CONDENSED="$(grep -v '^---$' "$BRIEFING_FILE" 2>/dev/null \
-    | grep -v '^$' \
-    | head -80 ...)"
+BRIEFING_CONDENSED="$(grep -v '^---$' "$BRIEFING_FILE" 2> /dev/null \
+  | grep -v '^$' \
+  | head -80 ...)"
 ```
 
 O briefing é construído sequencialmente, começando com a seção de protocolo de encerramento (TABLE
 de SESSION/SECTION/TURN + close_key). Essa seção tem ~25 linhas. Os alertas de violação e
 SESSION_CLOSE_NO_KEY são injetados DEPOIS do cabeçalho. Em situações críticas (violação + no-key +
-alerta de watchdog), o contexto injetado pode ter 60-70 linhas de protocolo antes dos alertas.
-Os **alertas críticos podem ser cortados** e o LLM não os vê no contexto injetado.
+alerta de watchdog), o contexto injetado pode ter 60-70 linhas de protocolo antes dos alertas. Os
+**alertas críticos podem ser cortados** e o LLM não os vê no contexto injetado.
 
-**Fix**: colocar os alertas críticos PRIMEIRO no briefing, antes da seção de protocolo (que pode
-ser vista ao carregar o arquivo manualmente):
+**Fix**: colocar os alertas críticos PRIMEIRO no briefing, antes da seção de protocolo (que pode ser
+vista ao carregar o arquivo manualmente):
 
 ```bash
 # Reordenação do briefing: escrever alertas críticos ANTES do protocolo genérico.
 # Ou aumentar o limite de head -80 para head -150:
-BRIEFING_CONDENSED="$(grep -v '^---$' "$BRIEFING_FILE" 2>/dev/null \
-    | grep -v '^$' \
-    | head -150 \
-    | grep -v 'Gerado automaticamente' || true)"
+BRIEFING_CONDENSED="$(grep -v '^---$' "$BRIEFING_FILE" 2> /dev/null \
+  | grep -v '^$' \
+  | head -150 \
+  | grep -v 'Gerado automaticamente' || true)"
 ```
 
 ---
 
 ### BUG-35 — `session-start.sh`: GNU grep `\|` sem `-E` — não portável
 
-**Severidade**: BAIXA
-**Status**: ⏳ Pendente (documentado — sem impacto no ambiente atual)
+**Severidade**: BAIXA **Status**: ⏳ Pendente (documentado — sem impacto no ambiente atual)
 **Arquivo**: `session-start.sh`, linha ~342
 
-**Descrição**:
-`session-start.sh` usa `grep` com alternação BRE:
+**Descrição**: `session-start.sh` usa `grep` com alternação BRE:
 
 ```bash
 grep -q '"sessionEnd"\|"sessionCloseAuthorized"' "$PREV_AUDIT_FILE"
 ```
 
-`\|` é uma extensão GNU grep (BRE), não POSIX padrão. Sem `-E` (ERE), não é reconhecido em
-sistemas não-GNU (macOS, BSD). O ambiente atual é Linux, mas o DevContainer pode mudar.
+`\|` é uma extensão GNU grep (BRE), não POSIX padrão. Sem `-E` (ERE), não é reconhecido em sistemas
+não-GNU (macOS, BSD). O ambiente atual é Linux, mas o DevContainer pode mudar.
 
 ```bash
 # DEPOIS (portável com ERE):
@@ -1889,9 +1856,7 @@ grep -qE '"sessionEnd"|"sessionCloseAuthorized"' "$PREV_AUDIT_FILE"
 
 ### BUG-36 — `watchdog.sh`: GNU grep `\|` sem `-E` (mesma classe do BUG-35)
 
-**Severidade**: BAIXA
-**Status**: ⏳ Pendente
-**Arquivo**: `watchdog.sh`, linha ~220
+**Severidade**: BAIXA **Status**: ⏳ Pendente **Arquivo**: `watchdog.sh`, linha ~220
 
 **Descrição**: Mesmo padrão do BUG-35 — `grep` com `\|` BRE sem `-E`. Impacto mínimo em ambiente
 Linux, mas inconsistência de estilo e portabilidade.
@@ -1902,15 +1867,12 @@ Linux, mas inconsistência de estilo e portabilidade.
 
 ### BUG-37 — `session-start.sh`: CLOSE_KEY fallback baseado em `date +%s` colide em sessões simultâneas
 
-**Severidade**: BAIXA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-start.sh`, linha ~165
+**Severidade**: BAIXA **Status**: ⏳ Pendente **Arquivo**: `session-start.sh`, linha ~165
 
-**Descrição**:
-O fallback do CLOSE_KEY quando `openssl rand` não está disponível:
+**Descrição**: O fallback do CLOSE_KEY quando `openssl rand` não está disponível:
 
 ```bash
-CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2>/dev/null | ... || date +%s | sha256sum | head -c 8 | ...)"
+CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | ... || date +%s | sha256sum | head -c 8 | ...)"
 ```
 
 Duas sessões iniciadas no mesmo segundo (e.g., via script de automação) resultariam em `date +%s`
@@ -1919,20 +1881,17 @@ idênticos → mesmo CLOSE_KEY → ambas as sessões com a mesma chave de encerr
 **Fix**: adicionar $$ (PID) para unicidade:
 
 ```bash
-CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2>/dev/null | tr '[:lower:]' '[:upper:]' \
-    || printf '%s%s' "$(date +%s)" "$$" | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
+CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | tr '[:lower:]' '[:upper:]' \
+  || printf '%s%s' "$(date +%s)" "$$" | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
 ```
 
 ---
 
 ### BUG-38 — `pre-compact.sh`: Sem rastreio de `current_turn.last_compaction_at` no CTX
 
-**Severidade**: BAIXA
-**Status**: ⏳ Pendente
-**Arquivo**: `pre-compact.sh`, linha ~85
+**Severidade**: BAIXA **Status**: ⏳ Pendente **Arquivo**: `pre-compact.sh`, linha ~85
 
-**Descrição**:
-`pre-compact.sh` incrementa `session_stats.compaction_count` mas não registra
+**Descrição**: `pre-compact.sh` incrementa `session_stats.compaction_count` mas não registra
 `current_turn.last_compaction_at`. Outros scripts (e.g., `start-turn.sh`) não têm meio de detectar
 quando a última compactação ocorreu em relação ao turno atual. Isso impede alertas proativos do tipo
 "pós-compactação: recarregue o contexto".
@@ -1947,12 +1906,10 @@ quando a última compactação ocorreu em relação ao turno atual. Isso impede 
 
 ### BUG-39 — `session-end.sh`: `SESSION_ID_PAYLOAD = SESSION_ID` redundante em `inline_restart`
 
-**Severidade**: BAIXA
-**Status**: ⏳ Pendente (dead code — documentado)
-**Arquivo**: `session-end.sh`, linha ~268
+**Severidade**: BAIXA **Status**: ⏳ Pendente (dead code — documentado) **Arquivo**:
+`session-end.sh`, linha ~268
 
-**Descrição**:
-Na branch `inline_restart` do guard de session_id de `session-end.sh`:
+**Descrição**: Na branch `inline_restart` do guard de session_id de `session-end.sh`:
 
 ```bash
 elif [ "$_CTX_SOURCE_SE" = "inline_restart" ]; then
@@ -1960,21 +1917,19 @@ elif [ "$_CTX_SOURCE_SE" = "inline_restart" ]; then
 ```
 
 Ambas as variáveis `SESSION_ID_PAYLOAD` e `SESSION_ID` foram populadas com o valor de
-`jq -r '.session.id'` do mesmo CTX arquivo. A atribuição é duplicada e sem efeito. Pode ser
-removida sem impacto funcional para reduzir confusão.
+`jq -r '.session.id'` do mesmo CTX arquivo. A atribuição é duplicada e sem efeito. Pode ser removida
+sem impacto funcional para reduzir confusão.
 
 ---
 
 ### BUG-40 — `session-checkpoint.sh`: `mapfile` e `compgen -G` requerem bash 4.0+
 
-**Severidade**: BAIXA
-**Status**: ⏳ Pendente
-**Arquivo**: `session-checkpoint.sh`, linha ~155
+**Severidade**: BAIXA **Status**: ⏳ Pendente **Arquivo**: `session-checkpoint.sh`, linha ~155
 
 **Descrição**:
 
 ```bash
-mapfile -t SESS_FILES < <(compgen -G "$CHECKPOINT_DIR/sess_${SESSION_ID}_turn*.json" 2>/dev/null || true)
+mapfile -t SESS_FILES < <(compgen -G "$CHECKPOINT_DIR/sess_${SESSION_ID}_turn*.json" 2> /dev/null || true)
 ```
 
 `mapfile` (também conhecido como `readarray`) existe desde bash 4.0. `compgen -G` é uma extensão
@@ -1986,51 +1941,45 @@ bash e pode se comportar inesperadamente em ambientes restritos. Em bash < 4 (ma
 ```bash
 SESS_FILES=()
 while IFS= read -r f; do
-    SESS_FILES+=("$f")
-done < <(ls "$CHECKPOINT_DIR"/sess_"${SESSION_ID}"_turn*.json 2>/dev/null || true)
+  SESS_FILES+=("$f")
+done < <(ls "$CHECKPOINT_DIR"/sess_"${SESSION_ID}"_turn*.json 2> /dev/null || true)
 ```
 
 ---
 
 ### BUG-41 — `start-section.sh`: `date -d` específico do GNU — falha em macOS/BSD
 
-**Severidade**: BAIXA
-**Status**: ⏳ Pendente
-**Arquivo**: `start-section.sh`, linha ~95
+**Severidade**: BAIXA **Status**: ⏳ Pendente **Arquivo**: `start-section.sh`, linha ~95
 
-**Descrição**:
-O cálculo de duração da seção encerrada usa:
+**Descrição**: O cálculo de duração da seção encerrada usa:
 
 ```bash
-START_S="$(date -d "$PREV_SECTION_STARTED" '+%s' 2>/dev/null || echo 0)"
+START_S="$(date -d "$PREV_SECTION_STARTED" '+%s' 2> /dev/null || echo 0)"
 ```
 
-`date -d` é específico de GNU coreutils. Em macOS/BSD, `date -d` não existe; usa-se `date -j -f`.
-O script tem `|| echo 0` como fallback, mas isso significa que `PREV_DURATION_S` sempre será 0 em
+`date -d` é específico de GNU coreutils. Em macOS/BSD, `date -d` não existe; usa-se `date -j -f`. O
+script tem `|| echo 0` como fallback, mas isso significa que `PREV_DURATION_S` sempre será 0 em
 ambientes não-GNU, e o evento `sectionEnd` registrará duração incorreta.
 
 **Fix** (portável):
 
 ```bash
-START_S="$(date -d "$PREV_SECTION_STARTED" '+%s' 2>/dev/null \
-    || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$PREV_SECTION_STARTED" '+%s' 2>/dev/null \
-    || echo 0)"
+START_S="$(date -d "$PREV_SECTION_STARTED" '+%s' 2> /dev/null \
+  || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$PREV_SECTION_STARTED" '+%s' 2> /dev/null \
+  || echo 0)"
 ```
 
 ---
 
 ### BUG-42 — `rotate-audit.sh`: JSON construído com `printf` — risco de injection
 
-**Severidade**: BAIXA
-**Status**: ⏳ Pendente
-**Arquivo**: `rotate-audit.sh`, linha ~85
+**Severidade**: BAIXA **Status**: ⏳ Pendente **Arquivo**: `rotate-audit.sh`, linha ~85
 
-**Descrição**:
-O evento `auditRotated` é construído com `printf` interpolando variáveis diretamente:
+**Descrição**: O evento `auditRotated` é construído com `printf` interpolando variáveis diretamente:
 
 ```bash
 printf '{"event":"auditRotated","session_id":"%s","timestamp":"%s","archive_file":"%s",...}\n' \
-    "$SESSION_ID" "$NOW" "$ARCHIVE_FILE" ... >> "$AUDIT_FILE"
+  "$SESSION_ID" "$NOW" "$ARCHIVE_FILE" ... >> "$AUDIT_FILE"
 ```
 
 Se `$SESSION_ID`, `$NOW` ou `$ARCHIVE_FILE` contiverem `"`, `\`, ou newlines, o JSON resultante
@@ -2041,46 +1990,44 @@ aspas, mas o padrão é inconsistente com todos os outros scripts que usam `jq -
 
 ```bash
 jq -cn \
-    --arg event "auditRotated" \
-    --arg sid "$SESSION_ID" \
-    --arg ts "$NOW" \
-    --arg archive "$ARCHIVE_FILE" \
-    --argjson archived "$CURRENT_LINES" \
-    --argjson kept "$NEW_LINES" \
-    '{event: $event, session_id: $sid, timestamp: $ts, archive_file: $archive, archived_lines: $archived, kept_lines: $kept}' \
-    >> "$AUDIT_FILE"
+  --arg event "auditRotated" \
+  --arg sid "$SESSION_ID" \
+  --arg ts "$NOW" \
+  --arg archive "$ARCHIVE_FILE" \
+  --argjson archived "$CURRENT_LINES" \
+  --argjson kept "$NEW_LINES" \
+  '{event: $event, session_id: $sid, timestamp: $ts, archive_file: $archive, archived_lines: $archived, kept_lines: $kept}' \
+  >> "$AUDIT_FILE"
 ```
 
 ---
 
 ### BUG-43 — `session-start.sh`: `cat` com array vazio pode bloquear lendo stdin
 
-**Severidade**: BAIXA
-**Status**: ⏳ Pendente (verificar em campo)
-**Arquivo**: `session-start.sh`, linhas ~465–480
+**Severidade**: BAIXA **Status**: ⏳ Pendente (verificar em campo) **Arquivo**: `session-start.sh`,
+linhas ~465–480
 
-**Descrição**:
-Na análise de tendências, o script lista arquivos de audit anteriores e os concatena:
+**Descrição**: Na análise de tendências, o script lista arquivos de audit anteriores e os concatena:
 
 ```bash
-mapfile -t _TREND_SID_FILES < <(ls "$LOG_DIR"/audit-*.jsonl 2>/dev/null | head -10 || true)
+mapfile -t _TREND_SID_FILES < <(ls "$LOG_DIR"/audit-*.jsonl 2> /dev/null | head -10 || true)
 # ...
-cat "${_TREND_SID_FILES[@]}" > "$_TREND_MERGED" 2>/dev/null || true
+cat "${_TREND_SID_FILES[@]}" > "$_TREND_MERGED" 2> /dev/null || true
 ```
 
 Se `_TREND_SID_FILES` estiver vazio (instalação fresca sem sessões anteriores), `cat` com array
 vazio recebe apenas `> "$_TREND_MERGED"` como argumento — sem arquivos de input, `cat` leria de
 stdin. Em um shell não-interativo com `stdin` conectado a `/dev/null`, `cat` termina imediatamente.
-Mas em contextos onde `stdin` não é `/dev/null` (execução manual, subshell interativo), `cat`
-**pode bloquear indefinidamente**.
+Mas em contextos onde `stdin` não é `/dev/null` (execução manual, subshell interativo), `cat` **pode
+bloquear indefinidamente**.
 
 **Fix**: adicionar guard para array não-vazio:
 
 ```bash
 if [ "${#_TREND_SID_FILES[@]}" -gt 0 ]; then
-    cat "${_TREND_SID_FILES[@]}" > "$_TREND_MERGED" 2>/dev/null || true
+  cat "${_TREND_SID_FILES[@]}" > "$_TREND_MERGED" 2> /dev/null || true
 else
-    : > "$_TREND_MERGED"  # arquivo vazio para evitar leitura de stdin
+  : > "$_TREND_MERGED" # arquivo vazio para evitar leitura de stdin
 fi
 ```
 
@@ -2088,13 +2035,11 @@ fi
 
 ### BUG-44 — `common.sh` (`heal_v1`/`heal_v2`): `mv "$tmp" "$CTX_FILE"` substitui symlink em vez do alvo
 
-**Severidade**: BAIXA
-**Status**: ⏳ Pendente (já documentado como INFO-01 — promovido por impacto em edge cases)
-**Arquivo**: `common.sh`, linhas ~380–430
+**Severidade**: BAIXA **Status**: ⏳ Pendente (já documentado como INFO-01 — promovido por impacto
+em edge cases) **Arquivo**: `common.sh`, linhas ~380–430
 
-**Descrição**:
-As funções `heal_v1()` e `heal_v2()` têm dois ramos: `sponge` (correto — segue symlink) e `mktemp`
-(problemático). No ramo mktemp:
+**Descrição**: As funções `heal_v1()` e `heal_v2()` têm dois ramos: `sponge` (correto — segue
+symlink) e `mktemp` (problemático). No ramo mktemp:
 
 ```bash
 _TMP="$(mktemp)"
@@ -2114,15 +2059,15 @@ há impacto imediato. Mas em cenários de fallback onde `CTX_FILE` = symlink (e.
 
 ```bash
 _TMP="$(mktemp)"
-jq ... > "$_TMP" && mv "$_TMP" "$(readlink -f "$CTX_FILE" 2>/dev/null || echo "$CTX_FILE")"
+jq ... > "$_TMP" && mv "$_TMP" "$(readlink -f "$CTX_FILE" 2> /dev/null || echo "$CTX_FILE")"
 ```
 
 ---
 
 ### Resumo da Seção 9.1
 
-| Categoria     | Quantidade | IDs             | Status                     |
-| ------------- | ---------- | --------------- | -------------------------- |
+| Categoria     | Quantidade | IDs             | Status                      |
+| ------------- | ---------- | --------------- | --------------------------- |
 | Bugs críticos | 4          | BUG-20/21/22/23 | ⏳ Pendente                 |
 | Bugs altos    | 3          | BUG-24/25/26    | ⏳ Pendente                 |
 | Bugs médios   | 9          | BUG-27 a BUG-34 | ⏳ Pendente                 |
@@ -2132,51 +2077,45 @@ jq ... > "$_TMP" && mv "$_TMP" "$(readlink -f "$CTX_FILE" 2>/dev/null || echo "$
 ### Priorização de correções
 
 **Fase A — Correções críticas (implementar primeiro):**
+
 1. BUG-20/21/22/23: Fix do guard pattern em 4 scripts — mesmo diff, 4 arquivos
 2. BUG-24: Deadlock flock em post-tool-use.sh — 1 linha de fix
 3. BUG-26: pipe tail|sponge em session-end.sh — 3 linhas de fix
 
-**Fase B — Correções de confiabilidade:**
-4. BUG-28 + BUG-32: session-close.sh CTX existence check (resolve 2 bugs juntos)
-5. BUG-25: Trap clobbering em session-start.sh
-6. BUG-27: AUDIT_FILE restore pattern em session-start.sh
-7. BUG-33: _PREV_ASK_API_FAILURES lido antes do CTX novo em session-start.sh
-8. BUG-34: head -80 → head -150 em additionalContext
+**Fase B — Correções de confiabilidade:** 4. BUG-28 + BUG-32: session-close.sh CTX existence check
+(resolve 2 bugs juntos) 5. BUG-25: Trap clobbering em session-start.sh 6. BUG-27: AUDIT_FILE restore
+pattern em session-start.sh 7. BUG-33: \_PREV_ASK_API_FAILURES lido antes do CTX novo em
+session-start.sh 8. BUG-34: head -80 → head -150 em additionalContext
 
-**Fase C — Melhorias e baixa severidade:**
-9. BUG-29: Archive naming com SID_SHORT
-10. BUG-30: TOOLS_COUNT fallback para SESSION_ID="unknown"
-11. BUG-31: Padronizar apply_per_session_paths() em 5 scripts
-12. BUG-35/36: GNU grep → ERE (‑E flag)
-13. BUG-37: CLOSE_KEY fallback com PID
-14. BUG-38: last_compaction_at no CTX
-15. BUG-40/41: Portabilidade bash 4.0+ / GNU date
-16. BUG-42: printf → jq em rotate-audit.sh
-17. BUG-43: guard cat com array vazio
-18. BUG-44: readlink -f no mktemp branch do heal
+**Fase C — Melhorias e baixa severidade:** 9. BUG-29: Archive naming com SID_SHORT 10. BUG-30:
+TOOLS_COUNT fallback para SESSION_ID="unknown" 11. BUG-31: Padronizar apply_per_session_paths() em 5
+scripts 12. BUG-35/36: GNU grep → ERE (‑E flag) 13. BUG-37: CLOSE_KEY fallback com PID 14. BUG-38:
+last_compaction_at no CTX 15. BUG-40/41: Portabilidade bash 4.0+ / GNU date 16. BUG-42: printf → jq
+em rotate-audit.sh 17. BUG-43: guard cat com array vazio 18. BUG-44: readlink -f no mktemp branch do
+heal
 
 ---
 
 _Seção 9.1 gerada por auditoria exaustiva conduzida em 2026-03-12. Nenhuma correção deve ser
 aplicada antes de aprovação via `vscode_askQuestions`._
 
-
 ---
 
 ## Seção 9.2 — Auditoria Exaustiva v2 (2026-03-XX)
 
-**Contexto**: Segunda rodada de auditoria. Documentação oficial do GitHub Copilot Hooks
-lida integralmente (3 páginas: `about-hooks`, `use-hooks`, `hooks-configuration`). Scripts
-auditados: 25+. Findings consolidados com base em discrepâncias docs×código, portabilidade,
-locking, métricas e lógica de estado.
+**Contexto**: Segunda rodada de auditoria. Documentação oficial do GitHub Copilot Hooks lida
+integralmente (3 páginas: `about-hooks`, `use-hooks`, `hooks-configuration`). Scripts auditados:
+25+. Findings consolidados com base em discrepâncias docs×código, portabilidade, locking, métricas e
+lógica de estado.
 
 **Sources oficiais consultados:**
+
 - `https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-hooks`
 - `https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/use-hooks`
 - `https://docs.github.com/en/copilot/reference/hooks-configuration`
 
-**Descoberta-chave dos docs:** `timeoutSec` default = **30 segundos**. Todos os nossos
-hooks críticos estão abaixo desse valor, elevando o risco de timeout silencioso.
+**Descoberta-chave dos docs:** `timeoutSec` default = **30 segundos**. Todos os nossos hooks
+críticos estão abaixo desse valor, elevando o risco de timeout silencioso.
 
 ---
 
@@ -2189,18 +2128,17 @@ hooks críticos estão abaixo desse valor, elevando o risco de timeout silencios
 
 #### BUG-49 — `sessionStart` timeout 15s incompatível com complexidade do script
 
-**Severidade:** ALTA
-**Arquivo:** `.github/hooks/copilot-hooks.json` + `scripts/session-start.sh`
+**Severidade:** ALTA **Arquivo:** `.github/hooks/copilot-hooks.json` + `scripts/session-start.sh`
 
-**Descrição:**
-`session-start.sh` tem 54KB e executa: leitura de CTX existente, geração de session_id,
-detecção de inline_restart, watchdog check, criação do CTX completo (400+ campos via jq),
-chamada a `rotate-audit.sh`, geração do `session-briefing.md` (arquivo Markdown completo).
-Timeout atual: **15 segundos**. Default oficial: **30 segundos**. Sob I/O pesado ou disco
-lento, o script pode exceder 15s — o Copilot MATA o processo, o hook falha silenciosamente
-e a sessão começa sem contexto.
+**Descrição:** `session-start.sh` tem 54KB e executa: leitura de CTX existente, geração de
+session_id, detecção de inline_restart, watchdog check, criação do CTX completo (400+ campos via
+jq), chamada a `rotate-audit.sh`, geração do `session-briefing.md` (arquivo Markdown completo).
+Timeout atual: **15 segundos**. Default oficial: **30 segundos**. Sob I/O pesado ou disco lento, o
+script pode exceder 15s — o Copilot MATA o processo, o hook falha silenciosamente e a sessão começa
+sem contexto.
 
 **Fix:**
+
 ```json
 "sessionStart": [{ "timeoutSec": 60 }]
 ```
@@ -2209,17 +2147,16 @@ e a sessão começa sem contexto.
 
 #### BUG-50 — `agentStop` timeout 10s incompatível com lógica de bloqueio
 
-**Severidade:** ALTA
-**Arquivo:** `.github/hooks/copilot-hooks.json` + `scripts/agent-stop.sh`
+**Severidade:** ALTA **Arquivo:** `.github/hooks/copilot-hooks.json` + `scripts/agent-stop.sh`
 
-**Descrição:**
-`agent-stop.sh` tem 46KB e executa: leitura de CTX, verificação de vscode_askQuestions,
-emissão de `decision:block` (lógica de compliance), atualização de turn_history no CTX,
-geração de systemMessage de 200+ linhas. Timeout atual: **10 segundos**. Default oficial:
-**30 segundos**. Scripts de bloqueio que falham por timeout causam liberação incorreta do
-agente (sem block) — violando o protocolo TODO v9.0.
+**Descrição:** `agent-stop.sh` tem 46KB e executa: leitura de CTX, verificação de
+vscode_askQuestions, emissão de `decision:block` (lógica de compliance), atualização de turn_history
+no CTX, geração de systemMessage de 200+ linhas. Timeout atual: **10 segundos**. Default oficial:
+**30 segundos**. Scripts de bloqueio que falham por timeout causam liberação incorreta do agente
+(sem block) — violando o protocolo TODO v9.0.
 
 **Fix:**
+
 ```json
 "agentStop": [{ "timeoutSec": 45 }]
 ```
@@ -2228,13 +2165,11 @@ agente (sem block) — violando o protocolo TODO v9.0.
 
 #### BUG-51 — `userPromptSubmitted` timeout 10s insuficiente para HEAL v1
 
-**Severidade:** MÉDIA
-**Arquivo:** `.github/hooks/copilot-hooks.json`
+**Severidade:** MÉDIA **Arquivo:** `.github/hooks/copilot-hooks.json`
 
-**Descrição:**
-`log-prompt.sh` contém lógica HEAL v1 (detecção de reconnect + RECONNECT-01/02), geração
-de novo close_key, atualização de CTX com turn counters. Sob RECONNECT-02 (reset completo
-de CTX), o script pode levar >10s sob I/O pesado.
+**Descrição:** `log-prompt.sh` contém lógica HEAL v1 (detecção de reconnect + RECONNECT-01/02),
+geração de novo close_key, atualização de CTX com turn counters. Sob RECONNECT-02 (reset completo de
+CTX), o script pode levar >10s sob I/O pesado.
 
 **Fix:** `"timeoutSec": 30`
 
@@ -2242,13 +2177,11 @@ de CTX), o script pode levar >10s sob I/O pesado.
 
 #### BUG-52 — `preToolUse` timeout 15s abaixo do default oficial
 
-**Severidade:** MÉDIA
-**Arquivo:** `.github/hooks/copilot-hooks.json`
+**Severidade:** MÉDIA **Arquivo:** `.github/hooks/copilot-hooks.json`
 
-**Descrição:**
-`pre-tool-use.sh` executa: flock, redação de credenciais (múltiplos sed), append em
-audit.jsonl, auto-recovery (criação de CTX mínimo). O default oficial é 30s; nosso 15s
-não oferece margem.
+**Descrição:** `pre-tool-use.sh` executa: flock, redação de credenciais (múltiplos sed), append em
+audit.jsonl, auto-recovery (criação de CTX mínimo). O default oficial é 30s; nosso 15s não oferece
+margem.
 
 **Fix:** `"timeoutSec": 30`
 
@@ -2256,13 +2189,11 @@ não oferece margem.
 
 #### BUG-53 — `postToolUse` timeout 15s abaixo do default oficial
 
-**Severidade:** MÉDIA
-**Arquivo:** `.github/hooks/copilot-hooks.json`
+**Severidade:** MÉDIA **Arquivo:** `.github/hooks/copilot-hooks.json`
 
-**Descrição:**
-`post-tool-use.sh` tem lógica complexa: guard session_id, HEAL v1, inline_restart sync
-(com contador e cap de 5), detecção de vscode_askQuestions API failures, atualização de CTX
-com múltiplos campos. O default oficial é 30s.
+**Descrição:** `post-tool-use.sh` tem lógica complexa: guard session_id, HEAL v1, inline_restart
+sync (com contador e cap de 5), detecção de vscode_askQuestions API failures, atualização de CTX com
+múltiplos campos. O default oficial é 30s.
 
 **Fix:** `"timeoutSec": 30`
 
@@ -2270,13 +2201,11 @@ com múltiplos campos. O default oficial é 30s.
 
 #### BUG-54 — Hooks auxiliares com timeout 10s (abaixo do default oficial 30s)
 
-**Severidade:** BAIXA
-**Arquivo:** `.github/hooks/copilot-hooks.json`
+**Severidade:** BAIXA **Arquivo:** `.github/hooks/copilot-hooks.json`
 
-**Descrição:**
-Os hooks `subagentStop`, `subagentStart`, `postToolUseFailure` e `preCompact` têm
-`timeoutSec: 10`, abaixo do default oficial de 30s. Não há justificativa para manter
-valores abaixo do default.
+**Descrição:** Os hooks `subagentStop`, `subagentStart`, `postToolUseFailure` e `preCompact` têm
+`timeoutSec: 10`, abaixo do default oficial de 30s. Não há justificativa para manter valores abaixo
+do default.
 
 **Fix:** Elevar todos para `"timeoutSec": 30`.
 
@@ -2284,41 +2213,39 @@ valores abaixo do default.
 
 ### Grupo B — Hooks Não Oficiais / Schema Divergente (BUG-55 a BUG-58)
 
-> **Contexto oficial:** Os docs listam exatamente 8 tipos de hook: `sessionStart`,
-> `sessionEnd`, `userPromptSubmitted`, `preToolUse`, `postToolUse`, `agentStop`,
-> `subagentStop`, `errorOccurred`. Nenhum outro tipo está documentado.
+> **Contexto oficial:** Os docs listam exatamente 8 tipos de hook: `sessionStart`, `sessionEnd`,
+> `userPromptSubmitted`, `preToolUse`, `postToolUse`, `agentStop`, `subagentStop`, `errorOccurred`.
+> Nenhum outro tipo está documentado.
 
 ---
 
 #### BUG-55 — `postToolUseFailure` não é hook oficial → `tool-use-failure.sh` é código morto
 
-**Severidade:** ALTA (risco de falsa confiança)
-**Arquivo:** `copilot-hooks.json` + `scripts/tool-use-failure.sh`
+**Severidade:** ALTA (risco de falsa confiança) **Arquivo:** `copilot-hooks.json` +
+`scripts/tool-use-failure.sh`
 
-**Descrição:**
-O tipo de hook `postToolUseFailure` **não existe** na documentação oficial. O VS Code nunca
-dispara esse evento. `tool-use-failure.sh` **nunca executa** — toda a lógica de tracking de
+**Descrição:** O tipo de hook `postToolUseFailure` **não existe** na documentação oficial. O VS Code
+nunca dispara esse evento. `tool-use-failure.sh` **nunca executa** — toda a lógica de tracking de
 falhas de ferramentas nele contida é código morto.
 
-As falhas são detectáveis via `postToolUse` com `toolResult.resultType == "failure"`.
-A heurística já existe em `post-tool-use.sh` (variável `RESULT_TYPE`), mas operadores
-podem acreditar que `tool-use-failure.sh` monitora ativamente as falhas.
+As falhas são detectáveis via `postToolUse` com `toolResult.resultType == "failure"`. A heurística
+já existe em `post-tool-use.sh` (variável `RESULT_TYPE`), mas operadores podem acreditar que
+`tool-use-failure.sh` monitora ativamente as falhas.
 
 **Fix:**
+
 1. Remover entrada `postToolUseFailure` de `copilot-hooks.json`.
-2. Avaliar integração de `tool-use-failure.sh` à lógica de `post-tool-use.sh`
-   (para quando `RESULT_TYPE == "failure"`).
+2. Avaliar integração de `tool-use-failure.sh` à lógica de `post-tool-use.sh` (para quando
+   `RESULT_TYPE == "failure"`).
 
 ---
 
 #### BUG-56 — `subagentStart` não está nos docs oficiais
 
-**Severidade:** MÉDIA
-**Arquivo:** `copilot-hooks.json` + `scripts/subagent-start.sh`
+**Severidade:** MÉDIA **Arquivo:** `copilot-hooks.json` + `scripts/subagent-start.sh`
 
-**Descrição:**
-O tipo `subagentStart` **não consta** na lista oficial de hook types. Pode ser extensão
-não documentada do VS Code Copilot. `subagent-start.sh` pode nunca executar na prática.
+**Descrição:** O tipo `subagentStart` **não consta** na lista oficial de hook types. Pode ser
+extensão não documentada do VS Code Copilot. `subagent-start.sh` pode nunca executar na prática.
 
 **Fix:** Adicionar comentário de alerta em `copilot-hooks.json` e documentar no
 `GUIA-HOOKS-COPILOT.md` como extensão empiricamente observada, não confirmada pelos docs.
@@ -2327,13 +2254,11 @@ não documentada do VS Code Copilot. `subagent-start.sh` pode nunca executar na 
 
 #### BUG-57 — `preCompact` não está nos docs públicos oficiais
 
-**Severidade:** BAIXA
-**Arquivo:** `copilot-hooks.json` + `scripts/pre-compact.sh`
+**Severidade:** BAIXA **Arquivo:** `copilot-hooks.json` + `scripts/pre-compact.sh`
 
-**Descrição:**
-`preCompact` não aparece na referência oficial pública, mas é conhecido como extensão do
-GitHub Copilot Chat. O script funciona quando o hook dispara, mas não há garantia de
-estabilidade da API entre versões do VS Code.
+**Descrição:** `preCompact` não aparece na referência oficial pública, mas é conhecido como extensão
+do GitHub Copilot Chat. O script funciona quando o hook dispara, mas não há garantia de estabilidade
+da API entre versões do VS Code.
 
 **Fix:** Documentar como extensão não oficial no `GUIA-HOOKS-COPILOT.md`.
 
@@ -2341,46 +2266,46 @@ estabilidade da API entre versões do VS Code.
 
 #### BUG-58 — `session_id` não está nos schemas oficiais de hook inputs
 
-**Severidade:** INFO (design documentado)
-**Arquivo:** Todos os scripts de hook
+**Severidade:** INFO (design documentado) **Arquivo:** Todos os scripts de hook
 
-**Descrição:**
-Os schemas oficiais de `sessionStart`, `sessionEnd`, `userPromptSubmitted`, `preToolUse` e
-`postToolUse` **não listam `session_id`** como campo de input. Nosso sistema depende
-fortemente dessa extensão não documentada. O campo existe empiricamente (confirmado em
-2026-03-09 via `raw-post-input.jsonl`), mas não é garantido em futuras versões.
+**Descrição:** Os schemas oficiais de `sessionStart`, `sessionEnd`, `userPromptSubmitted`,
+`preToolUse` e `postToolUse` **não listam `session_id`** como campo de input. Nosso sistema depende
+fortemente dessa extensão não documentada. O campo existe empiricamente (confirmado em 2026-03-09
+via `raw-post-input.jsonl`), mas não é garantido em futuras versões.
 
-**Fix:** Documentar explicitamente em `GUIA-HOOKS-COPILOT.md` como extensão empírica.
-Manter o padrão `.session_id // ""` como fallback robusto.
+**Fix:** Documentar explicitamente em `GUIA-HOOKS-COPILOT.md` como extensão empírica. Manter o
+padrão `.session_id // ""` como fallback robusto.
 
 ---
 
 ### Grupo C — Portabilidade (BUG-59 a BUG-64)
 
-> **Contexto:** BUG-45 (corrigido em `start-section.sh` no Sprint 6) identificou o padrão
-> `date -d` como bug de portabilidade GNU/BSD. A análise mostrou que outros 4 scripts têm
-> o mesmo problema, além de outros gaps de portabilidade.
+> **Contexto:** BUG-45 (corrigido em `start-section.sh` no Sprint 6) identificou o padrão `date -d`
+> como bug de portabilidade GNU/BSD. A análise mostrou que outros 4 scripts têm o mesmo problema,
+> além de outros gaps de portabilidade.
 
 ---
 
 #### BUG-59 — `agent-stop.sh` usa `date -d` sem fallback BSD (TURN_START_S)
 
-**Severidade:** ALTA
-**Arquivo:** `scripts/agent-stop.sh` (aprox. linhas 175-180)
+**Severidade:** ALTA **Arquivo:** `scripts/agent-stop.sh` (aprox. linhas 175-180)
 
 **Descrição:**
+
 ```bash
-TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s' 2>/dev/null || echo 0)"
+TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
 ```
-`date -d` é GNU-only. No macOS/BSD, retorna erro silencioso e `TURN_START_S=0`. O cálculo
-de duração do TURN fica sempre errado em ambientes não-Linux.
+
+`date -d` é GNU-only. No macOS/BSD, retorna erro silencioso e `TURN_START_S=0`. O cálculo de duração
+do TURN fica sempre errado em ambientes não-Linux.
 
 **Fix** (padrão BUG-45):
+
 ```bash
-if date -d "$TURN_STARTED_AT" '+%s' >/dev/null 2>&1; then
-    TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s')"
+if date -d "$TURN_STARTED_AT" '+%s' > /dev/null 2>&1; then
+  TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s')"
 else
-    TURN_START_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$TURN_STARTED_AT" '+%s' 2>/dev/null || echo 0)"
+  TURN_START_S="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$TURN_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
 fi
 ```
 
@@ -2388,16 +2313,15 @@ fi
 
 #### BUG-60 — `session-end.sh` usa `date -d` sem fallback BSD (2 chamadas)
 
-**Severidade:** ALTA
-**Arquivo:** `scripts/session-end.sh` (aprox. linhas 132-180)
+**Severidade:** ALTA **Arquivo:** `scripts/session-end.sh` (aprox. linhas 132-180)
 
-**Descrição:**
-Duas instâncias de `date -d` sem fallback BSD:
+**Descrição:** Duas instâncias de `date -d` sem fallback BSD:
+
 1. Duração da seção: `date -d "$CLOSE_SECTION_STARTED" '+%s'`
 2. Duração da sessão: `date -d "$START_ISO" '+%s'`
 
-Ambas retornam 0 no macOS, fazendo com que todas as durações calculadas em session-end.sh
-sejam incorretas em ambientes BSD.
+Ambas retornam 0 no macOS, fazendo com que todas as durações calculadas em session-end.sh sejam
+incorretas em ambientes BSD.
 
 **Fix:** Aplicar helper `iso_to_epoch_portable` (padrão BUG-45) nas duas ocorrências.
 
@@ -2405,13 +2329,14 @@ sejam incorretas em ambientes BSD.
 
 #### BUG-61 — `section-end.sh` usa `date -d` sem fallback BSD (SECTION_EPOCH)
 
-**Severidade:** ALTA
-**Arquivo:** `scripts/section-end.sh` (aprox. linha 65)
+**Severidade:** ALTA **Arquivo:** `scripts/section-end.sh` (aprox. linha 65)
 
 **Descrição:**
+
 ```bash
-SECTION_EPOCH="$(date -d "$SECTION_STARTED_AT" '+%s' 2>/dev/null || echo 0)"
+SECTION_EPOCH="$(date -d "$SECTION_STARTED_AT" '+%s' 2> /dev/null || echo 0)"
 ```
+
 Mesma classe do BUG-45. DURATION_S sempre 0 ou errado em macOS/BSD.
 
 **Fix:** Mesmo padrão de BUG-59.
@@ -2420,14 +2345,15 @@ Mesma classe do BUG-45. DURATION_S sempre 0 ou errado em macOS/BSD.
 
 #### BUG-62 — `subagent-stop.sh` usa `date -d` sem fallback BSD (DURATION_S)
 
-**Severidade:** MÉDIA
-**Arquivo:** `scripts/subagent-stop.sh` (aprox. linhas 88-95)
+**Severidade:** MÉDIA **Arquivo:** `scripts/subagent-stop.sh` (aprox. linhas 88-95)
 
 **Descrição:**
+
 ```bash
-LAST_S="$(date -d "$LAST_TOOL_TS" '+%s' 2>/dev/null || echo 0)"
-NOW_S="$(date -d "$NOW_ISO" '+%s' 2>/dev/null || echo 0)"
+LAST_S="$(date -d "$LAST_TOOL_TS" '+%s' 2> /dev/null || echo 0)"
+NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
 ```
+
 Duas chamadas `date -d` sem fallback BSD. DURATION_S sempre 0 em macOS/BSD.
 
 **Fix:** Mesmo padrão de BUG-59.
@@ -2436,54 +2362,59 @@ Duas chamadas `date -d` sem fallback BSD. DURATION_S sempre 0 em macOS/BSD.
 
 #### BUG-63 — `log-prompt.sh` close_key usa `xxd -p -u` e fallback de pipeline ineficaz
 
-**Severidade:** MÉDIA
-**Arquivo:** `scripts/log-prompt.sh` (aprox. linha 219 no RECONNECT-02 path)
+**Severidade:** MÉDIA **Arquivo:** `scripts/log-prompt.sh` (aprox. linha 219 no RECONNECT-02 path)
 
 **Descrição:**
+
 ```bash
-_NEW_KEY="ENCERRAR-$(head -c 4 /dev/urandom 2>/dev/null | xxd -p -u 2>/dev/null | head -c 8 \
-    || date +%s | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
+_NEW_KEY="ENCERRAR-$(head -c 4 /dev/urandom 2> /dev/null | xxd -p -u 2> /dev/null | head -c 8 \
+  || date +%s | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
 ```
 
 Dois problemas:
-1. **`xxd` não está disponível universalmente** (não é GNU coreutils padrão). Em Alpine
-   Linux ou containers minimalistas, `xxd` pode estar ausente.
-2. **O fallback `||` é ineficaz em pipeline.** Exit code de um pipeline é o do ÚLTIMO
-   comando (`head -c 8`), não do que falhou no meio. Se `xxd` está ausente, a pipe produz
-   saída vazia mas `head -c 8` retorna 0 (sucesso). O fallback NUNCA é ativado. Resultado:
-   `close_key = "ENCERRAR-"` (sufixo vazio) — chave inválida.
+
+1. **`xxd` não está disponível universalmente** (não é GNU coreutils padrão). Em Alpine Linux ou
+   containers minimalistas, `xxd` pode estar ausente.
+2. **O fallback `||` é ineficaz em pipeline.** Exit code de um pipeline é o do ÚLTIMO comando
+   (`head -c 8`), não do que falhou no meio. Se `xxd` está ausente, a pipe produz saída vazia mas
+   `head -c 8` retorna 0 (sucesso). O fallback NUNCA é ativado. Resultado: `close_key = "ENCERRAR-"`
+   (sufixo vazio) — chave inválida.
 
 Comparar com `session-start.sh` que corretamente usa:
+
 ```bash
-CLOSE_KEY="ENCERRAR-$(head -c 4 /dev/urandom | sha256sum 2>/dev/null | head -c 8 | tr '[:lower:]' '[:upper:]')"
+CLOSE_KEY="ENCERRAR-$(head -c 4 /dev/urandom | sha256sum 2> /dev/null | head -c 8 | tr '[:lower:]' '[:upper:]')"
 ```
 
 **Fix:** Usar o mesmo método de `session-start.sh` (sha256sum, sempre disponível):
+
 ```bash
-_NEW_KEY="ENCERRAR-$(head -c 4 /dev/urandom 2>/dev/null | sha256sum 2>/dev/null \
-    | head -c 8 | tr '[:lower:]' '[:upper:]' \
-    || date +%s | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
+_NEW_KEY="ENCERRAR-$(head -c 4 /dev/urandom 2> /dev/null | sha256sum 2> /dev/null \
+  | head -c 8 | tr '[:lower:]' '[:upper:]' \
+  || date +%s | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
 ```
 
 ---
 
 #### BUG-64 — `save-finding.sh` usa `date +%s%3N` sem suporte BSD — fallback gera IDs não únicos
 
-**Severidade:** MÉDIA
-**Arquivo:** `scripts/save-finding.sh` (aprox. linha 52)
+**Severidade:** MÉDIA **Arquivo:** `scripts/save-finding.sh` (aprox. linha 52)
 
 **Descrição:**
+
 ```bash
-FINDING_ID="f_$(date +%s%3N 2>/dev/null || echo 0)_${RANDOM}"
+FINDING_ID="f_$(date +%s%3N 2> /dev/null || echo 0)_${RANDOM}"
 ```
-`%3N` (milissegundos) **não é suportado pelo BSD date** (macOS). Em macOS, o fallback
-produz `f_0_${RANDOM}`. Múltiplos findings salvos no mesmo segundo terão o prefixo `f_0_`,
-diferenciados apenas por `$RANDOM` — com colisões possíveis.
+
+`%3N` (milissegundos) **não é suportado pelo BSD date** (macOS). Em macOS, o fallback produz
+`f_0_${RANDOM}`. Múltiplos findings salvos no mesmo segundo terão o prefixo `f_0_`, diferenciados
+apenas por `$RANDOM` — com colisões possíveis.
 
 **Fix:**
+
 ```bash
 # Usa seconds * 1000 como fake-milliseconds (portável, mesmo padrão de add-task.sh)
-FINDING_ID="f_$(date -u +%s000 2>/dev/null || echo "$(date +%s)000")_${RANDOM}"
+FINDING_ID="f_$(date -u +%s000 2> /dev/null || echo "$(date +%s)000")_${RANDOM}"
 ```
 
 ---
@@ -2494,46 +2425,49 @@ FINDING_ID="f_$(date -u +%s000 2>/dev/null || echo "$(date +%s)000")_${RANDOM}"
 
 #### BUG-65 — `ctx_update()` usa `with_lock()` ≠ flock fd 9 dos scripts principais
 
-**Severidade:** ALTA
-**Arquivo:** `hooks-lib/common.sh` (funções `ctx_update`, `with_lock`)
+**Severidade:** ALTA **Arquivo:** `hooks-lib/common.sh` (funções `ctx_update`, `with_lock`)
 
-**Descrição:**
-Todos os scripts principais adquirem lock via `exec 9> "$_CTX_LOCK"; flock -x -w N 9`.
-Internamente, `ctx_update()` chama `with_lock()` que abre seu próprio file descriptor,
-independente do fd 9.
+**Descrição:** Todos os scripts principais adquirem lock via
+`exec 9> "$_CTX_LOCK"; flock -x -w N 9`. Internamente, `ctx_update()` chama `with_lock()` que abre
+seu próprio file descriptor, independente do fd 9.
 
-**Consequência:** Um script que já detém o lock fd 9 e internamente chama `ctx_update()`
-abre um SEGUNDO fd para o mesmo lockfile via `with_lock()`. O flock por fd é não-reentrante:
-um segundo `open()` + `flock()` no mesmo arquivo pelo mesmo processo pode ser concedido
-imediatamente pelo kernel (o processo já é o owner do lockfile). Isso permite que
-`ctx_update()` escreva no CTX concorrentemente à lógica principal do script, mesmo quando
-o script "acha" que detém o lock exclusivo.
+**Consequência:** Um script que já detém o lock fd 9 e internamente chama `ctx_update()` abre um
+SEGUNDO fd para o mesmo lockfile via `with_lock()`. O flock por fd é não-reentrante: um segundo
+`open()` + `flock()` no mesmo arquivo pelo mesmo processo pode ser concedido imediatamente pelo
+kernel (o processo já é o owner do lockfile). Isso permite que `ctx_update()` escreva no CTX
+concorrentemente à lógica principal do script, mesmo quando o script "acha" que detém o lock
+exclusivo.
 
-**Fix:** `ctx_update()` deve documentar que o chamador é responsável pelo lock, e remover
-o `with_lock()` interno. Ou: todos os scripts devem usar `ctx_update()` em vez de
-`exec 9>` + jq direto.
+**Fix:** `ctx_update()` deve documentar que o chamador é responsável pelo lock, e remover o
+`with_lock()` interno. Ou: todos os scripts devem usar `ctx_update()` em vez de `exec 9>` + jq
+direto.
 
 ---
 
 #### BUG-66 — `rotate-audit.sh` sem lock antes da rotação atômica
 
-**Severidade:** MÉDIA
-**Arquivo:** `scripts/rotate-audit.sh` (linhas de cp + sponge)
+**Severidade:** MÉDIA **Arquivo:** `scripts/rotate-audit.sh` (linhas de cp + sponge)
 
 **Descrição:**
+
 ```bash
-cp "$AUDIT_FILE" "$ARCHIVE_FILE"                                    # 1. copia
-tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" | sponge "$AUDIT_FILE"  # 2. trunca
+cp "$AUDIT_FILE" "$ARCHIVE_FILE"                                  # 1. copia
+tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" | sponge "$AUDIT_FILE" # 2. trunca
 ```
+
 Se outro hook escreve em `$AUDIT_FILE` ENTRE os passos 1 e 2:
+
 - O evento aparece no arquivo ativo (após sponge) ✓
-- Mas NÃO aparece no arquivo de archive (copiado ANTES) ✗
-→ Evento perdido do histórico.
+- Mas NÃO aparece no arquivo de archive (copiado ANTES) ✗ → Evento perdido do histórico.
 
 **Fix:** Adquirir flock antes do cp:
+
 ```bash
 exec 9> "${AUDIT_FILE}.lock"
-flock -x -w "${HOOKS_FLOCK_TIMEOUT:-5}" 9 2>/dev/null || { log "lock timeout"; exit 1; }
+flock -x -w "${HOOKS_FLOCK_TIMEOUT:-5}" 9 2> /dev/null || {
+  log "lock timeout"
+  exit 1
+}
 cp "$AUDIT_FILE" "$ARCHIVE_FILE"
 tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" | sponge "$AUDIT_FILE"
 ```
@@ -2542,11 +2476,10 @@ tail -n "$AUDIT_KEEP_RECENT" "$AUDIT_FILE" | sponge "$AUDIT_FILE"
 
 #### BUG-67 — Timeout de flock inconsistente: hardcoded `-w 3` vs `HOOKS_FLOCK_TIMEOUT`
 
-**Severidade:** BAIXA
-**Arquivo:** `scripts/log-prompt.sh`, `scripts/pre-tool-use.sh` (e outros)
+**Severidade:** BAIXA **Arquivo:** `scripts/log-prompt.sh`, `scripts/pre-tool-use.sh` (e outros)
 
-**Descrição:**
-`config.sh` define `HOOKS_FLOCK_TIMEOUT=5`. Mas vários scripts ignoram essa variável:
+**Descrição:** `config.sh` define `HOOKS_FLOCK_TIMEOUT=5`. Mas vários scripts ignoram essa variável:
+
 - `log-prompt.sh`: `flock -x -w 3 9` (hardcoded 3s)
 - `pre-tool-use.sh`: `flock -x -w 3 9` (hardcoded 3s)
 - `session-end.sh` (correto): `flock -x -w "${HOOKS_FLOCK_TIMEOUT:-5}" 9`
@@ -2563,23 +2496,25 @@ Inconsistência dificulta ajuste centralizado do timeout de lock.
 
 #### BUG-68 — `session-checkpoint.sh` lê `tool-metrics.jsonl` sem resolução per-session
 
-**Severidade:** MÉDIA
-**Arquivo:** `scripts/session-checkpoint.sh`
+**Severidade:** MÉDIA **Arquivo:** `scripts/session-checkpoint.sh`
 
 **Descrição:**
+
 ```bash
 METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"
 ```
+
 Sempre aponta para o arquivo global, sem resolução per-session (sem leitura de
-`current-session-id.txt`). Se métricas forem migradas para arquivos per-session, os
-checkpoints lerão dados errados silenciosamente.
+`current-session-id.txt`). Se métricas forem migradas para arquivos per-session, os checkpoints
+lerão dados errados silenciosamente.
 
 **Fix:** Aplicar o padrão UPG-AUDIT-01 para `METRICS_FILE`:
+
 ```bash
 _CSI_FILE="$STATE_DIR/current-session-id.txt"
-if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2>/dev/null)" && [ -n "$_CURR_SID" ]; then
-    _SID_SHORT="${_CURR_SID:0:8}"
-    METRICS_FILE="$LOG_DIR/tool-metrics-${_SID_SHORT}.jsonl"
+if [ -f "$_CSI_FILE" ] && _CURR_SID="$(cat "$_CSI_FILE" 2> /dev/null)" && [ -n "$_CURR_SID" ]; then
+  _SID_SHORT="${_CURR_SID:0:8}"
+  METRICS_FILE="$LOG_DIR/tool-metrics-${_SID_SHORT}.jsonl"
 fi
 ```
 
@@ -2587,17 +2522,15 @@ fi
 
 #### BUG-69 — `error-occurred.sh`: `AUDIT_FILE` só definido dentro do bloco per-session
 
-**Severidade:** MÉDIA
-**Arquivo:** `scripts/error-occurred.sh` (aprox. linhas 20-30)
+**Severidade:** MÉDIA **Arquivo:** `scripts/error-occurred.sh` (aprox. linhas 20-30)
 
-**Descrição:**
-Em `error-occurred.sh`, `AUDIT_FILE` é definido apenas dentro do bloco condicional
-per-session (quando `SESSION_ID_PAYLOAD` é não-vazio). Quando o payload não tem
-`session_id` (possível dado que o campo não está nos schemas oficiais), `AUDIT_FILE`
-recebe o valor default de `common.sh` (`$LOG_DIR/audit.jsonl` global).
+**Descrição:** Em `error-occurred.sh`, `AUDIT_FILE` é definido apenas dentro do bloco condicional
+per-session (quando `SESSION_ID_PAYLOAD` é não-vazio). Quando o payload não tem `session_id`
+(possível dado que o campo não está nos schemas oficiais), `AUDIT_FILE` recebe o valor default de
+`common.sh` (`$LOG_DIR/audit.jsonl` global).
 
-Erros com `session_id` vão para o arquivo per-session correto; erros sem `session_id` vão
-para `audit.jsonl` global — dificultando correlação por sessão.
+Erros com `session_id` vão para o arquivo per-session correto; erros sem `session_id` vão para
+`audit.jsonl` global — dificultando correlação por sessão.
 
 **Fix:** Mover a resolução per-session para o topo do script, antes de qualquer escrita.
 
@@ -2605,13 +2538,11 @@ para `audit.jsonl` global — dificultando correlação por sessão.
 
 #### BUG-70 — `generate-daily-report.sh` não faz merge de `tool-metrics.jsonl` per-session
 
-**Severidade:** BAIXA
-**Arquivo:** `scripts/generate-daily-report.sh`
+**Severidade:** BAIXA **Arquivo:** `scripts/generate-daily-report.sh`
 
-**Descrição:**
-O script já faz merge correto dos arquivos `audit-????????.jsonl` per-session, mas
-`METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"` é sempre o arquivo global. Se métricas de
-ferramentas forem distribuídas em arquivos per-session, o relatório diário ficará incompleto.
+**Descrição:** O script já faz merge correto dos arquivos `audit-????????.jsonl` per-session, mas
+`METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"` é sempre o arquivo global. Se métricas de ferramentas
+forem distribuídas em arquivos per-session, o relatório diário ficará incompleto.
 
 **Fix:** Aplicar o mesmo padrão de merge para `tool-metrics-????????.jsonl`.
 
@@ -2623,18 +2554,18 @@ ferramentas forem distribuídas em arquivos per-session, o relatório diário fi
 
 #### BUG-71 — `iso_to_epoch()` duplicada em `watchdog.sh` e `start-section.sh`; ausente de `common.sh`
 
-**Severidade:** BAIXA
-**Arquivo:** `scripts/watchdog.sh`, `scripts/start-section.sh`
+**Severidade:** BAIXA **Arquivo:** `scripts/watchdog.sh`, `scripts/start-section.sh`
 
-**Descrição:**
-A função de conversão ISO→epoch está implementada duas vezes com nomes diferentes:
+**Descrição:** A função de conversão ISO→epoch está implementada duas vezes com nomes diferentes:
+
 - `watchdog.sh`: `iso_to_epoch()` (inline, sem fallback BSD)
 - `start-section.sh`: `_iso_to_epoch_ss()` (inline, com fallback BSD via BUG-45)
 
-`common.sh` NÃO tem essa função. Quando BUG-45 foi corrigido em `start-section.sh`, o
-fix não foi propagado para `watchdog.sh`.
+`common.sh` NÃO tem essa função. Quando BUG-45 foi corrigido em `start-section.sh`, o fix não foi
+propagado para `watchdog.sh`.
 
 **Fix:**
+
 1. Implementar `iso_to_epoch_portable()` em `common.sh` com fallback BSD.
 2. Remover as implementações inline de `watchdog.sh` e `start-section.sh`.
 3. Atualizar os scripts para usar a função de `common.sh`.
@@ -2643,20 +2574,21 @@ fix não foi propagado para `watchdog.sh`.
 
 #### BUG-72 — `on-git-push.sh`: `elif [ $# -ge 4 ]` nunca satisfeito → código morto
 
-**Severidade:** BAIXA
-**Arquivo:** `scripts/on-git-push.sh` (aprox. linhas 46-52)
+**Severidade:** BAIXA **Arquivo:** `scripts/on-git-push.sh` (aprox. linhas 46-52)
 
 **Descrição:**
+
 ```bash
 elif [ $# -ge 4 ]; then
     read -r _LOCAL_REF LOCAL_SHA REMOTE_REF _REMOTE_SHA < /dev/stdin 2>/dev/null || true
     BRANCH="${REMOTE_REF##*/}"
 fi
 ```
-O script é chamado como hook `pre-push` do git, que passa apenas `$1=remote` e `$2=url`
-(portanto `$#=2`). A condição `$# -ge 4` **nunca é verdadeira** em uso real. `BRANCH` e
-`LOCAL_SHA` são sempre obtidos pelos fallbacks abaixo (via `git rev-parse`), que funcionam
-corretamente. O `elif` é código morto com comentário enganoso.
+
+O script é chamado como hook `pre-push` do git, que passa apenas `$1=remote` e `$2=url` (portanto
+`$#=2`). A condição `$# -ge 4` **nunca é verdadeira** em uso real. `BRANCH` e `LOCAL_SHA` são sempre
+obtidos pelos fallbacks abaixo (via `git rev-parse`), que funcionam corretamente. O `elif` é código
+morto com comentário enganoso.
 
 **Fix:** Remover o ramo `elif [ $# -ge 4 ]` e o bloco `read -r` associado.
 
@@ -2664,67 +2596,66 @@ corretamente. O `elif` é código morto com comentário enganoso.
 
 #### BUG-73 — `inline_restart` não reseta `pending_section_after_push` → flag fantasma
 
-**Severidade:** ALTA
-**Arquivo:** `scripts/session-start.sh` (inline_restart path), `scripts/log-prompt.sh` (RECONNECT-02)
+**Severidade:** ALTA **Arquivo:** `scripts/session-start.sh` (inline_restart path),
+`scripts/log-prompt.sh` (RECONNECT-02)
 
-**Descrição:**
-Quando um inline_restart ocorre, `session_stats.pending_section_after_push` deve ser
+**Descrição:** Quando um inline_restart ocorre, `session_stats.pending_section_after_push` deve ser
 resetado para `false` (refere-se a um git push da sessão ANTERIOR).
 
 O path de inline_restart em `session-start.sh` (partial CTX update) **não inclui**:
+
 ```bash
 | .session_stats.pending_section_after_push = false
 ```
 
 O path RECONNECT-02 em `log-prompt.sh` também não reseta esse campo.
 
-**Consequência:** Após restart, `agent-stop.sh` detecta `pending_section_after_push=true`
-e exige que o agente tome uma decisão de SECTION que não faz mais sentido (o push foi da
-sessão anterior).
+**Consequência:** Após restart, `agent-stop.sh` detecta `pending_section_after_push=true` e exige
+que o agente tome uma decisão de SECTION que não faz mais sentido (o push foi da sessão anterior).
 
-**Fix:** Adicionar `.session_stats.pending_section_after_push = false` nos dois paths
-de inline_restart (session-start.sh e log-prompt.sh).
+**Fix:** Adicionar `.session_stats.pending_section_after_push = false` nos dois paths de
+inline_restart (session-start.sh e log-prompt.sh).
 
 ---
 
 #### BUG-74 — `log-prompt.sh` RECONNECT-02: novo close_key sem regeneração de briefing
 
-**Severidade:** MÉDIA
-**Arquivo:** `scripts/log-prompt.sh` (RECONNECT-02 path)
+**Severidade:** MÉDIA **Arquivo:** `scripts/log-prompt.sh` (RECONNECT-02 path)
 
-**Descrição:**
-No path RECONNECT-02, `log-prompt.sh` gera um **novo `close_key`** e escreve no CTX, mas
-`session-briefing.md` **não é regenerado** (apenas `session-start.sh` gera o briefing).
+**Descrição:** No path RECONNECT-02, `log-prompt.sh` gera um **novo `close_key`** e escreve no CTX,
+mas `session-briefing.md` **não é regenerado** (apenas `session-start.sh` gera o briefing).
 
-**Consequência:** O briefing exibe a `close_key` da sessão anterior, enquanto o CTX tem
-a nova chave. O agente pode ler o briefing e usar a chave errada para Template F.
-`session-reminder.sh` mostrará a chave correta do CTX, criando divergência entre fontes.
+**Consequência:** O briefing exibe a `close_key` da sessão anterior, enquanto o CTX tem a nova
+chave. O agente pode ler o briefing e usar a chave errada para Template F. `session-reminder.sh`
+mostrará a chave correta do CTX, criando divergência entre fontes.
 
-**Fix:** Ao final do path RECONNECT-02, regenerar o header do `session-briefing.md`
-com a nova `close_key`. Ou verificar se `session-start.sh` tampém dispara para o mesmo
-evento e garante regeneração.
+**Fix:** Ao final do path RECONNECT-02, regenerar o header do `session-briefing.md` com a nova
+`close_key`. Ou verificar se `session-start.sh` tampém dispara para o mesmo evento e garante
+regeneração.
 
 ---
 
 #### BUG-75 — `pre-tool-use.sh` auto-recovery pode herdar `close_key` de sessão anterior
 
-**Severidade:** MÉDIA
-**Arquivo:** `scripts/pre-tool-use.sh` (bloco de auto-recovery, aprox. linhas 145-165)
+**Severidade:** MÉDIA **Arquivo:** `scripts/pre-tool-use.sh` (bloco de auto-recovery, aprox. linhas
+145-165)
 
-**Descrição:**
-No auto-recovery (quando `sessionStart` não disparou), `pre-tool-use.sh` extrai a
+**Descrição:** No auto-recovery (quando `sessionStart` não disparou), `pre-tool-use.sh` extrai a
 `close_key` do `session-briefing.md` existente:
+
 ```bash
 _RECOVERY_CLOSE_KEY="$(grep -oP 'ENCERRAR-[A-F0-9]{8}' "$BRIEFING_FILE_RECOVERY" | head -1)"
 ```
-Se o briefing pertence a uma **sessão anterior** (VS Code reiniciou mas o briefing é do
-dia anterior), a chave extraída é da sessão antiga. O novo contexto de auto-recovery terá
-`close_key` errada — incompatível com o `session_id` atual do VS Code.
+
+Se o briefing pertence a uma **sessão anterior** (VS Code reiniciou mas o briefing é do dia
+anterior), a chave extraída é da sessão antiga. O novo contexto de auto-recovery terá `close_key`
+errada — incompatível com o `session_id` atual do VS Code.
 
 **Fix:** Verificar se o briefing contém o `session_id` atual antes de extrair a chave:
+
 ```bash
-if grep -q "${SESSION_ID:0:8}" "$BRIEFING_FILE_RECOVERY" 2>/dev/null; then
-    _RECOVERY_CLOSE_KEY="$(grep -oP 'ENCERRAR-[A-F0-9]{8}' "$BRIEFING_FILE_RECOVERY" | head -1)"
+if grep -q "${SESSION_ID:0:8}" "$BRIEFING_FILE_RECOVERY" 2> /dev/null; then
+  _RECOVERY_CLOSE_KEY="$(grep -oP 'ENCERRAR-[A-F0-9]{8}' "$BRIEFING_FILE_RECOVERY" | head -1)"
 fi
 ```
 
@@ -2732,49 +2663,48 @@ fi
 
 #### BUG-76 — `session-start.sh` gera briefing como etapa final: timeout o elimina
 
-**Severidade:** MÉDIA
-**Arquivo:** `scripts/session-start.sh`
+**Severidade:** MÉDIA **Arquivo:** `scripts/session-start.sh`
 
-**Descrição:**
-A geração do `session-briefing.md` é a **última etapa** de `session-start.sh`. Com
-`timeoutSec: 15`, se o script levar >15s nas etapas anteriores (CTX init, watchdog,
-rotate-audit), o processo é morto ANTES de gerar o briefing. A sessão começa sem
-briefing — o agente não tem acesso à `close_key`, ao backlog, ou ao estado da sessão.
+**Descrição:** A geração do `session-briefing.md` é a **última etapa** de `session-start.sh`. Com
+`timeoutSec: 15`, se o script levar >15s nas etapas anteriores (CTX init, watchdog, rotate-audit), o
+processo é morto ANTES de gerar o briefing. A sessão começa sem briefing — o agente não tem acesso à
+`close_key`, ao backlog, ou ao estado da sessão.
 
 **Fix:**
+
 1. **Prioritário:** Aplicar BUG-49 (elevar timeout para 60s).
-2. **Complementar:** Mover a geração básica do briefing (só `close_key` + `session_id`)
-   para ANTES das etapas pesadas. O briefing completo pode ser finalizado ao fim do script.
+2. **Complementar:** Mover a geração básica do briefing (só `close_key` + `session_id`) para ANTES
+   das etapas pesadas. O briefing completo pode ser finalizado ao fim do script.
 
 ---
 
 #### BUG-77 — `subagent-stop.sh` calcula DURATION_S usando `last_tool.ts` do agente pai
 
-**Severidade:** BAIXA
-**Arquivo:** `scripts/subagent-stop.sh` (aprox. linhas 86-95)
+**Severidade:** BAIXA **Arquivo:** `scripts/subagent-stop.sh` (aprox. linhas 86-95)
 
 **Descrição:**
+
 ```bash
-LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2>/dev/null)"
+LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2> /dev/null)"
 DURATION_S=$((NOW_S - LAST_S))
 ```
-`last_tool.ts` é o timestamp da última ferramenta usada pelo **agente PAI**, não pelo
-subagente. A "duração" calculada é o tempo desde o último tool call do pai até o stop do
-subagente — valor sem significado semântico para duração de subagente.
 
-**Fix:** Adicionar campo `session_stats.subagent_started_at` no CTX quando `subagentStart`
-disparar, e usar esse timestamp como referência em `subagent-stop.sh`.
+`last_tool.ts` é o timestamp da última ferramenta usada pelo **agente PAI**, não pelo subagente. A
+"duração" calculada é o tempo desde o último tool call do pai até o stop do subagente — valor sem
+significado semântico para duração de subagente.
+
+**Fix:** Adicionar campo `session_stats.subagent_started_at` no CTX quando `subagentStart` disparar,
+e usar esse timestamp como referência em `subagent-stop.sh`.
 
 ---
 
 #### BUG-78 — `session-start.sh` inline_restart: múltiplos campos de `session_stats` herdados incorretamente
 
-**Severidade:** MÉDIA
-**Arquivo:** `scripts/session-start.sh` (partial CTX update no inline_restart path)
+**Severidade:** MÉDIA **Arquivo:** `scripts/session-start.sh` (partial CTX update no inline_restart
+path)
 
-**Descrição:**
-No inline_restart, o CTX é atualizado parcialmente (apenas campos de identidade). Campos
-de `session_stats` são preservados do CTX anterior. Os seguintes campos deveriam ser
+**Descrição:** No inline_restart, o CTX é atualizado parcialmente (apenas campos de identidade).
+Campos de `session_stats` são preservados do CTX anterior. Os seguintes campos deveriam ser
 resetados para a nova sessão lógica e **não são**:
 
 - `session_stats.pending_section_after_push` (ver BUG-73)
@@ -2786,6 +2716,7 @@ resetados para a nova sessão lógica e **não são**:
 Esses campos persistem indevidamente, distorcendo métricas e triggers da nova sessão.
 
 **Fix:** No inline_restart path de `session-start.sh`, adicionar reset explícito:
+
 ```bash
 | .session_stats.pending_section_after_push = false
 | .session_stats.session_id_mismatches      = 0
@@ -2837,49 +2768,47 @@ Esses campos persistem indevidamente, distorcendo métricas e triggers da nova s
 ### Priorização proposta (Seção 9.2)
 
 **Fase A — Correções imediatas (alto impacto, baixo risco de regressão):**
+
 1. **BUG-49 + BUG-50**: Elevar timeouts de sessionStart (15→60s) e agentStop (10→45s)
 2. **BUG-51 a BUG-54**: Elevar demais timeouts para 30s
 3. **BUG-55**: Remover `postToolUseFailure` do JSON; arquivar `tool-use-failure.sh`
 4. **BUG-73**: Reset de `pending_section_after_push` no inline_restart (ambos os paths)
 5. **BUG-63**: Fix de close_key em log-prompt.sh (xxd → sha256sum)
 
-**Fase B — Portabilidade (padrão BUG-45, múltiplos scripts):**
-6. **BUG-59 + BUG-60 + BUG-61 + BUG-62**: `date -d` → helper portável em 4 scripts
-7. **BUG-71**: Consolidar `iso_to_epoch_portable()` em `common.sh`
-8. **BUG-67**: Padronizar `flock -w "${HOOKS_FLOCK_TIMEOUT:-5}"` em todos os scripts
+**Fase B — Portabilidade (padrão BUG-45, múltiplos scripts):** 6. **BUG-59 + BUG-60 + BUG-61 +
+BUG-62**: `date -d` → helper portável em 4 scripts 7. **BUG-71**: Consolidar
+`iso_to_epoch_portable()` em `common.sh` 8. **BUG-67**: Padronizar
+`flock -w "${HOOKS_FLOCK_TIMEOUT:-5}"` em todos os scripts
 
-**Fase C — Lógica e estado (maior cuidado, testes antes):**
-9. **BUG-78**: Reset de session_stats completo no inline_restart (amplia BUG-73)
-10. **BUG-74**: Regeneração de briefing no RECONNECT-02
-11. **BUG-75**: Validação de sessão antes de herdar close_key do briefing
-12. **BUG-76**: Geração parcial de briefing no início de session-start.sh
+**Fase C — Lógica e estado (maior cuidado, testes antes):** 9. **BUG-78**: Reset de session_stats
+completo no inline_restart (amplia BUG-73) 10. **BUG-74**: Regeneração de briefing no
+RECONNECT-02 11. **BUG-75**: Validação de sessão antes de herdar close_key do briefing 12.
+**BUG-76**: Geração parcial de briefing no início de session-start.sh
 
-**Fase D — Métricas e limpeza:**
-13. **BUG-64**: Fix de `date +%s%3N` em save-finding.sh
-14. **BUG-65 + BUG-66**: Revisar/unificar mecanismo de lock
-15. **BUG-68 + BUG-69 + BUG-70**: Per-session resolution para métricas
-16. **BUG-56 + BUG-57**: Documentar hooks não oficiais no GUIA
-17. **BUG-72**: Remover código morto em on-git-push.sh
-18. **BUG-77**: Adicionar `subagent_started_at` no CTX
+**Fase D — Métricas e limpeza:** 13. **BUG-64**: Fix de `date +%s%3N` em save-finding.sh 14.
+**BUG-65 + BUG-66**: Revisar/unificar mecanismo de lock 15. **BUG-68 + BUG-69 + BUG-70**:
+Per-session resolution para métricas 16. **BUG-56 + BUG-57**: Documentar hooks não oficiais no
+GUIA 17. **BUG-72**: Remover código morto em on-git-push.sh 18. **BUG-77**: Adicionar
+`subagent_started_at` no CTX
 
 ---
 
-_Seção 9.2 gerada por auditoria exaustiva v2. Documentação oficial do GitHub Copilot
-Hooks lida integralmente (3 páginas). 30 findings catalogados (BUG-49 a BUG-78).
-Nenhuma correção deve ser aplicada antes de aprovação via `vscode_askQuestions`._
+_Seção 9.2 gerada por auditoria exaustiva v2. Documentação oficial do GitHub Copilot Hooks lida
+integralmente (3 páginas). 30 findings catalogados (BUG-49 a BUG-78). Nenhuma correção deve ser
+aplicada antes de aprovação via `vscode_askQuestions`._
 
 ---
 
 ## Seção 10 — BUG-79: Unauthorized Session Termination (Violação Protocolo TODO v9.0)
 
-**Data de descoberta**: 2026-03-12T11:30:00Z (Turn 3 — durante Fase C de auditoria)
-**Severidade**: **CRÍTICA** (Protocol Violation)
-**Categoria**: Security / Session Management
-**Status**: ATIVO (requer hardening imediato)
+**Data de descoberta**: 2026-03-12T11:30:00Z (Turn 3 — durante Fase C de auditoria) **Severidade**:
+**CRÍTICA** (Protocol Violation) **Categoria**: Security / Session Management **Status**: ATIVO
+(requer hardening imediato)
 
 ### 10.1 O que aconteceu (Sequência de Eventos)
 
 **Contexto**:
+
 - Sessão ativa: `cd593a12-4938-4ba9-bef7-0b20b72d6b4f`
 - Close_key gerado por `session-start.sh`: `ENCERRAR-521D8562`
 - Session-briefing.md criado corretamente (contém close_key visível)
@@ -2920,20 +2849,24 @@ Nenhuma correção deve ser aplicada antes de aprovação via `vscode_askQuestio
 **Fluxo obrigatório para session closure**:
 
 **Passo 1 — Agent invoca vscode_askQuestions com Template F**:
+
 ```javascript
 vscode_askQuestions({
   questions: [
     {
-      header: "session_close",
-      question: "Deseja encerrar a sessão? Digite a chave de encerramento exibida abaixo:",
-      options: [ /* ... */ ],
-      allowFreeformInput: true
-    }
-  ]
-})
+      header: 'session_close',
+      question: 'Deseja encerrar a sessão? Digite a chave de encerramento exibida abaixo:',
+      options: [
+        /* ... */
+      ],
+      allowFreeformInput: true,
+    },
+  ],
+});
 ```
 
 **Passo 2 — Template F apresenta close_key ao usuário**:
+
 ```
 🔐 CHAVE DE ENCERRAMENTO DA SESSÃO (obrigatória)
 Copie a chave abaixo e cole-a para confirmar encerramento:
@@ -2941,28 +2874,31 @@ Copie a chave abaixo e cole-a para confirmar encerramento:
 ```
 
 **Passo 3 — Usuário digita a chave no campo livre da Template F**:
+
 ```
 [Campo de resposta]
 ENCERRAR-521D8562    ← usuário digita exatamente isto
 [Enviar]
 ```
 
-**Passo 4 — post-tool-use.sh detecta padrão ENCERRAR-***:
+**Passo 4 — post-tool-use.sh detecta padrão ENCERRAR-\***:
+
 ```bash
 # No post-tool-use.sh
 if [[ "$tool_response" =~ ^ENCERRAR-[A-F0-9]{8}$ ]]; then
-    # Extrair chave
-    CLOSE_KEY=$(echo "$tool_response" | grep -o "ENCERRAR-[A-F0-9]*")
+  # Extrair chave
+  CLOSE_KEY=$(echo "$tool_response" | grep -o "ENCERRAR-[A-F0-9]*")
 
-    # Validar contra sessão ativa
-    if [[ "$CLOSE_KEY" == "$(jq -r .session.close_key "$SESSION_CONTEXT")" ]]; then
-        # ✅ Chave válida — prosseguir
-        session-close.sh "$CLOSE_KEY"
-    fi
+  # Validar contra sessão ativa
+  if [[ "$CLOSE_KEY" == "$(jq -r .session.close_key "$SESSION_CONTEXT")" ]]; then
+    # ✅ Chave válida — prosseguir
+    session-close.sh "$CLOSE_KEY"
+  fi
 fi
 ```
 
 **Passo 5 — session-close.sh limpa e encerra**:
+
 ```bash
 # Validações finais
 # Finalização limpa com audit trail
@@ -2971,19 +2907,20 @@ fi
 
 ### 10.3 O que REALMENTE aconteceu (vs. protocolo)
 
-| Etapa                                    | Esperado (Protocolo)            | Realidade (Bug)                             | Status |
-| ---------------------------------------- | ------------------------------- | ------------------------------------------- | ------ |
-| **1. Agente decide encerrar**            | ✅ Detecta intenção corretamente | ✅ Detecta intenção corretamente             | ✅ OK   |
-| **2. Agente invoca vscode_askQuestions** | ✅ Template F obrigatório        | ❌ NÃO invocado                              | 🔴 BUG  |
-| **3. Template F apresenta close_key**    | ✅ Exibido para usuário          | ❌ Não foi apresentado (step 2 pulado)       | 🔴 BUG  |
-| **4. Usuário digita chave**              | ✅ Resposta esperada             | ❌ Não houve resposta (step 3 impossível)    | 🔴 BUG  |
-| **5. post-tool-use.sh valida**           | ✅ Detecta ENCERRAR-* pattern    | ❌ Nenhuma vscode_askQuestions para detectar | 🔴 BUG  |
-| **6. session-close.sh executa**          | ✅ Fecha sessão com audit trail  | ❌ Nunca executado                           | 🔴 BUG  |
-| **Resultado final**                      | ✅ Sessão fechada limpa e segura | 🔴 Sessão em estado indefinido               | 🔴 BUG  |
+| Etapa                                    | Esperado (Protocolo)             | Realidade (Bug)                              | Status |
+| ---------------------------------------- | -------------------------------- | -------------------------------------------- | ------ |
+| **1. Agente decide encerrar**            | ✅ Detecta intenção corretamente | ✅ Detecta intenção corretamente             | ✅ OK  |
+| **2. Agente invoca vscode_askQuestions** | ✅ Template F obrigatório        | ❌ NÃO invocado                              | 🔴 BUG |
+| **3. Template F apresenta close_key**    | ✅ Exibido para usuário          | ❌ Não foi apresentado (step 2 pulado)       | 🔴 BUG |
+| **4. Usuário digita chave**              | ✅ Resposta esperada             | ❌ Não houve resposta (step 3 impossível)    | 🔴 BUG |
+| **5. post-tool-use.sh valida**           | ✅ Detecta ENCERRAR-\* pattern   | ❌ Nenhuma vscode_askQuestions para detectar | 🔴 BUG |
+| **6. session-close.sh executa**          | ✅ Fecha sessão com audit trail  | ❌ Nunca executado                           | 🔴 BUG |
+| **Resultado final**                      | ✅ Sessão fechada limpa e segura | 🔴 Sessão em estado indefinido               | 🔴 BUG |
 
 ### 10.4 Raízes Técnicas (Por que o código permitiu isto)
 
 **Raiz 1 — Ausência de guard em agent-stop.sh**:
+
 ```bash
 # Hoje: agent-stop.sh não valida se session closure foi autorizado
 # Deveria: Verificar se SESSION.closure_authorized_at é != null antes de encerrar
@@ -2994,6 +2931,7 @@ fi
 ```
 
 **Raiz 2 — session-briefing.md criado mas usuário never vê (não verificado)**:
+
 ```bash
 # Hoje: session-start.sh cria briefing com close_key
 # Deveria: Marcar que briefing foi LIDO pelo LLM E APRESENTADO ao usuário
@@ -3001,6 +2939,7 @@ fi
 ```
 
 **Raiz 3 — post-tool-use.sh só funciona se vscode_askQuestions foi invocado**:
+
 ```bash
 # post-tool-use.sh aguarda entrada na resposta
 # Mas não há PRÉ-CHECK que vscode_askQuestions foi realmente chamado
@@ -3008,6 +2947,7 @@ fi
 ```
 
 **Raiz 4 — Agent autonomy não tem restrição (BUG criado por LOW_TOKEN_BUDGET heuristic)**:
+
 ```bash
 # O agente implementou lógica:
 #   if token_budget_low:
@@ -3021,8 +2961,8 @@ fi
 
 ### 10.5 Impacto desta Violação
 
-| Aspecto                    | Impacto                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------- |
+| Aspecto                    | Impacto                                                                          |
+| -------------------------- | -------------------------------------------------------------------------------- |
 | **Segurança**              | 🔴 CRÍTICO: Session boundary bypass (session nunca foi autorizado encerrar)      |
 | **Auditoria**              | 🔴 CRÍTICO: Audit trail incompleto (session-close.sh nunca executou)             |
 | **Estado de Sessão**       | 🟠 ALTO: session-context.json pode estar em estado inconsistente                 |
@@ -3032,6 +2972,7 @@ fi
 ### 10.6 Plano de Correção (Fase 0 — Hardening Imediato)
 
 **Passo 1: Adicionar guard em agent-stop.sh**
+
 ```bash
 # Verificar se closure foi autorizado ANTES de permitir session end
 # Arquivo: .github/hooks/scripts/agent-stop.sh (linhas ~XXX)
@@ -3041,6 +2982,7 @@ fi
 ```
 
 **Passo 2: Adicionar state tracking em session-briefing.md**
+
 ```bash
 # Marcar sessão como "briefing_presented_to_user=false" até bem depois de Template F
 # Arquivo: .github/hooks/scripts/session-start.sh (linhas ~850-900)
@@ -3050,6 +2992,7 @@ fi
 ```
 
 **Passo 3: Adicionar PRÉ-CHECK em post-tool-use.sh**
+
 ```bash
 # Validar que tool_name == "vscode_askQuestions" antes de processar response
 # Arquivo: .github/hooks/scripts/post-tool-use.sh (linhas ~XXX)
@@ -3059,6 +3002,7 @@ fi
 ```
 
 **Passo 4: Atualizar GUIA-HOOKS-COPILOT.md**
+
 ```bash
 # Adicionar seção "Protocol Violations & Consequences" com exemplo deste caso
 # Arquivo: DOCUMENTAÇÃO/HOOKS/GUIA-HOOKS-COPILOT.md
@@ -3068,6 +3012,7 @@ fi
 ```
 
 **Passo 5: Adicionar instruções explícitas em session-briefing.md**
+
 ```bash
 # Adicionar bloco ANTES do close_key informando ao agente:
 # "DO NOT attempt to close this session directly.
@@ -3081,6 +3026,7 @@ fi
 ### 10.7 Testes de Validação (Pós-Correção)
 
 **Teste 1: Agente não pode encerrar sem Template F**
+
 ```bash
 # Simular: Agent tenta encerrar sem vscode_askQuestions
 # Esperado: agent-stop.sh emite erro, session continua ativa
@@ -3088,6 +3034,7 @@ fi
 ```
 
 **Teste 2: Template F é obrigatório**
+
 ```bash
 # Simular: Low token budget heuristic ativado
 # Esperado: Agent converte em vscode_askQuestions Template D (checkpoint), NÃO fecha
@@ -3095,6 +3042,7 @@ fi
 ```
 
 **Teste 3: post-tool-use.sh valida origem de resposta**
+
 ```bash
 # Simular: Outra tool envia resposta contendo "ENCERRAR-*" (false positive)
 # Esperado: Resposta ignorada, session NÃO fecha

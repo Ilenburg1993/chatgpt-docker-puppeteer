@@ -1,8 +1,7 @@
 # F14.1 — Criação de libs dedicadas para hooks automáticos (2026-03-15)
 
-**Fase**: F14.1
-**Fonte de verdade do escopo**: `.github/hooks/copilot-hooks.json`
-**Artefato machine-readable desta fase**: `.github/hooks/state/f14-auto-hook-entry-lib-status.json`
+**Fase**: F14.1 **Fonte de verdade do escopo**: `.github/hooks/copilot-hooks.json` **Artefato
+machine-readable desta fase**: `.github/hooks/state/f14-auto-hook-entry-lib-status.json`
 
 ## Objetivo
 
@@ -35,8 +34,9 @@ repositório, preparando migração de lógica para F14.2 e padronização de di
 
 ## Contrato dos novos entrypoints (F14.1)
 
-Cada nova lib expõe função pública canônica (`run_*_hook`) com comportamento **placeholder fail-fast**,
-explicitando que a migração de lógica ainda ocorrerá em F14.2. Isso evita ambiguidade entre:
+Cada nova lib expõe função pública canônica (`run_*_hook`) com comportamento **placeholder
+fail-fast**, explicitando que a migração de lógica ainda ocorrerá em F14.2. Isso evita ambiguidade
+entre:
 
 1. artefato estrutural criado (F14.1), e
 2. migração funcional completa (F14.2/F14.3).

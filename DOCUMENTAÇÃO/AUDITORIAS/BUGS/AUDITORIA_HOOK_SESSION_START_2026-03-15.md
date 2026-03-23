@@ -2,7 +2,11 @@
 
 ## Sumário executivo
 
-A implementação do hook `sessionStart` está bem modularizada no nível de entrypoint (F14/F17), mas ainda apresenta riscos semânticos importantes em **consistência de contrato**, **atomicidade de estado**, **detecção de encerramento abrupto** e **custos operacionais no boot da sessão**. O desenho atual funciona no caminho feliz, porém há múltiplos pontos de drift entre contratos (`events-contract.md` / `session-context.schema.json`) e valores efetivamente persistidos.
+A implementação do hook `sessionStart` está bem modularizada no nível de entrypoint (F14/F17), mas
+ainda apresenta riscos semânticos importantes em **consistência de contrato**, **atomicidade de
+estado**, **detecção de encerramento abrupto** e **custos operacionais no boot da sessão**. O
+desenho atual funciona no caminho feliz, porém há múltiplos pontos de drift entre contratos
+(`events-contract.md` / `session-context.schema.json`) e valores efetivamente persistidos.
 
 Resultado geral: **estado funcional bom**, **robustez média**, **governança contratual parcial**.
 
@@ -14,9 +18,11 @@ Resultado geral: **estado funcional bom**, **robustez média**, **governança co
   - `.github/hooks/scripts/session-start.sh`
   - `.github/hooks/hooks-lib/lifecycle/session-start-*.sh`
   - `.github/hooks/hooks-lib/session-start-{core,aux}.sh` (shim)
-  - dependências contratuais correlatas: `common.sh`, `events-contract.md`, `session-context.schema.json`, `smoke-test.sh`
+  - dependências contratuais correlatas: `common.sh`, `events-contract.md`,
+    `session-context.schema.json`, `smoke-test.sh`
 - Runtime considerado: Bash + jq + arquivos de estado/log do sistema de hooks.
-- Método: auditoria manual semântica (skill `code-audit`) com foco em invariantes de lifecycle e consistência de estado.
+- Método: auditoria manual semântica (skill `code-audit`) com foco em invariantes de lifecycle e
+  consistência de estado.
 
 ---
 
@@ -44,34 +50,46 @@ Resultado geral: **estado funcional bom**, **robustez média**, **governança co
 ## Parte I — Issues detalhados
 
 ### BUG-SS-001 — Fallback de `session_id` fora do contrato UUID
+
 - **Arquivo:** `hooks-lib/lifecycle/session-start-input.sh`
 - **Severidade:** Alta
-- **Descrição:** quando `session_id` não vem no payload, o fallback gera `sess_<timestamp>`, mas o schema (`contracts/session-context.schema.json`) define padrão UUID para `session.id`.
+- **Descrição:** quando `session_id` não vem no payload, o fallback gera `sess_<timestamp>`, mas o
+  schema (`contracts/session-context.schema.json`) define padrão UUID para `session.id`.
 - **Impacto:** risco de drift contratual e falhas em consumidores que assumem UUID.
-- **Correção proposta:** fallback por UUID válido (`uuidgen`/`openssl`) e flag separada para indicar origem sintética.
+- **Correção proposta:** fallback por UUID válido (`uuidgen`/`openssl`) e flag separada para indicar
+  origem sintética.
 
 ### BUG-SS-002 — Divergência de métrica de sessão (`turn_unauthorized` vs `turn_no_askQuestions`)
+
 - **Arquivo:** `hooks-lib/session-start-core.sh`
 - **Severidade:** Alta
-- **Descrição:** contexto inicial usa `turn_unauthorized`, enquanto o schema e partes do fluxo adotam `turn_no_askQuestions`.
+- **Descrição:** contexto inicial usa `turn_unauthorized`, enquanto o schema e partes do fluxo
+  adotam `turn_no_askQuestions`.
 - **Impacto:** métricas inconsistentes e risco de dashboards/alertas incorretos.
-- **Correção proposta:** convergir para um único campo canônico e manter migração backward-compatible explícita.
+- **Correção proposta:** convergir para um único campo canônico e manter migração
+  backward-compatible explícita.
 
 ### BUG-SS-003 — Inline restart reusa estado sem reset completo
+
 - **Arquivo:** `hooks-lib/session-start-core.sh`
 - **Severidade:** Média
-- **Descrição:** no caminho `inline_restart` há atualização parcial do contexto prévio; partes de estado podem permanecer “sujas”.
+- **Descrição:** no caminho `inline_restart` há atualização parcial do contexto prévio; partes de
+  estado podem permanecer “sujas”.
 - **Impacto:** efeitos colaterais de sessão anterior influenciando sessão atual.
-- **Correção proposta:** reset explícito de subconjuntos críticos (`current_turn`, recovery transient, flags de pending).
+- **Correção proposta:** reset explícito de subconjuntos críticos (`current_turn`, recovery
+  transient, flags de pending).
 
 ### BUG-SS-004 — Fallback de corrupção não recalcula sessão lógica
+
 - **Arquivos:** `hooks-lib/session-start-core.sh`, `hooks-lib/lifecycle/session-start-lib.sh`
 - **Severidade:** Alta
-- **Descrição:** quando inline corrompe, `SOURCE` é alterado para `new`, mas `LOGICAL_SESSION_NUMBER` pode já ter sido calculado para inline.
+- **Descrição:** quando inline corrompe, `SOURCE` é alterado para `new`, mas
+  `LOGICAL_SESSION_NUMBER` pode já ter sido calculado para inline.
 - **Impacto:** numeração lógica potencialmente incorreta.
 - **Correção proposta:** recalcular `LOGICAL_SESSION_NUMBER` ao trocar `SOURCE` em fallback.
 
 ### BUG-SS-005 — Detecção de reconnect baseada em `grep`
+
 - **Arquivo:** `hooks-lib/lifecycle/session-start-recovery.sh`
 - **Severidade:** Alta
 - **Descrição:** detecção usa `grep` por string em JSONL; suscetível a match acidental e ruído.
@@ -79,6 +97,7 @@ Resultado geral: **estado funcional bom**, **robustez média**, **governança co
 - **Correção proposta:** substituir por consulta estruturada com `jq` por `event` + `session_id`.
 
 ### BUG-SS-006 — Escrita de recovery sem lock
+
 - **Arquivo:** `hooks-lib/lifecycle/session-start-recovery.sh`
 - **Severidade:** Média
 - **Descrição:** atualização de `per_ctx_file` com `mv/cp` sem lock central.
@@ -86,6 +105,7 @@ Resultado geral: **estado funcional bom**, **robustez média**, **governança co
 - **Correção proposta:** unificar escrita via helper transacional com lock.
 
 ### BUG-SS-007 — Mutação global de `AUDIT_FILE` em trends
+
 - **Arquivo:** `hooks-lib/session-start-aux.sh`
 - **Severidade:** Média
 - **Descrição:** função de tendências troca `AUDIT_FILE` global temporariamente.
@@ -93,6 +113,7 @@ Resultado geral: **estado funcional bom**, **robustez média**, **governança co
 - **Correção proposta:** usar variável local isolada + `trap` de cleanup/restauração.
 
 ### BUG-SS-008 — Housekeeping sem timeout
+
 - **Arquivo:** `hooks-lib/lifecycle/session-start-runtime.sh`
 - **Severidade:** Média
 - **Descrição:** execução de `watchdog.sh` e `rotate-audit.sh` sem timeout de proteção.
@@ -100,13 +121,16 @@ Resultado geral: **estado funcional bom**, **robustez média**, **governança co
 - **Correção proposta:** envolver em executor com timeout (`run_aux_block`) e telemetria de duração.
 
 ### BUG-SS-009 — Exposição de `close_key` em audit
+
 - **Arquivo:** `hooks-lib/lifecycle/session-start-events.sh`
 - **Severidade:** Média
 - **Descrição:** evento `sessionStart` persiste `close_key` em texto puro.
 - **Impacto:** ampliação de superfície de segredo operacional.
-- **Correção proposta:** logar apenas hash/prefixo e manter valor completo somente no contexto necessário.
+- **Correção proposta:** logar apenas hash/prefixo e manter valor completo somente no contexto
+  necessário.
 
 ### BUG-SS-010 — `additionalContext` sem limite explícito
+
 - **Arquivo:** `hooks-lib/lifecycle/session-start-observability.sh`
 - **Severidade:** Média
 - **Descrição:** payload textual pode crescer dependendo do briefing.
@@ -114,16 +138,20 @@ Resultado geral: **estado funcional bom**, **robustez média**, **governança co
 - **Correção proposta:** impor limite de bytes e sumarização por blocos prioritários.
 
 ### BUG-SS-011 — `auto_recovery` não mapeado explicitamente
+
 - **Arquivo:** `hooks-lib/lifecycle/session-start-input.sh`
 - **Severidade:** Baixa
-- **Descrição:** fonte existe no contrato/documentação, mas não no mapeamento dedicado de `trigger_kind`.
+- **Descrição:** fonte existe no contrato/documentação, mas não no mapeamento dedicado de
+  `trigger_kind`.
 - **Impacto:** perda de granularidade semântica em auditoria.
 - **Correção proposta:** adicionar branch explícito para `auto_recovery`.
 
 ### BUG-SS-012 — Smoke com baixa cobertura comportamental do `session-start`
+
 - **Arquivo:** `scripts/smoke-test.sh`
 - **Severidade:** Média
-- **Descrição:** checks majoritariamente estruturais; faltam cenários adversos específicos do `session-start` modular.
+- **Descrição:** checks majoritariamente estruturais; faltam cenários adversos específicos do
+  `session-start` modular.
 - **Impacto:** regressões lógicas podem passar despercebidas.
 - **Correção proposta:** adicionar suíte de cenários comportamentais dedicados ao hook.
 
@@ -134,7 +162,7 @@ Resultado geral: **estado funcional bom**, **robustez média**, **governança co
 > Lista objetiva, priorizada e acionável para implementação incremental.
 
 | ID   | Prioridade | Categoria       | Proposta                                                                                                                 |
-| ---- | ---------- | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| ---- | ---------- | --------------- | ------------------------------------------------------------------------------------------------------------------------ | ---- |
 | P-01 | Alta       | Contrato        | Gerar fallback de `session_id` em UUID válido (não `sess_<ts>`).                                                         |
 | P-02 | Alta       | Contrato        | Validar `session_id` de entrada contra regex UUID e marcar `session_id_invalid=true` em caso de desvio.                  |
 | P-03 | Média      | Contrato        | Capturar `hook_event_name` no parser e validar `SessionStart`.                                                           |
@@ -198,4 +226,5 @@ Prioridade recomendada de execução:
 2. **P1 curto prazo**: `P-02`, `P-08`, `P-15`, `P-21`, `P-26`, `P-41`, `P-50`, `P-51`.
 3. **P2 melhoria contínua**: demais itens de governança, performance e padronização de template.
 
-Este relatório entrega **52 propostas** (acima do mínimo de 30 e dentro da faixa ideal ~50 solicitada).
+Este relatório entrega **52 propostas** (acima do mínimo de 30 e dentro da faixa ideal ~50
+solicitada).

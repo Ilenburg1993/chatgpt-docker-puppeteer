@@ -914,7 +914,7 @@
   // 2000 ms: base padrão recomendada para projetos ≥ 10 k LOC (este tem ~21 k).
   // 500 ms gerava reconstruções excessivas do grafo de contexto durante sessões
   // de edição ativa → latência perceptível nas sugestões inline.
-  "github.copilot.chat.languageContext.typescript.cacheTimeout": 5000,
+  "github.copilot.chat.languageContext.typescript.cacheTimeout": 2000,
   "github.copilot.chat.languageContext.typescript.enabled": true,
   "github.copilot.chat.languageContext.typescript.includeDocumentation": true,
   "github.copilot.chat.localeOverride": "pt-br",

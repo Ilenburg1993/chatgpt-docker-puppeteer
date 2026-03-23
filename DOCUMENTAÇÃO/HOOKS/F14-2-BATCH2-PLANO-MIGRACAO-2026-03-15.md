@@ -1,8 +1,7 @@
 # F14.2 — Batch 2 (3 hooks restantes) — Plano de migração segura
 
-**Data**: 2026-03-15
-**Fase**: F14.2 (em execução)
-**Escopo restante**: `pre-tool-use`, `post-tool-use`, `session-start`
+**Data**: 2026-03-15 **Fase**: F14.2 (em execução) **Escopo restante**: `pre-tool-use`,
+`post-tool-use`, `session-start`
 
 ## Diagnóstico rápido de complexidade
 
@@ -22,7 +21,8 @@
 
 Para cada hook restante, aplicar o mesmo padrão usado em `session-end` e subagents:
 
-1. Script vira entrypoint fino (bootstrap + source common/policy/core/aux + source entry-lib + dispatch).
+1. Script vira entrypoint fino (bootstrap + source common/policy/core/aux + source entry-lib +
+   dispatch).
 2. Lógica principal migra para `run_<hook>_hook` na entry-lib dedicada.
 3. Diagnóstico via `get_errors` após cada migração.
 4. Atualizar `.github/hooks/state/f14-auto-hook-entry-lib-status.json` imediatamente.
@@ -37,5 +37,6 @@ Para cada hook restante, aplicar o mesmo padrão usado em `session-end` e subage
 ## Critério de saída do Batch 2
 
 - Os 3 hooks remanescentes migrados para entry-libs dedicadas.
-- `f14-auto-hook-entry-lib-status.json` com `migrated_in_f14_2=8` (excluindo `agentStop` referência).
+- `f14-auto-hook-entry-lib-status.json` com `migrated_in_f14_2=8` (excluindo `agentStop`
+  referência).
 - F14.2 marcada como concluída no ROADMAP/PLANO.
