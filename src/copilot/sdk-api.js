@@ -18,12 +18,18 @@
  * GET /api/sdk/webhooks — Lista webhooks registrados POST /api/sdk/webhooks — Registra novo webhook DELETE
  * /api/sdk/webhooks/:id — Remove webhook registrado
  *
+ * GET /api/sdk/agent/info — Info do agente (status, uptime, PID, sessionId)
+ * GET /api/sdk/agent/tools — ToolsRegistry rico com metadados
+ * GET /api/sdk/agent/telemetry — Resumo de telemetria (sessões, erros)
+ * POST /api/sdk/agent/telemetry/clear — Reseta store de telemetria
+ *
  * @module copilot/sdk-api
  */
 
 import { log } from '#core/logger';
 import { Router } from 'express';
 import { alwaysAliveAgent } from './always-alive.js';
+import { clearTelemetry, getSummary } from './lib/telemetry.js';
 import {
     createSdkSession,
     disconnectSdkSession,
@@ -582,6 +588,72 @@ router.delete('/webhooks/:id', (req, res) => {
         return;
     }
     res.json({ ok: true, id });
+});
+
+// ─── Agente Always-Alive: telemetria e registry ───────────────────────────────
+
+/**
+ * GET /agent/info
+ *
+ * Retorna informações do agente Always-Alive: status, uptime, sessão ativa.
+ */
+router.get('/agent/info', (_req, res) => {
+    const agent = /** @type {any} */ (alwaysAliveAgent);
+    res.json({
+        ok: true,
+        running: agent.isRunning?.() ?? false,
+        sessionId: agent.currentSessionId ?? null,
+        uptime: Math.floor(process.uptime()),
+        pid: process.pid,
+        nodeVersion: process.version,
+        env: process.env['NODE_ENV'] ?? 'development',
+    });
+});
+
+/**
+ * GET /agent/tools
+ *
+ * Lista as ferramentas registradas no ToolsRegistry do agente, com metadados ricos.
+ */
+router.get('/agent/tools', (_req, res) => {
+    const registry = /** @type {any} */ (alwaysAliveAgent).toolsRegistry;
+    if (!registry) {
+        res.status(503).json({ ok: false, error: 'ToolsRegistry não disponível (agente não iniciado)' });
+        return;
+    }
+    res.json({ ok: true, ...registry });
+});
+
+/**
+ * GET /agent/telemetry
+ *
+ * Retorna o resumo de telemetria do agente (sessões, erros, latências).
+ */
+router.get('/agent/telemetry', (_req, res) => {
+    const telemetry = /** @type {any} */ (alwaysAliveAgent).telemetry;
+    if (!telemetry) {
+        res.status(503).json({ ok: false, error: 'Telemetria não disponível (agente não iniciado)' });
+        return;
+    }
+    res.json({ ok: true, summary: getSummary(telemetry), raw: telemetry });
+});
+
+/**
+ * POST /agent/telemetry/clear
+ *
+ * Reseta o store de telemetria do agente. Útil após deploy ou manutenção.
+ */
+router.post('/agent/telemetry/clear', (req, res) => {
+    void req;
+    const agent = /** @type {any} */ (alwaysAliveAgent);
+    if (!agent.telemetry) {
+        res.status(503).json({ ok: false, error: 'Telemetria não disponível (agente não iniciado)' });
+        return;
+    }
+    // Usa a função oficial clearTelemetry do lib/telemetry
+    clearTelemetry(agent.telemetry);
+    log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
+    res.json({ ok: true, message: 'Telemetria resetada com sucesso' });
 });
 
 export default router;
