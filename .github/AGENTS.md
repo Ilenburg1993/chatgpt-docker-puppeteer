@@ -1,7 +1,10 @@
 # AGENTS.md — Guia operacional enxuto para agentes
 
 **Status**: canônico para templates e operação prática no workspace. **Última atualização**:
-2026-03-15. Este arquivo é SEMPRE OBRIGATÓRIO para agentes de IA operando neste repositório, servindo como guia tático e fonte de templates de `vscode_askQuestions`. Para regras de lifecycle, governança e arquitetura, consulte as fontes canônicas listadas no final deste documento. Leia periodicamente este documento.
+2026-03-15. Este arquivo é SEMPRE OBRIGATÓRIO para agentes de IA operando neste repositório,
+servindo como guia tático e fonte de templates de `vscode_askQuestions`. Para regras de lifecycle,
+governança e arquitetura, consulte as fontes canônicas listadas no final deste documento. Leia
+periodicamente este documento.
 
 > Este arquivo foi reduzido para evitar redundância. Regras duplicadas foram removidas e apontadas
 > para fontes únicas.
@@ -22,25 +25,38 @@
 ## Regras rápidas de operação, OBRIGATÓRIAS.
 
 - Responder em **pt-BR**.
-- Você deve ser proativo, seguindo os protocolos, mas sempre sugerindo e implementando upgrades arquiteturais e de processo quando identificar oportunidades (ex.: refactor, modularização, automação de tarefas manuais), dentre outras coisas, sempre buscando otimizar para ciclos de feedback rápidos e redução de trabalho manual.
-- Iniciar turno de trabalho com `manage_todo_list`. Tente ter sempre, no mínimo, 10 TODOS.
-- Encerrar turno com `vscode_askQuestions` (último ato útil).
+- Você deve ser proativo, seguindo os protocolos, mas sempre sugerindo e implementando upgrades
+  arquiteturais e de processo quando identificar oportunidades (ex.: refactor, modularização,
+  automação de tarefas manuais etc), dentre outras coisas, sempre buscando otimizar para ciclos de
+  feedback rápidos e redução de trabalho manual.
+- Iniciar turno de trabalho com `manage_todo_list`. Tente ter sempre, no mínimo, 10 TODOS. O último
+  item do manage_todo_list deve ser SEMPRE chamar tool `vscode_askQuestions`.
 - Após cada `vscode_askQuestions`, executar **imediatamente** `manage_todo_list` para atualizar o
-  checklist (bookkeeping obrigatório de fechamento parcial); se houver nova ferramenta de trabalho
-  depois disso, um novo `vscode_askQuestions` será obrigatório ao fim.
-- Preferir blocos contínuos de trabalho (meta operacional: ~10 minutos) antes de checkpoints periódicos de continuidade (Template D), sem violar exigências de governança ativa.
+  checklist de acordo com a resposta do usuário.
+- Preferir blocos contínuos de trabalho (meta operacional: ~10 minutos) antes de checkpoints
+  periódicos de continuidade (Template D), sem violar exigências de governança ativa.
 - Antes de commit/push: `vscode_askQuestions` **Template G**.
-- Não utilizar lint, format, ou typecheck como etapas intermediárias sem autorização explícita (via Template A ou D) ou solicitação explícita do usuário.
-- Encerramento de sessão: **somente Template F + key válida** (via fluxo automático dos hooks).
-- É OBRIGATÓRIO, SEMPRE, ATUALIZAR OS TODOS IMEDIATAMENTE APÓS O USUÁRIO DAR A RESPOSTA AO vscode_askQuestions, DE ACORDO COM A RESPOSTA FORNECIDA PELO USUÁRIO.
+- Evitar utilizar lint, format, ou typecheck como etapas intermediárias sem autorização explícita
+  (via Template A ou D) ou solicitação explícita do usuário.
+- Encerramento de sessão/turn: **somente Template F + key válida** (via fluxo automático dos hooks).
+- É OBRIGATÓRIO, SEMPRE, ATUALIZAR OS TODOS IMEDIATAMENTE, através da tool `manage_todo_list`, APÓS
+  O USUÁRIO DAR A RESPOSTA AO `vscode_askQuestions`, DE ACORDO COM A RESPOSTA FORNECIDA PELO
+  USUÁRIO.
 
 ## É TERMINANTEMENTE PROIBIDO, SEMPRE.
 
-- CONCLUIR UMA SESSION/TURN SEM AUTORIZAÇÃO OU PEDIDO EXPRESSO DO USUÁRIO ATRAVÉS DE SELEÇÃO DE OPÇÃO OU FREETEXT ATRAVÉS DA TOOL VSCODE_ASKQUESTIONS. POR DEFAULT, UMA SESSION/TURN NUNCA PODE SER ENCERRADO POR DECISÃO AUTÔNOMA DO AGENTE.
+- CONCLUIR UMA SESSION/TURN SEM AUTORIZAÇÃO OU PEDIDO EXPRESSO DO USUÁRIO ATRAVÉS DE SELEÇÃO DE
+  OPÇÃO OU FREETEXT ATRAVÉS DA TOOL VSCODE_ASKQUESTIONS. POR DEFAULT, UMA SESSION/TURN NUNCA PODE
+  SER ENCERRADO POR DECISÃO AUTÔNOMA DO AGENTE.
 
-- CHAMAR `task_complete` SEM ANTES CHAMAR `vscode_askQuestions` NO MESMO TURNO. **O PreToolUse hook bloqueia automaticamente `task_complete` quando `vscode_askQuestions` não foi chamado.** Isso inclui turnos após git push, após commit, após último TODO concluído, após qualquer trabalho finalizado.
+- CHAMAR `task_complete` SEM ANTES CHAMAR `vscode_askQuestions` NO MESMO TURNO. **O PreToolUse hook
+  bloqueia automaticamente `task_complete` quando `vscode_askQuestions` não foi chamado.** Isso
+  inclui turnos após git push, após commit, após último TODO concluído, após qualquer trabalho
+  finalizado.
 
-- INTERPRETAR A INSTRUÇÃO DO VS CODE COPILOT DE CHAMAR `task_complete` QUANDO A TAREFA ESTÁ PRONTA COMO UMA AUTORIZAÇÃO PARA PULAR vscode_askQuestions. A sequência CORRETA É: concluir trabalho → chamar vscode_askQuestions (Template A) → aguardar usuário → depois task_complete.
+- INTERPRETAR A INSTRUÇÃO DO VS CODE COPILOT DE CHAMAR `task_complete` QUANDO A TAREFA ESTÁ PRONTA
+  COMO UMA AUTORIZAÇÃO PARA PULAR vscode_askQuestions. A sequência CORRETA É: concluir trabalho →
+  chamar vscode_askQuestions (Template A) → aguardar usuário → depois task_complete.
 
 ## Checklist obrigatório no início/retomada
 
@@ -192,18 +208,16 @@ bash .github/hooks/scripts/watchdog.sh --json
 
 **Exit code:** `0` = saudável · `1` = problemas encontrados
 
-**Checks realizados:**
-| Check                          | O que verifica                                 |
-| ------------------------------ | ---------------------------------------------- |
-| `check_jq`                     | `jq` está disponível no PATH                   |
-| `check_state_file`             | `session.json` existe e é JSON válido          |
-| `check_scripts_executable`     | todos `.sh` em `scripts/` têm bit executável   |
-| `check_audit_writable`         | `audit.jsonl` e seu diretório são graváveis    |
-| `check_hooks_json`             | `hooks.json` existe e é JSON válido            |
-| `check_pending_session_close`  | alerta se `pending_session_close=true`         |
-| `check_consecutive_violations` | alerta se ≥ 5 turnos sem `vscode_askQuestions` |
+**Checks realizados:** | Check | O que verifica | | ------------------------------ |
+---------------------------------------------- | | `check_jq` | `jq` está disponível no PATH | |
+`check_state_file` | `session.json` existe e é JSON válido | | `check_scripts_executable` | todos
+`.sh` em `scripts/` têm bit executável | | `check_audit_writable` | `audit.jsonl` e seu diretório
+são graváveis | | `check_hooks_json` | `hooks.json` existe e é JSON válido | |
+`check_pending_session_close` | alerta se `pending_session_close=true` | |
+`check_consecutive_violations` | alerta se ≥ 5 turnos sem `vscode_askQuestions` |
 
 **Exemplo de output JSON:**
+
 ```json
 {
   "healthy": true,
@@ -214,6 +228,7 @@ bash .github/hooks/scripts/watchdog.sh --json
 ```
 
 **Quando usar:**
+
 - No início de uma sessão para confirmar que o ambiente está íntegro
 - Após erros ou comportamentos inesperados nos hooks
 - Em automação: `bash watchdog.sh --json | jq -e '.healthy'`
@@ -225,8 +240,8 @@ bash .github/hooks/scripts/watchdog.sh --json
 Quando ativado, cada hook salva seu payload completo em
 `.github/hooks/state/debug/payloads/<evento>-<timestamp>.json`.
 
-> ⚠️ **Segurança:** nunca commitar payloads — podem conter conteúdo do usuário.
-> O diretório `state/` já deve estar no `.gitignore`.
+> ⚠️ **Segurança:** nunca commitar payloads — podem conter conteúdo do usuário. O diretório `state/`
+> já deve estar no `.gitignore`.
 
 ```bash
 # Ativar captura
@@ -248,10 +263,11 @@ bash .github/hooks/scripts/debug-capture.sh show PreToolUse
 bash .github/hooks/scripts/debug-capture.sh clear
 ```
 
-**Eventos disponíveis:** `SessionStart` · `UserPromptSubmit` · `PreToolUse` · `PostToolUse` ·
-`Stop` · `PreCompact` · `SubagentStart` · `SubagentStop`
+**Eventos disponíveis:** `SessionStart` · `UserPromptSubmit` · `PreToolUse` · `PostToolUse` · `Stop`
+· `PreCompact` · `SubagentStart` · `SubagentStop`
 
 **Quando usar:**
+
 - Para inspecionar exatamente o que a plataforma envia no payload de um hook
 - Para depurar falhas de parse ou campos inesperadamente ausentes
 - Para validar que o hook recebe os dados corretos após uma mudança de schema
@@ -272,12 +288,13 @@ Estas ferramentas complementam o `manage_todo_list` com persistência em arquivo
 ### `scripts/add-task.sh` — Adicionar tarefa ao backlog
 
 ```bash
-bash .github/hooks/scripts/add-task.sh <prioridade> "Título" "Descrição + gate de aceitação"
+bash .github/hooks/scripts/add-task.sh "Descrição + gate de aceitação" < prioridade > "Título"
 # Prioridade: alta | media | baixa
 # Arquivo: state/pending-tasks.md + loga task_added no audit.jsonl
 ```
 
 **Exemplo:**
+
 ```bash
 bash .github/hooks/scripts/add-task.sh alta "Corrigir GAP-53" "watchdog valida scripts do hooks.json; gate: smoke-test passa"
 ```

@@ -398,7 +398,7 @@ async function boot() {
         // → Conflito: PM2 gerencia processos separados, mas integrated tenta iniciar server inline
         // → Resultado: 2 servidores HTTP competindo pela mesma porta (EADDRINUSE)
         const SERVER_MODE = resolveServerMode();
-        const runningUnderPM2 = Boolean(process.env.pm_id || process.env.PM2_HOME);
+        const runningUnderPM2 = Boolean(process.env.pm_id);
 
         if (runningUnderPM2 && SERVER_MODE === SERVER_MODES.INTEGRATED) {
             log('FATAL', '');

@@ -399,5 +399,45 @@ module.exports = {
                   },
               ]
             : []),
+
+        // ── Always-Alive Copilot SDK Agent ──────────────────────────────────
+        // Habilitado quando COPILOT_SDK_ENABLED=true no environment.
+        // Este processo NÃO inicia automaticamente com pm2 start — é opcional.
+        ...(process.env.COPILOT_SDK_ENABLED === 'true'
+            ? [
+                  {
+                      name: 'copilot-sdk-agent',
+                      cwd: projectRoot,
+                      script: './src/copilot/agent.js',
+                      wait_ready: false,
+                      exec_mode: 'fork',
+                      instances: 1,
+                      watch: false,
+                      autorestart: true,
+                      kill_timeout: 10000,
+                      max_restarts: 10,
+                      restart_delay: 3000,
+                      max_memory_restart: '512M',
+                      merge_logs: false,
+                      time: true,
+                      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+                      error_file: './logs/copilot-sdk-agent-error.log',
+                      out_file: './logs/copilot-sdk-agent-out.log',
+                      filter_env: ['NO_COLOR'],
+                      env: {
+                          NODE_ENV: 'development',
+                          FORCE_COLOR: '1',
+                          COPILOT_SDK_ENABLED: 'true',
+                          COPILOT_MODEL: 'gpt-4.1',
+                      },
+                      env_production: {
+                          NODE_ENV: 'production',
+                          FORCE_COLOR: '1',
+                          COPILOT_SDK_ENABLED: 'true',
+                          COPILOT_MODEL: 'gpt-4.1',
+                      },
+                  },
+              ]
+            : []),
     ],
 };

@@ -127,7 +127,8 @@ export function buildReadOnlyConfig(options = {}) {
  * @param {object} [options={}] Default is `{}`
  * @param {string} [options.model='gpt-4.1'] - Modelo a usar. Default is `'gpt-4.1'`
  * @param {Tool[]} [options.tools=[]] - Custom tools a registrar. Default is `[]`
- * @param {string[]} [options.denyTools=[]] - Nomes de tools que devem ser bloqueadas (restante aprovado). Default is `[]`
+ * @param {string[]} [options.denyTools=[]] - Nomes de tools que devem ser bloqueadas (restante aprovado). Default is
+ *   `[]`
  * @returns {SessionConfig}
  */
 export function buildFullAccessConfig(options = {}) {

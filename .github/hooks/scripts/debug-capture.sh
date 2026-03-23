@@ -34,7 +34,7 @@ case "${1:-status}" in
 
     show)
         local_event="${2:-}"
-        if [ ! -d "$DEBUG_DIR" ] || [ -z "$(ls -A "$DEBUG_DIR" 2>/dev/null)" ]; then
+        if [ ! -d "$DEBUG_DIR" ] || [ -z "$(ls -A "$DEBUG_DIR" 2> /dev/null)" ]; then
             echo "(nenhum payload capturado ainda — ative com: debug-capture.sh on)"
             exit 0
         fi
@@ -45,7 +45,7 @@ case "${1:-status}" in
                 [ -f "$f" ] || continue
                 echo ""
                 echo "--- $(basename "$f") ---"
-                jq '.' "$f" 2>/dev/null || cat "$f"
+                jq '.' "$f" 2> /dev/null || cat "$f"
             done
         else
             # Listar todos
@@ -69,7 +69,7 @@ case "${1:-status}" in
     status)
         if [ -f "$CAPTURE_FLAG" ]; then
             # shellcheck disable=SC2012
-            COUNT=$(ls "$DEBUG_DIR"/*.json 2>/dev/null | wc -l)
+            COUNT=$(ls "$DEBUG_DIR"/*.json 2> /dev/null | wc -l)
             echo "Captura: ATIVA | Payloads: $COUNT arquivos em $DEBUG_DIR"
         else
             echo "Captura: INATIVA (ative com: bash .github/hooks/scripts/debug-capture.sh on)"

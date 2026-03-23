@@ -266,3 +266,120 @@ describe('sdk-api › contratos de payload', () => {
         assert.ok(typeof successResponse.sessionId === 'string');
     });
 });
+
+// ─── Sprint 19: novos endpoints ───────────────────────────────────────────────
+
+describe('sdk-api Sprint 19 › rotas registradas', () => {
+    /** @type {{ path: string; methods: string[] }[]} */
+    const routes = [];
+
+    before(async () => {
+        const mod = await import('../../../src/copilot/sdk-api.js');
+        const router = /** @type {any} */ (mod.default);
+        if (Array.isArray(router?.stack)) {
+            for (const layer of router.stack) {
+                if (layer.route) {
+                    routes.push({
+                        path: layer.route.path,
+                        methods: Object.keys(layer.route.methods),
+                    });
+                }
+            }
+        }
+    });
+
+    it('possui rota POST /sessions/:id/abort', () => {
+        const found = routes.find((r) => r.path === '/sessions/:id/abort' && r.methods.includes('post'));
+        assert.ok(found, 'POST /sessions/:id/abort deve estar registrado');
+    });
+
+    it('possui rota GET /sessions/:id/messages', () => {
+        const found = routes.find((r) => r.path === '/sessions/:id/messages' && r.methods.includes('get'));
+        assert.ok(found, 'GET /sessions/:id/messages deve estar registrado');
+    });
+
+    it('possui rota GET /sessions/foreground', () => {
+        const found = routes.find((r) => r.path === '/sessions/foreground' && r.methods.includes('get'));
+        assert.ok(found, 'GET /sessions/foreground deve estar registrado');
+    });
+
+    it('possui rota PUT /sessions/foreground/:id', () => {
+        const found = routes.find((r) => r.path === '/sessions/foreground/:id' && r.methods.includes('put'));
+        assert.ok(found, 'PUT /sessions/foreground/:id deve estar registrado');
+    });
+
+    it('possui rota GET /agent/state', () => {
+        const found = routes.find((r) => r.path === '/agent/state' && r.methods.includes('get'));
+        assert.ok(found, 'GET /agent/state deve estar registrado');
+    });
+
+    it('possui rota GET /agent/stream', () => {
+        const found = routes.find((r) => r.path === '/agent/stream' && r.methods.includes('get'));
+        assert.ok(found, 'GET /agent/stream deve estar registrado');
+    });
+
+    it('/sessions/foreground aparece antes de /sessions/:id no stack (precedência de rota)', () => {
+        const idxForeground = /** @type {any} */ (routes).findIndex((r) => r.path === '/sessions/foreground');
+        const idxById = /** @type {any} */ (routes).findIndex((r) => r.path === '/sessions/:id');
+        assert.ok(idxForeground >= 0, '/sessions/foreground deve existir no router');
+        assert.ok(idxById >= 0, '/sessions/:id deve existir no router');
+        assert.ok(
+            idxForeground < idxById,
+            `/sessions/foreground (pos ${idxForeground}) deve vir antes de /sessions/:id (pos ${idxById})`,
+        );
+    });
+});
+
+describe('sdk-api Sprint 19 › contratos de payload', () => {
+    it('POST /sessions/:id/abort → resposta possui ok=true e sessionId', () => {
+        const response = { ok: true, sessionId: 'sess-abc', message: 'Processamento abortado.' };
+        assert.strictEqual(response.ok, true);
+        assert.ok(typeof response.sessionId === 'string');
+        assert.ok(typeof response.message === 'string');
+    });
+
+    it('GET /sessions/:id/messages → resposta possui count (number) e messages (array)', () => {
+        const response = { ok: true, sessionId: 'sess-abc', count: 3, messages: [{}, {}, {}] };
+        assert.strictEqual(response.ok, true);
+        assert.ok(typeof response.count === 'number');
+        assert.ok(Array.isArray(response.messages));
+        assert.strictEqual(response.count, response.messages.length);
+    });
+
+    it('GET /sessions/foreground → resposta possui foregroundSessionId (string ou null)', () => {
+        const withSession = { ok: true, foregroundSessionId: 'sess-abc' };
+        assert.strictEqual(withSession.ok, true);
+        assert.ok(typeof withSession.foregroundSessionId === 'string');
+
+        const noSession = { ok: true, foregroundSessionId: null };
+        assert.strictEqual(noSession.ok, true);
+        assert.strictEqual(noSession.foregroundSessionId, null);
+    });
+
+    it('PUT /sessions/foreground/:id → resposta possui ok=true e foregroundSessionId', () => {
+        const response = { ok: true, foregroundSessionId: 'sess-xyz' };
+        assert.strictEqual(response.ok, true);
+        assert.ok(typeof response.foregroundSessionId === 'string');
+    });
+
+    it('GET /agent/state → resposta possui state (string)', () => {
+        const validStates = ['connected', 'connecting', 'disconnected', 'error'];
+        const response = { ok: true, state: 'connected' };
+        assert.strictEqual(response.ok, true);
+        assert.ok(typeof response.state === 'string');
+        assert.ok(
+            validStates.includes(response.state),
+            `state deve ser um ConnectionState válido, recebido: ${response.state}`,
+        );
+    });
+
+    it('sessão não encontrada retorna 404 com ok=false e error (string)', () => {
+        const notFound = {
+            ok: false,
+            error: 'Sessão "xxx" não está ativa. Use POST /api/sdk/sessions/xxx/resume primeiro.',
+        };
+        assert.strictEqual(notFound.ok, false);
+        assert.ok(typeof notFound.error === 'string');
+        assert.ok(notFound.error.includes('xxx'));
+    });
+});

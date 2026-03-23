@@ -1,4 +1,6 @@
 // @ts-check
+import copilotBridge from '#copilot/http-bridge';
+import sdkApi from '#copilot/sdk-api';
 import { probeChromeConnection } from '#core/doctor';
 import { log } from '#core/logger';
 import { apiLimiter } from '#server/engine/app';
@@ -317,6 +319,17 @@ async function applyRoutes(app) {
        Estratégia: Garantir que nenhuma requisição órfã ou falha lógica escape
        do sistema sem um tratamento padronizado e rastreável.
     -------------------------------------------------------------------------- */
+
+    /**
+     * DOMÍNIO COPILOT SDK AGENT (Always-Alive Agent Bridge) Namespace: /api/copilot Expõe start/stop/send/answer para
+     * controle do Always-Alive Agent. Habilitado quando COPILOT_SDK_ENABLED=true (ou por padrão em desenvolvimento).
+     */
+    if (process.env.COPILOT_SDK_ENABLED !== 'false') {
+        app.use('/api/copilot', apiLimiter, copilotBridge);
+        log('INFO', '[COPILOT] SDK bridge registrado em /api/copilot');
+        app.use('/api/sdk', apiLimiter, sdkApi);
+        log('INFO', '[COPILOT] SDK API registrada em /api/sdk');
+    }
 
     // Captura rotas inexistentes (404)
     app.use(notFound);

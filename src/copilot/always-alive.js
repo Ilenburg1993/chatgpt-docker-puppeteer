@@ -29,7 +29,19 @@ import EventEmitter from 'node:events';
 import { buildMcpConfig } from './config/mcp-servers.js';
 import { buildMcpTools } from './mcp-tool-bridge.js';
 import { initOrResumeSession, readState, writeState } from './session-manager.js';
-import { allTools, registerForIntrospection, setTelemetryStore } from './tools/index.js';
+import {
+    allTools,
+    codeTools,
+    fileReadTools,
+    fileWriteTools,
+    gitTools,
+    hookTools,
+    introspectionTools,
+    registerForIntrospection,
+    sessionTools,
+    setTelemetryStore,
+    taskTools,
+} from './tools/index.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -219,7 +231,35 @@ export class AlwaysAliveAgent extends EventEmitter {
             // Inicializa telemetria e registry para esta sessão
             this.#telemetry = createTelemetry();
             this.#toolsRegistry = createRegistry();
-            registerTools(this.#toolsRegistry, tools, { category: 'all' });
+
+            // Registra cada grupo de tools com sua própria categoria e tags para filtragem granular
+            registerTools(this.#toolsRegistry, taskTools, { category: 'task', tags: ['queue', 'state'] });
+            registerTools(this.#toolsRegistry, codeTools, {
+                category: 'code',
+                tags: ['lint', 'test', 'typecheck'],
+                readOnly: true,
+            });
+            registerTools(this.#toolsRegistry, gitTools, { category: 'git', tags: ['vcs', 'diff', 'commit'] });
+            registerTools(this.#toolsRegistry, sessionTools, { category: 'session', tags: ['hooks', 'briefing'] });
+            registerTools(this.#toolsRegistry, hookTools, { category: 'hook', tags: ['audit', 'input', 'hooks'] });
+            registerTools(this.#toolsRegistry, introspectionTools, {
+                category: 'introspection',
+                tags: ['meta', 'telemetry'],
+                readOnly: true,
+            });
+            registerTools(this.#toolsRegistry, fileReadTools, {
+                category: 'file',
+                tags: ['filesystem', 'io', 'read'],
+                readOnly: true,
+            });
+            registerTools(this.#toolsRegistry, fileWriteTools, {
+                category: 'file',
+                tags: ['filesystem', 'io', 'write'],
+            });
+            // MCP tools registradas sem categoria específica pois são dinâmicas
+            if (mcpTools.length > 0) {
+                registerTools(this.#toolsRegistry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
+            }
 
             // Expõe registry/telemetria para introspection tools
             registerForIntrospection(tools);

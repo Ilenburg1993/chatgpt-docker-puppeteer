@@ -13,14 +13,20 @@
  * /api/sdk/sessions/active — Lista sessões ativas no registry GET /api/sdk/sessions/:id — Detalhes de uma sessão DELETE
  * /api/sdk/sessions/:id — Deleta sessão do disco (irreversível) POST /api/sdk/sessions/:id/resume — Retoma sessão
  * existente POST /api/sdk/sessions/:id/disconnect — Desconecta sessão ativa POST /api/sdk/sessions/:id/send — Envia
- * mensagem (sync ou async) GET /api/sdk/sessions/:id/stream — SSE stream de eventos da sessão
+ * mensagem (sync ou async) GET /api/sdk/sessions/:id/stream — SSE stream de eventos da sessão POST
+ * /api/sdk/sessions/:id/abort — Aborta processamento em andamento na sessão GET /api/sdk/sessions/:id/messages — Lista
+ * histórico de mensagens da sessão
+ *
+ * GET /api/sdk/sessions/foreground — Obtém sessionId em foreground PUT /api/sdk/sessions/foreground/:id — Define sessão
+ * em foreground
  *
  * GET /api/sdk/webhooks — Lista webhooks registrados POST /api/sdk/webhooks — Registra novo webhook DELETE
  * /api/sdk/webhooks/:id — Remove webhook registrado
  *
  * GET /api/sdk/agent/info — Info do agente (status, uptime, PID, sessionId) GET /api/sdk/agent/tools — ToolsRegistry
  * rico com metadados GET /api/sdk/agent/telemetry — Resumo de telemetria (sessões, erros) POST
- * /api/sdk/agent/telemetry/clear — Reseta store de telemetria
+ * /api/sdk/agent/telemetry/clear — Reseta store de telemetria GET /api/sdk/agent/state — Estado de conexão do
+ * CopilotClient GET /api/sdk/agent/stream — SSE de eventos de ciclo de vida do cliente
  *
  * @module copilot/sdk-api
  */
@@ -164,6 +170,35 @@ router.get('/sessions/active', (_req, res) => {
         activeMs: Date.now() - createdAt,
     }));
     res.json({ ok: true, count: active.length, sessions: active });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/foreground  +  PUT /sessions/foreground/:id
+// (devem aparecer ANTES de /sessions/:id para não serem capturadas pelo parâmetro)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Retorna o sessionId da sessão atualmente em foreground no CopilotClient.
+ */
+router.get('/sessions/foreground', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const client = await getClient();
+        const sessionId = await client.getForegroundSessionId();
+        res.json({ ok: true, foregroundSessionId: sessionId ?? null });
+    });
+});
+
+/**
+ * Define qual sessão está em foreground no CopilotClient (a sessão que o CLI prioriza).
+ */
+router.put('/sessions/foreground/:id', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const { id } = req.params;
+        const client = await getClient();
+        await client.setForegroundSessionId(id);
+        log('INFO', `[sdk-api] foreground session definida: ${id}`);
+        res.json({ ok: true, foregroundSessionId: id });
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -522,8 +557,8 @@ router.post('/client/stop', (req, res) => {
 /**
  * GET /tools
  *
- * Lista as ferramentas disponíveis. Se o agente está iniciado, usa o ToolsRegistry
- * rico (com categoria, tags, readOnly, skipPermission). Caso contrário, usa allTools estático.
+ * Lista as ferramentas disponíveis. Se o agente está iniciado, usa o ToolsRegistry rico (com categoria, tags, readOnly,
+ * skipPermission). Caso contrário, usa allTools estático.
  */
 router.get('/tools', (_req, res) => {
     const registry = /** @type {any} */ (alwaysAliveAgent).toolsRegistry;
@@ -678,6 +713,128 @@ router.post('/agent/telemetry/clear', (req, res) => {
     clearTelemetry(agent.telemetry);
     log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
     res.json({ ok: true, message: 'Telemetria resetada com sucesso' });
+});
+
+// ─── Sprint 19: novos endpoints de sessão e agente ───────────────────────────
+
+/**
+ * POST /sessions/:id/abort
+ *
+ * Aborta o processamento em andamento de uma sessão ativa. O modelo para de gerar tokens; a sessão permanece ativa e
+ * pode receber novos prompts.
+ */
+router.post('/sessions/:id/abort', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const { id } = req.params;
+        const entry = getSdkSession(id);
+        if (!entry) {
+            res.status(404).json({
+                ok: false,
+                error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
+            });
+            return;
+        }
+        await entry.session.abort();
+        log('INFO', `[sdk-api] abort solicitado: sessão ${id}`);
+        res.json({ ok: true, sessionId: id, message: 'Processamento abortado.' });
+    });
+});
+
+/**
+ * GET /sessions/:id/messages
+ *
+ * Retorna o histórico completo de mensagens (eventos) armazenado na sessão.
+ *
+ * @example
+ *     GET /api/sdk/sessions/my-session/messages
+ *     → { ok: true, sessionId: "my-session", count: 12, messages: [...] }
+ */
+router.get('/sessions/:id/messages', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const { id } = req.params;
+        const entry = getSdkSession(id);
+        if (!entry) {
+            res.status(404).json({
+                ok: false,
+                error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
+            });
+            return;
+        }
+        const messages = await entry.session.getMessages();
+        res.json({ ok: true, sessionId: id, count: messages.length, messages });
+    });
+});
+
+/**
+ * GET /agent/state
+ *
+ * Retorna o estado de conexão atual do CopilotClient (ConnectionState).
+ *
+ * @example
+ *     GET /api/sdk/agent/state
+ *     → { ok: true, state: "connected" }
+ */
+router.get('/agent/state', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const client = await getClient();
+        const state = client.getState();
+        res.json({ ok: true, state });
+    });
+});
+
+/**
+ * GET /agent/stream (SSE)
+ *
+ * Abre um stream SSE de eventos de ciclo de vida do CopilotClient (conexão, desconexão, erros).
+ *
+ * Eventos entregues:
+ *
+ * - `lifecycle` — { type, data } de eventos do client.on()
+ * - `heartbeat` — keepalive a cada 30s
+ * - `connected` — enviado imediatamente ao conectar (com estado atual)
+ *
+ * @example
+ *     const es = new EventSource('/api/sdk/agent/stream');
+ *     es.addEventListener('lifecycle', (e) => console.log(JSON.parse(e.data)));
+ */
+router.get('/agent/stream', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const client = await getClient();
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders();
+
+        /**
+         * Envia evento SSE formatado.
+         *
+         * @param {string} eventType
+         * @param {unknown} data
+         */
+        const sendEvent = (eventType, data) => {
+            if (res.writableEnded) return;
+            res.write(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
+        };
+
+        sendEvent('connected', { state: client.getState(), timestamp: Date.now() });
+
+        // Inscreve nos eventos de ciclo de vida do client
+        const unsubscribe = client.on((event) => {
+            sendEvent('lifecycle', event);
+        });
+
+        const heartbeatInterval = setInterval(() => {
+            sendEvent('heartbeat', { ts: Date.now() });
+        }, 30_000);
+
+        req.on('close', () => {
+            clearInterval(heartbeatInterval);
+            unsubscribe();
+            log('INFO', '[sdk-api] SSE agent/stream encerrado');
+        });
+    });
 });
 
 export default router;

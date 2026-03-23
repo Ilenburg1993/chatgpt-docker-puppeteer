@@ -1,7 +1,8 @@
 # Auditoria de Refatoração — Hook System
-**Versão**: 1.0 | **Data**: 2026-03-22 | **Commit base**: `a53925b3`
-**Escopo**: 54 arquivos, 11.393 linhas (`.github/hooks/`)
-**Status**: ✅ TODOS OS ITENS R-01 a R-17 CONCLUÍDOS — Sprint 9 finalizado (2026-03-22)
+
+**Versão**: 1.0 | **Data**: 2026-03-22 | **Commit base**: `a53925b3` **Escopo**: 54 arquivos, 11.393
+linhas (`.github/hooks/`) **Status**: ✅ TODOS OS ITENS R-01 a R-17 CONCLUÍDOS — Sprint 9 finalizado
+(2026-03-22)
 
 ---
 
@@ -37,6 +38,7 @@ lib/common.sh          ← base compartilhada (880 linhas)
 ```
 
 **Grafo de dependências de source:**
+
 ```
 session-start-lib.sh   → common.sh → api/01-vars.sh ... api/16-lifecycle.sh
 session-close-lib.sh   → common.sh
@@ -53,26 +55,34 @@ hook-payload-api.sh    → api/01-vars.sh...api/16-lifecycle.sh (source cada um)
 
 #### 1.2.1 Duplicação de Camadas de Carregamento — CRÍTICO
 
-**Problema**: O carregamento dos módulos `lib/api/` acontece em dois caminhos diferentes e incongruentes:
+**Problema**: O carregamento dos módulos `lib/api/` acontece em dois caminhos diferentes e
+incongruentes:
 
-- **Caminho A**: `hook-payload-api.sh` faz `source` de cada `api/XX-*.sh` sequencialmente (linhas 63–92)
-- **Caminho B**: Cada `lib/*-lib.sh` faz `source common.sh`, mas `common.sh` **não** carrega os módulos `api/` — delega a função `log_audit` para `_audit_write_event` (de `15-audit.sh`) via `declare -f` guard
+- **Caminho A**: `hook-payload-api.sh` faz `source` de cada `api/XX-*.sh` sequencialmente (linhas
+  63–92)
+- **Caminho B**: Cada `lib/*-lib.sh` faz `source common.sh`, mas `common.sh` **não** carrega os
+  módulos `api/` — delega a função `log_audit` para `_audit_write_event` (de `15-audit.sh`) via
+  `declare -f` guard
 
-**Consequência**: Dois fluxos de boot distintos, com comportamentos diferentes dependendo de qual foi chamado primeiro. Funções como `hook_log_audit` só estão disponíveis se `hook-payload-api.sh` foi carregado.
+**Consequência**: Dois fluxos de boot distintos, com comportamentos diferentes dependendo de qual
+foi chamado primeiro. Funções como `hook_log_audit` só estão disponíveis se `hook-payload-api.sh`
+foi carregado.
 
 **Evidência**:
+
 ```bash
 # common.sh:355-369 — fallback quando 15-audit.sh não foi carregado
 log_audit() {
-    if declare -f _audit_write_event > /dev/null 2>&1; then
-        _audit_write_event "$event" "$@"
-        return $?
-    fi
-    # Implementação legada (fallback)...
+  if declare -f _audit_write_event > /dev/null 2>&1; then
+    _audit_write_event "$event" "$@"
+    return $?
+  fi
+  # Implementação legada (fallback)...
 }
 ```
 
-**Refatoração proposta**: Criar `lib/loader.sh` centralizado que todos os scripts sourcem, garantindo ordem de carregamento canônica e única.
+**Refatoração proposta**: Criar `lib/loader.sh` centralizado que todos os scripts sourcem,
+garantindo ordem de carregamento canônica e única.
 
 ---
 
@@ -89,21 +99,23 @@ log_audit() {
 | `session-end.sh`   | **Sim diretamente** | **Sim diretamente**          | Completo   |
 | `session-close.sh` | **Sim diretamente** | Não                          | Incompleto |
 
-**Refatoração proposta**: Padronizar todos os entry points para sempre carregar `common.sh` explicitamente antes da lib específica.
+**Refatoração proposta**: Padronizar todos os entry points para sempre carregar `common.sh`
+explicitamente antes da lib específica.
 
 ---
 
 #### 1.2.3 Arquivo Stale: `hook-payload-api.sh.bak`
 
 **Status**: Arquivo de 208 linhas presente em `lib/hook-payload-api.sh.bak` (51.279 bytes).
-**Risco**: Confusão sobre qual é a versão canônica; possível carregamento acidental.
-**Ação**: **Deletar imediatamente** — não há referência válida a este arquivo no codebase.
+**Risco**: Confusão sobre qual é a versão canônica; possível carregamento acidental. **Ação**:
+**Deletar imediatamente** — não há referência válida a este arquivo no codebase.
 
 ---
 
 #### 1.2.4 `common.sh` — Arquivo Monolítico de 880 Linhas
 
 **Problema**: `common.sh` acumula responsabilidades heterogêneas:
+
 - Configuração de paths
 - CRUD do `session.json` (state management)
 - Funções de auditoria (legadas + fallback)
@@ -115,6 +127,7 @@ log_audit() {
 - Funções de debug capture
 
 **Categorias por linha**:
+
 ```
 Linhas   1-50:   Setup de paths e variáveis globais
 Linhas  51-240:  CRUD de state (read_field, update_state*, init_state, recover_or_init)
@@ -130,6 +143,7 @@ Linhas 811-880:  Briefing (generate_session_briefing, context_block, export_lang
 ```
 
 **Refatoração proposta**: Dividir `common.sh` em:
+
 - `lib/state-crud.sh` — leitura/escrita atômica de session.json
 - `lib/turn-lifecycle.sh` — open_new_turn, open_new_subturn, lifecycle events
 - `lib/briefing.sh` — generate_session_briefing, context_block
@@ -140,21 +154,28 @@ Linhas 811-880:  Briefing (generate_session_briefing, context_block, export_lang
 
 #### 1.2.5 `session-start.sh` Não Usa Pattern de outros hooks
 
-**Problema**: `session-start.sh` não faz `source common.sh` diretamente; delega tudo para `session-start-lib.sh` que por sua vez source `common.sh`. Isso não é um bug, mas cria inconsistência no onboarding.
+**Problema**: `session-start.sh` não faz `source common.sh` diretamente; delega tudo para
+`session-start-lib.sh` que por sua vez source `common.sh`. Isso não é um bug, mas cria
+inconsistência no onboarding.
 
 ---
 
 ### 1.3 Fluxo de Dados: Problemas com `AUDIT_FILE`
 
 **Problema**: Existem **dois destinos possíveis** para eventos de auditoria:
+
 1. `state/audit.jsonl` — durante a sessão ativa
 2. `logs/audit-TIMESTAMP.jsonl` — após rotação por cap ou sessão encerrada
 
-**Consequência**: Tests que buscam eventos em `state/audit.jsonl` falham quando a rotação ocorre no meio (exatamente o bug T71, corrigido em `a53925b3`).
+**Consequência**: Tests que buscam eventos em `state/audit.jsonl` falham quando a rotação ocorre no
+meio (exatamente o bug T71, corrigido em `a53925b3`).
 
-**Deficiência de design**: Não há um indireção canônica para "encontrar o arquivo de auditoria atual". Cada ponto de leitura precisa saber dos dois locais.
+**Deficiência de design**: Não há um indireção canônica para "encontrar o arquivo de auditoria
+atual". Cada ponto de leitura precisa saber dos dois locais.
 
-**Refatoração proposta**: Criar função `find_audit_file()` em `common.sh` que retorna o path correto (state/ ou logs/) — ou uma symlink `logs/audit-current.jsonl → ../state/audit.jsonl` que é atualizado na rotação.
+**Refatoração proposta**: Criar função `find_audit_file()` em `common.sh` que retorna o path correto
+(state/ ou logs/) — ou uma symlink `logs/audit-current.jsonl → ../state/audit.jsonl` que é
+atualizado na rotação.
 
 ---
 
@@ -162,21 +183,21 @@ Linhas 811-880:  Briefing (generate_session_briefing, context_block, export_lang
 
 ### 2.1 Bug Confirmado: `printf '- ...'` com `LANG=C.UTF-8` — RESOLVIDO
 
-**Estado**: ✅ Corrigido no commit `a53925b3`
-**Arquivo**: `lib/session-close-lib.sh:42-47`
-**Root cause**: `LANG=C.UTF-8` definido na linha 11 faz `printf` tratar format strings iniciando com `-` como flags
-**Fix**: Adicionado `--` em todas as 5 ocorrências de `printf '- ...'` na função `_generate_final_report()`
+**Estado**: ✅ Corrigido no commit `a53925b3` **Arquivo**: `lib/session-close-lib.sh:42-47` **Root
+cause**: `LANG=C.UTF-8` definido na linha 11 faz `printf` tratar format strings iniciando com `-`
+como flags **Fix**: Adicionado `--` em todas as 5 ocorrências de `printf '- ...'` na função
+`_generate_final_report()`
 
 ---
 
 ### 2.2 Bug Potencial: `printf '- ...'` em `session-start-lib.sh` — ✅ RESOLVIDO
 
-**Status**: ✅ **Resolvido** (verificado Sprint 10)
-**Arquivo**: `lib/session-start-lib.sh:141` e `:148`
-**Evidência atual**:
+**Status**: ✅ **Resolvido** (verificado Sprint 10) **Arquivo**: `lib/session-start-lib.sh:141` e
+`:148` **Evidência atual**:
+
 ```bash
-printf -- '- %s\n' "$issue"   # linha 141 — flag -- adicionado
-printf -- '- %s\n' "$warn"    # linha 148 — flag -- adicionado
+printf -- '- %s\n' "$issue" # linha 141 — flag -- adicionado
+printf -- '- %s\n' "$warn"  # linha 148 — flag -- adicionado
 ```
 
 **Análise**: Ambas as chamadas já usam `printf --` corretamente. Resolvido em Sprint anterior.
@@ -186,34 +207,38 @@ printf -- '- %s\n' "$warn"    # linha 148 — flag -- adicionado
 
 ### 2.3 Problema Documentado: `read_field()` e Boolean False — ✅ RESOLVIDO
 
-**Status**: ✅ **Resolvido** (verificado Sprint 10)
-**Arquivo**: `lib/state-crud.sh:32-36`
+**Status**: ✅ **Resolvido** (verificado Sprint 10) **Arquivo**: `lib/state-crud.sh:32-36`
 **Implementação atual**:
+
 ```bash
 # read_field_bool — avoids bug where read_field returns "" for boolean false
 read_field_bool() {
-    local path="$1"
-    jq -r "if ${path} then \"true\" else \"false\" end" "$STATE_FILE" 2>/dev/null || echo "false"
+  local path="$1"
+  jq -r "if ${path} then \"true\" else \"false\" end" "$STATE_FILE" 2> /dev/null || echo "false"
 }
 ```
 
-**Resolução**: `read_field_bool()` implementada em `state-crud.sh` e exposta via `common.sh`. Retorna literalmente `"true"` ou `"false"` para qualquer booleano JSON.
-**Cobertura de teste**: T84 verifica o comportamento diretamente.
+**Resolução**: `read_field_bool()` implementada em `state-crud.sh` e exposta via `common.sh`.
+Retorna literalmente `"true"` ou `"false"` para qualquer booleano JSON. **Cobertura de teste**: T84
+verifica o comportamento diretamente.
 
 ---
 
 ### 2.4 Função `log_audit()` Depreciada — ✅ RESOLVIDO (verificado Sprint 12)
 
-**Status**: ✅ **Resolvido** (verificado Sprint 12)
-**Arquivo**: `lib/audit-lib.sh`
-**Situação atual**: A função `log_audit()` permanece em `audit-lib.sh` como fallback de compatibilidade (marcada como `[LEGADO — DEPRECADO]`), mas **não é chamada ativamente** em nenhum arquivo. Todas as chamadas ativas usam `hook_log_audit()` de `api/15-audit.sh`:
+**Status**: ✅ **Resolvido** (verificado Sprint 12) **Arquivo**: `lib/audit-lib.sh` **Situação
+atual**: A função `log_audit()` permanece em `audit-lib.sh` como fallback de compatibilidade
+(marcada como `[LEGADO — DEPRECADO]`), mas **não é chamada ativamente** em nenhum arquivo. Todas as
+chamadas ativas usam `hook_log_audit()` de `api/15-audit.sh`:
+
 - `lib/subagent-lib.sh` — 6 chamadas ✅
 - `lib/stop-lib.sh` — 7+ chamadas ✅
 - `lib/turn-lifecycle.sh` — 1 chamada ✅
 - `lib/state-crud.sh` — 2 chamadas ✅
 - `lib/post-tool-use-lib.sh` — 2 chamadas ✅
 
-O caso citado anteriormente (`lib/common.sh:605 heal_orphaned_turn`) foi migrado em Sprint 7/8 (R-08 ✅).
+O caso citado anteriormente (`lib/common.sh:605 heal_orphaned_turn`) foi migrado em Sprint 7/8 (R-08
+✅).
 
 ---
 
@@ -221,18 +246,18 @@ O caso citado anteriormente (`lib/common.sh:605 heal_orphaned_turn`) foi migrado
 
 ### 2.5 Funções Depreciadas sem Remoção: Stub Wrapper em `16-lifecycle.sh` — ✅ RESOLVIDO
 
-**Status**: ✅ **Resolvido** (R-07/R-09, verificado Sprint 12)
-**Arquivo**: `lib/api/16-lifecycle.sh`
-**Situação atual**: `hook_turn_is_orphaned()` e `hook_heal_orphaned_turn()` possuem **implementação direta** (não delegam para legadas):
+**Status**: ✅ **Resolvido** (R-07/R-09, verificado Sprint 12) **Arquivo**:
+`lib/api/16-lifecycle.sh` **Situação atual**: `hook_turn_is_orphaned()` e
+`hook_heal_orphaned_turn()` possuem **implementação direta** (não delegam para legadas):
 
 ```bash
 hook_turn_is_orphaned() {
-    # R-07: implementação direta, sem dependência de turn_is_orphaned() legado
-    ...
+  # R-07: implementação direta, sem dependência de turn_is_orphaned() legado
+  ...
 }
 hook_heal_orphaned_turn() {
-    # R-07: implementação direta, sem dependência de heal_orphaned_turn() legado
-    ...
+  # R-07: implementação direta, sem dependência de heal_orphaned_turn() legado
+  ...
 }
 ```
 
@@ -242,50 +267,52 @@ A migração para implementação nativa foi feita via R-07 e R-09 em sprints an
 
 ### 2.6 Funções Depreciadas com Implementação Stub em `hook-payload-api.sh` — ✅ RESOLVIDO
 
-**Status**: ✅ **Resolvido** (verificado Sprint 11)
-**Arquivo**: `lib/hook-payload-api.sh`
+**Status**: ✅ **Resolvido** (verificado Sprint 11) **Arquivo**: `lib/hook-payload-api.sh`
 
-O stub `detect_close_key_in_text() { return 1; }` foi removido em sprint anterior. O arquivo agora carrega `common.sh` via guard antes de continuar (`if ! declare -f jq_field > /dev/null`), tornando o stub desnecessário. Apenas nota de comentário histórica permanece na linha 37.
+O stub `detect_close_key_in_text() { return 1; }` foi removido em sprint anterior. O arquivo agora
+carrega `common.sh` via guard antes de continuar (`if ! declare -f jq_field > /dev/null`), tornando
+o stub desnecessário. Apenas nota de comentário histórica permanece na linha 37.
 
 ---
 
 ### 2.7 `LANG=C.UTF-8` com Estratégias Inconsistentes entre Arquivos — ✅ RESOLVIDO
 
-**Status**: ✅ **Resolvido** (verificado Sprint 10)
-**Situação atual**:
+**Status**: ✅ **Resolvido** (verificado Sprint 10) **Situação atual**:
 
 | Arquivo                       | Abordagem                                      | Status                                 |
 | ----------------------------- | ---------------------------------------------- | -------------------------------------- |
-| `session-close-lib.sh:11`     | Chama `export_lang_utf8` (condicional)         | ✅ Correto                              |
-| `common.sh:878`               | `export LANG="${LANG:-C.UTF-8}"` (condicional) | ✅ Correto                              |
-| `hook-payload-api.sh:55`      | `export_lang_utf8()` — stub seguro com guard   | ✅ Correto (usa `${LANG:-C.UTF-8}`)     |
+| `session-close-lib.sh:11`     | Chama `export_lang_utf8` (condicional)         | ✅ Correto                             |
+| `common.sh:878`               | `export LANG="${LANG:-C.UTF-8}"` (condicional) | ✅ Correto                             |
+| `hook-payload-api.sh:55`      | `export_lang_utf8()` — stub seguro com guard   | ✅ Correto (usa `${LANG:-C.UTF-8}`)    |
 | `smoke-test-payload-api.sh:6` | `export LANG="C.UTF-8"`                        | Aceitável em contexto de teste isolado |
 
-**Resolução**: `session-close-lib.sh` migrou para `export_lang_utf8`; `hook-payload-api.sh` stub já usa `${LANG:-C.UTF-8}`. Padrão consistente aplicado.
+**Resolução**: `session-close-lib.sh` migrou para `export_lang_utf8`; `hook-payload-api.sh` stub já
+usa `${LANG:-C.UTF-8}`. Padrão consistente aplicado.
 
 ---
 
 ### 2.8 `increment_field()` e `decrement_field_floor0()` — ✅ RESOLVIDO
 
-**Status**: ✅ **Resolvido** (Sprint 11)
-**Arquivo**: `lib/state-crud.sh`
-**Implementação atual**: Ambas as funções agora usam `flock -x 9` sobre `$STATE_DIR/.state.lock`:
+**Status**: ✅ **Resolvido** (Sprint 11) **Arquivo**: `lib/state-crud.sh` **Implementação atual**:
+Ambas as funções agora usam `flock -x 9` sobre `$STATE_DIR/.state.lock`:
 
 ```bash
 increment_field() {
-    local lock_file="$STATE_DIR/.state.lock"
-    {
-        flock -x 9
-        current=$(read_field "$path")
-        new_val=$((${current:-0} + 1))
-        # ... jq write + mv ...
-    } 9>> "$lock_file"
+  local lock_file="$STATE_DIR/.state.lock"
+  {
+    flock -x 9
+    current=$(read_field "$path")
+    new_val=$((${current:-0} + 1))
+    # ... jq write + mv ...
+  } 9>> "$lock_file"
 }
 ```
 
-**Resultado**: Operações de leitura-modifica-escrita são agora serializadas via lock exclusivo. Subagentes em paralelo não podem causar lost-update em `subagents_active`.
-**Gate**: 86/86 testes smoke passando.
-```
+**Resultado**: Operações de leitura-modifica-escrita são agora serializadas via lock exclusivo.
+Subagentes em paralelo não podem causar lost-update em `subagents_active`. **Gate**: 86/86 testes
+smoke passando.
+
+````
 
 ---
 
@@ -305,13 +332,17 @@ increment_field() {
 **Situação atual**:
 ```bash
 pending_tasks_content="$(printf '```\n%s\n```' "$(cat "$PENDING_TASKS_FILE")")"
-```
+````
 
-O conteúdo é envolvido em bloco de código Markdown (``` )```` ``` ````). Isso garante que qualquer conteúdo dentro do arquivo é renderizado como literal — impede injeção de cabeçalhos, negrito, ou outros elementos Markdown arbitrários. Risco residual é mínimo e aceitável para um sistema interno.
-pending_tasks_content="$(cat "$PENDING_TASKS_FILE")"  # sem sanitize_md!
-...
+O conteúdo é envolvido em bloco de código Markdown (` )```` ` ````). Isso garante que qualquer
+conteúdo dentro do arquivo é renderizado como literal — impede injeção de cabeçalhos, negrito, ou
+outros elementos Markdown arbitrários. Risco residual é mínimo e aceitável para um sistema interno.
+pending_tasks_content="$(cat "$PENDING_TASKS_FILE")" # sem sanitize_md! ...
+
 ## Tarefas Pendentes
-${pending_tasks_content}                               # expansão direta
+
+${pending_tasks_content} # expansão direta
+
 ```
 
 **Risco de Segurança**: Injeção de Markdown/conteúdo arbitrário a partir de `pending-tasks.md` se o arquivo for modificado por agente malicioso.
@@ -326,31 +357,31 @@ ${pending_tasks_content}                               # expansão direta
 
 ### 3.1 Inventário de Cobertura
 
-| Arquivo de Teste            | Linhas    | Casos    | Foco                                               |
-| --------------------------- | --------- | -------- | -------------------------------------------------- |
+| Arquivo de Teste            | Linhas    | Casos    | Foco                                                         |
+| --------------------------- | --------- | -------- | ------------------------------------------------------------ |
 | `smoke-test.sh`             | 1.790     | 94       | Stop hook, estado core, session-close, pre-compact, watchdog |
-| `smoke-test-payload-api.sh` | 1.848     | ~60+     | Módulos api/ (parse, validate, output, etc.)       |
-| `integration-test-hooks.sh` | 1.066     | ~30+     | Integração entre hooks                             |
-| `stress-test-hooks.sh`      | 165       | ~10      | Concorrência e stress                              |
-| **Total**                   | **4.869** | **~194** | —                                                  |
+| `smoke-test-payload-api.sh` | 1.848     | ~60+     | Módulos api/ (parse, validate, output, etc.)                 |
+| `integration-test-hooks.sh` | 1.066     | ~30+     | Integração entre hooks                                       |
+| `stress-test-hooks.sh`      | 165       | ~10      | Concorrência e stress                                        |
+| **Total**                   | **4.869** | **~194** | —                                                            |
 
 ### 3.2 Gaps de Cobertura por Módulo
 
 #### Módulos Sem Cobertura Direta em Smoke Tests (status atualizado Sprint 19):
 
-| Módulo                              | Gap Identificado                              | Resolvido                |
-| ----------------------------------- | --------------------------------------------- | ------------------------ |
-| `api/09-metrics.sh`                 | Sem testes de cálculo de métricas de duração  | ✅ T90 (Sprint 17)        |
-| `api/11-compact-context.sh`         | Pouco coverage de serialização de contexto    | ✅ T93 (Sprint 18)        |
-| `api/12-subagent.sh`                | Budget/depth limits só testados indiretamente | ✅ T92 (Sprint 18)        |
-| `api/13-state-version.sh`           | Migration de versão de schema não testada     | ✅ T91 (Sprint 17)        |
-| `lib/common.sh` `generate_briefing` | Sem teste direto do output do briefing        | ✅ T79 (Sprint 8)         |
-| `lib/common.sh` `uuidgen_safe()`    | Sem teste de fallback                         | ✅ T85 (Sprint 10)        |
-| `lib/common.sh` `read_field_bool()` | Sem teste direto                              | ✅ T84 (Sprint 10)        |
-| `lib/turn-lifecycle.sh` `open_new_turn_batch()` | Sem teste direto               | ✅ T86 (Sprint 10)        |
-| `lib/state-crud.sh` `increment_field()` (flock) | Sem teste de incremento direto | ✅ T88 (Sprint 12)        |
-| `lib/state-crud.sh` `decrement_field_floor0()`  | Sem teste de floor behavior    | ✅ T87 (Sprint 12)        |
-| `scripts/watchdog.sh`               | Zero testes automatizados do watchdog         | ✅ T94 (Sprint 19)        |
+| Módulo                                          | Gap Identificado                              | Resolvido         |
+| ----------------------------------------------- | --------------------------------------------- | ----------------- |
+| `api/09-metrics.sh`                             | Sem testes de cálculo de métricas de duração  | ✅ T90 (Sprint 17) |
+| `api/11-compact-context.sh`                     | Pouco coverage de serialização de contexto    | ✅ T93 (Sprint 18) |
+| `api/12-subagent.sh`                            | Budget/depth limits só testados indiretamente | ✅ T92 (Sprint 18) |
+| `api/13-state-version.sh`                       | Migration de versão de schema não testada     | ✅ T91 (Sprint 17) |
+| `lib/common.sh` `generate_briefing`             | Sem teste direto do output do briefing        | ✅ T79 (Sprint 8)  |
+| `lib/common.sh` `uuidgen_safe()`                | Sem teste de fallback                         | ✅ T85 (Sprint 10) |
+| `lib/common.sh` `read_field_bool()`             | Sem teste direto                              | ✅ T84 (Sprint 10) |
+| `lib/turn-lifecycle.sh` `open_new_turn_batch()` | Sem teste direto                              | ✅ T86 (Sprint 10) |
+| `lib/state-crud.sh` `increment_field()` (flock) | Sem teste de incremento direto                | ✅ T88 (Sprint 12) |
+| `lib/state-crud.sh` `decrement_field_floor0()`  | Sem teste de floor behavior                   | ✅ T87 (Sprint 12) |
+| `scripts/watchdog.sh`                           | Zero testes automatizados do watchdog         | ✅ T94 (Sprint 19) |
 
 ### 3.3 Cenários Críticos Sem Testes de Regressão
 
@@ -377,27 +408,27 @@ O `scripts/watchdog.sh` (262 linhas) tem cobertura básica via T94 (Sprint 19): 
 
 ### 3.4 Testes Implementados (Sprints 10-24) ✅
 
-| ID  | Descrição                                                                  | Status         |
-| --- | -------------------------------------------------------------------------- | -------------- |
-| T76 | `session-end.sh` com turn ativo → verifica `turnEnd_abrupt` em audit       | ✅ Sprint 8     |
-| T77 | `_audit_cap_check()` com HOOKS_AUDIT_MAX_LINES=5 → verifica rotação        | ✅ Sprint 8     |
-| T78 | `printf -- '- %s\n'` em `session-start-lib.sh` com valor iniciando com `-` | ✅ Sprint 8     |
-| T79 | `generate_session_briefing()` output contém session_id e close_key         | ✅ Sprint 8     |
-| T80 | `open_new_turn()` avança número do turn e zera ask_questions_called        | ✅ Sprint 8     |
-| T81 | `make_close_key()` retorna formato ENCERRAR-XXXXXXXX                       | ✅ Sprint 8     |
-| T82 | `find_audit_file()` retorna AUDIT_FILE padrão quando sem symlink           | ✅ Sprint 8     |
-| T84 | `read_field_bool()` retorna `"true"`/`"false"` para booleanos JSON         | ✅ Sprint 10    |
-| T85 | `uuidgen_safe()` retorna formato UUID 8-4-4-4-12 válido                    | ✅ Sprint 10    |
-| T86 | `open_new_turn_batch()` avança turn number e zera ask_questions_called     | ✅ Sprint 10    |
-| T87 | `decrement_field_floor0()` não desce abaixo de 0 (floor behavior)         | ✅ Sprint 12    |
-| T88 | `increment_field()` incrementa campo numérico corretamente (flock)         | ✅ Sprint 12    |
-| T89 | `log_audit()` grava linha no audit.jsonl e habilita contador R-13          | ✅ Sprint 14    |
-| T90 | `hook_stat_turn_count()` retorna turn_count correto do state (api/09)      | ✅ Sprint 17    |
-| T91 | `hook_state_version()` retorna inteiro de state_schema_version (api/13)    | ✅ Sprint 17    |
-| T92 | `hook_subagent_depth()` retorna 0 sem subagentes ativos (api/12)           | ✅ Sprint 18    |
-| T93 | `hook_compact_ctx_session_summary()` emite markdown com stats (api/11)     | ✅ Sprint 18    |
-| T94 | `watchdog.sh --json` emite JSON com campo `healthy` booleano               | ✅ Sprint 19    |
-| T95 | `hooks-report.sh --json` retorna JSON válido (com ou sem state)              | ✅ Sprint 24    |
+| ID  | Descrição                                                                  | Status      |
+| --- | -------------------------------------------------------------------------- | ----------- |
+| T76 | `session-end.sh` com turn ativo → verifica `turnEnd_abrupt` em audit       | ✅ Sprint 8  |
+| T77 | `_audit_cap_check()` com HOOKS_AUDIT_MAX_LINES=5 → verifica rotação        | ✅ Sprint 8  |
+| T78 | `printf -- '- %s\n'` em `session-start-lib.sh` com valor iniciando com `-` | ✅ Sprint 8  |
+| T79 | `generate_session_briefing()` output contém session_id e close_key         | ✅ Sprint 8  |
+| T80 | `open_new_turn()` avança número do turn e zera ask_questions_called        | ✅ Sprint 8  |
+| T81 | `make_close_key()` retorna formato ENCERRAR-XXXXXXXX                       | ✅ Sprint 8  |
+| T82 | `find_audit_file()` retorna AUDIT_FILE padrão quando sem symlink           | ✅ Sprint 8  |
+| T84 | `read_field_bool()` retorna `"true"`/`"false"` para booleanos JSON         | ✅ Sprint 10 |
+| T85 | `uuidgen_safe()` retorna formato UUID 8-4-4-4-12 válido                    | ✅ Sprint 10 |
+| T86 | `open_new_turn_batch()` avança turn number e zera ask_questions_called     | ✅ Sprint 10 |
+| T87 | `decrement_field_floor0()` não desce abaixo de 0 (floor behavior)          | ✅ Sprint 12 |
+| T88 | `increment_field()` incrementa campo numérico corretamente (flock)         | ✅ Sprint 12 |
+| T89 | `log_audit()` grava linha no audit.jsonl e habilita contador R-13          | ✅ Sprint 14 |
+| T90 | `hook_stat_turn_count()` retorna turn_count correto do state (api/09)      | ✅ Sprint 17 |
+| T91 | `hook_state_version()` retorna inteiro de state_schema_version (api/13)    | ✅ Sprint 17 |
+| T92 | `hook_subagent_depth()` retorna 0 sem subagentes ativos (api/12)           | ✅ Sprint 18 |
+| T93 | `hook_compact_ctx_session_summary()` emite markdown com stats (api/11)     | ✅ Sprint 18 |
+| T94 | `watchdog.sh --json` emite JSON com campo `healthy` booleano               | ✅ Sprint 19 |
+| T95 | `hooks-report.sh --json` retorna JSON válido (com ou sem state)            | ✅ Sprint 24 |
 
 ### 3.5 Gaps Remanescentes (Baixa Prioridade)
 
@@ -419,12 +450,12 @@ O `scripts/watchdog.sh` (262 linhas) tem cobertura básica via T94 (Sprint 19): 
 
 **Top 5 por arquivo**:
 ```
-lib/api/02-parse.sh  — 53 chamadas jq  (parsing de payload)
-lib/common.sh        — 37 chamadas jq  (CRUD de estado)
-lib/api/15-audit.sh  — 11 chamadas jq  (composição de eventos)
-lib/api/05-output.sh — 11 chamadas jq  (formatação de output)
-lib/session-close-lib.sh — 9 chamadas jq (relatório final)
-```
+
+lib/api/02-parse.sh — 53 chamadas jq (parsing de payload) lib/common.sh — 37 chamadas jq (CRUD de
+estado) lib/api/15-audit.sh — 11 chamadas jq (composição de eventos) lib/api/05-output.sh — 11
+chamadas jq (formatação de output) lib/session-close-lib.sh — 9 chamadas jq (relatório final)
+
+````
 
 ### 4.2 Hot Path: `PreToolUse` e `PostToolUse`
 
@@ -450,27 +481,30 @@ Esses hooks são chamados **a cada ferramenta invocada** pelo agente — potenci
 tmp=$(mktemp "$STATE_DIR/.state.XXXXXX")
 jq ... "$STATE_FILE" > "$tmp"
 mv -f "$tmp" "$STATE_FILE" || { rm -f "$tmp"; return 1; }
-```
+````
 
-**Sprint 13**: `write_state()` em `state-crud.sh:145` e `complete-task.sh:37` corrigidos para incluir `|| { rm -f "$tmp"; return 1; }` após `mv -f`. Todos os 7 `mv -f` em `state-crud.sh` e 3 em `turn-lifecycle.sh` agora têm guard de erro.
+**Sprint 13**: `write_state()` em `state-crud.sh:145` e `complete-task.sh:37` corrigidos para
+incluir `|| { rm -f "$tmp"; return 1; }` após `mv -f`. Todos os 7 `mv -f` em `state-crud.sh` e 3 em
+`turn-lifecycle.sh` agora têm guard de erro.
 
 ### 4.4 `_audit_cap_check()` — Chamada após Cada Evento — ✅ RESOLVIDO (Sprint 14)
 
-**Arquivo**: `lib/audit-lib.sh:56-91`
-**Problema original**: `_audit_cap_check()` usava `wc -l` para contar linhas após cada evento gravado. Em sessões longas (> 5000 linhas), isso é potencialmente lento pois lê o arquivo inteiro.
+**Arquivo**: `lib/audit-lib.sh:56-91` **Problema original**: `_audit_cap_check()` usava `wc -l` para
+contar linhas após cada evento gravado. Em sessões longas (> 5000 linhas), isso é potencialmente
+lento pois lê o arquivo inteiro.
 
 **Solução implementada (R-13)**: Contador em memória `_AUDIT_LINE_COUNT` (global, init=0) é
 incrementado em `hook_log_audit` após cada escrita (linha 159). `_audit_cap_check()` só chama
-`wc -l` quando o contador é 0 (primeira chamada, pós-rotação ou subshell sem herança). Após
-rotação, o contador é resetado para 1.
+`wc -l` quando o contador é 0 (primeira chamada, pós-rotação ou subshell sem herança). Após rotação,
+o contador é resetado para 1.
 
 ```bash
 # audit-lib.sh:61 — fast path: contador em memória
 if [[ "${_AUDIT_LINE_COUNT:-0}" -gt 0 ]] && [[ "${_AUDIT_LINE_COUNT:-0}" -lt "$max" ]]; then
-    return 0
+  return 0
 fi
 # cai aqui apenas no init (contador=0) ou quando próximo ao cap (≥ max)
-count=$(wc -l < "$AUDIT_FILE" 2>/dev/null | tr -d ' ') || return 0
+count=$(wc -l < "$AUDIT_FILE" 2> /dev/null | tr -d ' ') || return 0
 # ...
 # audit-lib.sh:159 — incremento por evento
 _AUDIT_LINE_COUNT=$((_AUDIT_LINE_COUNT + 1))
@@ -484,34 +518,38 @@ _AUDIT_LINE_COUNT=$((_AUDIT_LINE_COUNT + 1))
 
 ### 5.1 Injeção em `increment_tools_by_type()`
 
-**Arquivo**: `lib/common.sh:645-667`
-**Situação**: A função sanitiza `tool_name` antes de usar como chave jq:
+**Arquivo**: `lib/common.sh:645-667` **Situação**: A função sanitiza `tool_name` antes de usar como
+chave jq:
+
 ```bash
 safe_name=$(printf '%s' "$tool_name" | tr -cd 'a-zA-Z0-9_-' | cut -c1-64)
 ```
+
 **Status**: ✅ Adequadamente mitigado via sanitização explícita.
 
 ### 5.2 Injeção de Markdown em `generate_session_briefing()` — ✅ ADEQUADO
 
-**Arquivo**: `lib/briefing.sh:66`
-**Situação**: `sanitize_md()` é aplicada para campos de estado. `pending_tasks_content` é envolvido em bloco de código fenced (` ``` `) que **neutraliza** formatação arbitrária de Markdown.
+**Arquivo**: `lib/briefing.sh:66` **Situação**: `sanitize_md()` é aplicada para campos de estado.
+`pending_tasks_content` é envolvido em bloco de código fenced (` ``` `) que **neutraliza**
+formatação arbitrária de Markdown.
 
-```bash
+````bash
 # shellcheck disable=SC2016
 pending_tasks_content="$(printf '```\n%s\n```' "$(cat "$PENDING_TASKS_FILE")")"
-```
+````
 
-**Status**: ✅ Adequadamente mitigado — conteúdo dentro de bloco de código é renderizado como literal.
+**Status**: ✅ Adequadamente mitigado — conteúdo dentro de bloco de código é renderizado como
+literal.
 
 ### 5.3 `log_audit()` — Injeção JSON via `jq --arg`
 
-**Arquivo**: `lib/common.sh:372-400`
-**Status**: ✅ Protegido — usa `jq --arg` para todos os campos, que escapa automaticamente caracteres especiais JSON.
+**Arquivo**: `lib/common.sh:372-400` **Status**: ✅ Protegido — usa `jq --arg` para todos os campos,
+que escapa automaticamente caracteres especiais JSON.
 
 ### 5.4 `session-close.sh` — Proteção contra Invocação Direta
 
-**Arquivo**: `scripts/session-close.sh` + proteção em `pre-tool-use-lib.sh`
-**Status**: ✅ Adequado — `pre-tool-use.sh` bloqueia `run_in_terminal` que tenta chamar `session-close.sh`.
+**Arquivo**: `scripts/session-close.sh` + proteção em `pre-tool-use-lib.sh` **Status**: ✅ Adequado
+— `pre-tool-use.sh` bloqueia `run_in_terminal` que tenta chamar `session-close.sh`.
 
 ```bash
 # pre-tool-use-lib.sh via api/08-risk.sh
@@ -520,22 +558,24 @@ hook_is_bypass_attempt()  # detecta tentativa de chamar session-close.sh diretam
 
 ### 5.5 `make_close_key()` — Entropia da Chave de Encerramento — ✅ RESOLVIDO (R-17)
 
-**Status**: ✅ **Resolvido** (R-17, verificado Sprint 12)
-**Arquivo**: `lib/utils.sh:19`
-**Situação atual**: A cadeia de fallbacks é segura:
+**Status**: ✅ **Resolvido** (R-17, verificado Sprint 12) **Arquivo**: `lib/utils.sh:19` **Situação
+atual**: A cadeia de fallbacks é segura:
+
 1. `/proc/sys/kernel/random/uuid` → 8 hex (uuid v4) — ✅ Boa entropia
 2. `od + /dev/urandom` → 8 hex — ✅ Boa entropia
 3. `dd + od + /dev/urandom` → 8 hex — ✅ Adequado
 4. **R-17**: `$RANDOM × 4` (64-bit de entropia bash) — ✅ Melhor que timestamp
 5. `date +%s%N` → último recurso — aceitável como fallback final
 
-O fallback `awk rand()` com seed previsível **foi removido** e substituído por `printf '%04X%04X' "$RANDOM" "$RANDOM"` (R-17).
+O fallback `awk rand()` com seed previsível **foi removido** e substituído por
+`printf '%04X%04X' "$RANDOM" "$RANDOM"` (R-17).
 
 ### 5.6 Arquivo de Estado Sem Permissão Restrita — ✅ RESOLVIDO (R-09)
 
-**Status**: ✅ **Resolvido** (R-09, verificado Sprint 12)
-**Arquivo**: `lib/state-crud.sh:226` (`init_state()`)
-**Situação atual**: `chmod 600 "$STATE_FILE"` é chamado imediatamente após a criação do arquivo:
+**Status**: ✅ **Resolvido** (R-09, verificado Sprint 12) **Arquivo**: `lib/state-crud.sh:226`
+(`init_state()`) **Situação atual**: `chmod 600 "$STATE_FILE"` é chamado imediatamente após a
+criação do arquivo:
+
 ```bash
 jq -n ... > "$STATE_FILE"
 chmod 600 "$STATE_FILE" 2> /dev/null || true # R-09: close_key não deve ser world-readable
@@ -549,9 +589,11 @@ O `close_key` não é mais legível por outros usuários do sistema.
 
 ### 6.1 Inventário Completo de GAPs
 
-O código registra 297 anotações de `GAP-` e `UP-` distribuídas pelos arquivos. Seguem os GAPs atualmente documentados:
+O código registra 297 anotações de `GAP-` e `UP-` distribuídas pelos arquivos. Seguem os GAPs
+atualmente documentados:
 
 **GAPs PRESENTES no código** (38 únicos):
+
 ```
 GAP-03, GAP-04, GAP-07, GAP-09, GAP-10, GAP-11, GAP-12, GAP-13, GAP-14,
 GAP-17, GAP-18, GAP-20, GAP-21, GAP-23, GAP-24, GAP-25, GAP-26, GAP-27,
@@ -561,19 +603,22 @@ GAP-60, GAP-61
 ```
 
 **GAPs AUSENTES** (nunca referenciados no código — 25 IDs):
+
 ```
 GAP-01, GAP-02, GAP-05, GAP-06, GAP-07*, GAP-08, GAP-15, GAP-16, GAP-19,
 GAP-22, GAP-28, GAP-30, GAP-33, GAP-37, GAP-38, GAP-39, GAP-40, GAP-41,
 GAP-42, GAP-43, GAP-44, GAP-45, GAP-56, GAP-62, GAP-63, GAP-64, GAP-65
 ```
-(*GAP-07 aparece em comentário mas não como anotação de dívida ativa)
 
-**Implicação**: Os GAPs ausentes foram: (a) resolvidos sem remoção da numeração, (b) nunca implementados, ou (c) residem em documentos MD não-shell.
+(\*GAP-07 aparece em comentário mas não como anotação de dívida ativa)
+
+**Implicação**: Os GAPs ausentes foram: (a) resolvidos sem remoção da numeração, (b) nunca
+implementados, ou (c) residem em documentos MD não-shell.
 
 ### 6.2 GAPs Críticos com Análise
 
-| GAP    | Localização                    | Descrição                                                         | Status         |
-| ------ | ------------------------------ | ----------------------------------------------------------------- | -------------- |
+| GAP    | Localização                    | Descrição                                                         | Status          |
+| ------ | ------------------------------ | ----------------------------------------------------------------- | --------------- |
 | GAP-03 | `stop-lib.sh`, `smoke-test.sh` | `ask_questions_called=false + strict_turn_close=true → block`     | Implementado ✅ |
 | GAP-04 | `common.sh:601`                | `started_at=null` para evitar re-heal na próxima UserPromptSubmit | Implementado ✅ |
 | GAP-09 | `common.sh:432`                | Fallback com `dd` quando `od` não disponível                      | Implementado ✅ |
@@ -596,7 +641,7 @@ GAP-42, GAP-43, GAP-44, GAP-45, GAP-56, GAP-62, GAP-63, GAP-64, GAP-65
 | UP-H1b   | `common.sh`     | Reset de `tools_after_ask_questions` no início do turno |
 | UP-H4    | `smoke-test.sh` | consecutive-unauthorized enforcement                    |
 | UP-15    | `smoke-test.sh` | preCompact_ask_questions_missing                        |
-| UP-16    | `common.sh`     | Remoção de funções depreciadas de output (emit_*)       |
+| UP-16    | `common.sh`     | Remoção de funções depreciadas de output (emit\_\*)     |
 
 ---
 
@@ -606,18 +651,18 @@ GAP-42, GAP-43, GAP-44, GAP-45, GAP-56, GAP-62, GAP-63, GAP-64, GAP-65
 
 #### Nível 1 — Correção Imediata (Bugs / Segurança)
 
-| #    | Ação                                                                                              | Arquivo                       | Risco se não feito       |
-| ---- | ------------------------------------------------------------------------------------------------- | ----------------------------- | ------------------------ |
-| R-01 | ✅ Deletar `hook-payload-api.sh.bak` — **Resolvido Sprint 9**                                                | `lib/hook-payload-api.sh.bak` | Arquivo deletado           |
-| R-02 | ✅ Corrigir `printf -- '- %s\n'` em `session-start-lib.sh:141,148` — **Resolvido Sprint 8**                   | `lib/session-start-lib.sh`    | Fix aplicado               |
+| #    | Ação                                                                                                                                   | Arquivo                       | Risco se não feito           |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ---------------------------- |
+| R-01 | ✅ Deletar `hook-payload-api.sh.bak` — **Resolvido Sprint 9**                                                                          | `lib/hook-payload-api.sh.bak` | Arquivo deletado             |
+| R-02 | ✅ Corrigir `printf -- '- %s\n'` em `session-start-lib.sh:141,148` — **Resolvido Sprint 8**                                            | `lib/session-start-lib.sh`    | Fix aplicado                 |
 | R-03 | ✅ Sanitizar `pending_tasks_content` em `generate_session_briefing()` — **Resolvido Sprint 8** via bloco de código em `briefing.sh:66` | `lib/briefing.sh:66`          | Markdown injection bloqueada |
-| R-04 | ✅ Padronizar LANG via `export_lang_utf8()` — **Resolvido Sprint 8** — definido em `utils.sh:132`, chamado em todos os entry points | Todos os entry points         | Consistente                  |
-| R-05 | ✅ Criar `read_field_bool()` para leitura de campos booleanos — **Resolvido Sprint 8** em `lib/state-crud.sh:32` | `lib/state-crud.sh:32`        | Bug bool false eliminado     |
+| R-04 | ✅ Padronizar LANG via `export_lang_utf8()` — **Resolvido Sprint 8** — definido em `utils.sh:132`, chamado em todos os entry points    | Todos os entry points         | Consistente                  |
+| R-05 | ✅ Criar `read_field_bool()` para leitura de campos booleanos — **Resolvido Sprint 8** em `lib/state-crud.sh:32`                       | `lib/state-crud.sh:32`        | Bug bool false eliminado     |
 
 #### Nível 2 — Refatoração Estrutural (Médio Prazo)
 
-| #    | Ação                                                                                                                                                                                                           | Impacto Esperado                     |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| #    | Ação                                                                                                                                                                                                            | Impacto Esperado                     |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | R-06 | ✅ Dividir `common.sh` em módulos menores — `state-crud.sh`, `audit-lib.sh`, `utils.sh`, `turn-lifecycle.sh`, `briefing.sh`; `common.sh` → 48-line aggregator                                                   | Manutenibilidade ↑                   |
 | R-07 | ✅ Criar `open_new_turn_batch()` com jq único — implementado em `lib/turn-lifecycle.sh` (Sprint 8)                                                                                                              | Performance: -80% I/O no turn open   |
 | R-08 | ✅ Migrar `log_audit()` em `common.sh:605` para `hook_log_audit()` — implementado em `lib/turn-lifecycle.sh` (`heal_orphaned_turn()` usa `hook_log_audit()`; confirmado via `# R-08:` em `api/16-lifecycle.sh`) | Consistência API                     |
@@ -627,8 +672,8 @@ GAP-42, GAP-43, GAP-44, GAP-45, GAP-56, GAP-62, GAP-63, GAP-64, GAP-65
 
 #### Nível 3 — Melhorias de Robustez (Longo Prazo)
 
-| #    | Ação                                                                                                                                                                                                                                                                                                                                                                         | Benefício                                   |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| #    | Ação                                                                                                                                                                                                                                                                                                                                                                          | Benefício                                   |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
 | R-12 | ✅ Adicionar testes T76-T83 — implementados, 83/83 passando (Sprint 7)                                                                                                                                                                                                                                                                                                        | Cobertura de edge cases                     |
 | R-13 | ✅ Contador em memória para `_audit_cap_check` — implementado via `_AUDIT_LINE_COUNT` global em `lib/audit-lib.sh`; reset após rotação, sincronizado com `wc -l` quando zerado                                                                                                                                                                                                | ~50% menos I/O em sessões longas            |
 | R-14 | ✅ Adicionar index `logs/audit-current.jsonl` symlink — `_audit_update_symlink()` em `lib/audit-lib.sh` (Sprint 8)                                                                                                                                                                                                                                                            | Acesso canônico ao audit ativo              |
@@ -667,52 +712,52 @@ Sprint 3 (testes e robustez — 4-6h):
 
 ### A.1 Tabela de Arquivos
 
-| Arquivo                             | Linhas | Responsabilidade                         | Issues Identificadas                          |
-| ----------------------------------- | ------ | ---------------------------------------- | --------------------------------------------- |
-| `hooks.json`                        | 41     | Configuração master (9 hooks)            | Nenhuma                                       |
-| `scripts/pre-tool-use.sh`           | ~10    | Entry point PreToolUse                   | Não carrega common.sh diretamente             |
-| `scripts/post-tool-use.sh`          | ~12    | Entry point PostToolUse                  | OK                                            |
-| `scripts/stop.sh`                   | ~12    | Entry point Stop                         | OK                                            |
-| `scripts/session-start.sh`          | ~8     | Entry point SessionStart                 | Não carrega common.sh diretamente             |
-| `scripts/session-end.sh`            | ~60    | Entry point SessionEnd + ABRUPT-TURN-END | OK — mais completo que os outros              |
-| `scripts/session-close.sh`          | ~12    | Encerramento autorizado de sessão        | Não carrega hook-payload-api.sh               |
-| `scripts/subagent-start.sh`         | ~10    | Entry point SubagentStart                | —                                             |
-| `scripts/subagent-stop.sh`          | ~10    | Entry point SubagentStop                 | —                                             |
-| `scripts/user-prompt-submit.sh`     | ~10    | Entry point UserPromptSubmit             | —                                             |
-| `scripts/pre-compact.sh`            | ~10    | Entry point PreCompact                   | —                                             |
-| `scripts/watchdog.sh`               | 262    | Watchdog externo                         | ✅ T94 (Sprint 19) — JSON + boolean 'healthy'  |
-| `scripts/hooks-report.sh`           | ~80    | Relatório de estado                      | ✅ T95 (Sprint 24)                             |
-| `scripts/smoke-test.sh`             | 1.790  | 94 testes unitários                      | Cobertura principal                           |
-| `scripts/smoke-test-payload-api.sh` | 1.846  | Testes da API layer                      | —                                             |
-| `scripts/integration-test-hooks.sh` | 1.066  | Testes de integração                     | —                                             |
-| `scripts/stress-test-hooks.sh`      | 165    | Stress tests                             | Pouco coverage                                |
-| `lib/common.sh`                     | 880    | Base compartilhada                       | Monolito, depreciados, perf                   |
+| Arquivo                             | Linhas | Responsabilidade                         | Issues Identificadas                                    |
+| ----------------------------------- | ------ | ---------------------------------------- | ------------------------------------------------------- |
+| `hooks.json`                        | 41     | Configuração master (9 hooks)            | Nenhuma                                                 |
+| `scripts/pre-tool-use.sh`           | ~10    | Entry point PreToolUse                   | Não carrega common.sh diretamente                       |
+| `scripts/post-tool-use.sh`          | ~12    | Entry point PostToolUse                  | OK                                                      |
+| `scripts/stop.sh`                   | ~12    | Entry point Stop                         | OK                                                      |
+| `scripts/session-start.sh`          | ~8     | Entry point SessionStart                 | Não carrega common.sh diretamente                       |
+| `scripts/session-end.sh`            | ~60    | Entry point SessionEnd + ABRUPT-TURN-END | OK — mais completo que os outros                        |
+| `scripts/session-close.sh`          | ~12    | Encerramento autorizado de sessão        | Não carrega hook-payload-api.sh                         |
+| `scripts/subagent-start.sh`         | ~10    | Entry point SubagentStart                | —                                                       |
+| `scripts/subagent-stop.sh`          | ~10    | Entry point SubagentStop                 | —                                                       |
+| `scripts/user-prompt-submit.sh`     | ~10    | Entry point UserPromptSubmit             | —                                                       |
+| `scripts/pre-compact.sh`            | ~10    | Entry point PreCompact                   | —                                                       |
+| `scripts/watchdog.sh`               | 262    | Watchdog externo                         | ✅ T94 (Sprint 19) — JSON + boolean 'healthy'           |
+| `scripts/hooks-report.sh`           | ~80    | Relatório de estado                      | ✅ T95 (Sprint 24)                                      |
+| `scripts/smoke-test.sh`             | 1.790  | 94 testes unitários                      | Cobertura principal                                     |
+| `scripts/smoke-test-payload-api.sh` | 1.846  | Testes da API layer                      | —                                                       |
+| `scripts/integration-test-hooks.sh` | 1.066  | Testes de integração                     | —                                                       |
+| `scripts/stress-test-hooks.sh`      | 165    | Stress tests                             | Pouco coverage                                          |
+| `lib/common.sh`                     | 880    | Base compartilhada                       | Monolito, depreciados, perf                             |
 | `lib/hook-payload-api.sh`           | 208    | Bootstrap módulos api/                   | OK — export_lang_utf8() usa fallback `${LANG:-C.UTF-8}` |
-| `lib/hook-payload-api.sh.bak`       | —      | **ARQUIVO STALE**                        | **Deletado (R-01, Sprint 9)**                 |
-| `lib/post-tool-use-lib.sh`          | 133    | Lógica PostToolUse                       | OK                                            |
-| `lib/pre-compact-lib.sh`            | 98     | Lógica PreCompact                        | Corrigido (bool fix)                          |
-| `lib/pre-tool-use-lib.sh`           | 303    | Lógica PreToolUse                        | OK                                            |
-| `lib/session-close-lib.sh`          | 191    | Lógica de encerramento                   | OK — export_lang_utf8() via common.sh           |
-| `lib/session-start-lib.sh`          | 209    | Lógica de início de sessão               | OK — `printf -- '- %s\n'` corrigido (R-02)   |
-| `lib/stop-lib.sh`                   | 177    | Lógica Stop hook                         | OK                                            |
-| `lib/subagent-lib.sh`               | 313    | Lógica Subagent Start/Stop               | OK                                            |
-| `lib/user-prompt-submit-lib.sh`     | 169    | Lógica UserPromptSubmit                  | OK                                            |
-| `lib/api/01-vars.sh`                | 251    | Variáveis globais da API                 | OK                                            |
-| `lib/api/02-parse.sh`               | 259    | Parsing de payload                       | 53 invocações jq — candidato a otimização     |
-| `lib/api/03-validate.sh`            | 92     | Validação semântica                      | OK                                            |
-| `lib/api/04-predicates.sh`          | 416    | Predicados de decisão                    | OK — arquivo central                          |
-| `lib/api/05-output.sh`              | 320    | Formatação de output JSON                | OK                                            |
-| `lib/api/06-query.sh`               | 157    | Queries de estado                        | OK                                            |
-| `lib/api/07-state.sh`               | 68     | Manipulação de estado                    | OK — R-06 resolvido inline (Sprint 5)         |
-| `lib/api/08-risk.sh`                | 216    | Avaliação de risco e bypass              | OK — crítico de segurança                     |
-| `lib/api/09-metrics.sh`             | 250    | Métricas de sessão                       | ✅ T90 (Sprint 17)                              |
-| `lib/api/10-close-key.sh`           | 120    | Gestão da close_key                      | OK                                            |
-| `lib/api/11-compact-context.sh`     | 182    | Contexto para PreCompact                 | OK                                            |
-| `lib/api/12-subagent.sh`            | 156    | Gestão de subagentes                     | OK                                            |
-| `lib/api/13-state-version.sh`       | 234    | Versionamento de schema                  | ✅ T91 (Sprint 17) — retorna inteiro de versão  |
-| `lib/api/14-validate-events.sh`     | 236    | Validação de payloads                    | Cobertura parcial (usa apenas `[[ ]]` — OK)   |
-| `lib/api/15-audit.sh`               | 183    | Implementação canônica de audit          | OK                                            |
-| `lib/api/16-lifecycle.sh`           | 67     | Lifecycle de turn/subturn                | OK — R-07/R-08 implementados inline           |
+| `lib/hook-payload-api.sh.bak`       | —      | **ARQUIVO STALE**                        | **Deletado (R-01, Sprint 9)**                           |
+| `lib/post-tool-use-lib.sh`          | 133    | Lógica PostToolUse                       | OK                                                      |
+| `lib/pre-compact-lib.sh`            | 98     | Lógica PreCompact                        | Corrigido (bool fix)                                    |
+| `lib/pre-tool-use-lib.sh`           | 303    | Lógica PreToolUse                        | OK                                                      |
+| `lib/session-close-lib.sh`          | 191    | Lógica de encerramento                   | OK — export_lang_utf8() via common.sh                   |
+| `lib/session-start-lib.sh`          | 209    | Lógica de início de sessão               | OK — `printf -- '- %s\n'` corrigido (R-02)              |
+| `lib/stop-lib.sh`                   | 177    | Lógica Stop hook                         | OK                                                      |
+| `lib/subagent-lib.sh`               | 313    | Lógica Subagent Start/Stop               | OK                                                      |
+| `lib/user-prompt-submit-lib.sh`     | 169    | Lógica UserPromptSubmit                  | OK                                                      |
+| `lib/api/01-vars.sh`                | 251    | Variáveis globais da API                 | OK                                                      |
+| `lib/api/02-parse.sh`               | 259    | Parsing de payload                       | 53 invocações jq — candidato a otimização               |
+| `lib/api/03-validate.sh`            | 92     | Validação semântica                      | OK                                                      |
+| `lib/api/04-predicates.sh`          | 416    | Predicados de decisão                    | OK — arquivo central                                    |
+| `lib/api/05-output.sh`              | 320    | Formatação de output JSON                | OK                                                      |
+| `lib/api/06-query.sh`               | 157    | Queries de estado                        | OK                                                      |
+| `lib/api/07-state.sh`               | 68     | Manipulação de estado                    | OK — R-06 resolvido inline (Sprint 5)                   |
+| `lib/api/08-risk.sh`                | 216    | Avaliação de risco e bypass              | OK — crítico de segurança                               |
+| `lib/api/09-metrics.sh`             | 250    | Métricas de sessão                       | ✅ T90 (Sprint 17)                                      |
+| `lib/api/10-close-key.sh`           | 120    | Gestão da close_key                      | OK                                                      |
+| `lib/api/11-compact-context.sh`     | 182    | Contexto para PreCompact                 | OK                                                      |
+| `lib/api/12-subagent.sh`            | 156    | Gestão de subagentes                     | OK                                                      |
+| `lib/api/13-state-version.sh`       | 234    | Versionamento de schema                  | ✅ T91 (Sprint 17) — retorna inteiro de versão          |
+| `lib/api/14-validate-events.sh`     | 236    | Validação de payloads                    | Cobertura parcial (usa apenas `[[ ]]` — OK)             |
+| `lib/api/15-audit.sh`               | 183    | Implementação canônica de audit          | OK                                                      |
+| `lib/api/16-lifecycle.sh`           | 67     | Lifecycle de turn/subturn                | OK — R-07/R-08 implementados inline                     |
 
 ### A.2 Matriz de Dependências de Source
 
@@ -776,4 +821,4 @@ api/16-lifecycle.sh → stubs para turn_is_orphaned, heal_orphaned_turn
 
 ---
 
-*Auditoria realizada em 2026-03-20. Próxima revisão recomendada após Sprint 2.*
+_Auditoria realizada em 2026-03-20. Próxima revisão recomendada após Sprint 2._

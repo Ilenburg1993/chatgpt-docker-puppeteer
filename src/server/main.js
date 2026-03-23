@@ -729,6 +729,18 @@ async function bootstrap(options = {}) {
             log('WARN', `[BOOT] Falha ao injetar MissionManager via options: ${_e.message}`);
         }
 
+        // Montagem opcional do copilotNervBridge (Upgrade 5) — conecta AlwaysAliveAgent ao NERV
+        if (process.env.COPILOT_SDK_ENABLED !== 'false') {
+            try {
+                const { copilotNervBridge } = await import('#copilot/nerv-bridge');
+                copilotNervBridge.mount(/** @type {any} */ (nerv));
+                log('INFO', '[COPILOT] copilotNervBridge montado — eventos do AlwaysAliveAgent fluem para NERV');
+            } catch (/** @type {any} */ e) {
+                const _e = /** @type {any} */ (e);
+                log('WARN', `[COPILOT] Falha ao montar copilotNervBridge: ${_e.message}`);
+            }
+        }
+
         /* --------------------------------------------------------------
            FASE 10 — Reconciler (último)
         -------------------------------------------------------------- */

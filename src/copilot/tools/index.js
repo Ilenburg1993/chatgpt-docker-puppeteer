@@ -9,6 +9,7 @@
  */
 
 import { codeTools } from './code-tools.js';
+import { fileReadTools, fileTools, fileWriteTools } from './file-tools.js';
 import { gitTools } from './git-tools.js';
 import { hookTools } from './hook-tools.js';
 import { introspectionTools, registerForIntrospection, setTelemetryStore } from './introspection-tools.js';
@@ -20,10 +21,21 @@ import { taskTools } from './task-tools.js';
  *
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const allTools = [...taskTools, ...codeTools, ...gitTools, ...sessionTools, ...hookTools, ...introspectionTools];
+export const allTools = [
+    ...taskTools,
+    ...codeTools,
+    ...gitTools,
+    ...sessionTools,
+    ...hookTools,
+    ...introspectionTools,
+    ...fileTools,
+];
 
 export {
     codeTools,
+    fileReadTools,
+    fileTools,
+    fileWriteTools,
     gitTools,
     hookTools,
     introspectionTools,

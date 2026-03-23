@@ -1630,8 +1630,8 @@ _t87_val=$(
     export HOOKS_TEST_STATE_DIR="$TEST_DIR"
     source "$HOOK_DIR/lib/common.sh"
     decrement_field_floor0 ".session_stats.turn_count"
-) 2>/dev/null || true
-_t87_json=$(jq -r '.session_stats.turn_count' "$TEST_DIR/session.json" 2>/dev/null)
+) 2> /dev/null || true
+_t87_json=$(jq -r '.session_stats.turn_count' "$TEST_DIR/session.json" 2> /dev/null)
 if [[ "${_t87_val:-}" = "0" ]] && [[ "${_t87_json:-}" = "0" ]]; then
     pass
 else
@@ -1648,8 +1648,8 @@ _t88_val=$(
     export HOOKS_TEST_STATE_DIR="$TEST_DIR"
     source "$HOOK_DIR/lib/common.sh"
     increment_field ".session_stats.turn_count"
-) 2>/dev/null || true
-_t88_json=$(jq -r '.session_stats.turn_count' "$TEST_DIR/session.json" 2>/dev/null)
+) 2> /dev/null || true
+_t88_json=$(jq -r '.session_stats.turn_count' "$TEST_DIR/session.json" 2> /dev/null)
 if [[ "${_t88_val:-}" = "1" ]] && [[ "${_t88_json:-}" = "1" ]]; then
     pass
 else
@@ -1663,14 +1663,14 @@ begin_test "T89: log_audit grava no audit.jsonl e habilita contador R-13"
 write_state "$(_state_aq_false 1)"
 _t89_audit="$TEST_DIR/audit.jsonl"
 _t89_before=0
-[[ -f "$_t89_audit" ]] && _t89_before=$(wc -l < "$_t89_audit" 2>/dev/null | tr -d ' ') || _t89_before=0
+[[ -f "$_t89_audit" ]] && _t89_before=$(wc -l < "$_t89_audit" 2> /dev/null | tr -d ' ') || _t89_before=0
 (
     export HOOKS_TEST_STATE_DIR="$TEST_DIR"
     source "$HOOK_DIR/lib/common.sh"
-    log_audit "test_event_t89" "key" "val" 2>/dev/null || true
-) 2>/dev/null || true
+    log_audit "test_event_t89" "key" "val" 2> /dev/null || true
+) 2> /dev/null || true
 _t89_after=0
-[[ -f "$_t89_audit" ]] && _t89_after=$(wc -l < "$_t89_audit" 2>/dev/null | tr -d ' ') || _t89_after=0
+[[ -f "$_t89_audit" ]] && _t89_after=$(wc -l < "$_t89_audit" 2> /dev/null | tr -d ' ') || _t89_after=0
 if [[ "${_t89_after:-0}" -gt "${_t89_before:-0}" ]]; then
     pass
 else
@@ -1681,7 +1681,7 @@ teardown
 # T90: hook_stat_turn_count retorna inteiro do session.json (api/09-metrics.sh)
 setup
 begin_test "T90: hook_stat_turn_count retorna turn_count do state"
-write_state "$(_state_aq_false 3)"  # turn_count=3 via _state_aq_false
+write_state "$(_state_aq_false 3)" # turn_count=3 via _state_aq_false
 _t90_val=''
 _t90_val=$(
     export HOOKS_TEST_STATE_DIR="$TEST_DIR"
@@ -1689,7 +1689,7 @@ _t90_val=$(
     source "$HOOK_DIR/lib/api/01-vars.sh"
     source "$HOOK_DIR/lib/api/09-metrics.sh"
     hook_stat_turn_count
-) 2>/dev/null || true
+) 2> /dev/null || true
 if [[ "${_t90_val:-}" = "3" ]]; then
     pass
 else
@@ -1700,7 +1700,7 @@ teardown
 # T91: hook_state_version retorna versão do schema do session.json (api/13-state-version.sh)
 setup
 begin_test "T91: hook_state_version retorna state_schema_version do state"
-write_state "$(_state_aq_false 1)"  # _state_aq_false gera state_schema_version=3
+write_state "$(_state_aq_false 1)" # _state_aq_false gera state_schema_version=3
 _t91_val=''
 _t91_val=$(
     export HOOKS_TEST_STATE_DIR="$TEST_DIR"
@@ -1708,7 +1708,7 @@ _t91_val=$(
     source "$HOOK_DIR/lib/api/01-vars.sh"
     source "$HOOK_DIR/lib/api/13-state-version.sh"
     hook_state_version
-) 2>/dev/null || true
+) 2> /dev/null || true
 if [[ "${_t91_val:-}" =~ ^[0-9]+$ ]]; then
     pass
 else
@@ -1719,7 +1719,7 @@ teardown
 # T92: hook_subagent_depth retorna 0 quando subagents_active=0 (api/12-subagent.sh)
 setup
 begin_test "T92: hook_subagent_depth retorna 0 sem subagentes ativos"
-write_state "$(_state_aq_false 1)"  # state sem subagents_active
+write_state "$(_state_aq_false 1)" # state sem subagents_active
 _t92_val=''
 _t92_val=$(
     export HOOKS_TEST_STATE_DIR="$TEST_DIR"
@@ -1727,7 +1727,7 @@ _t92_val=$(
     source "$HOOK_DIR/lib/api/01-vars.sh"
     source "$HOOK_DIR/lib/api/12-subagent.sh"
     hook_subagent_depth
-) 2>/dev/null || true
+) 2> /dev/null || true
 if [[ "${_t92_val:-}" = "0" ]]; then
     pass
 else
@@ -1748,7 +1748,7 @@ _t93_out=$(
     source "$HOOK_DIR/lib/api/10-close-key.sh"
     source "$HOOK_DIR/lib/api/11-compact-context.sh"
     hook_compact_ctx_session_summary
-) 2>/dev/null || true
+) 2> /dev/null || true
 if printf '%s' "${_t93_out:-}" | grep -q 'Turnos totais'; then
     pass
 else
@@ -1762,9 +1762,9 @@ begin_test "T94: watchdog.sh --json retorna JSON com campo 'healthy' (boolean)"
 _t94_out=''
 _t94_out=$(
     HOOKS_TEST_STATE_DIR="$TEST_DIR" \
-    bash "$HOOK_DIR/scripts/watchdog.sh" --json 2>/dev/null
-) || true  # exit não-zero aceitável (deps ausentes no env de teste)
-_t94_healthy=$(printf '%s' "${_t94_out:-}" | jq -r 'if (.healthy | type) == "boolean" then "ok" else "no" end' 2>/dev/null || true)
+        bash "$HOOK_DIR/scripts/watchdog.sh" --json 2> /dev/null
+) || true # exit não-zero aceitável (deps ausentes no env de teste)
+_t94_healthy=$(printf '%s' "${_t94_out:-}" | jq -r 'if (.healthy | type) == "boolean" then "ok" else "no" end' 2> /dev/null || true)
 if [[ "${_t94_healthy:-}" = "ok" ]]; then
     pass
 else
@@ -1778,8 +1778,8 @@ begin_test "T95: hooks-report.sh --json retorna JSON válido (sem state ou com s
 _t95_out=''
 _t95_out=$(
     HOOKS_TEST_STATE_DIR="$TEST_DIR" \
-    bash "$HOOK_DIR/scripts/hooks-report.sh" --json 2>/dev/null
-) || true  # exit não-zero aceitável (state ausente em env de teste)
+        bash "$HOOK_DIR/scripts/hooks-report.sh" --json 2> /dev/null
+) || true # exit não-zero aceitável (state ausente em env de teste)
 _t95_valid=$(printf '%s' "${_t95_out:-}" | jq -e . > /dev/null 2>&1 && printf 'ok' || printf 'no')
 if [[ "${_t95_valid:-}" = "ok" ]]; then
     pass
