@@ -32,6 +32,7 @@
   "type": "module",
   "imports": {
     "#agent/*": "./src/agent/*.js",
+    "#copilot/lib": "./src/copilot/lib/index.js",
     "#copilot/lib/*": "./src/copilot/lib/*.js",
     "#copilot/*": "./src/copilot/*.js",
     "#core/constants": "./src/core/constants/index.ts",

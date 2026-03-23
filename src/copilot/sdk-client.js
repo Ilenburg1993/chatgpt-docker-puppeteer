@@ -72,7 +72,7 @@ export {
     listAllClientSessions,
     listAvailableModels,
     pingClient,
-    stopClient,
+    stopClient
 };
 
 // ─── Aliases de compatibilidade ──────────────────────────────────────────────
@@ -121,7 +121,7 @@ export async function disconnectSdkSession(sessionId) {
  * Retorna a sessão ativa de um ID (registry em memória).
  *
  * @param {string} sessionId
- * @returns {object | undefined}
+ * @returns {SessionEntry | undefined}
  */
 export function getSdkSession(sessionId) {
     return getClientSession(sessionId);
@@ -130,7 +130,7 @@ export function getSdkSession(sessionId) {
 /**
  * Retorna todas as entradas de sessão ativas no registry em memória.
  *
- * @returns {object[]}
+ * @returns {Array<{ sessionId: string } & SessionEntry>}
  */
 export function listActiveSessions() {
     return listActiveClientSessions();
