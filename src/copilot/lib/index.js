@@ -13,6 +13,8 @@
  * - session — operações de sessão (createSession, resumeOrCreate, ...)
  * - agents — factories de CustomAgentConfig (createAgent, createReadOnlyAgent, ...)
  * - models — helpers de modelos (listModels, pickModel, buildReasoningConfig, ...)
+ * - tools-registry — registry de Custom Tools (createRegistry, registerTools, getAllTools, ...)
+ * - telemetry — telemetria leve (createTelemetry, recordToolCall, getSummary, ...)
  *
  * @module copilot/lib
  */
@@ -93,3 +95,38 @@ export {
     resolveModelId,
     supportsReasoning,
 } from '#copilot/lib/models';
+
+export {
+    createRegistry,
+    excludeByNames,
+    filterByNames,
+    getAllTools,
+    getReadOnlyTools,
+    getToolByName,
+    getToolCount,
+    getToolsByCategory,
+    getToolsByTag,
+    hasToolByName,
+    inspectRegistry,
+    listToolNames,
+    mergeRegistries,
+    registerTool,
+    registerTools,
+} from '#copilot/lib/tools-registry';
+
+export {
+    clearTelemetry,
+    createTelemetry,
+    getAverageDuration,
+    getCallsBySession,
+    getCallsByTool,
+    getErrorCalls,
+    getErrorCount,
+    getRecentCalls,
+    getSuccessCount,
+    getSummary,
+    getTotalCalls,
+    recordSessionEnd,
+    recordSessionStart,
+    recordToolCall,
+} from '#copilot/lib/telemetry';
