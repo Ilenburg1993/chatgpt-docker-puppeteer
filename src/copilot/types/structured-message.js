@@ -159,6 +159,7 @@ export const StructuredMessageSchema = z.object({
  * @property {number} responseLen - Comprimento da resposta bruta
  * @property {string[]} chunks - Chunks coletados via streaming
  * @property {number} durationMs - Duração total em ms
+ * @property {any} [parseError] - Erro ao parsear resposta estruturada (undefined quando bem-sucedido)
  */
 
 // ─── Builders ─────────────────────────────────────────────────────────────────

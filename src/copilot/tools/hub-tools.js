@@ -52,7 +52,10 @@ A sessão persiste no SQLite e sobrevive a restarts do servidor.`,
     handler: async (/** @type {{ title?: string; metadata?: Record<string, any> }} */ { title, metadata }) => {
         try {
             const hub = await requireHub();
-            const hubSessionId = hub.createSession({ title, metadata });
+            const hubSessionId = hub.createSession({
+                ...(title !== undefined && { title }),
+                ...(metadata !== undefined && { metadata }),
+            });
             log('INFO', `[hub_create_session] Hub session criada: ${hubSessionId}`);
             return {
                 success: true,
@@ -231,7 +234,7 @@ Retorna turns ordenados por número de turno (mais antigos primeiro).`,
             const turns = hub.store.readTurns(hubSessionId, {
                 limit: limit ?? 20,
                 offset: offset ?? 0,
-                after,
+                ...(after !== undefined && { after }),
             });
             const total = hub.store.countTurns(hubSessionId);
 
@@ -281,7 +284,7 @@ const hubListSessionsTool = defineTool('hub_list_sessions', {
             const hub = await requireHub();
             const sessions = hub.store.listHubSessions({
                 limit: limit ?? 10,
-                status: status ?? undefined,
+                ...(status !== undefined && { status }),
             });
 
             return {

@@ -92,9 +92,9 @@ export class HubOrchestrator extends EventEmitter {
         try {
             const activeSessions = this.#store.listHubSessions({ status: 'active' });
             for (const session of activeSessions) {
-                const count = this.#store.countTurns(session.hubSessionId);
-                this.#turnCounters.set(session.hubSessionId, count);
-                log('DEBUG', `[HubOrchestrator] Sessão ${session.hubSessionId}: ${count} turns restaurados.`);
+                const count = this.#store.countTurns(session.id);
+                this.#turnCounters.set(session.id, count);
+                log('DEBUG', `[HubOrchestrator] Sessão ${session.id}: ${count} turns restaurados.`);
             }
             if (activeSessions.length > 0) {
                 log('INFO', `[HubOrchestrator] ${activeSessions.length} sessão(ões) ativa(s) restaurada(s) da DB.`);
@@ -139,8 +139,8 @@ export class HubOrchestrator extends EventEmitter {
 
         const hubSessionId = this.#store.createHubSession({
             title: opts.title ?? `Conversa ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
-            sdkSessionId,
-            metadata: opts.metadata,
+            ...(sdkSessionId !== undefined && { sdkSessionId }),
+            ...(opts.metadata !== undefined && { metadata: opts.metadata }),
         });
 
         this.#turnCounters.set(hubSessionId, 0);
@@ -196,7 +196,7 @@ export class HubOrchestrator extends EventEmitter {
         const llmATurnId = this.#store.writeTurn(hubSessionId, {
             role: 'llm_a',
             content: messageContent,
-            sdkSessionId,
+            ...(sdkSessionId !== undefined && { sdkSessionId }),
             model: 'copilot-claude-sonnet-4.6',
             structured: typeof message === 'object' ? message : null,
         });
@@ -242,9 +242,9 @@ export class HubOrchestrator extends EventEmitter {
                     },
                     timeoutMs,
                 });
-                llmBResponse = result.raw?.response ?? llmBResponse;
+                llmBResponse = result.raw ?? llmBResponse;
                 llmBStructured = result.structured;
-                if (result.parseError) parseError = result.parseError;
+                if (result.parseError !== undefined) parseError = result.parseError;
             } else {
                 // Usar chat() simples
                 const content = typeof message === 'string' ? message : messageContent;
@@ -266,7 +266,7 @@ export class HubOrchestrator extends EventEmitter {
             this.#store.writeTurn(hubSessionId, {
                 role: 'llm_b',
                 content: `[ERRO] ${err.message}`,
-                sdkSessionId,
+                ...(sdkSessionId !== undefined && { sdkSessionId }),
                 model: modelLabel,
                 durationMs: Date.now() - startTime,
                 metadata: { error: true, errorMessage: err.message },
@@ -281,11 +281,11 @@ export class HubOrchestrator extends EventEmitter {
         const llmBTurnId = this.#store.writeTurn(hubSessionId, {
             role: 'llm_b',
             content: llmBResponse,
-            sdkSessionId,
+            ...(sdkSessionId !== undefined && { sdkSessionId }),
             model: modelLabel,
             structured: llmBStructured,
             durationMs,
-            metadata: parseError ? { parseError } : null,
+            metadata: parseError !== null ? { parseError } : null,
         });
 
         const llmBTurn = this.#store.getTurn(llmBTurnId);

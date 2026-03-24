@@ -22,13 +22,13 @@ import { LlmBridgeClient } from './llm-bridge-client.js';
 
 const HR = '─'.repeat(80);
 
-function section(title) {
+function section(/** @type {string} */ title) {
     console.log(`\n${'═'.repeat(80)}`);
     console.log(`  ${title}`);
     console.log('═'.repeat(80));
 }
 
-function turn(role, content) {
+function turn(/** @type {string} */ role, /** @type {string} */ content) {
     const label = role === 'A' ? '🤖 LLM-A' : '🔵 LLM-B';
     console.log(`\n${HR}`);
     console.log(`${label}:`);
@@ -128,13 +128,13 @@ async function main() {
     console.log('\nInicializando AlwaysAlive Agent...');
 
     await alwaysAliveAgent.start();
-    const snap = alwaysAliveAgent.getStatusSnapshot();
+    const snap = /** @type {{ sessionId?: string; model?: string }} */ (alwaysAliveAgent.getStatusSnapshot());
     console.log(`✅ Agente ativo: sessionId=${snap.sessionId}, model=${snap.model}, tools=30`);
 
     const bridge = new LlmBridgeClient();
 
     for (let i = 0; i < MESSAGES.length; i++) {
-        const msg = MESSAGES[i];
+        const msg = /** @type {string} */ (MESSAGES[i]);
         section(`Turno ${i + 1} de ${MESSAGES.length}`);
 
         turn('A', msg);

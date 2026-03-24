@@ -168,7 +168,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
                     const turns = store.readTurns(data.hubSession, {
                         limit: data.limit ?? 50,
                         offset: data.offset ?? 0,
-                        after: data.after,
+                        ...(data.after !== undefined && { after: data.after }),
                     });
                     socket.emit('turns:history:result', { hubSession: data.hubSession, turns });
                 } catch (/** @type {any} */ err) {

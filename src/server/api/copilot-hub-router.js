@@ -19,6 +19,7 @@ const router = express.Router();
 
 // ─── Importação lazy do hub (não bloqueia se COPILOT_SDK_ENABLED=false) ────────
 
+/** @type {import('#copilot/conversation-hub/hub').ConversationHub | null} */
 let _hubModule = null;
 
 /**
@@ -48,7 +49,7 @@ async function getHub() {
  * @param {express.Request} req
  * @param {express.Response} res
  * @param {express.NextFunction} next
- * @returns {void}
+ * @returns {Promise<void>}
  */
 async function requireHub(req, res, next) {
     const hub = await getHub();
