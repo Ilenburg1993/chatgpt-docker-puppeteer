@@ -81,16 +81,15 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
 const BOOT_PROMPT = process.env.LLM_B_BOOT_PROMPT ?? DEFAULT_BOOT_PROMPT;
 
 const BANNER = `
-╔══════════════════════════════════════════════════════════════════════════╗
+\x1b[36m╔══════════════════════════════════════════════════════════════════════════╗
 ║            Terminal LLM-B — Sessão Permanente Aberta                    ║
-╠══════════════════════════════════════════════════════════════════════════╣
-║  Comandos: /status · /history [n] · /db-history [n] · /who · /clear    ║
-║  Injeção LLM-A: POST http://localhost:${String(INJECT_PORT).padEnd(5)} /inject               ║
-╚══════════════════════════════════════════════════════════════════════════╝
+╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
+  Comandos: \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
+  Injeção:  \x1b[90mPOST http://localhost:${INJECT_PORT}/inject\x1b[0m
 `;
 
-const PROMPT_USER = 'você> ';
-const PROMPT_WAITING = '      ';
+const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
+const PROMPT_WAITING = '     ';
 
 // ─── Estado global do terminal ────────────────────────────────────────────────
 
@@ -116,19 +115,33 @@ function println(text) {
 }
 
 /**
- * Exibe resposta da LLM-B com formatação de ator.
+ * Exibe um turno completo (mensagem + resposta) com formatação visual limpa.
  *
- * @param {string} actor - Ator que enviou ('user' | 'llm-a')
- * @param {string} message - Mensagem enviada
- * @param {string} reply - Resposta da LLM-B
- * @param {number} durationMs - Duração da chamada
+ * @param {string} actor     - Ator que enviou ('user' | 'llm-a')
+ * @param {string} message   - Mensagem enviada
+ * @param {string} reply     - Resposta da LLM-B
+ * @param {number} durationMs - Duração da chamada em ms
  * @returns {void}
  */
 function printExchange(actor, message, reply, durationMs) {
-    const actorLabel = actor === 'llm-a' ? '🤖 LLM-A' : '👤 User';
-    println(`\n${actorLabel}: ${message}`);
-    println(`🧠 LLM-B: ${reply}`);
-    println(`   [${durationMs}ms]`);
+    const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const secs = (durationMs / 1000).toFixed(1);
+
+    // Cabeçalho do ator
+    if (actor === 'llm-a') {
+        println(`\n  🤖  \x1b[34mLLM-A\x1b[0m  \x1b[90m[${ts}]\x1b[0m`);
+        println(`  ${message}`);
+    }
+    // (mensagens do usuário já visíveis no REPL — não repetimos)
+
+    // Separador + resposta LLM-B
+    println(`\n  🧠  \x1b[32mLLM-B\x1b[0m  \x1b[90m[${ts}] ${secs}s\x1b[0m`);
+
+    // Exibe cada linha da resposta com recuo
+    for (const line of reply.split('\n')) {
+        println(`  ${line}`);
+    }
+    println('');
 }
 
 /**
@@ -138,13 +151,18 @@ function printExchange(actor, message, reply, durationMs) {
  */
 function cmdStatus() {
     const snap = /** @type {any} */ (alwaysAliveAgent.getStatusSnapshot());
-    println('\n── Status do Agente ──');
-    println(`  status:           ${snap.status}`);
-    println(`  dialogLoopActive: ${alwaysAliveAgent.dialogLoopActive}`);
-    println(`  turnCount (hub):  ${llmBridgeClient.turnCount}`);
-    println(`  taskId atual:     ${snap.currentTaskId ?? '(nenhum)'}`);
-    println(`  hubSessionId:     ${_hubSessionId ?? '(sem hub)'}`);
-    println('─────────────────────');
+    const active = alwaysAliveAgent.dialogLoopActive;
+    const statusColor = snap.status === 'waiting_for_input' ? '\x1b[32m' : snap.status === 'idle' ? '\x1b[33m' : '\x1b[31m';
+    println(`
+  \x1b[36mStatus do Terminal LLM-B\x1b[0m
+  ─────────────────────────────────────
+  agente          ${statusColor}${snap.status}\x1b[0m
+  dialog loop     ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
+  turnos (memória) ${llmBridgeClient.turnCount}
+  hub session     \x1b[90m${_hubSessionId ?? '(sem hub)'}\x1b[0m
+  inject port     ${INJECT_PORT}
+  ─────────────────────────────────────
+`);
 }
 
 /**
@@ -216,7 +234,7 @@ async function ensureDialogLoop() {
 
     const status = alwaysAliveAgent.status;
     if (status === 'stopped') {
-        println('[boot] Iniciando AlwaysAliveAgent…');
+        println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');
         await alwaysAliveAgent.start();
         // Aguarda idle
         await new Promise((resolve, reject) => {
@@ -233,9 +251,9 @@ async function ensureDialogLoop() {
         });
     }
 
-    println('[boot] Ativando dialog loop com LLM-B…');
+    println('\x1b[90m  Conectando ao agente…\x1b[0m');
     await llmBridgeClient.startDialogMode(BOOT_PROMPT ?? undefined, {
-        onReady: () => println('[llm-b] ✅ LLM-B sinalizada READY — terminal ativo.'),
+        onReady: () => println('\n  \x1b[32m●\x1b[0m  LLM-B pronta — pode começar\n'),
     });
 }
 
@@ -248,11 +266,14 @@ async function ensureDialogLoop() {
  */
 async function sendTurn(message, actor = 'user') {
     if (_busy) {
-        println('[terminal] Aguarde — LLM-B está processando...');
+        println('\x1b[33m  ⏳ Aguarde — LLM-B está processando...\x1b[0m');
         return null;
     }
     _busy = true;
-    if (_rl) _rl.setPrompt(PROMPT_WAITING);
+    if (_rl) {
+        process.stdout.write(`\x1b[90m  …\x1b[0m`);
+        _rl.setPrompt(PROMPT_WAITING);
+    }
 
     const t0 = Date.now();
     try {
@@ -432,14 +453,22 @@ function createInjectServer() {
  */
 function setupAgentListeners(rl) {
     const onQuestion = (/** @type {any} */ evt) => {
-        const q = evt?.question ?? '';
-        const choices = evt?.choices ?? [];
+        const q = /** @type {string} */ (evt?.question ?? '');
+        const choices = /** @type {string[]} */ (evt?.choices ?? []);
+
+        // Filtra mensagens internas do protocolo dialog loop (READY:/REPLY:/DONE:/STOPPED)
+        // O usuário nunca precisa interagir com elas — são tratadas automaticamente.
+        if (/^(READY[:\s]|REPLY[:\s]|DONE[:\s]|STOPPED|STOP_DIALOG)/i.test(q.trim())) {
+            return;
+        }
+
+        // Pergunta real do LLM-B (fora do protocolo READY/REPLY)
         rl.pause();
-        println(`\n⚡ PERGUNTA DO MODELO: "${q}"`);
+        println(`\n⚡ LLM-B perguntou: "${q}"`);
         if (choices.length > 0) {
             println(`   Opções: ${choices.join(' | ')}`);
         }
-        println('   Use /answer <resposta> para responder.');
+        println('   → Responda digitando normalmente. Sua próxima mensagem será a resposta.');
         rl.resume();
         rl.prompt();
     };
@@ -484,12 +513,12 @@ async function startRepl(injectServer) {
     const cleanup = setupAgentListeners(rl);
 
     println(BANNER);
-    println('[boot] Inicializando sessão com LLM-B…');
+    println('\x1b[90m  Iniciando sessão com LLM-B…\x1b[0m');
 
     try {
         await ensureDialogLoop();
     } catch (/** @type {any} */ e) {
-        println(`[boot] Erro ao inicializar: ${e.message}`);
+        println(`\x1b[31m  [erro de boot] ${e.message}\x1b[0m`);
         log('ERROR', `[TerminalServer] Boot error: ${e.message}`);
     }
 
@@ -522,13 +551,17 @@ async function startRepl(injectServer) {
                     break;
                 }
                 case 'who':
-                    println(
-                        `[who] Atores: 👤 você (stdin) · 🤖 LLM-A (POST :${INJECT_PORT}/inject) · 🧠 LLM-B (AlwaysAliveAgent)`,
-                    );
+                    println(`
+  \x1b[36mAtores ativos nesta sessão:\x1b[0m
+  👤  \x1b[32mVocê\x1b[0m          — stdin (digitar diretamente aqui)
+  🤖  \x1b[34mLLM-A\x1b[0m         — POST http://localhost:${INJECT_PORT}/inject
+  🧠  \x1b[35mLLM-B\x1b[0m         — AlwaysAliveAgent (GPT-4.1 Copilot SDK)
+  📡  \x1b[90mSSE stream\x1b[0m    — GET  http://localhost:${INJECT_PORT}/events
+`);
                     break;
                 case 'clear':
                     llmBridgeClient.clearHistory();
-                    println('[clear] Histórico local limpo.');
+                    println('\x1b[90m  Histórico em memória limpo.\x1b[0m');
                     break;
                 case 'answer': {
                     const ok = alwaysAliveAgent.answerPendingQuestion(arg);
@@ -536,14 +569,14 @@ async function startRepl(injectServer) {
                     break;
                 }
                 case 'restart':
-                    println('[restart] Reiniciando dialog loop…');
+                    println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
                     try {
                         await llmBridgeClient.stopDialogMode();
                     } catch {
                         /* já estava parado */
                     }
                     await ensureDialogLoop();
-                    println('[restart] Dialog loop reiniciado.');
+                    println('\x1b[32m  Dialog loop reiniciado.\x1b[0m');
                     break;
                 case 'quit':
                 case 'exit':
@@ -560,7 +593,7 @@ async function startRepl(injectServer) {
                     return;
                 default:
                     println(
-                        `[cli] Comando desconhecido: /${cmd}. Use /status, /history [n], /db-history [n], /who, /clear, /answer, /restart ou /quit.`,
+                        `[cli] Comando desconhecido: /${cmd}. Use /status, /history [n], /db-history [n], /who, /clear, /restart ou /quit.`,
                     );
             }
             rl.prompt();
