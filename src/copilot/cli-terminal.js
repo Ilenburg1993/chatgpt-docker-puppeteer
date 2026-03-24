@@ -8,8 +8,8 @@
  * conversa (últimas 10 trocas) /clear — limpa histórico local de conversa /answer <x> — responde a pergunta pendente do
  * modelo /quit — encerra o CLI
  *
- * Qualquer outra entrada é enviada ao modelo via LlmBridgeClient.chat(). Chunks são exibidos em tempo real via callback
- * onDelta (streaming).
+ * Qualquer outra entrada é enviada ao modelo via LlmBridgeClient em modo dialog (sessão contínua sem PRs extras). Para
+ * o terminal permanente multi-ator, veja terminal-server.js.
  *
  * @module copilot/cli-terminal
  *
@@ -17,19 +17,19 @@
  *     ```bash
  *     # Uso direto:
  *     node --strip-types src/copilot/cli-terminal.js
- *     ```;
+ *     ``;
  */
 
 import { log } from '#core/logger';
 import readline from 'node:readline';
 import { alwaysAliveAgent } from './always-alive.js';
-import { LlmBridgeClient } from './llm-bridge-client.js';
+import { llmBridgeClient } from './llm-bridge-client.js';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const BANNER = `
 ╔══════════════════════════════════════════════════╗
-║  Copilot CLI — AlwaysAlive REPL                 ║
+║  Copilot CLI — AlwaysAlive REPL (dialog mode)   ║
 ║  /status · /history · /clear · /answer · /quit  ║
 ╚══════════════════════════════════════════════════╝
 `;
@@ -48,37 +48,26 @@ function println(text) {
     process.stdout.write(`\n${text}\n`);
 }
 
-/**
- * Escreve um chunk de streaming inline (sem newline).
- *
- * @param {string} chunk - Chunk de texto
- * @returns {void}
- */
-function printChunk(chunk) {
-    process.stdout.write(chunk);
-}
-
 // ─── Handlers de comando ──────────────────────────────────────────────────────
 
 /**
  * Exibe o snapshot de status do agente.
  *
- * @param {LlmBridgeClient} client - Instância do LlmBridgeClient
  * @returns {void}
  */
-function cmdStatus(client) {
-    const snap = client.getAgentStatus();
+function cmdStatus() {
+    const snap = llmBridgeClient.getAgentStatus();
     println(`[status] ${JSON.stringify(snap, null, 2)}`);
+    println(`[status] dialogLoopActive: ${alwaysAliveAgent.dialogLoopActive}`);
 }
 
 /**
  * Exibe até 10 últimas trocas do histórico local.
  *
- * @param {LlmBridgeClient} client - Instância do LlmBridgeClient
  * @returns {void}
  */
-function cmdHistory(client) {
-    const hist = client.history;
+function cmdHistory() {
+    const hist = llmBridgeClient.history;
     if (hist.length === 0) {
         println('[history] Histórico vazio.');
         return;
@@ -93,16 +82,15 @@ function cmdHistory(client) {
 /**
  * Responde a uma pergunta pendente do modelo.
  *
- * @param {LlmBridgeClient} client - Instância do LlmBridgeClient
  * @param {string} answer - Texto da resposta
  * @returns {void}
  */
-function cmdAnswer(client, answer) {
+function cmdAnswer(answer) {
     if (!answer.trim()) {
         println('[answer] Uso: /answer <texto da resposta>');
         return;
     }
-    const ok = client.answer(answer);
+    const ok = alwaysAliveAgent.answerPendingQuestion(answer);
     if (ok) {
         println(`[answer] Resposta enviada: "${answer}"`);
     } else {
@@ -165,8 +153,6 @@ function setupAgentListeners(rl) {
  * @returns {Promise<void>}
  */
 export async function startCli() {
-    const client = new LlmBridgeClient();
-
     const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -178,11 +164,14 @@ export async function startCli() {
 
     println(BANNER);
 
-    const agentStatus = alwaysAliveAgent.status;
-    if (agentStatus === 'stopped') {
-        println('[aviso] Agente está stopped. Use alwaysAliveAgent.start() para iniciar antes de enviar mensagens.');
+    // Garante dialog loop ativo (sessão contínua sem PRs extras por turno)
+    if (!alwaysAliveAgent.dialogLoopActive && alwaysAliveAgent.status === 'idle') {
+        println('[boot] Ativando dialog loop (modo diálogo contínuo)…');
+        await llmBridgeClient.startDialogMode(undefined, {
+            onReady: () => println('[llm-b] ✅ Pronto para receber mensagens.'),
+        });
     } else {
-        println(`[agente] Status: ${agentStatus}. Pronto para receber mensagens.`);
+        println(`[agente] Status: ${alwaysAliveAgent.status} · dialogLoop: ${alwaysAliveAgent.dialogLoopActive}`);
     }
 
     rl.prompt();
@@ -201,17 +190,17 @@ export async function startCli() {
 
             switch (cmd?.toLowerCase()) {
                 case 'status':
-                    cmdStatus(client);
+                    cmdStatus();
                     break;
                 case 'history':
-                    cmdHistory(client);
+                    cmdHistory();
                     break;
                 case 'clear':
-                    client.clearHistory();
+                    llmBridgeClient.clearHistory();
                     println('[clear] Histórico limpo.');
                     break;
                 case 'answer':
-                    cmdAnswer(client, arg);
+                    cmdAnswer(arg);
                     break;
                 case 'quit':
                 case 'exit':
@@ -226,21 +215,14 @@ export async function startCli() {
             return;
         }
 
-        // Mensagem normal → envia ao modelo
+        // Mensagem normal → envia ao modelo via dialog turn (sessão contínua)
         rl.pause();
         process.stdout.write('\ncopilot> ');
 
         try {
-            const result = await client.chat(trimmed, {
-                onDelta: (chunk) => {
-                    printChunk(chunk);
-                },
-            });
-
-            // Garante nova linha após streaming
-            process.stdout.write(
-                `\n[${result.durationMs}ms · ${result.responseLen} chars · ${result.chunks.length} chunks]\n`,
-            );
+            const t0 = Date.now();
+            const reply = await llmBridgeClient.dialogTurn(trimmed, { timeout: 120_000 });
+            process.stdout.write(`${reply}\n[${Date.now() - t0}ms]\n`);
         } catch (/** @type {any} */ e) {
             println(`[erro] ${e.message}`);
             log('ERROR', `[CliTerminal] ${e.message}`);

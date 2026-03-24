@@ -208,15 +208,17 @@ export function mountCopilotNamespace(io, orchestrator, store) {
     orchestrator.on(
         'turn:complete',
         (
-            /** @type {{
-    hubSessionId: string;
-    turnId: number;
-    role: string;
-    content: string;
-    structured: any;
-    durationMs: number;
-    turnNumber: number;
-}} */ data,
+            /**
+             * @type {{
+             *     hubSessionId: string;
+             *     turnId: number;
+             *     role: string;
+             *     content: string;
+             *     structured: any;
+             *     durationMs: number;
+             *     turnNumber: number;
+             * }}
+             */ data,
         ) => {
             ns.to(data.hubSessionId).emit('turn:complete', data);
         },
