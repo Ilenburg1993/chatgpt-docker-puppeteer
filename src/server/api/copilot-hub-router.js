@@ -318,4 +318,44 @@ router.get('/sessions/:id/stream', requireHub, (req, res) => {
     });
 });
 
+// ─── Proxy: terminal permanente LLM-B ──────────────────────────────────────────
+
+/**
+ * POST /inject
+ *
+ * Proxy para o servidor de injeção do Terminal Permanente LLM-B (porta `LLM_B_TERMINAL_PORT`, padrão 3009). Permite
+ * que LLM-A ou o usuário enviem mensagens ao terminal sem conhecer a porta interna.
+ *
+ * Body JSON: `{ "message": string, "from"?: string }`
+ * Resposta: JSON retornado pelo terminal-server, ou 503 se o terminal não estiver acessível.
+ */
+router.post('/inject', async (req, res) => {
+    const terminalPort = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
+    const injectUrl = `http://127.0.0.1:${terminalPort}/inject`;
+
+    const body = JSON.stringify(req.body ?? {});
+
+    try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10_000);
+
+        const upstream = await fetch(injectUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body,
+            signal: ctrl.signal,
+        });
+        clearTimeout(timer);
+
+        const data = await upstream.json();
+        res.status(upstream.status).json(data);
+    } catch (/** @type {any} */ e) {
+        if (e.name === 'AbortError') {
+            res.status(504).json({ ok: false, error: 'Terminal LLM-B não respondeu a tempo' });
+        } else {
+            res.status(503).json({ ok: false, error: 'Terminal LLM-B inacessível', detail: e.message });
+        }
+    }
+});
+
 export default router;

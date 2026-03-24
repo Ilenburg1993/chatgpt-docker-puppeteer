@@ -1,7 +1,9 @@
 # Sprint: Terminal Permanente LLM-B
 
-**Data**: 2026-01-27
-**Status**: Em Execução
+**Data início**: 2026-01-27  
+**Data conclusão**: 2026-03-24  
+**Status**: ✅ Fase 1 Concluída — Fase 2 (Integração Hub + PM2) Em Execução  
+**Commits**: `f0c0dd15` (terminal-server) · `5a2f05f9` (hub-server) · `7625474f` (hub)  
 **Autor**: LLM-A (GitHub Copilot)
 
 ---
@@ -148,13 +150,33 @@ POST /api/hub/inject
 
 ## Checklist de Implementação
 
-- [ ] Criar `src/copilot/terminal-server.js` com readline + HTTP inject
-- [ ] Atualizar `src/copilot/cli-terminal.js` para usar `dialogTurn()`
-- [ ] Adicionar `POST /api/hub/inject` ao `copilot-hub-router.js`
-- [ ] Adicionar entrada `llm-b-terminal` ao `ecosystem.config.cjs`
+### Fase 1 — Terminal Base (CONCLUÍDA ✅)
+
+- [x] Criar `src/copilot/terminal-server.js` com readline + HTTP inject server `:3009`
+- [x] Atualizar `src/copilot/cli-terminal.js` para usar `dialogTurn()` via `llmBridgeClient` singleton
+- [x] REPL com comandos `/status`, `/history [n]`, `/who`, `/clear`, `/answer`, `/restart`, `/quit`
+- [x] Mutex `_busy` — evita turnos concorrentes
+- [x] Auto-boot do `AlwaysAliveAgent` + `startDialogMode()` ao iniciar
+- [x] `Ctrl+C` pausa readline mas mantém dialog loop ativo
+- [x] `npm run lint` → 0 erros
+- [x] `npm run test:unit` → 1474/1474 passando
+- [x] Commit `f0c0dd15` realizado
+
+### Fase 2 — Integração Hub + PM2 (EM EXECUÇÃO 🔄)
+
+- [ ] Integrar `terminal-server.js` com `ConversationHub` — criar `hub_session` permanente na boot e persistir turnos
+- [ ] Adicionar `POST /api/hub/inject` ao `copilot-hub-router.js` (proxy para `:3009/inject`)
+- [ ] Adicionar entrada `llm-b-terminal` ao `ecosystem.config.cjs` (condicional `COPILOT_TERMINAL_ENABLED=true`)
 - [ ] `npm run lint` → 0 erros
 - [ ] `npm run test:unit` → todos passando
-- [ ] Teste manual: abrir terminal via PM2 + injetar via curl
+- [ ] Commit da Fase 2
+
+### Fase 3 — Testes e Operação (FUTURA)
+
+- [ ] Teste manual: iniciar via PM2 (`COPILOT_TERMINAL_ENABLED=true pm2 start ecosystem.config.cjs --only llm-b-terminal`)
+- [ ] Teste inject via curl: `curl -X POST http://localhost:3009/inject -d '{"message":"olá"}'`
+- [ ] Teste proxy: `curl -X POST http://localhost:3008/api/hub/inject -d '{"message":"olá"}'`
+- [ ] Verificar histórico no hub: `GET /api/hub/sessions`
 
 ---
 
@@ -174,7 +196,30 @@ POST /api/hub/inject
 
 ## Notas Técnicas
 
-- **Dialog Loop**: o `AlwaysAliveAgent` já suporta `startDialogLoop()` e `sendDialogTurn()`. O terminal deve reutilizar isso.
-- **Singleton**: `alwaysAliveAgent` e `llmBridgeClient` são singletons — se o server principal já iniciou o agent, o terminal-server deve detectar e reutilizar o loop existente.
+- **Dialog Loop**: o `AlwaysAliveAgent` já suporta `startDialogLoop()` e `sendDialogTurn()`. O terminal reutiliza o singleton `llmBridgeClient.startDialogMode()` / `llmBridgeClient.dialogTurn()`.
+- **Singleton**: `alwaysAliveAgent` e `llmBridgeClient` são singletons — nunca instanciar com `new`.
 - **Porta 3009**: config via env `LLM_B_TERMINAL_PORT` com fallback para 3009.
-- **Ctrl+C handling**: deve pausar readline mas não encerrar o dialog loop — LLM-B fica esperando.
+- **Ctrl+C handling**: pausa readline mas não encerra o dialog loop — LLM-B permanece aguardando.
+- **Hub Integration**: o terminal cria sua própria `hub_session` "Terminal Permanente" para que turnos sejam persitidos no SQLite via `ConversationStore`.
+- **Proxy /inject**: `POST /api/hub/inject` no servidor Express (3008) é um proxy para `http://127.0.0.1:3009/inject` — LLM-A não precisa conhecer a porta interna.
+- **PM2**: processo `llm-b-terminal` ativado por `COPILOT_TERMINAL_ENABLED=true`; sem `wait_ready` pois o processo é interativo.
+- **bootPrompt**: env `LLM_B_BOOT_PROMPT` — mensagem de contexto enviada à LLM-B na primeira vez que o dialog loop sobe.
+
+---
+
+## Arquivos Implementados (Fase 1)
+
+| Arquivo | Status | Descrição |
+|---------|--------|-----------|
+| `src/copilot/terminal-server.js` | ✅ Criado | REPL + inject server HTTP :3009 |
+| `src/copilot/cli-terminal.js` | ✅ Atualizado | Migrado para dialog mode |
+| `DOCUMENTAÇÃO/PLANOS/SPRINT-TERMINAL-LLM-B.md` | ✅ Este arquivo | Plano do sprint |
+
+## Arquivos a Modificar (Fase 2)
+
+| Arquivo | Modificação |
+|---------|-------------|
+| `src/copilot/terminal-server.js` | Integração com `conversationHub` |
+| `src/server/api/copilot-hub-router.js` | `POST /api/hub/inject` proxy |
+| `ecosystem.config.cjs` | Processo `llm-b-terminal` condicional |
+| `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md` | Seção `src/copilot/` ✅ já adicionada |

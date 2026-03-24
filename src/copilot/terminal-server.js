@@ -38,7 +38,29 @@ import http from 'node:http';
 import readline from 'node:readline';
 import { alwaysAliveAgent } from './always-alive.js';
 import { llmBridgeClient } from './llm-bridge-client.js';
+// ─── ConversationHub (integração opcional) ────────────────────────────────────────────────────────────────────────────────────
 
+/** @type {import('./conversation-hub/hub.js').ConversationHub | null} */
+let _hubModule = null;
+
+/**
+ * Retorna o singleton `conversationHub` (lazy import) ou null se indisponível.
+ *
+ * @returns {Promise<import('./conversation-hub/hub.js').ConversationHub | null>}
+ */
+async function getHub() {
+    if (_hubModule !== null) return _hubModule;
+    try {
+        const m = await import('./conversation-hub/hub.js');
+        _hubModule = m.conversationHub;
+    } catch {
+        _hubModule = null;
+    }
+    return _hubModule;
+}
+
+/** ID da hub_session permanente criada no boot. @type {string | null} */
+let _hubSessionId = null;
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
 const INJECT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
@@ -109,6 +131,7 @@ function cmdStatus() {
     println(`  dialogLoopActive: ${alwaysAliveAgent.dialogLoopActive}`);
     println(`  turnCount (hub):  ${llmBridgeClient.turnCount}`);
     println(`  taskId atual:     ${snap.currentTaskId ?? '(nenhum)'}`);
+    println(`  hubSessionId:     ${_hubSessionId ?? '(sem hub)'}`);
     println('─────────────────────');
 }
 
@@ -194,6 +217,20 @@ async function sendTurn(message, actor = 'user') {
         const durationMs = Date.now() - t0;
         printExchange(actor, message, reply, durationMs);
         log('INFO', `[TerminalServer] Turno ${actor} concluído em ${durationMs}ms`);
+
+        // Persistir no ConversationHub (best-effort)
+        if (_hubSessionId) {
+            const hub = await getHub();
+            if (hub) {
+                try {
+                    hub.store.writeTurn(_hubSessionId, { role: 'user', content: message });
+                    hub.store.writeTurn(_hubSessionId, { role: 'llm_b', content: reply, durationMs });
+                } catch (/** @type {any} */ hubErr) {
+                    log('WARN', `[TerminalServer] Hub writeTurn falhou: ${hubErr.message}`);
+                }
+            }
+        }
+
         return reply;
     } catch (/** @type {any} */ e) {
         println(`[erro] ${e.message}`);
@@ -231,6 +268,7 @@ function createInjectServer() {
                     dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
                     agentStatus: alwaysAliveAgent.status,
                     busy: _busy,
+                    hubSessionId: _hubSessionId,
                 }),
             );
             return;
@@ -464,6 +502,21 @@ export async function startTerminalServer() {
     log('INFO', '[TerminalServer] Iniciando terminal permanente LLM-B…');
 
     const injectServer = createInjectServer();
+
+    // Criar hub_session permanente (best-effort)
+    try {
+        const hub = await getHub();
+        if (hub) {
+            _hubSessionId = hub.createSession({
+                title: 'Terminal Permanente LLM-B',
+                metadata: { source: 'terminal-server', startedAt: new Date().toISOString() },
+            });
+            log('INFO', `[TerminalServer] Hub session criada: ${_hubSessionId}`);
+        }
+    } catch (/** @type {any} */ e) {
+        log('WARN', `[TerminalServer] Hub não disponível na boot: ${e.message}`);
+    }
+
     await startRepl(injectServer);
 }
 

@@ -318,6 +318,32 @@ Função:
 
 Também é um serviço opt-in e separado do runtime central.
 
+### `src/copilot/`
+
+Função:
+
+- integrar o sistema com o GitHub Copilot SDK (LLM-B) de forma programática;
+- manter uma sessão de diálogo permanente e reutilizável com a LLM-B;
+- expor um hub de conversa persistente para comunicação tri-party (LLM-A ↔ LLM-B ↔ Usuário);
+- fornecer terminal permanente com acesso simultâneo por stdin e por HTTP.
+
+Peças importantes:
+
+- `agent.js`: processo standalone do Copilot SDK Agent (entrypoint PM2 `copilot-sdk-agent`);
+- `always-alive.js` (`AlwaysAliveAgent`): agente com dialog loop permanente; getters `status`, `dialogLoopActive`; métodos `start()`, `sendDialogTurn()`, `answerPendingQuestion()`;
+- `llm-bridge-client.js` (`LlmBridgeClient`): cliente de diálogo com métodos `startDialogMode()`, `dialogTurn()`, `stopDialogMode()`, `chatStructured()`; singleton `llmBridgeClient` exportado;
+- `nerv-bridge.js` (`copilotNervBridge`): ponte de eventos Copilot → NERV; `mount(nerv)`, `unmount()`;
+- `cli-terminal.js`: REPL CLI leve via readline, usa `llmBridgeClient.dialogTurn()` por mensagem;
+- `terminal-server.js`: **Terminal Permanente LLM-B** — REPL com dois atores (stdin e HTTP `:3009/inject`), auto-boot do dialog loop, integração com `ConversationHub` para persistência;
+- `conversation-hub/`: ConversationHub — `store.js` (SQLite), `orchestrator.js`, `socket-ns.js` (Socket.io `/copilot`), `hub.js` (singleton `conversationHub`); API REST em `src/server/api/copilot-hub-router.js`.
+
+Restrições:
+
+- Não chamar `puppeteer.launch()` neste módulo.
+- `alwaysAliveAgent` e `llmBridgeClient` são singletons — nunca instanciar diretamente em código novo.
+- `COPILOT_SDK_ENABLED=true` é requisito para ativar o processo; o código usa lazy import para não quebrar quando desabilitado.
+- O terminal permanente (`terminal-server.js`) opera na porta `LLM_B_TERMINAL_PORT` (padrão `3009`); o servidor principal opera em `3008`.
+
 ### `src/shared/`
 
 Função:

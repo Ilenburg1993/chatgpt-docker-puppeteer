@@ -439,5 +439,50 @@ module.exports = {
                   },
               ]
             : []),
+
+        // ── Terminal Permanente LLM-B ────────────────────────────────────────
+        // Habilitado quando COPILOT_TERMINAL_ENABLED=true no environment.
+        // Mantém sessão dialog loop aberta com LLM-B + servidor HTTP de injeção.
+        // Porta padrão: LLM_B_TERMINAL_PORT=3009. Requer COPILOT_SDK_ENABLED=true.
+        ...(process.env.COPILOT_TERMINAL_ENABLED === 'true'
+            ? [
+                  {
+                      name: 'llm-b-terminal',
+                      cwd: projectRoot,
+                      script: './src/copilot/terminal-server.js',
+                      wait_ready: false,
+                      exec_mode: 'fork',
+                      instances: 1,
+                      watch: false,
+                      autorestart: true,
+                      kill_timeout: 10000,
+                      max_restarts: 10,
+                      restart_delay: 3000,
+                      max_memory_restart: '512M',
+                      merge_logs: false,
+                      time: true,
+                      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+                      error_file: './logs/llm-b-terminal-error.log',
+                      out_file: './logs/llm-b-terminal-out.log',
+                      filter_env: ['NO_COLOR'],
+                      env: {
+                          NODE_ENV: 'development',
+                          FORCE_COLOR: '1',
+                          COPILOT_SDK_ENABLED: 'true',
+                          COPILOT_TERMINAL_ENABLED: 'true',
+                          LLM_B_TERMINAL_PORT: '3009',
+                          COPILOT_MODEL: 'gpt-4.1',
+                      },
+                      env_production: {
+                          NODE_ENV: 'production',
+                          FORCE_COLOR: '1',
+                          COPILOT_SDK_ENABLED: 'true',
+                          COPILOT_TERMINAL_ENABLED: 'true',
+                          LLM_B_TERMINAL_PORT: '3009',
+                          COPILOT_MODEL: 'gpt-4.1',
+                      },
+                  },
+              ]
+            : []),
     ],
 };
