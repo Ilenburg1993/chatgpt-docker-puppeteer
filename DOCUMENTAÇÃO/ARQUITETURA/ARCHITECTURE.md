@@ -1,8 +1,8 @@
 # Arquitetura Oficial do Sistema
 
-**Propósito**: definir a arquitetura oficial, atual e operacional do `chatgpt-docker-puppeteer`.  
-**Status documental**: Canônico.  
-**Público**: engenharia, manutenção, auditoria e agentes de IA.  
+**Propósito**: definir a arquitetura oficial, atual e operacional do `chatgpt-docker-puppeteer`.
+**Status documental**: Canônico.
+**Público**: engenharia, manutenção, auditoria e agentes de IA.
 **Última atualização**: 28 de fevereiro de 2026.
 
 ## 1. Propósito do sistema

@@ -1,9 +1,9 @@
 # Sprint: Terminal Permanente LLM-B
 
-**Data início**: 2026-01-27  
-**Data conclusão**: 2026-03-24  
-**Status**: ✅ Fase 1 Concluída — Fase 2 (Integração Hub + PM2) Em Execução  
-**Commits**: `f0c0dd15` (terminal-server) · `5a2f05f9` (hub-server) · `7625474f` (hub)  
+**Data início**: 2026-01-27
+**Data conclusão**: 2026-03-24
+**Status**: ✅ Fase 1 Concluída — Fase 2 (Integração Hub + PM2) Em Execução
+**Commits**: `f0c0dd15` (terminal-server) · `5a2f05f9` (hub-server) · `7625474f` (hub)
 **Autor**: LLM-A (GitHub Copilot)
 
 ---
@@ -209,17 +209,17 @@ POST /api/hub/inject
 
 ## Arquivos Implementados (Fase 1)
 
-| Arquivo | Status | Descrição |
-|---------|--------|-----------|
-| `src/copilot/terminal-server.js` | ✅ Criado | REPL + inject server HTTP :3009 |
-| `src/copilot/cli-terminal.js` | ✅ Atualizado | Migrado para dialog mode |
-| `DOCUMENTAÇÃO/PLANOS/SPRINT-TERMINAL-LLM-B.md` | ✅ Este arquivo | Plano do sprint |
+| Arquivo                                        | Status         | Descrição                       |
+| ---------------------------------------------- | -------------- | ------------------------------- |
+| `src/copilot/terminal-server.js`               | ✅ Criado       | REPL + inject server HTTP :3009 |
+| `src/copilot/cli-terminal.js`                  | ✅ Atualizado   | Migrado para dialog mode        |
+| `DOCUMENTAÇÃO/PLANOS/SPRINT-TERMINAL-LLM-B.md` | ✅ Este arquivo | Plano do sprint                 |
 
 ## Arquivos a Modificar (Fase 2)
 
-| Arquivo | Modificação |
-|---------|-------------|
-| `src/copilot/terminal-server.js` | Integração com `conversationHub` |
-| `src/server/api/copilot-hub-router.js` | `POST /api/hub/inject` proxy |
-| `ecosystem.config.cjs` | Processo `llm-b-terminal` condicional |
-| `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md` | Seção `src/copilot/` ✅ já adicionada |
+| Arquivo                                    | Modificação                           |
+| ------------------------------------------ | ------------------------------------- |
+| `src/copilot/terminal-server.js`           | Integração com `conversationHub`      |
+| `src/server/api/copilot-hub-router.js`     | `POST /api/hub/inject` proxy          |
+| `ecosystem.config.cjs`                     | Processo `llm-b-terminal` condicional |
+| `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md` | Seção `src/copilot/` ✅ já adicionada  |

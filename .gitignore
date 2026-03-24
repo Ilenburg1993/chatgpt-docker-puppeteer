@@ -56,6 +56,7 @@ logs/**/*.log
 .github/hooks/state/audit.jsonl
 .github/hooks/state/*.lock
 .github/hooks/state/.mismatch_track.json
+.github/hooks/state/sdk-always-alive.json
 .github/hooks/checkpoints/
 audit.log
 crash_reports/

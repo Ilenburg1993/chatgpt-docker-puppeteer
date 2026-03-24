@@ -323,11 +323,11 @@ router.get('/sessions/:id/stream', requireHub, (req, res) => {
 /**
  * POST /inject
  *
- * Proxy para o servidor de injeção do Terminal Permanente LLM-B (porta `LLM_B_TERMINAL_PORT`, padrão 3009). Permite
- * que LLM-A ou o usuário enviem mensagens ao terminal sem conhecer a porta interna.
+ * Proxy para o servidor de injeção do Terminal Permanente LLM-B (porta `LLM_B_TERMINAL_PORT`, padrão 3009). Permite que
+ * LLM-A ou o usuário enviem mensagens ao terminal sem conhecer a porta interna.
  *
- * Body JSON: `{ "message": string, "from"?: string }`
- * Resposta: JSON retornado pelo terminal-server, ou 503 se o terminal não estiver acessível.
+ * Body JSON: `{ "message": string, "from"?: string }` Resposta: JSON retornado pelo terminal-server, ou 503 se o
+ * terminal não estiver acessível.
  */
 router.post('/inject', async (req, res) => {
     const terminalPort = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);

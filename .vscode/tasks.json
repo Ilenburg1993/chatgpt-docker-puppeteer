@@ -426,6 +426,28 @@
       "command": "echo ${input:terminate}",
       "type": "shell",
       "problemMatcher": []
+    },
+    {
+      "label": "terminal:llm-b",
+      "type": "shell",
+      "command": "npm run terminal:llm-b",
+      "group": "none",
+      "detail": "Abrir terminal permanente LLM-B (REPL interativo + inject server :3009)",
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always",
+        "focus": true,
+        "title": "Terminal LLM-B"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": { "regexp": "^NUNCA$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "TerminalServer.*Iniciando",
+          "endsPattern": "LLM-B sinalizada READY"
+        }
+      }
     }
   ],
   "inputs": [
