@@ -754,6 +754,28 @@ async function bootstrap(options = {}) {
                 const _e = /** @type {any} */ (e);
                 log('WARN', `[COPILOT] Falha ao inicializar ConversationHub: ${_e.message}`);
             }
+
+            // AlwaysAliveAgent auto-start — inicia o agente se não rodando como processo PM2 separado
+            // Em produção, o agente roda como processo separado (copilot-sdk-agent) e não precisa deste bloco.
+            // Em desenvolvimento (único processo), este bloco garante que o agente esteja ativo.
+            if (process.env.COPILOT_AGENT_AUTOSTART !== 'false') {
+                try {
+                    const { alwaysAliveAgent } = await import('#copilot/always-alive');
+                    if (alwaysAliveAgent.status === 'stopped') {
+                        log('INFO', '[COPILOT] Auto-starting AlwaysAliveAgent...');
+                        await alwaysAliveAgent.start();
+                        log('INFO', `[COPILOT] AlwaysAliveAgent ativo. SessionId: ${alwaysAliveAgent.sessionId}`);
+                    } else {
+                        log('INFO', `[COPILOT] AlwaysAliveAgent já ativo (status=${alwaysAliveAgent.status})`);
+                    }
+                } catch (/** @type {any} */ e) {
+                    const _e = /** @type {any} */ (e);
+                    log(
+                        'WARN',
+                        `[COPILOT] Falha ao auto-iniciar AlwaysAliveAgent: ${_e.message} — hub disponível mas sem agente\n${_e.stack ?? '(sem stack)'}`,
+                    );
+                }
+            }
         }
 
         /* --------------------------------------------------------------

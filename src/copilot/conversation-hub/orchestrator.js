@@ -79,13 +79,30 @@ export class HubOrchestrator extends EventEmitter {
     // ─── Ciclo de vida ────────────────────────────────────────────────────────
 
     /**
-     * Inicializa o orquestrador criando o LlmBridgeClient.
+     * Inicializa o orquestrador criando o LlmBridgeClient. Restaura turn counters das sessões ativas da DB para
+     * garantir continuidade após restart.
      *
      * @param {LlmBridgeClient} [bridgeOverride] - Bridge a usar em vez de criar uma nova instância (útil em testes).
      * @returns {void}
      */
     init(bridgeOverride) {
         this.#bridge = bridgeOverride ?? new LlmBridgeClient();
+
+        // Restaurar turn counters das sessões ativas (evita sequência errada após restart)
+        try {
+            const activeSessions = this.#store.listHubSessions({ status: 'active' });
+            for (const session of activeSessions) {
+                const count = this.#store.countTurns(session.hubSessionId);
+                this.#turnCounters.set(session.hubSessionId, count);
+                log('DEBUG', `[HubOrchestrator] Sessão ${session.hubSessionId}: ${count} turns restaurados.`);
+            }
+            if (activeSessions.length > 0) {
+                log('INFO', `[HubOrchestrator] ${activeSessions.length} sessão(ões) ativa(s) restaurada(s) da DB.`);
+            }
+        } catch (/** @type {any} */ err) {
+            log('WARN', `[HubOrchestrator] Falha ao restaurar turn counters: ${err.message}`);
+        }
+
         log('DEBUG', '[HubOrchestrator] Inicializado com LlmBridgeClient.');
     }
 
@@ -207,7 +224,16 @@ export class HubOrchestrator extends EventEmitter {
         let parseError = null;
 
         try {
-            if (useStructured && typeof message === 'object') {
+            // Preferir dialog loop (sendDialogTurn) quando ativo — mais eficiente (0 PR por turno)
+            // Senão, usar LlmBridgeClient.chat() (1 PR por turno)
+            const agentInst = this.#agent ?? alwaysAliveAgent;
+            const useDialogLoop = /** @type {any} */ (agentInst).dialogLoopActive === true;
+
+            if (useDialogLoop) {
+                const content = typeof message === 'string' ? message : messageContent;
+                log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${turnNumber + 1}.`);
+                llmBResponse = await /** @type {any} */ (agentInst).sendDialogTurn(content, { timeout: timeoutMs });
+            } else if (useStructured && typeof message === 'object') {
                 // Usar chatStructured() com StructuredMessage
                 const result = await this.#bridge.chatStructured(/** @type {any} */ (message), {
                     onDelta: (chunk) => {
@@ -237,7 +263,7 @@ export class HubOrchestrator extends EventEmitter {
             this.emit('error', { hubSessionId, message: errMsg, error: err });
 
             // Persistir o erro como turn de LLM-B para manter histórico completo
-            const errTurnId = this.#store.writeTurn(hubSessionId, {
+            this.#store.writeTurn(hubSessionId, {
                 role: 'llm_b',
                 content: `[ERRO] ${err.message}`,
                 sdkSessionId,

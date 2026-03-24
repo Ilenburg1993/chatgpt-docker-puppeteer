@@ -94,7 +94,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
          */
         socket.on('join:session', (/** @type {{ hubSession: string }} */ data) => {
             if (!data?.hubSession) return;
-            socket.join(data.hubSession);
+            void socket.join(data.hubSession);
             log('DEBUG', `[socket-ns/copilot] Cliente ${clientId} entrou na sala: ${data.hubSession}`);
             socket.emit('joined:session', { hubSession: data.hubSession });
         });
@@ -104,7 +104,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
          */
         socket.on('leave:session', (/** @type {{ hubSession: string }} */ data) => {
             if (!data?.hubSession) return;
-            socket.leave(data.hubSession);
+            void socket.leave(data.hubSession);
             log('DEBUG', `[socket-ns/copilot] Cliente ${clientId} saiu da sala: ${data.hubSession}`);
         });
 

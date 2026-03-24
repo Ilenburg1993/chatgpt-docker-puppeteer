@@ -172,6 +172,15 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Indica se o modo de diálogo contínuo está ativo (startDialogLoop foi chamado e ainda não foi parado).
+     *
+     * @returns {boolean}
+     */
+    get dialogLoopActive() {
+        return this.#dialogLoopActive;
+    }
+
+    /**
      * Retorna a pergunta pendente (se houver).
      *
      * @returns {PendingQuestion | null}

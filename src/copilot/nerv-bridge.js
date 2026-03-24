@@ -92,7 +92,8 @@ function safeEmit(actionCode, payload) {
         actionCode,
         typeof payload === 'object' && payload !== null ? payload : { value: payload },
     );
-    _nerv.emitEvent(envelope).catch((/** @type {any} */ e) => {
+    // emitEvent() é síncrono (void) — wrapping em Promise.resolve para consistência
+    Promise.resolve(_nerv.emitEvent(envelope)).catch((/** @type {any} */ e) => {
         log('WARN', `[nerv-bridge] Falha ao emitir ${actionCode}: ${e?.message ?? String(e)}`);
     });
 }

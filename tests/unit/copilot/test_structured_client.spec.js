@@ -247,7 +247,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const b = new mod.LlmBridgeClient();
 
         await assert.rejects(
-            // @ts-ignore — teste deliberado de tipo inválido
+            // @ts-expect-error — teste deliberado de tipo inválido
             () => b.chatStructured({ context: 'c', intent: 'i', responseType: 'invalid_type' }),
             (err) => err.constructor.name === 'ZodError',
         );

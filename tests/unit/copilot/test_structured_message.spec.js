@@ -338,9 +338,9 @@ describe('parseStructuredResponse', () => {
     });
 
     it('retorna null para valores nulos', () => {
-        // @ts-ignore - teste deliberado de null
+        // @ts-expect-error - teste deliberado de null
         assert.equal(parseStructuredResponse(null), null);
-        // @ts-ignore
+        // @ts-expect-error — teste deliberado com undefined
         assert.equal(parseStructuredResponse(undefined), null);
     });
 });

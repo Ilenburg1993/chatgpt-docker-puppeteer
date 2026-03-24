@@ -199,4 +199,123 @@ router.post('/sessions/:id/close', requireHub, (req, res) => {
     }
 });
 
+// ─── POST /api/hub/sessions/:id/send ─────────────────────────────────────────
+
+/**
+ * Envia mensagem de LLM-A para LLM-B e retorna a resposta (síncrono).
+ *
+ * Body: { message: string, useStructured?: boolean, timeoutMs?: number } Response: { turnId, content, durationMs,
+ * hubSessionId, turnNumber }
+ */
+router.post('/sessions/:id/send', requireHub, async (req, res) => {
+    try {
+        const hub = /** @type {any} */ (req).hub;
+        const message = String(req.body?.message ?? '').trim();
+        const timeoutMs = Number(req.body?.timeoutMs) || 120_000;
+        const useStructured = Boolean(req.body?.useStructured ?? false);
+
+        if (!message) {
+            res.status(400).json({ error: "'message' é obrigatório e não pode ser vazio." });
+            return;
+        }
+
+        const session = hub.store.getHubSession(req.params.id);
+        if (!session) {
+            res.status(404).json({ error: `Sessão '${req.params.id}' não encontrada.` });
+            return;
+        }
+        if (session.status !== 'active') {
+            res.status(409).json({ error: `Sessão '${req.params.id}' não está ativa (${session.status}).` });
+            return;
+        }
+
+        const result = await hub.sendToLlmB(req.params.id, message, { useStructured, timeoutMs });
+        res.json(result);
+    } catch (/** @type {any} */ err) {
+        log('ERROR', `[copilot-hub-router] POST /sessions/:id/send: ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── GET /api/hub/sessions/:id/stream ────────────────────────────────────────
+
+/**
+ * SSE para receber eventos em tempo real de uma hub session.
+ *
+ * Eventos emitidos:
+ *
+ * - `turn:sent` — turno LLM-A enviado
+ * - `turn:delta` — chunk de streaming LLM-B
+ * - `turn:complete` — turno LLM-B completo
+ * - `error` — erro na sessão
+ * - `keepalive` — heartbeat a cada 15s
+ */
+router.get('/sessions/:id/stream', requireHub, (req, res) => {
+    const hub = /** @type {any} */ (req).hub;
+
+    // Verifica se a sessão existe
+    const session = hub.store.getHubSession(req.params.id);
+    if (!session) {
+        res.status(404).json({ error: `Sessão '${req.params.id}' não encontrada.` });
+        return;
+    }
+
+    // Configura SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    /**
+     * @param {string} event
+     * @param {object} data
+     */
+    const send = (event, data) => {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // Heartbeat a cada 15s para manter conexão ativa
+    const keepalive = setInterval(() => {
+        send('keepalive', { ts: Date.now() });
+    }, 15_000);
+
+    // Listeners de eventos do orchestrator (filtrados pela sessão)
+    const sessionId = req.params.id;
+
+    /** @param {any} evt */
+    const onSent = (evt) => {
+        if (evt.hubSessionId === sessionId) send('turn:sent', evt);
+    };
+    /** @param {any} evt */
+    const onDelta = (evt) => {
+        if (evt.hubSessionId === sessionId) send('turn:delta', evt);
+    };
+    /** @param {any} evt */
+    const onComplete = (evt) => {
+        if (evt.hubSessionId === sessionId) send('turn:complete', evt);
+    };
+    /** @param {any} evt */
+    const onError = (evt) => {
+        if (evt.hubSessionId === sessionId) send('error', evt);
+    };
+
+    hub.orchestrator.on('turn:sent', onSent);
+    hub.orchestrator.on('turn:delta', onDelta);
+    hub.orchestrator.on('turn:complete', onComplete);
+    hub.orchestrator.on('error', onError);
+
+    // Envia estado inicial
+    send('connected', { hubSessionId: sessionId, ts: Date.now() });
+
+    // Cleanup ao desconectar
+    req.on('close', () => {
+        clearInterval(keepalive);
+        hub.orchestrator.off('turn:sent', onSent);
+        hub.orchestrator.off('turn:delta', onDelta);
+        hub.orchestrator.off('turn:complete', onComplete);
+        hub.orchestrator.off('error', onError);
+    });
+});
+
 export default router;
