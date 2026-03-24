@@ -283,8 +283,8 @@ export function subscribeLlmB(onEvent, opts = {}) {
 /**
  * Subscreve apenas ao canal de eventos críticos da LLM-B (stalled, fatal, system).
  *
- * Usa o parâmetro `?level=critical` do endpoint SSE (P8). Ideal para alertas proativos sem
- * overhead de receber todas as respostas da LLM-B.
+ * Usa o parâmetro `?level=critical` do endpoint SSE (P8). Ideal para alertas proativos sem overhead de receber todas as
+ * respostas da LLM-B.
  *
  * @param {SseHandler} onEvent - Callback chamado a cada evento crítico
  * @param {{ port?: number }} [opts]
@@ -361,8 +361,8 @@ export function subscribeLlmBCritical(onEvent, opts = {}) {
 /**
  * Executa uma sequência ordenada de prompts na LLM-B via `POST /pipeline`.
  *
- * O pipeline é abortado se a LLM-B estiver ocupada em qualquer step. Cada step aguarda a resposta
- * antes de enviar o próximo.
+ * O pipeline é abortado se a LLM-B estiver ocupada em qualquer step. Cada step aguarda a resposta antes de enviar o
+ * próximo.
  *
  * @example
  *     ```js

@@ -1,17 +1,16 @@
 # Terminal Permanente LLM-B — Guia Completo
 
-**Versão**: 4.0 (Fase 4 — Memória + Pipeline + Reflection + SSE crítico + Auditoria)
-**Última atualização**: 2026-03-24
-**Módulo**: `src/copilot/terminal-server.js`
-**Porta inject**: `3009` (configurável via `LLM_B_TERMINAL_PORT`)
+**Versão**: 4.0 (Fase 4 — Memória + Pipeline + Reflection + SSE crítico + Auditoria) **Última
+atualização**: 2026-03-24 **Módulo**: `src/copilot/terminal-server.js` **Porta inject**: `3009`
+(configurável via `LLM_B_TERMINAL_PORT`)
 
 ---
 
 ## O que é
 
 O **Terminal Permanente LLM-B** é um processo Node.js que mantém uma sessão de diálogo
-permanentemente aberta com a **LLM-B** (GPT-4.1 via GitHub Copilot SDK). Três atores podem
-interagir em tempo real:
+permanentemente aberta com a **LLM-B** (GPT-4.1 via GitHub Copilot SDK). Três atores podem interagir
+em tempo real:
 
 | Ator                       | Canal                                   | Como                                             |
 | -------------------------- | --------------------------------------- | ------------------------------------------------ |
@@ -69,20 +68,20 @@ Cada turno é persistido no SQLite (`data/copilot.db`) e sobrevive a restarts.
 ```bash
 gh auth status
 # Deve mostrar: ✓ Logged in to github.com account <USUARIO>
-gh auth login  # se necessário
+gh auth login # se necessário
 ```
 
 ### 2. Variáveis de ambiente
 
 ```bash
-COPILOT_SDK_ENABLED=true          # obrigatório
-LLM_B_TERMINAL_PORT=3009          # porta inject (padrão: 3009)
-LLM_B_TURN_TIMEOUT=120000         # timeout por turno em ms (padrão: 120s)
-COPILOT_MODEL=gpt-4.1             # modelo (padrão: gpt-4.1)
-LLM_B_BOOT_PROMPT="..."           # contexto inicial personalizado (opcional)
-LLM_B_REFLECTION_INTERVAL_MIN=30  # ativa reflection loop (opt-in, padrão: desativado)
-LLM_B_WATCHDOG_MS=300000          # intervalo watchdog em ms (padrão: 5min)
-LLM_B_WATCHDOG_STALL_MS=900000    # limiar de inatividade para stalled (padrão: 15min)
+COPILOT_SDK_ENABLED=true         # obrigatório
+LLM_B_TERMINAL_PORT=3009         # porta inject (padrão: 3009)
+LLM_B_TURN_TIMEOUT=120000        # timeout por turno em ms (padrão: 120s)
+COPILOT_MODEL=gpt-4.1            # modelo (padrão: gpt-4.1)
+LLM_B_BOOT_PROMPT="..."          # contexto inicial personalizado (opcional)
+LLM_B_REFLECTION_INTERVAL_MIN=30 # ativa reflection loop (opt-in, padrão: desativado)
+LLM_B_WATCHDOG_MS=300000         # intervalo watchdog em ms (padrão: 5min)
+LLM_B_WATCHDOG_STALL_MS=900000   # limiar de inatividade para stalled (padrão: 15min)
 ```
 
 ---
@@ -132,19 +131,19 @@ Banner atual:
 
 ## Comandos do REPL
 
-| Comando                       | Descrição                                                                  |
-| ----------------------------- | -------------------------------------------------------------------------- |
-| `/status`                     | Status: agente, dialog loop, hubSessionId, turnCount, inject port          |
-| `/history [n]`                | Últimos N pares em memória (padrão: 10) — não persiste entre restarts      |
-| `/db-history [n]`             | Últimos N turnos persistidos no SQLite (padrão: 20)                        |
-| `/db-sessions [n]`            | **(P9)** Últimas N hub_sessions persistidas (padrão: 10)                   |
-| `/remember [tag:] conteúdo`   | **(P5)** Persiste memória semântica com tag livre                          |
-| `/recall [tag]`               | **(P5)** Recupera memórias por tag                                         |
-| `/recall ?busca textual`      | **(P5)** Busca FTS5 nas memórias                                           |
-| `/who`                        | Lista atores e canais disponíveis                                          |
-| `/clear`                      | Limpa histórico em memória (SQLite mantido)                                |
-| `/restart`                    | Reinicia o dialog loop manualmente                                         |
-| `/quit` / `/exit`             | Encerra o terminal                                                         |
+| Comando                     | Descrição                                                             |
+| --------------------------- | --------------------------------------------------------------------- |
+| `/status`                   | Status: agente, dialog loop, hubSessionId, turnCount, inject port     |
+| `/history [n]`              | Últimos N pares em memória (padrão: 10) — não persiste entre restarts |
+| `/db-history [n]`           | Últimos N turnos persistidos no SQLite (padrão: 20)                   |
+| `/db-sessions [n]`          | **(P9)** Últimas N hub_sessions persistidas (padrão: 10)              |
+| `/remember [tag:] conteúdo` | **(P5)** Persiste memória semântica com tag livre                     |
+| `/recall [tag]`             | **(P5)** Recupera memórias por tag                                    |
+| `/recall ?busca textual`    | **(P5)** Busca FTS5 nas memórias                                      |
+| `/who`                      | Lista atores e canais disponíveis                                     |
+| `/clear`                    | Limpa histórico em memória (SQLite mantido)                           |
+| `/restart`                  | Reinicia o dialog loop manualmente                                    |
+| `/quit` / `/exit`           | Encerra o terminal                                                    |
 
 ### Exemplos
 
@@ -215,19 +214,19 @@ curl -X POST http://127.0.0.1:3009/pipeline \
 ### `GET /events` — SSE streaming (P3 + P8)
 
 ```bash
-curl -N http://127.0.0.1:3009/events          # todos os eventos
-curl -N "http://127.0.0.1:3009/events?level=critical"  # apenas stalled/fatal/system
+curl -N http://127.0.0.1:3009/events                  # todos os eventos
+curl -N "http://127.0.0.1:3009/events?level=critical" # apenas stalled/fatal/system
 ```
 
 **Eventos emitidos:**
 
-| Evento    | Quando                              | Payload                              | Crítico |
-| --------- | ----------------------------------- | ------------------------------------ | ------- |
-| `reply`   | LLM-B emite uma resposta            | `{ content, timestamp }`             | ❌       |
-| `ready`   | Dialog loop pronto/reconectou       | `{ timestamp }`                      | ❌       |
-| `stalled` | Watchdog detectou inatividade       | `{ stalledMs }`                      | ✅       |
-| `system`  | Evento de sistema (reflection, etc) | `{ type, content, timestamp }`       | ✅       |
-| `fatal`   | Falha irrecuperável do SDK          | `{ message }`                        | ✅       |
+| Evento    | Quando                              | Payload                        | Crítico |
+| --------- | ----------------------------------- | ------------------------------ | ------- |
+| `reply`   | LLM-B emite uma resposta            | `{ content, timestamp }`       | ❌      |
+| `ready`   | Dialog loop pronto/reconectou       | `{ timestamp }`                | ❌      |
+| `stalled` | Watchdog detectou inatividade       | `{ stalledMs }`                | ✅      |
+| `system`  | Evento de sistema (reflection, etc) | `{ type, content, timestamp }` | ✅      |
+| `fatal`   | Falha irrecuperável do SDK          | `{ message }`                  | ✅      |
 
 ### `GET /sessions` — listagem (P9)
 
@@ -266,10 +265,10 @@ curl "http://127.0.0.1:3009/memory?search=dialog+loop&limit=5"
 
 ```javascript
 import {
-    injectToLlmB,
-    checkLlmBHealth,
-    subscribeLlmB,
-    waitForLlmBReady,
+  injectToLlmB,
+  checkLlmBHealth,
+  subscribeLlmB,
+  waitForLlmBReady,
 } from '#copilot/inject-llmb';
 
 // Health check
@@ -284,8 +283,8 @@ console.log(`LLM-B (${durationMs}ms):`, reply);
 
 // Subscrever SSE
 const sub = subscribeLlmB((evt) => {
-    if (evt.type === 'reply') console.log('resposta:', evt.data.content.slice(0, 80));
-    if (evt.type === 'stalled') console.warn('watchdog:', evt.data.stalledMs, 'ms');
+  if (evt.type === 'reply') console.log('resposta:', evt.data.content.slice(0, 80));
+  if (evt.type === 'stalled') console.warn('watchdog:', evt.data.stalledMs, 'ms');
 });
 sub.unsubscribe(); // quando terminar
 ```
@@ -300,6 +299,7 @@ O `AlwaysAliveAgent` monitora o dialog loop continuamente. Parâmetros configur�
 - `LLM_B_WATCHDOG_STALL_MS` — inatividade para emitir `dialog.stalled` (padrão: 15min)
 
 Ao detectar travamento:
+
 1. Emite `dialog.stalled`
 2. Persiste `[SISTEMA] Watchdog…` no Hub
 3. Emite evento SSE `stalled`
@@ -335,10 +335,11 @@ Ideal para: análises multi-etapa, geração de relatórios, workflows automatiz
 Envio periódico automático de um meta-prompt de reflexão à LLM-B. Ativado via env var:
 
 ```bash
-LLM_B_REFLECTION_INTERVAL_MIN=30  # reflexão a cada 30 minutos
+LLM_B_REFLECTION_INTERVAL_MIN=30 # reflexão a cada 30 minutos
 ```
 
-A LLM-B faz uma auto-avaliação da conversa e o resultado é transmitido via SSE `system { type: 'reflection' }`.
+A LLM-B faz uma auto-avaliação da conversa e o resultado é transmitido via SSE
+`system { type: 'reflection' }`.
 
 ---
 
@@ -364,40 +365,40 @@ copilot_memories_fts  -- virtual table (triggers automáticos)
 
 ## Variáveis de ambiente (completo)
 
-| Variável                        | Padrão    | Descrição                                           |
-| ------------------------------- | --------- | --------------------------------------------------- |
-| `COPILOT_SDK_ENABLED`           | `false`   | **Obrigatório** — habilita subsistema copilot       |
-| `COPILOT_TERMINAL_ENABLED`      | `false`   | Habilita processo PM2 `llm-b-terminal`              |
-| `LLM_B_TERMINAL_PORT`           | `3009`    | Porta do servidor HTTP de injeção                   |
-| `LLM_B_TURN_TIMEOUT`            | `120000`  | Timeout (ms) por turno                              |
-| `COPILOT_MODEL`                 | `gpt-4.1` | Modelo LLM-B                                        |
-| `LLM_B_BOOT_PROMPT`             | _(padrão)_ | Contexto inicial personalizado                     |
-| `LLM_B_REFLECTION_INTERVAL_MIN` | `0`       | Intervalo do reflection loop em minutos (0=off)     |
-| `LLM_B_WATCHDOG_MS`             | `300000`  | Intervalo de checagem do watchdog (ms)              |
-| `LLM_B_WATCHDOG_STALL_MS`       | `900000`  | Inatividade para emitir `dialog.stalled` (ms)        |
+| Variável                        | Padrão     | Descrição                                       |
+| ------------------------------- | ---------- | ----------------------------------------------- |
+| `COPILOT_SDK_ENABLED`           | `false`    | **Obrigatório** — habilita subsistema copilot   |
+| `COPILOT_TERMINAL_ENABLED`      | `false`    | Habilita processo PM2 `llm-b-terminal`          |
+| `LLM_B_TERMINAL_PORT`           | `3009`     | Porta do servidor HTTP de injeção               |
+| `LLM_B_TURN_TIMEOUT`            | `120000`   | Timeout (ms) por turno                          |
+| `COPILOT_MODEL`                 | `gpt-4.1`  | Modelo LLM-B                                    |
+| `LLM_B_BOOT_PROMPT`             | _(padrão)_ | Contexto inicial personalizado                  |
+| `LLM_B_REFLECTION_INTERVAL_MIN` | `0`        | Intervalo do reflection loop em minutos (0=off) |
+| `LLM_B_WATCHDOG_MS`             | `300000`   | Intervalo de checagem do watchdog (ms)          |
+| `LLM_B_WATCHDOG_STALL_MS`       | `900000`   | Inatividade para emitir `dialog.stalled` (ms)   |
 
 ---
 
 ## Roadmap — status por fase
 
-| Sprint | Upgrade                                      | Status    |
-| ------ | -------------------------------------------- | --------- |
-| P1     | Watchdog dialog loop                         | ✅ Fase 3  |
-| P2     | `/db-history` (SQLite persistido)            | ✅ Fase 3  |
-| P3     | SSE `/events` + `subscribeLlmB()`            | ✅ Fase 3  |
-| P4     | Eventos sistema persistidos no Hub           | ✅ Fase 3  |
-| P5     | Memória semântica (`/remember`, `/recall`)   | ✅ Fase 4  |
-| P6     | Pipeline de turnos (`POST /pipeline`)        | ✅ Fase 4  |
-| P7     | Reflection loop automático                   | ✅ Fase 4  |
-| P8     | Alertas SSE críticos (`?level=critical`)     | ✅ Fase 4  |
-| P9     | Auditoria `/db-sessions` + `GET /sessions`   | ✅ Fase 4  |
-| P10    | UI terminal aprimorada (ANSI colors)         | ✅ Fase 4  |
-| Q1     | `/forget <id>` — remover memória             | 🔜 Fase 5  |
-| Q2     | `/count` — estatísticas de uso               | 🔜 Fase 5  |
-| Q3     | `injectPipeline()` em inject-llmb.js         | 🔜 Fase 5  |
-| Q4     | Export MD/JSON de sessão via REPL            | 🔜 Fase 5  |
-| Q5     | Dashboard web para Hub (Socket.io)           | 🔜 Fase 5  |
-| Q6     | Multi-session switching (`/switch`)          | 🔜 Fase 5  |
+| Sprint | Upgrade                                    | Status    |
+| ------ | ------------------------------------------ | --------- |
+| P1     | Watchdog dialog loop                       | ✅ Fase 3 |
+| P2     | `/db-history` (SQLite persistido)          | ✅ Fase 3 |
+| P3     | SSE `/events` + `subscribeLlmB()`          | ✅ Fase 3 |
+| P4     | Eventos sistema persistidos no Hub         | ✅ Fase 3 |
+| P5     | Memória semântica (`/remember`, `/recall`) | ✅ Fase 4 |
+| P6     | Pipeline de turnos (`POST /pipeline`)      | ✅ Fase 4 |
+| P7     | Reflection loop automático                 | ✅ Fase 4 |
+| P8     | Alertas SSE críticos (`?level=critical`)   | ✅ Fase 4 |
+| P9     | Auditoria `/db-sessions` + `GET /sessions` | ✅ Fase 4 |
+| P10    | UI terminal aprimorada (ANSI colors)       | ✅ Fase 4 |
+| Q1     | `/forget <id>` — remover memória           | 🔜 Fase 5 |
+| Q2     | `/count` — estatísticas de uso             | 🔜 Fase 5 |
+| Q3     | `injectPipeline()` em inject-llmb.js       | 🔜 Fase 5 |
+| Q4     | Export MD/JSON de sessão via REPL          | 🔜 Fase 5 |
+| Q5     | Dashboard web para Hub (Socket.io)         | 🔜 Fase 5 |
+| Q6     | Multi-session switching (`/switch`)        | 🔜 Fase 5 |
 
 ---
 
@@ -406,8 +407,8 @@ copilot_memories_fts  -- virtual table (triggers automáticos)
 ### Terminal trava em "Conectando ao agente…"
 
 ```bash
-gh auth status              # precisa estar autenticado
-echo $COPILOT_SDK_ENABLED   # deve ser 'true'
+gh auth status            # precisa estar autenticado
+echo $COPILOT_SDK_ENABLED # deve ser 'true'
 ```
 
 ### "Hub não disponível"
@@ -424,7 +425,7 @@ kill -9 <PID>
 ### Watchdog reiniciando em loop
 
 ```bash
-npm run logs:follow   # ou logs/terminal-server.log
+npm run logs:follow # ou logs/terminal-server.log
 ```
 
 ---

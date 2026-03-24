@@ -528,7 +528,10 @@ function createInjectServer() {
             const memoryId = url.pathname.split('/')[2] ?? '';
             try {
                 const deleted = conversationStore.deleteMemory(memoryId);
-                res.writeHead(deleted ? 200 : 404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.writeHead(deleted ? 200 : 404, {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                });
                 res.end(JSON.stringify({ ok: deleted, id: memoryId }));
             } catch (/** @type {any} */ e) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -844,7 +847,11 @@ async function startRepl(injectServer) {
                         println('\x1b[90m  Uso: /forget <id>\x1b[0m');
                     } else {
                         const deleted = conversationStore.deleteMemory(arg);
-                        println(deleted ? `\x1b[32m  ✓ Memória removida: ${arg.slice(0, 8)}…\x1b[0m` : `\x1b[33m  Memória não encontrada: ${arg}\x1b[0m`);
+                        println(
+                            deleted
+                                ? `\x1b[32m  ✓ Memória removida: ${arg.slice(0, 8)}…\x1b[0m`
+                                : `\x1b[33m  Memória não encontrada: ${arg}\x1b[0m`,
+                        );
                     }
                     break;
                 }
