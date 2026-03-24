@@ -510,21 +510,26 @@ export class ConversationStore {
     recallMemories(opts = {}) {
         const db = this.#getDb();
         const limit = opts.limit ?? 20;
+        const sessionFilter = opts.hubSessionId ? 'AND m.hub_session_id = ?' : '';
+        const sessionArg = opts.hubSessionId ? [opts.hubSessionId] : [];
 
         if (opts.search) {
             // FTS5: busca semântica no conteúdo
             const ftsQuery = opts.search.replace(/['"]/g, ' ');
+            const tagFilter = opts.tag ? 'AND m.tag = ?' : '';
+            const tagArg = opts.tag ? [opts.tag] : [];
             const rows = db
                 .prepare(
                     `SELECT m.id, m.tag, m.content, m.created_at, m.hub_session_id
                      FROM copilot_memories_fts fts
                      JOIN copilot_memories m ON fts.id = m.id
                      WHERE copilot_memories_fts MATCH ?
-                     ${opts.tag ? 'AND m.tag = ?' : ''}
+                     ${tagFilter}
+                     ${sessionFilter}
                      ORDER BY rank
                      LIMIT ?`,
                 )
-                .all(...(opts.tag ? [ftsQuery, opts.tag, limit] : [ftsQuery, limit]));
+                .all(ftsQuery, ...tagArg, ...sessionArg, limit);
             return /** @type {any[]} */ (rows);
         }
 
@@ -533,9 +538,10 @@ export class ConversationStore {
                 db
                     .prepare(
                         `SELECT id, tag, content, created_at, hub_session_id FROM copilot_memories
-                         WHERE tag = ? ORDER BY created_at DESC LIMIT ?`,
+                         WHERE tag = ? ${opts.hubSessionId ? 'AND hub_session_id = ?' : ''}
+                         ORDER BY created_at DESC LIMIT ?`,
                     )
-                    .all(opts.tag, limit)
+                    .all(opts.tag, ...sessionArg, limit)
             );
         }
 
@@ -543,9 +549,10 @@ export class ConversationStore {
             db
                 .prepare(
                     `SELECT id, tag, content, created_at, hub_session_id FROM copilot_memories
+                     ${opts.hubSessionId ? 'WHERE hub_session_id = ?' : ''}
                      ORDER BY created_at DESC LIMIT ?`,
                 )
-                .all(limit)
+                .all(...sessionArg, limit)
         );
     }
 

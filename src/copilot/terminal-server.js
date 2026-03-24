@@ -85,8 +85,8 @@ const BANNER = `
 ║            Terminal LLM-B — Sessão Permanente Aberta                    ║
 ╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
   \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
-  \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m
-  \x1b[90mPOST :${INJECT_PORT}/inject  ·  POST :${INJECT_PORT}/pipeline  ·  GET :${INJECT_PORT}/events  ·  GET :${INJECT_PORT}/sessions  ·  POST/GET :${INJECT_PORT}/memory\x1b[0m
+  \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m · \x1b[33m/count\x1b[0m
+  \x1b[90mPOST :${INJECT_PORT}/inject  ·  POST :${INJECT_PORT}/pipeline  ·  GET :${INJECT_PORT}/events  ·  GET :${INJECT_PORT}/sessions  ·  POST/GET/DELETE :${INJECT_PORT}/memory\x1b[0m
 `;
 
 const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
@@ -523,6 +523,20 @@ function createInjectServer() {
             return;
         }
 
+        // DELETE /memory/:id  — remove uma memória semântica pelo id
+        if (req.method === 'DELETE' && /^\/memory\/[^/]+$/.test(url.pathname)) {
+            const memoryId = url.pathname.split('/')[2] ?? '';
+            try {
+                const deleted = conversationStore.deleteMemory(memoryId);
+                res.writeHead(deleted ? 200 : 404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({ ok: deleted, id: memoryId }));
+            } catch (/** @type {any} */ e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: false, error: e.message }));
+            }
+            return;
+        }
+
         // P6: Pipeline orchestration — executa uma sequência ordenada de mensagens para LLM-B
         // POST /pipeline  Body: { steps: [{ prompt: string; waitMs?: number; from?: string }]; from?: string }
         // Resposta: { ok: true; results: [{ step: number; prompt: string; reply: string; durationMs: number }] }
@@ -824,6 +838,33 @@ async function startRepl(injectServer) {
                     println(ok ? `[answer] Resposta enviada: "${arg}"` : '[answer] Nenhuma pergunta pendente.');
                     break;
                 }
+                case 'forget': {
+                    // /forget <id>  — remove memória semântica pelo ID (use /recall para ver IDs)
+                    if (!arg) {
+                        println('\x1b[90m  Uso: /forget <id>\x1b[0m');
+                    } else {
+                        const deleted = conversationStore.deleteMemory(arg);
+                        println(deleted ? `\x1b[32m  ✓ Memória removida: ${arg.slice(0, 8)}…\x1b[0m` : `\x1b[33m  Memória não encontrada: ${arg}\x1b[0m`);
+                    }
+                    break;
+                }
+                case 'count': {
+                    // /count — estatísticas rápidas da sessão atual
+                    const turns = conversationStore.readTurns(_hubSessionId ?? '', { limit: 9999 });
+                    const mems = conversationStore.recallMemories({ limit: 9999 });
+                    const userCount = turns.filter((t) => t.role === 'user').length;
+                    const llmbCount = turns.filter((t) => t.role === 'llm_b').length;
+                    println(`
+  \x1b[36mEstatísticas da sessão\x1b[0m
+  ─────────────────────────────────────────────
+  Turnos (usuário):   ${String(userCount).padStart(4)}
+  Turnos (LLM-B):     ${String(llmbCount).padStart(4)}
+  Turnos (total):     ${String(turns.length).padStart(4)}
+  Memórias salvas:    ${String(mems.length).padStart(4)}
+  Hub session:        ${_hubSessionId?.slice(0, 8) ?? '—'}…
+  ─────────────────────────────────────────────\n`);
+                    break;
+                }
                 case 'restart':
                     println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
                     try {
@@ -849,7 +890,7 @@ async function startRepl(injectServer) {
                     return;
                 default:
                     println(
-                        `\x1b[90m  Comando desconhecido: /${cmd}. Use /status, /history [n], /db-history [n], /db-sessions [n], /remember [tag:] texto, /recall [tag], /who, /clear, /restart ou /quit.\x1b[0m`,
+                        `\x1b[90m  Comando desconhecido: /${cmd}. Use /status, /history [n], /db-history [n], /db-sessions [n], /remember [tag:] texto, /recall [tag], /forget <id>, /count, /who, /clear, /restart ou /quit.\x1b[0m`,
                     );
             }
             rl.prompt();

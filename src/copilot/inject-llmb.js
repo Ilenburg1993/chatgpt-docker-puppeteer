@@ -279,3 +279,129 @@ export function subscribeLlmB(onEvent, opts = {}) {
         },
     };
 }
+
+/**
+ * Subscreve apenas ao canal de eventos críticos da LLM-B (stalled, fatal, system).
+ *
+ * Usa o parâmetro `?level=critical` do endpoint SSE (P8). Ideal para alertas proativos sem
+ * overhead de receber todas as respostas da LLM-B.
+ *
+ * @param {SseHandler} onEvent - Callback chamado a cada evento crítico
+ * @param {{ port?: number }} [opts]
+ * @returns {{ unsubscribe: () => void }}
+ */
+export function subscribeLlmBCritical(onEvent, opts = {}) {
+    const port = opts.port ?? DEFAULT_PORT;
+    let destroyed = false;
+
+    const req = http.request(
+        {
+            hostname: '127.0.0.1',
+            port,
+            path: '/events?level=critical',
+            method: 'GET',
+            headers: { Accept: 'text/event-stream' },
+        },
+        (res) => {
+            let buf = '';
+            res.on('data', (/** @type {Buffer} */ chunk) => {
+                buf += chunk.toString();
+                const lines = buf.split('\n');
+                buf = lines.pop() ?? '';
+
+                let currentEvent = '';
+                for (const line of lines) {
+                    if (line.startsWith('event:')) {
+                        currentEvent = line.slice(6).trim();
+                    } else if (line.startsWith('data:')) {
+                        try {
+                            const data = JSON.parse(line.slice(5).trim());
+                            onEvent({ type: currentEvent || 'message', data });
+                        } catch {
+                            /* ignora JSON inválido */
+                        }
+                        currentEvent = '';
+                    }
+                }
+            });
+            res.on('error', () => {
+                /* silencia erros de rede */
+            });
+        },
+    );
+
+    req.on('error', () => {
+        /* silencia falha — terminal pode não estar ativo */
+    });
+    req.end();
+
+    return {
+        unsubscribe() {
+            if (!destroyed) {
+                destroyed = true;
+                req.destroy();
+            }
+        },
+    };
+}
+
+/**
+ * @typedef {Object} PipelineStep
+ * @property {string} prompt - Mensagem a enviar neste step
+ * @property {number} [waitMs] - Espera em ms antes de enviar (padrão: 0)
+ * @property {string} [from] - Ator override para este step
+ */
+
+/**
+ * @typedef {Object} PipelineResult
+ * @property {boolean} ok - true se todos os steps completaram
+ * @property {{ step: number; prompt: string; reply: string; durationMs: number }[]} results
+ */
+
+/**
+ * Executa uma sequência ordenada de prompts na LLM-B via `POST /pipeline`.
+ *
+ * O pipeline é abortado se a LLM-B estiver ocupada em qualquer step. Cada step aguarda a resposta
+ * antes de enviar o próximo.
+ *
+ * @example
+ *     ```js
+ *     const { ok, results } = await injectPipeline([
+ *         { prompt: 'Você está disponível?' },
+ *         { prompt: 'Analise src/copilot/ e liste bugs.', waitMs: 1000 },
+ *         { prompt: 'Gere um resumo em 3 linhas.' },
+ *     ]);
+ *     ```;
+ *
+ * @param {PipelineStep[]} steps
+ * @param {{ from?: string; port?: number; timeoutMs?: number }} [opts]
+ * @returns {Promise<PipelineResult>}
+ * @throws {Error} Se o terminal não estiver ativo ou timeout excedido
+ */
+export async function injectPipeline(steps, opts = {}) {
+    const port = opts.port ?? DEFAULT_PORT;
+    const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS * steps.length;
+    const from = opts.from ?? 'llm-a';
+
+    const { statusCode, body } = await httpRequest('POST', '/pipeline', { steps, from }, port, timeoutMs);
+
+    let parsed;
+    try {
+        parsed = /** @type {any} */ (JSON.parse(body));
+    } catch {
+        throw new Error(`[inject-llmb] Resposta inválida do pipeline (status ${statusCode}): ${body.slice(0, 200)}`);
+    }
+
+    if (statusCode === 409) {
+        throw new Error('[inject-llmb] LLM-B ocupada — pipeline abortado. Resultados parciais em parsed.results.');
+    }
+
+    if (statusCode === 503) {
+        throw new Error('[inject-llmb] Terminal LLM-B não está disponível. Inicie com: npm run terminal:llm-b');
+    }
+
+    return {
+        ok: parsed.ok === true,
+        results: parsed.results ?? [],
+    };
+}
