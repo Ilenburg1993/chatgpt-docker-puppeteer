@@ -105,6 +105,38 @@ const DDL_CONVERSATION_TURNS = `
         WHERE user_read = 0;
 `;
 
+// ─── DDL memórias semânticas (P5) ─────────────────────────────────────────────
+
+const DDL_MEMORIES = `
+    CREATE TABLE IF NOT EXISTS copilot_memories (
+        id          TEXT PRIMARY KEY,
+        hub_session_id TEXT,
+        tag         TEXT NOT NULL DEFAULT 'geral',
+        content     TEXT NOT NULL,
+        metadata    TEXT,
+        created_at  INTEGER NOT NULL,
+        updated_at  INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_memories_tag ON copilot_memories(tag, created_at DESC);
+    CREATE VIRTUAL TABLE IF NOT EXISTS copilot_memories_fts USING fts5(
+        id UNINDEXED,
+        tag,
+        content,
+        content='copilot_memories',
+        content_rowid='rowid'
+    );
+    CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON copilot_memories BEGIN
+        INSERT INTO copilot_memories_fts(rowid, id, tag, content)
+        VALUES (new.rowid, new.id, new.tag, new.content);
+    END;
+    CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON copilot_memories BEGIN
+        UPDATE copilot_memories_fts SET tag=new.tag, content=new.content WHERE id=new.id;
+    END;
+    CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON copilot_memories BEGIN
+        DELETE FROM copilot_memories_fts WHERE id=old.id;
+    END;
+`;
+
 // ─── ConversationStore ────────────────────────────────────────────────────────
 
 /**
@@ -134,6 +166,7 @@ export class ConversationStore {
             this.#db = dbOverride ?? getDb();
             this.#db.exec(DDL_HUB_SESSIONS);
             this.#db.exec(DDL_CONVERSATION_TURNS);
+            this.#db.exec(DDL_MEMORIES);
             this.#initialized = true;
             log('DEBUG', '[ConversationStore] Tabelas inicializadas.');
         } catch (/** @type {any} */ err) {
@@ -438,6 +471,94 @@ export class ConversationStore {
             )
             .run(hubSessionId);
         return result.changes;
+    }
+
+    // ─── Memórias Semânticas (P5) ─────────────────────────────────────────────
+
+    /**
+     * Persiste uma memória semântica com tag livre.
+     *
+     * @param {{ tag?: string; content: string; hubSessionId?: string; metadata?: object }} opts
+     * @returns {string} ID da memória criada
+     */
+    storeMemory(opts) {
+        const db = this.#getDb();
+        const id = uuidv4();
+        const now = Date.now();
+        db.prepare(
+            `INSERT INTO copilot_memories (id, hub_session_id, tag, content, metadata, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+            id,
+            opts.hubSessionId ?? null,
+            opts.tag ?? 'geral',
+            opts.content,
+            opts.metadata ? JSON.stringify(opts.metadata) : null,
+            now,
+            now,
+        );
+        log('DEBUG', `[ConversationStore] Memória persistida: ${id} (tag: ${opts.tag ?? 'geral'})`);
+        return id;
+    }
+
+    /**
+     * Recupera memórias por tag e/ou busca textual (FTS5).
+     *
+     * @param {{ tag?: string; search?: string; limit?: number; hubSessionId?: string }} [opts]
+     * @returns {{ id: string; tag: string; content: string; created_at: number; hub_session_id: string | null }[]}
+     */
+    recallMemories(opts = {}) {
+        const db = this.#getDb();
+        const limit = opts.limit ?? 20;
+
+        if (opts.search) {
+            // FTS5: busca semântica no conteúdo
+            const ftsQuery = opts.search.replace(/['"]/g, ' ');
+            const rows = db
+                .prepare(
+                    `SELECT m.id, m.tag, m.content, m.created_at, m.hub_session_id
+                     FROM copilot_memories_fts fts
+                     JOIN copilot_memories m ON fts.id = m.id
+                     WHERE copilot_memories_fts MATCH ?
+                     ${opts.tag ? 'AND m.tag = ?' : ''}
+                     ORDER BY rank
+                     LIMIT ?`,
+                )
+                .all(...(opts.tag ? [ftsQuery, opts.tag, limit] : [ftsQuery, limit]));
+            return /** @type {any[]} */ (rows);
+        }
+
+        if (opts.tag) {
+            return /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `SELECT id, tag, content, created_at, hub_session_id FROM copilot_memories
+                         WHERE tag = ? ORDER BY created_at DESC LIMIT ?`,
+                    )
+                    .all(opts.tag, limit)
+            );
+        }
+
+        return /** @type {any[]} */ (
+            db
+                .prepare(
+                    `SELECT id, tag, content, created_at, hub_session_id FROM copilot_memories
+                     ORDER BY created_at DESC LIMIT ?`,
+                )
+                .all(limit)
+        );
+    }
+
+    /**
+     * Remove uma memória pelo id.
+     *
+     * @param {string} memoryId
+     * @returns {boolean} true se removida
+     */
+    deleteMemory(memoryId) {
+        const db = this.#getDb();
+        const result = db.prepare('DELETE FROM copilot_memories WHERE id = ?').run(memoryId);
+        return result.changes > 0;
     }
 }
 

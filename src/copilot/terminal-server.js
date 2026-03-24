@@ -84,8 +84,9 @@ const BANNER = `
 \x1b[36m╔══════════════════════════════════════════════════════════════════════════╗
 ║            Terminal LLM-B — Sessão Permanente Aberta                    ║
 ╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
-  Comandos: \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
-  Injeção:  \x1b[90mPOST http://localhost:${INJECT_PORT}/inject\x1b[0m
+  \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
+  \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m
+  \x1b[90mPOST :${INJECT_PORT}/inject  ·  POST :${INJECT_PORT}/pipeline  ·  GET :${INJECT_PORT}/events  ·  GET :${INJECT_PORT}/sessions  ·  POST/GET :${INJECT_PORT}/memory\x1b[0m
 `;
 
 const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
@@ -96,8 +97,14 @@ const PROMPT_WAITING = '     ';
 /** Mutex simples: evita dois turnos simultâneos. @type {boolean} */
 let _busy = false;
 
-/** Clientes SSE conectados no endpoint GET /events. @type {Set<import('node:http').ServerResponse>} */
+/** Clientes SSE conectados ao endpoint GET /events (todos os eventos). @type {Set<import('node:http').ServerResponse>} */
 const _sseClients = new Set();
+
+/**
+ * Clientes SSE que pedem apenas eventos críticos (?level=critical) — stalled, fatal, system. @type
+ * {Set<import('node:http').ServerResponse>}
+ */
+const _sseCriticalClients = new Set();
 
 /** Interface readline ativa. @type {readline.Interface | null} */
 let _rl = null;
@@ -117,9 +124,9 @@ function println(text) {
 /**
  * Exibe um turno completo (mensagem + resposta) com formatação visual limpa.
  *
- * @param {string} actor     - Ator que enviou ('user' | 'llm-a')
- * @param {string} message   - Mensagem enviada
- * @param {string} reply     - Resposta da LLM-B
+ * @param {string} actor - Ator que enviou ('user' | 'llm-a')
+ * @param {string} message - Mensagem enviada
+ * @param {string} reply - Resposta da LLM-B
  * @param {number} durationMs - Duração da chamada em ms
  * @returns {void}
  */
@@ -152,7 +159,8 @@ function printExchange(actor, message, reply, durationMs) {
 function cmdStatus() {
     const snap = /** @type {any} */ (alwaysAliveAgent.getStatusSnapshot());
     const active = alwaysAliveAgent.dialogLoopActive;
-    const statusColor = snap.status === 'waiting_for_input' ? '\x1b[32m' : snap.status === 'idle' ? '\x1b[33m' : '\x1b[31m';
+    const statusColor =
+        snap.status === 'waiting_for_input' ? '\x1b[32m' : snap.status === 'idle' ? '\x1b[33m' : '\x1b[31m';
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
@@ -198,25 +206,56 @@ function cmdHistory(n = 10) {
  */
 function cmdDbHistory(n = 20) {
     if (!_hubSessionId) {
-        println('[db-history] Hub session não disponível (sem persistência).');
+        println('\x1b[90m  /db-history: Hub session não disponível (sem persistência).\x1b[0m');
         return;
     }
     try {
         const turns = conversationStore.readTurns(_hubSessionId, { limit: n });
         if (turns.length === 0) {
-            println('[db-history] Nenhum turno persistido ainda.');
+            println('\x1b[90m  /db-history: Nenhum turno persistido ainda.\x1b[0m');
             return;
         }
-        println(`\n── DB-Histórico (últimos ${turns.length} turnos) ──`);
+        println(`\n  \x1b[36mÚltimos ${turns.length} turnos da sessão atual\x1b[0m`);
+        println('  ─────────────────────────────────────────────────');
         for (const t of turns) {
             const ts = new Date(t.created_at).toLocaleTimeString('pt-BR');
             const emoji = t.role === 'llm_b' ? '🧠' : t.role === 'llm_a' ? '🤖' : '👤';
             const preview = t.content.slice(0, 160) + (t.content.length > 160 ? '…' : '');
-            println(`  [${ts}] ${emoji} ${preview}`);
+            println(`  \x1b[90m[${ts}]\x1b[0m ${emoji}  ${preview}`);
         }
-        println('─────────────────────────────────');
+        println('  ─────────────────────────────────────────────────\n');
     } catch (/** @type {any} */ e) {
-        println(`[db-history] Erro ao ler DB: ${e.message}`);
+        println(`\x1b[31m  /db-history erro: ${e.message}\x1b[0m`);
+    }
+}
+
+/**
+ * Lista as hub_sessions persistidas no DB (auditoria, P9).
+ *
+ * @param {number} [n] - Número de sessões a exibir (padrão: 10)
+ * @returns {void}
+ */
+function cmdDbSessions(n = 10) {
+    try {
+        const sessions = conversationStore.listHubSessions({ limit: n });
+        if (sessions.length === 0) {
+            println('\x1b[90m  /db-sessions: Nenhuma sessão persistida ainda.\x1b[0m');
+            return;
+        }
+        println(`\n  \x1b[36mÚltimas ${sessions.length} hub sessions\x1b[0m`);
+        println('  ──────────────────────────────────────────────────────────────');
+        for (const s of sessions) {
+            const createdAt = new Date(s.created_at).toLocaleString('pt-BR');
+            const isCurrent = s.id === _hubSessionId;
+            const statusColor = s.status === 'active' ? '\x1b[32m' : '\x1b[90m';
+            const marker = isCurrent ? ' \x1b[33m← atual\x1b[0m' : '';
+            println(
+                `  ${statusColor}${s.status}\x1b[0m  \x1b[90m${createdAt}\x1b[0m  \x1b[2m${s.id.slice(0, 8)}\x1b[0m  ${s.title}${marker}`,
+            );
+        }
+        println('  ──────────────────────────────────────────────────────────────\n');
+    } catch (/** @type {any} */ e) {
+        println(`\x1b[31m  /db-sessions erro: ${e.message}\x1b[0m`);
     }
 }
 
@@ -311,21 +350,34 @@ async function sendTurn(message, actor = 'user') {
 
 // ─── Servidor HTTP de injeção ─────────────────────────────────────────────────
 
+/** Eventos considerados críticos para clientes em modo ?level=critical. */
+const CRITICAL_EVENTS = new Set(['stalled', 'fatal', 'system']);
+
 /**
- * Transmite um evento SSE para todos os clientes conectados ao endpoint GET /events.
+ * Transmite um evento SSE para todos os clientes conectados ao endpoint GET /events. Clientes em modo `?level=critical`
+ * recebem apenas eventos em CRITICAL_EVENTS.
  *
  * @param {string} event - Tipo do evento (ex: 'reply', 'ready', 'stalled')
  * @param {object} data - Payload JSON serializável
  * @returns {void}
  */
 function broadcastSse(event, data) {
-    if (_sseClients.size === 0) return;
+    if (_sseClients.size === 0 && _sseCriticalClients.size === 0) return;
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of _sseClients) {
         try {
             client.write(payload);
         } catch {
             _sseClients.delete(client);
+        }
+    }
+    if (CRITICAL_EVENTS.has(event)) {
+        for (const client of _sseCriticalClients) {
+            try {
+                client.write(payload);
+            } catch {
+                _sseCriticalClients.delete(client);
+            }
         }
     }
 }
@@ -359,18 +411,180 @@ function createInjectServer() {
         }
 
         // Canal de subscrição LLM-A: SSE — ouve respostas da LLM-B em tempo real
-        // GET /events → stream de eventos: "reply", "ready", "stalled"
+        // GET /events           → stream completo: "reply", "ready", "stalled", "system"
+        // GET /events?level=critical → apenas eventos críticos: "stalled", "fatal", "system"
         if (req.method === 'GET' && url.pathname === '/events') {
+            const isCriticalOnly = url.searchParams.get('level') === 'critical';
             res.writeHead(200, {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 Connection: 'keep-alive',
                 'Access-Control-Allow-Origin': '*',
             });
-            res.write(': connected\n\n');
-            _sseClients.add(res);
-            req.on('close', () => {
-                _sseClients.delete(res);
+            res.write(`: connected (level=${isCriticalOnly ? 'critical' : 'all'})\n\n`);
+            if (isCriticalOnly) {
+                _sseCriticalClients.add(res);
+                req.on('close', () => _sseCriticalClients.delete(res));
+            } else {
+                _sseClients.add(res);
+                req.on('close', () => _sseClients.delete(res));
+            }
+            return;
+        }
+
+        // P9: Lista hub_sessions — auditoria
+        // GET /sessions → JSON array de sessions persistidas
+        if (req.method === 'GET' && url.pathname === '/sessions') {
+            try {
+                const limit = Number(url.searchParams.get('limit') ?? '20');
+                const offset = Number(url.searchParams.get('offset') ?? '0');
+                const status = url.searchParams.get('status') ?? undefined;
+                const sessions = conversationStore.listHubSessions({
+                    limit: isNaN(limit) ? 20 : limit,
+                    offset: isNaN(offset) ? 0 : offset,
+                    status: /** @type {any} */ (status),
+                });
+                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({ ok: true, sessions, current: _hubSessionId }));
+            } catch (/** @type {any} */ e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: false, error: e.message }));
+            }
+            return;
+        }
+
+        // P9: Turnos de uma sessão específica — via REST
+        // GET /sessions/:id/turns → JSON array de turns
+        if (req.method === 'GET' && /^\/sessions\/[^/]+\/turns$/.test(url.pathname)) {
+            const sessionId = url.pathname.split('/')[2] ?? '';
+            try {
+                const limit = Number(url.searchParams.get('limit') ?? '50');
+                const offset = Number(url.searchParams.get('offset') ?? '0');
+                const turns = conversationStore.readTurns(sessionId, {
+                    limit: isNaN(limit) ? 50 : limit,
+                    offset: isNaN(offset) ? 0 : offset,
+                });
+                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({ ok: true, turns, sessionId }));
+            } catch (/** @type {any} */ e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: false, error: e.message }));
+            }
+            return;
+        }
+
+        // P5: Memória semântica
+        // POST /memory  Body: { tag?: string; content: string }
+        // GET  /memory?tag=X&search=X&limit=N
+        if (req.method === 'POST' && url.pathname === '/memory') {
+            let body = '';
+            req.on('data', (chunk) => {
+                body += chunk;
+            });
+            req.on('end', () => {
+                try {
+                    const parsed = /** @type {{ tag?: string; content?: string }} */ (JSON.parse(body));
+                    if (!parsed.content) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ ok: false, error: '"content" obrigatório' }));
+                        return;
+                    }
+                    const id = conversationStore.storeMemory({
+                        content: parsed.content,
+                        tag: parsed.tag ?? 'geral',
+                        ...(_hubSessionId ? { hubSessionId: _hubSessionId } : {}),
+                    });
+                    res.writeHead(201, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, id }));
+                } catch (/** @type {any} */ e) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: e.message }));
+                }
+            });
+            return;
+        }
+
+        if (req.method === 'GET' && url.pathname === '/memory') {
+            try {
+                const tagParam = url.searchParams.get('tag');
+                const searchParam = url.searchParams.get('search');
+                const limitParam = Number(url.searchParams.get('limit') ?? '20');
+                const memories = conversationStore.recallMemories({
+                    ...(tagParam ? { tag: tagParam } : {}),
+                    ...(searchParam ? { search: searchParam } : {}),
+                    limit: isNaN(limitParam) ? 20 : limitParam,
+                });
+                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({ ok: true, memories }));
+            } catch (/** @type {any} */ e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: false, error: e.message }));
+            }
+            return;
+        }
+
+        // P6: Pipeline orchestration — executa uma sequência ordenada de mensagens para LLM-B
+        // POST /pipeline  Body: { steps: [{ prompt: string; waitMs?: number; from?: string }]; from?: string }
+        // Resposta: { ok: true; results: [{ step: number; prompt: string; reply: string; durationMs: number }] }
+        if (req.method === 'POST' && url.pathname === '/pipeline') {
+            let body = '';
+            req.on('data', (chunk) => {
+                body += chunk;
+            });
+            req.on('end', async () => {
+                /** @type {{ steps?: { prompt: string; waitMs?: number; from?: string }[]; from?: string } | null} */
+                let parsed;
+                try {
+                    parsed = JSON.parse(body);
+                } catch {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: 'JSON inválido' }));
+                    return;
+                }
+
+                if (!Array.isArray(parsed?.steps) || parsed.steps.length === 0) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: '"steps" deve ser um array não vazio' }));
+                    return;
+                }
+
+                const globalFrom = parsed.from ?? 'llm-a';
+                const results = [];
+
+                for (let i = 0; i < parsed.steps.length; i++) {
+                    const step = parsed.steps[i];
+                    if (!step?.prompt) continue;
+                    const from = step.from ?? globalFrom;
+
+                    if (step.waitMs && step.waitMs > 0) {
+                        await new Promise((r) => setTimeout(r, step.waitMs));
+                    }
+
+                    const t0 = Date.now();
+                    const reply = await sendTurn(step.prompt, from).catch(() => null);
+                    results.push({
+                        step: i + 1,
+                        prompt: step.prompt,
+                        reply: reply ?? null,
+                        durationMs: Date.now() - t0,
+                    });
+
+                    // Se reply for null (busy), abortar pipeline
+                    if (reply === null) {
+                        res.writeHead(409, { 'Content-Type': 'application/json' });
+                        res.end(
+                            JSON.stringify({
+                                ok: false,
+                                error: `Step ${i + 1} retornou null (LLM-B ocupada) — pipeline interrompido`,
+                                results,
+                            }),
+                        );
+                        return;
+                    }
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: true, results }));
             });
             return;
         }
@@ -550,6 +764,48 @@ async function startRepl(injectServer) {
                     cmdDbHistory(n);
                     break;
                 }
+                case 'db-sessions': {
+                    const n = Number(arg) || 10;
+                    cmdDbSessions(n);
+                    break;
+                }
+                case 'remember': {
+                    // /remember [tag:] conteúdo
+                    const match = arg.match(/^([a-z0-9_-]+):\s*(.+)$/i);
+                    const tag = match ? (match[1] ?? 'geral') : 'geral';
+                    const content = match ? (match[2] ?? '').trim() : arg.trim();
+                    if (!content) {
+                        println('\x1b[90m  Uso: /remember [tag:] conteúdo\x1b[0m');
+                    } else {
+                        const id = conversationStore.storeMemory({
+                            tag,
+                            content,
+                            ...(_hubSessionId ? { hubSessionId: _hubSessionId } : {}),
+                        });
+                        println(`\x1b[32m  ✓ Memória salva\x1b[0m \x1b[90m[${tag}] ${id.slice(0, 8)}…\x1b[0m`);
+                    }
+                    break;
+                }
+                case 'recall': {
+                    // /recall [tag] ou /recall ?busca textual
+                    const isSearch = arg.startsWith('?');
+                    const memories = conversationStore.recallMemories({
+                        ...(isSearch ? { search: arg.slice(1).trim() } : arg ? { tag: arg } : {}),
+                        limit: 10,
+                    });
+                    if (memories.length === 0) {
+                        println('\x1b[90m  Nenhuma memória encontrada.\x1b[0m');
+                    } else {
+                        println(`\n  \x1b[36mMemórias\x1b[0m ${arg ? `[${arg}]` : '(todas)'}`);
+                        println('  ─────────────────────────────────────────────');
+                        for (const m of memories) {
+                            const ts = new Date(m.created_at).toLocaleString('pt-BR');
+                            println(`  \x1b[90m[${ts}]\x1b[0m \x1b[33m${m.tag}\x1b[0m  ${m.content}`);
+                        }
+                        println('  ─────────────────────────────────────────────\n');
+                    }
+                    break;
+                }
                 case 'who':
                     println(`
   \x1b[36mAtores ativos nesta sessão:\x1b[0m
@@ -593,7 +849,7 @@ async function startRepl(injectServer) {
                     return;
                 default:
                     println(
-                        `[cli] Comando desconhecido: /${cmd}. Use /status, /history [n], /db-history [n], /who, /clear, /restart ou /quit.`,
+                        `\x1b[90m  Comando desconhecido: /${cmd}. Use /status, /history [n], /db-history [n], /db-sessions [n], /remember [tag:] texto, /recall [tag], /who, /clear, /restart ou /quit.\x1b[0m`,
                     );
             }
             rl.prompt();
@@ -703,6 +959,27 @@ export async function startTerminalServer() {
             /* best-effort */
         }
     });
+
+    // P7: Reflection loop periódico — LLM-B avalia o histórico recente e emite insights
+    // Ativado apenas se a env var LLM_B_REFLECTION_INTERVAL_MIN estiver definida (> 0)
+    const reflectionIntervalMin = Number(process.env.LLM_B_REFLECTION_INTERVAL_MIN ?? '0');
+    if (reflectionIntervalMin > 0) {
+        const reflectionIntervalMs = reflectionIntervalMin * 60 * 1000;
+        log('INFO', `[TerminalServer] Reflection loop ativado: a cada ${reflectionIntervalMin}min.`);
+
+        const runReflection = () => {
+            if (!alwaysAliveAgent.dialogLoopActive || _busy) return;
+            log('INFO', '[TerminalServer] Executando reflection loop…');
+            sendTurn(
+                '[REFLEXÃO] Faça uma breve reflexão sobre as últimas mensagens desta conversa: o que foi discutido, o que está pendente, e se você tem alguma sugestão ou insight que ainda não mencionou. Seja conciso.',
+                'llm-a',
+            ).catch((/** @type {any} */ e) => log('WARN', `[TerminalServer] Reflection loop falhou: ${e.message}`));
+        };
+
+        const reflectionTimer = setInterval(runReflection, reflectionIntervalMs);
+        // Garantir que o timer não impede o processo de encerrar
+        if (typeof reflectionTimer.unref === 'function') reflectionTimer.unref();
+    }
 
     await startRepl(injectServer);
 }
