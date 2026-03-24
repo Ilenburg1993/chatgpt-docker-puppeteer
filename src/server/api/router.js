@@ -17,6 +17,7 @@ import * as ragController from './controllers/rag.js';
 import resultsController from './controllers/results.js';
 import systemController from './controllers/system.js';
 import tasksController from './controllers/tasks.js';
+import copilotHubRouter from './copilot-hub-router.js';
 
 /**
  * @typedef {{
@@ -329,6 +330,8 @@ async function applyRoutes(app) {
         log('INFO', '[COPILOT] SDK bridge registrado em /api/copilot');
         app.use('/api/sdk', apiLimiter, sdkApi);
         log('INFO', '[COPILOT] SDK API registrada em /api/sdk');
+        app.use('/api/hub', apiLimiter, copilotHubRouter);
+        log('INFO', '[COPILOT] ConversationHub REST API registrada em /api/hub');
     }
 
     // Captura rotas inexistentes (404)

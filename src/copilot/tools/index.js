@@ -12,6 +12,7 @@ import { codeTools } from './code-tools.js';
 import { fileReadTools, fileTools, fileWriteTools } from './file-tools.js';
 import { gitTools } from './git-tools.js';
 import { hookTools } from './hook-tools.js';
+import { hubTools } from './hub-tools.js';
 import { introspectionTools, registerForIntrospection, setTelemetryStore } from './introspection-tools.js';
 import { sessionTools } from './session-tools.js';
 import { shellTools } from './shell-tools.js';
@@ -28,6 +29,7 @@ export const allTools = [
     ...gitTools,
     ...sessionTools,
     ...hookTools,
+    ...hubTools,
     ...introspectionTools,
     ...fileTools,
     ...shellTools,
@@ -40,6 +42,7 @@ export {
     fileWriteTools,
     gitTools,
     hookTools,
+    hubTools,
     introspectionTools,
     registerForIntrospection,
     sessionTools,

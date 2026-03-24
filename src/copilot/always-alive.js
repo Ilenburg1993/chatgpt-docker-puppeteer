@@ -36,6 +36,7 @@ import {
     fileWriteTools,
     gitTools,
     hookTools,
+    hubTools,
     introspectionTools,
     registerForIntrospection,
     sessionTools,
@@ -243,6 +244,10 @@ export class AlwaysAliveAgent extends EventEmitter {
             registerTools(this.#toolsRegistry, gitTools, { category: 'git', tags: ['vcs', 'diff', 'commit'] });
             registerTools(this.#toolsRegistry, sessionTools, { category: 'session', tags: ['hooks', 'briefing'] });
             registerTools(this.#toolsRegistry, hookTools, { category: 'hook', tags: ['audit', 'input', 'hooks'] });
+            registerTools(this.#toolsRegistry, hubTools, {
+                category: 'hub',
+                tags: ['conversation', 'llm-b', 'dialog', 'persistent'],
+            });
             registerTools(this.#toolsRegistry, introspectionTools, {
                 category: 'introspection',
                 tags: ['meta', 'telemetry'],

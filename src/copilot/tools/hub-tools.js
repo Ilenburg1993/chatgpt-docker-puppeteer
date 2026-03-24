@@ -1,0 +1,321 @@
+// @ts-check
+/**
+ * src/copilot/tools/hub-tools.js
+ *
+ * Tools do AlwaysAliveAgent para o ConversationHub — ambiente permanente LLM-A ↔ LLM-B ↔ Usuário.
+ *
+ * LLM-A usa estas ferramentas para:
+ *
+ * - Criar e gerenciar hub_sessions de conversa
+ * - Enviar mensagens para LLM-B com histórico persistente
+ * - Verificar mensagens injetadas pelo usuário
+ * - Consultar histórico de conversas
+ *
+ * @module copilot/tools/hub-tools
+ */
+
+import { log } from '#core/logger';
+import { defineTool } from '@github/copilot-sdk';
+import { z } from 'zod';
+
+// ─── Importação lazy do hub ───────────────────────────────────────────────────
+
+/** @returns {Promise<import('../conversation-hub/hub.js').ConversationHub>} */
+async function requireHub() {
+    const { conversationHub } = await import('../conversation-hub/hub.js');
+    if (!conversationHub.isReady) {
+        throw new Error('ConversationHub não está inicializado. Verifique COPILOT_SDK_ENABLED e o boot do servidor.');
+    }
+    return conversationHub;
+}
+
+// ─── Tool: hub_create_session ─────────────────────────────────────────────────
+
+/**
+ * Tool: hub_create_session — LLM-A cria uma nova sessão de conversa persistente.
+ */
+const hubCreateSessionTool = defineTool('hub_create_session', {
+    description: `Cria uma nova hub_session de conversa persistente no ConversationHub.
+Retorna o hub_session_id que deve ser usado em todas as chamadas subsequentes de hub_send_message.
+A sessão persiste no SQLite e sobrevive a restarts do servidor.`,
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                title: z
+                    .string()
+                    .optional()
+                    .describe('Título descritivo da conversa (ex: "Análise de arquitetura Sprint Hub")'),
+                metadata: z.record(z.string(), z.any()).optional().describe('Metadados extras em JSON (opcional)'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ title?: string; metadata?: Record<string, any> }} */ { title, metadata }) => {
+        try {
+            const hub = await requireHub();
+            const hubSessionId = hub.createSession({ title, metadata });
+            log('INFO', `[hub_create_session] Hub session criada: ${hubSessionId}`);
+            return {
+                success: true,
+                hubSessionId,
+                message: `Hub session criada: ${hubSessionId}. Use este ID em hub_send_message.`,
+            };
+        } catch (/** @type {any} */ err) {
+            log('ERROR', `[hub_create_session] Erro: ${err.message}`);
+            return { success: false, error: err.message };
+        }
+    },
+});
+
+// ─── Tool: hub_send_message ───────────────────────────────────────────────────
+
+/**
+ * Tool: hub_send_message — LLM-A envia mensagem para LLM-B com persistência.
+ */
+const hubSendMessageTool = defineTool('hub_send_message', {
+    description: `Envia uma mensagem de LLM-A para LLM-B via ConversationHub com persistência e streaming.
+A mensagem e a resposta são salvas no SQLite. O usuário observa a conversa em tempo real via Socket.io.
+Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta estruturada em JSON.`,
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                hubSessionId: z.string().describe('ID da hub_session (obtido via hub_create_session)'),
+                message: z.string().describe('Mensagem a enviar para LLM-B'),
+                context: z.string().optional().describe('Contexto adicional para o protocolo StructuredMessage'),
+                intent: z
+                    .string()
+                    .optional()
+                    .describe('Intenção explícita da mensagem para o protocolo StructuredMessage'),
+                priority: z
+                    .enum(['low', 'medium', 'high', 'critical'])
+                    .optional()
+                    .default('medium')
+                    .describe('Prioridade da mensagem'),
+                responseType: z
+                    .enum(['diagnostic', 'plan', 'code', 'question', 'acknowledgment', 'error'])
+                    .optional()
+                    .describe('Tipo de resposta esperado de LLM-B'),
+                useStructured: z
+                    .boolean()
+                    .optional()
+                    .default(true)
+                    .describe('Se true, usa chatStructured() com protocolo StructuredMessage'),
+                timeoutMs: z
+                    .number()
+                    .optional()
+                    .default(120000)
+                    .describe('Timeout em ms para aguardar resposta de LLM-B'),
+            })
+        )
+    ),
+    handler: async (
+        /**
+         * @type {{
+         *     hubSessionId: string;
+         *     message: string;
+         *     context?: string;
+         *     intent?: string;
+         *     priority?: 'low' | 'medium' | 'high' | 'critical';
+         *     responseType?: string;
+         *     useStructured?: boolean;
+         *     timeoutMs?: number;
+         * }}
+         */
+        { hubSessionId, message, context, intent, priority, responseType, useStructured, timeoutMs },
+    ) => {
+        try {
+            const hub = await requireHub();
+
+            // Se useStructured e há context/intent, enviar como StructuredMessageInput
+            let payload;
+            if (useStructured !== false && (context || intent)) {
+                payload = {
+                    context: context ?? message,
+                    intent: intent ?? message,
+                    priority: priority ?? 'medium',
+                    responseType: responseType ?? undefined,
+                };
+            } else {
+                payload = message;
+            }
+
+            const result = await hub.sendToLlmB(hubSessionId, payload, {
+                useStructured: useStructured !== false && !!(context || intent),
+                timeoutMs: timeoutMs ?? 120_000,
+            });
+
+            log('INFO', `[hub_send_message] Resposta de LLM-B recebida (${result.durationMs}ms).`);
+
+            return {
+                success: true,
+                turnId: result.turnId,
+                hubSessionId: result.hubSessionId,
+                turnNumber: result.turnNumber,
+                durationMs: result.durationMs,
+                response: result.content,
+                structured: result.structured ?? null,
+            };
+        } catch (/** @type {any} */ err) {
+            log('ERROR', `[hub_send_message] Erro: ${err.message}`);
+            return { success: false, error: err.message };
+        }
+    },
+});
+
+// ─── Tool: hub_poll_user_messages ─────────────────────────────────────────────
+
+/**
+ * Tool: hub_poll_user_messages — LLM-A verifica mensagens do usuário.
+ */
+const hubPollUserMessagesTool = defineTool('hub_poll_user_messages', {
+    description: `Verifica e retorna mensagens pendentes injetadas pelo usuário na hub_session.
+LLM-A deve chamar esta tool periodicamente para processar inputs do usuário durante conversas longas.
+As mensagens são marcadas como lidas após esta chamada.`,
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                hubSessionId: z.string().describe('ID da hub_session'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ hubSessionId: string }} */ { hubSessionId }) => {
+        try {
+            const hub = await requireHub();
+            const messages = hub.pollUserMessages(hubSessionId);
+
+            return {
+                success: true,
+                hubSessionId,
+                pendingCount: messages.length,
+                messages: messages.map((m) => ({
+                    turnId: m.id,
+                    content: m.content,
+                    turnNumber: m.turn_number,
+                    createdAt: m.created_at,
+                })),
+            };
+        } catch (/** @type {any} */ err) {
+            log('ERROR', `[hub_poll_user_messages] Erro: ${err.message}`);
+            return { success: false, error: err.message };
+        }
+    },
+});
+
+// ─── Tool: hub_read_history ───────────────────────────────────────────────────
+
+/**
+ * Tool: hub_read_history — LLM-A lê o histórico de uma hub_session.
+ */
+const hubReadHistoryTool = defineTool('hub_read_history', {
+    description: `Lê o histórico de turns de uma hub_session.
+Útil para LLM-A retomar contexto após restart ou em sessões longas.
+Retorna turns ordenados por número de turno (mais antigos primeiro).`,
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                hubSessionId: z.string().describe('ID da hub_session'),
+                limit: z.number().optional().default(20).describe('Máximo de turns a retornar (default: 20)'),
+                offset: z.number().optional().default(0).describe('Offset para paginação'),
+                after: z
+                    .number()
+                    .optional()
+                    .describe('Retornar apenas turns com id > after (para polling incremental)'),
+            })
+        )
+    ),
+    handler: async (
+        /** @type {{ hubSessionId: string; limit?: number; offset?: number; after?: number }} */
+        { hubSessionId, limit, offset, after },
+    ) => {
+        try {
+            const hub = await requireHub();
+            const turns = hub.store.readTurns(hubSessionId, {
+                limit: limit ?? 20,
+                offset: offset ?? 0,
+                after,
+            });
+            const total = hub.store.countTurns(hubSessionId);
+
+            return {
+                success: true,
+                hubSessionId,
+                total,
+                returned: turns.length,
+                turns: turns.map((t) => ({
+                    id: t.id,
+                    role: t.role,
+                    content: t.content.slice(0, 500) + (t.content.length > 500 ? '...' : ''),
+                    turnNumber: t.turn_number,
+                    durationMs: t.duration_ms,
+                    model: t.model,
+                    createdAt: t.created_at,
+                })),
+            };
+        } catch (/** @type {any} */ err) {
+            log('ERROR', `[hub_read_history] Erro: ${err.message}`);
+            return { success: false, error: err.message };
+        }
+    },
+});
+
+// ─── Tool: hub_list_sessions ──────────────────────────────────────────────────
+
+/**
+ * Tool: hub_list_sessions — LLM-A lista as hub_sessions disponíveis.
+ */
+const hubListSessionsTool = defineTool('hub_list_sessions', {
+    description: `Lista as hub_sessions de conversa disponíveis no ConversationHub.
+Útil para LLM-A identificar sessões ativas ou retomar conversas anteriores.`,
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                limit: z.number().optional().default(10).describe('Máximo de sessões a retornar'),
+                status: z
+                    .enum(['active', 'closed', 'error'])
+                    .optional()
+                    .describe('Filtrar por status (omitir para todas)'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ limit?: number; status?: 'active' | 'closed' | 'error' }} */ { limit, status }) => {
+        try {
+            const hub = await requireHub();
+            const sessions = hub.store.listHubSessions({
+                limit: limit ?? 10,
+                status: status ?? undefined,
+            });
+
+            return {
+                success: true,
+                count: sessions.length,
+                sessions: sessions.map((s) => ({
+                    id: s.id,
+                    title: s.title,
+                    status: s.status,
+                    sdkSessionId: s.sdk_session_id,
+                    createdAt: s.created_at,
+                    updatedAt: s.updated_at,
+                })),
+            };
+        } catch (/** @type {any} */ err) {
+            log('ERROR', `[hub_list_sessions] Erro: ${err.message}`);
+            return { success: false, error: err.message };
+        }
+    },
+});
+
+// ─── Exports ──────────────────────────────────────────────────────────────────
+
+/**
+ * Conjunto de tools do hub para registro no AlwaysAliveAgent.
+ *
+ * @type {import('@github/copilot-sdk').Tool<any>[]}
+ */
+export const hubTools = [
+    hubCreateSessionTool,
+    hubSendMessageTool,
+    hubPollUserMessagesTool,
+    hubReadHistoryTool,
+    hubListSessionsTool,
+];
+
+export { hubCreateSessionTool, hubListSessionsTool, hubPollUserMessagesTool, hubReadHistoryTool, hubSendMessageTool };

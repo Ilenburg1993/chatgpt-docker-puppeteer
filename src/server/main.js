@@ -739,6 +739,21 @@ async function bootstrap(options = {}) {
                 const _e = /** @type {any} */ (e);
                 log('WARN', `[COPILOT] Falha ao montar copilotNervBridge: ${_e.message}`);
             }
+
+            // ConversationHub — ambiente permanente LLM-A ↔ LLM-B ↔ Usuário (Sprint Hub)
+            try {
+                const { conversationHub } = await import('#copilot/conversation-hub/hub');
+                const ioInstance = socketHub.getIO?.() ?? /** @type {any} */ (socketHub).io ?? null;
+                if (ioInstance) {
+                    await conversationHub.init({ io: ioInstance, nerv: /** @type {any} */ (nerv) });
+                    log('INFO', '[COPILOT] ConversationHub inicializado — namespace /copilot ativo');
+                } else {
+                    log('WARN', '[COPILOT] ConversationHub: ioInstance não disponível via socketHub.getIO()');
+                }
+            } catch (/** @type {any} */ e) {
+                const _e = /** @type {any} */ (e);
+                log('WARN', `[COPILOT] Falha ao inicializar ConversationHub: ${_e.message}`);
+            }
         }
 
         /* --------------------------------------------------------------
