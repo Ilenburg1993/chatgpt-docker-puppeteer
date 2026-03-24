@@ -40,42 +40,29 @@ if (!process.env.COPILOT_SDK_ENABLED) process.env.COPILOT_SDK_ENABLED = 'true';
 import { log } from '#core/logger';
 import http from 'node:http';
 import readline from 'node:readline';
-import { formatAliases, loadAliases, removeAlias, resolve, setAlias } from './alias-store.js';
+import { loadAliases, resolve } from './alias-store.js';
 import { alwaysAliveAgent } from './always-alive.js';
 import { conversationStore } from './conversation-hub/store.js';
-import {
-    closeIssue,
-    commentIssue,
-    createIssue,
-    diffPr,
-    formatIssueList,
-    formatPrList,
-    formatReleaseList,
-    formatRunList,
-    getStatus as ghGetStatus,
-    rawApi as ghRawApi,
-    listIssues,
-    listPrs,
-    listReleases,
-    listRuns,
-    searchIssues,
-    viewIssue,
-    viewPr,
-    viewRun,
-} from './gh-bridge.js';
-import {
-    formatBranch,
-    formatLog,
-    formatStatus,
-    gitBranch,
-    gitDiff,
-    gitLog,
-    gitPull,
-    gitStash,
-    gitStashList,
-    gitStatus,
-} from './git-bridge.js';
+import { listIssues, listPrs, listRuns } from './gh-bridge.js';
+import { gitLog, gitStatus } from './git-bridge.js';
 import { llmBridgeClient } from './llm-bridge-client.js';
+import {
+    cmdAlias as _cmdAlias,
+    cmdAnswer as _cmdAnswer,
+    cmdClear as _cmdClear,
+    cmdCount as _cmdCount,
+    cmdDbHistory as _cmdDbHistory,
+    cmdDbSessions as _cmdDbSessions,
+    cmdForget as _cmdForget,
+    cmdGh as _cmdGh,
+    cmdGit as _cmdGit,
+    cmdHelp as _cmdHelp,
+    cmdHistory as _cmdHistory,
+    cmdRecall as _cmdRecall,
+    cmdRemember as _cmdRemember,
+    cmdStatus as _cmdStatus,
+    cmdWho as _cmdWho,
+} from './terminal/commands/index.js';
 
 /** ID da hub_session permanente criada no boot. @type {string | null} */
 let _hubSessionId = null;
@@ -191,621 +178,31 @@ function printExchange(actor, message, reply, durationMs) {
  *
  * @returns {void}
  */
-function cmdStatus() {
-    const snap = /** @type {any} */ (alwaysAliveAgent.getStatusSnapshot());
-    const active = alwaysAliveAgent.dialogLoopActive;
-    const statusColor =
-        snap.status === 'waiting_for_input' ? '\x1b[32m' : snap.status === 'idle' ? '\x1b[33m' : '\x1b[31m';
-    println(`
-  \x1b[36mStatus do Terminal LLM-B\x1b[0m
-  ─────────────────────────────────────
-  agente          ${statusColor}${snap.status}\x1b[0m
-  dialog loop     ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
-  turnos (memória) ${llmBridgeClient.turnCount}
-  hub session     \x1b[90m${_hubSessionId ?? '(sem hub)'}\x1b[0m
-  inject port     ${INJECT_PORT}
-  ─────────────────────────────────────
-`);
-}
+// ─── Wrappers de comandos (delegam para terminal/commands/) ──────────────────
 
-/**
- * Exibe o histórico de conversa local.
- *
- * @param {number} n - Número de pares a exibir
- * @returns {void}
- */
-function cmdHistory(n = 10) {
-    const hist = llmBridgeClient.history;
-    if (hist.length === 0) {
-        println('[history] Histórico vazio.');
-        return;
-    }
-    const slice = hist.slice(-n * 2);
-    println(`\n── Histórico (últimos ${Math.floor(slice.length / 2)} pares) ──`);
-    for (const turn of slice) {
-        const ts = new Date(turn.timestamp).toLocaleTimeString('pt-BR');
-        const roleLabel = turn.role === 'user' ? '👤' : '🧠';
-        const preview = turn.content.slice(0, 160) + (turn.content.length > 160 ? '…' : '');
-        println(`  [${ts}] ${roleLabel} ${preview}`);
-    }
-    println('─────────────────────────────────');
-}
+/** @returns {void} */
+function cmdStatus() { _cmdStatus({ hubSessionId: _hubSessionId, injectPort: INJECT_PORT, println }); }
 
-// ─── Motor de diálogo ─────────────────────────────────────────────────────────
+/** @param {number} [n] @returns {void} */
+function cmdHistory(n = 10) { _cmdHistory({ println }, n); }
 
-/**
- * Exibe o histórico de conversa persistido no SQLite Hub (sobrevive a restarts).
- *
- * @param {number} [n] - Número de turnos a exibir (padrão: 20)
- * @returns {void}
- */
-function cmdDbHistory(n = 20) {
-    if (!_hubSessionId) {
-        println('\x1b[90m  /db-history: Hub session não disponível (sem persistência).\x1b[0m');
-        return;
-    }
-    try {
-        const turns = conversationStore.readTurns(_hubSessionId, { limit: n });
-        if (turns.length === 0) {
-            println('\x1b[90m  /db-history: Nenhum turno persistido ainda.\x1b[0m');
-            return;
-        }
-        println(`\n  \x1b[36mÚltimos ${turns.length} turnos da sessão atual\x1b[0m`);
-        println('  ─────────────────────────────────────────────────');
-        for (const t of turns) {
-            const ts = new Date(t.created_at).toLocaleTimeString('pt-BR');
-            const emoji = t.role === 'llm_b' ? '🧠' : t.role === 'llm_a' ? '🤖' : '👤';
-            const preview = t.content.slice(0, 160) + (t.content.length > 160 ? '…' : '');
-            println(`  \x1b[90m[${ts}]\x1b[0m ${emoji}  ${preview}`);
-        }
-        println('  ─────────────────────────────────────────────────\n');
-    } catch (/** @type {any} */ e) {
-        println(`\x1b[31m  /db-history erro: ${e.message}\x1b[0m`);
-    }
-}
+/** @param {number} [n] @returns {void} */
+function cmdDbHistory(n = 20) { _cmdDbHistory({ hubSessionId: _hubSessionId, println }, n); }
 
-/**
- * Lista as hub_sessions persistidas no DB (auditoria, P9).
- *
- * @param {number} [n] - Número de sessões a exibir (padrão: 10)
- * @returns {void}
- */
-function cmdDbSessions(n = 10) {
-    try {
-        const sessions = conversationStore.listHubSessions({ limit: n });
-        if (sessions.length === 0) {
-            println('\x1b[90m  /db-sessions: Nenhuma sessão persistida ainda.\x1b[0m');
-            return;
-        }
-        println(`\n  \x1b[36mÚltimas ${sessions.length} hub sessions\x1b[0m`);
-        println('  ──────────────────────────────────────────────────────────────');
-        for (const s of sessions) {
-            const createdAt = new Date(s.created_at).toLocaleString('pt-BR');
-            const isCurrent = s.id === _hubSessionId;
-            const statusColor = s.status === 'active' ? '\x1b[32m' : '\x1b[90m';
-            const marker = isCurrent ? ' \x1b[33m← atual\x1b[0m' : '';
-            println(
-                `  ${statusColor}${s.status}\x1b[0m  \x1b[90m${createdAt}\x1b[0m  \x1b[2m${s.id.slice(0, 8)}\x1b[0m  ${s.title}${marker}`,
-            );
-        }
-        println('  ──────────────────────────────────────────────────────────────\n');
-    } catch (/** @type {any} */ e) {
-        println(`\x1b[31m  /db-sessions erro: ${e.message}\x1b[0m`);
-    }
-}
+/** @param {number} [n] @returns {void} */
+function cmdDbSessions(n = 10) { _cmdDbSessions({ hubSessionId: _hubSessionId, println }, n); }
 
-// ─── Comandos GitHub CLI ──────────────────────────────────────────────────────
+/** @param {string[]} args @returns {Promise<void>} */
+async function cmdGh(args) { return _cmdGh(args, { println }); }
 
-/**
- * Handler do comando /gh <subcomando> [args…].
- *
- * Subcomandos: issue list [state] [label] — lista issues issue <n> — detalhes de uma issue issue create <title> — cria
- * issue (body vazio) issue close <n> — fecha issue issue comment <n> <texto> — comenta na issue pr list [state] — lista
- * pull requests pr <n> — detalhes de um PR pr diff <n> — diff de um PR run list [limit] — lista CI runs run <id> —
- * detalhes de um run release list — lista releases search <query> — busca issues/prs status — status geral da conta gh
- * api <endpoint> — chamada raw à gh api
- *
- * @param {string[]} args - argumentos após "/gh"
- * @returns {Promise<void>}
- */
-async function cmdGh(args) {
-    const sub = args[0]?.toLowerCase() ?? '';
+/** @param {string[]} args @returns {Promise<void>} */
+async function cmdGit(args) { return _cmdGit(args, { println }); }
 
-    // ── issue ──────────────────────────────────────────────────────────────
-    if (sub === 'issue' || sub === 'issues') {
-        const action = args[1]?.toLowerCase() ?? 'list';
+/** @param {string[]} args @returns {void} */
+function cmdAlias(args) { _cmdAlias(args, { println }); }
 
-        if (action === 'list' || action === 'ls') {
-            const stateArg = args[2] ?? 'open';
-            const label = args[3];
-            println('\x1b[90m  Buscando issues…\x1b[0m');
-            const issues = await listIssues({ state: /** @type {any} */ (stateArg), label }).catch(() => []);
-            if (!issues.length) {
-                println('\x1b[90m  Nenhuma issue encontrada.\x1b[0m');
-                return;
-            }
-            println(`\n  \x1b[36mIssues\x1b[0m \x1b[90m(${stateArg})\x1b[0m`);
-            println(formatIssueList(issues));
-            return;
-        }
-
-        if (action === 'create') {
-            const title = args.slice(2).join(' ');
-            if (!title) {
-                println('\x1b[90m  Uso: /gh issue create <título>\x1b[0m');
-                return;
-            }
-            println('\x1b[90m  Criando issue…\x1b[0m');
-            const result = await createIssue(title, '').catch(() => null);
-            if (result?.url) println(`\x1b[32m  ✓ Issue criada: ${result.url}\x1b[0m`);
-            else println('\x1b[31m  Falha ao criar issue.\x1b[0m');
-            return;
-        }
-
-        if (action === 'close') {
-            const n = Number(args[2]);
-            if (!n) {
-                println('\x1b[90m  Uso: /gh issue close <número>\x1b[0m');
-                return;
-            }
-            const ok = await closeIssue(n).catch(() => false);
-            println(ok ? `\x1b[32m  ✓ Issue #${n} fechada.\x1b[0m` : `\x1b[31m  Falha ao fechar #${n}.\x1b[0m`);
-            return;
-        }
-
-        if (action === 'comment') {
-            const n = Number(args[2]);
-            const body = args.slice(3).join(' ');
-            if (!n || !body) {
-                println('\x1b[90m  Uso: /gh issue comment <n> <texto>\x1b[0m');
-                return;
-            }
-            const ok = await commentIssue(n, body).catch(() => false);
-            println(ok ? `\x1b[32m  ✓ Comentário adicionado em #${n}.\x1b[0m` : `\x1b[31m  Falha ao comentar.\x1b[0m`);
-            return;
-        }
-
-        // action é número — ver detalhes
-        const n = Number(action);
-        if (n) {
-            println('\x1b[90m  Buscando issue…\x1b[0m');
-            const issue = await viewIssue(n).catch(() => null);
-            if (!issue) {
-                println(`\x1b[31m  Issue #${n} não encontrada.\x1b[0m`);
-                return;
-            }
-            println(
-                `\n  \x1b[36m#${issue.number}\x1b[0m \x1b[1m${issue.title}\x1b[0m  \x1b[90m[${issue.state}]\x1b[0m`,
-            );
-            println(`  URL: \x1b[34m${issue.url}\x1b[0m`);
-            if (issue.labels?.length) println(`  Labels: ${issue.labels.map((l) => l.name).join(', ')}`);
-            println(`  Autor: ${issue.author?.login}  ·  Comentários: ${issue.comments}`);
-            if (issue.body) {
-                println('  ─────────────────────────────────────────────');
-                for (const line of issue.body.slice(0, 800).split('\n')) println(`  ${line}`);
-                if (issue.body.length > 800) println('  \x1b[90m…(truncado)\x1b[0m');
-            }
-            println('');
-            return;
-        }
-
-        println('\x1b[90m  Uso: /gh issue [list|<n>|create|close|comment] [args…]\x1b[0m');
-        return;
-    }
-
-    // ── pr ────────────────────────────────────────────────────────────────
-    if (sub === 'pr' || sub === 'prs') {
-        const action = args[1]?.toLowerCase() ?? 'list';
-
-        if (action === 'list' || action === 'ls') {
-            const stateArg = args[2] ?? 'open';
-            println('\x1b[90m  Buscando PRs…\x1b[0m');
-            const prs = await listPrs({ state: /** @type {any} */ (stateArg) }).catch(() => []);
-            if (!prs.length) {
-                println('\x1b[90m  Nenhum PR encontrado.\x1b[0m');
-                return;
-            }
-            println(`\n  \x1b[36mPull Requests\x1b[0m \x1b[90m(${stateArg})\x1b[0m`);
-            println(formatPrList(prs));
-            return;
-        }
-
-        if (action === 'diff') {
-            const n = Number(args[2]);
-            if (!n) {
-                println('\x1b[90m  Uso: /gh pr diff <número>\x1b[0m');
-                return;
-            }
-            println('\x1b[90m  Buscando diff…\x1b[0m');
-            const diff = await diffPr(n).catch(() => '');
-            if (!diff) {
-                println(`\x1b[90m  Sem diff para PR #${n}.\x1b[0m`);
-                return;
-            }
-            // Exibe até 120 linhas
-            const lines = diff.split('\n').slice(0, 120);
-            for (const l of lines) {
-                if (l.startsWith('+')) println(`\x1b[32m  ${l}\x1b[0m`);
-                else if (l.startsWith('-')) println(`\x1b[31m  ${l}\x1b[0m`);
-                else println(`  ${l}`);
-            }
-            if (diff.split('\n').length > 120) println('  \x1b[90m…(diff truncado a 120 linhas)\x1b[0m');
-            return;
-        }
-
-        // action é número
-        const n = Number(action);
-        if (n) {
-            println('\x1b[90m  Buscando PR…\x1b[0m');
-            const pr = await viewPr(n).catch(() => null);
-            if (!pr) {
-                println(`\x1b[31m  PR #${n} não encontrado.\x1b[0m`);
-                return;
-            }
-            const draftTag = pr.isDraft ? '\x1b[33m[DRAFT]\x1b[0m ' : '';
-            println(
-                `\n  \x1b[36m#${pr.number}\x1b[0m ${draftTag}\x1b[1m${pr.title}\x1b[0m  \x1b[90m[${pr.state}]\x1b[0m`,
-            );
-            println(`  Branch: ${pr.headRefName}  ·  Autor: ${pr.author?.login}`);
-            println(`  URL: \x1b[34m${pr.url}\x1b[0m`);
-            if (pr.body) {
-                println('  ─────────────────────────────────────────────');
-                for (const line of pr.body.slice(0, 600).split('\n')) println(`  ${line}`);
-            }
-            println('');
-            return;
-        }
-
-        println('\x1b[90m  Uso: /gh pr [list|<n>|diff <n>] [args…]\x1b[0m');
-        return;
-    }
-
-    // ── run / ci ──────────────────────────────────────────────────────────
-    if (sub === 'run' || sub === 'runs' || sub === 'ci') {
-        const action = args[1]?.toLowerCase() ?? 'list';
-
-        if (action === 'list' || action === 'ls') {
-            const limit = Number(args[2]) || 10;
-            println('\x1b[90m  Buscando CI runs…\x1b[0m');
-            const runs = await listRuns({ limit }).catch(() => []);
-            if (!runs.length) {
-                println('\x1b[90m  Nenhum run encontrado.\x1b[0m');
-                return;
-            }
-            println('\n  \x1b[36mCI Runs\x1b[0m');
-            println(formatRunList(runs));
-            return;
-        }
-
-        const runId = action;
-        if (runId && runId !== 'list') {
-            println('\x1b[90m  Buscando run…\x1b[0m');
-            const run = /** @type {any} */ (await viewRun(runId).catch(() => null));
-            if (!run) {
-                println(`\x1b[31m  Run "${runId}" não encontrado.\x1b[0m`);
-                return;
-            }
-            println(`\n  \x1b[36mRun #${run.databaseId ?? runId}\x1b[0m  ${run.displayTitle ?? run.name}`);
-            println(`  Status: ${run.status}  ·  Conclusão: ${run.conclusion ?? '…'}`);
-            println(`  Branch: ${run.headBranch}  ·  Workflow: ${run.workflowName}`);
-            println(`  URL: \x1b[34m${run.url}\x1b[0m`);
-            println('');
-            return;
-        }
-
-        println('\x1b[90m  Uso: /gh run [list|<runId>]\x1b[0m');
-        return;
-    }
-
-    // ── release ───────────────────────────────────────────────────────────
-    if (sub === 'release' || sub === 'releases') {
-        println('\x1b[90m  Buscando releases…\x1b[0m');
-        const releases = await listReleases().catch(() => []);
-        if (!releases.length) {
-            println('\x1b[90m  Nenhuma release encontrada.\x1b[0m');
-            return;
-        }
-        println('\n  \x1b[36mReleases\x1b[0m');
-        println(formatReleaseList(releases));
-        return;
-    }
-
-    // ── search ────────────────────────────────────────────────────────────
-    if (sub === 'search') {
-        const query = args.slice(1).join(' ');
-        if (!query) {
-            println('\x1b[90m  Uso: /gh search <query>\x1b[0m');
-            return;
-        }
-        println('\x1b[90m  Buscando…\x1b[0m');
-        const results = await searchIssues(query, { limit: 10 }).catch(() => []);
-        if (!results.length) {
-            println('\x1b[90m  Nenhum resultado.\x1b[0m');
-            return;
-        }
-        println(`\n  \x1b[36mResultados para:\x1b[0m "${query}"`);
-        for (const r of /** @type {any[]} */ (results)) {
-            const typeLabel = r.isPullRequest ? '\x1b[34mPR\x1b[0m' : '\x1b[36missue\x1b[0m';
-            println(`  ${typeLabel}  #${r.number}  ${r.title}  \x1b[90m[${r.state}]\x1b[0m`);
-        }
-        println('');
-        return;
-    }
-
-    // ── status ────────────────────────────────────────────────────────────
-    if (sub === 'status' || sub === 'st') {
-        println('\x1b[90m  Verificando status gh…\x1b[0m');
-        const status = await ghGetStatus().catch(() => null);
-        if (!status) {
-            println('\x1b[90m  Status gh não disponível.\x1b[0m');
-            return;
-        }
-        println(`\n  \x1b[36mGitHub Status\x1b[0m\n  ${status}\n`);
-        return;
-    }
-
-    // ── api ───────────────────────────────────────────────────────────────
-    if (sub === 'api') {
-        const endpoint = args[1];
-        if (!endpoint) {
-            println('\x1b[90m  Uso: /gh api <endpoint>  ex: /gh api /user\x1b[0m');
-            return;
-        }
-        println('\x1b[90m  Chamando gh api…\x1b[0m');
-        const data = await ghRawApi(endpoint).catch(() => null);
-        if (data === null) {
-            println('\x1b[31m  Falha na chamada a gh api.\x1b[0m');
-            return;
-        }
-        const out = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-        for (const line of out.split('\n').slice(0, 80)) println(`  ${line}`);
-        if (out.split('\n').length > 80) println('  \x1b[90m…(truncado)\x1b[0m');
-        return;
-    }
-
-    // ── help ──────────────────────────────────────────────────────────────
-    println(`
-  \x1b[36m/gh — GitHub CLI\x1b[0m
-  ─────────────────────────────────────────────────────────────────
-  \x1b[33m/gh issue list [open|closed|all] [label]\x1b[0m  — lista issues
-  \x1b[33m/gh issue <n>\x1b[0m                             — detalhe de issue
-  \x1b[33m/gh issue create <título>\x1b[0m                 — cria issue
-  \x1b[33m/gh issue close <n>\x1b[0m                       — fecha issue
-  \x1b[33m/gh issue comment <n> <texto>\x1b[0m             — comenta issue
-  \x1b[33m/gh pr list [open|closed|merged]\x1b[0m          — lista PRs
-  \x1b[33m/gh pr <n>\x1b[0m                                — detalhe de PR
-  \x1b[33m/gh pr diff <n>\x1b[0m                           — diff de PR
-  \x1b[33m/gh run list [limit]\x1b[0m                      — lista CI runs
-  \x1b[33m/gh run <id>\x1b[0m                              — detalhe de run
-  \x1b[33m/gh release list\x1b[0m                          — lista releases
-  \x1b[33m/gh search <query>\x1b[0m                        — busca issues/prs
-  \x1b[33m/gh status\x1b[0m                                — status geral da conta
-  \x1b[33m/gh api <endpoint>\x1b[0m                        — chamada raw à API
-  ─────────────────────────────────────────────────────────────────
-`);
-}
-
-// ─── Comandos Git CLI ─────────────────────────────────────────────────────────
-
-/**
- * Handler do comando /git <subcomando> [args…].
- *
- * Subcomandos: status — arquivos modificados/staged log [n] — últimos N commits log --oneline [n]— log compacto diff
- * [--staged] [arquivo] branch — lista branches pull — git pull stash — git stash (sem args = push) stash list — lista
- * stashes
- *
- * @param {string[]} args - argumentos após "/git"
- * @returns {Promise<void>}
- */
-async function cmdGit(args) {
-    const sub = args[0]?.toLowerCase() ?? '';
-
-    if (sub === 'status' || sub === 'st' || sub === '') {
-        println('\x1b[90m  Verificando status git…\x1b[0m');
-        const entries = await gitStatus().catch(() => []);
-        println('\n  \x1b[36mGit Status\x1b[0m');
-        println(formatStatus(entries));
-        println('');
-        return;
-    }
-
-    if (sub === 'log') {
-        const oneline = args.includes('--oneline') || args.includes('-1');
-        const nArg = args.find((a) => /^\d+$/.test(a));
-        const n = nArg ? Number(nArg) : 15;
-        println('\x1b[90m  Buscando log…\x1b[0m');
-        const entries = await gitLog({ n, oneline }).catch(() => []);
-        println(`\n  \x1b[36mGit Log\x1b[0m \x1b[90m(últimos ${entries.length} commits)\x1b[0m`);
-        println(formatLog(entries, oneline));
-        println('');
-        return;
-    }
-
-    if (sub === 'diff') {
-        const staged = args.includes('--staged') || args.includes('--cached');
-        const file = args.find((a) => !a.startsWith('-') && a !== 'diff');
-        println('\x1b[90m  Gerando diff…\x1b[0m');
-        const diff = await gitDiff({ staged, file }).catch(() => '');
-        if (!diff) {
-            println('\x1b[90m  Sem diferenças.\x1b[0m');
-            return;
-        }
-        const lines = diff.split('\n').slice(0, 150);
-        for (const l of lines) {
-            if (l.startsWith('+') && !l.startsWith('+++')) println(`\x1b[32m  ${l}\x1b[0m`);
-            else if (l.startsWith('-') && !l.startsWith('---')) println(`\x1b[31m  ${l}\x1b[0m`);
-            else if (l.startsWith('@@')) println(`\x1b[36m  ${l}\x1b[0m`);
-            else println(`  ${l}`);
-        }
-        if (diff.split('\n').length > 150) println('\x1b[90m  …(truncado a 150 linhas)\x1b[0m');
-        return;
-    }
-
-    if (sub === 'branch' || sub === 'branches') {
-        println('\x1b[90m  Buscando branches…\x1b[0m');
-        const branches = await gitBranch().catch(() => []);
-        println('\n  \x1b[36mGit Branch\x1b[0m');
-        println(formatBranch(branches));
-        println('');
-        return;
-    }
-
-    if (sub === 'pull') {
-        println('\x1b[90m  Executando git pull…\x1b[0m');
-        const output = await gitPull().catch((e) => `Erro: ${e.message}`);
-        println(output.startsWith('Erro') ? `\x1b[31m  ✗ ${output}\x1b[0m` : `\x1b[32m  ✓ ${output || 'ok'}\x1b[0m`);
-        return;
-    }
-
-    if (sub === 'stash') {
-        const stashSub = args[1]?.toLowerCase() ?? 'push';
-        if (stashSub === 'list') {
-            const stashOut = await gitStashList().catch(() => '');
-            if (!stashOut) {
-                println('\x1b[90m  Nenhum stash encontrado.\x1b[0m');
-                return;
-            }
-            println('\n  \x1b[36mGit Stash List\x1b[0m');
-            for (const s of stashOut.split('\n').filter(Boolean)) println(`  ${s}`);
-            println('');
-            return;
-        }
-        const stashOut2 = await gitStash({ pop: stashSub === 'pop' }).catch((e) => `Erro: ${e.message}`);
-        println(
-            stashOut2.startsWith('Erro')
-                ? `\x1b[31m  ✗ ${stashOut2}\x1b[0m`
-                : `\x1b[32m  ✓ ${stashOut2 || 'ok'}\x1b[0m`,
-        );
-        return;
-    }
-
-    // help / fallback
-    println(`
-  \x1b[36m/git — Git CLI\x1b[0m
-  ─────────────────────────────────────────────────
-  \x1b[33m/git status\x1b[0m                    — status do working tree
-  \x1b[33m/git log [n] [--oneline]\x1b[0m       — log de commits
-  \x1b[33m/git diff [--staged] [file]\x1b[0m    — diff
-  \x1b[33m/git branch\x1b[0m                    — branches
-  \x1b[33m/git pull\x1b[0m                      — git pull
-  \x1b[33m/git stash [list|pop|drop]\x1b[0m     — stash
-  ─────────────────────────────────────────────────
-`);
-}
-
-// ─── Comando Alias ────────────────────────────────────────────────────────────
-
-/**
- * Handler do comando /alias [set|remove|reset|list].
- *
- * @param {string[]} args
- * @returns {void}
- */
-function cmdAlias(args) {
-    const action = args[0]?.toLowerCase() ?? 'list';
-
-    if (action === 'list' || action === '') {
-        println('\n  \x1b[36mAliases\x1b[0m');
-        println(formatAliases());
-        println('');
-        return;
-    }
-
-    if (action === 'set') {
-        const name = args[1];
-        const expansion = args.slice(2).join(' ');
-        if (!name || !expansion) {
-            println('\x1b[90m  Uso: /alias set <nome> <comando>   ex: /alias set /myissues /gh issue list\x1b[0m');
-            return;
-        }
-        setAlias(name.startsWith('/') ? name : `/${name}`, expansion);
-        println(`\x1b[32m  ✓ Alias definido: ${name} → ${expansion}\x1b[0m`);
-        return;
-    }
-
-    if (action === 'remove' || action === 'rm' || action === 'delete') {
-        const name = args[1];
-        if (!name) {
-            println('\x1b[90m  Uso: /alias remove <nome>\x1b[0m');
-            return;
-        }
-        const ok = removeAlias(name.startsWith('/') ? name : `/${name}`);
-        println(ok ? `\x1b[32m  ✓ Alias removido: ${name}\x1b[0m` : `\x1b[33m  Alias não encontrado: ${name}\x1b[0m`);
-        return;
-    }
-
-    println('\x1b[90m  Uso: /alias [list|set <nome> <cmd>|remove <nome>]\x1b[0m');
-}
-
-// ─── Comando Help ─────────────────────────────────────────────────────────────
-
-/**
- * Exibe ajuda completa do terminal.
- *
- * @returns {void}
- */
-function cmdHelp() {
-    println(`
-  \x1b[36m╔═══════════════════════ Terminal LLM-B — Ajuda ═══════════════════════╗\x1b[0m
-
-  \x1b[1mComandos de Sessão\x1b[0m
-  \x1b[33m/status\x1b[0m                              — status do agente LLM-B
-  \x1b[33m/history [n]\x1b[0m                         — últimos N turnos em memória
-  \x1b[33m/db-history [n]\x1b[0m                      — últimos N turnos (SQLite)
-  \x1b[33m/db-sessions [n]\x1b[0m                     — últimas N sessões hub
-  \x1b[33m/who\x1b[0m                                 — atores e canais ativos
-  \x1b[33m/count\x1b[0m                               — estatísticas da sessão
-  \x1b[33m/clear\x1b[0m                               — limpa histórico em memória
-  \x1b[33m/restart\x1b[0m                             — reinicia dialog loop
-  \x1b[33m/quit\x1b[0m / \x1b[33m/exit\x1b[0m                         — encerra terminal
-
-  \x1b[1mMemória Semântica\x1b[0m
-  \x1b[33m/remember [tag:] texto\x1b[0m               — persiste memória
-  \x1b[33m/recall [tag]\x1b[0m                        — recupera por tag
-  \x1b[33m/recall ?busca\x1b[0m                       — busca full-text
-  \x1b[33m/forget <id>\x1b[0m                         — remove memória por ID
-
-  \x1b[1mGitHub CLI (/gh)\x1b[0m
-  \x1b[33m/gh issue list\x1b[0m                       — listar issues (aliases: /issues)
-  \x1b[33m/gh issue <n>\x1b[0m                        — detalhe de issue
-  \x1b[33m/gh issue create <título>\x1b[0m            — criar issue
-  \x1b[33m/gh issue close <n>\x1b[0m                  — fechar issue
-  \x1b[33m/gh issue comment <n> <txt>\x1b[0m          — comentar issue
-  \x1b[33m/gh pr list\x1b[0m                          — listar PRs (alias: /prs)
-  \x1b[33m/gh pr <n>\x1b[0m                           — detalhe de PR
-  \x1b[33m/gh pr diff <n>\x1b[0m                      — diff de PR
-  \x1b[33m/gh run list\x1b[0m                         — listar CI runs (alias: /runs, /ci)
-  \x1b[33m/gh run <id>\x1b[0m                         — detalhe de run
-  \x1b[33m/gh release list\x1b[0m                     — listar releases
-  \x1b[33m/gh search <query>\x1b[0m                   — buscar issues/prs
-  \x1b[33m/gh status\x1b[0m                           — status da conta GitHub
-  \x1b[33m/gh api <endpoint>\x1b[0m                   — chamada raw à API
-
-  \x1b[1mGit CLI (/git)\x1b[0m
-  \x1b[33m/git status\x1b[0m                          — status working tree (alias: /st, /gst)
-  \x1b[33m/git log [n] [--oneline]\x1b[0m             — log de commits (alias: /log, /glog)
-  \x1b[33m/git diff [--staged] [file]\x1b[0m          — diff (alias: /diff)
-  \x1b[33m/git branch\x1b[0m                          — branches
-  \x1b[33m/git pull\x1b[0m                            — git pull
-  \x1b[33m/git stash [list|pop|drop]\x1b[0m           — stash
-
-  \x1b[1mAliases\x1b[0m
-  \x1b[33m/alias\x1b[0m / \x1b[33m/alias list\x1b[0m                — listar aliases
-  \x1b[33m/alias set <nome> <cmd>\x1b[0m              — criar alias
-  \x1b[33m/alias remove <nome>\x1b[0m                 — remover alias
-
-  \x1b[1mHTTP Endpoints\x1b[0m  \x1b[90m(porta ${INJECT_PORT})\x1b[0m
-  \x1b[33mPOST /inject\x1b[0m  \x1b[33mPOST /pipeline\x1b[0m  \x1b[33mGET /events\x1b[0m
-  \x1b[33mGET /sessions\x1b[0m  \x1b[33mPOST|GET|DELETE /memory\x1b[0m
-  \x1b[33mGET /gh/issues\x1b[0m  \x1b[33mGET /gh/prs\x1b[0m  \x1b[33mGET /gh/ci\x1b[0m
-  \x1b[33mGET /git/status\x1b[0m  \x1b[33mGET /git/log\x1b[0m
-
-  \x1b[90mTipo qualquer coisa sem /  para enviar mensagem à LLM-B\x1b[0m
-  \x1b[36m╚═══════════════════════════════════════════════════════════════════════╝\x1b[0m
-`);
-}
-
-// ─── Motor de diálogo ─────────────────────────────────────────────────────────
+/** @returns {void} */
+function cmdHelp() { _cmdHelp({ println, injectPort: INJECT_PORT }); }
 
 /**
  * Garante que o dialog loop está ativo. Se não estiver, inicia-o.
@@ -1411,93 +808,29 @@ async function startRepl(injectServer) {
                     break;
                 }
                 case 'remember': {
-                    // /remember [tag:] conteúdo
-                    const match = arg.match(/^([a-z0-9_-]+):\s*(.+)$/i);
-                    const tag = match ? (match[1] ?? 'geral') : 'geral';
-                    const content = match ? (match[2] ?? '').trim() : arg.trim();
-                    if (!content) {
-                        println('\x1b[90m  Uso: /remember [tag:] conteúdo\x1b[0m');
-                    } else {
-                        const id = conversationStore.storeMemory({
-                            tag,
-                            content,
-                            ...(_hubSessionId ? { hubSessionId: _hubSessionId } : {}),
-                        });
-                        println(`\x1b[32m  ✓ Memória salva\x1b[0m \x1b[90m[${tag}] ${id.slice(0, 8)}…\x1b[0m`);
-                    }
+                    _cmdRemember({ hubSessionId: _hubSessionId, println }, arg);
                     break;
                 }
                 case 'recall': {
-                    // /recall [tag] ou /recall ?busca textual
-                    const isSearch = arg.startsWith('?');
-                    const memories = conversationStore.recallMemories({
-                        ...(isSearch ? { search: arg.slice(1).trim() } : arg ? { tag: arg } : {}),
-                        limit: 10,
-                    });
-                    if (memories.length === 0) {
-                        println('\x1b[90m  Nenhuma memória encontrada.\x1b[0m');
-                    } else {
-                        println(`\n  \x1b[36mMemórias\x1b[0m ${arg ? `[${arg}]` : '(todas)'}`);
-                        println('  ─────────────────────────────────────────────');
-                        for (const m of memories) {
-                            const ts = new Date(m.created_at).toLocaleString('pt-BR');
-                            println(`  \x1b[90m[${ts}]\x1b[0m \x1b[33m${m.tag}\x1b[0m  ${m.content}`);
-                        }
-                        println('  ─────────────────────────────────────────────\n');
-                    }
+                    _cmdRecall({ hubSessionId: _hubSessionId, println }, arg);
                     break;
                 }
                 case 'who':
-                    println(`
-  \x1b[36mAtores ativos nesta sessão:\x1b[0m
-  👤  \x1b[32mVocê\x1b[0m          — stdin (digitar diretamente aqui)
-  🤖  \x1b[34mLLM-A\x1b[0m         — POST http://localhost:${INJECT_PORT}/inject
-  🧠  \x1b[35mLLM-B\x1b[0m         — AlwaysAliveAgent (GPT-4.1 Copilot SDK)
-  📡  \x1b[90mSSE stream\x1b[0m    — GET  http://localhost:${INJECT_PORT}/events
-`);
+                    _cmdWho({ injectPort: INJECT_PORT, println });
                     break;
                 case 'clear':
-                    llmBridgeClient.clearHistory();
-                    println('\x1b[90m  Histórico em memória limpo.\x1b[0m');
+                    _cmdClear({ println });
                     break;
                 case 'answer': {
-                    const ok = alwaysAliveAgent.answerPendingQuestion(arg);
-                    println(ok ? `[answer] Resposta enviada: "${arg}"` : '[answer] Nenhuma pergunta pendente.');
+                    _cmdAnswer({ println }, arg);
                     break;
                 }
                 case 'forget': {
-                    // /forget <id>  — remove memória semântica pelo ID (use /recall para ver IDs)
-                    if (!arg) {
-                        println('\x1b[90m  Uso: /forget <id>\x1b[0m');
-                    } else {
-                        const deleted = conversationStore.deleteMemory(arg);
-                        println(
-                            deleted
-                                ? `\x1b[32m  ✓ Memória removida: ${arg.slice(0, 8)}…\x1b[0m`
-                                : `\x1b[33m  Memória não encontrada: ${arg}\x1b[0m`,
-                        );
-                    }
+                    _cmdForget({ hubSessionId: _hubSessionId, println }, arg);
                     break;
                 }
                 case 'count': {
-                    // /count — estatísticas rápidas da sessão atual
-                    if (!_hubSessionId) {
-                        println('\x1b[33m  Nenhuma hub session ativa.\x1b[0m');
-                        break;
-                    }
-                    const turns = conversationStore.readTurns(_hubSessionId, { limit: 9999 });
-                    const mems = conversationStore.recallMemories({ limit: 9999 });
-                    const userCount = turns.filter((t) => t.role === 'user').length;
-                    const llmbCount = turns.filter((t) => t.role === 'llm_b').length;
-                    println(`
-  \x1b[36mEstatísticas da sessão\x1b[0m
-  ─────────────────────────────────────────────
-  Turnos (usuário):   ${String(userCount).padStart(4)}
-  Turnos (LLM-B):     ${String(llmbCount).padStart(4)}
-  Turnos (total):     ${String(turns.length).padStart(4)}
-  Memórias salvas:    ${String(mems.length).padStart(4)}
-  Hub session:        ${_hubSessionId?.slice(0, 8) ?? '—'}…
-  ─────────────────────────────────────────────\n`);
+                    _cmdCount({ hubSessionId: _hubSessionId, println });
                     break;
                 }
                 case 'restart':

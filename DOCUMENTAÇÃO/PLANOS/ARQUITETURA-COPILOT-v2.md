@@ -1,7 +1,7 @@
 # Plano de Arquitetura — `src/copilot` v2
 
-**Data**: 2026-06-15  
-**Status**: Rascunho de planejamento — aprovado para execução incremental  
+**Data**: 2026-06-15
+**Status**: Rascunho de planejamento — aprovado para execução incremental
 **Autores**: Análise automática via audit de código + testes reais com LLM-B
 
 ---
@@ -63,15 +63,15 @@ src/copilot/
 
 O arquivo mistura **7 responsabilidades distintas** sem separação de camadas:
 
-| Responsabilidade | Linhas aprox. | Deveria estar em |
-|---|---|---|
-| HTTP inject server (raw `node:http`) | ~400 | `terminal/server.js` |
-| Handlers de endpoints HTTP (health, git, gh, memory) | ~320 | `terminal/http-handlers.js` |
-| REPL readline (stdin/stdout) | ~250 | `terminal/repl.js` |
-| Comandos do REPL (14 comandos) | ~350 | `terminal/commands/*.js` |
-| Dialog loop (ensureDialogLoop, sendTurn) | ~100 | `terminal/dialog.js` |
-| Hub session management (boot, retomada) | ~80 | aproveitando `session-manager.js` |
-| SSE event broadcast | ~80 | `terminal/events.js` |
+| Responsabilidade                                     | Linhas aprox. | Deveria estar em                  |
+| ---------------------------------------------------- | ------------- | --------------------------------- |
+| HTTP inject server (raw `node:http`)                 | ~400          | `terminal/server.js`              |
+| Handlers de endpoints HTTP (health, git, gh, memory) | ~320          | `terminal/http-handlers.js`       |
+| REPL readline (stdin/stdout)                         | ~250          | `terminal/repl.js`                |
+| Comandos do REPL (14 comandos)                       | ~350          | `terminal/commands/*.js`          |
+| Dialog loop (ensureDialogLoop, sendTurn)             | ~100          | `terminal/dialog.js`              |
+| Hub session management (boot, retomada)              | ~80           | aproveitando `session-manager.js` |
+| SSE event broadcast                                  | ~80           | `terminal/events.js`              |
 
 #### Problema P2 — Dois stacks HTTP paralelos sem unificação
 
@@ -103,15 +103,15 @@ qual cenário.
 
 ## 2. Bugs Identificados via Auditoria de Código + Testes Reais
 
-| ID | Severidade | Arquivo | Descrição | Status |
-|---|---|---|---|---|
-| **BUG-1** | 🔴 CRÍTICO | `terminal-server.js:43,1390` | `resolve()` do `alias-store` **não era importado nem chamado** na função `rl.on('line')`. Aliases built-in (`/st`, `/log`, `/issues`, `/prs`, `/gst`, etc.) nunca expandiam no REPL — iam direto ao `default:` e exibiam "Comando desconhecido" | ✅ **CORRIGIDO** |
-| **BUG-2** | 🟡 MÉDIO | `terminal-server.js:662` | `gitStashList` era importado dinamicamente dentro de `cmdGit()` (`const { gitStashList } = await import(...)`) — inconsistente com todos os outros imports estáticos; impacto: overhead de dynamic import em cada chamada | ✅ **CORRIGIDO** |
-| **BUG-3** | 🟢 BAIXO | `terminal-server.js:/count` | `/count` chamava `readTurns(_hubSessionId ?? '', ...)` — se `_hubSessionId` fosse null, passava string vazia silenciosamente retornando 0 turnos sem mensagem de erro | ✅ **CORRIGIDO** |
-| **GAP-1** | 🏗️ DESIGN | `terminal-server.js` | `HubOrchestrator` bypassado — writes diretos ao `conversationStore` | Planejado v2.1 |
-| **GAP-2** | 🏗️ DESIGN | Global | Dois stacks HTTP paralelos sem camada compartilhada | Planejado v2.1 |
-| **GAP-3** | 🏗️ DESIGN | `terminal-server.js` | SSE artesanal em vez de reutilizar Socket.io hub | Planejado v2.2 |
-| **GAP-4** | 🏗️ DESIGN | `terminal-server.js` | 1677 linhas monólito | Planejado v2.1 |
+| ID        | Severidade | Arquivo                      | Descrição                                                                                                                                                                                                                                       | Status          |
+| --------- | ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| **BUG-1** | 🔴 CRÍTICO  | `terminal-server.js:43,1390` | `resolve()` do `alias-store` **não era importado nem chamado** na função `rl.on('line')`. Aliases built-in (`/st`, `/log`, `/issues`, `/prs`, `/gst`, etc.) nunca expandiam no REPL — iam direto ao `default:` e exibiam "Comando desconhecido" | ✅ **CORRIGIDO** |
+| **BUG-2** | 🟡 MÉDIO    | `terminal-server.js:662`     | `gitStashList` era importado dinamicamente dentro de `cmdGit()` (`const { gitStashList } = await import(...)`) — inconsistente com todos os outros imports estáticos; impacto: overhead de dynamic import em cada chamada                       | ✅ **CORRIGIDO** |
+| **BUG-3** | 🟢 BAIXO    | `terminal-server.js:/count`  | `/count` chamava `readTurns(_hubSessionId ?? '', ...)` — se `_hubSessionId` fosse null, passava string vazia silenciosamente retornando 0 turnos sem mensagem de erro                                                                           | ✅ **CORRIGIDO** |
+| **GAP-1** | 🏗️ DESIGN   | `terminal-server.js`         | `HubOrchestrator` bypassado — writes diretos ao `conversationStore`                                                                                                                                                                             | Planejado v2.1  |
+| **GAP-2** | 🏗️ DESIGN   | Global                       | Dois stacks HTTP paralelos sem camada compartilhada                                                                                                                                                                                             | Planejado v2.1  |
+| **GAP-3** | 🏗️ DESIGN   | `terminal-server.js`         | SSE artesanal em vez de reutilizar Socket.io hub                                                                                                                                                                                                | Planejado v2.2  |
+| **GAP-4** | 🏗️ DESIGN   | `terminal-server.js`         | 1677 linhas monólito                                                                                                                                                                                                                            | Planejado v2.1  |
 
 ---
 
@@ -119,20 +119,20 @@ qual cenário.
 
 Todos os endpoints foram testados com terminal real (`node --strip-types src/copilot/terminal-server.js`):
 
-| Endpoint | Método | Resultado | Observações |
-|---|---|---|---|
-| `/health` | GET | ✅ HTTP 200 | `dialogLoopActive:true, agentStatus:waiting_for_input` |
-| `/git/status` | GET | ✅ HTTP 200 | `entries:1` |
-| `/git/log?n=3` | GET | ✅ HTTP 200 | `commits:3, latest:59c4364` |
-| `/gh/issues?limit=2` | GET | ✅ HTTP 200 | `ok:true, issues:1` |
-| `/gh/prs?limit=2` | GET | ✅ HTTP 200 | `ok:true, prs:2` |
-| `/gh/ci?limit=3` | GET | ✅ HTTP 200 | `ok:true, runs:3` |
-| `/inject` | POST | ✅ HTTP 200 | `duration:4662ms`, LLM-B respondeu corretamente |
-| `/memory` | POST | ✅ HTTP 201 | `ok:true, id:badf0393` |
-| `/memory?tag=test` | GET | ✅ HTTP 200 | `ok:true, count:1` |
-| `/memory/:id` | DELETE | ✅ HTTP 200 | `ok:true` |
-| `/sessions` | GET | ✅ HTTP 200 | `sessions:3, current:c19f96d0` |
-| `/sessions/:id/turns` | GET | ✅ HTTP 200 | `turns:2` |
+| Endpoint              | Método | Resultado  | Observações                                            |
+| --------------------- | ------ | ---------- | ------------------------------------------------------ |
+| `/health`             | GET    | ✅ HTTP 200 | `dialogLoopActive:true, agentStatus:waiting_for_input` |
+| `/git/status`         | GET    | ✅ HTTP 200 | `entries:1`                                            |
+| `/git/log?n=3`        | GET    | ✅ HTTP 200 | `commits:3, latest:59c4364`                            |
+| `/gh/issues?limit=2`  | GET    | ✅ HTTP 200 | `ok:true, issues:1`                                    |
+| `/gh/prs?limit=2`     | GET    | ✅ HTTP 200 | `ok:true, prs:2`                                       |
+| `/gh/ci?limit=3`      | GET    | ✅ HTTP 200 | `ok:true, runs:3`                                      |
+| `/inject`             | POST   | ✅ HTTP 200 | `duration:4662ms`, LLM-B respondeu corretamente        |
+| `/memory`             | POST   | ✅ HTTP 201 | `ok:true, id:badf0393`                                 |
+| `/memory?tag=test`    | GET    | ✅ HTTP 200 | `ok:true, count:1`                                     |
+| `/memory/:id`         | DELETE | ✅ HTTP 200 | `ok:true`                                              |
+| `/sessions`           | GET    | ✅ HTTP 200 | `sessions:3, current:c19f96d0`                         |
+| `/sessions/:id/turns` | GET    | ✅ HTTP 200 | `turns:2`                                              |
 
 **100% dos endpoints validados e funcionando corretamente.**
 
@@ -148,14 +148,14 @@ A questão é se a facade HTTP deve ser um microserviço separado ou permanecer 
 
 **Justificativa:**
 
-| Critério | Microserviço separado | LIB-first (recomendado) |
-|---|---|---|
-| Latência de comunicação | Alta (IPC/HTTP entre processos) | Zero (chamada de função direta) |
-| Complexidade de deploy | Alta (2+ processos, health checks, etc.) | Baixa (1 processo) |
-| Compartilhamento de estado | Requer serialização | Compartilhamento direto de memória |
-| SQLite (maestro.sqlite) | Precisa de acesso compartilhado ou replicação | Acesso direto |
-| Debugging | Mais difícil (spans distribuídos) | Mais fácil (stack trace único) |
-| Escalabilidade horizontal | Melhor | Limitada (mas não é requisito) |
+| Critério                   | Microserviço separado                         | LIB-first (recomendado)            |
+| -------------------------- | --------------------------------------------- | ---------------------------------- |
+| Latência de comunicação    | Alta (IPC/HTTP entre processos)               | Zero (chamada de função direta)    |
+| Complexidade de deploy     | Alta (2+ processos, health checks, etc.)      | Baixa (1 processo)                 |
+| Compartilhamento de estado | Requer serialização                           | Compartilhamento direto de memória |
+| SQLite (maestro.sqlite)    | Precisa de acesso compartilhado ou replicação | Acesso direto                      |
+| Debugging                  | Mais difícil (spans distribuídos)             | Mais fácil (stack trace único)     |
+| Escalabilidade horizontal  | Melhor                                        | Limitada (mas não é requisito)     |
 
 **Conclusão**: Para este projeto, **uma LIB bem modularizada** dentro do mesmo processo é a solução
 correta. A facade HTTP (porta 3009 + Express `api/copilot/*`) são simplesmente routers finos sobre
@@ -324,22 +324,25 @@ src/copilot/
 - [x] **BUG-2**: Mover `gitStashList` para imports estáticos em `terminal-server.js`
 - [x] **BUG-3**: Guard em `/count` quando `_hubSessionId` é null
 
-### FASE B — Extração de comandos do REPL
+### FASE B — Extração de comandos do REPL ✅ CONCLUÍDA
 
-**Prazo**: curto prazo (sessão única)  
-**Objetivo**: Reduzir `terminal-server.js` de 1677 → ~900 linhas extraindo comandos.
+**Prazo**: curto prazo (sessão única)
+**Objetivo**: Reduzir `terminal-server.js` de 1677 → ~1016 linhas extraindo comandos.
+**Resultado**: 661 linhas de lógica migradas para 7 módulos (`commands/`); 884 linhas de código novo com JSDoc completo.
 
-**Escopo**:
-1. Criar `src/copilot/terminal/commands/session.js` (status, history, db-history, db-sessions, who, count, clear, restart, quit)
-2. Criar `src/copilot/terminal/commands/memory.js` (remember, recall, forget)
-3. Criar `src/copilot/terminal/commands/gh.js` (move `cmdGh()`)
-4. Criar `src/copilot/terminal/commands/git.js` (move `cmdGit()`)
-5. Criar `src/copilot/terminal/commands/alias.js` (move `cmdAlias()` + dispatch `resolve()`)
-6. Criar `src/copilot/terminal/commands/help.js` (move `cmdHelp()`)
-7. Criar `src/copilot/terminal/commands/index.js` (barrel + dispatch router)
-8. Adaptar `terminal-server.js` para importar e delegar para `commands/index.js`
+**Escopo** (todos concluídos):
+1. ✅ Criar `src/copilot/terminal/commands/session.js` (status, history, db-history, db-sessions, who, count, clear, answer)
+2. ✅ Criar `src/copilot/terminal/commands/memory.js` (remember, recall, forget)
+3. ✅ Criar `src/copilot/terminal/commands/gh.js` (move `cmdGh()`)
+4. ✅ Criar `src/copilot/terminal/commands/git.js` (move `cmdGit()`)
+5. ✅ Criar `src/copilot/terminal/commands/alias.js` (move `cmdAlias()`)
+6. ✅ Criar `src/copilot/terminal/commands/help.js` (move `cmdHelp()`)
+7. ✅ Criar `src/copilot/terminal/commands/index.js` (barrel re-export)
+8. ✅ Adaptar `terminal-server.js` para importar e delegar via ctx pattern
 
-**Benefícios**:
+**Padrão ctx adotado**: todas as funções de comando recebem um `ctx` object (`{ println, hubSessionId?, injectPort?, ... }`) — desacopladas do escopo global.
+
+**Benefícios alcançados**:
 - Testabilidade individual por comando
 - Organização por responsabilidade
 - Facilita adicionar novos comandos sem tocar no monólito
@@ -434,7 +437,7 @@ mas não crítica. Implementar apenas se o dashboard precisar de streaming de tu
 ```
 IMEDIATO (bugs críticos)    → FASE A ✅ CONCLUÍDA
 ────────────────────────────────────────────────
-CURTO PRAZO (sessão única)  → FASE B (extração de comandos)
+CURTO PRAZO (sessão única)  → FASE B ✅ CONCLUÍDA (extração de comandos: 7 módulos)
 MÉDIO PRAZO (2-3 sessões)   → FASE C + D (server + orchestrator)
 LONGO PRAZO                 → FASE E + F (reorganização de pastas)
 ```
