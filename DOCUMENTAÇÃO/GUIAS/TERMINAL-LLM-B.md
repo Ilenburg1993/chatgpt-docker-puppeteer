@@ -1,7 +1,7 @@
 # Terminal Permanente LLM-B — Guia Completo
 
-**Versão**: 4.0 (Fase 4 — Memória + Pipeline + Reflection + SSE crítico + Auditoria) **Última
-atualização**: 2026-03-24 **Módulo**: `src/copilot/terminal-server.js` **Porta inject**: `3009`
+**Versão**: 5.0 (Fase 5 — GitHub CLI bridge, git bridge, alias store, novos comandos REPL e endpoints HTTP)
+**Última atualização**: 2026-03-24 **Módulo**: `src/copilot/terminal-server.js` **Porta inject**: `3009`
 (configurável via `LLM_B_TERMINAL_PORT`)
 
 ---
@@ -22,15 +22,17 @@ Cada turno é persistido no SQLite (`data/copilot.db`) e sobrevive a restarts.
 
 ---
 
-## Arquitetura atual (Fase 4)
+## Arquitetura atual (Fase 5)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    Terminal Permanente LLM-B (Fase 4)                   │
+│                    Terminal Permanente LLM-B (Fase 5)                   │
 │                                                                         │
-│  stdin REPL ──────────────────────────────────────────────────────┐    │
+│  stdin REPL ── /gh /git /alias /help ─────────────────────────────┐    │
 │  POST :3009/inject ────────────────────────────────────────────►  │    │
 │  POST :3009/pipeline ─────────────────────────────────────────►   │    │
+│  GET  :3009/gh/issues|prs|ci ──────────────── gh-bridge.js        │    │
+│  GET  :3009/git/status|log ────────────────── git-bridge.js       │    │
 │                                                                    │    │
 │                                                     sendTurn()    │    │
 │                                                          │         │    │
@@ -56,6 +58,11 @@ Cada turno é persistido no SQLite (`data/copilot.db`) e sobrevive a restarts.
 │                broadcastSse()    copilot_conversation_turns         │    │
 │                (GET /events)     copilot_hub_sessions               │    │
 │                                 copilot_memories (P5)              │    │
+│                                                                         │
+│  Novos módulos (Fase 5):                                                │
+│    gh-bridge.js   — GitHub CLI wrapper (issues/PRs/CI/releases/search) │
+│    git-bridge.js  — Git CLI wrapper (status/log/branch/diff/stash/…)   │
+│    alias-store.js — Aliases customizáveis persistidos em .aliases.json  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -123,8 +130,10 @@ Banner atual:
 ║            Terminal LLM-B — Sessão Permanente Aberta                    ║
 ╚══════════════════════════════════════════════════════════════════════════╝
   /status · /history [n] · /db-history [n] · /db-sessions [n] · /who · /clear · /restart
-  /remember [tag:] texto · /recall [tag] · /recall ?busca
+  /remember [tag:] texto · /recall [tag] · /recall ?busca · /forget <id> · /count
+  /gh issue list · /gh pr list · /gh run list · /git status · /git log · /alias · /help
   POST :3009/inject  ·  POST :3009/pipeline  ·  GET :3009/events  ·  GET :3009/sessions  ·  POST/GET :3009/memory
+  GET :3009/gh/issues  ·  GET :3009/gh/prs  ·  GET :3009/gh/ci  ·  GET :3009/git/status  ·  GET :3009/git/log
 ```
 
 ---
@@ -140,10 +149,78 @@ Banner atual:
 | `/remember [tag:] conteúdo` | **(P5)** Persiste memória semântica com tag livre                     |
 | `/recall [tag]`             | **(P5)** Recupera memórias por tag                                    |
 | `/recall ?busca textual`    | **(P5)** Busca FTS5 nas memórias                                      |
+| `/forget <id>`              | **(Q1)** Remove memória por ID                                        |
+| `/count`                    | **(Q2)** Estatísticas de uso da sessão (turnos, memórias, etc.)       |
 | `/who`                      | Lista atores e canais disponíveis                                     |
 | `/clear`                    | Limpa histórico em memória (SQLite mantido)                           |
 | `/restart`                  | Reinicia o dialog loop manualmente                                    |
+| `/gh <subcomando>`          | **(Fase 5)** Comandos GitHub CLI                                      |
+| `/git <subcomando>`         | **(Fase 5)** Comandos git                                             |
+| `/alias [list\|set\|rm]`    | **(Fase 5)** Gerenciar aliases de comandos                            |
+| `/help`                     | **(Fase 5)** Ajuda completa de todos os comandos                      |
 | `/quit` / `/exit`           | Encerra o terminal                                                    |
+
+### Novos comandos da Fase 5
+
+#### `/gh` — GitHub CLI integrado
+
+```
+/gh issue list [--state open|closed|all] [--limit N]
+/gh issue view <número>
+/gh issue create <título> [corpo]
+/gh issue close <número>
+/gh issue comment <número> <comentário>
+/gh pr list [--state open|closed|merged|all] [--limit N]
+/gh pr view <número>
+/gh pr diff <número>
+/gh run list [--limit N] [--workflow <nome>]
+/gh run view <id>
+/gh run watch <id>
+/gh release list [--limit N]
+/gh release view <tag>
+/gh search issues <query>
+/gh search code <query>
+/gh status
+/gh api <endpoint>
+```
+
+#### `/git` — git integrado
+
+```
+/git status
+/git log [N]           — padrão: 20 commits
+/git log --oneline [N] — formato compacto
+/git branch
+/git diff              — unstaged
+/git diff --staged     — staged
+/git pull
+/git push [remote branch]
+/git add <arquivo>
+/git commit <mensagem>
+/git stash
+/git stash --pop
+/git stash --message <msg>
+/git stash list
+```
+
+#### `/alias` — aliases customizáveis
+
+```
+/alias                     — listar todos (built-in + customizados)
+/alias list                — mesma coisa
+/alias set <nome> <cmd>    — criar alias (ex: /alias set /issues /gh issue list)
+/alias remove <nome>       — remover alias customizado
+/alias reset               — restaurar aliases padrão
+
+# Aliases embutidos
+/issues → /gh issue list
+/prs    → /gh pr list
+/runs   → /gh run list
+/ci     → /gh run list
+/log    → /git log
+/st     → /git status
+/diff   → /git diff
+```
 
 ### Exemplos
 
@@ -257,6 +334,41 @@ curl -X POST http://127.0.0.1:3009/memory \
 curl "http://127.0.0.1:3009/memory?tag=arquitetura&limit=10"
 curl "http://127.0.0.1:3009/memory?search=dialog+loop&limit=5"
 # { "ok": true, "memories": [{ "id", "tag", "content", "created_at", "hub_session_id" }] }
+```
+
+### `GET /gh/issues` — issues via gh CLI (Fase 5)
+
+```bash
+curl "http://127.0.0.1:3009/gh/issues?state=open&limit=15"
+# { "ok": true, "issues": [...] }
+```
+
+### `GET /gh/prs` — pull requests via gh CLI (Fase 5)
+
+```bash
+curl "http://127.0.0.1:3009/gh/prs?state=open&limit=15"
+# { "ok": true, "prs": [...] }
+```
+
+### `GET /gh/ci` — runs de CI via gh CLI (Fase 5)
+
+```bash
+curl "http://127.0.0.1:3009/gh/ci?limit=15"
+# { "ok": true, "runs": [...] }
+```
+
+### `GET /git/status` — status do repositório (Fase 5)
+
+```bash
+curl "http://127.0.0.1:3009/git/status"
+# { "ok": true, "entries": [{ "xy", "path", "label", "color" }] }
+```
+
+### `GET /git/log` — log de commits (Fase 5)
+
+```bash
+curl "http://127.0.0.1:3009/git/log?n=20"
+# { "ok": true, "entries": [{ "hash", "abbrevHash", "authorName", "authorDate", "subject", "refNames" }] }
 ```
 
 ---
@@ -393,11 +505,16 @@ copilot_memories_fts  -- virtual table (triggers automáticos)
 | P8     | Alertas SSE críticos (`?level=critical`)   | ✅ Fase 4 |
 | P9     | Auditoria `/db-sessions` + `GET /sessions` | ✅ Fase 4 |
 | P10    | UI terminal aprimorada (ANSI colors)       | ✅ Fase 4 |
-| Q1     | `/forget <id>` — remover memória           | 🔜 Fase 5 |
-| Q2     | `/count` — estatísticas de uso             | 🔜 Fase 5 |
-| Q3     | `injectPipeline()` em inject-llmb.js       | 🔜 Fase 5 |
-| Q4     | Export MD/JSON de sessão via REPL          | 🔜 Fase 5 |
-| Q5     | Dashboard web para Hub (Socket.io)         | 🔜 Fase 5 |
+| Q1     | `/forget <id>` — remover memória           | ✅ Fase 5 |
+| Q2     | `/count` — estatísticas de uso             | ✅ Fase 5 |
+| Q3     | GitHub CLI bridge (`/gh`)                  | ✅ Fase 5 |
+| Q4     | Git bridge (`/git`)                        | ✅ Fase 5 |
+| Q5     | Alias store (`/alias`)                     | ✅ Fase 5 |
+| Q6     | Endpoints REST `/gh/*` e `/git/*`          | ✅ Fase 5 |
+| Q7     | Dashboard web para Hub (Socket.io)         | 🔜 Fase 6 |
+| Q8     | Export MD/JSON de sessão via REPL          | 🔜 Fase 6 |
+| Q9     | `injectPipeline()` em inject-llmb.js       | 🔜 Fase 6 |
+| Q10    | Diff visual colorizado no REPL             | 🔜 Fase 6 |
 | Q6     | Multi-session switching (`/switch`)        | 🔜 Fase 5 |
 
 ---
