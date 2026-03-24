@@ -65,6 +65,7 @@ import {
  * @property {function(string): void} resolve - Callback de resolução
  * @property {function(Error): void} reject - Callback de erro
  * @property {number} enqueuedAt - Timestamp em ms
+ * @property {number} [timeoutMs] - Timeout personalizado para sendAndWait (ms). undefined = usa padrão de 60s do SDK.
  */
 
 /**
@@ -94,6 +95,31 @@ export class AlwaysAliveAgent extends EventEmitter {
 
     /** @type {boolean} */
     #dialogLoopActive = false;
+
+    /**
+     * Timestamp da última atividade do dialog loop (ask_user recebido). Usado pelo watchdog para detectar travamentos.
+     *
+     * @type {number}
+     */
+    #lastDialogActivity = 0;
+
+    /** @type {ReturnType<typeof setInterval> | null} */
+    #watchdogTimer = null;
+
+    /**
+     * Intervalo do watchdog (ms). Controlado por `LLM_B_WATCHDOG_MS`. Padrão: 5 minutos.
+     *
+     * @type {number}
+     */
+    static #WATCHDOG_INTERVAL_MS = Number(process.env.LLM_B_WATCHDOG_MS ?? 5 * 60 * 1_000);
+
+    /**
+     * Limiar de inatividade (ms) para emitir 'dialog.stalled'. Controlado por `LLM_B_WATCHDOG_STALL_MS`. Padrão: 15
+     * minutos.
+     *
+     * @type {number}
+     */
+    static #WATCHDOG_STALL_MS = Number(process.env.LLM_B_WATCHDOG_STALL_MS ?? 15 * 60 * 1_000);
 
     /**
      * Tamanho máximo da fila de tarefas. Evita crescimento ilimitado de memória em cenários de sobrecarga.
@@ -391,9 +417,12 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Enfileira uma mensagem para ser enviada ao modelo.
      *
      * @param {string} message - Mensagem a enviar
+     * @param {{ timeoutMs?: number }} [opts] - Opções. `timeoutMs` sobrescreve o timeout padrão de 60s do SDK para
+     *   `sendAndWait`. Use um valor grande (ex.: `24 * 60 * 60 * 1000`) para tarefas de longa duração como o dialog
+     *   loop, que nunca emitem `session.idle` organicamente.
      * @returns {Promise<string>} Resposta completa do modelo
      */
-    sendMessage(message) {
+    sendMessage(message, { timeoutMs } = {}) {
         return new Promise((resolve, reject) => {
             if (this.#queue.length >= AlwaysAliveAgent.MAX_QUEUE_SIZE) {
                 const err = new Error(
@@ -412,6 +441,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                 resolve,
                 reject,
                 enqueuedAt: Date.now(),
+                ...(timeoutMs !== undefined ? { timeoutMs } : {}),
             });
             this.#queue.push(task);
             log('INFO', `[AlwaysAlive] Tarefa enfileirada: ${task.id}`);
@@ -549,8 +579,25 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
             this.once('dialog.ready', resolve);
         });
 
-        // sendMessage dispara o loop em background — não aguardamos a conclusão
-        this.sendMessage(metaPrompt).catch((/** @type {any} */ e) => {
+        // Inicia watchdog: detecta se o dialog loop ficar inativo por muito tempo
+        this.#lastDialogActivity = Date.now();
+        this.#watchdogTimer = setInterval(() => {
+            if (!this.#dialogLoopActive) {
+                clearInterval(/** @type {ReturnType<typeof setInterval>} */ (this.#watchdogTimer));
+                this.#watchdogTimer = null;
+                return;
+            }
+            const stalledMs = Date.now() - this.#lastDialogActivity;
+            if (stalledMs > AlwaysAliveAgent.#WATCHDOG_STALL_MS) {
+                log('WARN', `[AlwaysAlive] Watchdog: dialog loop inativo há ${Math.round(stalledMs / 1000)}s`);
+                this.emit('dialog.stalled', { stalledMs });
+            }
+        }, AlwaysAliveAgent.#WATCHDOG_INTERVAL_MS);
+
+        // sendMessage dispara o loop em background — não aguardamos a conclusão.
+        // Timeout de 24h: o dialog loop é infinito e session.idle nunca dispara durante ask_user,
+        // portanto o timeout padrão de 60s do SDK causaria reconexões desnecessárias a cada minuto.
+        this.sendMessage(metaPrompt, { timeoutMs: 24 * 60 * 60 * 1000 }).catch((/** @type {any} */ e) => {
             if (this.#dialogLoopActive) {
                 log('WARN', `[AlwaysAlive] Dialog loop encerrado: ${e.message}`);
                 this.#dialogLoopActive = false;
@@ -625,6 +672,11 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
             this.answerPendingQuestion('STOP_DIALOG');
         }
         this.#dialogLoopActive = false;
+        // Para o watchdog
+        if (this.#watchdogTimer !== null) {
+            clearInterval(this.#watchdogTimer);
+            this.#watchdogTimer = null;
+        }
     }
 
     // ─────────────── Privados ───────────────
@@ -664,7 +716,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
             });
 
             try {
-                const event = await session.sendAndWait({ prompt: task.message });
+                const event = await session.sendAndWait({ prompt: task.message }, task.timeoutMs);
                 unsubDelta();
                 const text = event?.data?.content ?? '';
                 this.#setStatus('idle');
@@ -766,11 +818,13 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
 
             if (trimmed.startsWith('READY:') || trimmed === 'READY') {
                 // Modelo sinaliza prontidão — emite evento para sendDialogTurn()
+                this.#lastDialogActivity = Date.now();
                 this.emit('dialog.ready', {});
                 // Aguarda a resposta via question.pending normal
                 // (sendDialogTurn chamará answerPendingQuestion com a mensagem do usuário)
             } else if (trimmed.startsWith('REPLY:') || trimmed.startsWith('DONE:')) {
                 // Modelo enviou uma resposta — extrai o conteúdo
+                this.#lastDialogActivity = Date.now();
                 const reply = trimmed.replace(/^(REPLY:|DONE:)\s*/i, '').trim();
                 this.emit('dialog.reply', { reply });
                 // Aguarda o próximo turno via question.pending

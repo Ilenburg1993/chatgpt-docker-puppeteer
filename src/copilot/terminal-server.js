@@ -41,27 +41,8 @@ import { log } from '#core/logger';
 import http from 'node:http';
 import readline from 'node:readline';
 import { alwaysAliveAgent } from './always-alive.js';
+import { conversationStore } from './conversation-hub/store.js';
 import { llmBridgeClient } from './llm-bridge-client.js';
-// ─── ConversationHub (integração opcional) ────────────────────────────────────────────────────────────────────────────────────
-
-/** @type {import('./conversation-hub/hub.js').ConversationHub | null} */
-let _hubModule = null;
-
-/**
- * Retorna o singleton `conversationHub` (lazy import) ou null se indisponível.
- *
- * @returns {Promise<import('./conversation-hub/hub.js').ConversationHub | null>}
- */
-async function getHub() {
-    if (_hubModule !== null) return _hubModule;
-    try {
-        const m = await import('./conversation-hub/hub.js');
-        _hubModule = m.conversationHub;
-    } catch {
-        _hubModule = null;
-    }
-    return _hubModule;
-}
 
 /** ID da hub_session permanente criada no boot. @type {string | null} */
 let _hubSessionId = null;
@@ -72,14 +53,38 @@ const INJECT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
 /** Timeout para aguardar resposta da LLM-B por turno (ms). */
 const TURN_TIMEOUT_MS = Number(process.env.LLM_B_TURN_TIMEOUT ?? 120_000);
 
-/** Boot prompt enviado ao iniciar o dialog loop. null = sem prompt inicial. */
-const BOOT_PROMPT = process.env.LLM_B_BOOT_PROMPT ?? null;
+/**
+ * Boot prompt padrão enviado à LLM-B ao iniciar o dialog loop. Pode ser sobrescrito pela variável de ambiente
+ * `LLM_B_BOOT_PROMPT`.
+ */
+const DEFAULT_BOOT_PROMPT = `Você é a LLM-B — assistente técnico interno do projeto chatgpt-docker-puppeteer.
+
+Contexto do projeto:
+- Node.js 24+ ESM; arquitetura orientada a eventos via barramento NERV
+- Camadas principais: kernel, driver, orchestrator, agent, infra, server, missions
+- Você opera como agente contínuo de longa duração, nunca encerra sessões
+
+Seu papel:
+- Responder perguntas técnicas sobre o codebase, arquitetura e decisões de design
+- Ajudar na análise de bugs, código e logs quando solicitado
+- Colaborar criticamente com o desenvolvedor e com a LLM-A (seu parceiro de raciocínio)
+
+Protocolo OBRIGATÓRIO de comunicação via ask_user:
+1. Chame ask_user("READY: aguardando próxima mensagem") para sinalizar prontidão.
+2. Ao receber uma mensagem, processe-a e formule uma resposta completa.
+3. Chame ask_user("REPLY: " + sua_resposta) para enviar a resposta.
+4. Retorne ao passo 1. NUNCA encerre o loop. Sempre use ask_user para comunicar.
+
+Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerrar.`;
+
+/** Boot prompt efetivo: env var sobrescreve o padrão. */
+const BOOT_PROMPT = process.env.LLM_B_BOOT_PROMPT ?? DEFAULT_BOOT_PROMPT;
 
 const BANNER = `
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║            Terminal LLM-B — Sessão Permanente Aberta                    ║
 ╠══════════════════════════════════════════════════════════════════════════╣
-║  Comandos: /status · /history [n] · /who · /clear · /quit               ║
+║  Comandos: /status · /history [n] · /db-history [n] · /who · /clear    ║
 ║  Injeção LLM-A: POST http://localhost:${String(INJECT_PORT).padEnd(5)} /inject               ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 `;
@@ -91,6 +96,9 @@ const PROMPT_WAITING = '      ';
 
 /** Mutex simples: evita dois turnos simultâneos. @type {boolean} */
 let _busy = false;
+
+/** Clientes SSE conectados no endpoint GET /events. @type {Set<import('node:http').ServerResponse>} */
+const _sseClients = new Set();
 
 /** Interface readline ativa. @type {readline.Interface | null} */
 let _rl = null;
@@ -165,6 +173,38 @@ function cmdHistory(n = 10) {
 // ─── Motor de diálogo ─────────────────────────────────────────────────────────
 
 /**
+ * Exibe o histórico de conversa persistido no SQLite Hub (sobrevive a restarts).
+ *
+ * @param {number} [n] - Número de turnos a exibir (padrão: 20)
+ * @returns {void}
+ */
+function cmdDbHistory(n = 20) {
+    if (!_hubSessionId) {
+        println('[db-history] Hub session não disponível (sem persistência).');
+        return;
+    }
+    try {
+        const turns = conversationStore.readTurns(_hubSessionId, { limit: n });
+        if (turns.length === 0) {
+            println('[db-history] Nenhum turno persistido ainda.');
+            return;
+        }
+        println(`\n── DB-Histórico (últimos ${turns.length} turnos) ──`);
+        for (const t of turns) {
+            const ts = new Date(t.created_at).toLocaleTimeString('pt-BR');
+            const emoji = t.role === 'llm_b' ? '🧠' : t.role === 'llm_a' ? '🤖' : '👤';
+            const preview = t.content.slice(0, 160) + (t.content.length > 160 ? '…' : '');
+            println(`  [${ts}] ${emoji} ${preview}`);
+        }
+        println('─────────────────────────────────');
+    } catch (/** @type {any} */ e) {
+        println(`[db-history] Erro ao ler DB: ${e.message}`);
+    }
+}
+
+// ─── Motor de diálogo ─────────────────────────────────────────────────────────
+
+/**
  * Garante que o dialog loop está ativo. Se não estiver, inicia-o.
  *
  * @returns {Promise<void>}
@@ -224,14 +264,13 @@ async function sendTurn(message, actor = 'user') {
 
         // Persistir no ConversationHub (best-effort)
         if (_hubSessionId) {
-            const hub = await getHub();
-            if (hub) {
-                try {
-                    hub.store.writeTurn(_hubSessionId, { role: 'user', content: message });
-                    hub.store.writeTurn(_hubSessionId, { role: 'llm_b', content: reply, durationMs });
-                } catch (/** @type {any} */ hubErr) {
-                    log('WARN', `[TerminalServer] Hub writeTurn falhou: ${hubErr.message}`);
-                }
+            try {
+                /** @type {'user' | 'llm_a'} */
+                const senderRole = actor === 'llm-a' ? 'llm_a' : 'user';
+                conversationStore.writeTurn(_hubSessionId, { role: senderRole, content: message });
+                conversationStore.writeTurn(_hubSessionId, { role: 'llm_b', content: reply, durationMs });
+            } catch (/** @type {any} */ hubErr) {
+                log('WARN', `[TerminalServer] Hub writeTurn falhou: ${hubErr.message}`);
             }
         }
 
@@ -250,6 +289,25 @@ async function sendTurn(message, actor = 'user') {
 }
 
 // ─── Servidor HTTP de injeção ─────────────────────────────────────────────────
+
+/**
+ * Transmite um evento SSE para todos os clientes conectados ao endpoint GET /events.
+ *
+ * @param {string} event - Tipo do evento (ex: 'reply', 'ready', 'stalled')
+ * @param {object} data - Payload JSON serializável
+ * @returns {void}
+ */
+function broadcastSse(event, data) {
+    if (_sseClients.size === 0) return;
+    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    for (const client of _sseClients) {
+        try {
+            client.write(payload);
+        } catch {
+            _sseClients.delete(client);
+        }
+    }
+}
 
 /**
  * Cria HTTP server interno para injeção de mensagens de LLM-A.
@@ -273,8 +331,26 @@ function createInjectServer() {
                     agentStatus: alwaysAliveAgent.status,
                     busy: _busy,
                     hubSessionId: _hubSessionId,
+                    sseClients: _sseClients.size,
                 }),
             );
+            return;
+        }
+
+        // Canal de subscrição LLM-A: SSE — ouve respostas da LLM-B em tempo real
+        // GET /events → stream de eventos: "reply", "ready", "stalled"
+        if (req.method === 'GET' && url.pathname === '/events') {
+            res.writeHead(200, {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                Connection: 'keep-alive',
+                'Access-Control-Allow-Origin': '*',
+            });
+            res.write(': connected\n\n');
+            _sseClients.add(res);
+            req.on('close', () => {
+                _sseClients.delete(res);
+            });
             return;
         }
 
@@ -440,6 +516,11 @@ async function startRepl(injectServer) {
                     cmdHistory(n);
                     break;
                 }
+                case 'db-history': {
+                    const n = Number(arg) || 20;
+                    cmdDbHistory(n);
+                    break;
+                }
                 case 'who':
                     println(
                         `[who] Atores: 👤 você (stdin) · 🤖 LLM-A (POST :${INJECT_PORT}/inject) · 🧠 LLM-B (AlwaysAliveAgent)`,
@@ -479,7 +560,7 @@ async function startRepl(injectServer) {
                     return;
                 default:
                     println(
-                        `[cli] Comando desconhecido: /${cmd}. Use /status, /history [n], /who, /clear, /answer, /restart ou /quit.`,
+                        `[cli] Comando desconhecido: /${cmd}. Use /status, /history [n], /db-history [n], /who, /clear, /answer, /restart ou /quit.`,
                     );
             }
             rl.prompt();
@@ -516,19 +597,79 @@ export async function startTerminalServer() {
 
     const injectServer = createInjectServer();
 
-    // Criar hub_session permanente (best-effort)
+    // Criar hub_session permanente no ConversationStore (best-effort; não depende de Socket.io)
     try {
-        const hub = await getHub();
-        if (hub) {
-            _hubSessionId = hub.createSession({
-                title: 'Terminal Permanente LLM-B',
-                metadata: { source: 'terminal-server', startedAt: new Date().toISOString() },
-            });
-            log('INFO', `[TerminalServer] Hub session criada: ${_hubSessionId}`);
-        }
+        conversationStore.init();
+        _hubSessionId = conversationStore.createHubSession({
+            title: 'Terminal Permanente LLM-B',
+            metadata: { source: 'terminal-server', startedAt: new Date().toISOString() },
+        });
+        log('INFO', `[TerminalServer] Hub session criada: ${_hubSessionId}`);
     } catch (/** @type {any} */ e) {
-        log('WARN', `[TerminalServer] Hub não disponível na boot: ${e.message}`);
+        log('WARN', `[TerminalServer] Hub storage indisponível, continua sem persistência: ${e.message}`);
     }
+
+    // Registrar watchdog: ao detectar dialog loop travado, reiniciar automaticamente
+    alwaysAliveAgent.on('dialog.stalled', (/** @type {{ stalledMs: number }} */ evt) => {
+        const secs = Math.round(evt.stalledMs / 1000);
+        println(`\n[watchdog] ⚠️  Dialog loop inativo há ${secs}s — reiniciando automaticamente…`);
+        log('WARN', `[TerminalServer] Watchdog disparou (${secs}s inativo). Reiniciando dialog loop.`);
+        if (_hubSessionId) {
+            try {
+                conversationStore.writeTurn(_hubSessionId, {
+                    role: 'user',
+                    content: `[SISTEMA] Watchdog: dialog loop inativo por ${secs}s — reinício automático.`,
+                });
+            } catch {
+                /* best-effort */
+            }
+        }
+        // Reinicia de forma assíncrona
+        llmBridgeClient
+            .stopDialogMode()
+            .catch(() => {})
+            .then(() => ensureDialogLoop())
+            .catch((/** @type {any} */ e) =>
+                log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop: ${e.message}`),
+            );
+        // Notifica clientes SSE
+        broadcastSse('stalled', { stalledMs: evt.stalledMs });
+    });
+
+    // SSE: transmitir respostas da LLM-B para clientes subscritos (canal LLM-A proativo)
+    alwaysAliveAgent.on('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
+        broadcastSse('reply', { content: evt.reply, timestamp: Date.now() });
+    });
+    alwaysAliveAgent.on('dialog.ready', () => {
+        broadcastSse('ready', { timestamp: Date.now() });
+    });
+
+    // P4: persiste eventos de sistema no Hub (reconexões, falhas fatais)
+    alwaysAliveAgent.on(
+        'ready',
+        (/** @type {{ sessionId: string; isResumed: boolean; reconected?: boolean }} */ evt) => {
+            if (!_hubSessionId || !evt.reconected) return; // evita registrar boot normal
+            try {
+                conversationStore.writeTurn(_hubSessionId, {
+                    role: 'user',
+                    content: `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
+                });
+            } catch {
+                /* best-effort */
+            }
+        },
+    );
+    alwaysAliveAgent.on('session.fatal', (/** @type {{ originalError: string; attempts: number }} */ evt) => {
+        if (!_hubSessionId) return;
+        try {
+            conversationStore.writeTurn(_hubSessionId, {
+                role: 'user',
+                content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
+            });
+        } catch {
+            /* best-effort */
+        }
+    });
 
     await startRepl(injectServer);
 }

@@ -194,3 +194,88 @@ export async function waitForLlmBReady(opts = {}) {
 
     throw new Error(`[inject-llmb] Terminal LLM-B não ficou pronto em ${maxWaitMs}ms.`);
 }
+
+/**
+ * @typedef {Object} SseEvent
+ * @property {string} type - tipo do evento SSE ('reply' | 'ready' | 'stalled')
+ * @property {any} data - payload JSON do evento
+ */
+
+/**
+ * @callback SseHandler
+ * @param {SseEvent} event
+ * @returns {void}
+ */
+
+/**
+ * Subscreve ao canal SSE de eventos da LLM-B (canal P3: LLM-A observa LLM-B em tempo real).
+ *
+ * Conecta ao endpoint `GET /events` do terminal-server. Chame `unsubscribe()` no objeto retornado para desconectar.
+ *
+ * @example
+ *     ```js
+ *     const sub = subscribeLlmB((evt) => {
+ *         if (evt.type === 'reply') console.log('LLM-B respondeu:', evt.data.content);
+ *     });
+ *     // ... depois:
+ *     sub.unsubscribe();
+ *     ```;
+ *
+ * @param {SseHandler} onEvent - Callback chamado a cada evento recebido
+ * @param {{ port?: number }} [opts]
+ * @returns {{ unsubscribe: () => void }} Controle de desconexão
+ */
+export function subscribeLlmB(onEvent, opts = {}) {
+    const port = opts.port ?? DEFAULT_PORT;
+    let destroyed = false;
+
+    const req = http.request(
+        {
+            hostname: '127.0.0.1',
+            port,
+            path: '/events',
+            method: 'GET',
+            headers: { Accept: 'text/event-stream' },
+        },
+        (res) => {
+            let buf = '';
+            res.on('data', (/** @type {Buffer} */ chunk) => {
+                buf += chunk.toString();
+                const lines = buf.split('\n');
+                buf = lines.pop() ?? '';
+
+                let currentEvent = '';
+                for (const line of lines) {
+                    if (line.startsWith('event:')) {
+                        currentEvent = line.slice(6).trim();
+                    } else if (line.startsWith('data:')) {
+                        try {
+                            const data = JSON.parse(line.slice(5).trim());
+                            onEvent({ type: currentEvent || 'message', data });
+                        } catch {
+                            /* ignora JSON inválido */
+                        }
+                        currentEvent = '';
+                    }
+                }
+            });
+            res.on('error', () => {
+                /* silencia erros de rede */
+            });
+        },
+    );
+
+    req.on('error', () => {
+        /* silencia falha de conexão — terminal pode não estar ativo */
+    });
+    req.end();
+
+    return {
+        unsubscribe() {
+            if (!destroyed) {
+                destroyed = true;
+                req.destroy();
+            }
+        },
+    };
+}
