@@ -40,7 +40,7 @@ if (!process.env.COPILOT_SDK_ENABLED) process.env.COPILOT_SDK_ENABLED = 'true';
 import { log } from '#core/logger';
 import http from 'node:http';
 import readline from 'node:readline';
-import { formatAliases, loadAliases, removeAlias, setAlias } from './alias-store.js';
+import { formatAliases, loadAliases, removeAlias, resolve, setAlias } from './alias-store.js';
 import { alwaysAliveAgent } from './always-alive.js';
 import { conversationStore } from './conversation-hub/store.js';
 import {
@@ -72,6 +72,7 @@ import {
     gitLog,
     gitPull,
     gitStash,
+    gitStashList,
     gitStatus,
 } from './git-bridge.js';
 import { llmBridgeClient } from './llm-bridge-client.js';
@@ -659,7 +660,6 @@ async function cmdGit(args) {
     if (sub === 'stash') {
         const stashSub = args[1]?.toLowerCase() ?? 'push';
         if (stashSub === 'list') {
-            const { gitStashList } = await import('./git-bridge.js');
             const stashOut = await gitStashList().catch(() => '');
             if (!stashOut) {
                 println('\x1b[90m  Nenhum stash encontrado.\x1b[0m');
@@ -1386,7 +1386,9 @@ async function startRepl(injectServer) {
 
         // Comandos especiais
         if (trimmed.startsWith('/')) {
-            const [cmd, ...rest] = trimmed.slice(1).split(' ');
+            // Resolve aliases antes do dispatch (ex: /st → /git status)
+            const resolved = resolve(trimmed);
+            const [cmd, ...rest] = resolved.slice(1).split(' ');
             const arg = rest.join(' ');
 
             switch (cmd?.toLowerCase()) {
@@ -1479,7 +1481,11 @@ async function startRepl(injectServer) {
                 }
                 case 'count': {
                     // /count — estatísticas rápidas da sessão atual
-                    const turns = conversationStore.readTurns(_hubSessionId ?? '', { limit: 9999 });
+                    if (!_hubSessionId) {
+                        println('\x1b[33m  Nenhuma hub session ativa.\x1b[0m');
+                        break;
+                    }
+                    const turns = conversationStore.readTurns(_hubSessionId, { limit: 9999 });
                     const mems = conversationStore.recallMemories({ limit: 9999 });
                     const userCount = turns.filter((t) => t.role === 'user').length;
                     const llmbCount = turns.filter((t) => t.role === 'llm_b').length;
