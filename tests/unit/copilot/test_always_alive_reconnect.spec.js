@@ -23,7 +23,7 @@ describe('always-alive › Sprint 6: backoff exponencial de reconexão', async (
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/always-alive.js', import.meta.url), 'utf-8');
+        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
     });
 
     it('deve conter método privado #tryReconnect', () => {

@@ -31,7 +31,7 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/always-alive.js', import.meta.url), 'utf-8');
+        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
     });
 
     it('startDialogLoop() deve estar definido como método público async', () => {
@@ -160,7 +160,7 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/always-alive.js', import.meta.url), 'utf-8');
+        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
     });
 
     it('startDialogLoop() usa sendMessage() para boot (não sendAndWait direto)', () => {

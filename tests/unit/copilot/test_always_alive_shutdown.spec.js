@@ -25,7 +25,7 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/always-alive.js', import.meta.url), 'utf-8');
+        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
     });
 
     it('stop() deve aceitar opção shutdownTimeoutMs (parâmetro opcional)', () => {
@@ -110,7 +110,7 @@ describe('always-alive › stop() retrocompatibilidade', async () => {
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/always-alive.js', import.meta.url), 'utf-8');
+        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
     });
 
     it('stop() deve aceitar chamada sem argumentos (parâmetro com default)', () => {
@@ -138,7 +138,7 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
 
     it('MAX_QUEUE_SIZE deve estar definido como static class field', async () => {
         const { readFile } = await import('node:fs/promises');
-        const src = await readFile(new URL('../../../src/copilot/always-alive.js', import.meta.url), 'utf-8');
+        const src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         assert.ok(
             src.includes('static MAX_QUEUE_SIZE = 100'),
             'MAX_QUEUE_SIZE deve ser static class field com valor 100',
@@ -155,7 +155,7 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
 
     it('código deve rejeitar sendMessage quando fila está no limite', async () => {
         const { readFile } = await import('node:fs/promises');
-        const src = await readFile(new URL('../../../src/copilot/always-alive.js', import.meta.url), 'utf-8');
+        const src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         assert.ok(
             src.includes('#queue.length >= AlwaysAliveAgent.MAX_QUEUE_SIZE'),
             'sendMessage deve verificar this.#queue.length >= AlwaysAliveAgent.MAX_QUEUE_SIZE',
@@ -164,7 +164,7 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
 
     it('mensagem de erro ao atingir limite deve indicar o tamanho máximo', async () => {
         const { readFile } = await import('node:fs/promises');
-        const src = await readFile(new URL('../../../src/copilot/always-alive.js', import.meta.url), 'utf-8');
+        const src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         assert.ok(src.includes('Fila cheia'), "mensagem de erro deve conter 'Fila cheia' para clareza operacional");
     });
 });
@@ -177,7 +177,7 @@ describe('always-alive › stop() idempotência', async () => {
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/always-alive.js', import.meta.url), 'utf-8');
+        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
     });
 
     it('stop() deve ter guard de idempotência verificando status === stopped', () => {
