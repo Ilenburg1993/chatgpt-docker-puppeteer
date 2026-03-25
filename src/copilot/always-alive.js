@@ -16,35 +16,18 @@
  * @module copilot/always-alive
  */
 
-import {
-    createRegistry,
-    createTelemetry,
-    recordSessionEnd,
-    recordSessionStart,
-    registerTools,
-} from '#copilot/lib/index';
+import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart } from '#copilot/lib/index';
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
+import { DialogWatchdog } from './agent/dialog-watchdog.js';
+import { AGENT_EVENTS } from './agent/events.js';
+import { executeTask } from './agent/task-executor.js';
+import { bootstrapTools } from './agent/tools-bootstrap.js';
+import { WebhookManager } from './agent/webhook-manager.js';
 import { buildMcpConfig } from './config/mcp-servers.js';
 import { buildMcpTools } from './mcp-tool-bridge.js';
-import { WebhookManager } from './agent/webhook-manager.js';
 import { initOrResumeSession, readState, writeState } from './session-manager.js';
-import {
-    allTools,
-    codeTools,
-    fileReadTools,
-    fileWriteTools,
-    gitTools,
-    hookTools,
-    hubTools,
-    introspectionTools,
-    registerForIntrospection,
-    sessionTools,
-    setTelemetryStore,
-    shellTools,
-    taskTools,
-} from './tools/index.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -97,15 +80,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     /** @type {boolean} */
     #dialogLoopActive = false;
 
-    /**
-     * Timestamp da última atividade do dialog loop (ask_user recebido). Usado pelo watchdog para detectar travamentos.
-     *
-     * @type {number}
-     */
-    #lastDialogActivity = 0;
-
-    /** @type {ReturnType<typeof setInterval> | null} */
-    #watchdogTimer = null;
+    /** @type {DialogWatchdog} */
+    #watchdog;
 
     /**
      * Intervalo do watchdog (ms). Controlado por `LLM_B_WATCHDOG_MS`. Padrão: 5 minutos.
@@ -153,6 +129,11 @@ export class AlwaysAliveAgent extends EventEmitter {
         // O padrão de 10 é insuficiente; 50 cobre cenários de carga real sem suprimir warnings.
         this.setMaxListeners(50);
         this.#model = options.model ?? process.env.COPILOT_MODEL ?? 'gpt-4.1';
+        this.#watchdog = new DialogWatchdog({
+            intervalMs: AlwaysAliveAgent.#WATCHDOG_INTERVAL_MS,
+            stallMs: AlwaysAliveAgent.#WATCHDOG_STALL_MS,
+            onStall: (stalledMs) => this.emit('dialog.stalled', { stalledMs }),
+        });
     }
 
     /**
@@ -256,7 +237,6 @@ export class AlwaysAliveAgent extends EventEmitter {
             this.#client = new CopilotClient();
 
             const mcpTools = await buildMcpTools();
-            const tools = [...allTools, ...mcpTools];
             if (mcpTools.length > 0) {
                 log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
             }
@@ -265,47 +245,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             this.#telemetry = createTelemetry();
             this.#toolsRegistry = createRegistry();
 
-            // Registra cada grupo de tools com sua própria categoria e tags para filtragem granular
-            registerTools(this.#toolsRegistry, taskTools, { category: 'task', tags: ['queue', 'state'] });
-            registerTools(this.#toolsRegistry, codeTools, {
-                category: 'code',
-                tags: ['lint', 'test', 'typecheck'],
-                readOnly: true,
-            });
-            registerTools(this.#toolsRegistry, gitTools, { category: 'git', tags: ['vcs', 'diff', 'commit'] });
-            registerTools(this.#toolsRegistry, sessionTools, { category: 'session', tags: ['hooks', 'briefing'] });
-            registerTools(this.#toolsRegistry, hookTools, { category: 'hook', tags: ['audit', 'input', 'hooks'] });
-            registerTools(this.#toolsRegistry, hubTools, {
-                category: 'hub',
-                tags: ['conversation', 'llm-b', 'dialog', 'persistent'],
-            });
-            registerTools(this.#toolsRegistry, introspectionTools, {
-                category: 'introspection',
-                tags: ['meta', 'telemetry'],
-                readOnly: true,
-            });
-            registerTools(this.#toolsRegistry, fileReadTools, {
-                category: 'file',
-                tags: ['filesystem', 'io', 'read'],
-                readOnly: true,
-            });
-            registerTools(this.#toolsRegistry, fileWriteTools, {
-                category: 'file',
-                tags: ['filesystem', 'io', 'write'],
-            });
-            registerTools(this.#toolsRegistry, shellTools, {
-                category: 'shell',
-                tags: ['exec', 'system', 'npm', 'node'],
-            });
-            // MCP tools registradas sem categoria específica pois são dinâmicas
-            if (mcpTools.length > 0) {
-                registerTools(this.#toolsRegistry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
-            }
-
-            // Expõe registry/telemetria para introspection tools
-            registerForIntrospection(tools);
-            setTelemetryStore(this.#telemetry);
-
+            // Registra tools por categoria e expõe para introspecção
+            const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
             log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
 
             const { session, isResumed } = await initOrResumeSession(this.#client, {
@@ -504,23 +445,9 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ [event: string]: number }} Mapa evento → contagem de listeners
      */
     listenerDiagnostics() {
-        const events = [
-            'task.queued',
-            'task.started',
-            'task.completed',
-            'task.error',
-            'task.delta',
-            'question.pending',
-            'question.answered',
-            'status',
-            'stopped',
-            'ready',
-            'session.compaction_start',
-            'session.compaction_complete',
-        ];
         /** @type {{ [event: string]: number }} */
         const result = {};
-        for (const evt of events) {
+        for (const evt of AGENT_EVENTS) {
             result[evt] = this.listenerCount(evt);
         }
         return result;
@@ -576,19 +503,12 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
         });
 
         // Inicia watchdog: detecta se o dialog loop ficar inativo por muito tempo
-        this.#lastDialogActivity = Date.now();
-        this.#watchdogTimer = setInterval(() => {
-            if (!this.#dialogLoopActive) {
-                clearInterval(/** @type {ReturnType<typeof setInterval>} */ (this.#watchdogTimer));
-                this.#watchdogTimer = null;
-                return;
-            }
-            const stalledMs = Date.now() - this.#lastDialogActivity;
-            if (stalledMs > AlwaysAliveAgent.#WATCHDOG_STALL_MS) {
-                log('WARN', `[AlwaysAlive] Watchdog: dialog loop inativo há ${Math.round(stalledMs / 1000)}s`);
-                this.emit('dialog.stalled', { stalledMs });
-            }
-        }, AlwaysAliveAgent.#WATCHDOG_INTERVAL_MS);
+        this.#watchdog = new DialogWatchdog({
+            intervalMs: AlwaysAliveAgent.#WATCHDOG_INTERVAL_MS,
+            stallMs: AlwaysAliveAgent.#WATCHDOG_STALL_MS,
+            onStall: (stalledMs) => this.emit('dialog.stalled', { stalledMs }),
+        });
+        this.#watchdog.start();
 
         // sendMessage dispara o loop em background — não aguardamos a conclusão.
         // Timeout de 24h: o dialog loop é infinito e session.idle nunca dispara durante ask_user,
@@ -668,11 +588,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
             this.answerPendingQuestion('STOP_DIALOG');
         }
         this.#dialogLoopActive = false;
-        // Para o watchdog
-        if (this.#watchdogTimer !== null) {
-            clearInterval(this.#watchdogTimer);
-            this.#watchdogTimer = null;
-        }
+        this.#watchdog.stop();
     }
 
     // ─────────────── Privados ───────────────
@@ -704,39 +620,14 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
         const state = readState();
         writeState({ sendCount: (state?.sendCount ?? 0) + 1 });
 
-        void (async () => {
-            // Subscreve ao streaming de tokens enquanto a tarefa está em andamento
-            const unsubDelta = session.on('assistant.message_delta', (/** @type {any} */ event) => {
-                const chunk = event?.data?.deltaContent ?? '';
-                if (chunk) this.emit('task.delta', { taskId: task.id, chunk });
-            });
-
-            try {
-                const event = await session.sendAndWait({ prompt: task.message }, task.timeoutMs);
-                unsubDelta();
-                const text = event?.data?.content ?? '';
-                this.#setStatus('idle');
-                this.emit('task.completed', { taskId: task.id, response: text, responseLen: text.length });
-                task.resolve(text);
-            } catch (/** @type {any} */ e) {
-                unsubDelta();
-                // Tenta reconectar com backoff exponencial se parecer erro de rede/sessão
-                const recovered = await this.#tryReconnect(e);
-                if (recovered) {
-                    // Sessão restaurada: reenfileira a tarefa para nova tentativa
-                    log('INFO', `[AlwaysAlive] Sessão restaurada. Reenfileirando tarefa ${task.id}.`);
-                    this.#queue.unshift(task);
-                    this.#setStatus('idle');
-                } else {
-                    log('ERROR', `[AlwaysAlive] Erro ao processar tarefa ${task.id}: ${e.message}`);
-                    this.#setStatus('idle');
-                    this.emit('task.error', { taskId: task.id, error: e.message });
-                    task.reject(e);
-                }
-            } finally {
-                this.#processQueue();
-            }
-        })();
+        void executeTask(session, task, {
+            onDelta: (chunk, taskId) => this.emit('task.delta', { taskId, chunk }),
+            setStatus: (s) => this.#setStatus(s),
+            emit: (event, payload) => this.emit(event, payload),
+            tryReconnect: (e) => this.#tryReconnect(e),
+            requeueTask: (t) => this.#queue.unshift(t),
+            scheduleNext: () => this.#processQueue(),
+        });
     }
 
     /**
@@ -767,7 +658,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
 
             try {
                 const mcpTools = await buildMcpTools();
-                const tools = [...allTools, ...mcpTools];
+                const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
                 const { session, isResumed } = await initOrResumeSession(this.#client, {
                     model: this.#model,
                     onPermissionRequest: approveAll,
@@ -814,13 +705,13 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
 
             if (trimmed.startsWith('READY:') || trimmed === 'READY') {
                 // Modelo sinaliza prontidão — emite evento para sendDialogTurn()
-                this.#lastDialogActivity = Date.now();
+                this.#watchdog.ping();
                 this.emit('dialog.ready', {});
                 // Aguarda a resposta via question.pending normal
                 // (sendDialogTurn chamará answerPendingQuestion com a mensagem do usuário)
             } else if (trimmed.startsWith('REPLY:') || trimmed.startsWith('DONE:')) {
                 // Modelo enviou uma resposta — extrai o conteúdo
-                this.#lastDialogActivity = Date.now();
+                this.#watchdog.ping();
                 const reply = trimmed.replace(/^(REPLY:|DONE:)\s*/i, '').trim();
                 this.emit('dialog.reply', { reply });
                 // Aguarda o próximo turno via question.pending
