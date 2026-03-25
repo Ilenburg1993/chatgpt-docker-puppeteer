@@ -22,7 +22,7 @@ describe('session-manager › createConfig inclui streaming: true', async () => 
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/session-manager.js', import.meta.url), 'utf-8');
+        sourceCode = await readFile(new URL('../../../src/copilot/agent/session-manager.js', import.meta.url), 'utf-8');
     });
 
     it('contém streaming: true no bloco createConfig', () => {
