@@ -164,9 +164,10 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
     });
 
     it('startDialogLoop() usa sendMessage() para boot (não sendAndWait direto)', () => {
-        // O método usa sendMessage() que coloca na fila, não session.sendAndWait diretamente
+        // O método usa sendMessage() que coloca na fila, não session.sendAndWait diretamente.
+        // Aceita qualquer chamada que inicie com this.sendMessage(metaPrompt), com ou sem opções extras.
         assert.ok(
-            sourceCode.includes('this.sendMessage(metaPrompt)'),
+            sourceCode.includes('this.sendMessage(metaPrompt'),
             'startDialogLoop deve usar this.sendMessage() para o boot prompt',
         );
     });

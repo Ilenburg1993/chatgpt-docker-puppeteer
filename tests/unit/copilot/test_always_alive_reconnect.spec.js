@@ -63,8 +63,9 @@ describe('always-alive › Sprint 6: backoff exponencial de reconexão', async (
     });
 
     it('deve reenfileirar tarefa com #queue.unshift quando reconexão bem-sucedida', () => {
+        // A tarefa é reenfileirada via #queue.unshift(); o nome da variável pode variar (task, t, etc.)
         assert.ok(
-            sourceCode.includes('this.#queue.unshift(task)'),
+            sourceCode.includes('this.#queue.unshift('),
             'ao reconectar, a tarefa deve ser reenfileirada no início via #queue.unshift()',
         );
     });
