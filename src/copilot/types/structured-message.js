@@ -184,7 +184,7 @@ export const StructuredMessageSchema = z.object({
  * @throws {z.ZodError} Se campos obrigatórios estiverem ausentes ou inválidos
  */
 export function buildStructuredRequest(input) {
-    return StructuredMessageSchema.parse(input);
+    return /** @type {StructuredMessage} */ (StructuredMessageSchema.parse(input));
 }
 
 /**
@@ -195,7 +195,7 @@ export function buildStructuredRequest(input) {
  * @throws {z.ZodError} Se campos inválidos
  */
 export function buildStructuredResponse(input) {
-    return StructuredMessageSchema.parse(input);
+    return /** @type {StructuredMessage} */ (StructuredMessageSchema.parse(input));
 }
 
 // ─── Serialização ─────────────────────────────────────────────────────────────
@@ -306,7 +306,7 @@ function _tryParseJson(text) {
     try {
         const obj = JSON.parse(text);
         const result = StructuredMessageSchema.safeParse(obj);
-        return result.success ? result.data : null;
+        return result.success ? /** @type {StructuredMessage} */ (result.data) : null;
     } catch {
         return null;
     }

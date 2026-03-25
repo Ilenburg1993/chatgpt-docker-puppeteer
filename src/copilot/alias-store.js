@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @module copilot/alias-store
  * @file Alias Store — gerencia aliases de comandos do terminal REPL.

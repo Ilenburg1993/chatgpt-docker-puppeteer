@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @module copilot/gh-bridge
  * @file GitHub CLI Bridge — encapsula chamadas ao `gh` CLI.

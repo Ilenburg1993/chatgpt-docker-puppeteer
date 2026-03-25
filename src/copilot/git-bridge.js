@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @module copilot/git-bridge
  * @file Git Bridge — encapsula chamadas ao `git` CLI.

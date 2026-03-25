@@ -4,9 +4,9 @@
  *
  * Servidor HTTP de injeção do Terminal Permanente LLM-B.
  *
- * Wrapper HTTP raw (node:http, porta 3009) que delega toda a lógica de negócio
- * para `http-handlers.js`. O único código neste arquivo é adaptação de transporte:
- * leitura de body, parsing de URL, escrita de status/cabeçalhos HTTP e tratamento SSE.
+ * Wrapper HTTP raw (node:http, porta 3009) que delega toda a lógica de negócio para `http-handlers.js`. O único código
+ * neste arquivo é adaptação de transporte: leitura de body, parsing de URL, escrita de status/cabeçalhos HTTP e
+ * tratamento SSE.
  *
  * | Método | Caminho             | Descrição                             |
  * | ------ | ------------------- | ------------------------------------- |
@@ -78,7 +78,9 @@ function sendJson(res, result) {
 function readBody(req) {
     return new Promise((resolve) => {
         let data = '';
-        req.on('data', (chunk) => { data += chunk; });
+        req.on('data', (chunk) => {
+            data += chunk;
+        });
         req.on('end', () => resolve(data));
     });
 }
@@ -90,7 +92,11 @@ function readBody(req) {
  * @returns {unknown | null}
  */
 function tryParseJson(raw) {
-    try { return JSON.parse(raw); } catch { return null; }
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
 }
 
 // ─── Servidor HTTP ────────────────────────────────────────────────────────────
@@ -134,22 +140,29 @@ export function createInjectServer() {
 
         // ── GET /sessions ─────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/sessions') {
-            sendJson(res, handleListSessions({
-                limit: Number(url.searchParams.get('limit') ?? '20'),
-                offset: Number(url.searchParams.get('offset') ?? '0'),
-                status: url.searchParams.get('status') ?? undefined,
-            }));
+            const rawStatus = url.searchParams.get('status');
+            sendJson(
+                res,
+                handleListSessions({
+                    limit: Number(url.searchParams.get('limit') ?? '20'),
+                    offset: Number(url.searchParams.get('offset') ?? '0'),
+                    ...(rawStatus !== null ? { status: rawStatus } : {}),
+                }),
+            );
             return;
         }
 
         // ── GET /sessions/:id/turns ───────────────────────────────────────
         if (req.method === 'GET' && /^\/sessions\/[^/]+\/turns$/.test(url.pathname)) {
             const sessionId = url.pathname.split('/')[2] ?? '';
-            sendJson(res, handleListTurns({
-                sessionId,
-                limit: Number(url.searchParams.get('limit') ?? '50'),
-                offset: Number(url.searchParams.get('offset') ?? '0'),
-            }));
+            sendJson(
+                res,
+                handleListTurns({
+                    sessionId,
+                    limit: Number(url.searchParams.get('limit') ?? '50'),
+                    offset: Number(url.searchParams.get('offset') ?? '0'),
+                }),
+            );
             return;
         }
 
@@ -157,18 +170,24 @@ export function createInjectServer() {
         if (req.method === 'POST' && url.pathname === '/memory') {
             const raw = await readBody(req);
             const parsed = /** @type {{ tag?: string; content?: string } | null} */ (tryParseJson(raw));
-            if (!parsed) { sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } }); return; }
+            if (!parsed) {
+                sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
+                return;
+            }
             sendJson(res, handleStoreMemory(parsed));
             return;
         }
 
         // ── GET /memory ───────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/memory') {
-            sendJson(res, handleRecallMemories({
-                tag: url.searchParams.get('tag'),
-                search: url.searchParams.get('search'),
-                limit: Number(url.searchParams.get('limit') ?? '20'),
-            }));
+            sendJson(
+                res,
+                handleRecallMemories({
+                    tag: url.searchParams.get('tag'),
+                    search: url.searchParams.get('search'),
+                    limit: Number(url.searchParams.get('limit') ?? '20'),
+                }),
+            );
             return;
         }
 
@@ -182,8 +201,14 @@ export function createInjectServer() {
         // ── POST /pipeline ────────────────────────────────────────────────
         if (req.method === 'POST' && url.pathname === '/pipeline') {
             const raw = await readBody(req);
-            const parsed = /** @type {{ steps?: { prompt: string; waitMs?: number; from?: string }[]; from?: string } | null} */ (tryParseJson(raw));
-            if (!parsed) { sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } }); return; }
+            const parsed =
+                /** @type {{ steps?: { prompt: string; waitMs?: number; from?: string }[]; from?: string } | null} */ (
+                    tryParseJson(raw)
+                );
+            if (!parsed) {
+                sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
+                return;
+            }
             sendJson(res, await handlePipeline(parsed));
             return;
         }
@@ -192,34 +217,46 @@ export function createInjectServer() {
         if (req.method === 'POST' && url.pathname === '/inject') {
             const raw = await readBody(req);
             const parsed = /** @type {{ message?: string; from?: string } | null} */ (tryParseJson(raw));
-            if (!parsed) { sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } }); return; }
+            if (!parsed) {
+                sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
+                return;
+            }
             sendJson(res, await handleInject(parsed));
             return;
         }
 
         // ── GET /gh/issues ────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/gh/issues') {
-            sendJson(res, await handleGhIssues({
-                state: url.searchParams.get('state') ?? 'open',
-                limit: Number(url.searchParams.get('limit') ?? '15'),
-            }));
+            sendJson(
+                res,
+                await handleGhIssues({
+                    state: url.searchParams.get('state') ?? 'open',
+                    limit: Number(url.searchParams.get('limit') ?? '15'),
+                }),
+            );
             return;
         }
 
         // ── GET /gh/prs ───────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/gh/prs') {
-            sendJson(res, await handleGhPrs({
-                state: url.searchParams.get('state') ?? 'open',
-                limit: Number(url.searchParams.get('limit') ?? '15'),
-            }));
+            sendJson(
+                res,
+                await handleGhPrs({
+                    state: url.searchParams.get('state') ?? 'open',
+                    limit: Number(url.searchParams.get('limit') ?? '15'),
+                }),
+            );
             return;
         }
 
         // ── GET /gh/ci ────────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/gh/ci') {
-            sendJson(res, await handleGhCi({
-                limit: Number(url.searchParams.get('limit') ?? '15'),
-            }));
+            sendJson(
+                res,
+                await handleGhCi({
+                    limit: Number(url.searchParams.get('limit') ?? '15'),
+                }),
+            );
             return;
         }
 
@@ -231,9 +268,12 @@ export function createInjectServer() {
 
         // ── GET /git/log ──────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/git/log') {
-            sendJson(res, await handleGitLog({
-                n: Number(url.searchParams.get('n') ?? '20'),
-            }));
+            sendJson(
+                res,
+                await handleGitLog({
+                    n: Number(url.searchParams.get('n') ?? '20'),
+                }),
+            );
             return;
         }
 
@@ -253,5 +293,3 @@ export function createInjectServer() {
 
     return server;
 }
-
-
