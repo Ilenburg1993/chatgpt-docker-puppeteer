@@ -109,6 +109,9 @@ export class AlwaysAliveAgent extends EventEmitter {
     /** @type {string} */
     #model;
 
+    /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */
+    #reasoningEffort;
+
     /** @type {boolean} */
     #isResumed = false;
 
@@ -122,7 +125,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     #toolsRegistry = createRegistry();
 
     /**
-     * @param {{ model?: string }} [options]
+     * @param {{ model?: string, reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' }} [options]
      */
     constructor(options = {}) {
         super();
@@ -130,6 +133,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         // O padrão de 10 é insuficiente; 50 cobre cenários de carga real sem suprimir warnings.
         this.setMaxListeners(50);
         this.#model = options.model ?? process.env.COPILOT_MODEL ?? 'gpt-4.1';
+        this.#reasoningEffort = options.reasoningEffort ?? undefined;
         this.#watchdog = new DialogWatchdog({
             intervalMs: AlwaysAliveAgent.#WATCHDOG_INTERVAL_MS,
             stallMs: AlwaysAliveAgent.#WATCHDOG_STALL_MS,
@@ -257,9 +261,11 @@ export class AlwaysAliveAgent extends EventEmitter {
                 hooks: {
                     onSessionStart: this.#onSessionStart.bind(this),
                     onSessionEnd: this.#onSessionEnd.bind(this),
+                    onErrorOccurred: this.#onErrorOccurred.bind(this),
                 },
                 tools,
                 mcpServers: buildMcpConfig(),
+                reasoningEffort: this.#reasoningEffort,
                 injectHookContext: true,
             });
 
@@ -685,9 +691,11 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                     hooks: {
                         onSessionStart: this.#onSessionStart.bind(this),
                         onSessionEnd: this.#onSessionEnd.bind(this),
+                        onErrorOccurred: this.#onErrorOccurred.bind(this),
                     },
                     tools,
                     mcpServers: buildMcpConfig(),
+                    reasoningEffort: this.#reasoningEffort,
                     injectHookContext: true,
                 });
                 this.#session = session;
@@ -785,6 +793,41 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
         log('INFO', `[AlwaysAlive] SessionEnd hook: ${_input.sessionId}`);
         recordSessionEnd(this.#telemetry, _input.sessionId);
         await this.#emitWebhook('session.end', { sessionId: _input.sessionId });
+    }
+
+    /**
+     * Hook `onErrorOccurred` do SDK — emite evento no agente para observabilidade via SSE/NERV.
+     *
+     * @param {{ error: string, errorContext: string, recoverable: boolean }} input
+     * @param {{ sessionId: string }} invocation
+     * @returns {void}
+     */
+    #onErrorOccurred(input, invocation) {
+        log('WARN', `[AlwaysAlive] SDK errorOccurred [${input.errorContext}]: ${input.error} (recuperável: ${input.recoverable})`);
+        this.emit('error', {
+            hookType: 'errorOccurred',
+            errorMessage: input.error,
+            errorContext: input.errorContext,
+            recoverable: input.recoverable,
+            sessionId: invocation.sessionId,
+        });
+    }
+
+    /**
+     * Retorna o histórico de mensagens da sessão SDK ativa.
+     *
+     * Útil para debug, auditoria e introspecção do context window.
+     * Retorna array vazio se não houver sessão ativa.
+     *
+     * @returns {Promise<any[]>}
+     */
+    async getSessionMessages() {
+        if (!this.#session) return [];
+        try {
+            return await this.#session.getMessages();
+        } catch {
+            return [];
+        }
     }
 }
 

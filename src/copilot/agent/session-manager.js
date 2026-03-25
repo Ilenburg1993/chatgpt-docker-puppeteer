@@ -117,6 +117,8 @@ export function writeState(updates) {
 
 /**
  * Remove o estado persistido. Usado para forçar uma nova sessão.
+ *
+ * @returns {void}
  */
 export function clearState() {
     if (existsSync(STATE_FILE)) {
@@ -140,6 +142,7 @@ export function clearState() {
  * @param {CopilotClient} client - Instância do CopilotClient
  * @param {object} sessionOptions - Opções para createSession/resumeSession
  * @param {string} [sessionOptions.model] - Modelo a usar (default: 'gpt-4.1')
+ * @param {'low' | 'medium' | 'high' | 'xhigh'} [sessionOptions.reasoningEffort] - Esforço de raciocínio para o3/o4-mini
  * @param {import('@github/copilot-sdk').PermissionHandler} [sessionOptions.onPermissionRequest]
  * @param {Function} [sessionOptions.onUserInputRequest]
  * @param {object} [sessionOptions.hooks]
@@ -161,6 +164,9 @@ export async function initOrResumeSession(client, sessionOptions) {
         model,
         streaming: true,
         infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 },
+        ...(sessionOptions.reasoningEffort !== undefined
+            ? { reasoningEffort: sessionOptions.reasoningEffort }
+            : {}),
         ...(sessionOptions.onPermissionRequest !== undefined
             ? { onPermissionRequest: sessionOptions.onPermissionRequest }
             : {}),
