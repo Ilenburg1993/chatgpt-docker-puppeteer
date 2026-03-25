@@ -7,4 +7,4 @@
  *
  * @module copilot/api/sdk-router
  */
-export * from '../sdk-api.js';
+export * from './sdk-api.js';

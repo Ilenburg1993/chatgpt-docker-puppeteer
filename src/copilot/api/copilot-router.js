@@ -7,4 +7,4 @@
  *
  * @module copilot/api/copilot-router
  */
-export * from '../http-bridge.js';
+export * from './http-bridge.js';

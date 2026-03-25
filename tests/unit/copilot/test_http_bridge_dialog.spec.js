@@ -59,7 +59,7 @@ describe('http-bridge › dialog: análise estrutural', async () => {
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/http-bridge.js', import.meta.url), 'utf-8');
+        sourceCode = await readFile(new URL('../../../src/copilot/api/http-bridge.js', import.meta.url), 'utf-8');
     });
 
     it("rota POST '/dialog/start' está definida", () => {
@@ -131,7 +131,7 @@ describe('http-bridge › dialog: validação de input via source-level', async 
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/http-bridge.js', import.meta.url), 'utf-8');
+        sourceCode = await readFile(new URL('../../../src/copilot/api/http-bridge.js', import.meta.url), 'utf-8');
     });
 
     it('/dialog/turn retorna 400 quando message está ausente (validação no source)', () => {

@@ -123,7 +123,7 @@ describe('http-bridge GET /stream › compaction events chegam via SSE', () => {
     let bridge;
 
     before(async () => {
-        const mod = await import('../../../src/copilot/http-bridge.js');
+        const mod = await import('../../../src/copilot/api/http-bridge.js');
         bridge = mod.default;
     });
 
@@ -147,7 +147,7 @@ describe('http-bridge GET /stream › compaction events chegam via SSE', () => {
     it('session.compaction_start aparece na lista AGENT_EVENTS do /stream', async () => {
         // Verifica via leitura do código fonte que o evento está listado
         const { readFile } = await import('node:fs/promises');
-        const src = await readFile(new URL('../../../src/copilot/http-bridge.js', import.meta.url), 'utf-8');
+        const src = await readFile(new URL('../../../src/copilot/api/http-bridge.js', import.meta.url), 'utf-8');
         assert.ok(
             src.includes("'session.compaction_start'"),
             'http-bridge.js deve listar session.compaction_start em AGENT_EVENTS',
@@ -156,7 +156,7 @@ describe('http-bridge GET /stream › compaction events chegam via SSE', () => {
 
     it('session.compaction_complete aparece na lista AGENT_EVENTS do /stream', async () => {
         const { readFile } = await import('node:fs/promises');
-        const src = await readFile(new URL('../../../src/copilot/http-bridge.js', import.meta.url), 'utf-8');
+        const src = await readFile(new URL('../../../src/copilot/api/http-bridge.js', import.meta.url), 'utf-8');
         assert.ok(
             src.includes("'session.compaction_complete'"),
             'http-bridge.js deve listar session.compaction_complete em AGENT_EVENTS',
