@@ -518,10 +518,10 @@ FASE P  ✅ CONCLUÍDA   Hardening de erros — BridgeError/SessionError em chan
 FASE Q  ✅ CONCLUÍDA   Tool Call Auditing — JSONL log de tool calls (channel/audit.js) (commit 3c1ab930)
 FASE R  ✅ CONCLUÍDA   Sub-routers http-bridge.js (bridge-stream, bridge-dialog, bridge-tasks) (commit 425a5802)
 FASE S  ✅ CONCLUÍDA   JSDoc/typing pass completo channel/ + bridges/ + agent/ — AlwaysAliveAgentLike typedef
-FASE T  ⏳             Tipar AGENT_EVENTS como union-type (satisfies operator)
+FASE T  ✅ CONCLUÍDA   Tipar AGENT_EVENTS como union-type — AgentEventName typedef (commit 276ea924)
 FASE U  ✅ CONCLUÍDA   SDK Event Forwarding — tool.execution_*, assistant.reasoning, session.usage_info (commit 654a80b5)
 FASE V  ✅ CONCLUÍDA   SDK History API + reasoningEffort + errorOccurred hook (commit 99611bed)
-FASE W  ⏳             Attachment Support — arquivos/imagens em sendMessage/chat
+FASE W  ✅ CONCLUÍDA   Attachment Support — arquivos/imagens em sendMessage/chat
 ```
 
 ---
@@ -720,7 +720,7 @@ sem novos erros.
 
 ---
 
-### FASE T — Tipar AGENT_EVENTS como Union-Type (satisfies operator) ⏳
+### FASE T — Tipar AGENT_EVENTS como Union-Type (satisfies operator) ✅ CONCLUÍDA
 
 **Objetivo**: Usar TypeScript `as const satisfies ReadonlyArray<AgentEvent>` em `agent/events.js`
 para que cada uso de string de evento seja verificado em tempo de compilação.
@@ -793,7 +793,7 @@ qualidade e observabilidade:
 
 ---
 
-### FASE W — Attachment Support: Arquivos e Imagens em Prompts ⏳
+### FASE W — Attachment Support: Arquivos e Imagens em Prompts ✅ CONCLUÍDA
 
 **Objetivo**: Permitir que `sendMessage()` e `LlmBridgeClient.chat()` aceitem `attachments`
 no formato `MessageOptions.attachments` do SDK — arquivos, imagens e referências GitHub.
