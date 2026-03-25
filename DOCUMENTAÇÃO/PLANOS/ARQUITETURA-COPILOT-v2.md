@@ -1,7 +1,7 @@
 # Plano de Arquitetura — `src/copilot` v2
 
-**Data**: 2026-06-15 — **Última atualização**: 2026-07-18
-**Status**: Fases A–H concluídas — em execução contínua rumo à v2.1+
+**Data**: 2026-06-15 — **Última atualização**: 2026-03-25
+**Status**: Fases A–I concluídas — em execução contínua rumo à v2.1+
 **Autores**: Análise automática via audit de código + testes reais com LLM-B
 
 ---
@@ -506,8 +506,8 @@ FASE E  ✅ CONCLUÍDA   Re-exports canônicos em bridges/, agent/, api/
 FASE F  ✅ CONCLUÍDA   Unificação stacks HTTP (http-handlers.js)
 FASE G  ✅ CONCLUÍDA   Modularização always-alive.js → agent/ (5 sub-módulos)
 FASE H  ✅ CONCLUÍDA   Modularização sdk-api.js → routes/ (4 sub-routers)
+FASE I  ✅ CONCLUÍDA   Localização canônica: agent/ + bridges/ (3fd5a93e, af705488, ae6d1cb3)
 ────────────────────────────────────────────────────────────────────────────────
-FASE I  📋 PLANEJADA   Mover always-alive.js para agent/always-alive.js canônico
 FASE J  📋 PLANEJADA   Integrar Socket.io hub no terminal (SSE → WS opcional)
 FASE K  📋 PLANEJADA   Criar core/ com types.js, errors.js, constants.js
 FASE L  📋 PLANEJADA   Remover cli-terminal.js (depreciado)
@@ -518,21 +518,28 @@ FASE M  📋 PLANEJADA   Unificar api/ (integrar http-handlers com Express)
 
 ## 9. Próximas Fases Detalhadas (v2.1 e além)
 
-### FASE I — Consolidar agent/ como localização canônica
+### FASE I — Consolidar agent/ e bridges/ como localização canônica ✅ CONCLUÍDA (`3fd5a93e`, `af705488`, `ae6d1cb3`)
 
-**Objetivo**: `always-alive.js` vive hoje em dois lugares: `src/copilot/always-alive.js` (original)
-e `src/copilot/agent/always-alive.js` (re-export). Tornar `agent/always-alive.js` o arquivo real
-e `src/copilot/always-alive.js` o re-export (inversão da direção atual).
+**Objetivo**: Inverter a direção dos re-exports — arquivos em `agent/` e `bridges/` passam a ter
+a implementação real; arquivos na raiz de `src/copilot/` viram thin re-exports de compatibilidade.
 
-**Passos**:
-1. Mover conteúdo real para `agent/always-alive.js`
-2. `always-alive.js` na raiz vira `export { AlwaysAliveAgent } from './agent/always-alive.js'`
-3. Atualizar todos os imports que importam de raiz (há ~12 arquivos)
-4. Idem para `session-manager.js`, `llm-bridge-client.js`, `inject-llmb.js`
-5. Verificar que `bridges/` re-exports apontam corretamente
+**Executado**:
 
-**Risco**: médio (muitos imports para atualizar; pode quebrar testes sem cuidado)
-**Estimativa**: 1 sessão
+| Arquivo raiz (thin re-export agora) | Canônico (implementação real) |
+|---|---|
+| `always-alive.js` (11L) | `agent/always-alive.js` (777L) |
+| `session-manager.js` (12L) | `agent/session-manager.js` (199L) |
+| `agent.js` (12L) | `agent/entry.js` (71L) |
+| `gh-bridge.js` (12L) | `bridges/gh-bridge.js` (711L) |
+| `git-bridge.js` (12L) | `bridges/git-bridge.js` (401L) |
+| `alias-store.js` (12L) | `bridges/alias-store.js` (164L) |
+| `nerv-bridge.js` (12L) | `bridges/nerv-bridge.js` (183L) |
+| `mcp-tool-bridge.js` (12L) | `bridges/mcp-tool-bridge.js` (194L) |
+| `llm-bridge-client.js` (12L) | `bridges/llm-bridge-client.js` (371L) |
+| `inject-llmb.js` (12L) | `bridges/inject-llmb.js` (407L) |
+
+**Resultado**: 10 arquivos migrados; imports relativos ajustados; testes de source analysis
+atualizados para ler arquivos canônicos. 1474 testes passando, 0 falhas.
 
 ---
 
@@ -615,4 +622,4 @@ Antes de commitar cada fase:
 ---
 
 *Documento gerado com base em análise estática do código e testes reais com LLM-B ativa.*
-*Atualizado em 2026-07-18 após conclusão das Fases G e H.*
+*Atualizado em 2026-03-25 após conclusão da Fase I (agent/ e bridges/ canônicos).*

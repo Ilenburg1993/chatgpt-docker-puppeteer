@@ -9,8 +9,8 @@
  */
 
 import { alwaysAliveAgent } from '../../agent/always-alive.js';
-import { conversationStore } from '../../conversation-hub/store.js';
 import { llmBridgeClient } from '../../bridges/llm-bridge-client.js';
+import { conversationStore } from '../../conversation-hub/store.js';
 
 /**
  * Referência ao _hubSessionId gerenciado pelo terminal server. É passado como parâmetro pois não pode ser importado

@@ -16,9 +16,9 @@
 
 import { log } from '#core/logger';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { conversationHub } from '../conversation-hub/hub.js';
 import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
 import { emitNerv } from '../bridges/nerv-bridge.js';
+import { conversationHub } from '../conversation-hub/hub.js';
 import { getBusy, getHubSessionId, getRl, getSseClients, getSseCriticalClients, setBusy } from './state.js';
 
 // ─── Eventos críticos para SSE ────────────────────────────────────────────────

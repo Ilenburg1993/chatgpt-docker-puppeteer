@@ -4,8 +4,8 @@
  *
  * Handlers de lógica pura para os endpoints do Terminal LLM-B.
  *
- * Cada handler recebe parâmetros tipados e retorna `{ status, body }` (ou `null` para endpoints
- * de streaming SSE, que exigem acesso direto ao `res`). Isso permite reutilização por:
+ * Cada handler recebe parâmetros tipados e retorna `{ status, body }` (ou `null` para endpoints de streaming SSE, que
+ * exigem acesso direto ao `res`). Isso permite reutilização por:
  *
  * - `terminal/server.js` — servidor HTTP raw (porta 3009, node:http)
  * - futuro Express router em `api/copilot-router.js` — fachada REST unificada
@@ -16,9 +16,9 @@
  */
 
 import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { conversationStore } from '../conversation-hub/store.js';
 import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
+import { conversationStore } from '../conversation-hub/store.js';
 import { sendTurn } from './dialog.js';
 import { getBusy, getHubSessionId, getSseClients, getSseCriticalClients } from './state.js';
 
@@ -314,8 +314,8 @@ export async function handleGitLog({ n = 20 } = {}) {
 // ─── Utilitários SSE ──────────────────────────────────────────────────────────
 
 /**
- * Obtém os conjuntos de clientes SSE (leitura apenas, sem lógica de registro).
- * O registro/remoção de clientes permanece em `server.js` pois requer `req`/`res`.
+ * Obtém os conjuntos de clientes SSE (leitura apenas, sem lógica de registro). O registro/remoção de clientes permanece
+ * em `server.js` pois requer `req`/`res`.
  *
  * @returns {{ all: Set<import('node:http').ServerResponse>; critical: Set<import('node:http').ServerResponse> }}
  */

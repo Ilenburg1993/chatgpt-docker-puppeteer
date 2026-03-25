@@ -74,13 +74,17 @@ const listToolsTool = defineTool('list_tools', {
     description:
         'Lista todas as ferramentas (Custom Tools) disponíveis nesta sessão. ' +
         'Retorna nome, descrição e parâmetros de cada ferramenta.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ category?: string; search?: string }>} */ (/** @type {unknown} */ (z.object({
-        category: z
-            .string()
-            .optional()
-            .describe('Filtrar por categoria (ex: "code", "git", "session", "task", "hook", "introspection")'),
-        search: z.string().optional().describe('Filtrar por termo no nome ou descrição da tool'),
-    }))),
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ category?: string; search?: string }>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                category: z
+                    .string()
+                    .optional()
+                    .describe('Filtrar por categoria (ex: "code", "git", "session", "task", "hook", "introspection")'),
+                search: z.string().optional().describe('Filtrar por termo no nome ou descrição da tool'),
+            })
+        )
+    ),
     handler: async (/** @type {{ category?: string; search?: string }} */ { category, search }) => {
         log('INFO', `[introspection/list_tools] category=${category ?? '*'} search=${search ?? '*'}`);
 
@@ -163,17 +167,21 @@ const getTelemetryTool = defineTool('get_telemetry', {
     description:
         'Retorna o sumário de telemetria da sessão: total de chamadas, taxa de sucesso, tools mais usadas, ' +
         'chamadas recentes e sessões registradas.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ recent?: number; toolName?: string }>} */ (/** @type {unknown} */ (z.object({
-        recent: z
-            .number()
-            .int()
-            .min(1)
-            .max(100)
-            .optional()
-            .default(10)
-            .describe('Número de chamadas recentes a incluir no resultado'),
-        toolName: z.string().optional().describe('Filtrar histórico por nome específico de tool'),
-    }))),
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ recent?: number; toolName?: string }>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                recent: z
+                    .number()
+                    .int()
+                    .min(1)
+                    .max(100)
+                    .optional()
+                    .default(10)
+                    .describe('Número de chamadas recentes a incluir no resultado'),
+                toolName: z.string().optional().describe('Filtrar histórico por nome específico de tool'),
+            })
+        )
+    ),
     handler: async (/** @type {{ recent?: number; toolName?: string }} */ { recent = 10, toolName }) => {
         if (!_telemetryStore) {
             return { available: false, message: 'Telemetria não inicializada nesta sessão.' };

@@ -3,8 +3,8 @@
  * @module copilot/agent/webhook-manager
  * @file WebhookManager — gerencia webhooks de notificação de eventos do agente.
  *
- *   Encapsula o registro, remoção e disparo de webhooks HTTP(S), extraído de
- *   `always-alive.js` para facilitar testes e reuso isolado.
+ *   Encapsula o registro, remoção e disparo de webhooks HTTP(S), extraído de `always-alive.js` para facilitar testes e
+ *   reuso isolado.
  */
 
 import { log } from '#core/logger';
@@ -17,6 +17,7 @@ import { log } from '#core/logger';
  * Gerencia webhooks de notificação de eventos.
  *
  * Exemplo de uso:
+ *
  * ```js
  * const wm = new WebhookManager();
  * const { id } = wm.register('https://meu-servidor/hook');
