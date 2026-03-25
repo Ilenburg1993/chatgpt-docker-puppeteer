@@ -4,7 +4,9 @@
  *
  * Servidor HTTP de injeção do Terminal Permanente LLM-B.
  *
- * Cria e gerencia o servidor HTTP interno (porta LLM_B_TERMINAL_PORT, padrão 3009) que expõe os seguintes endpoints:
+ * Wrapper HTTP raw (node:http, porta 3009) que delega toda a lógica de negócio
+ * para `http-handlers.js`. O único código neste arquivo é adaptação de transporte:
+ * leitura de body, parsing de URL, escrita de status/cabeçalhos HTTP e tratamento SSE.
  *
  * | Método | Caminho             | Descrição                             |
  * | ------ | ------------------- | ------------------------------------- |
@@ -28,16 +30,68 @@
 
 import { log } from '#core/logger';
 import http from 'node:http';
-import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { conversationStore } from '../conversation-hub/store.js';
-import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
-import { gitLog, gitStatus } from '../bridges/git-bridge.js';
-import { println, sendTurn } from './dialog.js';
-import { getBusy, getHubSessionId, getSseClients, getSseCriticalClients } from './state.js';
+import { println } from './dialog.js';
+import {
+    handleDeleteMemory,
+    handleGhCi,
+    handleGhIssues,
+    handleGhPrs,
+    handleGitLog,
+    handleGitStatus,
+    handleHealth,
+    handleInject,
+    handleListSessions,
+    handleListTurns,
+    handlePipeline,
+    handleRecallMemories,
+    handleStoreMemory,
+} from './http-handlers.js';
+import { getSseClients, getSseCriticalClients } from './state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
 const INJECT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
+
+// ─── Helpers de transporte ────────────────────────────────────────────────────
+
+/**
+ * Escreve uma resposta JSON no `res` a partir de um `HandlerResult`.
+ *
+ * @param {import('node:http').ServerResponse} res
+ * @param {{ status: number; body: unknown; cors?: boolean }} result
+ * @returns {void}
+ */
+function sendJson(res, result) {
+    /** @type {Record<string, string>} */
+    const headers = { 'Content-Type': 'application/json' };
+    if (result.cors) headers['Access-Control-Allow-Origin'] = '*';
+    res.writeHead(result.status, headers);
+    res.end(JSON.stringify(result.body));
+}
+
+/**
+ * Lê o body de uma requisição HTTP e retorna como string.
+ *
+ * @param {import('node:http').IncomingMessage} req
+ * @returns {Promise<string>}
+ */
+function readBody(req) {
+    return new Promise((resolve) => {
+        let data = '';
+        req.on('data', (chunk) => { data += chunk; });
+        req.on('end', () => resolve(data));
+    });
+}
+
+/**
+ * Faz parse seguro de JSON — retorna `null` se inválido.
+ *
+ * @param {string} raw
+ * @returns {unknown | null}
+ */
+function tryParseJson(raw) {
+    try { return JSON.parse(raw); } catch { return null; }
+}
 
 // ─── Servidor HTTP ────────────────────────────────────────────────────────────
 
@@ -47,28 +101,16 @@ const INJECT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
  * @returns {http.Server} Servidor HTTP iniciado na porta `INJECT_PORT`
  */
 export function createInjectServer() {
-    const server = http.createServer((req, res) => {
+    const server = http.createServer(async (req, res) => {
         const url = new URL(req.url ?? '/', `http://localhost:${INJECT_PORT}`);
 
         // ── GET /health ───────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/health') {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(
-                JSON.stringify({
-                    ok: true,
-                    dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
-                    agentStatus: alwaysAliveAgent.status,
-                    busy: getBusy(),
-                    hubSessionId: getHubSessionId(),
-                    sseClients: getSseClients().size,
-                }),
-            );
+            sendJson(res, handleHealth());
             return;
         }
 
         // ── GET /events ───────────────────────────────────────────────────
-        // GET /events           → stream completo: "reply", "ready", "stalled", "system"
-        // GET /events?level=critical → apenas eventos críticos: "stalled", "fatal", "system"
         if (req.method === 'GET' && url.pathname === '/events') {
             const isCriticalOnly = url.searchParams.get('level') === 'critical';
             const _sseClients = getSseClients();
@@ -92,297 +134,106 @@ export function createInjectServer() {
 
         // ── GET /sessions ─────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/sessions') {
-            try {
-                const limit = Number(url.searchParams.get('limit') ?? '20');
-                const offset = Number(url.searchParams.get('offset') ?? '0');
-                const status = url.searchParams.get('status') ?? undefined;
-                const sessions = conversationStore.listHubSessions({
-                    limit: isNaN(limit) ? 20 : limit,
-                    offset: isNaN(offset) ? 0 : offset,
-                    status: /** @type {any} */ (status),
-                });
-                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-                res.end(JSON.stringify({ ok: true, sessions, current: getHubSessionId() }));
-            } catch (/** @type {any} */ e) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: false, error: e.message }));
-            }
+            sendJson(res, handleListSessions({
+                limit: Number(url.searchParams.get('limit') ?? '20'),
+                offset: Number(url.searchParams.get('offset') ?? '0'),
+                status: url.searchParams.get('status') ?? undefined,
+            }));
             return;
         }
 
         // ── GET /sessions/:id/turns ───────────────────────────────────────
         if (req.method === 'GET' && /^\/sessions\/[^/]+\/turns$/.test(url.pathname)) {
             const sessionId = url.pathname.split('/')[2] ?? '';
-            try {
-                const limit = Number(url.searchParams.get('limit') ?? '50');
-                const offset = Number(url.searchParams.get('offset') ?? '0');
-                const turns = conversationStore.readTurns(sessionId, {
-                    limit: isNaN(limit) ? 50 : limit,
-                    offset: isNaN(offset) ? 0 : offset,
-                });
-                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-                res.end(JSON.stringify({ ok: true, turns, sessionId }));
-            } catch (/** @type {any} */ e) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: false, error: e.message }));
-            }
+            sendJson(res, handleListTurns({
+                sessionId,
+                limit: Number(url.searchParams.get('limit') ?? '50'),
+                offset: Number(url.searchParams.get('offset') ?? '0'),
+            }));
             return;
         }
 
         // ── POST /memory ──────────────────────────────────────────────────
         if (req.method === 'POST' && url.pathname === '/memory') {
-            let body = '';
-            req.on('data', (chunk) => {
-                body += chunk;
-            });
-            req.on('end', () => {
-                try {
-                    const parsed = /** @type {{ tag?: string; content?: string }} */ (JSON.parse(body));
-                    if (!parsed.content) {
-                        res.writeHead(400, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ ok: false, error: '"content" obrigatório' }));
-                        return;
-                    }
-                    const _hubSessionId = getHubSessionId();
-                    const id = conversationStore.storeMemory({
-                        content: parsed.content,
-                        tag: parsed.tag ?? 'geral',
-                        ...(_hubSessionId ? { hubSessionId: _hubSessionId } : {}),
-                    });
-                    res.writeHead(201, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, id }));
-                } catch (/** @type {any} */ e) {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: false, error: e.message }));
-                }
-            });
+            const raw = await readBody(req);
+            const parsed = /** @type {{ tag?: string; content?: string } | null} */ (tryParseJson(raw));
+            if (!parsed) { sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } }); return; }
+            sendJson(res, handleStoreMemory(parsed));
             return;
         }
 
         // ── GET /memory ───────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/memory') {
-            try {
-                const tagParam = url.searchParams.get('tag');
-                const searchParam = url.searchParams.get('search');
-                const limitParam = Number(url.searchParams.get('limit') ?? '20');
-                const memories = conversationStore.recallMemories({
-                    ...(tagParam ? { tag: tagParam } : {}),
-                    ...(searchParam ? { search: searchParam } : {}),
-                    limit: isNaN(limitParam) ? 20 : limitParam,
-                });
-                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-                res.end(JSON.stringify({ ok: true, memories }));
-            } catch (/** @type {any} */ e) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: false, error: e.message }));
-            }
+            sendJson(res, handleRecallMemories({
+                tag: url.searchParams.get('tag'),
+                search: url.searchParams.get('search'),
+                limit: Number(url.searchParams.get('limit') ?? '20'),
+            }));
             return;
         }
 
         // ── DELETE /memory/:id ────────────────────────────────────────────
         if (req.method === 'DELETE' && /^\/memory\/[^/]+$/.test(url.pathname)) {
             const memoryId = url.pathname.split('/')[2] ?? '';
-            try {
-                const deleted = conversationStore.deleteMemory(memoryId);
-                res.writeHead(deleted ? 200 : 404, {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                });
-                res.end(JSON.stringify({ ok: deleted, id: memoryId }));
-            } catch (/** @type {any} */ e) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: false, error: e.message }));
-            }
+            sendJson(res, handleDeleteMemory({ memoryId }));
             return;
         }
 
         // ── POST /pipeline ────────────────────────────────────────────────
         if (req.method === 'POST' && url.pathname === '/pipeline') {
-            let body = '';
-            req.on('data', (chunk) => {
-                body += chunk;
-            });
-            req.on('end', async () => {
-                /** @type {{ steps?: { prompt: string; waitMs?: number; from?: string }[]; from?: string } | null} */
-                let parsed;
-                try {
-                    parsed = JSON.parse(body);
-                } catch {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: false, error: 'JSON inválido' }));
-                    return;
-                }
-
-                if (!Array.isArray(parsed?.steps) || parsed.steps.length === 0) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: false, error: '"steps" deve ser um array não vazio' }));
-                    return;
-                }
-
-                const globalFrom = parsed.from ?? 'llm-a';
-                const results = [];
-
-                for (let i = 0; i < parsed.steps.length; i++) {
-                    const step = parsed.steps[i];
-                    if (!step?.prompt) continue;
-                    const from = step.from ?? globalFrom;
-
-                    if (step.waitMs && step.waitMs > 0) {
-                        await new Promise((r) => setTimeout(r, step.waitMs));
-                    }
-
-                    const t0 = Date.now();
-                    const reply = await sendTurn(step.prompt, from).catch(() => null);
-                    results.push({
-                        step: i + 1,
-                        prompt: step.prompt,
-                        reply: reply ?? null,
-                        durationMs: Date.now() - t0,
-                    });
-
-                    if (reply === null) {
-                        res.writeHead(409, { 'Content-Type': 'application/json' });
-                        res.end(
-                            JSON.stringify({
-                                ok: false,
-                                error: `Step ${i + 1} retornou null (LLM-B ocupada) — pipeline interrompido`,
-                                results,
-                            }),
-                        );
-                        return;
-                    }
-                }
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: true, results }));
-            });
+            const raw = await readBody(req);
+            const parsed = /** @type {{ steps?: { prompt: string; waitMs?: number; from?: string }[]; from?: string } | null} */ (tryParseJson(raw));
+            if (!parsed) { sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } }); return; }
+            sendJson(res, await handlePipeline(parsed));
             return;
         }
 
         // ── POST /inject ──────────────────────────────────────────────────
         if (req.method === 'POST' && url.pathname === '/inject') {
-            let body = '';
-            req.on('data', (chunk) => {
-                body += chunk;
-            });
-            req.on('end', () => {
-                /** @type {{ message?: string; from?: string } | null} */
-                let parsed = null;
-                try {
-                    parsed = /** @type {{ message?: string; from?: string }} */ (JSON.parse(body));
-                } catch {
-                    /* JSON inválido tratado abaixo */
-                }
-                if (!parsed) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: false, error: 'JSON inválido' }));
-                    return;
-                }
-
-                const message = parsed.message?.trim();
-                const from = parsed.from ?? 'llm-a';
-
-                if (!message) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: false, error: '"message" é obrigatório' }));
-                    return;
-                }
-
-                const t0 = Date.now();
-                sendTurn(message, from)
-                    .then((reply) => {
-                        res.writeHead(reply !== null ? 200 : 409, { 'Content-Type': 'application/json' });
-                        res.end(
-                            JSON.stringify({
-                                ok: reply !== null,
-                                reply: reply ?? null,
-                                durationMs: Date.now() - t0,
-                                from,
-                            }),
-                        );
-                    })
-                    .catch((/** @type {any} */ e) => {
-                        res.writeHead(500, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ ok: false, error: e.message }));
-                    });
-                return;
-            });
+            const raw = await readBody(req);
+            const parsed = /** @type {{ message?: string; from?: string } | null} */ (tryParseJson(raw));
+            if (!parsed) { sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } }); return; }
+            sendJson(res, await handleInject(parsed));
             return;
         }
 
         // ── GET /gh/issues ────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/gh/issues') {
-            const state = url.searchParams.get('state') ?? 'open';
-            const limit = Number(url.searchParams.get('limit') ?? '15');
-            listIssues({ state: /** @type {any} */ (state), limit })
-                .then((issues) => {
-                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-                    res.end(JSON.stringify({ ok: true, issues }));
-                })
-                .catch((/** @type {any} */ e) => {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: false, error: e.message }));
-                });
+            sendJson(res, await handleGhIssues({
+                state: url.searchParams.get('state') ?? 'open',
+                limit: Number(url.searchParams.get('limit') ?? '15'),
+            }));
             return;
         }
 
         // ── GET /gh/prs ───────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/gh/prs') {
-            const state = url.searchParams.get('state') ?? 'open';
-            const limit = Number(url.searchParams.get('limit') ?? '15');
-            listPrs({ state: /** @type {any} */ (state), limit })
-                .then((prs) => {
-                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-                    res.end(JSON.stringify({ ok: true, prs }));
-                })
-                .catch((/** @type {any} */ e) => {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: false, error: e.message }));
-                });
+            sendJson(res, await handleGhPrs({
+                state: url.searchParams.get('state') ?? 'open',
+                limit: Number(url.searchParams.get('limit') ?? '15'),
+            }));
             return;
         }
 
         // ── GET /gh/ci ────────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/gh/ci') {
-            const limit = Number(url.searchParams.get('limit') ?? '15');
-            listRuns({ limit })
-                .then((runs) => {
-                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-                    res.end(JSON.stringify({ ok: true, runs }));
-                })
-                .catch((/** @type {any} */ e) => {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: false, error: e.message }));
-                });
+            sendJson(res, await handleGhCi({
+                limit: Number(url.searchParams.get('limit') ?? '15'),
+            }));
             return;
         }
 
         // ── GET /git/status ───────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/git/status') {
-            gitStatus()
-                .then((entries) => {
-                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-                    res.end(JSON.stringify({ ok: true, entries }));
-                })
-                .catch((/** @type {any} */ e) => {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: false, error: e.message }));
-                });
+            sendJson(res, await handleGitStatus());
             return;
         }
 
         // ── GET /git/log ──────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/git/log') {
-            const n = Number(url.searchParams.get('n') ?? '20');
-            gitLog({ n })
-                .then((entries) => {
-                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-                    res.end(JSON.stringify({ ok: true, entries }));
-                })
-                .catch((/** @type {any} */ e) => {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: false, error: e.message }));
-                });
+            sendJson(res, await handleGitLog({
+                n: Number(url.searchParams.get('n') ?? '20'),
+            }));
             return;
         }
 
@@ -402,3 +253,5 @@ export function createInjectServer() {
 
     return server;
 }
+
+

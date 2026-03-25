@@ -397,12 +397,20 @@ api/sdk-router.js            → ../sdk-api.js
 **terminal/ atualizado**: imports internos agora usam caminhos canônicos (`bridges/`, `agent/`).
 **Compatibilidade**: arquivos originais mantidos; testes e server não foram alterados.
 
-### FASE F — Unificar stacks HTTP (opcional/longo prazo)
+### FASE F — Unificar stacks HTTP ✅ CONCLUÍDA
 
 **Objetivo**: Eliminar GAP-2, fazendo porta 3009 e `/api/copilot/*` compartilhar handlers.
 
-**Abordagem**: Criar `terminal/http-handlers.js` com lógica pura (sem `req/res`), usado tanto pelo
-HTTP raw (porta 3009) quanto pelo Express router — **Command Pattern** sobre os handlers.
+**Abordagem implementada**: Criado `terminal/http-handlers.js` com lógica pura (sem `req`/`res`).
+Cada handler recebe parâmetros tipados e retorna `{ status, body, cors? }`.
+`terminal/server.js` foi reduzido para wrapper de transporte (leitura de body, escrita HTTP),
+delegando toda lógica de negócio para os handlers.
+
+**Benefícios**:
+- Lógica de negócio testável sem dependência de `req`/`res`
+- `server.js`: 404 → 257 linhas (36% de redução)
+- Futura integração com Express router via `api/copilot-router.js` requer apenas adaptação slim
+- SSE (`/events`) permanece em `server.js` por necessitar de `req.on('close')` para remoção de clientes
 
 ---
 
@@ -436,7 +444,7 @@ IMEDIATO (bugs críticos)    → FASE A ✅ CONCLUÍDA
 ────────────────────────────────────────────────
 CURTO PRAZO (sessão única)  → FASE B ✅ CONCLUÍDA (extração de comandos: 7 módulos)
 MÉDIO PRAZO (2-3 sessões)   → FASE C ✅ CONCLUÍDA + FASE D ✅ CONCLUÍDA (conversationHub + NERV)
-LONGO PRAZO                 → FASE E ✅ CONCLUÍDA + FASE F (HTTP unification)
+LONGO PRAZO                 → FASE E ✅ CONCLUÍDA + FASE F ✅ CONCLUÍDA
 ```
 
 ---
