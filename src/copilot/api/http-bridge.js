@@ -17,6 +17,7 @@
  */
 
 import { log } from '#core/logger';
+import { AGENT_EVENTS } from '#copilot/core';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../always-alive.js';
 
@@ -228,25 +229,6 @@ bridge.get('/stream', (/** @type {Req} */ req, /** @type {Res} */ res) => {
 
     // Evento inicial com snapshot do estado atual
     sendEvt('connected', { ...alwaysAliveAgent.getStatusSnapshot(), timestamp: Date.now() });
-
-    /** @type {ReadonlyArray<string>} */
-    const AGENT_EVENTS = [
-        'task.queued',
-        'task.started',
-        'task.completed',
-        'task.error',
-        'task.delta',
-        'question.pending',
-        'question.answered',
-        'status',
-        'stopped',
-        'ready',
-        'session.compaction_start',
-        'session.compaction_complete',
-        'dialog.ready',
-        'dialog.reply',
-        'dialog.stopped',
-    ];
 
     /** @type {Map<string, (data: any) => void>} */
     const handlers = new Map(AGENT_EVENTS.map((evt) => [evt, (/** @type {any} */ data) => sendEvt(evt, data ?? {})]));

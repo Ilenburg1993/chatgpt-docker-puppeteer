@@ -182,15 +182,22 @@ describe('http-bridge › dialog: validação de input via source-level', async 
         assert.ok(sourceCode.includes("'Modo diálogo encerrado.'"), '/dialog/stop deve confirmar encerramento');
     });
 
-    it("SSE /stream inclui evento 'dialog.ready'", () => {
-        assert.ok(sourceCode.includes("'dialog.ready'"), "SSE /stream deve incluir 'dialog.ready'");
+    it("SSE /stream inclui evento 'dialog.ready'", async () => {
+        // AGENT_EVENTS foi consolidado em agent/events.js (Fase N) — verificar lá
+        const { readFile } = await import('node:fs/promises');
+        const eventsCode = await readFile(new URL('../../../src/copilot/agent/events.js', import.meta.url), 'utf-8');
+        assert.ok(eventsCode.includes("'dialog.ready'"), "SSE /stream deve incluir 'dialog.ready'");
     });
 
-    it("SSE /stream inclui evento 'dialog.reply'", () => {
-        assert.ok(sourceCode.includes("'dialog.reply'"), "SSE /stream deve incluir 'dialog.reply'");
+    it("SSE /stream inclui evento 'dialog.reply'", async () => {
+        const { readFile } = await import('node:fs/promises');
+        const eventsCode = await readFile(new URL('../../../src/copilot/agent/events.js', import.meta.url), 'utf-8');
+        assert.ok(eventsCode.includes("'dialog.reply'"), "SSE /stream deve incluir 'dialog.reply'");
     });
 
-    it("SSE /stream inclui evento 'dialog.stopped'", () => {
-        assert.ok(sourceCode.includes("'dialog.stopped'"), "SSE /stream deve incluir 'dialog.stopped'");
+    it("SSE /stream inclui evento 'dialog.stopped'", async () => {
+        const { readFile } = await import('node:fs/promises');
+        const eventsCode = await readFile(new URL('../../../src/copilot/agent/events.js', import.meta.url), 'utf-8');
+        assert.ok(eventsCode.includes("'dialog.stopped'"), "SSE /stream deve incluir 'dialog.stopped'");
     });
 });

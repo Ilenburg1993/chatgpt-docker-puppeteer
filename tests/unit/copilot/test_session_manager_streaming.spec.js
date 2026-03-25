@@ -145,21 +145,21 @@ describe('http-bridge GET /stream › compaction events chegam via SSE', () => {
     }
 
     it('session.compaction_start aparece na lista AGENT_EVENTS do /stream', async () => {
-        // Verifica via leitura do código fonte que o evento está listado
+        // AGENT_EVENTS foi consolidado em agent/events.js (Fase N) — http-bridge.js o importa via #copilot/core
         const { readFile } = await import('node:fs/promises');
-        const src = await readFile(new URL('../../../src/copilot/api/http-bridge.js', import.meta.url), 'utf-8');
+        const src = await readFile(new URL('../../../src/copilot/agent/events.js', import.meta.url), 'utf-8');
         assert.ok(
             src.includes("'session.compaction_start'"),
-            'http-bridge.js deve listar session.compaction_start em AGENT_EVENTS',
+            'agent/events.js deve listar session.compaction_start em AGENT_EVENTS',
         );
     });
 
     it('session.compaction_complete aparece na lista AGENT_EVENTS do /stream', async () => {
         const { readFile } = await import('node:fs/promises');
-        const src = await readFile(new URL('../../../src/copilot/api/http-bridge.js', import.meta.url), 'utf-8');
+        const src = await readFile(new URL('../../../src/copilot/agent/events.js', import.meta.url), 'utf-8');
         assert.ok(
             src.includes("'session.compaction_complete'"),
-            'http-bridge.js deve listar session.compaction_complete em AGENT_EVENTS',
+            'agent/events.js deve listar session.compaction_complete em AGENT_EVENTS',
         );
     });
 
