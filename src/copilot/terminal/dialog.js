@@ -15,7 +15,8 @@
 
 import { log } from '#core/logger';
 import { alwaysAliveAgent } from '../always-alive.js';
-import { conversationStore } from '../conversation-hub/store.js';
+import { conversationHub } from '../conversation-hub/hub.js';
+import { emitNerv } from '../nerv-bridge.js';
 import { llmBridgeClient } from '../llm-bridge-client.js';
 import {
     getBusy, getHubSessionId, getRl, getSseCriticalClients, getSseClients,
@@ -201,8 +202,10 @@ export async function sendTurn(message, actor = 'user') {
             try {
                 /** @type {'user' | 'llm_a'} */
                 const senderRole = actor === 'llm-a' ? 'llm_a' : 'user';
-                conversationStore.writeTurn(_hubSessionId, { role: senderRole, content: message });
-                conversationStore.writeTurn(_hubSessionId, { role: 'llm_b', content: reply, durationMs });
+                const msgTurnId = conversationHub.store.writeTurn(_hubSessionId, { role: senderRole, content: message });
+                const replyTurnId = conversationHub.store.writeTurn(_hubSessionId, { role: 'llm_b', content: reply, durationMs });
+                emitNerv('copilot:turn:sent', { hubSessionId: _hubSessionId, turnId: msgTurnId, role: senderRole, content: message });
+                emitNerv('copilot:turn:complete', { hubSessionId: _hubSessionId, turnId: replyTurnId, role: 'llm_b', content: reply, durationMs });
             } catch (/** @type {any} */ hubErr) {
                 log('WARN', `[TerminalServer] Hub writeTurn falhou: ${hubErr.message}`);
             }

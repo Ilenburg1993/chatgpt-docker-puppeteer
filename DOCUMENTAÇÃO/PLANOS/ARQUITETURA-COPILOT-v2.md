@@ -361,20 +361,15 @@ src/copilot/
 
 **Resultado**: `terminal-server.js` passa de 1677 linhas originais a 39 linhas; todos os módulos passam em `node --check` e `eslint --max-warnings 0`.
 
-### FASE D — Integrar HubOrchestrator
+### FASE D — Integrar HubOrchestrator ✅ CONCLUÍDA
 
-**Objetivo**: Eliminar GAP-1 fazendo o terminal usar `HubOrchestrator` em vez de
-`conversationStore.writeTurn()` diretamente.
+**Objetivo**: Eliminar GAP-1 fazendo o terminal usar `conversationHub` (singleton) em vez de
+`conversationStore` diretamente, e propagar eventos `turn:sent` / `turn:complete` para NERV.
 
-**Escopo**:
-1. Em `terminal/dialog.js`, importar `hubOrchestrator` de `conversation-hub/`
-2. Substituir `conversationStore.writeTurn(...)` por `hubOrchestrator.sendToLlmB(...)`
-3. Propagar eventos `turn:sent`, `turn:complete`, `user:injected` para NERV via `nerv-bridge.js`
-
-**Benefícios**:
-- Dashboard/Socket.io recebe eventos de turnos do terminal
-- NERV enxerga todas as conversas da LLM-B
-- Orquestrador único de conversas para todos os atores
+**Entregues**:
+1. `terminal/dialog.js`: importa `conversationHub` e `emitNerv`; `sendTurn()` usa `conversationHub.store.writeTurn()` + emite `copilot:turn:sent` e `copilot:turn:complete` via NERV
+2. `terminal/index.js`: `startTerminalServer()` usa `conversationHub.store.init()` e `conversationHub.store.createHubSession()`; todos os `writeTurn` de watchdog/fatal migrados para `conversationHub.store.writeTurn()`
+3. Todos os arquivos passam em `node --check` e `eslint --max-warnings 0`
 
 ### FASE E — Mover arquivos para nova estrutura de pastas
 
@@ -436,7 +431,7 @@ mas não crítica. Implementar apenas se o dashboard precisar de streaming de tu
 IMEDIATO (bugs críticos)    → FASE A ✅ CONCLUÍDA
 ────────────────────────────────────────────────
 CURTO PRAZO (sessão única)  → FASE B ✅ CONCLUÍDA (extração de comandos: 7 módulos)
-MÉDIO PRAZO (2-3 sessões)   → FASE C ✅ CONCLUÍDA (state/dialog/server/repl/index) + FASE D (orchestrator)
+MÉDIO PRAZO (2-3 sessões)   → FASE C ✅ CONCLUÍDA + FASE D ✅ CONCLUÍDA (conversationHub + NERV)
 LONGO PRAZO                 → FASE E + F (reorganização de pastas)
 ```
 

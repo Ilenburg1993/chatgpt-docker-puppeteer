@@ -18,7 +18,7 @@
 import { log } from '#core/logger';
 import { loadAliases } from '../alias-store.js';
 import { alwaysAliveAgent } from '../always-alive.js';
-import { conversationStore } from '../conversation-hub/store.js';
+import { conversationHub } from '../conversation-hub/hub.js';
 import { llmBridgeClient } from '../llm-bridge-client.js';
 import { broadcastSse, ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { startRepl } from './repl.js';
@@ -39,8 +39,8 @@ export async function startTerminalServer() {
 
     // Criar hub_session permanente (best-effort)
     try {
-        conversationStore.init();
-        const hubSessionId = conversationStore.createHubSession({
+        conversationHub.store.init();
+        const hubSessionId = conversationHub.store.createHubSession({
             title: 'Terminal Permanente LLM-B',
             metadata: { source: 'terminal-server', startedAt: new Date().toISOString() },
         });
@@ -58,7 +58,7 @@ export async function startTerminalServer() {
         const _hubSessionId = getHubSessionId();
         if (_hubSessionId) {
             try {
-                conversationStore.writeTurn(_hubSessionId, {
+                conversationHub.store.writeTurn(_hubSessionId, {
                     role: 'user',
                     content: `[SISTEMA] Watchdog: dialog loop inativo por ${secs}s — reinício automático.`,
                 });
@@ -89,7 +89,7 @@ export async function startTerminalServer() {
             const _hubSessionId = getHubSessionId();
             if (!_hubSessionId || !evt.reconected) return;
             try {
-                conversationStore.writeTurn(_hubSessionId, {
+                conversationHub.store.writeTurn(_hubSessionId, {
                     role: 'user',
                     content: `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
                 });
@@ -100,7 +100,7 @@ export async function startTerminalServer() {
         const _hubSessionId = getHubSessionId();
         if (!_hubSessionId) return;
         try {
-            conversationStore.writeTurn(_hubSessionId, {
+            conversationHub.store.writeTurn(_hubSessionId, {
                 role: 'user',
                 content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
             });
