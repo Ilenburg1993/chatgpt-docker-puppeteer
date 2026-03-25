@@ -3,9 +3,9 @@
  * src/copilot/llm-bridge-client.js
  *
  * Re-export de compatibilidade retroativa.
- * A implementação canônica está em src/copilot/bridges/llm-bridge-client.js (Fase J).
+ * A implementacao canonica esta em src/copilot/channel/client.js (Fase O).
  *
  * @module copilot/llm-bridge-client
- * @deprecated Use src/copilot/bridges/llm-bridge-client.js (localização canônica v2)
+ * @deprecated Use '#copilot/channel' (localizacao canonica v3)
  */
-export * from './bridges/llm-bridge-client.js';
+export * from './channel/client.js';

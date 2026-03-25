@@ -37,6 +37,8 @@
     "#copilot/types/*": "./src/copilot/types/*.js",
     "#copilot/conversation-hub": "./src/copilot/conversation-hub/index.js",
     "#copilot/conversation-hub/*": "./src/copilot/conversation-hub/*.js",
+    "#copilot/channel": "./src/copilot/channel/index.js",
+    "#copilot/channel/*": "./src/copilot/channel/*.js",
     "#copilot/core": "./src/copilot/core/index.js",
     "#copilot/core/*": "./src/copilot/core/*.js",
     "#copilot/tools/*": "./src/copilot/tools/*.js",
