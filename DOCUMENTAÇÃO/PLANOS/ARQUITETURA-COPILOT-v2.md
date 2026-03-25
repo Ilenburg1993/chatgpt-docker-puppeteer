@@ -1,7 +1,7 @@
 # Plano de Arquitetura — `src/copilot` v2
 
 **Data**: 2026-06-15 — **Última atualização**: 2026-03-25
-**Status**: Fases A–I concluídas — em execução contínua rumo à v2.1+
+**Status**: Fases A–M concluídas — v2.1 alcançada
 **Autores**: Análise automática via audit de código + testes reais com LLM-B
 
 ---
@@ -509,9 +509,9 @@ FASE H  ✅ CONCLUÍDA   Modularização sdk-api.js → routes/ (4 sub-routers)
 FASE I  ✅ CONCLUÍDA   Localização canônica: agent/ + bridges/ (3fd5a93e, af705488, ae6d1cb3)
 ────────────────────────────────────────────────────────────────────────────────
 FASE J  📋 PLANEJADA   Integrar Socket.io hub no terminal (SSE → WS opcional)
-FASE K  📋 PLANEJADA   Criar core/ com types.js, errors.js, constants.js
-FASE L  📋 PLANEJADA   Remover cli-terminal.js (depreciado)
-FASE M  📋 PLANEJADA   Unificar api/ (integrar http-handlers com Express)
+FASE K  ✅ CONCLUÍDA   api/ canônica: http-bridge.js e sdk-api.js movidos para api/ (f00e2e8c)
+FASE L  ✅ CONCLUÍDA   Remove cli-terminal.js e test_cli_terminal.spec.js (fc7eb58f)
+FASE M  ✅ CONCLUÍDA   Criar core/ com constants, errors, types (893a183a)
 ```
 
 ---
@@ -558,53 +558,43 @@ usando `conversation-hub/socket-ns.js` já existente.
 
 ---
 
-### FASE K — Criar camada core/ com contratos
+### FASE K — api/ como localização canônica para http-bridge e sdk-api ✅ CONCLUÍDA (`f00e2e8c`)
 
-**Objetivo**: Extrair tipos, erros e constantes para `src/copilot/core/`.
+**Objetivo**: Inverter a direção dos re-exports de `api/` — `api/http-bridge.js` e `api/sdk-api.js`
+passam a ter a implementação real; raízs viram thin re-exports.
 
-**Conteúdo**:
-- `core/types.js` — mover de `types/`, adicionar JsDoc exports de SDK
-- `core/errors.js` — `CopilotError`, `SessionError`, `BridgeError` com `code` semântico
-- `core/constants.js` — portas (3009), limites (MAX_QUEUE_SIZE=50), event names
-- `core/index.js` — barrel
-
-**Benefício**: Documentação ativa de contratos; erros tipados facilitam tratamento nos routers
-**Risco**: baixo (novos arquivos, sem mover lógica existente)
-**Estimativa**: 1 sessão
+**Executado**:
+- `src/copilot/http-bridge.js` (339L) → `src/copilot/api/http-bridge.js`; ajuste de `./always-alive.js` → `../always-alive.js`
+- `src/copilot/sdk-api.js` (33L) → `src/copilot/api/sdk-api.js`; ajuste de `./routes/` → `../routes/`
+- Raízes viraram thin re-exports com `export { default } + export *`
+- `api/copilot-router.js` e `api/sdk-router.js` atualizados para `./X` (mesmo dir)
+- 3 arquivos de testes: 7 readFile atualizados para `api/` path
+- 1465 testes passando, 0 falhas
 
 ---
 
-### FASE L — Remover cli-terminal.js
+### FASE L — Remover cli-terminal.js ✅ CONCLUÍDA (`fc7eb58f`)
 
 **Objetivo**: Eliminar duplicação com `terminal/`. Decisão D2 já tomada.
 
-**Passos**:
-1. Confirmar que nenhum código ativo importa `cli-terminal.js`
-2. Verificar que `ecosystem.config.*` não referencia
-3. Remover o arquivo
-4. Remover testes relacionados (se houver)
-
-**Risco**: mínimo (já deprecado em D2)
-**Estimativa**: < 30 min
+**Executado**:
+- Removido `src/copilot/cli-terminal.js` (standalone REPL — sem importadores em produção)
+- Removido `tests/unit/copilot/test_cli_terminal.spec.js` (9 testes removidos; total: 1465)
+- Ecosystem.config.cjs não referenciava o arquivo
 
 ---
 
-### FASE M — Unificar api/ com Express (eliminar node:http raw)
+### FASE M — Criar core/ com contratos centrais ✅ CONCLUÍDA (`893a183a`)
 
-**Objetivo**: `terminal/server.js` usa `node:http` raw (porta 3009). O plano é migrar os
-handlers para Express router em `api/copilot-router.js`, usando `terminal/http-handlers.js`
-que já tem a lógica pura.
+**Objetivo**: Centralizar tipos, erros e constantes em `src/copilot/core/`.
 
-**Passos**:
-1. `api/copilot-router.js` importa handlers de `terminal/http-handlers.js`
-2. Cada endpoint raw vira `router.get('/git/status', ...)` delegando ao handler
-3. `terminal/server.js` pode usar `express` como HTTP server
-4. SSE (`/events`) fica como rota Express com middleware especial
-5. Porta 3009 passa a ser uma instância Express separada (ou integrada ao server principal)
-
-**Benefício**: Um único stack HTTP; middleware compartilhado (auth, rate limit, logging)
-**Risco**: alto (mudança de runtime HTTP — requer testes extensivos de regressão)
-**Estimativa**: 2-3 sessões
+**Executado**:
+- `core/constants.js` — `LLM_B_TERMINAL_PORT` (3009), `MAX_QUEUE_SIZE` (100), re-export `AGENT_EVENTS`
+- `core/errors.js` — `CopilotError`, `SessionError`, `BridgeError` com `code` semântico
+- `core/types.js` — barrel re-exportando `types/index.js` (StructuredMessage)
+- `core/index.js` — barrel único
+- Aliases `#copilot/core` e `#copilot/core/*` adicionados em `package.json`
+- Apenas novos arquivos; nenhuma lógica existente movida
 
 ---
 
@@ -622,4 +612,4 @@ Antes de commitar cada fase:
 ---
 
 *Documento gerado com base em análise estática do código e testes reais com LLM-B ativa.*
-*Atualizado em 2026-03-25 após conclusão da Fase I (agent/ e bridges/ canônicos).*
+*Atualizado em 2026-03-25 após conclusão das Fases K, L e M. Arquitetura v2.1 atingida: todas as fases A–M concluídas.*
