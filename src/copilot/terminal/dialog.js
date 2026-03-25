@@ -19,6 +19,7 @@ import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
 import { emitNerv } from '../bridges/nerv-bridge.js';
 import { conversationHub } from '../conversation-hub/hub.js';
+import { getCopilotNamespace } from '../conversation-hub/socket-ns.js';
 import { getBusy, getHubSessionId, getRl, getSseClients, getSseCriticalClients, setBusy } from './state.js';
 
 // ─── Eventos críticos para SSE ────────────────────────────────────────────────
@@ -111,23 +112,32 @@ export function printExchange(actor, message, reply, durationMs) {
 export function broadcastSse(event, data) {
     const _sseClients = getSseClients();
     const _sseCriticalClients = getSseCriticalClients();
-    if (_sseClients.size === 0 && _sseCriticalClients.size === 0) return;
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const client of _sseClients) {
-        try {
-            client.write(payload);
-        } catch {
-            _sseClients.delete(client);
-        }
-    }
-    if (CRITICAL_EVENTS.has(event)) {
-        for (const client of _sseCriticalClients) {
+
+    // ── SSE (raw node:http) ───────────────────────────────────────────────────
+    if (_sseClients.size > 0 || _sseCriticalClients.size > 0) {
+        const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+        for (const client of _sseClients) {
             try {
                 client.write(payload);
             } catch {
-                _sseCriticalClients.delete(client);
+                _sseClients.delete(client);
             }
         }
+        if (CRITICAL_EVENTS.has(event)) {
+            for (const client of _sseCriticalClients) {
+                try {
+                    client.write(payload);
+                } catch {
+                    _sseCriticalClients.delete(client);
+                }
+            }
+        }
+    }
+
+    // ── Socket.io dual-emit (no-op quando namespace não montado, ex: processo separado) ──
+    const _ns = getCopilotNamespace();
+    if (_ns) {
+        _ns.emit(event, { ...data, hubSessionId: getHubSessionId() });
     }
 }
 

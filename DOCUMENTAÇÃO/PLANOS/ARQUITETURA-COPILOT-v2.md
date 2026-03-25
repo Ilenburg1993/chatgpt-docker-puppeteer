@@ -508,7 +508,7 @@ FASE G  ✅ CONCLUÍDA   Modularização always-alive.js → agent/ (5 sub-módu
 FASE H  ✅ CONCLUÍDA   Modularização sdk-api.js → routes/ (4 sub-routers)
 FASE I  ✅ CONCLUÍDA   Localização canônica: agent/ + bridges/ (3fd5a93e, af705488, ae6d1cb3)
 ────────────────────────────────────────────────────────────────────────────────
-FASE J  📋 PLANEJADA   Integrar Socket.io hub no terminal (SSE → WS opcional)
+FASE J  ✅ CONCLUÍDA   Integrar Socket.io hub no terminal — dual-emit SSE + Socket.io (dialog.js)
 FASE K  ✅ CONCLUÍDA   api/ canônica: http-bridge.js e sdk-api.js movidos para api/ (f00e2e8c)
 FASE L  ✅ CONCLUÍDA   Remove cli-terminal.js e test_cli_terminal.spec.js (fc7eb58f)
 FASE M  ✅ CONCLUÍDA   Criar core/ com constants, errors, types (893a183a)
@@ -525,36 +525,43 @@ a implementação real; arquivos na raiz de `src/copilot/` viram thin re-exports
 
 **Executado**:
 
-| Arquivo raiz (thin re-export agora) | Canônico (implementação real) |
-|---|---|
-| `always-alive.js` (11L) | `agent/always-alive.js` (777L) |
-| `session-manager.js` (12L) | `agent/session-manager.js` (199L) |
-| `agent.js` (12L) | `agent/entry.js` (71L) |
-| `gh-bridge.js` (12L) | `bridges/gh-bridge.js` (711L) |
-| `git-bridge.js` (12L) | `bridges/git-bridge.js` (401L) |
-| `alias-store.js` (12L) | `bridges/alias-store.js` (164L) |
-| `nerv-bridge.js` (12L) | `bridges/nerv-bridge.js` (183L) |
-| `mcp-tool-bridge.js` (12L) | `bridges/mcp-tool-bridge.js` (194L) |
-| `llm-bridge-client.js` (12L) | `bridges/llm-bridge-client.js` (371L) |
-| `inject-llmb.js` (12L) | `bridges/inject-llmb.js` (407L) |
+| Arquivo raiz (thin re-export agora) | Canônico (implementação real)         |
+| ----------------------------------- | ------------------------------------- |
+| `always-alive.js` (11L)             | `agent/always-alive.js` (777L)        |
+| `session-manager.js` (12L)          | `agent/session-manager.js` (199L)     |
+| `agent.js` (12L)                    | `agent/entry.js` (71L)                |
+| `gh-bridge.js` (12L)                | `bridges/gh-bridge.js` (711L)         |
+| `git-bridge.js` (12L)               | `bridges/git-bridge.js` (401L)        |
+| `alias-store.js` (12L)              | `bridges/alias-store.js` (164L)       |
+| `nerv-bridge.js` (12L)              | `bridges/nerv-bridge.js` (183L)       |
+| `mcp-tool-bridge.js` (12L)          | `bridges/mcp-tool-bridge.js` (194L)   |
+| `llm-bridge-client.js` (12L)        | `bridges/llm-bridge-client.js` (371L) |
+| `inject-llmb.js` (12L)              | `bridges/inject-llmb.js` (407L)       |
 
 **Resultado**: 10 arquivos migrados; imports relativos ajustados; testes de source analysis
 atualizados para ler arquivos canônicos. 1474 testes passando, 0 falhas.
 
 ---
 
-### FASE J — Integrar Socket.io hub (opcional, D5)
+### FASE J — Integrar Socket.io hub (dual-emit) ✅ CONCLUÍDA
 
-**Objetivo**: Substituir SSE artesanal (`/events` em `terminal/server.js`) por Socket.io
-usando `conversation-hub/socket-ns.js` já existente.
+**Objetivo**: Fazer `broadcastSse()` em `terminal/dialog.js` emitir **também** via o namespace
+`/copilot` do Socket.io, além do SSE raw já existente.
 
-**Passos**:
-1. `terminal/events.js` passa a emitir para o socket namespace além do SSE raw
-2. `terminal/server.js` mantém `/events` por compatibilidade; adiciona tag `socket.io` opcional
-3. Dashboard pode subscrever via WS em vez de SSE
+**Executado**:
+- `terminal/dialog.js` — adicionado import de `getCopilotNamespace` de `conversation-hub/socket-ns.js`
+- `broadcastSse(event, data)` reestruturado:
+  - SSE raw continua funcionando (clientes no Set `_sseClients` / `_sseCriticalClients`)
+  - Após os loops SSE, `getCopilotNamespace()` é verificado; se não-null: `ns.emit(event, { ...data, hubSessionId })`
+  - **No-op seguro quando terminal corre como processo separado** (namespace = null no processo isolado)
+- `/events` SSE permanece intacto em `server.js` — nenhuma quebra de compatibilidade
+- Dashboard (ou qualquer client Socket.io no `/copilot` namespace) pode subscrever eventos do terminal via WS
 
-**Risco**: baixo a médio (SSE permanece como fallback)
-**Estimativa**: 1-2 sessões — só executar se dashboard precisar
+**Comportamento em produção (PM2 separado)**: `getCopilotNamespace()` retorna `null` → sem efeito extra; degradação limpa
+**Comportamento integrado (mesmo processo)**: namespace montado → emit real via Socket.io
+
+**Risco**: mínimo (SSE permanece primário; socket.io é aditivo)
+- 1465 testes passando, lint limpo
 
 ---
 
