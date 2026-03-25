@@ -119,20 +119,21 @@ qual cenário.
 
 Todos os endpoints foram testados com terminal real (`node --strip-types src/copilot/terminal-server.js`):
 
-| Endpoint              | Método | Resultado  | Observações                                            |
-| --------------------- | ------ | ---------- | ------------------------------------------------------ |
-| `/health`             | GET    | ✅ HTTP 200 | `dialogLoopActive:true, agentStatus:waiting_for_input` |
-| `/git/status`         | GET    | ✅ HTTP 200 | `entries:1`                                            |
-| `/git/log?n=3`        | GET    | ✅ HTTP 200 | `commits:3, latest:59c4364`                            |
-| `/gh/issues?limit=2`  | GET    | ✅ HTTP 200 | `ok:true, issues:1`                                    |
-| `/gh/prs?limit=2`     | GET    | ✅ HTTP 200 | `ok:true, prs:2`                                       |
-| `/gh/ci?limit=3`      | GET    | ✅ HTTP 200 | `ok:true, runs:3`                                      |
-| `/inject`             | POST   | ✅ HTTP 200 | `duration:4662ms`, LLM-B respondeu corretamente        |
-| `/memory`             | POST   | ✅ HTTP 201 | `ok:true, id:badf0393`                                 |
-| `/memory?tag=test`    | GET    | ✅ HTTP 200 | `ok:true, count:1`                                     |
-| `/memory/:id`         | DELETE | ✅ HTTP 200 | `ok:true`                                              |
-| `/sessions`           | GET    | ✅ HTTP 200 | `sessions:3, current:c19f96d0`                         |
-| `/sessions/:id/turns` | GET    | ✅ HTTP 200 | `turns:2`                                              |
+| Endpoint              | Método | Resultado  | Observações                                                                    |
+| --------------------- | ------ | ---------- | ------------------------------------------------------------------------------ |
+| `/health`             | GET    | ✅ HTTP 200 | `dialogLoopActive:true, agentStatus:waiting_for_input, model, reasoningEffort` |
+| `/config`             | GET    | ✅ HTTP 200 | `{ model, reasoningEffort, planMode, dialogLoopActive, busy, port }`           |
+| `/git/status`         | GET    | ✅ HTTP 200 | `entries:1`                                                                    |
+| `/git/log?n=3`        | GET    | ✅ HTTP 200 | `commits:3, latest:59c4364`                                                    |
+| `/gh/issues?limit=2`  | GET    | ✅ HTTP 200 | `ok:true, issues:1`                                                            |
+| `/gh/prs?limit=2`     | GET    | ✅ HTTP 200 | `ok:true, prs:2`                                                               |
+| `/gh/ci?limit=3`      | GET    | ✅ HTTP 200 | `ok:true, runs:3`                                                              |
+| `/inject`             | POST   | ✅ HTTP 200 | `duration:4662ms`, aceita `context_files: string[]`                            |
+| `/memory`             | POST   | ✅ HTTP 201 | `ok:true, id:badf0393`                                                         |
+| `/memory?tag=test`    | GET    | ✅ HTTP 200 | `ok:true, count:1`                                                             |
+| `/memory/:id`         | DELETE | ✅ HTTP 200 | `ok:true`                                                                      |
+| `/sessions`           | GET    | ✅ HTTP 200 | `sessions:3, current:c19f96d0`                                                 |
+| `/sessions/:id/turns` | GET    | ✅ HTTP 200 | `turns:2`                                                                      |
 
 **100% dos endpoints validados e funcionando corretamente.**
 
@@ -522,6 +523,11 @@ FASE T  ✅ CONCLUÍDA   Tipar AGENT_EVENTS como union-type — AgentEventName t
 FASE U  ✅ CONCLUÍDA   SDK Event Forwarding — tool.execution_*, assistant.reasoning, session.usage_info (commit 654a80b5)
 FASE V  ✅ CONCLUÍDA   SDK History API + reasoningEffort + errorOccurred hook (commit 99611bed)
 FASE W  ✅ CONCLUÍDA   Attachment Support — arquivos/imagens em sendMessage/chat
+FASE X  ✅ CONCLUÍDA   Terminal: Modelo dinâmico + /model + /reasoning + reasoningEffort 'high' default (1c7e35d5)
+FASE Y  ✅ CONCLUÍDA   Terminal: File Context Embedding — file-context.js, /attach, @path inline
+FASE Z  ✅ CONCLUÍDA   Terminal UI: Spinner animado + rich layout + printExchange (1c7e35d5)
+FASE Z2 ✅ CONCLUÍDA   Terminal: Comandos avançados /context, /compact, /plan, /resume
+FASE Z3 ✅ CONCLUÍDA   HTTP API aprimorada: /health+model, /inject context_files, GET /config, SSE +model/reasoning
 ```
 
 ---
@@ -811,7 +817,7 @@ arquivos de código, diffs, imagens de UI ou referências a PRs/issues diretamen
 
 ---
 
-### FASE X — Terminal: Modelo Dinâmico e ReasoningEffort `high` por Padrão
+### FASE X — Terminal: Modelo Dinâmico e ReasoningEffort `high` por Padrão ✅ CONCLUÍDA (`1c7e35d5`)
 
 **Contexto — Limitações da configuração atual:**
 
@@ -879,7 +885,7 @@ permanece o canal principal.
 
 ---
 
-### FASE Y — Terminal: Contexto de Arquivo (File Context Embedding)
+### FASE Y — Terminal: Contexto de Arquivo (File Context Embedding) ✅ CONCLUÍDA
 
 **Contexto — Lacuna de envio de arquivos:**
 
@@ -959,7 +965,7 @@ Contexto de arquivo: src/copilot/agent/always-alive.js
 
 ---
 
-### FASE Z — Terminal UI: Layout Rico e Feedback Visual
+### FASE Z — Terminal UI: Layout Rico e Feedback Visual ✅ CONCLUÍDA (`1c7e35d5`)
 
 **Contexto — Estado atual do layout:**
 
@@ -1034,7 +1040,7 @@ a solução imediata e mais robusta; streaming incremental real é uma melhoria 
 
 ---
 
-### FASE Z2 — Terminal: Comandos Avançados (Copilot CLI–inspired)
+### FASE Z2 — Terminal: Comandos Avançados (Copilot CLI–inspired) ✅ CONCLUÍDA
 
 **Contexto — Funcionalidades ausentes que o Copilot CLI oferece:**
 
@@ -1114,7 +1120,7 @@ Implementar os comandos mais valiosos de forma nativa, sem dependências externa
 
 ---
 
-### FASE Z3 — HTTP API Aprimorada: Status Rico e Context Files para LLM-A
+### FASE Z3 — HTTP API Aprimorada: Status Rico e Context Files para LLM-A ✅ CONCLUÍDA
 
 **Contexto — Limitações da API HTTP atual:**
 

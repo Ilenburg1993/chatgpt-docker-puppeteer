@@ -58,8 +58,8 @@ export async function cmdModel({ println }, arg) {
             for (const m of models) {
                 const isActive = m.id === current;
                 const activeMarker = isActive ? ' \x1b[32m← ativo\x1b[0m' : '';
-                const reasoning = m.capabilities?.supportsReasoning ? ' \x1b[90m[reasoning]\x1b[0m' : '';
-                const vision = m.capabilities?.supportsVision ? ' \x1b[90m[vision]\x1b[0m' : '';
+                const reasoning = m.capabilities?.supports?.reasoningEffort ? ' \x1b[90m[reasoning]\x1b[0m' : '';
+                const vision = m.capabilities?.supports?.vision ? ' \x1b[90m[vision]\x1b[0m' : '';
                 println(`    \x1b[33m${m.id}\x1b[0m${activeMarker}${reasoning}${vision}`);
             }
             println('');

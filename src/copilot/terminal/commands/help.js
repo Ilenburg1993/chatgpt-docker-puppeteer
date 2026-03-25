@@ -41,6 +41,17 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/reasoning\x1b[0m                           — exibe nível de raciocínio atual
   \x1b[33m/reasoning low|medium|high|xhigh|off\x1b[0m — altera reasoning effort
 
+  \x1b[1mContexto e Arquivos\x1b[0m
+  \x1b[33m/attach\x1b[0m                              — lista fila de arquivos agendados para embed
+  \x1b[33m/attach <caminho>\x1b[0m                    — adiciona arquivo à fila (embed no próximo turno)
+  \x1b[33m/attach clear\x1b[0m                        — limpa fila de attachments
+  \x1b[33m@<caminho>\x1b[0m (inline)                  — embed automático: @src/foo.js no texto da mensagem
+  \x1b[33m/context\x1b[0m                             — estima uso atual de tokens da sessão
+  \x1b[33m/compact\x1b[0m                             — compacta histórico em resumo técnico denso
+  \x1b[33m/plan [on|off]\x1b[0m                       — ativa/desativa modo de planejamento passo-a-passo
+  \x1b[33m/resume\x1b[0m                              — lista últimas sessões do hub (para retomar)
+  \x1b[33m/resume <sessionId>\x1b[0m                  — injeta resumo de sessão anterior como contexto
+
   \x1b[1mMemória Semântica\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m               — persiste memória
   \x1b[33m/recall [tag]\x1b[0m                        — recupera por tag

@@ -79,10 +79,19 @@ export async function startTerminalServer() {
 
     // SSE: transmite respostas da LLM-B para clientes subscritos
     alwaysAliveAgent.on('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
-        broadcastSse('reply', { content: evt.reply, timestamp: Date.now() });
+        broadcastSse('reply', {
+            content: evt.reply,
+            timestamp: Date.now(),
+            model: alwaysAliveAgent.model,
+            reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
+        });
     });
     alwaysAliveAgent.on('dialog.ready', () => {
-        broadcastSse('ready', { timestamp: Date.now() });
+        broadcastSse('ready', {
+            timestamp: Date.now(),
+            model: alwaysAliveAgent.model,
+            reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
+        });
     });
 
     // Persiste reconexões e sessões fatais no Hub

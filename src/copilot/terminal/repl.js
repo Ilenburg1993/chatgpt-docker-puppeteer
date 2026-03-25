@@ -21,7 +21,10 @@ import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
 import {
     cmdAlias as _cmdAlias,
     cmdAnswer as _cmdAnswer,
+    cmdAttach as _cmdAttach,
     cmdClear as _cmdClear,
+    cmdCompact as _cmdCompact,
+    cmdContext as _cmdContext,
     cmdCount as _cmdCount,
     cmdDbHistory as _cmdDbHistory,
     cmdDbSessions as _cmdDbSessions,
@@ -31,14 +34,17 @@ import {
     cmdHelp as _cmdHelp,
     cmdHistory as _cmdHistory,
     cmdModel as _cmdModel,
+    cmdPlan as _cmdPlan,
     cmdReasoning as _cmdReasoning,
     cmdRecall as _cmdRecall,
     cmdRemember as _cmdRemember,
+    cmdResume as _cmdResume,
     cmdStatus as _cmdStatus,
     cmdWho as _cmdWho,
 } from './commands/index.js';
 import { ensureDialogLoop, println, sendTurn } from './dialog.js';
-import { getHubSessionId, setRl } from './state.js';
+import { extractAtReferences } from './file-context.js';
+import { addAttachment, getHubSessionId, setRl } from './state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
@@ -51,10 +57,12 @@ const BANNER = `
 \x1b[36m╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
   \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
   \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
+  \x1b[33m/attach [path|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m
   \x1b[36m/gh issue list\x1b[0m · \x1b[36m/gh pr list\x1b[0m · \x1b[36m/gh run list\x1b[0m · \x1b[36m/git status\x1b[0m · \x1b[36m/git log\x1b[0m · \x1b[36m/alias\x1b[0m · \x1b[36m/help\x1b[0m
   \x1b[90mPOST :${INJECT_PORT}/inject  ·  POST :${INJECT_PORT}/pipeline  ·  GET :${INJECT_PORT}/events  ·  GET :${INJECT_PORT}/sessions  ·  POST/GET/DELETE :${INJECT_PORT}/memory\x1b[0m
   \x1b[90mGET :${INJECT_PORT}/gh/issues  ·  GET :${INJECT_PORT}/gh/prs  ·  GET :${INJECT_PORT}/gh/ci  ·  GET :${INJECT_PORT}/git/status  ·  GET :${INJECT_PORT}/git/log\x1b[0m
+  \x1b[90mGET :${INJECT_PORT}/config  ·  GET :${INJECT_PORT}/health  |  @caminho/arquivo → embed automático\x1b[0m
 `;
 
 // ─── Helpers de dispatch ──────────────────────────────────────────────────────
@@ -125,6 +133,21 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
             break;
         case 'reasoning':
             _cmdReasoning({ println }, arg);
+            break;
+        case 'attach':
+            await _cmdAttach({ println }, arg);
+            break;
+        case 'context':
+            _cmdContext({ println });
+            break;
+        case 'compact':
+            await _cmdCompact({ println });
+            break;
+        case 'plan':
+            _cmdPlan({ println }, arg);
+            break;
+        case 'resume':
+            await _cmdResume({ println, hubSessionId: _hubSessionId }, arg);
             break;
         case 'quit':
         case 'exit':
@@ -253,7 +276,15 @@ export async function startRepl(injectServer) {
             return;
         }
 
-        await sendTurn(trimmed, 'user');
+        // Detectar referências @path inline e adicioná-las à fila de attachment
+        const { paths: atPaths, strippedMessage } = extractAtReferences(trimmed);
+        for (const p of atPaths) {
+            addAttachment(p);
+            println(`\x1b[90m  📎 @${p} adicionado à fila de attachments\x1b[0m`);
+        }
+        const finalMessage = atPaths.length > 0 ? strippedMessage || trimmed : trimmed;
+
+        await sendTurn(finalMessage, 'user');
     });
 
     rl.on('close', () => {

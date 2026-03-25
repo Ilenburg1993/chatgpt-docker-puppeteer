@@ -60,6 +60,24 @@ import { WebhookManager } from './webhook-manager.js';
  */
 
 /**
+ * Snapshot do estado atual do agente retornado por `getStatusSnapshot()`.
+ *
+ * @typedef {Object} AgentStatusSnapshot
+ * @property {string} status - Estado atual do agente
+ * @property {string | null} sessionId - ID da sessão ativa
+ * @property {string} model - Modelo ativo
+ * @property {string | undefined} reasoningEffort - Nível de esforço de ragionamento
+ * @property {number} queueSize - Número de tarefas na fila
+ * @property {number} oldestTaskWaitMs - Tempo de espera da tarefa mais antiga em ms
+ * @property {boolean} starvationAlert - true se há tarefa esperando > 60s
+ * @property {object | null} pendingQuestion - Pergunta pendente do modelo (ou null)
+ * @property {boolean} isResumed - true se a sessão foi retomada
+ * @property {number} resumeCount - Número de retomadas desde o início
+ * @property {number} sendCount - Total de mensagens enviadas
+ * @property {number | null} startedAt - Epoch ms do início da sessão
+ */
+
+/**
  * Always-Alive Agent — instância singleton que gerencia o ciclo de vida completo do agente Copilot SDK neste processo.
  *
  * @extends EventEmitter
@@ -487,7 +505,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna um snapshot do estado atual para a API HTTP.
      *
-     * @returns {object}
+     * @returns {AgentStatusSnapshot}
      */
     getStatusSnapshot() {
         const state = readState();

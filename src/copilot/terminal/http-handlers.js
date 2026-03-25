@@ -20,7 +20,8 @@ import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { sendTurn } from './dialog.js';
-import { getBusy, getHubSessionId, getSseClients, getSseCriticalClients } from './state.js';
+import { embedMultiple, readFileContext } from './file-context.js';
+import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from './state.js';
 
 // ─── Tipos auxiliares ─────────────────────────────────────────────────────────
 
@@ -47,6 +48,8 @@ export function handleHealth() {
             busy: getBusy(),
             hubSessionId: getHubSessionId(),
             sseClients: getSseClients().size,
+            model: alwaysAliveAgent.model,
+            reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
         },
     };
 }
@@ -205,7 +208,10 @@ export async function handlePipeline(body) {
 /**
  * Injeta uma mensagem na LLM-B e aguarda resposta.
  *
- * @param {{ message?: string; from?: string; timeout?: number } | null} body
+ * Aceita opcionalmente `context_files: string[]` — o servidor lê o conteúdo de cada arquivo e o embute como bloco
+ * markdown antes da mensagem.
+ *
+ * @param {{ message?: string; from?: string; timeout?: number; context_files?: string[] } | null} body
  * @returns {Promise<HandlerResult>}
  */
 export async function handleInject(body) {
@@ -215,9 +221,25 @@ export async function handleInject(body) {
     }
 
     const from = body?.from ?? 'llm-a';
+
+    // Embed de context_files, se fornecidos
+    let enrichedMessage = message;
+    const contextFiles = Array.isArray(body?.context_files) ? body.context_files : [];
+    if (contextFiles.length > 0) {
+        try {
+            const ctxs = await Promise.all(contextFiles.map(readFileContext));
+            enrichedMessage = embedMultiple(ctxs, message);
+        } catch (/** @type {any} */ embedErr) {
+            return {
+                status: 400,
+                body: { ok: false, error: `Falha ao processar context_files: ${embedErr.message}` },
+            };
+        }
+    }
+
     const t0 = Date.now();
     try {
-        const reply = await sendTurn(message, from);
+        const reply = await sendTurn(enrichedMessage, from);
         return {
             status: reply !== null ? 200 : 409,
             body: { ok: reply !== null, reply: reply ?? null, durationMs: Date.now() - t0, from },
@@ -321,4 +343,28 @@ export async function handleGitLog({ n = 20 } = {}) {
  */
 export function getSseClientSets() {
     return { all: getSseClients(), critical: getSseCriticalClients() };
+}
+
+// ─── GET /config ──────────────────────────────────────────────────────────────
+
+/**
+ * Retorna configuração dinâmica atual da sessão LLM-B.
+ *
+ * @returns {HandlerResult}
+ */
+export function handleGetConfig() {
+    return {
+        status: 200,
+        cors: true,
+        body: {
+            ok: true,
+            model: alwaysAliveAgent.model,
+            reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
+            planMode: getPlanMode(),
+            dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
+            busy: getBusy(),
+            hubSessionId: getHubSessionId(),
+            port: Number(process.env.LLM_B_TERMINAL_PORT ?? 3009),
+        },
+    };
 }

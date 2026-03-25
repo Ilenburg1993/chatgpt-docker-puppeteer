@@ -21,6 +21,12 @@ let _busy = false;
 /** Interface readline ativa. @type {import('node:readline').Interface | null} */
 let _rl = null;
 
+/** Fila de arquivos a embutir no próximo turno (via `/attach` ou `@path`). @type {string[]} */
+let _attachmentQueue = [];
+
+/** Modo planejamento: prefaça mensagens com instrução de plano antes de enviar. @type {boolean} */
+let _planMode = false;
+
 /**
  * Clientes SSE conectados ao endpoint GET /events (todos os eventos).
  *
@@ -72,4 +78,40 @@ export function getSseClients() {
 /** @returns {Set<import('node:http').ServerResponse>} */
 export function getSseCriticalClients() {
     return _sseCriticalClients;
+}
+
+// ─── Attachment queue ─────────────────────────────────────────────────────────
+
+/** @returns {string[]} Cópia defensiva da fila de arquivos. */
+export function getAttachmentQueue() {
+    return [..._attachmentQueue];
+}
+
+/**
+ * Adiciona um caminho de arquivo à fila de attachments.
+ *
+ * @param {string} filePath
+ * @returns {void}
+ */
+export function addAttachment(filePath) {
+    if (!_attachmentQueue.includes(filePath)) {
+        _attachmentQueue.push(filePath);
+    }
+}
+
+/** Limpa a fila de attachments. @returns {void} */
+export function clearAttachments() {
+    _attachmentQueue = [];
+}
+
+// ─── Plan mode ────────────────────────────────────────────────────────────────
+
+/** @returns {boolean} */
+export function getPlanMode() {
+    return _planMode;
+}
+
+/** @param {boolean} value @returns {void} */
+export function setPlanMode(value) {
+    _planMode = value;
 }

@@ -20,7 +20,18 @@ import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
 import { emitNerv } from '../bridges/nerv-bridge.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { getCopilotNamespace } from '../conversation-hub/socket-ns.js';
-import { getBusy, getHubSessionId, getRl, getSseClients, getSseCriticalClients, setBusy } from './state.js';
+import { embedMultiple, readFileContext } from './file-context.js';
+import {
+    clearAttachments,
+    getAttachmentQueue,
+    getBusy,
+    getHubSessionId,
+    getPlanMode,
+    getRl,
+    getSseClients,
+    getSseCriticalClients,
+    setBusy,
+} from './state.js';
 
 // ─── Eventos críticos para SSE ────────────────────────────────────────────────
 
@@ -37,6 +48,11 @@ const PROMPT_WAITING = '     ';
 
 /** Separador visual entre turnos — 72 colunas. */
 const SEPARATOR = '\x1b[90m  ' + '─'.repeat(70) + '\x1b[0m';
+
+/** Prefácio injetado antes das mensagens quando /plan mode está ativo. */
+const PLAN_PREFIX =
+    '[MODO PLANEJAMENTO] Antes de responder, elabore um plano detalhado passo-a-passo. ' +
+    'Não pule para a resposta diretamente. Liste dependências, riscos e alternativas.\n\n';
 
 /**
  * Boot prompt padrão enviado à LLM-B ao iniciar o dialog loop. Pode ser sobrescrito pela variável de ambiente
@@ -230,10 +246,31 @@ export async function sendTurn(message, actor = 'user') {
         rl.setPrompt(PROMPT_WAITING);
     }
 
+    // ── Enriquecimento da mensagem: fila de attachments e plan mode ──────────
+    let enrichedMessage = message;
+
+    // 1. Embed de arquivos da fila
+    const queue = getAttachmentQueue();
+    if (queue.length > 0) {
+        clearAttachments();
+        try {
+            const ctxs = await Promise.all(queue.map(readFileContext));
+            enrichedMessage = embedMultiple(ctxs, enrichedMessage);
+            println(`\x1b[90m  📎 ${ctxs.length} arquivo(s) embutido(s): ${ctxs.map((c) => c.path).join(', ')}\x1b[0m`);
+        } catch (/** @type {any} */ embedErr) {
+            println(`\x1b[33m  ⚠️  Falha ao embutir arquivo(s): ${embedErr.message}\x1b[0m`);
+        }
+    }
+
+    // 2. Prefácio de planejamento
+    if (getPlanMode()) {
+        enrichedMessage = PLAN_PREFIX + enrichedMessage;
+    }
+
     const t0 = Date.now();
     try {
         await ensureDialogLoop();
-        const reply = await llmBridgeClient.dialogTurn(message, { timeout: TURN_TIMEOUT_MS });
+        const reply = await llmBridgeClient.dialogTurn(enrichedMessage, { timeout: TURN_TIMEOUT_MS });
         const durationMs = Date.now() - t0;
         printExchange(actor, message, reply, durationMs);
         log('INFO', `[TerminalServer] Turno ${actor} concluído em ${durationMs}ms`);

@@ -24,6 +24,7 @@
  * | GET    | /gh/ci              | Lista GitHub CI runs via gh CLI       |
  * | GET    | /git/status         | Git status via spawn                  |
  * | GET    | /git/log            | Git log via spawn                     |
+ * | GET    | /config             | Configuração dinâmica da sessão LLM-B |
  *
  * @module copilot/terminal/server
  */
@@ -33,6 +34,7 @@ import http from 'node:http';
 import { println } from './dialog.js';
 import {
     handleDeleteMemory,
+    handleGetConfig,
     handleGhCi,
     handleGhIssues,
     handleGhPrs,
@@ -113,6 +115,12 @@ export function createInjectServer() {
         // ── GET /health ───────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/health') {
             sendJson(res, handleHealth());
+            return;
+        }
+
+        // ── GET /config ───────────────────────────────────────────────────
+        if (req.method === 'GET' && url.pathname === '/config') {
+            sendJson(res, handleGetConfig());
             return;
         }
 
