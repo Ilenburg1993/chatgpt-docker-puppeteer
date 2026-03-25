@@ -17,16 +17,16 @@ import {
     formatReleaseList,
     formatRunList,
     getStatus as ghGetStatus,
+    rawApi as ghRawApi,
     listIssues,
     listPrs,
     listReleases,
     listRuns,
-    rawApi as ghRawApi,
     searchIssues,
     viewIssue,
     viewPr,
     viewRun,
-} from '../../gh-bridge.js';
+} from '../../bridges/gh-bridge.js';
 
 /**
  * @typedef {object} SessionContext

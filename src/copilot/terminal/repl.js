@@ -5,6 +5,7 @@
  * Interface REPL readline do Terminal Permanente LLM-B.
  *
  * Responsável por:
+ *
  * - Criar/gerenciar readline interface (`startRepl`)
  * - Registrar listeners de eventos do AlwaysAliveAgent (`setupAgentListeners`)
  * - Fazer dispatch dos comandos `/xxx` para os módulos de commands/
@@ -14,9 +15,9 @@
 
 import { log } from '#core/logger';
 import readline from 'node:readline';
-import { resolve } from '../alias-store.js';
-import { alwaysAliveAgent } from '../always-alive.js';
-import { llmBridgeClient } from '../llm-bridge-client.js';
+import { resolve } from '../bridges/alias-store.js';
+import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
 import {
     cmdAlias as _cmdAlias,
     cmdAnswer as _cmdAnswer,
@@ -108,7 +109,11 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
             break;
         case 'restart':
             println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
-            try { await llmBridgeClient.stopDialogMode(); } catch { /* já parado */ }
+            try {
+                await llmBridgeClient.stopDialogMode();
+            } catch {
+                /* já parado */
+            }
             await ensureDialogLoop();
             println('\x1b[32m  Dialog loop reiniciado.\x1b[0m');
             break;
@@ -116,7 +121,11 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
         case 'exit':
             println('[terminal] Encerrando sessão…');
             cleanup();
-            try { await llmBridgeClient.stopDialogMode(); } catch { /* ignora */ }
+            try {
+                await llmBridgeClient.stopDialogMode();
+            } catch {
+                /* ignora */
+            }
             rl.close();
             injectServer.close();
             setRl(null);
@@ -184,8 +193,8 @@ export function setupAgentListeners(rl) {
 /**
  * Inicia o REPL readline do terminal permanente.
  *
- * Em modo headless (stdin não-TTY), apenas garante o dialog loop e retorna,
- * deixando o inject server HTTP manter o event loop ativo.
+ * Em modo headless (stdin não-TTY), apenas garante o dialog loop e retorna, deixando o inject server HTTP manter o
+ * event loop ativo.
  *
  * @param {import('node:http').Server} injectServer - Servidor HTTP de injeção (para fechar no /quit)
  * @returns {Promise<void>}

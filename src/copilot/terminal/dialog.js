@@ -5,6 +5,7 @@
  * Motor de diálogo do Terminal Permanente LLM-B.
  *
  * Responsável por:
+ *
  * - Garantir que o dialog loop está ativo (`ensureDialogLoop`)
  * - Enviar turnos de diálogo e exibir respostas (`sendTurn`)
  * - Transmitir eventos SSE para clientes conectados (`broadcastSse`)
@@ -14,14 +15,11 @@
  */
 
 import { log } from '#core/logger';
-import { alwaysAliveAgent } from '../always-alive.js';
+import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { conversationHub } from '../conversation-hub/hub.js';
-import { emitNerv } from '../nerv-bridge.js';
-import { llmBridgeClient } from '../llm-bridge-client.js';
-import {
-    getBusy, getHubSessionId, getRl, getSseCriticalClients, getSseClients,
-    setBusy,
-} from './state.js';
+import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
+import { emitNerv } from '../bridges/nerv-bridge.js';
+import { getBusy, getHubSessionId, getRl, getSseClients, getSseCriticalClients, setBusy } from './state.js';
 
 // ─── Eventos críticos para SSE ────────────────────────────────────────────────
 
@@ -37,8 +35,8 @@ const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
 const PROMPT_WAITING = '     ';
 
 /**
- * Boot prompt padrão enviado à LLM-B ao iniciar o dialog loop.
- * Pode ser sobrescrito pela variável de ambiente `LLM_B_BOOT_PROMPT`.
+ * Boot prompt padrão enviado à LLM-B ao iniciar o dialog loop. Pode ser sobrescrito pela variável de ambiente
+ * `LLM_B_BOOT_PROMPT`.
  */
 const DEFAULT_BOOT_PROMPT = `Você é a LLM-B — assistente técnico interno do projeto chatgpt-docker-puppeteer.
 
@@ -103,8 +101,8 @@ export function printExchange(actor, message, reply, durationMs) {
 // ─── SSE ──────────────────────────────────────────────────────────────────────
 
 /**
- * Transmite um evento SSE para todos os clientes conectados ao endpoint GET /events.
- * Clientes em modo `?level=critical` recebem apenas eventos em CRITICAL_EVENTS.
+ * Transmite um evento SSE para todos os clientes conectados ao endpoint GET /events. Clientes em modo `?level=critical`
+ * recebem apenas eventos em CRITICAL_EVENTS.
  *
  * @param {string} event - Tipo do evento (ex: 'reply', 'ready', 'stalled')
  * @param {object} data - Payload JSON serializável
@@ -202,10 +200,28 @@ export async function sendTurn(message, actor = 'user') {
             try {
                 /** @type {'user' | 'llm_a'} */
                 const senderRole = actor === 'llm-a' ? 'llm_a' : 'user';
-                const msgTurnId = conversationHub.store.writeTurn(_hubSessionId, { role: senderRole, content: message });
-                const replyTurnId = conversationHub.store.writeTurn(_hubSessionId, { role: 'llm_b', content: reply, durationMs });
-                emitNerv('copilot:turn:sent', { hubSessionId: _hubSessionId, turnId: msgTurnId, role: senderRole, content: message });
-                emitNerv('copilot:turn:complete', { hubSessionId: _hubSessionId, turnId: replyTurnId, role: 'llm_b', content: reply, durationMs });
+                const msgTurnId = conversationHub.store.writeTurn(_hubSessionId, {
+                    role: senderRole,
+                    content: message,
+                });
+                const replyTurnId = conversationHub.store.writeTurn(_hubSessionId, {
+                    role: 'llm_b',
+                    content: reply,
+                    durationMs,
+                });
+                emitNerv('copilot:turn:sent', {
+                    hubSessionId: _hubSessionId,
+                    turnId: msgTurnId,
+                    role: senderRole,
+                    content: message,
+                });
+                emitNerv('copilot:turn:complete', {
+                    hubSessionId: _hubSessionId,
+                    turnId: replyTurnId,
+                    role: 'llm_b',
+                    content: reply,
+                    durationMs,
+                });
             } catch (/** @type {any} */ hubErr) {
                 log('WARN', `[TerminalServer] Hub writeTurn falhou: ${hubErr.message}`);
             }

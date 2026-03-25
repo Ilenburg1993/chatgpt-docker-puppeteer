@@ -5,6 +5,7 @@
  * Ponto de entrada do Terminal Permanente LLM-B.
  *
  * Orquestra a inicialização sequencial de todos os subsistemas:
+ *
  * 1. Carrega aliases customizados
  * 2. Cria o servidor HTTP de injeção (via `server.js`)
  * 3. Cria hub_session no ConversationStore (best-effort)
@@ -16,14 +17,14 @@
  */
 
 import { log } from '#core/logger';
-import { loadAliases } from '../alias-store.js';
-import { alwaysAliveAgent } from '../always-alive.js';
+import { loadAliases } from '../bridges/alias-store.js';
+import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { conversationHub } from '../conversation-hub/hub.js';
-import { llmBridgeClient } from '../llm-bridge-client.js';
+import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
 import { broadcastSse, ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { startRepl } from './repl.js';
 import { createInjectServer } from './server.js';
-import { setHubSessionId, getHubSessionId } from './state.js';
+import { getHubSessionId, setHubSessionId } from './state.js';
 
 /**
  * Inicia o Terminal Permanente LLM-B.
@@ -62,7 +63,9 @@ export async function startTerminalServer() {
                     role: 'user',
                     content: `[SISTEMA] Watchdog: dialog loop inativo por ${secs}s — reinício automático.`,
                 });
-            } catch { /* best-effort */ }
+            } catch {
+                /* best-effort */
+            }
         }
         llmBridgeClient
             .stopDialogMode()
@@ -93,7 +96,9 @@ export async function startTerminalServer() {
                     role: 'user',
                     content: `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
                 });
-            } catch { /* best-effort */ }
+            } catch {
+                /* best-effort */
+            }
         },
     );
     alwaysAliveAgent.on('session.fatal', (/** @type {{ originalError: string; attempts: number }} */ evt) => {
@@ -104,7 +109,9 @@ export async function startTerminalServer() {
                 role: 'user',
                 content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
             });
-        } catch { /* best-effort */ }
+        } catch {
+            /* best-effort */
+        }
     });
 
     // P7: Reflection loop periódico

@@ -299,11 +299,11 @@ curl -N "http://127.0.0.1:3009/events?level=critical" # apenas stalled/fatal/sys
 
 | Evento    | Quando                              | Payload                        | Crítico |
 | --------- | ----------------------------------- | ------------------------------ | ------- |
-| `reply`   | LLM-B emite uma resposta            | `{ content, timestamp }`       | ❌      |
-| `ready`   | Dialog loop pronto/reconectou       | `{ timestamp }`                | ❌      |
-| `stalled` | Watchdog detectou inatividade       | `{ stalledMs }`                | ✅      |
-| `system`  | Evento de sistema (reflection, etc) | `{ type, content, timestamp }` | ✅      |
-| `fatal`   | Falha irrecuperável do SDK          | `{ message }`                  | ✅      |
+| `reply`   | LLM-B emite uma resposta            | `{ content, timestamp }`       | ❌       |
+| `ready`   | Dialog loop pronto/reconectou       | `{ timestamp }`                | ❌       |
+| `stalled` | Watchdog detectou inatividade       | `{ stalledMs }`                | ✅       |
+| `system`  | Evento de sistema (reflection, etc) | `{ type, content, timestamp }` | ✅       |
+| `fatal`   | Falha irrecuperável do SDK          | `{ message }`                  | ✅       |
 
 ### `GET /sessions` — listagem (P9)
 
@@ -493,8 +493,8 @@ copilot_memories_fts  -- virtual table (triggers automáticos)
 
 ## Roadmap — status por fase
 
-| Sprint | Upgrade                                    | Status    |
-| ------ | ------------------------------------------ | --------- |
+| Sprint | Upgrade                                    | Status   |
+| ------ | ------------------------------------------ | -------- |
 | P1     | Watchdog dialog loop                       | ✅ Fase 3 |
 | P2     | `/db-history` (SQLite persistido)          | ✅ Fase 3 |
 | P3     | SSE `/events` + `subscribeLlmB()`          | ✅ Fase 3 |

@@ -371,27 +371,31 @@ src/copilot/
 2. `terminal/index.js`: `startTerminalServer()` usa `conversationHub.store.init()` e `conversationHub.store.createHubSession()`; todos os `writeTurn` de watchdog/fatal migrados para `conversationHub.store.writeTurn()`
 3. Todos os arquivos passam em `node --check` e `eslint --max-warnings 0`
 
-### FASE E — Mover arquivos para nova estrutura de pastas
+### FASE E — Mover arquivos para nova estrutura de pastas ✅ CONCLUÍDA
 
-**Objetivo**: Reorganizar fisicamente os arquivos conforme o layout v2.
+**Objetivo**: Criar caminhos canônicos conforme layout v2 preservando compatibilidade.
 
-**Escopo** (movimentações):
+**Estratégia adotada**: Re-exports canônicos (não movimentação física), pois existem
+~30 arquivos externos (testes + server) que importam os módulos originais.
+
+**Arquivos criados** (re-exports → originais):
 ```
-alias-store.js     → bridges/alias-store.js
-gh-bridge.js       → bridges/gh-bridge.js
-git-bridge.js      → bridges/git-bridge.js
-nerv-bridge.js     → bridges/nerv-bridge.js
-mcp-tool-bridge.js → bridges/mcp-tool-bridge.js
-llm-bridge-client.js → bridge/llm-bridge-client.js
-inject-llmb.js     → bridge/inject-llmb.js
-always-alive.js    → agent/always-alive.js
-agent.js           → agent/entry.js
-session-manager.js → agent/session-manager.js
-http-bridge.js     → api/copilot-router.js
-sdk-api.js         → api/sdk-router.js
+bridges/alias-store.js       → ../alias-store.js
+bridges/gh-bridge.js         → ../gh-bridge.js
+bridges/git-bridge.js        → ../git-bridge.js
+bridges/nerv-bridge.js       → ../nerv-bridge.js
+bridges/mcp-tool-bridge.js   → ../mcp-tool-bridge.js
+bridges/llm-bridge-client.js → ../llm-bridge-client.js
+bridges/inject-llmb.js       → ../inject-llmb.js
+agent/always-alive.js        → ../always-alive.js
+agent/entry.js               → ../agent.js
+agent/session-manager.js     → ../session-manager.js
+api/copilot-router.js        → ../http-bridge.js
+api/sdk-router.js            → ../sdk-api.js
 ```
 
-**Requer**: atualizar todos os `import` relativos e aliases `#copilot/*` em `tsconfig`.
+**terminal/ atualizado**: imports internos agora usam caminhos canônicos (`bridges/`, `agent/`).
+**Compatibilidade**: arquivos originais mantidos; testes e server não foram alterados.
 
 ### FASE F — Unificar stacks HTTP (opcional/longo prazo)
 
@@ -432,7 +436,7 @@ IMEDIATO (bugs críticos)    → FASE A ✅ CONCLUÍDA
 ────────────────────────────────────────────────
 CURTO PRAZO (sessão única)  → FASE B ✅ CONCLUÍDA (extração de comandos: 7 módulos)
 MÉDIO PRAZO (2-3 sessões)   → FASE C ✅ CONCLUÍDA + FASE D ✅ CONCLUÍDA (conversationHub + NERV)
-LONGO PRAZO                 → FASE E + F (reorganização de pastas)
+LONGO PRAZO                 → FASE E ✅ CONCLUÍDA + FASE F (HTTP unification)
 ```
 
 ---

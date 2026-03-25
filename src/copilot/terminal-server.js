@@ -8,9 +8,8 @@ if (!process.env.COPILOT_SDK_ENABLED) process.env.COPILOT_SDK_ENABLED = 'true';
  *
  * Terminal Permanente LLM-B — wrapper de entrypoint.
  *
- * Este arquivo é o ponto de entrada histórico. Toda a lógica foi migrada para
- * `src/copilot/terminal/` (Fase C da refatoração modular). Este wrapper apenas
- * re-exporta `startTerminalServer` e, quando executado diretamente, chama-o.
+ * Este arquivo é o ponto de entrada histórico. Toda a lógica foi migrada para `src/copilot/terminal/` (Fase C da
+ * refatoração modular). Este wrapper apenas re-exporta `startTerminalServer` e, quando executado diretamente, chama-o.
  *
  * @module copilot/terminal-server
  *

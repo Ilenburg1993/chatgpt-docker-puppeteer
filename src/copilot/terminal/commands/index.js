@@ -11,5 +11,14 @@ export { cmdAlias } from './alias.js';
 export { cmdGh } from './gh.js';
 export { cmdGit } from './git.js';
 export { cmdHelp } from './help.js';
-export { cmdRemember, cmdRecall, cmdForget } from './memory.js';
-export { cmdStatus, cmdHistory, cmdDbHistory, cmdDbSessions, cmdWho, cmdCount, cmdClear, cmdAnswer } from './session.js';
+export { cmdForget, cmdRecall, cmdRemember } from './memory.js';
+export {
+    cmdAnswer,
+    cmdClear,
+    cmdCount,
+    cmdDbHistory,
+    cmdDbSessions,
+    cmdHistory,
+    cmdStatus,
+    cmdWho,
+} from './session.js';

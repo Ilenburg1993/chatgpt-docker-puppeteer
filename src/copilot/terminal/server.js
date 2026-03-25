@@ -4,37 +4,36 @@
  *
  * Servidor HTTP de injeção do Terminal Permanente LLM-B.
  *
- * Cria e gerencia o servidor HTTP interno (porta LLM_B_TERMINAL_PORT, padrão 3009)
- * que expõe os seguintes endpoints:
+ * Cria e gerencia o servidor HTTP interno (porta LLM_B_TERMINAL_PORT, padrão 3009) que expõe os seguintes endpoints:
  *
- * | Método | Caminho              | Descrição                                      |
- * |--------|----------------------|------------------------------------------------|
- * | GET    | /health              | Status do agente e do dialog loop              |
- * | GET    | /events              | SSE — stream de eventos da LLM-B               |
- * | GET    | /sessions            | Lista hub_sessions persistidas                 |
- * | GET    | /sessions/:id/turns  | Turnos de uma sessão específica                |
- * | POST   | /memory              | Armazena uma memória semântica                 |
- * | GET    | /memory              | Recupera memórias semânticas                   |
- * | DELETE | /memory/:id          | Remove uma memória semântica                   |
- * | POST   | /pipeline            | Executa sequência ordenada de turnos           |
- * | POST   | /inject              | Injeta uma mensagem na LLM-B                   |
- * | GET    | /gh/issues           | Lista GitHub issues via gh CLI                 |
- * | GET    | /gh/prs              | Lista GitHub pull requests via gh CLI          |
- * | GET    | /gh/ci               | Lista GitHub CI runs via gh CLI                |
- * | GET    | /git/status          | Git status via spawn                           |
- * | GET    | /git/log             | Git log via spawn                              |
+ * | Método | Caminho             | Descrição                             |
+ * | ------ | ------------------- | ------------------------------------- |
+ * | GET    | /health             | Status do agente e do dialog loop     |
+ * | GET    | /events             | SSE — stream de eventos da LLM-B      |
+ * | GET    | /sessions           | Lista hub_sessions persistidas        |
+ * | GET    | /sessions/:id/turns | Turnos de uma sessão específica       |
+ * | POST   | /memory             | Armazena uma memória semântica        |
+ * | GET    | /memory             | Recupera memórias semânticas          |
+ * | DELETE | /memory/:id         | Remove uma memória semântica          |
+ * | POST   | /pipeline           | Executa sequência ordenada de turnos  |
+ * | POST   | /inject             | Injeta uma mensagem na LLM-B          |
+ * | GET    | /gh/issues          | Lista GitHub issues via gh CLI        |
+ * | GET    | /gh/prs             | Lista GitHub pull requests via gh CLI |
+ * | GET    | /gh/ci              | Lista GitHub CI runs via gh CLI       |
+ * | GET    | /git/status         | Git status via spawn                  |
+ * | GET    | /git/log            | Git log via spawn                     |
  *
  * @module copilot/terminal/server
  */
 
 import { log } from '#core/logger';
 import http from 'node:http';
-import { alwaysAliveAgent } from '../always-alive.js';
+import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { conversationStore } from '../conversation-hub/store.js';
-import { listIssues, listPrs, listRuns } from '../gh-bridge.js';
-import { gitLog, gitStatus } from '../git-bridge.js';
+import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
+import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { println, sendTurn } from './dialog.js';
-import { getBusy, getHubSessionId, getSseCriticalClients, getSseClients } from './state.js';
+import { getBusy, getHubSessionId, getSseClients, getSseCriticalClients } from './state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
@@ -133,7 +132,9 @@ export function createInjectServer() {
         // ── POST /memory ──────────────────────────────────────────────────
         if (req.method === 'POST' && url.pathname === '/memory') {
             let body = '';
-            req.on('data', (chunk) => { body += chunk; });
+            req.on('data', (chunk) => {
+                body += chunk;
+            });
             req.on('end', () => {
                 try {
                     const parsed = /** @type {{ tag?: string; content?: string }} */ (JSON.parse(body));
@@ -198,7 +199,9 @@ export function createInjectServer() {
         // ── POST /pipeline ────────────────────────────────────────────────
         if (req.method === 'POST' && url.pathname === '/pipeline') {
             let body = '';
-            req.on('data', (chunk) => { body += chunk; });
+            req.on('data', (chunk) => {
+                body += chunk;
+            });
             req.on('end', async () => {
                 /** @type {{ steps?: { prompt: string; waitMs?: number; from?: string }[]; from?: string } | null} */
                 let parsed;
@@ -239,11 +242,13 @@ export function createInjectServer() {
 
                     if (reply === null) {
                         res.writeHead(409, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({
-                            ok: false,
-                            error: `Step ${i + 1} retornou null (LLM-B ocupada) — pipeline interrompido`,
-                            results,
-                        }));
+                        res.end(
+                            JSON.stringify({
+                                ok: false,
+                                error: `Step ${i + 1} retornou null (LLM-B ocupada) — pipeline interrompido`,
+                                results,
+                            }),
+                        );
                         return;
                     }
                 }
@@ -257,7 +262,9 @@ export function createInjectServer() {
         // ── POST /inject ──────────────────────────────────────────────────
         if (req.method === 'POST' && url.pathname === '/inject') {
             let body = '';
-            req.on('data', (chunk) => { body += chunk; });
+            req.on('data', (chunk) => {
+                body += chunk;
+            });
             req.on('end', () => {
                 /** @type {{ message?: string; from?: string } | null} */
                 let parsed = null;
@@ -285,12 +292,14 @@ export function createInjectServer() {
                 sendTurn(message, from)
                     .then((reply) => {
                         res.writeHead(reply !== null ? 200 : 409, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({
-                            ok: reply !== null,
-                            reply: reply ?? null,
-                            durationMs: Date.now() - t0,
-                            from,
-                        }));
+                        res.end(
+                            JSON.stringify({
+                                ok: reply !== null,
+                                reply: reply ?? null,
+                                durationMs: Date.now() - t0,
+                                from,
+                            }),
+                        );
                     })
                     .catch((/** @type {any} */ e) => {
                         res.writeHead(500, { 'Content-Type': 'application/json' });

@@ -2,19 +2,19 @@
 /**
  * src/copilot/terminal/commands/session.js
  *
- * Comandos de sessão do REPL terminal LLM-B:
- * /status, /history, /db-history, /db-sessions, /who, /count, /clear, /answer, /restart, /quit, /exit
+ * Comandos de sessão do REPL terminal LLM-B: /status, /history, /db-history, /db-sessions, /who, /count, /clear,
+ * /answer, /restart, /quit, /exit
  *
  * @module copilot/terminal/commands/session
  */
 
-import { alwaysAliveAgent } from '../../always-alive.js';
+import { alwaysAliveAgent } from '../../agent/always-alive.js';
 import { conversationStore } from '../../conversation-hub/store.js';
-import { llmBridgeClient } from '../../llm-bridge-client.js';
+import { llmBridgeClient } from '../../bridges/llm-bridge-client.js';
 
 /**
- * Referência ao _hubSessionId gerenciado pelo terminal server.
- * É passado como parâmetro pois não pode ser importado estaticamente (é mutável).
+ * Referência ao _hubSessionId gerenciado pelo terminal server. É passado como parâmetro pois não pode ser importado
+ * estaticamente (é mutável).
  *
  * @typedef {object} SessionContext
  * @property {string | null} [hubSessionId] - ID da hub session ativa
