@@ -514,6 +514,14 @@ FASE L  ✅ CONCLUÍDA   Remove cli-terminal.js e test_cli_terminal.spec.js (fc7
 FASE M  ✅ CONCLUÍDA   Criar core/ com constants, errors, types (893a183a)
 FASE N  ✅ CONCLUÍDA   Consolidar AGENT_EVENTS — elimina cópia local em http-bridge.js (85148e2e)
 FASE O  ✅ CONCLUÍDA   Criar channel/ módulo canônico LLM-A ↔ LLM-B (6964fcc4)
+FASE P  ⏳ PRÓXIMA     Hardening de erros — BridgeError/SessionError em channel/ e agent/
+FASE Q  ⏳             Tool Call Auditing — JSONL log de tool calls (channel/audit.js)
+FASE R  ⏳             Sub-routers http-bridge.js (bridge-stream, bridge-dialog, bridge-tasks)
+FASE S  ⏳             JSDoc/typing pass completo channel/ + bridges/ + agent/
+FASE T  ⏳             Tipar AGENT_EVENTS como union-type (satisfies operator)
+FASE U  ⏳             SDK Event Forwarding — tool.execution_*, assistant.reasoning, session.usage_info
+FASE V  ⏳             SDK History API + reasoningEffort + errorOccurred hook
+FASE W  ⏳             Attachment Support — arquivos/imagens em sendMessage/chat
 ```
 
 ---
@@ -628,11 +636,11 @@ o que estava espalhado entre `bridges/inject-llmb.js` e `bridges/llm-bridge-clie
 
 **Executado**:
 
-| Arquivo novo              | Conteúdo                                                                            |
-| ------------------------- | ----------------------------------------------------------------------------------- |
-| `channel/inject.js`       | Canônico: HTTP injection ao terminal server (POST /inject, GET /health, SSE, pipeline) |
-| `channel/client.js`       | Canônico: LlmBridgeClient (chat, chatStructured, startDialogMode, dialogTurn, etc.) |
-| `channel/index.js`        | Barrel: re-exports nomeados + `CHANNEL_VERSION = '1'`                               |
+| Arquivo novo        | Conteúdo                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `channel/inject.js` | Canônico: HTTP injection ao terminal server (POST /inject, GET /health, SSE, pipeline) |
+| `channel/client.js` | Canônico: LlmBridgeClient (chat, chatStructured, startDialogMode, dialogTurn, etc.)    |
+| `channel/index.js`  | Barrel: re-exports nomeados + `CHANNEL_VERSION = '1'`                                  |
 
 - Alias `#copilot/channel` e `#copilot/channel/*` adicionados em `package.json`
 - `bridges/inject-llmb.js` e `bridges/llm-bridge-client.js` → thin re-exports de compat
@@ -651,10 +659,10 @@ o que estava espalhado entre `bridges/inject-llmb.js` e `bridges/llm-bridge-clie
 ### FASE P — Hardening de Erros: CopilotError/SessionError/BridgeError ⏳
 
 **Objetivo**: Substituir `throw new Error(mensagem genérica)` por tipos semânticos de `core/errors.js`
-nos módulos principais do copilot — `inject-llmb.js`, `always-alive.js`, `http-bridge.js`, `session-manager.js`.
+nos módulos principais do copilot — `channel/inject.js`, `always-alive.js`, `http-bridge.js`, `session-manager.js`.
 
 **Plano**:
-- `bridges/inject-llmb.js` (ou `channel/inject.js` após Fase O): substituir todos os `throw new Error` por `throw new BridgeError(msg, code)`
+- `channel/inject.js`: substituir todos os `throw new Error` por `throw new BridgeError(msg, code)`
 - `agent/always-alive.js`: `SessionError` para falhas de ciclo de vida da sessão
 - `api/http-bridge.js`: `BridgeError` para erros de request/response
 - `agent/session-manager.js`: `SessionError` nos getters/setters que validam estado
@@ -670,7 +678,8 @@ nos módulos principais do copilot — `inject-llmb.js`, `always-alive.js`, `htt
 
 **Plano**:
 - Criar `channel/audit.js` com função `logToolCall(entry)` → append em `logs/tool-audit.jsonl`
-- Hook em `agent/tools-bootstrap.js`: wrapper audit em volta de cada tool registrado
+- Hook em `agent/tools-bootstrap.js` ou `agent/task-executor.js`: wrapper audit em todo tool registered
+- Aproveitar eventos SDK `tool.execution_start` / `tool.execution_complete` (subscritos em Fase U)
 - SSE no `/stream` pode incluir evento `tool.audit` (opt-in via query param)
 - Arquivo rotativo: quando > 10MB, rotacionar para `tool-audit.jsonl.1`
 - Exportar `getAuditSummary(sessionId)` → últimas N entradas de uma sessão
@@ -684,12 +693,12 @@ com `sdk-api.js` na Fase H.
 
 **Plano**:
 
-| Sub-router novo              | Rotas                                           |
-| ---------------------------- | ----------------------------------------------- |
-| `api/bridge-stream.js`       | `GET /stream` (SSE endpoint principal)           |
-| `api/bridge-dialog.js`       | `POST /dialog/start`, `/dialog/turn`, `/dialog/stop` |
-| `api/bridge-tasks.js`        | `POST /task`, `DELETE /task/:id`                 |
-| `api/bridge-control.js`      | `GET /status`, `POST /stop`, `POST /restart`     |
+| Sub-router novo         | Rotas                                                |
+| ----------------------- | ---------------------------------------------------- |
+| `api/bridge-stream.js`  | `GET /stream` (SSE endpoint principal)               |
+| `api/bridge-dialog.js`  | `POST /dialog/start`, `/dialog/turn`, `/dialog/stop` |
+| `api/bridge-tasks.js`   | `POST /task`, `DELETE /task/:id`                     |
+| `api/bridge-control.js` | `GET /status`, `POST /stop`, `POST /restart`         |
 
 - `api/http-bridge.js` vira aggregator (importa e monta sub-routers)
 - Cada sub-router tem seus próprios testes de análise estrutural
@@ -697,17 +706,17 @@ com `sdk-api.js` na Fase H.
 
 ---
 
-### FASE S — Session Persistence v2: Histórico nos Retomadas (Sprint B) ⏳
+### FASE S — JSDoc/Typing Pass: channel/ + bridge/ + agent/ ⏳
 
-**Objetivo**: Quando LLM-B retoma uma sessão (`AlwaysAliveAgent.start()` com `sessionId` existente),
-recebe um resumo estruturado dos últimos N turnos no `systemMessage`, reduzindo repetição de contexto.
+**Objetivo**: Garantir que todos os módulos em `channel/`, `bridges/` e `agent/` tenham JSDoc
+completo com `@param`, `@returns`, `@throws` em todos os exports públicos. Rodar `typecheck:node`
+sem novos erros.
 
 **Plano**:
-- `channel/history.js`: serializa turnos (LlmBridgeClient.history → resumo compacto)
-- `agent/session-manager.js`: salva `history_summary` no arquivo de sessão JSON
-- `agent/always-alive.js`: injeta `historySummary` no `systemMessage` quando `continuedSession=true`
-- N configurável: `config.session.historyWindowTurns ?? 10`
-- Testes: mock de sessão com histórico → verificar que systemMessage inclui resumo
+- Auditar `channel/inject.js`, `channel/client.js`, `agent/always-alive.js`, `agent/session-manager.js`
+- Preencher JSDoc faltantes ou incompletos
+- Adicionar tipos onde Pylance/tsserver reportar `any` implícito
+- `npm run typecheck:node` como gate de qualidade
 
 ---
 
@@ -724,13 +733,91 @@ para que cada uso de string de evento seja verificado em tempo de compilação.
 
 ---
 
+### FASE U — SDK Event Forwarding: Eventos de Tool Execution e Session Metadata ⏳
+
+**Contexto — Auditoria de Cobertura do SDK v0.1.32**:
+
+O SDK expõe ~45 tipos de eventos de sessão. Atualmente forwards implícitos somente via `sendAndWait`.
+Eventos SDK já capturados: `session.compaction_start`, `session.compaction_complete`,
+`assistant.message_delta` (para streaming).
+
+**Eventos SDK de alto valor NÃO ainda encaminhados ao AGENT_EVENTS / SSE**:
+
+| Evento SDK                  | Valor                                           | Prioridade |
+| --------------------------- | ----------------------------------------------- | ---------- |
+| `tool.execution_start`      | Auditoria: qual tool LLM-B invocou              | ⭐⭐⭐ |
+| `tool.execution_complete`   | Auditoria: resultado + duração do tool          | ⭐⭐⭐ |
+| `assistant.reasoning_delta` | Suporte a o3/o4-mini thinking tokens            | ⭐⭐⭐ |
+| `session.usage_info`        | Contagem de tokens + billing por turno          | ⭐⭐ |
+| `session.mode_changed`      | Plano vs. Ação — visibilidade de modo           | ⭐⭐ |
+| `session.plan_changed`      | Rastreamento do plano do agente                 | ⭐⭐ |
+| `permission.requested`      | Permissões solicitadas (além do callback solo)  | ⭐⭐ |
+| `skill.invoked`             | Habilidades do agente invocadas                 | ⭐ |
+| `subagent.started`          | Sub-agentes iniciados                           | ⭐ |
+| `session.warning`           | Avisos da sessão SDK                            | ⭐ |
+| `session.error`             | Erros granulares SDK (vs. catch genérico)       | ⭐⭐ |
+| `session.title_changed`     | Título da sessão atualizado                     | ⭐ |
+| `session.model_change`      | Troca de modelo em sessão ativa                 | ⭐ |
+
+**Plano**:
+- `agent/task-executor.js`: subscrever `tool.execution_start` → emit `tool.execution.start` no agente
+  e `tool.execution_complete` → emit `tool.execution.complete` + `tool.execution.duration_ms`
+- `agent/always-alive.js`: subscrever `assistant.reasoning_delta` → emit `task.reasoning` (novo)
+- `agent/always-alive.js`: subscrever `session.usage_info` → emit `session.usage`
+- `agent/always-alive.js`: subscrever `session.mode_changed` → emit `session.mode_changed`
+- `agent/events.js`: adicionar os novos eventos ao array `AGENT_EVENTS`
+- `api/http-bridge.js`: `GET /stream` já itera `AGENT_EVENTS` → automaticamente exposto no SSE
+
+---
+
+### FASE V — SDK History API + reasoningEffort + errorOccurred Hook ⏳
+
+**Objetivo**: Implementar 3 funcionalidades SDK ainda não usadas que têm impacto direto em
+qualidade e observabilidade:
+
+**1. `session.getMessages()` — Histórico da conversa SDK**:
+- `always-alive.js`: novo método `getSessionMessages()` → chama `this.#session.getMessages()`
+- Rota REST `GET /copilot/sdk/sessions/:id/messages` → retorna histórico completo
+- Útil para debug, auditoria e context window introspection
+
+**2. `reasoningEffort` em `SessionConfig`**:
+- `session-manager.js`: receber parâmetro `reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh'`
+  da configuração (`config.json → copilot.reasoningEffort ?? undefined`)
+- Permitir controle do esforço de raciocínio para o3/o4-mini via config
+- Sem default → SDK usa o padrão do modelo
+
+**3. `errorOccurred` hook em `SessionHooks`**:
+- `agent/tools-bootstrap.js` (ou `always-alive.js`): implementar `hooks.errorOccurred`
+- Emit `session.fatal` ou `error` com contexto rico ao capturar o hook
+- Log estruturado incluindo `hookType`, `errorMessage`, `sessionId`
+
+---
+
+### FASE W — Attachment Support: Arquivos e Imagens em Prompts ⏳
+
+**Objetivo**: Permitir que `sendMessage()` e `LlmBridgeClient.chat()` aceitem `attachments`
+no formato `MessageOptions.attachments` do SDK — arquivos, imagens e referências GitHub.
+
+**Motivação**: Atualmente todos os prompts são texto puro. Com attachments, LLM-A pode enviar
+arquivos de código, diffs, imagens de UI ou referências a PRs/issues diretamente a LLM-B.
+
+**Plano**:
+- `channel/client.js`: `LlmBridgeClient.chat(message, { attachments })` → passa para
+  `session.sendAndWait({ prompt: message, attachments })`
+- `channel/inject.js`: `injectToLlmB(message, { attachments })` → serializa attachments no payload
+- `agent/always-alive.js`: `sendMessage(message, { attachments })` → propaga para `#processQueue`
+- Tipo `ChannelAttachment = import('@github/copilot-sdk').MessageOptions['attachments']` em `channel/index.js`
+- REST API: `POST /copilot/task` aceita `{ message, attachments: [...] }` no body
+
+---
+
 ## 10. Checklist de Qualidade para Cada Fase
 
 Antes de commitar cada fase:
 - [ ] `npm run lint` sem erros
 - [ ] `npm run format:check` sem erros
 - [ ] `npm run typecheck:node` sem erros novos
-- [ ] `npm run test:unit` passando (1474+ testes)
+- [ ] `npm run test:unit` passando (1465+ testes)
 - [ ] Testar terminal real: `node --strip-types src/copilot/terminal-server.js`
 - [ ] Testar todos os endpoints HTTP listados na seção 3
 - [ ] Testar aliases no REPL: `/st`, `/log`, `/issues`, `/prs`
@@ -738,4 +825,5 @@ Antes de commitar cada fase:
 ---
 
 *Documento gerado com base em análise estática do código e testes reais com LLM-B ativa.*
-*Atualizado em 2026-03-25 após conclusão das Fases K, L e M. Arquitetura v2.1 atingida: todas as fases A–M concluídas.*
+*Atualizado em 2026-03-25 após Fases O (channel/ canônico) + auditoria de cobertura SDK v0.1.32.*
+*Arquitetura v2.2: Fases A–O concluídas; Fases P–W planejadas.*
