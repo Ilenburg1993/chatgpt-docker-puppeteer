@@ -65,20 +65,24 @@ describe('sdk-api › rotas registradas', () => {
     /** @type {{ path: string; methods: string[] }[]} */
     const routes = /** @type {{ path: string; methods: string[] }[]} */ ([]);
 
-    // Extrai rotas do stack do Express Router
+    // Extrai rotas do stack do Express Router (com suporte a sub-routers aninhados)
     before(async () => {
         const mod = await import('../../../src/copilot/sdk-api.js');
         const router = /** @type {any} */ (mod.default);
-        if (Array.isArray(router?.stack)) {
-            for (const layer of router.stack) {
+        /** @param {any[]} stack */
+        function collectRoutes(stack) {
+            for (const layer of stack) {
                 if (layer.route) {
                     routes.push({
                         path: layer.route.path,
                         methods: Object.keys(layer.route.methods),
                     });
+                } else if (layer.handle?.stack) {
+                    collectRoutes(layer.handle.stack);
                 }
             }
         }
+        if (Array.isArray(router?.stack)) collectRoutes(router.stack);
     });
 
     it('possui rota GET /ping', () => {
@@ -276,16 +280,20 @@ describe('sdk-api Sprint 19 › rotas registradas', () => {
     before(async () => {
         const mod = await import('../../../src/copilot/sdk-api.js');
         const router = /** @type {any} */ (mod.default);
-        if (Array.isArray(router?.stack)) {
-            for (const layer of router.stack) {
+        /** @param {any[]} stack */
+        function collectRoutes(stack) {
+            for (const layer of stack) {
                 if (layer.route) {
                     routes.push({
                         path: layer.route.path,
                         methods: Object.keys(layer.route.methods),
                     });
+                } else if (layer.handle?.stack) {
+                    collectRoutes(layer.handle.stack);
                 }
             }
         }
+        if (Array.isArray(router?.stack)) collectRoutes(router.stack);
     });
 
     it('possui rota POST /sessions/:id/abort', () => {
