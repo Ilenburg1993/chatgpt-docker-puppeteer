@@ -414,6 +414,26 @@ delegando toda lógica de negócio para os handlers.
 
 ---
 
+### FASE G — Extração WebhookManager de always-alive.js ✅ CONCLUÍDA
+
+**Objetivo**: Reduzir `always-alive.js` (917 linhas) extraindo responsabilidades auto-contidas.
+
+**Análise de viabilidade**: Campos privados ES2022 (`#campo`) não permitem extração simples de métodos
+para fora da classe. A única decomposição viável sem reescrita total é extrair sub-módulos stateful
+que recebem/gerenciam seu próprio estado interno, sendo compostos via campo privado na classe principal.
+
+**Abordagem implementada**: Criado `agent/webhook-manager.js` com classe `WebhookManager` autônoma.
+`AlwaysAliveAgent` substitui `#webhookUrls = new Map()` por `#webhooks = new WebhookManager()`,
+delegando `registerWebhook`/`unregisterWebhook`/`listWebhooks`/`#emitWebhook` ao novo módulo.
+
+**Benefícios**:
+- `always-alive.js`: 917 → 886 linhas (−31 linhas)
+- `WebhookManager` testável de forma totalmente isolada (zero dependência de EventEmitter)
+- Lógica de HTTP POST de webhook reutilizável em outros contextos
+- TypeScript strict: 0 erros mantidos
+
+---
+
 ## 7. Decisões de Design Registradas
 
 ### D1 — Não criar microserviço separado
@@ -444,7 +464,7 @@ IMEDIATO (bugs críticos)    → FASE A ✅ CONCLUÍDA
 ────────────────────────────────────────────────
 CURTO PRAZO (sessão única)  → FASE B ✅ CONCLUÍDA (extração de comandos: 7 módulos)
 MÉDIO PRAZO (2-3 sessões)   → FASE C ✅ CONCLUÍDA + FASE D ✅ CONCLUÍDA (conversationHub + NERV)
-LONGO PRAZO                 → FASE E ✅ CONCLUÍDA + FASE F ✅ CONCLUÍDA
+LONGO PRAZO                 → FASE E ✅ CONCLUÍDA + FASE F ✅ CONCLUÍDA + FASE G ✅ CONCLUÍDA
 ```
 
 ---

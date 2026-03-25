@@ -28,6 +28,7 @@ import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
 import { buildMcpConfig } from './config/mcp-servers.js';
 import { buildMcpTools } from './mcp-tool-bridge.js';
+import { WebhookManager } from './agent/webhook-manager.js';
 import { initOrResumeSession, readState, writeState } from './session-manager.js';
 import {
     allTools,
@@ -134,8 +135,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     /** @type {boolean} */
     #isResumed = false;
 
-    /** @type {Map<string, string>} Map de id → URL de webhook registrado */
-    #webhookUrls = new Map();
+    /** @type {WebhookManager} */
+    #webhooks = new WebhookManager();
 
     /** @type {import('#copilot/lib/telemetry').TelemetryStore} */
     #telemetry = createTelemetry();
@@ -161,10 +162,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ id: string; url: string }} Identificador do webhook registrado
      */
     registerWebhook(url) {
-        const id = `wh_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-        this.#webhookUrls.set(id, url);
-        log('INFO', `[AlwaysAlive] Webhook registrado: ${id} → ${url}`);
-        return { id, url };
+        return this.#webhooks.register(url);
     }
 
     /**
@@ -174,9 +172,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean} true se removido, false se não encontrado
      */
     unregisterWebhook(id) {
-        const removed = this.#webhookUrls.delete(id);
-        if (removed) log('INFO', `[AlwaysAlive] Webhook removido: ${id}`);
-        return removed;
+        return this.#webhooks.unregister(id);
     }
 
     /**
@@ -185,7 +181,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ id: string; url: string }[]}
      */
     listWebhooks() {
-        return [...this.#webhookUrls.entries()].map(([id, url]) => ({ id, url }));
+        return this.#webhooks.list();
     }
 
     /**
@@ -859,34 +855,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
      * @returns {Promise<void>}
      */
     async #emitWebhook(event, payload) {
-        if (this.#webhookUrls.size === 0) return;
-
-        const body = JSON.stringify({ event, payload, timestamp: Date.now() });
-
-        await Promise.allSettled(
-            [...this.#webhookUrls.entries()].map(async ([id, url]) => {
-                try {
-                    const { default: https } = await import('node:https');
-                    const { default: http } = await import('node:http');
-                    const parsed = new URL(url);
-                    const lib = parsed.protocol === 'https:' ? https : http;
-                    await new Promise((resolve, reject) => {
-                        const req = lib.request(
-                            url,
-                            { method: 'POST', headers: { 'Content-Type': 'application/json' } },
-                            (res) => {
-                                res.resume();
-                                res.on('end', resolve);
-                            },
-                        );
-                        req.on('error', reject);
-                        req.end(body);
-                    });
-                } catch (/** @type {any} */ e) {
-                    log('WARN', `[AlwaysAlive] Webhook ${id} falhou ao notificar ${url}: ${e.message}`);
-                }
-            }),
-        );
+        return this.#webhooks.emit(event, payload);
     }
 
     /**
