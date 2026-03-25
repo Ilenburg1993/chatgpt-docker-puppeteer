@@ -56,7 +56,7 @@ describe('http-bridge › GET /health: análise estrutural', async () => {
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/api/http-bridge.js', import.meta.url), 'utf-8');
+        sourceCode = await readFile(new URL('../../../src/copilot/api/bridge-control.js', import.meta.url), 'utf-8');
     });
 
     it("rota GET '/health' está registrada no router", () => {
