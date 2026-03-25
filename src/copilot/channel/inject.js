@@ -23,6 +23,7 @@
  *     ```;
  */
 
+import { BridgeError } from '#copilot/core';
 import http from 'node:http';
 
 /** Porta padrão do terminal LLM-B. */
@@ -93,7 +94,7 @@ function httpRequest(method, path, body, port, timeoutMs) {
         );
 
         req.setTimeout(timeoutMs, () => {
-            req.destroy(new Error(`Timeout após ${timeoutMs}ms aguardando LLM-B`));
+            req.destroy(new BridgeError(`Timeout após ${timeoutMs}ms aguardando LLM-B`, 'LLM_B_TIMEOUT'));
         });
 
         req.on('error', reject);
@@ -150,19 +151,19 @@ export async function injectToLlmB(message, opts = {}) {
     try {
         parsed = /** @type {any} */ (JSON.parse(body));
     } catch {
-        throw new Error(`[inject-llmb] Resposta inválida do terminal (status ${statusCode}): ${body.slice(0, 200)}`);
+        throw new BridgeError(`[inject-llmb] Resposta inválida do terminal (status ${statusCode}): ${body.slice(0, 200)}`, 'LLM_B_INVALID_RESPONSE');
     }
 
     if (statusCode === 409) {
-        throw new Error('[inject-llmb] LLM-B está ocupada processando outra mensagem. Tente novamente em instantes.');
+        throw new BridgeError('[inject-llmb] LLM-B está ocupada processando outra mensagem. Tente novamente em instantes.', 'LLM_B_BUSY');
     }
 
     if (statusCode === 503) {
-        throw new Error('[inject-llmb] Terminal LLM-B não está disponível. Inicie com: npm run terminal:llm-b');
+        throw new BridgeError('[inject-llmb] Terminal LLM-B não está disponível. Inicie com: npm run terminal:llm-b', 'LLM_B_UNAVAILABLE');
     }
 
     if (!parsed.ok) {
-        throw new Error(`[inject-llmb] Erro: ${parsed.error ?? 'desconhecido'}`);
+        throw new BridgeError(`[inject-llmb] Erro: ${parsed.error ?? 'desconhecido'}`, 'LLM_B_ERROR');
     }
 
     return {
@@ -192,7 +193,7 @@ export async function waitForLlmBReady(opts = {}) {
         await new Promise((r) => setTimeout(r, pollIntervalMs));
     }
 
-    throw new Error(`[inject-llmb] Terminal LLM-B não ficou pronto em ${maxWaitMs}ms.`);
+    throw new BridgeError(`[inject-llmb] Terminal LLM-B não ficou pronto em ${maxWaitMs}ms.`, 'LLM_B_NOT_READY');
 }
 
 /**
@@ -389,15 +390,15 @@ export async function injectPipeline(steps, opts = {}) {
     try {
         parsed = /** @type {any} */ (JSON.parse(body));
     } catch {
-        throw new Error(`[inject-llmb] Resposta inválida do pipeline (status ${statusCode}): ${body.slice(0, 200)}`);
+        throw new BridgeError(`[inject-llmb] Resposta inválida do pipeline (status ${statusCode}): ${body.slice(0, 200)}`, 'LLM_B_INVALID_RESPONSE');
     }
 
     if (statusCode === 409) {
-        throw new Error('[inject-llmb] LLM-B ocupada — pipeline abortado. Resultados parciais em parsed.results.');
+        throw new BridgeError('[inject-llmb] LLM-B ocupada — pipeline abortado. Resultados parciais em parsed.results.', 'LLM_B_BUSY');
     }
 
     if (statusCode === 503) {
-        throw new Error('[inject-llmb] Terminal LLM-B não está disponível. Inicie com: npm run terminal:llm-b');
+        throw new BridgeError('[inject-llmb] Terminal LLM-B não está disponível. Inicie com: npm run terminal:llm-b', 'LLM_B_UNAVAILABLE');
     }
 
     return {

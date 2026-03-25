@@ -16,8 +16,8 @@
  * @module copilot/api/http-bridge
  */
 
+import { AGENT_EVENTS, BridgeError } from '#copilot/core';
 import { log } from '#core/logger';
-import { AGENT_EVENTS } from '#copilot/core';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../always-alive.js';
 
@@ -152,7 +152,7 @@ bridge.post('/send', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
             const raceResult = await Promise.race([
                 alwaysAliveAgent.sendMessage(message),
                 new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error(`Timeout após ${timeoutMs}ms`)), timeoutMs),
+                    setTimeout(() => reject(new BridgeError(`Timeout após ${timeoutMs}ms`, 'HTTP_BRIDGE_TIMEOUT')), timeoutMs),
                 ),
             ]);
             return res.json({ ok: true, response: raceResult });

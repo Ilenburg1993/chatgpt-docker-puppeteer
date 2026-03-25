@@ -17,6 +17,7 @@
  */
 
 import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart } from '#copilot/lib/index';
+import { SessionError } from '#copilot/core/errors';
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
@@ -333,7 +334,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         const remainingTasks = this.#queue.splice(0);
         if (remainingTasks.length > 0) {
             log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
-            const shutdownError = new Error('[AlwaysAlive] Agente parado durante shutdown gracioso.');
+            const shutdownError = new SessionError('[AlwaysAlive] Agente parado durante shutdown gracioso.', 'AGENT_STOPPED');
             for (const task of remainingTasks) {
                 task.reject(shutdownError);
             }
@@ -362,8 +363,9 @@ export class AlwaysAliveAgent extends EventEmitter {
     sendMessage(message, { timeoutMs } = {}) {
         return new Promise((resolve, reject) => {
             if (this.#queue.length >= AlwaysAliveAgent.MAX_QUEUE_SIZE) {
-                const err = new Error(
+                const err = new SessionError(
                     `[AlwaysAlive] Fila cheia (${AlwaysAliveAgent.MAX_QUEUE_SIZE} tarefas). Tente novamente mais tarde.`,
+                    'QUEUE_FULL',
                 );
                 log(
                     'WARN',
@@ -476,11 +478,11 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     async startDialogLoop(bootPrompt) {
         if (this.#status !== 'idle') {
-            throw new Error(`[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${this.#status}'`);
+            throw new SessionError(`[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${this.#status}'`, 'INVALID_STATE');
         }
 
         if (this.#dialogLoopActive) {
-            throw new Error('[AlwaysAlive] Modo diálogo já está ativo. Chame stopDialogLoop() primeiro.');
+            throw new SessionError('[AlwaysAlive] Modo diálogo já está ativo. Chame stopDialogLoop() primeiro.', 'DIALOG_ALREADY_ACTIVE');
         }
 
         this.#dialogLoopActive = true;
@@ -537,13 +539,13 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
     sendDialogTurn(message, { timeout = 60_000 } = {}) {
         if (!this.#dialogLoopActive) {
             return Promise.reject(
-                new Error('[AlwaysAlive] Modo diálogo não está ativo. Chame startDialogLoop() primeiro.'),
+                new SessionError('[AlwaysAlive] Modo diálogo não está ativo. Chame startDialogLoop() primeiro.', 'DIALOG_NOT_ACTIVE'),
             );
         }
 
         return new Promise((resolve, reject) => {
             const timeoutHandle = setTimeout(() => {
-                reject(new Error(`[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`));
+                reject(new SessionError(`[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
             }, timeout);
 
             this.once('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
@@ -553,7 +555,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
 
             this.once('dialog.stopped', () => {
                 clearTimeout(timeoutHandle);
-                reject(new Error('[AlwaysAlive] Diálogo encerrado pelo modelo.'));
+                reject(new SessionError('[AlwaysAlive] Diálogo encerrado pelo modelo.', 'DIALOG_ENDED'));
             });
 
             // Alimenta o ask_user pendente com a mensagem do usuário
@@ -564,7 +566,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                 const onPending = (/** @type {unknown} */ _) => {
                     clearTimeout(timeoutHandle);
                     const newTimeout = setTimeout(() => {
-                        reject(new Error(`[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`));
+                        reject(new SessionError(`[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
                     }, timeout);
                     this.once('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
                         clearTimeout(newTimeout);
