@@ -811,6 +811,348 @@ arquivos de código, diffs, imagens de UI ou referências a PRs/issues diretamen
 
 ---
 
+### FASE X — Terminal: Modelo Dinâmico e ReasoningEffort `high` por Padrão
+
+**Contexto — Limitações da configuração atual:**
+
+O singleton `alwaysAliveAgent` é criado sem nenhuma opção explícita:
+
+```js
+// src/copilot/agent/always-alive.js (linha ~864) — estado atual
+export const alwaysAliveAgent = new AlwaysAliveAgent();
+// → model = process.env.COPILOT_MODEL ?? 'gpt-4.1'
+// → reasoningEffort = undefined  ← NÃO tem default 'high'
+```
+
+Além disso, não existem comandos `/model` ou `/reasoning` no terminal. O usuário não consegue:
+- Ver qual modelo está ativo
+- Trocar o modelo em runtime
+- Controlar o nível de raciocínio
+- Garantir que `reasoningEffort: 'high'` seja o padrão operacional
+
+**Objetivo:**
+- `reasoningEffort` padrão → `'high'` via env `COPILOT_REASONING_EFFORT` ou fallback hardcoded
+- `/model [id]` — lista modelos disponíveis ou troca o modelo ativo
+- `/reasoning [low|medium|high|xhigh]` — troca nível de raciocínio
+- `AlwaysAliveAgent.reconfigure(model, reasoningEffort)` — método de reconfiguração segura
+- Atualização visual: banner e `/who` exibem modelo + reasoning ativos
+
+**Plano de implementação:**
+
+1. **`agent/always-alive.js`**:
+   - Construtor: `#reasoningEffort = options.reasoningEffort ?? process.env.COPILOT_REASONING_EFFORT ?? 'high'`
+   - Singleton exportado: `new AlwaysAliveAgent({ reasoningEffort: process.env.COPILOT_REASONING_EFFORT ?? 'high' })`
+   - Novo método `reconfigure(model, reasoningEffort)`:
+     - Para o dialog loop (se ativo) via sinal STOP e aguarda `dialog.stopped`
+     - Atualiza `#model` e `#reasoningEffort`
+     - Reinicia dialog loop (custa 1 PR de boot, mas não mais que isso)
+   - Novo método `getConfig()` → `{ model: string; reasoningEffort: string | undefined }`
+
+2. **`terminal/commands/session.js`**:
+   - `cmdWho()`: inclui `alwaysAliveAgent.getConfig()` na saída
+   - `cmdStatus()`: inclui linha `modelo` e `reasoning` no snapshot
+
+3. **`terminal/commands/model.js`** (novo arquivo):
+   - `cmdModel(ctx, arg)`:
+     - `arg` vazio → lista modelos via `lib/models.js:listModels()`, filtra habilitados, descobre cada suporte a reasoning
+     - `arg = 'set <id>'` ou simplesmente `arg = '<id>'` → chama `alwaysAliveAgent.reconfigure(id, currentReasoning)`
+   - `cmdReasoning(ctx, arg)`:
+     - Valida contra `['low', 'medium', 'high', 'xhigh']`
+     - Chama `alwaysAliveAgent.reconfigure(currentModel, arg)`
+     - Informa na tela duração estimada do reboot
+
+4. **`terminal/repl.js`**:
+   - Adiciona `/model` e `/reasoning` no banner e no handler de comandos
+   - Importa `cmdModel`, `cmdReasoning` de `commands/model.js`
+
+5. **Variáveis de ambiente documentadas**:
+   - `COPILOT_MODEL` — modelo inicial (já existia)
+   - `COPILOT_REASONING_EFFORT` — nível padrão (novo; default `'high'`)
+
+**Arquivos afetados:**
+`agent/always-alive.js`, `terminal/commands/session.js`, `terminal/commands/model.js` (novo),
+`terminal/repl.js`
+
+**Constraint crítica**: `reconfigure()` reinicia o dialog loop (1 PR de boot). Não faz nada
+extra. Todos os turnos subsequentes continuam com 0 PR via `ask_user` protocol — o DialogLoop
+permanece o canal principal.
+
+---
+
+### FASE Y — Terminal: Contexto de Arquivo (File Context Embedding)
+
+**Contexto — Lacuna de envio de arquivos:**
+
+A Fase W implementou `attachments` SDK para a rota de task queue (`sendMessage` /
+`sendAndWait`). Porém o **terminal opera exclusivamente em modo DialogLoop** — onde a
+comunicação é via o protocolo de texto `ask_user("REPLY: ...")`. Neste modo, os
+`MessageOptions.attachments` do SDK **não se aplicam** (são para `sendAndWait`).
+
+Para enviar contexto de arquivo no terminal, a abordagem correta é **embedding textual**:
+o conteúdo do arquivo é lido no processo Node.js e injetado como contexto estruturado em
+markdown no corpo da mensagem antes de passar ao `sendTurn()`.
+
+Isso também se aplica quando **LLM-A** quer compartilhar um arquivo com LLM-B via
+`POST /inject` — o servidor lê localmente e embuta no texto do turn.
+
+**Objetivo:**
+- `@arquivo.js` no texto da mensagem → auto-leitura e embed
+- `/attach <caminho>` → "fila" de arquivos para o próximo turno
+- `/attach` sem args → lista arquivos em fila
+- `/attach clear` → limpa fila
+- `POST /inject` com campo `context_files: string[]` → servidor lê e embute
+- Limite de segurança: arquivo > 64KB → aviso + confirmação
+
+**Formato de embed:**
+
+```
+Contexto de arquivo: src/copilot/agent/always-alive.js
+\`\`\`js
+... conteúdo do arquivo ...
+\`\`\`
+
+{mensagem original do usuário}
+```
+
+**Plano de implementação:**
+
+1. **`terminal/file-context.js`** (novo módulo):
+   - `readFileContext(filePath)` → lê, verifica tamanho, retorna objeto `{ path, content, size, lang }`
+   - `detectLang(filePath)` → extensão → label de linguagem para o bloco markdown
+   - `embedContextBlock(fileCtx, message)` → monta string final com bloco markdown + mensagem
+   - `embedMultiple(fileCtxs, message)` → múltiplos arquivos empilhados
+   - Limite: `MAX_EMBED_BYTES = 65_536` (64KB total por envio)
+
+2. **`terminal/state.js`**:
+   - Adiciona `#attachmentQueue: string[]` ao estado
+   - `getAttachmentQueue()`, `addAttachment(path)`, `clearAttachments()`
+
+3. **`terminal/dialog.js`**:
+   - `sendTurn(message, actor)` → antes de enviar, checa fila e faz embed:
+     ```js
+     const queue = getAttachmentQueue();
+     const enrichedMsg = queue.length > 0
+         ? await embedMultiple(await Promise.all(queue.map(readFileContext)), message)
+         : message;
+     clearAttachments();
+     ```
+
+4. **`terminal/repl.js`**:
+   - Parser inline `@`: se mensagem contém `@<word>`, extrai como file path
+   - Chama `addAttachment(path)` automaticamente antes de `sendTurn`
+
+5. **`terminal/commands/attach.js`** (novo):
+   - `cmdAttach(ctx, arg)`:
+     - sem arg → exibe fila atual
+     - `'clear'` → limpa fila
+     - `<caminho>` → valida existência + tamanho → adiciona à fila
+
+6. **`http-handlers.js`**:
+   - `handleInject()`: se body contém `context_files: string[]` → lê e embeds antes de `sendTurn`
+
+7. **`terminal/repl.js`**:
+   - Adiciona `/attach` ao banner e handler
+
+**Arquivos afetados:**
+`terminal/file-context.js` (novo), `terminal/state.js`, `terminal/dialog.js`,
+`terminal/repl.js`, `terminal/commands/attach.js` (novo), `terminal/http-handlers.js`
+
+---
+
+### FASE Z — Terminal UI: Layout Rico e Feedback Visual
+
+**Contexto — Estado atual do layout:**
+
+O terminal atual é um readline básico com ANSI colors simples:
+- Prompt fixo: `você›`
+- Feedback de processamento: único `…` estático
+- Respostas exibidas em blocos de texto sem estrutura visual clara
+- Sem indicação de modelo ativo na interface
+- Sem streaming delta — resposta aparece toda de uma vez após `sendTurn()` retornar
+
+O Copilot CLI usa:
+- Spinner animado durante processamento
+- Streaming incremental de tokens
+- Status bar com informações de contexto
+- Modo de exibição de ferramenta em execução
+- Separadores visuais entre turnos
+
+**Objetivo:**
+- Spinner animado substituindo o `…` estático
+- Streaming incremental de deltas (via evento `task.delta` do agente)
+- Status bar informativo: modelo, reasoning, estado do loop, turn count
+- Separadores de turno com horário e metadados
+- Prompt enriquecido: `você[gpt-4.1/high]›`
+- Exibição especial de `task.reasoning` (thinking tokens) quando disponível
+
+**Plano de implementação:**
+
+1. **`terminal/spinner.js`** (novo módulo puro):
+   - `startSpinner(label)` → `setInterval` escrevendo frames `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏` com `\r`
+   - `stopSpinner()` → `clearInterval` + `process.stdout.write('\r\x1b[K')`
+   - Retorna handle com `{ stop() }`
+   - Totalmente ANSI, zero dependências externas
+
+2. **`terminal/dialog.js`** — substituir `process.stdout.write('…')`:
+   - Antes de `sendTurn` → `const spinner = startSpinner(' LLM-B thinking…')`
+   - Após `sendTurn` retornar → `spinner.stop()`
+   - Capturar evento `task.delta` do agente → print incremental via `process.stdout.write(chunk)`
+
+3. **`terminal/dialog.js`** — rich `printExchange()`:
+   - Adicionar linha de separador `─────────`: `\x1b[90m` (cinza)
+   - Exibir `[modelo | reasoning | durationMs]` no cabeçalho da resposta LLM-B
+   - Exibir tamanho em chars: `(1.2k chars)`
+   - Suporte a `actor === 'system'` com cor específica
+
+4. **`terminal/repl.js`** — prompt enriquecido:
+   ```js
+   function buildPrompt() {
+       const { model, reasoningEffort } = alwaysAliveAgent.getConfig();
+       const shortModel = model.replace('gpt-', '').replace('claude-', 'c-');
+       return `\x1b[32mvocê\x1b[0m\x1b[90m[${shortModel}/${reasoningEffort ?? '-'}]›\x1b[0m `;
+   }
+   ```
+   - Atualiza prompt dinamicamente após `/model` ou `/reasoning`
+
+5. **`terminal/repl.js`** — status bar no banner:
+   - Função `printStatusBar()` → exibe linha `═══` com modelo, reasoning, porta, dialog status
+   - Chamada no banner inicial e após `/model` / `/reasoning`
+
+6. **`terminal/commands/session.js`** — `cmdStatus()`:
+   - Incluir `modelo` e `reasoning` nas linhas de status
+   - Incluir `COPILOT_REASONING_EFFORT` env var na exibição
+
+**Arquivos afetados:**
+`terminal/spinner.js` (novo), `terminal/dialog.js`, `terminal/repl.js`,
+`terminal/commands/session.js`
+
+**Nota sobre streaming no DialogLoop:**
+O dialog loop não faz streaming via SDK diretamente — o `dialogTurn()` aguarda o `REPLY:` completo.
+Para pseudo-streaming visual, podemos usar eventos `task.delta` emitidos pelo `AlwaysAliveAgent`
+durante o processamento (`assistant.message_delta` → Fase U já captura isso). O spinner é
+a solução imediata e mais robusta; streaming incremental real é uma melhoria posterior.
+
+---
+
+### FASE Z2 — Terminal: Comandos Avançados (Copilot CLI–inspired)
+
+**Contexto — Funcionalidades ausentes que o Copilot CLI oferece:**
+
+| Copilot CLI Command | Funcionalidade                              | Status atual |
+| ------------------- | ------------------------------------------- | ------------ |
+| `/model`            | Lista e troca modelo                        | Fase X       |
+| `/context`          | Mostra uso do context window               | ❌ ausente   |
+| `/compact`          | Compactação manual da sessão               | ❌ ausente   |
+| `/plan` mode        | Mode de planejamento antes de executar     | ❌ ausente   |
+| `/resume`           | Retoma sessão anterior                     | ❌ ausente   |
+| `/feedback`         | Envia feedback sobre resposta              | ❌ ausente   |
+| Shift+Tab           | Alterna entre modos ask/plan               | ❌ ausente   |
+| Auto-compaction     | Compactação automática a 95% do context    | Via SDK Events |
+
+**Objetivo:**
+Implementar os comandos mais valiosos de forma nativa, sem dependências externas:
+
+**1. `/context` — Visualização do Contexto Estimado:**
+   - Estima tokens como `Math.round(chars / 4)` (heurística: ~4 chars/token)
+   - Usa `llmBridgeClient.history` + boot prompt para calcular total
+   - Exibe barra de uso: `[██████░░░░] 18% (3.2k / 16k tokens estimados)`
+   - Exibe warning se > 70% de `MAX_CONTEXT_TOKENS` estimado
+
+**2. `/compact` — Compactação Manual:**
+   - Envia mensagem especial ao LLM-B via `sendTurn()`:
+     ```
+     [SISTEMA] Compacte toda esta conversa em um resumo técnico denso. Preserve:
+     todos os fatos, código, decisões, estados e contexto de arquivos discutidos.
+     Responda APENAS com esse resumo. Após isso, considere o resumo como o novo
+     contexto inicial desta sessão.
+     ```
+   - Após resposta: limpa `llmBridgeClient.history` (memória local) e mantém apenas o resumo
+   - Exibe confirmação com novo tamanho estimado
+
+**3. `/plan [on|off]` — Modo de Planejamento:**
+   - Estado persistente em `terminal/state.js`: `#planMode: boolean`
+   - `planMode = true`: prefacing automático de mensagens com instrução de planejamento:
+     ```
+     [MODO PLANEJAMENTO] Antes de responder, elabore um plano detalhado passo-a-passo.
+     Não pule para a resposta diretamente. Liste dependências, riscos e alternativas.
+     ```
+   - `/plan on` / `/plan off` → ativa/desativa
+   - Indicador visual no prompt: `você[gpt-4.1/high][PLAN]›`
+
+**4. `/resume [sessionId]` — Retomada de Sessão:**
+   - Sem arg: lista últimas 5 hub_sessions via `conversationStore.listHubSessions()`
+   - Com `sessionId`: carrega turnos da sessão via `conversationStore.readTurns()` e inicia nova sessão agent com contexto prefixed
+   - Implementado como: envia summary dos turnos ao LLM-B no boot do dialog loop como parte do boot prompt
+
+**Plano de implementação:**
+
+1. **`terminal/commands/context.js`** (novo):
+   - `cmdContext(ctx)` com estimativa e barra visual
+   - `cmdCompact(ctx)` com fluxo de compactação
+
+2. **`terminal/commands/plan.js`** (novo):
+   - `cmdPlan(ctx, arg)` — toggle ou `on`/`off`
+   - `getPlanMode()`, `setPlanMode(bool)` em `state.js`
+
+3. **`terminal/commands/resume.js`** (novo):
+   - `cmdResume(ctx, sessionIdArg)`
+
+4. **`terminal/state.js`**:
+   - Novo campo `#planMode: boolean = false`
+   - Novas getters/setters
+
+5. **`terminal/dialog.js`**:
+   - `sendTurn()`: se `getPlanMode()`, prefaça a mensagem com instrução de plano
+
+6. **`terminal/repl.js`**:
+   - Adiciona `/context`, `/compact`, `/plan [on|off]`, `/resume [sessionId]` ao banner e handler
+
+**Arquivos afetados:**
+`terminal/commands/context.js` (novo), `terminal/commands/plan.js` (novo),
+`terminal/commands/resume.js` (novo), `terminal/state.js`, `terminal/dialog.js`,
+`terminal/repl.js`
+
+---
+
+### FASE Z3 — HTTP API Aprimorada: Status Rico e Context Files para LLM-A
+
+**Contexto — Limitações da API HTTP atual:**
+
+Quando LLM-A (este agente) usa a API HTTP para se comunicar com LLM-B, ela precisa de:
+- Saber qual modelo e reasoning estão ativos (antes de injetar)
+- Poder enviar arquivo de contexto junto com a mensagem (além dos attachments binários da Fase W)
+- Receber eventos SSE que incluam metadados de modelo/reasoning
+
+**Objetivo:**
+- `GET /health` retorna `{ model, reasoningEffort, dialogLoopActive, turns, ... }`
+- `POST /inject` aceita `context_files: string[]` — o servidor lê e embuta no texto
+- Eventos SSE aprimorados: todos os eventos incluem `model` e `reasoningEffort` no payload
+- Novo endpoint `GET /config` — retorna configuração de runtime do agente
+
+**Plano de implementação:**
+
+1. **`terminal/http-handlers.js`** — `handleHealth()`:
+   - Adiciona ao response: `{ model, reasoningEffort }` via `alwaysAliveAgent.getConfig()`
+
+2. **`terminal/http-handlers.js`** — `handleInject()`:
+   - Lê campo `context_files?: string[]` do body
+   - Se presente: chama `embedMultiple()` de `terminal/file-context.js` (Fase Y)
+   - A mensagem enriquecida vai para `sendTurn()`
+
+3. **`terminal/http-handlers.js`** — novo `handleGetConfig()`:
+   - `GET /config` → retorna `{ model, reasoningEffort, planMode, dialogLoopActive, turnCount, port }`
+
+4. **`terminal/dialog.js`** — `broadcastSse()`:
+   - Todos os payloads SSE incluem `model` e `reasoningEffort` como campos extras
+
+5. **`terminal/index.js`**:
+   - Registra rota `GET /config` → `handleGetConfig`
+
+**Arquivos afetados:**
+`terminal/http-handlers.js`, `terminal/dialog.js`, `terminal/index.js`
+
+---
+
 ## 10. Checklist de Qualidade para Cada Fase
 
 Antes de commitar cada fase:
@@ -824,6 +1166,71 @@ Antes de commitar cada fase:
 
 ---
 
+## 11. Mapa Visual das Fases do Terminal (X, Y, Z, Z2, Z3)
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                EVOLUÇÃO DO TERMINAL LLM-B — Fases X→Z3                    │
+├──────────────┬─────────────────────────────────────────────────────────────┤
+│ FASE X       │ reasoningEffort: 'high' default + /model + /reasoning       │
+│              │ AlwaysAliveAgent.reconfigure() + getConfig()                  │
+│              │ Prompt: você[gpt-4.1/high]›                                 │
+├──────────────┼─────────────────────────────────────────────────────────────┤
+│ FASE Y       │ @arquivo.js embed + /attach queue                            │
+│              │ terminal/file-context.js + state.attachmentQueue             │
+│              │ HTTP /inject aceita context_files[]                          │
+├──────────────┼─────────────────────────────────────────────────────────────┤
+│ FASE Z       │ Spinner animado + status bar + rich printExchange            │
+│              │ terminal/spinner.js + prompt dinâmico                        │
+│              │ [modelo | reasoning | Ns | 1.2k chars]                       │
+├──────────────┼─────────────────────────────────────────────────────────────┤
+│ FASE Z2      │ /context + /compact + /plan + /resume                        │
+│              │ Todos dentro do DialogLoop (0 PR extra)                      │
+│              │ Inspiração: Copilot CLI /context /compact Shift+Tab          │
+├──────────────┼─────────────────────────────────────────────────────────────┤
+│ FASE Z3      │ GET /health com model/reasoning                              │
+│              │ POST /inject com context_files[]                             │
+│              │ GET /config endpoint novo                                     │
+│              │ SSE events com model+reasoning em cada payload               │
+└──────────────┴─────────────────────────────────────────────────────────────┘
+```
+
+**Fluxo de dados após Fases X–Z3:**
+
+```
+Usuário digita: "@src/main.js explique a inicialização"
+        │
+        ▼
+repl.js: detecta @src/main.js → addAttachment('src/main.js')
+        │
+        ▼
+sendTurn('explique a inicialização', 'user')
+  ├── getPlanMode() → prefaça se planMode=true
+  ├── getAttachmentQueue() → ['src/main.js']
+  ├── readFileContext('src/main.js') → { content, lang, size }
+  ├── embedContextBlock(ctx, message) → markdown block + user text
+  └── llmBridgeClient.dialogTurn(enrichedMsg)
+          │
+          ▼
+  AlwaysAliveAgent:
+    model=gpt-4.1, reasoningEffort=high
+    ask_user("REPLY: enrichedMsg") → LLM-B processa
+          │
+          ▼
+  reply received → printExchange(actor, msg, reply, dur)
+    [gpt-4.1 | high | 4.2s | 3.1k chars]
+
+LLM-A via HTTP:
+POST localhost:3009/inject
+{ "message": "analise esse módulo", "context_files": ["src/kernel/index.js"] }
+  ├── servidor lê src/kernel/index.js
+  ├── embute conteúdo na mensagem
+  └── sendTurn(enrichedMsg, 'llm-a')
+```
+
+---
+
 *Documento gerado com base em análise estática do código e testes reais com LLM-B ativa.*
 *Atualizado em 2026-03-25 após Fases O (channel/ canônico) + auditoria de cobertura SDK v0.1.32.*
-*Arquitetura v2.2: Fases A–O concluídas; Fases P–W planejadas.*
+*Atualizado em 2026-03-27 após Fase W (Attachment Support) + planejamento Fases X–Z3 (Terminal UX).*
+*Arquitetura v2.3: Fases A–W concluídas; Fases X–Z3 planejadas.*
