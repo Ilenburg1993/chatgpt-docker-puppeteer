@@ -10,7 +10,7 @@
 /**
  * Nomes canônicos de eventos emitidos por {@link AlwaysAliveAgent}.
  *
- * @type {readonly string[]}
+ * Use `AgentEventName` para obter o union type de todos os nomes válidos.
  */
 export const AGENT_EVENTS = /** @type {const} */ ([
     'task.queued',
@@ -37,3 +37,12 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'tool.execution.start',
     'tool.execution.complete',
 ]);
+
+/**
+ * Union type de todos os nomes de eventos do AlwaysAliveAgent.
+ *
+ * @example
+ * // → 'task.queued' | 'task.started' | 'task.completed' | ...
+ *
+ * @typedef {typeof AGENT_EVENTS[number]} AgentEventName
+ */

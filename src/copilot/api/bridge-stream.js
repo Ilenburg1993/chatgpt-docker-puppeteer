@@ -19,6 +19,8 @@ import { AGENT_EVENTS } from '#copilot/core';
  * @typedef {import('express').Router} BridgeRouter
  *
  * @typedef {import('./bridge-control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
+ *
+ * @typedef {import('#copilot/core').AgentEventName} AgentEventName
  */
 
 /**
@@ -58,7 +60,7 @@ export function registerStreamRoutes(bridge, agent) {
         /**
          * Envia um evento SSE para o cliente.
          *
-         * @param {string} event - Nome do evento SSE
+         * @param {AgentEventName | 'connected' | 'heartbeat'} event - Nome do evento SSE
          * @param {object} data - Dados serializados em JSON
          * @returns {void}
          */
@@ -71,7 +73,7 @@ export function registerStreamRoutes(bridge, agent) {
         // Evento inicial com snapshot do estado atual
         sendEvt('connected', { ...agent.getStatusSnapshot(), timestamp: Date.now() });
 
-        /** @type {Map<string, (data: any) => void>} */
+        /** @type {Map<AgentEventName, (data: any) => void>} */
         const handlers = new Map(
             AGENT_EVENTS.map((evt) => [evt, (/** @type {any} */ data) => sendEvt(evt, data ?? {})]),
         );
