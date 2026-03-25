@@ -10,6 +10,8 @@
  *   agente pai.
  */
 
+import { auditToolComplete, auditToolStart } from '#copilot/channel';
+
 /**
  * @typedef {object} TaskExecutorCallbacks
  * @property {(chunk: string, taskId: string) => void} onDelta - Emite fragmento de resposta em streaming
@@ -53,6 +55,12 @@ export async function executeTask(session, task, callbacks) {
 
     // Subscreve a eventos de execução de tool para auditoria e observabilidade
     const unsubToolStart = session.on('tool.execution_start', (/** @type {any} */ event) => {
+        auditToolStart({
+            toolCallId: event?.data?.toolCallId ?? '',
+            toolName: event?.data?.toolName ?? '',
+            args: event?.data?.arguments ?? {},
+            mcpServerName: event?.data?.mcpServerName ?? null,
+        });
         emit('tool.execution.start', {
             toolCallId: event?.data?.toolCallId ?? '',
             toolName: event?.data?.toolName ?? '',
@@ -63,6 +71,12 @@ export async function executeTask(session, task, callbacks) {
     });
 
     const unsubToolComplete = session.on('tool.execution_complete', (/** @type {any} */ event) => {
+        auditToolComplete({
+            toolCallId: event?.data?.toolCallId ?? '',
+            success: event?.data?.success ?? false,
+            taskId: task.id,
+            resultContent: event?.data?.result?.content ?? null,
+        });
         emit('tool.execution.complete', {
             toolCallId: event?.data?.toolCallId ?? '',
             toolName: event?.data?.toolName ?? null,

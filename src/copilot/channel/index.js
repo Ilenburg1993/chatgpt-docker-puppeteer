@@ -2,15 +2,15 @@
 /**
  * src/copilot/channel/index.js
  *
- * Módulo canal LLM-A ↔ LLM-B — ponto de entrada canônico para toda comunicação entre
- * LLM-A (GitHub Copilot — este agente) e LLM-B (Copilot SDK / gpt-4.1).
+ * Módulo canal LLM-A ↔ LLM-B — ponto de entrada canônico para toda comunicação entre LLM-A (GitHub Copilot — este
+ * agente) e LLM-B (Copilot SDK / gpt-4.1).
  *
  * Consolida dois modos de comunicação:
  *
- * - **HTTP injection** (`inject.js`): via `POST /inject` ao terminal server ativo (porta 3009).
- *   Recomendado quando o terminal já está rodando (`npm run terminal:llm-b`).
- * - **SDK client** (`client.js`): via `AlwaysAliveAgent` em-processo, com streaming e histórico.
- *   Usado em scripts standalone que iniciam a sessão SDK diretamente.
+ * - **HTTP injection** (`inject.js`): via `POST /inject` ao terminal server ativo (porta 3009). Recomendado quando o
+ *   terminal já está rodando (`npm run terminal:llm-b`).
+ * - **SDK client** (`client.js`): via `AlwaysAliveAgent` em-processo, com streaming e histórico. Usado em scripts
+ *   standalone que iniciam a sessão SDK diretamente.
  *
  * @module copilot/channel
  *
@@ -51,13 +51,17 @@ export const CHANNEL_VERSION = '1';
 
 export {
     checkLlmBHealth,
+    injectPipeline,
     injectToLlmB,
-    waitForLlmBReady,
     subscribeLlmB,
     subscribeLlmBCritical,
-    injectPipeline,
+    waitForLlmBReady,
 } from './inject.js';
 
 // ─── SDK Client (modo standalone / em-processo) ────────────────────────────────
 
 export { LlmBridgeClient, llmBridgeClient } from './client.js';
+
+// ─── Tool Call Auditing ────────────────────────────────────────────────────────
+
+export { auditToolStart, auditToolComplete, getAuditSummary } from './audit.js';

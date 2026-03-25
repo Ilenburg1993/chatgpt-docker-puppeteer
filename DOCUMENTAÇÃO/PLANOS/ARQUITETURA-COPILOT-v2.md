@@ -514,12 +514,12 @@ FASE L  ✅ CONCLUÍDA   Remove cli-terminal.js e test_cli_terminal.spec.js (fc7
 FASE M  ✅ CONCLUÍDA   Criar core/ com constants, errors, types (893a183a)
 FASE N  ✅ CONCLUÍDA   Consolidar AGENT_EVENTS — elimina cópia local em http-bridge.js (85148e2e)
 FASE O  ✅ CONCLUÍDA   Criar channel/ módulo canônico LLM-A ↔ LLM-B (6964fcc4)
-FASE P  ⏳ PRÓXIMA     Hardening de erros — BridgeError/SessionError em channel/ e agent/
+FASE P  ✅ CONCLUÍDA   Hardening de erros — BridgeError/SessionError em channel/ e agent/ (commit d9f5545f)
 FASE Q  ⏳             Tool Call Auditing — JSONL log de tool calls (channel/audit.js)
 FASE R  ⏳             Sub-routers http-bridge.js (bridge-stream, bridge-dialog, bridge-tasks)
 FASE S  ⏳             JSDoc/typing pass completo channel/ + bridges/ + agent/
 FASE T  ⏳             Tipar AGENT_EVENTS como union-type (satisfies operator)
-FASE U  ⏳             SDK Event Forwarding — tool.execution_*, assistant.reasoning, session.usage_info
+FASE U  ✅ CONCLUÍDA   SDK Event Forwarding — tool.execution_*, assistant.reasoning, session.usage_info (commit 654a80b5)
 FASE V  ⏳             SDK History API + reasoningEffort + errorOccurred hook
 FASE W  ⏳             Attachment Support — arquivos/imagens em sendMessage/chat
 ```
@@ -656,7 +656,7 @@ o que estava espalhado entre `bridges/inject-llmb.js` e `bridges/llm-bridge-clie
 
 ---
 
-### FASE P — Hardening de Erros: CopilotError/SessionError/BridgeError ⏳
+### FASE P — Hardening de Erros: CopilotError/SessionError/BridgeError ✅ CONCLUÍDA
 
 **Objetivo**: Substituir `throw new Error(mensagem genérica)` por tipos semânticos de `core/errors.js`
 nos módulos principais do copilot — `channel/inject.js`, `always-alive.js`, `http-bridge.js`, `session-manager.js`.
@@ -733,7 +733,7 @@ para que cada uso de string de evento seja verificado em tempo de compilação.
 
 ---
 
-### FASE U — SDK Event Forwarding: Eventos de Tool Execution e Session Metadata ⏳
+### FASE U — SDK Event Forwarding: Eventos de Tool Execution e Session Metadata ✅ CONCLUÍDA
 
 **Contexto — Auditoria de Cobertura do SDK v0.1.32**:
 
