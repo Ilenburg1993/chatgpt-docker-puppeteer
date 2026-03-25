@@ -1,0 +1,224 @@
+// @ts-check
+/**
+ * src/copilot/terminal/dialog.js
+ *
+ * Motor de diálogo do Terminal Permanente LLM-B.
+ *
+ * Responsável por:
+ * - Garantir que o dialog loop está ativo (`ensureDialogLoop`)
+ * - Enviar turnos de diálogo e exibir respostas (`sendTurn`)
+ * - Transmitir eventos SSE para clientes conectados (`broadcastSse`)
+ * - Renderizar output no stdout (`println`, `printExchange`)
+ *
+ * @module copilot/terminal/dialog
+ */
+
+import { log } from '#core/logger';
+import { alwaysAliveAgent } from '../always-alive.js';
+import { conversationStore } from '../conversation-hub/store.js';
+import { llmBridgeClient } from '../llm-bridge-client.js';
+import {
+    getBusy, getHubSessionId, getRl, getSseCriticalClients, getSseClients,
+    setBusy,
+} from './state.js';
+
+// ─── Eventos críticos para SSE ────────────────────────────────────────────────
+
+/** Eventos considerados críticos para clientes em modo ?level=critical. */
+export const CRITICAL_EVENTS = new Set(['stalled', 'fatal', 'system']);
+
+// ─── Configuração ─────────────────────────────────────────────────────────────
+
+/** Timeout para aguardar resposta da LLM-B por turno (ms). */
+const TURN_TIMEOUT_MS = Number(process.env.LLM_B_TURN_TIMEOUT ?? 120_000);
+
+const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
+const PROMPT_WAITING = '     ';
+
+/**
+ * Boot prompt padrão enviado à LLM-B ao iniciar o dialog loop.
+ * Pode ser sobrescrito pela variável de ambiente `LLM_B_BOOT_PROMPT`.
+ */
+const DEFAULT_BOOT_PROMPT = `Você é a LLM-B — assistente técnico interno do projeto chatgpt-docker-puppeteer.
+
+Contexto do projeto:
+- Node.js 24+ ESM; arquitetura orientada a eventos via barramento NERV
+- Camadas principais: kernel, driver, orchestrator, agent, infra, server, missions
+- Você opera como agente contínuo de longa duração, nunca encerra sessões
+
+Seu papel:
+- Responder perguntas técnicas sobre o codebase, arquitetura e decisões de design
+- Ajudar na análise de bugs, código e logs quando solicitado
+- Colaborar criticamente com o desenvolvedor e com a LLM-A (seu parceiro de raciocínio)
+
+Protocolo OBRIGATÓRIO de comunicação via ask_user:
+1. Chame ask_user("READY: aguardando próxima mensagem") para sinalizar prontidão.
+2. Ao receber uma mensagem, processe-a e formule uma resposta completa.
+3. Chame ask_user("REPLY: " + sua_resposta) para enviar a resposta.
+4. Retorne ao passo 1. NUNCA encerre o loop. Sempre use ask_user para comunicar.
+
+Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerrar.`;
+
+/** Boot prompt efetivo: env var sobrescreve o padrão. @type {string} */
+export const BOOT_PROMPT = process.env.LLM_B_BOOT_PROMPT ?? DEFAULT_BOOT_PROMPT;
+
+// ─── Output helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Escreve linha no stdout preservando o estado do prompt.
+ *
+ * @param {string} text - Texto a exibir
+ * @returns {void}
+ */
+export function println(text) {
+    process.stdout.write(`\r${text}\n`);
+}
+
+/**
+ * Exibe um turno completo (mensagem + resposta) com formatação visual limpa.
+ *
+ * @param {string} actor - Ator que enviou ('user' | 'llm-a')
+ * @param {string} message - Mensagem enviada
+ * @param {string} reply - Resposta da LLM-B
+ * @param {number} durationMs - Duração da chamada em ms
+ * @returns {void}
+ */
+export function printExchange(actor, message, reply, durationMs) {
+    const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const secs = (durationMs / 1000).toFixed(1);
+
+    if (actor === 'llm-a') {
+        println(`\n  🤖  \x1b[34mLLM-A\x1b[0m  \x1b[90m[${ts}]\x1b[0m`);
+        println(`  ${message}`);
+    }
+
+    println(`\n  🧠  \x1b[32mLLM-B\x1b[0m  \x1b[90m[${ts}] ${secs}s\x1b[0m`);
+    for (const line of reply.split('\n')) {
+        println(`  ${line}`);
+    }
+    println('');
+}
+
+// ─── SSE ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Transmite um evento SSE para todos os clientes conectados ao endpoint GET /events.
+ * Clientes em modo `?level=critical` recebem apenas eventos em CRITICAL_EVENTS.
+ *
+ * @param {string} event - Tipo do evento (ex: 'reply', 'ready', 'stalled')
+ * @param {object} data - Payload JSON serializável
+ * @returns {void}
+ */
+export function broadcastSse(event, data) {
+    const _sseClients = getSseClients();
+    const _sseCriticalClients = getSseCriticalClients();
+    if (_sseClients.size === 0 && _sseCriticalClients.size === 0) return;
+    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    for (const client of _sseClients) {
+        try {
+            client.write(payload);
+        } catch {
+            _sseClients.delete(client);
+        }
+    }
+    if (CRITICAL_EVENTS.has(event)) {
+        for (const client of _sseCriticalClients) {
+            try {
+                client.write(payload);
+            } catch {
+                _sseCriticalClients.delete(client);
+            }
+        }
+    }
+}
+
+// ─── Dialog loop ──────────────────────────────────────────────────────────────
+
+/**
+ * Garante que o dialog loop está ativo. Se não estiver, inicia-o.
+ *
+ * @returns {Promise<void>}
+ */
+export async function ensureDialogLoop() {
+    if (alwaysAliveAgent.dialogLoopActive) {
+        return;
+    }
+
+    const status = alwaysAliveAgent.status;
+    if (status === 'stopped') {
+        println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');
+        await alwaysAliveAgent.start();
+        // Aguarda idle
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Timeout aguardando idle')), 30_000);
+            const check = () => {
+                if (alwaysAliveAgent.status === 'idle') {
+                    clearTimeout(timeout);
+                    resolve(undefined);
+                } else {
+                    setTimeout(check, 500);
+                }
+            };
+            check();
+        });
+    }
+
+    println('\x1b[90m  Conectando ao agente…\x1b[0m');
+    await llmBridgeClient.startDialogMode(BOOT_PROMPT ?? undefined, {
+        onReady: () => println('\n  \x1b[32m●\x1b[0m  LLM-B pronta — pode começar\n'),
+    });
+}
+
+/**
+ * Envia um turno de diálogo para a LLM-B e exibe a resposta.
+ *
+ * @param {string} message - Mensagem a enviar
+ * @param {string} [actor] - Quem está enviando ('user' | 'llm-a')
+ * @returns {Promise<string | null>} Resposta da LLM-B, ou null se busy
+ */
+export async function sendTurn(message, actor = 'user') {
+    if (getBusy()) {
+        println('\x1b[33m  ⏳ Aguarde — LLM-B está processando...\x1b[0m');
+        return null;
+    }
+    setBusy(true);
+    const rl = getRl();
+    if (rl) {
+        process.stdout.write(`\x1b[90m  …\x1b[0m`);
+        rl.setPrompt(PROMPT_WAITING);
+    }
+
+    const t0 = Date.now();
+    try {
+        await ensureDialogLoop();
+        const reply = await llmBridgeClient.dialogTurn(message, { timeout: TURN_TIMEOUT_MS });
+        const durationMs = Date.now() - t0;
+        printExchange(actor, message, reply, durationMs);
+        log('INFO', `[TerminalServer] Turno ${actor} concluído em ${durationMs}ms`);
+
+        const _hubSessionId = getHubSessionId();
+        if (_hubSessionId) {
+            try {
+                /** @type {'user' | 'llm_a'} */
+                const senderRole = actor === 'llm-a' ? 'llm_a' : 'user';
+                conversationStore.writeTurn(_hubSessionId, { role: senderRole, content: message });
+                conversationStore.writeTurn(_hubSessionId, { role: 'llm_b', content: reply, durationMs });
+            } catch (/** @type {any} */ hubErr) {
+                log('WARN', `[TerminalServer] Hub writeTurn falhou: ${hubErr.message}`);
+            }
+        }
+
+        return reply;
+    } catch (/** @type {any} */ e) {
+        println(`[erro] ${e.message}`);
+        log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${e.message}`);
+        return null;
+    } finally {
+        setBusy(false);
+        const rl = getRl();
+        if (rl) {
+            rl.setPrompt(PROMPT_USER);
+            rl.prompt();
+        }
+    }
+}

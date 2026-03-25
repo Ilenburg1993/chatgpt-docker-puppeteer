@@ -347,21 +347,19 @@ src/copilot/
 - Organização por responsabilidade
 - Facilita adicionar novos comandos sem tocar no monólito
 
-### FASE C — Extração do HTTP server e endpoints
+### FASE C — Extração do HTTP server e endpoints ✅ CONCLUÍDA
 
-**Objetivo**: Separar HTTP inject server do REPL em `terminal/server.js` e `terminal/events.js`.
+**Objetivo**: Separar HTTP inject server do REPL em módulos coesos dentro de `terminal/`.
 
-**Escopo**:
-1. Criar `src/copilot/terminal/server.js` — HTTP server, routing, handlers de endpoints
-2. Criar `src/copilot/terminal/events.js` — SSE broadcast + listeners do agente
-3. Criar `src/copilot/terminal/dialog.js` — `ensureDialogLoop()`, `sendTurn()`, `sendTurnFromHttp()`
-4. Criar `src/copilot/terminal/index.js` — `startTerminalServer()` coordena tudo
-5. `terminal-server.js` vira wrapper trivial que importa e chama `terminal/index.js`
+**Entregues**:
+1. `src/copilot/terminal/state.js` — estado global compartilhado (busy, rl, hubSessionId, sseClients)
+2. `src/copilot/terminal/dialog.js` — `ensureDialogLoop()`, `sendTurn()`, `broadcastSse()`, `println()`, `printExchange()`
+3. `src/copilot/terminal/server.js` — `createInjectServer()` + todos os endpoints HTTP
+4. `src/copilot/terminal/repl.js` — `setupAgentListeners()`, `startRepl()`
+5. `src/copilot/terminal/index.js` — `startTerminalServer()` (orquestrador)
+6. `terminal-server.js`: 1016 → 39 linhas (wrapper de entrypoint)
 
-**Benefícios**:
-- HTTP server testável isoladamente
-- Dialog logic independente de readline ou HTTP
-- Fácil substituir readline por outra interface
+**Resultado**: `terminal-server.js` passa de 1677 linhas originais a 39 linhas; todos os módulos passam em `node --check` e `eslint --max-warnings 0`.
 
 ### FASE D — Integrar HubOrchestrator
 
@@ -438,7 +436,7 @@ mas não crítica. Implementar apenas se o dashboard precisar de streaming de tu
 IMEDIATO (bugs críticos)    → FASE A ✅ CONCLUÍDA
 ────────────────────────────────────────────────
 CURTO PRAZO (sessão única)  → FASE B ✅ CONCLUÍDA (extração de comandos: 7 módulos)
-MÉDIO PRAZO (2-3 sessões)   → FASE C + D (server + orchestrator)
+MÉDIO PRAZO (2-3 sessões)   → FASE C ✅ CONCLUÍDA (state/dialog/server/repl/index) + FASE D (orchestrator)
 LONGO PRAZO                 → FASE E + F (reorganização de pastas)
 ```
 
