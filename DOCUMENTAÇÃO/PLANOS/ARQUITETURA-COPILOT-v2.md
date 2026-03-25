@@ -1,7 +1,7 @@
 # Plano de Arquitetura — `src/copilot` v2
 
-**Data**: 2026-06-15
-**Status**: Rascunho de planejamento — aprovado para execução incremental
+**Data**: 2026-06-15 — **Última atualização**: 2026-07-18
+**Status**: Fases A–H concluídas — em execução contínua rumo à v2.1+
 **Autores**: Análise automática via audit de código + testes reais com LLM-B
 
 ---
@@ -414,7 +414,7 @@ delegando toda lógica de negócio para os handlers.
 
 ---
 
-### FASE G — Extração WebhookManager de always-alive.js ✅ CONCLUÍDA
+### FASE G — Decomposição modular de always-alive.js ✅ CONCLUÍDA (`89a4319c`)
 
 **Objetivo**: Reduzir `always-alive.js` (917 linhas) extraindo responsabilidades auto-contidas.
 
@@ -422,15 +422,53 @@ delegando toda lógica de negócio para os handlers.
 para fora da classe. A única decomposição viável sem reescrita total é extrair sub-módulos stateful
 que recebem/gerenciam seu próprio estado interno, sendo compostos via campo privado na classe principal.
 
-**Abordagem implementada**: Criado `agent/webhook-manager.js` com classe `WebhookManager` autônoma.
+#### G.1 — WebhookManager ✅ (`9eda8c65`)
+
+`agent/webhook-manager.js` com classe `WebhookManager` autônoma.
 `AlwaysAliveAgent` substitui `#webhookUrls = new Map()` por `#webhooks = new WebhookManager()`,
 delegando `registerWebhook`/`unregisterWebhook`/`listWebhooks`/`#emitWebhook` ao novo módulo.
+`always-alive.js`: 917 → 886 linhas.
 
-**Benefícios**:
-- `always-alive.js`: 917 → 886 linhas (−31 linhas)
-- `WebhookManager` testável de forma totalmente isolada (zero dependência de EventEmitter)
-- Lógica de HTTP POST de webhook reutilizável em outros contextos
-- TypeScript strict: 0 erros mantidos
+#### G.2 — AGENT_EVENTS constante exportada ✅
+
+`agent/events.js` exporta constante `AGENT_EVENTS` com os 12+ nomes de evento do agente.
+`listenerDiagnostics()` usa essa constante em vez de array inline.
+
+#### G.3 — DialogWatchdog como classe injetada ✅
+
+`agent/dialog-watchdog.js` com classe `DialogWatchdog({ stallMs, intervalMs, onStall })`.
+`AlwaysAliveAgent` tem `#watchdog = new DialogWatchdog(...)`.
+
+#### G.4 — bootstrapTools helper ✅
+
+`agent/tools-bootstrap.js` com função pura `bootstrapTools(registry, allToolsList, mcpTools)`.
+
+#### G.5 — executeTask extração do IIFE inline ✅
+
+`agent/task-executor.js` com função `executeTask(session, task, ctx)`.
+
+**Resultado real**:
+- `always-alive.js`: 917 → 777 linhas (−140 linhas)
+- 5 sub-módulos em `agent/` — todos testáveis de forma isolada
+- Commit: `89a4319c`
+
+---
+
+### FASE H — Modularização de sdk-api.js ✅ CONCLUÍDA (`d2148020`)
+
+**Objetivo**: Reduzir `sdk-api.js` (915 linhas) extraindo as rotas em sub-routers por domínio.
+
+**Resultado**:
+- `sdk-api.js`: 915 → 34 linhas (orquestrador puro)
+- `routes/client.js`: 206 linhas — ping, status, auth, models, tools, client start/stop/force-stop (8 rotas)
+- `routes/sessions.js`: 557 linhas — todos os 15 endpoints /sessions/*
+- `routes/agent.js`: 197 linhas — /agent/info, tools, telemetry, state, stream SSE (6 rotas)
+- `routes/webhooks.js`: 90 linhas — /webhooks CRUD com validação de URL (3 rotas)
+- Testes: traversal recursivo do router.stack adaptado para sub-routers aninhados
+- Commit: `d2148020`
+
+**GAP cobertos**: SDK auditado (`dd74a835`) — todos os 33 endpoints implementados conforme SDK v0.1.32.
+SDK v0.2.0 bloqueado (requer `@github/copilot@^1.0.10` que ainda não foi publicado).
 
 ---
 
@@ -457,25 +495,119 @@ mas não crítica. Implementar apenas se o dashboard precisar de streaming de tu
 
 ---
 
-## 8. Resumo de Prioridades
+## 8. Resumo de Prioridades — Status atual
 
 ```
-IMEDIATO (bugs críticos)    → FASE A ✅ CONCLUÍDA
-────────────────────────────────────────────────
-CURTO PRAZO (sessão única)  → FASE B ✅ CONCLUÍDA (extração de comandos: 7 módulos)
-MÉDIO PRAZO (2-3 sessões)   → FASE C ✅ CONCLUÍDA + FASE D ✅ CONCLUÍDA (conversationHub + NERV)
-LONGO PRAZO                 → FASE E ✅ CONCLUÍDA + FASE F ✅ CONCLUÍDA + FASE G ✅ CONCLUÍDA
+FASE A  ✅ CONCLUÍDA   Bugs críticos (alias-store, gitStashList, /count guard)
+FASE B  ✅ CONCLUÍDA   Extração de comandos para terminal/commands/ (7 módulos)
+FASE C  ✅ CONCLUÍDA   HTTP server, dialog, repl, events em terminal/
+FASE D  ✅ CONCLUÍDA   Integração HubOrchestrator + NERV
+FASE E  ✅ CONCLUÍDA   Re-exports canônicos em bridges/, agent/, api/
+FASE F  ✅ CONCLUÍDA   Unificação stacks HTTP (http-handlers.js)
+FASE G  ✅ CONCLUÍDA   Modularização always-alive.js → agent/ (5 sub-módulos)
+FASE H  ✅ CONCLUÍDA   Modularização sdk-api.js → routes/ (4 sub-routers)
+────────────────────────────────────────────────────────────────────────────────
+FASE I  📋 PLANEJADA   Mover always-alive.js para agent/always-alive.js canônico
+FASE J  📋 PLANEJADA   Integrar Socket.io hub no terminal (SSE → WS opcional)
+FASE K  📋 PLANEJADA   Criar core/ com types.js, errors.js, constants.js
+FASE L  📋 PLANEJADA   Remover cli-terminal.js (depreciado)
+FASE M  📋 PLANEJADA   Unificar api/ (integrar http-handlers com Express)
 ```
 
 ---
 
-## 9. Checklist de Qualidade para Cada Fase
+## 9. Próximas Fases Detalhadas (v2.1 e além)
+
+### FASE I — Consolidar agent/ como localização canônica
+
+**Objetivo**: `always-alive.js` vive hoje em dois lugares: `src/copilot/always-alive.js` (original)
+e `src/copilot/agent/always-alive.js` (re-export). Tornar `agent/always-alive.js` o arquivo real
+e `src/copilot/always-alive.js` o re-export (inversão da direção atual).
+
+**Passos**:
+1. Mover conteúdo real para `agent/always-alive.js`
+2. `always-alive.js` na raiz vira `export { AlwaysAliveAgent } from './agent/always-alive.js'`
+3. Atualizar todos os imports que importam de raiz (há ~12 arquivos)
+4. Idem para `session-manager.js`, `llm-bridge-client.js`, `inject-llmb.js`
+5. Verificar que `bridges/` re-exports apontam corretamente
+
+**Risco**: médio (muitos imports para atualizar; pode quebrar testes sem cuidado)
+**Estimativa**: 1 sessão
+
+---
+
+### FASE J — Integrar Socket.io hub (opcional, D5)
+
+**Objetivo**: Substituir SSE artesanal (`/events` em `terminal/server.js`) por Socket.io
+usando `conversation-hub/socket-ns.js` já existente.
+
+**Passos**:
+1. `terminal/events.js` passa a emitir para o socket namespace além do SSE raw
+2. `terminal/server.js` mantém `/events` por compatibilidade; adiciona tag `socket.io` opcional
+3. Dashboard pode subscrever via WS em vez de SSE
+
+**Risco**: baixo a médio (SSE permanece como fallback)
+**Estimativa**: 1-2 sessões — só executar se dashboard precisar
+
+---
+
+### FASE K — Criar camada core/ com contratos
+
+**Objetivo**: Extrair tipos, erros e constantes para `src/copilot/core/`.
+
+**Conteúdo**:
+- `core/types.js` — mover de `types/`, adicionar JsDoc exports de SDK
+- `core/errors.js` — `CopilotError`, `SessionError`, `BridgeError` com `code` semântico
+- `core/constants.js` — portas (3009), limites (MAX_QUEUE_SIZE=50), event names
+- `core/index.js` — barrel
+
+**Benefício**: Documentação ativa de contratos; erros tipados facilitam tratamento nos routers
+**Risco**: baixo (novos arquivos, sem mover lógica existente)
+**Estimativa**: 1 sessão
+
+---
+
+### FASE L — Remover cli-terminal.js
+
+**Objetivo**: Eliminar duplicação com `terminal/`. Decisão D2 já tomada.
+
+**Passos**:
+1. Confirmar que nenhum código ativo importa `cli-terminal.js`
+2. Verificar que `ecosystem.config.*` não referencia
+3. Remover o arquivo
+4. Remover testes relacionados (se houver)
+
+**Risco**: mínimo (já deprecado em D2)
+**Estimativa**: < 30 min
+
+---
+
+### FASE M — Unificar api/ com Express (eliminar node:http raw)
+
+**Objetivo**: `terminal/server.js` usa `node:http` raw (porta 3009). O plano é migrar os
+handlers para Express router em `api/copilot-router.js`, usando `terminal/http-handlers.js`
+que já tem a lógica pura.
+
+**Passos**:
+1. `api/copilot-router.js` importa handlers de `terminal/http-handlers.js`
+2. Cada endpoint raw vira `router.get('/git/status', ...)` delegando ao handler
+3. `terminal/server.js` pode usar `express` como HTTP server
+4. SSE (`/events`) fica como rota Express com middleware especial
+5. Porta 3009 passa a ser uma instância Express separada (ou integrada ao server principal)
+
+**Benefício**: Um único stack HTTP; middleware compartilhado (auth, rate limit, logging)
+**Risco**: alto (mudança de runtime HTTP — requer testes extensivos de regressão)
+**Estimativa**: 2-3 sessões
+
+---
+
+## 10. Checklist de Qualidade para Cada Fase
 
 Antes de commitar cada fase:
 - [ ] `npm run lint` sem erros
 - [ ] `npm run format:check` sem erros
 - [ ] `npm run typecheck:node` sem erros novos
-- [ ] `npm run test:unit` passando
+- [ ] `npm run test:unit` passando (1474+ testes)
 - [ ] Testar terminal real: `node --strip-types src/copilot/terminal-server.js`
 - [ ] Testar todos os endpoints HTTP listados na seção 3
 - [ ] Testar aliases no REPL: `/st`, `/log`, `/issues`, `/prs`
@@ -483,3 +615,4 @@ Antes de commitar cada fase:
 ---
 
 *Documento gerado com base em análise estática do código e testes reais com LLM-B ativa.*
+*Atualizado em 2026-07-18 após conclusão das Fases G e H.*
