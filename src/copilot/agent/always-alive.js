@@ -16,19 +16,19 @@
  * @module copilot/always-alive
  */
 
-import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart } from '#copilot/lib/index';
 import { SessionError } from '#copilot/core/errors';
+import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart } from '#copilot/lib/index';
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
+import { buildMcpConfig } from '../config/mcp-servers.js';
+import { buildMcpTools } from '../mcp-tool-bridge.js';
+import { initOrResumeSession, readState, writeState } from '../session-manager.js';
 import { DialogWatchdog } from './dialog-watchdog.js';
 import { AGENT_EVENTS } from './events.js';
 import { executeTask } from './task-executor.js';
 import { bootstrapTools } from './tools-bootstrap.js';
 import { WebhookManager } from './webhook-manager.js';
-import { buildMcpConfig } from '../config/mcp-servers.js';
-import { buildMcpTools } from '../mcp-tool-bridge.js';
-import { initOrResumeSession, readState, writeState } from '../session-manager.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -51,6 +51,7 @@ import { initOrResumeSession, readState, writeState } from '../session-manager.j
  * @property {function(Error): void} reject - Callback de erro
  * @property {number} enqueuedAt - Timestamp em ms
  * @property {number} [timeoutMs] - Timeout personalizado para sendAndWait (ms). undefined = usa padrão de 60s do SDK.
+ * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens, seleções) a enviar junto com a mensagem.
  */
 
 /**
@@ -125,7 +126,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     #toolsRegistry = createRegistry();
 
     /**
-     * @param {{ model?: string, reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' }} [options]
+     * @param {{ model?: string; reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' }} [options]
      */
     constructor(options = {}) {
         super();
@@ -357,7 +358,10 @@ export class AlwaysAliveAgent extends EventEmitter {
         const remainingTasks = this.#queue.splice(0);
         if (remainingTasks.length > 0) {
             log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
-            const shutdownError = new SessionError('[AlwaysAlive] Agente parado durante shutdown gracioso.', 'AGENT_STOPPED');
+            const shutdownError = new SessionError(
+                '[AlwaysAlive] Agente parado durante shutdown gracioso.',
+                'AGENT_STOPPED',
+            );
             for (const task of remainingTasks) {
                 task.reject(shutdownError);
             }
@@ -378,12 +382,13 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Enfileira uma mensagem para ser enviada ao modelo.
      *
      * @param {string} message - Mensagem a enviar
-     * @param {{ timeoutMs?: number }} [opts] - Opções. `timeoutMs` sobrescreve o timeout padrão de 60s do SDK para
+     * @param {{ timeoutMs?: number; attachments?: import('@github/copilot-sdk').MessageOptions['attachments'] }} [opts] - Opções. `timeoutMs` sobrescreve o timeout padrão de 60s do SDK para
      *   `sendAndWait`. Use um valor grande (ex.: `24 * 60 * 60 * 1000`) para tarefas de longa duração como o dialog
-     *   loop, que nunca emitem `session.idle` organicamente.
+     *   loop, que nunca emitem `session.idle` organicamente. `attachments` permite enviar arquivos, imagens ou
+     *   referências de contexto junto com a mensagem.
      * @returns {Promise<string>} Resposta completa do modelo
      */
-    sendMessage(message, { timeoutMs } = {}) {
+    sendMessage(message, { timeoutMs, attachments } = {}) {
         return new Promise((resolve, reject) => {
             if (this.#queue.length >= AlwaysAliveAgent.MAX_QUEUE_SIZE) {
                 const err = new SessionError(
@@ -404,6 +409,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                 reject,
                 enqueuedAt: Date.now(),
                 ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+                ...(attachments !== undefined ? { attachments } : {}),
             });
             this.#queue.push(task);
             log('INFO', `[AlwaysAlive] Tarefa enfileirada: ${task.id}`);
@@ -501,11 +507,17 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     async startDialogLoop(bootPrompt) {
         if (this.#status !== 'idle') {
-            throw new SessionError(`[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${this.#status}'`, 'INVALID_STATE');
+            throw new SessionError(
+                `[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${this.#status}'`,
+                'INVALID_STATE',
+            );
         }
 
         if (this.#dialogLoopActive) {
-            throw new SessionError('[AlwaysAlive] Modo diálogo já está ativo. Chame stopDialogLoop() primeiro.', 'DIALOG_ALREADY_ACTIVE');
+            throw new SessionError(
+                '[AlwaysAlive] Modo diálogo já está ativo. Chame stopDialogLoop() primeiro.',
+                'DIALOG_ALREADY_ACTIVE',
+            );
         }
 
         this.#dialogLoopActive = true;
@@ -562,7 +574,10 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
     sendDialogTurn(message, { timeout = 60_000 } = {}) {
         if (!this.#dialogLoopActive) {
             return Promise.reject(
-                new SessionError('[AlwaysAlive] Modo diálogo não está ativo. Chame startDialogLoop() primeiro.', 'DIALOG_NOT_ACTIVE'),
+                new SessionError(
+                    '[AlwaysAlive] Modo diálogo não está ativo. Chame startDialogLoop() primeiro.',
+                    'DIALOG_NOT_ACTIVE',
+                ),
             );
         }
 
@@ -589,7 +604,12 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                 const onPending = (/** @type {unknown} */ _) => {
                     clearTimeout(timeoutHandle);
                     const newTimeout = setTimeout(() => {
-                        reject(new SessionError(`[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
+                        reject(
+                            new SessionError(
+                                `[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`,
+                                'DIALOG_TIMEOUT',
+                            ),
+                        );
                     }, timeout);
                     this.once('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
                         clearTimeout(newTimeout);
@@ -798,12 +818,15 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
     /**
      * Hook `onErrorOccurred` do SDK — emite evento no agente para observabilidade via SSE/NERV.
      *
-     * @param {{ error: string, errorContext: string, recoverable: boolean }} input
+     * @param {{ error: string; errorContext: string; recoverable: boolean }} input
      * @param {{ sessionId: string }} invocation
      * @returns {void}
      */
     #onErrorOccurred(input, invocation) {
-        log('WARN', `[AlwaysAlive] SDK errorOccurred [${input.errorContext}]: ${input.error} (recuperável: ${input.recoverable})`);
+        log(
+            'WARN',
+            `[AlwaysAlive] SDK errorOccurred [${input.errorContext}]: ${input.error} (recuperável: ${input.recoverable})`,
+        );
         this.emit('error', {
             hookType: 'errorOccurred',
             errorMessage: input.error,
@@ -816,8 +839,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
     /**
      * Retorna o histórico de mensagens da sessão SDK ativa.
      *
-     * Útil para debug, auditoria e introspecção do context window.
-     * Retorna array vazio se não houver sessão ativa.
+     * Útil para debug, auditoria e introspecção do context window. Retorna array vazio se não houver sessão ativa.
      *
      * @returns {Promise<any[]>}
      */

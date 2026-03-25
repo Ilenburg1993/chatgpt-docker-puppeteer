@@ -74,6 +74,8 @@ import { alwaysAliveAgent } from '../always-alive.js';
  * @property {(chunk: string, taskId: string) => void} [onDelta] - Callback por chunk de streaming
  * @property {(question: object) => void} [onQuestion] - Callback quando modelo faz pergunta
  * @property {number} [timeoutMs] - Timeout em ms (default: 60000)
+ * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
+ *   enviar junto com a mensagem
  */
 
 // ─── Implementação ────────────────────────────────────────────────────────────
@@ -102,7 +104,7 @@ export class LlmBridgeClient {
      * @throws {Error} Se o agente não estiver ativo ou a tarefa falhar
      */
     async chat(message, opts = {}) {
-        const { onDelta, onQuestion, timeoutMs = 60_000 } = opts;
+        const { onDelta, onQuestion, timeoutMs = 60_000, attachments } = opts;
         const startedAt = Date.now();
 
         if (alwaysAliveAgent.status === 'stopped') {
@@ -171,7 +173,7 @@ export class LlmBridgeClient {
                 );
             });
 
-            const response = await Promise.race([alwaysAliveAgent.sendMessage(message), timeoutPromise]);
+            const response = await Promise.race([alwaysAliveAgent.sendMessage(message, { attachments }), timeoutPromise]);
 
             const responseStr = /** @type {string} */ (response);
             const durationMs = Date.now() - startedAt;

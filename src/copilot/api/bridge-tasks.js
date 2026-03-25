@@ -35,10 +35,10 @@ export function registerTaskRoutes(bridge, agent) {
     /**
      * Enfileira uma mensagem para o agente processar. Retorna imediatamente com o taskId (processamento é assíncrono).
      *
-     * Body: { message: string, waitForResponse?: boolean, timeoutMs?: number }
+     * Body: { message: string, waitForResponse?: boolean, timeoutMs?: number, attachments?: Array }
      */
     bridge.post('/send', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { message, waitForResponse = false, timeoutMs = 30000 } = req.body ?? {};
+        const { message, waitForResponse = false, timeoutMs = 30000, attachments } = req.body ?? {};
 
         if (!message || typeof message !== 'string') {
             return res.status(400).json({ ok: false, error: 'Campo "message" (string) é obrigatório.' });
@@ -53,7 +53,7 @@ export function registerTaskRoutes(bridge, agent) {
         try {
             if (waitForResponse) {
                 const raceResult = await Promise.race([
-                    agent.sendMessage(message),
+                    agent.sendMessage(message, { ...(attachments !== undefined ? { attachments } : {}) }),
                     new Promise((_, reject) =>
                         setTimeout(
                             () => reject(new BridgeError(`Timeout após ${timeoutMs}ms`, 'HTTP_BRIDGE_TIMEOUT')),
@@ -65,7 +65,7 @@ export function registerTaskRoutes(bridge, agent) {
             }
 
             // Enfileira sem aguardar
-            agent.sendMessage(message).catch((/** @type {any} */ e) => {
+            agent.sendMessage(message, { ...(attachments !== undefined ? { attachments } : {}) }).catch((/** @type {any} */ e) => {
                 log('WARN', `[bridge-tasks/send] Tarefa assíncrona falhou: ${e.message}`);
             });
             return res.json({ ok: true, message: 'Mensagem enfileirada.', status: agent.status });

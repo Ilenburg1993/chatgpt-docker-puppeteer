@@ -28,6 +28,7 @@ import { auditToolComplete, auditToolStart } from '#copilot/channel';
  * @property {string} id
  * @property {string} message
  * @property {number} [timeoutMs]
+ * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments]
  * @property {number} enqueuedAt
  * @property {(text: string) => void} resolve
  * @property {(err: Error) => void} reject
@@ -86,7 +87,11 @@ export async function executeTask(session, task, callbacks) {
     });
 
     try {
-        const event = await session.sendAndWait({ prompt: task.message }, task.timeoutMs ?? 60_000);
+        const sendOpts = /** @type {import('@github/copilot-sdk').MessageOptions} */ ({
+            prompt: task.message,
+            ...(task.attachments !== undefined ? { attachments: task.attachments } : {}),
+        });
+        const event = await session.sendAndWait(sendOpts, task.timeoutMs ?? 60_000);
         unsubDelta();
         unsubToolStart();
         unsubToolComplete();

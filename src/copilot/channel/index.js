@@ -64,4 +64,14 @@ export { LlmBridgeClient, llmBridgeClient } from './client.js';
 
 // ─── Tool Call Auditing ────────────────────────────────────────────────────────
 
-export { auditToolStart, auditToolComplete, getAuditSummary } from './audit.js';
+export { auditToolComplete, auditToolStart, getAuditSummary } from './audit.js';
+
+// ─── Tipos públicos do canal ───────────────────────────────────────────────────
+
+/**
+ * Tipo de anexo aceito pelo canal LLM-A ↔ LLM-B.
+ *
+ * Mapeia diretamente para `MessageOptions['attachments']` do SDK, suportando arquivos, diretórios e seleções de texto.
+ *
+ * @typedef {import('@github/copilot-sdk').MessageOptions['attachments']} ChannelAttachment
+ */

@@ -38,7 +38,7 @@ import { log } from '#core/logger';
  *     getStatusSnapshot: () => AgentSnap;
  *     start: () => Promise<void>;
  *     stop: (opts?: { shutdownTimeoutMs?: number }) => Promise<void>;
- *     sendMessage: (message: string, opts?: { timeoutMs?: number }) => Promise<unknown>;
+ *     sendMessage: (message: string, opts?: { timeoutMs?: number; attachments?: import('@github/copilot-sdk').MessageOptions['attachments'] }) => Promise<unknown>;
  *     answerPendingQuestion: (answer: string) => boolean;
  *     startDialogLoop: (bootPrompt?: string) => Promise<void>;
  *     sendDialogTurn: (text: string, opts?: { timeout?: number }) => Promise<string>;
