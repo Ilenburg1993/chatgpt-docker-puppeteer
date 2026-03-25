@@ -515,12 +515,12 @@ FASE M  ✅ CONCLUÍDA   Criar core/ com constants, errors, types (893a183a)
 FASE N  ✅ CONCLUÍDA   Consolidar AGENT_EVENTS — elimina cópia local em http-bridge.js (85148e2e)
 FASE O  ✅ CONCLUÍDA   Criar channel/ módulo canônico LLM-A ↔ LLM-B (6964fcc4)
 FASE P  ✅ CONCLUÍDA   Hardening de erros — BridgeError/SessionError em channel/ e agent/ (commit d9f5545f)
-FASE Q  ⏳             Tool Call Auditing — JSONL log de tool calls (channel/audit.js)
-FASE R  ⏳             Sub-routers http-bridge.js (bridge-stream, bridge-dialog, bridge-tasks)
-FASE S  ⏳             JSDoc/typing pass completo channel/ + bridges/ + agent/
+FASE Q  ✅ CONCLUÍDA   Tool Call Auditing — JSONL log de tool calls (channel/audit.js) (commit 3c1ab930)
+FASE R  ✅ CONCLUÍDA   Sub-routers http-bridge.js (bridge-stream, bridge-dialog, bridge-tasks) (commit 425a5802)
+FASE S  ✅ CONCLUÍDA   JSDoc/typing pass completo channel/ + bridges/ + agent/ — AlwaysAliveAgentLike typedef
 FASE T  ⏳             Tipar AGENT_EVENTS como union-type (satisfies operator)
 FASE U  ✅ CONCLUÍDA   SDK Event Forwarding — tool.execution_*, assistant.reasoning, session.usage_info (commit 654a80b5)
-FASE V  ⏳             SDK History API + reasoningEffort + errorOccurred hook
+FASE V  ✅ CONCLUÍDA   SDK History API + reasoningEffort + errorOccurred hook (commit 99611bed)
 FASE W  ⏳             Attachment Support — arquivos/imagens em sendMessage/chat
 ```
 
@@ -671,7 +671,7 @@ nos módulos principais do copilot — `channel/inject.js`, `always-alive.js`, `
 
 ---
 
-### FASE Q — Tool Call Auditing: Log JSONL de Tool Calls (Sprint C) ⏳
+### FASE Q — Tool Call Auditing: Log JSONL de Tool Calls (Sprint C) ✅ CONCLUÍDA
 
 **Objetivo**: Registrar em `logs/tool-audit.jsonl` cada tool call executado por LLM-B:
 `{ ts, sessionId, tool, argsSummary, resultSummary, durationMs, success }`.
@@ -686,7 +686,7 @@ nos módulos principais do copilot — `channel/inject.js`, `always-alive.js`, `
 
 ---
 
-### FASE R — Extrair Rotas http-bridge.js em Sub-Routers ⏳
+### FASE R — Extrair Rotas http-bridge.js em Sub-Routers ✅ CONCLUÍDA
 
 **Objetivo**: Dividir `api/http-bridge.js` (~320 linhas) em sub-routers focados, como foi feito
 com `sdk-api.js` na Fase H.
@@ -706,7 +706,7 @@ com `sdk-api.js` na Fase H.
 
 ---
 
-### FASE S — JSDoc/Typing Pass: channel/ + bridge/ + agent/ ⏳
+### FASE S — JSDoc/Typing Pass: channel/ + bridge/ + agent/ ✅ CONCLUÍDA
 
 **Objetivo**: Garantir que todos os módulos em `channel/`, `bridges/` e `agent/` tenham JSDoc
 completo com `@param`, `@returns`, `@throws` em todos os exports públicos. Rodar `typecheck:node`
@@ -743,21 +743,21 @@ Eventos SDK já capturados: `session.compaction_start`, `session.compaction_comp
 
 **Eventos SDK de alto valor NÃO ainda encaminhados ao AGENT_EVENTS / SSE**:
 
-| Evento SDK                  | Valor                                           | Prioridade |
-| --------------------------- | ----------------------------------------------- | ---------- |
-| `tool.execution_start`      | Auditoria: qual tool LLM-B invocou              | ⭐⭐⭐ |
-| `tool.execution_complete`   | Auditoria: resultado + duração do tool          | ⭐⭐⭐ |
-| `assistant.reasoning_delta` | Suporte a o3/o4-mini thinking tokens            | ⭐⭐⭐ |
-| `session.usage_info`        | Contagem de tokens + billing por turno          | ⭐⭐ |
-| `session.mode_changed`      | Plano vs. Ação — visibilidade de modo           | ⭐⭐ |
-| `session.plan_changed`      | Rastreamento do plano do agente                 | ⭐⭐ |
-| `permission.requested`      | Permissões solicitadas (além do callback solo)  | ⭐⭐ |
-| `skill.invoked`             | Habilidades do agente invocadas                 | ⭐ |
-| `subagent.started`          | Sub-agentes iniciados                           | ⭐ |
-| `session.warning`           | Avisos da sessão SDK                            | ⭐ |
-| `session.error`             | Erros granulares SDK (vs. catch genérico)       | ⭐⭐ |
-| `session.title_changed`     | Título da sessão atualizado                     | ⭐ |
-| `session.model_change`      | Troca de modelo em sessão ativa                 | ⭐ |
+| Evento SDK                  | Valor                                          | Prioridade |
+| --------------------------- | ---------------------------------------------- | ---------- |
+| `tool.execution_start`      | Auditoria: qual tool LLM-B invocou             | ⭐⭐⭐        |
+| `tool.execution_complete`   | Auditoria: resultado + duração do tool         | ⭐⭐⭐        |
+| `assistant.reasoning_delta` | Suporte a o3/o4-mini thinking tokens           | ⭐⭐⭐        |
+| `session.usage_info`        | Contagem de tokens + billing por turno         | ⭐⭐         |
+| `session.mode_changed`      | Plano vs. Ação — visibilidade de modo          | ⭐⭐         |
+| `session.plan_changed`      | Rastreamento do plano do agente                | ⭐⭐         |
+| `permission.requested`      | Permissões solicitadas (além do callback solo) | ⭐⭐         |
+| `skill.invoked`             | Habilidades do agente invocadas                | ⭐          |
+| `subagent.started`          | Sub-agentes iniciados                          | ⭐          |
+| `session.warning`           | Avisos da sessão SDK                           | ⭐          |
+| `session.error`             | Erros granulares SDK (vs. catch genérico)      | ⭐⭐         |
+| `session.title_changed`     | Título da sessão atualizado                    | ⭐          |
+| `session.model_change`      | Troca de modelo em sessão ativa                | ⭐          |
 
 **Plano**:
 - `agent/task-executor.js`: subscrever `tool.execution_start` → emit `tool.execution.start` no agente
@@ -770,7 +770,7 @@ Eventos SDK já capturados: `session.compaction_start`, `session.compaction_comp
 
 ---
 
-### FASE V — SDK History API + reasoningEffort + errorOccurred Hook ⏳
+### FASE V — SDK History API + reasoningEffort + errorOccurred Hook ✅ CONCLUÍDA
 
 **Objetivo**: Implementar 3 funcionalidades SDK ainda não usadas que têm impacto direto em
 qualidade e observabilidade:

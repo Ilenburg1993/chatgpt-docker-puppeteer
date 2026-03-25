@@ -17,13 +17,15 @@ import { AGENT_EVENTS } from '#copilot/core';
  * @typedef {import('express').Response} Res
  *
  * @typedef {import('express').Router} BridgeRouter
+ *
+ * @typedef {import('./bridge-control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
  */
 
 /**
  * Registra a rota SSE GET /stream no router fornecido.
  *
  * @param {BridgeRouter} bridge - Express Router onde a rota será registrada
- * @param {any} agent - Instância do AlwaysAliveAgent
+ * @param {AlwaysAliveAgentLike} agent - Instância do AlwaysAliveAgent
  * @returns {void}
  */
 export function registerStreamRoutes(bridge, agent) {

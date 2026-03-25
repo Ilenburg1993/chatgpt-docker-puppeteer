@@ -19,13 +19,15 @@ import { log } from '#core/logger';
  * @typedef {import('express').Response} Res
  *
  * @typedef {import('express').Router} BridgeRouter
+ *
+ * @typedef {import('./bridge-control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
  */
 
 /**
  * Registra rotas do Dialog Loop no router fornecido.
  *
  * @param {BridgeRouter} bridge - Express Router onde as rotas serão registradas
- * @param {any} agent - Instância do AlwaysAliveAgent
+ * @param {AlwaysAliveAgentLike} agent - Instância do AlwaysAliveAgent
  * @returns {void}
  */
 export function registerDialogRoutes(bridge, agent) {

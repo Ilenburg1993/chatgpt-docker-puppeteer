@@ -31,13 +31,28 @@ import { log } from '#core/logger';
  *     starvationAlert: boolean;
  *     oldestTaskWaitMs: number;
  * }} AgentSnap
+ *
+ * @typedef {{
+ *     status: string;
+ *     sessionId: string | null;
+ *     getStatusSnapshot: () => AgentSnap;
+ *     start: () => Promise<void>;
+ *     stop: (opts?: { shutdownTimeoutMs?: number }) => Promise<void>;
+ *     sendMessage: (message: string, opts?: { timeoutMs?: number }) => Promise<unknown>;
+ *     answerPendingQuestion: (answer: string) => boolean;
+ *     startDialogLoop: (bootPrompt?: string) => Promise<void>;
+ *     sendDialogTurn: (text: string, opts?: { timeout?: number }) => Promise<string>;
+ *     stopDialogLoop: () => Promise<void>;
+ *     on: (event: string, listener: (...args: any[]) => void) => any;
+ *     off: (event: string, listener: (...args: any[]) => void) => any;
+ * }} AlwaysAliveAgentLike
  */
 
 /**
  * Registra rotas de controle do agente no router fornecido.
  *
  * @param {BridgeRouter} bridge - Express Router onde as rotas serão registradas
- * @param {any} agent - Instância do AlwaysAliveAgent
+ * @param {AlwaysAliveAgentLike} agent - Instância do AlwaysAliveAgent
  * @returns {void}
  */
 export function registerControlRoutes(bridge, agent) {
