@@ -512,6 +512,7 @@ FASE J  ✅ CONCLUÍDA   Integrar Socket.io hub no terminal — dual-emit SSE + 
 FASE K  ✅ CONCLUÍDA   api/ canônica: http-bridge.js e sdk-api.js movidos para api/ (f00e2e8c)
 FASE L  ✅ CONCLUÍDA   Remove cli-terminal.js e test_cli_terminal.spec.js (fc7eb58f)
 FASE M  ✅ CONCLUÍDA   Criar core/ com constants, errors, types (893a183a)
+FASE N  ✅ CONCLUÍDA   Consolidar AGENT_EVENTS — elimina cópia local em http-bridge.js (85148e2e)
 ```
 
 ---
@@ -602,6 +603,19 @@ passam a ter a implementação real; raízs viram thin re-exports.
 - `core/index.js` — barrel único
 - Aliases `#copilot/core` e `#copilot/core/*` adicionados em `package.json`
 - Apenas novos arquivos; nenhuma lógica existente movida
+
+### FASE N — Consolidar AGENT_EVENTS em core/ ✅ CONCLUÍDA (`85148e2e`)
+
+**Objetivo**: Eliminar a cópia local de `AGENT_EVENTS` em `http-bridge.js` (14 eventos, desatualizada) e substituir pelo import do array canônico em `core/` (18 eventos).
+
+**Executado**:
+- Remove `const AGENT_EVENTS = [...]` local de `src/copilot/api/http-bridge.js` (14 eventos)
+- Adiciona `import { AGENT_EVENTS } from '#copilot/core'` — fonte canônica: `agent/events.js` via `core/constants.js`
+- Novos eventos agora disponíveis no SSE `/stream`: `'error'`, `'session.fatal'`, `'dialog.stalled'`
+- Atualiza testes de static-inspection (`test_session_manager_streaming.spec.js`, `test_http_bridge_dialog.spec.js`) para ler `agent/events.js` (fonte canônica) em vez de `http-bridge.js`
+- 1465 testes unitários, 0 falhas
+
+**Resultado**: `http-bridge.js` é single-source-of-truth-free — toda lista de eventos é governada por `agent/events.js`.
 
 ---
 
