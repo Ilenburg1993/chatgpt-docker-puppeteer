@@ -51,7 +51,8 @@ import { WebhookManager } from './webhook-manager.js';
  * @property {function(Error): void} reject - Callback de erro
  * @property {number} enqueuedAt - Timestamp em ms
  * @property {number} [timeoutMs] - Timeout personalizado para sendAndWait (ms). undefined = usa padrão de 60s do SDK.
- * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens, seleções) a enviar junto com a mensagem.
+ * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens,
+ *   seleções) a enviar junto com a mensagem.
  */
 
 /**
@@ -134,7 +135,10 @@ export class AlwaysAliveAgent extends EventEmitter {
         // O padrão de 10 é insuficiente; 50 cobre cenários de carga real sem suprimir warnings.
         this.setMaxListeners(50);
         this.#model = options.model ?? process.env.COPILOT_MODEL ?? 'gpt-4.1';
-        this.#reasoningEffort = options.reasoningEffort ?? undefined;
+        this.#reasoningEffort =
+            options.reasoningEffort ??
+            /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */ (process.env.COPILOT_REASONING_EFFORT) ??
+            'high';
         this.#watchdog = new DialogWatchdog({
             intervalMs: AlwaysAliveAgent.#WATCHDOG_INTERVAL_MS,
             stallMs: AlwaysAliveAgent.#WATCHDOG_STALL_MS,
@@ -382,10 +386,13 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Enfileira uma mensagem para ser enviada ao modelo.
      *
      * @param {string} message - Mensagem a enviar
-     * @param {{ timeoutMs?: number; attachments?: import('@github/copilot-sdk').MessageOptions['attachments'] }} [opts] - Opções. `timeoutMs` sobrescreve o timeout padrão de 60s do SDK para
-     *   `sendAndWait`. Use um valor grande (ex.: `24 * 60 * 60 * 1000`) para tarefas de longa duração como o dialog
-     *   loop, que nunca emitem `session.idle` organicamente. `attachments` permite enviar arquivos, imagens ou
-     *   referências de contexto junto com a mensagem.
+     * @param {{ timeoutMs?: number; attachments?: import('@github/copilot-sdk').MessageOptions['attachments'] }} [opts]
+     *   - Opções. `timeoutMs` sobrescreve o timeout padrão de 60s do SDK para `sendAndWait`. Use um valor grande (ex.: `24
+     *
+     *       - 60 * 60 * 1000`) para tarefas de longa duração como o dialog loop, que nunca emitem `session.idle`
+     *               organicamente.`attachments` permite enviar arquivos, imagens ou referências de contexto junto com a
+     *               mensagem.
+     *
      * @returns {Promise<string>} Resposta completa do modelo
      */
     sendMessage(message, { timeoutMs, attachments } = {}) {
@@ -437,6 +444,46 @@ export class AlwaysAliveAgent extends EventEmitter {
         return true;
     }
 
+    // ─── Getters / Setters de configuração em runtime ─────────────────────────
+
+    /**
+     * ID do modelo atual em uso.
+     *
+     * @returns {string}
+     */
+    get model() {
+        return this.#model;
+    }
+
+    /**
+     * Troca o modelo em uso. A mudança é efetiva no próximo `sendMessage()`.
+     *
+     * @param {string} modelId - ID do modelo (ex. `'gpt-4.1'`, `'claude-sonnet-4-5'`)
+     * @returns {void}
+     */
+    setModel(modelId) {
+        this.#model = modelId;
+    }
+
+    /**
+     * Nível de raciocínio atual.
+     *
+     * @returns {'low' | 'medium' | 'high' | 'xhigh' | undefined}
+     */
+    get reasoningEffort() {
+        return this.#reasoningEffort;
+    }
+
+    /**
+     * Troca o nível de raciocínio. A mudança é efetiva no próximo `sendMessage()`.
+     *
+     * @param {'low' | 'medium' | 'high' | 'xhigh' | undefined} effort - Nível de raciocínio
+     * @returns {void}
+     */
+    setReasoningEffort(effort) {
+        this.#reasoningEffort = effort;
+    }
+
     /**
      * Retorna um snapshot do estado atual para a API HTTP.
      *
@@ -452,6 +499,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             status: this.#status,
             sessionId: this.sessionId,
             model: this.#model,
+            reasoningEffort: this.#reasoningEffort,
             queueSize: this.#queue.length,
             oldestTaskWaitMs: oldestWaitMs,
             starvationAlert: oldestWaitMs >= STARVATION_THRESHOLD_MS,

@@ -15,7 +15,7 @@
  * @example
  *     ```js
  *     import { LLM_B_TERMINAL_PORT, CopilotError, AGENT_EVENTS } from '#copilot/core';
- *     ```
+ *     ```;
  */
 
 export * from './constants.js';

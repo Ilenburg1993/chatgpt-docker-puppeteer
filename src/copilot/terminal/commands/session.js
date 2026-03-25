@@ -33,14 +33,17 @@ export function cmdStatus({ hubSessionId, injectPort, println }) {
     const active = alwaysAliveAgent.dialogLoopActive;
     const statusColor =
         snap.status === 'waiting_for_input' ? '\x1b[32m' : snap.status === 'idle' ? '\x1b[33m' : '\x1b[31m';
+    const effort = snap.reasoningEffort ?? 'high';
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
-  agente          ${statusColor}${snap.status}\x1b[0m
-  dialog loop     ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
+  agente           ${statusColor}${snap.status}\x1b[0m
+  dialog loop      ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
+  modelo           \x1b[36m${snap.model}\x1b[0m
+  reasoning        \x1b[35m${effort}\x1b[0m
   turnos (memória) ${llmBridgeClient.turnCount}
-  hub session     \x1b[90m${hubSessionId ?? '(sem hub)'}\x1b[0m
-  inject port     ${injectPort}
+  hub session      \x1b[90m${hubSessionId ?? '(sem hub)'}\x1b[0m
+  inject port      ${injectPort}
   ─────────────────────────────────────
 `);
 }

@@ -24,7 +24,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[36m╔═══════════════════════ Terminal LLM-B — Ajuda ═══════════════════════╗\x1b[0m
 
   \x1b[1mComandos de Sessão\x1b[0m
-  \x1b[33m/status\x1b[0m                              — status do agente LLM-B
+  \x1b[33m/status\x1b[0m                              — status do agente + modelo + reasoning
   \x1b[33m/history [n]\x1b[0m                         — últimos N turnos em memória
   \x1b[33m/db-history [n]\x1b[0m                      — últimos N turnos (SQLite)
   \x1b[33m/db-sessions [n]\x1b[0m                     — últimas N sessões hub
@@ -33,6 +33,13 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/clear\x1b[0m                               — limpa histórico em memória
   \x1b[33m/restart\x1b[0m                             — reinicia dialog loop
   \x1b[33m/quit\x1b[0m / \x1b[33m/exit\x1b[0m                         — encerra terminal
+
+  \x1b[1mConfiguração do Modelo\x1b[0m
+  \x1b[33m/model\x1b[0m                               — exibe modelo ativo
+  \x1b[33m/model list\x1b[0m                          — lista modelos disponíveis (via SDK)
+  \x1b[33m/model <id>\x1b[0m                          — troca modelo (ex: /model gpt-4.1)
+  \x1b[33m/reasoning\x1b[0m                           — exibe nível de raciocínio atual
+  \x1b[33m/reasoning low|medium|high|xhigh|off\x1b[0m — altera reasoning effort
 
   \x1b[1mMemória Semântica\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m               — persiste memória

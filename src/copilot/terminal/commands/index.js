@@ -8,6 +8,7 @@
  */
 
 export { cmdAlias } from './alias.js';
+export { cmdModel, cmdReasoning } from './config.js';
 export { cmdGh } from './gh.js';
 export { cmdGit } from './git.js';
 export { cmdHelp } from './help.js';

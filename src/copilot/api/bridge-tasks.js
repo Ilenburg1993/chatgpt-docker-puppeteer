@@ -65,9 +65,11 @@ export function registerTaskRoutes(bridge, agent) {
             }
 
             // Enfileira sem aguardar
-            agent.sendMessage(message, { ...(attachments !== undefined ? { attachments } : {}) }).catch((/** @type {any} */ e) => {
-                log('WARN', `[bridge-tasks/send] Tarefa assíncrona falhou: ${e.message}`);
-            });
+            agent
+                .sendMessage(message, { ...(attachments !== undefined ? { attachments } : {}) })
+                .catch((/** @type {any} */ e) => {
+                    log('WARN', `[bridge-tasks/send] Tarefa assíncrona falhou: ${e.message}`);
+                });
             return res.json({ ok: true, message: 'Mensagem enfileirada.', status: agent.status });
         } catch (/** @type {any} */ e) {
             log('ERROR', `[bridge-tasks/send] ${e.message}`);

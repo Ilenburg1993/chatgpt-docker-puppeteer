@@ -173,7 +173,10 @@ export class LlmBridgeClient {
                 );
             });
 
-            const response = await Promise.race([alwaysAliveAgent.sendMessage(message, { attachments }), timeoutPromise]);
+            const response = await Promise.race([
+                alwaysAliveAgent.sendMessage(message, { attachments }),
+                timeoutPromise,
+            ]);
 
             const responseStr = /** @type {string} */ (response);
             const durationMs = Date.now() - startedAt;

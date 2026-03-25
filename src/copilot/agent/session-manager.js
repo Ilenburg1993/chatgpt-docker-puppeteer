@@ -164,9 +164,7 @@ export async function initOrResumeSession(client, sessionOptions) {
         model,
         streaming: true,
         infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 },
-        ...(sessionOptions.reasoningEffort !== undefined
-            ? { reasoningEffort: sessionOptions.reasoningEffort }
-            : {}),
+        ...(sessionOptions.reasoningEffort !== undefined ? { reasoningEffort: sessionOptions.reasoningEffort } : {}),
         ...(sessionOptions.onPermissionRequest !== undefined
             ? { onPermissionRequest: sessionOptions.onPermissionRequest }
             : {}),

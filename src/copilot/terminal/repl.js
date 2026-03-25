@@ -30,6 +30,8 @@ import {
     cmdGit as _cmdGit,
     cmdHelp as _cmdHelp,
     cmdHistory as _cmdHistory,
+    cmdModel as _cmdModel,
+    cmdReasoning as _cmdReasoning,
     cmdRecall as _cmdRecall,
     cmdRemember as _cmdRemember,
     cmdStatus as _cmdStatus,
@@ -44,11 +46,12 @@ const INJECT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
 const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
 
 const BANNER = `
-\x1b[36m╔══════════════════════════════════════════════════════════════════════════╗
-║            Terminal LLM-B — Sessão Permanente Aberta                    ║
-╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
+\x1b[36m╔══════════════════════════════════════════════════════════════════════════╗\x1b[0m
+\x1b[36m║\x1b[0m  💬  \x1b[1mTerminal LLM-B\x1b[0m  \x1b[90m—\x1b[0m  Sessão Permanente                            \x1b[36m║\x1b[0m
+\x1b[36m╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
   \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
-  \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m · \x1b[33m/count\x1b[0m
+  \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
+  \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m
   \x1b[36m/gh issue list\x1b[0m · \x1b[36m/gh pr list\x1b[0m · \x1b[36m/gh run list\x1b[0m · \x1b[36m/git status\x1b[0m · \x1b[36m/git log\x1b[0m · \x1b[36m/alias\x1b[0m · \x1b[36m/help\x1b[0m
   \x1b[90mPOST :${INJECT_PORT}/inject  ·  POST :${INJECT_PORT}/pipeline  ·  GET :${INJECT_PORT}/events  ·  GET :${INJECT_PORT}/sessions  ·  POST/GET/DELETE :${INJECT_PORT}/memory\x1b[0m
   \x1b[90mGET :${INJECT_PORT}/gh/issues  ·  GET :${INJECT_PORT}/gh/prs  ·  GET :${INJECT_PORT}/gh/ci  ·  GET :${INJECT_PORT}/git/status  ·  GET :${INJECT_PORT}/git/log\x1b[0m
@@ -116,6 +119,12 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
             }
             await ensureDialogLoop();
             println('\x1b[32m  Dialog loop reiniciado.\x1b[0m');
+            break;
+        case 'model':
+            await _cmdModel({ println }, arg);
+            break;
+        case 'reasoning':
+            _cmdReasoning({ println }, arg);
             break;
         case 'quit':
         case 'exit':

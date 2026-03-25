@@ -4,11 +4,11 @@
  *
  * Auditoria JSONL de tool calls executados pela sessão SDK.
  *
- * Cada tool call gera uma entrada em `logs/tool-audit.jsonl` no formato:
- * `{ ts, sessionId, toolCallId, toolName, mcpServerName, argsSummary, resultSummary, durationMs, success }`
+ * Cada tool call gera uma entrada em `logs/tool-audit.jsonl` no formato: `{ ts, sessionId, toolCallId, toolName,
+ * mcpServerName, argsSummary, resultSummary, durationMs, success }`
  *
- * Rotação automática: quando o arquivo ultrapassa 10 MB é renomeado para `tool-audit.jsonl.1`
- * e um novo arquivo é criado.
+ * Rotação automática: quando o arquivo ultrapassa 10 MB é renomeado para `tool-audit.jsonl.1` e um novo arquivo é
+ * criado.
  *
  * @module copilot/channel/audit
  */
@@ -28,7 +28,7 @@ const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // ─── Fila de escritas pendentes ───────────────────────────────────────────────
 
-/** @type {Map<string, { toolName: string, mcpServerName: string|null, args: object, ts: number }>} */
+/** @type {Map<string, { toolName: string; mcpServerName: string | null; args: object; ts: number }>} */
 const _pending = new Map();
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ function argsSummary(args) {
 /**
  * Registra o início de uma tool call. Chamado no evento `tool.execution_start`.
  *
- * @param {{ toolCallId: string, toolName: string, args?: object, mcpServerName?: string|null }} entry
+ * @param {{ toolCallId: string; toolName: string; args?: object; mcpServerName?: string | null }} entry
  * @returns {void}
  */
 export function auditToolStart(entry) {
@@ -99,11 +99,11 @@ export function auditToolStart(entry) {
  * Chamado no evento `tool.execution_complete`.
  *
  * @param {{
- *   toolCallId: string,
- *   success: boolean,
- *   sessionId?: string|null,
- *   taskId?: string|null,
- *   resultContent?: string|null,
+ *     toolCallId: string;
+ *     success: boolean;
+ *     sessionId?: string | null;
+ *     taskId?: string | null;
+ *     resultContent?: string | null;
  * }} entry
  * @returns {void}
  */
@@ -141,8 +141,8 @@ export function auditToolComplete(entry) {
  *
  * Leitura sincronizada do arquivo completo — usar apenas para debug/diagnóstico.
  *
- * @param {string|null} sessionId - Filtrar por sessão; null retorna todas as entradas
- * @param {number} [limit=50] - Número máximo de entradas a retornar
+ * @param {string | null} sessionId - Filtrar por sessão; null retorna todas as entradas
+ * @param {number} [limit=50] - Número máximo de entradas a retornar. Default is `50`
  * @returns {object[]}
  */
 export function getAuditSummary(sessionId, limit = 50) {
@@ -150,7 +150,13 @@ export function getAuditSummary(sessionId, limit = 50) {
         if (!fs.existsSync(AUDIT_FILE)) return [];
         const lines = fs.readFileSync(AUDIT_FILE, 'utf8').trim().split('\n').filter(Boolean);
         const entries = lines
-            .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+            .map((l) => {
+                try {
+                    return JSON.parse(l);
+                } catch {
+                    return null;
+                }
+            })
             .filter(Boolean);
         const filtered = sessionId ? entries.filter((e) => e.sessionId === sessionId) : entries;
         return filtered.slice(-limit);

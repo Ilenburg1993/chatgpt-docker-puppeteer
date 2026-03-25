@@ -8,7 +8,7 @@
  *
  * - Garantir que o dialog loop está ativo (`ensureDialogLoop`)
  * - Enviar turnos de diálogo e exibir respostas (`sendTurn`)
- * - Transmitir eventos SSE para clientes conectados (`broadcastSse`)
+ * - Transmitir eventos via dual-emit SSE + Socket.io /copilot namespace (`broadcastSse`)
  * - Renderizar output no stdout (`println`, `printExchange`)
  *
  * @module copilot/terminal/dialog
@@ -34,6 +34,9 @@ const TURN_TIMEOUT_MS = Number(process.env.LLM_B_TURN_TIMEOUT ?? 120_000);
 
 const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
 const PROMPT_WAITING = '     ';
+
+/** Separador visual entre turnos — 72 colunas. */
+const SEPARATOR = '\x1b[90m  ' + '─'.repeat(70) + '\x1b[0m';
 
 /**
  * Boot prompt padrão enviado à LLM-B ao iniciar o dialog loop. Pode ser sobrescrito pela variável de ambiente
@@ -77,6 +80,14 @@ export function println(text) {
 /**
  * Exibe um turno completo (mensagem + resposta) com formatação visual limpa.
  *
+ * Formato:
+ *
+ *     ── [14:22:10] você ──────────────────────────────────────────────────────
+ *       <mensagem>
+ *
+ *     ── [14:22:11] 🧠 LLM-B · gpt-4.1 · high · 3.2s ─────────────────────
+ *       <resposta linha a linha>
+ *
  * @param {string} actor - Ator que enviou ('user' | 'llm-a')
  * @param {string} message - Mensagem enviada
  * @param {string} reply - Resposta da LLM-B
@@ -86,15 +97,31 @@ export function println(text) {
 export function printExchange(actor, message, reply, durationMs) {
     const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const secs = (durationMs / 1000).toFixed(1);
+    const model = alwaysAliveAgent.model;
+    const effort = alwaysAliveAgent.reasoningEffort ?? 'high';
+
+    // Duração colorida: verde <5s, amarelo <15s, vermelho >=15s
+    const secsNum = durationMs / 1000;
+    const secsColor =
+        secsNum < 5 ? `\x1b[32m${secs}s\x1b[0m` : secsNum < 15 ? `\x1b[33m${secs}s\x1b[0m` : `\x1b[31m${secs}s\x1b[0m`;
 
     if (actor === 'llm-a') {
-        println(`\n  🤖  \x1b[34mLLM-A\x1b[0m  \x1b[90m[${ts}]\x1b[0m`);
-        println(`  ${message}`);
+        println(SEPARATOR);
+        println(`  \x1b[90m[${ts}]\x1b[0m  🤖  \x1b[34mLLM-A\x1b[0m`);
+        println('');
+        for (const line of message.split('\n')) {
+            println(`  \x1b[34m│\x1b[0m  ${line}`);
+        }
+        println('');
     }
 
-    println(`\n  🧠  \x1b[32mLLM-B\x1b[0m  \x1b[90m[${ts}] ${secs}s\x1b[0m`);
+    println(SEPARATOR);
+    println(
+        `  \x1b[90m[${ts}]\x1b[0m  🧠  \x1b[32mLLM-B\x1b[0m  \x1b[90m·\x1b[0m  \x1b[36m${model}\x1b[0m  \x1b[90m·\x1b[0m  \x1b[35m${effort}\x1b[0m  \x1b[90m·\x1b[0m  ${secsColor}`,
+    );
+    println('');
     for (const line of reply.split('\n')) {
-        println(`  ${line}`);
+        println(`  \x1b[32m│\x1b[0m  ${line}`);
     }
     println('');
 }
@@ -102,10 +129,14 @@ export function printExchange(actor, message, reply, durationMs) {
 // ─── SSE ──────────────────────────────────────────────────────────────────────
 
 /**
- * Transmite um evento SSE para todos os clientes conectados ao endpoint GET /events. Clientes em modo `?level=critical`
- * recebem apenas eventos em CRITICAL_EVENTS.
+ * Transmite um evento para todos os canais de saída conectados:
  *
- * @param {string} event - Tipo do evento (ex: 'reply', 'ready', 'stalled')
+ * 1. **SSE (raw node:http)** — escrita direta em `ServerResponse` dos clientes no endpoint GET /events. Clientes em modo
+ *    `?level=critical` recebem apenas eventos listados em `CRITICAL_EVENTS`.
+ * 2. **Socket.io** — emite via namespace `/copilot` se o namespace estiver montado (processo integrado). Quando o terminal
+ *    corre como processo separado (PM2), o namespace é `null` e esta etapa é no-op.
+ *
+ * @param {string} event - Tipo do evento (ex: `'reply'` | `'ready'` | `'stalled'` | `'error'`)
  * @param {object} data - Payload JSON serializável
  * @returns {void}
  */
@@ -193,7 +224,9 @@ export async function sendTurn(message, actor = 'user') {
     setBusy(true);
     const rl = getRl();
     if (rl) {
-        process.stdout.write(`\x1b[90m  …\x1b[0m`);
+        const model = alwaysAliveAgent.model;
+        const effort = alwaysAliveAgent.reasoningEffort ?? 'high';
+        process.stdout.write(`  \x1b[90m⏳ aguardando \x1b[36m${model}\x1b[90m · \x1b[35m${effort}\x1b[90m…\x1b[0m`);
         rl.setPrompt(PROMPT_WAITING);
     }
 

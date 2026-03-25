@@ -4,8 +4,8 @@
  *
  * Classes de erro semântico para o módulo copilot.
  *
- * Fornece uma hierarquia de erros tipados que routers, bridges e agentes podem
- * lançar e capturar com tratamento diferenciado por tipo.
+ * Fornece uma hierarquia de erros tipados que routers, bridges e agentes podem lançar e capturar com tratamento
+ * diferenciado por tipo.
  *
  * @module copilot/core/errors
  */
@@ -18,7 +18,7 @@
 export class CopilotError extends Error {
     /**
      * @param {string} message - Mensagem descritiva do erro.
-     * @param {string} [code='COPILOT_ERROR'] - Código semântico do erro.
+     * @param {string} [code='COPILOT_ERROR'] - Código semântico do erro. Default is `'COPILOT_ERROR'`
      */
     constructor(message, code = 'COPILOT_ERROR') {
         super(message);
@@ -29,15 +29,14 @@ export class CopilotError extends Error {
 }
 
 /**
- * Erro de sessão do Copilot SDK.
- * Lançado quando há falha na criação, restauração ou gerenciamento de sessões.
+ * Erro de sessão do Copilot SDK. Lançado quando há falha na criação, restauração ou gerenciamento de sessões.
  *
  * @extends {CopilotError}
  */
 export class SessionError extends CopilotError {
     /**
      * @param {string} message - Mensagem descritiva do erro.
-     * @param {string} [code='SESSION_ERROR'] - Código semântico do erro.
+     * @param {string} [code='SESSION_ERROR'] - Código semântico do erro. Default is `'SESSION_ERROR'`
      */
     constructor(message, code = 'SESSION_ERROR') {
         super(message, code);
@@ -46,15 +45,14 @@ export class SessionError extends CopilotError {
 }
 
 /**
- * Erro de bridge (HTTP, NERV, Git, GH, MCP).
- * Lançado quando há falha na comunicação com serviços externos ou internos.
+ * Erro de bridge (HTTP, NERV, Git, GH, MCP). Lançado quando há falha na comunicação com serviços externos ou internos.
  *
  * @extends {CopilotError}
  */
 export class BridgeError extends CopilotError {
     /**
      * @param {string} message - Mensagem descritiva do erro.
-     * @param {string} [code='BRIDGE_ERROR'] - Código semântico do erro.
+     * @param {string} [code='BRIDGE_ERROR'] - Código semântico do erro. Default is `'BRIDGE_ERROR'`
      */
     constructor(message, code = 'BRIDGE_ERROR') {
         super(message, code);

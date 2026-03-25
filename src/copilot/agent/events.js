@@ -42,7 +42,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
  * Union type de todos os nomes de eventos do AlwaysAliveAgent.
  *
  * @example
- * // → 'task.queued' | 'task.started' | 'task.completed' | ...
+ *     // → 'task.queued' | 'task.started' | 'task.completed' | ...
  *
- * @typedef {typeof AGENT_EVENTS[number]} AgentEventName
+ * @typedef {(typeof AGENT_EVENTS)[number]} AgentEventName
  */

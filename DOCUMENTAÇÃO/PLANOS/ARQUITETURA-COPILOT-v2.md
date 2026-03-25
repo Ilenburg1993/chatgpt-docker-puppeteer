@@ -1038,16 +1038,16 @@ a solução imediata e mais robusta; streaming incremental real é uma melhoria 
 
 **Contexto — Funcionalidades ausentes que o Copilot CLI oferece:**
 
-| Copilot CLI Command | Funcionalidade                              | Status atual |
-| ------------------- | ------------------------------------------- | ------------ |
-| `/model`            | Lista e troca modelo                        | Fase X       |
-| `/context`          | Mostra uso do context window               | ❌ ausente   |
-| `/compact`          | Compactação manual da sessão               | ❌ ausente   |
-| `/plan` mode        | Mode de planejamento antes de executar     | ❌ ausente   |
-| `/resume`           | Retoma sessão anterior                     | ❌ ausente   |
-| `/feedback`         | Envia feedback sobre resposta              | ❌ ausente   |
-| Shift+Tab           | Alterna entre modos ask/plan               | ❌ ausente   |
-| Auto-compaction     | Compactação automática a 95% do context    | Via SDK Events |
+| Copilot CLI Command | Funcionalidade                          | Status atual   |
+| ------------------- | --------------------------------------- | -------------- |
+| `/model`            | Lista e troca modelo                    | Fase X         |
+| `/context`          | Mostra uso do context window            | ❌ ausente      |
+| `/compact`          | Compactação manual da sessão            | ❌ ausente      |
+| `/plan` mode        | Mode de planejamento antes de executar  | ❌ ausente      |
+| `/resume`           | Retoma sessão anterior                  | ❌ ausente      |
+| `/feedback`         | Envia feedback sobre resposta           | ❌ ausente      |
+| Shift+Tab           | Alterna entre modos ask/plan            | ❌ ausente      |
+| Auto-compaction     | Compactação automática a 95% do context | Via SDK Events |
 
 **Objetivo:**
 Implementar os comandos mais valiosos de forma nativa, sem dependências externas:
