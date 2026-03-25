@@ -10,12 +10,13 @@
  * /api/sdk/auth — Status de autenticação GitHub GET /api/sdk/models — Lista modelos disponíveis
  *
  * GET /api/sdk/sessions — Lista todas as sessões (disco + memória) POST /api/sdk/sessions — Cria nova sessão GET
- * /api/sdk/sessions/active — Lista sessões ativas no registry GET /api/sdk/sessions/:id — Detalhes de uma sessão DELETE
- * /api/sdk/sessions/:id — Deleta sessão do disco (irreversível) POST /api/sdk/sessions/:id/resume — Retoma sessão
- * existente POST /api/sdk/sessions/:id/disconnect — Desconecta sessão ativa POST /api/sdk/sessions/:id/send — Envia
- * mensagem (sync ou async) GET /api/sdk/sessions/:id/stream — SSE stream de eventos da sessão POST
- * /api/sdk/sessions/:id/abort — Aborta processamento em andamento na sessão GET /api/sdk/sessions/:id/messages — Lista
- * histórico de mensagens da sessão
+ * /api/sdk/sessions/active — Lista sessões ativas no registry GET /api/sdk/sessions/last — Retorna ID da última sessão
+ * modificada GET /api/sdk/sessions/:id — Detalhes de uma sessão DELETE /api/sdk/sessions/:id — Deleta sessão do disco
+ * (irreversível) POST /api/sdk/sessions/:id/resume — Retoma sessão existente POST /api/sdk/sessions/:id/disconnect —
+ * Desconecta sessão ativa POST /api/sdk/sessions/:id/send — Envia mensagem (sync ou async) POST
+ * /api/sdk/sessions/:id/model — Altera modelo da sessão ativa GET /api/sdk/sessions/:id/stream — SSE stream de eventos
+ * da sessão POST /api/sdk/sessions/:id/abort — Aborta processamento em andamento na sessão GET
+ * /api/sdk/sessions/:id/messages — Lista histórico de mensagens da sessão
  *
  * GET /api/sdk/sessions/foreground — Obtém sessionId em foreground PUT /api/sdk/sessions/foreground/:id — Define sessão
  * em foreground
@@ -27,6 +28,9 @@
  * rico com metadados GET /api/sdk/agent/telemetry — Resumo de telemetria (sessões, erros) POST
  * /api/sdk/agent/telemetry/clear — Reseta store de telemetria GET /api/sdk/agent/state — Estado de conexão do
  * CopilotClient GET /api/sdk/agent/stream — SSE de eventos de ciclo de vida do cliente
+ *
+ * POST /api/sdk/client/start — Inicia CopilotClient POST /api/sdk/client/stop — Para CopilotClient (gracioso) POST
+ * /api/sdk/client/force-stop — Para CopilotClient forçadamente
  *
  * @module copilot/sdk-api
  */
@@ -155,7 +159,7 @@ router.get('/models', (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /sessions/active
+// GET /sessions/active  +  GET /sessions/last
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -170,6 +174,17 @@ router.get('/sessions/active', (_req, res) => {
         activeMs: Date.now() - createdAt,
     }));
     res.json({ ok: true, count: active.length, sessions: active });
+});
+
+/**
+ * Retorna o ID da última sessão criada ou modificada (via CopilotClient.getLastSessionId).
+ */
+router.get('/sessions/last', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const client = await getClient();
+        const sessionId = await client.getLastSessionId();
+        res.json({ ok: true, lastSessionId: sessionId ?? null });
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -258,8 +273,20 @@ router.get('/sessions', (req, res) => {
  */
 router.post('/sessions', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const { model, sessionId, systemMessage, infiniteSessions, workingDirectory, streaming, provider } =
-            req.body ?? {};
+        const {
+            model,
+            sessionId,
+            systemMessage,
+            infiniteSessions,
+            workingDirectory,
+            streaming,
+            provider,
+            reasoningEffort,
+            availableTools,
+            excludedTools,
+            customAgents,
+            clientName,
+        } = req.body ?? {};
 
         if (!model || typeof model !== 'string') {
             res.status(400).json({ ok: false, error: 'Campo "model" (string) é obrigatório.' });
@@ -274,6 +301,11 @@ router.post('/sessions', (req, res) => {
             ...(workingDirectory ? { workingDirectory } : {}),
             ...(streaming !== undefined ? { streaming } : {}),
             ...(provider ? { provider } : {}),
+            ...(reasoningEffort ? { reasoningEffort } : {}),
+            ...(availableTools ? { availableTools } : {}),
+            ...(excludedTools ? { excludedTools } : {}),
+            ...(customAgents ? { customAgents } : {}),
+            ...(clientName ? { clientName } : {}),
         });
 
         res.status(201).json({
@@ -552,6 +584,20 @@ router.post('/client/stop', (req, res) => {
     });
 });
 
+/**
+ * POST /client/force-stop
+ *
+ * Para forçadamente o CopilotClient sem cleanup gracioso. Use quando `stop()` demora demais.
+ */
+router.post('/client/force-stop', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const client = await getClient();
+        await client.forceStop();
+        log('INFO', '[sdk-api] CopilotClient force-stop executado');
+        res.json({ ok: true, message: 'CopilotClient force-stop executado.' });
+    });
+});
+
 // ─── Ferramentas ─────────────────────────────────────────────────────────────
 
 /**
@@ -716,6 +762,35 @@ router.post('/agent/telemetry/clear', (req, res) => {
 });
 
 // ─── Sprint 19: novos endpoints de sessão e agente ───────────────────────────
+
+/**
+ * POST /sessions/:id/model
+ *
+ * Muda o modelo de uma sessão ativa em tempo real via CopilotSession.setModel().
+ *
+ * Body: { "model": "claude-sonnet-4-5" }
+ */
+router.post('/sessions/:id/model', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const { id } = req.params;
+        const { model } = req.body ?? {};
+        if (!model || typeof model !== 'string') {
+            res.status(400).json({ ok: false, error: 'Campo "model" (string) é obrigatório.' });
+            return;
+        }
+        const entry = getSdkSession(id);
+        if (!entry) {
+            res.status(404).json({
+                ok: false,
+                error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
+            });
+            return;
+        }
+        await entry.session.setModel(model);
+        log('INFO', `[sdk-api] modelo alterado: sessão ${id} → ${model}`);
+        res.json({ ok: true, sessionId: id, model });
+    });
+});
 
 /**
  * POST /sessions/:id/abort
