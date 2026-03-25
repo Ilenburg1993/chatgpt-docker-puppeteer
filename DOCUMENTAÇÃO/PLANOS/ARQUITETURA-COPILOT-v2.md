@@ -513,6 +513,7 @@ FASE K  ✅ CONCLUÍDA   api/ canônica: http-bridge.js e sdk-api.js movidos par
 FASE L  ✅ CONCLUÍDA   Remove cli-terminal.js e test_cli_terminal.spec.js (fc7eb58f)
 FASE M  ✅ CONCLUÍDA   Criar core/ com constants, errors, types (893a183a)
 FASE N  ✅ CONCLUÍDA   Consolidar AGENT_EVENTS — elimina cópia local em http-bridge.js (85148e2e)
+FASE O  ✅ CONCLUÍDA   Criar channel/ módulo canônico LLM-A ↔ LLM-B (6964fcc4)
 ```
 
 ---
@@ -619,31 +620,25 @@ passam a ter a implementação real; raízs viram thin re-exports.
 
 ---
 
-### FASE O — Módulo channel/: Camada Dedicada LLM-A ↔ LLM-B ⏳ PRÓXIMA
+### FASE O — Módulo channel/: Camada Dedicada LLM-A ↔ LLM-B ✅ CONCLUÍDA (`6964fcc4`)
 
 **Objetivo**: Criar `src/copilot/channel/` como o módulo canônico para toda comunicação entre
 LLM-A (GitHub Copilot — este agente) e LLM-B (Copilot SDK / gpt-4.1). Consolida e organiza
-o que hoje está espalhado entre `bridges/inject-llmb.js` e `bridges/llm-bridge-client.js`.
+o que estava espalhado entre `bridges/inject-llmb.js` e `bridges/llm-bridge-client.js`.
 
-**Motivação**: O canal LLM-A ↔ LLM-B é estratégico e crescerá com Sprint B (Session Persistence),
-Sprint C (Tool Call Auditing), Sprint D (Parallel Queue) e Sprint E (LLM-A Self-Description).
-Um módulo dedicado facilita extensão, versionamento de protocolo e auditoria.
+**Executado**:
 
-**Plano de execução**:
+| Arquivo novo              | Conteúdo                                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| `channel/inject.js`       | Canônico: HTTP injection ao terminal server (POST /inject, GET /health, SSE, pipeline) |
+| `channel/client.js`       | Canônico: LlmBridgeClient (chat, chatStructured, startDialogMode, dialogTurn, etc.) |
+| `channel/index.js`        | Barrel: re-exports nomeados + `CHANNEL_VERSION = '1'`                               |
 
-| Arquivo novo                      | Conteúdo                                                                           |
-| --------------------------------- | ---------------------------------------------------------------------------------- |
-| `channel/inject.js`               | Move de `bridges/inject-llmb.js` — HTTP injection ao terminal server (POST /inject) |
-| `channel/client.js`               | Move de `bridges/llm-bridge-client.js` — SDK wrapper (chat/chatStructured/dialog)  |
-| `channel/index.js`                | Barrel: `{ LlmChannel, inject, checkLlmBHealth, CHANNEL_VERSION }`                  |
-
-- Alias `#copilot/channel` adicionado em `package.json`
-- `bridges/inject-llmb.js` e `bridges/llm-bridge-client.js` viram thin re-exports (compat)
-- `BridgeError` de `core/errors.js` substituindo `throw new Error(...)` nesses módulos
-- `CHANNEL_VERSION = '1'` exportado — versão do protocolo de comunicação
-- JSDoc completo com `@throws {BridgeError}` nos métodos que podem falhar
-- Testes existentes atualizados para apontar aos canônicos em `channel/`
-- Guia `LLM-A-COMMUNICATION-GUIDE.md` atualizado com `#copilot/channel`
+- Alias `#copilot/channel` e `#copilot/channel/*` adicionados em `package.json`
+- `bridges/inject-llmb.js` e `bridges/llm-bridge-client.js` → thin re-exports de compat
+- Root `inject-llmb.js` e `llm-bridge-client.js` → apontam direto ao `channel/`
+- Re-export chain: root → channel/ (todos os consumidores existentes intactos)
+- 1465 testes passando, lint limpo
 
 **Impacto futuro** (Sprints planejados):
 - **Sprint B** (Session Persistence v2): `channel/history.js` para serializar turnos
