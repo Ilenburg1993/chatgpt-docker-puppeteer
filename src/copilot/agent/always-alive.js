@@ -276,6 +276,23 @@ export class AlwaysAliveAgent extends EventEmitter {
                 this.emit('session.compaction_complete', evt?.data ?? {});
             });
 
+            // Reasoning tokens (o3/o4-mini extended thinking) — forwarded via task.reasoning
+            session.on('assistant.reasoning_delta', (/** @type {any} */ evt) => {
+                const chunk = evt?.data?.deltaContent ?? '';
+                if (chunk) this.emit('task.reasoning', { chunk, reasoningId: evt?.data?.reasoningId ?? null });
+            });
+
+            // Uso de tokens e contexto da sessão — forwarded via session.usage
+            session.on('session.usage_info', (/** @type {any} */ evt) => {
+                this.emit('session.usage', evt?.data ?? {});
+            });
+
+            // Mudança de modo (plan ↔ act ↔ interactive) — forwarded via session.mode_changed
+            session.on('session.mode_changed', (/** @type {any} */ evt) => {
+                log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.previousMode} → ${evt?.data?.newMode}`);
+                this.emit('session.mode_changed', evt?.data ?? {});
+            });
+
             this.#setStatus('idle');
             log(
                 'INFO',

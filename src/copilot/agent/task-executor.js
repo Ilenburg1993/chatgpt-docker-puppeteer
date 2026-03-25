@@ -51,15 +51,39 @@ export async function executeTask(session, task, callbacks) {
         if (chunk) onDelta(chunk, task.id);
     });
 
+    // Subscreve a eventos de execução de tool para auditoria e observabilidade
+    const unsubToolStart = session.on('tool.execution_start', (/** @type {any} */ event) => {
+        emit('tool.execution.start', {
+            toolCallId: event?.data?.toolCallId ?? '',
+            toolName: event?.data?.toolName ?? '',
+            args: event?.data?.arguments ?? {},
+            mcpServerName: event?.data?.mcpServerName ?? null,
+            taskId: task.id,
+        });
+    });
+
+    const unsubToolComplete = session.on('tool.execution_complete', (/** @type {any} */ event) => {
+        emit('tool.execution.complete', {
+            toolCallId: event?.data?.toolCallId ?? '',
+            toolName: event?.data?.toolName ?? null,
+            success: event?.data?.success ?? false,
+            taskId: task.id,
+        });
+    });
+
     try {
         const event = await session.sendAndWait({ prompt: task.message }, task.timeoutMs ?? 60_000);
         unsubDelta();
+        unsubToolStart();
+        unsubToolComplete();
         const text = event?.data?.content ?? '';
         setStatus('idle');
         emit('task.completed', { taskId: task.id, response: text, responseLen: text.length });
         task.resolve(text);
     } catch (/** @type {any} */ e) {
         unsubDelta();
+        unsubToolStart();
+        unsubToolComplete();
         // Tenta reconectar com backoff exponencial se parecer erro de rede/sessão
         const recovered = await tryReconnect(e);
         if (recovered) {
