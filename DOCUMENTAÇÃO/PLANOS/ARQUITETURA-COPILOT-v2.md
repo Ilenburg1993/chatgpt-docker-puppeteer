@@ -619,6 +619,116 @@ passam a ter a implementação real; raízs viram thin re-exports.
 
 ---
 
+### FASE O — Módulo channel/: Camada Dedicada LLM-A ↔ LLM-B ⏳ PRÓXIMA
+
+**Objetivo**: Criar `src/copilot/channel/` como o módulo canônico para toda comunicação entre
+LLM-A (GitHub Copilot — este agente) e LLM-B (Copilot SDK / gpt-4.1). Consolida e organiza
+o que hoje está espalhado entre `bridges/inject-llmb.js` e `bridges/llm-bridge-client.js`.
+
+**Motivação**: O canal LLM-A ↔ LLM-B é estratégico e crescerá com Sprint B (Session Persistence),
+Sprint C (Tool Call Auditing), Sprint D (Parallel Queue) e Sprint E (LLM-A Self-Description).
+Um módulo dedicado facilita extensão, versionamento de protocolo e auditoria.
+
+**Plano de execução**:
+
+| Arquivo novo                      | Conteúdo                                                                           |
+| --------------------------------- | ---------------------------------------------------------------------------------- |
+| `channel/inject.js`               | Move de `bridges/inject-llmb.js` — HTTP injection ao terminal server (POST /inject) |
+| `channel/client.js`               | Move de `bridges/llm-bridge-client.js` — SDK wrapper (chat/chatStructured/dialog)  |
+| `channel/index.js`                | Barrel: `{ LlmChannel, inject, checkLlmBHealth, CHANNEL_VERSION }`                  |
+
+- Alias `#copilot/channel` adicionado em `package.json`
+- `bridges/inject-llmb.js` e `bridges/llm-bridge-client.js` viram thin re-exports (compat)
+- `BridgeError` de `core/errors.js` substituindo `throw new Error(...)` nesses módulos
+- `CHANNEL_VERSION = '1'` exportado — versão do protocolo de comunicação
+- JSDoc completo com `@throws {BridgeError}` nos métodos que podem falhar
+- Testes existentes atualizados para apontar aos canônicos em `channel/`
+- Guia `LLM-A-COMMUNICATION-GUIDE.md` atualizado com `#copilot/channel`
+
+**Impacto futuro** (Sprints planejados):
+- **Sprint B** (Session Persistence v2): `channel/history.js` para serializar turnos
+- **Sprint C** (Tool Call Auditing): `channel/audit.js` para log JSONL de tool calls
+- **Sprint D** (Parallel Queue): `channel/batch.js` para `chatBatch()`
+- **Sprint E** (LLM-A Self-Description): `channel/context.js` para introspection
+
+---
+
+### FASE P — Hardening de Erros: CopilotError/SessionError/BridgeError ⏳
+
+**Objetivo**: Substituir `throw new Error(mensagem genérica)` por tipos semânticos de `core/errors.js`
+nos módulos principais do copilot — `inject-llmb.js`, `always-alive.js`, `http-bridge.js`, `session-manager.js`.
+
+**Plano**:
+- `bridges/inject-llmb.js` (ou `channel/inject.js` após Fase O): substituir todos os `throw new Error` por `throw new BridgeError(msg, code)`
+- `agent/always-alive.js`: `SessionError` para falhas de ciclo de vida da sessão
+- `api/http-bridge.js`: `BridgeError` para erros de request/response
+- `agent/session-manager.js`: `SessionError` nos getters/setters que validam estado
+- Regra: cada `catch (err)` deve reemitir como tipo semântico ou logar com `err.code`
+- Nenhuma lógica nova — apenas substituição de tipo de erro
+
+---
+
+### FASE Q — Tool Call Auditing: Log JSONL de Tool Calls (Sprint C) ⏳
+
+**Objetivo**: Registrar em `logs/tool-audit.jsonl` cada tool call executado por LLM-B:
+`{ ts, sessionId, tool, argsSummary, resultSummary, durationMs, success }`.
+
+**Plano**:
+- Criar `channel/audit.js` com função `logToolCall(entry)` → append em `logs/tool-audit.jsonl`
+- Hook em `agent/tools-bootstrap.js`: wrapper audit em volta de cada tool registrado
+- SSE no `/stream` pode incluir evento `tool.audit` (opt-in via query param)
+- Arquivo rotativo: quando > 10MB, rotacionar para `tool-audit.jsonl.1`
+- Exportar `getAuditSummary(sessionId)` → últimas N entradas de uma sessão
+
+---
+
+### FASE R — Extrair Rotas http-bridge.js em Sub-Routers ⏳
+
+**Objetivo**: Dividir `api/http-bridge.js` (~320 linhas) em sub-routers focados, como foi feito
+com `sdk-api.js` na Fase H.
+
+**Plano**:
+
+| Sub-router novo              | Rotas                                           |
+| ---------------------------- | ----------------------------------------------- |
+| `api/bridge-stream.js`       | `GET /stream` (SSE endpoint principal)           |
+| `api/bridge-dialog.js`       | `POST /dialog/start`, `/dialog/turn`, `/dialog/stop` |
+| `api/bridge-tasks.js`        | `POST /task`, `DELETE /task/:id`                 |
+| `api/bridge-control.js`      | `GET /status`, `POST /stop`, `POST /restart`     |
+
+- `api/http-bridge.js` vira aggregator (importa e monta sub-routers)
+- Cada sub-router tem seus próprios testes de análise estrutural
+- Sem quebra de compatibilidade de rotas
+
+---
+
+### FASE S — Session Persistence v2: Histórico nos Retomadas (Sprint B) ⏳
+
+**Objetivo**: Quando LLM-B retoma uma sessão (`AlwaysAliveAgent.start()` com `sessionId` existente),
+recebe um resumo estruturado dos últimos N turnos no `systemMessage`, reduzindo repetição de contexto.
+
+**Plano**:
+- `channel/history.js`: serializa turnos (LlmBridgeClient.history → resumo compacto)
+- `agent/session-manager.js`: salva `history_summary` no arquivo de sessão JSON
+- `agent/always-alive.js`: injeta `historySummary` no `systemMessage` quando `continuedSession=true`
+- N configurável: `config.session.historyWindowTurns ?? 10`
+- Testes: mock de sessão com histórico → verificar que systemMessage inclui resumo
+
+---
+
+### FASE T — Tipar AGENT_EVENTS como Union-Type (satisfies operator) ⏳
+
+**Objetivo**: Usar TypeScript `as const satisfies ReadonlyArray<AgentEvent>` em `agent/events.js`
+para que cada uso de string de evento seja verificado em tempo de compilação.
+
+**Plano**:
+- `core/types.js`: exportar `AgentEvent = typeof AGENT_EVENTS[number]` (union de strings)
+- `agent/events.js`: anotar com `/** @type {ReadonlyArray<import('../core/types.js').AgentEvent>} */`
+- NERV/SSE: substituir `string` por `AgentEvent` onde os eventos são emitidos/consumidos
+- `npm run typecheck:node` deve capturar qualquer event-name inválido
+
+---
+
 ## 10. Checklist de Qualidade para Cada Fase
 
 Antes de commitar cada fase:
