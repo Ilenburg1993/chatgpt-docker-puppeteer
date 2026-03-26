@@ -94,6 +94,19 @@ export async function startTerminalServer() {
         });
     });
 
+    // AA.4: SSE 'context' event — emitir dados reais de uso de contexto após cada turno
+    alwaysAliveAgent.on('session.usage', (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
+        const { currentTokens = 0, tokenLimit = 0 } = data;
+        if (tokenLimit > 0) {
+            broadcastSse('context', {
+                tokens: currentTokens,
+                tokenLimit,
+                utilization: currentTokens / tokenLimit,
+                timestamp: Date.now(),
+            });
+        }
+    });
+
     // Persiste reconexões e sessões fatais no Hub
     alwaysAliveAgent.on(
         'ready',

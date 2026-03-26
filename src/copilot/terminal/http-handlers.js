@@ -39,6 +39,7 @@ import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalCli
  * @returns {HandlerResult}
  */
 export function handleHealth() {
+    const snapshot = alwaysAliveAgent.getStatusSnapshot();
     return {
         status: 200,
         body: {
@@ -50,6 +51,8 @@ export function handleHealth() {
             sseClients: getSseClients().size,
             model: alwaysAliveAgent.model,
             reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
+            // AA.5: expor dados reais de uso de contexto
+            contextWindow: snapshot.contextWindow,
         },
     };
 }
@@ -369,6 +372,7 @@ export function getSseClientSets() {
  * @returns {HandlerResult}
  */
 export function handleGetConfig() {
+    const snapshot = alwaysAliveAgent.getStatusSnapshot();
     return {
         status: 200,
         cors: true,
@@ -381,6 +385,8 @@ export function handleGetConfig() {
             busy: getBusy(),
             hubSessionId: getHubSessionId(),
             port: Number(process.env.LLM_B_TERMINAL_PORT ?? 3009),
+            // AA.5: expor dados reais de uso de contexto
+            contextWindow: snapshot.contextWindow,
         },
     };
 }

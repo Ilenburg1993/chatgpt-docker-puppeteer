@@ -164,6 +164,10 @@ export async function initOrResumeSession(client, sessionOptions) {
         model,
         streaming: true,
         infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 },
+        // AA.6: passar workingDirectory para o SDK contextualizar ferramentas de busca
+        workingDirectory: process.env.COPILOT_WORKING_DIRECTORY ?? process.cwd(),
+        // AA.7: diretórios de skills para o SDK carregar
+        skillDirectories: ['.github/skills'],
         ...(sessionOptions.reasoningEffort !== undefined ? { reasoningEffort: sessionOptions.reasoningEffort } : {}),
         ...(sessionOptions.onPermissionRequest !== undefined
             ? { onPermissionRequest: sessionOptions.onPermissionRequest }

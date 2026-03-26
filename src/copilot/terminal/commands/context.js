@@ -4,13 +4,15 @@
  *
  * Comandos `/context` e `/compact` para gerenciamento de contexto do dialog loop.
  *
- * `/context` → mostra estimativa de uso do context window com barra visual `/compact` → envia pedido de compactação à
- * LLM-B e limpa o histórico local
+ * `/context` → mostra uso do context window (tokens reais do SDK quando disponíveis;
+ *              fallback para heurística 4 chars/token)
+ * `/compact` → envia pedido de compactação à LLM-B e limpa o histórico local
  *
  * @module copilot/terminal/commands/context
  */
 
 import { llmBridgeClient } from '../../bridges/llm-bridge-client.js';
+import { alwaysAliveAgent } from '../../agent/always-alive.js';
 
 // ─── Estimativa de tokens ─────────────────────────────────────────────────────
 
@@ -49,7 +51,7 @@ function progressBar(used, total, width = 20) {
 // ─── /context ─────────────────────────────────────────────────────────────────
 
 /**
- * Exibe o uso estimado do context window com barra visual.
+ * Exibe o uso do context window — usa tokens reais do SDK quando disponíveis; fallback para heurística.
  *
  * @param {{ println: (text: string) => void }} ctx
  * @returns {void}
@@ -58,12 +60,16 @@ export function cmdContext({ println }) {
     const history = /** @type {{ role: string; content: string }[]} */ (
         /** @type {unknown} */ (llmBridgeClient.history) ?? []
     );
-    if (history.length === 0) {
+
+    // AA.3: usar dados reais do SDK se disponíveis
+    const sdkContext = alwaysAliveAgent.getStatusSnapshot().contextWindow;
+
+    if (!sdkContext && history.length === 0) {
         println('\x1b[90m  Nenhum histórico em memória ainda. Envie um turno primeiro.\x1b[0m');
         return;
     }
 
-    // Total de chars
+    // Total de chars (para exibição complementar)
     let totalChars = 0;
     let turnCount = 0;
     for (const turn of history) {
@@ -72,20 +78,33 @@ export function cmdContext({ println }) {
         turnCount++;
     }
 
-    const estimatedTokens = estimateTokens(totalChars);
-    const maxTokens = DEFAULT_MAX_TOKENS;
-    const pct = Math.min(estimatedTokens / maxTokens, 1);
-    const pctStr = (pct * 100).toFixed(1);
-    const bar = progressBar(estimatedTokens, maxTokens);
+    let usedTokens, maxTokens, pct, pctStr, isRealData;
+    if (sdkContext) {
+        usedTokens = sdkContext.currentTokens;
+        maxTokens = sdkContext.tokenLimit;
+        pct = Math.min(sdkContext.utilization, 1);
+        pctStr = (pct * 100).toFixed(1);
+        isRealData = true;
+    } else {
+        usedTokens = estimateTokens(totalChars);
+        maxTokens = DEFAULT_MAX_TOKENS;
+        pct = Math.min(usedTokens / maxTokens, 1);
+        pctStr = (pct * 100).toFixed(1);
+        isRealData = false;
+    }
+
+    const bar = progressBar(usedTokens, maxTokens);
 
     println('');
     println(`\x1b[36m  ─── Uso do Contexto ────────────────────────────────────────────\x1b[0m`);
     println(`  ${bar} \x1b[1m${pctStr}%\x1b[0m`);
     println(
-        `  Tokens estimados : \x1b[33m${estimatedTokens.toLocaleString('pt-BR')}\x1b[0m / \x1b[90m${maxTokens.toLocaleString('pt-BR')}\x1b[0m`,
+        `  Tokens${isRealData ? ' (real SDK)' : ' estimados'}: \x1b[33m${usedTokens.toLocaleString('pt-BR')}\x1b[0m / \x1b[90m${maxTokens.toLocaleString('pt-BR')}\x1b[0m`,
     );
-    println(`  Chars totais     : \x1b[33m${totalChars.toLocaleString('pt-BR')}\x1b[0m`);
-    println(`  Turnos na memória: \x1b[33m${turnCount}\x1b[0m`);
+    if (turnCount > 0) {
+        println(`  Chars totais     : \x1b[33m${totalChars.toLocaleString('pt-BR')}\x1b[0m`);
+        println(`  Turnos na memória: \x1b[33m${turnCount}\x1b[0m`);
+    }
 
     if (pct > 0.85) {
         println('');
@@ -95,7 +114,9 @@ export function cmdContext({ println }) {
         println(`\x1b[33m  ℹ️  Context window acima de 65% — monitore se a conversa for longa.\x1b[0m`);
     }
 
-    println(`\x1b[90m  (estimativa heurística: 4 chars ≈ 1 token; limite real depende do modelo)\x1b[0m`);
+    if (!isRealData) {
+        println(`\x1b[90m  (estimativa heurística: 4 chars ≈ 1 token; limite real depende do modelo)\x1b[0m`);
+    }
     println('');
 }
 

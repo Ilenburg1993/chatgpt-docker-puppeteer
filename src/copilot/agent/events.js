@@ -31,6 +31,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'session.usage',
     'session.token_budget_warning',
     'session.mode_changed',
+    'session.context_changed',
     'dialog.ready',
     'dialog.reply',
     'dialog.stopped',

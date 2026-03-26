@@ -75,6 +75,7 @@ import { WebhookManager } from './webhook-manager.js';
  * @property {number} resumeCount - Número de retomadas desde o início
  * @property {number} sendCount - Total de mensagens enviadas
  * @property {number | null} startedAt - Epoch ms do início da sessão
+ * @property {{ tokens: number; tokenLimit: number; utilization: number } | null} contextWindow - Dados reais de uso de contexto do SDK (ou null se não disponível)
  */
 
 /**
@@ -142,6 +143,14 @@ export class AlwaysAliveAgent extends EventEmitter {
 
     /** @type {boolean} */
     #isResumed = false;
+
+    /**
+     * AA.1 — Dados reais de uso de contexto capturados do evento `session.usage_info` do SDK.
+     * Atualizado a cada turno. null enquanto a sessão não emitir o primeiro evento.
+     *
+     * @type {{ tokens: number; tokenLimit: number; utilization: number } | null}
+     */
+    #contextState = null;
 
     /** @type {WebhookManager} */
     #webhooks = new WebhookManager();
@@ -326,6 +335,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             // Uso de tokens e contexto da sessão — forwarded via session.usage
             // MELHORIA-02: emite session.token_budget_warning quando uso > 80%
             // MELHORIA-05: na 1ª leitura após retomada, alerta se uso já > 70% (contexto pesado)
+            // AA.1: armazena em #contextState para exposição via getStatusSnapshot() e /context
             let _firstUsageChecked = false;
             session.on('session.usage_info', (/** @type {any} */ evt) => {
                 const data = evt?.data ?? {};
@@ -333,6 +343,12 @@ export class AlwaysAliveAgent extends EventEmitter {
                 const { currentTokens, tokenLimit } = data;
                 if (tokenLimit > 0) {
                     const ratio = Math.round((currentTokens / tokenLimit) * 100);
+                    // AA.1: atualizar estado de contexto com dados reais do SDK
+                    this.#contextState = {
+                        tokens: currentTokens,
+                        tokenLimit,
+                        utilization: currentTokens / tokenLimit,
+                    };
                     // MELHORIA-05: alerta proativo na 1ª leitura se sessão retomada com contexto pesado
                     if (!_firstUsageChecked && isResumed && currentTokens / tokenLimit > 0.7) {
                         log(
@@ -606,6 +622,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             resumeCount: state?.resumeCount ?? 0,
             sendCount: this.#sendCount,
             startedAt: state?.startedAt ?? null,
+            // AA.2: dados reais de contexto do SDK (null enquanto a sessão não emitiu usage_info)
+            contextWindow: this.#contextState,
         };
         this.#statusSnapshotCache = { snapshot, at: now };
         return snapshot;
