@@ -2304,6 +2304,8 @@ AH ─────────────────┴──── depende de
 
 ## 13. Fase AI — Extensibilidade, Observabilidade e Integração Avançada
 
+> **Status**: ✅ CONCLUÍDA — `db15b0b1` + `13620e78` (2026-03-15)
+>
 > **Pré-requisitos**: Fases AE→AH concluídas. Allowlist gap corrigido em `129348ec`.
 
 **Motivação**: cinco eixos de valor ficaram pendentes após o roadmap AE→AH:
@@ -2324,112 +2326,111 @@ AI.5 (native attachments HTTP)   ── independente
 
 ---
 
-### AI.1 — Persistência de tools-state em controle.json
+### AI.1 — Persistência de tools-state em tools-config.json
 
-**Status**: 🔴 PLANEJADO
+**Status**: ✅ CONCLUÍDA
 
-**Objetivo**: `patchToolsConfig()` grava em `controle.json` (chave `toolsConfig`) + `loadToolsConfig()` restaura no boot.
+**Implementação**: `patchToolsConfig()` grava em `tools-config.json` (raiz do projeto) + `loadToolsConfig()` restaura no boot.
 
 **Arquivos**:
-- `src/copilot/config/tools-state.js` — adicionar `loadToolsConfig()` + persistência em `patchToolsConfig()`
-- `src/copilot/agent/session-manager.js` — chamar `loadToolsConfig()` na inicialização
+- `src/copilot/config/tools-state.js` — `loadToolsConfig()` + `saveToolsConfig()` persistindo JSON
+- `src/copilot/agent/session-manager.js` — `loadToolsConfig()` chamado na inicialização do módulo
 
-**Detalhes**:
-- `controle.json` schema: `"toolsConfig": { "allowlist": null | string[], "denylist": string[] }`
-- Escritura atômica: ler → merge → gravar (evitar race conditions)
-- `loadToolsConfig()` idempotente: se chave ausente, mantém defaults `{ allowlist: null, denylist: [] }`
+**Notas**:
+- Arquivo JSON: `{ "allowlist": null | string[], "denylist": string[] }`
+- `loadToolsConfig()` idempotente: se arquivo ausente, mantém defaults `{ allowlist: null, denylist: [] }`
 
 ---
 
 ### AI.2 — Custom Tool Registry via API
 
-**Status**: 🔴 PLANEJADO (depende de AI.1)
+**Status**: ✅ CONCLUÍDA
 
-**Objetivo**: `GET/POST/DELETE /config/tools/custom` para gerenciar custom tools passadas via `tools: [...]` na SessionConfig.
+**Implementação**: `GET/POST/DELETE /config/tools/custom` para gerenciar custom tools passadas via `tools: [...]` na SessionConfig.
 
-**Arquivos novos**:
-- `src/copilot/config/custom-tools-registry.js` — `registerCustomTool()`, `getCustomTools()`, `removeCustomTool()`
+**Arquivos criados**:
+- `src/copilot/config/custom-tools-registry.js` — `registerCustomTool()`, `getCustomTools()`, `unregisterCustomTool()`, `buildCustomTools()` com persistência em `custom-tools.json`
 
 **Arquivos modificados**:
-- `src/copilot/terminal/http-handlers.js` — `handleGetCustomTools`, `handleRegisterCustomTool`, `handleRemoveCustomTool`
+- `src/copilot/terminal/http-handlers.js` — `handleGetCustomTools`, `handlePostCustomTool`, `handleDeleteCustomTool`
 - `src/copilot/terminal/server.js` — rotas `GET/POST/DELETE /config/tools/custom`
-- `src/copilot/agent/session-manager.js` — `tools: getCustomTools()` na SessionConfig
+- `src/copilot/agent/tools-bootstrap.js` — `buildCustomTools()` integrado ao bootstrap
 
 **API**:
 ```
 GET    /config/tools/custom         → { ok, tools: [{ name, description }] }
-POST   /config/tools/custom         → body: { name, description, params?, handlerCode }
+POST   /config/tools/custom         → body: { name, description, params?, handlerKey }
 DELETE /config/tools/custom/:name   → remove por nome
 ```
 
-**Segurança**: aceitar apenas de `localhost`; handlers em pré-registered map (sem eval dinâmico).
+**Segurança**: handlers identificados por `handlerKey` em mapa pré-autorizado (sem eval dinâmico).
 
 ---
 
 ### AI.3 — OpenTelemetry Traces no AlwaysAliveAgent
 
-**Status**: 🔴 PLANEJADO
+**Status**: ✅ CONCLUÍDA
 
-**Objetivo**: instrumentar `sendDialogTurn()`, `initOrResumeSession()`, `stopSession()` com spans OTEL.
+**Implementação**: spans OTEL instrumentando `session.boot` e `dialog.send_turn`.
 
 **Arquivos**:
-- `src/copilot/lib/telemetry.js` — adicionar `startSpan(name, attrs, fn)` wrapper
-- `src/copilot/agent/always-alive.js` — `startSpan` em sendDialogTurn, initOrResumeSession, stopSession
-- `src/copilot/agent/session-manager.js` — span `session.create`
+- `src/copilot/lib/telemetry.js` — `startSpan(name, attrs, fn)` wrapper com OTEL nativo + fallback no-op
+- `src/copilot/lib/index.js` — `startSpan` exportado
+- `src/copilot/agent/always-alive.js` — span `session.boot` em `initOrResumeSession`, span `dialog.send_turn` em `sendDialogTurn`
 
 **Notas**:
-- `@opentelemetry/sdk-trace-node` como dependência opcional (graceful degradation)
-- Em dev: `ConsoleSpanExporter`; em prod (`OTEL_EXPORTER_OTLP_ENDPOINT`): `OTLPTraceExporter`
-- Atributos: `session.id`, `model`, `actor`, `durationMs`, `contextTokens`
-- Pattern: `startSpan` retorna resultado do fn, propaga erros
+- `@opentelemetry/sdk-trace-node` dependência opcional (graceful degradation via try/catch na importação dinâmica)
+- `@ts-expect-error` na importação dinâmica opcional
 
 ---
 
 ### AI.4 — SDK History por hub_session (SQLite)
 
-**Status**: 🔴 PLANEJADO
+**Status**: ✅ CONCLUÍDA
 
-**Objetivo**: mapear `session.getHistory()` (`ConversationMessage[]`) para o schema `turns` do ConversationStore.
+**Implementação**: `session.getHistory()` sincronizado para `turns` do ConversationStore após retomada.
 
 **Arquivos**:
-- `src/copilot/conversation-hub/store.js` — novo método `syncFromSdkHistory(sessionId, messages)`
-- `src/copilot/agent/always-alive.js` — chamar `syncFromSdkHistory()` após reconexão
+- `src/copilot/conversation-hub/store.js` — `syncFromSdkHistory(hubSessionId, sdkSessionId, messages)`
+- `src/copilot/agent/always-alive.js` — `#syncSdkHistory(session)` chamado (fire-and-forget) quando `isResumed=true`
+- `src/copilot/agent/events.js` — `session.history_synced` adicionado ao `AGENT_EVENTS`
+- `src/copilot/bridges/nerv-bridge.js` — `COPILOT_SESSION_HISTORY_SYNCED` mapeado
 
 **Mapeamento**:
 
 | `ConversationMessage` (SDK) | `turns` (SQLite) |
 | --------------------------- | ---------------- |
-| `type: 'user'`              | `actor: 'user'`  |
-| `type: 'assistant'`         | `actor: 'llm-b'` |
+| `type: 'user'`              | `role: 'user'`   |
+| `type: 'assistant'`         | `role: 'llm-b'`  |
 | `content: string`           | `content`        |
-| `createdAt`                 | `created_at`     |
 
-- `INSERT OR IGNORE` pelo `turn_id` (idempotente)
-- Emitir `AGENT_EVENTS.HISTORY_SYNCED` após sync
+- Idempotente: duplicatas ignoradas via try/catch em `writeTurn`
 
 ---
 
-### AI.5 — Native File Attachments SDK (AA.8 — escopo realista)
+### AI.5 — Native File Attachments SDK
 
-**Status**: 🔴 PLANEJADO
+**Status**: ✅ CONCLUÍDA
 
-**Análise**: `MessageOptions.attachments` disponível em `sendMessage()` — não no `ask_user` do dialog loop. Portanto:
-- **Via HTTP `/inject`**: implementável com native attachments
-- **Via REPL `/attach`**: embed-in-text permanece (limitação arquitetural de `answerPendingQuestion(string)`)
+**Implementação**: `handleInject` em `http-handlers.js` roteia attachments nativos (`type: file/directory/selection`) direto para `alwaysAliveAgent.sendMessage({ attachments })`. Attachments `type: content` continuam usando embed-in-text (fallback para compatibilidade).
 
-**Arquivo**: `src/copilot/terminal/http-handlers.js` (`handleInject`) — usar `session.sendMessage(msg, { attachments: [{type:'file', path}] })` em vez de embed manual quando body tem `attachments[].path`.
+**Arquivo**: `src/copilot/terminal/http-handlers.js` — `handleInject` — separação entre native SDK attachments e embed markdown.
 
 ---
 
 ### Sumário Fase AI — Arquivos
 
-| Arquivo                                       | AI     | Status  | Propósito                               |
-| --------------------------------------------- | ------ | ------- | --------------------------------------- |
-| `src/copilot/config/custom-tools-registry.js` | AI.2   | 🔴 NOVO | Registry de custom tools em runtime     |
-| `src/copilot/config/tools-state.js`           | AI.1   | MODIF   | Persistência em controle.json           |
-| `src/copilot/agent/session-manager.js`        | AI.1,2 | MODIF   | `loadToolsConfig()` + `getCustomTools()`|
-| `src/copilot/agent/always-alive.js`           | AI.3,4 | MODIF   | OTEL spans + `syncFromSdkHistory()`     |
-| `src/copilot/lib/telemetry.js`                | AI.3   | MODIF   | `startSpan()` wrapper OTEL              |
-| `src/copilot/conversation-hub/store.js`       | AI.4   | MODIF   | `syncFromSdkHistory()`                  |
-| `src/copilot/terminal/http-handlers.js`       | AI.2,5 | MODIF   | Custom tools API + native attachments   |
-| `src/copilot/terminal/server.js`              | AI.2   | MODIF   | Rotas `/config/tools/custom`            |
+| Arquivo                                       | AI     | Status  | Propósito                                |
+| --------------------------------------------- | ------ | ------- | ---------------------------------------- |
+| `src/copilot/config/custom-tools-registry.js` | AI.2   | ✅ NOVO | Registry de custom tools em runtime      |
+| `src/copilot/config/tools-state.js`           | AI.1   | ✅ MODIF | Persistência em tools-config.json        |
+| `src/copilot/agent/session-manager.js`        | AI.1   | ✅ MODIF | `loadToolsConfig()` no boot              |
+| `src/copilot/agent/tools-bootstrap.js`        | AI.2   | ✅ MODIF | `buildCustomTools()` integrado           |
+| `src/copilot/agent/always-alive.js`           | AI.3,4 | ✅ MODIF | spans OTEL + `#syncSdkHistory()`         |
+| `src/copilot/agent/events.js`                 | AI.4   | ✅ MODIF | `session.history_synced` no AGENT_EVENTS |
+| `src/copilot/lib/telemetry.js`                | AI.3   | ✅ MODIF | `startSpan()` wrapper OTEL               |
+| `src/copilot/lib/index.js`                    | AI.3   | ✅ MODIF | `startSpan` exportado                    |
+| `src/copilot/conversation-hub/store.js`       | AI.4   | ✅ MODIF | `syncFromSdkHistory()`                   |
+| `src/copilot/terminal/http-handlers.js`       | AI.2,5 | ✅ MODIF | Custom tools API + native attachments    |
+| `src/copilot/terminal/server.js`              | AI.2   | ✅ MODIF | Rotas `/config/tools/custom`             |
+| `src/copilot/bridges/nerv-bridge.js`          | AI.4   | ✅ MODIF | `COPILOT_SESSION_HISTORY_SYNCED` mapeado |
