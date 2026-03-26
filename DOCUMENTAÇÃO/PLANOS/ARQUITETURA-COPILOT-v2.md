@@ -1451,10 +1451,10 @@ frontmatter, é tratado como documento de contexto. Em ambos os casos, o conteú
 
 **Importante — complementaridade com AA.0**:
 
-| Mecanismo  | Quando atualiza          | Limite        | Controle               |
-| ---------- | ------------------------ | ------------- | ---------------------- |
-| `systemMessage` append (AA.0) | A cada turn            | ~1–2 KB útil  | Total (buildamos nós)  |
-| `skillDirectories` (AA.7)     | A cada session create/resume | Ilimitado     | Depende do CLI format  |
+| Mecanismo                     | Quando atualiza              | Limite       | Controle              |
+| ----------------------------- | ---------------------------- | ------------ | --------------------- |
+| `systemMessage` append (AA.0) | A cada turn                  | ~1–2 KB útil | Total (buildamos nós) |
+| `skillDirectories` (AA.7)     | A cada session create/resume | Ilimitado    | Depende do CLI format |
 
 Skills são carregadas no startup/resume → não re-injetadas a cada turn. Portanto:
 - **`systemMessage` append** = instruções pequenas e dinâmicas (hook state, close_key)
@@ -1841,25 +1841,141 @@ Adicionar em `/st` (status) e `/context` (context info) o `SessionContext` detec
 
 ---
 
+### FASE AH — Tool System Hardening: Controle Granular de Tools e Custom Tools API
+
+**Prioridade**: ALTA (segurança + extensibilidade) | **Status**: 🔴 PLANEJADA | **Estimativa**: 2–3 sprints
+
+**Contexto e motivação (research 2026-03-26):**
+
+Investigação profunda do SDK v0.1.32 revelou o ciclo de vida completo do sistema de tools:
+
+1. **Registro**: `session.create({ tools: [{ name, description, parameters (JSON Schema), handler }] })` → SDK serializa via `toJsonSchema()` → envia ao CLI via RPC `session.create`.
+2. **Injeção no prompt**: CLI recebe definições → injeta `description` + schema de parâmetros no system prompt (seção "tool instructions") → LLM lê e aprende quando/como invocar.
+3. **Despacho**: LLM decide invocar → CLI emite evento `external_tool.requested { requestId, toolName, arguments, toolCallId }` → SDK roteia via `toolHandlers.get(toolName)` → `handler(args, { sessionId, toolCallId, toolName, arguments })` → resultado via `rpc.tools.handlePendingToolCall({ requestId, result|error })`.
+4. **Built-in tools** (implementados no CLI, NÃO passam pelo SDK): `bash`, `glob`, `grep`, `view`, `create`, `edit`, `lsp`, `memory`, `powershell`, `read_bash`, `stop_bash`, `web_fetch`, `web_search`. Suas descrições são injetadas pelo CLI diretamente, não pelo SDK.
+5. **Controle de tools**: `availableTools?: string[]` (allowlist, tem precedência) e `excludedTools?: string[]` (denylist) — ambos sobrevivem a `session.resume` via `ResumeSessionConfig`.
+6. **Override de built-in**: `{ name: 'bash', ..., overridesBuiltInTool: true }` permite substituir um tool nativo por implementação customizada.
+
+**Gaps identificados:**
+
+- **GAP-AH-01 — Ausência de allowlist/denylist**: AlwaysAliveAgent não passa `availableTools` nem `excludedTools` → todos os built-ins expostos, incluindo `bash` (risco SEC-01 da Fase AD). Solução: configurar `excludedTools` por padrão para tools não usadas, ou definir `availableTools` explícito.
+- **GAP-AH-02 — Tools dinâmicas sem API**: não há endereço HTTP para registrar/remover custom tools em tempo de execução. Seria possível via `buildOptions()` + `session.resume()` com novo array `tools`.
+- **GAP-AH-03 — Sem auditoria de invocação**: o `external_tool.requested` event não é logado/auditado além do Fase Q (JSONL tool calls). Integrar tool invocation no sistema de auditoria existente.
+- **GAP-AH-04 — Sem mecanismo de permissão por tool**: `onPermissionRequest` existe no SDK mas não está integrado ao sistema de permissões do AlwaysAliveAgent. Poderia implementar rate-limit por tool ou bloqueio de tools sensíveis.
+- **GAP-AH-05 — Descrições de custom tools ausentes ou fracas**: se em algum momento passarmos custom tools, a qualidade de `description` e o JSON Schema de `parameters` determinam se a LLM consegue invocá-las como esperado.
+
+**AH.1 — Tool Filter padrão seguro**
+
+```js
+// src/copilot/config/session-config.js
+// Definir quais built-ins são necessários; excluir o resto
+const DEFAULT_EXCLUDED_TOOLS = [
+    'powershell',  // não usado em Linux
+    'web_fetch',   // não necessário para nosso caso
+    'web_search',  // não necessário
+    'memory',      // built-in memory do CLI não integrado ao nosso sistema
+];
+
+// OU: usar allowlist quando o conjunto de tools for bem definido
+const DEFAULT_AVAILABLE_TOOLS = [
+    'bash', 'glob', 'grep', 'view', 'create', 'edit', 'lsp',
+    'read_bash', 'stop_bash',
+    // + qualquer custom tool registrada
+];
+```
+
+Expor via `PUT /config/tools` para ajuste em runtime (com `session.resume()`).
+
+**AH.2 — Tool Invocation Audit (integrar com Fase Q)**
+
+O evento `external_tool.requested` deve ser capturado em `session-manager.js`:
+
+```js
+session.on('external_tool.requested', ({ toolName, arguments: args, toolCallId }) => {
+    // já existe JSONL logger da Fase Q — emitir evento no nerv
+    this.nerv.emit(AGENT_EVENTS.TOOL_INVOCATION, { toolName, args, toolCallId, ts: Date.now() });
+    // Verificar rate limit ou blacklist em runtime
+});
+```
+
+**AH.3 — Custom Tool SDK: estrutura padrão com schema robusto**
+
+Definir fábrica de custom tools com tipagem forte:
+
+```js
+/**
+ * @param {string} name - nome único da tool
+ * @param {string} description - descrição clara para a LLM (crucial para invocação correta)
+ * @param {import('zod').ZodSchema | Record<string,unknown>} parameters - JSON Schema ou Zod
+ * @param {(args: any, ctx: import('@github/copilot-sdk').ToolInvocation) => Promise<string>} handler
+ * @returns {import('@github/copilot-sdk').Tool<any>}
+ */
+export function buildTool(name, description, parameters, handler) {
+    return { name, description, parameters, handler };
+}
+```
+
+**AH.4 — Explorar `lsp` tool built-in**
+
+O CLI já possui o tool `lsp` com operações: `goToDefinition`, `findReferences`, `rename`, `incomingCalls`, `workspaceSymbol`, `hover`. Verificar se está disponível no ambiente e documentar nos skills. Potencial para enriquecer respostas sobre código.
+
+**AH.5 — `onPermissionRequest` integrado ao AlwaysAliveAgent**
+
+```js
+createSession({
+    onPermissionRequest: async (permissionRequest) => {
+        // Log + decisão baseada em política
+        logger.info({ permissionRequest }, 'permission requested');
+        if (isHighRiskTool(permissionRequest)) {
+            return { kind: 'denied-by-rules', rules: ['high-risk-tool'] };
+        }
+        return { kind: 'approved' };
+    },
+    // ...
+});
+```
+
+> **Dependências**: AH.1 depende de AA.6 (workingDirectory) e AG configurados. AH.3 é pré-requisito para qualquer futura custom tool. AH.2 depende de Fase Q (JSONL auditing).
+
+> **Impacto de segurança**: AH.1 reduz superfície de ataque (SEC-01). AH.4 (`onPermissionRequest`) adiciona camada de controle para operações sensíveis de shell.
+
+---
+
 ## Análise: SDK vs. Implementação Própria para Gestão de Contexto
 
-**Research realizado em 2026-03-25** com base nos tipos SDK v0.1.32 e artigo oficial do GitHub Blog.
+**Research realizado em 2026-03-25 (revisado 2026-03-26)** com base nos tipos SDK v0.1.32 e investigação profunda do CLI bundle.
 
-| Aspecto                     | O SDK já faz                                            | Nossa implementação adiciona                 |
-| --------------------------- | ------------------------------------------------------- | -------------------------------------------- |
-| Compactação automática      | ✅ `InfiniteSessionConfig.backgroundCompactionThreshold` | Configuração dinâmica (AC.1)                 |
-| Eventos de compactação      | ✅ `session.compaction_start/complete`                   | Recovery, SSE broadcast (AC.2)               |
-| Métricas de tokens          | ✅ `session.usage_info` ephemeral                        | Armazenar estado + expor via API (AA.1-AA.5) |
-| Prompt caching              | ✅ transformedContent XML wrapping (Claude)              | Métricas de hit ratio (AB.4)                 |
-| Context window limit        | ✅ `ModelCapabilities.limits.max_context_window_tokens`  | Usar no `/context` real (AA.3)               |
-| File context caching        | ❌ Não existe no SDK                                     | TTL cache em file-context.js (AB.1)          |
-| Model list caching          | ❌ Não existe no SDK                                     | TTL cache em listModels() (AB.2)             |
-| Threshold config dinâmica   | ❌ Apenas na criação da sessão                           | PUT /config/infinite-session (AC.1)          |
-| REPL warnings de utilização | ❌ Não existe                                            | pre-send check em dialog.js (AC.4)           |
-| Workspace context (git)     | ✅ `SessionContext` (cwd, gitRoot, repo, branch)         | Passar `workingDirectory` na criação (AA.6)  |
-| Skills / docs pinados       | ✅ `skillDirectories` (sobrevive a resume/compaction!)   | Configurar dirs + file watcher (AA.7/AG.1)   |
-| Custom agents               | ✅ `CustomAgentConfig` + `@nome` na conversa             | buildDefaultCustomAgents() factory (AG.2)    |
-| File attachments p/turn     | ✅ `MessageOptions.attachments` (type:"file" nativo)     | Trocar embed-in-text por native (AA.8)       |
+| Aspecto                        | O SDK já faz                                                    | Nossa implementação adiciona                  |
+| ------------------------------ | --------------------------------------------------------------- | --------------------------------------------- |
+| Compactação automática         | ✅ `InfiniteSessionConfig.backgroundCompactionThreshold` (80%)  | Configuração dinâmica (AC.1)                  |
+| Eventos de compactação         | ✅ `session.compaction_start/complete`                          | Recovery, SSE broadcast (AC.2)                |
+| Métricas de tokens             | ✅ `session.usage_info` ephemeral                               | Armazenar estado + expor via API (AA.1-AA.5)  |
+| Prompt caching                 | ✅ transformedContent XML wrapping (Claude)                     | Métricas de hit ratio (AB.4)                  |
+| Context window limit           | ✅ `ModelCapabilities.limits.max_context_window_tokens`         | Usar no `/context` real (AA.3)                |
+| File context caching           | ❌ Não existe no SDK                                            | TTL cache em file-context.js (AB.1)           |
+| Model list caching             | ❌ Não existe no SDK                                            | TTL cache em listModels() (AB.2)              |
+| Threshold config dinâmica      | ❌ Apenas na criação da sessão                                  | PUT /config/infinite-session (AC.1)           |
+| REPL warnings de utilização    | ❌ Não existe                                                   | pre-send check em dialog.js (AC.4)            |
+| Workspace context (git)        | ✅ `SessionContext` (cwd, gitRoot, repo, branch)                | Passar `workingDirectory` na criação (AA.6)   |
+| Skills / docs pinados          | ✅ `skillDirectories` (sobrevive a resume/compaction!)          | Configurar dirs + file watcher (AA.7/AG.1)    |
+| Custom agents                  | ✅ `CustomAgentConfig` + `@nome` na conversa                    | buildDefaultCustomAgents() factory (AG.2)     |
+| Per-agent MCP servers          | ✅ `CustomAgentConfig.mcpServers` (separado do session-level)   | Mapear agents especializados com MCPs (AG.2)  |
+| Agent inference flag           | ✅ `CustomAgentConfig.infer` (padrão `true`)                    | Controlar disponibilidade de agents (AG.2)    |
+| File attachments p/turn        | ✅ `MessageOptions.attachments` (type:"file" nativo)            | Trocar embed-in-text por native (AA.8)        |
+| Tool selection guidance        | ✅ `<tool_preferences>` XML injetado pelo CLI via `UAe()`       | Documentado — sem impl necessária             |
+| Tool allowlist / denylist      | ✅ `availableTools` e `excludedTools` em SessionConfig          | Configurar por padrão seguro (AH.1)           |
+| Override de built-in tool      | ✅ `Tool.overridesBuiltInTool: true`                            | Disponível para extensões futuras (AH.3)      |
+| Tool names configuráveis       | ✅ `shellToolName`, `globToolName`, `grepToolName`              | Documentado — padrão "bash"/"glob"/"grep"     |
+| Custom tool registration       | ✅ `Tool<T>` interface com JSON Schema params + handler         | Fábrica buildTool() com schema robusto (AH.3) |
+| onPermissionRequest            | ✅ hook de permissão por operação                               | Integrar política de risco (AH.5)             |
+| MCP local (stdio)              | ✅ `MCPLocalServerConfig` (command, args, env, cwd)             | Configurar MCP servers globais (AG.2)         |
+| MCP remoto (HTTP/SSE)          | ✅ `MCPRemoteServerConfig` (url, headers)                       | Disponível para MCP externos (AG.2)           |
+
+**Mecanismo de seleção de tools (descoberta 2026-03-26):**
+- **Custom tools**: descrição + JSON Schema injetados no system prompt via `session.create` RPC → seção "tool instructions"
+- **Built-in shell tools** (`bash`, `glob`, `grep`, `view`): guiadas por `<tool_preferences>` XML gerado pela função `UAe({shellConfig})` no CLI bundle, que instrui a LLM a preferir `grep`/`glob`/`view` antes de recorrer ao `bash`
+- **Sub-agent tools** (`explore`, `task`, `general-purpose`): objetos `{name, description}` injetados como peer tools
+- **Hierarquia de preferência** documentada no prompt: `código inteligente (lsp) > glob > grep > bash`
 
 **Lições do artigo IssueCrush (GitHub Blog, 2026-03-24):**
 - "Cache the results" — uma das principais lições: guardar respostas no lado da aplicação
@@ -1881,11 +1997,11 @@ Antes de commitar cada fase:
 
 ---
 
-## 11. Mapa Visual das Fases do Terminal (X→Z3 concluídas; AA–AG planejadas)
+## 11. Mapa Visual das Fases do Terminal (X→Z3 concluídas; AA–AH planejadas)
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│              EVOLUÇÃO DO TERMINAL LLM-B — Fases X→Z3 (CONCLUÍDAS) + AA–AG (PLANEJADAS)│
+│           EVOLUÇÃO DO TERMINAL LLM-B — Fases X→Z3 (CONCLUÍDAS) + AA–AH (PLANEJADAS)  │
 ├──────────────┬─────────────────────────────────────────────────────────────────────────┤
 │ FASE X ✅    │ reasoningEffort: 'high' default + /model + /reasoning                   │
 │              │ AlwaysAliveAgent.reconfigure() + getConfig()                             │
@@ -1941,6 +2057,13 @@ Antes de commitar cada fase:
 │              │ Custom agents factory (buildDefaultCustomAgents) — @auditor, @docs      │
 │              │ Cmd REPL: /skills [list|add|remove|reload]                               │
 │              │ SessionContext (gitRoot, branch, repo) em /st e /context                │
+├──────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ FASE AH 🔴   │ DEFAULT_EXCLUDED_TOOLS → remove tools não usadas (SEC-01 mitigation)    │
+│ (PLANEJADA)  │ PUT /config/tools → ajustar allowlist/denylist em runtime               │
+│              │ onPermissionRequest integrado → política por tool (shell vs. read-only)  │
+│              │ buildTool() fábrica com schema Zod robusto para custom tools             │
+│              │ Tool invocation audit integrado ao JSONL logger (Fase Q)                │
+│              │ external_tool.requested → nerv.emit(TOOL_INVOCATION) para observabilidade│
 └──────────────┴─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1983,4 +2106,5 @@ POST localhost:3009/inject
 *Atualizado em 2026-03-25 após Fases O (channel/ canônico) + auditoria de cobertura SDK v0.1.32.*
 *Atualizado em 2026-03-27 após Fase W (Attachment Support) + planejamento Fases X–Z3 (Terminal UX).*
 *Atualizado em 2026-03-25 após Fases Y+Z2+Z3 concluídas + tsserver hardening. Novas fases AD+AA+AB+AC planejadas (Bug Fixes + Context Window Intelligence + Cache Strategy).*
-*Arquitetura v2.4: Fases A–Z3 concluídas; Fases AD+AA–AC planejadas (AD tem prioridade).*
+*Atualizado em 2026-03-26 após investigação profunda do sistema de tools (tool_preferences XML, CustomAgentConfig.mcpServers, dynamic tool names, onPermissionRequest). Nova Fase AH planejada.*
+*Arquitetura v2.5: Fases A–Z3 concluídas; Fases AD+AA–AC+AG+AH planejadas (AD tem prioridade).*
