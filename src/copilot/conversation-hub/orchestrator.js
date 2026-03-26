@@ -74,7 +74,12 @@ export class HubOrchestrator extends EventEmitter {
 
     /**
      * @param {import('./store.js').ConversationStore} store
-     * @param {{ getStatusSnapshot(): object; dialogLoopActive?: boolean; sendDialogTurn?(content: string, opts?: { timeout?: number }): Promise<string> }} [agentOverride] - AlwaysAliveAgent a usar (útil em testes).
+     * @param {{
+     *     getStatusSnapshot(): object;
+     *     dialogLoopActive?: boolean;
+     *     sendDialogTurn?(content: string, opts?: { timeout?: number }): Promise<string>;
+     * }} [agentOverride]
+     *   - AlwaysAliveAgent a usar (útil em testes).
      */
     constructor(store, agentOverride) {
         super();

@@ -10,6 +10,7 @@
  */
 
 import { log } from '#core/logger';
+import { CHANNEL_VERSION } from '../channel/index.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -49,6 +50,8 @@ import { log } from '#core/logger';
  *     stopDialogLoop: () => Promise<void>;
  *     on: (event: string, listener: (...args: any[]) => void) => any;
  *     off: (event: string, listener: (...args: any[]) => void) => any;
+ *     listenerDiagnostics: () => Record<string, number>;
+ *     queueSize: number;
  * }} AlwaysAliveAgentLike
  */
 
@@ -77,7 +80,7 @@ export function registerControlRoutes(bridge, agent) {
      * Status HTTP 200 quando agente está operacional (idle | processing | waiting_for_input). Status HTTP 503 quando
      * agente está parado ou sem sessão.
      *
-     * Body: { healthy: boolean, status, sessionId, queueSize, starvationAlert, uptime }
+     * Body: { healthy, status, sessionId, queueSize, starvationAlert, uptime, listenerCounts }
      */
     bridge.get('/health', (/** @type {Req} */ _req, /** @type {Res} */ res) => {
         const snap = /** @type {AgentSnap} */ (agent.getStatusSnapshot());
@@ -89,6 +92,8 @@ export function registerControlRoutes(bridge, agent) {
             queueSize: snap.queueSize,
             starvationAlert: snap.starvationAlert,
             uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
+            listenerCounts: agent.listenerDiagnostics(),
+            channelVersion: CHANNEL_VERSION,
         });
     });
 

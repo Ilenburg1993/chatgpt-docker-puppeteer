@@ -45,7 +45,10 @@ A sessão persiste no SQLite e sobrevive a restarts do servidor.`,
                     .string()
                     .optional()
                     .describe('Título descritivo da conversa (ex: "Análise de arquitetura Sprint Hub")'),
-                metadata: z.record(z.string(), z.any()).optional().describe('Metadados extras em JSON (opcional)'),
+                metadata: z
+                    .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+                    .optional()
+                    .describe('Metadados extras em JSON (apenas primitivos: string, number, boolean, null)'),
             })
         )
     ),

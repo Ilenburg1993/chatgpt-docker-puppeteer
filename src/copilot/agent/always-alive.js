@@ -105,6 +105,14 @@ export class AlwaysAliveAgent extends EventEmitter {
     #watchdog = null;
 
     /**
+     * PERF-01 (fix): contador de mensagens em memória para evitar readState()+writeState() síncrono a cada envio.
+     * Inicializado a partir do estado persistido no boot; persiste ao atingir 'stopped'.
+     *
+     * @type {number}
+     */
+    #sendCount = 0;
+
+    /**
      * Intervalo do watchdog (ms). Controlado por `LLM_B_WATCHDOG_MS`. Padrão: 5 minutos.
      *
      * @type {number}
@@ -327,6 +335,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             });
 
             this.#setStatus('idle');
+            // PERF-01 (fix): inicializar contador em memória a partir do estado persistido
+            this.#sendCount = readState()?.sendCount ?? 0;
             log(
                 'INFO',
                 `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`,
@@ -393,6 +403,9 @@ export class AlwaysAliveAgent extends EventEmitter {
             this.#dialogLoopActive = false;
             this.#watchdog?.stop();
         }
+
+        // PERF-01 (fix): persistir contador em disco apenas no shutdown, não a cada mensagem
+        writeState({ sendCount: this.#sendCount });
 
         this.#setStatus('stopped');
 
@@ -528,8 +541,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna um snapshot do estado atual para a API HTTP.
      *
-     * PERF-02 (fix): resultado cacheado por 500ms para evitar I/O síncrono em readState() por chamada.
-     * O cache é invalidado automaticamente quando status muda.
+     * PERF-02 (fix): resultado cacheado por 500ms para evitar I/O síncrono em readState() por chamada. O cache é
+     * invalidado automaticamente quando status muda.
      *
      * @returns {AgentStatusSnapshot}
      */
@@ -561,7 +574,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                 : null,
             isResumed: this.#isResumed,
             resumeCount: state?.resumeCount ?? 0,
-            sendCount: state?.sendCount ?? 0,
+            sendCount: this.#sendCount,
             startedAt: state?.startedAt ?? null,
         };
         this.#statusSnapshotCache = { snapshot, at: now };
@@ -773,8 +786,8 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
         this.emit('task.started', { taskId: task.id });
 
         log('INFO', `[AlwaysAlive] Processando tarefa ${task.id}`);
-        const state = readState();
-        writeState({ sendCount: (state?.sendCount ?? 0) + 1 });
+        // PERF-01 (fix): incremento em memória — persiste no disco apenas no shutdown
+        this.#sendCount++;
 
         void executeTask(session, task, {
             onDelta: (chunk, taskId) => this.emit('task.delta', { taskId, chunk }),

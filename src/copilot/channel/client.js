@@ -370,8 +370,8 @@ export class LlmBridgeClient {
     }
 
     /**
-     * Adiciona um turno ao histórico local sem enviar ao modelo (seed manual).
-     * Útil para inicializar contexto após resetar histórico via clearHistory().
+     * Adiciona um turno ao histórico local sem enviar ao modelo (seed manual). Útil para inicializar contexto após
+     * resetar histórico via clearHistory().
      *
      * @param {'user' | 'assistant' | 'system'} role - Papel do turno
      * @param {string} content - Conteúdo do turno

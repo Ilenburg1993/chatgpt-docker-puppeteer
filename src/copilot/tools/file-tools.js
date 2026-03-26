@@ -19,10 +19,10 @@
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import * as fs from 'node:fs';
 import { realpathSync } from 'node:fs';
 import * as path from 'node:path';
+import { promisify } from 'node:util';
 import { z } from 'zod';
 
 const execFileAsync = promisify(execFile);

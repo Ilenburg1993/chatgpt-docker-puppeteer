@@ -1,10 +1,10 @@
 # Plano de Execução — Fase AD: Auditoria `src/copilot`
 
-> **Documento**: Plano detalhado de execução da Fase AD  
-> **Origem**: Auditoria técnica `DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`  
-> **Criado em**: 2026-03-25  
-> **Validado por**: análise estática sobre código real (HEAD `bdaa1347`)  
-> **Status geral**: 🔴 PLANEJADO — execução pendente
+> **Documento**: Plano detalhado de execução da Fase AD
+> **Origem**: Auditoria técnica `DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`
+> **Criado em**: 2026-03-25
+> **Validado por**: análise estática sobre código real (HEAD `bdaa1347`)
+> **Status geral**: ✅ CONCLUÍDO — Sprints AD-1/2/3/4 executados (0 typecheck errors, 1466 testes passando)
 
 ---
 
@@ -13,11 +13,11 @@
 Cada item da auditoria foi verificado diretamente no código-fonte antes de incluir neste plano.
 Itens descartados não entram no plano de execução.
 
-| Decisão     | Critério                                                                  |
-| ----------- | ------------------------------------------------------------------------- |
-| ✅ INCLUÍDO  | Bug/vulnerabilidade confirmado no código atual, tem solução clara          |
-| ⚠️ ADIADO   | Válido mas complexidade/escopo exige fase separada futura                  |
-| ❌ DESCARTADO | Inaplicável (Node.js 24 fixo, acesso controlado, ou já corrigido)         |
+| Decisão      | Critério                                                          |
+| ------------ | ----------------------------------------------------------------- |
+| ✅ INCLUÍDO   | Bug/vulnerabilidade confirmado no código atual, tem solução clara |
+| ⚠️ ADIADO     | Válido mas complexidade/escopo exige fase separada futura         |
+| ❌ DESCARTADO | Inaplicável (Node.js 24 fixo, acesso controlado, ou já corrigido) |
 
 ---
 
@@ -479,24 +479,27 @@ z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
 
 ---
 
-## 3. Itens Adiados (para fase futura)
+## 3. Itens Adiados → promovidos à Fase AE
 
-| Item      | Motivo do adiamento                                                              |
-| --------- | -------------------------------------------------------------------------------- |
-| ARCH-01   | 13 re-exports deprecated — remoção requer refatoração de todos os importadores   |
-| ARCH-03   | Convergência de histórico entre instâncias `LlmBridgeClient` — alto impacto      |
-| ARCH-04   | Hub saúde no health — impacto baixo, escopo da Fase Z3 revisada                  |
-| GAP-02    | MCP schema com suporte a enums/nested — requer análise de MCP servers reais       |
-| MELHORIA-02 | OpenTelemetry — requer instalação de pacotes e infraestrutura de tracing        |
-| MELHORIA-05 | Histórico de SDK sessions por hub_session — migração de schema SQLite            |
-| PERF-03   | Tokenizer FTS5 `porter unicode61` — melhoria de relevância, não bug crítico      |
+> Todos os 7 itens abaixo foram promovidos ao `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md`
+> com planejamento detalhado e ordem de execução definida.
+
+| Item        | Motivo do adiamento AD                                                         | Sprint AE |
+| ----------- | ------------------------------------------------------------------------------ | --------- |
+| ARCH-01     | 13 re-exports deprecated — remoção requer refatoração de todos os importadores | AE-2      |
+| ARCH-03     | Convergência de histórico entre instâncias `LlmBridgeClient` — alto impacto    | AE-2      |
+| ARCH-04     | Hub saúde no health — impacto baixo, escopo da Fase Z3 revisada                | AE-1      |
+| GAP-02      | MCP schema com suporte a enums/nested — requer análise de MCP servers reais    | AE-2      |
+| MELHORIA-02 | OpenTelemetry — requer instalação de pacotes e infraestrutura de tracing       | AE-3      |
+| MELHORIA-05 | Histórico de SDK sessions por hub_session — migração de schema SQLite          | AE-3      |
+| PERF-03     | Tokenizer FTS5 `porter unicode61` — melhoria de relevância, não bug crítico    | AE-1      |
 
 ## 4. Itens Descartados
 
-| Item      | Motivo do descarte                                                                |
-| --------- | --------------------------------------------------------------------------------- |
-| SEC-05    | `run_node_file` — acesso já restrito a runtime controlado; BLOCKED_PATTERNS existe|
-| ARCH-05   | `import.meta.dirname` — Node.js 24 é requerimento fixo; bundling não é objetivo   |
+| Item    | Motivo do descarte                                                                 |
+| ------- | ---------------------------------------------------------------------------------- |
+| SEC-05  | `run_node_file` — acesso já restrito a runtime controlado; BLOCKED_PATTERNS existe |
+| ARCH-05 | `import.meta.dirname` — Node.js 24 é requerimento fixo; bundling não é objetivo    |
 
 ---
 

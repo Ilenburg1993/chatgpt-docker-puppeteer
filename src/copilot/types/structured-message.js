@@ -120,6 +120,9 @@ export const StructuredMessageSchema = z.object({
 
     /** Metadados extras livres para extensão futura */
     meta: z.record(z.string(), z.unknown()).optional(),
+
+    /** ID de rastreamento distribuído (opcional, para correlação de logs entre LLM-A e LLM-B) */
+    traceId: z.string().optional(),
 });
 
 // ─── Tipos TypeScript/JSDoc ───────────────────────────────────────────────────
@@ -139,6 +142,7 @@ export const StructuredMessageSchema = z.object({
  * @property {number} [turnNumber] - Número do turno na conversa
  * @property {string[]} [toolsUsed] - Ferramentas usadas neste turno
  * @property {Record<string, unknown>} [meta] - Metadados extras
+ * @property {string} [traceId] - ID de rastreamento distribuído para correlação de logs
  */
 
 /**
@@ -146,7 +150,7 @@ export const StructuredMessageSchema = z.object({
  * `turnNumber`, `toolsUsed` são opcionais na criação.
  *
  * @typedef {Omit<StructuredMessage, 'version' | 'output' | 'sessionId' | 'turnNumber' | 'toolsUsed' | 'meta'> &
- *     Partial<Pick<StructuredMessage, 'version' | 'output' | 'sessionId' | 'turnNumber' | 'toolsUsed' | 'meta'>>} StructuredMessageInput
+ *     Partial<Pick<StructuredMessage, 'version' | 'output' | 'sessionId' | 'turnNumber' | 'toolsUsed' | 'meta' | 'traceId'>>} StructuredMessageInput
  */
 
 /**

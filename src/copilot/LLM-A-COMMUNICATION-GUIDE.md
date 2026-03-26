@@ -348,39 +348,80 @@ if (status.status !== 'idle') {
 
 ## 9. Arquivos do módulo copilot (mapa)
 
+> **GAP-04 (atualizado Fase AD)** — estrutura canônica refletindo migração para sub-diretórios por domínio.
+
 ```
 src/copilot/
-├── agent.js                    ← entry point PM2 (opcional, sem servidor)
-├── always-alive.js             ← core do AlwaysAliveAgent
-├── cli-terminal.js             ← REPL interativo (uso humano)
-├── http-bridge.js              ← bridge Express (quando servidor principal roda)
-├── llm-bridge-client.js        ← ⭐ INTERFACE PRINCIPAL PARA LLM-A
-├── llm-a-conversation.mjs      ← script de conversa 5 turnos (demonstração)
-├── mcp-tool-bridge.js          ← bridge para MCP servers
-├── nerv-bridge.js              ← bridge para event bus NERV
-├── sdk-api.js                  ← 29 endpoints REST (quando servidor roda)
-├── sdk-client.js               ← cliente do SDK Copilot
-├── session-manager.js          ← gerenciamento de sessão persistente
+├── agent/
+│   ├── always-alive.js          ← ⭐ AlwaysAliveAgent (core do agente)
+│   ├── dialog-watchdog.js       ← watchdog de inatividade do dialog loop
+│   ├── entry.js                 ← entry point PM2 sem servidor
+│   ├── events.js                ← constantes AGENT_EVENTS
+│   ├── session-manager.js       ← gerenciamento de sessão persistente
+│   ├── task-executor.js         ← executor de tarefas SDK
+│   ├── tools-bootstrap.js       ← bootstrap de ferramentas por sessão
+│   └── webhook-manager.js       ← gerenciamento de webhooks
+├── api/
+│   ├── bridge-control.js        ← rotas REST /start /stop /status /health
+│   ├── bridge-dialog.js         ← rotas REST /dialog
+│   ├── bridge-stream.js         ← rotas SSE /stream /stream/critical
+│   ├── bridge-tasks.js          ← rotas REST /send /cancel
+│   ├── copilot-router.js        ← barrel das rotas copilot
+│   ├── http-bridge.js           ← ponto de montagem do router Express
+│   ├── sdk-api.js               ← 28 endpoints REST (wrapper legado)
+│   └── sdk-router.js            ← router SDK legado
+├── bridges/
+│   ├── alias-store.js           ← armazenamento de aliases
+│   ├── gh-bridge.js             ← bridge GitHub CLI
+│   ├── git-bridge.js            ← bridge Git
+│   ├── inject-llmb.js           ← script CLI de injeção
+│   ├── llm-bridge-client.js     ← ⭐ RE-EXPORT de compatibilidade → channel/client.js
+│   ├── mcp-tool-bridge.js       ← bridge para MCP servers
+│   └── nerv-bridge.js           ← ⭐ bridge para event bus NERV (22 eventos)
+├── channel/
+│   ├── audit.js                 ← auditoria da conversa (context window)
+│   ├── client.js                ← ⭐ LlmBridgeClient (INTERFACE PARA LLM-A)
+│   ├── index.js                 ← barrel + CHANNEL_VERSION
+│   └── inject.js                ← helper de injeção de contexto
 ├── config/
-│   ├── index.js                ← barrel de exports
-│   ├── mcp-servers.js          ← configuração MCP
-│   ├── session-config.js       ← builders de configuração de sessão
-│   ├── system-prompt.js        ← ⭐ builders do system message (Sprint 22)
-│   └── tool-restrictions.js   ← restrições de ferramentas
-├── lib/
-│   ├── agents.js               ← definição dos agentes especializados
-│   ├── client.js               ← client SDK wrapper
-│   ├── hooks.js                ← tools de hooks
-│   ├── index.js                ← barrel
-│   ├── models.js               ← definição de modelos
-│   ├── permissions.js          ← controle de permissões
-│   ├── session.js              ← abstração de sessão
-│   ├── telemetry.js            ← telemetria
-│   └── tools-registry.js      ← registro de ferramentas
-└── tools/
-    ├── file-tools.js           ← 8 ferramentas de arquivo (Sprint 17)
-    ├── hook-tools.js           ← ferramentas de hooks
-    └── shell-tools.js          ← 3 ferramentas shell (Sprint 21)
+│   ├── index.js                 ← barrel
+│   ├── mcp-servers.js           ← configuração MCP servers
+│   ├── session-config.js        ← builders de configuração de sessão
+│   └── system-prompt.js         ← ⭐ builders do system message
+├── conversation-hub/
+│   ├── hub.js                   ← ConversationHub (gerenciamento de sessões)
+│   ├── index.js                 ← barrel
+│   ├── orchestrator.js          ← orquestrador LLM-A (dialog mode coordinator)
+│   ├── socket-ns.js             ← namespace Socket.IO para o hub
+│   └── store.js                 ← ConversationStore (SQLite persistence)
+├── core/
+│   ├── constants.js             ← constantes globais do módulo
+│   ├── errors.js                ← SessionError e tipos de erro
+│   ├── index.js                 ← barrel
+│   └── types.js                 ← tipos JSDoc do módulo
+├── terminal/
+│   ├── commands/                ← comandos do REPL (/alias, /attach, /context, etc.)
+│   ├── dialog.js                ← sendTurn, ensureDialogLoop
+│   ├── file-context.js          ← readFileContext, embedMultiple
+│   ├── http-handlers.js         ← handlers HTTP (handleInject, handleStatus, etc.)
+│   ├── index.js                 ← barrel
+│   ├── repl.js                  ← REPL interativo
+│   ├── server.js                ← servidor HTTP LLM-B (:3009)
+│   └── state.js                 ← estado compartilhado do terminal
+├── tools/
+│   ├── code-tools.js            ← ferramentas de análise de código
+│   ├── file-tools.js            ← 11 ferramentas de arquivo + SEC-03/04
+│   ├── git-tools.js             ← ferramentas git
+│   ├── hook-tools.js            ← ferramentas de hooks
+│   ├── hub-tools.js             ← ferramentas do conversation hub
+│   ├── index.js                 ← barrel de tools
+│   ├── introspection-tools.js   ← introspecção de tools registradas
+│   ├── session-tools.js         ← ferramentas de sessão
+│   ├── shell-tools.js           ← 3 ferramentas shell com SEC-01 (tokenizer)
+│   └── task-tools.js            ← ferramentas de tarefas/fila
+└── types/
+    ├── index.js                 ← barrel de tipos
+    └── structured-message.js   ← ⭐ StructuredMessage schema + builders
 ```
 
 ---

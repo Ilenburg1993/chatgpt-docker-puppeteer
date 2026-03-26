@@ -20,6 +20,12 @@ import { log } from '#core/logger';
  * @typedef {import('express').Router} BridgeRouter
  *
  * @typedef {import('./bridge-control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
+ *
+ * @typedef {Object} SendRequestBody
+ * @property {string} message - Texto da mensagem a enviar ao agente
+ * @property {boolean} [waitForResponse] - Aguardar resposta síncrona (default: false)
+ * @property {number} [timeoutMs] - Timeout em ms ao aguardar resposta (default: 30000)
+ * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Arquivos/contexto extras
  */
 
 /**

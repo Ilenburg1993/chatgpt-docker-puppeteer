@@ -261,7 +261,12 @@ export function createInjectServer() {
                     'Content-Type': 'application/json',
                     'Retry-After': String(rateCheck.resetIn),
                 });
-                res.end(JSON.stringify({ ok: false, error: `Rate limit excedido. Tente novamente em ${rateCheck.resetIn}s.` }));
+                res.end(
+                    JSON.stringify({
+                        ok: false,
+                        error: `Rate limit excedido. Tente novamente em ${rateCheck.resetIn}s.`,
+                    }),
+                );
                 return;
             }
             const raw = await readBody(req);

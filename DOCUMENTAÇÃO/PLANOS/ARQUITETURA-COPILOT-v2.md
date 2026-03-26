@@ -1161,7 +1161,7 @@ Quando LLM-A (este agente) usa a API HTTP para se comunicar com LLM-B, ela preci
 
 ### FASE AD — Correção de Bugs e Hardening: Auditoria Independente `src/copilot`
 
-**Status**: 🔴 PLANEJADA
+**Status**: ✅ CONCLUÍDA (Sprints AD-1,2,3,4 — commit `27140f20` + Sprint 3+4 subsequente)
 
 **Motivação**
 
@@ -1174,12 +1174,12 @@ no código real (HEAD `bdaa1347`).
 
 **Sprints internos:**
 
-| Sprint  | Conteúdo                                          | Itens |
-| ------- | ------------------------------------------------- | ----- |
-| AD-1    | Bugs críticos (🔴): BUG-01,03,04 + SEC-02        | 4     |
-| AD-2    | Bugs altos (🟠): BUG-02,05–09 + SEC-01,03,04 + PERF-01,02 + ARCH-02 + TYPE-01 + GAP-01,03 | 15 |
-| AD-3    | Type safety + docs (🟡): TYPE-02–04 + GAP-04     | 4     |
-| AD-4    | Melhorias (🔵): MELHORIA-01,03,04,06             | 4     |
+| Sprint | Conteúdo                                                                                 | Itens |
+| ------ | ---------------------------------------------------------------------------------------- | ----- |
+| AD-1   | Bugs críticos (🔴): BUG-01,03,04 + SEC-02                                                 | 4     |
+| AD-2   | Bugs altos (🟠): BUG-02,05–09 + SEC-01,03,04 + PERF-01,02 + ARCH-02 + TYPE-01 + GAP-01,03 | 15    |
+| AD-3   | Type safety + docs (🟡): TYPE-02–04 + GAP-04                                              | 4     |
+| AD-4   | Melhorias (🔵): MELHORIA-01,03,04,06                                                      | 4     |
 
 **Arquivos principais a modificar:**
 - `src/copilot/agent/always-alive.js` (BUG-01,02,07,08 + PERF-01,02)
@@ -1194,6 +1194,32 @@ no código real (HEAD `bdaa1347`).
 - `src/copilot/api/bridge-tasks.js` (GAP-03 + TYPE-03)
 - `src/copilot/terminal/server.js` (GAP-01)
 - `src/copilot/types/structured-message.js` (TYPE-02 + MELHORIA-04)
+
+---
+
+### FASE AE — Refatoração Arquitetural + Infraestrutura: Itens Adiados da Auditoria AD
+
+**Status**: 🟡 PLANEJADA — pronto para execução
+
+**Motivação**
+
+Sete itens de alta/média complexidade foram intencionalmente adiados durante a Fase AD por requererem
+análise de impacto maior ou dependências de infra. Todos são derivados da auditoria
+`DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`.
+
+**Plano detalhado**: `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md`
+
+**Sprints internos:**
+
+| Sprint | Código      | Conteúdo                                                 | Esforço |
+| ------ | ----------- | -------------------------------------------------------- | ------- |
+| AE-1   | ARCH-04     | Hub health check no endpoint `/health`                   | 🟢 Baixo |
+| AE-1   | PERF-03     | FTS5 tokenizer porter + unicode61 no ConversationStore   | 🟢 Baixo |
+| AE-2   | ARCH-01     | Remover 13 re-exports de compatibilidade raiz `src/copilot/` | 🟠 Médio |
+| AE-2   | ARCH-03     | LlmBridgeClient: convergência do histórico entre instâncias | 🟠 Médio |
+| AE-2   | GAP-02      | MCP schema: suporte a enum + aninhamento de objetos      | 🟠 Médio |
+| AE-3   | MELHORIA-05 | SDK session history por hub_session (migração SQLite)    | 🔴 Alto  |
+| AE-3   | MELHORIA-02 | OpenTelemetry: traces/métricas no AlwaysAliveAgent       | 🔴 Alto  |
 
 ---
 

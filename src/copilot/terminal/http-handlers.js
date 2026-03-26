@@ -208,10 +208,12 @@ export async function handlePipeline(body) {
 /**
  * Injeta uma mensagem na LLM-B e aguarda resposta.
  *
- * Aceita opcionalmente `context_files: string[]` — o servidor lê o conteúdo de cada arquivo e o embute como bloco
- * markdown antes da mensagem.
+ * Aceita opcionalmente:
+ * - `context_files: string[]` — lê o conteúdo de cada arquivo e o embute como bloco markdown antes da mensagem.
+ * - `attachments: Array<{type: 'file'|'content', path?: string, content?: string, mimeType?: string}>` — contexto
+ *   extra embutido como bloco markdown na mensagem (MELHORIA-03: suporte a attachments do SDK emulado via embed).
  *
- * @param {{ message?: string; from?: string; timeout?: number; context_files?: string[] } | null} body
+ * @param {{ message?: string; from?: string; timeout?: number; context_files?: string[]; attachments?: Array<{type?: string; content?: string; path?: string}> } | null} body
  * @returns {Promise<HandlerResult>}
  */
 export async function handleInject(body) {
@@ -236,7 +238,14 @@ export async function handleInject(body) {
             };
         }
     }
-
+    // MELHORIA-03 (fix): suporte a attachments via embed de conteúdo inline
+    const attachments = Array.isArray(body?.attachments) ? body.attachments : [];
+    for (const attachment of attachments) {
+        if (attachment && typeof attachment.content === 'string') {
+            const label = attachment.path ?? 'attachment';
+            enrichedMessage = `\`\`\`\n${attachment.content}\n\`\`\`\n*(${label})*\n\n${enrichedMessage}`;
+        }
+    }
     const t0 = Date.now();
     try {
         const reply = await sendTurn(enrichedMessage, from);

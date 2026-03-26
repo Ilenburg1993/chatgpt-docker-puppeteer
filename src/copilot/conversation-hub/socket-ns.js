@@ -10,8 +10,8 @@
  * @module copilot/conversation-hub/socket-ns
  */
 
-import { log } from '#core/logger';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
+import { log } from '#core/logger';
 import jwt from 'jsonwebtoken';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
