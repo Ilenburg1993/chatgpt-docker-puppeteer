@@ -63,11 +63,10 @@ async function withErrorHandler(req, res, fn) {
  * Retorna informações do agente Always-Alive: status, uptime, sessão ativa.
  */
 router.get('/agent/info', (_req, res) => {
-    const agent = /** @type {any} */ (alwaysAliveAgent);
     res.json({
         ok: true,
-        running: agent.isRunning?.() ?? false,
-        sessionId: agent.currentSessionId ?? null,
+        running: alwaysAliveAgent.status !== 'stopped',
+        sessionId: alwaysAliveAgent.sessionId ?? null,
         uptime: Math.floor(process.uptime()),
         pid: process.pid,
         nodeVersion: process.version,
@@ -83,7 +82,7 @@ router.get('/agent/info', (_req, res) => {
  * Lista as ferramentas registradas no ToolsRegistry do agente, com metadados ricos.
  */
 router.get('/agent/tools', (_req, res) => {
-    const registry = /** @type {any} */ (alwaysAliveAgent).toolsRegistry;
+    const registry = alwaysAliveAgent.toolsRegistry;
     if (!registry) {
         res.status(503).json({ ok: false, error: 'ToolsRegistry não disponível (agente não iniciado)' });
         return;
@@ -99,7 +98,7 @@ router.get('/agent/tools', (_req, res) => {
  * Retorna o resumo de telemetria do agente (sessões, erros, latências).
  */
 router.get('/agent/telemetry', (_req, res) => {
-    const telemetry = /** @type {any} */ (alwaysAliveAgent).telemetry;
+    const telemetry = alwaysAliveAgent.telemetry;
     if (!telemetry) {
         res.status(503).json({ ok: false, error: 'Telemetria não disponível (agente não iniciado)' });
         return;
@@ -112,12 +111,12 @@ router.get('/agent/telemetry', (_req, res) => {
  */
 router.post('/agent/telemetry/clear', (req, res) => {
     void req;
-    const agent = /** @type {any} */ (alwaysAliveAgent);
-    if (!agent.telemetry) {
+    const telemetry = alwaysAliveAgent.telemetry;
+    if (!telemetry) {
         res.status(503).json({ ok: false, error: 'Telemetria não disponível (agente não iniciado)' });
         return;
     }
-    clearTelemetry(agent.telemetry);
+    clearTelemetry(telemetry);
     log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
     res.json({ ok: true, message: 'Telemetria resetada com sucesso' });
 });

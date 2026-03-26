@@ -8,7 +8,7 @@
  * exigem acesso direto ao `res`). Isso permite reutilização por:
  *
  * - `terminal/server.js` — servidor HTTP raw (porta 3009, node:http)
- * - futuro Express router em `api/copilot-router.js` — fachada REST unificada
+ * - Express router em `api/http-bridge.js` — fachada REST unificada
  *
  * Padrão: **Command Pattern** — cada função encapsula uma intenção de domínio.
  *

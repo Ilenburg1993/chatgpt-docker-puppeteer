@@ -50,6 +50,47 @@ export const BUILTIN_HANDLER_MAP = new Map([
             return val !== undefined ? val : '(não definido)';
         },
     ],
+    // ── Handlers adicionais (I1 — Fase 2) ─────────────────────────────────────
+    [
+        'process_info',
+        () =>
+            JSON.stringify({
+                pid: process.pid,
+                uptime: Math.floor(process.uptime()),
+                nodeVersion: process.version,
+                platform: process.platform,
+                memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+                env: process.env['NODE_ENV'] ?? 'development',
+            }),
+    ],
+    [
+        'uptime',
+        () => {
+            const s = Math.floor(process.uptime());
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            return `${h}h ${m}m ${sec}s (${s}s total)`;
+        },
+    ],
+    [
+        'math_eval',
+        (args) => {
+            const expr = typeof args['expression'] === 'string' ? args['expression'].trim() : '';
+            if (!expr) return '(expressão ausente)';
+            // Suporta expressões simples: um operador entre dois números (ex: "42 + 58", "10 * 3.5").
+            const m = /^(-?\d+(?:\.\d+)?)\s*([+\-*/])\s*(-?\d+(?:\.\d+)?)$/.exec(expr);
+            if (!m) return '(expressão não suportada — use: número operador número)';
+            const a = parseFloat(m[1] ?? '');
+            const op = m[2];
+            const b = parseFloat(m[3] ?? '');
+            if (op === '+') return String(a + b);
+            if (op === '-') return String(a - b);
+            if (op === '*') return String(a * b);
+            if (op === '/') return b === 0 ? '(divisão por zero)' : String(a / b);
+            return '(operador inválido)';
+        },
+    ],
 ]);
 
 /**

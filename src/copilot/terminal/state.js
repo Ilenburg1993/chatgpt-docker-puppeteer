@@ -7,8 +7,29 @@
  * Centraliza as variáveis mutáveis que precisam ser acessadas por dialog.js, server.js e repl.js sem depender de
  * closures no terminal-server.js monolítico.
  *
+ * **F1 (Fase 2)**: expõe `stateEmitter` (EventEmitter) para observabilidade reativa. Emite eventos ao mudar campos
+ * críticos, permitindo que consumidores reajam sem polling.
+ *
+ * Eventos emitidos:
+ * - `'hubSessionId:changed'` `(newId: string | null, prevId: string | null)` — ao mudar a hub session
+ * - `'busy:changed'` `(busy: boolean)` — ao mudar o estado de ocupação do terminal
+ *
  * @module copilot/terminal/state
  */
+
+import EventEmitter from 'node:events';
+
+// ─── Emitter reativo ──────────────────────────────────────────────────────────
+
+/**
+ * EventEmitter singleton para observar mudanças de estado do terminal.
+ *
+ * @example
+ *     import { stateEmitter } from './state.js';
+ *     stateEmitter.on('busy:changed', (busy) => console.log('terminal busy:', busy));
+ */
+export const stateEmitter = new EventEmitter();
+stateEmitter.setMaxListeners(20);
 
 // ─── Estado compartilhado ─────────────────────────────────────────────────────
 
@@ -49,7 +70,9 @@ export function getHubSessionId() {
 }
 /** @param {string | null} id @returns {void} */
 export function setHubSessionId(id) {
+    const prev = _hubSessionId;
     _hubSessionId = id;
+    if (prev !== id) stateEmitter.emit('hubSessionId:changed', id, prev);
 }
 
 /** @returns {boolean} */
@@ -58,7 +81,9 @@ export function getBusy() {
 }
 /** @param {boolean} value @returns {void} */
 export function setBusy(value) {
+    const prev = _busy;
     _busy = value;
+    if (prev !== value) stateEmitter.emit('busy:changed', value);
 }
 
 /** @returns {import('node:readline').Interface | null} */
