@@ -39,6 +39,7 @@ import {
     cmdRecall as _cmdRecall,
     cmdRemember as _cmdRemember,
     cmdResume as _cmdResume,
+    cmdSkills as _cmdSkills,
     cmdStatus as _cmdStatus,
     cmdWho as _cmdWho,
 } from './commands/index.js';
@@ -59,6 +60,7 @@ const BANNER = `
   \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
   \x1b[33m/attach [path|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m
+  \x1b[33m/skills [list|add <path>|remove <path>|reload]\x1b[0m
   \x1b[36m/gh issue list\x1b[0m · \x1b[36m/gh pr list\x1b[0m · \x1b[36m/gh run list\x1b[0m · \x1b[36m/git status\x1b[0m · \x1b[36m/git log\x1b[0m · \x1b[36m/alias\x1b[0m · \x1b[36m/help\x1b[0m
   \x1b[90mPOST :${INJECT_PORT}/inject  ·  POST :${INJECT_PORT}/pipeline  ·  GET :${INJECT_PORT}/events  ·  GET :${INJECT_PORT}/sessions  ·  POST/GET/DELETE :${INJECT_PORT}/memory\x1b[0m
   \x1b[90mGET :${INJECT_PORT}/gh/issues  ·  GET :${INJECT_PORT}/gh/prs  ·  GET :${INJECT_PORT}/gh/ci  ·  GET :${INJECT_PORT}/git/status  ·  GET :${INJECT_PORT}/git/log\x1b[0m
@@ -148,6 +150,9 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
             break;
         case 'resume':
             await _cmdResume({ println, hubSessionId: _hubSessionId }, arg);
+            break;
+        case 'skills':
+            _cmdSkills({ println }, arg);
             break;
         case 'quit':
         case 'exit':

@@ -11,6 +11,7 @@
 import { alwaysAliveAgent } from '../../agent/always-alive.js';
 import { llmBridgeClient } from '../../bridges/llm-bridge-client.js';
 import { conversationStore } from '../../conversation-hub/store.js';
+import { getWorkspaceContext } from '../workspace-context.js';
 
 /**
  * Referência ao _hubSessionId gerenciado pelo terminal server. É passado como parâmetro pois não pode ser importado
@@ -34,6 +35,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }) {
     const statusColor =
         snap.status === 'waiting_for_input' ? '\x1b[32m' : snap.status === 'idle' ? '\x1b[33m' : '\x1b[31m';
     const effort = snap.reasoningEffort ?? 'high';
+    const ws = getWorkspaceContext();
+    const branchStr = ws.currentBranch ? `\x1b[32m${ws.currentBranch}\x1b[0m` : '\x1b[90m(sem branch)\x1b[0m';
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
@@ -44,6 +47,10 @@ export function cmdStatus({ hubSessionId, injectPort, println }) {
   turnos (memória) ${llmBridgeClient.turnCount}
   hub session      \x1b[90m${hubSessionId ?? '(sem hub)'}\x1b[0m
   inject port      ${injectPort}
+  ─────────────────────────────────────
+  workspace        \x1b[90m${ws.cwd}\x1b[0m
+  git root         \x1b[90m${ws.gitRoot ?? '(não é git repo)'}\x1b[0m
+  branch           ${branchStr}
   ─────────────────────────────────────
 `);
 }

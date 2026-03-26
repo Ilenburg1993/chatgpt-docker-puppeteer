@@ -20,6 +20,8 @@ import { setBackgroundCompactionThreshold } from '../agent/session-manager.js';
 import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { sendTurn } from './dialog.js';
 import { embedMultiple, getFileCacheStats, readFileContext } from './file-context.js';
 import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from './state.js';
@@ -428,4 +430,64 @@ export function handleSetInfiniteSessionConfig(body) {
         setBackgroundCompactionThreshold(backgroundCompactionThreshold);
     }
     return { status: 200, cors: true, body: { ok: true, infiniteSession: getInfiniteSessionConfig() } };
+}
+
+// ── GET /config/skills + PUT /config/skills (AG.3) ───────────────────────────
+
+const SKILLS_PATH = join(resolve(import.meta.dirname, '../../../..'), 'skills.json');
+
+/**
+ * @typedef {Object} SkillsConfig
+ * @property {string[]} paths - Lista de caminhos de arquivos/diretórios de contexto fixado
+ */
+
+/**
+ * Lê o skills.json do disco. Retorna configuração padrão se o arquivo não existir.
+ *
+ * @returns {SkillsConfig}
+ */
+function readSkillsConfig() {
+    if (!existsSync(SKILLS_PATH)) return { paths: [] };
+    try {
+        const raw = readFileSync(SKILLS_PATH, 'utf8');
+        return JSON.parse(raw);
+    } catch {
+        return { paths: [] };
+    }
+}
+
+/**
+ * Persiste o skills.json no disco.
+ *
+ * @param {SkillsConfig} config
+ * @returns {void}
+ */
+function writeSkillsConfig(config) {
+    writeFileSync(SKILLS_PATH, JSON.stringify(config, null, 2), 'utf8');
+}
+
+/**
+ * GET /config/skills — retorna a lista de skills (paths pinned) configurados.
+ *
+ * @returns {HandlerResult}
+ */
+export function handleGetSkills() {
+    return { status: 200, cors: true, body: { ok: true, skills: readSkillsConfig() } };
+}
+
+/**
+ * PUT /config/skills — atualiza a lista de paths pinned.
+ * Espera `{ paths: string[] }` no body.
+ *
+ * @param {unknown} body
+ * @returns {HandlerResult}
+ */
+export function handleSetSkills(body) {
+    const { paths } = /** @type {any} */ (body) ?? {};
+    if (!Array.isArray(paths) || paths.some((p) => typeof p !== 'string')) {
+        return { status: 400, body: { ok: false, error: 'body deve conter { paths: string[] }' } };
+    }
+    const config = { paths };
+    writeSkillsConfig(config);
+    return { status: 200, cors: true, body: { ok: true, skills: config } };
 }

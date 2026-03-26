@@ -13,6 +13,7 @@
 
 import { llmBridgeClient } from '../../bridges/llm-bridge-client.js';
 import { alwaysAliveAgent } from '../../agent/always-alive.js';
+import { getWorkspaceContext } from '../workspace-context.js';
 
 // ─── Estimativa de tokens ─────────────────────────────────────────────────────
 
@@ -117,6 +118,13 @@ export function cmdContext({ println }) {
     if (!isRealData) {
         println(`\x1b[90m  (estimativa heurística: 4 chars ≈ 1 token; limite real depende do modelo)\x1b[0m`);
     }
+
+    // AG.5 — workspace SessionContext
+    const ws = getWorkspaceContext();
+    println(`\x1b[36m  ─── Workspace ──────────────────────────────────────────────────\x1b[0m`);
+    println(`  cwd    \x1b[90m${ws.cwd}\x1b[0m`);
+    if (ws.gitRoot) println(`  git    \x1b[90m${ws.gitRoot}\x1b[0m  branch: \x1b[32m${ws.currentBranch ?? '?'}\x1b[0m`);
+
     println('');
 }
 

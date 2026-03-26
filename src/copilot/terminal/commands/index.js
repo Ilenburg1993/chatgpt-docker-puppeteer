@@ -27,3 +27,4 @@ export {
     cmdStatus,
     cmdWho,
 } from './session.js';
+export { cmdSkills } from './skills.js';
