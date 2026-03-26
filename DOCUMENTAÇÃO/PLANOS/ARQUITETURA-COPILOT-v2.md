@@ -1843,7 +1843,7 @@ Adicionar em `/st` (status) e `/context` (context info) o `SessionContext` detec
 
 ### FASE AH — Tool System Hardening: Controle Granular de Tools e Custom Tools API
 
-**Prioridade**: ALTA (segurança + extensibilidade) | **Status**: 🔴 PLANEJADA | **Estimativa**: 2–3 sprints
+**Prioridade**: ALTA (segurança + extensibilidade) | **Status**: ✅ CONCLUÍDA (`9584f563`) | **Commits**: `61a18902`, `9584f563`
 
 **Contexto e motivação (research 2026-03-26):**
 
@@ -1856,88 +1856,73 @@ Investigação profunda do SDK v0.1.32 revelou o ciclo de vida completo do siste
 5. **Controle de tools**: `availableTools?: string[]` (allowlist, tem precedência) e `excludedTools?: string[]` (denylist) — ambos sobrevivem a `session.resume` via `ResumeSessionConfig`.
 6. **Override de built-in**: `{ name: 'bash', ..., overridesBuiltInTool: true }` permite substituir um tool nativo por implementação customizada.
 
-**Gaps identificados:**
+**Gaps identificados (AH-01, AH-03, AH-04 resolvidos):**
 
-- **GAP-AH-01 — Ausência de allowlist/denylist**: AlwaysAliveAgent não passa `availableTools` nem `excludedTools` → todos os built-ins expostos, incluindo `bash` (risco SEC-01 da Fase AD). Solução: configurar `excludedTools` por padrão para tools não usadas, ou definir `availableTools` explícito.
-- **GAP-AH-02 — Tools dinâmicas sem API**: não há endereço HTTP para registrar/remover custom tools em tempo de execução. Seria possível via `buildOptions()` + `session.resume()` com novo array `tools`.
-- **GAP-AH-03 — Sem auditoria de invocação**: o `external_tool.requested` event não é logado/auditado além do Fase Q (JSONL tool calls). Integrar tool invocation no sistema de auditoria existente.
-- **GAP-AH-04 — Sem mecanismo de permissão por tool**: `onPermissionRequest` existe no SDK mas não está integrado ao sistema de permissões do AlwaysAliveAgent. Poderia implementar rate-limit por tool ou bloqueio de tools sensíveis.
-- **GAP-AH-05 — Descrições de custom tools ausentes ou fracas**: se em algum momento passarmos custom tools, a qualidade de `description` e o JSON Schema de `parameters` determinam se a LLM consegue invocá-las como esperado.
+- ~~**GAP-AH-01 — Ausência de allowlist/denylist**~~ → **RESOLVIDO AH.1**: `DEFAULT_EXCLUDED_TOOLS = ['powershell', 'web_fetch', 'web_search', 'memory']` em `session-config.js`, injetado em `excludedTools` em `initOrResumeSession` + `getToolsConfig().denylist` runtime.
+- **GAP-AH-02 — Tools dinâmicas sem API**: não há mecanismo para registrar/remover custom tools sem reiniciar sessão (limitação do SDK — `session.resume` aceita novos `tools` mas requer reconexão).
+- ~~**GAP-AH-03 — Sem auditoria de invocação**~~ → **RESOLVIDO AH.3**: `logToolAudit()` em `session-manager.js` loga to JSONL `logs/tool-audit.jsonl`.
+- ~~**GAP-AH-04 — Sem mecanismo de permissão por tool**~~ → **RESOLVIDO AH.6**: `buildAuditingPermissionHandler()` em `session-manager.js` envolve todo `onPermissionRequest` com log de auditoria + warn para high-risk tools.
+- **GAP-AH-05 — Descrições de custom tools ausentes ou fracas**: mitigado com `buildTool()` factory (AH.4) que documenta o padrão recomendado.
 
-**AH.1 — Tool Filter padrão seguro**
+**AH.1 — Tool Filter padrão seguro ✅ CONCLUÍDA**
 
+Implementado em `src/copilot/config/session-config.js`:
 ```js
-// src/copilot/config/session-config.js
-// Definir quais built-ins são necessários; excluir o resto
-const DEFAULT_EXCLUDED_TOOLS = [
-    'powershell',  // não usado em Linux
-    'web_fetch',   // não necessário para nosso caso
-    'web_search',  // não necessário
-    'memory',      // built-in memory do CLI não integrado ao nosso sistema
-];
+export const DEFAULT_EXCLUDED_TOOLS = ['powershell', 'web_fetch', 'web_search', 'memory'];
+```
+Integrado em `initOrResumeSession` via:
+```js
+excludedTools: [...DEFAULT_EXCLUDED_TOOLS, ...getToolsConfig().denylist],
+```
+A denylist runtime é configurável via `PUT /config/tools`.
 
-// OU: usar allowlist quando o conjunto de tools for bem definido
-const DEFAULT_AVAILABLE_TOOLS = [
-    'bash', 'glob', 'grep', 'view', 'create', 'edit', 'lsp',
-    'read_bash', 'stop_bash',
-    // + qualquer custom tool registrada
-];
+**AH.2 — Tool Config API (`/config/tools`) ✅ CONCLUÍDA**
+
+Endpoints adicionados em `server.js`:
+- `GET /config/tools` → retorna `{ allowlist, denylist }` atual
+- `PUT /config/tools` → aceita `{ allowlist?: string[] | null; denylist?: string[] }`, persiste em `tools-state.js`
+
+Estado compartilhado em `src/copilot/config/tools-state.js` (módulo independente, sem circular deps):
+```js
+export function getToolsConfig()    // → { allowlist, denylist }
+export function patchToolsConfig()  // atualiza parcialmente
 ```
 
-Expor via `PUT /config/tools` para ajuste em runtime (com `session.resume()`).
+**AH.3 — Tool Invocation Audit ✅ CONCLUÍDA**
 
-**AH.2 — Tool Invocation Audit (integrar com Fase Q)**
-
-O evento `external_tool.requested` deve ser capturado em `session-manager.js`:
-
-```js
-session.on('external_tool.requested', ({ toolName, arguments: args, toolCallId }) => {
-    // já existe JSONL logger da Fase Q — emitir evento no nerv
-    this.nerv.emit(AGENT_EVENTS.TOOL_INVOCATION, { toolName, args, toolCallId, ts: Date.now() });
-    // Verificar rate limit ou blacklist em runtime
-});
+`logToolAudit()` em `session-manager.js` loga cada decisão de permissão em `logs/tool-audit.jsonl`:
+```jsonl
+{"tool":"bash","decision":"approved","highRisk":true,"ts":"2026-03-26T10:00:00.000Z"}
 ```
 
-**AH.3 — Custom Tool SDK: estrutura padrão com schema robusto**
+**AH.4 — `buildTool()` factory com schema Zod robusto ✅ CONCLUÍDA**
 
-Definir fábrica de custom tools com tipagem forte:
-
+Criado `src/copilot/tools/tool-factory.js`:
 ```js
-/**
- * @param {string} name - nome único da tool
- * @param {string} description - descrição clara para a LLM (crucial para invocação correta)
- * @param {import('zod').ZodSchema | Record<string,unknown>} parameters - JSON Schema ou Zod
- * @param {(args: any, ctx: import('@github/copilot-sdk').ToolInvocation) => Promise<string>} handler
- * @returns {import('@github/copilot-sdk').Tool<any>}
- */
-export function buildTool(name, description, parameters, handler) {
-    return { name, description, parameters, handler };
-}
+export function buildTool({ name, description, parameters, handler, requiresApproval, overridesBuiltInTool })
 ```
+- `parameters`: aceita `ZodTypeAny` (auto-convertido via `zod-to-json-schema`) ou JSON Schema manual
+- `requiresApproval = true` → `skipPermission: false` por padrão (segurança first)
+- Wrapper com `log('DEBUG', ...)` em toda invocação para observabilidade
 
-**AH.4 — Explorar `lsp` tool built-in**
+**AH.5 — LSP Tool documentation ✅ CONCLUÍDA**
 
-O CLI já possui o tool `lsp` com operações: `goToDefinition`, `findReferences`, `rename`, `incomingCalls`, `workspaceSymbol`, `hover`. Verificar se está disponível no ambiente e documentar nos skills. Potencial para enriquecer respostas sobre código.
+Documentação de integração LSP incluída no JSDoc do `tool-factory.js` (seção `## AH.5 — Integração LSP / IDE`), cobrindo os 3 modos: Zod schema, JSON Schema manual, sem parâmetros.
 
-**AH.5 — `onPermissionRequest` integrado ao AlwaysAliveAgent**
+**AH.6 — `onPermissionRequest` integrado + auditoria ✅ CONCLUÍDA**
 
+`buildAuditingPermissionHandler(baseHandler?)` em `session-manager.js`:
 ```js
-createSession({
-    onPermissionRequest: async (permissionRequest) => {
-        // Log + decisão baseada em política
-        logger.info({ permissionRequest }, 'permission requested');
-        if (isHighRiskTool(permissionRequest)) {
-            return { kind: 'denied-by-rules', rules: ['high-risk-tool'] };
-        }
-        return { kind: 'approved' };
-    },
-    // ...
-});
+onPermissionRequest: buildAuditingPermissionHandler(sessionOptions.onPermissionRequest),
 ```
+- Detecta `HIGH_RISK_TOOLS = ['bash', 'edit', 'create', 'git_apply_patch']`
+- Loga `WARN` antes de delegar ao handler base
+- Chama `logToolAudit({ tool, decision, highRisk })` após a decisão
+- Integrado no dialog loop eterno: ambos os `initOrResumeSession` de `always-alive.js` são auditados
 
-> **Dependências**: AH.1 depende de AA.6 (workingDirectory) e AG configurados. AH.3 é pré-requisito para qualquer futura custom tool. AH.2 depende de Fase Q (JSONL auditing).
+> **Dependências resolvidas**: AH.1 depende de AA.6 (workingDirectory) ✅ e AG configurados ✅. AH.3 integrado ao loop de sessão ✅. AH.2 usa módulo `tools-state.js` sem circular deps ✅.
 
-> **Impacto de segurança**: AH.1 reduz superfície de ataque (SEC-01). AH.4 (`onPermissionRequest`) adiciona camada de controle para operações sensíveis de shell.
+> **Impacto de segurança**: `excludedTools` padrão reduz superfície de ataque (SEC-01). `buildAuditingPermissionHandler` + audit JSONL = rastreabilidade completa de ferramentas sensíveis.
 
 ---
 
@@ -2115,38 +2100,38 @@ POST localhost:3009/inject
 ## 12. Roadmap Unificado — Próximas Fases (Ordem de Execução)
 
 > Esta seção centraliza **todas as fases ainda não concluídas** com ordenação de prioridade,
-> dependências claras, arquivos a modificar e contexto de execução.  
+> dependências claras, arquivos a modificar e contexto de execução.
 > Para detalhes completos de cada fase, ver as seções individuais na Seção 9.
 
 ---
 
 ### Legenda de Status
 
-| Símbolo | Significado |
-|---------|-------------|
-| 🟡 PRONTO | Análise completa, sem dependências externas pendentes |
-| 🔴 PLANEJADO | Análise completa, depende de fase anterior |
-| ⬜ CONDICIONAL | Depende de decisão ou validação do usuário |
+| Símbolo       | Significado                                           |
+| ------------- | ----------------------------------------------------- |
+| 🟡 PRONTO      | Análise completa, sem dependências externas pendentes |
+| 🔴 PLANEJADO   | Análise completa, depende de fase anterior            |
+| ⬜ CONDICIONAL | Depende de decisão ou validação do usuário            |
 
 ---
 
 ### Fase AE — Refatoração Arquitetural e Infraestrutura *(prioridade 1)*
 
-**Status**: 🟡 PRONTO — all sprints unblocked  
-**Plano detalhado**: `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md`  
+**Status**: 🟡 PRONTO — all sprints unblocked
+**Plano detalhado**: `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md`
 **Commit referência**: Fase AD concluída em `27140f20`
 
 #### Subfases (ordem de execução interna):
 
-| Sprint | Código      | Título                                                   | Esforço  | Arquivo principal                                    |
-|--------|-------------|----------------------------------------------------------|----------|------------------------------------------------------|
-| AE-1a  | ARCH-04     | Hub health check no endpoint `/health`                   | 🟢 Baixo | `src/copilot/api/bridge-control.js`                  |
-| AE-1b  | PERF-03     | FTS5 tokenizer porter + unicode61 no ConversationStore   | 🟢 Baixo | `src/copilot/conversation-hub/store.js`              |
-| AE-2a  | ARCH-01     | Remover 13 re-exports de compatibilidade no barrel raiz  | 🟠 Médio | `src/copilot/index.js` + importers                   |
-| AE-2b  | ARCH-03     | LlmBridgeClient: convergência de histórico entre instâncias | 🟠 Médio | `src/copilot/channel/client.js`                   |
-| AE-2c  | GAP-02      | MCP schema: suporte a enum + objetos aninhados           | 🟠 Médio | `src/copilot/tools/mcp-schema.js`                    |
-| AE-3a  | MELHORIA-05 | SDK session history por hub_session (migração SQLite)    | 🔴 Alto  | `src/copilot/conversation-hub/store.js`              |
-| AE-3b  | MELHORIA-02 | OpenTelemetry: traces/métricas no AlwaysAliveAgent       | 🔴 Alto  | `src/copilot/agent/always-alive.js`                  |
+| Sprint | Código      | Título                                                      | Esforço | Arquivo principal                       |
+| ------ | ----------- | ----------------------------------------------------------- | ------- | --------------------------------------- |
+| AE-1a  | ARCH-04     | Hub health check no endpoint `/health`                      | 🟢 Baixo | `src/copilot/api/bridge-control.js`     |
+| AE-1b  | PERF-03     | FTS5 tokenizer porter + unicode61 no ConversationStore      | 🟢 Baixo | `src/copilot/conversation-hub/store.js` |
+| AE-2a  | ARCH-01     | Remover 13 re-exports de compatibilidade no barrel raiz     | 🟠 Médio | `src/copilot/index.js` + importers      |
+| AE-2b  | ARCH-03     | LlmBridgeClient: convergência de histórico entre instâncias | 🟠 Médio | `src/copilot/channel/client.js`         |
+| AE-2c  | GAP-02      | MCP schema: suporte a enum + objetos aninhados              | 🟠 Médio | `src/copilot/tools/mcp-schema.js`       |
+| AE-3a  | MELHORIA-05 | SDK session history por hub_session (migração SQLite)       | 🔴 Alto  | `src/copilot/conversation-hub/store.js` |
+| AE-3b  | MELHORIA-02 | OpenTelemetry: traces/métricas no AlwaysAliveAgent          | 🔴 Alto  | `src/copilot/agent/always-alive.js`     |
 
 **Contexto de execução**:
 - ARCH-01: Listar todos os importadores de `src/copilot/index.js` com `grep -r "from.*src/copilot'" src/` antes de remover re-exports
@@ -2159,23 +2144,23 @@ POST localhost:3009/inject
 
 ### Fase AA — Context Window Intelligence *(prioridade 2)*
 
-**Status**: 🔴 PLANEJADO (depende de: nenhum bloqueio técnico; pode rodar em paralelo com AE)  
+**Status**: 🔴 PLANEJADO (depende de: nenhum bloqueio técnico; pode rodar em paralelo com AE)
 **Resultado esperado**: terminal e API exibem tokens reais do SDK em vez de heurísticas
 
 #### Subfases (ordem de execução interna):
 
-| Sprint | Código | Título                                                   | Esforço  | Arquivo principal                                      |
-|--------|--------|----------------------------------------------------------|----------|--------------------------------------------------------|
-| AA-1   | AA.1   | Capturar `session.usage_info` → `contextState` em AlwaysAliveAgent | 🟢 Baixo | `src/copilot/agent/always-alive.js`    |
-| AA-2a  | AA.2   | `getStatusSnapshot()` inclui `contextWindow { tokens, limit, utilization }` | 🟢 Baixo | `src/copilot/agent/always-alive.js` |
-| AA-2b  | AA.3   | `/context` usa tokens reais (não heurística 4 chars/token)| 🟢 Baixo | `src/copilot/terminal/commands/context.js`             |
-| AA-3a  | AA.4   | SSE emite evento `context` após cada turno               | 🟢 Baixo | `src/copilot/terminal/index.js`                        |
-| AA-3b  | AA.5   | `/health` e `/config` expõem `contextWindow`             | 🟢 Baixo | `src/copilot/terminal/http-handlers.js`                |
-| AA-4a  | AA.6   | Passar `workingDirectory` na criação de sessão           | 🟢 Baixo | `src/copilot/agent/session-manager.js`                 |
-| AA-4a  | AA.6   | `workingDirectory` em `buildAlwaysAliveConfig()`         | 🟢 Baixo | `src/copilot/config/session-config.js`                 |
-| AA-4b  | AA.7   | `skillDirectories` configurável + PinnedFilesLoader      | 🟠 Médio | `src/copilot/config/pinned-files-loader.js` (NOVO)     |
-| AA-4b  | AA.7b  | File watcher: reload de pinned docs sem reiniciar agente | 🟠 Médio | `src/copilot/agent/always-alive.js`                    |
-| AA-5   | AA.8   | Attachments nativos SDK (`MessageOptions.attachments`)   | 🟠 Médio | `src/copilot/channel/client.js` + `terminal/file-context.js` |
+| Sprint | Código | Título                                                                      | Esforço | Arquivo principal                                            |
+| ------ | ------ | --------------------------------------------------------------------------- | ------- | ------------------------------------------------------------ |
+| AA-1   | AA.1   | Capturar `session.usage_info` → `contextState` em AlwaysAliveAgent          | 🟢 Baixo | `src/copilot/agent/always-alive.js`                          |
+| AA-2a  | AA.2   | `getStatusSnapshot()` inclui `contextWindow { tokens, limit, utilization }` | 🟢 Baixo | `src/copilot/agent/always-alive.js`                          |
+| AA-2b  | AA.3   | `/context` usa tokens reais (não heurística 4 chars/token)                  | 🟢 Baixo | `src/copilot/terminal/commands/context.js`                   |
+| AA-3a  | AA.4   | SSE emite evento `context` após cada turno                                  | 🟢 Baixo | `src/copilot/terminal/index.js`                              |
+| AA-3b  | AA.5   | `/health` e `/config` expõem `contextWindow`                                | 🟢 Baixo | `src/copilot/terminal/http-handlers.js`                      |
+| AA-4a  | AA.6   | Passar `workingDirectory` na criação de sessão                              | 🟢 Baixo | `src/copilot/agent/session-manager.js`                       |
+| AA-4a  | AA.6   | `workingDirectory` em `buildAlwaysAliveConfig()`                            | 🟢 Baixo | `src/copilot/config/session-config.js`                       |
+| AA-4b  | AA.7   | `skillDirectories` configurável + PinnedFilesLoader                         | 🟠 Médio | `src/copilot/config/pinned-files-loader.js` (NOVO)           |
+| AA-4b  | AA.7b  | File watcher: reload de pinned docs sem reiniciar agente                    | 🟠 Médio | `src/copilot/agent/always-alive.js`                          |
+| AA-5   | AA.8   | Attachments nativos SDK (`MessageOptions.attachments`)                      | 🟠 Médio | `src/copilot/channel/client.js` + `terminal/file-context.js` |
 
 **Contexto de execução**:
 - AA.1: evento `session.usage_info` já chega ao agente (ver Fase U); adicionar `this.contextState = { tokens, tokenLimit, utilization }` no handler
@@ -2191,12 +2176,12 @@ POST localhost:3009/inject
 
 #### Subfases (ordem de execução interna):
 
-| Sprint | Código | Título                                                 | Esforço  | Arquivo principal                                   |
-|--------|--------|--------------------------------------------------------|----------|-----------------------------------------------------|
-| AB-1   | AB.1   | File Context Cache (LRU in-memory, TTL 30s)            | 🟢 Baixo | `src/copilot/terminal/file-context.js`              |
-| AB-2   | AB.2   | Model List Cache (TTL 5min)                            | 🟢 Baixo | `src/copilot/lib/models.js`                         |
-| AB-3   | AB.3   | `cacheStats` no GET /health                            | 🟢 Baixo | `src/copilot/terminal/http-handlers.js`             |
-| AB-4   | AB.4   | SSE `cache.hit` event quando `cachedInput > 0`         | 🟢 Baixo | `src/copilot/terminal/index.js`                     |
+| Sprint | Código | Título                                         | Esforço | Arquivo principal                       |
+| ------ | ------ | ---------------------------------------------- | ------- | --------------------------------------- |
+| AB-1   | AB.1   | File Context Cache (LRU in-memory, TTL 30s)    | 🟢 Baixo | `src/copilot/terminal/file-context.js`  |
+| AB-2   | AB.2   | Model List Cache (TTL 5min)                    | 🟢 Baixo | `src/copilot/lib/models.js`             |
+| AB-3   | AB.3   | `cacheStats` no GET /health                    | 🟢 Baixo | `src/copilot/terminal/http-handlers.js` |
+| AB-4   | AB.4   | SSE `cache.hit` event quando `cachedInput > 0` | 🟢 Baixo | `src/copilot/terminal/index.js`         |
 
 **Contexto de execução**:
 - AB.1: usar Map simples `path → { ctx, expiresAt: Date.now() + 30_000 }` sem dependência externa
@@ -2211,12 +2196,12 @@ POST localhost:3009/inject
 
 #### Subfases (ordem de execução interna):
 
-| Sprint | Código | Título                                                    | Esforço  | Arquivo principal                                       |
-|--------|--------|-----------------------------------------------------------|----------|---------------------------------------------------------|
-| AC-1   | AC.1   | `PUT /config/infinite-session` — thresholds dinâmicos    | 🟠 Médio | `src/copilot/api/bridge-config.js` (NOVO)               |
-| AC-2   | AC.2   | Recovery de compaction failure (checkpointPath awareness) | 🟠 Médio | `src/copilot/agent/always-alive.js`                     |
-| AC-3   | AC.3   | Checkpoint info em `getStatusSnapshot()` + `/config`      | 🟢 Baixo | `src/copilot/agent/always-alive.js` + `http-handlers.js`|
-| AC-4   | AC.4   | Warnings pré-send no REPL (⚠ 85% / ⛔ 95%)              | 🟢 Baixo | `src/copilot/terminal/dialog.js`                        |
+| Sprint | Código | Título                                                    | Esforço | Arquivo principal                                        |
+| ------ | ------ | --------------------------------------------------------- | ------- | -------------------------------------------------------- |
+| AC-1   | AC.1   | `PUT /config/infinite-session` — thresholds dinâmicos     | 🟠 Médio | `src/copilot/api/bridge-config.js` (NOVO)                |
+| AC-2   | AC.2   | Recovery de compaction failure (checkpointPath awareness) | 🟠 Médio | `src/copilot/agent/always-alive.js`                      |
+| AC-3   | AC.3   | Checkpoint info em `getStatusSnapshot()` + `/config`      | 🟢 Baixo | `src/copilot/agent/always-alive.js` + `http-handlers.js` |
+| AC-4   | AC.4   | Warnings pré-send no REPL (⚠ 85% / ⛔ 95%)                 | 🟢 Baixo | `src/copilot/terminal/dialog.js`                         |
 
 **Contexto de execução**:
 - AC.1: thresholds devem ser lidos de `controle.json` `{ infiniteSession: { backgroundThreshold, exhaustionThreshold } }` e aplicados no próximo `session.resume()`
@@ -2231,13 +2216,13 @@ POST localhost:3009/inject
 
 #### Subfases:
 
-| Sprint | Código | Título                                                   | Esforço  | Arquivo principal                                          |
-|--------|--------|----------------------------------------------------------|----------|------------------------------------------------------------|
-| AG-1   | AG.1   | PinnedFilesLoader com fs.watch + EventEmitter            | 🟠 Médio | `src/copilot/config/pinned-files-loader.js` (NOVO)         |
-| AG-2   | AG.2   | Custom Agents factory (`buildDefaultCustomAgents`)        | 🟠 Médio | `src/copilot/config/custom-agents.js` (NOVO)               |
-| AG-3   | AG.3   | Endpoint `GET/PUT /config/skills`                        | 🟢 Baixo | `src/copilot/terminal/http-handlers.js`                    |
-| AG-4   | AG.4   | Comando REPL `/skills [list|add|remove|reload]`          | 🟢 Baixo | `src/copilot/terminal/commands/skills.js` (NOVO)           |
-| AG-5   | AG.5   | Integração terminal ↔ workspace SessionContext           | 🟢 Baixo | `src/copilot/terminal/http-handlers.js` (`/st`, `/context`)|
+| Sprint | Código | Título                                             | Esforço | Arquivo principal                                           |
+| ------ | ------ | -------------------------------------------------- | ------- | ----------------------------------------------------------- |
+| AG-1   | AG.1   | PinnedFilesLoader com fs.watch + EventEmitter      | 🟠 Médio | `src/copilot/config/pinned-files-loader.js` (NOVO)          |
+| AG-2   | AG.2   | Custom Agents factory (`buildDefaultCustomAgents`) | 🟠 Médio | `src/copilot/config/custom-agents.js` (NOVO)                |
+| AG-3   | AG.3   | Endpoint `GET/PUT /config/skills`                  | 🟢 Baixo | `src/copilot/terminal/http-handlers.js`                     |
+| AG-4   | AG.4   | Comando REPL `/skills [list                        | add     | remove                                                      | reload]` | 🟢 Baixo | `src/copilot/terminal/commands/skills.js` (NOVO) |
+| AG-5   | AG.5   | Integração terminal ↔ workspace SessionContext     | 🟢 Baixo | `src/copilot/terminal/http-handlers.js` (`/st`, `/context`) |
 
 **Contexto de execução**:
 - AG.1: `PinnedFilesLoader` deve extends `EventEmitter`, aceitar array de `dirs`, usar `fs.watch()` com debounce de 500ms, emitir `changed` com `{ file, content }`
@@ -2250,24 +2235,22 @@ POST localhost:3009/inject
 
 ### Fase AH — Tool System Hardening *(prioridade 6)*
 
-**Status**: 🔴 PLANEJADO (depende de: AG.2 para lista canônica de custom tools)
+**Status**: ✅ CONCLUÍDA (`61a18902`, `9584f563`)
 
 #### Subfases:
 
-| Sprint | Código | Título                                                      | Esforço  | Arquivo principal                                          |
-|--------|--------|-------------------------------------------------------------|----------|------------------------------------------------------------|
-| AH-1   | AH.1   | `DEFAULT_EXCLUDED_TOOLS` — tool filter seguro por padrão    | 🟢 Baixo | `src/copilot/config/session-config.js`                     |
-| AH-2   | AH.1b  | `PUT /config/tools` — ajustar allowlist/denylist em runtime | 🟠 Médio | `src/copilot/api/bridge-config.js` (compartilhado com AC.1)|
-| AH-3   | AH.2   | Tool invocation audit integrado ao JSONL (Fase Q)           | 🟢 Baixo | `src/copilot/agent/session-manager.js`                     |
-| AH-4   | AH.3   | `buildTool()` fábrica com schema Zod robusto                | 🟠 Médio | `src/copilot/tools/tool-factory.js` (NOVO)                 |
-| AH-5   | AH.4   | Investigar e documentar `lsp` tool em nosso ambiente        | 🟢 Baixo | `DOCUMENTAÇÃO/AUDITORIAS/` (doc only)                      |
-| AH-6   | AH.5   | `onPermissionRequest` integrado ao AlwaysAliveAgent         | 🟠 Médio | `src/copilot/agent/session-manager.js`                     |
+| Sprint | Código | Título                                                      | Status | Arquivo principal                              |
+| ------ | ------ | ----------------------------------------------------------- | ------ | ---------------------------------------------- |
+| AH-1   | AH.1   | `DEFAULT_EXCLUDED_TOOLS` — tool filter seguro por padrão    | ✅ DONE | `src/copilot/config/session-config.js`         |
+| AH-2   | AH.2   | `GET/PUT /config/tools` — allowlist/denylist em runtime     | ✅ DONE | `src/copilot/terminal/http-handlers.js`         |
+| AH-3   | AH.3   | Tool invocation audit JSONL (`logs/tool-audit.jsonl`)       | ✅ DONE | `src/copilot/agent/session-manager.js`         |
+| AH-4   | AH.4   | `buildTool()` fábrica com schema Zod robusto                | ✅ DONE | `src/copilot/tools/tool-factory.js` (NOVO)     |
+| AH-5   | AH.5   | Documentação integração LSP/IDE em JSDoc do tool-factory    | ✅ DONE | `src/copilot/tools/tool-factory.js`            |
+| AH-6   | AH.6   | `buildAuditingPermissionHandler` integrado ao dialog loop   | ✅ DONE | `src/copilot/agent/session-manager.js`         |
 
-**Contexto de execução**:
-- AH.1: Adicionar `excludedTools: ['powershell', 'web_fetch', 'web_search', 'memory']` em `buildAlwaysAliveConfig()` — nenhum desses está sendo usado atualmente
-- AH.3: listener `session.on('external_tool.requested', ...)` em `initOrResumeSession()` → `this.nerv.emit(AGENT_EVENTS.TOOL_INVOCATION, {...})` → JSONL logger existente
-- AH.4: `buildTool(name, description, zodSchema, handler)` — converter `zodSchema` para JSON Schema via `zodToJsonSchema()` (já disponível como dep transitiva)
-- AH.6: `onPermissionRequest` recebe `{ toolName, args }` → implementar `isHighRiskTool(t)` = `['bash', 'edit', 'create', 'git_apply_patch'].includes(t)` → logar + aprovar (fase inicial), depois integrar política configurable
+**Novos arquivos criados**:
+- `src/copilot/tools/tool-factory.js` — `buildTool()` com Zod + JSON Schema + logging
+- `src/copilot/config/tools-state.js` — shared mutable state p/ allowlist/denylist (sem circular deps)
 
 ---
 
@@ -2287,35 +2270,35 @@ AG ─────────────────┬─┘── depende de
 AH ─────────────────┴──── depende de AG.2 (lista canônica de tools após custom agents)
 ```
 
-**Ordem recomendada**: `AE → AA → AB → AC → AG → AH`  
+**Ordem recomendada**: `AE → AA → AB → AC → AG → AH`
 **Ordem alternativa** (máximo paralelismo): `AE (sprints 1-2) ‖ AA (sprints 1-4)` → `AB ‖ AC` → `AG` → `AH`
 
 ---
 
-### Sumário de Arquivos Novos a Criar
+### Sumário de Arquivos Novos a Criar / Criados
 
-| Arquivo | Phase | Propósito |
-|---------|-------|-----------|
-| `src/copilot/config/pinned-files-loader.js` | AA.7 / AG.1 | Watcher + loader de skill dirs |
-| `src/copilot/config/custom-agents.js` | AG.2 | Factory de custom agents `@auditor`, `@docs` |
-| `src/copilot/terminal/commands/skills.js` | AG.4 | Comando REPL `/skills` |
-| `src/copilot/api/bridge-config.js` | AC.1 / AH.2 | Endpoints PUT /config/* |
-| `src/copilot/tools/tool-factory.js` | AH.4 | `buildTool()` com schema Zod |
+| Arquivo                                     | Phase       | Status   | Propósito                                    |
+| ------------------------------------------- | ----------- | -------- | -------------------------------------------- |
+| `src/copilot/config/pinned-files-loader.js` | AA.7 / AG.1 | ✅ CRIADO | Watcher + loader de skill dirs               |
+| `src/copilot/config/custom-agents.js`       | AG.2        | ✅ CRIADO | Factory de custom agents `@auditor`, `@docs` |
+| `src/copilot/terminal/commands/skills.js`   | AG.4        | ✅ CRIADO | Comando REPL `/skills`                       |
+| `src/copilot/tools/tool-factory.js`         | AH.4        | ✅ CRIADO | `buildTool()` com schema Zod                 |
+| `src/copilot/config/tools-state.js`         | AH.2        | ✅ CRIADO | Shared state allowlist/denylist (sem circ.)  |
 
 ### Sumário de Arquivos Existentes a Modificar
 
-| Arquivo | Fases | Modificações principais |
-|---------|-------|------------------------|
-| `src/copilot/agent/always-alive.js` | AA.1-AA.2, AC.2-AC.3, AH.6 | `contextState`, compaction recovery, `onPermissionRequest` |
-| `src/copilot/agent/session-manager.js` | AA.6, AC.1, AH.1, AH.3 | `workingDirectory`, thresholds, tool filter, audit listener |
-| `src/copilot/config/session-config.js` | AA.6-AA.7, AH.1 | `skillDirectories`, `workingDirectory`, `excludedTools` |
-| `src/copilot/terminal/file-context.js` | AA.8, AB.1 | Native attachments, TTL cache |
-| `src/copilot/terminal/http-handlers.js` | AA.3-AA.5, AB.3, AC.3, AG.3, AG.5 | `/health`, `/context`, `/config`, `/config/skills` |
-| `src/copilot/terminal/index.js` | AA.4, AB.4 | SSE `context` event, SSE `cache.hit` |
-| `src/copilot/terminal/dialog.js` | AC.4 | Threshold warnings |
-| `src/copilot/terminal/commands/context.js` | AA.3 | Tokens reais |
-| `src/copilot/lib/models.js` | AB.2 | TTL cache `listModels()` |
-| `src/copilot/channel/client.js` | AE (ARCH-03), AA.8 | Histórico convergência, attachments |
-| `src/copilot/conversation-hub/store.js` | AE (PERF-03, MELHORIA-05) | FTS5 tokenizer, SDK history |
-| `src/copilot/tools/mcp-schema.js` | AE (GAP-02) | enum + objetos aninhados |
-| `src/copilot/bridges/nerv-bridge.js` | AH.3 | TOOL_INVOCATION event |
+| Arquivo                                    | Fases                             | Modificações principais                                     |
+| ------------------------------------------ | --------------------------------- | ----------------------------------------------------------- |
+| `src/copilot/agent/always-alive.js`        | AA.1-AA.2, AC.2-AC.3, AH.6        | `contextState`, compaction recovery, `onPermissionRequest`  |
+| `src/copilot/agent/session-manager.js`     | AA.6, AC.1, AH.1, AH.3            | `workingDirectory`, thresholds, tool filter, audit listener |
+| `src/copilot/config/session-config.js`     | AA.6-AA.7, AH.1                   | `skillDirectories`, `workingDirectory`, `excludedTools`     |
+| `src/copilot/terminal/file-context.js`     | AA.8, AB.1                        | Native attachments, TTL cache                               |
+| `src/copilot/terminal/http-handlers.js`    | AA.3-AA.5, AB.3, AC.3, AG.3, AG.5 | `/health`, `/context`, `/config`, `/config/skills`          |
+| `src/copilot/terminal/index.js`            | AA.4, AB.4                        | SSE `context` event, SSE `cache.hit`                        |
+| `src/copilot/terminal/dialog.js`           | AC.4                              | Threshold warnings                                          |
+| `src/copilot/terminal/commands/context.js` | AA.3                              | Tokens reais                                                |
+| `src/copilot/lib/models.js`                | AB.2                              | TTL cache `listModels()`                                    |
+| `src/copilot/channel/client.js`            | AE (ARCH-03), AA.8                | Histórico convergência, attachments                         |
+| `src/copilot/conversation-hub/store.js`    | AE (PERF-03, MELHORIA-05)         | FTS5 tokenizer, SDK history                                 |
+| `src/copilot/tools/mcp-schema.js`          | AE (GAP-02)                       | enum + objetos aninhados                                    |
+| `src/copilot/bridges/nerv-bridge.js`       | AH.3                              | TOOL_INVOCATION event                                       |
