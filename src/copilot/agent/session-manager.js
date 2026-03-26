@@ -10,20 +10,21 @@
 
 import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
 import { resumeOrCreate } from '#copilot/lib/session';
+import { DEFAULT_EXCLUDED_TOOLS } from '#copilot/config/session-config';
+import { getToolsConfig } from '#copilot/config/tools-state';
 import { log } from '#core/logger';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const BRIEFING_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session-briefing.md');
 const SESSION_JSON_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session.json');
 
-// AH.3: JSONL de auditoria de ferramentas
-const TOOL_AUDIT_LOG = join(resolve(import.meta.dirname, '../../../..'), 'logs', 'tool-audit.jsonl');
+// AH.3: JSONL de auditoria de ferramentas (na raiz do projeto, diretório logs/)
+const TOOL_AUDIT_LOG = join(resolve(import.meta.dirname, '../../..'), 'logs', 'tool-audit.jsonl');
 
 /**
- * AH.6 — Retorna true se a tool é considerada de alto risco.
- * High-risk tools são aprovadas mas logadas explicitamente para auditoria.
+ * AH.6 — Retorna true se a tool é considerada de alto risco. High-risk tools são aprovadas mas logadas explicitamente
+ * para auditoria.
  *
  * @param {string} toolName
  * @returns {boolean}
@@ -40,6 +41,7 @@ function isHighRiskTool(toolName) {
  */
 function logToolAudit(entry) {
     try {
+        mkdirSync(join(TOOL_AUDIT_LOG, '..'), { recursive: true });
         const line = JSON.stringify({ ...entry, ts: new Date().toISOString() }) + '\n';
         appendFileSync(TOOL_AUDIT_LOG, line, 'utf8');
     } catch {
@@ -173,39 +175,41 @@ export function clearState() {
 }
 
 /**
- * AH.6 — Cria um PermissionHandler que audita todas as decisões e loga ferramentas de alto risco.
- * Envolve o handler fornecido (ou approveAll por padrão) com logging de auditoria.
+ * AH.6 — Cria um PermissionHandler que audita todas as decisões e loga ferramentas de alto risco. Envolve o handler
+ * fornecido (ou approveAll por padrão) com logging de auditoria.
  *
  * @param {import('@github/copilot-sdk').PermissionHandler | undefined} baseHandler
  * @returns {import('@github/copilot-sdk').PermissionHandler}
  */
 function buildAuditingPermissionHandler(baseHandler) {
-    return /** @type {import('@github/copilot-sdk').PermissionHandler} */ (async (request, invocation) => {
-        const toolName = /** @type {any} */ (request)?.toolName ?? /** @type {any} */ (request)?.tool ?? 'unknown';
-        const highRisk = isHighRiskTool(toolName);
+    return /** @type {import('@github/copilot-sdk').PermissionHandler} */ (
+        async (request, invocation) => {
+            const toolName = /** @type {any} */ (request)?.toolName ?? /** @type {any} */ (request)?.tool ?? 'unknown';
+            const highRisk = isHighRiskTool(toolName);
 
-        if (highRisk) {
-            log('WARN', `[AH.6] Ferramenta de alto risco solicitada: '${toolName}'`);
+            if (highRisk) {
+                log('WARN', `[AH.6] Ferramenta de alto risco solicitada: '${toolName}'`);
+            }
+
+            /** @type {any} */
+            let result;
+            if (baseHandler) {
+                result = await baseHandler(request, invocation);
+            } else {
+                // Default: aprovar tudo (comportamento do approveAll)
+                result = { kind: 'approved' };
+            }
+
+            const decision = result?.kind === 'approved' ? 'approved' : 'denied';
+            logToolAudit({ tool: toolName, decision, highRisk });
+
+            if (highRisk && decision === 'approved') {
+                log('INFO', `[AH.6] Ferramenta alto risco APROVADA: '${toolName}'`);
+            }
+
+            return result;
         }
-
-        /** @type {any} */
-        let result;
-        if (baseHandler) {
-            result = await baseHandler(request, invocation);
-        } else {
-            // Default: aprovar tudo (comportamento do approveAll)
-            result = { kind: 'approved' };
-        }
-
-        const decision = result?.kind === 'approved' ? 'approved' : 'denied';
-        logToolAudit({ tool: toolName, decision, highRisk });
-
-        if (highRisk && decision === 'approved') {
-            log('INFO', `[AH.6] Ferramenta alto risco APROVADA: '${toolName}'`);
-        }
-
-        return result;
-    });
+    );
 }
 
 /**
@@ -250,6 +254,8 @@ export async function initOrResumeSession(client, sessionOptions) {
         workingDirectory: process.env.COPILOT_WORKING_DIRECTORY ?? process.cwd(),
         // AA.7: diretórios de skills para o SDK carregar
         skillDirectories: ['.github/skills'],
+        // AH.1: ferramentas excluídas por padrão + denylist configurável em runtime
+        excludedTools: [...DEFAULT_EXCLUDED_TOOLS, ...getToolsConfig().denylist],
         ...(sessionOptions.reasoningEffort !== undefined ? { reasoningEffort: sessionOptions.reasoningEffort } : {}),
         // AH.6: wrapper de permissão com audit logging de ferramentas de alto risco
         onPermissionRequest: buildAuditingPermissionHandler(sessionOptions.onPermissionRequest),

@@ -15,13 +15,14 @@
  * @module copilot/terminal/http-handlers
  */
 
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { setBackgroundCompactionThreshold } from '../agent/session-manager.js';
+import { getToolsConfig, patchToolsConfig } from '#copilot/config/tools-state';
 import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
 import { sendTurn } from './dialog.js';
 import { embedMultiple, getFileCacheStats, readFileContext } from './file-context.js';
 import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from './state.js';
@@ -423,8 +424,15 @@ export function getInfiniteSessionConfig() {
 export function handleSetInfiniteSessionConfig(body) {
     const { backgroundCompactionThreshold } = body ?? {};
     if (backgroundCompactionThreshold !== undefined) {
-        if (typeof backgroundCompactionThreshold !== 'number' || backgroundCompactionThreshold < 0.1 || backgroundCompactionThreshold > 1.0) {
-            return { status: 400, body: { ok: false, error: 'backgroundCompactionThreshold deve ser um número entre 0.1 e 1.0' } };
+        if (
+            typeof backgroundCompactionThreshold !== 'number' ||
+            backgroundCompactionThreshold < 0.1 ||
+            backgroundCompactionThreshold > 1.0
+        ) {
+            return {
+                status: 400,
+                body: { ok: false, error: 'backgroundCompactionThreshold deve ser um número entre 0.1 e 1.0' },
+            };
         }
         _infiniteSessionConfig = { ..._infiniteSessionConfig, backgroundCompactionThreshold };
         setBackgroundCompactionThreshold(backgroundCompactionThreshold);
@@ -476,8 +484,7 @@ export function handleGetSkills() {
 }
 
 /**
- * PUT /config/skills — atualiza a lista de paths pinned.
- * Espera `{ paths: string[] }` no body.
+ * PUT /config/skills — atualiza a lista de paths pinned. Espera `{ paths: string[] }` no body.
  *
  * @param {unknown} body
  * @returns {HandlerResult}
@@ -495,23 +502,6 @@ export function handleSetSkills(body) {
 // ── GET /config/tools + PUT /config/tools (AH.2) ─────────────────────────────
 
 /**
- * Configuração de ferramentas em runtime (allow/deny lists).
- * Armazenada em memória — não persiste entre reinicializações.
- *
- * @type {{ allowlist: string[] | null; denylist: string[] }}
- */
-let _toolsConfig = { allowlist: null, denylist: [] };
-
-/**
- * Retorna a configuração atual de ferramentas (allowlist/denylist).
- *
- * @returns {{ allowlist: string[] | null; denylist: string[] }}
- */
-export function getToolsConfig() {
-    return { ..._toolsConfig };
-}
-
-/**
  * GET /config/tools — retorna a configuração atual de allowlist/denylist de ferramentas.
  *
  * @returns {HandlerResult}
@@ -521,8 +511,8 @@ export function handleGetToolsConfig() {
 }
 
 /**
- * PUT /config/tools — atualiza allowlist e/ou denylist de ferramentas em runtime.
- * Espera `{ allowlist?: string[] | null; denylist?: string[] }`.
+ * PUT /config/tools — atualiza allowlist e/ou denylist de ferramentas em runtime. Espera `{ allowlist?: string[] |
+ * null; denylist?: string[] }`.
  *
  * @param {unknown} rawBody
  * @returns {HandlerResult}
@@ -531,17 +521,20 @@ export function handleSetToolsConfig(rawBody) {
     const body = /** @type {any} */ (rawBody) ?? {};
 
     if ('allowlist' in body) {
-        if (body.allowlist !== null && (!Array.isArray(body.allowlist) || body.allowlist.some((/** @type {unknown} */ t) => typeof t !== 'string'))) {
+        if (
+            body.allowlist !== null &&
+            (!Array.isArray(body.allowlist) || body.allowlist.some((/** @type {unknown} */ t) => typeof t !== 'string'))
+        ) {
             return { status: 400, body: { ok: false, error: 'allowlist deve ser string[] ou null' } };
         }
-        _toolsConfig = { ..._toolsConfig, allowlist: body.allowlist };
+        patchToolsConfig({ allowlist: body.allowlist });
     }
 
     if ('denylist' in body) {
         if (!Array.isArray(body.denylist) || body.denylist.some((/** @type {unknown} */ t) => typeof t !== 'string')) {
             return { status: 400, body: { ok: false, error: 'denylist deve ser string[]' } };
         }
-        _toolsConfig = { ..._toolsConfig, denylist: body.denylist };
+        patchToolsConfig({ denylist: body.denylist });
     }
 
     return { status: 200, cors: true, body: { ok: true, tools: getToolsConfig() } };
