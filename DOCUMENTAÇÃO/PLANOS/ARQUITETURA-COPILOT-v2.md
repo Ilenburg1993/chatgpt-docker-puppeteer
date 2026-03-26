@@ -2090,10 +2090,8 @@ POST localhost:3009/inject
 *Documento gerado com base em análise estática do código e testes reais com LLM-B ativa.*
 *Atualizado em 2026-03-25 após Fases O (channel/ canônico) + auditoria de cobertura SDK v0.1.32.*
 *Atualizado em 2026-03-27 após Fase W (Attachment Support) + planejamento Fases X–Z3 (Terminal UX).*
-*Atualizado em 2026-03-25 após Fases Y+Z2+Z3 concluídas + tsserver hardening. Novas fases AD+AA+AB+AC planejadas (Bug Fixes + Context Window Intelligence + Cache Strategy).*
-*Atualizado em 2026-03-26 após investigação profunda do sistema de tools (tool_preferences XML, CustomAgentConfig.mcpServers, dynamic tool names, onPermissionRequest). Nova Fase AH planejada.*
-*Atualizado em 2026-03-26 — Roadmap Unificado (Seção 12) adicionado com todas as fases ordenadas e detalhadas para execução.*
-*Arquitetura v2.5: Fases A–Z3 concluídas; Fases AD+AA–AC+AG+AH planejadas (AD tem prioridade).*
+*Atualizado em 2026-03-26 — Roadmap Unificado (Seção 12) + Fase AH planejada.*
+*Atualizado em 2026-03-28 — Fases AE, AA, AB, AC, AG, AH concluídas. Arquitetura v2.6: todo o roadmap AE→AH executado e integrado.*
 
 ---
 
@@ -2117,9 +2115,8 @@ POST localhost:3009/inject
 
 ### Fase AE — Refatoração Arquitetural e Infraestrutura *(prioridade 1)*
 
-**Status**: 🟡 PRONTO — all sprints unblocked
+**Status**: ✅ CONCLUÍDA (`798c8fb9`, `468fe3ac`)
 **Plano detalhado**: `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md`
-**Commit referência**: Fase AD concluída em `27140f20`
 
 #### Subfases (ordem de execução interna):
 
@@ -2144,8 +2141,8 @@ POST localhost:3009/inject
 
 ### Fase AA — Context Window Intelligence *(prioridade 2)*
 
-**Status**: 🔴 PLANEJADO (depende de: nenhum bloqueio técnico; pode rodar em paralelo com AE)
-**Resultado esperado**: terminal e API exibem tokens reais do SDK em vez de heurísticas
+**Status**: ✅ CONCLUÍDA (`6a0a60ed`)
+**Resultado**: terminal e API exibem tokens reais do SDK em vez de heurísticas
 
 #### Subfases (ordem de execução interna):
 
@@ -2172,7 +2169,7 @@ POST localhost:3009/inject
 
 ### Fase AB — Cache Strategy *(prioridade 3)*
 
-**Status**: 🔴 PLANEJADO (depende de: AA.1 para métricas ricas no /health)
+**Status**: ✅ CONCLUÍDA (`9068f62f`)
 
 #### Subfases (ordem de execução interna):
 
@@ -2192,7 +2189,7 @@ POST localhost:3009/inject
 
 ### Fase AC — Context Window Hardening *(prioridade 4)*
 
-**Status**: 🔴 PLANEJADO (depende de: AA.1 para `contextState.utilization`)
+**Status**: ✅ CONCLUÍDA (`dab5cbf0`)
 
 #### Subfases (ordem de execução interna):
 
@@ -2212,7 +2209,7 @@ POST localhost:3009/inject
 
 ### Fase AG — Skills, Workspace & Custom Agents Integration *(prioridade 5)*
 
-**Status**: 🔴 PLANEJADO (depende de: AA.6 para `workingDirectory`, AA.7 para `skillDirectories`)
+**Status**: ✅ CONCLUÍDA (`f1b544c0`)
 
 #### Subfases:
 
