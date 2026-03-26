@@ -12,10 +12,40 @@ import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
 import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const BRIEFING_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session-briefing.md');
 const SESSION_JSON_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session.json');
+
+// AH.3: JSONL de auditoria de ferramentas
+const TOOL_AUDIT_LOG = join(resolve(import.meta.dirname, '../../../..'), 'logs', 'tool-audit.jsonl');
+
+/**
+ * AH.6 — Retorna true se a tool é considerada de alto risco.
+ * High-risk tools são aprovadas mas logadas explicitamente para auditoria.
+ *
+ * @param {string} toolName
+ * @returns {boolean}
+ */
+function isHighRiskTool(toolName) {
+    return ['bash', 'edit', 'create', 'git_apply_patch'].includes(toolName);
+}
+
+/**
+ * AH.3 — Registra uma chamada de ferramenta no JSONL de auditoria.
+ *
+ * @param {{ tool: string; decision: 'approved' | 'denied'; highRisk: boolean }} entry
+ * @returns {void}
+ */
+function logToolAudit(entry) {
+    try {
+        const line = JSON.stringify({ ...entry, ts: new Date().toISOString() }) + '\n';
+        appendFileSync(TOOL_AUDIT_LOG, line, 'utf8');
+    } catch {
+        // log de auditoria não deve travar a sessão
+    }
+}
 
 // AC.1: threshold dinâmico de compaction — configurável via PUT /config/infinite-session
 let _backgroundCompactionThreshold = 0.75;
@@ -143,6 +173,42 @@ export function clearState() {
 }
 
 /**
+ * AH.6 — Cria um PermissionHandler que audita todas as decisões e loga ferramentas de alto risco.
+ * Envolve o handler fornecido (ou approveAll por padrão) com logging de auditoria.
+ *
+ * @param {import('@github/copilot-sdk').PermissionHandler | undefined} baseHandler
+ * @returns {import('@github/copilot-sdk').PermissionHandler}
+ */
+function buildAuditingPermissionHandler(baseHandler) {
+    return /** @type {import('@github/copilot-sdk').PermissionHandler} */ (async (request, invocation) => {
+        const toolName = /** @type {any} */ (request)?.toolName ?? /** @type {any} */ (request)?.tool ?? 'unknown';
+        const highRisk = isHighRiskTool(toolName);
+
+        if (highRisk) {
+            log('WARN', `[AH.6] Ferramenta de alto risco solicitada: '${toolName}'`);
+        }
+
+        /** @type {any} */
+        let result;
+        if (baseHandler) {
+            result = await baseHandler(request, invocation);
+        } else {
+            // Default: aprovar tudo (comportamento do approveAll)
+            result = { kind: 'approved' };
+        }
+
+        const decision = result?.kind === 'approved' ? 'approved' : 'denied';
+        logToolAudit({ tool: toolName, decision, highRisk });
+
+        if (highRisk && decision === 'approved') {
+            log('INFO', `[AH.6] Ferramenta alto risco APROVADA: '${toolName}'`);
+        }
+
+        return result;
+    });
+}
+
+/**
  * Inicializa ou retoma uma sessão Copilot SDK de forma persistente.
  *
  * Fluxo:
@@ -185,9 +251,8 @@ export async function initOrResumeSession(client, sessionOptions) {
         // AA.7: diretórios de skills para o SDK carregar
         skillDirectories: ['.github/skills'],
         ...(sessionOptions.reasoningEffort !== undefined ? { reasoningEffort: sessionOptions.reasoningEffort } : {}),
-        ...(sessionOptions.onPermissionRequest !== undefined
-            ? { onPermissionRequest: sessionOptions.onPermissionRequest }
-            : {}),
+        // AH.6: wrapper de permissão com audit logging de ferramentas de alto risco
+        onPermissionRequest: buildAuditingPermissionHandler(sessionOptions.onPermissionRequest),
         ...(sessionOptions.onUserInputRequest !== undefined
             ? { onUserInputRequest: sessionOptions.onUserInputRequest }
             : {}),

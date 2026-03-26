@@ -36,6 +36,19 @@ const BASE_CONFIG = {
 };
 
 /**
+ * AH.1 — Ferramentas excluídas por padrão em sessões always-alive.
+ *
+ * Estas tools introduzem riscos de segurança ou são irrelevantes para o fluxo principal:
+ * - `powershell`: execução arbitrária de comandos no Windows
+ * - `web_fetch`: exfiltração potencial de dados via HTTP não auditado
+ * - `web_search`: buscas não controladas em produção
+ * - `memory`: manipulação de memória persistente via ferramenta lateral
+ *
+ * @type {string[]}
+ */
+export const DEFAULT_EXCLUDED_TOOLS = ['powershell', 'web_fetch', 'web_search', 'memory'];
+
+/**
  * Cria uma configuração de sessão para o Always-Alive Agent.
  *
  * Características:

@@ -43,12 +43,14 @@ import {
     handleHealth,
     handleInject,
     handleGetSkills,
+    handleGetToolsConfig,
     handleListSessions,
     handleListTurns,
     handlePipeline,
     handleRecallMemories,
     handleSetInfiniteSessionConfig,
     handleSetSkills,
+    handleSetToolsConfig,
     handleStoreMemory,
 } from './http-handlers.js';
 import { getSseClients, getSseCriticalClients } from './state.js';
@@ -180,6 +182,23 @@ export function createInjectServer() {
                 .then((raw) => {
                     const body = raw ? JSON.parse(raw) : {};
                     sendJson(res, handleSetSkills(body));
+                })
+                .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
+            return;
+        }
+
+        // ── GET /config/tools (AH.2) ──────────────────────────────────────
+        if (req.method === 'GET' && url.pathname === '/config/tools') {
+            sendJson(res, handleGetToolsConfig());
+            return;
+        }
+
+        // ── PUT /config/tools (AH.2) ──────────────────────────────────────
+        if (req.method === 'PUT' && url.pathname === '/config/tools') {
+            readBody(req)
+                .then((raw) => {
+                    const body = raw ? JSON.parse(raw) : {};
+                    sendJson(res, handleSetToolsConfig(body));
                 })
                 .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
             return;

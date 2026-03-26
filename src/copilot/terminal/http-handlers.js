@@ -491,3 +491,58 @@ export function handleSetSkills(body) {
     writeSkillsConfig(config);
     return { status: 200, cors: true, body: { ok: true, skills: config } };
 }
+
+// ── GET /config/tools + PUT /config/tools (AH.2) ─────────────────────────────
+
+/**
+ * Configuração de ferramentas em runtime (allow/deny lists).
+ * Armazenada em memória — não persiste entre reinicializações.
+ *
+ * @type {{ allowlist: string[] | null; denylist: string[] }}
+ */
+let _toolsConfig = { allowlist: null, denylist: [] };
+
+/**
+ * Retorna a configuração atual de ferramentas (allowlist/denylist).
+ *
+ * @returns {{ allowlist: string[] | null; denylist: string[] }}
+ */
+export function getToolsConfig() {
+    return { ..._toolsConfig };
+}
+
+/**
+ * GET /config/tools — retorna a configuração atual de allowlist/denylist de ferramentas.
+ *
+ * @returns {HandlerResult}
+ */
+export function handleGetToolsConfig() {
+    return { status: 200, cors: true, body: { ok: true, tools: getToolsConfig() } };
+}
+
+/**
+ * PUT /config/tools — atualiza allowlist e/ou denylist de ferramentas em runtime.
+ * Espera `{ allowlist?: string[] | null; denylist?: string[] }`.
+ *
+ * @param {unknown} rawBody
+ * @returns {HandlerResult}
+ */
+export function handleSetToolsConfig(rawBody) {
+    const body = /** @type {any} */ (rawBody) ?? {};
+
+    if ('allowlist' in body) {
+        if (body.allowlist !== null && (!Array.isArray(body.allowlist) || body.allowlist.some((/** @type {unknown} */ t) => typeof t !== 'string'))) {
+            return { status: 400, body: { ok: false, error: 'allowlist deve ser string[] ou null' } };
+        }
+        _toolsConfig = { ..._toolsConfig, allowlist: body.allowlist };
+    }
+
+    if ('denylist' in body) {
+        if (!Array.isArray(body.denylist) || body.denylist.some((/** @type {unknown} */ t) => typeof t !== 'string')) {
+            return { status: 400, body: { ok: false, error: 'denylist deve ser string[]' } };
+        }
+        _toolsConfig = { ..._toolsConfig, denylist: body.denylist };
+    }
+
+    return { status: 200, cors: true, body: { ok: true, tools: getToolsConfig() } };
+}
