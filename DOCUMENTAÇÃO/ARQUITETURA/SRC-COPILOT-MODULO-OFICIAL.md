@@ -806,20 +806,20 @@ Os 14 arquivos na raiz do módulo são **shims de compatibilidade** criados dura
 
 ## 11. Issues e Pontos de Atenção
 
-| #    | Issue                                                     | Impacto                     | Arquivo                                      | Status                                                                   |
-| ---- | --------------------------------------------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------ |
-| 9.1  | 13 shims legados na raiz                                  | DX                          | `src/copilot/*.js` (raiz)                    | Pendente (Fase 3)                                                        |
-| 9.2  | `sdk-client.js` oculta mapeamento                         | DX                          | `sdk-client.js`                              | Pendente (Fase 3)                                                        |
-| 9.3  | `terminal-server.js` vs `terminal/server.js`              | Confusão                    | ambos                                        | Pendente (Fase 3)                                                        |
-| 9.4  | `orchestrator.js` importava shim deprecated               | Médio                       | `conversation-hub/orchestrator.js`           | ✅ **Corrigido** — agora importa `../channel/client.js`                   |
+| #    | Issue                                                     | Impacto                     | Arquivo                                      | Status                                                                                            |
+| ---- | --------------------------------------------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 9.1  | 13 shims legados na raiz                                  | DX                          | `src/copilot/*.js` (raiz)                    | Pendente (Fase 3)                                                                                 |
+| 9.2  | `sdk-client.js` oculta mapeamento                         | DX                          | `sdk-client.js`                              | Pendente (Fase 3)                                                                                 |
+| 9.3  | `terminal-server.js` vs `terminal/server.js`              | Confusão                    | ambos                                        | Pendente (Fase 3)                                                                                 |
+| 9.4  | `orchestrator.js` importava shim deprecated               | Médio                       | `conversation-hub/orchestrator.js`           | ✅ **Corrigido** — agora importa `../channel/client.js`                                            |
 | 9.5  | `routes/agent.js` acessa campos privados via cast `any`   | Médio                       | `routes/agent.js`                            | ✅ **Corrigido** — casts `@type {any}` removidos; usa `.sessionId`, `.toolsRegistry`, `.telemetry` |
-| 9.6  | `task-tools.js` usava `execSync + curl`                   | Médio (bloqueia event loop) | `tools/task-tools.js`                        | ✅ **Corrigido** — substituído por `http.request` nativo                  |
-| 9.7  | Timeouts inconsistentes (120 s vs 130 s)                  | Baixo                       | `terminal/dialog.js` vs `channel/inject.js`  | ✅ **Corrigido** — centralizados em `core/constants.js`                   |
-| 9.8  | `BUILTIN_HANDLER_MAP` mínimo (3 handlers)                 | Funcional                   | `config/custom-tools-registry.js`            | ✅ **Corrigido** — +3 handlers: `process_info`, `uptime`, `math_eval`     |
-| 9.9  | Estado global mutável sem observers em `state.js`         | Race condition potencial    | `terminal/state.js`                          | ✅ **Corrigido** — `stateEmitter` EventEmitter emite `hubSessionId:changed` / `busy:changed` |
-| 9.10 | Sem limite de clientes SSE                                | Memory leak potencial       | `terminal/server.js`, `routes/agent.js`      | ✅ **Corrigido** — `MAX_SSE_CLIENTS` aplicado (HTTP 429)                  |
-| 9.11 | `copilot-router.js` e `sdk-router.js` são aliases inúteis | DX                          | `api/copilot-router.js`, `api/sdk-router.js` | ✅ **Corrigido** — arquivos removidos (sem callers ativos)                |
-| 9.12 | Migração FTS5 a cada `init()`                             | Risco DDL                   | `conversation-hub/store.js`                  | ✅ **Revisado** — guard `#initialized` + função idempotente já existentes |
+| 9.6  | `task-tools.js` usava `execSync + curl`                   | Médio (bloqueia event loop) | `tools/task-tools.js`                        | ✅ **Corrigido** — substituído por `http.request` nativo                                           |
+| 9.7  | Timeouts inconsistentes (120 s vs 130 s)                  | Baixo                       | `terminal/dialog.js` vs `channel/inject.js`  | ✅ **Corrigido** — centralizados em `core/constants.js`                                            |
+| 9.8  | `BUILTIN_HANDLER_MAP` mínimo (3 handlers)                 | Funcional                   | `config/custom-tools-registry.js`            | ✅ **Corrigido** — +3 handlers: `process_info`, `uptime`, `math_eval`                              |
+| 9.9  | Estado global mutável sem observers em `state.js`         | Race condition potencial    | `terminal/state.js`                          | ✅ **Corrigido** — `stateEmitter` EventEmitter emite `hubSessionId:changed` / `busy:changed`       |
+| 9.10 | Sem limite de clientes SSE                                | Memory leak potencial       | `terminal/server.js`, `routes/agent.js`      | ✅ **Corrigido** — `MAX_SSE_CLIENTS` aplicado (HTTP 429)                                           |
+| 9.11 | `copilot-router.js` e `sdk-router.js` são aliases inúteis | DX                          | `api/copilot-router.js`, `api/sdk-router.js` | ✅ **Corrigido** — arquivos removidos (sem callers ativos)                                         |
+| 9.12 | Migração FTS5 a cada `init()`                             | Risco DDL                   | `conversation-hub/store.js`                  | ✅ **Revisado** — guard `#initialized` + função idempotente já existentes                          |
 
 ---
 

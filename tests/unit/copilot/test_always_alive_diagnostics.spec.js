@@ -11,7 +11,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { alwaysAliveAgent } from '../../../src/copilot/always-alive.js';
+import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
 describe('AlwaysAliveAgent — diagnósticos de listeners e starvation', () => {
     describe('setMaxListeners', () => {

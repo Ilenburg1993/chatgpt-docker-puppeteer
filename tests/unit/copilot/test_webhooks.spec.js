@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, before, describe, it } from 'node:test';
 
-import { AlwaysAliveAgent } from '../../../src/copilot/always-alive.js';
+import { AlwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Suite principal

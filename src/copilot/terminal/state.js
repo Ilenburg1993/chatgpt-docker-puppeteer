@@ -11,6 +11,7 @@
  * críticos, permitindo que consumidores reajam sem polling.
  *
  * Eventos emitidos:
+ *
  * - `'hubSessionId:changed'` `(newId: string | null, prevId: string | null)` — ao mudar a hub session
  * - `'busy:changed'` `(busy: boolean)` — ao mudar o estado de ocupação do terminal
  *

@@ -48,7 +48,7 @@ describe('sdk-client › getClientState', () => {
         // Importar em isolamento apenas para ler o estado inicial —
         // em Node.js nativo o módulo é singleton, mas este subtest executa
         // antes de qualquer start(), então o estado deve ser not_started.
-        const { getClientState } = await import('../../../src/copilot/sdk-client.js');
+        const { getClientState } = await import('../../../src/copilot/lib/client.js');
         const state = getClientState();
         // Estado pode ser 'not_started' (se nunca iniciado) ou qualquer ConnectionState válido
         const validStates = ['not_started', 'disconnected', 'connecting', 'connected', 'error'];
@@ -60,7 +60,7 @@ describe('sdk-client › getClientState', () => {
 
 describe('sdk-client › getSdkSession', () => {
     it('retorna undefined para sessão inexistente', async () => {
-        const { getSdkSession } = await import('../../../src/copilot/sdk-client.js');
+        const { getClientSession: getSdkSession } = await import('../../../src/copilot/lib/client.js');
         const result = getSdkSession('nao-existe-xpto-abc123');
         assert.strictEqual(result, undefined);
     });
@@ -68,13 +68,13 @@ describe('sdk-client › getSdkSession', () => {
 
 describe('sdk-client › listActiveSessions (alias listSdkSessions)', () => {
     it('retorna array (vazio ou com entradas existentes)', async () => {
-        const { listActiveSessions } = await import('../../../src/copilot/sdk-client.js');
+        const { listActiveClientSessions: listActiveSessions } = await import('../../../src/copilot/lib/client.js');
         const list = listActiveSessions();
         assert.ok(Array.isArray(list), 'deve ser array');
     });
 
     it('cada entrada possui sessionId, model, createdAt, messagesCount', async () => {
-        const { listActiveSessions } = await import('../../../src/copilot/sdk-client.js');
+        const { listActiveClientSessions: listActiveSessions } = await import('../../../src/copilot/lib/client.js');
         const list = listActiveSessions();
         for (const entry of list) {
             assert.ok(typeof entry.sessionId === 'string', 'sessionId deve ser string');
@@ -89,7 +89,7 @@ describe('sdk-client › listActiveSessions (alias listSdkSessions)', () => {
 
 describe('sdk-client › disconnectSdkSession', () => {
     it('não lança erro ao desconectar sessão inexistente', async () => {
-        const { disconnectSdkSession } = await import('../../../src/copilot/sdk-client.js');
+        const { disconnectClientSession: disconnectSdkSession } = await import('../../../src/copilot/lib/client.js');
         await assert.doesNotReject(async () => {
             await disconnectSdkSession('sessao-nao-existe-xpto');
         });
@@ -100,7 +100,7 @@ describe('sdk-client › disconnectSdkSession', () => {
 
 describe('sdk-client › incrementMessageCount', () => {
     it('não lança erro para sessão inexistente (noop silencioso)', async () => {
-        const { incrementMessageCount } = await import('../../../src/copilot/sdk-client.js');
+        const { incrementSessionMessageCount: incrementMessageCount } = await import('../../../src/copilot/lib/client.js');
         assert.doesNotThrow(() => {
             incrementMessageCount('sessao-nao-existe-xyz');
         });

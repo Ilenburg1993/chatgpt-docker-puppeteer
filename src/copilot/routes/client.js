@@ -22,8 +22,8 @@
 
 import { log } from '#core/logger';
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../always-alive.js';
-import { getClient, getClientState, stopClient } from '../sdk-client.js';
+import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { getClient, getClientState, stopClient } from '../lib/client.js';
 import { allTools } from '../tools/index.js';
 
 /**

@@ -20,7 +20,7 @@
 
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
-import { alwaysAliveAgent } from '../../../src/copilot/always-alive.js';
+import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
 // ─── Suite: estrutura do módulo ────────────────────────────────────────────────
 
@@ -29,7 +29,7 @@ describe('llm-bridge-client › estrutura do módulo', () => {
     let mod;
 
     before(async () => {
-        mod = await import('../../../src/copilot/llm-bridge-client.js');
+        mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
     });
 
     it('exporta LlmBridgeClient (class)', () => {
@@ -71,7 +71,7 @@ describe('LlmBridgeClient › histórico de conversa', () => {
     let LlmBridgeClient;
 
     before(async () => {
-        const mod = await import('../../../src/copilot/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
         LlmBridgeClient = mod.LlmBridgeClient;
     });
 
@@ -112,7 +112,7 @@ describe('LlmBridgeClient › histórico de conversa', () => {
 
 describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
     it('onDelta é chamado para cada chunk emitido via task.delta', async () => {
-        const { LlmBridgeClient: LBC } = await import('../../../src/copilot/llm-bridge-client.js');
+        const { LlmBridgeClient: LBC } = await import('../../../src/copilot/bridges/llm-bridge-client.js');
         const client = new LBC();
 
         /** @type {string[]} */
@@ -163,7 +163,7 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
     });
 
     it('chat() retorna result com taskId, response, responseLen, durationMs, chunks', async () => {
-        const { LlmBridgeClient: LBC } = await import('../../../src/copilot/llm-bridge-client.js');
+        const { LlmBridgeClient: LBC } = await import('../../../src/copilot/bridges/llm-bridge-client.js');
         const client = new LBC();
 
         const sendMessageOrig = alwaysAliveAgent.sendMessage.bind(alwaysAliveAgent);
@@ -195,7 +195,7 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
     });
 
     it('chat() adiciona turno user e assistant no histórico', async () => {
-        const { LlmBridgeClient: LBC } = await import('../../../src/copilot/llm-bridge-client.js');
+        const { LlmBridgeClient: LBC } = await import('../../../src/copilot/bridges/llm-bridge-client.js');
         const client = new LBC();
 
         const sendMessageOrig = alwaysAliveAgent.sendMessage.bind(alwaysAliveAgent);
@@ -229,14 +229,14 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
 
 describe('LlmBridgeClient › getAgentStatus() e answer()', () => {
     it('getAgentStatus() retorna objeto com campo status', async () => {
-        const { llmBridgeClient } = await import('../../../src/copilot/llm-bridge-client.js');
+        const { llmBridgeClient } = await import('../../../src/copilot/bridges/llm-bridge-client.js');
         const snap = llmBridgeClient.getAgentStatus();
         assert.ok(typeof snap === 'object' && snap !== null, 'deve retornar objeto');
         assert.ok('status' in snap, 'deve ter campo status');
     });
 
     it('answer() retorna false quando não há pergunta pendente', async () => {
-        const { llmBridgeClient } = await import('../../../src/copilot/llm-bridge-client.js');
+        const { llmBridgeClient } = await import('../../../src/copilot/bridges/llm-bridge-client.js');
         const result = llmBridgeClient.answer('resposta de teste');
         assert.strictEqual(result, false, 'deve retornar false sem pergunta pendente');
     });

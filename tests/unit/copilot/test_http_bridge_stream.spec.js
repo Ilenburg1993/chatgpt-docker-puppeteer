@@ -18,7 +18,7 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { before, describe, it } from 'node:test';
-import { alwaysAliveAgent } from '../../../src/copilot/always-alive.js';
+import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,7 +105,7 @@ describe('http-bridge GET /stream — estrutura de rota', () => {
     let bridge;
 
     before(async () => {
-        const mod = await import('../../../src/copilot/http-bridge.js');
+        const mod = await import('../../../src/copilot/api/http-bridge.js');
         bridge = mod.default;
     });
 
@@ -129,7 +129,7 @@ describe('http-bridge GET /stream — headers SSE', () => {
     let bridge;
 
     before(async () => {
-        const mod = await import('../../../src/copilot/http-bridge.js');
+        const mod = await import('../../../src/copilot/api/http-bridge.js');
         bridge = mod.default;
     });
 
@@ -193,7 +193,7 @@ describe('http-bridge GET /stream — evento connected', () => {
     let bridge;
 
     before(async () => {
-        const mod = await import('../../../src/copilot/http-bridge.js');
+        const mod = await import('../../../src/copilot/api/http-bridge.js');
         bridge = mod.default;
     });
 
@@ -240,7 +240,7 @@ describe('http-bridge GET /stream — repasse de eventos do agente', () => {
     let bridge;
 
     before(async () => {
-        const mod = await import('../../../src/copilot/http-bridge.js');
+        const mod = await import('../../../src/copilot/api/http-bridge.js');
         bridge = mod.default;
     });
 
@@ -299,7 +299,7 @@ describe('http-bridge GET /stream — cleanup no fechamento', () => {
     let bridge;
 
     before(async () => {
-        const mod = await import('../../../src/copilot/http-bridge.js');
+        const mod = await import('../../../src/copilot/api/http-bridge.js');
         bridge = mod.default;
     });
 

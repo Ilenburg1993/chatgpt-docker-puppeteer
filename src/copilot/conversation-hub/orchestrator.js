@@ -13,7 +13,7 @@
 
 import { log } from '#core/logger';
 import EventEmitter from 'node:events';
-import { alwaysAliveAgent } from '../always-alive.js';
+import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { LlmBridgeClient } from '../channel/client.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────

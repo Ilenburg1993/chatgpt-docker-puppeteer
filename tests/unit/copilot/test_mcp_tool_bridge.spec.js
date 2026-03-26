@@ -14,7 +14,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { buildMcpTools, listMcpTools } from '../../../src/copilot/mcp-tool-bridge.js';
+import { buildMcpTools, listMcpTools } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
 
 // ---------------------------------------------------------------------------
 // listMcpTools — sem servidor (comportamento gracioso)
@@ -98,22 +98,22 @@ describe('mcp-tool-bridge › buildMcpTools (sem servidor)', () => {
 
 describe('mcp-tool-bridge › smoke tests', () => {
     it('listMcpTools é exportada como função', async () => {
-        const mod = await import('../../../src/copilot/mcp-tool-bridge.js');
+        const mod = await import('../../../src/copilot/bridges/mcp-tool-bridge.js');
         assert.ok(typeof mod.listMcpTools === 'function');
     });
 
     it('buildMcpTools é exportada como função', async () => {
-        const mod = await import('../../../src/copilot/mcp-tool-bridge.js');
+        const mod = await import('../../../src/copilot/bridges/mcp-tool-bridge.js');
         assert.ok(typeof mod.buildMcpTools === 'function');
     });
 
     it('módulo não exporta rpcCall (função privada)', async () => {
-        const mod = /** @type {any} */ (await import('../../../src/copilot/mcp-tool-bridge.js'));
+        const mod = /** @type {any} */ (await import('../../../src/copilot/bridges/mcp-tool-bridge.js'));
         assert.equal(mod.rpcCall, undefined, 'rpcCall deve ser privada (não exportada)');
     });
 
     it('módulo exporta listMcpTools e buildMcpTools e nada mais inesperado', async () => {
-        const mod = await import('../../../src/copilot/mcp-tool-bridge.js');
+        const mod = await import('../../../src/copilot/bridges/mcp-tool-bridge.js');
         const exports = Object.keys(mod);
         assert.ok(exports.includes('listMcpTools'), 'deve exportar listMcpTools');
         assert.ok(exports.includes('buildMcpTools'), 'deve exportar buildMcpTools');

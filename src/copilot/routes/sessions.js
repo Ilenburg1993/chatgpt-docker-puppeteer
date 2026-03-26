@@ -30,14 +30,14 @@
 import { log } from '#core/logger';
 import { Router } from 'express';
 import {
-    createSdkSession,
-    disconnectSdkSession,
+    createClientSession as createSdkSession,
+    disconnectClientSession as disconnectSdkSession,
     getClient,
-    getSdkSession,
-    incrementMessageCount,
-    listActiveSessions,
-    resumeSdkSession,
-} from '../sdk-client.js';
+    getClientSession as getSdkSession,
+    incrementSessionMessageCount as incrementMessageCount,
+    listActiveClientSessions as listActiveSessions,
+    resumeClientSession as resumeSdkSession,
+} from '../lib/client.js';
 
 /**
  * @typedef {import('express').Request} Req

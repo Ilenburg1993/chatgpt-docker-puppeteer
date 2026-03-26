@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
-import { alwaysAliveAgent, AlwaysAliveAgent } from '../../../src/copilot/always-alive.js';
+import { alwaysAliveAgent, AlwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
 // ─── Suite: análise estrutural ───────────────────────────────────────────────
 

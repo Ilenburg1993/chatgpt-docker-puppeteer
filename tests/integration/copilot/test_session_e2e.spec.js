@@ -184,15 +184,15 @@ describe('Copilot SDK › E2E › ciclo completo de sessão', { timeout: MODEL_T
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Suite de teste via sdk-client.js (módulo interno do projeto)
+// Suite de teste via lib/client.js (módulo interno do projeto)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Copilot SDK › E2E › via sdk-client.js (módulo interno)', { timeout: MODEL_TIMEOUT_MS * 2 }, () => {
-    /** @type {import('../../../src/copilot/sdk-client.js')} */
+describe('Copilot SDK › E2E › via lib/client.js (módulo interno)', { timeout: MODEL_TIMEOUT_MS * 2 }, () => {
+    /** @type {import('../../../src/copilot/lib/client.js')} */
     let sdkClient;
 
     before(async () => {
-        sdkClient = await import('../../../src/copilot/sdk-client.js');
+        sdkClient = await import('../../../src/copilot/lib/client.js');
     });
 
     after(async () => {
@@ -200,8 +200,8 @@ describe('Copilot SDK › E2E › via sdk-client.js (módulo interno)', { timeou
         await sdkClient.stopClient();
     });
 
-    it('deve criar sessão via createSdkSession e enviar mensagem', { timeout: MODEL_TIMEOUT_MS }, async () => {
-        const session = await sdkClient.createSdkSession({
+    it('deve criar sessão via createClientSession e enviar mensagem', { timeout: MODEL_TIMEOUT_MS }, async () => {
+        const session = await sdkClient.createClientSession({
             model: TEST_MODEL,
         });
 
@@ -217,36 +217,36 @@ describe('Copilot SDK › E2E › via sdk-client.js (módulo interno)', { timeou
         assert.ok(lower.includes('ativo'), `Esperado "ativo", recebido: "${event.data.content}"`);
 
         // Verificar registro no registry interno
-        const entry = sdkClient.getSdkSession(sessionId);
+        const entry = sdkClient.getClientSession(sessionId);
         assert.ok(entry, 'sessão deve estar no registry interno');
         assert.ok(entry.messagesCount >= 0, 'messagesCount deve existir');
 
-        await sdkClient.disconnectSdkSession(sessionId);
+        await sdkClient.disconnectClientSession(sessionId);
 
         // Após desconectar, não deve mais estar no registry
-        const afterDisconnect = sdkClient.getSdkSession(sessionId);
+        const afterDisconnect = sdkClient.getClientSession(sessionId);
         assert.equal(afterDisconnect, undefined, 'sessão deve ser removida do registry após disconnect');
     });
 
-    it('listActiveSessions deve refletir sessões ativas', async () => {
-        const initial = sdkClient.listActiveSessions();
+    it('listActiveClientSessions deve refletir sessões ativas', async () => {
+        const initial = sdkClient.listActiveClientSessions();
 
-        const session = await sdkClient.createSdkSession({ model: TEST_MODEL });
+        const session = await sdkClient.createClientSession({ model: TEST_MODEL });
         const { sessionId } = session;
 
-        const afterCreate = sdkClient.listActiveSessions();
+        const afterCreate = sdkClient.listActiveClientSessions();
         assert.ok(afterCreate.length > initial.length, 'deve ter mais sessões após criar');
         assert.ok(
             afterCreate.some((s) => s.sessionId === sessionId),
-            'nova sessão deve aparece em listActiveSessions',
+            'nova sessão deve aparecer em listActiveClientSessions',
         );
 
-        await sdkClient.disconnectSdkSession(sessionId);
+        await sdkClient.disconnectClientSession(sessionId);
 
-        const afterDisconnect = sdkClient.listActiveSessions();
+        const afterDisconnect = sdkClient.listActiveClientSessions();
         assert.ok(
             !afterDisconnect.some((s) => s.sessionId === sessionId),
-            'sessão desconectada não deve aparecer em listActiveSessions',
+            'sessão desconectada não deve aparecer em listActiveClientSessions',
         );
     });
 });

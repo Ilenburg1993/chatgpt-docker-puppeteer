@@ -41,7 +41,7 @@ import {
     serializeStructuredMessage,
 } from '#copilot/types/structured-message';
 import { log } from '#core/logger';
-import { alwaysAliveAgent } from '../always-alive.js';
+import { alwaysAliveAgent } from '../agent/always-alive.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 

@@ -16,7 +16,7 @@
  */
 
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../always-alive.js';
+import { alwaysAliveAgent } from '../agent/always-alive.js';
 
 /**
  * @typedef {import('express').Request} Req

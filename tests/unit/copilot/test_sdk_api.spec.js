@@ -44,7 +44,7 @@ function mockReqRes(opts = {}) {
 
 describe('sdk-api › módulo carrega sem erros', () => {
     it('importa e exporta um Router Express', async () => {
-        const mod = await import('../../../src/copilot/sdk-api.js');
+        const mod = await import('../../../src/copilot/api/sdk-api.js');
         const router = mod.default;
         assert.ok(router, 'export default deve existir');
         // Router Express tem `stack` (array de camadas de rota)
@@ -52,7 +52,7 @@ describe('sdk-api › módulo carrega sem erros', () => {
     });
 
     it('router possui stack de rotas registradas', async () => {
-        const mod = await import('../../../src/copilot/sdk-api.js');
+        const mod = await import('../../../src/copilot/api/sdk-api.js');
         const router = mod.default;
         // Express routers expõem .stack com as rotas registradas
         const stack = /** @type {any} */ (router)?.stack;
@@ -67,7 +67,7 @@ describe('sdk-api › rotas registradas', () => {
 
     // Extrai rotas do stack do Express Router (com suporte a sub-routers aninhados)
     before(async () => {
-        const mod = await import('../../../src/copilot/sdk-api.js');
+        const mod = await import('../../../src/copilot/api/sdk-api.js');
         const router = /** @type {any} */ (mod.default);
         /** @param {any[]} stack */
         function collectRoutes(stack) {
@@ -278,7 +278,7 @@ describe('sdk-api Sprint 19 › rotas registradas', () => {
     const routes = [];
 
     before(async () => {
-        const mod = await import('../../../src/copilot/sdk-api.js');
+        const mod = await import('../../../src/copilot/api/sdk-api.js');
         const router = /** @type {any} */ (mod.default);
         /** @param {any[]} stack */
         function collectRoutes(stack) {

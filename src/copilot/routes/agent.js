@@ -20,10 +20,10 @@
 
 import { log } from '#core/logger';
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../always-alive.js';
+import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { clearTelemetry, getSummary } from '../lib/telemetry.js';
-import { getClient } from '../sdk-client.js';
+import { getClient } from '../lib/client.js';
 
 /** Contador de clientes SSE ativos em /agent/stream. */
 let _agentSseClients = 0;
