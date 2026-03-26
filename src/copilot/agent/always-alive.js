@@ -101,8 +101,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     /** @type {boolean} */
     #dialogLoopActive = false;
 
-    /** @type {DialogWatchdog} */
-    #watchdog;
+    /** @type {DialogWatchdog | null} */
+    #watchdog = null;
 
     /**
      * Intervalo do watchdog (ms). Controlado por `LLM_B_WATCHDOG_MS`. Padrão: 5 minutos.
@@ -157,11 +157,6 @@ export class AlwaysAliveAgent extends EventEmitter {
             options.reasoningEffort ??
             /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */ (process.env.COPILOT_REASONING_EFFORT) ??
             'high';
-        this.#watchdog = new DialogWatchdog({
-            intervalMs: AlwaysAliveAgent.#WATCHDOG_INTERVAL_MS,
-            stallMs: AlwaysAliveAgent.#WATCHDOG_STALL_MS,
-            onStall: (stalledMs) => this.emit('dialog.stalled', { stalledMs }),
-        });
     }
 
     /**
@@ -209,6 +204,15 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     get dialogLoopActive() {
         return this.#dialogLoopActive;
+    }
+
+    /**
+     * Retorna o número atual de tarefas enfileiradas aguardando processamento.
+     *
+     * @returns {number}
+     */
+    get queueSize() {
+        return this.#queue.length;
     }
 
     /**
@@ -357,6 +361,16 @@ export class AlwaysAliveAgent extends EventEmitter {
 
         log('INFO', '[AlwaysAlive] Parando agente...');
 
+        // BUG-07 (fix): aguardar conclusão do boot antes de parar
+        if (this.#status === 'starting') {
+            log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
+            await Promise.race([
+                new Promise((r) => this.once('ready', r)),
+                new Promise((r) => this.once('error', r)),
+                new Promise((r) => setTimeout(r, 15_000)),
+            ]);
+        }
+
         // Se estiver processando uma tarefa, aguarda ela terminar (com timeout)
         if (this.#status === 'processing' || this.#status === 'waiting_for_input') {
             log('INFO', `[AlwaysAlive] Aguardando tarefa atual terminar (até ${shutdownTimeoutMs}ms)...`);
@@ -372,6 +386,12 @@ export class AlwaysAliveAgent extends EventEmitter {
                 }),
                 new Promise((resolve) => setTimeout(resolve, shutdownTimeoutMs)),
             ]);
+        }
+
+        // BUG-01 (fix): parar o watchdog e o dialog loop antes de setar status stopped
+        if (this.#dialogLoopActive) {
+            this.#dialogLoopActive = false;
+            this.#watchdog?.stop();
         }
 
         this.#setStatus('stopped');
@@ -502,18 +522,28 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.#reasoningEffort = effort;
     }
 
+    /** @type {{ snapshot: import('./always-alive.js').AgentStatusSnapshot; at: number } | null} */
+    #statusSnapshotCache = null;
+
     /**
      * Retorna um snapshot do estado atual para a API HTTP.
+     *
+     * PERF-02 (fix): resultado cacheado por 500ms para evitar I/O síncrono em readState() por chamada.
+     * O cache é invalidado automaticamente quando status muda.
      *
      * @returns {AgentStatusSnapshot}
      */
     getStatusSnapshot() {
-        const state = readState();
         const now = Date.now();
+        // Cache válido por 500ms para evitar leituras síncrona por polling rápido
+        if (this.#statusSnapshotCache && now - this.#statusSnapshotCache.at < 500) {
+            return this.#statusSnapshotCache.snapshot;
+        }
+        const state = readState();
         const STARVATION_THRESHOLD_MS = 60_000;
         const first = this.#queue[0];
         const oldestWaitMs = first !== undefined ? now - first.enqueuedAt : 0;
-        return {
+        const snapshot = {
             status: this.#status,
             sessionId: this.sessionId,
             model: this.#model,
@@ -534,6 +564,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             sendCount: state?.sendCount ?? 0,
             startedAt: state?.startedAt ?? null,
         };
+        this.#statusSnapshotCache = { snapshot, at: now };
+        return snapshot;
     }
 
     /**
@@ -667,9 +699,13 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                 this.answerPendingQuestion(message);
             } else {
                 // Modelo ainda não chegou ao ask_user — aguarda 'question.pending' uma vez
+                // BUG-02 (fix): registrar onStop dentro do onPending também, para limpar newTimeout
+                // e o listener interno de dialog.reply se dialog.stopped disparar antes da resposta
                 const onPending = (/** @type {unknown} */ _) => {
                     clearTimeout(timeoutHandle);
                     const newTimeout = setTimeout(() => {
+                        this.off('dialog.reply', onReply);
+                        this.off('dialog.stopped', onStop);
                         reject(
                             new SessionError(
                                 `[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`,
@@ -677,10 +713,18 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                             ),
                         );
                     }, timeout);
-                    this.once('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
+                    const onReply = (/** @type {{ reply: string }} */ evt) => {
                         clearTimeout(newTimeout);
+                        this.off('dialog.stopped', onStop);
                         resolve(evt.reply);
-                    });
+                    };
+                    const onStop = () => {
+                        clearTimeout(newTimeout);
+                        this.off('dialog.reply', onReply);
+                        reject(new SessionError('[AlwaysAlive] Diálogo encerrado pelo modelo.', 'DIALOG_ENDED'));
+                    };
+                    this.once('dialog.reply', onReply);
+                    this.once('dialog.stopped', onStop);
                     this.answerPendingQuestion(message);
                 };
                 this.once('question.pending', onPending);
@@ -699,7 +743,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
             this.answerPendingQuestion('STOP_DIALOG');
         }
         this.#dialogLoopActive = false;
-        this.#watchdog.stop();
+        this.#watchdog?.stop();
     }
 
     // ─────────────── Privados ───────────────
@@ -709,6 +753,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
      */
     #setStatus(status) {
         this.#status = status;
+        this.#statusSnapshotCache = null; // PERF-02: invalidar cache ao mudar status
         this.emit('status', status);
     }
 
@@ -818,13 +863,13 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
 
             if (trimmed.startsWith('READY:') || trimmed === 'READY') {
                 // Modelo sinaliza prontidão — emite evento para sendDialogTurn()
-                this.#watchdog.ping();
+                this.#watchdog?.ping();
                 this.emit('dialog.ready', {});
                 // Aguarda a resposta via question.pending normal
                 // (sendDialogTurn chamará answerPendingQuestion com a mensagem do usuário)
             } else if (trimmed.startsWith('REPLY:') || trimmed.startsWith('DONE:')) {
                 // Modelo enviou uma resposta — extrai o conteúdo
-                this.#watchdog.ping();
+                this.#watchdog?.ping();
                 const reply = trimmed.replace(/^(REPLY:|DONE:)\s*/i, '').trim();
                 this.emit('dialog.reply', { reply });
                 // Aguarda o próximo turno via question.pending

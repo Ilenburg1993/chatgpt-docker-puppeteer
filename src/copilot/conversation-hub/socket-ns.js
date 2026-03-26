@@ -11,6 +11,8 @@
  */
 
 import { log } from '#core/logger';
+import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
+import jwt from 'jsonwebtoken';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -58,7 +60,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
     const authRequired = _parseAuthRequired();
 
     if (authRequired) {
-        // Importação dinâmica do middleware JWT para não criar dependência circular com socket.js
+        // BUG-09 (fix): importações JWT movidas para top-level para evitar overhead por conexão
         ns.use(async (/** @type {SocketClient} */ socket, /** @type {function} */ next) => {
             try {
                 const token =
@@ -67,10 +69,6 @@ export function mountCopilotNamespace(io, orchestrator, store) {
                 if (!token) {
                     return next(new Error('COPILOT_NS: Token de autenticação ausente.'));
                 }
-
-                // Importar dynamicamente para evitar acoplamento circular
-                const { getJwtSecret, JWT_VERIFY_OPTIONS } = await import('#core/jwt_config');
-                const jwt = (await import('jsonwebtoken')).default;
 
                 const payload = jwt.verify(token, getJwtSecret(), /** @type {any} */ (JWT_VERIFY_OPTIONS));
                 /** @type {any} */ (socket).userId = /** @type {any} */ (payload).sub;

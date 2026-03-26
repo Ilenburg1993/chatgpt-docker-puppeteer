@@ -60,7 +60,13 @@ export class HubOrchestrator extends EventEmitter {
     /** @type {LlmBridgeClient | null} */
     #bridge = null;
 
-    /** @type {{ getStatusSnapshot(): object } | null} */
+    /**
+     * @type {{
+     *     getStatusSnapshot(): object;
+     *     dialogLoopActive?: boolean;
+     *     sendDialogTurn?(content: string, opts?: { timeout?: number }): Promise<string>;
+     * } | null}
+     */
     #agent = null;
 
     /** @type {Map<string, number>} hubSessionId → próximo turn_number esperado */
@@ -68,7 +74,7 @@ export class HubOrchestrator extends EventEmitter {
 
     /**
      * @param {import('./store.js').ConversationStore} store
-     * @param {{ getStatusSnapshot(): object }} [agentOverride] - AlwaysAliveAgent a usar (útil em testes).
+     * @param {{ getStatusSnapshot(): object; dialogLoopActive?: boolean; sendDialogTurn?(content: string, opts?: { timeout?: number }): Promise<string> }} [agentOverride] - AlwaysAliveAgent a usar (útil em testes).
      */
     constructor(store, agentOverride) {
         super();
@@ -227,12 +233,16 @@ export class HubOrchestrator extends EventEmitter {
             // Preferir dialog loop (sendDialogTurn) quando ativo — mais eficiente (0 PR por turno)
             // Senão, usar LlmBridgeClient.chat() (1 PR por turno)
             const agentInst = this.#agent ?? alwaysAliveAgent;
-            const useDialogLoop = /** @type {any} */ (agentInst).dialogLoopActive === true;
+            // TYPE-01 (fix): usar tipos explícitos via #agent typedef em vez de casts @type {any}
+            const useDialogLoop = agentInst.dialogLoopActive === true;
 
             if (useDialogLoop) {
                 const content = typeof message === 'string' ? message : messageContent;
                 log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${turnNumber + 1}.`);
-                llmBResponse = await /** @type {any} */ (agentInst).sendDialogTurn(content, { timeout: timeoutMs });
+                if (!agentInst.sendDialogTurn) {
+                    throw new Error('[HubOrchestrator] agentInst não suporta sendDialogTurn');
+                }
+                llmBResponse = await agentInst.sendDialogTurn(content, { timeout: timeoutMs });
             } else if (useStructured && typeof message === 'object') {
                 // Usar chatStructured() com StructuredMessage
                 const result = await this.#bridge.chatStructured(/** @type {any} */ (message), {
@@ -378,7 +388,9 @@ export class HubOrchestrator extends EventEmitter {
      */
     #getActiveSdkSessionId() {
         try {
-            const snap = /** @type {{ sessionId?: string }} */ (alwaysAliveAgent.getStatusSnapshot());
+            // BUG-06 (fix): usar agentOverride quando fornecido em vez de hardcodar alwaysAliveAgent
+            const activeAgent = this.#agent ?? alwaysAliveAgent;
+            const snap = /** @type {{ sessionId?: string }} */ (activeAgent.getStatusSnapshot());
             return snap.sessionId;
         } catch {
             return undefined;

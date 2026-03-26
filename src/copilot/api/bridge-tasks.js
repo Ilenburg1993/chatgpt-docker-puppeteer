@@ -64,6 +64,18 @@ export function registerTaskRoutes(bridge, agent) {
                 return res.json({ ok: true, response: raceResult });
             }
 
+            // GAP-03 (fix): verificar se a fila está cheia antes de retornar ok:true
+            // agent.sendMessage rejeita imediatamente com QUEUE_FULL, mas só após a promise ser criada
+            // Verificar proativamente via MAX_QUEUE_SIZE evita estado inconsistente
+            const queueSize = /** @type {any} */ (agent).queueSize ?? null;
+            const maxQueueSize = /** @type {any} */ (agent).constructor?.MAX_QUEUE_SIZE ?? null;
+            if (queueSize !== null && maxQueueSize !== null && queueSize >= maxQueueSize) {
+                return res.status(429).json({
+                    ok: false,
+                    error: `Fila cheia (${queueSize}/${maxQueueSize} tarefas). Tente novamente mais tarde.`,
+                });
+            }
+
             // Enfileira sem aguardar
             agent
                 .sendMessage(message, { ...(attachments !== undefined ? { attachments } : {}) })

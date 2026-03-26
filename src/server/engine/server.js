@@ -126,7 +126,7 @@ function start(port, attempt = 0) {
             resolve({ server: /** @type {any} */ (httpServer), port, protocol });
         });
 
-        httpServer.on('error', (err) => {
+        httpServer.on('error', (/** @type {Error & { code?: string }} */ err) => {
             if (err.code === 'EADDRINUSE') {
                 const nextPort = port + 1;
 

@@ -28,6 +28,8 @@ import { alwaysAliveAgent } from '../always-alive.js';
 /**
  * Mapa de eventos do AlwaysAliveAgent → actionCode NERV.
  *
+ * ARCH-02 (fix): todos os 22 eventos de AGENT_EVENTS mapeados (antes apenas 9).
+ *
  * @type {ReadonlyArray<{ event: string; actionCode: string }>}
  */
 const EVENT_MAP = [
@@ -36,10 +38,24 @@ const EVENT_MAP = [
     { event: 'task.started', actionCode: 'COPILOT_TASK_STARTED' },
     { event: 'task.completed', actionCode: 'COPILOT_TASK_COMPLETED' },
     { event: 'task.error', actionCode: 'COPILOT_TASK_ERROR' },
+    { event: 'task.delta', actionCode: 'COPILOT_TASK_DELTA' },
+    { event: 'task.reasoning', actionCode: 'COPILOT_TASK_REASONING' },
     { event: 'question.pending', actionCode: 'COPILOT_QUESTION_PENDING' },
     { event: 'question.answered', actionCode: 'COPILOT_QUESTION_ANSWERED' },
-    { event: 'started', actionCode: 'COPILOT_SESSION_STARTED' },
+    { event: 'ready', actionCode: 'COPILOT_AGENT_READY' },
+    { event: 'error', actionCode: 'COPILOT_AGENT_ERROR' },
     { event: 'stopped', actionCode: 'COPILOT_SESSION_STOPPED' },
+    { event: 'session.compaction_start', actionCode: 'COPILOT_SESSION_COMPACTION_START' },
+    { event: 'session.compaction_complete', actionCode: 'COPILOT_SESSION_COMPACTION_COMPLETE' },
+    { event: 'session.fatal', actionCode: 'COPILOT_SESSION_FATAL' },
+    { event: 'session.usage', actionCode: 'COPILOT_SESSION_USAGE' },
+    { event: 'session.mode_changed', actionCode: 'COPILOT_SESSION_MODE_CHANGED' },
+    { event: 'dialog.ready', actionCode: 'COPILOT_DIALOG_READY' },
+    { event: 'dialog.reply', actionCode: 'COPILOT_DIALOG_REPLY' },
+    { event: 'dialog.stopped', actionCode: 'COPILOT_DIALOG_STOPPED' },
+    { event: 'dialog.stalled', actionCode: 'COPILOT_DIALOG_STALLED' },
+    { event: 'tool.execution.start', actionCode: 'COPILOT_TOOL_EXECUTION_START' },
+    { event: 'tool.execution.complete', actionCode: 'COPILOT_TOOL_EXECUTION_COMPLETE' },
 ];
 
 /**

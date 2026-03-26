@@ -111,12 +111,19 @@ describe('exec_command — comportamento básico', () => {
         assert.notStrictEqual(result.exitCode, 0);
     });
 
-    it('retorna stdout e stderr corretamente', async () => {
+    it('retorna stdout corretamente', async () => {
+        const result = await callTool(execCommandTool, {
+            command: 'echo stdout_result',
+        });
+        assert.ok(result.stdout.includes('stdout_result'), `stdout deveria conter "stdout_result": ${result.stdout}`);
+    });
+
+    it('rejeita comandos com metacaracteres shell (SEC-01)', async () => {
         const result = await callTool(execCommandTool, {
             command: 'echo out; echo err >&2',
         });
-        assert.ok(result.stdout.includes('out'));
-        assert.ok(result.stderr.includes('err'));
+        assert.strictEqual(result.success, false, 'comandos com ";" devem ser rejeitados');
+        assert.ok(result.error, 'deve retornar mensagem de erro');
     });
 
     it('inclui durationMs na resposta', async () => {

@@ -54,6 +54,36 @@ import { getSseClients, getSseCriticalClients } from './state.js';
 
 const INJECT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
 
+// ─── Rate limiter simples para POST /inject ───────────────────────────────────
+// GAP-01 (fix): limitar POST /inject a 10 requisições por IP por janela de 60s
+// (previne flood / DDOS acidental no endpoint de injeção)
+
+/** @type {Map<string, { count: number; resetAt: number }>} */
+const _injectRateLimiter = new Map();
+const INJECT_RATE_MAX = Number(process.env.LLM_B_INJECT_RATE_MAX ?? 10);
+const INJECT_RATE_WINDOW_MS = Number(process.env.LLM_B_INJECT_RATE_WINDOW_MS ?? 60_000);
+
+/**
+ * Verifica se o IP excedeu o limite de requisições para /inject.
+ *
+ * @param {string} ip
+ * @returns {{ allowed: boolean; remaining: number; resetIn: number }}
+ */
+function checkInjectRate(ip) {
+    const now = Date.now();
+    let bucket = _injectRateLimiter.get(ip);
+    if (!bucket || now >= bucket.resetAt) {
+        bucket = { count: 0, resetAt: now + INJECT_RATE_WINDOW_MS };
+        _injectRateLimiter.set(ip, bucket);
+    }
+    bucket.count++;
+    return {
+        allowed: bucket.count <= INJECT_RATE_MAX,
+        remaining: Math.max(0, INJECT_RATE_MAX - bucket.count),
+        resetIn: Math.ceil((bucket.resetAt - now) / 1000),
+    };
+}
+
 // ─── Helpers de transporte ────────────────────────────────────────────────────
 
 /**
@@ -223,6 +253,17 @@ export function createInjectServer() {
 
         // ── POST /inject ──────────────────────────────────────────────────
         if (req.method === 'POST' && url.pathname === '/inject') {
+            // GAP-01 (fix): rate limiting por IP
+            const clientIp = req.socket.remoteAddress ?? 'unknown';
+            const rateCheck = checkInjectRate(clientIp);
+            if (!rateCheck.allowed) {
+                res.writeHead(429, {
+                    'Content-Type': 'application/json',
+                    'Retry-After': String(rateCheck.resetIn),
+                });
+                res.end(JSON.stringify({ ok: false, error: `Rate limit excedido. Tente novamente em ${rateCheck.resetIn}s.` }));
+                return;
+            }
             const raw = await readBody(req);
             const parsed = /** @type {{ message?: string; from?: string } | null} */ (tryParseJson(raw));
             if (!parsed) {

@@ -130,11 +130,9 @@ export async function cmdCompact({ println }) {
         return;
     }
 
-    // Limpar histórico local — substitui por resumo
-    if (Array.isArray(llmBridgeClient.history)) {
-        llmBridgeClient.history.length = 0;
-        llmBridgeClient.history.push({ role: 'assistant', content: reply });
-    }
+    // BUG-05 (fix): usar clearHistory()/seedHistory() em vez de mutação direta de ReadonlyArray
+    llmBridgeClient.clearHistory();
+    llmBridgeClient.seedHistory('assistant', reply);
 
     const estimatedNew = estimateTokens(reply?.length ?? 0);
     println('');

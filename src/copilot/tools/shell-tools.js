@@ -259,7 +259,15 @@ const execCommandTool = defineTool('exec_command', {
         const timeoutMs = Math.min(timeoutSeconds * 1000, MAX_TIMEOUT_MS);
         log('INFO', `[ShellTools] exec_command: ${command} (cwd=${cwdCheck.resolved}, timeout=${timeoutMs}ms)`);
 
-        const result = await runProcess('/bin/sh', ['-c', command], {
+        // SEC-01 (fix): tokenizar o comando e rejeitar constructs shell complexos em vez de
+        // usar '/bin/sh -c command' que permite bypass da blocklist via pipes, subshells, etc.
+        if (/[|;&<>$`\\]/.test(command)) {
+            return { success: false, error: 'Constructs shell complexos (|, ;, &, <, >, $, `) não são permitidos.' };
+        }
+        const parts = command.trim().split(/\s+/);
+        const [executable, ...execArgs] = parts;
+
+        const result = await runProcess(executable, execArgs, {
             cwd: cwdCheck.resolved,
             timeoutMs,
         });

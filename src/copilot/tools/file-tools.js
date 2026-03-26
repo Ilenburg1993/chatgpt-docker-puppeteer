@@ -18,10 +18,14 @@
 
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
-import { execSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import * as fs from 'node:fs';
+import { realpathSync } from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
+
+const execFileAsync = promisify(execFile);
 
 /** Raiz do workspace derivada do meta.url (resolve para /workspaces/...) */
 const WORKSPACE_ROOT = new URL('../../..', import.meta.url).pathname;
@@ -64,11 +68,21 @@ const BLOCKED_PATTERNS = [
  */
 function validatePath(filePath) {
     const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(WORKSPACE_ROOT, filePath);
-    const relativeToWorkspace = path.relative(WORKSPACE_ROOT, resolved);
+
+    // SEC-04 (fix): resolver symlinks antes de verificar containment para evitar symlink traversal
+    let realResolved = resolved;
+    try {
+        realResolved = realpathSync(resolved);
+    } catch {
+        // Arquivo não existe ainda — usar o caminho resolvido sem symlinks
+        // (realpathSync falha para paths inexistentes; aceitamos o resolved normalmente)
+    }
+
+    const relativeToWorkspace = path.relative(WORKSPACE_ROOT, realResolved);
 
     // Impede traversal fora do workspace
     if (relativeToWorkspace.startsWith('..')) {
-        return { ok: false, reason: `Acesso negado: caminho fora do workspace (${resolved})`, resolved };
+        return { ok: false, reason: `Acesso negado: caminho fora do workspace (${realResolved})`, resolved };
     }
 
     // Impede acesso a arquivos bloqueados
@@ -337,43 +351,42 @@ const searchInFilesTool = defineTool('search_in_files', {
 
         log('INFO', `[copilot/search_in_files] pattern="${pattern}" in ${resolved}`);
 
-        // Sanitize pattern to prevent command injection — use rg with -e flag (separate arg via execSync array isn't available,
-        // but we'll wrap in single quotes and escape any single quotes in the pattern)
-        const safePattern = pattern.replace(/'/g, "'\\''");
-        const flags = [
+        // SEC-03 (fix): usar execFile com args array em vez de execSync com template string interpolada
+        // Isso elimina a possibilidade de injeção via pattern, includePattern ou excludePattern
+        const rgArgs = [
             '--color=never',
             '--no-heading',
-            isRegex ? '' : '--fixed-strings',
-            caseSensitive ? '' : '--ignore-case',
+            ...(isRegex ? [] : ['--fixed-strings']),
+            ...(caseSensitive ? [] : ['--ignore-case']),
             `--context=${contextLines ?? 2}`,
             `--max-count=${maxResults ?? 50}`,
-            includePattern ? `--glob='${includePattern.replace(/'/g, "'\\''")}'` : '',
-            excludePattern ? `--glob='!${excludePattern.replace(/'/g, "'\\''")}'` : '',
+            ...(includePattern ? [`--glob=${includePattern}`] : []),
+            ...(excludePattern ? [`--glob=!${excludePattern}`] : []),
             '--glob=!node_modules',
             '--glob=!.git',
             '--glob=!dist',
-        ]
-            .filter(Boolean)
-            .join(' ');
-
-        const cmd = `rg ${flags} -e '${safePattern}' '${resolved}' 2>&1 | head -c ${MAX_SEARCH_OUTPUT}`;
+            '-e',
+            pattern,
+            resolved,
+        ];
 
         try {
-            const output = execSync(cmd, {
+            const { stdout, stderr: _stderr } = await execFileAsync('rg', rgArgs, {
                 cwd: WORKSPACE_ROOT,
-                encoding: 'utf8',
                 timeout: 30000,
+                maxBuffer: MAX_SEARCH_OUTPUT * 4,
             });
+            const output = stdout.slice(0, MAX_SEARCH_OUTPUT);
             return {
                 success: true,
                 pattern,
                 searchPath: resolved,
-                output: output.slice(0, MAX_SEARCH_OUTPUT),
-                truncated: output.length >= MAX_SEARCH_OUTPUT,
+                output,
+                truncated: stdout.length >= MAX_SEARCH_OUTPUT,
             };
         } catch (/** @type {any} */ err) {
             // exit code 1 = no matches (not an error for rg)
-            if (err.status === 1 && !err.stderr) {
+            if ((err.code === 1 || err.status === 1) && !err.stderr) {
                 return { success: true, pattern, searchPath: resolved, output: '', matchCount: 0 };
             }
             return { success: false, error: err.stderr ?? err.message };

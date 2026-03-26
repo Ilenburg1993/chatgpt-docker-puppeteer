@@ -256,6 +256,15 @@ export class LlmBridgeClient {
 
         const structured = parseStructuredResponse(chatResult.response);
 
+        // BUG-04 (fix): popular parseError quando a resposta não é um StructuredMessage válido
+        /** @type {Error | undefined} */
+        let parseError;
+        if (chatResult.response && !structured) {
+            parseError = new Error(
+                `Resposta não é StructuredMessage válido (${chatResult.responseLen ?? chatResult.response.length} chars)`,
+            );
+        }
+
         log(
             'INFO',
             `[LlmBridgeClient] chatStructured: responseType=${structured?.responseType ?? 'UNSTRUCTURED'}, ` +
@@ -269,6 +278,7 @@ export class LlmBridgeClient {
             responseLen: chatResult.responseLen,
             chunks: chatResult.chunks,
             durationMs: chatResult.durationMs,
+            ...(parseError !== undefined ? { parseError } : {}),
         };
     }
 
@@ -357,6 +367,18 @@ export class LlmBridgeClient {
     clearHistory() {
         this.#history = [];
         this.#turnCount = 0;
+    }
+
+    /**
+     * Adiciona um turno ao histórico local sem enviar ao modelo (seed manual).
+     * Útil para inicializar contexto após resetar histórico via clearHistory().
+     *
+     * @param {'user' | 'assistant' | 'system'} role - Papel do turno
+     * @param {string} content - Conteúdo do turno
+     * @returns {void}
+     */
+    seedHistory(role, content) {
+        this.#history.push({ role, content, timestamp: Date.now() });
     }
 
     /**

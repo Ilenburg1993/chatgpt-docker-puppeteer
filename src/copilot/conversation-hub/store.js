@@ -301,47 +301,54 @@ export class ConversationStore {
     writeTurn(hubSessionId, opts) {
         const db = this.#getDb();
 
-        // Calcular o próximo turn_number para esta sessão
-        const maxTurn = /** @type {{ max_turn: number | null }} */ (
-            db
-                .prepare(`SELECT MAX(turn_number) as max_turn FROM copilot_conversation_turns WHERE hub_session_id = ?`)
-                .get(hubSessionId)
-        );
-        const turnNumber = (maxTurn?.max_turn ?? 0) + 1;
-
-        // user_read: mensagens do usuário começam como "não lidas" (0) para que LLM-A as processe
-        const userRead = opts.role === 'user' ? 0 : 1;
-
-        const result = db
-            .prepare(
-                `INSERT INTO copilot_conversation_turns
-                 (hub_session_id, sdk_session_id, role, content, structured, tools_used,
-                  turn_number, created_at, duration_ms, model, user_read, metadata)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            )
-            .run(
-                hubSessionId,
-                opts.sdkSessionId ?? null,
-                opts.role,
-                opts.content,
-                opts.structured
-                    ? typeof opts.structured === 'string'
-                        ? opts.structured
-                        : JSON.stringify(opts.structured)
-                    : null,
-                opts.toolsUsed ? JSON.stringify(opts.toolsUsed) : null,
-                turnNumber,
-                Date.now(),
-                opts.durationMs ?? null,
-                opts.model ?? null,
-                userRead,
-                opts.metadata ? JSON.stringify(opts.metadata) : null,
+        // BUG-03 (fix): envolver SELECT MAX + INSERT em transaction para evitar race condition
+        const doWrite = db.transaction(() => {
+            // Calcular o próximo turn_number para esta sessão
+            const maxTurn = /** @type {{ max_turn: number | null }} */ (
+                db
+                    .prepare(
+                        `SELECT MAX(turn_number) as max_turn FROM copilot_conversation_turns WHERE hub_session_id = ?`,
+                    )
+                    .get(hubSessionId)
             );
+            const turnNumber = (maxTurn?.max_turn ?? 0) + 1;
 
-        // Atualizar updated_at da session
-        db.prepare(`UPDATE copilot_hub_sessions SET updated_at = ? WHERE id = ?`).run(Date.now(), hubSessionId);
+            // user_read: mensagens do usuário começam como "não lidas" (0) para que LLM-A as processe
+            const userRead = opts.role === 'user' ? 0 : 1;
 
-        return Number(result.lastInsertRowid);
+            const result = db
+                .prepare(
+                    `INSERT INTO copilot_conversation_turns
+                     (hub_session_id, sdk_session_id, role, content, structured, tools_used,
+                      turn_number, created_at, duration_ms, model, user_read, metadata)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                )
+                .run(
+                    hubSessionId,
+                    opts.sdkSessionId ?? null,
+                    opts.role,
+                    opts.content,
+                    opts.structured
+                        ? typeof opts.structured === 'string'
+                            ? opts.structured
+                            : JSON.stringify(opts.structured)
+                        : null,
+                    opts.toolsUsed ? JSON.stringify(opts.toolsUsed) : null,
+                    turnNumber,
+                    Date.now(),
+                    opts.durationMs ?? null,
+                    opts.model ?? null,
+                    userRead,
+                    opts.metadata ? JSON.stringify(opts.metadata) : null,
+                );
+
+            // Atualizar updated_at da session
+            db.prepare(`UPDATE copilot_hub_sessions SET updated_at = ? WHERE id = ?`).run(Date.now(), hubSessionId);
+
+            return Number(result.lastInsertRowid);
+        });
+
+        return doWrite();
     }
 
     /**
@@ -515,7 +522,9 @@ export class ConversationStore {
 
         if (opts.search) {
             // FTS5: busca semântica no conteúdo
-            const ftsQuery = opts.search.replace(/['"]/g, ' ');
+            // SEC-02 (fix): usar phrase-quoting do FTS5 em vez de remoção simples de aspas
+            // Isso encapsula o termo em aspas duplas, que o FTS5 trata como literal seguro
+            const ftsQuery = `"${opts.search.replace(/"/g, ' ').trim()}"`;
             const tagFilter = opts.tag ? 'AND m.tag = ?' : '';
             const tagArg = opts.tag ? [opts.tag] : [];
             const rows = db
