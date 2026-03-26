@@ -39,6 +39,7 @@ const BASE_CONFIG = {
  * AH.1 — Ferramentas excluídas por padrão em sessões always-alive.
  *
  * Estas tools introduzem riscos de segurança ou são irrelevantes para o fluxo principal:
+ *
  * - `powershell`: execução arbitrária de comandos no Windows
  * - `web_fetch`: exfiltração potencial de dados via HTTP não auditado
  * - `web_search`: buscas não controladas em produção

@@ -143,8 +143,8 @@ const DDL_MEMORIES = `
 /**
  * Migra `copilot_memories_fts` para usar o tokenizer `porter unicode61 remove_diacritics 1`.
  *
- * A tabela FTS5 não suporta ALTER TABLE, então a migração recria a estrutura completa caso
- * o tokenizer atual seja diferente. É idempotente: não faz nada se o tokenizer já estiver correto.
+ * A tabela FTS5 não suporta ALTER TABLE, então a migração recria a estrutura completa caso o tokenizer atual seja
+ * diferente. É idempotente: não faz nada se o tokenizer já estiver correto.
  *
  * @param {import('better-sqlite3').Database} db
  * @returns {void}
@@ -237,8 +237,8 @@ export class ConversationStore {
     // ─── HubSessions ──────────────────────────────────────────────────────────
 
     /**
-     * Expõe o banco SQLite para health checks externos (somente leitura recomendada).
-     * Retorna `null` se `init()` ainda não foi chamado.
+     * Expõe o banco SQLite para health checks externos (somente leitura recomendada). Retorna `null` se `init()` ainda
+     * não foi chamado.
      *
      * @returns {import('better-sqlite3').Database | null}
      */
@@ -631,6 +631,80 @@ export class ConversationStore {
         const db = this.#getDb();
         const result = db.prepare('DELETE FROM copilot_memories WHERE id = ?').run(memoryId);
         return result.changes > 0;
+    }
+
+    /**
+     * AI.4 — Sincroniza o histórico do SDK (`session.getHistory()`) para o schema `turns` do ConversationStore. Utiliza
+     * `INSERT OR IGNORE` para idempotência — mensagens já existentes não são duplicadas.
+     *
+     * O mapeamento é:
+     *
+     * - `ConversationMessage.type = 'user'` → `role: 'user'`
+     * - `ConversationMessage.type = 'assistant'` → `role: 'llm-b'`
+     * - `ConversationMessage.content` → `content`
+     * - `ConversationMessage.id` → usado como `metadata.sdkTurnId` para dedup
+     *
+     * @param {string} hubSessionId - ID da hub_session destino
+     * @param {string} sdkSessionId - ID da sessão SDK de origem
+     * @param {{ id?: string; type: string; content: string; createdAt?: number }[]} messages
+     * @returns {{ synced: number; skipped: number }}
+     */
+    syncFromSdkHistory(hubSessionId, sdkSessionId, messages) {
+        const db = this.#getDb();
+        let synced = 0;
+        let skipped = 0;
+
+        const doSync = db.transaction(() => {
+            for (const msg of messages) {
+                const role = msg.type === 'assistant' ? 'llm-b' : 'user';
+                const sdkTurnId = msg.id ?? null;
+                const metadata = sdkTurnId ? JSON.stringify({ sdkTurnId }) : null;
+
+                // INSERT OR IGNORE pelo sdkTurnId para idempotência
+                // Usamos sdk_session_id + metadata.sdkTurnId como chave natural de dedup
+                if (sdkTurnId) {
+                    const exists = db
+                        .prepare(
+                            `SELECT 1 FROM copilot_conversation_turns
+                             WHERE hub_session_id = ? AND metadata LIKE ?`,
+                        )
+                        .get(hubSessionId, `%${sdkTurnId}%`);
+                    if (exists) {
+                        skipped++;
+                        continue;
+                    }
+                }
+
+                const maxTurn = /** @type {{ max_turn: number | null }} */ (
+                    db
+                        .prepare(
+                            `SELECT MAX(turn_number) as max_turn FROM copilot_conversation_turns WHERE hub_session_id = ?`,
+                        )
+                        .get(hubSessionId)
+                );
+                const turnNumber = (maxTurn?.max_turn ?? 0) + 1;
+
+                db.prepare(
+                    `INSERT INTO copilot_conversation_turns
+                     (hub_session_id, sdk_session_id, role, content, turn_number, created_at, user_read, metadata)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                ).run(
+                    hubSessionId,
+                    sdkSessionId,
+                    role,
+                    msg.content ?? '',
+                    turnNumber,
+                    msg.createdAt ?? Date.now(),
+                    1, // mensagens históricas: marcadas como lidas
+                    metadata,
+                );
+                synced++;
+            }
+        });
+
+        doSync();
+        log('DEBUG', `[ConversationStore] syncFromSdkHistory: ${synced} sincronizados, ${skipped} ignorados (dupl).`);
+        return { synced, skipped };
     }
 }
 

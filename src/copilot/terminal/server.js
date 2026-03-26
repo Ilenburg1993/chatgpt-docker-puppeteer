@@ -33,8 +33,12 @@ import { log } from '#core/logger';
 import http from 'node:http';
 import { println } from './dialog.js';
 import {
+    handleDeleteCustomTool,
     handleDeleteMemory,
     handleGetConfig,
+    handleGetCustomTools,
+    handleGetSkills,
+    handleGetToolsConfig,
     handleGhCi,
     handleGhIssues,
     handleGhPrs,
@@ -42,12 +46,11 @@ import {
     handleGitStatus,
     handleHealth,
     handleInject,
-    handleGetSkills,
-    handleGetToolsConfig,
     handleListSessions,
     handleListTurns,
     handlePipeline,
     handleRecallMemories,
+    handleRegisterCustomTool,
     handleSetInfiniteSessionConfig,
     handleSetSkills,
     handleSetToolsConfig,
@@ -201,6 +204,30 @@ export function createInjectServer() {
                     sendJson(res, handleSetToolsConfig(body));
                 })
                 .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
+            return;
+        }
+
+        // ── GET /config/tools/custom (AI.2) ───────────────────────────────
+        if (req.method === 'GET' && url.pathname === '/config/tools/custom') {
+            sendJson(res, handleGetCustomTools());
+            return;
+        }
+
+        // ── POST /config/tools/custom (AI.2) ──────────────────────────────
+        if (req.method === 'POST' && url.pathname === '/config/tools/custom') {
+            readBody(req)
+                .then((raw) => {
+                    const body = raw ? JSON.parse(raw) : {};
+                    sendJson(res, handleRegisterCustomTool(body));
+                })
+                .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
+            return;
+        }
+
+        // ── DELETE /config/tools/custom/:name (AI.2) ──────────────────────
+        if (req.method === 'DELETE' && url.pathname.startsWith('/config/tools/custom/')) {
+            const name = url.pathname.slice('/config/tools/custom/'.length);
+            sendJson(res, handleDeleteCustomTool(decodeURIComponent(name)));
             return;
         }
 

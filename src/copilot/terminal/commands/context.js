@@ -4,15 +4,14 @@
  *
  * Comandos `/context` e `/compact` para gerenciamento de contexto do dialog loop.
  *
- * `/context` → mostra uso do context window (tokens reais do SDK quando disponíveis;
- *              fallback para heurística 4 chars/token)
- * `/compact` → envia pedido de compactação à LLM-B e limpa o histórico local
+ * `/context` → mostra uso do context window (tokens reais do SDK quando disponíveis; fallback para heurística 4
+ * chars/token) `/compact` → envia pedido de compactação à LLM-B e limpa o histórico local
  *
  * @module copilot/terminal/commands/context
  */
 
-import { llmBridgeClient } from '../../bridges/llm-bridge-client.js';
 import { alwaysAliveAgent } from '../../agent/always-alive.js';
+import { llmBridgeClient } from '../../bridges/llm-bridge-client.js';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 // ─── Estimativa de tokens ─────────────────────────────────────────────────────

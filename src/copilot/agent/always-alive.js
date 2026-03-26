@@ -17,13 +17,15 @@
  */
 
 import { SessionError } from '#copilot/core/errors';
-import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart } from '#copilot/lib/index';
+import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart, startSpan } from '#copilot/lib/index';
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
 import { buildMcpConfig } from '../config/mcp-servers.js';
+import { conversationStore } from '../conversation-hub/store.js';
 import { buildMcpTools } from '../mcp-tool-bridge.js';
 import { initOrResumeSession, readState, writeState } from '../session-manager.js';
+import { getHubSessionId } from '../terminal/state.js';
 import { DialogWatchdog } from './dialog-watchdog.js';
 import { AGENT_EVENTS } from './events.js';
 import { executeTask } from './task-executor.js';
@@ -75,7 +77,8 @@ import { WebhookManager } from './webhook-manager.js';
  * @property {number} resumeCount - Número de retomadas desde o início
  * @property {number} sendCount - Total de mensagens enviadas
  * @property {number | null} startedAt - Epoch ms do início da sessão
- * @property {{ tokens: number; tokenLimit: number; utilization: number } | null} contextWindow - Dados reais de uso de contexto do SDK (ou null se não disponível)
+ * @property {{ tokens: number; tokenLimit: number; utilization: number } | null} contextWindow - Dados reais de uso de
+ *   contexto do SDK (ou null se não disponível)
  * @property {string | null} lastCheckpointPath - Último caminho de checkpoint do SDK (ou null se nenhum ainda)
  */
 
@@ -146,16 +149,15 @@ export class AlwaysAliveAgent extends EventEmitter {
     #isResumed = false;
 
     /**
-     * AA.1 — Dados reais de uso de contexto capturados do evento `session.usage_info` do SDK.
-     * Atualizado a cada turno. null enquanto a sessão não emitir o primeiro evento.
+     * AA.1 — Dados reais de uso de contexto capturados do evento `session.usage_info` do SDK. Atualizado a cada turno.
+     * null enquanto a sessão não emitir o primeiro evento.
      *
      * @type {{ tokens: number; tokenLimit: number; utilization: number } | null}
      */
     #contextState = null;
 
     /**
-     * AC.3 — Último caminho de checkpoint salvo pelo SDK durante compaction.
-     * null até a primeira compaction concluída.
+     * AC.3 — Último caminho de checkpoint salvo pelo SDK durante compaction. null até a primeira compaction concluída.
      *
      * @type {string | null}
      */
@@ -292,7 +294,8 @@ export class AlwaysAliveAgent extends EventEmitter {
         log('INFO', '[AlwaysAlive] Iniciando agente...');
 
         try {
-            this.#client = new CopilotClient();
+            const client = new CopilotClient();
+            this.#client = client;
 
             const mcpTools = await buildMcpTools();
             if (mcpTools.length > 0) {
@@ -307,20 +310,23 @@ export class AlwaysAliveAgent extends EventEmitter {
             const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
             log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
 
-            const { session, isResumed } = await initOrResumeSession(this.#client, {
-                model: this.#model,
-                onPermissionRequest: approveAll,
-                onUserInputRequest: this.#handleUserInputRequest.bind(this),
-                hooks: {
-                    onSessionStart: this.#onSessionStart.bind(this),
-                    onSessionEnd: this.#onSessionEnd.bind(this),
-                    onErrorOccurred: this.#onErrorOccurred.bind(this),
-                },
-                tools,
-                mcpServers: buildMcpConfig(),
-                reasoningEffort: this.#reasoningEffort,
-                injectHookContext: true,
-            });
+            // AI.3: span OTEL para metrificar duração do boot de sessão
+            const { session, isResumed } = await startSpan('session.boot', { model: this.#model }, () =>
+                initOrResumeSession(client, {
+                    model: this.#model,
+                    onPermissionRequest: approveAll,
+                    onUserInputRequest: this.#handleUserInputRequest.bind(this),
+                    hooks: {
+                        onSessionStart: this.#onSessionStart.bind(this),
+                        onSessionEnd: this.#onSessionEnd.bind(this),
+                        onErrorOccurred: this.#onErrorOccurred.bind(this),
+                    },
+                    tools,
+                    mcpServers: buildMcpConfig(),
+                    reasoningEffort: this.#reasoningEffort,
+                    injectHookContext: true,
+                }),
+            );
 
             this.#session = session;
             this.#isResumed = isResumed;
@@ -412,6 +418,12 @@ export class AlwaysAliveAgent extends EventEmitter {
                 'INFO',
                 `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`,
             );
+
+            // AI.4: sincronizar histórico SDK → SQLite após reconexão com sessão existente
+            if (isResumed) {
+                void this.#syncSdkHistory(session);
+            }
+
             this.emit('ready', { sessionId: session.sessionId, isResumed });
         } catch (/** @type {any} */ e) {
             this.#setStatus('stopped');
@@ -767,33 +779,13 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
             );
         }
 
-        return new Promise((resolve, reject) => {
-            const timeoutHandle = setTimeout(() => {
-                reject(new SessionError(`[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
-            }, timeout);
-
-            this.once('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
-                clearTimeout(timeoutHandle);
-                resolve(evt.reply);
-            });
-
-            this.once('dialog.stopped', () => {
-                clearTimeout(timeoutHandle);
-                reject(new SessionError('[AlwaysAlive] Diálogo encerrado pelo modelo.', 'DIALOG_ENDED'));
-            });
-
-            // Alimenta o ask_user pendente com a mensagem do usuário
-            if (this.#pendingQuestion) {
-                this.answerPendingQuestion(message);
-            } else {
-                // Modelo ainda não chegou ao ask_user — aguarda 'question.pending' uma vez
-                // BUG-02 (fix): registrar onStop dentro do onPending também, para limpar newTimeout
-                // e o listener interno de dialog.reply se dialog.stopped disparar antes da resposta
-                const onPending = (/** @type {unknown} */ _) => {
-                    clearTimeout(timeoutHandle);
-                    const newTimeout = setTimeout(() => {
-                        this.off('dialog.reply', onReply);
-                        this.off('dialog.stopped', onStop);
+        // AI.3: instrumentar com span OTEL
+        return startSpan(
+            'dialog.send_turn',
+            { sessionId: this.sessionId ?? '', actor: 'user' },
+            () =>
+                new Promise((resolve, reject) => {
+                    const timeoutHandle = setTimeout(() => {
                         reject(
                             new SessionError(
                                 `[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`,
@@ -801,23 +793,56 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                             ),
                         );
                     }, timeout);
-                    const onReply = (/** @type {{ reply: string }} */ evt) => {
-                        clearTimeout(newTimeout);
-                        this.off('dialog.stopped', onStop);
+
+                    this.once('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
+                        clearTimeout(timeoutHandle);
                         resolve(evt.reply);
-                    };
-                    const onStop = () => {
-                        clearTimeout(newTimeout);
-                        this.off('dialog.reply', onReply);
+                    });
+
+                    this.once('dialog.stopped', () => {
+                        clearTimeout(timeoutHandle);
                         reject(new SessionError('[AlwaysAlive] Diálogo encerrado pelo modelo.', 'DIALOG_ENDED'));
-                    };
-                    this.once('dialog.reply', onReply);
-                    this.once('dialog.stopped', onStop);
-                    this.answerPendingQuestion(message);
-                };
-                this.once('question.pending', onPending);
-            }
-        });
+                    });
+
+                    // Alimenta o ask_user pendente com a mensagem do usuário
+                    if (this.#pendingQuestion) {
+                        this.answerPendingQuestion(message);
+                    } else {
+                        // Modelo ainda não chegou ao ask_user — aguarda 'question.pending' uma vez
+                        // BUG-02 (fix): registrar onStop dentro do onPending também, para limpar newTimeout
+                        // e o listener interno de dialog.reply se dialog.stopped disparar antes da resposta
+                        const onPending = (/** @type {unknown} */ _) => {
+                            clearTimeout(timeoutHandle);
+                            const newTimeout = setTimeout(() => {
+                                this.off('dialog.reply', onReply);
+                                this.off('dialog.stopped', onStop);
+                                reject(
+                                    new SessionError(
+                                        `[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`,
+                                        'DIALOG_TIMEOUT',
+                                    ),
+                                );
+                            }, timeout);
+                            const onReply = (/** @type {{ reply: string }} */ evt) => {
+                                clearTimeout(newTimeout);
+                                this.off('dialog.stopped', onStop);
+                                resolve(evt.reply);
+                            };
+                            const onStop = () => {
+                                clearTimeout(newTimeout);
+                                this.off('dialog.reply', onReply);
+                                reject(
+                                    new SessionError('[AlwaysAlive] Diálogo encerrado pelo modelo.', 'DIALOG_ENDED'),
+                                );
+                            };
+                            this.once('dialog.reply', onReply);
+                            this.once('dialog.stopped', onStop);
+                            this.answerPendingQuestion(message);
+                        };
+                        this.once('question.pending', onPending);
+                    }
+                }),
+        );
     }
 
     /**
@@ -835,6 +860,35 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
     }
 
     // ─────────────── Privados ───────────────
+
+    /**
+     * AI.4 — Sincroniza o histórico SDK → ConversationStore (SQLite) após reconexão. Chamado de forma assíncrona
+     * (fire-and-forget) para não bloquear o startup.
+     *
+     * @param {CopilotSession} session
+     * @returns {Promise<void>}
+     */
+    async #syncSdkHistory(session) {
+        try {
+            const hubSessionId = getHubSessionId();
+            if (!hubSessionId) return;
+            /** @type {any} */
+            const sdkSession = session;
+            if (typeof sdkSession.getHistory !== 'function') return;
+            const messages = await sdkSession.getHistory();
+            if (!Array.isArray(messages) || messages.length === 0) return;
+            const { synced, skipped } = conversationStore.syncFromSdkHistory(hubSessionId, session.sessionId, messages);
+            if (synced > 0) {
+                log(
+                    'INFO',
+                    `[AlwaysAlive] AI.4: ${synced} turnos SDK sincronizados com o ConversationStore (${skipped} ignorados).`,
+                );
+                this.emit('session.history_synced', { hubSessionId, sessionId: session.sessionId, synced, skipped });
+            }
+        } catch (/** @type {any} */ err) {
+            log('WARN', `[AlwaysAlive] AI.4: syncSdkHistory falhou (não crítico): ${err.message}`);
+        }
+    }
 
     /**
      * @param {AgentStatus} status

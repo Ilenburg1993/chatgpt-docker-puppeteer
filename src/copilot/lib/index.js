@@ -129,4 +129,5 @@ export {
     recordSessionEnd,
     recordSessionStart,
     recordToolCall,
+    startSpan,
 } from '#copilot/lib/telemetry';

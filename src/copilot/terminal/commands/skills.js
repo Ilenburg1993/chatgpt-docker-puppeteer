@@ -5,10 +5,11 @@
  * Comando `/skills` do REPL LLM-B para gerenciar arquivos de contexto "pinned".
  *
  * Subcomandos:
- * - `/skills list`            — lista caminhos configurados
- * - `/skills add <path>`      — adiciona um caminho à lista
- * - `/skills remove <path>`   — remove um caminho da lista
- * - `/skills reload`          — força reload do PinnedFilesLoader se ativo
+ *
+ * - `/skills list` — lista caminhos configurados
+ * - `/skills add <path>` — adiciona um caminho à lista
+ * - `/skills remove <path>` — remove um caminho da lista
+ * - `/skills reload` — força reload do PinnedFilesLoader se ativo
  *
  * @module copilot/terminal/commands/skills
  */

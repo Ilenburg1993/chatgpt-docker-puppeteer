@@ -57,6 +57,7 @@ const EVENT_MAP = [
     { event: 'dialog.stalled', actionCode: 'COPILOT_DIALOG_STALLED' },
     { event: 'tool.execution.start', actionCode: 'COPILOT_TOOL_EXECUTION_START' },
     { event: 'tool.execution.complete', actionCode: 'COPILOT_TOOL_EXECUTION_COMPLETE' },
+    { event: 'session.history_synced', actionCode: 'COPILOT_SESSION_HISTORY_SYNCED' },
 ];
 
 /**

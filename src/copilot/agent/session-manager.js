@@ -8,13 +8,16 @@
  * @module copilot/session-manager
  */
 
-import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
-import { resumeOrCreate } from '#copilot/lib/session';
 import { DEFAULT_EXCLUDED_TOOLS } from '#copilot/config/session-config';
-import { getToolsConfig } from '#copilot/config/tools-state';
+import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
+import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools-state';
+import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+
+// AI.1: carregar configuração de tools persistida ao iniciar o módulo
+loadToolsConfig();
 
 const BRIEFING_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session-briefing.md');
 const SESSION_JSON_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session.json');

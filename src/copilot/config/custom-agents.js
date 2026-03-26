@@ -2,8 +2,8 @@
 /**
  * src/copilot/config/custom-agents.js
  *
- * Factory de agentes customizados pré-configurados. Define perfis de agente com
- * conjuntos de ferramentas e prompts especializados para tarefas específicas.
+ * Factory de agentes customizados pré-configurados. Define perfis de agente com conjuntos de ferramentas e prompts
+ * especializados para tarefas específicas.
  *
  * Regras de nomeação: agentes são referenciados pelo modo `@nome` no REPL/terminal.
  *
@@ -105,8 +105,7 @@ export function listCustomAgents() {
 }
 
 /**
- * Registra ou sobrescreve um agente customizado em runtime.
- * Útil para testes e extensão dinâmica sem reinicialização.
+ * Registra ou sobrescreve um agente customizado em runtime. Útil para testes e extensão dinâmica sem reinicialização.
  *
  * @param {CustomAgentConfig} config
  * @returns {void}
@@ -117,8 +116,8 @@ export function registerCustomAgent(config) {
 }
 
 /**
- * Remove um agente customizado pelo nome.
- * Agentes built-in podem ser removidos (operação destrutiva, não reversível em runtime).
+ * Remove um agente customizado pelo nome. Agentes built-in podem ser removidos (operação destrutiva, não reversível em
+ * runtime).
  *
  * @param {string} name - Nome do agente, sem at-sign no prefixo
  * @returns {boolean} true se existia e foi removido

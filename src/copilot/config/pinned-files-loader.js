@@ -2,17 +2,17 @@
 /**
  * src/copilot/config/pinned-files-loader.js
  *
- * Carrega e monitora arquivos de contexto "pinned" (fixados) para injeção automática
- * em novas sessões. Usa fs.watch com debounce para detectar mudanças em tempo real.
+ * Carrega e monitora arquivos de contexto "pinned" (fixados) para injeção automática em novas sessões. Usa fs.watch com
+ * debounce para detectar mudanças em tempo real.
  *
  * @module copilot/config/pinned-files-loader
  */
 
+import { log } from '#core/logger';
 import { EventEmitter } from 'node:events';
 import { existsSync, readFileSync, watch } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { log } from '#core/logger';
 
 const DEBOUNCE_MS = 500;
 const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.js', '.ts', '.json', '.yaml', '.yml'];
@@ -28,20 +28,20 @@ const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.js', '.ts', '.json', '.yaml', '.y
  * @typedef {Object} PinnedFileChangedEvent
  * @property {string} file - Caminho absoluto do arquivo alterado
  * @property {string} content - Novo conteúdo
- * @property {'added'|'changed'|'removed'} type - Tipo de mudança
+ * @property {'added' | 'changed' | 'removed'} type - Tipo de mudança
  */
 
 /**
- * Carrega e monitora arquivos fixados para injeção de contexto em sessões.
- * Emite evento `changed` quando qualquer arquivo monitorado é modificado.
- *
- * @fires PinnedFilesLoader#changed
+ * Carrega e monitora arquivos fixados para injeção de contexto em sessões. Emite evento `changed` quando qualquer
+ * arquivo monitorado é modificado.
  *
  * @example
- * const loader = new PinnedFilesLoader(['./context', './docs/pinned']);
- * await loader.start();
- * loader.on('changed', ({ file, content, type }) => console.log(file, type));
- * const files = loader.getFiles();
+ *     const loader = new PinnedFilesLoader(['./context', './docs/pinned']);
+ *     await loader.start();
+ *     loader.on('changed', ({ file, content, type }) => console.log(file, type));
+ *     const files = loader.getFiles();
+ *
+ * @fires PinnedFilesLoader#changed
  */
 export class PinnedFilesLoader extends EventEmitter {
     /** @type {string[]} */
@@ -78,7 +78,10 @@ export class PinnedFilesLoader extends EventEmitter {
 
         await Promise.all(this.#dirs.map((dir) => this.#loadDir(dir)));
         this.#startWatchers();
-        log('INFO', `[PinnedFilesLoader] Pronto — ${this.#files.size} arquivo(s) carregado(s) de ${this.#dirs.length} dir(s)`);
+        log(
+            'INFO',
+            `[PinnedFilesLoader] Pronto — ${this.#files.size} arquivo(s) carregado(s) de ${this.#dirs.length} dir(s)`,
+        );
     }
 
     /**
@@ -175,7 +178,10 @@ export class PinnedFilesLoader extends EventEmitter {
                 });
                 this.#watchers.set(dir, watcher);
             } catch (err) {
-                log('WARN', `[PinnedFilesLoader] Não foi possível monitorar ${dir}: ${/** @type {Error} */ (err).message}`);
+                log(
+                    'WARN',
+                    `[PinnedFilesLoader] Não foi possível monitorar ${dir}: ${/** @type {Error} */ (err).message}`,
+                );
             }
         }
     }

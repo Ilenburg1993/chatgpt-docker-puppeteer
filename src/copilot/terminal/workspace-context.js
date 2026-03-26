@@ -3,6 +3,7 @@
  * src/copilot/terminal/workspace-context.js
  *
  * Detecta e expõe informações sobre o workspace atual:
+ *
  * - diretório de trabalho (cwd)
  * - raiz do repositório git (gitRoot)
  * - branch atual (currentBranch)
@@ -39,8 +40,8 @@ function tryExec(cmd, cwd) {
 }
 
 /**
- * Detecta a raiz do repositório git a partir de um diretório.
- * Usa `git rev-parse --show-toplevel` para maior confiabilidade.
+ * Detecta a raiz do repositório git a partir de um diretório. Usa `git rev-parse --show-toplevel` para maior
+ * confiabilidade.
  *
  * @param {string} cwd
  * @returns {string | null}
@@ -54,8 +55,7 @@ function detectGitRoot(cwd) {
 }
 
 /**
- * Retorna o contexto do workspace atual.
- * Resultado não é cacheado — cada chamada reflete o estado corrente do processo.
+ * Retorna o contexto do workspace atual. Resultado não é cacheado — cada chamada reflete o estado corrente do processo.
  *
  * @returns {WorkspaceContext}
  */

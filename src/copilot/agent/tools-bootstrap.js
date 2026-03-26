@@ -7,6 +7,7 @@
  *   tornando-a testável e legível de forma independente.
  */
 
+import { buildCustomTools } from '../config/custom-tools-registry.js';
 import { registerTools } from '../lib/tools-registry.js';
 import {
     codeTools,
@@ -77,6 +78,12 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         registerTools(registry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
     }
 
+    // AI.2: custom tools declarativas registradas via /config/tools/custom
+    const customTools = buildCustomTools();
+    if (customTools.length > 0) {
+        registerTools(registry, customTools, { category: 'custom', tags: ['runtime', 'declarative'] });
+    }
+
     const allTools = [
         ...taskTools,
         ...codeTools,
@@ -89,6 +96,7 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         ...fileWriteTools,
         ...shellTools,
         ...mcpTools,
+        ...customTools,
     ];
 
     // Expõe registry/telemetria para as ferramentas de introspecção (necessário antes de iniciar sessão)

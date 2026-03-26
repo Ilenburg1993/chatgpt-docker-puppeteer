@@ -38,6 +38,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'dialog.stalled',
     'tool.execution.start',
     'tool.execution.complete',
+    'session.history_synced',
 ]);
 
 /**

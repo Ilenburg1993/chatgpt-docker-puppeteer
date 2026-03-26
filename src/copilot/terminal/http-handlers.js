@@ -15,11 +15,17 @@
  * @module copilot/terminal/http-handlers
  */
 
+import {
+    BUILTIN_HANDLER_MAP,
+    getCustomToolDefinitions,
+    registerCustomTool,
+    removeCustomTool,
+} from '#copilot/config/custom-tools-registry';
+import { getToolsConfig, patchToolsConfig } from '#copilot/config/tools-state';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { setBackgroundCompactionThreshold } from '../agent/session-manager.js';
-import { getToolsConfig, patchToolsConfig } from '#copilot/config/tools-state';
 import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
@@ -220,15 +226,26 @@ export async function handlePipeline(body) {
  * Aceita opcionalmente:
  *
  * - `context_files: string[]` — lê o conteúdo de cada arquivo e o embute como bloco markdown antes da mensagem.
- * - `attachments: Array<{type: 'file'|'content', path?: string, content?: string, mimeType?: string}>` — contexto extra
- *   embutido como bloco markdown na mensagem (MELHORIA-03: suporte a attachments do SDK emulado via embed).
+ * - `attachments` — suporte a dois modos (AI.5):
+ *   - **Nativo SDK**: `{ type: 'file'|'directory'|'selection', path: string, ... }` — passados diretamente para
+ *     `MessageOptions.attachments` do SDK (suporte real a file attachments).
+ *   - **Embed inline (fallback)**: `{ type: 'content', content: string, path?: string }` — embutidos como bloco
+ *     markdown na mensagem (MELHORIA-03 original).
  *
  * @param {{
  *     message?: string;
  *     from?: string;
  *     timeout?: number;
  *     context_files?: string[];
- *     attachments?: { type?: string; content?: string; path?: string }[];
+ *     attachments?: Array<{
+ *         type?: string;
+ *         content?: string;
+ *         path?: string;
+ *         displayName?: string;
+ *         filePath?: string;
+ *         selection?: object;
+ *         text?: string;
+ *     }>;
  * } | null} body
  * @returns {Promise<HandlerResult>}
  */
@@ -254,17 +271,42 @@ export async function handleInject(body) {
             };
         }
     }
-    // MELHORIA-03 (fix): suporte a attachments via embed de conteúdo inline
-    const attachments = Array.isArray(body?.attachments) ? body.attachments : [];
-    for (const attachment of attachments) {
-        if (attachment && typeof attachment.content === 'string') {
-            const label = attachment.path ?? 'attachment';
-            enrichedMessage = `\`\`\`\n${attachment.content}\n\`\`\`\n*(${label})*\n\n${enrichedMessage}`;
+
+    // AI.5: separar attachments nativos SDK de attachments de conteúdo inline
+    const rawAttachments = Array.isArray(body?.attachments) ? body.attachments : [];
+    /** @type {import('@github/copilot-sdk').MessageOptions['attachments']} */
+    const nativeAttachments = [];
+
+    for (const att of rawAttachments) {
+        if (!att) continue;
+        if (att.type === 'file' && typeof att.path === 'string') {
+            nativeAttachments.push({ type: 'file', path: att.path, ...(att.displayName ? { displayName: att.displayName } : {}) });
+        } else if (att.type === 'directory' && typeof att.path === 'string') {
+            nativeAttachments.push({ type: 'directory', path: att.path, ...(att.displayName ? { displayName: att.displayName } : {}) });
+        } else if (att.type === 'selection' && typeof att.filePath === 'string') {
+            nativeAttachments.push({
+                type: 'selection',
+                filePath: att.filePath,
+                displayName: att.displayName ?? att.filePath,
+                ...(att.selection !== undefined ? { selection: /** @type {any} */ (att.selection) } : {}),
+                ...(typeof att.text === 'string' ? { text: att.text } : {}),
+            });
+        } else if (typeof att.content === 'string') {
+            // MELHORIA-03 (fallback): embed de conteúdo inline como bloco markdown
+            const label = att.path ?? 'attachment';
+            enrichedMessage = `\`\`\`\n${att.content}\n\`\`\`\n*(${label})*\n\n${enrichedMessage}`;
         }
     }
+
     const t0 = Date.now();
     try {
-        const reply = await sendTurn(enrichedMessage, from);
+        let reply;
+        if (nativeAttachments.length > 0) {
+            // AI.5: rota nativa SDK com file attachments reais
+            reply = await alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments });
+        } else {
+            reply = await sendTurn(enrichedMessage, from);
+        }
         return {
             status: reply !== null ? 200 : 409,
             body: { ok: reply !== null, reply: reply ?? null, durationMs: Date.now() - t0, from },
@@ -538,4 +580,58 @@ export function handleSetToolsConfig(rawBody) {
     }
 
     return { status: 200, cors: true, body: { ok: true, tools: getToolsConfig() } };
+}
+
+// ── GET /config/tools/custom + POST /config/tools/custom + DELETE /config/tools/custom/:name (AI.2) ──
+
+/**
+ * GET /config/tools/custom — lista as custom tools registradas em runtime.
+ *
+ * @returns {HandlerResult}
+ */
+export function handleGetCustomTools() {
+    const tools = getCustomToolDefinitions();
+    const availableHandlers = [...BUILTIN_HANDLER_MAP.keys()];
+    return { status: 200, cors: true, body: { ok: true, tools, availableHandlers } };
+}
+
+/**
+ * POST /config/tools/custom — registra uma nova custom tool declarativa. Espera `{ name, description, handlerId,
+ * parameters? }`.
+ *
+ * @param {unknown} rawBody
+ * @returns {HandlerResult}
+ */
+export function handleRegisterCustomTool(rawBody) {
+    const body = /** @type {any} */ (rawBody) ?? {};
+    if (typeof body.name !== 'string' || !body.name) {
+        return { status: 400, body: { ok: false, error: 'name (string) é obrigatório' } };
+    }
+    if (typeof body.description !== 'string' || !body.description) {
+        return { status: 400, body: { ok: false, error: 'description (string) é obrigatória' } };
+    }
+    if (typeof body.handlerId !== 'string' || !body.handlerId) {
+        return { status: 400, body: { ok: false, error: 'handlerId (string) é obrigatório' } };
+    }
+    const result = registerCustomTool({
+        name: body.name,
+        description: body.description,
+        handlerId: body.handlerId,
+        parameters: body.parameters ?? undefined,
+    });
+    if (!result.ok) return { status: 400, body: { ok: false, error: result.error } };
+    return { status: 201, cors: true, body: { ok: true, tool: { name: body.name, handlerId: body.handlerId } } };
+}
+
+/**
+ * DELETE /config/tools/custom/:name — remove uma custom tool pelo nome.
+ *
+ * @param {string} name
+ * @returns {HandlerResult}
+ */
+export function handleDeleteCustomTool(name) {
+    if (!name) return { status: 400, body: { ok: false, error: 'name é obrigatório' } };
+    const result = removeCustomTool(name);
+    if (!result.ok) return { status: 404, body: { ok: false, error: result.error } };
+    return { status: 200, cors: true, body: { ok: true } };
 }

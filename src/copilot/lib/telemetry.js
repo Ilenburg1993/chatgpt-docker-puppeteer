@@ -276,3 +276,102 @@ export function clearTelemetry(store) {
     store.toolCalls.length = 0;
     store.sessions.length = 0;
 }
+
+// ─── AI.3 — OTEL spans (graceful degradation) ────────────────────────────────
+
+/**
+ * Atributos de contexto para um span OTEL.
+ *
+ * @typedef {object} SpanAttrs
+ * @property {string} [sessionId] - ID da sessão
+ * @property {string} [model] - Modelo utilizado
+ * @property {string} [actor] - Ator (ex: 'llm-b', 'orchestrator')
+ * @property {Record<string, unknown>} [extra] - Atributos adicionais
+ */
+
+/** @type {any | null} Instância do tracer OTEL (null se não disponível) */
+let _tracer = null;
+
+/**
+ * Inicializa o tracer OTEL de forma segura (graceful degradation). Tentativa única no primeiro uso. Se
+ * `@opentelemetry/sdk-trace-node` não estiver instalado ou falhar, o sistema opera sem traces.
+ *
+ * @returns {Promise<any>}
+ */
+async function getTracer() {
+    if (_tracer !== null) return _tracer;
+    try {
+        // Importação dinâmica para degradação graciosa quando o pacote não está instalado
+        // @ts-ignore — @opentelemetry/sdk-trace-node é opcional; graceful degradation se não instalado
+        const { NodeTracerProvider } = await import('@opentelemetry/sdk-trace-node');
+        const { trace } = await import('@opentelemetry/api');
+        const provider = new NodeTracerProvider();
+        provider.register();
+        _tracer = trace.getTracer('copilot-agent', '1.0.0');
+        return _tracer;
+    } catch {
+        // Pacote não disponível — usar fallback de span no-op
+        _tracer = null;
+        return null;
+    }
+}
+
+/** Singleton da promessa de init do tracer. Evita múltiplas tentativas paralelas. @type {Promise<void> | null} */
+let _tracerInitPromise = null;
+
+/**
+ * AI.3 — Executa uma função dentro de um span OTEL, registrando latência e erros. Se OTEL não estiver disponível,
+ * executa a função diretamente sem overhead. Propaga erros normalmente.
+ *
+ * @template T
+ * @param {string} name - Nome do span (ex: 'session.create', 'dialog.sendTurn')
+ * @param {SpanAttrs} attrs - Atributos de contexto do span
+ * @param {() => Promise<T>} fn - Função a instrumentar
+ * @returns {Promise<T>}
+ */
+export async function startSpan(name, attrs, fn) {
+    // Inicializa tracer de forma lazy e singleton
+    if (_tracerInitPromise === null) {
+        _tracerInitPromise = getTracer().then(() => undefined);
+    }
+    await _tracerInitPromise;
+
+    if (!_tracer) {
+        // Sem OTEL disponível — executa direto
+        return fn();
+    }
+
+    try {
+        const { context, trace } = await import('@opentelemetry/api');
+        const span = _tracer.startSpan(name);
+        span.setAttribute('session.id', attrs.sessionId ?? '');
+        span.setAttribute('model', attrs.model ?? '');
+        span.setAttribute('actor', attrs.actor ?? '');
+        if (attrs.extra) {
+            for (const [k, v] of Object.entries(attrs.extra)) {
+                span.setAttribute(
+                    k,
+                    typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? v : JSON.stringify(v),
+                );
+            }
+        }
+        const ctx = trace.setSpan(context.active(), span);
+        const start = Date.now();
+        try {
+            const result = await context.with(ctx, fn);
+            span.setAttribute('duration_ms', Date.now() - start);
+            span.setStatus({ code: /** SpanStatusCode.OK */ 1 });
+            return result;
+        } catch (/** @type {any} */ err) {
+            span.setAttribute('duration_ms', Date.now() - start);
+            span.setStatus({ code: /** SpanStatusCode.ERROR */ 2, message: err.message });
+            span.recordException(err);
+            throw err;
+        } finally {
+            span.end();
+        }
+    } catch {
+        // Falha no próprio OTEL — não bloquear operação principal
+        return fn();
+    }
+}
