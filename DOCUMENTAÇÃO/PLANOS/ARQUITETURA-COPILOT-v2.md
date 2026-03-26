@@ -1945,31 +1945,31 @@ createSession({
 
 **Research realizado em 2026-03-25 (revisado 2026-03-26)** com base nos tipos SDK v0.1.32 e investigação profunda do CLI bundle.
 
-| Aspecto                        | O SDK já faz                                                    | Nossa implementação adiciona                  |
-| ------------------------------ | --------------------------------------------------------------- | --------------------------------------------- |
-| Compactação automática         | ✅ `InfiniteSessionConfig.backgroundCompactionThreshold` (80%)  | Configuração dinâmica (AC.1)                  |
-| Eventos de compactação         | ✅ `session.compaction_start/complete`                          | Recovery, SSE broadcast (AC.2)                |
-| Métricas de tokens             | ✅ `session.usage_info` ephemeral                               | Armazenar estado + expor via API (AA.1-AA.5)  |
-| Prompt caching                 | ✅ transformedContent XML wrapping (Claude)                     | Métricas de hit ratio (AB.4)                  |
-| Context window limit           | ✅ `ModelCapabilities.limits.max_context_window_tokens`         | Usar no `/context` real (AA.3)                |
-| File context caching           | ❌ Não existe no SDK                                            | TTL cache em file-context.js (AB.1)           |
-| Model list caching             | ❌ Não existe no SDK                                            | TTL cache em listModels() (AB.2)              |
-| Threshold config dinâmica      | ❌ Apenas na criação da sessão                                  | PUT /config/infinite-session (AC.1)           |
-| REPL warnings de utilização    | ❌ Não existe                                                   | pre-send check em dialog.js (AC.4)            |
-| Workspace context (git)        | ✅ `SessionContext` (cwd, gitRoot, repo, branch)                | Passar `workingDirectory` na criação (AA.6)   |
-| Skills / docs pinados          | ✅ `skillDirectories` (sobrevive a resume/compaction!)          | Configurar dirs + file watcher (AA.7/AG.1)    |
-| Custom agents                  | ✅ `CustomAgentConfig` + `@nome` na conversa                    | buildDefaultCustomAgents() factory (AG.2)     |
-| Per-agent MCP servers          | ✅ `CustomAgentConfig.mcpServers` (separado do session-level)   | Mapear agents especializados com MCPs (AG.2)  |
-| Agent inference flag           | ✅ `CustomAgentConfig.infer` (padrão `true`)                    | Controlar disponibilidade de agents (AG.2)    |
-| File attachments p/turn        | ✅ `MessageOptions.attachments` (type:"file" nativo)            | Trocar embed-in-text por native (AA.8)        |
-| Tool selection guidance        | ✅ `<tool_preferences>` XML injetado pelo CLI via `UAe()`       | Documentado — sem impl necessária             |
-| Tool allowlist / denylist      | ✅ `availableTools` e `excludedTools` em SessionConfig          | Configurar por padrão seguro (AH.1)           |
-| Override de built-in tool      | ✅ `Tool.overridesBuiltInTool: true`                            | Disponível para extensões futuras (AH.3)      |
-| Tool names configuráveis       | ✅ `shellToolName`, `globToolName`, `grepToolName`              | Documentado — padrão "bash"/"glob"/"grep"     |
-| Custom tool registration       | ✅ `Tool<T>` interface com JSON Schema params + handler         | Fábrica buildTool() com schema robusto (AH.3) |
-| onPermissionRequest            | ✅ hook de permissão por operação                               | Integrar política de risco (AH.5)             |
-| MCP local (stdio)              | ✅ `MCPLocalServerConfig` (command, args, env, cwd)             | Configurar MCP servers globais (AG.2)         |
-| MCP remoto (HTTP/SSE)          | ✅ `MCPRemoteServerConfig` (url, headers)                       | Disponível para MCP externos (AG.2)           |
+| Aspecto                     | O SDK já faz                                                  | Nossa implementação adiciona                  |
+| --------------------------- | ------------------------------------------------------------- | --------------------------------------------- |
+| Compactação automática      | ✅ `InfiniteSessionConfig.backgroundCompactionThreshold` (80%) | Configuração dinâmica (AC.1)                  |
+| Eventos de compactação      | ✅ `session.compaction_start/complete`                         | Recovery, SSE broadcast (AC.2)                |
+| Métricas de tokens          | ✅ `session.usage_info` ephemeral                              | Armazenar estado + expor via API (AA.1-AA.5)  |
+| Prompt caching              | ✅ transformedContent XML wrapping (Claude)                    | Métricas de hit ratio (AB.4)                  |
+| Context window limit        | ✅ `ModelCapabilities.limits.max_context_window_tokens`        | Usar no `/context` real (AA.3)                |
+| File context caching        | ❌ Não existe no SDK                                           | TTL cache em file-context.js (AB.1)           |
+| Model list caching          | ❌ Não existe no SDK                                           | TTL cache em listModels() (AB.2)              |
+| Threshold config dinâmica   | ❌ Apenas na criação da sessão                                 | PUT /config/infinite-session (AC.1)           |
+| REPL warnings de utilização | ❌ Não existe                                                  | pre-send check em dialog.js (AC.4)            |
+| Workspace context (git)     | ✅ `SessionContext` (cwd, gitRoot, repo, branch)               | Passar `workingDirectory` na criação (AA.6)   |
+| Skills / docs pinados       | ✅ `skillDirectories` (sobrevive a resume/compaction!)         | Configurar dirs + file watcher (AA.7/AG.1)    |
+| Custom agents               | ✅ `CustomAgentConfig` + `@nome` na conversa                   | buildDefaultCustomAgents() factory (AG.2)     |
+| Per-agent MCP servers       | ✅ `CustomAgentConfig.mcpServers` (separado do session-level)  | Mapear agents especializados com MCPs (AG.2)  |
+| Agent inference flag        | ✅ `CustomAgentConfig.infer` (padrão `true`)                   | Controlar disponibilidade de agents (AG.2)    |
+| File attachments p/turn     | ✅ `MessageOptions.attachments` (type:"file" nativo)           | Trocar embed-in-text por native (AA.8)        |
+| Tool selection guidance     | ✅ `<tool_preferences>` XML injetado pelo CLI via `UAe()`      | Documentado — sem impl necessária             |
+| Tool allowlist / denylist   | ✅ `availableTools` e `excludedTools` em SessionConfig         | Configurar por padrão seguro (AH.1)           |
+| Override de built-in tool   | ✅ `Tool.overridesBuiltInTool: true`                           | Disponível para extensões futuras (AH.3)      |
+| Tool names configuráveis    | ✅ `shellToolName`, `globToolName`, `grepToolName`             | Documentado — padrão "bash"/"glob"/"grep"     |
+| Custom tool registration    | ✅ `Tool<T>` interface com JSON Schema params + handler        | Fábrica buildTool() com schema robusto (AH.3) |
+| onPermissionRequest         | ✅ hook de permissão por operação                              | Integrar política de risco (AH.5)             |
+| MCP local (stdio)           | ✅ `MCPLocalServerConfig` (command, args, env, cwd)            | Configurar MCP servers globais (AG.2)         |
+| MCP remoto (HTTP/SSE)       | ✅ `MCPRemoteServerConfig` (url, headers)                      | Disponível para MCP externos (AG.2)           |
 
 **Mecanismo de seleção de tools (descoberta 2026-03-26):**
 - **Custom tools**: descrição + JSON Schema injetados no system prompt via `session.create` RPC → seção "tool instructions"
@@ -2107,4 +2107,215 @@ POST localhost:3009/inject
 *Atualizado em 2026-03-27 após Fase W (Attachment Support) + planejamento Fases X–Z3 (Terminal UX).*
 *Atualizado em 2026-03-25 após Fases Y+Z2+Z3 concluídas + tsserver hardening. Novas fases AD+AA+AB+AC planejadas (Bug Fixes + Context Window Intelligence + Cache Strategy).*
 *Atualizado em 2026-03-26 após investigação profunda do sistema de tools (tool_preferences XML, CustomAgentConfig.mcpServers, dynamic tool names, onPermissionRequest). Nova Fase AH planejada.*
+*Atualizado em 2026-03-26 — Roadmap Unificado (Seção 12) adicionado com todas as fases ordenadas e detalhadas para execução.*
 *Arquitetura v2.5: Fases A–Z3 concluídas; Fases AD+AA–AC+AG+AH planejadas (AD tem prioridade).*
+
+---
+
+## 12. Roadmap Unificado — Próximas Fases (Ordem de Execução)
+
+> Esta seção centraliza **todas as fases ainda não concluídas** com ordenação de prioridade,
+> dependências claras, arquivos a modificar e contexto de execução.  
+> Para detalhes completos de cada fase, ver as seções individuais na Seção 9.
+
+---
+
+### Legenda de Status
+
+| Símbolo | Significado |
+|---------|-------------|
+| 🟡 PRONTO | Análise completa, sem dependências externas pendentes |
+| 🔴 PLANEJADO | Análise completa, depende de fase anterior |
+| ⬜ CONDICIONAL | Depende de decisão ou validação do usuário |
+
+---
+
+### Fase AE — Refatoração Arquitetural e Infraestrutura *(prioridade 1)*
+
+**Status**: 🟡 PRONTO — all sprints unblocked  
+**Plano detalhado**: `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md`  
+**Commit referência**: Fase AD concluída em `27140f20`
+
+#### Subfases (ordem de execução interna):
+
+| Sprint | Código      | Título                                                   | Esforço  | Arquivo principal                                    |
+|--------|-------------|----------------------------------------------------------|----------|------------------------------------------------------|
+| AE-1a  | ARCH-04     | Hub health check no endpoint `/health`                   | 🟢 Baixo | `src/copilot/api/bridge-control.js`                  |
+| AE-1b  | PERF-03     | FTS5 tokenizer porter + unicode61 no ConversationStore   | 🟢 Baixo | `src/copilot/conversation-hub/store.js`              |
+| AE-2a  | ARCH-01     | Remover 13 re-exports de compatibilidade no barrel raiz  | 🟠 Médio | `src/copilot/index.js` + importers                   |
+| AE-2b  | ARCH-03     | LlmBridgeClient: convergência de histórico entre instâncias | 🟠 Médio | `src/copilot/channel/client.js`                   |
+| AE-2c  | GAP-02      | MCP schema: suporte a enum + objetos aninhados           | 🟠 Médio | `src/copilot/tools/mcp-schema.js`                    |
+| AE-3a  | MELHORIA-05 | SDK session history por hub_session (migração SQLite)    | 🔴 Alto  | `src/copilot/conversation-hub/store.js`              |
+| AE-3b  | MELHORIA-02 | OpenTelemetry: traces/métricas no AlwaysAliveAgent       | 🔴 Alto  | `src/copilot/agent/always-alive.js`                  |
+
+**Contexto de execução**:
+- ARCH-01: Listar todos os importadores de `src/copilot/index.js` com `grep -r "from.*src/copilot'" src/` antes de remover re-exports
+- ARCH-03: Ver `DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md` seção ARCH-03 para detalhe do padrão de convergência
+- GAP-02: O protocolo MCP JSON Schema atual não serializa `z.enum([...])` corretamente (gera `anyOf` em vez de `enum: [...]`)
+- MELHORIA-05: `session.getHistory()` retorna `ConversationMessage[]`; mapear para schema `turns` existente no SQLite
+- MELHORIA-02: OTEL trace em `sendTurn()`, `initOrResumeSession()`, `stopSession()` — usar `@opentelemetry/sdk-trace-node`
+
+---
+
+### Fase AA — Context Window Intelligence *(prioridade 2)*
+
+**Status**: 🔴 PLANEJADO (depende de: nenhum bloqueio técnico; pode rodar em paralelo com AE)  
+**Resultado esperado**: terminal e API exibem tokens reais do SDK em vez de heurísticas
+
+#### Subfases (ordem de execução interna):
+
+| Sprint | Código | Título                                                   | Esforço  | Arquivo principal                                      |
+|--------|--------|----------------------------------------------------------|----------|--------------------------------------------------------|
+| AA-1   | AA.1   | Capturar `session.usage_info` → `contextState` em AlwaysAliveAgent | 🟢 Baixo | `src/copilot/agent/always-alive.js`    |
+| AA-2a  | AA.2   | `getStatusSnapshot()` inclui `contextWindow { tokens, limit, utilization }` | 🟢 Baixo | `src/copilot/agent/always-alive.js` |
+| AA-2b  | AA.3   | `/context` usa tokens reais (não heurística 4 chars/token)| 🟢 Baixo | `src/copilot/terminal/commands/context.js`             |
+| AA-3a  | AA.4   | SSE emite evento `context` após cada turno               | 🟢 Baixo | `src/copilot/terminal/index.js`                        |
+| AA-3b  | AA.5   | `/health` e `/config` expõem `contextWindow`             | 🟢 Baixo | `src/copilot/terminal/http-handlers.js`                |
+| AA-4a  | AA.6   | Passar `workingDirectory` na criação de sessão           | 🟢 Baixo | `src/copilot/agent/session-manager.js`                 |
+| AA-4a  | AA.6   | `workingDirectory` em `buildAlwaysAliveConfig()`         | 🟢 Baixo | `src/copilot/config/session-config.js`                 |
+| AA-4b  | AA.7   | `skillDirectories` configurável + PinnedFilesLoader      | 🟠 Médio | `src/copilot/config/pinned-files-loader.js` (NOVO)     |
+| AA-4b  | AA.7b  | File watcher: reload de pinned docs sem reiniciar agente | 🟠 Médio | `src/copilot/agent/always-alive.js`                    |
+| AA-5   | AA.8   | Attachments nativos SDK (`MessageOptions.attachments`)   | 🟠 Médio | `src/copilot/channel/client.js` + `terminal/file-context.js` |
+
+**Contexto de execução**:
+- AA.1: evento `session.usage_info` já chega ao agente (ver Fase U); adicionar `this.contextState = { tokens, tokenLimit, utilization }` no handler
+- AA.6: `workingDirectory` deve ser o `process.cwd()` ou configurável via `controle.json`; o SDK faz git introspection automaticamente
+- AA.7: `skillDirectories` aceita array de strings (paths absolutos ou relativos); cada dir é varrido pelo CLI em busca de `*.md` com frontmatter YAML
+- AA.8: `MessageOptions.attachments` aceita `[{ type: 'file', path, mimeType? }]` — substituir o embed-in-text atual
+
+---
+
+### Fase AB — Cache Strategy *(prioridade 3)*
+
+**Status**: 🔴 PLANEJADO (depende de: AA.1 para métricas ricas no /health)
+
+#### Subfases (ordem de execução interna):
+
+| Sprint | Código | Título                                                 | Esforço  | Arquivo principal                                   |
+|--------|--------|--------------------------------------------------------|----------|-----------------------------------------------------|
+| AB-1   | AB.1   | File Context Cache (LRU in-memory, TTL 30s)            | 🟢 Baixo | `src/copilot/terminal/file-context.js`              |
+| AB-2   | AB.2   | Model List Cache (TTL 5min)                            | 🟢 Baixo | `src/copilot/lib/models.js`                         |
+| AB-3   | AB.3   | `cacheStats` no GET /health                            | 🟢 Baixo | `src/copilot/terminal/http-handlers.js`             |
+| AB-4   | AB.4   | SSE `cache.hit` event quando `cachedInput > 0`         | 🟢 Baixo | `src/copilot/terminal/index.js`                     |
+
+**Contexto de execução**:
+- AB.1: usar Map simples `path → { ctx, expiresAt: Date.now() + 30_000 }` sem dependência externa
+- AB.3: counters globais `let _fileCacheHits = 0, _fileCacheMisses = 0` em `file-context.js`
+- AB.4: `session.compaction_complete` tem `compactionTokensUsed.cachedInput` — verificar se `> 0` antes de emitir
+
+---
+
+### Fase AC — Context Window Hardening *(prioridade 4)*
+
+**Status**: 🔴 PLANEJADO (depende de: AA.1 para `contextState.utilization`)
+
+#### Subfases (ordem de execução interna):
+
+| Sprint | Código | Título                                                    | Esforço  | Arquivo principal                                       |
+|--------|--------|-----------------------------------------------------------|----------|---------------------------------------------------------|
+| AC-1   | AC.1   | `PUT /config/infinite-session` — thresholds dinâmicos    | 🟠 Médio | `src/copilot/api/bridge-config.js` (NOVO)               |
+| AC-2   | AC.2   | Recovery de compaction failure (checkpointPath awareness) | 🟠 Médio | `src/copilot/agent/always-alive.js`                     |
+| AC-3   | AC.3   | Checkpoint info em `getStatusSnapshot()` + `/config`      | 🟢 Baixo | `src/copilot/agent/always-alive.js` + `http-handlers.js`|
+| AC-4   | AC.4   | Warnings pré-send no REPL (⚠ 85% / ⛔ 95%)              | 🟢 Baixo | `src/copilot/terminal/dialog.js`                        |
+
+**Contexto de execução**:
+- AC.1: thresholds devem ser lidos de `controle.json` `{ infiniteSession: { backgroundThreshold, exhaustionThreshold } }` e aplicados no próximo `session.resume()`
+- AC.2: `compaction_complete` com `success: false` → emitir `AGENT_EVENTS.SESSION_ERROR` no nerv; se `checkpointPath` existe, logar instrução de recovery
+- AC.4: `contextState.utilization` calculado como `tokens / tokenLimit`; verificar antes de chamar `sdk.askUser()`
+
+---
+
+### Fase AG — Skills, Workspace & Custom Agents Integration *(prioridade 5)*
+
+**Status**: 🔴 PLANEJADO (depende de: AA.6 para `workingDirectory`, AA.7 para `skillDirectories`)
+
+#### Subfases:
+
+| Sprint | Código | Título                                                   | Esforço  | Arquivo principal                                          |
+|--------|--------|----------------------------------------------------------|----------|------------------------------------------------------------|
+| AG-1   | AG.1   | PinnedFilesLoader com fs.watch + EventEmitter            | 🟠 Médio | `src/copilot/config/pinned-files-loader.js` (NOVO)         |
+| AG-2   | AG.2   | Custom Agents factory (`buildDefaultCustomAgents`)        | 🟠 Médio | `src/copilot/config/custom-agents.js` (NOVO)               |
+| AG-3   | AG.3   | Endpoint `GET/PUT /config/skills`                        | 🟢 Baixo | `src/copilot/terminal/http-handlers.js`                    |
+| AG-4   | AG.4   | Comando REPL `/skills [list|add|remove|reload]`          | 🟢 Baixo | `src/copilot/terminal/commands/skills.js` (NOVO)           |
+| AG-5   | AG.5   | Integração terminal ↔ workspace SessionContext           | 🟢 Baixo | `src/copilot/terminal/http-handlers.js` (`/st`, `/context`)|
+
+**Contexto de execução**:
+- AG.1: `PinnedFilesLoader` deve extends `EventEmitter`, aceitar array de `dirs`, usar `fs.watch()` com debounce de 500ms, emitir `changed` com `{ file, content }`
+- AG.2: `CustomAgentConfig` (SDK): `{ name, description, tools, prompt, mcpServers?, infer? }` — criar agentes `@auditor` (só read tools) e `@docs` (só view/glob)
+- AG.2: `tools: ['glob', 'grep', 'view']` para agente read-only; `infer: true` para aparecer no `@` completions
+- AG.3: Persistir lista de skill dirs em `controle.json` para sobreviver ao restart
+- AG.5: `SessionContext` do SDK expõe `{ cwd, gitRoot, currentBranch, remoteUrl, repoName }` — expor via `/st` e `/context`
+
+---
+
+### Fase AH — Tool System Hardening *(prioridade 6)*
+
+**Status**: 🔴 PLANEJADO (depende de: AG.2 para lista canônica de custom tools)
+
+#### Subfases:
+
+| Sprint | Código | Título                                                      | Esforço  | Arquivo principal                                          |
+|--------|--------|-------------------------------------------------------------|----------|------------------------------------------------------------|
+| AH-1   | AH.1   | `DEFAULT_EXCLUDED_TOOLS` — tool filter seguro por padrão    | 🟢 Baixo | `src/copilot/config/session-config.js`                     |
+| AH-2   | AH.1b  | `PUT /config/tools` — ajustar allowlist/denylist em runtime | 🟠 Médio | `src/copilot/api/bridge-config.js` (compartilhado com AC.1)|
+| AH-3   | AH.2   | Tool invocation audit integrado ao JSONL (Fase Q)           | 🟢 Baixo | `src/copilot/agent/session-manager.js`                     |
+| AH-4   | AH.3   | `buildTool()` fábrica com schema Zod robusto                | 🟠 Médio | `src/copilot/tools/tool-factory.js` (NOVO)                 |
+| AH-5   | AH.4   | Investigar e documentar `lsp` tool em nosso ambiente        | 🟢 Baixo | `DOCUMENTAÇÃO/AUDITORIAS/` (doc only)                      |
+| AH-6   | AH.5   | `onPermissionRequest` integrado ao AlwaysAliveAgent         | 🟠 Médio | `src/copilot/agent/session-manager.js`                     |
+
+**Contexto de execução**:
+- AH.1: Adicionar `excludedTools: ['powershell', 'web_fetch', 'web_search', 'memory']` em `buildAlwaysAliveConfig()` — nenhum desses está sendo usado atualmente
+- AH.3: listener `session.on('external_tool.requested', ...)` em `initOrResumeSession()` → `this.nerv.emit(AGENT_EVENTS.TOOL_INVOCATION, {...})` → JSONL logger existente
+- AH.4: `buildTool(name, description, zodSchema, handler)` — converter `zodSchema` para JSON Schema via `zodToJsonSchema()` (já disponível como dep transitiva)
+- AH.6: `onPermissionRequest` recebe `{ toolName, args }` → implementar `isHighRiskTool(t)` = `['bash', 'edit', 'create', 'git_apply_patch'].includes(t)` → logar + aprovar (fase inicial), depois integrar política configurable
+
+---
+
+### Dependências entre Fases (grafo)
+
+```
+AE ─────────────────────────── independente (pode rodar agora)
+     │
+AA ──┤─ sem bloqueio técnico (melhor rodar após AE-2c GAP-02 por coerência)
+     │
+AB ──┴─────────────── depende de AA.1 (contextState com tokens reais)
+                │
+AC ─────────────┴─── depende de AA.1 (utilization para warnings)
+                      │
+AG ─────────────────┬─┘── depende de AA.6 + AA.7 (workingDirectory + skillDirectories)
+                    │
+AH ─────────────────┴──── depende de AG.2 (lista canônica de tools após custom agents)
+```
+
+**Ordem recomendada**: `AE → AA → AB → AC → AG → AH`  
+**Ordem alternativa** (máximo paralelismo): `AE (sprints 1-2) ‖ AA (sprints 1-4)` → `AB ‖ AC` → `AG` → `AH`
+
+---
+
+### Sumário de Arquivos Novos a Criar
+
+| Arquivo | Phase | Propósito |
+|---------|-------|-----------|
+| `src/copilot/config/pinned-files-loader.js` | AA.7 / AG.1 | Watcher + loader de skill dirs |
+| `src/copilot/config/custom-agents.js` | AG.2 | Factory de custom agents `@auditor`, `@docs` |
+| `src/copilot/terminal/commands/skills.js` | AG.4 | Comando REPL `/skills` |
+| `src/copilot/api/bridge-config.js` | AC.1 / AH.2 | Endpoints PUT /config/* |
+| `src/copilot/tools/tool-factory.js` | AH.4 | `buildTool()` com schema Zod |
+
+### Sumário de Arquivos Existentes a Modificar
+
+| Arquivo | Fases | Modificações principais |
+|---------|-------|------------------------|
+| `src/copilot/agent/always-alive.js` | AA.1-AA.2, AC.2-AC.3, AH.6 | `contextState`, compaction recovery, `onPermissionRequest` |
+| `src/copilot/agent/session-manager.js` | AA.6, AC.1, AH.1, AH.3 | `workingDirectory`, thresholds, tool filter, audit listener |
+| `src/copilot/config/session-config.js` | AA.6-AA.7, AH.1 | `skillDirectories`, `workingDirectory`, `excludedTools` |
+| `src/copilot/terminal/file-context.js` | AA.8, AB.1 | Native attachments, TTL cache |
+| `src/copilot/terminal/http-handlers.js` | AA.3-AA.5, AB.3, AC.3, AG.3, AG.5 | `/health`, `/context`, `/config`, `/config/skills` |
+| `src/copilot/terminal/index.js` | AA.4, AB.4 | SSE `context` event, SSE `cache.hit` |
+| `src/copilot/terminal/dialog.js` | AC.4 | Threshold warnings |
+| `src/copilot/terminal/commands/context.js` | AA.3 | Tokens reais |
+| `src/copilot/lib/models.js` | AB.2 | TTL cache `listModels()` |
+| `src/copilot/channel/client.js` | AE (ARCH-03), AA.8 | Histórico convergência, attachments |
+| `src/copilot/conversation-hub/store.js` | AE (PERF-03, MELHORIA-05) | FTS5 tokenizer, SDK history |
+| `src/copilot/tools/mcp-schema.js` | AE (GAP-02) | enum + objetos aninhados |
+| `src/copilot/bridges/nerv-bridge.js` | AH.3 | TOOL_INVOCATION event |
