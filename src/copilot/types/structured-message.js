@@ -150,7 +150,9 @@ export const StructuredMessageSchema = z.object({
  * `turnNumber`, `toolsUsed` são opcionais na criação.
  *
  * @typedef {Omit<StructuredMessage, 'version' | 'output' | 'sessionId' | 'turnNumber' | 'toolsUsed' | 'meta'> &
- *     Partial<Pick<StructuredMessage, 'version' | 'output' | 'sessionId' | 'turnNumber' | 'toolsUsed' | 'meta' | 'traceId'>>} StructuredMessageInput
+ *     Partial<
+ *         Pick<StructuredMessage, 'version' | 'output' | 'sessionId' | 'turnNumber' | 'toolsUsed' | 'meta' | 'traceId'>
+ *     >} StructuredMessageInput
  */
 
 /**

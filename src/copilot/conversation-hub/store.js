@@ -123,7 +123,8 @@ const DDL_MEMORIES = `
         tag,
         content,
         content='copilot_memories',
-        content_rowid='rowid'
+        content_rowid='rowid',
+        tokenize='porter unicode61 remove_diacritics 1'
     );
     CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON copilot_memories BEGIN
         INSERT INTO copilot_memories_fts(rowid, id, tag, content)
@@ -136,6 +137,50 @@ const DDL_MEMORIES = `
         DELETE FROM copilot_memories_fts WHERE id=old.id;
     END;
 `;
+
+// ─── FTS5 tokenizer migration (PERF-03) ──────────────────────────────────────
+
+/**
+ * Migra `copilot_memories_fts` para usar o tokenizer `porter unicode61 remove_diacritics 1`.
+ *
+ * A tabela FTS5 não suporta ALTER TABLE, então a migração recria a estrutura completa caso
+ * o tokenizer atual seja diferente. É idempotente: não faz nada se o tokenizer já estiver correto.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @returns {void}
+ */
+function migrateFts5Tokenizer(db) {
+    const TARGET_TOKENIZER = 'porter unicode61 remove_diacritics 1';
+    try {
+        // FTS5 expõe configuração via tabela shadow <nome>_config
+        /** @type {{ v?: string } | undefined} */
+        const row = /** @type {any} */ (
+            db.prepare("SELECT v FROM copilot_memories_fts_config WHERE k='tokenize'").get()
+        );
+        // Se o tokenizer já é o correto (ou a tabela foi recém-criada com IF NOT EXISTS no DDL), nada a fazer
+        if (!row || row.v === TARGET_TOKENIZER) return;
+        log('INFO', '[ConversationStore] PERF-03: migrando FTS5 para porter unicode61...');
+    } catch {
+        // tabela shadow ainda não existe — será criada com o tokenizer correto pelo DDL
+        return;
+    }
+    // Recriar tabela com tokenizer correto, preservando dados existentes
+    db.exec(`
+        DROP TABLE IF EXISTS copilot_memories_fts;
+        CREATE VIRTUAL TABLE copilot_memories_fts USING fts5(
+            id UNINDEXED,
+            tag,
+            content,
+            content='copilot_memories',
+            content_rowid='rowid',
+            tokenize='porter unicode61 remove_diacritics 1'
+        );
+        -- Repopular a partir dos dados persistidos
+        INSERT INTO copilot_memories_fts(rowid, id, tag, content)
+        SELECT rowid, id, tag, content FROM copilot_memories;
+    `);
+    log('INFO', '[ConversationStore] PERF-03: FTS5 migrado com sucesso.');
+}
 
 // ─── ConversationStore ────────────────────────────────────────────────────────
 
@@ -167,6 +212,7 @@ export class ConversationStore {
             this.#db.exec(DDL_HUB_SESSIONS);
             this.#db.exec(DDL_CONVERSATION_TURNS);
             this.#db.exec(DDL_MEMORIES);
+            migrateFts5Tokenizer(this.#db);
             this.#initialized = true;
             log('DEBUG', '[ConversationStore] Tabelas inicializadas.');
         } catch (/** @type {any} */ err) {
@@ -189,6 +235,16 @@ export class ConversationStore {
     }
 
     // ─── HubSessions ──────────────────────────────────────────────────────────
+
+    /**
+     * Expõe o banco SQLite para health checks externos (somente leitura recomendada).
+     * Retorna `null` se `init()` ainda não foi chamado.
+     *
+     * @returns {import('better-sqlite3').Database | null}
+     */
+    get db() {
+        return this.#db;
+    }
 
     /**
      * Cria uma nova hub_session.

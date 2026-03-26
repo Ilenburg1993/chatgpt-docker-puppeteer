@@ -11,6 +11,7 @@
 
 import { log } from '#core/logger';
 import { CHANNEL_VERSION } from '../channel/index.js';
+import { conversationStore } from '../conversation-hub/index.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -80,11 +81,23 @@ export function registerControlRoutes(bridge, agent) {
      * Status HTTP 200 quando agente está operacional (idle | processing | waiting_for_input). Status HTTP 503 quando
      * agente está parado ou sem sessão.
      *
-     * Body: { healthy, status, sessionId, queueSize, starvationAlert, uptime, listenerCounts }
+     * Body: { healthy, status, sessionId, queueSize, starvationAlert, uptime, listenerCounts, channelVersion, hubStore }
      */
     bridge.get('/health', (/** @type {Req} */ _req, /** @type {Res} */ res) => {
         const snap = /** @type {AgentSnap} */ (agent.getStatusSnapshot());
         const healthy = snap.status === 'idle' || snap.status === 'processing' || snap.status === 'waiting_for_input';
+
+        // ARCH-04: verificar conectividade do ConversationStore (SQLite)
+        /** @type {{ ok: boolean; error?: string }} */
+        const hubStore = (() => {
+            try {
+                conversationStore.db?.prepare('SELECT 1').get();
+                return { ok: true };
+            } catch (/** @type {any} */ e) {
+                return { ok: false, error: /** @type {string} */ (e.message ?? 'unknown') };
+            }
+        })();
+
         res.status(healthy ? 200 : 503).json({
             healthy,
             status: snap.status,
@@ -94,6 +107,7 @@ export function registerControlRoutes(bridge, agent) {
             uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
             listenerCounts: agent.listenerDiagnostics(),
             channelVersion: CHANNEL_VERSION,
+            hubStore,
         });
     });
 

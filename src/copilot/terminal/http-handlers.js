@@ -209,11 +209,18 @@ export async function handlePipeline(body) {
  * Injeta uma mensagem na LLM-B e aguarda resposta.
  *
  * Aceita opcionalmente:
- * - `context_files: string[]` — lê o conteúdo de cada arquivo e o embute como bloco markdown antes da mensagem.
- * - `attachments: Array<{type: 'file'|'content', path?: string, content?: string, mimeType?: string}>` — contexto
- *   extra embutido como bloco markdown na mensagem (MELHORIA-03: suporte a attachments do SDK emulado via embed).
  *
- * @param {{ message?: string; from?: string; timeout?: number; context_files?: string[]; attachments?: Array<{type?: string; content?: string; path?: string}> } | null} body
+ * - `context_files: string[]` — lê o conteúdo de cada arquivo e o embute como bloco markdown antes da mensagem.
+ * - `attachments: Array<{type: 'file'|'content', path?: string, content?: string, mimeType?: string}>` — contexto extra
+ *   embutido como bloco markdown na mensagem (MELHORIA-03: suporte a attachments do SDK emulado via embed).
+ *
+ * @param {{
+ *     message?: string;
+ *     from?: string;
+ *     timeout?: number;
+ *     context_files?: string[];
+ *     attachments?: { type?: string; content?: string; path?: string }[];
+ * } | null} body
  * @returns {Promise<HandlerResult>}
  */
 export async function handleInject(body) {
