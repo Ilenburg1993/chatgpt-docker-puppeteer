@@ -2236,14 +2236,14 @@ POST localhost:3009/inject
 
 #### Subfases:
 
-| Sprint | Código | Título                                                      | Status | Arquivo principal                              |
-| ------ | ------ | ----------------------------------------------------------- | ------ | ---------------------------------------------- |
-| AH-1   | AH.1   | `DEFAULT_EXCLUDED_TOOLS` — tool filter seguro por padrão    | ✅ DONE | `src/copilot/config/session-config.js`         |
-| AH-2   | AH.2   | `GET/PUT /config/tools` — allowlist/denylist em runtime     | ✅ DONE | `src/copilot/terminal/http-handlers.js`         |
-| AH-3   | AH.3   | Tool invocation audit JSONL (`logs/tool-audit.jsonl`)       | ✅ DONE | `src/copilot/agent/session-manager.js`         |
-| AH-4   | AH.4   | `buildTool()` fábrica com schema Zod robusto                | ✅ DONE | `src/copilot/tools/tool-factory.js` (NOVO)     |
-| AH-5   | AH.5   | Documentação integração LSP/IDE em JSDoc do tool-factory    | ✅ DONE | `src/copilot/tools/tool-factory.js`            |
-| AH-6   | AH.6   | `buildAuditingPermissionHandler` integrado ao dialog loop   | ✅ DONE | `src/copilot/agent/session-manager.js`         |
+| Sprint | Código | Título                                                    | Status | Arquivo principal                          |
+| ------ | ------ | --------------------------------------------------------- | ------ | ------------------------------------------ |
+| AH-1   | AH.1   | `DEFAULT_EXCLUDED_TOOLS` — tool filter seguro por padrão  | ✅ DONE | `src/copilot/config/session-config.js`     |
+| AH-2   | AH.2   | `GET/PUT /config/tools` — allowlist/denylist em runtime   | ✅ DONE | `src/copilot/terminal/http-handlers.js`    |
+| AH-3   | AH.3   | Tool invocation audit JSONL (`logs/tool-audit.jsonl`)     | ✅ DONE | `src/copilot/agent/session-manager.js`     |
+| AH-4   | AH.4   | `buildTool()` fábrica com schema Zod robusto              | ✅ DONE | `src/copilot/tools/tool-factory.js` (NOVO) |
+| AH-5   | AH.5   | Documentação integração LSP/IDE em JSDoc do tool-factory  | ✅ DONE | `src/copilot/tools/tool-factory.js`        |
+| AH-6   | AH.6   | `buildAuditingPermissionHandler` integrado ao dialog loop | ✅ DONE | `src/copilot/agent/session-manager.js`     |
 
 **Novos arquivos criados**:
 - `src/copilot/tools/tool-factory.js` — `buildTool()` com Zod + JSON Schema + logging
@@ -2299,3 +2299,137 @@ AH ─────────────────┴──── depende de
 | `src/copilot/conversation-hub/store.js`    | AE (PERF-03, MELHORIA-05)         | FTS5 tokenizer, SDK history                                 |
 | `src/copilot/tools/mcp-schema.js`          | AE (GAP-02)                       | enum + objetos aninhados                                    |
 | `src/copilot/bridges/nerv-bridge.js`       | AH.3                              | TOOL_INVOCATION event                                       |
+
+---
+
+## 13. Fase AI — Extensibilidade, Observabilidade e Integração Avançada
+
+> **Pré-requisitos**: Fases AE→AH concluídas. Allowlist gap corrigido em `129348ec`.
+
+**Motivação**: cinco eixos de valor ficaram pendentes após o roadmap AE→AH:
+
+1. **Persistência tools-state** — `allowlist`/`denylist` não sobrevivem a restart
+2. **Custom Tool Registry via API** — `buildTool()` existe mas sem gestão de runtime
+3. **OpenTelemetry** — sem traces estruturados; impossível medir latência por camada
+4. **SDK History por hub\_session** — `session.getHistory()` não mapeado para SQLite
+5. **Native Attachments** — ainda usam embed-in-text em vez de `MessageOptions.attachments`
+
+**Dependências**:
+```
+AI.1 (persistência tools-state) ──► AI.2 (custom tool registry via API)
+AI.3 (OTEL traces)               ── independente
+AI.4 (SDK history SQLite)        ── independente
+AI.5 (native attachments HTTP)   ── independente
+```
+
+---
+
+### AI.1 — Persistência de tools-state em controle.json
+
+**Status**: 🔴 PLANEJADO
+
+**Objetivo**: `patchToolsConfig()` grava em `controle.json` (chave `toolsConfig`) + `loadToolsConfig()` restaura no boot.
+
+**Arquivos**:
+- `src/copilot/config/tools-state.js` — adicionar `loadToolsConfig()` + persistência em `patchToolsConfig()`
+- `src/copilot/agent/session-manager.js` — chamar `loadToolsConfig()` na inicialização
+
+**Detalhes**:
+- `controle.json` schema: `"toolsConfig": { "allowlist": null | string[], "denylist": string[] }`
+- Escritura atômica: ler → merge → gravar (evitar race conditions)
+- `loadToolsConfig()` idempotente: se chave ausente, mantém defaults `{ allowlist: null, denylist: [] }`
+
+---
+
+### AI.2 — Custom Tool Registry via API
+
+**Status**: 🔴 PLANEJADO (depende de AI.1)
+
+**Objetivo**: `GET/POST/DELETE /config/tools/custom` para gerenciar custom tools passadas via `tools: [...]` na SessionConfig.
+
+**Arquivos novos**:
+- `src/copilot/config/custom-tools-registry.js` — `registerCustomTool()`, `getCustomTools()`, `removeCustomTool()`
+
+**Arquivos modificados**:
+- `src/copilot/terminal/http-handlers.js` — `handleGetCustomTools`, `handleRegisterCustomTool`, `handleRemoveCustomTool`
+- `src/copilot/terminal/server.js` — rotas `GET/POST/DELETE /config/tools/custom`
+- `src/copilot/agent/session-manager.js` — `tools: getCustomTools()` na SessionConfig
+
+**API**:
+```
+GET    /config/tools/custom         → { ok, tools: [{ name, description }] }
+POST   /config/tools/custom         → body: { name, description, params?, handlerCode }
+DELETE /config/tools/custom/:name   → remove por nome
+```
+
+**Segurança**: aceitar apenas de `localhost`; handlers em pré-registered map (sem eval dinâmico).
+
+---
+
+### AI.3 — OpenTelemetry Traces no AlwaysAliveAgent
+
+**Status**: 🔴 PLANEJADO
+
+**Objetivo**: instrumentar `sendDialogTurn()`, `initOrResumeSession()`, `stopSession()` com spans OTEL.
+
+**Arquivos**:
+- `src/copilot/lib/telemetry.js` — adicionar `startSpan(name, attrs, fn)` wrapper
+- `src/copilot/agent/always-alive.js` — `startSpan` em sendDialogTurn, initOrResumeSession, stopSession
+- `src/copilot/agent/session-manager.js` — span `session.create`
+
+**Notas**:
+- `@opentelemetry/sdk-trace-node` como dependência opcional (graceful degradation)
+- Em dev: `ConsoleSpanExporter`; em prod (`OTEL_EXPORTER_OTLP_ENDPOINT`): `OTLPTraceExporter`
+- Atributos: `session.id`, `model`, `actor`, `durationMs`, `contextTokens`
+- Pattern: `startSpan` retorna resultado do fn, propaga erros
+
+---
+
+### AI.4 — SDK History por hub_session (SQLite)
+
+**Status**: 🔴 PLANEJADO
+
+**Objetivo**: mapear `session.getHistory()` (`ConversationMessage[]`) para o schema `turns` do ConversationStore.
+
+**Arquivos**:
+- `src/copilot/conversation-hub/store.js` — novo método `syncFromSdkHistory(sessionId, messages)`
+- `src/copilot/agent/always-alive.js` — chamar `syncFromSdkHistory()` após reconexão
+
+**Mapeamento**:
+
+| `ConversationMessage` (SDK) | `turns` (SQLite) |
+| --------------------------- | ---------------- |
+| `type: 'user'`              | `actor: 'user'`  |
+| `type: 'assistant'`         | `actor: 'llm-b'` |
+| `content: string`           | `content`        |
+| `createdAt`                 | `created_at`     |
+
+- `INSERT OR IGNORE` pelo `turn_id` (idempotente)
+- Emitir `AGENT_EVENTS.HISTORY_SYNCED` após sync
+
+---
+
+### AI.5 — Native File Attachments SDK (AA.8 — escopo realista)
+
+**Status**: 🔴 PLANEJADO
+
+**Análise**: `MessageOptions.attachments` disponível em `sendMessage()` — não no `ask_user` do dialog loop. Portanto:
+- **Via HTTP `/inject`**: implementável com native attachments
+- **Via REPL `/attach`**: embed-in-text permanece (limitação arquitetural de `answerPendingQuestion(string)`)
+
+**Arquivo**: `src/copilot/terminal/http-handlers.js` (`handleInject`) — usar `session.sendMessage(msg, { attachments: [{type:'file', path}] })` em vez de embed manual quando body tem `attachments[].path`.
+
+---
+
+### Sumário Fase AI — Arquivos
+
+| Arquivo                                       | AI     | Status  | Propósito                               |
+| --------------------------------------------- | ------ | ------- | --------------------------------------- |
+| `src/copilot/config/custom-tools-registry.js` | AI.2   | 🔴 NOVO | Registry de custom tools em runtime     |
+| `src/copilot/config/tools-state.js`           | AI.1   | MODIF   | Persistência em controle.json           |
+| `src/copilot/agent/session-manager.js`        | AI.1,2 | MODIF   | `loadToolsConfig()` + `getCustomTools()`|
+| `src/copilot/agent/always-alive.js`           | AI.3,4 | MODIF   | OTEL spans + `syncFromSdkHistory()`     |
+| `src/copilot/lib/telemetry.js`                | AI.3   | MODIF   | `startSpan()` wrapper OTEL              |
+| `src/copilot/conversation-hub/store.js`       | AI.4   | MODIF   | `syncFromSdkHistory()`                  |
+| `src/copilot/terminal/http-handlers.js`       | AI.2,5 | MODIF   | Custom tools API + native attachments   |
+| `src/copilot/terminal/server.js`              | AI.2   | MODIF   | Rotas `/config/tools/custom`            |
