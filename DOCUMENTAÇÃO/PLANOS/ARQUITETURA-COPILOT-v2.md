@@ -1286,12 +1286,12 @@ Como o SDK aplica compaction (baseado em `types.d.ts` v0.1.32 + `session-events.
 
 **O que sobrevive vs. o que é compactado**:
 
-| Conteúdo | Sobrevive? | Mecanismo |
-|----------|-----------|-----------|
-| `systemMessage.content` | ✅ Sempre | É configuração (SessionConfig), re-aplicado após cada compaction |
-| Turnos de conversa recentes | ✅ Sim | Preservados até o limite + compaction começa |
-| Turnos antigos | ⚠️ Summary | Resumidos pelo SDK em `summaryContent` (lossy!) |
-| Instruções críticas só na conversa | ❌ Risk | Podem ser perdidas se só existirem em turnos antigos |
+| Conteúdo                           | Sobrevive? | Mecanismo                                                        |
+| ---------------------------------- | ---------- | ---------------------------------------------------------------- |
+| `systemMessage.content`            | ✅ Sempre   | É configuração (SessionConfig), re-aplicado após cada compaction |
+| Turnos de conversa recentes        | ✅ Sim      | Preservados até o limite + compaction começa                     |
+| Turnos antigos                     | ⚠️ Summary  | Resumidos pelo SDK em `summaryContent` (lossy!)                  |
+| Instruções críticas só na conversa | ❌ Risk     | Podem ser perdidas se só existirem em turnos antigos             |
 
 **Implementação (AA.0)**:
 
@@ -1376,20 +1376,158 @@ const systemMessage = buildPinnedSystemMessage(injectContext ? buildHookSystemCo
   `broadcastSse('context', { tokenLimit, currentTokens, utilization, messagesLength })`
 - Clientes SSE (LLM-A, dashboard) passam a receber dados reais de context utilization
 
-**Arquivos a modificar:**
+**AA.6 — workingDirectory: Workspace Context Automático**
+
+> **Discovery SDK**: O campo `workingDirectory?: string` em `SessionConfig` e `ResumeSessionConfig`
+> instrui o CLI a operar com raiz naquele diretório. O SDK também calcula `SessionContext`
+> automaticamente: `{ cwd, gitRoot?, repository?, branch? }` — se `workingDirectory` apontar para
+> a raiz do repo, o CLI server detecta o git context e o inclui nos metadados da sessão
+> (`SessionMetadata.context`). Isso é análogo ao comportamento do GitHub Copilot CLI no terminal:
+> quando invocado de dentro de um repo git, o agente "sabe" que está no repo X, branch Y.
+
+**Análise: terminal já integra workspace?**
+
+Não — atualmente o `session-manager.js` **não passa `workingDirectory`** na criação de sessão.
+O CLI server opera sem ancoragem de diretório. Consequências:
+
+1. O agente SDK não tem `gitRoot` / `repository` / `branch` em `SessionMetadata.context`.
+2. Ferramentas do CLI que operam com path relativo usam o `cwd` do processo, não um workspace
+   fixo — pode divergir.
+3. `listSessions({ cwd: ROOT })` não retorna a sessão (porque `context.cwd` não combina).
+
+**Implementação (AA.6)**:
+
+Em `session-manager.js`, adicionar `workingDirectory` no objeto `opts`:
+```js
+import { resolve } from 'node:path';
+const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../');
+
+// Dentro de initOrResumeSession():
+const opts = {
+    // ...existing fields...
+    workingDirectory: WORKSPACE_ROOT,   // ← NOVO
+};
+```
+
+Efeito imediato: o SDK passa `workingDirectory` ao CLI server via `session.create` RPC, o CLI
+server detecta `gitRoot` / `repository` / `branch` e inclui em `SessionMetadata.context`. Ferramentas
+como `read_file`/`edit_file` com paths relativos passam a ser resolvidas a partir do workspace root.
+
+**Arquivos**: `src/copilot/agent/session-manager.js` (1 linha de mudança)
+**Risco**: Muito baixo — só adiciona contexto git, não muda comportamento de ferramentas.
+
+---
+
+**AA.7 — skillDirectories: Documentos Carregados Permanentemente (File-Pinned Context)**
+
+> **Discovery SDK**: `skillDirectories?: string[]` é passado ao CLI server que lê arquivos
+> de skills a partir dos diretórios fornecidos. O **formato** é o mesmo das skills do GitHub Copilot
+> Chat (`SKILL.md` com frontmatter YAML). O campo está em `ResumeSessionConfig` → **sobrevive ao
+> resume de sessão**. As skills carregadas ficam disponíveis como contexto permanente para o LLM
+> (semelhante a instructions/custom instructions no Copilot Chat).
+
+**Uso proposto**:
+
+Podemos usar `skillDirectories` para injetar como "skills" quaisquer arquivos `.md` que queiramos
+que o LLM-B leia sempre — independente de compaction:
+
+```js
+// session-manager.js
+const PINNED_SKILL_DIRS = [
+    join(WORKSPACE_ROOT, '.github', 'instructions'),  // hooks-protocol + project-canon
+    join(WORKSPACE_ROOT, '.github', 'hooks', 'state'), // session-briefing dinâmico
+];
+
+const opts = {
+    // ...
+    skillDirectories: PINNED_SKILL_DIRS,
+};
+```
+
+**Comportamento esperado**: O CLI server lê os `.md` naqueles diretórios. Se o arquivo tiver
+frontmatter YAML com `name:` e `description:`, é registrado como skill nomeada. Se não tiver
+frontmatter, é tratado como documento de contexto. Em ambos os casos, o conteúdo **fica em
+`ResumeSessionConfig`** — presente após cada resume.
+
+**Importante — complementaridade com AA.0**:
+
+| Mecanismo  | Quando atualiza          | Limite        | Controle               |
+| ---------- | ------------------------ | ------------- | ---------------------- |
+| `systemMessage` append (AA.0) | A cada turn            | ~1–2 KB útil  | Total (buildamos nós)  |
+| `skillDirectories` (AA.7)     | A cada session create/resume | Ilimitado     | Depende do CLI format  |
+
+Skills são carregadas no startup/resume → não re-injetadas a cada turn. Portanto:
+- **`systemMessage` append** = instruções pequenas e dinâmicas (hook state, close_key)
+- **`skillDirectories`** = documentos grandes e estáticos (project-canon, hooks-protocol completo)
+
+**File Watcher — AA.7.b**:
+
+Para que alterações em arquivos de skill sejam refletidas **sem reiniciar o agente**:
+```
+src/copilot/config/pinned-files-loader.js  ← NOVO módulo
+```
+Responsabilidades:
+1. `watchPinnedDirs(dirs, onChanged)` — usa `fs.watch()` ou `chokidar` para vigiar diretórios
+2. Quando arquivo `.md` atualizado → emite evento interno `pinned-files:changed`
+3. `always-alive.js` subscreve → força `refreshSystemMessage()` na próxima janela idle
+   _OU_ inicia nova sessão com `skillDirectories` atualizado
+
+**Nota de limitação SDK**: O SDK não tem método `updateSkillDirectories()` em sessão ativa.
+A forma de refletir mudanças em `skillDirectories` é criar nova sessão (ou aguardar resume).
+Para mudanças em `systemMessage` (AA.0), o rebuild automático ao `initOrResumeSession` já é suficiente.
+
+**Arquivos**:
+- `src/copilot/agent/session-manager.js` — adicionar `skillDirectories: PINNED_SKILL_DIRS`
+- `src/copilot/config/pinned-files-loader.js` — NOVO: watcher + loader
+- `src/copilot/terminal/commands/pinned.js` — NOVO: comando `/pinned [list|add|remove|reload]`
+- `src/copilot/terminal/commands/index.js` — export
+- `src/copilot/terminal/repl.js` — dispatch
+- API opcional: `PUT /config/pinned-dirs` em `http-handlers.js`
+
+---
+
+**AA.8 — Message Attachments: File Context On-Demand por Turn**
+
+> **Discovery SDK**: `session.send({ prompt, attachments: [{type: "file", path}] })` injeta
+> arquivo real como contexto para aquele turno específico. Diferente de `skillDirectories` (que
+> carrega ao criar/resumir sessão), os attachments são **por-turn** — aparecem no contexto do LLM
+> para aquela mensagem e se tornam parte do histórico (sujeitos a compaction como qualquer turn).
+
+**Estado atual**: O terminal LLM-B já tem `file-context.js` para embed manual (`/attach`, `@path`).
+O conteúdo é atualmente embedado como text no corpo da mensagem. O SDK oferece uma alternativa mais
+limpa: passar como `attachments` ao invés de injetar no texto.
+
+**Oportunidade de melhoria**:
+
+Trocar embed-in-text por `attachments` nativo do SDK em `task-executor.js` e `always-alive.js`.
+Vantagens:
+- O CLI server pode exibir o arquivo diferenciado na UI (se TUI ativo)
+- O modelo recebe como contexto estruturado (não só texto)
+- Reduz tokens usados no histórico de turns (o CLI gerencia o contexto)
+
+**Arquivos**:
+- `src/copilot/terminal/file-context.js` — revisão para retornar `{type:"file", path}` além do embed
+- `src/copilot/agent/always-alive.js` — aceitar `attachments` native ao send
+- `src/copilot/agent/task-executor.js` — já aceita (verificado), validar passagem correta
+
+---
+
+**Arquivos a modificar (Fase AA completa):**
 - `src/copilot/config/system-prompt.js` — **AA.0**: novo `buildPinnedSystemMessage(hookContext)`
-- `src/copilot/agent/session-manager.js` — **AA.0**: trocar builder de systemMessage
-- `src/copilot/agent/always-alive.js` — **AA.1**: `#contextState`, getter, enriched `getStatusSnapshot`
+- `src/copilot/agent/session-manager.js` — **AA.0**: trocar builder; **AA.6**: `workingDirectory`; **AA.7**: `skillDirectories`
+- `src/copilot/agent/always-alive.js` — **AA.1**: `#contextState`, getter, enriched `getStatusSnapshot`; **AA.8**: attachments native
 - `src/copilot/terminal/commands/context.js` — **AA.3**: usar dados reais, manter fallback
 - `src/copilot/terminal/http-handlers.js` — **AA.2+AA.3**: contextWindow em /health e /config
 - `src/copilot/terminal/index.js` — **AA.5**: SSE context event
 - `src/copilot/terminal/commands/compaction.js` — **AA.4** NOVO: `/compaction` command
-- `src/copilot/terminal/commands/index.js` — export
+- `src/copilot/config/pinned-files-loader.js` — **AA.7.b** NOVO: watcher de arquivos pinados
+- `src/copilot/terminal/commands/pinned.js` — **AA.7** NOVO: `/pinned` command
+- `src/copilot/terminal/commands/index.js` — exports
 - `src/copilot/terminal/commands/help.js` — documentação
-- `src/copilot/terminal/repl.js` — dispatch caso `compaction`
+- `src/copilot/terminal/repl.js` — dispatch `compaction` e `pinned`
 
-> **Prioridade de implementação**: AA.0 primeiro (menor risco, maior impacto imediato) → AA.1 →
-> AA.3 → AA.2 → AA.5 → AA.4
+> **Prioridade de implementação**: AA.0 → AA.6 (1 linha, baixíssimo risco) → AA.1 →
+> AA.3 → AA.2 → AA.5 → AA.7 → AA.7.b → AA.4 → AA.8
 
 ---
 
@@ -1503,6 +1641,206 @@ Com AA e AB implementados, surgem questões de robustez:
 
 ---
 
+---
+
+### FASE AG — Skills, Workspace & Custom Agents Integration
+
+**Status**: 🔴 PLANEJADA
+
+**Motivação e Contexto**
+
+Research realizado em 2026-04-xx sobre o SDK v0.1.32 revelou três capacidades **não utilizadas**
+atualmente: `workingDirectory`, `skillDirectories` e `customAgents`. Estas capacidades permitem:
+
+1. **workingDirectory** → o CLI server "conhece" o repo git (branch, remote, gitRoot) — workspace context automático
+2. **skillDirectories** → diretórios com arquivos `.md` que ficam carregados permanentemente no contexto do LLM, sobrevivem a resume/compaction
+3. **customAgents** → sub-agentes com prompt + tool subset próprios, invocáveis via `@nome`
+
+**AA.6** (em Fase AA) já cobre `workingDirectory`. Esta Fase AG aprofunda `skillDirectories` e `customAgents`.
+
+**Descobertas de Research (SDK v0.1.32):**
+
+```typescript
+// SessionConfig (também em ResumeSessionConfig — sobrevivem ao resume!)
+skillDirectories?: string[];    // diretórios com arquivos .md para skills
+disabledSkills?: string[];      // blocklist de skills por nome
+customAgents?: CustomAgentConfig[];  // sub-agentes especializados
+workingDirectory?: string;      // workspace root para o CLI server
+
+// CustomAgentConfig:
+interface CustomAgentConfig {
+    name: string;              // invocado como @name na conversa
+    displayName?: string;
+    description?: string;
+    tools?: string[] | null;   // subset de tools; null = todos
+    prompt: string;            // system prompt do sub-agente
+    mcpServers?: Record<string, MCPServerConfig>;
+    infer?: boolean;           // default: true
+}
+
+// SessionContext (calculado pelo CLI server quando workingDirectory é fornecido):
+interface SessionContext {
+    cwd: string;
+    gitRoot?: string;     // raiz do repo git detectada automaticamente
+    repository?: string;  // "owner/repo" do GitHub
+    branch?: string;      // branch atual
+}
+```
+
+**Formato de Skills**:
+
+Baseado no formato usado pelo GitHub Copilot Chat (`.github/skills/*/SKILL.md`), skills são
+arquivos Markdown com frontmatter YAML opcional:
+
+```markdown
+---
+name: meu-skill
+description: "Descrição do skill para o modelo decidir quando usar"
+user-invocable: true
+---
+# Conteúdo do Skill (visto pelo LLM)
+...
+```
+
+Sem frontmatter, o arquivo é tratado como documento de contexto (sempre presente, sem nome de skill).
+
+**O que implementar:**
+
+**AG.1 — PinnedFilesLoader: Watcher de Arquivos Pinados**
+
+Criar `src/copilot/config/pinned-files-loader.js`:
+```js
+/**
+ * Carrega e monitora diretórios de "skills" SDK para o LLM-B.
+ *
+ * Quando arquivos nos diretórios monitorados são criados/modificados/deletados,
+ * emite evento 'pinned-files:changed' para que o agente possa reagir.
+ */
+import { watch } from 'node:fs';
+import { readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+import { EventEmitter } from 'node:events';
+
+export class PinnedFilesLoader extends EventEmitter {
+    /** @type {string[]} */
+    #dirs = [];
+    /** @type {Array<import('node:fs').FSWatcher>} */
+    #watchers = [];
+
+    /**
+     * @param {string[]} dirs - Diretórios a monitorar
+     */
+    constructor(dirs) { /* ... */ }
+
+    /** @returns {string[]} Diretórios monitorados */
+    get dirs() { return [...this.#dirs]; }
+
+    /** Inicia monitoramento de todos os diretórios */
+    start() { /* watch + emit 'changed' */ }
+
+    /** Para todos os watchers */
+    stop() { /* close watchers */ }
+
+    /** @returns {Promise<string[]>} Lista de arquivos .md encontrados */
+    async listFiles() { /* readdir recursivo */ }
+}
+
+/** Instância singleton para uso em session-manager.js */
+export const pinnedFilesLoader = new PinnedFilesLoader([
+    join(ROOT, '.github', 'instructions'),
+    join(ROOT, '.github', 'hooks', 'state'),
+]);
+```
+
+**Limitação importante**: O SDK não tem método para atualizar `skillDirectories` de uma sessão
+ativa. A única forma de refletir novos arquivos é criar/resumir sessão. A estratégia é:
+- `pinnedFilesLoader` emite `changed` → `always-alive.js` seta flag `#skillsOutdated = true`
+- Na próxima vez que `initOrResumeSession()` for chamado (restart/reconnect), usa o set atualizado
+
+**AG.2 — Custom Agents para Subtarefas Especializadas**
+
+Criar `src/copilot/config/custom-agents.js` com factory de agentes reutilizáveis:
+
+```js
+/**
+ * Agentes customizados disponíveis para o LLM-B.
+ *
+ * Invocados na conversa via @nome (ex: "@auditor analise este arquivo").
+ * Cada agente tem subset de tools e prompt focado.
+ */
+import { createReadOnlyAgent } from '#copilot/lib/agents';
+
+/**
+ * @returns {import('@github/copilot-sdk').CustomAgentConfig[]}
+ */
+export function buildDefaultCustomAgents() {
+    return [
+        createReadOnlyAgent(
+            'auditor',
+            'Realiza code review e auditoria de qualidade sem modificar arquivos.',
+        ),
+        {
+            name: 'docs',
+            displayName: 'Docs Agent',
+            description: 'Lê documentação e responde perguntas sobre a arquitetura do projeto.',
+            tools: ['read_file', 'list_directory', 'grep_search'],
+            prompt: 'Você é um especialista na documentação deste repositório. ' +
+                    'Leia os arquivos solicitados e responda com precisão.',
+        },
+    ];
+}
+```
+
+**AG.3 — Endpoint API: GET/PUT /config/skills**
+
+Adicionar ao `http-handlers.js`:
+- `GET /config/skills` → lista diretórios monitorados + arquivos encontrados
+- `PUT /config/skills` → `{ "add": "path", "remove": "path" }` → atualiza dirs em runtime
+  (efeito na próxima sessão; flag `skillsOutdated` no always-alive)
+
+**AG.4 — Comando REPL: `/skills [list|add|remove|reload]`**
+
+Novo `src/copilot/terminal/commands/skills.js`:
+- `/skills list` → lista skills carregados na sessão atual
+- `/skills add <dir>` → adiciona dir às pinned dirs (efeito na próxima sessão)
+- `/skills remove <dir>` → remove dir
+- `/skills reload` → ativa `always-alive.refreshSkills()` que reinicia sessão com set atualizado
+
+**AG.5 — Integração Terminal ↔ Workspace (completude)**
+
+Verificar e documentar o que o SDK já fornece automaticamente quando `workingDirectory` está definido:
+- Ferramentas do CLI com paths relativos resolvem a partir de `workingDirectory`
+- `SessionMetadata.context` tem `gitRoot`, `repository`, `branch`
+- `listSessions({ cwd: WORKSPACE_ROOT })` filtra sessões do projeto
+
+Adicionar em `/st` (status) e `/context` (context info) o `SessionContext` detectado automaticamente:
+```
+🔍 Workspace Context (via SDK)
+  - cwd:        /workspaces/chatgpt-docker-puppeteer
+  - gitRoot:    /workspaces/chatgpt-docker-puppeteer
+  - repository: owner/chatgpt-docker-puppeteer
+  - branch:     main
+```
+
+**Arquivos a criar/modificar:**
+- `src/copilot/config/pinned-files-loader.js` — **AG.1** NOVO: PinnedFilesLoader class
+- `src/copilot/config/custom-agents.js` — **AG.2** NOVO: factory de custom agents
+- `src/copilot/agent/session-manager.js` — **AG.1**: usar loader; **AG.2**: incluir customAgents
+- `src/copilot/agent/always-alive.js` — **AG.1**: flag `#skillsOutdated` + `refreshSkills()`
+- `src/copilot/terminal/http-handlers.js` — **AG.3**: GET/PUT /config/skills
+- `src/copilot/terminal/commands/skills.js` — **AG.4** NOVO: `/skills` command
+- `src/copilot/terminal/commands/context.js` — **AG.5**: adicionar SessionContext ao output
+- `src/copilot/terminal/commands/status.js` — **AG.5**: adicionar SessionContext ao /st
+- `src/copilot/terminal/commands/index.js` — export skills
+- `src/copilot/terminal/repl.js` — dispatch `skills`
+
+> **Prioridade de implementação**: AG.1 + AG.2 (base) → AG.5 (1 linha workingDirectory) →
+> AG.3 (API) → AG.4 (REPL) → AG.2 (custom agents, mais complexo)
+
+> **Dependências**: AG.1 depende de AA.6 (workingDirectory configurado). AG.4 depende de AG.1.
+
+---
+
 ## Análise: SDK vs. Implementação Própria para Gestão de Contexto
 
 **Research realizado em 2026-03-25** com base nos tipos SDK v0.1.32 e artigo oficial do GitHub Blog.
@@ -1518,6 +1856,10 @@ Com AA e AB implementados, surgem questões de robustez:
 | Model list caching          | ❌ Não existe no SDK                                     | TTL cache em listModels() (AB.2)             |
 | Threshold config dinâmica   | ❌ Apenas na criação da sessão                           | PUT /config/infinite-session (AC.1)          |
 | REPL warnings de utilização | ❌ Não existe                                            | pre-send check em dialog.js (AC.4)           |
+| Workspace context (git)     | ✅ `SessionContext` (cwd, gitRoot, repo, branch)         | Passar `workingDirectory` na criação (AA.6)  |
+| Skills / docs pinados       | ✅ `skillDirectories` (sobrevive a resume/compaction!)   | Configurar dirs + file watcher (AA.7/AG.1)   |
+| Custom agents               | ✅ `CustomAgentConfig` + `@nome` na conversa             | buildDefaultCustomAgents() factory (AG.2)    |
+| File attachments p/turn     | ✅ `MessageOptions.attachments` (type:"file" nativo)     | Trocar embed-in-text por native (AA.8)       |
 
 **Lições do artigo IssueCrush (GitHub Blog, 2026-03-24):**
 - "Cache the results" — uma das principais lições: guardar respostas no lado da aplicação
@@ -1539,11 +1881,11 @@ Antes de commitar cada fase:
 
 ---
 
-## 11. Mapa Visual das Fases do Terminal (X→Z3 concluídas; AA–AC planejadas)
+## 11. Mapa Visual das Fases do Terminal (X→Z3 concluídas; AA–AG planejadas)
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│              EVOLUÇÃO DO TERMINAL LLM-B — Fases X→Z3 (CONCLUÍDAS) + AA–AC (PLANEJADAS)│
+│              EVOLUÇÃO DO TERMINAL LLM-B — Fases X→Z3 (CONCLUÍDAS) + AA–AG (PLANEJADAS)│
 ├──────────────┬─────────────────────────────────────────────────────────────────────────┤
 │ FASE X ✅    │ reasoningEffort: 'high' default + /model + /reasoning                   │
 │              │ AlwaysAliveAgent.reconfigure() + getConfig()                             │
@@ -1579,6 +1921,10 @@ Antes de commitar cada fase:
 │              │ /health + /config incluem contextWindow { tokenLimit, utilization }      │
 │              │ SSE emite 'context' event com dados reais por turno                      │
 │              │ Novo comando /compaction [status|threshold|auto|manual]                  │
+│              │ workingDirectory → workspace/git context automático para o CLI (AA.6)   │
+│              │ skillDirectories → docs pinados permanentes via SDK (AA.7)               │
+│              │ File watcher → reload de pinned docs sem reiniciar agente (AA.7.b)       │
+│              │ Attachments nativos SDK p/ file context por turn (AA.8)                 │
 ├──────────────┼─────────────────────────────────────────────────────────────────────────┤
 │ FASE AB 🔴   │ TTL cache em readFileContext() (30s, LRU por path)                      │
 │ (PLANEJADA)  │ TTL cache em listModels() (5min)                                         │
@@ -1589,6 +1935,12 @@ Antes de commitar cada fase:
 │ (PLANEJADA)  │ Recovery de compaction failure + checkpointPath awareness                │
 │              │ Warnings pré-send no REPL (⚠ 85% | ⛔ 95% utilização)                  │
 │              │ Checkpoint info em GET /config + getStatusSnapshot()                     │
+├──────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ FASE AG 🔴   │ PinnedFilesLoader (EventEmitter) — watcher fs + emit 'changed'          │
+│ (PLANEJADA)  │ skillDirectories configurável via API (GET/PUT /config/skills)            │
+│              │ Custom agents factory (buildDefaultCustomAgents) — @auditor, @docs      │
+│              │ Cmd REPL: /skills [list|add|remove|reload]                               │
+│              │ SessionContext (gitRoot, branch, repo) em /st e /context                │
 └──────────────┴─────────────────────────────────────────────────────────────────────────┘
 ```
 
