@@ -256,6 +256,8 @@ export async function initOrResumeSession(client, sessionOptions) {
         skillDirectories: ['.github/skills'],
         // AH.1: ferramentas excluídas por padrão + denylist configurável em runtime
         excludedTools: [...DEFAULT_EXCLUDED_TOOLS, ...getToolsConfig().denylist],
+        // AH.2: allowlist em runtime — quando definida, tem precedência sobre excludedTools
+        ...(getToolsConfig().allowlist !== null ? { availableTools: getToolsConfig().allowlist } : {}),
         ...(sessionOptions.reasoningEffort !== undefined ? { reasoningEffort: sessionOptions.reasoningEffort } : {}),
         // AH.6: wrapper de permissão com audit logging de ferramentas de alto risco
         onPermissionRequest: buildAuditingPermissionHandler(sessionOptions.onPermissionRequest),
