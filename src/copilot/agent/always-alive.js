@@ -76,6 +76,7 @@ import { WebhookManager } from './webhook-manager.js';
  * @property {number} sendCount - Total de mensagens enviadas
  * @property {number | null} startedAt - Epoch ms do início da sessão
  * @property {{ tokens: number; tokenLimit: number; utilization: number } | null} contextWindow - Dados reais de uso de contexto do SDK (ou null se não disponível)
+ * @property {string | null} lastCheckpointPath - Último caminho de checkpoint do SDK (ou null se nenhum ainda)
  */
 
 /**
@@ -151,6 +152,14 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @type {{ tokens: number; tokenLimit: number; utilization: number } | null}
      */
     #contextState = null;
+
+    /**
+     * AC.3 — Último caminho de checkpoint salvo pelo SDK durante compaction.
+     * null até a primeira compaction concluída.
+     *
+     * @type {string | null}
+     */
+    #lastCheckpointPath = null;
 
     /** @type {WebhookManager} */
     #webhooks = new WebhookManager();
@@ -322,8 +331,24 @@ export class AlwaysAliveAgent extends EventEmitter {
                 this.emit('session.compaction_start', evt?.data ?? {});
             });
             session.on('session.compaction_complete', (/** @type {any} */ evt) => {
-                log('INFO', '[AlwaysAlive] Compaction concluída.');
-                this.emit('session.compaction_complete', evt?.data ?? {});
+                const data = evt?.data ?? {};
+                // AC.2: detectar falha de compaction e logar instrução de recovery com checkpointPath
+                if (data.success === false) {
+                    log('ERROR', '[AlwaysAlive] Compaction falhou. Sessão pode estar instável.');
+                    if (data.checkpointPath) {
+                        log(
+                            'WARN',
+                            `[AlwaysAlive] Checkpoint disponível: ${data.checkpointPath}. Para recovery manual, restaure esse arquivo e reinicie.`,
+                        );
+                    }
+                } else {
+                    log('INFO', '[AlwaysAlive] Compaction concluída.');
+                }
+                // AC.3: armazenar info de checkpoint no estado para exposição via getStatusSnapshot()
+                if (data.checkpointPath) {
+                    this.#lastCheckpointPath = data.checkpointPath;
+                }
+                this.emit('session.compaction_complete', data);
             });
 
             // Reasoning tokens (o3/o4-mini extended thinking) — forwarded via task.reasoning
@@ -624,6 +649,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             startedAt: state?.startedAt ?? null,
             // AA.2: dados reais de contexto do SDK (null enquanto a sessão não emitiu usage_info)
             contextWindow: this.#contextState,
+            // AC.3: último checkpoint da compaction (null até a primeira compaction)
+            lastCheckpointPath: this.#lastCheckpointPath,
         };
         this.#statusSnapshotCache = { snapshot, at: now };
         return snapshot;

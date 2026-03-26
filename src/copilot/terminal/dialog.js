@@ -237,6 +237,22 @@ export async function sendTurn(message, actor = 'user') {
         println('\x1b[33m  ⏳ Aguarde — LLM-B está processando...\x1b[0m');
         return null;
     }
+
+    // AC.4: aviso pré-send de context window
+    const ctxState = alwaysAliveAgent.getStatusSnapshot().contextWindow;
+    if (ctxState) {
+        const u = ctxState.utilization;
+        if (u >= 0.95) {
+            println(
+                `\x1b[31m  ⛔ Context window em ${(u * 100).toFixed(0)}% — risco de perda de contexto. Use /compact antes de continuar.\x1b[0m`,
+            );
+        } else if (u >= 0.85) {
+            println(
+                `\x1b[33m  ⚠️  Context window em ${(u * 100).toFixed(0)}% — considere usar /compact em breve.\x1b[0m`,
+            );
+        }
+    }
+
     setBusy(true);
     const rl = getRl();
     if (rl) {

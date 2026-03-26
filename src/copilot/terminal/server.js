@@ -46,6 +46,7 @@ import {
     handleListTurns,
     handlePipeline,
     handleRecallMemories,
+    handleSetInfiniteSessionConfig,
     handleStoreMemory,
 } from './http-handlers.js';
 import { getSseClients, getSseCriticalClients } from './state.js';
@@ -151,6 +152,17 @@ export function createInjectServer() {
         // ── GET /config ───────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/config') {
             sendJson(res, handleGetConfig());
+            return;
+        }
+
+        // ── PUT /config/infinite-session (AC.1) ──────────────────────────
+        if (req.method === 'PUT' && url.pathname === '/config/infinite-session') {
+            readBody(req)
+                .then((raw) => {
+                    const body = raw ? JSON.parse(raw) : {};
+                    sendJson(res, handleSetInfiniteSessionConfig(body));
+                })
+                .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
             return;
         }
 

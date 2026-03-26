@@ -17,6 +17,21 @@ import { join, resolve } from 'node:path';
 const BRIEFING_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session-briefing.md');
 const SESSION_JSON_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session.json');
 
+// AC.1: threshold dinâmico de compaction — configurável via PUT /config/infinite-session
+let _backgroundCompactionThreshold = 0.75;
+
+/**
+ * Atualiza o threshold de compaction. Aplicado na próxima sessão criada/retomada.
+ *
+ * @param {number} threshold - Valor entre 0.1 e 1.0
+ * @returns {void}
+ */
+export function setBackgroundCompactionThreshold(threshold) {
+    if (typeof threshold === 'number' && threshold >= 0.1 && threshold <= 1.0) {
+        _backgroundCompactionThreshold = threshold;
+    }
+}
+
 /**
  * Lê o session-briefing.md e session.json e constrói o conteúdo de systemMessage para injetar o contexto do hook system
  * em sessões SDK.
@@ -163,7 +178,8 @@ export async function initOrResumeSession(client, sessionOptions) {
     const opts = {
         model,
         streaming: true,
-        infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 },
+        // AC.1: threshold dinâmico lido da variável de módulo (configurável via setBackgroundCompactionThreshold)
+        infiniteSessions: { enabled: true, backgroundCompactionThreshold: _backgroundCompactionThreshold },
         // AA.6: passar workingDirectory para o SDK contextualizar ferramentas de busca
         workingDirectory: process.env.COPILOT_WORKING_DIRECTORY ?? process.cwd(),
         // AA.7: diretórios de skills para o SDK carregar

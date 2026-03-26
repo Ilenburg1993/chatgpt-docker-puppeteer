@@ -16,6 +16,7 @@
  */
 
 import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { setBackgroundCompactionThreshold } from '../agent/session-manager.js';
 import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
@@ -389,6 +390,42 @@ export function handleGetConfig() {
             port: Number(process.env.LLM_B_TERMINAL_PORT ?? 3009),
             // AA.5: expor dados reais de uso de contexto
             contextWindow: snapshot.contextWindow,
+            // AC.3: último checkpoint da compaction
+            lastCheckpointPath: snapshot.lastCheckpointPath,
+            // AC.1: threshold dinâmico de compaction
+            infiniteSession: getInfiniteSessionConfig(),
         },
     };
+}
+
+// ─── InfiniteSession config dinâmico (AC.1) ───────────────────────────────────
+
+/** @type {{ backgroundCompactionThreshold: number }} */
+let _infiniteSessionConfig = { backgroundCompactionThreshold: 0.75 };
+
+/**
+ * Retorna a configuração atual de InfiniteSession.
+ *
+ * @returns {{ backgroundCompactionThreshold: number }}
+ */
+export function getInfiniteSessionConfig() {
+    return { ..._infiniteSessionConfig };
+}
+
+/**
+ * Atualiza o threshold de compaction dinâmico. Aplicado na próxima sessão criada/retomada.
+ *
+ * @param {{ backgroundCompactionThreshold?: number }} body - Parâmetros de configuração
+ * @returns {HandlerResult}
+ */
+export function handleSetInfiniteSessionConfig(body) {
+    const { backgroundCompactionThreshold } = body ?? {};
+    if (backgroundCompactionThreshold !== undefined) {
+        if (typeof backgroundCompactionThreshold !== 'number' || backgroundCompactionThreshold < 0.1 || backgroundCompactionThreshold > 1.0) {
+            return { status: 400, body: { ok: false, error: 'backgroundCompactionThreshold deve ser um número entre 0.1 e 1.0' } };
+        }
+        _infiniteSessionConfig = { ..._infiniteSessionConfig, backgroundCompactionThreshold };
+        setBackgroundCompactionThreshold(backgroundCompactionThreshold);
+    }
+    return { status: 200, cors: true, body: { ok: true, infiniteSession: getInfiniteSessionConfig() } };
 }
