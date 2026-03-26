@@ -302,7 +302,7 @@ async function getTracer() {
     if (_tracer !== null) return _tracer;
     try {
         // Importação dinâmica para degradação graciosa quando o pacote não está instalado
-        // @ts-ignore — @opentelemetry/sdk-trace-node é opcional; graceful degradation se não instalado
+        // @ts-expect-error — @opentelemetry/sdk-trace-node é opcional; graceful degradation se não instalado
         const { NodeTracerProvider } = await import('@opentelemetry/sdk-trace-node');
         const { trace } = await import('@opentelemetry/api');
         const provider = new NodeTracerProvider();
