@@ -1,9 +1,43 @@
 # Plano Fase AE — Refatoração Arquitetural + Infraestrutura
 
 **Data de criação**: 2026-03-25
-**Status**: 🟡 PLANEJADA — pronto para execução
+**Última atualização**: 2026-04-01
+**Status**: 🟡 PARCIALMENTE CONCLUÍDA — AE-1 ✅ AE-2 ✅ (com ressalvas) · AE-3 ❌ adiada (ver §AE-3)
+**Commit AE-1**: `798c8fb9` · **Commit AE-2**: `468fe3ac`
 **Origem**: itens adiados da Fase AD (seção 3 de `PLANO_FASE_AD_AUDITORIA.md`)
 **Auditoria base**: `DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`
+
+---
+
+## 0. Resultados de Execução
+
+### Sprint AE-1 — ✅ CONCLUÍDA (`798c8fb9`)
+
+| Item | Arquivo | Status |
+|------|---------|--------|
+| ARCH-04 — Hub health no /health | `src/copilot/api/bridge-control.js` | ✅ `db.prepare('SELECT 1').get()` + campo `hubStore` |
+| PERF-03 — FTS5 tokenizer porter | `src/copilot/conversation-hub/store.js` | ✅ `porter unicode61 remove_diacritics 1` |
+
+### Sprint AE-2 — ✅ CONCLUÍDA com ressalvas (`468fe3ac`)
+
+| Item | Arquivo | Status | Ressalva |
+|------|---------|--------|----------|
+| GAP-02 — buildZodSchema enum/array/nested | `src/copilot/bridges/mcp-tool-bridge.js` | ✅ | — |
+| ARCH-01 — Eliminar uso de shims em produção | `src/server/api/router.js`, `src/server/main.js` | ✅ | shims **mantidos** em `src/copilot/*.js` como `@deprecated` para compatibilidade de testes |
+| ARCH-03 — dialogTurn registra #history | `src/copilot/channel/client.js` | ✅ | integração SQLite ↔ #history **adiada** para Fase AF |
+
+> **Extras implementados neste sprint** (originados de `AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`):
+> - **MELHORIA-02 (token budget warning)**: `session.token_budget_warning` emitido quando uso > 80% →
+>   `events.js`, `always-alive.js`, `nerv-bridge.js` atualizados; `bridge-stream.js` recebe via dynamic subscribe
+> - **MELHORIA-05 (startup context alert)**: alerta proativo one-shot na 1ª `session.usage_info` de sessão
+>   retomada quando uso > 70%
+
+### Sprint AE-3 — ❌ ADIADA para Fases AF/AG
+
+| Item | Status | Motivo do adiamento |
+|------|--------|---------------------|
+| MELHORIA-05 — SDK history persistence (SQLite ↔ #history) | ❌ PENDENTE | Alto risco de regressão; requer análise de schema + testes de integração |
+| MELHORIA-02 — OpenTelemetry no AlwaysAliveAgent | ❌ PENDENTE | Requer nova infraestrutura (pacotes OTel); escopo cresceu além da Fase AE |
 
 ---
 

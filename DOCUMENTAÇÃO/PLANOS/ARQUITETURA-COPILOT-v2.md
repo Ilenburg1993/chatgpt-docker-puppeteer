@@ -1258,6 +1258,91 @@ O `InfiniteSessionConfig.backgroundCompactionThreshold` está hardcoded em `0.75
 
 **O que FALTA (gaps a implementar):**
 
+**AA.0 — Anchor de Instruções Permanentes (Pinned Context Mechanism)**
+
+> **Contexto crítico**: A compactação SDK resume a *conversa* (turns de usuário + assistente), mas
+> o `systemMessage` em `SessionConfig` / `ResumeSessionConfig` é **configuração**, não histórico.
+> Portanto, `systemMessage.content` é o único conteúdo **garantidamente presente** na janela de
+> contexto após cada compactação — o SDK o re-aplica automaticamente.
+>
+> **Estado atual**: `session-manager.js` usa `buildHookContextAppendMessage(hookContext)` que adiciona
+> apenas o briefing operacional dinâmico (estado do hook system) em `mode: "append"`. As instruções
+> permanentes do LLM-B (`AGENT_IDENTITY`, `CODE_CHANGE_RULES`, `AGENT_GUIDELINES`,
+> `LAST_INSTRUCTIONS`) estão definidas em `src/copilot/config/system-prompt.js` mas **NÃO** são
+> incluídas no `systemMessage` ativo — ficam sujeitas ao compaction e podem ser perdidas ou
+> distorcidas em sessões longas.
+
+**Análise de mecanismo**:
+
+Como o SDK aplica compaction (baseado em `types.d.ts` v0.1.32 + `session-events.d.ts`):
+1. Quando `currentTokens / tokenLimit >= backgroundCompactionThreshold` (0.75), inicia compaction
+   em background (não bloqueia a sessão).
+2. O SDK chama um LLM para **resumir** todo o histórico de conversação em `summaryContent`
+   (`session.compaction_complete.data.summaryContent`).
+3. O histórico antigo é descartado; `messagesRemoved` mensagens são substituídas pelo summary.
+4. Um checkpoint é salvo (`checkpointPath`, `checkpointNumber`) para recovery.
+5. A **configuração** da sessão (incluindo `systemMessage`) é **re-aplicada integralmente** —
+   ela não faz parte do histórico compactável.
+
+**O que sobrevive vs. o que é compactado**:
+
+| Conteúdo | Sobrevive? | Mecanismo |
+|----------|-----------|-----------|
+| `systemMessage.content` | ✅ Sempre | É configuração (SessionConfig), re-aplicado após cada compaction |
+| Turnos de conversa recentes | ✅ Sim | Preservados até o limite + compaction começa |
+| Turnos antigos | ⚠️ Summary | Resumidos pelo SDK em `summaryContent` (lossy!) |
+| Instruções críticas só na conversa | ❌ Risk | Podem ser perdidas se só existirem em turnos antigos |
+
+**Implementação (AA.0)**:
+
+Criar `buildPinnedSystemMessage(hookContext)` em `src/copilot/config/system-prompt.js`:
+
+```js
+/**
+ * Constrói um SystemMessageConfig "append" com instruções permanentes + estado dinâmico do hook.
+ * Tudo neste builder é GARANTIDAMENTE fresco após cada compaction.
+ *
+ * @param {string} hookContext - Conteúdo dinâmico do hook system (session-briefing.md)
+ * @returns {SystemMessageConfig}
+ */
+export function buildPinnedSystemMessage(hookContext) {
+    const pinnedInstructions = [
+        `## Identidade\n${AGENT_IDENTITY}`,
+        `## Regras de Código\n${CODE_CHANGE_RULES}`,
+        `## Diretrizes Operacionais\n${AGENT_GUIDELINES}`,
+        hookContext ? `## Estado Operacional Atual\n${hookContext}` : '',
+        `## Instruções de Encerramento de Turno\n${LAST_INSTRUCTIONS}`,
+    ].filter(Boolean).join('\n\n---\n\n');
+
+    return buildAppendSystemMessage(pinnedInstructions);
+}
+```
+
+Atualizar `session-manager.js` (linha 160):
+```js
+// ANTES:
+const systemMessage = injectContext ? buildHookContextAppendMessage(buildHookSystemContext()) : undefined;
+
+// DEPOIS:
+const systemMessage = buildPinnedSystemMessage(injectContext ? buildHookSystemContext() : '');
+```
+
+**Garantia após implementação**: Após qualquer compaction, o LLM-B sempre recebe fresco:
+- Sua identidade e papel como agente autônomo
+- As regras de código (ESM, estilo, JSDoc etc.)
+- As diretrizes operacionais (hooks, vscode_askQuestions etc.)
+- O estado atual do sistema de hooks (dinâmico, mas sempre presente)
+- As instruções de final de turno (nunca sumariadas)
+
+**Arquivos a modificar**:
+- `src/copilot/config/system-prompt.js` — novo `buildPinnedSystemMessage(hookContext)`
+- `src/copilot/agent/session-manager.js` — trocar `buildHookContextAppendMessage` por `buildPinnedSystemMessage`
+
+**Risco**: Baixo — `mode: "append"` preserva SDK guardrails. Tamanho do system message aumenta
+~500-800 tokens (permanentes) + ~200-400 tokens (hook briefing dinâmico). Dentro do razoável.
+
+---
+
 **AA.1 — Context State no AlwaysAliveAgent**
 - Subscrever `session.usage_info` no `always-alive.js` e armazenar estado em `#contextState`:
   ```js
@@ -1292,14 +1377,19 @@ O `InfiniteSessionConfig.backgroundCompactionThreshold` está hardcoded em `0.75
 - Clientes SSE (LLM-A, dashboard) passam a receber dados reais de context utilization
 
 **Arquivos a modificar:**
-- `src/copilot/agent/always-alive.js` — `#contextState`, getter, enriched `getStatusSnapshot`
-- `src/copilot/terminal/commands/context.js` — usar dados reais, manter fallback
-- `src/copilot/terminal/http-handlers.js` — contextWindow em /health e /config
-- `src/copilot/terminal/index.js` — SSE context event
-- `src/copilot/terminal/commands/compaction.js` — NOVO: `/compaction` command
+- `src/copilot/config/system-prompt.js` — **AA.0**: novo `buildPinnedSystemMessage(hookContext)`
+- `src/copilot/agent/session-manager.js` — **AA.0**: trocar builder de systemMessage
+- `src/copilot/agent/always-alive.js` — **AA.1**: `#contextState`, getter, enriched `getStatusSnapshot`
+- `src/copilot/terminal/commands/context.js` — **AA.3**: usar dados reais, manter fallback
+- `src/copilot/terminal/http-handlers.js` — **AA.2+AA.3**: contextWindow em /health e /config
+- `src/copilot/terminal/index.js` — **AA.5**: SSE context event
+- `src/copilot/terminal/commands/compaction.js` — **AA.4** NOVO: `/compaction` command
 - `src/copilot/terminal/commands/index.js` — export
 - `src/copilot/terminal/commands/help.js` — documentação
 - `src/copilot/terminal/repl.js` — dispatch caso `compaction`
+
+> **Prioridade de implementação**: AA.0 primeiro (menor risco, maior impacto imediato) → AA.1 →
+> AA.3 → AA.2 → AA.5 → AA.4
 
 ---
 
