@@ -88,50 +88,75 @@ export async function listMcpTools() {
 }
 
 /**
- * Constrói o schema Zod para um JSON Schema simples de uma tool MCP. Suporta objetos planos com propriedades escalares.
+ * Constrói o schema Zod para um JSON Schema de uma tool MCP. Suporta: escalares, enums, arrays, objetos aninhados
+ * recursivos.
  *
- * @param {object} inputSchema - JSON Schema da tool
+ * GAP-02 (fix): suporte a `enum` e `properties` aninhadas adicionado.
+ *
+ * @param {object} inputSchema - JSON Schema da tool (ou sub-schema de propriedade)
+ * @param {Set<string>} [parentRequired] - conjunto de chaves obrigatórias do objeto pai
+ * @param {string} [key] - chave desta propriedade no objeto pai
  * @returns {import('zod').ZodType} Schema Zod equivalente
  */
-function buildZodSchema(inputSchema) {
+function buildZodSchema(inputSchema, parentRequired, key) {
     /** @type {any} */
     const schema = inputSchema;
 
-    if (!schema || schema.type !== 'object' || !schema.properties) {
-        return z.object({}).passthrough();
+    if (!schema) return z.unknown();
+
+    // GAP-02: enum (string literal union)
+    if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+        if (schema.enum.every((/** @type {any} */ v) => typeof v === 'string')) {
+            const desc = schema.description ?? '';
+            const baseEnum = z.enum(/** @type {[string, ...string[]]} */ (schema.enum));
+            const field = desc ? baseEnum.describe(desc) : baseEnum;
+            return parentRequired && key && !parentRequired.has(key) ? field.optional() : field;
+        }
     }
 
-    const required = new Set(/** @type {string[]} */ (schema.required ?? []));
+    // Entry point: objeto com properties (inclui raiz e objetos aninhados)
+    if (schema.type === 'object' || schema.properties) {
+        if (!schema.properties) return z.record(z.string(), z.unknown());
 
-    /** @type {Record<string, import('zod').ZodType>} */
-    const shape = {};
+        const required = new Set(/** @type {string[]} */ (schema.required ?? []));
 
-    for (const [key, prop] of Object.entries(/** @type {Record<string, any>} */ (schema.properties))) {
-        const description = prop.description ?? '';
-        let field;
+        /** @type {Record<string, import('zod').ZodType>} */
+        const shape = {};
 
-        switch (prop.type) {
-            case 'number':
-            case 'integer':
-                field = z.number().describe(description);
-                break;
-            case 'boolean':
-                field = z.boolean().describe(description);
-                break;
-            case 'array':
-                field = z.array(z.unknown()).describe(description);
-                break;
-            case 'object':
-                field = z.record(z.string(), z.unknown()).describe(description);
-                break;
-            default:
-                field = z.string().describe(description);
+        for (const [k, prop] of Object.entries(/** @type {Record<string, any>} */ (schema.properties))) {
+            // GAP-02: recursão para objetos aninhados
+            shape[k] = buildZodSchema(prop, required, k);
         }
 
-        shape[key] = required.has(key) ? field : field.optional();
+        const obj = z.object(shape);
+        if (parentRequired && key && !parentRequired.has(key)) return obj.optional();
+        return obj;
     }
 
-    return z.object(shape);
+    const description = schema.description ?? '';
+
+    /** @type {import('zod').ZodType} */
+    let field;
+
+    switch (schema.type) {
+        case 'number':
+        case 'integer':
+            field = z.number().describe(description);
+            break;
+        case 'boolean':
+            field = z.boolean().describe(description);
+            break;
+        case 'array': {
+            const items = schema.items ? buildZodSchema(schema.items) : z.unknown();
+            field = z.array(items).describe(description);
+            break;
+        }
+        default:
+            field = z.string().describe(description);
+    }
+
+    if (parentRequired && key && !parentRequired.has(key)) return field.optional();
+    return field;
 }
 
 /**

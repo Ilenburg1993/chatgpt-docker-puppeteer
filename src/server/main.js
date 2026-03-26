@@ -732,7 +732,7 @@ async function bootstrap(options = {}) {
         // Montagem opcional do copilotNervBridge (Upgrade 5) — conecta AlwaysAliveAgent ao NERV
         if (process.env.COPILOT_SDK_ENABLED !== 'false') {
             try {
-                const { copilotNervBridge } = await import('#copilot/nerv-bridge');
+                const { copilotNervBridge } = await import('#copilot/bridges/nerv-bridge');
                 copilotNervBridge.mount(/** @type {any} */ (nerv));
                 log('INFO', '[COPILOT] copilotNervBridge montado — eventos do AlwaysAliveAgent fluem para NERV');
             } catch (/** @type {any} */ e) {
@@ -760,7 +760,7 @@ async function bootstrap(options = {}) {
             // Em desenvolvimento (único processo), este bloco garante que o agente esteja ativo.
             if (process.env.COPILOT_AGENT_AUTOSTART !== 'false') {
                 try {
-                    const { alwaysAliveAgent } = await import('#copilot/always-alive');
+                    const { alwaysAliveAgent } = await import('#copilot/agent/always-alive');
                     if (alwaysAliveAgent.status === 'stopped') {
                         log('INFO', '[COPILOT] Auto-starting AlwaysAliveAgent...');
                         await alwaysAliveAgent.start();

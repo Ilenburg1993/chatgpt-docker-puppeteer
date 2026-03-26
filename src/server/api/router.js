@@ -1,9 +1,9 @@
 // @ts-check
-import copilotBridge from '#copilot/http-bridge';
-import sdkApi from '#copilot/sdk-api';
 import { probeChromeConnection } from '#core/doctor';
 import { log } from '#core/logger';
 import { apiLimiter } from '#server/engine/app';
+import copilotBridge from '../../copilot/api/http-bridge.js';
+import sdkApi from '../../copilot/api/sdk-api.js';
 import denyIfDelegated from '../middleware/deny_if_delegated.js';
 import { errorHandler, notFound } from '../middleware/error_handler.js';
 import artifactsController from './controllers/artifacts.js';

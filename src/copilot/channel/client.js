@@ -310,7 +310,7 @@ export class LlmBridgeClient {
      * Envia um turno de diálogo para a LLM-B no dialog loop.
      *
      * A LLM-B está suspensa em ask_user aguardando input. Esta chamada fornece o input e aguarda a resposta (REPLY: ou
-     * DONE: próximo READY).
+     * DONE: próximo READY). O histórico local é atualizado com o turno do usuário e a resposta da LLM-B.
      *
      * @param {string} message - Mensagem a enviar à LLM-B
      * @param {{ timeout?: number }} [opts]
@@ -318,7 +318,14 @@ export class LlmBridgeClient {
      */
     async dialogTurn(message, opts = {}) {
         const { timeout = 60_000 } = opts;
-        return alwaysAliveAgent.sendDialogTurn(message, { timeout });
+        // ARCH-03 fix: registra turno do usuário no histórico local antes de enviar
+        const sentAt = Date.now();
+        this.#history.push({ role: 'user', content: message, timestamp: sentAt });
+        this.#turnCount++;
+        const reply = await alwaysAliveAgent.sendDialogTurn(message, { timeout });
+        // Registra resposta da LLM-B no histórico local
+        this.#history.push({ role: 'assistant', content: reply, timestamp: Date.now() });
+        return reply;
     }
 
     /**

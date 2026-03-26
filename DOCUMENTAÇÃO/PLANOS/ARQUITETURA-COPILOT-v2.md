@@ -1211,15 +1211,15 @@ análise de impacto maior ou dependências de infra. Todos são derivados da aud
 
 **Sprints internos:**
 
-| Sprint | Código      | Conteúdo                                                 | Esforço |
-| ------ | ----------- | -------------------------------------------------------- | ------- |
-| AE-1   | ARCH-04     | Hub health check no endpoint `/health`                   | 🟢 Baixo |
-| AE-1   | PERF-03     | FTS5 tokenizer porter + unicode61 no ConversationStore   | 🟢 Baixo |
+| Sprint | Código      | Conteúdo                                                     | Esforço |
+| ------ | ----------- | ------------------------------------------------------------ | ------- |
+| AE-1   | ARCH-04     | Hub health check no endpoint `/health`                       | 🟢 Baixo |
+| AE-1   | PERF-03     | FTS5 tokenizer porter + unicode61 no ConversationStore       | 🟢 Baixo |
 | AE-2   | ARCH-01     | Remover 13 re-exports de compatibilidade raiz `src/copilot/` | 🟠 Médio |
-| AE-2   | ARCH-03     | LlmBridgeClient: convergência do histórico entre instâncias | 🟠 Médio |
-| AE-2   | GAP-02      | MCP schema: suporte a enum + aninhamento de objetos      | 🟠 Médio |
-| AE-3   | MELHORIA-05 | SDK session history por hub_session (migração SQLite)    | 🔴 Alto  |
-| AE-3   | MELHORIA-02 | OpenTelemetry: traces/métricas no AlwaysAliveAgent       | 🔴 Alto  |
+| AE-2   | ARCH-03     | LlmBridgeClient: convergência do histórico entre instâncias  | 🟠 Médio |
+| AE-2   | GAP-02      | MCP schema: suporte a enum + aninhamento de objetos          | 🟠 Médio |
+| AE-3   | MELHORIA-05 | SDK session history por hub_session (migração SQLite)        | 🔴 Alto  |
+| AE-3   | MELHORIA-02 | OpenTelemetry: traces/métricas no AlwaysAliveAgent           | 🔴 Alto  |
 
 ---
 

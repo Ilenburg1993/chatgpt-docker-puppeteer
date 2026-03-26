@@ -324,8 +324,38 @@ export class AlwaysAliveAgent extends EventEmitter {
             });
 
             // Uso de tokens e contexto da sessão — forwarded via session.usage
+            // MELHORIA-02: emite session.token_budget_warning quando uso > 80%
+            // MELHORIA-05: na 1ª leitura após retomada, alerta se uso já > 70% (contexto pesado)
+            let _firstUsageChecked = false;
             session.on('session.usage_info', (/** @type {any} */ evt) => {
-                this.emit('session.usage', evt?.data ?? {});
+                const data = evt?.data ?? {};
+                this.emit('session.usage', data);
+                const { currentTokens, tokenLimit } = data;
+                if (tokenLimit > 0) {
+                    const ratio = Math.round((currentTokens / tokenLimit) * 100);
+                    // MELHORIA-05: alerta proativo na 1ª leitura se sessão retomada com contexto pesado
+                    if (!_firstUsageChecked && isResumed && currentTokens / tokenLimit > 0.7) {
+                        log(
+                            'WARN',
+                            `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
+                        );
+                        this.emit('session.token_budget_warning', {
+                            currentTokens,
+                            tokenLimit,
+                            ratio,
+                            reason: 'startup_heavy',
+                        });
+                    }
+                    _firstUsageChecked = true;
+                    // MELHORIA-02: warning contínuo quando uso > 80%
+                    if (currentTokens / tokenLimit > 0.8) {
+                        log(
+                            'WARN',
+                            `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
+                        );
+                        this.emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
+                    }
+                }
             });
 
             // Mudança de modo (plan ↔ act ↔ interactive) — forwarded via session.mode_changed

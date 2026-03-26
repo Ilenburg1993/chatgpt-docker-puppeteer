@@ -1,8 +1,8 @@
 # Plano Fase AE — Refatoração Arquitetural + Infraestrutura
 
-**Data de criação**: 2026-03-25  
-**Status**: 🟡 PLANEJADA — pronto para execução  
-**Origem**: itens adiados da Fase AD (seção 3 de `PLANO_FASE_AD_AUDITORIA.md`)  
+**Data de criação**: 2026-03-25
+**Status**: 🟡 PLANEJADA — pronto para execução
+**Origem**: itens adiados da Fase AD (seção 3 de `PLANO_FASE_AD_AUDITORIA.md`)
 **Auditoria base**: `DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`
 
 ---
@@ -74,9 +74,9 @@ migrar queries, descartar `v1` em passo posterior.
 
 **Descrição**: Existem 13 "shims" de compatibilidade na raiz de `src/copilot/` que re-exportam
 módulos que foram movidos para sub-diretórios. Ex.:
-- `src/copilot/always-alive.js` → re-exporta `./agent/always-alive.js`  
-- `src/copilot/agent.js` → re-exporta `./agent/entry.js`  
-- `src/copilot/llm-bridge-client.js` → re-exporta `./channel/client.js`  
+- `src/copilot/always-alive.js` → re-exporta `./agent/always-alive.js`
+- `src/copilot/agent.js` → re-exporta `./agent/entry.js`
+- `src/copilot/llm-bridge-client.js` → re-exporta `./channel/client.js`
 
 Esses shims geram confusão e podem mascarar imports incorretos.
 
@@ -206,12 +206,12 @@ AE-3: MELHORIA-05 (análise 2h + implementação 3h) → commit
 
 ## 4. Riscos e Mitigações
 
-| Risco | Item | Mitigação |
-|-------|------|-----------|
-| Shim removido mas importer existente não encontrado | ARCH-01 | `grep -r` exaustivo antes de deletar; CI detecta import quebrado |
-| Migração FTS5 apaga dados | PERF-03 | Criar nova tabela `_v2`; manter `_v1` como fallback por N versões |
-| Histórico incoerente após ARCH-03 | ARCH-03 | Feature flag `HISTORY_PERSISTENCE=true` desligada por padrão |
-| OTel aumenta latência | MELHORIA-02 | Sampler probabilístico (1%); async-safe spans |
+| Risco                                               | Item        | Mitigação                                                         |
+| --------------------------------------------------- | ----------- | ----------------------------------------------------------------- |
+| Shim removido mas importer existente não encontrado | ARCH-01     | `grep -r` exaustivo antes de deletar; CI detecta import quebrado  |
+| Migração FTS5 apaga dados                           | PERF-03     | Criar nova tabela `_v2`; manter `_v1` como fallback por N versões |
+| Histórico incoerente após ARCH-03                   | ARCH-03     | Feature flag `HISTORY_PERSISTENCE=true` desligada por padrão      |
+| OTel aumenta latência                               | MELHORIA-02 | Sampler probabilístico (1%); async-safe spans                     |
 
 ---
 

@@ -49,6 +49,7 @@ const EVENT_MAP = [
     { event: 'session.compaction_complete', actionCode: 'COPILOT_SESSION_COMPACTION_COMPLETE' },
     { event: 'session.fatal', actionCode: 'COPILOT_SESSION_FATAL' },
     { event: 'session.usage', actionCode: 'COPILOT_SESSION_USAGE' },
+    { event: 'session.token_budget_warning', actionCode: 'COPILOT_SESSION_TOKEN_BUDGET_WARNING' },
     { event: 'session.mode_changed', actionCode: 'COPILOT_SESSION_MODE_CHANGED' },
     { event: 'dialog.ready', actionCode: 'COPILOT_DIALOG_READY' },
     { event: 'dialog.reply', actionCode: 'COPILOT_DIALOG_REPLY' },

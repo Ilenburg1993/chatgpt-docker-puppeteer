@@ -29,6 +29,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'session.compaction_complete',
     'session.fatal',
     'session.usage',
+    'session.token_budget_warning',
     'session.mode_changed',
     'dialog.ready',
     'dialog.reply',
