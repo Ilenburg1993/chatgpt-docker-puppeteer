@@ -1,7 +1,7 @@
 # Plano de Arquitetura — `src/copilot` v2
 
 **Data**: 2026-06-15 — **Última atualização**: 2026-03-25
-**Status**: Fases A–M concluídas — v2.1 alcançada
+**Status**: Fases A–Z3 concluídas — v2.4 alcançada. Fases AA–AC planejadas (Context Window Intelligence)
 **Autores**: Análise automática via audit de código + testes reais com LLM-B
 
 ---
@@ -1159,6 +1159,219 @@ Quando LLM-A (este agente) usa a API HTTP para se comunicar com LLM-B, ela preci
 
 ---
 
+### FASE AA — Context Window Intelligence: Monitoramento Real-Time e Gestão Dinâmica de Contexto
+
+**Status**: 🔴 PLANEJADA
+
+**Motivação e Contexto**
+
+O SDK Copilot expõe dados ricos sobre context window via evento `session.usage_info` (tipo ephemeral):
+```ts
+type: "session.usage_info";
+data: {
+    tokenLimit: number;      // limite do modelo (ex: 200_000 para claude-sonnet)
+    currentTokens: number;   // tokens atualmente ocupados
+    messagesLength: number;  // número de mensagens na conversa
+}
+```
+
+Além disso, os eventos `session.compaction_start` / `session.compaction_complete` já chegam ao
+`AlwaysAliveAgent` e são emitidos via SSE (Fase U). O evento `compaction_complete` contém:
+- `preCompactionTokens`, `postCompactionTokens`, `tokensRemoved`
+- `checkpointPath` para recovery por snapshot
+- `compactionTokensUsed` (custo da compactação em si)
+
+**Problema atual**: Esses dados chegam mas são parcialmente ignorados. O terminal exibe
+estimativa heurística (4 chars/token) via `/context`, mas **não usa os tokens reais do SDK**.
+O `InfiniteSessionConfig.backgroundCompactionThreshold` está hardcoded em `0.75` no
+`session-manager.js` sem possibilidade de ajuste em runtime.
+
+**O que o SDK controla automaticamente (já ativo):**
+- `infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 }` em `session-manager.js`
+- Compactação automática inicia quando context chega a 75% do limite
+- Compactação bloqueia sessão a 95% (`bufferExhaustionThreshold` default SDK = 0.95)
+- Eventos `session.compaction_start` / `session.compaction_complete` já são propagados via SSE
+
+**O que FALTA (gaps a implementar):**
+
+**AA.1 — Context State no AlwaysAliveAgent**
+- Subscrever `session.usage_info` no `always-alive.js` e armazenar estado em `#contextState`:
+  ```js
+  #contextState = { tokenLimit: 0, currentTokens: 0, messagesLength: 0, utilization: 0.0 }
+  ```
+- Getter `contextState` público → exposto em `getStatusSnapshot()`
+- Emitir `session.usage` com dados reais (já existe o evento, falta o payload rico)
+
+**AA.2 — Context Window no GET /health e GET /config**
+- `handleHealth()` e `handleGetConfig()` em `http-handlers.js` devem incluir:
+  ```json
+  { "contextWindow": { "tokenLimit": 200000, "currentTokens": 45000,
+                        "utilization": 0.225, "messagesLength": 12 } }
+  ```
+
+**AA.3 — `/context` usa dados reais do SDK**
+- `cmdContext()` em `commands/context.js` deve usar `alwaysAliveAgent.contextState` (dados reais)
+  em vez da heurística de 4 chars/token
+- Manter heurística como fallback quando `contextState.tokenLimit === 0` (ainda sem dados)
+
+**AA.4 — Configuração dinâmica de InfiniteSession via REPL**
+- Novo comando `/compaction [auto|manual|status|threshold <valor>]`:
+  - `auto`: default, delega ao SDK (backgroundCompactionThreshold configurável)
+  - `manual`: desabilita compactação automática (`infiniteSessions: { enabled: false }`)
+    — requer restart do loop de sessão para ter efeito
+  - `status`: mostra thresholds atuais e último evento de compactação
+  - `threshold <valor>`: exibe nota de que requer restart
+
+**AA.5 — SSE: enriquecer `session.usage` com utilization**
+- Em `terminal/index.js`, subscrever `session.usage` do `alwaysAliveAgent` e emitir via
+  `broadcastSse('context', { tokenLimit, currentTokens, utilization, messagesLength })`
+- Clientes SSE (LLM-A, dashboard) passam a receber dados reais de context utilization
+
+**Arquivos a modificar:**
+- `src/copilot/agent/always-alive.js` — `#contextState`, getter, enriched `getStatusSnapshot`
+- `src/copilot/terminal/commands/context.js` — usar dados reais, manter fallback
+- `src/copilot/terminal/http-handlers.js` — contextWindow em /health e /config
+- `src/copilot/terminal/index.js` — SSE context event
+- `src/copilot/terminal/commands/compaction.js` — NOVO: `/compaction` command
+- `src/copilot/terminal/commands/index.js` — export
+- `src/copilot/terminal/commands/help.js` — documentação
+- `src/copilot/terminal/repl.js` — dispatch caso `compaction`
+
+---
+
+### FASE AB — Cache Strategy: Prompt Caching Awareness e Result Cache
+
+**Status**: 🔴 PLANEJADA
+
+**Motivação e Contexto**
+
+O SDK registra dados de **prompt caching** nos eventos de compactação:
+```ts
+compactionTokensUsed?: {
+    input: number;
+    output: number;
+    cachedInput: number;  // tokens de input reutilizados do cache!
+}
+```
+
+Além disso, o evento `user.message` tem `transformedContent` — a versão transformada do prompt
+com XML wrapping para **prompt caching** do Claude (cache_control blocks). Isso indica que o SDK
+já aplica prompt caching internamente quando usa modelos Claude compatíveis.
+
+**Análise do Estado Atual:**
+
+1. **Prompt caching SDK**: O SDK faz automaticamente para sessões com `streaming: true` e modelos
+   Claude. Nenhuma ação adicional necessária para ativar — já está acontecendo.
+
+2. **Cache de resultados no terminal**: Não existe. Toda chamada `sendTurn()` vai para o SDK.
+   Oportunidade: cache de respostas para perguntas repetidas ou contextos idênticos.
+
+3. **Cache de file-context**: `readFileContext()` em `file-context.js` lê do disco a cada chamada.
+   Se o mesmo arquivo for referenciado N vezes no mesmo turno, será lido N vezes.
+
+4. **Cache de `listModels()`**: `cmdConfig()` chama `listModels()` que faz chamada SDK.
+   Não tem TTL cache — chamadas rápidas repetidas custam tempo.
+
+**O que implementar:**
+
+**AB.1 — File Context Cache (in-memory, TTL)**
+- Em `file-context.js`: cache LRU simples em Map com TTL de 30s
+  ```js
+  const _fileCache = new Map(); // path → { ctx, expiresAt }
+  export function clearFileCache() { _fileCache.clear(); }
+  ```
+- Benefício: `/attach src/main.js` em múltiplos turnos consecutivos não relê o arquivo
+- TTL curto (30s) preserva frescor para arquivos que o usuário edita durante a sessão
+
+**AB.2 — Model List Cache (TTL 5min)**
+- Em `lib/models.js`: cache com TTL para `listModels()`, evitando chamadas SDK redundantes
+- `cmdConfig --refresh` para invalidar manualmente
+
+**AB.3 — Metrics: Tracking de Cache Hits no /health**
+- `handleHealth()` retorna `{ cacheStats: { fileCacheHits, fileCacheMisses, modelCacheAge } }`
+- Permite que LLM-A (via POST /inject + /health) monitore eficiência do cache
+
+**AB.4 — Exposição de Prompt Cache Metrics via SSE**
+- Quando `session.compaction_complete` chega com `compactionTokensUsed.cachedInput > 0`:
+  emitir via SSE `broadcastSse('cache.hit', { cachedInput, totalInput, ratio })`
+- Dashboard e LLM-A podem reagir a eventos de cache
+
+**Arquivos a criar/modificar:**
+- `src/copilot/terminal/file-context.js` — TTL cache em `readFileContext()`
+- `src/copilot/lib/models.js` — TTL cache em `listModels()`
+- `src/copilot/terminal/http-handlers.js` — cacheStats em /health
+- `src/copilot/terminal/index.js` — SSE cache.hit event
+
+---
+
+### FASE AC — Context Window Hardening: InfiniteSession Configurável e Recovery
+
+**Status**: 🔴 PLANEJADA
+
+**Motivação**
+
+Com AA e AB implementados, surgem questões de robustez:
+1. O que acontece quando `bufferExhaustionThreshold` é atingido e o loop bloqueia?
+2. Como recuperar de uma compactação falha (`success: false`)?
+3. Como o usuário pode configurar thresholds sem reiniciar o processo?
+
+**Implementações:**
+
+**AC.1 — InfiniteSession Config API via HTTP**
+- Novo endpoint `PUT /config/infinite-session`
+  Body: `{ backgroundCompactionThreshold: 0.70, bufferExhaustionThreshold: 0.90 }`
+- Persiste config em `controle.json` para recarregar no próximo `initOrResumeSession()`
+- Resposta: `{ ok: true, appliedAt: 'next_restart', current: {...} }`
+
+**AC.2 — Compaction Failure Recovery**
+- Em `always-alive.js`: ao receber `session.compaction_complete` com `success: false`:
+  - Emitir `session.fatal` com detalhes do erro
+  - Se `checkpointPath` disponível: logar rota de recovery manual
+- Em `terminal/index.js`: ao receber `session.fatal` via alwaysAliveAgent:
+  - `broadcastSse('error', { type: 'compaction_failure', ... })`
+
+**AC.3 — Checkpoint Awareness**
+- `getStatusSnapshot()` inclui `{ lastCheckpoint: { number, path, tokensAfter } }`
+- `GET /config` retorna isso → terminal pode exibir checkpoint info em `/context`
+
+**AC.4 — Threshold Warnings no REPL**
+- `dialog.js`/`sendTurn()`: antes de enviar turno, verificar `contextState.utilization`:
+  - Se ≥ 0.85: imprimir aviso amarelo no REPL ("⚠ Context em 85% — compactação iminente")
+  - Se ≥ 0.95: imprimir aviso vermelho ("⛔ Context crítico — aguardando compactação")
+- Não bloqueia o envio — apenas informa o usuário
+
+**Arquivos a criar/modificar:**
+- `src/copilot/agent/always-alive.js` — handler de `compaction_complete` com recovery
+- `src/copilot/terminal/dialog.js` — threshold warnings pre-send
+- `src/copilot/api/bridge-control.js` ou novo `bridge-config.js` — PUT /config/infinite-session
+- `src/copilot/terminal/http-handlers.js` — checkpoint info no /config
+- `src/copilot/agent/session-manager.js` — ler thresholds de controle.json
+
+---
+
+## Análise: SDK vs. Implementação Própria para Gestão de Contexto
+
+**Research realizado em 2026-03-25** com base nos tipos SDK v0.1.32 e artigo oficial do GitHub Blog.
+
+| Aspecto                     | O SDK já faz                                            | Nossa implementação adiciona                 |
+| --------------------------- | ------------------------------------------------------- | -------------------------------------------- |
+| Compactação automática      | ✅ `InfiniteSessionConfig.backgroundCompactionThreshold` | Configuração dinâmica (AC.1)                 |
+| Eventos de compactação      | ✅ `session.compaction_start/complete`                   | Recovery, SSE broadcast (AC.2)               |
+| Métricas de tokens          | ✅ `session.usage_info` ephemeral                        | Armazenar estado + expor via API (AA.1-AA.5) |
+| Prompt caching              | ✅ transformedContent XML wrapping (Claude)              | Métricas de hit ratio (AB.4)                 |
+| Context window limit        | ✅ `ModelCapabilities.limits.max_context_window_tokens`  | Usar no `/context` real (AA.3)               |
+| File context caching        | ❌ Não existe no SDK                                     | TTL cache em file-context.js (AB.1)          |
+| Model list caching          | ❌ Não existe no SDK                                     | TTL cache em listModels() (AB.2)             |
+| Threshold config dinâmica   | ❌ Apenas na criação da sessão                           | PUT /config/infinite-session (AC.1)          |
+| REPL warnings de utilização | ❌ Não existe                                            | pre-send check em dialog.js (AC.4)           |
+
+**Lições do artigo IssueCrush (GitHub Blog, 2026-03-24):**
+- "Cache the results" — uma das principais lições: guardar respostas no lado da aplicação
+- "Always have a fallback" — design for graceful degradation ao atingir limites
+- "Clean up your sessions" — SDK requer cleanup explícito; InfiniteSession automatiza isso
+
+---
+
 ## 10. Checklist de Qualidade para Cada Fase
 
 Antes de commitar cada fase:
@@ -1172,36 +1385,52 @@ Antes de commitar cada fase:
 
 ---
 
-## 11. Mapa Visual das Fases do Terminal (X, Y, Z, Z2, Z3)
+## 11. Mapa Visual das Fases do Terminal (X→Z3 concluídas; AA–AC planejadas)
 
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                EVOLUÇÃO DO TERMINAL LLM-B — Fases X→Z3                    │
-├──────────────┬─────────────────────────────────────────────────────────────┤
-│ FASE X       │ reasoningEffort: 'high' default + /model + /reasoning       │
-│              │ AlwaysAliveAgent.reconfigure() + getConfig()                  │
-│              │ Prompt: você[gpt-4.1/high]›                                 │
-├──────────────┼─────────────────────────────────────────────────────────────┤
-│ FASE Y       │ @arquivo.js embed + /attach queue                            │
-│              │ terminal/file-context.js + state.attachmentQueue             │
-│              │ HTTP /inject aceita context_files[]                          │
-├──────────────┼─────────────────────────────────────────────────────────────┤
-│ FASE Z       │ Spinner animado + status bar + rich printExchange            │
-│              │ terminal/spinner.js + prompt dinâmico                        │
-│              │ [modelo | reasoning | Ns | 1.2k chars]                       │
-├──────────────┼─────────────────────────────────────────────────────────────┤
-│ FASE Z2      │ /context + /compact + /plan + /resume                        │
-│              │ Todos dentro do DialogLoop (0 PR extra)                      │
-│              │ Inspiração: Copilot CLI /context /compact Shift+Tab          │
-├──────────────┼─────────────────────────────────────────────────────────────┤
-│ FASE Z3      │ GET /health com model/reasoning                              │
-│              │ POST /inject com context_files[]                             │
-│              │ GET /config endpoint novo                                     │
-│              │ SSE events com model+reasoning em cada payload               │
-└──────────────┴─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│              EVOLUÇÃO DO TERMINAL LLM-B — Fases X→Z3 (CONCLUÍDAS) + AA–AC (PLANEJADAS)│
+├──────────────┬─────────────────────────────────────────────────────────────────────────┤
+│ FASE X ✅    │ reasoningEffort: 'high' default + /model + /reasoning                   │
+│              │ AlwaysAliveAgent.reconfigure() + getConfig()                             │
+│              │ Prompt: você[gpt-4.1/high]›                                             │
+├──────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ FASE Y ✅    │ @arquivo.js embed + /attach queue                                        │
+│              │ terminal/file-context.js + state.attachmentQueue                         │
+│              │ HTTP /inject aceita context_files[]                                      │
+├──────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ FASE Z ✅    │ Spinner animado + status bar + rich printExchange                        │
+│              │ terminal/spinner.js + prompt dinâmico                                    │
+│              │ [modelo | reasoning | Ns | 1.2k chars]                                   │
+├──────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ FASE Z2 ✅   │ /context + /compact + /plan + /resume                                    │
+│              │ Todos dentro do DialogLoop (0 PR extra)                                  │
+│              │ Inspiração: Copilot CLI /context /compact Shift+Tab                      │
+├──────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ FASE Z3 ✅   │ GET /health com model/reasoning                                          │
+│              │ POST /inject com context_files[]                                         │
+│              │ GET /config endpoint novo                                                 │
+│              │ SSE events com model+reasoning em cada payload                           │
+├──────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ FASE AA 🔴   │ session.usage_info → contextState em AlwaysAliveAgent                   │
+│ (PLANEJADA)  │ /context usa tokens reais do SDK (não heurística)                        │
+│              │ /health + /config incluem contextWindow { tokenLimit, utilization }      │
+│              │ SSE emite 'context' event com dados reais por turno                      │
+│              │ Novo comando /compaction [status|threshold|auto|manual]                  │
+├──────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ FASE AB 🔴   │ TTL cache em readFileContext() (30s, LRU por path)                      │
+│ (PLANEJADA)  │ TTL cache em listModels() (5min)                                         │
+│              │ cacheStats em GET /health { fileCacheHits, fileCacheMisses }             │
+│              │ SSE 'cache.hit' quando cachedInput > 0 em compaction_complete            │
+├──────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ FASE AC 🔴   │ PUT /config/infinite-session (backgroundCompactionThreshold dinâmico)   │
+│ (PLANEJADA)  │ Recovery de compaction failure + checkpointPath awareness                │
+│              │ Warnings pré-send no REPL (⚠ 85% | ⛔ 95% utilização)                  │
+│              │ Checkpoint info em GET /config + getStatusSnapshot()                     │
+└──────────────┴─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Fluxo de dados após Fases X–Z3:**
+**Fluxo de dados após Fases X–Z3:
 
 ```
 Usuário digita: "@src/main.js explique a inicialização"
@@ -1239,4 +1468,5 @@ POST localhost:3009/inject
 *Documento gerado com base em análise estática do código e testes reais com LLM-B ativa.*
 *Atualizado em 2026-03-25 após Fases O (channel/ canônico) + auditoria de cobertura SDK v0.1.32.*
 *Atualizado em 2026-03-27 após Fase W (Attachment Support) + planejamento Fases X–Z3 (Terminal UX).*
-*Arquitetura v2.3: Fases A–W concluídas; Fases X–Z3 planejadas.*
+*Atualizado em 2026-03-25 após Fases Y+Z2+Z3 concluídas + tsserver hardening. Novas fases AA+AB+AC planejadas (Context Window Intelligence + Cache Strategy).*
+*Arquitetura v2.4: Fases A–Z3 concluídas; Fases AA–AC planejadas.*
