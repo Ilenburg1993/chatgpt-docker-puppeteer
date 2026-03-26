@@ -1,7 +1,7 @@
 # Plano de Arquitetura — `src/copilot` v2
 
 **Data**: 2026-06-15 — **Última atualização**: 2026-03-25
-**Status**: Fases A–Z3 concluídas — v2.4 alcançada. Fases AA–AC planejadas (Context Window Intelligence)
+**Status**: Fases A–Z3 concluídas — v2.4 alcançada. Fases AD+AA–AC planejadas (Bug Fixes + Context Window Intelligence)
 **Autores**: Análise automática via audit de código + testes reais com LLM-B
 
 ---
@@ -1159,6 +1159,44 @@ Quando LLM-A (este agente) usa a API HTTP para se comunicar com LLM-B, ela preci
 
 ---
 
+### FASE AD — Correção de Bugs e Hardening: Auditoria Independente `src/copilot`
+
+**Status**: 🔴 PLANEJADA
+
+**Motivação**
+
+Auditoria técnica de 101 arquivos (`DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`)
+identificou **11 bugs críticos/altos**, **4 vulnerabilidades de segurança confirmadas** e
+**15+ itens de melhoria técnica**. Todos os itens incluídos nesta fase foram **validados manualmente**
+no código real (HEAD `bdaa1347`).
+
+**Plano detalhado**: ver `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AD_AUDITORIA.md`
+
+**Sprints internos:**
+
+| Sprint  | Conteúdo                                          | Itens |
+| ------- | ------------------------------------------------- | ----- |
+| AD-1    | Bugs críticos (🔴): BUG-01,03,04 + SEC-02        | 4     |
+| AD-2    | Bugs altos (🟠): BUG-02,05–09 + SEC-01,03,04 + PERF-01,02 + ARCH-02 + TYPE-01 + GAP-01,03 | 15 |
+| AD-3    | Type safety + docs (🟡): TYPE-02–04 + GAP-04     | 4     |
+| AD-4    | Melhorias (🔵): MELHORIA-01,03,04,06             | 4     |
+
+**Arquivos principais a modificar:**
+- `src/copilot/agent/always-alive.js` (BUG-01,02,07,08 + PERF-01,02)
+- `src/copilot/conversation-hub/store.js` (BUG-03 + SEC-02)
+- `src/copilot/channel/client.js` (BUG-04,05)
+- `src/copilot/tools/shell-tools.js` (SEC-01)
+- `src/copilot/tools/file-tools.js` (SEC-03,04)
+- `src/copilot/bridges/nerv-bridge.js` (ARCH-02)
+- `src/copilot/conversation-hub/orchestrator.js` (BUG-06 + TYPE-01)
+- `src/copilot/conversation-hub/socket-ns.js` (BUG-09)
+- `src/copilot/terminal/commands/context.js` (BUG-05)
+- `src/copilot/api/bridge-tasks.js` (GAP-03 + TYPE-03)
+- `src/copilot/terminal/server.js` (GAP-01)
+- `src/copilot/types/structured-message.js` (TYPE-02 + MELHORIA-04)
+
+---
+
 ### FASE AA — Context Window Intelligence: Monitoramento Real-Time e Gestão Dinâmica de Contexto
 
 **Status**: 🔴 PLANEJADA
@@ -1412,6 +1450,14 @@ Antes de commitar cada fase:
 │              │ GET /config endpoint novo                                                 │
 │              │ SSE events com model+reasoning em cada payload                           │
 ├──────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ FASE AD 🔴   │ BUG-01–09: watchdog leak, listener leak, race condition, parseError,    │
+│ (PLANEJADA)  │   mutação ReadonlyArray, agentOverride, stop() durante boot, watchdog    │
+│              │   duplicado, dynamic import socket-ns                                    │
+│              │ SEC-01–04: shell injection, FTS5 injection, ripgrep injection, symlinks  │
+│              │ PERF-01–02: sendCount em memória, cache TTL de getStatusSnapshot         │
+│              │ ARCH-02: todos os 22 AGENT_EVENTS no nerv-bridge (eram 9)               │
+│              │ 15+ itens de type safety, rate limiting, docs                            │
+├──────────────┼─────────────────────────────────────────────────────────────────────────┤
 │ FASE AA 🔴   │ session.usage_info → contextState em AlwaysAliveAgent                   │
 │ (PLANEJADA)  │ /context usa tokens reais do SDK (não heurística)                        │
 │              │ /health + /config incluem contextWindow { tokenLimit, utilization }      │
@@ -1468,5 +1514,5 @@ POST localhost:3009/inject
 *Documento gerado com base em análise estática do código e testes reais com LLM-B ativa.*
 *Atualizado em 2026-03-25 após Fases O (channel/ canônico) + auditoria de cobertura SDK v0.1.32.*
 *Atualizado em 2026-03-27 após Fase W (Attachment Support) + planejamento Fases X–Z3 (Terminal UX).*
-*Atualizado em 2026-03-25 após Fases Y+Z2+Z3 concluídas + tsserver hardening. Novas fases AA+AB+AC planejadas (Context Window Intelligence + Cache Strategy).*
-*Arquitetura v2.4: Fases A–Z3 concluídas; Fases AA–AC planejadas.*
+*Atualizado em 2026-03-25 após Fases Y+Z2+Z3 concluídas + tsserver hardening. Novas fases AD+AA+AB+AC planejadas (Bug Fixes + Context Window Intelligence + Cache Strategy).*
+*Arquitetura v2.4: Fases A–Z3 concluídas; Fases AD+AA–AC planejadas (AD tem prioridade).*
