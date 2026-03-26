@@ -14,7 +14,7 @@
 import { log } from '#core/logger';
 import EventEmitter from 'node:events';
 import { alwaysAliveAgent } from '../always-alive.js';
-import { LlmBridgeClient } from '../llm-bridge-client.js';
+import { LlmBridgeClient } from '../channel/client.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 

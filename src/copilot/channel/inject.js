@@ -25,12 +25,13 @@
 
 import { BridgeError } from '#copilot/core';
 import http from 'node:http';
+import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';
 
 /** Porta padrão do terminal LLM-B. */
 const DEFAULT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
 
 /** Timeout padrão para aguardar resposta (ms). */
-const DEFAULT_TIMEOUT_MS = Number(process.env.LLM_B_TURN_TIMEOUT ?? 130_000);
+const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
 
 /**
  * @typedef {Object} InjectOpts

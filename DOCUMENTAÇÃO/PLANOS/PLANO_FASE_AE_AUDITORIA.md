@@ -13,18 +13,18 @@
 
 ### Sprint AE-1 — ✅ CONCLUÍDA (`798c8fb9`)
 
-| Item | Arquivo | Status |
-|------|---------|--------|
-| ARCH-04 — Hub health no /health | `src/copilot/api/bridge-control.js` | ✅ `db.prepare('SELECT 1').get()` + campo `hubStore` |
-| PERF-03 — FTS5 tokenizer porter | `src/copilot/conversation-hub/store.js` | ✅ `porter unicode61 remove_diacritics 1` |
+| Item                            | Arquivo                                 | Status                                              |
+| ------------------------------- | --------------------------------------- | --------------------------------------------------- |
+| ARCH-04 — Hub health no /health | `src/copilot/api/bridge-control.js`     | ✅ `db.prepare('SELECT 1').get()` + campo `hubStore` |
+| PERF-03 — FTS5 tokenizer porter | `src/copilot/conversation-hub/store.js` | ✅ `porter unicode61 remove_diacritics 1`            |
 
 ### Sprint AE-2 — ✅ CONCLUÍDA com ressalvas (`468fe3ac`)
 
-| Item | Arquivo | Status | Ressalva |
-|------|---------|--------|----------|
-| GAP-02 — buildZodSchema enum/array/nested | `src/copilot/bridges/mcp-tool-bridge.js` | ✅ | — |
-| ARCH-01 — Eliminar uso de shims em produção | `src/server/api/router.js`, `src/server/main.js` | ✅ | shims **mantidos** em `src/copilot/*.js` como `@deprecated` para compatibilidade de testes |
-| ARCH-03 — dialogTurn registra #history | `src/copilot/channel/client.js` | ✅ | integração SQLite ↔ #history **adiada** para Fase AF |
+| Item                                        | Arquivo                                          | Status | Ressalva                                                                                   |
+| ------------------------------------------- | ------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------ |
+| GAP-02 — buildZodSchema enum/array/nested   | `src/copilot/bridges/mcp-tool-bridge.js`         | ✅      | —                                                                                          |
+| ARCH-01 — Eliminar uso de shims em produção | `src/server/api/router.js`, `src/server/main.js` | ✅      | shims **mantidos** em `src/copilot/*.js` como `@deprecated` para compatibilidade de testes |
+| ARCH-03 — dialogTurn registra #history      | `src/copilot/channel/client.js`                  | ✅      | integração SQLite ↔ #history **adiada** para Fase AF                                       |
 
 > **Extras implementados neste sprint** (originados de `AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`):
 > - **MELHORIA-02 (token budget warning)**: `session.token_budget_warning` emitido quando uso > 80% →
@@ -34,10 +34,10 @@
 
 ### Sprint AE-3 — ❌ ADIADA para Fases AF/AG
 
-| Item | Status | Motivo do adiamento |
-|------|--------|---------------------|
-| MELHORIA-05 — SDK history persistence (SQLite ↔ #history) | ❌ PENDENTE | Alto risco de regressão; requer análise de schema + testes de integração |
-| MELHORIA-02 — OpenTelemetry no AlwaysAliveAgent | ❌ PENDENTE | Requer nova infraestrutura (pacotes OTel); escopo cresceu além da Fase AE |
+| Item                                                      | Status     | Motivo do adiamento                                                       |
+| --------------------------------------------------------- | ---------- | ------------------------------------------------------------------------- |
+| MELHORIA-05 — SDK history persistence (SQLite ↔ #history) | ❌ PENDENTE | Alto risco de regressão; requer análise de schema + testes de integração  |
+| MELHORIA-02 — OpenTelemetry no AlwaysAliveAgent           | ❌ PENDENTE | Requer nova infraestrutura (pacotes OTel); escopo cresceu além da Fase AE |
 
 ---
 

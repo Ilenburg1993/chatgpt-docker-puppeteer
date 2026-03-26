@@ -27,6 +27,22 @@ export const LLM_B_TERMINAL_PORT = 3009;
 export const MAX_QUEUE_SIZE = 100;
 
 /**
+ * Timeout padrão de turno LLM-B em ms. Pode ser sobrescrito via `LLM_B_TURN_TIMEOUT`. Usado por dialog.js (terminal
+ * REPL) e channel/inject.js (injeção HTTP).
+ *
+ * @type {number}
+ */
+export const LLM_B_TURN_TIMEOUT_MS = Number(process.env.LLM_B_TURN_TIMEOUT ?? 120_000);
+
+/**
+ * Número máximo de clientes SSE simultâneos por endpoint. Evita leak de memória quando muitos clientes SSE abrem
+ * conexões sem fechá-las.
+ *
+ * @type {number}
+ */
+export const MAX_SSE_CLIENTS = Number(process.env.MAX_SSE_CLIENTS ?? 50);
+
+/**
  * Nomes canônicos de eventos emitidos pelo AlwaysAliveAgent. Re-exportados de agent/events.js para acesso centralizado
  * via core/.
  *

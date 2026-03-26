@@ -31,6 +31,7 @@
 
 import { log } from '#core/logger';
 import http from 'node:http';
+import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { println } from './dialog.js';
 import {
     handleDeleteCustomTool,
@@ -236,6 +237,12 @@ export function createInjectServer() {
             const isCriticalOnly = url.searchParams.get('level') === 'critical';
             const _sseClients = getSseClients();
             const _sseCriticalClients = getSseCriticalClients();
+            const totalSse = _sseClients.size + _sseCriticalClients.size;
+            if (totalSse >= MAX_SSE_CLIENTS) {
+                res.writeHead(429, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: false, error: 'Limite de clientes SSE atingido' }));
+                return;
+            }
             res.writeHead(200, {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',

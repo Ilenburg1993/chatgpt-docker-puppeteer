@@ -2422,7 +2422,7 @@ DELETE /config/tools/custom/:name   → remove por nome
 
 | Arquivo                                       | AI     | Status  | Propósito                                |
 | --------------------------------------------- | ------ | ------- | ---------------------------------------- |
-| `src/copilot/config/custom-tools-registry.js` | AI.2   | ✅ NOVO | Registry de custom tools em runtime      |
+| `src/copilot/config/custom-tools-registry.js` | AI.2   | ✅ NOVO  | Registry de custom tools em runtime      |
 | `src/copilot/config/tools-state.js`           | AI.1   | ✅ MODIF | Persistência em tools-config.json        |
 | `src/copilot/agent/session-manager.js`        | AI.1   | ✅ MODIF | `loadToolsConfig()` no boot              |
 | `src/copilot/agent/tools-bootstrap.js`        | AI.2   | ✅ MODIF | `buildCustomTools()` integrado           |

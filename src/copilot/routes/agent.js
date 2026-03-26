@@ -21,8 +21,12 @@
 import { log } from '#core/logger';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../always-alive.js';
+import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { clearTelemetry, getSummary } from '../lib/telemetry.js';
 import { getClient } from '../sdk-client.js';
+
+/** Contador de clientes SSE ativos em /agent/stream. */
+let _agentSseClients = 0;
 
 /**
  * @typedef {import('express').Request} Req
@@ -156,8 +160,13 @@ router.get('/agent/state', (req, res) => {
  */
 router.get('/agent/stream', (req, res) => {
     void withErrorHandler(req, res, async () => {
+        if (_agentSseClients >= MAX_SSE_CLIENTS) {
+            res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
+            return;
+        }
         const client = await getClient();
 
+        _agentSseClients++;
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
@@ -187,6 +196,7 @@ router.get('/agent/stream', (req, res) => {
         }, 30_000);
 
         req.on('close', () => {
+            _agentSseClients--;
             clearInterval(heartbeatInterval);
             unsubscribe();
             log('INFO', '[sdk-api] SSE agent/stream encerrado');

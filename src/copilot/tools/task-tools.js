@@ -10,8 +10,47 @@
 
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
-import { execSync } from 'node:child_process';
+import http from 'node:http';
 import { z } from 'zod';
+
+/**
+ * Realiza uma requisição HTTP local sem bloquear o event loop.
+ *
+ * @param {string} method
+ * @param {string} urlStr
+ * @param {string | null} body
+ * @param {number} [timeoutMs]
+ * @returns {Promise<string>}
+ */
+function httpRequest(method, urlStr, body = null, timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+        const url = new URL(urlStr);
+        const options = {
+            hostname: url.hostname,
+            port: url.port,
+            path: url.pathname + url.search,
+            method,
+            headers: /** @type {Record<string, string>} */ ({}),
+        };
+        if (body) {
+            options.headers['Content-Type'] = 'application/json';
+            options.headers['Content-Length'] = String(Buffer.byteLength(body));
+        }
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            res.on('end', () => resolve(data));
+        });
+        req.setTimeout(timeoutMs, () => {
+            req.destroy(new Error(`Timeout após ${timeoutMs}ms`));
+        });
+        req.on('error', reject);
+        if (body) req.write(body);
+        req.end();
+    });
+}
 
 /**
  * Marca uma tool como skip-permission (SDK v0.2.0+). Forward-compat: campo ignorado silenciosamente em SDK v0.1.x.
@@ -44,10 +83,9 @@ const getTasksTool = defineTool('get_tasks', {
     ),
     handler: async (/** @type {{ status?: string; limit?: number }} */ { status, limit }) => {
         try {
-            // Usar a API REST interna (não importar DB diretamente para evitar acoplamento)
             const port = process.env.PORT ?? '3008';
             const url = `http://127.0.0.1:${port}/api/tasks?limit=${limit ?? 10}${status ? `&status=${status}` : ''}`;
-            const result = execSync(`curl -sf "${url}" 2>/dev/null`, { encoding: 'utf8', timeout: 5000 });
+            const result = await httpRequest('GET', url);
             const data = JSON.parse(result);
             return {
                 tasks: data?.data?.tasks ?? data?.tasks ?? [],
@@ -93,10 +131,7 @@ const addTaskTool = defineTool('add_task', {
         try {
             const port = process.env.PORT ?? '3008';
             const body = JSON.stringify({ target, spec_user_message: user_message, priority: priority ?? 50, model });
-            const result = execSync(
-                `curl -sf -X POST -H "Content-Type: application/json" -d '${body.replace(/'/g, "\\'")}' "http://127.0.0.1:${port}/api/tasks"`,
-                { encoding: 'utf8', timeout: 5000 },
-            );
+            const result = await httpRequest('POST', `http://127.0.0.1:${port}/api/tasks`, body);
             const data = JSON.parse(result);
             log('INFO', `[copilot/add_task] Tarefa criada: ${data?.data?.id ?? JSON.stringify(data)}`);
             return { success: true, task: data?.data ?? data };
@@ -143,10 +178,7 @@ const getSystemHealthTool = defineTool('get_system_health', {
     handler: async () => {
         try {
             const port = process.env.PORT ?? '3008';
-            const result = execSync(`curl -sf "http://127.0.0.1:${port}/api/health" 2>/dev/null`, {
-                encoding: 'utf8',
-                timeout: 5000,
-            });
+            const result = await httpRequest('GET', `http://127.0.0.1:${port}/api/health`);
             return JSON.parse(result);
         } catch (/** @type {any} */ e) {
             return { healthy: false, error: e.message };

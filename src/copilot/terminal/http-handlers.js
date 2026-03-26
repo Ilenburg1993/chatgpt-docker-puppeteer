@@ -227,17 +227,18 @@ export async function handlePipeline(body) {
  *
  * - `context_files: string[]` — lê o conteúdo de cada arquivo e o embute como bloco markdown antes da mensagem.
  * - `attachments` — suporte a dois modos (AI.5):
+ *
  *   - **Nativo SDK**: `{ type: 'file'|'directory'|'selection', path: string, ... }` — passados diretamente para
- *     `MessageOptions.attachments` do SDK (suporte real a file attachments).
- *   - **Embed inline (fallback)**: `{ type: 'content', content: string, path?: string }` — embutidos como bloco
- *     markdown na mensagem (MELHORIA-03 original).
+ *       `MessageOptions.attachments` do SDK (suporte real a file attachments).
+ *   - **Embed inline (fallback)**: `{ type: 'content', content: string, path?: string }` — embutidos como bloco markdown na
+ *       mensagem (MELHORIA-03 original).
  *
  * @param {{
  *     message?: string;
  *     from?: string;
  *     timeout?: number;
  *     context_files?: string[];
- *     attachments?: Array<{
+ *     attachments?: {
  *         type?: string;
  *         content?: string;
  *         path?: string;
@@ -245,7 +246,7 @@ export async function handlePipeline(body) {
  *         filePath?: string;
  *         selection?: object;
  *         text?: string;
- *     }>;
+ *     }[];
  * } | null} body
  * @returns {Promise<HandlerResult>}
  */
@@ -280,9 +281,17 @@ export async function handleInject(body) {
     for (const att of rawAttachments) {
         if (!att) continue;
         if (att.type === 'file' && typeof att.path === 'string') {
-            nativeAttachments.push({ type: 'file', path: att.path, ...(att.displayName ? { displayName: att.displayName } : {}) });
+            nativeAttachments.push({
+                type: 'file',
+                path: att.path,
+                ...(att.displayName ? { displayName: att.displayName } : {}),
+            });
         } else if (att.type === 'directory' && typeof att.path === 'string') {
-            nativeAttachments.push({ type: 'directory', path: att.path, ...(att.displayName ? { displayName: att.displayName } : {}) });
+            nativeAttachments.push({
+                type: 'directory',
+                path: att.path,
+                ...(att.displayName ? { displayName: att.displayName } : {}),
+            });
         } else if (att.type === 'selection' && typeof att.filePath === 'string') {
             nativeAttachments.push({
                 type: 'selection',

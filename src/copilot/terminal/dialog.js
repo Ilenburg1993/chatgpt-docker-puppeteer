@@ -20,6 +20,7 @@ import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
 import { emitNerv } from '../bridges/nerv-bridge.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { getCopilotNamespace } from '../conversation-hub/socket-ns.js';
+import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';
 import { embedMultiple, readFileContext } from './file-context.js';
 import {
     clearAttachments,
@@ -41,7 +42,7 @@ export const CRITICAL_EVENTS = new Set(['stalled', 'fatal', 'system']);
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
 /** Timeout para aguardar resposta da LLM-B por turno (ms). */
-const TURN_TIMEOUT_MS = Number(process.env.LLM_B_TURN_TIMEOUT ?? 120_000);
+const TURN_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
 
 const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
 const PROMPT_WAITING = '     ';

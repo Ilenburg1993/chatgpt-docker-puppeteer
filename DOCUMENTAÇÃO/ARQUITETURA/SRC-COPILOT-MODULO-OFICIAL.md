@@ -75,22 +75,22 @@ src/copilot/
 
 ### Arquivos na raiz `src/copilot/`
 
-| Arquivo               | Tipo         | Aponta para                 | Status         |
-| --------------------- | ------------ | --------------------------- | -------------- |
-| `agent.js`            | Re-export    | `agent/entry.js`            | @deprecated    |
-| `always-alive.js`     | Re-export    | `agent/always-alive.js`     | @deprecated    |
-| `session-manager.js`  | Re-export    | `agent/session-manager.js`  | @deprecated    |
-| `nerv-bridge.js`      | Re-export    | `bridges/nerv-bridge.js`    | @deprecated    |
-| `gh-bridge.js`        | Re-export    | `bridges/gh-bridge.js`      | @deprecated    |
-| `git-bridge.js`       | Re-export    | `bridges/git-bridge.js`     | @deprecated    |
-| `http-bridge.js`      | Re-export    | `api/http-bridge.js`        | @deprecated    |
-| `inject-llmb.js`      | Re-export    | `channel/inject.js`         | @deprecated    |
-| `llm-bridge-client.js`| Re-export    | `channel/client.js`         | @deprecated    |
-| `mcp-tool-bridge.js`  | Re-export    | `bridges/mcp-tool-bridge.js`| @deprecated    |
-| `sdk-api.js`          | Re-export    | `api/sdk-api.js`            | @deprecated    |
-| `alias-store.js`      | Re-export    | `bridges/alias-store.js`    | @deprecated    |
-| `sdk-client.js`       | Wrapper      | `lib/client.js`             | @deprecated    |
-| `terminal-server.js`  | Entry legacy | `terminal/index.js`         | @deprecated    |
+| Arquivo                | Tipo         | Aponta para                  | Status      |
+| ---------------------- | ------------ | ---------------------------- | ----------- |
+| `agent.js`             | Re-export    | `agent/entry.js`             | @deprecated |
+| `always-alive.js`      | Re-export    | `agent/always-alive.js`      | @deprecated |
+| `session-manager.js`   | Re-export    | `agent/session-manager.js`   | @deprecated |
+| `nerv-bridge.js`       | Re-export    | `bridges/nerv-bridge.js`     | @deprecated |
+| `gh-bridge.js`         | Re-export    | `bridges/gh-bridge.js`       | @deprecated |
+| `git-bridge.js`        | Re-export    | `bridges/git-bridge.js`      | @deprecated |
+| `http-bridge.js`       | Re-export    | `api/http-bridge.js`         | @deprecated |
+| `inject-llmb.js`       | Re-export    | `channel/inject.js`          | @deprecated |
+| `llm-bridge-client.js` | Re-export    | `channel/client.js`          | @deprecated |
+| `mcp-tool-bridge.js`   | Re-export    | `bridges/mcp-tool-bridge.js` | @deprecated |
+| `sdk-api.js`           | Re-export    | `api/sdk-api.js`             | @deprecated |
+| `alias-store.js`       | Re-export    | `bridges/alias-store.js`     | @deprecated |
+| `sdk-client.js`        | Wrapper      | `lib/client.js`              | @deprecated |
+| `terminal-server.js`   | Entry legacy | `terminal/index.js`          | @deprecated |
 
 > **Ação necessária**: todos os 14 arquivos raiz são candidatos a remoção. Ver [Issue 9.1](#91-13-shims-legados-na-raiz).
 
@@ -100,21 +100,21 @@ src/copilot/
 
 O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 
-| Nível | Camada                   | Pacotes/Módulos                                                                                                           |
-| :---: | ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| 0     | **Contratos Centrais**   | `core/` — `errors.js`, `constants.js`, `types.js`                                                                        |
-| 1     | **Abstrações SDK**       | `lib/` — `client.js`, `session.js`, `hooks.js`, `permissions.js`, `models.js`, `tools-registry.js`, `telemetry.js`, `agents.js` |
-| 2     | **Tipos de Protocolo**   | `types/` — `structured-message.js`, `index.js`                                                                           |
-| 3     | **Agente Core**          | `agent/` — `always-alive.js`, `session-manager.js`, `tools-bootstrap.js`, `events.js`, `task-executor.js`, `dialog-watchdog.js`, `webhook-manager.js` |
-| 4     | **Custom Tools**         | `tools/` — 9 categorias + `tool-factory.js`                                                                              |
-| 5     | **Canal de Comunicação** | `channel/` — `client.js`, `inject.js`, `audit.js`                                                                        |
-| 6     | **Configuração**         | `config/` — `session-config.js`, `system-prompt.js`, `mcp-servers.js`, `tools-state.js`, `custom-tools-registry.js`, `custom-agents.js`, `pinned-files-loader.js` |
-| 7     | **Hub de Conversa**      | `conversation-hub/` — `hub.js`, `orchestrator.js`, `store.js`, `socket-ns.js`                                            |
-| 8     | **Integrações Externas** | `bridges/` — `nerv-bridge.js`, `gh-bridge.js`, `git-bridge.js`, `mcp-tool-bridge.js`, `alias-store.js`                   |
-| 9     | **API REST**             | `api/` — `http-bridge.js` (4 sub-routers) + `sdk-api.js` (4 routers de `routes/`)                                        |
-| 10    | **Routers Express**      | `routes/` — `agent.js`, `client.js`, `sessions.js`, `webhooks.js`                                                        |
-| 11    | **Terminal Interativo**  | `terminal/` — `server.js`, `repl.js`, `dialog.js`, `http-handlers.js`, `state.js`, `file-context.js`, `workspace-context.js`, `commands/` |
-| 12    | **Entry Points**         | `agent/entry.js`, `terminal/index.js`                                                                                     |
+| Nível | Camada                   | Pacotes/Módulos                                                                                                                                                   |
+| :---: | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   0   | **Contratos Centrais**   | `core/` — `errors.js`, `constants.js`, `types.js`                                                                                                                 |
+|   1   | **Abstrações SDK**       | `lib/` — `client.js`, `session.js`, `hooks.js`, `permissions.js`, `models.js`, `tools-registry.js`, `telemetry.js`, `agents.js`                                   |
+|   2   | **Tipos de Protocolo**   | `types/` — `structured-message.js`, `index.js`                                                                                                                    |
+|   3   | **Agente Core**          | `agent/` — `always-alive.js`, `session-manager.js`, `tools-bootstrap.js`, `events.js`, `task-executor.js`, `dialog-watchdog.js`, `webhook-manager.js`             |
+|   4   | **Custom Tools**         | `tools/` — 9 categorias + `tool-factory.js`                                                                                                                       |
+|   5   | **Canal de Comunicação** | `channel/` — `client.js`, `inject.js`, `audit.js`                                                                                                                 |
+|   6   | **Configuração**         | `config/` — `session-config.js`, `system-prompt.js`, `mcp-servers.js`, `tools-state.js`, `custom-tools-registry.js`, `custom-agents.js`, `pinned-files-loader.js` |
+|   7   | **Hub de Conversa**      | `conversation-hub/` — `hub.js`, `orchestrator.js`, `store.js`, `socket-ns.js`                                                                                     |
+|   8   | **Integrações Externas** | `bridges/` — `nerv-bridge.js`, `gh-bridge.js`, `git-bridge.js`, `mcp-tool-bridge.js`, `alias-store.js`                                                            |
+|   9   | **API REST**             | `api/` — `http-bridge.js` (4 sub-routers) + `sdk-api.js` (4 routers de `routes/`)                                                                                 |
+|  10   | **Routers Express**      | `routes/` — `agent.js`, `client.js`, `sessions.js`, `webhooks.js`                                                                                                 |
+|  11   | **Terminal Interativo**  | `terminal/` — `server.js`, `repl.js`, `dialog.js`, `http-handlers.js`, `state.js`, `file-context.js`, `workspace-context.js`, `commands/`                         |
+|  12   | **Entry Points**         | `agent/entry.js`, `terminal/index.js`                                                                                                                             |
 
 ---
 
@@ -132,21 +132,21 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 
 **Campos privados**:
 
-| Campo                   | Tipo                                              | Propósito                                 |
-| ----------------------- | ------------------------------------------------- | ----------------------------------------- |
-| `#client`               | `CopilotClient \| null`                           | Instância do SDK client                   |
-| `#session`              | `CopilotSession \| null`                          | Sessão SDK ativa                          |
-| `#status`               | `AgentStatus`                                     | idle/processing/waiting_for_input/starting/stopped |
-| `#queue`                | `AgentTask[]`                                     | Fila de tarefas pendentes (MAX=100)       |
-| `#pendingQuestion`      | `{resolve, reject} \| null`                       | Pergunta pendente do modelo               |
-| `#dialogLoopActive`     | `boolean`                                         | Flag do dialog loop                       |
-| `#watchdog`             | `DialogWatchdog \| null`                          | Monitor de estagnação                     |
-| `#sendCount`            | `number`                                          | Contador persistido de mensagens enviadas |
-| `#contextState`         | `{tokens, tokenLimit, utilization} \| null`       | Estado atual do context window            |
-| `#lastCheckpointPath`   | `string \| null`                                  | Último checkpoint de compaction           |
-| `#telemetry`            | `TelemetryStore \| null`                          | Store de telemetria da sessão             |
-| `#toolsRegistry`        | `ToolRegistry \| null`                            | Registry de tools da sessão               |
-| `#isResumed`            | `boolean`                                         | Indica se sessão foi retomada             |
+| Campo                 | Tipo                                        | Propósito                                          |
+| --------------------- | ------------------------------------------- | -------------------------------------------------- |
+| `#client`             | `CopilotClient \| null`                     | Instância do SDK client                            |
+| `#session`            | `CopilotSession \| null`                    | Sessão SDK ativa                                   |
+| `#status`             | `AgentStatus`                               | idle/processing/waiting_for_input/starting/stopped |
+| `#queue`              | `AgentTask[]`                               | Fila de tarefas pendentes (MAX=100)                |
+| `#pendingQuestion`    | `{resolve, reject} \| null`                 | Pergunta pendente do modelo                        |
+| `#dialogLoopActive`   | `boolean`                                   | Flag do dialog loop                                |
+| `#watchdog`           | `DialogWatchdog \| null`                    | Monitor de estagnação                              |
+| `#sendCount`          | `number`                                    | Contador persistido de mensagens enviadas          |
+| `#contextState`       | `{tokens, tokenLimit, utilization} \| null` | Estado atual do context window                     |
+| `#lastCheckpointPath` | `string \| null`                            | Último checkpoint de compaction                    |
+| `#telemetry`          | `TelemetryStore \| null`                    | Store de telemetria da sessão                      |
+| `#toolsRegistry`      | `ToolRegistry \| null`                      | Registry de tools da sessão                        |
+| `#isResumed`          | `boolean`                                   | Indica se sessão foi retomada                      |
 
 **Constantes**:
 - `MAX_QUEUE_SIZE = 100`
@@ -154,22 +154,22 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 
 **Métodos públicos**:
 
-| Método                                   | Descrição                                              |
-| ---------------------------------------- | ------------------------------------------------------ |
-| `start()`                                | Inicializa cliente, tools, sessão e wiring de eventos  |
-| `stop({ shutdownTimeoutMs })`            | Para graciosamente (aguarda tarefa ativa)              |
-| `sendMessage(message, opts)`             | Enfileira mensagem com optional attachments            |
-| `startDialogLoop()`                      | Inicia dialog loop infinito (mode §15.8)              |
-| `sendDialogTurn(message, opts)`          | Injeta turno no dialog loop ativo                     |
-| `stopDialogLoop()`                       | Encerra dialog loop                                    |
-| `answerPendingQuestion(answer)`          | Responde pergunta pendente do modelo                  |
-| `getStatusSnapshot()`                    | Retorna snapshot completo do estado                   |
-| `setModel(model)`                        | Altera modelo em runtime                              |
-| `setReasoningEffort(effort)`             | Altera modo de raciocínio em runtime                  |
-| `compactSession()`                       | Aciona compaction manual da sessão                     |
-| `registerWebhook(url, events, opts)`     | Registra webhook de notificação                       |
-| `unregisterWebhook(id)`                  | Remove webhook                                        |
-| `listWebhooks()`                         | Lista webhooks ativos                                  |
+| Método                               | Descrição                                             |
+| ------------------------------------ | ----------------------------------------------------- |
+| `start()`                            | Inicializa cliente, tools, sessão e wiring de eventos |
+| `stop({ shutdownTimeoutMs })`        | Para graciosamente (aguarda tarefa ativa)             |
+| `sendMessage(message, opts)`         | Enfileira mensagem com optional attachments           |
+| `startDialogLoop()`                  | Inicia dialog loop infinito (mode §15.8)              |
+| `sendDialogTurn(message, opts)`      | Injeta turno no dialog loop ativo                     |
+| `stopDialogLoop()`                   | Encerra dialog loop                                   |
+| `answerPendingQuestion(answer)`      | Responde pergunta pendente do modelo                  |
+| `getStatusSnapshot()`                | Retorna snapshot completo do estado                   |
+| `setModel(model)`                    | Altera modelo em runtime                              |
+| `setReasoningEffort(effort)`         | Altera modo de raciocínio em runtime                  |
+| `compactSession()`                   | Aciona compaction manual da sessão                    |
+| `registerWebhook(url, events, opts)` | Registra webhook de notificação                       |
+| `unregisterWebhook(id)`              | Remove webhook                                        |
+| `listWebhooks()`                     | Lista webhooks ativos                                 |
 
 **Método privado crítico**: `#syncSdkHistory(session)` — sincroniza histórico SDK → SQLite após retomada (AI.4).
 
@@ -183,15 +183,15 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 
 **Exports principais**:
 
-| Export                           | Descrição                                          |
-| -------------------------------- | -------------------------------------------------- |
-| `readState()`                    | Lê estado em disco (null se inexistente)           |
-| `writeState(data)`               | Persiste estado em disco                           |
-| `clearState()`                   | Remove arquivo de estado                           |
-| `initOrResumeSession(client, opts)` | Tenta resumir sessão salva, cria nova se falhar |
-| `buildHookSystemContext()`       | Injeta contexto dos hooks no system message        |
-| `setBackgroundCompactionThreshold(val)` | Configura limiar de compaction automática  |
-| `loadToolsConfig()`              | Carrega `tools-config.json` (AI.1)                |
+| Export                                  | Descrição                                       |
+| --------------------------------------- | ----------------------------------------------- |
+| `readState()`                           | Lê estado em disco (null se inexistente)        |
+| `writeState(data)`                      | Persiste estado em disco                        |
+| `clearState()`                          | Remove arquivo de estado                        |
+| `initOrResumeSession(client, opts)`     | Tenta resumir sessão salva, cria nova se falhar |
+| `buildHookSystemContext()`              | Injeta contexto dos hooks no system message     |
+| `setBackgroundCompactionThreshold(val)` | Configura limiar de compaction automática       |
+| `loadToolsConfig()`                     | Carrega `tools-config.json` (AI.1)              |
 
 **Schema de estado** (`sdk-always-alive.json`):
 ```json
@@ -214,14 +214,14 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 
 **`AGENT_EVENTS`** (array readonly):
 
-| Categoria      | Eventos                                                            |
-| -------------- | ------------------------------------------------------------------ |
-| Task           | `task.queued`, `task.started`, `task.completed`, `task.error`, `task.delta`, `task.reasoning` |
-| Question       | `question.pending`, `question.answered`                            |
-| Session        | `session.compaction_start`, `session.compaction_complete`, `session.fatal`, `session.usage`, `session.token_budget_warning`, `session.mode_changed`, `session.context_changed`, `session.history_synced` |
-| Dialog         | `dialog.ready`, `dialog.reply`, `dialog.stopped`, `dialog.stalled` |
-| Tool           | `tool.execution.start`, `tool.execution.complete`                  |
-| Misc           | `status`, `stopped`, `ready`, `error`                              |
+| Categoria | Eventos                                                                                                                                                                                                  |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Task      | `task.queued`, `task.started`, `task.completed`, `task.error`, `task.delta`, `task.reasoning`                                                                                                            |
+| Question  | `question.pending`, `question.answered`                                                                                                                                                                  |
+| Session   | `session.compaction_start`, `session.compaction_complete`, `session.fatal`, `session.usage`, `session.token_budget_warning`, `session.mode_changed`, `session.context_changed`, `session.history_synced` |
+| Dialog    | `dialog.ready`, `dialog.reply`, `dialog.stopped`, `dialog.stalled`                                                                                                                                       |
+| Tool      | `tool.execution.start`, `tool.execution.complete`                                                                                                                                                        |
+| Misc      | `status`, `stopped`, `ready`, `error`                                                                                                                                                                    |
 
 ---
 
@@ -233,20 +233,20 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 
 **Categorias registradas** (11+custom):
 
-| Categoria      | Arquivo origem          | Tools                                         |
-| -------------- | ----------------------- | --------------------------------------------- |
-| `task`         | `tools/task-tools.js`   | `get_tasks`, `add_task`, `update_task_status` |
-| `code`         | `tools/code-tools.js`   | `lint_check`, `run_tests`, `typecheck`        |
-| `git`          | `tools/git-tools.js`    | `git_status`, `git_diff`, `git_log`, `git_commit` |
-| `session`      | `tools/session-tools.js`| `get_session_state`, `set_model`, `compact_session` |
-| `hook`         | `tools/hook-tools.js`   | `hook_get_audit_tail`, `request_user_input`   |
-| `hub`          | `tools/hub-tools.js`    | `hub_send_message`, `hub_get_history`, `hub_create_session` |
-| `introspection`| `tools/introspection-tools.js`| `get_agent_status`, `list_tools`, `get_telemetry` |
-| `fileRead`     | `tools/file-tools.js`   | `read_file_content`, `list_directory`, `search_in_files` |
-| `fileWrite`    | `tools/file-tools.js`   | `write_file`                                  |
-| `shell`        | `tools/shell-tools.js`  | `run_shell_command`, `run_npm_script`, `run_node_script` |
-| `mcp`          | `bridges/mcp-tool-bridge.js` | tools carregadas dinamicamente via MCP   |
-| `custom`       | `config/custom-tools-registry.js` | tools registradas via API em runtime |
+| Categoria       | Arquivo origem                    | Tools                                                       |
+| --------------- | --------------------------------- | ----------------------------------------------------------- |
+| `task`          | `tools/task-tools.js`             | `get_tasks`, `add_task`, `update_task_status`               |
+| `code`          | `tools/code-tools.js`             | `lint_check`, `run_tests`, `typecheck`                      |
+| `git`           | `tools/git-tools.js`              | `git_status`, `git_diff`, `git_log`, `git_commit`           |
+| `session`       | `tools/session-tools.js`          | `get_session_state`, `set_model`, `compact_session`         |
+| `hook`          | `tools/hook-tools.js`             | `hook_get_audit_tail`, `request_user_input`                 |
+| `hub`           | `tools/hub-tools.js`              | `hub_send_message`, `hub_get_history`, `hub_create_session` |
+| `introspection` | `tools/introspection-tools.js`    | `get_agent_status`, `list_tools`, `get_telemetry`           |
+| `fileRead`      | `tools/file-tools.js`             | `read_file_content`, `list_directory`, `search_in_files`    |
+| `fileWrite`     | `tools/file-tools.js`             | `write_file`                                                |
+| `shell`         | `tools/shell-tools.js`            | `run_shell_command`, `run_npm_script`, `run_node_script`    |
+| `mcp`           | `bridges/mcp-tool-bridge.js`      | tools carregadas dinamicamente via MCP                      |
+| `custom`        | `config/custom-tools-registry.js` | tools registradas via API em runtime                        |
 
 ---
 
@@ -291,16 +291,16 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 
 Camada de wrappers sem side-effects — nenhum singleton é inicializado no `import`.
 
-| Arquivo            | Responsabilidade                                              | Exports-chave                                               |
-| ------------------ | ------------------------------------------------------------- | ----------------------------------------------------------- |
-| `client.js`        | `CopilotClient` singleton + registry de sessões ativas        | `getClient()`, `getActiveSessions()`, `registerSession()`   |
-| `session.js`       | Ciclo de vida de sessões SDK                                  | `createSession()`, `resumeOrCreate()`, `listSessions()`, `deleteSession()` |
-| `hooks.js`         | Factories de `SessionHooks`                                   | `createHooks()`, `createAuditHooks()`, `createMinimalHooks()` |
-| `permissions.js`   | Factories de `PermissionHandler`                              | `createApproveAllPermission()`, `createAuditPermission()`, `createSafePermission()` |
-| `agents.js`        | Builders de `CustomAgentConfig`                               | `createAgent()`, `createReadOnlyAgent()`, `createFullAccessAgent()` |
-| `models.js`        | Helpers de modelos                                            | `listModels()`, `pickModel()`, `buildReasoningConfig()`     |
-| `tools-registry.js`| Registry com metadados (categoria, tags, readOnly)            | `createRegistry()`, `registerTools()`, `getToolsByCategory()`, `filterByNames()`, `excludeByNames()`, `mergeRegistries()` |
-| `telemetry.js`     | Store em memória (buffer circular, maxRecords=500)            | `createTelemetry()`, `recordToolCall()`, `recordSessionStart/End()`, `getSummary()`, `startSpan()` |
+| Arquivo             | Responsabilidade                                       | Exports-chave                                                                                                             |
+| ------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `client.js`         | `CopilotClient` singleton + registry de sessões ativas | `getClient()`, `getActiveSessions()`, `registerSession()`                                                                 |
+| `session.js`        | Ciclo de vida de sessões SDK                           | `createSession()`, `resumeOrCreate()`, `listSessions()`, `deleteSession()`                                                |
+| `hooks.js`          | Factories de `SessionHooks`                            | `createHooks()`, `createAuditHooks()`, `createMinimalHooks()`                                                             |
+| `permissions.js`    | Factories de `PermissionHandler`                       | `createApproveAllPermission()`, `createAuditPermission()`, `createSafePermission()`                                       |
+| `agents.js`         | Builders de `CustomAgentConfig`                        | `createAgent()`, `createReadOnlyAgent()`, `createFullAccessAgent()`                                                       |
+| `models.js`         | Helpers de modelos                                     | `listModels()`, `pickModel()`, `buildReasoningConfig()`                                                                   |
+| `tools-registry.js` | Registry com metadados (categoria, tags, readOnly)     | `createRegistry()`, `registerTools()`, `getToolsByCategory()`, `filterByNames()`, `excludeByNames()`, `mergeRegistries()` |
+| `telemetry.js`      | Store em memória (buffer circular, maxRecords=500)     | `createTelemetry()`, `recordToolCall()`, `recordSessionStart/End()`, `getSummary()`, `startSpan()`                        |
 
 **`startSpan(name, attrs, fn)` (AI.3)**: wrapper OTEL com graceful degradation — tenta usar `@opentelemetry/sdk-trace-node` se instalado; caso contrário executa `fn()` diretamente com logging de latência.
 
@@ -310,10 +310,10 @@ Camada de wrappers sem side-effects — nenhum singleton é inicializado no `imp
 
 Dois modos complementares de LLM-A → LLM-B:
 
-| Modo               | Arquivo      | Quando usar                                              |
-| ------------------ | ------------ | -------------------------------------------------------- |
-| **HTTP injection** | `inject.js`  | Terminal LLM-B já ativo em processo separado (porta 3009) |
-| **SDK in-process** | `client.js`  | Scripts standalone que iniciam sessão SDK diretamente    |
+| Modo               | Arquivo     | Quando usar                                               |
+| ------------------ | ----------- | --------------------------------------------------------- |
+| **HTTP injection** | `inject.js` | Terminal LLM-B já ativo em processo separado (porta 3009) |
+| **SDK in-process** | `client.js` | Scripts standalone que iniciam sessão SDK diretamente     |
 
 #### `channel/inject.js`
 
@@ -322,7 +322,7 @@ Dois modos complementares de LLM-A → LLM-B:
 **Outras exports**: `checkLlmBHealth()`, `injectPipeline(steps)`, `subscribeLlmB(url, handler)`, `subscribeLlmBCritical(url, handler)`, `waitForLlmBReady(timeoutMs)`
 
 - Usa `http.request` nativo (sem fetch)
-- Timeout: `LLM_B_TURN_TIMEOUT ?? 130_000` ms (⚠️ diferente do terminal: 120 000 ms)
+- Timeout: `LLM_B_TURN_TIMEOUT ?? 120_000` ms (centralizado em `core/constants.js` — `LLM_B_TURN_TIMEOUT_MS`)
 - Rate: `INJECT_RATE_MAX = 10 req/IP/60 s` (controlado no servidor)
 
 #### `channel/client.js`
@@ -347,15 +347,15 @@ Dois modos complementares de LLM-A → LLM-B:
 
 ### 4.4 `config/` — Configuração
 
-| Arquivo                    | Responsabilidade                                              |
-| -------------------------- | ------------------------------------------------------------- |
-| `session-config.js`        | Builders de `SessionConfig` — `buildAlwaysAliveConfig()`, `buildReadOnlyConfig()`, `buildFullAccessConfig()` |
+| Arquivo                    | Responsabilidade                                                                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `session-config.js`        | Builders de `SessionConfig` — `buildAlwaysAliveConfig()`, `buildReadOnlyConfig()`, `buildFullAccessConfig()`                        |
 | `system-prompt.js`         | Constantes e builders do system prompt: `AGENT_IDENTITY`, `AGENT_TONE`, `buildAppendSystemMessage()`, `buildReplaceSystemMessage()` |
-| `mcp-servers.js`           | `buildMcpConfig()` — array de configurações de MCP servers   |
-| `tools-state.js`           | Estado de habilitação de tools em runtime; persistência em `tools-config.json` (AI.1) |
-| `custom-tools-registry.js` | Registry dinâmico de tools via API; persistência em `custom-tools.json` (AI.2) |
-| `custom-agents.js`         | `CustomAgentConfig` builders                                  |
-| `pinned-files-loader.js`   | Carrega arquivos fixos como contexto de sessão                |
+| `mcp-servers.js`           | `buildMcpConfig()` — array de configurações de MCP servers                                                                          |
+| `tools-state.js`           | Estado de habilitação de tools em runtime; persistência em `tools-config.json` (AI.1)                                               |
+| `custom-tools-registry.js` | Registry dinâmico de tools via API; persistência em `custom-tools.json` (AI.2)                                                      |
+| `custom-agents.js`         | `CustomAgentConfig` builders                                                                                                        |
+| `pinned-files-loader.js`   | Carrega arquivos fixos como contexto de sessão                                                                                      |
 
 #### `config/tools-state.js` (AI.1)
 
@@ -369,11 +369,11 @@ Dois modos complementares de LLM-A → LLM-B:
 
 **Handlers embutidos** (`BUILTIN_HANDLER_MAP`):
 
-| Key          | Comportamento                    |
-| ------------ | -------------------------------- |
-| `echo`       | Retorna a mensagem de input      |
-| `timestamp`  | Retorna ISO8601 do momento       |
-| `env_read`   | Lê variável de ambiente (allowlist) |
+| Key         | Comportamento                       |
+| ----------- | ----------------------------------- |
+| `echo`      | Retorna a mensagem de input         |
+| `timestamp` | Retorna ISO8601 do momento          |
+| `env_read`  | Lê variável de ambiente (allowlist) |
 
 **Exports**: `loadCustomToolsRegistry()`, `getCustomTools()`, `listCustomToolEntries()`, `registerCustomTool(entry)`, `unregisterCustomTool(name)`, `buildCustomTools()`, `getCustomToolDefinitions()`
 
@@ -399,21 +399,21 @@ Dois modos complementares de LLM-A → LLM-B:
 
 **Tabelas**:
 
-| Tabela                        | Propósito                                         |
-| ----------------------------- | ------------------------------------------------- |
-| `copilot_hub_sessions`        | Sessões de conversa (hub-level)                   |
-| `copilot_conversation_turns`  | Turnos individuais (FK cascade)                   |
-| `copilot_memories`            | Memórias persistentes + FTS5 (Porter unicode61)   |
+| Tabela                       | Propósito                                       |
+| ---------------------------- | ----------------------------------------------- |
+| `copilot_hub_sessions`       | Sessões de conversa (hub-level)                 |
+| `copilot_conversation_turns` | Turnos individuais (FK cascade)                 |
+| `copilot_memories`           | Memórias persistentes + FTS5 (Porter unicode61) |
 
 **Métodos principais**:
 
-| Método                                      | Descrição                              |
-| ------------------------------------------- | -------------------------------------- |
-| `createHubSession(metadata)`                | Cria nova hub session                  |
-| `writeTurn(hubSessionId, turnData)`         | Insere turno na conversa               |
-| `getSessionTurns(hubSessionId, limit)`      | Retorna turnos paginados               |
-| `writeMemory(hubSessionId, content, tags)`  | Persiste memória                       |
-| `searchMemories(query, limit)`              | Busca FTS5 (Porter stemmer)            |
+| Método                                                     | Descrição                              |
+| ---------------------------------------------------------- | -------------------------------------- |
+| `createHubSession(metadata)`                               | Cria nova hub session                  |
+| `writeTurn(hubSessionId, turnData)`                        | Insere turno na conversa               |
+| `getSessionTurns(hubSessionId, limit)`                     | Retorna turnos paginados               |
+| `writeMemory(hubSessionId, content, tags)`                 | Persiste memória                       |
+| `searchMemories(query, limit)`                             | Busca FTS5 (Porter stemmer)            |
 | `syncFromSdkHistory(hubSessionId, sdkSessionId, messages)` | AI.4 — sincroniza histórico SDK→SQLite |
 
 #### `conversation-hub/orchestrator.js`
@@ -436,13 +436,13 @@ Dois modos complementares de LLM-A → LLM-B:
 
 ### 4.6 `bridges/` — Integrações Externas
 
-| Arquivo               | Responsabilidade                                              |
-| --------------------- | ------------------------------------------------------------- |
-| `nerv-bridge.js`      | Ponte AlwaysAliveAgent ↔ NERV event bus (25 eventos mapeados) |
-| `gh-bridge.js`        | Wrapper `gh` CLI via `execFile`                               |
-| `git-bridge.js`       | Wrapper `git` CLI via `execFile`                              |
-| `mcp-tool-bridge.js`  | Carregamento dinâmico de tools via MCP JSON-RPC 2.0           |
-| `alias-store.js`      | 10 aliases embutidos + persistência em `~/.copilot-aliases.json` |
+| Arquivo              | Responsabilidade                                                 |
+| -------------------- | ---------------------------------------------------------------- |
+| `nerv-bridge.js`     | Ponte AlwaysAliveAgent ↔ NERV event bus (25 eventos mapeados)    |
+| `gh-bridge.js`       | Wrapper `gh` CLI via `execFile`                                  |
+| `git-bridge.js`      | Wrapper `git` CLI via `execFile`                                 |
+| `mcp-tool-bridge.js` | Carregamento dinâmico de tools via MCP JSON-RPC 2.0              |
+| `alias-store.js`     | 10 aliases embutidos + persistência em `~/.copilot-aliases.json` |
 
 #### `bridges/nerv-bridge.js`
 
@@ -484,72 +484,72 @@ api/sdk-api.js (/api/sdk/*)
 
 ### 4.8 `terminal/` — Terminal Interativo (Porta 3009)
 
-| Arquivo               | Responsabilidade                                                    |
-| --------------------- | ------------------------------------------------------------------- |
-| `index.js`            | `startTerminalServer()` — orquestração do boot completo             |
-| `server.js`           | `createInjectServer()` — HTTP server raw (`node:http`)              |
-| `repl.js`             | `startRepl()` — readline REPL interativo                            |
-| `dialog.js`           | Motor de diálogo: `sendTurn()`, `broadcastSse()`, `ensureDialogLoop()` |
-| `http-handlers.js`    | Command Pattern — handlers puros para todos os endpoints             |
-| `state.js`            | Estado global compartilhado do terminal                             |
-| `file-context.js`     | Builder de contexto de arquivo para injeção                         |
-| `workspace-context.js`| Builder de contexto de workspace para injeção                       |
+| Arquivo                | Responsabilidade                                                       |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `index.js`             | `startTerminalServer()` — orquestração do boot completo                |
+| `server.js`            | `createInjectServer()` — HTTP server raw (`node:http`)                 |
+| `repl.js`              | `startRepl()` — readline REPL interativo                               |
+| `dialog.js`            | Motor de diálogo: `sendTurn()`, `broadcastSse()`, `ensureDialogLoop()` |
+| `http-handlers.js`     | Command Pattern — handlers puros para todos os endpoints               |
+| `state.js`             | Estado global compartilhado do terminal                                |
+| `file-context.js`      | Builder de contexto de arquivo para injeção                            |
+| `workspace-context.js` | Builder de contexto de workspace para injeção                          |
 
 #### `terminal/state.js` — Estado Global
 
-| Getter/Setter             | Tipo                | Propósito                              |
-| ------------------------- | ------------------- | -------------------------------------- |
-| `getHubSessionId()`       | `string \| null`    | Hub session ativa                      |
-| `getBusy()` / `setBusy()` | `boolean`           | Flag de turno em processamento         |
-| `getRl()` / `setRl()`     | `readline \| null`  | Instância readline ativa               |
-| `getAttachmentQueue()`    | `string[]`          | Fila de arquivos a embutir no próximo turno |
-| `getPlanMode()`           | `boolean`           | Prefácio de planejamento ativo         |
-| `getSseClients()`         | `Set<ServerResponse>`| Clientes SSE conectados                |
-| `getSseCriticalClients()` | `Set<ServerResponse>`| Clientes SSE nível crítico             |
+| Getter/Setter             | Tipo                  | Propósito                                   |
+| ------------------------- | --------------------- | ------------------------------------------- |
+| `getHubSessionId()`       | `string \| null`      | Hub session ativa                           |
+| `getBusy()` / `setBusy()` | `boolean`             | Flag de turno em processamento              |
+| `getRl()` / `setRl()`     | `readline \| null`    | Instância readline ativa                    |
+| `getAttachmentQueue()`    | `string[]`            | Fila de arquivos a embutir no próximo turno |
+| `getPlanMode()`           | `boolean`             | Prefácio de planejamento ativo              |
+| `getSseClients()`         | `Set<ServerResponse>` | Clientes SSE conectados                     |
+| `getSseCriticalClients()` | `Set<ServerResponse>` | Clientes SSE nível crítico                  |
 
 #### `terminal/http-handlers.js` — Endpoints
 
-Handler | Método | Rota
---- | --- | ---
-`handleStatus` | GET | `/health`
-`handleGetConfig` | GET | `/config`
-`handleGetSkills` | GET | `/config/skills`
-`handlePostSkills` | PUT | `/config/skills`
-`handleGetTools` | GET | `/config/tools`
-`handlePutTools` | PUT | `/config/tools`
-`handleGetCustomTools` | GET | `/config/tools/custom`
-`handlePostCustomTool` | POST | `/config/tools/custom`
-`handleDeleteCustomTool` | DELETE | `/config/tools/custom/:name`
-`handleInfiniteSession` | PUT | `/config/infinite-session`
-`handleInject` | POST | `/inject`
-`handlePipeline` | POST | `/pipeline`
-`handleMemoryPost` | POST | `/memory`
-`handleMemoryGet` | GET | `/memory`
-`handleMemoryDelete` | DELETE | `/memory/:id`
-`handleGetSessions` | GET | `/sessions`
-`handleGetSessionTurns` | GET | `/sessions/:id/turns`
-`handleGhIssues` | GET | `/gh/issues`
-`handleGhPrs` | GET | `/gh/prs`
-`handleGhCi` | GET | `/gh/ci`
-`handleGitStatus` | GET | `/git/status`
-`handleGitLog` | GET | `/git/log`
+| Handler                  | Método | Rota                         |
+| ------------------------ | ------ | ---------------------------- |
+| `handleStatus`           | GET    | `/health`                    |
+| `handleGetConfig`        | GET    | `/config`                    |
+| `handleGetSkills`        | GET    | `/config/skills`             |
+| `handlePostSkills`       | PUT    | `/config/skills`             |
+| `handleGetTools`         | GET    | `/config/tools`              |
+| `handlePutTools`         | PUT    | `/config/tools`              |
+| `handleGetCustomTools`   | GET    | `/config/tools/custom`       |
+| `handlePostCustomTool`   | POST   | `/config/tools/custom`       |
+| `handleDeleteCustomTool` | DELETE | `/config/tools/custom/:name` |
+| `handleInfiniteSession`  | PUT    | `/config/infinite-session`   |
+| `handleInject`           | POST   | `/inject`                    |
+| `handlePipeline`         | POST   | `/pipeline`                  |
+| `handleMemoryPost`       | POST   | `/memory`                    |
+| `handleMemoryGet`        | GET    | `/memory`                    |
+| `handleMemoryDelete`     | DELETE | `/memory/:id`                |
+| `handleGetSessions`      | GET    | `/sessions`                  |
+| `handleGetSessionTurns`  | GET    | `/sessions/:id/turns`        |
+| `handleGhIssues`         | GET    | `/gh/issues`                 |
+| `handleGhPrs`            | GET    | `/gh/prs`                    |
+| `handleGhCi`             | GET    | `/gh/ci`                     |
+| `handleGitStatus`        | GET    | `/git/status`                |
+| `handleGitLog`           | GET    | `/git/log`                   |
 
 #### `terminal/commands/` — Comandos REPL
 
-| Arquivo       | Comandos REPL disponíveis                                    |
-| ------------- | ------------------------------------------------------------ |
-| `alias.js`    | `/alias list`, `/alias add`, `/alias remove`                 |
-| `attach.js`   | `/attach <caminho>` — adiciona arquivo à fila de contexto    |
-| `config.js`   | `/model <nome>`, `/reasoning <effort>`                       |
-| `context.js`  | `/compact`, `/context`                                       |
-| `gh.js`       | `/gh issues`, `/gh prs`, `/gh ci`                            |
-| `git.js`      | `/git status`, `/git log`                                    |
-| `help.js`     | `/help`                                                      |
-| `memory.js`   | `/remember <texto>`, `/recall <query>`, `/forget <id>`       |
-| `plan.js`     | `/plan on`, `/plan off`                                      |
-| `resume.js`   | `/resume`                                                    |
-| `session.js`  | `/status`, `/history`, `/db-history`, `/db-sessions`, `/who`, `/clear`, `/answer`, `/count`, `/restart` |
-| `skills.js`   | `/skills`                                                    |
+| Arquivo      | Comandos REPL disponíveis                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| `alias.js`   | `/alias list`, `/alias add`, `/alias remove`                                                            |
+| `attach.js`  | `/attach <caminho>` — adiciona arquivo à fila de contexto                                               |
+| `config.js`  | `/model <nome>`, `/reasoning <effort>`                                                                  |
+| `context.js` | `/compact`, `/context`                                                                                  |
+| `gh.js`      | `/gh issues`, `/gh prs`, `/gh ci`                                                                       |
+| `git.js`     | `/git status`, `/git log`                                                                               |
+| `help.js`    | `/help`                                                                                                 |
+| `memory.js`  | `/remember <texto>`, `/recall <query>`, `/forget <id>`                                                  |
+| `plan.js`    | `/plan on`, `/plan off`                                                                                 |
+| `resume.js`  | `/resume`                                                                                               |
+| `session.js` | `/status`, `/history`, `/db-history`, `/db-sessions`, `/who`, `/clear`, `/answer`, `/count`, `/restart` |
+| `skills.js`  | `/skills`                                                                                               |
 
 ---
 
@@ -675,57 +675,57 @@ startTerminalServer() → terminal/index.js
 
 ### Terminal (porta 3009 — `node:http` raw)
 
-| Método | Rota                           | Handler                  | Rate limit       |
-| ------ | ------------------------------ | ------------------------ | ---------------- |
-| GET    | `/health`                      | `handleStatus`           | —                |
-| GET    | `/config`                      | `handleGetConfig`        | —                |
-| GET    | `/config/skills`               | `handleGetSkills`        | —                |
-| PUT    | `/config/skills`               | `handlePostSkills`       | —                |
-| GET    | `/config/tools`                | `handleGetTools`         | —                |
-| PUT    | `/config/tools`                | `handlePutTools`         | —                |
-| GET    | `/config/tools/custom`         | `handleGetCustomTools`   | — (AI.2)         |
-| POST   | `/config/tools/custom`         | `handlePostCustomTool`   | — (AI.2)         |
-| DELETE | `/config/tools/custom/:name`   | `handleDeleteCustomTool` | — (AI.2)         |
-| PUT    | `/config/infinite-session`     | `handleInfiniteSession`  | —                |
-| POST   | `/inject`                      | `handleInject`           | 10 req/IP/60 s   |
-| POST   | `/pipeline`                    | `handlePipeline`         | —                |
-| POST   | `/memory`                      | `handleMemoryPost`       | —                |
-| GET    | `/memory`                      | `handleMemoryGet`        | —                |
-| DELETE | `/memory/:id`                  | `handleMemoryDelete`     | —                |
-| GET    | `/sessions`                    | `handleGetSessions`      | —                |
-| GET    | `/sessions/:id/turns`          | `handleGetSessionTurns`  | —                |
-| GET    | `/events`                      | SSE (todos eventos)      | —                |
-| GET    | `/events?level=critical`       | SSE (eventos críticos)   | —                |
-| GET    | `/gh/issues`                   | `handleGhIssues`         | —                |
-| GET    | `/gh/prs`                      | `handleGhPrs`            | —                |
-| GET    | `/gh/ci`                       | `handleGhCi`             | —                |
-| GET    | `/git/status`                  | `handleGitStatus`        | —                |
-| GET    | `/git/log`                     | `handleGitLog`           | —                |
+| Método | Rota                         | Handler                  | Rate limit     |
+| ------ | ---------------------------- | ------------------------ | -------------- |
+| GET    | `/health`                    | `handleStatus`           | —              |
+| GET    | `/config`                    | `handleGetConfig`        | —              |
+| GET    | `/config/skills`             | `handleGetSkills`        | —              |
+| PUT    | `/config/skills`             | `handlePostSkills`       | —              |
+| GET    | `/config/tools`              | `handleGetTools`         | —              |
+| PUT    | `/config/tools`              | `handlePutTools`         | —              |
+| GET    | `/config/tools/custom`       | `handleGetCustomTools`   | — (AI.2)       |
+| POST   | `/config/tools/custom`       | `handlePostCustomTool`   | — (AI.2)       |
+| DELETE | `/config/tools/custom/:name` | `handleDeleteCustomTool` | — (AI.2)       |
+| PUT    | `/config/infinite-session`   | `handleInfiniteSession`  | —              |
+| POST   | `/inject`                    | `handleInject`           | 10 req/IP/60 s |
+| POST   | `/pipeline`                  | `handlePipeline`         | —              |
+| POST   | `/memory`                    | `handleMemoryPost`       | —              |
+| GET    | `/memory`                    | `handleMemoryGet`        | —              |
+| DELETE | `/memory/:id`                | `handleMemoryDelete`     | —              |
+| GET    | `/sessions`                  | `handleGetSessions`      | —              |
+| GET    | `/sessions/:id/turns`        | `handleGetSessionTurns`  | —              |
+| GET    | `/events`                    | SSE (todos eventos)      | —              |
+| GET    | `/events?level=critical`     | SSE (eventos críticos)   | —              |
+| GET    | `/gh/issues`                 | `handleGhIssues`         | —              |
+| GET    | `/gh/prs`                    | `handleGhPrs`            | —              |
+| GET    | `/gh/ci`                     | `handleGhCi`             | —              |
+| GET    | `/git/status`                | `handleGitStatus`        | —              |
+| GET    | `/git/log`                   | `handleGitLog`           | —              |
 
 ### API Express — `/api/copilot/*`
 
-| Método | Rota                  | Descrição                          |
-| ------ | --------------------- | ---------------------------------- |
-| GET    | `/status`             | Snapshot do agente                 |
-| GET    | `/health`             | Saúde (idle/processing only)       |
-| GET    | `/session`            | Info da sessão SDK atual           |
-| POST   | `/start`              | Inicia agente                      |
-| POST   | `/stop`               | Para agente                        |
-| POST   | `/send`               | Enfileira mensagem (sync opt.)     |
-| POST   | `/answer`             | Responde pergunta pendente         |
-| GET    | `/stream`             | SSE — todos os 26 eventos          |
-| POST   | `/dialog/start`       | Inicia dialog loop                 |
-| POST   | `/dialog/turn`        | Injeta turno no dialog loop        |
-| POST   | `/dialog/stop`        | Encerra dialog loop                |
+| Método | Rota            | Descrição                      |
+| ------ | --------------- | ------------------------------ |
+| GET    | `/status`       | Snapshot do agente             |
+| GET    | `/health`       | Saúde (idle/processing only)   |
+| GET    | `/session`      | Info da sessão SDK atual       |
+| POST   | `/start`        | Inicia agente                  |
+| POST   | `/stop`         | Para agente                    |
+| POST   | `/send`         | Enfileira mensagem (sync opt.) |
+| POST   | `/answer`       | Responde pergunta pendente     |
+| GET    | `/stream`       | SSE — todos os 26 eventos      |
+| POST   | `/dialog/start` | Inicia dialog loop             |
+| POST   | `/dialog/turn`  | Injeta turno no dialog loop    |
+| POST   | `/dialog/stop`  | Encerra dialog loop            |
 
 ### API Express — `/api/sdk/*`
 
-| Grupo       | Rotas principais                                |
-| ----------- | ----------------------------------------------- |
-| `/agent`    | `GET /info /tools /telemetry /state /stream`    |
+| Grupo       | Rotas principais                                            |
+| ----------- | ----------------------------------------------------------- |
+| `/agent`    | `GET /info /tools /telemetry /state /stream`                |
 | `/client`   | `GET /ping /status /auth /models /tools; POST /start /stop` |
-| `/sessions` | CRUD completo `GET/POST/DELETE /sessions[/:id]` |
-| `/webhooks` | CRUD `GET/POST/DELETE /webhooks[/:id]`          |
+| `/sessions` | CRUD completo `GET/POST/DELETE /sessions[/:id]`             |
+| `/webhooks` | CRUD `GET/POST/DELETE /webhooks[/:id]`                      |
 
 ---
 
@@ -733,40 +733,40 @@ startTerminalServer() → terminal/index.js
 
 ### `AlwaysAliveAgent` → NERV bridge (`bridge/nerv-bridge.js`)
 
-| Evento copilot              | Action Code NERV                        |
-| --------------------------- | --------------------------------------- |
-| `status`                    | `COPILOT_STATUS`                        |
-| `ready`                     | `COPILOT_READY`                         |
-| `task.queued`               | `COPILOT_TASK_QUEUED`                   |
-| `task.started`              | `COPILOT_TASK_STARTED`                  |
-| `task.completed`            | `COPILOT_TASK_COMPLETED`                |
-| `task.error`                | `COPILOT_TASK_ERROR`                    |
-| `session.history_synced`    | `COPILOT_SESSION_HISTORY_SYNCED` (AI.4) |
-| ... (25 mapeamentos total)  | ...                                     |
+| Evento copilot             | Action Code NERV                        |
+| -------------------------- | --------------------------------------- |
+| `status`                   | `COPILOT_STATUS`                        |
+| `ready`                    | `COPILOT_READY`                         |
+| `task.queued`              | `COPILOT_TASK_QUEUED`                   |
+| `task.started`             | `COPILOT_TASK_STARTED`                  |
+| `task.completed`           | `COPILOT_TASK_COMPLETED`                |
+| `task.error`               | `COPILOT_TASK_ERROR`                    |
+| `session.history_synced`   | `COPILOT_SESSION_HISTORY_SYNCED` (AI.4) |
+| ... (25 mapeamentos total) | ...                                     |
 
 ### `HubOrchestrator` → Socket.io `/copilot`
 
-| Evento                | Descrição                          |
-| --------------------- | ---------------------------------- |
-| `turn:sent`           | Turno enviado à LLM-B              |
-| `turn:delta`          | Chunk de streaming recebido        |
-| `turn:complete`       | Resposta completa                  |
-| `user:injected`       | Mensagem do usuário injetada       |
-| `session:created`     | Nova hub session criada            |
-| `session:closed`      | Hub session encerrada              |
+| Evento            | Descrição                    |
+| ----------------- | ---------------------------- |
+| `turn:sent`       | Turno enviado à LLM-B        |
+| `turn:delta`      | Chunk de streaming recebido  |
+| `turn:complete`   | Resposta completa            |
+| `user:injected`   | Mensagem do usuário injetada |
+| `session:created` | Nova hub session criada      |
+| `session:closed`  | Hub session encerrada        |
 
 ---
 
 ## 8. Persistência e Estado
 
-| Arquivo                                       | Conteúdo                                      | Escopo                    |
-| --------------------------------------------- | --------------------------------------------- | ------------------------- |
-| `.github/hooks/state/sdk-always-alive.json`   | Estado da sessão SDK activa                   | Agente                    |
-| `tools-config.json` (raiz)                    | Allowlist/denylist de tools (AI.1)            | Configuração de runtime   |
-| `custom-tools.json` (raiz)                    | Registry de custom tools declarativas (AI.2)  | Configuração de runtime   |
-| `~/.copilot-aliases.json`                     | Aliases do REPL                               | Usuário                   |
-| `maestro.sqlite`                              | Hub sessions + turns + memories FTS5          | Banco de dados            |
-| `logs/tool-audit.jsonl`                       | Auditoria JSONL de tool calls arriscados      | Logs (rotação a 10 MB)    |
+| Arquivo                                     | Conteúdo                                     | Escopo                  |
+| ------------------------------------------- | -------------------------------------------- | ----------------------- |
+| `.github/hooks/state/sdk-always-alive.json` | Estado da sessão SDK activa                  | Agente                  |
+| `tools-config.json` (raiz)                  | Allowlist/denylist de tools (AI.1)           | Configuração de runtime |
+| `custom-tools.json` (raiz)                  | Registry de custom tools declarativas (AI.2) | Configuração de runtime |
+| `~/.copilot-aliases.json`                   | Aliases do REPL                              | Usuário                 |
+| `maestro.sqlite`                            | Hub sessions + turns + memories FTS5         | Banco de dados          |
+| `logs/tool-audit.jsonl`                     | Auditoria JSONL de tool calls arriscados     | Logs (rotação a 10 MB)  |
 
 ---
 
@@ -806,20 +806,20 @@ Os 14 arquivos na raiz do módulo são **shims de compatibilidade** criados dura
 
 ## 11. Issues e Pontos de Atenção
 
-| # | Issue | Impacto | Arquivo | Ação recomendada |
-| --- | --- | --- | --- | --- |
-| 9.1 | 13 shims legados na raiz | DX | `src/copilot/*.js` (raiz) | Remover em PR dedicado |
-| 9.2 | `sdk-client.js` oculta mapeamento | DX | `sdk-client.js` | Documentar ou migrar callers |
-| 9.3 | `terminal-server.js` vs `terminal/server.js` | Confusão | ambos | Renomear legacy |
-| 9.4 | `orchestrator.js` importa shim deprecated | Médio | `conversation-hub/orchestrator.js` | Corrigir para `../channel/client.js` |
-| 9.5 | `routes/agent.js` acessa campos privados via cast `any` | Médio | `routes/agent.js` | Adicionar `getToolsRegistry()` e `getTelemetry()` públicos |
-| 9.6 | `task-tools.js` usa `execSync + curl` | Médio (bloqueia event loop) | `tools/task-tools.js` | Substituir por `http.request` nativo |
-| 9.7 | Timeouts inconsistentes (120 s vs 130 s) | Baixo | `terminal/dialog.js` vs `channel/inject.js` | Centralizar em `core/constants.js` |
-| 9.8 | `BUILTIN_HANDLER_MAP` mínimo (3 handlers) | Funcional | `config/custom-tools-registry.js` | Adicionar handlers práticos |
-| 9.9 | Estado global mutável sem observers em `state.js` | Race condition potencial | `terminal/state.js` | Considerar EventEmitter ou Proxy |
-| 9.10 | Sem limite de clientes SSE | Memory leak potencial | `api/bridge-stream.js` | Adicionar `MAX_SSE_CLIENTS` |
-| 9.11 | `copilot-router.js` e `sdk-router.js` são aliases inúteis | DX | `api/copilot-router.js`, `api/sdk-router.js` | Remover |
-| 9.12 | Migração FTS5 executada a cada `init()` | Risco DDL | `conversation-hub/store.js` | Verificar versão antes de migrar |
+| #    | Issue                                                     | Impacto                     | Arquivo                                      | Status                                                                   |
+| ---- | --------------------------------------------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------ |
+| 9.1  | 13 shims legados na raiz                                  | DX                          | `src/copilot/*.js` (raiz)                    | Pendente (Fase 3)                                                        |
+| 9.2  | `sdk-client.js` oculta mapeamento                         | DX                          | `sdk-client.js`                              | Pendente (Fase 3)                                                        |
+| 9.3  | `terminal-server.js` vs `terminal/server.js`              | Confusão                    | ambos                                        | Pendente (Fase 3)                                                        |
+| 9.4  | `orchestrator.js` importava shim deprecated               | Médio                       | `conversation-hub/orchestrator.js`           | ✅ **Corrigido** — agora importa `../channel/client.js`                   |
+| 9.5  | `routes/agent.js` acessa campos privados via cast `any`   | Médio                       | `routes/agent.js`                            | Pendente (Fase 2/D1)                                                     |
+| 9.6  | `task-tools.js` usava `execSync + curl`                   | Médio (bloqueia event loop) | `tools/task-tools.js`                        | ✅ **Corrigido** — substituído por `http.request` nativo                  |
+| 9.7  | Timeouts inconsistentes (120 s vs 130 s)                  | Baixo                       | `terminal/dialog.js` vs `channel/inject.js`  | ✅ **Corrigido** — centralizados em `core/constants.js`                   |
+| 9.8  | `BUILTIN_HANDLER_MAP` mínimo (3 handlers)                 | Funcional                   | `config/custom-tools-registry.js`            | Pendente (Fase 2/I1)                                                     |
+| 9.9  | Estado global mutável sem observers em `state.js`         | Race condition potencial    | `terminal/state.js`                          | Pendente (Fase 2/F1)                                                     |
+| 9.10 | Sem limite de clientes SSE                                | Memory leak potencial       | `terminal/server.js`, `routes/agent.js`      | ✅ **Corrigido** — `MAX_SSE_CLIENTS` aplicado (HTTP 429)                  |
+| 9.11 | `copilot-router.js` e `sdk-router.js` são aliases inúteis | DX                          | `api/copilot-router.js`, `api/sdk-router.js` | Pendente (Fase 2/A1)                                                     |
+| 9.12 | Migração FTS5 a cada `init()`                             | Risco DDL                   | `conversation-hub/store.js`                  | ✅ **Revisado** — guard `#initialized` + função idempotente já existentes |
 
 ---
 
@@ -827,118 +827,118 @@ Os 14 arquivos na raiz do módulo são **shims de compatibilidade** criados dura
 
 ### Ativos (canônicos)
 
-| Arquivo                                          | Camada | Status |
-| ------------------------------------------------ | ------ | ------ |
-| `agent/entry.js`                                 | 12     | ✅ Ativo |
-| `agent/always-alive.js`                          | 3      | ✅ Crítico |
-| `agent/session-manager.js`                       | 3      | ✅ Ativo |
-| `agent/tools-bootstrap.js`                       | 3      | ✅ Ativo |
-| `agent/events.js`                                | 3      | ✅ Ativo |
-| `agent/task-executor.js`                         | 3      | ✅ Ativo |
-| `agent/dialog-watchdog.js`                       | 3      | ✅ Ativo |
-| `agent/webhook-manager.js`                       | 3      | ✅ Ativo |
-| `api/http-bridge.js`                             | 9      | ✅ Ativo |
-| `api/sdk-api.js`                                 | 9      | ✅ Ativo |
-| `api/bridge-control.js`                          | 9      | ✅ Ativo |
-| `api/bridge-dialog.js`                           | 9      | ✅ Ativo |
-| `api/bridge-stream.js`                           | 9      | ✅ Ativo |
-| `api/bridge-tasks.js`                            | 9      | ✅ Ativo |
-| `bridges/nerv-bridge.js`                         | 8      | ✅ Ativo |
-| `bridges/gh-bridge.js`                           | 8      | ✅ Ativo |
-| `bridges/git-bridge.js`                          | 8      | ✅ Ativo |
-| `bridges/mcp-tool-bridge.js`                     | 8      | ✅ Ativo |
-| `bridges/alias-store.js`                         | 8      | ✅ Ativo |
-| `channel/client.js`                              | 5      | ✅ Ativo |
-| `channel/inject.js`                              | 5      | ✅ Ativo |
-| `channel/audit.js`                               | 5      | ✅ Ativo |
-| `channel/index.js`                               | 5      | ✅ Ativo |
-| `config/session-config.js`                       | 6      | ✅ Ativo |
-| `config/system-prompt.js`                        | 6      | ✅ Ativo |
-| `config/mcp-servers.js`                          | 6      | ✅ Ativo |
-| `config/tools-state.js`                          | 6      | ✅ Ativo (AI.1) |
-| `config/custom-tools-registry.js`                | 6      | ✅ Ativo (AI.2) |
-| `config/custom-agents.js`                        | 6      | ✅ Ativo |
-| `config/pinned-files-loader.js`                  | 6      | ✅ Ativo |
-| `config/index.js`                                | 6      | ✅ Ativo |
-| `conversation-hub/hub.js`                        | 7      | ✅ Ativo |
-| `conversation-hub/orchestrator.js`               | 7      | ✅ Ativo |
-| `conversation-hub/store.js`                      | 7      | ✅ Ativo |
-| `conversation-hub/socket-ns.js`                  | 7      | ✅ Ativo |
-| `conversation-hub/index.js`                      | 7      | ✅ Ativo |
-| `core/constants.js`                              | 0      | ✅ Ativo |
-| `core/errors.js`                                 | 0      | ✅ Ativo |
-| `core/types.js`                                  | 0      | ✅ Ativo |
-| `core/index.js`                                  | 0      | ✅ Ativo |
-| `lib/client.js`                                  | 1      | ✅ Ativo |
-| `lib/session.js`                                 | 1      | ✅ Ativo |
-| `lib/hooks.js`                                   | 1      | ✅ Ativo |
-| `lib/permissions.js`                             | 1      | ✅ Ativo |
-| `lib/agents.js`                                  | 1      | ✅ Ativo |
-| `lib/models.js`                                  | 1      | ✅ Ativo |
-| `lib/tools-registry.js`                          | 1      | ✅ Ativo |
-| `lib/telemetry.js`                               | 1      | ✅ Ativo (AI.3) |
-| `lib/index.js`                                   | 1      | ✅ Ativo |
-| `routes/agent.js`                                | 10     | ✅ Ativo |
-| `routes/client.js`                               | 10     | ✅ Ativo |
-| `routes/sessions.js`                             | 10     | ✅ Ativo |
-| `routes/webhooks.js`                             | 10     | ✅ Ativo |
-| `terminal/index.js`                              | 12     | ✅ Ativo |
-| `terminal/server.js`                             | 11     | ✅ Ativo |
-| `terminal/repl.js`                               | 11     | ✅ Ativo |
-| `terminal/dialog.js`                             | 11     | ✅ Ativo |
-| `terminal/http-handlers.js`                      | 11     | ✅ Ativo (AI.2/AI.5) |
-| `terminal/state.js`                              | 11     | ✅ Ativo |
-| `terminal/file-context.js`                       | 11     | ✅ Ativo |
-| `terminal/workspace-context.js`                  | 11     | ✅ Ativo |
-| `terminal/commands/index.js`                     | 11     | ✅ Ativo |
-| `terminal/commands/alias.js`                     | 11     | ✅ Ativo |
-| `terminal/commands/attach.js`                    | 11     | ✅ Ativo |
-| `terminal/commands/config.js`                    | 11     | ✅ Ativo |
-| `terminal/commands/context.js`                   | 11     | ✅ Ativo |
-| `terminal/commands/gh.js`                        | 11     | ✅ Ativo |
-| `terminal/commands/git.js`                       | 11     | ✅ Ativo |
-| `terminal/commands/help.js`                      | 11     | ✅ Ativo |
-| `terminal/commands/memory.js`                    | 11     | ✅ Ativo |
-| `terminal/commands/plan.js`                      | 11     | ✅ Ativo |
-| `terminal/commands/resume.js`                    | 11     | ✅ Ativo |
-| `terminal/commands/session.js`                   | 11     | ✅ Ativo |
-| `terminal/commands/skills.js`                    | 11     | ✅ Ativo |
-| `tools/task-tools.js`                            | 4      | ✅ Ativo |
-| `tools/code-tools.js`                            | 4      | ✅ Ativo |
-| `tools/file-tools.js`                            | 4      | ✅ Ativo |
-| `tools/git-tools.js`                             | 4      | ✅ Ativo |
-| `tools/hook-tools.js`                            | 4      | ✅ Ativo |
-| `tools/hub-tools.js`                             | 4      | ✅ Ativo |
-| `tools/introspection-tools.js`                   | 4      | ✅ Ativo |
-| `tools/session-tools.js`                         | 4      | ✅ Ativo |
-| `tools/shell-tools.js`                           | 4      | ✅ Ativo |
-| `tools/tool-factory.js`                          | 4      | ✅ Ativo |
-| `tools/index.js`                                 | 4      | ✅ Ativo |
-| `types/structured-message.js`                    | 2      | ✅ Ativo |
-| `types/index.js`                                 | 2      | ✅ Ativo |
+| Arquivo                            | Camada | Status              |
+| ---------------------------------- | ------ | ------------------- |
+| `agent/entry.js`                   | 12     | ✅ Ativo             |
+| `agent/always-alive.js`            | 3      | ✅ Crítico           |
+| `agent/session-manager.js`         | 3      | ✅ Ativo             |
+| `agent/tools-bootstrap.js`         | 3      | ✅ Ativo             |
+| `agent/events.js`                  | 3      | ✅ Ativo             |
+| `agent/task-executor.js`           | 3      | ✅ Ativo             |
+| `agent/dialog-watchdog.js`         | 3      | ✅ Ativo             |
+| `agent/webhook-manager.js`         | 3      | ✅ Ativo             |
+| `api/http-bridge.js`               | 9      | ✅ Ativo             |
+| `api/sdk-api.js`                   | 9      | ✅ Ativo             |
+| `api/bridge-control.js`            | 9      | ✅ Ativo             |
+| `api/bridge-dialog.js`             | 9      | ✅ Ativo             |
+| `api/bridge-stream.js`             | 9      | ✅ Ativo             |
+| `api/bridge-tasks.js`              | 9      | ✅ Ativo             |
+| `bridges/nerv-bridge.js`           | 8      | ✅ Ativo             |
+| `bridges/gh-bridge.js`             | 8      | ✅ Ativo             |
+| `bridges/git-bridge.js`            | 8      | ✅ Ativo             |
+| `bridges/mcp-tool-bridge.js`       | 8      | ✅ Ativo             |
+| `bridges/alias-store.js`           | 8      | ✅ Ativo             |
+| `channel/client.js`                | 5      | ✅ Ativo             |
+| `channel/inject.js`                | 5      | ✅ Ativo             |
+| `channel/audit.js`                 | 5      | ✅ Ativo             |
+| `channel/index.js`                 | 5      | ✅ Ativo             |
+| `config/session-config.js`         | 6      | ✅ Ativo             |
+| `config/system-prompt.js`          | 6      | ✅ Ativo             |
+| `config/mcp-servers.js`            | 6      | ✅ Ativo             |
+| `config/tools-state.js`            | 6      | ✅ Ativo (AI.1)      |
+| `config/custom-tools-registry.js`  | 6      | ✅ Ativo (AI.2)      |
+| `config/custom-agents.js`          | 6      | ✅ Ativo             |
+| `config/pinned-files-loader.js`    | 6      | ✅ Ativo             |
+| `config/index.js`                  | 6      | ✅ Ativo             |
+| `conversation-hub/hub.js`          | 7      | ✅ Ativo             |
+| `conversation-hub/orchestrator.js` | 7      | ✅ Ativo             |
+| `conversation-hub/store.js`        | 7      | ✅ Ativo             |
+| `conversation-hub/socket-ns.js`    | 7      | ✅ Ativo             |
+| `conversation-hub/index.js`        | 7      | ✅ Ativo             |
+| `core/constants.js`                | 0      | ✅ Ativo             |
+| `core/errors.js`                   | 0      | ✅ Ativo             |
+| `core/types.js`                    | 0      | ✅ Ativo             |
+| `core/index.js`                    | 0      | ✅ Ativo             |
+| `lib/client.js`                    | 1      | ✅ Ativo             |
+| `lib/session.js`                   | 1      | ✅ Ativo             |
+| `lib/hooks.js`                     | 1      | ✅ Ativo             |
+| `lib/permissions.js`               | 1      | ✅ Ativo             |
+| `lib/agents.js`                    | 1      | ✅ Ativo             |
+| `lib/models.js`                    | 1      | ✅ Ativo             |
+| `lib/tools-registry.js`            | 1      | ✅ Ativo             |
+| `lib/telemetry.js`                 | 1      | ✅ Ativo (AI.3)      |
+| `lib/index.js`                     | 1      | ✅ Ativo             |
+| `routes/agent.js`                  | 10     | ✅ Ativo             |
+| `routes/client.js`                 | 10     | ✅ Ativo             |
+| `routes/sessions.js`               | 10     | ✅ Ativo             |
+| `routes/webhooks.js`               | 10     | ✅ Ativo             |
+| `terminal/index.js`                | 12     | ✅ Ativo             |
+| `terminal/server.js`               | 11     | ✅ Ativo             |
+| `terminal/repl.js`                 | 11     | ✅ Ativo             |
+| `terminal/dialog.js`               | 11     | ✅ Ativo             |
+| `terminal/http-handlers.js`        | 11     | ✅ Ativo (AI.2/AI.5) |
+| `terminal/state.js`                | 11     | ✅ Ativo             |
+| `terminal/file-context.js`         | 11     | ✅ Ativo             |
+| `terminal/workspace-context.js`    | 11     | ✅ Ativo             |
+| `terminal/commands/index.js`       | 11     | ✅ Ativo             |
+| `terminal/commands/alias.js`       | 11     | ✅ Ativo             |
+| `terminal/commands/attach.js`      | 11     | ✅ Ativo             |
+| `terminal/commands/config.js`      | 11     | ✅ Ativo             |
+| `terminal/commands/context.js`     | 11     | ✅ Ativo             |
+| `terminal/commands/gh.js`          | 11     | ✅ Ativo             |
+| `terminal/commands/git.js`         | 11     | ✅ Ativo             |
+| `terminal/commands/help.js`        | 11     | ✅ Ativo             |
+| `terminal/commands/memory.js`      | 11     | ✅ Ativo             |
+| `terminal/commands/plan.js`        | 11     | ✅ Ativo             |
+| `terminal/commands/resume.js`      | 11     | ✅ Ativo             |
+| `terminal/commands/session.js`     | 11     | ✅ Ativo             |
+| `terminal/commands/skills.js`      | 11     | ✅ Ativo             |
+| `tools/task-tools.js`              | 4      | ✅ Ativo             |
+| `tools/code-tools.js`              | 4      | ✅ Ativo             |
+| `tools/file-tools.js`              | 4      | ✅ Ativo             |
+| `tools/git-tools.js`               | 4      | ✅ Ativo             |
+| `tools/hook-tools.js`              | 4      | ✅ Ativo             |
+| `tools/hub-tools.js`               | 4      | ✅ Ativo             |
+| `tools/introspection-tools.js`     | 4      | ✅ Ativo             |
+| `tools/session-tools.js`           | 4      | ✅ Ativo             |
+| `tools/shell-tools.js`             | 4      | ✅ Ativo             |
+| `tools/tool-factory.js`            | 4      | ✅ Ativo             |
+| `tools/index.js`                   | 4      | ✅ Ativo             |
+| `types/structured-message.js`      | 2      | ✅ Ativo             |
+| `types/index.js`                   | 2      | ✅ Ativo             |
 
 ### Legados / Candidatos a Remoção
 
-| Arquivo                  | Aponta para                     | Ação          |
-| ------------------------ | ------------------------------- | ------------- |
-| `agent.js`               | `agent/entry.js`                | Remover       |
-| `always-alive.js`        | `agent/always-alive.js`         | Remover       |
-| `session-manager.js`     | `agent/session-manager.js`      | Remover       |
-| `nerv-bridge.js`         | `bridges/nerv-bridge.js`        | Remover       |
-| `gh-bridge.js`           | `bridges/gh-bridge.js`          | Remover       |
-| `git-bridge.js`          | `bridges/git-bridge.js`         | Remover       |
-| `http-bridge.js`         | `api/http-bridge.js`            | Remover       |
-| `inject-llmb.js`         | `channel/inject.js`             | Remover       |
-| `llm-bridge-client.js`   | `channel/client.js`             | Remover       |
-| `mcp-tool-bridge.js`     | `bridges/mcp-tool-bridge.js`    | Remover       |
-| `sdk-api.js`             | `api/sdk-api.js`                | Remover       |
-| `alias-store.js`         | `bridges/alias-store.js`        | Remover       |
-| `sdk-client.js`          | `lib/client.js` (wrapper)       | Migrar callers primeiro |
-| `terminal-server.js`     | `terminal/index.js`             | Remover       |
-| `api/copilot-router.js`  | `api/http-bridge.js`            | Remover       |
-| `api/sdk-router.js`      | `api/sdk-api.js`                | Remover       |
-| `bridges/inject-llmb.js` | `channel/inject.js`             | Remover       |
-| `bridges/llm-bridge-client.js` | `channel/client.js`       | Remover       |
+| Arquivo                        | Aponta para                  | Ação                    |
+| ------------------------------ | ---------------------------- | ----------------------- |
+| `agent.js`                     | `agent/entry.js`             | Remover                 |
+| `always-alive.js`              | `agent/always-alive.js`      | Remover                 |
+| `session-manager.js`           | `agent/session-manager.js`   | Remover                 |
+| `nerv-bridge.js`               | `bridges/nerv-bridge.js`     | Remover                 |
+| `gh-bridge.js`                 | `bridges/gh-bridge.js`       | Remover                 |
+| `git-bridge.js`                | `bridges/git-bridge.js`      | Remover                 |
+| `http-bridge.js`               | `api/http-bridge.js`         | Remover                 |
+| `inject-llmb.js`               | `channel/inject.js`          | Remover                 |
+| `llm-bridge-client.js`         | `channel/client.js`          | Remover                 |
+| `mcp-tool-bridge.js`           | `bridges/mcp-tool-bridge.js` | Remover                 |
+| `sdk-api.js`                   | `api/sdk-api.js`             | Remover                 |
+| `alias-store.js`               | `bridges/alias-store.js`     | Remover                 |
+| `sdk-client.js`                | `lib/client.js` (wrapper)    | Migrar callers primeiro |
+| `terminal-server.js`           | `terminal/index.js`          | Remover                 |
+| `api/copilot-router.js`        | `api/http-bridge.js`         | Remover                 |
+| `api/sdk-router.js`            | `api/sdk-api.js`             | Remover                 |
+| `bridges/inject-llmb.js`       | `channel/inject.js`          | Remover                 |
+| `bridges/llm-bridge-client.js` | `channel/client.js`          | Remover                 |
 
 ---
 

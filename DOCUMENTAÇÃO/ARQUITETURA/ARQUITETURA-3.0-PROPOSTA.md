@@ -1,6 +1,6 @@
 # Arquitetura 3.0 — Propostas de Evolução do Módulo `src/copilot`
 
-**Versão**: 3.0 (Proposta) | **Data**: 2026-03-15 | **Status**: 📋 Proposta para revisão e aprovação
+**Versão**: 3.0 (Proposta) | **Data**: 2026-03-15 | **Atualizado**: 2026-03-15 | **Status**: ✅ Fase 1 implementada, Fases 2-4 em caminhamento
 
 > Este documento avalia a situação arquitetural atual do módulo `src/copilot` e propõe um conjunto de correções, melhorias e reestruturações para evoluir o módulo para a versão 3.0. Baseia-se na documentação oficial em `SRC-COPILOT-MODULO-OFICIAL.md` e na análise exaustiva do código-fonte.
 
@@ -30,18 +30,18 @@
 
 ### 1.1 Resumo do Débito Técnico
 
-| Categoria               | Qtd | Impacto                                      |
-| ----------------------- | :-: | -------------------------------------------- |
-| Shims legados na raiz   | 18  | Alto (DX, confusão de imports)               |
-| Aliases inúteis em `api/`| 2  | Baixo (noise estrutural)                     |
-| Imports deprecated ativos| 1  | Médio (orchestrator.js usa shim)             |
-| Acesso direto a internals | 1  | Médio (routes/agent.js)                      |
-| Timeout inconsistente   | 1   | Baixo (120s vs 130s)                         |
-| Bloqueio de event loop  | 1   | Médio (execSync em task-tools.js)            |
-| Potencial memory leak   | 1   | Médio (SSE ilimitado)                        |
-| Migração DDL frágil     | 1   | Médio-alto (FTS5 a cada init)                |
-| BUILTIN_HANDLER_MAP mínimo | 1 | Funcional (extensibilidade)                 |
-| Estado global sem observers | 1 | Baixo-médio (race condition teórica)       |
+| Categoria                   |  Qtd  | Impacto                              |               Status                |
+| --------------------------- | :---: | ------------------------------------ | :---------------------------------: |
+| Shims legados na raiz       |  18   | Alto (DX, confusão de imports)       |          Pendente (Fase 3)          |
+| Aliases inúteis em `api/`   |   2   | Baixo (noise estrutural)             |          Pendente (Fase 2)          |
+| Imports deprecated ativos   |   1   | Médio (orchestrator.js usa shim)     |          ✅ Corrigido (B1)           |
+| Acesso direto a internals   |   1   | Médio (routes/agent.js)              |        Pendente (Fase 2/D1)         |
+| Timeout inconsistente       |   1   | Baixo (120s vs 130s)                 |          ✅ Corrigido (C1)           |
+| Bloqueio de event loop      |   1   | Médio (execSync em task-tools.js)    |          ✅ Corrigido (B2)           |
+| Potencial memory leak       |   1   | Médio (SSE ilimitado)                |          ✅ Corrigido (G1)           |
+| Migração DDL frágil         |   1   | Médio-alto (FTS5 a cada init)        | ✅ Revisado (H1 — já estava correto) |
+| BUILTIN_HANDLER_MAP mínimo  |   1   | Funcional (extensibilidade)          |        Pendente (Fase 2/I1)         |
+| Estado global sem observers |   1   | Baixo-médio (race condition teórica) |        Pendente (Fase 2/F1)         |
 
 ### 1.2 Pontos Fortes (preservar)
 
@@ -59,48 +59,56 @@
 
 ## 2. Roadmap por Prioridade
 
-### Fase 1 — Correções imediatas (sem reestruturação)
+### Fase 1 — Correções imediatas (sem reestruturação) ✅ IMPLEMENTADA
 
 > Mudanças pontuais, baixo risco, não exigem migração de imports.
 
-| ID | Proposta | Risco | Esforço |
-| -- | -------- | :---: | :-----: |
-| B1 | Corrigir import deprecated em `orchestrator.js` | Baixo | XS |
-| B2 | Substituir `execSync + curl` em `task-tools.js` | Baixo | S |
-| C1 | Centralizar timeouts em `core/constants.js` | Baixo | XS |
-| G1 | Limite de clientes SSE em `bridge-stream.js` | Baixo | XS |
-| H1 | Migração FTS5 idempotente (verificar versão antes) | Médio | S |
+| ID  | Proposta                                         | Risco | Esforço |                              Status                               |
+| --- | ------------------------------------------------ | :---: | :-----: | :---------------------------------------------------------------: |
+| B1  | Corrigir import deprecated em `orchestrator.js`  | Baixo |   XS    |                                 ✅                                 |
+| B2  | Substituir `execSync + curl` em `task-tools.js`  | Baixo |    S    |                                 ✅                                 |
+| C1  | Centralizar timeouts em `core/constants.js`      | Baixo |   XS    |                                 ✅                                 |
+| G1  | Limite de clientes SSE (`server.js`, `agent.js`) | Baixo |   XS    |                                 ✅                                 |
+| H1  | Guard FTS5 migration                             | Médio |    S    | ✅ (já estava correto — `#initialized` guard + função idempotente) |
+
+**Notas pós-implementação (Fase 1)**:
+
+- **B1**: `orchestrator.js` agora importa diretamente de `../channel/client.js` (eliminado nível de indireção via shim raiz)
+- **B2**: `task-tools.js` agora usa `node:http` assíncrono — sem bloqueio do event loop, sem dependência de `curl`; helper `httpRequest()` embutido com timeout configurável
+- **C1**: `core/constants.js` exporta `LLM_B_TURN_TIMEOUT_MS` (padrão 120 000 ms, sobrescritível via `LLM_B_TURN_TIMEOUT`); `dialog.js` e `inject.js` agora Referem a essa constante — end de divergência 120 s vs 130 s
+- **G1**: `core/constants.js` exporta `MAX_SSE_CLIENTS` (padrão 50, sobrescritível via `MAX_SSE_CLIENTS`); ambos os endpoints SSE (`/events` e `/api/sdk/agent/stream`) retornam HTTP 429 ao atingir o limite
+- **H1**: Revisão confirmou que `init()` já possui guard `if (this.#initialized) return;` e `migrateFts5Tokenizer()` já é idempotente — nenhuma alteração necessária
 
 ### Fase 2 — Encapsulamento e limpeza de API
 
-| ID | Proposta | Risco | Esforço |
-| -- | -------- | :---: | :-----: |
-| D1 | Getters públicos `getToolsRegistry()` / `getTelemetry()` | Baixo | S |
-| F1 | `state.js` reativo com EventEmitter interno | Médio | M |
-| I1 | Expandir `BUILTIN_HANDLER_MAP` com handlers úteis | Baixo | S |
-| A1 | Remover aliases inúteis (`copilot-router.js`, `sdk-router.js`) | Baixo | XS |
+| ID  | Proposta                                                       | Risco | Esforço |
+| --- | -------------------------------------------------------------- | :---: | :-----: |
+| D1  | Getters públicos `getToolsRegistry()` / `getTelemetry()`       | Baixo |    S    |
+| F1  | `state.js` reativo com EventEmitter interno                    | Médio |    M    |
+| I1  | Expandir `BUILTIN_HANDLER_MAP` com handlers úteis              | Baixo |    S    |
+| A1  | Remover aliases inúteis (`copilot-router.js`, `sdk-router.js`) | Baixo |   XS    |
 
 ### Fase 3 — Limpeza de shims legados
 
 > Requer mapeamento completo de callers externos ao módulo. Pode impactar `src/server/`, `ecosystem.config.cjs` e scripts de teste.
 
-| ID | Proposta | Risco | Esforço |
-| -- | -------- | :---: | :-----: |
-| A2 | Auditoria de callers de cada shim | Baixo | S |
-| A3 | Remover 13 shims `@deprecated` (exceto `sdk-client.js`) | Médio | M |
-| A4 | Migrar callers de `sdk-client.js`, depois remover | Médio | M |
+| ID  | Proposta                                                | Risco | Esforço |
+| --- | ------------------------------------------------------- | :---: | :-----: |
+| A2  | Auditoria de callers de cada shim                       | Baixo |    S    |
+| A3  | Remover 13 shims `@deprecated` (exceto `sdk-client.js`) | Médio |    M    |
+| A4  | Migrar callers de `sdk-client.js`, depois remover       | Médio |    M    |
 
 ### Fase 4 — Reestruturação modular (Arquitetura 3.0)
 
 > Reestruturação de pastas e consolidações. Requer plan de migração com alias temporários.
 
-| ID | Proposta | Risco | Esforço |
-| -- | -------- | :---: | :-----: |
-| E1 | Consolidar `api/bridge-*.js` e `routes/*.js` em `api/v1/` | Médio | L |
-| J1 | Extrair `tools/shell-tools.js` para `tools/shell/` com policy separada | Baixo | M |
-| J2 | Unificar `config/tools-state.js` + `config/custom-tools-registry.js` em `config/tools/` | Baixo | S |
-| J3 | Mover `terminal-server.js` (raiz) e eliminar confusão | Baixo | XS |
-| J4 | Introduzir `core/constants.js` canônico para TIMEOUTS, MAX_*, defaults | Baixo | S |
+| ID  | Proposta                                                                                | Risco | Esforço |
+| --- | --------------------------------------------------------------------------------------- | :---: | :-----: |
+| E1  | Consolidar `api/bridge-*.js` e `routes/*.js` em `api/v1/`                               | Médio |    L    |
+| J1  | Extrair `tools/shell-tools.js` para `tools/shell/` com policy separada                  | Baixo |    M    |
+| J2  | Unificar `config/tools-state.js` + `config/custom-tools-registry.js` em `config/tools/` | Baixo |    S    |
+| J3  | Mover `terminal-server.js` (raiz) e eliminar confusão                                   | Baixo |   XS    |
+| J4  | Introduzir `core/constants.js` canônico para TIMEOUTS, MAX_*, defaults                  | Baixo |    S    |
 
 ---
 
@@ -235,16 +243,16 @@ async function fetchLocalEndpoint(path) {
 
 Constantes de timeout espalhadas por vários arquivos:
 
-| Arquivo                     | Constante             | Valor    |
-| --------------------------- | --------------------- | -------- |
-| `terminal/dialog.js`        | `TURN_TIMEOUT_MS`     | 120 000  |
-| `channel/inject.js`         | `DEFAULT_TIMEOUT_MS`  | 130 000  |
-| `agent/task-executor.js`    | timeout padrão        | 60 000   |
-| `bridges/mcp-tool-bridge.js`| `MCP_TIMEOUT_MS`      | 8 000    |
-| `channel/audit.js`          | rotação               | 10 MB    |
-| `agent/always-alive.js`     | `MAX_QUEUE_SIZE`      | 100      |
-| `tools/shell-tools.js`      | `MAX_OUTPUT_BYTES`    | 10 000   |
-| `tools/shell-tools.js`      | `MAX_TIMEOUT_MS`      | 120 000  |
+| Arquivo                      | Constante            | Valor   |
+| ---------------------------- | -------------------- | ------- |
+| `terminal/dialog.js`         | `TURN_TIMEOUT_MS`    | 120 000 |
+| `channel/inject.js`          | `DEFAULT_TIMEOUT_MS` | 130 000 |
+| `agent/task-executor.js`     | timeout padrão       | 60 000  |
+| `bridges/mcp-tool-bridge.js` | `MCP_TIMEOUT_MS`     | 8 000   |
+| `channel/audit.js`           | rotação              | 10 MB   |
+| `agent/always-alive.js`      | `MAX_QUEUE_SIZE`     | 100     |
+| `tools/shell-tools.js`       | `MAX_OUTPUT_BYTES`   | 10 000  |
+| `tools/shell-tools.js`       | `MAX_TIMEOUT_MS`     | 120 000 |
 
 ### Solução: `core/constants.js` canônico
 
@@ -728,25 +736,25 @@ tools/
 
 ## 13. Matriz de Decisão e Faseamento
 
-| ID  | Título                                      | Fase | Risco | Tamanho | Prioridade |
-| --- | ------------------------------------------- | :--: | :---: | :-----: | :--------: |
-| B1  | Fix import deprecated em orchestrator.js    | 1    | 🟢 Baixo | XS | 🔴 Alta |
-| B2  | Substituir execSync+curl em task-tools.js   | 1    | 🟢 Baixo | S  | 🔴 Alta |
-| C1  | Centralizar timeouts em core/constants.js   | 1    | 🟢 Baixo | S  | 🟡 Média |
-| G1  | Limite MAX_SSE_CLIENTS em bridge-stream.js  | 1    | 🟢 Baixo | XS | 🟡 Média |
-| H1  | Migração FTS5 idempotente                   | 1    | 🟡 Médio | S  | 🔴 Alta |
-| D1  | Getters públicos em AlwaysAliveAgent        | 2    | 🟢 Baixo | S  | 🟡 Média |
-| F1  | state.js reativo com EventEmitter           | 2    | 🟡 Médio | M  | 🟡 Média |
-| I1  | Expandir BUILTIN_HANDLER_MAP               | 2    | 🟢 Baixo | S  | 🟢 Baixa  |
-| A1  | Remover aliases inúteis api/               | 2    | 🟢 Baixo | XS | 🟡 Média |
-| A2  | Auditar callers de shims                   | 3    | 🟢 Baixo | S  | 🟡 Média |
-| A3  | Remover 13 shims @deprecated               | 3    | 🟡 Médio | M  | 🟡 Média |
-| A4  | Migrar e remover sdk-client.js             | 3    | 🟡 Médio | M  | 🟢 Baixa  |
-| E1  | Consolidar api/ e routes/                  | 4    | 🟡 Médio | L  | 🟢 Baixa  |
-| J1  | Agrupar config/tools/*                     | 4    | 🟢 Baixo | S  | 🟢 Baixa  |
-| J2  | Separar integrations/ de bridges/          | 4    | 🟡 Médio | M  | 🟢 Baixa  |
-| J3  | core/constants.js robusto                  | 1    | 🟢 Baixo | S  | 🟡 Média |
-| J4  | Extrair tools/shell/*                      | 4    | 🟢 Baixo | M  | 🟢 Baixa  |
+| ID  | Título                                     | Fase  |  Risco  | Tamanho | Prioridade |
+| --- | ------------------------------------------ | :---: | :-----: | :-----: | :--------: |
+| B1  | Fix import deprecated em orchestrator.js   |   1   | 🟢 Baixo |   XS    |   🔴 Alta   |
+| B2  | Substituir execSync+curl em task-tools.js  |   1   | 🟢 Baixo |    S    |   🔴 Alta   |
+| C1  | Centralizar timeouts em core/constants.js  |   1   | 🟢 Baixo |    S    |  🟡 Média   |
+| G1  | Limite MAX_SSE_CLIENTS em bridge-stream.js |   1   | 🟢 Baixo |   XS    |  🟡 Média   |
+| H1  | Migração FTS5 idempotente                  |   1   | 🟡 Médio |    S    |   🔴 Alta   |
+| D1  | Getters públicos em AlwaysAliveAgent       |   2   | 🟢 Baixo |    S    |  🟡 Média   |
+| F1  | state.js reativo com EventEmitter          |   2   | 🟡 Médio |    M    |  🟡 Média   |
+| I1  | Expandir BUILTIN_HANDLER_MAP               |   2   | 🟢 Baixo |    S    |  🟢 Baixa   |
+| A1  | Remover aliases inúteis api/               |   2   | 🟢 Baixo |   XS    |  🟡 Média   |
+| A2  | Auditar callers de shims                   |   3   | 🟢 Baixo |    S    |  🟡 Média   |
+| A3  | Remover 13 shims @deprecated               |   3   | 🟡 Médio |    M    |  🟡 Média   |
+| A4  | Migrar e remover sdk-client.js             |   3   | 🟡 Médio |    M    |  🟢 Baixa   |
+| E1  | Consolidar api/ e routes/                  |   4   | 🟡 Médio |    L    |  🟢 Baixa   |
+| J1  | Agrupar config/tools/*                     |   4   | 🟢 Baixo |    S    |  🟢 Baixa   |
+| J2  | Separar integrations/ de bridges/          |   4   | 🟡 Médio |    M    |  🟢 Baixa   |
+| J3  | core/constants.js robusto                  |   1   | 🟢 Baixo |    S    |  🟡 Média   |
+| J4  | Extrair tools/shell/*                      |   4   | 🟢 Baixo |    M    |  🟢 Baixa   |
 
 ---
 
@@ -923,16 +931,16 @@ Total: ~83 arquivos. Zero shims. Zero aliases mortos. Imports corretos.
 
 ### Impacto esperado
 
-| Métrica                      | Antes | Depois | Melhoria         |
-| ---------------------------- | :---: | :----: | :--------------- |
-| Total de arquivos            | ~101  | ~78    | −23 (+23%)       |
-| Arquivos deprecated          | 18    | 0      | −100%            |
-| Imports deprecated ativos    | 1     | 0      | Corrigido        |
-| Race conditions potenciais   | 1     | 0      | Eliminada        |
-| Memory leaks potenciais (SSE) | 1    | 0      | Controlado       |
-| Execuções DDL por boot       | 1 FTS5 migration | 0 | Idempotência |
-| Timeouts inconsistentes       | 3 valores | 1 canonical | Centralizado |
-| Pastas top-level             | 12    | 13     | +1 (`integrations/`) |
+| Métrica                       |      Antes       |   Depois    | Melhoria             |
+| ----------------------------- | :--------------: | :---------: | :------------------- |
+| Total de arquivos             |       ~101       |     ~78     | −23 (+23%)           |
+| Arquivos deprecated           |        18        |      0      | −100%                |
+| Imports deprecated ativos     |        1         |      0      | Corrigido            |
+| Race conditions potenciais    |        1         |      0      | Eliminada            |
+| Memory leaks potenciais (SSE) |        1         |      0      | Controlado           |
+| Execuções DDL por boot        | 1 FTS5 migration |      0      | Idempotência         |
+| Timeouts inconsistentes       |    3 valores     | 1 canonical | Centralizado         |
+| Pastas top-level              |        12        |     13      | +1 (`integrations/`) |
 
 ---
 
