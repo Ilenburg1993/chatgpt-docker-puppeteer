@@ -29,6 +29,7 @@
 
 import { log } from '#core/logger';
 import { Router } from 'express';
+import { approveAll } from '@github/copilot-sdk';
 import {
     createClientSession as createSdkSession,
     disconnectClientSession as disconnectSdkSession,
@@ -208,6 +209,7 @@ router.post('/sessions', (req, res) => {
         }
 
         const session = await createSdkSession({
+            onPermissionRequest: approveAll,
             model,
             ...(sessionId ? { sessionId } : {}),
             ...(systemMessage ? { systemMessage } : {}),
@@ -309,7 +311,7 @@ router.post('/sessions/:id/resume', (req, res) => {
         const { id } = req.params;
         const { model } = req.body ?? {};
 
-        const session = await resumeSdkSession(id, model ? { model } : {});
+        const session = await resumeSdkSession(id, model ? { onPermissionRequest: approveAll, model } : { onPermissionRequest: approveAll });
         res.json({
             ok: true,
             sessionId: session.sessionId,
