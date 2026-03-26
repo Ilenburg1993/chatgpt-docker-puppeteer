@@ -26,18 +26,44 @@ import { getClient } from '#copilot/lib/client';
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort
  */
 
+// ─── AB.2: Cache de model list (TTL 5 min) ───────────────────────────────────
+
+/** TTL do cache de listModels em ms (5 minutos). */
+const MODELS_CACHE_TTL_MS = 5 * 60_000;
+
+/** @type {{ models: ModelInfo[]; expiresAt: number } | null} */
+let _modelsCache = null;
+
+/**
+ * Invalida o cache de modelos (útil em testes ou após mudança de conta).
+ *
+ * @returns {void}
+ */
+export function clearModelsCache() {
+    _modelsCache = null;
+}
+
 // ─── Listagem e filtragem ─────────────────────────────────────────────────────
 
 /**
- * Lista todos os modelos disponíveis usando o cliente SDK ativo. Equivale a `client.listModels()` mas usa o cliente
- * singleton gerenciado.
+ * Lista todos os modelos disponíveis usando o cliente SDK ativo.
+ *
+ * AB.2: resultado cacheado por 5 minutos para evitar requisições repetidas. Equivale a `client.listModels()` mas usa o
+ * cliente singleton gerenciado.
  *
  * @param {object} [clientOverrides={}] - Overrides opcionais para o cliente. Default is `{}`
+ * @param {boolean} [forceRefresh=false] - Ignorar cache e buscar lista atualizada. Default is `false`
  * @returns {Promise<ModelInfo[]>}
  */
-export async function listModels(clientOverrides = {}) {
+export async function listModels(clientOverrides = {}, forceRefresh = false) {
+    const now = Date.now();
+    if (!forceRefresh && _modelsCache && _modelsCache.expiresAt > now) {
+        return _modelsCache.models;
+    }
     const client = await getClient(clientOverrides);
-    return client.listModels();
+    const models = await client.listModels();
+    _modelsCache = { models, expiresAt: now + MODELS_CACHE_TTL_MS };
+    return models;
 }
 
 /**

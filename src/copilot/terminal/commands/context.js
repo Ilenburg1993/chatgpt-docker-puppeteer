@@ -80,7 +80,7 @@ export function cmdContext({ println }) {
 
     let usedTokens, maxTokens, pct, pctStr, isRealData;
     if (sdkContext) {
-        usedTokens = sdkContext.currentTokens;
+        usedTokens = sdkContext.tokens;
         maxTokens = sdkContext.tokenLimit;
         pct = Math.min(sdkContext.utilization, 1);
         pctStr = (pct * 100).toFixed(1);

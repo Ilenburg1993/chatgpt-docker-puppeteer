@@ -20,7 +20,7 @@ import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { sendTurn } from './dialog.js';
-import { embedMultiple, readFileContext } from './file-context.js';
+import { embedMultiple, getFileCacheStats, readFileContext } from './file-context.js';
 import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from './state.js';
 
 // ─── Tipos auxiliares ─────────────────────────────────────────────────────────
@@ -51,8 +51,10 @@ export function handleHealth() {
             sseClients: getSseClients().size,
             model: alwaysAliveAgent.model,
             reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
-            // AA.5: expor dados reais de uso de contexto
+            // AA.5: dados reais de uso de contexto
             contextWindow: snapshot.contextWindow,
+            // AB.3: estatísticas de cache
+            cacheStats: { fileContext: getFileCacheStats() },
         },
     };
 }

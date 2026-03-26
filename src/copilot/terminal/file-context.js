@@ -19,6 +19,9 @@ import { extname, resolve as pathResolve } from 'node:path';
 /** Limite total de bytes embutidos por envio (64 KB). */
 export const MAX_EMBED_BYTES = 65_536;
 
+/** TTL do cache de file-context em ms (30 segundos). */
+const FILE_CACHE_TTL_MS = 30_000;
+
 /** Mapa de extensão → linguagem para blocos de código markdown. @type {Record<string, string>} */
 const EXT_LANG = {
     '.js': 'js',
@@ -65,6 +68,41 @@ const EXT_LANG = {
  * @typedef {{ path: string; content: string; size: number; lang: string }} FileContext
  */
 
+/**
+ * Entrada no cache de file-context.
+ *
+ * @typedef {{ ctx: FileContext; expiresAt: number }} FileCacheEntry
+ */
+
+// ─── Cache de file-context (AB.1) ────────────────────────────────────────────
+
+/** @type {Map<string, FileCacheEntry>} */
+const _fileCache = new Map();
+
+/** Contador de cache hits (para `cacheStats` no /health). */
+let _fileCacheHits = 0;
+
+/** Contador de cache misses (para `cacheStats` no /health). */
+let _fileCacheMisses = 0;
+
+/**
+ * Retorna estatísticas de uso do cache de file-context.
+ *
+ * @returns {{ hits: number; misses: number; size: number }}
+ */
+export function getFileCacheStats() {
+    return { hits: _fileCacheHits, misses: _fileCacheMisses, size: _fileCache.size };
+}
+
+/**
+ * Invalida todas as entradas do cache de file-context.
+ *
+ * @returns {void}
+ */
+export function clearFileCache() {
+    _fileCache.clear();
+}
+
 // ─── Funções públicas ─────────────────────────────────────────────────────────
 
 /**
@@ -81,7 +119,8 @@ export function detectLang(filePath) {
 /**
  * Lê um arquivo e retorna seu contexto estruturado para embedding.
  *
- * Emite erro se o arquivo não existir, não for legível ou exceder `MAX_EMBED_BYTES`.
+ * AB.1: Usa cache em memória com TTL de 30s para evitar re-leituras desnecessárias. Emite erro se o arquivo não
+ * existir, não for legível ou exceder `MAX_EMBED_BYTES`.
  *
  * @param {string} filePath - Caminho (absoluto ou relativo ao cwd)
  * @returns {Promise<FileContext>}
@@ -89,17 +128,29 @@ export function detectLang(filePath) {
  */
 export async function readFileContext(filePath) {
     const absPath = pathResolve(filePath);
+
+    // AB.1: verificar cache antes de ler disco
+    const now = Date.now();
+    const cached = _fileCache.get(absPath);
+    if (cached && cached.expiresAt > now) {
+        _fileCacheHits++;
+        return cached.ctx;
+    }
+    _fileCacheMisses++;
+
     const info = await stat(absPath);
     if (info.size > MAX_EMBED_BYTES) {
         throw new Error(`Arquivo muito grande para embed: ${filePath} (${(info.size / 1024).toFixed(1)} KB > 64 KB)`);
     }
     const content = await readFile(absPath, 'utf-8');
-    return {
+    const ctx = {
         path: filePath,
         content,
         size: info.size,
         lang: detectLang(filePath),
     };
+    _fileCache.set(absPath, { ctx, expiresAt: now + FILE_CACHE_TTL_MS });
+    return ctx;
 }
 
 /**

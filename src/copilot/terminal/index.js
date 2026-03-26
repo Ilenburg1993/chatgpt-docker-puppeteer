@@ -107,6 +107,17 @@ export async function startTerminalServer() {
         }
     });
 
+    // AB.4: SSE 'cache.hit' — emitir quando compactação usar tokens cached
+    alwaysAliveAgent.on(
+        'session.compaction_complete',
+        (/** @type {{ compactionTokensUsed?: { cachedInput?: number }; success?: boolean }} */ evt) => {
+            const cachedInput = evt?.compactionTokensUsed?.cachedInput ?? 0;
+            if (cachedInput > 0) {
+                broadcastSse('cache.hit', { cachedInput, timestamp: Date.now() });
+            }
+        },
+    );
+
     // Persiste reconexões e sessões fatais no Hub
     alwaysAliveAgent.on(
         'ready',
