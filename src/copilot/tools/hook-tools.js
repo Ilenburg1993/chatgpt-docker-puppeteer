@@ -25,15 +25,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-
-/**
- * Marca uma tool como skip-permission (SDK v0.2.0+). Forward-compat: campo ignorado silenciosamente em SDK v0.1.x.
- *
- * @template {import('@github/copilot-sdk').Tool<any>} T
- * @param {T} tool
- * @returns {T}
- */
-const withSkipPermission = (tool) => Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
+import { withSkipPermission } from './tool-factory.js';
 
 /**
  * Raiz do repositório — calculada em relação a este arquivo (src/copilot/tools/).

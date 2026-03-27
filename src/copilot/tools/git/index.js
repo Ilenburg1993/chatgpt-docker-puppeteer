@@ -12,15 +12,7 @@ import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { execSync } from 'node:child_process';
 import { z } from 'zod';
-
-/**
- * Marca uma tool como skip-permission (SDK v0.2.0+). Forward-compat: campo ignorado silenciosamente em SDK v0.1.x.
- *
- * @template {import('@github/copilot-sdk').Tool<any>} T
- * @param {T} tool
- * @returns {T}
- */
-const withSkipPermission = (tool) => Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
+import { withSkipPermission } from '../tool-factory.js';
 
 const ROOT = new URL('../../../..', import.meta.url).pathname;
 

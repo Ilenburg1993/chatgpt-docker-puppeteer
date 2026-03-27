@@ -14,6 +14,7 @@ import { gitTools } from './git/index.js';
 import { hookTools } from './hook-tools.js';
 import { hubTools } from './hub-tools.js';
 import { introspectionTools, registerForIntrospection, setTelemetryStore } from './introspection-tools.js';
+import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
 import { sessionTools } from './session-tools.js';
 import { shellTools } from './shell/index.js';
 import { taskTools } from './task-tools.js';
@@ -29,6 +30,7 @@ export const allTools = [
     ...codeTools,
     ...gitTools,
     ...sessionTools,
+    ...sessionRpcTools,
     ...hookTools,
     ...hubTools,
     ...introspectionTools,
@@ -47,7 +49,9 @@ export {
     hubTools,
     introspectionTools,
     registerForIntrospection,
+    sessionRpcTools,
     sessionTools,
+    setSessionRpc,
     setTelemetryStore,
     shellTools,
     taskTools,

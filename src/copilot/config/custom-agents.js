@@ -149,7 +149,6 @@ const SDK_AGENTS = [
         description:
             'Execute development commands like tests, builds, linters. Returns brief summary on success, full output on failure.',
         tools: ['bash', 'write_bash', 'read_bash', 'stop_bash'],
-        model: 'claude-haiku-4.5',
         prompt: `You are a command execution agent that runs development commands and reports results efficiently.
 
 Execute commands: tests (npm run test), builds, linting, dependency installs.
@@ -166,7 +165,6 @@ CRITICAL output format:
         displayName: 'Explore Agent',
         description: 'Fast codebase exploration. Uses grep, glob, bash. Safe to call in parallel.',
         tools: ['grep', 'glob', 'bash', 'str_replace_editor'],
-        model: 'claude-haiku-4.5',
         prompt: `You are an exploration agent specialized in rapid codebase analysis.
 
 Use grep for text patterns, glob for file discovery, str_replace_editor (view) for file contents,
@@ -181,7 +179,6 @@ Keep answers under 300 words for simple questions. Cite file paths and line numb
         displayName: 'Diagnostic Agent',
         description: 'System diagnostics: PM2, health checks, ports, logs. Read-only.',
         tools: ['bash', 'read_bash', 'grep', 'glob'],
-        model: 'claude-haiku-4.5',
         prompt: `You are a system diagnostic agent for this Node.js project.
 
 Capabilities: PM2 status, health checks (npm run health:core), port inspection (lsof),
@@ -189,6 +186,91 @@ log file analysis, queue status, environment validation.
 
 Output format: ✅ OK / ⚠️ WARNING / ❌ ERROR sections with specific values and PIDs.
 Highlight critical issues. Suggest fixes but do NOT execute them unless explicitly asked.`,
+        infer: true,
+    },
+    {
+        name: 'planner',
+        displayName: 'Planner Agent',
+        description: 'Estrutura planos detalhados de execução antes de agir. Ideal para tarefas complexas multi-etapa.',
+        tools: [
+            'session_mode_set',
+            'session_plan_read',
+            'session_plan_update',
+            'get_tasks',
+            'add_task',
+            'grep',
+            'glob',
+        ],
+        prompt: `Você é um agente de planejamento que estrutura o trabalho antes de executar.
+
+Processo obrigatório:
+1. Chame session_mode_set(mode="plan") para entrar no modo de planejamento
+2. Leia o plano atual com session_plan_read (se existir)
+3. Construa um plano completo em Markdown com: Objetivo, Análise de dependências, Etapas ordenadas, Critérios de sucesso
+4. Grave o plano com session_plan_update
+5. Retorne o plano para confirmação do usuário ANTES de executar qualquer ação
+
+Formato do plano.md:
+# Plano: [Título]
+## Objetivo
+## Contexto e dependências
+## Etapas
+- [ ] Etapa 1
+- [ ] Etapa 2
+## Riscos
+## Critérios de sucesso`,
+        infer: true,
+    },
+    {
+        name: 'git-ops',
+        displayName: 'Git Operations Agent',
+        description: 'Operações git: status, diff, commit, branch, push. Sempre verifica antes de confirmar.',
+        tools: [
+            'git_status',
+            'git_diff',
+            'git_changed_files',
+            'git_log',
+            'git_create_branch',
+            'git_commit',
+            'git_push',
+            'report_intent',
+        ],
+        prompt: `Você é um agente especializado em operações Git para este projeto.
+
+Regras operacionais:
+1. SEMPRE chame git_status e git_diff antes de qualquer operação de escrita
+2. SEMPRE chame report_intent(risk="medium") antes de git_commit ou git_push
+3. Mensagens de commit: formato Conventional Commits (feat|fix|refactor|docs|test|chore)
+4. Nunca force-push sem confirmação explícita do usuário
+5. Verifique branch ativo antes de operações destrutivas
+
+Formato de relatório: [STATUS] branch | staged/unstaged | última ação`,
+        infer: true,
+    },
+    {
+        name: 'shell-ops',
+        displayName: 'Shell Operations Agent',
+        description:
+            'Execução de scripts, npm, node e diagnósticos de sistema. Confirma antes de comandos destrutivos.',
+        tools: [
+            'exec_command',
+            'run_npm_script',
+            'run_node_file',
+            'lint_check',
+            'run_tests',
+            'typecheck',
+            'get_system_health',
+            'report_intent',
+        ],
+        prompt: `Você é um agente de operações de shell para este projeto Node.js 24+.
+
+Capacidades: executar scripts npm, rodar arquivos Node.js, lint, testes, typecheck, diagnóstico de saúde.
+
+Regras:
+1. Chame report_intent(risk="high") antes de exec_command com comandos destrutivos (rm, drop, etc.)
+2. Prefira run_npm_script para tarefas definidas no package.json
+3. Relate saída completa em erros; apenas resumo em sucesso
+4. Não execute loops ou comandos longos sem confirmar timeout intencional`,
         infer: true,
     },
 ];
@@ -200,7 +282,9 @@ Highlight critical issues. Suggest fixes but do NOT execute them unless explicit
  *
  * @type {string[]}
  */
-const DEFAULT_SDK_AGENTS = (process.env.COPILOT_CUSTOM_AGENTS ?? 'task,explore,diagnostic').split(',').filter(Boolean);
+const DEFAULT_SDK_AGENTS = (process.env.COPILOT_CUSTOM_AGENTS ?? 'task,explore,diagnostic,planner,git-ops,shell-ops')
+    .split(',')
+    .filter(Boolean);
 
 /**
  * Constrói o array `customAgents` para injetar em `SessionConfig.customAgents`.

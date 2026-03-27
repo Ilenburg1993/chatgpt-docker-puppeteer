@@ -29,7 +29,7 @@ import { DialogWatchdog } from './dialog-watchdog.js';
 import { AGENT_EVENTS } from './events.js';
 import { initOrResumeSession, readState, writeState } from './session-manager.js';
 import { executeTask } from './task-executor.js';
-import { bootstrapTools } from './tools-bootstrap.js';
+import { bootstrapTools, setSessionRpc } from './tools-bootstrap.js';
 import { WebhookManager } from './webhook-manager.js';
 
 /**
@@ -330,6 +330,8 @@ export class AlwaysAliveAgent extends EventEmitter {
 
             this.#session = session;
             this.#isResumed = isResumed;
+            // L4: injetar RPC da sessão nas session-rpc-tools para exposição via tools
+            setSessionRpc(session.rpc);
 
             // Wiring de eventos de compaction para observabilidade via SSE/NERV
             session.on('session.compaction_start', (/** @type {any} */ evt) => {
@@ -512,6 +514,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                 log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${e.message}`);
             }
             this.#session = null;
+            setSessionRpc(null);
         }
         this.emit('stopped');
     }
@@ -973,6 +976,8 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                 });
                 this.#session = session;
                 this.#isResumed = isResumed;
+                // L4: atualizar RPC nas session-rpc-tools após reconexão
+                setSessionRpc(session.rpc);
                 log(
                     'INFO',
                     `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,

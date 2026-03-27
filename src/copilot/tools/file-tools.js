@@ -24,6 +24,7 @@ import { realpathSync } from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { withSkipPermission } from './tool-factory.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -95,15 +96,6 @@ function validatePath(filePath) {
 
     return { ok: true, resolved };
 }
-
-/**
- * Helper: marca uma tool como skipPermission (read-only; sem efeito em SDK <0.2.0).
- *
- * @template {import('@github/copilot-sdk').Tool<any>} T
- * @param {T} tool
- * @returns {T}
- */
-const withSkipPermission = (tool) => Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
 
 /**
  * Cast auxiliar que resolve inferência de tipo do SDK `defineTool<T>`.

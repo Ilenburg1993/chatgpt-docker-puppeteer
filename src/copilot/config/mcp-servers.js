@@ -61,9 +61,8 @@ export const MCP_SERVERS = {
     /**
      * GitHub MCP Server oficial (HTTP) — acesso completo à API GitHub via MCP remoto.
      *
-     * Usa o servidor HTTP oficial em `https://api.githubcopilot.com/mcp/` com autenticação
-     * via `GITHUB_TOKEN`. Fornece as mesmas tools que os agentes built-in `explore` e `research`
-     * usam internamente (github-mcp-server/*).
+     * Usa o servidor HTTP oficial em `https://api.githubcopilot.com/mcp/` com autenticação via `GITHUB_TOKEN`. Fornece
+     * as mesmas tools que os agentes built-in `explore` e `research` usam internamente (github-mcp-server/*).
      *
      * Requer: `GITHUB_TOKEN` no ambiente.
      */

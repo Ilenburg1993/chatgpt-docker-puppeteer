@@ -12,6 +12,7 @@ import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
 import http from 'node:http';
 import { z } from 'zod';
+import { withSkipPermission } from './tool-factory.js';
 
 /**
  * Realiza uma requisição HTTP local sem bloquear o event loop.
@@ -51,15 +52,6 @@ function httpRequest(method, urlStr, body = null, timeoutMs = 5000) {
         req.end();
     });
 }
-
-/**
- * Marca uma tool como skip-permission (SDK v0.2.0+). Forward-compat: campo ignorado silenciosamente em SDK v0.1.x.
- *
- * @template {import('@github/copilot-sdk').Tool<any>} T
- * @param {T} tool
- * @returns {T}
- */
-const withSkipPermission = (tool) => Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
 
 /**
  * Tool: get_tasks — lista tarefas recentes do sistema.

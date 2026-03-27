@@ -13,15 +13,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-
-/**
- * Marca uma tool como skip-permission (SDK v0.2.0+). Forward-compat: campo ignorado silenciosamente em SDK v0.1.x.
- *
- * @template {import('@github/copilot-sdk').Tool<any>} T
- * @param {T} tool
- * @returns {T}
- */
-const withSkipPermission = (tool) => Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
+import { withSkipPermission } from './tool-factory.js';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname, '..');
 const HOOKS_STATE = join(ROOT, '.github', 'hooks', 'state');
@@ -128,9 +120,8 @@ const setSessionContextTool = defineTool('set_session_context', {
 });
 
 /**
- * Tool: invoke_skill — carrega e retorna o conteúdo de uma skill pelo nome.
- * Análogo ao built-in `skill` do GitHub Copilot CLI. Permite ao agente injetar o conteúdo
- * de uma skill como contexto adicional no turn atual.
+ * Tool: invoke_skill — carrega e retorna o conteúdo de uma skill pelo nome. Análogo ao built-in `skill` do GitHub
+ * Copilot CLI. Permite ao agente injetar o conteúdo de uma skill como contexto adicional no turn atual.
  */
 const invokeSkillTool = defineTool('invoke_skill', {
     description:

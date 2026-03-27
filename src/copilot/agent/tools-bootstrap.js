@@ -18,6 +18,7 @@ import {
     hubTools,
     introspectionTools,
     registerForIntrospection,
+    sessionRpcTools,
     sessionTools,
     setTelemetryStore,
     shellTools,
@@ -32,6 +33,8 @@ import {
  *
  * @typedef {import('@github/copilot-sdk').Tool} Tool
  */
+
+export { setSessionRpc } from '../tools/index.js';
 
 /**
  * Registra todas as tools estáticas do agente no registry por categoria/tags, e expõe o registry/telemetria para as
@@ -51,6 +54,10 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
     });
     registerTools(registry, gitTools, { category: 'git', tags: ['vcs', 'diff', 'commit'] });
     registerTools(registry, sessionTools, { category: 'session', tags: ['hooks', 'briefing'] });
+    registerTools(registry, sessionRpcTools, {
+        category: 'session-rpc',
+        tags: ['rpc', 'mode', 'plan', 'agent', 'compaction'],
+    });
     registerTools(registry, hookTools, { category: 'hook', tags: ['audit', 'input', 'hooks'] });
     registerTools(registry, hubTools, {
         category: 'hub',
@@ -94,6 +101,7 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         ...codeTools,
         ...gitTools,
         ...sessionTools,
+        ...sessionRpcTools,
         ...hookTools,
         ...hubTools,
         ...introspectionTools,

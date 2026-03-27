@@ -12,15 +12,7 @@ import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
-
-/**
- * Marca uma tool como skip-permission (SDK v0.2.0+). Forward-compat: campo ignorado silenciosamente em SDK v0.1.x.
- *
- * @template {import('@github/copilot-sdk').Tool<any>} T
- * @param {T} tool
- * @returns {T}
- */
-const withSkipPermission = (tool) => Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
+import { withSkipPermission } from './tool-factory.js';
 
 // ─── Estado compartilhado via module-level registry ─────────────────────────
 
@@ -230,23 +222,26 @@ const getTelemetryTool = defineTool('get_telemetry', {
 });
 
 /**
- * Tool: report_intent — registra em log a intenção da LLM antes de executar uma ação sensível.
- * Análogo ao `report_intent` built-in do GitHub Copilot CLI. Garante auditabilidade e rastreabilidade.
+ * Tool: report_intent — registra em log a intenção da LLM antes de executar uma ação sensível. Análogo ao
+ * `report_intent` built-in do GitHub Copilot CLI. Garante auditabilidade e rastreabilidade.
  */
 const reportIntentTool = defineTool('report_intent', {
     description:
         'Registra a intenção do agente antes de executar uma ação sensível (ex: deletar arquivo, fazer push, ' +
         'executar comando destrutivo). Use ANTES de chamar uma tool que modifique estado externo irreversível. ' +
         'Não executa nenhuma ação — apenas registra e retorna confirmação de auditoria.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ intent: string; tool: string; risk?: string }>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                intent: z.string().describe('Descrição clara da intenção (o que o agente pretende fazer e por quê)'),
-                tool: z.string().describe('Nome da tool que será chamada em seguida'),
-                risk: z.string().optional().describe('Nível de risco estimado: low | medium | high'),
-            })
-        )
-    ),
+    parameters:
+        /** @type {import('@github/copilot-sdk').ZodSchema<{ intent: string; tool: string; risk?: string }>} */ (
+            /** @type {unknown} */ (
+                z.object({
+                    intent: z
+                        .string()
+                        .describe('Descrição clara da intenção (o que o agente pretende fazer e por quê)'),
+                    tool: z.string().describe('Nome da tool que será chamada em seguida'),
+                    risk: z.string().optional().describe('Nível de risco estimado: low | medium | high'),
+                })
+            )
+        ),
     handler: async (/** @type {{ intent: string; tool: string; risk?: string }} */ { intent, tool, risk }) => {
         const level = risk === 'high' ? 'WARN' : 'INFO';
         log(level, `[intent] tool=${tool} risk=${risk ?? 'low'} | ${intent}`);

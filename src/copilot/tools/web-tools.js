@@ -214,7 +214,109 @@ const webFetchTool = defineTool('web_fetch', {
     },
 });
 
+// ─── Tool: web_search ────────────────────────────────────────────────────────
+
+/**
+ * Tool: web_search — realiza busca na web via DuckDuckGo Lite e retorna resultados estruturados. Não requer API key.
+ * Usa o frontend HTML leve do DDG e extrai título, URL e snippet dos resultados.
+ */
+const webSearchTool = defineTool('web_search', {
+    description:
+        'Realiza busca na web via DuckDuckGo e retorna os primeiros resultados (título, URL, snippet). ' +
+        'Use quando precisar de informações atuais da web que não estão no workspace. ' +
+        'Não requer API key. Limite: 20 requisições/minuto (pool compartilhado com web_fetch).',
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                query: z.string().min(1).max(400).describe('Consulta de busca'),
+                maxResults: z
+                    .number()
+                    .int()
+                    .min(1)
+                    .max(10)
+                    .optional()
+                    .default(5)
+                    .describe('Número máximo de resultados a retornar (padrão 5, máx 10)'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ query: string; maxResults?: number }} */ { query, maxResults }) => {
+        if (!checkRateLimit()) {
+            return { success: false, error: `Rate limit excedido: máx ${MAX_REQUESTS_PER_MINUTE} req/min.` };
+        }
+
+        const limit = maxResults ?? 5;
+        // DDG HTML endpoint (leve, sem JavaScript, sem rastreamento)
+        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 15_000);
+
+            let response;
+            try {
+                response = await fetch(searchUrl, {
+                    method: 'GET',
+                    signal: controller.signal,
+                    redirect: 'follow',
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (compatible; github-copilot-agent/1.0)',
+                        Accept: 'text/html',
+                    },
+                });
+            } finally {
+                clearTimeout(timer);
+            }
+
+            if (!response.ok) {
+                return { success: false, error: `DDG retornou status ${response.status}` };
+            }
+
+            const html = await response.text();
+
+            // Extrai resultados via regex sobre o HTML do DDG Lite
+            // Pattern: <a class="result__a" href="...">título</a> e <a class="result__snippet">snippet</a>
+            /** @type {{ title: string; url: string; snippet: string }[]} */
+            const results = [];
+
+            const linkRe = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/gs;
+            const snippetRe = /<a[^>]+class="result__snippet"[^>]*>(.*?)<\/a>/gs;
+
+            const links = [...html.matchAll(linkRe)];
+            const snippets = [...html.matchAll(snippetRe)];
+
+            for (let i = 0; i < Math.min(limit, links.length); i++) {
+                const rawUrl = links[i]?.[1] ?? '';
+                const rawTitle = links[i]?.[2] ?? '';
+                const rawSnippet = snippets[i]?.[1] ?? '';
+
+                // DDG usa redirect URLs — extrai 'uddg' param ou usa diretamente
+                let finalUrl = rawUrl;
+                try {
+                    const u = new URL(rawUrl.startsWith('/') ? `https://html.duckduckgo.com${rawUrl}` : rawUrl);
+                    finalUrl = u.searchParams.get('uddg') ?? rawUrl;
+                } catch {
+                    /* usa rawUrl */
+                }
+
+                results.push({
+                    title: rawTitle.replace(/<[^>]+>/g, '').trim(),
+                    url: finalUrl,
+                    snippet: rawSnippet.replace(/<[^>]+>/g, '').trim(),
+                });
+            }
+
+            log('INFO', `[copilot/web_search] query="${query}" → ${results.length} resultados`);
+            return { success: true, query, results };
+        } catch (/** @type {any} */ e) {
+            const msg = e?.name === 'AbortError' ? 'Timeout (15s)' : (e?.message ?? String(e));
+            log('WARN', `[copilot/web_search] Erro: ${msg}`);
+            return { success: false, error: msg };
+        }
+    },
+});
+
 /**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const webTools = [webFetchTool];
+export const webTools = [webFetchTool, webSearchTool];
