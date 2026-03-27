@@ -199,4 +199,26 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
             "stopDialogLoop deve enviar 'STOP_DIALOG' para o modelo",
         );
     });
+
+    it('#dialogTurnMutex é declarado como campo privado', () => {
+        assert.ok(
+            sourceCode.includes('#dialogTurnMutex'),
+            '#dialogTurnMutex deve existir para serializar chamadas concorrentes a sendDialogTurn()',
+        );
+    });
+
+    it('#executeDialogTurn é declarado como método privado', () => {
+        assert.ok(
+            sourceCode.includes('#executeDialogTurn('),
+            '#executeDialogTurn deve existir como implementação interna serializada',
+        );
+    });
+
+    it('sendDialogTurn() encadeia no #dialogTurnMutex antes de executar', () => {
+        // Verifica o padrão do mutex: prev.then(() => this.#executeDialogTurn(...))
+        assert.ok(
+            sourceCode.includes('this.#dialogTurnMutex') && sourceCode.includes('prev.then'),
+            'sendDialogTurn deve encadear chamadas via #dialogTurnMutex para serializar execução',
+        );
+    });
 });

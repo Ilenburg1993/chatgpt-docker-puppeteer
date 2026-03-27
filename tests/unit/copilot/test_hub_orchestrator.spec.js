@@ -235,3 +235,106 @@ describe('HubOrchestrator.sendToLlmB', () => {
         assert.deepEqual(order, ['sent', 'complete'], 'turn:sent deve preceder turn:complete');
     });
 });
+
+// ─── Serialização por sessão (mutex) ──────────────────────────────────────────
+
+describe('HubOrchestrator.sendToLlmB serialização', () => {
+    it('chamadas concorrentes para a mesma sessão executam em sequência', async () => {
+        const sessionId = orchestrator.createSession({ title: 'Mutex test' });
+
+        const order = /** @type {number[]} */ ([]);
+
+        // Substitui o bridge por um que registra a ordem de execução com delay
+        let callN = 0;
+        const orderedBridge = /** @type {any} */ ({
+            chat: async (_msg, opts) => {
+                const n = ++callN;
+                // Simula latência diferente: call 1 demora mais que call 2
+                await new Promise((r) => setTimeout(r, n === 1 ? 30 : 5));
+                order.push(n);
+                opts?.onDelta?.(`chunk-${n}`);
+                return { response: `resp-${n}`, durationMs: 10 };
+            },
+            chatStructured: async (_input, opts) => {
+                const n = ++callN;
+                await new Promise((r) => setTimeout(r, n === 1 ? 30 : 5));
+                order.push(n);
+                opts?.onDelta?.(`chunk-${n}`);
+                return { response: `resp-${n}`, durationMs: 10, raw: null, structured: null };
+            },
+        });
+
+        // Criar orquestrador isolado para este teste
+        const Database = require('better-sqlite3');
+        const db2 = new Database(':memory:');
+        const store2 = new ConversationStore();
+        store2.init(db2);
+        const orch2 = new HubOrchestrator(store2, mockAgent);
+        orch2.init(orderedBridge);
+        const sid = orch2.createSession({ title: 'Serialized' });
+
+        // Dispara 3 chamadas concorrentemente
+        const [r1, r2, r3] = await Promise.all([
+            orch2.sendToLlmB(sid, 'msg1', { useStructured: false }),
+            orch2.sendToLlmB(sid, 'msg2', { useStructured: false }),
+            orch2.sendToLlmB(sid, 'msg3', { useStructured: false }),
+        ]);
+
+        // Devem ter sido processadas em ordem (1, 2, 3) mesmo com latências diferentes
+        assert.deepEqual(order, [1, 2, 3], 'deve serializar na ordem de enfileiramento');
+        // Todas devem ter conteúdo
+        assert.ok(r1.content.length > 0);
+        assert.ok(r2.content.length > 0);
+        assert.ok(r3.content.length > 0);
+
+        orch2.destroy();
+        db2.close();
+    });
+
+    it('emite turn:user_pending quando usuário injeta enquanto turn está em andamento', async () => {
+        const Database = require('better-sqlite3');
+        const db3 = new Database(':memory:');
+        const store3 = new ConversationStore();
+        store3.init(db3);
+
+        // Bridge com delay para simular turn em andamento
+        let resolveBridge = /** @type {(() => void) | null} */ (null);
+        const delayedBridge = /** @type {any} */ ({
+            chat: async (_msg, _opts) => {
+                await new Promise((r) => {
+                    resolveBridge = r;
+                });
+                return { response: 'resp', durationMs: 10 };
+            },
+            chatStructured: async () => ({ response: 'resp', durationMs: 10, raw: null, structured: null }),
+        });
+
+        const orch3 = new HubOrchestrator(store3, mockAgent);
+        orch3.init(delayedBridge);
+        const sid3 = orch3.createSession({ title: 'user_pending test' });
+
+        const pendingEvents = /** @type {any[]} */ ([]);
+        orch3.on('turn:user_pending', (e) => pendingEvents.push(e));
+
+        // Inicia turn (fica bloqueado no bridge)
+        const sendPromise = orch3.sendToLlmB(sid3, 'msg-lento', { useStructured: false });
+
+        // Aguarda um tick para garantir que o turn entrou em andamento
+        await new Promise((r) => setTimeout(r, 5));
+
+        // Usuário injeta mensagem enquanto turn está em andamento
+        orch3.injectUserMessage(sid3, 'Mensagem urgente do usuário');
+
+        // Deve ter emitido turn:user_pending
+        assert.equal(pendingEvents.length, 1, 'deve emitir turn:user_pending');
+        assert.equal(pendingEvents[0].hubSessionId, sid3);
+        assert.ok(typeof pendingEvents[0].content === 'string');
+
+        // Libera o bridge
+        resolveBridge?.();
+        await sendPromise;
+
+        orch3.destroy();
+        db3.close();
+    });
+});

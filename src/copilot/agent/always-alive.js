@@ -106,6 +106,14 @@ export class AlwaysAliveAgent extends EventEmitter {
     /** @type {boolean} */
     #dialogLoopActive = false;
 
+    /**
+     * Mutex para serializar chamadas a sendDialogTurn(). Garante que apenas um turno executa no dialog loop por vez,
+     * evitando race conditions no #pendingQuestion compartilhado.
+     *
+     * @type {Promise<void>}
+     */
+    #dialogTurnMutex = Promise.resolve();
+
     /** @type {DialogWatchdog | null} */
     #watchdog = null;
 
@@ -825,6 +833,9 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
      * Envia um turno de diálogo para o modelo suspenso no loop ask_user. Deve ser chamado após `startDialogLoop()` e
      * quando o evento `dialog.ready` for emitido (indicando que o modelo está aguardando).
      *
+     * Chamadas concorrentes são **serializadas automaticamente** via #dialogTurnMutex — nunca executam em paralelo.
+     * Isso garante que apenas um turno altera o #pendingQuestion por vez.
+     *
      * @param {string} message - Mensagem a enviar ao modelo
      * @param {{ timeout?: number; signal?: AbortSignal }} [opts] - timeout (padrão 60s) e AbortSignal opcional (UPG-01)
      * @returns {Promise<string>} A resposta do modelo (extraída do "REPLY: ...")
@@ -845,6 +856,25 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
             return Promise.reject(new DOMException('[AlwaysAlive] sendDialogTurn abortado.', 'AbortError'));
         }
 
+        // Serializa via mutex: encadeia na cauda do turno atual
+        const prev = this.#dialogTurnMutex;
+        /** @type {Promise<string>} */
+        const next = prev.then(() =>
+            this.#executeDialogTurn(message, { timeout, ...(signal !== undefined && { signal }) }),
+        );
+        // Atualiza a cauda — o .catch(() => {}) evita UnhandledRejection interna
+        this.#dialogTurnMutex = next.then(() => {}).catch(() => {});
+        return next;
+    }
+
+    /**
+     * Implementação interna de sendDialogTurn — executada de forma serializada pelo #dialogTurnMutex.
+     *
+     * @param {string} message
+     * @param {{ timeout: number; signal?: AbortSignal }} opts
+     * @returns {Promise<string>}
+     */
+    #executeDialogTurn(message, { timeout, signal }) {
         // AI.3: instrumentar com span OTEL
         return startSpan(
             'dialog.send_turn',

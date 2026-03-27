@@ -73,6 +73,14 @@ export class HubOrchestrator extends EventEmitter {
     #turnCounters = new Map();
 
     /**
+     * Mutex por sessão: garante que apenas um sendToLlmB() executa por vez por hubSessionId. Cada entry é a cauda da
+     * cadeia de Promises — novo sendToLlmB() encadeia via .then().
+     *
+     * @type {Map<string, Promise<void>>}
+     */
+    #inflightBySession = new Map();
+
+    /**
      * @param {import('./store.js').ConversationStore} store
      * @param {{
      *     getStatusSnapshot(): object;
@@ -125,6 +133,7 @@ export class HubOrchestrator extends EventEmitter {
     destroy() {
         this.#bridge = null;
         this.#turnCounters.clear();
+        this.#inflightBySession.clear();
         this.removeAllListeners();
         log('DEBUG', '[HubOrchestrator] Destruído.');
     }
@@ -170,6 +179,7 @@ export class HubOrchestrator extends EventEmitter {
     closeSession(hubSessionId) {
         this.#store.closeHubSession(hubSessionId);
         this.#turnCounters.delete(hubSessionId);
+        this.#inflightBySession.delete(hubSessionId);
         this.emit('session:closed', { hubSessionId });
         log('INFO', `[HubOrchestrator] Hub session encerrada: ${hubSessionId}`);
     }
@@ -185,12 +195,44 @@ export class HubOrchestrator extends EventEmitter {
      * 4. Persiste o turn de LLM-B ao completar
      * 5. Emite evento `turn:complete`
      *
+     * SERIALIZAÇÃO: chamadas concorrentes para a mesma hubSessionId são automaticamente enfileiradas via
+     * #inflightBySession — nunca executam em paralelo. Isso previne race conditions no sendDialogTurn() e na escrita de
+     * turns em SQLite.
+     *
      * @param {string} hubSessionId
      * @param {string | object} message - Texto da mensagem ou StructuredMessageInput
      * @param {SendToLlmBOpts} [opts]
      * @returns {Promise<OrchestratorResult>}
      */
-    async sendToLlmB(hubSessionId, message, opts = {}) {
+    sendToLlmB(hubSessionId, message, opts = {}) {
+        // Encadeia na cauda da Promise existente para esta sessão (mutex por sessão)
+        const prev = this.#inflightBySession.get(hubSessionId) ?? Promise.resolve();
+
+        /** @type {Promise<OrchestratorResult>} */
+        const next = prev.then(() => this.#executeSendToLlmB(hubSessionId, message, opts));
+
+        // Cauda sem valor — quando completa (ok ou erro), limpa o mapa se ninguém mais se encadeou
+        const tail = next.then(() => {}).catch(() => {});
+        this.#inflightBySession.set(hubSessionId, tail);
+        tail.then(() => {
+            // Só remove se a cauda armazenada ainda é esta — indica que a fila está vazia
+            if (this.#inflightBySession.get(hubSessionId) === tail) {
+                this.#inflightBySession.delete(hubSessionId);
+            }
+        }).catch(() => {});
+
+        return next;
+    }
+
+    /**
+     * Implementação interna de sendToLlmB — executada de forma serializada pelo mutex.
+     *
+     * @param {string} hubSessionId
+     * @param {string | object} message
+     * @param {SendToLlmBOpts} opts
+     * @returns {Promise<OrchestratorResult>}
+     */
+    async #executeSendToLlmB(hubSessionId, message, opts = {}) {
         if (!this.#bridge) {
             throw new Error('[HubOrchestrator] Não inicializado. Chame init() primeiro.');
         }
@@ -347,7 +389,20 @@ export class HubOrchestrator extends EventEmitter {
     injectUserMessage(hubSessionId, content, opts = {}) {
         const turnId = this.#store.injectUserMessage(hubSessionId, content, opts);
         this.emit('user:injected', { hubSessionId, turnId, content });
-        log('INFO', `[HubOrchestrator] Mensagem do usuário injetada na sessão ${hubSessionId}.`);
+
+        // Notifica LLM-A que há uma mensagem pendente do usuário para processar.
+        // Se um sendToLlmB() estiver em andamento (inflight), o evento serve como sinal para
+        // que LLM-A chame pollUserMessages() ao completar o turn atual.
+        const hasTurnInFlight = this.#inflightBySession.has(hubSessionId);
+        if (hasTurnInFlight) {
+            this.emit('turn:user_pending', { hubSessionId, turnId, content });
+            log(
+                'INFO',
+                `[HubOrchestrator] Mensagem do usuário injetada (turn em andamento) na sessão ${hubSessionId} — turn:user_pending emitido.`,
+            );
+        } else {
+            log('INFO', `[HubOrchestrator] Mensagem do usuário injetada na sessão ${hubSessionId}.`);
+        }
         return turnId;
     }
 
