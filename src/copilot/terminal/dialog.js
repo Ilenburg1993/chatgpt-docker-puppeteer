@@ -16,8 +16,8 @@
 
 import { log } from '#core/logger';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
 import { emitNerv } from '../bridges/nerv-bridge.js';
+import { llmBridgeClient } from '../channel/client.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { getCopilotNamespace } from '../conversation-hub/socket-ns.js';
 import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';

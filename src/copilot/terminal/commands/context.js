@@ -11,7 +11,7 @@
  */
 
 import { alwaysAliveAgent } from '../../agent/always-alive.js';
-import { llmBridgeClient } from '../../bridges/llm-bridge-client.js';
+import { llmBridgeClient } from '../../channel/client.js';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 // ─── Estimativa de tokens ─────────────────────────────────────────────────────

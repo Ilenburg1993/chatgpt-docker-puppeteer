@@ -58,6 +58,10 @@ const EVENT_MAP = [
     { event: 'tool.execution.start', actionCode: 'COPILOT_TOOL_EXECUTION_START' },
     { event: 'tool.execution.complete', actionCode: 'COPILOT_TOOL_EXECUTION_COMPLETE' },
     { event: 'session.history_synced', actionCode: 'COPILOT_SESSION_HISTORY_SYNCED' },
+    // MELHORIA-14 (fix): eventos adicionados no SDK v0.1.x não cobertos pelo mapa anterior
+    { event: 'session.usage_info', actionCode: 'COPILOT_SESSION_USAGE_INFO' },
+    { event: 'assistant.reasoning_delta', actionCode: 'COPILOT_ASSISTANT_REASONING_DELTA' },
+    { event: 'before-stop', actionCode: 'COPILOT_AGENT_BEFORE_STOP' },
 ];
 
 /**

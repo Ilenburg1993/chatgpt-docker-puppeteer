@@ -9,7 +9,7 @@
  */
 
 import { alwaysAliveAgent } from '../../agent/always-alive.js';
-import { llmBridgeClient } from '../../bridges/llm-bridge-client.js';
+import { llmBridgeClient } from '../../channel/client.js';
 import { conversationStore } from '../../conversation-hub/store.js';
 import { getWorkspaceContext } from '../workspace-context.js';
 

@@ -19,7 +19,7 @@
 import { log } from '#core/logger';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { loadAliases } from '../bridges/alias-store.js';
-import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
+import { llmBridgeClient } from '../channel/client.js';
 import { PinnedFilesLoader } from '../config/pinned-files-loader.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { broadcastSse, ensureDialogLoop, println, sendTurn } from './dialog.js';

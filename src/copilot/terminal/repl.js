@@ -17,7 +17,7 @@ import { log } from '#core/logger';
 import readline from 'node:readline';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { resolve } from '../bridges/alias-store.js';
-import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
+import { llmBridgeClient } from '../channel/client.js';
 import {
     cmdAlias as _cmdAlias,
     cmdAnswer as _cmdAnswer,
