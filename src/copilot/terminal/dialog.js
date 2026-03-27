@@ -8,6 +8,7 @@
  *
  * - Garantir que o dialog loop está ativo (`ensureDialogLoop`)
  * - Enviar turnos de diálogo e exibir respostas (`sendTurn`)
+ * - Serializar chamadas concorrentes a `sendTurn` via fila Promise (TERM-01)
  * - Transmitir eventos via dual-emit SSE + Socket.io /copilot namespace (`broadcastSse`)
  * - Renderizar output no stdout (`println`, `printExchange`)
  *
@@ -25,7 +26,6 @@ import { embedMultiple, readFileContext } from './file-context.js';
 import {
     clearAttachments,
     getAttachmentQueue,
-    getBusy,
     getHubSessionId,
     getPlanMode,
     getRl,
@@ -38,6 +38,35 @@ import {
 
 /** Eventos considerados críticos para clientes em modo ?level=critical. */
 export const CRITICAL_EVENTS = new Set(['stalled', 'fatal', 'system']);
+
+// ─── Fila de serialização de turnos (TERM-01) ─────────────────────────────────
+
+/**
+ * Limite máximo de turnos enfileirados aguardando LLM-B. Se excedido, novas chamadas são rejeitadas com 503
+ * (backpressure). Evita acúmulo ilimitado de promessas em sessões de alta carga.
+ */
+const MAX_TURN_QUEUE_SIZE = 10;
+
+/**
+ * Número de turnos atualmente enfileirados aguardando execução (exclui o turno em execução).
+ *
+ * @type {number}
+ */
+let _turnQueueDepth = 0;
+
+/**
+ * Promise-chain mutex para serializar chamadas concorrentes a `sendTurn`.
+ *
+ * TERM-01: substitui a estratégia de rejeição imediata (`getBusy() === true → return null`) por uma fila que serializa
+ * os callers na ordem de chegada. Isso garante que:
+ *
+ * - Mensagens de LLM-A e do usuário não são perdidas silenciosamente quando o terminal está ocupado.
+ * - O diálogo (dialog loop) não sofre race condition em `#pendingQuestion`.
+ * - A flag `_busy` permanece como indicador observável de estado, mas não é mais o gate de decisão.
+ *
+ * @type {Promise<string | null>}
+ */
+let _sendTurnMutex = Promise.resolve(null);
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
@@ -229,17 +258,45 @@ export async function ensureDialogLoop() {
 /**
  * Envia um turno de diálogo para a LLM-B e exibe a resposta.
  *
+ * TERM-01: chamadas concorrentes são enfileiradas em ordem de chegada (Promise-chain mutex). O terminal nunca mais
+ * rejeita uma mensagem com `null` apenas por estar ocupado — a mensagem é colocada na fila e processada quando o turno
+ * anterior terminar. Backpressure ativo quando a fila supera `MAX_TURN_QUEUE_SIZE`.
+ *
  * @param {string} message - Mensagem a enviar
  * @param {string} [actor] - Quem está enviando ('user' | 'llm-a')
- * @returns {Promise<string | null>} Resposta da LLM-B, ou null se busy
+ * @returns {Promise<string | null>} Resposta da LLM-B, ou null em erro irrecuperável
  */
-export async function sendTurn(message, actor = 'user') {
-    if (getBusy()) {
-        println('\x1b[33m  ⏳ Aguarde — LLM-B está processando...\x1b[0m');
-        return null;
+export function sendTurn(message, actor = 'user') {
+    // TERM-01: backpressure — rejeita se a fila está cheia
+    if (_turnQueueDepth >= MAX_TURN_QUEUE_SIZE) {
+        log(
+            'WARN',
+            `[TerminalServer] Fila de turnos cheia (${_turnQueueDepth}/${MAX_TURN_QUEUE_SIZE}) — rejeitando mensagem de ${actor}.`,
+        );
+        return Promise.resolve(null);
     }
 
-    // AC.4: aviso pré-send de context window
+    _turnQueueDepth++;
+    const next = _sendTurnMutex.then(() => _executeTurn(message, actor)).catch(() => null);
+    // A cauda ignora rejeição para não travar a fila
+    _sendTurnMutex = next.then(
+        () => null,
+        () => null,
+    );
+    void next.finally(() => {
+        _turnQueueDepth--;
+    });
+    return next;
+}
+
+/**
+ * Implementação interna do turno — executa após obter o mutex. Não deve ser chamada diretamente.
+ *
+ * @param {string} message
+ * @param {string} actor
+ * @returns {Promise<string | null>}
+ */
+async function _executeTurn(message, actor) {
     const ctxState = alwaysAliveAgent.getStatusSnapshot().contextWindow;
     if (ctxState) {
         const u = ctxState.utilization;
@@ -255,6 +312,8 @@ export async function sendTurn(message, actor = 'user') {
     }
 
     setBusy(true);
+    // GAP-4: notifica clientes SSE sobre início de processamento
+    broadcastSse('busy', { busy: true, actor });
     const rl = getRl();
     if (rl) {
         const model = alwaysAliveAgent.model;
@@ -334,6 +393,8 @@ export async function sendTurn(message, actor = 'user') {
         return null;
     } finally {
         setBusy(false);
+        // GAP-4: notifica clientes SSE que LLM-B ficou livre
+        broadcastSse('busy', { busy: false });
         const rl = getRl();
         if (rl) {
             rl.setPrompt(PROMPT_USER);

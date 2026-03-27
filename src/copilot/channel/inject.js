@@ -40,6 +40,9 @@ const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
  * @property {number} [port] - porta do terminal (default: LLM_B_TERMINAL_PORT ?? 3009)
  * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
+ * @property {number} [retries] - Tentativas automáticas em caso de 409 LLM_B_BUSY (default: 3; 0 = sem retry)
+ * @property {number} [retryDelayMs] - Delay base entre tentativas em ms; multiplicado pelo número da tentativa
+ *   (backoff linear, default: 1500)
  */
 
 /**
@@ -138,12 +141,44 @@ export async function checkLlmBHealth(opts = {}) {
  *
  * Latência esperada: 15-25 segundos por turno (round-trip ao modelo).
  *
+ * INJECT-01: Em caso de 409 (LLM_B_BUSY), tenta automaticamente até `retries` vezes com backoff linear (default: 3
+ * tentativas, 1.5s / 3s / 4.5s de espera). O comportamento é configurável via `opts.retries` e `opts.retryDelayMs`.
+ *
  * @param {string} message - Mensagem a enviar para LLM-B
  * @param {InjectOpts} [opts]
  * @returns {Promise<InjectResult>}
- * @throws {Error} Se o terminal não estiver ativo, LLM-B ocupada, ou timeout excedido
+ * @throws {Error} Se o terminal não estiver ativo, LLM-B ocupada após todas as tentativas, ou timeout excedido
  */
 export async function injectToLlmB(message, opts = {}) {
+    const maxRetries = opts.retries ?? 3;
+    const retryDelayMs = opts.retryDelayMs ?? 1_500;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await _doInjectToLlmB(message, opts);
+        } catch (/** @type {any} */ err) {
+            const isBusy = err?.code === 'LLM_B_BUSY';
+            if (isBusy && attempt < maxRetries) {
+                const waitMs = retryDelayMs * (attempt + 1);
+                await new Promise((r) => setTimeout(r, waitMs));
+                continue;
+            }
+            throw err;
+        }
+    }
+    // TypeScript safety — loop acima sempre retorna ou lança
+    /* c8 ignore next */
+    throw new BridgeError('[inject-llmb] Falha inesperada após retries', 'LLM_B_BUSY');
+}
+
+/**
+ * Implementação interna de uma única tentativa de injeção. Não deve ser chamada diretamente.
+ *
+ * @param {string} message
+ * @param {InjectOpts} opts
+ * @returns {Promise<InjectResult>}
+ */
+async function _doInjectToLlmB(message, opts) {
     const port = opts.port ?? DEFAULT_PORT;
     const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const from = opts.from ?? 'llm-a';

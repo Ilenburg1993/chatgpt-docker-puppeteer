@@ -31,7 +31,7 @@ import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { sendTurn } from './dialog.js';
 import { embedMultiple, getFileCacheStats, readFileContext } from './file-context.js';
-import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from './state.js';
+import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients, setBusy } from './state.js';
 
 // ─── Tipos auxiliares ─────────────────────────────────────────────────────────
 
@@ -312,7 +312,16 @@ export async function handleInject(body) {
         let reply;
         if (nativeAttachments.length > 0) {
             // AI.5: rota nativa SDK com file attachments reais
-            reply = await alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments });
+            // TERM-02: verifica _busy antes de chamar sendMessage para manter o invariante de estado
+            if (getBusy()) {
+                return { status: 409, body: { ok: false, reply: null, error: 'LLM-B ocupada', durationMs: 0, from } };
+            }
+            setBusy(true);
+            try {
+                reply = await alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments });
+            } finally {
+                setBusy(false);
+            }
         } else {
             reply = await sendTurn(enrichedMessage, from);
         }
