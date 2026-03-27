@@ -222,3 +222,93 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
         );
     });
 });
+
+// ─── Suite: DL-PERM hardening — watchdog e restart ───────────────────────────
+
+describe('always-alive › dialog loop: DL-PERM hardening', async () => {
+    /** @type {string} */
+    let sourceCode = '';
+
+    before(async () => {
+        const { readFile } = await import('node:fs/promises');
+        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
+    });
+
+    it('DL-PERM-04: sendDialogTurn() pinga watchdog antes de serializar o turno', () => {
+        // DL-PERM-04: #watchdog?.ping() deve ocorrer dentro de sendDialogTurn, antes do
+        // encadeamento no mutex (const prev = this.#dialogTurnMutex).
+        // Usar as posições exatas das duas linhas no sendDialogTurn (após a declaração de class).
+        const pingIdx = sourceCode.indexOf('#watchdog?.ping()');
+        const prevMutexIdx = sourceCode.indexOf('const prev = this.#dialogTurnMutex');
+        assert.ok(pingIdx !== -1, 'sendDialogTurn deve chamar this.#watchdog?.ping()');
+        assert.ok(prevMutexIdx !== -1, 'sendDialogTurn deve ter "const prev = this.#dialogTurnMutex"');
+        assert.ok(
+            pingIdx < prevMutexIdx,
+            '#watchdog?.ping() deve ocorrer antes de "const prev = this.#dialogTurnMutex"',
+        );
+    });
+
+    it('DL-PERM-05: stopDialogLoop() aceita campo reason', () => {
+        // reason: 'watchdog_restart' | 'authorized_stop' — distingue restart automático de encerramento definitivo
+        assert.ok(
+            sourceCode.includes("'watchdog_restart'") || sourceCode.includes("watchdog_restart"),
+            "stopDialogLoop deve suportar reason: 'watchdog_restart'",
+        );
+        assert.ok(
+            sourceCode.includes("'authorized_stop'") || sourceCode.includes("authorized_stop"),
+            "stopDialogLoop deve suportar reason: 'authorized_stop'",
+        );
+    });
+
+    it('DL-PERM-05: stopDialogLoop() emite dialog.stopped com campo reason', () => {
+        // O evento emitido deve incluir { reason, authorized: true }
+        assert.ok(
+            sourceCode.includes("emit('dialog.stopped'"),
+            "stopDialogLoop deve emitir 'dialog.stopped'",
+        );
+        // Verificar que reason está no objeto emitido — o emit deve incluir { reason, authorized: true }
+        assert.ok(
+            sourceCode.includes('{ reason, authorized: true }') ||
+                sourceCode.includes('{ reason: effectiveReason') ||
+                (sourceCode.includes("emit('dialog.stopped'") && sourceCode.includes('reason')),
+            "stopDialogLoop deve emitir dialog.stopped com campo 'reason'",
+        );
+    });
+
+    it('DL-PERM-05: #executeDialogTurn distingue stop definitivo de restart ao receber dialog.stopped', () => {
+        // onStopOuter deve checar authorized (true = definitivo) vs false (restart → retry)
+        assert.ok(
+            sourceCode.includes('stopEvt?.authorized') || sourceCode.includes('stoppedEvt?.authorized'),
+            '#executeDialogTurn deve verificar authorized para distinguir stop definitivo de restart',
+        );
+    });
+
+    it('DL-PERM-05: #executeDialogTurn aguarda dialog.ready para retry após restart não-definitivo', () => {
+        // Implementação do DL-PERM-09: ao receber dialog.stopped com authorized=false,
+        // o turno deve aguardar dialog.ready antes de retentar
+        assert.ok(
+            sourceCode.includes("'dialog.ready'") && sourceCode.includes('onRetryReady'),
+            '#executeDialogTurn deve aguardar dialog.ready e reenviar ao reencarar após restart',
+        );
+    });
+
+    it('DL-PERM-05: boot prompt não contém instrução STOP_DIALOG (DL-PERM-06)', () => {
+        // Boot prompt não deve instruir o modelo a responder ao comando STOP_DIALOG
+        // (conflito com a política DL-PERM de loop eterno)
+        // Verificar que a string STOP_DIALOG SÓ aparece em código funcional (answerPendingQuestion),
+        // não no meta-prompt de boot
+        const stopDialogIdx = sourceCode.indexOf('STOP_DIALOG');
+        const metaPromptIdx = sourceCode.indexOf('metaPrompt');
+        // O metaPrompt de boot não deve referenciar STOP_DIALOG dentro de sua string
+        const metaPromptSection = sourceCode.slice(metaPromptIdx, metaPromptIdx + 600);
+        assert.ok(
+            !metaPromptSection.includes('STOP_DIALOG'),
+            'metaPrompt de boot não deve instruir modelo a responder ao comando STOP_DIALOG',
+        );
+        // ... mas answerPendingQuestion('STOP_DIALOG') ainda deve existir
+        assert.ok(
+            stopDialogIdx !== -1 && sourceCode.includes("answerPendingQuestion('STOP_DIALOG')"),
+            "answerPendingQuestion('STOP_DIALOG') deve existir no stopDialogLoop()",
+        );
+    });
+});

@@ -87,6 +87,9 @@ const PLAN_PREFIX =
 /**
  * Boot prompt padrão enviado à LLM-B ao iniciar o dialog loop. Pode ser sobrescrito pela variável de ambiente
  * `LLM_B_BOOT_PROMPT`.
+ *
+ * DL-PERM-03: não há instrução de encerramento (STOP_DIALOG) — o loop é eterno por design.
+ * Se o modelo emitir STOPPED por iniciativa própria, o sistema reinicia automaticamente.
  */
 const DEFAULT_BOOT_PROMPT = `Você é a LLM-B — assistente técnico interno do projeto chatgpt-docker-puppeteer.
 
@@ -104,9 +107,11 @@ Protocolo OBRIGATÓRIO de comunicação via ask_user:
 1. Chame ask_user("READY: aguardando próxima mensagem") para sinalizar prontidão.
 2. Ao receber uma mensagem, processe-a e formule uma resposta completa.
 3. Chame ask_user("REPLY: " + sua_resposta) para enviar a resposta.
-4. Retorne ao passo 1. NUNCA encerre o loop. Sempre use ask_user para comunicar.
+4. Retorne ao passo 1.
 
-Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerrar.`;
+IMPORTANTE: NUNCA encerre o loop. Não use ask_user("STOPPED") nem qualquer variante
+de encerramento — o sistema é projetado para funcionar de forma contínua e permanente.
+O loop deve continuar mesmo quando não há mensagens pendentes.`;
 
 /** Boot prompt efetivo: env var sobrescreve o padrão. @type {string} */
 export const BOOT_PROMPT = process.env.LLM_B_BOOT_PROMPT ?? DEFAULT_BOOT_PROMPT;
@@ -221,15 +226,43 @@ export function broadcastSse(event, data) {
 // ─── Dialog loop ──────────────────────────────────────────────────────────────
 
 /**
+ * Promise em voo para proteger contra chamadas concorrentes a `ensureDialogLoop`.
+ *
+ * DL-PERM-02: se dois eventos (ex: `dialog.stalled` + `dialog.stopped`) dispararem
+ * `ensureDialogLoop()` ao mesmo tempo, apenas o primeiro inicia o loop — os demais aguardam
+ * a conclusão do mesmo boot, evitando dois `startDialogMode()` simultâneos.
+ *
+ * @type {Promise<void> | null}
+ */
+let _ensureDialogLoopInFlight = null;
+
+/**
  * Garante que o dialog loop está ativo. Se não estiver, inicia-o.
+ *
+ * DL-PERM-02: chamadas concorrentes são coalesced — apenas uma inicialização corre por vez.
  *
  * @returns {Promise<void>}
  */
-export async function ensureDialogLoop() {
+export function ensureDialogLoop() {
     if (alwaysAliveAgent.dialogLoopActive) {
-        return;
+        return Promise.resolve();
     }
+    // Coalescimento: se já há um boot em andamento, reutiliza a mesma Promise
+    if (_ensureDialogLoopInFlight !== null) {
+        return _ensureDialogLoopInFlight;
+    }
+    _ensureDialogLoopInFlight = _doEnsureDialogLoop().finally(() => {
+        _ensureDialogLoopInFlight = null;
+    });
+    return _ensureDialogLoopInFlight;
+}
 
+/**
+ * Implementação interna de ensureDialogLoop — nunca chamar diretamente.
+ *
+ * @returns {Promise<void>}
+ */
+async function _doEnsureDialogLoop() {
     const status = alwaysAliveAgent.status;
     if (status === 'stopped') {
         println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');
@@ -262,9 +295,8 @@ export async function ensureDialogLoop() {
  * rejeita uma mensagem com `null` apenas por estar ocupado — a mensagem é colocada na fila e processada quando o turno
  * anterior terminar. Backpressure ativo quando a fila supera `MAX_TURN_QUEUE_SIZE`.
  *
- * ATT-04 (arquitetura zero-PR): todos os attachments são convertidos em texto embeddado pelo chamador
- * (`handleInject`) antes de chegar aqui. `sendTurn` sempre usa o dialog loop (`dialogTurn`) — nunca
- * cria nova PR via `sendMessage()`.
+ * ATT-04 (arquitetura zero-PR): todos os attachments são convertidos em texto embeddado pelo chamador (`handleInject`)
+ * antes de chegar aqui. `sendTurn` sempre usa o dialog loop (`dialogTurn`) — nunca cria nova PR via `sendMessage()`.
  *
  * @param {string} message - Mensagem a enviar (pode conter blocos markdown de attachments)
  * @param {string} [actor] - Quem está enviando ('user' | 'llm-a')

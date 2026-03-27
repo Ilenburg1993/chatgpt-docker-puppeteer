@@ -62,7 +62,8 @@ export async function startTerminalServer() {
         log('WARN', `[TerminalServer] Hub storage indisponível, continua sem persistência: ${e.message}`);
     }
 
-    // Watchdog: dialog loop travado → reinicia automaticamente
+    // Watchdog: dialog loop travado → reinicia via stopDialogMode (emite dialog.stopped com reason: watchdog_restart)
+    // O handler de 'dialog.stopped' abaixo é responsável por chamar ensureDialogLoop() — evitando duplicação.
     alwaysAliveAgent.on('dialog.stalled', (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         println(`\n[watchdog] ⚠️  Dialog loop inativo há ${secs}s — reiniciando automaticamente…`);
@@ -78,13 +79,16 @@ export async function startTerminalServer() {
                 /* best-effort */
             }
         }
-        llmBridgeClient
-            .stopDialogMode()
-            .catch(() => {})
-            .then(() => ensureDialogLoop())
-            .catch((/** @type {any} */ e) =>
-                log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop: ${e.message}`),
+        // DL-PERM-06: stopDialogMode() usará reason='watchdog_restart', que o handler de
+        // 'dialog.stopped' capturará e chamará ensureDialogLoop(). Não chamar ensureDialogLoop()
+        // aqui diretamente para evitar duplo restart.
+        llmBridgeClient.stopDialogMode().catch((/** @type {any} */ e) => {
+            log('ERROR', `[TerminalServer] Falha ao parar dialog loop no watchdog: ${e.message}`);
+            // Fallback: se stopDialogMode() falhar, tentar reiniciar diretamente
+            ensureDialogLoop().catch((/** @type {any} */ e2) =>
+                log('ERROR', `[TerminalServer] Falha no fallback de restart após watchdog: ${e2.message}`),
             );
+        });
         broadcastSse('stalled', { stalledMs: evt.stalledMs });
     });
 
@@ -108,23 +112,33 @@ export async function startTerminalServer() {
     // DL-PERM: dialog loop permanente — reinicia automaticamente se o modelo encerrar o loop.
     // A LLM-B NUNCA deve encerrar o dialog loop sem autorização explícita do usuário.
     // Quando 'dialog.stopped' é emitido por iniciativa do modelo, reiniciamos automaticamente.
-    alwaysAliveAgent.on('dialog.stopped', (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
-        if (evt.authorized) {
-            // Encerramento autorizado explicitamente pelo usuário — respeitar
-            println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
-            log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
-            broadcastSse('stopped', { authorized: true });
-            return;
-        }
-        // Encerramento não autorizado — reiniciar automaticamente
-        const reason = evt.reason ?? 'desconhecido';
-        println(`\n\x1b[33m  [dialog] Loop encerrado pelo modelo (reason: ${reason}) — reiniciando automaticamente…\x1b[0m`);
-        log('WARN', `[TerminalServer] Dialog loop encerrado sem autorização (reason: ${reason}). Reiniciando.`);
-        broadcastSse('stopped', { reason, restarting: true });
-        ensureDialogLoop().catch((/** @type {any} */ e) =>
-            log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop após stop: ${e.message}`),
-        );
-    });
+    alwaysAliveAgent.on(
+        'dialog.stopped',
+        (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
+            const reason = evt.reason ?? 'desconhecido';
+
+            if (reason === 'authorized_stop') {
+                // Encerramento permanente autorizado pelo usuário — não reiniciar
+                println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
+                log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
+                broadcastSse('stopped', { authorized: true, reason });
+                return;
+            }
+
+            // Para todos os outros casos (watchdog_restart, model_stopped, falha de sendMessage, etc.)
+            // — reiniciar automaticamente. Isso garante que o loop nunca morre de forma permanente.
+            const isWatchdog = reason === 'watchdog_restart';
+            const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
+            println(
+                `\n\x1b[33m  [dialog] Loop encerrado (${label}) — reiniciando automaticamente…\x1b[0m`,
+            );
+            log('WARN', `[TerminalServer] Dialog loop encerrado (${label}). Reiniciando.`);
+            broadcastSse('stopped', { reason, restarting: true });
+            ensureDialogLoop().catch((/** @type {any} */ e) =>
+                log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop após stop: ${e.message}`),
+            );
+        },
+    );
 
     // AA.4: SSE 'context' event — emitir dados reais de uso de contexto após cada turno
     alwaysAliveAgent.on('session.usage', (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {

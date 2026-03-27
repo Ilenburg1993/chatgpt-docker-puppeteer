@@ -797,9 +797,11 @@ Protocolo OBRIGATÓRIO:
 1. Chame ask_user("READY: aguardando próxima mensagem") para sinalizar prontidão.
 2. Ao receber uma mensagem, processe-a e formule uma resposta.
 3. Chame ask_user("REPLY: " + sua_resposta) para enviar a resposta.
-4. Retorne ao passo 1. NUNCA encerre o loop. Sempre use ask_user para comunicar.
+4. Retorne ao passo 1.
 
-Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerrar.`;
+IMPORTANTE: NUNCA encerre o loop. Não use ask_user("STOPPED") nem qualquer forma de
+encerramento — o loop é eterno por design (DL-PERM). O sistema reiniciará automaticamente
+qualquer tentativa de encerramento não autorizado.`;
 
         // Boot: 1 PR — resolve quando o modelo emite o primeiro ask_user("READY:")
         const bootPromise = new Promise((resolve) => {
@@ -856,6 +858,10 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
             return Promise.reject(new DOMException('[AlwaysAlive] sendDialogTurn abortado.', 'AbortError'));
         }
 
+        // DL-PERM-04: registrar atividade no watchdog logo ao enviar o turno —
+        // assim o watchdog não dispara stall durante processamentos longos do modelo.
+        this.#watchdog?.ping();
+
         // Serializa via mutex: encadeia na cauda do turno atual
         const prev = this.#dialogTurnMutex;
         /** @type {Promise<string>} */
@@ -869,6 +875,12 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
 
     /**
      * Implementação interna de sendDialogTurn — executada de forma serializada pelo #dialogTurnMutex.
+     *
+     * DL-PERM-05: se `dialog.stopped` disparar com `authorized: false` (restart automático), aguarda
+     * `dialog.ready` por até `timeout` ms e reenvia a mensagem uma vez. Isso garante que turnos que
+     * estavam em flight durante um restart automático do loop não são perdidos silenciosamente.
+     *
+     * Se `dialog.stopped` disparar com `authorized: true`, rejeita imediatamente (encerramento definitivo).
      *
      * @param {string} message
      * @param {{ timeout: number; signal?: AbortSignal }} opts
@@ -896,10 +908,51 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                         this.off('dialog.stopped', onStopOuter);
                         resolve(evt.reply);
                     };
-                    const onStopOuter = () => {
+                    const onStopOuter = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt) => {
                         clearTimeout(timeoutHandle);
                         this.off('dialog.reply', onReplyOuter);
-                        reject(new SessionError('[AlwaysAlive] Diálogo encerrado pelo modelo.', 'DIALOG_ENDED'));
+                        if (stopEvt?.authorized) {
+                            // Encerramento definitivo — rejeitar imediatamente
+                            reject(
+                                new SessionError(
+                                    '[AlwaysAlive] Diálogo encerrado definitivamente.',
+                                    'DIALOG_ENDED',
+                                ),
+                            );
+                        } else {
+                            // DL-PERM-05: restart automático — aguarda dialog.ready e reenvia a mensagem
+                            log(
+                                'INFO',
+                                `[AlwaysAlive] DL-PERM-05: dialog.stopped (${stopEvt?.reason ?? 'unknown'}) durante turno — aguardando restart para reenviar.`,
+                            );
+                            const retryTimeout = setTimeout(() => {
+                                this.off('dialog.ready', onRetryReady);
+                                reject(
+                                    new SessionError(
+                                        `[AlwaysAlive] sendDialogTurn: timeout aguardando restart após dialog.stopped (${stopEvt?.reason})`,
+                                        'DIALOG_RESTART_TIMEOUT',
+                                    ),
+                                );
+                            }, timeout);
+                            const onRetryReady = () => {
+                                clearTimeout(retryTimeout);
+                                // Loop reiniciado — reenviar a mensagem uma vez
+                                if (this.#pendingQuestion) {
+                                    this.answerPendingQuestion(message);
+                                    this.once('dialog.reply', (/** @type {{ reply: string }} */ retryEvt) => {
+                                        resolve(retryEvt.reply);
+                                    });
+                                } else {
+                                    this.once('question.pending', () => {
+                                        this.answerPendingQuestion(message);
+                                        this.once('dialog.reply', (/** @type {{ reply: string }} */ retryEvt) => {
+                                            resolve(retryEvt.reply);
+                                        });
+                                    });
+                                }
+                            };
+                            this.once('dialog.ready', onRetryReady);
+                        }
                     };
 
                     // UPG-01: cancelar via AbortSignal externo
@@ -943,12 +996,45 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                                 this.off('dialog.stopped', onStop);
                                 resolve(evt.reply);
                             };
-                            const onStop = () => {
+                            const onStop = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt2) => {
                                 clearTimeout(newTimeout);
                                 this.off('dialog.reply', onReply);
-                                reject(
-                                    new SessionError('[AlwaysAlive] Diálogo encerrado pelo modelo.', 'DIALOG_ENDED'),
-                                );
+                                if (stopEvt2?.authorized) {
+                                    reject(
+                                        new SessionError(
+                                            '[AlwaysAlive] Diálogo encerrado definitivamente.',
+                                            'DIALOG_ENDED',
+                                        ),
+                                    );
+                                } else {
+                                    // DL-PERM-05: restart — aguardar dialog.ready e reenviar
+                                    const retryTimeout2 = setTimeout(() => {
+                                        this.off('dialog.ready', onRetryReady2);
+                                        reject(
+                                            new SessionError(
+                                                `[AlwaysAlive] sendDialogTurn: timeout aguardando restart (${stopEvt2?.reason})`,
+                                                'DIALOG_RESTART_TIMEOUT',
+                                            ),
+                                        );
+                                    }, timeout);
+                                    const onRetryReady2 = () => {
+                                        clearTimeout(retryTimeout2);
+                                        if (this.#pendingQuestion) {
+                                            this.answerPendingQuestion(message);
+                                            this.once('dialog.reply', (/** @type {{ reply: string }} */ retryEvt2) => {
+                                                resolve(retryEvt2.reply);
+                                            });
+                                        } else {
+                                            this.once('question.pending', () => {
+                                                this.answerPendingQuestion(message);
+                                                this.once('dialog.reply', (/** @type {{ reply: string }} */ retryEvt3) => {
+                                                    resolve(retryEvt3.reply);
+                                                });
+                                            });
+                                        }
+                                    };
+                                    this.once('dialog.ready', onRetryReady2);
+                                }
                             };
                             this.once('dialog.reply', onReply);
                             this.once('dialog.stopped', onStop);
@@ -963,18 +1049,23 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
     /**
      * Para o modo diálogo, sinalizando ao modelo para encerrar o loop.
      *
-     * DL-PERM: por padrão o encerramento é recusado para preservar o dialog loop permanente. Apenas quando
-     * `authorized: true` é passado o loop é efetivamente encerrado. Sem autorização, emite um aviso e retorna sem
-     * ação. Use `authorized: true` para:
+     * DL-PERM: por padrão o encerramento é recusado para preservar o dialog loop permanente. Apenas quando `authorized:
+     * true` é passado o loop é efetivamente encerrado. Sem autorização, emite um aviso e retorna sem ação. Use
+     * `authorized: true` para:
+     *
      * - Restart automático pelo watchdog (ação legítima de saúde do sistema)
      * - Encerramento explicitamente autorizado pelo usuário via API
      *
+     * O campo `reason` diferencia o tipo de encerramento:
+     * - `'watchdog_restart'` — restart automático do sistema (não-definitivo, loop será reiniciado)
+     * - `'authorized_stop'` — encerramento permanente autorizado pelo usuário
+     *
      * O restart automático em caso de encerramento pelo modelo é responsabilidade de `terminal/index.js`.
      *
-     * @param {{ authorized?: boolean }} [opts]
+     * @param {{ authorized?: boolean; reason?: 'watchdog_restart' | 'authorized_stop' }} [opts]
      * @returns {Promise<void>}
      */
-    async stopDialogLoop({ authorized = false } = {}) {
+    async stopDialogLoop({ authorized = false, reason = 'authorized_stop' } = {}) {
         if (!this.#dialogLoopActive) return;
         if (!authorized) {
             log(
@@ -989,7 +1080,7 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
         }
         this.#dialogLoopActive = false;
         this.#watchdog?.stop();
-        this.emit('dialog.stopped', { reason: 'authorized_stop', authorized: true });
+        this.emit('dialog.stopped', { reason, authorized: true });
     }
 
     // ─────────────── Privados ───────────────
