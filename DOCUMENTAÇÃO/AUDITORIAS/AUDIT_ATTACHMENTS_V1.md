@@ -1,9 +1,10 @@
 # AUDIT_ATTACHMENTS_V1 — Auditoria e Refatoração do Canal de Attachments LLM-A/B
 
-**Data**: 2026-03-27  
-**Autor**: GitHub Copilot (LLM-A)  
-**Status**: IMPLEMENTADO — `ATT-01`, `ATT-02`, `ATT-03`, `BUG-A` corrigidos  
-**Commit**: (a ser preenchido após push)  
+**Data**: 2026-03-27 → atualizado 2026-03-27
+**Autor**: GitHub Copilot (LLM-A)
+**Status**: IMPLEMENTADO — `ATT-01`, `ATT-02`, `ATT-04` (zero-PR), `BUG-A`, `DL-PERM` — ATT-03 REVOGADO
+**Nota**: ATT-03 foi revogado pois criava novas PRs via `sendMessage()`, violando a política zero-PR.
+**Commit**: (a ser preenchido após push)
 **Pré-condição**: `dcc72c80` (TERM-01/02 + GAP-4 + INJECT-01)
 
 ---
@@ -18,16 +19,16 @@ Análise completa do fluxo de attachments nos dois sentidos (usuário → LLM-B 
 
 ### Arquivos analisados
 
-| Arquivo | Papel |
-|---|---|
-| `src/copilot/terminal/commands/attach.js` | Comando `/attach` do usuário |
-| `src/copilot/terminal/file-context.js` | Leitura, cache e embed de arquivos |
-| `src/copilot/terminal/state.js` | `_attachmentQueue`, busy flag |
-| `src/copilot/terminal/dialog.js` | Motor de diálogo, `sendTurn`, `_executeTurn` |
-| `src/copilot/terminal/http-handlers.js` | `handleInject` — parsing e dispatch |
-| `src/copilot/channel/inject.js` | API pública `injectToLlmB()` |
-| `src/copilot/agent/always-alive.js` | `sendMessage()`, `sendDialogTurn()` |
-| `src/copilot/channel/client.js` | `LlmBridgeClient`, `dialogTurn()` |
+| Arquivo                                   | Papel                                        |
+| ----------------------------------------- | -------------------------------------------- |
+| `src/copilot/terminal/commands/attach.js` | Comando `/attach` do usuário                 |
+| `src/copilot/terminal/file-context.js`    | Leitura, cache e embed de arquivos           |
+| `src/copilot/terminal/state.js`           | `_attachmentQueue`, busy flag                |
+| `src/copilot/terminal/dialog.js`          | Motor de diálogo, `sendTurn`, `_executeTurn` |
+| `src/copilot/terminal/http-handlers.js`   | `handleInject` — parsing e dispatch          |
+| `src/copilot/channel/inject.js`           | API pública `injectToLlmB()`                 |
+| `src/copilot/agent/always-alive.js`       | `sendMessage()`, `sendDialogTurn()`          |
+| `src/copilot/channel/client.js`           | `LlmBridgeClient`, `dialogTurn()`            |
 
 ---
 
@@ -76,7 +77,7 @@ if (nativeAttachments.length > 0) {
 
 `handlePipeline` retornava `"LLM-B ocupada — pipeline interrompido"` quando `sendTurn` retornava `null`. Com TERM-01 (Promise-chain mutex), `null` já não significa "busy" — significa erro interno. A mensagem induzia ao erro.
 
-#### ATT-01/02 (informativo): `dialogTurn` e `sendDialogTurn` não suportam attachments  
+#### ATT-01/02 (informativo): `dialogTurn` e `sendDialogTurn` não suportam attachments
 
 O protocolo `ask_user` do dialog loop é baseado em strings — não há como passar file attachments nativos SDK via esse protocolo. Isso é uma **limitação de design do SDK**, não um bug. O caminho correto para attachments nativos é sempre via `sendMessage()` (nova PR).
 
@@ -188,8 +189,71 @@ sendTurn(message, actor, nativeAttachments?)
 
 ---
 
-## 6. Limitações conhecidas (não bug, design)
+## 7. Revisão arquitetural — ATT-04 (zero-PR) e DL-PERM
 
-- **Dialog loop não suporta attachments nativos**: o protocolo `ask_user` é baseado em string. Quando `nativeAttachments` está presente, `_executeTurn` automaticamente usa `sendMessage()` (nova PR), o que tem overhead de criação de sessão adicional.
-- **`/attach` do usuário usa embed inline**: o comando `/attach` no terminal adiciona arquivos à `_attachmentQueue` que são embutidos como markdown. Para attachments nativos SDK via terminal, o usuário deve usar o HTTP endpoint `/inject`.
-- **Sem deduplicação de context**: se o usuário usa tanto `/attach` quanto o HTTP `/inject` com `context_files`, ambos são processados e podem resultar em conteúdo duplicado.
+### 7.1 Problema identificado em ATT-03
+
+ATT-03 foi revogado porque criava um novo "Premium Request" (PR) via `alwaysAliveAgent.sendMessage()` quando
+attachments nativos SDK estavam presentes. Isso violava o princípio de "ficar sempre dentro do dialog loop `ask_user`".
+
+**Billing model do SDK:**
+- `session.send()` / `sendAndWait()` = **nova PR** (billable)
+- Resposta ao `ask_user` = **dentro da PR existente** (sem custo adicional)
+- Dialog loop: **1 PR total** para toda a conversa via protocolo `ask_user`
+
+**Limitação do SDK**: `UserInputResponse` aceita apenas `{ answer: string, wasFreeform: bool }` — não há como passar
+attachments nativos ao modelo via `ask_user`. A única solução compatível com zero-PR é converter todos os attachment
+types em texto markdown embeddado.
+
+### 7.2 ATT-04: Arquitetura zero-PR
+
+**Princípio**: todos os attachment types são resolvidos em Node.js para texto markdown antes de enviar ao modelo.
+
+```
+POST /inject { attachments: [...] }
+  → handleInject
+  → attachmentToEmbed(att) para cada attachment:
+      type 'file'      → readFileContext(path) → bloco markdown com conteúdo do arquivo
+      type 'directory' → readDirectoryContext(path) → blocos para cada arquivo do dir
+      type 'selection' → att.text como bloco markdown fenced
+      type 'content'   → att.content como bloco markdown
+  → enrichedMessage = embed blocks + mensagem original
+  → sendTurn(enrichedMessage, from)  ← caminho ÚNICO, sem nativeAttachments
+  → _executeTurn → dialogTurn() ← dialog loop, zero nova PR
+```
+
+**Novo helper em `file-context.js`:**
+- `readDirectoryContext(dirPath)` — lê arquivos de um diretório (shallow), respeitando `MAX_EMBED_BYTES`
+- `attachmentToEmbed(att)` — dispatcher universal que roteia qualquer tipo para o embed correto
+
+**sendTurn() simplificado**: assinatura `(message, actor)` — sem `nativeAttachments`. Sempre usa dialog loop.
+
+### 7.3 DL-PERM: Dialog loop permanente
+
+**Princípio**: a LLM-B NUNCA deve encerrar o dialog loop sem autorização explícita do usuário.
+
+**Implementação:**
+
+1. **`stopDialogLoop({ authorized? })`** — por padrão recusa o encerramento (apenas loga aviso). Requer
+   `{ authorized: true }` para encerrar efetivamente.
+
+2. **`#handleUserInputRequest` — handler STOPPED**: quando o modelo emite `STOPPED`/`STOP_DIALOG`, o sistema NÃO
+   encerra mais o loop — apenas emite `dialog.stopped` com `authorized: false`. O listener em `terminal/index.js`
+   escuta este evento e reinicia automaticamente via `ensureDialogLoop()`.
+
+3. **`/dialog/stop` endpoint** — protegido por `{ force: true }` no body. Sem force, retorna HTTP 403 explicando
+   a política DL-PERM. Com force, delega para `stopDialogLoop({ authorized: true })`.
+
+4. **`LlmBridgeClient.stopDialogMode()`** — delega para `stopDialogLoop({ authorized: true })` pois é chamado
+   apenas pelo watchdog (restart legítimo de saúde do sistema).
+
+**Vetores de encerramento autorizados:**
+- Watchdog de stall → `llmBridgeClient.stopDialogMode()` → restart (não encerra permanentemente)
+- `dialog.stopped` não autorizado → reinicia automaticamente via `ensureDialogLoop()`
+- `POST /dialog/stop { force: true }` → encerra permanentemente (apenas com autorização do usuário)
+
+**Vetores bloqueados:**
+- Modelo responde `STOPPED` por iniciativa própria → `authorized: false` → restart automático
+- `POST /dialog/stop` sem `{ force: true }` → 403 Forbidden
+- `alwaysAliveAgent.stopDialogLoop()` sem `{ authorized: true }` → log WARN, retorna sem ação
+

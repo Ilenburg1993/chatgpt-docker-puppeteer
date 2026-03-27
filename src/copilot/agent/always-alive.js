@@ -963,15 +963,33 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
     /**
      * Para o modo diálogo, sinalizando ao modelo para encerrar o loop.
      *
+     * DL-PERM: por padrão o encerramento é recusado para preservar o dialog loop permanente. Apenas quando
+     * `authorized: true` é passado o loop é efetivamente encerrado. Sem autorização, emite um aviso e retorna sem
+     * ação. Use `authorized: true` para:
+     * - Restart automático pelo watchdog (ação legítima de saúde do sistema)
+     * - Encerramento explicitamente autorizado pelo usuário via API
+     *
+     * O restart automático em caso de encerramento pelo modelo é responsabilidade de `terminal/index.js`.
+     *
+     * @param {{ authorized?: boolean }} [opts]
      * @returns {Promise<void>}
      */
-    async stopDialogLoop() {
+    async stopDialogLoop({ authorized = false } = {}) {
         if (!this.#dialogLoopActive) return;
+        if (!authorized) {
+            log(
+                'WARN',
+                '[AlwaysAlive] stopDialogLoop() chamado sem autorização — ignorado (DL-PERM). ' +
+                    'Use stopDialogLoop({ authorized: true }) para encerrar o loop.',
+            );
+            return;
+        }
         if (this.#pendingQuestion) {
             this.answerPendingQuestion('STOP_DIALOG');
         }
         this.#dialogLoopActive = false;
         this.#watchdog?.stop();
+        this.emit('dialog.stopped', { reason: 'authorized_stop', authorized: true });
     }
 
     // ─────────────── Privados ───────────────
@@ -1138,8 +1156,12 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                 this.emit('dialog.reply', { reply });
                 // Aguarda o próximo turno via question.pending
             } else if (trimmed.startsWith('STOPPED') || trimmed === 'STOP_DIALOG') {
-                this.#dialogLoopActive = false;
-                this.emit('dialog.stopped', { reason: 'model_stopped' });
+                // DL-PERM: o modelo tentou encerrar o loop. Não encerramos imediatamente — emitimos o evento
+                // 'dialog.stopped' para que o listener em terminal/index.js possa reiniciar automaticamente.
+                // O #dialogLoopActive NÃO é setado para false aqui — o restart via ensureDialogLoop() irá
+                // reativar o loop sem interrupção do protocolo ask_user.
+                log('WARN', '[AlwaysAlive] Modelo emitiu STOPPED — emitindo dialog.stopped para restart automático.');
+                this.emit('dialog.stopped', { reason: 'model_stopped', authorized: false });
             }
         }
         // ── Fim da interceptação ─────────────────────────────────────────────

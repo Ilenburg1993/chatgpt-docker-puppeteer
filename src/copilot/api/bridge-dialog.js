@@ -91,14 +91,27 @@ export function registerDialogRoutes(bridge, agent) {
     // ─── POST /dialog/stop ────────────────────────────────────────────────────
 
     /**
-     * Encerra o modo Dialog Loop, sinalizando STOP_DIALOG para o modelo.
+     * Encerra o Dialog Loop, exigindo autorização explícita do usuário (DL-PERM).
+     *
+     * Body: `{ force: boolean }` — deve ser `true` para realmente encerrar o loop.
+     * Sem `force: true`, retorna 403 com explicação da política de dialog loop permanente.
      *
      * Returns: { ok: true, message: string }
      */
-    bridge.post('/dialog/stop', async (/** @type {Req} */ _req, /** @type {Res} */ res) => {
+    bridge.post('/dialog/stop', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { force } = req.body ?? {};
+        if (!force) {
+            return res
+                .status(403)
+                .json({
+                    ok: false,
+                    error:
+                        'Dialog loop é permanente (DL-PERM). Use { force: true } apenas com autorização explícita do usuário.',
+                });
+        }
         try {
-            await agent.stopDialogLoop();
-            return res.json({ ok: true, message: 'Modo diálogo encerrado.' });
+            await agent.stopDialogLoop({ authorized: true });
+            return res.json({ ok: true, message: 'Modo diálogo encerrado por autorização do usuário.' });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return res.status(500).json({ ok: false, error: msg });

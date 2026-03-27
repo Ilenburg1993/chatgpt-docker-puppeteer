@@ -48,7 +48,7 @@ import { conversationStore } from '../conversation-hub/index.js';
  *     answerPendingQuestion: (answer: string) => boolean;
  *     startDialogLoop: (bootPrompt?: string) => Promise<void>;
  *     sendDialogTurn: (text: string, opts?: { timeout?: number }) => Promise<string>;
- *     stopDialogLoop: () => Promise<void>;
+ *     stopDialogLoop: (opts?: { authorized?: boolean }) => Promise<void>;
  *     on: (event: string, listener: (...args: any[]) => void) => any;
  *     off: (event: string, listener: (...args: any[]) => void) => any;
  *     listenerDiagnostics: () => Record<string, number>;

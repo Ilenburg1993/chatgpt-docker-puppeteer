@@ -262,16 +262,15 @@ export async function ensureDialogLoop() {
  * rejeita uma mensagem com `null` apenas por estar ocupado — a mensagem é colocada na fila e processada quando o turno
  * anterior terminar. Backpressure ativo quando a fila supera `MAX_TURN_QUEUE_SIZE`.
  *
- * ATT-03: aceita `nativeAttachments` opcionais. Quando presentes, o turno usa `sendMessage()` (nova PR no SDK)
- * em vez do dialog loop (`dialogTurn`), mas ainda serializado pelo mesmo mutex — garantindo exclusão mútua
- * independente do caminho de execução.
+ * ATT-04 (arquitetura zero-PR): todos os attachments são convertidos em texto embeddado pelo chamador
+ * (`handleInject`) antes de chegar aqui. `sendTurn` sempre usa o dialog loop (`dialogTurn`) — nunca
+ * cria nova PR via `sendMessage()`.
  *
- * @param {string} message - Mensagem a enviar
+ * @param {string} message - Mensagem a enviar (pode conter blocos markdown de attachments)
  * @param {string} [actor] - Quem está enviando ('user' | 'llm-a')
- * @param {import('@github/copilot-sdk').MessageOptions['attachments']} [nativeAttachments] - Attachments nativos SDK
  * @returns {Promise<string | null>} Resposta da LLM-B, ou null em erro irrecuperável
  */
-export function sendTurn(message, actor = 'user', nativeAttachments) {
+export function sendTurn(message, actor = 'user') {
     // TERM-01: backpressure — rejeita se a fila está cheia
     if (_turnQueueDepth >= MAX_TURN_QUEUE_SIZE) {
         log(
@@ -282,7 +281,7 @@ export function sendTurn(message, actor = 'user', nativeAttachments) {
     }
 
     _turnQueueDepth++;
-    const next = _sendTurnMutex.then(() => _executeTurn(message, actor, nativeAttachments)).catch(() => null);
+    const next = _sendTurnMutex.then(() => _executeTurn(message, actor)).catch(() => null);
     // A cauda ignora rejeição para não travar a fila
     _sendTurnMutex = next.then(
         () => null,
@@ -297,16 +296,14 @@ export function sendTurn(message, actor = 'user', nativeAttachments) {
 /**
  * Implementação interna do turno — executa após obter o mutex. Não deve ser chamada diretamente.
  *
- * ATT-03: quando `nativeAttachments` está populado, usa `alwaysAliveAgent.sendMessage()` (nova PR no SDK,
- * único caminho que suporta file attachments nativos). Quando ausente, usa o dialog loop via
- * `llmBridgeClient.dialogTurn()` (mais eficiente: zero PRs extras, protocolo ask_user existente).
+ * ATT-04 (arquitetura zero-PR): usa exclusivamente `llmBridgeClient.dialogTurn()` (protocolo ask_user, zero PRs
+ * extras). Todos os attachments já foram convertidos em texto embeddado pelo chamador antes de chegar aqui.
  *
  * @param {string} message
  * @param {string} actor
- * @param {import('@github/copilot-sdk').MessageOptions['attachments']} [nativeAttachments]
  * @returns {Promise<string | null>}
  */
-async function _executeTurn(message, actor, nativeAttachments) {
+async function _executeTurn(message, actor) {
     const ctxState = alwaysAliveAgent.getStatusSnapshot().contextWindow;
     if (ctxState) {
         const u = ctxState.utilization;
@@ -355,16 +352,8 @@ async function _executeTurn(message, actor, nativeAttachments) {
 
     const t0 = Date.now();
     try {
-        let reply;
-        if (nativeAttachments && nativeAttachments.length > 0) {
-            // ATT-03: path nativo SDK — envia via sendMessage() (nova PR) com file attachments reais.
-            // Não usa o dialog loop pois o protocolo ask_user não suporta attachments nativos.
-            // O mutex de sendTurn garante exclusão mútua com o dialog loop.
-            reply = await alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments });
-        } else {
-            await ensureDialogLoop();
-            reply = await llmBridgeClient.dialogTurn(enrichedMessage, { timeout: TURN_TIMEOUT_MS });
-        }
+        await ensureDialogLoop();
+        const reply = await llmBridgeClient.dialogTurn(enrichedMessage, { timeout: TURN_TIMEOUT_MS });
         const durationMs = Date.now() - t0;
         printExchange(actor, message, reply, durationMs);
         log('INFO', `[TerminalServer] Turno ${actor} concluído em ${durationMs}ms`);

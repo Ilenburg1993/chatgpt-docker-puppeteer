@@ -348,11 +348,13 @@ export class LlmBridgeClient {
     /**
      * Encerra o modo de diálogo direto, sinalizando STOP_DIALOG para LLM-B.
      *
+     * DL-PERM: autorizado internamente para uso pelo watchdog e mecanismos de restart do sistema.
+     *
      * @returns {Promise<void>}
      */
     async stopDialogMode() {
-        await alwaysAliveAgent.stopDialogLoop();
-        log('INFO', '[LlmBridgeClient] Modo diálogo encerrado.');
+        await alwaysAliveAgent.stopDialogLoop({ authorized: true });
+        log('INFO', '[LlmBridgeClient] Modo diálogo encerrado (restart autorizado do sistema).');
     }
 
     /**

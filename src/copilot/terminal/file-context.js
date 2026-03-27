@@ -11,8 +11,8 @@
  * @module copilot/terminal/file-context
  */
 
-import { readFile, stat } from 'node:fs/promises';
-import { extname, resolve as pathResolve } from 'node:path';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { extname, join as pathJoin, resolve as pathResolve } from 'node:path';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -222,4 +222,106 @@ export function extractAtReferences(message) {
         return '';
     });
     return { paths, strippedMessage: strippedMessage.trim() };
+}
+
+// ─── Conversão de attachments para embed textual (arquitetura zero-PR) ────────
+
+/**
+ * Lê os arquivos de um diretório (shallow, não recursivo) e retorna seus contextos.
+ *
+ * Respeita `MAX_EMBED_BYTES` total: para de adicionar arquivos quando o limite é atingido.
+ * Ignora arquivos binários e sub-diretórios. Lança erro se o diretório não existir.
+ *
+ * @param {string} dirPath - Caminho do diretório (absoluto ou relativo ao cwd)
+ * @returns {Promise<FileContext[]>} Lista de contextos dos arquivos lidos
+ * @throws {Error} Se o diretório não existir ou não for legível
+ */
+export async function readDirectoryContext(dirPath) {
+    const absPath = pathResolve(dirPath);
+    const entries = await readdir(absPath, { withFileTypes: true });
+    const files = entries.filter((e) => e.isFile()).map((e) => pathJoin(absPath, e.name));
+
+    let totalBytes = 0;
+    /** @type {FileContext[]} */
+    const ctxs = [];
+
+    for (const filePath of files) {
+        try {
+            const info = await stat(filePath);
+            if (info.size === 0 || totalBytes + info.size > MAX_EMBED_BYTES) continue;
+            const content = await readFile(filePath, 'utf-8');
+            // Verifica se é texto (rejeita binários por heurística: NUL byte)
+            if (content.includes('\0')) continue;
+            const ctx = { path: filePath, content, size: info.size, lang: detectLang(filePath) };
+            ctxs.push(ctx);
+            totalBytes += info.size;
+        } catch {
+            // Ignora arquivos ilegíveis ou binários
+        }
+    }
+
+    return ctxs;
+}
+
+/**
+ * @typedef {Object} RawAttachment
+ * @property {string} [type] - Tipo do attachment: 'file' | 'directory' | 'selection' | 'content'
+ * @property {string} [path] - Caminho do arquivo/diretório (tipos 'file' e 'directory')
+ * @property {string} [filePath] - Caminho do arquivo de seleção (tipo 'selection')
+ * @property {string} [displayName] - Nome de exibição opcional
+ * @property {string} [content] - Conteúdo inline (tipo 'content')
+ * @property {string} [text] - Texto da seleção (tipo 'selection')
+ * @property {object} [selection] - Coordenadas da seleção (tipo 'selection')
+ */
+
+/**
+ * Converte um attachment de qualquer tipo em texto markdown para embed no dialog loop.
+ *
+ * **Arquitetura zero-PR**: todos os tipos de attachment são convertidos em texto embeddado e enviados
+ * via dialog loop (`ask_user`), sem criar novos PRs via `session.send()`. A decisão sobre o caminho
+ * de execução é feita aqui — `sendTurn` nunca precisa saber sobre attachments nativos SDK.
+ *
+ * Mapeamento de tipos:
+ * - `file` → lê o arquivo e cria bloco markdown com o conteúdo
+ * - `directory` → lista arquivos do diretório e cria blocos para cada um
+ * - `selection` → usa `text` como conteúdo do bloco markdown
+ * - `content` → usa `content` diretamente como bloco markdown
+ *
+ * @param {RawAttachment} att - Attachment a converter
+ * @returns {Promise<string | null>} Texto markdown, ou null se o attachment for inválido/vazio
+ */
+export async function attachmentToEmbed(att) {
+    if (!att || typeof att !== 'object') return null;
+
+    const label = att.displayName ?? att.path ?? att.filePath ?? 'attachment';
+
+    if (att.type === 'file' && typeof att.path === 'string') {
+        try {
+            const ctx = await readFileContext(att.path);
+            return buildBlock(ctx);
+        } catch (/** @type {any} */ e) {
+            return `*(Arquivo \`${att.path}\` não pôde ser lido: ${e.message})*`;
+        }
+    }
+
+    if (att.type === 'directory' && typeof att.path === 'string') {
+        try {
+            const ctxs = await readDirectoryContext(att.path);
+            if (ctxs.length === 0) return `*(Diretório \`${att.path}\` está vazio ou sem arquivos legíveis)*`;
+            return `Contexto de diretório: \`${att.path}\`\n\n` + ctxs.map(buildBlock).join('\n\n');
+        } catch (/** @type {any} */ e) {
+            return `*(Diretório \`${att.path}\` não pôde ser lido: ${e.message})*`;
+        }
+    }
+
+    if (att.type === 'selection' && typeof att.text === 'string' && att.text.length > 0) {
+        const lang = typeof att.filePath === 'string' ? detectLang(att.filePath) : 'text';
+        return `Seleção de \`${label}\`\n\`\`\`${lang}\n${att.text}\n\`\`\``;
+    }
+
+    if (typeof att.content === 'string' && att.content.length > 0) {
+        return `\`\`\`\n${att.content}\n\`\`\`\n*(${label})*`;
+    }
+
+    return null;
 }

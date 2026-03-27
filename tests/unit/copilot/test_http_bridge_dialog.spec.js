@@ -88,10 +88,12 @@ describe('http-bridge › dialog: análise estrutural', async () => {
         );
     });
 
-    it('rotas chamam alwaysAliveAgent.stopDialogLoop()', () => {
+    it('rotas chamam alwaysAliveAgent.stopDialogLoop() com authorized: true (DL-PERM)', () => {
+        // DL-PERM: stopDialogLoop deve ser chamado com { authorized: true } para respeitar política zero-PR
         assert.ok(
-            sourceCode.includes('alwaysAliveAgent.stopDialogLoop(') || sourceCode.includes('agent.stopDialogLoop('),
-            '/dialog/stop deve chamar stopDialogLoop()',
+            sourceCode.includes('stopDialogLoop({ authorized: true })') ||
+                sourceCode.includes("stopDialogLoop({ authorized: true })"),
+            '/dialog/stop deve chamar stopDialogLoop({ authorized: true }) (DL-PERM)',
         );
     });
 
@@ -185,7 +187,11 @@ describe('http-bridge › dialog: validação de input via source-level', async 
     });
 
     it('/dialog/stop retorna mensagem de confirmação', () => {
-        assert.ok(sourceCode.includes("'Modo diálogo encerrado.'"), '/dialog/stop deve confirmar encerramento');
+        // DL-PERM: a mensagem mudou para incluir "autorização do usuário"
+        assert.ok(
+            sourceCode.includes("'Modo diálogo encerrado por autorização do usuário.'"),
+            '/dialog/stop deve confirmar encerramento com menção a autorização do usuário (DL-PERM)',
+        );
     });
 
     it("SSE /stream inclui evento 'dialog.ready'", async () => {

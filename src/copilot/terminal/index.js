@@ -105,6 +105,27 @@ export async function startTerminalServer() {
         });
     });
 
+    // DL-PERM: dialog loop permanente — reinicia automaticamente se o modelo encerrar o loop.
+    // A LLM-B NUNCA deve encerrar o dialog loop sem autorização explícita do usuário.
+    // Quando 'dialog.stopped' é emitido por iniciativa do modelo, reiniciamos automaticamente.
+    alwaysAliveAgent.on('dialog.stopped', (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
+        if (evt.authorized) {
+            // Encerramento autorizado explicitamente pelo usuário — respeitar
+            println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
+            log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
+            broadcastSse('stopped', { authorized: true });
+            return;
+        }
+        // Encerramento não autorizado — reiniciar automaticamente
+        const reason = evt.reason ?? 'desconhecido';
+        println(`\n\x1b[33m  [dialog] Loop encerrado pelo modelo (reason: ${reason}) — reiniciando automaticamente…\x1b[0m`);
+        log('WARN', `[TerminalServer] Dialog loop encerrado sem autorização (reason: ${reason}). Reiniciando.`);
+        broadcastSse('stopped', { reason, restarting: true });
+        ensureDialogLoop().catch((/** @type {any} */ e) =>
+            log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop após stop: ${e.message}`),
+        );
+    });
+
     // AA.4: SSE 'context' event — emitir dados reais de uso de contexto após cada turno
     alwaysAliveAgent.on('session.usage', (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
         const { currentTokens = 0, tokenLimit = 0 } = data;

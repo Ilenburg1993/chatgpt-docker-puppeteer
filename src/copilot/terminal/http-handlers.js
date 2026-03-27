@@ -30,7 +30,7 @@ import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { sendTurn } from './dialog.js';
-import { embedMultiple, getFileCacheStats, readFileContext } from './file-context.js';
+import { attachmentToEmbed, embedMultiple, getFileCacheStats, readFileContext } from './file-context.js';
 import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from './state.js';
 
 // ─── Tipos auxiliares ─────────────────────────────────────────────────────────
@@ -226,14 +226,14 @@ export async function handlePipeline(body) {
  * Aceita opcionalmente:
  *
  * - `context_files: string[]` — lê o conteúdo de cada arquivo e o embute como bloco markdown antes da mensagem.
- * - `attachments` — suporte a dois modos:
+ * - `attachments` — **arquitetura zero-PR (ATT-04)**: todos os tipos são convertidos em texto embeddado no cliente
+ *   Node.js e enviados via dialog loop (`ask_user`). Nenhum attachment cria nova PR via `session.send()`.
  *
- *   - **Nativo SDK**: `{ type: 'file'|'directory'|'selection', path: string, ... }` — passados para `sendTurn()` que
- *       internamente usa `alwaysAliveAgent.sendMessage()` (nova PR, único caminho SDK que suporta file attachments).
- *   - **Embed inline (fallback)**: `{ type: 'content', content: string, path?: string }` — embutidos como bloco markdown
- *       na mensagem antes de enviar via dialog loop.
- *
- * ATT-03: ambos os caminhos passam pelo mesmo mutex de serialização em `sendTurn()`, garantindo exclusão mútua.
+ *   Tipos suportados:
+ *   - `{ type: 'file', path: string }` — lê o arquivo e embute o conteúdo como bloco markdown.
+ *   - `{ type: 'directory', path: string }` — lista e embute os arquivos do diretório.
+ *   - `{ type: 'selection', text: string, filePath?: string }` — embute o texto selecionado como bloco markdown.
+ *   - `{ content: string, path?: string }` — embute o conteúdo inline como bloco markdown.
  *
  * @param {{
  *     message?: string;
@@ -275,46 +275,21 @@ export async function handleInject(body) {
         }
     }
 
-    // AI.5: separar attachments nativos SDK de attachments de conteúdo inline
+    // ATT-04: todos os attachment types são convertidos em texto embeddado (zero-PR).
+    // Nenhum attachment cria nova PR — tudo vai via dialog loop (ask_user).
     const rawAttachments = Array.isArray(body?.attachments) ? body.attachments : [];
-    /** @type {import('@github/copilot-sdk').MessageOptions['attachments']} */
-    const nativeAttachments = [];
-
-    for (const att of rawAttachments) {
-        if (!att) continue;
-        if (att.type === 'file' && typeof att.path === 'string') {
-            nativeAttachments.push({
-                type: 'file',
-                path: att.path,
-                ...(att.displayName ? { displayName: att.displayName } : {}),
-            });
-        } else if (att.type === 'directory' && typeof att.path === 'string') {
-            nativeAttachments.push({
-                type: 'directory',
-                path: att.path,
-                ...(att.displayName ? { displayName: att.displayName } : {}),
-            });
-        } else if (att.type === 'selection' && typeof att.filePath === 'string') {
-            nativeAttachments.push({
-                type: 'selection',
-                filePath: att.filePath,
-                displayName: att.displayName ?? att.filePath,
-                ...(att.selection !== undefined ? { selection: /** @type {any} */ (att.selection) } : {}),
-                ...(typeof att.text === 'string' ? { text: att.text } : {}),
-            });
-        } else if (typeof att.content === 'string') {
-            // MELHORIA-03 (fallback): embed de conteúdo inline como bloco markdown
-            const label = att.path ?? 'attachment';
-            enrichedMessage = `\`\`\`\n${att.content}\n\`\`\`\n*(${label})*\n\n${enrichedMessage}`;
+    if (rawAttachments.length > 0) {
+        const embedParts = await Promise.all(rawAttachments.map(attachmentToEmbed));
+        const validParts = embedParts.filter(/** @type {(s: string | null) => s is string} */ (s) => s !== null);
+        if (validParts.length > 0) {
+            enrichedMessage = validParts.join('\n\n') + '\n\n' + enrichedMessage;
         }
     }
 
     const t0 = Date.now();
     try {
-        // ATT-03: sendTurn aceita nativeAttachments e decide internamente o path de execução
-        // (dialog loop para texto simples; sendMessage para attachments nativos SDK).
-        // O mutex de sendTurn garante exclusão mútua em ambos os caminhos.
-        const reply = await sendTurn(enrichedMessage, from, nativeAttachments.length > 0 ? nativeAttachments : undefined);
+        // ATT-04: caminho único — dialog loop, zero nova PR
+        const reply = await sendTurn(enrichedMessage, from);
         return {
             status: reply !== null ? 200 : 409,
             body: { ok: reply !== null, reply: reply ?? null, durationMs: Date.now() - t0, from },

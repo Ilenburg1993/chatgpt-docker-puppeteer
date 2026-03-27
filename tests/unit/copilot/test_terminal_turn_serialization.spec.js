@@ -83,31 +83,36 @@ describe('terminal/dialog.js › TERM-01: análise estrutural', async () => {
         );
     });
 
-    it('ATT-03: sendTurn deve aceitar nativeAttachments como terceiro parâmetro', () => {
+    it('ATT-04: sendTurn deve aceitar apenas message e actor (sem nativeAttachments)', () => {
+        // ATT-04: arquitetura zero-PR — sendTurn não aceita mais nativeAttachments
         assert.ok(
-            source.includes('export function sendTurn(message, actor = \'user\', nativeAttachments)'),
-            'ATT-03: sendTurn deve aceitar nativeAttachments como terceiro parâmetro opcional',
+            source.includes("export function sendTurn(message, actor = 'user')"),
+            'ATT-04: sendTurn deve ter apenas (message, actor) — sem terceiro parâmetro nativeAttachments',
         );
     });
 
-    it('ATT-03: _executeTurn deve usar alwaysAliveAgent.sendMessage quando nativeAttachments presentes', () => {
-        assert.ok(
-            source.includes('alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments })'),
-            'ATT-03: _executeTurn deve usar sendMessage com file attachments quando nativeAttachments presentes',
-        );
-    });
-
-    it('ATT-03: _executeTurn deve usar dialogTurn quando nativeAttachments ausentes', () => {
+    it('ATT-04: _executeTurn deve usar dialogTurn — nunca sendMessage', () => {
         assert.ok(
             source.includes('llmBridgeClient.dialogTurn(enrichedMessage'),
-            'ATT-03: _executeTurn deve usar dialogTurn quando não há attachments nativos',
+            'ATT-04: _executeTurn deve usar dialogTurn (zero-PR)',
+        );
+    });
+
+    it('ATT-04: _executeTurn não deve chamar alwaysAliveAgent.sendMessage (violaria política zero-PR)', () => {
+        const execTurnStart = source.indexOf('async function _executeTurn(');
+        const execTurnEnd = source.indexOf('\nasync function ', execTurnStart + 1);
+        const execTurnBody =
+            execTurnEnd > -1 ? source.substring(execTurnStart, execTurnEnd) : source.substring(execTurnStart);
+        assert.ok(
+            !execTurnBody.includes('alwaysAliveAgent.sendMessage'),
+            'ATT-04: _executeTurn não deve chamar sendMessage (criaria nova PR)',
         );
     });
 });
 
 // ─── Suite 2: análise estrutural — http-handlers.js ─────────────────────────
 
-describe('terminal/http-handlers.js › ATT-03: análise estrutural (unificação de attachments)', async () => {
+describe('terminal/http-handlers.js › ATT-04: arquitetura zero-PR para attachments', async () => {
     /** @type {string} */
     let source = '';
 
@@ -115,36 +120,53 @@ describe('terminal/http-handlers.js › ATT-03: análise estrutural (unificaçã
         source = await readFile(new URL('../../../src/copilot/terminal/http-handlers.js', import.meta.url), 'utf-8');
     });
 
-    it('não deve importar setBusy de state.js (ATT-03: responsabilidade migrou para dialog.js)', () => {
-        // ATT-03: http-handlers.js não gerencia mais _busy diretamente — sendTurn() cuida disso
-        assert.ok(!source.includes('setBusy'), 'http-handlers.js não deve mais importar setBusy após ATT-03');
+    it('não deve importar setBusy de state.js (ATT-04: responsabilidade migrou para dialog.js)', () => {
+        assert.ok(!source.includes('setBusy'), 'http-handlers.js não deve mais importar setBusy após ATT-04');
     });
 
-    it('ATT-03: deve chamar sendTurn() com nativeAttachments como terceiro argumento', () => {
-        // Verifica que nativeAttachments é passado para sendTurn ao invés de sendMessage direto
+    it('ATT-04: deve importar attachmentToEmbed de file-context.js', () => {
         assert.ok(
-            source.includes('sendTurn(enrichedMessage, from, nativeAttachments'),
-            'ATT-03: sendTurn deve receber nativeAttachments como terceiro parâmetro',
+            source.includes('attachmentToEmbed'),
+            'ATT-04: http-handlers.js deve importar attachmentToEmbed para conversão zero-PR',
         );
     });
 
-    it('ATT-03: não deve chamar alwaysAliveAgent.sendMessage em handleInject', () => {
-        // Após ATT-03, handleInject não chama sendMessage diretamente — delega para sendTurn
+    it('ATT-04: handleInject deve usar attachmentToEmbed para converter attachments para texto', () => {
         const handleInjectStart = source.indexOf('export async function handleInject(');
         const handleInjectEnd = source.indexOf('\nexport async function handle', handleInjectStart + 1);
-        const handleInjectBody = handleInjectEnd > -1
-            ? source.substring(handleInjectStart, handleInjectEnd)
-            : source.substring(handleInjectStart);
+        const handleInjectBody =
+            handleInjectEnd > -1
+                ? source.substring(handleInjectStart, handleInjectEnd)
+                : source.substring(handleInjectStart);
         assert.ok(
-            !handleInjectBody.includes('alwaysAliveAgent.sendMessage('),
-            'ATT-03: handleInject não deve mais chamar alwaysAliveAgent.sendMessage diretamente',
+            handleInjectBody.includes('attachmentToEmbed'),
+            'ATT-04: handleInject deve usar attachmentToEmbed (converte todos os tipos para texto)',
         );
     });
 
-    it('ATT-03: deve usar nativeAttachments.length > 0 como guard antes de passar para sendTurn', () => {
+    it('ATT-04: handleInject não deve passar nativeAttachments para sendTurn', () => {
+        const handleInjectStart = source.indexOf('export async function handleInject(');
+        const handleInjectEnd = source.indexOf('\nexport async function handle', handleInjectStart + 1);
+        const handleInjectBody =
+            handleInjectEnd > -1
+                ? source.substring(handleInjectStart, handleInjectEnd)
+                : source.substring(handleInjectStart);
         assert.ok(
-            source.includes('nativeAttachments.length > 0'),
-            'ATT-03: deve verificar nativeAttachments.length > 0 antes de passar para sendTurn',
+            !handleInjectBody.includes('sendTurn(enrichedMessage, from, nativeAttachments'),
+            'ATT-04: handleInject não deve passar nativeAttachments para sendTurn (caminho único zero-PR)',
+        );
+    });
+
+    it('ATT-04: não deve chamar alwaysAliveAgent.sendMessage em handleInject', () => {
+        const handleInjectStart = source.indexOf('export async function handleInject(');
+        const handleInjectEnd = source.indexOf('\nexport async function handle', handleInjectStart + 1);
+        const handleInjectBody =
+            handleInjectEnd > -1
+                ? source.substring(handleInjectStart, handleInjectEnd)
+                : source.substring(handleInjectStart);
+        assert.ok(
+            !handleInjectBody.includes('alwaysAliveAgent.sendMessage('),
+            'ATT-04: handleInject não deve chamar sendMessage (criaria nova PR)',
         );
     });
 });
