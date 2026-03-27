@@ -20,8 +20,8 @@ import {
     getCustomToolDefinitions,
     registerCustomTool,
     removeCustomTool,
-} from '#copilot/config/custom-tools-registry';
-import { getToolsConfig, patchToolsConfig } from '#copilot/config/tools-state';
+} from '#copilot/config/tools/registry';
+import { getToolsConfig, patchToolsConfig } from '#copilot/config/tools/state';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';

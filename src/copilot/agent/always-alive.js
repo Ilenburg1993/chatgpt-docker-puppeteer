@@ -21,13 +21,13 @@ import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart, 
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
+import { buildMcpTools } from '../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../config/mcp-servers.js';
 import { conversationStore } from '../conversation-hub/store.js';
-import { buildMcpTools } from '../bridges/mcp-tool-bridge.js';
-import { initOrResumeSession, readState, writeState } from './session-manager.js';
 import { getHubSessionId } from '../terminal/state.js';
 import { DialogWatchdog } from './dialog-watchdog.js';
 import { AGENT_EVENTS } from './events.js';
+import { initOrResumeSession, readState, writeState } from './session-manager.js';
 import { executeTask } from './task-executor.js';
 import { bootstrapTools } from './tools-bootstrap.js';
 import { WebhookManager } from './webhook-manager.js';

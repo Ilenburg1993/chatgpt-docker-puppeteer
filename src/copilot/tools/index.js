@@ -15,7 +15,7 @@ import { hookTools } from './hook-tools.js';
 import { hubTools } from './hub-tools.js';
 import { introspectionTools, registerForIntrospection, setTelemetryStore } from './introspection-tools.js';
 import { sessionTools } from './session-tools.js';
-import { shellTools } from './shell-tools.js';
+import { shellTools } from './shell/index.js';
 import { taskTools } from './task-tools.js';
 
 /**

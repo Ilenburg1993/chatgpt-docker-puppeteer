@@ -32,7 +32,7 @@
 
 | Categoria                   |  Qtd  | Impacto                              |                             Status                              |
 | --------------------------- | :---: | ------------------------------------ | :-------------------------------------------------------------: |
-| Shims legados na raiz       |  18   | Alto (DX, confusão de imports)       |                        ✅ Concluído (Fase 3)                        |
+| Shims legados na raiz       |  18   | Alto (DX, confusão de imports)       |                      ✅ Concluído (Fase 3)                       |
 | Aliases inúteis em `api/`   |   2   | Baixo (noise estrutural)             |              ✅ Corrigido (A1 — arquivos removidos)              |
 | Imports deprecated ativos   |   1   | Médio (orchestrator.js usa shim)     |                        ✅ Corrigido (B1)                         |
 | Acesso direto a internals   |   1   | Médio (routes/agent.js)              |               ✅ Corrigido (D1 — casts removidos)                |
@@ -736,25 +736,25 @@ tools/
 
 ## 13. Matriz de Decisão e Faseamento
 
-| ID  | Título                                     | Fase  |  Risco  | Tamanho | Prioridade |   Status   |
-| --- | ------------------------------------------ | :---: | :-----: | :-----: | :--------: | :--------: |
-| B1  | Fix import deprecated em orchestrator.js   |   1   | 🟢 Baixo |   XS    |   🔴 Alta   |     ✅      |
-| B2  | Substituir execSync+curl em task-tools.js  |   1   | 🟢 Baixo |    S    |   🔴 Alta   |     ✅      |
-| C1  | Centralizar timeouts em core/constants.js  |   1   | 🟢 Baixo |    S    |  🟡 Média   |     ✅      |
-| G1  | Limite MAX_SSE_CLIENTS em bridge-stream.js |   1   | 🟢 Baixo |   XS    |  🟡 Média   |     ✅      |
-| H1  | Migração FTS5 idempotente                  |   1   | 🟡 Médio |    S    |   🔴 Alta   |     ✅      |
-| D1  | Getters públicos em AlwaysAliveAgent       |   2   | 🟢 Baixo |    S    |  🟡 Média   |     ✅      |
-| F1  | state.js reativo com EventEmitter          |   2   | 🟡 Médio |    M    |  🟡 Média   |     ✅      |
-| I1  | Expandir BUILTIN_HANDLER_MAP               |   2   | 🟢 Baixo |    S    |  🟢 Baixa   |     ✅      |
-| A1  | Remover aliases inúteis api/               |   2   | 🟢 Baixo |   XS    |  🟡 Média   |     ✅      |
+| ID  | Título                                     | Fase  |  Risco  | Tamanho | Prioridade |   Status    |
+| --- | ------------------------------------------ | :---: | :-----: | :-----: | :--------: | :---------: |
+| B1  | Fix import deprecated em orchestrator.js   |   1   | 🟢 Baixo |   XS    |   🔴 Alta   |      ✅      |
+| B2  | Substituir execSync+curl em task-tools.js  |   1   | 🟢 Baixo |    S    |   🔴 Alta   |      ✅      |
+| C1  | Centralizar timeouts em core/constants.js  |   1   | 🟢 Baixo |    S    |  🟡 Média   |      ✅      |
+| G1  | Limite MAX_SSE_CLIENTS em bridge-stream.js |   1   | 🟢 Baixo |   XS    |  🟡 Média   |      ✅      |
+| H1  | Migração FTS5 idempotente                  |   1   | 🟡 Médio |    S    |   🔴 Alta   |      ✅      |
+| D1  | Getters públicos em AlwaysAliveAgent       |   2   | 🟢 Baixo |    S    |  🟡 Média   |      ✅      |
+| F1  | state.js reativo com EventEmitter          |   2   | 🟡 Médio |    M    |  🟡 Média   |      ✅      |
+| I1  | Expandir BUILTIN_HANDLER_MAP               |   2   | 🟢 Baixo |    S    |  🟢 Baixa   |      ✅      |
+| A1  | Remover aliases inúteis api/               |   2   | 🟢 Baixo |   XS    |  🟡 Média   |      ✅      |
 | A2  | Auditar callers de shims                   |   3   | 🟢 Baixo |    S    |  🟡 Média   | ✅ Concluído |
 | A3  | Remover 13 shims @deprecated               |   3   | 🟡 Médio |    M    |  🟡 Média   | ✅ Concluído |
 | A4  | Migrar e remover sdk-client.js             |   3   | 🟡 Médio |    M    |  🟢 Baixa   | ✅ Concluído |
-| E1  | Consolidar api/ e routes/                  |   4   | 🟡 Médio |    L    |  🟢 Baixa   | 🔄 Pendente |
-| J1  | Agrupar config/tools/*                     |   4   | 🟢 Baixo |    S    |  🟢 Baixa   | 🔄 Pendente |
-| J2  | Separar integrations/ de bridges/          |   4   | 🟡 Médio |    M    |  🟢 Baixa   | 🔄 Pendente |
-| J3  | core/constants.js robusto                  |   1   | 🟢 Baixo |    S    |  🟡 Média   |     ✅      |
-| J4  | Extrair tools/shell/*                      |   4   | 🟢 Baixo |    M    |  🟢 Baixa   | 🔄 Pendente |
+| E1  | Consolidar api/ e routes/                  |   4   | 🟡 Médio |    L    |  🟢 Baixa   | 🔄 Pendente  |
+| J1  | Agrupar config/tools/*                     |   4   | 🟢 Baixo |    S    |  🟢 Baixa   | 🔄 Pendente  |
+| J2  | Separar integrations/ de bridges/          |   4   | 🟡 Médio |    M    |  🟢 Baixa   | 🔄 Pendente  |
+| J3  | core/constants.js robusto                  |   1   | 🟢 Baixo |    S    |  🟡 Média   |      ✅      |
+| J4  | Extrair tools/shell/*                      |   4   | 🟢 Baixo |    M    |  🟢 Baixa   | 🔄 Pendente  |
 
 ---
 

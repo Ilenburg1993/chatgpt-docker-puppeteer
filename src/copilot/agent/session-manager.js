@@ -10,7 +10,7 @@
 
 import { DEFAULT_EXCLUDED_TOOLS } from '#copilot/config/session-config';
 import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
-import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools-state';
+import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools/state';
 import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

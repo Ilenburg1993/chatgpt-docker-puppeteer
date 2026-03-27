@@ -7,7 +7,7 @@
  *   tornando-a testável e legível de forma independente.
  */
 
-import { buildCustomTools } from '../config/custom-tools-registry.js';
+import { buildCustomTools } from '../config/tools/registry.js';
 import { registerTools } from '../lib/tools-registry.js';
 import {
     codeTools,

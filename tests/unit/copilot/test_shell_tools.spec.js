@@ -24,7 +24,7 @@ import {
     runNodeFileTool,
     runNpmScriptTool,
     shellTools,
-} from '../../../src/copilot/tools/shell-tools.js';
+} from '../../../src/copilot/tools/shell/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

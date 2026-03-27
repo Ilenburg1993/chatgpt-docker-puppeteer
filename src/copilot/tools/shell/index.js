@@ -28,7 +28,7 @@ import { z } from 'zod';
 const execFileAsync = promisify(execFile);
 
 /** Raiz do workspace — único diretório autorizado para execução */
-const WORKSPACE_ROOT = new URL('../../..', import.meta.url).pathname;
+const WORKSPACE_ROOT = new URL('../../../..', import.meta.url).pathname;
 
 /** Limite máximo de bytes no output retornado */
 const MAX_OUTPUT_BYTES = 10_000;
