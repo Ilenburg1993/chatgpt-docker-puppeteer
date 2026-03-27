@@ -671,7 +671,14 @@ export const fileReadTools = [
  *
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const fileWriteTools = [writeFileContentTool, createFileTool, deleteFileTool, copyFileTool, moveFileTool, patchFileTool];
+export const fileWriteTools = [
+    writeFileContentTool,
+    createFileTool,
+    deleteFileTool,
+    copyFileTool,
+    moveFileTool,
+    patchFileTool,
+];
 
 /**
  * Conjunto completo de tools de filesystem (leitura + escrita).

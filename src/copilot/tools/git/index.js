@@ -160,10 +160,7 @@ const gitCreateBranchTool = defineTool('git_create_branch', {
         /** @type {unknown} */ (
             z.object({
                 name: z.string().describe('Nome do branch (ex: "feat/nova-feature")'),
-                base: z
-                    .string()
-                    .optional()
-                    .describe('Commit ou branch base (omitir = usa HEAD atual)'),
+                base: z.string().optional().describe('Commit ou branch base (omitir = usa HEAD atual)'),
                 checkout: z.boolean().optional().default(true).describe('Se false, apenas cria sem fazer checkout'),
             })
         )
@@ -174,9 +171,7 @@ const gitCreateBranchTool = defineTool('git_create_branch', {
             return { success: false, error: 'Nome de branch inválido. Use apenas letras, números, /, _, -, .' };
         }
         const basePart = base && /^[a-zA-Z0-9/_.-]+$/.test(base) ? ` "${base}"` : '';
-        const cmd = (checkout ?? true)
-            ? `git checkout -b "${name}"${basePart}`
-            : `git branch "${name}"${basePart}`;
+        const cmd = (checkout ?? true) ? `git checkout -b "${name}"${basePart}` : `git branch "${name}"${basePart}`;
         log('INFO', `[copilot/git_create_branch] ${cmd}`);
         const r = safeGit(cmd);
         return { success: r.exitCode === 0, output: r.stdout, error: r.error };
@@ -192,11 +187,7 @@ const gitLogTool = defineTool('git_log', {
         /** @type {unknown} */ (
             z.object({
                 n: z.number().int().min(1).max(50).optional().default(10).describe('Número de commits a retornar'),
-                oneline: z
-                    .boolean()
-                    .optional()
-                    .default(true)
-                    .describe('Se true, formato compacto (--oneline)'),
+                oneline: z.boolean().optional().default(true).describe('Se true, formato compacto (--oneline)'),
             })
         )
     ),

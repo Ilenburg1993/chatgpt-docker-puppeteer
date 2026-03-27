@@ -43,7 +43,13 @@ function validateUrl(url) {
         const a = ipNums[0] ?? -1;
         const b = ipNums[1] ?? -1;
         const c = ipNums[2] ?? -1;
-        if (a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 0 && b === 0 && c === 0)) {
+        if (
+            a === 10 ||
+            a === 127 ||
+            (a === 172 && b >= 16 && b <= 31) ||
+            (a === 192 && b === 168) ||
+            (a === 0 && b === 0 && c === 0)
+        ) {
             return { safe: false, reason: `Endereço IP privado bloqueado: ${url.hostname}` };
         }
     }
@@ -106,7 +112,9 @@ const webFetchTool = defineTool('web_fetch', {
             })
         )
     ),
-    handler: async (/** @type {{ url: string; maxBytes?: number; timeoutMs?: number }} */ { url, maxBytes, timeoutMs }) => {
+    handler: async (
+        /** @type {{ url: string; maxBytes?: number; timeoutMs?: number }} */ { url, maxBytes, timeoutMs },
+    ) => {
         // Rate limit
         if (!checkRateLimit()) {
             return { success: false, error: `Rate limit excedido: máx ${MAX_REQUESTS_PER_MINUTE} req/min.` };

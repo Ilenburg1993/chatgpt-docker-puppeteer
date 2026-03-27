@@ -230,10 +230,42 @@ const getTelemetryTool = defineTool('get_telemetry', {
 });
 
 /**
+ * Tool: report_intent — registra em log a intenção da LLM antes de executar uma ação sensível.
+ * Análogo ao `report_intent` built-in do GitHub Copilot CLI. Garante auditabilidade e rastreabilidade.
+ */
+const reportIntentTool = defineTool('report_intent', {
+    description:
+        'Registra a intenção do agente antes de executar uma ação sensível (ex: deletar arquivo, fazer push, ' +
+        'executar comando destrutivo). Use ANTES de chamar uma tool que modifique estado externo irreversível. ' +
+        'Não executa nenhuma ação — apenas registra e retorna confirmação de auditoria.',
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ intent: string; tool: string; risk?: string }>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                intent: z.string().describe('Descrição clara da intenção (o que o agente pretende fazer e por quê)'),
+                tool: z.string().describe('Nome da tool que será chamada em seguida'),
+                risk: z.string().optional().describe('Nível de risco estimado: low | medium | high'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ intent: string; tool: string; risk?: string }} */ { intent, tool, risk }) => {
+        const level = risk === 'high' ? 'WARN' : 'INFO';
+        log(level, `[intent] tool=${tool} risk=${risk ?? 'low'} | ${intent}`);
+        return {
+            recorded: true,
+            intent,
+            tool,
+            risk: risk ?? 'low',
+            timestamp: new Date().toISOString(),
+        };
+    },
+});
+
+/**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
 export const introspectionTools = [
     withSkipPermission(listToolsTool),
     withSkipPermission(getAgentInfoTool),
     withSkipPermission(getTelemetryTool),
+    withSkipPermission(reportIntentTool),
 ];

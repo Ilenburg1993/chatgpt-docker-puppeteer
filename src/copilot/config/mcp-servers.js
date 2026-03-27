@@ -57,14 +57,25 @@ export const MCP_SERVERS = {
         command: 'npx',
         args: ['@modelcontextprotocol/server-memory'],
     },
+
+    /**
+     * GitHub MCP Server oficial (HTTP) — acesso completo à API GitHub via MCP remoto.
+     *
+     * Usa o servidor HTTP oficial em `https://api.githubcopilot.com/mcp/` com autenticação
+     * via `GITHUB_TOKEN`. Fornece as mesmas tools que os agentes built-in `explore` e `research`
+     * usam internamente (github-mcp-server/*).
+     *
+     * Requer: `GITHUB_TOKEN` no ambiente.
+     */
+    'github-official': {
+        type: 'http',
+        url: 'https://api.githubcopilot.com/mcp/',
+        headers: {
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN ?? ''}`,
+        },
+    },
 };
 
-/**
- * Nomes dos servidores MCP habilitados por padrão no Always-Alive Agent. Pode ser sobrescrito via variável de ambiente
- * COPILOT_MCP_SERVERS (CSV).
- *
- * @type {string[]}
- */
 const DEFAULT_ENABLED = (process.env.COPILOT_MCP_SERVERS ?? '').split(',').filter(Boolean);
 
 /**

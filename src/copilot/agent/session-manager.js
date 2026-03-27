@@ -10,6 +10,7 @@
 
 import { DEFAULT_EXCLUDED_TOOLS } from '#copilot/config/session-config';
 import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
+import { buildCustomAgentsConfig } from '../config/custom-agents.js';
 import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools/state';
 import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
@@ -270,6 +271,8 @@ export async function initOrResumeSession(client, sessionOptions) {
         ...(sessionOptions.hooks !== undefined ? { hooks: sessionOptions.hooks } : {}),
         ...(sessionOptions.tools !== undefined ? { tools: sessionOptions.tools } : {}),
         ...(sessionOptions.mcpServers !== undefined ? { mcpServers: sessionOptions.mcpServers } : {}),
+        // L1: sub-agentes customizados especializados (task, explore, diagnostic)
+        customAgents: buildCustomAgentsConfig(),
         ...(systemMessage !== undefined ? { systemMessage } : {}),
     };
 

@@ -108,13 +108,13 @@
 
 > Reestruturação de pastas e consolidações. Requer plan de migração com alias temporários.
 
-| ID  | Proposta                                                                                | Risco | Esforço | Status |
-| --- | --------------------------------------------------------------------------------------- | :---: | :-----: | :----: |
-| E1  | Consolidar `api/bridge-*.js` e `routes/*.js` em `api/v1/`                               | Médio |    L    |   ⏭️ De-priorizado: `api/sdk-api.js` já agrega `routes/`   |
-| J1  | Extrair `tools/shell-tools.js` para `tools/shell/` com policy separada                  | Baixo |    M    |   ✅ (corrigido `WORKSPACE_ROOT` — URL 3→4 níveis)   |
-| J2  | Unificar `config/tools-state.js` + `config/custom-tools-registry.js` em `config/tools/` | Baixo |    S    |   ✅ (barrel `index.js` + 2 aliases `package.json`)   |
-| J3  | Mover `terminal-server.js` (raiz) e eliminar confusão                                   | Baixo |   XS    |   ⏭️ Intencional: entry point PM2 (não pode ser movido)   |
-| J4  | Introduzir `core/constants.js` canônico para TIMEOUTS, MAX_*, defaults                  | Baixo |    S    |   ✅ Já existia desde Fase 1   |
+| ID  | Proposta                                                                                | Risco | Esforço |                        Status                         |
+| --- | --------------------------------------------------------------------------------------- | :---: | :-----: | :---------------------------------------------------: |
+| E1  | Consolidar `api/bridge-*.js` e `routes/*.js` em `api/v1/`                               | Médio |    L    | ⏭️ De-priorizado: `api/sdk-api.js` já agrega `routes/` |
+| J1  | Extrair `tools/shell-tools.js` para `tools/shell/` com policy separada                  | Baixo |    M    |    ✅ (corrigido `WORKSPACE_ROOT` — URL 3→4 níveis)    |
+| J2  | Unificar `config/tools-state.js` + `config/custom-tools-registry.js` em `config/tools/` | Baixo |    S    |   ✅ (barrel `index.js` + 2 aliases `package.json`)    |
+| J3  | Mover `terminal-server.js` (raiz) e eliminar confusão                                   | Baixo |   XS    | ⏭️ Intencional: entry point PM2 (não pode ser movido)  |
+| J4  | Introduzir `core/constants.js` canônico para TIMEOUTS, MAX_*, defaults                  | Baixo |    S    |               ✅ Já existia desde Fase 1               |
 
 **Notas pós-implementação (Fase 4)**:
 - `tools/shell/index.js`: WORKSPACE_ROOT usa `'../../../..'` (4 níveis) para resolução correta após movimentação
@@ -125,16 +125,16 @@
 
 > Adicionar novas custom tools que ampliem as capacidades da LLM-B, consolidar o sistema de tools, e integrar recursos do SDK ainda não utilizados.
 
-| ID   | Proposta                                                                     | Risco | Esforço |
-| ---- | ---------------------------------------------------------------------------- | :---: | :-----: |
-| K1   | Novas tools git: `git_push`, `git_create_branch`, `git_log`                  | Baixo |    M    |
-| K2   | Tool `patch_file` — edição cirúrgica por diff                                | Médio |    M    |
-| K3   | Tools de contexto de sessão: `get_workspace_info`, `set_session_context`     | Baixo |    S    |
-| K4   | Tool `web_search` / `web_fetch` com rate-limit e política de segurança       | Médio |    L    |
-| K5   | Migrar todas as tools para usar `tool-factory.js` (`buildTool`)              | Baixo |    M    |
-| K6   | Criar `tools/git/index.js` consolidando `git-tools.js`                       | Baixo |    S    |
-| K7   | Sub-agente `customAgents` configurável via `config/agents.js`                 | Médio |    L    |
-| K8   | Integrar `onUserInputRequest` SDK em `request_user_input` tool               | Baixo |    S    |
+| ID  | Proposta                                                                 | Risco | Esforço |
+| --- | ------------------------------------------------------------------------ | :---: | :-----: |
+| K1  | Novas tools git: `git_push`, `git_create_branch`, `git_log`              | Baixo |    M    |
+| K2  | Tool `patch_file` — edição cirúrgica por diff                            | Médio |    M    |
+| K3  | Tools de contexto de sessão: `get_workspace_info`, `set_session_context` | Baixo |    S    |
+| K4  | Tool `web_search` / `web_fetch` com rate-limit e política de segurança   | Médio |    L    |
+| K5  | Migrar todas as tools para usar `tool-factory.js` (`buildTool`)          | Baixo |    M    |
+| K6  | Criar `tools/git/index.js` consolidando `git-tools.js`                   | Baixo |    S    |
+| K7  | Sub-agente `customAgents` configurável via `config/agents.js`            | Médio |    L    |
+| K8  | Integrar `onUserInputRequest` SDK em `request_user_input` tool           | Baixo |    S    |
 
 ---
 
@@ -762,33 +762,33 @@ tools/
 
 ## 13. Matriz de Decisão e Faseamento
 
-| ID  | Título                                     | Fase  |  Risco  | Tamanho | Prioridade |   Status    |
-| --- | ------------------------------------------ | :---: | :-----: | :-----: | :--------: | :---------: |
-| B1  | Fix import deprecated em orchestrator.js   |   1   | 🟢 Baixo |   XS    |   🔴 Alta   |      ✅      |
-| B2  | Substituir execSync+curl em task-tools.js  |   1   | 🟢 Baixo |    S    |   🔴 Alta   |      ✅      |
-| C1  | Centralizar timeouts em core/constants.js  |   1   | 🟢 Baixo |    S    |  🟡 Média   |      ✅      |
-| G1  | Limite MAX_SSE_CLIENTS em bridge-stream.js |   1   | 🟢 Baixo |   XS    |  🟡 Média   |      ✅      |
-| H1  | Migração FTS5 idempotente                  |   1   | 🟡 Médio |    S    |   🔴 Alta   |      ✅      |
-| D1  | Getters públicos em AlwaysAliveAgent       |   2   | 🟢 Baixo |    S    |  🟡 Média   |      ✅      |
-| F1  | state.js reativo com EventEmitter          |   2   | 🟡 Médio |    M    |  🟡 Média   |      ✅      |
-| I1  | Expandir BUILTIN_HANDLER_MAP               |   2   | 🟢 Baixo |    S    |  🟢 Baixa   |      ✅      |
-| A1  | Remover aliases inúteis api/               |   2   | 🟢 Baixo |   XS    |  🟡 Média   |      ✅      |
-| A2  | Auditar callers de shims                   |   3   | 🟢 Baixo |    S    |  🟡 Média   | ✅ Concluído |
-| A3  | Remover 13 shims @deprecated               |   3   | 🟡 Médio |    M    |  🟡 Média   | ✅ Concluído |
-| A4  | Migrar e remover sdk-client.js             |   3   | 🟡 Médio |    M    |  🟢 Baixa   | ✅ Concluído |
-| E1  | Consolidar api/ e routes/                  |   4   | 🟡 Médio |    L    |  🟢 Baixa   | ⏭️ De-priorizado  |
-| J1  | Extrair tools/shell/index.js               |   4   | 🟢 Baixo |    M    |  🟡 Média   | ✅ Concluído |
-| J2  | config/tools/ subpasta unificada           |   4   | 🟢 Baixo |    S    |  🟡 Média   | ✅ Concluído |
-| J3  | terminal-server.js entry point PM2         |   4   | 🟢 Baixo |   XS    |  🟢 Baixa   | ⏭️ Intencional — não mover |
-| J4  | core/constants.js canônico                 |   1   | 🟢 Baixo |    S    |  🟡 Média   | ✅ Concluído |
-| K1  | git_push, git_create_branch, git_log       |   5   | 🟢 Baixo |    M    |   🔴 Alta   | ⬜ Pendente |
-| K2  | patch_file — edição cirúrgica              |   5   | 🟡 Médio |    M    |  🟡 Média   | ⬜ Pendente |
-| K3  | get_workspace_info, set_session_context    |   5   | 🟢 Baixo |    S    |  🟡 Média   | ⬜ Pendente |
-| K4  | web_fetch com rate-limit e segurança       |   5   | 🟡 Médio |    L    |   🔴 Alta   | ⬜ Pendente |
-| K5  | Migrar todas as tools para buildTool       |   5   | 🟢 Baixo |    M    |  🟡 Média   | ⬜ Pendente |
-| K6  | tools/git/index.js consolidado             |   5   | 🟢 Baixo |    S    |  🟢 Baixa   | ⬜ Pendente |
-| K7  | customAgents config/agents.js              |   5   | 🟡 Médio |    L    |  🟡 Média   | ⬜ Pendente |
-| K8  | onUserInputRequest SDK em request_user_input| 5   | 🟢 Baixo |    S    |   🔴 Alta   | ⬜ Pendente |
+| ID  | Título                                       | Fase  |  Risco  | Tamanho | Prioridade |          Status           |
+| --- | -------------------------------------------- | :---: | :-----: | :-----: | :--------: | :-----------------------: |
+| B1  | Fix import deprecated em orchestrator.js     |   1   | 🟢 Baixo |   XS    |   🔴 Alta   |             ✅             |
+| B2  | Substituir execSync+curl em task-tools.js    |   1   | 🟢 Baixo |    S    |   🔴 Alta   |             ✅             |
+| C1  | Centralizar timeouts em core/constants.js    |   1   | 🟢 Baixo |    S    |  🟡 Média   |             ✅             |
+| G1  | Limite MAX_SSE_CLIENTS em bridge-stream.js   |   1   | 🟢 Baixo |   XS    |  🟡 Média   |             ✅             |
+| H1  | Migração FTS5 idempotente                    |   1   | 🟡 Médio |    S    |   🔴 Alta   |             ✅             |
+| D1  | Getters públicos em AlwaysAliveAgent         |   2   | 🟢 Baixo |    S    |  🟡 Média   |             ✅             |
+| F1  | state.js reativo com EventEmitter            |   2   | 🟡 Médio |    M    |  🟡 Média   |             ✅             |
+| I1  | Expandir BUILTIN_HANDLER_MAP                 |   2   | 🟢 Baixo |    S    |  🟢 Baixa   |             ✅             |
+| A1  | Remover aliases inúteis api/                 |   2   | 🟢 Baixo |   XS    |  🟡 Média   |             ✅             |
+| A2  | Auditar callers de shims                     |   3   | 🟢 Baixo |    S    |  🟡 Média   |        ✅ Concluído        |
+| A3  | Remover 13 shims @deprecated                 |   3   | 🟡 Médio |    M    |  🟡 Média   |        ✅ Concluído        |
+| A4  | Migrar e remover sdk-client.js               |   3   | 🟡 Médio |    M    |  🟢 Baixa   |        ✅ Concluído        |
+| E1  | Consolidar api/ e routes/                    |   4   | 🟡 Médio |    L    |  🟢 Baixa   |      ⏭️ De-priorizado      |
+| J1  | Extrair tools/shell/index.js                 |   4   | 🟢 Baixo |    M    |  🟡 Média   |        ✅ Concluído        |
+| J2  | config/tools/ subpasta unificada             |   4   | 🟢 Baixo |    S    |  🟡 Média   |        ✅ Concluído        |
+| J3  | terminal-server.js entry point PM2           |   4   | 🟢 Baixo |   XS    |  🟢 Baixa   | ⏭️ Intencional — não mover |
+| J4  | core/constants.js canônico                   |   1   | 🟢 Baixo |    S    |  🟡 Média   |        ✅ Concluído        |
+| K1  | git_push, git_create_branch, git_log         |   5   | 🟢 Baixo |    M    |   🔴 Alta   |        ⬜ Pendente         |
+| K2  | patch_file — edição cirúrgica                |   5   | 🟡 Médio |    M    |  🟡 Média   |        ⬜ Pendente         |
+| K3  | get_workspace_info, set_session_context      |   5   | 🟢 Baixo |    S    |  🟡 Média   |        ⬜ Pendente         |
+| K4  | web_fetch com rate-limit e segurança         |   5   | 🟡 Médio |    L    |   🔴 Alta   |        ⬜ Pendente         |
+| K5  | Migrar todas as tools para buildTool         |   5   | 🟢 Baixo |    M    |  🟡 Média   |        ⬜ Pendente         |
+| K6  | tools/git/index.js consolidado               |   5   | 🟢 Baixo |    S    |  🟢 Baixa   |        ⬜ Pendente         |
+| K7  | customAgents config/agents.js                |   5   | 🟡 Médio |    L    |  🟡 Média   |        ⬜ Pendente         |
+| K8  | onUserInputRequest SDK em request_user_input |   5   | 🟢 Baixo |    S    |   🔴 Alta   |        ⬜ Pendente         |
 
 ---
 
@@ -1148,16 +1148,16 @@ Após isso, a LLM-B pode usar `ask_user` built-in OU a custom `request_user_inpu
 
 ### Resumo Fase 5
 
-| ID  | Proposta                                | Prioridade |    Esforço |
-| --- | --------------------------------------- | :--------: | ---------: |
-| K1  | git_push, git_create_branch, git_log    |  🔴 Alta   |          M |
-| K2  | patch_file (search-and-replace)         |  🟡 Média  |          M |
-| K3  | get_workspace_info, set_session_context |  🟡 Média  |          S |
-| K4  | web_fetch (anti-SSRF)                   |  🔴 Alta   |          L |
-| K5  | Migrar tools para buildTool             |  🟡 Média  |          M |
-| K6  | tools/git/index.js reorganizado         |  🟢 Baixa  |          S |
-| K7  | customAgents especializados             |  🟡 Média  |          L |
-| K8  | onUserInputRequest SDK integration      |  🔴 Alta   |          S |
+| ID  | Proposta                                | Prioridade | Esforço |
+| --- | --------------------------------------- | :--------: | ------: |
+| K1  | git_push, git_create_branch, git_log    |   🔴 Alta   |       M |
+| K2  | patch_file (search-and-replace)         |  🟡 Média   |       M |
+| K3  | get_workspace_info, set_session_context |  🟡 Média   |       S |
+| K4  | web_fetch (anti-SSRF)                   |   🔴 Alta   |       L |
+| K5  | Migrar tools para buildTool             |  🟡 Média   |       M |
+| K6  | tools/git/index.js reorganizado         |  🟢 Baixa   |       S |
+| K7  | customAgents especializados             |  🟡 Média   |       L |
+| K8  | onUserInputRequest SDK integration      |   🔴 Alta   |       S |
 
 **Ordem de execução sugerida**: K8 → K3 → K1 → K4 → K2 → K5 → K6 → K7
 
@@ -1165,4 +1165,289 @@ Após isso, a LLM-B pode usar `ask_user` built-in OU a custom `request_user_inpu
 
 ---
 
-*Proposta elaborada em: 2026-03-15 · Fase 5 adicionada em: 2026-03-27 · Para aprovação e faseamento*
+*Proposta elaborada em: 2026-03-15 · Fase 5 adicionada em: 2026-03-27 · Seções 18-20 adicionadas em: 2026-03-27 · Para aprovação e faseamento*
+
+---
+
+## 18. Análise Profunda: Herança CLI → LLM-B
+
+> **Objetivo**: entender **como** a LLM-B herda capacidades da CLI Copilot, **o que** é herdado,
+> e **o que precisa ser integrado melhor**.
+
+### 18.1 Arquitetura da Comunicação
+
+```
+┌─────────────────────┐    JSON-RPC/stdio   ┌──────────────────────────────────┐
+│  AlwaysAliveAgent   │◄───────────────────►│  @github/copilot CLI (bundled)   │
+│  (Node.js process)  │                     │  node_modules/@github/copilot/   │
+│                     │   CopilotClient      │  index.js                        │
+│  src/copilot/agent/ │   .createSession()  │                                  │
+│  always-alive.js    │                     │  ┌─────────────────────────────┐ │
+└─────────────────────┘                     │  │  GitHub Copilot LLM Backend │ │
+         │                                  │  │  (claude-sonnet-4.5 etc.)   │ │
+         │ tools[] (custom)                 │  └─────────────────────────────┘ │
+         └──────────────────────────────────►│  Built-in tools injetadas       │
+                                            │  automaticamente na sessão       │
+                                            └──────────────────────────────────┘
+```
+
+**Fluxo de herança**:
+
+1. `CopilotClient` faz `spawn()` do CLI bundled em
+   `node_modules/@github/copilot/index.js` via `stdio`
+2. Protocolo JSON-RPC com `vscode-jsonrpc` — versão negociada (mínimo 2, máximo atual)
+3. `client.createSession()` envia `session.create` com:
+   - `tools[]` — nossas custom tools (registradas via `defineTool`)
+   - `excludedTools[]` — tools builtin bloqueadas por política
+   - `availableTools[]` — allowlist opcional
+   - `mcpServers{}` — MCP servers a disponibilizar
+   - `skillDirectories[]` — diretórios de skills YAML (atualmente `./.github/skills`)
+4. A CLI injeta **automaticamente** suas built-in tools na sessão — a LLM-B as vê junto das custom tools
+5. A LLM-B **não tem acesso ao código-fonte** — apenas aos schemas JSON de cada tool
+
+### 18.2 Built-in Tools da CLI (inventário completo)
+
+Listadas via `client.rpc.tools.list({})` no ambiente atual:
+
+| #   | Nome                              | Categoria | Descrição resumida                                                          | Herdada pela LLM-B |
+| --- | --------------------------------- | --------- | --------------------------------------------------------------------------- | :----------------: |
+| 1   | `bash`                            | Shell     | Shell persistente interativo, sync e async, com suporte a detach/daemon     |         ✅          |
+| 2   | `write_bash`                      | Shell     | Envia stdin para sessão bash async                                          |         ✅          |
+| 3   | `read_bash`                       | Shell     | Lê stdout/stderr de sessão bash async                                       |         ✅          |
+| 4   | `stop_bash`                       | Shell     | Termina sessão bash async                                                   |         ✅          |
+| 5   | `list_bash`                       | Shell     | Lista sessões bash ativas                                                   |         ✅          |
+| 6   | `str_replace_editor`              | File      | Editor de arquivos (view/create/str_replace/insert/undo_edit)               |         ✅          |
+| 7   | `web_fetch`                       | Web       | HTTP GET/POST para URLs externas                                            |    ⚠️ bloqueada*    |
+| 8   | `report_intent`                   | Meta      | Reporta intenção do agente ao usuário (feedback para UI CLI)                |         ✅          |
+| 9   | `fetch_copilot_cli_documentation` | Meta      | Recupera documentação interna da CLI Copilot                                |         ✅          |
+| 10  | `skill`                           | Agent     | Invoca skills YAML de `.github/skills/` como sub-rotinas                    |         ✅          |
+| 11  | `ask_user`                        | Dialog    | Solicita input do usuário (habilita quando `onUserInputRequest` registrado) |        ✅**         |
+| 12  | `grep`                            | Search    | grep em arquivos do workspace                                               |         ✅          |
+| 13  | `glob`                            | Search    | glob pattern search em arquivos                                             |         ✅          |
+| 14  | `task`                            | SubAgent  | Invoca sub-agente `task` do definitions/ (execução de comandos)             |         ✅          |
+
+*`web_fetch` — bloqueada no `DEFAULT_EXCLUDED_TOOLS` de `session-config.js` (junto com `powershell`, `web_search`, `memory`). Razão: auditoria de segurança, substituída pela nossa `fetch_url`/`http_request` com anti-SSRF.
+
+**`ask_user` — disponível apenas quando `onUserInputRequest` está registrado na SessionConfig. Já implementado no `always-alive.js` (linha 318).
+
+### 18.3 Agents Built-in (Sub-agentes da CLI)
+
+A CLI tem 5 agents YAML em `node_modules/@github/copilot/definitions/`:
+
+| Agent               | Modelo            | Purpose              | Tools disponíveis                                                 |
+| ------------------- | ----------------- | -------------------- | ----------------------------------------------------------------- |
+| `task`              | claude-haiku-4.5  | Exec dev commands    | `*` (todas)                                                       |
+| `explore`           | claude-haiku-4.5  | Codebase exploration | grep, glob, view, bash, lsp + GitHub MCP + Bluebird               |
+| `research`          | claude-sonnet-4.6 | Staff-level research | GitHub MCP, web_fetch, web_search, task, grep, glob, view, create |
+| `configure-copilot` | *(padrão)*        | Config wizard        | skills específicas                                                |
+| `code-review`       | *(padrão)*        | Code review          | skills específicas                                                |
+
+O agente `task` (invocado via `task` built-in) usa **todas as tools** — ou seja, a LLM-B pode delegar para `task` e esse sub-agente terá acesso a tudo. Isso é o mecanismo de sub-agentes nativo.
+
+### 18.4 Skills YAML (`.github/skills/`)
+
+A CLI carrega `skillDirectories: ['.github/skills']` — este projeto já usa isso na `session-manager.js` (linha 259). Skills YAML são invocadas via a tool `skill`:
+
+```
+.github/skills/
+├── *.skill.yaml   ← arquivos de skill (se criados aqui)
+```
+
+Atualmente este projeto não tem skills customizadas criadas. A tool `skill` herda as skills da CLI mais qualquer YAML em `.github/skills/`.
+
+### 18.5 GitHub MCP Server Nativo da CLI
+
+O agente `explore` usa `github-mcp-server/get_file_contents`, `github-mcp-server/list_issues` etc. Este é o **servidor MCP nativo** embutido na CLI — diferente do `@modelcontextprotocol/server-github` que temos configurado.
+
+**Dois servidores distintos**:
+1. **`github-mcp-server` (nativo CLI)**: embutido no CLI bundled, não precisa de `npx`, usa o auth do token do usuário autenticado. Disponível automaticamente nos sub-agentes `explore`/`research` que o referenciam.
+2. **`@modelcontextprotocol/server-github` (npm)**: servidor externo que precisamos lançar via `npx`, configurado em `MCP_SERVERS.github` no `mcp-servers.js`.
+3. **GitHub API MCP HTTP**: servidor oficial em `https://api.githubcopilot.com/mcp/` — acessível via `MCPRemoteServerConfig` com `type: 'http'`.
+
+### 18.6 O Que a LLM-B Herda Automaticamente
+
+Quando uma sessão é criada **sem** `availableTools` nem `excludedTools`, a LLM-B herda:
+
+- **Todas as 14 built-in tools** da CLI
+- **Todas as custom tools** passadas em `tools[]`
+- **Tools dos MCP servers** configurados em `mcpServers{}`
+- **Sub-agente `task`** via a built-in `task` tool
+- **Skills** de `.github/skills/`
+
+Com a configuração atual (`DEFAULT_EXCLUDED_TOOLS`), a LLM-B recebe 14 - 4 = **10 built-in tools** + nossas **43 custom tools** = **~53 tools totais** (excluindo MCP).
+
+### 18.7 Diferença: GitHub Copilot (eu) vs LLM-B
+
+O **GitHub Copilot** (este assistente integrado ao VS Code) tem acesso a ferramentas específicas do ambiente IDE:
+- `run_in_terminal`, `create_file`, `replace_string_in_file`, `read_file`, `get_errors` etc.
+- Ferramentas de workspace VS Code, notebook, browser automation
+- MCP tools de servidores configurados para o workspace VS Code
+
+A **LLM-B** (AlwaysAliveAgent) tem:
+- Built-in tools CLI (bash, grep, glob, str_replace_editor etc.)
+- Nossas 43 custom tools (git, file, web, session, task, hub etc.)
+- Sub-agentes via `task`, `explore`, `research`
+- Acesso via MCP servers configurados
+
+**Gaps antes da Fase 6** (tools que eu tenho e a LLM-B não tinha):
+- `web_fetch` → substituída por `fetch_url`/`http_request` com anti-SSRF ✅
+- `patch_file` / str_replace → coberta por `patch_file` ✅ e `str_replace_editor` (built-in CLI) ✅
+- Subagentes especializados → `task` built-in existe, falta `customAgents` configurados (K7)
+- `web_search` → bloqueada no DEFAULT_EXCLUDED_TOOLS, ainda sem alternativa interna
+
+---
+
+## 19. Proposta L — Fase 6: Sub-agentes, Skills e Integração Avançada
+
+> **Motivação**: Após inventariar os gaps Fase 5, a Fase 6 foca em capacidades de **orquestração avançada**:
+> sub-agentes customizados (`customAgents`), as skills YAML, MCP server GitHub oficial, e polimento geral.
+
+### 19.1 Roadmap Fase 6
+
+| ID  | Proposta                                      | Prioridade | Esforço |
+| --- | --------------------------------------------- | :--------: | ------: |
+| L1  | K7 carry-over: customAgents especializados    |   🔴 Alta   |       L |
+| L2  | GitHub MCP server HTTP oficial                |   🔴 Alta   |       S |
+| L3  | Skills YAML nativas (.github/skills/)         |  🟡 Média   |       M |
+| L4  | web_search tool (alternativa segura)          |  🟡 Média   |       M |
+| L5  | mcp-servers: suporte dinâmico via config.json |  🟡 Média   |       S |
+| L6  | Audit: DEFAULT_EXCLUDED_TOOLS revisão         |  🟢 Baixa   |       S |
+| L7  | memory MCP tool — gestão de contexto longo    |  🟢 Baixa   |       M |
+
+### 19.2 L1 — customAgents Especializados
+
+O SDK suporta `customAgents` na `SessionConfig`:
+
+```js
+customAgents: [
+    {
+        name: 'architect',
+        displayName: 'Architect Agent',
+        description: 'Analisa arquitetura, propõe refatorações e documenta decisões.',
+        tools: ['grep', 'glob', 'str_replace_editor', 'bash'],
+        model: 'claude-sonnet-4.6',
+        prompt: fs.readFileSync('.github/agents/architect.md', 'utf8'),
+    },
+    {
+        name: 'tester',
+        displayName: 'Tester Agent',
+        description: 'Escreve e executa testes unitários e de integração.',
+        tools: ['bash', 'str_replace_editor', 'grep'],
+        model: 'claude-haiku-4.5',
+        prompt: fs.readFileSync('.github/agents/tester.md', 'utf8'),
+    }
+]
+```
+
+Esses agentes ficam disponíveis como sub-agentes que a LLM-B pode invocar via a interface padrão.
+
+**Localização de prompts**: `.github/agents/*.md`
+
+### 19.2 L2 — GitHub MCP Server HTTP Oficial
+
+Adicionar ao `mcp-servers.js` o servidor oficial GitHub via tipo `http`:
+
+```js
+'github-official': {
+    type: 'http',
+    url: 'https://api.githubcopilot.com/mcp/',
+    headers: {
+        Authorization: `Bearer ${process.env.GITHUB_TOKEN ?? ''}`,
+    },
+},
+```
+
+Isso dá à LLM-B acesso à mesma API GitHub que os agentes built-in `explore`/`research` usam, sem precisar de `npx`.
+
+### 19.3 L3 — Skills YAML Nativas
+
+Criar skills YAML em `.github/skills/` para capacidades recorrentes:
+
+```yaml
+# .github/skills/diagnose-system.skill.yaml
+name: diagnose-system
+description: Diagnóstico completo do sistema (PM2, logs, ports, health)
+prompt: |
+  Execute os seguintes diagnósticos em paralelo:
+  1. Status PM2: npm run pm2:status
+  2. Health check: npm run health:core
+  3. Portas em uso: lsof -i :3009 -i :3001 -i :3000
+  Consolide e reporte quaisquer problemas encontrados.
+```
+
+Skills são invocadas via `skill` built-in — a LLM-B pode orquestrar diagnósticos complexos em uma chamada.
+
+### 19.4 Resumo Herança CLI→LLM-B (visão condensada)
+
+```
+CLI Built-in (14 tools)
+  ├── bash/write_bash/read_bash/stop_bash/list_bash  → Shell completo
+  ├── str_replace_editor                             → Editor multi-operação
+  ├── web_fetch (bloqueada)                          → Substituída por fetch_url
+  ├── grep / glob                                    → Search
+  ├── task (sub-agente)                              → Delegação de execução
+  ├── skill                                          → Skills YAML
+  ├── ask_user                                       → Dialog com usuário
+  ├── report_intent                                  → Feedback para UI
+  └── fetch_copilot_cli_documentation                → Auto-referência
+
+Custom Tools (43 — pós-Fase 5)
+  ├── git/           → 8 tools (status, diff, commit, add, push, branch, log, stash)
+  ├── file/          → 9 tools (read, write, create, delete, copy, move, find, search, patch)
+  ├── shell/         → 3 tools (exec, spawn, env_get)
+  ├── session/       → 4 tools (state, workspace_info, context, close)
+  ├── hub/           → 5 tools (conversation, history, turn management)
+  ├── hook/          → 3 tools (lifecycle hooks)
+  ├── introspection/ → 3 tools (registry, capabilities, status)
+  ├── task/          → 4 tools (task CRUD)
+  ├── code/          → 3 tools (lint, format, types)
+  └── web/           → 2 tools (fetch_url, http_request)
+
+MCP Servers (configuráveis)
+  ├── github-official (HTTP)  → 36 GitHub API tools via MCP
+  ├── filesystem (stdio)      → file system access estruturado
+  └── memory (stdio)          → grafos de conhecimento
+
+Sub-agentes
+  ├── task (built-in)         → execução de comandos de dev
+  ├── explore (built-in)      → exploração de codebase
+  ├── research (built-in)     → pesquisa staff-level
+  └── customAgents (Fase 6)   → architect, tester, etc.
+```
+
+---
+
+## 20. Gap Analysis: LLM-B vs GitHub Copilot IDE
+
+Esta seção compara as capacidades do **GitHub Copilot** (assistente IDE) com a **LLM-B** (AlwaysAliveAgent).
+
+### 20.1 Tabela Comparativa
+
+| Capacidade                   |   GitHub Copilot (IDE)   |               LLM-B pós-Fase 5               | Gap / Observação        |
+| ---------------------------- | :----------------------: | :------------------------------------------: | ----------------------- |
+| Shell execution              |    ✅ run_in_terminal     |               ✅ bash built-in                | Equivalente             |
+| File read                    |       ✅ read_file        |   ✅ str_replace_editor + read_file custom    | Coberto                 |
+| File write/edit              | ✅ replace_string_in_file |      ✅ str_replace_editor + patch_file       | Coberto                 |
+| File create                  |      ✅ create_file       |             ✅ create_file custom             | Coberto                 |
+| Codebase search (regex)      |      ✅ grep_search       |               ✅ grep built-in                | Equivalente             |
+| Codebase search (glob)       |      ✅ file_search       |               ✅ glob built-in                | Equivalente             |
+| Semantic code search         |    ✅ semantic_search     |     ✅ bluebird tools (via explore agent)     | Via sub-agente          |
+| Web fetch                    |     ✅ fetch_webpage      |          ✅ fetch_url + http_request          | Coberto (com anti-SSRF) |
+| Web search                   |      ✅ Bing/Google       |            ❌ web_search bloqueada            | **Gap** — L4            |
+| GitHub issues/PRs            |       ✅ MCP tools        |   ⚠️ via github-official MCP (L2 pendente)    | L2                      |
+| Sub-agentes                  |      ✅ runSubagent       | ⚠️ task/explore built-ins + customAgents (L1) | L1                      |
+| Memory persistente           |      ✅ memory tool       |  ❌ memory bloqueada (MCP memory disponível)  | L7                      |
+| VS Code API                  |   ✅ run_vscode_command   |          ❌ N/A (processo separado)           | N/A                     |
+| Error analysis (get_errors)  |       ✅ get_errors       |             ⚠️ via bash + eslint              | Workaround              |
+| Code execution (notebooks)   |   ✅ run_notebook_cell    |                    ❌ N/A                     | N/A                     |
+| Dialog com usuário           |        ✅ implicit        |       ✅ ask_user + request_user_input        | Coberto                 |
+| Git operations               |    ✅ git via terminal    |         ✅ 8 custom git tools + bash          | Coberto                 |
+| Skills/Agents especializados |      ✅ runSubagent       |   ⚠️ 5 built-in agents + customAgents (L1)    | L1                      |
+
+### 20.2 Prioridades de Fechamento de Gap para Fase 6
+
+1. **L2** (GitHub MCP HTTP): 1 linha de config — impacto alto
+2. **L1** (customAgents): varias linhas de YAML + config — impacto alto
+3. **L4** (web_search): nova tool segura — impacto médio
+4. **L3** (skills YAML): 2-3 arquivos YAML — impacto médio
+5. **L7** (memory MCP): configurar server + remover do excluded — impacto baixo

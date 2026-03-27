@@ -128,6 +128,56 @@ const setSessionContextTool = defineTool('set_session_context', {
 });
 
 /**
+ * Tool: invoke_skill — carrega e retorna o conteúdo de uma skill pelo nome.
+ * Análogo ao built-in `skill` do GitHub Copilot CLI. Permite ao agente injetar o conteúdo
+ * de uma skill como contexto adicional no turn atual.
+ */
+const invokeSkillTool = defineTool('invoke_skill', {
+    description:
+        'Carrega o conteúdo de uma skill pelo nome e retorna seu conteúdo completo como contexto. ' +
+        'Use quando precisar de instruções especializadas de uma skill (ex: "code-audit", "jsdoc-authoring"). ' +
+        'Lista skills disponíveis se chamado sem parâmetro `name`.',
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ name?: string }>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                name: z.string().optional().describe('Nome da skill a carregar (slug do diretório em .github/skills/)'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ name?: string }} */ { name }) => {
+        const skillsDir = resolve(join(process.cwd(), '.github', 'skills'));
+        if (!existsSync(skillsDir)) {
+            return { error: 'Diretório .github/skills/ não encontrado.' };
+        }
+
+        const { readdirSync } = await import('node:fs');
+        const available = readdirSync(skillsDir, { withFileTypes: true })
+            .filter((d) => d.isDirectory())
+            .map((d) => d.name)
+            .sort();
+
+        if (!name) {
+            return { available };
+        }
+
+        const skillPath = join(skillsDir, name, 'SKILL.md');
+        if (!existsSync(skillPath)) {
+            return { error: `Skill '${name}' não encontrada.`, available };
+        }
+
+        const content = readFileSync(skillPath, 'utf-8');
+        log('INFO', `[copilot/invoke_skill] skill='${name}' carregada (${content.length} bytes)`);
+        return { name, content };
+    },
+});
+
+/**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const sessionTools = [withSkipPermission(readBriefingTool), writePendingTaskTool, withSkipPermission(getWorkspaceInfoTool), setSessionContextTool];
+export const sessionTools = [
+    withSkipPermission(readBriefingTool),
+    writePendingTaskTool,
+    withSkipPermission(getWorkspaceInfoTool),
+    setSessionContextTool,
+    withSkipPermission(invokeSkillTool),
+];

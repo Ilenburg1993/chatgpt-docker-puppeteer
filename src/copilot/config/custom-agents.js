@@ -125,3 +125,100 @@ export function registerCustomAgent(config) {
 export function removeCustomAgent(name) {
     return BUILTIN_AGENTS.delete(name);
 }
+
+// ---------------------------------------------------------------------------
+// SDK Integration — CustomAgentConfig para SessionConfig.customAgents
+// ---------------------------------------------------------------------------
+
+/**
+ * @typedef {import('@github/copilot-sdk').CustomAgentConfig} SdkCustomAgentConfig
+ */
+
+/**
+ * Sub-agentes no formato aceito pelo SDK (SessionConfig.customAgents).
+ *
+ * Esses agentes são invocados pela LLM-B via delegação automática. Diferem dos agentes internos (`BUILTIN_AGENTS`) que
+ * são usados via REPL/terminal — estes são nativos ao SDK Copilot.
+ *
+ * @type {SdkCustomAgentConfig[]}
+ */
+const SDK_AGENTS = [
+    {
+        name: 'task',
+        displayName: 'Task Agent',
+        description:
+            'Execute development commands like tests, builds, linters. Returns brief summary on success, full output on failure.',
+        tools: ['bash', 'write_bash', 'read_bash', 'stop_bash'],
+        model: 'claude-haiku-4.5',
+        prompt: `You are a command execution agent that runs development commands and reports results efficiently.
+
+Execute commands: tests (npm run test), builds, linting, dependency installs.
+
+CRITICAL output format:
+- SUCCESS: one-line summary (e.g., "All 247 tests passed")
+- FAILURE: full error output with stack traces
+- Do NOT fix errors or make suggestions — just execute and report
+- Do NOT retry on failure`,
+        infer: true,
+    },
+    {
+        name: 'explore',
+        displayName: 'Explore Agent',
+        description: 'Fast codebase exploration. Uses grep, glob, bash. Safe to call in parallel.',
+        tools: ['grep', 'glob', 'bash', 'str_replace_editor'],
+        model: 'claude-haiku-4.5',
+        prompt: `You are an exploration agent specialized in rapid codebase analysis.
+
+Use grep for text patterns, glob for file discovery, str_replace_editor (view) for file contents,
+bash for commands grep/glob can't handle (find, ls, git log, wc).
+
+CRITICAL: Maximize parallel tool calling — always call independent tools simultaneously.
+Keep answers under 300 words for simple questions. Cite file paths and line numbers.`,
+        infer: true,
+    },
+    {
+        name: 'diagnostic',
+        displayName: 'Diagnostic Agent',
+        description: 'System diagnostics: PM2, health checks, ports, logs. Read-only.',
+        tools: ['bash', 'read_bash', 'grep', 'glob'],
+        model: 'claude-haiku-4.5',
+        prompt: `You are a system diagnostic agent for this Node.js project.
+
+Capabilities: PM2 status, health checks (npm run health:core), port inspection (lsof),
+log file analysis, queue status, environment validation.
+
+Output format: ✅ OK / ⚠️ WARNING / ❌ ERROR sections with specific values and PIDs.
+Highlight critical issues. Suggest fixes but do NOT execute them unless explicitly asked.`,
+        infer: true,
+    },
+];
+
+/**
+ * Nomes dos SDK agents habilitados por padrão.
+ *
+ * Pode ser sobrescrito via `COPILOT_CUSTOM_AGENTS=task,explore,diagnostic` (CSV).
+ *
+ * @type {string[]}
+ */
+const DEFAULT_SDK_AGENTS = (process.env.COPILOT_CUSTOM_AGENTS ?? 'task,explore,diagnostic').split(',').filter(Boolean);
+
+/**
+ * Constrói o array `customAgents` para injetar em `SessionConfig.customAgents`.
+ *
+ * @param {string[]} [enabled] - Nomes dos agentes a incluir. Default: DEFAULT_SDK_AGENTS.
+ * @returns {SdkCustomAgentConfig[] | undefined} Array de agentes ou undefined se vazio.
+ */
+export function buildCustomAgentsConfig(enabled = DEFAULT_SDK_AGENTS) {
+    if (enabled.length === 0) return undefined;
+    const agents = SDK_AGENTS.filter((a) => enabled.includes(a.name));
+    return agents.length > 0 ? agents : undefined;
+}
+
+/**
+ * Lista os nomes dos SDK agents disponíveis para SessionConfig.
+ *
+ * @returns {string[]}
+ */
+export function listAvailableSdkAgents() {
+    return SDK_AGENTS.map((a) => a.name);
+}
