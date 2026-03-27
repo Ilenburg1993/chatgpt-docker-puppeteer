@@ -444,8 +444,8 @@
         "pattern": { "regexp": "^NUNCA$" },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": "TerminalServer.*Iniciando",
-          "endsPattern": "LLM-B sinalizada READY"
+          "beginsPattern": "\\[TerminalServer\\] Iniciando terminal",
+          "endsPattern": "LLM-B pronta"
         }
       }
     }

@@ -121,13 +121,28 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
             _cmdCount({ hubSessionId: _hubSessionId, println });
             break;
         case 'restart':
+            // DL-PERM: /restart para o loop via stopDialogMode() (reason: watchdog_restart), que
+            // emite dialog.stopped → o handler em index.js chama ensureDialogLoop() automaticamente.
+            // Aguardamos dialog.ready para confirmar que o boot completou antes de exibir feedback.
             println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
             try {
+                const readyPromise = new Promise((resolve, reject) => {
+                    const timeout = setTimeout(
+                        () => reject(new Error('Timeout aguardando restart')),
+                        30_000,
+                    );
+                    alwaysAliveAgent.once('dialog.ready', () => {
+                        clearTimeout(timeout);
+                        resolve(undefined);
+                    });
+                });
                 await llmBridgeClient.stopDialogMode();
-            } catch {
-                /* já parado */
+                await readyPromise;
+            } catch (/** @type {any} */ e) {
+                println(`\x1b[31m  Falha no restart: ${e.message}\x1b[0m`);
+                // Fallback: tentar ensureDialogLoop diretamente
+                await ensureDialogLoop().catch(() => {});
             }
-            await ensureDialogLoop();
             println('\x1b[32m  Dialog loop reiniciado.\x1b[0m');
             break;
         case 'model':
@@ -158,10 +173,13 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
         case 'exit':
             println('[terminal] Encerrando sessão…');
             cleanup();
+            // TERM-QUIT-01: usar authorized_stop para que o handler de dialog.stopped
+            // em index.js NÃO tente reiniciar o loop após o encerramento explícito pelo usuário.
+            // stopDialogMode() usa reason='watchdog_restart' que causaria restart indevido.
             try {
-                await llmBridgeClient.stopDialogMode();
+                await alwaysAliveAgent.stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
             } catch {
-                /* ignora */
+                /* ignora — loop pode já estar parado */
             }
             rl.close();
             injectServer.close();
