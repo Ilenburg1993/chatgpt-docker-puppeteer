@@ -191,8 +191,9 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.#model = options.model ?? process.env.COPILOT_MODEL ?? 'gpt-4.1';
         this.#reasoningEffort =
             options.reasoningEffort ??
-            /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */ (process.env.COPILOT_REASONING_EFFORT) ??
-            'high';
+            /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */ (
+                process.env.COPILOT_REASONING_EFFORT || undefined
+            );
     }
 
     /**
@@ -876,9 +877,9 @@ qualquer tentativa de encerramento não autorizado.`;
     /**
      * Implementação interna de sendDialogTurn — executada de forma serializada pelo #dialogTurnMutex.
      *
-     * DL-PERM-05: se `dialog.stopped` disparar com `authorized: false` (restart automático), aguarda
-     * `dialog.ready` por até `timeout` ms e reenvia a mensagem uma vez. Isso garante que turnos que
-     * estavam em flight durante um restart automático do loop não são perdidos silenciosamente.
+     * DL-PERM-05: se `dialog.stopped` disparar com `authorized: false` (restart automático), aguarda `dialog.ready` por
+     * até `timeout` ms e reenvia a mensagem uma vez. Isso garante que turnos que estavam em flight durante um restart
+     * automático do loop não são perdidos silenciosamente.
      *
      * Se `dialog.stopped` disparar com `authorized: true`, rejeita imediatamente (encerramento definitivo).
      *
@@ -914,10 +915,7 @@ qualquer tentativa de encerramento não autorizado.`;
                         if (stopEvt?.authorized) {
                             // Encerramento definitivo — rejeitar imediatamente
                             reject(
-                                new SessionError(
-                                    '[AlwaysAlive] Diálogo encerrado definitivamente.',
-                                    'DIALOG_ENDED',
-                                ),
+                                new SessionError('[AlwaysAlive] Diálogo encerrado definitivamente.', 'DIALOG_ENDED'),
                             );
                         } else {
                             // DL-PERM-05: restart automático — aguarda dialog.ready e reenvia a mensagem
@@ -1027,9 +1025,12 @@ qualquer tentativa de encerramento não autorizado.`;
                                         } else {
                                             this.once('question.pending', () => {
                                                 this.answerPendingQuestion(message);
-                                                this.once('dialog.reply', (/** @type {{ reply: string }} */ retryEvt3) => {
-                                                    resolve(retryEvt3.reply);
-                                                });
+                                                this.once(
+                                                    'dialog.reply',
+                                                    (/** @type {{ reply: string }} */ retryEvt3) => {
+                                                        resolve(retryEvt3.reply);
+                                                    },
+                                                );
                                             });
                                         }
                                     };
@@ -1057,6 +1058,7 @@ qualquer tentativa de encerramento não autorizado.`;
      * - Encerramento explicitamente autorizado pelo usuário via API
      *
      * O campo `reason` diferencia o tipo de encerramento:
+     *
      * - `'watchdog_restart'` — restart automático do sistema (não-definitivo, loop será reiniciado)
      * - `'authorized_stop'` — encerramento permanente autorizado pelo usuário
      *

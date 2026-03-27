@@ -82,8 +82,10 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 function normalizeParameters(parameters) {
     if (!parameters) return undefined;
 
-    // Detecta instância Zod pela presença de `_def` (marcador interno do Zod)
-    if ('_def' in parameters) {
+    // Detecta instância Zod v3 (`_def`) ou Zod v4 (`_zod`).
+    // Zod v4 mudou a arquitetura interna — a propriedade identificadora passou de `_def` para `_zod`.
+    // Ambas indicam um schema Zod que precisa ser convertido para JSON Schema antes de ser passado ao SDK.
+    if ('_def' in parameters || '_zod' in parameters) {
         try {
             return /** @type {Record<string, unknown>} */ (
                 zodToJsonSchema(/** @type {import('zod/v3').ZodTypeAny} */ (parameters))

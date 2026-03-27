@@ -226,7 +226,7 @@ const todoCreateTool = defineTool('todo_create', {
             .describe('Data de vencimento ISO 8601 (ex: 2026-04-01T18:00:00Z)'),
         parent_id: z.string().optional().describe('ID da tarefa pai para criar como subtarefa'),
         notes: z.string().max(10000).optional().describe('Notas livres associadas à tarefa'),
-        metadata: z.record(z.unknown()).optional().describe('Campos extras extensíveis (JSON livre)'),
+        metadata: z.record(z.string(), z.unknown()).optional().describe('Campos extras extensíveis (JSON livre)'),
     }),
     handler: async (
         /**
@@ -461,7 +461,7 @@ const todoUpdateTool = defineTool('todo_update', {
             .describe('Nova data vencimento ISO 8601 (null para remover)'),
         notes: z.string().max(10000).optional().describe('Novas notas (substitui completamente)'),
         append_notes: z.string().max(5000).optional().describe('Adicionar ao final das notas existentes'),
-        metadata: z.record(z.unknown()).optional().describe('Merge de metadata (deep merge de keys)'),
+        metadata: z.record(z.string(), z.unknown()).optional().describe('Merge de metadata (deep merge de keys)'),
     }),
     handler: async (
         /**
@@ -1043,7 +1043,7 @@ const todoImportTool = defineTool('todo_import', {
                     tags: z.array(z.string().max(100)).max(20).optional(),
                     due_date: z.string().datetime({ offset: true }).optional(),
                     notes: z.string().max(10000).optional(),
-                    metadata: z.record(z.unknown()).optional(),
+                    metadata: z.record(z.string(), z.unknown()).optional(),
                 }),
             )
             .min(1)
