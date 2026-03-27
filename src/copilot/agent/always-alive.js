@@ -855,15 +855,20 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                         );
                     }, timeout);
 
-                    this.once('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
+                    // NEW-01 (fix): cross-cleanup entre os dois listeners para evitar orphan listener
+                    const onReplyOuter = (/** @type {{ reply: string }} */ evt) => {
                         clearTimeout(timeoutHandle);
+                        this.off('dialog.stopped', onStopOuter);
                         resolve(evt.reply);
-                    });
-
-                    this.once('dialog.stopped', () => {
+                    };
+                    const onStopOuter = () => {
                         clearTimeout(timeoutHandle);
+                        this.off('dialog.reply', onReplyOuter);
                         reject(new SessionError('[AlwaysAlive] Diálogo encerrado pelo modelo.', 'DIALOG_ENDED'));
-                    });
+                    };
+
+                    this.once('dialog.reply', onReplyOuter);
+                    this.once('dialog.stopped', onStopOuter);
 
                     // Alimenta o ask_user pendente com a mensagem do usuário
                     if (this.#pendingQuestion) {

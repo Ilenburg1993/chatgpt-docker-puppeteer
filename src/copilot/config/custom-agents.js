@@ -111,7 +111,18 @@ export function listCustomAgents() {
  * @returns {void}
  */
 export function registerCustomAgent(config) {
-    if (!config?.name) throw new Error('CustomAgentConfig.name é obrigatório');
+    if (!config?.name || typeof config.name !== 'string') {
+        throw new Error('CustomAgentConfig.name deve ser string não-vazia');
+    }
+    if (typeof config.description !== 'string' || !config.description) {
+        throw new Error('CustomAgentConfig.description deve ser string não-vazia');
+    }
+    if (!Array.isArray(config.tools) || config.tools.some((t) => typeof t !== 'string')) {
+        throw new Error('CustomAgentConfig.tools deve ser string[]');
+    }
+    if (typeof config.prompt !== 'string') {
+        throw new Error('CustomAgentConfig.prompt deve ser string');
+    }
     BUILTIN_AGENTS.set(config.name, config);
 }
 

@@ -67,6 +67,9 @@ let _client = null;
 /** @type {boolean} */
 let _starting = false;
 
+/** @type {Error | null} */
+let _startError = null;
+
 /** @type {Map<string, SessionEntry>} */
 const _sessions = new Map();
 
@@ -123,10 +126,17 @@ export async function getClient(overrides = {}) {
                 }
             }, 100);
         });
+        // NEW-02 (fix): propagar erro de inicialização para waiters
+        if (_startError) {
+            const err = _startError;
+            _startError = null;
+            throw err;
+        }
         if (_client) return _client;
     }
 
     _starting = true;
+    _startError = null;
     try {
         const options = buildClientOptions(overrides);
         log('INFO', '[lib/client] Iniciando CopilotClient...');
@@ -135,6 +145,9 @@ export async function getClient(overrides = {}) {
         _client = client;
         log('INFO', `[lib/client] CopilotClient conectado. Estado: ${client.getState()}`);
         return client;
+    } catch (/** @type {any} */ e) {
+        _startError = e;
+        throw e;
     } finally {
         _starting = false;
     }
@@ -391,6 +404,7 @@ export function getActiveSessionCount() {
 export function _resetClientState() {
     _client = null;
     _starting = false;
+    _startError = null;
     _sessions.clear();
 }
 
@@ -403,4 +417,5 @@ export function _resetClientState() {
 export function _injectClientForTest(mockClient) {
     _client = mockClient;
     _starting = false;
+    _startError = null;
 }

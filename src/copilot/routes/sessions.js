@@ -362,7 +362,20 @@ router.post('/sessions/:id/disconnect', (req, res) => {
 router.post('/sessions/:id/send', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
-        const { prompt, waitForResponse = true, timeoutMs = 60_000, attachments } = req.body ?? {};
+        const { prompt, waitForResponse = true, attachments } = req.body ?? {};
+        const rawTimeoutMs = (req.body ?? {}).timeoutMs;
+        // NEW-03 (fix): validar timeoutMs para evitar NaN / Infinity / negativo no setTimeout
+        const timeoutMs =
+            rawTimeoutMs === undefined
+                ? 60_000
+                : typeof rawTimeoutMs === 'number' && isFinite(rawTimeoutMs) && rawTimeoutMs > 0
+                  ? rawTimeoutMs
+                  : null;
+
+        if (timeoutMs === null) {
+            res.status(400).json({ ok: false, error: 'Campo "timeoutMs" deve ser um número positivo finito.' });
+            return;
+        }
 
         if (!prompt || typeof prompt !== 'string') {
             res.status(400).json({ ok: false, error: 'Campo "prompt" (string) é obrigatório.' });

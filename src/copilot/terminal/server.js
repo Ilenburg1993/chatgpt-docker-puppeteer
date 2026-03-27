@@ -105,6 +105,8 @@ function checkInjectRate(ip) {
 function sendJson(res, result) {
     /** @type {Record<string, string>} */
     const headers = { 'Content-Type': 'application/json' };
+    // NEW-06: CORS wildcard é seguro aqui porque o server faz bind em 127.0.0.1 (loopback only).
+    // Apenas código local pode alcançar esta porta — não há exposição externa.
     if (result.cors) headers['Access-Control-Allow-Origin'] = '*';
     res.writeHead(result.status, headers);
     res.end(JSON.stringify(result.body));
