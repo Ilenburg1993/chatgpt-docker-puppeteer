@@ -425,15 +425,17 @@ export class ConversationStore {
 
         // Retry com backoff para conflicts de UNIQUE constraint (race condition WAL)
         // NEW-04 (fix): sleep síncrono entre tentativas para dar ao WAL tempo de resolver o lock
+        // UPG-02 (melhoria): constante WRITE_MAX_RETRIES facilita tuning futuro
+        const WRITE_MAX_RETRIES = 3;
         const RETRY_DELAYS_MS = [5, 15, 40];
         const sleepSync = (/** @type {number} */ ms) =>
             Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < WRITE_MAX_RETRIES; attempt++) {
             try {
                 return doWrite();
             } catch (/** @type {any} */ err) {
                 const isConstraint = err?.code === 'SQLITE_CONSTRAINT_UNIQUE' || err?.code === 'SQLITE_CONSTRAINT';
-                if (!isConstraint || attempt === 2) throw err;
+                if (!isConstraint || attempt === WRITE_MAX_RETRIES - 1) throw err;
                 log(
                     'WARN',
                     `[ConversationStore] writeTurn conflict (attempt=${attempt + 1}), retrying in ${RETRY_DELAYS_MS[attempt] ?? 5}ms...`,

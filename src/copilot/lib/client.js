@@ -117,14 +117,18 @@ export async function getClient(overrides = {}) {
     }
 
     if (_starting) {
-        // Aguarda até o cliente estar pronto (poll leve, sem busy-loop)
+        // Aguarda até o cliente estar pronto (UPG-05: backoff exponencial para reduzir pressão)
         await new Promise((resolve) => {
-            const interval = setInterval(() => {
+            let pollDelay = 100;
+            const poll = () => {
                 if (!_starting) {
-                    clearInterval(interval);
                     resolve(undefined);
+                    return;
                 }
-            }, 100);
+                pollDelay = Math.min(pollDelay * 2, 2000);
+                setTimeout(poll, pollDelay);
+            };
+            setTimeout(poll, pollDelay);
         });
         // NEW-02 (fix): propagar erro de inicialização para waiters
         if (_startError) {

@@ -826,11 +826,11 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
      * quando o evento `dialog.ready` for emitido (indicando que o modelo está aguardando).
      *
      * @param {string} message - Mensagem a enviar ao modelo
-     * @param {{ timeout?: number }} [opts] - Opção de timeout (padrão 60s)
+     * @param {{ timeout?: number; signal?: AbortSignal }} [opts] - timeout (padrão 60s) e AbortSignal opcional (UPG-01)
      * @returns {Promise<string>} A resposta do modelo (extraída do "REPLY: ...")
      * @throws {Error} Se o modo diálogo não estiver ativo
      */
-    sendDialogTurn(message, { timeout = 60_000 } = {}) {
+    sendDialogTurn(message, { timeout = 60_000, signal } = {}) {
         if (!this.#dialogLoopActive) {
             return Promise.reject(
                 new SessionError(
@@ -838,6 +838,11 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                     'DIALOG_NOT_ACTIVE',
                 ),
             );
+        }
+
+        // UPG-01: suporte a AbortSignal externo
+        if (signal?.aborted) {
+            return Promise.reject(new DOMException('[AlwaysAlive] sendDialogTurn abortado.', 'AbortError'));
         }
 
         // AI.3: instrumentar com span OTEL
@@ -866,6 +871,20 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
                         this.off('dialog.reply', onReplyOuter);
                         reject(new SessionError('[AlwaysAlive] Diálogo encerrado pelo modelo.', 'DIALOG_ENDED'));
                     };
+
+                    // UPG-01: cancelar via AbortSignal externo
+                    if (signal) {
+                        signal.addEventListener(
+                            'abort',
+                            () => {
+                                clearTimeout(timeoutHandle);
+                                this.off('dialog.reply', onReplyOuter);
+                                this.off('dialog.stopped', onStopOuter);
+                                reject(new DOMException('[AlwaysAlive] sendDialogTurn abortado.', 'AbortError'));
+                            },
+                            { once: true },
+                        );
+                    }
 
                     this.once('dialog.reply', onReplyOuter);
                     this.once('dialog.stopped', onStopOuter);

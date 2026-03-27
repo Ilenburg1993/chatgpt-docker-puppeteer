@@ -62,6 +62,8 @@ import { log } from '#core/logger';
  * @typedef {Object} HooksConfig
  * @property {boolean} [auditLog=false] Se true, cada hook loga os eventos no logger do sistema (nível DEBUG). Default
  *   is `false`
+ * @property {boolean} [debugTools=false] UPG-06: Se true, loga ferramentas em DEBUG mesmo sem auditLog completo.
+ *   Default is `false`
  * @property {string[]} [allowTools] Lista de nomes de ferramentas que devem ser permitidas. Se definida, ferramentas
  *   ausentes nesta lista recebem decisão "deny" em onPreToolUse.
  * @property {string[]} [denyTools] Lista de nomes de ferramentas sempre negadas. Tem precedência sobre allowTools.
@@ -116,6 +118,7 @@ function resolveToolDecision(toolName, allowTools, denyTools, denyPatterns) {
  */
 export function createHooks(cfg = {}) {
     const auditLog = cfg.auditLog ?? false;
+    const debugTools = cfg.debugTools ?? false;
     const allowTools = cfg.allowTools ?? [];
     const denyTools = cfg.denyTools ?? [];
     const denyPatterns = cfg.denyPatterns ?? [];
@@ -134,7 +137,8 @@ export function createHooks(cfg = {}) {
             const toolName = input.toolName ?? 'unknown';
             const decision = resolveToolDecision(toolName, allowTools, denyTools, denyPatterns);
 
-            if (auditLog) {
+            if (auditLog || debugTools) {
+                // UPG-06: debugTools permite audit mínimo de tools mesmo sem auditLog completo
                 log(
                     'DEBUG',
                     `[lib/hooks] onPreToolUse: tool='${toolName}' decision='${decision}' sessionId='${invocation?.sessionId}'`,
@@ -228,12 +232,13 @@ export function createHooks(cfg = {}) {
 // ─── Presets prontos para uso ────────────────────────────────────────────────
 
 /**
- * Cria hooks com auditLog desativado e sem restrições de ferramentas. Apenas loga erros. Ideal para sessões simples.
+ * Cria hooks com auditLog desativado e sem restrições de ferramentas. UPG-06: loga tools em DEBUG para auditoria de
+ * segurança mínima em produção.
  *
  * @returns {SessionHooks}
  */
 export function createMinimalHooks() {
-    return createHooks({});
+    return createHooks({ debugTools: true });
 }
 
 /**

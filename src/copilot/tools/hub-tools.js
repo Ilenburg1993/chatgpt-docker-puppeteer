@@ -131,6 +131,10 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
         try {
             const hub = await requireHub();
 
+            // UPG-04: validar timeoutMs para evitar valores absurdos de modelos alucinados
+            const resolvedTimeout =
+                typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 120_000;
+
             // Se useStructured e há context/intent, enviar como StructuredMessageInput
             let payload;
             if (useStructured !== false && (context || intent)) {
@@ -146,7 +150,7 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
 
             const result = await hub.sendToLlmB(hubSessionId, payload, {
                 useStructured: useStructured !== false && !!(context || intent),
-                timeoutMs: timeoutMs ?? 120_000,
+                timeoutMs: resolvedTimeout,
             });
 
             log('INFO', `[hub_send_message] Resposta de LLM-B recebida (${result.durationMs}ms).`);
