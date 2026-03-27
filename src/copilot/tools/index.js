@@ -18,6 +18,7 @@ import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
 import { sessionTools } from './session-tools.js';
 import { shellTools } from './shell/index.js';
 import { taskTools } from './task-tools.js';
+import { todoReadTools, todoTools, todoWriteTools } from './todo-tools.js';
 import { webTools } from './web-tools.js';
 
 /**
@@ -37,6 +38,7 @@ export const allTools = [
     ...fileTools,
     ...shellTools,
     ...webTools,
+    ...todoTools,
 ];
 
 export {
@@ -55,5 +57,8 @@ export {
     setTelemetryStore,
     shellTools,
     taskTools,
+    todoReadTools,
+    todoTools,
+    todoWriteTools,
     webTools,
 };

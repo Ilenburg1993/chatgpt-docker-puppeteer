@@ -11,8 +11,8 @@ revisado após auditoria SDK v0.2.0 (npm), auditorias de código e Sprints 15-16
 
 ### Estado atual da base de código (pós-Sprint 16c — commit 7ebb2843)
 
-| Módulo                         | Status                    | Sprint  |
-| ------------------------------ | ------------------------- | ------- |
+| Módulo                         | Status                   | Sprint  |
+| ------------------------------ | ------------------------ | ------- |
 | `lib/client.js`                | ✅ Implementado           | 10      |
 | `lib/session.js`               | ✅ Implementado           | 10      |
 | `lib/permissions.js`           | ✅ Implementado           | 10      |
@@ -215,9 +215,9 @@ import { SYSTEM_PROMPT_SECTIONS, CopilotClient } from '@github/copilot-sdk';
 
 | Tool             | Operação                   | skipPermission | Segurança                                       |
 | ---------------- | -------------------------- | -------------- | ----------------------------------------------- |
-| `exec_command`   | Executa comando arbitrário | ❌ não         | Blocklist 15+ padrões, cwd restrito             |
-| `run_npm_script` | Executa `npm run <script>` | ❌ não         | Whitelist explícita de 20 scripts               |
-| `run_node_file`  | Executa `node <file>`      | ❌ não         | Ext. permitidas (.js/.mjs/.cjs), workspace only |
+| `exec_command`   | Executa comando arbitrário | ❌ não          | Blocklist 15+ padrões, cwd restrito             |
+| `run_npm_script` | Executa `npm run <script>` | ❌ não          | Whitelist explícita de 20 scripts               |
+| `run_node_file`  | Executa `node <file>`      | ❌ não          | Ext. permitidas (.js/.mjs/.cjs), workspace only |
 
 **Restrições de segurança embutidas**:
 
@@ -388,8 +388,8 @@ manutenção — sem testes, refactors são perigosos. **Duração**: 1-2 sprint
 
 ## Tabela de Prioridades e Dependências
 
-| Sprint | Título                 | Status            | Prioridade | Depende de | Commit     |
-| ------ | ---------------------- | ----------------- | ---------- | ---------- | ---------- |
+| Sprint | Título                 | Status           | Prioridade | Depende de | Commit     |
+| ------ | ---------------------- | ---------------- | ---------- | ---------- | ---------- |
 | 17     | File Tools             | ✅ CONCLUÍDO      | CRÍTICO    | —          | `f6ec3970` |
 | 18     | SDK v0.2.0 Upgrade     | ⚠️ BLOQUEADO      | ALTO       | —          | —          |
 | 19     | Session API Extensions | ✅ CONCLUÍDO      | ALTO       | 18\*       | `f6ec3970` |
@@ -398,6 +398,7 @@ manutenção — sem testes, refactors são perigosos. **Duração**: 1-2 sprint
 | 22     | System Message Upgrade | ✅ CONCLUÍDO (p.) | MÉDIO      | 18\*       | próximo    |
 | 23     | OpenTelemetry Nativo   | ⏳ PENDENTE       | BAIXO      | 18         | —          |
 | 24     | Testes de Integração   | ⏳ PENDENTE       | ALTO (QA)  | 17-22      | —          |
+| **F8** | **Todo Management**    | ✅ CONCLUÍDO      | MÉDIO      | 17/21      | pendente   |
 
 > \* Sprint 22 implementado parcialmente com SDK v0.1.32 (`mode: "append"/"replace"`); migração para
 > `mode: "customize"` aguarda SDK v0.2.0.
@@ -410,12 +411,13 @@ manutenção — sem testes, refactors são perigosos. **Duração**: 1-2 sprint
 4. ~~Sprint 20 (Agent Stream)~~ — ✅ done (via Sprint 19)
 5. ~~Sprint 21 (Shell Tools)~~ — ✅ done
 6. ~~Sprint 22 (System Message)~~ — ✅ done (parcial v0.1.32; migração futura → v0.2.0)
-7. **Sprint 24 (Testes)** — paralelizável com qualquer sprint
-8. Sprint 23 (OpenTelemetry) — baixa prioridade
+7. ~~**Fase 8 (Todo Management)**~~ — ✅ done (12 tools, 71 testes, `todo-tools.js`)
+8. **Sprint 24 (Testes)** — paralelizável com qualquer sprint
+9. Sprint 23 (OpenTelemetry) — baixa prioridade
 
 ---
 
-## Diagrama de Estado — src/copilot após Sprint 22
+## Diagrama de Estado — src/copilot após Fase 8 (Todo Management)
 
 ```
 src/copilot/
@@ -447,20 +449,49 @@ src/copilot/
 │   └── tools-registry.js       → createRegistry, registerTools, getByCategory
 │
 └── tools/
-    ├── index.js                → barrel de todas as tools
+    ├── index.js                → barrel de todas as tools (65 tools total)
     ├── introspection-tools.js  → list_tools, get_agent_info, get_telemetry
     ├── task-tools.js           → get_tasks, add_task, get_session_state, health
     ├── code-tools.js           → lint_check, run_tests, typecheck
     ├── git-tools.js            → git_status, git_diff, git_commit, git_changed_files
     ├── hook-tools.js           → read_briefing, write_pending_task, audit, request_user_input
     ├── session-tools.js        → get_session_state, get_system_health
-    ├── file-tools.js           ← NOVO (Sprint 17): read/write/list/search arquivos
-    └── shell-tools.js          ← NOVO (Sprint 21): exec_command, run_npm_script
+    ├── file-tools.js           ← Sprint 17: read/write/list/search arquivos
+    ├── shell-tools.js          ← Sprint 21: exec_command, run_npm_script
+    └── todo-tools.js           ← Fase 8: 12 tools de gerenciamento de tarefas
+                                   todo_create, todo_get, todo_list, todo_update,
+                                   todo_set_status, todo_delete, todo_add_subtask,
+                                   todo_search, todo_stats, todo_bulk_update,
+                                   todo_clear_completed, todo_import
 ```
 
 ---
 
-## Notas de Segurança (atualizado para Sprints 17 e 21)
+### Fase 8 — Todo Management System (12 tools) ✅ CONCLUÍDO
+
+**Descrição**: Sistema profundo de gerenciamento de tarefas/TODOs para o agente LLM-B.
+**Arquivo**: `src/copilot/tools/todo-tools.js` (~1050 linhas)
+**Testes**: `tests/unit/copilot/test_todo_tools.spec.js` — 71 testes, 100% passando
+**Total de tools após Fase 8**: **65 tools**
+
+| Tool                   | Categoria | Descrição                                                       |
+| ---------------------- | --------- | --------------------------------------------------------------- |
+| `todo_create`          | write     | Criar tarefa com título, prioridade, tags, data e subtarefas    |
+| `todo_get`             | read      | Obter tarefa por ID com subtarefas aninhadas opcionais          |
+| `todo_list`            | read      | Listar com filtros por status, prioridade, tag, texto, vencidas |
+| `todo_update`          | write     | Atualizar campos, adicionar/remover tags, append de notas       |
+| `todo_set_status`      | write     | Transição de status com validação de fluxo (FSM)                |
+| `todo_delete`          | write     | Deletar com cascade para subtarefas                             |
+| `todo_add_subtask`     | write     | Adicionar subtarefa a uma tarefa existente                      |
+| `todo_search`          | read      | Busca full-text por título, descrição, tags, notas              |
+| `todo_stats`           | read      | Dashboard com contagens, taxas, vencidas, prioridades           |
+| `todo_bulk_update`     | write     | Atualizar status/prioridade/tags em múltiplas tarefas           |
+| `todo_clear_completed` | write     | Limpar tarefas concluídas/canceladas (com dry_run)              |
+| `todo_import`          | write     | Importar batch de tarefas com prioridade padrão                 |
+
+**Storage**: `$WORKSPACE_ROOT/.github/hooks/state/todos.json` (atômico via tmp→rename)
+
+ (atualizado para Sprints 17 e 21)
 
 ### File Tools (Sprint 17)
 
@@ -544,8 +575,8 @@ const shellRestrictionsHook = async (input) => {
 
 ### Estado atual da base de código
 
-| Módulo                   | Status              | Testes     |
-| ------------------------ | ------------------- | ---------- |
+| Módulo                   | Status             | Testes     |
+| ------------------------ | ------------------ | ---------- |
 | `lib/client.js`          | ✅ Implementado     | Sprint 10  |
 | `lib/session.js`         | ✅ Implementado     | Sprint 10  |
 | `lib/permissions.js`     | ✅ Implementado     | Sprint 10  |
@@ -715,8 +746,8 @@ se conectem a "servidores de contexto" que fornecem **tools**, **resources** e *
 
 ### Capacidades do protocolo MCP que ainda não usamos
 
-| Capacidade MCP           | Status neste projeto       | Oportunidade                                   |
-| ------------------------ | -------------------------- | ---------------------------------------------- |
+| Capacidade MCP           | Status neste projeto      | Oportunidade                                   |
+| ------------------------ | ------------------------- | ---------------------------------------------- |
 | `tools/list`             | ✅ Usado (mcp-tool-bridge) | —                                              |
 | `tools/call`             | ✅ Usado (mcp-tool-bridge) | —                                              |
 | `resources/list`         | ❌ Não implementado        | LLM-B acessa arquivos via MCP resource!        |

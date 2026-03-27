@@ -23,6 +23,8 @@ import {
     setTelemetryStore,
     shellTools,
     taskTools,
+    todoReadTools,
+    todoWriteTools,
     webTools,
 } from '../tools/index.js';
 
@@ -85,6 +87,15 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         category: 'web',
         tags: ['http', 'fetch', 'ssrf-protected'],
     });
+    registerTools(registry, todoReadTools, {
+        category: 'todo',
+        tags: ['tasks', 'todo', 'management', 'read'],
+        readOnly: true,
+    });
+    registerTools(registry, todoWriteTools, {
+        category: 'todo',
+        tags: ['tasks', 'todo', 'management', 'write'],
+    });
 
     if (mcpTools.length > 0) {
         registerTools(registry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
@@ -109,6 +120,8 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         ...fileWriteTools,
         ...shellTools,
         ...webTools,
+        ...todoReadTools,
+        ...todoWriteTools,
         ...mcpTools,
         ...customTools,
     ];
