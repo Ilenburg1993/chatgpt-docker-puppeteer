@@ -190,7 +190,9 @@ export const StructuredMessageSchema = z.object({
  * @throws {z.ZodError} Se campos obrigatórios estiverem ausentes ou inválidos
  */
 export function buildStructuredRequest(input) {
-    return /** @type {StructuredMessage} */ (StructuredMessageSchema.parse(input));
+    // MELHORIA-12 (fix): auto-gerar traceId se não fornecido, para correlação distribuída de logs
+    const withTrace = input.traceId ? input : { ...input, traceId: crypto.randomUUID() };
+    return /** @type {StructuredMessage} */ (StructuredMessageSchema.parse(withTrace));
 }
 
 /**

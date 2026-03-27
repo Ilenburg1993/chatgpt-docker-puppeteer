@@ -93,6 +93,12 @@ export class LlmBridgeClient {
     #turnCount = 0;
 
     /**
+     * ARCH-05 (fix): limite máximo de entradas no histórico local para evitar crescimento ilimitado de memória em
+     * sessões de longa duração. Entradas mais antigas são removidas automaticamente.
+     */
+    static #MAX_HISTORY_SIZE = 500;
+
+    /**
      * Envia uma mensagem ao LLM-B e aguarda a resposta completa.
      *
      * Coleta chunks via task.delta durante o processamento para construir a resposta incrementalmente. Suporta
@@ -112,7 +118,7 @@ export class LlmBridgeClient {
         }
 
         // Registra turno do usuário no histórico
-        this.#history.push({
+        this.#pushHistory({
             role: 'user',
             content: message,
             timestamp: startedAt,
@@ -182,7 +188,7 @@ export class LlmBridgeClient {
             const durationMs = Date.now() - startedAt;
 
             // Registra turno do assistente no histórico
-            this.#history.push({
+            this.#pushHistory({
                 role: 'assistant',
                 content: responseStr,
                 timestamp: Date.now(),
@@ -298,12 +304,23 @@ export class LlmBridgeClient {
     async startDialogMode(bootPrompt, opts = {}) {
         const { onReady, onReply, onStopped } = opts;
 
+        // BUG-06 (fix): armazenar o wrapper do onReply para poder removê-lo em caso de erro
+        const replyHandler = onReply ? (/** @type {any} */ evt) => onReply(evt.reply ?? '') : null;
+
         if (onReady) alwaysAliveAgent.once('dialog.ready', onReady);
-        if (onReply) alwaysAliveAgent.on('dialog.reply', (/** @type {any} */ evt) => onReply(evt.reply ?? ''));
+        if (replyHandler) alwaysAliveAgent.on('dialog.reply', replyHandler);
         if (onStopped) alwaysAliveAgent.once('dialog.stopped', onStopped);
 
-        await alwaysAliveAgent.startDialogLoop(bootPrompt);
-        log('INFO', '[LlmBridgeClient] Modo diálogo ativo — LLM-B sinalizou READY.');
+        try {
+            await alwaysAliveAgent.startDialogLoop(bootPrompt);
+            log('INFO', '[LlmBridgeClient] Modo diálogo ativo — LLM-B sinalizou READY.');
+        } catch (err) {
+            // Limpar listeners registrados se startDialogLoop lançar antes de ter efeito
+            if (onReady) alwaysAliveAgent.off('dialog.ready', onReady);
+            if (replyHandler) alwaysAliveAgent.off('dialog.reply', replyHandler);
+            if (onStopped) alwaysAliveAgent.off('dialog.stopped', onStopped);
+            throw err;
+        }
     }
 
     /**
@@ -320,11 +337,11 @@ export class LlmBridgeClient {
         const { timeout = 60_000 } = opts;
         // ARCH-03 fix: registra turno do usuário no histórico local antes de enviar
         const sentAt = Date.now();
-        this.#history.push({ role: 'user', content: message, timestamp: sentAt });
+        this.#pushHistory({ role: 'user', content: message, timestamp: sentAt });
         this.#turnCount++;
         const reply = await alwaysAliveAgent.sendDialogTurn(message, { timeout });
         // Registra resposta da LLM-B no histórico local
-        this.#history.push({ role: 'assistant', content: reply, timestamp: Date.now() });
+        this.#pushHistory({ role: 'assistant', content: reply, timestamp: Date.now() });
         return reply;
     }
 
@@ -385,7 +402,20 @@ export class LlmBridgeClient {
      * @returns {void}
      */
     seedHistory(role, content) {
-        this.#history.push({ role, content, timestamp: Date.now() });
+        this.#pushHistory({ role, content, timestamp: Date.now() });
+    }
+
+    /**
+     * ARCH-05: Adiciona ao histórico com auto-trim para evitar crescimento ilimitado.
+     *
+     * @param {ConversationTurn} turn
+     * @returns {void}
+     */
+    #pushHistory(turn) {
+        this.#history.push(turn);
+        if (this.#history.length > LlmBridgeClient.#MAX_HISTORY_SIZE) {
+            this.#history.splice(0, this.#history.length - LlmBridgeClient.#MAX_HISTORY_SIZE);
+        }
     }
 
     /**

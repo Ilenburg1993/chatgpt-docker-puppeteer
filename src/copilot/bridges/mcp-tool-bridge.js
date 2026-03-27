@@ -38,6 +38,9 @@ const MCP_BASE = `http://127.0.0.1:${MCP_PORT}/api/mcp`;
 /**
  * Executa uma requisição JSON-RPC 2.0 contra o endpoint MCP local.
  *
+ * MELHORIA-11 (fix): adiciona retry com backoff exponencial para erros de rede transientes (ECONNRESET, ETIMEDOUT, HTTP
+ * 5xx). Tenta até 3 vezes com jitter.
+ *
  * @param {string} method - Método JSON-RPC (ex: 'tools/list', 'tools/call')
  * @param {unknown} [params] - Parâmetros do método
  * @returns {Promise<unknown>} Resultado do campo `result` ou lança Error em caso de falha
@@ -50,24 +53,49 @@ async function rpcCall(method, params) {
         params: params ?? {},
     });
 
-    const response = await fetch(MCP_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        signal: AbortSignal.timeout(8000),
-    });
+    const MAX_ATTEMPTS = 3;
+    /** @type {any} */
+    let lastError;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        try {
+            const response = await fetch(MCP_BASE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body,
+                signal: AbortSignal.timeout(8000),
+            });
 
-    if (!response.ok) {
-        throw new Error(`MCP HTTP ${response.status}: ${response.statusText}`);
+            if (!response.ok) {
+                const err = new Error(`MCP HTTP ${response.status}: ${response.statusText}`);
+                // Só faz retry em erros 5xx (servidor); 4xx são definitivos
+                if (response.status < 500) throw err;
+                lastError = err;
+                if (attempt < MAX_ATTEMPTS - 1) {
+                    await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt) + Math.random() * 100));
+                    continue;
+                }
+                throw err;
+            }
+
+            const json = /** @type {any} */ (await response.json());
+
+            if (json.error) {
+                throw new Error(`MCP RPC error [${method}]: ${JSON.stringify(json.error)}`);
+            }
+
+            return json.result;
+        } catch (/** @type {any} */ e) {
+            lastError = e;
+            const isTransient = e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED' || e.name === 'TimeoutError';
+            if (!isTransient || attempt >= MAX_ATTEMPTS - 1) throw e;
+            log(
+                'WARN',
+                `[mcp-tool-bridge] rpcCall '${method}' falhou (tentativa ${attempt + 1}/${MAX_ATTEMPTS}): ${e.message}`,
+            );
+            await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt) + Math.random() * 100));
+        }
     }
-
-    const json = /** @type {any} */ (await response.json());
-
-    if (json.error) {
-        throw new Error(`MCP RPC error [${method}]: ${JSON.stringify(json.error)}`);
-    }
-
-    return json.result;
+    throw lastError;
 }
 
 /**

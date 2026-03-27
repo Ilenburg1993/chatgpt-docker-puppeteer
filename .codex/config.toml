@@ -42,3 +42,6 @@ e a proibicao de usar puppeteer.launch() ou gerenciar browser localmente. Apos m
 rode npm run lint, npm run format:check e npm run test:unit; inclua npm run test:integration quando
 alterar driver, kernel ou server.
 """
+
+[plugins."github@openai-curated"]
+enabled = true

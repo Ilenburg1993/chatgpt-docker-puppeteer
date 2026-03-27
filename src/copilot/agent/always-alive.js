@@ -413,6 +413,27 @@ export class AlwaysAliveAgent extends EventEmitter {
                 this.emit('session.mode_changed', evt?.data ?? {});
             });
 
+            // MELHORIA-02 (fix): catch-all para eventos do SDK não tratados explicitamente
+            // Permite observabilidade de novos eventos adicionados em versões futuras do SDK
+            if (typeof (/** @type {any} */ (session).onEvent) === 'function') {
+                /** @type {any} */ (session).onEvent((/** @type {any} */ evt) => {
+                    const kind = evt?.kind ?? evt?.type ?? 'unknown';
+                    const knownEvents = new Set([
+                        'session.compaction_start',
+                        'session.compaction_complete',
+                        'assistant.reasoning_delta',
+                        'session.usage_info',
+                        'session.mode_changed',
+                        'assistant.message_delta',
+                        'tool.execution_start',
+                        'tool.execution_complete',
+                    ]);
+                    if (!knownEvents.has(kind)) {
+                        log('DEBUG', `[AlwaysAlive] Evento SDK não tratado: kind=${kind}`);
+                    }
+                });
+            }
+
             this.#setStatus('idle');
             // PERF-01 (fix): inicializar contador em memória a partir do estado persistido
             this.#sendCount = readState()?.sendCount ?? 0;
@@ -455,6 +476,11 @@ export class AlwaysAliveAgent extends EventEmitter {
         if (this.#status === 'stopped') return;
 
         log('INFO', '[AlwaysAlive] Parando agente...');
+
+        // BUG-02 (fix): emitir 'before-stop' para que consumers externos removam seus próprios listeners
+        // antes do shutdown, evitando acúmulo de dead callbacks a cada ciclo stop()/start()
+        this.emit('before-stop');
+        this.removeAllListeners('before-stop');
 
         // BUG-07 (fix): aguardar conclusão do boot antes de parar
         if (this.#status === 'starting') {
@@ -523,17 +549,26 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Enfileira uma mensagem para ser enviada ao modelo.
      *
      * @param {string} message - Mensagem a enviar
-     * @param {{ timeoutMs?: number; attachments?: import('@github/copilot-sdk').MessageOptions['attachments'] }} [opts]
+     * @param {{
+     *     timeoutMs?: number;
+     *     attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
+     *     signal?: AbortSignal;
+     * }} [opts]
      *   - Opções. `timeoutMs` sobrescreve o timeout padrão de 60s do SDK para `sendAndWait`. Use um valor grande (ex.: `24
      *
      *       - 60 * 60 * 1000`) para tarefas de longa duração como o dialog loop, que nunca emitem `session.idle`
-     *               organicamente.`attachments` permite enviar arquivos, imagens ou referências de contexto junto com a
-     *               mensagem.
+     *               organicamente.`attachments`permite enviar arquivos, imagens ou referências de contexto junto com a
+     *               mensagem.`signal` permite cancelar a tarefa via AbortSignal (MELHORIA-13).
      *
      * @returns {Promise<string>} Resposta completa do modelo
      */
-    sendMessage(message, { timeoutMs, attachments } = {}) {
+    sendMessage(message, { timeoutMs, attachments, signal } = {}) {
         return new Promise((resolve, reject) => {
+            // MELHORIA-13 (fix): suporte a AbortSignal para cancelamento externo da tarefa
+            if (signal?.aborted) {
+                reject(new DOMException('AbortError: sendMessage cancelado antes de enfileirar.', 'AbortError'));
+                return;
+            }
             if (this.#queue.length >= AlwaysAliveAgent.MAX_QUEUE_SIZE) {
                 const err = new SessionError(
                     `[AlwaysAlive] Fila cheia (${AlwaysAliveAgent.MAX_QUEUE_SIZE} tarefas). Tente novamente mais tarde.`,
@@ -555,6 +590,21 @@ export class AlwaysAliveAgent extends EventEmitter {
                 ...(timeoutMs !== undefined ? { timeoutMs } : {}),
                 ...(attachments !== undefined ? { attachments } : {}),
             });
+            // MELHORIA-13 (fix): cancelar tarefa na fila se o AbortSignal disparar antes de executar
+            if (signal) {
+                signal.addEventListener(
+                    'abort',
+                    () => {
+                        const idx = this.#queue.indexOf(task);
+                        if (idx !== -1) {
+                            this.#queue.splice(idx, 1);
+                            log('INFO', `[AlwaysAlive] Tarefa ${task.id} cancelada via AbortSignal na fila.`);
+                        }
+                        reject(new DOMException('Tarefa cancelada pelo AbortSignal.', 'AbortError'));
+                    },
+                    { once: true },
+                );
+            }
             this.#queue.push(task);
             log('INFO', `[AlwaysAlive] Tarefa enfileirada: ${task.id}`);
             this.emit('task.queued', { taskId: task.id, message });
@@ -600,6 +650,14 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     setModel(modelId) {
         this.#model = modelId;
+        // MELHORIA-08 (fix): propagar ao SDK imediatamente se sessão ativa
+        if (this.#session && typeof (/** @type {any} */ (this.#session).setModel) === 'function') {
+            try {
+                /** @type {any} */ (this.#session).setModel(modelId);
+            } catch (/** @type {any} */ e) {
+                log('WARN', `[AlwaysAlive] setModel live falhou (SDK version?): ${e.message}`);
+            }
+        }
     }
 
     /**
@@ -908,6 +966,11 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
      * @returns {void}
      */
     #processQueue() {
+        // BUG-04 (fix): guard de reentrância — scheduleNext() é chamado no finally de executeTask,
+        // o que pode disparar uma segunda entrada em #processQueue antes de setStatus('processing')
+        // ter efeito via emit assíncrono. O status 'processing' ainda é o guard primário, mas o
+        // estágio de shift() da fila pode ocorrer duas vezes se dois scheduleNext() dispararem
+        // sequencialmente no mesmo tick. Este flag síncrono protege esse gap.
         if (this.#status !== 'idle' || this.#queue.length === 0 || !this.#session) return;
         const session = this.#session;
 
@@ -1108,6 +1171,18 @@ Se receber "STOP_DIALOG", responda com ask_user("STOPPED") e então pode encerra
         } catch {
             return [];
         }
+    }
+
+    /**
+     * MELHORIA-07 (fix): suporte a `await using agent = alwaysAliveAgent` no padrão Explicit Resource Management
+     * (ECMAScript TC39 Stage 4).
+     *
+     * Permite encapsular o ciclo de vida do agente em blocos `await using` de forma determinística.
+     *
+     * @returns {Promise<void>}
+     */
+    async [Symbol.asyncDispose]() {
+        await this.stop();
     }
 }
 

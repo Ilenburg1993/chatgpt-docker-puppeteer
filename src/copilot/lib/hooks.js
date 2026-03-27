@@ -141,6 +141,13 @@ export function createHooks(cfg = {}) {
                 );
             }
 
+            // SDK-01 (fix): incluir additionalContext quando a tool é negada, conforme spec do SDK
+            if (decision === 'deny') {
+                return {
+                    permissionDecision: 'deny',
+                    additionalContext: `Ferramenta '${toolName}' não é permitida pela política de hooks.`,
+                };
+            }
             return { permissionDecision: decision };
         };
         hooks.onPreToolUse = /** @type {PreToolUseHandler} */ (preToolFn);

@@ -310,13 +310,16 @@ export async function sendTurn(message, actor = 'user') {
                     hubSessionId: _hubSessionId,
                     turnId: msgTurnId,
                     role: senderRole,
-                    content: message,
+                    // SEC-03 (fix): não expor conteúdo completo no payload NERV — usar apenas metadados
+                    // O conteúdo completo fica exclusivamente no banco (conversation-hub/store.js)
+                    contentLen: message.length,
                 });
                 emitNerv('copilot:turn:complete', {
                     hubSessionId: _hubSessionId,
                     turnId: replyTurnId,
                     role: 'llm_b',
-                    content: reply,
+                    // SEC-03: idem — contentLen para observabilidade, sem vazar texto ao bus de eventos
+                    contentLen: reply.length,
                     durationMs,
                 });
             } catch (/** @type {any} */ hubErr) {

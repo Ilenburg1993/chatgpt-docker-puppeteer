@@ -92,17 +92,11 @@ export async function executeTask(session, task, callbacks) {
             ...(task.attachments !== undefined ? { attachments: task.attachments } : {}),
         });
         const event = await session.sendAndWait(sendOpts, task.timeoutMs ?? 60_000);
-        unsubDelta();
-        unsubToolStart();
-        unsubToolComplete();
         const text = event?.data?.content ?? '';
         setStatus('idle');
         emit('task.completed', { taskId: task.id, response: text, responseLen: text.length });
         task.resolve(text);
     } catch (/** @type {any} */ e) {
-        unsubDelta();
-        unsubToolStart();
-        unsubToolComplete();
         // Tenta reconectar com backoff exponencial se parecer erro de rede/sessão
         const recovered = await tryReconnect(e);
         if (recovered) {
@@ -115,6 +109,11 @@ export async function executeTask(session, task, callbacks) {
             task.reject(e);
         }
     } finally {
+        // SDK-06 (fix): garantir que os listeners são removidos em qualquer caminho de execução
+        // (sucesso, erro, ou exceção relançada após tryReconnect) para evitar memory leak acumulado
+        unsubDelta();
+        unsubToolStart();
+        unsubToolComplete();
         scheduleNext();
     }
 }

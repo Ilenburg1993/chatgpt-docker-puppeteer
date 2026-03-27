@@ -99,8 +99,9 @@ describe('lib/session › createSession', () => {
         await createSession(client, { systemMessageContent: 'contexto de teste' });
         const cfg = capturedConfigs[0];
         assert.ok(cfg.systemMessage, 'deve ter systemMessage');
-        assert.strictEqual(cfg.systemMessage.sections.guidelines.action, 'append');
-        assert.strictEqual(cfg.systemMessage.sections.guidelines.content, 'contexto de teste');
+        // SDK-03 (fix): SDK v0.1.x usa { mode: 'append', content } em vez de sections.guidelines
+        assert.strictEqual(cfg.systemMessage.mode, 'append');
+        assert.strictEqual(cfg.systemMessage.content, 'contexto de teste');
     });
 
     it('nao inclui systemMessage quando systemMessage=false', async () => {

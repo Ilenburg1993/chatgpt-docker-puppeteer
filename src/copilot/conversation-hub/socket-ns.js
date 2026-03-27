@@ -92,6 +92,17 @@ export function mountCopilotNamespace(io, orchestrator, store) {
          */
         socket.on('join:session', (/** @type {{ hubSession: string }} */ data) => {
             if (!data?.hubSession) return;
+            // SEC-05 (fix): verificar que a sessão existe no store antes de entrar na sala
+            // Sem isso, um cliente poderia criar salas com IDs arbitrários e receber eventos de broadcast
+            const sessionExists = store.getHubSession(data.hubSession);
+            if (!sessionExists) {
+                log(
+                    'WARN',
+                    `[socket-ns/copilot] join:session negado — sessão '${data.hubSession}' não existe (clientId=${clientId})`,
+                );
+                socket.emit('error:join', { hubSession: data.hubSession, reason: 'session_not_found' });
+                return;
+            }
             void socket.join(data.hubSession);
             log('DEBUG', `[socket-ns/copilot] Cliente ${clientId} entrou na sala: ${data.hubSession}`);
             socket.emit('joined:session', { hubSession: data.hubSession });

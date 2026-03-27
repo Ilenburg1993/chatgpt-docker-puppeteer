@@ -37,6 +37,35 @@ const MAX_OUTPUT_BYTES = 10_000;
 const MAX_TIMEOUT_MS = 120_000;
 
 /**
+ * BUG-07 (fix): Detecta metacaracteres shell perigosos fora de aspas simples ou duplas. Evita falsos positivos em
+ * argumentos legítimos como caminhos com `$HOME` ou formatos de git log.
+ *
+ * @param {string} command
+ * @returns {boolean}
+ */
+function hasShellMetaOutsideQuotes(command) {
+    let inSingle = false;
+    let inDouble = false;
+    for (let i = 0; i < command.length; i++) {
+        const c = command[i];
+        if (c === "'" && !inDouble) {
+            inSingle = !inSingle;
+            continue;
+        }
+        if (c === '"' && !inSingle) {
+            inDouble = !inDouble;
+            continue;
+        }
+        if (!inSingle && !inDouble) {
+            if ('|;&<>'.includes(/** @type {string} */ (c))) return true;
+            if (c === '`') return true;
+            if (c === '$' && command[i + 1] === '(') return true; // subshell $()
+        }
+    }
+    return false;
+}
+
+/**
  * Padrões de comandos perigosos bloqueados. Verificados contra o comando completo após tokenização.
  *
  * @type {RegExp[]}
@@ -64,6 +93,10 @@ const BLOCKED_COMMAND_PATTERNS = [
     /\b(reboot|shutdown|halt|poweroff)\b/i,
     /\bcrontab\b/,
     /\bat\s+\w/, // at scheduler
+    // SEC-01 (fix): bloquear comandos de enumeração de ambiente que expõem variáveis sensíveis
+    /\bprintenv\b/,
+    /\benv\b\s*$/, // 'env' sem args lista todas as variáveis
+    /\bset\b\s*$/, // shell builtin 'set' sem args lista todas as variáveis
 ];
 
 /**
@@ -259,10 +292,14 @@ const execCommandTool = defineTool('exec_command', {
         const timeoutMs = Math.min(timeoutSeconds * 1000, MAX_TIMEOUT_MS);
         log('INFO', `[ShellTools] exec_command: ${command} (cwd=${cwdCheck.resolved}, timeout=${timeoutMs}ms)`);
 
-        // SEC-01 (fix): tokenizar o comando e rejeitar constructs shell complexos em vez de
-        // usar '/bin/sh -c command' que permite bypass da blocklist via pipes, subshells, etc.
-        if (/[|;&<>$`\\]/.test(command)) {
-            return { success: false, error: 'Constructs shell complexos (|, ;, &, <, >, $, `) não são permitidos.' };
+        // BUG-07/SEC-01 (fix): usar tokenizador contextual em vez de regex simples para
+        // detectar metacaracteres shell fora de aspas — evita falsos positivos em argumentos
+        // legítimos como caminhos com $ ou aspas em argumentos de git log.
+        if (hasShellMetaOutsideQuotes(command)) {
+            return {
+                success: false,
+                error: 'Constructs shell complexos (|, ;, &, <, >, subshell $()) não são permitidos.',
+            };
         }
         const parts = command.trim().split(/\s+/);
         const [executable, ...execArgs] = parts;

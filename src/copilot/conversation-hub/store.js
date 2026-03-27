@@ -97,7 +97,8 @@ const DDL_CONVERSATION_TURNS = `
         model           TEXT,
         user_read       INTEGER NOT NULL DEFAULT 1,
         metadata        TEXT,
-        FOREIGN KEY (hub_session_id) REFERENCES copilot_hub_sessions(id) ON DELETE CASCADE
+        FOREIGN KEY (hub_session_id) REFERENCES copilot_hub_sessions(id) ON DELETE CASCADE,
+        CONSTRAINT uq_hub_turn UNIQUE (hub_session_id, turn_number)
     );
     CREATE INDEX IF NOT EXISTS idx_conv_turns_session ON copilot_conversation_turns(hub_session_id, turn_number);
     CREATE INDEX IF NOT EXISTS idx_conv_turns_time ON copilot_conversation_turns(created_at DESC);
@@ -131,7 +132,8 @@ const DDL_MEMORIES = `
         VALUES (new.rowid, new.id, new.tag, new.content);
     END;
     CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON copilot_memories BEGIN
-        UPDATE copilot_memories_fts SET tag=new.tag, content=new.content WHERE id=new.id;
+        INSERT INTO copilot_memories_fts(copilot_memories_fts, rowid, id, tag, content) VALUES('delete', old.rowid, old.id, old.tag, old.content);
+        INSERT INTO copilot_memories_fts(rowid, id, tag, content) VALUES (new.rowid, new.id, new.tag, new.content);
     END;
     CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON copilot_memories BEGIN
         DELETE FROM copilot_memories_fts WHERE id=old.id;
@@ -215,6 +217,21 @@ export class ConversationStore {
             migrateFts5Tokenizer(this.#db);
             this.#initialized = true;
             log('DEBUG', '[ConversationStore] Tabelas inicializadas.');
+
+            // MELHORIA-09 (fix): agendar WAL checkpoint periódico para evitar acúmulo do WAL file
+            // em sessões de longa duração. O checkpoint passivo (PASSIVE) não bloqueia readers.
+            const db = this.#db;
+            const checkpointTimer = setInterval(
+                () => {
+                    try {
+                        db.pragma('wal_checkpoint(PASSIVE)');
+                    } catch {
+                        // Ignorar erros de checkpoint — não é crítico
+                    }
+                },
+                5 * 60 * 1000,
+            ); // a cada 5 minutos
+            checkpointTimer.unref?.(); // não impede o processo de sair
         } catch (/** @type {any} */ err) {
             log('ERROR', `[ConversationStore] Falha ao inicializar tabelas: ${err.message}`);
             throw err;
@@ -357,7 +374,9 @@ export class ConversationStore {
     writeTurn(hubSessionId, opts) {
         const db = this.#getDb();
 
-        // BUG-03 (fix): envolver SELECT MAX + INSERT em transaction para evitar race condition
+        // BUG-01 (fix): UNIQUE constraint (hub_session_id, turn_number) protege contra insert duplicado.
+        // Em cenário com SQLite WAL mode e dois writers simultâneos, o segundo recebe SQLITE_CONSTRAINT
+        // e faz retry automaticamente, relendo o MAX(turn_number) para obter o valor correto.
         const doWrite = db.transaction(() => {
             // Calcular o próximo turn_number para esta sessão
             const maxTurn = /** @type {{ max_turn: number | null }} */ (
@@ -404,7 +423,18 @@ export class ConversationStore {
             return Number(result.lastInsertRowid);
         });
 
-        return doWrite();
+        // Retry com backoff para conflicts de UNIQUE constraint (race condition WAL)
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                return doWrite();
+            } catch (/** @type {any} */ err) {
+                const isConstraint = err?.code === 'SQLITE_CONSTRAINT_UNIQUE' || err?.code === 'SQLITE_CONSTRAINT';
+                if (!isConstraint || attempt === 2) throw err;
+                log('WARN', `[ConversationStore] writeTurn conflict (attempt=${attempt + 1}), retrying...`);
+            }
+        }
+        /* c8 ignore next */
+        return -1;
     }
 
     /**
@@ -578,9 +608,13 @@ export class ConversationStore {
 
         if (opts.search) {
             // FTS5: busca semântica no conteúdo
-            // SEC-02 (fix): usar phrase-quoting do FTS5 em vez de remoção simples de aspas
-            // Isso encapsula o termo em aspas duplas, que o FTS5 trata como literal seguro
-            const ftsQuery = `"${opts.search.replace(/"/g, ' ').trim()}"`;
+            // SEC-02 (fix v2): escapar TODOS os metacaracteres FTS5 (*, ^, |, &, !, operadores AND/OR/NOT/NEAR)
+            // A simples remoção de aspas duplas não é suficiente — operadores textuais ainda são interpretados
+            const sanitized = opts.search
+                .replace(/[*^"():|&!,-]/g, ' ')
+                .replace(/\b(AND|OR|NOT|NEAR)\b/gi, ' ')
+                .trim();
+            const ftsQuery = `"${sanitized}"`;
             const tagFilter = opts.tag ? 'AND m.tag = ?' : '';
             const tagArg = opts.tag ? [opts.tag] : [];
             const rows = db

@@ -261,6 +261,12 @@ export class HubOrchestrator extends EventEmitter {
                 llmBStructured = result.structured;
                 if (result.parseError !== undefined) parseError = result.parseError;
             } else {
+                // ARCH-03 (fix): registrar auditoria quando o fallback para chat() simples é usado,
+                // pois isso indica que useStructured=false ou mensagem em formato inesperado
+                log(
+                    'WARN',
+                    `[HubOrchestrator] Usando chat() simples (fallback path) para hubSession=${hubSessionId}, useStructured=${useStructured}, messageType=${typeof message}`,
+                );
                 // Usar chat() simples
                 const content = typeof message === 'string' ? message : messageContent;
                 const result = await this.#bridge.chat(content, {

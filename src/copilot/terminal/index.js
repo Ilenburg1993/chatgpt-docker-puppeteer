@@ -20,6 +20,7 @@ import { log } from '#core/logger';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { loadAliases } from '../bridges/alias-store.js';
 import { llmBridgeClient } from '../bridges/llm-bridge-client.js';
+import { PinnedFilesLoader } from '../config/pinned-files-loader.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { broadcastSse, ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { startRepl } from './repl.js';
@@ -35,6 +36,16 @@ export async function startTerminalServer() {
     log('INFO', '[TerminalServer] Iniciando terminal permanente LLM-B…');
 
     loadAliases();
+
+    // ARCH-04 (fix): instanciar PinnedFilesLoader para monitorar arquivos de contexto fixados
+    // Isso habilita o comando /skills reload e o sistema de pinned context files
+    const pinnedLoader = new PinnedFilesLoader([]);
+    await pinnedLoader.start().catch((/** @type {any} */ e) => {
+        log('WARN', `[TerminalServer] PinnedFilesLoader não pôde iniciar: ${e.message}`);
+    });
+    pinnedLoader.on('changed', () => {
+        log('INFO', '[TerminalServer] PinnedFilesLoader: arquivos de contexto atualizados.');
+    });
 
     const injectServer = createInjectServer();
 

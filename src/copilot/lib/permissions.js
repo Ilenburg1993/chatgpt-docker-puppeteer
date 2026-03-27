@@ -99,6 +99,18 @@ export function createPermissionHandler(config) {
     const handlerFn = async (/** @type {PermissionRequest} */ request) => {
         const toolName = /** @type {any} */ (request)?.toolName ?? /** @type {any} */ (request)?.tool ?? 'unknown';
 
+        // SDK-02 (fix): tratar content-exclusion-policy — não aprovar automaticamente
+        // O SDK pode invocar o handler com kind='content-exclusion-check' para arquivos bloqueados por política
+        if (/** @type {any} */ (request)?.kind === 'content-exclusion-check') {
+            const path = /** @type {any} */ (request)?.path ?? 'desconhecido';
+            log('WARN', `[lib/permissions] NEGADO (content-exclusion-policy): path='${path}'`);
+            return /** @type {PermissionRequestResult} */ ({
+                kind: 'denied-by-content-exclusion-policy',
+                path,
+                message: 'Arquivo bloqueado pela política de exclusão de conteúdo.',
+            });
+        }
+
         // 1. Callback custom tem precedencia total
         if (onRequest) {
             const customResult = await onRequest(request);

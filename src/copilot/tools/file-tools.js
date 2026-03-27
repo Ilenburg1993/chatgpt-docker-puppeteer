@@ -34,6 +34,27 @@ const WORKSPACE_ROOT = new URL('../../..', import.meta.url).pathname;
 /** Limite máximo de bytes retornados por read_file_content */
 const MAX_CONTENT_BYTES = 80_000;
 
+// MELHORIA-10 (fix): verificação lazy da disponibilidade de ripgrep (cache single-check)
+/** @type {boolean | null} */
+let _rgAvailable = null;
+
+/**
+ * Verifica se o binário `rg` (ripgrep) está disponível no PATH. O resultado é cacheado após a primeira verificação.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function isRgAvailable() {
+    if (_rgAvailable !== null) return _rgAvailable;
+    try {
+        await execFileAsync('rg', ['--version'], { timeout: 3000 });
+        _rgAvailable = true;
+    } catch {
+        _rgAvailable = false;
+        log('WARN', '[copilot/file-tools] ripgrep (rg) não encontrado no PATH — search_in_files retornará erro.');
+    }
+    return _rgAvailable;
+}
+
 /** Limite máximo de bytes retornados por search_in_file */
 const MAX_SEARCH_OUTPUT = 20_000;
 
@@ -59,6 +80,16 @@ const BLOCKED_PATTERNS = [
     /id_ed25519/i,
     /\.npmrc$/i,
     /\.netrc$/i,
+    // SEC-04 (fix): extensões executáveis que não devem ser criadas/sobrescritas via file-tools
+    /\.exe$/i,
+    /\.bat$/i,
+    /\.cmd$/i,
+    /\.sh$/i,
+    /\.ps1$/i,
+    /\.msi$/i,
+    /\.dll$/i,
+    /\.so$/i,
+    /\.dylib$/i,
 ];
 
 /**
@@ -363,6 +394,10 @@ const searchInFilesTool = defineTool('search_in_files', {
         ];
 
         try {
+            // MELHORIA-10 (fix): verificar disponibilidade de rg antes de tentar executar
+            if (!(await isRgAvailable())) {
+                return { success: false, error: 'ripgrep (rg) não está disponível neste ambiente.' };
+            }
             const { stdout, stderr: _stderr } = await execFileAsync('rg', rgArgs, {
                 cwd: WORKSPACE_ROOT,
                 timeout: 30000,
