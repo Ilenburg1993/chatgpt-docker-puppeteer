@@ -14,8 +14,8 @@
  */
 
 import assert from 'node:assert/strict';
-import { before, describe, it } from 'node:test';
 import { readFile } from 'node:fs/promises';
+import { before, describe, it } from 'node:test';
 
 // ─── Suite 1: análise estrutural — dialog.js ────────────────────────────────
 
@@ -24,10 +24,7 @@ describe('terminal/dialog.js › TERM-01: análise estrutural', async () => {
     let source = '';
 
     before(async () => {
-        source = await readFile(
-            new URL('../../../src/copilot/terminal/dialog.js', import.meta.url),
-            'utf-8',
-        );
+        source = await readFile(new URL('../../../src/copilot/terminal/dialog.js', import.meta.url), 'utf-8');
     });
 
     it('deve exportar sendTurn como função (não async — agora é wrapper síncrono)', () => {
@@ -53,10 +50,7 @@ describe('terminal/dialog.js › TERM-01: análise estrutural', async () => {
     });
 
     it('deve ter MAX_TURN_QUEUE_SIZE definido', () => {
-        assert.ok(
-            source.includes('MAX_TURN_QUEUE_SIZE'),
-            'MAX_TURN_QUEUE_SIZE deve definir limite de backpressure',
-        );
+        assert.ok(source.includes('MAX_TURN_QUEUE_SIZE'), 'MAX_TURN_QUEUE_SIZE deve definir limite de backpressure');
     });
 
     it('deve ter função interna _executeTurn (implementação do turno)', () => {
@@ -69,14 +63,14 @@ describe('terminal/dialog.js › TERM-01: análise estrutural', async () => {
     it('GAP-4: deve chamar broadcastSse ao marcar busy=true', () => {
         assert.ok(
             source.includes("broadcastSse('busy', { busy: true"),
-            "GAP-4: broadcastSse deve ser chamado com busy:true quando turno inicia",
+            'GAP-4: broadcastSse deve ser chamado com busy:true quando turno inicia',
         );
     });
 
     it('GAP-4: deve chamar broadcastSse ao marcar busy=false no finally', () => {
         assert.ok(
             source.includes("broadcastSse('busy', { busy: false }"),
-            "GAP-4: broadcastSse deve ser chamado com busy:false quando turno termina",
+            'GAP-4: broadcastSse deve ser chamado com busy:false quando turno termina',
         );
     });
 
@@ -88,58 +82,69 @@ describe('terminal/dialog.js › TERM-01: análise estrutural', async () => {
             'sendTurn não deve mais rejeitar imediatamente com return null quando busy — usa fila',
         );
     });
+
+    it('ATT-03: sendTurn deve aceitar nativeAttachments como terceiro parâmetro', () => {
+        assert.ok(
+            source.includes('export function sendTurn(message, actor = \'user\', nativeAttachments)'),
+            'ATT-03: sendTurn deve aceitar nativeAttachments como terceiro parâmetro opcional',
+        );
+    });
+
+    it('ATT-03: _executeTurn deve usar alwaysAliveAgent.sendMessage quando nativeAttachments presentes', () => {
+        assert.ok(
+            source.includes('alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments })'),
+            'ATT-03: _executeTurn deve usar sendMessage com file attachments quando nativeAttachments presentes',
+        );
+    });
+
+    it('ATT-03: _executeTurn deve usar dialogTurn quando nativeAttachments ausentes', () => {
+        assert.ok(
+            source.includes('llmBridgeClient.dialogTurn(enrichedMessage'),
+            'ATT-03: _executeTurn deve usar dialogTurn quando não há attachments nativos',
+        );
+    });
 });
 
 // ─── Suite 2: análise estrutural — http-handlers.js ─────────────────────────
 
-describe('terminal/http-handlers.js › TERM-02: análise estrutural', async () => {
+describe('terminal/http-handlers.js › ATT-03: análise estrutural (unificação de attachments)', async () => {
     /** @type {string} */
     let source = '';
 
     before(async () => {
-        source = await readFile(
-            new URL('../../../src/copilot/terminal/http-handlers.js', import.meta.url),
-            'utf-8',
+        source = await readFile(new URL('../../../src/copilot/terminal/http-handlers.js', import.meta.url), 'utf-8');
+    });
+
+    it('não deve importar setBusy de state.js (ATT-03: responsabilidade migrou para dialog.js)', () => {
+        // ATT-03: http-handlers.js não gerencia mais _busy diretamente — sendTurn() cuida disso
+        assert.ok(!source.includes('setBusy'), 'http-handlers.js não deve mais importar setBusy após ATT-03');
+    });
+
+    it('ATT-03: deve chamar sendTurn() com nativeAttachments como terceiro argumento', () => {
+        // Verifica que nativeAttachments é passado para sendTurn ao invés de sendMessage direto
+        assert.ok(
+            source.includes('sendTurn(enrichedMessage, from, nativeAttachments'),
+            'ATT-03: sendTurn deve receber nativeAttachments como terceiro parâmetro',
         );
     });
 
-    it('deve importar setBusy de state.js', () => {
+    it('ATT-03: não deve chamar alwaysAliveAgent.sendMessage em handleInject', () => {
+        // Após ATT-03, handleInject não chama sendMessage diretamente — delega para sendTurn
+        const handleInjectStart = source.indexOf('export async function handleInject(');
+        const handleInjectEnd = source.indexOf('\nexport async function handle', handleInjectStart + 1);
+        const handleInjectBody = handleInjectEnd > -1
+            ? source.substring(handleInjectStart, handleInjectEnd)
+            : source.substring(handleInjectStart);
         assert.ok(
-            source.includes('setBusy'),
-            'http-handlers.js deve importar setBusy para TERM-02',
+            !handleInjectBody.includes('alwaysAliveAgent.sendMessage('),
+            'ATT-03: handleInject não deve mais chamar alwaysAliveAgent.sendMessage diretamente',
         );
     });
 
-    it('TERM-02: deve verificar getBusy() antes de alwaysAliveAgent.sendMessage com nativeAttachments', () => {
-        // Verifica que existe um getBusy() guard antes do sendMessage no branch nativeAttachments
-        const sendMessageIdx = source.indexOf('alwaysAliveAgent.sendMessage(');
-        assert.ok(sendMessageIdx > -1, 'sendMessage deve existir em http-handlers.js');
-
-        // O getBusy() deve aparecer antes do sendMessage no file
-        const getBusyBeforeSendMessage = source.lastIndexOf('getBusy()', sendMessageIdx);
+    it('ATT-03: deve usar nativeAttachments.length > 0 como guard antes de passar para sendTurn', () => {
         assert.ok(
-            getBusyBeforeSendMessage > -1,
-            'TERM-02: getBusy() deve ser verificado antes de alwaysAliveAgent.sendMessage nas rotas com nativeAttachments',
-        );
-    });
-
-    it('TERM-02: deve chamar setBusy(true) e setBusy(false) no branch de nativeAttachments', () => {
-        const sendMessageIdx = source.indexOf('alwaysAliveAgent.sendMessage(');
-        // Extrai o contexto em torno de sendMessage (1000 chars antes)
-        const contextBefore = source.substring(Math.max(0, sendMessageIdx - 1000), sendMessageIdx);
-        assert.ok(
-            contextBefore.includes('setBusy(true)'),
-            'TERM-02: setBusy(true) deve ser chamado antes de sendMessage no branch nativeAttachments',
-        );
-    });
-
-    it('TERM-02: deve ter setBusy(false) no finally do branch nativeAttachments', () => {
-        const sendMessageIdx = source.indexOf('alwaysAliveAgent.sendMessage(');
-        // Extrai contexto após sendMessage (500 chars depois)
-        const contextAfter = source.substring(sendMessageIdx, Math.min(source.length, sendMessageIdx + 500));
-        assert.ok(
-            contextAfter.includes('setBusy(false)'),
-            'TERM-02: setBusy(false) deve ser chamado no finally do branch nativeAttachments',
+            source.includes('nativeAttachments.length > 0'),
+            'ATT-03: deve verificar nativeAttachments.length > 0 antes de passar para sendTurn',
         );
     });
 });
@@ -188,7 +193,9 @@ describe('terminal/dialog.js › TERM-01: serialização na fila (comportamento)
                 () => null,
                 () => null,
             );
-            void next.finally(() => { queueDepth--; });
+            void next.finally(() => {
+                queueDepth--;
+            });
             return next;
         }
 
@@ -219,7 +226,14 @@ describe('terminal/dialog.js › TERM-01: serialização na fila (comportamento)
             // Aguarda sinal de liberação ou abort
             await new Promise((r) => {
                 const timer = setTimeout(r, 200); // timeout rápido para testes
-                ac.signal.addEventListener('abort', () => { clearTimeout(timer); r(undefined); }, { once: true });
+                ac.signal.addEventListener(
+                    'abort',
+                    () => {
+                        clearTimeout(timer);
+                        r(undefined);
+                    },
+                    { once: true },
+                );
             });
             return `reply-${id}`;
         }
@@ -232,8 +246,13 @@ describe('terminal/dialog.js › TERM-01: serialização na fila (comportamento)
             if (queueDepth >= MAX_QUEUE) return Promise.resolve(null);
             queueDepth++;
             const next = mutex.then(() => blockingExecute(id)).catch(() => null);
-            mutex = next.then(() => null, () => null);
-            void next.finally(() => { queueDepth--; });
+            mutex = next.then(
+                () => null,
+                () => null,
+            );
+            void next.finally(() => {
+                queueDepth--;
+            });
             return next;
         }
 

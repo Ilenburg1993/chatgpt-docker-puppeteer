@@ -31,7 +31,7 @@ import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { sendTurn } from './dialog.js';
 import { embedMultiple, getFileCacheStats, readFileContext } from './file-context.js';
-import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients, setBusy } from './state.js';
+import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from './state.js';
 
 // ─── Tipos auxiliares ─────────────────────────────────────────────────────────
 
@@ -208,7 +208,7 @@ export async function handlePipeline(body) {
                 status: 409,
                 body: {
                     ok: false,
-                    error: `Step ${i + 1} retornou null (LLM-B ocupada) — pipeline interrompido`,
+                    error: `Step ${i + 1} retornou null (erro interno na LLM-B) — pipeline interrompido`,
                     results,
                 },
             };
@@ -226,12 +226,14 @@ export async function handlePipeline(body) {
  * Aceita opcionalmente:
  *
  * - `context_files: string[]` — lê o conteúdo de cada arquivo e o embute como bloco markdown antes da mensagem.
- * - `attachments` — suporte a dois modos (AI.5):
+ * - `attachments` — suporte a dois modos:
  *
- *   - **Nativo SDK**: `{ type: 'file'|'directory'|'selection', path: string, ... }` — passados diretamente para
- *       `MessageOptions.attachments` do SDK (suporte real a file attachments).
- *   - **Embed inline (fallback)**: `{ type: 'content', content: string, path?: string }` — embutidos como bloco markdown na
- *       mensagem (MELHORIA-03 original).
+ *   - **Nativo SDK**: `{ type: 'file'|'directory'|'selection', path: string, ... }` — passados para `sendTurn()` que
+ *       internamente usa `alwaysAliveAgent.sendMessage()` (nova PR, único caminho SDK que suporta file attachments).
+ *   - **Embed inline (fallback)**: `{ type: 'content', content: string, path?: string }` — embutidos como bloco markdown
+ *       na mensagem antes de enviar via dialog loop.
+ *
+ * ATT-03: ambos os caminhos passam pelo mesmo mutex de serialização em `sendTurn()`, garantindo exclusão mútua.
  *
  * @param {{
  *     message?: string;
@@ -309,22 +311,10 @@ export async function handleInject(body) {
 
     const t0 = Date.now();
     try {
-        let reply;
-        if (nativeAttachments.length > 0) {
-            // AI.5: rota nativa SDK com file attachments reais
-            // TERM-02: verifica _busy antes de chamar sendMessage para manter o invariante de estado
-            if (getBusy()) {
-                return { status: 409, body: { ok: false, reply: null, error: 'LLM-B ocupada', durationMs: 0, from } };
-            }
-            setBusy(true);
-            try {
-                reply = await alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments });
-            } finally {
-                setBusy(false);
-            }
-        } else {
-            reply = await sendTurn(enrichedMessage, from);
-        }
+        // ATT-03: sendTurn aceita nativeAttachments e decide internamente o path de execução
+        // (dialog loop para texto simples; sendMessage para attachments nativos SDK).
+        // O mutex de sendTurn garante exclusão mútua em ambos os caminhos.
+        const reply = await sendTurn(enrichedMessage, from, nativeAttachments.length > 0 ? nativeAttachments : undefined);
         return {
             status: reply !== null ? 200 : 409,
             body: { ok: reply !== null, reply: reply ?? null, durationMs: Date.now() - t0, from },
