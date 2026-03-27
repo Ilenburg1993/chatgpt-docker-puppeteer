@@ -1,15 +1,16 @@
 # Nível 5: MONITOR + Context Compaction Strategy
 
-**Status**: 🟡 DESIGN (NOT IMPLEMENTED YET)
-**Data**: 2026-03-15
-**Prioridade**: MÉDIA (Bom ter, não bloqueante)
+**Status**: 🟡 DESIGN (NOT IMPLEMENTED YET) **Data**: 2026-03-15 **Prioridade**: MÉDIA (Bom ter, não
+bloqueante)
 
 ---
 
 ## 1. Nível 5: MONITOR — Dashboard + Real-time Alerting
 
 ### Objetivo
-Exibir indicadores visuais em tempo real no dashboard sobre status de SESSION CLOSE authorization + anomalias detectadas na lifecycle.
+
+Exibir indicadores visuais em tempo real no dashboard sobre status de SESSION CLOSE authorization +
+anomalias detectadas na lifecycle.
 
 ### Escopo
 
@@ -21,15 +22,9 @@ Exibir indicadores visuais em tempo real no dashboard sobre status de SESSION CL
 <!-- Exibe status visual de Session Close (na navbar ou sidebar) -->
 <template>
   <div :class="statusClass">
-    <span v-if="isAuthorized" class="status-authorized">
-      🔓 AUTH (close_key validated)
-    </span>
-    <span v-else-if="isRequested" class="status-requested">
-      ⏳ Aguardando CLOSE KEY...
-    </span>
-    <span v-else class="status-active">
-      🔒 SESSION ATIVA
-    </span>
+    <span v-if="isAuthorized" class="status-authorized"> 🔓 AUTH (close_key validated) </span>
+    <span v-else-if="isRequested" class="status-requested"> ⏳ Aguardando CLOSE KEY... </span>
+    <span v-else class="status-active"> 🔒 SESSION ATIVA </span>
 
     <!-- Botão rápido para Template F se não autorizado -->
     <button v-if="!isAuthorized" @click="promptCloseKey" class="btn-close-session">
@@ -81,10 +76,21 @@ export default {
 </script>
 
 <style scoped>
-.status-authorized { color: green; font-weight: bold; }
-.status-requested { color: orange; font-weight: bold; }
-.status-active { color: gray; }
-.btn-close-session { background: __main; padding: 8px 16px; }
+.status-authorized {
+  color: green;
+  font-weight: bold;
+}
+.status-requested {
+  color: orange;
+  font-weight: bold;
+}
+.status-active {
+  color: gray;
+}
+.btn-close-session {
+  background: __main;
+  padding: 8px 16px;
+}
 </style>
 ```
 
@@ -100,9 +106,7 @@ export default {
       <span class="severity" :class="anomaly.severity">{{ anomaly.severity }}</span>
       <span class="type">{{ anomaly.anomaly_type }}</span>
       <p class="message">{{ anomaly.message }}</p>
-      <button class="btn-resolve" @click="toggleRecovery(anomaly)">
-        Acknowledge & Recover
-      </button>
+      <button class="btn-resolve" @click="toggleRecovery(anomaly)">Acknowledge & Recover</button>
     </div>
   </div>
 </template>
@@ -140,9 +144,9 @@ export default {
 
 ```javascript
 /**
- * @fileoverview Real-time session monitoring + anomaly detection
- * Emite eventos Socket.io para dashboard quando anomalias detectadas.
  * @module server/realtime/session-monitor
+ * @file Real-time session monitoring + anomaly detection Emite eventos Socket.io para dashboard quando anomalias
+ *   detectadas.
  */
 
 import EventEmitter from 'events';
@@ -152,6 +156,7 @@ import path from 'path';
 export class SessionMonitor extends EventEmitter {
   /**
    * Inicializa monitor de session lifecycle.
+   *
    * @param {Object} options - { io, ctxFile, auditFile }
    */
   constructor(options = {}) {
@@ -231,7 +236,7 @@ export class SessionMonitor extends EventEmitter {
    * Buffer anomalia para broadcast periódico.
    */
   emitAnomaly(anomaly) {
-    if (!this.anomalyBuffer.some(a => a.id === anomaly.id)) {
+    if (!this.anomalyBuffer.some((a) => a.id === anomaly.id)) {
       this.anomalyBuffer.push(anomaly);
     }
   }
@@ -258,18 +263,20 @@ sessionMonitor.start();
 ## 2. Context Compaction Strategy
 
 ### Objetivo
-Detectar quando token budget está se aproximando do limite (~80% usado) e invocar `/compact` automaticamente para liberar contexto, sem interromper o fluxo de trabalho.
+
+Detectar quando token budget está se aproximando do limite (~80% usado) e invocar `/compact`
+automaticamente para liberar contexto, sem interromper o fluxo de trabalho.
 
 ### Escopo
 
 #### 2.1 Token Budget Monitoring
 
-**Localidade**: Extensão existente de `src/kernel/observation_store.js` ou novo módulo `src/observability/token-budget-monitor.js`
+**Localidade**: Extensão existente de `src/kernel/observation_store.js` ou novo módulo
+`src/observability/token-budget-monitor.js`
 
 ```javascript
 /**
- * Monitora utilização de tokens no contexto LLM.
- * Dispara ação de compaction quando threshold é atingido.
+ * Monitora utilização de tokens no contexto LLM. Dispara ação de compaction quando threshold é atingido.
  */
 export class TokenBudgetMonitor {
   constructor(options = {}) {
@@ -281,6 +288,7 @@ export class TokenBudgetMonitor {
 
   /**
    * Avalia utilização atual de tokens (estimativa heurística).
+   *
    * @returns {Object} { used, total, percent, status }
    */
   getStatus() {
@@ -306,8 +314,8 @@ export class TokenBudgetMonitor {
   }
 
   /**
-   * Se budget > 80%, dispara evento para sinalizar necessidade de compaction.
-   * O agente pode responder invocando /compact ou ignorar.
+   * Se budget > 80%, dispara evento para sinalizar necessidade de compaction. O agente pode responder invocando
+   * /compact ou ignorar.
    */
   checkAndAlert() {
     const status = this.getStatus();
@@ -363,6 +371,7 @@ export class TokenBudgetMonitor {
 #### 2.2 Auto-Compaction Trigger
 
 **Timing**: Ideal é invocar `/compact` automaticamente quando:
+
 1. Token budget > 80%
 2. Agente está entre tarefas (não mid-execution)
 3. Não há git push pendente imediatamente
@@ -375,35 +384,35 @@ export class TokenBudgetMonitor {
 # ── Context Compaction Auto-trigger ───────────────────────────────────────
 # Verifica se token budget está acima de 80% e se compaction é apropriada
 if command -v get_token_budget_status > /dev/null; then
-    _TOKEN_STATUS="$(get_token_budget_status)"
-    _TOKEN_PERCENT="$(echo "$_TOKEN_STATUS" | jq -r '.percent // 0')"
+  _TOKEN_STATUS="$(get_token_budget_status)"
+  _TOKEN_PERCENT="$(echo "$_TOKEN_STATUS" | jq -r '.percent // 0')"
 
-    if [ "$_TOKEN_PERCENT" -gt 80 ]; then
-        echo "[context-compaction] Token budget at ${_TOKEN_PERCENT}% — triggering /compact" >&2
+  if [ "$_TOKEN_PERCENT" -gt 80 ]; then
+    echo "[context-compaction] Token budget at ${_TOKEN_PERCENT}% — triggering /compact" >&2
 
-        # Log event
-        jq -cn \
-            --arg event "context_auto_compact_triggered" \
-            --arg sid "$SESSION_ID" \
-            --arg percent "$_TOKEN_PERCENT" \
-            '{
+    # Log event
+    jq -cn \
+      --arg event "context_auto_compact_triggered" \
+      --arg sid "$SESSION_ID" \
+      --arg percent "$_TOKEN_PERCENT" \
+      '{
                 event: $event,
                 session_id: $sid,
                 token_percent: $percent,
                 trigger: "agent-stop automated check"
             }' >> "$AUDIT_FILE" 2> /dev/null || true
 
-        # Emite systemMessage pedindo compaction
-        jq -cn \
-            --arg percent "$_TOKEN_PERCENT" \
-            '{
+    # Emite systemMessage pedindo compaction
+    jq -cn \
+      --arg percent "$_TOKEN_PERCENT" \
+      '{
                 systemMessage: (
                     "⚠️ CONTEXT COMPACTION NEEDED: Token budget at " + $percent + "%\n" +
                     "Invoke /compact to archive old SECTION + reduce context size.\n" +
                     "This will free up tokens for continued work."
                 )
             }'
-    fi
+  fi
 fi
 ```
 
@@ -470,7 +479,9 @@ compactRouter.post('/', async (req, res) => {
 ## 3. Template E+ Design (Multi-Decision Checkpoint)
 
 ### Objetivo
-Proporcionar pontos de decisão ao agente quando anomalias são detectadas ou contexto se aproxima de limites.
+
+Proporcionar pontos de decisão ao agente quando anomalias são detectadas ou contexto se aproxima de
+limites.
 
 ### Escopo
 
@@ -483,7 +494,7 @@ Proporcionar pontos de decisão ao agente quando anomalias são detectadas ou co
   "trigger": [
     "recovery.alerts_require_kickoff = true",
     "token_budget > 80%",
-    "turn_count % 5 == 0 (periodic)",
+    "turn_count % 5 == 0 (periodic)"
   ],
   "fields": [
     {
@@ -518,7 +529,7 @@ Proporcionar pontos de decisão ao agente quando anomalias são detectadas ou co
     "continue": "update_recovery.recovery_acknowledged=true; continue_turn",
     "compact": "invoke /compact via run_in_terminal",
     "close_session": "invoke vscode_askQuestions Template F",
-    "review_anomaly": "emit systemMessage with anomaly details",
+    "review_anomaly": "emit systemMessage with anomaly details"
   }
 }
 ```
@@ -566,17 +577,20 @@ User/Agent Response:
 ## 5. Status de Implementação
 
 **Nível 5a (MONITOR — Dashboard)**
+
 - [ ] SessionCloseStatus.vue — criar componente
 - [ ] SessionAnomalies.vue — criar componente
 - [ ] session-monitor.js — criar BackendEventEmitter
 - [ ] Socket.io integration — conectar Monitor ao servidor
 
 **Nível 5b (AUTO-COMPACTION)**
+
 - [ ] TokenBudgetMonitor class — criar
 - [ ] Auto-trigger em agent-stop.sh — adicionar
 - [ ] /compact endpoint — verificar/estender
 
 **Nível 5c (Template E+)**
+
 - [ ] Especificação formal em .github/AGENTS.md
 - [ ] Post-process logic em post-tool-use.sh
 - [ ] Recovery acknowledgment flag
@@ -592,6 +606,7 @@ User/Agent Response:
 ---
 
 **Discussão Aberta**:
+
 - Timing ideal para Template E+: début/mid-turn vs end-turn?
 - Token estimation: usar audit.jsonl size ou hook para Anthropic token counter?
 - Dashboard priority: real-time alerts vs periodic polling?

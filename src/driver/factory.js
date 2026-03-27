@@ -929,7 +929,8 @@ class DriverFactory extends EventEmitter {
 
     /**
      * ✅ v3.0 (C3): Libera driver de volta ao pool (estado UNATTACHED). ✅ v3.1: Suporta Hot Pool Recycling (estado IDLE
-     * + resetSession).
+     *
+     * - resetSession).
      *
      * @param {TargetDriver} driver - Driver para liberar
      * @returns {Promise<void>}
@@ -1572,13 +1573,15 @@ class DriverFactory extends EventEmitter {
             // Este signal será substituído quando a task real assumir o driver (Hot Swap)
             const warmupController = new AbortController();
 
-            const attachableDriver = /** @type {TargetDriver & {
-    attachContext: (
-        page: import('puppeteer-core').Page,
-        signal?: AbortSignal | null,
-        taskId?: string | null,
-    ) => void;
-}} */ (driver);
+            const attachableDriver = /**
+             * @type {TargetDriver & {
+             *     attachContext: (
+             *         page: import('puppeteer-core').Page,
+             *         signal?: AbortSignal | null,
+             *         taskId?: string | null,
+             *     ) => void;
+             * }}
+             */ (driver);
             attachableDriver.attachContext(page, warmupController.signal, 'pool-warmup');
 
             // Marca driver como 'Hot' para métricas

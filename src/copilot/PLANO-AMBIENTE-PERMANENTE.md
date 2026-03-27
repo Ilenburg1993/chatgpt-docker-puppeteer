@@ -1,10 +1,8 @@
 # Plano de Upgrade Massivo — Ambiente Permanente LLM-A ↔ LLM-B ↔ Usuário
 
-**Versão**: 1.0
-**Data**: 2026-03-23
-**Autor**: LLM-A (GitHub Copilot Claude Sonnet 4.6) — líder técnico
-**Consultado**: LLM-B (gpt-4.1 via AlwaysAliveAgent SDK) — perspectiva secundária
-**Decisão final**: LLM-A
+**Versão**: 1.0 **Data**: 2026-03-23 **Autor**: LLM-A (GitHub Copilot Claude Sonnet 4.6) — líder
+técnico **Consultado**: LLM-B (gpt-4.1 via AlwaysAliveAgent SDK) — perspectiva secundária **Decisão
+final**: LLM-A
 
 ---
 
@@ -23,7 +21,9 @@
 ### O que queremos
 
 Um **ambiente permanente e tri-party** onde:
-- **LLM-A** (GitHub Copilot, o orquestrador) pode invocar e receber respostas de LLM-B a qualquer momento, mesmo entre sessões
+
+- **LLM-A** (GitHub Copilot, o orquestrador) pode invocar e receber respostas de LLM-B a qualquer
+  momento, mesmo entre sessões
 - **LLM-B** (gpt-4.1 via SDK) está sempre disponível como agente subordinado
 - **Usuário** pode:
   - Observar todas as trocas LLM-A ↔ LLM-B em tempo real no dashboard
@@ -36,27 +36,35 @@ Um **ambiente permanente e tri-party** onde:
 
 ### 2.1. Integração AlwaysAliveAgent no main-server (não como processo separado)
 
-**Decisão**: `AlwaysAliveAgent` passa a inicializar dentro do **main-server** (processo `dashboard-web`), não mais como processo PM2 separado.
+**Decisão**: `AlwaysAliveAgent` passa a inicializar dentro do **main-server** (processo
+`dashboard-web`), não mais como processo PM2 separado.
 
 **Justificativa LLM-A**:
+
 - Elimina IPC entre processos (socket Unix seria complexidade desnecessária)
 - `AlwaysAliveAgent` já tem reconnect automático e não bloqueia se o token estiver inválido
 - A integração ao NERV (que já existe via `nerv-bridge.js`) fica trivial — mesmo processo
-- O dashboard pode escutar eventos do `AlwaysAliveAgent` diretamente sem overhead de serialização entre processos
+- O dashboard pode escutar eventos do `AlwaysAliveAgent` diretamente sem overhead de serialização
+  entre processos
 - Já existe precedente: `copilotNervBridge.mount(nerv)` é chamado no `src/server/main.js:733-740`
 
-**Ressalva crítica (LLM-A — não mencionada por LLM-B)**: O boot sequence do main-server **não pode depender** do AlwaysAliveAgent estar disponível. Portanto o start do agente deve ser:
-  - **Asíncrono e não-bloqueante** no boot
-  - Protegido por **circuit breaker** (max 5 tentativas, exponential backoff)
-  - **Degradação elegante**: servidor funciona normalmente mesmo se `COPILOT_SDK_ENABLED=false` ou token inválido
+**Ressalva crítica (LLM-A — não mencionada por LLM-B)**: O boot sequence do main-server **não pode
+depender** do AlwaysAliveAgent estar disponível. Portanto o start do agente deve ser:
 
-**Novo PM2 process `copilot-sdk-agent`**: manter no `ecosystem.config.cjs` APENAS como **fallback de recuperação** — pode ser iniciado manualmente se o main-server não tiver SDK habilitado.
+- **Asíncrono e não-bloqueante** no boot
+- Protegido por **circuit breaker** (max 5 tentativas, exponential backoff)
+- **Degradação elegante**: servidor funciona normalmente mesmo se `COPILOT_SDK_ENABLED=false` ou
+  token inválido
+
+**Novo PM2 process `copilot-sdk-agent`**: manter no `ecosystem.config.cjs` APENAS como **fallback de
+recuperação** — pode ser iniciado manualmente se o main-server não tiver SDK habilitado.
 
 ### 2.2. Histórico persistente via SQLite
 
 **Decisão**: Nova tabela `conversation_turns` no SQLite existente (caminho: `data/copilot.db`).
 
 **Schema da tabela**:
+
 ```sql
 CREATE TABLE IF NOT EXISTS conversation_turns (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,19 +85,24 @@ CREATE INDEX IF NOT EXISTS idx_conv_turns_hub ON conversation_turns(hub_session,
 CREATE INDEX IF NOT EXISTS idx_conv_turns_time ON conversation_turns(created_at);
 ```
 
-**Justificativa LLM-A**: JSONL seria simples mas torna queries (listar por sessão, paginar, filtrar por role) ineficientes. SQLite garante atomicidade mesmo com múltiplos writers (WAL mode).
+**Justificativa LLM-A**: JSONL seria simples mas torna queries (listar por sessão, paginar, filtrar
+por role) ineficientes. SQLite garante atomicidade mesmo com múltiplos writers (WAL mode).
 
 ### 2.3. Canal de tempo real via Socket.io namespace `/copilot`
 
 **Decisão**: Criar namespace dedicado `/copilot` no Socket.io existente (instância `socket.js`).
 
 **Justificativa LLM-A**:
+
 - O Socket.io existente já tem autenticação JWT, CORS, e integração com NERV
-- Um namespace separado evita poluição de eventos — o dashboard pode escutar `/copilot` sem receber eventos de task-queue, kernel, etc.
+- Um namespace separado evita poluição de eventos — o dashboard pode escutar `/copilot` sem receber
+  eventos de task-queue, kernel, etc.
 - Permite broadcast seletivo e controle de salas por `hub_session_id`
 - Bidirecional: usuário pode emitir `copilot:user:inject` para injetar mensagens no diálogo ativo
 
-**Nota LLM-A**: LLM-B sugeriu namespace separado por razões corretas, mas não considerou que o namespace precisa ser registrado na mesma instância de `socket.io` — não é um novo servidor Socket.io. Isso é importante: usar `io.of('/copilot')` sobre a instância existente de `Server`.
+**Nota LLM-A**: LLM-B sugeriu namespace separado por razões corretas, mas não considerou que o
+namespace precisa ser registrado na mesma instância de `socket.io` — não é um novo servidor
+Socket.io. Isso é importante: usar `io.of('/copilot')` sobre a instância existente de `Server`.
 
 ---
 
@@ -181,6 +194,7 @@ export class ConversationStore {
 ```
 
 **Detalhes de implementação**:
+
 - Usa `node:sqlite` (nativo Node.js 22+) ou `better-sqlite3` (já no projeto?)
 - WAL mode (`PRAGMA journal_mode=WAL`) para leituras sem bloqueio durante writes
 - Singleton exportado como `conversationStore`
@@ -224,7 +238,9 @@ export function mountCopilotNamespace(io) {
   ns.on('connection', (socket) => {
     // join room por hub_session para broadcasts seletivos
     socket.on('join:session', ({ hubSession }) => socket.join(hubSession));
-    socket.on('user:inject', ({ hubSession, content }) => userChannel.inject(hubSession, content, socket.userId));
+    socket.on('user:inject', ({ hubSession, content }) =>
+      userChannel.inject(hubSession, content, socket.userId),
+    );
   });
 
   return ns;
@@ -265,18 +281,19 @@ POST /api/hub/sessions                  — criar nova sessão (para LLM-A usar 
 
 ## 5. Integração no main-server Boot Sequence
 
-No `src/server/main.js`, após a FASE 9 (Adapter NERV ↔ Socket), adicionar **FASE 10 — Conversation Hub**:
+No `src/server/main.js`, após a FASE 9 (Adapter NERV ↔ Socket), adicionar **FASE 10 — Conversation
+Hub**:
 
 ```javascript
 // FASE 10 — Conversation Hub (opcional, não bloqueia boot)
 if (process.env.COPILOT_SDK_ENABLED !== 'false') {
-    try {
-        const { conversationHub } = await import('#copilot/conversation-hub/hub');
-        await conversationHub.init({ io: socketHub.getIo(), nerv });
-        log('INFO', '[HUB] ConversationHub iniciado — ambiente permanente LLM-A↔LLM-B↔Usuário ativo');
-    } catch (_e) {
-        log('WARN', `[HUB] Falha ao iniciar ConversationHub: ${_e.message} (degradação elegante)`);
-    }
+  try {
+    const { conversationHub } = await import('#copilot/conversation-hub/hub');
+    await conversationHub.init({ io: socketHub.getIo(), nerv });
+    log('INFO', '[HUB] ConversationHub iniciado — ambiente permanente LLM-A↔LLM-B↔Usuário ativo');
+  } catch (_e) {
+    log('WARN', `[HUB] Falha ao iniciar ConversationHub: ${_e.message} (degradação elegante)`);
+  }
 }
 ```
 
@@ -284,7 +301,8 @@ if (process.env.COPILOT_SDK_ENABLED !== 'false') {
 
 ## 6. Ferramentas para LLM-A
 
-Para que LLM-A possa usar o hub nativamente via ferramentas do AlwaysAliveAgent, criar novos tools em `src/copilot/tools/hub-tools.js`:
+Para que LLM-A possa usar o hub nativamente via ferramentas do AlwaysAliveAgent, criar novos tools
+em `src/copilot/tools/hub-tools.js`:
 
 ```
 hub_create_session       — cria nova sessão de conversa gerenciada
@@ -294,58 +312,65 @@ hub_read_history         — lê histórico de turns de uma sessão
 hub_list_sessions        — lista sessões ativas/recentes
 ```
 
-Esses tools ficam registrados nos 30 tools do AlwaysAliveAgent, tornando o hub acessível nativamente durante execuções de LLM-A.
+Esses tools ficam registrados nos 30 tools do AlwaysAliveAgent, tornando o hub acessível nativamente
+durante execuções de LLM-A.
 
 ---
 
 ## 7. Cronograma de Sprints
 
 ### Sprint Hub-1 — ConversationStore (SQLite)
-**Escopo**: `store.js` com schema, CRUD, WAL mode, testes unitários
-**Estimativa de código**: ~200 linhas + ~20 testes
-**Dependência**: verificar se `better-sqlite3` já está no projeto ou usar `node:sqlite`
+
+**Escopo**: `store.js` com schema, CRUD, WAL mode, testes unitários **Estimativa de código**: ~200
+linhas + ~20 testes **Dependência**: verificar se `better-sqlite3` já está no projeto ou usar
+`node:sqlite`
 
 ### Sprint Hub-2 — HubOrchestrator + namespace Socket.io
+
 **Escopo**: `orchestrator.js`, `socket-ns.js`, `user-channel.js`, integração no `socket.js`
-**Estimativa de código**: ~400 linhas + ~30 testes
-**Dependência**: Sprint Hub-1 (store)
+**Estimativa de código**: ~400 linhas + ~30 testes **Dependência**: Sprint Hub-1 (store)
 
 ### Sprint Hub-3 — ConversationHub singleton + boot integration
-**Escopo**: `hub.js`, modificação em `src/server/main.js`, REST router
-**Estimativa de código**: ~250 linhas + ~15 testes
-**Dependência**: Sprint Hub-2 (orchestrator + namespace)
+
+**Escopo**: `hub.js`, modificação em `src/server/main.js`, REST router **Estimativa de código**:
+~250 linhas + ~15 testes **Dependência**: Sprint Hub-2 (orchestrator + namespace)
 
 ### Sprint Hub-4 — Hub Tools para LLM-A
-**Escopo**: `tools/hub-tools.js`, registro no AlwaysAliveAgent, testes de integração
-**Estimativa de código**: ~150 linhas + ~20 testes
-**Dependência**: Sprint Hub-3 (hub singleton funcionando)
+
+**Escopo**: `tools/hub-tools.js`, registro no AlwaysAliveAgent, testes de integração **Estimativa de
+código**: ~150 linhas + ~20 testes **Dependência**: Sprint Hub-3 (hub singleton funcionando)
 
 ### Sprint Hub-5 — Dashboard UI (se houver frontend)
-**Escopo**: componente React/Vue no dashboard para visualização de conversas
-**Dependência**: Sprint Hub-2 (namespace Socket.io)
-**Nota**: Verificar stack do dashboard antes de iniciar
+
+**Escopo**: componente React/Vue no dashboard para visualização de conversas **Dependência**: Sprint
+Hub-2 (namespace Socket.io) **Nota**: Verificar stack do dashboard antes de iniciar
 
 ---
 
 ## 8. Decisões Técnicas Adicionais (LLM-A)
 
 ### 8.1. SQLite: `node:sqlite` nativo vs `better-sqlite3`
-- Verificar com `node --version` (24.x): `node:sqlite` está disponível como módulo experimental desde Node 22.5.0 e estável em 22+
+
+- Verificar com `node --version` (24.x): `node:sqlite` está disponível como módulo experimental
+  desde Node 22.5.0 e estável em 22+
 - Se `better-sqlite3` já estiver no `package.json`, usá-lo (já testado no projeto)
 - Se não, usar `node:sqlite` (sem dependência externa)
 - **Preferência LLM-A**: `node:sqlite` nativo para manter zero-dependency philosophy
 
 ### 8.2. Autenticação no namespace `/copilot`
+
 - Reusar o middleware JWT de `src/server/engine/socket.js`
 - Flag `COPILOT_HUB_AUTH_REQUIRED` (default: same as `DASHBOARD_SOCKET_AUTH_REQUIRED`)
 - Em ambiente de desenvolvimento local, auth pode ser relaxada
 
 ### 8.3. Circuit Breaker para AlwaysAliveAgent no main-server
+
 - Se o token `COPILOT_GITHUB_TOKEN` não estiver definido, o hub simplesmente não inicia
 - Máximo 3 tentativas de start na fase de boot, depois marca como "degraded" e continua
 - O `GET /api/copilot/health` reflete o estado real (ready/degraded/offline)
 
 ### 8.4. Persistência entre sessões PM2
+
 - `hub_session` tem UUID próprio (diferente de `session_id` do SDK)
 - Ao reiniciar o main-server, as sessões SQLite persistem
 - `AlwaysAliveAgent` cria nova sessão SDK, mas o `hub_session` mantém histórico anterior
@@ -355,15 +380,17 @@ Esses tools ficam registrados nos 30 tools do AlwaysAliveAgent, tornando o hub a
 
 ## 9. O que LLM-B Respondeu (registro crítico)
 
-LLM-B foi consultado com 3 perguntas específicas e respondeu em JSON estruturado (protocolo Sprint A funcionando):
+LLM-B foi consultado com 3 perguntas específicas e respondeu em JSON estruturado (protocolo Sprint A
+funcionando):
 
-| Pergunta                                   | Resposta LLM-B                  | Avaliação LLM-A                                                                                                      |
-| ------------------------------------------ | ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Pergunta                                   | Resposta LLM-B                  | Avaliação LLM-A                                                                                                       |
+| ------------------------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | AlwaysAlive no main-server (a) vs IPC (b)? | Opção (a), elimina complexidade | ✅ **Concordo** — mas LLM-B não mencionou circuit breaker para degradação elegante                                    |
 | SQLite vs JSONL para histórico?            | SQLite, queries eficientes      | ✅ **Concordo** — mas LLM-B não pensou em node:sqlite nativo vs better-sqlite3                                        |
 | Socket.io namespace dedicado vs SSE?       | Namespace `/copilot` dedicado   | ✅ **Concordo** — mas LLM-B não mencionou que deve ser `io.of('/copilot')` na instância existente, não um novo Server |
 
-**Conclusão**: LLM-B forneceu direções corretas mas superficiais. As decisões de implementação detalhadas foram todas de LLM-A. Consulta foi útil como soundcheck, não como fonte de arquitetura.
+**Conclusão**: LLM-B forneceu direções corretas mas superficiais. As decisões de implementação
+detalhadas foram todas de LLM-A. Consulta foi útil como soundcheck, não como fonte de arquitetura.
 
 ---
 
@@ -386,10 +413,12 @@ LLM-B foi consultado com 3 perguntas específicas e respondeu em JSON estruturad
 Iniciar **Sprint Hub-1**: criar `src/copilot/conversation-hub/store.js`.
 
 Antes de iniciar:
+
 1. Verificar `package.json` para decidir `node:sqlite` vs `better-sqlite3`
 2. Verificar se existe `data/` directory ou similar para o DB path
 3. Verificar se há outros módulos SQLite no projeto para seguir o padrão existente
 
 ---
 
-*Documento criado por LLM-A. Consulta LLM-B registrada na seção 9. Todas as decisões finais são de LLM-A.*
+_Documento criado por LLM-A. Consulta LLM-B registrada na seção 9. Todas as decisões finais são de
+LLM-A._

@@ -1,10 +1,9 @@
 # Plano de Execução — Fase AD: Auditoria `src/copilot`
 
-> **Documento**: Plano detalhado de execução da Fase AD
-> **Origem**: Auditoria técnica `DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`
-> **Criado em**: 2026-03-25
-> **Validado por**: análise estática sobre código real (HEAD `bdaa1347`)
-> **Status geral**: ✅ CONCLUÍDO — Sprints AD-1/2/3/4 executados (0 typecheck errors, 1466 testes passando)
+> **Documento**: Plano detalhado de execução da Fase AD **Origem**: Auditoria técnica
+> `DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md` **Criado em**: 2026-03-25
+> **Validado por**: análise estática sobre código real (HEAD `bdaa1347`) **Status geral**: ✅
+> CONCLUÍDO — Sprints AD-1/2/3/4 executados (0 typecheck errors, 1466 testes passando)
 
 ---
 
@@ -13,8 +12,8 @@
 Cada item da auditoria foi verificado diretamente no código-fonte antes de incluir neste plano.
 Itens descartados não entram no plano de execução.
 
-| Decisão      | Critério                                                          |
-| ------------ | ----------------------------------------------------------------- |
+| Decisão       | Critério                                                          |
+| ------------- | ----------------------------------------------------------------- |
 | ✅ INCLUÍDO   | Bug/vulnerabilidade confirmado no código atual, tem solução clara |
 | ⚠️ ADIADO     | Válido mas complexidade/escopo exige fase separada futura         |
 | ❌ DESCARTADO | Inaplicável (Node.js 24 fixo, acesso controlado, ou já corrigido) |
@@ -33,10 +32,11 @@ Itens descartados não entram no plano de execução.
 **Arquivo**: `src/copilot/agent/always-alive.js`
 
 **Correção**: Dentro de `stop()`, após `this.#setStatus('stopped')`, adicionar:
+
 ```js
 if (this.#dialogLoopActive) {
-    this.#dialogLoopActive = false;
-    this.#watchdog?.stop();
+  this.#dialogLoopActive = false;
+  this.#watchdog?.stop();
 }
 ```
 
@@ -46,7 +46,8 @@ if (this.#dialogLoopActive) {
 
 #### AD-1.2 — BUG-03: Race condition em `ConversationStore.writeTurn`
 
-**Confirmado**: `SELECT MAX(turn_number)` + `INSERT` em `store.js` não estão dentro de `db.transaction()`.
+**Confirmado**: `SELECT MAX(turn_number)` + `INSERT` em `store.js` não estão dentro de
+`db.transaction()`.
 
 **Arquivo**: `src/copilot/conversation-hub/store.js`
 
@@ -62,6 +63,7 @@ if (this.#dialogLoopActive) {
 **Arquivos**: `src/copilot/channel/client.js`, `src/copilot/types/structured-message.js`
 
 **Correção mínima**:
+
 ```js
 // client.js — chatStructured():
 const structured = parseStructuredResponse(chatResult.response);
@@ -70,6 +72,7 @@ const parseError = (chatResult.response && !structured)
     : undefined;
 return { structured, raw: chatResult.response, ..., parseError };
 ```
+
 Adicionar `parseError?: Error` ao typedef `StructuredChatResult`.
 
 ---
@@ -82,10 +85,12 @@ Adicionar `parseError?: Error` ao typedef `StructuredChatResult`.
 **Arquivo**: `src/copilot/conversation-hub/store.js`
 
 **Correção**: Escapar via frase exata:
+
 ```js
 const ftsQuery = `"${opts.search.replace(/"/g, ' ').trim()}"`;
 if (!ftsQuery || ftsQuery === '""') return [];
 ```
+
 Busca por frase exata (coloca entre aspas duplas FTS5) — qualquer input do usuário torna-se literal.
 
 ---
@@ -95,34 +100,36 @@ Busca por frase exata (coloca entre aspas duplas FTS5) — qualquer input do usu
 #### AD-2.1 — BUG-02: Leak de listener em `sendDialogTurn` no ramo `question.pending`
 
 **Confirmado**: Quando `onPending` dispara, registra `once('dialog.reply')` interno mas:
-  - Se `dialog.stopped` (registrado **antes** do `else`) disparar, o `newTimeout` e o listener
-    interno não são limpos — timer + listener órfãos.
+
+- Se `dialog.stopped` (registrado **antes** do `else`) disparar, o `newTimeout` e o listener interno
+  não são limpos — timer + listener órfãos.
 
 **Arquivo**: `src/copilot/agent/always-alive.js`
 
-**Correção**: Dentro do `onPending`, registrar também um handler `onStop` que limpa `newTimeout`
-e deregistra `onReply`:
+**Correção**: Dentro do `onPending`, registrar também um handler `onStop` que limpa `newTimeout` e
+deregistra `onReply`:
+
 ```js
 const onPending = (_) => {
-    clearTimeout(timeoutHandle);
-    const newTimeout = setTimeout(() => {
-        this.off('dialog.reply', onReply);
-        this.off('dialog.stopped', onStop);
-        reject(new SessionError(`sendDialogTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
-    }, timeout);
-    const onReply = (evt) => {
-        clearTimeout(newTimeout);
-        this.off('dialog.stopped', onStop);
-        resolve(evt.reply);
-    };
-    const onStop = () => {
-        clearTimeout(newTimeout);
-        this.off('dialog.reply', onReply);
-        reject(new SessionError('Diálogo encerrado.', 'DIALOG_ENDED'));
-    };
-    this.once('dialog.reply', onReply);
-    this.once('dialog.stopped', onStop);
-    this.answerPendingQuestion(message);
+  clearTimeout(timeoutHandle);
+  const newTimeout = setTimeout(() => {
+    this.off('dialog.reply', onReply);
+    this.off('dialog.stopped', onStop);
+    reject(new SessionError(`sendDialogTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
+  }, timeout);
+  const onReply = (evt) => {
+    clearTimeout(newTimeout);
+    this.off('dialog.stopped', onStop);
+    resolve(evt.reply);
+  };
+  const onStop = () => {
+    clearTimeout(newTimeout);
+    this.off('dialog.reply', onReply);
+    reject(new SessionError('Diálogo encerrado.', 'DIALOG_ENDED'));
+  };
+  this.once('dialog.reply', onReply);
+  this.once('dialog.stopped', onStop);
+  this.answerPendingQuestion(message);
 };
 ```
 
@@ -131,15 +138,18 @@ const onPending = (_) => {
 #### AD-2.2 — BUG-05: Mutação ilegal de `ReadonlyArray` em `cmdCompact`
 
 **Confirmado**: `context.js` linhas 135–136 fazem:
+
 ```js
 llmBridgeClient.history.length = 0;           // falha silenciosa
 llmBridgeClient.history.push({ ... });        // TypeError em modo estrito
 ```
+
 `clearHistory()` existe em `client.js` (linha 357), mas `seedHistory()` não.
 
 **Arquivos**: `src/copilot/channel/client.js`, `src/copilot/terminal/commands/context.js`
 
 **Correção**:
+
 1. Adicionar `seedHistory(role, content)` em `LlmBridgeClient`:
    ```js
    seedHistory(role, content) {
@@ -161,6 +171,7 @@ llmBridgeClient.history.push({ ... });        // TypeError em modo estrito
 **Arquivo**: `src/copilot/conversation-hub/orchestrator.js`
 
 **Correção**:
+
 ```js
 #getActiveSdkSessionId() {
     try {
@@ -183,14 +194,15 @@ boot, define `stopped` imediatamente; quando o boot completar emitirá eventos e
 **Arquivo**: `src/copilot/agent/always-alive.js`
 
 **Correção**: adicionar ao início de `stop()`, após o guard de `stopped`:
+
 ```js
 if (this.#status === 'starting') {
-    log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
-    await Promise.race([
-        new Promise(r => this.once('ready', r)),
-        new Promise(r => this.once('error', r)),
-        new Promise(r => setTimeout(r, 15_000)),
-    ]);
+  log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
+  await Promise.race([
+    new Promise((r) => this.once('ready', r)),
+    new Promise((r) => this.once('error', r)),
+    new Promise((r) => setTimeout(r, 15_000)),
+  ]);
 }
 ```
 
@@ -210,8 +222,8 @@ sobrescreve. Instância do construtor é descartada sem cleanup.
 
 #### AD-2.6 — BUG-09: Dynamic `import()` no hot-path do middleware Socket.io
 
-**Confirmado**: `socket-ns.js` executa `await import('#core/jwt_config')` e `await import('jsonwebtoken')`
-dentro do middleware `ns.use()`, que roda em cada nova conexão.
+**Confirmado**: `socket-ns.js` executa `await import('#core/jwt_config')` e
+`await import('jsonwebtoken')` dentro do middleware `ns.use()`, que roda em cada nova conexão.
 
 **Arquivo**: `src/copilot/conversation-hub/socket-ns.js`
 
@@ -221,13 +233,13 @@ dentro do middleware `ns.use()`, que roda em cada nova conexão.
 
 #### AD-2.7 — SEC-01: Injeção de shell em `exec_command`
 
-**Confirmado**: `shell-tools.js` linha 262 passa o comando literal para `/bin/sh -c`.
-A blocklist via regex é bypassável com `;`, `&&`, `$(...)`, redirecionamentos `>`.
+**Confirmado**: `shell-tools.js` linha 262 passa o comando literal para `/bin/sh -c`. A blocklist
+via regex é bypassável com `;`, `&&`, `$(...)`, redirecionamentos `>`.
 
 **Arquivo**: `src/copilot/tools/shell-tools.js`
 
-**Correção**: Para a maioria dos usos legítimos (git, npm, ls, node), tokenizar o comando e
-rejeitar se contiver metacaracteres shell (`|`, `;`, `&&`, `$()`, `<`, `>`):
+**Correção**: Para a maioria dos usos legítimos (git, npm, ls, node), tokenizar o comando e rejeitar
+se contiver metacaracteres shell (`|`, `;`, `&&`, `$()`, `<`, `>`):
 
 ```js
 /**
@@ -235,10 +247,10 @@ rejeitar se contiver metacaracteres shell (`|`, `;`, `&&`, `$()`, `<`, `>`):
  * @returns {{ executable: string; args: string[] } | null}
  */
 function tokenizeSimpleCommand(command) {
-    if (/[|;&<>$`\\]/.test(command)) return null;
-    const parts = command.trim().split(/\s+/);
-    if (parts.length === 0) return null;
-    return { executable: parts[0], args: parts.slice(1) };
+  if (/[|;&<>$`\\]/.test(command)) return null;
+  const parts = command.trim().split(/\s+/);
+  if (parts.length === 0) return null;
+  return { executable: parts[0], args: parts.slice(1) };
 }
 ```
 
@@ -253,7 +265,7 @@ allowlist de prefixos de comando (`git`, `npm`, `node`, `cat`, `ls`, `find`, `gr
 #### AD-2.8 — SEC-03: Injeção de shell em `search_in_files` via ripgrep
 
 **Confirmado**: `file-tools.js` linha 359 interpolação de `safePattern` e `resolved` em template
-string passada a `execSync`. Sanitização só com `replace(/'/g, "'\\''")`  não cobre todos os vetores.
+string passada a `execSync`. Sanitização só com `replace(/'/g, "'\\''")` não cobre todos os vetores.
 
 **Arquivo**: `src/copilot/tools/file-tools.js`
 
@@ -269,27 +281,30 @@ workspace podem apontar para fora.
 **Arquivo**: `src/copilot/tools/file-tools.js`
 
 **Correção**:
+
 ```js
 import { realpathSync } from 'node:fs';
 
 function validatePath(filePath) {
-    const resolved = path.isAbsolute(filePath)
-        ? filePath
-        : path.resolve(WORKSPACE_ROOT, filePath);
+  const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(WORKSPACE_ROOT, filePath);
 
-    let realResolved = resolved;
-    try {
-        realResolved = realpathSync(resolved);
-    } catch {
-        // Arquivo ainda não existe (create_file) — usar resolved sem resolução
-        realResolved = resolved;
-    }
+  let realResolved = resolved;
+  try {
+    realResolved = realpathSync(resolved);
+  } catch {
+    // Arquivo ainda não existe (create_file) — usar resolved sem resolução
+    realResolved = resolved;
+  }
 
-    const relativeToWorkspace = path.relative(WORKSPACE_ROOT, realResolved);
-    if (relativeToWorkspace.startsWith('..')) {
-        return { ok: false, reason: `Acesso negado: caminho fora do workspace (${realResolved})`, resolved: realResolved };
-    }
-    // ...
+  const relativeToWorkspace = path.relative(WORKSPACE_ROOT, realResolved);
+  if (relativeToWorkspace.startsWith('..')) {
+    return {
+      ok: false,
+      reason: `Acesso negado: caminho fora do workspace (${realResolved})`,
+      resolved: realResolved,
+    };
+  }
+  // ...
 }
 ```
 
@@ -297,8 +312,8 @@ function validatePath(filePath) {
 
 #### AD-2.10 — PERF-01: I/O síncrono por mensagem em `#processQueue`
 
-**Confirmado**: `always-alive.js` linhas 731–732 fazem `readState()` + `writeState()` síncrono
-em **cada** mensagem enfileirada.
+**Confirmado**: `always-alive.js` linhas 731–732 fazem `readState()` + `writeState()` síncrono em
+**cada** mensagem enfileirada.
 
 **Arquivo**: `src/copilot/agent/always-alive.js`
 
@@ -314,6 +329,7 @@ apenas em eventos explícitos (shutdown, reconnection), não a cada mensagem.
 **Arquivo**: `src/copilot/agent/always-alive.js`
 
 **Correção**: Cache em memória com TTL de 2s:
+
 ```js
 #cachedState = null;
 #cacheExpiry = 0;
@@ -328,28 +344,31 @@ static #STATE_CACHE_TTL = 2_000;
     return this.#cachedState;
 }
 ```
+
 Invalidar cache (`this.#cachedState = null`) quando `writeState()` for chamado.
 
 ---
 
 #### AD-2.12 — ARCH-02: 13 eventos ausentes no `nerv-bridge.js`
 
-**Confirmado**: `AGENT_EVENTS` tem 22 eventos; `EVENT_MAP` do nerv-bridge tem apenas 9.
-Eventos críticos ausentes: `task.delta`, `task.reasoning`, `ready`, `error`,
-`session.fatal`, `session.usage`, `session.mode_changed`, `dialog.ready`, `dialog.reply`,
-`dialog.stopped`, `dialog.stalled`, `tool.execution.start`, `tool.execution.complete`.
+**Confirmado**: `AGENT_EVENTS` tem 22 eventos; `EVENT_MAP` do nerv-bridge tem apenas 9. Eventos
+críticos ausentes: `task.delta`, `task.reasoning`, `ready`, `error`, `session.fatal`,
+`session.usage`, `session.mode_changed`, `dialog.ready`, `dialog.reply`, `dialog.stopped`,
+`dialog.stalled`, `tool.execution.start`, `tool.execution.complete`.
 
 **Arquivo**: `src/copilot/bridges/nerv-bridge.js`
 
 **Correção**: Gerar `EVENT_MAP` diretamente de `AGENT_EVENTS`:
+
 ```js
 import { AGENT_EVENTS } from '../agent/events.js';
 
-const EVENT_MAP = AGENT_EVENTS.map(event => ({
-    event,
-    actionCode: `COPILOT_${event.toUpperCase().replace(/\./g, '_')}`,
+const EVENT_MAP = AGENT_EVENTS.map((event) => ({
+  event,
+  actionCode: `COPILOT_${event.toUpperCase().replace(/\./g, '_')}`,
 }));
 ```
+
 Isso garante que todos os novos eventos adicionados a `AGENT_EVENTS` sejam automaticamente
 propagados ao NERV sem manutenção manual.
 
@@ -362,6 +381,7 @@ propagados ao NERV sem manutenção manual.
 **Arquivo**: `src/copilot/conversation-hub/orchestrator.js`
 
 **Correção**: Tipar corretamente o `agentOverride`:
+
 ```js
 /**
  * @typedef {Pick<import('../agent/always-alive.js').AlwaysAliveAgent,
@@ -380,18 +400,23 @@ propagados ao NERV sem manutenção manual.
 **Arquivo**: `src/copilot/terminal/server.js` ou `src/copilot/terminal/http-handlers.js`
 
 **Correção**: Implementar limitador simples in-memory (sem dependência externa):
+
 ```js
 const _injectBucket = new Map(); // `${ip}` → { count: number, resetAt: number }
 
 function checkInjectRateLimit(ip) {
-    const now = Date.now();
-    const e = _injectBucket.get(ip) ?? { count: 0, resetAt: now + 60_000 };
-    if (now > e.resetAt) { e.count = 0; e.resetAt = now + 60_000; }
-    e.count++;
-    _injectBucket.set(ip, e);
-    return e.count <= Number(process.env.LLM_B_INJECT_RPM ?? 20);
+  const now = Date.now();
+  const e = _injectBucket.get(ip) ?? { count: 0, resetAt: now + 60_000 };
+  if (now > e.resetAt) {
+    e.count = 0;
+    e.resetAt = now + 60_000;
+  }
+  e.count++;
+  _injectBucket.set(ip, e);
+  return e.count <= Number(process.env.LLM_B_INJECT_RPM ?? 20);
 }
 ```
+
 Aplicar antes de processar o body em `handleInject`.
 
 ---
@@ -403,14 +428,15 @@ Aplicar antes de processar o body em `handleInject`.
 **Arquivo**: `src/copilot/api/bridge-tasks.js`
 
 **Correção**: verificar `getStatusSnapshot().queueSize` antes de enfileirar:
+
 ```js
 const snap = agent.getStatusSnapshot();
 const MAX_Q = AlwaysAliveAgent.MAX_QUEUE_SIZE ?? 50;
 if (snap.queueSize >= MAX_Q) {
-    return res.status(503).json({
-        ok: false,
-        error: `Fila cheia (${snap.queueSize}/${MAX_Q}).`
-    });
+  return res.status(503).json({
+    ok: false,
+    error: `Fila cheia (${snap.queueSize}/${MAX_Q}).`,
+  });
 }
 ```
 
@@ -439,8 +465,9 @@ if (snap.queueSize >= MAX_Q) {
 **Arquivo**: `src/copilot/tools/hub-tools.js`
 
 **Correção**: Restringir a primitivos serializáveis:
+
 ```js
-z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]));
 ```
 
 ---
@@ -449,7 +476,8 @@ z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
 
 **Arquivo**: `src/copilot/LLM-A-COMMUNICATION-GUIDE.md`
 
-**Correção**: Atualizar seção de mapa de arquivos para refletir estrutura atual (`agent/`, `channel/`, `bridges/`).
+**Correção**: Atualizar seção de mapa de arquivos para refletir estrutura atual (`agent/`,
+`channel/`, `bridges/`).
 
 ---
 
@@ -481,8 +509,8 @@ z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
 
 ## 3. Itens Adiados → promovidos à Fase AE
 
-> Todos os 7 itens abaixo foram promovidos ao `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md`
-> com planejamento detalhado e ordem de execução definida.
+> Todos os 7 itens abaixo foram promovidos ao `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md` com
+> planejamento detalhado e ordem de execução definida.
 
 | Item        | Motivo do adiamento AD                                                         | Sprint AE |
 | ----------- | ------------------------------------------------------------------------------ | --------- |
@@ -537,6 +565,7 @@ AD-4.1 → AD-4.4 (melhorias)
 ## 6. Resultado Esperado
 
 Após a Fase AD completa:
+
 - **0 bugs críticos** confirmados pela auditoria
 - **0 vulnerabilidades SEC-01..04** nos caminhos de execução de comandos e SQL
 - `npm run typecheck:node` mantém 0 erros
@@ -545,5 +574,5 @@ Após a Fase AD completa:
 
 ---
 
-*Plano gerado após validação manual de cada item da auditoria no código real (HEAD `bdaa1347`).*
-*Criado em 2026-03-25.*
+_Plano gerado após validação manual de cada item da auditoria no código real (HEAD `bdaa1347`)._
+_Criado em 2026-03-25._

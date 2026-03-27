@@ -153,7 +153,7 @@ class Triage extends EventEmitter {
      *
      * @param {object} page - Puppeteer Page instance
      * @param {function} page.evaluate - Método para executar código no browser
-     * @param {string} [langCode='en'] - Código de idioma para análise semântica Default is `'en'`
+     * @param {string} [langCode='en'] - Código de idioma para análise semântica. Default is `'en'`
      * @throws {Error} Se page não for fornecido
      * @throws {Error} Se page.evaluate não for uma função
      * @throws {Error} Se langCode não for uma string não-vazia

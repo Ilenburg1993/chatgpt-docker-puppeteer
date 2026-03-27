@@ -1,21 +1,24 @@
 # PLANO DE REPARO COMPLETO — BUG-79/80/81/82
 
-**Data**: 2026-03-12
-**Escopo**: Sistema de session lifecycle, close_key validation, e session-context
-**Status**: Planejamento detalhado
+**Data**: 2026-03-12 **Escopo**: Sistema de session lifecycle, close_key validation, e
+session-context **Status**: Planejamento detalhado
 
 ---
 
 ## 📋 Bugs Mapeados
 
 ### BUG-79 (Confirmado) — Unauthorized Session Close
-- **Original Evidence**: Session anterior encerrou sem vscode_askQuestions Template F (encontrada em UNAUTHORIZED_CLOSE.flag)
+
+- **Original Evidence**: Session anterior encerrou sem vscode_askQuestions Template F (encontrada em
+  UNAUTHORIZED_CLOSE.flag)
 - **Status**: PARCIALMENTE RESOLVIDO (nova session dcf579af foi autorizada adequadamente)
 - **Ação Requerida**: Validar se Guards B,C,E estão implementados
 
 ### BUG-80 (Crítico + Novo) — False Positive in close_key_validated
+
 - **Symptom**: post-tool-use.sh seta `.session.close_key_validated = true` ANTES de validar a KEY
-- **Location**: `/workspaces/chatgpt-docker-puppeteer/.github/hooks/scripts/post-tool-use.sh` linha 266-270
+- **Location**: `/workspaces/chatgpt-docker-puppeteer/.github/hooks/scripts/post-tool-use.sh` linha
+  266-270
 - **Root Cause**: Ordem de operações incorreta
   ```bash
   # ❌ WRONG ORDER:
@@ -38,6 +41,7 @@
   ```
 
 ### BUG-81 (Novo) — Inconsistent turn_count vs turn_authorized
+
 - **Symptom**: session-context-cd593a12.json (c516b172) mostra:
   - `turn_count: 0` (nenhum turno completado?)
   - `turn_authorized: 8` (8 turnos autorizados?)
@@ -52,6 +56,7 @@
   - Qual é a fonte de verdade — auditoria ou session-context?
 
 ### BUG-82 (Novo) — Chronological Impossibility
+
 - **Symptom**:
   - c516b172 started: 2026-03-12T09:12:53Z
   - dcf579af started: 2026-03-12T11:01:14Z (2 HORAS DEPOIS)
@@ -77,6 +82,7 @@
 ### Cenário A: User fornece CORRETA close_key
 
 **Atual (Broken)**:
+
 ```
 1. vscode_askQuestions Template F chamada
 2. User digita KEY correta
@@ -91,6 +97,7 @@
 ```
 
 **Correto (Proposto)**:
+
 ```
 1. vscode_askQuestions Template F chamada
 2. User digita KEY correta
@@ -108,6 +115,7 @@
 ### Cenário B: User fornece INCORRETA close_key
 
 **Atual (Broken)**:
+
 ```
 1. vscode_askQuestions Template F chamada
 2. User digita KEY incorreta (ou typo)
@@ -124,6 +132,7 @@
 ```
 
 **Correto (Proposto)**:
+
 ```
 1. vscode_askQuestions Template F chamada
 2. User digita KEY incorreta (ou typo)
@@ -142,6 +151,7 @@
 ### Cenário C: Session reconnect durante atividade
 
 **Atual (Broken/Confuso)**:
+
 ```
 Session c516b172:
 - started_at: 09:12:53Z
@@ -160,6 +170,7 @@ Estado final:
 ```
 
 **Correto (Proposto)**:
+
 ```
 Session c516b172:
 - started_at: 09:12:53Z
@@ -185,32 +196,35 @@ Agora dcf579af continua de forma limpa
 **Arquivo**: `/workspaces/chatgpt-docker-puppeteer/.github/hooks/scripts/post-tool-use.sh`
 
 **Mudança**:
+
 - Lines 260-310: Reordenar lógica de validação
   - ANTES: Setar close_key_validated, depois chamar session-close.sh
   - DEPOIS: Chamar session-close.sh, só setar se exit code 0
 
 **Código Novo** (pseudocódigo):
+
 ```bash
 if [ "$KEY_FOUND" = "true" ]; then
-    # NÃO seta close_key_validated aqui!
-    # Deixa para session-close.sh fazer
+  # NÃO seta close_key_validated aqui!
+  # Deixa para session-close.sh fazer
 
-    _EXIT_CODE=0
-    bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" || _EXIT_CODE=$?
+  _EXIT_CODE=0
+  bash "$_SESSION_CLOSE_SCRIPT" "$CURRENT_CLOSE_KEY" || _EXIT_CODE=$?
 
-    if [ $_EXIT_CODE -eq 0 ]; then
-        # Sucesso: session-close.sh já setou close_key_validated=true
-        # Log apenas para audit
-        jq -cn ... '{event: "sessionClose_key_validated_confirmed", ...}' >> "$AUDIT_FILE"
-    else
-        # Falha: KEY era inválida
-        # MANTÉM close_key_validated = false (nunca foi alterado)
-        jq -cn ... '{event: "sessionClose_key_validation_failed", ...}' >> "$AUDIT_FILE"
-    fi
+  if [ $_EXIT_CODE -eq 0 ]; then
+    # Sucesso: session-close.sh já setou close_key_validated=true
+    # Log apenas para audit
+    jq -cn ... '{event: "sessionClose_key_validated_confirmed", ...}' >> "$AUDIT_FILE"
+  else
+    # Falha: KEY era inválida
+    # MANTÉM close_key_validated = false (nunca foi alterado)
+    jq -cn ... '{event: "sessionClose_key_validation_failed", ...}' >> "$AUDIT_FILE"
+  fi
 fi
 ```
 
 **Validação**:
+
 - [ ] Test Cenário B (KEY inválida) → close_key_validated permanece false
 - [ ] Test Cenário A (KEY válida) → close_key_validated fica true
 - [ ] Shellcheck: sem erros
@@ -219,12 +233,14 @@ fi
 ### Fase 2: Fix BUG-81 (turn_count vs turn_authorized)
 
 **Investigation**:
+
 - [ ] Encontrar onde turn_authorized é incrementado
 - [ ] Comparar contra turn_count no code
 - [ ] Determinar qual deve ser fonte de verdade
 - [ ] Validar lógica em agent-stop.sh que usa esses números
 
 **Action** (TBD após investigation):
+
 - [ ] Sincronizar turn_count com turn_authorized
 - [ ] Ou remover turn_authorized se turn_count é suficiente
 - [ ] Documentar qual é a semantica de cada um
@@ -232,27 +248,33 @@ fi
 ### Fase 3: Fix BUG-82 (Chronological Impossibility)
 
 **Investigation**:
+
 - [ ] Comparar session-context timestamps com audit.jsonl timestamps
 - [ ] Validar when reconnect_at ocorreu
 - [ ] Determinar if dcf579af foi realmente "auto_recovery" ou "reconnect_rollover"
 
 **Action** (TBD após investigation):
+
 - [ ] Potencialmente corrigir source=auto_recovery para source=reconnect_rollover
-- [ ] Ou validar que a timeline é realmente correta (possível que os tempos estejam ajustados por timezone)
+- [ ] Ou validar que a timeline é realmente correta (possível que os tempos estejam ajustados por
+      timezone)
 
 ### Fase 4: Implement Guards B, C, E (Prevenção Futura)
 
 **Guard B** — Enforce All Questions via vscode_askQuestions
+
 - PRÉ-COMMIT: Regex checar se response contém "?" sem vscode_askQuestions invocation
 - LOCAL: agent-stop.sh ou pre-commit hook
 - Severity: ALTO (previne BUG-79 direto)
 
 **Guard C** — Detect "Completion Heuristic"
+
 - PRÉ-COMMIT: Se response contém padrão "✅ TODO X completo" → require vscode_askQuestions
 - LOCAL: agent-stop.sh
 - Severity: ALTO (previne BUG-80 direto)
 
 **Guard E** — Token Budget Monitoring
+
 - A cada 5 turnos: checar remaining_tokens
 - Se < 30%: dispare /compact command
 - Se < 10%: force vscode_askQuestions Template D
@@ -292,5 +314,5 @@ fi
 
 ---
 
-*Planejamento iniciado: 2026-03-12T21:30:00Z*
-*Próximo passo: Revisão e aprovação do plano pelo usuário*
+_Planejamento iniciado: 2026-03-12T21:30:00Z_ _Próximo passo: Revisão e aprovação do plano pelo
+usuário_

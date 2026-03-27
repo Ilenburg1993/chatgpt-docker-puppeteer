@@ -2,7 +2,9 @@
 
 **Versão**: 2.0 (pós-Fase AI) | **Data**: 2026-03-15 | **Status**: ✅ Canônico
 
-> Este documento é a referência oficial e completa para o módulo `src/copilot`. Substitui análises parciais em arquivos anteriores. Baseado na inspeção exaustiva do código-fonte combinada com o histórico de fases de desenvolvimento (AE → AI).
+> Este documento é a referência oficial e completa para o módulo `src/copilot`. Substitui análises
+> parciais em arquivos anteriores. Baseado na inspeção exaustiva do código-fonte combinada com o
+> histórico de fases de desenvolvimento (AE → AI).
 
 ---
 
@@ -25,15 +27,18 @@
 
 ## 1. Visão Geral e Propósito
 
-O módulo `src/copilot` é um **sistema autônomo de orquestração de agente LLM** construído sobre o SDK oficial `@github/copilot-sdk`. Suas responsabilidades centrais são:
+O módulo `src/copilot` é um **sistema autônomo de orquestração de agente LLM** construído sobre o
+SDK oficial `@github/copilot-sdk`. Suas responsabilidades centrais são:
 
 - Manter uma sessão SDK de longa duração (Always-Alive) com persistência e recovery automático
-- Expor interfaces de comunicação duplas: **HTTP REST** (para LLM-A e sistemas externos) e **REPL interativo** (terminal)
+- Expor interfaces de comunicação duplas: **HTTP REST** (para LLM-A e sistemas externos) e **REPL
+  interativo** (terminal)
 - Orquestrar conversas multi-turno entre LLM-A ↔ LLM-B ↔ Usuário com persistência SQLite
 - Registrar e executar Custom Tools (SDK nativo + MCP + declarativas via API)
 - Integrar com o barramento de eventos NERV e broadcast SSE/Socket.io em tempo real
 
-**Tecnologias-chave**: Node.js >=24, ESM, `@github/copilot-sdk`, better-sqlite3, Socket.io, readline.
+**Tecnologias-chave**: Node.js >=24, ESM, `@github/copilot-sdk`, better-sqlite3, Socket.io,
+readline.
 
 ---
 
@@ -92,7 +97,8 @@ src/copilot/
 | `sdk-client.js`        | Wrapper      | `lib/client.js`              | @deprecated |
 | `terminal-server.js`   | Entry legacy | `terminal/index.js`          | @deprecated |
 
-> **Ação necessária**: todos os 14 arquivos raiz são candidatos a remoção. Ver [Issue 9.1](#91-13-shims-legados-na-raiz).
+> **Ação necessária**: todos os 14 arquivos raiz são candidatos a remoção. Ver
+> [Issue 9.1](#91-13-shims-legados-na-raiz).
 
 ---
 
@@ -124,7 +130,8 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 
 #### `agent/always-alive.js` ⭐ ARQUIVO CRÍTICO
 
-**Responsabilidade**: Singleton central. Gerencia todo o ciclo de vida da sessão SDK: inicialização, execução de tarefas, dialog loop, reconexão, compaction e encerramento.
+**Responsabilidade**: Singleton central. Gerencia todo o ciclo de vida da sessão SDK: inicialização,
+execução de tarefas, dialog loop, reconexão, compaction e encerramento.
 
 **Classe**: `AlwaysAliveAgent extends EventEmitter`
 
@@ -149,6 +156,7 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 | `#isResumed`          | `boolean`                                   | Indica se sessão foi retomada                      |
 
 **Constantes**:
+
 - `MAX_QUEUE_SIZE = 100`
 - Watchdog: intervalo 5 min, stall 15 min
 
@@ -171,13 +179,15 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 | `unregisterWebhook(id)`              | Remove webhook                                        |
 | `listWebhooks()`                     | Lista webhooks ativos                                 |
 
-**Método privado crítico**: `#syncSdkHistory(session)` — sincroniza histórico SDK → SQLite após retomada (AI.4).
+**Método privado crítico**: `#syncSdkHistory(session)` — sincroniza histórico SDK → SQLite após
+retomada (AI.4).
 
 ---
 
 #### `agent/session-manager.js`
 
-**Responsabilidade**: Persistência do estado de sessão SDK em disco; lógica de `initOrResumeSession`.
+**Responsabilidade**: Persistência do estado de sessão SDK em disco; lógica de
+`initOrResumeSession`.
 
 **Arquivo de estado**: `.github/hooks/state/sdk-always-alive.json`
 
@@ -194,6 +204,7 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 | `loadToolsConfig()`                     | Carrega `tools-config.json` (AI.1)              |
 
 **Schema de estado** (`sdk-always-alive.json`):
+
 ```json
 {
   "sessionId": "string",
@@ -204,7 +215,9 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 }
 ```
 
-**Auditoria JSONL**: tool calls de alto risco (`bash`, `edit`, `create`, `git_apply_patch`) são auditadas em `logs/tool-audit.jsonl` com rotação a 10 MB. Background compaction threshold padrão: 0.75.
+**Auditoria JSONL**: tool calls de alto risco (`bash`, `edit`, `create`, `git_apply_patch`) são
+auditadas em `logs/tool-audit.jsonl` com rotação a 10 MB. Background compaction threshold padrão:
+0.75.
 
 ---
 
@@ -252,14 +265,16 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 
 #### `agent/task-executor.js`
 
-**Responsabilidade**: Extrai a execução de tarefa individual da classe `AlwaysAliveAgent` para testabilidade.
+**Responsabilidade**: Extrai a execução de tarefa individual da classe `AlwaysAliveAgent` para
+testabilidade.
 
 **Função**: `executeTask(session, task, callbacks)`
 
 - Assina `assistant.message_delta` (streaming delta → `task.delta`)
 - Assina `tool.execution_start/complete` (auditoria)
 - `session.sendAndWait({ prompt, attachments? })` com timeout default 60 s
-- Callbacks: `onDelta(chunk)`, `onReasoning(chunk)`, `onToolStart(evt)`, `onToolComplete(evt)`, `onReconnect()`
+- Callbacks: `onDelta(chunk)`, `onReasoning(chunk)`, `onToolStart(evt)`, `onToolComplete(evt)`,
+  `onReconnect()`
 
 ---
 
@@ -269,7 +284,8 @@ O módulo é organizado em 12 níveis, do mais abstrato ao mais concreto:
 
 **Classe**: `DialogWatchdog`
 
-**API**: `start()`, `stop()`, `ping()` — callback `onStall(stalledMs)` disparado quando `now - lastPing > stallMs`.
+**API**: `start()`, `stop()`, `ping()` — callback `onStall(stalledMs)` disparado quando
+`now - lastPing > stallMs`.
 
 ---
 
@@ -302,7 +318,9 @@ Camada de wrappers sem side-effects — nenhum singleton é inicializado no `imp
 | `tools-registry.js` | Registry com metadados (categoria, tags, readOnly)     | `createRegistry()`, `registerTools()`, `getToolsByCategory()`, `filterByNames()`, `excludeByNames()`, `mergeRegistries()` |
 | `telemetry.js`      | Store em memória (buffer circular, maxRecords=500)     | `createTelemetry()`, `recordToolCall()`, `recordSessionStart/End()`, `getSummary()`, `startSpan()`                        |
 
-**`startSpan(name, attrs, fn)` (AI.3)**: wrapper OTEL com graceful degradation — tenta usar `@opentelemetry/sdk-trace-node` se instalado; caso contrário executa `fn()` diretamente com logging de latência.
+**`startSpan(name, attrs, fn)` (AI.3)**: wrapper OTEL com graceful degradation — tenta usar
+`@opentelemetry/sdk-trace-node` se instalado; caso contrário executa `fn()` diretamente com logging
+de latência.
 
 ---
 
@@ -319,10 +337,12 @@ Dois modos complementares de LLM-A → LLM-B:
 
 **Função principal**: `injectToLlmB(message, actor, opts)` — HTTP POST para `/inject`
 
-**Outras exports**: `checkLlmBHealth()`, `injectPipeline(steps)`, `subscribeLlmB(url, handler)`, `subscribeLlmBCritical(url, handler)`, `waitForLlmBReady(timeoutMs)`
+**Outras exports**: `checkLlmBHealth()`, `injectPipeline(steps)`, `subscribeLlmB(url, handler)`,
+`subscribeLlmBCritical(url, handler)`, `waitForLlmBReady(timeoutMs)`
 
 - Usa `http.request` nativo (sem fetch)
-- Timeout: `LLM_B_TURN_TIMEOUT ?? 120_000` ms (centralizado em `core/constants.js` — `LLM_B_TURN_TIMEOUT_MS`)
+- Timeout: `LLM_B_TURN_TIMEOUT ?? 120_000` ms (centralizado em `core/constants.js` —
+  `LLM_B_TURN_TIMEOUT_MS`)
 - Rate: `INJECT_RATE_MAX = 10 req/IP/60 s` (controlado no servidor)
 
 #### `channel/client.js`
@@ -363,7 +383,8 @@ Dois modos complementares de LLM-A → LLM-B:
 
 **Persistência**: `tools-config.json` na raiz do projeto
 
-**Exports**: `getToolsConfig()`, `patchToolsConfig(updates)`, `loadToolsConfig()`, `saveToolsConfig()`
+**Exports**: `getToolsConfig()`, `patchToolsConfig(updates)`, `loadToolsConfig()`,
+`saveToolsConfig()`
 
 #### `config/custom-tools-registry.js` (AI.2)
 
@@ -375,7 +396,9 @@ Dois modos complementares de LLM-A → LLM-B:
 | `timestamp` | Retorna ISO8601 do momento          |
 | `env_read`  | Lê variável de ambiente (allowlist) |
 
-**Exports**: `loadCustomToolsRegistry()`, `getCustomTools()`, `listCustomToolEntries()`, `registerCustomTool(entry)`, `unregisterCustomTool(name)`, `buildCustomTools()`, `getCustomToolDefinitions()`
+**Exports**: `loadCustomToolsRegistry()`, `getCustomTools()`, `listCustomToolEntries()`,
+`registerCustomTool(entry)`, `unregisterCustomTool(name)`, `buildCustomTools()`,
+`getCustomToolDefinitions()`
 
 ---
 
@@ -385,9 +408,11 @@ Dois modos complementares de LLM-A → LLM-B:
 
 **Singleton**: `conversationHub`
 
-**Método principal**: `init({ io, nerv })` — idempotente, inicializa Store → Orchestrator → Socket.io NS
+**Método principal**: `init({ io, nerv })` — idempotente, inicializa Store → Orchestrator →
+Socket.io NS
 
 **Atalhos de API**:
+
 - `createSession(metadata)` → `store.createHubSession(metadata)`
 - `sendToLlmB(hubSessionId, message)` → `orchestrator.sendToLlmB(...)`
 - `injectUserMessage(hubSessionId, content)` → `orchestrator.injectUserMessage(...)`
@@ -420,7 +445,8 @@ Dois modos complementares de LLM-A → LLM-B:
 
 **Classe**: `HubOrchestrator extends EventEmitter`
 
-**Eventos emitidos**: `turn:sent`, `turn:delta`, `turn:complete`, `user:injected`, `session:created`, `session:closed`, `error`
+**Eventos emitidos**: `turn:sent`, `turn:delta`, `turn:complete`, `user:injected`,
+`session:created`, `session:closed`, `error`
 
 **Mantém**: `#turnCounters: Map<hubSessionId, nextTurnNumber>` — restaurados do DB no `init()`
 
@@ -428,7 +454,8 @@ Dois modos complementares de LLM-A → LLM-B:
 
 **Namespace Socket.io**: `/copilot`
 
-**Autenticação**: controlada por `COPILOT_HUB_SOCKET_AUTH_REQUIRED` (override) ou `DASHBOARD_SOCKET_AUTH_REQUIRED`
+**Autenticação**: controlada por `COPILOT_HUB_SOCKET_AUTH_REQUIRED` (override) ou
+`DASHBOARD_SOCKET_AUTH_REQUIRED`
 
 **Eventos recebidos do cliente**: `join:session`, `inject:message`, `get:history`
 
@@ -446,11 +473,13 @@ Dois modos complementares de LLM-A → LLM-B:
 
 #### `bridges/nerv-bridge.js`
 
-**Exports**: `copilotNervBridge { mount(nerv), unmount(), isActive() }`, `emitNerv(actionCode, payload)`
+**Exports**: `copilotNervBridge { mount(nerv), unmount(), isActive() }`,
+`emitNerv(actionCode, payload)`
 
 **Envelope**: `{ actor: 'COPILOT', actionCode, messageType: 'EVENT', payload, timestamp }`
 
-**ACTION_CODES incluem**: `COPILOT_STATUS`, `COPILOT_READY`, `COPILOT_TASK_*`, `COPILOT_SESSION_*`, `COPILOT_TOOL_*`, `COPILOT_SESSION_HISTORY_SYNCED` (AI.4)
+**ACTION_CODES incluem**: `COPILOT_STATUS`, `COPILOT_READY`, `COPILOT_TASK_*`, `COPILOT_SESSION_*`,
+`COPILOT_TOOL_*`, `COPILOT_SESSION_HISTORY_SYNCED` (AI.4)
 
 #### `bridges/mcp-tool-bridge.js`
 
@@ -478,7 +507,8 @@ api/sdk-api.js (/api/sdk/*)
     └── routes/webhooks.js → CRUD /webhooks
 ```
 
-> **Nota**: `copilot-router.js` e `sdk-router.js` são apenas re-exports de `http-bridge.js` e `sdk-api.js` respectivamente.
+> **Nota**: `copilot-router.js` e `sdk-router.js` são apenas re-exports de `http-bridge.js` e
+> `sdk-api.js` respectivamente.
 
 ---
 
@@ -556,6 +586,7 @@ api/sdk-api.js (/api/sdk/*)
 ### 4.9 `tools/` — Custom Tools SDK
 
 **Segurança de `shell-tools.js`**:
+
 - Blocklist: 20+ padrões perigosos (`rm -rf`, `drop table`, `curl`, etc.)
 - `cwd` restrito a `/workspaces/`
 - `ALLOWED_NPM_SCRIPTS` whitelistados explicitamente
@@ -563,7 +594,8 @@ api/sdk-api.js (/api/sdk/*)
 - Verificação de root bloqueada
 - `MAX_OUTPUT_BYTES = 10_000`, `MAX_TIMEOUT_MS = 120_000`
 
-**`tool-factory.js`**: `buildTool(name, description, schema, handler)` — factory genérica para tools declarativas.
+**`tool-factory.js`**: `buildTool(name, description, schema, handler)` — factory genérica para tools
+declarativas.
 
 ---
 
@@ -573,7 +605,8 @@ api/sdk-api.js (/api/sdk/*)
 
 **Schema Zod**: `StructuredMessageSchema`
 
-**Tipos de resposta** (`RESPONSE_TYPES`): `diagnostic | plan | code | question | confirmation | error`
+**Tipos de resposta** (`RESPONSE_TYPES`):
+`diagnostic | plan | code | question | confirmation | error`
 
 **Prioridades** (`PRIORITY_LEVELS`): `low | medium | high | critical`
 
@@ -774,16 +807,19 @@ startTerminalServer() → terminal/index.js
 
 ### `tools/shell-tools.js` — Proteções embutidas
 
-1. **Blocklist de comandos perigosos**: `rm -rf`, `drop table`, `truncate`, `format`, `mkfs`, `dd`, `chmod 777`, `sudo`, `su`, e outros
+1. **Blocklist de comandos perigosos**: `rm -rf`, `drop table`, `truncate`, `format`, `mkfs`, `dd`,
+   `chmod 777`, `sudo`, `su`, e outros
 2. **Whitelist de npm scripts**: apenas scripts pré-aprovados podem ser executados
 3. **CWD restrito**: apenas `/workspaces/` é permitido como diretório de trabalho
-4. **Env vars removidas**: `SECRET_*`, `TOKEN_*`, `PASSWORD_*`, `API_KEY_*` são removidas do ambiente filho
+4. **Env vars removidas**: `SECRET_*`, `TOKEN_*`, `PASSWORD_*`, `API_KEY_*` são removidas do
+   ambiente filho
 5. **Bloqueio de root**: verificação de `process.getuid() === 0` bloqueia execução como root
 6. **Limites de saída**: `MAX_OUTPUT_BYTES = 10_000`, `MAX_TIMEOUT_MS = 120_000`
 
 ### `config/custom-tools-registry.js` — Segurança
 
-- **Sem eval**: handlers são identificados por `handlerKey` (string ID) em mapa pré-autorizado (`BUILTIN_HANDLER_MAP`)
+- **Sem eval**: handlers são identificados por `handlerKey` (string ID) em mapa pré-autorizado
+  (`BUILTIN_HANDLER_MAP`)
 - **Sem código dinâmico**: nenhuma execução de código enviado via API
 
 ### `terminal/server.js` — Rate Limiting
@@ -794,11 +830,15 @@ startTerminalServer() → terminal/index.js
 
 ## 10. Diagnóstico: Shims Legados
 
-Os 14 arquivos na raiz do módulo são **shims de compatibilidade** criados durante fases de refatoração e nunca removidos. Todos são candidatos a remoção em um PR dedicado de limpeza.
+Os 14 arquivos na raiz do módulo são **shims de compatibilidade** criados durante fases de
+refatoração e nunca removidos. Todos são candidatos a remoção em um PR dedicado de limpeza.
 
-**Exceção**: `sdk-client.js` não é um re-export puro — contém mapeamento de nomes (`createSdkSession()` → `lib/client.createClientSession()`). Requer análise de callers antes da remoção.
+**Exceção**: `sdk-client.js` não é um re-export puro — contém mapeamento de nomes
+(`createSdkSession()` → `lib/client.createClientSession()`). Requer análise de callers antes da
+remoção.
 
 **Cadeias de dois níveis** (require atenção especial):
+
 - `inject-llmb.js` → `bridges/inject-llmb.js` → `channel/inject.js`
 - `llm-bridge-client.js` → `bridges/llm-bridge-client.js` → `channel/client.js`
 
@@ -806,11 +846,11 @@ Os 14 arquivos na raiz do módulo são **shims de compatibilidade** criados dura
 
 ## 11. Issues e Pontos de Atenção
 
-| #    | Issue                                                     | Impacto                     | Arquivo                                      | Status                                                                                            |
-| ---- | --------------------------------------------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 9.1  | 13 shims legados na raiz                                  | DX                          | `src/copilot/*.js` (raiz)                    | Pendente (Fase 3)                                                                                 |
-| 9.2  | `sdk-client.js` oculta mapeamento                         | DX                          | `sdk-client.js`                              | Pendente (Fase 3)                                                                                 |
-| 9.3  | `terminal-server.js` vs `terminal/server.js`              | Confusão                    | ambos                                        | Pendente (Fase 3)                                                                                 |
+| #    | Issue                                                     | Impacto                     | Arquivo                                      | Status                                                                                             |
+| ---- | --------------------------------------------------------- | --------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 9.1  | 13 shims legados na raiz                                  | DX                          | `src/copilot/*.js` (raiz)                    | Pendente (Fase 3)                                                                                  |
+| 9.2  | `sdk-client.js` oculta mapeamento                         | DX                          | `sdk-client.js`                              | Pendente (Fase 3)                                                                                  |
+| 9.3  | `terminal-server.js` vs `terminal/server.js`              | Confusão                    | ambos                                        | Pendente (Fase 3)                                                                                  |
 | 9.4  | `orchestrator.js` importava shim deprecated               | Médio                       | `conversation-hub/orchestrator.js`           | ✅ **Corrigido** — agora importa `../channel/client.js`                                            |
 | 9.5  | `routes/agent.js` acessa campos privados via cast `any`   | Médio                       | `routes/agent.js`                            | ✅ **Corrigido** — casts `@type {any}` removidos; usa `.sessionId`, `.toolsRegistry`, `.telemetry` |
 | 9.6  | `task-tools.js` usava `execSync + curl`                   | Médio (bloqueia event loop) | `tools/task-tools.js`                        | ✅ **Corrigido** — substituído por `http.request` nativo                                           |
@@ -827,8 +867,8 @@ Os 14 arquivos na raiz do módulo são **shims de compatibilidade** criados dura
 
 ### Ativos (canônicos)
 
-| Arquivo                            | Camada | Status              |
-| ---------------------------------- | ------ | ------------------- |
+| Arquivo                            | Camada | Status               |
+| ---------------------------------- | ------ | -------------------- |
 | `agent/entry.js`                   | 12     | ✅ Ativo             |
 | `agent/always-alive.js`            | 3      | ✅ Crítico           |
 | `agent/session-manager.js`         | 3      | ✅ Ativo             |
@@ -942,4 +982,4 @@ Os 14 arquivos na raiz do módulo são **shims de compatibilidade** criados dura
 
 ---
 
-*Gerado em: 2026-03-15 · Baseado na inspeção do código-fonte pós-Fase AI (AI.1–AI.5)*
+_Gerado em: 2026-03-15 · Baseado na inspeção do código-fonte pós-Fase AI (AI.1–AI.5)_

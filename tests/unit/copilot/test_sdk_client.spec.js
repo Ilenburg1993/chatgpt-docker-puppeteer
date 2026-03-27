@@ -100,7 +100,8 @@ describe('sdk-client › disconnectSdkSession', () => {
 
 describe('sdk-client › incrementMessageCount', () => {
     it('não lança erro para sessão inexistente (noop silencioso)', async () => {
-        const { incrementSessionMessageCount: incrementMessageCount } = await import('../../../src/copilot/lib/client.js');
+        const { incrementSessionMessageCount: incrementMessageCount } =
+            await import('../../../src/copilot/lib/client.js');
         assert.doesNotThrow(() => {
             incrementMessageCount('sessao-nao-existe-xyz');
         });

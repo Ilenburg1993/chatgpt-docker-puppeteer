@@ -305,6 +305,7 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
  *     url: () => string;
  * }} SadiPageLike
  *
+ *
  * @typedef {{
  *     selector: string;
  *     isShadow?: boolean;
@@ -314,6 +315,7 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
  *     timestamp?: number;
  * }} SadiElementProtocol
  *
+ *
  * @typedef {{
  *     protocol: SadiElementProtocol;
  *     confidence: number;
@@ -322,6 +324,7 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
  *     has_svg?: boolean;
  *     is_disabled?: boolean;
  * }} SadiDetectionResult
+ *
  *
  * @typedef {{
  *     protocol: SadiElementProtocol;

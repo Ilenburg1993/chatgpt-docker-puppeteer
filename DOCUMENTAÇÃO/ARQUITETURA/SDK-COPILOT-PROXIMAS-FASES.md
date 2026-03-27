@@ -11,8 +11,8 @@ revisado após auditoria SDK v0.2.0 (npm), auditorias de código e Sprints 15-16
 
 ### Estado atual da base de código (pós-Sprint 16c — commit 7ebb2843)
 
-| Módulo                         | Status                   | Sprint  |
-| ------------------------------ | ------------------------ | ------- |
+| Módulo                         | Status                    | Sprint  |
+| ------------------------------ | ------------------------- | ------- |
 | `lib/client.js`                | ✅ Implementado           | 10      |
 | `lib/session.js`               | ✅ Implementado           | 10      |
 | `lib/permissions.js`           | ✅ Implementado           | 10      |
@@ -126,7 +126,8 @@ revisado após auditoria SDK v0.2.0 (npm), auditorias de código e Sprints 15-16
 
 - `src/copilot/tools/file-tools.js` com 8 ferramentas de filesystem
 - `fileReadTools` (skipPermission: true): `read_file_content`, `list_directory`, `search_in_files`
-- `fileWriteTools` (skipPermission: false): `write_file_content`, `create_file`, `delete_file`, `copy_file`, `move_file`
+- `fileWriteTools` (skipPermission: false): `write_file_content`, `create_file`, `delete_file`,
+  `copy_file`, `move_file`
 - `validatePath()`: previne traversal e bloqueia `.env`, `.git/`, `node_modules/`
 - `sdkParam` helper: resolve `ToolHandler<unknown>` type conflict
 - `tools/index.js`: fileTools incluídos em allTools; exports granulares por categoria
@@ -201,7 +202,8 @@ import { SYSTEM_PROMPT_SECTIONS, CopilotClient } from '@github/copilot-sdk';
 
 **Status**: ✅ Concluído em 2026-03-24 como parte da Sprint 19 | Commit: `f6ec3970`
 
-**Implementado**: `GET /agent/stream` — SSE de eventos de lifecycle do `CopilotClient`. Ver Sprint 19 acima.
+**Implementado**: `GET /agent/stream` — SSE de eventos de lifecycle do `CopilotClient`. Ver Sprint
+19 acima.
 
 ---
 
@@ -213,9 +215,9 @@ import { SYSTEM_PROMPT_SECTIONS, CopilotClient } from '@github/copilot-sdk';
 
 | Tool             | Operação                   | skipPermission | Segurança                                       |
 | ---------------- | -------------------------- | -------------- | ----------------------------------------------- |
-| `exec_command`   | Executa comando arbitrário | ❌ não          | Blocklist 15+ padrões, cwd restrito             |
-| `run_npm_script` | Executa `npm run <script>` | ❌ não          | Whitelist explícita de 20 scripts               |
-| `run_node_file`  | Executa `node <file>`      | ❌ não          | Ext. permitidas (.js/.mjs/.cjs), workspace only |
+| `exec_command`   | Executa comando arbitrário | ❌ não         | Blocklist 15+ padrões, cwd restrito             |
+| `run_npm_script` | Executa `npm run <script>` | ❌ não         | Whitelist explícita de 20 scripts               |
+| `run_node_file`  | Executa `node <file>`      | ❌ não         | Ext. permitidas (.js/.mjs/.cjs), workspace only |
 
 **Restrições de segurança embutidas**:
 
@@ -231,14 +233,16 @@ import { SYSTEM_PROMPT_SECTIONS, CopilotClient } from '@github/copilot-sdk';
 - `src/copilot/tools/shell-tools.js` — 3 tools
 - `tests/unit/copilot/test_shell_tools.spec.js` — 39 testes (39/39 passando)
 - `src/copilot/tools/index.js` — `shellTools` adicionado ao `allTools`
-- `src/copilot/always-alive.js` — registrado com `{category: 'shell', tags: ['exec', 'system', 'npm', 'node']}`
+- `src/copilot/always-alive.js` — registrado com
+  `{category: 'shell', tags: ['exec', 'system', 'npm', 'node']}`
 
 ---
 
 ### Sprint 22 — System Message Upgrade ★ MÉDIO ✅ CONCLUÍDO (parcial — SDK v0.1.32)
 
-> **Commit**: `PENDING_SPRINT22` | **Implementação parcial**: usa `mode: "append"` e `mode: "replace"` do SDK v0.1.32.
-> **Aguardando SDK v0.2.0** para `mode: "customize"` com seções nomeadas (bloqueado como Sprint 18).
+> **Commit**: `PENDING_SPRINT22` | **Implementação parcial**: usa `mode: "append"` e
+> `mode: "replace"` do SDK v0.1.32. **Aguardando SDK v0.2.0** para `mode: "customize"` com seções
+> nomeadas (bloqueado como Sprint 18).
 
 **Objetivo**: usar `mode: "customize"` com todas as 10 seções do SDK v0.2.0. **ROI**: médio —
 permite fine-grained control do system prompt. **Duração**: 0.5 sprint.
@@ -247,8 +251,10 @@ permite fine-grained control do system prompt. **Duração**: 0.5 sprint.
 
 **Novo arquivo `src/copilot/config/system-prompt.js`**:
 
-- Constante `SYSTEM_PROMPT_SECTIONS` — 10 chaves nomeadas, pronta para migração a `@github/copilot-sdk v0.2.0`
-- Constantes de texto: `AGENT_IDENTITY`, `AGENT_TONE`, `TOOL_EFFICIENCY`, `ENVIRONMENT_CONTEXT`, `CODE_CHANGE_RULES`, `AGENT_GUIDELINES`, `LAST_INSTRUCTIONS`
+- Constante `SYSTEM_PROMPT_SECTIONS` — 10 chaves nomeadas, pronta para migração a
+  `@github/copilot-sdk v0.2.0`
+- Constantes de texto: `AGENT_IDENTITY`, `AGENT_TONE`, `TOOL_EFFICIENCY`, `ENVIRONMENT_CONTEXT`,
+  `CODE_CHANGE_RULES`, `AGENT_GUIDELINES`, `LAST_INSTRUCTIONS`
 - `buildAppendSystemMessage(content)` — `mode: "append"` tipado
 - `buildReplaceSystemMessage(content)` — `mode: "replace"` tipado
 - `buildAlwaysAliveSystemMessage(opts)` — system prompt completo com 7 seções em `mode: "replace"`
@@ -256,8 +262,10 @@ permite fine-grained control do system prompt. **Duração**: 0.5 sprint.
 
 **Correções de API**:
 
-- `session-manager.js`: substituiu `mode: "customize"` (não existe no v0.1.32, era cast `any`) por `buildHookContextAppendMessage` tipada
-- `session-config.js`: substituiu campo `guidelines` (inválido) por `content` via `buildHookContextAppendMessage`
+- `session-manager.js`: substituiu `mode: "customize"` (não existe no v0.1.32, era cast `any`) por
+  `buildHookContextAppendMessage` tipada
+- `session-config.js`: substituiu campo `guidelines` (inválido) por `content` via
+  `buildHookContextAppendMessage`
 
 **Testes**: 24 novos testes em `tests/unit/copilot/test_system_prompt.spec.js` | Baseline: 1395 pass
 
@@ -380,18 +388,19 @@ manutenção — sem testes, refactors são perigosos. **Duração**: 1-2 sprint
 
 ## Tabela de Prioridades e Dependências
 
-| Sprint | Título                 | Status           | Prioridade | Depende de | Commit     |
-| ------ | ---------------------- | ---------------- | ---------- | ---------- | ---------- |
+| Sprint | Título                 | Status            | Prioridade | Depende de | Commit     |
+| ------ | ---------------------- | ----------------- | ---------- | ---------- | ---------- |
 | 17     | File Tools             | ✅ CONCLUÍDO      | CRÍTICO    | —          | `f6ec3970` |
 | 18     | SDK v0.2.0 Upgrade     | ⚠️ BLOQUEADO      | ALTO       | —          | —          |
-| 19     | Session API Extensions | ✅ CONCLUÍDO      | ALTO       | 18*        | `f6ec3970` |
-| 20     | Agent Lifecycle Stream | ✅ CONCLUÍDO      | MÉDIO      | 18*/19     | `f6ec3970` |
+| 19     | Session API Extensions | ✅ CONCLUÍDO      | ALTO       | 18\*       | `f6ec3970` |
+| 20     | Agent Lifecycle Stream | ✅ CONCLUÍDO      | MÉDIO      | 18\*/19    | `f6ec3970` |
 | 21     | Shell Tools            | ✅ CONCLUÍDO      | MÉDIO      | 17         | `dbb778bf` |
-| 22     | System Message Upgrade | ✅ CONCLUÍDO (p.) | MÉDIO      | 18*        | próximo    |
+| 22     | System Message Upgrade | ✅ CONCLUÍDO (p.) | MÉDIO      | 18\*       | próximo    |
 | 23     | OpenTelemetry Nativo   | ⏳ PENDENTE       | BAIXO      | 18         | —          |
 | 24     | Testes de Integração   | ⏳ PENDENTE       | ALTO (QA)  | 17-22      | —          |
 
-> \* Sprint 22 implementado parcialmente com SDK v0.1.32 (`mode: "append"/"replace"`); migração para `mode: "customize"` aguarda SDK v0.2.0.
+> \* Sprint 22 implementado parcialmente com SDK v0.1.32 (`mode: "append"/"replace"`); migração para
+> `mode: "customize"` aguarda SDK v0.2.0.
 
 **Ordem de execução recomendada (restante)**:
 
@@ -535,8 +544,8 @@ const shellRestrictionsHook = async (input) => {
 
 ### Estado atual da base de código
 
-| Módulo                   | Status             | Testes     |
-| ------------------------ | ------------------ | ---------- |
+| Módulo                   | Status              | Testes     |
+| ------------------------ | ------------------- | ---------- |
 | `lib/client.js`          | ✅ Implementado     | Sprint 10  |
 | `lib/session.js`         | ✅ Implementado     | Sprint 10  |
 | `lib/permissions.js`     | ✅ Implementado     | Sprint 10  |
@@ -706,8 +715,8 @@ se conectem a "servidores de contexto" que fornecem **tools**, **resources** e *
 
 ### Capacidades do protocolo MCP que ainda não usamos
 
-| Capacidade MCP           | Status neste projeto      | Oportunidade                                   |
-| ------------------------ | ------------------------- | ---------------------------------------------- |
+| Capacidade MCP           | Status neste projeto       | Oportunidade                                   |
+| ------------------------ | -------------------------- | ---------------------------------------------- |
 | `tools/list`             | ✅ Usado (mcp-tool-bridge) | —                                              |
 | `tools/call`             | ✅ Usado (mcp-tool-bridge) | —                                              |
 | `resources/list`         | ❌ Não implementado        | LLM-B acessa arquivos via MCP resource!        |
@@ -1177,11 +1186,11 @@ specification v2025-11-25._
 ```javascript
 /**
  * @typedef {Object} StructuredMessage
- * @property {string} context     - Resumo do estado atual ou briefing relevante
- * @property {string} intent      - Objetivo principal da mensagem
- * @property {'low'|'medium'|'high'} priority  - Prioridade da ação
- * @property {'diagnostic'|'plan'|'code'|'question'} responseType - Tipo de resposta
- * @property {string} output      - Conteúdo principal (diagnóstico, plano, código, etc)
+ * @property {string} context - Resumo do estado atual ou briefing relevante
+ * @property {string} intent - Objetivo principal da mensagem
+ * @property {'low' | 'medium' | 'high'} priority - Prioridade da ação
+ * @property {'diagnostic' | 'plan' | 'code' | 'question'} responseType - Tipo de resposta
+ * @property {string} output - Conteúdo principal (diagnóstico, plano, código, etc)
  */
 ```
 
@@ -1189,12 +1198,14 @@ specification v2025-11-25._
 `StructuredMessage`.
 
 **Campo `responseType`**:
+
 - `'diagnostic'` — diagnósticos de sistema/testes
 - `'plan'` — planejamento de sprints/tarefas
 - `'code'` — código a implementar
 - `'question'` — pergunta para LLM-A
 
 **Arquivos a criar/modificar**:
+
 - `src/copilot/types/structured-message.js` — definição do tipo + validador Zod
 - `src/copilot/llm-bridge-client.js` — `chatStructured(msg: StructuredMessage)` method
 - `tests/unit/copilot/test_structured_message.spec.js` — testes de schema + serialização
@@ -1208,12 +1219,25 @@ specification v2025-11-25._
 **Formato do log** (`.github/hooks/state/tool-audit.jsonl`):
 
 ```jsonl
-{"ts":1774304482417,"tool":"exec_command","args":{"command":"npm run test:unit"},"result":{"exitCode":0},"durationMs":53750,"sessionId":"d9c7e155-..."}
+{
+  "ts": 1774304482417,
+  "tool": "exec_command",
+  "args": {
+    "command": "npm run test:unit"
+  },
+  "result": {
+    "exitCode": 0
+  },
+  "durationMs": 53750,
+  "sessionId": "d9c7e155-..."
+}
 ```
 
 **Arquivos a criar/modificar**:
+
 - `src/copilot/lib/tool-auditor.js` — serviço de auditoria com append a JSONL
-- Patch em cada tool existente (`shell-tools.js`, `file-tools.js`, `hook-tools.js`) para chamar auditor
+- Patch em cada tool existente (`shell-tools.js`, `file-tools.js`, `hook-tools.js`) para chamar
+  auditor
 - `tests/unit/copilot/test_tool_auditor.spec.js`
 
 ---
@@ -1223,6 +1247,7 @@ specification v2025-11-25._
 **Objetivo**: Testes de integração cobrindo fluxo completo do módulo copilot.
 
 **Arquivos a criar**:
+
 - `tests/integration/copilot/test_sdk_api.spec.js`
 - `tests/integration/copilot/test_tools_file.spec.js`
 - `tests/integration/copilot/test_tools_shell.spec.js`
@@ -1238,6 +1263,7 @@ specification v2025-11-25._
 consolidação de resultados.
 
 **Arquivos a criar/modificar**:
+
 - `src/copilot/parallel-task-queue.js` — fila de tasks com `Promise.allSettled`
 - `src/copilot/llm-bridge-client.js` — `chatBatch(messages: StructuredMessage[])` method
 
@@ -1250,6 +1276,7 @@ consolidação de resultados.
 **Objetivo**: LLM-B recebe os últimos N turnos como contexto ao retomar uma sessão.
 
 **Arquivos a modificar**:
+
 - `src/copilot/session-manager.js` — persistir turnos em SQLite (já disponível)
 - `src/copilot/always-alive.js` — injetar histórico ao `initOrResumeSession`
 
@@ -1257,5 +1284,5 @@ consolidação de resultados.
 
 ### Script de conversa (artefato criado)
 
-`src/copilot/llm-a-conversation.mjs` — script de 5 turnos para conversas programáticas LLM-A ↔ LLM-B.
-Execução: `node --strip-types src/copilot/llm-a-conversation.mjs`
+`src/copilot/llm-a-conversation.mjs` — script de 5 turnos para conversas programáticas LLM-A ↔
+LLM-B. Execução: `node --strip-types src/copilot/llm-a-conversation.mjs`

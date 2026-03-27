@@ -4,8 +4,8 @@
  *
  * Entry point do processo PM2 "copilot-sdk-agent".
  *
- * Inicializa o AlwaysAliveAgent e mantém o processo ativo, aguardando
- * mensagens via sinais ou via HTTP bridge (montado no dashboard-web :3008).
+ * Inicializa o AlwaysAliveAgent e mantém o processo ativo, aguardando mensagens via sinais ou via HTTP bridge (montado
+ * no dashboard-web :3008).
  *
  * Este processo é opcional e controlado por COPILOT_SDK_ENABLED=true.
  *
@@ -19,6 +19,7 @@ const RESTART_DELAY_MS = parseInt(process.env.COPILOT_RESTART_DELAY_MS ?? '5000'
 
 /**
  * Inicializa o agente com tentativas de retry.
+ *
  * @param {number} [attempt]
  * @returns {Promise<void>}
  */
@@ -31,7 +32,7 @@ async function startWithRetry(attempt = 1) {
         log('ERROR', `[copilot/agent] Falha ao iniciar (tentativa ${attempt}): ${e.message}`);
         if (attempt < 5) {
             log('INFO', `[copilot/agent] Tentando novamente em ${RESTART_DELAY_MS}ms...`);
-            await new Promise(r => setTimeout(r, RESTART_DELAY_MS));
+            await new Promise((r) => setTimeout(r, RESTART_DELAY_MS));
             await startWithRetry(attempt + 1);
         } else {
             log('ERROR', '[copilot/agent] Máximo de tentativas atingido. Encerrando processo.');

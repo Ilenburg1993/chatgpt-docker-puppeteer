@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
  * # ============================================================================
+ *
  * Puppeteer Launch Guard — Architectural Enforcement Layer
  *
  * ## OBJETIVO

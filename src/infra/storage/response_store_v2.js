@@ -69,13 +69,15 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
             }),
         );
 
-        /** @type {{
-    textFile: string;
-    markdownFile: string;
-    jsonFile: string;
-    htmlFile: string;
-    legacy?: { textFile: string; markdownFile: string; jsonFile: string; htmlFile: string };
-}} */
+        /**
+         * @type {{
+         *     textFile: string;
+         *     markdownFile: string;
+         *     jsonFile: string;
+         *     htmlFile: string;
+         *     legacy?: { textFile: string; markdownFile: string; jsonFile: string; htmlFile: string };
+         * }}
+         */
         const out = {
             textFile: `${basePath}.txt`,
             markdownFile: `${basePath}.md`,

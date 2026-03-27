@@ -40,13 +40,15 @@ export async function collectRuntimeFindings(options) {
         rag: { ok: false, available: null, degraded: null },
         lsp: { ok: false, details: '' },
     });
-    /** @type {{
-    signal: string;
-    evidence: string;
-    source_tool: string;
-    file?: string | null;
-    line?: number | null;
-}[]} */
+    /**
+     * @type {{
+     *     signal: string;
+     *     evidence: string;
+     *     source_tool: string;
+     *     file?: string | null;
+     *     line?: number | null;
+     * }[]}
+     */
     const signals = [];
 
     const mcpDiag = await exec('runtime.mcp_diagnose', 'npm', ['run', 'mcp:diagnose', '--', '--json'], {

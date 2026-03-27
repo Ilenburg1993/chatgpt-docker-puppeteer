@@ -1,8 +1,10 @@
 // @ts-check
-/** @import {
-  ComputedRef,
-  Ref
-} from "vue" */
+/**
+ * @import {
+ *   ComputedRef,
+ *   Ref
+ * } from "vue"
+ */
 import { http } from '@/lib/http';
 import { computed, onMounted, ref } from 'vue';
 import { useNotifications } from './useNotifications.js';

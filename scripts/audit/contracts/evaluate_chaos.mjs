@@ -16,13 +16,15 @@ import { evaluateRuntimeSignals } from './evaluate_runtime.mjs';
  * @returns {Promise<any>}
  */
 export async function evaluateChaosContracts(options) {
-    /** @type {{
-    signal: string;
-    evidence: string;
-    source_tool: string;
-    file?: string | null;
-    line?: number | null;
-}[]} */
+    /**
+     * @type {{
+     *     signal: string;
+     *     evidence: string;
+     *     source_tool: string;
+     *     file?: string | null;
+     *     line?: number | null;
+     * }[]}
+     */
     const signals = [];
     /** @type {{ source: string; message: string }[]} */
     const warnings = [];

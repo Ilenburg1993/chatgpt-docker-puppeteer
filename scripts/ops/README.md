@@ -1,10 +1,8 @@
 # scripts/ops
 
 **Propósito**: Scripts de operações do dia a dia — monitoramento, PM2, visualização de fila, rotação
-de perfis e logs.
-**Status**: Canônico.
-**Público**: Operações e desenvolvedores em ambiente de produção.
-**Última atualização**: 2 de março de 2026.
+de perfis e logs. **Status**: Canônico. **Público**: Operações e desenvolvedores em ambiente de
+produção. **Última atualização**: 2 de março de 2026.
 
 ## Entradas principais
 

@@ -1,21 +1,22 @@
 # LLM-A Communication Guide
 
-> **Para**: LLM-A (GitHub Copilot — orquestrador deste repositório)
-> **Sobre**: Como me comunicar com LLM-B (Copilot SDK / gpt-4.1) de forma robusta
-> **Criado**: 2026-03-23 (revisado após conversa colaborativa de 5 turnos)
+> **Para**: LLM-A (GitHub Copilot — orquestrador deste repositório) **Sobre**: Como me comunicar com
+> LLM-B (Copilot SDK / gpt-4.1) de forma robusta **Criado**: 2026-03-23 (revisado após conversa
+> colaborativa de 5 turnos)
 
 ---
 
 ## 1. O que é LLM-B e como ela funciona
 
 **LLM-B** é o modelo `gpt-4.1` rodando dentro do `@github/copilot-sdk` via `AlwaysAliveAgent`. Ela:
+
 - Mantém uma sessão viva indefinidamente (sempre-alive)
 - Tem acesso a 30 ferramentas: bash, arquivo, git, npm, SQL, agentes especializados, skills, hooks
 - Processa mensagens em fila, com streaming de tokens por `task.delta`
 - Pode fazer perguntas de volta via `ask_user` (que LLM-A responde via `.answer()`)
 
-**LLM-B NÃO é um HTTP server separado** — ela é uma camada de SDK sobre a API GitHub Copilot.
-**O servidor Express principal (porta 3008) NÃO é necessário** para conversar com LLM-B.
+**LLM-B NÃO é um HTTP server separado** — ela é uma camada de SDK sobre a API GitHub Copilot. **O
+servidor Express principal (porta 3008) NÃO é necessário** para conversar com LLM-B.
 
 ---
 
@@ -50,8 +51,8 @@ await alwaysAliveAgent.start();
 const bridge = new LlmBridgeClient();
 
 const result = await bridge.chat('Olá LLM-B! Execute npm run test:unit e diga o resultado.', {
-    onDelta: (chunk) => process.stdout.write(chunk),  // streaming em tempo real
-    timeoutMs: 120_000,  // 2 minutos para tarefas longas
+  onDelta: (chunk) => process.stdout.write(chunk), // streaming em tempo real
+  timeoutMs: 120_000, // 2 minutos para tarefas longas
 });
 
 console.log('\n[', result.durationMs, 'ms,', result.responseLen, 'chars]');
@@ -69,14 +70,17 @@ import { LlmBridgeClient } from '../llm-bridge-client.js';
 await alwaysAliveAgent.start();
 const bridge = new LlmBridgeClient();
 
-const result = await bridge.chatStructured({
+const result = await bridge.chatStructured(
+  {
     context: 'Sprint A acabou de ser implementado. 1395 testes passando.',
     intent: 'Verificar se os novos testes do Sprint A estão passando',
     priority: 'high',
     responseType: 'diagnostic',
-}, {
+  },
+  {
     onDelta: (chunk) => process.stdout.write(chunk),
-});
+  },
+);
 
 // result.structured: StructuredMessage parseado da resposta
 // result.raw: string bruta de LLM-B
@@ -88,37 +92,33 @@ await alwaysAliveAgent.stop();
 
 ## 3. O protocolo StructuredMessage (Sprint A)
 
-**Por que usar**: mensagens estruturadas permitem que LLM-A e LLM-B se entendam sem ambiguidade,
-com campos explícitos que podem ser inspecionados, logados e auditados.
+**Por que usar**: mensagens estruturadas permitem que LLM-A e LLM-B se entendam sem ambiguidade, com
+campos explícitos que podem ser inspecionados, logados e auditados.
 
 ### Schema
 
-```javascript
+````javascript
 /**
  * @typedef {Object} StructuredMessage
- * @property {string} context
- *   Resumo do estado atual do sistema ou briefing relevante.
- *   Exemplo: "Sprint 22 concluído. 1395 testes. Próximo: Sprint A."
- * @property {string} intent
- *   Objetivo principal desta mensagem. O que LLM-B deve fazer.
- *   Exemplo: "Verificar se todos os testes passam após mudança em config/index.js"
- * @property {'low'|'medium'|'high'} priority
- *   Urgência da tarefa. 'high' = precisa resposta imediata e correta.
- * @property {'diagnostic'|'plan'|'code'|'question'} responseType
- *   Tipo de resposta esperado:
+ * @property {string} context Resumo do estado atual do sistema ou briefing relevante. Exemplo: "Sprint 22 concluído.
+ *   1395 testes. Próximo: Sprint A."
+ * @property {string} intent Objetivo principal desta mensagem. O que LLM-B deve fazer. Exemplo: "Verificar se todos os
+ *   testes passam após mudança em config/index.js"
+ * @property {'low' | 'medium' | 'high'} priority Urgência da tarefa. 'high' = precisa resposta imediata e correta.
+ * @property {'diagnostic' | 'plan' | 'code' | 'question'} responseType Tipo de resposta esperado:
+ *
  *   - 'diagnostic': relatório de estado/saúde do sistema
  *   - 'plan': plano de ação / lista de sprints
  *   - 'code': código a implementar (retorna blocos ```js)
- *   - 'question': LLM-B precisa de mais informação
- * @property {string} [output]
- *   Conteúdo principal da resposta (preenchido por LLM-B).
- *   Omitido quando LLM-A envia a mensagem.
+ *   - 'question': LLM-B precisa de mais informação @property {string} [output] Conteúdo principal da resposta (preenchido
+ *       por LLM-B). Omitido quando LLM-A envia a mensagem.
  */
-```
+````
 
 ### Serialização
 
 **LLM-A → LLM-B**: JSON puro, sem texto extra antes ou depois.
+
 ```json
 {
   "context": "Estou implementando Sprint A. Arquivo: src/copilot/types/structured-message.js",
@@ -129,6 +129,7 @@ com campos explícitos que podem ser inspecionados, logados e auditados.
 ```
 
 **LLM-B → LLM-A**: Também JSON puro, campo `output` preenchido.
+
 ```json
 {
   "context": "Schema recebido e analisado",
@@ -142,6 +143,7 @@ com campos explícitos que podem ser inspecionados, logados e auditados.
 ### Regra de fallback
 
 Se LLM-B responder com texto puro (não JSON), `chatStructured()` ainda funciona:
+
 - `result.structured = null`
 - `result.raw = resposta_inteira`
 - Não lançar erro — LLM-B pode não ter entendido que deve responder em JSON
@@ -151,33 +153,42 @@ Se LLM-B responder com texto puro (não JSON), `chatStructured()` ainda funciona
 ## 4. Modos de conversa disponíveis
 
 ### Modo 1: `chat()` — string simples (para tarefas de propósito geral)
+
 ```javascript
 const result = await bridge.chat('Execute npm run lint e diga o número de erros.');
 ```
+
 - **Quando usar**: diagnósticos rápidos, tarefas ad-hoc, pilotos
 - **Retorna**: `ChatResult { response: string, durationMs, responseLen, chunks }`
 
 ### Modo 2: `chatStructured()` — protocolo JSON (para integração LLM-A ↔ LLM-B)
+
 ```javascript
 const result = await bridge.chatStructured({ context, intent, priority, responseType });
 ```
+
 - **Quando usar**: comunicação programática formal, auditável, persistível
-- **Retorna**: `StructuredChatResult { structured: StructuredMessage|null, raw: string, ...ChatResult }`
+- **Retorna**:
+  `StructuredChatResult { structured: StructuredMessage|null, raw: string, ...ChatResult }`
 
 ### Modo 3: `startDialogMode()` / `dialogTurn()` — Dialog Loop (para iteração multi-passo)
+
 ```javascript
 await bridge.startDialogMode('Realize N tarefas usando ask_user entre cada uma');
 const reply1 = await bridge.dialogTurn('Tarefa 1: verifique os testes');
 const reply2 = await bridge.dialogTurn('Tarefa 2: aplique lint fix');
 await bridge.stopDialogMode();
 ```
+
 - **Quando usar**: workflows multi-passo onde LLM-B coordena com LLM-A
 - **Baseado em**: padrão §15.8 (Dialog Loop)
 
 ### Modo 4: `chatBatch()` — múltiplas tasks em paralelo (Sprint D — futuro)
+
 ```javascript
 const results = await bridge.chatBatch([msg1, msg2, msg3]);
 ```
+
 - **Quando usar**: análises independentes que podem ser paralelizadas
 - **Status**: planejado para Sprint D
 
@@ -188,6 +199,7 @@ const results = await bridge.chatBatch([msg1, msg2, msg3]);
 LLM-B pode usar estas ferramentas durante a conversa — basta mencionar na mensagem:
 
 ### Shell & Terminal
+
 | Tool             | O que faz                             |
 | ---------------- | ------------------------------------- |
 | `exec_command`   | Executa comando shell (com allowlist) |
@@ -195,6 +207,7 @@ LLM-B pode usar estas ferramentas durante a conversa — basta mencionar na mens
 | `run_node_file`  | Executa arquivo .js/.mjs com node     |
 
 ### Arquivo & Filesystem
+
 | Tool              | O que faz                          |
 | ----------------- | ---------------------------------- |
 | `read_file`       | Lê arquivo (com limite de tamanho) |
@@ -209,6 +222,7 @@ LLM-B pode usar estas ferramentas durante a conversa — basta mencionar na mens
 | `write_json_file` | Serializa + escreve JSON           |
 
 ### Git
+
 | Tool         | O que faz          |
 | ------------ | ------------------ |
 | `git_status` | `git status` atual |
@@ -218,6 +232,7 @@ LLM-B pode usar estas ferramentas durante a conversa — basta mencionar na mens
 | `git_push`   | Push para origin   |
 
 ### Hooks & Estado da Sessão
+
 | Tool                    | O que faz                                    |
 | ----------------------- | -------------------------------------------- |
 | `read_session_briefing` | Lê `.github/hooks/state/session-briefing.md` |
@@ -225,6 +240,7 @@ LLM-B pode usar estas ferramentas durante a conversa — basta mencionar na mens
 | `get_close_key`         | Obtém a chave de encerramento da sessão      |
 
 ### Agentes Especializados
+
 | Tool                | O que faz                      |
 | ------------------- | ------------------------------ |
 | `explore_agent`     | Agente de exploração de código |
@@ -232,6 +248,7 @@ LLM-B pode usar estas ferramentas durante a conversa — basta mencionar na mens
 | `code_review_agent` | Agente de revisão de código    |
 
 ### Skills Customizadas
+
 | Tool              | O que faz                        |
 | ----------------- | -------------------------------- |
 | `code_audit`      | Auditoria de qualidade de código |
@@ -269,54 +286,60 @@ LLM-B pode usar estas ferramentas durante a conversa — basta mencionar na mens
 ## 7. Sprints planejados para melhorar a comunicação
 
 ### Sprint A — Structured Dialog Protocol ✅ (este sprint)
-**Status**: implementando agora
-**Objetivo**: Schema `StructuredMessage` + `bridge.chatStructured()` + validação Zod
-**Por que**: base para toda comunicação robusta e auditável entre LLM-A e LLM-B
+
+**Status**: implementando agora **Objetivo**: Schema `StructuredMessage` +
+`bridge.chatStructured()` + validação Zod **Por que**: base para toda comunicação robusta e
+auditável entre LLM-A e LLM-B
 
 ### Sprint C — Tool Call Auditing
-**Status**: pendente (após Sprint A)
-**Objetivo**: Log JSONL de todo tool call: `{ts, tool, args, result, durationMs, sessionId}`
-**Por que**: debugging, auditoria, análise de performance das ferramentas
+
+**Status**: pendente (após Sprint A) **Objetivo**: Log JSONL de todo tool call:
+`{ts, tool, args, result, durationMs, sessionId}` **Por que**: debugging, auditoria, análise de
+performance das ferramentas
 
 ### Sprint 24 — Integration Tests do módulo copilot
-**Status**: pendente (alta prioridade)
-**Objetivo**: Testes de integração para sdk-api, tools, config-builders
-**Por que**: garantia de que o módulo copilot funciona end-to-end
+
+**Status**: pendente (alta prioridade) **Objetivo**: Testes de integração para sdk-api, tools,
+config-builders **Por que**: garantia de que o módulo copilot funciona end-to-end
 
 ### Sprint D — Parallel Task Queue
-**Status**: futuro (depende de Sprint A)
-**Objetivo**: `bridge.chatBatch()` para múltiplas tasks em paralelo
-**Por que**: eficiência quando LLM-A precisa fazer múltiplas verificações independentes
+
+**Status**: futuro (depende de Sprint A) **Objetivo**: `bridge.chatBatch()` para múltiplas tasks em
+paralelo **Por que**: eficiência quando LLM-A precisa fazer múltiplas verificações independentes
 
 ### Sprint B — Session Persistence v2
-**Status**: futuro (depende de Sprint A)
-**Objetivo**: LLM-B recebe histórico dos últimos N turnos ao retomar sessão
-**Por que**: melhora continuidade e reduz repetição de contexto
+
+**Status**: futuro (depende de Sprint A) **Objetivo**: LLM-B recebe histórico dos últimos N turnos
+ao retomar sessão **Por que**: melhora continuidade e reduz repetição de contexto
 
 ### Sprint E — LLM-A Self-Description Tool
-**Status**: ideia (sprint futuro)
-**Objetivo**: LLM-B pode chamar `get_llm_a_context()` para saber o que LLM-A sabe
-**Por que**: elimina necessidade de LLM-A incluir contexto manualmente em cada mensagem
+
+**Status**: ideia (sprint futuro) **Objetivo**: LLM-B pode chamar `get_llm_a_context()` para saber o
+que LLM-A sabe **Por que**: elimina necessidade de LLM-A incluir contexto manualmente em cada
+mensagem
 
 ---
 
 ## 8. Boas práticas para LLM-A
 
 ### Sempre incluir contexto relevante
+
 ```javascript
 // ❌ Pouco contexto
 await bridge.chat('Execute os testes');
 
 // ✅ Contexto adequado
 await bridge.chatStructured({
-    context: 'Sprint A acabou de ser implementado. Arquivos novos: types/structured-message.js, atualizado: llm-bridge-client.js',
-    intent: 'Execute npm run test:unit -- --test-filter=structured e confirme 0 falhas',
-    priority: 'high',
-    responseType: 'diagnostic',
+  context:
+    'Sprint A acabou de ser implementado. Arquivos novos: types/structured-message.js, atualizado: llm-bridge-client.js',
+  intent: 'Execute npm run test:unit -- --test-filter=structured e confirme 0 falhas',
+  priority: 'high',
+  responseType: 'diagnostic',
 });
 ```
 
 ### Timeouts adequados por tipo de tarefa
+
 ```javascript
 // Diagnósticos rápidos: 30s
 await bridge.chat(msg, { timeoutMs: 30_000 });
@@ -329,18 +352,20 @@ await bridge.chat(msg, { timeoutMs: 300_000 });
 ```
 
 ### Streaming para feedback imediato
+
 ```javascript
 // Sempre usar onDelta para ver progresso em tempo real
 await bridge.chat(msg, {
-    onDelta: (chunk) => process.stdout.write(chunk),
+  onDelta: (chunk) => process.stdout.write(chunk),
 });
 ```
 
 ### Verificar status antes de enviar
+
 ```javascript
 const status = bridge.getAgentStatus();
 if (status.status !== 'idle') {
-    console.warn('Agente ocupado:', status.status);
+  console.warn('Agente ocupado:', status.status);
 }
 ```
 
@@ -348,7 +373,8 @@ if (status.status !== 'idle') {
 
 ## 9. Arquivos do módulo copilot (mapa)
 
-> **GAP-04 (atualizado Fase AD)** — estrutura canônica refletindo migração para sub-diretórios por domínio.
+> **GAP-04 (atualizado Fase AD)** — estrutura canônica refletindo migração para sub-diretórios por
+> domínio.
 
 ```
 src/copilot/
@@ -429,13 +455,15 @@ src/copilot/
 ## 10. Troubleshooting
 
 ### "Agente não está ativo"
+
 ```javascript
 // Causa: chat() chamado antes de start()
 // Solução:
-await alwaysAliveAgent.start();  // sempre aguardar
+await alwaysAliveAgent.start(); // sempre aguardar
 ```
 
 ### Sessão expirada / "Session not found"
+
 ```javascript
 // Causa: sessão antiga não existe mais no SDK
 // Comportamento: AlwaysAlive cria nova sessão automaticamente
@@ -443,21 +471,23 @@ await alwaysAliveAgent.start();  // sempre aguardar
 ```
 
 ### Timeout em tarefas longas
+
 ```javascript
 // Causa: default de 60s insuficiente para auditorias/testes complexos
 // Solução:
-await bridge.chat(msg, { timeoutMs: 300_000 });  // 5 minutos
+await bridge.chat(msg, { timeoutMs: 300_000 }); // 5 minutos
 ```
 
 ### LLM-B não responde em JSON (chatStructured)
+
 ```javascript
 // Causa: LLM-B ignorou instrução de responder em JSON
 // `chatStructured` retorna result.structured = null neste caso
 // Solução: verificar result.structured !== null antes de usar
 if (result.structured) {
-    console.log('Tipo:', result.structured.responseType);
+  console.log('Tipo:', result.structured.responseType);
 } else {
-    console.log('Resposta em texto:', result.raw);
+  console.log('Resposta em texto:', result.raw);
 }
 ```
 

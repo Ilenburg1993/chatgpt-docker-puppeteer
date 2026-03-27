@@ -92,14 +92,16 @@ export class OllamaHostSupervisor {
         this._consecutiveFailures = 0;
         this._circuitOpenUntil = 0;
         this._state = /** @type {OllamaHostState} */ ('stopped');
-        /** @type {{
-    ok: boolean;
-    version: string | null;
-    statusCode: number | null;
-    checkedAt: number;
-    error: string | null;
-    circuitOpen: boolean;
-}} */
+        /**
+         * @type {{
+         *     ok: boolean;
+         *     version: string | null;
+         *     statusCode: number | null;
+         *     checkedAt: number;
+         *     error: string | null;
+         *     circuitOpen: boolean;
+         * }}
+         */
         this._last = {
             ok: false,
             version: null,

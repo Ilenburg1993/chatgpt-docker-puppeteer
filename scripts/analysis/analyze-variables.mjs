@@ -554,14 +554,16 @@ class _DependencyMapper {
 // ============================================
 class IssueDetector {
     constructor() {
-        /** @type {{
-    unused: any[];
-    duplicates: any[];
-    magicValues: any[];
-    redundantLet: any[];
-    enumCandidates: any[];
-    typeCandidates: any[];
-}} */
+        /**
+         * @type {{
+         *     unused: any[];
+         *     duplicates: any[];
+         *     magicValues: any[];
+         *     redundantLet: any[];
+         *     enumCandidates: any[];
+         *     typeCandidates: any[];
+         * }}
+         */
         this.issues = {
             unused: [],
             duplicates: [],

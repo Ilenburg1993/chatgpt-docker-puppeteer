@@ -1,6 +1,7 @@
 # Relatório Técnico: `src/copilot`
 
-**Repositório**: chatgpt-docker-puppeteer | **Data**: 2026 | **Escopo**: análise exaustiva do módulo `src/copilot`
+**Repositório**: chatgpt-docker-puppeteer | **Data**: 2026 | **Escopo**: análise exaustiva do módulo
+`src/copilot`
 
 ---
 
@@ -149,6 +150,7 @@ src/copilot/
 ## 2. Análise por Arquivo
 
 ### `agent/entry.js`
+
 | Atributo             | Valor                                           |
 | -------------------- | ----------------------------------------------- |
 | **Responsabilidade** | Entry point do processo PM2 `copilot-sdk-agent` |
@@ -157,11 +159,13 @@ src/copilot/
 | **Padrão**           | Retry Pattern (max 5 tentativas, delay 5 s)     |
 | **Status**           | Ativo, canônico v2                              |
 
-Inicializa `alwaysAliveAgent.start()` com retry, registra signal handlers (`SIGTERM`, `SIGINT`) e escuta eventos `'status'` e `'error'` do agente.
+Inicializa `alwaysAliveAgent.start()` com retry, registra signal handlers (`SIGTERM`, `SIGINT`) e
+escuta eventos `'status'` e `'error'` do agente.
 
 ---
 
 ### `agent/always-alive.js`
+
 | Atributo             | Valor                                                           |
 | -------------------- | --------------------------------------------------------------- |
 | **Responsabilidade** | Singleton central — gerencia todo o ciclo de vida de sessão SDK |
@@ -169,11 +173,16 @@ Inicializa `alwaysAliveAgent.start()` com retry, registra signal handlers (`SIGT
 | **Padrão**           | Singleton, EventEmitter, Queue, Watchdog                        |
 | **Status**           | Ativo, arquivo crítico                                          |
 
-Campos privados: `#client`, `#session`, `#status`, `#queue`, `#pendingQuestion`, `#dialogLoopActive`, `#watchdog`, `#sendCount`, `#contextState`, `#lastCheckpointPath`, `#webhooks`, `#telemetry`, `#toolsRegistry`. Status: `'idle' | 'processing' | 'waiting_for_input' | 'starting' | 'stopped'`. MAX_QUEUE_SIZE=100. Watchdog: intervalo 5 min, stall 15 min. Token budget warning: 80% contínuo, 70% no resume.
+Campos privados: `#client`, `#session`, `#status`, `#queue`, `#pendingQuestion`,
+`#dialogLoopActive`, `#watchdog`, `#sendCount`, `#contextState`, `#lastCheckpointPath`, `#webhooks`,
+`#telemetry`, `#toolsRegistry`. Status:
+`'idle' | 'processing' | 'waiting_for_input' | 'starting' | 'stopped'`. MAX_QUEUE_SIZE=100.
+Watchdog: intervalo 5 min, stall 15 min. Token budget warning: 80% contínuo, 70% no resume.
 
 ---
 
 ### `agent/session-manager.js`
+
 | Atributo               | Valor                                                                                                                        |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | **Responsabilidade**   | Persistência em disco do estado da sessão SDK e lógica de resume                                                             |
@@ -181,22 +190,26 @@ Campos privados: `#client`, `#session`, `#status`, `#queue`, `#pendingQuestion`,
 | **Arquivos de estado** | `.github/hooks/state/sdk-always-alive.json`, `logs/tool-audit.jsonl`                                                         |
 | **Status**             | Ativo, canônico v2                                                                                                           |
 
-Injeção de contexto do hook system no `systemMessage`. Auditoria JSONL de ferramentas de alto risco (`bash`, `edit`, `create`, `git_apply_patch`). Background compaction threshold padrão: 0.75.
+Injeção de contexto do hook system no `systemMessage`. Auditoria JSONL de ferramentas de alto risco
+(`bash`, `edit`, `create`, `git_apply_patch`). Background compaction threshold padrão: 0.75.
 
 ---
 
 ### `agent/tools-bootstrap.js`
+
 | Atributo             | Valor                                                    |
 | -------------------- | -------------------------------------------------------- |
 | **Responsabilidade** | Registro de ferramentas por categoria no boot do agente  |
 | **Exports**          | `bootstrapTools(registry, telemetry, mcpTools) → Tool[]` |
 | **Status**           | Ativo                                                    |
 
-Registra 11 categorias: task, code, git, session, hook, hub, introspection, fileRead, fileWrite, shell, mcp, custom. Chama `registerForIntrospection(allTools)` e `setTelemetryStore(telemetry)`.
+Registra 11 categorias: task, code, git, session, hook, hub, introspection, fileRead, fileWrite,
+shell, mcp, custom. Chama `registerForIntrospection(allTools)` e `setTelemetryStore(telemetry)`.
 
 ---
 
 ### `agent/events.js`
+
 | Atributo             | Valor                                                       |
 | -------------------- | ----------------------------------------------------------- |
 | **Responsabilidade** | Constantes canônicas dos 26 eventos do `AlwaysAliveAgent`   |
@@ -206,6 +219,7 @@ Registra 11 categorias: task, code, git, session, hook, hub, introspection, file
 ---
 
 ### `agent/task-executor.js`
+
 | Atributo             | Valor                                           |
 | -------------------- | ----------------------------------------------- |
 | **Responsabilidade** | Execução de tarefa individual da fila do agente |
@@ -213,22 +227,26 @@ Registra 11 categorias: task, code, git, session, hook, hub, introspection, file
 | **Padrão**           | Command Pattern, Callbacks                      |
 | **Status**           | Ativo                                           |
 
-Assina `assistant.message_delta` (streaming), `tool.execution_start/complete` (auditoria). Timeout default 60 s via `session.sendAndWait()`.
+Assina `assistant.message_delta` (streaming), `tool.execution_start/complete` (auditoria). Timeout
+default 60 s via `session.sendAndWait()`.
 
 ---
 
 ### `agent/dialog-watchdog.js`
+
 | Atributo             | Valor                                              |
 | -------------------- | -------------------------------------------------- |
 | **Responsabilidade** | Monitor de inatividade isolado do dialog loop      |
 | **Exports**          | `class DialogWatchdog { start(), stop(), ping() }` |
 | **Status**           | Ativo                                              |
 
-Extraído de `always-alive.js` para facilitar testes. Callback `onStall(stalledMs)` disparado quando inactividade > `stallMs`.
+Extraído de `always-alive.js` para facilitar testes. Callback `onStall(stalledMs)` disparado quando
+inactividade > `stallMs`.
 
 ---
 
 ### `agent/webhook-manager.js`
+
 | Atributo             | Valor                                                               |
 | -------------------- | ------------------------------------------------------------------- |
 | **Responsabilidade** | Gerenciamento de webhooks de notificação HTTP                       |
@@ -240,28 +258,33 @@ Fire-and-forget via `Promise.allSettled`. ID gerado como `wh_{timestamp}_{random
 ---
 
 ### `api/http-bridge.js`
+
 | Atributo             | Valor                                         |
 | -------------------- | --------------------------------------------- |
 | **Responsabilidade** | Aggregator do Express router `/api/copilot/*` |
 | **Exports**          | `default bridge` — Express Router             |
 | **Status**           | Ativo, canônico                               |
 
-Monta 4 sub-routers: `bridge-control`, `bridge-tasks`, `bridge-stream`, `bridge-dialog`. O `copilot-router.js` é seu alias.
+Monta 4 sub-routers: `bridge-control`, `bridge-tasks`, `bridge-stream`, `bridge-dialog`. O
+`copilot-router.js` é seu alias.
 
 ---
 
 ### `api/bridge-control.js`
+
 | Atributo             | Valor                                                                  |
 | -------------------- | ---------------------------------------------------------------------- |
 | **Responsabilidade** | Rotas de controle: `GET /status /health /session`, `POST /start /stop` |
 | **Exports**          | `registerControlRoutes(bridge, agent)`                                 |
 | **Status**           | Ativo                                                                  |
 
-`/health` retorna `ok` apenas quando `status === 'idle' || 'processing'`. Inclui snapshot do ConversationStore na resposta `/health`.
+`/health` retorna `ok` apenas quando `status === 'idle' || 'processing'`. Inclui snapshot do
+ConversationStore na resposta `/health`.
 
 ---
 
 ### `api/bridge-dialog.js`
+
 | Atributo             | Valor                                                                          |
 | -------------------- | ------------------------------------------------------------------------------ |
 | **Responsabilidade** | Dialog Loop §15.8: `POST /dialog/start /dialog/turn /dialog/stop`              |
@@ -272,28 +295,33 @@ Monta 4 sub-routers: `bridge-control`, `bridge-tasks`, `bridge-stream`, `bridge-
 ---
 
 ### `api/bridge-stream.js`
+
 | Atributo             | Valor                                                            |
 | -------------------- | ---------------------------------------------------------------- |
 | **Responsabilidade** | SSE global `GET /stream` — push de todos os 26 eventos do agente |
 | **Exports**          | `registerStreamRoutes(bridge, agent)`                            |
 | **Status**           | Ativo                                                            |
 
-Heartbeat a cada 15 s. Assina dinamicamente todos os `AGENT_EVENTS`. Remove listeners ao desconectar.
+Heartbeat a cada 15 s. Assina dinamicamente todos os `AGENT_EVENTS`. Remove listeners ao
+desconectar.
 
 ---
 
 ### `api/bridge-tasks.js`
+
 | Atributo             | Valor                                                                    |
 | -------------------- | ------------------------------------------------------------------------ |
 | **Responsabilidade** | `POST /send` (enfileirar mensagem) + `POST /answer` (responder pergunta) |
 | **Exports**          | `registerTaskRoutes(bridge, agent)`                                      |
 | **Status**           | Ativo                                                                    |
 
-`/send` suporta modo síncrono (`waitForResponse=true`) com `Promise.race` + timeout. Verificação proativa de `MAX_QUEUE_SIZE` (GAP-03) antes de retornar `ok:true`.
+`/send` suporta modo síncrono (`waitForResponse=true`) com `Promise.race` + timeout. Verificação
+proativa de `MAX_QUEUE_SIZE` (GAP-03) antes de retornar `ok:true`.
 
 ---
 
 ### `api/sdk-api.js`
+
 | Atributo             | Valor                                                               |
 | -------------------- | ------------------------------------------------------------------- |
 | **Responsabilidade** | Aggregator do router `/api/sdk/*` — monta os 4 routers de `routes/` |
@@ -305,39 +333,47 @@ Subsets: `clientRouter`, `sessionsRouter`, `agentRouter`, `webhooksRouter`.
 ---
 
 ### `bridges/nerv-bridge.js`
+
 | Atributo             | Valor                                                                                       |
 | -------------------- | ------------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Ponte event-driven entre `AlwaysAliveAgent` e NERV bus                                      |
 | **Exports**          | `copilotNervBridge { mount(nerv), unmount(), isActive() }`, `emitNerv(actionCode, payload)` |
 | **Status**           | Ativo                                                                                       |
 
-EVENT_MAP cobre todos os 25 eventos. Envelope: `{ actor: 'COPILOT', actionCode, messageType: 'EVENT', payload, timestamp }`. `safeEmit()` é fire-and-forget.
+EVENT_MAP cobre todos os 25 eventos. Envelope:
+`{ actor: 'COPILOT', actionCode, messageType: 'EVENT', payload, timestamp }`. `safeEmit()` é
+fire-and-forget.
 
 ---
 
 ### `bridges/mcp-tool-bridge.js`
+
 | Atributo             | Valor                                                       |
 | -------------------- | ----------------------------------------------------------- |
 | **Responsabilidade** | Carregamento dinâmico de ferramentas via MCP (JSON-RPC 2.0) |
 | **Exports**          | `listMcpTools()`, `buildMcpTools()`                         |
 | **Status**           | Ativo                                                       |
 
-Converte JSON Schema → Zod via `buildZodSchema()`. Timeout de 8 s via `AbortSignal.timeout`. Suporta: `enum`, objetos aninhados, arrays.
+Converte JSON Schema → Zod via `buildZodSchema()`. Timeout de 8 s via `AbortSignal.timeout`.
+Suporta: `enum`, objetos aninhados, arrays.
 
 ---
 
 ### `bridges/alias-store.js`
+
 | Atributo             | Valor                                                                      |
 | -------------------- | -------------------------------------------------------------------------- |
 | **Responsabilidade** | Aliases do REPL — 10 embutidos + persistência em `~/.copilot-aliases.json` |
 | **Exports**          | `loadAliases`, `resolve`, `defineAlias`, `removeAlias`, `listAliases`      |
 | **Status**           | Ativo                                                                      |
 
-Resolução em cadeia até 5 níveis. Aliases embutidos: `/issues`, `/prs`, `/runs`, `/ci`, `/log`, `/st`, `/diff`, `/gst`, `/glog`, `/glog1`.
+Resolução em cadeia até 5 níveis. Aliases embutidos: `/issues`, `/prs`, `/runs`, `/ci`, `/log`,
+`/st`, `/diff`, `/gst`, `/glog`, `/glog1`.
 
 ---
 
 ### `channel/index.js`
+
 | Atributo             | Valor                                                     |
 | -------------------- | --------------------------------------------------------- |
 | **Responsabilidade** | Barrel + `CHANNEL_VERSION = '1'`                          |
@@ -347,6 +383,7 @@ Resolução em cadeia até 5 níveis. Aliases embutidos: `/issues`, `/prs`, `/ru
 ---
 
 ### `channel/client.js`
+
 | Atributo             | Valor                                                              |
 | -------------------- | ------------------------------------------------------------------ |
 | **Responsabilidade** | `LlmBridgeClient` — camada conversacional sobre `AlwaysAliveAgent` |
@@ -354,22 +391,26 @@ Resolução em cadeia até 5 níveis. Aliases embutidos: `/issues`, `/prs`, `/ru
 | **Padrão**           | Façade, History Buffer                                             |
 | **Status**           | Ativo                                                              |
 
-Mantém `#history` (turn-by-turn) e `#turnCount`. Suporta streaming via `task.delta`. `chatStructured()` usa protocolo StructuredMessage. Timeout padrão 60 s.
+Mantém `#history` (turn-by-turn) e `#turnCount`. Suporta streaming via `task.delta`.
+`chatStructured()` usa protocolo StructuredMessage. Timeout padrão 60 s.
 
 ---
 
 ### `channel/inject.js`
+
 | Atributo             | Valor                                                                                                             |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Canal HTTP: LLM-A → POST `/inject` do terminal ativo (porta 3009)                                                 |
 | **Exports**          | `injectToLlmB`, `checkLlmBHealth`, `injectPipeline`, `subscribeLlmB`, `subscribeLlmBCritical`, `waitForLlmBReady` |
 | **Status**           | Ativo                                                                                                             |
 
-Usa `http.request` nativo (sem `fetch`). Timeout padrão: `LLM_B_TURN_TIMEOUT` ?? 130 000 ms. Rate: `INJECT_RATE_MAX=10/60s` no servidor.
+Usa `http.request` nativo (sem `fetch`). Timeout padrão: `LLM_B_TURN_TIMEOUT` ?? 130 000 ms. Rate:
+`INJECT_RATE_MAX=10/60s` no servidor.
 
 ---
 
 ### `channel/audit.js`
+
 | Atributo             | Valor                                                                    |
 | -------------------- | ------------------------------------------------------------------------ |
 | **Responsabilidade** | Auditoria JSONL de tool calls (início + conclusão)                       |
@@ -382,6 +423,7 @@ Fila em memória `_pending: Map<toolCallId, …>` para correlacionar start/compl
 ---
 
 ### `conversation-hub/store.js`
+
 | Atributo             | Valor                                                                                          |
 | -------------------- | ---------------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Persistência SQLite — `copilot_hub_sessions`, `copilot_conversation_turns`, `copilot_memories` |
@@ -389,11 +431,14 @@ Fila em memória `_pending: Map<toolCallId, …>` para correlacionar start/compl
 | **DB**               | Usa `getDb()` do projeto (arquivo `maestro.sqlite`)                                            |
 | **Status**           | Ativo                                                                                          |
 
-DDL idempotente (`CREATE TABLE IF NOT EXISTS`). `copilot_memories` usa FTS5 com tokenizer `porter unicode61 remove_diacritics 1` (PERF-03). Triggers para sincronizar FTS5 em insert/update/delete. Índice em `user_read = 0` para polling de mensagens não lidas.
+DDL idempotente (`CREATE TABLE IF NOT EXISTS`). `copilot_memories` usa FTS5 com tokenizer
+`porter unicode61 remove_diacritics 1` (PERF-03). Triggers para sincronizar FTS5 em
+insert/update/delete. Índice em `user_read = 0` para polling de mensagens não lidas.
 
 ---
 
 ### `conversation-hub/hub.js`
+
 | Atributo             | Valor                                                                                      |
 | -------------------- | ------------------------------------------------------------------------------------------ |
 | **Responsabilidade** | Singleton `ConversationHub` — ponto de entrada único para ambiente LLM-A ↔ LLM-B ↔ Usuário |
@@ -401,11 +446,14 @@ DDL idempotente (`CREATE TABLE IF NOT EXISTS`). `copilot_memories` usa FTS5 com 
 | **Padrão**           | Facade, Template Method                                                                    |
 | **Status**           | Ativo                                                                                      |
 
-`init({ io, nerv })` idempotente — inicializa Store → Orchestrator → Socket.io namespace → (opt) NERV bridge. Atalhos de API: `createSession()`, `sendToLlmB()`, `injectUserMessage()`, `pollUserMessages()`.
+`init({ io, nerv })` idempotente — inicializa Store → Orchestrator → Socket.io namespace → (opt)
+NERV bridge. Atalhos de API: `createSession()`, `sendToLlmB()`, `injectUserMessage()`,
+`pollUserMessages()`.
 
 ---
 
 ### `conversation-hub/orchestrator.js`
+
 | Atributo             | Valor                                                                                                     |
 | -------------------- | --------------------------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Lógica de diálogo entre LLM-A, LLM-B e Usuário                                                            |
@@ -413,11 +461,13 @@ DDL idempotente (`CREATE TABLE IF NOT EXISTS`). `copilot_memories` usa FTS5 com 
 | **Eventos emitidos** | `turn:sent`, `turn:delta`, `turn:complete`, `user:injected`, `session:created`, `session:closed`, `error` |
 | **Status**           | Ativo                                                                                                     |
 
-Mantém `#turnCounters: Map<hubSessionId, nextTurnNumber>`. Restaura contadores das sessões ativas no `init()` para continuidade após restart.
+Mantém `#turnCounters: Map<hubSessionId, nextTurnNumber>`. Restaura contadores das sessões ativas no
+`init()` para continuidade após restart.
 
 ---
 
 ### `conversation-hub/socket-ns.js`
+
 | Atributo             | Valor                                                                                                                  |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Namespace Socket.io `/copilot` — streaming real-time da conversa                                                       |
@@ -430,6 +480,7 @@ Eventos recebidos do cliente: `join:session`, `inject:message`, `get:history`.
 ---
 
 ### `core/errors.js`
+
 | Atributo             | Valor                                                                                   |
 | -------------------- | --------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Hierarquia de erros tipados                                                             |
@@ -439,6 +490,7 @@ Eventos recebidos do cliente: `join:session`, `inject:message`, `get:history`.
 ---
 
 ### `lib/tools-registry.js`
+
 | Atributo             | Valor                                                                                                                                                                                   |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Registry de Custom Tools com metadados (categoria, tags, readOnly)                                                                                                                      |
@@ -448,6 +500,7 @@ Eventos recebidos do cliente: `join:session`, `inject:message`, `get:history`.
 ---
 
 ### `lib/telemetry.js`
+
 | Atributo             | Valor                                                                                                                              |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Store de telemetria em memória — tool calls, sessões, latências                                                                    |
@@ -458,6 +511,7 @@ Eventos recebidos do cliente: `join:session`, `inject:message`, `get:history`.
 ---
 
 ### `tools/shell-tools.js`
+
 | Atributo             | Valor                                                                                                                                    |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Ferramentas de shell com restrições de segurança embutidas                                                                               |
@@ -469,17 +523,20 @@ Eventos recebidos do cliente: `join:session`, `inject:message`, `get:history`.
 ---
 
 ### `types/structured-message.js`
+
 | Atributo             | Valor                                                                                                                                                                              |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Protocolo StructuredMessage — Sprint A                                                                                                                                             |
 | **Exports**          | `StructuredMessageSchema (Zod)`, `buildStructuredRequest`, `buildStructuredResponse`, `parseStructuredResponse`, `serializeStructuredMessage`, `RESPONSE_TYPES`, `PRIORITY_LEVELS` |
 | **Status**           | Ativo                                                                                                                                                                              |
 
-`RESPONSE_TYPES`: `diagnostic | plan | code | question | confirmation | error`. `PRIORITY_LEVELS`: `low | medium | high | critical`. Parser tem fallback gracioso (texto puro → `null`).
+`RESPONSE_TYPES`: `diagnostic | plan | code | question | confirmation | error`. `PRIORITY_LEVELS`:
+`low | medium | high | critical`. Parser tem fallback gracioso (texto puro → `null`).
 
 ---
 
 ### `config/system-prompt.js`
+
 | Atributo             | Valor                                                                                                                                                                      |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Responsabilidade** | Definição e builders do system prompt do LLM-B                                                                                                                             |
@@ -490,6 +547,7 @@ Eventos recebidos do cliente: `join:session`, `inject:message`, `get:history`.
 ---
 
 ### `config/custom-tools-registry.js`
+
 | Atributo               | Valor                                                                             |
 | ---------------------- | --------------------------------------------------------------------------------- |
 | **Responsabilidade**   | Registry dinâmico de tools declarativas em runtime (sem reinicialização)          |
@@ -634,7 +692,9 @@ startTerminalServer() [terminal/index.js]
                                     └── segue fluxo do POST /inject acima
 ```
 
-**Comandos REPL disponíveis**: `/status`, `/history`, `/db-history`, `/db-sessions`, `/remember`, `/recall`, `/forget`, `/who`, `/clear`, `/answer`, `/count`, `/restart`, `/model`, `/reasoning`, `/attach`, `/context`, `/compact`, `/plan`, `/resume`, `/gh`, `/git`, `/alias`, `/skills`, `/help`.
+**Comandos REPL disponíveis**: `/status`, `/history`, `/db-history`, `/db-sessions`, `/remember`,
+`/recall`, `/forget`, `/who`, `/clear`, `/answer`, `/count`, `/restart`, `/model`, `/reasoning`,
+`/attach`, `/context`, `/compact`, `/plan`, `/resume`, `/gh`, `/git`, `/alias`, `/skills`, `/help`.
 
 ---
 
@@ -754,19 +814,25 @@ Ponto de checagem: `#lastCheckpointPath` — atualizado a cada evento `session.c
 
 ### 9.1 Poluição de shims na raiz (alto impacto na DX)
 
-Os 13 arquivos shim na raiz do módulo (`agent.js`, `always-alive.js`, etc.) estão marcados como `@deprecated` mas **nunca foram removidos**. Qualquer `import` incorreto do código externo passa silenciosamente pelo shim e chega ao arquivo canônico. Não há mecanismo que force a migração.
+Os 13 arquivos shim na raiz do módulo (`agent.js`, `always-alive.js`, etc.) estão marcados como
+`@deprecated` mas **nunca foram removidos**. Qualquer `import` incorreto do código externo passa
+silenciosamente pelo shim e chega ao arquivo canônico. Não há mecanismo que force a migração.
 
 **Código problemático**: dois shims formam cadeias de dois níveis:
+
 - `inject-llmb.js` → `bridges/inject-llmb.js` → `channel/inject.js`
 - `llm-bridge-client.js` → `bridges/llm-bridge-client.js` → `channel/client.js`
 
 ### 9.2 `sdk-client.js` é um wrapper, não só re-export
 
-Enquanto todos os outros shims fazem `export * from`, o `sdk-client.js` remapeia nomes (p. ex. `createSdkSession()` → `lib/client.createClientSession()`), criando uma camada de tradução oculta que pode silenciosamente quebrar ao evoluir as assinaturas.
+Enquanto todos os outros shims fazem `export * from`, o `sdk-client.js` remapeia nomes (p. ex.
+`createSdkSession()` → `lib/client.createClientSession()`), criando uma camada de tradução oculta
+que pode silenciosamente quebrar ao evoluir as assinaturas.
 
 ### 9.3 Dois arquivos `server` com nomes similares
 
-- `terminal-server.js` (raiz): wrapper histórico, define `COPILOT_SDK_ENABLED=true`, re-exporta `startTerminalServer`
+- `terminal-server.js` (raiz): wrapper histórico, define `COPILOT_SDK_ENABLED=true`, re-exporta
+  `startTerminalServer`
 - `terminal/server.js`: implementação real do HTTP server
 
 Causa confusão na navegação de código.
@@ -787,11 +853,13 @@ const registry = /** @type {any} */ (alwaysAliveAgent).toolsRegistry;
 const telemetry = /** @type {any} */ (alwaysAliveAgent).telemetry;
 ```
 
-Campos privados acessados via cast inseguro — contorna encapsulamento. Solução: adicionar `getToolsRegistry()` e `getTelemetry()` ao `AlwaysAliveAgent`.
+Campos privados acessados via cast inseguro — contorna encapsulamento. Solução: adicionar
+`getToolsRegistry()` e `getTelemetry()` ao `AlwaysAliveAgent`.
 
 ### 9.6 `task-tools.js` usa `execSync + curl` para chamadas internas
 
-Em vez de importar a camada de dados diretamente, usa curl sincronamente — bloqueia o event loop e cria dependência de binário externo.
+Em vez de importar a camada de dados diretamente, usa curl sincronamente — bloqueia o event loop e
+cria dependência de binário externo.
 
 ### 9.7 Timeout inconsistente entre `dialog.js` e `inject.js`
 
@@ -802,15 +870,18 @@ Dois valores diferentes para "timeout de turno" sem origem em `core/constants.js
 
 ### 9.8 `config/custom-tools-registry.js` — BUILTIN_HANDLER_MAP mínimo
 
-Apenas 3 handlers embutidos (`echo`, `timestamp`, `env_read`). Sem handlers práticos registráveis via API sem editar código.
+Apenas 3 handlers embutidos (`echo`, `timestamp`, `env_read`). Sem handlers práticos registráveis
+via API sem editar código.
 
 ### 9.9 `terminal/state.js` — estado global mutável sem observers
 
-Estado global (`_hubSessionId`, `_busy`, etc.) consultado por múltiplos módulos sem mecanismo de observer — race condition potencial.
+Estado global (`_hubSessionId`, `_busy`, etc.) consultado por múltiplos módulos sem mecanismo de
+observer — race condition potencial.
 
 ### 9.10 Sem limite máximo de clientes SSE em `bridge-stream.js`
 
-Listeners do `AlwaysAliveAgent` acumulam para clientes SSE sem limite. Conexões zombie nunca fechadas podem causar memory leak.
+Listeners do `AlwaysAliveAgent` acumulam para clientes SSE sem limite. Conexões zombie nunca
+fechadas podem causar memory leak.
 
 ### 9.11 `copilot-router.js` e `sdk-router.js` são aliases sem valor
 
@@ -818,13 +889,16 @@ Cada um tem uma única linha de `export * from` — aumentam o inventário de ar
 
 ### 9.12 Migração FTS5 executada a cada `init()` do store
 
-A migração `migrateMemoriesFtsTokenizer` em `store.js` executa lógica DDL potencialmente destrutiva a cada inicialização — frágil em produção.
+A migração `migrateMemoriesFtsTokenizer` em `store.js` executa lógica DDL potencialmente destrutiva
+a cada inicialização — frágil em produção.
 
 ---
 
 ## 10. Análise dos Arquivos na Raiz do Módulo
 
-Todos os 13 arquivos são **shims de compatibilidade** criados durante fases de refatoração e nunca removidos. O único que difere é `sdk-client.js`: além de re-exportar, contém remapeamento de nomes — é um **wrapper de tradução**, não um re-export puro.
+Todos os 13 arquivos são **shims de compatibilidade** criados durante fases de refatoração e nunca
+removidos. O único que difere é `sdk-client.js`: além de re-exportar, contém remapeamento de nomes —
+é um **wrapper de tradução**, não um re-export puro.
 
 ---
 
@@ -841,7 +915,8 @@ Todos os 13 arquivos são **shims de compatibilidade** criados durante fases de 
 | `bridge-stream.js`  | GET /stream                                     | SSE global (heartbeat 15s)       |
 | `bridge-tasks.js`   | POST /send /answer                              | Fila de tarefas                  |
 
-Total: **14 endpoints REST** em `/api/copilot/*` + ~**20 endpoints SDK** em `/api/sdk/*` via routes/.
+Total: **14 endpoints REST** em `/api/copilot/*` + ~**20 endpoints SDK** em `/api/sdk/*` via
+routes/.
 
 ---
 
@@ -875,7 +950,8 @@ Dois modos complementares de comunicação entre LLM-A e LLM-B:
 
 ## 14. Análise da Pasta `lib/`
 
-Camada de abstrações **puras e sem side effects** sobre o SDK. Nenhum singleton é iniciado no import. Exporta ~80 símbolos via barrel.
+Camada de abstrações **puras e sem side effects** sobre o SDK. Nenhum singleton é iniciado no
+import. Exporta ~80 símbolos via barrel.
 
 | Sub-módulo          | Responsabilidade                                                           |
 | ------------------- | -------------------------------------------------------------------------- |
@@ -906,7 +982,8 @@ Camada de abstrações **puras e sem side effects** sobre o SDK. Nenhum singleto
 | `session-tools`       | `get_session_state`, `set_model`, `compact_session`                    |
 | `shell-tools`         | `run_shell_command`, `run_npm_script`, `run_node_script`               |
 
-`tool-factory.js` — `buildTool()`: factory genérica para tools declarativas. `skipPermission: true` marcado via `withSkipPermission()` nas tools de leitura.
+`tool-factory.js` — `buildTool()`: factory genérica para tools declarativas. `skipPermission: true`
+marcado via `withSkipPermission()` nas tools de leitura.
 
 ---
 
@@ -947,7 +1024,8 @@ conversationHub (singleton — hub.js)
                     └── emit('user:injected', …)
 ```
 
-**Persistência**: usa `maestro.sqlite` compartilhado. Hub sessions são independentes das sessões SDK — `sdk_session_id` é referência fraca.
+**Persistência**: usa `maestro.sqlite` compartilhado. Hub sessions são independentes das sessões SDK
+— `sdk_session_id` é referência fraca.
 
 ---
 
@@ -990,9 +1068,11 @@ Dialog Motor (terminal/dialog.js)
 
 ## Sumário Executivo
 
-O módulo `src/copilot` é um sistema **maduro e bem estruturado** com 12 camadas arquiteturais bem definidas, cobrindo desde contratos centrais até terminal interativo.
+O módulo `src/copilot` é um sistema **maduro e bem estruturado** com 12 camadas arquiteturais bem
+definidas, cobrindo desde contratos centrais até terminal interativo.
 
 **Pontos fortes:**
+
 - Sem side-effects no import em toda a camada `lib/`
 - Segurança embutida nas shell-tools (blocklist, whitelist, cwd restrito)
 - Auditoria JSONL com rotação automática de 10 MB

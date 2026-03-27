@@ -1,8 +1,8 @@
 # Plano de Arquitetura — `src/copilot` v2
 
-**Data**: 2026-06-15 — **Última atualização**: 2026-03-25
-**Status**: Fases A–Z3 concluídas — v2.4 alcançada. Fases AD+AA–AC planejadas (Bug Fixes + Context Window Intelligence)
-**Autores**: Análise automática via audit de código + testes reais com LLM-B
+**Data**: 2026-06-15 — **Última atualização**: 2026-03-25 **Status**: Fases A–Z3 concluídas — v2.4
+alcançada. Fases AD+AA–AC planejadas (Bug Fixes + Context Window Intelligence) **Autores**: Análise
+automática via audit de código + testes reais com LLM-B
 
 ---
 
@@ -90,9 +90,9 @@ Os stacks A e B têm sobreposição funcional (health, inject, dialog control) s
 
 #### Problema P4 — Socket.io hub não integrado ao terminal
 
-`conversation-hub/hub.js` e `socket-ns.js` proveem infraestrutura Socket.io para streaming de
-turnos em tempo real — mas `terminal-server.js` usa SSE artesanal (`/events`) em vez de reutilizar
-essa infraestrutura.
+`conversation-hub/hub.js` e `socket-ns.js` proveem infraestrutura Socket.io para streaming de turnos
+em tempo real — mas `terminal-server.js` usa SSE artesanal (`/events`) em vez de reutilizar essa
+infraestrutura.
 
 #### Problema P5 — `cli-terminal.js` duplica parcialmente `terminal-server.js`
 
@@ -103,24 +103,25 @@ qual cenário.
 
 ## 2. Bugs Identificados via Auditoria de Código + Testes Reais
 
-| ID        | Severidade | Arquivo                      | Descrição                                                                                                                                                                                                                                       | Status          |
-| --------- | ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| **BUG-1** | 🔴 CRÍTICO  | `terminal-server.js:43,1390` | `resolve()` do `alias-store` **não era importado nem chamado** na função `rl.on('line')`. Aliases built-in (`/st`, `/log`, `/issues`, `/prs`, `/gst`, etc.) nunca expandiam no REPL — iam direto ao `default:` e exibiam "Comando desconhecido" | ✅ **CORRIGIDO** |
-| **BUG-2** | 🟡 MÉDIO    | `terminal-server.js:662`     | `gitStashList` era importado dinamicamente dentro de `cmdGit()` (`const { gitStashList } = await import(...)`) — inconsistente com todos os outros imports estáticos; impacto: overhead de dynamic import em cada chamada                       | ✅ **CORRIGIDO** |
-| **BUG-3** | 🟢 BAIXO    | `terminal-server.js:/count`  | `/count` chamava `readTurns(_hubSessionId ?? '', ...)` — se `_hubSessionId` fosse null, passava string vazia silenciosamente retornando 0 turnos sem mensagem de erro                                                                           | ✅ **CORRIGIDO** |
-| **GAP-1** | 🏗️ DESIGN   | `terminal-server.js`         | `HubOrchestrator` bypassado — writes diretos ao `conversationStore`                                                                                                                                                                             | Planejado v2.1  |
-| **GAP-2** | 🏗️ DESIGN   | Global                       | Dois stacks HTTP paralelos sem camada compartilhada                                                                                                                                                                                             | Planejado v2.1  |
-| **GAP-3** | 🏗️ DESIGN   | `terminal-server.js`         | SSE artesanal em vez de reutilizar Socket.io hub                                                                                                                                                                                                | Planejado v2.2  |
-| **GAP-4** | 🏗️ DESIGN   | `terminal-server.js`         | 1677 linhas monólito                                                                                                                                                                                                                            | Planejado v2.1  |
+| ID        | Severidade | Arquivo                      | Descrição                                                                                                                                                                                                                                       | Status           |
+| --------- | ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| **BUG-1** | 🔴 CRÍTICO | `terminal-server.js:43,1390` | `resolve()` do `alias-store` **não era importado nem chamado** na função `rl.on('line')`. Aliases built-in (`/st`, `/log`, `/issues`, `/prs`, `/gst`, etc.) nunca expandiam no REPL — iam direto ao `default:` e exibiam "Comando desconhecido" | ✅ **CORRIGIDO** |
+| **BUG-2** | 🟡 MÉDIO   | `terminal-server.js:662`     | `gitStashList` era importado dinamicamente dentro de `cmdGit()` (`const { gitStashList } = await import(...)`) — inconsistente com todos os outros imports estáticos; impacto: overhead de dynamic import em cada chamada                       | ✅ **CORRIGIDO** |
+| **BUG-3** | 🟢 BAIXO   | `terminal-server.js:/count`  | `/count` chamava `readTurns(_hubSessionId ?? '', ...)` — se `_hubSessionId` fosse null, passava string vazia silenciosamente retornando 0 turnos sem mensagem de erro                                                                           | ✅ **CORRIGIDO** |
+| **GAP-1** | 🏗️ DESIGN  | `terminal-server.js`         | `HubOrchestrator` bypassado — writes diretos ao `conversationStore`                                                                                                                                                                             | Planejado v2.1   |
+| **GAP-2** | 🏗️ DESIGN  | Global                       | Dois stacks HTTP paralelos sem camada compartilhada                                                                                                                                                                                             | Planejado v2.1   |
+| **GAP-3** | 🏗️ DESIGN  | `terminal-server.js`         | SSE artesanal em vez de reutilizar Socket.io hub                                                                                                                                                                                                | Planejado v2.2   |
+| **GAP-4** | 🏗️ DESIGN  | `terminal-server.js`         | 1677 linhas monólito                                                                                                                                                                                                                            | Planejado v2.1   |
 
 ---
 
 ## 3. Resultados dos Testes Reais com LLM-B
 
-Todos os endpoints foram testados com terminal real (`node --strip-types src/copilot/terminal-server.js`):
+Todos os endpoints foram testados com terminal real
+(`node --strip-types src/copilot/terminal-server.js`):
 
-| Endpoint              | Método | Resultado  | Observações                                                                    |
-| --------------------- | ------ | ---------- | ------------------------------------------------------------------------------ |
+| Endpoint              | Método | Resultado   | Observações                                                                    |
+| --------------------- | ------ | ----------- | ------------------------------------------------------------------------------ |
 | `/health`             | GET    | ✅ HTTP 200 | `dialogLoopActive:true, agentStatus:waiting_for_input, model, reasoningEffort` |
 | `/config`             | GET    | ✅ HTTP 200 | `{ model, reasoningEffort, planMode, dialogLoopActive, busy, port }`           |
 | `/git/status`         | GET    | ✅ HTTP 200 | `entries:1`                                                                    |
@@ -142,6 +143,7 @@ Todos os endpoints foram testados com terminal real (`node --strip-types src/cop
 ## 4. Avaliação: LIB vs API
 
 ### Cenário atual
+
 O sistema já é, de facto, uma **biblioteca interna + facade HTTP** dentro do mesmo processo Node.js.
 A questão é se a facade HTTP deve ser um microserviço separado ou permanecer integrada.
 
@@ -159,8 +161,8 @@ A questão é se a facade HTTP deve ser um microserviço separado ou permanecer 
 | Escalabilidade horizontal  | Melhor                                        | Limitada (mas não é requisito)     |
 
 **Conclusão**: Para este projeto, **uma LIB bem modularizada** dentro do mesmo processo é a solução
-correta. A facade HTTP (porta 3009 + Express `api/copilot/*`) são simplesmente routers finos sobre
-a LIB — não microserviços independentes.
+correta. A facade HTTP (porta 3009 + Express `api/copilot/*`) são simplesmente routers finos sobre a
+LIB — não microserviços independentes.
 
 ---
 
@@ -321,18 +323,21 @@ src/copilot/
 
 **Prazo**: imediato (sem refatoração, só bugs)
 
-- [x] **BUG-1**: Adicionar `resolve` ao import de `alias-store.js` + chamar antes do dispatch do REPL
+- [x] **BUG-1**: Adicionar `resolve` ao import de `alias-store.js` + chamar antes do dispatch do
+      REPL
 - [x] **BUG-2**: Mover `gitStashList` para imports estáticos em `terminal-server.js`
 - [x] **BUG-3**: Guard em `/count` quando `_hubSessionId` é null
 
 ### FASE B — Extração de comandos do REPL ✅ CONCLUÍDA
 
-**Prazo**: curto prazo (sessão única)
-**Objetivo**: Reduzir `terminal-server.js` de 1677 → ~1016 linhas extraindo comandos.
-**Resultado**: 661 linhas de lógica migradas para 7 módulos (`commands/`); 884 linhas de código novo com JSDoc completo.
+**Prazo**: curto prazo (sessão única) **Objetivo**: Reduzir `terminal-server.js` de 1677 → ~1016
+linhas extraindo comandos. **Resultado**: 661 linhas de lógica migradas para 7 módulos
+(`commands/`); 884 linhas de código novo com JSDoc completo.
 
 **Escopo** (todos concluídos):
-1. ✅ Criar `src/copilot/terminal/commands/session.js` (status, history, db-history, db-sessions, who, count, clear, answer)
+
+1. ✅ Criar `src/copilot/terminal/commands/session.js` (status, history, db-history, db-sessions,
+   who, count, clear, answer)
 2. ✅ Criar `src/copilot/terminal/commands/memory.js` (remember, recall, forget)
 3. ✅ Criar `src/copilot/terminal/commands/gh.js` (move `cmdGh()`)
 4. ✅ Criar `src/copilot/terminal/commands/git.js` (move `cmdGit()`)
@@ -341,9 +346,11 @@ src/copilot/
 7. ✅ Criar `src/copilot/terminal/commands/index.js` (barrel re-export)
 8. ✅ Adaptar `terminal-server.js` para importar e delegar via ctx pattern
 
-**Padrão ctx adotado**: todas as funções de comando recebem um `ctx` object (`{ println, hubSessionId?, injectPort?, ... }`) — desacopladas do escopo global.
+**Padrão ctx adotado**: todas as funções de comando recebem um `ctx` object
+(`{ println, hubSessionId?, injectPort?, ... }`) — desacopladas do escopo global.
 
 **Benefícios alcançados**:
+
 - Testabilidade individual por comando
 - Organização por responsabilidade
 - Facilita adicionar novos comandos sem tocar no monólito
@@ -353,14 +360,18 @@ src/copilot/
 **Objetivo**: Separar HTTP inject server do REPL em módulos coesos dentro de `terminal/`.
 
 **Entregues**:
-1. `src/copilot/terminal/state.js` — estado global compartilhado (busy, rl, hubSessionId, sseClients)
-2. `src/copilot/terminal/dialog.js` — `ensureDialogLoop()`, `sendTurn()`, `broadcastSse()`, `println()`, `printExchange()`
+
+1. `src/copilot/terminal/state.js` — estado global compartilhado (busy, rl, hubSessionId,
+   sseClients)
+2. `src/copilot/terminal/dialog.js` — `ensureDialogLoop()`, `sendTurn()`, `broadcastSse()`,
+   `println()`, `printExchange()`
 3. `src/copilot/terminal/server.js` — `createInjectServer()` + todos os endpoints HTTP
 4. `src/copilot/terminal/repl.js` — `setupAgentListeners()`, `startRepl()`
 5. `src/copilot/terminal/index.js` — `startTerminalServer()` (orquestrador)
 6. `terminal-server.js`: 1016 → 39 linhas (wrapper de entrypoint)
 
-**Resultado**: `terminal-server.js` passa de 1677 linhas originais a 39 linhas; todos os módulos passam em `node --check` e `eslint --max-warnings 0`.
+**Resultado**: `terminal-server.js` passa de 1677 linhas originais a 39 linhas; todos os módulos
+passam em `node --check` e `eslint --max-warnings 0`.
 
 ### FASE D — Integrar HubOrchestrator ✅ CONCLUÍDA
 
@@ -368,18 +379,24 @@ src/copilot/
 `conversationStore` diretamente, e propagar eventos `turn:sent` / `turn:complete` para NERV.
 
 **Entregues**:
-1. `terminal/dialog.js`: importa `conversationHub` e `emitNerv`; `sendTurn()` usa `conversationHub.store.writeTurn()` + emite `copilot:turn:sent` e `copilot:turn:complete` via NERV
-2. `terminal/index.js`: `startTerminalServer()` usa `conversationHub.store.init()` e `conversationHub.store.createHubSession()`; todos os `writeTurn` de watchdog/fatal migrados para `conversationHub.store.writeTurn()`
+
+1. `terminal/dialog.js`: importa `conversationHub` e `emitNerv`; `sendTurn()` usa
+   `conversationHub.store.writeTurn()` + emite `copilot:turn:sent` e `copilot:turn:complete` via
+   NERV
+2. `terminal/index.js`: `startTerminalServer()` usa `conversationHub.store.init()` e
+   `conversationHub.store.createHubSession()`; todos os `writeTurn` de watchdog/fatal migrados para
+   `conversationHub.store.writeTurn()`
 3. Todos os arquivos passam em `node --check` e `eslint --max-warnings 0`
 
 ### FASE E — Mover arquivos para nova estrutura de pastas ✅ CONCLUÍDA
 
 **Objetivo**: Criar caminhos canônicos conforme layout v2 preservando compatibilidade.
 
-**Estratégia adotada**: Re-exports canônicos (não movimentação física), pois existem
-~30 arquivos externos (testes + server) que importam os módulos originais.
+**Estratégia adotada**: Re-exports canônicos (não movimentação física), pois existem ~30 arquivos
+externos (testes + server) que importam os módulos originais.
 
 **Arquivos criados** (re-exports → originais):
+
 ```
 bridges/alias-store.js       → ../alias-store.js
 bridges/gh-bridge.js         → ../gh-bridge.js
@@ -403,15 +420,17 @@ api/sdk-router.js            → ../sdk-api.js
 **Objetivo**: Eliminar GAP-2, fazendo porta 3009 e `/api/copilot/*` compartilhar handlers.
 
 **Abordagem implementada**: Criado `terminal/http-handlers.js` com lógica pura (sem `req`/`res`).
-Cada handler recebe parâmetros tipados e retorna `{ status, body, cors? }`.
-`terminal/server.js` foi reduzido para wrapper de transporte (leitura de body, escrita HTTP),
-delegando toda lógica de negócio para os handlers.
+Cada handler recebe parâmetros tipados e retorna `{ status, body, cors? }`. `terminal/server.js` foi
+reduzido para wrapper de transporte (leitura de body, escrita HTTP), delegando toda lógica de
+negócio para os handlers.
 
 **Benefícios**:
+
 - Lógica de negócio testável sem dependência de `req`/`res`
 - `server.js`: 404 → 257 linhas (36% de redução)
 - Futura integração com Express router via `api/copilot-router.js` requer apenas adaptação slim
-- SSE (`/events`) permanece em `server.js` por necessitar de `req.on('close')` para remoção de clientes
+- SSE (`/events`) permanece em `server.js` por necessitar de `req.on('close')` para remoção de
+  clientes
 
 ---
 
@@ -419,15 +438,16 @@ delegando toda lógica de negócio para os handlers.
 
 **Objetivo**: Reduzir `always-alive.js` (917 linhas) extraindo responsabilidades auto-contidas.
 
-**Análise de viabilidade**: Campos privados ES2022 (`#campo`) não permitem extração simples de métodos
-para fora da classe. A única decomposição viável sem reescrita total é extrair sub-módulos stateful
-que recebem/gerenciam seu próprio estado interno, sendo compostos via campo privado na classe principal.
+**Análise de viabilidade**: Campos privados ES2022 (`#campo`) não permitem extração simples de
+métodos para fora da classe. A única decomposição viável sem reescrita total é extrair sub-módulos
+stateful que recebem/gerenciam seu próprio estado interno, sendo compostos via campo privado na
+classe principal.
 
 #### G.1 — WebhookManager ✅ (`9eda8c65`)
 
-`agent/webhook-manager.js` com classe `WebhookManager` autônoma.
-`AlwaysAliveAgent` substitui `#webhookUrls = new Map()` por `#webhooks = new WebhookManager()`,
-delegando `registerWebhook`/`unregisterWebhook`/`listWebhooks`/`#emitWebhook` ao novo módulo.
+`agent/webhook-manager.js` com classe `WebhookManager` autônoma. `AlwaysAliveAgent` substitui
+`#webhookUrls = new Map()` por `#webhooks = new WebhookManager()`, delegando
+`registerWebhook`/`unregisterWebhook`/`listWebhooks`/`#emitWebhook` ao novo módulo.
 `always-alive.js`: 917 → 886 linhas.
 
 #### G.2 — AGENT_EVENTS constante exportada ✅
@@ -449,6 +469,7 @@ delegando `registerWebhook`/`unregisterWebhook`/`listWebhooks`/`#emitWebhook` ao
 `agent/task-executor.js` com função `executeTask(session, task, ctx)`.
 
 **Resultado real**:
+
 - `always-alive.js`: 917 → 777 linhas (−140 linhas)
 - 5 sub-módulos em `agent/` — todos testáveis de forma isolada
 - Commit: `89a4319c`
@@ -460,37 +481,45 @@ delegando `registerWebhook`/`unregisterWebhook`/`listWebhooks`/`#emitWebhook` ao
 **Objetivo**: Reduzir `sdk-api.js` (915 linhas) extraindo as rotas em sub-routers por domínio.
 
 **Resultado**:
+
 - `sdk-api.js`: 915 → 34 linhas (orquestrador puro)
-- `routes/client.js`: 206 linhas — ping, status, auth, models, tools, client start/stop/force-stop (8 rotas)
-- `routes/sessions.js`: 557 linhas — todos os 15 endpoints /sessions/*
+- `routes/client.js`: 206 linhas — ping, status, auth, models, tools, client start/stop/force-stop
+  (8 rotas)
+- `routes/sessions.js`: 557 linhas — todos os 15 endpoints /sessions/\*
 - `routes/agent.js`: 197 linhas — /agent/info, tools, telemetry, state, stream SSE (6 rotas)
 - `routes/webhooks.js`: 90 linhas — /webhooks CRUD com validação de URL (3 rotas)
 - Testes: traversal recursivo do router.stack adaptado para sub-routers aninhados
 - Commit: `d2148020`
 
-**GAP cobertos**: SDK auditado (`dd74a835`) — todos os 33 endpoints implementados conforme SDK v0.1.32.
-SDK v0.2.0 bloqueado (requer `@github/copilot@^1.0.10` que ainda não foi publicado).
+**GAP cobertos**: SDK auditado (`dd74a835`) — todos os 33 endpoints implementados conforme SDK
+v0.1.32. SDK v0.2.0 bloqueado (requer `@github/copilot@^1.0.10` que ainda não foi publicado).
 
 ---
 
 ## 7. Decisões de Design Registradas
 
 ### D1 — Não criar microserviço separado
-O subsistema `copilot` permanece no mesmo processo Node.js. A LIB é a fonte da verdade; HTTP é fachada.
+
+O subsistema `copilot` permanece no mesmo processo Node.js. A LIB é a fonte da verdade; HTTP é
+fachada.
 
 ### D2 — `cli-terminal.js` é depreciado
+
 `terminal-server.js` (após refatoração) se torna o único terminal REPL canônico. `cli-terminal.js`
 será removido na FASE E após migração verificada.
 
 ### D3 — Aliases são responsabilidade de `bridges/alias-store.js`
+
 `resolve()` deve sempre ser chamado no dispatch antes de qualquer comando `/`. Nenhuma outra lógica
 de comando deve conhecer aliases diretamente.
 
 ### D4 — `HubOrchestrator` é o único escritor de turnos
+
 Após FASE D, nenhum código fora de `conversation-hub/orchestrator.js` deve chamar
 `conversationStore.writeTurn()` diretamente. A abstração é o Orchestrator.
 
 ### D5 — Socket.io hub é opcional
+
 A integração do `terminal-server` com `socket-ns.js` (streaming em tempo real via WS) é desejável
 mas não crítica. Implementar apenas se o dashboard precisar de streaming de turnos do terminal.
 
@@ -536,8 +565,8 @@ FASE Z3 ✅ CONCLUÍDA   HTTP API aprimorada: /health+model, /inject context_fil
 
 ### FASE I — Consolidar agent/ e bridges/ como localização canônica ✅ CONCLUÍDA (`3fd5a93e`, `af705488`, `ae6d1cb3`)
 
-**Objetivo**: Inverter a direção dos re-exports — arquivos em `agent/` e `bridges/` passam a ter
-a implementação real; arquivos na raiz de `src/copilot/` viram thin re-exports de compatibilidade.
+**Objetivo**: Inverter a direção dos re-exports — arquivos em `agent/` e `bridges/` passam a ter a
+implementação real; arquivos na raiz de `src/copilot/` viram thin re-exports de compatibilidade.
 
 **Executado**:
 
@@ -565,18 +594,25 @@ atualizados para ler arquivos canônicos. 1474 testes passando, 0 falhas.
 `/copilot` do Socket.io, além do SSE raw já existente.
 
 **Executado**:
-- `terminal/dialog.js` — adicionado import de `getCopilotNamespace` de `conversation-hub/socket-ns.js`
+
+- `terminal/dialog.js` — adicionado import de `getCopilotNamespace` de
+  `conversation-hub/socket-ns.js`
 - `broadcastSse(event, data)` reestruturado:
   - SSE raw continua funcionando (clientes no Set `_sseClients` / `_sseCriticalClients`)
-  - Após os loops SSE, `getCopilotNamespace()` é verificado; se não-null: `ns.emit(event, { ...data, hubSessionId })`
-  - **No-op seguro quando terminal corre como processo separado** (namespace = null no processo isolado)
+  - Após os loops SSE, `getCopilotNamespace()` é verificado; se não-null:
+    `ns.emit(event, { ...data, hubSessionId })`
+  - **No-op seguro quando terminal corre como processo separado** (namespace = null no processo
+    isolado)
 - `/events` SSE permanece intacto em `server.js` — nenhuma quebra de compatibilidade
-- Dashboard (ou qualquer client Socket.io no `/copilot` namespace) pode subscrever eventos do terminal via WS
+- Dashboard (ou qualquer client Socket.io no `/copilot` namespace) pode subscrever eventos do
+  terminal via WS
 
-**Comportamento em produção (PM2 separado)**: `getCopilotNamespace()` retorna `null` → sem efeito extra; degradação limpa
-**Comportamento integrado (mesmo processo)**: namespace montado → emit real via Socket.io
+**Comportamento em produção (PM2 separado)**: `getCopilotNamespace()` retorna `null` → sem efeito
+extra; degradação limpa **Comportamento integrado (mesmo processo)**: namespace montado → emit real
+via Socket.io
 
 **Risco**: mínimo (SSE permanece primário; socket.io é aditivo)
+
 - 1465 testes passando, lint limpo
 
 ---
@@ -587,8 +623,11 @@ atualizados para ler arquivos canônicos. 1474 testes passando, 0 falhas.
 passam a ter a implementação real; raízs viram thin re-exports.
 
 **Executado**:
-- `src/copilot/http-bridge.js` (339L) → `src/copilot/api/http-bridge.js`; ajuste de `./always-alive.js` → `../always-alive.js`
-- `src/copilot/sdk-api.js` (33L) → `src/copilot/api/sdk-api.js`; ajuste de `./routes/` → `../routes/`
+
+- `src/copilot/http-bridge.js` (339L) → `src/copilot/api/http-bridge.js`; ajuste de
+  `./always-alive.js` → `../always-alive.js`
+- `src/copilot/sdk-api.js` (33L) → `src/copilot/api/sdk-api.js`; ajuste de `./routes/` →
+  `../routes/`
 - Raízes viraram thin re-exports com `export { default } + export *`
 - `api/copilot-router.js` e `api/sdk-router.js` atualizados para `./X` (mesmo dir)
 - 3 arquivos de testes: 7 readFile atualizados para `api/` path
@@ -601,6 +640,7 @@ passam a ter a implementação real; raízs viram thin re-exports.
 **Objetivo**: Eliminar duplicação com `terminal/`. Decisão D2 já tomada.
 
 **Executado**:
+
 - Removido `src/copilot/cli-terminal.js` (standalone REPL — sem importadores em produção)
 - Removido `tests/unit/copilot/test_cli_terminal.spec.js` (9 testes removidos; total: 1465)
 - Ecosystem.config.cjs não referenciava o arquivo
@@ -612,7 +652,9 @@ passam a ter a implementação real; raízs viram thin re-exports.
 **Objetivo**: Centralizar tipos, erros e constantes em `src/copilot/core/`.
 
 **Executado**:
-- `core/constants.js` — `LLM_B_TERMINAL_PORT` (3009), `MAX_QUEUE_SIZE` (100), re-export `AGENT_EVENTS`
+
+- `core/constants.js` — `LLM_B_TERMINAL_PORT` (3009), `MAX_QUEUE_SIZE` (100), re-export
+  `AGENT_EVENTS`
 - `core/errors.js` — `CopilotError`, `SessionError`, `BridgeError` com `code` semântico
 - `core/types.js` — barrel re-exportando `types/index.js` (StructuredMessage)
 - `core/index.js` — barrel único
@@ -621,24 +663,30 @@ passam a ter a implementação real; raízs viram thin re-exports.
 
 ### FASE N — Consolidar AGENT_EVENTS em core/ ✅ CONCLUÍDA (`85148e2e`)
 
-**Objetivo**: Eliminar a cópia local de `AGENT_EVENTS` em `http-bridge.js` (14 eventos, desatualizada) e substituir pelo import do array canônico em `core/` (18 eventos).
+**Objetivo**: Eliminar a cópia local de `AGENT_EVENTS` em `http-bridge.js` (14 eventos,
+desatualizada) e substituir pelo import do array canônico em `core/` (18 eventos).
 
 **Executado**:
+
 - Remove `const AGENT_EVENTS = [...]` local de `src/copilot/api/http-bridge.js` (14 eventos)
-- Adiciona `import { AGENT_EVENTS } from '#copilot/core'` — fonte canônica: `agent/events.js` via `core/constants.js`
+- Adiciona `import { AGENT_EVENTS } from '#copilot/core'` — fonte canônica: `agent/events.js` via
+  `core/constants.js`
 - Novos eventos agora disponíveis no SSE `/stream`: `'error'`, `'session.fatal'`, `'dialog.stalled'`
-- Atualiza testes de static-inspection (`test_session_manager_streaming.spec.js`, `test_http_bridge_dialog.spec.js`) para ler `agent/events.js` (fonte canônica) em vez de `http-bridge.js`
+- Atualiza testes de static-inspection (`test_session_manager_streaming.spec.js`,
+  `test_http_bridge_dialog.spec.js`) para ler `agent/events.js` (fonte canônica) em vez de
+  `http-bridge.js`
 - 1465 testes unitários, 0 falhas
 
-**Resultado**: `http-bridge.js` é single-source-of-truth-free — toda lista de eventos é governada por `agent/events.js`.
+**Resultado**: `http-bridge.js` é single-source-of-truth-free — toda lista de eventos é governada
+por `agent/events.js`.
 
 ---
 
 ### FASE O — Módulo channel/: Camada Dedicada LLM-A ↔ LLM-B ✅ CONCLUÍDA (`6964fcc4`)
 
-**Objetivo**: Criar `src/copilot/channel/` como o módulo canônico para toda comunicação entre
-LLM-A (GitHub Copilot — este agente) e LLM-B (Copilot SDK / gpt-4.1). Consolida e organiza
-o que estava espalhado entre `bridges/inject-llmb.js` e `bridges/llm-bridge-client.js`.
+**Objetivo**: Criar `src/copilot/channel/` como o módulo canônico para toda comunicação entre LLM-A
+(GitHub Copilot — este agente) e LLM-B (Copilot SDK / gpt-4.1). Consolida e organiza o que estava
+espalhado entre `bridges/inject-llmb.js` e `bridges/llm-bridge-client.js`.
 
 **Executado**:
 
@@ -655,6 +703,7 @@ o que estava espalhado entre `bridges/inject-llmb.js` e `bridges/llm-bridge-clie
 - 1465 testes passando, lint limpo
 
 **Impacto futuro** (Sprints planejados):
+
 - **Sprint B** (Session Persistence v2): `channel/history.js` para serializar turnos
 - **Sprint C** (Tool Call Auditing): `channel/audit.js` para log JSONL de tool calls
 - **Sprint D** (Parallel Queue): `channel/batch.js` para `chatBatch()`
@@ -664,10 +713,12 @@ o que estava espalhado entre `bridges/inject-llmb.js` e `bridges/llm-bridge-clie
 
 ### FASE P — Hardening de Erros: CopilotError/SessionError/BridgeError ✅ CONCLUÍDA
 
-**Objetivo**: Substituir `throw new Error(mensagem genérica)` por tipos semânticos de `core/errors.js`
-nos módulos principais do copilot — `channel/inject.js`, `always-alive.js`, `http-bridge.js`, `session-manager.js`.
+**Objetivo**: Substituir `throw new Error(mensagem genérica)` por tipos semânticos de
+`core/errors.js` nos módulos principais do copilot — `channel/inject.js`, `always-alive.js`,
+`http-bridge.js`, `session-manager.js`.
 
 **Plano**:
+
 - `channel/inject.js`: substituir todos os `throw new Error` por `throw new BridgeError(msg, code)`
 - `agent/always-alive.js`: `SessionError` para falhas de ciclo de vida da sessão
 - `api/http-bridge.js`: `BridgeError` para erros de request/response
@@ -683,8 +734,10 @@ nos módulos principais do copilot — `channel/inject.js`, `always-alive.js`, `
 `{ ts, sessionId, tool, argsSummary, resultSummary, durationMs, success }`.
 
 **Plano**:
+
 - Criar `channel/audit.js` com função `logToolCall(entry)` → append em `logs/tool-audit.jsonl`
-- Hook em `agent/tools-bootstrap.js` ou `agent/task-executor.js`: wrapper audit em todo tool registered
+- Hook em `agent/tools-bootstrap.js` ou `agent/task-executor.js`: wrapper audit em todo tool
+  registered
 - Aproveitar eventos SDK `tool.execution_start` / `tool.execution_complete` (subscritos em Fase U)
 - SSE no `/stream` pode incluir evento `tool.audit` (opt-in via query param)
 - Arquivo rotativo: quando > 10MB, rotacionar para `tool-audit.jsonl.1`
@@ -694,8 +747,8 @@ nos módulos principais do copilot — `channel/inject.js`, `always-alive.js`, `
 
 ### FASE R — Extrair Rotas http-bridge.js em Sub-Routers ✅ CONCLUÍDA
 
-**Objetivo**: Dividir `api/http-bridge.js` (~320 linhas) em sub-routers focados, como foi feito
-com `sdk-api.js` na Fase H.
+**Objetivo**: Dividir `api/http-bridge.js` (~320 linhas) em sub-routers focados, como foi feito com
+`sdk-api.js` na Fase H.
 
 **Plano**:
 
@@ -719,7 +772,9 @@ completo com `@param`, `@returns`, `@throws` em todos os exports públicos. Roda
 sem novos erros.
 
 **Plano**:
-- Auditar `channel/inject.js`, `channel/client.js`, `agent/always-alive.js`, `agent/session-manager.js`
+
+- Auditar `channel/inject.js`, `channel/client.js`, `agent/always-alive.js`,
+  `agent/session-manager.js`
 - Preencher JSDoc faltantes ou incompletos
 - Adicionar tipos onde Pylance/tsserver reportar `any` implícito
 - `npm run typecheck:node` como gate de qualidade
@@ -732,8 +787,10 @@ sem novos erros.
 para que cada uso de string de evento seja verificado em tempo de compilação.
 
 **Plano**:
+
 - `core/types.js`: exportar `AgentEvent = typeof AGENT_EVENTS[number]` (union de strings)
-- `agent/events.js`: anotar com `/** @type {ReadonlyArray<import('../core/types.js').AgentEvent>} */`
+- `agent/events.js`: anotar com
+  `/** @type {ReadonlyArray<import('../core/types.js').AgentEvent>} */`
 - NERV/SSE: substituir `string` por `AgentEvent` onde os eventos são emitidos/consumidos
 - `npm run typecheck:node` deve capturar qualquer event-name inválido
 
@@ -743,31 +800,32 @@ para que cada uso de string de evento seja verificado em tempo de compilação.
 
 **Contexto — Auditoria de Cobertura do SDK v0.1.32**:
 
-O SDK expõe ~45 tipos de eventos de sessão. Atualmente forwards implícitos somente via `sendAndWait`.
-Eventos SDK já capturados: `session.compaction_start`, `session.compaction_complete`,
+O SDK expõe ~45 tipos de eventos de sessão. Atualmente forwards implícitos somente via
+`sendAndWait`. Eventos SDK já capturados: `session.compaction_start`, `session.compaction_complete`,
 `assistant.message_delta` (para streaming).
 
 **Eventos SDK de alto valor NÃO ainda encaminhados ao AGENT_EVENTS / SSE**:
 
 | Evento SDK                  | Valor                                          | Prioridade |
 | --------------------------- | ---------------------------------------------- | ---------- |
-| `tool.execution_start`      | Auditoria: qual tool LLM-B invocou             | ⭐⭐⭐        |
-| `tool.execution_complete`   | Auditoria: resultado + duração do tool         | ⭐⭐⭐        |
-| `assistant.reasoning_delta` | Suporte a o3/o4-mini thinking tokens           | ⭐⭐⭐        |
-| `session.usage_info`        | Contagem de tokens + billing por turno         | ⭐⭐         |
-| `session.mode_changed`      | Plano vs. Ação — visibilidade de modo          | ⭐⭐         |
-| `session.plan_changed`      | Rastreamento do plano do agente                | ⭐⭐         |
-| `permission.requested`      | Permissões solicitadas (além do callback solo) | ⭐⭐         |
-| `skill.invoked`             | Habilidades do agente invocadas                | ⭐          |
-| `subagent.started`          | Sub-agentes iniciados                          | ⭐          |
-| `session.warning`           | Avisos da sessão SDK                           | ⭐          |
-| `session.error`             | Erros granulares SDK (vs. catch genérico)      | ⭐⭐         |
-| `session.title_changed`     | Título da sessão atualizado                    | ⭐          |
-| `session.model_change`      | Troca de modelo em sessão ativa                | ⭐          |
+| `tool.execution_start`      | Auditoria: qual tool LLM-B invocou             | ⭐⭐⭐     |
+| `tool.execution_complete`   | Auditoria: resultado + duração do tool         | ⭐⭐⭐     |
+| `assistant.reasoning_delta` | Suporte a o3/o4-mini thinking tokens           | ⭐⭐⭐     |
+| `session.usage_info`        | Contagem de tokens + billing por turno         | ⭐⭐       |
+| `session.mode_changed`      | Plano vs. Ação — visibilidade de modo          | ⭐⭐       |
+| `session.plan_changed`      | Rastreamento do plano do agente                | ⭐⭐       |
+| `permission.requested`      | Permissões solicitadas (além do callback solo) | ⭐⭐       |
+| `skill.invoked`             | Habilidades do agente invocadas                | ⭐         |
+| `subagent.started`          | Sub-agentes iniciados                          | ⭐         |
+| `session.warning`           | Avisos da sessão SDK                           | ⭐         |
+| `session.error`             | Erros granulares SDK (vs. catch genérico)      | ⭐⭐       |
+| `session.title_changed`     | Título da sessão atualizado                    | ⭐         |
+| `session.model_change`      | Troca de modelo em sessão ativa                | ⭐         |
 
 **Plano**:
-- `agent/task-executor.js`: subscrever `tool.execution_start` → emit `tool.execution.start` no agente
-  e `tool.execution_complete` → emit `tool.execution.complete` + `tool.execution.duration_ms`
+
+- `agent/task-executor.js`: subscrever `tool.execution_start` → emit `tool.execution.start` no
+  agente e `tool.execution_complete` → emit `tool.execution.complete` + `tool.execution.duration_ms`
 - `agent/always-alive.js`: subscrever `assistant.reasoning_delta` → emit `task.reasoning` (novo)
 - `agent/always-alive.js`: subscrever `session.usage_info` → emit `session.usage`
 - `agent/always-alive.js`: subscrever `session.mode_changed` → emit `session.mode_changed`
@@ -778,21 +836,24 @@ Eventos SDK já capturados: `session.compaction_start`, `session.compaction_comp
 
 ### FASE V — SDK History API + reasoningEffort + errorOccurred Hook ✅ CONCLUÍDA
 
-**Objetivo**: Implementar 3 funcionalidades SDK ainda não usadas que têm impacto direto em
-qualidade e observabilidade:
+**Objetivo**: Implementar 3 funcionalidades SDK ainda não usadas que têm impacto direto em qualidade
+e observabilidade:
 
 **1. `session.getMessages()` — Histórico da conversa SDK**:
+
 - `always-alive.js`: novo método `getSessionMessages()` → chama `this.#session.getMessages()`
 - Rota REST `GET /copilot/sdk/sessions/:id/messages` → retorna histórico completo
 - Útil para debug, auditoria e context window introspection
 
 **2. `reasoningEffort` em `SessionConfig`**:
-- `session-manager.js`: receber parâmetro `reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh'`
-  da configuração (`config.json → copilot.reasoningEffort ?? undefined`)
+
+- `session-manager.js`: receber parâmetro `reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh'` da
+  configuração (`config.json → copilot.reasoningEffort ?? undefined`)
 - Permitir controle do esforço de raciocínio para o3/o4-mini via config
 - Sem default → SDK usa o padrão do modelo
 
 **3. `errorOccurred` hook em `SessionHooks`**:
+
 - `agent/tools-bootstrap.js` (ou `always-alive.js`): implementar `hooks.errorOccurred`
 - Emit `session.fatal` ou `error` com contexto rico ao capturar o hook
 - Log estruturado incluindo `hookType`, `errorMessage`, `sessionId`
@@ -801,18 +862,20 @@ qualidade e observabilidade:
 
 ### FASE W — Attachment Support: Arquivos e Imagens em Prompts ✅ CONCLUÍDA
 
-**Objetivo**: Permitir que `sendMessage()` e `LlmBridgeClient.chat()` aceitem `attachments`
-no formato `MessageOptions.attachments` do SDK — arquivos, imagens e referências GitHub.
+**Objetivo**: Permitir que `sendMessage()` e `LlmBridgeClient.chat()` aceitem `attachments` no
+formato `MessageOptions.attachments` do SDK — arquivos, imagens e referências GitHub.
 
 **Motivação**: Atualmente todos os prompts são texto puro. Com attachments, LLM-A pode enviar
 arquivos de código, diffs, imagens de UI ou referências a PRs/issues diretamente a LLM-B.
 
 **Plano**:
+
 - `channel/client.js`: `LlmBridgeClient.chat(message, { attachments })` → passa para
   `session.sendAndWait({ prompt: message, attachments })`
 - `channel/inject.js`: `injectToLlmB(message, { attachments })` → serializa attachments no payload
 - `agent/always-alive.js`: `sendMessage(message, { attachments })` → propaga para `#processQueue`
-- Tipo `ChannelAttachment = import('@github/copilot-sdk').MessageOptions['attachments']` em `channel/index.js`
+- Tipo `ChannelAttachment = import('@github/copilot-sdk').MessageOptions['attachments']` em
+  `channel/index.js`
 - REST API: `POST /copilot/task` aceita `{ message, attachments: [...] }` no body
 
 ---
@@ -831,12 +894,14 @@ export const alwaysAliveAgent = new AlwaysAliveAgent();
 ```
 
 Além disso, não existem comandos `/model` ou `/reasoning` no terminal. O usuário não consegue:
+
 - Ver qual modelo está ativo
 - Trocar o modelo em runtime
 - Controlar o nível de raciocínio
 - Garantir que `reasoningEffort: 'high'` seja o padrão operacional
 
 **Objetivo:**
+
 - `reasoningEffort` padrão → `'high'` via env `COPILOT_REASONING_EFFORT` ou fallback hardcoded
 - `/model [id]` — lista modelos disponíveis ou troca o modelo ativo
 - `/reasoning [low|medium|high|xhigh]` — troca nível de raciocínio
@@ -846,8 +911,10 @@ Além disso, não existem comandos `/model` ou `/reasoning` no terminal. O usuá
 **Plano de implementação:**
 
 1. **`agent/always-alive.js`**:
-   - Construtor: `#reasoningEffort = options.reasoningEffort ?? process.env.COPILOT_REASONING_EFFORT ?? 'high'`
-   - Singleton exportado: `new AlwaysAliveAgent({ reasoningEffort: process.env.COPILOT_REASONING_EFFORT ?? 'high' })`
+   - Construtor:
+     `#reasoningEffort = options.reasoningEffort ?? process.env.COPILOT_REASONING_EFFORT ?? 'high'`
+   - Singleton exportado:
+     `new AlwaysAliveAgent({ reasoningEffort: process.env.COPILOT_REASONING_EFFORT ?? 'high' })`
    - Novo método `reconfigure(model, reasoningEffort)`:
      - Para o dialog loop (se ativo) via sinal STOP e aguarda `dialog.stopped`
      - Atualiza `#model` e `#reasoningEffort`
@@ -860,8 +927,10 @@ Além disso, não existem comandos `/model` ou `/reasoning` no terminal. O usuá
 
 3. **`terminal/commands/model.js`** (novo arquivo):
    - `cmdModel(ctx, arg)`:
-     - `arg` vazio → lista modelos via `lib/models.js:listModels()`, filtra habilitados, descobre cada suporte a reasoning
-     - `arg = 'set <id>'` ou simplesmente `arg = '<id>'` → chama `alwaysAliveAgent.reconfigure(id, currentReasoning)`
+     - `arg` vazio → lista modelos via `lib/models.js:listModels()`, filtra habilitados, descobre
+       cada suporte a reasoning
+     - `arg = 'set <id>'` ou simplesmente `arg = '<id>'` → chama
+       `alwaysAliveAgent.reconfigure(id, currentReasoning)`
    - `cmdReasoning(ctx, arg)`:
      - Valida contra `['low', 'medium', 'high', 'xhigh']`
      - Chama `alwaysAliveAgent.reconfigure(currentModel, arg)`
@@ -875,13 +944,12 @@ Além disso, não existem comandos `/model` ou `/reasoning` no terminal. O usuá
    - `COPILOT_MODEL` — modelo inicial (já existia)
    - `COPILOT_REASONING_EFFORT` — nível padrão (novo; default `'high'`)
 
-**Arquivos afetados:**
-`agent/always-alive.js`, `terminal/commands/session.js`, `terminal/commands/model.js` (novo),
-`terminal/repl.js`
+**Arquivos afetados:** `agent/always-alive.js`, `terminal/commands/session.js`,
+`terminal/commands/model.js` (novo), `terminal/repl.js`
 
-**Constraint crítica**: `reconfigure()` reinicia o dialog loop (1 PR de boot). Não faz nada
-extra. Todos os turnos subsequentes continuam com 0 PR via `ask_user` protocol — o DialogLoop
-permanece o canal principal.
+**Constraint crítica**: `reconfigure()` reinicia o dialog loop (1 PR de boot). Não faz nada extra.
+Todos os turnos subsequentes continuam com 0 PR via `ask_user` protocol — o DialogLoop permanece o
+canal principal.
 
 ---
 
@@ -889,19 +957,20 @@ permanece o canal principal.
 
 **Contexto — Lacuna de envio de arquivos:**
 
-A Fase W implementou `attachments` SDK para a rota de task queue (`sendMessage` /
-`sendAndWait`). Porém o **terminal opera exclusivamente em modo DialogLoop** — onde a
-comunicação é via o protocolo de texto `ask_user("REPLY: ...")`. Neste modo, os
-`MessageOptions.attachments` do SDK **não se aplicam** (são para `sendAndWait`).
+A Fase W implementou `attachments` SDK para a rota de task queue (`sendMessage` / `sendAndWait`).
+Porém o **terminal opera exclusivamente em modo DialogLoop** — onde a comunicação é via o protocolo
+de texto `ask_user("REPLY: ...")`. Neste modo, os `MessageOptions.attachments` do SDK **não se
+aplicam** (são para `sendAndWait`).
 
-Para enviar contexto de arquivo no terminal, a abordagem correta é **embedding textual**:
-o conteúdo do arquivo é lido no processo Node.js e injetado como contexto estruturado em
-markdown no corpo da mensagem antes de passar ao `sendTurn()`.
+Para enviar contexto de arquivo no terminal, a abordagem correta é **embedding textual**: o conteúdo
+do arquivo é lido no processo Node.js e injetado como contexto estruturado em markdown no corpo da
+mensagem antes de passar ao `sendTurn()`.
 
-Isso também se aplica quando **LLM-A** quer compartilhar um arquivo com LLM-B via
-`POST /inject` — o servidor lê localmente e embuta no texto do turn.
+Isso também se aplica quando **LLM-A** quer compartilhar um arquivo com LLM-B via `POST /inject` — o
+servidor lê localmente e embuta no texto do turn.
 
 **Objetivo:**
+
 - `@arquivo.js` no texto da mensagem → auto-leitura e embed
 - `/attach <caminho>` → "fila" de arquivos para o próximo turno
 - `/attach` sem args → lista arquivos em fila
@@ -923,7 +992,8 @@ Contexto de arquivo: src/copilot/agent/always-alive.js
 **Plano de implementação:**
 
 1. **`terminal/file-context.js`** (novo módulo):
-   - `readFileContext(filePath)` → lê, verifica tamanho, retorna objeto `{ path, content, size, lang }`
+   - `readFileContext(filePath)` → lê, verifica tamanho, retorna objeto
+     `{ path, content, size, lang }`
    - `detectLang(filePath)` → extensão → label de linguagem para o bloco markdown
    - `embedContextBlock(fileCtx, message)` → monta string final com bloco markdown + mensagem
    - `embedMultiple(fileCtxs, message)` → múltiplos arquivos empilhados
@@ -937,7 +1007,8 @@ Contexto de arquivo: src/copilot/agent/always-alive.js
    - `sendTurn(message, actor)` → antes de enviar, checa fila e faz embed:
      ```js
      const queue = getAttachmentQueue();
-     const enrichedMsg = queue.length > 0
+     const enrichedMsg =
+       queue.length > 0
          ? await embedMultiple(await Promise.all(queue.map(readFileContext)), message)
          : message;
      clearAttachments();
@@ -959,8 +1030,7 @@ Contexto de arquivo: src/copilot/agent/always-alive.js
 7. **`terminal/repl.js`**:
    - Adiciona `/attach` ao banner e handler
 
-**Arquivos afetados:**
-`terminal/file-context.js` (novo), `terminal/state.js`, `terminal/dialog.js`,
+**Arquivos afetados:** `terminal/file-context.js` (novo), `terminal/state.js`, `terminal/dialog.js`,
 `terminal/repl.js`, `terminal/commands/attach.js` (novo), `terminal/http-handlers.js`
 
 ---
@@ -970,6 +1040,7 @@ Contexto de arquivo: src/copilot/agent/always-alive.js
 **Contexto — Estado atual do layout:**
 
 O terminal atual é um readline básico com ANSI colors simples:
+
 - Prompt fixo: `você›`
 - Feedback de processamento: único `…` estático
 - Respostas exibidas em blocos de texto sem estrutura visual clara
@@ -977,6 +1048,7 @@ O terminal atual é um readline básico com ANSI colors simples:
 - Sem streaming delta — resposta aparece toda de uma vez após `sendTurn()` retornar
 
 O Copilot CLI usa:
+
 - Spinner animado durante processamento
 - Streaming incremental de tokens
 - Status bar com informações de contexto
@@ -984,6 +1056,7 @@ O Copilot CLI usa:
 - Separadores visuais entre turnos
 
 **Objetivo:**
+
 - Spinner animado substituindo o `…` estático
 - Streaming incremental de deltas (via evento `task.delta` do agente)
 - Status bar informativo: modelo, reasoning, estado do loop, turn count
@@ -1011,13 +1084,15 @@ O Copilot CLI usa:
    - Suporte a `actor === 'system'` com cor específica
 
 4. **`terminal/repl.js`** — prompt enriquecido:
+
    ```js
    function buildPrompt() {
-       const { model, reasoningEffort } = alwaysAliveAgent.getConfig();
-       const shortModel = model.replace('gpt-', '').replace('claude-', 'c-');
-       return `\x1b[32mvocê\x1b[0m\x1b[90m[${shortModel}/${reasoningEffort ?? '-'}]›\x1b[0m `;
+     const { model, reasoningEffort } = alwaysAliveAgent.getConfig();
+     const shortModel = model.replace('gpt-', '').replace('claude-', 'c-');
+     return `\x1b[32mvocê\x1b[0m\x1b[90m[${shortModel}/${reasoningEffort ?? '-'}]›\x1b[0m `;
    }
    ```
+
    - Atualiza prompt dinamicamente após `/model` ou `/reasoning`
 
 5. **`terminal/repl.js`** — status bar no banner:
@@ -1028,15 +1103,14 @@ O Copilot CLI usa:
    - Incluir `modelo` e `reasoning` nas linhas de status
    - Incluir `COPILOT_REASONING_EFFORT` env var na exibição
 
-**Arquivos afetados:**
-`terminal/spinner.js` (novo), `terminal/dialog.js`, `terminal/repl.js`,
+**Arquivos afetados:** `terminal/spinner.js` (novo), `terminal/dialog.js`, `terminal/repl.js`,
 `terminal/commands/session.js`
 
-**Nota sobre streaming no DialogLoop:**
-O dialog loop não faz streaming via SDK diretamente — o `dialogTurn()` aguarda o `REPLY:` completo.
-Para pseudo-streaming visual, podemos usar eventos `task.delta` emitidos pelo `AlwaysAliveAgent`
-durante o processamento (`assistant.message_delta` → Fase U já captura isso). O spinner é
-a solução imediata e mais robusta; streaming incremental real é uma melhoria posterior.
+**Nota sobre streaming no DialogLoop:** O dialog loop não faz streaming via SDK diretamente — o
+`dialogTurn()` aguarda o `REPLY:` completo. Para pseudo-streaming visual, podemos usar eventos
+`task.delta` emitidos pelo `AlwaysAliveAgent` durante o processamento (`assistant.message_delta` →
+Fase U já captura isso). O spinner é a solução imediata e mais robusta; streaming incremental real é
+uma melhoria posterior.
 
 ---
 
@@ -1047,48 +1121,53 @@ a solução imediata e mais robusta; streaming incremental real é uma melhoria 
 | Copilot CLI Command | Funcionalidade                          | Status atual   |
 | ------------------- | --------------------------------------- | -------------- |
 | `/model`            | Lista e troca modelo                    | Fase X         |
-| `/context`          | Mostra uso do context window            | ❌ ausente      |
-| `/compact`          | Compactação manual da sessão            | ❌ ausente      |
-| `/plan` mode        | Mode de planejamento antes de executar  | ❌ ausente      |
-| `/resume`           | Retoma sessão anterior                  | ❌ ausente      |
-| `/feedback`         | Envia feedback sobre resposta           | ❌ ausente      |
-| Shift+Tab           | Alterna entre modos ask/plan            | ❌ ausente      |
+| `/context`          | Mostra uso do context window            | ❌ ausente     |
+| `/compact`          | Compactação manual da sessão            | ❌ ausente     |
+| `/plan` mode        | Mode de planejamento antes de executar  | ❌ ausente     |
+| `/resume`           | Retoma sessão anterior                  | ❌ ausente     |
+| `/feedback`         | Envia feedback sobre resposta           | ❌ ausente     |
+| Shift+Tab           | Alterna entre modos ask/plan            | ❌ ausente     |
 | Auto-compaction     | Compactação automática a 95% do context | Via SDK Events |
 
-**Objetivo:**
-Implementar os comandos mais valiosos de forma nativa, sem dependências externas:
+**Objetivo:** Implementar os comandos mais valiosos de forma nativa, sem dependências externas:
 
 **1. `/context` — Visualização do Contexto Estimado:**
-   - Estima tokens como `Math.round(chars / 4)` (heurística: ~4 chars/token)
-   - Usa `llmBridgeClient.history` + boot prompt para calcular total
-   - Exibe barra de uso: `[██████░░░░] 18% (3.2k / 16k tokens estimados)`
-   - Exibe warning se > 70% de `MAX_CONTEXT_TOKENS` estimado
+
+- Estima tokens como `Math.round(chars / 4)` (heurística: ~4 chars/token)
+- Usa `llmBridgeClient.history` + boot prompt para calcular total
+- Exibe barra de uso: `[██████░░░░] 18% (3.2k / 16k tokens estimados)`
+- Exibe warning se > 70% de `MAX_CONTEXT_TOKENS` estimado
 
 **2. `/compact` — Compactação Manual:**
-   - Envia mensagem especial ao LLM-B via `sendTurn()`:
-     ```
-     [SISTEMA] Compacte toda esta conversa em um resumo técnico denso. Preserve:
-     todos os fatos, código, decisões, estados e contexto de arquivos discutidos.
-     Responda APENAS com esse resumo. Após isso, considere o resumo como o novo
-     contexto inicial desta sessão.
-     ```
-   - Após resposta: limpa `llmBridgeClient.history` (memória local) e mantém apenas o resumo
-   - Exibe confirmação com novo tamanho estimado
+
+- Envia mensagem especial ao LLM-B via `sendTurn()`:
+  ```
+  [SISTEMA] Compacte toda esta conversa em um resumo técnico denso. Preserve:
+  todos os fatos, código, decisões, estados e contexto de arquivos discutidos.
+  Responda APENAS com esse resumo. Após isso, considere o resumo como o novo
+  contexto inicial desta sessão.
+  ```
+- Após resposta: limpa `llmBridgeClient.history` (memória local) e mantém apenas o resumo
+- Exibe confirmação com novo tamanho estimado
 
 **3. `/plan [on|off]` — Modo de Planejamento:**
-   - Estado persistente em `terminal/state.js`: `#planMode: boolean`
-   - `planMode = true`: prefacing automático de mensagens com instrução de planejamento:
-     ```
-     [MODO PLANEJAMENTO] Antes de responder, elabore um plano detalhado passo-a-passo.
-     Não pule para a resposta diretamente. Liste dependências, riscos e alternativas.
-     ```
-   - `/plan on` / `/plan off` → ativa/desativa
-   - Indicador visual no prompt: `você[gpt-4.1/high][PLAN]›`
+
+- Estado persistente em `terminal/state.js`: `#planMode: boolean`
+- `planMode = true`: prefacing automático de mensagens com instrução de planejamento:
+  ```
+  [MODO PLANEJAMENTO] Antes de responder, elabore um plano detalhado passo-a-passo.
+  Não pule para a resposta diretamente. Liste dependências, riscos e alternativas.
+  ```
+- `/plan on` / `/plan off` → ativa/desativa
+- Indicador visual no prompt: `você[gpt-4.1/high][PLAN]›`
 
 **4. `/resume [sessionId]` — Retomada de Sessão:**
-   - Sem arg: lista últimas 5 hub_sessions via `conversationStore.listHubSessions()`
-   - Com `sessionId`: carrega turnos da sessão via `conversationStore.readTurns()` e inicia nova sessão agent com contexto prefixed
-   - Implementado como: envia summary dos turnos ao LLM-B no boot do dialog loop como parte do boot prompt
+
+- Sem arg: lista últimas 5 hub_sessions via `conversationStore.listHubSessions()`
+- Com `sessionId`: carrega turnos da sessão via `conversationStore.readTurns()` e inicia nova sessão
+  agent com contexto prefixed
+- Implementado como: envia summary dos turnos ao LLM-B no boot do dialog loop como parte do boot
+  prompt
 
 **Plano de implementação:**
 
@@ -1113,10 +1192,8 @@ Implementar os comandos mais valiosos de forma nativa, sem dependências externa
 6. **`terminal/repl.js`**:
    - Adiciona `/context`, `/compact`, `/plan [on|off]`, `/resume [sessionId]` ao banner e handler
 
-**Arquivos afetados:**
-`terminal/commands/context.js` (novo), `terminal/commands/plan.js` (novo),
-`terminal/commands/resume.js` (novo), `terminal/state.js`, `terminal/dialog.js`,
-`terminal/repl.js`
+**Arquivos afetados:** `terminal/commands/context.js` (novo), `terminal/commands/plan.js` (novo),
+`terminal/commands/resume.js` (novo), `terminal/state.js`, `terminal/dialog.js`, `terminal/repl.js`
 
 ---
 
@@ -1125,11 +1202,13 @@ Implementar os comandos mais valiosos de forma nativa, sem dependências externa
 **Contexto — Limitações da API HTTP atual:**
 
 Quando LLM-A (este agente) usa a API HTTP para se comunicar com LLM-B, ela precisa de:
+
 - Saber qual modelo e reasoning estão ativos (antes de injetar)
 - Poder enviar arquivo de contexto junto com a mensagem (além dos attachments binários da Fase W)
 - Receber eventos SSE que incluam metadados de modelo/reasoning
 
 **Objetivo:**
+
 - `GET /health` retorna `{ model, reasoningEffort, dialogLoopActive, turns, ... }`
 - `POST /inject` aceita `context_files: string[]` — o servidor lê e embuta no texto
 - Eventos SSE aprimorados: todos os eventos incluem `model` e `reasoningEffort` no payload
@@ -1146,7 +1225,8 @@ Quando LLM-A (este agente) usa a API HTTP para se comunicar com LLM-B, ela preci
    - A mensagem enriquecida vai para `sendTurn()`
 
 3. **`terminal/http-handlers.js`** — novo `handleGetConfig()`:
-   - `GET /config` → retorna `{ model, reasoningEffort, planMode, dialogLoopActive, turnCount, port }`
+   - `GET /config` → retorna
+     `{ model, reasoningEffort, planMode, dialogLoopActive, turnCount, port }`
 
 4. **`terminal/dialog.js`** — `broadcastSse()`:
    - Todos os payloads SSE incluem `model` e `reasoningEffort` como campos extras
@@ -1154,8 +1234,7 @@ Quando LLM-A (este agente) usa a API HTTP para se comunicar com LLM-B, ela preci
 5. **`terminal/index.js`**:
    - Registra rota `GET /config` → `handleGetConfig`
 
-**Arquivos afetados:**
-`terminal/http-handlers.js`, `terminal/dialog.js`, `terminal/index.js`
+**Arquivos afetados:** `terminal/http-handlers.js`, `terminal/dialog.js`, `terminal/index.js`
 
 ---
 
@@ -1166,22 +1245,23 @@ Quando LLM-A (este agente) usa a API HTTP para se comunicar com LLM-B, ela preci
 **Motivação**
 
 Auditoria técnica de 101 arquivos (`DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`)
-identificou **11 bugs críticos/altos**, **4 vulnerabilidades de segurança confirmadas** e
-**15+ itens de melhoria técnica**. Todos os itens incluídos nesta fase foram **validados manualmente**
-no código real (HEAD `bdaa1347`).
+identificou **11 bugs críticos/altos**, **4 vulnerabilidades de segurança confirmadas** e **15+
+itens de melhoria técnica**. Todos os itens incluídos nesta fase foram **validados manualmente** no
+código real (HEAD `bdaa1347`).
 
 **Plano detalhado**: ver `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AD_AUDITORIA.md`
 
 **Sprints internos:**
 
-| Sprint | Conteúdo                                                                                 | Itens |
-| ------ | ---------------------------------------------------------------------------------------- | ----- |
+| Sprint | Conteúdo                                                                                  | Itens |
+| ------ | ----------------------------------------------------------------------------------------- | ----- |
 | AD-1   | Bugs críticos (🔴): BUG-01,03,04 + SEC-02                                                 | 4     |
 | AD-2   | Bugs altos (🟠): BUG-02,05–09 + SEC-01,03,04 + PERF-01,02 + ARCH-02 + TYPE-01 + GAP-01,03 | 15    |
 | AD-3   | Type safety + docs (🟡): TYPE-02–04 + GAP-04                                              | 4     |
 | AD-4   | Melhorias (🔵): MELHORIA-01,03,04,06                                                      | 4     |
 
 **Arquivos principais a modificar:**
+
 - `src/copilot/agent/always-alive.js` (BUG-01,02,07,08 + PERF-01,02)
 - `src/copilot/conversation-hub/store.js` (BUG-03 + SEC-02)
 - `src/copilot/channel/client.js` (BUG-04,05)
@@ -1203,16 +1283,16 @@ no código real (HEAD `bdaa1347`).
 
 **Motivação**
 
-Sete itens de alta/média complexidade foram intencionalmente adiados durante a Fase AD por requererem
-análise de impacto maior ou dependências de infra. Todos são derivados da auditoria
+Sete itens de alta/média complexidade foram intencionalmente adiados durante a Fase AD por
+requererem análise de impacto maior ou dependências de infra. Todos são derivados da auditoria
 `DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md`.
 
 **Plano detalhado**: `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md`
 
 **Sprints internos:**
 
-| Sprint | Código      | Conteúdo                                                     | Esforço |
-| ------ | ----------- | ------------------------------------------------------------ | ------- |
+| Sprint | Código      | Conteúdo                                                     | Esforço  |
+| ------ | ----------- | ------------------------------------------------------------ | -------- |
 | AE-1   | ARCH-04     | Hub health check no endpoint `/health`                       | 🟢 Baixo |
 | AE-1   | PERF-03     | FTS5 tokenizer porter + unicode61 no ConversationStore       | 🟢 Baixo |
 | AE-2   | ARCH-01     | Remover 13 re-exports de compatibilidade raiz `src/copilot/` | 🟠 Médio |
@@ -1229,28 +1309,32 @@ análise de impacto maior ou dependências de infra. Todos são derivados da aud
 
 **Motivação e Contexto**
 
-O SDK Copilot expõe dados ricos sobre context window via evento `session.usage_info` (tipo ephemeral):
+O SDK Copilot expõe dados ricos sobre context window via evento `session.usage_info` (tipo
+ephemeral):
+
 ```ts
-type: "session.usage_info";
+type: 'session.usage_info';
 data: {
-    tokenLimit: number;      // limite do modelo (ex: 200_000 para claude-sonnet)
-    currentTokens: number;   // tokens atualmente ocupados
-    messagesLength: number;  // número de mensagens na conversa
+  tokenLimit: number; // limite do modelo (ex: 200_000 para claude-sonnet)
+  currentTokens: number; // tokens atualmente ocupados
+  messagesLength: number; // número de mensagens na conversa
 }
 ```
 
 Além disso, os eventos `session.compaction_start` / `session.compaction_complete` já chegam ao
 `AlwaysAliveAgent` e são emitidos via SSE (Fase U). O evento `compaction_complete` contém:
+
 - `preCompactionTokens`, `postCompactionTokens`, `tokensRemoved`
 - `checkpointPath` para recovery por snapshot
 - `compactionTokensUsed` (custo da compactação em si)
 
-**Problema atual**: Esses dados chegam mas são parcialmente ignorados. O terminal exibe
-estimativa heurística (4 chars/token) via `/context`, mas **não usa os tokens reais do SDK**.
-O `InfiniteSessionConfig.backgroundCompactionThreshold` está hardcoded em `0.75` no
+**Problema atual**: Esses dados chegam mas são parcialmente ignorados. O terminal exibe estimativa
+heurística (4 chars/token) via `/context`, mas **não usa os tokens reais do SDK**. O
+`InfiniteSessionConfig.backgroundCompactionThreshold` está hardcoded em `0.75` no
 `session-manager.js` sem possibilidade de ajuste em runtime.
 
 **O que o SDK controla automaticamente (já ativo):**
+
 - `infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 }` em `session-manager.js`
 - Compactação automática inicia quando context chega a 75% do limite
 - Compactação bloqueia sessão a 95% (`bufferExhaustionThreshold` default SDK = 0.95)
@@ -1260,14 +1344,14 @@ O `InfiniteSessionConfig.backgroundCompactionThreshold` está hardcoded em `0.75
 
 **AA.0 — Anchor de Instruções Permanentes (Pinned Context Mechanism)**
 
-> **Contexto crítico**: A compactação SDK resume a *conversa* (turns de usuário + assistente), mas
-> o `systemMessage` em `SessionConfig` / `ResumeSessionConfig` é **configuração**, não histórico.
+> **Contexto crítico**: A compactação SDK resume a _conversa_ (turns de usuário + assistente), mas o
+> `systemMessage` em `SessionConfig` / `ResumeSessionConfig` é **configuração**, não histórico.
 > Portanto, `systemMessage.content` é o único conteúdo **garantidamente presente** na janela de
 > contexto após cada compactação — o SDK o re-aplica automaticamente.
 >
-> **Estado atual**: `session-manager.js` usa `buildHookContextAppendMessage(hookContext)` que adiciona
-> apenas o briefing operacional dinâmico (estado do hook system) em `mode: "append"`. As instruções
-> permanentes do LLM-B (`AGENT_IDENTITY`, `CODE_CHANGE_RULES`, `AGENT_GUIDELINES`,
+> **Estado atual**: `session-manager.js` usa `buildHookContextAppendMessage(hookContext)` que
+> adiciona apenas o briefing operacional dinâmico (estado do hook system) em `mode: "append"`. As
+> instruções permanentes do LLM-B (`AGENT_IDENTITY`, `CODE_CHANGE_RULES`, `AGENT_GUIDELINES`,
 > `LAST_INSTRUCTIONS`) estão definidas em `src/copilot/config/system-prompt.js` mas **NÃO** são
 > incluídas no `systemMessage` ativo — ficam sujeitas ao compaction e podem ser perdidas ou
 > distorcidas em sessões longas.
@@ -1275,23 +1359,24 @@ O `InfiniteSessionConfig.backgroundCompactionThreshold` está hardcoded em `0.75
 **Análise de mecanismo**:
 
 Como o SDK aplica compaction (baseado em `types.d.ts` v0.1.32 + `session-events.d.ts`):
-1. Quando `currentTokens / tokenLimit >= backgroundCompactionThreshold` (0.75), inicia compaction
-   em background (não bloqueia a sessão).
+
+1. Quando `currentTokens / tokenLimit >= backgroundCompactionThreshold` (0.75), inicia compaction em
+   background (não bloqueia a sessão).
 2. O SDK chama um LLM para **resumir** todo o histórico de conversação em `summaryContent`
    (`session.compaction_complete.data.summaryContent`).
 3. O histórico antigo é descartado; `messagesRemoved` mensagens são substituídas pelo summary.
 4. Um checkpoint é salvo (`checkpointPath`, `checkpointNumber`) para recovery.
-5. A **configuração** da sessão (incluindo `systemMessage`) é **re-aplicada integralmente** —
-   ela não faz parte do histórico compactável.
+5. A **configuração** da sessão (incluindo `systemMessage`) é **re-aplicada integralmente** — ela
+   não faz parte do histórico compactável.
 
 **O que sobrevive vs. o que é compactado**:
 
 | Conteúdo                           | Sobrevive? | Mecanismo                                                        |
 | ---------------------------------- | ---------- | ---------------------------------------------------------------- |
-| `systemMessage.content`            | ✅ Sempre   | É configuração (SessionConfig), re-aplicado após cada compaction |
-| Turnos de conversa recentes        | ✅ Sim      | Preservados até o limite + compaction começa                     |
-| Turnos antigos                     | ⚠️ Summary  | Resumidos pelo SDK em `summaryContent` (lossy!)                  |
-| Instruções críticas só na conversa | ❌ Risk     | Podem ser perdidas se só existirem em turnos antigos             |
+| `systemMessage.content`            | ✅ Sempre  | É configuração (SessionConfig), re-aplicado após cada compaction |
+| Turnos de conversa recentes        | ✅ Sim     | Preservados até o limite + compaction começa                     |
+| Turnos antigos                     | ⚠️ Summary | Resumidos pelo SDK em `summaryContent` (lossy!)                  |
+| Instruções críticas só na conversa | ❌ Risk    | Podem ser perdidas se só existirem em turnos antigos             |
 
 **Implementação (AA.0)**:
 
@@ -1299,35 +1384,41 @@ Criar `buildPinnedSystemMessage(hookContext)` em `src/copilot/config/system-prom
 
 ```js
 /**
- * Constrói um SystemMessageConfig "append" com instruções permanentes + estado dinâmico do hook.
- * Tudo neste builder é GARANTIDAMENTE fresco após cada compaction.
+ * Constrói um SystemMessageConfig "append" com instruções permanentes + estado dinâmico do hook. Tudo neste builder é
+ * GARANTIDAMENTE fresco após cada compaction.
  *
  * @param {string} hookContext - Conteúdo dinâmico do hook system (session-briefing.md)
  * @returns {SystemMessageConfig}
  */
 export function buildPinnedSystemMessage(hookContext) {
-    const pinnedInstructions = [
-        `## Identidade\n${AGENT_IDENTITY}`,
-        `## Regras de Código\n${CODE_CHANGE_RULES}`,
-        `## Diretrizes Operacionais\n${AGENT_GUIDELINES}`,
-        hookContext ? `## Estado Operacional Atual\n${hookContext}` : '',
-        `## Instruções de Encerramento de Turno\n${LAST_INSTRUCTIONS}`,
-    ].filter(Boolean).join('\n\n---\n\n');
+  const pinnedInstructions = [
+    `## Identidade\n${AGENT_IDENTITY}`,
+    `## Regras de Código\n${CODE_CHANGE_RULES}`,
+    `## Diretrizes Operacionais\n${AGENT_GUIDELINES}`,
+    hookContext ? `## Estado Operacional Atual\n${hookContext}` : '',
+    `## Instruções de Encerramento de Turno\n${LAST_INSTRUCTIONS}`,
+  ]
+    .filter(Boolean)
+    .join('\n\n---\n\n');
 
-    return buildAppendSystemMessage(pinnedInstructions);
+  return buildAppendSystemMessage(pinnedInstructions);
 }
 ```
 
 Atualizar `session-manager.js` (linha 160):
+
 ```js
 // ANTES:
-const systemMessage = injectContext ? buildHookContextAppendMessage(buildHookSystemContext()) : undefined;
+const systemMessage = injectContext
+  ? buildHookContextAppendMessage(buildHookSystemContext())
+  : undefined;
 
 // DEPOIS:
 const systemMessage = buildPinnedSystemMessage(injectContext ? buildHookSystemContext() : '');
 ```
 
 **Garantia após implementação**: Após qualquer compaction, o LLM-B sempre recebe fresco:
+
 - Sua identidade e papel como agente autônomo
 - As regras de código (ESM, estilo, JSDoc etc.)
 - As diretrizes operacionais (hooks, vscode_askQuestions etc.)
@@ -1335,8 +1426,10 @@ const systemMessage = buildPinnedSystemMessage(injectContext ? buildHookSystemCo
 - As instruções de final de turno (nunca sumariadas)
 
 **Arquivos a modificar**:
+
 - `src/copilot/config/system-prompt.js` — novo `buildPinnedSystemMessage(hookContext)`
-- `src/copilot/agent/session-manager.js` — trocar `buildHookContextAppendMessage` por `buildPinnedSystemMessage`
+- `src/copilot/agent/session-manager.js` — trocar `buildHookContextAppendMessage` por
+  `buildPinnedSystemMessage`
 
 **Risco**: Baixo — `mode: "append"` preserva SDK guardrails. Tamanho do system message aumenta
 ~500-800 tokens (permanentes) + ~200-400 tokens (hook briefing dinâmico). Dentro do razoável.
@@ -1344,6 +1437,7 @@ const systemMessage = buildPinnedSystemMessage(injectContext ? buildHookSystemCo
 ---
 
 **AA.1 — Context State no AlwaysAliveAgent**
+
 - Subscrever `session.usage_info` no `always-alive.js` e armazenar estado em `#contextState`:
   ```js
   #contextState = { tokenLimit: 0, currentTokens: 0, messagesLength: 0, utilization: 0.0 }
@@ -1352,26 +1446,36 @@ const systemMessage = buildPinnedSystemMessage(injectContext ? buildHookSystemCo
 - Emitir `session.usage` com dados reais (já existe o evento, falta o payload rico)
 
 **AA.2 — Context Window no GET /health e GET /config**
+
 - `handleHealth()` e `handleGetConfig()` em `http-handlers.js` devem incluir:
   ```json
-  { "contextWindow": { "tokenLimit": 200000, "currentTokens": 45000,
-                        "utilization": 0.225, "messagesLength": 12 } }
+  {
+    "contextWindow": {
+      "tokenLimit": 200000,
+      "currentTokens": 45000,
+      "utilization": 0.225,
+      "messagesLength": 12
+    }
+  }
   ```
 
 **AA.3 — `/context` usa dados reais do SDK**
-- `cmdContext()` em `commands/context.js` deve usar `alwaysAliveAgent.contextState` (dados reais)
-  em vez da heurística de 4 chars/token
+
+- `cmdContext()` em `commands/context.js` deve usar `alwaysAliveAgent.contextState` (dados reais) em
+  vez da heurística de 4 chars/token
 - Manter heurística como fallback quando `contextState.tokenLimit === 0` (ainda sem dados)
 
 **AA.4 — Configuração dinâmica de InfiniteSession via REPL**
+
 - Novo comando `/compaction [auto|manual|status|threshold <valor>]`:
   - `auto`: default, delega ao SDK (backgroundCompactionThreshold configurável)
-  - `manual`: desabilita compactação automática (`infiniteSessions: { enabled: false }`)
-    — requer restart do loop de sessão para ter efeito
+  - `manual`: desabilita compactação automática (`infiniteSessions: { enabled: false }`) — requer
+    restart do loop de sessão para ter efeito
   - `status`: mostra thresholds atuais e último evento de compactação
   - `threshold <valor>`: exibe nota de que requer restart
 
 **AA.5 — SSE: enriquecer `session.usage` com utilization**
+
 - Em `terminal/index.js`, subscrever `session.usage` do `alwaysAliveAgent` e emitir via
   `broadcastSse('context', { tokenLimit, currentTokens, utilization, messagesLength })`
 - Clientes SSE (LLM-A, dashboard) passam a receber dados reais de context utilization
@@ -1380,50 +1484,51 @@ const systemMessage = buildPinnedSystemMessage(injectContext ? buildHookSystemCo
 
 > **Discovery SDK**: O campo `workingDirectory?: string` em `SessionConfig` e `ResumeSessionConfig`
 > instrui o CLI a operar com raiz naquele diretório. O SDK também calcula `SessionContext`
-> automaticamente: `{ cwd, gitRoot?, repository?, branch? }` — se `workingDirectory` apontar para
-> a raiz do repo, o CLI server detecta o git context e o inclui nos metadados da sessão
+> automaticamente: `{ cwd, gitRoot?, repository?, branch? }` — se `workingDirectory` apontar para a
+> raiz do repo, o CLI server detecta o git context e o inclui nos metadados da sessão
 > (`SessionMetadata.context`). Isso é análogo ao comportamento do GitHub Copilot CLI no terminal:
 > quando invocado de dentro de um repo git, o agente "sabe" que está no repo X, branch Y.
 
 **Análise: terminal já integra workspace?**
 
-Não — atualmente o `session-manager.js` **não passa `workingDirectory`** na criação de sessão.
-O CLI server opera sem ancoragem de diretório. Consequências:
+Não — atualmente o `session-manager.js` **não passa `workingDirectory`** na criação de sessão. O CLI
+server opera sem ancoragem de diretório. Consequências:
 
 1. O agente SDK não tem `gitRoot` / `repository` / `branch` em `SessionMetadata.context`.
-2. Ferramentas do CLI que operam com path relativo usam o `cwd` do processo, não um workspace
-   fixo — pode divergir.
+2. Ferramentas do CLI que operam com path relativo usam o `cwd` do processo, não um workspace fixo —
+   pode divergir.
 3. `listSessions({ cwd: ROOT })` não retorna a sessão (porque `context.cwd` não combina).
 
 **Implementação (AA.6)**:
 
 Em `session-manager.js`, adicionar `workingDirectory` no objeto `opts`:
+
 ```js
 import { resolve } from 'node:path';
 const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../');
 
 // Dentro de initOrResumeSession():
 const opts = {
-    // ...existing fields...
-    workingDirectory: WORKSPACE_ROOT,   // ← NOVO
+  // ...existing fields...
+  workingDirectory: WORKSPACE_ROOT, // ← NOVO
 };
 ```
 
-Efeito imediato: o SDK passa `workingDirectory` ao CLI server via `session.create` RPC, o CLI
-server detecta `gitRoot` / `repository` / `branch` e inclui em `SessionMetadata.context`. Ferramentas
-como `read_file`/`edit_file` com paths relativos passam a ser resolvidas a partir do workspace root.
+Efeito imediato: o SDK passa `workingDirectory` ao CLI server via `session.create` RPC, o CLI server
+detecta `gitRoot` / `repository` / `branch` e inclui em `SessionMetadata.context`. Ferramentas como
+`read_file`/`edit_file` com paths relativos passam a ser resolvidas a partir do workspace root.
 
-**Arquivos**: `src/copilot/agent/session-manager.js` (1 linha de mudança)
-**Risco**: Muito baixo — só adiciona contexto git, não muda comportamento de ferramentas.
+**Arquivos**: `src/copilot/agent/session-manager.js` (1 linha de mudança) **Risco**: Muito baixo —
+só adiciona contexto git, não muda comportamento de ferramentas.
 
 ---
 
 **AA.7 — skillDirectories: Documentos Carregados Permanentemente (File-Pinned Context)**
 
-> **Discovery SDK**: `skillDirectories?: string[]` é passado ao CLI server que lê arquivos
-> de skills a partir dos diretórios fornecidos. O **formato** é o mesmo das skills do GitHub Copilot
-> Chat (`SKILL.md` com frontmatter YAML). O campo está em `ResumeSessionConfig` → **sobrevive ao
-> resume de sessão**. As skills carregadas ficam disponíveis como contexto permanente para o LLM
+> **Discovery SDK**: `skillDirectories?: string[]` é passado ao CLI server que lê arquivos de skills
+> a partir dos diretórios fornecidos. O **formato** é o mesmo das skills do GitHub Copilot Chat
+> (`SKILL.md` com frontmatter YAML). O campo está em `ResumeSessionConfig` → **sobrevive ao resume
+> de sessão**. As skills carregadas ficam disponíveis como contexto permanente para o LLM
 > (semelhante a instructions/custom instructions no Copilot Chat).
 
 **Uso proposto**:
@@ -1434,13 +1539,13 @@ que o LLM-B leia sempre — independente de compaction:
 ```js
 // session-manager.js
 const PINNED_SKILL_DIRS = [
-    join(WORKSPACE_ROOT, '.github', 'instructions'),  // hooks-protocol + project-canon
-    join(WORKSPACE_ROOT, '.github', 'hooks', 'state'), // session-briefing dinâmico
+  join(WORKSPACE_ROOT, '.github', 'instructions'), // hooks-protocol + project-canon
+  join(WORKSPACE_ROOT, '.github', 'hooks', 'state'), // session-briefing dinâmico
 ];
 
 const opts = {
-    // ...
-    skillDirectories: PINNED_SKILL_DIRS,
+  // ...
+  skillDirectories: PINNED_SKILL_DIRS,
 };
 ```
 
@@ -1457,26 +1562,31 @@ frontmatter, é tratado como documento de contexto. Em ambos os casos, o conteú
 | `skillDirectories` (AA.7)     | A cada session create/resume | Ilimitado    | Depende do CLI format |
 
 Skills são carregadas no startup/resume → não re-injetadas a cada turn. Portanto:
+
 - **`systemMessage` append** = instruções pequenas e dinâmicas (hook state, close_key)
 - **`skillDirectories`** = documentos grandes e estáticos (project-canon, hooks-protocol completo)
 
 **File Watcher — AA.7.b**:
 
 Para que alterações em arquivos de skill sejam refletidas **sem reiniciar o agente**:
+
 ```
 src/copilot/config/pinned-files-loader.js  ← NOVO módulo
 ```
+
 Responsabilidades:
+
 1. `watchPinnedDirs(dirs, onChanged)` — usa `fs.watch()` ou `chokidar` para vigiar diretórios
 2. Quando arquivo `.md` atualizado → emite evento interno `pinned-files:changed`
-3. `always-alive.js` subscreve → força `refreshSystemMessage()` na próxima janela idle
-   _OU_ inicia nova sessão com `skillDirectories` atualizado
+3. `always-alive.js` subscreve → força `refreshSystemMessage()` na próxima janela idle _OU_ inicia
+   nova sessão com `skillDirectories` atualizado
 
-**Nota de limitação SDK**: O SDK não tem método `updateSkillDirectories()` em sessão ativa.
-A forma de refletir mudanças em `skillDirectories` é criar nova sessão (ou aguardar resume).
-Para mudanças em `systemMessage` (AA.0), o rebuild automático ao `initOrResumeSession` já é suficiente.
+**Nota de limitação SDK**: O SDK não tem método `updateSkillDirectories()` em sessão ativa. A forma
+de refletir mudanças em `skillDirectories` é criar nova sessão (ou aguardar resume). Para mudanças
+em `systemMessage` (AA.0), o rebuild automático ao `initOrResumeSession` já é suficiente.
 
 **Arquivos**:
+
 - `src/copilot/agent/session-manager.js` — adicionar `skillDirectories: PINNED_SKILL_DIRS`
 - `src/copilot/config/pinned-files-loader.js` — NOVO: watcher + loader
 - `src/copilot/terminal/commands/pinned.js` — NOVO: comando `/pinned [list|add|remove|reload]`
@@ -1488,10 +1598,10 @@ Para mudanças em `systemMessage` (AA.0), o rebuild automático ao `initOrResume
 
 **AA.8 — Message Attachments: File Context On-Demand por Turn**
 
-> **Discovery SDK**: `session.send({ prompt, attachments: [{type: "file", path}] })` injeta
-> arquivo real como contexto para aquele turno específico. Diferente de `skillDirectories` (que
-> carrega ao criar/resumir sessão), os attachments são **por-turn** — aparecem no contexto do LLM
-> para aquela mensagem e se tornam parte do histórico (sujeitos a compaction como qualquer turn).
+> **Discovery SDK**: `session.send({ prompt, attachments: [{type: "file", path}] })` injeta arquivo
+> real como contexto para aquele turno específico. Diferente de `skillDirectories` (que carrega ao
+> criar/resumir sessão), os attachments são **por-turn** — aparecem no contexto do LLM para aquela
+> mensagem e se tornam parte do histórico (sujeitos a compaction como qualquer turn).
 
 **Estado atual**: O terminal LLM-B já tem `file-context.js` para embed manual (`/attach`, `@path`).
 O conteúdo é atualmente embedado como text no corpo da mensagem. O SDK oferece uma alternativa mais
@@ -1501,11 +1611,13 @@ limpa: passar como `attachments` ao invés de injetar no texto.
 
 Trocar embed-in-text por `attachments` nativo do SDK em `task-executor.js` e `always-alive.js`.
 Vantagens:
+
 - O CLI server pode exibir o arquivo diferenciado na UI (se TUI ativo)
 - O modelo recebe como contexto estruturado (não só texto)
 - Reduz tokens usados no histórico de turns (o CLI gerencia o contexto)
 
 **Arquivos**:
+
 - `src/copilot/terminal/file-context.js` — revisão para retornar `{type:"file", path}` além do embed
 - `src/copilot/agent/always-alive.js` — aceitar `attachments` native ao send
 - `src/copilot/agent/task-executor.js` — já aceita (verificado), validar passagem correta
@@ -1513,9 +1625,12 @@ Vantagens:
 ---
 
 **Arquivos a modificar (Fase AA completa):**
+
 - `src/copilot/config/system-prompt.js` — **AA.0**: novo `buildPinnedSystemMessage(hookContext)`
-- `src/copilot/agent/session-manager.js` — **AA.0**: trocar builder; **AA.6**: `workingDirectory`; **AA.7**: `skillDirectories`
-- `src/copilot/agent/always-alive.js` — **AA.1**: `#contextState`, getter, enriched `getStatusSnapshot`; **AA.8**: attachments native
+- `src/copilot/agent/session-manager.js` — **AA.0**: trocar builder; **AA.6**: `workingDirectory`;
+  **AA.7**: `skillDirectories`
+- `src/copilot/agent/always-alive.js` — **AA.1**: `#contextState`, getter, enriched
+  `getStatusSnapshot`; **AA.8**: attachments native
 - `src/copilot/terminal/commands/context.js` — **AA.3**: usar dados reais, manter fallback
 - `src/copilot/terminal/http-handlers.js` — **AA.2+AA.3**: contextWindow em /health e /config
 - `src/copilot/terminal/index.js` — **AA.5**: SSE context event
@@ -1526,8 +1641,8 @@ Vantagens:
 - `src/copilot/terminal/commands/help.js` — documentação
 - `src/copilot/terminal/repl.js` — dispatch `compaction` e `pinned`
 
-> **Prioridade de implementação**: AA.0 → AA.6 (1 linha, baixíssimo risco) → AA.1 →
-> AA.3 → AA.2 → AA.5 → AA.7 → AA.7.b → AA.4 → AA.8
+> **Prioridade de implementação**: AA.0 → AA.6 (1 linha, baixíssimo risco) → AA.1 → AA.3 → AA.2 →
+> AA.5 → AA.7 → AA.7.b → AA.4 → AA.8
 
 ---
 
@@ -1538,6 +1653,7 @@ Vantagens:
 **Motivação e Contexto**
 
 O SDK registra dados de **prompt caching** nos eventos de compactação:
+
 ```ts
 compactionTokensUsed?: {
     input: number;
@@ -1546,9 +1662,9 @@ compactionTokensUsed?: {
 }
 ```
 
-Além disso, o evento `user.message` tem `transformedContent` — a versão transformada do prompt
-com XML wrapping para **prompt caching** do Claude (cache_control blocks). Isso indica que o SDK
-já aplica prompt caching internamente quando usa modelos Claude compatíveis.
+Além disso, o evento `user.message` tem `transformedContent` — a versão transformada do prompt com
+XML wrapping para **prompt caching** do Claude (cache_control blocks). Isso indica que o SDK já
+aplica prompt caching internamente quando usa modelos Claude compatíveis.
 
 **Análise do Estado Atual:**
 
@@ -1561,34 +1677,41 @@ já aplica prompt caching internamente quando usa modelos Claude compatíveis.
 3. **Cache de file-context**: `readFileContext()` em `file-context.js` lê do disco a cada chamada.
    Se o mesmo arquivo for referenciado N vezes no mesmo turno, será lido N vezes.
 
-4. **Cache de `listModels()`**: `cmdConfig()` chama `listModels()` que faz chamada SDK.
-   Não tem TTL cache — chamadas rápidas repetidas custam tempo.
+4. **Cache de `listModels()`**: `cmdConfig()` chama `listModels()` que faz chamada SDK. Não tem TTL
+   cache — chamadas rápidas repetidas custam tempo.
 
 **O que implementar:**
 
 **AB.1 — File Context Cache (in-memory, TTL)**
+
 - Em `file-context.js`: cache LRU simples em Map com TTL de 30s
   ```js
   const _fileCache = new Map(); // path → { ctx, expiresAt }
-  export function clearFileCache() { _fileCache.clear(); }
+  export function clearFileCache() {
+    _fileCache.clear();
+  }
   ```
 - Benefício: `/attach src/main.js` em múltiplos turnos consecutivos não relê o arquivo
 - TTL curto (30s) preserva frescor para arquivos que o usuário edita durante a sessão
 
 **AB.2 — Model List Cache (TTL 5min)**
+
 - Em `lib/models.js`: cache com TTL para `listModels()`, evitando chamadas SDK redundantes
 - `cmdConfig --refresh` para invalidar manualmente
 
 **AB.3 — Metrics: Tracking de Cache Hits no /health**
+
 - `handleHealth()` retorna `{ cacheStats: { fileCacheHits, fileCacheMisses, modelCacheAge } }`
 - Permite que LLM-A (via POST /inject + /health) monitore eficiência do cache
 
 **AB.4 — Exposição de Prompt Cache Metrics via SSE**
-- Quando `session.compaction_complete` chega com `compactionTokensUsed.cachedInput > 0`:
-  emitir via SSE `broadcastSse('cache.hit', { cachedInput, totalInput, ratio })`
+
+- Quando `session.compaction_complete` chega com `compactionTokensUsed.cachedInput > 0`: emitir via
+  SSE `broadcastSse('cache.hit', { cachedInput, totalInput, ratio })`
 - Dashboard e LLM-A podem reagir a eventos de cache
 
 **Arquivos a criar/modificar:**
+
 - `src/copilot/terminal/file-context.js` — TTL cache em `readFileContext()`
 - `src/copilot/lib/models.js` — TTL cache em `listModels()`
 - `src/copilot/terminal/http-handlers.js` — cacheStats em /health
@@ -1603,6 +1726,7 @@ já aplica prompt caching internamente quando usa modelos Claude compatíveis.
 **Motivação**
 
 Com AA e AB implementados, surgem questões de robustez:
+
 1. O que acontece quando `bufferExhaustionThreshold` é atingido e o loop bloqueia?
 2. Como recuperar de uma compactação falha (`success: false`)?
 3. Como o usuário pode configurar thresholds sem reiniciar o processo?
@@ -1610,12 +1734,14 @@ Com AA e AB implementados, surgem questões de robustez:
 **Implementações:**
 
 **AC.1 — InfiniteSession Config API via HTTP**
-- Novo endpoint `PUT /config/infinite-session`
-  Body: `{ backgroundCompactionThreshold: 0.70, bufferExhaustionThreshold: 0.90 }`
+
+- Novo endpoint `PUT /config/infinite-session` Body:
+  `{ backgroundCompactionThreshold: 0.70, bufferExhaustionThreshold: 0.90 }`
 - Persiste config em `controle.json` para recarregar no próximo `initOrResumeSession()`
 - Resposta: `{ ok: true, appliedAt: 'next_restart', current: {...} }`
 
 **AC.2 — Compaction Failure Recovery**
+
 - Em `always-alive.js`: ao receber `session.compaction_complete` com `success: false`:
   - Emitir `session.fatal` com detalhes do erro
   - Se `checkpointPath` disponível: logar rota de recovery manual
@@ -1623,16 +1749,19 @@ Com AA e AB implementados, surgem questões de robustez:
   - `broadcastSse('error', { type: 'compaction_failure', ... })`
 
 **AC.3 — Checkpoint Awareness**
+
 - `getStatusSnapshot()` inclui `{ lastCheckpoint: { number, path, tokensAfter } }`
 - `GET /config` retorna isso → terminal pode exibir checkpoint info em `/context`
 
 **AC.4 — Threshold Warnings no REPL**
+
 - `dialog.js`/`sendTurn()`: antes de enviar turno, verificar `contextState.utilization`:
   - Se ≥ 0.85: imprimir aviso amarelo no REPL ("⚠ Context em 85% — compactação iminente")
   - Se ≥ 0.95: imprimir aviso vermelho ("⛔ Context crítico — aguardando compactação")
 - Não bloqueia o envio — apenas informa o usuário
 
 **Arquivos a criar/modificar:**
+
 - `src/copilot/agent/always-alive.js` — handler de `compaction_complete` com recovery
 - `src/copilot/terminal/dialog.js` — threshold warnings pre-send
 - `src/copilot/api/bridge-control.js` ou novo `bridge-config.js` — PUT /config/infinite-session
@@ -1652,11 +1781,14 @@ Com AA e AB implementados, surgem questões de robustez:
 Research realizado em 2026-04-xx sobre o SDK v0.1.32 revelou três capacidades **não utilizadas**
 atualmente: `workingDirectory`, `skillDirectories` e `customAgents`. Estas capacidades permitem:
 
-1. **workingDirectory** → o CLI server "conhece" o repo git (branch, remote, gitRoot) — workspace context automático
-2. **skillDirectories** → diretórios com arquivos `.md` que ficam carregados permanentemente no contexto do LLM, sobrevivem a resume/compaction
+1. **workingDirectory** → o CLI server "conhece" o repo git (branch, remote, gitRoot) — workspace
+   context automático
+2. **skillDirectories** → diretórios com arquivos `.md` que ficam carregados permanentemente no
+   contexto do LLM, sobrevivem a resume/compaction
 3. **customAgents** → sub-agentes com prompt + tool subset próprios, invocáveis via `@nome`
 
-**AA.6** (em Fase AA) já cobre `workingDirectory`. Esta Fase AG aprofunda `skillDirectories` e `customAgents`.
+**AA.6** (em Fase AA) já cobre `workingDirectory`. Esta Fase AG aprofunda `skillDirectories` e
+`customAgents`.
 
 **Descobertas de Research (SDK v0.1.32):**
 
@@ -1689,32 +1821,36 @@ interface SessionContext {
 
 **Formato de Skills**:
 
-Baseado no formato usado pelo GitHub Copilot Chat (`.github/skills/*/SKILL.md`), skills são
-arquivos Markdown com frontmatter YAML opcional:
+Baseado no formato usado pelo GitHub Copilot Chat (`.github/skills/*/SKILL.md`), skills são arquivos
+Markdown com frontmatter YAML opcional:
 
 ```markdown
 ---
 name: meu-skill
-description: "Descrição do skill para o modelo decidir quando usar"
+description: 'Descrição do skill para o modelo decidir quando usar'
 user-invocable: true
 ---
+
 # Conteúdo do Skill (visto pelo LLM)
+
 ...
 ```
 
-Sem frontmatter, o arquivo é tratado como documento de contexto (sempre presente, sem nome de skill).
+Sem frontmatter, o arquivo é tratado como documento de contexto (sempre presente, sem nome de
+skill).
 
 **O que implementar:**
 
 **AG.1 — PinnedFilesLoader: Watcher de Arquivos Pinados**
 
 Criar `src/copilot/config/pinned-files-loader.js`:
+
 ```js
 /**
  * Carrega e monitora diretórios de "skills" SDK para o LLM-B.
  *
- * Quando arquivos nos diretórios monitorados são criados/modificados/deletados,
- * emite evento 'pinned-files:changed' para que o agente possa reagir.
+ * Quando arquivos nos diretórios monitorados são criados/modificados/deletados, emite evento 'pinned-files:changed'
+ * para que o agente possa reagir.
  */
 import { watch } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
@@ -1722,38 +1858,49 @@ import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 
 export class PinnedFilesLoader extends EventEmitter {
-    /** @type {string[]} */
-    #dirs = [];
-    /** @type {Array<import('node:fs').FSWatcher>} */
-    #watchers = [];
+  /** @type {string[]} */
+  #dirs = [];
+  /** @type {import('node:fs').FSWatcher[]} */
+  #watchers = [];
 
-    /**
-     * @param {string[]} dirs - Diretórios a monitorar
-     */
-    constructor(dirs) { /* ... */ }
+  /**
+   * @param {string[]} dirs - Diretórios a monitorar
+   */
+  constructor(dirs) {
+    /* ... */
+  }
 
-    /** @returns {string[]} Diretórios monitorados */
-    get dirs() { return [...this.#dirs]; }
+  /** @returns {string[]} Diretórios monitorados */
+  get dirs() {
+    return [...this.#dirs];
+  }
 
-    /** Inicia monitoramento de todos os diretórios */
-    start() { /* watch + emit 'changed' */ }
+  /** Inicia monitoramento de todos os diretórios */
+  start() {
+    /* watch + emit 'changed' */
+  }
 
-    /** Para todos os watchers */
-    stop() { /* close watchers */ }
+  /** Para todos os watchers */
+  stop() {
+    /* close watchers */
+  }
 
-    /** @returns {Promise<string[]>} Lista de arquivos .md encontrados */
-    async listFiles() { /* readdir recursivo */ }
+  /** @returns {Promise<string[]>} Lista de arquivos .md encontrados */
+  async listFiles() {
+    /* readdir recursivo */
+  }
 }
 
 /** Instância singleton para uso em session-manager.js */
 export const pinnedFilesLoader = new PinnedFilesLoader([
-    join(ROOT, '.github', 'instructions'),
-    join(ROOT, '.github', 'hooks', 'state'),
+  join(ROOT, '.github', 'instructions'),
+  join(ROOT, '.github', 'hooks', 'state'),
 ]);
 ```
 
 **Limitação importante**: O SDK não tem método para atualizar `skillDirectories` de uma sessão
 ativa. A única forma de refletir novos arquivos é criar/resumir sessão. A estratégia é:
+
 - `pinnedFilesLoader` emite `changed` → `always-alive.js` seta flag `#skillsOutdated = true`
 - Na próxima vez que `initOrResumeSession()` for chamado (restart/reconnect), usa o set atualizado
 
@@ -1765,8 +1912,8 @@ Criar `src/copilot/config/custom-agents.js` com factory de agentes reutilizávei
 /**
  * Agentes customizados disponíveis para o LLM-B.
  *
- * Invocados na conversa via @nome (ex: "@auditor analise este arquivo").
- * Cada agente tem subset de tools e prompt focado.
+ * Invocados na conversa via @nome (ex: "@auditor analise este arquivo"). Cada agente tem subset de tools e prompt
+ * focado.
  */
 import { createReadOnlyAgent } from '#copilot/lib/agents';
 
@@ -1774,33 +1921,36 @@ import { createReadOnlyAgent } from '#copilot/lib/agents';
  * @returns {import('@github/copilot-sdk').CustomAgentConfig[]}
  */
 export function buildDefaultCustomAgents() {
-    return [
-        createReadOnlyAgent(
-            'auditor',
-            'Realiza code review e auditoria de qualidade sem modificar arquivos.',
-        ),
-        {
-            name: 'docs',
-            displayName: 'Docs Agent',
-            description: 'Lê documentação e responde perguntas sobre a arquitetura do projeto.',
-            tools: ['read_file', 'list_directory', 'grep_search'],
-            prompt: 'Você é um especialista na documentação deste repositório. ' +
-                    'Leia os arquivos solicitados e responda com precisão.',
-        },
-    ];
+  return [
+    createReadOnlyAgent(
+      'auditor',
+      'Realiza code review e auditoria de qualidade sem modificar arquivos.',
+    ),
+    {
+      name: 'docs',
+      displayName: 'Docs Agent',
+      description: 'Lê documentação e responde perguntas sobre a arquitetura do projeto.',
+      tools: ['read_file', 'list_directory', 'grep_search'],
+      prompt:
+        'Você é um especialista na documentação deste repositório. ' +
+        'Leia os arquivos solicitados e responda com precisão.',
+    },
+  ];
 }
 ```
 
 **AG.3 — Endpoint API: GET/PUT /config/skills**
 
 Adicionar ao `http-handlers.js`:
+
 - `GET /config/skills` → lista diretórios monitorados + arquivos encontrados
-- `PUT /config/skills` → `{ "add": "path", "remove": "path" }` → atualiza dirs em runtime
-  (efeito na próxima sessão; flag `skillsOutdated` no always-alive)
+- `PUT /config/skills` → `{ "add": "path", "remove": "path" }` → atualiza dirs em runtime (efeito na
+  próxima sessão; flag `skillsOutdated` no always-alive)
 
 **AG.4 — Comando REPL: `/skills [list|add|remove|reload]`**
 
 Novo `src/copilot/terminal/commands/skills.js`:
+
 - `/skills list` → lista skills carregados na sessão atual
 - `/skills add <dir>` → adiciona dir às pinned dirs (efeito na próxima sessão)
 - `/skills remove <dir>` → remove dir
@@ -1808,12 +1958,16 @@ Novo `src/copilot/terminal/commands/skills.js`:
 
 **AG.5 — Integração Terminal ↔ Workspace (completude)**
 
-Verificar e documentar o que o SDK já fornece automaticamente quando `workingDirectory` está definido:
+Verificar e documentar o que o SDK já fornece automaticamente quando `workingDirectory` está
+definido:
+
 - Ferramentas do CLI com paths relativos resolvem a partir de `workingDirectory`
 - `SessionMetadata.context` tem `gitRoot`, `repository`, `branch`
 - `listSessions({ cwd: WORKSPACE_ROOT })` filtra sessões do projeto
 
-Adicionar em `/st` (status) e `/context` (context info) o `SessionContext` detectado automaticamente:
+Adicionar em `/st` (status) e `/context` (context info) o `SessionContext` detectado
+automaticamente:
+
 ```
 🔍 Workspace Context (via SDK)
   - cwd:        /workspaces/chatgpt-docker-puppeteer
@@ -1823,6 +1977,7 @@ Adicionar em `/st` (status) e `/context` (context info) o `SessionContext` detec
 ```
 
 **Arquivos a criar/modificar:**
+
 - `src/copilot/config/pinned-files-loader.js` — **AG.1** NOVO: PinnedFilesLoader class
 - `src/copilot/config/custom-agents.js` — **AG.2** NOVO: factory de custom agents
 - `src/copilot/agent/session-manager.js` — **AG.1**: usar loader; **AG.2**: incluir customAgents
@@ -1834,8 +1989,8 @@ Adicionar em `/st` (status) e `/context` (context info) o `SessionContext` detec
 - `src/copilot/terminal/commands/index.js` — export skills
 - `src/copilot/terminal/repl.js` — dispatch `skills`
 
-> **Prioridade de implementação**: AG.1 + AG.2 (base) → AG.5 (1 linha workingDirectory) →
-> AG.3 (API) → AG.4 (REPL) → AG.2 (custom agents, mais complexo)
+> **Prioridade de implementação**: AG.1 + AG.2 (base) → AG.5 (1 linha workingDirectory) → AG.3 (API)
+> → AG.4 (REPL) → AG.2 (custom agents, mais complexo)
 
 > **Dependências**: AG.1 depende de AA.6 (workingDirectory configurado). AG.4 depende de AG.1.
 
@@ -1843,46 +1998,74 @@ Adicionar em `/st` (status) e `/context` (context info) o `SessionContext` detec
 
 ### FASE AH — Tool System Hardening: Controle Granular de Tools e Custom Tools API
 
-**Prioridade**: ALTA (segurança + extensibilidade) | **Status**: ✅ CONCLUÍDA (`9584f563`) | **Commits**: `61a18902`, `9584f563`
+**Prioridade**: ALTA (segurança + extensibilidade) | **Status**: ✅ CONCLUÍDA (`9584f563`) |
+**Commits**: `61a18902`, `9584f563`
 
 **Contexto e motivação (research 2026-03-26):**
 
 Investigação profunda do SDK v0.1.32 revelou o ciclo de vida completo do sistema de tools:
 
-1. **Registro**: `session.create({ tools: [{ name, description, parameters (JSON Schema), handler }] })` → SDK serializa via `toJsonSchema()` → envia ao CLI via RPC `session.create`.
-2. **Injeção no prompt**: CLI recebe definições → injeta `description` + schema de parâmetros no system prompt (seção "tool instructions") → LLM lê e aprende quando/como invocar.
-3. **Despacho**: LLM decide invocar → CLI emite evento `external_tool.requested { requestId, toolName, arguments, toolCallId }` → SDK roteia via `toolHandlers.get(toolName)` → `handler(args, { sessionId, toolCallId, toolName, arguments })` → resultado via `rpc.tools.handlePendingToolCall({ requestId, result|error })`.
-4. **Built-in tools** (implementados no CLI, NÃO passam pelo SDK): `bash`, `glob`, `grep`, `view`, `create`, `edit`, `lsp`, `memory`, `powershell`, `read_bash`, `stop_bash`, `web_fetch`, `web_search`. Suas descrições são injetadas pelo CLI diretamente, não pelo SDK.
-5. **Controle de tools**: `availableTools?: string[]` (allowlist, tem precedência) e `excludedTools?: string[]` (denylist) — ambos sobrevivem a `session.resume` via `ResumeSessionConfig`.
-6. **Override de built-in**: `{ name: 'bash', ..., overridesBuiltInTool: true }` permite substituir um tool nativo por implementação customizada.
+1. **Registro**:
+   `session.create({ tools: [{ name, description, parameters (JSON Schema), handler }] })` → SDK
+   serializa via `toJsonSchema()` → envia ao CLI via RPC `session.create`.
+2. **Injeção no prompt**: CLI recebe definições → injeta `description` + schema de parâmetros no
+   system prompt (seção "tool instructions") → LLM lê e aprende quando/como invocar.
+3. **Despacho**: LLM decide invocar → CLI emite evento
+   `external_tool.requested { requestId, toolName, arguments, toolCallId }` → SDK roteia via
+   `toolHandlers.get(toolName)` → `handler(args, { sessionId, toolCallId, toolName, arguments })` →
+   resultado via `rpc.tools.handlePendingToolCall({ requestId, result|error })`.
+4. **Built-in tools** (implementados no CLI, NÃO passam pelo SDK): `bash`, `glob`, `grep`, `view`,
+   `create`, `edit`, `lsp`, `memory`, `powershell`, `read_bash`, `stop_bash`, `web_fetch`,
+   `web_search`. Suas descrições são injetadas pelo CLI diretamente, não pelo SDK.
+5. **Controle de tools**: `availableTools?: string[]` (allowlist, tem precedência) e
+   `excludedTools?: string[]` (denylist) — ambos sobrevivem a `session.resume` via
+   `ResumeSessionConfig`.
+6. **Override de built-in**: `{ name: 'bash', ..., overridesBuiltInTool: true }` permite substituir
+   um tool nativo por implementação customizada.
 
 **Gaps identificados (AH-01, AH-03, AH-04 resolvidos):**
 
-- ~~**GAP-AH-01 — Ausência de allowlist/denylist**~~ → **RESOLVIDO AH.1**: `DEFAULT_EXCLUDED_TOOLS = ['powershell', 'web_fetch', 'web_search', 'memory']` em `session-config.js`, injetado em `excludedTools` em `initOrResumeSession` + `getToolsConfig().denylist` runtime.
-- **GAP-AH-02 — Tools dinâmicas sem API**: não há mecanismo para registrar/remover custom tools sem reiniciar sessão (limitação do SDK — `session.resume` aceita novos `tools` mas requer reconexão).
-- ~~**GAP-AH-03 — Sem auditoria de invocação**~~ → **RESOLVIDO AH.3**: `logToolAudit()` em `session-manager.js` loga to JSONL `logs/tool-audit.jsonl`.
-- ~~**GAP-AH-04 — Sem mecanismo de permissão por tool**~~ → **RESOLVIDO AH.6**: `buildAuditingPermissionHandler()` em `session-manager.js` envolve todo `onPermissionRequest` com log de auditoria + warn para high-risk tools.
-- **GAP-AH-05 — Descrições de custom tools ausentes ou fracas**: mitigado com `buildTool()` factory (AH.4) que documenta o padrão recomendado.
+- ~~**GAP-AH-01 — Ausência de allowlist/denylist**~~ → **RESOLVIDO AH.1**:
+  `DEFAULT_EXCLUDED_TOOLS = ['powershell', 'web_fetch', 'web_search', 'memory']` em
+  `session-config.js`, injetado em `excludedTools` em `initOrResumeSession` +
+  `getToolsConfig().denylist` runtime.
+- **GAP-AH-02 — Tools dinâmicas sem API**: não há mecanismo para registrar/remover custom tools sem
+  reiniciar sessão (limitação do SDK — `session.resume` aceita novos `tools` mas requer reconexão).
+- ~~**GAP-AH-03 — Sem auditoria de invocação**~~ → **RESOLVIDO AH.3**: `logToolAudit()` em
+  `session-manager.js` loga to JSONL `logs/tool-audit.jsonl`.
+- ~~**GAP-AH-04 — Sem mecanismo de permissão por tool**~~ → **RESOLVIDO AH.6**:
+  `buildAuditingPermissionHandler()` em `session-manager.js` envolve todo `onPermissionRequest` com
+  log de auditoria + warn para high-risk tools.
+- **GAP-AH-05 — Descrições de custom tools ausentes ou fracas**: mitigado com `buildTool()` factory
+  (AH.4) que documenta o padrão recomendado.
 
 **AH.1 — Tool Filter padrão seguro ✅ CONCLUÍDA**
 
 Implementado em `src/copilot/config/session-config.js`:
+
 ```js
 export const DEFAULT_EXCLUDED_TOOLS = ['powershell', 'web_fetch', 'web_search', 'memory'];
 ```
+
 Integrado em `initOrResumeSession` via:
+
 ```js
 excludedTools: [...DEFAULT_EXCLUDED_TOOLS, ...getToolsConfig().denylist],
 ```
+
 A denylist runtime é configurável via `PUT /config/tools`.
 
 **AH.2 — Tool Config API (`/config/tools`) ✅ CONCLUÍDA**
 
 Endpoints adicionados em `server.js`:
-- `GET /config/tools` → retorna `{ allowlist, denylist }` atual
-- `PUT /config/tools` → aceita `{ allowlist?: string[] | null; denylist?: string[] }`, persiste em `tools-state.js`
 
-Estado compartilhado em `src/copilot/config/tools-state.js` (módulo independente, sem circular deps):
+- `GET /config/tools` → retorna `{ allowlist, denylist }` atual
+- `PUT /config/tools` → aceita `{ allowlist?: string[] | null; denylist?: string[] }`, persiste em
+  `tools-state.js`
+
+Estado compartilhado em `src/copilot/config/tools-state.js` (módulo independente, sem circular
+deps):
+
 ```js
 export function getToolsConfig()    // → { allowlist, denylist }
 export function patchToolsConfig()  // atualiza parcialmente
@@ -1891,47 +2074,63 @@ export function patchToolsConfig()  // atualiza parcialmente
 **AH.3 — Tool Invocation Audit ✅ CONCLUÍDA**
 
 `logToolAudit()` em `session-manager.js` loga cada decisão de permissão em `logs/tool-audit.jsonl`:
+
 ```jsonl
-{"tool":"bash","decision":"approved","highRisk":true,"ts":"2026-03-26T10:00:00.000Z"}
+{
+  "tool": "bash",
+  "decision": "approved",
+  "highRisk": true,
+  "ts": "2026-03-26T10:00:00.000Z"
+}
 ```
 
 **AH.4 — `buildTool()` factory com schema Zod robusto ✅ CONCLUÍDA**
 
 Criado `src/copilot/tools/tool-factory.js`:
+
 ```js
 export function buildTool({ name, description, parameters, handler, requiresApproval, overridesBuiltInTool })
 ```
+
 - `parameters`: aceita `ZodTypeAny` (auto-convertido via `zod-to-json-schema`) ou JSON Schema manual
 - `requiresApproval = true` → `skipPermission: false` por padrão (segurança first)
 - Wrapper com `log('DEBUG', ...)` em toda invocação para observabilidade
 
 **AH.5 — LSP Tool documentation ✅ CONCLUÍDA**
 
-Documentação de integração LSP incluída no JSDoc do `tool-factory.js` (seção `## AH.5 — Integração LSP / IDE`), cobrindo os 3 modos: Zod schema, JSON Schema manual, sem parâmetros.
+Documentação de integração LSP incluída no JSDoc do `tool-factory.js` (seção
+`## AH.5 — Integração LSP / IDE`), cobrindo os 3 modos: Zod schema, JSON Schema manual, sem
+parâmetros.
 
 **AH.6 — `onPermissionRequest` integrado + auditoria ✅ CONCLUÍDA**
 
 `buildAuditingPermissionHandler(baseHandler?)` em `session-manager.js`:
+
 ```js
 onPermissionRequest: buildAuditingPermissionHandler(sessionOptions.onPermissionRequest),
 ```
+
 - Detecta `HIGH_RISK_TOOLS = ['bash', 'edit', 'create', 'git_apply_patch']`
 - Loga `WARN` antes de delegar ao handler base
 - Chama `logToolAudit({ tool, decision, highRisk })` após a decisão
 - Integrado no dialog loop eterno: ambos os `initOrResumeSession` de `always-alive.js` são auditados
 
-> **Dependências resolvidas**: AH.1 depende de AA.6 (workingDirectory) ✅ e AG configurados ✅. AH.3 integrado ao loop de sessão ✅. AH.2 usa módulo `tools-state.js` sem circular deps ✅.
+> **Dependências resolvidas**: AH.1 depende de AA.6 (workingDirectory) ✅ e AG configurados ✅. AH.3
+> integrado ao loop de sessão ✅. AH.2 usa módulo `tools-state.js` sem circular deps ✅.
 
-> **Impacto de segurança**: `excludedTools` padrão reduz superfície de ataque (SEC-01). `buildAuditingPermissionHandler` + audit JSONL = rastreabilidade completa de ferramentas sensíveis.
+> **Impacto de segurança**: `excludedTools` padrão reduz superfície de ataque (SEC-01).
+> `buildAuditingPermissionHandler` + audit JSONL = rastreabilidade completa de ferramentas
+> sensíveis.
 
 ---
 
 ## Análise: SDK vs. Implementação Própria para Gestão de Contexto
 
-**Research realizado em 2026-03-25 (revisado 2026-03-26)** com base nos tipos SDK v0.1.32 e investigação profunda do CLI bundle.
+**Research realizado em 2026-03-25 (revisado 2026-03-26)** com base nos tipos SDK v0.1.32 e
+investigação profunda do CLI bundle.
 
-| Aspecto                     | O SDK já faz                                                  | Nossa implementação adiciona                  |
-| --------------------------- | ------------------------------------------------------------- | --------------------------------------------- |
+| Aspecto                     | O SDK já faz                                                   | Nossa implementação adiciona                  |
+| --------------------------- | -------------------------------------------------------------- | --------------------------------------------- |
 | Compactação automática      | ✅ `InfiniteSessionConfig.backgroundCompactionThreshold` (80%) | Configuração dinâmica (AC.1)                  |
 | Eventos de compactação      | ✅ `session.compaction_start/complete`                         | Recovery, SSE broadcast (AC.2)                |
 | Métricas de tokens          | ✅ `session.usage_info` ephemeral                              | Armazenar estado + expor via API (AA.1-AA.5)  |
@@ -1957,12 +2156,19 @@ onPermissionRequest: buildAuditingPermissionHandler(sessionOptions.onPermissionR
 | MCP remoto (HTTP/SSE)       | ✅ `MCPRemoteServerConfig` (url, headers)                      | Disponível para MCP externos (AG.2)           |
 
 **Mecanismo de seleção de tools (descoberta 2026-03-26):**
-- **Custom tools**: descrição + JSON Schema injetados no system prompt via `session.create` RPC → seção "tool instructions"
-- **Built-in shell tools** (`bash`, `glob`, `grep`, `view`): guiadas por `<tool_preferences>` XML gerado pela função `UAe({shellConfig})` no CLI bundle, que instrui a LLM a preferir `grep`/`glob`/`view` antes de recorrer ao `bash`
-- **Sub-agent tools** (`explore`, `task`, `general-purpose`): objetos `{name, description}` injetados como peer tools
-- **Hierarquia de preferência** documentada no prompt: `código inteligente (lsp) > glob > grep > bash`
+
+- **Custom tools**: descrição + JSON Schema injetados no system prompt via `session.create` RPC →
+  seção "tool instructions"
+- **Built-in shell tools** (`bash`, `glob`, `grep`, `view`): guiadas por `<tool_preferences>` XML
+  gerado pela função `UAe({shellConfig})` no CLI bundle, que instrui a LLM a preferir
+  `grep`/`glob`/`view` antes de recorrer ao `bash`
+- **Sub-agent tools** (`explore`, `task`, `general-purpose`): objetos `{name, description}`
+  injetados como peer tools
+- **Hierarquia de preferência** documentada no prompt:
+  `código inteligente (lsp) > glob > grep > bash`
 
 **Lições do artigo IssueCrush (GitHub Blog, 2026-03-24):**
+
 - "Cache the results" — uma das principais lições: guardar respostas no lado da aplicação
 - "Always have a fallback" — design for graceful degradation ao atingir limites
 - "Clean up your sessions" — SDK requer cleanup explícito; InfiniteSession automatiza isso
@@ -1972,6 +2178,7 @@ onPermissionRequest: buildAuditingPermissionHandler(sessionOptions.onPermissionR
 ## 10. Checklist de Qualidade para Cada Fase
 
 Antes de commitar cada fase:
+
 - [ ] `npm run lint` sem erros
 - [ ] `npm run format:check` sem erros
 - [ ] `npm run typecheck:node` sem erros novos
@@ -2052,7 +2259,7 @@ Antes de commitar cada fase:
 └──────────────┴─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Fluxo de dados após Fases X–Z3:
+\*\*Fluxo de dados após Fases X–Z3:
 
 ```
 Usuário digita: "@src/main.js explique a inicialização"
@@ -2087,41 +2294,42 @@ POST localhost:3009/inject
 
 ---
 
-*Documento gerado com base em análise estática do código e testes reais com LLM-B ativa.*
-*Atualizado em 2026-03-25 após Fases O (channel/ canônico) + auditoria de cobertura SDK v0.1.32.*
-*Atualizado em 2026-03-27 após Fase W (Attachment Support) + planejamento Fases X–Z3 (Terminal UX).*
-*Atualizado em 2026-03-26 — Roadmap Unificado (Seção 12) + Fase AH planejada.*
-*Atualizado em 2026-03-28 — Fases AE, AA, AB, AC, AG, AH concluídas. Arquitetura v2.6: todo o roadmap AE→AH executado e integrado.*
+_Documento gerado com base em análise estática do código e testes reais com LLM-B ativa._
+_Atualizado em 2026-03-25 após Fases O (channel/ canônico) + auditoria de cobertura SDK v0.1.32._
+_Atualizado em 2026-03-27 após Fase W (Attachment Support) + planejamento Fases X–Z3 (Terminal UX)._
+_Atualizado em 2026-03-26 — Roadmap Unificado (Seção 12) + Fase AH planejada._ _Atualizado em
+2026-03-28 — Fases AE, AA, AB, AC, AG, AH concluídas. Arquitetura v2.6: todo o roadmap AE→AH
+executado e integrado._
 
 ---
 
 ## 12. Roadmap Unificado — Próximas Fases (Ordem de Execução)
 
 > Esta seção centraliza **todas as fases ainda não concluídas** com ordenação de prioridade,
-> dependências claras, arquivos a modificar e contexto de execução.
-> Para detalhes completos de cada fase, ver as seções individuais na Seção 9.
+> dependências claras, arquivos a modificar e contexto de execução. Para detalhes completos de cada
+> fase, ver as seções individuais na Seção 9.
 
 ---
 
 ### Legenda de Status
 
-| Símbolo       | Significado                                           |
-| ------------- | ----------------------------------------------------- |
+| Símbolo        | Significado                                           |
+| -------------- | ----------------------------------------------------- |
 | 🟡 PRONTO      | Análise completa, sem dependências externas pendentes |
 | 🔴 PLANEJADO   | Análise completa, depende de fase anterior            |
 | ⬜ CONDICIONAL | Depende de decisão ou validação do usuário            |
 
 ---
 
-### Fase AE — Refatoração Arquitetural e Infraestrutura *(prioridade 1)*
+### Fase AE — Refatoração Arquitetural e Infraestrutura _(prioridade 1)_
 
-**Status**: ✅ CONCLUÍDA (`798c8fb9`, `468fe3ac`)
-**Plano detalhado**: `DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md`
+**Status**: ✅ CONCLUÍDA (`798c8fb9`, `468fe3ac`) **Plano detalhado**:
+`DOCUMENTAÇÃO/PLANOS/PLANO_FASE_AE_AUDITORIA.md`
 
 #### Subfases (ordem de execução interna):
 
-| Sprint | Código      | Título                                                      | Esforço | Arquivo principal                       |
-| ------ | ----------- | ----------------------------------------------------------- | ------- | --------------------------------------- |
+| Sprint | Código      | Título                                                      | Esforço  | Arquivo principal                       |
+| ------ | ----------- | ----------------------------------------------------------- | -------- | --------------------------------------- |
 | AE-1a  | ARCH-04     | Hub health check no endpoint `/health`                      | 🟢 Baixo | `src/copilot/api/bridge-control.js`     |
 | AE-1b  | PERF-03     | FTS5 tokenizer porter + unicode61 no ConversationStore      | 🟢 Baixo | `src/copilot/conversation-hub/store.js` |
 | AE-2a  | ARCH-01     | Remover 13 re-exports de compatibilidade no barrel raiz     | 🟠 Médio | `src/copilot/index.js` + importers      |
@@ -2131,23 +2339,29 @@ POST localhost:3009/inject
 | AE-3b  | MELHORIA-02 | OpenTelemetry: traces/métricas no AlwaysAliveAgent          | 🔴 Alto  | `src/copilot/agent/always-alive.js`     |
 
 **Contexto de execução**:
-- ARCH-01: Listar todos os importadores de `src/copilot/index.js` com `grep -r "from.*src/copilot'" src/` antes de remover re-exports
-- ARCH-03: Ver `DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md` seção ARCH-03 para detalhe do padrão de convergência
-- GAP-02: O protocolo MCP JSON Schema atual não serializa `z.enum([...])` corretamente (gera `anyOf` em vez de `enum: [...]`)
-- MELHORIA-05: `session.getHistory()` retorna `ConversationMessage[]`; mapear para schema `turns` existente no SQLite
-- MELHORIA-02: OTEL trace em `sendTurn()`, `initOrResumeSession()`, `stopSession()` — usar `@opentelemetry/sdk-trace-node`
+
+- ARCH-01: Listar todos os importadores de `src/copilot/index.js` com
+  `grep -r "from.*src/copilot'" src/` antes de remover re-exports
+- ARCH-03: Ver `DOCUMENTAÇÃO/AUDITORIAS/AUDITORIA_INDEPENDENTE_SRC_COPILOT.md` seção ARCH-03 para
+  detalhe do padrão de convergência
+- GAP-02: O protocolo MCP JSON Schema atual não serializa `z.enum([...])` corretamente (gera `anyOf`
+  em vez de `enum: [...]`)
+- MELHORIA-05: `session.getHistory()` retorna `ConversationMessage[]`; mapear para schema `turns`
+  existente no SQLite
+- MELHORIA-02: OTEL trace em `sendTurn()`, `initOrResumeSession()`, `stopSession()` — usar
+  `@opentelemetry/sdk-trace-node`
 
 ---
 
-### Fase AA — Context Window Intelligence *(prioridade 2)*
+### Fase AA — Context Window Intelligence _(prioridade 2)_
 
-**Status**: ✅ CONCLUÍDA (`6a0a60ed`)
-**Resultado**: terminal e API exibem tokens reais do SDK em vez de heurísticas
+**Status**: ✅ CONCLUÍDA (`6a0a60ed`) **Resultado**: terminal e API exibem tokens reais do SDK em
+vez de heurísticas
 
 #### Subfases (ordem de execução interna):
 
-| Sprint | Código | Título                                                                      | Esforço | Arquivo principal                                            |
-| ------ | ------ | --------------------------------------------------------------------------- | ------- | ------------------------------------------------------------ |
+| Sprint | Código | Título                                                                      | Esforço  | Arquivo principal                                            |
+| ------ | ------ | --------------------------------------------------------------------------- | -------- | ------------------------------------------------------------ |
 | AA-1   | AA.1   | Capturar `session.usage_info` → `contextState` em AlwaysAliveAgent          | 🟢 Baixo | `src/copilot/agent/always-alive.js`                          |
 | AA-2a  | AA.2   | `getStatusSnapshot()` inclui `contextWindow { tokens, limit, utilization }` | 🟢 Baixo | `src/copilot/agent/always-alive.js`                          |
 | AA-2b  | AA.3   | `/context` usa tokens reais (não heurística 4 chars/token)                  | 🟢 Baixo | `src/copilot/terminal/commands/context.js`                   |
@@ -2160,84 +2374,101 @@ POST localhost:3009/inject
 | AA-5   | AA.8   | Attachments nativos SDK (`MessageOptions.attachments`)                      | 🟠 Médio | `src/copilot/channel/client.js` + `terminal/file-context.js` |
 
 **Contexto de execução**:
-- AA.1: evento `session.usage_info` já chega ao agente (ver Fase U); adicionar `this.contextState = { tokens, tokenLimit, utilization }` no handler
-- AA.6: `workingDirectory` deve ser o `process.cwd()` ou configurável via `controle.json`; o SDK faz git introspection automaticamente
-- AA.7: `skillDirectories` aceita array de strings (paths absolutos ou relativos); cada dir é varrido pelo CLI em busca de `*.md` com frontmatter YAML
-- AA.8: `MessageOptions.attachments` aceita `[{ type: 'file', path, mimeType? }]` — substituir o embed-in-text atual
+
+- AA.1: evento `session.usage_info` já chega ao agente (ver Fase U); adicionar
+  `this.contextState = { tokens, tokenLimit, utilization }` no handler
+- AA.6: `workingDirectory` deve ser o `process.cwd()` ou configurável via `controle.json`; o SDK faz
+  git introspection automaticamente
+- AA.7: `skillDirectories` aceita array de strings (paths absolutos ou relativos); cada dir é
+  varrido pelo CLI em busca de `*.md` com frontmatter YAML
+- AA.8: `MessageOptions.attachments` aceita `[{ type: 'file', path, mimeType? }]` — substituir o
+  embed-in-text atual
 
 ---
 
-### Fase AB — Cache Strategy *(prioridade 3)*
+### Fase AB — Cache Strategy _(prioridade 3)_
 
 **Status**: ✅ CONCLUÍDA (`9068f62f`)
 
 #### Subfases (ordem de execução interna):
 
-| Sprint | Código | Título                                         | Esforço | Arquivo principal                       |
-| ------ | ------ | ---------------------------------------------- | ------- | --------------------------------------- |
+| Sprint | Código | Título                                         | Esforço  | Arquivo principal                       |
+| ------ | ------ | ---------------------------------------------- | -------- | --------------------------------------- |
 | AB-1   | AB.1   | File Context Cache (LRU in-memory, TTL 30s)    | 🟢 Baixo | `src/copilot/terminal/file-context.js`  |
 | AB-2   | AB.2   | Model List Cache (TTL 5min)                    | 🟢 Baixo | `src/copilot/lib/models.js`             |
 | AB-3   | AB.3   | `cacheStats` no GET /health                    | 🟢 Baixo | `src/copilot/terminal/http-handlers.js` |
 | AB-4   | AB.4   | SSE `cache.hit` event quando `cachedInput > 0` | 🟢 Baixo | `src/copilot/terminal/index.js`         |
 
 **Contexto de execução**:
+
 - AB.1: usar Map simples `path → { ctx, expiresAt: Date.now() + 30_000 }` sem dependência externa
 - AB.3: counters globais `let _fileCacheHits = 0, _fileCacheMisses = 0` em `file-context.js`
-- AB.4: `session.compaction_complete` tem `compactionTokensUsed.cachedInput` — verificar se `> 0` antes de emitir
+- AB.4: `session.compaction_complete` tem `compactionTokensUsed.cachedInput` — verificar se `> 0`
+  antes de emitir
 
 ---
 
-### Fase AC — Context Window Hardening *(prioridade 4)*
+### Fase AC — Context Window Hardening _(prioridade 4)_
 
 **Status**: ✅ CONCLUÍDA (`dab5cbf0`)
 
 #### Subfases (ordem de execução interna):
 
-| Sprint | Código | Título                                                    | Esforço | Arquivo principal                                        |
-| ------ | ------ | --------------------------------------------------------- | ------- | -------------------------------------------------------- |
+| Sprint | Código | Título                                                    | Esforço  | Arquivo principal                                        |
+| ------ | ------ | --------------------------------------------------------- | -------- | -------------------------------------------------------- |
 | AC-1   | AC.1   | `PUT /config/infinite-session` — thresholds dinâmicos     | 🟠 Médio | `src/copilot/api/bridge-config.js` (NOVO)                |
 | AC-2   | AC.2   | Recovery de compaction failure (checkpointPath awareness) | 🟠 Médio | `src/copilot/agent/always-alive.js`                      |
 | AC-3   | AC.3   | Checkpoint info em `getStatusSnapshot()` + `/config`      | 🟢 Baixo | `src/copilot/agent/always-alive.js` + `http-handlers.js` |
-| AC-4   | AC.4   | Warnings pré-send no REPL (⚠ 85% / ⛔ 95%)                 | 🟢 Baixo | `src/copilot/terminal/dialog.js`                         |
+| AC-4   | AC.4   | Warnings pré-send no REPL (⚠ 85% / ⛔ 95%)                | 🟢 Baixo | `src/copilot/terminal/dialog.js`                         |
 
 **Contexto de execução**:
-- AC.1: thresholds devem ser lidos de `controle.json` `{ infiniteSession: { backgroundThreshold, exhaustionThreshold } }` e aplicados no próximo `session.resume()`
-- AC.2: `compaction_complete` com `success: false` → emitir `AGENT_EVENTS.SESSION_ERROR` no nerv; se `checkpointPath` existe, logar instrução de recovery
-- AC.4: `contextState.utilization` calculado como `tokens / tokenLimit`; verificar antes de chamar `sdk.askUser()`
+
+- AC.1: thresholds devem ser lidos de `controle.json`
+  `{ infiniteSession: { backgroundThreshold, exhaustionThreshold } }` e aplicados no próximo
+  `session.resume()`
+- AC.2: `compaction_complete` com `success: false` → emitir `AGENT_EVENTS.SESSION_ERROR` no nerv; se
+  `checkpointPath` existe, logar instrução de recovery
+- AC.4: `contextState.utilization` calculado como `tokens / tokenLimit`; verificar antes de chamar
+  `sdk.askUser()`
 
 ---
 
-### Fase AG — Skills, Workspace & Custom Agents Integration *(prioridade 5)*
+### Fase AG — Skills, Workspace & Custom Agents Integration _(prioridade 5)_
 
 **Status**: ✅ CONCLUÍDA (`f1b544c0`)
 
 #### Subfases:
 
-| Sprint | Código | Título                                             | Esforço | Arquivo principal                                           |
-| ------ | ------ | -------------------------------------------------- | ------- | ----------------------------------------------------------- |
+| Sprint | Código | Título                                             | Esforço  | Arquivo principal                                           |
+| ------ | ------ | -------------------------------------------------- | -------- | ----------------------------------------------------------- | -------- | -------- | ------------------------------------------------ |
 | AG-1   | AG.1   | PinnedFilesLoader com fs.watch + EventEmitter      | 🟠 Médio | `src/copilot/config/pinned-files-loader.js` (NOVO)          |
 | AG-2   | AG.2   | Custom Agents factory (`buildDefaultCustomAgents`) | 🟠 Médio | `src/copilot/config/custom-agents.js` (NOVO)                |
 | AG-3   | AG.3   | Endpoint `GET/PUT /config/skills`                  | 🟢 Baixo | `src/copilot/terminal/http-handlers.js`                     |
-| AG-4   | AG.4   | Comando REPL `/skills [list                        | add     | remove                                                      | reload]` | 🟢 Baixo | `src/copilot/terminal/commands/skills.js` (NOVO) |
+| AG-4   | AG.4   | Comando REPL `/skills [list                        | add      | remove                                                      | reload]` | 🟢 Baixo | `src/copilot/terminal/commands/skills.js` (NOVO) |
 | AG-5   | AG.5   | Integração terminal ↔ workspace SessionContext     | 🟢 Baixo | `src/copilot/terminal/http-handlers.js` (`/st`, `/context`) |
 
 **Contexto de execução**:
-- AG.1: `PinnedFilesLoader` deve extends `EventEmitter`, aceitar array de `dirs`, usar `fs.watch()` com debounce de 500ms, emitir `changed` com `{ file, content }`
-- AG.2: `CustomAgentConfig` (SDK): `{ name, description, tools, prompt, mcpServers?, infer? }` — criar agentes `@auditor` (só read tools) e `@docs` (só view/glob)
-- AG.2: `tools: ['glob', 'grep', 'view']` para agente read-only; `infer: true` para aparecer no `@` completions
+
+- AG.1: `PinnedFilesLoader` deve extends `EventEmitter`, aceitar array de `dirs`, usar `fs.watch()`
+  com debounce de 500ms, emitir `changed` com `{ file, content }`
+- AG.2: `CustomAgentConfig` (SDK): `{ name, description, tools, prompt, mcpServers?, infer? }` —
+  criar agentes `@auditor` (só read tools) e `@docs` (só view/glob)
+- AG.2: `tools: ['glob', 'grep', 'view']` para agente read-only; `infer: true` para aparecer no `@`
+  completions
 - AG.3: Persistir lista de skill dirs em `controle.json` para sobreviver ao restart
-- AG.5: `SessionContext` do SDK expõe `{ cwd, gitRoot, currentBranch, remoteUrl, repoName }` — expor via `/st` e `/context`
+- AG.5: `SessionContext` do SDK expõe `{ cwd, gitRoot, currentBranch, remoteUrl, repoName }` — expor
+  via `/st` e `/context`
 
 ---
 
-### Fase AH — Tool System Hardening *(prioridade 6)*
+### Fase AH — Tool System Hardening _(prioridade 6)_
 
 **Status**: ✅ CONCLUÍDA (`61a18902`, `9584f563`)
 
 #### Subfases:
 
-| Sprint | Código | Título                                                    | Status | Arquivo principal                          |
-| ------ | ------ | --------------------------------------------------------- | ------ | ------------------------------------------ |
+| Sprint | Código | Título                                                    | Status  | Arquivo principal                          |
+| ------ | ------ | --------------------------------------------------------- | ------- | ------------------------------------------ |
 | AH-1   | AH.1   | `DEFAULT_EXCLUDED_TOOLS` — tool filter seguro por padrão  | ✅ DONE | `src/copilot/config/session-config.js`     |
 | AH-2   | AH.2   | `GET/PUT /config/tools` — allowlist/denylist em runtime   | ✅ DONE | `src/copilot/terminal/http-handlers.js`    |
 | AH-3   | AH.3   | Tool invocation audit JSONL (`logs/tool-audit.jsonl`)     | ✅ DONE | `src/copilot/agent/session-manager.js`     |
@@ -2246,8 +2477,10 @@ POST localhost:3009/inject
 | AH-6   | AH.6   | `buildAuditingPermissionHandler` integrado ao dialog loop | ✅ DONE | `src/copilot/agent/session-manager.js`     |
 
 **Novos arquivos criados**:
+
 - `src/copilot/tools/tool-factory.js` — `buildTool()` com Zod + JSON Schema + logging
-- `src/copilot/config/tools-state.js` — shared mutable state p/ allowlist/denylist (sem circular deps)
+- `src/copilot/config/tools-state.js` — shared mutable state p/ allowlist/denylist (sem circular
+  deps)
 
 ---
 
@@ -2267,15 +2500,15 @@ AG ─────────────────┬─┘── depende de
 AH ─────────────────┴──── depende de AG.2 (lista canônica de tools após custom agents)
 ```
 
-**Ordem recomendada**: `AE → AA → AB → AC → AG → AH`
-**Ordem alternativa** (máximo paralelismo): `AE (sprints 1-2) ‖ AA (sprints 1-4)` → `AB ‖ AC` → `AG` → `AH`
+**Ordem recomendada**: `AE → AA → AB → AC → AG → AH` **Ordem alternativa** (máximo paralelismo):
+`AE (sprints 1-2) ‖ AA (sprints 1-4)` → `AB ‖ AC` → `AG` → `AH`
 
 ---
 
 ### Sumário de Arquivos Novos a Criar / Criados
 
-| Arquivo                                     | Phase       | Status   | Propósito                                    |
-| ------------------------------------------- | ----------- | -------- | -------------------------------------------- |
+| Arquivo                                     | Phase       | Status    | Propósito                                    |
+| ------------------------------------------- | ----------- | --------- | -------------------------------------------- |
 | `src/copilot/config/pinned-files-loader.js` | AA.7 / AG.1 | ✅ CRIADO | Watcher + loader de skill dirs               |
 | `src/copilot/config/custom-agents.js`       | AG.2        | ✅ CRIADO | Factory de custom agents `@auditor`, `@docs` |
 | `src/copilot/terminal/commands/skills.js`   | AG.4        | ✅ CRIADO | Comando REPL `/skills`                       |
@@ -2313,10 +2546,11 @@ AH ─────────────────┴──── depende de
 1. **Persistência tools-state** — `allowlist`/`denylist` não sobrevivem a restart
 2. **Custom Tool Registry via API** — `buildTool()` existe mas sem gestão de runtime
 3. **OpenTelemetry** — sem traces estruturados; impossível medir latência por camada
-4. **SDK History por hub\_session** — `session.getHistory()` não mapeado para SQLite
+4. **SDK History por hub_session** — `session.getHistory()` não mapeado para SQLite
 5. **Native Attachments** — ainda usam embed-in-text em vez de `MessageOptions.attachments`
 
 **Dependências**:
+
 ```
 AI.1 (persistência tools-state) ──► AI.2 (custom tool registry via API)
 AI.3 (OTEL traces)               ── independente
@@ -2330,15 +2564,19 @@ AI.5 (native attachments HTTP)   ── independente
 
 **Status**: ✅ CONCLUÍDA
 
-**Implementação**: `patchToolsConfig()` grava em `tools-config.json` (raiz do projeto) + `loadToolsConfig()` restaura no boot.
+**Implementação**: `patchToolsConfig()` grava em `tools-config.json` (raiz do projeto) +
+`loadToolsConfig()` restaura no boot.
 
 **Arquivos**:
+
 - `src/copilot/config/tools-state.js` — `loadToolsConfig()` + `saveToolsConfig()` persistindo JSON
 - `src/copilot/agent/session-manager.js` — `loadToolsConfig()` chamado na inicialização do módulo
 
 **Notas**:
+
 - Arquivo JSON: `{ "allowlist": null | string[], "denylist": string[] }`
-- `loadToolsConfig()` idempotente: se arquivo ausente, mantém defaults `{ allowlist: null, denylist: [] }`
+- `loadToolsConfig()` idempotente: se arquivo ausente, mantém defaults
+  `{ allowlist: null, denylist: [] }`
 
 ---
 
@@ -2346,17 +2584,23 @@ AI.5 (native attachments HTTP)   ── independente
 
 **Status**: ✅ CONCLUÍDA
 
-**Implementação**: `GET/POST/DELETE /config/tools/custom` para gerenciar custom tools passadas via `tools: [...]` na SessionConfig.
+**Implementação**: `GET/POST/DELETE /config/tools/custom` para gerenciar custom tools passadas via
+`tools: [...]` na SessionConfig.
 
 **Arquivos criados**:
-- `src/copilot/config/custom-tools-registry.js` — `registerCustomTool()`, `getCustomTools()`, `unregisterCustomTool()`, `buildCustomTools()` com persistência em `custom-tools.json`
+
+- `src/copilot/config/custom-tools-registry.js` — `registerCustomTool()`, `getCustomTools()`,
+  `unregisterCustomTool()`, `buildCustomTools()` com persistência em `custom-tools.json`
 
 **Arquivos modificados**:
-- `src/copilot/terminal/http-handlers.js` — `handleGetCustomTools`, `handlePostCustomTool`, `handleDeleteCustomTool`
+
+- `src/copilot/terminal/http-handlers.js` — `handleGetCustomTools`, `handlePostCustomTool`,
+  `handleDeleteCustomTool`
 - `src/copilot/terminal/server.js` — rotas `GET/POST/DELETE /config/tools/custom`
 - `src/copilot/agent/tools-bootstrap.js` — `buildCustomTools()` integrado ao bootstrap
 
 **API**:
+
 ```
 GET    /config/tools/custom         → { ok, tools: [{ name, description }] }
 POST   /config/tools/custom         → body: { name, description, params?, handlerKey }
@@ -2374,12 +2618,17 @@ DELETE /config/tools/custom/:name   → remove por nome
 **Implementação**: spans OTEL instrumentando `session.boot` e `dialog.send_turn`.
 
 **Arquivos**:
-- `src/copilot/lib/telemetry.js` — `startSpan(name, attrs, fn)` wrapper com OTEL nativo + fallback no-op
+
+- `src/copilot/lib/telemetry.js` — `startSpan(name, attrs, fn)` wrapper com OTEL nativo + fallback
+  no-op
 - `src/copilot/lib/index.js` — `startSpan` exportado
-- `src/copilot/agent/always-alive.js` — span `session.boot` em `initOrResumeSession`, span `dialog.send_turn` em `sendDialogTurn`
+- `src/copilot/agent/always-alive.js` — span `session.boot` em `initOrResumeSession`, span
+  `dialog.send_turn` em `sendDialogTurn`
 
 **Notas**:
-- `@opentelemetry/sdk-trace-node` dependência opcional (graceful degradation via try/catch na importação dinâmica)
+
+- `@opentelemetry/sdk-trace-node` dependência opcional (graceful degradation via try/catch na
+  importação dinâmica)
 - `@ts-expect-error` na importação dinâmica opcional
 
 ---
@@ -2388,11 +2637,15 @@ DELETE /config/tools/custom/:name   → remove por nome
 
 **Status**: ✅ CONCLUÍDA
 
-**Implementação**: `session.getHistory()` sincronizado para `turns` do ConversationStore após retomada.
+**Implementação**: `session.getHistory()` sincronizado para `turns` do ConversationStore após
+retomada.
 
 **Arquivos**:
-- `src/copilot/conversation-hub/store.js` — `syncFromSdkHistory(hubSessionId, sdkSessionId, messages)`
-- `src/copilot/agent/always-alive.js` — `#syncSdkHistory(session)` chamado (fire-and-forget) quando `isResumed=true`
+
+- `src/copilot/conversation-hub/store.js` —
+  `syncFromSdkHistory(hubSessionId, sdkSessionId, messages)`
+- `src/copilot/agent/always-alive.js` — `#syncSdkHistory(session)` chamado (fire-and-forget) quando
+  `isResumed=true`
 - `src/copilot/agent/events.js` — `session.history_synced` adicionado ao `AGENT_EVENTS`
 - `src/copilot/bridges/nerv-bridge.js` — `COPILOT_SESSION_HISTORY_SYNCED` mapeado
 
@@ -2412,16 +2665,19 @@ DELETE /config/tools/custom/:name   → remove por nome
 
 **Status**: ✅ CONCLUÍDA
 
-**Implementação**: `handleInject` em `http-handlers.js` roteia attachments nativos (`type: file/directory/selection`) direto para `alwaysAliveAgent.sendMessage({ attachments })`. Attachments `type: content` continuam usando embed-in-text (fallback para compatibilidade).
+**Implementação**: `handleInject` em `http-handlers.js` roteia attachments nativos
+(`type: file/directory/selection`) direto para `alwaysAliveAgent.sendMessage({ attachments })`.
+Attachments `type: content` continuam usando embed-in-text (fallback para compatibilidade).
 
-**Arquivo**: `src/copilot/terminal/http-handlers.js` — `handleInject` — separação entre native SDK attachments e embed markdown.
+**Arquivo**: `src/copilot/terminal/http-handlers.js` — `handleInject` — separação entre native SDK
+attachments e embed markdown.
 
 ---
 
 ### Sumário Fase AI — Arquivos
 
-| Arquivo                                       | AI     | Status  | Propósito                                |
-| --------------------------------------------- | ------ | ------- | ---------------------------------------- |
+| Arquivo                                       | AI     | Status   | Propósito                                |
+| --------------------------------------------- | ------ | -------- | ---------------------------------------- |
 | `src/copilot/config/custom-tools-registry.js` | AI.2   | ✅ NOVO  | Registry de custom tools em runtime      |
 | `src/copilot/config/tools-state.js`           | AI.1   | ✅ MODIF | Persistência em tools-config.json        |
 | `src/copilot/agent/session-manager.js`        | AI.1   | ✅ MODIF | `loadToolsConfig()` no boot              |

@@ -1,11 +1,8 @@
 # Sprint: Terminal Permanente LLM-B
 
-**Data início**: 2026-01-27
-**Data última atualização**: 2026-03-25
-**Versão do Plano**: v2.0 — Fase 5 (GitHub + Terminal Avançado)
-**Status**: ✅ Fases 1-4 Concluídas — Fase 5 Em Execução
-**Commit base Fase 5**: `d83aaacb`
-**Autor**: LLM-A (GitHub Copilot)
+**Data início**: 2026-01-27 **Data última atualização**: 2026-03-25 **Versão do Plano**: v2.0 — Fase
+5 (GitHub + Terminal Avançado) **Status**: ✅ Fases 1-4 Concluídas — Fase 5 Em Execução **Commit
+base Fase 5**: `d83aaacb` **Autor**: LLM-A (GitHub Copilot)
 
 ---
 
@@ -25,24 +22,28 @@ Criar um **terminal de missão crítica** para o sistema AI, que combine:
 ## Histórico de Fases
 
 ### ✅ Fase 1 — Bootstrap do Terminal (Concluída)
+
 - Terminal REPL conectado à LLM-B via `always-alive.js`
 - `POST /inject` endpoint funcional
 - Protocolo READY:/REPLY:/DONE:/STOPPED com filtro no readline
 - BANNER inicial, /status, /history, /who, /clear, /restart, /quit
 
 ### ✅ Fase 2 — Integração Hub + PM2 (Concluída)
+
 - ConversationHub com SQLite para persistência de sessões
 - `hub_session_id` criado no start, passado para `always-alive`
 - `/db-history [n]` para consultar SQLite diretamente
 - PM2 ecosystem para processo permanente
 
 ### ✅ Fase 3 — SSE + Observabilidade (Concluída)
+
 - `GET /events` — SSE stream com eventos: reply, ready, stalled, system
 - `GET /events?level=critical` — filtro de eventos críticos
 - `broadcastSse(event, data)` para propagação
 - Watchdog de 5 minutos (P1)
 
 ### ✅ Fase 4 — Memória Semântica + Pipeline + UI (Concluída)
+
 - **P5**: Semantic memory (`copilot_memories` + FTS5): `/remember`, `/recall`, `/forget`
 - **P6**: Pipeline orchestration (`POST /pipeline`, steps sequenciais)
 - **P7**: Reflection loop automático (env `LLM_B_REFLECTION_INTERVAL_MIN`)
@@ -56,8 +57,8 @@ Criar um **terminal de missão crítica** para o sistema AI, que combine:
 
 ## Fase 5 — GitHub CLI Integration + Terminal Avançado
 
-**Meta**: Transformar o terminal de "REPL primitivo" em terminal de missão completo,
-com integração nativa com o repositório GitHub, operações Git, e features avançadas de UX.
+**Meta**: Transformar o terminal de "REPL primitivo" em terminal de missão completo, com integração
+nativa com o repositório GitHub, operações Git, e features avançadas de UX.
 
 ### Arquitetura da Fase 5
 
@@ -79,8 +80,8 @@ terminal-server.js
 
 **Arquivo**: `src/copilot/gh-bridge.js`
 
-**Objetivo**: Módulo auxiliar que encapsula todas as chamadas ao `gh` CLI,
-retornando objetos JS estruturados. Usa `execFile` (não `exec`) para segurança.
+**Objetivo**: Módulo auxiliar que encapsula todas as chamadas ao `gh` CLI, retornando objetos JS
+estruturados. Usa `execFile` (não `exec`) para segurança.
 
 **API pública do módulo:**
 
@@ -150,11 +151,13 @@ gh search code  "<query>" --json path,repository,textMatches --limit 10
 ```
 
 **Tratamento de erros:**
+
 - Output vazio → retorna array vazio / objeto null
 - `403` / `Unauthorized` no stderr → fallback gracioso com mensagem
 - Timeout 15s por execução (configável por env `LLM_B_GH_TIMEOUT_MS`)
 
 **Env vars:**
+
 - `LLM_B_GH_TIMEOUT_MS` — timeout por chamada gh CLI (default: 15000)
 - `LLM_B_GH_DEFAULT_REPO` — repo padrão (ex: `owner/repo`; auto-detect se vazio)
 
@@ -265,29 +268,33 @@ export async function gitStash(pop)        // → string
 
 ```js
 // Carregar histórico salvo ao inicializar readline
-const historyFile = process.env.LLM_B_HISTORY_FILE
-    ?? path.join(os.homedir(), '.copilot-terminal-history');
+const historyFile =
+  process.env.LLM_B_HISTORY_FILE ?? path.join(os.homedir(), '.copilot-terminal-history');
 const historySize = parseInt(process.env.LLM_B_HISTORY_SIZE ?? '1000', 10);
 
 function loadHistory() {
-    try { return fs.readFileSync(historyFile, 'utf8').split('\n').filter(Boolean); }
-    catch { return []; }
+  try {
+    return fs.readFileSync(historyFile, 'utf8').split('\n').filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 function saveHistory(history) {
-    fs.writeFileSync(historyFile, history.slice(0, historySize).join('\n'));
+  fs.writeFileSync(historyFile, history.slice(0, historySize).join('\n'));
 }
 
 const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    historySize,
-    history: loadHistory(),
-    terminal: true,
+  input: process.stdin,
+  output: process.stdout,
+  historySize,
+  history: loadHistory(),
+  terminal: true,
 });
 rl.on('close', () => saveHistory(rl.history));
 ```
 
 **Env vars:**
+
 - `LLM_B_HISTORY_FILE` — caminho do arquivo (default: `~/.copilot-terminal-history`)
 - `LLM_B_HISTORY_SIZE` — tamanho máximo (default: 1000)
 
@@ -313,14 +320,14 @@ rl.on('close', () => saveHistory(rl.history));
 ```json
 {
   "/issues": "/gh issue list",
-  "/prs":    "/gh pr list",
-  "/runs":   "/gh run list",
-  "/ci":     "/gh run list",
-  "/log":    "/git log",
-  "/st":     "/git status",
-  "/diff":   "/git diff",
-  "/gst":    "/git status",
-  "/glog":   "/git log 20"
+  "/prs": "/gh pr list",
+  "/runs": "/gh run list",
+  "/ci": "/gh run list",
+  "/log": "/git log",
+  "/st": "/git status",
+  "/diff": "/git diff",
+  "/gst": "/git status",
+  "/glog": "/git log 20"
 }
 ```
 
@@ -375,6 +382,7 @@ gh:ci:complete   → { runId, name, conclusion, url }
 ```
 
 **Env vars:**
+
 - `LLM_B_GH_POLL_INTERVAL_MIN` — intervalo de polling (default: 5)
 - `LLM_B_GH_NOTIFICATIONS` — enable/disable (`true`|`false`, default: `true`)
 
@@ -382,15 +390,15 @@ gh:ci:complete   → { runId, name, conclusion, url }
 
 ## Ordem de Implementação (Fase 5)
 
-| Prioridade | Item                              | Impacto | Complexidade |
-| ---------- | --------------------------------- | ------- | ------------ |
-| P1 (Alta)  | P11 — gh-bridge.js                | Alta    | Média        |
-| P2 (Alta)  | P12 — REPL /gh *                  | Alta    | Média        |
-| P3 (Alta)  | P13 — REPL /git * + git-bridge.js | Alta    | Baixa        |
-| P4 (Alta)  | P14 — Histórico persistente       | Média   | Baixa        |
-| P5 (Média) | P15 — Aliases                     | Média   | Baixa        |
-| P6 (Média) | P16 — HTTP /gh/* /git/*           | Alta    | Média        |
-| P7 (Média) | P17 — SSE Push Notifications      | Média   | Alta         |
+| Prioridade | Item                               | Impacto | Complexidade |
+| ---------- | ---------------------------------- | ------- | ------------ |
+| P1 (Alta)  | P11 — gh-bridge.js                 | Alta    | Média        |
+| P2 (Alta)  | P12 — REPL /gh \*                  | Alta    | Média        |
+| P3 (Alta)  | P13 — REPL /git \* + git-bridge.js | Alta    | Baixa        |
+| P4 (Alta)  | P14 — Histórico persistente        | Média   | Baixa        |
+| P5 (Média) | P15 — Aliases                      | Média   | Baixa        |
+| P6 (Média) | P16 — HTTP /gh/_ /git/_            | Alta    | Média        |
+| P7 (Média) | P17 — SSE Push Notifications       | Média   | Alta         |
 
 ---
 
@@ -437,6 +445,7 @@ gh:ci:complete   → { runId, name, conclusion, url }
 ## Checklist de Implementação (Fase 5)
 
 ### P11 — gh-bridge.js
+
 - [ ] `listIssues(opts)` com `--json` e timeout
 - [ ] `viewIssue(n)` com body formatado
 - [ ] `createIssue(title, body, opts)` retorna URL
@@ -457,7 +466,8 @@ gh:ci:complete   → { runId, name, conclusion, url }
 - [ ] Timeout configurável via env
 - [ ] Usar `execFile` (não `exec`), sem shell injection
 
-### P12 — REPL /gh *
+### P12 — REPL /gh \*
+
 - [ ] `/gh issue list` com tabela ANSI
 - [ ] `/gh issue <n>` com body + labels + URL
 - [ ] `/gh issue create` wizard interativo
@@ -476,7 +486,8 @@ gh:ci:complete   → { runId, name, conclusion, url }
 - [ ] `/gh status` com fallback
 - [ ] `/gh api <endpoint>` raw
 
-### P13 — REPL /git * + git-bridge.js
+### P13 — REPL /git \* + git-bridge.js
+
 - [ ] `gitStatus()` com cores por estado
 - [ ] `gitLog(n)` com formato legível
 - [ ] `gitDiff(opts)` com linha count
@@ -487,17 +498,20 @@ gh:ci:complete   → { runId, name, conclusion, url }
 - [ ] REPL: `/git status|log|diff|branch|checkout|pull|push|add|commit|stash`
 
 ### P14 — Histórico Persistente
+
 - [ ] `loadHistoryFromFile()` no init do readline
 - [ ] `saveHistoryToFile(rl.history)` no `close`
 - [ ] Env `LLM_B_HISTORY_FILE` e `LLM_B_HISTORY_SIZE`
 
 ### P15 — Aliases
+
 - [ ] `alias-store.js` com load/save JSON
 - [ ] Aliases built-in: /issues, /prs, /runs, /ci, /log, /st, /diff
 - [ ] REPL: `/alias`, `/alias set`, `/alias rm`, `/alias reset`
 - [ ] Resolver alias no dispatcher ANTES do switch
 
-### P16 — HTTP /gh/* /git/*
+### P16 — HTTP /gh/_ /git/_
+
 - [ ] `GET /gh/issues`, `GET /gh/issues/:n`
 - [ ] `POST /gh/issues`, `POST /gh/issues/:n/comment`
 - [ ] `GET /gh/prs`, `GET /gh/prs/:n`, `GET /gh/prs/:n/diff`
@@ -509,6 +523,7 @@ gh:ci:complete   → { runId, name, conclusion, url }
 - [ ] `GET /git/status`, `GET /git/log`, `GET /git/diff`, `GET /git/branch`
 
 ### P17 — SSE Push Notifications
+
 - [ ] Polling interval configurável
 - [ ] Estado interno `_ghLastKnown` para diff de novidades
 - [ ] Eventos SSE: `gh:issue:new`, `gh:pr:new`, `gh:ci:update`, `gh:ci:complete`
@@ -568,4 +583,4 @@ gh:ci:complete   → { runId, name, conclusion, url }
 
 ---
 
-*Última atualização: 2026-03-25 — Plano v2.0 escrito por LLM-A*
+_Última atualização: 2026-03-25 — Plano v2.0 escrito por LLM-A_

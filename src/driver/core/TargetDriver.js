@@ -955,7 +955,7 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * * Prepara contexto para execução.
+     * - Prepara contexto para execução.
      *
      * @abstract
      * @param {object} _taskSpec - Especificação da task

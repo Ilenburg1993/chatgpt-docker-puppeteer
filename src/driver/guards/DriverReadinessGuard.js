@@ -80,7 +80,7 @@ class DriverReadinessGuard {
      * @param {object} [options={}] - Validation options. Default is `{}`
      * @param {number} [options.stabilityTimeout=10000] - Stabilizer timeout. Default is `10000`
      * @param {boolean} [options.skipTriage=false] - Skip triage scan (fast mode). Default is `false`
-     * @param {boolean} [options.skipSession=false] - Skip session health check Default is `false`
+     * @param {boolean} [options.skipSession=false] - Skip session health check. Default is `false`
      * @returns {Promise<any>} Validation result
      * @throws {Error} Se validation encontra FATAL issues
      */

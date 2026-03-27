@@ -49,34 +49,40 @@ export const DEPTH_LEVEL = Object.freeze({
 
 /** @typedef {string} HealthCheckDepth */
 /** @typedef {{ name: string; size: number; modified_at: string }} OllamaModelInfo */
-/** @typedef {{
-    connected: boolean;
-    host: string;
-    responseTimeMs: number | null;
-    models: OllamaModelInfo[];
-    version: string | null;
-    error: string | null;
-}} OllamaHealthResult */
-/** @typedef {{
-    connected: boolean;
-    url: string;
-    responseTimeMs: number | null;
-    policiesLoaded: boolean;
-    modelsAvailable: number;
-    error: string | null;
-}} GatewayHealthResult */
+/**
+ * @typedef {{
+ *     connected: boolean;
+ *     host: string;
+ *     responseTimeMs: number | null;
+ *     models: OllamaModelInfo[];
+ *     version: string | null;
+ *     error: string | null;
+ * }} OllamaHealthResult
+ */
+/**
+ * @typedef {{
+ *     connected: boolean;
+ *     url: string;
+ *     responseTimeMs: number | null;
+ *     policiesLoaded: boolean;
+ *     modelsAvailable: number;
+ *     error: string | null;
+ * }} GatewayHealthResult
+ */
 /** @typedef {{ totalMb: number; usedMb: number; freeMb: number; usagePercent: number }} SystemMemoryHealth */
 /** @typedef {{ count: number; loadAverage: number[] }} SystemCpuHealth */
-/** @typedef {{
-    status: string;
-    memory: SystemMemoryHealth;
-    cpu: SystemCpuHealth;
-    uptime: number;
-    platform?: string;
-    arch?: string;
-    hostname?: string;
-    nodeVersion?: string;
-}} SystemHealthResult */
+/**
+ * @typedef {{
+ *     status: string;
+ *     memory: SystemMemoryHealth;
+ *     cpu: SystemCpuHealth;
+ *     uptime: number;
+ *     platform?: string;
+ *     arch?: string;
+ *     hostname?: string;
+ *     nodeVersion?: string;
+ * }} SystemHealthResult
+ */
 
 /**
  * @param {unknown} error

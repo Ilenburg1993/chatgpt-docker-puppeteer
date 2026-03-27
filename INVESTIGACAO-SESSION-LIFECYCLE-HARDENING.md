@@ -1,14 +1,16 @@
 # 🔐 Investigação: Session Lifecycle Hardening
 
-**Data**: 2026-03-14
-**Sessão**: dcf579af-502e-4bf2-9d92-75903f85b0a2 (Recovery #2)
-**Status**: ✅ Investigação Completa + Propostas Detalhadas
+**Data**: 2026-03-14 **Sessão**: dcf579af-502e-4bf2-9d92-75903f85b0a2 (Recovery #2) **Status**: ✅
+Investigação Completa + Propostas Detalhadas
 
 ---
 
 ## 1. Pergunta Central do Usuário
 
-> "Sempre que o Copilot inicia um processo de encerramento, o sistema de hooks chama AUTOMATICAMENTE o sessionEnd, certo? Se a resposta é sim, não seria possível nós incluirmos no script session-end alguma lógica para bloquear o processo de encerramento caso todas as condições não sejam satisfeitas?"
+> "Sempre que o Copilot inicia um processo de encerramento, o sistema de hooks chama AUTOMATICAMENTE
+> o sessionEnd, certo? Se a resposta é sim, não seria possível nós incluirmos no script session-end
+> alguma lógica para bloquear o processo de encerramento caso todas as condições não sejam
+> satisfeitas?"
 
 ---
 
@@ -16,7 +18,8 @@
 
 ### 2.1 Descoberta Crítica: sessionEnd Output é IGNORADO
 
-**Fonte**: [GitHub Docs - Hooks Configuration](https://docs.github.com/en/copilot/reference/hooks-configuration)
+**Fonte**:
+[GitHub Docs - Hooks Configuration](https://docs.github.com/en/copilot/reference/hooks-configuration)
 
 ```
 ### Session end hook
@@ -35,12 +38,12 @@ Output: **Ignored** ← ⚠️ CRUCIAL
 
 ### 2.2 Implicações Diretas
 
-| Aspecto                           | Realidade                                                          |
-| --------------------------------- | ------------------------------------------------------------------ |
+| Aspecto                           | Realidade                                                           |
+| --------------------------------- | ------------------------------------------------------------------- |
 | **sessionEnd é automático?**      | ✅ SIM — Copilot dispara automaticamente quando sessão encerra      |
 | **Pode bloquear o encerramento?** | ❌ NÃO — Output é completamente ignorado (não há `decision:block`!) |
-| **Por que ignorado?**             | sessionEnd é um hook **pós-evento** (cleanup), não pré-aprovação   |
-| **Fluxo esperado**                | sessionEnd → cleanup/logging APENAS (session já está encerrando)   |
+| **Por que ignorado?**             | sessionEnd é um hook **pós-evento** (cleanup), não pré-aprovação    |
+| **Fluxo esperado**                | sessionEnd → cleanup/logging APENAS (session já está encerrando)    |
 
 ---
 
@@ -51,6 +54,7 @@ Output: **Ignored** ← ⚠️ CRUCIAL
 **Propósito**: Cleanup e logging quando sessão encerra
 
 **Fluxo atual**:
+
 ```
 sessionEnd hook dispara (automático)
     ↓
@@ -63,21 +67,25 @@ session-end.sh executa:
 ```
 
 **Gap Identificado**:
+
 - session-end.sh NÃO tem mecanismo para **bloquear** o encerramento
 - Mesmo que quiséssemos, output de sessionEnd é ignorado
 - O script roda DEPOIS que a sessão já iniciou seu término
 
 ### 3.2 Questão Filosófica Implícita
 
-Quando o usuário pergunta "não seria possível bloquear o processo de encerramento", está implicitamente perguntando:
+Quando o usuário pergunta "não seria possível bloquear o processo de encerramento", está
+implicitamente perguntando:
 
 > "Como podemos impedir que uma sessão termine sem passar pelo protocolo de autorização?"
 
 **Resposta**: Não via `sessionEnd` hook, MAS há **outras abordagens mais eficazes**:
 
 1. **Defesa em camadas**: Bloquear ANTES que o agente iniciar o encerramento
-2. **Detecção de anomalia**: Identificar encerramento não autorizado NO COMEÇO (sessionStart recovery)
-3. **Força de autorização**: Exigir `vscode_askQuestions` Template F OBRIGATORIAMENTE antes de qualquer ação terminal
+2. **Detecção de anomalia**: Identificar encerramento não autorizado NO COMEÇO (sessionStart
+   recovery)
+3. **Força de autorização**: Exigir `vscode_askQuestions` Template F OBRIGATORIAMENTE antes de
+   qualquer ação terminal
 
 ---
 
@@ -97,29 +105,29 @@ PREV_CLOSE_MODE="$(jq -r '.session.close_mode // "unknown"' PREV_CTX_FILE)"
 
 case "$PREV_CLOSE_MODE" in
   authorized_close)
-      # OK: encerramento legítimo
-      jq '.session.prev_close_mode = "recovered_authorized"' NEW_CTX_FILE
-      ;;
+    # OK: encerramento legítimo
+    jq '.session.prev_close_mode = "recovered_authorized"' NEW_CTX_FILE
+    ;;
   key_rejected)
-      # ALERT: usuário tentou encerrar com KEY inválida
-      # Log BUG-ALERT e continue (recuperação automática)
-      jq '.session.alerts += ["previous_session_key_rejected"]' NEW_CTX_FILE
-      ;;
+    # ALERT: usuário tentou encerrar com KEY inválida
+    # Log BUG-ALERT e continue (recuperação automática)
+    jq '.session.alerts += ["previous_session_key_rejected"]' NEW_CTX_FILE
+    ;;
   missing_authorization)
-      # CRITICAL: encerramento SEM key at all
-      # Log BUG-CRITICAL e continue (defesa fallback)
-      jq '.session.alerts += ["previous_session_closed_no_key"]' NEW_CTX_FILE
-      ;;
-  abrupt/**|timeout/*)
-      # ERROR: crash/timeout durante lasturn
-      jq '.session.alerts += ["previous_session_abrupt_termination"]' NEW_CTX_FILE
-      ;;
+    # CRITICAL: encerramento SEM key at all
+    # Log BUG-CRITICAL e continue (defesa fallback)
+    jq '.session.alerts += ["previous_session_closed_no_key"]' NEW_CTX_FILE
+    ;;
+  abrupt/** | timeout/*)
+    # ERROR: crash/timeout durante lasturn
+    jq '.session.alerts += ["previous_session_abrupt_termination"]' NEW_CTX_FILE
+    ;;
 esac
 
 # Se há alertas no recovery, exigir vscode_askQuestions Template E (Session Kickoff)
 if jq -e '.session.alerts and (.session.alerts | length > 0)' NEW_CTX_FILE > /dev/null; then
-    # Sinalizamsg para agent-startup: deve invocar Template E antes de trabalho
-    jq '.session.recovery_alerts_require_kickoff = true' NEW_CTX_FILE
+  # Sinalizamsg para agent-startup: deve invocar Template E antes de trabalho
+  jq '.session.recovery_alerts_require_kickoff = true' NEW_CTX_FILE
 fi
 ```
 
@@ -140,7 +148,7 @@ INPUT=$(cat)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.toolName')
 
 if [ "$TOOL_NAME" != "bash" ]; then
-  exit 0  # Allow non-bash tools
+  exit 0 # Allow non-bash tools
 fi
 
 COMMAND=$(echo "$INPUT" | jq -r '.toolArgs.command')
@@ -162,13 +170,15 @@ if echo "$COMMAND" | grep -qE "^git push"; then
 fi
 ```
 
-**Resultado**: Qualquer intento de git push final será bloqueado a menos que Template F tenha sido invocado corretamente
+**Resultado**: Qualquer intento de git push final será bloqueado a menos que Template F tenha sido
+invocado corretamente
 
 ---
 
 ### Nível 3: MANDATE — Mandatory vscode_askQuestions Before Agent Stop
 
-**Objetivo**: Força agente a invocar `vscode_askQuestions` Template F ANTES que agentStop seja executado
+**Objetivo**: Força agente a invocar `vscode_askQuestions` Template F ANTES que agentStop seja
+executado
 
 **Implementação**: Expandir `agent-stop.sh` com validação adicional
 
@@ -197,7 +207,8 @@ fi
 
 ### Nível 4: Refactor session-end.sh para VALIDATE Antes de Commit Final
 
-**Objetivo**: Mesmo que output seja ignorado, session-end.sh pode VALIDAR state e logar discrepâncias
+**Objetivo**: Mesmo que output seja ignorado, session-end.sh pode VALIDAR state e logar
+discrepâncias
 
 ```bash
 # session-end.sh — Validação pré-encerramento (NOVO)
@@ -246,7 +257,7 @@ if (sessionStatus.reason === 'user_exit' && !sessionStatus.close_key_validated) 
   io.emit('session:unauthorized_termination_risk', {
     sessionId: sessionStatus.session_id,
     message: '⚠️ Session está encerrando SEM autorização. Aplique close key AGORA.',
-    severity: 'CRITICAL'
+    severity: 'CRITICAL',
   });
 }
 ```
@@ -256,37 +267,33 @@ if (sessionStatus.reason === 'user_exit' && !sessionStatus.close_key_validated) 
 ## 5. Mapa de Implementação (Fases)
 
 ### ✅ Já Implementado
+
 - BUG-80 fix: post-tool-use.sh validação de close_key ANTES de setar flag (✅ DONE)
 
 ### 🟡 Fase 1: Detecção de Anomalias (Nível 1)
-**Arquivo**: `session-start.sh`
-**Escopo**: Adicionar `recovery_alerts_require_kickoff` logic
-**Tempo estimado**: 30 min
-**Risco**: BAIXO (apenas adição de flags, sem change de fluxo)
+
+**Arquivo**: `session-start.sh` **Escopo**: Adicionar `recovery_alerts_require_kickoff` logic
+**Tempo estimado**: 30 min **Risco**: BAIXO (apenas adição de flags, sem change de fluxo)
 
 ### 🟡 Fase 2: Pre-termination Guard (Nível 2)
-**Arquivo**: `preToolUse` hook (novo)
-**Escopo**: Bloquear git push sem Template F
-**Tempo estimado**: 45 min
-**Risco**: MÉDIO (pode ser muito restritivo, validar com casos reais)
+
+**Arquivo**: `preToolUse` hook (novo) **Escopo**: Bloquear git push sem Template F **Tempo
+estimado**: 45 min **Risco**: MÉDIO (pode ser muito restritivo, validar com casos reais)
 
 ### 🟡 Fase 3: Mandatory vscode_askQuestions (Nível 3)
-**Arquivo**: `agent-stop.sh`
-**Escopo**: CLOSE_KEY gate antes de agent parar
-**Tempo estimado**: 1 hora
-**Risco**: MÉDIO-ALTO (pode criar loops infinitos, precisa cuidado)
+
+**Arquivo**: `agent-stop.sh` **Escopo**: CLOSE_KEY gate antes de agent parar **Tempo estimado**: 1
+hora **Risco**: MÉDIO-ALTO (pode criar loops infinitos, precisa cuidado)
 
 ### 🟡 Fase 4: Terminal State Validation (Nível 4)
-**Arquivo**: `session-end.sh`
-**Escopo**: Validação de anomalias + BUG-CRITICAL logs
-**Tempo estimado**: 30 min
-**Risco**: BAIXO (logging apenas, sem change de behavior)
+
+**Arquivo**: `session-end.sh` **Escopo**: Validação de anomalias + BUG-CRITICAL logs **Tempo
+estimado**: 30 min **Risco**: BAIXO (logging apenas, sem change de behavior)
 
 ### 🟡 Fase 5: UI/Alerting (Nível 5)
-**Arquivo**: `src/server/realtime/session-monitor.js`
-**Escopo**: Dashboard indicators
-**Tempo estimado**: 1 hora
-**Risco**: BAIXO (cosmetic, não afeta fluxo)
+
+**Arquivo**: `src/server/realtime/session-monitor.js` **Escopo**: Dashboard indicators **Tempo
+estimado**: 1 hora **Risco**: BAIXO (cosmetic, não afeta fluxo)
 
 ---
 
@@ -294,9 +301,8 @@ if (sessionStatus.reason === 'user_exit' && !sessionStatus.close_key_validated) 
 
 ### 6.1 BUG-81: Detecção de Direct Questions (SEM vscode_askQuestions)
 
-**Status**: Identificado
-**Problema**: Agent pode fazer perguntas no texto da resposta sem usar `vscode_askQuestions`
-**Solução**: Adicionar regex check em `post-tool-use.sh`
+**Status**: Identificado **Problema**: Agent pode fazer perguntas no texto da resposta sem usar
+`vscode_askQuestions` **Solução**: Adicionar regex check em `post-tool-use.sh`
 
 ```bash
 # post-tool-use.sh — Novo gate (pseudocódigo)
@@ -319,18 +325,17 @@ fi
 
 ### 6.2 BUG-82: Context Compaction (/compact command)
 
-**Status**: Não implementado
-**Problema**: Audit logs crescem indefinidamente
-**Solução**: Implementar `/compact` command + token budget monitoring
+**Status**: Não implementado **Problema**: Audit logs crescem indefinidamente **Solução**:
+Implementar `/compact` command + token budget monitoring
 
 ```bash
 # Novo command em agentStop: /compact
 
 # Analisa tamanho do audit.jsonl
 AUDIT_SIZE=$(wc -c < "$AUDIT_FILE")
-TOKENS_ESTIMATE=$((AUDIT_SIZE / 4))  # Rough estimate
+TOKENS_ESTIMATE=$((AUDIT_SIZE / 4)) # Rough estimate
 
-if [ $TOKENS_ESTIMATE -gt 100000 ]; then  # 70% threshold
+if [ $TOKENS_ESTIMATE -gt 100000 ]; then # 70% threshold
   # Trigger compaction
   # Opção 1: Compress eventos old com summary
   # Opção 2: Archive e rotate para novo arquivo
@@ -342,9 +347,11 @@ fi
 
 ### 6.3 BUG-83: False Confidence na session-start.sh
 
-**Descoberta**: `session-start.sh` sempre reseta `close_key_validated=false`, mas se última sessão terminou abruptamente, isso não é suficiente
+**Descoberta**: `session-start.sh` sempre reseta `close_key_validated=false`, mas se última sessão
+terminou abruptamente, isso não é suficiente
 
-**Proposta**: Após reset, TAMBÉM verificar se há `SESSION_CLOSE_NO_KEY.flag` deixado pela sessão anterior
+**Proposta**: Após reset, TAMBÉM verificar se há `SESSION_CLOSE_NO_KEY.flag` deixado pela sessão
+anterior
 
 ```bash
 # session-start.sh — Novo check
@@ -362,8 +369,8 @@ fi
 
 ## 7. Roadmap Resumido (Próx. 3 Turnos)
 
-| Turno     | Deliverable                                                    | Status    |
-| --------- | -------------------------------------------------------------- | --------- |
+| Turno     | Deliverable                                                    | Status     |
+| --------- | -------------------------------------------------------------- | ---------- |
 | **Atual** | BUG-80 fix (post-tool-use.sh) + Investigação Session Lifecycle | ✅ DONE    |
 | **T+1**   | Implementar Níveis 1-2 Hardening + BUG-81 guard                | 🟡 PLANNED |
 | **T+2**   | Implementar Níveis 3-4 + BUG-82 compact                        | 🟡 PLANNED |
@@ -375,13 +382,16 @@ fi
 
 **Resposta à pergunta do usuário**:
 
-> ✅ **Verdade parcial**: `sessionEnd` É chamado automaticamente, MAS seu output É ignorado pelo Copilot, então NÃO é possível bloquear diretamente via sessionEnd.
+> ✅ **Verdade parcial**: `sessionEnd` É chamado automaticamente, MAS seu output É ignorado pelo
+> Copilot, então NÃO é possível bloquear diretamente via sessionEnd.
 >
-> ✅ **Mas há alternativas**: Usar preToolUse (bloqueia ações), agentStop (força vscode_askQuestions), e sessionStart recovery (detecta anomalias). Estas SÃO eficazes.
+> ✅ **Mas há alternativas**: Usar preToolUse (bloqueia ações), agentStop (força
+> vscode_askQuestions), e sessionStart recovery (detecta anomalias). Estas SÃO eficazes.
 >
-> ✅ **Recomendação**: Implementar os 5 níveis de hardening de forma progressiva. Os 3-4 primeiros resolvem a maioria dos cenários. Nível 5 é cosmético.
+> ✅ **Recomendação**: Implementar os 5 níveis de hardening de forma progressiva. Os 3-4 primeiros
+> resolvem a maioria dos cenários. Nível 5 é cosmético.
 
 ---
 
-**Prepared by**: CI Agent (dcf579af session recovery)
-**Next**: Await user confirmation to proceed with Phase 1 implementation
+**Prepared by**: CI Agent (dcf579af session recovery) **Next**: Await user confirmation to proceed
+with Phase 1 implementation

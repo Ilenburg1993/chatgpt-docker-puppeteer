@@ -419,7 +419,7 @@ class InputResolver extends EventEmitter {
      * @param {any} protocol - Protocolo resolvido
      * @param {string} source - Fonte da resolução ('DNA_MATCH' ou 'HEURISTIC_MATCH')
      * @param {object} dnaRules - Regras DNA do domínio
-     * @param {number} [confidence=1.0] - Nível de confiança (0-1) Default is `1.0`
+     * @param {number} [confidence=1.0] - Nível de confiança (0-1). Default is `1.0`
      * @returns {Promise<any>} Protocolo final com sendButton
      */
     async _finalizeDiscovery(protocol, source, dnaRules, confidence = 1.0) {

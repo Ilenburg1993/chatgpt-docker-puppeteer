@@ -420,7 +420,8 @@ async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 
  * Calcula timeout adaptativo para execução de MCP tools baseado em histórico.
  *
  * **Side-effects:** Pode acionar circuit breaker para tools muito lentos. **Semântica:** Timeout baseado em P99.7 (mean
- * + 3*std) + context penalty. **Unidades:** Retorna timeout em ms, min 10s, max 300s (5min).
+ *
+ * - 3*std) + context penalty. **Unidades:** Retorna timeout em ms, min 10s, max 300s (5min).
  *
  * @param {string} toolName - Nome do tool (e.g., 'ollama_generate', 'rag_search')
  * @param {GetToolTimeoutOptions} [options={}] - Opções de contexto (contextSize: tamanho em bytes). Default is `{}`

@@ -1,9 +1,11 @@
 // @ts-check
-/** @import {
-  NextFunction,
-  Request,
-  Response
-} from "express" */
+/**
+ * @import {
+ *   NextFunction,
+ *   Request,
+ *   Response
+ * } from "express"
+ */
 /** @import {VerifyOptions} from "jsonwebtoken" */
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import { log } from '#core/logger';

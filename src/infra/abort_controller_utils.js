@@ -19,7 +19,7 @@
  * @param {function} operation - Function that returns a Promise
  * @param {number} timeoutMs - Timeout in milliseconds
  * @param {string} [timeoutMessage='Operation timed out'] - Error message for timeout. Default is `'Operation timed
- *   out'`
+ *   out'`. Default is `'Operation timed out'`
  * @returns {Promise<unknown>} Result of the operation
  * @throws {Error} If timeout occurs or operation fails
  */
@@ -118,7 +118,7 @@ export async function withAbort(operation, timeoutMs, timeoutMessage = 'Operatio
  *
  * @param {number} timeoutMs - Timeout in milliseconds
  * @param {string} [timeoutMessage='Operation timed out'] - Error message for timeout. Default is `'Operation timed
- *   out'`
+ *   out'`. Default is `'Operation timed out'`
  * @returns {{ promise: Promise<void>; controller: AbortController; cleanup: function }}
  */
 export function createSharedTimeout(timeoutMs, timeoutMessage = 'Operation timed out') {

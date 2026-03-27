@@ -81,7 +81,8 @@ export function registerControlRoutes(bridge, agent) {
      * Status HTTP 200 quando agente está operacional (idle | processing | waiting_for_input). Status HTTP 503 quando
      * agente está parado ou sem sessão.
      *
-     * Body: { healthy, status, sessionId, queueSize, starvationAlert, uptime, listenerCounts, channelVersion, hubStore }
+     * Body: { healthy, status, sessionId, queueSize, starvationAlert, uptime, listenerCounts, channelVersion, hubStore
+     * }
      */
     bridge.get('/health', (/** @type {Req} */ _req, /** @type {Res} */ res) => {
         const snap = /** @type {AgentSnap} */ (agent.getStatusSnapshot());

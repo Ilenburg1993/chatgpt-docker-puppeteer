@@ -1,8 +1,10 @@
 // @ts-check
-/** @import {
-  IncomingMessage,
-  ServerResponse
-} from "http" */
+/**
+ * @import {
+ *   IncomingMessage,
+ *   ServerResponse
+ * } from "http"
+ */
 /** @import {Socket} from "net" */
 /** @import {RequestOptions} from "node:http" */
 /**
@@ -232,7 +234,7 @@ class ChromeProxyService {
      *     });
      *     await proxy.start();
      *
-     * @param {Partial<ChromeProxyServiceConfig>} [config={}] - Service configuration (merges with defaults) Default is
+     * @param {Partial<ChromeProxyServiceConfig>} [config={}] - Service configuration (merges with defaults). Default is
      *   `{}`
      */
     constructor(config = {}) {

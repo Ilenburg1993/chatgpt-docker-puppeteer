@@ -10,12 +10,12 @@
 
 /**
  * @typedef {object} McpServerConfig
- * @property {string} type - Tipo de transporte ('stdio' | 'sse')
- * @property {string} command - Executável a iniciar (para stdio)
+ * @property {string} type - Tipo de transporte ('stdio' | 'http' | 'sse')
+ * @property {string} [command] - Executável a iniciar (para stdio/local)
  * @property {string[]} [args] - Argumentos CLI (para stdio)
  * @property {Record<string, string>} [env] - Variáveis de ambiente adicionais
- * @property {string} [url] - URL do servidor SSE
- * @property {Record<string, string>} [headers] - Headers HTTP adicionais (para SSE)
+ * @property {string} [url] - URL do servidor HTTP/SSE remoto
+ * @property {Record<string, string>} [headers] - Headers HTTP adicionais (para http/sse)
  */
 
 /**

@@ -1,8 +1,11 @@
 # Arquitetura 3.0 — Propostas de Evolução do Módulo `src/copilot`
 
-**Versão**: 3.0 (Proposta) | **Data**: 2026-03-15 | **Atualizado**: 2026-03-27 | **Status**: ✅ Fases 1–4 implementadas, Fase 5 planejada
+**Versão**: 3.0 (Proposta) | **Data**: 2026-03-15 | **Atualizado**: 2026-03-27 | **Status**: ✅
+Fases 1–4 implementadas, Fase 5 planejada
 
-> Este documento avalia a situação arquitetural atual do módulo `src/copilot` e propõe um conjunto de correções, melhorias e reestruturações para evoluir o módulo para a versão 3.0. Baseia-se na documentação oficial em `SRC-COPILOT-MODULO-OFICIAL.md` e na análise exaustiva do código-fonte.
+> Este documento avalia a situação arquitetural atual do módulo `src/copilot` e propõe um conjunto
+> de correções, melhorias e reestruturações para evoluir o módulo para a versão 3.0. Baseia-se na
+> documentação oficial em `SRC-COPILOT-MODULO-OFICIAL.md` e na análise exaustiva do código-fonte.
 
 ---
 
@@ -30,18 +33,18 @@
 
 ### 1.1 Resumo do Débito Técnico
 
-| Categoria                   |  Qtd  | Impacto                              |                             Status                              |
-| --------------------------- | :---: | ------------------------------------ | :-------------------------------------------------------------: |
-| Shims legados na raiz       |  18   | Alto (DX, confusão de imports)       |                      ✅ Concluído (Fase 3)                       |
-| Aliases inúteis em `api/`   |   2   | Baixo (noise estrutural)             |              ✅ Corrigido (A1 — arquivos removidos)              |
-| Imports deprecated ativos   |   1   | Médio (orchestrator.js usa shim)     |                        ✅ Corrigido (B1)                         |
-| Acesso direto a internals   |   1   | Médio (routes/agent.js)              |               ✅ Corrigido (D1 — casts removidos)                |
-| Timeout inconsistente       |   1   | Baixo (120s vs 130s)                 |                        ✅ Corrigido (C1)                         |
-| Bloqueio de event loop      |   1   | Médio (execSync em task-tools.js)    |                        ✅ Corrigido (B2)                         |
-| Potencial memory leak       |   1   | Médio (SSE ilimitado)                |                        ✅ Corrigido (G1)                         |
-| Migração DDL frágil         |   1   | Médio-alto (FTS5 a cada init)        |               ✅ Revisado (H1 — já estava correto)               |
-| BUILTIN_HANDLER_MAP mínimo  |   1   | Funcional (extensibilidade)          | ✅ Corrigido (I1 — +3 handlers: process_info, uptime, math_eval) |
-| Estado global sem observers |   1   | Baixo-médio (race condition teórica) |          ✅ Corrigido (F1 — stateEmitter EventEmitter)           |
+| Categoria                   | Qtd | Impacto                              |                              Status                              |
+| --------------------------- | :-: | ------------------------------------ | :--------------------------------------------------------------: |
+| Shims legados na raiz       | 18  | Alto (DX, confusão de imports)       |                      ✅ Concluído (Fase 3)                       |
+| Aliases inúteis em `api/`   |  2  | Baixo (noise estrutural)             |              ✅ Corrigido (A1 — arquivos removidos)              |
+| Imports deprecated ativos   |  1  | Médio (orchestrator.js usa shim)     |                        ✅ Corrigido (B1)                         |
+| Acesso direto a internals   |  1  | Médio (routes/agent.js)              |               ✅ Corrigido (D1 — casts removidos)                |
+| Timeout inconsistente       |  1  | Baixo (120s vs 130s)                 |                        ✅ Corrigido (C1)                         |
+| Bloqueio de event loop      |  1  | Médio (execSync em task-tools.js)    |                        ✅ Corrigido (B2)                         |
+| Potencial memory leak       |  1  | Médio (SSE ilimitado)                |                        ✅ Corrigido (G1)                         |
+| Migração DDL frágil         |  1  | Médio-alto (FTS5 a cada init)        |               ✅ Revisado (H1 — já estava correto)               |
+| BUILTIN_HANDLER_MAP mínimo  |  1  | Funcional (extensibilidade)          | ✅ Corrigido (I1 — +3 handlers: process_info, uptime, math_eval) |
+| Estado global sem observers |  1  | Baixo-médio (race condition teórica) |          ✅ Corrigido (F1 — stateEmitter EventEmitter)           |
 
 ### 1.2 Pontos Fortes (preservar)
 
@@ -63,8 +66,8 @@
 
 > Mudanças pontuais, baixo risco, não exigem migração de imports.
 
-| ID  | Proposta                                         | Risco | Esforço |                              Status                               |
-| --- | ------------------------------------------------ | :---: | :-----: | :---------------------------------------------------------------: |
+| ID  | Proposta                                         | Risco | Esforço |                               Status                               |
+| --- | ------------------------------------------------ | :---: | :-----: | :----------------------------------------------------------------: |
 | B1  | Corrigir import deprecated em `orchestrator.js`  | Baixo |   XS    |                                 ✅                                 |
 | B2  | Substituir `execSync + curl` em `task-tools.js`  | Baixo |    S    |                                 ✅                                 |
 | C1  | Centralizar timeouts em `core/constants.js`      | Baixo |   XS    |                                 ✅                                 |
@@ -73,16 +76,23 @@
 
 **Notas pós-implementação (Fase 1)**:
 
-- **B1**: `orchestrator.js` agora importa diretamente de `../channel/client.js` (eliminado nível de indireção via shim raiz)
-- **B2**: `task-tools.js` agora usa `node:http` assíncrono — sem bloqueio do event loop, sem dependência de `curl`; helper `httpRequest()` embutido com timeout configurável
-- **C1**: `core/constants.js` exporta `LLM_B_TURN_TIMEOUT_MS` (padrão 120 000 ms, sobrescritível via `LLM_B_TURN_TIMEOUT`); `dialog.js` e `inject.js` agora Referem a essa constante — end de divergência 120 s vs 130 s
-- **G1**: `core/constants.js` exporta `MAX_SSE_CLIENTS` (padrão 50, sobrescritível via `MAX_SSE_CLIENTS`); ambos os endpoints SSE (`/events` e `/api/sdk/agent/stream`) retornam HTTP 429 ao atingir o limite
-- **H1**: Revisão confirmou que `init()` já possui guard `if (this.#initialized) return;` e `migrateFts5Tokenizer()` já é idempotente — nenhuma alteração necessária
+- **B1**: `orchestrator.js` agora importa diretamente de `../channel/client.js` (eliminado nível de
+  indireção via shim raiz)
+- **B2**: `task-tools.js` agora usa `node:http` assíncrono — sem bloqueio do event loop, sem
+  dependência de `curl`; helper `httpRequest()` embutido com timeout configurável
+- **C1**: `core/constants.js` exporta `LLM_B_TURN_TIMEOUT_MS` (padrão 120 000 ms, sobrescritível via
+  `LLM_B_TURN_TIMEOUT`); `dialog.js` e `inject.js` agora Referem a essa constante — end de
+  divergência 120 s vs 130 s
+- **G1**: `core/constants.js` exporta `MAX_SSE_CLIENTS` (padrão 50, sobrescritível via
+  `MAX_SSE_CLIENTS`); ambos os endpoints SSE (`/events` e `/api/sdk/agent/stream`) retornam HTTP 429
+  ao atingir o limite
+- **H1**: Revisão confirmou que `init()` já possui guard `if (this.#initialized) return;` e
+  `migrateFts5Tokenizer()` já é idempotente — nenhuma alteração necessária
 
 ### Fase 2 — Encapsulamento e limpeza de API ✅ IMPLEMENTADA
 
-| ID  | Proposta                                                       | Risco | Esforço |                                           Status                                           |
-| --- | -------------------------------------------------------------- | :---: | :-----: | :----------------------------------------------------------------------------------------: |
+| ID  | Proposta                                                       | Risco | Esforço |                                           Status                                            |
+| --- | -------------------------------------------------------------- | :---: | :-----: | :-----------------------------------------------------------------------------------------: |
 | D1  | Getters públicos `getToolsRegistry()` / `getTelemetry()`       | Baixo |    S    |        ✅ (getters já existiam; casts `@type {any}` removidos de `routes/agent.js`)         |
 | F1  | `state.js` reativo com EventEmitter interno                    | Médio |    M    | ✅ (`stateEmitter` exportado; `hubSessionId:changed` e `busy:changed` emitidos nos setters) |
 | I1  | Expandir `BUILTIN_HANDLER_MAP` com handlers úteis              | Baixo |    S    |                   ✅ (+3 handlers: `process_info`, `uptime`, `math_eval`)                   |
@@ -90,40 +100,46 @@
 
 ### Fase 3 — Limpeza de shims legados ✅ IMPLEMENTADA (commit ad0aecfe + 9bad4d14)
 
-> Requer mapeamento completo de callers externos ao módulo. Pode impactar `src/server/`, `ecosystem.config.cjs` e scripts de teste.
+> Requer mapeamento completo de callers externos ao módulo. Pode impactar `src/server/`,
+> `ecosystem.config.cjs` e scripts de teste.
 
 | ID  | Proposta                                                | Risco | Esforço | Status |
 | --- | ------------------------------------------------------- | :---: | :-----: | :----: |
-| A2  | Auditoria de callers de cada shim                       | Baixo |    S    |   ✅    |
-| A3  | Remover 13 shims `@deprecated` (exceto `sdk-client.js`) | Médio |    M    |   ✅    |
-| A4  | Migrar callers de `sdk-client.js`, depois remover       | Médio |    M    |   ✅    |
+| A2  | Auditoria de callers de cada shim                       | Baixo |    S    |   ✅   |
+| A3  | Remover 13 shims `@deprecated` (exceto `sdk-client.js`) | Médio |    M    |   ✅   |
+| A4  | Migrar callers de `sdk-client.js`, depois remover       | Médio |    M    |   ✅   |
 
 **Notas pós-implementação (Fase 3)**:
+
 - 12 shims removidos; mantidos apenas `agent.js` e `terminal-server.js` (PM2 entry points)
 - 17+ arquivos-fonte + 16 test files migrados para imports canônicos
-- `sdk-client.js` → `lib/client.js`; `onPermissionRequest: approveAll` injetado explicitamente em `routes/sessions.js`
+- `sdk-client.js` → `lib/client.js`; `onPermissionRequest: approveAll` injetado explicitamente em
+  `routes/sessions.js`
 - Novo alias `#copilot/session-manager` → `./agent/session-manager.js` adicionado ao `package.json`
 
 ### Fase 4 — Reestruturação modular (Arquitetura 3.0) ✅ IMPLEMENTADA (commit 759fb11a)
 
 > Reestruturação de pastas e consolidações. Requer plan de migração com alias temporários.
 
-| ID  | Proposta                                                                                | Risco | Esforço |                        Status                         |
-| --- | --------------------------------------------------------------------------------------- | :---: | :-----: | :---------------------------------------------------: |
+| ID  | Proposta                                                                                | Risco | Esforço |                         Status                         |
+| --- | --------------------------------------------------------------------------------------- | :---: | :-----: | :----------------------------------------------------: |
 | E1  | Consolidar `api/bridge-*.js` e `routes/*.js` em `api/v1/`                               | Médio |    L    | ⏭️ De-priorizado: `api/sdk-api.js` já agrega `routes/` |
 | J1  | Extrair `tools/shell-tools.js` para `tools/shell/` com policy separada                  | Baixo |    M    |    ✅ (corrigido `WORKSPACE_ROOT` — URL 3→4 níveis)    |
 | J2  | Unificar `config/tools-state.js` + `config/custom-tools-registry.js` em `config/tools/` | Baixo |    S    |   ✅ (barrel `index.js` + 2 aliases `package.json`)    |
 | J3  | Mover `terminal-server.js` (raiz) e eliminar confusão                                   | Baixo |   XS    | ⏭️ Intencional: entry point PM2 (não pode ser movido)  |
-| J4  | Introduzir `core/constants.js` canônico para TIMEOUTS, MAX_*, defaults                  | Baixo |    S    |               ✅ Já existia desde Fase 1               |
+| J4  | Introduzir `core/constants.js` canônico para TIMEOUTS, MAX\_\*, defaults                | Baixo |    S    |               ✅ Já existia desde Fase 1               |
 
 **Notas pós-implementação (Fase 4)**:
-- `tools/shell/index.js`: WORKSPACE_ROOT usa `'../../../..'` (4 níveis) para resolução correta após movimentação
+
+- `tools/shell/index.js`: WORKSPACE_ROOT usa `'../../../..'` (4 níveis) para resolução correta após
+  movimentação
 - `config/tools/` com `state.js`, `registry.js`, `index.js` barrel
 - 1466 testes unitários passando após a fase
 
 ### Fase 5 — Expansão e Consolidação de Tools
 
-> Adicionar novas custom tools que ampliem as capacidades da LLM-B, consolidar o sistema de tools, e integrar recursos do SDK ainda não utilizados.
+> Adicionar novas custom tools que ampliem as capacidades da LLM-B, consolidar o sistema de tools, e
+> integrar recursos do SDK ainda não utilizados.
 
 | ID  | Proposta                                                                 | Risco | Esforço |
 | --- | ------------------------------------------------------------------------ | :---: | :-----: |
@@ -172,7 +188,8 @@ src/copilot/
 
 - Aumentam artificialmente o inventário de arquivos
 - Dificultam navegação (ex: pesquisar "http-bridge" retorna 3 arquivos)
-- Cadeias de 2 níveis (`inject-llmb.js` → `bridges/inject-llmb.js` → `channel/inject.js`) são especialmente confusas
+- Cadeias de 2 níveis (`inject-llmb.js` → `bridges/inject-llmb.js` → `channel/inject.js`) são
+  especialmente confusas
 - O shim `sdk-client.js` oculta remapeamento de nomes, criando API fantasma
 
 ### Solução recomendada
@@ -190,11 +207,13 @@ grep -r "from.*always-alive\.js'" --include="*.js" -l
 **Passo 3**: Remover os shims.
 
 **Exceção**: `sdk-client.js` requer análise prévia porque remapeia nomes:
+
 ```js
 // sdk-client.js atual
 export { createClientSession as createSdkSession } from './lib/client.js';
 // ↑ Callers chamando createSdkSession() não compilarão após remoção direta
 ```
+
 Solução: primeiro migrar callers para `lib/client.createClientSession()`, depois remover.
 
 ### Benefícios
@@ -210,12 +229,14 @@ Solução: primeiro migrar callers para `lib/client.createClientSession()`, depo
 ### B1: `conversation-hub/orchestrator.js` usa import deprecated
 
 **Situação atual**:
+
 ```js
 // orchestrator.js (linha ~10)
 import { LlmBridgeClient } from '../llm-bridge-client.js'; // ← shim deprecated
 ```
 
 **Solução**:
+
 ```js
 import { LlmBridgeClient } from '../channel/client.js'; // ← canônico
 ```
@@ -227,35 +248,38 @@ import { LlmBridgeClient } from '../channel/client.js'; // ← canônico
 ### B2: `tools/task-tools.js` usa `execSync + curl` para chamadas internas
 
 **Situação atual**:
+
 ```js
 // task-tools.js — bloqueia o event loop
 const result = execSync('curl -s http://127.0.0.1:3009/sessions', { encoding: 'utf8' });
 ```
 
 **Problemas**:
+
 1. `execSync` bloqueia o event loop do Node.js
 2. Dependência de binário externo `curl`
 3. Não tem tratamento de timeout
 4. Quebra em ambientes sem `curl`
 
 **Solução**:
+
 ```js
 import { request } from 'node:http';
 
 async function fetchLocalEndpoint(path) {
-    return new Promise((resolve, reject) => {
-        const req = request(
-            { hostname: '127.0.0.1', port: 3009, path, method: 'GET' },
-            (res) => {
-                let data = '';
-                res.on('data', (chunk) => data += chunk);
-                res.on('end', () => resolve(JSON.parse(data)));
-            }
-        );
-        req.setTimeout(5000, () => { req.destroy(); reject(new Error('timeout')); });
-        req.on('error', reject);
-        req.end();
+  return new Promise((resolve, reject) => {
+    const req = request({ hostname: '127.0.0.1', port: 3009, path, method: 'GET' }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => resolve(JSON.parse(data)));
     });
+    req.setTimeout(5000, () => {
+      req.destroy();
+      reject(new Error('timeout'));
+    });
+    req.on('error', reject);
+    req.end();
+  });
 }
 ```
 
@@ -287,44 +311,44 @@ Constantes de timeout espalhadas por vários arquivos:
 
 /** Timeouts em milissegundos */
 export const TIMEOUTS = Object.freeze({
-    /** Timeout padrão de um turno de diálogo no terminal */
-    DIALOG_TURN_MS: 120_000,
-    /** Timeout padrão de inject HTTP (LLM-A → LLM-B) */
-    INJECT_HTTP_MS: 120_000,   // ← alinhar com DIALOG_TURN_MS
-    /** Timeout de tarefa individual via session.sendAndWait */
-    TASK_SEND_WAIT_MS: 60_000,
-    /** Timeout de chamada MCP */
-    MCP_RPC_MS: 8_000,
+  /** Timeout padrão de um turno de diálogo no terminal */
+  DIALOG_TURN_MS: 120_000,
+  /** Timeout padrão de inject HTTP (LLM-A → LLM-B) */
+  INJECT_HTTP_MS: 120_000, // ← alinhar com DIALOG_TURN_MS
+  /** Timeout de tarefa individual via session.sendAndWait */
+  TASK_SEND_WAIT_MS: 60_000,
+  /** Timeout de chamada MCP */
+  MCP_RPC_MS: 8_000,
 });
 
 /** Limites de tamanho e quantidade */
 export const LIMITS = Object.freeze({
-    /** Tamanho máximo da fila de tarefas do agente */
-    MAX_QUEUE_SIZE: 100,
-    /** Máximo de bytes na saída de shell-tools */
-    MAX_SHELL_OUTPUT_BYTES: 10_000,
-    /** Máximo de timeout em shell-tools */
-    MAX_SHELL_TIMEOUT_MS: 120_000,
-    /** Tamanho de rotação do arquivo de auditoria JSONL */
-    AUDIT_LOG_ROTATE_BYTES: 10_000_000,  // 10 MB
-    /** Intervalo de heartbeat SSE */
-    SSE_HEARTBEAT_MS: 15_000,
-    /** Máximo de clientes SSE simultâneos (anti memory-leak) */
-    MAX_SSE_CLIENTS: 50,
-    /** Máximo de registros no buffer circular de telemetria */
-    TELEMETRY_MAX_RECORDS: 500,
+  /** Tamanho máximo da fila de tarefas do agente */
+  MAX_QUEUE_SIZE: 100,
+  /** Máximo de bytes na saída de shell-tools */
+  MAX_SHELL_OUTPUT_BYTES: 10_000,
+  /** Máximo de timeout em shell-tools */
+  MAX_SHELL_TIMEOUT_MS: 120_000,
+  /** Tamanho de rotação do arquivo de auditoria JSONL */
+  AUDIT_LOG_ROTATE_BYTES: 10_000_000, // 10 MB
+  /** Intervalo de heartbeat SSE */
+  SSE_HEARTBEAT_MS: 15_000,
+  /** Máximo de clientes SSE simultâneos (anti memory-leak) */
+  MAX_SSE_CLIENTS: 50,
+  /** Máximo de registros no buffer circular de telemetria */
+  TELEMETRY_MAX_RECORDS: 500,
 });
 
 /** Valores padrão de configuração */
 export const DEFAULTS = Object.freeze({
-    /** Limiar de compaction background */
-    BACKGROUND_COMPACTION_THRESHOLD: 0.75,
-    /** Aviso de token budget */
-    TOKEN_BUDGET_WARNING_PCT: 0.80,
-    /** Aviso de token budget no resume */
-    TOKEN_BUDGET_WARNING_RESUME_PCT: 0.70,
-    /** Número máximo de tentativas de reconexão do agente */
-    MAX_RECONNECT_ATTEMPTS: 5,
+  /** Limiar de compaction background */
+  BACKGROUND_COMPACTION_THRESHOLD: 0.75,
+  /** Aviso de token budget */
+  TOKEN_BUDGET_WARNING_PCT: 0.8,
+  /** Aviso de token budget no resume */
+  TOKEN_BUDGET_WARNING_RESUME_PCT: 0.7,
+  /** Número máximo de tentativas de reconexão do agente */
+  MAX_RECONNECT_ATTEMPTS: 5,
 });
 ```
 
@@ -344,7 +368,8 @@ const registry = /** @type {any} */ (alwaysAliveAgent).toolsRegistry;
 const telemetry = /** @type {any} */ (alwaysAliveAgent).telemetry;
 ```
 
-Isso contorna a visibilidade `#private` dos campos — qualquer refatoração interna do `AlwaysAliveAgent` pode quebrar silenciosamente essas rotas.
+Isso contorna a visibilidade `#private` dos campos — qualquer refatoração interna do
+`AlwaysAliveAgent` pode quebrar silenciosamente essas rotas.
 
 ### Solução: getters públicos
 
@@ -368,7 +393,8 @@ const registry = alwaysAliveAgent.getToolsRegistry();
 const telemetry = alwaysAliveAgent.getTelemetry();
 ```
 
-**Benefícios**: encapsulamento preservado, TypeScript pode verificar o tipo, refatorações internas são seguras.
+**Benefícios**: encapsulamento preservado, TypeScript pode verificar o tipo, refatorações internas
+são seguras.
 
 ---
 
@@ -376,7 +402,8 @@ const telemetry = alwaysAliveAgent.getTelemetry();
 
 ### Situação atual
 
-Dois grupos de Express routers com responsabilidades diferentes mas sem separação clara de qual é para qual consumidor:
+Dois grupos de Express routers com responsabilidades diferentes mas sem separação clara de qual é
+para qual consumidor:
 
 ```
 api/
@@ -396,7 +423,9 @@ routes/
 └── webhooks.js           # montado sob /api/sdk/webhooks
 ```
 
-A confusão: `api/` contém tanto aggregators (`http-bridge.js`, `sdk-api.js`) quanto sub-routers (`bridge-*.js`). Os sub-routers de `routes/` são montados por `api/sdk-api.js`. Não fica claro onde adicionar um novo endpoint.
+A confusão: `api/` contém tanto aggregators (`http-bridge.js`, `sdk-api.js`) quanto sub-routers
+(`bridge-*.js`). Os sub-routers de `routes/` são montados por `api/sdk-api.js`. Não fica claro onde
+adicionar um novo endpoint.
 
 ### Solução: Reorganização em namespaces explícitos
 
@@ -420,6 +449,7 @@ api/
 ```
 
 **Migração**:
+
 1. Criar estrutura nova sem remover a antiga
 2. Mover conteúdo arquivos por arquivos
 3. Adicionar re-exports temporários nos arquivos antigos
@@ -427,6 +457,7 @@ api/
 5. Remover re-exports e arquivos antigos
 
 **Benefícios**:
+
 - Fica óbvio onde adicionar novos endpoints
 - Separação clara entre "API de controle do agente" e "API de introspection SDK"
 - Elimina `routes/` como pasta separada (folding)
@@ -443,14 +474,19 @@ api/
 // state.js
 let _busy = false;
 export const getBusy = () => _busy;
-export const setBusy = (v) => { _busy = v; };
+export const setBusy = (v) => {
+  _busy = v;
+};
 ```
 
-Múltiplos módulos fazem polling implícito de `getBusy()`. Não há notificação quando o estado muda — consumidores precisam verificar por polling.
+Múltiplos módulos fazem polling implícito de `getBusy()`. Não há notificação quando o estado muda —
+consumidores precisam verificar por polling.
 
 ### Problema real
 
-Se `state.js` for compartilhado entre `dialog.js`, `http-handlers.js` e o REPL, mutações concorrentes podem causar inconsistências (ex: dois `handleInject` concorrentes que veem `busy=false` ao mesmo tempo antes que o primeiro defina `busy=true`).
+Se `state.js` for compartilhado entre `dialog.js`, `http-handlers.js` e o REPL, mutações
+concorrentes podem causar inconsistências (ex: dois `handleInject` concorrentes que veem
+`busy=false` ao mesmo tempo antes que o primeiro defina `busy=true`).
 
 ### Solução: Emitter interno + transição atômica
 
@@ -459,37 +495,45 @@ Se `state.js` for compartilhado entre `dialog.js`, `http-handlers.js` e o REPL, 
 import { EventEmitter } from 'node:events';
 
 class TerminalState extends EventEmitter {
-    #busy = false;
-    #hubSessionId = /** @type {string|null} */ (null);
-    #attachmentQueue = /** @type {string[]} */ ([]);
+  #busy = false;
+  #hubSessionId = /** @type {string | null} */ (null);
+  #attachmentQueue = /** @type {string[]} */ ([]);
 
-    /**
-     * Tenta adquirir o lock de "busy".
-     * @returns {boolean} true se conseguiu (era false → agora true), false se já estava busy
-     */
-    tryAcquireBusy() {
-        if (this.#busy) return false;
-        this.#busy = true;
-        this.emit('busy:changed', true);
-        return true;
-    }
+  /**
+   * Tenta adquirir o lock de "busy".
+   *
+   * @returns {boolean} true se conseguiu (era false → agora true), false se já estava busy
+   */
+  tryAcquireBusy() {
+    if (this.#busy) return false;
+    this.#busy = true;
+    this.emit('busy:changed', true);
+    return true;
+  }
 
-    releaseBusy() {
-        this.#busy = false;
-        this.emit('busy:changed', false);
-    }
+  releaseBusy() {
+    this.#busy = false;
+    this.emit('busy:changed', false);
+  }
 
-    get hubSessionId() { return this.#hubSessionId; }
-    set hubSessionId(v) { this.#hubSessionId = v; this.emit('session:changed', v); }
+  get hubSessionId() {
+    return this.#hubSessionId;
+  }
+  set hubSessionId(v) {
+    this.#hubSessionId = v;
+    this.emit('session:changed', v);
+  }
 
-    // ... demais getters/setters
+  // ... demais getters/setters
 }
 
 export const terminalState = new TerminalState();
 ```
 
 **Benefícios**:
-- Elimina race condition de busy (tryAcquireBusy é atômico dentro do event loop Node.js single-thread)
+
+- Elimina race condition de busy (tryAcquireBusy é atômico dentro do event loop Node.js
+  single-thread)
 - Permite listeners reativos em vez de polling
 - EventEmitter é nativo, zero dependências extras
 
@@ -504,17 +548,18 @@ export const terminalState = new TerminalState();
 ```js
 // bridge-stream.js (sketch)
 app.get('/stream', (req, res) => {
-    res.setHeader('Content-Type', 'text/event-stream');
-    // Sem limite de clientes
-    for (const event of AGENT_EVENTS) {
-        const handler = (data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-        alwaysAliveAgent.on(event, handler);
-        req.on('close', () => alwaysAliveAgent.off(event, handler));
-    }
+  res.setHeader('Content-Type', 'text/event-stream');
+  // Sem limite de clientes
+  for (const event of AGENT_EVENTS) {
+    const handler = (data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    alwaysAliveAgent.on(event, handler);
+    req.on('close', () => alwaysAliveAgent.off(event, handler));
+  }
 });
 ```
 
-Conexões zombie (clientes que fecharam sem fechar a conexão HTTP) mantêm listeners ativos indefinidamente.
+Conexões zombie (clientes que fecharam sem fechar a conexão HTTP) mantêm listeners ativos
+indefinidamente.
 
 ### Solução: Limite de clientes + cleanup robusto
 
@@ -525,37 +570,37 @@ import { LIMITS } from '../core/constants.js';
 const activeSseClients = new Set();
 
 app.get('/stream', (req, res) => {
-    if (activeSseClients.size >= LIMITS.MAX_SSE_CLIENTS) {
-        return res.status(503).json({ error: 'Too many SSE clients' });
-    }
+  if (activeSseClients.size >= LIMITS.MAX_SSE_CLIENTS) {
+    return res.status(503).json({ error: 'Too many SSE clients' });
+  }
 
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
 
-    activeSseClients.add(res);
+  activeSseClients.add(res);
 
-    const handlers = new Map();
-    for (const event of AGENT_EVENTS) {
-        const handler = (data) => {
-            if (res.writableEnded) return;
-            res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-        };
-        handlers.set(event, handler);
-        alwaysAliveAgent.on(event, handler);
-    }
-
-    const cleanup = () => {
-        activeSseClients.delete(res);
-        for (const [event, handler] of handlers) {
-            alwaysAliveAgent.off(event, handler);
-        }
+  const handlers = new Map();
+  for (const event of AGENT_EVENTS) {
+    const handler = (data) => {
+      if (res.writableEnded) return;
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
+    handlers.set(event, handler);
+    alwaysAliveAgent.on(event, handler);
+  }
 
-    req.on('close', cleanup);
-    req.on('error', cleanup);
-    res.on('close', cleanup);
+  const cleanup = () => {
+    activeSseClients.delete(res);
+    for (const [event, handler] of handlers) {
+      alwaysAliveAgent.off(event, handler);
+    }
+  };
+
+  req.on('close', cleanup);
+  req.on('error', cleanup);
+  res.on('close', cleanup);
 });
 ```
 
@@ -575,7 +620,9 @@ async init() {
 }
 ```
 
-O método `migrateMemoriesFtsTokenizer()` provavelmente faz operações DDL destrutivas (drop/recreate da tabela FTS5 virtual). Executar isso em cada inicialização em produção cria risco de:
+O método `migrateMemoriesFtsTokenizer()` provavelmente faz operações DDL destrutivas (drop/recreate
+da tabela FTS5 virtual). Executar isso em cada inicialização em produção cria risco de:
+
 1. Perda transitória de dados durante a migração
 2. Lentidão no boot se há muitas memórias
 3. Falha silenciosa se a migração falha na metade
@@ -619,7 +666,8 @@ async init() {
 }
 ```
 
-**Benefícios**: migração executada apenas uma vez; boot rápido após a primeira migração; seguro para hot-restart.
+**Benefícios**: migração executada apenas uma vez; boot rápido após a primeira migração; seguro para
+hot-restart.
 
 ---
 
@@ -627,13 +675,14 @@ async init() {
 
 ### Situação atual
 
-O `config/custom-tools-registry.js` permite registrar custom tools via API sem reinicialização, mas tem apenas 3 handlers:
+O `config/custom-tools-registry.js` permite registrar custom tools via API sem reinicialização, mas
+tem apenas 3 handlers:
 
 ```js
 export const BUILTIN_HANDLER_MAP = {
-    echo: async ({ message }) => ({ result: message }),
-    timestamp: async () => ({ timestamp: new Date().toISOString() }),
-    env_read: async ({ key }) => ({ value: process.env[key] ?? null }),
+  echo: async ({ message }) => ({ result: message }),
+  timestamp: async () => ({ timestamp: new Date().toISOString() }),
+  env_read: async ({ key }) => ({ value: process.env[key] ?? null }),
 };
 ```
 
@@ -643,55 +692,55 @@ Isso limita fortemente a utilidade do recurso — qualquer tool útil exige edi�
 
 ```js
 export const BUILTIN_HANDLER_MAP = {
-    // ── existentes ──
-    echo: async ({ message }) => ({ result: message }),
-    timestamp: async () => ({ timestamp: new Date().toISOString() }),
-    env_read: async ({ key }) => ({ value: process.env[key] ?? null }),
+  // ── existentes ──
+  echo: async ({ message }) => ({ result: message }),
+  timestamp: async () => ({ timestamp: new Date().toISOString() }),
+  env_read: async ({ key }) => ({ value: process.env[key] ?? null }),
 
-    // ── novos: leitura de estado ──
+  // ── novos: leitura de estado ──
 
-    /** Retorna o snapshot do AgentStatus */
-    agent_status: async () => alwaysAliveAgent.getStatusSnapshot(),
+  /** Retorna o snapshot do AgentStatus */
+  agent_status: async () => alwaysAliveAgent.getStatusSnapshot(),
 
-    /** Retorna uso de context window (tokens) */
-    context_usage: async () => {
-        const snap = alwaysAliveAgent.getStatusSnapshot();
-        return { contextState: snap.contextState ?? null };
-    },
+  /** Retorna uso de context window (tokens) */
+  context_usage: async () => {
+    const snap = alwaysAliveAgent.getStatusSnapshot();
+    return { contextState: snap.contextState ?? null };
+  },
 
-    // ── novos: memória ──
+  // ── novos: memória ──
 
-    /** Busca memórias FTS5 */
-    memory_search: async ({ query, limit = 5 }) =>
-        conversationStore.searchMemories(query, limit),
+  /** Busca memórias FTS5 */
+  memory_search: async ({ query, limit = 5 }) => conversationStore.searchMemories(query, limit),
 
-    /** Grava memória */
-    memory_write: async ({ content, tags }) => {
-        const hubId = getHubSessionId();
-        if (!hubId) throw new Error('No active hub session');
-        return conversationStore.writeMemory(hubId, content, tags);
-    },
+  /** Grava memória */
+  memory_write: async ({ content, tags }) => {
+    const hubId = getHubSessionId();
+    if (!hubId) throw new Error('No active hub session');
+    return conversationStore.writeMemory(hubId, content, tags);
+  },
 
-    // ── novos: git ──
+  // ── novos: git ──
 
-    /** Retorna `git status --short` */
-    git_status_short: async () => {
-        const { stdout } = await execFilePromise('git', ['status', '--short']);
-        return { output: stdout.trim() };
-    },
+  /** Retorna `git status --short` */
+  git_status_short: async () => {
+    const { stdout } = await execFilePromise('git', ['status', '--short']);
+    return { output: stdout.trim() };
+  },
 
-    // ── novos: filesystem ──
+  // ── novos: filesystem ──
 
-    /** Lê arquivo (max 50KB) */
-    read_file: async ({ path }) => {
-        const MAX = 50_000;
-        const buf = await fs.readFile(path, 'utf8');
-        return { content: buf.length > MAX ? buf.slice(0, MAX) + '\n[truncado]' : buf };
-    },
+  /** Lê arquivo (max 50KB) */
+  read_file: async ({ path }) => {
+    const MAX = 50_000;
+    const buf = await fs.readFile(path, 'utf8');
+    return { content: buf.length > MAX ? buf.slice(0, MAX) + '\n[truncado]' : buf };
+  },
 };
 ```
 
-**Benefícios**: extensibilidade real das custom tools via API; sem necessidade de editar código para casos de uso comuns.
+**Benefícios**: extensibilidade real das custom tools via API; sem necessidade de editar código para
+casos de uso comuns.
 
 ---
 
@@ -702,10 +751,12 @@ Esta proposta unifica as mudanças das fases anteriores em uma visão de estrutu
 ### J1: Unificar configurações de tools em `config/tools/`
 
 **Atual**: dois arquivos no mesmo nível:
+
 - `config/tools-state.js` — allowlist/denylist
 - `config/custom-tools-registry.js` — registry dinâmico
 
 **Proposta**:
+
 ```
 config/
 ├── tools/
@@ -722,9 +773,11 @@ config/
 
 ### J2: Mover `bridges/gh-bridge.js` e `bridges/git-bridge.js` para `integrations/`
 
-As bridges `gh` e `git` são integrações de CLI externas, não são integrations de sistema interno (como NERV). Separá-las melhora o mental model.
+As bridges `gh` e `git` são integrações de CLI externas, não são integrations de sistema interno
+(como NERV). Separá-las melhora o mental model.
 
 **Proposta**:
+
 ```
 integrations/
 ├── git.js               ← ex bridges/git-bridge.js
@@ -756,39 +809,40 @@ tools/
 ├── ...
 ```
 
-**Benefícios**: separação da política de segurança da lógica de execução; testabilidade da policy sem executar comandos.
+**Benefícios**: separação da política de segurança da lógica de execução; testabilidade da policy
+sem executar comandos.
 
 ---
 
 ## 13. Matriz de Decisão e Faseamento
 
-| ID  | Título                                       | Fase  |  Risco  | Tamanho | Prioridade |          Status           |
-| --- | -------------------------------------------- | :---: | :-----: | :-----: | :--------: | :-----------------------: |
-| B1  | Fix import deprecated em orchestrator.js     |   1   | 🟢 Baixo |   XS    |   🔴 Alta   |             ✅             |
-| B2  | Substituir execSync+curl em task-tools.js    |   1   | 🟢 Baixo |    S    |   🔴 Alta   |             ✅             |
-| C1  | Centralizar timeouts em core/constants.js    |   1   | 🟢 Baixo |    S    |  🟡 Média   |             ✅             |
-| G1  | Limite MAX_SSE_CLIENTS em bridge-stream.js   |   1   | 🟢 Baixo |   XS    |  🟡 Média   |             ✅             |
-| H1  | Migração FTS5 idempotente                    |   1   | 🟡 Médio |    S    |   🔴 Alta   |             ✅             |
-| D1  | Getters públicos em AlwaysAliveAgent         |   2   | 🟢 Baixo |    S    |  🟡 Média   |             ✅             |
-| F1  | state.js reativo com EventEmitter            |   2   | 🟡 Médio |    M    |  🟡 Média   |             ✅             |
-| I1  | Expandir BUILTIN_HANDLER_MAP                 |   2   | 🟢 Baixo |    S    |  🟢 Baixa   |             ✅             |
-| A1  | Remover aliases inúteis api/                 |   2   | 🟢 Baixo |   XS    |  🟡 Média   |             ✅             |
-| A2  | Auditar callers de shims                     |   3   | 🟢 Baixo |    S    |  🟡 Média   |        ✅ Concluído        |
-| A3  | Remover 13 shims @deprecated                 |   3   | 🟡 Médio |    M    |  🟡 Média   |        ✅ Concluído        |
-| A4  | Migrar e remover sdk-client.js               |   3   | 🟡 Médio |    M    |  🟢 Baixa   |        ✅ Concluído        |
-| E1  | Consolidar api/ e routes/                    |   4   | 🟡 Médio |    L    |  🟢 Baixa   |      ⏭️ De-priorizado      |
-| J1  | Extrair tools/shell/index.js                 |   4   | 🟢 Baixo |    M    |  🟡 Média   |        ✅ Concluído        |
-| J2  | config/tools/ subpasta unificada             |   4   | 🟢 Baixo |    S    |  🟡 Média   |        ✅ Concluído        |
-| J3  | terminal-server.js entry point PM2           |   4   | 🟢 Baixo |   XS    |  🟢 Baixa   | ⏭️ Intencional — não mover |
-| J4  | core/constants.js canônico                   |   1   | 🟢 Baixo |    S    |  🟡 Média   |        ✅ Concluído        |
-| K1  | git_push, git_create_branch, git_log         |   5   | 🟢 Baixo |    M    |   🔴 Alta   |        ⬜ Pendente         |
-| K2  | patch_file — edição cirúrgica                |   5   | 🟡 Médio |    M    |  🟡 Média   |        ⬜ Pendente         |
-| K3  | get_workspace_info, set_session_context      |   5   | 🟢 Baixo |    S    |  🟡 Média   |        ⬜ Pendente         |
-| K4  | web_fetch com rate-limit e segurança         |   5   | 🟡 Médio |    L    |   🔴 Alta   |        ⬜ Pendente         |
-| K5  | Migrar todas as tools para buildTool         |   5   | 🟢 Baixo |    M    |  🟡 Média   |        ⬜ Pendente         |
-| K6  | tools/git/index.js consolidado               |   5   | 🟢 Baixo |    S    |  🟢 Baixa   |        ⬜ Pendente         |
-| K7  | customAgents config/agents.js                |   5   | 🟡 Médio |    L    |  🟡 Média   |        ⬜ Pendente         |
-| K8  | onUserInputRequest SDK em request_user_input |   5   | 🟢 Baixo |    S    |   🔴 Alta   |        ⬜ Pendente         |
+| ID  | Título                                       | Fase |  Risco   | Tamanho | Prioridade |           Status           |
+| --- | -------------------------------------------- | :--: | :------: | :-----: | :--------: | :------------------------: |
+| B1  | Fix import deprecated em orchestrator.js     |  1   | 🟢 Baixo |   XS    |  🔴 Alta   |             ✅             |
+| B2  | Substituir execSync+curl em task-tools.js    |  1   | 🟢 Baixo |    S    |  🔴 Alta   |             ✅             |
+| C1  | Centralizar timeouts em core/constants.js    |  1   | 🟢 Baixo |    S    |  🟡 Média  |             ✅             |
+| G1  | Limite MAX_SSE_CLIENTS em bridge-stream.js   |  1   | 🟢 Baixo |   XS    |  🟡 Média  |             ✅             |
+| H1  | Migração FTS5 idempotente                    |  1   | 🟡 Médio |    S    |  🔴 Alta   |             ✅             |
+| D1  | Getters públicos em AlwaysAliveAgent         |  2   | 🟢 Baixo |    S    |  🟡 Média  |             ✅             |
+| F1  | state.js reativo com EventEmitter            |  2   | 🟡 Médio |    M    |  🟡 Média  |             ✅             |
+| I1  | Expandir BUILTIN_HANDLER_MAP                 |  2   | 🟢 Baixo |    S    |  🟢 Baixa  |             ✅             |
+| A1  | Remover aliases inúteis api/                 |  2   | 🟢 Baixo |   XS    |  🟡 Média  |             ✅             |
+| A2  | Auditar callers de shims                     |  3   | 🟢 Baixo |    S    |  🟡 Média  |        ✅ Concluído        |
+| A3  | Remover 13 shims @deprecated                 |  3   | 🟡 Médio |    M    |  🟡 Média  |        ✅ Concluído        |
+| A4  | Migrar e remover sdk-client.js               |  3   | 🟡 Médio |    M    |  🟢 Baixa  |        ✅ Concluído        |
+| E1  | Consolidar api/ e routes/                    |  4   | 🟡 Médio |    L    |  🟢 Baixa  |      ⏭️ De-priorizado      |
+| J1  | Extrair tools/shell/index.js                 |  4   | 🟢 Baixo |    M    |  🟡 Média  |        ✅ Concluído        |
+| J2  | config/tools/ subpasta unificada             |  4   | 🟢 Baixo |    S    |  🟡 Média  |        ✅ Concluído        |
+| J3  | terminal-server.js entry point PM2           |  4   | 🟢 Baixo |   XS    |  🟢 Baixa  | ⏭️ Intencional — não mover |
+| J4  | core/constants.js canônico                   |  1   | 🟢 Baixo |    S    |  🟡 Média  |        ✅ Concluído        |
+| K1  | git_push, git_create_branch, git_log         |  5   | 🟢 Baixo |    M    |  🔴 Alta   |        ⬜ Pendente         |
+| K2  | patch_file — edição cirúrgica                |  5   | 🟡 Médio |    M    |  🟡 Média  |        ⬜ Pendente         |
+| K3  | get_workspace_info, set_session_context      |  5   | 🟢 Baixo |    S    |  🟡 Média  |        ⬜ Pendente         |
+| K4  | web_fetch com rate-limit e segurança         |  5   | 🟡 Médio |    L    |  🔴 Alta   |        ⬜ Pendente         |
+| K5  | Migrar todas as tools para buildTool         |  5   | 🟢 Baixo |    M    |  🟡 Média  |        ⬜ Pendente         |
+| K6  | tools/git/index.js consolidado               |  5   | 🟢 Baixo |    S    |  🟢 Baixa  |        ⬜ Pendente         |
+| K7  | customAgents config/agents.js                |  5   | 🟡 Médio |    L    |  🟡 Média  |        ⬜ Pendente         |
+| K8  | onUserInputRequest SDK em request_user_input |  5   | 🟢 Baixo |    S    |  🔴 Alta   |        ⬜ Pendente         |
 
 ---
 
@@ -911,7 +965,9 @@ src/copilot/
 ```
 
 **Arquivos removidos** (vs. situação atual):
-- 14 shims raiz: `agent.js`, `always-alive.js`, `session-manager.js`, `nerv-bridge.js`, ..., `terminal-server.js`
+
+- 14 shims raiz: `agent.js`, `always-alive.js`, `session-manager.js`, `nerv-bridge.js`, ...,
+  `terminal-server.js`
 - 2 aliases `api/`: `copilot-router.js`, `sdk-router.js`
 - 2 bridges intermediárias: `bridges/inject-llmb.js`, `bridges/llm-bridge-client.js`
 - `routes/` como pasta separada (folded em `api/sdk/`)
@@ -982,13 +1038,19 @@ Total: ~83 arquivos. Zero shims. Zero aliases mortos. Imports corretos.
 
 ## 16. Proposta K — Fase 5: Expansão e Consolidação de Tools
 
-**Contexto**: O sistema conta hoje com 35 custom tools distribuídas em 9 módulos. A LLM-B herda automaticamente _todas_ as built-in tools do Copilot CLI (incluindo `read_file`, `write_file`, `edit_file`, `grep`, `glob`, `bash`, `web_search` e outras via `--allow-all`). As custom tools são **adicionais** — não substituem as built-ins, a menos que `overridesBuiltInTool: true` seja declarado. A Fase 5 preenche lacunas identificadas na comparação entre as capacidades da LLM-A (GitHub Copilot) e da LLM-B (custom agent).
+**Contexto**: O sistema conta hoje com 35 custom tools distribuídas em 9 módulos. A LLM-B herda
+automaticamente _todas_ as built-in tools do Copilot CLI (incluindo `read_file`, `write_file`,
+`edit_file`, `grep`, `glob`, `bash`, `web_search` e outras via `--allow-all`). As custom tools são
+**adicionais** — não substituem as built-ins, a menos que `overridesBuiltInTool: true` seja
+declarado. A Fase 5 preenche lacunas identificadas na comparação entre as capacidades da LLM-A
+(GitHub Copilot) e da LLM-B (custom agent).
 
 ### K1 — Novas tools Git (git_push, git_create_branch, git_log)
 
 **Localização**: `src/copilot/tools/git-tools.js` (adição de tools)
 
-**Motivação**: `git-tools.js` atual tem apenas `git_status`, `git_diff`, `git_changed_files`, `git_commit`. Faltam operações de branch e de push para workflows completos.
+**Motivação**: `git-tools.js` atual tem apenas `git_status`, `git_diff`, `git_changed_files`,
+`git_commit`. Faltam operações de branch e de push para workflows completos.
 
 ```js
 // Novas tools propostas
@@ -1006,14 +1068,20 @@ defineTool('git_log', 'Retorna o log de commits recentes', ...)
 
 **Localização**: `src/copilot/tools/file-tools.js` (nova tool)
 
-**Motivação**: O CLI tem `edit_file` built-in, mas a LLM-B necessita de uma custom tool para edições pontuais via `old_string` → `new_string` com contexto obrigatório (mesma semântica do replace_string_in_file do Copilot). Permite auditoria da ferramenta via hooks.
+**Motivação**: O CLI tem `edit_file` built-in, mas a LLM-B necessita de uma custom tool para edições
+pontuais via `old_string` → `new_string` com contexto obrigatório (mesma semântica do
+replace_string_in_file do Copilot). Permite auditoria da ferramenta via hooks.
 
 ```js
-defineTool('patch_file', 'Aplica uma substituição cirúrgica num arquivo', z.object({
+defineTool(
+  'patch_file',
+  'Aplica uma substituição cirúrgica num arquivo',
+  z.object({
     path: z.string(),
     old_string: z.string().describe('Texto exato a substituir (≥3 linhas de contexto)'),
     new_string: z.string().describe('Texto de substituição'),
-}))
+  }),
+);
 ```
 
 **Risco**: Médio — edição destrutiva; deve validar que `old_string` ocorre exatamente 1 vez.
@@ -1026,11 +1094,13 @@ defineTool('patch_file', 'Aplica uma substituição cirúrgica num arquivo', z.o
 **Localização**: `src/copilot/tools/session-tools.js` (novas tools)
 
 **Motivação**: `get_session_state` existe mas é orientada ao sistema. Faltam tools para:
-- `get_workspace_info`: retorna info do workspace (cwd, git root, branch, Node version, arquivos abertos)
-- `set_session_context`: permite à LLM-B armazenar contexto em memória de sessão para resposta subsequente
 
-**Risco**: Baixo — leitura e escrita em memória de sessão controlada.
-**Esforço**: S
+- `get_workspace_info`: retorna info do workspace (cwd, git root, branch, Node version, arquivos
+  abertos)
+- `set_session_context`: permite à LLM-B armazenar contexto em memória de sessão para resposta
+  subsequente
+
+**Risco**: Baixo — leitura e escrita em memória de sessão controlada. **Esforço**: S
 
 ---
 
@@ -1038,26 +1108,33 @@ defineTool('patch_file', 'Aplica uma substituição cirúrgica num arquivo', z.o
 
 **Localização**: `src/copilot/tools/web-tools.js` (novo módulo)
 
-**Motivação**: A LLM-A tem `fetch_webpage`. A LLM-B supostamente herda `web_search` / `web_fetch` do CLI, mas sem controle explícito de rate-limit, sem SSRF protection, sem allow-list de domínios. Uma custom tool traz:
+**Motivação**: A LLM-A tem `fetch_webpage`. A LLM-B supostamente herda `web_search` / `web_fetch` do
+CLI, mas sem controle explícito de rate-limit, sem SSRF protection, sem allow-list de domínios. Uma
+custom tool traz:
+
 - Validation de URL (bloquear `localhost`, IPs privados — anti-SSRF)
 - Rate-limiting (máx N requests/min)
 - Content-type filtering (apenas `text/*`)
 - Timeout configurável
 
 ```js
-defineTool('web_fetch', 'Busca o conteúdo de uma URL pública', z.object({
+defineTool(
+  'web_fetch',
+  'Busca o conteúdo de uma URL pública',
+  z.object({
     url: z.string().url(),
     maxBytes: z.number().int().max(512_000).optional(),
-}))
+  }),
+);
 ```
 
 **Regras de segurança (OWASP A10 SSRF)**:
+
 - Bloquear URLs com host `localhost`, `127.*`, `10.*`, `172.16-31.*`, `192.168.*`, `::1`, `fd*`
 - Bloquear esquemas `file://`, `ftp://`, `data:`
 - Apenas GET; sem redirect para hosts internos
 
-**Risco**: Médio (SSRF se mal implementado — por isso é uma custom tool).
-**Esforço**: L
+**Risco**: Médio (SSRF se mal implementado — por isso é uma custom tool). **Esforço**: L
 
 ---
 
@@ -1065,12 +1142,16 @@ defineTool('web_fetch', 'Busca o conteúdo de uma URL pública', z.object({
 
 **Localização**: todos os `tools/*.js` e `tools/shell/index.js`
 
-**Motivação**: `tool-factory.js` existe desde a Fase AI com `buildTool` que encapsula `defineTool` com logging automático, `skipPermission` por padrão e padrão JSDoc. Nenhuma tool atual usa `buildTool`. Migrar traz:
+**Motivação**: `tool-factory.js` existe desde a Fase AI com `buildTool` que encapsula `defineTool`
+com logging automático, `skipPermission` por padrão e padrão JSDoc. Nenhuma tool atual usa
+`buildTool`. Migrar traz:
+
 - Logging uniforme em cada invocação (`#core/logger`)
 - Possibilidade de togglear `skipPermission` por grupo (read-only vs. write)
 - Ponto central para métricas de uso
 
 **Abordagem**:
+
 1. Auditar `tool-factory.js` e completar sua implementação
 2. Migrar `file-tools.js` (leitura) → `skipPermission: true`
 3. Migrar `git-tools.js` (`git_status`, `git_diff`, `git_log`) → `skipPermission: true`
@@ -1085,7 +1166,9 @@ defineTool('web_fetch', 'Busca o conteúdo de uma URL pública', z.object({
 
 **Localização**: `src/copilot/tools/git-tools.js` → `src/copilot/tools/git/index.js`
 
-**Motivação**: Seguindo o padrão de `tools/shell/index.js` (Fase 4 J1), `git-tools.js` também se beneficia de uma subpasta dedicada com `policy.js` separado (configuração de paths permitidos, branches proibidos para force-push, etc.).
+**Motivação**: Seguindo o padrão de `tools/shell/index.js` (Fase 4 J1), `git-tools.js` também se
+beneficia de uma subpasta dedicada com `policy.js` separado (configuração de paths permitidos,
+branches proibidos para force-push, etc.).
 
 ```
 tools/
@@ -1094,8 +1177,7 @@ tools/
 │   └── policy.js    ← ALLOWED_BRANCHES, MAX_COMMIT_MSG_LENGTH, etc.
 ```
 
-**Risco**: Baixo — mesma mecânica da J1, ajuste de `import.meta.url` depth.
-**Esforço**: S
+**Risco**: Baixo — mesma mecânica da J1, ajuste de `import.meta.url` depth. **Esforço**: S
 
 ---
 
@@ -1103,25 +1185,26 @@ tools/
 
 **Localização**: `src/copilot/lib/agents.js` + `src/copilot/lib/session.js`
 
-**Motivação**: O SDK suporta `customAgents` na `SessionConfig` para criar sub-agentes especializados com tool subsets. Hoje `lib/agents.js` existe mas não é integrado na criação de sessão default. Proposta:
+**Motivação**: O SDK suporta `customAgents` na `SessionConfig` para criar sub-agentes especializados
+com tool subsets. Hoje `lib/agents.js` existe mas não é integrado na criação de sessão default.
+Proposta:
 
 ```js
 customAgents: [
-    {
-        name: 'researcher',
-        description: 'Agente de pesquisa somente-leitura',
-        tools: readOnlyToolNames,   // apenas read_file, search, git_status, web_fetch
-    },
-    {
-        name: 'implementer',
-        description: 'Agente de implementação com acesso escrita',
-        tools: allToolNames,
-    }
-]
+  {
+    name: 'researcher',
+    description: 'Agente de pesquisa somente-leitura',
+    tools: readOnlyToolNames, // apenas read_file, search, git_status, web_fetch
+  },
+  {
+    name: 'implementer',
+    description: 'Agente de implementação com acesso escrita',
+    tools: allToolNames,
+  },
+];
 ```
 
-**Risco**: Médio — requer testes de comportamento do SDK com customAgents.
-**Esforço**: L
+**Risco**: Médio — requer testes de comportamento do SDK com customAgents. **Esforço**: L
 
 ---
 
@@ -1129,20 +1212,22 @@ customAgents: [
 
 **Localização**: `src/copilot/lib/session.js` + `src/copilot/tools/hook-tools.js`
 
-**Motivação**: `request_user_input` atual usa JSON-RPC próprio (via `task-tools.js`). O SDK tem `onUserInputRequest` que habilita o built-in `ask_user`, criando interface padrão que o CLI já conhece. Integrar:
+**Motivação**: `request_user_input` atual usa JSON-RPC próprio (via `task-tools.js`). O SDK tem
+`onUserInputRequest` que habilita o built-in `ask_user`, criando interface padrão que o CLI já
+conhece. Integrar:
 
 ```js
 // sessionConfig
 onUserInputRequest: async (prompt, options) => {
-    // delegate to the existing dialog bridge (terminal/dialog.js)
-    return await terminalDialog.request(prompt, options);
-}
+  // delegate to the existing dialog bridge (terminal/dialog.js)
+  return await terminalDialog.request(prompt, options);
+};
 ```
 
-Após isso, a LLM-B pode usar `ask_user` built-in OU a custom `request_user_input` — redundância controlada.
+Após isso, a LLM-B pode usar `ask_user` built-in OU a custom `request_user_input` — redundância
+controlada.
 
-**Risco**: Baixo — additive change, fallback para comportamento atual.
-**Esforço**: S
+**Risco**: Baixo — additive change, fallback para comportamento atual. **Esforço**: S
 
 ---
 
@@ -1150,29 +1235,31 @@ Após isso, a LLM-B pode usar `ask_user` built-in OU a custom `request_user_inpu
 
 | ID  | Proposta                                | Prioridade | Esforço |
 | --- | --------------------------------------- | :--------: | ------: |
-| K1  | git_push, git_create_branch, git_log    |   🔴 Alta   |       M |
-| K2  | patch_file (search-and-replace)         |  🟡 Média   |       M |
-| K3  | get_workspace_info, set_session_context |  🟡 Média   |       S |
-| K4  | web_fetch (anti-SSRF)                   |   🔴 Alta   |       L |
-| K5  | Migrar tools para buildTool             |  🟡 Média   |       M |
-| K6  | tools/git/index.js reorganizado         |  🟢 Baixa   |       S |
-| K7  | customAgents especializados             |  🟡 Média   |       L |
-| K8  | onUserInputRequest SDK integration      |   🔴 Alta   |       S |
+| K1  | git_push, git_create_branch, git_log    |  🔴 Alta   |       M |
+| K2  | patch_file (search-and-replace)         |  🟡 Média  |       M |
+| K3  | get_workspace_info, set_session_context |  🟡 Média  |       S |
+| K4  | web_fetch (anti-SSRF)                   |  🔴 Alta   |       L |
+| K5  | Migrar tools para buildTool             |  🟡 Média  |       M |
+| K6  | tools/git/index.js reorganizado         |  🟢 Baixa  |       S |
+| K7  | customAgents especializados             |  🟡 Média  |       L |
+| K8  | onUserInputRequest SDK integration      |  🔴 Alta   |       S |
 
 **Ordem de execução sugerida**: K8 → K3 → K1 → K4 → K2 → K5 → K6 → K7
 
-**Critério de conclusão da Fase 5**: todos os K1-K8 implementados, `npm run test:unit` 0 falhas, `npm run lint` 0 erros, tools novas com ≥1 teste unitário cada.
+**Critério de conclusão da Fase 5**: todos os K1-K8 implementados, `npm run test:unit` 0 falhas,
+`npm run lint` 0 erros, tools novas com ≥1 teste unitário cada.
 
 ---
 
-*Proposta elaborada em: 2026-03-15 · Fase 5 adicionada em: 2026-03-27 · Seções 18-20 adicionadas em: 2026-03-27 · Para aprovação e faseamento*
+_Proposta elaborada em: 2026-03-15 · Fase 5 adicionada em: 2026-03-27 · Seções 18-20 adicionadas em:
+2026-03-27 · Para aprovação e faseamento_
 
 ---
 
 ## 18. Análise Profunda: Herança CLI → LLM-B
 
-> **Objetivo**: entender **como** a LLM-B herda capacidades da CLI Copilot, **o que** é herdado,
-> e **o que precisa ser integrado melhor**.
+> **Objetivo**: entender **como** a LLM-B herda capacidades da CLI Copilot, **o que** é herdado, e
+> **o que precisa ser integrado melhor**.
 
 ### 18.1 Arquitetura da Comunicação
 
@@ -1193,8 +1280,8 @@ Após isso, a LLM-B pode usar `ask_user` built-in OU a custom `request_user_inpu
 
 **Fluxo de herança**:
 
-1. `CopilotClient` faz `spawn()` do CLI bundled em
-   `node_modules/@github/copilot/index.js` via `stdio`
+1. `CopilotClient` faz `spawn()` do CLI bundled em `node_modules/@github/copilot/index.js` via
+   `stdio`
 2. Protocolo JSON-RPC com `vscode-jsonrpc` — versão negociada (mínimo 2, máximo atual)
 3. `client.createSession()` envia `session.create` com:
    - `tools[]` — nossas custom tools (registradas via `defineTool`)
@@ -1202,7 +1289,8 @@ Após isso, a LLM-B pode usar `ask_user` built-in OU a custom `request_user_inpu
    - `availableTools[]` — allowlist opcional
    - `mcpServers{}` — MCP servers a disponibilizar
    - `skillDirectories[]` — diretórios de skills YAML (atualmente `./.github/skills`)
-4. A CLI injeta **automaticamente** suas built-in tools na sessão — a LLM-B as vê junto das custom tools
+4. A CLI injeta **automaticamente** suas built-in tools na sessão — a LLM-B as vê junto das custom
+   tools
 5. A LLM-B **não tem acesso ao código-fonte** — apenas aos schemas JSON de cada tool
 
 ### 18.2 Built-in Tools da CLI (inventário completo)
@@ -1211,24 +1299,27 @@ Listadas via `client.rpc.tools.list({})` no ambiente atual:
 
 | #   | Nome                              | Categoria | Descrição resumida                                                          | Herdada pela LLM-B |
 | --- | --------------------------------- | --------- | --------------------------------------------------------------------------- | :----------------: |
-| 1   | `bash`                            | Shell     | Shell persistente interativo, sync e async, com suporte a detach/daemon     |         ✅          |
-| 2   | `write_bash`                      | Shell     | Envia stdin para sessão bash async                                          |         ✅          |
-| 3   | `read_bash`                       | Shell     | Lê stdout/stderr de sessão bash async                                       |         ✅          |
-| 4   | `stop_bash`                       | Shell     | Termina sessão bash async                                                   |         ✅          |
-| 5   | `list_bash`                       | Shell     | Lista sessões bash ativas                                                   |         ✅          |
-| 6   | `str_replace_editor`              | File      | Editor de arquivos (view/create/str_replace/insert/undo_edit)               |         ✅          |
-| 7   | `web_fetch`                       | Web       | HTTP GET/POST para URLs externas                                            |    ⚠️ bloqueada*    |
-| 8   | `report_intent`                   | Meta      | Reporta intenção do agente ao usuário (feedback para UI CLI)                |         ✅          |
-| 9   | `fetch_copilot_cli_documentation` | Meta      | Recupera documentação interna da CLI Copilot                                |         ✅          |
-| 10  | `skill`                           | Agent     | Invoca skills YAML de `.github/skills/` como sub-rotinas                    |         ✅          |
-| 11  | `ask_user`                        | Dialog    | Solicita input do usuário (habilita quando `onUserInputRequest` registrado) |        ✅**         |
-| 12  | `grep`                            | Search    | grep em arquivos do workspace                                               |         ✅          |
-| 13  | `glob`                            | Search    | glob pattern search em arquivos                                             |         ✅          |
-| 14  | `task`                            | SubAgent  | Invoca sub-agente `task` do definitions/ (execução de comandos)             |         ✅          |
+| 1   | `bash`                            | Shell     | Shell persistente interativo, sync e async, com suporte a detach/daemon     |         ✅         |
+| 2   | `write_bash`                      | Shell     | Envia stdin para sessão bash async                                          |         ✅         |
+| 3   | `read_bash`                       | Shell     | Lê stdout/stderr de sessão bash async                                       |         ✅         |
+| 4   | `stop_bash`                       | Shell     | Termina sessão bash async                                                   |         ✅         |
+| 5   | `list_bash`                       | Shell     | Lista sessões bash ativas                                                   |         ✅         |
+| 6   | `str_replace_editor`              | File      | Editor de arquivos (view/create/str_replace/insert/undo_edit)               |         ✅         |
+| 7   | `web_fetch`                       | Web       | HTTP GET/POST para URLs externas                                            |   ⚠️ bloqueada\*   |
+| 8   | `report_intent`                   | Meta      | Reporta intenção do agente ao usuário (feedback para UI CLI)                |         ✅         |
+| 9   | `fetch_copilot_cli_documentation` | Meta      | Recupera documentação interna da CLI Copilot                                |         ✅         |
+| 10  | `skill`                           | Agent     | Invoca skills YAML de `.github/skills/` como sub-rotinas                    |         ✅         |
+| 11  | `ask_user`                        | Dialog    | Solicita input do usuário (habilita quando `onUserInputRequest` registrado) |       ✅\*\*       |
+| 12  | `grep`                            | Search    | grep em arquivos do workspace                                               |         ✅         |
+| 13  | `glob`                            | Search    | glob pattern search em arquivos                                             |         ✅         |
+| 14  | `task`                            | SubAgent  | Invoca sub-agente `task` do definitions/ (execução de comandos)             |         ✅         |
 
-*`web_fetch` — bloqueada no `DEFAULT_EXCLUDED_TOOLS` de `session-config.js` (junto com `powershell`, `web_search`, `memory`). Razão: auditoria de segurança, substituída pela nossa `fetch_url`/`http_request` com anti-SSRF.
+\*`web_fetch` — bloqueada no `DEFAULT_EXCLUDED_TOOLS` de `session-config.js` (junto com
+`powershell`, `web_search`, `memory`). Razão: auditoria de segurança, substituída pela nossa
+`fetch_url`/`http_request` com anti-SSRF.
 
-**`ask_user` — disponível apenas quando `onUserInputRequest` está registrado na SessionConfig. Já implementado no `always-alive.js` (linha 318).
+\*\*`ask_user` — disponível apenas quando `onUserInputRequest` está registrado na SessionConfig. Já
+implementado no `always-alive.js` (linha 318).
 
 ### 18.3 Agents Built-in (Sub-agentes da CLI)
 
@@ -1239,30 +1330,40 @@ A CLI tem 5 agents YAML em `node_modules/@github/copilot/definitions/`:
 | `task`              | claude-haiku-4.5  | Exec dev commands    | `*` (todas)                                                       |
 | `explore`           | claude-haiku-4.5  | Codebase exploration | grep, glob, view, bash, lsp + GitHub MCP + Bluebird               |
 | `research`          | claude-sonnet-4.6 | Staff-level research | GitHub MCP, web_fetch, web_search, task, grep, glob, view, create |
-| `configure-copilot` | *(padrão)*        | Config wizard        | skills específicas                                                |
-| `code-review`       | *(padrão)*        | Code review          | skills específicas                                                |
+| `configure-copilot` | _(padrão)_        | Config wizard        | skills específicas                                                |
+| `code-review`       | _(padrão)_        | Code review          | skills específicas                                                |
 
-O agente `task` (invocado via `task` built-in) usa **todas as tools** — ou seja, a LLM-B pode delegar para `task` e esse sub-agente terá acesso a tudo. Isso é o mecanismo de sub-agentes nativo.
+O agente `task` (invocado via `task` built-in) usa **todas as tools** — ou seja, a LLM-B pode
+delegar para `task` e esse sub-agente terá acesso a tudo. Isso é o mecanismo de sub-agentes nativo.
 
 ### 18.4 Skills YAML (`.github/skills/`)
 
-A CLI carrega `skillDirectories: ['.github/skills']` — este projeto já usa isso na `session-manager.js` (linha 259). Skills YAML são invocadas via a tool `skill`:
+A CLI carrega `skillDirectories: ['.github/skills']` — este projeto já usa isso na
+`session-manager.js` (linha 259). Skills YAML são invocadas via a tool `skill`:
 
 ```
 .github/skills/
 ├── *.skill.yaml   ← arquivos de skill (se criados aqui)
 ```
 
-Atualmente este projeto não tem skills customizadas criadas. A tool `skill` herda as skills da CLI mais qualquer YAML em `.github/skills/`.
+Atualmente este projeto não tem skills customizadas criadas. A tool `skill` herda as skills da CLI
+mais qualquer YAML em `.github/skills/`.
 
 ### 18.5 GitHub MCP Server Nativo da CLI
 
-O agente `explore` usa `github-mcp-server/get_file_contents`, `github-mcp-server/list_issues` etc. Este é o **servidor MCP nativo** embutido na CLI — diferente do `@modelcontextprotocol/server-github` que temos configurado.
+O agente `explore` usa `github-mcp-server/get_file_contents`, `github-mcp-server/list_issues` etc.
+Este é o **servidor MCP nativo** embutido na CLI — diferente do
+`@modelcontextprotocol/server-github` que temos configurado.
 
 **Dois servidores distintos**:
-1. **`github-mcp-server` (nativo CLI)**: embutido no CLI bundled, não precisa de `npx`, usa o auth do token do usuário autenticado. Disponível automaticamente nos sub-agentes `explore`/`research` que o referenciam.
-2. **`@modelcontextprotocol/server-github` (npm)**: servidor externo que precisamos lançar via `npx`, configurado em `MCP_SERVERS.github` no `mcp-servers.js`.
-3. **GitHub API MCP HTTP**: servidor oficial em `https://api.githubcopilot.com/mcp/` — acessível via `MCPRemoteServerConfig` com `type: 'http'`.
+
+1. **`github-mcp-server` (nativo CLI)**: embutido no CLI bundled, não precisa de `npx`, usa o auth
+   do token do usuário autenticado. Disponível automaticamente nos sub-agentes `explore`/`research`
+   que o referenciam.
+2. **`@modelcontextprotocol/server-github` (npm)**: servidor externo que precisamos lançar via
+   `npx`, configurado em `MCP_SERVERS.github` no `mcp-servers.js`.
+3. **GitHub API MCP HTTP**: servidor oficial em `https://api.githubcopilot.com/mcp/` — acessível via
+   `MCPRemoteServerConfig` com `type: 'http'`.
 
 ### 18.6 O Que a LLM-B Herda Automaticamente
 
@@ -1274,22 +1375,27 @@ Quando uma sessão é criada **sem** `availableTools` nem `excludedTools`, a LLM
 - **Sub-agente `task`** via a built-in `task` tool
 - **Skills** de `.github/skills/`
 
-Com a configuração atual (`DEFAULT_EXCLUDED_TOOLS`), a LLM-B recebe 14 - 4 = **10 built-in tools** + nossas **43 custom tools** = **~53 tools totais** (excluindo MCP).
+Com a configuração atual (`DEFAULT_EXCLUDED_TOOLS`), a LLM-B recebe 14 - 4 = **10 built-in tools** +
+nossas **43 custom tools** = **~53 tools totais** (excluindo MCP).
 
 ### 18.7 Diferença: GitHub Copilot (eu) vs LLM-B
 
-O **GitHub Copilot** (este assistente integrado ao VS Code) tem acesso a ferramentas específicas do ambiente IDE:
+O **GitHub Copilot** (este assistente integrado ao VS Code) tem acesso a ferramentas específicas do
+ambiente IDE:
+
 - `run_in_terminal`, `create_file`, `replace_string_in_file`, `read_file`, `get_errors` etc.
 - Ferramentas de workspace VS Code, notebook, browser automation
 - MCP tools de servidores configurados para o workspace VS Code
 
 A **LLM-B** (AlwaysAliveAgent) tem:
+
 - Built-in tools CLI (bash, grep, glob, str_replace_editor etc.)
 - Nossas 43 custom tools (git, file, web, session, task, hub etc.)
 - Sub-agentes via `task`, `explore`, `research`
 - Acesso via MCP servers configurados
 
 **Gaps antes da Fase 6** (tools que eu tenho e a LLM-B não tinha):
+
 - `web_fetch` → substituída por `fetch_url`/`http_request` com anti-SSRF ✅
 - `patch_file` / str_replace → coberta por `patch_file` ✅ e `str_replace_editor` (built-in CLI) ✅
 - Subagentes especializados → `task` built-in existe, falta `customAgents` configurados (K7)
@@ -1299,20 +1405,21 @@ A **LLM-B** (AlwaysAliveAgent) tem:
 
 ## 19. Proposta L — Fase 6: Sub-agentes, Skills e Integração Avançada
 
-> **Motivação**: Após inventariar os gaps Fase 5, a Fase 6 foca em capacidades de **orquestração avançada**:
-> sub-agentes customizados (`customAgents`), as skills YAML, MCP server GitHub oficial, e polimento geral.
+> **Motivação**: Após inventariar os gaps Fase 5, a Fase 6 foca em capacidades de **orquestração
+> avançada**: sub-agentes customizados (`customAgents`), as skills YAML, MCP server GitHub oficial,
+> e polimento geral.
 
 ### 19.1 Roadmap Fase 6
 
 | ID  | Proposta                                      | Prioridade | Esforço |
 | --- | --------------------------------------------- | :--------: | ------: |
-| L1  | K7 carry-over: customAgents especializados    |   🔴 Alta   |       L |
-| L2  | GitHub MCP server HTTP oficial                |   🔴 Alta   |       S |
-| L3  | Skills YAML nativas (.github/skills/)         |  🟡 Média   |       M |
-| L4  | web_search tool (alternativa segura)          |  🟡 Média   |       M |
-| L5  | mcp-servers: suporte dinâmico via config.json |  🟡 Média   |       S |
-| L6  | Audit: DEFAULT_EXCLUDED_TOOLS revisão         |  🟢 Baixa   |       S |
-| L7  | memory MCP tool — gestão de contexto longo    |  🟢 Baixa   |       M |
+| L1  | K7 carry-over: customAgents especializados    |  🔴 Alta   |       L |
+| L2  | GitHub MCP server HTTP oficial                |  🔴 Alta   |       S |
+| L3  | Skills YAML nativas (.github/skills/)         |  🟡 Média  |       M |
+| L4  | web_search tool (alternativa segura)          |  🟡 Média  |       M |
+| L5  | mcp-servers: suporte dinâmico via config.json |  🟡 Média  |       S |
+| L6  | Audit: DEFAULT_EXCLUDED_TOOLS revisão         |  🟢 Baixa  |       S |
+| L7  | memory MCP tool — gestão de contexto longo    |  🟢 Baixa  |       M |
 
 ### 19.2 L1 — customAgents Especializados
 
@@ -1320,23 +1427,23 @@ O SDK suporta `customAgents` na `SessionConfig`:
 
 ```js
 customAgents: [
-    {
-        name: 'architect',
-        displayName: 'Architect Agent',
-        description: 'Analisa arquitetura, propõe refatorações e documenta decisões.',
-        tools: ['grep', 'glob', 'str_replace_editor', 'bash'],
-        model: 'claude-sonnet-4.6',
-        prompt: fs.readFileSync('.github/agents/architect.md', 'utf8'),
-    },
-    {
-        name: 'tester',
-        displayName: 'Tester Agent',
-        description: 'Escreve e executa testes unitários e de integração.',
-        tools: ['bash', 'str_replace_editor', 'grep'],
-        model: 'claude-haiku-4.5',
-        prompt: fs.readFileSync('.github/agents/tester.md', 'utf8'),
-    }
-]
+  {
+    name: 'architect',
+    displayName: 'Architect Agent',
+    description: 'Analisa arquitetura, propõe refatorações e documenta decisões.',
+    tools: ['grep', 'glob', 'str_replace_editor', 'bash'],
+    model: 'claude-sonnet-4.6',
+    prompt: fs.readFileSync('.github/agents/architect.md', 'utf8'),
+  },
+  {
+    name: 'tester',
+    displayName: 'Tester Agent',
+    description: 'Escreve e executa testes unitários e de integração.',
+    tools: ['bash', 'str_replace_editor', 'grep'],
+    model: 'claude-haiku-4.5',
+    prompt: fs.readFileSync('.github/agents/tester.md', 'utf8'),
+  },
+];
 ```
 
 Esses agentes ficam disponíveis como sub-agentes que a LLM-B pode invocar via a interface padrão.
@@ -1357,7 +1464,8 @@ Adicionar ao `mcp-servers.js` o servidor oficial GitHub via tipo `http`:
 },
 ```
 
-Isso dá à LLM-B acesso à mesma API GitHub que os agentes built-in `explore`/`research` usam, sem precisar de `npx`.
+Isso dá à LLM-B acesso à mesma API GitHub que os agentes built-in `explore`/`research` usam, sem
+precisar de `npx`.
 
 ### 19.3 L3 — Skills YAML Nativas
 
@@ -1375,7 +1483,8 @@ prompt: |
   Consolide e reporte quaisquer problemas encontrados.
 ```
 
-Skills são invocadas via `skill` built-in — a LLM-B pode orquestrar diagnósticos complexos em uma chamada.
+Skills são invocadas via `skill` built-in — a LLM-B pode orquestrar diagnósticos complexos em uma
+chamada.
 
 ### 19.4 Resumo Herança CLI→LLM-B (visão condensada)
 
@@ -1419,12 +1528,13 @@ Sub-agentes
 
 ## 20. Gap Analysis: LLM-B vs GitHub Copilot IDE
 
-Esta seção compara as capacidades do **GitHub Copilot** (assistente IDE) com a **LLM-B** (AlwaysAliveAgent).
+Esta seção compara as capacidades do **GitHub Copilot** (assistente IDE) com a **LLM-B**
+(AlwaysAliveAgent).
 
 ### 20.1 Tabela Comparativa
 
-| Capacidade                   |   GitHub Copilot (IDE)   |               LLM-B pós-Fase 5               | Gap / Observação        |
-| ---------------------------- | :----------------------: | :------------------------------------------: | ----------------------- |
+| Capacidade                   |   GitHub Copilot (IDE)    |               LLM-B pós-Fase 5                | Gap / Observação        |
+| ---------------------------- | :-----------------------: | :-------------------------------------------: | ----------------------- |
 | Shell execution              |    ✅ run_in_terminal     |               ✅ bash built-in                | Equivalente             |
 | File read                    |       ✅ read_file        |   ✅ str_replace_editor + read_file custom    | Coberto                 |
 | File write/edit              | ✅ replace_string_in_file |      ✅ str_replace_editor + patch_file       | Coberto                 |

@@ -54,14 +54,16 @@ export async function collectTestFindings(options) {
 
     const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
 
-    /** @type {{
-    stepId: string;
-    name: string;
-    command: 'node' | 'npm';
-    args: string[];
-    timeoutMs: number;
-    contractId: string | null;
-}[]} */
+    /**
+     * @type {{
+     *     stepId: string;
+     *     name: string;
+     *     command: 'node' | 'npm';
+     *     args: string[];
+     *     timeoutMs: number;
+     *     contractId: string | null;
+     * }[]}
+     */
     const plan = [];
 
     if (options.profile === 'quick') {

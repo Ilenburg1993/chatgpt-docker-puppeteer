@@ -43,13 +43,17 @@ import { log } from '#core/logger';
  *
  * @typedef {{ toolName: string; toolArgs: object; toolResult: unknown; timestamp: number; cwd: string }} PostToolUseHookInput
  *
+ *
  * @typedef {{ prompt: string; timestamp: number; cwd: string }} UserPromptSubmittedHookInput
  *
  * @typedef {{ source: 'startup' | 'resume' | 'new'; initialPrompt?: string; timestamp: number; cwd: string }} SessionStartHookInput
  *
+ *
  * @typedef {{ reason: string; finalMessage?: string; error?: Error; timestamp: number; cwd: string }} SessionEndHookInput
  *
+ *
  * @typedef {{ error: Error; errorContext: string; recoverable: boolean; timestamp: number; cwd: string }} ErrorOccurredHookInput
+ *
  *
  * @typedef {{ sessionId: string }} InvocationContext
  */

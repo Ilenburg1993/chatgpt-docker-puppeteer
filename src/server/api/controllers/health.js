@@ -18,6 +18,7 @@ import fs from 'node:fs/promises';
  *     total_bytes: number;
  * }} DiskStatfsSummary
  *
+ *
  * @typedef {{ path: string; exists: boolean; statfs: DiskStatfsSummary | null }} DiskHealthEntry
  */
 

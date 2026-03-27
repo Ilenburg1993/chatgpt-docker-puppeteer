@@ -378,14 +378,16 @@ class DriverNERVAdapter extends EventEmitter {
         const taskId = task.meta.id;
         const startTime = Date.now();
 
-        /** @type {{
-    total: number;
-    poolAcquire: number | null;
-    contextAttach: number | null;
-    execute: number | null;
-    detach: number | null;
-    release: number | null;
-}} */
+        /**
+         * @type {{
+         *     total: number;
+         *     poolAcquire: number | null;
+         *     contextAttach: number | null;
+         *     execute: number | null;
+         *     detach: number | null;
+         *     release: number | null;
+         * }}
+         */
         const timings = {
             total: startTime,
             poolAcquire: null,

@@ -228,10 +228,12 @@ Se nenhuma das condições for verdadeira, mantenha o typedef local no arquivo q
 /** @import {TaskRecord} from "#types/tasks.js" */
 
 // Pode importar múltiplos tipos:
-/** @import {
-  TaskRecord,
-  TaskStatus
-} from "#types/tasks.js" */
+/**
+ * @import {
+ *   TaskRecord,
+ *   TaskStatus
+ * } from "#types/tasks.js"
+ */
 
 // Import apenas de namespace:
 /** @import * from "#types/index.js" */

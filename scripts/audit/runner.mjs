@@ -43,13 +43,15 @@ import { triageFindings } from './triage_llm.mjs';
 /** @typedef {'smart' | 'full' | 'changed' | 'off'} QualityMode */
 /** @typedef {'success' | 'partial' | 'aborted' | 'fatal'} RunOutcome */
 /** @typedef {'signal' | 'uncaught_exception' | 'unhandled_rejection' | 'manual' | 'none'} AbortReason */
-/** @typedef {'observability'
-    | 'reactive_bug'
-    | 'exploratory_bug'
-    | 'contracts'
-    | 'security'
-    | 'performance'
-    | 'architecture'} AuditMode */
+/**
+ * @typedef {'observability'
+ *     | 'reactive_bug'
+ *     | 'exploratory_bug'
+ *     | 'contracts'
+ *     | 'security'
+ *     | 'performance'
+ *     | 'architecture'} AuditMode
+ */
 
 const MASTER_PATH = 'DOCUMENTAÇÃO/AUDITORIAS/BUGS/BUG_AUDIT_MASTER.md';
 const SNAPSHOTS_DIR = 'DOCUMENTAÇÃO/AUDITORIAS/BUGS/rodadas';
@@ -445,15 +447,17 @@ async function main() {
     /** @type {any} */
     let architectureResult = { findings: [], errors: [], warnings: [], telemetry: { findings_by_kind: {} } };
     const plannedStartEta = etaEstimator.estimateRemaining(plannedStepKeys);
-    /** @type {{
-    stdout_bytes_total: number;
-    stderr_bytes_total: number;
-    stdout_truncated_steps: string[];
-    stderr_truncated_steps: string[];
-    steps_with_overflow: number;
-    max_stdout_bytes: number;
-    max_stderr_bytes: number;
-}} */
+    /**
+     * @type {{
+     *     stdout_bytes_total: number;
+     *     stderr_bytes_total: number;
+     *     stdout_truncated_steps: string[];
+     *     stderr_truncated_steps: string[];
+     *     steps_with_overflow: number;
+     *     max_stdout_bytes: number;
+     *     max_stderr_bytes: number;
+     * }}
+     */
     const logStats = {
         stdout_bytes_total: 0,
         stderr_bytes_total: 0,
@@ -1761,10 +1765,12 @@ async function main() {
         return false;
     }
 
-    /** @type {Record<
-    string,
-    { total: number; violated: number; covered: number; covered_by_run: number; covered_by_tests: number }
->} */
+    /**
+     * @type {Record<
+     *     string,
+     *     { total: number; violated: number; covered: number; covered_by_run: number; covered_by_tests: number }
+     * >}
+     */
     const contractCoverage = {};
     const violatedContracts = new Set(findings.map((item) => item.contract_id).filter(Boolean));
     /** @type {Set<string>} */
