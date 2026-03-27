@@ -9,6 +9,7 @@
 
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
+import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
@@ -71,6 +72,62 @@ const writePendingTaskTool = defineTool('write_pending_task', {
 });
 
 /**
+ * Tool: get_workspace_info — retorna informações contextuais do workspace.
+ */
+const getWorkspaceInfoTool = defineTool('get_workspace_info', {
+    description:
+        'Retorna informações do workspace atual: diretório de trabalho, branch git, Node version, status básico.',
+    parameters: z.object({}),
+    handler: async () => {
+        const cwd = ROOT;
+        const nodeVersion = process.version;
+        const platform = process.platform;
+
+        let gitBranch = null;
+        let gitRoot = null;
+        let gitCommit = null;
+        try {
+            gitBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+            gitRoot = execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+            gitCommit = execSync('git rev-parse --short HEAD', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+        } catch {
+            // not a git repo or git not available
+        }
+
+        return {
+            cwd,
+            nodeVersion,
+            platform,
+            git: gitRoot ? { branch: gitBranch, commit: gitCommit, root: gitRoot } : null,
+        };
+    },
+});
+
+/** @type {Map<string, unknown>} */
+const SESSION_CONTEXT_STORE = new Map();
+
+/**
+ * Tool: set_session_context — armazena contexto em memória de sessão.
+ */
+const setSessionContextTool = defineTool('set_session_context', {
+    description:
+        'Armazena um valor de contexto em memória de sessão (chave/valor). Use para preservar informações entre turnos.',
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                key: z.string().describe('Chave de contexto (ex: "current_task", "user_goal")'),
+                value: z.string().describe('Valor a armazenar (string)'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ key: string; value: string }} */ { key, value }) => {
+        SESSION_CONTEXT_STORE.set(key, value);
+        log('INFO', `[copilot/set_session_context] key='${key}' armazenado (${SESSION_CONTEXT_STORE.size} entradas)`);
+        return { success: true, key, stored: SESSION_CONTEXT_STORE.size };
+    },
+});
+
+/**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const sessionTools = [withSkipPermission(readBriefingTool), writePendingTaskTool];
+export const sessionTools = [withSkipPermission(readBriefingTool), writePendingTaskTool, withSkipPermission(getWorkspaceInfoTool), setSessionContextTool];

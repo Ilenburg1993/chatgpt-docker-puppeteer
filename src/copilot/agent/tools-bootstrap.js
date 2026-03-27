@@ -22,6 +22,7 @@ import {
     setTelemetryStore,
     shellTools,
     taskTools,
+    webTools,
 } from '../tools/index.js';
 
 /**
@@ -73,6 +74,10 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         category: 'shell',
         tags: ['exec', 'system', 'npm', 'node'],
     });
+    registerTools(registry, webTools, {
+        category: 'web',
+        tags: ['http', 'fetch', 'ssrf-protected'],
+    });
 
     if (mcpTools.length > 0) {
         registerTools(registry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
@@ -95,6 +100,7 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         ...fileReadTools,
         ...fileWriteTools,
         ...shellTools,
+        ...webTools,
         ...mcpTools,
         ...customTools,
     ];

@@ -595,6 +595,61 @@ const moveFileTool = defineTool('move_file', {
     },
 });
 
+/**
+ * Tool: patch_file — edição cirúrgica por substituição de string exata.
+ */
+const patchFileTool = defineTool('patch_file', {
+    description:
+        'Aplica uma substituição cirúrgica num arquivo: substitui `old_string` por `new_string`. ' +
+        '`old_string` deve ocorrer EXATAMENTE UMA VEZ no arquivo (inclua ≥3 linhas de contexto). ' +
+        '⚠️ REQUER APROVAÇÃO — modifica o arquivo em disco.',
+    parameters: sdkParam(
+        z.object({
+            path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto)'),
+            old_string: z
+                .string()
+                .min(1)
+                .describe('Texto exato a substituir. Deve ocorrer exatamente 1 vez no arquivo.'),
+            new_string: z.string().describe('Texto de substituição (pode ser string vazia para deletar)'),
+        }),
+    ),
+    handler: async ({ path: filePath, old_string, new_string }) => {
+        const v = validatePath(filePath);
+        if (!v.ok) return { success: false, error: v.reason };
+
+        if (!fs.existsSync(v.resolved)) {
+            return { success: false, error: `Arquivo não encontrado: ${v.resolved}` };
+        }
+
+        let content;
+        try {
+            content = fs.readFileSync(v.resolved, 'utf8');
+        } catch (/** @type {any} */ e) {
+            return { success: false, error: `Erro ao ler arquivo: ${e.message}` };
+        }
+
+        const occurrences = content.split(old_string).length - 1;
+        if (occurrences === 0) {
+            return { success: false, error: 'old_string não encontrado no arquivo.' };
+        }
+        if (occurrences > 1) {
+            return {
+                success: false,
+                error: `old_string encontrado ${occurrences} vezes. Inclua mais contexto para identificar unicamente.`,
+            };
+        }
+
+        const updated = content.replace(old_string, new_string);
+        try {
+            fs.writeFileSync(v.resolved, updated, 'utf8');
+            log('INFO', `[copilot/patch_file] Patch aplicado: ${v.resolved}`);
+            return { success: true, path: v.resolved };
+        } catch (/** @type {any} */ e) {
+            return { success: false, error: `Erro ao escrever arquivo: ${e.message}` };
+        }
+    },
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EXPORTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -616,7 +671,7 @@ export const fileReadTools = [
  *
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const fileWriteTools = [writeFileContentTool, createFileTool, deleteFileTool, copyFileTool, moveFileTool];
+export const fileWriteTools = [writeFileContentTool, createFileTool, deleteFileTool, copyFileTool, moveFileTool, patchFileTool];
 
 /**
  * Conjunto completo de tools de filesystem (leitura + escrita).

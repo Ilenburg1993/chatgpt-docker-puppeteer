@@ -1,6 +1,6 @@
 # Arquitetura 3.0 — Propostas de Evolução do Módulo `src/copilot`
 
-**Versão**: 3.0 (Proposta) | **Data**: 2026-03-15 | **Atualizado**: 2026-03-15 | **Status**: ✅ Fases 1–2 implementadas, Fases 3-4 em caminhamento
+**Versão**: 3.0 (Proposta) | **Data**: 2026-03-15 | **Atualizado**: 2026-03-27 | **Status**: ✅ Fases 1–4 implementadas, Fase 5 planejada
 
 > Este documento avalia a situação arquitetural atual do módulo `src/copilot` e propõe um conjunto de correções, melhorias e reestruturações para evoluir o módulo para a versão 3.0. Baseia-se na documentação oficial em `SRC-COPILOT-MODULO-OFICIAL.md` e na análise exaustiva do código-fonte.
 
@@ -88,27 +88,53 @@
 | I1  | Expandir `BUILTIN_HANDLER_MAP` com handlers úteis              | Baixo |    S    |                   ✅ (+3 handlers: `process_info`, `uptime`, `math_eval`)                   |
 | A1  | Remover aliases inúteis (`copilot-router.js`, `sdk-router.js`) | Baixo |   XS    |                        ✅ (arquivos removidos — 0 callers externos)                         |
 
-### Fase 3 — Limpeza de shims legados
+### Fase 3 — Limpeza de shims legados ✅ IMPLEMENTADA (commit ad0aecfe + 9bad4d14)
 
 > Requer mapeamento completo de callers externos ao módulo. Pode impactar `src/server/`, `ecosystem.config.cjs` e scripts de teste.
 
-| ID  | Proposta                                                | Risco | Esforço |
-| --- | ------------------------------------------------------- | :---: | :-----: |
-| A2  | Auditoria de callers de cada shim                       | Baixo |    S    |
-| A3  | Remover 13 shims `@deprecated` (exceto `sdk-client.js`) | Médio |    M    |
-| A4  | Migrar callers de `sdk-client.js`, depois remover       | Médio |    M    |
+| ID  | Proposta                                                | Risco | Esforço | Status |
+| --- | ------------------------------------------------------- | :---: | :-----: | :----: |
+| A2  | Auditoria de callers de cada shim                       | Baixo |    S    |   ✅    |
+| A3  | Remover 13 shims `@deprecated` (exceto `sdk-client.js`) | Médio |    M    |   ✅    |
+| A4  | Migrar callers de `sdk-client.js`, depois remover       | Médio |    M    |   ✅    |
 
-### Fase 4 — Reestruturação modular (Arquitetura 3.0)
+**Notas pós-implementação (Fase 3)**:
+- 12 shims removidos; mantidos apenas `agent.js` e `terminal-server.js` (PM2 entry points)
+- 17+ arquivos-fonte + 16 test files migrados para imports canônicos
+- `sdk-client.js` → `lib/client.js`; `onPermissionRequest: approveAll` injetado explicitamente em `routes/sessions.js`
+- Novo alias `#copilot/session-manager` → `./agent/session-manager.js` adicionado ao `package.json`
+
+### Fase 4 — Reestruturação modular (Arquitetura 3.0) ✅ IMPLEMENTADA (commit 759fb11a)
 
 > Reestruturação de pastas e consolidações. Requer plan de migração com alias temporários.
 
-| ID  | Proposta                                                                                | Risco | Esforço |
-| --- | --------------------------------------------------------------------------------------- | :---: | :-----: |
-| E1  | Consolidar `api/bridge-*.js` e `routes/*.js` em `api/v1/`                               | Médio |    L    |
-| J1  | Extrair `tools/shell-tools.js` para `tools/shell/` com policy separada                  | Baixo |    M    |
-| J2  | Unificar `config/tools-state.js` + `config/custom-tools-registry.js` em `config/tools/` | Baixo |    S    |
-| J3  | Mover `terminal-server.js` (raiz) e eliminar confusão                                   | Baixo |   XS    |
-| J4  | Introduzir `core/constants.js` canônico para TIMEOUTS, MAX_*, defaults                  | Baixo |    S    |
+| ID  | Proposta                                                                                | Risco | Esforço | Status |
+| --- | --------------------------------------------------------------------------------------- | :---: | :-----: | :----: |
+| E1  | Consolidar `api/bridge-*.js` e `routes/*.js` em `api/v1/`                               | Médio |    L    |   ⏭️ De-priorizado: `api/sdk-api.js` já agrega `routes/`   |
+| J1  | Extrair `tools/shell-tools.js` para `tools/shell/` com policy separada                  | Baixo |    M    |   ✅ (corrigido `WORKSPACE_ROOT` — URL 3→4 níveis)   |
+| J2  | Unificar `config/tools-state.js` + `config/custom-tools-registry.js` em `config/tools/` | Baixo |    S    |   ✅ (barrel `index.js` + 2 aliases `package.json`)   |
+| J3  | Mover `terminal-server.js` (raiz) e eliminar confusão                                   | Baixo |   XS    |   ⏭️ Intencional: entry point PM2 (não pode ser movido)   |
+| J4  | Introduzir `core/constants.js` canônico para TIMEOUTS, MAX_*, defaults                  | Baixo |    S    |   ✅ Já existia desde Fase 1   |
+
+**Notas pós-implementação (Fase 4)**:
+- `tools/shell/index.js`: WORKSPACE_ROOT usa `'../../../..'` (4 níveis) para resolução correta após movimentação
+- `config/tools/` com `state.js`, `registry.js`, `index.js` barrel
+- 1466 testes unitários passando após a fase
+
+### Fase 5 — Expansão e Consolidação de Tools
+
+> Adicionar novas custom tools que ampliem as capacidades da LLM-B, consolidar o sistema de tools, e integrar recursos do SDK ainda não utilizados.
+
+| ID   | Proposta                                                                     | Risco | Esforço |
+| ---- | ---------------------------------------------------------------------------- | :---: | :-----: |
+| K1   | Novas tools git: `git_push`, `git_create_branch`, `git_log`                  | Baixo |    M    |
+| K2   | Tool `patch_file` — edição cirúrgica por diff                                | Médio |    M    |
+| K3   | Tools de contexto de sessão: `get_workspace_info`, `set_session_context`     | Baixo |    S    |
+| K4   | Tool `web_search` / `web_fetch` com rate-limit e política de segurança       | Médio |    L    |
+| K5   | Migrar todas as tools para usar `tool-factory.js` (`buildTool`)              | Baixo |    M    |
+| K6   | Criar `tools/git/index.js` consolidando `git-tools.js`                       | Baixo |    S    |
+| K7   | Sub-agente `customAgents` configurável via `config/agents.js`                 | Médio |    L    |
+| K8   | Integrar `onUserInputRequest` SDK em `request_user_input` tool               | Baixo |    S    |
 
 ---
 
@@ -750,11 +776,19 @@ tools/
 | A2  | Auditar callers de shims                   |   3   | 🟢 Baixo |    S    |  🟡 Média   | ✅ Concluído |
 | A3  | Remover 13 shims @deprecated               |   3   | 🟡 Médio |    M    |  🟡 Média   | ✅ Concluído |
 | A4  | Migrar e remover sdk-client.js             |   3   | 🟡 Médio |    M    |  🟢 Baixa   | ✅ Concluído |
-| E1  | Consolidar api/ e routes/                  |   4   | 🟡 Médio |    L    |  🟢 Baixa   | 🔄 Pendente  |
-| J1  | Agrupar config/tools/*                     |   4   | 🟢 Baixo |    S    |  🟢 Baixa   | 🔄 Pendente  |
-| J2  | Separar integrations/ de bridges/          |   4   | 🟡 Médio |    M    |  🟢 Baixa   | 🔄 Pendente  |
-| J3  | core/constants.js robusto                  |   1   | 🟢 Baixo |    S    |  🟡 Média   |      ✅      |
-| J4  | Extrair tools/shell/*                      |   4   | 🟢 Baixo |    M    |  🟢 Baixa   | 🔄 Pendente  |
+| E1  | Consolidar api/ e routes/                  |   4   | 🟡 Médio |    L    |  🟢 Baixa   | ⏭️ De-priorizado  |
+| J1  | Extrair tools/shell/index.js               |   4   | 🟢 Baixo |    M    |  🟡 Média   | ✅ Concluído |
+| J2  | config/tools/ subpasta unificada           |   4   | 🟢 Baixo |    S    |  🟡 Média   | ✅ Concluído |
+| J3  | terminal-server.js entry point PM2         |   4   | 🟢 Baixo |   XS    |  🟢 Baixa   | ⏭️ Intencional — não mover |
+| J4  | core/constants.js canônico                 |   1   | 🟢 Baixo |    S    |  🟡 Média   | ✅ Concluído |
+| K1  | git_push, git_create_branch, git_log       |   5   | 🟢 Baixo |    M    |   🔴 Alta   | ⬜ Pendente |
+| K2  | patch_file — edição cirúrgica              |   5   | 🟡 Médio |    M    |  🟡 Média   | ⬜ Pendente |
+| K3  | get_workspace_info, set_session_context    |   5   | 🟢 Baixo |    S    |  🟡 Média   | ⬜ Pendente |
+| K4  | web_fetch com rate-limit e segurança       |   5   | 🟡 Médio |    L    |   🔴 Alta   | ⬜ Pendente |
+| K5  | Migrar todas as tools para buildTool       |   5   | 🟢 Baixo |    M    |  🟡 Média   | ⬜ Pendente |
+| K6  | tools/git/index.js consolidado             |   5   | 🟢 Baixo |    S    |  🟢 Baixa   | ⬜ Pendente |
+| K7  | customAgents config/agents.js              |   5   | 🟡 Médio |    L    |  🟡 Média   | ⬜ Pendente |
+| K8  | onUserInputRequest SDK em request_user_input| 5   | 🟢 Baixo |    S    |   🔴 Alta   | ⬜ Pendente |
 
 ---
 
@@ -944,4 +978,191 @@ Total: ~83 arquivos. Zero shims. Zero aliases mortos. Imports corretos.
 
 ---
 
-*Proposta elaborada em: 2026-03-15 · Para aprovação e faseamento*
+---
+
+## 16. Proposta K — Fase 5: Expansão e Consolidação de Tools
+
+**Contexto**: O sistema conta hoje com 35 custom tools distribuídas em 9 módulos. A LLM-B herda automaticamente _todas_ as built-in tools do Copilot CLI (incluindo `read_file`, `write_file`, `edit_file`, `grep`, `glob`, `bash`, `web_search` e outras via `--allow-all`). As custom tools são **adicionais** — não substituem as built-ins, a menos que `overridesBuiltInTool: true` seja declarado. A Fase 5 preenche lacunas identificadas na comparação entre as capacidades da LLM-A (GitHub Copilot) e da LLM-B (custom agent).
+
+### K1 — Novas tools Git (git_push, git_create_branch, git_log)
+
+**Localização**: `src/copilot/tools/git-tools.js` (adição de tools)
+
+**Motivação**: `git-tools.js` atual tem apenas `git_status`, `git_diff`, `git_changed_files`, `git_commit`. Faltam operações de branch e de push para workflows completos.
+
+```js
+// Novas tools propostas
+defineTool('git_push', 'Faz push do branch atual para o origin', ...)
+defineTool('git_create_branch', 'Cria e faz checkout de um novo branch', ...)
+defineTool('git_log', 'Retorna o log de commits recentes', ...)
+```
+
+**Risco**: Baixo — operações git com validações de segurança (sem force-push por padrão).
+**Esforço**: M
+
+---
+
+### K2 — Tool `patch_file` (edição cirúrgica por search-and-replace)
+
+**Localização**: `src/copilot/tools/file-tools.js` (nova tool)
+
+**Motivação**: O CLI tem `edit_file` built-in, mas a LLM-B necessita de uma custom tool para edições pontuais via `old_string` → `new_string` com contexto obrigatório (mesma semântica do replace_string_in_file do Copilot). Permite auditoria da ferramenta via hooks.
+
+```js
+defineTool('patch_file', 'Aplica uma substituição cirúrgica num arquivo', z.object({
+    path: z.string(),
+    old_string: z.string().describe('Texto exato a substituir (≥3 linhas de contexto)'),
+    new_string: z.string().describe('Texto de substituição'),
+}))
+```
+
+**Risco**: Médio — edição destrutiva; deve validar que `old_string` ocorre exatamente 1 vez.
+**Esforço**: M
+
+---
+
+### K3 — Tools de contexto: `get_workspace_info`, `set_session_context`
+
+**Localização**: `src/copilot/tools/session-tools.js` (novas tools)
+
+**Motivação**: `get_session_state` existe mas é orientada ao sistema. Faltam tools para:
+- `get_workspace_info`: retorna info do workspace (cwd, git root, branch, Node version, arquivos abertos)
+- `set_session_context`: permite à LLM-B armazenar contexto em memória de sessão para resposta subsequente
+
+**Risco**: Baixo — leitura e escrita em memória de sessão controlada.
+**Esforço**: S
+
+---
+
+### K4 — Tool `web_fetch` com rate-limit e política de segurança
+
+**Localização**: `src/copilot/tools/web-tools.js` (novo módulo)
+
+**Motivação**: A LLM-A tem `fetch_webpage`. A LLM-B supostamente herda `web_search` / `web_fetch` do CLI, mas sem controle explícito de rate-limit, sem SSRF protection, sem allow-list de domínios. Uma custom tool traz:
+- Validation de URL (bloquear `localhost`, IPs privados — anti-SSRF)
+- Rate-limiting (máx N requests/min)
+- Content-type filtering (apenas `text/*`)
+- Timeout configurável
+
+```js
+defineTool('web_fetch', 'Busca o conteúdo de uma URL pública', z.object({
+    url: z.string().url(),
+    maxBytes: z.number().int().max(512_000).optional(),
+}))
+```
+
+**Regras de segurança (OWASP A10 SSRF)**:
+- Bloquear URLs com host `localhost`, `127.*`, `10.*`, `172.16-31.*`, `192.168.*`, `::1`, `fd*`
+- Bloquear esquemas `file://`, `ftp://`, `data:`
+- Apenas GET; sem redirect para hosts internos
+
+**Risco**: Médio (SSRF se mal implementado — por isso é uma custom tool).
+**Esforço**: L
+
+---
+
+### K5 — Migrar todas as tools para usar `buildTool` (tool-factory.js)
+
+**Localização**: todos os `tools/*.js` e `tools/shell/index.js`
+
+**Motivação**: `tool-factory.js` existe desde a Fase AI com `buildTool` que encapsula `defineTool` com logging automático, `skipPermission` por padrão e padrão JSDoc. Nenhuma tool atual usa `buildTool`. Migrar traz:
+- Logging uniforme em cada invocação (`#core/logger`)
+- Possibilidade de togglear `skipPermission` por grupo (read-only vs. write)
+- Ponto central para métricas de uso
+
+**Abordagem**:
+1. Auditar `tool-factory.js` e completar sua implementação
+2. Migrar `file-tools.js` (leitura) → `skipPermission: true`
+3. Migrar `git-tools.js` (`git_status`, `git_diff`, `git_log`) → `skipPermission: true`
+4. Restantes: `skipPermission: false` (padrão seguro)
+
+**Risco**: Baixo — funcionalidade preservada, apenas refactor de como defineTool é chamado.
+**Esforço**: M
+
+---
+
+### K6 — Reorganizar `git-tools.js` → `tools/git/index.js`
+
+**Localização**: `src/copilot/tools/git-tools.js` → `src/copilot/tools/git/index.js`
+
+**Motivação**: Seguindo o padrão de `tools/shell/index.js` (Fase 4 J1), `git-tools.js` também se beneficia de uma subpasta dedicada com `policy.js` separado (configuração de paths permitidos, branches proibidos para force-push, etc.).
+
+```
+tools/
+├── git/
+│   ├── index.js     ← tools: git_status, git_diff, git_changed_files, git_commit, git_push, git_create_branch, git_log
+│   └── policy.js    ← ALLOWED_BRANCHES, MAX_COMMIT_MSG_LENGTH, etc.
+```
+
+**Risco**: Baixo — mesma mecânica da J1, ajuste de `import.meta.url` depth.
+**Esforço**: S
+
+---
+
+### K7 — Configurar `customAgents` especializados
+
+**Localização**: `src/copilot/lib/agents.js` + `src/copilot/lib/session.js`
+
+**Motivação**: O SDK suporta `customAgents` na `SessionConfig` para criar sub-agentes especializados com tool subsets. Hoje `lib/agents.js` existe mas não é integrado na criação de sessão default. Proposta:
+
+```js
+customAgents: [
+    {
+        name: 'researcher',
+        description: 'Agente de pesquisa somente-leitura',
+        tools: readOnlyToolNames,   // apenas read_file, search, git_status, web_fetch
+    },
+    {
+        name: 'implementer',
+        description: 'Agente de implementação com acesso escrita',
+        tools: allToolNames,
+    }
+]
+```
+
+**Risco**: Médio — requer testes de comportamento do SDK com customAgents.
+**Esforço**: L
+
+---
+
+### K8 — Integrar `onUserInputRequest` do SDK na tool `request_user_input`
+
+**Localização**: `src/copilot/lib/session.js` + `src/copilot/tools/hook-tools.js`
+
+**Motivação**: `request_user_input` atual usa JSON-RPC próprio (via `task-tools.js`). O SDK tem `onUserInputRequest` que habilita o built-in `ask_user`, criando interface padrão que o CLI já conhece. Integrar:
+
+```js
+// sessionConfig
+onUserInputRequest: async (prompt, options) => {
+    // delegate to the existing dialog bridge (terminal/dialog.js)
+    return await terminalDialog.request(prompt, options);
+}
+```
+
+Após isso, a LLM-B pode usar `ask_user` built-in OU a custom `request_user_input` — redundância controlada.
+
+**Risco**: Baixo — additive change, fallback para comportamento atual.
+**Esforço**: S
+
+---
+
+### Resumo Fase 5
+
+| ID  | Proposta                                | Prioridade |    Esforço |
+| --- | --------------------------------------- | :--------: | ---------: |
+| K1  | git_push, git_create_branch, git_log    |  🔴 Alta   |          M |
+| K2  | patch_file (search-and-replace)         |  🟡 Média  |          M |
+| K3  | get_workspace_info, set_session_context |  🟡 Média  |          S |
+| K4  | web_fetch (anti-SSRF)                   |  🔴 Alta   |          L |
+| K5  | Migrar tools para buildTool             |  🟡 Média  |          M |
+| K6  | tools/git/index.js reorganizado         |  🟢 Baixa  |          S |
+| K7  | customAgents especializados             |  🟡 Média  |          L |
+| K8  | onUserInputRequest SDK integration      |  🔴 Alta   |          S |
+
+**Ordem de execução sugerida**: K8 → K3 → K1 → K4 → K2 → K5 → K6 → K7
+
+**Critério de conclusão da Fase 5**: todos os K1-K8 implementados, `npm run test:unit` 0 falhas, `npm run lint` 0 erros, tools novas com ≥1 teste unitário cada.
+
+---
+
+*Proposta elaborada em: 2026-03-15 · Fase 5 adicionada em: 2026-03-27 · Para aprovação e faseamento*

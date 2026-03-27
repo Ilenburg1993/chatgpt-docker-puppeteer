@@ -10,13 +10,14 @@
 
 import { codeTools } from './code-tools.js';
 import { fileReadTools, fileTools, fileWriteTools } from './file-tools.js';
-import { gitTools } from './git-tools.js';
+import { gitTools } from './git/index.js';
 import { hookTools } from './hook-tools.js';
 import { hubTools } from './hub-tools.js';
 import { introspectionTools, registerForIntrospection, setTelemetryStore } from './introspection-tools.js';
 import { sessionTools } from './session-tools.js';
 import { shellTools } from './shell/index.js';
 import { taskTools } from './task-tools.js';
+import { webTools } from './web-tools.js';
 
 /**
  * Conjunto completo de Custom Tools disponíveis para o SDK Agent.
@@ -33,6 +34,7 @@ export const allTools = [
     ...introspectionTools,
     ...fileTools,
     ...shellTools,
+    ...webTools,
 ];
 
 export {
@@ -49,4 +51,5 @@ export {
     setTelemetryStore,
     shellTools,
     taskTools,
+    webTools,
 };
