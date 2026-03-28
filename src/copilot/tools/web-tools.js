@@ -53,6 +53,11 @@ function validateUrl(url) {
             return { safe: false, reason: `Endereço IP privado bloqueado: ${url.hostname}` };
         }
     }
+    // SEC-N05 (fix): bloquear IPv6 loopback e ULA (fd00::/8)
+    const h = url.hostname.toLowerCase();
+    if (h === '::1' || h === '0:0:0:0:0:0:0:1' || h.startsWith('fd') || h === 'fe80') {
+        return { safe: false, reason: `IPv6 privado/loopback bloqueado: ${url.hostname}` };
+    }
     return { safe: true };
 }
 
@@ -188,13 +193,17 @@ const webFetchTool = defineTool('web_fetch', {
                 chunks.push(value);
             }
 
-            const text = new TextDecoder().decode(
-                chunks.reduce((acc, c) => {
-                    const merged = new Uint8Array(acc.length + c.length);
-                    merged.set(acc);
-                    merged.set(c, acc.length);
+    const text = new TextDecoder().decode(
+                (() => {
+                    const total = chunks.reduce((s, c) => s + c.length, 0);
+                    const merged = new Uint8Array(total);
+                    let offset = 0;
+                    for (const c of chunks) {
+                        merged.set(c, offset);
+                        offset += c.length;
+                    }
                     return merged;
-                }, new Uint8Array(0)),
+                })(),
             );
 
             log('INFO', `[copilot/web_fetch] ${url} → ${response.status} (${text.length} chars)`);

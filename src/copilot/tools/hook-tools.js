@@ -20,7 +20,9 @@
 
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const execFileAsync = promisify(execFile);
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -70,7 +72,7 @@ const hookGetAuditTailTool = defineTool('hook_get_audit_tail', {
             return { entries: [], error: 'audit.jsonl não encontrado' };
         }
         try {
-            const raw = execFileSync('tail', ['-n', String(lines ?? 20), auditPath], {
+            const { stdout: raw } = await execFileAsync('tail', ['-n', String(lines ?? 20), auditPath], {
                 encoding: 'utf8',
                 timeout: 3000,
             });

@@ -84,6 +84,10 @@ const INJECT_RATE_WINDOW_MS = Number(process.env.LLM_B_INJECT_RATE_WINDOW_MS ?? 
  */
 function checkInjectRate(ip) {
     const now = Date.now();
+    // BUG-N03 (fix): purgar entradas expiradas para evitar memory leak em uptime longo
+    for (const [key, bucket] of _injectRateLimiter) {
+        if (now >= bucket.resetAt) _injectRateLimiter.delete(key);
+    }
     let bucket = _injectRateLimiter.get(ip);
     if (!bucket || now >= bucket.resetAt) {
         bucket = { count: 0, resetAt: now + INJECT_RATE_WINDOW_MS };
@@ -118,17 +122,27 @@ function sendJson(res, result) {
 
 /**
  * Lê o body de uma requisição HTTP e retorna como string.
+ * Rejeita payloads acima de MAX_BODY_BYTES (proteção contra DoS).
  *
  * @param {import('node:http').IncomingMessage} req
  * @returns {Promise<string>}
  */
 function readBody(req) {
-    return new Promise((resolve) => {
+    const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2 MB
+    return new Promise((resolve, reject) => {
         let data = '';
+        let bytes = 0;
         req.on('data', (chunk) => {
+            bytes += Buffer.byteLength(chunk);
+            if (bytes > MAX_BODY_BYTES) {
+                req.destroy();
+                reject(Object.assign(new Error('Payload too large'), { code: 'PAYLOAD_TOO_LARGE' }));
+                return;
+            }
             data += chunk;
         });
         req.on('end', () => resolve(data));
+        req.on('error', reject);
     });
 }
 
@@ -156,6 +170,8 @@ function tryParseJson(raw) {
 export function createInjectServer() {
     const server = http.createServer(async (req, res) => {
         const url = new URL(req.url ?? '/', `http://localhost:${INJECT_PORT}`);
+        try {
+
 
         // ── GET /health ───────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/health') {
@@ -429,6 +445,20 @@ export function createInjectServer() {
 
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+        } catch (/** @type {any} */ err) {
+            if (err?.code === 'PAYLOAD_TOO_LARGE') {
+                if (!res.headersSent) {
+                    res.writeHead(413, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: 'Payload too large (máx 2 MB)' }));
+                }
+            } else {
+                log('ERROR', `[TerminalServer] Erro não tratado: ${err?.message ?? err}`);
+                if (!res.headersSent) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: 'Internal server error' }));
+                }
+            }
+        }
     });
 
     server.listen(INJECT_PORT, '127.0.0.1', () => {

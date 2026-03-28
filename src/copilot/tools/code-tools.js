@@ -10,32 +10,35 @@
 
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
-import { execSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { z } from 'zod';
 import { withSkipPermission } from './tool-factory.js';
 
 const ROOT = new URL('../../..', import.meta.url).pathname;
+const execFileAsync = promisify(execFile);
 
 /**
- * Executa um comando com timeout e captura stdout+stderr.
+ * Executa um comando de shell via execFile de forma assíncrona (não bloqueia event loop).
  *
- * @param {string} cmd
+ * @param {string[]} argv — argv[0] é o executável, resto são args
  * @param {number} [timeoutMs]
- * @returns {{ stdout: string; exitCode: number; error?: string }}
+ * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
  */
-function safeExec(cmd, timeoutMs = 60000) {
+async function safeExec(argv, timeoutMs = 60_000) {
+    const [cmd, ...args] = argv;
     try {
-        const stdout = execSync(cmd, {
+        const { stdout } = await execFileAsync(cmd ?? 'echo', args, {
             cwd: ROOT,
             encoding: 'utf8',
             timeout: timeoutMs,
-            stdio: ['pipe', 'pipe', 'pipe'],
+            maxBuffer: 4 * 1024 * 1024,
         });
         return { stdout: stdout.slice(0, 4000), exitCode: 0 };
     } catch (/** @type {any} */ e) {
         return {
             stdout: (e.stdout ?? '').slice(0, 2000),
-            exitCode: e.status ?? 1,
+            exitCode: typeof e.code === 'number' ? e.code : (e.status ?? 1),
             error: (e.stderr ?? e.message ?? '').slice(0, 2000),
         };
     }
@@ -55,10 +58,12 @@ const lintCheckTool = defineTool('lint_check', {
         )
     ),
     handler: async (/** @type {{ fix?: boolean; path?: string }} */ { fix, path: filePath }) => {
-        const fixFlag = fix ? '--fix' : '';
         const target = filePath ?? '.';
         log('INFO', `[copilot/lint_check] Executando lint em '${target}'${fix ? ' com --fix' : ''}`);
-        const result = safeExec(`npm run lint ${fixFlag} -- ${target} 2>&1 | head -100`, 90000);
+        const eslintArgs = ['node_modules/.bin/eslint', '--max-warnings=0'];
+        if (fix) eslintArgs.push('--fix');
+        eslintArgs.push(target);
+        const result = await safeExec(eslintArgs, 90_000);
         return {
             success: result.exitCode === 0,
             output: result.stdout,
@@ -80,13 +85,20 @@ const runTestsTool = defineTool('run_tests', {
             .describe('Suíte de testes a executar'),
     }),
     handler: async (/** @type {{ suite?: string }} */ { suite }) => {
-        const script = suite === 'integration' ? 'test:integration' : suite === 'all' ? 'test:all' : 'test:fast';
+        /** @type {Record<string, string>} */
+        const scriptMap = {
+            integration: 'test:integration',
+            all: 'test:all',
+            unit: 'test:fast',
+            fast: 'test:fast',
+        };
+        const script = scriptMap[suite ?? 'fast'] ?? 'test:fast';
         log('INFO', `[copilot/run_tests] Executando npm run ${script}`);
-        const result = safeExec(`npm run ${script} 2>&1 | tail -40`, 120000);
+        const npmResult = await safeExec(['npm', 'run', script], 120_000);
         return {
-            success: result.exitCode === 0,
-            output: result.stdout,
-            error: result.error,
+            success: npmResult.exitCode === 0,
+            output: npmResult.stdout,
+            error: npmResult.error,
         };
     },
 });
@@ -99,7 +111,7 @@ const typecheckTool = defineTool('typecheck', {
     parameters: z.object({}),
     handler: async () => {
         log('INFO', '[copilot/typecheck] Executando typecheck:node');
-        const result = safeExec('npm run typecheck:node 2>&1 | head -80', 120000);
+        const result = await safeExec(['npm', 'run', 'typecheck:node'], 120_000);
         return {
             success: result.exitCode === 0,
             output: result.stdout,
