@@ -148,10 +148,10 @@ describe('ConversationStore.writeTurn / readTurns', () => {
         sessionId = store.createHubSession({ title: 'Sessão de turns' });
     });
 
-    it('registra turn_number sequencial', () => {
-        const t1 = store.writeTurn(sessionId, { role: 'llm_a', content: 'Pergunta 1' });
-        const t2 = store.writeTurn(sessionId, { role: 'llm_b', content: 'Resposta 1' });
-        const t3 = store.writeTurn(sessionId, { role: 'llm_a', content: 'Pergunta 2' });
+    it('registra turn_number sequencial', async () => {
+        const t1 = await store.writeTurn(sessionId, { role: 'llm_a', content: 'Pergunta 1' });
+        const t2 = await store.writeTurn(sessionId, { role: 'llm_b', content: 'Resposta 1' });
+        const t3 = await store.writeTurn(sessionId, { role: 'llm_a', content: 'Pergunta 2' });
 
         const turn1 = store.getTurn(t1);
         const turn2 = store.getTurn(t2);
@@ -187,9 +187,9 @@ describe('ConversationStore.writeTurn / readTurns', () => {
         assert.ok(turns.length <= 1);
     });
 
-    it('persiste conteúdo structured como JSON', () => {
+    it('persiste conteúdo structured como JSON', async () => {
         const structured = { responseType: 'diagnostic', output: 'ok' };
-        const tid = store.writeTurn(sessionId, {
+        const tid = await store.writeTurn(sessionId, {
             role: 'llm_b',
             content: 'raw content',
             structured,
@@ -204,12 +204,12 @@ describe('ConversationStore.writeTurn / readTurns', () => {
 // ─── countTurns ──────────────────────────────────────────────────────────────
 
 describe('ConversationStore.countTurns', () => {
-    it('conta corretamente os turns de uma sessão', () => {
+    it('conta corretamente os turns de uma sessão', async () => {
         const id = store.createHubSession({ title: 'Count test' });
         assert.equal(store.countTurns(id), 0, 'nova sessão deve ter 0 turns');
 
-        store.writeTurn(id, { role: 'llm_a', content: 'a' });
-        store.writeTurn(id, { role: 'llm_b', content: 'b' });
+        await store.writeTurn(id, { role: 'llm_a', content: 'a' });
+        await store.writeTurn(id, { role: 'llm_b', content: 'b' });
         assert.equal(store.countTurns(id), 2);
     });
 });
@@ -224,8 +224,8 @@ describe('ConversationStore mensagens do usuário', () => {
         sessionId = store.createHubSession({ title: 'User messages test' });
     });
 
-    it('injectUserMessage cria turn com user_read=0', () => {
-        const tid = store.injectUserMessage(sessionId, 'Mensagem do usuário 1');
+    it('injectUserMessage cria turn com user_read=0', async () => {
+        const tid = await store.injectUserMessage(sessionId, 'Mensagem do usuário 1');
         const turn = store.getTurn(tid);
 
         assert.equal(turn?.role, 'user');
@@ -233,15 +233,15 @@ describe('ConversationStore mensagens do usuário', () => {
         assert.equal(turn?.user_read, 0);
     });
 
-    it('writeTurn com role=llm_a cria user_read=1', () => {
-        const tid = store.writeTurn(sessionId, { role: 'llm_a', content: 'response' });
+    it('writeTurn com role=llm_a cria user_read=1', async () => {
+        const tid = await store.writeTurn(sessionId, { role: 'llm_a', content: 'response' });
         const turn = store.getTurn(tid);
         assert.equal(turn?.user_read, 1);
     });
 
-    it('getPendingUserMessages retorna apenas user_read=0', () => {
+    it('getPendingUserMessages retorna apenas user_read=0', async () => {
         // Injetar mais uma mensagem não lida
-        store.injectUserMessage(sessionId, 'Mensagem do usuário 2');
+        await store.injectUserMessage(sessionId, 'Mensagem do usuário 2');
 
         const pending = store.getPendingUserMessages(sessionId);
         assert.ok(pending.length >= 1, 'deve ter pelo menos 1 mensagem pendente');
@@ -255,16 +255,16 @@ describe('ConversationStore mensagens do usuário', () => {
         );
     });
 
-    it('markUserMessageRead altera user_read=1', () => {
-        const tid = store.injectUserMessage(sessionId, 'Para marcar como lida');
+    it('markUserMessageRead altera user_read=1', async () => {
+        const tid = await store.injectUserMessage(sessionId, 'Para marcar como lida');
         store.markUserMessageRead(tid);
         const turn = store.getTurn(tid);
         assert.equal(turn?.user_read, 1);
     });
 
-    it('markAllUserMessagesRead marca todas como lidas', () => {
-        store.injectUserMessage(sessionId, 'Não lida A');
-        store.injectUserMessage(sessionId, 'Não lida B');
+    it('markAllUserMessagesRead marca todas como lidas', async () => {
+        await store.injectUserMessage(sessionId, 'Não lida A');
+        await store.injectUserMessage(sessionId, 'Não lida B');
 
         const countBefore = store.getPendingUserMessages(sessionId).length;
         assert.ok(countBefore >= 2);

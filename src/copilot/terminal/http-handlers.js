@@ -30,7 +30,7 @@ import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { sendTurn } from './dialog.js';
-import { attachmentToEmbed, embedMultiple, getFileCacheStats, readFileContext } from './file-context.js';
+import { attachmentToEmbed, embedMultiple, getFileCacheStats, readFileContext, MAX_EMBED_BYTES } from './file-context.js';
 import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from './state.js';
 
 // ─── Tipos auxiliares ─────────────────────────────────────────────────────────
@@ -230,6 +230,7 @@ export async function handlePipeline(body) {
  *   Node.js e enviados via dialog loop (`ask_user`). Nenhum attachment cria nova PR via `session.send()`.
  *
  *   Tipos suportados:
+ *
  *   - `{ type: 'file', path: string }` — lê o arquivo e embute o conteúdo como bloco markdown.
  *   - `{ type: 'directory', path: string }` — lista e embute os arquivos do diretório.
  *   - `{ type: 'selection', text: string, filePath?: string }` — embute o texto selecionado como bloco markdown.
@@ -282,7 +283,18 @@ export async function handleInject(body) {
         const embedParts = await Promise.all(rawAttachments.map(attachmentToEmbed));
         const validParts = embedParts.filter(/** @type {(s: string | null) => s is string} */ (s) => s !== null);
         if (validParts.length > 0) {
-            enrichedMessage = validParts.join('\n\n') + '\n\n' + enrichedMessage;
+            // GAP-Q10 fix: limitar total de bytes embeddados ao mesmo MAX_EMBED_BYTES
+            let totalBytes = 0;
+            const limitedParts = [];
+            for (const part of validParts) {
+                const partBytes = Buffer.byteLength(part, 'utf8');
+                if (totalBytes + partBytes > MAX_EMBED_BYTES) break;
+                limitedParts.push(part);
+                totalBytes += partBytes;
+            }
+            if (limitedParts.length > 0) {
+                enrichedMessage = limitedParts.join('\n\n') + '\n\n' + enrichedMessage;
+            }
         }
     }
 

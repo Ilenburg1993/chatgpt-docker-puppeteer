@@ -330,16 +330,27 @@ export class LlmBridgeClient {
      * DONE: próximo READY). O histórico local é atualizado com o turno do usuário e a resposta da LLM-B.
      *
      * @param {string} message - Mensagem a enviar à LLM-B
-     * @param {{ timeout?: number }} [opts]
+     * @param {{ timeout?: number, onDelta?: (chunk: string) => void }} [opts]
      * @returns {Promise<string>} Resposta da LLM-B (conteúdo após REPLY: ou confirmação de DONE:)
      */
     async dialogTurn(message, opts = {}) {
-        const { timeout = 60_000 } = opts;
+        const { timeout = 60_000, onDelta } = opts;
         // ARCH-03 fix: registra turno do usuário no histórico local antes de enviar
         const sentAt = Date.now();
         this.#pushHistory({ role: 'user', content: message, timestamp: sentAt });
         this.#turnCount++;
-        const reply = await alwaysAliveAgent.sendDialogTurn(message, { timeout });
+
+        // BUG-H05 fix: propaga chunks de streaming para onDelta enquanto sendDialogTurn processa
+        const onDeltaTemp = onDelta
+            ? (/** @type {any} */ evt) => { if (evt.chunk) onDelta(evt.chunk); }
+            : null;
+        if (onDeltaTemp) alwaysAliveAgent.on('task.delta', onDeltaTemp);
+        let reply;
+        try {
+            reply = await alwaysAliveAgent.sendDialogTurn(message, { timeout });
+        } finally {
+            if (onDeltaTemp) alwaysAliveAgent.off('task.delta', onDeltaTemp);
+        }
         // Registra resposta da LLM-B no histórico local
         this.#pushHistory({ role: 'assistant', content: reply, timestamp: Date.now() });
         return reply;
@@ -348,8 +359,8 @@ export class LlmBridgeClient {
     /**
      * Encerra o modo de diálogo direto, sinalizando STOP_DIALOG para LLM-B.
      *
-     * DL-PERM: autorizado internamente para uso pelo watchdog e mecanismos de restart do sistema.
-     * Usa reason 'watchdog_restart' para que o handler em index.js saiba que deve reiniciar.
+     * DL-PERM: autorizado internamente para uso pelo watchdog e mecanismos de restart do sistema. Usa reason
+     * 'watchdog_restart' para que o handler em index.js saiba que deve reiniciar.
      *
      * @returns {Promise<void>}
      */
@@ -417,7 +428,10 @@ export class LlmBridgeClient {
     #pushHistory(turn) {
         this.#history.push(turn);
         if (this.#history.length > LlmBridgeClient.#MAX_HISTORY_SIZE) {
-            this.#history.splice(0, this.#history.length - LlmBridgeClient.#MAX_HISTORY_SIZE);
+            // ARCH-07 (fix): emitir warning explícito ao truncar histórico em vez de silenciar
+            const removed = this.#history.length - LlmBridgeClient.#MAX_HISTORY_SIZE;
+            this.#history.splice(0, removed);
+            log('WARN', `[LlmBridgeClient] Histórico truncado: ${removed} entrada(s) removida(s) (limite: ${LlmBridgeClient.#MAX_HISTORY_SIZE}).`);
         }
     }
 

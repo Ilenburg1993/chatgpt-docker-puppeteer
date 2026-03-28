@@ -176,6 +176,11 @@ export class PinnedFilesLoader extends EventEmitter {
                     const filePath = join(dir, filename);
                     this.#scheduleReload(filePath);
                 });
+                // GAP-Q02 fix: listener de erro para evitar crash se o diretório for removido
+                watcher.on('error', (/** @type {Error} */ err) => {
+                    log('WARN', `[PinnedFilesLoader] Watcher erro em ${dir}: ${err.message}`);
+                    this.#watchers.delete(dir);
+                });
                 this.#watchers.set(dir, watcher);
             } catch (err) {
                 log(

@@ -20,11 +20,12 @@ import { z } from 'zod';
 
 // ─── Importação lazy do hub ───────────────────────────────────────────────────
 
-/** @returns {Promise<import('../conversation-hub/hub.js').ConversationHub>} */
+// ARCH-03 fix: retorna null em modo standalone em vez de lançar exceção
+/** @returns {Promise<import('../conversation-hub/hub.js').ConversationHub | null>} */
 async function requireHub() {
     const { conversationHub } = await import('../conversation-hub/hub.js');
     if (!conversationHub.isReady) {
-        throw new Error('ConversationHub não está inicializado. Verifique COPILOT_SDK_ENABLED e o boot do servidor.');
+        return null;
     }
     return conversationHub;
 }
@@ -55,6 +56,7 @@ A sessão persiste no SQLite e sobrevive a restarts do servidor.`,
     handler: async (/** @type {{ title?: string; metadata?: Record<string, any> }} */ { title, metadata }) => {
         try {
             const hub = await requireHub();
+            if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
             const hubSessionId = hub.createSession({
                 ...(title !== undefined && { title }),
                 ...(metadata !== undefined && { metadata }),
@@ -130,6 +132,7 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
     ) => {
         try {
             const hub = await requireHub();
+            if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
 
             // UPG-04: validar timeoutMs para evitar valores absurdos de modelos alucinados
             const resolvedTimeout =
@@ -190,6 +193,7 @@ As mensagens são marcadas como lidas após esta chamada.`,
     handler: async (/** @type {{ hubSessionId: string }} */ { hubSessionId }) => {
         try {
             const hub = await requireHub();
+            if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
             const messages = hub.pollUserMessages(hubSessionId);
 
             return {
@@ -238,6 +242,7 @@ Retorna turns ordenados por número de turno (mais antigos primeiro).`,
     ) => {
         try {
             const hub = await requireHub();
+            if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
             const turns = hub.store.readTurns(hubSessionId, {
                 limit: limit ?? 20,
                 offset: offset ?? 0,
@@ -289,6 +294,7 @@ const hubListSessionsTool = defineTool('hub_list_sessions', {
     handler: async (/** @type {{ limit?: number; status?: 'active' | 'closed' | 'error' }} */ { limit, status }) => {
         try {
             const hub = await requireHub();
+            if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
             const sessions = hub.store.listHubSessions({
                 limit: limit ?? 10,
                 ...(status !== undefined && { status }),

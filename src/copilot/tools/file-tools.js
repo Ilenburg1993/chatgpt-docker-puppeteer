@@ -101,13 +101,19 @@ const BLOCKED_PATTERNS = [
 function validatePath(filePath) {
     const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(WORKSPACE_ROOT, filePath);
 
-    // SEC-04 (fix): resolver symlinks antes de verificar containment para evitar symlink traversal
+    // SEC-04 / BUG-H06 (fix): resolver symlinks antes de verificar containment.
+    // Quando o arquivo ainda não existe, resolve o diretório pai para evitar symlink traversal via parent.
     let realResolved = resolved;
     try {
         realResolved = realpathSync(resolved);
     } catch {
-        // Arquivo não existe ainda — usar o caminho resolvido sem symlinks
-        // (realpathSync falha para paths inexistentes; aceitamos o resolved normalmente)
+        // Arquivo não existe ainda — resolver o diretório pai (que deve existir)
+        try {
+            const parentDir = realpathSync(path.dirname(resolved));
+            realResolved = path.join(parentDir, path.basename(resolved));
+        } catch {
+            // Diretório pai também não existe; usar o caminho resolvido normalmente
+        }
     }
 
     const relativeToWorkspace = path.relative(WORKSPACE_ROOT, realResolved);
@@ -403,7 +409,14 @@ const searchInFilesTool = defineTool('search_in_files', {
                 timeout: 30000,
                 maxBuffer: MAX_SEARCH_OUTPUT * 4,
             });
-            const output = stdout.slice(0, MAX_SEARCH_OUTPUT);
+            // SEC-V05 fix: filtrar linhas que pareçam conter dados sensíveis (PEM, JWT, tokens)
+            const SENSITIVE_LINE_RE = /-----BEGIN [A-Z ]+-----|ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/;
+            const filteredOutput = stdout
+                .split('\n')
+                .filter((line) => !SENSITIVE_LINE_RE.test(line))
+                .join('\n')
+                .slice(0, MAX_SEARCH_OUTPUT);
+            const output = filteredOutput;
             return {
                 success: true,
                 pattern,

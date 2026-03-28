@@ -8,6 +8,9 @@
  * @module copilot/config/mcp-servers
  */
 
+import { log } from '#core/logger';
+import { DEFAULT_EXCLUDED_TOOLS } from './session-config.js';
+
 /**
  * @typedef {object} McpServerConfig
  * @property {string} type - Tipo de transporte ('stdio' | 'http' | 'sse')
@@ -86,6 +89,11 @@ const DEFAULT_ENABLED = (process.env.COPILOT_MCP_SERVERS ?? '').split(',').filte
  */
 export function buildMcpConfig(enabled = DEFAULT_ENABLED) {
     if (enabled.length === 0) return undefined;
+
+    // GAP-Q01 fix: avisar quando MCP server 'memory' está habilitado mas excluído via DEFAULT_EXCLUDED_TOOLS
+    if (enabled.includes('memory') && DEFAULT_EXCLUDED_TOOLS.includes('memory')) {
+        log('WARN', "[MCP] Servidor 'memory' está em COPILOT_MCP_SERVERS mas 'memory' está em DEFAULT_EXCLUDED_TOOLS — a ferramenta será carregada mas excluída da sessão.");
+    }
 
     /** @type {McpServersMap} */
     const result = {};

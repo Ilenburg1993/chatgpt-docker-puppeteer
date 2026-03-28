@@ -67,6 +67,8 @@ const INJECT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
 // GAP-01 (fix): limitar POST /inject a 10 requisições por IP por janela de 60s
 // (previne flood / DDOS acidental no endpoint de injeção)
 
+// SEC-V06: rate limiter em memória — contadores são zerados a cada restart do processo.
+// Em produção, use redis ou implemente na camada de reverse proxy (nginx/Caddy) para persistência.
 /** @type {Map<string, { count: number; resetAt: number }>} */
 const _injectRateLimiter = new Map();
 const INJECT_RATE_MAX = Number(process.env.LLM_B_INJECT_RATE_MAX ?? 10);

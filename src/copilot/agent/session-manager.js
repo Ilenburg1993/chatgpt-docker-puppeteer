@@ -13,7 +13,8 @@ import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
 import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools/state';
 import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { approveAll } from '@github/copilot-sdk';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { buildCustomAgentsConfig } from '../config/custom-agents.js';
 
@@ -38,7 +39,11 @@ function isHighRiskTool(toolName) {
 }
 
 /**
- * AH.3 — Registra uma chamada de ferramenta no JSONL de auditoria.
+ * AH.3 — Registra uma decisão de permissão de ferramenta no JSONL de auditoria.
+ *
+ * ARCH-01: este log registra decisões de permissão (approve/deny) de hooks, distinto do
+ * `channel/audit.js` que registra tool calls SDK (start/complete com durationMs). São
+ * complementares; ambos escrevem no mesmo arquivo `logs/tool-audit.jsonl`.
  *
  * @param {{ tool: string; decision: 'approved' | 'denied'; highRisk: boolean }} entry
  * @returns {void}
@@ -46,6 +51,13 @@ function isHighRiskTool(toolName) {
 function logToolAudit(entry) {
     try {
         mkdirSync(join(TOOL_AUDIT_LOG, '..'), { recursive: true });
+        // SEC-V03 fix: rotacionar arquivo ao atingir 10 MB
+        const ROTATE_LOG = TOOL_AUDIT_LOG + '.1';
+        const MAX_BYTES = 10 * 1024 * 1024;
+        if (existsSync(TOOL_AUDIT_LOG)) {
+            const size = statSync(TOOL_AUDIT_LOG).size;
+            if (size >= MAX_BYTES) renameSync(TOOL_AUDIT_LOG, ROTATE_LOG);
+        }
         const line = JSON.stringify({ ...entry, ts: new Date().toISOString() }) + '\n';
         appendFileSync(TOOL_AUDIT_LOG, line, 'utf8');
     } catch {
@@ -200,8 +212,8 @@ function buildAuditingPermissionHandler(baseHandler) {
             if (baseHandler) {
                 result = await baseHandler(request, invocation);
             } else {
-                // Default: aprovar tudo (comportamento do approveAll)
-                result = { kind: 'approved' };
+                // BUG-H07 (fix): usar SDK approveAll em vez de objeto manual { kind: 'approved' }
+                result = await approveAll(request, invocation);
             }
 
             const decision = result?.kind === 'approved' ? 'approved' : 'denied';

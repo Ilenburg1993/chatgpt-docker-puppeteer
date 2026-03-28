@@ -221,12 +221,18 @@ export class ConversationStore {
             // MELHORIA-09 (fix): agendar WAL checkpoint periódico para evitar acúmulo do WAL file
             // em sessões de longa duração. O checkpoint passivo (PASSIVE) não bloqueia readers.
             const db = this.#db;
+            let _checkpointErrors = 0;
             const checkpointTimer = setInterval(
                 () => {
                     try {
                         db.pragma('wal_checkpoint(PASSIVE)');
-                    } catch {
-                        // Ignorar erros de checkpoint — não é crítico
+                        _checkpointErrors = 0; // resetar contador em sucesso
+                    } catch (/** @type {any} */ err) {
+                        _checkpointErrors++;
+                        // GAP-Q07 fix: emitir warning após 10 erros consecutivos
+                        if (_checkpointErrors >= 10) {
+                            log('WARN', `[ConversationStore] WAL checkpoint falhou ${_checkpointErrors}x consecutivas: ${err.message}`);
+                        }
                     }
                 },
                 5 * 60 * 1000,
@@ -369,9 +375,9 @@ export class ConversationStore {
      *
      * @param {string} hubSessionId - ID da hub_session
      * @param {WriteTurnOpts} opts
-     * @returns {number} ID do turno inserido
+     * @returns {Promise<number>} ID do turno inserido
      */
-    writeTurn(hubSessionId, opts) {
+    async writeTurn(hubSessionId, opts) {
         const db = this.#getDb();
 
         // BUG-01 (fix): UNIQUE constraint (hub_session_id, turn_number) protege contra insert duplicado.
@@ -424,12 +430,10 @@ export class ConversationStore {
         });
 
         // Retry com backoff para conflicts de UNIQUE constraint (race condition WAL)
-        // NEW-04 (fix): sleep síncrono entre tentativas para dar ao WAL tempo de resolver o lock
-        // UPG-02 (melhoria): constante WRITE_MAX_RETRIES facilita tuning futuro
+        // BUG-C02 (fix): substituído Atomics.wait() (bloqueava event loop) por sleep async
         const WRITE_MAX_RETRIES = 3;
         const RETRY_DELAYS_MS = [5, 15, 40];
-        const sleepSync = (/** @type {number} */ ms) =>
-            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+        const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
         for (let attempt = 0; attempt < WRITE_MAX_RETRIES; attempt++) {
             try {
                 return doWrite();
@@ -440,7 +444,7 @@ export class ConversationStore {
                     'WARN',
                     `[ConversationStore] writeTurn conflict (attempt=${attempt + 1}), retrying in ${RETRY_DELAYS_MS[attempt] ?? 5}ms...`,
                 );
-                sleepSync(RETRY_DELAYS_MS[attempt] ?? 5);
+                await sleep(RETRY_DELAYS_MS[attempt] ?? 5);
             }
         }
         /* c8 ignore next */
@@ -519,7 +523,7 @@ export class ConversationStore {
      * @param {string} hubSessionId
      * @param {string} content
      * @param {{ metadata?: object }} [opts]
-     * @returns {number} ID do turno inserido
+     * @returns {Promise<number>} ID do turno inserido
      */
     injectUserMessage(hubSessionId, content, opts = {}) {
         return this.writeTurn(hubSessionId, {

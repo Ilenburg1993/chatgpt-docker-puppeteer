@@ -237,6 +237,12 @@ export class HubOrchestrator extends EventEmitter {
             throw new Error('[HubOrchestrator] Não inicializado. Chame init() primeiro.');
         }
 
+        // ARCH-02 fix: verificar que o agente está ativo antes de prosseguir
+        const agentCheck = this.#agent ?? alwaysAliveAgent;
+        if (agentCheck.status === 'stopped') {
+            throw new Error('[HubOrchestrator] AlwaysAliveAgent não está ativo');
+        }
+
         const useStructured = opts.useStructured !== false;
         const timeoutMs = opts.timeoutMs ?? 120_000;
         const modelLabel = opts.model ?? 'gpt-4.1';
@@ -246,16 +252,22 @@ export class HubOrchestrator extends EventEmitter {
 
         // Persistir turn de LLM-A
         const sdkSessionId = this.#getActiveSdkSessionId();
-        const llmATurnId = this.#store.writeTurn(hubSessionId, {
+        const llmATurnId = await this.#store.writeTurn(hubSessionId, {
             role: 'llm_a',
             content: messageContent,
             ...(sdkSessionId !== undefined && { sdkSessionId }),
             model: 'copilot-claude-sonnet-4.6',
             structured: typeof message === 'object' ? message : null,
         });
-
+        // BUG-C05 (fix): writeTurn retornando -1 indica falha irrecuperável
+        if (llmATurnId === -1) {
+            throw new Error('[HubOrchestrator] writeTurn falhou irrecuperavelmente para turno LLM-A');
+        }
         const llmATurn = this.#store.getTurn(llmATurnId);
-        const turnNumber = llmATurn?.turn_number ?? 0;
+        const turnNumber = llmATurn?.turn_number;
+        if (!turnNumber) {
+            throw new Error(`[HubOrchestrator] Turno ${llmATurnId} não encontrado após writeTurn`);
+        }
 
         this.emit('turn:sent', {
             hubSessionId,
@@ -326,7 +338,7 @@ export class HubOrchestrator extends EventEmitter {
             this.emit('error', { hubSessionId, message: errMsg, error: err });
 
             // Persistir o erro como turn de LLM-B para manter histórico completo
-            this.#store.writeTurn(hubSessionId, {
+            await this.#store.writeTurn(hubSessionId, {
                 role: 'llm_b',
                 content: `[ERRO] ${err.message}`,
                 ...(sdkSessionId !== undefined && { sdkSessionId }),
@@ -341,7 +353,7 @@ export class HubOrchestrator extends EventEmitter {
         const durationMs = Date.now() - startTime;
 
         // Persistir resposta de LLM-B
-        const llmBTurnId = this.#store.writeTurn(hubSessionId, {
+        const llmBTurnId = await this.#store.writeTurn(hubSessionId, {
             role: 'llm_b',
             content: llmBResponse,
             ...(sdkSessionId !== undefined && { sdkSessionId }),
@@ -384,10 +396,10 @@ export class HubOrchestrator extends EventEmitter {
      * @param {string} hubSessionId
      * @param {string} content
      * @param {{ metadata?: object }} [opts]
-     * @returns {number} ID do turno registrado
+     * @returns {Promise<number>} ID do turno registrado
      */
-    injectUserMessage(hubSessionId, content, opts = {}) {
-        const turnId = this.#store.injectUserMessage(hubSessionId, content, opts);
+    async injectUserMessage(hubSessionId, content, opts = {}) {
+        const turnId = await this.#store.injectUserMessage(hubSessionId, content, opts);
         this.emit('user:injected', { hubSessionId, turnId, content });
 
         // Notifica LLM-A que há uma mensagem pendente do usuário para processar.

@@ -12,7 +12,7 @@
 
 import { log } from '#core/logger';
 import { HubOrchestrator } from './orchestrator.js';
-import { mountCopilotNamespace } from './socket-ns.js';
+import { mountCopilotNamespace, unmountCopilotNamespace } from './socket-ns.js';
 import { conversationStore } from './store.js';
 
 // ─── ConversationHub ──────────────────────────────────────────────────────────
@@ -163,6 +163,8 @@ export class ConversationHub {
             this.#orchestrator.destroy();
             this.#orchestrator = null;
         }
+        // ARCH-06 fix: desmontar namespace Socket.io para evitar estado inconsistente após restart
+        unmountCopilotNamespace();
         this.#initialized = false;
         log('INFO', '[ConversationHub] Parado.');
     }

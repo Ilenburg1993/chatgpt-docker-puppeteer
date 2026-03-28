@@ -262,6 +262,23 @@ export function getCopilotNamespace() {
 }
 
 /**
+ * ARCH-06 fix: Desmonta o namespace /copilot, desconectando todos os clients e limpando a referência.
+ * Deve ser chamado em ConversationHub.stop() para evitar estado inconsistente após restart.
+ *
+ * @returns {void}
+ */
+export function unmountCopilotNamespace() {
+    if (!copilotNamespace) return;
+    try {
+        copilotNamespace.disconnectSockets(true);
+        copilotNamespace.removeAllListeners();
+    } catch {
+        // ignorar erros de desmonte
+    }
+    copilotNamespace = null;
+}
+
+/**
  * Emite um evento para todos os clients em uma hub_session específica.
  *
  * @param {string} hubSessionId

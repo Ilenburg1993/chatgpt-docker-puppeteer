@@ -615,6 +615,8 @@ export class AlwaysAliveAgent extends EventEmitter {
                 );
             }
             this.#queue.push(task);
+            // GAP-Q08 fix: invalidar cache de status ao enfileirar para manter queueSize atualizado
+            this.#statusSnapshotCache = null;
             log('INFO', `[AlwaysAlive] Tarefa enfileirada: ${task.id}`);
             this.emit('task.queued', { taskId: task.id, message });
             this.#processQueue();
@@ -1100,8 +1102,9 @@ qualquer tentativa de encerramento não autorizado.`;
             if (!hubSessionId) return;
             /** @type {any} */
             const sdkSession = session;
-            if (typeof sdkSession.getHistory !== 'function') return;
-            const messages = await sdkSession.getHistory();
+            // SDK-NC01 (fix): método correto é getMessages(), não getHistory()
+            if (typeof sdkSession.getMessages !== 'function') return;
+            const messages = await sdkSession.getMessages();
             if (!Array.isArray(messages) || messages.length === 0) return;
             const { synced, skipped } = conversationStore.syncFromSdkHistory(hubSessionId, session.sessionId, messages);
             if (synced > 0) {
@@ -1187,6 +1190,8 @@ qualquer tentativa de encerramento não autorizado.`;
 
             try {
                 const mcpTools = await buildMcpTools();
+                // BUG-C03 (fix): resetar registry antes de bootstrapTools para evitar duplicação de tools
+                this.#toolsRegistry = createRegistry();
                 const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
                 const { session, isResumed } = await initOrResumeSession(this.#client, {
                     model: this.#model,

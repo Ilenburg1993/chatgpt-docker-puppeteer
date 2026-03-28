@@ -297,6 +297,11 @@ const DEFAULT_SDK_AGENTS = (process.env.COPILOT_CUSTOM_AGENTS ?? 'task,explore,d
     .split(',')
     .filter(Boolean);
 
+// GAP-Q03 fix: COPILOT_DISABLED_AGENTS permite desabilitar sub-agentes sem remover de COPILOT_CUSTOM_AGENTS
+const DISABLED_AGENTS = new Set(
+    (process.env.COPILOT_DISABLED_AGENTS ?? '').split(',').filter(Boolean),
+);
+
 /**
  * Constrói o array `customAgents` para injetar em `SessionConfig.customAgents`.
  *
@@ -305,7 +310,7 @@ const DEFAULT_SDK_AGENTS = (process.env.COPILOT_CUSTOM_AGENTS ?? 'task,explore,d
  */
 export function buildCustomAgentsConfig(enabled = DEFAULT_SDK_AGENTS) {
     if (enabled.length === 0) return undefined;
-    const agents = SDK_AGENTS.filter((a) => enabled.includes(a.name));
+    const agents = SDK_AGENTS.filter((a) => enabled.includes(a.name) && !DISABLED_AGENTS.has(a.name));
     return agents.length > 0 ? agents : undefined;
 }
 

@@ -308,6 +308,10 @@ const webSearchTool = defineTool('web_search', {
                 });
             }
 
+            // GAP-Q04 fix: avisar quando DDG retorna 0 resultados (possível bloqueio ou query sem match)
+            if (results.length === 0) {
+                log('WARN', `[copilot/web_search] query="${query}" retornou 0 resultados — DDG pode estar bloqueando ou query sem correspondência.`);
+            }
             log('INFO', `[copilot/web_search] query="${query}" → ${results.length} resultados`);
             return { success: true, query, results };
         } catch (/** @type {any} */ e) {
@@ -321,4 +325,5 @@ const webSearchTool = defineTool('web_search', {
 /**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-export const webTools = [webFetchTool, webSearchTool];
+// SEC-V01 fix: webSearchTool desabilitado por padrão — ativar via WEB_SEARCH_ENABLED=true
+export const webTools = [webFetchTool, ...(process.env['WEB_SEARCH_ENABLED'] === 'true' ? [webSearchTool] : [])];

@@ -129,14 +129,14 @@ describe('HubOrchestrator.closeSession', () => {
 // ─── injectUserMessage ────────────────────────────────────────────────────────
 
 describe('HubOrchestrator.injectUserMessage', () => {
-    it('retorna turnId numérico', () => {
+    it('retorna turnId numérico', async () => {
         const sessionId = orchestrator.createSession();
-        const tid = orchestrator.injectUserMessage(sessionId, 'Olá, hub!');
+        const tid = await orchestrator.injectUserMessage(sessionId, 'Olá, hub!');
         assert.equal(typeof tid, 'number');
         assert.ok(tid > 0);
     });
 
-    it('emite evento user:injected', () => {
+    it('emite evento user:injected', async () => {
         const sessionId = orchestrator.createSession();
 
         /** @type {any} */
@@ -145,14 +145,14 @@ describe('HubOrchestrator.injectUserMessage', () => {
             emitted = d;
         });
 
-        orchestrator.injectUserMessage(sessionId, 'Teste evento inject');
+        await orchestrator.injectUserMessage(sessionId, 'Teste evento inject');
         assert.ok(emitted !== null, 'evento user:injected deve ser emitido');
         assert.equal(emitted?.content, 'Teste evento inject');
     });
 
-    it('persiste turn com role=user e user_read=0', () => {
+    it('persiste turn com role=user e user_read=0', async () => {
         const sessionId = orchestrator.createSession();
-        const tid = orchestrator.injectUserMessage(sessionId, 'Mensagem user');
+        const tid = await orchestrator.injectUserMessage(sessionId, 'Mensagem user');
 
         const turn = store.getTurn(tid);
         assert.equal(turn?.role, 'user');
@@ -323,7 +323,7 @@ describe('HubOrchestrator.sendToLlmB serialização', () => {
         await new Promise((r) => setTimeout(r, 5));
 
         // Usuário injeta mensagem enquanto turn está em andamento
-        orch3.injectUserMessage(sid3, 'Mensagem urgente do usuário');
+        await orch3.injectUserMessage(sid3, 'Mensagem urgente do usuário');
 
         // Deve ter emitido turn:user_pending
         assert.equal(pendingEvents.length, 1, 'deve emitir turn:user_pending');
