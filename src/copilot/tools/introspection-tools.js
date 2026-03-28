@@ -230,6 +230,7 @@ const reportIntentTool = defineTool('report_intent', {
         'Registra a intenção do agente antes de executar uma ação sensível (ex: deletar arquivo, fazer push, ' +
         'executar comando destrutivo). Use ANTES de chamar uma tool que modifique estado externo irreversível. ' +
         'Não executa nenhuma ação — apenas registra e retorna confirmação de auditoria.',
+    overridesBuiltInTool: true,
     parameters:
         /** @type {import('@github/copilot-sdk').ZodSchema<{ intent: string; tool: string; risk?: string }>} */ (
             /** @type {unknown} */ (
