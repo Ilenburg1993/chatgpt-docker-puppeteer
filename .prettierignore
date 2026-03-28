@@ -63,3 +63,6 @@ DOCUMENTAÇÃO/PLANOS/LEGADO_PLANO/
 # Hooks state files — gerados automaticamente em runtime, não formatar
 .github/hooks/state/
 .github/hooks/logs/
+
+# Arquivos com JSDoc multi-ponto que causam loop de idempotência no prettier
+src/shared/page_stability/stabilizer.js
