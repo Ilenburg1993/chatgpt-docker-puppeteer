@@ -268,8 +268,6 @@ export function getSummary(store) {
     for (const r of store.toolCalls) {
         if (!durationsByTool[r.toolName]) durationsByTool[r.toolName] = [];
         const toolDurations = durationsByTool[r.toolName];
-        if (toolDurations) toolDurations
-        if (toolDurations) toolDurations
         if (toolDurations) toolDurations.push(r.durationMs);
     }
     /** @type {Record<string, number>} */
