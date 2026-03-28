@@ -349,10 +349,10 @@ export function createInjectServer() {
             // ── POST /pipeline ────────────────────────────────────────────────
             if (req.method === 'POST' && url.pathname === '/pipeline') {
                 const raw = await readBody(req);
-                const parsed =
-                    /** @type {{ steps?: { prompt: string; waitMs?: number; from?: string }[]; from?: string } | null} */ (
-                        tryParseJson(raw)
-                    );
+                const parsed = /** @type {{
+    steps?: { prompt: string; waitMs?: number; from?: string }[];
+    from?: string;
+} | null} */ (tryParseJson(raw));
                 if (!parsed) {
                     sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
                     return;

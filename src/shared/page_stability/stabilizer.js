@@ -136,7 +136,7 @@ async function getPageLoadStatus(
         try {
             const busy = await page.evaluate((/** @type {any} */ config) => {
                 // Returns true when the page still appears "busy" (spinner OR recent network).
-                /** @param {Document | ShadowRoot} [root=document] . . . Default is `document` */
+                /** @param {Document | ShadowRoot} [root=document] . . . . Default is `document` */
                 const checkSpinnersDeep = (root = document) => {
                     const selector =
                         '[role="progressbar"], .spinner, .loading, svg.animate-spin, [aria-busy="true"], [data-loading="true"]';
