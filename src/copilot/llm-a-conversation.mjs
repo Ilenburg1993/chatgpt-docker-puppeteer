@@ -16,7 +16,7 @@
  */
 
 import { alwaysAliveAgent } from './agent/always-alive.js';
-import { LlmBridgeClient } from './bridges/llm-bridge-client.js';
+import { LlmBridgeClient } from './channel/client.js';
 
 // ─── Helpers de display ────────────────────────────────────────────────────
 

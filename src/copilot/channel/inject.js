@@ -41,8 +41,8 @@ const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
  * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
  * @property {number} [retries] - Tentativas automáticas em caso de 409 LLM_B_BUSY (default: 3; 0 = sem retry)
- * @property {number} [retryDelayMs] - Delay base entre tentativas em ms; multiplicado pelo número da tentativa
- *   (backoff linear, default: 1500)
+ * @property {number} [retryDelayMs] - Delay base entre tentativas em ms; multiplicado pelo número da tentativa (backoff
+ *   linear, default: 1500)
  */
 
 /**

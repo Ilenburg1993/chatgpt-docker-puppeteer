@@ -127,10 +127,7 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
             println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
             try {
                 const readyPromise = new Promise((resolve, reject) => {
-                    const timeout = setTimeout(
-                        () => reject(new Error('Timeout aguardando restart')),
-                        30_000,
-                    );
+                    const timeout = setTimeout(() => reject(new Error('Timeout aguardando restart')), 30_000);
                     alwaysAliveAgent.once('dialog.ready', () => {
                         clearTimeout(timeout);
                         resolve(undefined);

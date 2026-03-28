@@ -14,7 +14,16 @@ import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools/state';
 import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
 import { approveAll } from '@github/copilot-sdk';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+    appendFileSync,
+    existsSync,
+    mkdirSync,
+    readFileSync,
+    renameSync,
+    rmSync,
+    statSync,
+    writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { buildCustomAgentsConfig } from '../config/custom-agents.js';
 
@@ -41,9 +50,9 @@ function isHighRiskTool(toolName) {
 /**
  * AH.3 — Registra uma decisão de permissão de ferramenta no JSONL de auditoria.
  *
- * ARCH-01: este log registra decisões de permissão (approve/deny) de hooks, distinto do
- * `channel/audit.js` que registra tool calls SDK (start/complete com durationMs). São
- * complementares; ambos escrevem no mesmo arquivo `logs/tool-audit.jsonl`.
+ * ARCH-01: este log registra decisões de permissão (approve/deny) de hooks, distinto do `channel/audit.js` que registra
+ * tool calls SDK (start/complete com durationMs). São complementares; ambos escrevem no mesmo arquivo
+ * `logs/tool-audit.jsonl`.
  *
  * @param {{ tool: string; decision: 'approved' | 'denied'; highRisk: boolean }} entry
  * @returns {void}

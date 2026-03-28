@@ -1,8 +1,8 @@
 # Auditoria: Canal Terminal LLM-B — Serialização, Bypass e Retry
 
-**Data**: 2026-03-25  
-**Escopo**: `src/copilot/terminal/dialog.js`, `src/copilot/terminal/http-handlers.js`, `src/copilot/channel/inject.js`  
-**Status**: ✅ Implementado e testado (766/766 testes passando)  
+**Data**: 2026-03-25
+**Escopo**: `src/copilot/terminal/dialog.js`, `src/copilot/terminal/http-handlers.js`, `src/copilot/channel/inject.js`
+**Status**: ✅ Implementado e testado (766/766 testes passando)
 **Commit anterior**: `d96a01a9` (CONC-01/02/03)
 
 ---
@@ -30,8 +30,8 @@ injectToLlmB()          → POST /inject (porta 3009)
 
 ### TERM-01 — `sendTurn` rejeitava silenciosamente quando `_busy = true`
 
-**Arquivo**: `src/copilot/terminal/dialog.js`  
-**Severidade**: Alta — mensagens de LLM-A e do usuário eram descartadas sem aviso  
+**Arquivo**: `src/copilot/terminal/dialog.js`
+**Severidade**: Alta — mensagens de LLM-A e do usuário eram descartadas sem aviso
 
 **Comportamento anterior**:
 ```js
@@ -73,8 +73,8 @@ export function sendTurn(message, actor = 'user') {
 
 ### TERM-02 — `handleInject` com `nativeAttachments` bypassava `_busy`
 
-**Arquivo**: `src/copilot/terminal/http-handlers.js`  
-**Severidade**: Alta — possível execução paralela de turnos, violando o invariante de 1 turno ativo  
+**Arquivo**: `src/copilot/terminal/http-handlers.js`
+**Severidade**: Alta — possível execução paralela de turnos, violando o invariante de 1 turno ativo
 
 **Comportamento anterior**:
 ```js
@@ -110,8 +110,8 @@ if (nativeAttachments.length > 0) {
 
 ### GAP-4 — Clientes SSE não recebiam evento `busy` ao iniciar/encerrar turnos
 
-**Arquivo**: `src/copilot/terminal/dialog.js` → `_executeTurn()`  
-**Severidade**: Média — ferramentas e dashboards SSE não conseguiam observar estado de processamento  
+**Arquivo**: `src/copilot/terminal/dialog.js` → `_executeTurn()`
+**Severidade**: Média — ferramentas e dashboards SSE não conseguiam observar estado de processamento
 
 **Comportamento anterior**: `stateEmitter.emit('busy:changed')` era emitido por `setBusy()`, mas
 nenhum evento SSE era transmitido para clientes conectados via `GET /events`.
@@ -136,8 +136,8 @@ Clientes SSE agora recebem eventos `busy` com payload `{ busy: boolean, actor?: 
 
 ### INJECT-01 — `injectToLlmB` não fazia retry em 409 (LLM_B_BUSY)
 
-**Arquivo**: `src/copilot/channel/inject.js`  
-**Severidade**: Média — LLM-A precisava implementar retry manualmente, ou perdia a mensagem  
+**Arquivo**: `src/copilot/channel/inject.js`
+**Severidade**: Média — LLM-A precisava implementar retry manualmente, ou perdia a mensagem
 
 **Comportamento anterior**: `injectToLlmB()` lançava `BridgeError('LLM_B_BUSY')` imediatamente
 na primeira resposta 409 recebida do terminal.
@@ -174,13 +174,13 @@ os defaults). Total de espera máxima antes de desistir: ~9s.
 
 ## Impacto das Mudanças
 
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| Usuário digita enquanto LLM-B processa | Mensagem descartada com `null` | Mensagem enfileirada, enviada quando LLM-B liberar |
-| LLM-A injeta enquanto LLM-B processa | 409 imediato (sem retry) | Retry automático em até ~9s |
-| Pipeline com N steps e LLM-B busy | Falha no step com `sendTurn → null` | Steps aguardam na fila |
-| Attachment nativo (file) com LLM-B busy | Execução paralela (race condition) | 409 retornado; retry em `injectToLlmB` |
-| Clientes SSE monitorando estado | Sem notificação de início/fim de turno | Evento `busy` emitido em toda transição |
+| Cenário                                 | Antes                                  | Depois                                             |
+| --------------------------------------- | -------------------------------------- | -------------------------------------------------- |
+| Usuário digita enquanto LLM-B processa  | Mensagem descartada com `null`         | Mensagem enfileirada, enviada quando LLM-B liberar |
+| LLM-A injeta enquanto LLM-B processa    | 409 imediato (sem retry)               | Retry automático em até ~9s                        |
+| Pipeline com N steps e LLM-B busy       | Falha no step com `sendTurn → null`    | Steps aguardam na fila                             |
+| Attachment nativo (file) com LLM-B busy | Execução paralela (race condition)     | 409 retornado; retry em `injectToLlmB`             |
+| Clientes SSE monitorando estado         | Sem notificação de início/fim de turno | Evento `busy` emitido em toda transição            |
 
 ---
 
@@ -212,10 +212,10 @@ os defaults). Total de espera máxima antes de desistir: ~9s.
 
 ## Arquivos Modificados
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/copilot/terminal/dialog.js` | TERM-01: serialização via Promise-chain; GAP-4: broadcastSse |
-| `src/copilot/terminal/http-handlers.js` | TERM-02: getBusy/setBusy no path nativeAttachments |
-| `src/copilot/channel/inject.js` | INJECT-01: retry automático com backoff |
-| `tests/unit/copilot/test_terminal_turn_serialization.spec.js` | Novos testes (14) |
-| `tests/unit/copilot/test_inject_retry.spec.js` | Novos testes (10) |
+| Arquivo                                                       | Mudança                                                      |
+| ------------------------------------------------------------- | ------------------------------------------------------------ |
+| `src/copilot/terminal/dialog.js`                              | TERM-01: serialização via Promise-chain; GAP-4: broadcastSse |
+| `src/copilot/terminal/http-handlers.js`                       | TERM-02: getBusy/setBusy no path nativeAttachments           |
+| `src/copilot/channel/inject.js`                               | INJECT-01: retry automático com backoff                      |
+| `tests/unit/copilot/test_terminal_turn_serialization.spec.js` | Novos testes (14)                                            |
+| `tests/unit/copilot/test_inject_retry.spec.js`                | Novos testes (10)                                            |

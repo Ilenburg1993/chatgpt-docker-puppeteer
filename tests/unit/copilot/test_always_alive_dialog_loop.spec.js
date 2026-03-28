@@ -251,21 +251,18 @@ describe('always-alive › dialog loop: DL-PERM hardening', async () => {
     it('DL-PERM-05: stopDialogLoop() aceita campo reason', () => {
         // reason: 'watchdog_restart' | 'authorized_stop' — distingue restart automático de encerramento definitivo
         assert.ok(
-            sourceCode.includes("'watchdog_restart'") || sourceCode.includes("watchdog_restart"),
+            sourceCode.includes("'watchdog_restart'") || sourceCode.includes('watchdog_restart'),
             "stopDialogLoop deve suportar reason: 'watchdog_restart'",
         );
         assert.ok(
-            sourceCode.includes("'authorized_stop'") || sourceCode.includes("authorized_stop"),
+            sourceCode.includes("'authorized_stop'") || sourceCode.includes('authorized_stop'),
             "stopDialogLoop deve suportar reason: 'authorized_stop'",
         );
     });
 
     it('DL-PERM-05: stopDialogLoop() emite dialog.stopped com campo reason', () => {
         // O evento emitido deve incluir { reason, authorized: true }
-        assert.ok(
-            sourceCode.includes("emit('dialog.stopped'"),
-            "stopDialogLoop deve emitir 'dialog.stopped'",
-        );
+        assert.ok(sourceCode.includes("emit('dialog.stopped'"), "stopDialogLoop deve emitir 'dialog.stopped'");
         // Verificar que reason está no objeto emitido — o emit deve incluir { reason, authorized: true }
         assert.ok(
             sourceCode.includes('{ reason, authorized: true }') ||

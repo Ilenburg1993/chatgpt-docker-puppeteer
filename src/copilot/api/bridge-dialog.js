@@ -93,21 +93,18 @@ export function registerDialogRoutes(bridge, agent) {
     /**
      * Encerra o Dialog Loop, exigindo autorização explícita do usuário (DL-PERM).
      *
-     * Body: `{ force: boolean }` — deve ser `true` para realmente encerrar o loop.
-     * Sem `force: true`, retorna 403 com explicação da política de dialog loop permanente.
+     * Body: `{ force: boolean }` — deve ser `true` para realmente encerrar o loop. Sem `force: true`, retorna 403 com
+     * explicação da política de dialog loop permanente.
      *
      * Returns: { ok: true, message: string }
      */
     bridge.post('/dialog/stop', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const { force } = req.body ?? {};
         if (!force) {
-            return res
-                .status(403)
-                .json({
-                    ok: false,
-                    error:
-                        'Dialog loop é permanente (DL-PERM). Use { force: true } apenas com autorização explícita do usuário.',
-                });
+            return res.status(403).json({
+                ok: false,
+                error: 'Dialog loop é permanente (DL-PERM). Use { force: true } apenas com autorização explícita do usuário.',
+            });
         }
         try {
             await agent.stopDialogLoop({ authorized: true });

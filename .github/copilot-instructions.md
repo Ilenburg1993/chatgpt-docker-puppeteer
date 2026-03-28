@@ -115,3 +115,11 @@ arquitetura orientada a eventos e foco em confiabilidade operacional.
 - Bugs e auditorias: `DOCUMENTAÇÃO/BUGS/` e `DOCUMENTAÇÃO/AUDITORIAS/`
 - Operações: `DOCUMENTAÇÃO/OPERACOES/`
 - Hub .github: `.github/README.md`
+
+## Terminal LLM-B — Regra de inicialização
+
+> **OBRIGATÓRIO**: O terminal LLM-B **deve** ser iniciado via `run_task("shell: terminal:llm-b")`
+> (Task do VS Code), não via `run_in_terminal` com `isBackground=true`. Rodar em background oculto
+> priva o usuário do painel interativo visível no VS Code.
+>
+> Protocolo completo: skill `llm-b-comms` → `.github/skills/llm-b-comms/SKILL.md`

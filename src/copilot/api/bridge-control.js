@@ -48,7 +48,10 @@ import { conversationStore } from '../conversation-hub/index.js';
  *     answerPendingQuestion: (answer: string) => boolean;
  *     startDialogLoop: (bootPrompt?: string) => Promise<void>;
  *     sendDialogTurn: (text: string, opts?: { timeout?: number }) => Promise<string>;
- *     stopDialogLoop: (opts?: { authorized?: boolean; reason?: 'watchdog_restart' | 'authorized_stop' }) => Promise<void>;
+ *     stopDialogLoop: (opts?: {
+ *         authorized?: boolean;
+ *         reason?: 'watchdog_restart' | 'authorized_stop';
+ *     }) => Promise<void>;
  *     on: (event: string, listener: (...args: any[]) => void) => any;
  *     off: (event: string, listener: (...args: any[]) => void) => any;
  *     listenerDiagnostics: () => Record<string, number>;
@@ -106,7 +109,7 @@ export function registerControlRoutes(bridge, agent) {
             queueSize: snap.queueSize,
             starvationAlert: snap.starvationAlert,
             uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
-            listenerCounts: agent.listenerDiagnostics(),
+            // SEC-V04 (fix): listenerCounts removido da resposta HTTP — expunha topologia interna de eventos
             channelVersion: CHANNEL_VERSION,
             hubStore,
         });

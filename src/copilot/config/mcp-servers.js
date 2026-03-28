@@ -92,7 +92,10 @@ export function buildMcpConfig(enabled = DEFAULT_ENABLED) {
 
     // GAP-Q01 fix: avisar quando MCP server 'memory' está habilitado mas excluído via DEFAULT_EXCLUDED_TOOLS
     if (enabled.includes('memory') && DEFAULT_EXCLUDED_TOOLS.includes('memory')) {
-        log('WARN', "[MCP] Servidor 'memory' está em COPILOT_MCP_SERVERS mas 'memory' está em DEFAULT_EXCLUDED_TOOLS — a ferramenta será carregada mas excluída da sessão.");
+        log(
+            'WARN',
+            "[MCP] Servidor 'memory' está em COPILOT_MCP_SERVERS mas 'memory' está em DEFAULT_EXCLUDED_TOOLS — a ferramenta será carregada mas excluída da sessão.",
+        );
     }
 
     /** @type {McpServersMap} */

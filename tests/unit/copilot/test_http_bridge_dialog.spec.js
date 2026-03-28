@@ -92,7 +92,7 @@ describe('http-bridge › dialog: análise estrutural', async () => {
         // DL-PERM: stopDialogLoop deve ser chamado com { authorized: true } para respeitar política zero-PR
         assert.ok(
             sourceCode.includes('stopDialogLoop({ authorized: true })') ||
-                sourceCode.includes("stopDialogLoop({ authorized: true })"),
+                sourceCode.includes('stopDialogLoop({ authorized: true })'),
             '/dialog/stop deve chamar stopDialogLoop({ authorized: true }) (DL-PERM)',
         );
     });

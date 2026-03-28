@@ -310,7 +310,10 @@ const webSearchTool = defineTool('web_search', {
 
             // GAP-Q04 fix: avisar quando DDG retorna 0 resultados (possível bloqueio ou query sem match)
             if (results.length === 0) {
-                log('WARN', `[copilot/web_search] query="${query}" retornou 0 resultados — DDG pode estar bloqueando ou query sem correspondência.`);
+                log(
+                    'WARN',
+                    `[copilot/web_search] query="${query}" retornou 0 resultados — DDG pode estar bloqueando ou query sem correspondência.`,
+                );
             }
             log('INFO', `[copilot/web_search] query="${query}" → ${results.length} resultados`);
             return { success: true, query, results };

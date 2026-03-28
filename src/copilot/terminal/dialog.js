@@ -88,8 +88,8 @@ const PLAN_PREFIX =
  * Boot prompt padrão enviado à LLM-B ao iniciar o dialog loop. Pode ser sobrescrito pela variável de ambiente
  * `LLM_B_BOOT_PROMPT`.
  *
- * DL-PERM-03: não há instrução de encerramento (STOP_DIALOG) — o loop é eterno por design.
- * Se o modelo emitir STOPPED por iniciativa própria, o sistema reinicia automaticamente.
+ * DL-PERM-03: não há instrução de encerramento (STOP_DIALOG) — o loop é eterno por design. Se o modelo emitir STOPPED
+ * por iniciativa própria, o sistema reinicia automaticamente.
  */
 const DEFAULT_BOOT_PROMPT = `Você é a LLM-B — assistente técnico interno do projeto chatgpt-docker-puppeteer.
 
@@ -228,9 +228,9 @@ export function broadcastSse(event, data) {
 /**
  * Promise em voo para proteger contra chamadas concorrentes a `ensureDialogLoop`.
  *
- * DL-PERM-02: se dois eventos (ex: `dialog.stalled` + `dialog.stopped`) dispararem
- * `ensureDialogLoop()` ao mesmo tempo, apenas o primeiro inicia o loop — os demais aguardam
- * a conclusão do mesmo boot, evitando dois `startDialogMode()` simultâneos.
+ * DL-PERM-02: se dois eventos (ex: `dialog.stalled` + `dialog.stopped`) dispararem `ensureDialogLoop()` ao mesmo tempo,
+ * apenas o primeiro inicia o loop — os demais aguardam a conclusão do mesmo boot, evitando dois `startDialogMode()`
+ * simultâneos.
  *
  * @type {Promise<void> | null}
  */
@@ -395,11 +395,11 @@ async function _executeTurn(message, actor) {
             try {
                 /** @type {'user' | 'llm_a'} */
                 const senderRole = actor === 'llm-a' ? 'llm_a' : 'user';
-                const msgTurnId = conversationHub.store.writeTurn(_hubSessionId, {
+                const msgTurnId = await conversationHub.store.writeTurn(_hubSessionId, {
                     role: senderRole,
                     content: message,
                 });
-                const replyTurnId = conversationHub.store.writeTurn(_hubSessionId, {
+                const replyTurnId = await conversationHub.store.writeTurn(_hubSessionId, {
                     role: 'llm_b',
                     content: reply,
                     durationMs,

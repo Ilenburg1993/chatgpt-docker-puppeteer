@@ -1,11 +1,11 @@
 ---
 name: llm-b-comms
 description: >-
-  Protocolo oficial de comunicação de LLM-A com LLM-B via Terminal Permanente.
-  Cobre como inicializar o terminal, verificar saúde, enviar mensagens, interpretar respostas,
-  e lidar com todos os casos especiais (terminal offline, loop não pronto, ocupado, stall etc.).
-  Use quando precisar se comunicar com LLM-B, verificar seu estado, ou quando as instruções de
-  comunicação LLM-A ↔ LLM-B não estiverem claras.
+  Protocolo oficial de comunicação de LLM-A com LLM-B via Terminal Permanente. Cobre como
+  inicializar o terminal, verificar saúde, enviar mensagens, interpretar respostas, e lidar com
+  todos os casos especiais (terminal offline, loop não pronto, ocupado, stall etc.). Use quando
+  precisar se comunicar com LLM-B, verificar seu estado, ou quando as instruções de comunicação
+  LLM-A ↔ LLM-B não estiverem claras.
 user-invocable: true
 ---
 
@@ -13,9 +13,13 @@ user-invocable: true
 
 ## Visão Geral
 
-A LLM-B é um agente de raciocínio contínuo que opera em um **Terminal Permanente** (processo Node.js separado, porta 3009). A comunicação se dá **exclusivamente via HTTP** usando o arquivo `src/copilot/channel/inject.js` (ou seu equivalente de API pública em `src/copilot/channel/index.js`).
+A LLM-B é um agente de raciocínio contínuo que opera em um **Terminal Permanente** (processo Node.js
+separado, porta 3009). A comunicação se dá **exclusivamente via HTTP** usando o arquivo
+`src/copilot/channel/inject.js` (ou seu equivalente de API pública em
+`src/copilot/channel/index.js`).
 
-**Regra fundamental**: Você (LLM-A) NUNCA fala diretamente com a LLM-B — toda comunicação é intermediada pelo Terminal Permanente ativo na porta 3009.
+**Regra fundamental**: Você (LLM-A) NUNCA fala diretamente com a LLM-B — toda comunicação é
+intermediada pelo Terminal Permanente ativo na porta 3009.
 
 ---
 
@@ -33,14 +37,22 @@ const health = await checkLlmBHealth();
 ```
 
 Interpretação:
+
 - `ok: false` → Terminal offline. Precisa ser iniciado antes de qualquer comunicação.
-- `ok: true, ready: false` → Terminal online mas dialog loop não inicializado ainda. Use `waitForLlmBReady()`.
+- `ok: true, ready: false` → Terminal online mas dialog loop não inicializado ainda. Use
+  `waitForLlmBReady()`.
 - `ok: true, ready: true, busy: false` → Pronto para receber mensagem.
-- `ok: true, ready: true, busy: true` → Ocupado processando outra mensagem. `injectToLlmB()` tentará automaticamente (retry com backoff).
+- `ok: true, ready: true, busy: true` → Ocupado processando outra mensagem. `injectToLlmB()` tentará
+  automaticamente (retry com backoff).
 
 ---
 
 ## Passo 2: Iniciar o Terminal (se necessário)
+
+> **CRÍTICO — Regra de inicialização**: O terminal **DEVE** ser sempre iniciado via **Task do VS
+> Code** (`terminal:llm-b`), não via `run_in_terminal` com `isBackground=true`. Apenas a task abre
+> um painel visível para o usuário. Rodar em background oculto priva o usuário do terminal
+> interativo.
 
 **No VSCode** (método recomendado — integração nativa com workspace):
 
@@ -52,19 +64,23 @@ Ctrl+Shift+P → "Tasks: Run Task" → "terminal:llm-b"
 
 Ou pelo painel de tasks (Explorer → Run and Debug não — usar Terminal → Run Task).
 
-O VSCode abrirá um painel dedicado chamado "Terminal LLM-B" e aguardará o pattern `LLM-B pronta` no output antes de marcar a task como concluída.
+O VSCode abrirá um painel dedicado chamado "Terminal LLM-B" e aguardará o pattern `LLM-B pronta` no
+output antes de marcar a task como concluída.
 
 **Via linha de comando direta**:
+
 ```bash
 npm run terminal:llm-b
 ```
 
 **Via PM2 (produção)**:
+
 ```bash
 COPILOT_TERMINAL_ENABLED=true npx pm2 start ecosystem.config.cjs --only llm-b-terminal
 ```
 
 **Verificar se já está rodando**:
+
 ```bash
 curl -s http://127.0.0.1:3009/health | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8');console.log(JSON.parse(d))"
 ```
@@ -84,17 +100,21 @@ await waitForLlmBReady({ maxWaitMs: 30_000, pollIntervalMs: 2_000 });
 ## Passo 4: Enviar Mensagem e Receber Resposta
 
 ### Caso simples (mensagem única):
+
 ```javascript
 import { injectToLlmB } from '#copilot/channel';
 
-const result = await injectToLlmB('Analise o arquivo src/copilot/agent/always-alive.js e identifique possíveis race conditions.');
+const result = await injectToLlmB(
+  'Analise o arquivo src/copilot/agent/always-alive.js e identifique possíveis race conditions.',
+);
 // result = { ok: true, reply: "...", durationMs: 18500, from: "llm-a" }
 
-console.log(result.reply);    // resposta completa da LLM-B
+console.log(result.reply); // resposta completa da LLM-B
 console.log(result.durationMs); // ex: 18500 (esperado: 15-25s por turno)
 ```
 
 ### Com attachments (arquivos):
+
 ```javascript
 import { injectToLlmB } from '#copilot/channel';
 import { readFileSync } from 'node:fs';
@@ -102,7 +122,7 @@ import { readFileSync } from 'node:fs';
 // Método 1: embed o conteúdo diretamente na mensagem (recomendado para arquivos pequenos)
 const code = readFileSync('src/copilot/agent/always-alive.js', 'utf-8');
 const result = await injectToLlmB(
-  `Analise este arquivo e identifique todos os métodos que emitem eventos:\n\n\`\`\`js\n${code}\n\`\`\``
+  `Analise este arquivo e identifique todos os métodos que emitem eventos:\n\n\`\`\`js\n${code}\n\`\`\``,
 );
 
 // Método 2: usar o campo attachments (API do Copilot SDK — para arquivos via SDK)
@@ -110,12 +130,17 @@ const result = await injectToLlmB(
 ```
 
 ### Pipeline (sequência de mensagens):
+
 ```javascript
 import { injectPipeline } from '#copilot/channel';
 
 const { ok, results } = await injectPipeline([
   { prompt: 'Você está disponível para uma análise longa?' },
-  { prompt: 'Analise todas as classes em src/copilot/agent/ e liste os eventos emitidos por cada uma.', waitMs: 2000 },
+  {
+    prompt:
+      'Analise todas as classes em src/copilot/agent/ e liste os eventos emitidos por cada uma.',
+    waitMs: 2000,
+  },
   { prompt: 'Agora, identifique possíveis vazamentos de listeners (missing off() calls).' },
   { prompt: 'Gere um resumo executivo com os 3 problemas mais críticos encontrados.' },
 ]);
@@ -157,32 +182,35 @@ sub.unsubscribe();
 ```
 
 Para apenas eventos críticos (stall, fatal, system) sem overhead de replies:
+
 ```javascript
 import { subscribeLlmBCritical } from '#copilot/channel';
-const sub = subscribeLlmBCritical((evt) => { /* ... */ });
+const sub = subscribeLlmBCritical((evt) => {
+  /* ... */
+});
 ```
 
 ---
 
 ## Tratamento de Erros
 
-| Código de Erro | Causa | Ação |
-|---|---|---|
-| `LLM_B_TIMEOUT` | Resposta demorou > `timeoutMs` (padrão: 130s) | Aumentar `timeoutMs` ou dividir a pergunta |
-| `LLM_B_BUSY` | LLM-B ocupada após todos os retries (padrão: 3) | Aguardar e tentar novamente; aumentar `retries` |
-| `LLM_B_UNAVAILABLE` | Terminal não está rodando (503) | Iniciar o terminal: `npm run terminal:llm-b` |
-| `LLM_B_NOT_READY` | Dialog loop não ficou pronto em tempo | Verificar logs do terminal; reiniciar se necessário |
-| `LLM_B_ERROR` | Erro interno na execução do turno | Verificar logs: `logs/llm-b-terminal-error.log` |
-| `LLM_B_INVALID_RESPONSE` | Resposta não é JSON válido | Bug no terminal — verificar versão do código |
+| Código de Erro           | Causa                                           | Ação                                                |
+| ------------------------ | ----------------------------------------------- | --------------------------------------------------- |
+| `LLM_B_TIMEOUT`          | Resposta demorou > `timeoutMs` (padrão: 130s)   | Aumentar `timeoutMs` ou dividir a pergunta          |
+| `LLM_B_BUSY`             | LLM-B ocupada após todos os retries (padrão: 3) | Aguardar e tentar novamente; aumentar `retries`     |
+| `LLM_B_UNAVAILABLE`      | Terminal não está rodando (503)                 | Iniciar o terminal: `npm run terminal:llm-b`        |
+| `LLM_B_NOT_READY`        | Dialog loop não ficou pronto em tempo           | Verificar logs do terminal; reiniciar se necessário |
+| `LLM_B_ERROR`            | Erro interno na execução do turno               | Verificar logs: `logs/llm-b-terminal-error.log`     |
+| `LLM_B_INVALID_RESPONSE` | Resposta não é JSON válido                      | Bug no terminal — verificar versão do código        |
 
 ```javascript
 import { injectToLlmB } from '#copilot/channel';
 
 try {
   const result = await injectToLlmB('Sua pergunta aqui', {
-    timeoutMs: 180_000,  // 3 minutos para perguntas complexas
-    retries: 5,           // tentar até 5 vezes se ocupado
-    retryDelayMs: 2_000,  // 2s, 4s, 6s, 8s, 10s de espera
+    timeoutMs: 180_000, // 3 minutos para perguntas complexas
+    retries: 5, // tentar até 5 vezes se ocupado
+    retryDelayMs: 2_000, // 2s, 4s, 6s, 8s, 10s de espera
   });
   console.log(result.reply);
 } catch (err) {
@@ -280,6 +308,7 @@ LLM-A recebe a resposta
 ```
 
 ### Dialog Loop Protocol (interno):
+
 O dialog loop é a "linguagem" que LLM-B fala internamente com o sistema:
 
 1. LLM-B chama `ask_user("READY: aguardando próxima mensagem")` → `dialog.ready` emitido
@@ -288,22 +317,23 @@ O dialog loop é a "linguagem" que LLM-B fala internamente com o sistema:
 4. Sistema captura o reply → resolve a Promise do `sendDialogTurn()`
 5. Sistema envia `ask_user("READY: ...")` para o próximo turno → volta para passo 1
 
-O loop é **eterno por design** (DL-PERM). O watchdog (padrão: stall em 15min de inatividade) reinicia automaticamente se o loop travar.
+O loop é **eterno por design** (DL-PERM). O watchdog (padrão: stall em 15min de inatividade)
+reinicia automaticamente se o loop travar.
 
 ---
 
 ## Variáveis de Ambiente Relevantes
 
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `LLM_B_TERMINAL_PORT` | `3009` | Porta HTTP do terminal |
-| `COPILOT_SDK_ENABLED` | `false` | **Obrigatório** `true` para o terminal funcionar |
-| `COPILOT_MODEL` | `gpt-4.1` | Modelo usado pela LLM-B |
-| `LLM_B_TURN_TIMEOUT_MS` | `130000` | Timeout por turno (130s) |
-| `LLM_B_WATCHDOG_MS` | `300000` | Intervalo do watchdog (5min) |
-| `LLM_B_WATCHDOG_STALL_MS` | `900000` | Stall threshold (15min) |
-| `LLM_B_BOOT_PROMPT` | (interno) | Sobrescreve o boot prompt padrão |
-| `COPILOT_TERMINAL_ENABLED` | `false` | Habilita o terminal via PM2 |
+| Variável                   | Padrão    | Descrição                                        |
+| -------------------------- | --------- | ------------------------------------------------ |
+| `LLM_B_TERMINAL_PORT`      | `3009`    | Porta HTTP do terminal                           |
+| `COPILOT_SDK_ENABLED`      | `false`   | **Obrigatório** `true` para o terminal funcionar |
+| `COPILOT_MODEL`            | `gpt-4.1` | Modelo usado pela LLM-B                          |
+| `LLM_B_TURN_TIMEOUT_MS`    | `130000`  | Timeout por turno (130s)                         |
+| `LLM_B_WATCHDOG_MS`        | `300000`  | Intervalo do watchdog (5min)                     |
+| `LLM_B_WATCHDOG_STALL_MS`  | `900000`  | Stall threshold (15min)                          |
+| `LLM_B_BOOT_PROMPT`        | (interno) | Sobrescreve o boot prompt padrão                 |
+| `COPILOT_TERMINAL_ENABLED` | `false`   | Habilita o terminal via PM2                      |
 
 ---
 
@@ -333,16 +363,24 @@ curl -s http://127.0.0.1:3009/config | jq .
 
 ## Boas Práticas
 
-1. **Sempre verificar saúde antes de enviar**: `checkLlmBHealth()` é rápido (timeout 5s) e evita esperas longas se o terminal estiver offline.
+1. **Sempre verificar saúde antes de enviar**: `checkLlmBHealth()` é rápido (timeout 5s) e evita
+   esperas longas se o terminal estiver offline.
 
-2. **Mensagens longas**: Para análises profundas de código (múltiplos arquivos), use `injectPipeline()` dividindo em steps lógicos — a LLM-B tem contexto limitado e perguntas menores produzem respostas mais focadas.
+2. **Mensagens longas**: Para análises profundas de código (múltiplos arquivos), use
+   `injectPipeline()` dividindo em steps lógicos — a LLM-B tem contexto limitado e perguntas menores
+   produzem respostas mais focadas.
 
-3. **Timeouts**: Para análises complexas, definir `timeoutMs: 180_000` (3min). O padrão de 130s pode ser curtoPara respostas longas.
+3. **Timeouts**: Para análises complexas, definir `timeoutMs: 180_000` (3min). O padrão de 130s pode
+   ser curtoPara respostas longas.
 
-4. **Contexto**: Se precisar incluir arquivos, embuta o conteúdo diretamente na mensagem como bloco de código Markdown — é mais confiável que attachments.
+4. **Contexto**: Se precisar incluir arquivos, embuta o conteúdo diretamente na mensagem como bloco
+   de código Markdown — é mais confiável que attachments.
 
-5. **Sessão Hub**: Toda conversa é persistida automaticamente na hub_session. Use `GET /sessions` e `GET /sessions/:id/turns` para recuperar histórico.
+5. **Sessão Hub**: Toda conversa é persistida automaticamente na hub_session. Use `GET /sessions` e
+   `GET /sessions/:id/turns` para recuperar histórico.
 
-6. **Não reiniciar o terminal sem necessidade**: O dialog loop é permanente e o watchdog cuida de restarts automáticos. Só reinicie manualmente se o terminal travar completamente.
+6. **Não reiniciar o terminal sem necessidade**: O dialog loop é permanente e o watchdog cuida de
+   restarts automáticos. Só reinicie manualmente se o terminal travar completamente.
 
-7. **Rate limit**: `/inject` tem rate limit de 10 req/min por IP (padrão). Para injeções em lote, use `/pipeline` que trata internamente.
+7. **Rate limit**: `/inject` tem rate limit de 10 req/min por IP (padrão). Para injeções em lote,
+   use `/pipeline` que trata internamente.

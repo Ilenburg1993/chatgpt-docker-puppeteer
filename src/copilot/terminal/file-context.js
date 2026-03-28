@@ -229,8 +229,8 @@ export function extractAtReferences(message) {
 /**
  * Lê os arquivos de um diretório (shallow, não recursivo) e retorna seus contextos.
  *
- * Respeita `MAX_EMBED_BYTES` total: para de adicionar arquivos quando o limite é atingido.
- * Ignora arquivos binários e sub-diretórios. Lança erro se o diretório não existir.
+ * Respeita `MAX_EMBED_BYTES` total: para de adicionar arquivos quando o limite é atingido. Ignora arquivos binários e
+ * sub-diretórios. Lança erro se o diretório não existir.
  *
  * @param {string} dirPath - Caminho do diretório (absoluto ou relativo ao cwd)
  * @returns {Promise<FileContext[]>} Lista de contextos dos arquivos lidos
@@ -277,11 +277,12 @@ export async function readDirectoryContext(dirPath) {
 /**
  * Converte um attachment de qualquer tipo em texto markdown para embed no dialog loop.
  *
- * **Arquitetura zero-PR**: todos os tipos de attachment são convertidos em texto embeddado e enviados
- * via dialog loop (`ask_user`), sem criar novos PRs via `session.send()`. A decisão sobre o caminho
- * de execução é feita aqui — `sendTurn` nunca precisa saber sobre attachments nativos SDK.
+ * **Arquitetura zero-PR**: todos os tipos de attachment são convertidos em texto embeddado e enviados via dialog loop
+ * (`ask_user`), sem criar novos PRs via `session.send()`. A decisão sobre o caminho de execução é feita aqui —
+ * `sendTurn` nunca precisa saber sobre attachments nativos SDK.
  *
  * Mapeamento de tipos:
+ *
  * - `file` → lê o arquivo e cria bloco markdown com o conteúdo
  * - `directory` → lista arquivos do diretório e cria blocos para cada um
  * - `selection` → usa `text` como conteúdo do bloco markdown

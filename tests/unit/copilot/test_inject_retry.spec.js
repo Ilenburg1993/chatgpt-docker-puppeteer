@@ -14,8 +14,8 @@
  */
 
 import assert from 'node:assert/strict';
-import { before, describe, it } from 'node:test';
 import { readFile } from 'node:fs/promises';
+import { before, describe, it } from 'node:test';
 import { BridgeError } from '../../../src/copilot/core/index.js';
 
 // ─── Suite 1: análise estrutural do source ─────────────────────────────────
@@ -25,17 +25,11 @@ describe('channel/inject.js › INJECT-01: análise estrutural', async () => {
     let source = '';
 
     before(async () => {
-        source = await readFile(
-            new URL('../../../src/copilot/channel/inject.js', import.meta.url),
-            'utf-8',
-        );
+        source = await readFile(new URL('../../../src/copilot/channel/inject.js', import.meta.url), 'utf-8');
     });
 
     it('InjectOpts deve ter campo retries', () => {
-        assert.ok(
-            source.includes('@property {number} [retries]'),
-            'InjectOpts deve documentar a propriedade retries',
-        );
+        assert.ok(source.includes('@property {number} [retries]'), 'InjectOpts deve documentar a propriedade retries');
     });
 
     it('InjectOpts deve ter campo retryDelayMs', () => {

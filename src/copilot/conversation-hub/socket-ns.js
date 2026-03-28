@@ -262,8 +262,8 @@ export function getCopilotNamespace() {
 }
 
 /**
- * ARCH-06 fix: Desmonta o namespace /copilot, desconectando todos os clients e limpando a referência.
- * Deve ser chamado em ConversationHub.stop() para evitar estado inconsistente após restart.
+ * ARCH-06 fix: Desmonta o namespace /copilot, desconectando todos os clients e limpando a referência. Deve ser chamado
+ * em ConversationHub.stop() para evitar estado inconsistente após restart.
  *
  * @returns {void}
  */

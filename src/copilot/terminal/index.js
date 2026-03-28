@@ -17,6 +17,7 @@
  */
 
 import { log } from '#core/logger';
+import { resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { loadAliases } from '../bridges/alias-store.js';
 import { llmBridgeClient } from '../channel/client.js';
@@ -37,9 +38,13 @@ export async function startTerminalServer() {
 
     loadAliases();
 
-    // ARCH-04 (fix): instanciar PinnedFilesLoader para monitorar arquivos de contexto fixados
+    // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
     // Isso habilita o comando /skills reload e o sistema de pinned context files
-    const pinnedLoader = new PinnedFilesLoader([]);
+    const _root = resolve(import.meta.dirname, '../../..');
+    const pinnedLoader = new PinnedFilesLoader([
+        resolve(_root, '.github', 'skills'),
+        resolve(_root, '.github', 'instructions'),
+    ]);
     await pinnedLoader.start().catch((/** @type {any} */ e) => {
         log('WARN', `[TerminalServer] PinnedFilesLoader não pôde iniciar: ${e.message}`);
     });
@@ -64,14 +69,14 @@ export async function startTerminalServer() {
 
     // Watchdog: dialog loop travado → reinicia via stopDialogMode (emite dialog.stopped com reason: watchdog_restart)
     // O handler de 'dialog.stopped' abaixo é responsável por chamar ensureDialogLoop() — evitando duplicação.
-    alwaysAliveAgent.on('dialog.stalled', (/** @type {{ stalledMs: number }} */ evt) => {
+    alwaysAliveAgent.on('dialog.stalled', async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         println(`\n[watchdog] ⚠️  Dialog loop inativo há ${secs}s — reiniciando automaticamente…`);
         log('WARN', `[TerminalServer] Watchdog disparou (${secs}s inativo). Reiniciando dialog loop.`);
         const _hubSessionId = getHubSessionId();
         if (_hubSessionId) {
             try {
-                conversationHub.store.writeTurn(_hubSessionId, {
+                await conversationHub.store.writeTurn(_hubSessionId, {
                     role: 'user',
                     content: `[SISTEMA] Watchdog: dialog loop inativo por ${secs}s — reinício automático.`,
                 });
@@ -112,33 +117,28 @@ export async function startTerminalServer() {
     // DL-PERM: dialog loop permanente — reinicia automaticamente se o modelo encerrar o loop.
     // A LLM-B NUNCA deve encerrar o dialog loop sem autorização explícita do usuário.
     // Quando 'dialog.stopped' é emitido por iniciativa do modelo, reiniciamos automaticamente.
-    alwaysAliveAgent.on(
-        'dialog.stopped',
-        (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
-            const reason = evt.reason ?? 'desconhecido';
+    alwaysAliveAgent.on('dialog.stopped', (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
+        const reason = evt.reason ?? 'desconhecido';
 
-            if (reason === 'authorized_stop') {
-                // Encerramento permanente autorizado pelo usuário — não reiniciar
-                println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
-                log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
-                broadcastSse('stopped', { authorized: true, reason });
-                return;
-            }
+        if (reason === 'authorized_stop') {
+            // Encerramento permanente autorizado pelo usuário — não reiniciar
+            println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
+            log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
+            broadcastSse('stopped', { authorized: true, reason });
+            return;
+        }
 
-            // Para todos os outros casos (watchdog_restart, model_stopped, falha de sendMessage, etc.)
-            // — reiniciar automaticamente. Isso garante que o loop nunca morre de forma permanente.
-            const isWatchdog = reason === 'watchdog_restart';
-            const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
-            println(
-                `\n\x1b[33m  [dialog] Loop encerrado (${label}) — reiniciando automaticamente…\x1b[0m`,
-            );
-            log('WARN', `[TerminalServer] Dialog loop encerrado (${label}). Reiniciando.`);
-            broadcastSse('stopped', { reason, restarting: true });
-            ensureDialogLoop().catch((/** @type {any} */ e) =>
-                log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop após stop: ${e.message}`),
-            );
-        },
-    );
+        // Para todos os outros casos (watchdog_restart, model_stopped, falha de sendMessage, etc.)
+        // — reiniciar automaticamente. Isso garante que o loop nunca morre de forma permanente.
+        const isWatchdog = reason === 'watchdog_restart';
+        const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
+        println(`\n\x1b[33m  [dialog] Loop encerrado (${label}) — reiniciando automaticamente…\x1b[0m`);
+        log('WARN', `[TerminalServer] Dialog loop encerrado (${label}). Reiniciando.`);
+        broadcastSse('stopped', { reason, restarting: true });
+        ensureDialogLoop().catch((/** @type {any} */ e) =>
+            log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop após stop: ${e.message}`),
+        );
+    });
 
     // AA.4: SSE 'context' event — emitir dados reais de uso de contexto após cada turno
     alwaysAliveAgent.on('session.usage', (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
@@ -167,11 +167,11 @@ export async function startTerminalServer() {
     // Persiste reconexões e sessões fatais no Hub
     alwaysAliveAgent.on(
         'ready',
-        (/** @type {{ sessionId: string; isResumed: boolean; reconected?: boolean }} */ evt) => {
+        async (/** @type {{ sessionId: string; isResumed: boolean; reconected?: boolean }} */ evt) => {
             const _hubSessionId = getHubSessionId();
             if (!_hubSessionId || !evt.reconected) return;
             try {
-                conversationHub.store.writeTurn(_hubSessionId, {
+                await conversationHub.store.writeTurn(_hubSessionId, {
                     role: 'user',
                     content: `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
                 });
@@ -180,11 +180,11 @@ export async function startTerminalServer() {
             }
         },
     );
-    alwaysAliveAgent.on('session.fatal', (/** @type {{ originalError: string; attempts: number }} */ evt) => {
+    alwaysAliveAgent.on('session.fatal', async (/** @type {{ originalError: string; attempts: number }} */ evt) => {
         const _hubSessionId = getHubSessionId();
         if (!_hubSessionId) return;
         try {
-            conversationHub.store.writeTurn(_hubSessionId, {
+            await conversationHub.store.writeTurn(_hubSessionId, {
                 role: 'user',
                 content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
             });

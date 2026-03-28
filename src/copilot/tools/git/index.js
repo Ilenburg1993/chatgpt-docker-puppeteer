@@ -99,7 +99,11 @@ const gitCommitTool = defineTool('git_commit', {
         // GAP-Q09 fix: verificar se há algo staged antes de commitar
         const staged = safeGit('git diff --cached --name-only');
         if (staged.exitCode !== 0 || !staged.stdout.trim()) {
-            return { success: false, output: '', error: 'Nenhum arquivo staged. Use `paths` ou `all:true` para adicionar arquivos antes de commitar.' };
+            return {
+                success: false,
+                output: '',
+                error: 'Nenhum arquivo staged. Use `paths` ou `all:true` para adicionar arquivos antes de commitar.',
+            };
         }
         log('INFO', `[copilot/git_commit] Commitando: ${message}`);
         const r = safeGit(`git commit -m "${message.replace(/"/g, '\\"')}"`);

@@ -256,4 +256,3 @@ POST /inject { attachments: [...] }
 - Modelo responde `STOPPED` por iniciativa própria → `authorized: false` → restart automático
 - `POST /dialog/stop` sem `{ force: true }` → 403 Forbidden
 - `alwaysAliveAgent.stopDialogLoop()` sem `{ authorized: true }` → log WARN, retorna sem ação
-
