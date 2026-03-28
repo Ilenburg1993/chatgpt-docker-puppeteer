@@ -14,16 +14,8 @@ import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools/state';
 import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
 import { approveAll } from '@github/copilot-sdk';
-import {
-    appendFileSync,
-    existsSync,
-    mkdirSync,
-    readFileSync,
-    renameSync,
-    rmSync,
-    statSync,
-    writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { buildCustomAgentsConfig } from '../config/custom-agents.js';
 
@@ -58,20 +50,25 @@ function isHighRiskTool(toolName) {
  * @returns {void}
  */
 function logToolAudit(entry) {
-    try {
-        mkdirSync(join(TOOL_AUDIT_LOG, '..'), { recursive: true });
-        // SEC-V03 fix: rotacionar arquivo ao atingir 10 MB
-        const ROTATE_LOG = TOOL_AUDIT_LOG + '.1';
-        const MAX_BYTES = 10 * 1024 * 1024;
-        if (existsSync(TOOL_AUDIT_LOG)) {
-            const size = statSync(TOOL_AUDIT_LOG).size;
-            if (size >= MAX_BYTES) renameSync(TOOL_AUDIT_LOG, ROTATE_LOG);
+    // PERF-02 (fix): operações de I/O assíncronas (fire-and-forget) — não bloqueia o event loop
+    const line = JSON.stringify({ ...entry, ts: new Date().toISOString() }) + '\n';
+    const ROTATE_LOG = TOOL_AUDIT_LOG + '.1';
+    const MAX_BYTES = 10 * 1024 * 1024;
+
+    void (async () => {
+        try {
+            await mkdir(join(TOOL_AUDIT_LOG, '..'), { recursive: true });
+            try {
+                const { size } = await stat(TOOL_AUDIT_LOG);
+                if (size >= MAX_BYTES) await rename(TOOL_AUDIT_LOG, ROTATE_LOG);
+            } catch {
+                // arquivo não existe ainda — ok
+            }
+            await appendFile(TOOL_AUDIT_LOG, line, 'utf8');
+        } catch {
+            // log de auditoria não deve travar a sessão
         }
-        const line = JSON.stringify({ ...entry, ts: new Date().toISOString() }) + '\n';
-        appendFileSync(TOOL_AUDIT_LOG, line, 'utf8');
-    } catch {
-        // log de auditoria não deve travar a sessão
-    }
+    })();
 }
 
 // AC.1: threshold dinâmico de compaction — configurável via PUT /config/infinite-session

@@ -37,12 +37,27 @@ function httpRequest(method, urlStr, body = null, timeoutMs = 5000) {
             options.headers['Content-Type'] = 'application/json';
             options.headers['Content-Length'] = String(Buffer.byteLength(body));
         }
+        const MAX_RESP_BYTES = 1 * 1024 * 1024; // BUG-N09 (fix): limit 1 MB
         const req = http.request(options, (res) => {
             let data = '';
-            res.on('data', (chunk) => {
-                data += chunk;
+            let received = 0;
+            res.on('data', (/** @type {Buffer} */ chunk) => {
+                received += chunk.length;
+                if (received > MAX_RESP_BYTES) {
+                    req.destroy(new Error('Resposta excede limite de 1 MB'));
+                    return;
+                }
+                data += chunk.toString('utf8');
             });
-            res.on('end', () => resolve(data));
+            res.on('end', () => {
+                // BUG-N09 (fix): verificar statusCode antes de resolver
+                const status = res.statusCode ?? 0;
+                if (status >= 400) {
+                    reject(new Error(`HTTP ${status}: ${data.slice(0, 200)}`));
+                } else {
+                    resolve(data);
+                }
+            });
         });
         req.setTimeout(timeoutMs, () => {
             req.destroy(new Error(`Timeout após ${timeoutMs}ms`));

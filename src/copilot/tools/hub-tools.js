@@ -134,6 +134,13 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
             const hub = await requireHub();
             if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
 
+            // SEC-N04 (fix): truncar message para evitar payloads gigantes
+            const MAX_MSG_CHARS = 32_000;
+            const safeMessage =
+                typeof message === 'string' && message.length > MAX_MSG_CHARS
+                    ? message.slice(0, MAX_MSG_CHARS) + ' […truncado]'
+                    : message;
+
             // UPG-04: validar timeoutMs para evitar valores absurdos de modelos alucinados
             const resolvedTimeout =
                 typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 120_000;
@@ -142,13 +149,13 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
             let payload;
             if (useStructured !== false && (context || intent)) {
                 payload = {
-                    context: context ?? message,
-                    intent: intent ?? message,
+                    context: context ?? safeMessage,
+                    intent: intent ?? safeMessage,
                     priority: priority ?? 'medium',
                     responseType: responseType ?? undefined,
                 };
             } else {
-                payload = message;
+                payload = safeMessage;
             }
 
             const result = await hub.sendToLlmB(hubSessionId, payload, {

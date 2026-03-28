@@ -313,7 +313,10 @@ export async function handleInject(body) {
         return { status: 400, body: { ok: false, error: '"message" é obrigatório' } };
     }
 
-    const from = body?.from ?? 'llm-a';
+    // SEC-N03 (fix): validar campo `from` — aceitar apenas valores conhecidos
+    const ALLOWED_FROM = new Set(['llm-a', 'user', 'system', 'llm_a']);
+    const rawFrom = body?.from ?? 'llm-a';
+    const from = typeof rawFrom === 'string' && ALLOWED_FROM.has(rawFrom) ? rawFrom : 'llm-a';
 
     // Embed de context_files, se fornecidos
     let enrichedMessage = message;
