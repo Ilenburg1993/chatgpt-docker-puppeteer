@@ -24,6 +24,7 @@
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
 import * as fs from 'node:fs';
+import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { withSkipPermission } from './tool-factory.js';
@@ -115,14 +116,16 @@ const VALID_TRANSITIONS = {
 /**
  * Lê o store de tarefas do disco. Cria estrutura vazia se o arquivo não existir.
  *
- * @returns {TodoStore}
+ * ARCH-N09/UPG-N06 (fix): I/O assíncrono via fs/promises para não bloquear o event loop.
+ *
+ * @returns {Promise<TodoStore>}
  */
-function readStore() {
+async function readStore() {
     try {
         if (!fs.existsSync(TODOS_FILE)) {
             return { version: SCHEMA_VERSION, tasks: {} };
         }
-        const raw = fs.readFileSync(TODOS_FILE, 'utf8');
+        const raw = await fsp.readFile(TODOS_FILE, 'utf8');
         const data = JSON.parse(raw);
         if (typeof data.tasks !== 'object' || data.tasks === null) {
             return { version: SCHEMA_VERSION, tasks: {} };
@@ -136,17 +139,20 @@ function readStore() {
 /**
  * Persiste o store no disco via escrita atômica (.tmp → rename).
  *
+ * ARCH-N09/UPG-N06 (fix): I/O assíncrono via fs/promises para não bloquear o event loop.
+ *
  * @param {TodoStore} store
+ * @returns {Promise<void>}
  */
-function writeStore(store) {
+async function writeStore(store) {
     const dir = path.dirname(TODOS_FILE);
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
     store.version = SCHEMA_VERSION;
     const json = JSON.stringify(store, null, 2);
-    fs.writeFileSync(TODOS_TMP, json, 'utf8');
-    fs.renameSync(TODOS_TMP, TODOS_FILE);
+    await fsp.writeFile(TODOS_TMP, json, 'utf8');
+    await fsp.rename(TODOS_TMP, TODOS_FILE);
 }
 
 /**
@@ -242,7 +248,7 @@ const todoCreateTool = defineTool('todo_create', {
          * }}
          */ args,
     ) => {
-        const store = readStore();
+        const store = await readStore();
 
         // Validar parent se fornecido
         if (args.parent_id && !store.tasks[args.parent_id]) {
@@ -281,7 +287,7 @@ const todoCreateTool = defineTool('todo_create', {
             }
         }
 
-        writeStore(store);
+        await writeStore(store);
         log.info(`[todo_create] Tarefa criada id=${id} title=${task.title} priority=${task.priority}`);
         return { success: true, task: sanitize(task) };
     },
@@ -309,7 +315,7 @@ const todoGetTool = withSkipPermission(
                 .describe('Se true, inclui objetos completos das subtarefas diretas'),
         }),
         handler: async (/** @type {{ id: string; include_subtasks?: boolean }} */ args) => {
-            const store = readStore();
+            const store = await readStore();
             const task = store.tasks[args.id];
             if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
 
@@ -375,7 +381,7 @@ const todoListTool = withSkipPermission(
              * }}
              */ args,
         ) => {
-            const store = readStore();
+            const store = await readStore();
             const allTasks = Object.values(store.tasks);
 
             const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
@@ -480,7 +486,7 @@ const todoUpdateTool = defineTool('todo_update', {
          * }}
          */ args,
     ) => {
-        const store = readStore();
+        const store = await readStore();
         const task = store.tasks[args.id];
         if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
 
@@ -506,7 +512,7 @@ const todoUpdateTool = defineTool('todo_update', {
         if (args.metadata) task.metadata = { ...task.metadata, ...args.metadata };
 
         task.updatedAt = ts;
-        writeStore(store);
+        await writeStore(store);
 
         log.info(
             `[todo_update] Tarefa atualizada id=${args.id} changed=${Object.keys(args)
@@ -537,7 +543,7 @@ const todoSetStatusTool = defineTool('todo_set_status', {
         force: z.boolean().optional().describe('Forçar transição mesmo fora do grafo de estados'),
     }),
     handler: async (/** @type {{ id: string; status: TodoStatus; force?: boolean }} */ args) => {
-        const store = readStore();
+        const store = await readStore();
         const task = store.tasks[args.id];
         if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
 
@@ -565,7 +571,7 @@ const todoSetStatusTool = defineTool('todo_set_status', {
             task.completedAt = null;
         }
 
-        writeStore(store);
+        await writeStore(store);
         log.info(`[todo_set_status] Status alterado id=${args.id} from=${current} to=${next}`);
         return { success: true, task: sanitize(task), previous_status: current };
     },
@@ -592,7 +598,7 @@ const todoDeleteTool = defineTool('todo_delete', {
             .describe('Se true, remove subtarefas recursivamente; se false, desvincula-as'),
     }),
     handler: async (/** @type {{ id: string; cascade?: boolean }} */ args) => {
-        const store = readStore();
+        const store = await readStore();
         const task = store.tasks[args.id];
         if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
 
@@ -633,7 +639,7 @@ const todoDeleteTool = defineTool('todo_delete', {
         }
 
         delete store.tasks[args.id];
-        writeStore(store);
+        await writeStore(store);
 
         log.info(`[todo_delete] Tarefa removida id=${args.id} cascade=${args.cascade} count=${deleted.length}`);
         return { success: true, deleted, count: deleted.length };
@@ -674,7 +680,7 @@ const todoAddSubtaskTool = defineTool('todo_add_subtask', {
          * }}
          */ args,
     ) => {
-        const store = readStore();
+        const store = await readStore();
 
         if (!store.tasks[args.parent_id]) {
             return { success: false, error: `Tarefa pai não encontrada: ${args.parent_id}` };
@@ -707,7 +713,7 @@ const todoAddSubtaskTool = defineTool('todo_add_subtask', {
         parent.subtaskIds.push(id);
         parent.updatedAt = ts;
 
-        writeStore(store);
+        await writeStore(store);
         log.info(`[todo_add_subtask] Subtarefa criada id=${id} parent_id=${args.parent_id} title=${subtask.title}`);
         return { success: true, subtask: sanitize(subtask), parent_subtask_count: parent.subtaskIds.length };
     },
@@ -739,7 +745,7 @@ const todoSearchTool = withSkipPermission(
         handler: async (
             /** @type {{ query: string; status?: TodoStatus; priority?: TodoPriority; limit?: number }} */ args,
         ) => {
-            const store = readStore();
+            const store = await readStore();
             const terms = args.query
                 .toLowerCase()
                 .split(/\s+/)
@@ -806,7 +812,7 @@ const todoStatsTool = withSkipPermission(
                 .describe('Se true, inclui lista das 5 tarefas de maior prioridade pendentes'),
         }),
         handler: async (/** @type {{ include_recent?: boolean; include_top_priority?: boolean }} */ args) => {
-            const store = readStore();
+            const store = await readStore();
             const allTasks = Object.values(store.tasks);
             const total = allTasks.length;
 
@@ -926,7 +932,7 @@ const todoBulkUpdateTool = defineTool('todo_bulk_update', {
             };
         }
 
-        const store = readStore();
+        const store = await readStore();
         const ts = now();
         const updated = [];
         const notFound = [];
@@ -949,7 +955,7 @@ const todoBulkUpdateTool = defineTool('todo_bulk_update', {
             updated.push(id);
         }
 
-        if (updated.length > 0) writeStore(store);
+        if (updated.length > 0) await writeStore(store);
 
         log.info(`[todo_bulk_update] Bulk update updated=${updated.length} not_found=${notFound.length}`);
         return { success: true, updated, not_found: notFound, count: updated.length };
@@ -977,7 +983,7 @@ const todoClearCompletedTool = defineTool('todo_clear_completed', {
         dry_run: z.boolean().optional().default(false).describe('Se true, simula a remoção sem persistir'),
     }),
     handler: async (/** @type {{ status_filter?: 'done' | 'cancelled' | 'both'; dry_run?: boolean }} */ args) => {
-        const store = readStore();
+        const store = await readStore();
         const ts = now();
         const toDelete = [];
         const filter = args.status_filter ?? 'both';
@@ -1003,7 +1009,7 @@ const todoClearCompletedTool = defineTool('todo_clear_completed', {
                 }
                 delete store.tasks[id];
             }
-            writeStore(store);
+            await writeStore(store);
         }
 
         log.info(`[todo_clear_completed] Clear completed count=${toDelete.length} dry_run=${args.dry_run}`);
@@ -1071,7 +1077,7 @@ const todoImportTool = defineTool('todo_import', {
          * }}
          */ args,
     ) => {
-        const store = readStore();
+        const store = await readStore();
         const ts = now();
         const created = [];
 
@@ -1098,7 +1104,7 @@ const todoImportTool = defineTool('todo_import', {
             created.push(id);
         }
 
-        writeStore(store);
+        await writeStore(store);
         log.info(`[todo_import] Tarefas importadas count=${created.length}`);
         return { success: true, created_ids: created, count: created.length };
     },

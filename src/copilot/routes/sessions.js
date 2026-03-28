@@ -52,6 +52,20 @@ import {
 
 const router = Router();
 
+// SEC-N06/UPG-N19 (fix): autenticação opcional por token Bearer para SDK routes
+// Configurar via variável de ambiente SDK_API_TOKEN. Endpoints são públicos se não configurado.
+const SDK_API_TOKEN = process.env.SDK_API_TOKEN ?? null;
+
+if (SDK_API_TOKEN) {
+    router.use((req, res, next) => {
+        const authHeader = req.headers['authorization'] ?? '';
+        if (authHeader !== `Bearer ${SDK_API_TOKEN}`) {
+            return res.status(401).json({ ok: false, error: 'Unauthorized' });
+        }
+        return next();
+    });
+}
+
 // SEC-N05/N06 (fix): validação de model — prevenir injeção e garantir formato kosher
 const MODEL_SAFE_RE = /^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,99})$/;
 

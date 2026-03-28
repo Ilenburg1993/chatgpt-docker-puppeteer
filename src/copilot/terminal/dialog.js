@@ -222,7 +222,9 @@ export function broadcastSse(event, data) {
 
     // ── SSE (raw node:http) ───────────────────────────────────────────────────
     if (_sseClients.size > 0 || _sseCriticalClients.size > 0) {
-        const payload = `event: ${event}\ndata: ${JSON.stringify(safeData)}\n\n`;
+        // BUG-N06 (fix): incluir hubSessionId no payload SSE para consistência com Socket.io
+        const ssePayloadData = { ...safeData, hubSessionId: getHubSessionId() };
+        const payload = `event: ${event}\ndata: ${JSON.stringify(ssePayloadData)}\n\n`;
         for (const client of _sseClients) {
             try {
                 client.write(payload);

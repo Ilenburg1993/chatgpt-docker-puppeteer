@@ -91,8 +91,21 @@ router.get('/agent/tools', (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /agent/telemetry  +  POST /agent/telemetry/clear
+// GET /telemetry (alias canônico UPG-N08/GAP-N14) + GET /agent/telemetry  +  POST /agent/telemetry/clear
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * UPG-N08/GAP-N14 (fix): Alias canônico em /telemetry que expõe o resumo de telemetria SDK. Equivalente a GET
+ * /agent/telemetry — retorna getSummary() + raw store.
+ */
+router.get('/telemetry', (_req, res) => {
+    const telemetry = alwaysAliveAgent.telemetry;
+    if (!telemetry) {
+        res.status(503).json({ ok: false, error: 'Telemetria não disponível (agente não iniciado)' });
+        return;
+    }
+    res.json({ ok: true, summary: getSummary(telemetry), raw: telemetry });
+});
 
 /**
  * Retorna o resumo de telemetria do agente (sessões, erros, latências).

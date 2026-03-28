@@ -43,6 +43,30 @@ const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../');
  */
 const HOOK_STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
 
+/**
+ * ARCH-N01 (fix): Resolver pendente para suspensão real do SDK via request_user_input. Quando o handler cria a Promise
+ * de suspensão, registra aqui o resolver. O agente chama resolveUserInput() via answerPendingQuestion() para
+ * desbloquear o modelo.
+ *
+ * @type {((answer: string) => void) | null}
+ */
+let _pendingInputResolver = null;
+
+/**
+ * ARCH-N01: Registra uma resposta para a tool request_user_input pendente. Deve ser chamado pelo agente quando receber
+ * POST /api/copilot/answer.
+ *
+ * @param {string} answer
+ * @returns {boolean} true se havia uma Promise pendente, false se não
+ */
+export function resolveUserInput(answer) {
+    if (!_pendingInputResolver) return false;
+    const fn = _pendingInputResolver;
+    _pendingInputResolver = null;
+    fn(answer);
+    return true;
+}
+
 // ─── Tool: hook_get_audit_tail ────────────────────────────────────────────────
 
 /**
@@ -145,37 +169,37 @@ const requestUserInputTool = defineTool('request_user_input', {
             requires_selection,
         },
     ) => {
-        // Este handler é invocado pelo SDK via onUserInputRequest.
-        // O AlwaysAliveAgent já registra o handler onUserInputRequest que:
-        // 1. Seta status 'waiting_for_input'
-        // 2. Persiste pendingQuestion no estado
-        // 3. Bloqueia via Promise até POST /api/copilot/answer ser chamado
-        // 4. Resolve com { answer, wasFreeform }
-        //
-        // Para garantir o corrreto funcionamento, esta tool retorna o formato
-        // esperado pelo onUserInputRequest handler internamente.
-        // O SDK intercepta a invocação de 'ask_user' — no entanto, como esta tool
-        // é custom (não o ask_user nativo), o handler aqui recebe os parâmetros
-        // e deve encaminhar para o mecanismo de suspensão do agente.
-
         const fullQuestion = context ? `${question}\n\n**Contexto**: ${context}` : question;
         const allowFreeform = !requires_selection;
 
         log('INFO', `[hook-tools/request_user_input] Pergunta: "${fullQuestion.slice(0, 100)}"`);
 
-        // Constructo de resposta estruturado para o usuário/interface:
-        // O AlwaysAliveAgent internamente expõe via GET /api/copilot/status.pendingQuestion
-        // e aguarda POST /api/copilot/answer.
-        // Esta tool retorna o estado atual para confirmar ao modelo que a pergunta foi registrada.
-        return {
-            question: fullQuestion,
-            choices: choices ?? [],
-            allowFreeform,
-            status: 'waiting_for_input',
-            instruction:
-                'Aguardando resposta do usuário via POST /api/copilot/answer. ' +
-                'Não processe mais nada até receber a resposta.',
-        };
+        // ARCH-N01 (fix): suspensão real — a Promise só resolve quando resolveUserInput() for chamado,
+        // o que ocorre via answerPendingQuestion() no agente (POST /api/copilot/answer).
+        // Isso garante que o modelo não continua processamento até receber a resposta do usuário.
+        return new Promise((resolve) => {
+            _pendingInputResolver = (answer) => {
+                resolve({
+                    question: fullQuestion,
+                    choices: choices ?? [],
+                    allowFreeform,
+                    status: 'resolved',
+                    answer,
+                    instruction: 'Resposta recebida. Processar e continuar o fluxo.',
+                });
+            };
+            // Emite evento SSE para que a interface saiba que o agente está aguardando input
+            // (broadcastSse importado dinamicamente para evitar dependência cíclica)
+            import('../terminal/dialog.js')
+                .then(({ broadcastSse }) => {
+                    broadcastSse('waiting_for_input', {
+                        question: fullQuestion,
+                        choices: choices ?? [],
+                        allowFreeform,
+                    });
+                })
+                .catch(() => {});
+        });
     },
 });
 

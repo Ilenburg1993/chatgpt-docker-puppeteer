@@ -638,7 +638,17 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     answerPendingQuestion(answer) {
         if (!this.#pendingQuestion) {
-            log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
+            // ARCH-N01 (fix): mesmo sem pendingQuestion nativo, pode haver Promise de hook-tools.
+            // Tentar resolver via resolveUserInput() exportado de hook-tools.
+            import('../tools/hook-tools.js')
+                .then(({ resolveUserInput }) => {
+                    if (!resolveUserInput(answer)) {
+                        log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
+                    }
+                })
+                .catch(() => {
+                    log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
+                });
             return false;
         }
         log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
@@ -646,6 +656,12 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.#pendingQuestion = null;
         writeState({ pendingQuestion: null });
         this.emit('question.answered', { answer });
+        // ARCH-N01 (fix): também resolver Promise da tool request_user_input se houver uma pendente
+        import('../tools/hook-tools.js')
+            .then(({ resolveUserInput }) => {
+                resolveUserInput(answer);
+            })
+            .catch(() => {});
         return true;
     }
 
