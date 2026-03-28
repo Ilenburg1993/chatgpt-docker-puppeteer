@@ -21,7 +21,7 @@ import { withSkipPermission } from './tool-factory.js';
  * @param {string} urlStr
  * @param {string | null} body
  * @param {number} [timeoutMs]
- * @returns {Promise<string>}
+ * @returns {Promise<{ statusCode: number; body: string }>}
  */
 function httpRequest(method, urlStr, body = null, timeoutMs = 5000) {
     return new Promise((resolve, reject) => {
@@ -50,13 +50,8 @@ function httpRequest(method, urlStr, body = null, timeoutMs = 5000) {
                 data += chunk.toString('utf8');
             });
             res.on('end', () => {
-                // BUG-N09 (fix): verificar statusCode antes de resolver
-                const status = res.statusCode ?? 0;
-                if (status >= 400) {
-                    reject(new Error(`HTTP ${status}: ${data.slice(0, 200)}`));
-                } else {
-                    resolve(data);
-                }
+                const statusCode = res.statusCode ?? 0;
+                resolve({ statusCode, body: data });
             });
         });
         req.setTimeout(timeoutMs, () => {
@@ -92,8 +87,9 @@ const getTasksTool = defineTool('get_tasks', {
         try {
             const port = process.env.PORT ?? '3008';
             const url = `http://127.0.0.1:${port}/api/tasks?limit=${limit ?? 10}${status ? `&status=${status}` : ''}`;
-            const result = await httpRequest('GET', url);
-            const data = JSON.parse(result);
+            const { statusCode, body } = await httpRequest('GET', url);
+            if (statusCode !== 200) return { tasks: [], total: 0, error: `HTTP ${statusCode}` };
+            const data = JSON.parse(body);
             return {
                 tasks: data?.data?.tasks ?? data?.tasks ?? [],
                 total: data?.data?.total ?? data?.total ?? 0,
@@ -138,8 +134,9 @@ const addTaskTool = defineTool('add_task', {
         try {
             const port = process.env.PORT ?? '3008';
             const body = JSON.stringify({ target, spec_user_message: user_message, priority: priority ?? 50, model });
-            const result = await httpRequest('POST', `http://127.0.0.1:${port}/api/tasks`, body);
-            const data = JSON.parse(result);
+            const { statusCode, body: resBody } = await httpRequest('POST', `http://127.0.0.1:${port}/api/tasks`, body);
+            if (statusCode >= 400) return { success: false, error: `HTTP ${statusCode}: ${resBody.slice(0, 200)}` };
+            const data = JSON.parse(resBody);
             log('INFO', `[copilot/add_task] Tarefa criada: ${data?.data?.id ?? JSON.stringify(data)}`);
             return { success: true, task: data?.data ?? data };
         } catch (/** @type {any} */ e) {
@@ -185,8 +182,9 @@ const getSystemHealthTool = defineTool('get_system_health', {
     handler: async () => {
         try {
             const port = process.env.PORT ?? '3008';
-            const result = await httpRequest('GET', `http://127.0.0.1:${port}/api/health`);
-            return JSON.parse(result);
+            const { statusCode, body } = await httpRequest('GET', `http://127.0.0.1:${port}/api/health`);
+            if (statusCode !== 200) return { healthy: false, error: `HTTP ${statusCode}` };
+            return JSON.parse(body);
         } catch (/** @type {any} */ e) {
             return { healthy: false, error: e.message };
         }

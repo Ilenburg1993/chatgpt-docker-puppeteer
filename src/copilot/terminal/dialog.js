@@ -204,9 +204,25 @@ export function broadcastSse(event, data) {
     const _sseClients = getSseClients();
     const _sseCriticalClients = getSseCriticalClients();
 
+    // BUG-N07 (fix): truncar conteúdo de reply para evitar SSE message gigante
+    const MAX_SSE_CONTENT_CHARS = 64_000;
+    /** @type {object} */
+    let safeData = data;
+    if (
+        data !== null &&
+        typeof data === 'object' &&
+        typeof (/** @type {any} */ (data).content) === 'string' &&
+        /** @type {any} */ (data).content.length > MAX_SSE_CONTENT_CHARS
+    ) {
+        safeData = {
+            ...data,
+            content: /** @type {any} */ (data).content.slice(0, MAX_SSE_CONTENT_CHARS) + ' […truncado]',
+        };
+    }
+
     // ── SSE (raw node:http) ───────────────────────────────────────────────────
     if (_sseClients.size > 0 || _sseCriticalClients.size > 0) {
-        const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+        const payload = `event: ${event}\ndata: ${JSON.stringify(safeData)}\n\n`;
         for (const client of _sseClients) {
             try {
                 client.write(payload);
@@ -228,7 +244,7 @@ export function broadcastSse(event, data) {
     // ── Socket.io dual-emit (no-op quando namespace não montado, ex: processo separado) ──
     const _ns = getCopilotNamespace();
     if (_ns) {
-        _ns.emit(event, { ...data, hubSessionId: getHubSessionId() });
+        _ns.emit(event, { ...safeData, hubSessionId: getHubSessionId() });
     }
 }
 
@@ -361,6 +377,11 @@ export function sendTurn(message, actor = 'user') {
     );
     void next.finally(() => {
         _turnQueueDepth--;
+        // PERF-N06 (fix): resetar a cadeia do mutex quando a fila estiver vazia
+        // Impede que a cadeia de .then() cresça indefinidamente ao longo de milhões de turnos.
+        if (_turnQueueDepth === 0) {
+            _sendTurnMutex = Promise.resolve(null);
+        }
     });
     return next;
 }
