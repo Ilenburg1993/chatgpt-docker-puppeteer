@@ -90,12 +90,14 @@ const permissionModeSetTool = buildTool({
     }),
     requiresApproval: false,
     handler: async (
-        /** @type {{
-    mode: 'approve_all' | 'audit_only' | 'selective';
-    allowTools?: string[];
-    denyTools?: string[];
-    denyShell?: boolean;
-}} */ { mode, allowTools, denyTools, denyShell },
+        /**
+         * @type {{
+         *     mode: 'approve_all' | 'audit_only' | 'selective';
+         *     allowTools?: string[];
+         *     denyTools?: string[];
+         *     denyShell?: boolean;
+         * }}
+         */ { mode, allowTools, denyTools, denyShell },
     ) => {
         const before = alwaysAliveAgent.getPermissionMode();
         /** @type {{ allowTools?: string[]; denyTools?: string[]; denyShell?: boolean }} */

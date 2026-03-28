@@ -1,9 +1,7 @@
 # AUDIT_PERMISSIONS_ARCH_2026
 
-**Tipo**: Auditoria arquitetural + segurança
-**Escopo**: Subsistema de permissões e aprovação de tools do `src/copilot`
-**Data**: 2026-06-22
-**Status**: ✅ Executado — ver itens abaixo
+**Tipo**: Auditoria arquitetural + segurança **Escopo**: Subsistema de permissões e aprovação de
+tools do `src/copilot` **Data**: 2026-06-22 **Status**: ✅ Executado — ver itens abaixo
 
 ---
 
@@ -82,7 +80,8 @@ runtime. A rica infraestrutura em `lib/permissions.js` (whitelist, blacklist, ca
 mode) é completamente ignorada pelo agente principal.
 
 **Impacto**: Impossível alterar o comportamento sem reiniciar o processo. Sem observabilidade das
-decisões por padrão (o audit wrapper existe mas o SDK `approveAll` não passa pelo `lib/permissions`).
+decisões por padrão (o audit wrapper existe mas o SDK `approveAll` não passa pelo
+`lib/permissions`).
 
 **Correção**: Introduzir `#permissionHandler` como campo privado da classe, inicializável via
 construtor/`setPermissionMode()`. Ver SEC-PERM-01 no plano de execução.
@@ -100,6 +99,7 @@ o sistema já aprova tudo (hardcoded), mas o usuário não sabe disso e não tem
 comportamento.
 
 **Correção**: Implementar:
+
 1. `permission_mode_get` / `permission_mode_set` tools (expostas à LLM)
 2. `GET/POST /api/copilot/permissions` endpoints HTTP
 3. Modos suportados: `approve_all`, `audit_only`, `selective` (com whitelist/blacklist configurável)
@@ -122,11 +122,16 @@ Ver UPG-N17-WEB.
 ### 🟡 ALTO — WEB-01: `web_search` desabilitado por padrão sem justificativa operacional
 
 **Arquivo**: `src/copilot/tools/web-tools.js` (última linha)
+
 ```js
-export const webTools = [webFetchTool, ...(process.env['WEB_SEARCH_ENABLED'] === 'true' ? [webSearchTool] : [])];
+export const webTools = [
+  webFetchTool,
+  ...(process.env['WEB_SEARCH_ENABLED'] === 'true' ? [webSearchTool] : []),
+];
 ```
 
 **Arquivo**: `src/copilot/config/session-config.js`
+
 ```js
 export const DEFAULT_EXCLUDED_TOOLS = ['powershell', 'web_fetch', 'web_search', 'memory'];
 ```
@@ -182,7 +187,7 @@ correspondem aos nomes reais das tools do projeto (`run_shell_command`, `run_npm
 ```js
 const h = url.hostname.toLowerCase();
 if (h === '::1' || h === '0:0:0:0:0:0:0:1' || h.startsWith('fd') || h === 'fe80') {
-    return { safe: false, reason: `IPv6 privado/loopback bloqueado: ${url.hostname}` };
+  return { safe: false, reason: `IPv6 privado/loopback bloqueado: ${url.hostname}` };
 }
 ```
 
@@ -222,20 +227,20 @@ commit atual mas registrado para UPG-N18.
 
 | ID          | Prioridade | Descrição                                                               | Arquivo(s)                                           |
 | ----------- | ---------- | ----------------------------------------------------------------------- | ---------------------------------------------------- |
-| PERM-01-FIX | 🔴          | Substituir `approveAll` hardcoded por `#permissionHandler` configurável | `always-alive.js`                                    |
-| PERM-02-FIX | 🔴          | Criar `permission_mode_get/set` tools + endpoint HTTP                   | `tools/permission-tools.js`, `api/bridge-control.js` |
-| WEB-01-FIX  | 🟡          | Habilitar `web_search` por padrão (opt-out via env)                     | `web-tools.js`                                       |
-| UPG-N17-WEB | 🟡          | Migrar `web-tools.js` para `buildTool`                                  | `web-tools.js`                                       |
-| PERM-03-FIX | 🟡          | Corrigir `createSafePermission` com nomes reais                         | `lib/permissions.js`                                 |
-| SSRF-01-FIX | 🟡          | Expandir cobertura IPv6 no SSRF guard                                   | `web-tools.js`                                       |
+| PERM-01-FIX | 🔴         | Substituir `approveAll` hardcoded por `#permissionHandler` configurável | `always-alive.js`                                    |
+| PERM-02-FIX | 🔴         | Criar `permission_mode_get/set` tools + endpoint HTTP                   | `tools/permission-tools.js`, `api/bridge-control.js` |
+| WEB-01-FIX  | 🟡         | Habilitar `web_search` por padrão (opt-out via env)                     | `web-tools.js`                                       |
+| UPG-N17-WEB | 🟡         | Migrar `web-tools.js` para `buildTool`                                  | `web-tools.js`                                       |
+| PERM-03-FIX | 🟡         | Corrigir `createSafePermission` com nomes reais                         | `lib/permissions.js`                                 |
+| SSRF-01-FIX | 🟡         | Expandir cobertura IPv6 no SSRF guard                                   | `web-tools.js`                                       |
 
 ### Backlog
 
 | ID           | Prioridade | Descrição                                        |
 | ------------ | ---------- | ------------------------------------------------ |
-| ARCH-01-FIX  | 🟡          | `always-alive.js` usar `buildAlwaysAliveConfig`  |
-| AUDIT-01-FIX | 🟢          | Rotação do audit log                             |
-| SDK-01-FIX   | 🟢          | UPG-N18: migrar tools restantes para `buildTool` |
+| ARCH-01-FIX  | 🟡         | `always-alive.js` usar `buildAlwaysAliveConfig`  |
+| AUDIT-01-FIX | 🟢         | Rotação do audit log                             |
+| SDK-01-FIX   | 🟢         | UPG-N18: migrar tools restantes para `buildTool` |
 
 ---
 
@@ -268,17 +273,17 @@ onPermissionRequest: this.#permissionHandler,
 ```js
 // tools/permission-tools.js (novo arquivo)
 export const permissionModeSetTool = buildTool({
-    name: 'permission_mode_set',
-    description: 'Altera o modo de aprovação de tools do agente em runtime. ...',
-    parameters: z.object({
-        mode: z.enum(['approve_all', 'audit_only', 'deny_shell', 'selective']),
-        allowTools: z.array(z.string()).optional(),
-        denyTools: z.array(z.string()).optional(),
-    }),
-    handler: async ({ mode, allowTools, denyTools }) => {
-        // chama alwaysAliveAgent.setPermissionMode(...)
-    },
-    requiresApproval: false, // lida com permissão, não precisa de aprovação
+  name: 'permission_mode_set',
+  description: 'Altera o modo de aprovação de tools do agente em runtime. ...',
+  parameters: z.object({
+    mode: z.enum(['approve_all', 'audit_only', 'deny_shell', 'selective']),
+    allowTools: z.array(z.string()).optional(),
+    denyTools: z.array(z.string()).optional(),
+  }),
+  handler: async ({ mode, allowTools, denyTools }) => {
+    // chama alwaysAliveAgent.setPermissionMode(...)
+  },
+  requiresApproval: false, // lida com permissão, não precisa de aprovação
 });
 ```
 
@@ -287,8 +292,8 @@ export const permissionModeSetTool = buildTool({
 ```js
 // web-tools.js — última linha
 export const webTools = [
-    webFetchTool,
-    ...(process.env['WEB_SEARCH_DISABLED'] === 'true' ? [] : [webSearchTool]),
+  webFetchTool,
+  ...(process.env['WEB_SEARCH_DISABLED'] === 'true' ? [] : [webSearchTool]),
 ];
 ```
 
