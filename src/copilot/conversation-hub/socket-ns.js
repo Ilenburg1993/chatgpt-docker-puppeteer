@@ -56,6 +56,31 @@ export function mountCopilotNamespace(io, orchestrator, store) {
 
     const ns = io.of('/copilot');
 
+    // SEC-N04 (fix): rate limit por socket no evento user:inject
+    /** @type {Map<string, { count: number; resetAt: number }>} */
+    const _socketInjectBuckets = new Map();
+    const INJECT_LIMIT = 10;
+    const INJECT_WINDOW_MS = 60_000;
+
+    /**
+     * Retorna true se o socket ainda está dentro do limite de injects por minuto.
+     *
+     * @param {string} socketId
+     * @returns {boolean}
+     */
+    function checkSocketInjectRate(socketId) {
+        const now = Date.now();
+        // Prune expirados
+        for (const [key, bucket] of _socketInjectBuckets) {
+            if (now >= bucket.resetAt) _socketInjectBuckets.delete(key);
+        }
+        const bucket = _socketInjectBuckets.get(socketId) ?? { count: 0, resetAt: now + INJECT_WINDOW_MS };
+        if (bucket.count >= INJECT_LIMIT) return false;
+        bucket.count++;
+        _socketInjectBuckets.set(socketId, bucket);
+        return true;
+    }
+
     // Autenticação opcional (controlada por env var ou herda do namespace principal)
     const authRequired = _parseAuthRequired();
 
@@ -123,6 +148,13 @@ export function mountCopilotNamespace(io, orchestrator, store) {
         socket.on('user:inject', (/** @type {{ hubSession: string; content: string }} */ data) => {
             if (!data?.hubSession || !data?.content) {
                 socket.emit('error:inject', { reason: 'hubSession e content são obrigatórios.' });
+                return;
+            }
+
+            // SEC-N04 (fix): rate limit por socket
+            if (!checkSocketInjectRate(clientId)) {
+                socket.emit('error:inject', { reason: 'Rate limit excedido. Tente novamente em breve.' });
+                log('WARN', `[socket-ns/copilot] Rate limit atingido pelo socket ${clientId}`);
                 return;
             }
 

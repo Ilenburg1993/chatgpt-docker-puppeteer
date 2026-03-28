@@ -52,6 +52,26 @@ import {
 
 const router = Router();
 
+// SEC-N05/N06 (fix): validação de model — prevenir injeção e garantir formato kosher
+const MODEL_SAFE_RE = /^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,99})$/;
+
+/**
+ * Valida e sanitiza o campo `model` recebido do body HTTP. Retorna o model normalizado (trim) ou null se inválido.
+ *
+ * @param {unknown} model
+ * @returns {{ ok: true; model: string } | { ok: false; error: string }}
+ */
+function validateModel(model) {
+    if (!model || typeof model !== 'string') {
+        return { ok: false, error: 'Campo "model" (string) é obrigatório.' };
+    }
+    const trimmed = model.trim();
+    if (!MODEL_SAFE_RE.test(trimmed)) {
+        return { ok: false, error: 'Campo "model" contém caracteres inválidos ou formato não permitido.' };
+    }
+    return { ok: true, model: trimmed };
+}
+
 /**
  * Wrapper que captura erros e retorna 500 padronizado.
  *
@@ -203,14 +223,16 @@ router.post('/sessions', (req, res) => {
             clientName,
         } = req.body ?? {};
 
-        if (!model || typeof model !== 'string') {
-            res.status(400).json({ ok: false, error: 'Campo "model" (string) é obrigatório.' });
+        const modelResult = validateModel(model);
+        if (!modelResult.ok) {
+            res.status(400).json({ ok: false, error: modelResult.error });
             return;
         }
+        const safeModel = modelResult.model;
 
         const session = await createSdkSession({
             onPermissionRequest: approveAll,
-            model,
+            model: safeModel,
             ...(sessionId ? { sessionId } : {}),
             ...(systemMessage ? { systemMessage } : {}),
             ...(infiniteSessions !== undefined ? { infiniteSessions } : {}),
@@ -502,10 +524,12 @@ router.post('/sessions/:id/model', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
         const { model } = req.body ?? {};
-        if (!model || typeof model !== 'string') {
-            res.status(400).json({ ok: false, error: 'Campo "model" (string) é obrigatório.' });
+        const modelValidation = validateModel(model);
+        if (!modelValidation.ok) {
+            res.status(400).json({ ok: false, error: modelValidation.error });
             return;
         }
+        const safeModel = modelValidation.model;
         const entry = getSdkSession(id);
         if (!entry) {
             res.status(404).json({
@@ -514,9 +538,9 @@ router.post('/sessions/:id/model', (req, res) => {
             });
             return;
         }
-        await entry.session.setModel(model);
-        log('INFO', `[sdk-api] modelo alterado: sessão ${id} → ${model}`);
-        res.json({ ok: true, sessionId: id, model });
+        await entry.session.setModel(safeModel);
+        log('INFO', `[sdk-api] modelo alterado: sessão ${id} → ${safeModel}`);
+        res.json({ ok: true, sessionId: id, model: safeModel });
     });
 });
 

@@ -91,8 +91,18 @@ function httpRequest(method, path, body, port, timeoutMs) {
                 headers,
             },
             (res) => {
+                // BUG-N06 (fix): limitar corpo da resposta a 2 MB para evitar acúmulo irrestrito
+                const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
                 let data = '';
-                res.on('data', (chunk) => {
+                let received = 0;
+                res.on('data', (/** @type {Buffer} */ chunk) => {
+                    received += chunk.length;
+                    if (received > MAX_RESPONSE_BYTES) {
+                        req.destroy(
+                            new BridgeError('Resposta do terminal excede limite de 2 MB', 'LLM_B_RESPONSE_TOO_LARGE'),
+                        );
+                        return;
+                    }
                     data += chunk;
                 });
                 res.on('end', () => resolve({ statusCode: res.statusCode ?? 0, body: data }));

@@ -21,13 +21,13 @@
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-const execFileAsync = promisify(execFile);
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { z } from 'zod';
 import { withSkipPermission } from './tool-factory.js';
+const execFileAsync = promisify(execFile);
 
 /**
  * Raiz do repositório — calculada em relação a este arquivo (src/copilot/tools/).

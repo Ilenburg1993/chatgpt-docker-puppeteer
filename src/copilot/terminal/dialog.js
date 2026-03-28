@@ -55,6 +55,15 @@ const MAX_TURN_QUEUE_SIZE = 10;
 let _turnQueueDepth = 0;
 
 /**
+ * Retorna a profundidade atual da fila de turnos.
+ *
+ * @returns {number}
+ */
+export function getTurnQueueDepth() {
+    return _turnQueueDepth;
+}
+
+/**
  * Promise-chain mutex para serializar chamadas concorrentes a `sendTurn`.
  *
  * TERM-01: substitui a estratégia de rejeição imediata (`getBusy() === true → return null`) por uma fila que serializa
@@ -260,9 +269,40 @@ export function ensureDialogLoop() {
 /**
  * Implementação interna de ensureDialogLoop — nunca chamar diretamente.
  *
+ * BUG-N05 (fix): retry com backoff exponencial (2s/4s/8s) em caso de falha.
+ *
  * @returns {Promise<void>}
  */
 async function _doEnsureDialogLoop() {
+    const MAX_RETRIES = 3;
+    let attempt = 0;
+
+    while (attempt <= MAX_RETRIES) {
+        try {
+            await _tryStartDialogLoop();
+            return;
+        } catch (/** @type {any} */ err) {
+            attempt++;
+            if (attempt > MAX_RETRIES) {
+                log('ERROR', `[dialog] ensureDialogLoop falhou após ${MAX_RETRIES} tentativas: ${err.message}`);
+                throw err;
+            }
+            const delay = 2000 * 2 ** (attempt - 1); // 2s, 4s, 8s
+            log(
+                'WARN',
+                `[dialog] ensureDialogLoop falhou (tentativa ${attempt}/${MAX_RETRIES}) — retry em ${delay}ms: ${err.message}`,
+            );
+            await new Promise((r) => setTimeout(r, delay));
+        }
+    }
+}
+
+/**
+ * Tenta iniciar o dialog loop uma vez.
+ *
+ * @returns {Promise<void>}
+ */
+async function _tryStartDialogLoop() {
     const status = alwaysAliveAgent.status;
     if (status === 'stopped') {
         println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');

@@ -193,7 +193,7 @@ const webFetchTool = defineTool('web_fetch', {
                 chunks.push(value);
             }
 
-    const text = new TextDecoder().decode(
+            const text = new TextDecoder().decode(
                 (() => {
                     const total = chunks.reduce((s, c) => s + c.length, 0);
                     const merged = new Uint8Array(total);

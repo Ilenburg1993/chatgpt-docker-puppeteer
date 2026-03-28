@@ -121,8 +121,8 @@ function sendJson(res, result) {
 }
 
 /**
- * Lê o body de uma requisição HTTP e retorna como string.
- * Rejeita payloads acima de MAX_BODY_BYTES (proteção contra DoS).
+ * Lê o body de uma requisição HTTP e retorna como string. Rejeita payloads acima de MAX_BODY_BYTES (proteção contra
+ * DoS).
  *
  * @param {import('node:http').IncomingMessage} req
  * @returns {Promise<string>}
@@ -171,280 +171,278 @@ export function createInjectServer() {
     const server = http.createServer(async (req, res) => {
         const url = new URL(req.url ?? '/', `http://localhost:${INJECT_PORT}`);
         try {
-
-
-        // ── GET /health ───────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/health') {
-            sendJson(res, handleHealth());
-            return;
-        }
-
-        // ── GET /context (UPG-04) ─────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/context') {
-            sendJson(res, handleGetContext());
-            return;
-        }
-
-        // ── GET /config ───────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/config') {
-            sendJson(res, handleGetConfig());
-            return;
-        }
-
-        // ── PUT /config/infinite-session (AC.1) ──────────────────────────
-        if (req.method === 'PUT' && url.pathname === '/config/infinite-session') {
-            readBody(req)
-                .then((raw) => {
-                    const body = raw ? JSON.parse(raw) : {};
-                    sendJson(res, handleSetInfiniteSessionConfig(body));
-                })
-                .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
-            return;
-        }
-
-        // ── GET /config/skills (AG.3) ─────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/config/skills') {
-            sendJson(res, handleGetSkills());
-            return;
-        }
-
-        // ── PUT /config/skills (AG.3) ─────────────────────────────────────
-        if (req.method === 'PUT' && url.pathname === '/config/skills') {
-            readBody(req)
-                .then((raw) => {
-                    const body = raw ? JSON.parse(raw) : {};
-                    sendJson(res, handleSetSkills(body));
-                })
-                .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
-            return;
-        }
-
-        // ── GET /config/tools (AH.2) ──────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/config/tools') {
-            sendJson(res, handleGetToolsConfig());
-            return;
-        }
-
-        // ── PUT /config/tools (AH.2) ──────────────────────────────────────
-        if (req.method === 'PUT' && url.pathname === '/config/tools') {
-            readBody(req)
-                .then((raw) => {
-                    const body = raw ? JSON.parse(raw) : {};
-                    sendJson(res, handleSetToolsConfig(body));
-                })
-                .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
-            return;
-        }
-
-        // ── GET /config/tools/custom (AI.2) ───────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/config/tools/custom') {
-            sendJson(res, handleGetCustomTools());
-            return;
-        }
-
-        // ── POST /config/tools/custom (AI.2) ──────────────────────────────
-        if (req.method === 'POST' && url.pathname === '/config/tools/custom') {
-            readBody(req)
-                .then((raw) => {
-                    const body = raw ? JSON.parse(raw) : {};
-                    sendJson(res, handleRegisterCustomTool(body));
-                })
-                .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
-            return;
-        }
-
-        // ── DELETE /config/tools/custom/:name (AI.2) ──────────────────────
-        if (req.method === 'DELETE' && url.pathname.startsWith('/config/tools/custom/')) {
-            const name = url.pathname.slice('/config/tools/custom/'.length);
-            sendJson(res, handleDeleteCustomTool(decodeURIComponent(name)));
-            return;
-        }
-
-        // ── GET /events ───────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/events') {
-            const isCriticalOnly = url.searchParams.get('level') === 'critical';
-            const _sseClients = getSseClients();
-            const _sseCriticalClients = getSseCriticalClients();
-            const totalSse = _sseClients.size + _sseCriticalClients.size;
-            if (totalSse >= MAX_SSE_CLIENTS) {
-                res.writeHead(429, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: false, error: 'Limite de clientes SSE atingido' }));
+            // ── GET /health ───────────────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/health') {
+                sendJson(res, handleHealth());
                 return;
             }
-            res.writeHead(200, {
-                'Content-Type': 'text/event-stream',
-                'Cache-Control': 'no-cache',
-                Connection: 'keep-alive',
-                'Access-Control-Allow-Origin': '*',
-            });
-            res.write(`: connected (level=${isCriticalOnly ? 'critical' : 'all'})\n\n`);
-            if (isCriticalOnly) {
-                _sseCriticalClients.add(res);
-                req.on('close', () => _sseCriticalClients.delete(res));
-            } else {
-                _sseClients.add(res);
-                req.on('close', () => _sseClients.delete(res));
-            }
-            return;
-        }
 
-        // ── GET /sessions ─────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/sessions') {
-            const rawStatus = url.searchParams.get('status');
-            sendJson(
-                res,
-                handleListSessions({
-                    limit: Number(url.searchParams.get('limit') ?? '20'),
-                    offset: Number(url.searchParams.get('offset') ?? '0'),
-                    ...(rawStatus !== null ? { status: rawStatus } : {}),
-                }),
-            );
-            return;
-        }
-
-        // ── GET /sessions/:id/turns ───────────────────────────────────────
-        if (req.method === 'GET' && /^\/sessions\/[^/]+\/turns$/.test(url.pathname)) {
-            const sessionId = url.pathname.split('/')[2] ?? '';
-            sendJson(
-                res,
-                handleListTurns({
-                    sessionId,
-                    limit: Number(url.searchParams.get('limit') ?? '50'),
-                    offset: Number(url.searchParams.get('offset') ?? '0'),
-                }),
-            );
-            return;
-        }
-
-        // ── POST /memory ──────────────────────────────────────────────────
-        if (req.method === 'POST' && url.pathname === '/memory') {
-            const raw = await readBody(req);
-            const parsed = /** @type {{ tag?: string; content?: string } | null} */ (tryParseJson(raw));
-            if (!parsed) {
-                sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
+            // ── GET /context (UPG-04) ─────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/context') {
+                sendJson(res, handleGetContext());
                 return;
             }
-            sendJson(res, handleStoreMemory(parsed));
-            return;
-        }
 
-        // ── GET /memory ───────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/memory') {
-            sendJson(
-                res,
-                handleRecallMemories({
-                    tag: url.searchParams.get('tag'),
-                    search: url.searchParams.get('search'),
-                    limit: Number(url.searchParams.get('limit') ?? '20'),
-                }),
-            );
-            return;
-        }
-
-        // ── DELETE /memory/:id ────────────────────────────────────────────
-        if (req.method === 'DELETE' && /^\/memory\/[^/]+$/.test(url.pathname)) {
-            const memoryId = url.pathname.split('/')[2] ?? '';
-            sendJson(res, handleDeleteMemory({ memoryId }));
-            return;
-        }
-
-        // ── POST /pipeline ────────────────────────────────────────────────
-        if (req.method === 'POST' && url.pathname === '/pipeline') {
-            const raw = await readBody(req);
-            const parsed =
-                /** @type {{ steps?: { prompt: string; waitMs?: number; from?: string }[]; from?: string } | null} */ (
-                    tryParseJson(raw)
-                );
-            if (!parsed) {
-                sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
+            // ── GET /config ───────────────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/config') {
+                sendJson(res, handleGetConfig());
                 return;
             }
-            sendJson(res, await handlePipeline(parsed));
-            return;
-        }
 
-        // ── POST /inject ──────────────────────────────────────────────────
-        if (req.method === 'POST' && url.pathname === '/inject') {
-            // GAP-01 (fix): rate limiting por IP
-            const clientIp = req.socket.remoteAddress ?? 'unknown';
-            const rateCheck = checkInjectRate(clientIp);
-            if (!rateCheck.allowed) {
-                res.writeHead(429, {
-                    'Content-Type': 'application/json',
-                    'Retry-After': String(rateCheck.resetIn),
+            // ── PUT /config/infinite-session (AC.1) ──────────────────────────
+            if (req.method === 'PUT' && url.pathname === '/config/infinite-session') {
+                readBody(req)
+                    .then((raw) => {
+                        const body = raw ? JSON.parse(raw) : {};
+                        sendJson(res, handleSetInfiniteSessionConfig(body));
+                    })
+                    .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
+                return;
+            }
+
+            // ── GET /config/skills (AG.3) ─────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/config/skills') {
+                sendJson(res, handleGetSkills());
+                return;
+            }
+
+            // ── PUT /config/skills (AG.3) ─────────────────────────────────────
+            if (req.method === 'PUT' && url.pathname === '/config/skills') {
+                readBody(req)
+                    .then((raw) => {
+                        const body = raw ? JSON.parse(raw) : {};
+                        sendJson(res, handleSetSkills(body));
+                    })
+                    .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
+                return;
+            }
+
+            // ── GET /config/tools (AH.2) ──────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/config/tools') {
+                sendJson(res, handleGetToolsConfig());
+                return;
+            }
+
+            // ── PUT /config/tools (AH.2) ──────────────────────────────────────
+            if (req.method === 'PUT' && url.pathname === '/config/tools') {
+                readBody(req)
+                    .then((raw) => {
+                        const body = raw ? JSON.parse(raw) : {};
+                        sendJson(res, handleSetToolsConfig(body));
+                    })
+                    .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
+                return;
+            }
+
+            // ── GET /config/tools/custom (AI.2) ───────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/config/tools/custom') {
+                sendJson(res, handleGetCustomTools());
+                return;
+            }
+
+            // ── POST /config/tools/custom (AI.2) ──────────────────────────────
+            if (req.method === 'POST' && url.pathname === '/config/tools/custom') {
+                readBody(req)
+                    .then((raw) => {
+                        const body = raw ? JSON.parse(raw) : {};
+                        sendJson(res, handleRegisterCustomTool(body));
+                    })
+                    .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
+                return;
+            }
+
+            // ── DELETE /config/tools/custom/:name (AI.2) ──────────────────────
+            if (req.method === 'DELETE' && url.pathname.startsWith('/config/tools/custom/')) {
+                const name = url.pathname.slice('/config/tools/custom/'.length);
+                sendJson(res, handleDeleteCustomTool(decodeURIComponent(name)));
+                return;
+            }
+
+            // ── GET /events ───────────────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/events') {
+                const isCriticalOnly = url.searchParams.get('level') === 'critical';
+                const _sseClients = getSseClients();
+                const _sseCriticalClients = getSseCriticalClients();
+                const totalSse = _sseClients.size + _sseCriticalClients.size;
+                if (totalSse >= MAX_SSE_CLIENTS) {
+                    res.writeHead(429, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: 'Limite de clientes SSE atingido' }));
+                    return;
+                }
+                res.writeHead(200, {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    Connection: 'keep-alive',
+                    'Access-Control-Allow-Origin': '*',
                 });
-                res.end(
-                    JSON.stringify({
-                        ok: false,
-                        error: `Rate limit excedido. Tente novamente em ${rateCheck.resetIn}s.`,
+                res.write(`: connected (level=${isCriticalOnly ? 'critical' : 'all'})\n\n`);
+                if (isCriticalOnly) {
+                    _sseCriticalClients.add(res);
+                    req.on('close', () => _sseCriticalClients.delete(res));
+                } else {
+                    _sseClients.add(res);
+                    req.on('close', () => _sseClients.delete(res));
+                }
+                return;
+            }
+
+            // ── GET /sessions ─────────────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/sessions') {
+                const rawStatus = url.searchParams.get('status');
+                sendJson(
+                    res,
+                    handleListSessions({
+                        limit: Number(url.searchParams.get('limit') ?? '20'),
+                        offset: Number(url.searchParams.get('offset') ?? '0'),
+                        ...(rawStatus !== null ? { status: rawStatus } : {}),
                     }),
                 );
                 return;
             }
-            const raw = await readBody(req);
-            const parsed = /** @type {{ message?: string; from?: string } | null} */ (tryParseJson(raw));
-            if (!parsed) {
-                sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
+
+            // ── GET /sessions/:id/turns ───────────────────────────────────────
+            if (req.method === 'GET' && /^\/sessions\/[^/]+\/turns$/.test(url.pathname)) {
+                const sessionId = url.pathname.split('/')[2] ?? '';
+                sendJson(
+                    res,
+                    handleListTurns({
+                        sessionId,
+                        limit: Number(url.searchParams.get('limit') ?? '50'),
+                        offset: Number(url.searchParams.get('offset') ?? '0'),
+                    }),
+                );
                 return;
             }
-            sendJson(res, await handleInject(parsed));
-            return;
-        }
 
-        // ── GET /gh/issues ────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/gh/issues') {
-            sendJson(
-                res,
-                await handleGhIssues({
-                    state: url.searchParams.get('state') ?? 'open',
-                    limit: Number(url.searchParams.get('limit') ?? '15'),
-                }),
-            );
-            return;
-        }
+            // ── POST /memory ──────────────────────────────────────────────────
+            if (req.method === 'POST' && url.pathname === '/memory') {
+                const raw = await readBody(req);
+                const parsed = /** @type {{ tag?: string; content?: string } | null} */ (tryParseJson(raw));
+                if (!parsed) {
+                    sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
+                    return;
+                }
+                sendJson(res, handleStoreMemory(parsed));
+                return;
+            }
 
-        // ── GET /gh/prs ───────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/gh/prs') {
-            sendJson(
-                res,
-                await handleGhPrs({
-                    state: url.searchParams.get('state') ?? 'open',
-                    limit: Number(url.searchParams.get('limit') ?? '15'),
-                }),
-            );
-            return;
-        }
+            // ── GET /memory ───────────────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/memory') {
+                sendJson(
+                    res,
+                    handleRecallMemories({
+                        tag: url.searchParams.get('tag'),
+                        search: url.searchParams.get('search'),
+                        limit: Number(url.searchParams.get('limit') ?? '20'),
+                    }),
+                );
+                return;
+            }
 
-        // ── GET /gh/ci ────────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/gh/ci') {
-            sendJson(
-                res,
-                await handleGhCi({
-                    limit: Number(url.searchParams.get('limit') ?? '15'),
-                }),
-            );
-            return;
-        }
+            // ── DELETE /memory/:id ────────────────────────────────────────────
+            if (req.method === 'DELETE' && /^\/memory\/[^/]+$/.test(url.pathname)) {
+                const memoryId = url.pathname.split('/')[2] ?? '';
+                sendJson(res, handleDeleteMemory({ memoryId }));
+                return;
+            }
 
-        // ── GET /git/status ───────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/git/status') {
-            sendJson(res, await handleGitStatus());
-            return;
-        }
+            // ── POST /pipeline ────────────────────────────────────────────────
+            if (req.method === 'POST' && url.pathname === '/pipeline') {
+                const raw = await readBody(req);
+                const parsed =
+                    /** @type {{ steps?: { prompt: string; waitMs?: number; from?: string }[]; from?: string } | null} */ (
+                        tryParseJson(raw)
+                    );
+                if (!parsed) {
+                    sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
+                    return;
+                }
+                sendJson(res, await handlePipeline(parsed));
+                return;
+            }
 
-        // ── GET /git/log ──────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/git/log') {
-            sendJson(
-                res,
-                await handleGitLog({
-                    n: Number(url.searchParams.get('n') ?? '20'),
-                }),
-            );
-            return;
-        }
+            // ── POST /inject ──────────────────────────────────────────────────
+            if (req.method === 'POST' && url.pathname === '/inject') {
+                // GAP-01 (fix): rate limiting por IP
+                const clientIp = req.socket.remoteAddress ?? 'unknown';
+                const rateCheck = checkInjectRate(clientIp);
+                if (!rateCheck.allowed) {
+                    res.writeHead(429, {
+                        'Content-Type': 'application/json',
+                        'Retry-After': String(rateCheck.resetIn),
+                    });
+                    res.end(
+                        JSON.stringify({
+                            ok: false,
+                            error: `Rate limit excedido. Tente novamente em ${rateCheck.resetIn}s.`,
+                        }),
+                    );
+                    return;
+                }
+                const raw = await readBody(req);
+                const parsed = /** @type {{ message?: string; from?: string } | null} */ (tryParseJson(raw));
+                if (!parsed) {
+                    sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
+                    return;
+                }
+                sendJson(res, await handleInject(parsed));
+                return;
+            }
 
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+            // ── GET /gh/issues ────────────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/gh/issues') {
+                sendJson(
+                    res,
+                    await handleGhIssues({
+                        state: url.searchParams.get('state') ?? 'open',
+                        limit: Number(url.searchParams.get('limit') ?? '15'),
+                    }),
+                );
+                return;
+            }
+
+            // ── GET /gh/prs ───────────────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/gh/prs') {
+                sendJson(
+                    res,
+                    await handleGhPrs({
+                        state: url.searchParams.get('state') ?? 'open',
+                        limit: Number(url.searchParams.get('limit') ?? '15'),
+                    }),
+                );
+                return;
+            }
+
+            // ── GET /gh/ci ────────────────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/gh/ci') {
+                sendJson(
+                    res,
+                    await handleGhCi({
+                        limit: Number(url.searchParams.get('limit') ?? '15'),
+                    }),
+                );
+                return;
+            }
+
+            // ── GET /git/status ───────────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/git/status') {
+                sendJson(res, await handleGitStatus());
+                return;
+            }
+
+            // ── GET /git/log ──────────────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/git/log') {
+                sendJson(
+                    res,
+                    await handleGitLog({
+                        n: Number(url.searchParams.get('n') ?? '20'),
+                    }),
+                );
+                return;
+            }
+
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Not found' }));
         } catch (/** @type {any} */ err) {
             if (err?.code === 'PAYLOAD_TOO_LARGE') {
                 if (!res.headersSent) {
