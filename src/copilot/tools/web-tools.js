@@ -85,6 +85,7 @@ function checkRateLimit() {
  * Tool: web_fetch — busca o conteúdo de uma URL pública com proteção SSRF.
  */
 const webFetchTool = defineTool('web_fetch', {
+    overridesBuiltInTool: true,
     description:
         'Busca o conteúdo de uma URL pública (HTTP/HTTPS). Apenas texto (text/*). ' +
         'Bloqueado para IPs privados, localhost e esquemas não-HTTP (proteção SSRF). ' +
@@ -221,6 +222,7 @@ const webFetchTool = defineTool('web_fetch', {
  * Usa o frontend HTML leve do DDG e extrai título, URL e snippet dos resultados.
  */
 const webSearchTool = defineTool('web_search', {
+    overridesBuiltInTool: true,
     description:
         'Realiza busca na web via DuckDuckGo e retorna os primeiros resultados (título, URL, snippet). ' +
         'Use quando precisar de informações atuais da web que não estão no workspace. ' +

@@ -130,5 +130,11 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
     registerForIntrospection(allTools);
     setTelemetryStore(telemetry);
 
-    return allTools;
+    // Garante que todas as tools têm overridesBuiltInTool: true para evitar conflito com
+    // ferramentas nativas do CLI Copilot (web_fetch, read_file, exec_command, etc.)
+    const finalTools = allTools.map((t) =>
+        t.overridesBuiltInTool ? t : { ...t, overridesBuiltInTool: true },
+    );
+
+    return finalTools;
 }
