@@ -18,6 +18,7 @@
 
 import { SessionError } from '#copilot/core/errors';
 import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart, startSpan } from '#copilot/lib/index';
+import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/lib/permissions';
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
@@ -174,6 +175,12 @@ export class AlwaysAliveAgent extends EventEmitter {
     /** @type {WebhookManager} */
     #webhooks = new WebhookManager();
 
+    /** @type {import('@github/copilot-sdk').PermissionHandler} */
+    #permissionHandler = approveAll;
+
+    /** @type {'approve_all' | 'audit_only' | 'selective'} */
+    #permissionModeLabel = /** @type {'approve_all'} */ ('approve_all');
+
     /** @type {import('#copilot/lib/telemetry').TelemetryStore} */
     #telemetry = createTelemetry();
 
@@ -194,6 +201,67 @@ export class AlwaysAliveAgent extends EventEmitter {
             /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */ (
                 process.env.COPILOT_REASONING_EFFORT || undefined
             );
+    }
+
+    // ─── Controle de permissão em runtime ─────────────────────────────────────
+
+    /**
+     * Retorna o modo de permissão ativo como string legível.
+     *
+     * Modos disponíveis:
+     *
+     * - `"approve_all"` — aprova tudo automaticamente (comportamento padrão, SDK approveAll)
+     * - `"audit_only"` — aprova tudo mas loga cada decisão
+     * - `"selective"` — whitelist/blacklist/callback customizado
+     *
+     * @returns {'approve_all' | 'audit_only' | 'selective'}
+     */
+    getPermissionMode() {
+        return this.#permissionModeLabel;
+    }
+
+    /**
+     * Altera o modo de aprovação de tools em runtime — sem reiniciar o agente.
+     *
+     * A mudança é aplicada na PRÓXIMA reconexão/reinício real de sessão. Para sessões já ativas, apenas novos
+     * `initOrResumeSession` usarão o handler atualizado.
+     *
+     * DL-PERM: o dialog loop não é uma tool e não passa por este handler. Não é possível bloquear o encerramento do
+     * dialog loop via configuração de permissão.
+     *
+     * @param {'approve_all' | 'audit_only' | 'selective'} mode - Modo de aprovação
+     * @param {{ allowTools?: string[]; denyTools?: string[]; denyShell?: boolean }} [opts] - Opções para modo selective
+     * @returns {void}
+     */
+    setPermissionMode(mode, opts = {}) {
+        const { allowTools, denyTools, denyShell } = opts;
+        switch (mode) {
+            case 'approve_all':
+                this.#permissionHandler = approveAll;
+                this.#permissionModeLabel = 'approve_all';
+                break;
+            case 'audit_only':
+                this.#permissionHandler = createAuditOnlyPermission();
+                this.#permissionModeLabel = 'audit_only';
+                break;
+            case 'selective': {
+                const shellTools = ['run_shell_command', 'run_npm_script', 'run_node_script'];
+                /** @type {import('#copilot/lib/permissions').PermissionHandlerConfig} */
+                const cfg = {
+                    denyTools: [...(denyShell ? shellTools : []), ...(denyTools ?? [])],
+                    auditMode: true,
+                };
+                if (allowTools?.length) cfg.allowTools = allowTools;
+                this.#permissionHandler = createPermissionHandler(cfg);
+                this.#permissionModeLabel = 'selective';
+                break;
+            }
+            default:
+                log('WARN', `[AlwaysAlive] setPermissionMode: modo inválido '${/** @type {any} */ (mode)}'`);
+                return;
+        }
+        log('INFO', `[AlwaysAlive] Modo de permissão alterado para '${mode}'.`);
+        this.emit('permission.mode_changed', { mode });
     }
 
     /**
@@ -323,7 +391,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             const { session, isResumed } = await startSpan('session.boot', { model: this.#model }, () =>
                 initOrResumeSession(client, {
                     model: this.#model,
-                    onPermissionRequest: approveAll,
+                    onPermissionRequest: this.#permissionHandler,
                     onUserInputRequest: this.#handleUserInputRequest.bind(this),
                     hooks: {
                         onSessionStart: this.#onSessionStart.bind(this),
@@ -758,6 +826,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             contextWindow: this.#contextState,
             // AC.3: último checkpoint da compaction (null até a primeira compaction)
             lastCheckpointPath: this.#lastCheckpointPath,
+            // PERM-01: modo de aprovação ativo
+            permissionMode: this.#permissionModeLabel,
         };
         this.#statusSnapshotCache = { snapshot, at: now };
         return snapshot;
@@ -1218,7 +1288,7 @@ qualquer tentativa de encerramento não autorizado.`;
                 const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
                 const { session, isResumed } = await initOrResumeSession(this.#client, {
                     model: this.#model,
-                    onPermissionRequest: approveAll,
+                    onPermissionRequest: this.#permissionHandler,
                     onUserInputRequest: this.#handleUserInputRequest.bind(this),
                     hooks: {
                         onSessionStart: this.#onSessionStart.bind(this),

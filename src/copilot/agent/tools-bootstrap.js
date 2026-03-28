@@ -17,6 +17,7 @@ import {
     hookTools,
     hubTools,
     introspectionTools,
+    permissionTools,
     registerForIntrospection,
     sessionRpcTools,
     sessionTools,
@@ -96,6 +97,10 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         category: 'todo',
         tags: ['tasks', 'todo', 'management', 'write'],
     });
+    registerTools(registry, permissionTools, {
+        category: 'permission',
+        tags: ['approval', 'security', 'runtime-control'],
+    });
 
     if (mcpTools.length > 0) {
         registerTools(registry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
@@ -122,6 +127,7 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         ...webTools,
         ...todoReadTools,
         ...todoWriteTools,
+        ...permissionTools,
         ...mcpTools,
         ...customTools,
     ];

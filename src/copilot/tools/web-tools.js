@@ -8,8 +8,8 @@
  */
 
 import { log } from '#core/logger';
-import { defineTool } from '@github/copilot-sdk';
 import { z } from 'zod';
+import { buildTool } from './tool-factory.js';
 
 // ─── SSRF Protection ─────────────────────────────────────────────────────────
 
@@ -89,35 +89,33 @@ function checkRateLimit() {
 /**
  * Tool: web_fetch — busca o conteúdo de uma URL pública com proteção SSRF.
  */
-const webFetchTool = defineTool('web_fetch', {
+const webFetchTool = buildTool({
+    name: 'web_fetch',
     overridesBuiltInTool: true,
+    requiresApproval: false,
     description:
         'Busca o conteúdo de uma URL pública (HTTP/HTTPS). Apenas texto (text/*). ' +
         'Bloqueado para IPs privados, localhost e esquemas não-HTTP (proteção SSRF). ' +
         'Limite: 20 requisições/minuto.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                url: z.string().url().describe('URL completa da página a buscar (https:// recomendado)'),
-                maxBytes: z
-                    .number()
-                    .int()
-                    .min(1)
-                    .max(512_000)
-                    .optional()
-                    .default(131_072)
-                    .describe('Tamanho máximo da resposta em bytes (padrão 128 KB, máx 512 KB)'),
-                timeoutMs: z
-                    .number()
-                    .int()
-                    .min(1000)
-                    .max(30_000)
-                    .optional()
-                    .default(10_000)
-                    .describe('Timeout em ms (padrão 10 s, máx 30 s)'),
-            })
-        )
-    ),
+    parameters: z.object({
+        url: z.string().url().describe('URL completa da página a buscar (https:// recomendado)'),
+        maxBytes: z
+            .number()
+            .int()
+            .min(1)
+            .max(512_000)
+            .optional()
+            .default(131_072)
+            .describe('Tamanho máximo da resposta em bytes (padrão 128 KB, máx 512 KB)'),
+        timeoutMs: z
+            .number()
+            .int()
+            .min(1000)
+            .max(30_000)
+            .optional()
+            .default(10_000)
+            .describe('Timeout em ms (padrão 10 s, máx 30 s)'),
+    }),
     handler: async (
         /** @type {{ url: string; maxBytes?: number; timeoutMs?: number }} */ { url, maxBytes, timeoutMs },
     ) => {
@@ -230,27 +228,25 @@ const webFetchTool = defineTool('web_fetch', {
  * Tool: web_search — realiza busca na web via DuckDuckGo Lite e retorna resultados estruturados. Não requer API key.
  * Usa o frontend HTML leve do DDG e extrai título, URL e snippet dos resultados.
  */
-const webSearchTool = defineTool('web_search', {
+const webSearchTool = buildTool({
+    name: 'web_search',
     overridesBuiltInTool: true,
+    requiresApproval: false,
     description:
         'Realiza busca na web via DuckDuckGo e retorna os primeiros resultados (título, URL, snippet). ' +
         'Use quando precisar de informações atuais da web que não estão no workspace. ' +
         'Não requer API key. Limite: 20 requisições/minuto (pool compartilhado com web_fetch).',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                query: z.string().min(1).max(400).describe('Consulta de busca'),
-                maxResults: z
-                    .number()
-                    .int()
-                    .min(1)
-                    .max(10)
-                    .optional()
-                    .default(5)
-                    .describe('Número máximo de resultados a retornar (padrão 5, máx 10)'),
-            })
-        )
-    ),
+    parameters: z.object({
+        query: z.string().min(1).max(400).describe('Consulta de busca'),
+        maxResults: z
+            .number()
+            .int()
+            .min(1)
+            .max(10)
+            .optional()
+            .default(5)
+            .describe('Número máximo de resultados a retornar (padrão 5, máx 10)'),
+    }),
     handler: async (/** @type {{ query: string; maxResults?: number }} */ { query, maxResults }) => {
         if (!checkRateLimit()) {
             return { success: false, error: `Rate limit excedido: máx ${MAX_REQUESTS_PER_MINUTE} req/min.` };
@@ -337,5 +333,5 @@ const webSearchTool = defineTool('web_search', {
 /**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
-// SEC-V01 fix: webSearchTool desabilitado por padrão — ativar via WEB_SEARCH_ENABLED=true
-export const webTools = [webFetchTool, ...(process.env['WEB_SEARCH_ENABLED'] === 'true' ? [webSearchTool] : [])];
+// WEB-01-FIX: web_search habilitado por padrão — desativar via WEB_SEARCH_DISABLED=true
+export const webTools = [webFetchTool, ...(process.env['WEB_SEARCH_DISABLED'] === 'true' ? [] : [webSearchTool])];

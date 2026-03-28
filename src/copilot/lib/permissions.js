@@ -212,7 +212,7 @@ export function createRestrictedPermission(allowedTools) {
  */
 export function createSafePermission(additionalDenyTools) {
     return createPermissionHandler({
-        denyPatterns: [/^shell_exec$/i, /^run_command$/i, /^exec$/i],
-        denyTools: ['system_exec', 'shell_run', ...(additionalDenyTools ?? [])],
+        // PERM-03-FIX: usar nomes reais das shell-tools do projeto (não nomes genéricos)
+        denyTools: ['run_shell_command', 'run_npm_script', 'run_node_script', ...(additionalDenyTools ?? [])],
     });
 }

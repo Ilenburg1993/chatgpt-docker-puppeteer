@@ -52,6 +52,11 @@ import { conversationStore } from '../conversation-hub/index.js';
  *         authorized?: boolean;
  *         reason?: 'watchdog_restart' | 'authorized_stop';
  *     }) => Promise<void>;
+ *     getPermissionMode?: () => 'approve_all' | 'audit_only' | 'selective';
+ *     setPermissionMode?: (
+ *         mode: 'approve_all' | 'audit_only' | 'selective',
+ *         opts?: { allowTools?: string[]; denyTools?: string[]; denyShell?: boolean },
+ *     ) => void;
  *     on: (event: string, listener: (...args: any[]) => void) => any;
  *     off: (event: string, listener: (...args: any[]) => void) => any;
  *     listenerDiagnostics: () => Record<string, number>;
@@ -162,6 +167,57 @@ export function registerControlRoutes(bridge, agent) {
             return res.json({ ok: true, message: 'Agente parado.' });
         } catch (/** @type {any} */ e) {
             log('ERROR', `[bridge-control/stop] ${e.message}`);
+            return res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // ─── GET /permissions ─────────────────────────────────────────────────────
+
+    /**
+     * Retorna o modo de aprovação de tools atualmente ativo.
+     *
+     * Response: { ok: true, mode: 'approve_all' | 'audit_only' | 'selective' }
+     */
+    bridge.get('/permissions', (/** @type {Req} */ _req, /** @type {Res} */ res) => {
+        const mode = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all';
+        return res.json({ ok: true, mode });
+    });
+
+    // ─── POST /permissions ────────────────────────────────────────────────────
+
+    /**
+     * Altera o modo de aprovação de tools em runtime — sem reiniciar o agente.
+     *
+     * Body: { mode: 'approve_all' | 'audit_only' | 'selective', allowTools?: string[], denyTools?: string[],
+     * denyShell?: boolean }
+     *
+     * DL-PERM: o dialog loop não é uma tool e não é afetado por este endpoint.
+     */
+    bridge.post('/permissions', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { mode, allowTools, denyTools, denyShell } = req.body ?? {};
+        const validModes = ['approve_all', 'audit_only', 'selective'];
+        if (!mode || !validModes.includes(mode)) {
+            return res.status(400).json({
+                ok: false,
+                error: `Campo "mode" inválido. Valores aceitos: ${validModes.join(', ')}.`,
+            });
+        }
+        if (typeof agent.setPermissionMode !== 'function') {
+            return res.status(501).json({ ok: false, error: 'setPermissionMode não disponível nesta instância.' });
+        }
+        try {
+            const before = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all';
+            /** @type {{ allowTools?: string[]; denyTools?: string[]; denyShell?: boolean }} */
+            const opts = {};
+            if (Array.isArray(allowTools) && allowTools.length) opts.allowTools = allowTools;
+            if (Array.isArray(denyTools) && denyTools.length) opts.denyTools = denyTools;
+            if (denyShell === true) opts.denyShell = true;
+            agent.setPermissionMode(mode, opts);
+            const after = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : mode;
+            log('INFO', `[bridge-control/permissions] modo: ${before} → ${after}`);
+            return res.json({ ok: true, before, after });
+        } catch (/** @type {any} */ e) {
+            log('ERROR', `[bridge-control/permissions] ${e.message}`);
             return res.status(500).json({ ok: false, error: e.message });
         }
     });
