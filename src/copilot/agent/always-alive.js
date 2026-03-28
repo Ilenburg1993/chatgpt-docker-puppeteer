@@ -366,6 +366,13 @@ export class AlwaysAliveAgent extends EventEmitter {
                     this.#lastCheckpointPath = data.checkpointPath;
                 }
                 this.emit('session.compaction_complete', data);
+                // UPG-N15 (fix): emitir evento canônico 'context:compacted' para observabilidade externa
+                const snap = this.getStatusSnapshot();
+                this.emit('context:compacted', {
+                    sessionId: snap?.sessionId ?? null,
+                    ts: Date.now(),
+                    checkpoint: data.checkpointPath ?? null,
+                });
             });
 
             // Reasoning tokens (o3/o4-mini extended thinking) — forwarded via task.reasoning

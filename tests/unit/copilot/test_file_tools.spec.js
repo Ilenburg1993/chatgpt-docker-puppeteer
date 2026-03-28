@@ -78,9 +78,9 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('fileTools — exportações do módulo', () => {
-    it('fileReadTools é um Array com 3 elementos', () => {
+    it('fileReadTools é um Array com 4 elementos', () => {
         assert.ok(Array.isArray(fileReadTools));
-        assert.equal(fileReadTools.length, 3);
+        assert.equal(fileReadTools.length, 4);
     });
 
     it('fileWriteTools é um Array com 6 elementos', () => {
@@ -88,16 +88,17 @@ describe('fileTools — exportações do módulo', () => {
         assert.equal(fileWriteTools.length, 6);
     });
 
-    it('fileTools = fileReadTools + fileWriteTools (9 no total)', () => {
+    it('fileTools = fileReadTools + fileWriteTools (10 no total)', () => {
         assert.ok(Array.isArray(fileTools));
-        assert.equal(fileTools.length, 9);
+        assert.equal(fileTools.length, 10);
     });
 
-    it('fileReadTools inclui read_file_content, list_directory, search_in_files', () => {
+    it('fileReadTools inclui read_file_content, list_directory, search_in_files, diff_files', () => {
         const names = fileReadTools.map((t) => /** @type {any} */ (t).name);
         assert.ok(names.includes('read_file_content'));
         assert.ok(names.includes('list_directory'));
         assert.ok(names.includes('search_in_files'));
+        assert.ok(names.includes('diff_files'));
     });
 
     it('fileWriteTools inclui write_file_content, create_file, delete_file, copy_file, move_file, patch_file', () => {

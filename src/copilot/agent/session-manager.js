@@ -104,7 +104,12 @@ export function buildHookSystemContext() {
             const state = JSON.parse(readFileSync(SESSION_JSON_FILE, 'utf8'));
             const consecutive = state?.compliance?.consecutive_unauthorized ?? 0;
             const turnNum = state?.current_turn?.number ?? 0;
-            const closeKey = state?.close_key ?? 'N/A';
+            const rawCloseKey = state?.close_key ?? 'N/A';
+            // SEC-N07 (fix): sanitizar close_key — limitar a alfanuméricos para evitar prompt injection
+            const closeKey =
+                typeof rawCloseKey === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(rawCloseKey)
+                    ? rawCloseKey
+                    : 'INVALID_KEY';
             const strictClose = state?.strict_turn_close ?? true;
             parts.push(
                 [

@@ -490,6 +490,15 @@ async function _executeTurn(message, actor) {
     } catch (/** @type {any} */ e) {
         println(`[erro] ${e.message}`);
         log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${e.message}`);
+        // BUG-N11 (fix): se o agente parou durante o turno, restabelecer o loop de forma assíncrona
+        if (!alwaysAliveAgent.dialogLoopActive) {
+            log('WARN', '[TerminalServer] Dialog loop inativo após erro — reagendando ensureDialogLoop');
+            setTimeout(() => {
+                ensureDialogLoop().catch((/** @type {any} */ restartErr) => {
+                    log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop: ${restartErr.message}`);
+                });
+            }, 2_000);
+        }
         return null;
     } finally {
         setBusy(false);

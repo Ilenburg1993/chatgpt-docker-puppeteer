@@ -28,6 +28,7 @@ import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { setBackgroundCompactionThreshold } from '../agent/session-manager.js';
 import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
+import { conversationHub } from '../conversation-hub/hub.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { sendTurn } from './dialog.js';
 import {
@@ -56,6 +57,16 @@ import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalCli
  */
 export function handleHealth() {
     const snapshot = alwaysAliveAgent.getStatusSnapshot();
+    // UPG-N22/GAP-N06 (fix): incluir status do ConversationHub no /health
+    let hubInfo = { initialized: false, activeSessions: 0 };
+    if (conversationHub.isReady) {
+        try {
+            const activeSessions = conversationStore.listHubSessions({ status: 'active' });
+            hubInfo = { initialized: true, activeSessions: activeSessions.length };
+        } catch {
+            hubInfo = { initialized: true, activeSessions: -1 };
+        }
+    }
     return {
         status: 200,
         body: {
@@ -71,6 +82,8 @@ export function handleHealth() {
             contextWindow: snapshot.contextWindow,
             // AB.3: estatísticas de cache
             cacheStats: { fileContext: getFileCacheStats() },
+            // UPG-N22: status do ConversationHub
+            hub: hubInfo,
         },
     };
 }
@@ -240,14 +253,31 @@ export async function handlePipeline(body) {
         return { status: 400, body: { ok: false, error: '"steps" deve ser um array não vazio' } };
     }
 
-    const globalFrom = body.from ?? 'llm-a';
+    // GAP-N02 (fix): limitar número de steps para evitar fila de turnos massiva
+    const MAX_PIPELINE_STEPS = 20;
+    if (body.steps.length > MAX_PIPELINE_STEPS) {
+        return {
+            status: 400,
+            body: {
+                ok: false,
+                error: `Máximo ${MAX_PIPELINE_STEPS} steps por pipeline (recebido: ${body.steps.length})`,
+            },
+        };
+    }
+
+    // SEC-N03 (fix): validar campo `from` global do pipeline
+    const ALLOWED_FROM_PIPELINE = new Set(['llm-a', 'user', 'system', 'llm_a']);
+    const rawGlobalFrom = body.from ?? 'llm-a';
+    const globalFrom =
+        typeof rawGlobalFrom === 'string' && ALLOWED_FROM_PIPELINE.has(rawGlobalFrom) ? rawGlobalFrom : 'llm-a';
     /** @type {{ step: number; prompt: string; reply: string | null; durationMs: number }[]} */
     const results = [];
 
     for (let i = 0; i < body.steps.length; i++) {
         const step = body.steps[i];
         if (!step?.prompt) continue;
-        const from = step.from ?? globalFrom;
+        const rawStepFrom = step.from ?? globalFrom;
+        const from = ALLOWED_FROM_PIPELINE.has(rawStepFrom) ? rawStepFrom : globalFrom;
 
         if (step.waitMs && step.waitMs > 0) {
             await new Promise((r) => setTimeout(r, step.waitMs));
@@ -376,10 +406,14 @@ export async function handleInject(body) {
  * @param {{ state?: string; limit?: number }} params
  * @returns {Promise<HandlerResult>}
  */
-export async function handleGhIssues({ state = 'open', limit = 15 } = {}) {
+export async function handleGhIssues({ state = 'open', limit = 15, page = 1 } = {}) {
     try {
-        const issues = await listIssues({ state: /** @type {any} */ (state), limit });
-        return { status: 200, cors: true, body: { ok: true, issues } };
+        const result = await listIssues({ state: /** @type {any} */ (state), perPage: limit, page });
+        return {
+            status: 200,
+            cors: true,
+            body: { ok: true, issues: result.items, hasMore: result.hasMore, page: result.page },
+        };
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
     }
@@ -393,10 +427,14 @@ export async function handleGhIssues({ state = 'open', limit = 15 } = {}) {
  * @param {{ state?: string; limit?: number }} params
  * @returns {Promise<HandlerResult>}
  */
-export async function handleGhPrs({ state = 'open', limit = 15 } = {}) {
+export async function handleGhPrs({ state = 'open', limit = 15, page = 1 } = {}) {
     try {
-        const prs = await listPrs({ state: /** @type {any} */ (state), limit });
-        return { status: 200, cors: true, body: { ok: true, prs } };
+        const result = await listPrs({ state: /** @type {any} */ (state), perPage: limit, page });
+        return {
+            status: 200,
+            cors: true,
+            body: { ok: true, prs: result.items, hasMore: result.hasMore, page: result.page },
+        };
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
     }
@@ -410,10 +448,14 @@ export async function handleGhPrs({ state = 'open', limit = 15 } = {}) {
  * @param {{ limit?: number }} params
  * @returns {Promise<HandlerResult>}
  */
-export async function handleGhCi({ limit = 15 } = {}) {
+export async function handleGhCi({ limit = 15, page = 1 } = {}) {
     try {
-        const runs = await listRuns({ limit });
-        return { status: 200, cors: true, body: { ok: true, runs } };
+        const result = await listRuns({ perPage: limit, page });
+        return {
+            status: 200,
+            cors: true,
+            body: { ok: true, runs: result.items, hasMore: result.hasMore, page: result.page },
+        };
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
     }

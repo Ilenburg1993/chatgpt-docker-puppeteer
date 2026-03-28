@@ -101,6 +101,35 @@ function checkInjectRate(ip) {
     };
 }
 
+// SEC-N02 (fix): rate-limit por endpoint para /pipeline, /memory (write), /attach
+/** @type {Map<string, { count: number; resetAt: number }>} */
+const _writeRateLimiter = new Map();
+const WRITE_RATE_MAX = 5; // mais restritivo que /inject
+const WRITE_RATE_WINDOW_MS = 60_000;
+
+/**
+ * Verifica rate-limit para endpoints de escrita (/pipeline, /memory, /attach, /context-send).
+ *
+ * @param {string} ipEndpoint - Combinação de IP + endpoint key para isolamento por rota
+ * @returns {{ allowed: boolean; resetIn: number }}
+ */
+function checkWriteRate(ipEndpoint) {
+    const now = Date.now();
+    for (const [key, bucket] of _writeRateLimiter) {
+        if (now >= bucket.resetAt) _writeRateLimiter.delete(key);
+    }
+    let bucket = _writeRateLimiter.get(ipEndpoint);
+    if (!bucket || now >= bucket.resetAt) {
+        bucket = { count: 0, resetAt: now + WRITE_RATE_WINDOW_MS };
+        _writeRateLimiter.set(ipEndpoint, bucket);
+    }
+    bucket.count++;
+    return {
+        allowed: bucket.count <= WRITE_RATE_MAX,
+        resetIn: Math.ceil((bucket.resetAt - now) / 1000),
+    };
+}
+
 // ─── Helpers de transporte ────────────────────────────────────────────────────
 
 /**
@@ -168,13 +197,32 @@ function tryParseJson(raw) {
  * @returns {http.Server} Servidor HTTP iniciado na porta `INJECT_PORT`
  */
 export function createInjectServer() {
+    // GAP-N03/UPG-N04 (fix): autenticação por token estático opcional no terminal LLM-B
+    const TERMINAL_TOKEN = process.env.LLM_B_TERMINAL_TOKEN ?? null;
+
     const server = http.createServer(async (req, res) => {
         const url = new URL(req.url ?? '/', `http://localhost:${INJECT_PORT}`);
+        // UPG-N23 (fix): propagar X-Request-ID para rastreabilidade de requests
+        const requestId = req.headers['x-request-id']
+            ? String(req.headers['x-request-id']).slice(0, 64)
+            : `llmb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        res.setHeader('X-Request-ID', requestId);
         try {
             // ── GET /health ───────────────────────────────────────────────────
+            // /health é isento de auth para permitir healthchecks sem token
             if (req.method === 'GET' && url.pathname === '/health') {
                 sendJson(res, handleHealth());
                 return;
+            }
+
+            // Verificar token se configurado (todos os outros endpoints)
+            if (TERMINAL_TOKEN) {
+                const authHeader = req.headers['authorization'] ?? '';
+                if (authHeader !== `Bearer ${TERMINAL_TOKEN}`) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+                    return;
+                }
             }
 
             // ── GET /context (UPG-04) ─────────────────────────────────────────
@@ -316,6 +364,19 @@ export function createInjectServer() {
 
             // ── POST /memory ──────────────────────────────────────────────────
             if (req.method === 'POST' && url.pathname === '/memory') {
+                // SEC-N02 (fix): rate-limit em /memory write (5 req/min por IP)
+                const memIp = req.socket.remoteAddress ?? 'unknown';
+                const memRate = checkWriteRate(`${memIp}:memory`);
+                if (!memRate.allowed) {
+                    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(memRate.resetIn) });
+                    res.end(
+                        JSON.stringify({
+                            ok: false,
+                            error: `Rate limit excedido em /memory. Tente em ${memRate.resetIn}s.`,
+                        }),
+                    );
+                    return;
+                }
                 const raw = await readBody(req);
                 const parsed = /** @type {{ tag?: string; content?: string } | null} */ (tryParseJson(raw));
                 if (!parsed) {
@@ -348,11 +409,29 @@ export function createInjectServer() {
 
             // ── POST /pipeline ────────────────────────────────────────────────
             if (req.method === 'POST' && url.pathname === '/pipeline') {
+                // SEC-N02 (fix): rate-limit em /pipeline (5 req/min por IP)
+                const pipelineIp = req.socket.remoteAddress ?? 'unknown';
+                const pipelineRate = checkWriteRate(`${pipelineIp}:pipeline`);
+                if (!pipelineRate.allowed) {
+                    res.writeHead(429, {
+                        'Content-Type': 'application/json',
+                        'Retry-After': String(pipelineRate.resetIn),
+                    });
+                    res.end(
+                        JSON.stringify({
+                            ok: false,
+                            error: `Rate limit excedido em /pipeline. Tente em ${pipelineRate.resetIn}s.`,
+                        }),
+                    );
+                    return;
+                }
                 const raw = await readBody(req);
-                const parsed = /** @type {{
-    steps?: { prompt: string; waitMs?: number; from?: string }[];
-    from?: string;
-} | null} */ (tryParseJson(raw));
+                const parsed = /**
+                 * @type {{
+                 *     steps?: { prompt: string; waitMs?: number; from?: string }[];
+                 *     from?: string;
+                 * } | null}
+                 */ (tryParseJson(raw));
                 if (!parsed) {
                     sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
                     return;

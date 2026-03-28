@@ -158,6 +158,14 @@ export function mountCopilotNamespace(io, orchestrator, store) {
                 return;
             }
 
+            // SEC-N09 (fix): sanitizar content — remover marcadores de sistema para evitar prompt injection
+            const MAX_INJECT_CONTENT = 32_000;
+            const rawContent = typeof data.content === 'string' ? data.content : String(data.content ?? '');
+            const safeContent = rawContent
+                .slice(0, MAX_INJECT_CONTENT)
+                .replace(/^\s*\[SYSTEM[^\]]*\]/gim, '[BLOCKED]')
+                .replace(/^\s*SYSTEM:/gim, '[BLOCKED]');
+
             try {
                 const session = store.getHubSession(data.hubSession);
                 if (!session || session.status !== 'active') {
@@ -167,7 +175,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
                     return;
                 }
 
-                const turnId = orchestrator.injectUserMessage(data.hubSession, data.content, {
+                const turnId = orchestrator.injectUserMessage(data.hubSession, safeContent, {
                     metadata: {
                         injectedBy: /** @type {any} */ (socket).userId ?? 'anonymous',
                         socketId: clientId,

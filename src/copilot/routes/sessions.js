@@ -303,6 +303,15 @@ router.delete('/sessions/:id', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
 
+        // SEC-N10 (fix): exigir confirmação explícita para operação irreversível
+        const confirmHeader = req.headers['x-confirm-delete'];
+        if (confirmHeader !== 'true') {
+            return res.status(400).json({
+                ok: false,
+                error: 'Operação irreversível. Adicione o header "X-Confirm-Delete: true" para confirmar.',
+            });
+        }
+
         // Desconectar do registry se ativo
         await disconnectSdkSession(id);
 

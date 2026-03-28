@@ -54,7 +54,13 @@ export async function cmdGh({ println }, args) {
             const stateArg = args[2] ?? 'open';
             const label = args[3];
             println('\x1b[90m  Buscando issues…\x1b[0m');
-            const issues = await listIssues({ state: /** @type {any} */ (stateArg), label }).catch(() => []);
+            const issueResult = await listIssues({ state: /** @type {any} */ (stateArg), label }).catch(() => ({
+                items: [],
+                hasMore: false,
+                page: 1,
+                perPage: 15,
+            }));
+            const issues = issueResult.items;
             if (!issues.length) {
                 println('\x1b[90m  Nenhuma issue encontrada.\x1b[0m');
                 return;
@@ -135,7 +141,13 @@ export async function cmdGh({ println }, args) {
         if (action === 'list' || action === 'ls') {
             const stateArg = args[2] ?? 'open';
             println('\x1b[90m  Buscando PRs…\x1b[0m');
-            const prs = await listPrs({ state: /** @type {any} */ (stateArg) }).catch(() => []);
+            const prResult = await listPrs({ state: /** @type {any} */ (stateArg) }).catch(() => ({
+                items: [],
+                hasMore: false,
+                page: 1,
+                perPage: 15,
+            }));
+            const prs = prResult.items;
             if (!prs.length) {
                 println('\x1b[90m  Nenhum PR encontrado.\x1b[0m');
                 return;
@@ -201,7 +213,13 @@ export async function cmdGh({ println }, args) {
         if (action === 'list' || action === 'ls') {
             const limit = Number(args[2]) || 10;
             println('\x1b[90m  Buscando CI runs…\x1b[0m');
-            const runs = await listRuns({ limit }).catch(() => []);
+            const runResult = await listRuns({ limit }).catch(() => ({
+                items: [],
+                hasMore: false,
+                page: 1,
+                perPage: 10,
+            }));
+            const runs = runResult.items;
             if (!runs.length) {
                 println('\x1b[90m  Nenhum run encontrado.\x1b[0m');
                 return;

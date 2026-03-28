@@ -191,20 +191,34 @@ const readFileContentTool = defineTool('read_file_content', {
             const stats = fs.statSync(resolved);
             if (stats.isDirectory()) return { success: false, error: 'É um diretório, use list_directory.' };
 
-            const raw = fs.readFileSync(resolved);
-
+            // UPG-N10/BUG-N12 (fix): usar streaming para evitar carregar arquivos grandes em memória
             if (encoding === 'base64') {
+                const chunks = /** @type {Buffer[]} */ ([]);
+                await new Promise((resolve, reject) => {
+                    const stream = fs.createReadStream(resolved, { end: MAX_CONTENT_BYTES - 1 });
+                    stream.on('data', (chunk) => chunks.push(/** @type {Buffer} */ (chunk)));
+                    stream.on('end', resolve);
+                    stream.on('error', reject);
+                });
+                const raw = Buffer.concat(chunks);
                 return {
                     success: true,
                     path: resolved,
                     size: stats.size,
                     encoding: 'base64',
-                    content: raw.slice(0, MAX_CONTENT_BYTES).toString('base64'),
-                    truncated: raw.length > MAX_CONTENT_BYTES,
+                    content: raw.toString('base64'),
+                    truncated: stats.size > MAX_CONTENT_BYTES,
                 };
             }
 
-            const text = raw.toString('utf8');
+            const textChunks = /** @type {Buffer[]} */ ([]);
+            await new Promise((resolve, reject) => {
+                const stream = fs.createReadStream(resolved, { end: MAX_CONTENT_BYTES * 3 - 1 });
+                stream.on('data', (chunk) => textChunks.push(/** @type {Buffer} */ (chunk)));
+                stream.on('end', resolve);
+                stream.on('error', reject);
+            });
+            const text = Buffer.concat(textChunks).toString('utf8');
             const lines = text.split('\n');
             const total = lines.length;
 
@@ -695,6 +709,57 @@ const patchFileTool = defineTool('patch_file', {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * UPG-N20/GAP-N10 (fix): Tool diff_files — exibe diferença unificada entre dois arquivos (usa `diff -u`).
+ */
+const diffFilesTool = defineTool('diff_files', {
+    description:
+        'Exibe a diferença unificada (unified diff) entre dois arquivos do workspace. ' +
+        'Útil para comparar versões ou verificar mudanças antes de aplicar patches.',
+    parameters: sdkParam(
+        z.object({
+            path_a: z.string().describe('Caminho do primeiro arquivo (linha base / original)'),
+            path_b: z.string().describe('Caminho do segundo arquivo (linha modificada / nova versão)'),
+            context_lines: z
+                .number()
+                .int()
+                .min(0)
+                .max(20)
+                .optional()
+                .default(3)
+                .describe('Número de linhas de contexto exibidas ao redor de cada mudança (padrão: 3)'),
+        }),
+    ),
+    handler: async ({ path_a, path_b, context_lines }) => {
+        const va = validatePath(path_a);
+        if (!va.ok) return { success: false, error: `path_a: ${va.reason}` };
+        const vb = validatePath(path_b);
+        if (!vb.ok) return { success: false, error: `path_b: ${vb.reason}` };
+
+        try {
+            const { stdout } = await execFileAsync('diff', [`-U${context_lines ?? 3}`, va.resolved, vb.resolved]).catch(
+                (err) => {
+                    // diff retorna exit code 1 quando há diferenças — isso não é um erro
+                    if (err.code === 1) return { stdout: err.stdout ?? '', stderr: '' };
+                    throw err;
+                },
+            );
+            const MAX_DIFF_BYTES = 64_000;
+            const diff =
+                stdout.length > MAX_DIFF_BYTES ? stdout.slice(0, MAX_DIFF_BYTES) + '\n[... diff truncado ...]' : stdout;
+            return {
+                success: true,
+                path_a: va.resolved,
+                path_b: vb.resolved,
+                diff,
+                identical: diff.trim() === '',
+            };
+        } catch (/** @type {any} */ err) {
+            return { success: false, error: err.message };
+        }
+    },
+});
+
+/**
  * Tools de leitura do filesystem (skipPermission: true — não modificam estado).
  *
  * @type {import('@github/copilot-sdk').Tool[]}
@@ -703,6 +768,7 @@ export const fileReadTools = [
     withSkipPermission(readFileContentTool),
     withSkipPermission(listDirectoryTool),
     withSkipPermission(searchInFilesTool),
+    withSkipPermission(diffFilesTool),
 ];
 
 /**

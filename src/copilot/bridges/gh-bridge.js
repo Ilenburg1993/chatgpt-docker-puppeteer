@@ -137,30 +137,40 @@ export async function getDefaultRepo() {
 /**
  * Lista issues do repositório.
  *
+ * GAP-N11/UPG-N21 (fix): suporte a paginação via page+perPage; retorna hasMore.
+ *
  * @param {object} [opts]
  * @param {'open' | 'closed' | 'all'} [opts.state]
  * @param {string} [opts.label]
  * @param {number} [opts.limit]
- * @returns {Promise<IssueItem[]>}
+ * @param {number} [opts.page] - Página (1-based). Requer perPage.
+ * @param {number} [opts.perPage] - Itens por página (default: 15, max: 100).
+ * @returns {Promise<{ items: IssueItem[]; hasMore: boolean; page: number; perPage: number }>}
  */
 export async function listIssues(opts = {}) {
-    const { state = 'open', label, limit = 15 } = opts;
+    const { state = 'open', label, page = 1, perPage } = opts;
+    const pageSize = Math.min(perPage ?? opts.limit ?? 15, 100);
+    // Buscar pageSize+1 para detectar hasMore sem chamada extra
+    const fetchLimit = Math.min(pageSize * page + 1, 1000);
     const args = [
         'issue',
         'list',
         '--json',
         'number,title,state,labels,author,createdAt,updatedAt',
         '--limit',
-        String(limit),
+        String(fetchLimit),
         '--state',
         state,
         ...repoArgs(),
     ];
     if (label) args.push('--label', label);
     try {
-        return (await runGhJson(args)) ?? [];
+        const all = /** @type {IssueItem[]} */ ((await runGhJson(args)) ?? []);
+        const offset = (page - 1) * pageSize;
+        const items = all.slice(offset, offset + pageSize);
+        return { items, hasMore: all.length > offset + pageSize, page, perPage: pageSize };
     } catch {
-        return [];
+        return { items: [], hasMore: false, page, perPage: pageSize };
     }
 }
 
@@ -276,22 +286,27 @@ export async function commentIssue(number, body) {
  * @returns {Promise<PrItem[]>}
  */
 export async function listPrs(opts = {}) {
-    const { state = 'open', limit = 15 } = opts;
+    const { state = 'open', page = 1, perPage } = opts;
+    const pageSize = Math.min(perPage ?? opts.limit ?? 15, 100);
+    const fetchLimit = Math.min(pageSize * page + 1, 1000);
     const args = [
         'pr',
         'list',
         '--json',
         'number,title,state,headRefName,author,isDraft,createdAt,mergeable',
         '--limit',
-        String(limit),
+        String(fetchLimit),
         '--state',
         state,
         ...repoArgs(),
     ];
     try {
-        return (await runGhJson(args)) ?? [];
+        const all = /** @type {PrItem[]} */ ((await runGhJson(args)) ?? []);
+        const offset = (page - 1) * pageSize;
+        const items = all.slice(offset, offset + pageSize);
+        return { items, hasMore: all.length > offset + pageSize, page, perPage: pageSize };
     } catch {
-        return [];
+        return { items: [], hasMore: false, page, perPage: pageSize };
     }
 }
 
@@ -386,21 +401,26 @@ export async function mergePr(number, opts = {}) {
  * @returns {Promise<RunItem[]>}
  */
 export async function listRuns(opts = {}) {
-    const { limit = 10, branch } = opts;
+    const { branch, page = 1, perPage } = opts;
+    const pageSize = Math.min(perPage ?? opts.limit ?? 10, 100);
+    const fetchLimit = Math.min(pageSize * page + 1, 1000);
     const args = [
         'run',
         'list',
         '--json',
         'databaseId,name,status,conclusion,event,createdAt,headBranch',
         '--limit',
-        String(limit),
+        String(fetchLimit),
         ...repoArgs(),
     ];
     if (branch) args.push('--branch', branch);
     try {
-        return (await runGhJson(args)) ?? [];
+        const all = /** @type {RunItem[]} */ ((await runGhJson(args)) ?? []);
+        const offset = (page - 1) * pageSize;
+        const items = all.slice(offset, offset + pageSize);
+        return { items, hasMore: all.length > offset + pageSize, page, perPage: pageSize };
     } catch {
-        return [];
+        return { items: [], hasMore: false, page, perPage: pageSize };
     }
 }
 

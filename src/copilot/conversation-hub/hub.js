@@ -169,6 +169,34 @@ export class ConversationHub {
         log('INFO', '[ConversationHub] Parado.');
     }
 
+    /**
+     * ARCH-N08 (fix): Encerra o hub graciosamente — fecha todas as sessões ativas antes de destruir recursos.
+     *
+     * @returns {Promise<void>}
+     */
+    async close() {
+        if (!this.#initialized) return;
+
+        // Fechar todas as sessões ativas no orchestrator
+        if (this.#orchestrator) {
+            try {
+                const activeSessions = conversationStore.listHubSessions({ status: 'active' });
+                for (const session of activeSessions) {
+                    try {
+                        this.#orchestrator.closeSession(session.id);
+                    } catch {
+                        // Ignorar erros individuais — prosseguir com as demais
+                    }
+                }
+            } catch {
+                // listHubSessions pode falhar se DB já estiver fechado
+            }
+        }
+
+        this.stop();
+        log('INFO', '[ConversationHub] Encerramento gracioso concluído.');
+    }
+
     // ─── Integração NERV ───────────────────────────────────────────────────────
 
     /**
