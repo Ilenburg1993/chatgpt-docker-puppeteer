@@ -43,9 +43,15 @@
  *
  * Incrementar quando houver mudanças incompatíveis na API pública.
  *
+ * UPG-07: versão semver — MAJOR.MINOR.PATCH
+ *
+ * - MAJOR: mudanças incompatíveis no protocolo StructuredMessage
+ * - MINOR: novas features backward-compatible
+ * - PATCH: bugfixes e melhorias internas
+ *
  * @type {string}
  */
-export const CHANNEL_VERSION = '1';
+export const CHANNEL_VERSION = '1.3.0';
 
 // ─── HTTP Injection (modo terminal ativo) ──────────────────────────────────────
 

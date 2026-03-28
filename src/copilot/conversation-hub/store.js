@@ -104,6 +104,9 @@ const DDL_CONVERSATION_TURNS = `
     CREATE INDEX IF NOT EXISTS idx_conv_turns_time ON copilot_conversation_turns(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_conv_turns_unread ON copilot_conversation_turns(hub_session_id, user_read)
         WHERE user_read = 0;
+    -- UPG-05: índice para markAllUserMessagesRead() que filtra por role='user' + user_read=0
+    CREATE INDEX IF NOT EXISTS idx_conv_turns_user_unread ON copilot_conversation_turns(hub_session_id)
+        WHERE role = 'user' AND user_read = 0;
 `;
 
 // ─── DDL memórias semânticas (P5) ─────────────────────────────────────────────
@@ -231,7 +234,10 @@ export class ConversationStore {
                         _checkpointErrors++;
                         // GAP-Q07 fix: emitir warning após 10 erros consecutivos
                         if (_checkpointErrors >= 10) {
-                            log('WARN', `[ConversationStore] WAL checkpoint falhou ${_checkpointErrors}x consecutivas: ${err.message}`);
+                            log(
+                                'WARN',
+                                `[ConversationStore] WAL checkpoint falhou ${_checkpointErrors}x consecutivas: ${err.message}`,
+                            );
                         }
                     }
                 },

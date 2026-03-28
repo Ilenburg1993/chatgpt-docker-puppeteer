@@ -28,6 +28,12 @@ import { z } from 'zod';
 const MCP_PORT = process.env.PORT ?? '3008';
 const MCP_BASE = `http://127.0.0.1:${MCP_PORT}/api/mcp`;
 
+// UPG-02: Circuit Breaker para chamadas ao MCP Tool Registry
+// Evita 40s de bloqueio quando o servidor MCP está offline (5 tentativas × 8s timeout)
+let _mcpCircuitOpen = false;
+let _mcpCircuitOpenAt = 0;
+const CIRCUIT_RESET_MS = 60_000;
+
 /**
  * @typedef {object} McpToolMeta
  * @property {string} name - Nome canônico da tool
@@ -132,6 +138,30 @@ function buildZodSchema(inputSchema, parentRequired, key) {
 
     if (!schema) return z.unknown();
 
+    // BUG-H08 (fix): suporte a allOf/oneOf/anyOf (composição de schemas JSON Schema)
+    if (Array.isArray(schema.allOf) && schema.allOf.length > 0) {
+        // allOf: interseção — usamos o primeiro schema como base (simplificação segura)
+        return buildZodSchema(schema.allOf[0], parentRequired, key);
+    }
+    if (Array.isArray(schema.oneOf) && schema.oneOf.length > 0) {
+        const options = schema.oneOf.map((/** @type {any} */ s) => buildZodSchema(s));
+        const field = z.union(
+            /** @type {[import('zod').ZodType, import('zod').ZodType, ...import('zod').ZodType[]]} */ (
+                options.length >= 2 ? options : [options[0], z.unknown()]
+            ),
+        );
+        return parentRequired && key && !parentRequired.has(key) ? field.optional() : field;
+    }
+    if (Array.isArray(schema.anyOf) && schema.anyOf.length > 0) {
+        const options = schema.anyOf.map((/** @type {any} */ s) => buildZodSchema(s));
+        const field = z.union(
+            /** @type {[import('zod').ZodType, import('zod').ZodType, ...import('zod').ZodType[]]} */ (
+                options.length >= 2 ? options : [options[0], z.unknown()]
+            ),
+        );
+        return parentRequired && key && !parentRequired.has(key) ? field.optional() : field;
+    }
+
     // GAP-02: enum (string literal union)
     if (Array.isArray(schema.enum) && schema.enum.length > 0) {
         if (schema.enum.every((/** @type {any} */ v) => typeof v === 'string')) {
@@ -234,7 +264,25 @@ function createSdkToolFromMcp(mcpTool) {
  * @returns {Promise<import('@github/copilot-sdk').Tool[]>} Array de Custom Tools prontas para registro no SDK
  */
 export async function buildMcpTools() {
-    const mcpTools = await listMcpTools();
+    // UPG-02: circuit breaker — não tentar se o circuito está aberto
+    if (_mcpCircuitOpen && Date.now() - _mcpCircuitOpenAt < CIRCUIT_RESET_MS) {
+        log('INFO', '[mcp-tool-bridge] Circuit aberto — pulando consulta ao MCP Registry.');
+        return [];
+    }
+
+    let mcpTools;
+    try {
+        mcpTools = await listMcpTools();
+        _mcpCircuitOpen = false; // reset em caso de sucesso
+    } catch (/** @type {any} */ err) {
+        _mcpCircuitOpen = true;
+        _mcpCircuitOpenAt = Date.now();
+        log(
+            'WARN',
+            `[mcp-tool-bridge] Falha ao consultar MCP Registry — circuit aberto por ${CIRCUIT_RESET_MS / 1000}s: ${err.message}`,
+        );
+        return [];
+    }
 
     if (mcpTools.length === 0) {
         log('INFO', '[mcp-tool-bridge] Nenhuma tool MCP disponível (servidor offline ou MCP_ENABLED=false).');

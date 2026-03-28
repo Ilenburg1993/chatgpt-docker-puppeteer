@@ -289,6 +289,23 @@ export class LlmBridgeClient {
     }
 
     /**
+     * UPG-06: Envia múltiplas mensagens em sequência, retornando um array de resultados.
+     *
+     * Nota: como AlwaysAliveAgent serializa a fila, não há paralelismo real. A vantagem é que LLM-A não precisa
+     * gerenciar futures manualmente — batches são entregues na ordem recebida.
+     *
+     * @param {string[]} messages - Mensagens a enviar em sequência
+     * @param {{
+     *     timeout?: number;
+     *     onDelta?: (chunk: string) => void;
+     * }} [opts]
+     * @returns {Promise<{ response: string; taskId: string; durationMs: number }[]>}
+     */
+    async chatBatch(messages, opts = {}) {
+        return Promise.all(messages.map((msg) => this.chat(msg, opts)));
+    }
+
+    /**
      * Inicia a LLM-B em modo de "diálogo direto" (Dialog Loop).
      *
      * @param {string} [bootPrompt] - Prompt de boot (usa padrão §15.8 quando omitido)
@@ -330,7 +347,7 @@ export class LlmBridgeClient {
      * DONE: próximo READY). O histórico local é atualizado com o turno do usuário e a resposta da LLM-B.
      *
      * @param {string} message - Mensagem a enviar à LLM-B
-     * @param {{ timeout?: number, onDelta?: (chunk: string) => void }} [opts]
+     * @param {{ timeout?: number; onDelta?: (chunk: string) => void }} [opts]
      * @returns {Promise<string>} Resposta da LLM-B (conteúdo após REPLY: ou confirmação de DONE:)
      */
     async dialogTurn(message, opts = {}) {
@@ -342,7 +359,9 @@ export class LlmBridgeClient {
 
         // BUG-H05 fix: propaga chunks de streaming para onDelta enquanto sendDialogTurn processa
         const onDeltaTemp = onDelta
-            ? (/** @type {any} */ evt) => { if (evt.chunk) onDelta(evt.chunk); }
+            ? (/** @type {any} */ evt) => {
+                  if (evt.chunk) onDelta(evt.chunk);
+              }
             : null;
         if (onDeltaTemp) alwaysAliveAgent.on('task.delta', onDeltaTemp);
         let reply;
@@ -431,7 +450,10 @@ export class LlmBridgeClient {
             // ARCH-07 (fix): emitir warning explícito ao truncar histórico em vez de silenciar
             const removed = this.#history.length - LlmBridgeClient.#MAX_HISTORY_SIZE;
             this.#history.splice(0, removed);
-            log('WARN', `[LlmBridgeClient] Histórico truncado: ${removed} entrada(s) removida(s) (limite: ${LlmBridgeClient.#MAX_HISTORY_SIZE}).`);
+            log(
+                'WARN',
+                `[LlmBridgeClient] Histórico truncado: ${removed} entrada(s) removida(s) (limite: ${LlmBridgeClient.#MAX_HISTORY_SIZE}).`,
+            );
         }
     }
 

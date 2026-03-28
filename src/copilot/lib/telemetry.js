@@ -261,7 +261,30 @@ export function getSummary(store) {
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
-    return { totalCalls, successCalls, errorCalls, averageDurationMs, activeSessions, totalSessions, topTools };
+    // UPG-10: p95 de latência por tool para identificar tools lentas
+    /** @type {Record<string, number[]>} */
+    const durationsByTool = {};
+    for (const r of store.toolCalls) {
+        if (!durationsByTool[r.toolName]) durationsByTool[r.toolName] = [];
+        durationsByTool[r.toolName].push(r.durationMs);
+    }
+    /** @type {Record<string, number>} */
+    const p95ByTool = {};
+    for (const [toolName, durations] of Object.entries(durationsByTool)) {
+        const sorted = [...durations].sort((a, b) => a - b);
+        p95ByTool[toolName] = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
+    }
+
+    return {
+        totalCalls,
+        successCalls,
+        errorCalls,
+        averageDurationMs,
+        activeSessions,
+        totalSessions,
+        topTools,
+        p95ByTool,
+    };
 }
 
 // ─── Reset ───────────────────────────────────────────────────────────────────

@@ -70,6 +70,9 @@ import { log } from '#core/logger';
  * @property {RegExp[]} [denyPatterns] Padrões regex contra toolName. Qualquer match resulta em "deny".
  * @property {PreToolUseHandler} [onPreToolUse] Handler customizado para pré-execução de ferramenta. Substitui o
  *   comportamento padrão.
+ * @property {(toolName: string) => Promise<boolean>} [onPermissionAsk] UPG-09: Callback de aprovação interativa. Se
+ *   definido, ferramentas que não estejam em denyTools/denyPatterns e não estejam na allowList serão enviadas para
+ *   aprovação via este callback antes de executar. Retornar `true` para aprovar, `false` para negar.
  * @property {PostToolUseHandler} [onPostToolUse] Handler customizado para pós-execução de ferramenta.
  * @property {UserPromptSubmittedHandler} [onUserPromptSubmitted] Handler customizado para prompts do usuário.
  * @property {SessionStartHandler} [onSessionStart] Handler customizado para início de sessão.
@@ -122,6 +125,8 @@ export function createHooks(cfg = {}) {
     const allowTools = cfg.allowTools ?? [];
     const denyTools = cfg.denyTools ?? [];
     const denyPatterns = cfg.denyPatterns ?? [];
+    // UPG-09: callback de aprovação interativa (modo "ask")
+    const askHandler = cfg.onPermissionAsk ?? null;
 
     /** @type {SessionHooks} */
     const hooks = {};
@@ -152,6 +157,23 @@ export function createHooks(cfg = {}) {
                     additionalContext: `Ferramenta '${toolName}' não é permitida pela política de hooks.`,
                 };
             }
+
+            // UPG-09: modo "ask" — se não está na allowList e há callback de aprovação, perguntar
+            if (askHandler && allowTools.length > 0 && !allowTools.includes(toolName)) {
+                let approved = false;
+                try {
+                    approved = await askHandler(toolName);
+                } catch (/** @type {any} */ e) {
+                    log('WARN', `[lib/hooks] onPermissionAsk lançou erro para '${toolName}': ${e.message} — negando`);
+                }
+                if (!approved) {
+                    return {
+                        permissionDecision: 'deny',
+                        additionalContext: `Ferramenta '${toolName}' negada pelo callback onPermissionAsk.`,
+                    };
+                }
+            }
+
             return { permissionDecision: decision };
         };
         hooks.onPreToolUse = /** @type {PreToolUseHandler} */ (preToolFn);
@@ -259,7 +281,8 @@ export function createDenyAllHooks() {
     /** @type {PreToolUseHandler} */
     const denyHandler = async () => ({
         permissionDecision: /** @type {'deny'} */ ('deny'),
-        permissionDecisionReason: 'Ferramentas desabilitadas nesta sessão.',
+        // BUG-H02 (fix): SDK usa additionalContext, não permissionDecisionReason
+        additionalContext: 'Ferramentas desabilitadas nesta sessão.',
     });
     return createHooks({
         auditLog: true,

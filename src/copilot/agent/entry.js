@@ -13,6 +13,7 @@
  */
 
 import { log } from '#core/logger';
+import { CopilotClient } from '@github/copilot-sdk';
 import { alwaysAliveAgent } from './always-alive.js';
 
 const RESTART_DELAY_MS = parseInt(process.env.COPILOT_RESTART_DELAY_MS ?? '5000', 10);
@@ -68,5 +69,18 @@ alwaysAliveAgent.on('error', (err) => {
 });
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
+
+// UPG-08: health check de conectividade proativo antes do primeiro start
+try {
+    const pingClient = new CopilotClient();
+    await Promise.race([
+        pingClient.ping('boot health check'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Ping timeout (5s)')), 5000)),
+    ]);
+    log('INFO', '[copilot/agent] CLI conectado — ping OK.');
+} catch (/** @type {any} */ e) {
+    log('WARN', `[copilot/agent] CLI não respondeu ao ping no boot: ${e.message}`);
+    // Continuar de qualquer forma — startWithRetry() tratará a falha
+}
 
 void startWithRetry();

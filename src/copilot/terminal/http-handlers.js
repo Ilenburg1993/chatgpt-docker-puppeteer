@@ -30,7 +30,13 @@ import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { sendTurn } from './dialog.js';
-import { attachmentToEmbed, embedMultiple, getFileCacheStats, readFileContext, MAX_EMBED_BYTES } from './file-context.js';
+import {
+    attachmentToEmbed,
+    embedMultiple,
+    getFileCacheStats,
+    MAX_EMBED_BYTES,
+    readFileContext,
+} from './file-context.js';
 import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from './state.js';
 
 // ─── Tipos auxiliares ─────────────────────────────────────────────────────────
@@ -65,6 +71,54 @@ export function handleHealth() {
             contextWindow: snapshot.contextWindow,
             // AB.3: estatísticas de cache
             cacheStats: { fileContext: getFileCacheStats() },
+        },
+    };
+}
+
+// ─── GET /sessions ────────────────────────────────────────────────────────────
+
+// ─── GET /context ─────────────────────────────────────────────────────────────
+
+/**
+ * UPG-04: Endpoint dedicado para monitoramento de uso de contexto.
+ *
+ * @returns {HandlerResult}
+ */
+export function handleGetContext() {
+    const snapshot = alwaysAliveAgent.getStatusSnapshot();
+    const cw = snapshot.contextWindow;
+    if (!cw) {
+        return {
+            status: 200,
+            cors: true,
+            body: {
+                ok: true,
+                tokens: 0,
+                tokenLimit: 0,
+                utilization: 0,
+                utilizationPercent: 0,
+                lastCheckpointPath: null,
+                warning: 'none',
+            },
+        };
+    }
+    const utilization = cw.utilization;
+    /** @type {'none' | 'moderate' | 'high' | 'critical'} */
+    let warning = 'none';
+    if (utilization >= 0.95) warning = 'critical';
+    else if (utilization >= 0.8) warning = 'high';
+    else if (utilization >= 0.6) warning = 'moderate';
+    return {
+        status: 200,
+        cors: true,
+        body: {
+            ok: true,
+            tokens: cw.tokens,
+            tokenLimit: cw.tokenLimit,
+            utilization,
+            utilizationPercent: Math.round(utilization * 100),
+            lastCheckpointPath: null,
+            warning,
         },
     };
 }

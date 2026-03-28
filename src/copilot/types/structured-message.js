@@ -123,6 +123,18 @@ export const StructuredMessageSchema = z.object({
 
     /** ID de rastreamento distribuído (opcional, para correlação de logs entre LLM-A e LLM-B) */
     traceId: z.string().optional(),
+
+    /**
+     * UPG-03: timestamp Unix ms — quando a mensagem foi criada/enviada. Gerado automaticamente em
+     * buildStructuredRequest() se não fornecido.
+     */
+    timestamp: z.number().int().optional(),
+
+    /**
+     * UPG-03: correlationId — UUID enviado por LLM-A e devolvido inalterado por LLM-B, permitindo match exato de
+     * request/response sem depender de traceId.
+     */
+    correlationId: z.string().optional(),
 });
 
 // ─── Tipos TypeScript/JSDoc ───────────────────────────────────────────────────
@@ -143,6 +155,8 @@ export const StructuredMessageSchema = z.object({
  * @property {string[]} [toolsUsed] - Ferramentas usadas neste turno
  * @property {Record<string, unknown>} [meta] - Metadados extras
  * @property {string} [traceId] - ID de rastreamento distribuído para correlação de logs
+ * @property {number} [timestamp] - Unix ms — quando a mensagem foi criada
+ * @property {string} [correlationId] - UUID para correlação de request/response LLM-A ↔ LLM-B
  */
 
 /**
@@ -191,7 +205,13 @@ export const StructuredMessageSchema = z.object({
  */
 export function buildStructuredRequest(input) {
     // MELHORIA-12 (fix): auto-gerar traceId se não fornecido, para correlação distribuída de logs
-    const withTrace = input.traceId ? input : { ...input, traceId: crypto.randomUUID() };
+    // UPG-03: auto-gerar timestamp e correlationId para rastreabilidade temporal e request/response
+    const withTrace = {
+        ...input,
+        traceId: input.traceId ?? crypto.randomUUID(),
+        timestamp: input.timestamp ?? Date.now(),
+        correlationId: input.correlationId ?? crypto.randomUUID(),
+    };
     return /** @type {StructuredMessage} */ (StructuredMessageSchema.parse(withTrace));
 }
 

@@ -11,6 +11,7 @@
  * | Método | Caminho             | Descrição                             |
  * | ------ | ------------------- | ------------------------------------- |
  * | GET    | /health             | Status do agente e do dialog loop     |
+ * | GET    | /context            | Uso de contexto/tokens em tempo real  |
  * | GET    | /events             | SSE — stream de eventos da LLM-B      |
  * | GET    | /sessions           | Lista hub_sessions persistidas        |
  * | GET    | /sessions/:id/turns | Turnos de uma sessão específica       |
@@ -37,6 +38,7 @@ import {
     handleDeleteCustomTool,
     handleDeleteMemory,
     handleGetConfig,
+    handleGetContext,
     handleGetCustomTools,
     handleGetSkills,
     handleGetToolsConfig,
@@ -158,6 +160,12 @@ export function createInjectServer() {
         // ── GET /health ───────────────────────────────────────────────────
         if (req.method === 'GET' && url.pathname === '/health') {
             sendJson(res, handleHealth());
+            return;
+        }
+
+        // ── GET /context (UPG-04) ─────────────────────────────────────────
+        if (req.method === 'GET' && url.pathname === '/context') {
+            sendJson(res, handleGetContext());
             return;
         }
 

@@ -20,7 +20,7 @@
 
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
@@ -127,6 +127,38 @@ const ALLOWED_NPM_SCRIPTS = new Set([
     'queue:flow',
     'queue:clean',
 ]);
+
+/**
+ * BUG-H01 (fix): tokeniza um comando shell respeitando aspas simples e duplas. Exemplo: tokenizeShell('echo "hello
+ * world"') → ['echo', 'hello world']
+ *
+ * @param {string} command
+ * @returns {string[]}
+ */
+function tokenizeShell(command) {
+    const tokens = [];
+    let current = '';
+    let inSingle = false;
+    let inDouble = false;
+
+    for (let i = 0; i < command.length; i++) {
+        const ch = command[i];
+        if (ch === "'" && !inDouble) {
+            inSingle = !inSingle;
+        } else if (ch === '"' && !inSingle) {
+            inDouble = !inDouble;
+        } else if (ch === ' ' && !inSingle && !inDouble) {
+            if (current.length > 0) {
+                tokens.push(current);
+                current = '';
+            }
+        } else {
+            current += ch;
+        }
+    }
+    if (current.length > 0) tokens.push(current);
+    return tokens;
+}
 
 /**
  * Verifica se um cwd é seguro (dentro do workspace).
@@ -236,6 +268,73 @@ async function runProcess(file, args, { cwd, timeoutMs }) {
 }
 
 /**
+ * UPG-01: Executa uma pipeline de dois processos via piping explícito de spawn (sem shell). Cada segmento é tokenizado
+ * e validado individualmente antes da execução.
+ *
+ * @param {{ file: string; args: string[] }[]} stages - Etapas da pipeline (cmd1 | cmd2)
+ * @param {{ cwd: string; timeoutMs: number }} opts
+ * @returns {Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }>}
+ */
+async function runPipeline(stages, { cwd, timeoutMs }) {
+    const start = Date.now();
+    return new Promise((resolve) => {
+        /** @type {import('node:child_process').ChildProcess[]} */
+        const procs = stages.map((s, i) =>
+            spawn(s.file, s.args, {
+                cwd,
+                env: safeEnv(),
+                stdio: i === 0 ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
+            }),
+        );
+
+        // Encadear stdout[n] → stdin[n+1]
+        for (let i = 0; i < procs.length - 1; i++) {
+            const curr = procs[i];
+            const next = procs[i + 1];
+            if (curr?.stdout && next?.stdin) curr.stdout.pipe(next.stdin);
+        }
+
+        const lastProc = procs[procs.length - 1];
+        if (!lastProc) {
+            resolve({ exitCode: 1, stdout: '', stderr: 'Pipeline vazia', durationMs: Date.now() - start });
+            return;
+        }
+
+        let stdout = '';
+        let stderr = '';
+        lastProc.stdout?.on('data', (d) => {
+            stdout += d;
+        });
+        lastProc.stderr?.on('data', (d) => {
+            stderr += d;
+        });
+
+        const timer = setTimeout(() => {
+            for (const p of procs) p.kill('SIGTERM');
+            resolve({
+                exitCode: 124,
+                stdout: truncateOutput(stdout),
+                stderr: 'Timeout',
+                durationMs: Date.now() - start,
+            });
+        }, timeoutMs);
+
+        lastProc.on('close', (code) => {
+            clearTimeout(timer);
+            resolve({
+                exitCode: code ?? 1,
+                stdout: truncateOutput(stdout),
+                stderr: truncateOutput(stderr),
+                durationMs: Date.now() - start,
+            });
+        });
+
+        // Fechar stdin do primeiro processo
+        procs[0]?.stdin?.end();
+    });
+}
+
+/**
  * Cast auxiliar que resolve inferência de tipo do SDK `defineTool<T>`.
  *
  * @template T
@@ -292,6 +391,41 @@ const execCommandTool = defineTool('exec_command', {
         const timeoutMs = Math.min(timeoutSeconds * 1000, MAX_TIMEOUT_MS);
         log('INFO', `[ShellTools] exec_command: ${command} (cwd=${cwdCheck.resolved}, timeout=${timeoutMs}ms)`);
 
+        // UPG-01: detectar pipeline simples (cmd1 | cmd2) e executar via spawn explícito sem shell.
+        // Apenas pipes simples (sem subshell, sem redireção, sem ;/&) são permitidos.
+        // Cada segmento é validado individualmente pela blocklist antes de executar.
+        const pipeSegments = command.split('|').map((/** @type {string} */ s) => s.trim());
+        if (pipeSegments.length > 1) {
+            // Permitir no máximo 5 estágios para evitar abuso
+            if (pipeSegments.length > 5) {
+                return { success: false, error: 'Pipeline muito longa (máx. 5 estágios).' };
+            }
+            // Validar cada segmento individualmente
+            for (const seg of pipeSegments) {
+                const segCheck = checkCommandBlocklist(seg.trim());
+                if (!segCheck.ok) {
+                    log('WARN', `[ShellTools] exec_command pipe bloqueado (segmento: "${seg}"): ${segCheck.reason}`);
+                    return { success: false, error: segCheck.reason ?? 'Segmento bloqueado na pipeline' };
+                }
+                if (hasShellMetaOutsideQuotes(seg)) {
+                    return { success: false, error: `Constructs shell complexos no segmento: "${seg}"` };
+                }
+            }
+            const stages = pipeSegments.map((/** @type {string} */ seg) => {
+                const parts = tokenizeShell(seg.trim());
+                const [file, ...args] = parts;
+                return { file: file ?? '', args };
+            });
+            const result = await runPipeline(stages, { cwd: cwdCheck.resolved, timeoutMs });
+            return {
+                success: result.exitCode === 0,
+                exitCode: result.exitCode,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                durationMs: result.durationMs,
+            };
+        }
+
         // BUG-07/SEC-01 (fix): usar tokenizador contextual em vez de regex simples para
         // detectar metacaracteres shell fora de aspas — evita falsos positivos em argumentos
         // legítimos como caminhos com $ ou aspas em argumentos de git log.
@@ -301,8 +435,12 @@ const execCommandTool = defineTool('exec_command', {
                 error: 'Constructs shell complexos (|, ;, &, <, >, subshell $()) não são permitidos.',
             };
         }
-        const parts = command.trim().split(/\s+/);
+        // BUG-H01 (fix): tokenizar respeitando aspas simples e duplas, em vez de split(/\s+/)
+        const parts = tokenizeShell(command.trim());
         const [executable, ...execArgs] = parts;
+        if (!executable) {
+            return { success: false, error: 'Comando vazio.' };
+        }
 
         const result = await runProcess(executable, execArgs, {
             cwd: cwdCheck.resolved,
