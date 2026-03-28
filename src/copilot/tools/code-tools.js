@@ -9,11 +9,10 @@
  */
 
 import { log } from '#core/logger';
-import { defineTool } from '@github/copilot-sdk';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
-import { withSkipPermission } from './tool-factory.js';
+import { buildTool, withSkipPermission } from './tool-factory.js';
 
 const ROOT = new URL('../../..', import.meta.url).pathname;
 const execFileAsync = promisify(execFile);
@@ -47,16 +46,13 @@ async function safeExec(argv, timeoutMs = 60_000) {
 /**
  * Tool: lint_check — executa ESLint no projeto.
  */
-const lintCheckTool = defineTool('lint_check', {
+const lintCheckTool = buildTool({
+    name: 'lint_check',
     description: 'Executa ESLint no projeto para detectar erros de estilo/qualidade. Retorna erros encontrados.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                fix: z.boolean().optional().default(false).describe('Se true, aplica correções automáticas (--fix)'),
-                path: z.string().optional().describe('Caminho específico para lintar (ex: src/copilot)'),
-            })
-        )
-    ),
+    parameters: z.object({
+        fix: z.boolean().optional().default(false).describe('Se true, aplica correções automáticas (--fix)'),
+        path: z.string().optional().describe('Caminho específico para lintar (ex: src/copilot)'),
+    }),
     handler: async (/** @type {{ fix?: boolean; path?: string }} */ { fix, path: filePath }) => {
         const target = filePath ?? '.';
         log('INFO', `[copilot/lint_check] Executando lint em '${target}'${fix ? ' com --fix' : ''}`);
@@ -75,7 +71,8 @@ const lintCheckTool = defineTool('lint_check', {
 /**
  * Tool: run_tests — executa a suíte de testes rápidos.
  */
-const runTestsTool = defineTool('run_tests', {
+const runTestsTool = buildTool({
+    name: 'run_tests',
     description: 'Executa os testes unitários rápidos (test:fast). Retorna resultado.',
     parameters: z.object({
         suite: z
@@ -106,7 +103,8 @@ const runTestsTool = defineTool('run_tests', {
 /**
  * Tool: typecheck — executa verificação de tipos TypeScript.
  */
-const typecheckTool = defineTool('typecheck', {
+const typecheckTool = buildTool({
+    name: 'typecheck',
     description: 'Executa verificação de tipos TypeScript (typecheck:node). Retorna erros de tipo encontrados.',
     parameters: z.object({}),
     handler: async () => {

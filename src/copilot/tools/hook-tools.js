@@ -19,14 +19,13 @@
  */
 
 import { log } from '#core/logger';
-import { defineTool } from '@github/copilot-sdk';
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { z } from 'zod';
-import { withSkipPermission } from './tool-factory.js';
+import { buildTool, withSkipPermission } from './tool-factory.js';
 const execFileAsync = promisify(execFile);
 
 /**
@@ -75,7 +74,8 @@ export function resolveUserInput(answer) {
  * Lê as últimas N entradas do audit.jsonl do hook system. Útil para diagnosticar compliance e histórico de chamadas de
  * ferramentas.
  */
-const hookGetAuditTailTool = defineTool('hook_get_audit_tail', {
+const hookGetAuditTailTool = buildTool({
+    name: 'hook_get_audit_tail',
     description:
         'Lê as últimas entradas do audit.jsonl do hook system. Útil para verificar compliance, ' +
         'histórico de chamadas de ferramentas e detectar violações de protocolo.',
@@ -133,34 +133,26 @@ const hookGetAuditTailTool = defineTool('hook_get_audit_tail', {
  * Quando invocada, o SDK suspende a execução via onUserInputRequest até que o usuário responda via POST
  * /api/copilot/answer (ou interface equivalente).
  */
-const requestUserInputTool = defineTool('request_user_input', {
+const requestUserInputTool = buildTool({
+    name: 'request_user_input',
     description:
         'Solicita input interativo ao usuário. ' +
         'OBRIGATÓRIO: use SEMPRE ao final de cada resposta para perguntar qual é o próximo passo. ' +
         'Nunca encerre uma resposta sem chamar esta ferramenta — ela garante a continuidade da sessão. ' +
         'É o equivalente ao vscode_askQuestions do protocolo de hooks: o agente não avança sem resposta.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                question: z.string().describe('Pergunta principal ao usuário (clara e objetiva)'),
-                context: z
-                    .string()
-                    .optional()
-                    .describe('Contexto adicional — resumo do que foi feito para o usuário avaliar'),
-                choices: z
-                    .array(z.string())
-                    .optional()
-                    .describe(
-                        'Opções predefinidas. Se fornecido, o usuário escolhe entre estas opções ou escreve texto livre',
-                    ),
-                requires_selection: z
-                    .boolean()
-                    .optional()
-                    .default(false)
-                    .describe('Se true, o usuário DEVE escolher uma das choices (sem texto livre)'),
-            })
-        )
-    ),
+    parameters: z.object({
+        question: z.string().describe('Pergunta principal ao usuário (clara e objetiva)'),
+        context: z.string().optional().describe('Contexto adicional — resumo do que foi feito para o usuário avaliar'),
+        choices: z
+            .array(z.string())
+            .optional()
+            .describe('Opções predefinidas. Se fornecido, o usuário escolhe entre estas opções ou escreve texto livre'),
+        requires_selection: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe('Se true, o usuário DEVE escolher uma das choices (sem texto livre)'),
+    }),
     handler: async (
         /** @type {{ question: string; context?: string; choices?: string[]; requires_selection?: boolean }} */ {
             question,
@@ -210,7 +202,8 @@ const requestUserInputTool = defineTool('request_user_input', {
  *
  * Lê `pending-tasks.md` e retorna um resumo estruturado das tarefas pendentes.
  */
-const hookGetPendingTasksTool = defineTool('hook_get_pending_tasks', {
+const hookGetPendingTasksTool = buildTool({
+    name: 'hook_get_pending_tasks',
     description:
         'Lista as tarefas pendentes do hook system (pending-tasks.md). ' +
         'Use para verificar o backlog atual antes de solicitar input ao usuário.',

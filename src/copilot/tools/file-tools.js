@@ -17,14 +17,13 @@
  */
 
 import { log } from '#core/logger';
-import { defineTool } from '@github/copilot-sdk';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import { realpathSync } from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
-import { withSkipPermission } from './tool-factory.js';
+import { buildTool, withSkipPermission } from './tool-factory.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -134,20 +133,6 @@ function validatePath(filePath) {
     return { ok: true, resolved };
 }
 
-/**
- * Cast auxiliar que resolve inferência de tipo do SDK `defineTool<T>`.
- *
- * Necessário quando o handler retorna tipo union com shapes diferentes (ex: `{ success: true, ... } | { success: false,
- * error }`). Sem o cast, TypeScript infere T=unknown e exige `(args: unknown) => ...`, incompatível com o handler
- * desestruturado. Com T=any, `ToolHandler<any>` aceita qualquer função.
- *
- * @template T
- * @param {import('zod').ZodType<T>} schema
- * @returns {import('@github/copilot-sdk').ZodSchema<any>}
- */
-const sdkParam = (schema) =>
-    /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (schema));
-
 // ─────────────────────────────────────────────────────────────────────────────
 // OPERAÇÕES DE LEITURA (skipPermission: true)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -155,32 +140,31 @@ const sdkParam = (schema) =>
 /**
  * Tool: read_file_content — lê o conteúdo de um arquivo.
  */
-const readFileContentTool = defineTool('read_file_content', {
+const readFileContentTool = buildTool({
+    name: 'read_file_content',
     description:
         'Lê o conteúdo de um arquivo no workspace. Arquivos de texto são retornados como string. ' +
         'Arquivos binários retornam uma indicação de tipo. Output limitado a 80KB.',
-    parameters: sdkParam(
-        z.object({
-            path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto dentro de /workspaces/)'),
-            startLine: z
-                .number()
-                .int()
-                .min(1)
-                .optional()
-                .describe('Linha inicial (1-based). Se omitido, lê desde o início.'),
-            endLine: z
-                .number()
-                .int()
-                .min(1)
-                .optional()
-                .describe('Linha final (1-based, inclusivo). Se omitido, lê até o fim.'),
-            encoding: z
-                .enum(['utf8', 'base64'])
-                .optional()
-                .default('utf8')
-                .describe('Codificação de saída. Use base64 para arquivos binários.'),
-        }),
-    ),
+    parameters: z.object({
+        path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto dentro de /workspaces/)'),
+        startLine: z
+            .number()
+            .int()
+            .min(1)
+            .optional()
+            .describe('Linha inicial (1-based). Se omitido, lê desde o início.'),
+        endLine: z
+            .number()
+            .int()
+            .min(1)
+            .optional()
+            .describe('Linha final (1-based, inclusivo). Se omitido, lê até o fim.'),
+        encoding: z
+            .enum(['utf8', 'base64'])
+            .optional()
+            .default('utf8')
+            .describe('Codificação de saída. Use base64 para arquivos binários.'),
+    }),
     handler: async ({ path: filePath, startLine, endLine, encoding }) => {
         const { ok, reason, resolved } = validatePath(filePath);
         if (!ok) return { success: false, error: reason };
@@ -245,30 +229,25 @@ const readFileContentTool = defineTool('read_file_content', {
 /**
  * Tool: list_directory — lista o conteúdo de um diretório.
  */
-const listDirectoryTool = defineTool('list_directory', {
+const listDirectoryTool = buildTool({
+    name: 'list_directory',
     description:
         'Lista o conteúdo de um diretório no workspace. Retorna nome, tipo (file/dir) e tamanho. ' +
         'Opcionalmente recursivo com limite de profundidade.',
-    parameters: sdkParam(
-        z.object({
-            path: z.string().describe('Caminho do diretório (relativo ao workspace ou absoluto)'),
-            recursive: z.boolean().optional().default(false).describe('Se true, lista recursivamente'),
-            depth: z
-                .number()
-                .int()
-                .min(1)
-                .max(8)
-                .optional()
-                .default(3)
-                .describe('Profundidade máxima para listagem recursiva (1-8)'),
-            showHidden: z
-                .boolean()
-                .optional()
-                .default(false)
-                .describe('Incluir arquivos/diretórios ocultos (dotfiles)'),
-            filter: z.string().optional().describe('Glob pattern para filtrar entradas (ex: *.js, *.md)'),
-        }),
-    ),
+    parameters: z.object({
+        path: z.string().describe('Caminho do diretório (relativo ao workspace ou absoluto)'),
+        recursive: z.boolean().optional().default(false).describe('Se true, lista recursivamente'),
+        depth: z
+            .number()
+            .int()
+            .min(1)
+            .max(8)
+            .optional()
+            .default(3)
+            .describe('Profundidade máxima para listagem recursiva (1-8)'),
+        showHidden: z.boolean().optional().default(false).describe('Incluir arquivos/diretórios ocultos (dotfiles)'),
+        filter: z.string().optional().describe('Glob pattern para filtrar entradas (ex: *.js, *.md)'),
+    }),
     handler: async ({ path: dirPath, recursive, depth, showHidden, filter }) => {
         const { ok, reason, resolved } = validatePath(dirPath);
         if (!ok) return { success: false, error: reason };
@@ -345,40 +324,35 @@ const listDirectoryTool = defineTool('list_directory', {
 /**
  * Tool: search_in_files — busca texto/regex em arquivos do workspace.
  */
-const searchInFilesTool = defineTool('search_in_files', {
+const searchInFilesTool = buildTool({
+    name: 'search_in_files',
     description:
         'Busca texto ou regex em arquivos do workspace usando ripgrep (rg). ' +
         'Retorna correspondências com número de linha e contexto.',
-    parameters: sdkParam(
-        z.object({
-            pattern: z.string().describe('Padrão de busca (texto literal ou regex)'),
-            path: z
-                .string()
-                .optional()
-                .default('.')
-                .describe('Diretório ou arquivo onde buscar (relativo ao workspace)'),
-            isRegex: z.boolean().optional().default(false).describe('Se true, trata pattern como expressão regular'),
-            caseSensitive: z.boolean().optional().default(false).describe('Busca sensível a maiúsculas'),
-            includePattern: z.string().optional().describe('Filtro de arquivos a incluir (ex: *.js, *.ts)'),
-            excludePattern: z.string().optional().describe('Filtro de arquivos a excluir (ex: node_modules, dist)'),
-            contextLines: z
-                .number()
-                .int()
-                .min(0)
-                .max(10)
-                .optional()
-                .default(2)
-                .describe('Linhas de contexto ao redor de cada match (0-10)'),
-            maxResults: z
-                .number()
-                .int()
-                .min(1)
-                .max(500)
-                .optional()
-                .default(50)
-                .describe('Número máximo de resultados (1-500)'),
-        }),
-    ),
+    parameters: z.object({
+        pattern: z.string().describe('Padrão de busca (texto literal ou regex)'),
+        path: z.string().optional().default('.').describe('Diretório ou arquivo onde buscar (relativo ao workspace)'),
+        isRegex: z.boolean().optional().default(false).describe('Se true, trata pattern como expressão regular'),
+        caseSensitive: z.boolean().optional().default(false).describe('Busca sensível a maiúsculas'),
+        includePattern: z.string().optional().describe('Filtro de arquivos a incluir (ex: *.js, *.ts)'),
+        excludePattern: z.string().optional().describe('Filtro de arquivos a excluir (ex: node_modules, dist)'),
+        contextLines: z
+            .number()
+            .int()
+            .min(0)
+            .max(10)
+            .optional()
+            .default(2)
+            .describe('Linhas de contexto ao redor de cada match (0-10)'),
+        maxResults: z
+            .number()
+            .int()
+            .min(1)
+            .max(500)
+            .optional()
+            .default(50)
+            .describe('Número máximo de resultados (1-500)'),
+    }),
     handler: async ({
         pattern,
         path: searchPath,
@@ -455,21 +429,20 @@ const searchInFilesTool = defineTool('search_in_files', {
 /**
  * Tool: write_file_content — escreve conteúdo em um arquivo existente.
  */
-const writeFileContentTool = defineTool('write_file_content', {
+const writeFileContentTool = buildTool({
+    name: 'write_file_content',
     description:
         'Escreve conteúdo em um arquivo existente no workspace. ' +
         '⚠️ REQUER APROVAÇÃO — sobrescreve conteúdo existente. Use create_file para arquivos novos.',
-    parameters: sdkParam(
-        z.object({
-            path: z.string().describe('Caminho do arquivo (deve existir)'),
-            content: z.string().describe('Novo conteúdo completo do arquivo'),
-            encoding: z
-                .enum(['utf8', 'base64'])
-                .optional()
-                .default('utf8')
-                .describe('Codificação do conteúdo (utf8 para texto, base64 para binário)'),
-        }),
-    ),
+    parameters: z.object({
+        path: z.string().describe('Caminho do arquivo (deve existir)'),
+        content: z.string().describe('Novo conteúdo completo do arquivo'),
+        encoding: z
+            .enum(['utf8', 'base64'])
+            .optional()
+            .default('utf8')
+            .describe('Codificação do conteúdo (utf8 para texto, base64 para binário)'),
+    }),
     handler: async ({ path: filePath, content, encoding }) => {
         const { ok, reason, resolved } = validatePath(filePath);
         if (!ok) return { success: false, error: reason };
@@ -496,26 +469,25 @@ const writeFileContentTool = defineTool('write_file_content', {
 /**
  * Tool: create_file — cria um novo arquivo com conteúdo opcional.
  */
-const createFileTool = defineTool('create_file', {
+const createFileTool = buildTool({
+    name: 'create_file',
     description:
         'Cria um novo arquivo no workspace com conteúdo opcional. ' +
         '⚠️ REQUER APROVAÇÃO — o arquivo não deve existir previamente (use write_file_content para sobrescrever).',
-    parameters: sdkParam(
-        z.object({
-            path: z.string().describe('Caminho do arquivo a criar'),
-            content: z.string().optional().default('').describe('Conteúdo inicial do arquivo'),
-            createParentDirs: z
-                .boolean()
-                .optional()
-                .default(true)
-                .describe('Se true, cria diretórios intermediários se não existirem'),
-            overwrite: z
-                .boolean()
-                .optional()
-                .default(false)
-                .describe('Se true, sobrescreve o arquivo se já existir (⚠️ destrutivo)'),
-        }),
-    ),
+    parameters: z.object({
+        path: z.string().describe('Caminho do arquivo a criar'),
+        content: z.string().optional().default('').describe('Conteúdo inicial do arquivo'),
+        createParentDirs: z
+            .boolean()
+            .optional()
+            .default(true)
+            .describe('Se true, cria diretórios intermediários se não existirem'),
+        overwrite: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe('Se true, sobrescreve o arquivo se já existir (⚠️ destrutivo)'),
+    }),
     handler: async ({ path: filePath, content, createParentDirs, overwrite }) => {
         const { ok, reason, resolved } = validatePath(filePath);
         if (!ok) return { success: false, error: reason };
@@ -547,14 +519,13 @@ const createFileTool = defineTool('create_file', {
 /**
  * Tool: delete_file — deleta um arquivo do workspace.
  */
-const deleteFileTool = defineTool('delete_file', {
+const deleteFileTool = buildTool({
+    name: 'delete_file',
     description:
         'Deleta um arquivo do workspace. ' + '⚠️ REQUER APROVAÇÃO — OPERAÇÃO IRREVERSÍVEL. Não deleta diretórios.',
-    parameters: sdkParam(
-        z.object({
-            path: z.string().describe('Caminho do arquivo a deletar'),
-        }),
-    ),
+    parameters: z.object({
+        path: z.string().describe('Caminho do arquivo a deletar'),
+    }),
     handler: async ({ path: filePath }) => {
         const { ok, reason, resolved } = validatePath(filePath);
         if (!ok) return { success: false, error: reason };
@@ -577,15 +548,14 @@ const deleteFileTool = defineTool('delete_file', {
 /**
  * Tool: copy_file — copia um arquivo para outro caminho no workspace.
  */
-const copyFileTool = defineTool('copy_file', {
+const copyFileTool = buildTool({
+    name: 'copy_file',
     description: 'Copia um arquivo para outro caminho no workspace. ' + '⚠️ REQUER APROVAÇÃO se o destino já existe.',
-    parameters: sdkParam(
-        z.object({
-            source: z.string().describe('Caminho do arquivo de origem'),
-            destination: z.string().describe('Caminho de destino'),
-            overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
-        }),
-    ),
+    parameters: z.object({
+        source: z.string().describe('Caminho do arquivo de origem'),
+        destination: z.string().describe('Caminho de destino'),
+        overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
+    }),
     handler: async ({ source, destination, overwrite }) => {
         const src = validatePath(source);
         if (!src.ok) return { success: false, error: src.reason };
@@ -615,15 +585,14 @@ const copyFileTool = defineTool('copy_file', {
 /**
  * Tool: move_file — move/renomeia um arquivo para outro caminho no workspace.
  */
-const moveFileTool = defineTool('move_file', {
+const moveFileTool = buildTool({
+    name: 'move_file',
     description: 'Move ou renomeia um arquivo no workspace. ' + '⚠️ REQUER APROVAÇÃO — remove o arquivo de origem.',
-    parameters: sdkParam(
-        z.object({
-            source: z.string().describe('Caminho do arquivo de origem'),
-            destination: z.string().describe('Caminho de destino'),
-            overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
-        }),
-    ),
+    parameters: z.object({
+        source: z.string().describe('Caminho do arquivo de origem'),
+        destination: z.string().describe('Caminho de destino'),
+        overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
+    }),
     handler: async ({ source, destination, overwrite }) => {
         const src = validatePath(source);
         if (!src.ok) return { success: false, error: src.reason };
@@ -652,21 +621,17 @@ const moveFileTool = defineTool('move_file', {
 /**
  * Tool: patch_file — edição cirúrgica por substituição de string exata.
  */
-const patchFileTool = defineTool('patch_file', {
+const patchFileTool = buildTool({
+    name: 'patch_file',
     description:
         'Aplica uma substituição cirúrgica num arquivo: substitui `old_string` por `new_string`. ' +
         '`old_string` deve ocorrer EXATAMENTE UMA VEZ no arquivo (inclua ≥3 linhas de contexto). ' +
         '⚠️ REQUER APROVAÇÃO — modifica o arquivo em disco.',
-    parameters: sdkParam(
-        z.object({
-            path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto)'),
-            old_string: z
-                .string()
-                .min(1)
-                .describe('Texto exato a substituir. Deve ocorrer exatamente 1 vez no arquivo.'),
-            new_string: z.string().describe('Texto de substituição (pode ser string vazia para deletar)'),
-        }),
-    ),
+    parameters: z.object({
+        path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto)'),
+        old_string: z.string().min(1).describe('Texto exato a substituir. Deve ocorrer exatamente 1 vez no arquivo.'),
+        new_string: z.string().describe('Texto de substituição (pode ser string vazia para deletar)'),
+    }),
     handler: async ({ path: filePath, old_string, new_string }) => {
         const v = validatePath(filePath);
         if (!v.ok) return { success: false, error: v.reason };
@@ -711,24 +676,23 @@ const patchFileTool = defineTool('patch_file', {
 /**
  * UPG-N20/GAP-N10 (fix): Tool diff_files — exibe diferença unificada entre dois arquivos (usa `diff -u`).
  */
-const diffFilesTool = defineTool('diff_files', {
+const diffFilesTool = buildTool({
+    name: 'diff_files',
     description:
         'Exibe a diferença unificada (unified diff) entre dois arquivos do workspace. ' +
         'Útil para comparar versões ou verificar mudanças antes de aplicar patches.',
-    parameters: sdkParam(
-        z.object({
-            path_a: z.string().describe('Caminho do primeiro arquivo (linha base / original)'),
-            path_b: z.string().describe('Caminho do segundo arquivo (linha modificada / nova versão)'),
-            context_lines: z
-                .number()
-                .int()
-                .min(0)
-                .max(20)
-                .optional()
-                .default(3)
-                .describe('Número de linhas de contexto exibidas ao redor de cada mudança (padrão: 3)'),
-        }),
-    ),
+    parameters: z.object({
+        path_a: z.string().describe('Caminho do primeiro arquivo (linha base / original)'),
+        path_b: z.string().describe('Caminho do segundo arquivo (linha modificada / nova versão)'),
+        context_lines: z
+            .number()
+            .int()
+            .min(0)
+            .max(20)
+            .optional()
+            .default(3)
+            .describe('Número de linhas de contexto exibidas ao redor de cada mudança (padrão: 3)'),
+    }),
     handler: async ({ path_a, path_b, context_lines }) => {
         const va = validatePath(path_a);
         if (!va.ok) return { success: false, error: `path_a: ${va.reason}` };
