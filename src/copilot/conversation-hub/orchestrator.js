@@ -239,7 +239,7 @@ export class HubOrchestrator extends EventEmitter {
 
         // ARCH-02 fix: verificar que o agente está ativo antes de prosseguir
         const agentCheck = this.#agent ?? alwaysAliveAgent;
-        if (agentCheck.status === 'stopped') {
+        if (/** @type {any} */ (agentCheck).status === 'stopped') {
             throw new Error('[HubOrchestrator] AlwaysAliveAgent não está ativo');
         }
 

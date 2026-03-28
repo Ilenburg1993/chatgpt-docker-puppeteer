@@ -135,7 +135,7 @@ export class ConversationHub {
      * @param {string} hubSessionId
      * @param {string} content
      * @param {{ metadata?: object }} [opts]
-     * @returns {number} turnId
+     * @returns {Promise<number>} turnId
      */
     injectUserMessage(hubSessionId, content, opts = {}) {
         return this.orchestrator.injectUserMessage(hubSessionId, content, opts);

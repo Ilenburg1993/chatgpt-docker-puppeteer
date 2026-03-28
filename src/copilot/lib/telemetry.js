@@ -240,6 +240,7 @@ export function getErrorCalls(store) {
  *     activeSessions: number;
  *     totalSessions: number;
  *     topTools: { toolName: string; count: number }[];
+ *     p95ByTool: Record<string, number>;
  * }}
  */
 export function getSummary(store) {
@@ -266,13 +267,17 @@ export function getSummary(store) {
     const durationsByTool = {};
     for (const r of store.toolCalls) {
         if (!durationsByTool[r.toolName]) durationsByTool[r.toolName] = [];
-        durationsByTool[r.toolName].push(r.durationMs);
+        const toolDurations = durationsByTool[r.toolName];
+        if (toolDurations) toolDurations
+        if (toolDurations) toolDurations
+        if (toolDurations) toolDurations.push(r.durationMs);
     }
     /** @type {Record<string, number>} */
     const p95ByTool = {};
     for (const [toolName, durations] of Object.entries(durationsByTool)) {
         const sorted = [...durations].sort((a, b) => a - b);
-        p95ByTool[toolName] = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
+        const idx = Math.floor(sorted.length * 0.95);
+        p95ByTool[toolName] = sorted[idx] ?? sorted[sorted.length - 1] ?? 0;
     }
 
     return {
