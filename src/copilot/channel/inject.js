@@ -103,7 +103,7 @@ function httpRequest(method, path, body, port, timeoutMs) {
                         );
                         return;
                     }
-                    data += chunk;
+                    data += chunk.toString('utf8');
                 });
                 res.on('end', () => resolve({ statusCode: res.statusCode ?? 0, body: data }));
             },
