@@ -11,8 +11,8 @@ revisado após auditoria SDK v0.2.0 (npm), auditorias de código e Sprints 15-16
 
 ### Estado atual da base de código (pós-Sprint 16c — commit 7ebb2843)
 
-| Módulo                         | Status                   | Sprint  |
-| ------------------------------ | ------------------------ | ------- |
+| Módulo                         | Status                    | Sprint  |
+| ------------------------------ | ------------------------- | ------- |
 | `lib/client.js`                | ✅ Implementado           | 10      |
 | `lib/session.js`               | ✅ Implementado           | 10      |
 | `lib/permissions.js`           | ✅ Implementado           | 10      |
@@ -215,9 +215,9 @@ import { SYSTEM_PROMPT_SECTIONS, CopilotClient } from '@github/copilot-sdk';
 
 | Tool             | Operação                   | skipPermission | Segurança                                       |
 | ---------------- | -------------------------- | -------------- | ----------------------------------------------- |
-| `exec_command`   | Executa comando arbitrário | ❌ não          | Blocklist 15+ padrões, cwd restrito             |
-| `run_npm_script` | Executa `npm run <script>` | ❌ não          | Whitelist explícita de 20 scripts               |
-| `run_node_file`  | Executa `node <file>`      | ❌ não          | Ext. permitidas (.js/.mjs/.cjs), workspace only |
+| `exec_command`   | Executa comando arbitrário | ❌ não         | Blocklist 15+ padrões, cwd restrito             |
+| `run_npm_script` | Executa `npm run <script>` | ❌ não         | Whitelist explícita de 20 scripts               |
+| `run_node_file`  | Executa `node <file>`      | ❌ não         | Ext. permitidas (.js/.mjs/.cjs), workspace only |
 
 **Restrições de segurança embutidas**:
 
@@ -388,8 +388,8 @@ manutenção — sem testes, refactors são perigosos. **Duração**: 1-2 sprint
 
 ## Tabela de Prioridades e Dependências
 
-| Sprint | Título                 | Status           | Prioridade | Depende de | Commit     |
-| ------ | ---------------------- | ---------------- | ---------- | ---------- | ---------- |
+| Sprint | Título                 | Status            | Prioridade | Depende de | Commit     |
+| ------ | ---------------------- | ----------------- | ---------- | ---------- | ---------- |
 | 17     | File Tools             | ✅ CONCLUÍDO      | CRÍTICO    | —          | `f6ec3970` |
 | 18     | SDK v0.2.0 Upgrade     | ⚠️ BLOQUEADO      | ALTO       | —          | —          |
 | 19     | Session API Extensions | ✅ CONCLUÍDO      | ALTO       | 18\*       | `f6ec3970` |
@@ -469,10 +469,10 @@ src/copilot/
 
 ### Fase 8 — Todo Management System (12 tools) ✅ CONCLUÍDO
 
-**Descrição**: Sistema profundo de gerenciamento de tarefas/TODOs para o agente LLM-B.
-**Arquivo**: `src/copilot/tools/todo-tools.js` (~1050 linhas)
-**Testes**: `tests/unit/copilot/test_todo_tools.spec.js` — 71 testes, 100% passando
-**Total de tools após Fase 8**: **65 tools**
+**Descrição**: Sistema profundo de gerenciamento de tarefas/TODOs para o agente LLM-B. **Arquivo**:
+`src/copilot/tools/todo-tools.js` (~1050 linhas) **Testes**:
+`tests/unit/copilot/test_todo_tools.spec.js` — 71 testes, 100% passando **Total de tools após Fase
+8**: **65 tools**
 
 | Tool                   | Categoria | Descrição                                                       |
 | ---------------------- | --------- | --------------------------------------------------------------- |
@@ -491,7 +491,7 @@ src/copilot/
 
 **Storage**: `$WORKSPACE_ROOT/.github/hooks/state/todos.json` (atômico via tmp→rename)
 
- (atualizado para Sprints 17 e 21)
+(atualizado para Sprints 17 e 21)
 
 ### File Tools (Sprint 17)
 
@@ -575,8 +575,8 @@ const shellRestrictionsHook = async (input) => {
 
 ### Estado atual da base de código
 
-| Módulo                   | Status             | Testes     |
-| ------------------------ | ------------------ | ---------- |
+| Módulo                   | Status              | Testes     |
+| ------------------------ | ------------------- | ---------- |
 | `lib/client.js`          | ✅ Implementado     | Sprint 10  |
 | `lib/session.js`         | ✅ Implementado     | Sprint 10  |
 | `lib/permissions.js`     | ✅ Implementado     | Sprint 10  |
@@ -746,8 +746,8 @@ se conectem a "servidores de contexto" que fornecem **tools**, **resources** e *
 
 ### Capacidades do protocolo MCP que ainda não usamos
 
-| Capacidade MCP           | Status neste projeto      | Oportunidade                                   |
-| ------------------------ | ------------------------- | ---------------------------------------------- |
+| Capacidade MCP           | Status neste projeto       | Oportunidade                                   |
+| ------------------------ | -------------------------- | ---------------------------------------------- |
 | `tools/list`             | ✅ Usado (mcp-tool-bridge) | —                                              |
 | `tools/call`             | ✅ Usado (mcp-tool-bridge) | —                                              |
 | `resources/list`         | ❌ Não implementado        | LLM-B acessa arquivos via MCP resource!        |

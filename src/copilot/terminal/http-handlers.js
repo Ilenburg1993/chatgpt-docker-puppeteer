@@ -403,7 +403,7 @@ export async function handleInject(body) {
 /**
  * Lista GitHub issues via gh CLI.
  *
- * @param {{ state?: string; limit?: number }} params
+ * @param {{ state?: string; limit?: number; page?: number }} params
  * @returns {Promise<HandlerResult>}
  */
 export async function handleGhIssues({ state = 'open', limit = 15, page = 1 } = {}) {
@@ -424,7 +424,7 @@ export async function handleGhIssues({ state = 'open', limit = 15, page = 1 } = 
 /**
  * Lista GitHub pull requests via gh CLI.
  *
- * @param {{ state?: string; limit?: number }} params
+ * @param {{ state?: string; limit?: number; page?: number }} params
  * @returns {Promise<HandlerResult>}
  */
 export async function handleGhPrs({ state = 'open', limit = 15, page = 1 } = {}) {
@@ -445,7 +445,7 @@ export async function handleGhPrs({ state = 'open', limit = 15, page = 1 } = {})
 /**
  * Lista GitHub CI runs via gh CLI.
  *
- * @param {{ limit?: number }} params
+ * @param {{ limit?: number; page?: number }} params
  * @returns {Promise<HandlerResult>}
  */
 export async function handleGhCi({ limit = 15, page = 1 } = {}) {

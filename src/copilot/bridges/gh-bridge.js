@@ -283,7 +283,9 @@ export async function commentIssue(number, body) {
  * @param {object} [opts]
  * @param {'open' | 'closed' | 'merged' | 'all'} [opts.state]
  * @param {number} [opts.limit]
- * @returns {Promise<PrItem[]>}
+ * @param {number} [opts.page] - Página (1-based).
+ * @param {number} [opts.perPage] - Itens por página (default: 15, max: 100).
+ * @returns {Promise<{ items: PrItem[]; hasMore: boolean; page: number; perPage: number }>}
  */
 export async function listPrs(opts = {}) {
     const { state = 'open', page = 1, perPage } = opts;
@@ -398,7 +400,9 @@ export async function mergePr(number, opts = {}) {
  * @param {object} [opts]
  * @param {number} [opts.limit]
  * @param {string} [opts.branch]
- * @returns {Promise<RunItem[]>}
+ * @param {number} [opts.page] - Página (1-based).
+ * @param {number} [opts.perPage] - Itens por página (default: 15, max: 100).
+ * @returns {Promise<{ items: RunItem[]; hasMore: boolean; page: number; perPage: number }>}
  */
 export async function listRuns(opts = {}) {
     const { branch, page = 1, perPage } = opts;

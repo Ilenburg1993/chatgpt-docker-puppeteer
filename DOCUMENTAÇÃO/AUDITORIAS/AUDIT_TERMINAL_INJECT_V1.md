@@ -1,9 +1,8 @@
 # Auditoria: Canal Terminal LLM-B — Serialização, Bypass e Retry
 
-**Data**: 2026-03-25
-**Escopo**: `src/copilot/terminal/dialog.js`, `src/copilot/terminal/http-handlers.js`, `src/copilot/channel/inject.js`
-**Status**: ✅ Implementado e testado (766/766 testes passando)
-**Commit anterior**: `d96a01a9` (CONC-01/02/03)
+**Data**: 2026-03-25 **Escopo**: `src/copilot/terminal/dialog.js`,
+`src/copilot/terminal/http-handlers.js`, `src/copilot/channel/inject.js` **Status**: ✅ Implementado
+e testado (766/766 testes passando) **Commit anterior**: `d96a01a9` (CONC-01/02/03)
 
 ---
 
@@ -30,17 +29,18 @@ injectToLlmB()          → POST /inject (porta 3009)
 
 ### TERM-01 — `sendTurn` rejeitava silenciosamente quando `_busy = true`
 
-**Arquivo**: `src/copilot/terminal/dialog.js`
-**Severidade**: Alta — mensagens de LLM-A e do usuário eram descartadas sem aviso
+**Arquivo**: `src/copilot/terminal/dialog.js` **Severidade**: Alta — mensagens de LLM-A e do usuário
+eram descartadas sem aviso
 
 **Comportamento anterior**:
+
 ```js
 export async function sendTurn(message, actor = 'user') {
-    if (getBusy()) {
-        println('⏳ Aguarde — LLM-B está processando...');
-        return null;  // ← DESCARTE SILENCIOSO
-    }
-    // ...
+  if (getBusy()) {
+    println('⏳ Aguarde — LLM-B está processando...');
+    return null; // ← DESCARTE SILENCIOSO
+  }
+  // ...
 }
 ```
 
@@ -48,40 +48,48 @@ Qualquer chamada concorrente a `sendTurn` enquanto um turno estava em andamento 
 imediato. O pipeline, LLM-A e o usuário perdiam mensagens sem possibilidade de recuperação.
 
 **Correção implementada** — Promise-chain mutex:
+
 ```js
 export function sendTurn(message, actor = 'user') {
-    // backpressure: rejeita se fila está cheia
-    if (_turnQueueDepth >= MAX_TURN_QUEUE_SIZE) return Promise.resolve(null);
+  // backpressure: rejeita se fila está cheia
+  if (_turnQueueDepth >= MAX_TURN_QUEUE_SIZE) return Promise.resolve(null);
 
-    _turnQueueDepth++;
-    const next = _sendTurnMutex.then(() => _executeTurn(message, actor)).catch(() => null);
-    _sendTurnMutex = next.then(() => null, () => null); // cauda da fila
-    void next.finally(() => { _turnQueueDepth--; });
-    return next;
+  _turnQueueDepth++;
+  const next = _sendTurnMutex.then(() => _executeTurn(message, actor)).catch(() => null);
+  _sendTurnMutex = next.then(
+    () => null,
+    () => null,
+  ); // cauda da fila
+  void next.finally(() => {
+    _turnQueueDepth--;
+  });
+  return next;
 }
 ```
 
 **Propriedades**:
+
 - Chamadas concorrentes são enfileiradas em ordem de chegada (FIFO)
 - Nenhuma mensagem é descartada silenciosamente (a menos que a fila esteja cheia)
 - Backpressure: `MAX_TURN_QUEUE_SIZE = 10` — acima disso, `null` imediato com log `WARN`
 - `_busy` permanece como indicador observável, mas não é mais o gate de decisão
-- BUG-3 (pipeline falhava ao chamar `sendTurn` em loop quando busy) resolvido automaticamente
-  — o pipeline agora espera na fila em vez de falhar
+- BUG-3 (pipeline falhava ao chamar `sendTurn` em loop quando busy) resolvido automaticamente — o
+  pipeline agora espera na fila em vez de falhar
 
 ---
 
 ### TERM-02 — `handleInject` com `nativeAttachments` bypassava `_busy`
 
-**Arquivo**: `src/copilot/terminal/http-handlers.js`
-**Severidade**: Alta — possível execução paralela de turnos, violando o invariante de 1 turno ativo
+**Arquivo**: `src/copilot/terminal/http-handlers.js` **Severidade**: Alta — possível execução
+paralela de turnos, violando o invariante de 1 turno ativo
 
 **Comportamento anterior**:
+
 ```js
 if (nativeAttachments.length > 0) {
-    // sem verificação de getBusy()
-    // sem setBusy(true) / setBusy(false)
-    reply = await alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments });
+  // sem verificação de getBusy()
+  // sem setBusy(true) / setBusy(false)
+  reply = await alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments });
 }
 ```
 
@@ -90,17 +98,18 @@ Quando `inject.js` enviava mensagens com attachments reais (arquivos, imagens), 
 turno de `sendTurn()`.
 
 **Correção implementada**:
+
 ```js
 if (nativeAttachments.length > 0) {
-    if (getBusy()) {
-        return { status: 409, body: { ok: false, reply: null, error: 'LLM-B ocupada' } };
-    }
-    setBusy(true);
-    try {
-        reply = await alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments });
-    } finally {
-        setBusy(false);
-    }
+  if (getBusy()) {
+    return { status: 409, body: { ok: false, reply: null, error: 'LLM-B ocupada' } };
+  }
+  setBusy(true);
+  try {
+    reply = await alwaysAliveAgent.sendMessage(enrichedMessage, { attachments: nativeAttachments });
+  } finally {
+    setBusy(false);
+  }
 }
 ```
 
@@ -110,13 +119,14 @@ if (nativeAttachments.length > 0) {
 
 ### GAP-4 — Clientes SSE não recebiam evento `busy` ao iniciar/encerrar turnos
 
-**Arquivo**: `src/copilot/terminal/dialog.js` → `_executeTurn()`
-**Severidade**: Média — ferramentas e dashboards SSE não conseguiam observar estado de processamento
+**Arquivo**: `src/copilot/terminal/dialog.js` → `_executeTurn()` **Severidade**: Média — ferramentas
+e dashboards SSE não conseguiam observar estado de processamento
 
 **Comportamento anterior**: `stateEmitter.emit('busy:changed')` era emitido por `setBusy()`, mas
 nenhum evento SSE era transmitido para clientes conectados via `GET /events`.
 
 **Correção implementada** — `broadcastSse` nos pontos de transição:
+
 ```js
 async function _executeTurn(message, actor) {
     // ...
@@ -136,37 +146,39 @@ Clientes SSE agora recebem eventos `busy` com payload `{ busy: boolean, actor?: 
 
 ### INJECT-01 — `injectToLlmB` não fazia retry em 409 (LLM_B_BUSY)
 
-**Arquivo**: `src/copilot/channel/inject.js`
-**Severidade**: Média — LLM-A precisava implementar retry manualmente, ou perdia a mensagem
+**Arquivo**: `src/copilot/channel/inject.js` **Severidade**: Média — LLM-A precisava implementar
+retry manualmente, ou perdia a mensagem
 
-**Comportamento anterior**: `injectToLlmB()` lançava `BridgeError('LLM_B_BUSY')` imediatamente
-na primeira resposta 409 recebida do terminal.
+**Comportamento anterior**: `injectToLlmB()` lançava `BridgeError('LLM_B_BUSY')` imediatamente na
+primeira resposta 409 recebida do terminal.
 
 **Correção implementada** — retry automático com backoff linear:
+
 ```js
 export async function injectToLlmB(message, opts = {}) {
-    const maxRetries = opts.retries ?? 3;        // padrão: 3 tentativas
-    const retryDelayMs = opts.retryDelayMs ?? 1_500; // padrão: 1.5s base
+  const maxRetries = opts.retries ?? 3; // padrão: 3 tentativas
+  const retryDelayMs = opts.retryDelayMs ?? 1_500; // padrão: 1.5s base
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-            return await _doInjectToLlmB(message, opts);
-        } catch (err) {
-            const isBusy = err?.code === 'LLM_B_BUSY';
-            if (isBusy && attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, retryDelayMs * (attempt + 1)));
-                continue;  // backoff linear: 1.5s, 3s, 4.5s
-            }
-            throw err;
-        }
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await _doInjectToLlmB(message, opts);
+    } catch (err) {
+      const isBusy = err?.code === 'LLM_B_BUSY';
+      if (isBusy && attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, retryDelayMs * (attempt + 1)));
+        continue; // backoff linear: 1.5s, 3s, 4.5s
+      }
+      throw err;
     }
+  }
 }
 ```
 
-**Backoff**: linear multiplicativo — espera `retryDelayMs × (tentativa + 1)` (1.5s, 3s, 4.5s para
-os defaults). Total de espera máxima antes de desistir: ~9s.
+**Backoff**: linear multiplicativo — espera `retryDelayMs × (tentativa + 1)` (1.5s, 3s, 4.5s para os
+defaults). Total de espera máxima antes de desistir: ~9s.
 
 **Configurabilidade via opts**:
+
 - `opts.retries = 0` → sem retry (comportamento original)
 - `opts.retries = 5, opts.retryDelayMs = 500` → 5 tentativas com delays de 500ms, 1s, 1.5s...
 
@@ -189,11 +201,13 @@ os defaults). Total de espera máxima antes de desistir: ~9s.
 ### Novos arquivos de teste
 
 **`tests/unit/copilot/test_terminal_turn_serialization.spec.js`** (14 testes):
+
 - Análise estrutural do source de `dialog.js` e `http-handlers.js`
 - Comportamento de serialização: 3 chamadas concorrentes → execução serial FIFO
 - Comportamento de backpressure: fila cheia → null imediato
 
 **`tests/unit/copilot/test_inject_retry.spec.js`** (10 testes):
+
 - Análise estrutural do source de `inject.js`
 - Retry em LLM_B_BUSY (sucesso na segunda tentativa)
 - Sem retry para erros não-BUSY

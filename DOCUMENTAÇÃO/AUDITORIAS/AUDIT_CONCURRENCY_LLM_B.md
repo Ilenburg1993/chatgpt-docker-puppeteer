@@ -1,20 +1,21 @@
 # AUDIT_CONCURRENCY_LLM_B — Auditoria de Concorrência e Serialização de Mensagens para LLM-B
 
-**Data:** 2026-03-27
-**Escopo:** `src/copilot/agent/always-alive.js`, `src/copilot/conversation-hub/orchestrator.js`
-**Status:** IMPLEMENTADO — CONC-01, CONC-02, CONC-03
+**Data:** 2026-03-27 **Escopo:** `src/copilot/agent/always-alive.js`,
+`src/copilot/conversation-hub/orchestrator.js` **Status:** IMPLEMENTADO — CONC-01, CONC-02, CONC-03
 **Commit:** pending → aplicado após esta documentação
 
 ---
 
 ## 1. Motivação
 
-Durante uma sessão permanente (dialog loop), a LLM-B pode receber mensagens de duas origens distintas:
+Durante uma sessão permanente (dialog loop), a LLM-B pode receber mensagens de duas origens
+distintas:
 
 1. **LLM-A** (`HubOrchestrator.sendToLlmB`) — chamadas programáticas da orquestração
 2. **Usuário humano** (`socket-ns.js → injectUserMessage`) — input direto via WebSocket
 
-A investigação foi motivada pela pergunta: *o que acontece quando chegam múltiplas mensagens simultaneamente? Há fila? Buffer? Serialização?*
+A investigação foi motivada pela pergunta: _o que acontece quando chegam múltiplas mensagens
+simultaneamente? Há fila? Buffer? Serialização?_
 
 ---
 
@@ -38,6 +39,7 @@ Usuário → socket user:inject → HubOrchestrator.injectUserMessage()
 ```
 
 **Caminho do LlmBridgeClient** (modo useStructured=true):
+
 ```
 LlmBridgeClient.chat(msg)
   └─► AlwaysAliveAgent.sendMessage() → #queue.enqueue()   [fila com serialização ✓]
@@ -50,11 +52,11 @@ LlmBridgeClient.chat(msg)
 
 ### BUG-A — Race condition em `sendDialogTurn` (CRÍTICO)
 
-**Localização:** `src/copilot/agent/always-alive.js`
-**Severidade:** Alta
-**Efeito:** Mensagem silenciosamente perdida ou resposta dirigida ao caller errado
+**Localização:** `src/copilot/agent/always-alive.js` **Severidade:** Alta **Efeito:** Mensagem
+silenciosamente perdida ou resposta dirigida ao caller errado
 
-**Causa:** `sendDialogTurn` operava diretamente sobre `#pendingQuestion` sem qualquer forma de exclusão mútua. Se dois callers invocassem `sendDialogTurn` concorrentemente:
+**Causa:** `sendDialogTurn` operava diretamente sobre `#pendingQuestion` sem qualquer forma de
+exclusão mútua. Se dois callers invocassem `sendDialogTurn` concorrentemente:
 
 1. Caller A e Caller B ambos verificam `#pendingQuestion !== null` — ambos passam
 2. Caller A chama `this.answerPendingQuestion(messageA)`
@@ -75,11 +77,12 @@ sendDialogTurn(message, { timeout = 60_000, signal } = {}) {
 
 ### BUG-B — Chamadas concorrentes em `HubOrchestrator.sendToLlmB` (ALTO)
 
-**Localização:** `src/copilot/conversation-hub/orchestrator.js`
-**Severidade:** Alta
-**Efeito:** Turns com números errados, respostas trocadas, store inconsistente
+**Localização:** `src/copilot/conversation-hub/orchestrator.js` **Severidade:** Alta **Efeito:**
+Turns com números errados, respostas trocadas, store inconsistente
 
-**Causa:** `sendToLlmB` não impedia que duas chamadas com o mesmo `hubSessionId` acontecessem de forma simultânea. Em caso de múltiplos callers concorrentes (ex: timer automático + mensagem do usuário):
+**Causa:** `sendToLlmB` não impedia que duas chamadas com o mesmo `hubSessionId` acontecessem de
+forma simultânea. Em caso de múltiplos callers concorrentes (ex: timer automático + mensagem do
+usuário):
 
 1. Ambas as chamadas lêem `turnNumber = store.getCurrentTurnNumber()` → mesmo valor
 2. Ambas persistem `llm_a` com o mesmo `turnNumber` → colisão no store
@@ -87,15 +90,17 @@ sendDialogTurn(message, { timeout = 60_000, signal } = {}) {
 
 ### GAP-C — Ausência de notificação push `turn:user_pending` (MÉDIO)
 
-**Localização:** `HubOrchestrator.injectUserMessage()`
-**Severidade:** Média
-**Efeito:** LLM-A não sabia em tempo real quando o usuário injetou mensagem durante turn ativo
+**Localização:** `HubOrchestrator.injectUserMessage()` **Severidade:** Média **Efeito:** LLM-A não
+sabia em tempo real quando o usuário injetou mensagem durante turn ativo
 
-**Causa:** `injectUserMessage` persistia a mensagem no SQLite e emitia `user:injected`, mas não distinguia se havia um turn em andamento. LLM-A precisava fazer `pollUserMessages` manualmente e poderia perder a janela ideal de resposta.
+**Causa:** `injectUserMessage` persistia a mensagem no SQLite e emitia `user:injected`, mas não
+distinguia se havia um turn em andamento. LLM-A precisava fazer `pollUserMessages` manualmente e
+poderia perder a janela ideal de resposta.
 
 ### GAP-D — Ausência de sistema de prioridade (FUTURO)
 
-Mensagens do usuário humano não têm prioridade sobre mensagens programáticas de LLM-A. Se LLM-A está em diálogo contínuo, o usuário precisa esperar a fila drenar.
+Mensagens do usuário humano não têm prioridade sobre mensagens programáticas de LLM-A. Se LLM-A está
+em diálogo contínuo, o usuário precisa esperar a fila drenar.
 
 **Mitigação futura:** Priority queue ou mecanismo de interrupt.
 
@@ -136,12 +141,14 @@ sendDialogTurn(message, { timeout = 60_000, signal } = {}) {
 ```
 
 **Garantias:**
+
 - Apenas um `#executeDialogTurn` executa por vez
 - Rejeições não bloqueiam a fila (`.catch(() => {})` na cauda do mutex)
 - AbortSignal é checado **antes** de entrar na fila (fail-fast)
 - `#dialogLoopActive` é checado **antes** de entrar na fila
 
-**Ref:** `#executeDialogTurn` contém toda a lógica original (`startSpan`, `#pendingQuestion`, listeners, etc.)
+**Ref:** `#executeDialogTurn` contém toda a lógica original (`startSpan`, `#pendingQuestion`,
+listeners, etc.)
 
 ### CONC-02 — Mutex por sessão em `sendToLlmB` (orchestrator.js)
 
@@ -167,6 +174,7 @@ sendToLlmB(hubSessionId, message, opts = {}) {
 ```
 
 **Garantias:**
+
 - Serialização **por sessão** — sessões diferentes não se bloqueiam mutuamente
 - Auto-limpeza da Map quando a fila de uma sessão esvazia (sem memory leak)
 - Cleanup explícito em `closeSession()` e `destroy()`
@@ -188,6 +196,7 @@ injectUserMessage(hubSessionId, content, opts = {}) {
 ```
 
 **Garantias:**
+
 - LLM-A recebe notificação imediata quando usuário injeta durante turn ativo
 - Evento inclui `turnId` para rastreabilidade
 - Sem polling necessário — push notification
@@ -285,6 +294,8 @@ AlwaysAliveAgent.sendDialogTurn(msg2)  ─┤  #dialogTurnMutex chain → serial
 
 ## 10. Referências
 
-- `src/copilot/agent/always-alive.js` — impl `#dialogTurnMutex`, `sendDialogTurn`, `#executeDialogTurn`
-- `src/copilot/conversation-hub/orchestrator.js` — impl `#inflightBySession`, `sendToLlmB`, `#executeSendToLlmB`, `injectUserMessage` com `turn:user_pending`
+- `src/copilot/agent/always-alive.js` — impl `#dialogTurnMutex`, `sendDialogTurn`,
+  `#executeDialogTurn`
+- `src/copilot/conversation-hub/orchestrator.js` — impl `#inflightBySession`, `sendToLlmB`,
+  `#executeSendToLlmB`, `injectUserMessage` com `turn:user_pending`
 - `DOCUMENTAÇÃO/AUDITORIAS/AUDIT_SRC_COPILOT_V2.md` — UPG-01..UPG-06 (contexto anterior)

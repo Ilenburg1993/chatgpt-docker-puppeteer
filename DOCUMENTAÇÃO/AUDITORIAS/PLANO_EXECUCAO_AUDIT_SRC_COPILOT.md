@@ -1,8 +1,7 @@
 # Plano de Execução — Auditoria src/copilot
 
-**Origem**: `DOCUMENTAÇÃO/AUDITORIAS/AUDIT_SRC_COPILOT.md`
-**Gerado em**: 2026-03-28
-**Status**: Em execução
+**Origem**: `DOCUMENTAÇÃO/AUDITORIAS/AUDIT_SRC_COPILOT.md` **Gerado em**: 2026-03-28 **Status**: Em
+execução
 
 ---
 
@@ -34,8 +33,8 @@ resume o resultado de cada validação e seu status de execução.
 
 ## P1 — CRÍTICO (execução imediata)
 
-| ID     | Arquivo                     | Título                                                     | Validado     | Status      |
-| ------ | --------------------------- | ---------------------------------------------------------- | ------------ | ----------- |
+| ID     | Arquivo                     | Título                                                     | Validado      | Status       |
+| ------ | --------------------------- | ---------------------------------------------------------- | ------------- | ------------ |
 | SDK-01 | `lib/hooks.js`              | `onPreToolUse` sem `"ask"` + `additionalContext`           | ✅ Confirmado | ✅ CORRIGIDO |
 | SDK-02 | `lib/permissions.js`        | PermissionHandler sem `denied-by-content-exclusion-policy` | ✅ Confirmado | ✅ CORRIGIDO |
 | SDK-03 | `lib/session.js`            | `mode: 'customize'` inválido no SDK v0.1.x                 | ✅ Confirmado | ✅ CORRIGIDO |
@@ -49,26 +48,26 @@ resume o resultado de cada validação e seu status de execução.
 
 ## P2 — ALTO (execução em segunda rodada)
 
-| ID     | Arquivo                         | Título                                                     | Validado         | Status      |
-| ------ | ------------------------------- | ---------------------------------------------------------- | ---------------- | ----------- |
-| SDK-06 | `agent/task-executor.js`        | `session.on()` unsubscribe não está no `finally`           | ✅ Confirmado     | ✅ CORRIGIDO |
-| SDK-04 | Todos `tools/*.js`              | `defineTool` com double-cast anti-pattern                  | ✅ Confirmado     | 🔵 Deferido  |
-| SDK-05 | `agent/always-alive.js`         | `sendAndWait` timeout misalignment                         | ✅ Confirmado     | ✅ CORRIGIDO |
-| SDK-07 | `lib/permissions.js`            | PermissionHandler sem `denied-by-content-exclusion-policy` | Duplicata SDK-02 | —           |
-| BUG-04 | `agent/always-alive.js`         | `#processQueue()` pode ser reentrante                      | ✅ Confirmado     | ✅ CORRIGIDO |
-| BUG-05 | `agent/dialog-watchdog.js`      | `start()` não verifica se já está rodando                  | ✅ Confirmado     | ✅ CORRIGIDO |
-| BUG-06 | `channel/client.js`             | `startDialogMode()` listeners sem cleanup em erro          | ✅ Confirmado     | ✅ CORRIGIDO |
-| BUG-07 | `tools/shell/index.js`          | Regex shell-meta defeituosa                                | ✅ Confirmado     | ✅ CORRIGIDO |
-| SEC-03 | `terminal/dialog.js`            | NERV emite conteúdo completo das respostas                 | ✅ Confirmado     | ✅ CORRIGIDO |
-| SEC-04 | `tools/file-tools.js`           | `validatePath` sem rejeição de extensões perigosas         | ✅ Confirmado     | ✅ CORRIGIDO |
-| SEC-05 | `conversation-hub/socket-ns.js` | `join:session` sem verificação de autorização              | ✅ Confirmado     | ✅ CORRIGIDO |
+| ID     | Arquivo                         | Título                                                     | Validado         | Status       |
+| ------ | ------------------------------- | ---------------------------------------------------------- | ---------------- | ------------ |
+| SDK-06 | `agent/task-executor.js`        | `session.on()` unsubscribe não está no `finally`           | ✅ Confirmado    | ✅ CORRIGIDO |
+| SDK-04 | Todos `tools/*.js`              | `defineTool` com double-cast anti-pattern                  | ✅ Confirmado    | 🔵 Deferido  |
+| SDK-05 | `agent/always-alive.js`         | `sendAndWait` timeout misalignment                         | ✅ Confirmado    | ✅ CORRIGIDO |
+| SDK-07 | `lib/permissions.js`            | PermissionHandler sem `denied-by-content-exclusion-policy` | Duplicata SDK-02 | —            |
+| BUG-04 | `agent/always-alive.js`         | `#processQueue()` pode ser reentrante                      | ✅ Confirmado    | ✅ CORRIGIDO |
+| BUG-05 | `agent/dialog-watchdog.js`      | `start()` não verifica se já está rodando                  | ✅ Confirmado    | ✅ CORRIGIDO |
+| BUG-06 | `channel/client.js`             | `startDialogMode()` listeners sem cleanup em erro          | ✅ Confirmado    | ✅ CORRIGIDO |
+| BUG-07 | `tools/shell/index.js`          | Regex shell-meta defeituosa                                | ✅ Confirmado    | ✅ CORRIGIDO |
+| SEC-03 | `terminal/dialog.js`            | NERV emite conteúdo completo das respostas                 | ✅ Confirmado    | ✅ CORRIGIDO |
+| SEC-04 | `tools/file-tools.js`           | `validatePath` sem rejeição de extensões perigosas         | ✅ Confirmado    | ✅ CORRIGIDO |
+| SEC-05 | `conversation-hub/socket-ns.js` | `join:session` sem verificação de autorização              | ✅ Confirmado    | ✅ CORRIGIDO |
 
 ---
 
 ## P3 — MÉDIO (execução em terceira rodada)
 
-| ID      | Arquivo                         | Título                                              | Validado     | Status                    |
-| ------- | ------------------------------- | --------------------------------------------------- | ------------ | ------------------------- |
+| ID      | Arquivo                         | Título                                              | Validado      | Status                     |
+| ------- | ------------------------------- | --------------------------------------------------- | ------------- | -------------------------- |
 | SDK-08  | `agent/session-manager.js`      | `backgroundCompactionThreshold` sem clamp           | ✅ Confirmado | ✅ CORRIGIDO               |
 | SDK-09  | `agent/always-alive.js`         | `session.on()` retorno de unsubscribe inconsistente | ✅ Confirmado | ✅ CORRIGIDO               |
 | BUG-08  | `terminal/server.js`            | Rate limiter sem limpeza periódica                  | ✅ Confirmado | ✅ CORRIGIDO               |
@@ -81,8 +80,8 @@ resume o resultado de cada validação e seu status de execução.
 
 ## P4 — BAIXO/MELHORIAS (execução em quarta rodada)
 
-| ID          | Arquivo                            | Título                                       | Validado     | Status                       |
-| ----------- | ---------------------------------- | -------------------------------------------- | ------------ | ---------------------------- |
+| ID          | Arquivo                            | Título                                       | Validado      | Status                        |
+| ----------- | ---------------------------------- | -------------------------------------------- | ------------- | ----------------------------- |
 | SDK-10      | `config/mcp-servers.js`            | `mcpServers.type` divergência SDK            | ✅ Confirmado | 🔵 Deferido                   |
 | SDK-11      | `agent/always-alive.js`            | `session.getMessages()` sem verificação      | ✅ Confirmado | ✅ CORRIGIDO                  |
 | SDK-12      | `agent/always-alive.js`            | `reasoningEffort: 'xhigh'` não documentado   | ✅ Confirmado | ✅ CORRIGIDO                  |
@@ -173,4 +172,5 @@ Fase 4 (P4 — Baixo/Melhorias):
 
 ---
 
-*Documento gerado e validado em 2026-03-28. Itens deferidos serão reavaliados em sprint subsequente.*
+_Documento gerado e validado em 2026-03-28. Itens deferidos serão reavaliados em sprint
+subsequente._
