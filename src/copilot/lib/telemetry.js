@@ -342,8 +342,10 @@ async function getTracer() {
     }
 }
 
-/** Singleton da promessa de init do tracer. Evita múltiplas tentativas paralelas. @type {Promise<void> | null} */
-let _tracerInitPromise = null;
+// BUG-MED-12 (fix): inicializar no carregamento do módulo para eliminar race condition teórica
+// Dois calls síncronos a startSpan no mesmo tick poderiam criar dois providers paralelos.
+/** @type {Promise<void>} */
+const _tracerInitPromise = getTracer().then(() => undefined);
 
 /**
  * AI.3 — Executa uma função dentro de um span OTEL, registrando latência e erros. Se OTEL não estiver disponível,
@@ -356,10 +358,7 @@ let _tracerInitPromise = null;
  * @returns {Promise<T>}
  */
 export async function startSpan(name, attrs, fn) {
-    // Inicializa tracer de forma lazy e singleton
-    if (_tracerInitPromise === null) {
-        _tracerInitPromise = getTracer().then(() => undefined);
-    }
+    // Aguarda a inicialização do tracer (singleton iniciado no carregamento do módulo)
     await _tracerInitPromise;
 
     if (!_tracer) {

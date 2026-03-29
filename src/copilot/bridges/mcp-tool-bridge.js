@@ -34,6 +34,11 @@ let _mcpCircuitOpen = false;
 let _mcpCircuitOpenAt = 0;
 const CIRCUIT_RESET_MS = 60_000;
 
+// BUG-MED-09 (fix): backoff exponencial para tentativas iniciais após restart do processo
+// Evita ~9 tentativas HTTP desnecessárias quando o servidor MCP está offline no boot
+const _BOOT_BACKOFF_MS = [0, 200, 1000, 5_000]; // tentativas 1–4: imediata, 200ms, 1s, 5s
+let _bootAttemptCount = 0;
+
 /**
  * @typedef {object} McpToolMeta
  * @property {string} name - Nome canônico da tool
@@ -230,6 +235,8 @@ function createSdkToolFromMcp(mcpTool) {
     return defineTool(toolName, {
         description: `[MCP] ${mcpTool.description ?? mcpTool.name}`,
         parameters: schema,
+        // GAP-SDK-07 (fix): MCP tools devem override built-ins com o mesmo nome
+        overridesBuiltInTool: true,
         handler: async (/** @type {Record<string, unknown>} */ params) => {
             try {
                 /** @type {any} */
@@ -270,10 +277,18 @@ export async function buildMcpTools() {
         return [];
     }
 
+    // BUG-MED-09 (fix): aplicar backoff exponencial nas tentativas iniciais de boot
+    const bootDelay = _BOOT_BACKOFF_MS[Math.min(_bootAttemptCount, _BOOT_BACKOFF_MS.length - 1)] ?? 0;
+    _bootAttemptCount++;
+    if (bootDelay > 0) {
+        await new Promise((r) => setTimeout(r, bootDelay));
+    }
+
     let mcpTools;
     try {
         mcpTools = await listMcpTools();
         _mcpCircuitOpen = false; // reset em caso de sucesso
+        _bootAttemptCount = 0; // BUG-MED-09: reset contador de boot após sucesso
     } catch (/** @type {any} */ err) {
         _mcpCircuitOpen = true;
         _mcpCircuitOpenAt = Date.now();

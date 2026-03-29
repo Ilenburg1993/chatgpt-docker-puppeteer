@@ -71,7 +71,8 @@ function hasShellMetaOutsideQuotes(command) {
  * @type {RegExp[]}
  */
 const BLOCKED_COMMAND_PATTERNS = [
-    /\brm\s+-[a-z]*r[a-z]*f|rm\s+-[a-z]*f[a-z]*r/i, // rm -rf / rm -fr
+    /\brm\s+-[a-z]*r[a-z]*f|rm\s+-[a-z]*f[a-z]*r/i, // rm -rf / rm -fr (flags combinadas)
+    /\brm\s+(-\w+\s+){1,4}-[rf]/i, // BUG-MED-10 (fix): rm -r -f / rm -f -r (flags separadas)
     /\bdd\b/,
     /\bmkfs\b/,
     /\bformat\b/,
@@ -205,11 +206,15 @@ function truncateOutput(text) {
 /**
  * Ambiente seguro para sub-processos: remove variáveis sensíveis.
  *
+ * SEC-VULN-04 (fix): além de lista explícita, filtra por padrão todas as variáveis cujo nome sugere credenciais (TOKEN,
+ * SECRET, PASSWORD, API_KEY, CREDENTIAL, PRIVATE_KEY).
+ *
  * @returns {Record<string, string>}
  */
 function safeEnv() {
     const env = { ...process.env };
-    const sensitive = [
+    // Lista explícita de variáveis sensíveis conhecidas
+    const sensitiveExact = new Set([
         'GITHUB_TOKEN',
         'COPILOT_TOKEN',
         'NPM_TOKEN',
@@ -226,9 +231,13 @@ function safeEnv() {
         'SESSION_SECRET',
         'OPENAI_API_KEY',
         'ANTHROPIC_API_KEY',
-    ];
-    for (const key of sensitive) {
-        delete env[key];
+    ]);
+    // Padrão genérico: remove qualquer var cujo nome contenha tokens sensíveis
+    const sensitivePattern = /TOKEN|SECRET|PASSWORD|API_KEY|CREDENTIAL|PRIVATE_KEY/i;
+    for (const key of Object.keys(env)) {
+        if (sensitiveExact.has(key) || sensitivePattern.test(key)) {
+            delete env[key];
+        }
     }
     return /** @type {Record<string, string>} */ (env);
 }

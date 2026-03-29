@@ -15,6 +15,9 @@ import { z } from 'zod';
 import { buildTool, withSkipPermission } from './tool-factory.js';
 
 const ROOT = new URL('../../..', import.meta.url).pathname;
+// BUG-MED-08 (fix): caminho absoluto para ESLint — evita falhas em ambientes
+// onde o cwd não coincide com o ROOT do projeto
+const ESLINT_BIN = new URL('../../../node_modules/.bin/eslint', import.meta.url).pathname;
 const execFileAsync = promisify(execFile);
 
 /**
@@ -56,7 +59,7 @@ const lintCheckTool = buildTool({
     handler: async (/** @type {{ fix?: boolean; path?: string }} */ { fix, path: filePath }) => {
         const target = filePath ?? '.';
         log('INFO', `[copilot/lint_check] Executando lint em '${target}'${fix ? ' com --fix' : ''}`);
-        const eslintArgs = ['node_modules/.bin/eslint', '--max-warnings=0'];
+        const eslintArgs = [ESLINT_BIN, '--max-warnings=0'];
         if (fix) eslintArgs.push('--fix');
         eslintArgs.push(target);
         const result = await safeExec(eslintArgs, 90_000);

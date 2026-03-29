@@ -317,6 +317,16 @@ export function createInjectServer() {
                     res.end(JSON.stringify({ ok: false, error: 'Limite de clientes SSE atingido' }));
                     return;
                 }
+                // SEC-VULN-06 (fix): sliding window por IP — máximo de 5 conexões SSE por IP
+                const sseIp = req.socket?.remoteAddress ?? 'unknown';
+                const sseIpRate = checkWriteRate(`sse:${sseIp}`);
+                if (!sseIpRate.allowed) {
+                    res.writeHead(429, { 'Content-Type': 'application/json' });
+                    res.end(
+                        JSON.stringify({ ok: false, error: `Muitas conexões SSE. Tente em ${sseIpRate.resetIn}s.` }),
+                    );
+                    return;
+                }
                 res.writeHead(200, {
                     'Content-Type': 'text/event-stream',
                     'Cache-Control': 'no-cache',

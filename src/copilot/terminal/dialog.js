@@ -224,7 +224,10 @@ export function broadcastSse(event, data) {
     if (_sseClients.size > 0 || _sseCriticalClients.size > 0) {
         // BUG-N06 (fix): incluir hubSessionId no payload SSE para consistência com Socket.io
         const ssePayloadData = { ...safeData, hubSessionId: getHubSessionId() };
-        const payload = `event: ${event}\ndata: ${JSON.stringify(ssePayloadData)}\n\n`;
+        // SEC-VULN-02 (fix): sanitizar nome do evento SSE para prevenir injeção de protocolo
+        // (event names não podem conter \n ou \r — RFC 8895 §6.2)
+        const safeEvent = String(event).replace(/[\r\n]/g, '_');
+        const payload = `event: ${safeEvent}\ndata: ${JSON.stringify(ssePayloadData)}\n\n`;
         for (const client of _sseClients) {
             try {
                 client.write(payload);
@@ -243,10 +246,21 @@ export function broadcastSse(event, data) {
         }
     }
 
-    // ── Socket.io dual-emit (no-op quando namespace não montado, ex: processo separado) ──
+    // ── Socket.io (BUG-HIGH-02 fix): emitir apenas para a sala da hub_session ativa ──
+    // Evita vazamento de dados entre sessões diferentes conectadas ao mesmo namespace
     const _ns = getCopilotNamespace();
+    const _hubSessionId = getHubSessionId();
     if (_ns) {
-        _ns.emit(event, { ...safeData, hubSessionId: getHubSessionId() });
+        if (_hubSessionId) {
+            // Emitir somente para a sala da sessão ativa
+            _ns.to(_hubSessionId).emit(event, { ...safeData, hubSessionId: _hubSessionId });
+        } else {
+            // Sem sessão ativa: emitir globalmente apenas eventos de sistema inócuos
+            const SYSTEM_EVENTS = new Set(['ready', 'stalled', 'stopped', 'fatal', 'busy']);
+            if (SYSTEM_EVENTS.has(event)) {
+                _ns.emit(event, { ...safeData, hubSessionId: null });
+            }
+        }
     }
 }
 

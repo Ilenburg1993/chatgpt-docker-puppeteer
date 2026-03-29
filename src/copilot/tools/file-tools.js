@@ -658,7 +658,10 @@ const patchFileTool = buildTool({
             };
         }
 
-        const updated = content.replace(old_string, new_string);
+        // BUG-HIGH-01 fix: escapar padrões especiais de substituição ($&, $', $`, $$, $n)
+        // para que new_string seja tratado como literal e não como pattern de replacement
+        const safeNewString = new_string.replace(/\$/g, '$$$$');
+        const updated = content.replace(old_string, safeNewString);
         try {
             fs.writeFileSync(v.resolved, updated, 'utf8');
             log('INFO', `[copilot/patch_file] Patch aplicado: ${v.resolved}`);

@@ -15,7 +15,7 @@ import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
 import { approveAll } from '@github/copilot-sdk';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
+import { access, appendFile, mkdir, readFile, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { buildCustomAgentsConfig } from '../config/custom-agents.js';
 
@@ -90,42 +90,56 @@ export function setBackgroundCompactionThreshold(threshold) {
  * Lê o session-briefing.md e session.json e constrói o conteúdo de systemMessage para injetar o contexto do hook system
  * em sessões SDK.
  *
- * @returns {string} Conteúdo markdown com contexto operacional do hook system
+ * BUG-HIGH-05 (fix): convertida para async para evitar bloqueio do event loop em I/O lento (ex.: containers Docker com
+ * volumes NFS).
+ *
+ * @returns {Promise<string>} Conteúdo markdown com contexto operacional do hook system
  */
-export function buildHookSystemContext() {
+export async function buildHookSystemContext() {
     const parts = [];
 
-    if (existsSync(BRIEFING_FILE)) {
-        parts.push('## Contexto da Sessão (Hook System)\n\n' + readFileSync(BRIEFING_FILE, 'utf8'));
+    try {
+        await access(BRIEFING_FILE);
+        const content = await readFile(BRIEFING_FILE, 'utf8');
+        parts.push('## Contexto da Sessão (Hook System)\n\n' + content);
+    } catch {
+        /* arquivo não existe — ignorar */
     }
 
-    if (existsSync(SESSION_JSON_FILE)) {
-        try {
-            const state = JSON.parse(readFileSync(SESSION_JSON_FILE, 'utf8'));
-            const consecutive = state?.compliance?.consecutive_unauthorized ?? 0;
-            const turnNum = state?.current_turn?.number ?? 0;
-            const rawCloseKey = state?.close_key ?? 'N/A';
-            // SEC-N07 (fix): sanitizar close_key — limitar a alfanuméricos para evitar prompt injection
-            const closeKey =
-                typeof rawCloseKey === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(rawCloseKey)
-                    ? rawCloseKey
-                    : 'INVALID_KEY';
-            const strictClose = state?.strict_turn_close ?? true;
-            parts.push(
-                [
-                    '\n## Estado de Compliance Atual',
-                    `- Turno atual: #${turnNum}`,
-                    `- Consecutivos sem vscode_askQuestions: ${consecutive}`,
-                    `- close_key: \`${closeKey}\``,
-                    `- strict_turn_close: ${strictClose}`,
-                    '',
-                    '**Protocolo obrigatório**: Encerre cada turno com `vscode_askQuestions`.',
-                    'Não inicie task_complete sem chamar vscode_askQuestions antes.',
-                ].join('\n'),
-            );
-        } catch {
-            // session.json inválido — ignorar silenciosamente
-        }
+    try {
+        await access(SESSION_JSON_FILE);
+        const raw = await readFile(SESSION_JSON_FILE, 'utf8');
+        const state = JSON.parse(raw);
+        // SEC-VULN-03 (fix): validar e sanitizar todos os valores de session.json
+        // antes de usá-los no system prompt para prevenir prompt injection
+        const rawConsecutive = state?.compliance?.consecutive_unauthorized;
+        const consecutive =
+            typeof rawConsecutive === 'number' && Number.isFinite(rawConsecutive)
+                ? Math.max(0, Math.trunc(rawConsecutive))
+                : 0;
+        const rawTurnNum = state?.current_turn?.number;
+        const turnNum =
+            typeof rawTurnNum === 'number' && Number.isFinite(rawTurnNum) ? Math.max(0, Math.trunc(rawTurnNum)) : 0;
+        const rawCloseKey = state?.close_key ?? 'N/A';
+        // SEC-N07 (fix): sanitizar close_key — limitar a alfanuméricos para evitar prompt injection
+        const closeKey =
+            typeof rawCloseKey === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(rawCloseKey) ? rawCloseKey : 'INVALID_KEY';
+        const strictClose =
+            state?.strict_turn_close === true || state?.strict_turn_close === false ? state.strict_turn_close : true;
+        parts.push(
+            [
+                '\n## Estado de Compliance Atual',
+                `- Turno atual: #${turnNum}`,
+                `- Consecutivos sem vscode_askQuestions: ${consecutive}`,
+                `- close_key: \`${closeKey}\``,
+                `- strict_turn_close: ${strictClose}`,
+                '',
+                '**Protocolo obrigatório**: Encerre cada turno com `vscode_askQuestions`.',
+                'Não inicie task_complete sem chamar vscode_askQuestions antes.',
+            ].join('\n'),
+        );
+    } catch {
+        /* arquivo não existe ou JSON inválido — ignorar silenciosamente */
     }
 
     return parts.join('\n\n');
@@ -221,7 +235,13 @@ function buildAuditingPermissionHandler(baseHandler) {
             /** @type {any} */
             let result;
             if (baseHandler) {
-                result = await baseHandler(request, invocation);
+                // BUG-HIGH-09 (fix): baseHandler pode lançar exceção; fallback para approveAll
+                try {
+                    result = await baseHandler(request, invocation);
+                } catch (/** @type {any} */ err) {
+                    log('WARN', `[AH.6] baseHandler lançou exceção (fallback approveAll): ${err?.message}`);
+                    result = await approveAll(request, invocation);
+                }
             } else {
                 // BUG-H07 (fix): usar SDK approveAll em vez de objeto manual { kind: 'approved' }
                 result = await approveAll(request, invocation);
@@ -269,7 +289,7 @@ export async function initOrResumeSession(client, sessionOptions) {
     const injectContext = sessionOptions.injectHookContext !== false;
 
     /** @type {import('@github/copilot-sdk').SystemMessageConfig | undefined} */
-    const systemMessage = injectContext ? buildHookContextAppendMessage(buildHookSystemContext()) : undefined;
+    const systemMessage = injectContext ? buildHookContextAppendMessage(await buildHookSystemContext()) : undefined;
 
     /** @type {any} */
     const opts = {

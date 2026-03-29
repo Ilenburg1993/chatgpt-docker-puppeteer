@@ -18,11 +18,32 @@ import { log } from '#core/logger';
 import { z } from 'zod';
 import { buildTool } from './tool-factory.js';
 
-// ─── Importação lazy do hub ───────────────────────────────────────────────────
+// ─── Injeção de dependência do hub (ARCH-02) ─────────────────────────────────
 
-// ARCH-03 fix: retorna null em modo standalone em vez de lançar exceção
-/** @returns {Promise<import('../conversation-hub/hub.js').ConversationHub | null>} */
+/** @type {import('../conversation-hub/hub.js').ConversationHub | null} */
+let _injectedHub = null;
+
+/**
+ * Injeta o ConversationHub para evitar import dinâmico implícito. Seguir o padrão de `setSessionRpc()` em
+ * session-rpc-tools.js. Deve ser chamado em `bootstrapTools()` após o hub ser inicializado.
+ *
+ * @param {import('../conversation-hub/hub.js').ConversationHub} hub
+ */
+export function setHub(hub) {
+    _injectedHub = hub;
+}
+
+/**
+ * Retorna o hub injetado (preferencial) ou resolve via import dinâmico como fallback.
+ *
+ * @returns {Promise<import('../conversation-hub/hub.js').ConversationHub | null>}
+ */
 async function requireHub() {
+    // ARCH-02: hub injetado via setHub() evita import dinâmico oculto
+    if (_injectedHub !== null) {
+        return _injectedHub.isReady ? _injectedHub : null;
+    }
+    // Fallback: import dinâmico para compatibilidade retroativa
     const { conversationHub } = await import('../conversation-hub/hub.js');
     if (!conversationHub.isReady) {
         return null;

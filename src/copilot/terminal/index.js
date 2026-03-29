@@ -19,6 +19,7 @@
 import { log } from '#core/logger';
 import { resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { configureHookTools, setHub } from '../agent/tools-bootstrap.js';
 import { loadAliases } from '../bridges/alias-store.js';
 import { llmBridgeClient } from '../channel/client.js';
 import { PinnedFilesLoader } from '../config/pinned-files-loader.js';
@@ -37,6 +38,11 @@ export async function startTerminalServer() {
     log('INFO', '[TerminalServer] Iniciando terminal permanente LLM-B…');
 
     loadAliases();
+
+    // ARCH-02 (fix): injetar hub explicitamente nas hub-tools para evitar import dinâmico oculto
+    setHub(conversationHub);
+    // ARCH-03 (fix): injetar broadcastSse nas hook-tools para remover import dinâmico circular
+    configureHookTools({ broadcastSse });
 
     // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
     // Isso habilita o comando /skills reload e o sistema de pinned context files
@@ -201,6 +207,11 @@ export async function startTerminalServer() {
 
         const runReflection = () => {
             if (!alwaysAliveAgent.dialogLoopActive) return;
+            // ARCH-07 (fix): skip reflection se fila já tem tarefas para evitar acúmulo
+            if (alwaysAliveAgent.queueSize > 0) {
+                log('INFO', '[TerminalServer] Reflection loop pulado — fila ocupada.');
+                return;
+            }
             log('INFO', '[TerminalServer] Executando reflection loop…');
             sendTurn(
                 '[REFLEXÃO] Faça uma breve reflexão sobre as últimas mensagens desta conversa: o que foi discutido, o que está pendente, e se você tem alguma sugestão ou insight que ainda não mencionou. Seja conciso.',

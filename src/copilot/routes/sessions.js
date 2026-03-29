@@ -66,6 +66,37 @@ if (SDK_API_TOKEN) {
     });
 }
 
+// SEC-VULN-05 (fix): rate limiting para endpoints de criação/envio de sessão.
+// Limite: 10 req/min por IP para criação e 30 req/min por IP para envio.
+/** @type {Map<string, { count: number; bucketStart: number }>} */
+const _rlWindowMap = new Map();
+
+/**
+ * Middleware de rate limiting simples por IP (em memória, por processo).
+ *
+ * @param {number} maxPerMinute - Máximo de requisições por minuto
+ * @param {string} label - Label para log
+ * @returns {import('express').RequestHandler}
+ */
+function rateLimitMiddleware(maxPerMinute, label) {
+    const WINDOW_MS = 60_000;
+    return (req, res, next) => {
+        const ip = req.ip ?? 'unknown';
+        const key = `${label}:${ip}`;
+        const now = Date.now();
+        const entry = _rlWindowMap.get(key);
+        if (!entry || now - entry.bucketStart > WINDOW_MS) {
+            _rlWindowMap.set(key, { count: 1, bucketStart: now });
+            return next();
+        }
+        entry.count += 1;
+        if (entry.count > maxPerMinute) {
+            return res.status(429).json({ ok: false, error: 'Too many requests. Tente novamente em 1 minuto.' });
+        }
+        return next();
+    };
+}
+
 // SEC-N05/N06 (fix): validação de model — prevenir injeção e garantir formato kosher
 const MODEL_SAFE_RE = /^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,99})$/;
 
@@ -220,7 +251,7 @@ router.get('/sessions', (req, res) => {
  * }
  * ```
  */
-router.post('/sessions', (req, res) => {
+router.post('/sessions', rateLimitMiddleware(10, 'create_session'), (req, res) => {
     void withErrorHandler(req, res, async () => {
         const {
             model,
@@ -404,9 +435,9 @@ router.post('/sessions/:id/disconnect', (req, res) => {
  * Quando waitForResponse=true, aguarda a resposta completa do modelo (blocking). Quando waitForResponse=false,
  * enfileira e retorna imediatamente (messageId).
  */
-router.post('/sessions/:id/send', (req, res) => {
+router.post('/sessions/:id/send', rateLimitMiddleware(30, 'session_send'), (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const { id } = req.params;
+        const id = /** @type {string} */ (req.params['id']);
         const { prompt, waitForResponse = true, attachments } = req.body ?? {};
         const rawTimeoutMs = (req.body ?? {}).timeoutMs;
         // NEW-03 (fix): validar timeoutMs para evitar NaN / Infinity / negativo no setTimeout

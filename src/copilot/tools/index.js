@@ -11,8 +11,8 @@
 import { codeTools } from './code-tools.js';
 import { fileReadTools, fileTools, fileWriteTools } from './file-tools.js';
 import { gitTools } from './git/index.js';
-import { hookTools } from './hook-tools.js';
-import { hubTools } from './hub-tools.js';
+import { configureHookTools, hookTools } from './hook-tools.js';
+import { hubTools, setHub } from './hub-tools.js';
 import { introspectionTools, registerForIntrospection, setTelemetryStore } from './introspection-tools.js';
 import { permissionTools } from './permission-tools.js';
 import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
@@ -45,6 +45,7 @@ export const allTools = [
 
 export {
     codeTools,
+    configureHookTools,
     fileReadTools,
     fileTools,
     fileWriteTools,
@@ -56,6 +57,7 @@ export {
     registerForIntrospection,
     sessionRpcTools,
     sessionTools,
+    setHub,
     setSessionRpc,
     setTelemetryStore,
     shellTools,

@@ -31,6 +31,10 @@ import { AGENT_EVENTS } from '#copilot/core';
  * @returns {void}
  */
 export function registerStreamRoutes(bridge, agent) {
+    // ARCH-05 (fix): cada conexão SSE adiciona N listeners ao agent (um por AGENT_EVENT).
+    // Com múltiplos clientes conectados, o EventEmitter emit warning de memory leak.
+    // setMaxListeners(0) desabilita o limite — correto para fan-out pattern.
+    agent.setMaxListeners?.(0);
     // ─── GET /stream ──────────────────────────────────────────────────────────
 
     /**
@@ -66,7 +70,9 @@ export function registerStreamRoutes(bridge, agent) {
          */
         const sendEvt = (event, data) => {
             if (!res.writableEnded) {
-                res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+                // SEC-VULN-02 (fix aplicado consistentemente): sanitizar nome do evento SSE
+                const safeEvent = String(event).replace(/[\r\n]/g, '_');
+                res.write(`event: ${safeEvent}\ndata: ${JSON.stringify(data)}\n\n`);
             }
         };
 

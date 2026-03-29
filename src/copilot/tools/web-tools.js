@@ -15,7 +15,7 @@ import { buildTool } from './tool-factory.js';
 
 /** Regex de hosts internos/privados. Case-insensitive. Bloquear para prevenir SSRF (OWASP A10). */
 const PRIVATE_HOST_RE =
-    /^(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|::1|fd[0-9a-f]{2}:)/i;
+    /^(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|0\.0\.0\.0|::1|fd[0-9a-f]{2}:|metadata\.google\.internal$)/i;
 
 /** Esquemas de URL bloqueados. */
 const BLOCKED_SCHEMES = new Set(['file:', 'ftp:', 'data:', 'javascript:']);
@@ -42,15 +42,15 @@ function validateUrl(url) {
         const ipNums = ipv4Parts.map(Number);
         const a = ipNums[0] ?? -1;
         const b = ipNums[1] ?? -1;
-        const c = ipNums[2] ?? -1;
         if (
+            a === 0 || // 0.0.0.0/8 — sec: rotas inválidas / unspec
             a === 10 ||
             a === 127 ||
+            (a === 169 && b === 254) || // SEC-VULN-01 (fix): 169.254.x.x — IMDS link-local
             (a === 172 && b >= 16 && b <= 31) ||
-            (a === 192 && b === 168) ||
-            (a === 0 && b === 0 && c === 0)
+            (a === 192 && b === 168)
         ) {
-            return { safe: false, reason: `Endereço IP privado bloqueado: ${url.hostname}` };
+            return { safe: false, reason: `Endereço IP privado/link-local bloqueado: ${url.hostname}` };
         }
     }
     // SEC-N05 (fix): bloquear IPv6 loopback e ULA (fd00::/8)

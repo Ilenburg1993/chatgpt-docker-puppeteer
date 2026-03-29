@@ -202,6 +202,10 @@ export class ConversationStore {
     /** @type {boolean} */
     #initialized = false;
 
+    // ARCH-04 (fix): armazenar referência do timer para clearInterval() no close()
+    /** @type {ReturnType<typeof setInterval> | null} */
+    #checkpointTimer = null;
+
     /**
      * Inicializa as tabelas (idempotente — CREATE TABLE IF NOT EXISTS). Deve ser chamado uma vez antes de usar qualquer
      * outro método.
@@ -218,6 +222,11 @@ export class ConversationStore {
             this.#db.exec(DDL_CONVERSATION_TURNS);
             this.#db.exec(DDL_MEMORIES);
             migrateFts5Tokenizer(this.#db);
+
+            // BUG-CRIT-03 migration: corrigir role 'llm-b' (hífen) para 'llm_b' (underscore canônico)
+            // Idempotente — rows com role='llm_b' já não são afetadas
+            this.#db.prepare(`UPDATE copilot_conversation_turns SET role = 'llm_b' WHERE role = 'llm-b'`).run();
+
             this.#initialized = true;
             log('DEBUG', '[ConversationStore] Tabelas inicializadas.');
 
@@ -244,6 +253,7 @@ export class ConversationStore {
                 5 * 60 * 1000,
             ); // a cada 5 minutos
             checkpointTimer.unref?.(); // não impede o processo de sair
+            this.#checkpointTimer = checkpointTimer; // ARCH-04 (fix): manter referência
         } catch (/** @type {any} */ err) {
             log('ERROR', `[ConversationStore] Falha ao inicializar tabelas: ${err.message}`);
             throw err;
@@ -261,6 +271,24 @@ export class ConversationStore {
             throw new Error('[ConversationStore] store.init() não foi chamado.');
         }
         return this.#db;
+    }
+
+    /**
+     * Encerra o store: cancela o timer de WAL checkpoint. Deve ser chamado em testes ou em shutdown graceful do
+     * servidor.
+     *
+     * ARCH-04 (fix): sem este método, o timer fica pendente impedindo o processo de sair naturalmente em ambientes onde
+     * não se usa .unref() (ex: algumas versões de Bun/Deno).
+     *
+     * @returns {void}
+     */
+    close() {
+        if (this.#checkpointTimer !== null) {
+            clearInterval(this.#checkpointTimer);
+            this.#checkpointTimer = null;
+        }
+        this.#initialized = false;
+        this.#db = null;
     }
 
     // ─── HubSessions ──────────────────────────────────────────────────────────
@@ -694,7 +722,7 @@ export class ConversationStore {
      * O mapeamento é:
      *
      * - `ConversationMessage.type = 'user'` → `role: 'user'`
-     * - `ConversationMessage.type = 'assistant'` → `role: 'llm-b'`
+     * - `ConversationMessage.type = 'assistant'` → `role: 'llm_b'` (underscore, canônico)
      * - `ConversationMessage.content` → `content`
      * - `ConversationMessage.id` → usado como `metadata.sdkTurnId` para dedup
      *
@@ -710,7 +738,8 @@ export class ConversationStore {
 
         const doSync = db.transaction(() => {
             for (const msg of messages) {
-                const role = msg.type === 'assistant' ? 'llm-b' : 'user';
+                // BUG-CRIT-03 fix: underscore canônico alinhado com TurnRole typedef ('llm_b', não 'llm-b')
+                const role = msg.type === 'assistant' ? 'llm_b' : 'user';
                 const sdkTurnId = msg.id ?? null;
                 const metadata = sdkTurnId ? JSON.stringify({ sdkTurnId }) : null;
 

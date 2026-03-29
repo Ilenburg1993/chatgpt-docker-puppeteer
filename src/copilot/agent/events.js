@@ -39,6 +39,8 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'tool.execution.complete',
     'session.history_synced',
     'before-stop',
+    // GAP-SDK-04 (fix): event emitido pelo agent após compactação de contexto do SDK
+    'context:compacted',
 ]);
 
 /**

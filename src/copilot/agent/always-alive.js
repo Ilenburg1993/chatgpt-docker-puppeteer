@@ -449,6 +449,13 @@ export class AlwaysAliveAgent extends EventEmitter {
                 if (chunk) this.emit('task.reasoning', { chunk, reasoningId: evt?.data?.reasoningId ?? null });
             });
 
+            // BUG-HIGH-03 (fix): streaming de delta também no modo dialog loop
+            // Emitir task.delta para cada chunk de resposta do assistente, independente do modo de execução
+            session.on('assistant.message_delta', (/** @type {any} */ evt) => {
+                const chunk = evt?.data?.deltaContent ?? evt?.data?.content ?? '';
+                if (chunk) this.emit('task.delta', { taskId: null, chunk });
+            });
+
             // Uso de tokens e contexto da sessão — forwarded via session.usage
             // MELHORIA-02: emite session.token_budget_warning quando uso > 80%
             // MELHORIA-05: na 1ª leitura após retomada, alerta se uso já > 70% (contexto pesado)
@@ -606,6 +613,8 @@ export class AlwaysAliveAgent extends EventEmitter {
 
         // Rejeita todas as tarefas pendentes na fila
         const remainingTasks = this.#queue.splice(0);
+        // BUG-MED-03 (fix): invalidar cache após splice para garantir queueSize=0 no próximo snapshot
+        this.#statusSnapshotCache = null;
         if (remainingTasks.length > 0) {
             log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
             const shutdownError = new SessionError(
@@ -1196,7 +1205,14 @@ qualquer tentativa de encerramento não autorizado.`;
             /** @type {any} */
             const sdkSession = session;
             // SDK-NC01 (fix): método correto é getMessages(), não getHistory()
-            if (typeof sdkSession.getMessages !== 'function') return;
+            // GAP-SDK-02 (fix): logar WARN para diagnóstico de incompatibilidade de versão do SDK
+            if (typeof sdkSession.getMessages !== 'function') {
+                log(
+                    'WARN',
+                    '[AlwaysAlive] AI.4: sdkSession.getMessages() não disponível nesta versão do SDK — histórico não sincronizado.',
+                );
+                return;
+            }
             const messages = await sdkSession.getMessages();
             if (!Array.isArray(messages) || messages.length === 0) return;
             const { synced, skipped } = conversationStore.syncFromSdkHistory(hubSessionId, session.sessionId, messages);
@@ -1309,6 +1325,17 @@ qualquer tentativa de encerramento não autorizado.`;
                     `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,
                 );
                 this.emit('ready', { sessionId: session.sessionId, isResumed, reconected: true });
+
+                // BUG-HIGH-04 (fix): se dialog loop estava ativo, emitir dialog.stopped autorizado=false
+                // para que sendDialogTurn (DL-PERM-05) detecte o restart e reenvie a mensagem pendente
+                if (this.#dialogLoopActive) {
+                    log(
+                        'INFO',
+                        '[AlwaysAlive] Reconexão: dialog loop ativo, emitindo dialog.stopped para restart via DL-PERM-05.',
+                    );
+                    this.#dialogLoopActive = false;
+                    this.emit('dialog.stopped', { reason: 'reconnect_restart', authorized: false });
+                }
                 return true;
             } catch (/** @type {any} */ reconnectError) {
                 log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${reconnectError.message}`);

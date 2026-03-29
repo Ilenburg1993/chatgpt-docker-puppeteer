@@ -60,6 +60,8 @@ const EVENT_MAP = [
     { event: 'session.history_synced', actionCode: 'COPILOT_SESSION_HISTORY_SYNCED' },
     // BUG-C04 (fix): before-stop é emitido pelo agent antes do encerramento
     { event: 'before-stop', actionCode: 'COPILOT_AGENT_BEFORE_STOP' },
+    // GAP-SDK-04 (fix): context:compacted — emitido após compactação de contexto
+    { event: 'context:compacted', actionCode: 'COPILOT_CONTEXT_COMPACTED' },
     // ARCH-04 (fix): removidos 'session.usage_info' e 'assistant.reasoning_delta' — são eventos do SDK session,
     // não do EventEmitter do agent, e nunca serão emitidos via agent.on()
 ];
@@ -162,7 +164,32 @@ export function mount(nerv) {
     }
     _nerv = nerv;
     _attachListeners();
+
+    // BUG-HIGH-10 (fix): re-registrar listeners após ciclo stop()/start() do agente.
+    // O agente emite 'before-stop' antes de encerrar; ouvimos para limpar nossos listeners
+    // e então re-registramos quando 'ready' disparar (novo ciclo de vida do agente).
+    alwaysAliveAgent.on('before-stop', _onAgentBeforeStop);
+
     log('INFO', '[nerv-bridge] Bridge NERV↔AlwaysAlive montado.');
+}
+
+/**
+ * Handler interno: ao receber 'before-stop', remove os listeners do bridge e aguarda que o agente suba novamente para
+ * re-registrá-los.
+ *
+ * @returns {void}
+ */
+function _onAgentBeforeStop() {
+    log('INFO', '[nerv-bridge] Agente sinalizou before-stop — removendo listeners temporariamente.');
+    _detachListeners();
+    // Ao reiniciar, o agente emite 'ready'; re-registramos UMA vez.
+    alwaysAliveAgent.once('ready', () => {
+        if (_nerv === null) return; // bridge foi desmontado enquanto o agente reiniciava
+        log('INFO', '[nerv-bridge] Agente pronto novamente — re-registrando listeners.');
+        _attachListeners();
+        // Reagendar o handler para o próximo ciclo de stop
+        alwaysAliveAgent.on('before-stop', _onAgentBeforeStop);
+    });
 }
 
 /**
@@ -172,6 +199,7 @@ export function mount(nerv) {
  */
 export function unmount() {
     _detachListeners();
+    alwaysAliveAgent.off('before-stop', _onAgentBeforeStop);
     _nerv = null;
     log('INFO', '[nerv-bridge] Bridge NERV↔AlwaysAlive desmontado.');
 }

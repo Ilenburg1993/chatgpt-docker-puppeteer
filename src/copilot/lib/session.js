@@ -133,7 +133,11 @@ function buildSessionConfig(opts, mode) {
         if (co.workingDirectory !== undefined) cfg.workingDirectory = co.workingDirectory;
         if (co.mcpServers !== undefined) cfg.mcpServers = co.mcpServers;
         if (co.customAgents !== undefined) cfg.customAgents = co.customAgents;
-        cfg.infiniteSessions = buildInfiniteSessionConfig(co.infiniteSessions);
+        // BUG-HIGH-06 (fix): só aplicar infiniteSessions quando explicitamente fornecido
+        // Evita habilitar compaction automática em sessões que não solicitaram (ex: routes/sessions.js)
+        if (co.infiniteSessions !== undefined) {
+            cfg.infiniteSessions = buildInfiniteSessionConfig(co.infiniteSessions);
+        }
     }
 
     if (opts.onPermissionRequest !== undefined) cfg.onPermissionRequest = opts.onPermissionRequest;

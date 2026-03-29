@@ -51,6 +51,25 @@ const HOOK_STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
  */
 let _pendingInputResolver = null;
 
+// ─── ARCH-03: Injeção de broadcastSse para evitar dependência circular ────────
+
+/**
+ * Callback de broadcast SSE injetado via `configureHookTools()`. Fallback: no-op até que o terminal seja inicializado.
+ *
+ * @type {(event: string, data: Record<string, unknown>) => void}
+ */
+let _broadcastSse = () => {};
+
+/**
+ * Injeta a função `broadcastSse` para evitar o import dinâmico circular de `terminal/dialog.js`. Deve ser chamado em
+ * `startTerminalServer()` antes de iniciar o agente.
+ *
+ * @param {{ broadcastSse: (event: string, data: Record<string, unknown>) => void }} config
+ */
+export function configureHookTools({ broadcastSse }) {
+    _broadcastSse = broadcastSse;
+}
+
 /**
  * ARCH-N01: Registra uma resposta para a tool request_user_input pendente. Deve ser chamado pelo agente quando receber
  * POST /api/copilot/answer.
@@ -180,17 +199,12 @@ const requestUserInputTool = buildTool({
                     instruction: 'Resposta recebida. Processar e continuar o fluxo.',
                 });
             };
-            // Emite evento SSE para que a interface saiba que o agente está aguardando input
-            // (broadcastSse importado dinamicamente para evitar dependência cíclica)
-            import('../terminal/dialog.js')
-                .then(({ broadcastSse }) => {
-                    broadcastSse('waiting_for_input', {
-                        question: fullQuestion,
-                        choices: choices ?? [],
-                        allowFreeform,
-                    });
-                })
-                .catch(() => {});
+            // ARCH-03 (fix): broadcastSse injetado via configureHookTools() — sem import dinâmico circular
+            _broadcastSse('waiting_for_input', {
+                question: fullQuestion,
+                choices: choices ?? [],
+                allowFreeform,
+            });
         });
     },
 });

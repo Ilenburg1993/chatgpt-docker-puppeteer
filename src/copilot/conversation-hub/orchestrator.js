@@ -301,7 +301,20 @@ export class HubOrchestrator extends EventEmitter {
                 if (!agentInst.sendDialogTurn) {
                     throw new Error('[HubOrchestrator] agentInst não suporta sendDialogTurn');
                 }
-                llmBResponse = await agentInst.sendDialogTurn(content, { timeout: timeoutMs });
+                // BUG-HIGH-03 (fix): capturar task.delta durante sendDialogTurn para emitir turn:delta em tempo real
+                const onDelta = (/** @type {{ chunk: string }} */ evt) => {
+                    const chunk = evt?.chunk ?? '';
+                    if (chunk) {
+                        this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
+                    }
+                };
+                alwaysAliveAgent.on('task.delta', onDelta);
+                try {
+                    // sendDialogTurn já retorna a resposta completa; usá-la diretamente evita dupla acumulação
+                    llmBResponse = await agentInst.sendDialogTurn(content, { timeout: timeoutMs });
+                } finally {
+                    alwaysAliveAgent.off('task.delta', onDelta);
+                }
             } else if (useStructured && typeof message === 'object') {
                 // Usar chatStructured() com StructuredMessage
                 const result = await this.#bridge.chatStructured(/** @type {any} */ (message), {

@@ -10,8 +10,19 @@
  */
 
 import { log } from '#core/logger';
+import { createRequire } from 'node:module';
 import { CHANNEL_VERSION } from '../channel/index.js';
 import { conversationStore } from '../conversation-hub/index.js';
+
+// UPG-PROP-07 (fix): ler versão do SDK uma vez no carregamento do módulo para incluir no /health
+const _sdkVersion = (() => {
+    try {
+        const req = createRequire(import.meta.url);
+        return /** @type {{ version: string }} */ (req('@github/copilot-sdk/package.json')).version;
+    } catch {
+        return 'unknown';
+    }
+})();
 
 /**
  * @typedef {import('express').Request} Req
@@ -60,6 +71,7 @@ import { conversationStore } from '../conversation-hub/index.js';
  *     on: (event: string, listener: (...args: any[]) => void) => any;
  *     off: (event: string, listener: (...args: any[]) => void) => any;
  *     listenerDiagnostics: () => Record<string, number>;
+ *     setMaxListeners?: (n: number) => void;
  *     queueSize: number;
  * }} AlwaysAliveAgentLike
  */
@@ -116,6 +128,11 @@ export function registerControlRoutes(bridge, agent) {
             uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
             // SEC-V04 (fix): listenerCounts removido da resposta HTTP — expunha topologia interna de eventos
             channelVersion: CHANNEL_VERSION,
+            // UPG-PROP-07 (fix): versão do SDK e do Node.js para rastreabilidade em deploys
+            sdkVersion: _sdkVersion,
+            nodeVersion: process.version,
+            // UPG-PROP-10 (fix): diagnóstico de listeners disponível apenas em desenvolvimento
+            listenerDiagnostics: process.env.NODE_ENV === 'development' ? agent.listenerDiagnostics?.() : undefined,
             hubStore,
         });
     });

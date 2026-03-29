@@ -145,7 +145,8 @@ export function mountCopilotNamespace(io, orchestrator, store) {
         /**
          * Usuário injeta mensagem em uma hub_session ativa.
          */
-        socket.on('user:inject', (/** @type {{ hubSession: string; content: string }} */ data) => {
+        // BUG-CRIT-02 fix: handler assíncrono para await injectUserMessage (retorna Promise<number>)
+        socket.on('user:inject', async (/** @type {{ hubSession: string; content: string }} */ data) => {
             if (!data?.hubSession || !data?.content) {
                 socket.emit('error:inject', { reason: 'hubSession e content são obrigatórios.' });
                 return;
@@ -175,7 +176,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
                     return;
                 }
 
-                const turnId = orchestrator.injectUserMessage(data.hubSession, safeContent, {
+                const turnId = await orchestrator.injectUserMessage(data.hubSession, safeContent, {
                     metadata: {
                         injectedBy: /** @type {any} */ (socket).userId ?? 'anonymous',
                         socketId: clientId,
@@ -185,8 +186,8 @@ export function mountCopilotNamespace(io, orchestrator, store) {
                 socket.emit('inject:ack', { hubSession: data.hubSession, turnId });
                 log('INFO', `[socket-ns/copilot] Mensagem injetada pelo usuário na sessão ${data.hubSession}.`);
             } catch (/** @type {any} */ err) {
-                socket.emit('error:inject', { reason: err.message });
-                log('ERROR', `[socket-ns/copilot] Erro ao injetar mensagem: ${err.message}`);
+                socket.emit('error:inject', { reason: err.message ?? String(err) });
+                log('ERROR', `[socket-ns/copilot] Erro ao injetar mensagem: ${err.message ?? String(err)}`);
             }
         });
 

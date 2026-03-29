@@ -101,9 +101,18 @@ export function buildMcpConfig(enabled = DEFAULT_ENABLED) {
     /** @type {McpServersMap} */
     const result = {};
     for (const name of enabled) {
-        if (MCP_SERVERS[name]) {
-            result[name] = MCP_SERVERS[name];
+        if (!MCP_SERVERS[name]) continue;
+
+        // UPG-PROP-09 (fix): validar credenciais obrigatórias antes de registrar o servidor MCP
+        if ((name === 'github' || name === 'github-official') && !process.env.GITHUB_TOKEN) {
+            log(
+                'WARN',
+                `[MCP] Servidor '${name}' requer GITHUB_TOKEN — variável ausente no ambiente. Servidor pulado.`,
+            );
+            continue;
         }
+
+        result[name] = MCP_SERVERS[name];
     }
 
     return Object.keys(result).length > 0 ? result : undefined;

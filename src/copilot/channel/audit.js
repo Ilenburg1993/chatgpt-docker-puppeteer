@@ -14,6 +14,7 @@
  */
 
 import fs from 'node:fs';
+import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,35 +32,40 @@ const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 /** @type {Map<string, { toolName: string; mcpServerName: string | null; args: object; ts: number }>} */
 const _pending = new Map();
 
-// ─── Helpers internos ─────────────────────────────────────────────────────────
+// ─── Buffer de escritas assíncronas (BUG-CRIT-04 fix) ────────────────────────
+
+/** @type {string[]} */
+const _writeQueue = [];
+let _flushScheduled = false;
 
 /**
- * Garante que o diretório de logs existe.
+ * Flush assíncrono via setImmediate — não bloqueia o event loop.
  *
  * @returns {void}
  */
-function ensureLogsDir() {
-    if (!fs.existsSync(LOGS_DIR)) {
-        fs.mkdirSync(LOGS_DIR, { recursive: true });
-    }
-}
-
-/**
- * Rotaciona o arquivo de auditoria se ultrapassar MAX_SIZE_BYTES.
- *
- * @returns {void}
- */
-function maybeRotate() {
-    try {
-        if (!fs.existsSync(AUDIT_FILE)) return;
-        const { size } = fs.statSync(AUDIT_FILE);
-        if (size >= MAX_SIZE_BYTES) {
-            fs.renameSync(AUDIT_FILE, AUDIT_ROTATE);
+function scheduleFlush() {
+    if (_flushScheduled) return;
+    _flushScheduled = true;
+    setImmediate(async () => {
+        _flushScheduled = false;
+        const batch = _writeQueue.splice(0);
+        if (!batch.length) return;
+        try {
+            await mkdir(LOGS_DIR, { recursive: true });
+            try {
+                const { size } = await stat(AUDIT_FILE);
+                if (size >= MAX_SIZE_BYTES) await rename(AUDIT_FILE, AUDIT_ROTATE);
+            } catch {
+                // arquivo ainda não existe — OK
+            }
+            await appendFile(AUDIT_FILE, batch.join(''), 'utf8');
+        } catch {
+            // Falha silenciosa — auditoria não deve interromper o agente
         }
-    } catch {
-        // Ignorar erros de rotação — não deve bloquear o agente
-    }
+    });
 }
+
+// ─── Helpers internos ─────────────────────────────────────────────────────────
 
 /**
  * Serializa os argumentos de uma tool call em texto curto para o log.
@@ -127,13 +133,10 @@ export function auditToolComplete(entry) {
         success: entry.success,
     };
 
-    try {
-        ensureLogsDir();
-        maybeRotate();
-        fs.appendFileSync(AUDIT_FILE, JSON.stringify(record) + '\n', 'utf8');
-    } catch {
-        // Falha silenciosa — auditoria não deve interromper a execução do agente
-    }
+    // BUG-CRIT-04 fix: I/O assíncrono via buffer+setImmediate — não bloqueia event loop
+    const line = JSON.stringify(record) + '\n';
+    _writeQueue.push(line);
+    scheduleFlush();
 }
 
 /**

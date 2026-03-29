@@ -90,52 +90,57 @@ export const PRIORITY_LEVELS = /** @type {const} */ ({
  *
  * Versão 1.0 do protocolo — campos obrigatórios mínimos para comunicação LLM-A/LLM-B.
  */
-export const StructuredMessageSchema = z.object({
-    /** Versão do protocolo (para evolução futura) */
-    version: z.string().default('1.0'),
+export const StructuredMessageSchema = z
+    .object({
+        /** Versão do protocolo (para evolução futura) */
+        version: z.string().default('1.0'),
 
-    /** Resumo do estado atual ou briefing relevante */
-    context: z.string().min(1, 'context é obrigatório'),
+        /** Resumo do estado atual ou briefing relevante */
+        context: z.string().min(1, 'context é obrigatório'),
 
-    /** Objetivo principal desta mensagem / o que LLM-B deve fazer */
-    intent: z.string().min(1, 'intent é obrigatório'),
+        /** Objetivo principal desta mensagem / o que LLM-B deve fazer */
+        intent: z.string().min(1, 'intent é obrigatório'),
 
-    /** Urgência da tarefa */
-    priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
+        /** Urgência da tarefa */
+        priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
 
-    /** Tipo de resposta esperado de LLM-B */
-    responseType: z.enum(['diagnostic', 'plan', 'code', 'question', 'confirmation', 'error']),
+        /** Tipo de resposta esperado de LLM-B */
+        responseType: z.enum(['diagnostic', 'plan', 'code', 'question', 'confirmation', 'error']),
 
-    /** Conteúdo principal da mensagem ou resposta */
-    output: z.string().optional(),
+        /** Conteúdo principal da mensagem ou resposta */
+        output: z.string().optional(),
 
-    /** ID da sessão LLM-B (preenchido automaticamente quando disponível) */
-    sessionId: z.string().optional(),
+        /** ID da sessão LLM-B (preenchido automaticamente quando disponível) */
+        sessionId: z.string().optional(),
 
-    /** Número do turno na conversa (preenchido automaticamente) */
-    turnNumber: z.number().int().min(0).optional(),
+        /** Número do turno na conversa (preenchido automaticamente) */
+        turnNumber: z.number().int().min(0).optional(),
 
-    /** Ferramentas usadas neste turno (preenchido por LLM-B na resposta) */
-    toolsUsed: z.array(z.string()).optional(),
+        /** Ferramentas usadas neste turno (preenchido por LLM-B na resposta) */
+        toolsUsed: z.array(z.string()).optional(),
 
-    /** Metadados extras livres para extensão futura */
-    meta: z.record(z.string(), z.unknown()).optional(),
+        /** Metadados extras livres para extensão futura */
+        meta: z.record(z.string(), z.unknown()).optional(),
 
-    /** ID de rastreamento distribuído (opcional, para correlação de logs entre LLM-A e LLM-B) */
-    traceId: z.string().optional(),
+        /** ID de rastreamento distribuído (opcional, para correlação de logs entre LLM-A e LLM-B) */
+        traceId: z.string().optional(),
 
-    /**
-     * UPG-03: timestamp Unix ms — quando a mensagem foi criada/enviada. Gerado automaticamente em
-     * buildStructuredRequest() se não fornecido.
-     */
-    timestamp: z.number().int().optional(),
+        /**
+         * UPG-03: timestamp Unix ms — quando a mensagem foi criada/enviada. Gerado automaticamente em
+         * buildStructuredRequest() se não fornecido.
+         */
+        timestamp: z.number().int().optional(),
 
-    /**
-     * UPG-03: correlationId — UUID enviado por LLM-A e devolvido inalterado por LLM-B, permitindo match exato de
-     * request/response sem depender de traceId.
-     */
-    correlationId: z.string().optional(),
-});
+        /**
+         * UPG-03: correlationId — UUID enviado por LLM-A e devolvido inalterado por LLM-B, permitindo match exato de
+         * request/response sem depender de traceId. UPG-PROP-11 (fix): validar como UUID para evitar correlationIds
+         * malformados que quebram rastreamento.
+         */
+        correlationId: z.string().uuid().optional(),
+    })
+    // UPG-PROP-03 (fix): .strict() rejeita campos desconhecidos enviados pelo LLM — evita campos
+    // proprietários sendo silenciosamente ignorados e garante fidelidade ao protocolo v1.0.
+    .strict();
 
 // ─── Tipos TypeScript/JSDoc ───────────────────────────────────────────────────
 

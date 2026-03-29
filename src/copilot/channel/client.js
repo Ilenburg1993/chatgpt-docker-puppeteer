@@ -299,10 +299,26 @@ export class LlmBridgeClient {
      *     timeout?: number;
      *     onDelta?: (chunk: string) => void;
      * }} [opts]
-     * @returns {Promise<{ response: string; taskId: string; durationMs: number }[]>}
+     * @returns {Promise<
+     *     (
+     *         | { response: string; taskId: string; durationMs: number }
+     *         | { error: string; response: null; taskId: string; durationMs: number }
+     *     )[]
+     * >}
      */
     async chatBatch(messages, opts = {}) {
-        return Promise.all(messages.map((msg) => this.chat(msg, opts)));
+        // BUG-HIGH-08 (fix): Promise.all disparava todas as mensagens em paralelo,
+        // corrompendo histórico de conversa. Loop sequencial preserva a ordem.
+        /** @type {(ChatResult | { error: string; response: null; taskId: string; durationMs: number })[]} */
+        const results = [];
+        for (const msg of messages) {
+            try {
+                results.push(await this.chat(msg, opts));
+            } catch (/** @type {any} */ err) {
+                results.push({ error: err.message, response: null, taskId: '', durationMs: 0 });
+            }
+        }
+        return results;
     }
 
     /**
@@ -352,9 +368,7 @@ export class LlmBridgeClient {
      */
     async dialogTurn(message, opts = {}) {
         const { timeout = 60_000, onDelta } = opts;
-        // ARCH-03 fix: registra turno do usuário no histórico local antes de enviar
         const sentAt = Date.now();
-        this.#pushHistory({ role: 'user', content: message, timestamp: sentAt });
         this.#turnCount++;
 
         // BUG-H05 fix: propaga chunks de streaming para onDelta enquanto sendDialogTurn processa
@@ -370,6 +384,9 @@ export class LlmBridgeClient {
         } finally {
             if (onDeltaTemp) alwaysAliveAgent.off('task.delta', onDeltaTemp);
         }
+        // BUG-MED-02 (fix): registrar turno de usuário apenas após confirmação de envio bem-sucedido
+        // Evita histórico contaminado com menssagens do usuário sem resposta correspondente
+        this.#pushHistory({ role: 'user', content: message, timestamp: sentAt });
         // Registra resposta da LLM-B no histórico local
         this.#pushHistory({ role: 'assistant', content: reply, timestamp: Date.now() });
         return reply;
@@ -405,6 +422,27 @@ export class LlmBridgeClient {
      */
     get history() {
         return /** @type {ReadonlyArray<ConversationTurn>} */ (this.#history);
+    }
+
+    /**
+     * UPG-PROP-12 (fix): Retorna os últimos N pares (user + assistant) do histórico.
+     *
+     * Útil para enviar contexto compacto a um LLM sem incluir o histórico completo. Garante que os pares comecem sempre
+     * por uma mensagem `user`, preservando a estrutura de alternância esperada pelo protocolo.
+     *
+     * @param {number} [pairs=5] - Número máximo de pares a retornar. Default is `5`
+     * @returns {ReadonlyArray<ConversationTurn>} Slice imutável dos últimos N pares
+     */
+    getLastNPairs(pairs = 5) {
+        const hist = /** @type {ConversationTurn[]} */ (this.#history);
+        const userIndices = hist
+            .map((t, i) => ({ i, role: t.role }))
+            .filter((t) => t.role === 'user')
+            .map((t) => t.i)
+            .slice(-pairs);
+        if (!userIndices.length) return /** @type {ReadonlyArray<ConversationTurn>} */ (hist.slice(-pairs * 2));
+        const startIdx = userIndices[0];
+        return /** @type {ReadonlyArray<ConversationTurn>} */ (hist.slice(startIdx));
     }
 
     /**

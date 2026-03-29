@@ -81,6 +81,7 @@ const MAX_LIST = 200;
  * @property {string} createdAt - ISO 8601 timestamp de criação
  * @property {string} updatedAt - ISO 8601 timestamp de última atualização
  * @property {string | null} completedAt - ISO 8601 timestamp de conclusão (ou null)
+ * @property {string | null} completedBy - Identificador de quem concluiu a tarefa (agente, usuário, etc.) — UPG-PROP-05
  * @property {Record<string, unknown>} metadata - Campos extensíveis livres
  */
 
@@ -273,6 +274,7 @@ const todoCreateTool = defineTool('todo_create', {
             createdAt: ts,
             updatedAt: ts,
             completedAt: null,
+            completedBy: null,
             metadata: args.metadata ?? {},
         };
 
@@ -288,7 +290,7 @@ const todoCreateTool = defineTool('todo_create', {
         }
 
         await writeStore(store);
-        log.info(`[todo_create] Tarefa criada id=${id} title=${task.title} priority=${task.priority}`);
+        log('INFO', `[todo_create] Tarefa criada id=${id} title=${task.title} priority=${task.priority}`);
         return { success: true, task: sanitize(task) };
     },
 });
@@ -514,7 +516,8 @@ const todoUpdateTool = defineTool('todo_update', {
         task.updatedAt = ts;
         await writeStore(store);
 
-        log.info(
+        log(
+            'INFO',
             `[todo_update] Tarefa atualizada id=${args.id} changed=${Object.keys(args)
                 .filter((k) => k !== 'id')
                 .join(',')}`,
@@ -541,8 +544,13 @@ const todoSetStatusTool = defineTool('todo_set_status', {
         id: zId,
         status: zStatus.describe('Novo status da tarefa'),
         force: z.boolean().optional().describe('Forçar transição mesmo fora do grafo de estados'),
+        // UPG-PROP-05 (fix): identificador de quem concluiu a tarefa (agente, usuário, etc.)
+        completed_by: z
+            .string()
+            .optional()
+            .describe('Identificador de quem concluiu (agente, usuário). Gravado em completedBy quando status=done.'),
     }),
-    handler: async (/** @type {{ id: string; status: TodoStatus; force?: boolean }} */ args) => {
+    handler: async (/** @type {{ id: string; status: TodoStatus; force?: boolean; completed_by?: string }} */ args) => {
         const store = await readStore();
         const task = store.tasks[args.id];
         if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
@@ -567,12 +575,15 @@ const todoSetStatusTool = defineTool('todo_set_status', {
         task.updatedAt = ts;
         if (next === 'done') {
             task.completedAt = ts;
+            // UPG-PROP-05 (fix): registrar quem concluiu para rastreabilidade
+            task.completedBy = args.completed_by ?? null;
         } else if (task.completedAt !== null) {
             task.completedAt = null;
+            task.completedBy = null;
         }
 
         await writeStore(store);
-        log.info(`[todo_set_status] Status alterado id=${args.id} from=${current} to=${next}`);
+        log('INFO', `[todo_set_status] Status alterado id=${args.id} from=${current} to=${next}`);
         return { success: true, task: sanitize(task), previous_status: current };
     },
 });
@@ -641,7 +652,7 @@ const todoDeleteTool = defineTool('todo_delete', {
         delete store.tasks[args.id];
         await writeStore(store);
 
-        log.info(`[todo_delete] Tarefa removida id=${args.id} cascade=${args.cascade} count=${deleted.length}`);
+        log('INFO', `[todo_delete] Tarefa removida id=${args.id} cascade=${args.cascade} count=${deleted.length}`);
         return { success: true, deleted, count: deleted.length };
     },
 });
@@ -704,6 +715,7 @@ const todoAddSubtaskTool = defineTool('todo_add_subtask', {
             createdAt: ts,
             updatedAt: ts,
             completedAt: null,
+            completedBy: null,
             metadata: {},
         };
 
@@ -714,7 +726,7 @@ const todoAddSubtaskTool = defineTool('todo_add_subtask', {
         parent.updatedAt = ts;
 
         await writeStore(store);
-        log.info(`[todo_add_subtask] Subtarefa criada id=${id} parent_id=${args.parent_id} title=${subtask.title}`);
+        log('INFO', `[todo_add_subtask] Subtarefa criada id=${id} parent_id=${args.parent_id} title=${subtask.title}`);
         return { success: true, subtask: sanitize(subtask), parent_subtask_count: parent.subtaskIds.length };
     },
 });
@@ -913,6 +925,8 @@ const todoBulkUpdateTool = defineTool('todo_bulk_update', {
         priority: zPriority.optional().describe('Nova prioridade a aplicar a todas'),
         add_tags: z.array(z.string().max(100)).max(10).optional().describe('Tags a adicionar a todas'),
         remove_tags: z.array(z.string()).optional().describe('Tags a remover de todas'),
+        // UPG-PROP-05 (fix): identificador de quem concluiu (propagado quando status=done)
+        completed_by: z.string().optional().describe('Identificador de quem concluiu (agente, usuário, etc.)'),
     }),
     handler: async (
         /**
@@ -922,6 +936,7 @@ const todoBulkUpdateTool = defineTool('todo_bulk_update', {
          *     priority?: TodoPriority;
          *     add_tags?: string[];
          *     remove_tags?: string[];
+         *     completed_by?: string;
          * }}
          */ args,
     ) => {
@@ -946,7 +961,13 @@ const todoBulkUpdateTool = defineTool('todo_bulk_update', {
 
             if (args.status) {
                 task.status = args.status;
-                if (args.status === 'done') task.completedAt = ts;
+                if (args.status === 'done') {
+                    task.completedAt = ts;
+                    // UPG-PROP-05 (fix): completedBy propagado no bulk update
+                    task.completedBy = args.completed_by ?? null;
+                } else {
+                    task.completedBy = null;
+                }
             }
             if (args.priority) task.priority = args.priority;
             if (args.add_tags) task.tags = [...new Set([...task.tags, ...args.add_tags])];
@@ -957,7 +978,7 @@ const todoBulkUpdateTool = defineTool('todo_bulk_update', {
 
         if (updated.length > 0) await writeStore(store);
 
-        log.info(`[todo_bulk_update] Bulk update updated=${updated.length} not_found=${notFound.length}`);
+        log('INFO', `[todo_bulk_update] Bulk update updated=${updated.length} not_found=${notFound.length}`);
         return { success: true, updated, not_found: notFound, count: updated.length };
     },
 });
@@ -1012,7 +1033,7 @@ const todoClearCompletedTool = defineTool('todo_clear_completed', {
             await writeStore(store);
         }
 
-        log.info(`[todo_clear_completed] Clear completed count=${toDelete.length} dry_run=${args.dry_run}`);
+        log('INFO', `[todo_clear_completed] Clear completed count=${toDelete.length} dry_run=${args.dry_run}`);
         return {
             success: true,
             deleted: toDelete,
@@ -1098,6 +1119,7 @@ const todoImportTool = defineTool('todo_import', {
                 createdAt: ts,
                 updatedAt: ts,
                 completedAt: item.status === 'done' ? ts : null,
+                completedBy: null,
                 metadata: item.metadata ?? {},
             };
             store.tasks[id] = task;
@@ -1105,7 +1127,7 @@ const todoImportTool = defineTool('todo_import', {
         }
 
         await writeStore(store);
-        log.info(`[todo_import] Tarefas importadas count=${created.length}`);
+        log('INFO', `[todo_import] Tarefas importadas count=${created.length}`);
         return { success: true, created_ids: created, count: created.length };
     },
 });
