@@ -1442,7 +1442,7 @@ não respondidos.
 - SEC-N02/UPG-N03 (server.js): `checkWriteRate` para `/pipeline` e `/memory`
 - GAP-N03/UPG-N04 (server.js): auth middleware `LLM_B_TERMINAL_TOKEN`
 
-### Batch-8 (pendente commit) — ✅ Implementado
+### Batch-8 (commit `67efa3b8`) — ✅ Implementado
 
 - SEC-N06/UPG-N19 (sessions.js): middleware de auth Bearer `SDK_API_TOKEN` opcional para rotas SDK
 - ARCH-N09/UPG-N06 (todo-tools.js): I/O assíncrono via `fs/promises` em `readStore`/`writeStore`
@@ -1451,14 +1451,27 @@ não respondidos.
 - ARCH-N01 (hook-tools.js): `request_user_input` agora suspende via Promise real;
   `resolveUserInput()` exportado e integrado em `always-alive.answerPendingQuestion()`
 
-### Pendentes
+### Batch-9 (revisão fase 4) — ✅ Implementado
 
-- UPG-N16 — Semáforo explícito substituindo Promise-chain mutex (baixa prioridade)
-- UPG-N17 — Padronizar todas as tools em `buildTool` factory (refactor extenso, baixa prioridade)
-- QUAL-N03 — Remover comentários de audit ID do código (limpeza estética)
-- ARCH-N05 — llm-bridge-client.js deprecated refs (já tem @deprecated JSDoc, arquivo é re-export)
-- ARCH-N01 (parcial) — status update realtime via SSE (pendente wiring emit de `waiting_for_input`
-  status no agente)
+Itens verificados e implementados durante revisão de AUDIT_SRC_COPILOT_4.md:
+
+- **ARCH-N06** (always-alive.js): `MAX_QUEUE_SIZE` agora importado de `#copilot/core/constants`
+  (antes campo `static MAX_QUEUE_SIZE = 100` duplicava o valor de `constants.js`); refência
+  convertida de `AlwaysAliveAgent.MAX_QUEUE_SIZE` para `MAX_QUEUE_SIZE` diretamente.
+- **QUAL-N02** (always-alive.js): `setMaxListeners` configurável via `AGENT_MAX_LISTENERS` env var
+  (padrão 50) em vez de hardcoded.
+
+### Status Final dos Pendentes
+
+| Item               | Status          | Observação                                                                                                                                                              |
+| ------------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UPG-N16            | ✅ RESOLVIDO    | Reset `_sendTurnMutex = Promise.resolve(null)` quando `_turnQueueDepth === 0` (PERF-N06 fix em Batch-1) elimina crescimento infinito da chain                           |
+| UPG-N17            | ✅ IMPLEMENTADO | commit `4d276abd` — migração completa para `buildTool` factory                                                                                                          |
+| ARCH-N01 (parcial) | ✅ IMPLEMENTADO | `#setStatus('waiting_for_input')` em `always-alive.js:1406`, `_broadcastSse('waiting_for_input', …)` em `hook-tools.js:203`, POST `/answer` em `bridge-tasks.js:98-112` |
+| ARCH-N05           | ✅ DOCUMENTADO  | Arquivo tem `@deprecated` JSDoc; é re-export legítimo, sem ação necessária                                                                                              |
+| ARCH-N06           | ✅ IMPLEMENTADO | commit Batch-9 — importa de `constants.js`                                                                                                                              |
+| QUAL-N02           | ✅ IMPLEMENTADO | commit Batch-9 — env var `AGENT_MAX_LISTENERS`                                                                                                                          |
+| QUAL-N03           | ⏭ POSTERGADO   | Comentários de audit ID são documentação inline rastreável; limpeza cosmética sem impacto funcional                                                                     |
 
 ---
 

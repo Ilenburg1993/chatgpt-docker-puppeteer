@@ -16,6 +16,7 @@
  * @module copilot/always-alive
  */
 
+import { MAX_QUEUE_SIZE } from '#copilot/core/constants';
 import { SessionError } from '#copilot/core/errors';
 import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart, startSpan } from '#copilot/lib/index';
 import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/lib/permissions';
@@ -141,13 +142,6 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     static #WATCHDOG_STALL_MS = Number(process.env.LLM_B_WATCHDOG_STALL_MS ?? 15 * 60 * 1_000);
 
-    /**
-     * Tamanho máximo da fila de tarefas. Evita crescimento ilimitado de memória em cenários de sobrecarga.
-     *
-     * @type {number}
-     */
-    static MAX_QUEUE_SIZE = 100;
-
     /** @type {string} */
     #model;
 
@@ -211,8 +205,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     constructor(options = {}) {
         super();
         // Agentes de alta carga acumulam múltiplos listeners por tarefa + SSE + bridge.
-        // O padrão de 10 é insuficiente; 50 cobre cenários de carga real sem suprimir warnings.
-        this.setMaxListeners(50);
+        // O padrão de 10 é insuficiente; configurável via AGENT_MAX_LISTENERS (padrão 50).
+        this.setMaxListeners(Number(process.env.AGENT_MAX_LISTENERS ?? 50));
         this.#model = options.model ?? process.env.COPILOT_MODEL ?? 'gpt-4.1';
         this.#reasoningEffort =
             options.reasoningEffort ??
@@ -681,14 +675,14 @@ export class AlwaysAliveAgent extends EventEmitter {
                 reject(new DOMException('AbortError: sendMessage cancelado antes de enfileirar.', 'AbortError'));
                 return;
             }
-            if (this.#queue.length >= AlwaysAliveAgent.MAX_QUEUE_SIZE) {
+            if (this.#queue.length >= MAX_QUEUE_SIZE) {
                 const err = new SessionError(
-                    `[AlwaysAlive] Fila cheia (${AlwaysAliveAgent.MAX_QUEUE_SIZE} tarefas). Tente novamente mais tarde.`,
+                    `[AlwaysAlive] Fila cheia (${MAX_QUEUE_SIZE} tarefas). Tente novamente mais tarde.`,
                     'QUEUE_FULL',
                 );
                 log(
                     'WARN',
-                    `[AlwaysAlive] sendMessage rejeitado: fila cheia (${this.#queue.length}/${AlwaysAliveAgent.MAX_QUEUE_SIZE}).`,
+                    `[AlwaysAlive] sendMessage rejeitado: fila cheia (${this.#queue.length}/${MAX_QUEUE_SIZE}).`,
                 );
                 reject(err);
                 return;
