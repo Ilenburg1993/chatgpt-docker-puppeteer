@@ -284,7 +284,7 @@ export class HubOrchestrator extends EventEmitter {
 
         // Invocar LLM-B com streaming
         const startTime = Date.now();
-        let llmBResponse = '';
+        /** @type {string} */ let llmBResponse;
         let llmBStructured = null;
         let parseError = null;
 
@@ -292,58 +292,25 @@ export class HubOrchestrator extends EventEmitter {
             // Preferir dialog loop (sendDialogTurn) quando ativo — mais eficiente (0 PR por turno)
             // Senão, usar LlmBridgeClient.chat() (1 PR por turno)
             const agentInst = this.#agent ?? alwaysAliveAgent;
-            // TYPE-01 (fix): usar tipos explícitos via #agent typedef em vez de casts @type {any}
             const useDialogLoop = agentInst.dialogLoopActive === true;
 
             if (useDialogLoop) {
-                const content = typeof message === 'string' ? message : messageContent;
-                log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${turnNumber + 1}.`);
-                if (!agentInst.sendDialogTurn) {
-                    throw new Error('[HubOrchestrator] agentInst não suporta sendDialogTurn');
-                }
-                // BUG-HIGH-03 (fix): capturar task.delta durante sendDialogTurn para emitir turn:delta em tempo real
-                const onDelta = (/** @type {{ chunk: string }} */ evt) => {
-                    const chunk = evt?.chunk ?? '';
-                    if (chunk) {
-                        this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
-                    }
-                };
-                alwaysAliveAgent.on('task.delta', onDelta);
-                try {
-                    // sendDialogTurn já retorna a resposta completa; usá-la diretamente evita dupla acumulação
-                    llmBResponse = await agentInst.sendDialogTurn(content, { timeout: timeoutMs });
-                } finally {
-                    alwaysAliveAgent.off('task.delta', onDelta);
-                }
-            } else if (useStructured && typeof message === 'object') {
-                // Usar chatStructured() com StructuredMessage
-                const result = await this.#bridge.chatStructured(/** @type {any} */ (message), {
-                    onDelta: (chunk) => {
-                        llmBResponse += chunk;
-                        this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
-                    },
+                llmBResponse = await this.#callViaDialogLoop(
+                    message,
+                    messageContent,
+                    hubSessionId,
+                    turnNumber,
                     timeoutMs,
-                });
-                llmBResponse = result.raw ?? llmBResponse;
-                llmBStructured = result.structured;
-                if (result.parseError !== undefined) parseError = result.parseError;
-            } else {
-                // ARCH-03 (fix): registrar auditoria quando o fallback para chat() simples é usado,
-                // pois isso indica que useStructured=false ou mensagem em formato inesperado
-                log(
-                    'WARN',
-                    `[HubOrchestrator] Usando chat() simples (fallback path) para hubSession=${hubSessionId}, useStructured=${useStructured}, messageType=${typeof message}`,
                 );
-                // Usar chat() simples
-                const content = typeof message === 'string' ? message : messageContent;
-                const result = await this.#bridge.chat(content, {
-                    onDelta: (chunk) => {
-                        llmBResponse += chunk;
-                        this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
-                    },
+            } else if (useStructured && typeof message === 'object') {
+                ({ llmBResponse, llmBStructured, parseError } = await this.#callViaStructured(
+                    message,
+                    hubSessionId,
+                    turnNumber,
                     timeoutMs,
-                });
-                llmBResponse = result.response;
+                ));
+            } else {
+                llmBResponse = await this.#callViaSimpleChat(messageContent, hubSessionId, turnNumber, timeoutMs);
             }
         } catch (/** @type {any} */ err) {
             const errMsg = `[HubOrchestrator] Erro na resposta de LLM-B: ${err.message}`;
@@ -486,5 +453,87 @@ export class HubOrchestrator extends EventEmitter {
         } catch {
             return undefined;
         }
+    }
+
+    /**
+     * Envia message via Dialog Loop (sendDialogTurn). Emite `turn:delta` em tempo real via task.delta do agente.
+     *
+     * @param {string | object} message
+     * @param {string} messageContent - Versão string normalizada
+     * @param {string} hubSessionId
+     * @param {number} turnNumber
+     * @param {number} timeoutMs
+     * @returns {Promise<string>}
+     */
+    async #callViaDialogLoop(message, messageContent, hubSessionId, turnNumber, timeoutMs) {
+        const agentInst = this.#agent ?? alwaysAliveAgent;
+        const content = typeof message === 'string' ? message : messageContent;
+        log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${turnNumber + 1}.`);
+        if (!agentInst.sendDialogTurn) {
+            throw new Error('[HubOrchestrator] agentInst não suporta sendDialogTurn');
+        }
+        // BUG-HIGH-03 (fix): capturar task.delta durante sendDialogTurn para emitir turn:delta em tempo real
+        const onDelta = (/** @type {{ chunk: string }} */ evt) => {
+            const chunk = evt?.chunk ?? '';
+            if (chunk) this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
+        };
+        const agentEmitter = /** @type {any} */ (agentInst);
+        agentEmitter.on('task.delta', onDelta);
+        try {
+            return await agentInst.sendDialogTurn(content, { timeout: timeoutMs });
+        } finally {
+            agentEmitter.off('task.delta', onDelta);
+        }
+    }
+
+    /**
+     * Envia message via chatStructured() com StructuredMessage.
+     *
+     * @param {object} message
+     * @param {string} hubSessionId
+     * @param {number} turnNumber
+     * @param {number} timeoutMs
+     * @returns {Promise<{ llmBResponse: string; llmBStructured: object | null; parseError: any }>}
+     */
+    async #callViaStructured(message, hubSessionId, turnNumber, timeoutMs) {
+        if (!this.#bridge) throw new Error('[HubOrchestrator] Não inicializado.');
+        /** @type {string} */ let accumulated = '';
+        const result = await this.#bridge.chatStructured(/** @type {any} */ (message), {
+            onDelta: (chunk) => {
+                accumulated += chunk;
+                this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
+            },
+            timeoutMs,
+        });
+        return {
+            llmBResponse: result.raw ?? accumulated,
+            llmBStructured: result.structured ?? null,
+            parseError: result.parseError ?? null,
+        };
+    }
+
+    /**
+     * Envia message via chat() simples (fallback). ARCH-03: registra WARN pois indica useStructured=false ou mensagem
+     * em formato inesperado.
+     *
+     * @param {string} messageContent
+     * @param {string} hubSessionId
+     * @param {number} turnNumber
+     * @param {number} timeoutMs
+     * @returns {Promise<string>}
+     */
+    async #callViaSimpleChat(messageContent, hubSessionId, turnNumber, timeoutMs) {
+        if (!this.#bridge) throw new Error('[HubOrchestrator] Não inicializado.');
+        log(
+            'WARN',
+            `[HubOrchestrator] Usando chat() simples (fallback path) para hubSession=${hubSessionId}, messageType=string`,
+        );
+        const result = await this.#bridge.chat(messageContent, {
+            onDelta: (chunk) => {
+                this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
+            },
+            timeoutMs,
+        });
+        return result.response;
     }
 }

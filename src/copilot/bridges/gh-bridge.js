@@ -101,6 +101,36 @@ function repoArgs() {
     return ENV_REPO ? ['--repo', ENV_REPO] : [];
 }
 
+/**
+ * Aplica paginação client-side sobre um array já carregado do gh CLI. Padroniza o cálculo de fetchLimit, offset e
+ * hasMore nos três listadores.
+ *
+ * @template T
+ * @param {T[]} all - Array completo retornado pelo gh CLI
+ * @param {{ page: number; pageSize: number }} pager
+ * @returns {{ items: T[]; hasMore: boolean; page: number; perPage: number }}
+ */
+function slicePage(all, { page, pageSize }) {
+    const offset = (page - 1) * pageSize;
+    return {
+        items: all.slice(offset, offset + pageSize),
+        hasMore: all.length > offset + pageSize,
+        page,
+        perPage: pageSize,
+    };
+}
+
+/**
+ * Calcula o limite de busca para paginação client-side. Busca um item a mais (pageSize * page + 1) para detectar
+ * hasMore.
+ *
+ * @param {{ page: number; pageSize: number }} pager
+ * @returns {number}
+ */
+function calcFetchLimit({ page, pageSize }) {
+    return Math.min(pageSize * page + 1, 1000);
+}
+
 // ---------------------------------------------------------------------------
 // Repo info
 // ---------------------------------------------------------------------------
@@ -150,15 +180,14 @@ export async function getDefaultRepo() {
 export async function listIssues(opts = {}) {
     const { state = 'open', label, page = 1, perPage } = opts;
     const pageSize = Math.min(perPage ?? opts.limit ?? 15, 100);
-    // Buscar pageSize+1 para detectar hasMore sem chamada extra
-    const fetchLimit = Math.min(pageSize * page + 1, 1000);
+    const pager = { page, pageSize };
     const args = [
         'issue',
         'list',
         '--json',
         'number,title,state,labels,author,createdAt,updatedAt',
         '--limit',
-        String(fetchLimit),
+        String(calcFetchLimit(pager)),
         '--state',
         state,
         ...repoArgs(),
@@ -166,9 +195,7 @@ export async function listIssues(opts = {}) {
     if (label) args.push('--label', label);
     try {
         const all = /** @type {IssueItem[]} */ ((await runGhJson(args)) ?? []);
-        const offset = (page - 1) * pageSize;
-        const items = all.slice(offset, offset + pageSize);
-        return { items, hasMore: all.length > offset + pageSize, page, perPage: pageSize };
+        return slicePage(all, pager);
     } catch {
         return { items: [], hasMore: false, page, perPage: pageSize };
     }
@@ -290,23 +317,21 @@ export async function commentIssue(number, body) {
 export async function listPrs(opts = {}) {
     const { state = 'open', page = 1, perPage } = opts;
     const pageSize = Math.min(perPage ?? opts.limit ?? 15, 100);
-    const fetchLimit = Math.min(pageSize * page + 1, 1000);
+    const pager = { page, pageSize };
     const args = [
         'pr',
         'list',
         '--json',
         'number,title,state,headRefName,author,isDraft,createdAt,mergeable',
         '--limit',
-        String(fetchLimit),
+        String(calcFetchLimit(pager)),
         '--state',
         state,
         ...repoArgs(),
     ];
     try {
         const all = /** @type {PrItem[]} */ ((await runGhJson(args)) ?? []);
-        const offset = (page - 1) * pageSize;
-        const items = all.slice(offset, offset + pageSize);
-        return { items, hasMore: all.length > offset + pageSize, page, perPage: pageSize };
+        return slicePage(all, pager);
     } catch {
         return { items: [], hasMore: false, page, perPage: pageSize };
     }
@@ -407,22 +432,20 @@ export async function mergePr(number, opts = {}) {
 export async function listRuns(opts = {}) {
     const { branch, page = 1, perPage } = opts;
     const pageSize = Math.min(perPage ?? opts.limit ?? 10, 100);
-    const fetchLimit = Math.min(pageSize * page + 1, 1000);
+    const pager = { page, pageSize };
     const args = [
         'run',
         'list',
         '--json',
         'databaseId,name,status,conclusion,event,createdAt,headBranch',
         '--limit',
-        String(fetchLimit),
+        String(calcFetchLimit(pager)),
         ...repoArgs(),
     ];
     if (branch) args.push('--branch', branch);
     try {
         const all = /** @type {RunItem[]} */ ((await runGhJson(args)) ?? []);
-        const offset = (page - 1) * pageSize;
-        const items = all.slice(offset, offset + pageSize);
-        return { items, hasMore: all.length > offset + pageSize, page, perPage: pageSize };
+        return slicePage(all, pager);
     } catch {
         return { items: [], hasMore: false, page, perPage: pageSize };
     }
@@ -456,17 +479,19 @@ export async function viewRun(runId) {
  * @param {(run: RunItem) => void} onUpdate - callback chamado a cada poll
  * @param {object} [opts]
  * @param {number} [opts.intervalMs]
- * @returns {Promise<object | null>} run final
+ * @param {number} [opts.maxAttempts] - Limite de polls (default: 360 ≈ 30 min a 5 s/poll)
+ * @returns {Promise<object | null>} run final, ou null se timeout/não encontrado
  */
 export async function watchRun(runId, onUpdate, opts = {}) {
-    const { intervalMs = 5000 } = opts;
-    for (;;) {
+    const { intervalMs = 5000, maxAttempts = 360 } = opts;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const run = /** @type {any} */ (await viewRun(runId));
         if (!run) return null;
         onUpdate(run);
         if (run.status === 'completed') return run;
         await new Promise((r) => setTimeout(r, intervalMs));
     }
+    return null;
 }
 
 /**

@@ -94,6 +94,19 @@ export function getAllTools(registry) {
 }
 
 /**
+ * Retorna ferramentas que satisfazem o predicado fornecido.
+ *
+ * @param {ToolRegistry} registry
+ * @param {(entry: ToolEntry) => boolean} predicate
+ * @returns {Tool[]}
+ */
+export function getToolsBy(registry, predicate) {
+    return Array.from(registry.entries.values())
+        .filter(predicate)
+        .map((e) => e.tool);
+}
+
+/**
  * Retorna ferramentas de uma categoria específica.
  *
  * @param {ToolRegistry} registry
@@ -101,11 +114,7 @@ export function getAllTools(registry) {
  * @returns {Tool[]}
  */
 export function getToolsByCategory(registry, category) {
-    const result = [];
-    for (const entry of registry.entries.values()) {
-        if (entry.category === category) result.push(entry.tool);
-    }
-    return result;
+    return getToolsBy(registry, (e) => e.category === category);
 }
 
 /**
@@ -116,11 +125,7 @@ export function getToolsByCategory(registry, category) {
  * @returns {Tool[]}
  */
 export function getToolsByTag(registry, tag) {
-    const result = [];
-    for (const entry of registry.entries.values()) {
-        if (entry.tags && entry.tags.includes(tag)) result.push(entry.tool);
-    }
-    return result;
+    return getToolsBy(registry, (e) => Array.isArray(e.tags) && e.tags.includes(tag));
 }
 
 /**
@@ -130,11 +135,7 @@ export function getToolsByTag(registry, tag) {
  * @returns {Tool[]}
  */
 export function getReadOnlyTools(registry) {
-    const result = [];
-    for (const entry of registry.entries.values()) {
-        if (entry.readOnly) result.push(entry.tool);
-    }
-    return result;
+    return getToolsBy(registry, (e) => e.readOnly === true);
 }
 
 /**

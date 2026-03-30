@@ -27,8 +27,10 @@ if (!process.env.COPILOT_SDK_ENABLED) process.env.COPILOT_SDK_ENABLED = 'true';
 
 export { startTerminalServer } from './terminal/index.js';
 
+import { fileURLToPath } from 'node:url';
+
 // Executa diretamente quando chamado via `node terminal-server.js`
-const isMain = process.argv[1]?.endsWith('terminal-server.js') ?? false;
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
     const { startTerminalServer } = await import('./terminal/index.js');
     startTerminalServer().catch((e) => {

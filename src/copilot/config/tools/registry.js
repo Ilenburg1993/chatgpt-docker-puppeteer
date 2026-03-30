@@ -239,3 +239,12 @@ export function buildCustomTools() {
 
 // Carrega ao inicializar o módulo
 loadCustomTools();
+
+/**
+ * Reseta o estado interno do registry para isolamento de testes. **Não usar em produção.**
+ *
+ * @internal
+ */
+export function _resetRegistry() {
+    _registry = new Map();
+}

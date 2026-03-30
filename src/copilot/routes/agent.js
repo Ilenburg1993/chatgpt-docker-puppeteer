@@ -24,6 +24,7 @@ import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { getClient } from '../lib/client.js';
 import { clearTelemetry, getSummary } from '../lib/telemetry.js';
+import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** Contador de clientes SSE ativos em /agent/stream. */
 let _agentSseClients = 0;
@@ -37,23 +38,14 @@ let _agentSseClients = 0;
 const router = Router();
 
 /**
- * Wrapper que captura erros e retorna 500 padronizado.
+ * Wrapper com prefixo de log para as rotas de agente.
  *
  * @param {Req} req
  * @param {Res} res
  * @param {() => Promise<unknown>} fn
  * @returns {Promise<void>}
  */
-async function withErrorHandler(req, res, fn) {
-    try {
-        await fn();
-    } catch (/** @type {any} */ e) {
-        log('ERROR', `[sdk-api/agent] ${req.method} ${req.path} → ${e.message}`);
-        if (!res.headersSent) {
-            res.status(500).json({ ok: false, error: e.message });
-        }
-    }
-}
+const withErrorHandler = _withErrorHandler.bind(null, 'sdk-api/agent');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /agent/info
@@ -91,33 +83,27 @@ router.get('/agent/tools', (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /telemetry (alias canônico UPG-N08/GAP-N14) + GET /agent/telemetry  +  POST /agent/telemetry/clear
+// GET /agent/telemetry  +  GET /telemetry (alias retrocompatível)  +  POST /agent/telemetry/clear
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * UPG-N08/GAP-N14 (fix): Alias canônico em /telemetry que expõe o resumo de telemetria SDK. Equivalente a GET
- * /agent/telemetry — retorna getSummary() + raw store.
+ * Retorna o resumo de telemetria do agente (sessões, erros, latências). Alias /telemetry mantido para compatibilidade
+ * retroativa (UPG-N08/GAP-N14).
+ *
+ * @param {import('express').Request} _req
+ * @param {import('express').Response} res
  */
-router.get('/telemetry', (_req, res) => {
+function handleGetTelemetry(_req, res) {
     const telemetry = alwaysAliveAgent.telemetry;
     if (!telemetry) {
         res.status(503).json({ ok: false, error: 'Telemetria não disponível (agente não iniciado)' });
         return;
     }
     res.json({ ok: true, summary: getSummary(telemetry), raw: telemetry });
-});
+}
 
-/**
- * Retorna o resumo de telemetria do agente (sessões, erros, latências).
- */
-router.get('/agent/telemetry', (_req, res) => {
-    const telemetry = alwaysAliveAgent.telemetry;
-    if (!telemetry) {
-        res.status(503).json({ ok: false, error: 'Telemetria não disponível (agente não iniciado)' });
-        return;
-    }
-    res.json({ ok: true, summary: getSummary(telemetry), raw: telemetry });
-});
+router.get('/agent/telemetry', handleGetTelemetry);
+router.get('/telemetry', handleGetTelemetry);
 
 /**
  * Reseta o store de telemetria do agente. Útil após deploy ou manutenção.

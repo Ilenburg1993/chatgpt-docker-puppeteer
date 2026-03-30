@@ -68,13 +68,20 @@ export function registerDialogRoutes(bridge, agent) {
      * retorna.
      */
     bridge.post('/dialog/turn', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const MIN_DIALOG_TIMEOUT_MS = 1_000;
+        const MAX_DIALOG_TIMEOUT_MS = 300_000;
         const { message, timeout = 60_000 } = req.body ?? {};
 
         if (!message || typeof message !== 'string') {
             return res.status(400).json({ ok: false, error: 'Campo "message" (string) é obrigatório.' });
         }
-        if (typeof timeout !== 'number' || timeout < 1_000 || timeout > 300_000) {
-            return res.status(400).json({ ok: false, error: '"timeout" deve ser número entre 1000 e 300000.' });
+        if (typeof timeout !== 'number' || timeout < MIN_DIALOG_TIMEOUT_MS || timeout > MAX_DIALOG_TIMEOUT_MS) {
+            return res
+                .status(400)
+                .json({
+                    ok: false,
+                    error: `"timeout" deve ser número entre ${MIN_DIALOG_TIMEOUT_MS} e ${MAX_DIALOG_TIMEOUT_MS}.`,
+                });
         }
 
         try {

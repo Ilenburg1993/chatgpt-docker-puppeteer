@@ -308,3 +308,14 @@ export async function buildMcpTools() {
 
     return mcpTools.map((tool) => createSdkToolFromMcp(tool));
 }
+
+/**
+ * Reseta estado interno mutable do bridge para isolamento de testes. **Não usar em produção.**
+ *
+ * @internal
+ */
+export function _resetMcpState() {
+    _mcpCircuitOpen = false;
+    _mcpCircuitOpenAt = 0;
+    _bootAttemptCount = 0;
+}

@@ -19,25 +19,28 @@ import { alwaysAliveAgent } from './always-alive.js';
 const RESTART_DELAY_MS = parseInt(process.env.COPILOT_RESTART_DELAY_MS ?? '5000', 10);
 
 /**
- * Inicializa o agente com tentativas de retry.
+ * Inicializa o agente com loop de retry (até 5 tentativas) em vez de recursão.
  *
- * @param {number} [attempt]
  * @returns {Promise<void>}
  */
-async function startWithRetry(attempt = 1) {
-    try {
-        log('INFO', `[copilot/agent] Iniciando Always-Alive Agent (tentativa ${attempt})...`);
-        await alwaysAliveAgent.start();
-        log('INFO', '[copilot/agent] Agente ativo e aguardando mensagens via HTTP bridge.');
-    } catch (/** @type {any} */ e) {
-        log('ERROR', `[copilot/agent] Falha ao iniciar (tentativa ${attempt}): ${e.message}`);
-        if (attempt < 5) {
-            log('INFO', `[copilot/agent] Tentando novamente em ${RESTART_DELAY_MS}ms...`);
-            await new Promise((r) => setTimeout(r, RESTART_DELAY_MS));
-            await startWithRetry(attempt + 1);
-        } else {
-            log('ERROR', '[copilot/agent] Máximo de tentativas atingido. Encerrando processo.');
-            process.exit(1);
+async function startWithRetry() {
+    const MAX_ATTEMPTS = 5;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+            log('INFO', `[copilot/agent] Iniciando Always-Alive Agent (tentativa ${attempt})...`);
+            await alwaysAliveAgent.start();
+            log('INFO', '[copilot/agent] Agente ativo e aguardando mensagens via HTTP bridge.');
+            return;
+        } catch (/** @type {any} */ e) {
+            log('ERROR', `[copilot/agent] Falha ao iniciar (tentativa ${attempt}): ${e.message}`);
+            if (attempt < MAX_ATTEMPTS) {
+                log('INFO', `[copilot/agent] Tentando novamente em ${RESTART_DELAY_MS}ms...`);
+                await new Promise((r) => setTimeout(r, RESTART_DELAY_MS));
+            } else {
+                log('ERROR', '[copilot/agent] Máximo de tentativas atingido. Encerrando processo.');
+                process.exitCode = 1;
+                process.exit(1);
+            }
         }
     }
 }
@@ -83,4 +86,9 @@ try {
     // Continuar de qualquer forma — startWithRetry() tratará a falha
 }
 
-void startWithRetry();
+// RF-051: salvar Promise para garantir que erros de rejeição não fiquem silenciosos
+const _startPromise = startWithRetry();
+_startPromise.catch((/** @type {any} */ e) => {
+    log('ERROR', `[copilot/agent] startWithRetry() rejeitou: ${e.message}`);
+    process.exitCode = 1;
+});

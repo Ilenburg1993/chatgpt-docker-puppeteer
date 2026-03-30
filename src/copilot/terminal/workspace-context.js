@@ -55,14 +55,29 @@ function detectGitRoot(cwd) {
 }
 
 /**
- * Retorna o contexto do workspace atual. Resultado não é cacheado — cada chamada reflete o estado corrente do processo.
+ * Retorna o contexto do workspace atual.
+ *
+ * RF-054: resultado cacheado por `CONTEXT_CACHE_TTL_MS` para evitar overhead de `execSync` em chamadas repetidas (ex: a
+ * cada turno do REPL). Cache é invalidado automaticamente por TTL.
  *
  * @returns {WorkspaceContext}
  */
+
+/** @type {number} */
+const CONTEXT_CACHE_TTL_MS = 30_000;
+
+/** @type {{ context: WorkspaceContext; expiresAt: number } | null} */
+let _contextCache = null;
+
 export function getWorkspaceContext() {
+    const now = Date.now();
+    if (_contextCache && _contextCache.expiresAt > now) {
+        return _contextCache.context;
+    }
     const cwd = process.env.COPILOT_WORKING_DIRECTORY ?? process.cwd();
     const gitRoot = detectGitRoot(cwd);
     const currentBranch = gitRoot ? tryExec('git rev-parse --abbrev-ref HEAD', gitRoot) : null;
-
-    return { cwd, gitRoot, currentBranch };
+    const context = { cwd, gitRoot, currentBranch };
+    _contextCache = { context, expiresAt: now + CONTEXT_CACHE_TTL_MS };
+    return context;
 }

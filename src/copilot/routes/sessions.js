@@ -39,6 +39,7 @@ import {
     listActiveClientSessions as listActiveSessions,
     resumeClientSession as resumeSdkSession,
 } from '../lib/client.js';
+import { pickDefined } from '../lib/utils.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -84,6 +85,10 @@ function rateLimitMiddleware(maxPerMinute, label) {
         const ip = req.ip ?? 'unknown';
         const key = `${label}:${ip}`;
         const now = Date.now();
+        // BUG-RF015 (fix): purgar entradas expiradas para evitar memory leak em uptime longo
+        for (const [k, e] of _rlWindowMap) {
+            if (now - e.bucketStart > WINDOW_MS) _rlWindowMap.delete(k);
+        }
         const entry = _rlWindowMap.get(key);
         if (!entry || now - entry.bucketStart > WINDOW_MS) {
             _rlWindowMap.set(key, { count: 1, bucketStart: now });
@@ -278,17 +283,19 @@ router.post('/sessions', rateLimitMiddleware(10, 'create_session'), (req, res) =
         const session = await createSdkSession({
             onPermissionRequest: approveAll,
             model: safeModel,
-            ...(sessionId ? { sessionId } : {}),
-            ...(systemMessage ? { systemMessage } : {}),
-            ...(infiniteSessions !== undefined ? { infiniteSessions } : {}),
-            ...(workingDirectory ? { workingDirectory } : {}),
-            ...(streaming !== undefined ? { streaming } : {}),
-            ...(provider ? { provider } : {}),
-            ...(reasoningEffort ? { reasoningEffort } : {}),
-            ...(availableTools ? { availableTools } : {}),
-            ...(excludedTools ? { excludedTools } : {}),
-            ...(customAgents ? { customAgents } : {}),
-            ...(clientName ? { clientName } : {}),
+            ...pickDefined({
+                sessionId,
+                systemMessage,
+                infiniteSessions,
+                workingDirectory,
+                streaming,
+                provider,
+                reasoningEffort,
+                availableTools,
+                excludedTools,
+                customAgents,
+                clientName,
+            }),
         });
 
         res.status(201).json({

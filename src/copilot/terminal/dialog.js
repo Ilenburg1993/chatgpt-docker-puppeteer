@@ -220,46 +220,67 @@ export function broadcastSse(event, data) {
         };
     }
 
-    // ── SSE (raw node:http) ───────────────────────────────────────────────────
-    if (_sseClients.size > 0 || _sseCriticalClients.size > 0) {
-        // BUG-N06 (fix): incluir hubSessionId no payload SSE para consistência com Socket.io
-        const ssePayloadData = { ...safeData, hubSessionId: getHubSessionId() };
-        // SEC-VULN-02 (fix): sanitizar nome do evento SSE para prevenir injeção de protocolo
-        // (event names não podem conter \n ou \r — RFC 8895 §6.2)
-        const safeEvent = String(event).replace(/[\r\n]/g, '_');
-        const payload = `event: ${safeEvent}\ndata: ${JSON.stringify(ssePayloadData)}\n\n`;
-        for (const client of _sseClients) {
+    emitSse(_sseClients, _sseCriticalClients, event, safeData);
+    emitSocket(getCopilotNamespace(), getHubSessionId(), event, safeData);
+}
+
+/**
+ * Envia um evento SSE para clientes raw (node:http ServerResponse).
+ *
+ * @param {Set<import('node:http').ServerResponse>} clients - Clientes SSE gerais
+ * @param {Set<import('node:http').ServerResponse>} criticalClients - Clientes SSE de eventos críticos
+ * @param {string} event - Tipo do evento
+ * @param {object} data - Payload já sanitizado/truncado
+ * @returns {void}
+ */
+function emitSse(clients, criticalClients, event, data) {
+    if (clients.size === 0 && criticalClients.size === 0) return;
+
+    // BUG-N06 (fix): incluir hubSessionId no payload SSE para consistência com Socket.io
+    const ssePayloadData = { ...data, hubSessionId: getHubSessionId() };
+    // SEC-VULN-02 (fix): sanitizar nome do evento SSE para prevenir injeção de protocolo
+    // (event names não podem conter \n ou \r — RFC 8895 §6.2)
+    const safeEvent = String(event).replace(/[\r\n]/g, '_');
+    const payload = `event: ${safeEvent}\ndata: ${JSON.stringify(ssePayloadData)}\n\n`;
+
+    for (const client of clients) {
+        try {
+            client.write(payload);
+        } catch {
+            clients.delete(client);
+        }
+    }
+    if (CRITICAL_EVENTS.has(event)) {
+        for (const client of criticalClients) {
             try {
                 client.write(payload);
             } catch {
-                _sseClients.delete(client);
-            }
-        }
-        if (CRITICAL_EVENTS.has(event)) {
-            for (const client of _sseCriticalClients) {
-                try {
-                    client.write(payload);
-                } catch {
-                    _sseCriticalClients.delete(client);
-                }
+                criticalClients.delete(client);
             }
         }
     }
+}
 
-    // ── Socket.io (BUG-HIGH-02 fix): emitir apenas para a sala da hub_session ativa ──
-    // Evita vazamento de dados entre sessões diferentes conectadas ao mesmo namespace
-    const _ns = getCopilotNamespace();
-    const _hubSessionId = getHubSessionId();
-    if (_ns) {
-        if (_hubSessionId) {
-            // Emitir somente para a sala da sessão ativa
-            _ns.to(_hubSessionId).emit(event, { ...safeData, hubSessionId: _hubSessionId });
-        } else {
-            // Sem sessão ativa: emitir globalmente apenas eventos de sistema inócuos
-            const SYSTEM_EVENTS = new Set(['ready', 'stalled', 'stopped', 'fatal', 'busy']);
-            if (SYSTEM_EVENTS.has(event)) {
-                _ns.emit(event, { ...safeData, hubSessionId: null });
-            }
+/**
+ * Emite um evento via Socket.io namespace `/copilot`.
+ *
+ * @param {import('socket.io').Namespace | null} ns - Namespace Socket.io (null = no-op)
+ * @param {string | null} hubSessionId - ID da hub_session ativa
+ * @param {string} event - Tipo do evento
+ * @param {object} data - Payload já sanitizado/truncado
+ * @returns {void}
+ */
+function emitSocket(ns, hubSessionId, event, data) {
+    if (!ns) return;
+    if (hubSessionId) {
+        // ── Socket.io (BUG-HIGH-02 fix): emitir apenas para a sala da hub_session ativa ──
+        // Evita vazamento de dados entre sessões diferentes conectadas ao mesmo namespace
+        ns.to(hubSessionId).emit(event, { ...data, hubSessionId });
+    } else {
+        // Sem sessão ativa: emitir globalmente apenas eventos de sistema inócuos
+        const SYSTEM_EVENTS = new Set(['ready', 'stalled', 'stopped', 'fatal', 'busy']);
+        if (SYSTEM_EVENTS.has(event)) {
+            ns.emit(event, { ...data, hubSessionId: null });
         }
     }
 }

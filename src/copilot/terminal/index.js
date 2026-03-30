@@ -30,51 +30,11 @@ import { createInjectServer } from './server.js';
 import { getHubSessionId, setHubSessionId } from './state.js';
 
 /**
- * Inicia o Terminal Permanente LLM-B.
+ * Registra todos os event listeners do AlwaysAliveAgent no terminal server.
  *
- * @returns {Promise<void>}
+ * @returns {void}
  */
-export async function startTerminalServer() {
-    log('INFO', '[TerminalServer] Iniciando terminal permanente LLM-B…');
-
-    loadAliases();
-
-    // ARCH-02 (fix): injetar hub explicitamente nas hub-tools para evitar import dinâmico oculto
-    setHub(conversationHub);
-    // ARCH-03 (fix): injetar broadcastSse nas hook-tools para remover import dinâmico circular
-    configureHookTools({ broadcastSse });
-
-    // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
-    // Isso habilita o comando /skills reload e o sistema de pinned context files
-    const _root = resolve(import.meta.dirname, '../../..');
-    const pinnedLoader = new PinnedFilesLoader([
-        resolve(_root, '.github', 'skills'),
-        resolve(_root, '.github', 'instructions'),
-    ]);
-    await pinnedLoader.start().catch((/** @type {any} */ e) => {
-        log('WARN', `[TerminalServer] PinnedFilesLoader não pôde iniciar: ${e.message}`);
-    });
-    pinnedLoader.on('changed', () => {
-        log('INFO', '[TerminalServer] PinnedFilesLoader: arquivos de contexto atualizados.');
-    });
-
-    const injectServer = createInjectServer();
-
-    // Criar hub_session permanente (best-effort)
-    try {
-        conversationHub.store.init();
-        const hubSessionId = conversationHub.store.createHubSession({
-            title: 'Terminal Permanente LLM-B',
-            metadata: { source: 'terminal-server', startedAt: new Date().toISOString() },
-        });
-        setHubSessionId(hubSessionId);
-        log('INFO', `[TerminalServer] Hub session criada: ${hubSessionId}`);
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[TerminalServer] Hub storage indisponível, continua sem persistência: ${e.message}`);
-    }
-
-    // Watchdog: dialog loop travado → reinicia via stopDialogMode (emite dialog.stopped com reason: watchdog_restart)
-    // O handler de 'dialog.stopped' abaixo é responsável por chamar ensureDialogLoop() — evitando duplicação.
+function registerAgentEventListeners() {
     alwaysAliveAgent.on('dialog.stalled', async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         println(`\n[watchdog] ⚠️  Dialog loop inativo há ${secs}s — reiniciando automaticamente…`);
@@ -121,21 +81,16 @@ export async function startTerminalServer() {
     });
 
     // DL-PERM: dialog loop permanente — reinicia automaticamente se o modelo encerrar o loop.
-    // A LLM-B NUNCA deve encerrar o dialog loop sem autorização explícita do usuário.
-    // Quando 'dialog.stopped' é emitido por iniciativa do modelo, reiniciamos automaticamente.
     alwaysAliveAgent.on('dialog.stopped', (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
         const reason = evt.reason ?? 'desconhecido';
 
         if (reason === 'authorized_stop') {
-            // Encerramento permanente autorizado pelo usuário — não reiniciar
             println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
             log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
             broadcastSse('stopped', { authorized: true, reason });
             return;
         }
 
-        // Para todos os outros casos (watchdog_restart, model_stopped, falha de sendMessage, etc.)
-        // — reiniciar automaticamente. Isso garante que o loop nunca morre de forma permanente.
         const isWatchdog = reason === 'watchdog_restart';
         const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
         println(`\n\x1b[33m  [dialog] Loop encerrado (${label}) — reiniciando automaticamente…\x1b[0m`);
@@ -146,7 +101,7 @@ export async function startTerminalServer() {
         );
     });
 
-    // AA.4: SSE 'context' event — emitir dados reais de uso de contexto após cada turno
+    // AA.4: SSE 'context' event
     alwaysAliveAgent.on('session.usage', (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
         const { currentTokens = 0, tokenLimit = 0 } = data;
         if (tokenLimit > 0) {
@@ -159,7 +114,7 @@ export async function startTerminalServer() {
         }
     });
 
-    // AB.4: SSE 'cache.hit' — emitir quando compactação usar tokens cached
+    // AB.4: SSE 'cache.hit'
     alwaysAliveAgent.on(
         'session.compaction_complete',
         (/** @type {{ compactionTokensUsed?: { cachedInput?: number }; success?: boolean }} */ evt) => {
@@ -198,30 +153,84 @@ export async function startTerminalServer() {
             /* best-effort */
         }
     });
+}
 
-    // P7: Reflection loop periódico
+/**
+ * Ativa o reflection loop periódico se `LLM_B_REFLECTION_INTERVAL_MIN` > 0.
+ *
+ * @returns {void}
+ */
+function startReflectionLoop() {
     const reflectionIntervalMin = Number(process.env.LLM_B_REFLECTION_INTERVAL_MIN ?? '0');
-    if (reflectionIntervalMin > 0) {
-        const reflectionIntervalMs = reflectionIntervalMin * 60 * 1000;
-        log('INFO', `[TerminalServer] Reflection loop ativado: a cada ${reflectionIntervalMin}min.`);
+    if (reflectionIntervalMin <= 0) return;
 
-        const runReflection = () => {
-            if (!alwaysAliveAgent.dialogLoopActive) return;
-            // ARCH-07 (fix): skip reflection se fila já tem tarefas para evitar acúmulo
-            if (alwaysAliveAgent.queueSize > 0) {
-                log('INFO', '[TerminalServer] Reflection loop pulado — fila ocupada.');
-                return;
-            }
-            log('INFO', '[TerminalServer] Executando reflection loop…');
-            sendTurn(
-                '[REFLEXÃO] Faça uma breve reflexão sobre as últimas mensagens desta conversa: o que foi discutido, o que está pendente, e se você tem alguma sugestão ou insight que ainda não mencionou. Seja conciso.',
-                'llm-a',
-            ).catch((/** @type {any} */ e) => log('WARN', `[TerminalServer] Reflection loop falhou: ${e.message}`));
-        };
+    const reflectionIntervalMs = reflectionIntervalMin * 60 * 1000;
+    log('INFO', `[TerminalServer] Reflection loop ativado: a cada ${reflectionIntervalMin}min.`);
 
-        const reflectionTimer = setInterval(runReflection, reflectionIntervalMs);
-        if (typeof reflectionTimer.unref === 'function') reflectionTimer.unref();
+    const runReflection = () => {
+        if (!alwaysAliveAgent.dialogLoopActive) return;
+        // ARCH-07 (fix): skip reflection se fila já tem tarefas para evitar acúmulo
+        if (alwaysAliveAgent.queueSize > 0) {
+            log('INFO', '[TerminalServer] Reflection loop pulado — fila ocupada.');
+            return;
+        }
+        log('INFO', '[TerminalServer] Executando reflection loop…');
+        sendTurn(
+            '[REFLEXÃO] Faça uma breve reflexão sobre as últimas mensagens desta conversa: o que foi discutido, o que está pendente, e se você tem alguma sugestão ou insight que ainda não mencionou. Seja conciso.',
+            'llm-a',
+        ).catch((/** @type {any} */ e) => log('WARN', `[TerminalServer] Reflection loop falhou: ${e.message}`));
+    };
+
+    const reflectionTimer = setInterval(runReflection, reflectionIntervalMs);
+    if (typeof reflectionTimer.unref === 'function') reflectionTimer.unref();
+}
+
+/**
+ * Inicia o Terminal Permanente LLM-B.
+ *
+ * @returns {Promise<void>}
+ */
+export async function startTerminalServer() {
+    log('INFO', '[TerminalServer] Iniciando terminal permanente LLM-B…');
+
+    loadAliases();
+
+    // ARCH-02 (fix): injetar hub explicitamente nas hub-tools para evitar import dinâmico oculto
+    setHub(conversationHub);
+    // ARCH-03 (fix): injetar broadcastSse nas hook-tools para remover import dinâmico circular
+    configureHookTools({ broadcastSse });
+
+    // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
+    // Isso habilita o comando /skills reload e o sistema de pinned context files
+    const _root = resolve(import.meta.dirname, '../../..');
+    const pinnedLoader = new PinnedFilesLoader([
+        resolve(_root, '.github', 'skills'),
+        resolve(_root, '.github', 'instructions'),
+    ]);
+    await pinnedLoader.start().catch((/** @type {any} */ e) => {
+        log('WARN', `[TerminalServer] PinnedFilesLoader não pôde iniciar: ${e.message}`);
+    });
+    pinnedLoader.on('changed', () => {
+        log('INFO', '[TerminalServer] PinnedFilesLoader: arquivos de contexto atualizados.');
+    });
+
+    const injectServer = createInjectServer();
+
+    // Criar hub_session permanente (best-effort)
+    try {
+        conversationHub.store.init();
+        const hubSessionId = conversationHub.store.createHubSession({
+            title: 'Terminal Permanente LLM-B',
+            metadata: { source: 'terminal-server', startedAt: new Date().toISOString() },
+        });
+        setHubSessionId(hubSessionId);
+        log('INFO', `[TerminalServer] Hub session criada: ${hubSessionId}`);
+    } catch (/** @type {any} */ e) {
+        log('WARN', `[TerminalServer] Hub storage indisponível, continua sem persistência: ${e.message}`);
     }
+
+    registerAgentEventListeners();
+    startReflectionLoop();
 
     await startRepl(injectServer);
 }

@@ -231,3 +231,13 @@ export function emitNerv(actionCode, payload) {
  * @type {{ mount: typeof mount; unmount: typeof unmount; isMounted: typeof isMounted; emitNerv: typeof emitNerv }}
  */
 export const copilotNervBridge = { mount, unmount, isMounted, emitNerv };
+
+/**
+ * Reseta estado interno mutable do bridge para isolamento de testes. **Não usar em produção.**
+ *
+ * @internal
+ */
+export function _resetNervBridgeState() {
+    _nerv = null;
+    _listeners.clear();
+}

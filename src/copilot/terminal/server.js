@@ -73,10 +73,42 @@ const INJECT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
 
 // SEC-V06: rate limiter em memória — contadores são zerados a cada restart do processo.
 // Em produção, use redis ou implemente na camada de reverse proxy (nginx/Caddy) para persistência.
-/** @type {Map<string, { count: number; resetAt: number }>} */
-const _injectRateLimiter = new Map();
+
+/**
+ * Cria um rate limiter em memória por chave (IP, IP+endpoint, etc.).
+ *
+ * @param {number} max - Máximo de requisições permitidas por janela
+ * @param {number} windowMs - Duração da janela em ms
+ * @returns {{ check: (key: string) => { allowed: boolean; remaining: number; resetIn: number } }}
+ */
+function createRateLimiter(max, windowMs) {
+    /** @type {Map<string, { count: number; resetAt: number }>} */
+    const store = new Map();
+    return {
+        check(key) {
+            const now = Date.now();
+            // BUG-N03 (fix): purgar entradas expiradas para evitar memory leak em uptime longo
+            for (const [k, bucket] of store) {
+                if (now >= bucket.resetAt) store.delete(k);
+            }
+            let bucket = store.get(key);
+            if (!bucket || now >= bucket.resetAt) {
+                bucket = { count: 0, resetAt: now + windowMs };
+                store.set(key, bucket);
+            }
+            bucket.count++;
+            return {
+                allowed: bucket.count <= max,
+                remaining: Math.max(0, max - bucket.count),
+                resetIn: Math.ceil((bucket.resetAt - now) / 1000),
+            };
+        },
+    };
+}
+
 const INJECT_RATE_MAX = Number(process.env.LLM_B_INJECT_RATE_MAX ?? 10);
 const INJECT_RATE_WINDOW_MS = Number(process.env.LLM_B_INJECT_RATE_WINDOW_MS ?? 60_000);
+const _injectRateLimiter = createRateLimiter(INJECT_RATE_MAX, INJECT_RATE_WINDOW_MS);
 
 /**
  * Verifica se o IP excedeu o limite de requisições para /inject.
@@ -85,51 +117,22 @@ const INJECT_RATE_WINDOW_MS = Number(process.env.LLM_B_INJECT_RATE_WINDOW_MS ?? 
  * @returns {{ allowed: boolean; remaining: number; resetIn: number }}
  */
 function checkInjectRate(ip) {
-    const now = Date.now();
-    // BUG-N03 (fix): purgar entradas expiradas para evitar memory leak em uptime longo
-    for (const [key, bucket] of _injectRateLimiter) {
-        if (now >= bucket.resetAt) _injectRateLimiter.delete(key);
-    }
-    let bucket = _injectRateLimiter.get(ip);
-    if (!bucket || now >= bucket.resetAt) {
-        bucket = { count: 0, resetAt: now + INJECT_RATE_WINDOW_MS };
-        _injectRateLimiter.set(ip, bucket);
-    }
-    bucket.count++;
-    return {
-        allowed: bucket.count <= INJECT_RATE_MAX,
-        remaining: Math.max(0, INJECT_RATE_MAX - bucket.count),
-        resetIn: Math.ceil((bucket.resetAt - now) / 1000),
-    };
+    return _injectRateLimiter.check(ip);
 }
 
 // SEC-N02 (fix): rate-limit por endpoint para /pipeline, /memory (write), /attach
-/** @type {Map<string, { count: number; resetAt: number }>} */
-const _writeRateLimiter = new Map();
 const WRITE_RATE_MAX = 5; // mais restritivo que /inject
 const WRITE_RATE_WINDOW_MS = 60_000;
+const _writeRateLimiter = createRateLimiter(WRITE_RATE_MAX, WRITE_RATE_WINDOW_MS);
 
 /**
  * Verifica rate-limit para endpoints de escrita (/pipeline, /memory, /attach, /context-send).
  *
  * @param {string} ipEndpoint - Combinação de IP + endpoint key para isolamento por rota
- * @returns {{ allowed: boolean; resetIn: number }}
+ * @returns {{ allowed: boolean; remaining: number; resetIn: number }}
  */
 function checkWriteRate(ipEndpoint) {
-    const now = Date.now();
-    for (const [key, bucket] of _writeRateLimiter) {
-        if (now >= bucket.resetAt) _writeRateLimiter.delete(key);
-    }
-    let bucket = _writeRateLimiter.get(ipEndpoint);
-    if (!bucket || now >= bucket.resetAt) {
-        bucket = { count: 0, resetAt: now + WRITE_RATE_WINDOW_MS };
-        _writeRateLimiter.set(ipEndpoint, bucket);
-    }
-    bucket.count++;
-    return {
-        allowed: bucket.count <= WRITE_RATE_MAX,
-        resetIn: Math.ceil((bucket.resetAt - now) / 1000),
-    };
+    return _writeRateLimiter.check(ipEndpoint);
 }
 
 // ─── Helpers de transporte ────────────────────────────────────────────────────

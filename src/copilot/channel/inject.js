@@ -268,32 +268,21 @@ export async function waitForLlmBReady(opts = {}) {
  */
 
 /**
- * Subscreve ao canal SSE de eventos da LLM-B (canal P3: LLM-A observa LLM-B em tempo real).
+ * Helper interno: conecta ao endpoint SSE do terminal-server e entrega eventos ao callback.
  *
- * Conecta ao endpoint `GET /events` do terminal-server. Chame `unsubscribe()` no objeto retornado para desconectar.
- *
- * @example
- *     ```js
- *     const sub = subscribeLlmB((evt) => {
- *         if (evt.type === 'reply') console.log('LLM-B respondeu:', evt.data.content);
- *     });
- *     // ... depois:
- *     sub.unsubscribe();
- *     ```;
- *
- * @param {SseHandler} onEvent - Callback chamado a cada evento recebido
- * @param {{ port?: number }} [opts]
- * @returns {{ unsubscribe: () => void }} Controle de desconexão
+ * @param {string} path - Path do endpoint, ex: '/events' ou '/events?level=critical'
+ * @param {number} port
+ * @param {SseHandler} onEvent
+ * @returns {{ unsubscribe: () => void }}
  */
-export function subscribeLlmB(onEvent, opts = {}) {
-    const port = opts.port ?? DEFAULT_PORT;
+function _subscribeSse(path, port, onEvent) {
     let destroyed = false;
 
     const req = http.request(
         {
             hostname: '127.0.0.1',
             port,
-            path: '/events',
+            path,
             method: 'GET',
             headers: { Accept: 'text/event-stream' },
         },
@@ -341,6 +330,28 @@ export function subscribeLlmB(onEvent, opts = {}) {
 }
 
 /**
+ * Subscreve ao canal SSE de eventos da LLM-B (canal P3: LLM-A observa LLM-B em tempo real).
+ *
+ * Conecta ao endpoint `GET /events` do terminal-server. Chame `unsubscribe()` no objeto retornado para desconectar.
+ *
+ * @example
+ *     ```js
+ *     const sub = subscribeLlmB((evt) => {
+ *         if (evt.type === 'reply') console.log('LLM-B respondeu:', evt.data.content);
+ *     });
+ *     // ... depois:
+ *     sub.unsubscribe();
+ *     ```;
+ *
+ * @param {SseHandler} onEvent - Callback chamado a cada evento recebido
+ * @param {{ port?: number }} [opts]
+ * @returns {{ unsubscribe: () => void }} Controle de desconexão
+ */
+export function subscribeLlmB(onEvent, opts = {}) {
+    return _subscribeSse('/events', opts.port ?? DEFAULT_PORT, onEvent);
+}
+
+/**
  * Subscreve apenas ao canal de eventos críticos da LLM-B (stalled, fatal, system).
  *
  * Usa o parâmetro `?level=critical` do endpoint SSE (P8). Ideal para alertas proativos sem overhead de receber todas as
@@ -351,58 +362,7 @@ export function subscribeLlmB(onEvent, opts = {}) {
  * @returns {{ unsubscribe: () => void }}
  */
 export function subscribeLlmBCritical(onEvent, opts = {}) {
-    const port = opts.port ?? DEFAULT_PORT;
-    let destroyed = false;
-
-    const req = http.request(
-        {
-            hostname: '127.0.0.1',
-            port,
-            path: '/events?level=critical',
-            method: 'GET',
-            headers: { Accept: 'text/event-stream' },
-        },
-        (res) => {
-            let buf = '';
-            res.on('data', (/** @type {Buffer} */ chunk) => {
-                buf += chunk.toString();
-                const lines = buf.split('\n');
-                buf = lines.pop() ?? '';
-
-                let currentEvent = '';
-                for (const line of lines) {
-                    if (line.startsWith('event:')) {
-                        currentEvent = line.slice(6).trim();
-                    } else if (line.startsWith('data:')) {
-                        try {
-                            const data = JSON.parse(line.slice(5).trim());
-                            onEvent({ type: currentEvent || 'message', data });
-                        } catch {
-                            /* ignora JSON inválido */
-                        }
-                        currentEvent = '';
-                    }
-                }
-            });
-            res.on('error', () => {
-                /* silencia erros de rede */
-            });
-        },
-    );
-
-    req.on('error', () => {
-        /* silencia falha — terminal pode não estar ativo */
-    });
-    req.end();
-
-    return {
-        unsubscribe() {
-            if (!destroyed) {
-                destroyed = true;
-                req.destroy();
-            }
-        },
-    };
+    return _subscribeSse('/events?level=critical', opts.port ?? DEFAULT_PORT, onEvent);
 }
 
 /**

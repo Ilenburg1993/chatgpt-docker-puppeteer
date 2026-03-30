@@ -10,8 +10,8 @@
 
 import { log } from '#core/logger';
 import { EventEmitter } from 'node:events';
-import { existsSync, readFileSync, watch } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
+import { existsSync, watch } from 'node:fs';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const DEBOUNCE_MS = 500;
@@ -141,7 +141,7 @@ export class PinnedFilesLoader extends EventEmitter {
             try {
                 const info = await stat(filePath);
                 if (!info.isFile()) continue;
-                this.#loadFile(filePath);
+                await this.#loadFile(filePath);
             } catch {
                 // arquivo pode ter sido removido entre readdir e stat
             }
@@ -149,15 +149,15 @@ export class PinnedFilesLoader extends EventEmitter {
     }
 
     /**
+     * RF-045: versão async para uso na inicialização (chamada via await em #loadDir).
+     *
      * @param {string} filePath
-     * @returns {void}
+     * @returns {Promise<void>}
      */
-    #loadFile(filePath) {
+    async #loadFile(filePath) {
         try {
-            const content = readFileSync(filePath, 'utf8');
-            const existed = this.#files.has(filePath);
+            const content = await readFile(filePath, 'utf8');
             this.#files.set(filePath, { path: filePath, content, loadedAt: Date.now() });
-            void existed;
         } catch {
             // arquivo inacessível — ignorar silenciosamente
         }
@@ -194,6 +194,8 @@ export class PinnedFilesLoader extends EventEmitter {
     /**
      * Recarrega um arquivo com debounce para evitar múltiplos eventos rápidos.
      *
+     * RF-045: usa `readFile` async dentro do setTimeout para não bloquear o event loop.
+     *
      * @param {string} filePath
      * @returns {void}
      */
@@ -201,7 +203,7 @@ export class PinnedFilesLoader extends EventEmitter {
         const existing = this.#debounceTimers.get(filePath);
         if (existing) clearTimeout(existing);
 
-        const timer = setTimeout(() => {
+        const timer = setTimeout(async () => {
             this.#debounceTimers.delete(filePath);
 
             if (!existsSync(filePath)) {
@@ -216,7 +218,7 @@ export class PinnedFilesLoader extends EventEmitter {
             }
 
             try {
-                const content = readFileSync(filePath, 'utf8');
+                const content = await readFile(filePath, 'utf8');
                 const existed = this.#files.has(filePath);
                 this.#files.set(filePath, { path: filePath, content, loadedAt: Date.now() });
                 const type = existed ? 'changed' : 'added';

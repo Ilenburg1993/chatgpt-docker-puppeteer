@@ -10,25 +10,28 @@
 
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { z } from 'zod';
 import { withSkipPermission } from '../tool-factory.js';
+
+const execAsync = promisify(exec);
 
 const ROOT = new URL('../../../..', import.meta.url).pathname;
 
 /**
  * @param {string} cmd
  * @param {number} [timeoutMs]
- * @returns {{ stdout: string; exitCode: number; error?: string }}
+ * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
  */
-function safeGit(cmd, timeoutMs = 15000) {
+async function safeGit(cmd, timeoutMs = 15000) {
     try {
-        const stdout = execSync(cmd, { cwd: ROOT, encoding: 'utf8', timeout: timeoutMs });
+        const { stdout } = await execAsync(cmd, { cwd: ROOT, encoding: 'utf8', timeout: timeoutMs });
         return { stdout: stdout.slice(0, 4000), exitCode: 0 };
     } catch (/** @type {any} */ e) {
         return {
             stdout: (e.stdout ?? '').slice(0, 2000),
-            exitCode: e.status ?? 1,
+            exitCode: e.code ?? 1,
             error: (e.stderr ?? e.message ?? '').slice(0, 1000),
         };
     }
@@ -41,7 +44,7 @@ const gitStatusTool = defineTool('git_status', {
     description: 'Mostra o status atual do repositório Git (arquivos modificados, staged, etc).',
     parameters: z.object({}),
     handler: async () => {
-        const r = safeGit('git status --short && echo "---" && git log --oneline -5');
+        const r = await safeGit('git status --short && echo "---" && git log --oneline -5');
         return { output: r.stdout, error: r.error };
     },
 });
@@ -66,7 +69,7 @@ const gitDiffTool = defineTool('git_diff', {
     handler: async (/** @type {{ staged?: boolean; path?: string }} */ { staged, path: filePath }) => {
         const flag = staged ? '--staged' : '';
         const target = filePath ?? '';
-        const r = safeGit(`git diff ${flag} ${target} | head -200`);
+        const r = await safeGit(`git diff ${flag} ${target} | head -200`);
         return { output: r.stdout, error: r.error };
     },
 });
@@ -91,13 +94,13 @@ const gitCommitTool = defineTool('git_commit', {
     ),
     handler: async (/** @type {{ message: string; paths?: string[]; all?: boolean }} */ { message, paths, all }) => {
         if (all) {
-            safeGit('git add -A');
+            await safeGit('git add -A');
         } else if (paths && paths.length > 0) {
             const escaped = paths.map((p) => `"${p.replace(/"/g, '\\"')}"`).join(' ');
-            safeGit(`git add ${escaped}`);
+            await safeGit(`git add ${escaped}`);
         }
         // GAP-Q09 fix: verificar se há algo staged antes de commitar
-        const staged = safeGit('git diff --cached --name-only');
+        const staged = await safeGit('git diff --cached --name-only');
         if (staged.exitCode !== 0 || !staged.stdout.trim()) {
             return {
                 success: false,
@@ -106,7 +109,7 @@ const gitCommitTool = defineTool('git_commit', {
             };
         }
         log('INFO', `[copilot/git_commit] Commitando: ${message}`);
-        const r = safeGit(`git commit -m "${message.replace(/"/g, '\\"')}"`);
+        const r = await safeGit(`git commit -m "${message.replace(/"/g, '\\"')}"`);
         return {
             success: r.exitCode === 0,
             output: r.stdout,
@@ -122,7 +125,7 @@ const gitChangedFilesTool = defineTool('git_changed_files', {
     description: 'Lista arquivos modificados em relação ao último commit.',
     parameters: z.object({}),
     handler: async () => {
-        const r = safeGit('git diff --name-status HEAD');
+        const r = await safeGit('git diff --name-status HEAD');
         return { output: r.stdout, error: r.error };
     },
 });
@@ -146,7 +149,7 @@ const gitPushTool = defineTool('git_push', {
     ),
     handler: async (/** @type {{ remote?: string; setUpstream?: boolean }} */ { remote, setUpstream }) => {
         const upstream = setUpstream ? '--set-upstream' : '';
-        const r = safeGit(`git push ${upstream} "${(remote ?? 'origin').replace(/"/g, '')}"`, 30000);
+        const r = await safeGit(`git push ${upstream} "${(remote ?? 'origin').replace(/"/g, '')}"`, 30000);
         log('INFO', `[copilot/git_push] remote=${remote ?? 'origin'} exitCode=${r.exitCode}`);
         return { success: r.exitCode === 0, output: r.stdout, error: r.error };
     },
@@ -174,7 +177,7 @@ const gitCreateBranchTool = defineTool('git_create_branch', {
         const basePart = base && /^[a-zA-Z0-9/_.-]+$/.test(base) ? ` "${base}"` : '';
         const cmd = (checkout ?? true) ? `git checkout -b "${name}"${basePart}` : `git branch "${name}"${basePart}`;
         log('INFO', `[copilot/git_create_branch] ${cmd}`);
-        const r = safeGit(cmd);
+        const r = await safeGit(cmd);
         return { success: r.exitCode === 0, output: r.stdout, error: r.error };
     },
 });
@@ -194,7 +197,7 @@ const gitLogTool = defineTool('git_log', {
     ),
     handler: async (/** @type {{ n?: number; oneline?: boolean }} */ { n, oneline }) => {
         const format = (oneline ?? true) ? '--oneline' : '--pretty=format:"%h %an %ar %s"';
-        const r = safeGit(`git log ${format} -${n ?? 10}`);
+        const r = await safeGit(`git log ${format} -${n ?? 10}`);
         return { output: r.stdout, error: r.error };
     },
 });

@@ -29,7 +29,7 @@ import { conversationStore } from '../conversation-hub/store.js';
 import { getHubSessionId } from '../terminal/state.js';
 import { DialogWatchdog } from './dialog-watchdog.js';
 import { AGENT_EVENTS } from './events.js';
-import { initOrResumeSession, readState, writeState } from './session-manager.js';
+import { initOrResumeSession, readState, writeState, writeStateAsync } from './session-manager.js';
 import { executeTask } from './task-executor.js';
 import { bootstrapTools, setSessionRpc } from './tools-bootstrap.js';
 import { WebhookManager } from './webhook-manager.js';
@@ -386,41 +386,13 @@ export class AlwaysAliveAgent extends EventEmitter {
             const client = new CopilotClient();
             this.#client = client;
 
-            const mcpTools = await buildMcpTools();
-            if (mcpTools.length > 0) {
-                log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
-            }
-
-            // Inicializa telemetria e registry para esta sessão
+            // Inicializa telemetria para esta sessão (registry e MCP tools são criados dentro de #initSession)
             this.#telemetry = createTelemetry();
-            this.#toolsRegistry = createRegistry();
-
-            // Registra tools por categoria e expõe para introspecção
-            const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
-            log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
 
             // AI.3: span OTEL para metrificar duração do boot de sessão
             const { session, isResumed } = await startSpan('session.boot', { model: this.#model }, () =>
-                initOrResumeSession(client, {
-                    model: this.#model,
-                    onPermissionRequest: this.#permissionHandler,
-                    onUserInputRequest: this.#handleUserInputRequest.bind(this),
-                    hooks: {
-                        onSessionStart: this.#onSessionStart.bind(this),
-                        onSessionEnd: this.#onSessionEnd.bind(this),
-                        onErrorOccurred: this.#onErrorOccurred.bind(this),
-                    },
-                    tools,
-                    mcpServers: buildMcpConfig(),
-                    reasoningEffort: this.#reasoningEffort,
-                    injectHookContext: true,
-                }),
+                this.#initSession(client),
             );
-
-            this.#session = session;
-            this.#isResumed = isResumed;
-            // L4: injetar RPC da sessão nas session-rpc-tools para exposição via tools
-            setSessionRpc(session.rpc);
 
             // Wiring de eventos de compaction para observabilidade via SSE/NERV
             session.on('session.compaction_start', (/** @type {any} */ evt) => {
@@ -744,7 +716,9 @@ export class AlwaysAliveAgent extends EventEmitter {
         log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
         this.#pendingQuestion.resolve(answer);
         this.#pendingQuestion = null;
-        writeState({ pendingQuestion: null });
+        writeStateAsync({ pendingQuestion: null }).catch((/** @type {any} */ e) =>
+            log('WARN', `[AlwaysAlive] writeState pendingQuestion=null: ${e.message}`),
+        );
         this.emit('question.answered', { answer });
         // ARCH-N01 (fix): também resolver Promise da tool request_user_input se houver uma pendente
         import('../tools/hook-tools.js')
@@ -1040,33 +1014,9 @@ qualquer tentativa de encerramento não autorizado.`;
                                 'INFO',
                                 `[AlwaysAlive] DL-PERM-05: dialog.stopped (${stopEvt?.reason ?? 'unknown'}) durante turno — aguardando restart para reenviar.`,
                             );
-                            const retryTimeout = setTimeout(() => {
-                                this.off('dialog.ready', onRetryReady);
-                                reject(
-                                    new SessionError(
-                                        `[AlwaysAlive] sendDialogTurn: timeout aguardando restart após dialog.stopped (${stopEvt?.reason})`,
-                                        'DIALOG_RESTART_TIMEOUT',
-                                    ),
-                                );
-                            }, timeout);
-                            const onRetryReady = () => {
-                                clearTimeout(retryTimeout);
-                                // Loop reiniciado — reenviar a mensagem uma vez
-                                if (this.#pendingQuestion) {
-                                    this.answerPendingQuestion(message);
-                                    this.once('dialog.reply', (/** @type {{ reply: string }} */ retryEvt) => {
-                                        resolve(retryEvt.reply);
-                                    });
-                                } else {
-                                    this.once('question.pending', () => {
-                                        this.answerPendingQuestion(message);
-                                        this.once('dialog.reply', (/** @type {{ reply: string }} */ retryEvt) => {
-                                            resolve(retryEvt.reply);
-                                        });
-                                    });
-                                }
-                            };
-                            this.once('dialog.ready', onRetryReady);
+                            this.#waitForDialogRestartAndReply(message, timeout, stopEvt?.reason)
+                                .then(resolve)
+                                .catch(reject);
                         }
                     };
 
@@ -1123,35 +1073,9 @@ qualquer tentativa de encerramento não autorizado.`;
                                     );
                                 } else {
                                     // DL-PERM-05: restart — aguardar dialog.ready e reenviar
-                                    const retryTimeout2 = setTimeout(() => {
-                                        this.off('dialog.ready', onRetryReady2);
-                                        reject(
-                                            new SessionError(
-                                                `[AlwaysAlive] sendDialogTurn: timeout aguardando restart (${stopEvt2?.reason})`,
-                                                'DIALOG_RESTART_TIMEOUT',
-                                            ),
-                                        );
-                                    }, timeout);
-                                    const onRetryReady2 = () => {
-                                        clearTimeout(retryTimeout2);
-                                        if (this.#pendingQuestion) {
-                                            this.answerPendingQuestion(message);
-                                            this.once('dialog.reply', (/** @type {{ reply: string }} */ retryEvt2) => {
-                                                resolve(retryEvt2.reply);
-                                            });
-                                        } else {
-                                            this.once('question.pending', () => {
-                                                this.answerPendingQuestion(message);
-                                                this.once(
-                                                    'dialog.reply',
-                                                    (/** @type {{ reply: string }} */ retryEvt3) => {
-                                                        resolve(retryEvt3.reply);
-                                                    },
-                                                );
-                                            });
-                                        }
-                                    };
-                                    this.once('dialog.ready', onRetryReady2);
+                                    this.#waitForDialogRestartAndReply(message, timeout, stopEvt2?.reason)
+                                        .then(resolve)
+                                        .catch(reject);
                                 }
                             };
                             this.once('dialog.reply', onReply);
@@ -1203,6 +1127,45 @@ qualquer tentativa de encerramento não autorizado.`;
     }
 
     // ─────────────── Privados ───────────────
+
+    /**
+     * DL-PERM-05 — Aguarda `dialog.ready` (após um restart automático não-autorizado) e reenvia `message` uma vez.
+     *
+     * Encapsula o padrão repetido em `#executeDialogTurn`: timeout de restart + onRetryReady + send + reply.
+     *
+     * @param {string} message - Mensagem original a reenviar após o restart
+     * @param {number} timeout - Timeout em ms para aguardar `dialog.ready`
+     * @param {string} [stopReason] - `reason` do evento `dialog.stopped` (para o log de erro de timeout)
+     * @returns {Promise<string>} reply recebida após o reenvio
+     */
+    #waitForDialogRestartAndReply(message, timeout, stopReason) {
+        return new Promise((resolve, reject) => {
+            const retryTimeout = setTimeout(() => {
+                this.off('dialog.ready', onRetryReady);
+                reject(
+                    new SessionError(
+                        `[AlwaysAlive] sendDialogTurn: timeout aguardando restart após dialog.stopped (${stopReason ?? 'unknown'})`,
+                        'DIALOG_RESTART_TIMEOUT',
+                    ),
+                );
+            }, timeout);
+            const onRetryReady = () => {
+                clearTimeout(retryTimeout);
+                const sendAndListen = () => {
+                    this.answerPendingQuestion(message);
+                    this.once('dialog.reply', (/** @type {{ reply: string }} */ retryEvt) => {
+                        resolve(retryEvt.reply);
+                    });
+                };
+                if (this.#pendingQuestion) {
+                    sendAndListen();
+                } else {
+                    this.once('question.pending', sendAndListen);
+                }
+            };
+            this.once('dialog.ready', onRetryReady);
+        });
+    }
 
     /**
      * AI.4 — Sincroniza o histórico SDK → ConversationStore (SQLite) após reconexão. Chamado de forma assíncrona
@@ -1285,6 +1248,46 @@ qualquer tentativa de encerramento não autorizado.`;
     }
 
     /**
+     * Inicializa (ou reinicializa) a sessão SDK: carrega MCP tools, reconstrói o registry, bootstrap das tools, chama
+     * `initOrResumeSession` e sincroniza o estado interno.
+     *
+     * Usado tanto no `start()` inicial quanto em cada tentativa de `#tryReconnect()`.
+     *
+     * @param {any} client - Cliente SDK já instanciado
+     * @returns {Promise<{ session: any; isResumed: boolean }>}
+     */
+    async #initSession(client) {
+        const mcpTools = await buildMcpTools();
+        if (mcpTools.length > 0) {
+            log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
+        }
+        // BUG-C03 (fix): resetar registry antes de bootstrapTools para evitar duplicação de tools
+        this.#toolsRegistry = createRegistry();
+        const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
+        log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
+
+        const { session, isResumed } = await initOrResumeSession(client, {
+            model: this.#model,
+            onPermissionRequest: this.#permissionHandler,
+            onUserInputRequest: this.#handleUserInputRequest.bind(this),
+            hooks: {
+                onSessionStart: this.#onSessionStart.bind(this),
+                onSessionEnd: this.#onSessionEnd.bind(this),
+                onErrorOccurred: this.#onErrorOccurred.bind(this),
+            },
+            tools,
+            mcpServers: buildMcpConfig(),
+            reasoningEffort: this.#reasoningEffort,
+            injectHookContext: true,
+        });
+
+        this.#session = session;
+        this.#isResumed = isResumed;
+        setSessionRpc(session.rpc);
+        return { session, isResumed };
+    }
+
+    /**
      * Tenta reconectar a sessão SDK com backoff exponencial e jitter.
      *
      * Chamado quando `session.sendAndWait` falha, para determinar se o erro é recuperável (rede/sessão) e reestabelecer
@@ -1311,28 +1314,7 @@ qualquer tentativa de encerramento não autorizado.`;
             await new Promise((r) => setTimeout(r, delay));
 
             try {
-                const mcpTools = await buildMcpTools();
-                // BUG-C03 (fix): resetar registry antes de bootstrapTools para evitar duplicação de tools
-                this.#toolsRegistry = createRegistry();
-                const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
-                const { session, isResumed } = await initOrResumeSession(this.#client, {
-                    model: this.#model,
-                    onPermissionRequest: this.#permissionHandler,
-                    onUserInputRequest: this.#handleUserInputRequest.bind(this),
-                    hooks: {
-                        onSessionStart: this.#onSessionStart.bind(this),
-                        onSessionEnd: this.#onSessionEnd.bind(this),
-                        onErrorOccurred: this.#onErrorOccurred.bind(this),
-                    },
-                    tools,
-                    mcpServers: buildMcpConfig(),
-                    reasoningEffort: this.#reasoningEffort,
-                    injectHookContext: true,
-                });
-                this.#session = session;
-                this.#isResumed = isResumed;
-                // L4: atualizar RPC nas session-rpc-tools após reconexão
-                setSessionRpc(session.rpc);
+                const { session, isResumed } = await this.#initSession(this.#client);
                 log(
                     'INFO',
                     `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,
@@ -1398,7 +1380,9 @@ qualquer tentativa de encerramento não autorizado.`;
         // ── Fim da interceptação ─────────────────────────────────────────────
 
         this.#setStatus('waiting_for_input');
-        writeState({ pendingQuestion: question });
+        writeStateAsync({ pendingQuestion: question }).catch((/** @type {any} */ e) =>
+            log('WARN', `[AlwaysAlive] writeState pendingQuestion: ${e.message}`),
+        );
 
         return new Promise((resolve) => {
             /** @type {PendingQuestion} */

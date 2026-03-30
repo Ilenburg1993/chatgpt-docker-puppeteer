@@ -52,6 +52,14 @@
  * ```
  *
  * @module copilot/tools/tool-factory
+ *
+ * ## Quando usar `buildTool` vs `defineTool`
+ *
+ * - **`buildTool`** (este módulo): para tools de produção. Adiciona logging automático de invocação,
+ *   validação Zod transparente via `zod-to-json-schema`, e padroniza `skipPermission`. Use em todos os
+ *   arquivos de tools em `src/copilot/tools/`.
+ * - **`defineTool`** (do `@github/copilot-sdk`): uso interno/SDK apenas. Evite chamar diretamente em
+ *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
 import { log } from '#core/logger';

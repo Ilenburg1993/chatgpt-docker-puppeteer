@@ -10,7 +10,7 @@
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { withSkipPermission } from './tool-factory.js';
@@ -27,8 +27,12 @@ const readBriefingTool = defineTool('read_briefing', {
     parameters: z.object({}),
     handler: async () => {
         const p = join(HOOKS_STATE, 'session-briefing.md');
-        if (!existsSync(p)) return { content: null, message: 'Briefing não encontrado.' };
-        return { content: readFileSync(p, 'utf8') };
+        try {
+            const content = await readFile(p, 'utf8');
+            return { content };
+        } catch {
+            return { content: null, message: 'Briefing não encontrado.' };
+        }
     },
 });
 
@@ -50,11 +54,16 @@ const writePendingTaskTool = defineTool('write_pending_task', {
         /** @type {{ title: string; description?: string; priority?: string }} */ { title, description, priority },
     ) => {
         try {
-            mkdirSync(HOOKS_STATE, { recursive: true });
+            await mkdir(HOOKS_STATE, { recursive: true });
             const p = join(HOOKS_STATE, 'pending-tasks.md');
-            const existing = existsSync(p) ? readFileSync(p, 'utf8') : '# Tarefas Pendentes\n\n';
+            let existing = '# Tarefas Pendentes\n\n';
+            try {
+                existing = await readFile(p, 'utf8');
+            } catch {
+                /* file may not exist yet */
+            }
             const entry = `\n## [${(priority ?? 'medium').toUpperCase()}] ${title}\n${description ? `\n${description}\n` : ''}_Adicionado pelo SDK Agent em ${new Date().toISOString()}_\n`;
-            writeFileSync(p, existing + entry, 'utf8');
+            await writeFile(p, existing + entry, 'utf8');
             log('INFO', `[copilot/write_pending_task] Tarefa adicionada: ${title}`);
             return { success: true, title };
         } catch (/** @type {any} */ e) {
@@ -95,7 +104,14 @@ const getWorkspaceInfoTool = defineTool('get_workspace_info', {
     },
 });
 
-/** @type {Map<string, unknown>} */
+/**
+ * Cache de contexto de sessão em memória.
+ *
+ * **Efêmero por design**: os dados são perdidos quando o processo é reiniciado. Use apenas para contexto temporário
+ * intra-sessão. Para persistência, utilize `conversation-hub/store.js` (SQLite).
+ *
+ * @type {Map<string, unknown>}
+ */
 const SESSION_CONTEXT_STORE = new Map();
 
 /**
@@ -137,12 +153,14 @@ const invokeSkillTool = defineTool('invoke_skill', {
     ),
     handler: async (/** @type {{ name?: string }} */ { name }) => {
         const skillsDir = resolve(join(process.cwd(), '.github', 'skills'));
-        if (!existsSync(skillsDir)) {
+        try {
+            await stat(skillsDir);
+        } catch {
             return { error: 'Diretório .github/skills/ não encontrado.' };
         }
 
-        const { readdirSync } = await import('node:fs');
-        const available = readdirSync(skillsDir, { withFileTypes: true })
+        const entries = await readdir(skillsDir, { withFileTypes: true });
+        const available = entries
             .filter((d) => d.isDirectory())
             .map((d) => d.name)
             .sort();
@@ -152,11 +170,13 @@ const invokeSkillTool = defineTool('invoke_skill', {
         }
 
         const skillPath = join(skillsDir, name, 'SKILL.md');
-        if (!existsSync(skillPath)) {
+        let content;
+        try {
+            content = await readFile(skillPath, 'utf-8');
+        } catch {
             return { error: `Skill '${name}' não encontrada.`, available };
         }
 
-        const content = readFileSync(skillPath, 'utf-8');
         log('INFO', `[copilot/invoke_skill] skill='${name}' carregada (${content.length} bytes)`);
         return { name, content };
     },

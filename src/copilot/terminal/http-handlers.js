@@ -48,6 +48,14 @@ import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalCli
  * @typedef {{ status: number; body: unknown; cors?: boolean }} HandlerResult
  */
 
+/**
+ * Valores válidos para o campo `from` nos endpoints /inject e /pipeline. SEC-N03: aceitar apenas remetentes conhecidos
+ * para evitar injeção de contexto.
+ *
+ * @type {ReadonlySet<string>}
+ */
+const ALLOWED_FROM = new Set(['llm-a', 'user', 'system', 'llm_a']);
+
 // ─── GET /health ──────────────────────────────────────────────────────────────
 
 /**
@@ -266,10 +274,8 @@ export async function handlePipeline(body) {
     }
 
     // SEC-N03 (fix): validar campo `from` global do pipeline
-    const ALLOWED_FROM_PIPELINE = new Set(['llm-a', 'user', 'system', 'llm_a']);
     const rawGlobalFrom = body.from ?? 'llm-a';
-    const globalFrom =
-        typeof rawGlobalFrom === 'string' && ALLOWED_FROM_PIPELINE.has(rawGlobalFrom) ? rawGlobalFrom : 'llm-a';
+    const globalFrom = typeof rawGlobalFrom === 'string' && ALLOWED_FROM.has(rawGlobalFrom) ? rawGlobalFrom : 'llm-a';
     /** @type {{ step: number; prompt: string; reply: string | null; durationMs: number }[]} */
     const results = [];
 
@@ -277,7 +283,7 @@ export async function handlePipeline(body) {
         const step = body.steps[i];
         if (!step?.prompt) continue;
         const rawStepFrom = step.from ?? globalFrom;
-        const from = ALLOWED_FROM_PIPELINE.has(rawStepFrom) ? rawStepFrom : globalFrom;
+        const from = ALLOWED_FROM.has(rawStepFrom) ? rawStepFrom : globalFrom;
 
         if (step.waitMs && step.waitMs > 0) {
             await new Promise((r) => setTimeout(r, step.waitMs));
@@ -344,7 +350,6 @@ export async function handleInject(body) {
     }
 
     // SEC-N03 (fix): validar campo `from` — aceitar apenas valores conhecidos
-    const ALLOWED_FROM = new Set(['llm-a', 'user', 'system', 'llm_a']);
     const rawFrom = body?.from ?? 'llm-a';
     const from = typeof rawFrom === 'string' && ALLOWED_FROM.has(rawFrom) ? rawFrom : 'llm-a';
 

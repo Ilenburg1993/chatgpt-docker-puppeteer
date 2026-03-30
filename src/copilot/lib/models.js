@@ -61,7 +61,14 @@ export async function listModels(clientOverrides = {}, forceRefresh = false) {
         return _modelsCache.models;
     }
     const client = await getClient(clientOverrides);
-    const models = await client.listModels();
+    let models;
+    try {
+        models = await client.listModels();
+    } catch (e) {
+        // RF-048: purge cache stale em caso de erro de rede, para forçar retry na próxima chamada
+        _modelsCache = null;
+        throw e;
+    }
     _modelsCache = { models, expiresAt: now + MODELS_CACHE_TTL_MS };
     return models;
 }

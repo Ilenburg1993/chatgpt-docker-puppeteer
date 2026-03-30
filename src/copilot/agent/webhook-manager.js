@@ -8,6 +8,8 @@
  */
 
 import { log } from '#core/logger';
+import http from 'node:http';
+import https from 'node:https';
 
 /**
  * @typedef {{ id: string; url: string }} WebhookEntry
@@ -80,8 +82,7 @@ export class WebhookManager {
         await Promise.allSettled(
             [...this.#urls.entries()].map(async ([id, url]) => {
                 try {
-                    const { default: https } = await import('node:https');
-                    const { default: http } = await import('node:http');
+                    // http e https importados no topo do módulo (RF-053)
                     const parsed = new URL(url);
                     const lib = parsed.protocol === 'https:' ? https : http;
                     await new Promise((resolve, reject) => {

@@ -104,6 +104,74 @@ function resolveToolDecision(toolName, allowTools, denyTools, denyPatterns) {
     return 'allow';
 }
 
+// ─── Handler builders ────────────────────────────────────────────────────────
+
+/**
+ * Constrói o handler `onPreToolUse` padrão com lógica de allow/deny/ask.
+ *
+ * @param {object} opts
+ * @param {string[]} opts.allowTools
+ * @param {string[]} opts.denyTools
+ * @param {RegExp[]} opts.denyPatterns
+ * @param {boolean} opts.auditLog
+ * @param {boolean} opts.debugTools
+ * @param {((toolName: string) => Promise<boolean>) | null} opts.askHandler
+ * @returns {PreToolUseHandler}
+ */
+function buildPreToolUseHandler({ allowTools, denyTools, denyPatterns, auditLog, debugTools, askHandler }) {
+    const preToolFn = async (/** @type {PreToolUseHookInput} */ input, /** @type {InvocationContext} */ invocation) => {
+        const toolName = input.toolName ?? 'unknown';
+        const decision = resolveToolDecision(toolName, allowTools, denyTools, denyPatterns);
+
+        if (auditLog || debugTools) {
+            log(
+                'DEBUG',
+                `[lib/hooks] onPreToolUse: tool='${toolName}' decision='${decision}' sessionId='${invocation?.sessionId}'`,
+            );
+        }
+
+        if (decision === 'deny') {
+            return {
+                permissionDecision: 'deny',
+                additionalContext: `Ferramenta '${toolName}' não é permitida pela política de hooks.`,
+            };
+        }
+
+        if (askHandler && allowTools.length > 0 && !allowTools.includes(toolName)) {
+            let approved = false;
+            try {
+                approved = await askHandler(toolName);
+            } catch (/** @type {any} */ e) {
+                log('WARN', `[lib/hooks] onPermissionAsk lançou erro para '${toolName}': ${e.message} — negando`);
+            }
+            if (!approved) {
+                return {
+                    permissionDecision: 'deny',
+                    additionalContext: `Ferramenta '${toolName}' negada pelo callback onPermissionAsk.`,
+                };
+            }
+        }
+
+        return { permissionDecision: decision };
+    };
+    return /** @type {PreToolUseHandler} */ (preToolFn);
+}
+
+/**
+ * Constrói o handler `onErrorOccurred` padrão com logging de WARN.
+ *
+ * @returns {ErrorOccurredHandler}
+ */
+function buildErrorOccurredHandler() {
+    const fn = async (/** @type {ErrorOccurredHookInput} */ input, /** @type {InvocationContext} */ invocation) => {
+        log(
+            'WARN',
+            `[lib/hooks] onErrorOccurred: error='${input.error}' context='${input.errorContext}' recoverable=${input.recoverable} sessionId='${invocation?.sessionId}'`,
+        );
+    };
+    return /** @type {ErrorOccurredHandler} */ (fn);
+}
+
 // ─── Factory principal ───────────────────────────────────────────────────────
 
 /**
@@ -135,48 +203,14 @@ export function createHooks(cfg = {}) {
     if (cfg.onPreToolUse) {
         hooks.onPreToolUse = cfg.onPreToolUse;
     } else {
-        const preToolFn = async (
-            /** @type {PreToolUseHookInput} */ input,
-            /** @type {InvocationContext} */ invocation,
-        ) => {
-            const toolName = input.toolName ?? 'unknown';
-            const decision = resolveToolDecision(toolName, allowTools, denyTools, denyPatterns);
-
-            if (auditLog || debugTools) {
-                // UPG-06: debugTools permite audit mínimo de tools mesmo sem auditLog completo
-                log(
-                    'DEBUG',
-                    `[lib/hooks] onPreToolUse: tool='${toolName}' decision='${decision}' sessionId='${invocation?.sessionId}'`,
-                );
-            }
-
-            // SDK-01 (fix): incluir additionalContext quando a tool é negada, conforme spec do SDK
-            if (decision === 'deny') {
-                return {
-                    permissionDecision: 'deny',
-                    additionalContext: `Ferramenta '${toolName}' não é permitida pela política de hooks.`,
-                };
-            }
-
-            // UPG-09: modo "ask" — se não está na allowList e há callback de aprovação, perguntar
-            if (askHandler && allowTools.length > 0 && !allowTools.includes(toolName)) {
-                let approved = false;
-                try {
-                    approved = await askHandler(toolName);
-                } catch (/** @type {any} */ e) {
-                    log('WARN', `[lib/hooks] onPermissionAsk lançou erro para '${toolName}': ${e.message} — negando`);
-                }
-                if (!approved) {
-                    return {
-                        permissionDecision: 'deny',
-                        additionalContext: `Ferramenta '${toolName}' negada pelo callback onPermissionAsk.`,
-                    };
-                }
-            }
-
-            return { permissionDecision: decision };
-        };
-        hooks.onPreToolUse = /** @type {PreToolUseHandler} */ (preToolFn);
+        hooks.onPreToolUse = buildPreToolUseHandler({
+            allowTools,
+            denyTools,
+            denyPatterns,
+            auditLog,
+            debugTools,
+            askHandler,
+        });
     }
 
     // ── onPostToolUse ────────────────────────────────────────────────────────
@@ -236,16 +270,7 @@ export function createHooks(cfg = {}) {
     if (cfg.onErrorOccurred) {
         hooks.onErrorOccurred = cfg.onErrorOccurred;
     } else {
-        const errorFn = async (
-            /** @type {ErrorOccurredHookInput} */ input,
-            /** @type {InvocationContext} */ invocation,
-        ) => {
-            log(
-                'WARN',
-                `[lib/hooks] onErrorOccurred: error='${input.error}' context='${input.errorContext}' recoverable=${input.recoverable} sessionId='${invocation?.sessionId}'`,
-            );
-        };
-        hooks.onErrorOccurred = /** @type {ErrorOccurredHandler} */ (errorFn);
+        hooks.onErrorOccurred = buildErrorOccurredHandler();
     }
 
     return hooks;

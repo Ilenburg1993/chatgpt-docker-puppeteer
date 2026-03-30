@@ -49,6 +49,25 @@ function getRpc() {
     return { ok: true, rpc: _rpc };
 }
 
+/**
+ * Executa uma operação RPC com checagem de disponibilidade e tratamento de erros padronizado.
+ *
+ * @template T
+ * @param {string} toolName - Nome do tool para logging
+ * @param {(rpc: any) => Promise<T>} fn - Função que recebe o handle RPC e executa a operação
+ * @returns {Promise<T | { error: string }>}
+ */
+async function wrapRpc(toolName, fn) {
+    const r = getRpc();
+    if (!r.ok) return { error: r.error };
+    try {
+        return await fn(r.rpc);
+    } catch (/** @type {any} */ e) {
+        log('ERROR', `[${toolName}] ${e.message}`);
+        return { error: e.message };
+    }
+}
+
 // ─── session_mode_get ─────────────────────────────────────────────────────────
 
 /**
@@ -61,18 +80,12 @@ const sessionModeGetTool = defineTool('session_mode_get', {
     parameters: /** @type {import('@github/copilot-sdk').ZodSchema<Record<string, never>>} */ (
         /** @type {unknown} */ (z.object({}))
     ),
-    handler: async () => {
-        const r = getRpc();
-        if (!r.ok) return { error: r.error };
-        try {
-            const result = await r.rpc.mode.get();
+    handler: async () =>
+        wrapRpc('session_mode_get', async (rpc) => {
+            const result = await rpc.mode.get();
             log('INFO', `[session_mode_get] mode=${result.mode}`);
             return result;
-        } catch (/** @type {any} */ e) {
-            log('ERROR', `[session_mode_get] ${e.message}`);
-            return { error: e.message };
-        }
-    },
+        }),
 });
 
 // ─── session_mode_set ─────────────────────────────────────────────────────────
@@ -94,18 +107,12 @@ const sessionModeSetTool = defineTool('session_mode_set', {
             })
         )
     ),
-    handler: async (/** @type {{ mode: 'interactive' | 'plan' | 'autopilot' }} */ { mode }) => {
-        const r = getRpc();
-        if (!r.ok) return { error: r.error };
-        try {
-            const result = await r.rpc.mode.set({ mode });
+    handler: async (/** @type {{ mode: 'interactive' | 'plan' | 'autopilot' }} */ { mode }) =>
+        wrapRpc('session_mode_set', async (rpc) => {
+            const result = await rpc.mode.set({ mode });
             log('INFO', `[session_mode_set] mode→${result.mode}`);
             return result;
-        } catch (/** @type {any} */ e) {
-            log('ERROR', `[session_mode_set] ${e.message}`);
-            return { error: e.message };
-        }
-    },
+        }),
 });
 
 // ─── session_plan_read ────────────────────────────────────────────────────────
@@ -120,18 +127,12 @@ const sessionPlanReadTool = defineTool('session_plan_read', {
     parameters: /** @type {import('@github/copilot-sdk').ZodSchema<Record<string, never>>} */ (
         /** @type {unknown} */ (z.object({}))
     ),
-    handler: async () => {
-        const r = getRpc();
-        if (!r.ok) return { error: r.error };
-        try {
-            const result = await r.rpc.plan.read();
+    handler: async () =>
+        wrapRpc('session_plan_read', async (rpc) => {
+            const result = await rpc.plan.read();
             log('INFO', `[session_plan_read] exists=${result.exists} path=${result.filePath ?? 'null'}`);
             return result;
-        } catch (/** @type {any} */ e) {
-            log('ERROR', `[session_plan_read] ${e.message}`);
-            return { error: e.message };
-        }
-    },
+        }),
 });
 
 // ─── session_plan_update ──────────────────────────────────────────────────────
@@ -151,18 +152,12 @@ const sessionPlanUpdateTool = defineTool('session_plan_update', {
             })
         )
     ),
-    handler: async (/** @type {{ content: string }} */ { content }) => {
-        const r = getRpc();
-        if (!r.ok) return { error: r.error };
-        try {
-            const result = await r.rpc.plan.update({ content });
+    handler: async (/** @type {{ content: string }} */ { content }) =>
+        wrapRpc('session_plan_update', async (rpc) => {
+            const result = await rpc.plan.update({ content });
             log('INFO', `[session_plan_update] atualizado (${content.length} chars)`);
             return result;
-        } catch (/** @type {any} */ e) {
-            log('ERROR', `[session_plan_update] ${e.message}`);
-            return { error: e.message };
-        }
-    },
+        }),
 });
 
 // ─── session_plan_delete ──────────────────────────────────────────────────────
@@ -177,18 +172,12 @@ const sessionPlanDeleteTool = defineTool('session_plan_delete', {
     parameters: /** @type {import('@github/copilot-sdk').ZodSchema<Record<string, never>>} */ (
         /** @type {unknown} */ (z.object({}))
     ),
-    handler: async () => {
-        const r = getRpc();
-        if (!r.ok) return { error: r.error };
-        try {
-            const result = await r.rpc.plan.delete();
+    handler: async () =>
+        wrapRpc('session_plan_delete', async (rpc) => {
+            const result = await rpc.plan.delete();
             log('INFO', '[session_plan_delete] plan.md removido');
             return result;
-        } catch (/** @type {any} */ e) {
-            log('ERROR', `[session_plan_delete] ${e.message}`);
-            return { error: e.message };
-        }
-    },
+        }),
 });
 
 // ─── session_agent_list ───────────────────────────────────────────────────────
@@ -203,18 +192,12 @@ const sessionAgentListTool = defineTool('session_agent_list', {
     parameters: /** @type {import('@github/copilot-sdk').ZodSchema<Record<string, never>>} */ (
         /** @type {unknown} */ (z.object({}))
     ),
-    handler: async () => {
-        const r = getRpc();
-        if (!r.ok) return { error: r.error };
-        try {
-            const result = await r.rpc.agent.list();
+    handler: async () =>
+        wrapRpc('session_agent_list', async (rpc) => {
+            const result = await rpc.agent.list();
             log('INFO', `[session_agent_list] ${result.agents.length} agentes disponíveis`);
             return result;
-        } catch (/** @type {any} */ e) {
-            log('ERROR', `[session_agent_list] ${e.message}`);
-            return { error: e.message };
-        }
-    },
+        }),
 });
 
 // ─── session_agent_select ─────────────────────────────────────────────────────
@@ -234,23 +217,17 @@ const sessionAgentSelectTool = defineTool('session_agent_select', {
             })
         )
     ),
-    handler: async (/** @type {{ name: string }} */ { name }) => {
-        const r = getRpc();
-        if (!r.ok) return { error: r.error };
-        try {
+    handler: async (/** @type {{ name: string }} */ { name }) =>
+        wrapRpc('session_agent_select', async (rpc) => {
             if (!name) {
-                await r.rpc.agent.deselect();
+                await rpc.agent.deselect();
                 log('INFO', '[session_agent_select] agente deselecionado (padrão)');
                 return { selected: null };
             }
-            const result = await r.rpc.agent.select({ name });
+            const result = await rpc.agent.select({ name });
             log('INFO', `[session_agent_select] selecionado: ${result.agent.name}`);
             return result;
-        } catch (/** @type {any} */ e) {
-            log('ERROR', `[session_agent_select] ${e.message}`);
-            return { error: e.message };
-        }
-    },
+        }),
 });
 
 // ─── session_compact ──────────────────────────────────────────────────────────
@@ -266,21 +243,15 @@ const sessionCompactTool = defineTool('session_compact', {
     parameters: /** @type {import('@github/copilot-sdk').ZodSchema<Record<string, never>>} */ (
         /** @type {unknown} */ (z.object({}))
     ),
-    handler: async () => {
-        const r = getRpc();
-        if (!r.ok) return { error: r.error };
-        try {
-            const result = await r.rpc.compaction.compact();
+    handler: async () =>
+        wrapRpc('session_compact', async (rpc) => {
+            const result = await rpc.compaction.compact();
             log(
                 'INFO',
                 `[session_compact] success=${result.success} freed=${result.tokensFreed ?? 0} msgs=${result.messagesRemoved ?? 0}`,
             );
             return result;
-        } catch (/** @type {any} */ e) {
-            log('ERROR', `[session_compact] ${e.message}`);
-            return { error: e.message };
-        }
-    },
+        }),
 });
 
 // ─── Export ───────────────────────────────────────────────────────────────────

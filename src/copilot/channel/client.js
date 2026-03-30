@@ -335,6 +335,29 @@ export class LlmBridgeClient {
     }
 
     /**
+     * Registra os event listeners de diálogo e retorna uma função de cleanup simétrica.
+     *
+     * @param {{ onReady?: () => void; onReply?: (reply: string) => void; onStopped?: () => void }} opts
+     * @returns {{ replyHandler: ((evt: any) => void) | null; cleanup: () => void }}
+     */
+    #registerDialogListeners(opts) {
+        const { onReady, onReply, onStopped } = opts;
+        const replyHandler = onReply ? (/** @type {any} */ evt) => onReply(evt.reply ?? '') : null;
+
+        if (onReady) alwaysAliveAgent.once('dialog.ready', onReady);
+        if (replyHandler) alwaysAliveAgent.on('dialog.reply', replyHandler);
+        if (onStopped) alwaysAliveAgent.once('dialog.stopped', onStopped);
+
+        const cleanup = () => {
+            if (onReady) alwaysAliveAgent.off('dialog.ready', onReady);
+            if (replyHandler) alwaysAliveAgent.off('dialog.reply', replyHandler);
+            if (onStopped) alwaysAliveAgent.off('dialog.stopped', onStopped);
+        };
+
+        return { replyHandler, cleanup };
+    }
+
+    /**
      * Inicia a LLM-B em modo de "diálogo direto" (Dialog Loop).
      *
      * @param {string} [bootPrompt] - Prompt de boot (usa padrão §15.8 quando omitido)
@@ -348,23 +371,13 @@ export class LlmBridgeClient {
      * @throws {Error} Se agente não estiver idle ou dialog loop já estiver ativo
      */
     async startDialogMode(bootPrompt, opts = {}) {
-        const { onReady, onReply, onStopped } = opts;
-
-        // BUG-06 (fix): armazenar o wrapper do onReply para poder removê-lo em caso de erro
-        const replyHandler = onReply ? (/** @type {any} */ evt) => onReply(evt.reply ?? '') : null;
-
-        if (onReady) alwaysAliveAgent.once('dialog.ready', onReady);
-        if (replyHandler) alwaysAliveAgent.on('dialog.reply', replyHandler);
-        if (onStopped) alwaysAliveAgent.once('dialog.stopped', onStopped);
+        const { cleanup } = this.#registerDialogListeners(opts);
 
         try {
             await alwaysAliveAgent.startDialogLoop(bootPrompt);
             log('INFO', '[LlmBridgeClient] Modo diálogo ativo — LLM-B sinalizou READY.');
         } catch (err) {
-            // Limpar listeners registrados se startDialogLoop lançar antes de ter efeito
-            if (onReady) alwaysAliveAgent.off('dialog.ready', onReady);
-            if (replyHandler) alwaysAliveAgent.off('dialog.reply', replyHandler);
-            if (onStopped) alwaysAliveAgent.off('dialog.stopped', onStopped);
+            cleanup();
             throw err;
         }
     }

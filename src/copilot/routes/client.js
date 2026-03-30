@@ -25,6 +25,7 @@ import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { getClient, getClientState, stopClient } from '../lib/client.js';
 import { allTools } from '../tools/index.js';
+import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -35,23 +36,14 @@ import { allTools } from '../tools/index.js';
 const router = Router();
 
 /**
- * Wrapper que captura erros e retorna 500 padronizado.
+ * Wrapper com prefixo de log para as rotas de cliente.
  *
  * @param {Req} req
  * @param {Res} res
  * @param {() => Promise<unknown>} fn
  * @returns {Promise<void>}
  */
-async function withErrorHandler(req, res, fn) {
-    try {
-        await fn();
-    } catch (/** @type {any} */ e) {
-        log('ERROR', `[sdk-api/client] ${req.method} ${req.path} → ${e.message}`);
-        if (!res.headersSent) {
-            res.status(500).json({ ok: false, error: e.message });
-        }
-    }
-}
+const withErrorHandler = _withErrorHandler.bind(null, 'sdk-api/client');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /ping

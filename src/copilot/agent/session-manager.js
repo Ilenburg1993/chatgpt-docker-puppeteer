@@ -18,6 +18,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { access, appendFile, mkdir, readFile, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { buildCustomAgentsConfig } from '../config/custom-agents.js';
+import { pickDefined } from '../lib/utils.js';
 
 // AI.1: carregar configuração de tools persistida ao iniciar o módulo
 loadToolsConfig();
@@ -204,6 +205,29 @@ export function writeState(updates) {
 }
 
 /**
+ * Versão async de `writeState`. Preferir em handlers de alta frequência para não bloquear o event loop.
+ *
+ * @param {Partial<AliveAgentState>} updates
+ * @returns {Promise<AliveAgentState>}
+ */
+export async function writeStateAsync(updates) {
+    await mkdir(STATE_DIR, { recursive: true });
+    const current = readState() ?? {
+        sessionId: '',
+        startedAt: Date.now(),
+        resumedAt: Date.now(),
+        resumeCount: 0,
+        sendCount: 0,
+        model: 'gpt-4.1',
+        pendingQuestion: null,
+    };
+    const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(STATE_FILE, JSON.stringify(next, null, 4), 'utf8');
+    return next;
+}
+
+/**
  * Remove o estado persistido. Usado para forçar uma nova sessão.
  *
  * @returns {void}
@@ -305,18 +329,18 @@ export async function initOrResumeSession(client, sessionOptions) {
         excludedTools: [...DEFAULT_EXCLUDED_TOOLS, ...getToolsConfig().denylist],
         // AH.2: allowlist em runtime — quando definida, tem precedência sobre excludedTools
         ...(getToolsConfig().allowlist !== null ? { availableTools: getToolsConfig().allowlist } : {}),
-        ...(sessionOptions.reasoningEffort !== undefined ? { reasoningEffort: sessionOptions.reasoningEffort } : {}),
+        ...pickDefined({
+            reasoningEffort: sessionOptions.reasoningEffort,
+            onUserInputRequest: sessionOptions.onUserInputRequest,
+            hooks: sessionOptions.hooks,
+            tools: sessionOptions.tools,
+            mcpServers: sessionOptions.mcpServers,
+            systemMessage,
+        }),
         // AH.6: wrapper de permissão com audit logging de ferramentas de alto risco
         onPermissionRequest: buildAuditingPermissionHandler(sessionOptions.onPermissionRequest),
-        ...(sessionOptions.onUserInputRequest !== undefined
-            ? { onUserInputRequest: sessionOptions.onUserInputRequest }
-            : {}),
-        ...(sessionOptions.hooks !== undefined ? { hooks: sessionOptions.hooks } : {}),
-        ...(sessionOptions.tools !== undefined ? { tools: sessionOptions.tools } : {}),
-        ...(sessionOptions.mcpServers !== undefined ? { mcpServers: sessionOptions.mcpServers } : {}),
         // L1: sub-agentes customizados especializados (task, explore, diagnostic)
         customAgents: buildCustomAgentsConfig(),
-        ...(systemMessage !== undefined ? { systemMessage } : {}),
     };
 
     // Delega para lib/session.resumeOrCreate — tenta retomar, cria se falhar

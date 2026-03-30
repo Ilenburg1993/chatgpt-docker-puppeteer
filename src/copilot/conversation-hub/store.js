@@ -850,12 +850,14 @@ export class ConversationStore {
                 // INSERT OR IGNORE pelo sdkTurnId para idempotência
                 // Usamos sdk_session_id + metadata.sdkTurnId como chave natural de dedup
                 if (sdkTurnId) {
+                    // Escapar metacaracteres SQL LIKE (% e _) para evitar match acidental de outras linhas
+                    const escapedId = sdkTurnId.replace(/%/g, '\\%').replace(/_/g, '\\_');
                     const exists = db
                         .prepare(
                             `SELECT 1 FROM copilot_conversation_turns
-                             WHERE hub_session_id = ? AND metadata LIKE ?`,
+                             WHERE hub_session_id = ? AND metadata LIKE ? ESCAPE '\\'`,
                         )
-                        .get(hubSessionId, `%${sdkTurnId}%`);
+                        .get(hubSessionId, `%${escapedId}%`);
                     if (exists) {
                         skipped++;
                         continue;

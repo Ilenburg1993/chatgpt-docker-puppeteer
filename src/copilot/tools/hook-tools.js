@@ -20,7 +20,8 @@
 
 import { log } from '#core/logger';
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -43,13 +44,16 @@ const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../');
 const HOOK_STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
 
 /**
- * ARCH-N01 (fix): Resolver pendente para suspensão real do SDK via request_user_input. Quando o handler cria a Promise
- * de suspensão, registra aqui o resolver. O agente chama resolveUserInput() via answerPendingQuestion() para
- * desbloquear o modelo.
+ * ARCH-N01 (fix): Resolver pendente para suspensão real do SDK via request_user_input. Usamos Map<string, (answer:
+ * string) => void> em vez de singleton para evitar race condition quando múltiplos turnos chamam a tool simultaneamente
+ * — cada chamada recebe requestId único.
  *
- * @type {((answer: string) => void) | null}
+ * @type {Map<string, (answer: string) => void>}
  */
-let _pendingInputResolver = null;
+const _pendingInputResolvers = new Map();
+
+/** Contador incremental para IDs únicos de request. @type {number} */
+let _pendingInputSeq = 0;
 
 // ─── ARCH-03: Injeção de broadcastSse para evitar dependência circular ────────
 
@@ -71,18 +75,32 @@ export function configureHookTools({ broadcastSse }) {
 }
 
 /**
- * ARCH-N01: Registra uma resposta para a tool request_user_input pendente. Deve ser chamado pelo agente quando receber
- * POST /api/copilot/answer.
+ * ARCH-N01: Registra uma resposta para a tool request_user_input pendente. Resolve a Promise do request mais antigo
+ * ainda pendente (FIFO).
  *
- * @param {string} answer
- * @returns {boolean} true se havia uma Promise pendente, false se não
+ * @param {string} answer - Resposta do usuário
+ * @param {string} [requestId] - ID específico do request (opcional; se omitido, resolve o mais antigo)
+ * @returns {boolean} true se havia uma Promise pendente resolvida, false se fila vazia
  */
-export function resolveUserInput(answer) {
-    if (!_pendingInputResolver) return false;
-    const fn = _pendingInputResolver;
-    _pendingInputResolver = null;
+export function resolveUserInput(answer, requestId) {
+    if (_pendingInputResolvers.size === 0) return false;
+    // Usar requestId específico se fornecido; caso contrário, resolver o mais antigo (primeiro inserido)
+    const id = requestId ?? _pendingInputResolvers.keys().next().value;
+    if (!id) return false;
+    const fn = _pendingInputResolvers.get(id);
+    if (!fn) return false;
+    _pendingInputResolvers.delete(id);
     fn(answer);
     return true;
+}
+
+/**
+ * Retorna os IDs dos requests de input atualmente pendentes.
+ *
+ * @returns {string[]}
+ */
+export function getPendingInputIds() {
+    return [..._pendingInputResolvers.keys()];
 }
 
 // ─── Tool: hook_get_audit_tail ────────────────────────────────────────────────
@@ -185,12 +203,26 @@ const requestUserInputTool = buildTool({
 
         log('INFO', `[hook-tools/request_user_input] Pergunta: "${fullQuestion.slice(0, 100)}"`);
 
+        // RF-029: gerar ID único para este request de input
+        const requestId = `input_${++_pendingInputSeq}`;
+
         // ARCH-N01 (fix): suspensão real — a Promise só resolve quando resolveUserInput() for chamado,
         // o que ocorre via answerPendingQuestion() no agente (POST /api/copilot/answer).
         // Isso garante que o modelo não continua processamento até receber a resposta do usuário.
-        return new Promise((resolve) => {
-            _pendingInputResolver = (answer) => {
+        return new Promise((resolve, reject) => {
+            // RF-029: se já há muitos requests pendentes (>5), rejeitar para evitar acúmulo indefinido
+            if (_pendingInputResolvers.size >= 5) {
+                reject(
+                    new Error(
+                        `[hook-tools] Limite de requests de input simultâneos atingido (5). ` +
+                            `Requests pendentes: ${[..._pendingInputResolvers.keys()].join(', ')}`,
+                    ),
+                );
+                return;
+            }
+            _pendingInputResolvers.set(requestId, (answer) => {
                 resolve({
+                    requestId,
                     question: fullQuestion,
                     choices: choices ?? [],
                     allowFreeform,
@@ -198,9 +230,10 @@ const requestUserInputTool = buildTool({
                     answer,
                     instruction: 'Resposta recebida. Processar e continuar o fluxo.',
                 });
-            };
+            });
             // ARCH-03 (fix): broadcastSse injetado via configureHookTools() — sem import dinâmico circular
             _broadcastSse('waiting_for_input', {
+                requestId,
                 question: fullQuestion,
                 choices: choices ?? [],
                 allowFreeform,
@@ -228,7 +261,7 @@ const hookGetPendingTasksTool = buildTool({
             return { content: '', exists: false };
         }
         try {
-            const content = readFileSync(pendingPath, 'utf8');
+            const content = await readFile(pendingPath, 'utf8');
             log('INFO', `[hook-tools/get_pending_tasks] pending-tasks.md lido (${content.length} chars).`);
             return { content, exists: true };
         } catch (/** @type {any} */ e) {

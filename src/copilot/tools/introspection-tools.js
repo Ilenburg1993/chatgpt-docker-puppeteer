@@ -57,6 +57,24 @@ export function setTelemetryStore(store) {
     _telemetryStore = store;
 }
 
+// ─── Mapeamento de categorias heurísticas ────────────────────────────────────
+// TODO(RF-026): derivar categorias do ToolRegistry para evitar manutenção manual.
+
+/**
+ * Mapa de categoria → nomes de tools pertencentes a ela. Usado quando o registry completo com metadados não está
+ * disponível.
+ *
+ * @type {Readonly<Record<string, readonly string[]>>}
+ */
+const CATEGORY_TOOL_MAP = Object.freeze({
+    code: ['lint_check', 'run_tests', 'typecheck'],
+    git: ['git_status', 'git_diff', 'git_commit', 'git_changed_files'],
+    session: ['read_briefing', 'write_pending_task'],
+    task: ['get_tasks', 'add_task', 'get_session_state', 'get_system_health'],
+    hook: ['hook_get_audit_tail', 'request_user_input', 'hook_get_pending_tasks'],
+    introspection: ['list_tools', 'get_agent_info', 'get_telemetry'],
+});
+
 // ─── Tools ───────────────────────────────────────────────────────────────────
 
 /**
@@ -89,17 +107,9 @@ const listToolsTool = defineTool('list_tools', {
             );
         }
 
-        // Categorias heurísticas por prefixo de nome
+        // Categorias heurísticas por nome de tool (ver CATEGORY_TOOL_MAP)
         if (category) {
-            const prefixMap = /** @type {Record<string, string[]>} */ ({
-                code: ['lint_check', 'run_tests', 'typecheck'],
-                git: ['git_status', 'git_diff', 'git_commit', 'git_changed_files'],
-                session: ['read_briefing', 'write_pending_task'],
-                task: ['get_tasks', 'add_task', 'get_session_state', 'get_system_health'],
-                hook: ['hook_get_audit_tail', 'request_user_input', 'hook_get_pending_tasks'],
-                introspection: ['list_tools', 'get_agent_info', 'get_telemetry'],
-            });
-            const allowed = prefixMap[category];
+            const allowed = CATEGORY_TOOL_MAP[category];
             if (allowed) tools = tools.filter((t) => allowed.includes(t.name));
         }
 

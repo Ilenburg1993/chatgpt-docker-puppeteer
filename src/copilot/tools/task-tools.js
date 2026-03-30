@@ -10,58 +10,12 @@
 
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
-import http from 'node:http';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { httpRequest } from '../lib/http-request.js';
 import { withSkipPermission } from './tool-factory.js';
-
-/**
- * Realiza uma requisição HTTP local sem bloquear o event loop.
- *
- * @param {string} method
- * @param {string} urlStr
- * @param {string | null} body
- * @param {number} [timeoutMs]
- * @returns {Promise<{ statusCode: number; body: string }>}
- */
-function httpRequest(method, urlStr, body = null, timeoutMs = 5000) {
-    return new Promise((resolve, reject) => {
-        const url = new URL(urlStr);
-        const options = {
-            hostname: url.hostname,
-            port: url.port,
-            path: url.pathname + url.search,
-            method,
-            headers: /** @type {Record<string, string>} */ ({}),
-        };
-        if (body) {
-            options.headers['Content-Type'] = 'application/json';
-            options.headers['Content-Length'] = String(Buffer.byteLength(body));
-        }
-        const MAX_RESP_BYTES = 1 * 1024 * 1024; // BUG-N09 (fix): limit 1 MB
-        const req = http.request(options, (res) => {
-            let data = '';
-            let received = 0;
-            res.on('data', (/** @type {Buffer} */ chunk) => {
-                received += chunk.length;
-                if (received > MAX_RESP_BYTES) {
-                    req.destroy(new Error('Resposta excede limite de 1 MB'));
-                    return;
-                }
-                data += chunk.toString('utf8');
-            });
-            res.on('end', () => {
-                const statusCode = res.statusCode ?? 0;
-                resolve({ statusCode, body: data });
-            });
-        });
-        req.setTimeout(timeoutMs, () => {
-            req.destroy(new Error(`Timeout após ${timeoutMs}ms`));
-        });
-        req.on('error', reject);
-        if (body) req.write(body);
-        req.end();
-    });
-}
 
 /**
  * Tool: get_tasks — lista tarefas recentes do sistema.
@@ -154,9 +108,6 @@ const getSessionStateTool = defineTool('get_session_state', {
     parameters: z.object({}),
     handler: async () => {
         try {
-            const { readFileSync, existsSync } = await import('node:fs');
-            const { join, resolve } = await import('node:path');
-            const { fileURLToPath } = await import('node:url');
             const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../');
             const stateDir = join(ROOT, '.github', 'hooks', 'state');
             const files = ['session-briefing.md', 'pending-tasks.md', 'session.json'];

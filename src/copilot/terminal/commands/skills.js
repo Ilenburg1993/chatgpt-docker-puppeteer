@@ -78,9 +78,10 @@ export function cmdSkills({ println }, arg) {
         }
 
         case 'reload': {
-            // Emite sinal para que o PinnedFilesLoader (se instanciado) recarregue
-            // A integração completa requer que PinnedFilesLoader seja instanciado no bootstrap
-            println('  ⟳ Reload solicitado. (Reinicie o processo para carregar novos paths)');
+            // RF-055: PinnedFilesLoader não expõe método reload() público.
+            // Para recarregar, reiniciar o processo ou redefinir os paths via /skills add|remove.
+            println('  ⟳ Reload manual não disponível via REPL.');
+            println('  Use /skills add|remove para atualizar os paths, ou reinicie o processo.');
             break;
         }
 

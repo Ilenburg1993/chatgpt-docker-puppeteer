@@ -281,8 +281,10 @@ const webSearchTool = buildTool({
 
             const html = await response.text();
 
-            // Extrai resultados via regex sobre o HTML do DDG Lite
-            // Pattern: <a class="result__a" href="...">título</a> e <a class="result__snippet">snippet</a>
+            // Extrai resultados via regex sobre o HTML do DDG Lite.
+            // AVISO: este parsing é frágil por design — depende do layout HTML do DDG que pode mudar sem aviso.
+            // Se a extração começar a retornar 0 resultados consistentemente, verificar se as classes CSS
+            // "result__a" e "result__snippet" ainda existem no HTML retornado por https://html.duckduckgo.com/html/
             /** @type {{ title: string; url: string; snippet: string }[]} */
             const results = [];
 

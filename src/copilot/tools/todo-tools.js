@@ -203,6 +203,69 @@ const zStatus = z.enum(['todo', 'in_progress', 'done', 'cancelled', 'blocked']);
 const zPriority = z.enum(['critical', 'high', 'medium', 'low', 'none']);
 const zId = z.string().min(1).max(64).describe('ID da tarefa (8 chars gerado automaticamente)');
 
+/**
+ * Mapa de ordenação de prioridades (menor = mais importante). Usado como chave de sort em listagens e stats.
+ *
+ * @type {Record<import('./todo-tools.js').TodoPriority | string, number>}
+ */
+const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
+
+// ---------------------------------------------------------------------------
+// Helper de criação de tarefa
+// ---------------------------------------------------------------------------
+
+/**
+ * Cria uma nova `TodoItem` no `store`, atualiza o pai se fornecido, mas NÃO persiste. O chamador é responsável por
+ * chamar `writeStore(store)`.
+ *
+ * @param {TodoStore} store - Store mutável já carregado do disco
+ * @param {{
+ *     title: string;
+ *     description?: string;
+ *     priority?: TodoPriority;
+ *     tags?: string[];
+ *     dueDate?: string | null;
+ *     parentId?: string | null;
+ *     notes?: string;
+ *     metadata?: Record<string, unknown>;
+ * }} opts
+ * @returns {{ task: TodoItem } | { error: string }}
+ */
+function createTask(store, opts) {
+    if (opts.parentId && !store.tasks[opts.parentId]) {
+        return { error: `Tarefa pai não encontrada: ${opts.parentId}` };
+    }
+    const id = generateId();
+    const ts = now();
+    /** @type {TodoItem} */
+    const task = {
+        id,
+        title: opts.title,
+        description: opts.description ?? '',
+        status: 'todo',
+        priority: opts.priority ?? 'medium',
+        tags: opts.tags ?? [],
+        dueDate: opts.dueDate ?? null,
+        parentId: opts.parentId ?? null,
+        subtaskIds: [],
+        notes: opts.notes ?? '',
+        createdAt: ts,
+        updatedAt: ts,
+        completedAt: null,
+        completedBy: null,
+        metadata: opts.metadata ?? {},
+    };
+    store.tasks[id] = task;
+    if (opts.parentId) {
+        const parent = store.tasks[opts.parentId];
+        if (parent && !parent.subtaskIds.includes(id)) {
+            parent.subtaskIds.push(id);
+            parent.updatedAt = ts;
+        }
+    }
+    return { task };
+}
+
 // ---------------------------------------------------------------------------
 // Tool: todo_create
 // ---------------------------------------------------------------------------
@@ -251,47 +314,25 @@ const todoCreateTool = defineTool('todo_create', {
     ) => {
         const store = await readStore();
 
-        // Validar parent se fornecido
-        if (args.parent_id && !store.tasks[args.parent_id]) {
-            return { success: false, error: `Tarefa pai não encontrada: ${args.parent_id}` };
-        }
-
-        const id = generateId();
-        const ts = now();
-
-        /** @type {TodoItem} */
-        const task = {
-            id,
+        const result = createTask(store, {
             title: args.title,
-            description: args.description ?? '',
-            status: 'todo',
-            priority: args.priority ?? 'medium',
-            tags: args.tags ?? [],
-            dueDate: args.due_date ?? null,
-            parentId: args.parent_id ?? null,
-            subtaskIds: [],
-            notes: args.notes ?? '',
-            createdAt: ts,
-            updatedAt: ts,
-            completedAt: null,
-            completedBy: null,
-            metadata: args.metadata ?? {},
-        };
+            ...(args.description !== undefined && { description: args.description }),
+            ...(args.priority !== undefined && { priority: args.priority }),
+            ...(args.tags !== undefined && { tags: args.tags }),
+            ...(args.due_date !== undefined && { dueDate: args.due_date }),
+            ...(args.parent_id !== undefined && { parentId: args.parent_id }),
+            ...(args.notes !== undefined && { notes: args.notes }),
+            ...(args.metadata !== undefined && { metadata: args.metadata }),
+        });
 
-        store.tasks[id] = task;
-
-        // Registrar como subtarefa no pai
-        if (args.parent_id) {
-            const parent = store.tasks[args.parent_id];
-            if (parent && !parent.subtaskIds.includes(id)) {
-                parent.subtaskIds.push(id);
-                parent.updatedAt = ts;
-            }
-        }
+        if ('error' in result) return { success: false, error: result.error };
 
         await writeStore(store);
-        log('INFO', `[todo_create] Tarefa criada id=${id} title=${task.title} priority=${task.priority}`);
-        return { success: true, task: sanitize(task) };
+        log(
+            'INFO',
+            `[todo_create] Tarefa criada id=${result.task.id} title=${result.task.title} priority=${result.task.priority}`,
+        );
+        return { success: true, task: sanitize(result.task) };
     },
 });
 
@@ -386,8 +427,6 @@ const todoListTool = withSkipPermission(
             const store = await readStore();
             const allTasks = Object.values(store.tasks);
 
-            const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
-
             /** @type {(TodoItem & { overdue: boolean })[]} */
             let filtered = allTasks.map((t) => ({ ...t, overdue: isOverdue(t) }));
 
@@ -420,8 +459,8 @@ const todoListTool = withSkipPermission(
             // Ordenação: overdue primeiro → prioridade → mais recente
             filtered.sort((a, b) => {
                 if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
-                const pa = priorityOrder[a.priority] ?? 99;
-                const pb = priorityOrder[b.priority] ?? 99;
+                const pa = PRIORITY_ORDER[a.priority] ?? 99;
+                const pb = PRIORITY_ORDER[b.priority] ?? 99;
                 if (pa !== pb) return pa - pb;
                 return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
             });
@@ -693,41 +732,25 @@ const todoAddSubtaskTool = defineTool('todo_add_subtask', {
     ) => {
         const store = await readStore();
 
-        if (!store.tasks[args.parent_id]) {
-            return { success: false, error: `Tarefa pai não encontrada: ${args.parent_id}` };
-        }
-
-        const id = generateId();
-        const ts = now();
-
-        /** @type {TodoItem} */
-        const subtask = {
-            id,
+        const result = createTask(store, {
             title: args.title,
-            description: args.description ?? '',
-            status: 'todo',
-            priority: args.priority ?? 'medium',
-            tags: args.tags ?? [],
-            dueDate: args.due_date ?? null,
+            ...(args.description !== undefined && { description: args.description }),
+            ...(args.priority !== undefined && { priority: args.priority }),
+            ...(args.tags !== undefined && { tags: args.tags }),
+            ...(args.due_date !== undefined && { dueDate: args.due_date }),
             parentId: args.parent_id,
-            subtaskIds: [],
-            notes: args.notes ?? '',
-            createdAt: ts,
-            updatedAt: ts,
-            completedAt: null,
-            completedBy: null,
-            metadata: {},
-        };
+            ...(args.notes !== undefined && { notes: args.notes }),
+        });
 
-        store.tasks[id] = subtask;
+        if ('error' in result) return { success: false, error: result.error };
+
         const parent = store.tasks[args.parent_id];
-        if (!parent) return { success: false, error: `Tarefa pai sumiu inesperadamente: ${args.parent_id}` };
-        parent.subtaskIds.push(id);
-        parent.updatedAt = ts;
-
         await writeStore(store);
-        log('INFO', `[todo_add_subtask] Subtarefa criada id=${id} parent_id=${args.parent_id} title=${subtask.title}`);
-        return { success: true, subtask: sanitize(subtask), parent_subtask_count: parent.subtaskIds.length };
+        log(
+            'INFO',
+            `[todo_add_subtask] Subtarefa criada id=${result.task.id} parent_id=${args.parent_id} title=${result.task.title}`,
+        );
+        return { success: true, subtask: sanitize(result.task), parent_subtask_count: parent?.subtaskIds.length ?? 0 };
     },
 });
 
@@ -763,8 +786,6 @@ const todoSearchTool = withSkipPermission(
                 .split(/\s+/)
                 .filter((t) => t.length > 0);
 
-            const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
-
             /** @type {{ task: TodoItem & { overdue: boolean }; score: number }[]} */
             const scored = [];
 
@@ -783,8 +804,8 @@ const todoSearchTool = withSkipPermission(
             // Ordenar por: score desc → priority → createdAt desc
             scored.sort((a, b) => {
                 if (b.score !== a.score) return b.score - a.score;
-                const pa = priorityOrder[a.task.priority] ?? 99;
-                const pb = priorityOrder[b.task.priority] ?? 99;
+                const pa = PRIORITY_ORDER[a.task.priority] ?? 99;
+                const pb = PRIORITY_ORDER[b.task.priority] ?? 99;
                 if (pa !== pb) return pa - pb;
                 return new Date(b.task.createdAt).getTime() - new Date(a.task.createdAt).getTime();
             });
@@ -889,12 +910,11 @@ const todoStatsTool = withSkipPermission(
             }
 
             if (args.include_top_priority !== false) {
-                const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
                 result.top_priority_pending = [...allTasks]
                     .filter((t) => t.status !== 'done' && t.status !== 'cancelled')
                     .sort((a, b) => {
-                        const pa = priorityOrder[a.priority] ?? 99;
-                        const pb = priorityOrder[b.priority] ?? 99;
+                        const pa = PRIORITY_ORDER[a.priority] ?? 99;
+                        const pb = PRIORITY_ORDER[b.priority] ?? 99;
                         if (pa !== pb) return pa - pb;
                         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
                     })

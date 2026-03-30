@@ -160,5 +160,4 @@ export function formatAliases() {
         .join('\n');
 }
 
-// Inicializar ao importar
-loadAliases();
+// Aliases são carregados explicitamente pelo caller (ex: terminal/index.js → loadAliases())
