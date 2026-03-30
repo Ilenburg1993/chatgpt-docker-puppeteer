@@ -81,6 +81,8 @@ try {
         new Promise((_, reject) => setTimeout(() => reject(new Error('Ping timeout (5s)')), 5000)),
     ]);
     log('INFO', '[copilot/agent] CLI conectado — ping OK.');
+    // LEAK-01 (fix): parar pingClient após uso para evitar conexão TCP persistente
+    pingClient.stop().catch(() => {});
 } catch (/** @type {any} */ e) {
     log('WARN', `[copilot/agent] CLI não respondeu ao ping no boot: ${e.message}`);
     // Continuar de qualquer forma — startWithRetry() tratará a falha

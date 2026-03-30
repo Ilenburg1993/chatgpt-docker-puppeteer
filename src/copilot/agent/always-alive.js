@@ -29,7 +29,7 @@ import { conversationStore } from '../conversation-hub/store.js';
 import { getHubSessionId } from '../terminal/state.js';
 import { DialogWatchdog } from './dialog-watchdog.js';
 import { AGENT_EVENTS } from './events.js';
-import { initOrResumeSession, readState, writeState, writeStateAsync } from './session-manager.js';
+import { initOrResumeSession, readState, writeStateAsync } from './session-manager.js';
 import { executeTask } from './task-executor.js';
 import { bootstrapTools, setSessionRpc } from './tools-bootstrap.js';
 import { WebhookManager } from './webhook-manager.js';
@@ -85,6 +85,15 @@ import { WebhookManager } from './webhook-manager.js';
  */
 
 /**
+ * IMPROVE-AA-01: Constantes do protocolo do dialog loop. Usadas em #handleUserInputRequest e no metaPrompt de boot.
+ * Centralizar aqui evita strings mágicas espalhadas pelo código.
+ */
+const DIALOG_PROTO_READY = 'READY:';
+const DIALOG_PROTO_REPLY = 'REPLY:';
+const DIALOG_PROTO_DONE = 'DONE:';
+const DIALOG_PROTO_STOPPED = 'STOPPED';
+
+/**
  * Always-Alive Agent — instância singleton que gerencia o ciclo de vida completo do agente Copilot SDK neste processo.
  *
  * @extends EventEmitter
@@ -115,6 +124,47 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @type {Promise<void>}
      */
     #dialogTurnMutex = Promise.resolve();
+
+    /**
+     * BUG-AA-04 (fix): contador de profundidade da fila do dialog turn mutex. Permite resetar a Promise-chain quando a
+     * fila zera, prevenindo crescimento indefinido.
+     *
+     * @type {number}
+     */
+    #dialogTurnQueueDepth = 0;
+
+    /**
+     * BUG-AA-02 (fix): sinaliza que stopDialogLoop está em execução. Evita race condition entre stopDialogLoop e
+     * #handleUserInputRequest.
+     *
+     * @type {boolean}
+     */
+    #dialogLoopStopping = false;
+
+    /**
+     * BUG-AA-03 (fix): armazena as funções de unsubscribe retornadas por session.on(). O SDK não é um EventEmitter —
+     * session.on() retorna () => void, não this. Essas referências são chamadas no stop() / #tryReconnect() para evitar
+     * memory leak.
+     *
+     * @type {(() => void)[]}
+     */
+    #sessionEventUnsubscribers = [];
+
+    /**
+     * MR-02 (fix): tamanho máximo da fila de turnos do dialog loop (backpressure). Configurável via
+     * LLM_B_DIALOG_QUEUE_MAX.
+     *
+     * @type {number}
+     */
+    static #MAX_DIALOG_TURN_QUEUE_SIZE = Number(process.env.LLM_B_DIALOG_QUEUE_MAX ?? 10);
+
+    /**
+     * IMPROVE-AA-02: timeout para aguardar `dialog.ready` durante startDialogLoop(). Controlado por
+     * `LLM_B_BOOT_TIMEOUT_MS`. Padrão: 30 segundos.
+     *
+     * @type {number}
+     */
+    static #DIALOG_BOOT_TIMEOUT_MS = Number(process.env.LLM_B_BOOT_TIMEOUT_MS ?? 30_000);
 
     /** @type {DialogWatchdog | null} */
     #watchdog = null;
@@ -395,98 +445,112 @@ export class AlwaysAliveAgent extends EventEmitter {
             );
 
             // Wiring de eventos de compaction para observabilidade via SSE/NERV
-            session.on('session.compaction_start', (/** @type {any} */ evt) => {
-                log('INFO', '[AlwaysAlive] Compaction iniciada (sessão infinita).');
-                this.emit('session.compaction_start', evt?.data ?? {});
-            });
-            session.on('session.compaction_complete', (/** @type {any} */ evt) => {
-                const data = evt?.data ?? {};
-                // AC.2: detectar falha de compaction e logar instrução de recovery com checkpointPath
-                if (data.success === false) {
-                    log('ERROR', '[AlwaysAlive] Compaction falhou. Sessão pode estar instável.');
-                    if (data.checkpointPath) {
-                        log(
-                            'WARN',
-                            `[AlwaysAlive] Checkpoint disponível: ${data.checkpointPath}. Para recovery manual, restaure esse arquivo e reinicie.`,
-                        );
+            // BUG-AA-03 (fix): session.on() retorna () => void (não this) — armazenar para cleanup no stop/reconnect.
+            this.#sessionEventUnsubscribers = [];
+            this.#sessionEventUnsubscribers.push(
+                session.on('session.compaction_start', (/** @type {any} */ evt) => {
+                    log('INFO', '[AlwaysAlive] Compaction iniciada (sessão infinita).');
+                    this.emit('session.compaction_start', evt?.data ?? {});
+                }),
+            );
+            this.#sessionEventUnsubscribers.push(
+                session.on('session.compaction_complete', (/** @type {any} */ evt) => {
+                    const data = evt?.data ?? {};
+                    // AC.2: detectar falha de compaction e logar instrução de recovery com checkpointPath
+                    if (data.success === false) {
+                        log('ERROR', '[AlwaysAlive] Compaction falhou. Sessão pode estar instável.');
+                        if (data.checkpointPath) {
+                            log(
+                                'WARN',
+                                `[AlwaysAlive] Checkpoint disponível: ${data.checkpointPath}. Para recovery manual, restaure esse arquivo e reinicie.`,
+                            );
+                        }
+                    } else {
+                        log('INFO', '[AlwaysAlive] Compaction concluída.');
                     }
-                } else {
-                    log('INFO', '[AlwaysAlive] Compaction concluída.');
-                }
-                // AC.3: armazenar info de checkpoint no estado para exposição via getStatusSnapshot()
-                if (data.checkpointPath) {
-                    this.#lastCheckpointPath = data.checkpointPath;
-                }
-                this.emit('session.compaction_complete', data);
-                // UPG-N15 (fix): emitir evento canônico 'context:compacted' para observabilidade externa
-                const snap = this.getStatusSnapshot();
-                this.emit('context:compacted', {
-                    sessionId: snap?.sessionId ?? null,
-                    ts: Date.now(),
-                    checkpoint: data.checkpointPath ?? null,
-                });
-            });
+                    // AC.3: armazenar info de checkpoint no estado para exposição via getStatusSnapshot()
+                    if (data.checkpointPath) {
+                        this.#lastCheckpointPath = data.checkpointPath;
+                    }
+                    this.emit('session.compaction_complete', data);
+                    // UPG-N15 (fix): emitir evento canônico 'context:compacted' para observabilidade externa
+                    const snap = this.getStatusSnapshot();
+                    this.emit('context:compacted', {
+                        sessionId: snap?.sessionId ?? null,
+                        ts: Date.now(),
+                        checkpoint: data.checkpointPath ?? null,
+                    });
+                }),
+            );
 
             // Reasoning tokens (o3/o4-mini extended thinking) — forwarded via task.reasoning
-            session.on('assistant.reasoning_delta', (/** @type {any} */ evt) => {
-                const chunk = evt?.data?.deltaContent ?? '';
-                if (chunk) this.emit('task.reasoning', { chunk, reasoningId: evt?.data?.reasoningId ?? null });
-            });
+            this.#sessionEventUnsubscribers.push(
+                session.on('assistant.reasoning_delta', (/** @type {any} */ evt) => {
+                    const chunk = evt?.data?.deltaContent ?? '';
+                    if (chunk) this.emit('task.reasoning', { chunk, reasoningId: evt?.data?.reasoningId ?? null });
+                }),
+            );
 
             // BUG-HIGH-03 (fix): streaming de delta também no modo dialog loop
             // Emitir task.delta para cada chunk de resposta do assistente, independente do modo de execução
-            session.on('assistant.message_delta', (/** @type {any} */ evt) => {
-                const chunk = evt?.data?.deltaContent ?? evt?.data?.content ?? '';
-                if (chunk) this.emit('task.delta', { taskId: null, chunk });
-            });
+            this.#sessionEventUnsubscribers.push(
+                session.on('assistant.message_delta', (/** @type {any} */ evt) => {
+                    const chunk = evt?.data?.deltaContent ?? evt?.data?.content ?? '';
+                    if (chunk) this.emit('task.delta', { taskId: null, chunk });
+                }),
+            );
 
             // Uso de tokens e contexto da sessão — forwarded via session.usage
             // MELHORIA-02: emite session.token_budget_warning quando uso > 80%
             // MELHORIA-05: na 1ª leitura após retomada, alerta se uso já > 70% (contexto pesado)
             // AA.1: armazena em #contextState para exposição via getStatusSnapshot() e /context
             let _firstUsageChecked = false;
-            session.on('session.usage_info', (/** @type {any} */ evt) => {
-                const data = evt?.data ?? {};
-                this.emit('session.usage', data);
-                const { currentTokens, tokenLimit } = data;
-                if (tokenLimit > 0) {
-                    const ratio = Math.round((currentTokens / tokenLimit) * 100);
-                    // AA.1: atualizar estado de contexto com dados reais do SDK
-                    this.#contextState = {
-                        tokens: currentTokens,
-                        tokenLimit,
-                        utilization: currentTokens / tokenLimit,
-                    };
-                    // MELHORIA-05: alerta proativo na 1ª leitura se sessão retomada com contexto pesado
-                    if (!_firstUsageChecked && isResumed && currentTokens / tokenLimit > 0.7) {
-                        log(
-                            'WARN',
-                            `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
-                        );
-                        this.emit('session.token_budget_warning', {
-                            currentTokens,
+            this.#sessionEventUnsubscribers.push(
+                session.on('session.usage_info', (/** @type {any} */ evt) => {
+                    const data = evt?.data ?? {};
+                    this.emit('session.usage', data);
+                    const { currentTokens, tokenLimit } = data;
+                    if (tokenLimit > 0) {
+                        const ratio = Math.round((currentTokens / tokenLimit) * 100);
+                        // AA.1: atualizar estado de contexto com dados reais do SDK
+                        this.#contextState = {
+                            tokens: currentTokens,
                             tokenLimit,
-                            ratio,
-                            reason: 'startup_heavy',
-                        });
+                            utilization: currentTokens / tokenLimit,
+                        };
+                        // MELHORIA-05: alerta proativo na 1ª leitura se sessão retomada com contexto pesado
+                        if (!_firstUsageChecked && isResumed && currentTokens / tokenLimit > 0.7) {
+                            log(
+                                'WARN',
+                                `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
+                            );
+                            this.emit('session.token_budget_warning', {
+                                currentTokens,
+                                tokenLimit,
+                                ratio,
+                                reason: 'startup_heavy',
+                            });
+                        }
+                        _firstUsageChecked = true;
+                        // MELHORIA-02: warning contínuo quando uso > 80%
+                        if (currentTokens / tokenLimit > 0.8) {
+                            log(
+                                'WARN',
+                                `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
+                            );
+                            this.emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
+                        }
                     }
-                    _firstUsageChecked = true;
-                    // MELHORIA-02: warning contínuo quando uso > 80%
-                    if (currentTokens / tokenLimit > 0.8) {
-                        log(
-                            'WARN',
-                            `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
-                        );
-                        this.emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
-                    }
-                }
-            });
+                }),
+            );
 
             // Mudança de modo (plan ↔ act ↔ interactive) — forwarded via session.mode_changed
-            session.on('session.mode_changed', (/** @type {any} */ evt) => {
-                log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.previousMode} → ${evt?.data?.newMode}`);
-                this.emit('session.mode_changed', evt?.data ?? {});
-            });
+            this.#sessionEventUnsubscribers.push(
+                session.on('session.mode_changed', (/** @type {any} */ evt) => {
+                    log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.previousMode} → ${evt?.data?.newMode}`);
+                    this.emit('session.mode_changed', evt?.data ?? {});
+                }),
+            );
 
             // MELHORIA-02 (fix): catch-all para eventos do SDK não tratados explicitamente
             // Permite observabilidade de novos eventos adicionados em versões futuras do SDK
@@ -591,7 +655,10 @@ export class AlwaysAliveAgent extends EventEmitter {
         }
 
         // PERF-01 (fix): persistir contador em disco apenas no shutdown, não a cada mensagem
-        writeState({ sendCount: this.#sendCount });
+        // SYNC-SM-01 (fix): usar writeStateAsync para não bloquear o event loop durante shutdown
+        await writeStateAsync({ sendCount: this.#sendCount }).catch((/** @type {any} */ e) =>
+            log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${e.message}`),
+        );
 
         this.#setStatus('stopped');
 
@@ -609,6 +676,10 @@ export class AlwaysAliveAgent extends EventEmitter {
                 task.reject(shutdownError);
             }
         }
+
+        // BUG-AA-03 (fix): cancelar todos os listeners session.on() antes de desconectar
+        for (const unsub of this.#sessionEventUnsubscribers) unsub();
+        this.#sessionEventUnsubscribers = [];
 
         if (this.#session) {
             try {
@@ -645,6 +716,18 @@ export class AlwaysAliveAgent extends EventEmitter {
             // MELHORIA-13 (fix): suporte a AbortSignal para cancelamento externo da tarefa
             if (signal?.aborted) {
                 reject(new DOMException('AbortError: sendMessage cancelado antes de enfileirar.', 'AbortError'));
+                return;
+            }
+            // GAP-AA-01 (fix): bloquear sendMessage() externo enquanto dialog loop estiver ativo.
+            // startDialogLoop() chama sendMessage() antes de setar dialogLoopActive=true, portanto
+            // o guard usa a heurística de timeoutMs==24h para distinguir a chamada interna.
+            if (this.#dialogLoopActive && timeoutMs !== 24 * 60 * 60 * 1000) {
+                reject(
+                    new SessionError(
+                        '[AlwaysAlive] sendMessage() bloqueado: dialog loop ativo. Use sendDialogTurn().',
+                        'DIALOG_ACTIVE',
+                    ),
+                );
                 return;
             }
             if (this.#queue.length >= MAX_QUEUE_SIZE) {
@@ -886,18 +969,32 @@ export class AlwaysAliveAgent extends EventEmitter {
             `Você é um agente de diálogo contínuo.
 
 Protocolo OBRIGATÓRIO:
-1. Chame ask_user("READY: aguardando próxima mensagem") para sinalizar prontidão.
+1. Chame ask_user("${DIALOG_PROTO_READY} aguardando próxima mensagem") para sinalizar prontidão.
 2. Ao receber uma mensagem, processe-a e formule uma resposta.
-3. Chame ask_user("REPLY: " + sua_resposta) para enviar a resposta.
+3. Chame ask_user("${DIALOG_PROTO_REPLY} " + sua_resposta) para enviar a resposta.
 4. Retorne ao passo 1.
 
-IMPORTANTE: NUNCA encerre o loop. Não use ask_user("STOPPED") nem qualquer forma de
+IMPORTANTE: NUNCA encerre o loop. Não use ask_user("${DIALOG_PROTO_STOPPED}") nem qualquer forma de
 encerramento — o loop é eterno por design (DL-PERM). O sistema reiniciará automaticamente
 qualquer tentativa de encerramento não autorizado.`;
 
-        // Boot: 1 PR — resolve quando o modelo emite o primeiro ask_user("READY:")
-        const bootPromise = new Promise((resolve) => {
-            this.once('dialog.ready', resolve);
+        // Boot: 1 PR — resolve quando o modelo emite o primeiro ask_user("READY:"), com timeout (IMPROVE-AA-02)
+        const bootPromise = new Promise((resolve, reject) => {
+            const bootTimeout = setTimeout(() => {
+                this.off('dialog.ready', onBootReady);
+                reject(
+                    new SessionError(
+                        `[AlwaysAlive] startDialogLoop boot timeout após ${AlwaysAliveAgent.#DIALOG_BOOT_TIMEOUT_MS}ms`,
+                        'BOOT_TIMEOUT',
+                    ),
+                );
+            }, AlwaysAliveAgent.#DIALOG_BOOT_TIMEOUT_MS);
+            /** @type {() => void} */
+            const onBootReady = () => {
+                clearTimeout(bootTimeout);
+                resolve(undefined);
+            };
+            this.once('dialog.ready', onBootReady);
         });
 
         // Inicia watchdog: detecta se o dialog loop ficar inativo por muito tempo
@@ -950,11 +1047,22 @@ qualquer tentativa de encerramento não autorizado.`;
             return Promise.reject(new DOMException('[AlwaysAlive] sendDialogTurn abortado.', 'AbortError'));
         }
 
+        // MR-02 (fix): backpressure — rejeitar se a fila já atingiu o máximo
+        if (this.#dialogTurnQueueDepth >= AlwaysAliveAgent.#MAX_DIALOG_TURN_QUEUE_SIZE) {
+            return Promise.reject(
+                new SessionError(
+                    `[AlwaysAlive] Fila de diálogo cheia (${this.#dialogTurnQueueDepth}/${AlwaysAliveAgent.#MAX_DIALOG_TURN_QUEUE_SIZE} turnos pendentes).`,
+                    'DIALOG_QUEUE_FULL',
+                ),
+            );
+        }
+
         // DL-PERM-04: registrar atividade no watchdog logo ao enviar o turno —
         // assim o watchdog não dispara stall durante processamentos longos do modelo.
         this.#watchdog?.ping();
 
         // Serializa via mutex: encadeia na cauda do turno atual
+        this.#dialogTurnQueueDepth++;
         const prev = this.#dialogTurnMutex;
         /** @type {Promise<string>} */
         const next = prev.then(() =>
@@ -962,6 +1070,14 @@ qualquer tentativa de encerramento não autorizado.`;
         );
         // Atualiza a cauda — o .catch(() => {}) evita UnhandledRejection interna
         this.#dialogTurnMutex = next.then(() => {}).catch(() => {});
+        // BUG-AA-04 (fix): resetar a cadeia do mutex quando a fila zerar, prevenindo crescimento
+        // indefinido de Promise-chain em sessões de longa duração com milhares de turnos.
+        void next.finally(() => {
+            this.#dialogTurnQueueDepth--;
+            if (this.#dialogTurnQueueDepth === 0) {
+                this.#dialogTurnMutex = Promise.resolve();
+            }
+        });
         return next;
     }
 
@@ -985,7 +1101,17 @@ qualquer tentativa de encerramento não autorizado.`;
             { sessionId: this.sessionId ?? '', actor: 'user' },
             () =>
                 new Promise((resolve, reject) => {
+                    // BUG-AA-01 (fix): referência ao listener onPending — necessária para remoção no timeout.
+                    // Sem isso, timeoutHandle pode disparar e deixar onPending orfão nos ouvintes do EventEmitter.
+                    /** @type {((arg: unknown) => void) | null} */
+                    let pendingListener = null;
+
                     const timeoutHandle = setTimeout(() => {
+                        // BUG-AA-01 (fix): remover listener orfão antes de rejeitar
+                        if (pendingListener) {
+                            this.off('question.pending', pendingListener);
+                            pendingListener = null;
+                        }
                         reject(
                             new SessionError(
                                 `[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`,
@@ -1045,6 +1171,7 @@ qualquer tentativa de encerramento não autorizado.`;
                         // BUG-02 (fix): registrar onStop dentro do onPending também, para limpar newTimeout
                         // e o listener interno de dialog.reply se dialog.stopped disparar antes da resposta
                         const onPending = (/** @type {unknown} */ _) => {
+                            pendingListener = null; // BUG-AA-01: foi disparado, não é mais orfão
                             clearTimeout(timeoutHandle);
                             const newTimeout = setTimeout(() => {
                                 this.off('dialog.reply', onReply);
@@ -1082,7 +1209,16 @@ qualquer tentativa de encerramento não autorizado.`;
                             this.once('dialog.stopped', onStop);
                             this.answerPendingQuestion(message);
                         };
+                        // BUG-AA-01 (fix): guardar referência para remoção caso o timeout dispare antes
+                        pendingListener = onPending;
                         this.once('question.pending', onPending);
+                        // BUG-AA-05 (fix): #pendingQuestion pode ter sido preenchido entre a verificação
+                        // inicial (this.#pendingQuestion === null) e o registro do once — checar novamente.
+                        if (this.#pendingQuestion) {
+                            this.off('question.pending', onPending);
+                            pendingListener = null;
+                            onPending(undefined);
+                        }
                     }
                 }),
         );
@@ -1118,10 +1254,14 @@ qualquer tentativa de encerramento não autorizado.`;
             );
             return;
         }
+        // BUG-AA-02 (fix): evitar double-stop se stopDialogLoop() for chamado concorrentemente
+        if (this.#dialogLoopStopping) return;
+        this.#dialogLoopStopping = true;
         if (this.#pendingQuestion) {
             this.answerPendingQuestion('STOP_DIALOG');
         }
         this.#dialogLoopActive = false;
+        this.#dialogLoopStopping = false;
         this.#watchdog?.stop();
         this.emit('dialog.stopped', { reason, authorized: true });
     }
@@ -1153,9 +1293,24 @@ qualquer tentativa de encerramento não autorizado.`;
                 clearTimeout(retryTimeout);
                 const sendAndListen = () => {
                     this.answerPendingQuestion(message);
-                    this.once('dialog.reply', (/** @type {{ reply: string }} */ retryEvt) => {
+                    // BUG-AA-06 (fix): guardar listener de dialog.stopped secundário para rejeitar se o loop
+                    // reiniciado parar novamente antes de emitir dialog.reply
+                    const onRetryStopped = (/** @type {{ reason?: string }} */ stoppedEvt) => {
+                        this.off('dialog.reply', onRetryReply);
+                        reject(
+                            new SessionError(
+                                `[AlwaysAlive] sendDialogTurn: dialog.stopped durante retry (${stoppedEvt?.reason ?? 'unknown'})`,
+                                'DIALOG_STOPPED_DURING_RETRY',
+                            ),
+                        );
+                    };
+                    /** @type {(evt: { reply: string }) => void} */
+                    const onRetryReply = (retryEvt) => {
+                        this.off('dialog.stopped', onRetryStopped);
                         resolve(retryEvt.reply);
-                    });
+                    };
+                    this.once('dialog.reply', onRetryReply);
+                    this.once('dialog.stopped', onRetryStopped);
                 };
                 if (this.#pendingQuestion) {
                     sendAndListen();
@@ -1305,6 +1460,10 @@ qualquer tentativa de encerramento não autorizado.`;
 
         log('WARN', `[AlwaysAlive] Erro de sessão detectado: ${originalError.message}. Iniciando reconexão...`);
 
+        // BUG-AA-03 (fix): cancelar listeners da sessão anterior antes de reconectar
+        for (const unsub of this.#sessionEventUnsubscribers) unsub();
+        this.#sessionEventUnsubscribers = [];
+
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + random(0..base)
             const delay = baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * baseDelayMs;
@@ -1356,19 +1515,19 @@ qualquer tentativa de encerramento não autorizado.`;
         if (this.#dialogLoopActive) {
             const trimmed = question.trim();
 
-            if (trimmed.startsWith('READY:') || trimmed === 'READY') {
+            if (trimmed.startsWith(DIALOG_PROTO_READY) || trimmed === 'READY') {
                 // Modelo sinaliza prontidão — emite evento para sendDialogTurn()
                 this.#watchdog?.ping();
                 this.emit('dialog.ready', {});
                 // Aguarda a resposta via question.pending normal
                 // (sendDialogTurn chamará answerPendingQuestion com a mensagem do usuário)
-            } else if (trimmed.startsWith('REPLY:') || trimmed.startsWith('DONE:')) {
+            } else if (trimmed.startsWith(DIALOG_PROTO_REPLY) || trimmed.startsWith(DIALOG_PROTO_DONE)) {
                 // Modelo enviou uma resposta — extrai o conteúdo
                 this.#watchdog?.ping();
                 const reply = trimmed.replace(/^(REPLY:|DONE:)\s*/i, '').trim();
                 this.emit('dialog.reply', { reply });
                 // Aguarda o próximo turno via question.pending
-            } else if (trimmed.startsWith('STOPPED') || trimmed === 'STOP_DIALOG') {
+            } else if (trimmed.startsWith(DIALOG_PROTO_STOPPED) || trimmed === 'STOP_DIALOG') {
                 // DL-PERM: o modelo tentou encerrar o loop. Não encerramos imediatamente — emitimos o evento
                 // 'dialog.stopped' para que o listener em terminal/index.js possa reiniciar automaticamente.
                 // O #dialogLoopActive NÃO é setado para false aqui — o restart via ensureDialogLoop() irá

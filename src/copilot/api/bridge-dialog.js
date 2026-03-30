@@ -76,12 +76,10 @@ export function registerDialogRoutes(bridge, agent) {
             return res.status(400).json({ ok: false, error: 'Campo "message" (string) é obrigatório.' });
         }
         if (typeof timeout !== 'number' || timeout < MIN_DIALOG_TIMEOUT_MS || timeout > MAX_DIALOG_TIMEOUT_MS) {
-            return res
-                .status(400)
-                .json({
-                    ok: false,
-                    error: `"timeout" deve ser número entre ${MIN_DIALOG_TIMEOUT_MS} e ${MAX_DIALOG_TIMEOUT_MS}.`,
-                });
+            return res.status(400).json({
+                ok: false,
+                error: `"timeout" deve ser número entre ${MIN_DIALOG_TIMEOUT_MS} e ${MAX_DIALOG_TIMEOUT_MS}.`,
+            });
         }
 
         try {

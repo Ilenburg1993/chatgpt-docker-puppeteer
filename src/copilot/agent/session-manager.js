@@ -346,14 +346,15 @@ export async function initOrResumeSession(client, sessionOptions) {
     // Delega para lib/session.resumeOrCreate — tenta retomar, cria se falhar
     const result = await resumeOrCreate(client, state?.sessionId ?? null, opts);
 
+    // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop
     if (result.isResumed) {
-        writeState({
+        await writeStateAsync({
             resumedAt: Date.now(),
             resumeCount: (state?.resumeCount ?? 0) + 1,
         });
         log('INFO', `[PersistentSession] Sessão retomada com sucesso (retomada #${(state?.resumeCount ?? 0) + 1}).`);
     } else {
-        writeState({
+        await writeStateAsync({
             sessionId: result.sessionId,
             startedAt: Date.now(),
             resumedAt: Date.now(),

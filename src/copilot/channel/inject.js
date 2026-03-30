@@ -290,21 +290,30 @@ function _subscribeSse(path, port, onEvent) {
             let buf = '';
             res.on('data', (/** @type {Buffer} */ chunk) => {
                 buf += chunk.toString();
-                const lines = buf.split('\n');
-                buf = lines.pop() ?? '';
+                // SSE-INJECT-01 (fix): parsear por blocos delimitados por linha vazia (RFC 8895).
+                // Múltiplas linhas data: num mesmo bloco são acumuladas e concatenadas com \n.
+                const blocks = buf.split(/\r?\n\r?\n/);
+                buf = blocks.pop() ?? '';
 
-                let currentEvent = '';
-                for (const line of lines) {
-                    if (line.startsWith('event:')) {
-                        currentEvent = line.slice(6).trim();
-                    } else if (line.startsWith('data:')) {
+                for (const block of blocks) {
+                    if (!block.trim()) continue;
+                    let currentEvent = '';
+                    const dataLines = /** @type {string[]} */ ([]);
+                    for (const line of block.split(/\r?\n/)) {
+                        if (line.startsWith('event:')) {
+                            currentEvent = line.slice(6).trim();
+                        } else if (line.startsWith('data:')) {
+                            dataLines.push(line.slice(5).trimStart());
+                        }
+                        // ignorar linhas 'id:' e 'retry:' — não usadas por este parser
+                    }
+                    if (dataLines.length > 0) {
                         try {
-                            const data = JSON.parse(line.slice(5).trim());
+                            const data = JSON.parse(dataLines.join('\n'));
                             onEvent({ type: currentEvent || 'message', data });
                         } catch {
                             /* ignora JSON inválido */
                         }
-                        currentEvent = '';
                     }
                 }
             });
