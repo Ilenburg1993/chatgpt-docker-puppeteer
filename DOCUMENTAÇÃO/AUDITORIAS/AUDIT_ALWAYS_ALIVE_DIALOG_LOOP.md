@@ -1058,12 +1058,12 @@ export function writeState(updates) {
 | BUG-AA-04 | 🟠 ALTO     | `always-alive.js`    | `#dialogTurnMutex` não reseta → crescimento indefinido              | Pequeno | ✅ `00105bc1` (via `#dialogTurnQueueDepth`) |
 | BUG-AA-05 | 🟡 MÉDIO    | `always-alive.js`    | `question.pending` emitido antes do listener → turno perdido        | Médio   | ✅ `00105bc1`                               |
 | BUG-AA-06 | 🟡 MÉDIO    | `always-alive.js`    | `#watchdog` não parado em `stop()` se `#dialogLoopActive === false` | Pequeno | ✅ `00105bc1` (via `#dialogLoopStopping`)   |
-| BUG-AA-07 | 🟡 MÉDIO    | `session-manager.js` | `mkdir` redundante em cada `writeStateAsync`                        | Pequeno | ⚪ Pendente                                 |
+| BUG-AA-07 | 🟡 MÉDIO    | `session-manager.js` | `mkdir` redundante em cada `writeStateAsync`                        | Pequeno | ✅ `b0f774d1`                               |
 | BUG-AA-08 | 🟡 MÉDIO    | `always-alive.js`    | `#waitForDialogRestartAndReply` não distingue stop definitivo       | Pequeno | ✅ `00105bc1`                               |
-| BUG-AA-09 | 🟡 MÉDIO    | `entry.js`           | `session.fatal` não tratado → processo zumbi sem sessão             | Pequeno | ⚪ Pendente                                 |
-| BUG-AA-10 | 🟢 BAIXO    | `always-alive.js`    | `#tryReconnect` não loga intenção de restart do dialog loop         | Trivial | ⚪ Pendente                                 |
-| BUG-AA-11 | 🟢 BAIXO    | `always-alive.js`    | `session.onEvent` não-documentado em vez de API pública             | Pequeno | ⚪ Pendente                                 |
-| BUG-AA-12 | 🟢 BAIXO    | `lib/session.js`     | `mode: 'append'` obsoleto — migrar para `mode: 'customize'`         | Trivial | ⚪ Pendente                                 |
+| BUG-AA-09 | 🟡 MÉDIO    | `entry.js`           | `session.fatal` não tratado → processo zumbi sem sessão             | Pequeno | ✅ `b0f774d1`                               |
+| BUG-AA-10 | 🟢 BAIXO    | `always-alive.js`    | `#tryReconnect` não loga intenção de restart do dialog loop         | Trivial | ✅ `5f0a71ba`                               |
+| BUG-AA-11 | 🟢 BAIXO    | `always-alive.js`    | `session.onEvent` não-documentado em vez de API pública             | Pequeno | ✅ `b0f774d1`                               |
+| BUG-AA-12 | 🟢 BAIXO    | `lib/session.js`     | `mode: 'append'` obsoleto — migrar para `mode: 'customize'`         | Trivial | ✅ `b0f774d1`                               |
 
 ### Melhorias de Robustez
 
@@ -1071,24 +1071,24 @@ export function writeState(updates) {
 | ----- | ---------- | ---------------------------------------------------- | ------- | ------------------------------------------------------------ |
 | MR-01 | 🔴 Alta     | Timeout no `bootPromise` de `startDialogLoop`        | Pequeno | ✅ `00105bc1`                                                 |
 | MR-02 | 🔴 Alta     | Backpressure para `sendDialogTurn`                   | Pequeno | ✅ `00105bc1`                                                 |
-| MR-03 | 🟡 Média    | Eventos `dialog.turn_start` / `dialog.turn_end`      | Pequeno | ⚪ Pendente                                                   |
-| MR-04 | 🟡 Média    | Métricas de latência por turno no `#telemetry`       | Médio   | ⚪ Pendente                                                   |
-| MR-05 | 🟡 Média    | `ensureDialogLoop` aguarda idle durante `processing` | Pequeno | ⚪ Pendente                                                   |
+| MR-03 | 🟡 Média    | Eventos `dialog.turn_start` / `dialog.turn_end`      | Pequeno | ✅ `5f0a71ba`                                                 |
+| MR-04 | 🟡 Média    | Métricas de latência por turno no `#telemetry`       | Médio   | ✅ `5f0a71ba`                                                 |
+| MR-05 | 🟡 Média    | `ensureDialogLoop` aguarda idle durante `processing` | Pequeno | ✅ `b0f774d1`                                                   |
 | MR-06 | 🟡 Média    | `readState()` async version para usos não-críticos   | Pequeno | ✅ `00105bc1` (SYNC-SM-01)                                    |
-| MR-07 | 🟢 Baixa    | Validação de `COPILOT_MODEL` no boot de `entry.js`   | Trivial | ⚪ Pendente                                                   |
-| MR-08 | 🟢 Baixa    | Persistir `dialogLoopActive` em disco                | Médio   | ⚪ Pendente                                                   |
-| MR-09 | 🟢 Baixa    | `_subscribeSse` com reconexão automática             | Médio   | ⚪ Pendente (SSE-INJECT-01 melhora o parser, não a reconexão) |
+| MR-07 | 🟢 Baixa    | Validação de `COPILOT_MODEL` no boot de `entry.js`   | Trivial | ✅ `5f0a71ba`                                                 |
+| MR-08 | 🟢 Baixa    | Persistir `dialogLoopActive` em disco                | Médio   | ✅ `5f0a71ba`                                                 |
+| MR-09 | 🟢 Baixa    | `_subscribeSse` com reconexão automática             | Médio   | ✅ `b0f774d1`                                                 |
 
 ### Refatorações
 
 | ID     | Prioridade | Descrição                                     | Esforço | Implementado                                                              |
 | ------ | ---------- | --------------------------------------------- | ------- | ------------------------------------------------------------------------- |
-| RF-D01 | 🟡 Média    | Extrair `DialogProtocol` como classe testável | Médio   | ⚪ Pendente (IMPROVE-AA-01 centraliza constantes, mas não extrai a classe) |
-| RF-D02 | 🟢 Baixa    | Reintentos com contador em `task-executor.js` | Pequeno | ⚪ Pendente                                                                |
-| RF-D03 | 🟢 Baixa    | Separar handlers em `#handleUserInputRequest` | Médio   | ⚪ Pendente                                                                |
-| RF-D04 | 🟢 Baixa    | Boot prompt centralizado como objeto tipado   | Pequeno | ⚪ Pendente                                                                |
-| RF-D05 | 🟡 Média    | Telemetria OTEL completa no dialog loop       | Pequeno | ⚪ Pendente                                                                |
-| RF-D06 | 🟡 Média    | `readState()` com cache in-process            | Pequeno | ⚪ Pendente                                                                |
+| RF-D01 | 🟡 Média    | Extrair `DialogProtocol` como classe testável | Médio   | ✅ `b0f774d1` (`dialog-protocol.js` com classify/extractReply/buildBootPrompt) |
+| RF-D02 | 🟢 Baixa    | Reintentos com contador em `task-executor.js` | Pequeno | ✅ `5f0a71ba`                                                               |
+| RF-D03 | 🟢 Baixa    | Separar handlers em `#handleUserInputRequest` | Médio   | ✅ `5f0a71ba`                                                               |
+| RF-D04 | 🟢 Baixa    | Boot prompt centralizado como objeto tipado   | Pequeno | ✅ `5f0a71ba` (via `DialogProtocol.buildBootPrompt()`)                      |
+| RF-D05 | 🟡 Média    | Telemetria OTEL completa no dialog loop       | Pequeno | ✅ `5f0a71ba` (`extra.turnNumber` + `model` em startSpan)                  |
+| RF-D06 | 🟡 Média    | `readState()` com cache in-process            | Pequeno | ✅ `b0f774d1` (`_stateCache` em session-manager.js)                        |
 
 ---
 
@@ -1209,25 +1209,25 @@ zumbi causado por `session.fatal` não tratado.
 
 | #   | Item                                       | Arquivo                                  | Benefício                             |
 | --- | ------------------------------------------ | ---------------------------------------- | ------------------------------------- |
-| 4.1 | RF-D03: separar handlers ask_user          | `always-alive.js`                        | Clareza e testabilidade separada      |
-| 4.2 | MR-04: métricas de latência via telemetry  | `always-alive.js`                        | Detectar regressões de performance    |
-| 4.3 | RF-D05: OTEL spans completos               | `always-alive.js`                        | Spans com turnNumber e questionType   |
-| 4.4 | MR-07: validar COPILOT_MODEL no boot       | `entry.js`                               | Falha rápida em modelo inválido       |
-| 4.5 | MR-08: persistir dialogLoopActive em disco | `always-alive.js` + `session-manager.js` | Auto-restart perfeito após PM2 crash  |
-| 4.6 | MR-09: reconexão SSE em inject.js          | `channel/inject.js`                      | Canal LLM-A → LLM-B resiliente        |
-| 4.7 | RF-D04: boot prompt centralizado           | `agent/dialog-protocol.js`               | DRY entre always-alive.js e dialog.js |
+| 4.1 | RF-D03: separar handlers ask_user          | `always-alive.js`                        | ✅ `5f0a71ba` — Clareza e testabilidade separada      |
+| 4.2 | MR-04: métricas de latência via telemetry  | `always-alive.js`                        | ✅ `5f0a71ba` — Detectar regressões de performance    |
+| 4.3 | RF-D05: OTEL spans completos               | `always-alive.js`                        | ✅ `5f0a71ba` — Spans com `extra.turnNumber` e model  |
+| 4.4 | MR-07: validar COPILOT_MODEL no boot       | `entry.js`                               | ✅ `5f0a71ba` — Falha rápida em modelo inválido       |
+| 4.5 | MR-08: persistir dialogLoopActive em disco | `always-alive.js` + `session-manager.js` | ✅ `5f0a71ba` — Auto-restart perfeito após PM2 crash  |
+| 4.6 | MR-09: reconexão SSE em inject.js          | `channel/inject.js`                      | ✅ `b0f774d1` — Canal LLM-A → LLM-B resiliente        |
+| 4.7 | RF-D04: boot prompt centralizado           | `agent/dialog-protocol.js`               | ✅ `5f0a71ba` — DRY entre always-alive.js e dialog.js |
 
 ---
 
 ### Status Geral do Roadmap
 
-| Fase                  | Total de itens | Status                                       |
-| --------------------- | -------------- | -------------------------------------------- |
-| Fase 1 (crítico)      | 5 itens        | ✅ CONCLUÍDA — commit `00105bc1`              |
-| Fase 2 (alto impacto) | 6 itens        | ✅ CONCLUÍDA — commit `00105bc1`              |
-| Fase 3 (qualidade)    | 6 itens        | 🔶 PARCIAL — SYNC-SM-01, SSE-INJECT-01 feitos |
-| Fase 4 (polimento)    | 7 itens        | ⚪ Pendente                                   |
-| **Total**             | **24 itens**   | 12/24 implementados                          |
+| Fase                  | Total de itens | Status                                                         |
+| --------------------- | -------------- | -------------------------------------------------------------- |
+| Fase 1 (crítico)      | 5 itens        | ✅ CONCLUÍDA — commit `00105bc1`                               |
+| Fase 2 (alto impacto) | 6 itens        | ✅ CONCLUÍDA — commit `00105bc1`                               |
+| Fase 3 (qualidade)    | 6 itens        | ✅ CONCLUÍDA — `b0f774d1` + `5f0a71ba`                        |
+| Fase 4 (polimento)    | 7 itens        | ✅ CONCLUÍDA — `b0f774d1` + `5f0a71ba`                        |
+| **Total**             | **24 itens**   | **24/24 implementados** — Roadmap 100% concluído ✅            |
 
 #### Mapeamento Fase 1 → commits
 
