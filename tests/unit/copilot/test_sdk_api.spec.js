@@ -24,11 +24,11 @@ function mockReqRes(opts = {}) {
     const captured = { status: 200, body: /** @type {unknown} */ (undefined) };
     const res = {
         _status: 200,
-        status(code) {
+        status(/** @type {number} */ code) {
             captured.status = code;
             return res;
         },
-        json(data) {
+        json(/** @type {any} */ data) {
             captured.body = data;
             return res;
         },
@@ -225,7 +225,7 @@ describe('sdk-api › withErrorHandler (simulação)', () => {
 describe('sdk-api › contratos de payload', () => {
     it('POST /sessions requer campo "model" como string', () => {
         // Verifica a lógica de validação sem chamar o handler real
-        function validateBody(body) {
+        function validateBody(/** @type {any} */ body) {
             const { model } = body ?? {};
             if (!model || typeof model !== 'string') {
                 return { valid: false, error: 'Campo "model" (string) é obrigatório.' };
@@ -242,7 +242,7 @@ describe('sdk-api › contratos de payload', () => {
     });
 
     it('POST /sessions/:id/send requer campo "prompt" como string', () => {
-        function validateBody(body) {
+        function validateBody(/** @type {any} */ body) {
             const { prompt } = body ?? {};
             if (!prompt || typeof prompt !== 'string') {
                 return { valid: false, error: 'Campo "prompt" (string) é obrigatório.' };
@@ -327,8 +327,10 @@ describe('sdk-api Sprint 19 › rotas registradas', () => {
     });
 
     it('/sessions/foreground aparece antes de /sessions/:id no stack (precedência de rota)', () => {
-        const idxForeground = /** @type {any} */ (routes).findIndex((r) => r.path === '/sessions/foreground');
-        const idxById = /** @type {any} */ (routes).findIndex((r) => r.path === '/sessions/:id');
+        const idxForeground = /** @type {any} */ (routes).findIndex(
+            (/** @type {any} */ r) => r.path === '/sessions/foreground',
+        );
+        const idxById = /** @type {any} */ (routes).findIndex((/** @type {any} */ r) => r.path === '/sessions/:id');
         assert.ok(idxForeground >= 0, '/sessions/foreground deve existir no router');
         assert.ok(idxById >= 0, '/sessions/:id deve existir no router');
         assert.ok(

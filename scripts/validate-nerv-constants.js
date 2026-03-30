@@ -34,12 +34,21 @@ const ALL_ENUMS = [
     'TaskControlCommand',
 ];
 
+/**
+ * @param {string} enumName
+ * @returns {string[]}
+ */
 function getEnumKeys(enumName) {
     const obj = constants[enumName];
     if (!obj || typeof obj !== 'object') return [];
     return Object.keys(obj).sort();
 }
 
+/**
+ * @param {string} enumName
+ * @param {string[]} keys
+ * @returns {Promise<{ key: string; files: string[] }[]>}
+ */
 async function findUsedKeys(enumName, keys) {
     const result = [];
     for (const key of keys) {
@@ -68,6 +77,18 @@ async function findUsedKeys(enumName, keys) {
     return result;
 }
 
+/**
+ * @param {string} enumName
+ * @returns {Promise<{
+ *     enumName: string;
+ *     error?: string;
+ *     defined: string[];
+ *     usedKeys: string[];
+ *     unusedKeys: string[];
+ *     coverage: number;
+ *     usageDetail?: { key: string; files: string[] }[];
+ * }>}
+ */
 async function analyzeEnum(enumName) {
     const defined = getEnumKeys(enumName);
     if (defined.length === 0) {
@@ -93,6 +114,17 @@ async function analyzeEnum(enumName) {
     };
 }
 
+/**
+ * @param {{
+ *     enumName: string;
+ *     error?: string;
+ *     defined: string[];
+ *     usedKeys: string[];
+ *     unusedKeys: string[];
+ *     coverage: number;
+ * }} report
+ * @returns {void}
+ */
 function printEnumReport(report) {
     if (report.error) {
         console.log(`  ⚠️  ${report.enumName}: ${report.error}`);

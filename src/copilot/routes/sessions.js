@@ -351,10 +351,11 @@ router.delete('/sessions/:id', (req, res) => {
         // SEC-N10 (fix): exigir confirmação explícita para operação irreversível
         const confirmHeader = req.headers['x-confirm-delete'];
         if (confirmHeader !== 'true') {
-            return res.status(400).json({
+            res.status(400).json({
                 ok: false,
                 error: 'Operação irreversível. Adicione o header "X-Confirm-Delete: true" para confirmar.',
             });
+            return;
         }
 
         // Desconectar do registry se ativo

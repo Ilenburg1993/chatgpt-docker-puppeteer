@@ -23,7 +23,7 @@ import {
 
 /**
  * @param {string} toolName
- * @returns {import('@github/copilot-sdk').PreToolUseHookInput}
+ * @returns {import('../../../src/copilot/lib/hooks.js').PreToolUseHookInput}
  */
 function makePreInput(toolName) {
     return /** @type {any} */ ({ toolName, toolArgs: {}, timestamp: Date.now(), cwd: '/tmp' });
@@ -31,7 +31,7 @@ function makePreInput(toolName) {
 
 /**
  * @param {string} toolName
- * @returns {import('@github/copilot-sdk').PostToolUseHookInput}
+ * @returns {import('../../../src/copilot/lib/hooks.js').PostToolUseHookInput}
  */
 function makePostInput(toolName) {
     return /** @type {any} */ ({
@@ -56,37 +56,49 @@ describe('lib/hooks › createHooks › padrão', () => {
 
     it('onPreToolUse permite qualquer tool se allowTools nao definido', async () => {
         const hooks = createHooks();
-        const result = await hooks.onPreToolUse(makePreInput('qualquer_tool'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('qualquer_tool'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'allow');
     });
 
     it('onPreToolUse retorna allow para tool conhecida', async () => {
         const hooks = createHooks({ allowTools: ['read_file', 'list_dir'] });
-        const result = await hooks.onPreToolUse(makePreInput('read_file'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('read_file'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'allow');
     });
 
     it('onPreToolUse retorna deny para tool fora da whitelist', async () => {
         const hooks = createHooks({ allowTools: ['read_file'] });
-        const result = await hooks.onPreToolUse(makePreInput('shell_exec'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('shell_exec'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 
     it('denyTools tem precedencia sobre allowTools', async () => {
         const hooks = createHooks({ allowTools: ['read_file'], denyTools: ['read_file'] });
-        const result = await hooks.onPreToolUse(makePreInput('read_file'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('read_file'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 
     it('denyPatterns bloqueia por regex', async () => {
         const hooks = createHooks({ denyPatterns: [/^shell_/] });
-        const result = await hooks.onPreToolUse(makePreInput('shell_exec'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('shell_exec'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 
     it('denyPatterns nao bloqueia tool que nao faz match', async () => {
         const hooks = createHooks({ denyPatterns: [/^shell_/] });
-        const result = await hooks.onPreToolUse(makePreInput('read_file'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('read_file'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'allow');
     });
 });
@@ -131,21 +143,28 @@ describe('lib/hooks › createHooks › auditLog', () => {
 
 describe('lib/hooks › createHooks › handlers customizados', () => {
     it('onPreToolUse customizado substitui o padrão', async () => {
-        /** @type {import('@github/copilot-sdk').PreToolUseHandler} */
+        /** @type {import('../../../src/copilot/lib/hooks.js').PreToolUseHandler} */
         const customPre = async () => ({ permissionDecision: 'ask' });
         const hooks = createHooks({ onPreToolUse: customPre });
-        const result = await hooks.onPreToolUse(makePreInput('any_tool'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('any_tool'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'ask');
     });
 
     it('onErrorOccurred customizado substituí o padrão', async () => {
+        /** @type {string} */
         let captured = '';
-        /** @type {import('@github/copilot-sdk').ErrorOccurredHandler} */
-        const customErr = async (input) => {
-            captured = input.error;
+        /** @type {import('../../../src/copilot/lib/hooks.js').ErrorOccurredHandler} */
+        const customErr = async (
+            /** @type {import('../../../src/copilot/lib/hooks.js').ErrorOccurredHookInput} */ input,
+        ) => {
+            captured = String(input.error);
         };
         const hooks = createHooks({ onErrorOccurred: customErr });
-        await hooks.onErrorOccurred(
+        const fn = hooks.onErrorOccurred;
+        assert.ok(typeof fn === 'function');
+        await fn(
             /** @type {any} */ ({
                 error: 'test-error',
                 errorContext: 'system',
@@ -169,7 +188,9 @@ describe('lib/hooks › createMinimalHooks', () => {
 
     it('permite qualquer tool (sem restricoes)', async () => {
         const hooks = createMinimalHooks();
-        const result = await hooks.onPreToolUse(makePreInput('rm_rf'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('rm_rf'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'allow');
     });
 });
@@ -189,7 +210,9 @@ describe('lib/hooks › createAuditHooks', () => {
 
     it('onPostToolUse pode ser chamado sem erro', async () => {
         const hooks = createAuditHooks();
-        const result = await hooks.onPostToolUse(makePostInput('read_file'), makeInvocation());
+        const fn = hooks.onPostToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePostInput('read_file'), makeInvocation());
         assert.ok(result === undefined || typeof result === 'object');
     });
 });
@@ -199,13 +222,17 @@ describe('lib/hooks › createAuditHooks', () => {
 describe('lib/hooks › createDenyAllHooks', () => {
     it('nega qualquer ferramenta', async () => {
         const hooks = createDenyAllHooks();
-        const result = await hooks.onPreToolUse(makePreInput('read_file'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('read_file'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 
     it('nega mesmo ferramentas "seguras"', async () => {
         const hooks = createDenyAllHooks();
-        const result = await hooks.onPreToolUse(makePreInput('list_dir'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('list_dir'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 });
@@ -215,19 +242,25 @@ describe('lib/hooks › createDenyAllHooks', () => {
 describe('lib/hooks › createSafeHooks', () => {
     it('permite read_file (na whitelist padrao)', async () => {
         const hooks = createSafeHooks();
-        const result = await hooks.onPreToolUse(makePreInput('read_file'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('read_file'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'allow');
     });
 
     it('nega shell_exec (fora da whitelist)', async () => {
         const hooks = createSafeHooks();
-        const result = await hooks.onPreToolUse(makePreInput('shell_exec'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('shell_exec'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 
     it('permite tool extra passada como argumento', async () => {
         const hooks = createSafeHooks(['minha_tool_segura']);
-        const result = await hooks.onPreToolUse(makePreInput('minha_tool_segura'), makeInvocation());
+        const fn = hooks.onPreToolUse;
+        assert.ok(typeof fn === 'function');
+        const result = await fn(makePreInput('minha_tool_segura'), makeInvocation());
         assert.strictEqual(result?.permissionDecision, 'allow');
     });
 });
@@ -236,11 +269,11 @@ describe('lib/hooks › createSafeHooks', () => {
 
 describe('lib/hooks › composePreToolUseHandlers', () => {
     it('usa primeiro handler que retorna permissionDecision', async () => {
-        /** @type {import('@github/copilot-sdk').PreToolUseHandler} */
+        /** @type {import('../../../src/copilot/lib/hooks.js').PreToolUseHandler} */
         const h1 = async () => undefined;
-        /** @type {import('@github/copilot-sdk').PreToolUseHandler} */
+        /** @type {import('../../../src/copilot/lib/hooks.js').PreToolUseHandler} */
         const h2 = async () => ({ permissionDecision: 'deny' });
-        /** @type {import('@github/copilot-sdk').PreToolUseHandler} */
+        /** @type {import('../../../src/copilot/lib/hooks.js').PreToolUseHandler} */
         const h3 = async () => ({ permissionDecision: 'allow' });
 
         const composed = composePreToolUseHandlers(h1, h2, h3);
@@ -249,9 +282,9 @@ describe('lib/hooks › composePreToolUseHandlers', () => {
     });
 
     it('retorna undefined se nenhum handler retornar decisao', async () => {
-        /** @type {import('@github/copilot-sdk').PreToolUseHandler} */
+        /** @type {import('../../../src/copilot/lib/hooks.js').PreToolUseHandler} */
         const h1 = async () => undefined;
-        /** @type {import('@github/copilot-sdk').PreToolUseHandler} */
+        /** @type {import('../../../src/copilot/lib/hooks.js').PreToolUseHandler} */
         const h2 = async () => undefined;
 
         const composed = composePreToolUseHandlers(h1, h2);
@@ -264,7 +297,7 @@ describe('lib/hooks › composePreToolUseHandlers', () => {
 
 describe('lib/hooks › createErrorNotifierHook', () => {
     it('chama callback com os parametros corretos', async () => {
-        /** @type {{ error: string; context: string; recoverable: boolean; sessionId: string } | null} */
+        /** @type {{ error: Error | string; context: string; recoverable: boolean; sessionId: string } | null} */
         let captured = null;
 
         const hook = createErrorNotifierHook((error, context, recoverable, sessionId) => {
@@ -282,10 +315,14 @@ describe('lib/hooks › createErrorNotifierHook', () => {
             { sessionId: 'sess-notify-test' },
         );
 
-        assert.ok(captured !== null);
-        assert.strictEqual(captured.error, 'falha-teste');
-        assert.strictEqual(captured.context, 'tool_execution');
-        assert.strictEqual(captured.recoverable, true);
-        assert.strictEqual(captured.sessionId, 'sess-notify-test');
+        assert.ok(captured !== null, 'callback deve ter sido chamado');
+        const capturedData =
+            /** @type {{ error: Error | string; context: string; recoverable: boolean; sessionId: string }} */ (
+                /** @type {unknown} */ (captured)
+            );
+        assert.strictEqual(String(capturedData.error), 'falha-teste');
+        assert.strictEqual(capturedData.context, 'tool_execution');
+        assert.strictEqual(capturedData.recoverable, true);
+        assert.strictEqual(capturedData.sessionId, 'sess-notify-test');
     });
 });

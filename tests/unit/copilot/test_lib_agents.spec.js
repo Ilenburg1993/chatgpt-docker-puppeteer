@@ -165,8 +165,8 @@ describe('buildAgentList', () => {
         const a2 = createAgent({ name: 'a2', prompt: 'p2' });
         const list = buildAgentList(a1, a2);
         assert.equal(list.length, 2);
-        assert.equal(list[0].name, 'a1');
-        assert.equal(list[1].name, 'a2');
+        assert.equal(list[0]?.name, 'a1');
+        assert.equal(list[1]?.name, 'a2');
     });
 
     it('deve retornar array vazio se chamado sem argumentos', () => {

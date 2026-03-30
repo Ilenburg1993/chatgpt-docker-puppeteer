@@ -43,7 +43,7 @@ import { v4 as uuidv4 } from 'uuid';
  * @property {number} created_at - Unix timestamp ms
  * @property {number} [duration_ms] - Duração do turno em ms (para LLM-B)
  * @property {string} [model] - Modelo usado ('gpt-4.1' | 'copilot-claude-sonnet-4.6')
- * @property {boolean} [user_read] - Se o usuário leu (para mensagens injetadas pelo usuário)
+ * @property {0 | 1} [user_read] - Se a mensagem foi processada (0=pendente, 1=processada)
  * @property {string} [metadata] - JSON livre para extensão
  */
 

@@ -68,7 +68,7 @@ describe('AlwaysAliveAgent — diagnósticos de listeners e starvation', () => {
             alwaysAliveAgent.on('ready', h2);
 
             const diagDuring = alwaysAliveAgent.listenerDiagnostics();
-            assert.equal(diagDuring['ready'], diagBefore['ready'] + 2);
+            assert.equal(diagDuring['ready'] ?? 0, (diagBefore['ready'] ?? 0) + 2);
 
             alwaysAliveAgent.off('ready', h1);
             alwaysAliveAgent.off('ready', h2);

@@ -31,8 +31,8 @@ import { allTools } from '../../../src/copilot/tools/index.js';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Encontra uma tool pelo nome em um array de tools */
-function findTool(tools, name) {
-    return tools.find((t) => /** @type {any} */ (t).name === name);
+function findTool(/** @type {any[]} */ tools, /** @type {string} */ name) {
+    return tools.find((/** @type {any} */ t) => t.name === name);
 }
 
 /**
@@ -216,7 +216,7 @@ describe('list_directory', () => {
         const result = await callTool(tool, { path: TMP_DIR, recursive: true, depth: 2 });
         assert.equal(result.success, true);
         // O subdiretório deve estar presente
-        const subDirEntry = result.entries.find((e) => e.type === 'dir');
+        const subDirEntry = result.entries.find((/** @type {any} */ e) => e.type === 'dir');
         assert.ok(subDirEntry, 'deve encontrar entrada do tipo dir');
     });
 });

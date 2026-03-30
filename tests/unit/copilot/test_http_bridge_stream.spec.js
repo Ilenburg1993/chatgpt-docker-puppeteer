@@ -29,7 +29,7 @@ import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
  *     res: any;
  *     headers: Record<string, string>;
  *     chunks: string[];
- *     writableEnded: boolean;
+ *     _flushed: boolean;
  * }}
  */
 function makeSseResMock() {
@@ -44,13 +44,13 @@ function makeSseResMock() {
             return res._writableEnded ?? false;
         },
         _writableEnded: false,
-        setHeader(name, value) {
+        setHeader(/** @type {string} */ name, /** @type {string} */ value) {
             headers[name] = value;
         },
         flushHeaders() {
             flushed = true;
         },
-        write(chunk) {
+        write(/** @type {string} */ chunk) {
             chunks.push(chunk);
         },
     });
@@ -59,7 +59,6 @@ function makeSseResMock() {
         res,
         headers,
         chunks,
-        flushed: false,
         get _flushed() {
             return flushed;
         },
@@ -207,7 +206,7 @@ describe('http-bridge GET /stream — evento connected', () => {
 
         // Deve ter ao menos 1 chunk após a conexão
         assert.ok(chunks.length >= 1, 'deve ter escrito ao menos 1 chunk SSE');
-        const firstChunk = chunks[0];
+        const firstChunk = chunks[0] ?? '';
         assert.ok(
             firstChunk.startsWith('event: connected\n'),
             `primeiro evento deve ser 'connected', recebido: ${firstChunk}`,
@@ -224,8 +223,8 @@ describe('http-bridge GET /stream — evento connected', () => {
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
 
-        const dataLine = chunks[0]?.split('\n')[1]; // "data: {...}"
-        assert.ok(dataLine?.startsWith('data: '), 'deve ter linha data:');
+        const dataLine = (chunks[0] ?? '').split('\n')[1] ?? ''; // "data: {...}"
+        assert.ok(dataLine.startsWith('data: '), 'deve ter linha data:');
         const parsed = JSON.parse(dataLine.replace('data: ', ''));
         assert.ok(typeof parsed.timestamp === 'number', 'connected deve ter timestamp numérico');
 
@@ -255,14 +254,14 @@ describe('http-bridge GET /stream — repasse de eventos do agente', () => {
         const initialCount = chunks.length;
 
         // Simula alwaysAliveAgent emitindo task.completed
-        alwaysAliveAgent.emit('task.completed', {
+        /** @type {any} */ (alwaysAliveAgent).emit('task.completed', {
             taskId: 'stream-test-001',
             response: 'Resposta completa',
             responseLen: 17,
         });
 
         assert.ok(chunks.length > initialCount, 'deve ter escrito novo chunk SSE');
-        const lastChunk = chunks[chunks.length - 1];
+        const lastChunk = chunks[chunks.length - 1] ?? '';
         assert.ok(
             lastChunk.startsWith('event: task.completed\n'),
             `deve ser evento task.completed, recebido: ${lastChunk}`,
@@ -279,12 +278,15 @@ describe('http-bridge GET /stream — repasse de eventos do agente', () => {
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
 
-        alwaysAliveAgent.emit('task.delta', { taskId: 'stream-delta-001', chunk: 'token parcial' });
+        /** @type {any} */ (alwaysAliveAgent).emit('task.delta', {
+            taskId: 'stream-delta-001',
+            chunk: 'token parcial',
+        });
 
         const deltaChunks = chunks.filter((c) => c.startsWith('event: task.delta\n'));
         assert.ok(deltaChunks.length >= 1, 'deve ter recebido ao menos 1 chunk task.delta via SSE');
 
-        const dataLine = deltaChunks[0].split('\n')[1];
+        const dataLine = (deltaChunks[0] ?? '').split('\n')[1] ?? '';
         const parsed = JSON.parse(dataLine.replace('data: ', ''));
         assert.strictEqual(parsed.taskId, 'stream-delta-001');
 
@@ -317,7 +319,7 @@ describe('http-bridge GET /stream — cleanup no fechamento', () => {
         const countAfterClose = chunks.length;
 
         // Emite evento depois do fechamento
-        alwaysAliveAgent.emit('task.completed', {
+        /** @type {any} */ (alwaysAliveAgent).emit('task.completed', {
             taskId: 'after-close',
             response: 'não deve chegar',
             responseLen: 14,
@@ -338,7 +340,7 @@ describe('http-bridge GET /stream — cleanup no fechamento', () => {
         resMock._writableEnded = true;
 
         assert.doesNotThrow(() => {
-            alwaysAliveAgent.emit('task.started', { taskId: 'safe-test' });
+            /** @type {any} */ (alwaysAliveAgent).emit('task.started', { taskId: 'safe-test' });
         }, 'não deve lançar exceção ao tentar escrever em res encerrado');
 
         reqEmitter.emit('close');

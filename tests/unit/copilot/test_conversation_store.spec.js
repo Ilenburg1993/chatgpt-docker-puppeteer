@@ -66,7 +66,7 @@ describe('ConversationStore.createHubSession', () => {
     it('usa título padrão quando não informado', () => {
         const id = store.createHubSession();
         const session = store.getHubSession(id);
-        assert.ok(session?.title.length > 0, 'deve ter título não-vazio');
+        assert.ok((session?.title?.length ?? 0) > 0, 'deve ter título não-vazio');
     });
 
     it('persiste sdkSessionId', () => {
@@ -165,7 +165,7 @@ describe('ConversationStore.writeTurn / readTurns', () => {
     it('readTurns retorna em ordem crescente', () => {
         const turns = store.readTurns(sessionId);
         for (let i = 1; i < turns.length; i++) {
-            assert.ok(turns[i].turn_number >= turns[i - 1].turn_number, 'deve crescer');
+            assert.ok((turns[i]?.turn_number ?? 0) >= (turns[i - 1]?.turn_number ?? 0), 'deve crescer');
         }
     });
 
@@ -174,10 +174,14 @@ describe('ConversationStore.writeTurn / readTurns', () => {
         const all = store.readTurns(sessionId);
         if (all.length < 2) return; // skip se menos de 2
 
-        const firstId = all[0].id;
+        const first = all[0];
+        const second = all[1];
+        if (!first || !second) return; // skip se menos de 2
+
+        const firstId = first.id;
         const filtered = store.readTurns(sessionId, { after: firstId });
         assert.ok(
-            filtered.every((t) => t.id > firstId),
+            filtered.every((t) => t.id > (firstId ?? -1)),
             'todos devem ter id > firstId',
         );
     });

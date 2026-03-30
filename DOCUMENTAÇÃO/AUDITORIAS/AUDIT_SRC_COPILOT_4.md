@@ -1463,8 +1463,8 @@ Itens verificados e implementados durante revisão de AUDIT_SRC_COPILOT_4.md:
 
 ### Status Final dos Pendentes
 
-| Item               | Status          | Observação                                                                                                                                                              |
-| ------------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Item               | Status         | Observação                                                                                                                                                              |
+| ------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | UPG-N16            | ✅ RESOLVIDO    | Reset `_sendTurnMutex = Promise.resolve(null)` quando `_turnQueueDepth === 0` (PERF-N06 fix em Batch-1) elimina crescimento infinito da chain                           |
 | UPG-N17            | ✅ IMPLEMENTADO | commit `4d276abd` — migração completa para `buildTool` factory                                                                                                          |
 | ARCH-N01 (parcial) | ✅ IMPLEMENTADO | `#setStatus('waiting_for_input')` em `always-alive.js:1406`, `_broadcastSse('waiting_for_input', …)` em `hook-tools.js:203`, POST `/answer` em `bridge-tasks.js:98-112` |

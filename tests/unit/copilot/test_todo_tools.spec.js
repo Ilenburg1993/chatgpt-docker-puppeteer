@@ -273,7 +273,7 @@ describe('todo_create', () => {
         const store = readStore();
         const ids = Object.keys(store.tasks);
         assert.equal(ids.length, 1);
-        assert.equal(store.tasks[ids[0]].title, 'Persistida');
+        assert.equal(store.tasks[/** @type {string} */ (ids[0])].title, 'Persistida');
     });
 });
 

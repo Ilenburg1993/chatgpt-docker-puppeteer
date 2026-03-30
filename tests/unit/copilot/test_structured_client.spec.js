@@ -35,7 +35,7 @@ const mockAgent = {
     on: (/** @type {string} */ event, /** @type {Function} */ fn) => {
         _listeners.set(event, fn);
     },
-    off: (_event, _fn) => {},
+    off: (/** @type {any} */ _event, /** @type {any} */ _fn) => {},
     answerPendingQuestion: mock.fn(),
 };
 
@@ -202,7 +202,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         });
         b.chat = mockChat;
 
-        const onDelta = (_chunk) => {};
+        const onDelta = (/** @type {any} */ _chunk) => {};
         await b.chatStructured({ context: 'c', intent: 'i', responseType: 'diagnostic' }, { onDelta });
 
         assert.ok(capturedOpts !== null, 'opts deve ter sido passado para chat()');
@@ -238,7 +238,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
 
         await assert.rejects(
             () => b.chatStructured({ context: '', intent: 'i', responseType: 'diagnostic' }),
-            (err) => err.constructor.name === 'ZodError',
+            (/** @type {any} */ err) => err.constructor.name === 'ZodError',
         );
     });
 
@@ -249,7 +249,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         await assert.rejects(
             // @ts-expect-error — teste deliberado de tipo inválido
             () => b.chatStructured({ context: 'c', intent: 'i', responseType: 'invalid_type' }),
-            (err) => err.constructor.name === 'ZodError',
+            (/** @type {any} */ err) => err.constructor.name === 'ZodError',
         );
     });
 });

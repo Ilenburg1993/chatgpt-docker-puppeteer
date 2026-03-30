@@ -18,7 +18,7 @@ import { describe, it } from 'node:test';
  *
  * @param {string} sessionId
  * @param {string} [model]
- * @returns {{ sessionId: string; entry: object }}
+ * @returns {{ sessionId: string; entry: { session: any; model: string; createdAt: number; messagesCount: number } }}
  */
 function makeEntry(sessionId, model = 'gpt-4o') {
     const session = /** @type {any} */ ({

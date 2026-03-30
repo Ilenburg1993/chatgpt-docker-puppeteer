@@ -20,18 +20,18 @@ function makeTmpDir() {
 }
 
 function makeMockClient({ failResume = false } = {}) {
-    const created = [];
-    const resumed = [];
+    const created = /** @type {any[]} */ ([]);
+    const resumed = /** @type {any[]} */ ([]);
 
     return {
         created,
         resumed,
-        async createSession(opts) {
+        async createSession(/** @type {any} */ opts) {
             const session = { sessionId: `new-session-${Date.now()}`, opts };
             created.push(session);
             return session;
         },
-        async resumeSession(id, opts) {
+        async resumeSession(/** @type {any} */ id, /** @type {any} */ opts) {
             if (failResume) throw new Error('Resume failed (mock)');
             const session = { sessionId: id, opts };
             resumed.push(session);
@@ -123,7 +123,7 @@ describe('session-manager › initOrResumeSession › sem sessão prévia', () =
         clearState();
 
         const client = makeMockClient();
-        const { session, isResumed } = await initOrResumeSession(client, {
+        const { session, isResumed } = await initOrResumeSession(/** @type {any} */ (client), {
             model: 'gpt-4.1',
         });
 
@@ -138,7 +138,7 @@ describe('session-manager › initOrResumeSession › sem sessão prévia', () =
         clearState();
 
         const client = makeMockClient();
-        const { session } = await initOrResumeSession(client, { model: 'gpt-4.1' });
+        const { session } = await initOrResumeSession(/** @type {any} */ (client), { model: 'gpt-4.1' });
 
         const state = readState();
         assert.ok(state !== null);
@@ -169,7 +169,7 @@ describe('session-manager › initOrResumeSession › com sessão prévia', () =
         });
 
         const client = makeMockClient();
-        const { session, isResumed } = await initOrResumeSession(client, { model: 'gpt-4.1' });
+        const { session, isResumed } = await initOrResumeSession(/** @type {any} */ (client), { model: 'gpt-4.1' });
 
         assert.strictEqual(session.sessionId, 'existing-session-xyz');
         assert.strictEqual(isResumed, true);
@@ -192,7 +192,7 @@ describe('session-manager › initOrResumeSession › com sessão prévia', () =
         });
 
         const client = makeMockClient({ failResume: true });
-        const { session, isResumed } = await initOrResumeSession(client, { model: 'gpt-4.1' });
+        const { session, isResumed } = await initOrResumeSession(/** @type {any} */ (client), { model: 'gpt-4.1' });
 
         assert.ok(session.sessionId.startsWith('new-session-'));
         assert.strictEqual(isResumed, false);
@@ -211,7 +211,7 @@ describe('session-manager › initOrResumeSession › injectHookContext', () => 
         clearState();
 
         const client = makeMockClient();
-        await initOrResumeSession(client, { model: 'gpt-4.1', injectHookContext: true });
+        await initOrResumeSession(/** @type {any} */ (client), { model: 'gpt-4.1', injectHookContext: true });
 
         const created = client.created[0];
         assert.ok(created !== undefined);
@@ -228,7 +228,7 @@ describe('session-manager › initOrResumeSession › injectHookContext', () => 
         clearState();
 
         const client = makeMockClient();
-        await initOrResumeSession(client, { model: 'gpt-4.1', injectHookContext: false });
+        await initOrResumeSession(/** @type {any} */ (client), { model: 'gpt-4.1', injectHookContext: false });
 
         const created = client.created[0];
         assert.ok(created !== undefined);

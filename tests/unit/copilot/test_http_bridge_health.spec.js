@@ -28,11 +28,11 @@ function makeResMock() {
     const state = { statusCode: 200, body: null };
 
     const res = {
-        status(code) {
+        status(/** @type {number} */ code) {
             state.statusCode = code;
             return res;
         },
-        json(data) {
+        json(/** @type {any} */ data) {
             state.body = data;
         },
     };

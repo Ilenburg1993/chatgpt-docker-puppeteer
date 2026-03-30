@@ -202,7 +202,7 @@ describe('buildStructuredRequest', () => {
     it('lança ZodError para input inválido', () => {
         assert.throws(
             () => buildStructuredRequest({ context: '', intent: 'i', responseType: 'plan' }),
-            (err) => err.constructor.name === 'ZodError',
+            (/** @type {any} */ err) => err.constructor.name === 'ZodError',
         );
     });
 

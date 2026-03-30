@@ -69,8 +69,8 @@ describe('AlwaysAliveAgent › webhooks', () => {
             const { id } = agent.registerWebhook('http://localhost:8080/evt');
             const list = agent.listWebhooks();
             assert.equal(list.length, 1);
-            assert.equal(list[0].id, id);
-            assert.equal(list[0].url, 'http://localhost:8080/evt');
+            assert.equal(list[0]?.id, id);
+            assert.equal(list[0]?.url, 'http://localhost:8080/evt');
         });
 
         it('deve listar múltiplos webhooks', () => {
@@ -83,6 +83,7 @@ describe('AlwaysAliveAgent › webhooks', () => {
         it('cada item deve ter as propriedades id e url', () => {
             agent.registerWebhook('http://x.com');
             const [item] = agent.listWebhooks();
+            assert.ok(item !== undefined);
             assert.ok(Object.hasOwn(item, 'id'));
             assert.ok(Object.hasOwn(item, 'url'));
         });
@@ -115,7 +116,7 @@ describe('AlwaysAliveAgent › webhooks', () => {
             agent.unregisterWebhook(r2.id);
             const list = agent.listWebhooks();
             assert.equal(list.length, 1);
-            assert.equal(list[0].id, r1.id);
+            assert.equal(list[0]?.id, r1.id);
         });
 
         it('remover mesmo id duas vezes retorna false na segunda chamada', () => {

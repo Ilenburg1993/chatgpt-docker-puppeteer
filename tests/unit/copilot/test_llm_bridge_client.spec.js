@@ -211,10 +211,10 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
             await client.chat('Mensagem usuário');
 
             assert.strictEqual(client.history.length, 2, 'deve ter 2 turnos (user + assistant)');
-            assert.strictEqual(client.history[0].role, 'user');
-            assert.strictEqual(client.history[0].content, 'Mensagem usuário');
-            assert.strictEqual(client.history[1].role, 'assistant');
-            assert.strictEqual(client.history[1].content, 'Resposta assistente');
+            assert.strictEqual(client.history[0]?.role, 'user');
+            assert.strictEqual(client.history[0]?.content, 'Mensagem usuário');
+            assert.strictEqual(client.history[1]?.role, 'assistant');
+            assert.strictEqual(client.history[1]?.content, 'Resposta assistente');
             assert.strictEqual(client.turnCount, 1);
         } finally {
             alwaysAliveAgent.sendMessage = sendMessageOrig;

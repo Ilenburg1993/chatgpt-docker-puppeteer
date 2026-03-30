@@ -33,12 +33,12 @@ let orchestrator;
 
 /** @type {{ chat: Function; chatStructured: Function }} */
 const mockBridge = {
-    chat: async (_msg, opts) => {
+    chat: async (/** @type {any} */ _msg, /** @type {any} */ opts) => {
         opts?.onDelta?.('Resposta ');
         opts?.onDelta?.('mockada');
         return { response: 'Resposta mockada', durationMs: 50, raw: null, chunks: 2 };
     },
-    chatStructured: async (_input, opts) => {
+    chatStructured: async (/** @type {any} */ _input, /** @type {any} */ opts) => {
         opts?.onDelta?.('Resposta estruturada');
         return {
             response: 'Resposta estruturada',
@@ -247,7 +247,7 @@ describe('HubOrchestrator.sendToLlmB serialização', () => {
         // Substitui o bridge por um que registra a ordem de execução com delay
         let callN = 0;
         const orderedBridge = /** @type {any} */ ({
-            chat: async (_msg, opts) => {
+            chat: async (/** @type {any} */ _msg, /** @type {any} */ opts) => {
                 const n = ++callN;
                 // Simula latência diferente: call 1 demora mais que call 2
                 await new Promise((r) => setTimeout(r, n === 1 ? 30 : 5));
@@ -255,7 +255,7 @@ describe('HubOrchestrator.sendToLlmB serialização', () => {
                 opts?.onDelta?.(`chunk-${n}`);
                 return { response: `resp-${n}`, durationMs: 10 };
             },
-            chatStructured: async (_input, opts) => {
+            chatStructured: async (/** @type {any} */ _input, /** @type {any} */ opts) => {
                 const n = ++callN;
                 await new Promise((r) => setTimeout(r, n === 1 ? 30 : 5));
                 order.push(n);
@@ -298,9 +298,9 @@ describe('HubOrchestrator.sendToLlmB serialização', () => {
         store3.init(db3);
 
         // Bridge com delay para simular turn em andamento
-        let resolveBridge = /** @type {(() => void) | null} */ (null);
+        let resolveBridge = /** @type {((value?: any) => void) | null} */ (null);
         const delayedBridge = /** @type {any} */ ({
-            chat: async (_msg, _opts) => {
+            chat: async (/** @type {any} */ _msg, /** @type {any} */ _opts) => {
                 await new Promise((r) => {
                     resolveBridge = r;
                 });

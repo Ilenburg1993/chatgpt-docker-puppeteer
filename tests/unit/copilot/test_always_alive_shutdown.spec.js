@@ -15,7 +15,8 @@
 
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
-import { alwaysAliveAgent, AlwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
+import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
+import { MAX_QUEUE_SIZE } from '../../../src/copilot/core/constants.js';
 
 // ─── Suite: análise estrutural ───────────────────────────────────────────────
 
@@ -132,33 +133,34 @@ describe('always-alive › stop() retrocompatibilidade', async () => {
 // ─── Suite: limite máximo de fila ───────────────────────────────────────────
 
 describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
-    it('AlwaysAliveAgent.MAX_QUEUE_SIZE deve ser 100', () => {
-        assert.equal(AlwaysAliveAgent.MAX_QUEUE_SIZE, 100);
+    it('MAX_QUEUE_SIZE deve ser 100', () => {
+        assert.equal(MAX_QUEUE_SIZE, 100);
     });
 
-    it('MAX_QUEUE_SIZE deve estar definido como static class field', async () => {
+    it('MAX_QUEUE_SIZE deve ser importado de constants.js (sem campo static duplicado)', async () => {
         const { readFile } = await import('node:fs/promises');
         const src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         assert.ok(
-            src.includes('static MAX_QUEUE_SIZE = 100'),
-            'MAX_QUEUE_SIZE deve ser static class field com valor 100',
+            src.includes("import { MAX_QUEUE_SIZE } from '#copilot/core/constants'"),
+            'MAX_QUEUE_SIZE deve ser importado de #copilot/core/constants',
         );
+        assert.ok(!src.includes('static MAX_QUEUE_SIZE'), 'Não deve ter campo static MAX_QUEUE_SIZE duplicado');
     });
 
     it('sendMessage() deve rejeitar se fila é igual a MAX_QUEUE_SIZE', () => {
         // Testa a lógica de validação sem conexão real
         // alwaysAliveAgent está 'stopped', logo nåo processa
         // mas a verificação de limite deve ser front: antes de enfileirar
-        assert.equal(typeof AlwaysAliveAgent.MAX_QUEUE_SIZE, 'number');
-        assert.ok(AlwaysAliveAgent.MAX_QUEUE_SIZE > 0);
+        assert.equal(typeof MAX_QUEUE_SIZE, 'number');
+        assert.ok(MAX_QUEUE_SIZE > 0);
     });
 
     it('código deve rejeitar sendMessage quando fila está no limite', async () => {
         const { readFile } = await import('node:fs/promises');
         const src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         assert.ok(
-            src.includes('#queue.length >= AlwaysAliveAgent.MAX_QUEUE_SIZE'),
-            'sendMessage deve verificar this.#queue.length >= AlwaysAliveAgent.MAX_QUEUE_SIZE',
+            src.includes('#queue.length >= MAX_QUEUE_SIZE'),
+            'sendMessage deve verificar this.#queue.length >= MAX_QUEUE_SIZE',
         );
     });
 

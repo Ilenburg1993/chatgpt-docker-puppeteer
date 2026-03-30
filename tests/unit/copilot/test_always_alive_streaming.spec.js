@@ -34,12 +34,12 @@ function makeMockSession(opts = {}) {
 
     const session = /** @type {any} */ ({
         sessionId: 'mock-session-uuid',
-        on: (eventType, handler) => {
+        on: (/** @type {string} */ eventType, /** @type {(...args: any[]) => void} */ handler) => {
             sessionEmitter.on(eventType, handler);
             // Retorna função de unsubscribe (compatível com SDK)
             return () => sessionEmitter.off(eventType, handler);
         },
-        sendAndWait: async ({ prompt: _p }) => {
+        sendAndWait: async (/** @type {any} */ { prompt: _p }) => {
             // Emite deltas antes de resolver, simulando streaming
             for (const chunk of deltaChunks) {
                 emittedDeltas.push(chunk);

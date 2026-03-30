@@ -175,7 +175,7 @@ describe('http-bridge GET /stream › compaction events chegam via SSE', () => {
             },
             setHeader() {},
             flushHeaders() {},
-            write(chunk) {
+            write(/** @type {any} */ chunk) {
                 chunks.push(chunk);
             },
         });

@@ -24,7 +24,7 @@ import {
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 /** @returns {import('@github/copilot-sdk').ModelInfo} */
-function makeModel(id, overrides = {}) {
+function makeModel(/** @type {string} */ id, overrides = {}) {
     return {
         id,
         name: `Model ${id}`,
@@ -37,7 +37,7 @@ function makeModel(id, overrides = {}) {
 }
 
 /** @returns {import('@github/copilot-sdk').ModelInfo} */
-function makeVisionModel(id) {
+function makeVisionModel(/** @type {string} */ id) {
     return makeModel(id, {
         capabilities: {
             supports: { vision: true, reasoningEffort: false },
@@ -47,7 +47,7 @@ function makeVisionModel(id) {
 }
 
 /** @returns {import('@github/copilot-sdk').ModelInfo} */
-function makeReasoningModel(id, efforts = ['low', 'medium', 'high']) {
+function makeReasoningModel(/** @type {string} */ id, efforts = ['low', 'medium', 'high']) {
     return makeModel(id, {
         capabilities: {
             supports: { vision: false, reasoningEffort: true },
@@ -59,14 +59,14 @@ function makeReasoningModel(id, efforts = ['low', 'medium', 'high']) {
 }
 
 /** @returns {import('@github/copilot-sdk').ModelInfo} */
-function makeDisabledModel(id) {
+function makeDisabledModel(/** @type {string} */ id) {
     return makeModel(id, {
         policy: { state: 'disabled', terms: '' },
     });
 }
 
 /** @returns {import('@github/copilot-sdk').ModelInfo} */
-function makeEnabledModel(id) {
+function makeEnabledModel(/** @type {string} */ id) {
     return makeModel(id, {
         policy: { state: 'enabled', terms: '' },
     });
@@ -111,7 +111,7 @@ describe('filterReasoningModels', () => {
         const models = [makeModel('plain'), makeReasoningModel('reasoner')];
         const result = filterReasoningModels(models);
         assert.equal(result.length, 1);
-        assert.equal(result[0].id, 'reasoner');
+        assert.equal(result[0]?.id, 'reasoner');
     });
 
     it('deve retornar array vazio se nenhum suportar reasoning', () => {
@@ -126,7 +126,7 @@ describe('filterVisionModels', () => {
         const models = [makeModel('text-only'), makeVisionModel('vision-model')];
         const result = filterVisionModels(models);
         assert.equal(result.length, 1);
-        assert.equal(result[0].id, 'vision-model');
+        assert.equal(result[0]?.id, 'vision-model');
     });
 
     it('deve retornar array vazio se nenhum suportar vision', () => {
@@ -256,7 +256,6 @@ describe('buildReasoningConfig', () => {
     it('deve lançar erro se effort não for suportado pelo modelo', () => {
         const models = [makeReasoningModel('claude', ['low', 'medium'])];
         assert.throws(
-            // @ts-expect-error teste com valor inválido
             () => buildReasoningConfig(models, 'claude', 'xhigh'),
             /xhigh.*não é suportado|não é suportado.*xhigh/,
         );
