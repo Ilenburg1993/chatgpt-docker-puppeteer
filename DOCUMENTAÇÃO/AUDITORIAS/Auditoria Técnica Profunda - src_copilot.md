@@ -528,7 +528,7 @@ alwaysAliveAgent.on('before-stop', () => {
 
 ---
 
-### BUG-HIGH-11 — `routes/sessions.js`: Validação de `timeoutMs` aceita `NaN` convertido de parâmetro body
+### BUG-HIGH-11 — `routes/sessions.js`: Validação de `timeoutMs` aceita `NaN` convertido de parâmetro body ✅ VALIDADO OK (sem bug)
 
 **Arquivo**: `src/copilot/routes/sessions.js` **Linha afetada**: handler `POST /sessions/:id/send`
 **Análise**: A fix `NEW-03` trata `rawTimeoutMs` mas apenas para valores
@@ -1034,16 +1034,12 @@ retornar `queueSize` desatualizado.
 
 ---
 
-### BUG-MED-04 — `lib/permissions.js`: `createPermissionHandler` não trata `kind: 'content-exclusion-check'` corretamente
+### BUG-MED-04 — `lib/permissions.js`: `createPermissionHandler` não trata `kind: 'content-exclusion-check'` corretamente ✅ VALIDADO CORRETO
 
-**Análise**: O handler em `createPermissionHandler` tem lógica especial para
-`kind === 'content-exclusion-check'`. Mas o resultado retornado é
-`{ kind: 'denied-by-content-exclusion-policy', path, message }`. Segundo o SDK, este `kind` de
-resultado só é válido quando o REQUEST também tem esse kind. Se `createPermissionHandler` é usado
-sem a proteção de content exclusion, o SDK pode rejeitar o resultado malformado. **Verificação**:
-Confirmar no SDK se `denied-by-content-exclusion-policy` requer que o request seja também
-`content-exclusion-check`. Se sim, o handler atual está correto. Se não, simplificar para
-`denied-by-rules`.
+**Análise**: O resultado `{ kind: 'denied-by-content-exclusion-policy', path, message }` é retornado
+**somente** quando `request.kind === 'content-exclusion-check'`, o que garante conformidade com o
+SDK. A lógica está correta. O resultado é produzido apenas quando o request tem esse kind
+específico, portanto não há risco de resultado malformado.
 
 ---
 
@@ -1270,21 +1266,12 @@ completedBy: z.string().optional().describe('Identificador de quem concluiu a ta
 
 ---
 
-### UPG-PROP-06 — `conversation-hub/store.js`: Adicionar índice fulltext em `conversation_turns.content`
+### UPG-PROP-06 — `conversation-hub/store.js`: Adicionar índice fulltext em `conversation_turns.content` ✅ IMPLEMENTADO
 
-As queries atuais em `readTurns` fazem full scan. Para sessões com centenas de turnos, adicionar
-FTS5 em `content` dos turnos melhoraria dramaticamente a busca:
-
-```sql
-CREATE VIRTUAL TABLE IF NOT EXISTS copilot_turns_fts USING fts5(
-    id UNINDEXED,
-    hub_session_id UNINDEXED,
-    content,
-    content='copilot_conversation_turns',
-    content_rowid='id',
-    tokenize='porter unicode61 remove_diacritics 1'
-);
-```
+FTS5 virtual table `copilot_turns_fts` criada com triggers de sincronização automática
+(INSERT/UPDATE/DELETE). Método `searchTurns({ query, hubSessionId?, role?, limit? })` adicionado ao
+`ConversationStore`. Função `initTurnsFts()` re-sincroniza a tabela FTS em BDs existentes
+(idempotente). 5 novos testes unitários cobrindo busca, filtro por role, filtro por sessão e limite.
 
 ---
 

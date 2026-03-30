@@ -276,3 +276,61 @@ describe('ConversationStore mensagens do usuário', () => {
         assert.equal(pendingAfter.length, 0);
     });
 });
+
+// ─── searchTurns (UPG-PROP-06 FTS5) ─────────────────────────────────────────
+
+describe('ConversationStore.searchTurns', () => {
+    /** @type {string} */
+    let sessionId;
+
+    before(async () => {
+        sessionId = store.createHubSession({ title: 'FTS5 search test' });
+        await store.writeTurn(sessionId, { role: 'user', content: 'Como configurar autenticação OAuth2?' });
+        await store.writeTurn(sessionId, { role: 'llm_b', content: 'Use o fluxo authorization_code com PKCE.' });
+        await store.writeTurn(sessionId, { role: 'user', content: 'O que é um refresh token?' });
+        await store.writeTurn(sessionId, {
+            role: 'llm_b',
+            content: 'Refresh token permite renovar o access token sem re-autenticar.',
+        });
+        await store.writeTurn(sessionId, { role: 'user', content: 'Tópico completamente diferente: banco de dados.' });
+    });
+
+    it('retorna turns que correspondem à query FTS5', () => {
+        const results = store.searchTurns({ query: 'token', hubSessionId: sessionId });
+        assert.ok(results.length >= 2, 'deve encontrar pelo menos 2 turns com "token"');
+        assert.ok(
+            results.every((t) => t.content.toLowerCase().includes('token')),
+            'todos os resultados devem conter "token"',
+        );
+    });
+
+    it('retorna array vazio para query vazia/só metacaracteres', () => {
+        const results = store.searchTurns({ query: '---', hubSessionId: sessionId });
+        assert.equal(results.length, 0);
+    });
+
+    it('filtra por role', () => {
+        const results = store.searchTurns({ query: 'token', hubSessionId: sessionId, role: 'user' });
+        assert.ok(results.length >= 1);
+        assert.ok(
+            results.every((t) => t.role === 'user'),
+            'todos devem ter role=user',
+        );
+    });
+
+    it('filtra por hubSessionId — não retorna turns de outra sessão', async () => {
+        const other = store.createHubSession({ title: 'Other session' });
+        await store.writeTurn(other, { role: 'user', content: 'token de outra sessão' });
+
+        const results = store.searchTurns({ query: 'token', hubSessionId: sessionId });
+        assert.ok(
+            results.every((t) => t.hub_session_id === sessionId),
+            'deve filtrar por sessão',
+        );
+    });
+
+    it('respeita limite', () => {
+        const results = store.searchTurns({ query: 'token', hubSessionId: sessionId, limit: 1 });
+        assert.ok(results.length <= 1);
+    });
+});

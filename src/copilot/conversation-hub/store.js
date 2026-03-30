@@ -66,6 +66,14 @@ import { v4 as uuidv4 } from 'uuid';
  * @property {number} [after] - Retornar apenas turns com id > after
  */
 
+/**
+ * @typedef {Object} SearchTurnsOpts
+ * @property {string} query - Query FTS5 para busca em content
+ * @property {string} [hubSessionId] - Filtrar por sessão específica
+ * @property {string} [role] - Filtrar por role (user, llm_b, etc.)
+ * @property {number} [limit] - Máximo de registros (default 20)
+ */
+
 // ─── DDL (gerenciado aqui, não via migrations principais) ────────────────────
 
 const DDL_HUB_SESSIONS = `
@@ -108,6 +116,63 @@ const DDL_CONVERSATION_TURNS = `
     CREATE INDEX IF NOT EXISTS idx_conv_turns_user_unread ON copilot_conversation_turns(hub_session_id)
         WHERE role = 'user' AND user_read = 0;
 `;
+
+// ─── DDL FTS5 para conversation_turns (UPG-PROP-06) ─────────────────────────────
+
+const DDL_TURNS_FTS = `
+    CREATE VIRTUAL TABLE IF NOT EXISTS copilot_turns_fts USING fts5(
+        id UNINDEXED,
+        hub_session_id UNINDEXED,
+        content,
+        content='copilot_conversation_turns',
+        content_rowid='id',
+        tokenize='porter unicode61 remove_diacritics 1'
+    );
+    CREATE TRIGGER IF NOT EXISTS turns_ai AFTER INSERT ON copilot_conversation_turns BEGIN
+        INSERT INTO copilot_turns_fts(rowid, id, hub_session_id, content)
+        VALUES (new.id, new.id, new.hub_session_id, new.content);
+    END;
+    CREATE TRIGGER IF NOT EXISTS turns_au AFTER UPDATE ON copilot_conversation_turns BEGIN
+        INSERT INTO copilot_turns_fts(copilot_turns_fts, rowid, id, hub_session_id, content)
+            VALUES('delete', old.id, old.id, old.hub_session_id, old.content);
+        INSERT INTO copilot_turns_fts(rowid, id, hub_session_id, content)
+            VALUES (new.id, new.id, new.hub_session_id, new.content);
+    END;
+    CREATE TRIGGER IF NOT EXISTS turns_ad AFTER DELETE ON copilot_conversation_turns BEGIN
+        INSERT INTO copilot_turns_fts(copilot_turns_fts, rowid, id, hub_session_id, content)
+            VALUES('delete', old.id, old.id, old.hub_session_id, old.content);
+    END;
+`;
+
+/**
+ * Inicializa (ou re-sincroniza) a tabela FTS5 de turns caso ela esteja vazia mas a tabela de conteúdo não. Idempotente:
+ * não reinsere linhas já indexadas.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @returns {void}
+ */
+function initTurnsFts(db) {
+    try {
+        /** @type {{ count: number } | undefined} */
+        const ftsCount = /** @type {any} */ (db.prepare('SELECT COUNT(*) AS count FROM copilot_turns_fts').get());
+        /** @type {{ count: number } | undefined} */
+        const turnCount = /** @type {any} */ (
+            db.prepare('SELECT COUNT(*) AS count FROM copilot_conversation_turns').get()
+        );
+        if ((ftsCount?.count ?? 0) === 0 && (turnCount?.count ?? 0) > 0) {
+            // Tabela FTS vazia mas há dados — repopular (ex: instalação em BD existente)
+            log('INFO', '[ConversationStore] UPG-PROP-06: populando copilot_turns_fts a partir de dados existentes...');
+            db.exec(`
+                INSERT INTO copilot_turns_fts(rowid, id, hub_session_id, content)
+                SELECT id, id, hub_session_id, content FROM copilot_conversation_turns;
+            `);
+            log('INFO', '[ConversationStore] UPG-PROP-06: copilot_turns_fts populado.');
+        }
+    } catch (/** @type {any} */ err) {
+        // Não fatal — apenas log warn. A tabela FTS pode ser reconstruída manualmente.
+        log('WARN', `[ConversationStore] UPG-PROP-06: falha ao inicializar turns FTS5: ${err.message}`);
+    }
+}
 
 // ─── DDL memórias semânticas (P5) ─────────────────────────────────────────────
 
@@ -220,8 +285,10 @@ export class ConversationStore {
             this.#db = dbOverride ?? getDb();
             this.#db.exec(DDL_HUB_SESSIONS);
             this.#db.exec(DDL_CONVERSATION_TURNS);
+            this.#db.exec(DDL_TURNS_FTS);
             this.#db.exec(DDL_MEMORIES);
             migrateFts5Tokenizer(this.#db);
+            initTurnsFts(this.#db);
 
             // BUG-CRIT-03 migration: corrigir role 'llm-b' (hífen) para 'llm_b' (underscore canônico)
             // Idempotente — rows com role='llm_b' já não são afetadas
@@ -518,6 +585,43 @@ export class ConversationStore {
                 )
                 .all(hubSessionId, limit, offset)
         );
+    }
+
+    /**
+     * Busca turns por conteúdo usando FTS5 (fulltext search).
+     *
+     * @param {SearchTurnsOpts} opts
+     * @returns {ConversationTurn[]}
+     */
+    searchTurns(opts) {
+        const db = this.#getDb();
+        const limit = opts.limit ?? 20;
+        // Sanitizar query FTS5: remover metacaracteres para evitar injection e erros de parse
+        const sanitized = opts.query
+            .replace(/[*^"():|&!,-]/g, ' ')
+            .replace(/\b(AND|OR|NOT|NEAR)\b/gi, ' ')
+            .trim();
+        if (!sanitized) return [];
+        const ftsQuery = `"${sanitized}"`;
+
+        const roleFilter = opts.role ? 'AND t.role = ?' : '';
+        const roleArg = opts.role ? [opts.role] : [];
+        const sessionFilter = opts.hubSessionId ? 'AND t.hub_session_id = ?' : '';
+        const sessionArg = opts.hubSessionId ? [opts.hubSessionId] : [];
+
+        const rows = db
+            .prepare(
+                `SELECT t.*
+                 FROM copilot_turns_fts fts
+                 JOIN copilot_conversation_turns t ON fts.id = t.id
+                 WHERE copilot_turns_fts MATCH ?
+                 ${roleFilter}
+                 ${sessionFilter}
+                 ORDER BY rank
+                 LIMIT ?`,
+            )
+            .all(ftsQuery, ...roleArg, ...sessionArg, limit);
+        return /** @type {ConversationTurn[]} */ (rows);
     }
 
     /**
