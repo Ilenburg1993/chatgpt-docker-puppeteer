@@ -166,6 +166,24 @@ export class AlwaysAliveAgent extends EventEmitter {
     #contextState = null;
 
     /**
+     * UPG-PROP-04 (fix): cache de mensagens da sessão SDK para reduzir latência em chamadas repetidas. Invalida
+     * automaticamente após TTL ou troca de sessão.
+     *
+     * @type {any[] | null}
+     */
+    #messagesCache = null;
+
+    /** @type {number} */
+    #messagesCacheAt = 0;
+
+    /**
+     * TTL do cache de mensagens em ms. Padrão: 30 segundos.
+     *
+     * @type {number}
+     */
+    static #MESSAGES_CACHE_TTL = 30_000;
+
+    /**
      * AC.3 — Último caminho de checkpoint salvo pelo SDK durante compaction. null até a primeira compaction concluída.
      *
      * @type {string | null}
@@ -633,6 +651,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                 log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${e.message}`);
             }
             this.#session = null;
+            this.#messagesCache = null;
             setSessionRpc(null);
         }
         this.emit('stopped');
@@ -1455,13 +1474,22 @@ qualquer tentativa de encerramento não autorizado.`;
      * Retorna o histórico de mensagens da sessão SDK ativa.
      *
      * Útil para debug, auditoria e introspecção do context window. Retorna array vazio se não houver sessão ativa.
+     * UPG-PROP-04 (fix): resultado em cache por até {@link AlwaysAliveAgent.#MESSAGES_CACHE_TTL} ms para reduzir
+     * chamadas repetidas ao SDK em fluxos de introspection.
      *
      * @returns {Promise<any[]>}
      */
     async getSessionMessages() {
         if (!this.#session) return [];
+        const now = Date.now();
+        if (this.#messagesCache !== null && now - this.#messagesCacheAt < AlwaysAliveAgent.#MESSAGES_CACHE_TTL) {
+            return this.#messagesCache;
+        }
         try {
-            return await this.#session.getMessages();
+            const messages = await this.#session.getMessages();
+            this.#messagesCache = messages;
+            this.#messagesCacheAt = now;
+            return messages;
         } catch {
             return [];
         }

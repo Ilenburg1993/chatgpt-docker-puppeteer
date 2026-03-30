@@ -56,7 +56,7 @@ const BANNER = `
 \x1b[36m╔══════════════════════════════════════════════════════════════════════════╗\x1b[0m
 \x1b[36m║\x1b[0m  💬  \x1b[1mTerminal LLM-B\x1b[0m  \x1b[90m—\x1b[0m  Sessão Permanente                            \x1b[36m║\x1b[0m
 \x1b[36m╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
-  \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
+  \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n] [offset]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
   \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
   \x1b[33m/attach [path|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m
@@ -90,8 +90,10 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
             break;
         }
         case 'db-history': {
+            // UPG-PROP-13 (fix): suporte a offset para paginação: /db-history [n] [offset]
             const n = Number(arg) || 20;
-            _cmdDbHistory({ hubSessionId: _hubSessionId, println }, n);
+            const dbHistOffset = Number(rest[0]) || 0;
+            _cmdDbHistory({ hubSessionId: _hubSessionId, println }, n, dbHistOffset);
             break;
         }
         case 'db-sessions': {

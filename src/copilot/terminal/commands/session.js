@@ -83,21 +83,23 @@ export function cmdHistory({ println }, n = 10) {
  * Exibe o histórico SQLite persistido.
  *
  * @param {SessionContext} ctx
- * @param {number} [n]
+ * @param {number} [n] - Número de turnos a exibir (padrão: 20)
+ * @param {number} [offset] - Offset de paginação (UPG-PROP-13)
  * @returns {void}
  */
-export function cmdDbHistory({ hubSessionId, println }, n = 20) {
+export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
     if (!hubSessionId) {
         println('\x1b[90m  /db-history: Hub session não disponível (sem persistência).\x1b[0m');
         return;
     }
     try {
-        const turns = conversationStore.readTurns(hubSessionId, { limit: n });
+        const turns = conversationStore.readTurns(hubSessionId, { limit: n, offset });
         if (turns.length === 0) {
             println('\x1b[90m  /db-history: Nenhum turno persistido ainda.\x1b[0m');
             return;
         }
-        println(`\n  \x1b[36mÚltimos ${turns.length} turnos da sessão atual\x1b[0m`);
+        const offsetLabel = offset > 0 ? ` (offset ${offset})` : '';
+        println(`\n  \x1b[36mÚltimos ${turns.length} turnos da sessão atual${offsetLabel}\x1b[0m`);
         println('  ─────────────────────────────────────────────────');
         for (const t of turns) {
             const ts = new Date(t.created_at).toLocaleTimeString('pt-BR');

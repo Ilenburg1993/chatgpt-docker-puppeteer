@@ -11,6 +11,7 @@
  * | Método | Caminho             | Descrição                             |
  * | ------ | ------------------- | ------------------------------------- |
  * | GET    | /health             | Status do agente e do dialog loop     |
+ * | GET    | /metrics            | Métricas Prometheus (text/plain)      |
  * | GET    | /context            | Uso de contexto/tokens em tempo real  |
  * | GET    | /events             | SSE — stream de eventos da LLM-B      |
  * | GET    | /sessions           | Lista hub_sessions persistidas        |
@@ -51,6 +52,7 @@ import {
     handleInject,
     handleListSessions,
     handleListTurns,
+    handleMetrics,
     handlePipeline,
     handleRecallMemories,
     handleRegisterCustomTool,
@@ -212,6 +214,15 @@ export function createInjectServer() {
             // /health é isento de auth para permitir healthchecks sem token
             if (req.method === 'GET' && url.pathname === '/health') {
                 sendJson(res, handleHealth());
+                return;
+            }
+
+            // ── GET /metrics ──────────────────────────────────────────────────
+            // UPG-PROP-08 (fix): /metrics é isento de auth (compatibilidade com Prometheus scrape)
+            if (req.method === 'GET' && url.pathname === '/metrics') {
+                const result = handleMetrics();
+                res.writeHead(result.status, { 'Content-Type': result.contentType });
+                res.end(result.body);
                 return;
             }
 

@@ -729,3 +729,66 @@ export function handleDeleteCustomTool(name) {
     if (!result.ok) return { status: 404, body: { ok: false, error: result.error } };
     return { status: 200, cors: true, body: { ok: true } };
 }
+
+// ─── GET /metrics ─────────────────────────────────────────────────────────────
+
+/**
+ * UPG-PROP-08 (fix): endpoint `/metrics` compatível com Prometheus para exposição de métricas operacionais do agente
+ * LLM-B. Retorna texto no formato Prometheus text exposition format (version 0.0.4).
+ *
+ * Métricas expostas:
+ *
+ * - `llmb_agent_status` (gauge 0/1) — status atual do agente
+ * - `llmb_queue_size` (gauge) — tarefas pendentes na fila
+ * - `llmb_send_count_total` (counter) — total de mensagens enviadas
+ * - `llmb_sse_clients` (gauge) — SSE clients conectados
+ * - `llmb_context_tokens` (gauge) — tokens usados no context window
+ * - `llmb_context_token_limit` (gauge) — limite de tokens do context window
+ * - `llmb_context_utilization` (gauge) — utilização do context window (0.0–1.0)
+ *
+ * @returns {{ status: number; contentType: string; body: string }}
+ */
+export function handleMetrics() {
+    const snapshot = alwaysAliveAgent.getStatusSnapshot();
+    const statusValue = snapshot.status === 'running' || snapshot.status === 'busy' ? 1 : 0;
+    const queueSize = snapshot.queueSize ?? 0;
+    const sendCount = snapshot.sendCount ?? 0;
+    const sseClients = getSseClients().size;
+    const cw = snapshot.contextWindow;
+
+    const lines = [
+        '# HELP llmb_agent_status Current agent status (1=active, 0=inactive)',
+        '# TYPE llmb_agent_status gauge',
+        `llmb_agent_status ${statusValue}`,
+        '',
+        '# HELP llmb_queue_size Number of tasks pending in the queue',
+        '# TYPE llmb_queue_size gauge',
+        `llmb_queue_size ${queueSize}`,
+        '',
+        '# HELP llmb_send_count_total Total messages sent since last start',
+        '# TYPE llmb_send_count_total counter',
+        `llmb_send_count_total ${sendCount}`,
+        '',
+        '# HELP llmb_sse_clients Number of connected SSE clients',
+        '# TYPE llmb_sse_clients gauge',
+        `llmb_sse_clients ${sseClients}`,
+        '',
+        '# HELP llmb_context_tokens Context window tokens used',
+        '# TYPE llmb_context_tokens gauge',
+        `llmb_context_tokens ${cw?.tokens ?? 0}`,
+        '',
+        '# HELP llmb_context_token_limit Context window token limit',
+        '# TYPE llmb_context_token_limit gauge',
+        `llmb_context_token_limit ${cw?.tokenLimit ?? 0}`,
+        '',
+        '# HELP llmb_context_utilization Context window utilization ratio (0.0 to 1.0)',
+        '# TYPE llmb_context_utilization gauge',
+        `llmb_context_utilization ${cw?.utilization ?? 0}`,
+        '',
+    ];
+    return {
+        status: 200,
+        contentType: 'text/plain; version=0.0.4; charset=utf-8',
+        body: lines.join('\n'),
+    };
+}

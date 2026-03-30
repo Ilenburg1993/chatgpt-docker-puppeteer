@@ -95,8 +95,21 @@ export class LlmBridgeClient {
     /**
      * ARCH-05 (fix): limite máximo de entradas no histórico local para evitar crescimento ilimitado de memória em
      * sessões de longa duração. Entradas mais antigas são removidas automaticamente.
+     *
+     * ARCH-06 (fix): valor padrão estático — pode ser sobrescrito por instância via construtor.
      */
-    static #MAX_HISTORY_SIZE = 500;
+    static #DEFAULT_MAX_HISTORY_SIZE = 500;
+
+    /** @type {number} */
+    #maxHistorySize;
+
+    /**
+     * @param {{ maxHistorySize?: number }} [opts]
+     */
+    constructor(opts = {}) {
+        // ARCH-06 (fix): tamanho máximo do histórico configurável por instância
+        this.#maxHistorySize = opts.maxHistorySize ?? LlmBridgeClient.#DEFAULT_MAX_HISTORY_SIZE;
+    }
 
     /**
      * Envia uma mensagem ao LLM-B e aguarda a resposta completa.
@@ -484,13 +497,13 @@ export class LlmBridgeClient {
      */
     #pushHistory(turn) {
         this.#history.push(turn);
-        if (this.#history.length > LlmBridgeClient.#MAX_HISTORY_SIZE) {
+        if (this.#history.length > this.#maxHistorySize) {
             // ARCH-07 (fix): emitir warning explícito ao truncar histórico em vez de silenciar
-            const removed = this.#history.length - LlmBridgeClient.#MAX_HISTORY_SIZE;
+            const removed = this.#history.length - this.#maxHistorySize;
             this.#history.splice(0, removed);
             log(
                 'WARN',
-                `[LlmBridgeClient] Histórico truncado: ${removed} entrada(s) removida(s) (limite: ${LlmBridgeClient.#MAX_HISTORY_SIZE}).`,
+                `[LlmBridgeClient] Histórico truncado: ${removed} entrada(s) removida(s) (limite: ${this.#maxHistorySize}).`,
             );
         }
     }

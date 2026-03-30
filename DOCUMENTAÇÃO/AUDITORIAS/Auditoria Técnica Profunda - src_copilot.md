@@ -544,7 +544,7 @@ _[Reclassificado como OK — retirando da lista de bugs]_
 
 ## 4. Gaps de Conformidade com o SDK
 
-### GAP-SDK-01 — `session-manager.js`: `resumeOrCreate` passa `SessionCreateOptions` para `resumeSession`
+### GAP-SDK-01 — `session-manager.js`: `resumeOrCreate` passa `SessionCreateOptions` para `resumeSession` ⚠️ DOCUMENTADO (tipagem enganosa, comportamento funcional correto)
 
 **Arquivo**: `src/copilot/lib/session.js` **Análise**: A função
 `resumeOrCreate(client, sessionId, opts)` passa `opts` (do tipo `SessionCreateOptions`) para
@@ -621,7 +621,7 @@ E adicionar ao `nerv-bridge.js`:
 
 ---
 
-### GAP-SDK-05 — `lib/session.js`: `mode: 'append'` pode ser obsoleto em SDK v0.2.0+
+### GAP-SDK-05 — `lib/session.js`: `mode: 'append'` pode ser obsoleto em SDK v0.2.0+ ⚠️ DOCUMENTADO (requer verificação futura com changelog do SDK)
 
 **Arquivo**: `src/copilot/config/system-prompt.js`, `src/copilot/lib/session.js` **Análise**: Os
 comentários no código dizem "SDK v0.1.x não suporta mode:'customize'; usar mode:'append'".
@@ -634,7 +634,7 @@ migrar para `mode: 'append'` que é o modo seguro.
 
 ---
 
-### GAP-SDK-06 — `tools/tool-factory.js`: `zodToJsonSchema` pode ser incompatível com Zod v4
+### GAP-SDK-06 — `tools/tool-factory.js`: `zodToJsonSchema` pode ser incompatível com Zod v4 ⚠️ DOCUMENTADO (verificar versões em package.json ao atualizar Zod)
 
 **Arquivo**: `src/copilot/tools/tool-factory.js` **Análise**: O código usa `zod-to-json-schema` com
 detecção de Zod v3 (`'_def' in parameters`) e Zod v4 (`'_zod' in parameters`). Porém,
@@ -841,7 +841,7 @@ function checkInjectRateSliding(ip) {
 
 ## 6. Problemas Arquiteturais
 
-### ARCH-01 — `conversation-hub/orchestrator.js` + `channel/client.js`: Acoplamento duplo ao `alwaysAliveAgent` singleton
+### ARCH-01 — `conversation-hub/orchestrator.js` + `channel/client.js`: Acoplamento duplo ao `alwaysAliveAgent` singleton ⚠️ RECONHECIDO (design de longo prazo)
 
 **Análise**: Tanto `HubOrchestrator` quanto `LlmBridgeClient` operam sobre o mesmo
 `alwaysAliveAgent` singleton via imports diretos. Se o terminal server e o ConversationHub tentarem
@@ -963,12 +963,16 @@ bridge.get('/stream', (req, res) => {
 
 ---
 
-### ARCH-06 — `channel/client.js`: `LlmBridgeClient.#MAX_HISTORY_SIZE` estático compartilhado entre instâncias
+### ARCH-06 — `channel/client.js`: `LlmBridgeClient.#MAX_HISTORY_SIZE` estático compartilhado entre instâncias ✅ CORRIGIDO
 
-**Análise**: `#MAX_HISTORY_SIZE = 500` é um campo estático privado. Se múltiplas instâncias de
-`LlmBridgeClient` existirem (o que acontece: `llmBridgeClient` singleton + `new LlmBridgeClient()`
-em `HubOrchestrator`), todas compartilham o mesmo limite. Não é um bug funcional mas é um design
-smell para um campo que deveria ser configurável por instância.
+**Análise**: `#MAX_HISTORY_SIZE = 500` era um campo estático privado. Todas as instâncias
+compartilhavam o mesmo limite. Não era bug funcional mas design smell para campo que deveria ser
+configurável por instância.
+
+**Correção aplicada**: Campo estático renomeado para `#DEFAULT_MAX_HISTORY_SIZE`, adicionado campo
+de instância `#maxHistorySize` e construtor `constructor({ maxHistorySize = 500 } = {})`. Todas as
+referências a `LlmBridgeClient.#MAX_HISTORY_SIZE` substituídas por `this.#maxHistorySize`.
+Instâncias existentes sem argumento mantêm o comportamento padrão (500).
 
 ---
 
@@ -998,7 +1002,7 @@ const runReflection = () => {
 
 ## 7. Bugs de Severidade Média
 
-### BUG-MED-01 — `config/session-config.js`: `DEFAULT_EXCLUDED_TOOLS` exclui `web_fetch` mas custom tool a sobrescreve
+### BUG-MED-01 — `config/session-config.js`: `DEFAULT_EXCLUDED_TOOLS` exclui `web_fetch` mas custom tool a sobrescreve ⚠️ DOCUMENTADO (comportamento intencional — custom tool e built-in são registros independentes)
 
 `DEFAULT_EXCLUDED_TOOLS = ['powershell', 'web_fetch', 'web_search', 'memory']`. A custom tool
 `web_fetch` em `tools/web-tools.js` usa `overridesBuiltInTool: true`. A exclusão via `excludedTools`
@@ -1043,7 +1047,7 @@ Confirmar no SDK se `denied-by-content-exclusion-policy` requer que o request se
 
 ---
 
-### BUG-MED-05 — `routes/sessions.js`: Endpoint `DELETE /sessions/:id` usa apenas header, não body, para confirmação
+### BUG-MED-05 — `routes/sessions.js`: Endpoint `DELETE /sessions/:id` usa apenas header, não body, para confirmação ⚠️ DOCUMENTADO (OK para uso interno; CORS preflight documentado como limitação conhecida)
 
 **Análise**: A confirmação usa `req.headers['x-confirm-delete']`. Ferramentas HTTP simples (curl sem
 `-H`) não enviam este header por default, o que é a proteção pretendida. Porém, navegadores que
@@ -1052,7 +1056,7 @@ mas documentar.
 
 ---
 
-### BUG-MED-06 — `terminal/server.js`: `readBody` com `MAX_BODY_BYTES = 2MB` mas `terminal/http-handlers.js` tem limite próprio de `MAX_EMBED_BYTES = 64KB` para attachments
+### BUG-MED-06 — `terminal/server.js`: `readBody` com `MAX_BODY_BYTES = 2MB` mas `terminal/http-handlers.js` tem limite próprio de `MAX_EMBED_BYTES = 64KB` para attachments ⚠️ DOCUMENTADO (truncamento ocorre corretamente; inconsistência de UX, não de segurança)
 
 **Análise**: Existe inconsistência entre o limite de body (2MB) e o limite de embed de attachments
 (64KB). Um body de 1.5MB com múltiplos attachments passará o `readBody` mas será truncado no
@@ -1061,7 +1065,7 @@ que não recebe erro 413 para payloads entre 64KB e 2MB.
 
 ---
 
-### BUG-MED-07 — `always-alive.js`: `emit('before-stop')` e `removeAllListeners('before-stop')` em `stop()` remove listener único
+### BUG-MED-07 — `always-alive.js`: `emit('before-stop')` e `removeAllListeners('before-stop')` em `stop()` remove listener único ⚠️ DOCUMENTADO (comportamento intencional — cleanup em cascata ao reiniciar a sessão)
 
 **Análise**: O código faz:
 
@@ -1169,7 +1173,7 @@ async function startSpan(name, attrs, fn) {
 
 ## 8. Aprimoramentos e Upgrades Propostos
 
-### UPG-PROP-01 — Telemetria OpenTelemetry nativa via `CopilotClient` config
+### UPG-PROP-01 — Telemetria OpenTelemetry nativa via `CopilotClient` config ⏭️ ADIADO (requer refatoração do ciclo de vida do CopilotClient em always-alive.js — complexidade alta, benefício marginal dado que lib/telemetry.js já funciona)
 
 **Análise**: O SDK oficial suporta telemetria OTEL diretamente via
 `CopilotClient({ telemetry: { otlpEndpoint: '...' } })`. O projeto implementa OTEL via
@@ -1193,7 +1197,7 @@ const client = new CopilotClient({
 
 ---
 
-### UPG-PROP-02 — Migrar `always-alive.js` para padrão `await using` (Explicit Resource Management)
+### UPG-PROP-02 — Migrar `always-alive.js` para padrão `await using` (Explicit Resource Management) ⏭️ ADIADO (`Symbol.asyncDispose` já implementado; migração de scripts standalone é opcional e de baixo impacto)
 
 O `Symbol.asyncDispose` já está implementado no `AlwaysAliveAgent`. O padrão `await using` está
 disponível no Node.js 22+ (stage 4 TC39). Migrar scripts standalone:
@@ -1231,11 +1235,12 @@ Isso evita que LLM-B responda com campos proprietários que são silenciosamente
 
 ---
 
-### UPG-PROP-04 — Implementar `session.getMessages()` cache em `LlmBridgeClient`
+### UPG-PROP-04 — Implementar `session.getMessages()` cache em `LlmBridgeClient` ✅ IMPLEMENTADO
 
-A chamada a `getSessionMessages()` em `AlwaysAliveAgent` e o sync subsequente em `#syncSdkHistory`
-ocorrem toda vez que uma sessão é retomada. Para sessões com histórico longo, isso pode ser lento.
-Implementar cache com TTL:
+Cache com TTL de 30s adicionado diretamente em `AlwaysAliveAgent.getSessionMessages()` (o método
+público que encapsula a chamada ao SDK). Campos `#messagesCache`, `#messagesCacheAt` e
+`static #MESSAGES_CACHE_TTL = 30_000` adicionados à classe. Cache é invalidado quando `#session` é
+definido como `null` no `stop()`.
 
 ```javascript
 // Em always-alive.js
@@ -1306,7 +1311,12 @@ res.status(healthy ? 200 : 503).json({
 
 ---
 
-### UPG-PROP-08 — `terminal/server.js`: Adicionar endpoint `GET /metrics` (Prometheus-compatible)
+### UPG-PROP-08 — `terminal/server.js`: Adicionar endpoint `GET /metrics` (Prometheus-compatible) ✅ IMPLEMENTADO
+
+Endpoint `GET /metrics` adicionado em `http-handlers.js` (`handleMetrics`) e roteado em `server.js`.
+Isento de autenticação (compatível com scraping Prometheus). Expõe: `llmb_agent_status`,
+`llmb_queue_size`, `llmb_send_count_total`, `llmb_sse_clients`, `llmb_context_tokens`,
+`llmb_context_token_limit`, `llmb_context_utilization`. Formato: `text/plain; version=0.0.4`.
 
 ```javascript
 server.on('request', (req, res) => {
@@ -1407,18 +1417,15 @@ getLastNPairs(pairs = 5) {
 
 ---
 
-### UPG-PROP-13 — `terminal/commands/session.js`: `cmdDbHistory` deveria paginar
+### UPG-PROP-13 — `terminal/commands/session.js`: `cmdDbHistory` deveria paginar ✅ IMPLEMENTADO
 
-Atualmente `readTurns(hubSessionId, { limit: n })` é chamado com `n` fixo. Para sessões longas, o
-usuário pode querer paginar. Adicionar suporte a `offset`:
-
-```bash
-/db-history 20 40 # 20 itens a partir do offset 40
-```
+Parâmetro `offset` adicionado a `cmdDbHistory({ ... }, n = 20, offset = 0)`. Parser em `repl.js`
+atualizado: `/db-history [n] [offset]` (ex.: `/db-history 20 40`). Banner do terminal atualizado
+para refletir a nova sintaxe.
 
 ---
 
-### UPG-PROP-14 — Migrar `codeTools` para usar `execa` em vez de `execFile`
+### UPG-PROP-14 — Migrar `codeTools` para usar `execa` em vez de `execFile` ⏭️ ADIADO (nova dependência de produção; impacto alto para benefício moderado — `execFile` com promisify funciona corretamente)
 
 A dependência `execa` (já popular no ecossistema Node.js) oferece melhor tratamento de erros,
 streams melhorados e cancelamento nativo via AbortSignal, sem o overhead de promisify:
