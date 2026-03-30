@@ -343,6 +343,12 @@ async function _doEnsureDialogLoop() {
             attempt++;
             if (attempt > MAX_RETRIES) {
                 log('ERROR', `[dialog] ensureDialogLoop falhou após ${MAX_RETRIES} tentativas: ${err.message}`);
+                // FLOW-UPG-05: emitir Nerv severity=error para alertar monitoramento
+                emitNerv('copilot:dialog:boot_failed', {
+                    error: err.message,
+                    attempts: MAX_RETRIES,
+                    severity: 'error',
+                });
                 throw err;
             }
             const delay = 2000 * 2 ** (attempt - 1); // 2s, 4s, 8s
@@ -532,6 +538,29 @@ async function _executeTurn(message, actor) {
                     content: reply,
                     durationMs,
                 });
+                // FLOW-UPG-01: notificar Orchestrator para que LLM-A e listeners SSE vejam a
+                // mensagem do terminal. Usa turn_number do store para consistência de sequência.
+                try {
+                    const msgTurn = conversationHub.store.getTurn(msgTurnId);
+                    const replyTurn = conversationHub.store.getTurn(replyTurnId);
+                    conversationHub.notifyTerminalTurn(
+                        _hubSessionId,
+                        {
+                            turnId: msgTurnId,
+                            role: senderRole,
+                            content: message,
+                            turnNumber: msgTurn?.turn_number ?? 0,
+                        },
+                        {
+                            turnId: replyTurnId,
+                            content: reply,
+                            turnNumber: replyTurn?.turn_number ?? 0,
+                            durationMs,
+                        },
+                    );
+                } catch (/** @type {any} */ notifyErr) {
+                    log('WARN', `[TerminalServer] FLOW-01: notifyTerminalTurn falhou (não crítico): ${notifyErr.message}`);
+                }
                 emitNerv('copilot:turn:sent', {
                     hubSessionId: _hubSessionId,
                     turnId: msgTurnId,

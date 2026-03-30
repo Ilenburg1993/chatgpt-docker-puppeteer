@@ -197,11 +197,11 @@ export class AlwaysAliveAgent extends EventEmitter {
     #pendingModelFallback = false;
 
     /**
-     * RF-PR-05: Modelo original antes de aplicar o fallback (para restaurar se necessário).
+     * RF-PR-05: Modelo de fallback lido de `COPILOT_FALLBACK_MODEL`. Aplicado em startDialogLoop() (0-PR).
      *
      * @type {string | null}
      */
-    #originalModel = null;
+    #fallbackModel = process.env.COPILOT_FALLBACK_MODEL ?? null;
 
     /**
      * Intervalo do watchdog (ms). Controlado por `LLM_B_WATCHDOG_MS`. Padrão: 5 minutos.
@@ -1018,6 +1018,17 @@ export class AlwaysAliveAgent extends EventEmitter {
             log('WARN', `[AlwaysAlive] writeState dialogLoopActive=true: ${e.message}`),
         );
 
+        // RF-PR-05 (0-PR fix): aplicar fallback de modelo sinalizados por rate_limit/quota ANTES
+        // da nova sessão de boot. Isso garante que a troca de modelo nunca consome um PR extra —
+        // ela ocorre na próxima inicialização natural do loop (1 PR de boot já esperado).
+        if (this.#pendingModelFallback && this.#fallbackModel) {
+            const prev = this.#model;
+            this.#model = this.#fallbackModel;
+            this.#pendingModelFallback = false;
+            this.emit('pr.fallback_model', { previousModel: prev, newModel: this.#fallbackModel, ts: Date.now() });
+            log('WARN', `[AlwaysAlive] RF-PR-05 (0-PR): modelo trocado ${prev} → ${this.#model} em startDialogLoop — sem PR adicional.`);
+        }
+
         // RF-D04: boot prompt centralizado em DialogProtocol.buildBootPrompt() para DRY entre always-alive.js e dialog.js
         const metaPrompt = bootPrompt ?? DialogProtocol.buildBootPrompt();
 
@@ -1632,16 +1643,10 @@ export class AlwaysAliveAgent extends EventEmitter {
         for (const unsub of this.#sessionEventUnsubscribers) unsub();
         this.#sessionEventUnsubscribers = [];
 
-        // RF-PR-05: se há sinal de rate_limit/quota, aplicar fallback de modelo antes de reconectar
-        if (this.#pendingModelFallback) {
-            const fallbackModel = process.env.COPILOT_FALLBACK_MODEL;
-            if (fallbackModel && fallbackModel !== this.#model) {
-                log('WARN', `[AlwaysAlive] RF-PR-05: aplicando model fallback: ${this.#model} → ${fallbackModel}`);
-                this.#model = fallbackModel;
-                this.emit('pr.fallback_model', { previousModel: this.#originalModel, fallbackModel, ts: Date.now() });
-            }
-            this.#pendingModelFallback = false;
-        }
+        // RF-PR-05: NÃO aplicar fallback de modelo aqui — #tryReconnect causa 1 PR inevitável
+        // (nova sessão), então o fallback seria aplicado para uma sessão que já custou 1 PR.
+        // O fallback DEVE ser aplicado em startDialogLoop() para garantia 0-PR adicional.
+        // Ver FLOW-UPG-02 em AUDIT_SEND_DIALOG_TURN_FLOW.md.
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + random(0..base)
@@ -1818,7 +1823,6 @@ export class AlwaysAliveAgent extends EventEmitter {
                     `[AlwaysAlive] RF-PR-05: rate_limit/quota detectado — próxima reconexão usará model fallback: ${fallbackModel}`,
                 );
                 this.#pendingModelFallback = true;
-                this.#originalModel = this.#model;
             } else {
                 log('WARN', '[AlwaysAlive] RF-PR-05: rate_limit/quota mas nenhum COPILOT_FALLBACK_MODEL configurado.');
             }

@@ -414,6 +414,45 @@ export class HubOrchestrator extends EventEmitter {
         return msgs;
     }
 
+    // ─── Notificação de turnos externos ──────────────────────────────────────
+
+    /**
+     * FLOW-UPG-01: Notifica o Orchestrator sobre um turno já persistido no ConversationStore pelo
+     * terminal (dialog.js). Emite `turn:sent` e `turn:complete` para que LLM-A e listeners de SSE
+     * vejam as mensagens do usuário humano digitadas diretamente no terminal.
+     *
+     * Não re-persiste turnos — apenas emite os eventos com os IDs já gravados.
+     *
+     * @param {string} hubSessionId
+     * @param {{ turnId: number; role: 'user' | 'llm_a'; content: string; turnNumber: number; source?: string }} userTurn
+     * @param {{ turnId: number; content: string; turnNumber: number; durationMs: number }} llmBTurn
+     * @returns {void}
+     */
+    notifyTerminalTurn(hubSessionId, userTurn, llmBTurn) {
+        this.emit('turn:sent', {
+            hubSessionId,
+            turnId: userTurn.turnId,
+            role: userTurn.role,
+            content: userTurn.content,
+            turnNumber: userTurn.turnNumber,
+            source: userTurn.source ?? 'terminal',
+        });
+        this.emit('turn:complete', {
+            hubSessionId,
+            turnId: llmBTurn.turnId,
+            role: 'llm_b',
+            content: llmBTurn.content,
+            structured: null,
+            durationMs: llmBTurn.durationMs,
+            turnNumber: llmBTurn.turnNumber,
+            source: 'terminal',
+        });
+        log(
+            'DEBUG',
+            `[HubOrchestrator] FLOW-01: notifyTerminalTurn emitido (user=${userTurn.turnId}, llm_b=${llmBTurn.turnId}).`,
+        );
+    }
+
     // ─── Histórico ────────────────────────────────────────────────────────────
 
     /**

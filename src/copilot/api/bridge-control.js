@@ -73,6 +73,7 @@ const _sdkVersion = (() => {
  *     listenerDiagnostics: () => Record<string, number>;
  *     setMaxListeners?: (n: number) => void;
  *     queueSize: number;
+ *     dialogLoopActive?: boolean;
  * }} AlwaysAliveAgentLike
  */
 

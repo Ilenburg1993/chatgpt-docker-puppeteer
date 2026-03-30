@@ -120,8 +120,9 @@ describe('http-bridge › dialog: análise estrutural', async () => {
     });
 
     it('/dialog/turn retorna HTTP 409 se modo diálogo não está ativo', () => {
+        // FLOW-06: a lógica usa isLoopInactive para mapear 409
         assert.ok(
-            sourceCode.includes("includes('não está ativo') ? 409"),
+            sourceCode.includes("isLoopInactive ? 409") || sourceCode.includes("includes('não está ativo') ? 409"),
             '/dialog/turn deve retornar 409 se modo diálogo não está ativo',
         );
     });

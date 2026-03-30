@@ -151,6 +151,20 @@ export class ConversationHub {
         return this.orchestrator.pollUserMessages(hubSessionId);
     }
 
+    /**
+     * FLOW-UPG-01: Notifica o Orchestrator sobre um turno já persistido pelo terminal (dialog.js).
+     * Emite `turn:sent` e `turn:complete` para que LLM-A e listeners de SSE vejam a conversa do
+     * usuário humano digitada diretamente no terminal.
+     *
+     * @param {string} hubSessionId
+     * @param {{ turnId: number; role: 'user' | 'llm_a'; content: string; turnNumber: number; source?: string }} userTurn
+     * @param {{ turnId: number; content: string; turnNumber: number; durationMs: number }} llmBTurn
+     * @returns {void}
+     */
+    notifyTerminalTurn(hubSessionId, userTurn, llmBTurn) {
+        return this.orchestrator.notifyTerminalTurn(hubSessionId, userTurn, llmBTurn);
+    }
+
     // ─── Encerramento ──────────────────────────────────────────────────────────
 
     /**
