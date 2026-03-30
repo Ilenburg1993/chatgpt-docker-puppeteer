@@ -30,6 +30,7 @@ import { auditToolComplete, auditToolStart } from '#copilot/channel';
  * @property {number} [timeoutMs]
  * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments]
  * @property {number} enqueuedAt
+ * @property {number} [attempts] - RF-D02: número de tentativas realizadas (para limitar reintentos)
  * @property {(text: string) => void} resolve
  * @property {(err: Error) => void} reject
  */
@@ -100,9 +101,18 @@ export async function executeTask(session, task, callbacks) {
         // Tenta reconectar com backoff exponencial se parecer erro de rede/sessão
         const recovered = await tryReconnect(e);
         if (recovered) {
-            // Sessão restaurada: reenfileira a tarefa para nova tentativa
-            requeueTask(task);
-            setStatus('idle');
+            // RF-D02: limitar reintentos transparentes para evitar loop infinito em falhas repetidas
+            const MAX_TASK_RETRIES = 3;
+            task.attempts = (task.attempts ?? 0) + 1;
+            if (task.attempts >= MAX_TASK_RETRIES) {
+                setStatus('idle');
+                emit('task.error', { taskId: task.id, error: `Máximo de ${MAX_TASK_RETRIES} tentativas atingido após reconexão` });
+                task.reject(new Error(`[task-executor] Máximo de ${MAX_TASK_RETRIES} tentativas atingido (taskId: ${task.id})`));
+            } else {
+                // Sessão restaurada: reenfileira a tarefa para nova tentativa
+                requeueTask(task);
+                setStatus('idle');
+            }
         } else {
             setStatus('idle');
             emit('task.error', { taskId: task.id, error: e.message });

@@ -18,7 +18,7 @@
 
 import { MAX_QUEUE_SIZE } from '#copilot/core/constants';
 import { SessionError } from '#copilot/core/errors';
-import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart, startSpan } from '#copilot/lib/index';
+import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart, recordToolCall, startSpan } from '#copilot/lib/index';
 import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/lib/permissions';
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
@@ -27,8 +27,8 @@ import { buildMcpTools } from '../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../config/mcp-servers.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { getHubSessionId } from '../terminal/state.js';
+import { DialogProtocol } from './dialog-protocol.js';
 import { DialogWatchdog } from './dialog-watchdog.js';
-import { DIALOG_PROTO_READY, DIALOG_PROTO_REPLY, DIALOG_PROTO_STOPPED, DialogProtocol } from './dialog-protocol.js';
 import { AGENT_EVENTS } from './events.js';
 import { initOrResumeSession, readState, writeStateAsync } from './session-manager.js';
 import { executeTask } from './task-executor.js';
@@ -86,8 +86,8 @@ import { WebhookManager } from './webhook-manager.js';
  */
 
 /**
- * IMPROVE-AA-01: Constantes do protocolo importadas de dialog-protocol.js (RF-D01).
- * Centralizadas lá para testabilidade isolada; re-exportadas implicitamente pelo import acima.
+ * IMPROVE-AA-01: Constantes do protocolo importadas de dialog-protocol.js (RF-D01). Centralizadas lá para testabilidade
+ * isolada; re-exportadas implicitamente pelo import acima.
  */
 
 /**
@@ -960,20 +960,13 @@ export class AlwaysAliveAgent extends EventEmitter {
         }
 
         this.#dialogLoopActive = true;
+        // MR-08: persistir dialogLoopActive em disco para diagnóstico após PM2 crash/restart
+        writeStateAsync({ dialogLoopActive: true }).catch((/** @type {any} */ e) =>
+            log('WARN', `[AlwaysAlive] writeState dialogLoopActive=true: ${e.message}`),
+        );
 
-        const metaPrompt =
-            bootPrompt ??
-            `Você é um agente de diálogo contínuo.
-
-Protocolo OBRIGATÓRIO:
-1. Chame ask_user("${DIALOG_PROTO_READY} aguardando próxima mensagem") para sinalizar prontidão.
-2. Ao receber uma mensagem, processe-a e formule uma resposta.
-3. Chame ask_user("${DIALOG_PROTO_REPLY} " + sua_resposta) para enviar a resposta.
-4. Retorne ao passo 1.
-
-IMPORTANTE: NUNCA encerre o loop. Não use ask_user("${DIALOG_PROTO_STOPPED}") nem qualquer forma de
-encerramento — o loop é eterno por design (DL-PERM). O sistema reiniciará automaticamente
-qualquer tentativa de encerramento não autorizado.`;
+        // RF-D04: boot prompt centralizado em DialogProtocol.buildBootPrompt() para DRY entre always-alive.js e dialog.js
+        const metaPrompt = bootPrompt ?? DialogProtocol.buildBootPrompt();
 
         // Boot: 1 PR — resolve quando o modelo emite o primeiro ask_user("READY:"), com timeout (IMPROVE-AA-02)
         const bootPromise = new Promise((resolve, reject) => {
@@ -1092,10 +1085,14 @@ qualquer tentativa de encerramento não autorizado.`;
      * @returns {Promise<string>}
      */
     #executeDialogTurn(message, { timeout, signal }) {
+        // MR-03: emitir turn_start para observabilidade
+        const turnStart = Date.now();
+        this.emit('dialog.turn_start', { message: message.slice(0, 120), ts: turnStart });
         // AI.3: instrumentar com span OTEL
         return startSpan(
             'dialog.send_turn',
-            { sessionId: this.sessionId ?? '', actor: 'user' },
+            // RF-D05: enriquecer span com turnNumber e modelo para detectar regressões de performance
+            { sessionId: this.sessionId ?? '', actor: 'user', model: this.#model, extra: { turnNumber: this.#sendCount } },
             () =>
                 new Promise((resolve, reject) => {
                     // BUG-AA-01 (fix): referência ao listener onPending — necessária para remoção no timeout.
@@ -1121,6 +1118,15 @@ qualquer tentativa de encerramento não autorizado.`;
                     const onReplyOuter = (/** @type {{ reply: string }} */ evt) => {
                         clearTimeout(timeoutHandle);
                         this.off('dialog.stopped', onStopOuter);
+                        // MR-03: emitir turn_end com latência para observabilidade
+                        const durationMs = Date.now() - turnStart;
+                        this.emit('dialog.turn_end', { reply: evt.reply.slice(0, 120), durationMs });
+                        // MR-04: registrar latência no store de telemetria para detectar regressões de performance
+                        recordToolCall(this.#telemetry, 'dialog.turn', {
+                            durationMs,
+                            success: true,
+                            sessionId: this.sessionId ?? undefined,
+                        });
                         resolve(evt.reply);
                     };
                     const onStopOuter = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt) => {
@@ -1259,6 +1265,10 @@ qualquer tentativa de encerramento não autorizado.`;
         }
         this.#dialogLoopActive = false;
         this.#dialogLoopStopping = false;
+        // MR-08: persistir dialogLoopActive=false em disco para diagnóstico após PM2 crash/restart
+        writeStateAsync({ dialogLoopActive: false }).catch((/** @type {any} */ e) =>
+            log('WARN', `[AlwaysAlive] writeState dialogLoopActive=false: ${e.message}`),
+        );
         this.#watchdog?.stop();
         this.emit('dialog.stopped', { reason, authorized: true });
     }
@@ -1486,6 +1496,12 @@ qualquer tentativa de encerramento não autorizado.`;
                     );
                     this.#dialogLoopActive = false;
                     this.emit('dialog.stopped', { reason: 'reconnect_restart', authorized: false });
+                } else {
+                    // BUG-AA-10 (fix): log explícito para diagnóstico quando loop estava idle entre turnos
+                    log(
+                        'INFO',
+                        '[AlwaysAlive] Reconexão: dialog loop estava inativo. Aguardando terminal/dialog.js retomar via ensureDialogLoop...',
+                    );
                 }
                 return true;
             } catch (/** @type {any} */ reconnectError) {
@@ -1501,40 +1517,64 @@ qualquer tentativa de encerramento não autorizado.`;
     /**
      * Handler chamado pelo SDK quando o modelo usa a ferramenta ask_user.
      *
+     * RF-D03: delega para handler especializado conforme modo ativo.
+     *
      * @param {{ question: string; choices?: string[]; allowFreeform: boolean }} input
      * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
      */
     async #handleUserInputRequest({ question, choices, allowFreeform }) {
         log('INFO', `[AlwaysAlive] Modelo tem pergunta: "${question.slice(0, 120)}"`);
 
+        if (this.#dialogLoopActive) {
+            return this.#handleDialogLoopInput({ question, allowFreeform });
+        }
+        return this.#handleInteractiveQuestion({ question, ...(choices !== undefined && { choices }), allowFreeform });
+    }
+
+    /**
+     * RF-D03: Handler de protocolo no modo dialog loop.
+     * Intercepta mensagens READY/REPLY/DONE/STOPPED e emite os eventos correspondentes.
+     *
+     * @param {{ question: string; allowFreeform: boolean }} input
+     * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
+     */
+    #handleDialogLoopInput({ question, allowFreeform }) {
         // ── Interceptação do dialog loop ────────────────────────────────────
         // No modo diálogo, o modelo usa ask_user com prefixos especiais (RF-D01: DialogProtocol).
-        if (this.#dialogLoopActive) {
-            const kind = DialogProtocol.classify(question);
+        const kind = DialogProtocol.classify(question);
 
-            if (kind === 'ready') {
-                // Modelo sinaliza prontidão — emite evento para sendDialogTurn()
-                this.#watchdog?.ping();
-                this.emit('dialog.ready', {});
-                // Aguarda a resposta via question.pending normal
-                // (sendDialogTurn chamará answerPendingQuestion com a mensagem do usuário)
-            } else if (kind === 'reply') {
-                // Modelo enviou uma resposta — extrai o conteúdo
-                this.#watchdog?.ping();
-                const reply = DialogProtocol.extractReply(question);
-                this.emit('dialog.reply', { reply });
-                // Aguarda o próximo turno via question.pending
-            } else if (kind === 'stopped') {
-                // DL-PERM: o modelo tentou encerrar o loop. Não encerramos imediatamente — emitimos o evento
-                // 'dialog.stopped' para que o listener em terminal/index.js possa reiniciar automaticamente.
-                // O #dialogLoopActive NÃO é setado para false aqui — o restart via ensureDialogLoop() irá
-                // reativar o loop sem interrupção do protocolo ask_user.
-                log('WARN', '[AlwaysAlive] Modelo emitiu STOPPED — emitindo dialog.stopped para restart automático.');
-                this.emit('dialog.stopped', { reason: 'model_stopped', authorized: false });
-            }
+        if (kind === 'ready') {
+            // Modelo sinaliza prontidão — emite evento para sendDialogTurn()
+            this.#watchdog?.ping();
+            this.emit('dialog.ready', {});
+            // Aguarda a resposta via question.pending normal
+            // (sendDialogTurn chamará answerPendingQuestion com a mensagem do usuário)
+        } else if (kind === 'reply') {
+            // Modelo enviou uma resposta — extrai o conteúdo
+            this.#watchdog?.ping();
+            const reply = DialogProtocol.extractReply(question);
+            this.emit('dialog.reply', { reply });
+            // Aguarda o próximo turno via question.pending
+        } else if (kind === 'stopped') {
+            // DL-PERM: o modelo tentou encerrar o loop. Não encerramos imediatamente — emitimos o evento
+            // 'dialog.stopped' para que o listener em terminal/index.js possa reiniciar automaticamente.
+            // O #dialogLoopActive NÃO é setado para false aqui — o restart via ensureDialogLoop() irá
+            // reativar o loop sem interrupção do protocolo ask_user.
+            log('WARN', '[AlwaysAlive] Modelo emitiu STOPPED — emitindo dialog.stopped para restart automático.');
+            this.emit('dialog.stopped', { reason: 'model_stopped', authorized: false });
         }
         // ── Fim da interceptação ─────────────────────────────────────────────
+        return this.#handleInteractiveQuestion({ question, allowFreeform });
+    }
 
+    /**
+     * RF-D03: Handler para pergunta interativa normal (fora do dialog loop).
+     * Suspende execução até que answerPendingQuestion() seja chamado via API HTTP.
+     *
+     * @param {{ question: string; choices?: string[]; allowFreeform: boolean }} input
+     * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
+     */
+    #handleInteractiveQuestion({ question, choices, allowFreeform }) {
         this.#setStatus('waiting_for_input');
         writeStateAsync({ pendingQuestion: question }).catch((/** @type {any} */ e) =>
             log('WARN', `[AlwaysAlive] writeState pendingQuestion: ${e.message}`),

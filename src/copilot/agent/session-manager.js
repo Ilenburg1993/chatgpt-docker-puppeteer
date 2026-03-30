@@ -172,6 +172,7 @@ let _stateDirReady = false;
  * @property {number} sendCount - Total de mensagens enviadas (tracked externamente)
  * @property {string} model - Modelo configurado para esta sessão
  * @property {string | null} pendingQuestion - Pergunta pendente do modelo (se houver)
+ * @property {boolean} [dialogLoopActive] - MR-08: se o dialog loop estava ativo no momento do snapshot
  */
 
 /**
@@ -196,8 +197,8 @@ export function readState() {
 /**
  * Persiste o estado da sessão em disco.
  *
- * BUG-AA-07 (fix): `_stateDirReady` evita chamada mkdirSync redundante após 1ª criação.
- * RF-D06 (melhoria): atualiza `_stateCache` após escrita para que readState() não precise I/O.
+ * BUG-AA-07 (fix): `_stateDirReady` evita chamada mkdirSync redundante após 1ª criação. RF-D06 (melhoria): atualiza
+ * `_stateCache` após escrita para que readState() não precise I/O.
  *
  * @param {Partial<AliveAgentState>} updates - Campos a atualizar no estado
  * @returns {AliveAgentState} Estado completo após a atualização
@@ -225,8 +226,8 @@ export function writeState(updates) {
 /**
  * Versão async de `writeState`. Preferir em handlers de alta frequência para não bloquear o event loop.
  *
- * BUG-AA-07 (fix): `_stateDirReady` evita chamada mkdir redundante após 1ª criação.
- * RF-D06 (melhoria): atualiza `_stateCache` após escrita.
+ * BUG-AA-07 (fix): `_stateDirReady` evita chamada mkdir redundante após 1ª criação. RF-D06 (melhoria): atualiza
+ * `_stateCache` após escrita.
  *
  * @param {Partial<AliveAgentState>} updates
  * @returns {Promise<AliveAgentState>}

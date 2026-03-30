@@ -97,6 +97,25 @@ try {
     // Continuar de qualquer forma — startWithRetry() tratará a falha
 }
 
+// MR-07 (fix): validar COPILOT_MODEL proativamente — falha rápida em modelo inválido
+if (process.env.COPILOT_MODEL) {
+    try {
+        const { listModels } = await import('../lib/models.js');
+        const models = await listModels();
+        const valid = models.some((/** @type {{ id: string }} */ m) => m.id === process.env.COPILOT_MODEL);
+        if (!valid) {
+            log(
+                'WARN',
+                `[copilot/agent] Modelo '${process.env.COPILOT_MODEL}' não encontrado na lista de modelos disponíveis. Verifique COPILOT_MODEL.`,
+            );
+        } else {
+            log('INFO', `[copilot/agent] Modelo '${process.env.COPILOT_MODEL}' validado na lista de modelos.`);
+        }
+    } catch {
+        /* não crítico — continuar sem validação */
+    }
+}
+
 // RF-051: salvar Promise para garantir que erros de rejeição não fiquem silenciosos
 const _startPromise = startWithRetry();
 _startPromise.catch((/** @type {any} */ e) => {
