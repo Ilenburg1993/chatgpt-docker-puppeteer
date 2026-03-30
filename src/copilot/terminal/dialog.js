@@ -309,6 +309,11 @@ export function ensureDialogLoop() {
     if (alwaysAliveAgent.dialogLoopActive) {
         return Promise.resolve();
     }
+    // NEW-PAUSE-04: não reiniciar automaticamente se o usuário pausou explicitamente
+    if (alwaysAliveAgent.dialogPaused) {
+        log('INFO', '[dialog] ensureDialogLoop() ignorado — dialogPaused=true (pausado pelo usuário)');
+        return Promise.resolve();
+    }
     // Coalescimento: se já há um boot em andamento, reutiliza a mesma Promise
     if (_ensureDialogLoopInFlight !== null) {
         return _ensureDialogLoopInFlight;

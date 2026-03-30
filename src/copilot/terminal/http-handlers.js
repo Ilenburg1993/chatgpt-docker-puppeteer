@@ -801,8 +801,9 @@ export function handleMetrics() {
 // ─── Pause / Resume ───────────────────────────────────────────────────────────
 
 /**
- * NEW-PAUSE: Handler para POST /dialog/pause.
- * Pausa o dialog loop preservando o sessionId para retomada sem consumir PR.
+ * NEW-PAUSE: Handler para POST /dialog/pause. Pausa o dialog loop preservando o sessionId para retomada sem consumir
+ * PR.
+ *
  * @returns {Promise<{ status: number; body: object }>}
  */
 export async function handleDialogPause() {
@@ -811,15 +812,19 @@ export async function handleDialogPause() {
     }
     try {
         await alwaysAliveAgent.pauseDialogLoop();
-        return { status: 200, body: { ok: true, message: 'Dialog loop pausado. Use POST /dialog/resume para retomar.' } };
+        return {
+            status: 200,
+            body: { ok: true, message: 'Dialog loop pausado. Use POST /dialog/resume para retomar.' },
+        };
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
     }
 }
 
 /**
- * NEW-PAUSE: Handler para POST /dialog/resume.
- * Retoma o dialog loop a partir de estado pausado (sem novo PR se sessão ainda ativa).
+ * NEW-PAUSE: Handler para POST /dialog/resume. Retoma o dialog loop a partir de estado pausado (sem novo PR se sessão
+ * ainda ativa).
+ *
  * @returns {Promise<{ status: number; body: object }>}
  */
 export async function handleDialogResume() {
@@ -832,4 +837,30 @@ export async function handleDialogResume() {
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
     }
+}
+
+// ─── Quota ────────────────────────────────────────────────────────────────────
+
+/**
+ * RF-PR-04: Handler para GET /quota. Retorna dados de cota de PRs a partir do estado persistido (atualizado por
+ * `assistant.usage`).
+ *
+ * @returns {{ status: number; body: object }}
+ */
+export function handleGetQuota() {
+    const snapshot = alwaysAliveAgent.getStatusSnapshot();
+    const prInfo = alwaysAliveAgent.lastPrInfo ?? null;
+    return {
+        status: 200,
+        body: {
+            ok: true,
+            sendCount: snapshot?.sendCount ?? 0,
+            dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
+            sessionId: alwaysAliveAgent.sessionId ?? null,
+            lastPrConsumedAt: prInfo?.ts ?? null,
+            lastPrModel: prInfo?.model ?? null,
+            lastPrCost: prInfo?.cost ?? null,
+            lastQuotaSnapshots: prInfo?.quotaSnapshots ?? null,
+        },
+    };
 }

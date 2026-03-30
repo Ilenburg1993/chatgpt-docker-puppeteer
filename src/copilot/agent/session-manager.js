@@ -178,6 +178,10 @@ let _stateDirReady = false;
  * @property {string} [pendingTurnMessage] - RF-PR-02: última mensagem enviada sem resposta confirmada
  * @property {number} [pendingTurnTs] - RF-PR-02: timestamp do envio pendente
  * @property {boolean} [pendingTurnConsumedPR] - RF-PR-02: se assistant.usage já foi emitido para este turno
+ * @property {number} [lastPrConsumedAt] - RF-PR-04: timestamp do último PR consumido
+ * @property {string} [lastPrModel] - RF-PR-04: modelo que consumiu o último PR
+ * @property {number} [lastPrCost] - RF-PR-04: custo reportado pelo SDK no último PR
+ * @property {any} [lastQuotaSnapshots] - RF-PR-04: snapshots de cota do último assistant.usage
  */
 
 /**

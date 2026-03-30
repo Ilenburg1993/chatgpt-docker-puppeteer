@@ -47,6 +47,8 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'context:compacted',
     // RF-PR-03: emitido quando assistant.usage é detectado (PR consumido)
     'pr.consumed',
+    // RF-PR-05: emitido quando o modelo falha com rate_limit/quota e o fallback é aplicado
+    'pr.fallback_model',
     // NEW-PAUSE: emitidos por pauseDialogLoop() e resumeDialogLoop()
     'permission.mode_changed',
 ]);

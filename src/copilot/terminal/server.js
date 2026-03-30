@@ -13,6 +13,7 @@
  * | GET    | /health             | Status do agente e do dialog loop     |
  * | GET    | /metrics            | Métricas Prometheus (text/plain)      |
  * | GET    | /context            | Uso de contexto/tokens em tempo real  |
+ * | GET    | /quota              | Dados de cota de PRs em tempo real    |
  * | GET    | /events             | SSE — stream de eventos da LLM-B      |
  * | GET    | /sessions           | Lista hub_sessions persistidas        |
  * | GET    | /sessions/:id/turns | Turnos de uma sessão específica       |
@@ -40,9 +41,12 @@ import { println } from './dialog.js';
 import {
     handleDeleteCustomTool,
     handleDeleteMemory,
+    handleDialogPause,
+    handleDialogResume,
     handleGetConfig,
     handleGetContext,
     handleGetCustomTools,
+    handleGetQuota,
     handleGetSkills,
     handleGetToolsConfig,
     handleGhCi,
@@ -62,8 +66,6 @@ import {
     handleSetSkills,
     handleSetToolsConfig,
     handleStoreMemory,
-    handleDialogPause,
-    handleDialogResume,
 } from './http-handlers.js';
 import { getSseClients, getSseCriticalClients } from './state.js';
 
@@ -246,6 +248,12 @@ export function createInjectServer() {
             // ── GET /context (UPG-04) ─────────────────────────────────────────
             if (req.method === 'GET' && url.pathname === '/context') {
                 sendJson(res, handleGetContext());
+                return;
+            }
+
+            // ── GET /quota — RF-PR-04 ─────────────────────────────────────────
+            if (req.method === 'GET' && url.pathname === '/quota') {
+                sendJson(res, handleGetQuota());
                 return;
             }
 

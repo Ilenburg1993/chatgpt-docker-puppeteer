@@ -182,6 +182,28 @@ export class AlwaysAliveAgent extends EventEmitter {
     #sendCount = 0;
 
     /**
+     * RF-PR-04: último dados de billing PR (model, cost, quotaSnapshots, ts). Atualizado pelo listener assistant.usage
+     * em start().
+     *
+     * @type {{ model?: string; cost?: number; quotaSnapshots?: any; ts: number } | null}
+     */
+    #lastPrInfo = null;
+
+    /**
+     * RF-PR-05: Se true, a próxima reconexão tentará com o modelo alternativo `COPILOT_FALLBACK_MODEL`.
+     *
+     * @type {boolean}
+     */
+    #pendingModelFallback = false;
+
+    /**
+     * RF-PR-05: Modelo original antes de aplicar o fallback (para restaurar se necessário).
+     *
+     * @type {string | null}
+     */
+    #originalModel = null;
+
+    /**
      * Intervalo do watchdog (ms). Controlado por `LLM_B_WATCHDOG_MS`. Padrão: 5 minutos.
      *
      * @type {number}
@@ -567,9 +589,18 @@ export class AlwaysAliveAgent extends EventEmitter {
                         const data = evt?.data ?? {};
                         const { model, cost, quotaSnapshots } = data;
                         log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
+                        // RF-PR-04: persistir em memória para GET /quota
+                        this.#lastPrInfo = { model, cost, quotaSnapshots, ts: Date.now() };
                         this.emit('pr.consumed', { model, cost, quotaSnapshots, ts: Date.now() });
                         // RF-PR-02: marcar que o PR foi consumido para o turno pendente
-                        writeStateAsync({ pendingTurnConsumedPR: true }).catch((/** @type {any} */ e) =>
+                        // RF-PR-04: persistir dados de quota para o endpoint GET /quota
+                        writeStateAsync({
+                            pendingTurnConsumedPR: true,
+                            lastPrConsumedAt: Date.now(),
+                            lastPrModel: model ?? '',
+                            lastPrCost: cost ?? 0,
+                            lastQuotaSnapshots: quotaSnapshots ?? null,
+                        }).catch((/** @type {any} */ e) =>
                             log('WARN', `[AlwaysAlive] writeState pendingTurnConsumedPR: ${e.message}`),
                         );
                         return;
@@ -1393,6 +1424,16 @@ export class AlwaysAliveAgent extends EventEmitter {
         return readState()?.dialogPaused ?? false;
     }
 
+    /**
+     * RF-PR-04: Retorna os últimos dados de billing do PR consumido. Atualizado quando `assistant.usage` é emitido pelo
+     * SDK.
+     *
+     * @returns {{ model?: string; cost?: number; quotaSnapshots?: any; ts: number } | null}
+     */
+    get lastPrInfo() {
+        return this.#lastPrInfo;
+    }
+
     // ─────────────── Privados ───────────────
 
     /**
@@ -1591,6 +1632,17 @@ export class AlwaysAliveAgent extends EventEmitter {
         for (const unsub of this.#sessionEventUnsubscribers) unsub();
         this.#sessionEventUnsubscribers = [];
 
+        // RF-PR-05: se há sinal de rate_limit/quota, aplicar fallback de modelo antes de reconectar
+        if (this.#pendingModelFallback) {
+            const fallbackModel = process.env.COPILOT_FALLBACK_MODEL;
+            if (fallbackModel && fallbackModel !== this.#model) {
+                log('WARN', `[AlwaysAlive] RF-PR-05: aplicando model fallback: ${this.#model} → ${fallbackModel}`);
+                this.#model = fallbackModel;
+                this.emit('pr.fallback_model', { previousModel: this.#originalModel, fallbackModel, ts: Date.now() });
+            }
+            this.#pendingModelFallback = false;
+        }
+
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + random(0..base)
             const delay = baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * baseDelayMs;
@@ -1755,6 +1807,23 @@ export class AlwaysAliveAgent extends EventEmitter {
             'WARN',
             `[AlwaysAlive] SDK errorOccurred [${input.errorContext}]: ${input.error} (recuperável: ${input.recoverable})`,
         );
+
+        // RF-PR-05: sinalizar fallback de modelo quando a quota/rate_limit for atingida
+        const isRateOrQuotaError = input.errorContext === 'rate_limit' || input.errorContext === 'quota';
+        if (isRateOrQuotaError) {
+            const fallbackModel = process.env.COPILOT_FALLBACK_MODEL;
+            if (fallbackModel && fallbackModel !== this.#model) {
+                log(
+                    'WARN',
+                    `[AlwaysAlive] RF-PR-05: rate_limit/quota detectado — próxima reconexão usará model fallback: ${fallbackModel}`,
+                );
+                this.#pendingModelFallback = true;
+                this.#originalModel = this.#model;
+            } else {
+                log('WARN', '[AlwaysAlive] RF-PR-05: rate_limit/quota mas nenhum COPILOT_FALLBACK_MODEL configurado.');
+            }
+        }
+
         this.emit('error', {
             hookType: 'errorOccurred',
             errorMessage: input.error,

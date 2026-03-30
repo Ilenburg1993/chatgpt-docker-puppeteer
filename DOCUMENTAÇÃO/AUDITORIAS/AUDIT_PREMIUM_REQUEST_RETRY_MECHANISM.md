@@ -72,15 +72,15 @@ O billing ocorre **exclusivamente** quando o evento `assistant.usage` é emitido
 
 | Cenário                                        | PR cobrado? |
 | ---------------------------------------------- | :---------: |
-| Erro de rede antes da requisição chegar ao LLM | ❌ Não      |
-| HTTP 429 rate-limit no gateway                 | ❌ Não      |
-| HTTP 503 serviço indisponível                  | ❌ Não      |
-| Timeout do cliente SDK                         | ❌ Não      |
-| `ask_user` tool call (resposta ao usuário)     | ❌ Não      |
-| Reconexão via `resumeSession()`                | ❌ Não      |
-| Criação de sessão `createSession()` sem send   | ❌ Não      |
-| LLM processar e retornar resposta completa     | ✅ Sim      |
-| LLM processar mas ferramenta falhar depois     | ✅ Sim      |
+| Erro de rede antes da requisição chegar ao LLM |    ❌ Não    |
+| HTTP 429 rate-limit no gateway                 |    ❌ Não    |
+| HTTP 503 serviço indisponível                  |    ❌ Não    |
+| Timeout do cliente SDK                         |    ❌ Não    |
+| `ask_user` tool call (resposta ao usuário)     |    ❌ Não    |
+| Reconexão via `resumeSession()`                |    ❌ Não    |
+| Criação de sessão `createSession()` sem send   |    ❌ Não    |
+| LLM processar e retornar resposta completa     |    ✅ Sim    |
+| LLM processar mas ferramenta falhar depois     |    ✅ Sim    |
 
 ### 2.3 Estrutura de eventos em um turno normal
 
@@ -97,12 +97,12 @@ session.send(message)
 
 ### 2.4 `createSession` vs `resumeSession`
 
-| Operação                           | Cria novo PR? | Novo sessionId? | Histórico?   |
+| Operação                           | Cria novo PR? | Novo sessionId? |  Histórico?  |
 | ---------------------------------- | :-----------: | :-------------: | :----------: |
-| `client.createSession(config)`     | ❌ Não        | ✅ Sim          | ❌ Zerado    |
-| `client.resumeSession(id, config)` | ❌ Não        | ❌ Mesmo        | ✅ Preservado |
-| `session.send(message)` (sucesso)  | ✅ Sim        | Mesmo           | Preservado   |
-| `session.send(message)` (falha)    | ❌ Não        | Mesmo           | Preservado   |
+| `client.createSession(config)`     |     ❌ Não     |      ✅ Sim      |   ❌ Zerado   |
+| `client.resumeSession(id, config)` |     ❌ Não     |     ❌ Mesmo     | ✅ Preservado |
+| `session.send(message)` (sucesso)  |     ✅ Sim     |      Mesmo      |  Preservado  |
+| `session.send(message)` (falha)    |     ❌ Não     |      Mesmo      |  Preservado  |
 
 **Conclusão crítica**: Reconectar via `resumeSession` com o mesmo `sessionId` **nunca consome PR**.
 O PR só é contado quando o LLM efetivamente processa e retorna `assistant.usage`.
@@ -241,15 +241,15 @@ Quando `errorHandling: "retry"` é retornado:
 
 ### 4.3 Erros recuperáveis vs não-recuperáveis
 
-| `errorContext`     | `recoverable` | Estratégia ideal            |
-| ------------------ | :-----------: | --------------------------- |
-| `model_call`       | `true`        | `retry` (até 3x)            |
-| `model_call`       | `false`       | `abort` (falha permanente)  |
-| `tool_execution`   | `true`        | `skip` (pular tool)         |
-| `tool_execution`   | `false`       | `abort`                     |
-| `system`           | `true`        | `retry` (1x)                |
-| `system`           | `false`       | `abort`                     |
-| `user_input`       | qualquer      | `skip` (input inválido)     |
+| `errorContext`   | `recoverable` | Estratégia ideal           |
+| ---------------- | :-----------: | -------------------------- |
+| `model_call`     |    `true`     | `retry` (até 3x)           |
+| `model_call`     |    `false`    | `abort` (falha permanente) |
+| `tool_execution` |    `true`     | `skip` (pular tool)        |
+| `tool_execution` |    `false`    | `abort`                    |
+| `system`         |    `true`     | `retry` (1x)               |
+| `system`         |    `false`    | `abort`                    |
+| `user_input`     |   qualquer    | `skip` (input inválido)    |
 
 ### 4.4 O SDK `disableResume` para reconexão silenciosa
 
@@ -315,16 +315,16 @@ function buildSessionConfig(opts, mode) {
 
 ### 5.4 Gaps de implementação
 
-| ID         | Descrição                                                              | Impacto PR   |
-| ---------- | ---------------------------------------------------------------------- | :----------: |
-| GAP-PR-01  | `onErrorOccurred` não configurado → sem retry automático no SDK        | Alto         |
-| GAP-PR-02  | `startDialogLoop()` após `resumeSession` envia boot → 1 PR a cada boot | Alto         |
-| GAP-PR-03  | Sem feature de pause explícito → restart = novo loop = 1 PR           | Alto         |
-| GAP-PR-04  | `assistant.usage` não monitorado → sem visibilidade de billing         | Médio        |
-| GAP-PR-05  | Sem `pendingTurnMessage` persistido → turno perdido após crash          | Médio        |
-| GAP-PR-06  | `disableResume` não exposto → `session.resume` event desnecessário     | Baixo        |
-| GAP-PR-07  | Sem endpoint `/quota` para monitoramento externo de PRs                | Baixo        |
-| GAP-PR-08  | Sem fallback de modelo em rate-limit → downtime até modelo disponível  | Baixo        |
+| ID        | Descrição                                                              | Impacto PR |
+| --------- | ---------------------------------------------------------------------- | :--------: |
+| GAP-PR-01 | `onErrorOccurred` não configurado → sem retry automático no SDK        |    Alto    |
+| GAP-PR-02 | `startDialogLoop()` após `resumeSession` envia boot → 1 PR a cada boot |    Alto    |
+| GAP-PR-03 | Sem feature de pause explícito → restart = novo loop = 1 PR            |    Alto    |
+| GAP-PR-04 | `assistant.usage` não monitorado → sem visibilidade de billing         |   Médio    |
+| GAP-PR-05 | Sem `pendingTurnMessage` persistido → turno perdido após crash         |   Médio    |
+| GAP-PR-06 | `disableResume` não exposto → `session.resume` event desnecessário     |   Baixo    |
+| GAP-PR-07 | Sem endpoint `/quota` para monitoramento externo de PRs                |   Baixo    |
+| GAP-PR-08 | Sem fallback de modelo em rate-limit → downtime até modelo disponível  |   Baixo    |
 
 ---
 
@@ -477,41 +477,58 @@ if (state.dialogPaused && state.isResumed) {
 
 ### 7.1 Tabela de itens
 
-| ID           | Prioridade | Descrição                                          | Arquivos                                     | Esforço   |
-| ------------ | ---------- | -------------------------------------------------- | -------------------------------------------- | --------- |
-| RF-PR-01     | 🔴 Alta     | `onErrorOccurred` hook com retry automático        | `lib/session.js`                             | Pequeno   |
-| RF-PR-06     | 🔴 Alta     | `disableResume: true` em reconexão silenciosa      | `lib/session.js`                             | Trivial   |
-| NEW-PAUSE-01 | 🔴 Alta     | Estado `dialogPaused/pausedAt` no `session-manager` | `session-manager.js`                         | Pequeno   |
-| NEW-PAUSE-02 | 🔴 Alta     | `pauseDialogLoop()` em `AlwaysAliveAgent`          | `always-alive.js`                            | Médio     |
-| NEW-PAUSE-03 | 🔴 Alta     | `resumeDialogLoop()` em `AlwaysAliveAgent`         | `always-alive.js`                            | Médio     |
-| NEW-PAUSE-04 | 🔴 Alta     | Detecção de `dialogPaused` no boot em `entry.js`   | `entry.js` + `terminal/dialog.js`            | Pequeno   |
-| NEW-PAUSE-05 | 🔴 Alta     | Endpoints HTTP `/terminal/pause` e `/resume`       | `terminal/server.js` ou `routes/`            | Médio     |
-| NEW-PAUSE-06 | 🟡 Média    | Comandos `/pause` e `/resume` no REPL              | `terminal/repl.js`                           | Pequeno   |
-| RF-PR-03     | 🟡 Média    | Monitorar `assistant.usage` → billing real-time    | `always-alive.js`                            | Pequeno   |
-| RF-PR-02     | 🟡 Média    | Persistir `pendingTurnMessage` + `consumedPR`      | `session-manager.js` + `always-alive.js`     | Médio     |
-| RF-PR-04     | 🟡 Média    | Endpoint `GET /quota` com dados de PRs restantes   | `routes/` (novo)                             | Pequeno   |
-| RF-PR-05     | 🟢 Baixa    | Fallback automático de modelo em rate-limit 429    | `always-alive.js` + `entry.js`               | Médio     |
+| ID           | Prioridade | Descrição                                           | Arquivos                                  | Esforço | Status            |
+| ------------ | ---------- | --------------------------------------------------- | ----------------------------------------- | ------- | ----------------- |
+| RF-PR-01     | 🔴 Alta     | `onErrorOccurred` hook com retry automático         | `lib/session.js`                          | Pequeno | ✅ commit 2bd82481 |
+| RF-PR-06     | 🔴 Alta     | `disableResume: true` em reconexão silenciosa       | `lib/session.js`                          | Trivial | ✅ commit 2bd82481 |
+| NEW-PAUSE-01 | 🔴 Alta     | Estado `dialogPaused/pausedAt` no `session-manager` | `session-manager.js`                      | Pequeno | ✅ commit 2bd82481 |
+| NEW-PAUSE-02 | 🔴 Alta     | `pauseDialogLoop()` em `AlwaysAliveAgent`           | `always-alive.js`                         | Médio   | ✅ commit 2bd82481 |
+| NEW-PAUSE-03 | 🔴 Alta     | `resumeDialogLoop()` em `AlwaysAliveAgent`          | `always-alive.js`                         | Médio   | ✅ commit 2bd82481 |
+| NEW-PAUSE-04 | 🔴 Alta     | Detecção de `dialogPaused` no boot em `entry.js`    | `entry.js` + `terminal/dialog.js`         | Pequeno | ✅ commit HEAD     |
+| NEW-PAUSE-05 | 🔴 Alta     | Endpoints HTTP `/dialog/pause` e `/dialog/resume`   | `terminal/server.js` + `http-handlers.js` | Médio   | ✅ commit 2bd82481 |
+| NEW-PAUSE-06 | 🟡 Média    | Comandos `/pause` e `/dialog-resume` no REPL        | `terminal/repl.js`                        | Pequeno | ✅ commit 2bd82481 |
+| RF-PR-02     | 🟡 Média    | Persistir `pendingTurnMessage` + `consumedPR`       | `session-manager.js` + `always-alive.js`  | Médio   | ✅ commit 2bd82481 |
+| RF-PR-03     | 🟡 Média    | Monitorar `assistant.usage` → billing real-time     | `always-alive.js`                         | Pequeno | ✅ commit 2bd82481 |
+| RF-PR-04     | 🟡 Média    | Endpoint `GET /quota` com dados de PRs restantes    | `http-handlers.js` + `server.js`          | Pequeno | ✅ commit HEAD     |
+| RF-PR-05     | 🟢 Baixa    | Fallback automático de modelo em rate-limit 429     | `always-alive.js` + `entry.js`            | Médio   | ✅ commit HEAD     |
 
-### 7.2 Ordem de implementação recomendada
+### 7.2 Progresso atual (COMPLETO — 12/12 itens)
 
-**Fase A — Zero-PR hardening (sessão e erros):**
+**Implementados (12/12 itens):**
+
+- ✅ **RF-PR-01/06** (`session.js`): retry automático 3x `onErrorOccurred` + `disableResume` flag
+- ✅ **RF-PR-02** (`always-alive.js`): `pendingTurnMessage/Ts/ConsumedPR` persistidos antes/após cada turno
+- ✅ **RF-PR-03** (`always-alive.js`): listener `assistant.usage` → evento `pr.consumed` + escrita de estado
+- ✅ **RF-PR-04** (`http-handlers.js` + `server.js`): `GET /quota` com dados de billing em tempo real
+- ✅ **RF-PR-05** (`always-alive.js`): fallback automático de modelo via `COPILOT_FALLBACK_MODEL` quando `errorContext === 'rate_limit' | 'quota'`
+- ✅ **NEW-PAUSE-01/02/03** (`session-manager.js` + `always-alive.js`): `pauseDialogLoop()` / `resumeDialogLoop()` com Estratégia A (0 PR) e Estratégia B (1 PR)
+- ✅ **NEW-PAUSE-04** (`terminal/dialog.js`): `ensureDialogLoop()` respeita `dialogPaused` e ignora restart automático
+- ✅ **NEW-PAUSE-05** (`http-handlers.js` + `server.js`): `POST /dialog/pause` + `POST /dialog/resume`
+- ✅ **NEW-PAUSE-06** (`repl.js`): comandos `/pause` e `/dialog-resume` no REPL
+- ✅ `events.js`: `dialog.paused`, `dialog.resumed`, `pr.consumed`, `pr.fallback_model`, `dialog.turn_start`, `dialog.turn_end` adicionados
+
+**Pendentes:** Nenhum.
+
+### 7.3 Ordem de implementação recomendada
+
+**Fase A — Zero-PR hardening (sessão e erros):** ✅ COMPLETO
 1. `RF-PR-06`: `disableResume: true` em `lib/session.js` — trivial, remove side-effects
 2. `RF-PR-01`: `onErrorOccurred` hook em `buildSessionConfig` — retry automático no SDK
 
-**Fase B — Pause/Resume feature:**
-3. `NEW-PAUSE-01`: novos campos em `AliveAgentState`
-4. `NEW-PAUSE-02` + `NEW-PAUSE-03`: métodos `pauseDialogLoop()` e `resumeDialogLoop()`
-5. `NEW-PAUSE-04`: detecção no boot + integração com `ensureDialogLoop()`
-6. `NEW-PAUSE-05`: endpoints HTTP
-7. `NEW-PAUSE-06`: comandos REPL
+**Fase B — Pause/Resume feature:** ✅ COMPLETO
+3. `NEW-PAUSE-01`: novos campos em `AliveAgentState` ✅
+4. `NEW-PAUSE-02` + `NEW-PAUSE-03`: métodos `pauseDialogLoop()` e `resumeDialogLoop()` ✅
+5. `NEW-PAUSE-04`: detecção no boot + integração com `ensureDialogLoop()` ✅
+6. `NEW-PAUSE-05`: endpoints HTTP ✅
+7. `NEW-PAUSE-06`: comandos REPL ✅
 
-**Fase C — Observabilidade e resiliência:**
-8. `RF-PR-03`: monitorar `assistant.usage`
-9. `RF-PR-02`: persistir `pendingTurnMessage`
-10. `RF-PR-04`: endpoint `/quota`
-11. `RF-PR-05`: fallback de modelo
+**Fase C — Observabilidade e resiliência:** ✅ COMPLETO
+8. `RF-PR-03`: monitorar `assistant.usage` ✅
+9. `RF-PR-02`: persistir `pendingTurnMessage` ✅
+10. `RF-PR-04`: endpoint `/quota` ✅
+11. `RF-PR-05`: fallback de modelo ✅
 
-### 7.3 Detalhes de implementação por item
+### 7.4 Detalhes de implementação por item
 
 #### RF-PR-01 — `onErrorOccurred` hook
 
@@ -685,20 +702,20 @@ router.get('/quota', async (req, res) => {
 
 ## 8. Status de Implementação
 
-| ID           | Status          | Commit |
-| ------------ | --------------- | ------ |
-| RF-PR-01     | ⏳ Pendente      | —      |
-| RF-PR-02     | ⏳ Pendente      | —      |
-| RF-PR-03     | ⏳ Pendente      | —      |
-| RF-PR-04     | ⏳ Pendente      | —      |
-| RF-PR-05     | ⏳ Pendente      | —      |
-| RF-PR-06     | ⏳ Pendente      | —      |
-| NEW-PAUSE-01 | ⏳ Pendente      | —      |
-| NEW-PAUSE-02 | ⏳ Pendente      | —      |
-| NEW-PAUSE-03 | ⏳ Pendente      | —      |
-| NEW-PAUSE-04 | ⏳ Pendente      | —      |
-| NEW-PAUSE-05 | ⏳ Pendente      | —      |
-| NEW-PAUSE-06 | ⏳ Pendente      | —      |
+| ID           | Status     | Commit |
+| ------------ | ---------- | ------ |
+| RF-PR-01     | ⏳ Pendente | —      |
+| RF-PR-02     | ⏳ Pendente | —      |
+| RF-PR-03     | ⏳ Pendente | —      |
+| RF-PR-04     | ⏳ Pendente | —      |
+| RF-PR-05     | ⏳ Pendente | —      |
+| RF-PR-06     | ⏳ Pendente | —      |
+| NEW-PAUSE-01 | ⏳ Pendente | —      |
+| NEW-PAUSE-02 | ⏳ Pendente | —      |
+| NEW-PAUSE-03 | ⏳ Pendente | —      |
+| NEW-PAUSE-04 | ⏳ Pendente | —      |
+| NEW-PAUSE-05 | ⏳ Pendente | —      |
+| NEW-PAUSE-06 | ⏳ Pendente | —      |
 
 ---
 
