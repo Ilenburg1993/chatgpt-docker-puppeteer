@@ -89,10 +89,11 @@ function buildSystemMessageConfig(systemMessageOpt, content) {
     if (systemMessageOpt && typeof systemMessageOpt === 'object') return systemMessageOpt;
     if (!content) return undefined;
 
-    // SDK-03 (fix): SDK v0.1.x não suporta mode:'customize'; usar mode:'append' até SDK v0.2.0
-    // TODO(SDK-v0.2.0): migrar para mode:'customize' com sections quando disponível
+    // SDK-03 (update): SDK 0.2.0 suporta mode:'customize' com sections e content.
+    // Usando mode:'customize' com content equivale ao antigo mode:'append', mas permite
+    // future section-level overrides sem quebrar compatibilidade.
     return {
-        mode: 'append',
+        mode: 'customize',
         content,
     };
 }

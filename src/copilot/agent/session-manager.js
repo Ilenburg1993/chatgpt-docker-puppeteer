@@ -150,6 +150,13 @@ const ROOT = resolve(import.meta.dirname, '../../');
 const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
 const STATE_FILE = join(STATE_DIR, 'sdk-always-alive.json');
 
+// RF-D06 + BUG-AA-07: cache in-process de readState e flag para evitar mkdir redundante.
+// _stateCache é atualizado em cada writeState/writeStateAsync; readState retorna o cache
+// quando disponível, sem I/O. _stateDirReady evita a chamada mkdirSync/mkdir após 1ª criação.
+/** @type {import('./session-manager.js').AliveAgentState | null} */
+let _stateCache = null;
+let _stateDirReady = false;
+
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
  *
@@ -170,12 +177,16 @@ const STATE_FILE = join(STATE_DIR, 'sdk-always-alive.json');
 /**
  * Lê o estado persistido do agente da sessão em disco.
  *
+ * RF-D06 (melhoria): retorna o cache in-process quando disponível, evitando readFileSync no hot path.
+ *
  * @returns {AliveAgentState | null} Estado persistido ou null se não existir
  */
 export function readState() {
+    if (_stateCache !== null) return _stateCache;
     if (!existsSync(STATE_FILE)) return null;
     try {
-        return JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+        _stateCache = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+        return _stateCache;
     } catch (/** @type {any} */ e) {
         log('WARN', `[PersistentSession] Falha ao ler estado: ${e.message}`);
         return null;
@@ -185,11 +196,17 @@ export function readState() {
 /**
  * Persiste o estado da sessão em disco.
  *
+ * BUG-AA-07 (fix): `_stateDirReady` evita chamada mkdirSync redundante após 1ª criação.
+ * RF-D06 (melhoria): atualiza `_stateCache` após escrita para que readState() não precise I/O.
+ *
  * @param {Partial<AliveAgentState>} updates - Campos a atualizar no estado
  * @returns {AliveAgentState} Estado completo após a atualização
  */
 export function writeState(updates) {
-    mkdirSync(STATE_DIR, { recursive: true });
+    if (!_stateDirReady) {
+        mkdirSync(STATE_DIR, { recursive: true });
+        _stateDirReady = true;
+    }
     const current = readState() ?? {
         sessionId: '',
         startedAt: Date.now(),
@@ -201,17 +218,24 @@ export function writeState(updates) {
     };
     const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
     writeFileSync(STATE_FILE, JSON.stringify(next, null, 4), 'utf8');
+    _stateCache = next;
     return next;
 }
 
 /**
  * Versão async de `writeState`. Preferir em handlers de alta frequência para não bloquear o event loop.
  *
+ * BUG-AA-07 (fix): `_stateDirReady` evita chamada mkdir redundante após 1ª criação.
+ * RF-D06 (melhoria): atualiza `_stateCache` após escrita.
+ *
  * @param {Partial<AliveAgentState>} updates
  * @returns {Promise<AliveAgentState>}
  */
 export async function writeStateAsync(updates) {
-    await mkdir(STATE_DIR, { recursive: true });
+    if (!_stateDirReady) {
+        await mkdir(STATE_DIR, { recursive: true });
+        _stateDirReady = true;
+    }
     const current = readState() ?? {
         sessionId: '',
         startedAt: Date.now(),
@@ -224,6 +248,7 @@ export async function writeStateAsync(updates) {
     const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
     const { writeFile } = await import('node:fs/promises');
     await writeFile(STATE_FILE, JSON.stringify(next, null, 4), 'utf8');
+    _stateCache = next;
     return next;
 }
 
@@ -237,6 +262,9 @@ export function clearState() {
         rmSync(STATE_FILE);
         log('INFO', '[PersistentSession] Estado removido — próxima inicialização criará nova sessão.');
     }
+    // RF-D06: invalidar cache após remoção do arquivo
+    _stateCache = null;
+    _stateDirReady = false;
 }
 
 /**

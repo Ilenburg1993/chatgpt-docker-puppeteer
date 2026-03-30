@@ -71,6 +71,15 @@ alwaysAliveAgent.on('error', (err) => {
     log('ERROR', `[copilot/agent] Erro do agente: ${err.message}`);
 });
 
+// BUG-AA-09 (fix): session.fatal indica que a sessão está irrecuperável. Sem este handler,
+// o processo continua vivo sem sessão ativa (zumbi). PM2 reinicia imediatamente após o exit.
+alwaysAliveAgent.on('session.fatal', (/** @type {any} */ evt) => {
+    const reason = evt?.reason ?? evt?.message ?? 'desconhecido';
+    log('ERROR', `[copilot/agent] session.fatal recebido — encerrando processo: ${reason}`);
+    process.exitCode = 1;
+    process.exit(1);
+});
+
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
 // UPG-08: health check de conectividade proativo antes do primeiro start

@@ -23,6 +23,7 @@
  *     ```;
  */
 
+import { log } from '#core/logger';
 import { BridgeError } from '#copilot/core';
 import http from 'node:http';
 import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';
@@ -269,6 +270,7 @@ export async function waitForLlmBReady(opts = {}) {
 
 /**
  * Helper interno: conecta ao endpoint SSE do terminal-server e entrega eventos ao callback.
+ * MR-09 (fix): reconecta automaticamente com backoff exponencial quando a conexão cai.
  *
  * @param {string} path - Path do endpoint, ex: '/events' ou '/events?level=critical'
  * @param {number} port
@@ -277,62 +279,98 @@ export async function waitForLlmBReady(opts = {}) {
  */
 function _subscribeSse(path, port, onEvent) {
     let destroyed = false;
+    // MR-09: controle de reconexão — backoff exponencial entre 1s e 30s
+    let reconnectMs = 1_000;
+    const MAX_RECONNECT_MS = 30_000;
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let reconnectTimer = null;
+    /** @type {ReturnType<typeof http.request> | null} */
+    let currentReq = null;
 
-    const req = http.request(
-        {
-            hostname: '127.0.0.1',
-            port,
-            path,
-            method: 'GET',
-            headers: { Accept: 'text/event-stream' },
-        },
-        (res) => {
-            let buf = '';
-            res.on('data', (/** @type {Buffer} */ chunk) => {
-                buf += chunk.toString();
-                // SSE-INJECT-01 (fix): parsear por blocos delimitados por linha vazia (RFC 8895).
-                // Múltiplas linhas data: num mesmo bloco são acumuladas e concatenadas com \n.
-                const blocks = buf.split(/\r?\n\r?\n/);
-                buf = blocks.pop() ?? '';
+    function connect() {
+        if (destroyed) return;
 
-                for (const block of blocks) {
-                    if (!block.trim()) continue;
-                    let currentEvent = '';
-                    const dataLines = /** @type {string[]} */ ([]);
-                    for (const line of block.split(/\r?\n/)) {
-                        if (line.startsWith('event:')) {
-                            currentEvent = line.slice(6).trim();
-                        } else if (line.startsWith('data:')) {
-                            dataLines.push(line.slice(5).trimStart());
+        const req = http.request(
+            {
+                hostname: '127.0.0.1',
+                port,
+                path,
+                method: 'GET',
+                headers: { Accept: 'text/event-stream' },
+            },
+            (res) => {
+                // Reconexão bem-sucedida — resetar backoff
+                reconnectMs = 1_000;
+                let buf = '';
+                res.on('data', (/** @type {Buffer} */ chunk) => {
+                    buf += chunk.toString();
+                    // SSE-INJECT-01 (fix): parsear por blocos delimitados por linha vazia (RFC 8895).
+                    // Múltiplas linhas data: num mesmo bloco são acumuladas e concatenadas com \n.
+                    const blocks = buf.split(/\r?\n\r?\n/);
+                    buf = blocks.pop() ?? '';
+
+                    for (const block of blocks) {
+                        if (!block.trim()) continue;
+                        let currentEvent = '';
+                        const dataLines = /** @type {string[]} */ ([]);
+                        for (const line of block.split(/\r?\n/)) {
+                            if (line.startsWith('event:')) {
+                                currentEvent = line.slice(6).trim();
+                            } else if (line.startsWith('data:')) {
+                                dataLines.push(line.slice(5).trimStart());
+                            }
+                            // ignorar linhas 'id:' e 'retry:' — não usadas por este parser
                         }
-                        // ignorar linhas 'id:' e 'retry:' — não usadas por este parser
-                    }
-                    if (dataLines.length > 0) {
-                        try {
-                            const data = JSON.parse(dataLines.join('\n'));
-                            onEvent({ type: currentEvent || 'message', data });
-                        } catch {
-                            /* ignora JSON inválido */
+                        if (dataLines.length > 0) {
+                            try {
+                                const data = JSON.parse(dataLines.join('\n'));
+                                onEvent({ type: currentEvent || 'message', data });
+                            } catch {
+                                /* ignora JSON inválido */
+                            }
                         }
                     }
-                }
-            });
-            res.on('error', () => {
-                /* silencia erros de rede */
-            });
-        },
-    );
+                });
+                res.on('close', () => {
+                    if (!destroyed) scheduleReconnect();
+                });
+                res.on('error', () => {
+                    if (!destroyed) scheduleReconnect();
+                });
+            },
+        );
+        currentReq = req;
 
-    req.on('error', () => {
-        /* silencia falha de conexão — terminal pode não estar ativo */
-    });
-    req.end();
+        req.on('error', () => {
+            if (!destroyed) scheduleReconnect();
+        });
+        req.end();
+    }
+
+    function scheduleReconnect() {
+        if (destroyed || reconnectTimer !== null) return;
+        log('DEBUG', `[inject] SSE desconectado (${path}) — reconectando em ${reconnectMs}ms`);
+        reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            connect();
+        }, reconnectMs);
+        // Backoff exponencial: 1s → 2s → 4s → ... → 30s (teto)
+        reconnectMs = Math.min(reconnectMs * 2, MAX_RECONNECT_MS);
+    }
+
+    // Conectar imediatamente
+    connect();
 
     return {
         unsubscribe() {
             if (!destroyed) {
                 destroyed = true;
-                req.destroy();
+                if (reconnectTimer !== null) {
+                    clearTimeout(reconnectTimer);
+                    reconnectTimer = null;
+                }
+                currentReq?.destroy();
+                currentReq = null;
             }
         },
     };

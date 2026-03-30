@@ -28,6 +28,7 @@ import { buildMcpConfig } from '../config/mcp-servers.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { getHubSessionId } from '../terminal/state.js';
 import { DialogWatchdog } from './dialog-watchdog.js';
+import { DIALOG_PROTO_READY, DIALOG_PROTO_REPLY, DIALOG_PROTO_STOPPED, DialogProtocol } from './dialog-protocol.js';
 import { AGENT_EVENTS } from './events.js';
 import { initOrResumeSession, readState, writeStateAsync } from './session-manager.js';
 import { executeTask } from './task-executor.js';
@@ -85,13 +86,9 @@ import { WebhookManager } from './webhook-manager.js';
  */
 
 /**
- * IMPROVE-AA-01: Constantes do protocolo do dialog loop. Usadas em #handleUserInputRequest e no metaPrompt de boot.
- * Centralizar aqui evita strings mágicas espalhadas pelo código.
+ * IMPROVE-AA-01: Constantes do protocolo importadas de dialog-protocol.js (RF-D01).
+ * Centralizadas lá para testabilidade isolada; re-exportadas implicitamente pelo import acima.
  */
-const DIALOG_PROTO_READY = 'READY:';
-const DIALOG_PROTO_REPLY = 'REPLY:';
-const DIALOG_PROTO_DONE = 'DONE:';
-const DIALOG_PROTO_STOPPED = 'STOPPED';
 
 /**
  * Always-Alive Agent — instância singleton que gerencia o ciclo de vida completo do agente Copilot SDK neste processo.
@@ -552,10 +549,10 @@ export class AlwaysAliveAgent extends EventEmitter {
                 }),
             );
 
-            // MELHORIA-02 (fix): catch-all para eventos do SDK não tratados explicitamente
-            // Permite observabilidade de novos eventos adicionados em versões futuras do SDK
-            if (typeof (/** @type {any} */ (session).onEvent) === 'function') {
-                /** @type {any} */ (session).onEvent((/** @type {any} */ evt) => {
+            // BUG-AA-11 (fix): substituir session.onEvent() (privado/não-documentado) por session.on(handler)
+            // que é a API pública do SDK 0.2.0. Retorna () => void → armazenar para cleanup.
+            this.#sessionEventUnsubscribers.push(
+                session.on((/** @type {any} */ evt) => {
                     const kind = evt?.kind ?? evt?.type ?? 'unknown';
                     const knownEvents = new Set([
                         'session.compaction_start',
@@ -570,8 +567,8 @@ export class AlwaysAliveAgent extends EventEmitter {
                     if (!knownEvents.has(kind)) {
                         log('DEBUG', `[AlwaysAlive] Evento SDK não tratado: kind=${kind}`);
                     }
-                });
-            }
+                }),
+            );
 
             this.#setStatus('idle');
             // PERF-01 (fix): inicializar contador em memória a partir do estado persistido
@@ -1511,23 +1508,23 @@ qualquer tentativa de encerramento não autorizado.`;
         log('INFO', `[AlwaysAlive] Modelo tem pergunta: "${question.slice(0, 120)}"`);
 
         // ── Interceptação do dialog loop ────────────────────────────────────
-        // No modo diálogo, o modelo usa ask_user com prefixos especiais.
+        // No modo diálogo, o modelo usa ask_user com prefixos especiais (RF-D01: DialogProtocol).
         if (this.#dialogLoopActive) {
-            const trimmed = question.trim();
+            const kind = DialogProtocol.classify(question);
 
-            if (trimmed.startsWith(DIALOG_PROTO_READY) || trimmed === 'READY') {
+            if (kind === 'ready') {
                 // Modelo sinaliza prontidão — emite evento para sendDialogTurn()
                 this.#watchdog?.ping();
                 this.emit('dialog.ready', {});
                 // Aguarda a resposta via question.pending normal
                 // (sendDialogTurn chamará answerPendingQuestion com a mensagem do usuário)
-            } else if (trimmed.startsWith(DIALOG_PROTO_REPLY) || trimmed.startsWith(DIALOG_PROTO_DONE)) {
+            } else if (kind === 'reply') {
                 // Modelo enviou uma resposta — extrai o conteúdo
                 this.#watchdog?.ping();
-                const reply = trimmed.replace(/^(REPLY:|DONE:)\s*/i, '').trim();
+                const reply = DialogProtocol.extractReply(question);
                 this.emit('dialog.reply', { reply });
                 // Aguarda o próximo turno via question.pending
-            } else if (trimmed.startsWith(DIALOG_PROTO_STOPPED) || trimmed === 'STOP_DIALOG') {
+            } else if (kind === 'stopped') {
                 // DL-PERM: o modelo tentou encerrar o loop. Não encerramos imediatamente — emitimos o evento
                 // 'dialog.stopped' para que o listener em terminal/index.js possa reiniciar automaticamente.
                 // O #dialogLoopActive NÃO é setado para false aqui — o restart via ensureDialogLoop() irá

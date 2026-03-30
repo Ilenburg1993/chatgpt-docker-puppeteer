@@ -375,6 +375,31 @@ async function _tryStartDialogLoop() {
         });
     }
 
+    // MR-05 (fix): se o agente está em 'processing', startDialogMode falharia com INVALID_STATE.
+    // Aguardar até 30s para o agente terminar a tarefa em andamento e voltar para 'idle'.
+    if (alwaysAliveAgent.status === 'processing') {
+        println('\x1b[90m  Aguardando agente concluir tarefa em andamento…\x1b[0m');
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(
+                () => reject(new Error('Timeout aguardando idle após processing (30s)')),
+                30_000,
+            );
+            const check = () => {
+                const s = alwaysAliveAgent.status;
+                if (s === 'idle') {
+                    clearTimeout(timeout);
+                    resolve(undefined);
+                } else if (s === 'stopped') {
+                    clearTimeout(timeout);
+                    reject(new Error(`Agente parado inesperadamente antes de dialog loop`));
+                } else {
+                    setTimeout(check, 500);
+                }
+            };
+            check();
+        });
+    }
+
     println('\x1b[90m  Conectando ao agente…\x1b[0m');
     await llmBridgeClient.startDialogMode(BOOT_PROMPT ?? undefined, {
         onReady: () => println('\n  \x1b[32m●\x1b[0m  LLM-B pronta — pode começar\n'),

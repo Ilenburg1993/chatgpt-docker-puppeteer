@@ -54,22 +54,35 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
     });
 
     it('padrão READY: é interceptado no handler do ask_user', () => {
+        // RF-D01: a lógica foi movida para DialogProtocol.classify() em dialog-protocol.js
         assert.ok(
-            sourceCode.includes("startsWith('READY:')") || sourceCode.includes("'READY:'"),
+            sourceCode.includes("startsWith('READY:')") ||
+                sourceCode.includes("'READY:'") ||
+                sourceCode.includes("DialogProtocol.classify") ||
+                sourceCode.includes("=== 'ready'"),
             "handler deve interceptar padrão 'READY:' do dialog loop",
         );
     });
 
     it('padrão REPLY: é interceptado no handler do ask_user', () => {
+        // RF-D01: a lógica foi movida para DialogProtocol.classify() em dialog-protocol.js
         assert.ok(
-            sourceCode.includes("startsWith('REPLY:')") || sourceCode.includes("'REPLY:'"),
+            sourceCode.includes("startsWith('REPLY:')") ||
+                sourceCode.includes("'REPLY:'") ||
+                sourceCode.includes("DialogProtocol.classify") ||
+                sourceCode.includes("=== 'reply'"),
             "handler deve interceptar padrão 'REPLY:' do dialog loop",
         );
     });
 
     it('padrão DONE: é interceptado no handler do ask_user', () => {
+        // RF-D01: a lógica foi movida para DialogProtocol.classify() em dialog-protocol.js
+        // DONE: é classificado como 'reply' pelo DialogProtocol (equivalente a REPLY:)
         assert.ok(
-            sourceCode.includes("startsWith('DONE:')") || sourceCode.includes("'DONE:'"),
+            sourceCode.includes("startsWith('DONE:')") ||
+                sourceCode.includes("'DONE:'") ||
+                sourceCode.includes("DialogProtocol.classify") ||
+                sourceCode.includes("=== 'reply'"),
             "handler deve interceptar padrão 'DONE:' do dialog loop",
         );
     });

@@ -1050,45 +1050,45 @@ export function writeState(updates) {
 
 ### Bugs
 
-| ID        | Severidade | Arquivo              | Descrição                                                           | Esforço | Implementado |
-| --------- | ---------- | -------------------- | ------------------------------------------------------------------- | ------- | ------------ |
-| BUG-AA-01 | 🔴 CRÍTICO  | `always-alive.js`    | Listener leak `question.pending` ao timeout                         | Pequeno | ✅ `00105bc1` |
-| BUG-AA-02 | 🔴 CRÍTICO  | `always-alive.js`    | Race condition `stopDialogLoop` / `#handleUserInputRequest`         | Médio   | ✅ `00105bc1` |
-| BUG-AA-03 | 🔴 CRÍTICO  | `always-alive.js`    | `session.on` sem armazenar unsubscribe → memory leak                | Médio   | ✅ `00105bc1` |
+| ID        | Severidade | Arquivo              | Descrição                                                           | Esforço | Implementado                               |
+| --------- | ---------- | -------------------- | ------------------------------------------------------------------- | ------- | ------------------------------------------ |
+| BUG-AA-01 | 🔴 CRÍTICO  | `always-alive.js`    | Listener leak `question.pending` ao timeout                         | Pequeno | ✅ `00105bc1`                               |
+| BUG-AA-02 | 🔴 CRÍTICO  | `always-alive.js`    | Race condition `stopDialogLoop` / `#handleUserInputRequest`         | Médio   | ✅ `00105bc1`                               |
+| BUG-AA-03 | 🔴 CRÍTICO  | `always-alive.js`    | `session.on` sem armazenar unsubscribe → memory leak                | Médio   | ✅ `00105bc1`                               |
 | BUG-AA-04 | 🟠 ALTO     | `always-alive.js`    | `#dialogTurnMutex` não reseta → crescimento indefinido              | Pequeno | ✅ `00105bc1` (via `#dialogTurnQueueDepth`) |
-| BUG-AA-05 | 🟡 MÉDIO    | `always-alive.js`    | `question.pending` emitido antes do listener → turno perdido        | Médio   | ✅ `00105bc1` |
-| BUG-AA-06 | 🟡 MÉDIO    | `always-alive.js`    | `#watchdog` não parado em `stop()` se `#dialogLoopActive === false` | Pequeno | ✅ `00105bc1` (via `#dialogLoopStopping`) |
-| BUG-AA-07 | 🟡 MÉDIO    | `session-manager.js` | `mkdir` redundante em cada `writeStateAsync`                        | Pequeno | ⚪ Pendente |
-| BUG-AA-08 | 🟡 MÉDIO    | `always-alive.js`    | `#waitForDialogRestartAndReply` não distingue stop definitivo       | Pequeno | ✅ `00105bc1` |
-| BUG-AA-09 | 🟡 MÉDIO    | `entry.js`           | `session.fatal` não tratado → processo zumbi sem sessão             | Pequeno | ⚪ Pendente |
-| BUG-AA-10 | 🟢 BAIXO    | `always-alive.js`    | `#tryReconnect` não loga intenção de restart do dialog loop         | Trivial | ⚪ Pendente |
-| BUG-AA-11 | 🟢 BAIXO    | `always-alive.js`    | `session.onEvent` não-documentado em vez de API pública             | Pequeno | ⚪ Pendente |
-| BUG-AA-12 | 🟢 BAIXO    | `lib/session.js`     | `mode: 'append'` obsoleto — migrar para `mode: 'customize'`         | Trivial | ⚪ Pendente |
+| BUG-AA-05 | 🟡 MÉDIO    | `always-alive.js`    | `question.pending` emitido antes do listener → turno perdido        | Médio   | ✅ `00105bc1`                               |
+| BUG-AA-06 | 🟡 MÉDIO    | `always-alive.js`    | `#watchdog` não parado em `stop()` se `#dialogLoopActive === false` | Pequeno | ✅ `00105bc1` (via `#dialogLoopStopping`)   |
+| BUG-AA-07 | 🟡 MÉDIO    | `session-manager.js` | `mkdir` redundante em cada `writeStateAsync`                        | Pequeno | ⚪ Pendente                                 |
+| BUG-AA-08 | 🟡 MÉDIO    | `always-alive.js`    | `#waitForDialogRestartAndReply` não distingue stop definitivo       | Pequeno | ✅ `00105bc1`                               |
+| BUG-AA-09 | 🟡 MÉDIO    | `entry.js`           | `session.fatal` não tratado → processo zumbi sem sessão             | Pequeno | ⚪ Pendente                                 |
+| BUG-AA-10 | 🟢 BAIXO    | `always-alive.js`    | `#tryReconnect` não loga intenção de restart do dialog loop         | Trivial | ⚪ Pendente                                 |
+| BUG-AA-11 | 🟢 BAIXO    | `always-alive.js`    | `session.onEvent` não-documentado em vez de API pública             | Pequeno | ⚪ Pendente                                 |
+| BUG-AA-12 | 🟢 BAIXO    | `lib/session.js`     | `mode: 'append'` obsoleto — migrar para `mode: 'customize'`         | Trivial | ⚪ Pendente                                 |
 
 ### Melhorias de Robustez
 
-| ID    | Prioridade | Descrição                                            | Esforço | Implementado |
-| ----- | ---------- | ---------------------------------------------------- | ------- | ------------ |
-| MR-01 | 🔴 Alta     | Timeout no `bootPromise` de `startDialogLoop`        | Pequeno | ✅ `00105bc1` |
-| MR-02 | 🔴 Alta     | Backpressure para `sendDialogTurn`                   | Pequeno | ✅ `00105bc1` |
-| MR-03 | 🟡 Média    | Eventos `dialog.turn_start` / `dialog.turn_end`      | Pequeno | ⚪ Pendente |
-| MR-04 | 🟡 Média    | Métricas de latência por turno no `#telemetry`       | Médio   | ⚪ Pendente |
-| MR-05 | 🟡 Média    | `ensureDialogLoop` aguarda idle durante `processing` | Pequeno | ⚪ Pendente |
-| MR-06 | 🟡 Média    | `readState()` async version para usos não-críticos   | Pequeno | ✅ `00105bc1` (SYNC-SM-01) |
-| MR-07 | 🟢 Baixa    | Validação de `COPILOT_MODEL` no boot de `entry.js`   | Trivial | ⚪ Pendente |
-| MR-08 | 🟢 Baixa    | Persistir `dialogLoopActive` em disco                | Médio   | ⚪ Pendente |
+| ID    | Prioridade | Descrição                                            | Esforço | Implementado                                                 |
+| ----- | ---------- | ---------------------------------------------------- | ------- | ------------------------------------------------------------ |
+| MR-01 | 🔴 Alta     | Timeout no `bootPromise` de `startDialogLoop`        | Pequeno | ✅ `00105bc1`                                                 |
+| MR-02 | 🔴 Alta     | Backpressure para `sendDialogTurn`                   | Pequeno | ✅ `00105bc1`                                                 |
+| MR-03 | 🟡 Média    | Eventos `dialog.turn_start` / `dialog.turn_end`      | Pequeno | ⚪ Pendente                                                   |
+| MR-04 | 🟡 Média    | Métricas de latência por turno no `#telemetry`       | Médio   | ⚪ Pendente                                                   |
+| MR-05 | 🟡 Média    | `ensureDialogLoop` aguarda idle durante `processing` | Pequeno | ⚪ Pendente                                                   |
+| MR-06 | 🟡 Média    | `readState()` async version para usos não-críticos   | Pequeno | ✅ `00105bc1` (SYNC-SM-01)                                    |
+| MR-07 | 🟢 Baixa    | Validação de `COPILOT_MODEL` no boot de `entry.js`   | Trivial | ⚪ Pendente                                                   |
+| MR-08 | 🟢 Baixa    | Persistir `dialogLoopActive` em disco                | Médio   | ⚪ Pendente                                                   |
 | MR-09 | 🟢 Baixa    | `_subscribeSse` com reconexão automática             | Médio   | ⚪ Pendente (SSE-INJECT-01 melhora o parser, não a reconexão) |
 
 ### Refatorações
 
-| ID     | Prioridade | Descrição                                     | Esforço | Implementado |
-| ------ | ---------- | --------------------------------------------- | ------- | ------------ |
+| ID     | Prioridade | Descrição                                     | Esforço | Implementado                                                              |
+| ------ | ---------- | --------------------------------------------- | ------- | ------------------------------------------------------------------------- |
 | RF-D01 | 🟡 Média    | Extrair `DialogProtocol` como classe testável | Médio   | ⚪ Pendente (IMPROVE-AA-01 centraliza constantes, mas não extrai a classe) |
-| RF-D02 | 🟢 Baixa    | Reintentos com contador em `task-executor.js` | Pequeno | ⚪ Pendente |
-| RF-D03 | 🟢 Baixa    | Separar handlers em `#handleUserInputRequest` | Médio   | ⚪ Pendente |
-| RF-D04 | 🟢 Baixa    | Boot prompt centralizado como objeto tipado   | Pequeno | ⚪ Pendente |
-| RF-D05 | 🟡 Média    | Telemetria OTEL completa no dialog loop       | Pequeno | ⚪ Pendente |
-| RF-D06 | 🟡 Média    | `readState()` com cache in-process            | Pequeno | ⚪ Pendente |
+| RF-D02 | 🟢 Baixa    | Reintentos com contador em `task-executor.js` | Pequeno | ⚪ Pendente                                                                |
+| RF-D03 | 🟢 Baixa    | Separar handlers em `#handleUserInputRequest` | Médio   | ⚪ Pendente                                                                |
+| RF-D04 | 🟢 Baixa    | Boot prompt centralizado como objeto tipado   | Pequeno | ⚪ Pendente                                                                |
+| RF-D05 | 🟡 Média    | Telemetria OTEL completa no dialog loop       | Pequeno | ⚪ Pendente                                                                |
+| RF-D06 | 🟡 Média    | `readState()` com cache in-process            | Pequeno | ⚪ Pendente                                                                |
 
 ---
 
@@ -1231,34 +1231,34 @@ zumbi causado por `session.fatal` não tratado.
 
 #### Mapeamento Fase 1 → commits
 
-| Item  | Descrição                                 | Status |
-| ----- | ----------------------------------------- | ------ |
-| 1.1   | BUG-AA-01: off listener ao timeout        | ✅     |
-| 1.2   | BUG-AA-03: armazenar unsubscribers SDK    | ✅     |
-| 1.3   | BUG-AA-04: dialTurnMutex → limitador      | ✅ (convertido em #dialogTurnQueueDepth + MAX_SIZE) |
-| 1.4   | BUG-AA-06: watchdog.stop incondicional    | ✅ (guardado por #dialogLoopStopping) |
-| 1.5   | MR-01: timeout no bootPromise             | ✅ (LLM_B_BOOT_TIMEOUT_MS=30s) |
+| Item | Descrição                              | Status                                             |
+| ---- | -------------------------------------- | -------------------------------------------------- |
+| 1.1  | BUG-AA-01: off listener ao timeout     | ✅                                                  |
+| 1.2  | BUG-AA-03: armazenar unsubscribers SDK | ✅                                                  |
+| 1.3  | BUG-AA-04: dialTurnMutex → limitador   | ✅ (convertido em #dialogTurnQueueDepth + MAX_SIZE) |
+| 1.4  | BUG-AA-06: watchdog.stop incondicional | ✅ (guardado por #dialogLoopStopping)               |
+| 1.5  | MR-01: timeout no bootPromise          | ✅ (LLM_B_BOOT_TIMEOUT_MS=30s)                      |
 
 #### Mapeamento Fase 2 → commits
 
-| Item  | Descrição                                        | Status |
-| ----- | ------------------------------------------------ | ------ |
-| 2.1   | BUG-AA-02: flag #dialogLoopStopping              | ✅     |
-| 2.2   | BUG-AA-05: check #pendingQuestion após once      | ✅     |
-| 2.3   | BUG-AA-08: stop definitivo em waitForRestart     | ✅ (via 2º handler dialog.stopped) |
-| 2.4   | BUG-AA-09: ouvir session.fatal em entry.js       | ⚪ Pendente |
-| 2.5   | MR-02: backpressure sendDialogTurn               | ✅ (#MAX_DIALOG_TURN_QUEUE_SIZE) |
-| GAP-1 | GAP-AA-01: guard em sendMessage quando ativo     | ✅ (DIALOG_ACTIVE guard) |
+| Item  | Descrição                                    | Status                            |
+| ----- | -------------------------------------------- | --------------------------------- |
+| 2.1   | BUG-AA-02: flag #dialogLoopStopping          | ✅                                 |
+| 2.2   | BUG-AA-05: check #pendingQuestion após once  | ✅                                 |
+| 2.3   | BUG-AA-08: stop definitivo em waitForRestart | ✅ (via 2º handler dialog.stopped) |
+| 2.4   | BUG-AA-09: ouvir session.fatal em entry.js   | ⚪ Pendente                        |
+| 2.5   | MR-02: backpressure sendDialogTurn           | ✅ (#MAX_DIALOG_TURN_QUEUE_SIZE)   |
+| GAP-1 | GAP-AA-01: guard em sendMessage quando ativo | ✅ (DIALOG_ACTIVE guard)           |
 
 #### Itens adicionais implementados (fora do roadmap original)
 
-| Item          | Descrição                                                   | Status |
-| ------------- | ----------------------------------------------------------- | ------ |
-| IMPROVE-AA-01 | Constantes DIALOG_PROTO_* centralizadas                     | ✅     |
-| IMPROVE-AA-02 | #DIALOG_BOOT_TIMEOUT_MS via env LLM_B_BOOT_TIMEOUT_MS       | ✅     |
-| LEAK-01       | entry.js: pingClient.stop() após ping                       | ✅     |
-| SYNC-SM-01    | writeState→writeStateAsync em session-manager.js e stop()  | ✅     |
-| SSE-INJECT-01 | Parser SSE RFC 8895 compliant em channel/inject.js          | ✅     |
+| Item          | Descrição                                                 | Status |
+| ------------- | --------------------------------------------------------- | ------ |
+| IMPROVE-AA-01 | Constantes DIALOG_PROTO_* centralizadas                   | ✅      |
+| IMPROVE-AA-02 | #DIALOG_BOOT_TIMEOUT_MS via env LLM_B_BOOT_TIMEOUT_MS     | ✅      |
+| LEAK-01       | entry.js: pingClient.stop() após ping                     | ✅      |
+| SYNC-SM-01    | writeState→writeStateAsync em session-manager.js e stop() | ✅      |
+| SSE-INJECT-01 | Parser SSE RFC 8895 compliant em channel/inject.js        | ✅      |
 
 ---
 
