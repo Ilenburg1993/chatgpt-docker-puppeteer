@@ -18,7 +18,14 @@
 
 import { MAX_QUEUE_SIZE } from '#copilot/core/constants';
 import { SessionError } from '#copilot/core/errors';
-import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart, recordToolCall, startSpan } from '#copilot/lib/index';
+import {
+    createRegistry,
+    createTelemetry,
+    recordSessionEnd,
+    recordSessionStart,
+    recordToolCall,
+    startSpan,
+} from '#copilot/lib/index';
 import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/lib/permissions';
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
@@ -554,6 +561,20 @@ export class AlwaysAliveAgent extends EventEmitter {
             this.#sessionEventUnsubscribers.push(
                 session.on((/** @type {any} */ evt) => {
                     const kind = evt?.kind ?? evt?.type ?? 'unknown';
+
+                    // RF-PR-03: detectar assistant.usage para billing real-time
+                    if (kind === 'assistant.usage') {
+                        const data = evt?.data ?? {};
+                        const { model, cost, quotaSnapshots } = data;
+                        log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
+                        this.emit('pr.consumed', { model, cost, quotaSnapshots, ts: Date.now() });
+                        // RF-PR-02: marcar que o PR foi consumido para o turno pendente
+                        writeStateAsync({ pendingTurnConsumedPR: true }).catch((/** @type {any} */ e) =>
+                            log('WARN', `[AlwaysAlive] writeState pendingTurnConsumedPR: ${e.message}`),
+                        );
+                        return;
+                    }
+
                     const knownEvents = new Set([
                         'session.compaction_start',
                         'session.compaction_complete',
@@ -563,6 +584,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                         'assistant.message_delta',
                         'tool.execution_start',
                         'tool.execution_complete',
+                        'assistant.usage',
                     ]);
                     if (!knownEvents.has(kind)) {
                         log('DEBUG', `[AlwaysAlive] Evento SDK não tratado: kind=${kind}`);
@@ -1088,11 +1110,22 @@ export class AlwaysAliveAgent extends EventEmitter {
         // MR-03: emitir turn_start para observabilidade
         const turnStart = Date.now();
         this.emit('dialog.turn_start', { message: message.slice(0, 120), ts: turnStart });
+        // RF-PR-02: persistir mensagem pendente antes de enviar (para retry após restart sem PR)
+        writeStateAsync({
+            pendingTurnMessage: message,
+            pendingTurnTs: turnStart,
+            pendingTurnConsumedPR: false,
+        }).catch((/** @type {any} */ e) => log('WARN', `[AlwaysAlive] writeState pendingTurn: ${e.message}`));
         // AI.3: instrumentar com span OTEL
         return startSpan(
             'dialog.send_turn',
             // RF-D05: enriquecer span com turnNumber e modelo para detectar regressões de performance
-            { sessionId: this.sessionId ?? '', actor: 'user', model: this.#model, extra: { turnNumber: this.#sendCount } },
+            {
+                sessionId: this.sessionId ?? '',
+                actor: 'user',
+                model: this.#model,
+                extra: { turnNumber: this.#sendCount },
+            },
             () =>
                 new Promise((resolve, reject) => {
                     // BUG-AA-01 (fix): referência ao listener onPending — necessária para remoção no timeout.
@@ -1271,6 +1304,93 @@ export class AlwaysAliveAgent extends EventEmitter {
         );
         this.#watchdog?.stop();
         this.emit('dialog.stopped', { reason, authorized: true });
+    }
+
+    /**
+     * NEW-PAUSE-02: Pausa o dialog loop sem desconectar a sessão nem encerrar o agentic turn.
+     *
+     * O modelo permanece aguardando em `ask_user` enquanto a sessão CLI estiver ativa. O estado é serializado em disco
+     * para que um restart posterior possa retomar sem novo PR (zero-cost resume).
+     *
+     * Diferença de `stopDialogLoop()`:
+     *
+     * - `stopDialogLoop()` envia `STOP_DIALOG` ao modelo — encerra o agentic turn, 0 PR novo mas loop precisa reiniciar
+     * - `pauseDialogLoop()` **não** envia nada — preserva o estado `ask_user` no servidor CLI
+     *
+     * @returns {Promise<void>}
+     */
+    async pauseDialogLoop() {
+        if (!this.#dialogLoopActive) {
+            log('WARN', '[AlwaysAlive] pauseDialogLoop() chamado com loop inativo — ignorado.');
+            return;
+        }
+        const sid = this.sessionId;
+        // NEW-PAUSE-01: persistir estado pausado
+        await writeStateAsync({ dialogPaused: true, pausedAt: Date.now(), dialogLoopActive: true }).catch(
+            (/** @type {any} */ e) => log('WARN', `[AlwaysAlive] writeState dialogPaused: ${e.message}`),
+        );
+        log('INFO', `[AlwaysAlive] Dialog loop pausado. SessionId: ${sid}. Reinicie e use resumeDialogLoop().`);
+        this.emit('dialog.paused', { sessionId: sid, pausedAt: Date.now() });
+    }
+
+    /**
+     * NEW-PAUSE-03: Retoma o dialog loop após um `pauseDialogLoop()`.
+     *
+     * Estratégia híbrida (zero-PR quando possível):
+     *
+     * - **Estratégia A** (0 PR): aguarda `question.pending` por 5 segundos — se o servidor CLI preservou o estado
+     *   `ask_user`, o modelo responde imediatamente sem novo envio.
+     * - **Estratégia B** (1 PR): se nenhum `ask_user` chegar, reenvia o boot prompt para reinicializar o loop.
+     *
+     * @returns {Promise<void>}
+     * @throws {Error} Se o agente não estiver no estado 'idle'
+     */
+    async resumeDialogLoop() {
+        const state = readState();
+        if (!state?.dialogPaused) {
+            log('WARN', '[AlwaysAlive] resumeDialogLoop() chamado sem dialogPaused=true — ignorado.');
+            return;
+        }
+        if (this.#status !== 'idle' && this.#status !== 'waiting_for_input') {
+            throw new SessionError(
+                `[AlwaysAlive] resumeDialogLoop() requer status 'idle' ou 'waiting_for_input'. Status atual: '${this.#status}'`,
+                'INVALID_STATE',
+            );
+        }
+
+        // Limpa o estado de pause imediatamente para evitar loops duplos
+        await writeStateAsync({ dialogPaused: false }).catch((/** @type {any} */ e) =>
+            log('WARN', `[AlwaysAlive] writeState dialogPaused=false: ${e.message}`),
+        );
+
+        // Estratégia A: aguardar ask_user preservado no servidor CLI (0 PR)
+        const preserved = await Promise.race([
+            new Promise((resolve) => this.once('question.pending', () => resolve(true))),
+            new Promise((resolve) => setTimeout(() => resolve(false), 5_000)),
+        ]);
+
+        if (preserved) {
+            log('INFO', '[AlwaysAlive] resumeDialogLoop: ask_user preservado no CLI — retomada zero-PR.');
+            this.emit('dialog.resumed', { prConsumed: false });
+            return;
+        }
+
+        // Estratégia B: reenviar boot prompt (1 PR de retomada)
+        log('INFO', '[AlwaysAlive] resumeDialogLoop: ask_user não encontrado — reenviando boot prompt (1 PR).');
+        this.#dialogLoopActive = false; // reset para que startDialogLoop() aceite
+        await writeStateAsync({ dialogLoopActive: false }).catch(() => {});
+
+        await this.startDialogLoop();
+        this.emit('dialog.resumed', { prConsumed: true });
+    }
+
+    /**
+     * Indica se o dialog loop está atualmente pausado via `pauseDialogLoop()`.
+     *
+     * @returns {boolean}
+     */
+    get dialogPaused() {
+        return readState()?.dialogPaused ?? false;
     }
 
     // ─────────────── Privados ───────────────
@@ -1532,8 +1652,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * RF-D03: Handler de protocolo no modo dialog loop.
-     * Intercepta mensagens READY/REPLY/DONE/STOPPED e emite os eventos correspondentes.
+     * RF-D03: Handler de protocolo no modo dialog loop. Intercepta mensagens READY/REPLY/DONE/STOPPED e emite os
+     * eventos correspondentes.
      *
      * @param {{ question: string; allowFreeform: boolean }} input
      * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
@@ -1568,8 +1688,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * RF-D03: Handler para pergunta interativa normal (fora do dialog loop).
-     * Suspende execução até que answerPendingQuestion() seja chamado via API HTTP.
+     * RF-D03: Handler para pergunta interativa normal (fora do dialog loop). Suspende execução até que
+     * answerPendingQuestion() seja chamado via API HTTP.
      *
      * @param {{ question: string; choices?: string[]; allowFreeform: boolean }} input
      * @returns {Promise<{ answer: string; wasFreeform: boolean }>}

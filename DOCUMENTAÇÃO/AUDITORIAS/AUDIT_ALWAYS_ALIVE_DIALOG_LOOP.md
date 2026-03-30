@@ -1067,28 +1067,28 @@ export function writeState(updates) {
 
 ### Melhorias de Robustez
 
-| ID    | Prioridade | Descrição                                            | Esforço | Implementado                                                 |
-| ----- | ---------- | ---------------------------------------------------- | ------- | ------------------------------------------------------------ |
-| MR-01 | 🔴 Alta     | Timeout no `bootPromise` de `startDialogLoop`        | Pequeno | ✅ `00105bc1`                                                 |
-| MR-02 | 🔴 Alta     | Backpressure para `sendDialogTurn`                   | Pequeno | ✅ `00105bc1`                                                 |
-| MR-03 | 🟡 Média    | Eventos `dialog.turn_start` / `dialog.turn_end`      | Pequeno | ✅ `5f0a71ba`                                                 |
-| MR-04 | 🟡 Média    | Métricas de latência por turno no `#telemetry`       | Médio   | ✅ `5f0a71ba`                                                 |
-| MR-05 | 🟡 Média    | `ensureDialogLoop` aguarda idle durante `processing` | Pequeno | ✅ `b0f774d1`                                                   |
-| MR-06 | 🟡 Média    | `readState()` async version para usos não-críticos   | Pequeno | ✅ `00105bc1` (SYNC-SM-01)                                    |
-| MR-07 | 🟢 Baixa    | Validação de `COPILOT_MODEL` no boot de `entry.js`   | Trivial | ✅ `5f0a71ba`                                                 |
-| MR-08 | 🟢 Baixa    | Persistir `dialogLoopActive` em disco                | Médio   | ✅ `5f0a71ba`                                                 |
-| MR-09 | 🟢 Baixa    | `_subscribeSse` com reconexão automática             | Médio   | ✅ `b0f774d1`                                                 |
+| ID    | Prioridade | Descrição                                            | Esforço | Implementado              |
+| ----- | ---------- | ---------------------------------------------------- | ------- | ------------------------- |
+| MR-01 | 🔴 Alta     | Timeout no `bootPromise` de `startDialogLoop`        | Pequeno | ✅ `00105bc1`              |
+| MR-02 | 🔴 Alta     | Backpressure para `sendDialogTurn`                   | Pequeno | ✅ `00105bc1`              |
+| MR-03 | 🟡 Média    | Eventos `dialog.turn_start` / `dialog.turn_end`      | Pequeno | ✅ `5f0a71ba`              |
+| MR-04 | 🟡 Média    | Métricas de latência por turno no `#telemetry`       | Médio   | ✅ `5f0a71ba`              |
+| MR-05 | 🟡 Média    | `ensureDialogLoop` aguarda idle durante `processing` | Pequeno | ✅ `b0f774d1`              |
+| MR-06 | 🟡 Média    | `readState()` async version para usos não-críticos   | Pequeno | ✅ `00105bc1` (SYNC-SM-01) |
+| MR-07 | 🟢 Baixa    | Validação de `COPILOT_MODEL` no boot de `entry.js`   | Trivial | ✅ `5f0a71ba`              |
+| MR-08 | 🟢 Baixa    | Persistir `dialogLoopActive` em disco                | Médio   | ✅ `5f0a71ba`              |
+| MR-09 | 🟢 Baixa    | `_subscribeSse` com reconexão automática             | Médio   | ✅ `b0f774d1`              |
 
 ### Refatorações
 
-| ID     | Prioridade | Descrição                                     | Esforço | Implementado                                                              |
-| ------ | ---------- | --------------------------------------------- | ------- | ------------------------------------------------------------------------- |
+| ID     | Prioridade | Descrição                                     | Esforço | Implementado                                                                  |
+| ------ | ---------- | --------------------------------------------- | ------- | ----------------------------------------------------------------------------- |
 | RF-D01 | 🟡 Média    | Extrair `DialogProtocol` como classe testável | Médio   | ✅ `b0f774d1` (`dialog-protocol.js` com classify/extractReply/buildBootPrompt) |
-| RF-D02 | 🟢 Baixa    | Reintentos com contador em `task-executor.js` | Pequeno | ✅ `5f0a71ba`                                                               |
-| RF-D03 | 🟢 Baixa    | Separar handlers em `#handleUserInputRequest` | Médio   | ✅ `5f0a71ba`                                                               |
-| RF-D04 | 🟢 Baixa    | Boot prompt centralizado como objeto tipado   | Pequeno | ✅ `5f0a71ba` (via `DialogProtocol.buildBootPrompt()`)                      |
-| RF-D05 | 🟡 Média    | Telemetria OTEL completa no dialog loop       | Pequeno | ✅ `5f0a71ba` (`extra.turnNumber` + `model` em startSpan)                  |
-| RF-D06 | 🟡 Média    | `readState()` com cache in-process            | Pequeno | ✅ `b0f774d1` (`_stateCache` em session-manager.js)                        |
+| RF-D02 | 🟢 Baixa    | Reintentos com contador em `task-executor.js` | Pequeno | ✅ `5f0a71ba`                                                                  |
+| RF-D03 | 🟢 Baixa    | Separar handlers em `#handleUserInputRequest` | Médio   | ✅ `5f0a71ba`                                                                  |
+| RF-D04 | 🟢 Baixa    | Boot prompt centralizado como objeto tipado   | Pequeno | ✅ `5f0a71ba` (via `DialogProtocol.buildBootPrompt()`)                         |
+| RF-D05 | 🟡 Média    | Telemetria OTEL completa no dialog loop       | Pequeno | ✅ `5f0a71ba` (`extra.turnNumber` + `model` em startSpan)                      |
+| RF-D06 | 🟡 Média    | `readState()` com cache in-process            | Pequeno | ✅ `b0f774d1` (`_stateCache` em session-manager.js)                            |
 
 ---
 
@@ -1207,8 +1207,8 @@ zumbi causado por `session.fatal` não tratado.
 
 **Objetivo**: completar observabilidade, validações de boot e separação de concerns.
 
-| #   | Item                                       | Arquivo                                  | Benefício                             |
-| --- | ------------------------------------------ | ---------------------------------------- | ------------------------------------- |
+| #   | Item                                       | Arquivo                                  | Benefício                                            |
+| --- | ------------------------------------------ | ---------------------------------------- | ---------------------------------------------------- |
 | 4.1 | RF-D03: separar handlers ask_user          | `always-alive.js`                        | ✅ `5f0a71ba` — Clareza e testabilidade separada      |
 | 4.2 | MR-04: métricas de latência via telemetry  | `always-alive.js`                        | ✅ `5f0a71ba` — Detectar regressões de performance    |
 | 4.3 | RF-D05: OTEL spans completos               | `always-alive.js`                        | ✅ `5f0a71ba` — Spans com `extra.turnNumber` e model  |
@@ -1221,13 +1221,13 @@ zumbi causado por `session.fatal` não tratado.
 
 ### Status Geral do Roadmap
 
-| Fase                  | Total de itens | Status                                                         |
-| --------------------- | -------------- | -------------------------------------------------------------- |
-| Fase 1 (crítico)      | 5 itens        | ✅ CONCLUÍDA — commit `00105bc1`                               |
-| Fase 2 (alto impacto) | 6 itens        | ✅ CONCLUÍDA — commit `00105bc1`                               |
-| Fase 3 (qualidade)    | 6 itens        | ✅ CONCLUÍDA — `b0f774d1` + `5f0a71ba`                        |
-| Fase 4 (polimento)    | 7 itens        | ✅ CONCLUÍDA — `b0f774d1` + `5f0a71ba`                        |
-| **Total**             | **24 itens**   | **24/24 implementados** — Roadmap 100% concluído ✅            |
+| Fase                  | Total de itens | Status                                             |
+| --------------------- | -------------- | -------------------------------------------------- |
+| Fase 1 (crítico)      | 5 itens        | ✅ CONCLUÍDA — commit `00105bc1`                    |
+| Fase 2 (alto impacto) | 6 itens        | ✅ CONCLUÍDA — commit `00105bc1`                    |
+| Fase 3 (qualidade)    | 6 itens        | ✅ CONCLUÍDA — `b0f774d1` + `5f0a71ba`              |
+| Fase 4 (polimento)    | 7 itens        | ✅ CONCLUÍDA — `b0f774d1` + `5f0a71ba`              |
+| **Total**             | **24 itens**   | **24/24 implementados** — Roadmap 100% concluído ✅ |
 
 #### Mapeamento Fase 1 → commits
 

@@ -35,12 +35,20 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'dialog.reply',
     'dialog.stopped',
     'dialog.stalled',
+    'dialog.paused',
+    'dialog.resumed',
     'tool.execution.start',
     'tool.execution.complete',
+    'dialog.turn_start',
+    'dialog.turn_end',
     'session.history_synced',
     'before-stop',
     // GAP-SDK-04 (fix): event emitido pelo agent após compactação de contexto do SDK
     'context:compacted',
+    // RF-PR-03: emitido quando assistant.usage é detectado (PR consumido)
+    'pr.consumed',
+    // NEW-PAUSE: emitidos por pauseDialogLoop() e resumeDialogLoop()
+    'permission.mode_changed',
 ]);
 
 /**

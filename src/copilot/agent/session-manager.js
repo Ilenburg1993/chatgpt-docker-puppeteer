@@ -173,6 +173,11 @@ let _stateDirReady = false;
  * @property {string} model - Modelo configurado para esta sessão
  * @property {string | null} pendingQuestion - Pergunta pendente do modelo (se houver)
  * @property {boolean} [dialogLoopActive] - MR-08: se o dialog loop estava ativo no momento do snapshot
+ * @property {boolean} [dialogPaused] - NEW-PAUSE-01: true se pause explícito foi emitido via pauseDialogLoop()
+ * @property {number} [pausedAt] - NEW-PAUSE-01: timestamp do pause
+ * @property {string} [pendingTurnMessage] - RF-PR-02: última mensagem enviada sem resposta confirmada
+ * @property {number} [pendingTurnTs] - RF-PR-02: timestamp do envio pendente
+ * @property {boolean} [pendingTurnConsumedPR] - RF-PR-02: se assistant.usage já foi emitido para este turno
  */
 
 /**

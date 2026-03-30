@@ -106,8 +106,13 @@ export async function executeTask(session, task, callbacks) {
             task.attempts = (task.attempts ?? 0) + 1;
             if (task.attempts >= MAX_TASK_RETRIES) {
                 setStatus('idle');
-                emit('task.error', { taskId: task.id, error: `Máximo de ${MAX_TASK_RETRIES} tentativas atingido após reconexão` });
-                task.reject(new Error(`[task-executor] Máximo de ${MAX_TASK_RETRIES} tentativas atingido (taskId: ${task.id})`));
+                emit('task.error', {
+                    taskId: task.id,
+                    error: `Máximo de ${MAX_TASK_RETRIES} tentativas atingido após reconexão`,
+                });
+                task.reject(
+                    new Error(`[task-executor] Máximo de ${MAX_TASK_RETRIES} tentativas atingido (taskId: ${task.id})`),
+                );
             } else {
                 // Sessão restaurada: reenfileira a tarefa para nova tentativa
                 requeueTask(task);

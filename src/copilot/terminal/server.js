@@ -21,6 +21,8 @@
  * | DELETE | /memory/:id         | Remove uma memória semântica          |
  * | POST   | /pipeline           | Executa sequência ordenada de turnos  |
  * | POST   | /inject             | Injeta uma mensagem na LLM-B          |
+ * | POST   | /dialog/pause       | Pausa o dialog loop (NEW-PAUSE)       |
+ * | POST   | /dialog/resume      | Retoma o dialog loop (NEW-PAUSE)      |
  * | GET    | /gh/issues          | Lista GitHub issues via gh CLI        |
  * | GET    | /gh/prs             | Lista GitHub pull requests via gh CLI |
  * | GET    | /gh/ci              | Lista GitHub CI runs via gh CLI       |
@@ -60,6 +62,8 @@ import {
     handleSetSkills,
     handleSetToolsConfig,
     handleStoreMemory,
+    handleDialogPause,
+    handleDialogResume,
 } from './http-handlers.js';
 import { getSseClients, getSseCriticalClients } from './state.js';
 
@@ -489,6 +493,18 @@ export function createInjectServer() {
                     return;
                 }
                 sendJson(res, await handleInject(parsed));
+                return;
+            }
+
+            // ── POST /dialog/pause — NEW-PAUSE ────────────────────────────────
+            if (req.method === 'POST' && url.pathname === '/dialog/pause') {
+                sendJson(res, await handleDialogPause());
+                return;
+            }
+
+            // ── POST /dialog/resume — NEW-PAUSE ───────────────────────────────
+            if (req.method === 'POST' && url.pathname === '/dialog/resume') {
+                sendJson(res, await handleDialogResume());
                 return;
             }
 

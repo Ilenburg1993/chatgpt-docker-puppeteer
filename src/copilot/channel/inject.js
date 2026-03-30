@@ -23,8 +23,8 @@
  *     ```;
  */
 
-import { log } from '#core/logger';
 import { BridgeError } from '#copilot/core';
+import { log } from '#core/logger';
 import http from 'node:http';
 import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';
 
@@ -269,8 +269,8 @@ export async function waitForLlmBReady(opts = {}) {
  */
 
 /**
- * Helper interno: conecta ao endpoint SSE do terminal-server e entrega eventos ao callback.
- * MR-09 (fix): reconecta automaticamente com backoff exponencial quando a conexão cai.
+ * Helper interno: conecta ao endpoint SSE do terminal-server e entrega eventos ao callback. MR-09 (fix): reconecta
+ * automaticamente com backoff exponencial quando a conexão cai.
  *
  * @param {string} path - Path do endpoint, ex: '/events' ou '/events?level=critical'
  * @param {number} port

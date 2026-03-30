@@ -59,6 +59,7 @@ const BANNER = `
   \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n] [offset]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
   \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
   \x1b[33m/attach [path|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
+  \x1b[33m/pause\x1b[0m · \x1b[33m/dialog-resume [bootPrompt]\x1b[0m \x1b[90m← NEW-PAUSE: pausa/retoma sem PR\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m
   \x1b[33m/skills [list|add <path>|remove <path>|reload]\x1b[0m
   \x1b[36m/gh issue list\x1b[0m · \x1b[36m/gh pr list\x1b[0m · \x1b[36m/gh run list\x1b[0m · \x1b[36m/git status\x1b[0m · \x1b[36m/git log\x1b[0m · \x1b[36m/alias\x1b[0m · \x1b[36m/help\x1b[0m
@@ -164,6 +165,24 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
             break;
         case 'resume':
             await _cmdResume({ println, hubSessionId: _hubSessionId }, arg);
+            break;
+        case 'pause':
+            // NEW-PAUSE: pausa o dialog loop preservando sessionId para retomada sem PR
+            try {
+                await alwaysAliveAgent.pauseDialogLoop();
+                println('\x1b[33m  Dialog loop pausado. Use /dialog-resume para retomar sem consumir PR.\x1b[0m');
+            } catch (/** @type {any} */ e) {
+                println(`\x1b[31m  Erro ao pausar: ${e.message}\x1b[0m`);
+            }
+            break;
+        case 'dialog-resume':
+            // NEW-PAUSE: retoma o dialog loop a partir do sessionId pausado (0 PR se ainda ativo)
+            try {
+                await alwaysAliveAgent.resumeDialogLoop();
+                println('\x1b[32m  Dialog loop retomado.\x1b[0m');
+            } catch (/** @type {any} */ e) {
+                println(`\x1b[31m  Erro ao retomar: ${e.message}\x1b[0m`);
+            }
             break;
         case 'skills':
             _cmdSkills({ println }, arg);

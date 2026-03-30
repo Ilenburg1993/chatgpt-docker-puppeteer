@@ -58,7 +58,7 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
         assert.ok(
             sourceCode.includes("startsWith('READY:')") ||
                 sourceCode.includes("'READY:'") ||
-                sourceCode.includes("DialogProtocol.classify") ||
+                sourceCode.includes('DialogProtocol.classify') ||
                 sourceCode.includes("=== 'ready'"),
             "handler deve interceptar padrão 'READY:' do dialog loop",
         );
@@ -69,7 +69,7 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
         assert.ok(
             sourceCode.includes("startsWith('REPLY:')") ||
                 sourceCode.includes("'REPLY:'") ||
-                sourceCode.includes("DialogProtocol.classify") ||
+                sourceCode.includes('DialogProtocol.classify') ||
                 sourceCode.includes("=== 'reply'"),
             "handler deve interceptar padrão 'REPLY:' do dialog loop",
         );
@@ -81,7 +81,7 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
         assert.ok(
             sourceCode.includes("startsWith('DONE:')") ||
                 sourceCode.includes("'DONE:'") ||
-                sourceCode.includes("DialogProtocol.classify") ||
+                sourceCode.includes('DialogProtocol.classify') ||
                 sourceCode.includes("=== 'reply'"),
             "handler deve interceptar padrão 'DONE:' do dialog loop",
         );

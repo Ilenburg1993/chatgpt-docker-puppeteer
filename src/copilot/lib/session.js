@@ -66,6 +66,7 @@ import { CopilotClient } from '@github/copilot-sdk';
  * @property {boolean | object} [systemMessage]
  * @property {string} [systemMessageContent]
  * @property {boolean} [streaming]
+ * @property {boolean} [disableResume] - RF-PR-06: se true, reconecta sem emitir session.resume (reconexão silenciosa)
  */
 
 /**
@@ -143,8 +144,41 @@ function buildSessionConfig(opts, mode) {
 
     if (opts.onPermissionRequest !== undefined) cfg.onPermissionRequest = opts.onPermissionRequest;
     if (opts.onUserInputRequest !== undefined) cfg.onUserInputRequest = opts.onUserInputRequest;
-    if (opts.hooks !== undefined) cfg.hooks = opts.hooks;
+
+    // RF-PR-01: compor hooks com onErrorOccurred padrão para retry automático sem PR
+    {
+        const userHooks = /** @type {Record<string, any>} */ (opts.hooks ?? {});
+        /** @type {Record<string, any>} */
+        const composedHooks = { ...userHooks };
+        // Só injetar handler padrão se o usuário não forneceu o seu próprio
+        if (!composedHooks['onErrorOccurred']) {
+            composedHooks['onErrorOccurred'] = (/** @type {any} */ input) => {
+                const { error, errorContext, recoverable } = input ?? {};
+                if (recoverable && errorContext === 'model_call') {
+                    log(
+                        'WARN',
+                        `[lib/session] onErrorOccurred recuperável (${errorContext}): ${error} — retry automático`,
+                    );
+                    return { errorHandling: 'retry', retryCount: 3 };
+                }
+                if (recoverable && errorContext === 'tool_execution') {
+                    log('WARN', `[lib/session] onErrorOccurred tool recuperável: ${error} — skip`);
+                    return { errorHandling: 'skip' };
+                }
+                log('WARN', `[lib/session] onErrorOccurred não-recuperável (${errorContext}): ${error} — abort`);
+                return { errorHandling: 'abort' };
+            };
+        }
+        cfg.hooks = composedHooks;
+    }
+
     if (opts.tools !== undefined) cfg.tools = opts.tools;
+
+    // RF-PR-06: disableResume — reconexão silenciosa sem emitir session.resume
+    if (mode === 'resume') {
+        const ro = /** @type {SessionResumeOptions} */ (opts);
+        if (ro.disableResume !== undefined) cfg.disableResume = ro.disableResume;
+    }
 
     const systemMsg = buildSystemMessageConfig(opts.systemMessage, /** @type {any} */ (opts).systemMessageContent);
     if (systemMsg !== undefined) cfg.systemMessage = systemMsg;

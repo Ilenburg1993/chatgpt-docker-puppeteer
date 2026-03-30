@@ -797,3 +797,39 @@ export function handleMetrics() {
         body: lines.join('\n'),
     };
 }
+
+// ─── Pause / Resume ───────────────────────────────────────────────────────────
+
+/**
+ * NEW-PAUSE: Handler para POST /dialog/pause.
+ * Pausa o dialog loop preservando o sessionId para retomada sem consumir PR.
+ * @returns {Promise<{ status: number; body: object }>}
+ */
+export async function handleDialogPause() {
+    if (!alwaysAliveAgent.dialogLoopActive) {
+        return { status: 409, body: { ok: false, error: 'Dialog loop não está ativo.' } };
+    }
+    try {
+        await alwaysAliveAgent.pauseDialogLoop();
+        return { status: 200, body: { ok: true, message: 'Dialog loop pausado. Use POST /dialog/resume para retomar.' } };
+    } catch (/** @type {any} */ e) {
+        return { status: 500, body: { ok: false, error: e.message } };
+    }
+}
+
+/**
+ * NEW-PAUSE: Handler para POST /dialog/resume.
+ * Retoma o dialog loop a partir de estado pausado (sem novo PR se sessão ainda ativa).
+ * @returns {Promise<{ status: number; body: object }>}
+ */
+export async function handleDialogResume() {
+    if (alwaysAliveAgent.dialogLoopActive) {
+        return { status: 409, body: { ok: false, error: 'Dialog loop já está ativo.' } };
+    }
+    try {
+        await alwaysAliveAgent.resumeDialogLoop();
+        return { status: 200, body: { ok: true, message: 'Dialog loop retomado.' } };
+    } catch (/** @type {any} */ e) {
+        return { status: 500, body: { ok: false, error: e.message } };
+    }
+}

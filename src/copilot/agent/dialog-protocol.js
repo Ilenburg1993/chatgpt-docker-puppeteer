@@ -4,9 +4,9 @@
  *
  * RF-D01: Protocolo de comunicação do Dialog Loop.
  *
- * Centraliza as constantes de protocolo, a lógica de classificação de mensagens `ask_user` e
- * a extração de conteúdo de REPLY/DONE. Exposto como `DialogProtocol` para permitir testes
- * unitários isolados, sem depender de `AlwaysAliveAgent`.
+ * Centraliza as constantes de protocolo, a lógica de classificação de mensagens `ask_user` e a extração de conteúdo de
+ * REPLY/DONE. Exposto como `DialogProtocol` para permitir testes unitários isolados, sem depender de
+ * `AlwaysAliveAgent`.
  *
  * @module copilot/agent/dialog-protocol
  */
@@ -49,6 +49,7 @@ export const DIALOG_PROTO_STOPPED = 'STOPPED';
 export class DialogProtocol {
     /**
      * Classifica uma mensagem `ask_user` emitida pelo modelo em uma das 4 categorias:
+     *
      * - `'ready'` — modelo sinalizou prontidão (READY:)
      * - `'reply'` — modelo enviou uma resposta (REPLY: / DONE:)
      * - `'stopped'` — modelo tentou encerrar o loop (STOPPED / STOP_DIALOG)
@@ -72,14 +73,17 @@ export class DialogProtocol {
     }
 
     /**
-     * Extrai o conteúdo da resposta do modelo de uma mensagem `ask_user` classificada como `'reply'`.
-     * Remove os prefixos `REPLY:` ou `DONE:` (case-insensitive) do início da string.
+     * Extrai o conteúdo da resposta do modelo de uma mensagem `ask_user` classificada como `'reply'`. Remove os
+     * prefixos `REPLY:` ou `DONE:` (case-insensitive) do início da string.
      *
      * @param {string} question - Mensagem de ask_user de kind 'reply'
      * @returns {string} Conteúdo da resposta sem o prefixo
      */
     static extractReply(question) {
-        return question.trim().replace(/^(REPLY:|DONE:)\s*/i, '').trim();
+        return question
+            .trim()
+            .replace(/^(REPLY:|DONE:)\s*/i, '')
+            .trim();
     }
 
     /**
