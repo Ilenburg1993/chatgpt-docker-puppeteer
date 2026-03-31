@@ -7,6 +7,11 @@
  * O Dialog Loop implementa o padrão §15.8 — "Agente SDK Sempre Vivo" onde a LLM usa ask_user em loop para comunicação
  * bidirecional com 0 PRs adicionais.
  *
+ * E.1 Update: após extração do DialogLoopManager, os testes de análise estrutural agora verificam:
+ *
+ * - always-alive.js: API pública (métodos de delegação) + referência ao DialogLoopManager
+ * - dialog-loop-manager.js: implementação interna (mutex, watchdog, protocolo)
+ *
  * Cobre:
  *
  * - startDialogLoop() existe e é uma função assíncrona
@@ -14,7 +19,7 @@
  * - stopDialogLoop() existe como método público
  * - Eventos dialog.ready, dialog.reply, dialog.stopped são emitidos corretamente
  * - Interceptação de READY:, REPLY:, DONE:, STOPPED no #handleUserInputRequest
- * - #dialogLoopActive campo privado está definido no source
+ * - DialogLoopManager encapsula campos privados (#active, #turnMutex, #watchdog)
  * - startDialogLoop() lança erro se status não é 'idle'
  * - sendDialogTurn() lança erro se dialog loop não está ativo
  */
@@ -28,10 +33,16 @@ import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 describe('always-alive › dialog loop: análise estrutural', async () => {
     /** @type {string} */
     let sourceCode = '';
+    /** @type {string} */
+    let dlmSourceCode = '';
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
         sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
+        dlmSourceCode = await readFile(
+            new URL('../../../src/copilot/agent/dialog-loop-manager.js', import.meta.url),
+            'utf-8',
+        );
     });
 
     it('startDialogLoop() deve estar definido como método público async', () => {
@@ -46,57 +57,62 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
         assert.ok(sourceCode.includes('async stopDialogLoop('), 'stopDialogLoop() deve ser método público async');
     });
 
-    it('#dialogLoopActive campo privado está definido', () => {
+    it('#dialogLoopActive campo privado está definido (E.1: agora em DialogLoopManager como #active)', () => {
+        // E.1: o campo foi movido para DialogLoopManager como #active; always-alive.js usa #dialogLoop
         assert.ok(
-            sourceCode.includes('#dialogLoopActive = false'),
-            '#dialogLoopActive deve ser inicializado como false',
+            dlmSourceCode.includes('#active = false') || dlmSourceCode.includes('#active=false'),
+            '#active deve ser inicializado como false no DialogLoopManager',
+        );
+        assert.ok(
+            sourceCode.includes('#dialogLoop') || sourceCode.includes('DialogLoopManager'),
+            'always-alive.js deve usar DialogLoopManager via #dialogLoop',
         );
     });
 
     it('padrão READY: é interceptado no handler do ask_user', () => {
-        // RF-D01: a lógica foi movida para DialogProtocol.classify() em dialog-protocol.js
+        // RF-D01 (E.1): a lógica foi movida para DialogLoopManager.handleProtocolInput()
+        // always-alive.js delega via #dialogLoop.handleProtocolInput()
         assert.ok(
-            sourceCode.includes("startsWith('READY:')") ||
-                sourceCode.includes("'READY:'") ||
-                sourceCode.includes('DialogProtocol.classify') ||
-                sourceCode.includes("=== 'ready'"),
-            "handler deve interceptar padrão 'READY:' do dialog loop",
+            dlmSourceCode.includes("=== 'ready'") ||
+                dlmSourceCode.includes('DialogProtocol.classify') ||
+                dlmSourceCode.includes("kind === 'ready'"),
+            "DialogLoopManager deve interceptar padrão 'READY:' via DialogProtocol",
         );
     });
 
     it('padrão REPLY: é interceptado no handler do ask_user', () => {
-        // RF-D01: a lógica foi movida para DialogProtocol.classify() em dialog-protocol.js
+        // RF-D01 (E.1): lógica em DialogLoopManager
         assert.ok(
-            sourceCode.includes("startsWith('REPLY:')") ||
-                sourceCode.includes("'REPLY:'") ||
-                sourceCode.includes('DialogProtocol.classify') ||
-                sourceCode.includes("=== 'reply'"),
-            "handler deve interceptar padrão 'REPLY:' do dialog loop",
+            dlmSourceCode.includes("=== 'reply'") ||
+                dlmSourceCode.includes('DialogProtocol.classify') ||
+                dlmSourceCode.includes("kind === 'reply'"),
+            "DialogLoopManager deve interceptar padrão 'REPLY:' via DialogProtocol",
         );
     });
 
     it('padrão DONE: é interceptado no handler do ask_user', () => {
-        // RF-D01: a lógica foi movida para DialogProtocol.classify() em dialog-protocol.js
-        // DONE: é classificado como 'reply' pelo DialogProtocol (equivalente a REPLY:)
+        // RF-D01 (E.1): DONE: é classificado como 'reply' pelo DialogProtocol
         assert.ok(
-            sourceCode.includes("startsWith('DONE:')") ||
-                sourceCode.includes("'DONE:'") ||
-                sourceCode.includes('DialogProtocol.classify') ||
-                sourceCode.includes("=== 'reply'"),
-            "handler deve interceptar padrão 'DONE:' do dialog loop",
+            dlmSourceCode.includes("=== 'reply'") ||
+                dlmSourceCode.includes('DialogProtocol.classify') ||
+                dlmSourceCode.includes("kind === 'reply'"),
+            "DialogLoopManager deve interceptar padrão 'DONE:' (classificado como 'reply') via DialogProtocol",
         );
     });
 
     it("evento 'dialog.ready' é emitido no handler", () => {
+        // E.1: always-alive.js propaga via listener do DLM (on 'ready' → emit 'dialog.ready')
         assert.ok(
-            sourceCode.includes("emit('dialog.ready'"),
+            sourceCode.includes("emit('dialog.ready'") ||
+                (sourceCode.includes("'dialog.ready'") && sourceCode.includes('#dialogLoop')),
             "handler deve emitir 'dialog.ready' quando modelo sinalizar READY",
         );
     });
 
     it("evento 'dialog.reply' é emitido no handler", () => {
         assert.ok(
-            sourceCode.includes("emit('dialog.reply'"),
+            sourceCode.includes("emit('dialog.reply'") ||
+                (sourceCode.includes("'dialog.reply'") && sourceCode.includes('#dialogLoop')),
             "handler deve emitir 'dialog.reply' quando modelo enviar REPLY:",
         );
     });
@@ -109,9 +125,10 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
     });
 
     it('meta-prompt de boot inclui instrução READY e REPLY', () => {
+        // E.1: o meta-prompt é gerado por DialogProtocol.buildBootPrompt() — verificar no DLM ou dialog-protocol.js
         assert.ok(
-            sourceCode.includes('READY') && sourceCode.includes('REPLY:'),
-            'meta-prompt deve instruir o modelo a usar READY e REPLY:',
+            dlmSourceCode.includes('buildBootPrompt') || sourceCode.includes('buildBootPrompt'),
+            'startDialogLoop deve usar DialogProtocol.buildBootPrompt()',
         );
     });
 });
@@ -139,7 +156,7 @@ describe('always-alive › dialog loop: comportamento via eventos', () => {
     it('sendDialogTurn() lança se dialog loop não está ativo', async () => {
         await assert.rejects(
             () => alwaysAliveAgent.sendDialogTurn('Olá', { timeout: 100 }),
-            /Modo diálogo não está ativo/,
+            /não está ativo|DIALOG_NOT_ACTIVE/,
             'sendDialogTurn() deve rejeitar se loop não está ativo',
         );
     });
@@ -169,69 +186,71 @@ describe('always-alive › dialog loop: comportamento via eventos', () => {
 
 describe('always-alive › dialog loop: protocolo 0-PR', async () => {
     /** @type {string} */
-    let sourceCode = '';
+    let dlmSourceCode = '';
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
-    });
-
-    it('startDialogLoop() usa sendMessage() para boot (não sendAndWait direto)', () => {
-        // O método usa sendMessage() que coloca na fila, não session.sendAndWait diretamente.
-        // Aceita qualquer chamada que inicie com this.sendMessage(metaPrompt), com ou sem opções extras.
-        assert.ok(
-            sourceCode.includes('this.sendMessage(metaPrompt'),
-            'startDialogLoop deve usar this.sendMessage() para o boot prompt',
+        dlmSourceCode = await readFile(
+            new URL('../../../src/copilot/agent/dialog-loop-manager.js', import.meta.url),
+            'utf-8',
         );
     });
 
-    it('sendDialogTurn() usa answerPendingQuestion() para responder ao modelo', () => {
+    it('DialogLoopManager usa sendMessage() do host para boot (não sendAndWait direto)', () => {
+        // E.1: DLM usa host.sendMessage() que coloca na fila
         assert.ok(
-            sourceCode.includes('this.answerPendingQuestion(message)'),
-            'sendDialogTurn deve usar answerPendingQuestion() para alimentar o ask_user',
+            dlmSourceCode.includes('host.sendMessage(') || dlmSourceCode.includes('this.#host.sendMessage('),
+            'DialogLoopManager deve usar host.sendMessage() para o boot prompt',
         );
     });
 
-    it('startDialogLoop() aguarda evento dialog.ready antes de resolver', () => {
+    it('DialogLoopManager usa answerPendingQuestion() do host para responder ao modelo', () => {
         assert.ok(
-            sourceCode.includes("'dialog.ready'") && sourceCode.includes('bootPromise'),
-            'startDialogLoop deve aguardar dialog.ready via promise antes de resolver',
+            dlmSourceCode.includes('answerPendingQuestion(message)') ||
+                dlmSourceCode.includes('host.answerPendingQuestion('),
+            'DialogLoopManager deve usar host.answerPendingQuestion() para alimentar o ask_user',
         );
     });
 
-    it('sendDialogTurn() tem timeout configurável (padrão 60000ms)', () => {
+    it('DialogLoopManager aguarda evento ready antes de resolver start()', () => {
         assert.ok(
-            sourceCode.includes('timeout = 60_000') || sourceCode.includes('timeout = 60000'),
-            'sendDialogTurn deve ter timeout padrão de 60000ms',
+            dlmSourceCode.includes("'ready'") && dlmSourceCode.includes('bootPromise'),
+            'DialogLoopManager.start() deve aguardar ready via promise antes de resolver',
         );
     });
 
-    it('stopDialogLoop() chama answerPendingQuestion com STOP_DIALOG', () => {
+    it('sendTurn() tem timeout configurável (padrão 60000ms)', () => {
         assert.ok(
-            sourceCode.includes("answerPendingQuestion('STOP_DIALOG')"),
-            "stopDialogLoop deve enviar 'STOP_DIALOG' para o modelo",
+            dlmSourceCode.includes('timeout = 60_000') || dlmSourceCode.includes('timeout = 60000'),
+            'sendTurn deve ter timeout padrão de 60000ms',
         );
     });
 
-    it('#dialogTurnMutex é declarado como campo privado', () => {
+    it('DialogLoopManager envia STOP_DIALOG ao parar o loop', () => {
         assert.ok(
-            sourceCode.includes('#dialogTurnMutex'),
-            '#dialogTurnMutex deve existir para serializar chamadas concorrentes a sendDialogTurn()',
+            dlmSourceCode.includes("'STOP_DIALOG'") || dlmSourceCode.includes('"STOP_DIALOG"'),
+            "stop() do DialogLoopManager deve enviar 'STOP_DIALOG' ao modelo",
         );
     });
 
-    it('#executeDialogTurn é declarado como método privado', () => {
+    it('#turnMutex é declarado como campo privado no DialogLoopManager', () => {
         assert.ok(
-            sourceCode.includes('#executeDialogTurn('),
-            '#executeDialogTurn deve existir como implementação interna serializada',
+            dlmSourceCode.includes('#turnMutex'),
+            '#turnMutex deve existir para serializar chamadas concorrentes a sendTurn()',
         );
     });
 
-    it('sendDialogTurn() encadeia no #dialogTurnMutex antes de executar', () => {
-        // Verifica o padrão do mutex: prev.then(() => this.#executeDialogTurn(...))
+    it('#executeTurn é declarado como método privado no DialogLoopManager', () => {
         assert.ok(
-            sourceCode.includes('this.#dialogTurnMutex') && sourceCode.includes('prev.then'),
-            'sendDialogTurn deve encadear chamadas via #dialogTurnMutex para serializar execução',
+            dlmSourceCode.includes('#executeTurn('),
+            '#executeTurn deve existir como implementação interna serializada',
+        );
+    });
+
+    it('sendTurn() encadeia no #turnMutex antes de executar', () => {
+        assert.ok(
+            dlmSourceCode.includes('this.#turnMutex') && dlmSourceCode.includes('prev.then'),
+            'sendTurn deve encadear chamadas via #turnMutex para serializar execução',
         );
     });
 });
@@ -240,85 +259,72 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
 
 describe('always-alive › dialog loop: DL-PERM hardening', async () => {
     /** @type {string} */
-    let sourceCode = '';
+    let dlmSourceCode = '';
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
-    });
-
-    it('DL-PERM-04: sendDialogTurn() pinga watchdog antes de serializar o turno', () => {
-        // DL-PERM-04: #watchdog?.ping() deve ocorrer dentro de sendDialogTurn, antes do
-        // encadeamento no mutex (const prev = this.#dialogTurnMutex).
-        // Usar as posições exatas das duas linhas no sendDialogTurn (após a declaração de class).
-        const pingIdx = sourceCode.indexOf('#watchdog?.ping()');
-        const prevMutexIdx = sourceCode.indexOf('const prev = this.#dialogTurnMutex');
-        assert.ok(pingIdx !== -1, 'sendDialogTurn deve chamar this.#watchdog?.ping()');
-        assert.ok(prevMutexIdx !== -1, 'sendDialogTurn deve ter "const prev = this.#dialogTurnMutex"');
-        assert.ok(
-            pingIdx < prevMutexIdx,
-            '#watchdog?.ping() deve ocorrer antes de "const prev = this.#dialogTurnMutex"',
+        dlmSourceCode = await readFile(
+            new URL('../../../src/copilot/agent/dialog-loop-manager.js', import.meta.url),
+            'utf-8',
         );
     });
 
-    it('DL-PERM-05: stopDialogLoop() aceita campo reason', () => {
-        // reason: 'watchdog_restart' | 'authorized_stop' — distingue restart automático de encerramento definitivo
+    it('DL-PERM-04: sendTurn() pinga watchdog antes de serializar o turno', () => {
+        // DL-PERM-04: #watchdog?.ping() deve ocorrer dentro de sendTurn, antes do encadeamento no mutex
+        const pingIdx = dlmSourceCode.indexOf('#watchdog?.ping()');
+        const prevMutexIdx = dlmSourceCode.indexOf('const prev = this.#turnMutex');
+        assert.ok(pingIdx !== -1, 'sendTurn deve chamar this.#watchdog?.ping()');
+        assert.ok(prevMutexIdx !== -1, 'sendTurn deve ter "const prev = this.#turnMutex"');
+        assert.ok(pingIdx < prevMutexIdx, '#watchdog?.ping() deve ocorrer antes de "const prev = this.#turnMutex"');
+    });
+
+    it('DL-PERM-05: stop() aceita campo reason', () => {
         assert.ok(
-            sourceCode.includes("'watchdog_restart'") || sourceCode.includes('watchdog_restart'),
-            "stopDialogLoop deve suportar reason: 'watchdog_restart'",
+            dlmSourceCode.includes("'watchdog_restart'") || dlmSourceCode.includes('watchdog_restart'),
+            "stop() deve suportar reason: 'watchdog_restart'",
         );
         assert.ok(
-            sourceCode.includes("'authorized_stop'") || sourceCode.includes('authorized_stop'),
-            "stopDialogLoop deve suportar reason: 'authorized_stop'",
+            dlmSourceCode.includes("'authorized_stop'") || dlmSourceCode.includes('authorized_stop'),
+            "stop() deve suportar reason: 'authorized_stop'",
         );
     });
 
-    it('DL-PERM-05: stopDialogLoop() emite dialog.stopped com campo reason', () => {
-        // O evento emitido deve incluir { reason, authorized: true }
-        assert.ok(sourceCode.includes("emit('dialog.stopped'"), "stopDialogLoop deve emitir 'dialog.stopped'");
-        // Verificar que reason está no objeto emitido — o emit deve incluir { reason, authorized: true }
+    it('DL-PERM-05: stop() emite stopped com campo reason', () => {
+        assert.ok(dlmSourceCode.includes("emit('stopped'"), "stop() deve emitir 'stopped'");
         assert.ok(
-            sourceCode.includes('{ reason, authorized: true }') ||
-                sourceCode.includes('{ reason: effectiveReason') ||
-                (sourceCode.includes("emit('dialog.stopped'") && sourceCode.includes('reason')),
-            "stopDialogLoop deve emitir dialog.stopped com campo 'reason'",
+            dlmSourceCode.includes('{ reason, authorized: true }') ||
+                (dlmSourceCode.includes("emit('stopped'") && dlmSourceCode.includes('reason')),
+            "stop() deve emitir stopped com campo 'reason'",
         );
     });
 
-    it('DL-PERM-05: #executeDialogTurn distingue stop definitivo de restart ao receber dialog.stopped', () => {
-        // onStopOuter deve checar authorized (true = definitivo) vs false (restart → retry)
+    it('DL-PERM-05: #executeTurn distingue stop definitivo de restart ao receber stopped', () => {
         assert.ok(
-            sourceCode.includes('stopEvt?.authorized') || sourceCode.includes('stoppedEvt?.authorized'),
-            '#executeDialogTurn deve verificar authorized para distinguir stop definitivo de restart',
+            dlmSourceCode.includes('stopEvt?.authorized') || dlmSourceCode.includes('stoppedEvt?.authorized'),
+            '#executeTurn deve verificar authorized para distinguir stop definitivo de restart',
         );
     });
 
-    it('DL-PERM-05: #executeDialogTurn aguarda dialog.ready para retry após restart não-definitivo', () => {
-        // Implementação do DL-PERM-09: ao receber dialog.stopped com authorized=false,
-        // o turno deve aguardar dialog.ready antes de retentar
+    it('DL-PERM-05: #executeTurn aguarda ready para retry após restart não-definitivo', () => {
         assert.ok(
-            sourceCode.includes("'dialog.ready'") && sourceCode.includes('onRetryReady'),
-            '#executeDialogTurn deve aguardar dialog.ready e reenviar ao reencarar após restart',
+            dlmSourceCode.includes("'ready'") && dlmSourceCode.includes('onRetryReady'),
+            '#executeTurn deve aguardar ready e reenviar ao reencontrar após restart',
         );
     });
 
     it('DL-PERM-05: boot prompt não contém instrução STOP_DIALOG (DL-PERM-06)', () => {
-        // Boot prompt não deve instruir o modelo a responder ao comando STOP_DIALOG
-        // (conflito com a política DL-PERM de loop eterno)
-        // Verificar que a string STOP_DIALOG SÓ aparece em código funcional (answerPendingQuestion),
-        // não no meta-prompt de boot
-        const stopDialogIdx = sourceCode.indexOf('STOP_DIALOG');
-        const metaPromptIdx = sourceCode.indexOf('metaPrompt');
-        // O metaPrompt de boot não deve referenciar STOP_DIALOG dentro de sua string
-        const metaPromptSection = sourceCode.slice(metaPromptIdx, metaPromptIdx + 600);
+        // metaPrompt de boot não deve referenciar STOP_DIALOG
+        const metaPromptIdx = dlmSourceCode.indexOf('metaPrompt');
+        const metaPromptSection = dlmSourceCode.slice(metaPromptIdx, metaPromptIdx + 600);
         assert.ok(
             !metaPromptSection.includes('STOP_DIALOG'),
             'metaPrompt de boot não deve instruir modelo a responder ao comando STOP_DIALOG',
         );
-        // ... mas answerPendingQuestion('STOP_DIALOG') ainda deve existir
+        // STOP_DIALOG deve existir no stop() / answerPendingQuestion
         assert.ok(
-            stopDialogIdx !== -1 && sourceCode.includes("answerPendingQuestion('STOP_DIALOG')"),
-            "answerPendingQuestion('STOP_DIALOG') deve existir no stopDialogLoop()",
+            dlmSourceCode.includes("'STOP_DIALOG'") || dlmSourceCode.includes('"STOP_DIALOG"'),
+            "STOP_DIALOG deve existir no stop() do DialogLoopManager",
         );
     });
 });
+

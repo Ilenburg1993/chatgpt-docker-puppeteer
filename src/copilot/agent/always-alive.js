@@ -18,15 +18,8 @@
 
 import { MAX_QUEUE_SIZE } from '#copilot/core/constants';
 import { SessionError } from '#copilot/core/errors';
-import { raceEvents, waitForEvent } from '#copilot/lib/event-helpers';
-import {
-    createRegistry,
-    createTelemetry,
-    recordSessionEnd,
-    recordSessionStart,
-    recordToolCall,
-    startSpan,
-} from '#copilot/lib/index';
+import { raceEvents } from '#copilot/lib/event-helpers';
+import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart, startSpan } from '#copilot/lib/index';
 import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/lib/permissions';
 import { log } from '#core/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
@@ -35,8 +28,8 @@ import { buildMcpTools } from '../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../config/mcp-servers.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { getHubSessionId } from '../terminal/state.js';
-import { DialogProtocol } from './dialog-protocol.js';
-import { DialogWatchdog } from './dialog-watchdog.js';
+import { DialogLoopManager } from './dialog-loop-manager.js';
+// DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 import { AGENT_EVENTS } from './events.js';
 import { initOrResumeSession, readState, writeStateAsync } from './session-manager.js';
 import { executeTask } from './task-executor.js';
@@ -119,40 +112,12 @@ export class AlwaysAliveAgent extends EventEmitter {
     /** @type {AgentTask[]} */
     #queue = [];
 
-    /** @type {boolean} */
-    #dialogLoopActive = false;
-
     /**
-     * Mutex para serializar chamadas a sendDialogTurn(). Garante que apenas um turno executa no dialog loop por vez,
-     * evitando race conditions no #pendingQuestion compartilhado.
+     * E.1: DialogLoopManager — encapsula mutex, watchdog, backpressure, protocolo e pause/resume do dialog loop.
      *
-     * @type {Promise<void>}
+     * @type {DialogLoopManager}
      */
-    #dialogTurnMutex = Promise.resolve();
-
-    /**
-     * BUG-AA-04 (fix): contador de profundidade da fila do dialog turn mutex. Permite resetar a Promise-chain quando a
-     * fila zera, prevenindo crescimento indefinido.
-     *
-     * @type {number}
-     */
-    #dialogTurnQueueDepth = 0;
-
-    /**
-     * F3.3 (BUG-MOD-06): geração do mutex. Incrementada a cada reset — garante que a Promise em flight só faz reset
-     * quando ainda é a última da cadeia, evitando reset prematuro em corridas.
-     *
-     * @type {number}
-     */
-    #dialogTurnMutexGen = 0;
-
-    /**
-     * BUG-AA-02 (fix): sinaliza que stopDialogLoop está em execução. Evita race condition entre stopDialogLoop e
-     * #handleUserInputRequest.
-     *
-     * @type {boolean}
-     */
-    #dialogLoopStopping = false;
+    #dialogLoop = new DialogLoopManager();
 
     /**
      * BUG-AA-03 (fix): armazena as funções de unsubscribe retornadas por session.on(). O SDK não é um EventEmitter —
@@ -162,25 +127,6 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @type {(() => void)[]}
      */
     #sessionEventUnsubscribers = [];
-
-    /**
-     * MR-02 (fix): tamanho máximo da fila de turnos do dialog loop (backpressure). Configurável via
-     * LLM_B_DIALOG_QUEUE_MAX.
-     *
-     * @type {number}
-     */
-    static #MAX_DIALOG_TURN_QUEUE_SIZE = Number(process.env.LLM_B_DIALOG_QUEUE_MAX ?? 10);
-
-    /**
-     * IMPROVE-AA-02: timeout para aguardar `dialog.ready` durante startDialogLoop(). Controlado por
-     * `LLM_B_BOOT_TIMEOUT_MS`. Padrão: 30 segundos.
-     *
-     * @type {number}
-     */
-    static #DIALOG_BOOT_TIMEOUT_MS = Number(process.env.LLM_B_BOOT_TIMEOUT_MS ?? 30_000);
-
-    /** @type {DialogWatchdog | null} */
-    #watchdog = null;
 
     /**
      * PERF-01 (fix): contador de mensagens em memória para evitar readState()+writeState() síncrono a cada envio.
@@ -197,35 +143,6 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @type {{ model?: string; cost?: number; quotaSnapshots?: any; ts: number } | null}
      */
     #lastPrInfo = null;
-
-    /**
-     * RF-PR-05: Se true, a próxima reconexão tentará com o modelo alternativo `COPILOT_FALLBACK_MODEL`.
-     *
-     * @type {boolean}
-     */
-    #pendingModelFallback = false;
-
-    /**
-     * RF-PR-05: Modelo de fallback lido de `COPILOT_FALLBACK_MODEL`. Aplicado em startDialogLoop() (0-PR).
-     *
-     * @type {string | null}
-     */
-    #fallbackModel = process.env.COPILOT_FALLBACK_MODEL ?? null;
-
-    /**
-     * Intervalo do watchdog (ms). Controlado por `LLM_B_WATCHDOG_MS`. Padrão: 5 minutos.
-     *
-     * @type {number}
-     */
-    static #WATCHDOG_INTERVAL_MS = Number(process.env.LLM_B_WATCHDOG_MS ?? 5 * 60 * 1_000);
-
-    /**
-     * Limiar de inatividade (ms) para emitir 'dialog.stalled'. Controlado por `LLM_B_WATCHDOG_STALL_MS`. Padrão: 15
-     * minutos.
-     *
-     * @type {number}
-     */
-    static #WATCHDOG_STALL_MS = Number(process.env.LLM_B_WATCHDOG_STALL_MS ?? 15 * 60 * 1_000);
 
     /** @type {string} */
     #model;
@@ -405,7 +322,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     get dialogLoopActive() {
-        return this.#dialogLoopActive;
+        return this.#dialogLoop.active;
     }
 
     /**
@@ -556,10 +473,9 @@ export class AlwaysAliveAgent extends EventEmitter {
         }
 
         // BUG-01 (fix): parar o watchdog e o dialog loop antes de setar status stopped
-        if (this.#dialogLoopActive) {
-            this.#dialogLoopActive = false;
+        if (this.#dialogLoop.active) {
+            this.#dialogLoop.forceDeactivate();
             this.emit('dialog.loop.changed', { active: false, ts: Date.now() });
-            this.#watchdog?.stop();
         }
 
         // PERF-01 (fix): persistir contador em disco apenas no shutdown, não a cada mensagem
@@ -799,7 +715,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             // GAP-AA-01 (fix): bloquear sendMessage() externo enquanto dialog loop estiver ativo.
             // startDialogLoop() chama sendMessage() antes de setar dialogLoopActive=true, portanto
             // o guard usa a heurística de timeoutMs==24h para distinguir a chamada interna.
-            if (this.#dialogLoopActive && timeoutMs !== 24 * 60 * 60 * 1000) {
+            if (this.#dialogLoop.active && timeoutMs !== 24 * 60 * 60 * 1000) {
                 reject(
                     new SessionError(
                         '[AlwaysAlive] sendMessage() bloqueado: dialog loop ativo. Use sendDialogTurn().',
@@ -1005,24 +921,10 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * Inicia o "modo diálogo direto" com a LLM: envia um meta-prompt de boot que instrui o modelo a usar `ask_user` em
-     * loop.
-     *
-     * Neste modo, cada chamada a `sendDialogTurn(text)` alimenta o próximo `ask_user` do modelo **sem consumir novo
-     * PR**. Toda a conversa ocorre dentro de um único `sendMessage()` (1 PR total), usando o canal `onUserInputRequest`
-     * como transporte bidirecional.
-     *
-     * Fluxo:
-     *
-     *     startDialogLoop(bootPrompt)  ← 1 PR (sendMessage)
-     *       modelo: ask_user("READY:") ← suspende (0 PR)
-     *       sendDialogTurn("Olá")      ← responde via ask_user (0 PR)
-     *       modelo: ask_user("REPLY: resposta") ← suspende (0 PR)
-     *       sendDialogTurn("continua") ← responde (0 PR)
-     *       ...N turnos, tudo 1 PR...
+     * Inicia o "modo diálogo direto" com a LLM. Delega ao DialogLoopManager.
      *
      * @param {string} [bootPrompt] - Prompt de boot personalizado (opcional)
-     * @returns {Promise<void>} Resolve quando o loop estiver pronto para receber turnos
+     * @returns {Promise<void>}
      * @throws {Error} Se o agente não estiver no estado 'idle'
      */
     async startDialogLoop(bootPrompt) {
@@ -1032,428 +934,63 @@ export class AlwaysAliveAgent extends EventEmitter {
                 'INVALID_STATE',
             );
         }
-
-        if (this.#dialogLoopActive) {
-            throw new SessionError(
-                '[AlwaysAlive] Modo diálogo já está ativo. Chame stopDialogLoop() primeiro.',
-                'DIALOG_ALREADY_ACTIVE',
-            );
-        }
-
-        this.#dialogLoopActive = true;
+        this.#ensureDialogLoopAttached();
+        await this.#dialogLoop.start(bootPrompt);
         this.emit('dialog.loop.changed', { active: true, ts: Date.now() });
-        // MR-08: persistir dialogLoopActive em disco para diagnóstico após PM2 crash/restart
-        writeStateAsync({ dialogLoopActive: true }).catch((/** @type {any} */ e) =>
-            log('WARN', `[AlwaysAlive] writeState dialogLoopActive=true: ${e.message}`),
-        );
-
-        // RF-PR-05 (0-PR fix): aplicar fallback de modelo sinalizados por rate_limit/quota ANTES
-        // da nova sessão de boot. Isso garante que a troca de modelo nunca consome um PR extra —
-        // ela ocorre na próxima inicialização natural do loop (1 PR de boot já esperado).
-        if (this.#pendingModelFallback && this.#fallbackModel) {
-            const prev = this.#model;
-            this.#model = this.#fallbackModel;
-            this.#pendingModelFallback = false;
-            this.emit('pr.fallback_model', { previousModel: prev, newModel: this.#fallbackModel, ts: Date.now() });
-            log(
-                'WARN',
-                `[AlwaysAlive] RF-PR-05 (0-PR): modelo trocado ${prev} → ${this.#model} em startDialogLoop — sem PR adicional.`,
-            );
-        }
-
-        // RF-D04: boot prompt centralizado em DialogProtocol.buildBootPrompt() para DRY entre always-alive.js e dialog.js
-        const metaPrompt = bootPrompt ?? DialogProtocol.buildBootPrompt();
-
-        // Boot: 1 PR — resolve quando o modelo emite o primeiro ask_user("READY:"), com timeout (IMPROVE-AA-02)
-        const bootPromise = waitForEvent(this, 'dialog.ready', {
-            timeoutMs: AlwaysAliveAgent.#DIALOG_BOOT_TIMEOUT_MS,
-            timeoutError: `[AlwaysAlive] startDialogLoop boot timeout após ${AlwaysAliveAgent.#DIALOG_BOOT_TIMEOUT_MS}ms`,
-        });
-
-        // Inicia watchdog: detecta se o dialog loop ficar inativo por muito tempo
-        this.#watchdog = new DialogWatchdog({
-            intervalMs: AlwaysAliveAgent.#WATCHDOG_INTERVAL_MS,
-            stallThresholdMs: AlwaysAliveAgent.#WATCHDOG_STALL_MS,
-            onStall: (stalledMs) => this.emit('dialog.stalled', { stalledMs }),
-        });
-        this.#watchdog.start();
-
-        // sendMessage dispara o loop em background — não aguardamos a conclusão.
-        // Timeout de 24h: o dialog loop é infinito e session.idle nunca dispara durante ask_user,
-        // portanto o timeout padrão de 60s do SDK causaria reconexões desnecessárias a cada minuto.
-        this.sendMessage(metaPrompt, { timeoutMs: 24 * 60 * 60 * 1000 }).catch((/** @type {any} */ e) => {
-            if (this.#dialogLoopActive) {
-                log('WARN', `[AlwaysAlive] Dialog loop encerrado: ${e.message}`);
-                this.#dialogLoopActive = false;
-                this.emit('dialog.loop.changed', { active: false, ts: Date.now() });
-                this.emit('dialog.stopped', { reason: e.message });
-            }
-        });
-
-        await bootPromise;
-        log('INFO', '[AlwaysAlive] Modo diálogo iniciado. Use sendDialogTurn() para interagir.');
     }
 
     /**
-     * Envia um turno de diálogo para o modelo suspenso no loop ask_user. Deve ser chamado após `startDialogLoop()` e
-     * quando o evento `dialog.ready` for emitido (indicando que o modelo está aguardando).
-     *
-     * Chamadas concorrentes são **serializadas automaticamente** via #dialogTurnMutex — nunca executam em paralelo.
-     * Isso garante que apenas um turno altera o #pendingQuestion por vez.
-     *
-     * @param {string} message - Mensagem a enviar ao modelo
-     * @param {{ timeout?: number; signal?: AbortSignal }} [opts] - timeout (padrão 60s) e AbortSignal opcional (UPG-01)
-     * @returns {Promise<string>} A resposta do modelo (extraída do "REPLY: ...")
-     * @throws {Error} Se o modo diálogo não estiver ativo
-     */
-    sendDialogTurn(message, { timeout = 60_000, signal } = {}) {
-        if (!this.#dialogLoopActive) {
-            return Promise.reject(
-                new SessionError(
-                    '[AlwaysAlive] Modo diálogo não está ativo. Chame startDialogLoop() primeiro.',
-                    'DIALOG_NOT_ACTIVE',
-                ),
-            );
-        }
-
-        // UPG-01: suporte a AbortSignal externo
-        if (signal?.aborted) {
-            return Promise.reject(new DOMException('[AlwaysAlive] sendDialogTurn abortado.', 'AbortError'));
-        }
-
-        // MR-02 (fix): backpressure — rejeitar se a fila já atingiu o máximo
-        if (this.#dialogTurnQueueDepth >= AlwaysAliveAgent.#MAX_DIALOG_TURN_QUEUE_SIZE) {
-            return Promise.reject(
-                new SessionError(
-                    `[AlwaysAlive] Fila de diálogo cheia (${this.#dialogTurnQueueDepth}/${AlwaysAliveAgent.#MAX_DIALOG_TURN_QUEUE_SIZE} turnos pendentes).`,
-                    'DIALOG_QUEUE_FULL',
-                ),
-            );
-        }
-
-        // DL-PERM-04: registrar atividade no watchdog logo ao enviar o turno —
-        // assim o watchdog não dispara stall durante processamentos longos do modelo.
-        this.#watchdog?.ping();
-
-        // Serializa via mutex: encadeia na cauda do turno atual
-        this.#dialogTurnQueueDepth++;
-        const prev = this.#dialogTurnMutex;
-        /** @type {Promise<string>} */
-        const next = prev.then(() =>
-            this.#executeDialogTurn(message, { timeout, ...(signal !== undefined && { signal }) }),
-        );
-        // Atualiza a cauda — o .catch(() => {}) evita UnhandledRejection interna
-        this.#dialogTurnMutex = next.then(() => {}).catch(() => {});
-        // F3.3 (BUG-MOD-06 fix): GEN captura o valor atual — se outro enqueue acontecer antes
-        // deste finally, #dialogTurnMutexGen terá sido incrementado e o reset é cancelado,
-        // prevenindo race condition entre Promises concorrentes.
-        const myGen = ++this.#dialogTurnMutexGen;
-        void next.finally(() => {
-            this.#dialogTurnQueueDepth--;
-            if (this.#dialogTurnQueueDepth === 0 && this.#dialogTurnMutexGen === myGen) {
-                this.#dialogTurnMutex = Promise.resolve();
-            }
-        });
-        return next;
-    }
-
-    /**
-     * Implementação interna de sendDialogTurn — executada de forma serializada pelo #dialogTurnMutex.
-     *
-     * DL-PERM-05: se `dialog.stopped` disparar com `authorized: false` (restart automático), aguarda `dialog.ready` por
-     * até `timeout` ms e reenvia a mensagem uma vez. Isso garante que turnos que estavam em flight durante um restart
-     * automático do loop não são perdidos silenciosamente.
-     *
-     * Se `dialog.stopped` disparar com `authorized: true`, rejeita imediatamente (encerramento definitivo).
+     * Envia um turno de diálogo. Delega ao DialogLoopManager.
      *
      * @param {string} message
-     * @param {{ timeout: number; signal?: AbortSignal }} opts
+     * @param {{ timeout?: number; signal?: AbortSignal }} [opts]
      * @returns {Promise<string>}
      */
-    #executeDialogTurn(message, { timeout, signal }) {
-        // MR-03: emitir turn_start para observabilidade
-        const turnStart = Date.now();
-        this.emit('dialog.turn_start', { message: message.slice(0, 120), ts: turnStart });
-        // RF-PR-02: persistir mensagem pendente antes de enviar (para retry após restart sem PR)
-        writeStateAsync({
-            pendingTurnMessage: message,
-            pendingTurnTs: turnStart,
-            pendingTurnConsumedPR: false,
-        }).catch((/** @type {any} */ e) => log('WARN', `[AlwaysAlive] writeState pendingTurn: ${e.message}`));
-        // AI.3: instrumentar com span OTEL
-        return startSpan(
-            'dialog.send_turn',
-            // RF-D05: enriquecer span com turnNumber e modelo para detectar regressões de performance
-            {
-                sessionId: this.sessionId ?? '',
-                actor: 'user',
-                model: this.#model,
-                extra: { turnNumber: this.#sendCount },
-            },
-            () =>
-                new Promise((resolve, reject) => {
-                    // BUG-AA-01 (fix): referência ao listener onPending — necessária para remoção no timeout.
-                    // Sem isso, timeoutHandle pode disparar e deixar onPending orfão nos ouvintes do EventEmitter.
-                    /** @type {((arg: unknown) => void) | null} */
-                    let pendingListener = null;
-
-                    const timeoutHandle = setTimeout(() => {
-                        // BUG-AA-01 (fix): remover listener orfão antes de rejeitar
-                        if (pendingListener) {
-                            this.off('question.pending', pendingListener);
-                            pendingListener = null;
-                        }
-                        reject(
-                            new SessionError(
-                                `[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`,
-                                'DIALOG_TIMEOUT',
-                            ),
-                        );
-                    }, timeout);
-
-                    // NEW-01 (fix): cross-cleanup entre os dois listeners para evitar orphan listener
-                    const onReplyOuter = (/** @type {{ reply: string }} */ evt) => {
-                        clearTimeout(timeoutHandle);
-                        this.off('dialog.stopped', onStopOuter);
-                        // MR-03: emitir turn_end com latência para observabilidade
-                        const durationMs = Date.now() - turnStart;
-                        this.emit('dialog.turn_end', { reply: evt.reply.slice(0, 120), durationMs });
-                        // MR-04: registrar latência no store de telemetria para detectar regressões de performance
-                        recordToolCall(this.#telemetry, 'dialog.turn', {
-                            durationMs,
-                            success: true,
-                            sessionId: this.sessionId ?? undefined,
-                        });
-                        resolve(evt.reply);
-                    };
-                    const onStopOuter = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt) => {
-                        clearTimeout(timeoutHandle);
-                        this.off('dialog.reply', onReplyOuter);
-                        if (stopEvt?.authorized) {
-                            // Encerramento definitivo — rejeitar imediatamente
-                            reject(
-                                new SessionError('[AlwaysAlive] Diálogo encerrado definitivamente.', 'DIALOG_ENDED'),
-                            );
-                        } else {
-                            // DL-PERM-05: restart automático — aguarda dialog.ready e reenvia a mensagem
-                            log(
-                                'INFO',
-                                `[AlwaysAlive] DL-PERM-05: dialog.stopped (${stopEvt?.reason ?? 'unknown'}) durante turno — aguardando restart para reenviar.`,
-                            );
-                            this.#waitForDialogRestartAndReply(message, timeout, stopEvt?.reason)
-                                .then(resolve)
-                                .catch(reject);
-                        }
-                    };
-
-                    // UPG-01: cancelar via AbortSignal externo
-                    if (signal) {
-                        signal.addEventListener(
-                            'abort',
-                            () => {
-                                clearTimeout(timeoutHandle);
-                                this.off('dialog.reply', onReplyOuter);
-                                this.off('dialog.stopped', onStopOuter);
-                                reject(new DOMException('[AlwaysAlive] sendDialogTurn abortado.', 'AbortError'));
-                            },
-                            { once: true },
-                        );
-                    }
-
-                    this.once('dialog.reply', onReplyOuter);
-                    this.once('dialog.stopped', onStopOuter);
-
-                    // Alimenta o ask_user pendente com a mensagem do usuário
-                    if (this.#pendingQuestion) {
-                        this.answerPendingQuestion(message);
-                    } else {
-                        // Modelo ainda não chegou ao ask_user — aguarda 'question.pending' uma vez
-                        // BUG-02 (fix): registrar onStop dentro do onPending também, para limpar newTimeout
-                        // e o listener interno de dialog.reply se dialog.stopped disparar antes da resposta
-                        const onPending = (/** @type {unknown} */ _) => {
-                            pendingListener = null; // BUG-AA-01: foi disparado, não é mais orfão
-                            clearTimeout(timeoutHandle);
-                            const newTimeout = setTimeout(() => {
-                                this.off('dialog.reply', onReply);
-                                this.off('dialog.stopped', onStop);
-                                reject(
-                                    new SessionError(
-                                        `[AlwaysAlive] sendDialogTurn timeout após ${timeout}ms`,
-                                        'DIALOG_TIMEOUT',
-                                    ),
-                                );
-                            }, timeout);
-                            const onReply = (/** @type {{ reply: string }} */ evt) => {
-                                clearTimeout(newTimeout);
-                                this.off('dialog.stopped', onStop);
-                                resolve(evt.reply);
-                            };
-                            const onStop = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt2) => {
-                                clearTimeout(newTimeout);
-                                this.off('dialog.reply', onReply);
-                                if (stopEvt2?.authorized) {
-                                    reject(
-                                        new SessionError(
-                                            '[AlwaysAlive] Diálogo encerrado definitivamente.',
-                                            'DIALOG_ENDED',
-                                        ),
-                                    );
-                                } else {
-                                    // DL-PERM-05: restart — aguardar dialog.ready e reenviar
-                                    this.#waitForDialogRestartAndReply(message, timeout, stopEvt2?.reason)
-                                        .then(resolve)
-                                        .catch(reject);
-                                }
-                            };
-                            this.once('dialog.reply', onReply);
-                            this.once('dialog.stopped', onStop);
-                            this.answerPendingQuestion(message);
-                        };
-                        // BUG-AA-01 (fix): guardar referência para remoção caso o timeout dispare antes
-                        pendingListener = onPending;
-                        this.once('question.pending', onPending);
-                        // BUG-AA-05 (fix): #pendingQuestion pode ter sido preenchido entre a verificação
-                        // inicial (this.#pendingQuestion === null) e o registro do once — checar novamente.
-                        if (this.#pendingQuestion) {
-                            this.off('question.pending', onPending);
-                            pendingListener = null;
-                            onPending(undefined);
-                        }
-                    }
-                }),
-        );
+    sendDialogTurn(message, opts) {
+        return this.#dialogLoop.sendTurn(message, opts);
     }
 
     /**
-     * Para o modo diálogo, sinalizando ao modelo para encerrar o loop.
-     *
-     * DL-PERM: por padrão o encerramento é recusado para preservar o dialog loop permanente. Apenas quando `authorized:
-     * true` é passado o loop é efetivamente encerrado. Sem autorização, emite um aviso e retorna sem ação. Use
-     * `authorized: true` para:
-     *
-     * - Restart automático pelo watchdog (ação legítima de saúde do sistema)
-     * - Encerramento explicitamente autorizado pelo usuário via API
-     *
-     * O campo `reason` diferencia o tipo de encerramento:
-     *
-     * - `'watchdog_restart'` — restart automático do sistema (não-definitivo, loop será reiniciado)
-     * - `'authorized_stop'` — encerramento permanente autorizado pelo usuário
-     *
-     * O restart automático em caso de encerramento pelo modelo é responsabilidade de `terminal/index.js`.
+     * Para o modo diálogo. Delega ao DialogLoopManager.
      *
      * @param {{ authorized?: boolean; reason?: 'watchdog_restart' | 'authorized_stop' }} [opts]
      * @returns {Promise<void>}
      */
-    async stopDialogLoop({ authorized = false, reason = 'authorized_stop' } = {}) {
-        if (!this.#dialogLoopActive) return;
-        if (!authorized) {
-            log(
-                'WARN',
-                '[AlwaysAlive] stopDialogLoop() chamado sem autorização — ignorado (DL-PERM). ' +
-                    'Use stopDialogLoop({ authorized: true }) para encerrar o loop.',
-            );
-            return;
-        }
-        // BUG-AA-02 (fix): evitar double-stop se stopDialogLoop() for chamado concorrentemente
-        if (this.#dialogLoopStopping) return;
-        this.#dialogLoopStopping = true;
-        if (this.#pendingQuestion) {
-            this.answerPendingQuestion('STOP_DIALOG');
-        }
-        this.#dialogLoopActive = false;
-        this.#dialogLoopStopping = false;
-        // MR-08: persistir dialogLoopActive=false em disco para diagnóstico após PM2 crash/restart
-        writeStateAsync({ dialogLoopActive: false }).catch((/** @type {any} */ e) =>
-            log('WARN', `[AlwaysAlive] writeState dialogLoopActive=false: ${e.message}`),
-        );
-        this.#watchdog?.stop();
-        this.emit('dialog.stopped', { reason, authorized: true });
+    async stopDialogLoop(opts) {
+        await this.#dialogLoop.stop(opts);
     }
 
     /**
-     * NEW-PAUSE-02: Pausa o dialog loop sem desconectar a sessão nem encerrar o agentic turn.
-     *
-     * O modelo permanece aguardando em `ask_user` enquanto a sessão CLI estiver ativa. O estado é serializado em disco
-     * para que um restart posterior possa retomar sem novo PR (zero-cost resume).
-     *
-     * Diferença de `stopDialogLoop()`:
-     *
-     * - `stopDialogLoop()` envia `STOP_DIALOG` ao modelo — encerra o agentic turn, 0 PR novo mas loop precisa reiniciar
-     * - `pauseDialogLoop()` **não** envia nada — preserva o estado `ask_user` no servidor CLI
+     * Pausa o dialog loop. Delega ao DialogLoopManager.
      *
      * @returns {Promise<void>}
      */
     async pauseDialogLoop() {
-        if (!this.#dialogLoopActive) {
-            log('WARN', '[AlwaysAlive] pauseDialogLoop() chamado com loop inativo — ignorado.');
-            return;
-        }
-        const sid = this.sessionId;
-        // NEW-PAUSE-01: persistir estado pausado
-        await writeStateAsync({ dialogPaused: true, pausedAt: Date.now(), dialogLoopActive: true }).catch(
-            (/** @type {any} */ e) => log('WARN', `[AlwaysAlive] writeState dialogPaused: ${e.message}`),
-        );
-        log('INFO', `[AlwaysAlive] Dialog loop pausado. SessionId: ${sid}. Reinicie e use resumeDialogLoop().`);
-        this.emit('dialog.paused', { sessionId: sid, pausedAt: Date.now() });
+        await this.#dialogLoop.pause(this.sessionId);
     }
 
     /**
-     * NEW-PAUSE-03: Retoma o dialog loop após um `pauseDialogLoop()`.
-     *
-     * Estratégia híbrida (zero-PR quando possível):
-     *
-     * - **Estratégia A** (0 PR): aguarda `question.pending` por 5 segundos — se o servidor CLI preservou o estado
-     *   `ask_user`, o modelo responde imediatamente sem novo envio.
-     * - **Estratégia B** (1 PR): se nenhum `ask_user` chegar, reenvia o boot prompt para reinicializar o loop.
+     * Retoma o dialog loop. Delega ao DialogLoopManager.
      *
      * @returns {Promise<void>}
-     * @throws {Error} Se o agente não estiver no estado 'idle'
      */
     async resumeDialogLoop() {
-        const state = readState();
-        if (!state?.dialogPaused) {
-            log('WARN', '[AlwaysAlive] resumeDialogLoop() chamado sem dialogPaused=true — ignorado.');
-            return;
-        }
         if (this.#status !== 'idle' && this.#status !== 'waiting_for_input') {
             throw new SessionError(
                 `[AlwaysAlive] resumeDialogLoop() requer status 'idle' ou 'waiting_for_input'. Status atual: '${this.#status}'`,
                 'INVALID_STATE',
             );
         }
-
-        // Limpa o estado de pause imediatamente para evitar loops duplos
-        await writeStateAsync({ dialogPaused: false }).catch((/** @type {any} */ e) =>
-            log('WARN', `[AlwaysAlive] writeState dialogPaused=false: ${e.message}`),
-        );
-
-        // Estratégia A: aguardar ask_user preservado no servidor CLI (0 PR)
-        const preserved = await waitForEvent(this, 'question.pending', { timeoutMs: 5_000 })
-            .then(() => true)
-            .catch(() => false);
-
-        if (preserved) {
-            log('INFO', '[AlwaysAlive] resumeDialogLoop: ask_user preservado no CLI — retomada zero-PR.');
-            this.emit('dialog.resumed', { prConsumed: false });
-            return;
-        }
-
-        // Estratégia B: reenviar boot prompt (1 PR de retomada)
-        log('INFO', '[AlwaysAlive] resumeDialogLoop: ask_user não encontrado — reenviando boot prompt (1 PR).');
-        this.#dialogLoopActive = false; // reset para que startDialogLoop() aceite
-        await writeStateAsync({ dialogLoopActive: false }).catch(() => {});
-
-        await this.startDialogLoop();
-        this.emit('dialog.resumed', { prConsumed: true });
+        await this.#dialogLoop.resume();
     }
 
     /**
-     * Indica se o dialog loop está atualmente pausado via `pauseDialogLoop()`.
+     * Indica se o dialog loop está atualmente pausado.
      *
      * @returns {boolean}
      */
     get dialogPaused() {
-        return readState()?.dialogPaused ?? false;
+        return this.#dialogLoop.paused;
     }
 
     /**
@@ -1470,57 +1007,30 @@ export class AlwaysAliveAgent extends EventEmitter {
     // ─────────────── Privados ───────────────
 
     /**
-     * DL-PERM-05 — Aguarda `dialog.ready` (após um restart automático não-autorizado) e reenvia `message` uma vez.
-     *
-     * Encapsula o padrão repetido em `#executeDialogTurn`: timeout de restart + onRetryReady + send + reply.
-     *
-     * @param {string} message - Mensagem original a reenviar após o restart
-     * @param {number} timeout - Timeout em ms para aguardar `dialog.ready`
-     * @param {string} [stopReason] - `reason` do evento `dialog.stopped` (para o log de erro de timeout)
-     * @returns {Promise<string>} reply recebida após o reenvio
+     * E.1: Garante que o DialogLoopManager está vinculado ao host com a interface AgentHost.
      */
-    #waitForDialogRestartAndReply(message, timeout, stopReason) {
-        return new Promise((resolve, reject) => {
-            const retryTimeout = setTimeout(() => {
-                this.off('dialog.ready', onRetryReady);
-                reject(
-                    new SessionError(
-                        `[AlwaysAlive] sendDialogTurn: timeout aguardando restart após dialog.stopped (${stopReason ?? 'unknown'})`,
-                        'DIALOG_RESTART_TIMEOUT',
-                    ),
-                );
-            }, timeout);
-            const onRetryReady = () => {
-                clearTimeout(retryTimeout);
-                const sendAndListen = () => {
-                    this.answerPendingQuestion(message);
-                    // BUG-AA-06 (fix): guardar listener de dialog.stopped secundário para rejeitar se o loop
-                    // reiniciado parar novamente antes de emitir dialog.reply
-                    const onRetryStopped = (/** @type {{ reason?: string }} */ stoppedEvt) => {
-                        this.off('dialog.reply', onRetryReply);
-                        reject(
-                            new SessionError(
-                                `[AlwaysAlive] sendDialogTurn: dialog.stopped durante retry (${stoppedEvt?.reason ?? 'unknown'})`,
-                                'DIALOG_STOPPED_DURING_RETRY',
-                            ),
-                        );
-                    };
-                    /** @type {(evt: { reply: string }) => void} */
-                    const onRetryReply = (retryEvt) => {
-                        this.off('dialog.stopped', onRetryStopped);
-                        resolve(retryEvt.reply);
-                    };
-                    this.once('dialog.reply', onRetryReply);
-                    this.once('dialog.stopped', onRetryStopped);
-                };
-                if (this.#pendingQuestion) {
-                    sendAndListen();
-                } else {
-                    this.once('question.pending', sendAndListen);
-                }
-            };
-            this.once('dialog.ready', onRetryReady);
-        });
+    #ensureDialogLoopAttached() {
+        /** @type {import('./dialog-loop-manager.js').AgentHost} */
+        const host = {
+            sendMessage: (msg, opts) => this.sendMessage(msg, opts),
+            answerPendingQuestion: (answer) => this.answerPendingQuestion(answer),
+            getSessionId: () => this.sessionId,
+            getModel: () => this.#model,
+            getPendingQuestion: () => this.#pendingQuestion,
+        };
+        this.#dialogLoop.attach(host, this.#telemetry);
+        // Propagar eventos do DialogLoopManager com prefixo dialog. para manter compatibilidade
+        this.#dialogLoop.removeAllListeners();
+        this.#dialogLoop.on('ready', (/** @type {any} */ evt) => this.emit('dialog.ready', evt));
+        this.#dialogLoop.on('reply', (/** @type {any} */ evt) => this.emit('dialog.reply', evt));
+        this.#dialogLoop.on('stopped', (/** @type {any} */ evt) => this.emit('dialog.stopped', evt));
+        this.#dialogLoop.on('paused', (/** @type {any} */ evt) => this.emit('dialog.paused', evt));
+        this.#dialogLoop.on('resumed', (/** @type {any} */ evt) => this.emit('dialog.resumed', evt));
+        this.#dialogLoop.on('stalled', (/** @type {any} */ evt) => this.emit('dialog.stalled', evt));
+        this.#dialogLoop.on('turn_start', (/** @type {any} */ evt) => this.emit('dialog.turn_start', evt));
+        this.#dialogLoop.on('turn_end', (/** @type {any} */ evt) => this.emit('dialog.turn_end', evt));
+        this.#dialogLoop.on('changed', (/** @type {any} */ evt) => this.emit('dialog.loop.changed', evt));
+        this.#dialogLoop.on('model.fallback', (/** @type {any} */ evt) => this.emit('pr.fallback_model', evt));
     }
 
     /**
@@ -1688,12 +1198,12 @@ export class AlwaysAliveAgent extends EventEmitter {
 
                 // BUG-HIGH-04 (fix): se dialog loop estava ativo, emitir dialog.stopped autorizado=false
                 // para que sendDialogTurn (DL-PERM-05) detecte o restart e reenvie a mensagem pendente
-                if (this.#dialogLoopActive) {
+                if (this.#dialogLoop.active) {
                     log(
                         'INFO',
                         '[AlwaysAlive] Reconexão: dialog loop ativo, emitindo dialog.stopped para restart via DL-PERM-05.',
                     );
-                    this.#dialogLoopActive = false;
+                    this.#dialogLoop.notifyReconnect();
                     this.emit('dialog.stopped', { reason: 'reconnect_restart', authorized: false });
                 } else {
                     // BUG-AA-10 (fix): log explícito para diagnóstico quando loop estava idle entre turnos
@@ -1724,45 +1234,23 @@ export class AlwaysAliveAgent extends EventEmitter {
     async #handleUserInputRequest({ question, choices, allowFreeform }) {
         log('INFO', `[AlwaysAlive] Modelo tem pergunta: "${question.slice(0, 120)}"`);
 
-        if (this.#dialogLoopActive) {
+        if (this.#dialogLoop.active) {
             return this.#handleDialogLoopInput({ question, allowFreeform });
         }
         return this.#handleInteractiveQuestion({ question, ...(choices !== undefined && { choices }), allowFreeform });
     }
 
     /**
-     * RF-D03: Handler de protocolo no modo dialog loop. Intercepta mensagens READY/REPLY/DONE/STOPPED e emite os
-     * eventos correspondentes.
+     * RF-D03: Handler de protocolo no modo dialog loop. Delega interceptação ao DialogLoopManager e
+     * retorna para o handler de pergunta interativa normal para suspender a execução (ask_user).
      *
      * @param {{ question: string; allowFreeform: boolean }} input
      * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
      */
     #handleDialogLoopInput({ question, allowFreeform }) {
-        // ── Interceptação do dialog loop ────────────────────────────────────
-        // No modo diálogo, o modelo usa ask_user com prefixos especiais (RF-D01: DialogProtocol).
-        const kind = DialogProtocol.classify(question);
-
-        if (kind === 'ready') {
-            // Modelo sinaliza prontidão — emite evento para sendDialogTurn()
-            this.#watchdog?.ping();
-            this.emit('dialog.ready', {});
-            // Aguarda a resposta via question.pending normal
-            // (sendDialogTurn chamará answerPendingQuestion com a mensagem do usuário)
-        } else if (kind === 'reply') {
-            // Modelo enviou uma resposta — extrai o conteúdo
-            this.#watchdog?.ping();
-            const reply = DialogProtocol.extractReply(question);
-            this.emit('dialog.reply', { reply });
-            // Aguarda o próximo turno via question.pending
-        } else if (kind === 'stopped') {
-            // DL-PERM: o modelo tentou encerrar o loop. Não encerramos imediatamente — emitimos o evento
-            // 'dialog.stopped' para que o listener em terminal/index.js possa reiniciar automaticamente.
-            // O #dialogLoopActive NÃO é setado para false aqui — o restart via ensureDialogLoop() irá
-            // reativar o loop sem interrupção do protocolo ask_user.
-            log('WARN', '[AlwaysAlive] Modelo emitiu STOPPED — emitindo dialog.stopped para restart automático.');
-            this.emit('dialog.stopped', { reason: 'model_stopped', authorized: false });
-        }
-        // ── Fim da interceptação ─────────────────────────────────────────────
+        // Classifica e emite eventos READY/REPLY/STOPPED via DLM — propaga para always-alive via listener
+        this.#dialogLoop.handleProtocolInput({ question });
+        // Sempre suspende via handleInteractiveQuestion para aguardar answerPendingQuestion()
         return this.#handleInteractiveQuestion({ question, allowFreeform });
     }
 
@@ -1844,7 +1332,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                     'WARN',
                     `[AlwaysAlive] RF-PR-05: rate_limit/quota detectado — próxima reconexão usará model fallback: ${fallbackModel}`,
                 );
-                this.#pendingModelFallback = true;
+                this.#dialogLoop.scheduleFallback(fallbackModel);
             } else {
                 log('WARN', '[AlwaysAlive] RF-PR-05: rate_limit/quota mas nenhum COPILOT_FALLBACK_MODEL configurado.');
             }
