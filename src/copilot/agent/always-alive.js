@@ -711,6 +711,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         // BUG-01 (fix): parar o watchdog e o dialog loop antes de setar status stopped
         if (this.#dialogLoopActive) {
             this.#dialogLoopActive = false;
+            this.emit('dialog.loop.changed', { active: false, ts: Date.now() });
             this.#watchdog?.stop();
         }
 
@@ -1040,6 +1041,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         }
 
         this.#dialogLoopActive = true;
+        this.emit('dialog.loop.changed', { active: true, ts: Date.now() });
         // MR-08: persistir dialogLoopActive em disco para diagnóstico após PM2 crash/restart
         writeStateAsync({ dialogLoopActive: true }).catch((/** @type {any} */ e) =>
             log('WARN', `[AlwaysAlive] writeState dialogLoopActive=true: ${e.message}`),
@@ -1096,6 +1098,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             if (this.#dialogLoopActive) {
                 log('WARN', `[AlwaysAlive] Dialog loop encerrado: ${e.message}`);
                 this.#dialogLoopActive = false;
+                this.emit('dialog.loop.changed', { active: false, ts: Date.now() });
                 this.emit('dialog.stopped', { reason: e.message });
             }
         });

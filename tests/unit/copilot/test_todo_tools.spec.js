@@ -30,9 +30,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import * as url from 'node:url';
+import { getDb } from '../../../src/infra/db/sqlite.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Setup: redirect TODOS_FILE para diretório temporário isolado
+// Setup: paths e helpers SQLite
 // ─────────────────────────────────────────────────────────────────────────────
 
 const WORKSPACE_ROOT = path.resolve(url.fileURLToPath(new URL('../../../', import.meta.url)));
@@ -41,7 +42,7 @@ const TMP_STATE = path.join(TMP_BASE, '.github', 'hooks', 'state');
 const TMP_TODOS = path.join(TMP_STATE, 'todos.json');
 
 /**
- * Escreve o store diretamente no arquivo temporário (bypass do módulo para setup).
+ * Escreve o store diretamente no arquivo temporário (backup/restore para migração one-shot).
  *
  * @param {Record<string, any>} data
  */
@@ -51,13 +52,34 @@ function writeRaw(data) {
 }
 
 /**
- * Lê o store diretamente do arquivo temporário.
+ * Lê tarefas diretamente do SQLite (verifica persistência).
  *
  * @returns {{ version: number; tasks: Record<string, any> }}
  */
 function readRaw() {
-    if (!fs.existsSync(TMP_TODOS)) return { version: 1, tasks: {} };
-    return JSON.parse(fs.readFileSync(TMP_TODOS, 'utf8'));
+    try {
+        const db = getDb();
+        const rows = /** @type {{ id: string; data: string }[]} */ (
+            db.prepare('SELECT id, data FROM copilot_todo_tasks').all()
+        );
+        /** @type {Record<string, any>} */
+        const tasks = {};
+        for (const row of rows) tasks[row.id] = JSON.parse(row.data);
+        return { version: 1, tasks };
+    } catch {
+        return { version: 1, tasks: {} };
+    }
+}
+
+/**
+ * Limpa a tabela copilot_todo_tasks para isolamento entre testes.
+ */
+function clearTodoTable() {
+    try {
+        getDb().prepare('DELETE FROM copilot_todo_tasks').run();
+    } catch {
+        // tabela pode não existir — ignorar
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,20 +142,26 @@ const REAL_TODOS_BAK = REAL_TODOS + '.test-backup';
 let originalContent = null;
 
 beforeEach(() => {
-    // Garantir que o diretório existe
+    // Garantir que o diretório existe (para compatibilidade com migração one-shot)
     fs.mkdirSync(REAL_STATE_DIR, { recursive: true });
-    // Backup do arquivo real existente (se houver)
+    // Backup do arquivo JSON legado (se houver)
     if (fs.existsSync(REAL_TODOS)) {
         originalContent = fs.readFileSync(REAL_TODOS, 'utf8');
     } else {
         originalContent = null;
     }
-    // Iniciar com store vazio para cada teste
-    fs.writeFileSync(REAL_TODOS, JSON.stringify({ version: 1, tasks: {} }, null, 2), 'utf8');
+    // Limpar tabela SQLite para cada teste (isolamento F4.2)
+    clearTodoTable();
+    // Garantir que o JSON legado não interfira com a migração
+    if (fs.existsSync(REAL_TODOS)) {
+        fs.unlinkSync(REAL_TODOS);
+    }
 });
 
 afterEach(() => {
-    // Restaurar o arquivo original
+    // Limpar tabela SQLite
+    clearTodoTable();
+    // Restaurar o arquivo JSON legado original
     if (originalContent !== null) {
         fs.writeFileSync(REAL_TODOS, originalContent, 'utf8');
     } else if (fs.existsSync(REAL_TODOS)) {
@@ -148,13 +176,12 @@ afterEach(() => {
 });
 
 /**
- * Lê o store real (onde o módulo persiste dados durante os testes).
+ * Lê o store via SQLite (onde o módulo persiste dados durante os testes).
  *
  * @returns {{ version: number; tasks: Record<string, any> }}
  */
 function readStore() {
-    if (!fs.existsSync(REAL_TODOS)) return { version: 1, tasks: {} };
-    return JSON.parse(fs.readFileSync(REAL_TODOS, 'utf8'));
+    return readRaw();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -72,6 +72,10 @@ function registerAgentEventListeners() {
             reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
         });
     });
+    // F4.6 (UPG-11): emite dialog.loop.changed para dashboard responsivo
+    alwaysAliveAgent.on('dialog.loop.changed', (/** @type {{ active: boolean; ts: number }} */ evt) => {
+        broadcastSse('dialog.loop.changed', { active: evt.active, timestamp: evt.ts });
+    });
     alwaysAliveAgent.on('dialog.ready', () => {
         broadcastSse('ready', {
             timestamp: Date.now(),

@@ -22,9 +22,9 @@
  */
 
 import { log } from '#core/logger';
+import { getDb } from '#infra/db/sqlite';
 import { defineTool } from '@github/copilot-sdk';
 import * as fs from 'node:fs';
-import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { withSkipPermission } from './tool-factory.js';
@@ -36,11 +36,8 @@ import { withSkipPermission } from './tool-factory.js';
 /** Raiz do workspace */
 const WORKSPACE_ROOT = new URL('../../..', import.meta.url).pathname;
 
-/** Arquivo de persistência das tarefas */
+/** Arquivo JSON legado (mantido para migração one-shot) */
 const TODOS_FILE = path.join(WORKSPACE_ROOT, '.github', 'hooks', 'state', 'todos.json');
-
-/** Arquivo temporário para escrita atômica */
-const TODOS_TMP = TODOS_FILE + '.tmp';
 
 /** Versão do schema de dados */
 const SCHEMA_VERSION = 1;
@@ -122,6 +119,65 @@ const VALID_TRANSITIONS = {
  * @returns {Promise<TodoStore>}
  */
 
+// ---------------------------------------------------------------------------
+// SQLite backend — F4.2 (UPG-03): migração de JSON file para SQLite
+// ---------------------------------------------------------------------------
+
+/**
+ * Inicializa a tabela `copilot_todo_tasks` no maestro.sqlite (idempotente). Também faz migração one-shot do JSON legado
+ * se a tabela estiver vazia.
+ */
+function _initTodoDb() {
+    const db = getDb();
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS copilot_todo_tasks (
+            id          TEXT PRIMARY KEY,
+            data        TEXT NOT NULL,
+            status      TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) STORED,
+            priority    TEXT GENERATED ALWAYS AS (json_extract(data, '$.priority')) STORED,
+            parent_id   TEXT GENERATED ALWAYS AS (json_extract(data, '$.parentId')) STORED,
+            created_at  TEXT GENERATED ALWAYS AS (json_extract(data, '$.createdAt')) STORED,
+            updated_at  TEXT GENERATED ALWAYS AS (json_extract(data, '$.updatedAt')) STORED
+        ) STRICT;
+    `);
+    db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_todo_status    ON copilot_todo_tasks(status);
+        CREATE INDEX IF NOT EXISTS idx_todo_priority  ON copilot_todo_tasks(priority);
+        CREATE INDEX IF NOT EXISTS idx_todo_parent_id ON copilot_todo_tasks(parent_id);
+        CREATE INDEX IF NOT EXISTS idx_todo_created   ON copilot_todo_tasks(created_at);
+    `);
+
+    // Migração one-shot do JSON legado
+    const count = /** @type {{ n: number }} */ (db.prepare('SELECT COUNT(*) AS n FROM copilot_todo_tasks').get());
+    if (count.n === 0 && fs.existsSync(TODOS_FILE)) {
+        try {
+            const raw = fs.readFileSync(TODOS_FILE, 'utf8');
+            const data = JSON.parse(raw);
+            const tasks = typeof data?.tasks === 'object' ? data.tasks : {};
+            const insert = db.prepare('INSERT OR IGNORE INTO copilot_todo_tasks (id, data) VALUES (?, ?)');
+            const insertMany = db.transaction((/** @type {[string, string][]} */ rows) => {
+                for (const [id, json] of rows) insert.run(id, json);
+            });
+            const rows = /** @type {[string, string][]} */ (
+                Object.entries(tasks).map(([id, task]) => [id, JSON.stringify(task)])
+            );
+            if (rows.length > 0) {
+                insertMany(rows);
+                log('INFO', `[todo-tools] Migração JSON→SQLite: ${rows.length} tarefas importadas.`);
+            }
+        } catch (e) {
+            log('WARN', `[todo-tools] Migração JSON legado falhou (não-crítico): ${/** @type {Error} */ (e).message}`);
+        }
+    }
+}
+
+// Inicializa o DB na carga do módulo (síncrono, one-time).
+try {
+    _initTodoDb();
+} catch (e) {
+    log('WARN', `[todo-tools] _initTodoDb falhou: ${/** @type {Error} */ (e).message}`);
+}
+
 // BUG-CRIT-04 (fix): mutex serial para serializar ciclos read-modify-write do store.
 // Todas as operações que leem E escrevem devem usar withStore(fn).
 let _storeMutex = Promise.resolve();
@@ -157,16 +213,22 @@ async function withStore(fn) {
 
 async function _readStoreRaw() {
     try {
-        if (!fs.existsSync(TODOS_FILE)) {
-            return { version: SCHEMA_VERSION, tasks: {} };
+        const db = getDb();
+        const rows = /** @type {{ id: string; data: string }[]} */ (
+            db.prepare('SELECT id, data FROM copilot_todo_tasks').all()
+        );
+        /** @type {Record<string, TodoItem>} */
+        const tasks = {};
+        for (const row of rows) {
+            try {
+                tasks[row.id] = JSON.parse(row.data);
+            } catch {
+                // ignora linhas corrompidas
+            }
         }
-        const raw = await fsp.readFile(TODOS_FILE, 'utf8');
-        const data = JSON.parse(raw);
-        if (typeof data.tasks !== 'object' || data.tasks === null) {
-            return { version: SCHEMA_VERSION, tasks: {} };
-        }
-        return data;
-    } catch {
+        return { version: SCHEMA_VERSION, tasks };
+    } catch (e) {
+        log('WARN', `[todo-tools] _readStoreRaw falhou, retornando vazio: ${/** @type {Error} */ (e).message}`);
         return { version: SCHEMA_VERSION, tasks: {} };
     }
 }
@@ -176,14 +238,19 @@ async function _readStoreRaw() {
  * @returns {Promise<void>}
  */
 async function _writeStoreRaw(store) {
-    const dir = path.dirname(TODOS_FILE);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-    store.version = SCHEMA_VERSION;
-    const json = JSON.stringify(store, null, 2);
-    await fsp.writeFile(TODOS_TMP, json, 'utf8');
-    await fsp.rename(TODOS_TMP, TODOS_FILE);
+    const db = getDb();
+    // Upsert todas as tarefas do store em memória para o SQLite.
+    // Para deletados (removidos do store), apagamos do DB comparando os ids presentes.
+    const upsert = db.prepare('INSERT OR REPLACE INTO copilot_todo_tasks (id, data) VALUES (?, ?)');
+    const del = db.prepare('DELETE FROM copilot_todo_tasks WHERE id NOT IN (SELECT value FROM json_each(?))');
+    const ids = Object.keys(store.tasks);
+    const txn = db.transaction(() => {
+        for (const [id, task] of Object.entries(store.tasks)) {
+            upsert.run(id, JSON.stringify(task));
+        }
+        del.run(JSON.stringify(ids));
+    });
+    txn();
 }
 
 /** @returns {Promise<TodoStore>} */
