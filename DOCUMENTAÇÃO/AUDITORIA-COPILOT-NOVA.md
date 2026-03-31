@@ -1721,19 +1721,17 @@ _Roadmap adicionado em 2026-03-30. Última atualização de status: 2026-04-01 (
 
 ## 12. Fase 6 — Novas Propostas de Upgrades e Correções
 
-> **Data da proposta**: 2026-04-01  
-> **Contexto**: Com as Fases 0–5 concluídas (37 de 40 itens — F4.2, F4.6, F4.7 pendentes), estes são
-> os próximos melhoramentos mais impactantes identificados na análise do codebase.
+> **Data da proposta**: 2026-04-01 **Contexto**: Com as Fases 0–5 concluídas (37 de 40 itens — F4.2,
+> F4.6, F4.7 pendentes), estes são os próximos melhoramentos mais impactantes identificados na
+> análise do codebase.
 
 ---
 
 ### F6.1 — BUG-MOD-07: `repl.js` — `/restart` fecha `readyPromise` antes do loop parar
 
-**Arquivo**: `src/copilot/terminal/repl.js`  
-**Problema**: O listener `alwaysAliveAgent.once('dialog.ready', ...)` é registrado _antes_ de
-`stopDialogMode()`. Se o evento `dialog.ready` for emitido durante o stop, o `once` pode perdê-lo
-por race condition.  
-**Correção**:
+**Arquivo**: `src/copilot/terminal/repl.js` **Problema**: O listener
+`alwaysAliveAgent.once('dialog.ready', ...)` é registrado _antes_ de `stopDialogMode()`. Se o evento
+`dialog.ready` for emitido durante o stop, o `once` pode perdê-lo por race condition. **Correção**:
 
 ```js
 await llmBridgeClient.stopDialogMode();
@@ -1754,32 +1752,29 @@ await readyPromise;
 
 ### F6.2 — BUG-MOD-03: `hub-tools.js` — truncar `context` e `intent` em `hub_send_message`
 
-**Arquivo**: `src/copilot/tools/hub-tools.js`  
-**Problema**: `message` é truncado em 32 000 chars, mas `context` e `intent` (passados ao
-`chatStructured`) podem ser arbitrariamente longos.  
+**Arquivo**: `src/copilot/tools/hub-tools.js` **Problema**: `message` é truncado em 32 000 chars,
+mas `context` e `intent` (passados ao `chatStructured`) podem ser arbitrariamente longos.
 **Correção**: Adicionar `safeContext = String(context ?? safeMessage).slice(0, 8_000)` e
-`safeIntent = String(intent ?? safeMessage).slice(0, 4_000)` antes de `chatStructured`.  
-**Esforço**: Baixo · **Prioridade**: P2 · **PR**: 0
+`safeIntent = String(intent ?? safeMessage).slice(0, 4_000)` antes de `chatStructured`. **Esforço**:
+Baixo · **Prioridade**: P2 · **PR**: 0
 
 ---
 
 ### F6.3 — BUG-MOD-04: `server.js` — rate limiters separados para SSE vs HTTP
 
-**Arquivo**: `src/copilot/terminal/server.js`  
-**Problema**: SSE e operações HTTP POST compartilham o mesmo `_writeRateLimiter`, permitindo que
-POSTs normais esgotem a cota de conexões SSE.  
+**Arquivo**: `src/copilot/terminal/server.js` **Problema**: SSE e operações HTTP POST compartilham o
+mesmo `_writeRateLimiter`, permitindo que POSTs normais esgotem a cota de conexões SSE.
 **Correção**: Criar `_sseRateLimiter` separado (`maxEvents: 5, windowMs: 10_000`) para SSE, usado
-exclusivamente em conexões `GET /sse`.  
-**Esforço**: Médio · **Prioridade**: P2 · **PR**: 0
+exclusivamente em conexões `GET /sse`. **Esforço**: Médio · **Prioridade**: P2 · **PR**: 0
 
 ---
 
 ### F6.4 — BUG-MOD-05: `web-tools.js` — validar URLs de `uddg` param contra `PRIVATE_HOST_RE`
 
-**Arquivo**: `src/copilot/tools/web-tools.js`  
-**Problema**: Os URLs retornados de DDG (`uddg` param) não são validados contra `PRIVATE_HOST_RE`. O
-modelo poderia usar `web_fetch` para acessar uma URL interna sugestionada pelos resultados.  
-**Correção**: Após extrair URLs dos resultados DDG, filtrar via:
+**Arquivo**: `src/copilot/tools/web-tools.js` **Problema**: Os URLs retornados de DDG (`uddg` param)
+não são validados contra `PRIVATE_HOST_RE`. O modelo poderia usar `web_fetch` para acessar uma URL
+interna sugestionada pelos resultados. **Correção**: Após extrair URLs dos resultados DDG, filtrar
+via:
 
 ```js
 results = results.filter((r) => {
@@ -1797,11 +1792,10 @@ results = results.filter((r) => {
 
 ### F6.5 — BUG-MOD-09: `orchestrator.js` — limpar `#inflightBySession` em `closeSession`
 
-**Arquivo**: `src/copilot/conversation-hub/orchestrator.js`  
-**Problema**: Se `sendToLlmB()` for chamado concomitantemente ao `closeSession()`, a entrada
-deletada pode ser re-inserida no Map, criando entradas "zumbi".  
-**Correção**: Usar um Set de sessões fechadas `_closedSessions` antes do delete; em `sendToLlmB`,
-verificar se a sessão está no Set antes de re-inserir:
+**Arquivo**: `src/copilot/conversation-hub/orchestrator.js` **Problema**: Se `sendToLlmB()` for
+chamado concomitantemente ao `closeSession()`, a entrada deletada pode ser re-inserida no Map,
+criando entradas "zumbi". **Correção**: Usar um Set de sessões fechadas `_closedSessions` antes do
+delete; em `sendToLlmB`, verificar se a sessão está no Set antes de re-inserir:
 
 ```js
 if (this._closedSessions?.has(hubSessionId)) return;
@@ -1813,31 +1807,29 @@ if (this._closedSessions?.has(hubSessionId)) return;
 
 ### F6.6 — BUG-MOD-14: `client.js` — logar `traceId`/`correlationId` no `writeTurn`
 
-**Arquivo**: `src/copilot/channel/client.js`, `src/copilot/conversation-hub/store.js`  
-**Problema**: `buildStructuredRequest()` gera `traceId`/`correlationId` via `crypto.randomUUID()`
-mas nunca persiste esses valores, impedindo correlação de turnos para debug.  
-**Correção**: Passar `traceId` e `correlationId` como `metadata` ao `writeTurn()`. Adicionar coluna
-`metadata JSON` (nullable) na tabela `copilot_conversation_turns` se ainda não existir.  
-**Esforço**: Médio · **Prioridade**: P3 · **PR**: 0
+**Arquivo**: `src/copilot/channel/client.js`, `src/copilot/conversation-hub/store.js` **Problema**:
+`buildStructuredRequest()` gera `traceId`/`correlationId` via `crypto.randomUUID()` mas nunca
+persiste esses valores, impedindo correlação de turnos para debug. **Correção**: Passar `traceId` e
+`correlationId` como `metadata` ao `writeTurn()`. Adicionar coluna `metadata JSON` (nullable) na
+tabela `copilot_conversation_turns` se ainda não existir. **Esforço**: Médio · **Prioridade**: P3 ·
+**PR**: 0
 
 ---
 
 ### F6.7 — BUG-MOD-15: `entry.js` — `pingClient.forceStop()` com optional chaining
 
-**Arquivo**: `src/copilot/agent/entry.js`  
-**Problema**: `pingClient.stop()` chamado em cliente não-iniciado can ter comportamento indefinido
-em versões futuras do SDK.  
-**Correção**: `pingClient.forceStop?.().catch(() => {})` — usar `forceStop` com optional chaining.  
-**Esforço**: Baixo · **Prioridade**: P3 · **PR**: 0
+**Arquivo**: `src/copilot/agent/entry.js` **Problema**: `pingClient.stop()` chamado em cliente
+não-iniciado can ter comportamento indefinido em versões futuras do SDK. **Correção**:
+`pingClient.forceStop?.().catch(() => {})` — usar `forceStop` com optional chaining. **Esforço**:
+Baixo · **Prioridade**: P3 · **PR**: 0
 
 ---
 
 ### F6.8 — UPG-04: `handleInject` — suporte a `type: 'blob'` para attachments em memória
 
-**Arquivo**: `src/copilot/terminal/http-handlers.js`  
-**Problema**: O SDK v0.2.0 adicionou `type: 'blob'` para attachments base64. O handler de `/inject`
-aceita `type: 'file'` e `type: 'directory'`, mas não `blob`.  
-**Correção**:
+**Arquivo**: `src/copilot/terminal/http-handlers.js` **Problema**: O SDK v0.2.0 adicionou
+`type: 'blob'` para attachments base64. O handler de `/inject` aceita `type: 'file'` e
+`type: 'directory'`, mas não `blob`. **Correção**:
 
 ```js
 if (attach.type === 'blob' && typeof attach.data === 'string') {
@@ -1855,10 +1847,9 @@ if (attach.type === 'blob' && typeof attach.data === 'string') {
 
 ### F6.9 — UPG-05: `getLastNPairs` — cursor-based em vez de slice linear
 
-**Arquivo**: `src/copilot/channel/client.js`  
-**Problema**: `getLastNPairs` usa slice O(n) em históricos longos (500+ entradas por sessão).  
-**Correção**: Manter índice do último par visto numa propriedade interna `_lastPairIdx` e navegar do
-fim para o início em O(n) mas sem recriar array:
+**Arquivo**: `src/copilot/channel/client.js` **Problema**: `getLastNPairs` usa slice O(n) em
+históricos longos (500+ entradas por sessão). **Correção**: Manter índice do último par visto numa
+propriedade interna `_lastPairIdx` e navegar do fim para o início em O(n) mas sem recriar array:
 
 ```js
 getLastNPairs(n) {
@@ -1884,9 +1875,9 @@ getLastNPairs(n) {
 
 ### F6.10 — UPG-13: `ConversationStore` — WAL mode + cache explícito na inicialização
 
-**Arquivo**: `src/copilot/conversation-hub/store.js`  
-**Problema**: Não há verificação de que o SQLite foi aberto com WAL mode e cache otimizado.  
-**Correção**: Na inicialização do store, adicionar:
+**Arquivo**: `src/copilot/conversation-hub/store.js` **Problema**: Não há verificação de que o
+SQLite foi aberto com WAL mode e cache otimizado. **Correção**: Na inicialização do store,
+adicionar:
 
 ```js
 this.#db.pragma('journal_mode=WAL');
@@ -1901,10 +1892,9 @@ this.#db.pragma('temp_store=MEMORY');
 
 ### F6.11 — UPG-14: `BUG-LEVE-06`: `alias-store.js` — detectar loops de alias
 
-**Arquivo**: `src/copilot/bridges/alias-store.js`  
-**Problema**: Loops de alias (`/a` → `/b` → `/a`) são silenciosos; o usuário nunca sabe que o alias
-está em ciclo.  
-**Correção**: Detectar loop via Set de aliases visitados:
+**Arquivo**: `src/copilot/bridges/alias-store.js` **Problema**: Loops de alias (`/a` → `/b` → `/a`)
+são silenciosos; o usuário nunca sabe que o alias está em ciclo. **Correção**: Detectar loop via Set
+de aliases visitados:
 
 ```js
 const visited = new Set();
@@ -1921,67 +1911,59 @@ if (visited.has(alias)) throw new Error(`Loop detectado em alias: ${[...visited]
 
 ### F6.12 — UPG-15: `sdk-03` (restante) — usar `SYSTEM_PROMPT_SECTIONS` com sections nomeadas completo
 
-**Arquivo**: `src/copilot/config/system-prompt.js`, `src/copilot/agent/session-manager.js`  
+**Arquivo**: `src/copilot/config/system-prompt.js`, `src/copilot/agent/session-manager.js`
 **Contexto**: F0.2 migrou `buildHookContextAppendMessage` para sections, mas as constantes
 `SYSTEM_PROMPT_SECTIONS` definidas em `system-prompt.js` ainda não são importadas do SDK
 (`import { SYSTEM_PROMPT_SECTIONS } from '@github/copilot-sdk'`). Usar as constantes do SDK garante
-que os nomes estão corretos mesmo em atualizações futuras.  
-**Correção**: Substituir constantes locais pelas do SDK onde possível.  
-**Esforço**: Baixo · **Prioridade**: P3 · **PR**: 0
+que os nomes estão corretos mesmo em atualizações futuras. **Correção**: Substituir constantes
+locais pelas do SDK onde possível. **Esforço**: Baixo · **Prioridade**: P3 · **PR**: 0
 
 ---
 
 ### F6.13 — NOVO: `session-rpc-tools.js` — substituir `session.rpc.*` por API pública
 
-**Arquivo**: `src/copilot/tools/session-rpc-tools.js`  
-**Problema** (SDK-05): `session.rpc.mode.get()`, `session.rpc.plan.read()` etc. são APIs JSON-RPC
-internas do CLI sem tipagem e sem garantia de estabilidade. O SDK v0.2.0 expõe `session.setModel()`
-como API pública.  
+**Arquivo**: `src/copilot/tools/session-rpc-tools.js` **Problema** (SDK-05):
+`session.rpc.mode.get()`, `session.rpc.plan.read()` etc. são APIs JSON-RPC internas do CLI sem
+tipagem e sem garantia de estabilidade. O SDK v0.2.0 expõe `session.setModel()` como API pública.
 **Correção**: Mapear cada chamada `session.rpc.*` para o equivalente público do SDK. Para RPCs sem
 equivalente público, adicionar `// SDK-05: API interna — risco de quebra em atualizações` e
-empacotar em try/catch com fallback gracioso.  
-**Esforço**: Alto · **Prioridade**: P3 · **PR**: 0
+empacotar em try/catch com fallback gracioso. **Esforço**: Alto · **Prioridade**: P3 · **PR**: 0
 
 ---
 
 ### F6.14 — NOVO: `dialog-watchdog.js` — renomear `stallMs` para `stallThresholdMs`
 
-**Arquivo**: `src/copilot/agent/dialog-watchdog.js`  
-**Problema** (BUG-LEVE-01): Nome ambíguo — `stallMs` pode ser confundido com o tempo decorrido em
-milissegundos vs o limiar threshold.  
+**Arquivo**: `src/copilot/agent/dialog-watchdog.js` **Problema** (BUG-LEVE-01): Nome ambíguo —
+`stallMs` pode ser confundido com o tempo decorrido em milissegundos vs o limiar threshold.
 **Correção**: Renomear campo privado `#stallMs` → `#stallThresholdMs` e atualizar referências
-internas.  
-**Esforço**: Baixo · **Prioridade**: P4 · **PR**: 0
+internas. **Esforço**: Baixo · **Prioridade**: P4 · **PR**: 0
 
 ---
 
 ### F6.15 — NOVO: `gh-bridge.js` — adicionar conclusão `timed_out` ao `runIcon`
 
-**Arquivo**: `src/copilot/bridges/gh-bridge.js`  
-**Problema** (BUG-LEVE-02): `runIcon` mapeia `cancelled` mas não `timed_out`, retornando `'⚠️'`
-genérico para runs que deram timeout.  
-**Correção**: Adicionar `case 'timed_out': return '⏱️';` ao switch de conclusão.  
-**Esforço**: Baixo · **Prioridade**: P4 · **PR**: 0
+**Arquivo**: `src/copilot/bridges/gh-bridge.js` **Problema** (BUG-LEVE-02): `runIcon` mapeia
+`cancelled` mas não `timed_out`, retornando `'⚠️'` genérico para runs que deram timeout.
+**Correção**: Adicionar `case 'timed_out': return '⏱️';` ao switch de conclusão. **Esforço**: Baixo
+· **Prioridade**: P4 · **PR**: 0
 
 ---
 
 ### F6.16 — NOVO: `todos-tools.js` — relatar subtarefas desvinculadas em `todo_delete`
 
-**Arquivo**: `src/copilot/tools/todo-tools.js`  
-**Problema** (BUG-LEVE-10): Com `cascade: false`, subtarefas são "orfanizadas" sem o modelo saber
-quantas foram afetadas.  
-**Correção**: Retornar `orphaned: [ids]` na resposta do `todoDeleteTool` quando `cascade: false`.  
-**Esforço**: Baixo · **Prioridade**: P4 · **PR**: 0
+**Arquivo**: `src/copilot/tools/todo-tools.js` **Problema** (BUG-LEVE-10): Com `cascade: false`,
+subtarefas são "orfanizadas" sem o modelo saber quantas foram afetadas. **Correção**: Retornar
+`orphaned: [ids]` na resposta do `todoDeleteTool` quando `cascade: false`. **Esforço**: Baixo ·
+**Prioridade**: P4 · **PR**: 0
 
 ---
 
 ### F6.17 — NOVO: `store.js` — deduplicar índices parciais redundantes
 
-**Arquivo**: `src/copilot/conversation-hub/store.js`  
-**Problema** (BUG-LEVE-03): `idx_conv_turns_user_unread` e `idx_conv_turns_unread` têm overlap, com
-dois índices parciais cobrindo casos similares.  
-**Correção**: Revisar se ambos são utilizados nos queries de `getPendingUserMessages`; remover o
-redundante ou consolidar em um único índice composto.  
+**Arquivo**: `src/copilot/conversation-hub/store.js` **Problema** (BUG-LEVE-03):
+`idx_conv_turns_user_unread` e `idx_conv_turns_unread` têm overlap, com dois índices parciais
+cobrindo casos similares. **Correção**: Revisar se ambos são utilizados nos queries de
+`getPendingUserMessages`; remover o redundante ou consolidar em um único índice composto.
 **Esforço**: Baixo · **Prioridade**: P4 · **PR**: 0
 
 ---
@@ -1991,24 +1973,27 @@ redundante ou consolidar em um único índice composto.
 | ID    | Item                                             | Esforço | Prioridade | Status |
 | ----- | ------------------------------------------------ | ------- | ---------- | ------ |
 | F6.1  | `/restart` race condition em `repl.js`           | Baixo   | **P2**     | ⏳     |
-| F6.2  | Truncar `context`/`intent` em `hub_send_message` | Baixo   | **P2**     | ⏳     |
-| F6.3  | Rate limiter separado SSE vs HTTP                | Médio   | **P2**     | ⏳     |
-| F6.4  | Validar URLs DDG contra `PRIVATE_HOST_RE`        | Baixo   | **P2**     | ⏳     |
+| F6.2  | Truncar `context`/`intent` em `hub_send_message` | Baixo   | **P2**     | ✅     |
+| F6.3  | Rate limiter separado SSE vs HTTP                | Médio   | **P2**     | ✅     |
+| F6.4  | Validar URLs DDG contra `PRIVATE_HOST_RE`        | Baixo   | **P2**     | ✅     |
 | F6.5  | `#inflightBySession` proteção zumbi              | Médio   | **P2**     | ⏳     |
-| F6.6  | Logar `traceId` no `writeTurn`                   | Médio   | **P3**     | ⏳     |
-| F6.7  | `pingClient.forceStop()` com optional chaining   | Baixo   | **P3**     | ⏳     |
+| F6.6  | Logar `traceId` no `writeTurn`                   | Médio   | **P3**     | ✅     |
+| F6.7  | `pingClient.forceStop()` com optional chaining   | Baixo   | **P3**     | ✅     |
 | F6.8  | `handleInject` suporte `type: 'blob'`            | Baixo   | **P3**     | ⏳     |
 | F6.9  | `getLastNPairs` cursor-based                     | Médio   | **P4**     | ⏳     |
 | F6.10 | SQLite WAL mode + cache na inicialização         | Baixo   | **P3**     | ⏳     |
-| F6.11 | `alias-store.js` detectar loops de alias         | Baixo   | **P3**     | ⏳     |
+| F6.11 | `alias-store.js` detectar loops de alias         | Baixo   | **P3**     | ✅     |
 | F6.12 | `SYSTEM_PROMPT_SECTIONS` do SDK (constantes)     | Baixo   | **P3**     | ⏳     |
 | F6.13 | `session-rpc-tools.js` → API pública SDK         | Alto    | **P3**     | ⏳     |
-| F6.14 | Renomear `stallMs` → `stallThresholdMs`          | Baixo   | **P4**     | ⏳     |
-| F6.15 | `gh-bridge.js` → `timed_out` em `runIcon`        | Baixo   | **P4**     | ⏳     |
+| F6.14 | Renomear `stallMs` → `stallThresholdMs`          | Baixo   | **P4**     | ✅     |
+| F6.15 | `gh-bridge.js` → `timed_out` em `runIcon`        | Baixo   | **P4**     | ✅     |
 | F6.16 | `todoDeleteTool` relatar subtarefas orfanizadas  | Baixo   | **P4**     | ⏳     |
 | F6.17 | Deduplicar índices parciais em `store.js`        | Baixo   | **P4**     | ⏳     |
+| F6.18 | `ALLOWED_NPM_SCRIPTS` configurável via env       | Baixo   | **P3**     | ✅ 🆕  |
+| F6.19 | `structured-message.js` — campo `attachments`    | Baixo   | **P3**     | ✅ 🆕  |
 
 ---
 
-_Roadmap adicionado em 2026-03-30. Última atualização de status: 2026-04-01 (commit `0f05a717`).  
-Fase 6 proposta em 2026-04-01 após conclusão das Fases 0–5._
+_Roadmap adicionado em 2026-03-30. Última atualização de status: 2026-04-01 (commits `672b0bcc`,
+`acc929ed`, fix F6.6)._ _F6.2, F6.3, F6.4, F6.6, F6.7, F6.11, F6.14, F6.15, F6.18, F6.19 concluídos
+em 2026-04-01._
