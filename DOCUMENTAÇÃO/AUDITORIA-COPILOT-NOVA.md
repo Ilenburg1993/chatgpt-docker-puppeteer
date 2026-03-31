@@ -1671,46 +1671,344 @@ Já coberto em F3.8.
 
 ### Resumo do Roadmap
 
-| Fase | ID   | Item                                            | Esforço | Prioridade |
-| ---- | ---- | ----------------------------------------------- | ------- | ---------- |
-| F0   | F0.1 | SDK-01: `onPermissionRequest` default           | Baixo   | **P0**     |
-| F0   | F0.2 | SDK-03: sections nomeadas no system message     | Médio   | **P2**     |
-| F0   | F0.3 | SDK-04: `getMessages()` guard + comentário      | Baixo   | **P3**     |
-| F0   | F0.4 | SDK-07: `ping()` argumento verificar            | Baixo   | **P3**     |
-| F0   | F0.5 | SDK-08: `client.stop()` no shutdown do agente   | Baixo   | **P1**     |
-| F0   | F0.6 | SDK-09: remover forcing `overridesBuiltInTool`  | Médio   | **P2**     |
-| F1   | F1.1 | CRIT-02: `writeTurn` lança exceção              | Baixo   | **P0**     |
-| F1   | F1.2 | CRIT-04: `todo-tools.js` mutex                  | Médio   | **P0**     |
-| F1   | F1.3 | CRIT-05: verificar double-emit `task.delta`     | Baixo   | **P0**     |
-| F1   | F1.4 | CRIT-06: `chatBatch` documentar sequencial      | Baixo   | **P1**     |
-| F1   | F1.5 | CRIT-07: `PinnedFilesLoader` Linux recursive    | Médio   | **P1**     |
-| F2   | F2.1 | SEC-01: allowlist de executáveis                | Alto    | **P1**     |
-| F2   | F2.2 | SEC-02: limitar tamanho leitura session files   | Baixo   | **P1**     |
-| F2   | F2.3 | SEC-03: protect JSON.parse prototype pollution  | Baixo   | **P1**     |
-| F2   | F2.4 | SEC-04: `timingSafeEqual` para token            | Baixo   | **P1**     |
-| F2   | F2.5 | SEC-05: expandir BLOCKED_PATTERNS               | Baixo   | **P2**     |
-| F2   | F2.6 | SEC-06: socket join session verificar ownership | Médio   | **P1**     |
-| F2   | F2.7 | SEC-07: `rawApi` restringir a GET               | Baixo   | **P1**     |
-| F2   | F2.8 | SEC-08: nota DNS rebinding + dns.lookup         | Médio   | **P2**     |
-| F3   | F3.1 | MOD-01: limite `consecutive_unauthorized`       | Baixo   | **P2**     |
-| F3   | F3.2 | MOD-02: MCP circuit breaker reset               | Baixo   | **P2**     |
-| F3   | F3.3 | MOD-06: mutex geração sem race condition        | Médio   | **P2**     |
-| F3   | F3.4 | MOD-08: `validatePath` async                    | Médio   | **P2**     |
-| F3   | F3.5 | MOD-10: `onErrorOccurred` hierarchy fix         | Médio   | **P2**     |
-| F3   | F3.6 | MOD-11: `getAuditSummary` async                 | Baixo   | **P2**     |
-| F3   | F3.7 | MOD-12: `nerv-bridge.js` listener once          | Baixo   | **P2**     |
-| F3   | F3.8 | LEVE-11: `git-tools.js` execFile                | Baixo   | **P2**     |
-| F3   | F3.9 | LEVE-09: `lastPrInfo` cópia rasa                | Baixo   | **P3**     |
-| F4   | F4.2 | UPG-03: `todo-tools.js` → SQLite                | Alto    | **P3**     |
-| F4   | F4.3 | UPG-06: `session.idle` para métricas            | Baixo   | **P3**     |
-| F4   | F4.4 | UPG-09: DDG JSON API                            | Baixo   | **P3**     |
-| F4   | F4.5 | UPG-10: `chatBatch` semáforo                    | Médio   | **P3**     |
-| F4   | F4.6 | UPG-11: `dialogLoopActive` via SSE              | Médio   | **P3**     |
-| F4   | F4.7 | UPG-12: teste integração ciclo stop/start       | Alto    | **P3**     |
-| F4   | F4.8 | UPG-02: OTLP nativa do SDK                      | Médio   | **P3**     |
-| F4   | F4.9 | UPG-08: versão semver em structured-message     | Baixo   | **P3**     |
-| F5   | F5.1 | ARCH-01: Zod schema para `session.json`         | Alto    | **P4**     |
-| F5   | F5.3 | ARCH-07: `/hub-health` no terminal server       | Baixo   | **P4**     |
-| F5   | F5.4 | ARCH-06: `.passthrough()` em respostas          | Baixo   | **P4**     |
+> **Legenda**: ✅ Concluído · 🔄 Em andamento · ⏳ Pendente · 🆕 Novo (proposta Fase 6)
 
-_Roadmap adicionado em 2026-03-30. Execução em ordem P0 → P1 → P2 → P3 → P4._
+| Fase | ID   | Item                                            | Esforço | Prioridade | Status |
+| ---- | ---- | ----------------------------------------------- | ------- | ---------- | ------ |
+| F0   | F0.1 | SDK-01: `onPermissionRequest` default           | Baixo   | **P0**     | ✅     |
+| F0   | F0.2 | SDK-03: sections nomeadas no system message     | Médio   | **P2**     | ✅     |
+| F0   | F0.3 | SDK-04: `getMessages()` guard + comentário      | Baixo   | **P3**     | ✅     |
+| F0   | F0.4 | SDK-07: `ping()` argumento verificar            | Baixo   | **P3**     | ✅     |
+| F0   | F0.5 | SDK-08: `client.stop()` no shutdown do agente   | Baixo   | **P1**     | ✅     |
+| F0   | F0.6 | SDK-09: remover forcing `overridesBuiltInTool`  | Médio   | **P2**     | ✅     |
+| F1   | F1.1 | CRIT-02: `writeTurn` lança exceção              | Baixo   | **P0**     | ✅     |
+| F1   | F1.2 | CRIT-04: `todo-tools.js` mutex                  | Médio   | **P0**     | ✅     |
+| F1   | F1.3 | CRIT-05: verificar double-emit `task.delta`     | Baixo   | **P0**     | ✅     |
+| F1   | F1.4 | CRIT-06: `chatBatch` documentar sequencial      | Baixo   | **P1**     | ✅     |
+| F1   | F1.5 | CRIT-07: `PinnedFilesLoader` Linux recursive    | Médio   | **P1**     | ✅     |
+| F2   | F2.1 | SEC-01: allowlist de executáveis                | Alto    | **P1**     | ✅     |
+| F2   | F2.2 | SEC-02: limitar tamanho leitura session files   | Baixo   | **P1**     | ✅     |
+| F2   | F2.3 | SEC-03: protect JSON.parse prototype pollution  | Baixo   | **P1**     | ✅     |
+| F2   | F2.4 | SEC-04: `timingSafeEqual` para token            | Baixo   | **P1**     | ✅     |
+| F2   | F2.5 | SEC-05: expandir BLOCKED_PATTERNS               | Baixo   | **P2**     | ✅     |
+| F2   | F2.6 | SEC-06: socket join session verificar ownership | Médio   | **P1**     | ✅     |
+| F2   | F2.7 | SEC-07: `rawApi` restringir a GET               | Baixo   | **P1**     | ✅     |
+| F2   | F2.8 | SEC-08: nota DNS rebinding + dns.lookup         | Médio   | **P2**     | ✅     |
+| F3   | F3.1 | MOD-01: limite `consecutive_unauthorized`       | Baixo   | **P2**     | ✅     |
+| F3   | F3.2 | MOD-02: MCP circuit breaker reset               | Baixo   | **P2**     | ✅     |
+| F3   | F3.3 | MOD-06: mutex geração sem race condition        | Médio   | **P2**     | ✅     |
+| F3   | F3.4 | MOD-08: `validatePath` async                    | Médio   | **P2**     | ✅     |
+| F3   | F3.5 | MOD-10: `onErrorOccurred` hierarchy fix         | Médio   | **P2**     | ✅     |
+| F3   | F3.6 | MOD-11: `getAuditSummary` async                 | Baixo   | **P2**     | ✅     |
+| F3   | F3.7 | MOD-12: `nerv-bridge.js` listener once          | Baixo   | **P2**     | ✅     |
+| F3   | F3.8 | LEVE-11: `git-tools.js` execFile                | Baixo   | **P2**     | ✅     |
+| F3   | F3.9 | LEVE-09: `lastPrInfo` cópia rasa                | Baixo   | **P3**     | ✅     |
+| F4   | F4.2 | UPG-03: `todo-tools.js` → SQLite                | Alto    | **P3**     | ⏳     |
+| F4   | F4.3 | UPG-06: `session.idle` para métricas            | Baixo   | **P3**     | ✅     |
+| F4   | F4.4 | UPG-09: DDG JSON API                            | Baixo   | **P3**     | ✅     |
+| F4   | F4.5 | UPG-10: `chatBatch` semáforo                    | Médio   | **P3**     | ✅     |
+| F4   | F4.6 | UPG-11: `dialogLoopActive` via SSE              | Médio   | **P3**     | ⏳     |
+| F4   | F4.7 | UPG-12: teste integração ciclo stop/start       | Alto    | **P3**     | ⏳     |
+| F4   | F4.8 | UPG-02: OTLP nativa do SDK                      | Médio   | **P3**     | ✅     |
+| F4   | F4.9 | UPG-08: versão semver em structured-message     | Baixo   | **P3**     | ✅     |
+| F5   | F5.1 | ARCH-01: Zod schema para `session.json`         | Alto    | **P4**     | ✅     |
+| F5   | F5.3 | ARCH-07: `/hub-health` no terminal server       | Baixo   | **P4**     | ✅     |
+| F5   | F5.4 | ARCH-06: `.passthrough()` em respostas          | Baixo   | **P4**     | ✅     |
+
+_Roadmap adicionado em 2026-03-30. Última atualização de status: 2026-04-01 (commit `0f05a717`)._
+
+---
+
+## 12. Fase 6 — Novas Propostas de Upgrades e Correções
+
+> **Data da proposta**: 2026-04-01  
+> **Contexto**: Com as Fases 0–5 concluídas (37 de 40 itens — F4.2, F4.6, F4.7 pendentes), estes são
+> os próximos melhoramentos mais impactantes identificados na análise do codebase.
+
+---
+
+### F6.1 — BUG-MOD-07: `repl.js` — `/restart` fecha `readyPromise` antes do loop parar
+
+**Arquivo**: `src/copilot/terminal/repl.js`  
+**Problema**: O listener `alwaysAliveAgent.once('dialog.ready', ...)` é registrado _antes_ de
+`stopDialogMode()`. Se o evento `dialog.ready` for emitido durante o stop, o `once` pode perdê-lo
+por race condition.  
+**Correção**:
+
+```js
+await llmBridgeClient.stopDialogMode();
+// Registrar APÓS o stop, garantindo que o próximo evento é o esperado
+const readyPromise = new Promise((resolve, reject) => {
+  const timeout = setTimeout(() => reject(new Error('restart timeout')), 30_000);
+  alwaysAliveAgent.once('dialog.ready', () => {
+    clearTimeout(timeout);
+    resolve();
+  });
+});
+await readyPromise;
+```
+
+**Esforço**: Baixo · **Prioridade**: P2 · **PR**: 0
+
+---
+
+### F6.2 — BUG-MOD-03: `hub-tools.js` — truncar `context` e `intent` em `hub_send_message`
+
+**Arquivo**: `src/copilot/tools/hub-tools.js`  
+**Problema**: `message` é truncado em 32 000 chars, mas `context` e `intent` (passados ao
+`chatStructured`) podem ser arbitrariamente longos.  
+**Correção**: Adicionar `safeContext = String(context ?? safeMessage).slice(0, 8_000)` e
+`safeIntent = String(intent ?? safeMessage).slice(0, 4_000)` antes de `chatStructured`.  
+**Esforço**: Baixo · **Prioridade**: P2 · **PR**: 0
+
+---
+
+### F6.3 — BUG-MOD-04: `server.js` — rate limiters separados para SSE vs HTTP
+
+**Arquivo**: `src/copilot/terminal/server.js`  
+**Problema**: SSE e operações HTTP POST compartilham o mesmo `_writeRateLimiter`, permitindo que
+POSTs normais esgotem a cota de conexões SSE.  
+**Correção**: Criar `_sseRateLimiter` separado (`maxEvents: 5, windowMs: 10_000`) para SSE, usado
+exclusivamente em conexões `GET /sse`.  
+**Esforço**: Médio · **Prioridade**: P2 · **PR**: 0
+
+---
+
+### F6.4 — BUG-MOD-05: `web-tools.js` — validar URLs de `uddg` param contra `PRIVATE_HOST_RE`
+
+**Arquivo**: `src/copilot/tools/web-tools.js`  
+**Problema**: Os URLs retornados de DDG (`uddg` param) não são validados contra `PRIVATE_HOST_RE`. O
+modelo poderia usar `web_fetch` para acessar uma URL interna sugestionada pelos resultados.  
+**Correção**: Após extrair URLs dos resultados DDG, filtrar via:
+
+```js
+results = results.filter((r) => {
+  try {
+    return !PRIVATE_HOST_RE.test(new URL(r.url).hostname);
+  } catch {
+    return false;
+  }
+});
+```
+
+**Esforço**: Baixo · **Prioridade**: P2 · **PR**: 0
+
+---
+
+### F6.5 — BUG-MOD-09: `orchestrator.js` — limpar `#inflightBySession` em `closeSession`
+
+**Arquivo**: `src/copilot/conversation-hub/orchestrator.js`  
+**Problema**: Se `sendToLlmB()` for chamado concomitantemente ao `closeSession()`, a entrada
+deletada pode ser re-inserida no Map, criando entradas "zumbi".  
+**Correção**: Usar um Set de sessões fechadas `_closedSessions` antes do delete; em `sendToLlmB`,
+verificar se a sessão está no Set antes de re-inserir:
+
+```js
+if (this._closedSessions?.has(hubSessionId)) return;
+```
+
+**Esforço**: Médio · **Prioridade**: P2 · **PR**: 0
+
+---
+
+### F6.6 — BUG-MOD-14: `client.js` — logar `traceId`/`correlationId` no `writeTurn`
+
+**Arquivo**: `src/copilot/channel/client.js`, `src/copilot/conversation-hub/store.js`  
+**Problema**: `buildStructuredRequest()` gera `traceId`/`correlationId` via `crypto.randomUUID()`
+mas nunca persiste esses valores, impedindo correlação de turnos para debug.  
+**Correção**: Passar `traceId` e `correlationId` como `metadata` ao `writeTurn()`. Adicionar coluna
+`metadata JSON` (nullable) na tabela `copilot_conversation_turns` se ainda não existir.  
+**Esforço**: Médio · **Prioridade**: P3 · **PR**: 0
+
+---
+
+### F6.7 — BUG-MOD-15: `entry.js` — `pingClient.forceStop()` com optional chaining
+
+**Arquivo**: `src/copilot/agent/entry.js`  
+**Problema**: `pingClient.stop()` chamado em cliente não-iniciado can ter comportamento indefinido
+em versões futuras do SDK.  
+**Correção**: `pingClient.forceStop?.().catch(() => {})` — usar `forceStop` com optional chaining.  
+**Esforço**: Baixo · **Prioridade**: P3 · **PR**: 0
+
+---
+
+### F6.8 — UPG-04: `handleInject` — suporte a `type: 'blob'` para attachments em memória
+
+**Arquivo**: `src/copilot/terminal/http-handlers.js`  
+**Problema**: O SDK v0.2.0 adicionou `type: 'blob'` para attachments base64. O handler de `/inject`
+aceita `type: 'file'` e `type: 'directory'`, mas não `blob`.  
+**Correção**:
+
+```js
+if (attach.type === 'blob' && typeof attach.data === 'string') {
+  return {
+    type: 'blob',
+    mimeType: attach.mimeType ?? 'application/octet-stream',
+    data: Buffer.from(attach.data, 'base64'),
+  };
+}
+```
+
+**Esforço**: Baixo · **Prioridade**: P3 · **PR**: 0
+
+---
+
+### F6.9 — UPG-05: `getLastNPairs` — cursor-based em vez de slice linear
+
+**Arquivo**: `src/copilot/channel/client.js`  
+**Problema**: `getLastNPairs` usa slice O(n) em históricos longos (500+ entradas por sessão).  
+**Correção**: Manter índice do último par visto numa propriedade interna `_lastPairIdx` e navegar do
+fim para o início em O(n) mas sem recriar array:
+
+```js
+getLastNPairs(n) {
+    const pairs = [];
+    let i = this._history.length - 1;
+    while (i >= 0 && pairs.length < n) {
+        if (this._history[i].role === 'assistant') {
+            const j = i - 1;
+            if (j >= 0 && this._history[j].role === 'user') {
+                pairs.unshift({ user: this._history[j], assistant: this._history[i] });
+                i = j - 1; continue;
+            }
+        }
+        i--;
+    }
+    return pairs;
+}
+```
+
+**Esforço**: Médio · **Prioridade**: P4 · **PR**: 0
+
+---
+
+### F6.10 — UPG-13: `ConversationStore` — WAL mode + cache explícito na inicialização
+
+**Arquivo**: `src/copilot/conversation-hub/store.js`  
+**Problema**: Não há verificação de que o SQLite foi aberto com WAL mode e cache otimizado.  
+**Correção**: Na inicialização do store, adicionar:
+
+```js
+this.#db.pragma('journal_mode=WAL');
+this.#db.pragma('synchronous=NORMAL');
+this.#db.pragma('cache_size=-32000'); // 32 MB
+this.#db.pragma('temp_store=MEMORY');
+```
+
+**Esforço**: Baixo · **Prioridade**: P3 · **PR**: 0
+
+---
+
+### F6.11 — UPG-14: `BUG-LEVE-06`: `alias-store.js` — detectar loops de alias
+
+**Arquivo**: `src/copilot/bridges/alias-store.js`  
+**Problema**: Loops de alias (`/a` → `/b` → `/a`) são silenciosos; o usuário nunca sabe que o alias
+está em ciclo.  
+**Correção**: Detectar loop via Set de aliases visitados:
+
+```js
+const visited = new Set();
+while (alias && !visited.has(alias)) {
+  visited.add(alias);
+  alias = this._store.get(alias);
+}
+if (visited.has(alias)) throw new Error(`Loop detectado em alias: ${[...visited].join(' → ')}`);
+```
+
+**Esforço**: Baixo · **Prioridade**: P3 · **PR**: 0
+
+---
+
+### F6.12 — UPG-15: `sdk-03` (restante) — usar `SYSTEM_PROMPT_SECTIONS` com sections nomeadas completo
+
+**Arquivo**: `src/copilot/config/system-prompt.js`, `src/copilot/agent/session-manager.js`  
+**Contexto**: F0.2 migrou `buildHookContextAppendMessage` para sections, mas as constantes
+`SYSTEM_PROMPT_SECTIONS` definidas em `system-prompt.js` ainda não são importadas do SDK
+(`import { SYSTEM_PROMPT_SECTIONS } from '@github/copilot-sdk'`). Usar as constantes do SDK garante
+que os nomes estão corretos mesmo em atualizações futuras.  
+**Correção**: Substituir constantes locais pelas do SDK onde possível.  
+**Esforço**: Baixo · **Prioridade**: P3 · **PR**: 0
+
+---
+
+### F6.13 — NOVO: `session-rpc-tools.js` — substituir `session.rpc.*` por API pública
+
+**Arquivo**: `src/copilot/tools/session-rpc-tools.js`  
+**Problema** (SDK-05): `session.rpc.mode.get()`, `session.rpc.plan.read()` etc. são APIs JSON-RPC
+internas do CLI sem tipagem e sem garantia de estabilidade. O SDK v0.2.0 expõe `session.setModel()`
+como API pública.  
+**Correção**: Mapear cada chamada `session.rpc.*` para o equivalente público do SDK. Para RPCs sem
+equivalente público, adicionar `// SDK-05: API interna — risco de quebra em atualizações` e
+empacotar em try/catch com fallback gracioso.  
+**Esforço**: Alto · **Prioridade**: P3 · **PR**: 0
+
+---
+
+### F6.14 — NOVO: `dialog-watchdog.js` — renomear `stallMs` para `stallThresholdMs`
+
+**Arquivo**: `src/copilot/agent/dialog-watchdog.js`  
+**Problema** (BUG-LEVE-01): Nome ambíguo — `stallMs` pode ser confundido com o tempo decorrido em
+milissegundos vs o limiar threshold.  
+**Correção**: Renomear campo privado `#stallMs` → `#stallThresholdMs` e atualizar referências
+internas.  
+**Esforço**: Baixo · **Prioridade**: P4 · **PR**: 0
+
+---
+
+### F6.15 — NOVO: `gh-bridge.js` — adicionar conclusão `timed_out` ao `runIcon`
+
+**Arquivo**: `src/copilot/bridges/gh-bridge.js`  
+**Problema** (BUG-LEVE-02): `runIcon` mapeia `cancelled` mas não `timed_out`, retornando `'⚠️'`
+genérico para runs que deram timeout.  
+**Correção**: Adicionar `case 'timed_out': return '⏱️';` ao switch de conclusão.  
+**Esforço**: Baixo · **Prioridade**: P4 · **PR**: 0
+
+---
+
+### F6.16 — NOVO: `todos-tools.js` — relatar subtarefas desvinculadas em `todo_delete`
+
+**Arquivo**: `src/copilot/tools/todo-tools.js`  
+**Problema** (BUG-LEVE-10): Com `cascade: false`, subtarefas são "orfanizadas" sem o modelo saber
+quantas foram afetadas.  
+**Correção**: Retornar `orphaned: [ids]` na resposta do `todoDeleteTool` quando `cascade: false`.  
+**Esforço**: Baixo · **Prioridade**: P4 · **PR**: 0
+
+---
+
+### F6.17 — NOVO: `store.js` — deduplicar índices parciais redundantes
+
+**Arquivo**: `src/copilot/conversation-hub/store.js`  
+**Problema** (BUG-LEVE-03): `idx_conv_turns_user_unread` e `idx_conv_turns_unread` têm overlap, com
+dois índices parciais cobrindo casos similares.  
+**Correção**: Revisar se ambos são utilizados nos queries de `getPendingUserMessages`; remover o
+redundante ou consolidar em um único índice composto.  
+**Esforço**: Baixo · **Prioridade**: P4 · **PR**: 0
+
+---
+
+### Tabela Resumo — Fase 6 (Novas Propostas)
+
+| ID    | Item                                             | Esforço | Prioridade | Status |
+| ----- | ------------------------------------------------ | ------- | ---------- | ------ |
+| F6.1  | `/restart` race condition em `repl.js`           | Baixo   | **P2**     | ⏳     |
+| F6.2  | Truncar `context`/`intent` em `hub_send_message` | Baixo   | **P2**     | ⏳     |
+| F6.3  | Rate limiter separado SSE vs HTTP                | Médio   | **P2**     | ⏳     |
+| F6.4  | Validar URLs DDG contra `PRIVATE_HOST_RE`        | Baixo   | **P2**     | ⏳     |
+| F6.5  | `#inflightBySession` proteção zumbi              | Médio   | **P2**     | ⏳     |
+| F6.6  | Logar `traceId` no `writeTurn`                   | Médio   | **P3**     | ⏳     |
+| F6.7  | `pingClient.forceStop()` com optional chaining   | Baixo   | **P3**     | ⏳     |
+| F6.8  | `handleInject` suporte `type: 'blob'`            | Baixo   | **P3**     | ⏳     |
+| F6.9  | `getLastNPairs` cursor-based                     | Médio   | **P4**     | ⏳     |
+| F6.10 | SQLite WAL mode + cache na inicialização         | Baixo   | **P3**     | ⏳     |
+| F6.11 | `alias-store.js` detectar loops de alias         | Baixo   | **P3**     | ⏳     |
+| F6.12 | `SYSTEM_PROMPT_SECTIONS` do SDK (constantes)     | Baixo   | **P3**     | ⏳     |
+| F6.13 | `session-rpc-tools.js` → API pública SDK         | Alto    | **P3**     | ⏳     |
+| F6.14 | Renomear `stallMs` → `stallThresholdMs`          | Baixo   | **P4**     | ⏳     |
+| F6.15 | `gh-bridge.js` → `timed_out` em `runIcon`        | Baixo   | **P4**     | ⏳     |
+| F6.16 | `todoDeleteTool` relatar subtarefas orfanizadas  | Baixo   | **P4**     | ⏳     |
+| F6.17 | Deduplicar índices parciais em `store.js`        | Baixo   | **P4**     | ⏳     |
+
+---
+
+_Roadmap adicionado em 2026-03-30. Última atualização de status: 2026-04-01 (commit `0f05a717`).  
+Fase 6 proposta em 2026-04-01 após conclusão das Fases 0–5._
