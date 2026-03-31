@@ -302,17 +302,18 @@ export class LlmBridgeClient {
     }
 
     /**
-     * UPG-06: Envia múltiplas mensagens em sequência, retornando um array de resultados.
+     * UPG-06: Envia múltiplas mensagens com controle de concorrência via semáforo.
      *
-     * Nota: como AlwaysAliveAgent serializa a fila, não há paralelismo real. A vantagem é que LLM-A não precisa
-     * gerenciar futures manualmente — batches são entregues na ordem recebida.
+     * Cada "slot" de concorrência é uma chain de Promises. Mensagens são atribuídas ciclicamente aos slots, garantindo
+     * que até `concurrency` mensagens rodem simultâneas. Com `concurrency=1` (padrão), o comportamento é puramente
+     * sequencial — preservando histórico de conversa.
      *
      * @remarks
-     *   **BUG-CRIT-06 (documentado)**: Esta implementação é SEQUENCIAL, não paralela. Cada mensagem aguarda reply
-     *   completo antes de enviar a próxima (preserva histórico de conversa). Para paralelismo real, use múltiplas
-     *   instâncias ou aguarde UPG-10 (semáforo de concorrência).
-     * @param {string[]} messages - Mensagens a enviar em sequência
+     *   **BUG-CRIT-06 (documentado)**: AlwaysAliveAgent serializa internamente a fila — paralelismo real exige múltiplas
+     *   instâncias. O semáforo aqui controla a taxa de submissão ao agente.
+     * @param {string[]} messages - Mensagens a enviar
      * @param {{
+     *     concurrency?: number;
      *     timeout?: number;
      *     onDelta?: (chunk: string) => void;
      * }} [opts]
@@ -324,18 +325,24 @@ export class LlmBridgeClient {
      * >}
      */
     async chatBatch(messages, opts = {}) {
-        // BUG-HIGH-08 (fix): Promise.all disparava todas as mensagens em paralelo,
-        // corrompendo histórico de conversa. Loop sequencial preserva a ordem.
-        /** @type {(ChatResult | { error: string; response: null; taskId: string; durationMs: number })[]} */
-        const results = [];
-        for (const msg of messages) {
-            try {
-                results.push(await this.chat(msg, opts));
-            } catch (/** @type {any} */ err) {
-                results.push({ error: err.message, response: null, taskId: '', durationMs: 0 });
-            }
-        }
-        return results;
+        const { concurrency = 1, ...chatOpts } = opts;
+        const slots = Array.from({ length: Math.max(1, concurrency) }, () => Promise.resolve());
+        /** @type {Promise<ChatResult | { error: string; response: null; taskId: string; durationMs: number }>[]} */
+        const pending = messages.map((msg, i) => {
+            const slot = i % slots.length;
+            /** @type {Promise<ChatResult | { error: string; response: null; taskId: string; durationMs: number }>} */
+            const next = (slots[slot] ?? Promise.resolve()).then(() =>
+                this.chat(msg, chatOpts).catch((/** @type {any} */ err) => ({
+                    error: err.message,
+                    response: /** @type {null} */ (null),
+                    taskId: '',
+                    durationMs: 0,
+                })),
+            );
+            slots[slot] = next.then(() => undefined);
+            return next;
+        });
+        return Promise.all(pending);
     }
 
     /**

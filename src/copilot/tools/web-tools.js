@@ -253,7 +253,90 @@ const webSearchTool = buildTool({
         }
 
         const limit = maxResults ?? 5;
-        // DDG HTML endpoint (leve, sem JavaScript, sem rastreamento)
+
+        // F4.4 (UPG-09): tenta DDG Instant Answer JSON API primeiro (não requer JS, sem scraping frágil)
+        const jsonUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 15_000);
+
+            let response;
+            try {
+                response = await fetch(jsonUrl, {
+                    method: 'GET',
+                    signal: controller.signal,
+                    redirect: 'follow',
+                    headers: {
+                        'User-Agent': 'github-copilot-agent/1.0',
+                        Accept: 'application/json',
+                    },
+                });
+            } finally {
+                clearTimeout(timer);
+            }
+
+            if (response.ok) {
+                /** @type {any} */
+                const data = await response.json();
+
+                /** @type {{ title: string; url: string; snippet: string }[]} */
+                const results = [];
+
+                // AbstractText (resposta direta para queries com resultado instantâneo)
+                if (data.AbstractText && data.AbstractURL) {
+                    results.push({
+                        title: data.Heading ?? query,
+                        url: data.AbstractURL,
+                        snippet: data.AbstractText,
+                    });
+                }
+
+                // RelatedTopics: array de tópicos relacionados
+                const topics = Array.isArray(data.RelatedTopics) ? data.RelatedTopics : [];
+                for (const topic of topics) {
+                    if (results.length >= limit) break;
+                    // Tópicos simples têm FirstURL e Text
+                    if (topic.FirstURL && topic.Text) {
+                        results.push({
+                            title: topic.Text.split(' - ')[0]?.trim() ?? topic.Text,
+                            url: topic.FirstURL,
+                            snippet: topic.Text,
+                        });
+                    }
+                    // Tópicos agrupados têm Topics[]
+                    if (Array.isArray(topic.Topics)) {
+                        for (const sub of topic.Topics) {
+                            if (results.length >= limit) break;
+                            if (sub.FirstURL && sub.Text) {
+                                results.push({
+                                    title: sub.Text.split(' - ')[0]?.trim() ?? sub.Text,
+                                    url: sub.FirstURL,
+                                    snippet: sub.Text,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                if (results.length > 0) {
+                    log('INFO', `[copilot/web_search] DDG JSON API: query="${query}" → ${results.length} resultados`);
+                    return { success: true, query, results: results.slice(0, limit) };
+                }
+                // Sem resultados JSON — cai para HTML scraping
+                log(
+                    'WARN',
+                    `[copilot/web_search] DDG JSON API retornou 0 resultados para query="${query}" — usando HTML scraping`,
+                );
+            }
+        } catch (/** @type {any} */ e) {
+            if (e?.name === 'AbortError') {
+                return { success: false, error: 'Timeout (15s)' };
+            }
+            log('WARN', `[copilot/web_search] DDG JSON API falhou (${e?.message ?? e}) — usando HTML scraping`);
+        }
+
+        // Fallback: HTML scraping DDG Lite
         const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
 
         try {

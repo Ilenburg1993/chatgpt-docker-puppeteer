@@ -87,6 +87,14 @@ export async function executeTask(session, task, callbacks) {
         });
     });
 
+    // F4.3 (UPG-06): captura o timestamp exato de session.idle para durationMs preciso
+    const startTime = Date.now();
+    /** @type {number | undefined} */
+    let idleTime;
+    const unsubIdle = session.on('session.idle', () => {
+        idleTime = Date.now();
+    });
+
     try {
         const sendOpts = /** @type {import('@github/copilot-sdk').MessageOptions} */ ({
             prompt: task.message,
@@ -94,8 +102,9 @@ export async function executeTask(session, task, callbacks) {
         });
         const event = await session.sendAndWait(sendOpts, task.timeoutMs ?? 60_000);
         const text = event?.data?.content ?? '';
+        const durationMs = (idleTime ?? Date.now()) - startTime;
         setStatus('idle');
-        emit('task.completed', { taskId: task.id, response: text, responseLen: text.length });
+        emit('task.completed', { taskId: task.id, response: text, responseLen: text.length, durationMs });
         task.resolve(text);
     } catch (/** @type {any} */ e) {
         // Tenta reconectar com backoff exponencial se parecer erro de rede/sessão
@@ -129,6 +138,7 @@ export async function executeTask(session, task, callbacks) {
         unsubDelta();
         unsubToolStart();
         unsubToolComplete();
+        unsubIdle();
         scheduleNext();
     }
 }

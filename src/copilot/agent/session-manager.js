@@ -17,8 +17,38 @@ import { approveAll } from '@github/copilot-sdk';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { access, appendFile, mkdir, readFile, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { z } from 'zod';
 import { buildCustomAgentsConfig } from '../config/custom-agents.js';
 import { pickDefined } from '../lib/utils.js';
+
+// ─── F5.1 (ARCH-01): Schema Zod para session.json ────────────────────────────
+
+/**
+ * Schema Zod para validação de session.json do hook system.
+ *
+ * Usa .passthrough() para tolerar campos adicionais de outras versões do hook.
+ */
+const SessionJsonSchema = z
+    .object({
+        close_key: z
+            .string()
+            .regex(/^[a-zA-Z0-9_-]{1,64}$/)
+            .optional(),
+        strict_turn_close: z.boolean().optional(),
+        current_turn: z
+            .object({
+                number: z.number().int().min(0),
+            })
+            .passthrough()
+            .optional(),
+        compliance: z
+            .object({
+                consecutive_unauthorized: z.number().int().min(0).max(9999),
+            })
+            .passthrough()
+            .optional(),
+    })
+    .passthrough();
 
 // AI.1: carregar configuração de tools persistida ao iniciar o módulo
 loadToolsConfig();
@@ -110,7 +140,12 @@ export async function buildHookSystemContext() {
     try {
         await access(SESSION_JSON_FILE);
         const raw = await readFile(SESSION_JSON_FILE, 'utf8');
-        const state = JSON.parse(raw);
+        // F5.1 (ARCH-01): valida session.json com schema Zod para detectar corrupcao precocemente
+        const parseResult = SessionJsonSchema.safeParse(JSON.parse(raw));
+        if (!parseResult.success) {
+            log('WARN', `[session-manager] session.json com estrutura inválida: ${parseResult.error.message}`);
+        }
+        const state = parseResult.success ? parseResult.data : JSON.parse(raw);
         // SEC-VULN-03 (fix): validar e sanitizar todos os valores de session.json
         // antes de usá-los no system prompt para prevenir prompt injection
         const rawConsecutive = state?.compliance?.consecutive_unauthorized;

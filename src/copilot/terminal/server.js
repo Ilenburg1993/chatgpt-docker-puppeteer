@@ -56,6 +56,7 @@ import {
     handleGitLog,
     handleGitStatus,
     handleHealth,
+    handleHubHealth,
     handleInject,
     handleListSessions,
     handleListTurns,
@@ -224,6 +225,14 @@ export function createInjectServer() {
             // /health é isento de auth para permitir healthchecks sem token
             if (req.method === 'GET' && url.pathname === '/health') {
                 sendJson(res, handleHealth());
+                return;
+            }
+
+            // ── GET /hub-health ───────────────────────────────────────────────
+            // F5.3 (ARCH-07): verifica saúde do ConversationHub e do DB SQLite
+            // Isento de auth para facilitar monitoramento externo
+            if (req.method === 'GET' && url.pathname === '/hub-health') {
+                sendJson(res, handleHubHealth());
                 return;
             }
 

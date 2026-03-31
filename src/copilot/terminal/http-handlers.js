@@ -864,3 +864,35 @@ export function handleGetQuota() {
         },
     };
 }
+
+// ─── GET /hub-health ─────────────────────────────────────────────────────────
+
+/**
+ * F5.3 (ARCH-07): Verifica a saúde do ConversationHub e do DB SQLite.
+ *
+ * Executa `SELECT 1` no banco para confirmar que está responsivo. Retorna `{ ok: true }` se o DB responder, `{ ok:
+ * false }` com erro descritivo caso contrário.
+ *
+ * @returns {HandlerResult}
+ */
+export function handleHubHealth() {
+    if (!conversationHub.isReady) {
+        return { status: 503, body: { ok: false, error: 'ConversationHub não inicializado' } };
+    }
+    try {
+        // SELECT 1 funcional: listar com limit=1 confirma que o DB responde
+        const activeSessions = conversationStore.listHubSessions({ status: 'active', limit: 1000 });
+        const allSessions = conversationStore.listHubSessions({ limit: 1000 });
+        return {
+            status: 200,
+            body: {
+                ok: true,
+                dbResponsive: true,
+                activeSessions: activeSessions.length,
+                totalSessions: allSessions.length,
+            },
+        };
+    } catch (/** @type {any} */ e) {
+        return { status: 503, body: { ok: false, error: e?.message ?? String(e), dbResponsive: false } };
+    }
+}

@@ -93,7 +93,10 @@ export const PRIORITY_LEVELS = /** @type {const} */ ({
 export const StructuredMessageSchema = z
     .object({
         /** Versão do protocolo (para evolução futura) */
-        version: z.string().default('1.0'),
+        version: z
+            .string()
+            .regex(/^\d+\.\d+(\.\d+)?$/, 'version deve ser semver (ex: 1.0 ou 1.0.0)')
+            .default('1.0'),
 
         /** Resumo do estado atual ou briefing relevante */
         context: z.string().min(1, 'context é obrigatório'),
@@ -141,6 +144,16 @@ export const StructuredMessageSchema = z
     // UPG-PROP-03 (fix): .strict() rejeita campos desconhecidos enviados pelo LLM — evita campos
     // proprietários sendo silenciosamente ignorados e garante fidelidade ao protocolo v1.0.
     .strict();
+
+/**
+ * Schema para parsing de respostas LLM-B — usa `.passthrough()` para tolerar campos adicionais.
+ *
+ * F5.4 (ARCH-06): LLM-B pode retornar campos extras não definidos no protocolo v1.0. Usar `.passthrough()` aqui evita
+ * que respostas válidas sejam rejeitadas por campos desconhecidos.
+ *
+ * @internal Use apenas em parseStructuredResponse(), não para validar requests.
+ */
+const StructuredMessageResponseSchema = StructuredMessageSchema.passthrough();
 
 // ─── Tipos TypeScript/JSDoc ───────────────────────────────────────────────────
 
@@ -331,6 +344,9 @@ export function isStructuredMessage(value) {
 /**
  * Tenta fazer parse de uma string JSON e validar como StructuredMessage.
  *
+ * F5.4 (ARCH-06): usa StructuredMessageResponseSchema (.passthrough()) para tolerar campos extras que LLM-B possa
+ * retornar, evitando rejeição de respostas válidas por campos desconhecidos.
+ *
  * @private
  * @param {string} text - Texto JSON candidato
  * @returns {StructuredMessage | null} Mensagem validada ou null
@@ -338,7 +354,7 @@ export function isStructuredMessage(value) {
 function _tryParseJson(text) {
     try {
         const obj = JSON.parse(text);
-        const result = StructuredMessageSchema.safeParse(obj);
+        const result = StructuredMessageResponseSchema.safeParse(obj);
         return result.success ? /** @type {StructuredMessage} */ (result.data) : null;
     } catch {
         return null;
