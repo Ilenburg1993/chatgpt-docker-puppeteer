@@ -18,6 +18,7 @@
 
 import { MAX_QUEUE_SIZE } from '#copilot/core/constants';
 import { SessionError } from '#copilot/core/errors';
+import { raceEvents, waitForEvent } from '#copilot/lib/event-helpers';
 import {
     createRegistry,
     createTelemetry,
@@ -481,157 +482,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             // Wiring de eventos de compaction para observabilidade via SSE/NERV
             // BUG-AA-03 (fix): session.on() retorna () => void (não this) — armazenar para cleanup no stop/reconnect.
             this.#sessionEventUnsubscribers = [];
-            this.#sessionEventUnsubscribers.push(
-                session.on('session.compaction_start', (/** @type {any} */ evt) => {
-                    log('INFO', '[AlwaysAlive] Compaction iniciada (sessão infinita).');
-                    this.emit('session.compaction_start', evt?.data ?? {});
-                }),
-            );
-            this.#sessionEventUnsubscribers.push(
-                session.on('session.compaction_complete', (/** @type {any} */ evt) => {
-                    const data = evt?.data ?? {};
-                    // AC.2: detectar falha de compaction e logar instrução de recovery com checkpointPath
-                    if (data.success === false) {
-                        log('ERROR', '[AlwaysAlive] Compaction falhou. Sessão pode estar instável.');
-                        if (data.checkpointPath) {
-                            log(
-                                'WARN',
-                                `[AlwaysAlive] Checkpoint disponível: ${data.checkpointPath}. Para recovery manual, restaure esse arquivo e reinicie.`,
-                            );
-                        }
-                    } else {
-                        log('INFO', '[AlwaysAlive] Compaction concluída.');
-                    }
-                    // AC.3: armazenar info de checkpoint no estado para exposição via getStatusSnapshot()
-                    if (data.checkpointPath) {
-                        this.#lastCheckpointPath = data.checkpointPath;
-                    }
-                    this.emit('session.compaction_complete', data);
-                    // UPG-N15 (fix): emitir evento canônico 'context:compacted' para observabilidade externa
-                    const snap = this.getStatusSnapshot();
-                    this.emit('context:compacted', {
-                        sessionId: snap?.sessionId ?? null,
-                        ts: Date.now(),
-                        checkpoint: data.checkpointPath ?? null,
-                    });
-                }),
-            );
-
-            // Reasoning tokens (o3/o4-mini extended thinking) — forwarded via task.reasoning
-            this.#sessionEventUnsubscribers.push(
-                session.on('assistant.reasoning_delta', (/** @type {any} */ evt) => {
-                    const chunk = evt?.data?.deltaContent ?? '';
-                    if (chunk) this.emit('task.reasoning', { chunk, reasoningId: evt?.data?.reasoningId ?? null });
-                }),
-            );
-
-            // BUG-HIGH-03 (fix): streaming de delta também no modo dialog loop
-            // BUG-CRIT-05 (fix): listener global apenas para dialog-loop (status !== 'processing')
-            // — evita double-emit com o listener de task-executor.js durante execução de tarefa
-            this.#sessionEventUnsubscribers.push(
-                session.on('assistant.message_delta', (/** @type {any} */ evt) => {
-                    if (this.#status === 'processing') return; // task-executor.js já emite
-                    const chunk = evt?.data?.deltaContent ?? evt?.data?.content ?? '';
-                    if (chunk) this.emit('task.delta', { taskId: null, chunk });
-                }),
-            );
-
-            // Uso de tokens e contexto da sessão — forwarded via session.usage
-            // MELHORIA-02: emite session.token_budget_warning quando uso > 80%
-            // MELHORIA-05: na 1ª leitura após retomada, alerta se uso já > 70% (contexto pesado)
-            // AA.1: armazena em #contextState para exposição via getStatusSnapshot() e /context
-            let _firstUsageChecked = false;
-            this.#sessionEventUnsubscribers.push(
-                session.on('session.usage_info', (/** @type {any} */ evt) => {
-                    const data = evt?.data ?? {};
-                    this.emit('session.usage', data);
-                    const { currentTokens, tokenLimit } = data;
-                    if (tokenLimit > 0) {
-                        const ratio = Math.round((currentTokens / tokenLimit) * 100);
-                        // AA.1: atualizar estado de contexto com dados reais do SDK
-                        this.#contextState = {
-                            tokens: currentTokens,
-                            tokenLimit,
-                            utilization: currentTokens / tokenLimit,
-                        };
-                        // MELHORIA-05: alerta proativo na 1ª leitura se sessão retomada com contexto pesado
-                        if (!_firstUsageChecked && isResumed && currentTokens / tokenLimit > 0.7) {
-                            log(
-                                'WARN',
-                                `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
-                            );
-                            this.emit('session.token_budget_warning', {
-                                currentTokens,
-                                tokenLimit,
-                                ratio,
-                                reason: 'startup_heavy',
-                            });
-                        }
-                        _firstUsageChecked = true;
-                        // MELHORIA-02: warning contínuo quando uso > 80%
-                        if (currentTokens / tokenLimit > 0.8) {
-                            log(
-                                'WARN',
-                                `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
-                            );
-                            this.emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
-                        }
-                    }
-                }),
-            );
-
-            // Mudança de modo (plan ↔ act ↔ interactive) — forwarded via session.mode_changed
-            this.#sessionEventUnsubscribers.push(
-                session.on('session.mode_changed', (/** @type {any} */ evt) => {
-                    log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.previousMode} → ${evt?.data?.newMode}`);
-                    this.emit('session.mode_changed', evt?.data ?? {});
-                }),
-            );
-
-            // BUG-AA-11 (fix): substituir session.onEvent() (privado/não-documentado) por session.on(handler)
-            // que é a API pública do SDK 0.2.0. Retorna () => void → armazenar para cleanup.
-            this.#sessionEventUnsubscribers.push(
-                session.on((/** @type {any} */ evt) => {
-                    const kind = evt?.kind ?? evt?.type ?? 'unknown';
-
-                    // RF-PR-03: detectar assistant.usage para billing real-time
-                    if (kind === 'assistant.usage') {
-                        const data = evt?.data ?? {};
-                        const { model, cost, quotaSnapshots } = data;
-                        log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
-                        // RF-PR-04: persistir em memória para GET /quota
-                        this.#lastPrInfo = { model, cost, quotaSnapshots, ts: Date.now() };
-                        this.emit('pr.consumed', { model, cost, quotaSnapshots, ts: Date.now() });
-                        // RF-PR-02: marcar que o PR foi consumido para o turno pendente
-                        // RF-PR-04: persistir dados de quota para o endpoint GET /quota
-                        writeStateAsync({
-                            pendingTurnConsumedPR: true,
-                            lastPrConsumedAt: Date.now(),
-                            lastPrModel: model ?? '',
-                            lastPrCost: cost ?? 0,
-                            lastQuotaSnapshots: quotaSnapshots ?? null,
-                        }).catch((/** @type {any} */ e) =>
-                            log('WARN', `[AlwaysAlive] writeState pendingTurnConsumedPR: ${e.message}`),
-                        );
-                        return;
-                    }
-
-                    const knownEvents = new Set([
-                        'session.compaction_start',
-                        'session.compaction_complete',
-                        'assistant.reasoning_delta',
-                        'session.usage_info',
-                        'session.mode_changed',
-                        'assistant.message_delta',
-                        'tool.execution_start',
-                        'tool.execution_complete',
-                        'assistant.usage',
-                    ]);
-                    if (!knownEvents.has(kind)) {
-                        log('DEBUG', `[AlwaysAlive] Evento SDK não tratado: kind=${kind}`);
-                    }
-                }),
-            );
+            this.#wireSessionEvents(session, isResumed);
 
             this.#setStatus('idle');
             // PERF-01 (fix): inicializar contador em memória a partir do estado persistido
@@ -684,11 +535,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         // BUG-07 (fix): aguardar conclusão do boot antes de parar
         if (this.#status === 'starting') {
             log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
-            await Promise.race([
-                new Promise((r) => this.once('ready', r)),
-                new Promise((r) => this.once('error', r)),
-                new Promise((r) => setTimeout(r, 15_000)),
-            ]);
+            await raceEvents(this, ['ready', 'error'], { timeoutMs: 15_000 }).catch(() => {});
         }
 
         // Se estiver processando uma tarefa, aguarda ela terminar (com timeout)
@@ -770,6 +617,159 @@ export class AlwaysAliveAgent extends EventEmitter {
         }
 
         this.emit('stopped');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Session Event Wiring (extraído de start() para clareza — D.4)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Registra todos os listeners de eventos da sessão SDK e popula `#sessionEventUnsubscribers`. Extraído de `start()`
+     * para reduzir a complexidade ciclomática do boot.
+     *
+     * @param {CopilotSession} session
+     * @param {boolean} isResumed
+     * @returns {void}
+     */
+    #wireSessionEvents(session, isResumed) {
+        // Compaction start
+        this.#sessionEventUnsubscribers.push(
+            session.on('session.compaction_start', (/** @type {any} */ evt) => {
+                log('INFO', '[AlwaysAlive] Compaction iniciada (sessão infinita).');
+                this.emit('session.compaction_start', evt?.data ?? {});
+            }),
+        );
+
+        // Compaction complete — com detecção de falha (AC.2) e checkpoint (AC.3)
+        this.#sessionEventUnsubscribers.push(
+            session.on('session.compaction_complete', (/** @type {any} */ evt) => {
+                const data = evt?.data ?? {};
+                if (data.success === false) {
+                    log('ERROR', '[AlwaysAlive] Compaction falhou. Sessão pode estar instável.');
+                    if (data.checkpointPath) {
+                        log(
+                            'WARN',
+                            `[AlwaysAlive] Checkpoint disponível: ${data.checkpointPath}. Para recovery manual, restaure esse arquivo e reinicie.`,
+                        );
+                    }
+                } else {
+                    log('INFO', '[AlwaysAlive] Compaction concluída.');
+                }
+                if (data.checkpointPath) {
+                    this.#lastCheckpointPath = data.checkpointPath;
+                }
+                this.emit('session.compaction_complete', data);
+                // UPG-N15 (fix): emitir evento canônico 'context:compacted' para observabilidade externa
+                const snap = this.getStatusSnapshot();
+                this.emit('context:compacted', {
+                    sessionId: snap?.sessionId ?? null,
+                    ts: Date.now(),
+                    checkpoint: data.checkpointPath ?? null,
+                });
+            }),
+        );
+
+        // Reasoning tokens (o3/o4-mini extended thinking)
+        this.#sessionEventUnsubscribers.push(
+            session.on('assistant.reasoning_delta', (/** @type {any} */ evt) => {
+                const chunk = evt?.data?.deltaContent ?? '';
+                if (chunk) this.emit('task.reasoning', { chunk, reasoningId: evt?.data?.reasoningId ?? null });
+            }),
+        );
+
+        // BUG-HIGH-03 / BUG-CRIT-05: streaming de delta apenas para dialog-loop (status !== 'processing')
+        this.#sessionEventUnsubscribers.push(
+            session.on('assistant.message_delta', (/** @type {any} */ evt) => {
+                if (this.#status === 'processing') return;
+                const chunk = evt?.data?.deltaContent ?? evt?.data?.content ?? '';
+                if (chunk) this.emit('task.delta', { taskId: null, chunk });
+            }),
+        );
+
+        // Token usage + context window — MELHORIA-02/05/AA.1
+        let _firstUsageChecked = false;
+        this.#sessionEventUnsubscribers.push(
+            session.on('session.usage_info', (/** @type {any} */ evt) => {
+                const data = evt?.data ?? {};
+                this.emit('session.usage', data);
+                const { currentTokens, tokenLimit } = data;
+                if (tokenLimit > 0) {
+                    const ratio = Math.round((currentTokens / tokenLimit) * 100);
+                    this.#contextState = {
+                        tokens: currentTokens,
+                        tokenLimit,
+                        utilization: currentTokens / tokenLimit,
+                    };
+                    if (!_firstUsageChecked && isResumed && currentTokens / tokenLimit > 0.7) {
+                        log(
+                            'WARN',
+                            `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
+                        );
+                        this.emit('session.token_budget_warning', {
+                            currentTokens,
+                            tokenLimit,
+                            ratio,
+                            reason: 'startup_heavy',
+                        });
+                    }
+                    _firstUsageChecked = true;
+                    if (currentTokens / tokenLimit > 0.8) {
+                        log(
+                            'WARN',
+                            `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
+                        );
+                        this.emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
+                    }
+                }
+            }),
+        );
+
+        // Mudança de modo (plan ↔ act ↔ interactive)
+        this.#sessionEventUnsubscribers.push(
+            session.on('session.mode_changed', (/** @type {any} */ evt) => {
+                log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.previousMode} → ${evt?.data?.newMode}`);
+                this.emit('session.mode_changed', evt?.data ?? {});
+            }),
+        );
+
+        // BUG-AA-11: catch-all para eventos não tratados + billing (assistant.usage)
+        /** @type {Set<string>} */
+        const knownEvents = new Set([
+            'session.compaction_start',
+            'session.compaction_complete',
+            'assistant.reasoning_delta',
+            'session.usage_info',
+            'session.mode_changed',
+            'assistant.message_delta',
+            'tool.execution_start',
+            'tool.execution_complete',
+            'assistant.usage',
+        ]);
+        this.#sessionEventUnsubscribers.push(
+            session.on((/** @type {any} */ evt) => {
+                const kind = evt?.kind ?? evt?.type ?? 'unknown';
+                if (kind === 'assistant.usage') {
+                    const data = evt?.data ?? {};
+                    const { model, cost, quotaSnapshots } = data;
+                    log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
+                    this.#lastPrInfo = { model, cost, quotaSnapshots, ts: Date.now() };
+                    this.emit('pr.consumed', { model, cost, quotaSnapshots, ts: Date.now() });
+                    writeStateAsync({
+                        pendingTurnConsumedPR: true,
+                        lastPrConsumedAt: Date.now(),
+                        lastPrModel: model ?? '',
+                        lastPrCost: cost ?? 0,
+                        lastQuotaSnapshots: quotaSnapshots ?? null,
+                    }).catch((/** @type {any} */ e) =>
+                        log('WARN', `[AlwaysAlive] writeState pendingTurnConsumedPR: ${e.message}`),
+                    );
+                    return;
+                }
+                if (!knownEvents.has(kind)) {
+                    log('DEBUG', `[AlwaysAlive] Evento SDK não tratado: kind=${kind}`);
+                }
+            }),
+        );
     }
 
     /**
@@ -1065,22 +1065,9 @@ export class AlwaysAliveAgent extends EventEmitter {
         const metaPrompt = bootPrompt ?? DialogProtocol.buildBootPrompt();
 
         // Boot: 1 PR — resolve quando o modelo emite o primeiro ask_user("READY:"), com timeout (IMPROVE-AA-02)
-        const bootPromise = new Promise((resolve, reject) => {
-            const bootTimeout = setTimeout(() => {
-                this.off('dialog.ready', onBootReady);
-                reject(
-                    new SessionError(
-                        `[AlwaysAlive] startDialogLoop boot timeout após ${AlwaysAliveAgent.#DIALOG_BOOT_TIMEOUT_MS}ms`,
-                        'BOOT_TIMEOUT',
-                    ),
-                );
-            }, AlwaysAliveAgent.#DIALOG_BOOT_TIMEOUT_MS);
-            /** @type {() => void} */
-            const onBootReady = () => {
-                clearTimeout(bootTimeout);
-                resolve(undefined);
-            };
-            this.once('dialog.ready', onBootReady);
+        const bootPromise = waitForEvent(this, 'dialog.ready', {
+            timeoutMs: AlwaysAliveAgent.#DIALOG_BOOT_TIMEOUT_MS,
+            timeoutError: `[AlwaysAlive] startDialogLoop boot timeout após ${AlwaysAliveAgent.#DIALOG_BOOT_TIMEOUT_MS}ms`,
         });
 
         // Inicia watchdog: detecta se o dialog loop ficar inativo por muito tempo
@@ -1441,10 +1428,9 @@ export class AlwaysAliveAgent extends EventEmitter {
         );
 
         // Estratégia A: aguardar ask_user preservado no servidor CLI (0 PR)
-        const preserved = await Promise.race([
-            new Promise((resolve) => this.once('question.pending', () => resolve(true))),
-            new Promise((resolve) => setTimeout(() => resolve(false), 5_000)),
-        ]);
+        const preserved = await waitForEvent(this, 'question.pending', { timeoutMs: 5_000 })
+            .then(() => true)
+            .catch(() => false);
 
         if (preserved) {
             log('INFO', '[AlwaysAlive] resumeDialogLoop: ask_user preservado no CLI — retomada zero-PR.');

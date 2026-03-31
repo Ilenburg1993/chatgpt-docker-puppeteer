@@ -39,36 +39,8 @@ import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { println } from './dialog.js';
-import {
-    handleDeleteCustomTool,
-    handleDeleteMemory,
-    handleDialogPause,
-    handleDialogResume,
-    handleGetConfig,
-    handleGetContext,
-    handleGetCustomTools,
-    handleGetQuota,
-    handleGetSkills,
-    handleGetToolsConfig,
-    handleGhCi,
-    handleGhIssues,
-    handleGhPrs,
-    handleGitLog,
-    handleGitStatus,
-    handleHealth,
-    handleHubHealth,
-    handleInject,
-    handleListSessions,
-    handleListTurns,
-    handleMetrics,
-    handlePipeline,
-    handleRecallMemories,
-    handleRegisterCustomTool,
-    handleSetInfiniteSessionConfig,
-    handleSetSkills,
-    handleSetToolsConfig,
-    handleStoreMemory,
-} from './http-handlers.js';
+import { handleMetrics } from './http-handlers.js';
+import { matchRoute } from './route-table.js';
 import { getSseClients, getSseCriticalClients } from './state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
@@ -237,33 +209,19 @@ export function createInjectServer() {
             : `llmb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         res.setHeader('X-Request-ID', requestId);
         try {
-            // ── GET /health ───────────────────────────────────────────────────
-            // /health é isento de auth para permitir healthchecks sem token
-            if (req.method === 'GET' && url.pathname === '/health') {
-                sendJson(res, handleHealth());
+            const route = matchRoute(req.method ?? 'GET', url.pathname);
+
+            // ── Rotas não encontradas ─────────────────────────────────────────
+            if (!route) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: false, error: 'Not found' }));
                 return;
             }
 
-            // ── GET /hub-health ───────────────────────────────────────────────
-            // F5.3 (ARCH-07): verifica saúde do ConversationHub e do DB SQLite
-            // Isento de auth para facilitar monitoramento externo
-            if (req.method === 'GET' && url.pathname === '/hub-health') {
-                sendJson(res, handleHubHealth());
-                return;
-            }
-
-            // ── GET /metrics ──────────────────────────────────────────────────
-            // UPG-PROP-08 (fix): /metrics é isento de auth (compatibilidade com Prometheus scrape)
-            if (req.method === 'GET' && url.pathname === '/metrics') {
-                const result = handleMetrics();
-                res.writeHead(result.status, { 'Content-Type': result.contentType });
-                res.end(result.body);
-                return;
-            }
-
-            // Verificar token se configurado (todos os outros endpoints)
-            // SEC-04: timingSafeEqual evita timing-attack na comparação do token
-            if (TERMINAL_TOKEN) {
+            // ── Auth bypass para rotas isentas (health, metrics, hub-health) ──
+            // Demais rotas verificam token se configurado
+            if (!route.skipAuth && TERMINAL_TOKEN) {
+                // SEC-04: timingSafeEqual evita timing-attack na comparação do token
                 const authHeader = req.headers['authorization'] ?? '';
                 const expected = `Bearer ${TERMINAL_TOKEN}`;
                 const providedBuf = Buffer.from(authHeader.padEnd(expected.length));
@@ -277,95 +235,41 @@ export function createInjectServer() {
                 }
             }
 
-            // ── GET /context (UPG-04) ─────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/context') {
-                sendJson(res, handleGetContext());
+            // ── Rate limiting (por IP + endpoint key) ─────────────────────────
+            if (route.rateLimiter) {
+                const clientIp = req.socket?.remoteAddress ?? 'unknown';
+                let rateResult;
+                if (route.rateLimiter === 'inject') {
+                    rateResult = checkInjectRate(clientIp);
+                } else if (route.rateLimiter === 'write') {
+                    rateResult = checkWriteRate(`${clientIp}:${route.rateLimiterKey ?? 'default'}`);
+                } else if (route.rateLimiter === 'sse') {
+                    rateResult = checkSseRate(clientIp);
+                }
+                if (rateResult && !rateResult.allowed) {
+                    const msg =
+                        route.rateLimiter === 'sse'
+                            ? `Muitas conexões SSE. Tente em ${rateResult.resetIn}s.`
+                            : `Rate limit excedido. Tente em ${rateResult.resetIn}s.`;
+                    res.writeHead(429, {
+                        'Content-Type': 'application/json',
+                        'Retry-After': String(rateResult.resetIn),
+                    });
+                    res.end(JSON.stringify({ ok: false, error: msg }));
+                    return;
+                }
+            }
+
+            // ── Custom routes: /metrics (contentType especial) ────────────────
+            if (route.custom && url.pathname === '/metrics') {
+                const result = handleMetrics();
+                res.writeHead(result.status, { 'Content-Type': result.contentType });
+                res.end(result.body);
                 return;
             }
 
-            // ── GET /quota — RF-PR-04 ─────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/quota') {
-                sendJson(res, handleGetQuota());
-                return;
-            }
-
-            // ── GET /config ───────────────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/config') {
-                sendJson(res, handleGetConfig());
-                return;
-            }
-
-            // ── PUT /config/infinite-session (AC.1) ──────────────────────────
-            if (req.method === 'PUT' && url.pathname === '/config/infinite-session') {
-                readBody(req)
-                    .then((raw) => {
-                        const body = raw ? JSON.parse(raw) : {};
-                        sendJson(res, handleSetInfiniteSessionConfig(body));
-                    })
-                    .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
-                return;
-            }
-
-            // ── GET /config/skills (AG.3) ─────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/config/skills') {
-                sendJson(res, handleGetSkills());
-                return;
-            }
-
-            // ── PUT /config/skills (AG.3) ─────────────────────────────────────
-            if (req.method === 'PUT' && url.pathname === '/config/skills') {
-                readBody(req)
-                    .then((raw) => {
-                        const body = raw ? JSON.parse(raw) : {};
-                        sendJson(res, handleSetSkills(body));
-                    })
-                    .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
-                return;
-            }
-
-            // ── GET /config/tools (AH.2) ──────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/config/tools') {
-                sendJson(res, handleGetToolsConfig());
-                return;
-            }
-
-            // ── PUT /config/tools (AH.2) ──────────────────────────────────────
-            if (req.method === 'PUT' && url.pathname === '/config/tools') {
-                readBody(req)
-                    .then((raw) => {
-                        const body = raw ? JSON.parse(raw) : {};
-                        sendJson(res, handleSetToolsConfig(body));
-                    })
-                    .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
-                return;
-            }
-
-            // ── GET /config/tools/custom (AI.2) ───────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/config/tools/custom') {
-                sendJson(res, handleGetCustomTools());
-                return;
-            }
-
-            // ── POST /config/tools/custom (AI.2) ──────────────────────────────
-            if (req.method === 'POST' && url.pathname === '/config/tools/custom') {
-                readBody(req)
-                    .then((raw) => {
-                        const body = raw ? JSON.parse(raw) : {};
-                        sendJson(res, handleRegisterCustomTool(body));
-                    })
-                    .catch((err) => sendJson(res, { status: 400, body: { ok: false, error: err.message } }));
-                return;
-            }
-
-            // ── DELETE /config/tools/custom/:name (AI.2) ──────────────────────
-            if (req.method === 'DELETE' && url.pathname.startsWith('/config/tools/custom/')) {
-                const name = url.pathname.slice('/config/tools/custom/'.length);
-                sendJson(res, handleDeleteCustomTool(decodeURIComponent(name)));
-                return;
-            }
-
-            // ── GET /events ───────────────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/events') {
+            // ── Custom routes: /events (SSE) ─────────────────────────────────
+            if (route.custom && url.pathname === '/events') {
                 const isCriticalOnly = url.searchParams.get('level') === 'critical';
                 const _sseClients = getSseClients();
                 const _sseCriticalClients = getSseCriticalClients();
@@ -373,16 +277,6 @@ export function createInjectServer() {
                 if (totalSse >= MAX_SSE_CLIENTS) {
                     res.writeHead(429, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: 'Limite de clientes SSE atingido' }));
-                    return;
-                }
-                // F6.2 (BUG-MOD-04): usa checkSseRate (limiter dedicado) em vez de checkWriteRate
-                const sseIp = req.socket?.remoteAddress ?? 'unknown';
-                const sseIpRate = checkSseRate(sseIp);
-                if (!sseIpRate.allowed) {
-                    res.writeHead(429, { 'Content-Type': 'application/json' });
-                    res.end(
-                        JSON.stringify({ ok: false, error: `Muitas conexões SSE. Tente em ${sseIpRate.resetIn}s.` }),
-                    );
                     return;
                 }
                 res.writeHead(200, {
@@ -402,206 +296,22 @@ export function createInjectServer() {
                 return;
             }
 
-            // ── GET /sessions ─────────────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/sessions') {
-                const rawStatus = url.searchParams.get('status');
-                sendJson(
-                    res,
-                    handleListSessions({
-                        limit: Number(url.searchParams.get('limit') ?? '20'),
-                        offset: Number(url.searchParams.get('offset') ?? '0'),
-                        ...(rawStatus !== null ? { status: rawStatus } : {}),
-                    }),
-                );
+            // ── Generic dispatch: body parsing + params + handler call ────────
+            const handlerArg =
+                route.body === 'json'
+                    ? await readBody(req).then(tryParseJson)
+                    : route.params
+                      ? route.params(url, url.pathname)
+                      : undefined;
+
+            // Body parsing failed
+            if (route.body === 'json' && handlerArg === null) {
+                sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
                 return;
             }
 
-            // ── GET /sessions/:id/turns ───────────────────────────────────────
-            if (req.method === 'GET' && /^\/sessions\/[^/]+\/turns$/.test(url.pathname)) {
-                const sessionId = url.pathname.split('/')[2] ?? '';
-                sendJson(
-                    res,
-                    handleListTurns({
-                        sessionId,
-                        limit: Number(url.searchParams.get('limit') ?? '50'),
-                        offset: Number(url.searchParams.get('offset') ?? '0'),
-                    }),
-                );
-                return;
-            }
-
-            // ── POST /memory ──────────────────────────────────────────────────
-            if (req.method === 'POST' && url.pathname === '/memory') {
-                // SEC-N02 (fix): rate-limit em /memory write (5 req/min por IP)
-                const memIp = req.socket.remoteAddress ?? 'unknown';
-                const memRate = checkWriteRate(`${memIp}:memory`);
-                if (!memRate.allowed) {
-                    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(memRate.resetIn) });
-                    res.end(
-                        JSON.stringify({
-                            ok: false,
-                            error: `Rate limit excedido em /memory. Tente em ${memRate.resetIn}s.`,
-                        }),
-                    );
-                    return;
-                }
-                const raw = await readBody(req);
-                const parsed = /** @type {{ tag?: string; content?: string } | null} */ (tryParseJson(raw));
-                if (!parsed) {
-                    sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
-                    return;
-                }
-                sendJson(res, handleStoreMemory(parsed));
-                return;
-            }
-
-            // ── GET /memory ───────────────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/memory') {
-                sendJson(
-                    res,
-                    handleRecallMemories({
-                        tag: url.searchParams.get('tag'),
-                        search: url.searchParams.get('search'),
-                        limit: Number(url.searchParams.get('limit') ?? '20'),
-                    }),
-                );
-                return;
-            }
-
-            // ── DELETE /memory/:id ────────────────────────────────────────────
-            if (req.method === 'DELETE' && /^\/memory\/[^/]+$/.test(url.pathname)) {
-                const memoryId = url.pathname.split('/')[2] ?? '';
-                sendJson(res, handleDeleteMemory({ memoryId }));
-                return;
-            }
-
-            // ── POST /pipeline ────────────────────────────────────────────────
-            if (req.method === 'POST' && url.pathname === '/pipeline') {
-                // SEC-N02 (fix): rate-limit em /pipeline (5 req/min por IP)
-                const pipelineIp = req.socket.remoteAddress ?? 'unknown';
-                const pipelineRate = checkWriteRate(`${pipelineIp}:pipeline`);
-                if (!pipelineRate.allowed) {
-                    res.writeHead(429, {
-                        'Content-Type': 'application/json',
-                        'Retry-After': String(pipelineRate.resetIn),
-                    });
-                    res.end(
-                        JSON.stringify({
-                            ok: false,
-                            error: `Rate limit excedido em /pipeline. Tente em ${pipelineRate.resetIn}s.`,
-                        }),
-                    );
-                    return;
-                }
-                const raw = await readBody(req);
-                const parsed = /**
-                 * @type {{
-                 *     steps?: { prompt: string; waitMs?: number; from?: string }[];
-                 *     from?: string;
-                 * } | null}
-                 */ (tryParseJson(raw));
-                if (!parsed) {
-                    sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
-                    return;
-                }
-                sendJson(res, await handlePipeline(parsed));
-                return;
-            }
-
-            // ── POST /inject ──────────────────────────────────────────────────
-            if (req.method === 'POST' && url.pathname === '/inject') {
-                // GAP-01 (fix): rate limiting por IP
-                const clientIp = req.socket.remoteAddress ?? 'unknown';
-                const rateCheck = checkInjectRate(clientIp);
-                if (!rateCheck.allowed) {
-                    res.writeHead(429, {
-                        'Content-Type': 'application/json',
-                        'Retry-After': String(rateCheck.resetIn),
-                    });
-                    res.end(
-                        JSON.stringify({
-                            ok: false,
-                            error: `Rate limit excedido. Tente novamente em ${rateCheck.resetIn}s.`,
-                        }),
-                    );
-                    return;
-                }
-                const raw = await readBody(req);
-                const parsed = /** @type {{ message?: string; from?: string } | null} */ (tryParseJson(raw));
-                if (!parsed) {
-                    sendJson(res, { status: 400, body: { ok: false, error: 'JSON inválido' } });
-                    return;
-                }
-                sendJson(res, await handleInject(parsed));
-                return;
-            }
-
-            // ── POST /dialog/pause — NEW-PAUSE ────────────────────────────────
-            if (req.method === 'POST' && url.pathname === '/dialog/pause') {
-                sendJson(res, await handleDialogPause());
-                return;
-            }
-
-            // ── POST /dialog/resume — NEW-PAUSE ───────────────────────────────
-            if (req.method === 'POST' && url.pathname === '/dialog/resume') {
-                sendJson(res, await handleDialogResume());
-                return;
-            }
-
-            // ── GET /gh/issues ────────────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/gh/issues') {
-                sendJson(
-                    res,
-                    await handleGhIssues({
-                        state: url.searchParams.get('state') ?? 'open',
-                        limit: Number(url.searchParams.get('limit') ?? '15'),
-                    }),
-                );
-                return;
-            }
-
-            // ── GET /gh/prs ───────────────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/gh/prs') {
-                sendJson(
-                    res,
-                    await handleGhPrs({
-                        state: url.searchParams.get('state') ?? 'open',
-                        limit: Number(url.searchParams.get('limit') ?? '15'),
-                    }),
-                );
-                return;
-            }
-
-            // ── GET /gh/ci ────────────────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/gh/ci') {
-                sendJson(
-                    res,
-                    await handleGhCi({
-                        limit: Number(url.searchParams.get('limit') ?? '15'),
-                    }),
-                );
-                return;
-            }
-
-            // ── GET /git/status ───────────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/git/status') {
-                sendJson(res, await handleGitStatus());
-                return;
-            }
-
-            // ── GET /git/log ──────────────────────────────────────────────────
-            if (req.method === 'GET' && url.pathname === '/git/log') {
-                sendJson(
-                    res,
-                    await handleGitLog({
-                        n: Number(url.searchParams.get('n') ?? '20'),
-                    }),
-                );
-                return;
-            }
-
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+            const result = route.async ? await route.handler(handlerArg) : route.handler(handlerArg);
+            sendJson(res, result);
         } catch (/** @type {any} */ err) {
             if (err?.code === 'PAYLOAD_TOO_LARGE') {
                 if (!res.headersSent) {

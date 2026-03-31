@@ -73,8 +73,8 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
  * @typedef {object} BuildToolOptions
  * @property {string} name - Nome único da ferramenta (snake_case recomendado)
  * @property {string} description - Descrição legível para o modelo
- * @property {import('zod/v3').ZodTypeAny | Record<string, unknown>} [parameters] - Schema Zod ou JSON Schema manual dos
- *   parâmetros
+ * @property {import('zod').ZodType | import('zod/v3').ZodTypeAny | Record<string, unknown>} [parameters] - Schema Zod
+ *   (v3 ou v4) ou JSON Schema manual dos parâmetros
  * @property {import('@github/copilot-sdk').ToolHandler<TArgs>} handler - Callback executor da ferramenta
  * @property {boolean} [requiresApproval] - Se `true` (default), skipPermission=false
  * @property {boolean} [overridesBuiltInTool] - Se sobrescreve ferramenta nativa do SDK
@@ -84,7 +84,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
  * Normaliza o schema de parâmetros para o formato aceito pelo SDK. Aceita instâncias Zod (convertidas automaticamente)
  * ou JSON Schema direto.
  *
- * @param {import('zod/v3').ZodTypeAny | Record<string, unknown> | undefined} parameters
+ * @param {import('zod').ZodType | import('zod/v3').ZodTypeAny | Record<string, unknown> | undefined} parameters
  * @returns {Record<string, unknown> | undefined}
  */
 function normalizeParameters(parameters) {

@@ -774,7 +774,7 @@
   // Subfase 19.1) Chat e agentes
   "chat.agent.enabled": true,
   // Perfil doméstico: limitar fan-out de requests para reduzir risco de timeout em sessões longas.
-  "chat.agent.maxRequests": 500,
+  "chat.agent.maxRequests": 2000,
   "chat.agent.thinking.collapsedTools": "always",
   "chat.agent.thinkingStyle": "fixedScrolling",
   "chat.agentsControl.clickBehavior": "cycle",

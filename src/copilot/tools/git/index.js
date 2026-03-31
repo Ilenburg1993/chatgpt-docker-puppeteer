@@ -20,31 +20,6 @@ const execAsync = promisify(execFile);
 const ROOT = new URL('../../../..', import.meta.url).pathname;
 
 /**
- * @param {string} cmd
- * @param {number} [timeoutMs]
- * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
- */
-async function _safeGit(cmd, timeoutMs = 15000) {
-    try {
-        // F3.8 (LEVE-11): execFile com shell:true para comandos compostos (pipes/&&) mas sem
-        // interpolação de variáveis de ambiente inseguras. Para git commit com mensagem do usuário,
-        // usar safeGitArgs() que passa args separados sem shell.
-        const { stdout } = await execAsync('/bin/sh', ['-c', `git ${cmd.startsWith('git ') ? cmd.slice(4) : cmd}`], {
-            cwd: ROOT,
-            encoding: 'utf8',
-            timeout: timeoutMs,
-        });
-        return { stdout: stdout.slice(0, 4000), exitCode: 0 };
-    } catch (/** @type {any} */ e) {
-        return {
-            stdout: (e.stdout ?? '').slice(0, 2000),
-            exitCode: e.code ?? 1,
-            error: (e.stderr ?? e.message ?? '').slice(0, 1000),
-        };
-    }
-}
-
-/**
  * F3.8 (LEVE-11): executa `git` com args separados (sem interpolação shell) — seguro para valores fornecidos pelo
  * usuário (ex: mensagem de commit, paths).
  *

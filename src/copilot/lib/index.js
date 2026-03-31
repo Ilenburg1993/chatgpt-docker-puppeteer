@@ -131,4 +131,5 @@ export {
     recordToolCall,
     startSpan,
 } from '#copilot/lib/telemetry';
+export { raceEvents, waitForEvent } from './event-helpers.js';
 export { validateUrl, validateUrlString } from './url-validator.js';

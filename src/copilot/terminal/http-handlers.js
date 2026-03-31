@@ -729,10 +729,11 @@ export function handleRegisterCustomTool(rawBody) {
 /**
  * DELETE /config/tools/custom/:name — remove uma custom tool pelo nome.
  *
- * @param {string} name
+ * @param {{ name: string } | string} nameOrParams
  * @returns {HandlerResult}
  */
-export function handleDeleteCustomTool(name) {
+export function handleDeleteCustomTool(nameOrParams) {
+    const name = typeof nameOrParams === 'string' ? nameOrParams : nameOrParams?.name;
     if (!name) return { status: 400, body: { ok: false, error: 'name é obrigatório' } };
     const result = removeCustomTool(name);
     if (!result.ok) return { status: 404, body: { ok: false, error: result.error } };

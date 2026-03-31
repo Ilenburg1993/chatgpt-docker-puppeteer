@@ -1,0 +1,643 @@
+{
+  "fileCount": 106,
+  "totalLines": 26884,
+  "totalBytes": 1049680,
+  "files": [
+    {
+      "path": "src/copilot/LLM-A-COMMUNICATION-GUIDE.md",
+      "bytes": 18670,
+      "lines": 497,
+      "sha1": "62f2d59366ee"
+    },
+    {
+      "path": "src/copilot/PLANO-AMBIENTE-PERMANENTE.md",
+      "bytes": 19134,
+      "lines": 425,
+      "sha1": "e8fc4c78bea0"
+    },
+    {
+      "path": "src/copilot/agent.js",
+      "bytes": 469,
+      "lines": 12,
+      "sha1": "3167eada76e5"
+    },
+    {
+      "path": "src/copilot/agent/always-alive.js",
+      "bytes": 85564,
+      "lines": 1920,
+      "sha1": "233d3247b97a"
+    },
+    {
+      "path": "src/copilot/agent/dialog-protocol.js",
+      "bytes": 4062,
+      "lines": 114,
+      "sha1": "ad234b449a7e"
+    },
+    {
+      "path": "src/copilot/agent/dialog-watchdog.js",
+      "bytes": 3111,
+      "lines": 114,
+      "sha1": "92681ab3d5fa"
+    },
+    {
+      "path": "src/copilot/agent/entry.js",
+      "bytes": 5126,
+      "lines": 125,
+      "sha1": "754f0be584fa"
+    },
+    {
+      "path": "src/copilot/agent/events.js",
+      "bytes": 1803,
+      "lines": 64,
+      "sha1": "e12f08982fc9"
+    },
+    {
+      "path": "src/copilot/agent/session-manager.js",
+      "bytes": 19704,
+      "lines": 461,
+      "sha1": "575c6016fa17"
+    },
+    {
+      "path": "src/copilot/agent/task-executor.js",
+      "bytes": 6343,
+      "lines": 145,
+      "sha1": "439627687951"
+    },
+    {
+      "path": "src/copilot/agent/tools-bootstrap.js",
+      "bytes": 5295,
+      "lines": 157,
+      "sha1": "c66469b9c809"
+    },
+    {
+      "path": "src/copilot/agent/webhook-manager.js",
+      "bytes": 3384,
+      "lines": 107,
+      "sha1": "df5923226c35"
+    },
+    {
+      "path": "src/copilot/api/bridge-control.js",
+      "bytes": 10840,
+      "lines": 243,
+      "sha1": "013a3860c7bf"
+    },
+    {
+      "path": "src/copilot/api/bridge-dialog.js",
+      "bytes": 5815,
+      "lines": 133,
+      "sha1": "1dce5fe8b1fb"
+    },
+    {
+      "path": "src/copilot/api/bridge-stream.js",
+      "bytes": 3937,
+      "lines": 97,
+      "sha1": "d4125f510858"
+    },
+    {
+      "path": "src/copilot/api/bridge-tasks.js",
+      "bytes": 5224,
+      "lines": 119,
+      "sha1": "fd09eb37c708"
+    },
+    {
+      "path": "src/copilot/api/http-bridge.js",
+      "bytes": 1851,
+      "lines": 41,
+      "sha1": "4c12f5b676b6"
+    },
+    {
+      "path": "src/copilot/api/sdk-api.js",
+      "bytes": 1153,
+      "lines": 34,
+      "sha1": "dd1f58fe25ee"
+    },
+    {
+      "path": "src/copilot/bridges/alias-store.js",
+      "bytes": 5897,
+      "lines": 184,
+      "sha1": "41b0e9267a6c"
+    },
+    {
+      "path": "src/copilot/bridges/gh-bridge.js",
+      "bytes": 21480,
+      "lines": 762,
+      "sha1": "60dbfdceafcc"
+    },
+    {
+      "path": "src/copilot/bridges/git-bridge.js",
+      "bytes": 11698,
+      "lines": 402,
+      "sha1": "b2b911a5e39c"
+    },
+    {
+      "path": "src/copilot/bridges/inject-llmb.js",
+      "bytes": 330,
+      "lines": 11,
+      "sha1": "a60833158a9a"
+    },
+    {
+      "path": "src/copilot/bridges/llm-bridge-client.js",
+      "bytes": 335,
+      "lines": 11,
+      "sha1": "c0e9809e3b19"
+    },
+    {
+      "path": "src/copilot/bridges/mcp-tool-bridge.js",
+      "bytes": 12424,
+      "lines": 323,
+      "sha1": "82ff7315106c"
+    },
+    {
+      "path": "src/copilot/bridges/nerv-bridge.js",
+      "bytes": 9319,
+      "lines": 258,
+      "sha1": "f67aaa513144"
+    },
+    {
+      "path": "src/copilot/channel/audit.js",
+      "bytes": 6045,
+      "lines": 171,
+      "sha1": "825c2541a974"
+    },
+    {
+      "path": "src/copilot/channel/client.js",
+      "bytes": 22132,
+      "lines": 565,
+      "sha1": "0e93a689f215"
+    },
+    {
+      "path": "src/copilot/channel/index.js",
+      "bytes": 3262,
+      "lines": 84,
+      "sha1": "c6ff66f8f8a4"
+    },
+    {
+      "path": "src/copilot/channel/inject.js",
+      "bytes": 17587,
+      "lines": 484,
+      "sha1": "201e3b3af835"
+    },
+    {
+      "path": "src/copilot/config/custom-agents.js",
+      "bytes": 12255,
+      "lines": 323,
+      "sha1": "f53c5fb07d0d"
+    },
+    {
+      "path": "src/copilot/config/index.js",
+      "bytes": 791,
+      "lines": 33,
+      "sha1": "309af2f7b627"
+    },
+    {
+      "path": "src/copilot/config/mcp-servers.js",
+      "bytes": 4285,
+      "lines": 129,
+      "sha1": "6244fe94064a"
+    },
+    {
+      "path": "src/copilot/config/pinned-files-loader.js",
+      "bytes": 9468,
+      "lines": 262,
+      "sha1": "ca679c7434f9"
+    },
+    {
+      "path": "src/copilot/config/session-config.js",
+      "bytes": 5898,
+      "lines": 182,
+      "sha1": "445246a2b9bf"
+    },
+    {
+      "path": "src/copilot/config/system-prompt.js",
+      "bytes": 9390,
+      "lines": 230,
+      "sha1": "f66e636c5675"
+    },
+    {
+      "path": "src/copilot/config/tools/index.js",
+      "bytes": 266,
+      "lines": 12,
+      "sha1": "4c1e93d6f696"
+    },
+    {
+      "path": "src/copilot/config/tools/registry.js",
+      "bytes": 9087,
+      "lines": 251,
+      "sha1": "7c14b18bf19a"
+    },
+    {
+      "path": "src/copilot/config/tools/state.js",
+      "bytes": 3364,
+      "lines": 94,
+      "sha1": "3d7827a3899d"
+    },
+    {
+      "path": "src/copilot/conversation-hub/hub.js",
+      "bytes": 9281,
+      "lines": 258,
+      "sha1": "83725f2fcf9b"
+    },
+    {
+      "path": "src/copilot/conversation-hub/index.js",
+      "bytes": 446,
+      "lines": 14,
+      "sha1": "b12d7f647e86"
+    },
+    {
+      "path": "src/copilot/conversation-hub/orchestrator.js",
+      "bytes": 25158,
+      "lines": 609,
+      "sha1": "73ceaa5db607"
+    },
+    {
+      "path": "src/copilot/conversation-hub/socket-ns.js",
+      "bytes": 14697,
+      "lines": 372,
+      "sha1": "50de6d7f7b70"
+    },
+    {
+      "path": "src/copilot/conversation-hub/store.js",
+      "bytes": 31926,
+      "lines": 800,
+      "sha1": "25d060f42e30"
+    },
+    {
+      "path": "src/copilot/core/constants.js",
+      "bytes": 1536,
+      "lines": 53,
+      "sha1": "b378a74a53a0"
+    },
+    {
+      "path": "src/copilot/core/errors.js",
+      "bytes": 1785,
+      "lines": 62,
+      "sha1": "9b23c974393e"
+    },
+    {
+      "path": "src/copilot/core/index.js",
+      "bytes": 623,
+      "lines": 24,
+      "sha1": "1b4fab2607cc"
+    },
+    {
+      "path": "src/copilot/core/types.js",
+      "bytes": 336,
+      "lines": 13,
+      "sha1": "b0fb66003bdb"
+    },
+    {
+      "path": "src/copilot/db/migrations.js",
+      "bytes": 8192,
+      "lines": 180,
+      "sha1": "2565d36d8d5d"
+    },
+    {
+      "path": "src/copilot/db/sqlite.js",
+      "bytes": 5377,
+      "lines": 174,
+      "sha1": "716c5377f03f"
+    },
+    {
+      "path": "src/copilot/lib/agents.js",
+      "bytes": 6394,
+      "lines": 165,
+      "sha1": "7a3876ee0eeb"
+    },
+    {
+      "path": "src/copilot/lib/client.js",
+      "bytes": 14034,
+      "lines": 434,
+      "sha1": "67c067572db3"
+    },
+    {
+      "path": "src/copilot/lib/hooks.js",
+      "bytes": 16721,
+      "lines": 382,
+      "sha1": "cd7f2fd35f34"
+    },
+    {
+      "path": "src/copilot/lib/http-request.js",
+      "bytes": 2184,
+      "lines": 58,
+      "sha1": "325dafdcc412"
+    },
+    {
+      "path": "src/copilot/lib/index.js",
+      "bytes": 3272,
+      "lines": 134,
+      "sha1": "d03cc643b904"
+    },
+    {
+      "path": "src/copilot/lib/models.js",
+      "bytes": 8700,
+      "lines": 244,
+      "sha1": "921cebd7d51f"
+    },
+    {
+      "path": "src/copilot/lib/permissions.js",
+      "bytes": 7796,
+      "lines": 219,
+      "sha1": "b6c0656b84a4"
+    },
+    {
+      "path": "src/copilot/lib/session.js",
+      "bytes": 11552,
+      "lines": 287,
+      "sha1": "e5cc7a9f1066"
+    },
+    {
+      "path": "src/copilot/lib/telemetry.js",
+      "bytes": 14326,
+      "lines": 403,
+      "sha1": "c58e62cc080f"
+    },
+    {
+      "path": "src/copilot/lib/tools-registry.js",
+      "bytes": 8165,
+      "lines": 255,
+      "sha1": "c2923d0b94df"
+    },
+    {
+      "path": "src/copilot/lib/utils.js",
+      "bytes": 800,
+      "lines": 38,
+      "sha1": "2dee359a822d"
+    },
+    {
+      "path": "src/copilot/llm-a-conversation.mjs",
+      "bytes": 7255,
+      "lines": 176,
+      "sha1": "3857135eaa14"
+    },
+    {
+      "path": "src/copilot/routes/agent.js",
+      "bytes": 8449,
+      "lines": 206,
+      "sha1": "ce05edb5e33c"
+    },
+    {
+      "path": "src/copilot/routes/client.js",
+      "bytes": 8028,
+      "lines": 200,
+      "sha1": "5f7825b56fb2"
+    },
+    {
+      "path": "src/copilot/routes/middleware.js",
+      "bytes": 841,
+      "lines": 31,
+      "sha1": "1946b0cdb151"
+    },
+    {
+      "path": "src/copilot/routes/sessions.js",
+      "bytes": 27652,
+      "lines": 662,
+      "sha1": "7c1a7c7b8c82"
+    },
+    {
+      "path": "src/copilot/routes/webhooks.js",
+      "bytes": 3632,
+      "lines": 91,
+      "sha1": "b4092a73779b"
+    },
+    {
+      "path": "src/copilot/terminal-server.js",
+      "bytes": 1435,
+      "lines": 41,
+      "sha1": "0e01a9803204"
+    },
+    {
+      "path": "src/copilot/terminal/commands/alias.js",
+      "bytes": 1926,
+      "lines": 63,
+      "sha1": "cafb46bfe434"
+    },
+    {
+      "path": "src/copilot/terminal/commands/attach.js",
+      "bytes": 2534,
+      "lines": 74,
+      "sha1": "9c087c1be1e8"
+    },
+    {
+      "path": "src/copilot/terminal/commands/config.js",
+      "bytes": 4726,
+      "lines": 119,
+      "sha1": "5baea89fe1ec"
+    },
+    {
+      "path": "src/copilot/terminal/commands/context.js",
+      "bytes": 7115,
+      "lines": 171,
+      "sha1": "401d70062214"
+    },
+    {
+      "path": "src/copilot/terminal/commands/gh.js",
+      "bytes": 13883,
+      "lines": 383,
+      "sha1": "7a8c4654026f"
+    },
+    {
+      "path": "src/copilot/terminal/commands/git.js",
+      "bytes": 4741,
+      "lines": 128,
+      "sha1": "86b3312d3d70"
+    },
+    {
+      "path": "src/copilot/terminal/commands/help.js",
+      "bytes": 5809,
+      "lines": 100,
+      "sha1": "bae52032390b"
+    },
+    {
+      "path": "src/copilot/terminal/commands/index.js",
+      "bytes": 810,
+      "lines": 31,
+      "sha1": "2edff79698ff"
+    },
+    {
+      "path": "src/copilot/terminal/commands/memory.js",
+      "bytes": 2811,
+      "lines": 86,
+      "sha1": "9534b75abe73"
+    },
+    {
+      "path": "src/copilot/terminal/commands/plan.js",
+      "bytes": 1764,
+      "lines": 60,
+      "sha1": "058e7543436d"
+    },
+    {
+      "path": "src/copilot/terminal/commands/resume.js",
+      "bytes": 3492,
+      "lines": 86,
+      "sha1": "f10115abbe9f"
+    },
+    {
+      "path": "src/copilot/terminal/commands/session.js",
+      "bytes": 8964,
+      "lines": 211,
+      "sha1": "eb766dde2233"
+    },
+    {
+      "path": "src/copilot/terminal/commands/skills.js",
+      "bytes": 3217,
+      "lines": 93,
+      "sha1": "4e63bdda1b23"
+    },
+    {
+      "path": "src/copilot/terminal/dialog.js",
+      "bytes": 25276,
+      "lines": 613,
+      "sha1": "1bb7ff401033"
+    },
+    {
+      "path": "src/copilot/terminal/file-context.js",
+      "bytes": 12579,
+      "lines": 345,
+      "sha1": "d9c2d8a9c8f2"
+    },
+    {
+      "path": "src/copilot/terminal/http-handlers.js",
+      "bytes": 35411,
+      "lines": 900,
+      "sha1": "87f8d4fcc5b0"
+    },
+    {
+      "path": "src/copilot/terminal/index.js",
+      "bytes": 10395,
+      "lines": 241,
+      "sha1": "fc36c2146c15"
+    },
+    {
+      "path": "src/copilot/terminal/repl.js",
+      "bytes": 14731,
+      "lines": 349,
+      "sha1": "708a3c1da320"
+    },
+    {
+      "path": "src/copilot/terminal/server.js",
+      "bytes": 30532,
+      "lines": 633,
+      "sha1": "a22d92736fa5"
+    },
+    {
+      "path": "src/copilot/terminal/state.js",
+      "bytes": 4783,
+      "lines": 144,
+      "sha1": "790336a5bc8b"
+    },
+    {
+      "path": "src/copilot/terminal/workspace-context.js",
+      "bytes": 2501,
+      "lines": 84,
+      "sha1": "2f22d96c9e28"
+    },
+    {
+      "path": "src/copilot/tools/code-tools.js",
+      "bytes": 4672,
+      "lines": 132,
+      "sha1": "bd3a802c6269"
+    },
+    {
+      "path": "src/copilot/tools/file-tools.js",
+      "bytes": 31400,
+      "lines": 762,
+      "sha1": "79896a18e71d"
+    },
+    {
+      "path": "src/copilot/tools/git-tools.js",
+      "bytes": 322,
+      "lines": 10,
+      "sha1": "a21dde2c9a79"
+    },
+    {
+      "path": "src/copilot/tools/git/index.js",
+      "bytes": 10175,
+      "lines": 246,
+      "sha1": "f6e47aa32ffd"
+    },
+    {
+      "path": "src/copilot/tools/hook-tools.js",
+      "bytes": 11873,
+      "lines": 284,
+      "sha1": "6ca470b42ee2"
+    },
+    {
+      "path": "src/copilot/tools/hub-tools.js",
+      "bytes": 15100,
+      "lines": 348,
+      "sha1": "53e0f86dcd67"
+    },
+    {
+      "path": "src/copilot/tools/index.js",
+      "bytes": 1851,
+      "lines": 70,
+      "sha1": "17efb8ac4227"
+    },
+    {
+      "path": "src/copilot/tools/introspection-tools.js",
+      "bytes": 10740,
+      "lines": 278,
+      "sha1": "cdf45e33d639"
+    },
+    {
+      "path": "src/copilot/tools/permission-tools.js",
+      "bytes": 5606,
+      "lines": 133,
+      "sha1": "93721085b678"
+    },
+    {
+      "path": "src/copilot/tools/session-rpc-tools.js",
+      "bytes": 12714,
+      "lines": 280,
+      "sha1": "f4ff03fa0220"
+    },
+    {
+      "path": "src/copilot/tools/session-tools.js",
+      "bytes": 7537,
+      "lines": 195,
+      "sha1": "064570aa339e"
+    },
+    {
+      "path": "src/copilot/tools/shell/index.js",
+      "bytes": 23517,
+      "lines": 611,
+      "sha1": "8eae2fc440ab"
+    },
+    {
+      "path": "src/copilot/tools/task-tools.js",
+      "bytes": 6138,
+      "lines": 154,
+      "sha1": "9b20381ce90e"
+    },
+    {
+      "path": "src/copilot/tools/todo-tools.js",
+      "bytes": 51592,
+      "lines": 1295,
+      "sha1": "6c56a9c56a7a"
+    },
+    {
+      "path": "src/copilot/tools/tool-factory.js",
+      "bytes": 6414,
+      "lines": 161,
+      "sha1": "808a4a51adf2"
+    },
+    {
+      "path": "src/copilot/tools/web-tools.js",
+      "bytes": 18427,
+      "lines": 442,
+      "sha1": "bfc1b353e748"
+    },
+    {
+      "path": "src/copilot/types/index.js",
+      "bytes": 545,
+      "lines": 24,
+      "sha1": "25809f495616"
+    },
+    {
+      "path": "src/copilot/types/structured-message.js",
+      "bytes": 15666,
+      "lines": 381,
+      "sha1": "392feb0b88ac"
+    }
+  ]
+}

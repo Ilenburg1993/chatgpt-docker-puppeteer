@@ -174,7 +174,7 @@ export class PinnedFilesLoader extends EventEmitter {
             if (!existsSync(dir)) continue;
             try {
                 const watchOpts = supportsRecursive ? { persistent: false, recursive: true } : { persistent: false };
-                const watcher = watch(dir, watchOpts, (eventType, filename) => {
+                const watcher = watch(dir, watchOpts, (_eventType, filename) => {
                     if (!filename) return;
                     if (!SUPPORTED_EXTENSIONS.some((ext) => filename.endsWith(ext))) return;
                     const filePath = join(dir, filename);
@@ -193,7 +193,7 @@ export class PinnedFilesLoader extends EventEmitter {
                         for (const entry of readdirSync(dir)) {
                             const subPath = join(dir, entry);
                             if (!statSync(subPath).isDirectory()) continue;
-                            const subWatcher = watch(subPath, { persistent: false }, (evtType, fname) => {
+                            const subWatcher = watch(subPath, { persistent: false }, (_evtType, fname) => {
                                 if (!fname) return;
                                 if (!SUPPORTED_EXTENSIONS.some((ext) => fname.endsWith(ext))) return;
                                 this.#scheduleReload(join(subPath, fname));

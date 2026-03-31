@@ -470,3 +470,210 @@ const resolvedTimeout = typeof timeoutMs === 'number' && Number.isFinite(timeout
 2. `test_lib_session.spec.js` — "inclui systemMessage quando systemMessageContent fornecido": mode='customize' vs expected 'append'
 3. `test_system_prompt.spec.js` — 5 testes: SYSTEM_PROMPT_SECTIONS keys mudaram, buildHookContextAppendMessage mode mudou
 4. `test_hook_tools.spec.js` — 1 cancelled: `request_user_input` handler retorna Promise que nunca resolve em ambiente de teste
+
+---
+
+## PARTE 5 — REFATORAÇÕES PROFUNDAS (Phase 3)
+
+**Data**: 2026-03-31
+**Objetivo**: Modularização, extração de responsabilidades, router declarativo, cobertura de testes e hardening
+**Metodologia**: Investigação estrutural completa → plano faseado → execução com validação
+
+### 5.1 Métricas baseline
+
+| Métrica                          | Valor                                                            |
+| -------------------------------- | ---------------------------------------------------------------- |
+| Total de linhas (src/copilot)    | 25.876                                                           |
+| Total de arquivos JS             | ~70                                                              |
+| Maior arquivo                    | always-alive.js (1.919 linhas, 30+ métodos)                      |
+| 2º maior                         | todo-tools.js (1.320 linhas, 13 tools)                           |
+| 3º maior                         | http-handlers.js (902 linhas, 25 exports)                        |
+| test files copilot               | 35                                                               |
+| Tests total copilot              | 802                                                              |
+| Tests total global               | 1.602                                                            |
+| Módulos sem testes dedicados     | bridges, channel, config, routes, terminal (comandos), db, types |
+| `new Promise` em always-alive.js | 13 ocorrências (polling patterns)                                |
+| Rotas manuais em server.js       | 29 `if(method + pathname)` blocks                                |
+| Fan-out always-alive.js          | 19 módulos importam o singleton                                  |
+
+### 5.2 Plano de fases
+
+---
+
+#### FASE A — Decomposição do God Object `AlwaysAliveAgent` (always-alive.js)
+**Prioridade**: ALTA | **Impacto**: Manutenibilidade, testabilidade, SRP
+**Risco**: MÉDIO (singleton com 19 dependentes)
+
+O `AlwaysAliveAgent` é uma classe de 1.919 linhas com 30+ métodos que mistura:
+- Lifecycle (start/stop/reconnect)
+- Dialog loop (start/stop/pause/resume/sendTurn)
+- Queue processing (#processQueue)
+- Session management (#initSession, #syncSdkHistory)
+- Webhook dispatch (#emitWebhook)
+- Permission management (get/setPermissionMode)
+- User input handling (#handleUserInputRequest, #handleDialogLoopInput, #handleInteractiveQuestion)
+- Status/diagnostics (getStatusSnapshot, listenerDiagnostics)
+
+##### Subfases:
+
+**A.1 — Extrair `DialogEngine`** (~400 linhas)
+- Mover: `startDialogLoop`, `sendDialogTurn`, `#executeDialogTurn`, `stopDialogLoop`, `pauseDialogLoop`, `resumeDialogLoop`, `#waitForDialogRestartAndReply`
+- Arquivo novo: `src/copilot/agent/dialog-engine.js`
+- AlwaysAliveAgent delegará para `this._dialogEngine`
+- EventEmitter composition: DialogEngine emite `dialog.*` events, AlwaysAliveAgent re-emite
+
+**A.2 — Extrair `waitForStatus()` helper** (~50 linhas)
+- 13 `new Promise` com polling pattern (`setTimeout check loop`) → helper genérico
+- `waitForStatus(emitter, predicate, { timeout, pollInterval })` → `src/copilot/agent/wait-for-status.js`
+- Usado por always-alive.js, dialog.js e potencialmente outros
+
+**A.3 — Extrair `WebhookDispatcher`** (~80 linhas)
+- Mover: `registerWebhook`, `unregisterWebhook`, `listWebhooks`, `#emitWebhook`
+- Arquivo novo: `src/copilot/agent/webhook-dispatcher.js` (ou mover para `webhook-manager.js` existente)
+- Verificar `webhook-manager.js` (106 linhas) — possivelmente unificar
+
+**A.4 — Extrair `InputHandler`** (~100 linhas)
+- Mover: `#handleUserInputRequest`, `#handleDialogLoopInput`, `#handleInteractiveQuestion`, `answerPendingQuestion`
+- Arquivo novo: `src/copilot/agent/input-handler.js`
+
+---
+
+#### FASE B — Router declarativo para `server.js` (terminal)
+**Prioridade**: ALTA | **Impacto**: Manutenibilidade, DRY, segurança
+**Risco**: BAIXO (substituição mecânica 1:1)
+
+O `server.js` tem 29 rotas implementadas como blocos `if(method === 'X' && pathname === '/y')` com padrão repetitivo de `readBody → JSON.parse → handler → sendJson`. Além disso, a lógica de auth é inline e isentada manualmente para `/health`, `/hub-health`, `/metrics`.
+
+##### Subfases:
+
+**B.1 — Criar micro-router declarativo**
+- Arquivo: `src/copilot/terminal/router.js` (~100 linhas)
+- Signature: `createRouter(routes: RouteDefinition[]): http.RequestListener`
+- Route definition: `{ method, path, handler, auth?, parseBody? }`
+- Features: auto-CORS, auto-JSON parse, auto-sendJson, 404 handler, error boundary
+
+**B.2 — Migrar server.js para usar router**
+- Converter as 29 rotas de if/else para array de `RouteDefinition`
+- server.js passaria de ~632 linhas para ~200 (tabela de rotas + SSE handlers especiais)
+
+**B.3 — Testes para router.js**
+- Testar: matching, 404, CORS, auth check, body parsing, error handling
+- ~15-20 testes unitários
+
+---
+
+#### FASE C — Modularização de `http-handlers.js`
+**Prioridade**: MÉDIA | **Impacto**: SRP, navegabilidade
+**Risco**: BAIXO (refatoração de exports)
+
+Os 25 handlers de `http-handlers.js` (902 linhas) cobrem domínios muito distintos:
+- Health/metrics (2)
+- Context (1)
+- Sessions/turns (2)
+- Memory (3)
+- Pipeline/inject (2)
+- GitHub (5)
+- Git (2)
+- Config (8)
+- SSE (helpers)
+
+##### Subfases:
+
+**C.1 — Extrair handlers por domínio**
+- `src/copilot/terminal/handlers/health.js` — handleHealth, handleHubHealth, handleMetrics
+- `src/copilot/terminal/handlers/github.js` — handleGhIssues, handleGhPrs, handleGhCi, handleGitStatus, handleGitLog
+- `src/copilot/terminal/handlers/config.js` — handleGetConfig, handleSetInfiniteSessionConfig, handleGetSkills, handleSetSkills, handleGetToolsConfig, handleSetToolsConfig, handleGetCustomTools, handleRegisterCustomTool, handleDeleteCustomTool
+- `src/copilot/terminal/handlers/memory.js` — handleStoreMemory, handleRecallMemories, handleDeleteMemory
+- `src/copilot/terminal/handlers/pipeline.js` — handlePipeline, handleInject
+- `src/copilot/terminal/handlers/sessions.js` — handleListSessions, handleListTurns
+- `http-handlers.js` vira barrel re-exporting tudo (backward compat)
+
+---
+
+#### FASE D — Cobertura de testes incrementais
+**Prioridade**: ALTA | **Impacto**: Segurança da refatoração, regressão
+**Risco**: NENHUM (somente adição)
+
+Módulos sem testes dedicados que mais se beneficiariam:
+
+##### Subfases:
+
+**D.1 — Testes para `http-handlers.js`** (handlers puros)
+- Os handlers retornam `{ status, body }` — extremamente testáveis
+- Prioridade: handleHealth, handleInject (validação `from`), handlePipeline
+- ~30 testes
+
+**D.2 — Testes para `config/tools/registry.js`**
+- Registry global com `registerTool`, `getToolDefinition`, etc
+- ~15 testes
+
+**D.3 — Testes para `config/tools/state.js`**
+- `patchToolsConfig`, `getToolsConfig`
+- ~10 testes
+
+**D.4 — Testes para `bridges/git-bridge.js`**
+- `gitStatus`, `gitLog`, `gitDiff` — wrappers do `gh`/`git` CLI
+- Mock de `child_process` ou `execa`
+- ~15 testes
+
+**D.5 — Testes para `channel/audit.js`**
+- Audit trail write/read + rotation
+- ~10 testes
+
+---
+
+#### FASE E — Upgrades de qualidade e hardening
+**Prioridade**: MÉDIA | **Impacto**: Robustez, observabilidade
+**Risco**: BAIXO
+
+##### Subfases:
+
+**E.1 — Centralizar error types em `src/copilot/core/errors.js`**
+- Atualmente erros são `new Error('...')` sem tipagem
+- Criar: `CopilotError`, `SessionError`, `ToolExecutionError`, `AuthError`, `ValidationError`
+- Cada um com `code`, `statusCode`, `cause` chain
+- ~80 linhas
+
+**E.2 — Upgrade `todo-tools.js` — extrair persistência**
+- Separar store SQLite de tool handlers
+- `src/copilot/tools/todo/store.js` — CRUD operations
+- `src/copilot/tools/todo/tools.js` — tool definitions
+- todo-tools.js vira barrel
+
+**E.3 — AbortSignal propagation**
+- Vários métodos já aceitam `signal` mas não o propagam consistentemente
+- Audit: mapear onde `signal` existe mas é ignorado
+- Hardening dos paths críticos (sendMessage, sendDialogTurn)
+
+**E.4 — Rate limiter genérico**
+- `sessions.js` tem rate limiter inline (200ms window)
+- Outros endpoints não têm
+- Extrair: `src/copilot/lib/rate-limiter.js` com sliding window
+
+### 5.3 Ordem de execução recomendada
+
+```
+FASE D.1 (testes http-handlers)   ← safety net para Fases B e C
+  ↓
+FASE B  (router declarativo)      ← simplificação server.js
+  ↓
+FASE C  (modularizar handlers)    ← SRP
+  ↓
+FASE A.2 (waitForStatus helper)   ← quick win, base para A.1
+  ↓
+FASE A.1 (DialogEngine)           ← maior impacto estrutural
+  ↓
+FASE A.3 + A.4 (webhook + input)  ← completar decomposição
+  ↓
+FASE D.2-D.5 (testes restantes)   ← cobertura ampla
+  ↓
+FASE E.1-E.4 (hardening)          ← polimento
+```
+
+### 5.4 Restrições e princípios
+
+1. **Backward compatibility**: Todo barrel/re-export deve manter API pública idêntica
+2. **Sem breaking changes**: Imports existentes de `always-alive.js` continuam funcionando
+3. **Teste antes de cada commit**: 1602/1602 tests OK
+4. **Incremental**: Cada subfase é commitável independentemente
+5. **Não tocar em `puppeteer.launch()`**: Restrição do projeto
