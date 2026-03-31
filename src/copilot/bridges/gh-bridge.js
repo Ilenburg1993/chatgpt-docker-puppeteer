@@ -85,6 +85,7 @@ function runIcon(status, conclusion) {
         if (conclusion === 'failure') return '❌';
         if (conclusion === 'cancelled') return '🚫';
         if (conclusion === 'skipped') return '⏭️';
+        if (conclusion === 'timed_out') return '⏱️';
         return '⚠️';
     }
     if (status === 'in_progress') return '⏳';

@@ -88,7 +88,14 @@ export function resolve(input) {
         // Tentar match exato ou com args
         const [cmd, ...rest] = current.split(' ');
         const alias = cmd ? _aliases[cmd] : undefined;
-        if (!alias || seen.has(cmd)) break;
+        if (!alias) break;
+        // F6.5 (BUG-LEVE-06): detectar loop de alias explicitamente antes de quebrar silencioso
+        if (seen.has(cmd)) {
+            console.warn(
+                `[alias-store] Loop de alias detectado: "${cmd}" → ciclo em ${[...seen].join(' → ')} → "${cmd}"`,
+            );
+            break;
+        }
         seen.add(cmd);
         current = rest.length ? `${alias} ${rest.join(' ')}` : alias;
     }
@@ -100,12 +107,25 @@ export function resolve(input) {
  *
  * @param {string} name - nome do alias (ex: "/issues")
  * @param {string} command - comando alvo (ex: "/gh issue list --state open")
- * @returns {void}
+ * @returns {{ ok: boolean; error?: string }}
  */
 export function setAlias(name, command) {
     const key = name.startsWith('/') ? name : `/${name}`;
+    // F6.5 (BUG-LEVE-06): detectar ciclos antes de persistir
+    const testAliases = { ..._aliases, [key]: command };
+    const seen = new Set([key]);
+    let current = command.split(' ')[0] ?? '';
+    for (let i = 0; i < 10; i++) {
+        if (!current || !testAliases[current]) break;
+        if (seen.has(current)) {
+            return { ok: false, error: `Loop de alias detectado: "${key}" → ${[...seen].join(' → ')} → "${current}"` };
+        }
+        seen.add(current);
+        current = (testAliases[current] ?? '').split(' ')[0] ?? '';
+    }
     _aliases[key] = command;
     saveCustomAliases();
+    return { ok: true };
 }
 
 /**

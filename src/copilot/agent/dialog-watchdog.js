@@ -12,8 +12,8 @@ import { log } from '#core/logger';
 /**
  * @typedef {Object} DialogWatchdogOptions
  * @property {number} intervalMs - Intervalo de verificação em ms (padrão: `LLM_B_WATCHDOG_MS`, 5 min)
- * @property {number} stallMs - Limiar de inatividade para emitir stall em ms (padrão: `LLM_B_WATCHDOG_STALL_MS`, 15
- *   min)
+ * @property {number} stallThresholdMs - Limiar de inatividade para emitir stall em ms (padrão:
+ *   `LLM_B_WATCHDOG_STALL_MS`, 15 min)
  * @property {(stalledMs: number) => void} onStall - Callback chamado quando o loop está travado
  */
 
@@ -25,7 +25,7 @@ import { log } from '#core/logger';
  * ```js
  * const watchdog = new DialogWatchdog({
  *     intervalMs: 5 * 60_000,
- *     stallMs: 15 * 60_000,
+ *     stallThresholdMs: 15 * 60_000,
  *     onStall: (ms) => agent.emit('dialog.stalled', { stalledMs: ms }),
  * });
  * watchdog.start();
@@ -40,7 +40,7 @@ export class DialogWatchdog {
     #intervalMs;
 
     /** @type {number} */
-    #stallMs;
+    #stallThresholdMs;
 
     /** @type {(stalledMs: number) => void} */
     #onStall;
@@ -54,9 +54,9 @@ export class DialogWatchdog {
     /**
      * @param {DialogWatchdogOptions} opts
      */
-    constructor({ intervalMs, stallMs, onStall }) {
+    constructor({ intervalMs, stallThresholdMs, onStall }) {
         this.#intervalMs = intervalMs;
-        this.#stallMs = stallMs;
+        this.#stallThresholdMs = stallThresholdMs;
         this.#onStall = onStall;
     }
 
@@ -74,7 +74,7 @@ export class DialogWatchdog {
         this.#lastActivity = Date.now();
         this.#timer = setInterval(() => {
             const stalledMs = Date.now() - this.#lastActivity;
-            if (stalledMs > this.#stallMs) {
+            if (stalledMs > this.#stallThresholdMs) {
                 log('WARN', `[DialogWatchdog] Dialog loop inativo há ${Math.round(stalledMs / 1000)}s`);
                 this.#onStall(stalledMs);
             }

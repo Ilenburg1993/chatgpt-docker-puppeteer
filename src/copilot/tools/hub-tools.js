@@ -149,16 +149,26 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
                     ? message.slice(0, MAX_MSG_CHARS) + ' […truncado]'
                     : message;
 
+            // F6.1 (BUG-MOD-03): truncar context e intent para evitar payloads gigantes no StructuredMessage
+            const safeContext =
+                typeof context === 'string' && context.length > MAX_MSG_CHARS
+                    ? context.slice(0, MAX_MSG_CHARS) + ' […truncado]'
+                    : context;
+            const safeIntent =
+                typeof intent === 'string' && intent.length > MAX_MSG_CHARS
+                    ? intent.slice(0, MAX_MSG_CHARS) + ' […truncado]'
+                    : intent;
+
             // UPG-04: validar timeoutMs para evitar valores absurdos de modelos alucinados
             const resolvedTimeout =
                 typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 120_000;
 
             // Se useStructured e há context/intent, enviar como StructuredMessageInput
             let payload;
-            if (useStructured !== false && (context || intent)) {
+            if (useStructured !== false && (safeContext || safeIntent)) {
                 payload = {
-                    context: context ?? safeMessage,
-                    intent: intent ?? safeMessage,
+                    context: safeContext ?? safeMessage,
+                    intent: safeIntent ?? safeMessage,
                     priority: priority ?? 'medium',
                     responseType: responseType ?? undefined,
                 };

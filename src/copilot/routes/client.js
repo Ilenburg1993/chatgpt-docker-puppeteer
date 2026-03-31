@@ -149,7 +149,8 @@ router.post('/client/stop', (req, res) => {
 router.post('/client/force-stop', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const client = await getClient();
-        await client.forceStop();
+        // F6.8 (BUG-MOD-15): usar optional chaining para compatibilidade com versões SDK sem forceStop
+        await /** @type {any} */ (client).forceStop?.();
         log('INFO', '[sdk-api] CopilotClient force-stop executado');
         res.json({ ok: true, message: 'CopilotClient force-stop executado.' });
     });

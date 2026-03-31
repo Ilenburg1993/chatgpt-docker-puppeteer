@@ -320,8 +320,19 @@ const webSearchTool = buildTool({
                 }
 
                 if (results.length > 0) {
-                    log('INFO', `[copilot/web_search] DDG JSON API: query="${query}" → ${results.length} resultados`);
-                    return { success: true, query, results: results.slice(0, limit) };
+                    // F6.4 (BUG-LEVE-04): filtrar URLs privadas/SSRF nos resultados DDG (JSON API)
+                    const safeResults = results.filter((r) => {
+                        try {
+                            return validateUrl(new URL(r.url)).safe;
+                        } catch {
+                            return false;
+                        }
+                    });
+                    log(
+                        'INFO',
+                        `[copilot/web_search] DDG JSON API: query="${query}" → ${safeResults.length} resultados`,
+                    );
+                    return { success: true, query, results: safeResults.slice(0, limit) };
                 }
                 // Sem resultados JSON — cai para HTML scraping
                 log(
@@ -405,8 +416,16 @@ const webSearchTool = buildTool({
                     `[copilot/web_search] query="${query}" retornou 0 resultados — DDG pode estar bloqueando ou query sem correspondência.`,
                 );
             }
-            log('INFO', `[copilot/web_search] query="${query}" → ${results.length} resultados`);
-            return { success: true, query, results };
+            // F6.4 (BUG-LEVE-04): filtrar URLs privadas/SSRF nos resultados DDG (HTML scraping)
+            const safeHtmlResults = results.filter((r) => {
+                try {
+                    return validateUrl(new URL(r.url)).safe;
+                } catch {
+                    return false;
+                }
+            });
+            log('INFO', `[copilot/web_search] query="${query}" → ${safeHtmlResults.length} resultados`);
+            return { success: true, query, results: safeHtmlResults };
         } catch (/** @type {any} */ e) {
             const msg = e?.name === 'AbortError' ? 'Timeout (15s)' : (e?.message ?? String(e));
             log('WARN', `[copilot/web_search] Erro: ${msg}`);

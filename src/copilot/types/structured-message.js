@@ -140,6 +140,22 @@ export const StructuredMessageSchema = z
          * malformados que quebram rastreamento.
          */
         correlationId: z.string().uuid().optional(),
+
+        /**
+         * F6.10: attachments — arquivos ou referências de contexto anexados à mensagem (ex: trechos de código, paths,
+         * URLs). Cada attachment tem um `type` e um `content` string. NOTA: .strict() está ativo neste schema —
+         * qualquer campo spread inesperado de objetos externos será rejeitado. Sempre declarar novos campos aqui antes
+         * de adicioná-los ao protocolo.
+         */
+        attachments: z
+            .array(
+                z.object({
+                    type: z.enum(['code', 'file_path', 'url', 'text']),
+                    content: z.string(),
+                    label: z.string().optional(),
+                }),
+            )
+            .optional(),
     })
     // UPG-PROP-03 (fix): .strict() rejeita campos desconhecidos enviados pelo LLM — evita campos
     // proprietários sendo silenciosamente ignorados e garante fidelidade ao protocolo v1.0.
@@ -175,6 +191,8 @@ const StructuredMessageResponseSchema = StructuredMessageSchema.passthrough();
  * @property {string} [traceId] - ID de rastreamento distribuído para correlação de logs
  * @property {number} [timestamp] - Unix ms — quando a mensagem foi criada
  * @property {string} [correlationId] - UUID para correlação de request/response LLM-A ↔ LLM-B
+ * @property {{ type: 'code' | 'file_path' | 'url' | 'text'; content: string; label?: string }[]} [attachments] - Anexos
+ *   de contexto (código, paths, URLs, texto)
  */
 
 /**

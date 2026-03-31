@@ -101,11 +101,12 @@ const BLOCKED_COMMAND_PATTERNS = [
 ];
 
 /**
- * Scripts npm permitidos (whitelist explícita). Qualquer outro script requer revisão.
+ * Scripts npm permitidos (whitelist explícita). Qualquer outro script requer revisão. F6.6 (BUG-MOD-13): configurável
+ * via COPILOT_NPM_SCRIPT_ALLOWLIST (lista separada por vírgula).
  *
  * @type {Set<string>}
  */
-const ALLOWED_NPM_SCRIPTS = new Set([
+const _DEFAULT_NPM_SCRIPTS = [
     'lint',
     'lint:fix',
     'format',
@@ -127,7 +128,16 @@ const ALLOWED_NPM_SCRIPTS = new Set([
     'queue:status',
     'queue:flow',
     'queue:clean',
-]);
+];
+const _envAllowlist = process.env['COPILOT_NPM_SCRIPT_ALLOWLIST'];
+const ALLOWED_NPM_SCRIPTS = new Set(
+    _envAllowlist
+        ? _envAllowlist
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+        : _DEFAULT_NPM_SCRIPTS,
+);
 
 /**
  * BUG-H01 (fix): tokeniza um comando shell respeitando aspas simples e duplas. Exemplo: tokenizeShell('echo "hello

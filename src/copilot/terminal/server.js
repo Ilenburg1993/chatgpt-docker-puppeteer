@@ -143,6 +143,22 @@ function checkWriteRate(ipEndpoint) {
     return _writeRateLimiter.check(ipEndpoint);
 }
 
+// F6.2 (BUG-MOD-04): rate limiter SSE separado — conexões persistentes têm padrão distinto de writes
+const SSE_RATE_MAX = Number(process.env.LLM_B_SSE_RATE_MAX ?? 10);
+const SSE_RATE_WINDOW_MS = Number(process.env.LLM_B_SSE_RATE_WINDOW_MS ?? 60_000);
+const _sseRateLimiter = createRateLimiter(SSE_RATE_MAX, SSE_RATE_WINDOW_MS);
+
+/**
+ * Verifica rate-limit para conexões SSE (/events, /events/critical) — janela e limite independentes dos endpoints de
+ * escrita.
+ *
+ * @param {string} ip - IP do cliente
+ * @returns {{ allowed: boolean; remaining: number; resetIn: number }}
+ */
+function checkSseRate(ip) {
+    return _sseRateLimiter.check(`sse:${ip}`);
+}
+
 // ─── Helpers de transporte ────────────────────────────────────────────────────
 
 /**
@@ -359,9 +375,9 @@ export function createInjectServer() {
                     res.end(JSON.stringify({ ok: false, error: 'Limite de clientes SSE atingido' }));
                     return;
                 }
-                // SEC-VULN-06 (fix): sliding window por IP — máximo de 5 conexões SSE por IP
+                // F6.2 (BUG-MOD-04): usa checkSseRate (limiter dedicado) em vez de checkWriteRate
                 const sseIp = req.socket?.remoteAddress ?? 'unknown';
-                const sseIpRate = checkWriteRate(`sse:${sseIp}`);
+                const sseIpRate = checkSseRate(sseIp);
                 if (!sseIpRate.allowed) {
                     res.writeHead(429, { 'Content-Type': 'application/json' });
                     res.end(

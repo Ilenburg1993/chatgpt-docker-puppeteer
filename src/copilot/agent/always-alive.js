@@ -1086,7 +1086,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         // Inicia watchdog: detecta se o dialog loop ficar inativo por muito tempo
         this.#watchdog = new DialogWatchdog({
             intervalMs: AlwaysAliveAgent.#WATCHDOG_INTERVAL_MS,
-            stallMs: AlwaysAliveAgent.#WATCHDOG_STALL_MS,
+            stallThresholdMs: AlwaysAliveAgent.#WATCHDOG_STALL_MS,
             onStall: (stalledMs) => this.emit('dialog.stalled', { stalledMs }),
         });
         this.#watchdog.start();

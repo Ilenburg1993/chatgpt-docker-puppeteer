@@ -252,12 +252,21 @@ export class HubOrchestrator extends EventEmitter {
 
         // Persistir turn de LLM-A
         const sdkSessionId = this.#getActiveSdkSessionId();
+        // F6.7 (BUG-MOD-14): logar traceId/correlationId no metadata do turn para rastreabilidade distribuída
+        const structuredMeta =
+            typeof message === 'object' && message !== null
+                ? {
+                      traceId: /** @type {any} */ (message).traceId,
+                      correlationId: /** @type {any} */ (message).correlationId,
+                  }
+                : {};
         const llmATurnId = await this.#store.writeTurn(hubSessionId, {
             role: 'llm_a',
             content: messageContent,
             ...(sdkSessionId !== undefined && { sdkSessionId }),
             model: 'copilot-claude-sonnet-4.6',
             structured: typeof message === 'object' ? message : null,
+            metadata: Object.keys(structuredMeta).length > 0 ? structuredMeta : null,
         });
         const llmATurn = this.#store.getTurn(llmATurnId);
         const turnNumber = llmATurn?.turn_number;

@@ -38,7 +38,11 @@ export function cmdAlias({ println }, args) {
             println('\x1b[90m  Uso: /alias set <nome> <comando>   ex: /alias set /myissues /gh issue list\x1b[0m');
             return;
         }
-        setAlias(name.startsWith('/') ? name : `/${name}`, expansion);
+        const result = setAlias(name.startsWith('/') ? name : `/${name}`, expansion);
+        if (!result.ok) {
+            println(`\x1b[31m  ✗ Erro ao definir alias: ${result.error}\x1b[0m`);
+            return;
+        }
         println(`\x1b[32m  ✓ Alias definido: ${name} → ${expansion}\x1b[0m`);
         return;
     }
