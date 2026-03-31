@@ -4,14 +4,14 @@
  *
  * ConversationStore — persistência SQLite para o ambiente permanente LLM-A ↔ LLM-B ↔ Usuário.
  *
- * Usa o mesmo DB maestro.sqlite do projeto (via getDb()) com tabelas adicionais para gerenciar hub_sessions e
- * conversation_turns independentemente das sessões SDK do AlwaysAliveAgent.
+ * F7.5: migrado para o banco isolado copilot.sqlite via `getCopilotDb()`. As tabelas são criadas pelas migrations
+ * formais em `src/copilot/db/migrations.js`, não mais por DDL inline neste arquivo.
  *
  * @module copilot/conversation-hub/store
  */
 
+import { getCopilotDb } from '#copilot/db/sqlite';
 import { log } from '#core/logger';
-import { getDb } from '#infra/db/sqlite';
 import { v4 as uuidv4 } from 'uuid';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -74,78 +74,13 @@ import { v4 as uuidv4 } from 'uuid';
  * @property {number} [limit] - Máximo de registros (default 20)
  */
 
-// ─── DDL (gerenciado aqui, não via migrations principais) ────────────────────
-
-const DDL_HUB_SESSIONS = `
-    CREATE TABLE IF NOT EXISTS copilot_hub_sessions (
-        id              TEXT PRIMARY KEY,
-        sdk_session_id  TEXT,
-        title           TEXT NOT NULL DEFAULT 'Conversa sem título',
-        status          TEXT NOT NULL DEFAULT 'active',
-        metadata        TEXT,
-        created_at      INTEGER NOT NULL,
-        updated_at      INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_hub_sessions_status ON copilot_hub_sessions(status, updated_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_hub_sessions_sdk ON copilot_hub_sessions(sdk_session_id);
-`;
-
-const DDL_CONVERSATION_TURNS = `
-    CREATE TABLE IF NOT EXISTS copilot_conversation_turns (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        hub_session_id  TEXT NOT NULL,
-        sdk_session_id  TEXT,
-        role            TEXT NOT NULL,
-        content         TEXT NOT NULL,
-        structured      TEXT,
-        tools_used      TEXT,
-        turn_number     INTEGER NOT NULL,
-        created_at      INTEGER NOT NULL,
-        duration_ms     INTEGER,
-        model           TEXT,
-        user_read       INTEGER NOT NULL DEFAULT 1,
-        metadata        TEXT,
-        FOREIGN KEY (hub_session_id) REFERENCES copilot_hub_sessions(id) ON DELETE CASCADE,
-        CONSTRAINT uq_hub_turn UNIQUE (hub_session_id, turn_number)
-    );
-    CREATE INDEX IF NOT EXISTS idx_conv_turns_session ON copilot_conversation_turns(hub_session_id, turn_number);
-    CREATE INDEX IF NOT EXISTS idx_conv_turns_time ON copilot_conversation_turns(created_at DESC);
-    -- F6.17 (BUG-LEVE-03): idx_conv_turns_unread removido (redundante com idx_conv_turns_user_unread abaixo).
-    -- UPG-05: índice para markAllUserMessagesRead() que filtra por role='user' + user_read=0
-    CREATE INDEX IF NOT EXISTS idx_conv_turns_user_unread ON copilot_conversation_turns(hub_session_id)
-        WHERE role = 'user' AND user_read = 0;
-`;
-
-// ─── DDL FTS5 para conversation_turns (UPG-PROP-06) ─────────────────────────────
-
-const DDL_TURNS_FTS = `
-    CREATE VIRTUAL TABLE IF NOT EXISTS copilot_turns_fts USING fts5(
-        id UNINDEXED,
-        hub_session_id UNINDEXED,
-        content,
-        content='copilot_conversation_turns',
-        content_rowid='id',
-        tokenize='porter unicode61 remove_diacritics 1'
-    );
-    CREATE TRIGGER IF NOT EXISTS turns_ai AFTER INSERT ON copilot_conversation_turns BEGIN
-        INSERT INTO copilot_turns_fts(rowid, id, hub_session_id, content)
-        VALUES (new.id, new.id, new.hub_session_id, new.content);
-    END;
-    CREATE TRIGGER IF NOT EXISTS turns_au AFTER UPDATE ON copilot_conversation_turns BEGIN
-        INSERT INTO copilot_turns_fts(copilot_turns_fts, rowid, id, hub_session_id, content)
-            VALUES('delete', old.id, old.id, old.hub_session_id, old.content);
-        INSERT INTO copilot_turns_fts(rowid, id, hub_session_id, content)
-            VALUES (new.id, new.id, new.hub_session_id, new.content);
-    END;
-    CREATE TRIGGER IF NOT EXISTS turns_ad AFTER DELETE ON copilot_conversation_turns BEGIN
-        INSERT INTO copilot_turns_fts(copilot_turns_fts, rowid, id, hub_session_id, content)
-            VALUES('delete', old.id, old.id, old.hub_session_id, old.content);
-    END;
-`;
+// ─── DDL movido para src/copilot/db/migrations.js (F7.3) ─────────────────────
+// As tabelas copilot_hub_sessions, copilot_conversation_turns, FTS5 e copilot_memories
+// são criadas pelas migrations v1–v4 no banco copilot.sqlite. O DDL inline foi removido.
 
 /**
- * Inicializa (ou re-sincroniza) a tabela FTS5 de turns caso ela esteja vazia mas a tabela de conteúdo não. Idempotente:
- * não reinsere linhas já indexadas.
+ * Popula a tabela FTS5 de turns caso ela esteja vazia mas a tabela de conteúdo não. Executado após migrations para
+ * bancos pré-existentes que migraram do maestro.sqlite.
  *
  * @param {import('better-sqlite3').Database} db
  * @returns {void}
@@ -159,7 +94,6 @@ function initTurnsFts(db) {
             db.prepare('SELECT COUNT(*) AS count FROM copilot_conversation_turns').get()
         );
         if ((ftsCount?.count ?? 0) === 0 && (turnCount?.count ?? 0) > 0) {
-            // Tabela FTS vazia mas há dados — repopular (ex: instalação em BD existente)
             log('INFO', '[ConversationStore] UPG-PROP-06: populando copilot_turns_fts a partir de dados existentes...');
             db.exec(`
                 INSERT INTO copilot_turns_fts(rowid, id, hub_session_id, content)
@@ -168,44 +102,9 @@ function initTurnsFts(db) {
             log('INFO', '[ConversationStore] UPG-PROP-06: copilot_turns_fts populado.');
         }
     } catch (/** @type {any} */ err) {
-        // Não fatal — apenas log warn. A tabela FTS pode ser reconstruída manualmente.
         log('WARN', `[ConversationStore] UPG-PROP-06: falha ao inicializar turns FTS5: ${err.message}`);
     }
 }
-
-// ─── DDL memórias semânticas (P5) ─────────────────────────────────────────────
-
-const DDL_MEMORIES = `
-    CREATE TABLE IF NOT EXISTS copilot_memories (
-        id          TEXT PRIMARY KEY,
-        hub_session_id TEXT,
-        tag         TEXT NOT NULL DEFAULT 'geral',
-        content     TEXT NOT NULL,
-        metadata    TEXT,
-        created_at  INTEGER NOT NULL,
-        updated_at  INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_memories_tag ON copilot_memories(tag, created_at DESC);
-    CREATE VIRTUAL TABLE IF NOT EXISTS copilot_memories_fts USING fts5(
-        id UNINDEXED,
-        tag,
-        content,
-        content='copilot_memories',
-        content_rowid='rowid',
-        tokenize='porter unicode61 remove_diacritics 1'
-    );
-    CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON copilot_memories BEGIN
-        INSERT INTO copilot_memories_fts(rowid, id, tag, content)
-        VALUES (new.rowid, new.id, new.tag, new.content);
-    END;
-    CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON copilot_memories BEGIN
-        INSERT INTO copilot_memories_fts(copilot_memories_fts, rowid, id, tag, content) VALUES('delete', old.rowid, old.id, old.tag, old.content);
-        INSERT INTO copilot_memories_fts(rowid, id, tag, content) VALUES (new.rowid, new.id, new.tag, new.content);
-    END;
-    CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON copilot_memories BEGIN
-        DELETE FROM copilot_memories_fts WHERE id=old.id;
-    END;
-`;
 
 // ─── FTS5 tokenizer migration (PERF-03) ──────────────────────────────────────
 
@@ -256,8 +155,8 @@ function migrateFts5Tokenizer(db) {
 /**
  * Persistência SQLite para o Conversation Hub.
  *
- * Usa a mesma instância do DB maestro.sqlite do projeto. As tabelas são criadas via DDL inline (não via migrations
- * principais para não acoplá-las ao ciclo de lifecycle das migrations de missões).
+ * F7.5: usa o banco isolado copilot.sqlite via getCopilotDb(). As tabelas são criadas pelas migrations formais em
+ * src/copilot/db/migrations.js (não mais por DDL inline).
  */
 export class ConversationStore {
     /** @type {import('better-sqlite3').Database | null} */
@@ -281,24 +180,17 @@ export class ConversationStore {
         if (this.#initialized) return;
 
         try {
-            this.#db = dbOverride ?? getDb();
-            this.#db.exec(DDL_HUB_SESSIONS);
-            this.#db.exec(DDL_CONVERSATION_TURNS);
-            this.#db.exec(DDL_TURNS_FTS);
-            this.#db.exec(DDL_MEMORIES);
-            migrateFts5Tokenizer(this.#db);
-            initTurnsFts(this.#db);
-
-            // BUG-CRIT-03 migration: corrigir role 'llm-b' (hífen) para 'llm_b' (underscore canônico)
-            // Idempotente — rows com role='llm_b' já não são afetadas
-            this.#db.prepare(`UPDATE copilot_conversation_turns SET role = 'llm_b' WHERE role = 'llm-b'`).run();
+            // F7.5: usar banco isolado copilot.sqlite; em testes passa-se dbOverride (:memory:)
+            this.#db = dbOverride ?? getCopilotDb();
+            const db = this.#db;
+            migrateFts5Tokenizer(db);
+            initTurnsFts(db);
 
             this.#initialized = true;
             log('DEBUG', '[ConversationStore] Tabelas inicializadas.');
 
             // MELHORIA-09 (fix): agendar WAL checkpoint periódico para evitar acúmulo do WAL file
             // em sessões de longa duração. O checkpoint passivo (PASSIVE) não bloqueia readers.
-            const db = this.#db;
             let _checkpointErrors = 0;
             const checkpointTimer = setInterval(
                 () => {

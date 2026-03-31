@@ -30,7 +30,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import * as url from 'node:url';
-import { getDb } from '../../../src/infra/db/sqlite.js';
+import { getCopilotDb } from '../../../src/copilot/db/sqlite.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Setup: paths e helpers SQLite
@@ -58,7 +58,7 @@ function writeRaw(data) {
  */
 function readRaw() {
     try {
-        const db = getDb();
+        const db = getCopilotDb();
         const rows = /** @type {{ id: string; data: string }[]} */ (
             db.prepare('SELECT id, data FROM copilot_todo_tasks').all()
         );
@@ -76,7 +76,7 @@ function readRaw() {
  */
 function clearTodoTable() {
     try {
-        getDb().prepare('DELETE FROM copilot_todo_tasks').run();
+        getCopilotDb().prepare('DELETE FROM copilot_todo_tasks').run();
     } catch {
         // tabela pode não existir — ignorar
     }

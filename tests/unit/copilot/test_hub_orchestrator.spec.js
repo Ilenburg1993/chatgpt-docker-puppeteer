@@ -19,8 +19,33 @@ import { createRequire } from 'node:module';
 import { after, before, describe, it } from 'node:test';
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
+import { COPILOT_MIGRATIONS } from '../../../src/copilot/db/migrations.js';
 
 const require = createRequire(import.meta.url);
+
+/**
+ * Aplica as migrations copilot a um banco in-memory de teste.
+ *
+ * @param {import('better-sqlite3').Database} db
+ */
+function applyCopilotMigrations(db) {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            applied_at_ms INTEGER NOT NULL
+        );
+    `);
+    for (const m of COPILOT_MIGRATIONS) {
+        if (typeof m.up === 'string') db.exec(m.up);
+        else if (typeof m.upFn === 'function') m.upFn(db);
+        db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
+            m.version,
+            m.name,
+            Date.now(),
+        );
+    }
+}
 
 /** @type {import('better-sqlite3').Database} */
 let testDb;
@@ -58,6 +83,7 @@ const mockAgent = { getStatusSnapshot: () => ({ sessionId: 'mock-sdk-session-id'
 before(() => {
     const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
+    applyCopilotMigrations(testDb);
 
     store = new ConversationStore();
     store.init(testDb);
@@ -267,6 +293,7 @@ describe('HubOrchestrator.sendToLlmB serialização', () => {
         // Criar orquestrador isolado para este teste
         const Database = require('better-sqlite3');
         const db2 = new Database(':memory:');
+        applyCopilotMigrations(db2);
         const store2 = new ConversationStore();
         store2.init(db2);
         const orch2 = new HubOrchestrator(store2, mockAgent);
@@ -294,6 +321,7 @@ describe('HubOrchestrator.sendToLlmB serialização', () => {
     it('emite turn:user_pending quando usuário injeta enquanto turn está em andamento', async () => {
         const Database = require('better-sqlite3');
         const db3 = new Database(':memory:');
+        applyCopilotMigrations(db3);
         const store3 = new ConversationStore();
         store3.init(db3);
 

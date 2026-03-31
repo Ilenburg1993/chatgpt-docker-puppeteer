@@ -21,8 +21,8 @@
  * @module copilot/tools/todo-tools
  */
 
+import { getCopilotDb } from '#copilot/db/sqlite';
 import { log } from '#core/logger';
-import { getDb } from '#infra/db/sqlite';
 import { defineTool } from '@github/copilot-sdk';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -120,37 +120,23 @@ const VALID_TRANSITIONS = {
  */
 
 // ---------------------------------------------------------------------------
-// SQLite backend — F4.2 (UPG-03): migração de JSON file para SQLite
+// SQLite backend — F4.2 (UPG-03) + F7.6: banco isolado copilot.sqlite
 // ---------------------------------------------------------------------------
+// O DDL da tabela copilot_todo_tasks (migration v5) está em src/copilot/db/migrations.js.
+// getCopilotDb() aplica as migrations ao abrir copilot.sqlite, portanto não é necessário
+// criar a tabela aqui. A migração one-shot JSON→SQLite é feita em _migrateJsonLegacy().
 
 /**
- * Inicializa a tabela `copilot_todo_tasks` no maestro.sqlite (idempotente). Também faz migração one-shot do JSON legado
- * se a tabela estiver vazia.
+ * Migração one-shot do arquivo JSON legado (todos.json) para o SQLite isolado. Executada apenas se a tabela estiver
+ * vazia e o arquivo legado existir.
+ *
+ * @returns {void}
  */
-function _initTodoDb() {
-    const db = getDb();
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS copilot_todo_tasks (
-            id          TEXT PRIMARY KEY,
-            data        TEXT NOT NULL,
-            status      TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) STORED,
-            priority    TEXT GENERATED ALWAYS AS (json_extract(data, '$.priority')) STORED,
-            parent_id   TEXT GENERATED ALWAYS AS (json_extract(data, '$.parentId')) STORED,
-            created_at  TEXT GENERATED ALWAYS AS (json_extract(data, '$.createdAt')) STORED,
-            updated_at  TEXT GENERATED ALWAYS AS (json_extract(data, '$.updatedAt')) STORED
-        ) STRICT;
-    `);
-    db.exec(`
-        CREATE INDEX IF NOT EXISTS idx_todo_status    ON copilot_todo_tasks(status);
-        CREATE INDEX IF NOT EXISTS idx_todo_priority  ON copilot_todo_tasks(priority);
-        CREATE INDEX IF NOT EXISTS idx_todo_parent_id ON copilot_todo_tasks(parent_id);
-        CREATE INDEX IF NOT EXISTS idx_todo_created   ON copilot_todo_tasks(created_at);
-    `);
-
-    // Migração one-shot do JSON legado
-    const count = /** @type {{ n: number }} */ (db.prepare('SELECT COUNT(*) AS n FROM copilot_todo_tasks').get());
-    if (count.n === 0 && fs.existsSync(TODOS_FILE)) {
-        try {
+function _migrateJsonLegacy() {
+    try {
+        const db = getCopilotDb();
+        const count = /** @type {{ n: number }} */ (db.prepare('SELECT COUNT(*) AS n FROM copilot_todo_tasks').get());
+        if (count.n === 0 && fs.existsSync(TODOS_FILE)) {
             const raw = fs.readFileSync(TODOS_FILE, 'utf8');
             const data = JSON.parse(raw);
             const tasks = typeof data?.tasks === 'object' ? data.tasks : {};
@@ -165,17 +151,17 @@ function _initTodoDb() {
                 insertMany(rows);
                 log('INFO', `[todo-tools] Migração JSON→SQLite: ${rows.length} tarefas importadas.`);
             }
-        } catch (e) {
-            log('WARN', `[todo-tools] Migração JSON legado falhou (não-crítico): ${/** @type {Error} */ (e).message}`);
         }
+    } catch (e) {
+        log('WARN', `[todo-tools] Migração JSON legado falhou (não-crítico): ${/** @type {Error} */ (e).message}`);
     }
 }
 
-// Inicializa o DB na carga do módulo (síncrono, one-time).
+// Executa migração legada na carga do módulo (síncrono, one-time).
 try {
-    _initTodoDb();
+    _migrateJsonLegacy();
 } catch (e) {
-    log('WARN', `[todo-tools] _initTodoDb falhou: ${/** @type {Error} */ (e).message}`);
+    log('WARN', `[todo-tools] _migrateJsonLegacy falhou: ${/** @type {Error} */ (e).message}`);
 }
 
 // BUG-CRIT-04 (fix): mutex serial para serializar ciclos read-modify-write do store.
@@ -213,7 +199,7 @@ async function withStore(fn) {
 
 async function _readStoreRaw() {
     try {
-        const db = getDb();
+        const db = getCopilotDb();
         const rows = /** @type {{ id: string; data: string }[]} */ (
             db.prepare('SELECT id, data FROM copilot_todo_tasks').all()
         );
@@ -238,7 +224,7 @@ async function _readStoreRaw() {
  * @returns {Promise<void>}
  */
 async function _writeStoreRaw(store) {
-    const db = getDb();
+    const db = getCopilotDb();
     // Upsert todas as tarefas do store em memória para o SQLite.
     // Para deletados (removidos do store), apagamos do DB comparando os ids presentes.
     const upsert = db.prepare('INSERT OR REPLACE INTO copilot_todo_tasks (id, data) VALUES (?, ?)');

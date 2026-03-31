@@ -34,6 +34,7 @@
     "#agent/*": "./src/agent/*.js",
     "#copilot/lib": "./src/copilot/lib/index.js",
     "#copilot/lib/*": "./src/copilot/lib/*.js",
+    "#copilot/db/*": "./src/copilot/db/*.js",
     "#copilot/types/*": "./src/copilot/types/*.js",
     "#copilot/conversation-hub": "./src/copilot/conversation-hub/index.js",
     "#copilot/conversation-hub/*": "./src/copilot/conversation-hub/*.js",

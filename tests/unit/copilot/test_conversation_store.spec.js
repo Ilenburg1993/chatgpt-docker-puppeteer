@@ -25,8 +25,33 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { after, before, describe, it } from 'node:test';
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
+import { COPILOT_MIGRATIONS } from '../../../src/copilot/db/migrations.js';
 
 const require = createRequire(import.meta.url);
+
+/**
+ * Aplica as migrations copilot a um banco in-memory de teste.
+ *
+ * @param {import('better-sqlite3').Database} db
+ */
+function applyCopilotMigrations(db) {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            applied_at_ms INTEGER NOT NULL
+        );
+    `);
+    for (const m of COPILOT_MIGRATIONS) {
+        if (typeof m.up === 'string') db.exec(m.up);
+        else if (typeof m.upFn === 'function') m.upFn(db);
+        db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
+            m.version,
+            m.name,
+            Date.now(),
+        );
+    }
+}
 
 /** @type {import('better-sqlite3').Database} */
 let testDb;
@@ -37,9 +62,11 @@ let store;
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 before(() => {
-    // DB in-memory — injeta no store via dbOverride para não tocar em maestro.sqlite
+    // DB in-memory — injeta no store via dbOverride para não tocar em copilot.sqlite
     const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
+    // F7: aplicar migrations copilot para criar tabelas no banco de teste
+    applyCopilotMigrations(testDb);
     store = new ConversationStore();
     store.init(testDb);
 });

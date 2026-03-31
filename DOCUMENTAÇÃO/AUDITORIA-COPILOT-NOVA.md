@@ -1269,27 +1269,27 @@ this.#db.pragma('cache_size=-32000'); // 32MB cache
 
 | ID          | Categoria       | Severidade | Esforço | Impacto | Prioridade |
 | ----------- | --------------- | ---------- | ------- | ------- | ---------- |
-| BUG-CRIT-01 | Bug Crítico     | 🔴 Crítico | Baixo   | Alto    | **P0**     |
-| BUG-CRIT-02 | Bug Crítico     | 🔴 Crítico | Baixo   | Alto    | **P0**     |
-| BUG-CRIT-04 | Bug Crítico     | 🔴 Crítico | Médio   | Alto    | **P0**     |
-| BUG-CRIT-05 | Bug Crítico     | 🔴 Crítico | Baixo   | Médio   | **P0**     |
-| SDK-01      | SDK Conformance | 🔴 Crítico | Baixo   | Alto    | **P0**     |
-| BUG-CRIT-03 | Bug Crítico     | 🟠 Alto    | Médio   | Médio   | **P1**     |
-| BUG-CRIT-06 | Bug Crítico     | 🟠 Alto    | Médio   | Médio   | **P1**     |
-| BUG-CRIT-07 | Bug Crítico     | 🟠 Alto    | Alto    | Baixo   | **P1**     |
-| SEC-01      | Segurança       | 🟠 Alto    | Alto    | Alto    | **P1**     |
-| SEC-06      | Segurança       | 🟠 Alto    | Médio   | Alto    | **P1**     |
-| SEC-07      | Segurança       | 🟠 Alto    | Baixo   | Médio   | **P1**     |
-| BUG-MOD-01  | Bug Moderado    | 🟡 Médio   | Baixo   | Médio   | **P2**     |
-| BUG-MOD-04  | Bug Moderado    | 🟡 Médio   | Baixo   | Baixo   | **P2**     |
-| BUG-MOD-08  | Bug Moderado    | 🟡 Médio   | Médio   | Médio   | **P2**     |
-| BUG-MOD-11  | Bug Moderado    | 🟡 Médio   | Baixo   | Médio   | **P2**     |
-| SDK-03      | SDK Conformance | 🟡 Médio   | Médio   | Médio   | **P2**     |
-| SDK-05      | SDK Conformance | 🟡 Médio   | Alto    | Médio   | **P2**     |
-| ARCH-03     | Arquitetura     | 🟡 Médio   | Alto    | Alto    | **P2**     |
-| UPG-03      | Upgrade         | 🟢 Baixo   | Alto    | Alto    | **P3**     |
-| UPG-09      | Upgrade         | 🟢 Baixo   | Baixo   | Médio   | **P3**     |
-| UPG-12      | Upgrade         | 🟢 Baixo   | Alto    | Alto    | **P3**     |
+| BUG-CRIT-01 | Bug Crítico     | 🔴 Crítico  | Baixo   | Alto    | **P0**     |
+| BUG-CRIT-02 | Bug Crítico     | 🔴 Crítico  | Baixo   | Alto    | **P0**     |
+| BUG-CRIT-04 | Bug Crítico     | 🔴 Crítico  | Médio   | Alto    | **P0**     |
+| BUG-CRIT-05 | Bug Crítico     | 🔴 Crítico  | Baixo   | Médio   | **P0**     |
+| SDK-01      | SDK Conformance | 🔴 Crítico  | Baixo   | Alto    | **P0**     |
+| BUG-CRIT-03 | Bug Crítico     | 🟠 Alto     | Médio   | Médio   | **P1**     |
+| BUG-CRIT-06 | Bug Crítico     | 🟠 Alto     | Médio   | Médio   | **P1**     |
+| BUG-CRIT-07 | Bug Crítico     | 🟠 Alto     | Alto    | Baixo   | **P1**     |
+| SEC-01      | Segurança       | 🟠 Alto     | Alto    | Alto    | **P1**     |
+| SEC-06      | Segurança       | 🟠 Alto     | Médio   | Alto    | **P1**     |
+| SEC-07      | Segurança       | 🟠 Alto     | Baixo   | Médio   | **P1**     |
+| BUG-MOD-01  | Bug Moderado    | 🟡 Médio    | Baixo   | Médio   | **P2**     |
+| BUG-MOD-04  | Bug Moderado    | 🟡 Médio    | Baixo   | Baixo   | **P2**     |
+| BUG-MOD-08  | Bug Moderado    | 🟡 Médio    | Médio   | Médio   | **P2**     |
+| BUG-MOD-11  | Bug Moderado    | 🟡 Médio    | Baixo   | Médio   | **P2**     |
+| SDK-03      | SDK Conformance | 🟡 Médio    | Médio   | Médio   | **P2**     |
+| SDK-05      | SDK Conformance | 🟡 Médio    | Alto    | Médio   | **P2**     |
+| ARCH-03     | Arquitetura     | 🟡 Médio    | Alto    | Alto    | **P2**     |
+| UPG-03      | Upgrade         | 🟢 Baixo    | Alto    | Alto    | **P3**     |
+| UPG-09      | Upgrade         | 🟢 Baixo    | Baixo   | Médio   | **P3**     |
+| UPG-12      | Upgrade         | 🟢 Baixo    | Alto    | Alto    | **P3**     |
 
 ---
 
@@ -1675,45 +1675,45 @@ Já coberto em F3.8.
 
 | Fase | ID   | Item                                            | Esforço | Prioridade | Status |
 | ---- | ---- | ----------------------------------------------- | ------- | ---------- | ------ |
-| F0   | F0.1 | SDK-01: `onPermissionRequest` default           | Baixo   | **P0**     | ✅     |
-| F0   | F0.2 | SDK-03: sections nomeadas no system message     | Médio   | **P2**     | ✅     |
-| F0   | F0.3 | SDK-04: `getMessages()` guard + comentário      | Baixo   | **P3**     | ✅     |
-| F0   | F0.4 | SDK-07: `ping()` argumento verificar            | Baixo   | **P3**     | ✅     |
-| F0   | F0.5 | SDK-08: `client.stop()` no shutdown do agente   | Baixo   | **P1**     | ✅     |
-| F0   | F0.6 | SDK-09: remover forcing `overridesBuiltInTool`  | Médio   | **P2**     | ✅     |
-| F1   | F1.1 | CRIT-02: `writeTurn` lança exceção              | Baixo   | **P0**     | ✅     |
-| F1   | F1.2 | CRIT-04: `todo-tools.js` mutex                  | Médio   | **P0**     | ✅     |
-| F1   | F1.3 | CRIT-05: verificar double-emit `task.delta`     | Baixo   | **P0**     | ✅     |
-| F1   | F1.4 | CRIT-06: `chatBatch` documentar sequencial      | Baixo   | **P1**     | ✅     |
-| F1   | F1.5 | CRIT-07: `PinnedFilesLoader` Linux recursive    | Médio   | **P1**     | ✅     |
-| F2   | F2.1 | SEC-01: allowlist de executáveis                | Alto    | **P1**     | ✅     |
-| F2   | F2.2 | SEC-02: limitar tamanho leitura session files   | Baixo   | **P1**     | ✅     |
-| F2   | F2.3 | SEC-03: protect JSON.parse prototype pollution  | Baixo   | **P1**     | ✅     |
-| F2   | F2.4 | SEC-04: `timingSafeEqual` para token            | Baixo   | **P1**     | ✅     |
-| F2   | F2.5 | SEC-05: expandir BLOCKED_PATTERNS               | Baixo   | **P2**     | ✅     |
-| F2   | F2.6 | SEC-06: socket join session verificar ownership | Médio   | **P1**     | ✅     |
-| F2   | F2.7 | SEC-07: `rawApi` restringir a GET               | Baixo   | **P1**     | ✅     |
-| F2   | F2.8 | SEC-08: nota DNS rebinding + dns.lookup         | Médio   | **P2**     | ✅     |
-| F3   | F3.1 | MOD-01: limite `consecutive_unauthorized`       | Baixo   | **P2**     | ✅     |
-| F3   | F3.2 | MOD-02: MCP circuit breaker reset               | Baixo   | **P2**     | ✅     |
-| F3   | F3.3 | MOD-06: mutex geração sem race condition        | Médio   | **P2**     | ✅     |
-| F3   | F3.4 | MOD-08: `validatePath` async                    | Médio   | **P2**     | ✅     |
-| F3   | F3.5 | MOD-10: `onErrorOccurred` hierarchy fix         | Médio   | **P2**     | ✅     |
-| F3   | F3.6 | MOD-11: `getAuditSummary` async                 | Baixo   | **P2**     | ✅     |
-| F3   | F3.7 | MOD-12: `nerv-bridge.js` listener once          | Baixo   | **P2**     | ✅     |
-| F3   | F3.8 | LEVE-11: `git-tools.js` execFile                | Baixo   | **P2**     | ✅     |
-| F3   | F3.9 | LEVE-09: `lastPrInfo` cópia rasa                | Baixo   | **P3**     | ✅     |
-| F4   | F4.2 | UPG-03: `todo-tools.js` → SQLite                | Alto    | **P3**     | ⏳     |
-| F4   | F4.3 | UPG-06: `session.idle` para métricas            | Baixo   | **P3**     | ✅     |
-| F4   | F4.4 | UPG-09: DDG JSON API                            | Baixo   | **P3**     | ✅     |
-| F4   | F4.5 | UPG-10: `chatBatch` semáforo                    | Médio   | **P3**     | ✅     |
-| F4   | F4.6 | UPG-11: `dialogLoopActive` via SSE              | Médio   | **P3**     | ⏳     |
-| F4   | F4.7 | UPG-12: teste integração ciclo stop/start       | Alto    | **P3**     | ⏳     |
-| F4   | F4.8 | UPG-02: OTLP nativa do SDK                      | Médio   | **P3**     | ✅     |
-| F4   | F4.9 | UPG-08: versão semver em structured-message     | Baixo   | **P3**     | ✅     |
-| F5   | F5.1 | ARCH-01: Zod schema para `session.json`         | Alto    | **P4**     | ✅     |
-| F5   | F5.3 | ARCH-07: `/hub-health` no terminal server       | Baixo   | **P4**     | ✅     |
-| F5   | F5.4 | ARCH-06: `.passthrough()` em respostas          | Baixo   | **P4**     | ✅     |
+| F0   | F0.1 | SDK-01: `onPermissionRequest` default           | Baixo   | **P0**     | ✅      |
+| F0   | F0.2 | SDK-03: sections nomeadas no system message     | Médio   | **P2**     | ✅      |
+| F0   | F0.3 | SDK-04: `getMessages()` guard + comentário      | Baixo   | **P3**     | ✅      |
+| F0   | F0.4 | SDK-07: `ping()` argumento verificar            | Baixo   | **P3**     | ✅      |
+| F0   | F0.5 | SDK-08: `client.stop()` no shutdown do agente   | Baixo   | **P1**     | ✅      |
+| F0   | F0.6 | SDK-09: remover forcing `overridesBuiltInTool`  | Médio   | **P2**     | ✅      |
+| F1   | F1.1 | CRIT-02: `writeTurn` lança exceção              | Baixo   | **P0**     | ✅      |
+| F1   | F1.2 | CRIT-04: `todo-tools.js` mutex                  | Médio   | **P0**     | ✅      |
+| F1   | F1.3 | CRIT-05: verificar double-emit `task.delta`     | Baixo   | **P0**     | ✅      |
+| F1   | F1.4 | CRIT-06: `chatBatch` documentar sequencial      | Baixo   | **P1**     | ✅      |
+| F1   | F1.5 | CRIT-07: `PinnedFilesLoader` Linux recursive    | Médio   | **P1**     | ✅      |
+| F2   | F2.1 | SEC-01: allowlist de executáveis                | Alto    | **P1**     | ✅      |
+| F2   | F2.2 | SEC-02: limitar tamanho leitura session files   | Baixo   | **P1**     | ✅      |
+| F2   | F2.3 | SEC-03: protect JSON.parse prototype pollution  | Baixo   | **P1**     | ✅      |
+| F2   | F2.4 | SEC-04: `timingSafeEqual` para token            | Baixo   | **P1**     | ✅      |
+| F2   | F2.5 | SEC-05: expandir BLOCKED_PATTERNS               | Baixo   | **P2**     | ✅      |
+| F2   | F2.6 | SEC-06: socket join session verificar ownership | Médio   | **P1**     | ✅      |
+| F2   | F2.7 | SEC-07: `rawApi` restringir a GET               | Baixo   | **P1**     | ✅      |
+| F2   | F2.8 | SEC-08: nota DNS rebinding + dns.lookup         | Médio   | **P2**     | ✅      |
+| F3   | F3.1 | MOD-01: limite `consecutive_unauthorized`       | Baixo   | **P2**     | ✅      |
+| F3   | F3.2 | MOD-02: MCP circuit breaker reset               | Baixo   | **P2**     | ✅      |
+| F3   | F3.3 | MOD-06: mutex geração sem race condition        | Médio   | **P2**     | ✅      |
+| F3   | F3.4 | MOD-08: `validatePath` async                    | Médio   | **P2**     | ✅      |
+| F3   | F3.5 | MOD-10: `onErrorOccurred` hierarchy fix         | Médio   | **P2**     | ✅      |
+| F3   | F3.6 | MOD-11: `getAuditSummary` async                 | Baixo   | **P2**     | ✅      |
+| F3   | F3.7 | MOD-12: `nerv-bridge.js` listener once          | Baixo   | **P2**     | ✅      |
+| F3   | F3.8 | LEVE-11: `git-tools.js` execFile                | Baixo   | **P2**     | ✅      |
+| F3   | F3.9 | LEVE-09: `lastPrInfo` cópia rasa                | Baixo   | **P3**     | ✅      |
+| F4   | F4.2 | UPG-03: `todo-tools.js` → SQLite                | Alto    | **P3**     | ⏳      |
+| F4   | F4.3 | UPG-06: `session.idle` para métricas            | Baixo   | **P3**     | ✅      |
+| F4   | F4.4 | UPG-09: DDG JSON API                            | Baixo   | **P3**     | ✅      |
+| F4   | F4.5 | UPG-10: `chatBatch` semáforo                    | Médio   | **P3**     | ✅      |
+| F4   | F4.6 | UPG-11: `dialogLoopActive` via SSE              | Médio   | **P3**     | ⏳      |
+| F4   | F4.7 | UPG-12: teste integração ciclo stop/start       | Alto    | **P3**     | ⏳      |
+| F4   | F4.8 | UPG-02: OTLP nativa do SDK                      | Médio   | **P3**     | ✅      |
+| F4   | F4.9 | UPG-08: versão semver em structured-message     | Baixo   | **P3**     | ✅      |
+| F5   | F5.1 | ARCH-01: Zod schema para `session.json`         | Alto    | **P4**     | ✅      |
+| F5   | F5.3 | ARCH-07: `/hub-health` no terminal server       | Baixo   | **P4**     | ✅      |
+| F5   | F5.4 | ARCH-06: `.passthrough()` em respostas          | Baixo   | **P4**     | ✅      |
 
 _Roadmap adicionado em 2026-03-30. Última atualização de status: 2026-04-01 (commit `0f05a717`)._
 
@@ -1972,25 +1972,25 @@ cobrindo casos similares. **Correção**: Revisar se ambos são utilizados nos q
 
 | ID    | Item                                             | Esforço | Prioridade | Status |
 | ----- | ------------------------------------------------ | ------- | ---------- | ------ |
-| F6.1  | `/restart` race condition em `repl.js`           | Baixo   | **P2**     | ✅     |
-| F6.2  | Truncar `context`/`intent` em `hub_send_message` | Baixo   | **P2**     | ✅     |
-| F6.3  | Rate limiter separado SSE vs HTTP                | Médio   | **P2**     | ✅     |
-| F6.4  | Validar URLs DDG contra `PRIVATE_HOST_RE`        | Baixo   | **P2**     | ✅     |
-| F6.5  | `#inflightBySession` proteção zumbi              | Médio   | **P2**     | ✅     |
-| F6.6  | Logar `traceId` no `writeTurn`                   | Médio   | **P3**     | ✅     |
-| F6.7  | `pingClient.forceStop()` com optional chaining   | Baixo   | **P3**     | ✅     |
-| F6.8  | `handleInject` suporte `type: 'blob'`            | Baixo   | **P3**     | ✅     |
-| F6.9  | `getLastNPairs` cursor-based                     | Médio   | **P4**     | ✅     |
-| F6.10 | SQLite WAL mode + cache na inicialização         | Baixo   | **P3**     | ✅     |
-| F6.11 | `alias-store.js` detectar loops de alias         | Baixo   | **P3**     | ✅     |
-| F6.12 | `SYSTEM_PROMPT_SECTIONS` do SDK (constantes)     | Baixo   | **P3**     | ✅     |
-| F6.13 | `session-rpc-tools.js` → API pública SDK         | Alto    | **P3**     | ✅     |
-| F6.14 | Renomear `stallMs` → `stallThresholdMs`          | Baixo   | **P4**     | ✅     |
-| F6.15 | `gh-bridge.js` → `timed_out` em `runIcon`        | Baixo   | **P4**     | ✅     |
-| F6.16 | `todoDeleteTool` relatar subtarefas orfanizadas  | Baixo   | **P4**     | ✅     |
-| F6.17 | Deduplicar índices parciais em `store.js`        | Baixo   | **P4**     | ✅     |
-| F6.18 | `ALLOWED_NPM_SCRIPTS` configurável via env       | Baixo   | **P3**     | ✅ 🆕  |
-| F6.19 | `structured-message.js` — campo `attachments`    | Baixo   | **P3**     | ✅ 🆕  |
+| F6.1  | `/restart` race condition em `repl.js`           | Baixo   | **P2**     | ✅      |
+| F6.2  | Truncar `context`/`intent` em `hub_send_message` | Baixo   | **P2**     | ✅      |
+| F6.3  | Rate limiter separado SSE vs HTTP                | Médio   | **P2**     | ✅      |
+| F6.4  | Validar URLs DDG contra `PRIVATE_HOST_RE`        | Baixo   | **P2**     | ✅      |
+| F6.5  | `#inflightBySession` proteção zumbi              | Médio   | **P2**     | ✅      |
+| F6.6  | Logar `traceId` no `writeTurn`                   | Médio   | **P3**     | ✅      |
+| F6.7  | `pingClient.forceStop()` com optional chaining   | Baixo   | **P3**     | ✅      |
+| F6.8  | `handleInject` suporte `type: 'blob'`            | Baixo   | **P3**     | ✅      |
+| F6.9  | `getLastNPairs` cursor-based                     | Médio   | **P4**     | ✅      |
+| F6.10 | SQLite WAL mode + cache na inicialização         | Baixo   | **P3**     | ✅      |
+| F6.11 | `alias-store.js` detectar loops de alias         | Baixo   | **P3**     | ✅      |
+| F6.12 | `SYSTEM_PROMPT_SECTIONS` do SDK (constantes)     | Baixo   | **P3**     | ✅      |
+| F6.13 | `session-rpc-tools.js` → API pública SDK         | Alto    | **P3**     | ✅      |
+| F6.14 | Renomear `stallMs` → `stallThresholdMs`          | Baixo   | **P4**     | ✅      |
+| F6.15 | `gh-bridge.js` → `timed_out` em `runIcon`        | Baixo   | **P4**     | ✅      |
+| F6.16 | `todoDeleteTool` relatar subtarefas orfanizadas  | Baixo   | **P4**     | ✅      |
+| F6.17 | Deduplicar índices parciais em `store.js`        | Baixo   | **P4**     | ✅      |
+| F6.18 | `ALLOWED_NPM_SCRIPTS` configurável via env       | Baixo   | **P3**     | ✅ 🆕    |
+| F6.19 | `structured-message.js` — campo `attachments`    | Baixo   | **P3**     | ✅ 🆕    |
 
 ---
 

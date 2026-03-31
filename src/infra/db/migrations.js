@@ -649,13 +649,6 @@ const MIGRATIONS = [
             CREATE INDEX IF NOT EXISTS idx_diagnostic_reports_type ON diagnostic_reports(report_type, created_at_ms DESC);
         `,
     },
-    {
-        version: 10,
-        name: 'drop_redundant_conv_turns_unread_index',
-        // F6.17 (BUG-LEVE-03): idx_conv_turns_unread é redundante em relação a idx_conv_turns_user_unread.
-        // Todas as queries de user_read=0 também filtram por role='user', tornando o índice mais amplo desnecessário.
-        up: `DROP INDEX IF EXISTS idx_conv_turns_unread;`,
-    },
 ];
 
 export { MIGRATIONS };
