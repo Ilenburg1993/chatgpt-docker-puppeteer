@@ -1703,23 +1703,121 @@ Já coberto em F3.8.
 | F3   | F3.7 | MOD-12: `nerv-bridge.js` listener once          | Baixo   | **P2**     | ✅      |
 | F3   | F3.8 | LEVE-11: `git-tools.js` execFile                | Baixo   | **P2**     | ✅      |
 | F3   | F3.9 | LEVE-09: `lastPrInfo` cópia rasa                | Baixo   | **P3**     | ✅      |
-| F4   | F4.2 | UPG-03: `todo-tools.js` → SQLite                | Alto    | **P3**     | ⏳      |
+| F4   | F4.2 | UPG-03: `todo-tools.js` → SQLite                | Alto    | **P3**     | ✅      |
 | F4   | F4.3 | UPG-06: `session.idle` para métricas            | Baixo   | **P3**     | ✅      |
 | F4   | F4.4 | UPG-09: DDG JSON API                            | Baixo   | **P3**     | ✅      |
 | F4   | F4.5 | UPG-10: `chatBatch` semáforo                    | Médio   | **P3**     | ✅      |
-| F4   | F4.6 | UPG-11: `dialogLoopActive` via SSE              | Médio   | **P3**     | ⏳      |
-| F4   | F4.7 | UPG-12: teste integração ciclo stop/start       | Alto    | **P3**     | ⏳      |
+| F4   | F4.6 | UPG-11: `dialogLoopActive` via SSE              | Médio   | **P3**     | ✅      |
+| F4   | F4.7 | UPG-12: teste integração ciclo stop/start       | Alto    | **P3**     | ✅      |
 | F4   | F4.8 | UPG-02: OTLP nativa do SDK                      | Médio   | **P3**     | ✅      |
 | F4   | F4.9 | UPG-08: versão semver em structured-message     | Baixo   | **P3**     | ✅      |
 | F5   | F5.1 | ARCH-01: Zod schema para `session.json`         | Alto    | **P4**     | ✅      |
 | F5   | F5.3 | ARCH-07: `/hub-health` no terminal server       | Baixo   | **P4**     | ✅      |
 | F5   | F5.4 | ARCH-06: `.passthrough()` em respostas          | Baixo   | **P4**     | ✅      |
 
-_Roadmap adicionado em 2026-03-30. Última atualização de status: 2026-04-01 (commit `0f05a717`)._
+| F7   | F7.1 | DB Dual: `src/copilot/db/sqlite.js` singleton   | Alto    | **P2**     | ✅      |
+| F7   | F7.2 | DB Dual: migrações `src/copilot/db/migrations.js` | Alto  | **P2**     | ✅      |
+| F7   | F7.3 | DB Dual: DDLs sessions/turns/memories migrados  | Médio   | **P2**     | ✅      |
+| F7   | F7.4 | DB Dual: DDL `copilot_todo_tasks` migrado        | Médio   | **P2**     | ✅      |
+| F7   | F7.5 | DB Dual: `store.js` usa `#copilot/db/sqlite`     | Baixo   | **P2**     | ✅      |
+| F7   | F7.6 | DB Dual: `todo-tools.js` remove DDL inline       | Baixo   | **P2**     | ✅      |
+| F7   | F7.7 | DB Dual: remove migration v10 do central         | Baixo   | **P2**     | ✅      |
+| F7   | F7.8 | DB Dual: testes adaptados para nova estrutura    | Médio   | **P2**     | ✅      |
+| F7   | F7.9 | DB Dual: alias `#copilot/db/*` em package.json   | Baixo   | **P2**     | ✅      |
+
+_Roadmap adicionado em 2026-03-30. Última atualização de status: 2026-04-02 (commits `672b0bcc`, `acc929ed`, `d670aaf5`, `203164cc`, `ac6057f6`, `1e5911c1`)._
+_Fases 0–7 completas: 59/59 itens implementados._
 
 ---
 
-## 12. Fase 6 — Novas Propostas de Upgrades e Correções
+## 12. Fase 7 — Isolamento DB Dual (`copilot.sqlite`)
+
+> **Data da proposta**: 2026-04-02 **Contexto**: As tabelas `copilot_*` coexistiam em
+> `maestro.sqlite` junto com as tabelas de domínio principal, sem FK constraints entre elas.
+> Identificou-se que é possível (e desejável) isolar essas tabelas em um banco separado
+> (`copilot.sqlite`) para independência operacional, backup diferencial e menor acoplamento.
+
+---
+
+### F7.1 — `src/copilot/db/sqlite.js` — Singleton para `copilot.sqlite`
+
+**Arquivo**: `src/copilot/db/sqlite.js` (NOVO) **Problema** (ARCH): As tabelas `copilot_*` eram
+gerenciadas via `getDb()` do módulo `#infra/db/sqlite`, que também serve tabelas de domínio
+principal. Isso criava acoplamento implícito e impedia backup diferencial do banco copilot.
+**Correção**: Criar singleton dedicado `getCopilotDb()` com path configurável via
+`COPILOT_DB_PATH` (padrão: `data/copilot.sqlite`). **Esforço**: Baixo · **Prioridade**: P2 ·
+**Commit**: `1e5911c1`
+
+---
+
+### F7.2 — `src/copilot/db/migrations.js` — Migrações versionadas para copilot
+
+**Arquivo**: `src/copilot/db/migrations.js` (NOVO) **Problema** (ARCH): Não havia sistema de
+migrações para o banco copilot — as tabelas eram criadas via DDL inline nos módulos (`store.js`,
+`todo-tools.js`), o que impedia evoluções controladas do schema. **Correção**: Criar
+`runCopilotMigrations(db)` com versões 1–4 (sessions, turns+índices, memories+FTS5, todo_tasks).
+**Esforço**: Médio · **Prioridade**: P2 · **Commit**: `1e5911c1`
+
+---
+
+### F7.3–F7.6 — Migração DDLs inline → migrações versionadas
+
+**Arquivos**: `store.js`, `todo-tools.js` **Problema** (ARCH): DDLs executados em module-load
+via `#initTodoDb()` e `ConversationStore.init()` inline. **Correção**: Remover DDLs inline; delegar
+a `runCopilotMigrations(db)` chamado explicitamente em `init()`. Aceita `dbOverride` para injeção
+em testes. **Esforço**: Médio · **Prioridade**: P2 · **Commit**: `1e5911c1`
+
+---
+
+### F7.7 — `src/infra/db/migrations.js` — Remover migração v10 deslocada
+
+**Arquivo**: `src/infra/db/migrations.js` **Problema** (ARCH): A migration v10 (`DROP INDEX
+idx_conv_turns_unread`) estava na migração central, porém o índice pertence ao banco copilot.
+**Correção**: Mover a remoção do índice para a migration v2 do banco copilot (DDL no arquivo
+correto); remover v10 do central. **Esforço**: Baixo · **Prioridade**: P2 · **Commit**: `1e5911c1`
+
+---
+
+### F7.8 — Testes adaptados para nova estrutura DB
+
+**Arquivos**: `tests/unit/copilot/test_todo_tools.spec.js`,
+`tests/unit/copilot/test_conversation_store.spec.js`,
+`tests/unit/copilot/test_hub_orchestrator.spec.js` **Problema** (ARCH): Os testes criavam tabelas
+via `getDb()` do módulo central. Após o split, precisam usar `getCopilotDb()` e chamar
+`runCopilotMigrations(testDb)` antes das asserções. **Correção**: Refatorar setup dos testes para
+usar in-memory `copilot.sqlite` com migrações aplicadas. **Esforço**: Médio · **Prioridade**: P2 ·
+**Commit**: `1e5911c1`
+
+---
+
+### F7.9 — `package.json` — Alias `#copilot/db/*`
+
+**Arquivo**: `package.json` **Problema** (ARCH): Sem alias, os imports em `store.js` e
+`todo-tools.js` precisariam usar caminhos relativos longos. **Correção**: Adicionar
+`"#copilot/db/*": "./src/copilot/db/*.js"` em `imports` do `package.json`. **Esforço**: Baixo ·
+**Prioridade**: P2 · **Commit**: `1e5911c1`
+
+---
+
+### Tabela Resumo — Fase 7 (DB Dual)
+
+| ID    | Item                                                    | Esforço | Prioridade | Status |
+| ----- | ------------------------------------------------------- | ------- | ---------- | ------ |
+| F7.1  | `src/copilot/db/sqlite.js` — singleton copilot.sqlite   | Baixo   | **P2**     | ✅      |
+| F7.2  | `src/copilot/db/migrations.js` — migrações v1–4         | Médio   | **P2**     | ✅      |
+| F7.3  | DDLs sessions/turns/memories migrados                   | Médio   | **P2**     | ✅      |
+| F7.4  | DDL `copilot_todo_tasks` migrado                        | Médio   | **P2**     | ✅      |
+| F7.5  | `store.js` usa `#copilot/db/sqlite`                     | Baixo   | **P2**     | ✅      |
+| F7.6  | `todo-tools.js` remove DDL inline                       | Baixo   | **P2**     | ✅      |
+| F7.7  | Remove migration v10 do central                         | Baixo   | **P2**     | ✅      |
+| F7.8  | Testes adaptados para nova estrutura DB                 | Médio   | **P2**     | ✅      |
+| F7.9  | Alias `#copilot/db/*` em `package.json`                 | Baixo   | **P2**     | ✅      |
+
+_Fase 7 implementada em 2026-04-02 (commit `1e5911c1`). 9/9 itens concluídos._
+
+---
+
+## 13. Fase 6 — Novas Propostas de Upgrades e Correções
 
 > **Data da proposta**: 2026-04-01 **Contexto**: Com as Fases 0–5 concluídas (37 de 40 itens — F4.2,
 > F4.6, F4.7 pendentes), estes são os próximos melhoramentos mais impactantes identificados na
