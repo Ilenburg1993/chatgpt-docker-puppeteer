@@ -1,10 +1,9 @@
 # Auditoria: Mecanismo Zero-PR — Dialog Loop, Retry e Pause/Resume
 
-**Data**: 2026-07-10 (criação) / 2026-07-12 (consolidação profunda)
-**Status**: CONSOLIDADO — roadmap final pronto para implementação
-**Autor**: GitHub Copilot (LLM-A)
-**Contexto**: `@github/copilot-sdk v0.2.0`, `Node.js 24 ESM`
-**Commit de referência**: `8f85d2ba` (pré-implementação)
+**Data**: 2026-07-10 (criação) / 2026-07-12 (consolidação profunda) **Status**: CONSOLIDADO —
+roadmap final pronto para implementação **Autor**: GitHub Copilot (LLM-A) **Contexto**:
+`@github/copilot-sdk v0.2.0`, `Node.js 24 ESM` **Commit de referência**: `8f85d2ba`
+(pré-implementação)
 
 ---
 
@@ -72,15 +71,15 @@ O billing ocorre **exclusivamente** quando o evento `assistant.usage` é emitido
 
 | Cenário                                        | PR cobrado? |
 | ---------------------------------------------- | :---------: |
-| Erro de rede antes da requisição chegar ao LLM |    ❌ Não    |
-| HTTP 429 rate-limit no gateway                 |    ❌ Não    |
-| HTTP 503 serviço indisponível                  |    ❌ Não    |
-| Timeout do cliente SDK                         |    ❌ Não    |
-| `ask_user` tool call (resposta ao usuário)     |    ❌ Não    |
-| Reconexão via `resumeSession()`                |    ❌ Não    |
-| Criação de sessão `createSession()` sem send   |    ❌ Não    |
-| LLM processar e retornar resposta completa     |    ✅ Sim    |
-| LLM processar mas ferramenta falhar depois     |    ✅ Sim    |
+| Erro de rede antes da requisição chegar ao LLM |   ❌ Não    |
+| HTTP 429 rate-limit no gateway                 |   ❌ Não    |
+| HTTP 503 serviço indisponível                  |   ❌ Não    |
+| Timeout do cliente SDK                         |   ❌ Não    |
+| `ask_user` tool call (resposta ao usuário)     |   ❌ Não    |
+| Reconexão via `resumeSession()`                |   ❌ Não    |
+| Criação de sessão `createSession()` sem send   |   ❌ Não    |
+| LLM processar e retornar resposta completa     |   ✅ Sim    |
+| LLM processar mas ferramenta falhar depois     |   ✅ Sim    |
 
 ### 2.3 Estrutura de eventos em um turno normal
 
@@ -97,12 +96,12 @@ session.send(message)
 
 ### 2.4 `createSession` vs `resumeSession`
 
-| Operação                           | Cria novo PR? | Novo sessionId? |  Histórico?  |
-| ---------------------------------- | :-----------: | :-------------: | :----------: |
-| `client.createSession(config)`     |     ❌ Não     |      ✅ Sim      |   ❌ Zerado   |
-| `client.resumeSession(id, config)` |     ❌ Não     |     ❌ Mesmo     | ✅ Preservado |
-| `session.send(message)` (sucesso)  |     ✅ Sim     |      Mesmo      |  Preservado  |
-| `session.send(message)` (falha)    |     ❌ Não     |      Mesmo      |  Preservado  |
+| Operação                           | Cria novo PR? | Novo sessionId? |  Histórico?   |
+| ---------------------------------- | :-----------: | :-------------: | :-----------: |
+| `client.createSession(config)`     |    ❌ Não     |     ✅ Sim      |   ❌ Zerado   |
+| `client.resumeSession(id, config)` |    ❌ Não     |    ❌ Mesmo     | ✅ Preservado |
+| `session.send(message)` (sucesso)  |    ✅ Sim     |      Mesmo      |  Preservado   |
+| `session.send(message)` (falha)    |    ❌ Não     |      Mesmo      |  Preservado   |
 
 **Conclusão crítica**: Reconectar via `resumeSession` com o mesmo `sessionId` **nunca consome PR**.
 O PR só é contado quando o LLM efetivamente processa e retorna `assistant.usage`.
@@ -113,8 +112,8 @@ O PR só é contado quando o LLM efetivamente processa e retorna `assistant.usag
 
 ### 3.1 O ciclo fundamental
 
-O dialog loop (`startDialogLoop()` em `always-alive.js`, [linha ~940](../../src/copilot/agent/always-alive.js))
-usa a seguinte arquitetura:
+O dialog loop (`startDialogLoop()` em `always-alive.js`,
+[linha ~940](../../src/copilot/agent/always-alive.js)) usa a seguinte arquitetura:
 
 ```
 startDialogLoop(bootPrompt)
@@ -139,18 +138,19 @@ startDialogLoop(bootPrompt)
 
 **Chave arquitetural**: `ask_user` é uma **ferramenta local** processada pelo cliente SDK — não é
 uma chamada LLM nova. Cada resposta via `answerPendingQuestion()` alimenta o `onUserInputRequest`
-callback diretamente, sem novo `session.send()`. Portanto, **todos os turnos do dialog loop após
-o boot custam 0 PR**.
+callback diretamente, sem novo `session.send()`. Portanto, **todos os turnos do dialog loop após o
+boot custam 0 PR**.
 
 ### 3.2 Por que um único sendMessage() pode durar dias
 
 `sendMessage(metaPrompt, { timeoutMs: 24 * 60 * 60 * 1000 })` — timeout de 24h intencionalmente.
 
-A sessão SDK mantém o contexto do agentic turn ativo enquanto o modelo está em estado
-`ask_user` (aguardando input). A cadeia de tool calls é uma única agentic turn que nunca termina
-até o modelo chamar `STOP_DIALOG` ou o agente fechar a sessão.
+A sessão SDK mantém o contexto do agentic turn ativo enquanto o modelo está em estado `ask_user`
+(aguardando input). A cadeia de tool calls é uma única agentic turn que nunca termina até o modelo
+chamar `STOP_DIALOG` ou o agente fechar a sessão.
 
 **Status da sessão durante dialog loop**:
+
 - `session.idle` **nunca dispara** enquanto o modelo está aguardando `ask_user`
 - O agente fica em status `waiting_for_input` indefinidamente
 - Isso é exatamente o comportamento desejado: 1 PR → conversa infinita
@@ -170,8 +170,8 @@ PC reinicia
                           └─ Se falhar → createSession() → 0 PR (mas perde contexto)
 ```
 
-Após o `start()`, o `entry.js` **não** chama `startDialogLoop()` automaticamente.
-Quem faz isso é `terminal/dialog.js` via `ensureDialogLoop()`.
+Após o `start()`, o `entry.js` **não** chama `startDialogLoop()` automaticamente. Quem faz isso é
+`terminal/dialog.js` via `ensureDialogLoop()`.
 
 ```
 terminal/dialog.js: ensureDialogLoop()
@@ -211,8 +211,8 @@ Esta é a base da feature **Pause/Resume** descrita na Seção 6.
                                                     [1 PR contado no total]
 ```
 
-**Por que funciona**: o `sessionId` é preservado entre o erro e o retry, e `assistant.usage` só
-é emitido uma vez (quando o LLM efetivamente processa).
+**Por que funciona**: o `sessionId` é preservado entre o erro e o retry, e `assistant.usage` só é
+emitido uma vez (quando o LLM efetivamente processa).
 
 ### 4.2 O hook `onErrorOccurred` — retry automático
 
@@ -221,20 +221,21 @@ O SDK expõe esse hook para controlar retry programaticamente:
 ```ts
 // @github/copilot-sdk (tipos inferidos de session-events.d.ts + SDK docs)
 interface ErrorOccurredHookInput {
-  error: string;                                              // mensagem de erro
-  errorContext: "model_call" | "tool_execution" | "system" | "user_input";
-  recoverable: boolean;                                       // SDK detectou como recuperável
+  error: string; // mensagem de erro
+  errorContext: 'model_call' | 'tool_execution' | 'system' | 'user_input';
+  recoverable: boolean; // SDK detectou como recuperável
 }
 
 interface ErrorOccurredHookOutput {
-  suppressOutput?: boolean;         // esconde msg de erro do usuário
-  errorHandling?: "retry" | "skip" | "abort";
-  retryCount?: number;              // máx tentativas (default: 1)
-  userNotification?: string;        // mensagem de status customizada (opcional)
+  suppressOutput?: boolean; // esconde msg de erro do usuário
+  errorHandling?: 'retry' | 'skip' | 'abort';
+  retryCount?: number; // máx tentativas (default: 1)
+  userNotification?: string; // mensagem de status customizada (opcional)
 }
 ```
 
 Quando `errorHandling: "retry"` é retornado:
+
 - O SDK reenvia internamente **sem nova chamada ao LLM** se o erro foi antes do processamento
 - Sem nova chamada `session.send()` visível externamente
 - `retryCount` controla máximo de tentativas automáticas
@@ -254,12 +255,13 @@ Quando `errorHandling: "retry"` é retornado:
 ### 4.4 O SDK `disableResume` para reconexão silenciosa
 
 `ResumeSessionConfig` expõe:
+
 ```ts
 disableResume?: boolean;  // When true, skips emitting the session.resume event
 ```
 
-Útil para reconexões onde não queremos disparar handlers de `session.resume` (ex: evitar que
-o modelo envie mensagem de boas-vindas a cada PM2 restart).
+Útil para reconexões onde não queremos disparar handlers de `session.resume` (ex: evitar que o
+modelo envie mensagem de boas-vindas a cada PM2 restart).
 
 ---
 
@@ -287,13 +289,13 @@ src/copilot/
 ```ts
 // Estado ATUAL (pré-implementação das melhorias)
 interface AliveAgentState {
-  sessionId: string;              // ID da sessão ativa
-  startedAt: number;              // timestamp de criação da sessão
-  resumedAt: number;              // timestamp da última retomada
-  resumeCount: number;            // total de retomadas
-  sendCount: number;              // total de mensagens enviadas
+  sessionId: string; // ID da sessão ativa
+  startedAt: number; // timestamp de criação da sessão
+  resumedAt: number; // timestamp da última retomada
+  resumeCount: number; // total de retomadas
+  sendCount: number; // total de mensagens enviadas
   pendingQuestion: string | null; // pergunta pendente do modelo
-  dialogLoopActive?: boolean;     // MR-08: se loop estava ativo
+  dialogLoopActive?: boolean; // MR-08: se loop estava ativo
 }
 ```
 
@@ -304,10 +306,10 @@ interface AliveAgentState {
 ```js
 // ATUAL: hooks externos são passados, mas onErrorOccurred não é configurado por padrão
 function buildSessionConfig(opts, mode) {
-    const cfg = {};
-    // ...
-    if (opts.hooks !== undefined) cfg.hooks = opts.hooks;  // hooks externos apenas
-    // ...
+  const cfg = {};
+  // ...
+  if (opts.hooks !== undefined) cfg.hooks = opts.hooks; // hooks externos apenas
+  // ...
 }
 ```
 
@@ -374,17 +376,20 @@ FLUXO RESUME (no terminal ou automático):
 ### 6.3 Estratégias de zero-cost resume
 
 **Estratégia A — Resume sem envio (ideal, 0 PR):**
+
 - Após resumeSession, o SDK restaura o contexto local
 - O modelo estava em estado `ask_user` suspenso — ao reconectar, o SDK pode retomar esse estado
 - Precisamos testar se `ask_user` pendente sobrevive à reconexão de sessão
 - Se sobreviver: `resumeDialogLoop()` apenas aguarda `question.pending` sem enviar nada → **0 PR**
 
 **Estratégia B — Resume com ping mínimo (possível 1 PR):**
+
 - Envia mensagem de retomada curta ao modelo para re-acionar o loop
 - O modelo responde com `ask_user("READY:")` → loop restaurado
 - Custo: 1 PR (unavoidável se o estado ask_user não sobreviveu à reconexão)
 
 **Estratégia C — Hybrid:**
+
 - Após reconnect, aguardar N segundos por `question.pending`
 - Se chegar → 0 PR (estado preservado)
 - Se não chegar → enviar ping mínimo → 1 PR (fallback)
@@ -397,11 +402,11 @@ FLUXO RESUME (no terminal ou automático):
 // APÓS implementação
 interface AliveAgentState {
   // ...campos existentes...
-  dialogPaused?: boolean;     // true se comando pause foi emitido
-  pausedAt?: number;          // timestamp do pause
-  pausedSessionId?: string;   // sessionId preservado no pause (pode diferir de sessionId)
-  pendingTurnMessage?: string;     // última mensagem enviada ao LLM sem resposta
-  pendingTurnTs?: number;          // timestamp do envio pendente
+  dialogPaused?: boolean; // true se comando pause foi emitido
+  pausedAt?: number; // timestamp do pause
+  pausedSessionId?: string; // sessionId preservado no pause (pode diferir de sessionId)
+  pendingTurnMessage?: string; // última mensagem enviada ao LLM sem resposta
+  pendingTurnTs?: number; // timestamp do envio pendente
   pendingTurnConsumedPR?: boolean; // se assistant.usage já foi emitido para este turno
 }
 ```
@@ -477,56 +482,61 @@ if (state.dialogPaused && state.isResumed) {
 
 ### 7.1 Tabela de itens
 
-| ID           | Prioridade | Descrição                                           | Arquivos                                  | Esforço | Status            |
-| ------------ | ---------- | --------------------------------------------------- | ----------------------------------------- | ------- | ----------------- |
-| RF-PR-01     | 🔴 Alta     | `onErrorOccurred` hook com retry automático         | `lib/session.js`                          | Pequeno | ✅ commit 2bd82481 |
-| RF-PR-06     | 🔴 Alta     | `disableResume: true` em reconexão silenciosa       | `lib/session.js`                          | Trivial | ✅ commit 2bd82481 |
-| NEW-PAUSE-01 | 🔴 Alta     | Estado `dialogPaused/pausedAt` no `session-manager` | `session-manager.js`                      | Pequeno | ✅ commit 2bd82481 |
-| NEW-PAUSE-02 | 🔴 Alta     | `pauseDialogLoop()` em `AlwaysAliveAgent`           | `always-alive.js`                         | Médio   | ✅ commit 2bd82481 |
-| NEW-PAUSE-03 | 🔴 Alta     | `resumeDialogLoop()` em `AlwaysAliveAgent`          | `always-alive.js`                         | Médio   | ✅ commit 2bd82481 |
-| NEW-PAUSE-04 | 🔴 Alta     | Detecção de `dialogPaused` no boot em `entry.js`    | `entry.js` + `terminal/dialog.js`         | Pequeno | ✅ commit HEAD     |
-| NEW-PAUSE-05 | 🔴 Alta     | Endpoints HTTP `/dialog/pause` e `/dialog/resume`   | `terminal/server.js` + `http-handlers.js` | Médio   | ✅ commit 2bd82481 |
-| NEW-PAUSE-06 | 🟡 Média    | Comandos `/pause` e `/dialog-resume` no REPL        | `terminal/repl.js`                        | Pequeno | ✅ commit 2bd82481 |
-| RF-PR-02     | 🟡 Média    | Persistir `pendingTurnMessage` + `consumedPR`       | `session-manager.js` + `always-alive.js`  | Médio   | ✅ commit 2bd82481 |
-| RF-PR-03     | 🟡 Média    | Monitorar `assistant.usage` → billing real-time     | `always-alive.js`                         | Pequeno | ✅ commit 2bd82481 |
-| RF-PR-04     | 🟡 Média    | Endpoint `GET /quota` com dados de PRs restantes    | `http-handlers.js` + `server.js`          | Pequeno | ✅ commit HEAD     |
-| RF-PR-05     | 🟢 Baixa    | Fallback automático de modelo em rate-limit 429     | `always-alive.js` + `entry.js`            | Médio   | ✅ commit HEAD     |
+| ID           | Prioridade | Descrição                                           | Arquivos                                  | Esforço | Status             |
+| ------------ | ---------- | --------------------------------------------------- | ----------------------------------------- | ------- | ------------------ |
+| RF-PR-01     | 🔴 Alta    | `onErrorOccurred` hook com retry automático         | `lib/session.js`                          | Pequeno | ✅ commit 2bd82481 |
+| RF-PR-06     | 🔴 Alta    | `disableResume: true` em reconexão silenciosa       | `lib/session.js`                          | Trivial | ✅ commit 2bd82481 |
+| NEW-PAUSE-01 | 🔴 Alta    | Estado `dialogPaused/pausedAt` no `session-manager` | `session-manager.js`                      | Pequeno | ✅ commit 2bd82481 |
+| NEW-PAUSE-02 | 🔴 Alta    | `pauseDialogLoop()` em `AlwaysAliveAgent`           | `always-alive.js`                         | Médio   | ✅ commit 2bd82481 |
+| NEW-PAUSE-03 | 🔴 Alta    | `resumeDialogLoop()` em `AlwaysAliveAgent`          | `always-alive.js`                         | Médio   | ✅ commit 2bd82481 |
+| NEW-PAUSE-04 | 🔴 Alta    | Detecção de `dialogPaused` no boot em `entry.js`    | `entry.js` + `terminal/dialog.js`         | Pequeno | ✅ commit HEAD     |
+| NEW-PAUSE-05 | 🔴 Alta    | Endpoints HTTP `/dialog/pause` e `/dialog/resume`   | `terminal/server.js` + `http-handlers.js` | Médio   | ✅ commit 2bd82481 |
+| NEW-PAUSE-06 | 🟡 Média   | Comandos `/pause` e `/dialog-resume` no REPL        | `terminal/repl.js`                        | Pequeno | ✅ commit 2bd82481 |
+| RF-PR-02     | 🟡 Média   | Persistir `pendingTurnMessage` + `consumedPR`       | `session-manager.js` + `always-alive.js`  | Médio   | ✅ commit 2bd82481 |
+| RF-PR-03     | 🟡 Média   | Monitorar `assistant.usage` → billing real-time     | `always-alive.js`                         | Pequeno | ✅ commit 2bd82481 |
+| RF-PR-04     | 🟡 Média   | Endpoint `GET /quota` com dados de PRs restantes    | `http-handlers.js` + `server.js`          | Pequeno | ✅ commit HEAD     |
+| RF-PR-05     | 🟢 Baixa   | Fallback automático de modelo em rate-limit 429     | `always-alive.js` + `entry.js`            | Médio   | ✅ commit HEAD     |
 
 ### 7.2 Progresso atual (COMPLETO — 12/12 itens)
 
 **Implementados (12/12 itens):**
 
 - ✅ **RF-PR-01/06** (`session.js`): retry automático 3x `onErrorOccurred` + `disableResume` flag
-- ✅ **RF-PR-02** (`always-alive.js`): `pendingTurnMessage/Ts/ConsumedPR` persistidos antes/após cada turno
-- ✅ **RF-PR-03** (`always-alive.js`): listener `assistant.usage` → evento `pr.consumed` + escrita de estado
-- ✅ **RF-PR-04** (`http-handlers.js` + `server.js`): `GET /quota` com dados de billing em tempo real
-- ✅ **RF-PR-05** (`always-alive.js`): fallback automático de modelo via `COPILOT_FALLBACK_MODEL` quando `errorContext === 'rate_limit' | 'quota'`
-- ✅ **NEW-PAUSE-01/02/03** (`session-manager.js` + `always-alive.js`): `pauseDialogLoop()` / `resumeDialogLoop()` com Estratégia A (0 PR) e Estratégia B (1 PR)
-- ✅ **NEW-PAUSE-04** (`terminal/dialog.js`): `ensureDialogLoop()` respeita `dialogPaused` e ignora restart automático
-- ✅ **NEW-PAUSE-05** (`http-handlers.js` + `server.js`): `POST /dialog/pause` + `POST /dialog/resume`
+- ✅ **RF-PR-02** (`always-alive.js`): `pendingTurnMessage/Ts/ConsumedPR` persistidos antes/após
+  cada turno
+- ✅ **RF-PR-03** (`always-alive.js`): listener `assistant.usage` → evento `pr.consumed` + escrita
+  de estado
+- ✅ **RF-PR-04** (`http-handlers.js` + `server.js`): `GET /quota` com dados de billing em tempo
+  real
+- ✅ **RF-PR-05** (`always-alive.js`): fallback automático de modelo via `COPILOT_FALLBACK_MODEL`
+  quando `errorContext === 'rate_limit' | 'quota'`
+- ✅ **NEW-PAUSE-01/02/03** (`session-manager.js` + `always-alive.js`): `pauseDialogLoop()` /
+  `resumeDialogLoop()` com Estratégia A (0 PR) e Estratégia B (1 PR)
+- ✅ **NEW-PAUSE-04** (`terminal/dialog.js`): `ensureDialogLoop()` respeita `dialogPaused` e ignora
+  restart automático
+- ✅ **NEW-PAUSE-05** (`http-handlers.js` + `server.js`): `POST /dialog/pause` +
+  `POST /dialog/resume`
 - ✅ **NEW-PAUSE-06** (`repl.js`): comandos `/pause` e `/dialog-resume` no REPL
-- ✅ `events.js`: `dialog.paused`, `dialog.resumed`, `pr.consumed`, `pr.fallback_model`, `dialog.turn_start`, `dialog.turn_end` adicionados
+- ✅ `events.js`: `dialog.paused`, `dialog.resumed`, `pr.consumed`, `pr.fallback_model`,
+  `dialog.turn_start`, `dialog.turn_end` adicionados
 
 **Pendentes:** Nenhum.
 
 ### 7.3 Ordem de implementação recomendada
 
 **Fase A — Zero-PR hardening (sessão e erros):** ✅ COMPLETO
+
 1. `RF-PR-06`: `disableResume: true` em `lib/session.js` — trivial, remove side-effects
 2. `RF-PR-01`: `onErrorOccurred` hook em `buildSessionConfig` — retry automático no SDK
 
-**Fase B — Pause/Resume feature:** ✅ COMPLETO
-3. `NEW-PAUSE-01`: novos campos em `AliveAgentState` ✅
-4. `NEW-PAUSE-02` + `NEW-PAUSE-03`: métodos `pauseDialogLoop()` e `resumeDialogLoop()` ✅
-5. `NEW-PAUSE-04`: detecção no boot + integração com `ensureDialogLoop()` ✅
-6. `NEW-PAUSE-05`: endpoints HTTP ✅
-7. `NEW-PAUSE-06`: comandos REPL ✅
+**Fase B — Pause/Resume feature:** ✅ COMPLETO 3. `NEW-PAUSE-01`: novos campos em `AliveAgentState`
+✅ 4. `NEW-PAUSE-02` + `NEW-PAUSE-03`: métodos `pauseDialogLoop()` e `resumeDialogLoop()` ✅ 5.
+`NEW-PAUSE-04`: detecção no boot + integração com `ensureDialogLoop()` ✅ 6. `NEW-PAUSE-05`:
+endpoints HTTP ✅ 7. `NEW-PAUSE-06`: comandos REPL ✅
 
-**Fase C — Observabilidade e resiliência:** ✅ COMPLETO
-8. `RF-PR-03`: monitorar `assistant.usage` ✅
-9. `RF-PR-02`: persistir `pendingTurnMessage` ✅
-10. `RF-PR-04`: endpoint `/quota` ✅
-11. `RF-PR-05`: fallback de modelo ✅
+**Fase C — Observabilidade e resiliência:** ✅ COMPLETO 8. `RF-PR-03`: monitorar `assistant.usage`
+✅ 9. `RF-PR-02`: persistir `pendingTurnMessage` ✅ 10. `RF-PR-04`: endpoint `/quota` ✅ 11.
+`RF-PR-05`: fallback de modelo ✅
 
 ### 7.4 Detalhes de implementação por item
 
@@ -538,21 +548,21 @@ if (state.dialogPaused && state.isResumed) {
 // Antes de retornar cfg, adicionar:
 const userHooks = opts.hooks ?? {};
 cfg.hooks = {
-    ...userHooks,
-    onErrorOccurred: (/** @type {any} */ input) => {
-        const { error, errorContext, recoverable } = input;
-        if (recoverable && errorContext === 'model_call') {
-            log('WARN', `[lib/session] onErrorOccurred recuperável (${error}) — retry automático`);
-            return { errorHandling: 'retry', retryCount: 3 };
-        }
-        if (errorContext === 'tool_execution' && recoverable) {
-            return { errorHandling: 'skip' };
-        }
-        log('WARN', `[lib/session] onErrorOccurred não-recuperável (${errorContext}): ${error}`);
-        return { errorHandling: 'abort' };
-    },
-    // Preservar onErrorOccurred externo se fornecido
-    ...(userHooks.onErrorOccurred ? { onErrorOccurred: userHooks.onErrorOccurred } : {}),
+  ...userHooks,
+  onErrorOccurred: (/** @type {any} */ input) => {
+    const { error, errorContext, recoverable } = input;
+    if (recoverable && errorContext === 'model_call') {
+      log('WARN', `[lib/session] onErrorOccurred recuperável (${error}) — retry automático`);
+      return { errorHandling: 'retry', retryCount: 3 };
+    }
+    if (errorContext === 'tool_execution' && recoverable) {
+      return { errorHandling: 'skip' };
+    }
+    log('WARN', `[lib/session] onErrorOccurred não-recuperável (${errorContext}): ${error}`);
+    return { errorHandling: 'abort' };
+  },
+  // Preservar onErrorOccurred externo se fornecido
+  ...(userHooks.onErrorOccurred ? { onErrorOccurred: userHooks.onErrorOccurred } : {}),
 };
 ```
 
@@ -561,15 +571,17 @@ cfg.hooks = {
 **Arquivo**: `src/copilot/lib/session.js`
 
 Adicionar campo em `SessionResumeOptions`:
+
 ```js
 /** @property {boolean} [disableResume] - Se true, não emite session.resume (reconexão silenciosa) */
 ```
 
 Em `buildSessionConfig()` para modo 'resume':
+
 ```js
 if (mode === 'resume') {
-    const ro = /** @type {SessionResumeOptions} */ (opts);
-    if (ro.disableResume !== undefined) cfg.disableResume = ro.disableResume;
+  const ro = /** @type {SessionResumeOptions} */ (opts);
+  if (ro.disableResume !== undefined) cfg.disableResume = ro.disableResume;
 }
 ```
 
@@ -580,8 +592,7 @@ reconexões internas automáticas (watchdog restart, reconexão após erro).
 
 ```js
 /**
- * @typedef {Object} AliveAgentState
- * ...campos existentes...
+ * @typedef {Object} AliveAgentState ...campos existentes...
  * @property {boolean} [dialogPaused] - true se pause explícito foi emitido
  * @property {number} [pausedAt] - timestamp do pause
  * @property {string} [pendingTurnMessage] - última mensagem sem resposta confirmada
@@ -660,15 +671,15 @@ Em `always-alive.js`, no bloco de `#sessionEventUnsubscribers.push()`:
 ```js
 // RF-PR-03: billing real-time
 this.#sessionEventUnsubscribers.push(
-    session.on((/** @type {any} */ evt) => {
-        if (evt?.type === 'assistant.usage' || evt?.kind === 'assistant.usage') {
-            const data = evt?.data ?? {};
-            const { model, cost, quotaSnapshots } = data;
-            log('INFO', `[AlwaysAlive] PR consumido: model=${model}, cost=${cost ?? '?'}`);
-            this.emit('pr.consumed', { model, cost, quotaSnapshots, ts: Date.now() });
-            writeStateAsync({ pendingTurnConsumedPR: true }).catch(() => {});
-        }
-    }),
+  session.on((/** @type {any} */ evt) => {
+    if (evt?.type === 'assistant.usage' || evt?.kind === 'assistant.usage') {
+      const data = evt?.data ?? {};
+      const { model, cost, quotaSnapshots } = data;
+      log('INFO', `[AlwaysAlive] PR consumido: model=${model}, cost=${cost ?? '?'}`);
+      this.emit('pr.consumed', { model, cost, quotaSnapshots, ts: Date.now() });
+      writeStateAsync({ pendingTurnConsumedPR: true }).catch(() => {});
+    }
+  }),
 );
 ```
 
@@ -679,22 +690,22 @@ Novo arquivo ou rota em `src/copilot/server/routes/`:
 ```js
 // GET /quota
 router.get('/quota', async (req, res) => {
-    try {
-        const client = alwaysAliveAgent._client; // expor via getter protegido
-        const quota = await client.rpc.account.getQuota();
-        const state = readState();
-        res.json({
-            quota: quota?.quotaSnapshots ?? {},
-            pendingTurn: {
-                active: !!(state?.pendingTurnMessage),
-                consumedPR: state?.pendingTurnConsumedPR ?? false,
-                message: state?.pendingTurnMessage ?? null,
-                ts: state?.pendingTurnTs ?? null,
-            },
-        });
-    } catch (e) {
-        res.status(503).json({ error: e.message });
-    }
+  try {
+    const client = alwaysAliveAgent._client; // expor via getter protegido
+    const quota = await client.rpc.account.getQuota();
+    const state = readState();
+    res.json({
+      quota: quota?.quotaSnapshots ?? {},
+      pendingTurn: {
+        active: !!state?.pendingTurnMessage,
+        consumedPR: state?.pendingTurnConsumedPR ?? false,
+        message: state?.pendingTurnMessage ?? null,
+        ts: state?.pendingTurnTs ?? null,
+      },
+    });
+  } catch (e) {
+    res.status(503).json({ error: e.message });
+  }
 });
 ```
 
@@ -702,8 +713,8 @@ router.get('/quota', async (req, res) => {
 
 ## 8. Status de Implementação
 
-| ID           | Status     | Commit |
-| ------------ | ---------- | ------ |
+| ID           | Status      | Commit |
+| ------------ | ----------- | ------ |
 | RF-PR-01     | ⏳ Pendente | —      |
 | RF-PR-02     | ⏳ Pendente | —      |
 | RF-PR-03     | ⏳ Pendente | —      |
@@ -719,5 +730,6 @@ router.get('/quota', async (req, res) => {
 
 ---
 
-*Documento gerado por GitHub Copilot (LLM-A) em 2026-07-12.*
-*Contexto: análise profunda de `always-alive.js` (1702l), `session.js` (271l), `session-manager.js` (399l), `entry.js` (124l), `terminal/dialog.js` (575l), `terminal/index.js` (236l), tipos SDK `session-events.d.ts`.*
+_Documento gerado por GitHub Copilot (LLM-A) em 2026-07-12._ _Contexto: análise profunda de
+`always-alive.js` (1702l), `session.js` (271l), `session-manager.js` (399l), `entry.js` (124l),
+`terminal/dialog.js` (575l), `terminal/index.js` (236l), tipos SDK `session-events.d.ts`._
