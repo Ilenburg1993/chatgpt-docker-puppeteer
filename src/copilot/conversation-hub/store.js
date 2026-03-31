@@ -549,7 +549,7 @@ export class ConversationStore {
             }
         }
         /* c8 ignore next */
-        return -1;
+        throw new Error('[ConversationStore] writeTurn: todos os retries esgotados sem sucesso (SQLITE_CONSTRAINT)');
     }
 
     /**

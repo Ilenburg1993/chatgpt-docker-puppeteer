@@ -1084,3 +1084,343 @@ this.#db.pragma('cache_size=-32000'); // 32MB cache
 ---
 
 *Documento gerado por análise estática dos 104 arquivos do módulo `src/copilot/`, cruzado com documentação oficial `@github/copilot-sdk` v0.2.0 (npm, GitHub releases, docs.github.com). Data: 2026-03-30.*
+
+---
+
+## 11. Roadmap de Implementação
+
+> **⚠️ POLÍTICA DE PREMIUM REQUESTS (PR)**
+> Nenhuma correção ou upgrade deve criar fluxos que consumam PR adicionais.
+> - PR é consumido **apenas** por `client.createSession()` (1 PR) e por re-conexões explícitas.
+> - `session.disconnect()` + `client.resumeSession()` = **0 PR**.
+> - `sendDialogTurn()` via `ask_user` = **0 PR**.
+> - Toda mudança deve ser auditada para garantir que não introduz `createSession()` extra.
+> Esta política é inegociável e deve ser verificada em cada fase antes do commit.
+
+> **📋 NOTA DE VERIFICAÇÃO DA AUDITORIA (pré-implementação)**
+> Após inspeção direta do SDK instalado (`@github/copilot-sdk@0.2.0`), as seguintes premissas da auditoria foram **corrigidas**:
+> - **BUG-CRIT-01** (parcialmente incorreto): `CopilotClient` tem `autoStart: true` por padrão — `client.start()` é chamado automaticamente em `createSession()`. O código atual é correto. Sem ação necessária.
+> - **BUG-CRIT-03** (invertido): `destroy()` está **DEPRECATED** no SDK v0.2.0. O código atual usa `disconnect()` — que é o correto. Sem ação necessária.
+> - **SDK-03** (parcialmente resolvido): `mode: 'customize'` já está em uso em `buildSystemMessageConfig`. O que falta é usar sections nomeadas para `guidelines`/`custom_instructions`.
+> - **BUG-CRIT-05** (a verificar): double-emit de `task.delta` requer inspeção direta dos listeners no `start()` vs `task-executor.js`.
+
+---
+
+### Fase 0 — SDK Conformance (Alta prioridade, 0 PR, impacto imediato)
+
+> Corrige divergências com a API oficial do SDK v0.2.0. Todas as mudanças são internas e não afetam fluxos de PR.
+
+#### F0.1 — SDK-01: `onPermissionRequest` obrigatório — adicionar default `approveAll`
+
+- **Arquivo**: `src/copilot/lib/session.js`, função `buildSessionConfig()`
+- **Problema**: Se `opts.onPermissionRequest === undefined`, o campo é omitido do `cfg`, mas o SDK v0.2.0 o torna obrigatório (sem `?` no tipo `SessionConfig`).
+- **Correção**: Adicionar `cfg.onPermissionRequest = opts.onPermissionRequest ?? approveAll` — garantindo sempre um handler.
+- **Impacto PR**: 0 — mudança apenas no objeto de configuração.
+- **Testes**: Verificar que `test_lib_session.spec.js` cobre o caso `onPermissionRequest: undefined`.
+
+#### F0.2 — SDK-03: Usar sections nomeadas do `mode: 'customize'` para hook context
+
+- **Arquivo**: `src/copilot/agent/session-manager.js`, `src/copilot/config/system-prompt.js`
+- **Problema**: `buildHookContextAppendMessage` usa content string genérica. O SDK v0.2.0 suporta `sections.guidelines` com `{ action: 'append', content }`.
+- **Correção**: Migrar para `{ mode: 'customize', sections: { guidelines: { action: 'append', content: hookContext } } }`. Importar `SYSTEM_PROMPT_SECTIONS` do SDK em vez da versão local em `system-prompt.js`.
+- **Impacto PR**: 0.
+- **Testes**: `test_system_prompt.spec.js`.
+
+#### F0.3 — SDK-04: `getMessages()` — adicionar guard de existência
+
+- **Arquivo**: `src/copilot/agent/always-alive.js`, método `#syncSdkHistory`
+- **Problema**: `getMessages()` não é parte da API pública estável do SDK. O guard `typeof sdkSession.getMessages !== 'function'` já existe, mas o log de WARN não menciona que é API unofficial. Adicionar comentário explícito e marcar como risco de regressão.
+- **Correção**: Apenas documentar com `// API interna SDK — pode ser removida em versões futuras` e manter o guard existente.
+- **Impacto PR**: 0.
+
+#### F0.4 — SDK-07: `client.ping()` — remover argumento string
+
+- **Arquivo**: `src/copilot/agent/entry.js`, `src/copilot/routes/client.js`
+- **Problema**: `client.ping('boot health check')` passa string, mas a assinatura oficial é `ping(message?: string)` — o parâmetro *existe* mas é opcional. Verificar se o SDK ignora ou usa. Se ignorado, manter; se usado em log, preservar.
+- **Ação**: Inspecionar o SDK `dist/client.d.ts`; se o argumento é tipado, sem ação. Se não, remover.
+- **Impacto PR**: 0.
+
+#### F0.5 — SDK-08: `client.stop()` — garantir chamada no shutdown do agente
+
+- **Arquivo**: `src/copilot/agent/always-alive.js`, método `stop()`
+- **Problema**: `stop()` desconecta a session mas não chama `this.#client.stop()`, deixando o processo CLI rodando.
+- **Correção**: Após `session.disconnect()`, chamar `await this.#client.stop().catch((errs) => log('WARN', ...))`.
+- **Impacto PR**: 0 — `client.stop()` não cria sessão.
+
+#### F0.6 — SDK-09: `tools-bootstrap.js` — remover forcing global de `overridesBuiltInTool: true`
+
+- **Arquivo**: `src/copilot/agent/tools-bootstrap.js`
+- **Problema**: Força `overridesBuiltInTool: true` em TODAS as tools, mascarando colisões de nome acidentais.
+- **Correção**: Remover o `.map()` e adicionar verificação de nomes duplicados com aviso de log. Tools que de fato sobrescrevem built-ins devem ter `overridesBuiltInTool: true` explícito em sua definição.
+- **Impacto PR**: 0.
+
+---
+
+### Fase 1 — Bugs Críticos (Alta prioridade, segurança/correção)
+
+> Bugs com potencial de corromper dados, perder mensagens ou criar race conditions. Todos são 0 PR.
+
+#### F1.1 — BUG-CRIT-02: `writeTurn` sentinela `-1` → lançar exceção
+
+- **Arquivo**: `src/copilot/conversation-hub/store.js`, `src/copilot/terminal/dialog.js`
+- **Problema**: `writeTurn` retorna `-1` em caso de falha irrecuperável; `dialog.js` não verifica.
+- **Correção**:
+  1. Em `store.js`: trocar o `return -1` final por `throw new Error('[ConversationStore] writeTurn falhou irrecuperavelmente após 3 tentativas')`.
+  2. Em `dialog.js`: o bloco `try/catch` existente ao redor de `writeTurn` já captura, mas remover qualquer checagem `=== -1` residual.
+  3. Em `orchestrator.js`: verificar se `if (turnId === -1) throw` pode ser simplificado para apenas deixar a exceção propagar.
+- **Impacto PR**: 0.
+- **Testes**: `test_conversation_store.spec.js`.
+
+#### F1.2 — BUG-CRIT-04: `todo-tools.js` — mutex para `readStore`/`writeStore`
+
+- **Arquivo**: `src/copilot/tools/todo-tools.js`
+- **Problema**: Race condition em leitura-modificação-escrita concorrente.
+- **Correção**: Implementar `_storeMutex = Promise.resolve()` + `withStoreLock(fn)` wrapper. Todos os handlers que modificam o store usam `withStoreLock(async () => { ... })`.
+- **Impacto PR**: 0.
+- **Testes**: `test_todo_tools.spec.js` — adicionar teste de concorrência.
+
+#### F1.3 — BUG-CRIT-05: Verificar double-emit de `task.delta`
+
+- **Arquivo**: `src/copilot/agent/always-alive.js`
+- **Problema**: Possível duplo listener de `assistant.message_delta` em `start()` e `task-executor.js`.
+- **Ação**:
+  1. Inspecionar `start()` para listener de `assistant.message_delta`.
+  2. Se existir E `task-executor.js` também tiver, remover de `start()`.
+  3. Se não existir ou for condicional ao modo, documentar.
+- **Impacto PR**: 0.
+- **Testes**: `test_always_alive_streaming.spec.js`.
+
+#### F1.4 — BUG-CRIT-06: `chatBatch` — documentar limitação sequencial
+
+- **Arquivo**: `src/copilot/channel/client.js`
+- **Problema**: JSDoc promete paralelismo mas implementação é sequencial.
+- **Correção de curto prazo**: Atualizar JSDoc para documentar que é sequencial e renomear internamente ou adicionar flag `concurrency`.
+- **Correção de médio prazo**: Implementar semáforo com `concurrency` configurável (UPG-10).
+- **Impacto PR**: 0.
+
+#### F1.5 — BUG-CRIT-07: `PinnedFilesLoader` — watcher recursivo em Linux
+
+- **Arquivo**: `src/copilot/config/pinned-files-loader.js`
+- **Problema**: `fs.watch` não é recursivo no Linux.
+- **Correção**: Adicionar fallback: se `process.platform === 'linux'`, usar `fs.watch` nos subdiretórios individualmente (loop sobre subdirs), ou usar `setInterval` de polling leve a cada 30s para o diretório skills.
+- **Impacto PR**: 0.
+
+---
+
+### Fase 2 — Segurança (Alta prioridade)
+
+> Todos os gaps de segurança. Nenhum consome PR.
+
+#### F2.1 — SEC-01: `exec_command` — adicionar allowlist de executáveis
+
+- **Arquivo**: `src/copilot/tools/shell/index.js`
+- **Problema**: Blocklist de metacaracteres incompleta. Sujeita. a bypass via process substitution, brace expansion, etc.
+- **Correção**: Adicionar `ALLOWED_EXECUTABLES` allowlist: `['git', 'node', 'npm', 'npx', 'ls', 'cat', 'grep', 'find', 'rg', 'fd', 'echo', 'pwd', 'which', 'wc', 'head', 'tail', 'sort', 'uniq', 'diff', 'cp', 'mv', 'mkdir', 'rm', 'touch']`. Rejeitar qualquer executável não nessa lista.
+
+#### F2.2 — SEC-02: `buildHookSystemContext` — limitar tamanho de arquivos lidos
+
+- **Arquivo**: `src/copilot/agent/session-manager.js`
+- **Correção**: Adicionar `.slice(0, 8_000)` após `readFile` para `session-briefing.md` e `session.json`.
+
+#### F2.3 — SEC-03: `inject.js` — validar JSON de saúde contra prototype pollution
+
+- **Arquivo**: `src/copilot/channel/inject.js`
+- **Correção**: Usar `JSON.parse(body, (k, v) => k === '__proto__' || k === 'constructor' ? undefined : v)` para bloquear prototype pollution.
+
+#### F2.4 — SEC-04: `server.js` — comparação de token com `timingSafeEqual`
+
+- **Arquivo**: `src/copilot/terminal/server.js`
+- **Correção**: Implementar comparação via `crypto.timingSafeEqual` para o `TERMINAL_TOKEN`.
+
+#### F2.5 — SEC-05: `file-tools.js` — expandir `BLOCKED_PATTERNS` com paths de credenciais
+
+- **Arquivo**: `src/copilot/tools/file-tools.js`
+- **Correção**: Adicionar à blocklist: `.aws/credentials`, `.kube/config`, `.docker/config.json`, `.ssh/`, `~/.gitconfig` (com senhas).
+
+#### F2.6 — SEC-06: `socket-ns.js` — `join:session` verificar ownership
+
+- **Arquivo**: `src/copilot/conversation-hub/socket-ns.js`
+- **Problema**: Qualquer cliente autenticado pode entrar em qualquer sessão.
+- **Correção**: Verificar se o `hubSessionId` pertence ao `socket.userId` (se multi-usuário) ou simplesmente verificar se a sessão existe e está ativa antes de aceitar o join. Em modo single-user, ao menos validar que o `hubSessionId` não é um string injetado com path traversal.
+
+#### F2.7 — SEC-07: `gh-bridge.js` — restringir `rawApi` a métodos seguros
+
+- **Arquivo**: `src/copilot/bridges/gh-bridge.js`
+- **Correção**: Adicionar validação de método: apenas `GET` permitido por default. Adicionar `ALLOWED_GITHUB_API_PREFIXES` para limitar endpoints.
+
+#### F2.8 — SEC-08: `web-tools.js` — nota sobre DNS rebinding (mitigação parcial)
+
+- **Arquivo**: `src/copilot/tools/web-tools.js`
+- **Correção de curto prazo**: Adicionar comentário `// SEC-08: DNS rebinding — mitigação completa requer validação pós-DNS` e implementar verificação do `hostname` resolvido usando `dns.lookup` antes do `fetch`.
+
+---
+
+### Fase 3 — Bugs Moderados (Prioridade média)
+
+> Bugs que causam degradação de funcionalidade mas não corrompem dados.
+
+#### F3.1 — BUG-MOD-01: `consecutive_unauthorized` — limite superior no prompt injection
+
+- **Arquivo**: `src/copilot/agent/session-manager.js`
+- **Correção**: `Math.min(Math.max(0, Math.trunc(raw)), 9999)`.
+
+#### F3.2 — BUG-MOD-02: `mcp-tool-bridge.js` — resetar `_bootAttemptCount` ao abrir circuit
+
+- **Arquivo**: `src/copilot/bridges/mcp-tool-bridge.js`
+- **Correção**: `_bootAttemptCount = 0` no bloco de abertura do circuit breaker.
+
+#### F3.3 — BUG-MOD-06: `#dialogTurnMutex` race condition no reset
+
+- **Arquivo**: `src/copilot/agent/always-alive.js`
+- **Problema**: Contador pode zerar prematuramente entre Promises concorrentes.
+- **Correção**: Usar ID de geração (`_mutexGeneration`) para validar que o reset só ocorre na última promise da cadeia.
+
+#### F3.4 — BUG-MOD-08: `file-tools.js` — `validatePath` síncrono → assíncrono
+
+- **Arquivo**: `src/copilot/tools/file-tools.js`
+- **Correção**: Converter `realpathSync` para `fs.promises.realpath`.
+
+#### F3.5 — BUG-MOD-10: `session-config.js` — `onErrorOccurred` de `createHooks` sobrescreve retry
+
+- **Arquivo**: `src/copilot/lib/session.js`, `src/copilot/config/session-config.js`
+- **Problema**: `createHooks()` produz `onErrorOccurred` sem retry; isso sobrescreve o default de retry.
+- **Correção**: `buildAlwaysAliveConfig` deve deixar `onErrorOccurred` **undefined** para que `buildSessionConfig` injete o default com retry. Ou `buildAlwaysAliveConfig` deve fornecer o mesmo onErrorOccurred com retry.
+
+#### F3.6 — BUG-MOD-11: `audit.js` — `getAuditSummary` síncrono → assíncrono
+
+- **Arquivo**: `src/copilot/channel/audit.js`
+- **Correção**: `fs.promises.readFile`.
+
+#### F3.7 — BUG-MOD-12: `nerv-bridge.js` — re-registro duplo de `before-stop` listener
+
+- **Arquivo**: `src/copilot/bridges/nerv-bridge.js`
+- **Correção**: Usar `once` ao invés de `on` para o re-registro em `_onAgentBeforeStop`. Ou rastrear se já está registrado via flag booleana.
+
+#### F3.8 — BUG-LEVE-11: `git-tools.js` — `exec` → `execFile`
+
+- **Arquivo**: `src/copilot/tools/git/index.js`
+- **Correção**: Substituir `promisify(exec)` por `promisify(execFile)` com args separados — elimina risco de injeção shell via message de commit.
+
+#### F3.9 — BUG-LEVE-09: `lastPrInfo` getter — retornar cópia rasa
+
+- **Arquivo**: `src/copilot/agent/always-alive.js`
+- **Correção**: `return { ...this.#lastPrInfo }`.
+
+---
+
+### Fase 4 — Upgrades e Melhorias (Prioridade baixa)
+
+> Melhorias que aumentam robustez, performance ou observabilidade. Nenhuma consome PR.
+
+#### F4.1 — UPG-01: `git-tools.js` — `exec` → `execFile` (consolidado com F3.8)
+
+Já coberto em F3.8.
+
+#### F4.2 — UPG-03: `todo-tools.js` — migrar para SQLite
+
+- **Impacto**: Alto esforço, alto benefício. Usar tabela `copilot_todo_tasks` no `maestro.sqlite`. Elimina mutex e I/O de arquivo.
+- **Dependência**: requer F1.2 concluído antes.
+
+#### F4.3 — UPG-06: `session.on('session.idle')` para métricas precisas
+
+- **Arquivo**: `src/copilot/agent/always-alive.js`, `src/copilot/agent/task-executor.js`
+- **Correção**: Registrar listener de `session.idle` para emitir métrica de latência precisa.
+
+#### F4.4 — UPG-09: `web-tools.js` — DDG Instant Answer API
+
+- **Arquivo**: `src/copilot/tools/web-tools.js`
+- **Correção**: Substituir parsing HTML por `https://api.duckduckgo.com/?q=QUERY&format=json&no_html=1`.
+
+#### F4.5 — UPG-10: `chatBatch` — semáforo de concorrência
+
+- **Arquivo**: `src/copilot/channel/client.js`
+- **Correção**: Implementar semáforo com `concurrency` configurável. Default = 1 (sequencial, compatível).
+
+#### F4.6 — UPG-11: `dialogLoopActive` via SSE (evento Nerv)
+
+- **Arquivo**: `src/copilot/agent/always-alive.js`, SSE bridge
+- **Correção**: Emitir `dialog.loop.changed` via Nerv cuando `dialogLoopActive` mudar, para dashboard responsivo.
+
+#### F4.7 — UPG-12: Teste de integração do ciclo `stop()`/`start()`
+
+- **Arquivo**: `tests/integration/copilot/`
+- **Correção**: Criar `test_always_alive_lifecycle.spec.js` com 3 ciclos completos stop/start.
+
+#### F4.8 — UPG-02: Telemetria OTLP nativa do SDK
+
+- **Arquivo**: `src/copilot/lib/client.js`
+- **Correção**: Passar `telemetry: { otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT }` ao `CopilotClient` quando a env var estiver presente. Remove dependência de `@opentelemetry/sdk-trace-node`.
+
+#### F4.9 — UPG-08: `structured-message.js` — versão semver validada
+
+- **Arquivo**: `src/copilot/types/structured-message.js`
+- **Correção**: Trocar `z.string().default('1.0')` por `z.string().regex(/^\d+\.\d+(\.\d+)?$/).default('1.0')`.
+
+---
+
+### Fase 5 — Arquitetura (Longo prazo)
+
+> Melhorias estruturais que requerem planejamento mais cuidadoso.
+
+#### F5.1 — ARCH-01: Schema Zod para `session.json`
+
+- Adicionar validação Zod ao ler `sdk-always-alive.json` em `session-manager.js`.
+
+#### F5.2 — ARCH-05: `tools-bootstrap.js` — verificar colisão de nomes (coberto por F0.6)
+
+#### F5.3 — ARCH-07: Health check do `ConversationStore` no servidor terminal
+
+- Adicionar endpoint `/hub-health` ao `server.js` (porta 3009) que verifica `db.prepare('SELECT 1').get()`.
+
+#### F5.4 — ARCH-06: `StructuredMessageSchema` — substituir `.strict()` por `.passthrough()` nas respostas
+
+- **Arquivo**: `src/copilot/types/structured-message.js`
+- Manter `.strict()` apenas para o schema de request; usar `.passthrough()` para parse de respostas LLM-B.
+
+---
+
+### Resumo do Roadmap
+
+| Fase | ID   | Item                                            | Esforço | Prioridade |
+| ---- | ---- | ----------------------------------------------- | ------- | ---------- |
+| F0   | F0.1 | SDK-01: `onPermissionRequest` default           | Baixo   | **P0**     |
+| F0   | F0.2 | SDK-03: sections nomeadas no system message     | Médio   | **P2**     |
+| F0   | F0.3 | SDK-04: `getMessages()` guard + comentário      | Baixo   | **P3**     |
+| F0   | F0.4 | SDK-07: `ping()` argumento verificar            | Baixo   | **P3**     |
+| F0   | F0.5 | SDK-08: `client.stop()` no shutdown do agente   | Baixo   | **P1**     |
+| F0   | F0.6 | SDK-09: remover forcing `overridesBuiltInTool`  | Médio   | **P2**     |
+| F1   | F1.1 | CRIT-02: `writeTurn` lança exceção              | Baixo   | **P0**     |
+| F1   | F1.2 | CRIT-04: `todo-tools.js` mutex                  | Médio   | **P0**     |
+| F1   | F1.3 | CRIT-05: verificar double-emit `task.delta`     | Baixo   | **P0**     |
+| F1   | F1.4 | CRIT-06: `chatBatch` documentar sequencial      | Baixo   | **P1**     |
+| F1   | F1.5 | CRIT-07: `PinnedFilesLoader` Linux recursive    | Médio   | **P1**     |
+| F2   | F2.1 | SEC-01: allowlist de executáveis                | Alto    | **P1**     |
+| F2   | F2.2 | SEC-02: limitar tamanho leitura session files   | Baixo   | **P1**     |
+| F2   | F2.3 | SEC-03: protect JSON.parse prototype pollution  | Baixo   | **P1**     |
+| F2   | F2.4 | SEC-04: `timingSafeEqual` para token            | Baixo   | **P1**     |
+| F2   | F2.5 | SEC-05: expandir BLOCKED_PATTERNS               | Baixo   | **P2**     |
+| F2   | F2.6 | SEC-06: socket join session verificar ownership | Médio   | **P1**     |
+| F2   | F2.7 | SEC-07: `rawApi` restringir a GET               | Baixo   | **P1**     |
+| F2   | F2.8 | SEC-08: nota DNS rebinding + dns.lookup         | Médio   | **P2**     |
+| F3   | F3.1 | MOD-01: limite `consecutive_unauthorized`       | Baixo   | **P2**     |
+| F3   | F3.2 | MOD-02: MCP circuit breaker reset               | Baixo   | **P2**     |
+| F3   | F3.3 | MOD-06: mutex geração sem race condition        | Médio   | **P2**     |
+| F3   | F3.4 | MOD-08: `validatePath` async                    | Médio   | **P2**     |
+| F3   | F3.5 | MOD-10: `onErrorOccurred` hierarchy fix         | Médio   | **P2**     |
+| F3   | F3.6 | MOD-11: `getAuditSummary` async                 | Baixo   | **P2**     |
+| F3   | F3.7 | MOD-12: `nerv-bridge.js` listener once          | Baixo   | **P2**     |
+| F3   | F3.8 | LEVE-11: `git-tools.js` execFile                | Baixo   | **P2**     |
+| F3   | F3.9 | LEVE-09: `lastPrInfo` cópia rasa                | Baixo   | **P3**     |
+| F4   | F4.2 | UPG-03: `todo-tools.js` → SQLite                | Alto    | **P3**     |
+| F4   | F4.3 | UPG-06: `session.idle` para métricas            | Baixo   | **P3**     |
+| F4   | F4.4 | UPG-09: DDG JSON API                            | Baixo   | **P3**     |
+| F4   | F4.5 | UPG-10: `chatBatch` semáforo                    | Médio   | **P3**     |
+| F4   | F4.6 | UPG-11: `dialogLoopActive` via SSE              | Médio   | **P3**     |
+| F4   | F4.7 | UPG-12: teste integração ciclo stop/start       | Alto    | **P3**     |
+| F4   | F4.8 | UPG-02: OTLP nativa do SDK                      | Médio   | **P3**     |
+| F4   | F4.9 | UPG-08: versão semver em structured-message     | Baixo   | **P3**     |
+| F5   | F5.1 | ARCH-01: Zod schema para `session.json`         | Alto    | **P4**     |
+| F5   | F5.3 | ARCH-07: `/hub-health` no terminal server       | Baixo   | **P4**     |
+| F5   | F5.4 | ARCH-06: `.passthrough()` em respostas          | Baixo   | **P4**     |
+
+*Roadmap adicionado em 2026-03-30. Execução em ordem P0 → P1 → P2 → P3 → P4.*

@@ -19,30 +19,23 @@
 /**
  * @typedef {import('@github/copilot-sdk').SystemMessageConfig} SystemMessageConfig
  */
+import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from '@github/copilot-sdk';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes de identidade e instruções do LLM-B
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Nomes das seções do system prompt (preparado para SDK v0.2.0 `mode: "customize"`).
+ * Metadados das seções do system prompt — re-exportados do SDK v0.2.0. Cada valor é `{ description: string }`; a chave
+ * é o nome da seção (ex.: `'guidelines'`).
  *
- * Quando `@github/copilot-sdk` v0.2.0+ for disponível, usar `SYSTEM_PROMPT_SECTIONS` do SDK em vez deste objeto.
- *
- * @type {Readonly<Record<string, string>>}
+ * @type {import('@github/copilot-sdk').SystemPromptSection extends infer K
+ *     ? K extends string
+ *         ? Record<K, { description: string }>
+ *         : never
+ *     : never}
  */
-export const SYSTEM_PROMPT_SECTIONS = Object.freeze({
-    identity: 'identity',
-    tone: 'tone',
-    tool_efficiency: 'tool_efficiency',
-    environment_context: 'environment_context',
-    code_change_rules: 'code_change_rules',
-    guidelines: 'guidelines',
-    safety: 'safety',
-    tool_instructions: 'tool_instructions',
-    custom_instructions: 'custom_instructions',
-    last_instructions: 'last_instructions',
-});
+export const SYSTEM_PROMPT_SECTIONS = /** @type {any} */ (SDK_SECTIONS);
 
 /**
  * Identidade do agente LLM-B.
@@ -131,6 +124,24 @@ Antes de encerrar este turno:
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Constrói um `SystemMessageConfig` no modo `"customize"` com appendment na seção `guidelines`.
+ *
+ * SDK-03: usa a API de sections nomeadas do SDK v0.2.0 para granularidade máxima no contexto de hooks/sessão.
+ *
+ * @param {string} content - Conteúdo a ser adicionado na seção guidelines
+ * @returns {SystemMessageConfig}
+ */
+export function buildGuidelinesAppendMessage(content) {
+    // As chaves de sections são strings (ex.: 'guidelines'), não os objetos { description }
+    return /** @type {SystemMessageConfig} */ ({
+        mode: 'customize',
+        sections: {
+            guidelines: { action: 'append', content },
+        },
+    });
+}
+
+/**
  * Constrói um `SystemMessageConfig` no modo `"append"`.
  *
  * Adiciona instruções ao system message gerenciado pelo SDK, sem substituir o comportamento padrão. É o modo mais
@@ -204,7 +215,8 @@ export function buildAlwaysAliveSystemMessage(opts = {}) {
 export function buildHookContextAppendMessage(hookContext) {
     if (!hookContext) return buildAppendSystemMessage('');
 
-    return buildAppendSystemMessage(
+    // SDK-03: usa sections.guidelines (mode:'customize') para granularidade no SDK v0.2.0
+    return buildGuidelinesAppendMessage(
         [
             '---',
             '## Contexto Operacional do Hook System',

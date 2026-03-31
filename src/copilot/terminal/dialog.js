@@ -559,7 +559,10 @@ async function _executeTurn(message, actor) {
                         },
                     );
                 } catch (/** @type {any} */ notifyErr) {
-                    log('WARN', `[TerminalServer] FLOW-01: notifyTerminalTurn falhou (não crítico): ${notifyErr.message}`);
+                    log(
+                        'WARN',
+                        `[TerminalServer] FLOW-01: notifyTerminalTurn falhou (não crítico): ${notifyErr.message}`,
+                    );
                 }
                 emitNerv('copilot:turn:sent', {
                     hubSessionId: _hubSessionId,

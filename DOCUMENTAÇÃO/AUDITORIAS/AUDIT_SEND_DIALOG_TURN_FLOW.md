@@ -1,8 +1,8 @@
 # Análise do Fluxo `sendDialogTurn` — Ponta a Ponta
 
-**Data**: 2026-07-16  
-**Autor**: GitHub Copilot (Claude Sonnet 4.6)  
-**Escopo**: Todos os caminhos de entrada de mensagem → `sendDialogTurn` → resposta LLM-B  
+**Data**: 2026-07-16
+**Autor**: GitHub Copilot (Claude Sonnet 4.6)
+**Escopo**: Todos os caminhos de entrada de mensagem → `sendDialogTurn` → resposta LLM-B
 **Status**: ✅ IMPLEMENTADO — ver seção [Plano de Implementação](#plano-de-implementação)
 
 ---
@@ -15,39 +15,39 @@ propõe implementações concretas.
 
 ### Bugs Encontrados
 
-| ID | Severidade | Descrição |
-|----|-----------|-----------|
-| **FLOW-01** | 🔴 CRÍTICO | Mensagens do terminal (usuário humano) **não são injetadas no Orchestrator** — LLM-A nunca vê a conversa do usuário com LLM-B via terminal |
-| **FLOW-02** | 🔴 CRÍTICO | RF-PR-05: troca de modelo em `#tryReconnect` **não é 0-PR** — `resumeOrCreate` pode criar nova sessão porque o `sessionId` no estado é do modelo anterior, incompatível |
-| **FLOW-03** | 🟡 MÉDIO | `ensureDialogLoop()` em `dialog.js` não distingue entre "puxa mensagem antes de loop pronto" e "timeout na inicialização" — erros de boot silenciosos |
-| **FLOW-04** | 🟡 MÉDIO | `HubOrchestrator.#callViaDialogLoop` não persiste a mensagem do usuário no ConversationStore antes de chamar `sendDialogTurn` — se falhar, o turno LLM-A é gravado mas o de LLM-B não |
-| **FLOW-05** | 🟠 BAIXO | `dialog.js._executeTurn` não passa o `hubSessionId` ao chamar `conversationHub.writeTurn` — usa o ID do módulo global (`getHubSessionId()`) que pode estar defasado em caso de mudança de sessão |
-| **FLOW-06** | 🟠 BAIXO | `bridge-dialog.js POST /dialog/turn` não verifica `dialogLoopActive` antes de chamar `sendDialogTurn` — o guard já existe em `sendDialogTurn`, mas o erro `409` informativo só seria gerado para `status !== 'idle'` em `/dialog/start` |
+| ID          | Severidade | Descrição                                                                                                                                                                                                                               |
+| ----------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **FLOW-01** | 🔴 CRÍTICO  | Mensagens do terminal (usuário humano) **não são injetadas no Orchestrator** — LLM-A nunca vê a conversa do usuário com LLM-B via terminal                                                                                              |
+| **FLOW-02** | 🔴 CRÍTICO  | RF-PR-05: troca de modelo em `#tryReconnect` **não é 0-PR** — `resumeOrCreate` pode criar nova sessão porque o `sessionId` no estado é do modelo anterior, incompatível                                                                 |
+| **FLOW-03** | 🟡 MÉDIO    | `ensureDialogLoop()` em `dialog.js` não distingue entre "puxa mensagem antes de loop pronto" e "timeout na inicialização" — erros de boot silenciosos                                                                                   |
+| **FLOW-04** | 🟡 MÉDIO    | `HubOrchestrator.#callViaDialogLoop` não persiste a mensagem do usuário no ConversationStore antes de chamar `sendDialogTurn` — se falhar, o turno LLM-A é gravado mas o de LLM-B não                                                   |
+| **FLOW-05** | 🟠 BAIXO    | `dialog.js._executeTurn` não passa o `hubSessionId` ao chamar `conversationHub.writeTurn` — usa o ID do módulo global (`getHubSessionId()`) que pode estar defasado em caso de mudança de sessão                                        |
+| **FLOW-06** | 🟠 BAIXO    | `bridge-dialog.js POST /dialog/turn` não verifica `dialogLoopActive` antes de chamar `sendDialogTurn` — o guard já existe em `sendDialogTurn`, mas o erro `409` informativo só seria gerado para `status !== 'idle'` em `/dialog/start` |
 
 ### Melhorias Propostas
 
-| ID | Tipo | Descrição |
-|----|------|-----------|
+| ID              | Tipo            | Descrição                                                                                                      |
+| --------------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
 | **FLOW-UPG-01** | Observabilidade | Emitir evento `user.turn_injected_to_orchestrator` quando terminal sincroniza com o Orchestrator (fix FLOW-01) |
-| **FLOW-UPG-02** | Resiliência | RF-PR-05: aplicar fallback model em `startDialogLoop()` (0-PR garantido) em vez de `#tryReconnect` |
-| **FLOW-UPG-03** | Rastreabilidade | Adicionar `turnSource: 'terminal' | 'api' | 'orchestrator'` no evento `dialog.turn_start` |
-| **FLOW-UPG-04** | Diagnóstico | `bridge-dialog.js /dialog/turn` deve retornar `dialogLoopActive` no body de erro 409 |
-| **FLOW-UPG-05** | Robustez | `dialog.js`: timeout de `ensureDialogLoop()` deve emitir `Nerv` com severity=error para alertar monitoramento |
+| **FLOW-UPG-02** | Resiliência     | RF-PR-05: aplicar fallback model em `startDialogLoop()` (0-PR garantido) em vez de `#tryReconnect`             |
+| **FLOW-UPG-03** | Rastreabilidade | Adicionar `turnSource: 'terminal'                                                                              | 'api' | 'orchestrator'` no evento `dialog.turn_start` |
+| **FLOW-UPG-04** | Diagnóstico     | `bridge-dialog.js /dialog/turn` deve retornar `dialogLoopActive` no body de erro 409                           |
+| **FLOW-UPG-05** | Robustez        | `dialog.js`: timeout de `ensureDialogLoop()` deve emitir `Nerv` com severity=error para alertar monitoramento  |
 
 ---
 
 ## Índice
 
-1. [Arquitetura de Caminhos de Mensagem](#1-arquitetura-de-caminhos-de-mensagem)  
-2. [Caminho A — Usuário → Terminal → LLM-B](#2-caminho-a--usuário--terminal--llm-b)  
-3. [Caminho B — LLM-A → Orchestrator → LLM-B](#3-caminho-b--llm-a--orchestrator--llm-b)  
-4. [Caminho C — API HTTP → bridge-dialog → LLM-B](#4-caminho-c--api-http--bridge-dialog--llm-b)  
-5. [Caminho D — API HTTP `/inject` → Orchestrator → (LLM-A poll)](#5-caminho-d--api-http-inject--orchestrator--llm-a-poll)  
-6. [sendDialogTurn em Detalhe (always-alive.js)](#6-senddialogTurn-em-detalhe-always-alivejs)  
-7. [Bug FLOW-01 — Gap Terminal ↔ Orchestrator](#7-bug-flow-01--gap-terminal--orchestrator)  
-8. [Bug FLOW-02 — RF-PR-05 não é 0-PR](#8-bug-flow-02--rf-pr-05-não-é-0-pr)  
-9. [Plano de Implementação](#plano-de-implementação)  
-10. [Tabela Consolidada](#tabela-consolidada)  
+1. [Arquitetura de Caminhos de Mensagem](#1-arquitetura-de-caminhos-de-mensagem)
+2. [Caminho A — Usuário → Terminal → LLM-B](#2-caminho-a--usuário--terminal--llm-b)
+3. [Caminho B — LLM-A → Orchestrator → LLM-B](#3-caminho-b--llm-a--orchestrator--llm-b)
+4. [Caminho C — API HTTP → bridge-dialog → LLM-B](#4-caminho-c--api-http--bridge-dialog--llm-b)
+5. [Caminho D — API HTTP `/inject` → Orchestrator → (LLM-A poll)](#5-caminho-d--api-http-inject--orchestrator--llm-a-poll)
+6. [sendDialogTurn em Detalhe (always-alive.js)](#6-senddialogTurn-em-detalhe-always-alivejs)
+7. [Bug FLOW-01 — Gap Terminal ↔ Orchestrator](#7-bug-flow-01--gap-terminal--orchestrator)
+8. [Bug FLOW-02 — RF-PR-05 não é 0-PR](#8-bug-flow-02--rf-pr-05-não-é-0-pr)
+9. [Plano de Implementação](#plano-de-implementação)
+10. [Tabela Consolidada](#tabela-consolidada)
 
 ---
 
@@ -316,11 +316,11 @@ Quando o usuário digita no terminal e `dialog.js` chama `llmBridgeClient.dialog
 é gravado diretamente no ConversationStore (`store.writeTurn(role:'user')`) mas **não passa pelo
 HubOrchestrator**. Isso cria uma assimetria:
 
-| Fonte da mensagem | ConversationStore | HubOrchestrator `turn:sent` | LLM-A pode ver? |
-|---|---|---|---|
-| Terminal (`sendTurn`) | ✅ gravado | ❌ não emitido | ❌ NÃO |
-| LLM-A (`sendToLlmB`) | ✅ gravado | ✅ emitido | ✅ SIM |
-| API `/inject` | ✅ gravado | N/A (via poll) | ✅ SIM (via poll) |
+| Fonte da mensagem     | ConversationStore | HubOrchestrator `turn:sent` | LLM-A pode ver?  |
+| --------------------- | ----------------- | --------------------------- | ---------------- |
+| Terminal (`sendTurn`) | ✅ gravado         | ❌ não emitido               | ❌ NÃO            |
+| LLM-A (`sendToLlmB`)  | ✅ gravado         | ✅ emitido                   | ✅ SIM            |
+| API `/inject`         | ✅ gravado         | N/A (via poll)              | ✅ SIM (via poll) |
 
 **Consequência**: LLM-A que usa `orchestrator.sendToLlmB()` e `pollUserMessages()` **nunca vê** as
 mensagens que o usuário digitou diretamente no terminal. O histórico no ConversationStore fica
@@ -422,16 +422,16 @@ modelo.
 
 ## Tabela Consolidada
 
-| ID | Tipo | Severidade | Arquivo | Status |
-|----|------|-----------|---------|--------|
-| FLOW-01 | Bug | 🔴 CRÍTICO | `dialog.js`, `orchestrator.js`, `hub.js` | ✅ IMPLEMENTADO |
-| FLOW-02 | Bug | 🔴 CRÍTICO | `always-alive.js` | ✅ IMPLEMENTADO |
-| FLOW-03 | Bug | 🟡 MÉDIO | `dialog.js` | 🔵 BACKLOG |
-| FLOW-04 | Bug | 🟡 MÉDIO | `orchestrator.js` | 🔵 BACKLOG |
-| FLOW-05 | Bug | 🟠 BAIXO | `dialog.js` | 🔵 BACKLOG |
-| FLOW-06 | Bug | 🟠 BAIXO | `bridge-dialog.js` | ✅ IMPLEMENTADO |
-| FLOW-UPG-01 | Melhoria | — | `dialog.js`, `hub.js` | ✅ IMPLEMENTADO |
-| FLOW-UPG-02 | Melhoria | — | `always-alive.js` | ✅ IMPLEMENTADO |
-| FLOW-UPG-03 | Melhoria | — | `always-alive.js` | ✅ IMPLEMENTADO |
-| FLOW-UPG-04 | Melhoria | — | `bridge-dialog.js` | ✅ IMPLEMENTADO |
-| FLOW-UPG-05 | Melhoria | — | `dialog.js` | ✅ IMPLEMENTADO |
+| ID          | Tipo     | Severidade | Arquivo                                  | Status         |
+| ----------- | -------- | ---------- | ---------------------------------------- | -------------- |
+| FLOW-01     | Bug      | 🔴 CRÍTICO  | `dialog.js`, `orchestrator.js`, `hub.js` | ✅ IMPLEMENTADO |
+| FLOW-02     | Bug      | 🔴 CRÍTICO  | `always-alive.js`                        | ✅ IMPLEMENTADO |
+| FLOW-03     | Bug      | 🟡 MÉDIO    | `dialog.js`                              | 🔵 BACKLOG      |
+| FLOW-04     | Bug      | 🟡 MÉDIO    | `orchestrator.js`                        | 🔵 BACKLOG      |
+| FLOW-05     | Bug      | 🟠 BAIXO    | `dialog.js`                              | 🔵 BACKLOG      |
+| FLOW-06     | Bug      | 🟠 BAIXO    | `bridge-dialog.js`                       | ✅ IMPLEMENTADO |
+| FLOW-UPG-01 | Melhoria | —          | `dialog.js`, `hub.js`                    | ✅ IMPLEMENTADO |
+| FLOW-UPG-02 | Melhoria | —          | `always-alive.js`                        | ✅ IMPLEMENTADO |
+| FLOW-UPG-03 | Melhoria | —          | `always-alive.js`                        | ✅ IMPLEMENTADO |
+| FLOW-UPG-04 | Melhoria | —          | `bridge-dialog.js`                       | ✅ IMPLEMENTADO |
+| FLOW-UPG-05 | Melhoria | —          | `dialog.js`                              | ✅ IMPLEMENTADO |

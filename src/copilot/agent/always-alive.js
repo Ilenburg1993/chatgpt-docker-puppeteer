@@ -518,9 +518,11 @@ export class AlwaysAliveAgent extends EventEmitter {
             );
 
             // BUG-HIGH-03 (fix): streaming de delta também no modo dialog loop
-            // Emitir task.delta para cada chunk de resposta do assistente, independente do modo de execução
+            // BUG-CRIT-05 (fix): listener global apenas para dialog-loop (status !== 'processing')
+            // — evita double-emit com o listener de task-executor.js durante execução de tarefa
             this.#sessionEventUnsubscribers.push(
                 session.on('assistant.message_delta', (/** @type {any} */ evt) => {
+                    if (this.#status === 'processing') return; // task-executor.js já emite
                     const chunk = evt?.data?.deltaContent ?? evt?.data?.content ?? '';
                     if (chunk) this.emit('task.delta', { taskId: null, chunk });
                 }),
@@ -741,6 +743,23 @@ export class AlwaysAliveAgent extends EventEmitter {
             this.#messagesCache = null;
             setSessionRpc(null);
         }
+
+        // SDK-08: parar o processo CLI para liberar recursos do processo
+        if (this.#client) {
+            try {
+                const stopErrors = await this.#client.stop();
+                if (stopErrors.length > 0) {
+                    log(
+                        'WARN',
+                        `[AlwaysAlive] SDK client.stop() erros: ${stopErrors.map((e) => e.message).join('; ')}`,
+                    );
+                }
+            } catch (/** @type {any} */ e) {
+                log('WARN', `[AlwaysAlive] Erro ao parar client SDK: ${e.message}`);
+            }
+            this.#client = null;
+        }
+
         this.emit('stopped');
     }
 
@@ -1026,7 +1045,10 @@ export class AlwaysAliveAgent extends EventEmitter {
             this.#model = this.#fallbackModel;
             this.#pendingModelFallback = false;
             this.emit('pr.fallback_model', { previousModel: prev, newModel: this.#fallbackModel, ts: Date.now() });
-            log('WARN', `[AlwaysAlive] RF-PR-05 (0-PR): modelo trocado ${prev} → ${this.#model} em startDialogLoop — sem PR adicional.`);
+            log(
+                'WARN',
+                `[AlwaysAlive] RF-PR-05 (0-PR): modelo trocado ${prev} → ${this.#model} em startDialogLoop — sem PR adicional.`,
+            );
         }
 
         // RF-D04: boot prompt centralizado em DialogProtocol.buildBootPrompt() para DRY entre always-alive.js e dialog.js

@@ -259,10 +259,6 @@ export class HubOrchestrator extends EventEmitter {
             model: 'copilot-claude-sonnet-4.6',
             structured: typeof message === 'object' ? message : null,
         });
-        // BUG-C05 (fix): writeTurn retornando -1 indica falha irrecuperável
-        if (llmATurnId === -1) {
-            throw new Error('[HubOrchestrator] writeTurn falhou irrecuperavelmente para turno LLM-A');
-        }
         const llmATurn = this.#store.getTurn(llmATurnId);
         const turnNumber = llmATurn?.turn_number;
         if (!turnNumber) {
@@ -417,9 +413,9 @@ export class HubOrchestrator extends EventEmitter {
     // ─── Notificação de turnos externos ──────────────────────────────────────
 
     /**
-     * FLOW-UPG-01: Notifica o Orchestrator sobre um turno já persistido no ConversationStore pelo
-     * terminal (dialog.js). Emite `turn:sent` e `turn:complete` para que LLM-A e listeners de SSE
-     * vejam as mensagens do usuário humano digitadas diretamente no terminal.
+     * FLOW-UPG-01: Notifica o Orchestrator sobre um turno já persistido no ConversationStore pelo terminal (dialog.js).
+     * Emite `turn:sent` e `turn:complete` para que LLM-A e listeners de SSE vejam as mensagens do usuário humano
+     * digitadas diretamente no terminal.
      *
      * Não re-persiste turnos — apenas emite os eventos com os IDs já gravados.
      *

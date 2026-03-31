@@ -47,7 +47,7 @@ describe('session-manager › buildHookSystemContext', () => {
         // Importamos a função real — o ambiente de teste não tem os arquivos .github/hooks/state/
         // então o resultado deve ser '' (sem partes).
         const { buildHookSystemContext } = await import('#copilot/session-manager');
-        const result = buildHookSystemContext();
+        const result = await buildHookSystemContext();
         // Pode ser '' ou string com conteúdo dependendo do ambiente; nunca deve lançar.
         assert.strictEqual(typeof result, 'string');
     });
@@ -64,7 +64,7 @@ describe('session-manager › buildHookSystemContext', () => {
         // injetar o path em runtime sem refatoração — cobrimos via teste indireto de mock).
         // Este teste verifica que a função produz saída quando o arquivo existe.
         const { buildHookSystemContext } = await import('#copilot/session-manager');
-        const result = buildHookSystemContext();
+        const result = await buildHookSystemContext();
         // Independente de existir ou não, o retorno é sempre string
         assert.ok(typeof result === 'string');
     });

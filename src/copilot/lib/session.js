@@ -13,7 +13,7 @@
  */
 
 import { log } from '#core/logger';
-import { CopilotClient } from '@github/copilot-sdk';
+import { CopilotClient, approveAll } from '@github/copilot-sdk';
 
 /**
  * @typedef {InstanceType<typeof CopilotClient>} CopilotClientInstance
@@ -143,6 +143,7 @@ function buildSessionConfig(opts, mode) {
     }
 
     if (opts.onPermissionRequest !== undefined) cfg.onPermissionRequest = opts.onPermissionRequest;
+    else cfg.onPermissionRequest = approveAll; // SDK-01: obrigatório no v0.2.0 — default approveAll
     if (opts.onUserInputRequest !== undefined) cfg.onUserInputRequest = opts.onUserInputRequest;
 
     // RF-PR-01: compor hooks com onErrorOccurred padrão para retry automático sem PR

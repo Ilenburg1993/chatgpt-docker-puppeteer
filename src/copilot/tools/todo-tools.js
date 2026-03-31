@@ -121,7 +121,41 @@ const VALID_TRANSITIONS = {
  *
  * @returns {Promise<TodoStore>}
  */
-async function readStore() {
+
+// BUG-CRIT-04 (fix): mutex serial para serializar ciclos read-modify-write do store.
+// Todas as operações que leem E escrevem devem usar withStore(fn).
+let _storeMutex = Promise.resolve();
+
+/**
+ * Serializa uma operação de read-modify-write no store.
+ * O callback `fn` recebe o store, modifica-o in-place e retorna um valor opcional.
+ *
+ * @template T
+ * @param {(store: TodoStore) => Promise<T> | T} fn
+ * @returns {Promise<T>}
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function withStore(fn) {
+    /** @type {(v?: unknown) => void} */
+    let release;
+    const token = new Promise((r) => {
+        release = /** @type {any} */ (r);
+    });
+    const prev = _storeMutex;
+    _storeMutex = _storeMutex.then(() => token);
+    await prev;
+    try {
+        const store = await _readStoreRaw();
+        const result = await fn(store);
+        await _writeStoreRaw(store);
+        return result;
+    } finally {
+        // @ts-expect-error — release is always assigned before await prev resolves
+        release();
+    }
+}
+
+async function _readStoreRaw() {
     try {
         if (!fs.existsSync(TODOS_FILE)) {
             return { version: SCHEMA_VERSION, tasks: {} };
@@ -138,14 +172,10 @@ async function readStore() {
 }
 
 /**
- * Persiste o store no disco via escrita atômica (.tmp → rename).
- *
- * ARCH-N09/UPG-N06 (fix): I/O assíncrono via fs/promises para não bloquear o event loop.
- *
  * @param {TodoStore} store
  * @returns {Promise<void>}
  */
-async function writeStore(store) {
+async function _writeStoreRaw(store) {
     const dir = path.dirname(TODOS_FILE);
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -155,6 +185,19 @@ async function writeStore(store) {
     await fsp.writeFile(TODOS_TMP, json, 'utf8');
     await fsp.rename(TODOS_TMP, TODOS_FILE);
 }
+
+/** @returns {Promise<TodoStore>} */
+async function readStore() {
+    return _readStoreRaw();
+}
+
+/**
+ * Persiste o store no disco. Para operações com read-modify-write, prefira `withStore`.
+ *
+ * @param {TodoStore} store
+ * @returns {Promise<void>}
+ */
+const writeStore = _writeStoreRaw;
 
 /**
  * Gera um ID único de 8 caracteres alfanuméricos.

@@ -35,6 +35,7 @@
  */
 
 import { log } from '#core/logger';
+import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { println } from './dialog.js';
@@ -236,9 +237,15 @@ export function createInjectServer() {
             }
 
             // Verificar token se configurado (todos os outros endpoints)
+            // SEC-04: timingSafeEqual evita timing-attack na comparação do token
             if (TERMINAL_TOKEN) {
                 const authHeader = req.headers['authorization'] ?? '';
-                if (authHeader !== `Bearer ${TERMINAL_TOKEN}`) {
+                const expected = `Bearer ${TERMINAL_TOKEN}`;
+                const providedBuf = Buffer.from(authHeader.padEnd(expected.length));
+                const expectedBuf = Buffer.from(expected);
+                const lengthMatch = authHeader.length === expected.length;
+                const tokenMatch = lengthMatch && timingSafeEqual(providedBuf, expectedBuf);
+                if (!tokenMatch) {
                     res.writeHead(401, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
                     return;

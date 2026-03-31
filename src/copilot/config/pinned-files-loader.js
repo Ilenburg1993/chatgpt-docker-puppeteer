@@ -10,7 +10,7 @@
 
 import { log } from '#core/logger';
 import { EventEmitter } from 'node:events';
-import { existsSync, watch } from 'node:fs';
+import { existsSync, readdirSync, statSync, watch } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -167,10 +167,16 @@ export class PinnedFilesLoader extends EventEmitter {
      * @returns {void}
      */
     #startWatchers() {
+        // BUG-CRIT-07 (fix): fs.watch com recursive só funciona em macOS/Windows nativamente.
+        // Em Linux (DevContainer), usar recursive: true nos dirs e monitorar subdirs manualmente.
+        const supportsRecursive = process.platform === 'darwin' || process.platform === 'win32';
         for (const dir of this.#dirs) {
             if (!existsSync(dir)) continue;
             try {
-                const watcher = watch(dir, { persistent: false }, (eventType, filename) => {
+                const watchOpts = supportsRecursive
+                    ? { persistent: false, recursive: true }
+                    : { persistent: false };
+                const watcher = watch(dir, watchOpts, (eventType, filename) => {
                     if (!filename) return;
                     if (!SUPPORTED_EXTENSIONS.some((ext) => filename.endsWith(ext))) return;
                     const filePath = join(dir, filename);
@@ -182,6 +188,27 @@ export class PinnedFilesLoader extends EventEmitter {
                     this.#watchers.delete(dir);
                 });
                 this.#watchers.set(dir, watcher);
+
+                // BUG-CRIT-07 (fix): em Linux, monitorar subdirs de primeiro nível também
+                if (!supportsRecursive) {
+                    try {
+                        for (const entry of readdirSync(dir)) {
+                            const subPath = join(dir, entry);
+                            if (!statSync(subPath).isDirectory()) continue;
+                            const subWatcher = watch(subPath, { persistent: false }, (evtType, fname) => {
+                                if (!fname) return;
+                                if (!SUPPORTED_EXTENSIONS.some((ext) => fname.endsWith(ext))) return;
+                                this.#scheduleReload(join(subPath, fname));
+                            });
+                            subWatcher.on('error', (/** @type {Error} */ e) =>
+                                log('WARN', `[PinnedFilesLoader] Watcher subdir erro ${subPath}: ${e.message}`),
+                            );
+                            this.#watchers.set(subPath, subWatcher);
+                        }
+                    } catch {
+                        // subdirs indisponíveis — continuar com watch do dir raiz
+                    }
+                }
             } catch (err) {
                 log(
                     'WARN',

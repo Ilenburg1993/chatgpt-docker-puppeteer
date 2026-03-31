@@ -318,6 +318,11 @@ export class LlmBridgeClient {
      *         | { error: string; response: null; taskId: string; durationMs: number }
      *     )[]
      * >}
+     *
+     * @remarks
+     * **BUG-CRIT-06 (documentado)**: Esta implementação é SEQUENCIAL, não paralela.
+     * Cada mensagem aguarda reply completo antes de enviar a próxima (preserva histórico de conversa).
+     * Para paralelismo real, use múltiplas instâncias ou aguarde UPG-10 (semáforo de concorrência).
      */
     async chatBatch(messages, opts = {}) {
         // BUG-HIGH-08 (fix): Promise.all disparava todas as mensagens em paralelo,

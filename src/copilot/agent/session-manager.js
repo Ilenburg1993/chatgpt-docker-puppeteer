@@ -146,6 +146,23 @@ export async function buildHookSystemContext() {
     return parts.join('\n\n');
 }
 
+// SEC-02: limite máximo de contexto (8KB) para prevenir injection de conteúdo grande via briefing
+const HOOK_CONTEXT_MAX_BYTES = 8 * 1024;
+
+/**
+ * Constrói contexto do hook system com limite de tamanho aplicado.
+ *
+ * @returns {Promise<string>}
+ */
+export async function buildHookSystemContextSafe() {
+    const raw = await buildHookSystemContext();
+    if (Buffer.byteLength(raw, 'utf8') > HOOK_CONTEXT_MAX_BYTES) {
+        const truncated = Buffer.from(raw, 'utf8').subarray(0, HOOK_CONTEXT_MAX_BYTES).toString('utf8');
+        return truncated + '\n\n⚠️ [contexto truncado por limite SEC-02: 8KB]';
+    }
+    return raw;
+}
+
 const ROOT = resolve(import.meta.dirname, '../../');
 const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
 const STATE_FILE = join(STATE_DIR, 'sdk-always-alive.json');
@@ -351,7 +368,7 @@ export async function initOrResumeSession(client, sessionOptions) {
     const injectContext = sessionOptions.injectHookContext !== false;
 
     /** @type {import('@github/copilot-sdk').SystemMessageConfig | undefined} */
-    const systemMessage = injectContext ? buildHookContextAppendMessage(await buildHookSystemContext()) : undefined;
+    const systemMessage = injectContext ? buildHookContextAppendMessage(await buildHookSystemContextSafe()) : undefined;
 
     /** @type {any} */
     const opts = {

@@ -7,6 +7,7 @@
  *   tornando-a testável e legível de forma independente.
  */
 
+import { log } from '#core/logger';
 import { buildCustomTools } from '../config/tools/registry.js';
 import { registerTools } from '../lib/tools-registry.js';
 import {
@@ -136,9 +137,20 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
     registerForIntrospection(allTools);
     setTelemetryStore(telemetry);
 
-    // Garante que todas as tools têm overridesBuiltInTool: true para evitar conflito com
-    // ferramentas nativas do CLI Copilot (web_fetch, read_file, exec_command, etc.)
-    const finalTools = allTools.map((t) => (t.overridesBuiltInTool ? t : { ...t, overridesBuiltInTool: true }));
+    // SDK-09: verificar colisões de nome e manter overridesBuiltInTool explícito em cada tool.
+    // Não forçar globalmente para não mascarar conflitos acidentais com built-ins do CLI.
+    const nameCount = /** @type {Map<string, number>} */ (new Map());
+    for (const t of allTools) {
+        nameCount.set(t.name, (nameCount.get(t.name) ?? 0) + 1);
+    }
+    for (const [name, count] of nameCount) {
+        if (count > 1) {
+            log(
+                'WARN',
+                `[tools-bootstrap] SDK-09: tool "${name}" registrada ${count}× — verifique sobreposição acidental.`,
+            );
+        }
+    }
 
-    return finalTools;
+    return allTools;
 }
