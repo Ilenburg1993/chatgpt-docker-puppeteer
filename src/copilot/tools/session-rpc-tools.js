@@ -9,6 +9,10 @@
  * Ativação: chamar setSessionRpc(session.rpc) após a sessão ser criada no always-alive.js.
  *
  * @module copilot/tools/session-rpc-tools
+ *
+ * **SDK-05 (F6.13)**: as APIs `session.rpc.*` são RPCs JSON-RPC internos do CLI sem tipagem pública garantida.
+ * Todas as chamadas são encapsuladas em `wrapRpc()` com try/catch e fallback gracioso (retorna `{ error }` em falha).
+ * Em versões futuras do SDK, verificar se novos métodos públicos estão disponíveis como substitutos.
  */
 
 import { log } from '#core/logger';
@@ -82,6 +86,7 @@ const sessionModeGetTool = defineTool('session_mode_get', {
     ),
     handler: async () =>
         wrapRpc('session_mode_get', async (rpc) => {
+            // SDK-05: rpc.mode.get() é API interna — sem equivalente público no SDK v0.2.0
             const result = await rpc.mode.get();
             log('INFO', `[session_mode_get] mode=${result.mode}`);
             return result;
@@ -245,6 +250,7 @@ const sessionCompactTool = defineTool('session_compact', {
     ),
     handler: async () =>
         wrapRpc('session_compact', async (rpc) => {
+            // SDK-05: rpc.compaction.compact() é API interna — sem equivalente público no SDK v0.2.0
             const result = await rpc.compaction.compact();
             log(
                 'INFO',

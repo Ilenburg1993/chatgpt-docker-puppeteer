@@ -324,6 +324,7 @@ export async function handlePipeline(body) {
  *   - `{ type: 'file', path: string }` — lê o arquivo e embute o conteúdo como bloco markdown.
  *   - `{ type: 'directory', path: string }` — lista e embute os arquivos do diretório.
  *   - `{ type: 'selection', text: string, filePath?: string }` — embute o texto selecionado como bloco markdown.
+ *   - `{ type: 'blob', data: string, mimeType?: string }` — decodifica base64 e embute (F6.8, SDK v0.2.0+).
  *   - `{ content: string, path?: string }` — embute o conteúdo inline como bloco markdown.
  *
  * @param {{

@@ -81,6 +81,14 @@ export class HubOrchestrator extends EventEmitter {
     #inflightBySession = new Map();
 
     /**
+     * F6.5 (BUG-MOD-09): sessões já encerradas — previne re-inserção zumbi em #inflightBySession após closeSession()
+     * ser chamado durante uma Promise em voo.
+     *
+     * @type {Set<string>}
+     */
+    #closedSessions = new Set();
+
+    /**
      * @param {import('./store.js').ConversationStore} store
      * @param {{
      *     getStatusSnapshot(): object;
@@ -134,6 +142,7 @@ export class HubOrchestrator extends EventEmitter {
         this.#bridge = null;
         this.#turnCounters.clear();
         this.#inflightBySession.clear();
+        this.#closedSessions.clear();
         this.removeAllListeners();
         log('DEBUG', '[HubOrchestrator] Destruído.');
     }
@@ -180,6 +189,8 @@ export class HubOrchestrator extends EventEmitter {
         this.#store.closeHubSession(hubSessionId);
         this.#turnCounters.delete(hubSessionId);
         this.#inflightBySession.delete(hubSessionId);
+        // F6.5 (BUG-MOD-09): registrar no set de sessões fechadas para bloquear re-inserções zumbi
+        this.#closedSessions.add(hubSessionId);
         this.emit('session:closed', { hubSessionId });
         log('INFO', `[HubOrchestrator] Hub session encerrada: ${hubSessionId}`);
     }
@@ -205,15 +216,29 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {Promise<OrchestratorResult>}
      */
     sendToLlmB(hubSessionId, message, opts = {}) {
+        // F6.5 (BUG-MOD-09): bloquear novas mensagens para sessões já encerradas
+        if (this.#closedSessions.has(hubSessionId)) {
+            return Promise.reject(new Error(`[HubOrchestrator] Sessão já encerrada: ${hubSessionId}`));
+        }
+
         // Encadeia na cauda da Promise existente para esta sessão (mutex por sessão)
         const prev = this.#inflightBySession.get(hubSessionId) ?? Promise.resolve();
 
         /** @type {Promise<OrchestratorResult>} */
-        const next = prev.then(() => this.#executeSendToLlmB(hubSessionId, message, opts));
+        const next = prev.then(() => {
+            // Verificação dupla: pode ter sido fechada enquanto aguardava na fila
+            if (this.#closedSessions.has(hubSessionId)) {
+                throw new Error(`[HubOrchestrator] Sessão encerrada durante enfileiramento: ${hubSessionId}`);
+            }
+            return this.#executeSendToLlmB(hubSessionId, message, opts);
+        });
 
         // Cauda sem valor — quando completa (ok ou erro), limpa o mapa se ninguém mais se encadeou
         const tail = next.then(() => {}).catch(() => {});
-        this.#inflightBySession.set(hubSessionId, tail);
+        // F6.5: só inserir no mapa se a sessão ainda não foi fechada
+        if (!this.#closedSessions.has(hubSessionId)) {
+            this.#inflightBySession.set(hubSessionId, tail);
+        }
         tail.then(() => {
             // Só remove se a cauda armazenada ainda é esta — indica que a fila está vazia
             if (this.#inflightBySession.get(hubSessionId) === tail) {

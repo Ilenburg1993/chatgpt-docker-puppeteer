@@ -127,17 +127,23 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
             // DL-PERM: /restart para o loop via stopDialogMode() (reason: watchdog_restart), que
             // emite dialog.stopped → o handler em index.js chama ensureDialogLoop() automaticamente.
             // Aguardamos dialog.ready para confirmar que o boot completou antes de exibir feedback.
+            //
+            // F6.1 (BUG-MOD-07): registrar o listener APÓS stopDialogMode() para evitar capturar
+            // um dialog.ready de um boot anterior. Se o boot completar antes do registro (ultra-rápido),
+            // verificamos dialogLoopActive para não ficatarmos presos no timeout.
             println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
             try {
-                const readyPromise = new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => reject(new Error('Timeout aguardando restart')), 30_000);
-                    alwaysAliveAgent.once('dialog.ready', () => {
-                        clearTimeout(timeout);
-                        resolve(undefined);
-                    });
-                });
                 await llmBridgeClient.stopDialogMode();
-                await readyPromise;
+                // Verifica se o loop já voltou antes de registrar o listener
+                if (!alwaysAliveAgent.dialogLoopActive) {
+                    await new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => reject(new Error('Timeout aguardando restart')), 30_000);
+                        alwaysAliveAgent.once('dialog.ready', () => {
+                            clearTimeout(timeout);
+                            resolve(undefined);
+                        });
+                    });
+                }
             } catch (/** @type {any} */ e) {
                 println(`\x1b[31m  Falha no restart: ${e.message}\x1b[0m`);
                 // Fallback: tentar ensureDialogLoop diretamente

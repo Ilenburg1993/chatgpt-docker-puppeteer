@@ -1972,28 +1972,27 @@ cobrindo casos similares. **Correção**: Revisar se ambos são utilizados nos q
 
 | ID    | Item                                             | Esforço | Prioridade | Status |
 | ----- | ------------------------------------------------ | ------- | ---------- | ------ |
-| F6.1  | `/restart` race condition em `repl.js`           | Baixo   | **P2**     | ⏳     |
+| F6.1  | `/restart` race condition em `repl.js`           | Baixo   | **P2**     | ✅     |
 | F6.2  | Truncar `context`/`intent` em `hub_send_message` | Baixo   | **P2**     | ✅     |
 | F6.3  | Rate limiter separado SSE vs HTTP                | Médio   | **P2**     | ✅     |
 | F6.4  | Validar URLs DDG contra `PRIVATE_HOST_RE`        | Baixo   | **P2**     | ✅     |
-| F6.5  | `#inflightBySession` proteção zumbi              | Médio   | **P2**     | ⏳     |
+| F6.5  | `#inflightBySession` proteção zumbi              | Médio   | **P2**     | ✅     |
 | F6.6  | Logar `traceId` no `writeTurn`                   | Médio   | **P3**     | ✅     |
 | F6.7  | `pingClient.forceStop()` com optional chaining   | Baixo   | **P3**     | ✅     |
-| F6.8  | `handleInject` suporte `type: 'blob'`            | Baixo   | **P3**     | ⏳     |
-| F6.9  | `getLastNPairs` cursor-based                     | Médio   | **P4**     | ⏳     |
-| F6.10 | SQLite WAL mode + cache na inicialização         | Baixo   | **P3**     | ⏳     |
+| F6.8  | `handleInject` suporte `type: 'blob'`            | Baixo   | **P3**     | ✅     |
+| F6.9  | `getLastNPairs` cursor-based                     | Médio   | **P4**     | ✅     |
+| F6.10 | SQLite WAL mode + cache na inicialização         | Baixo   | **P3**     | ✅     |
 | F6.11 | `alias-store.js` detectar loops de alias         | Baixo   | **P3**     | ✅     |
-| F6.12 | `SYSTEM_PROMPT_SECTIONS` do SDK (constantes)     | Baixo   | **P3**     | ⏳     |
-| F6.13 | `session-rpc-tools.js` → API pública SDK         | Alto    | **P3**     | ⏳     |
+| F6.12 | `SYSTEM_PROMPT_SECTIONS` do SDK (constantes)     | Baixo   | **P3**     | ✅     |
+| F6.13 | `session-rpc-tools.js` → API pública SDK         | Alto    | **P3**     | ✅     |
 | F6.14 | Renomear `stallMs` → `stallThresholdMs`          | Baixo   | **P4**     | ✅     |
 | F6.15 | `gh-bridge.js` → `timed_out` em `runIcon`        | Baixo   | **P4**     | ✅     |
-| F6.16 | `todoDeleteTool` relatar subtarefas orfanizadas  | Baixo   | **P4**     | ⏳     |
-| F6.17 | Deduplicar índices parciais em `store.js`        | Baixo   | **P4**     | ⏳     |
+| F6.16 | `todoDeleteTool` relatar subtarefas orfanizadas  | Baixo   | **P4**     | ✅     |
+| F6.17 | Deduplicar índices parciais em `store.js`        | Baixo   | **P4**     | ✅     |
 | F6.18 | `ALLOWED_NPM_SCRIPTS` configurável via env       | Baixo   | **P3**     | ✅ 🆕  |
 | F6.19 | `structured-message.js` — campo `attachments`    | Baixo   | **P3**     | ✅ 🆕  |
 
 ---
 
 _Roadmap adicionado em 2026-03-30. Última atualização de status: 2026-04-01 (commits `672b0bcc`,
-`acc929ed`, fix F6.6)._ _F6.2, F6.3, F6.4, F6.6, F6.7, F6.11, F6.14, F6.15, F6.18, F6.19 concluídos
-em 2026-04-01._
+`acc929ed`, `d670aaf5`, Fase 6 completa)._ _Todos os itens F6.1–F6.19 concluídos em 2026-04-01._

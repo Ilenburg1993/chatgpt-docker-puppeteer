@@ -467,19 +467,34 @@ export class LlmBridgeClient {
      * Útil para enviar contexto compacto a um LLM sem incluir o histórico completo. Garante que os pares comecem sempre
      * por uma mensagem `user`, preservando a estrutura de alternância esperada pelo protocolo.
      *
+     * F6.9 (UPG-05): implementação cursor-based — navega do fim para o início sem criar arrays intermediários.
+     *
      * @param {number} [pairs=5] - Número máximo de pares a retornar. Default is `5`
      * @returns {ReadonlyArray<ConversationTurn>} Slice imutável dos últimos N pares
      */
     getLastNPairs(pairs = 5) {
         const hist = /** @type {ConversationTurn[]} */ (this.#history);
-        const userIndices = hist
-            .map((t, i) => ({ i, role: t.role }))
-            .filter((t) => t.role === 'user')
-            .map((t) => t.i)
-            .slice(-pairs);
-        if (!userIndices.length) return /** @type {ReadonlyArray<ConversationTurn>} */ (hist.slice(-pairs * 2));
-        const startIdx = userIndices[0];
-        return /** @type {ReadonlyArray<ConversationTurn>} */ (hist.slice(startIdx));
+        /** @type {{ user: ConversationTurn; assistant: ConversationTurn }[]} */
+        const collected = [];
+        let i = hist.length - 1;
+        while (i >= 0 && collected.length < pairs) {
+            const cur = hist[i];
+            if (cur?.role === 'assistant') {
+                const j = i - 1;
+                const prev = j >= 0 ? hist[j] : undefined;
+                if (prev?.role === 'user') {
+                    collected.unshift({ user: prev, assistant: cur });
+                    i = j - 1;
+                    continue;
+                }
+            }
+            i--;
+        }
+        if (!collected.length) return /** @type {ReadonlyArray<ConversationTurn>} */ (hist.slice(-pairs * 2));
+        // Achata pares em array plano [user, assistant, user, assistant, ...]
+        return /** @type {ReadonlyArray<ConversationTurn>} */ (
+            collected.flatMap(({ user, assistant }) => [user, assistant])
+        );
     }
 
     /**

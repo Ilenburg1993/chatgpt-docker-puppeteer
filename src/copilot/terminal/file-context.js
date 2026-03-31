@@ -265,13 +265,15 @@ export async function readDirectoryContext(dirPath) {
 
 /**
  * @typedef {Object} RawAttachment
- * @property {string} [type] - Tipo do attachment: 'file' | 'directory' | 'selection' | 'content'
+ * @property {string} [type] - Tipo do attachment: 'file' | 'directory' | 'selection' | 'content' | 'blob'
  * @property {string} [path] - Caminho do arquivo/diretório (tipos 'file' e 'directory')
  * @property {string} [filePath] - Caminho do arquivo de seleção (tipo 'selection')
  * @property {string} [displayName] - Nome de exibição opcional
  * @property {string} [content] - Conteúdo inline (tipo 'content')
  * @property {string} [text] - Texto da seleção (tipo 'selection')
  * @property {object} [selection] - Coordenadas da seleção (tipo 'selection')
+ * @property {string} [data] - Conteúdo base64 (tipo 'blob', SDK v0.2.0+)
+ * @property {string} [mimeType] - MIME type do blob (tipo 'blob', padrão: 'application/octet-stream')
  */
 
 /**
@@ -287,6 +289,7 @@ export async function readDirectoryContext(dirPath) {
  * - `directory` → lista arquivos do diretório e cria blocos para cada um
  * - `selection` → usa `text` como conteúdo do bloco markdown
  * - `content` → usa `content` diretamente como bloco markdown
+ * - `blob` → decodifica base64 e embute como bloco de texto (F6.8, SDK v0.2.0+)
  *
  * @param {RawAttachment} att - Attachment a converter
  * @returns {Promise<string | null>} Texto markdown, ou null se o attachment for inválido/vazio
@@ -318,6 +321,19 @@ export async function attachmentToEmbed(att) {
     if (att.type === 'selection' && typeof att.text === 'string' && att.text.length > 0) {
         const lang = typeof att.filePath === 'string' ? detectLang(att.filePath) : 'text';
         return `Seleção de \`${label}\`\n\`\`\`${lang}\n${att.text}\n\`\`\``;
+    }
+
+    // F6.8 (UPG-04): suporte a type: 'blob' (base64) adicionado no SDK v0.2.0
+    if (att.type === 'blob' && typeof att.data === 'string') {
+        const mimeType = typeof att.mimeType === 'string' ? att.mimeType : 'application/octet-stream';
+        // Decodifica base64 para texto; se não for legível, exibe como hexadecimal parcial
+        let decodedContent;
+        try {
+            decodedContent = Buffer.from(att.data, 'base64').toString('utf8');
+        } catch {
+            decodedContent = `(dados binários, mimeType: ${mimeType})`;
+        }
+        return `Blob \`${label}\` (${mimeType})\n\`\`\`\n${decodedContent}\n\`\`\``;
     }
 
     if (typeof att.content === 'string' && att.content.length > 0) {

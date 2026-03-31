@@ -35,6 +35,9 @@ function applyPragmas(db) {
     db.pragma('foreign_keys = ON');
     db.pragma('busy_timeout = 5000');
     db.pragma('wal_autocheckpoint = 1000');
+    // F6.10 (UPG-13): otimizações de memória — 32 MB page cache + sorts/índices em RAM
+    db.pragma('cache_size = -32000'); // negativo = KiB → 32 MB
+    db.pragma('temp_store = MEMORY');
 }
 
 /**

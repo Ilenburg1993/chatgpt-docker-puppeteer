@@ -110,8 +110,7 @@ const DDL_CONVERSATION_TURNS = `
     );
     CREATE INDEX IF NOT EXISTS idx_conv_turns_session ON copilot_conversation_turns(hub_session_id, turn_number);
     CREATE INDEX IF NOT EXISTS idx_conv_turns_time ON copilot_conversation_turns(created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_conv_turns_unread ON copilot_conversation_turns(hub_session_id, user_read)
-        WHERE user_read = 0;
+    -- F6.17 (BUG-LEVE-03): idx_conv_turns_unread removido (redundante com idx_conv_turns_user_unread abaixo).
     -- UPG-05: índice para markAllUserMessagesRead() que filtra por role='user' + user_read=0
     CREATE INDEX IF NOT EXISTS idx_conv_turns_user_unread ON copilot_conversation_turns(hub_session_id)
         WHERE role = 'user' AND user_read = 0;

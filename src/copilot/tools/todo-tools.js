@@ -801,8 +801,19 @@ const todoDeleteTool = defineTool('todo_delete', {
         delete store.tasks[args.id];
         await writeStore(store);
 
-        log('INFO', `[todo_delete] Tarefa removida id=${args.id} cascade=${args.cascade} count=${deleted.length}`);
-        return { success: true, deleted, count: deleted.length };
+        // F6.16 (BUG-LEVE-10): reportar subtarefas orfanizadas quando cascade: false
+        const orphaned = !args.cascade && task.subtaskIds.length > 0 ? [...task.subtaskIds] : undefined;
+
+        log(
+            'INFO',
+            `[todo_delete] Tarefa removida id=${args.id} cascade=${args.cascade} count=${deleted.length}${orphaned ? ` orphaned=${orphaned.join(',')}` : ''}`,
+        );
+        return {
+            success: true,
+            deleted,
+            count: deleted.length,
+            ...(orphaned !== undefined && { orphaned }),
+        };
     },
 });
 
