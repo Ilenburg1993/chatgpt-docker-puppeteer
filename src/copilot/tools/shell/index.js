@@ -106,37 +106,39 @@ const BLOCKED_COMMAND_PATTERNS = [
  *
  * @type {Set<string>}
  */
-const _DEFAULT_NPM_SCRIPTS = [
-    'lint',
-    'lint:fix',
-    'format',
-    'format:check',
-    'test:unit',
-    'test:fast',
-    'test:integration',
-    'test:all',
-    'typecheck:node',
-    'typecheck:tools',
-    'typecheck:browser',
-    'typecheck:full',
-    'typecheck:strict',
-    'audit:quick',
-    'analyze:deps',
-    'diagnose',
-    'health:core',
-    'health:full',
-    'queue:status',
-    'queue:flow',
-    'queue:clean',
-];
-const _envAllowlist = process.env['COPILOT_NPM_SCRIPT_ALLOWLIST'];
 const ALLOWED_NPM_SCRIPTS = new Set(
-    _envAllowlist
-        ? _envAllowlist
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean)
-        : _DEFAULT_NPM_SCRIPTS,
+    (() => {
+        const envAllowlist = process.env['COPILOT_NPM_SCRIPT_ALLOWLIST'];
+        if (envAllowlist) {
+            return envAllowlist
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+        }
+        return [
+            'lint',
+            'lint:fix',
+            'format',
+            'format:check',
+            'test:unit',
+            'test:fast',
+            'test:integration',
+            'test:all',
+            'typecheck:node',
+            'typecheck:tools',
+            'typecheck:browser',
+            'typecheck:full',
+            'typecheck:strict',
+            'audit:quick',
+            'analyze:deps',
+            'diagnose',
+            'health:core',
+            'health:full',
+            'queue:status',
+            'queue:flow',
+            'queue:clean',
+        ];
+    })(),
 );
 
 /**
