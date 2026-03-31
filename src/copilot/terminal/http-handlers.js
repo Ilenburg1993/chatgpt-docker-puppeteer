@@ -118,7 +118,7 @@ export function handleGetContext() {
                 tokenLimit: 0,
                 utilization: 0,
                 utilizationPercent: 0,
-                lastCheckpointPath: null,
+                lastCheckpointPath: snapshot.lastCheckpointPath,
                 warning: 'none',
             },
         };
@@ -138,7 +138,7 @@ export function handleGetContext() {
             tokenLimit: cw.tokenLimit,
             utilization,
             utilizationPercent: Math.round(utilization * 100),
-            lastCheckpointPath: null,
+            lastCheckpointPath: snapshot.lastCheckpointPath,
             warning,
         },
     };
@@ -756,7 +756,7 @@ export function handleDeleteCustomTool(name) {
  */
 export function handleMetrics() {
     const snapshot = alwaysAliveAgent.getStatusSnapshot();
-    const statusValue = snapshot.status === 'running' || snapshot.status === 'busy' ? 1 : 0;
+    const statusValue = snapshot.status !== 'stopped' ? 1 : 0;
     const queueSize = snapshot.queueSize ?? 0;
     const sendCount = snapshot.sendCount ?? 0;
     const sseClients = getSseClients().size;

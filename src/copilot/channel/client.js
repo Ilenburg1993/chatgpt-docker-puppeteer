@@ -325,6 +325,9 @@ export class LlmBridgeClient {
      * >}
      */
     async chatBatch(messages, opts = {}) {
+        if (messages.length > 50) {
+            throw new RangeError(`chatBatch: máximo 50 mensagens por batch (recebido: ${messages.length})`);
+        }
         const { concurrency = 1, ...chatOpts } = opts;
         const slots = Array.from({ length: Math.max(1, concurrency) }, () => Promise.resolve());
         /** @type {Promise<ChatResult | { error: string; response: null; taskId: string; durationMs: number }>[]} */

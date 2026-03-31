@@ -24,7 +24,7 @@ const ROOT = new URL('../../../..', import.meta.url).pathname;
  * @param {number} [timeoutMs]
  * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
  */
-async function safeGit(cmd, timeoutMs = 15000) {
+async function _safeGit(cmd, timeoutMs = 15000) {
     try {
         // F3.8 (LEVE-11): execFile com shell:true para comandos compostos (pipes/&&) mas sem
         // interpolação de variáveis de ambiente inseguras. Para git commit com mensagem do usuário,
@@ -72,8 +72,10 @@ const gitStatusTool = defineTool('git_status', {
     description: 'Mostra o status atual do repositório Git (arquivos modificados, staged, etc).',
     parameters: z.object({}),
     handler: async () => {
-        const r = await safeGit('git status --short && echo "---" && git log --oneline -5');
-        return { output: r.stdout, error: r.error };
+        const statusResult = await safeGitArgs(['status', '--short']);
+        const logResult = await safeGitArgs(['log', '--oneline', '-5']);
+        const combined = [statusResult.stdout, '---', logResult.stdout].filter(Boolean).join('\n');
+        return { output: combined, error: statusResult.error || logResult.error };
     },
 });
 
@@ -95,9 +97,12 @@ const gitDiffTool = defineTool('git_diff', {
         )
     ),
     handler: async (/** @type {{ staged?: boolean; path?: string }} */ { staged, path: filePath }) => {
-        const flag = staged ? '--staged' : '';
-        const target = filePath ?? '';
-        const r = await safeGit(`git diff ${flag} ${target} | head -200`);
+        const args = ['diff'];
+        if (staged) args.push('--staged');
+        if (filePath) args.push('--', filePath);
+        const r = await safeGitArgs(args);
+        // Trunca a 200 linhas sem usar pipe shell
+        r.stdout = r.stdout.split('\n').slice(0, 200).join('\n');
         return { output: r.stdout, error: r.error };
     },
 });
@@ -154,7 +159,7 @@ const gitChangedFilesTool = defineTool('git_changed_files', {
     description: 'Lista arquivos modificados em relação ao último commit.',
     parameters: z.object({}),
     handler: async () => {
-        const r = await safeGit('git diff --name-status HEAD');
+        const r = await safeGitArgs(['diff', '--name-status', 'HEAD']);
         return { output: r.stdout, error: r.error };
     },
 });
@@ -177,9 +182,12 @@ const gitPushTool = defineTool('git_push', {
         )
     ),
     handler: async (/** @type {{ remote?: string; setUpstream?: boolean }} */ { remote, setUpstream }) => {
-        const upstream = setUpstream ? '--set-upstream' : '';
-        const r = await safeGit(`git push ${upstream} "${(remote ?? 'origin').replace(/"/g, '')}"`, 30000);
-        log('INFO', `[copilot/git_push] remote=${remote ?? 'origin'} exitCode=${r.exitCode}`);
+        const safeRemote = (remote ?? 'origin').replace(/[^a-zA-Z0-9/_.-]/g, '');
+        const args = ['push'];
+        if (setUpstream) args.push('--set-upstream');
+        args.push(safeRemote);
+        const r = await safeGitArgs(args, 30000);
+        log('INFO', `[copilot/git_push] remote=${safeRemote} exitCode=${r.exitCode}`);
         return { success: r.exitCode === 0, output: r.stdout, error: r.error };
     },
 });
@@ -203,10 +211,15 @@ const gitCreateBranchTool = defineTool('git_create_branch', {
         if (!/^[a-zA-Z0-9/_.-]+$/.test(name)) {
             return { success: false, error: 'Nome de branch inválido. Use apenas letras, números, /, _, -, .' };
         }
-        const basePart = base && /^[a-zA-Z0-9/_.-]+$/.test(base) ? ` "${base}"` : '';
-        const cmd = (checkout ?? true) ? `git checkout -b "${name}"${basePart}` : `git branch "${name}"${basePart}`;
-        log('INFO', `[copilot/git_create_branch] ${cmd}`);
-        const r = await safeGit(cmd);
+        const args = (checkout ?? true) ? ['checkout', '-b', name] : ['branch', name];
+        if (base) {
+            if (!/^[a-zA-Z0-9/_.-]+$/.test(base)) {
+                return { success: false, error: 'Base inválida. Use apenas letras, números, /, _, -, .' };
+            }
+            args.push(base);
+        }
+        log('INFO', `[copilot/git_create_branch] git ${args.join(' ')}`);
+        const r = await safeGitArgs(args);
         return { success: r.exitCode === 0, output: r.stdout, error: r.error };
     },
 });
@@ -225,8 +238,14 @@ const gitLogTool = defineTool('git_log', {
         )
     ),
     handler: async (/** @type {{ n?: number; oneline?: boolean }} */ { n, oneline }) => {
-        const format = (oneline ?? true) ? '--oneline' : '--pretty=format:"%h %an %ar %s"';
-        const r = await safeGit(`git log ${format} -${n ?? 10}`);
+        const args = ['log'];
+        if (oneline ?? true) {
+            args.push('--oneline');
+        } else {
+            args.push('--pretty=format:%h %an %ar %s');
+        }
+        args.push(`-${n ?? 10}`);
+        const r = await safeGitArgs(args);
         return { output: r.stdout, error: r.error };
     },
 });

@@ -61,6 +61,25 @@ router.post('/webhooks', (req, res) => {
             res.status(400).json({ ok: false, error: 'URL deve usar protocolo http ou https' });
             return;
         }
+        // SEC-P2-03: bloquear hosts privados/internos (SSRF)
+        const host = parsed.hostname.toLowerCase();
+        if (
+            host === 'localhost' ||
+            host === '127.0.0.1' ||
+            host === '::1' ||
+            host === '0.0.0.0' ||
+            host.endsWith('.local') ||
+            host.startsWith('10.') ||
+            host.startsWith('192.168.') ||
+            /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+            host.startsWith('169.254.') ||
+            host === '[::1]' ||
+            host.startsWith('fd') ||
+            host.startsWith('fe80')
+        ) {
+            res.status(400).json({ ok: false, error: 'URL não pode apontar para hosts privados/internos' });
+            return;
+        }
     } catch {
         res.status(400).json({ ok: false, error: 'URL inválida' });
         return;

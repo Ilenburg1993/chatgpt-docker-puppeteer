@@ -301,7 +301,7 @@ router.post('/sessions', rateLimitMiddleware(10, 'create_session'), (req, res) =
         res.status(201).json({
             ok: true,
             sessionId: session.sessionId,
-            model,
+            model: safeModel,
             workspacePath: session.workspacePath ?? null,
         });
     });

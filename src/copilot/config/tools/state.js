@@ -73,7 +73,10 @@ function persistToolsConfig() {
  * @returns {{ allowlist: string[] | null; denylist: string[] }}
  */
 export function getToolsConfig() {
-    return { ..._toolsConfig };
+    return {
+        allowlist: Array.isArray(_toolsConfig.allowlist) ? [..._toolsConfig.allowlist] : null,
+        denylist: [..._toolsConfig.denylist],
+    };
 }
 
 /**
@@ -84,10 +87,13 @@ export function getToolsConfig() {
  */
 export function patchToolsConfig(updates) {
     if ('allowlist' in updates) {
-        _toolsConfig = { ..._toolsConfig, allowlist: updates.allowlist ?? null };
+        _toolsConfig = {
+            ..._toolsConfig,
+            allowlist: Array.isArray(updates.allowlist) ? [...updates.allowlist] : null,
+        };
     }
     if ('denylist' in updates) {
-        _toolsConfig = { ..._toolsConfig, denylist: updates.denylist ?? [] };
+        _toolsConfig = { ..._toolsConfig, denylist: updates.denylist ? [...updates.denylist] : [] };
     }
     persistToolsConfig();
 }

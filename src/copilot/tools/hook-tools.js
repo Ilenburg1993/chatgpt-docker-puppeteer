@@ -221,6 +221,7 @@ const requestUserInputTool = buildTool({
                 return;
             }
             _pendingInputResolvers.set(requestId, (answer) => {
+                clearTimeout(autoCleanupTimer);
                 resolve({
                     requestId,
                     question: fullQuestion,
@@ -231,6 +232,22 @@ const requestUserInputTool = buildTool({
                     instruction: 'Resposta recebida. Processar e continuar o fluxo.',
                 });
             });
+            // BUG-P2-06: auto-cleanup após 10min para evitar memory leak se resolver nunca é chamado
+            const autoCleanupTimer = setTimeout(() => {
+                if (_pendingInputResolvers.has(requestId)) {
+                    _pendingInputResolvers.delete(requestId);
+                    resolve({
+                        requestId,
+                        question: fullQuestion,
+                        choices: choices ?? [],
+                        allowFreeform,
+                        status: 'timeout',
+                        answer: '',
+                        instruction: 'Timeout: usuário não respondeu em 10 minutos. Continuar sem resposta.',
+                    });
+                }
+            }, 600_000);
+            autoCleanupTimer.unref();
             // ARCH-03 (fix): broadcastSse injetado via configureHookTools() — sem import dinâmico circular
             _broadcastSse('waiting_for_input', {
                 requestId,

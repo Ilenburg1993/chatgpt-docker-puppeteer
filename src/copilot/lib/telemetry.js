@@ -206,24 +206,36 @@ export function getCallsBySession(store, sessionId) {
 }
 
 /**
- * Retorna as N chamadas mais recentes.
+ * Retorna as N chamadas mais recentes, opcionalmente filtradas por idade.
  *
  * @param {TelemetryStore} store
  * @param {number} [n=10] Default is `10`
+ * @param {{ sinceMs?: number }} [opts] Filtrar apenas chamadas com no máximo `sinceMs` ms de idade
  * @returns {ToolCallRecord[]}
  */
-export function getRecentCalls(store, n = 10) {
-    return store.toolCalls.slice(-n);
+export function getRecentCalls(store, n = 10, opts = {}) {
+    let calls = store.toolCalls;
+    if (opts.sinceMs != null) {
+        const cutoff = Date.now() - opts.sinceMs;
+        calls = calls.filter((r) => r.timestamp >= cutoff);
+    }
+    return calls.slice(-n);
 }
 
 /**
- * Retorna apenas as chamadas com erro.
+ * Retorna apenas as chamadas com erro, opcionalmente filtradas por idade.
  *
  * @param {TelemetryStore} store
+ * @param {{ sinceMs?: number }} [opts] Filtrar apenas chamadas com no máximo `sinceMs` ms de idade
  * @returns {ToolCallRecord[]}
  */
-export function getErrorCalls(store) {
-    return store.toolCalls.filter((r) => !r.success);
+export function getErrorCalls(store, opts = {}) {
+    let calls = store.toolCalls.filter((r) => !r.success);
+    if (opts.sinceMs != null) {
+        const cutoff = Date.now() - opts.sinceMs;
+        calls = calls.filter((r) => r.timestamp >= cutoff);
+    }
+    return calls;
 }
 
 // ─── Sumário ──────────────────────────────────────────────────────────────────

@@ -190,6 +190,11 @@ export class HubOrchestrator extends EventEmitter {
         this.#turnCounters.delete(hubSessionId);
         this.#inflightBySession.delete(hubSessionId);
         // F6.5 (BUG-MOD-09): registrar no set de sessões fechadas para bloquear re-inserções zumbi
+        // BUG-P2-09: limitar set para evitar crescimento indefinido em produção de longa duração
+        if (this.#closedSessions.size >= 1000) {
+            const first = this.#closedSessions.values().next().value;
+            if (first !== undefined) this.#closedSessions.delete(first);
+        }
         this.#closedSessions.add(hubSessionId);
         this.emit('session:closed', { hubSessionId });
         log('INFO', `[HubOrchestrator] Hub session encerrada: ${hubSessionId}`);

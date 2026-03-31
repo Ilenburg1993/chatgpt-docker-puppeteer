@@ -60,11 +60,11 @@ const MAX_SEARCH_OUTPUT = 20_000;
 const MAX_LIST_ENTRIES = 500;
 
 /**
- * Padrões de arquivos bloqueados (segredos, chaves, credenciais). Avaliados contra o basename do arquivo.
+ * Padrões de arquivos bloqueados para TODAS as operações (segredos, chaves, credenciais).
  *
  * @type {RegExp[]}
  */
-const BLOCKED_PATTERNS = [
+const BLOCKED_PATTERNS_SECRETS = [
     /\.env$/i,
     /\.env\./i,
     /\.pem$/i,
@@ -78,6 +78,14 @@ const BLOCKED_PATTERNS = [
     /id_ed25519/i,
     /\.npmrc$/i,
     /\.netrc$/i,
+];
+
+/**
+ * Padrões adicionais bloqueados apenas para operações de ESCRITA (executáveis que não devem ser criados/sobrescritos).
+ *
+ * @type {RegExp[]}
+ */
+const BLOCKED_PATTERNS_WRITE_ONLY = [
     // SEC-04 (fix): extensões executáveis que não devem ser criadas/sobrescritas via file-tools
     /\.exe$/i,
     /\.bat$/i,
@@ -91,12 +99,21 @@ const BLOCKED_PATTERNS = [
 ];
 
 /**
+ * Todos os padrões bloqueados (secrets + executáveis) — para operações de escrita.
+ *
+ * @type {RegExp[]}
+ */
+const BLOCKED_PATTERNS = [...BLOCKED_PATTERNS_SECRETS, ...BLOCKED_PATTERNS_WRITE_ONLY];
+
+/**
  * Verifica se um caminho está dentro do workspace autorizado e não é um arquivo bloqueado.
  *
  * @param {string} filePath - Caminho absoluto ou relativo
+ * @param {{ mode?: 'read' | 'write' }} [opts] - Modo de operação (default: 'write' para máxima proteção)
  * @returns {Promise<{ ok: boolean; reason?: string; resolved: string }>}
  */
-async function validatePath(filePath) {
+async function validatePath(filePath, opts) {
+    const mode = opts?.mode ?? 'write';
     const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(WORKSPACE_ROOT, filePath);
 
     // SEC-04 / BUG-H06 (fix): resolver symlinks antes de verificar containment.
@@ -123,8 +140,10 @@ async function validatePath(filePath) {
     }
 
     // Impede acesso a arquivos bloqueados
+    // BUG-P2-08: leitura usa apenas padrões de secrets; escrita usa todos
+    const patterns = mode === 'read' ? BLOCKED_PATTERNS_SECRETS : BLOCKED_PATTERNS;
     const basename = path.basename(resolved);
-    for (const pattern of BLOCKED_PATTERNS) {
+    for (const pattern of patterns) {
         if (pattern.test(basename)) {
             return { ok: false, reason: `Acesso negado: arquivo protegido (${basename})`, resolved };
         }
@@ -166,7 +185,7 @@ const readFileContentTool = buildTool({
             .describe('Codificação de saída. Use base64 para arquivos binários.'),
     }),
     handler: async ({ path: filePath, startLine, endLine, encoding }) => {
-        const { ok, reason, resolved } = await validatePath(filePath);
+        const { ok, reason, resolved } = await validatePath(filePath, { mode: 'read' });
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/read_file_content] ${resolved}`);
@@ -249,7 +268,7 @@ const listDirectoryTool = buildTool({
         filter: z.string().optional().describe('Glob pattern para filtrar entradas (ex: *.js, *.md)'),
     }),
     handler: async ({ path: dirPath, recursive, depth, showHidden, filter }) => {
-        const { ok, reason, resolved } = await validatePath(dirPath);
+        const { ok, reason, resolved } = await validatePath(dirPath, { mode: 'read' });
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/list_directory] ${resolved} (recursive=${recursive}, depth=${depth})`);
@@ -363,8 +382,13 @@ const searchInFilesTool = buildTool({
         contextLines,
         maxResults,
     }) => {
-        const { ok, reason, resolved } = await validatePath(searchPath ?? '.');
+        const { ok, reason, resolved } = await validatePath(searchPath ?? '.', { mode: 'read' });
         if (!ok) return { success: false, error: reason };
+
+        // SEC-P2-02: limitar comprimento do pattern para evitar ReDoS
+        if (pattern.length > 500) {
+            return { success: false, error: 'Pattern muito longo (máximo 500 caracteres).' };
+        }
 
         log('INFO', `[copilot/search_in_files] pattern="${pattern}" in ${resolved}`);
 
@@ -557,7 +581,7 @@ const copyFileTool = buildTool({
         overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
     }),
     handler: async ({ source, destination, overwrite }) => {
-        const src = await validatePath(source);
+        const src = await validatePath(source, { mode: 'read' });
         if (!src.ok) return { success: false, error: src.reason };
 
         const dst = await validatePath(destination);
@@ -594,7 +618,7 @@ const moveFileTool = buildTool({
         overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
     }),
     handler: async ({ source, destination, overwrite }) => {
-        const src = await validatePath(source);
+        const src = await validatePath(source, { mode: 'read' });
         if (!src.ok) return { success: false, error: src.reason };
 
         const dst = await validatePath(destination);
@@ -697,9 +721,9 @@ const diffFilesTool = buildTool({
             .describe('Número de linhas de contexto exibidas ao redor de cada mudança (padrão: 3)'),
     }),
     handler: async ({ path_a, path_b, context_lines }) => {
-        const va = await validatePath(path_a);
+        const va = await validatePath(path_a, { mode: 'read' });
         if (!va.ok) return { success: false, error: `path_a: ${va.reason}` };
-        const vb = await validatePath(path_b);
+        const vb = await validatePath(path_b, { mode: 'read' });
         if (!vb.ok) return { success: false, error: `path_b: ${vb.reason}` };
 
         try {

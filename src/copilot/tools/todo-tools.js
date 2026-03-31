@@ -176,7 +176,6 @@ let _storeMutex = Promise.resolve();
  * @param {(store: TodoStore) => Promise<T> | T} fn
  * @returns {Promise<T>}
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function withStore(fn) {
     /** @type {(v?: unknown) => void} */
     let release;
@@ -245,20 +244,26 @@ async function readStore() {
 }
 
 /**
- * Persiste o store no disco. Para operações com read-modify-write, prefira `withStore`.
- *
- * @param {TodoStore} store
- * @returns {Promise<void>}
- */
-const writeStore = _writeStoreRaw;
-
-/**
  * Gera um ID único de 8 caracteres alfanuméricos.
  *
  * @returns {string}
  */
 function generateId() {
     return Math.random().toString(36).slice(2, 10).padEnd(8, '0');
+}
+
+/**
+ * Gera um ID único para o store atual, evitando colisão com tarefas já existentes.
+ *
+ * @param {TodoStore} store
+ * @returns {string}
+ */
+function generateUniqueId(store) {
+    let id = generateId();
+    while (store.tasks[id]) {
+        id = generateId();
+    }
+    return id;
 }
 
 /**
@@ -312,7 +317,7 @@ const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
 
 /**
  * Cria uma nova `TodoItem` no `store`, atualiza o pai se fornecido, mas NÃO persiste. O chamador é responsável por
- * chamar `writeStore(store)`.
+ * executar a operação dentro de `withStore(...)` para garantir persistência atômica.
  *
  * @param {TodoStore} store - Store mutável já carregado do disco
  * @param {{
@@ -331,7 +336,7 @@ function createTask(store, opts) {
     if (opts.parentId && !store.tasks[opts.parentId]) {
         return { error: `Tarefa pai não encontrada: ${opts.parentId}` };
     }
-    const id = generateId();
+    const id = generateUniqueId(store);
     const ts = now();
     /** @type {TodoItem} */
     const task = {
@@ -408,27 +413,26 @@ const todoCreateTool = defineTool('todo_create', {
          * }}
          */ args,
     ) => {
-        const store = await readStore();
+        return withStore(async (store) => {
+            const result = createTask(store, {
+                title: args.title,
+                ...(args.description !== undefined && { description: args.description }),
+                ...(args.priority !== undefined && { priority: args.priority }),
+                ...(args.tags !== undefined && { tags: args.tags }),
+                ...(args.due_date !== undefined && { dueDate: args.due_date }),
+                ...(args.parent_id !== undefined && { parentId: args.parent_id }),
+                ...(args.notes !== undefined && { notes: args.notes }),
+                ...(args.metadata !== undefined && { metadata: args.metadata }),
+            });
 
-        const result = createTask(store, {
-            title: args.title,
-            ...(args.description !== undefined && { description: args.description }),
-            ...(args.priority !== undefined && { priority: args.priority }),
-            ...(args.tags !== undefined && { tags: args.tags }),
-            ...(args.due_date !== undefined && { dueDate: args.due_date }),
-            ...(args.parent_id !== undefined && { parentId: args.parent_id }),
-            ...(args.notes !== undefined && { notes: args.notes }),
-            ...(args.metadata !== undefined && { metadata: args.metadata }),
+            if ('error' in result) return { success: false, error: result.error };
+
+            log(
+                'INFO',
+                `[todo_create] Tarefa criada id=${result.task.id} title=${result.task.title} priority=${result.task.priority}`,
+            );
+            return { success: true, task: sanitize(result.task) };
         });
-
-        if ('error' in result) return { success: false, error: result.error };
-
-        await writeStore(store);
-        log(
-            'INFO',
-            `[todo_create] Tarefa criada id=${result.task.id} title=${result.task.title} priority=${result.task.priority}`,
-        );
-        return { success: true, task: sanitize(result.task) };
     },
 });
 
@@ -623,41 +627,42 @@ const todoUpdateTool = defineTool('todo_update', {
          * }}
          */ args,
     ) => {
-        const store = await readStore();
-        const task = store.tasks[args.id];
-        if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
+        return withStore(async (store) => {
+            const task = store.tasks[args.id];
+            if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
 
-        const ts = now();
-        const old = { ...task };
+            const ts = now();
+            const old = { ...task };
 
-        if (args.title !== undefined) task.title = args.title;
-        if (args.description !== undefined) task.description = args.description;
-        if (args.priority !== undefined) task.priority = args.priority;
-        if (args.due_date !== undefined) task.dueDate = args.due_date;
-        if (args.notes !== undefined) task.notes = args.notes;
+            if (args.title !== undefined) task.title = args.title;
+            if (args.description !== undefined) task.description = args.description;
+            if (args.priority !== undefined) task.priority = args.priority;
+            if (args.due_date !== undefined) task.dueDate = args.due_date;
+            if (args.notes !== undefined) task.notes = args.notes;
 
-        // Tags: replace > add/remove
-        if (args.tags !== undefined) {
-            task.tags = [...new Set(args.tags)];
-        } else {
-            if (args.add_tags) task.tags = [...new Set([...task.tags, ...args.add_tags])];
-            if (args.remove_tags) task.tags = task.tags.filter((t) => !args.remove_tags?.includes(t));
-        }
+            // Tags: replace > add/remove
+            if (args.tags !== undefined) {
+                task.tags = [...new Set(args.tags)];
+            } else {
+                if (args.add_tags) task.tags = [...new Set([...task.tags, ...args.add_tags])];
+                if (args.remove_tags) task.tags = task.tags.filter((t) => !args.remove_tags?.includes(t));
+            }
 
-        if (args.append_notes) task.notes = task.notes ? `${task.notes}\n\n${args.append_notes}` : args.append_notes;
+            if (args.append_notes)
+                task.notes = task.notes ? `${task.notes}\n\n${args.append_notes}` : args.append_notes;
 
-        if (args.metadata) task.metadata = { ...task.metadata, ...args.metadata };
+            if (args.metadata) task.metadata = { ...task.metadata, ...args.metadata };
 
-        task.updatedAt = ts;
-        await writeStore(store);
+            task.updatedAt = ts;
 
-        log(
-            'INFO',
-            `[todo_update] Tarefa atualizada id=${args.id} changed=${Object.keys(args)
-                .filter((k) => k !== 'id')
-                .join(',')}`,
-        );
-        return { success: true, task: sanitize(task), previous: sanitize(old) };
+            log(
+                'INFO',
+                `[todo_update] Tarefa atualizada id=${args.id} changed=${Object.keys(args)
+                    .filter((k) => k !== 'id')
+                    .join(',')}`,
+            );
+            return { success: true, task: sanitize(task), previous: sanitize(old) };
+        });
     },
 });
 
@@ -685,42 +690,41 @@ const todoSetStatusTool = defineTool('todo_set_status', {
             .optional()
             .describe('Identificador de quem concluiu (agente, usuário). Gravado em completedBy quando status=done.'),
     }),
-    handler: async (/** @type {{ id: string; status: TodoStatus; force?: boolean; completed_by?: string }} */ args) => {
-        const store = await readStore();
-        const task = store.tasks[args.id];
-        if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
+    handler: async (/** @type {{ id: string; status: TodoStatus; force?: boolean; completed_by?: string }} */ args) =>
+        withStore(async (store) => {
+            const task = store.tasks[args.id];
+            if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
 
-        const current = task.status;
-        const next = args.status;
+            const current = task.status;
+            const next = args.status;
 
-        if (current === next) return { success: true, task: sanitize(task), message: 'Status já é o solicitado' };
+            if (current === next) return { success: true, task: sanitize(task), message: 'Status já é o solicitado' };
 
-        const allowed = VALID_TRANSITIONS[current] ?? [];
-        if (!args.force && !allowed.includes(next)) {
-            return {
-                success: false,
-                error: `Transição inválida: ${current} → ${next}. Permitidas: ${allowed.join(', ')}`,
-                current_status: current,
-                allowed_transitions: allowed,
-            };
-        }
+            const allowed = VALID_TRANSITIONS[current] ?? [];
+            if (!args.force && !allowed.includes(next)) {
+                return {
+                    success: false,
+                    error: `Transição inválida: ${current} → ${next}. Permitidas: ${allowed.join(', ')}`,
+                    current_status: current,
+                    allowed_transitions: allowed,
+                };
+            }
 
-        const ts = now();
-        task.status = next;
-        task.updatedAt = ts;
-        if (next === 'done') {
-            task.completedAt = ts;
-            // UPG-PROP-05 (fix): registrar quem concluiu para rastreabilidade
-            task.completedBy = args.completed_by ?? null;
-        } else if (task.completedAt !== null) {
-            task.completedAt = null;
-            task.completedBy = null;
-        }
+            const ts = now();
+            task.status = next;
+            task.updatedAt = ts;
+            if (next === 'done') {
+                task.completedAt = ts;
+                // UPG-PROP-05 (fix): registrar quem concluiu para rastreabilidade
+                task.completedBy = args.completed_by ?? null;
+            } else if (task.completedAt !== null) {
+                task.completedAt = null;
+                task.completedBy = null;
+            }
 
-        await writeStore(store);
-        log('INFO', `[todo_set_status] Status alterado id=${args.id} from=${current} to=${next}`);
-        return { success: true, task: sanitize(task), previous_status: current };
-    },
+            log('INFO', `[todo_set_status] Status alterado id=${args.id} from=${current} to=${next}`);
+            return { success: true, task: sanitize(task), previous_status: current };
+        }),
 });
 
 // ---------------------------------------------------------------------------
@@ -743,64 +747,63 @@ const todoDeleteTool = defineTool('todo_delete', {
             .default(false)
             .describe('Se true, remove subtarefas recursivamente; se false, desvincula-as'),
     }),
-    handler: async (/** @type {{ id: string; cascade?: boolean }} */ args) => {
-        const store = await readStore();
-        const task = store.tasks[args.id];
-        if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
+    handler: async (/** @type {{ id: string; cascade?: boolean }} */ args) =>
+        withStore(async (store) => {
+            const task = store.tasks[args.id];
+            if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
 
-        const ts = now();
-        const deleted = [args.id];
+            const ts = now();
+            const deleted = [args.id];
 
-        // Remover referência no pai
-        if (task.parentId) {
-            const parent = store.tasks[task.parentId];
-            if (parent) {
-                parent.subtaskIds = parent.subtaskIds.filter((id) => id !== args.id);
-                parent.updatedAt = ts;
-            }
-        }
-
-        if (args.cascade) {
-            // Exclusão recursiva de subtarefas
-            const queue = [...task.subtaskIds];
-            while (queue.length > 0) {
-                const childId = queue.shift();
-                if (!childId) continue;
-                const child = store.tasks[childId];
-                if (child) {
-                    queue.push(...child.subtaskIds);
-                    deleted.push(childId);
-                    delete store.tasks[childId];
+            // Remover referência no pai
+            if (task.parentId) {
+                const parent = store.tasks[task.parentId];
+                if (parent) {
+                    parent.subtaskIds = parent.subtaskIds.filter((id) => id !== args.id);
+                    parent.updatedAt = ts;
                 }
             }
-        } else {
-            // Desvincular subtarefas (tornam-se raiz)
-            for (const childId of task.subtaskIds) {
-                const child = store.tasks[childId];
-                if (child) {
-                    child.parentId = null;
-                    child.updatedAt = ts;
+
+            if (args.cascade) {
+                // Exclusão recursiva de subtarefas
+                const queue = [...task.subtaskIds];
+                while (queue.length > 0) {
+                    const childId = queue.shift();
+                    if (!childId) continue;
+                    const child = store.tasks[childId];
+                    if (child) {
+                        queue.push(...child.subtaskIds);
+                        deleted.push(childId);
+                        delete store.tasks[childId];
+                    }
+                }
+            } else {
+                // Desvincular subtarefas (tornam-se raiz)
+                for (const childId of task.subtaskIds) {
+                    const child = store.tasks[childId];
+                    if (child) {
+                        child.parentId = null;
+                        child.updatedAt = ts;
+                    }
                 }
             }
-        }
 
-        delete store.tasks[args.id];
-        await writeStore(store);
+            delete store.tasks[args.id];
 
-        // F6.16 (BUG-LEVE-10): reportar subtarefas orfanizadas quando cascade: false
-        const orphaned = !args.cascade && task.subtaskIds.length > 0 ? [...task.subtaskIds] : undefined;
+            // F6.16 (BUG-LEVE-10): reportar subtarefas orfanizadas quando cascade: false
+            const orphaned = !args.cascade && task.subtaskIds.length > 0 ? [...task.subtaskIds] : undefined;
 
-        log(
-            'INFO',
-            `[todo_delete] Tarefa removida id=${args.id} cascade=${args.cascade} count=${deleted.length}${orphaned ? ` orphaned=${orphaned.join(',')}` : ''}`,
-        );
-        return {
-            success: true,
-            deleted,
-            count: deleted.length,
-            ...(orphaned !== undefined && { orphaned }),
-        };
-    },
+            log(
+                'INFO',
+                `[todo_delete] Tarefa removida id=${args.id} cascade=${args.cascade} count=${deleted.length}${orphaned ? ` orphaned=${orphaned.join(',')}` : ''}`,
+            );
+            return {
+                success: true,
+                deleted,
+                count: deleted.length,
+                ...(orphaned !== undefined && { orphaned }),
+            };
+        }),
 });
 
 // ---------------------------------------------------------------------------
@@ -837,27 +840,30 @@ const todoAddSubtaskTool = defineTool('todo_add_subtask', {
          * }}
          */ args,
     ) => {
-        const store = await readStore();
+        return withStore(async (store) => {
+            const result = createTask(store, {
+                title: args.title,
+                ...(args.description !== undefined && { description: args.description }),
+                ...(args.priority !== undefined && { priority: args.priority }),
+                ...(args.tags !== undefined && { tags: args.tags }),
+                ...(args.due_date !== undefined && { dueDate: args.due_date }),
+                parentId: args.parent_id,
+                ...(args.notes !== undefined && { notes: args.notes }),
+            });
 
-        const result = createTask(store, {
-            title: args.title,
-            ...(args.description !== undefined && { description: args.description }),
-            ...(args.priority !== undefined && { priority: args.priority }),
-            ...(args.tags !== undefined && { tags: args.tags }),
-            ...(args.due_date !== undefined && { dueDate: args.due_date }),
-            parentId: args.parent_id,
-            ...(args.notes !== undefined && { notes: args.notes }),
+            if ('error' in result) return { success: false, error: result.error };
+
+            const parent = store.tasks[args.parent_id];
+            log(
+                'INFO',
+                `[todo_add_subtask] Subtarefa criada id=${result.task.id} parent_id=${args.parent_id} title=${result.task.title}`,
+            );
+            return {
+                success: true,
+                subtask: sanitize(result.task),
+                parent_subtask_count: parent?.subtaskIds.length ?? 0,
+            };
         });
-
-        if ('error' in result) return { success: false, error: result.error };
-
-        const parent = store.tasks[args.parent_id];
-        await writeStore(store);
-        log(
-            'INFO',
-            `[todo_add_subtask] Subtarefa criada id=${result.task.id} parent_id=${args.parent_id} title=${result.task.title}`,
-        );
-        return { success: true, subtask: sanitize(result.task), parent_subtask_count: parent?.subtaskIds.length ?? 0 };
     },
 });
 
@@ -1074,39 +1080,39 @@ const todoBulkUpdateTool = defineTool('todo_bulk_update', {
             };
         }
 
-        const store = await readStore();
-        const ts = now();
-        const updated = [];
-        const notFound = [];
+        return withStore(async (store) => {
+            const ts = now();
+            const updated = [];
+            const notFound = [];
 
-        for (const id of args.ids) {
-            const task = store.tasks[id];
-            if (!task) {
-                notFound.push(id);
-                continue;
-            }
-
-            if (args.status) {
-                task.status = args.status;
-                if (args.status === 'done') {
-                    task.completedAt = ts;
-                    // UPG-PROP-05 (fix): completedBy propagado no bulk update
-                    task.completedBy = args.completed_by ?? null;
-                } else {
-                    task.completedBy = null;
+            for (const id of args.ids) {
+                const task = store.tasks[id];
+                if (!task) {
+                    notFound.push(id);
+                    continue;
                 }
+
+                if (args.status) {
+                    task.status = args.status;
+                    if (args.status === 'done') {
+                        task.completedAt = ts;
+                        // UPG-PROP-05 (fix): completedBy propagado no bulk update
+                        task.completedBy = args.completed_by ?? null;
+                    } else {
+                        task.completedAt = null;
+                        task.completedBy = null;
+                    }
+                }
+                if (args.priority) task.priority = args.priority;
+                if (args.add_tags) task.tags = [...new Set([...task.tags, ...args.add_tags])];
+                if (args.remove_tags) task.tags = task.tags.filter((t) => !args.remove_tags?.includes(t));
+                task.updatedAt = ts;
+                updated.push(id);
             }
-            if (args.priority) task.priority = args.priority;
-            if (args.add_tags) task.tags = [...new Set([...task.tags, ...args.add_tags])];
-            if (args.remove_tags) task.tags = task.tags.filter((t) => !args.remove_tags?.includes(t));
-            task.updatedAt = ts;
-            updated.push(id);
-        }
 
-        if (updated.length > 0) await writeStore(store);
-
-        log('INFO', `[todo_bulk_update] Bulk update updated=${updated.length} not_found=${notFound.length}`);
-        return { success: true, updated, not_found: notFound, count: updated.length };
+            log('INFO', `[todo_bulk_update] Bulk update updated=${updated.length} not_found=${notFound.length}`);
+            return { success: true, updated, not_found: notFound, count: updated.length };
+        });
     },
 });
 
@@ -1131,45 +1137,65 @@ const todoClearCompletedTool = defineTool('todo_clear_completed', {
         dry_run: z.boolean().optional().default(false).describe('Se true, simula a remoção sem persistir'),
     }),
     handler: async (/** @type {{ status_filter?: 'done' | 'cancelled' | 'both'; dry_run?: boolean }} */ args) => {
-        const store = await readStore();
-        const ts = now();
-        const toDelete = [];
         const filter = args.status_filter ?? 'both';
 
-        for (const task of Object.values(store.tasks)) {
-            const match =
-                (filter === 'both' && (task.status === 'done' || task.status === 'cancelled')) ||
-                (filter === 'done' && task.status === 'done') ||
-                (filter === 'cancelled' && task.status === 'cancelled');
+        if (args.dry_run) {
+            const store = await readStore();
+            const toDelete = [];
+            for (const task of Object.values(store.tasks)) {
+                const match =
+                    (filter === 'both' && (task.status === 'done' || task.status === 'cancelled')) ||
+                    (filter === 'done' && task.status === 'done') ||
+                    (filter === 'cancelled' && task.status === 'cancelled');
 
-            if (match) toDelete.push(task.id);
-        }
-
-        if (!args.dry_run && toDelete.length > 0) {
-            for (const id of toDelete) {
-                const task = store.tasks[id];
-                if (task?.parentId) {
-                    const parent = store.tasks[task.parentId];
-                    if (parent) {
-                        parent.subtaskIds = parent.subtaskIds.filter((sid) => sid !== id);
-                        parent.updatedAt = ts;
-                    }
-                }
-                delete store.tasks[id];
+                if (match) toDelete.push(task.id);
             }
-            await writeStore(store);
+
+            return {
+                success: true,
+                deleted: toDelete,
+                count: toDelete.length,
+                dry_run: true,
+                message: `Simulação: ${toDelete.length} tarefas seriam removidas`,
+            };
         }
 
-        log('INFO', `[todo_clear_completed] Clear completed count=${toDelete.length} dry_run=${args.dry_run}`);
-        return {
-            success: true,
-            deleted: toDelete,
-            count: toDelete.length,
-            dry_run: args.dry_run ?? false,
-            message: args.dry_run
-                ? `Simulação: ${toDelete.length} tarefas seriam removidas`
-                : `${toDelete.length} tarefas removidas`,
-        };
+        return withStore(async (store) => {
+            const ts = now();
+            const toDelete = [];
+
+            for (const task of Object.values(store.tasks)) {
+                const match =
+                    (filter === 'both' && (task.status === 'done' || task.status === 'cancelled')) ||
+                    (filter === 'done' && task.status === 'done') ||
+                    (filter === 'cancelled' && task.status === 'cancelled');
+
+                if (match) toDelete.push(task.id);
+            }
+
+            if (toDelete.length > 0) {
+                for (const id of toDelete) {
+                    const task = store.tasks[id];
+                    if (task?.parentId) {
+                        const parent = store.tasks[task.parentId];
+                        if (parent) {
+                            parent.subtaskIds = parent.subtaskIds.filter((sid) => sid !== id);
+                            parent.updatedAt = ts;
+                        }
+                    }
+                    delete store.tasks[id];
+                }
+            }
+
+            log('INFO', `[todo_clear_completed] Clear completed count=${toDelete.length} dry_run=false`);
+            return {
+                success: true,
+                deleted: toDelete,
+                count: toDelete.length,
+                dry_run: false,
+                message: `${toDelete.length} tarefas removidas`,
+            };
+        });
     },
 });
 
@@ -1225,37 +1251,37 @@ const todoImportTool = defineTool('todo_import', {
          * }}
          */ args,
     ) => {
-        const store = await readStore();
-        const ts = now();
-        const created = [];
+        return withStore(async (store) => {
+            const ts = now();
+            const created = [];
 
-        for (const item of args.tasks) {
-            const id = generateId();
-            /** @type {TodoItem} */
-            const task = {
-                id,
-                title: item.title,
-                description: item.description ?? '',
-                status: item.status ?? 'todo',
-                priority: item.priority ?? args.default_priority ?? 'medium',
-                tags: item.tags ?? [],
-                dueDate: item.due_date ?? null,
-                parentId: null,
-                subtaskIds: [],
-                notes: item.notes ?? '',
-                createdAt: ts,
-                updatedAt: ts,
-                completedAt: item.status === 'done' ? ts : null,
-                completedBy: null,
-                metadata: item.metadata ?? {},
-            };
-            store.tasks[id] = task;
-            created.push(id);
-        }
+            for (const item of args.tasks) {
+                const id = generateUniqueId(store);
+                /** @type {TodoItem} */
+                const task = {
+                    id,
+                    title: item.title,
+                    description: item.description ?? '',
+                    status: item.status ?? 'todo',
+                    priority: item.priority ?? args.default_priority ?? 'medium',
+                    tags: item.tags ?? [],
+                    dueDate: item.due_date ?? null,
+                    parentId: null,
+                    subtaskIds: [],
+                    notes: item.notes ?? '',
+                    createdAt: ts,
+                    updatedAt: ts,
+                    completedAt: item.status === 'done' ? ts : null,
+                    completedBy: null,
+                    metadata: item.metadata ?? {},
+                };
+                store.tasks[id] = task;
+                created.push(id);
+            }
 
-        await writeStore(store);
-        log('INFO', `[todo_import] Tarefas importadas count=${created.length}`);
-        return { success: true, created_ids: created, count: created.length };
+            log('INFO', `[todo_import] Tarefas importadas count=${created.length}`);
+            return { success: true, created_ids: created, count: created.length };
+        });
     },
 });
 

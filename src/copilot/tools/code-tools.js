@@ -9,7 +9,8 @@
  */
 
 import { log } from '#core/logger';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import { buildTool, withSkipPermission } from './tool-factory.js';
@@ -17,7 +18,11 @@ import { buildTool, withSkipPermission } from './tool-factory.js';
 const ROOT = new URL('../../..', import.meta.url).pathname;
 // BUG-MED-08 (fix): caminho absoluto para ESLint — evita falhas em ambientes
 // onde o cwd não coincide com o ROOT do projeto
-const ESLINT_BIN = new URL('../../../node_modules/.bin/eslint', import.meta.url).pathname;
+const _resolvedEslint = new URL('../../../node_modules/.bin/eslint', import.meta.url).pathname;
+// BUG-P2-18: fallback para `which eslint` se o caminho resolvido não existir
+const ESLINT_BIN = existsSync(_resolvedEslint)
+    ? _resolvedEslint
+    : (() => { try { return execFileSync('which', ['eslint'], { encoding: 'utf8' }).trim(); } catch { return _resolvedEslint; } })();
 const execFileAsync = promisify(execFile);
 
 /**

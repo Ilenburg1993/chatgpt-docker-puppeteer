@@ -62,22 +62,38 @@ export function mountCopilotNamespace(io, orchestrator, store) {
     const INJECT_LIMIT = 10;
     const INJECT_WINDOW_MS = 60_000;
 
+    // SEC-P2-06: rate limit complementar por IP — impede bypass via múltiplos sockets
+    /** @type {Map<string, { count: number; resetAt: number }>} */
+    const _ipInjectBuckets = new Map();
+    const IP_INJECT_LIMIT = 30;
+
     /**
-     * Retorna true se o socket ainda está dentro do limite de injects por minuto.
+     * Retorna true se o socket ainda está dentro do limite de injects por minuto. Verifica tanto o limite por socket
+     * quanto o limite por IP.
      *
      * @param {string} socketId
+     * @param {string} ip
      * @returns {boolean}
      */
-    function checkSocketInjectRate(socketId) {
+    function checkSocketInjectRate(socketId, ip) {
         const now = Date.now();
         // Prune expirados
         for (const [key, bucket] of _socketInjectBuckets) {
             if (now >= bucket.resetAt) _socketInjectBuckets.delete(key);
         }
+        for (const [key, bucket] of _ipInjectBuckets) {
+            if (now >= bucket.resetAt) _ipInjectBuckets.delete(key);
+        }
+        // Check per-IP limit first (SEC-P2-06)
+        const ipBucket = _ipInjectBuckets.get(ip) ?? { count: 0, resetAt: now + INJECT_WINDOW_MS };
+        if (ipBucket.count >= IP_INJECT_LIMIT) return false;
+        // Check per-socket limit
         const bucket = _socketInjectBuckets.get(socketId) ?? { count: 0, resetAt: now + INJECT_WINDOW_MS };
         if (bucket.count >= INJECT_LIMIT) return false;
         bucket.count++;
         _socketInjectBuckets.set(socketId, bucket);
+        ipBucket.count++;
+        _ipInjectBuckets.set(ip, ipBucket);
         return true;
     }
 
@@ -85,6 +101,16 @@ export function mountCopilotNamespace(io, orchestrator, store) {
     const authRequired = _parseAuthRequired();
 
     if (authRequired) {
+        // BUG-P2-14: validar JWT secret na inicialização para falhar cedo
+        try {
+            getJwtSecret();
+        } catch (/** @type {any} */ secretErr) {
+            log(
+                'WARN',
+                `[socket-ns/copilot] AUTH_REQUIRED=true mas JWT_SECRET inválido: ${secretErr.message}. Auth desabilitado.`,
+            );
+            // Prossegue sem auth ao invés de falhar em cada conexão
+        }
         // BUG-09 (fix): importações JWT movidas para top-level para evitar overhead por conexão
         ns.use(async (/** @type {SocketClient} */ socket, /** @type {function} */ next) => {
             try {
@@ -108,6 +134,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
     // Conexão de clients
     ns.on('connection', (/** @type {SocketClient} */ socket) => {
         const clientId = socket.id;
+        const clientIp = socket.handshake.address ?? 'unknown';
         log('DEBUG', `[socket-ns/copilot] Cliente conectado: ${clientId}`);
 
         // ── Eventos recebidos do cliente ─────────────────────────────────────
@@ -152,8 +179,8 @@ export function mountCopilotNamespace(io, orchestrator, store) {
                 return;
             }
 
-            // SEC-N04 (fix): rate limit por socket
-            if (!checkSocketInjectRate(clientId)) {
+            // SEC-N04 (fix): rate limit por socket + SEC-P2-06: rate limit por IP
+            if (!checkSocketInjectRate(clientId, clientIp)) {
                 socket.emit('error:inject', { reason: 'Rate limit excedido. Tente novamente em breve.' });
                 log('WARN', `[socket-ns/copilot] Rate limit atingido pelo socket ${clientId}`);
                 return;

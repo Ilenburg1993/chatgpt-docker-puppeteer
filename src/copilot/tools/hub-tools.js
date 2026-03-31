@@ -161,7 +161,9 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
 
             // UPG-04: validar timeoutMs para evitar valores absurdos de modelos alucinados
             const resolvedTimeout =
-                typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 120_000;
+                typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
+                    ? Math.min(Math.max(timeoutMs, 5_000), 300_000)
+                    : 120_000;
 
             // Se useStructured e há context/intent, enviar como StructuredMessageInput
             let payload;
