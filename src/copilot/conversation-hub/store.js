@@ -150,6 +150,24 @@ function migrateFts5Tokenizer(db) {
     log('INFO', '[ConversationStore] PERF-03: FTS5 migrado com sucesso.');
 }
 
+// ─── Helpers FTS5 ─────────────────────────────────────────────────────────────
+
+/**
+ * Sanitiza uma query para uso seguro em FTS5 MATCH. Remove metacaracteres e operadores reservados para evitar FTS5
+ * injection e erros de parse.
+ *
+ * @param {string} raw - Query bruta do usuário
+ * @returns {string | null} Query sanitizada pronta para MATCH, ou null se vazia após sanitização
+ */
+function sanitizeFtsQuery(raw) {
+    const sanitized = raw
+        .replace(/[*^"():|&!,-]/g, ' ')
+        .replace(/\b(AND|OR|NOT|NEAR)\b/gi, ' ')
+        .trim();
+    if (!sanitized) return null;
+    return `"${sanitized}"`;
+}
+
 // ─── ConversationStore ────────────────────────────────────────────────────────
 
 /**
@@ -487,13 +505,8 @@ export class ConversationStore {
     searchTurns(opts) {
         const db = this.#getDb();
         const limit = opts.limit ?? 20;
-        // Sanitizar query FTS5: remover metacaracteres para evitar injection e erros de parse
-        const sanitized = opts.query
-            .replace(/[*^"():|&!,-]/g, ' ')
-            .replace(/\b(AND|OR|NOT|NEAR)\b/gi, ' ')
-            .trim();
-        if (!sanitized) return [];
-        const ftsQuery = `"${sanitized}"`;
+        const ftsQuery = sanitizeFtsQuery(opts.query);
+        if (!ftsQuery) return [];
 
         const roleFilter = opts.role ? 'AND t.role = ?' : '';
         const roleArg = opts.role ? [opts.role] : [];
@@ -650,14 +663,8 @@ export class ConversationStore {
         const sessionArg = opts.hubSessionId ? [opts.hubSessionId] : [];
 
         if (opts.search) {
-            // FTS5: busca semântica no conteúdo
-            // SEC-02 (fix v2): escapar TODOS os metacaracteres FTS5 (*, ^, |, &, !, operadores AND/OR/NOT/NEAR)
-            // A simples remoção de aspas duplas não é suficiente — operadores textuais ainda são interpretados
-            const sanitized = opts.search
-                .replace(/[*^"():|&!,-]/g, ' ')
-                .replace(/\b(AND|OR|NOT|NEAR)\b/gi, ' ')
-                .trim();
-            const ftsQuery = `"${sanitized}"`;
+            const ftsQuery = sanitizeFtsQuery(opts.search);
+            if (!ftsQuery) return [];
             const tagFilter = opts.tag ? 'AND m.tag = ?' : '';
             const tagArg = opts.tag ? [opts.tag] : [];
             const rows = db

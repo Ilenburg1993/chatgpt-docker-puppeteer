@@ -30,13 +30,13 @@ describe('system-prompt › exportações do módulo', () => {
             'last_instructions',
         ];
         for (const key of expected) {
-            assert.ok(Object.values(SYSTEM_PROMPT_SECTIONS).includes(key), `Seção "${key}" deveria existir`);
+            assert.ok(Object.keys(SYSTEM_PROMPT_SECTIONS).includes(key), `Seção "${key}" deveria existir`);
         }
     });
 
-    it('SYSTEM_PROMPT_SECTIONS deve ser imutável (frozen)', async () => {
+    it('SYSTEM_PROMPT_SECTIONS deve conter 10 seções (SDK v0.2.0)', async () => {
         const { SYSTEM_PROMPT_SECTIONS } = await import('#copilot/config/system-prompt');
-        assert.ok(Object.isFrozen(SYSTEM_PROMPT_SECTIONS));
+        assert.strictEqual(Object.keys(SYSTEM_PROMPT_SECTIONS).length, 10);
     });
 
     it('deve exportar as constantes de texto de identidade', async () => {
@@ -194,11 +194,11 @@ describe('system-prompt › buildAlwaysAliveSystemMessage', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('system-prompt › buildHookContextAppendMessage', () => {
-    it('deve retornar mode: "append" com conteúdo formatado', async () => {
+    it('deve retornar mode: "customize" com sections.guidelines (SDK v0.2.0)', async () => {
         const { buildHookContextAppendMessage } = await import('#copilot/config/system-prompt');
         const msg = buildHookContextAppendMessage('meu briefing aqui');
-        assert.strictEqual(msg.mode, 'append');
-        const content = /** @type {any} */ (msg).content;
+        assert.strictEqual(msg.mode, 'customize');
+        const content = /** @type {any} */ (msg).sections?.guidelines?.content;
         assert.ok(content.includes('meu briefing aqui'), 'Deve incluir o hook context');
         assert.ok(content.includes('Hook System'), 'Deve mencionar Hook System');
     });
@@ -206,7 +206,7 @@ describe('system-prompt › buildHookContextAppendMessage', () => {
     it('deve incluir lembrete de vscode_askQuestions no conteúdo', async () => {
         const { buildHookContextAppendMessage } = await import('#copilot/config/system-prompt');
         const msg = buildHookContextAppendMessage('algum contexto');
-        const content = /** @type {any} */ (msg).content;
+        const content = /** @type {any} */ (msg).sections?.guidelines?.content;
         assert.ok(content.includes('vscode_askQuestions'), 'Deve incluir lembrete do protocolo');
     });
 
@@ -227,7 +227,7 @@ describe('system-prompt › buildHookContextAppendMessage', () => {
     it('content deve conter o separador ---', async () => {
         const { buildHookContextAppendMessage } = await import('#copilot/config/system-prompt');
         const msg = buildHookContextAppendMessage('briefing');
-        const content = /** @type {any} */ (msg).content;
+        const content = /** @type {any} */ (msg).sections?.guidelines?.content;
         assert.ok(content.startsWith('---') || content.includes('\n---\n'), 'Deve iniciar com separador');
     });
 });

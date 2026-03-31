@@ -136,6 +136,13 @@ export async function readFileContext(filePath) {
         _fileCacheHits++;
         return cached.ctx;
     }
+    // Purgar entrada expirada (se houver) + purga lazy de entradas antigas quando cache é grande
+    if (cached) _fileCache.delete(absPath);
+    if (_fileCache.size > 200) {
+        for (const [key, entry] of _fileCache) {
+            if (entry.expiresAt <= now) _fileCache.delete(key);
+        }
+    }
     _fileCacheMisses++;
 
     const info = await stat(absPath);

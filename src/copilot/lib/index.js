@@ -131,3 +131,4 @@ export {
     recordToolCall,
     startSpan,
 } from '#copilot/lib/telemetry';
+export { validateUrl, validateUrlString } from './url-validator.js';

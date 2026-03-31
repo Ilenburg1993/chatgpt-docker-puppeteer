@@ -160,10 +160,10 @@ describe('lib/permissions › createRestrictedPermission', () => {
 });
 
 describe('lib/permissions › createSafePermission', () => {
-    it('nega shell_exec', async () => {
+    it('nega run_shell_command', async () => {
         const { createSafePermission } = await import('../../../src/copilot/lib/permissions.js');
         const handler = createSafePermission();
-        const result = await handler(makeRequest('shell_exec'), { sessionId: 'test' });
+        const result = await handler(makeRequest('run_shell_command'), { sessionId: 'test' });
         assert.strictEqual(result.kind, 'denied-by-rules');
     });
 

@@ -90,35 +90,55 @@ describe('hookTools', () => {
             assert.ok(hasProtocol, 'description deve mencionar o protocolo de continuidade');
         });
 
-        it('handler retorna question e status=waiting_for_input', async () => {
+        // Nota: o handler retorna uma Promise que só resolve quando resolveUserInput() é chamado
+        // (ARCH-N01 suspensão real). Para testar, agendamos resolveUserInput() logo após invocar.
+
+        it('handler retorna question e status=resolved após resolveUserInput', async () => {
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
-            const result = await handler({ question: 'Qual o próximo passo?', choices: ['A', 'B'] });
+            const promise = handler({ question: 'Qual o próximo passo?', choices: ['A', 'B'] });
+            // Agendar resolução no próximo tick
+            queueMicrotask(() => resolveUserInput('seguir'));
+            const result = await promise;
             assert.equal(result.question, 'Qual o próximo passo?');
-            assert.equal(result.status, 'waiting_for_input');
+            assert.equal(result.status, 'resolved');
+            assert.equal(result.answer, 'seguir');
         });
 
         it('handler com context concatena ao question', async () => {
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
-            const result = await handler({ question: 'O que fazer?', context: 'Fiz X e Y.' });
+            const promise = handler({ question: 'O que fazer?', context: 'Fiz X e Y.' });
+            queueMicrotask(() => resolveUserInput('ok'));
+            const result = await promise;
             assert.ok(result.question.includes('O que fazer?'));
             assert.ok(result.question.includes('Fiz X e Y.'));
         });
 
         it('handler com requires_selection=true define allowFreeform=false', async () => {
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
-            const result = await handler({ question: 'Escolha:', choices: ['A', 'B'], requires_selection: true });
+            const promise = handler({ question: 'Escolha:', choices: ['A', 'B'], requires_selection: true });
+            queueMicrotask(() => resolveUserInput('A'));
+            const result = await promise;
             assert.equal(result.allowFreeform, false);
         });
 
         it('handler sem choices retorna choices=[]', async () => {
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
-            const result = await handler({ question: 'Qual a prioridade?' });
+            const promise = handler({ question: 'Qual a prioridade?' });
+            queueMicrotask(() => resolveUserInput('alta'));
+            const result = await promise;
             assert.deepEqual(result.choices, []);
         });
 
         it('result.instruction é string não vazia', async () => {
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
-            const result = await handler({ question: 'Continua?' });
+            const promise = handler({ question: 'Continua?' });
+            queueMicrotask(() => resolveUserInput('sim'));
+            const result = await promise;
             assert.ok(typeof result.instruction === 'string' && result.instruction.length > 0);
         });
     });

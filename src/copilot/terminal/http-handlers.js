@@ -92,6 +92,9 @@ export function handleHealth() {
             cacheStats: { fileContext: getFileCacheStats() },
             // UPG-N22: status do ConversationHub
             hub: hubInfo,
+            // QUA-P2-08: uptime e memória do processo
+            uptime: Math.round(process.uptime()),
+            memoryMB: Math.round(process.memoryUsage.rss() / 1_048_576),
         },
     };
 }

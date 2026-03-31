@@ -99,8 +99,8 @@ describe('lib/session › createSession', () => {
         await createSession(client, { systemMessageContent: 'contexto de teste' });
         const cfg = capturedConfigs[0];
         assert.ok(cfg.systemMessage, 'deve ter systemMessage');
-        // SDK-03 (fix): SDK v0.1.x usa { mode: 'append', content } em vez de sections.guidelines
-        assert.strictEqual(cfg.systemMessage.mode, 'append');
+        // SDK-03 (update): SDK v0.2.0 usa { mode: 'customize', content }
+        assert.strictEqual(cfg.systemMessage.mode, 'customize');
         assert.strictEqual(cfg.systemMessage.content, 'contexto de teste');
     });
 
