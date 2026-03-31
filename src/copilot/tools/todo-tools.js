@@ -127,8 +127,8 @@ const VALID_TRANSITIONS = {
 let _storeMutex = Promise.resolve();
 
 /**
- * Serializa uma operação de read-modify-write no store.
- * O callback `fn` recebe o store, modifica-o in-place e retorna um valor opcional.
+ * Serializa uma operação de read-modify-write no store. O callback `fn` recebe o store, modifica-o in-place e retorna
+ * um valor opcional.
  *
  * @template T
  * @param {(store: TodoStore) => Promise<T> | T} fn

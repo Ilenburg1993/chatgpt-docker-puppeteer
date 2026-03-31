@@ -163,11 +163,29 @@ function buildPreToolUseHandler({ allowTools, denyTools, denyPatterns, auditLog,
  * @returns {ErrorOccurredHandler}
  */
 function buildErrorOccurredHandler() {
+    // F3.5 (BUG-MOD-10): este handler é o único responsável pelo retry automático (RF-PR-01).
+    // Centralizado aqui para não ser sobrescrito pelo override duplicado que havia em session.js.
     const fn = async (/** @type {ErrorOccurredHookInput} */ input, /** @type {InvocationContext} */ invocation) => {
+        const { error, errorContext, recoverable } = input ?? {};
+        if (recoverable && errorContext === 'model_call') {
+            log(
+                'WARN',
+                `[lib/hooks] onErrorOccurred recuperável (${errorContext}): ${error} — retry automático sessionId='${invocation?.sessionId}'`,
+            );
+            return { errorHandling: 'retry', retryCount: 3 };
+        }
+        if (recoverable && errorContext === 'tool_execution') {
+            log(
+                'WARN',
+                `[lib/hooks] onErrorOccurred tool recuperável: ${error} — skip sessionId='${invocation?.sessionId}'`,
+            );
+            return { errorHandling: 'skip' };
+        }
         log(
             'WARN',
-            `[lib/hooks] onErrorOccurred: error='${input.error}' context='${input.errorContext}' recoverable=${input.recoverable} sessionId='${invocation?.sessionId}'`,
+            `[lib/hooks] onErrorOccurred não-recuperável (${errorContext}): ${error} — abort sessionId='${invocation?.sessionId}'`,
         );
+        return { errorHandling: 'abort' };
     };
     return /** @type {ErrorOccurredHandler} */ (fn);
 }

@@ -138,6 +138,14 @@ export class AlwaysAliveAgent extends EventEmitter {
     #dialogTurnQueueDepth = 0;
 
     /**
+     * F3.3 (BUG-MOD-06): geração do mutex. Incrementada a cada reset — garante que a Promise em flight só faz reset
+     * quando ainda é a última da cadeia, evitando reset prematuro em corridas.
+     *
+     * @type {number}
+     */
+    #dialogTurnMutexGen = 0;
+
+    /**
      * BUG-AA-02 (fix): sinaliza que stopDialogLoop está em execução. Evita race condition entre stopDialogLoop e
      * #handleUserInputRequest.
      *
@@ -1146,11 +1154,13 @@ export class AlwaysAliveAgent extends EventEmitter {
         );
         // Atualiza a cauda — o .catch(() => {}) evita UnhandledRejection interna
         this.#dialogTurnMutex = next.then(() => {}).catch(() => {});
-        // BUG-AA-04 (fix): resetar a cadeia do mutex quando a fila zerar, prevenindo crescimento
-        // indefinido de Promise-chain em sessões de longa duração com milhares de turnos.
+        // F3.3 (BUG-MOD-06 fix): GEN captura o valor atual — se outro enqueue acontecer antes
+        // deste finally, #dialogTurnMutexGen terá sido incrementado e o reset é cancelado,
+        // prevenindo race condition entre Promises concorrentes.
+        const myGen = ++this.#dialogTurnMutexGen;
         void next.finally(() => {
             this.#dialogTurnQueueDepth--;
-            if (this.#dialogTurnQueueDepth === 0) {
+            if (this.#dialogTurnQueueDepth === 0 && this.#dialogTurnMutexGen === myGen) {
                 this.#dialogTurnMutex = Promise.resolve();
             }
         });
@@ -1464,7 +1474,8 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ model?: string; cost?: number; quotaSnapshots?: any; ts: number } | null}
      */
     get lastPrInfo() {
-        return this.#lastPrInfo;
+        // F3.9 (LEVE-09): retornar cópia rasa para evitar mutação externa do estado interno
+        return this.#lastPrInfo ? { ...this.#lastPrInfo } : null;
     }
 
     // ─────────────── Privados ───────────────

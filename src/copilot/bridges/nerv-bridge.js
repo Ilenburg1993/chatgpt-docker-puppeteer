@@ -87,6 +87,14 @@ let _nerv = null;
 const _listeners = new Map();
 
 /**
+ * F3.7 (BUG-MOD-12): rastrear se o handler before-stop já está registrado para evitar re-registro duplo em caso de
+ * mount() → unmount() → mount() rápido.
+ *
+ * @type {boolean}
+ */
+let _beforeStopRegistered = false;
+
+/**
  * Cria um envelope simples para emissão no NERV.
  *
  * @param {string} actionCode
@@ -168,7 +176,11 @@ export function mount(nerv) {
     // BUG-HIGH-10 (fix): re-registrar listeners após ciclo stop()/start() do agente.
     // O agente emite 'before-stop' antes de encerrar; ouvimos para limpar nossos listeners
     // e então re-registramos quando 'ready' disparar (novo ciclo de vida do agente).
-    alwaysAliveAgent.on('before-stop', _onAgentBeforeStop);
+    // F3.7 (BUG-MOD-12): verificar flag para evitar registro duplo em mounts consecutivos.
+    if (!_beforeStopRegistered) {
+        alwaysAliveAgent.on('before-stop', _onAgentBeforeStop);
+        _beforeStopRegistered = true;
+    }
 
     log('INFO', '[nerv-bridge] Bridge NERV↔AlwaysAlive montado.');
 }
@@ -187,7 +199,7 @@ function _onAgentBeforeStop() {
         if (_nerv === null) return; // bridge foi desmontado enquanto o agente reiniciava
         log('INFO', '[nerv-bridge] Agente pronto novamente — re-registrando listeners.');
         _attachListeners();
-        // Reagendar o handler para o próximo ciclo de stop
+        // Reagendar o handler para o próximo ciclo de stop (flag já true, apenas re-registra)
         alwaysAliveAgent.on('before-stop', _onAgentBeforeStop);
     });
 }
@@ -200,6 +212,7 @@ function _onAgentBeforeStop() {
 export function unmount() {
     _detachListeners();
     alwaysAliveAgent.off('before-stop', _onAgentBeforeStop);
+    _beforeStopRegistered = false;
     _nerv = null;
     log('INFO', '[nerv-bridge] Bridge NERV↔AlwaysAlive desmontado.');
 }
@@ -239,5 +252,6 @@ export const copilotNervBridge = { mount, unmount, isMounted, emitNerv };
  */
 export function _resetNervBridgeState() {
     _nerv = null;
+    _beforeStopRegistered = false;
     _listeners.clear();
 }

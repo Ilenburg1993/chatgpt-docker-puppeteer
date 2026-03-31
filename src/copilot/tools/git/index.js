@@ -10,12 +10,12 @@
 
 import { log } from '#core/logger';
 import { defineTool } from '@github/copilot-sdk';
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import { withSkipPermission } from '../tool-factory.js';
 
-const execAsync = promisify(exec);
+const execAsync = promisify(execFile);
 
 const ROOT = new URL('../../../..', import.meta.url).pathname;
 
@@ -26,7 +26,35 @@ const ROOT = new URL('../../../..', import.meta.url).pathname;
  */
 async function safeGit(cmd, timeoutMs = 15000) {
     try {
-        const { stdout } = await execAsync(cmd, { cwd: ROOT, encoding: 'utf8', timeout: timeoutMs });
+        // F3.8 (LEVE-11): execFile com shell:true para comandos compostos (pipes/&&) mas sem
+        // interpolação de variáveis de ambiente inseguras. Para git commit com mensagem do usuário,
+        // usar safeGitArgs() que passa args separados sem shell.
+        const { stdout } = await execAsync('/bin/sh', ['-c', `git ${cmd.startsWith('git ') ? cmd.slice(4) : cmd}`], {
+            cwd: ROOT,
+            encoding: 'utf8',
+            timeout: timeoutMs,
+        });
+        return { stdout: stdout.slice(0, 4000), exitCode: 0 };
+    } catch (/** @type {any} */ e) {
+        return {
+            stdout: (e.stdout ?? '').slice(0, 2000),
+            exitCode: e.code ?? 1,
+            error: (e.stderr ?? e.message ?? '').slice(0, 1000),
+        };
+    }
+}
+
+/**
+ * F3.8 (LEVE-11): executa `git` com args separados (sem interpolação shell) — seguro para valores fornecidos pelo
+ * usuário (ex: mensagem de commit, paths).
+ *
+ * @param {string[]} args - Argumentos para `git` (ex: ['commit', '-m', message])
+ * @param {number} [timeoutMs]
+ * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
+ */
+async function safeGitArgs(args, timeoutMs = 15000) {
+    try {
+        const { stdout } = await execAsync('git', args, { cwd: ROOT, encoding: 'utf8', timeout: timeoutMs });
         return { stdout: stdout.slice(0, 4000), exitCode: 0 };
     } catch (/** @type {any} */ e) {
         return {
@@ -94,13 +122,13 @@ const gitCommitTool = defineTool('git_commit', {
     ),
     handler: async (/** @type {{ message: string; paths?: string[]; all?: boolean }} */ { message, paths, all }) => {
         if (all) {
-            await safeGit('git add -A');
+            await safeGitArgs(['add', '-A']);
         } else if (paths && paths.length > 0) {
-            const escaped = paths.map((p) => `"${p.replace(/"/g, '\\"')}"`).join(' ');
-            await safeGit(`git add ${escaped}`);
+            // F3.8: paths como args separados — sem interpolação shell
+            await safeGitArgs(['add', '--', ...paths]);
         }
         // GAP-Q09 fix: verificar se há algo staged antes de commitar
-        const staged = await safeGit('git diff --cached --name-only');
+        const staged = await safeGitArgs(['diff', '--cached', '--name-only']);
         if (staged.exitCode !== 0 || !staged.stdout.trim()) {
             return {
                 success: false,
@@ -109,7 +137,8 @@ const gitCommitTool = defineTool('git_commit', {
             };
         }
         log('INFO', `[copilot/git_commit] Commitando: ${message}`);
-        const r = await safeGit(`git commit -m "${message.replace(/"/g, '\\"')}"`);
+        // F3.8: mensagem como arg separado — elimina risco de injeção shell via conteúdo da mensagem
+        const r = await safeGitArgs(['commit', '-m', message]);
         return {
             success: r.exitCode === 0,
             output: r.stdout,

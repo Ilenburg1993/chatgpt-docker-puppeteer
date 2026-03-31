@@ -86,7 +86,7 @@ alwaysAliveAgent.on('session.fatal', (/** @type {any} */ evt) => {
 try {
     const pingClient = new CopilotClient();
     await Promise.race([
-        pingClient.ping('boot health check'),
+        pingClient.ping(),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Ping timeout (5s)')), 5000)),
     ]);
     log('INFO', '[copilot/agent] CLI conectado — ping OK.');

@@ -173,9 +173,7 @@ export class PinnedFilesLoader extends EventEmitter {
         for (const dir of this.#dirs) {
             if (!existsSync(dir)) continue;
             try {
-                const watchOpts = supportsRecursive
-                    ? { persistent: false, recursive: true }
-                    : { persistent: false };
+                const watchOpts = supportsRecursive ? { persistent: false, recursive: true } : { persistent: false };
                 const watcher = watch(dir, watchOpts, (eventType, filename) => {
                     if (!filename) return;
                     if (!SUPPORTED_EXTENSIONS.some((ext) => filename.endsWith(ext))) return;

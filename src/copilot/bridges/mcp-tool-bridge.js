@@ -292,6 +292,7 @@ export async function buildMcpTools() {
     } catch (/** @type {any} */ err) {
         _mcpCircuitOpen = true;
         _mcpCircuitOpenAt = Date.now();
+        _bootAttemptCount = 0; // F3.2 (BUG-MOD-02): resetar ao abrir circuit para evitar backoff acumulado
         log(
             'WARN',
             `[mcp-tool-bridge] Falha ao consultar MCP Registry — circuit aberto por ${CIRCUIT_RESET_MS / 1000}s: ${err.message}`,

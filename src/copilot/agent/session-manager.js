@@ -116,7 +116,7 @@ export async function buildHookSystemContext() {
         const rawConsecutive = state?.compliance?.consecutive_unauthorized;
         const consecutive =
             typeof rawConsecutive === 'number' && Number.isFinite(rawConsecutive)
-                ? Math.max(0, Math.trunc(rawConsecutive))
+                ? Math.min(Math.max(0, Math.trunc(rawConsecutive)), 9999)
                 : 0;
         const rawTurnNum = state?.current_turn?.number;
         const turnNum =

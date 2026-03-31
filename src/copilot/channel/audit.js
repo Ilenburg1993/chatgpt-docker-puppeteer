@@ -142,16 +142,17 @@ export function auditToolComplete(entry) {
 /**
  * Retorna as últimas `limit` entradas de auditoria para um dado `sessionId`.
  *
- * Leitura sincronizada do arquivo completo — usar apenas para debug/diagnóstico.
+ * Leitura assíncrona do arquivo completo — usar apenas para debug/diagnóstico.
  *
  * @param {string | null} sessionId - Filtrar por sessão; null retorna todas as entradas
  * @param {number} [limit=50] - Número máximo de entradas a retornar. Default is `50`
- * @returns {object[]}
+ * @returns {Promise<object[]>}
  */
-export function getAuditSummary(sessionId, limit = 50) {
+export async function getAuditSummary(sessionId, limit = 50) {
     try {
         if (!fs.existsSync(AUDIT_FILE)) return [];
-        const lines = fs.readFileSync(AUDIT_FILE, 'utf8').trim().split('\n').filter(Boolean);
+        const raw = await fs.promises.readFile(AUDIT_FILE, 'utf8');
+        const lines = raw.trim().split('\n').filter(Boolean);
         const entries = lines
             .map((l) => {
                 try {

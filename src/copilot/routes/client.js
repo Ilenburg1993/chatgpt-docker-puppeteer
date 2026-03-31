@@ -55,7 +55,7 @@ const withErrorHandler = _withErrorHandler.bind(null, 'sdk-api/client');
 router.get('/ping', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const client = await getClient();
-        const result = await client.ping('sdk-api health check');
+        const result = await client.ping();
         res.json({ ok: true, ...result });
     });
 });

@@ -146,31 +146,11 @@ function buildSessionConfig(opts, mode) {
     else cfg.onPermissionRequest = approveAll; // SDK-01: obrigatório no v0.2.0 — default approveAll
     if (opts.onUserInputRequest !== undefined) cfg.onUserInputRequest = opts.onUserInputRequest;
 
-    // RF-PR-01: compor hooks com onErrorOccurred padrão para retry automático sem PR
+    // RF-PR-01: compor hooks — onErrorOccurred com retry automático está em buildErrorOccurredHandler() (hooks.js)
+    // e é o default de createHooks(). Preservamos hooks do usuário sem sobrescrever.
     {
         const userHooks = /** @type {Record<string, any>} */ (opts.hooks ?? {});
-        /** @type {Record<string, any>} */
-        const composedHooks = { ...userHooks };
-        // Só injetar handler padrão se o usuário não forneceu o seu próprio
-        if (!composedHooks['onErrorOccurred']) {
-            composedHooks['onErrorOccurred'] = (/** @type {any} */ input) => {
-                const { error, errorContext, recoverable } = input ?? {};
-                if (recoverable && errorContext === 'model_call') {
-                    log(
-                        'WARN',
-                        `[lib/session] onErrorOccurred recuperável (${errorContext}): ${error} — retry automático`,
-                    );
-                    return { errorHandling: 'retry', retryCount: 3 };
-                }
-                if (recoverable && errorContext === 'tool_execution') {
-                    log('WARN', `[lib/session] onErrorOccurred tool recuperável: ${error} — skip`);
-                    return { errorHandling: 'skip' };
-                }
-                log('WARN', `[lib/session] onErrorOccurred não-recuperável (${errorContext}): ${error} — abort`);
-                return { errorHandling: 'abort' };
-            };
-        }
-        cfg.hooks = composedHooks;
+        cfg.hooks = { ...userHooks };
     }
 
     if (opts.tools !== undefined) cfg.tools = opts.tools;

@@ -19,7 +19,6 @@
 import { log } from '#core/logger';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
-import { realpathSync } from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
@@ -95,20 +94,21 @@ const BLOCKED_PATTERNS = [
  * Verifica se um caminho está dentro do workspace autorizado e não é um arquivo bloqueado.
  *
  * @param {string} filePath - Caminho absoluto ou relativo
- * @returns {{ ok: boolean; reason?: string; resolved: string }}
+ * @returns {Promise<{ ok: boolean; reason?: string; resolved: string }>}
  */
-function validatePath(filePath) {
+async function validatePath(filePath) {
     const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(WORKSPACE_ROOT, filePath);
 
     // SEC-04 / BUG-H06 (fix): resolver symlinks antes de verificar containment.
+    // F3.4 (BUG-MOD-08): usar realpath assíncrono para não bloquear o event loop.
     // Quando o arquivo ainda não existe, resolve o diretório pai para evitar symlink traversal via parent.
     let realResolved = resolved;
     try {
-        realResolved = realpathSync(resolved);
+        realResolved = await fs.promises.realpath(resolved);
     } catch {
         // Arquivo não existe ainda — resolver o diretório pai (que deve existir)
         try {
-            const parentDir = realpathSync(path.dirname(resolved));
+            const parentDir = await fs.promises.realpath(path.dirname(resolved));
             realResolved = path.join(parentDir, path.basename(resolved));
         } catch {
             // Diretório pai também não existe; usar o caminho resolvido normalmente
@@ -166,7 +166,7 @@ const readFileContentTool = buildTool({
             .describe('Codificação de saída. Use base64 para arquivos binários.'),
     }),
     handler: async ({ path: filePath, startLine, endLine, encoding }) => {
-        const { ok, reason, resolved } = validatePath(filePath);
+        const { ok, reason, resolved } = await validatePath(filePath);
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/read_file_content] ${resolved}`);
@@ -249,7 +249,7 @@ const listDirectoryTool = buildTool({
         filter: z.string().optional().describe('Glob pattern para filtrar entradas (ex: *.js, *.md)'),
     }),
     handler: async ({ path: dirPath, recursive, depth, showHidden, filter }) => {
-        const { ok, reason, resolved } = validatePath(dirPath);
+        const { ok, reason, resolved } = await validatePath(dirPath);
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/list_directory] ${resolved} (recursive=${recursive}, depth=${depth})`);
@@ -363,7 +363,7 @@ const searchInFilesTool = buildTool({
         contextLines,
         maxResults,
     }) => {
-        const { ok, reason, resolved } = validatePath(searchPath ?? '.');
+        const { ok, reason, resolved } = await validatePath(searchPath ?? '.');
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/search_in_files] pattern="${pattern}" in ${resolved}`);
@@ -444,7 +444,7 @@ const writeFileContentTool = buildTool({
             .describe('Codificação do conteúdo (utf8 para texto, base64 para binário)'),
     }),
     handler: async ({ path: filePath, content, encoding }) => {
-        const { ok, reason, resolved } = validatePath(filePath);
+        const { ok, reason, resolved } = await validatePath(filePath);
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/write_file_content] ${resolved}`);
@@ -489,7 +489,7 @@ const createFileTool = buildTool({
             .describe('Se true, sobrescreve o arquivo se já existir (⚠️ destrutivo)'),
     }),
     handler: async ({ path: filePath, content, createParentDirs, overwrite }) => {
-        const { ok, reason, resolved } = validatePath(filePath);
+        const { ok, reason, resolved } = await validatePath(filePath);
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/create_file] ${resolved}`);
@@ -527,7 +527,7 @@ const deleteFileTool = buildTool({
         path: z.string().describe('Caminho do arquivo a deletar'),
     }),
     handler: async ({ path: filePath }) => {
-        const { ok, reason, resolved } = validatePath(filePath);
+        const { ok, reason, resolved } = await validatePath(filePath);
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/delete_file] ${resolved}`);
@@ -557,10 +557,10 @@ const copyFileTool = buildTool({
         overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
     }),
     handler: async ({ source, destination, overwrite }) => {
-        const src = validatePath(source);
+        const src = await validatePath(source);
         if (!src.ok) return { success: false, error: src.reason };
 
-        const dst = validatePath(destination);
+        const dst = await validatePath(destination);
         if (!dst.ok) return { success: false, error: dst.reason };
 
         log('INFO', `[copilot/copy_file] ${src.resolved} → ${dst.resolved}`);
@@ -594,10 +594,10 @@ const moveFileTool = buildTool({
         overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
     }),
     handler: async ({ source, destination, overwrite }) => {
-        const src = validatePath(source);
+        const src = await validatePath(source);
         if (!src.ok) return { success: false, error: src.reason };
 
-        const dst = validatePath(destination);
+        const dst = await validatePath(destination);
         if (!dst.ok) return { success: false, error: dst.reason };
 
         log('INFO', `[copilot/move_file] ${src.resolved} → ${dst.resolved}`);
@@ -633,7 +633,7 @@ const patchFileTool = buildTool({
         new_string: z.string().describe('Texto de substituição (pode ser string vazia para deletar)'),
     }),
     handler: async ({ path: filePath, old_string, new_string }) => {
-        const v = validatePath(filePath);
+        const v = await validatePath(filePath);
         if (!v.ok) return { success: false, error: v.reason };
 
         if (!fs.existsSync(v.resolved)) {
@@ -697,9 +697,9 @@ const diffFilesTool = buildTool({
             .describe('Número de linhas de contexto exibidas ao redor de cada mudança (padrão: 3)'),
     }),
     handler: async ({ path_a, path_b, context_lines }) => {
-        const va = validatePath(path_a);
+        const va = await validatePath(path_a);
         if (!va.ok) return { success: false, error: `path_a: ${va.reason}` };
-        const vb = validatePath(path_b);
+        const vb = await validatePath(path_b);
         if (!vb.ok) return { success: false, error: `path_b: ${vb.reason}` };
 
         try {

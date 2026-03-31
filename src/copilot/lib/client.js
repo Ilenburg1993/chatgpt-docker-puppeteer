@@ -211,12 +211,11 @@ export function getClientState() {
 /**
  * Executa ping no CLI para verificar conectividade.
  *
- * @param {string} [message] - Mensagem opcional de diagnóstico
  * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
  */
-export async function pingClient(message = 'lib/client health check') {
+export async function pingClient() {
     const client = await getClient();
-    return client.ping(message);
+    return client.ping();
 }
 
 /**
