@@ -33,7 +33,18 @@ const MAX_LOG_BYTES = 10 * 1024 * 1024; // 10 MB
  *
  * @type {ReadonlySet<string>}
  */
-const HIGH_RISK_TOOLS = new Set(['bash', 'edit', 'create', 'git_apply_patch']);
+// G2-BUG-09: adicionadas ferramentas de shell que existem no ambiente
+const HIGH_RISK_TOOLS = new Set([
+    'bash',
+    'edit',
+    'create',
+    'git_apply_patch',
+    'run_shell_command',
+    'run_npm_script',
+    'run_node_script',
+    'execute_code',
+    'computer',
+]);
 
 /**
  * Retorna `true` se a ferramenta é classificada como alto risco.

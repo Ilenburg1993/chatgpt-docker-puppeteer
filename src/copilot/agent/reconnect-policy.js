@@ -53,12 +53,21 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
         await new Promise((r) => setTimeout(r, delay));
 
         try {
+            // G2-BUG-07: parar o client antes de reinicializar para evitar listeners duplicados
+            // e recursos pendurados da sessão anterior.
+            if (typeof client.stop === 'function') {
+                try {
+                    await client.stop();
+                } catch (/** @type {any} */ stopErr) {
+                    log('WARN', `[AlwaysAlive] client.stop() antes de reconexão falhou (ignorado): ${stopErr.message}`);
+                }
+            }
             const { session, isResumed } = await initSession(client);
             log(
                 'INFO',
                 `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,
             );
-            emit('ready', { sessionId: session.sessionId, isResumed, reconected: true });
+            emit('ready', { sessionId: session.sessionId, isResumed, reconnected: true });
 
             if (dialogLoop.active) {
                 log(

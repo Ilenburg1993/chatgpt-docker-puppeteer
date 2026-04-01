@@ -113,6 +113,12 @@ export class MessageQueue {
     enqueue(task, opts = {}) {
         const { signal } = opts;
 
+        // G2-BUG-02: rejeitar imediatamente se o sinal já foi disparado antes do enqueue
+        if (signal?.aborted) {
+            task.reject(new DOMException('Tarefa cancelada pelo AbortSignal.', 'AbortError'));
+            return;
+        }
+
         if (this.#items.length >= MAX_QUEUE_SIZE) {
             const err = new SessionError(
                 `[AlwaysAlive] Fila cheia (${MAX_QUEUE_SIZE} tarefas). Tente novamente mais tarde.`,
@@ -181,7 +187,17 @@ export class MessageQueue {
         if (tasks.length > 0) {
             this.#onChanged?.();
             for (const task of tasks) {
-                task.reject(err);
+                // G2-BUG-12: criar cópia por task para que mutações de stack/cause por
+                // diferentes handlers não se propagam entre tasks.
+                let taskErr = err;
+                if (err instanceof Error && tasks.length > 1) {
+                    taskErr = Object.assign(
+                        err.constructor === Error ? new Error(err.message) : Object.create(Object.getPrototypeOf(err)),
+                        err,
+                        { stack: err.stack },
+                    );
+                }
+                task.reject(taskErr);
             }
         }
         return tasks;

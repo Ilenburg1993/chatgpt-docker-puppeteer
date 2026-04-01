@@ -44,6 +44,8 @@ import { readState, writeStateAsync } from './state-io.js';
  *
  * @typedef {Object} AgentHost
  * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessage - Envia mensagem ao SDK
+ * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessageDialogBoot - Envia o boot
+ *   prompt sem passar pelo guard do dialog loop — uso exclusivo do DialogLoopManager
  * @property {(answer: string) => void} answerPendingQuestion - Responde à pergunta pendente
  * @property {() => string | null} getSessionId - Retorna o sessionId ativo
  * @property {() => string} getModel - Retorna o modelo ativo
@@ -237,7 +239,14 @@ export class DialogLoopManager extends EventEmitter {
         });
         this.#watchdog.start();
 
-        this.#host.sendMessage(metaPrompt, { timeoutMs: 24 * 60 * 60 * 1000 }).catch((/** @type {any} */ e) => {
+        // G2-ARCH-02: usar sendMessageDialogBoot() para evitar a heurística frágil timeoutMs===24h.
+        // O boot prompt tem timeout muito longo pois o dialog loop não emite session.idle organicamente.
+        const host = this.#host;
+        const bootSendFn = typeof (/** @type {any} */ (host).sendMessageDialogBoot) === 'function'
+            ? /** @type {any} */ (host).sendMessageDialogBoot.bind(host)
+            : (/** @type {string} */ msg, /** @type {{ timeoutMs?: number }} */ opts = {}) => host.sendMessage(msg, { ...opts, timeoutMs: 24 * 60 * 60 * 1000 });
+
+        bootSendFn(metaPrompt, { timeoutMs: 24 * 60 * 60 * 1000 }).catch((/** @type {any} */ e) => {
             if (this.#active) {
                 log('WARN', `[DialogLoopManager] Dialog loop encerrado: ${e.message}`);
                 this.#active = false;
@@ -366,7 +375,11 @@ export class DialogLoopManager extends EventEmitter {
         }
 
         // Estratégia A (async): aguardar ask_user preservado (0 PR)
-        const preserved = await waitForEvent(this, 'question.pending', { timeoutMs: 5_000 })
+        // G2-BUG-03: 'question.pending' é emitido pelo agente host (AlwaysAliveAgent),
+        // não pelo DialogLoopManager — ouvir no host se ele for EventEmitter.
+        const hostEmitter = /** @type {any} */ (this.#host);
+        const pendingTarget = typeof hostEmitter?.on === 'function' ? hostEmitter : this;
+        const preserved = await waitForEvent(pendingTarget, 'question.pending', { timeoutMs: 5_000 })
             .then(() => true)
             .catch(() => false);
 
@@ -414,6 +427,10 @@ export class DialogLoopManager extends EventEmitter {
     forceDeactivate() {
         this.#active = false;
         this.#watchdog?.stop();
+        this.#watchdog = null;
+        // G2-BUG-11: emitir 'stopped' para que o host receba notificação do encerramento forçado
+        this.emit('stopped', { reason: 'force_deactivate', authorized: false });
+        this.emit('changed', { active: false, ts: Date.now(), reason: 'force_deactivate' });
     }
 
     // ────────────── Privado ──────────────
@@ -429,10 +446,16 @@ export class DialogLoopManager extends EventEmitter {
         if (!this.#host || !this.#telemetry) {
             return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
         }
+        // G2-BUG-05: verificar novamente signal?.aborted no início de #executeTurn para cobrir
+        // a janela de race entre a verificação em sendTurn() e a execução do mutex.
+        if (signal?.aborted) {
+            return Promise.reject(new DOMException('[DialogLoopManager] sendTurn abortado.', 'AbortError'));
+        }
         const host = this.#host;
         const telemetry = this.#telemetry;
 
         const turnStart = Date.now();
+        this.#sendCount++;
         this.emit('turn_start', { message: message.slice(0, 120), ts: turnStart });
         writeStateAsync({
             pendingTurnMessage: message,

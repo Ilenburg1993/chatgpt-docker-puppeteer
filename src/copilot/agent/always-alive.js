@@ -554,9 +554,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                 reject(new DOMException('AbortError: sendMessage cancelado antes de enfileirar.', 'AbortError'));
                 return;
             }
-            // startDialogLoop() chama sendMessage() antes de setar dialogLoopActive=true, portanto
-            // o guard usa a heurística de timeoutMs==24h para distinguir a chamada interna.
-            if (this.#dialogLoop.active && timeoutMs !== 24 * 60 * 60 * 1000) {
+            if (this.#dialogLoop.active) {
                 reject(
                     new SessionError(
                         '[AlwaysAlive] sendMessage() bloqueado: dialog loop ativo. Use sendDialogTurn().',
@@ -565,6 +563,43 @@ export class AlwaysAliveAgent extends EventEmitter {
                 );
                 return;
             }
+            this.#enqueueTask(message, {
+                resolve,
+                reject,
+                ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+                ...(attachments !== undefined ? { attachments } : {}),
+                ...(signal !== undefined ? { signal } : {}),
+            });
+        });
+    }
+
+    /**
+     * Variante interna de sendMessage() usada pelo DialogLoopManager para enviar o boot prompt.
+     * Bypassa o guard de dialog loop ativo — NÃO expor como API pública.
+     *
+     * @param {string} message
+     * @param {{ timeoutMs?: number }} [opts]
+     * @returns {Promise<string>}
+     */
+    sendMessageDialogBoot(message, opts = {}) {
+        return new Promise((resolve, reject) => {
+            this.#enqueueTask(message, { ...opts, resolve, reject });
+        });
+    }
+
+    /**
+     * Enfileira uma task internamente — compartilhado por sendMessage e sendMessageDialogBoot.
+     *
+     * @param {string} message
+     * @param {{
+     *     timeoutMs?: number;
+     *     attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
+     *     signal?: AbortSignal;
+     *     resolve: (v: string | PromiseLike<string>) => void;
+     *     reject: (r: unknown) => void;
+     * }} opts
+     */
+    #enqueueTask(message, { timeoutMs, attachments, signal, resolve, reject }) {
             const task = /** @type {AgentTask} */ ({
                 id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                 message,
@@ -581,7 +616,6 @@ export class AlwaysAliveAgent extends EventEmitter {
                 return;
             }
             this.emit('task.queued', { taskId: task.id, message });
-        });
     }
 
     /**
@@ -640,10 +674,13 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     setModel(modelId) {
         this.#model = modelId;
-        // Propaga ao SDK imediatamente se a sessão já está ativa (suporte a runtime model switch).
-        if (this.#session && typeof (/** @type {any} */ (this.#session).setModel) === 'function') {
+        // G2-BUG-10: setModel() é uma API não documentada do SDK (não consta nos types oficiais).
+        // O cast `any` é deliberado e a chamada é protegida por typeof para evitar crash em versões
+        // do SDK que não suportem a troca de modelo em runtime.
+        const sdkSession = /** @type {{ setModel?: (id: string) => void }} */ (this.#session);
+        if (sdkSession && typeof sdkSession.setModel === 'function') {
             try {
-                /** @type {any} */ (this.#session).setModel(modelId);
+                sdkSession.setModel(modelId);
             } catch (/** @type {any} */ e) {
                 log('WARN', `[AlwaysAlive] setModel live falhou (SDK version?): ${e.message}`);
             }
@@ -815,6 +852,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         /** @type {import('./dialog-loop-manager.js').AgentHost} */
         const host = {
             sendMessage: (msg, opts) => this.sendMessage(msg, opts),
+            sendMessageDialogBoot: (msg, opts) => this.sendMessageDialogBoot(msg, opts),
             answerPendingQuestion: (answer) => this.answerPendingQuestion(answer),
             getSessionId: () => this.sessionId,
             getModel: () => this.#model,
@@ -873,6 +911,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             }
         } catch (/** @type {any} */ err) {
             log('WARN', `[AlwaysAlive] syncSdkHistory falhou (não crítico): ${err.message}`);
+            // G2-BUG-17: emitir session.history_synced com ok:false para que consumers SSE monitorem falhas
+            this.emit('session.history_synced', { ok: false, error: err.message });
         }
     }
 

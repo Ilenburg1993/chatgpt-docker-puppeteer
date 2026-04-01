@@ -12,6 +12,20 @@ import http from 'node:http';
 import https from 'node:https';
 
 /**
+ * Timeout (ms) para cada requisição HTTP de webhook. Evita que webhooks lentos bloqueiem o ciclo.
+ *
+ * @type {number}
+ */
+const WEBHOOK_TIMEOUT_MS = Number(process.env.WEBHOOK_TIMEOUT_MS) || 5_000;
+
+/**
+ * Máximo de webhooks simultâneos que podem ser registrados.
+ *
+ * @type {number}
+ */
+const MAX_WEBHOOKS = Number(process.env.MAX_WEBHOOKS) || 50;
+
+/**
  * @typedef {{ id: string; url: string }} WebhookEntry
  */
 
@@ -38,6 +52,9 @@ export class WebhookManager {
      * @returns {WebhookEntry} Entrada registrada
      */
     register(url) {
+        if (this.#urls.size >= MAX_WEBHOOKS) {
+            throw new Error(`[WebhookManager] Limite de ${MAX_WEBHOOKS} webhooks atingido.`);
+        }
         const id = `wh_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         this.#urls.set(id, url);
         log('INFO', `[WebhookManager] Registrado: ${id} → ${url}`);
@@ -87,12 +104,18 @@ export class WebhookManager {
                     await new Promise((resolve, reject) => {
                         const req = lib.request(
                             url,
-                            { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+                            {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                // G2-BUG-15: timeout para evitar que webhook lento bloqueie o ciclo
+                                timeout: WEBHOOK_TIMEOUT_MS,
+                            },
                             (res) => {
                                 res.resume();
                                 res.on('end', resolve);
                             },
                         );
+                        req.on('timeout', () => req.destroy(new Error(`webhook timeout (${WEBHOOK_TIMEOUT_MS}ms)`)));
                         req.on('error', reject);
                         req.end(body);
                     });

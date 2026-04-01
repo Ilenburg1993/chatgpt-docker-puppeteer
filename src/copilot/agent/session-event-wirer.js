@@ -37,7 +37,8 @@ import { writeStateAsync } from './state-io.js';
  *   - Atualiza info de billing
  *
  * @property {() => boolean} isProcessing - true quando status === 'processing' (para filtrar deltas)
- * @property {() => boolean} dialogLoopActive - true quando o dialog loop está ativo (para filtrar deltas de waiting_for_input)
+ * @property {() => boolean} dialogLoopActive - true quando o dialog loop está ativo (para filtrar deltas de
+ *   waiting_for_input)
  */
 
 /**
@@ -49,7 +50,8 @@ import { writeStateAsync } from './state-io.js';
  * @returns {(() => void)[]} Lista de funções de unsubscribe a chamar no cleanup
  */
 export function wireSessionEvents(session, isResumed, callbacks) {
-    const { emit, getStatusSnapshot, onCheckpointPath, onContextState, onPrInfo, isProcessing, dialogLoopActive } = callbacks;
+    const { emit, getStatusSnapshot, onCheckpointPath, onContextState, onPrInfo, isProcessing, dialogLoopActive } =
+        callbacks;
 
     /** @type {(() => void)[]} */
     const unsubs = [];
@@ -133,15 +135,16 @@ export function wireSessionEvents(session, isResumed, callbacks) {
                         ratio,
                         reason: 'startup_heavy',
                     });
-                }
-                _firstUsageChecked = true;
-                if (currentTokens / tokenLimit > 0.8) {
+                    // G2-BUG-13: não emitir segundo token_budget_warning neste mesmo tick para sessões
+                    // retomadas com contexto pesado (> 70% já emitiu acima).
+                } else if (currentTokens / tokenLimit > 0.8) {
                     log(
                         'WARN',
                         `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
                     );
                     emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
                 }
+                _firstUsageChecked = true;
             }
         }),
     );
@@ -151,6 +154,21 @@ export function wireSessionEvents(session, isResumed, callbacks) {
         session.on('session.mode_changed', (/** @type {any} */ evt) => {
             log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.previousMode} → ${evt?.data?.newMode}`);
             emit('session.mode_changed', evt?.data ?? {});
+        }),
+    );
+
+    // G2-BUG-14: tool.execution_start e tool.execution_complete estavam no knownEvents mas nunca subscritos.
+    // Guard isProcessing(): durante task execution, task-executor.js já emite com taskId — evitar duplicata.
+    unsubs.push(
+        session.on('tool.execution_start', (/** @type {any} */ evt) => {
+            if (isProcessing()) return;
+            emit('tool.execution.start', evt?.data ?? {});
+        }),
+    );
+    unsubs.push(
+        session.on('tool.execution_complete', (/** @type {any} */ evt) => {
+            if (isProcessing()) return;
+            emit('tool.execution.complete', evt?.data ?? {});
         }),
     );
 
