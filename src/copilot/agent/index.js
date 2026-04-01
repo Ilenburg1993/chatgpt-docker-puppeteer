@@ -9,6 +9,7 @@
  */
 
 export { AlwaysAliveAgent, alwaysAliveAgent } from './always-alive.js';
+export { } from './agent-contract.js'; // re-exporta os typedefs: IAlwaysAliveAgent
 export { DialogLoopManager } from './dialog-loop-manager.js';
 export { DialogProtocol } from './dialog-protocol.js';
 export { DialogWatchdog } from './dialog-watchdog.js';

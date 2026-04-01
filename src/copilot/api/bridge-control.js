@@ -45,36 +45,7 @@ const _sdkVersion = (() => {
  *     oldestTaskWaitMs: number;
  * }} AgentSnap
  *
- *
- * @typedef {{
- *     status: string;
- *     sessionId: string | null;
- *     getStatusSnapshot: () => AgentSnap;
- *     start: () => Promise<void>;
- *     stop: (opts?: { shutdownTimeoutMs?: number }) => Promise<void>;
- *     sendMessage: (
- *         message: string,
- *         opts?: { timeoutMs?: number; attachments?: import('@github/copilot-sdk').MessageOptions['attachments'] },
- *     ) => Promise<unknown>;
- *     answerPendingQuestion: (answer: string) => boolean;
- *     startDialogLoop: (bootPrompt?: string) => Promise<void>;
- *     sendDialogTurn: (text: string, opts?: { timeout?: number }) => Promise<string>;
- *     stopDialogLoop: (opts?: {
- *         authorized?: boolean;
- *         reason?: 'watchdog_restart' | 'authorized_stop';
- *     }) => Promise<void>;
- *     getPermissionMode?: () => 'approve_all' | 'audit_only' | 'selective';
- *     setPermissionMode?: (
- *         mode: 'approve_all' | 'audit_only' | 'selective',
- *         opts?: { allowTools?: string[]; denyTools?: string[]; denyShell?: boolean },
- *     ) => void;
- *     on: (event: string, listener: (...args: any[]) => void) => any;
- *     off: (event: string, listener: (...args: any[]) => void) => any;
- *     listenerDiagnostics: () => Record<string, number>;
- *     setMaxListeners?: (n: number) => void;
- *     queueSize: number;
- *     dialogLoopActive?: boolean;
- * }} AlwaysAliveAgentLike
+ * @typedef {import('../agent/agent-contract.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
  */
 
 /**
