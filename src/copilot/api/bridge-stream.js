@@ -33,8 +33,10 @@ import { AGENT_EVENTS } from '#copilot/core';
 export function registerStreamRoutes(bridge, agent) {
     // ARCH-05 (fix): cada conexão SSE adiciona N listeners ao agent (um por AGENT_EVENT).
     // Com múltiplos clientes conectados, o EventEmitter emit warning de memory leak.
-    // setMaxListeners(0) desabilita o limite — correto para fan-out pattern.
-    agent.setMaxListeners?.(0);
+    // G2-ARCH-21: limite bounded (100 clientes × eventos AGENT_EVENTS) em vez de ilimitado (0)
+    // para que o warning ainda apareça caso haja leak real de connections.
+    const MAX_SSE_CLIENTS = Number(process.env.MAX_SSE_CLIENTS) || 100;
+    agent.setMaxListeners?.(MAX_SSE_CLIENTS * (AGENT_EVENTS.length + 2)); // +2 para heartbeat + reconnect
     // ─── GET /stream ──────────────────────────────────────────────────────────
 
     /**

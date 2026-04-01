@@ -126,3 +126,65 @@ describe('AlwaysAliveAgent › webhooks', () => {
         });
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// G2-TEST-08/09: Validação SSRF em registerWebhook (G2-SEC-01)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('AlwaysAliveAgent › webhooks: SSRF protection (G2-SEC-01)', () => {
+    /** @type {import('../../../src/copilot/agent/always-alive.js').AlwaysAliveAgent} */
+    let agent;
+
+    before(async () => {
+        const { AlwaysAliveAgent } = await import('../../../src/copilot/agent/always-alive.js');
+        agent = new AlwaysAliveAgent();
+    });
+
+    it('deve bloquear localhost', () => {
+        assert.throws(
+            () => agent.registerWebhook('http://localhost/hook'),
+            /loopback|privado|bloqueado/i,
+        );
+    });
+
+    it('deve bloquear 127.0.0.1', () => {
+        assert.throws(
+            () => agent.registerWebhook('http://127.0.0.1/hook'),
+            /loopback|privado|bloqueado/i,
+        );
+    });
+
+    it('deve bloquear 10.0.0.1 (RFC-1918)', () => {
+        assert.throws(
+            () => agent.registerWebhook('http://10.0.0.1/hook'),
+            /loopback|privado|bloqueado/i,
+        );
+    });
+
+    it('deve bloquear 192.168.1.1 (RFC-1918)', () => {
+        assert.throws(
+            () => agent.registerWebhook('http://192.168.1.1/hook'),
+            /loopback|privado|bloqueado/i,
+        );
+    });
+
+    it('deve bloquear protocolo file://', () => {
+        assert.throws(
+            () => agent.registerWebhook('file:///etc/passwd'),
+            /protocolo|inválida/i,
+        );
+    });
+
+    it('deve bloquear URL inválida', () => {
+        assert.throws(
+            () => agent.registerWebhook('not-a-url'),
+            /inválida|invalid/i,
+        );
+    });
+
+    it('deve aceitar URL pública válida', () => {
+        const entry = agent.registerWebhook('https://example.com/hook');
+        assert.ok(entry.id.startsWith('wh_'));
+        agent.unregisterWebhook(entry.id);
+    });
+});

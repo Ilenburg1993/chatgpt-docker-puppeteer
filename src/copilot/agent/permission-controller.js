@@ -140,7 +140,10 @@ export class PermissionController {
                 log('WARN', `[PermissionController] setMode: modo inv\u00e1lido '${/** @type {any} */ (mode)}'`);
                 return;
         }
-        log('INFO', `[PermissionController] Modo de permiss\u00e3o alterado para '${mode}'.`);
+        log(
+            'INFO',
+            `[PermissionController] Modo de permissão alterado para '${mode}'. Nota: a mudança é aplicada imediatamente e afeta apenas requisições futuras nesta sessão.`,
+        );
         this.#onModeChanged?.(mode);
     }
 }
