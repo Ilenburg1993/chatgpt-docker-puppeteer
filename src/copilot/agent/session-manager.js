@@ -121,8 +121,7 @@ export function setBackgroundCompactionThreshold(threshold) {
  * Lê o session-briefing.md e session.json e constrói o conteúdo de systemMessage para injetar o contexto do hook system
  * em sessões SDK.
  *
- * Convertida para `async` para evitar bloqueio do event loop em I/O lento (ex.: containers Docker com
- * volumes NFS).
+ * Convertida para `async` para evitar bloqueio do event loop em I/O lento (ex.: containers Docker com volumes NFS).
  *
  * @returns {Promise<string>} Conteúdo markdown com contexto operacional do hook system
  */
@@ -258,8 +257,8 @@ export function readState() {
 /**
  * Persiste o estado da sessão em disco.
  *
- * `_stateDirReady` evita chamada mkdirSync redundante após a 1ª criação. Atualiza
- * `_stateCache` após a escrita para que `readState()` não precise de I/O nas leituras seguintes.
+ * `_stateDirReady` evita chamada mkdirSync redundante após a 1ª criação. Atualiza `_stateCache` após a escrita para que
+ * `readState()` não precise de I/O nas leituras seguintes.
  *
  * @param {Partial<AliveAgentState>} updates - Campos a atualizar no estado
  * @returns {AliveAgentState} Estado completo após a atualização
@@ -287,8 +286,8 @@ export function writeState(updates) {
 /**
  * Versão async de `writeState`. Preferir em handlers de alta frequência para não bloquear o event loop.
  *
- * `_stateDirReady` evita chamada mkdir redundante após a 1ª criação. Atualiza
- * `_stateCache` após a escrita para que `readState()` não precise de I/O nas leituras seguintes.
+ * `_stateDirReady` evita chamada mkdir redundante após a 1ª criação. Atualiza `_stateCache` após a escrita para que
+ * `readState()` não precise de I/O nas leituras seguintes.
  *
  * @param {Partial<AliveAgentState>} updates
  * @returns {Promise<AliveAgentState>}
@@ -324,7 +323,7 @@ export function clearState() {
         rmSync(STATE_FILE);
         log('INFO', '[PersistentSession] Estado removido — próxima inicialização criará nova sessão.');
     }
-        // Invalida cache após remoção do arquivo.
+    // Invalida cache após remoção do arquivo.
     _stateCache = null;
     _stateDirReady = false;
 }

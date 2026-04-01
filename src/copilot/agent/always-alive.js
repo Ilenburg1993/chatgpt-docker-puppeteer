@@ -115,25 +115,25 @@ export class AlwaysAliveAgent extends EventEmitter {
     #dialogLoop = new DialogLoopManager();
 
     /**
-     * Funções de unsubscribe retornadas por `session.on()`. O SDK não expõe um EventEmitter padrão —
-     * cada `session.on()` retorna `() => void`. Chamadas em `stop()` e `#tryReconnect()` para prevenir
-     * memory leaks entre ciclos de sessão.
+     * Funções de unsubscribe retornadas por `session.on()`. O SDK não expõe um EventEmitter padrão — cada
+     * `session.on()` retorna `() => void`. Chamadas em `stop()` e `#tryReconnect()` para prevenir memory leaks entre
+     * ciclos de sessão.
      *
      * @type {(() => void)[]}
      */
     #sessionEventUnsubscribers = [];
 
     /**
-     * Contador de mensagens enviadas mantido em memória para evitar I/O síncrono por envio.
-     * Inicializado a partir do estado persistido no boot; salvo em disco apenas no `stop()`.
+     * Contador de mensagens enviadas mantido em memória para evitar I/O síncrono por envio. Inicializado a partir do
+     * estado persistido no boot; salvo em disco apenas no `stop()`.
      *
      * @type {number}
      */
     #sendCount = 0;
 
     /**
-     * Último snapshot de billing (model, cost, quotaSnapshots, timestamp). Atualizado pelo listener
-     * `assistant.usage` durante o wiring de sessão em `start()`.
+     * Último snapshot de billing (model, cost, quotaSnapshots, timestamp). Atualizado pelo listener `assistant.usage`
+     * durante o wiring de sessão em `start()`.
      *
      * @type {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null}
      */
@@ -149,16 +149,16 @@ export class AlwaysAliveAgent extends EventEmitter {
     #isResumed = false;
 
     /**
-     * Snapshot de uso de contexto capturado do evento `session.usage_info` do SDK.
-     * Atualizado a cada turno; `null` enquanto a sessão não emitir o primeiro evento.
+     * Snapshot de uso de contexto capturado do evento `session.usage_info` do SDK. Atualizado a cada turno; `null`
+     * enquanto a sessão não emitir o primeiro evento.
      *
      * @type {{ tokens: number; tokenLimit: number; utilization: number } | null}
      */
     #contextState = null;
 
     /**
-     * Cache de mensagens da sessão SDK para reduzir latência em chamadas repetidas via `getSessionMessages()`.
-     * Invalida automaticamente após `#MESSAGES_CACHE_TTL` ou na troca de sessão.
+     * Cache de mensagens da sessão SDK para reduzir latência em chamadas repetidas via `getSessionMessages()`. Invalida
+     * automaticamente após `#MESSAGES_CACHE_TTL` ou na troca de sessão.
      *
      * @type {any[] | null}
      */
@@ -175,8 +175,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     static #MESSAGES_CACHE_TTL = 30_000;
 
     /**
-     * Último caminho de checkpoint salvo pelo SDK durante compaction de contexto.
-     * `null` até a primeira compaction ser concluída.
+     * Último caminho de checkpoint salvo pelo SDK durante compaction de contexto. `null` até a primeira compaction ser
+     * concluída.
      *
      * @type {string | null}
      */
@@ -236,8 +236,8 @@ export class AlwaysAliveAgent extends EventEmitter {
      * A mudança é aplicada na PRÓXIMA reconexão/reinício real de sessão. Para sessões já ativas, apenas novos
      * `initOrResumeSession` usarão o handler atualizado.
      *
-     * O dialog loop não é uma tool e não passa por este handler. Não é possível bloquear o encerramento do
-     * dialog loop via configuração de permissão.
+     * O dialog loop não é uma tool e não passa por este handler. Não é possível bloquear o encerramento do dialog loop
+     * via configuração de permissão.
      *
      * @param {'approve_all' | 'audit_only' | 'selective'} mode - Modo de aprovação
      * @param {{ allowTools?: string[]; denyTools?: string[]; denyShell?: boolean }} [opts] - Opções para modo selective
@@ -683,9 +683,9 @@ export class AlwaysAliveAgent extends EventEmitter {
      *     attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
      *     signal?: AbortSignal;
      * }} [opts]
-     *   - `timeoutMs` sobrescreve o timeout padrão de 60 s do SDK para `sendAndWait`. Use um valor grande (ex.:
-     *     `24 * 60 * 60 * 1000`) para tarefas de longa duração como o dialog loop, que nunca emitem `session.idle`
-     *     organicamente.
+     *   - `timeoutMs` sobrescreve o timeout padrão de 60 s do SDK para `sendAndWait`. Use um valor grande (ex.: `24 * 60 *
+     *       60 * 1000`) para tarefas de longa duração como o dialog loop, que nunca emitem `session.idle`
+     *       organicamente.
      *   - `attachments` permite enviar arquivos, imagens ou referências de contexto junto com a mensagem.
      *   - `signal` permite cancelar a tarefa via `AbortSignal` antes ou durante o processamento.
      *
@@ -842,8 +842,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna um snapshot do estado atual do agente para a API HTTP.
      *
-     * O resultado é cacheado por 500 ms para evitar leituras síncronas de `readState()` em polling rápido.
-     * O cache é invalidado automaticamente quando o status muda via `#setStatus()`.
+     * O resultado é cacheado por 500 ms para evitar leituras síncronas de `readState()` em polling rápido. O cache é
+     * invalidado automaticamente quando o status muda via `#setStatus()`.
      *
      * @returns {AgentStatusSnapshot}
      */
@@ -1013,8 +1013,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Sincroniza o histórico SDK → ConversationStore (SQLite) após reconexão.
      *
-     * Chamado de forma assíncrona (fire-and-forget) no `start()` quando `isResumed=true`
-     * para não bloquear o startup. Falhas são logadas como WARN e não propagadas.
+     * Chamado de forma assíncrona (fire-and-forget) no `start()` quando `isResumed=true` para não bloquear o startup.
+     * Falhas são logadas como WARN e não propagadas.
      *
      * @param {CopilotSession} session
      * @returns {Promise<void>}
@@ -1193,6 +1193,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Handler chamado pelo SDK quando o modelo usa a ferramenta `ask_user`.
      *
      * Delega para o handler especializado conforme o modo ativo:
+     *
      * - Se dialog loop ativo: intercepta o protocolo READY/REPLY/STOPPED via DLM.
      * - Caso contrário: suspende a execução até `answerPendingQuestion()` ser chamado via API HTTP.
      *
@@ -1211,8 +1212,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Handler de protocolo no modo dialog loop.
      *
-     * Propaga a classificação READY/REPLY/STOPPED ao DialogLoopManager e suspende a execução
-     * aguardando `answerPendingQuestion()` — necessário para fechar o ciclo `ask_user` do SDK.
+     * Propaga a classificação READY/REPLY/STOPPED ao DialogLoopManager e suspende a execução aguardando
+     * `answerPendingQuestion()` — necessário para fechar o ciclo `ask_user` do SDK.
      *
      * @param {{ question: string; allowFreeform: boolean }} input
      * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
@@ -1227,8 +1228,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Handler para pergunta interativa normal (fora do dialog loop).
      *
-     * Suspende a execução até que `answerPendingQuestion()` seja chamado via API HTTP.
-     * Define `status='waiting_for_input'` e persiste a pergunta no estado para recovery após restart.
+     * Suspende a execução até que `answerPendingQuestion()` seja chamado via API HTTP. Define
+     * `status='waiting_for_input'` e persiste a pergunta no estado para recovery após restart.
      *
      * @param {{ question: string; choices?: string[]; allowFreeform: boolean }} input
      * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
@@ -1322,9 +1323,9 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna o histórico de mensagens da sessão SDK ativa.
      *
-     * Útil para debug, auditoria e introspecção do context window.
-     * O resultado é cacheado por `#MESSAGES_CACHE_TTL` ms para reduzir chamadas repetidas ao SDK.
-     * Retorna array vazio se não houver sessão ativa ou se `getMessages()` lance (sem suporte no SDK).
+     * Útil para debug, auditoria e introspecção do context window. O resultado é cacheado por `#MESSAGES_CACHE_TTL` ms
+     * para reduzir chamadas repetidas ao SDK. Retorna array vazio se não houver sessão ativa ou se `getMessages()`
+     * lance (sem suporte no SDK).
      *
      * @returns {Promise<any[]>}
      */

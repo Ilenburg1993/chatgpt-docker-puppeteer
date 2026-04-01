@@ -4,8 +4,8 @@
  * @file Constantes de eventos emitidos pelo AlwaysAliveAgent.
  *
  *   Centraliza os nomes de evento para que testes, bridges e consumidores possam subscribir sem depender de strings
- *   literais espalhadas. Manter esta lista sincronizada com os `emit()` em `always-alive.js`,
- *   `dialog-loop-manager.js` e `task-executor.js`.
+ *   literais espalhadas. Manter esta lista sincronizada com os `emit()` em `always-alive.js`, `dialog-loop-manager.js`
+ *   e `task-executor.js`.
  */
 
 /**
@@ -14,11 +14,13 @@
  * Use `AgentEventName` para obter o union type de todos os nomes válidos.
  *
  * Grupos de eventos:
+ *
  * - **task.***: ciclo de vida de uma tarefa individual (enqueued → started → completed | error).
  * - **session.***: eventos do ciclo de vida da sessão SDK (compaction, usage, billing, fatal).
  * - **dialog.***: ciclo de vida do dialog loop (LLM-B ↔ SDK).
  * - **tool.***: execução de ferramentas pelo SDK durante um turno.
- * - **question.pending / question.answered / status / stopped / ready / error**: controle de estado de alto nível do agente.
+ * - **question.pending / question.answered / status / stopped / ready / error**: controle de estado de alto nível do
+ *   agente.
  * - **pr.consumed / pr.fallback_model / permission.mode_changed**: métricas e controle de permissões.
  * - **context:compacted**: emitido após compactação de contexto local.
  * - **before-stop**: emitido antes de `stop()` iniciar o dreno da fila.

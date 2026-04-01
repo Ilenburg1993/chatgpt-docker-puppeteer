@@ -35,7 +35,8 @@ import { readState, writeStateAsync } from './session-manager.js';
  * @property {number} [bootTimeoutMs] - Timeout para boot do dialog (default: 30s)
  * @property {number} [watchdogIntervalMs] - Intervalo do watchdog (default: 5min)
  * @property {number} [watchdogStallMs] - Limiar de stall (default: 15min)
- * @property {string | null} [fallbackModel] - Modelo de fallback a usar na próxima inicialização (agendado por `scheduleFallback()`)
+ * @property {string | null} [fallbackModel] - Modelo de fallback a usar na próxima inicialização (agendado por
+ *   `scheduleFallback()`)
  */
 
 /**
@@ -168,8 +169,8 @@ export class DialogLoopManager extends EventEmitter {
     /**
      * Notifica o DLM que houve reconexão do agente.
      *
-     * Desativa o flag `active` para que o mecanismo de restart da fila detecte a reconexão
-     * e reenvie a mensagem pendente após a nova sessão ser estabelecida.
+     * Desativa o flag `active` para que o mecanismo de restart da fila detecte a reconexão e reenvie a mensagem
+     * pendente após a nova sessão ser estabelecida.
      */
     notifyReconnect() {
         if (this.#active) {
@@ -302,7 +303,10 @@ export class DialogLoopManager extends EventEmitter {
     async stop({ authorized = false, reason = 'authorized_stop' } = {}) {
         if (!this.#active) return;
         if (!authorized) {
-            log('WARN', '[DialogLoopManager] stop() sem autorização — ignorado. Use `authorized: true` para encerrar o loop.');
+            log(
+                'WARN',
+                '[DialogLoopManager] stop() sem autorização — ignorado. Use `authorized: true` para encerrar o loop.',
+            );
             return;
         }
         if (this.#stopping) return;

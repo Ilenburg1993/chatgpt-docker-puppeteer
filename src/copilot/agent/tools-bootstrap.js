@@ -145,10 +145,7 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
     }
     for (const [name, count] of nameCount) {
         if (count > 1) {
-            log(
-                'WARN',
-                `[tools-bootstrap] Tool "${name}" registrada ${count}× — verifique sobreposição acidental.`,
-            );
+            log('WARN', `[tools-bootstrap] Tool "${name}" registrada ${count}× — verifique sobreposição acidental.`);
         }
     }
 
