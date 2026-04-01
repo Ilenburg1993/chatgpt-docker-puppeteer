@@ -52,8 +52,8 @@ export { AGENT_EVENTS } from '../agent/events.js';
 /** @typedef {import('../agent/events.js').AgentEventName} AgentEventName */
 
 /**
- * G1-DX-04: Nomes canônicos de categoria de ferramentas registradas em tools-bootstrap.js.
- * Usar estas constantes em vez de strings literais ao registrar novas ferramentas.
+ * G1-DX-04: Nomes canônicos de categoria de ferramentas registradas em tools-bootstrap.js. Usar estas constantes em vez
+ * de strings literais ao registrar novas ferramentas.
  *
  * @type {Readonly<Record<string, string>>}
  */

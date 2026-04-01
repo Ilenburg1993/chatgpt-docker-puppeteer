@@ -5,6 +5,7 @@
  * Testes unitários comportamentais para src/copilot/agent/reconnect-policy.js.
  *
  * Cobre (G1-DX-03):
+ *
  * - backoff determinístico via jitterFn injetável
  * - reconexão bem-sucedida na primeira tentativa
  * - reconexão após N falhas
@@ -27,14 +28,14 @@ import { tryReconnect } from '../../../src/copilot/agent/reconnect-policy.js';
  * @param {object} [overrides]
  */
 function makeCallbacks(overrides = {}) {
-    const emitted = /** @type {Array<[string, any]>} */ ([]);
+    const emitted = /** @type {[string, any][]} */ ([]);
     /** @type {any} */
     const cbs = {
         /** @param {string} event @param {any} [payload] */
         emit: (event, payload) => emitted.push([event, payload]),
         initSession: async () => ({ session: { sessionId: 'sess-ok' }, isResumed: false }),
         dialogLoop: { active: false, notifyReconnect: () => {} },
-        /** @param {Array<() => void>} _unsubs */
+        /** @param {(() => void)[]} _unsubs */
         clearSessionEventUnsubs: (_unsubs) => {},
         _emitted: emitted,
         ...overrides,
@@ -45,9 +46,9 @@ function makeCallbacks(overrides = {}) {
 /**
  * Filtra eventos emitidos por nome.
  *
- * @param {Array<[string, any]>} emitted
+ * @param {[string, any][]} emitted
  * @param {string} name
- * @returns {Array<[string, any]>}
+ * @returns {[string, any][]}
  */
 function filterEvents(emitted, name) {
     return emitted.filter((/** @type {[string, any]} */ [e]) => e === name);
@@ -56,7 +57,7 @@ function filterEvents(emitted, name) {
 /**
  * Localiza o primeiro evento emitido por nome.
  *
- * @param {Array<[string, any]>} emitted
+ * @param {[string, any][]} emitted
  * @param {string} name
  * @returns {[string, any] | undefined}
  */
@@ -109,7 +110,10 @@ describe('reconnect-policy › reconexão bem-sucedida', () => {
         const cbs = makeCallbacks();
         await tryReconnect(new Error('err'), {}, 'idle', cbs, { ...FAST_OPTS, maxAttempts: 3 });
         const statuses = filterEvents(cbs._emitted, 'status').map((/** @type {[string, any]} */ [, p]) => p);
-        assert.ok(statuses.includes('reconnecting:1/3'), `Status reconnecting:1/3 deve ter sido emitido. Emitidos: ${JSON.stringify(statuses)}`);
+        assert.ok(
+            statuses.includes('reconnecting:1/3'),
+            `Status reconnecting:1/3 deve ter sido emitido. Emitidos: ${JSON.stringify(statuses)}`,
+        );
     });
 });
 
@@ -151,7 +155,9 @@ describe('reconnect-policy › falhas parciais antes do sucesso', () => {
 describe('reconnect-policy › esgotamento de tentativas', () => {
     it('deve retornar false quando todas as tentativas falham', async () => {
         const cbs = makeCallbacks({
-            initSession: async () => { throw new Error('sem rede'); },
+            initSession: async () => {
+                throw new Error('sem rede');
+            },
         });
         const result = await tryReconnect(new Error('initial'), {}, 'idle', cbs, { ...FAST_OPTS, maxAttempts: 2 });
         assert.strictEqual(result, false);
@@ -159,7 +165,9 @@ describe('reconnect-policy › esgotamento de tentativas', () => {
 
     it('deve emitir "session.fatal" após esgotar tentativas', async () => {
         const cbs = makeCallbacks({
-            initSession: async () => { throw new Error('falha permanente'); },
+            initSession: async () => {
+                throw new Error('falha permanente');
+            },
         });
         await tryReconnect(new Error('original error'), {}, 'idle', cbs, { ...FAST_OPTS, maxAttempts: 2 });
         const fatal = firstEvent(cbs._emitted, 'session.fatal');
@@ -173,7 +181,9 @@ describe('reconnect-policy › esgotamento de tentativas', () => {
 
     it('deve emitir status reconnecting:N/M para todas as N tentativas', async () => {
         const cbs = makeCallbacks({
-            initSession: async () => { throw new Error('err'); },
+            initSession: async () => {
+                throw new Error('err');
+            },
         });
         await tryReconnect(new Error('e'), {}, 'idle', cbs, { ...FAST_OPTS, maxAttempts: 3 });
         const statuses = filterEvents(cbs._emitted, 'status').map((/** @type {[string, any]} */ [, p]) => p);
@@ -190,7 +200,9 @@ describe('reconnect-policy › dialog loop ativo durante reconexão', () => {
         const cbs = makeCallbacks({
             dialogLoop: {
                 active: true,
-                notifyReconnect: () => { notified = true; },
+                notifyReconnect: () => {
+                    notified = true;
+                },
             },
         });
         await tryReconnect(new Error('err'), {}, 'idle', cbs, FAST_OPTS);
@@ -213,7 +225,9 @@ describe('reconnect-policy › dialog loop ativo durante reconexão', () => {
         const cbs = makeCallbacks({
             dialogLoop: {
                 active: false,
-                notifyReconnect: () => { notified = true; },
+                notifyReconnect: () => {
+                    notified = true;
+                },
             },
         });
         await tryReconnect(new Error('err'), {}, 'idle', cbs, FAST_OPTS);
@@ -226,10 +240,12 @@ describe('reconnect-policy › jitter determinístico (G1-DX-03)', () => {
         const delays = /** @type {number[]} */ ([]);
         const origSetTimeout = globalThis.setTimeout;
         // Mock setTimeout para capturar delays sem aguardar
-        globalThis.setTimeout = /** @type {any} */ ((/** @type {() => void} */ fn, /** @type {number} */ delay) => {
-            delays.push(delay);
-            return origSetTimeout(fn, 0); // executa imediatamente
-        });
+        globalThis.setTimeout = /** @type {any} */ (
+            (/** @type {() => void} */ fn, /** @type {number} */ delay) => {
+                delays.push(delay);
+                return origSetTimeout(fn, 0); // executa imediatamente
+            }
+        );
 
         const cbs = makeCallbacks({
             initSession: async () => {
@@ -239,7 +255,11 @@ describe('reconnect-policy › jitter determinístico (G1-DX-03)', () => {
         });
 
         try {
-            await tryReconnect(new Error('e'), {}, 'idle', cbs, { baseDelayMs: 100, jitterFn: () => 0, maxAttempts: 3 });
+            await tryReconnect(new Error('e'), {}, 'idle', cbs, {
+                baseDelayMs: 100,
+                jitterFn: () => 0,
+                maxAttempts: 3,
+            });
         } finally {
             globalThis.setTimeout = origSetTimeout;
         }

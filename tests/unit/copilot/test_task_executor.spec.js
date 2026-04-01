@@ -5,6 +5,7 @@
  * Testes unitários comportamentais para src/copilot/agent/task-executor.js.
  *
  * Cobre (G1-DX-01):
+ *
  * - execução de task bem-sucedida
  * - AbortError não aciona tryReconnect (G1-BUG-03)
  * - erro de sessão + reconexão bem-sucedida renenfileira task
@@ -88,11 +89,14 @@ function makeSession(opts = {}) {
  * Retorna objeto com campos extra (_statuses, _events) para inspeção nos testes.
  *
  * @param {object} [overrides]
- * @returns {import('../../../src/copilot/agent/task-executor.js').TaskExecutorCallbacks & { _statuses: string[], _events: Array<[string, any]> }}
+ * @returns {import('../../../src/copilot/agent/task-executor.js').TaskExecutorCallbacks & {
+ *     _statuses: string[];
+ *     _events: [string, any][];
+ * }}
  */
 function makeCallbacks(overrides = {}) {
     const statuses = /** @type {string[]} */ ([]);
-    const events = /** @type {Array<[string, any]>} */ ([]);
+    const events = /** @type {[string, any][]} */ ([]);
     /** @type {any} */
     const cbs = {
         onDelta: (/** @type {string} */ _delta) => {},
@@ -132,7 +136,10 @@ describe('task-executor › execução bem-sucedida', () => {
         void executeTask(session, task, cbs);
         await task.promise;
 
-        assert.ok(cbs._statuses.includes('idle'), `setStatus('idle') deve ter sido chamado. Statuses: ${JSON.stringify(cbs._statuses)}`);
+        assert.ok(
+            cbs._statuses.includes('idle'),
+            `setStatus('idle') deve ter sido chamado. Statuses: ${JSON.stringify(cbs._statuses)}`,
+        );
     });
 
     it('deve emitir task.completed com o taskId correto', async () => {
@@ -156,7 +163,9 @@ describe('task-executor › execução bem-sucedida', () => {
         // scheduleNext deve ser substituído antes de executeTask o desestruturar.
         const cbs2 = {
             ...cbs,
-            scheduleNext: () => { wrapper.did = true; },
+            scheduleNext: () => {
+                wrapper.did = true;
+            },
         };
 
         void executeTask(session, task, cbs2);
@@ -176,7 +185,10 @@ describe('task-executor › AbortError não aciona reconexão (G1-BUG-03)', () =
         });
         let tryReconnectCalled = false;
         const cbs = makeCallbacks({
-            tryReconnect: async () => { tryReconnectCalled = true; return false; },
+            tryReconnect: async () => {
+                tryReconnectCalled = true;
+                return false;
+            },
         });
 
         void executeTask(session, task, cbs);
@@ -192,7 +204,9 @@ describe('task-executor › AbortError não aciona reconexão (G1-BUG-03)', () =
     it('deve emitir task.error com mensagem "AbortError" após AbortError', async () => {
         const task = makeTask();
         const session = makeSession({
-            onSendAndWait: async () => { throw new DOMException('abort', 'AbortError'); },
+            onSendAndWait: async () => {
+                throw new DOMException('abort', 'AbortError');
+            },
         });
         const cbs = makeCallbacks();
 
@@ -209,12 +223,17 @@ describe('task-executor › erro de sessão + reconexão', () => {
     it('deve reenfileirar task quando tryReconnect retorna true', async () => {
         const task = makeTask();
         const session = makeSession({
-            onSendAndWait: async () => { throw new Error('Conexão perdida'); },
+            onSendAndWait: async () => {
+                throw new Error('Conexão perdida');
+            },
         });
         let requeued = false;
         const cbs = makeCallbacks({
             tryReconnect: async () => true,
-            requeueTask: () => { requeued = true; task.resolve('requeued'); },
+            requeueTask: () => {
+                requeued = true;
+                task.resolve('requeued');
+            },
         });
 
         void executeTask(session, task, cbs);
@@ -227,7 +246,9 @@ describe('task-executor › erro de sessão + reconexão', () => {
     it('deve rejeitar task quando tryReconnect retorna false', async () => {
         const task = makeTask();
         const session = makeSession({
-            onSendAndWait: async () => { throw new Error('Falha permanente de rede'); },
+            onSendAndWait: async () => {
+                throw new Error('Falha permanente de rede');
+            },
         });
         const cbs = makeCallbacks({ tryReconnect: async () => false });
 
@@ -238,7 +259,9 @@ describe('task-executor › erro de sessão + reconexão', () => {
     it('deve emitir task.error quando tryReconnect retorna false', async () => {
         const task = makeTask({ id: 'err-task-789' });
         const session = makeSession({
-            onSendAndWait: async () => { throw new Error('timeout na rede'); },
+            onSendAndWait: async () => {
+                throw new Error('timeout na rede');
+            },
         });
         const cbs = makeCallbacks({ tryReconnect: async () => false });
 
@@ -255,7 +278,9 @@ describe('task-executor › max retries atingido', () => {
     it('deve rejeitar task após atingir MAX_TASK_RETRIES tentativas', async () => {
         const task = makeTask({ attempts: 2 }); // já com 2 tentativas
         const session = makeSession({
-            onSendAndWait: async () => { throw new Error('falha repetida'); },
+            onSendAndWait: async () => {
+                throw new Error('falha repetida');
+            },
         });
         const cbs = makeCallbacks({
             tryReconnect: async () => true, // reconexão sempre OK mas max retries atingido
@@ -268,7 +293,9 @@ describe('task-executor › max retries atingido', () => {
     it('deve emitir task.error ao atingir max retries', async () => {
         const task = makeTask({ attempts: 2 });
         const session = makeSession({
-            onSendAndWait: async () => { throw new Error('err'); },
+            onSendAndWait: async () => {
+                throw new Error('err');
+            },
         });
         const cbs = makeCallbacks({ tryReconnect: async () => true });
 
@@ -288,13 +315,17 @@ describe('task-executor › cleanup de listeners', () => {
     it('deve chamar scheduleNext mesmo quando task falha', async () => {
         const task = makeTask();
         const session = makeSession({
-            onSendAndWait: async () => { throw new Error('falha'); },
+            onSendAndWait: async () => {
+                throw new Error('falha');
+            },
         });
         const wrapper = { did: false };
         const cbs = {
             ...makeCallbacks(),
             tryReconnect: async () => false,
-            scheduleNext: () => { wrapper.did = true; },
+            scheduleNext: () => {
+                wrapper.did = true;
+            },
         };
 
         void executeTask(session, task, cbs);

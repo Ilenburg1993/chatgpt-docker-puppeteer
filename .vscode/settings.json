@@ -870,7 +870,6 @@
   "chat.tools.terminal.blockDetectedFileWrites": "never",
   "chat.tools.terminal.enableAutoApprove": true,
   "chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
-  "chat.tools.terminal.sandbox.enabled": false,
   "chat.unifiedAgentsBar.enabled": true,
   "chat.useAgentSkills": true,
   "chat.useAgentsMdFile": true,
@@ -1100,4 +1099,5 @@
   "github.copilot.chat.inlineEdits.triggerOnEditorChangeAfterSeconds": 20,
   "github.copilot.chat.useResponsesApiTruncation": true,
   "js/ts.tsserver.tracing.enabled": false,
+  "chat.agent.sandbox": false,
 }
