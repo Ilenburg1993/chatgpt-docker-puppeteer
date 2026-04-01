@@ -86,14 +86,13 @@ export class WebhookManager {
     /**
      * Registra uma URL de webhook.
      *
-     * @param {string} url - URL HTTP(S) que receberá POST com payload de evento
-     * @returns {WebhookEntry} Entrada registrada
-     * @throws {Error} Se a URL for inválida/insegura ou o limite de webhooks for atingido
-     *
      * @example
      *     const wm = new WebhookManager();
      *     const { id } = wm.register('https://hooks.example.com/notify');
      *
+     * @param {string} url - URL HTTP(S) que receberá POST com payload de evento
+     * @returns {WebhookEntry} Entrada registrada
+     * @throws {Error} Se a URL for inválida/insegura ou o limite de webhooks for atingido
      */
     register(url) {
         WebhookManager.#validateUrl(url);
