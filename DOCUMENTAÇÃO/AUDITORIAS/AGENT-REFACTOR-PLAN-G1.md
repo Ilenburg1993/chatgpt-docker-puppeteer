@@ -665,12 +665,12 @@ no entry.js).
 
 ## PARTE IV — TRACKING TABLE
 
-| Fase                              | Status      | Commit |
-| --------------------------------- | ----------- | ------ |
-| G1.1 Bugs críticos/altos          | ⏳ PENDENTE | —      |
-| G1.2 Testes ausentes              | ⏳ PENDENTE | —      |
-| G1.3 Contratos de interface/tipos | ⏳ PENDENTE | —      |
-| G1.4 Refatorações arquiteturais   | ⏳ PENDENTE | —      |
+| Fase                              | Status       | Commit       |
+| --------------------------------- | ------------ | ------------ |
+| G1.1 Bugs críticos/altos          | ✅ COMPLETO  | `63ec8123`   |
+| G1.2 Testes ausentes              | ✅ COMPLETO  | `3e5ea8a9`   |
+| G1.3 Contratos de interface/tipos | ✅ COMPLETO  | `f08451ee`   |
+| G1.4 Refatorações arquiteturais   | ✅ COMPLETO  | `51e21532` + |
 
 ---
 

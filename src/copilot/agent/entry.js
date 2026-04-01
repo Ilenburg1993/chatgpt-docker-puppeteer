@@ -62,6 +62,25 @@ async function shutdown(signal = 'SIGTERM') {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
+// ─── IPC básico (G1-API-03) ───────────────────────────────────────────────────
+// Permite que o processo pai (PM2 / scripts de controle) envie comandos via IPC.
+// Comandos suportados: { cmd: 'ping' }, { cmd: 'status' }, { cmd: 'stop' }.
+if (process.send) {
+    process.on('message', (/** @type {any} */ msg) => {
+        const cmd = msg?.cmd;
+        if (cmd === 'ping') {
+            process.send?.({ ok: true, pong: true });
+        } else if (cmd === 'status') {
+            process.send?.({ ok: true, status: alwaysAliveAgent.status });
+        } else if (cmd === 'stop') {
+            log('INFO', '[copilot/agent] IPC stop recebido — encerrando...');
+            shutdown('IPC:stop').catch(() => {});
+        } else {
+            process.send?.({ ok: false, error: `Comando desconhecido: ${cmd}` });
+        }
+    });
+}
+
 // Logar status periódico (evita PM2 matar o processo por inatividade)
 alwaysAliveAgent.on('status', (status) => {
     log('INFO', `[copilot/agent] Status: ${status}`);

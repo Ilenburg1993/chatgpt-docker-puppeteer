@@ -404,6 +404,8 @@ export class AlwaysAliveAgent extends EventEmitter {
                     this.#lastPrInfo = info;
                 },
                 isProcessing: () => this.#status === 'processing',
+                // G1-BUG-06: filtrar deltas durante waiting_for_input com dialog loop ativo
+                dialogLoopActive: () => this.#dialogLoop?.active ?? false,
             });
 
             this.#setStatus('idle');

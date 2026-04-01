@@ -37,6 +37,7 @@ import { writeStateAsync } from './state-io.js';
  *   - Atualiza info de billing
  *
  * @property {() => boolean} isProcessing - true quando status === 'processing' (para filtrar deltas)
+ * @property {() => boolean} dialogLoopActive - true quando o dialog loop está ativo (para filtrar deltas de waiting_for_input)
  */
 
 /**
@@ -48,7 +49,7 @@ import { writeStateAsync } from './state-io.js';
  * @returns {(() => void)[]} Lista de funções de unsubscribe a chamar no cleanup
  */
 export function wireSessionEvents(session, isResumed, callbacks) {
-    const { emit, getStatusSnapshot, onCheckpointPath, onContextState, onPrInfo, isProcessing } = callbacks;
+    const { emit, getStatusSnapshot, onCheckpointPath, onContextState, onPrInfo, isProcessing, dialogLoopActive } = callbacks;
 
     /** @type {(() => void)[]} */
     const unsubs = [];
@@ -97,10 +98,11 @@ export function wireSessionEvents(session, isResumed, callbacks) {
         }),
     );
 
-    // Streaming delta apenas quando dialog loop está ativo (status !== 'processing').
+    // Streaming delta — filtra durante 'processing' (task.delta via task-executor) e durante
+    // 'waiting_for_input' com dialog loop ativo (G1-BUG-06: evita taskId:null no SSE).
     unsubs.push(
         session.on('assistant.message_delta', (/** @type {any} */ evt) => {
-            if (isProcessing()) return;
+            if (isProcessing() || dialogLoopActive()) return;
             const chunk = evt?.data?.deltaContent ?? evt?.data?.content ?? '';
             if (chunk) emit('task.delta', { taskId: null, chunk });
         }),

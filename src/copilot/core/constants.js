@@ -50,3 +50,27 @@ export const MAX_SSE_CLIENTS = Number(process.env.MAX_SSE_CLIENTS ?? 50);
  */
 export { AGENT_EVENTS } from '../agent/events.js';
 /** @typedef {import('../agent/events.js').AgentEventName} AgentEventName */
+
+/**
+ * G1-DX-04: Nomes canônicos de categoria de ferramentas registradas em tools-bootstrap.js.
+ * Usar estas constantes em vez de strings literais ao registrar novas ferramentas.
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+export const TOOL_CATEGORIES = Object.freeze({
+    TASK: 'task',
+    CODE: 'code',
+    GIT: 'git',
+    SESSION: 'session',
+    SESSION_RPC: 'session-rpc',
+    HOOK: 'hook',
+    HUB: 'hub',
+    INTROSPECTION: 'introspection',
+    FILE: 'file',
+    SHELL: 'shell',
+    WEB: 'web',
+    TODO: 'todo',
+    PERMISSION: 'permission',
+    MCP: 'mcp',
+    CUSTOM: 'custom',
+});

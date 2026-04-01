@@ -50,58 +50,35 @@ export { configureHookTools, setHub, setSessionRpc } from '../tools/index.js';
  * @returns {Tool[]} Array consolidado `[...staticTools, ...mcpTools]` pronto para a sessão SDK
  */
 export function bootstrapTools(registry, telemetry, mcpTools) {
-    registerTools(registry, taskTools, { category: 'task', tags: ['queue', 'state'] });
-    registerTools(registry, codeTools, {
-        category: 'code',
-        tags: ['lint', 'test', 'typecheck'],
-        readOnly: true,
-    });
-    registerTools(registry, gitTools, { category: 'git', tags: ['vcs', 'diff', 'commit'] });
-    registerTools(registry, sessionTools, { category: 'session', tags: ['hooks', 'briefing'] });
-    registerTools(registry, sessionRpcTools, {
-        category: 'session-rpc',
-        tags: ['rpc', 'mode', 'plan', 'agent', 'compaction'],
-    });
-    registerTools(registry, hookTools, { category: 'hook', tags: ['audit', 'input', 'hooks'] });
-    registerTools(registry, hubTools, {
-        category: 'hub',
-        tags: ['conversation', 'llm-b', 'dialog', 'persistent'],
-    });
-    registerTools(registry, introspectionTools, {
-        category: 'introspection',
-        tags: ['meta', 'telemetry'],
-        readOnly: true,
-    });
-    registerTools(registry, fileReadTools, {
-        category: 'file',
-        tags: ['filesystem', 'io', 'read'],
-        readOnly: true,
-    });
-    registerTools(registry, fileWriteTools, {
-        category: 'file',
-        tags: ['filesystem', 'io', 'write'],
-    });
-    registerTools(registry, shellTools, {
-        category: 'shell',
-        tags: ['exec', 'system', 'npm', 'node'],
-    });
-    registerTools(registry, webTools, {
-        category: 'web',
-        tags: ['http', 'fetch', 'ssrf-protected'],
-    });
-    registerTools(registry, todoReadTools, {
-        category: 'todo',
-        tags: ['tasks', 'todo', 'management', 'read'],
-        readOnly: true,
-    });
-    registerTools(registry, todoWriteTools, {
-        category: 'todo',
-        tags: ['tasks', 'todo', 'management', 'write'],
-    });
-    registerTools(registry, permissionTools, {
-        category: 'permission',
-        tags: ['approval', 'security', 'runtime-control'],
-    });
+    /**
+     * G1-ARCH-07: Lista única de pares [tools, opts] usada tanto para registro quanto para buildAllTools.
+     * Declarada local à função para evitar TDZ com módulos que exportam via inicialização lazy.
+     * Adicionar um novo grupo aqui é suficiente — não há necessidade de duplicar no spread de `allTools`.
+     *
+     * @type {Array<[import('@github/copilot-sdk').Tool[], Record<string, any>]>}
+     */
+    const TOOL_GROUPS = [
+        [taskTools, { category: 'task', tags: ['queue', 'state'] }],
+        [codeTools, { category: 'code', tags: ['lint', 'test', 'typecheck'], readOnly: true }],
+        [gitTools, { category: 'git', tags: ['vcs', 'diff', 'commit'] }],
+        [sessionTools, { category: 'session', tags: ['hooks', 'briefing'] }],
+        [sessionRpcTools, { category: 'session-rpc', tags: ['rpc', 'mode', 'plan', 'agent', 'compaction'] }],
+        [hookTools, { category: 'hook', tags: ['audit', 'input', 'hooks'] }],
+        [hubTools, { category: 'hub', tags: ['conversation', 'llm-b', 'dialog', 'persistent'] }],
+        [introspectionTools, { category: 'introspection', tags: ['meta', 'telemetry'], readOnly: true }],
+        [fileReadTools, { category: 'file', tags: ['filesystem', 'io', 'read'], readOnly: true }],
+        [fileWriteTools, { category: 'file', tags: ['filesystem', 'io', 'write'] }],
+        [shellTools, { category: 'shell', tags: ['exec', 'system', 'npm', 'node'] }],
+        [webTools, { category: 'web', tags: ['http', 'fetch', 'ssrf-protected'] }],
+        [todoReadTools, { category: 'todo', tags: ['tasks', 'todo', 'management', 'read'], readOnly: true }],
+        [todoWriteTools, { category: 'todo', tags: ['tasks', 'todo', 'management', 'write'] }],
+        [permissionTools, { category: 'permission', tags: ['approval', 'security', 'runtime-control'] }],
+    ];
+
+    // G1-ARCH-07: itera sobre TOOL_GROUPS uma única vez — evita duplicação entre registerTools e allTools
+    for (const [tools, opts] of TOOL_GROUPS) {
+        registerTools(registry, tools, opts);
+    }
 
     if (mcpTools.length > 0) {
         registerTools(registry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
@@ -114,21 +91,7 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
     }
 
     const allTools = [
-        ...taskTools,
-        ...codeTools,
-        ...gitTools,
-        ...sessionTools,
-        ...sessionRpcTools,
-        ...hookTools,
-        ...hubTools,
-        ...introspectionTools,
-        ...fileReadTools,
-        ...fileWriteTools,
-        ...shellTools,
-        ...webTools,
-        ...todoReadTools,
-        ...todoWriteTools,
-        ...permissionTools,
+        ...TOOL_GROUPS.flatMap(([t]) => t),
         ...mcpTools,
         ...customTools,
     ];
