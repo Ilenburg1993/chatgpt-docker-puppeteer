@@ -34,9 +34,9 @@ describe('AlwaysAliveAgent › webhooks', () => {
 
     describe('registerWebhook()', () => {
         it('deve retornar objeto com id e url', () => {
-            const result = agent.registerWebhook('http://localhost:9000/hook');
+            const result = agent.registerWebhook('http://test-hook.example.com:9000/hook');
             assert.ok(typeof result.id === 'string', 'id deve ser string');
-            assert.equal(result.url, 'http://localhost:9000/hook');
+            assert.equal(result.url, 'http://test-hook.example.com:9000/hook');
         });
 
         it('id deve começar com "wh_"', () => {
@@ -66,11 +66,11 @@ describe('AlwaysAliveAgent › webhooks', () => {
         });
 
         it('deve listar o webhook recém-registrado', () => {
-            const { id } = agent.registerWebhook('http://localhost:8080/evt');
+            const { id } = agent.registerWebhook('http://test-hook.example.com:8080/evt');
             const list = agent.listWebhooks();
             assert.equal(list.length, 1);
             assert.equal(list[0]?.id, id);
-            assert.equal(list[0]?.url, 'http://localhost:8080/evt');
+            assert.equal(list[0]?.url, 'http://test-hook.example.com:8080/evt');
         });
 
         it('deve listar múltiplos webhooks', () => {
@@ -93,7 +93,7 @@ describe('AlwaysAliveAgent › webhooks', () => {
 
     describe('unregisterWebhook()', () => {
         it('deve retornar true ao remover webhook existente', () => {
-            const { id } = agent.registerWebhook('http://localhost/hook');
+            const { id } = agent.registerWebhook('http://test-hook.example.com/hook');
             const removed = agent.unregisterWebhook(id);
             assert.equal(removed, true);
         });

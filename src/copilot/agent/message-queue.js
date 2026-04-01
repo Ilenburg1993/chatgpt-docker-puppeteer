@@ -166,6 +166,10 @@ export class MessageQueue {
     /**
      * Reinsere uma tarefa no início da fila (re-enqueue após falha transiente).
      *
+     * Nota: `onEnqueue()` **não** é chamado intencionalmente — o caller (host) é responsável por disparar o
+     * processamento manualmente após unshift, pois neste ponto o processador provavelmente já está rodando e disparar
+     * `onEnqueue()` causaria reentrada.
+     *
      * @param {AgentTask} task
      * @returns {void}
      */

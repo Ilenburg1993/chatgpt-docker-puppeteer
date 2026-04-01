@@ -595,8 +595,14 @@ export class DialogLoopManager extends EventEmitter {
         if (!host) return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
 
         return new Promise((resolve, reject) => {
+            // G2-ARCH-04: declarar onRetryPending no escopo da Promise para poder removê-la no timeout
+            /** @type {(() => void) | null} */
+            let onRetryPending = null;
+
             const retryTimeout = setTimeout(() => {
                 this.off('ready', onRetryReady);
+                // G2-ARCH-04: limpar listener 'question.pending' se ainda pendente
+                if (onRetryPending) this.off('question.pending', onRetryPending);
                 reject(
                     new SessionError(
                         `[DialogLoopManager] Timeout aguardando restart após stopped (${stopReason ?? 'unknown'})`,
@@ -607,7 +613,7 @@ export class DialogLoopManager extends EventEmitter {
 
             const onRetryReady = () => {
                 clearTimeout(retryTimeout);
-                const sendAndListen = () => {
+                onRetryPending = () => {
                     host.answerPendingQuestion(message);
                     const onRetryStopped = (/** @type {{ reason?: string }} */ stoppedEvt) => {
                         this.off('reply', onRetryReply);
@@ -627,9 +633,9 @@ export class DialogLoopManager extends EventEmitter {
                     this.once('stopped', onRetryStopped);
                 };
                 if (host.getPendingQuestion()) {
-                    sendAndListen();
+                    onRetryPending();
                 } else {
-                    this.once('question.pending', sendAndListen);
+                    this.once('question.pending', onRetryPending);
                 }
             };
             this.once('ready', onRetryReady);

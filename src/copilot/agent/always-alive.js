@@ -39,6 +39,8 @@ import { buildStatusSnapshot } from './status-snapshot.js';
 import { executeTask } from './task-executor.js';
 import { bootstrapTools, setSessionRpc } from './tools-bootstrap.js';
 import { WebhookManager } from './webhook-manager.js';
+// G2-ARCH-03: import estático em vez de dinâmico (hook-tools não cria circular dependency)
+import { resolveUserInput as hookToolsResolveUserInput } from '../tools/hook-tools.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -194,11 +196,11 @@ export class AlwaysAliveAgent extends EventEmitter {
     #messagesCacheAt = 0;
 
     /**
-     * TTL do cache de mensagens em ms. Padrão: 30 segundos.
+     * TTL do cache de mensagens em ms. Padrão: 30 segundos. Configurável via AGENT_MESSAGES_CACHE_TTL_MS.
      *
      * @type {number}
      */
-    static #MESSAGES_CACHE_TTL = 30_000;
+    static #MESSAGES_CACHE_TTL = Number(process.env.AGENT_MESSAGES_CACHE_TTL_MS) || 30_000;
 
     /**
      * Último caminho de checkpoint salvo pelo SDK durante compaction de contexto. `null` até a primeira compaction ser
@@ -627,16 +629,10 @@ export class AlwaysAliveAgent extends EventEmitter {
     answerPendingQuestion(answer) {
         if (!this.#pendingQuestion) {
             // ARCH-N01 (fix): mesmo sem pendingQuestion nativo, pode haver Promise de hook-tools.
-            // Tentar resolver via resolveUserInput() exportado de hook-tools.
-            import('../tools/hook-tools.js')
-                .then(({ resolveUserInput }) => {
-                    if (!resolveUserInput(answer)) {
-                        log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
-                    }
-                })
-                .catch(() => {
-                    log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
-                });
+            // G2-ARCH-03: resolveUserInput agora é import estático (sem circular dependency).
+            if (!hookToolsResolveUserInput(answer)) {
+                log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
+            }
             return false;
         }
         log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
@@ -646,12 +642,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             log('WARN', `[AlwaysAlive] writeState pendingQuestion=null: ${e.message}`),
         );
         this.emit('question.answered', { answer });
-        // ARCH-N01 (fix): também resolver Promise da tool request_user_input se houver uma pendente
-        import('../tools/hook-tools.js')
-            .then(({ resolveUserInput }) => {
-                resolveUserInput(answer);
-            })
-            .catch(() => {});
+        // G2-ARCH-03: também resolver Promise da tool request_user_input — import estático
+        hookToolsResolveUserInput(answer);
         return true;
     }
 
@@ -713,13 +705,15 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Retorna um snapshot do estado atual do agente para a API HTTP.
      *
      * O resultado é cacheado por 500 ms para evitar leituras síncronas de `readState()` em polling rápido. O cache é
-     * invalidado automaticamente quando o status muda via `#setStatus()`.
+     * invalidado automaticamente quando o status muda via `#setStatus()`. Configurável via
+     * AGENT_STATUS_SNAPSHOT_TTL_MS.
      *
      * @returns {AgentStatusSnapshot}
      */
     getStatusSnapshot() {
         const now = Date.now();
-        if (this.#statusSnapshotCache && now - this.#statusSnapshotCache.at < 500) {
+        const ttl = Number(process.env.AGENT_STATUS_SNAPSHOT_TTL_MS) || 500;
+        if (this.#statusSnapshotCache && now - this.#statusSnapshotCache.at < ttl) {
             return this.#statusSnapshotCache.snapshot;
         }
         const state = readState();
@@ -747,6 +741,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Retorna contagem de listeners por evento para diagnóstico de leaks.
      *
      * @returns {{ [event: string]: number }} Mapa evento → contagem de listeners
+     * @internal Uso exclusivo em NODE_ENV=development e testes. Não expor como API pública de produção.
      */
     listenerDiagnostics() {
         /** @type {{ [event: string]: number }} */

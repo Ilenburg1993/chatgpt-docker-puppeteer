@@ -13,6 +13,13 @@
 import { auditToolComplete, auditToolStart } from '#copilot/channel';
 
 /**
+ * Máximo de tentativas de retry por task após reconexão. Configurável via AGENT_MAX_TASK_RETRIES.
+ *
+ * @type {number}
+ */
+const MAX_TASK_RETRIES = Number(process.env.AGENT_MAX_TASK_RETRIES) || 3;
+
+/**
  * @typedef {object} TaskExecutorCallbacks
  * @property {(chunk: string, taskId: string) => void} onDelta - Emite fragmento de resposta em streaming
  * @property {(status: 'idle' | 'processing' | 'waiting_for_input' | 'starting' | 'stopped') => void} setStatus - Muda
@@ -118,7 +125,6 @@ export async function executeTask(session, task, callbacks) {
         const recovered = await tryReconnect(e);
         if (recovered) {
             // Limita reintentos transparentes para evitar loop infinito em falhas repetidas.
-            const MAX_TASK_RETRIES = 3;
             task.attempts = (task.attempts ?? 0) + 1;
             if (task.attempts >= MAX_TASK_RETRIES) {
                 setStatus('idle');

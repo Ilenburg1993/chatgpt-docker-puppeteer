@@ -8,8 +8,6 @@
  */
 
 import { log } from '#core/logger';
-import http from 'node:http';
-import https from 'node:https';
 
 /**
  * Timeout (ms) para cada requisição HTTP de webhook. Evita que webhooks lentos bloqueiem o ciclo.
@@ -46,12 +44,53 @@ export class WebhookManager {
     #urls = new Map();
 
     /**
+     * Valida se uma URL de webhook é segura (protocolo HTTP/HTTPS, sem IPs privados/loopback exceto quando
+     * explicitamente permitido via WEBHOOK_ALLOW_PRIVATE_HOSTS=true).
+     *
+     * G2-SEC-01: prevenção de SSRF básica — bloqueia acesso a RFC-1918 e loopback.
+     *
+     * @param {string} url
+     * @throws {Error} Se a URL for inválida ou insegura
+     */
+    static #validateUrl(url) {
+        let parsed;
+        try {
+            parsed = new URL(url);
+        } catch {
+            throw new Error(`[WebhookManager] URL inválida: ${url}`);
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            throw new Error(`[WebhookManager] Protocolo não permitido: ${parsed.protocol}. Use http ou https.`);
+        }
+        const allowPrivate = process.env.WEBHOOK_ALLOW_PRIVATE_HOSTS === 'true';
+        if (!allowPrivate) {
+            const hostname = parsed.hostname;
+            // Bloquear loopback, localhost, e ranges RFC-1918
+            if (
+                hostname === 'localhost' ||
+                hostname === '0.0.0.0' ||
+                /^127\./.test(hostname) ||
+                /^::1$/.test(hostname) ||
+                /^10\./.test(hostname) ||
+                /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+                /^192\.168\./.test(hostname) ||
+                /^169\.254\./.test(hostname) // link-local
+            ) {
+                throw new Error(
+                    `[WebhookManager] Host privado/loopback bloqueado por segurança: ${hostname}. Use WEBHOOK_ALLOW_PRIVATE_HOSTS=true para permitir em dev.`,
+                );
+            }
+        }
+    }
+
+    /**
      * Registra uma URL de webhook.
      *
      * @param {string} url - URL HTTP(S) que receberá POST com payload de evento
      * @returns {WebhookEntry} Entrada registrada
      */
     register(url) {
+        WebhookManager.#validateUrl(url);
         if (this.#urls.size >= MAX_WEBHOOKS) {
             throw new Error(`[WebhookManager] Limite de ${MAX_WEBHOOKS} webhooks atingido.`);
         }
@@ -98,29 +137,20 @@ export class WebhookManager {
 
         await Promise.allSettled(
             [...this.#urls.entries()].map(async ([id, url]) => {
+                // G2-ARCH-06: usar fetch (Node 18+) em vez de http/https nativos — mais limpo e testável
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
                 try {
-                    const parsed = new URL(url);
-                    const lib = parsed.protocol === 'https:' ? https : http;
-                    await new Promise((resolve, reject) => {
-                        const req = lib.request(
-                            url,
-                            {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                // G2-BUG-15: timeout para evitar que webhook lento bloqueie o ciclo
-                                timeout: WEBHOOK_TIMEOUT_MS,
-                            },
-                            (res) => {
-                                res.resume();
-                                res.on('end', resolve);
-                            },
-                        );
-                        req.on('timeout', () => req.destroy(new Error(`webhook timeout (${WEBHOOK_TIMEOUT_MS}ms)`)));
-                        req.on('error', reject);
-                        req.end(body);
+                    await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body,
+                        signal: controller.signal,
                     });
                 } catch (/** @type {any} */ e) {
                     log('WARN', `[WebhookManager] ${id} falhou ao notificar ${url}: ${e.message}`);
+                } finally {
+                    clearTimeout(timeoutId);
                 }
             }),
         );

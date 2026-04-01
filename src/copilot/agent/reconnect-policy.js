@@ -46,7 +46,9 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + jitter(0..base)
-        const delay = baseDelayMs * Math.pow(2, attempt - 1) + jitterFn() * baseDelayMs;
+        // G2-ARCH-09: cap no máximo de 30s para evitar esperas excessivas
+        const raw = baseDelayMs * Math.pow(2, attempt - 1) + jitterFn() * baseDelayMs;
+        const delay = Math.min(raw, 30_000);
         log('INFO', `[AlwaysAlive] Reconexão tentativa ${attempt}/${maxAttempts} em ${Math.round(delay)}ms...`);
         emit('status', `reconnecting:${attempt}/${maxAttempts}`);
 

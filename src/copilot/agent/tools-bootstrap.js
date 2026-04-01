@@ -51,11 +51,11 @@ export { configureHookTools, setHub, setSessionRpc } from '../tools/index.js';
  */
 export function bootstrapTools(registry, telemetry, mcpTools) {
     /**
-     * G1-ARCH-07: Lista única de pares [tools, opts] usada tanto para registro quanto para buildAllTools.
-     * Declarada local à função para evitar TDZ com módulos que exportam via inicialização lazy.
-     * Adicionar um novo grupo aqui é suficiente — não há necessidade de duplicar no spread de `allTools`.
+     * G1-ARCH-07: Lista única de pares [tools, opts] usada tanto para registro quanto para buildAllTools. Declarada
+     * local à função para evitar TDZ com módulos que exportam via inicialização lazy. Adicionar um novo grupo aqui é
+     * suficiente — não há necessidade de duplicar no spread de `allTools`.
      *
-     * @type {Array<[import('@github/copilot-sdk').Tool[], Record<string, any>]>}
+     * @type {[import('@github/copilot-sdk').Tool[], Record<string, any>][]}
      */
     const TOOL_GROUPS = [
         [taskTools, { category: 'task', tags: ['queue', 'state'] }],
@@ -90,11 +90,7 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         registerTools(registry, customTools, { category: 'custom', tags: ['runtime', 'declarative'] });
     }
 
-    const allTools = [
-        ...TOOL_GROUPS.flatMap(([t]) => t),
-        ...mcpTools,
-        ...customTools,
-    ];
+    const allTools = [...TOOL_GROUPS.flatMap(([t]) => t), ...mcpTools, ...customTools];
 
     // Expõe registry/telemetria para as ferramentas de introspecção (necessário antes de iniciar sessão)
     registerForIntrospection(allTools);
