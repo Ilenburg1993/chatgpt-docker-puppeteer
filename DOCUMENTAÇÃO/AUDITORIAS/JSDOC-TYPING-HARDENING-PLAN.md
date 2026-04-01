@@ -1,8 +1,7 @@
 # Plano de Reforço JSDoc & Tipagem — `src/copilot`
 
-**Status**: 🔄 em andamento — Phases 1-9 completas, Phases 10-14 planejadas
-**Última atualização**: 2026-04-02
-**Escopo**: 116 arquivos `.js` em `src/copilot/`
+**Status**: 🔄 em andamento — Phases 1-9 completas, Phases 10-14 planejadas **Última atualização**:
+2026-04-02 **Escopo**: 116 arquivos `.js` em `src/copilot/`
 
 ---
 
@@ -116,24 +115,24 @@ Arquivo: `config/typing/strict/tsconfig.strict.src.copilot.json`
 
 ### Métricas-alvo
 
-| Métrica                                       | Antes | Final     | Meta  |
-| --------------------------------------------- | ----- | --------- | ----- |
+| Métrica                                       | Antes | Final     | Meta   |
+| --------------------------------------------- | ----- | --------- | ------ |
 | `@type {any}` (não-catch)                     | 99    | **0**     | 0 ✅   |
-| `@type {any}` (catch — irredutível TS1196)    | 138   | 139       | n/a   |
+| `@type {any}` (catch — irredutível TS1196)    | 138   | 139       | n/a    |
 | `@param {any}`                                | 21    | **0**     | 0 ✅   |
 | `@returns {any}` / `Promise<any>`             | 11    | **1**     | 0 ⚠️   |
-| `ZodSchema<any>` (SDK genérico — irredutível) | —     | 11        | ≤ 11  |
+| `ZodSchema<any>` (SDK genérico — irredutível) | —     | 11        | ≤ 11   |
 | `Tool<any>` (SDK genérico)                    | —     | **0**     | 0 ✅   |
 | Erros `noPropertyAccessFromIndexSig`          | 142   | **0**     | 0 ✅   |
 | `noImplicitOverride`                          | —     | **0**     | 0 ✅   |
 | `@throws` tags                                | 21    | **37**    | 80+ ⚠️ |
-| `@typedef` declarações                        | 187   | **209**   | 220+  |
-| `@param` tags                                 | 576   | **789**   | —     |
-| `@returns` tags                               | 576   | **577**   | —     |
-| `@example` tags                               | —     | **30**    | 50+   |
-| `@module` tags                                | —     | 117       | 115   |
-| `@see` cross-references                       | —     | **9**     | 30+   |
-| Blocos JSDoc `/** */`                         | 1.899 | **1.985** | —     |
+| `@typedef` declarações                        | 187   | **209**   | 220+   |
+| `@param` tags                                 | 576   | **789**   | —      |
+| `@returns` tags                               | 576   | **577**   | —      |
+| `@example` tags                               | —     | **30**    | 50+    |
+| `@module` tags                                | —     | 117       | 115    |
+| `@see` cross-references                       | —     | **9**     | 30+    |
+| Blocos JSDoc `/** */`                         | 1.899 | **1.985** | —      |
 | Erros typecheck strict                        | 0     | **0**     | 0 ✅   |
 
 ---
@@ -343,8 +342,8 @@ Foco nos 97 usos de `any` em `src/copilot/agent/`. Prioridade pelos top-5 arquiv
 
 ### Mapeamento fases originais → execução real
 
-| Fase original  | O que foi feito                                                                                | Status        |
-| -------------- | ---------------------------------------------------------------------------------------------- | ------------- |
+| Fase original  | O que foi feito                                                                                | Status         |
+| -------------- | ---------------------------------------------------------------------------------------------- | -------------- |
 | F1.1 (ENV)     | `process.env.VAR` → bracket access em 36 arquivos                                              | ✅ Phase 1     |
 | F1.2 (SDK)     | `src/copilot/types/sdk.js` com 13 re-exports SDK                                               | ✅ Phase 3 WIP |
 | F2 (agent/)    | 97 `any` eliminados (always-alive, session-event-wirer, task-executor, reconnect-policy, etc.) | ✅ Phase 2+3   |
@@ -561,8 +560,8 @@ confirmados como irredutíveis (SDK defineTool type inference chain).
 
 ## 8b. Fases 10-14 — Segundo ciclo de hardening
 
-> **Baseline pós-Phase 9**: 116 arquivos, 0 typecheck errors, 1924 tests pass.
-> Métricas-alvo para este ciclo estão na tabela da seção 1.5.
+> **Baseline pós-Phase 9**: 116 arquivos, 0 typecheck errors, 1924 tests pass. Métricas-alvo para
+> este ciclo estão na tabela da seção 1.5.
 
 ### Métricas snapshot (pós-Phase 9 / pré-Phase 10)
 
@@ -583,12 +582,15 @@ confirmados como irredutíveis (SDK defineTool type inference chain).
 onde possível.
 
 #### PROP-01 — `channel/inject.js:263` — `SseEvent.data: any`
+
 - Avaliar payload real do SSE e substituir por `Record<string, unknown>` ou typedef concreto
 
 #### PROP-02 — `agent/state-io.js:48` — `lastQuotaSnapshots: any`
+
 - Verificar formato dos snapshots de cota e tipar com typedef
 
 #### PROP-03 — `conversation-hub/hub.js:22-23` — `io: any`, `nerv: any`
+
 - `io` → `import('socket.io').Server`
 - `nerv` → tipo do NervBus (verificar se há typedef existente)
 
@@ -597,22 +599,28 @@ onde possível.
 **Objetivo**: De 37 → 80+ `@throws` tags.
 
 #### THR-10 — agent/ (6/8 cobertos → 8/8+)
+
 - Varrer `throw new` restantes em agent/ e adicionar `@throws`
 - Incluir funções que chamam I/O (fs, net, db) com `@throws {Error}`
 
 #### THR-11 — channel/ (8/12 cobertos → 12/12+)
+
 - 4 `throw new` sem `@throws`: identificar e anotar
 
 #### THR-12 — conversation-hub/ (8/10 cobertos → 10/10+)
+
 - 2 `throw new` sem `@throws`: identificar e anotar
 
 #### THR-13 — config/ (3/4 cobertos → 4/4+)
+
 - 1 `throw new` sem `@throws`: identificar e anotar
 
 #### THR-14 — lib/ (6/7 cobertos → 7/7+)
+
 - 1 `throw new` sem `@throws`: identificar e anotar
 
 #### THR-15 — terminal/ + bridges/ + demais
+
 - Varrer `throw` e `re-throw` restantes e adicionar `@throws`
 - Meta: 100% dos `throw new` com `@throws` correspondente
 
@@ -621,28 +629,34 @@ onde possível.
 **Objetivo**: De 9 → 40+ `@see` tags.
 
 #### SEE-10 — agent/ ↔ lib/ (funções de sessão, client)
+
 - `always-alive.js` → `@see lib/session.js`, `@see lib/client.js`
 - `dialog-loop-manager.js` → `@see agent/dialog-protocol.js`, `@see agent/dialog-watchdog.js`
 
 #### SEE-11 — tools/ ↔ bridges/ (tool calls que usam bridges)
+
 - `hub-tools.js` → `@see conversation-hub/orchestrator.js`
 - `file-tools.js` → `@see channel/inject.js`
 - `session-rpc-tools.js` → `@see lib/session.js`
 
 #### SEE-12 — channel/ ↔ conversation-hub/ (fluxo de injeção LLM-B)
+
 - `inject.js` → `@see channel/client.js`, `@see conversation-hub/orchestrator.js`
 - `client.js` → `@see channel/inject.js`
 
 #### SEE-13 — config/ ↔ lib/ (configuração → uso)
+
 - `session-config.js` → `@see lib/session.js`
 - `custom-agents.js` → `@see lib/agents.js`
 - `tools/registry.js` → `@see lib/tools-registry.js`
 
 #### SEE-14 — @typedef refs
+
 - Cada `@typedef` em `types/sdk.js` → `@see` para a implementação SDK correspondente
 - Cada `@typedef` em `types/common.js` / `types/todo.js` → `@see` para uso principal
 
 #### SEE-15 — db/ e routes/
+
 - `sqlite.js` → `@see conversation-hub/store.js`
 - `routes/client.js` → `@see api/bridge-*.js`
 
@@ -651,34 +665,41 @@ onde possível.
 **Objetivo**: De 30 → 60+ `@example` tags.
 
 #### EX-10 — tools/ (1 → 10+)
+
 - Adicionar `@example` em cada tool exportada: `file-tools`, `hub-tools`, `todo-tools`, `git/`,
   `session-rpc-tools`, `task-tools`, `web-tools`, `introspection-tools`, `shell/`
 
 #### EX-11 — bridges/ (0 → 5+)
+
 - `mcp-tool-bridge.js`: `rpcCall`, `convertMcpTools`
 - `gh-bridge.js`: `runGh`, `rawApi`
 - `nerv-bridge.js`: métodos principais
 
 #### EX-12 — agent/ (2 → 7+)
+
 - `always-alive.js`: constructor, start, stop
 - `dialog-loop-manager.js`: start, sendDialogTurn
 - `task-executor.js`: execute
 
 #### EX-13 — conversation-hub/ (0 → 4+)
+
 - `orchestrator.js`: sendToLlmB, initializeSession
 - `store.js`: writeTurn, getConversationHistory
 - `hub.js`: constructor
 
 #### EX-14 — channel/ (6 → 8+)
+
 - `inject.js`: injectToLlmB, waitForLlmBReady
 - `client.js`: chatBatch
 
 #### EX-15 — config/ (2 → 5+)
+
 - `session-config.js`: buildSessionConfig
 - `mcp-servers.js`: loadMcpServers
 - `system-prompt.js`: buildSystemPrompt
 
 #### EX-16 — terminal/ + db/ + routes/
+
 - `terminal/dialog.js`: send, receive
 - `db/sqlite.js`: migrate, query
 - `routes/client.js`: handlers principais
@@ -686,6 +707,7 @@ onde possível.
 ### PHASE 14 — Validação final + commit (FIN-10..12)
 
 #### FIN-10 — Validação completa
+
 - `npx tsc --project config/typing/strict/tsconfig.strict.src.copilot.json --noEmit` → 0 erros
 - `npx tsc --project tsconfig.node.json --noEmit` → 0 erros
 - `npm run lint` → 0 erros
@@ -693,10 +715,12 @@ onde possível.
 - `node --strip-types --test 'tests/unit/**/*.spec.js'` → 1924+ pass, 0 fail
 
 #### FIN-11 — Atualizar métricas finais
+
 - Registrar snapshot final neste documento
 - Marcar status como completo
 
 #### FIN-12 — Commit + push
+
 - `git commit -m 'feat(typing): Phases 10-14 — @property any elimination, @throws/@see/@example deep enrichment'`
 - `git push origin main`
 
@@ -704,8 +728,8 @@ onde possível.
 
 ## 8b. Fases 10-14 — Segundo ciclo de hardening
 
-> **Baseline pós-Phase 9**: 116 arquivos, 0 typecheck errors, 1924 tests pass.
-> Métricas-alvo para este ciclo estão na tabela da seção 1.5.
+> **Baseline pós-Phase 9**: 116 arquivos, 0 typecheck errors, 1924 tests pass. Métricas-alvo para
+> este ciclo estão na tabela da seção 1.5.
 
 ### Métricas snapshot (pós-Phase 9 / pré-Phase 10)
 
@@ -726,12 +750,15 @@ onde possível.
 onde possível.
 
 #### PROP-01 — `channel/inject.js:263` — `SseEvent.data: any`
+
 - Avaliar payload real do SSE e substituir por `Record<string, unknown>` ou typedef concreto
 
 #### PROP-02 — `agent/state-io.js:48` — `lastQuotaSnapshots: any`
+
 - Verificar formato dos snapshots de cota e tipar com typedef
 
 #### PROP-03 — `conversation-hub/hub.js:22-23` — `io: any`, `nerv: any`
+
 - `io` → `import('socket.io').Server`
 - `nerv` → tipo do NervBus (verificar se há typedef existente)
 
@@ -740,22 +767,28 @@ onde possível.
 **Objetivo**: De 37 → 80+ `@throws` tags.
 
 #### THR-10 — agent/ (6/8 cobertos → 8/8+)
+
 - Varrer `throw new` restantes em agent/ e adicionar `@throws`
 - Incluir funções que chamam I/O (fs, net, db) com `@throws {Error}`
 
 #### THR-11 — channel/ (8/12 cobertos → 12/12+)
+
 - 4 `throw new` sem `@throws`: identificar e anotar
 
 #### THR-12 — conversation-hub/ (8/10 cobertos → 10/10+)
+
 - 2 `throw new` sem `@throws`: identificar e anotar
 
 #### THR-13 — config/ (3/4 cobertos → 4/4+)
+
 - 1 `throw new` sem `@throws`: identificar e anotar
 
 #### THR-14 — lib/ (6/7 cobertos → 7/7+)
+
 - 1 `throw new` sem `@throws`: identificar e anotar
 
 #### THR-15 — terminal/ + bridges/ + demais
+
 - Varrer `throw` e `re-throw` restantes e adicionar `@throws`
 - Meta: 100% dos `throw new` com `@throws` correspondente
 
@@ -764,28 +797,34 @@ onde possível.
 **Objetivo**: De 9 → 40+ `@see` tags.
 
 #### SEE-10 — agent/ ↔ lib/ (funções de sessão, client)
+
 - `always-alive.js` → `@see lib/session.js`, `@see lib/client.js`
 - `dialog-loop-manager.js` → `@see agent/dialog-protocol.js`, `@see agent/dialog-watchdog.js`
 
 #### SEE-11 — tools/ ↔ bridges/ (tool calls que usam bridges)
+
 - `hub-tools.js` → `@see conversation-hub/orchestrator.js`
 - `file-tools.js` → `@see channel/inject.js`
 - `session-rpc-tools.js` → `@see lib/session.js`
 
 #### SEE-12 — channel/ ↔ conversation-hub/ (fluxo de injeção LLM-B)
+
 - `inject.js` → `@see channel/client.js`, `@see conversation-hub/orchestrator.js`
 - `client.js` → `@see channel/inject.js`
 
 #### SEE-13 — config/ ↔ lib/ (configuração → uso)
+
 - `session-config.js` → `@see lib/session.js`
 - `custom-agents.js` → `@see lib/agents.js`
 - `tools/registry.js` → `@see lib/tools-registry.js`
 
 #### SEE-14 — @typedef refs
+
 - Cada `@typedef` em `types/sdk.js` → `@see` para a implementação SDK correspondente
 - Cada `@typedef` em `types/common.js` / `types/todo.js` → `@see` para uso principal
 
 #### SEE-15 — db/ e routes/
+
 - `sqlite.js` → `@see conversation-hub/store.js`
 - `routes/client.js` → `@see api/bridge-*.js`
 
@@ -794,34 +833,41 @@ onde possível.
 **Objetivo**: De 30 → 60+ `@example` tags.
 
 #### EX-10 — tools/ (1 → 10+)
+
 - Adicionar `@example` em cada tool exportada: `file-tools`, `hub-tools`, `todo-tools`, `git/`,
   `session-rpc-tools`, `task-tools`, `web-tools`, `introspection-tools`, `shell/`
 
 #### EX-11 — bridges/ (0 → 5+)
+
 - `mcp-tool-bridge.js`: `rpcCall`, `convertMcpTools`
 - `gh-bridge.js`: `runGh`, `rawApi`
 - `nerv-bridge.js`: métodos principais
 
 #### EX-12 — agent/ (2 → 7+)
+
 - `always-alive.js`: constructor, start, stop
 - `dialog-loop-manager.js`: start, sendDialogTurn
 - `task-executor.js`: execute
 
 #### EX-13 — conversation-hub/ (0 → 4+)
+
 - `orchestrator.js`: sendToLlmB, initializeSession
 - `store.js`: writeTurn, getConversationHistory
 - `hub.js`: constructor
 
 #### EX-14 — channel/ (6 → 8+)
+
 - `inject.js`: injectToLlmB, waitForLlmBReady
 - `client.js`: chatBatch
 
 #### EX-15 — config/ (2 → 5+)
+
 - `session-config.js`: buildSessionConfig
 - `mcp-servers.js`: loadMcpServers
 - `system-prompt.js`: buildSystemPrompt
 
 #### EX-16 — terminal/ + db/ + routes/
+
 - `terminal/dialog.js`: send, receive
 - `db/sqlite.js`: migrate, query
 - `routes/client.js`: handlers principais
@@ -829,6 +875,7 @@ onde possível.
 ### PHASE 14 — Validação final + commit (FIN-10..12)
 
 #### FIN-10 — Validação completa
+
 - `npx tsc --project config/typing/strict/tsconfig.strict.src.copilot.json --noEmit` → 0 erros
 - `npx tsc --project tsconfig.node.json --noEmit` → 0 erros
 - `npm run lint` → 0 erros
@@ -836,10 +883,12 @@ onde possível.
 - `node --strip-types --test 'tests/unit/**/*.spec.js'` → 1924+ pass, 0 fail
 
 #### FIN-11 — Atualizar métricas finais
+
 - Registrar snapshot final neste documento
 - Marcar status como completo
 
 #### FIN-12 — Commit + push
+
 - `git commit -m 'feat(typing): Phases 10-14 — @property any elimination, @throws/@see/@example deep enrichment'`
 - `git push origin main`
 
