@@ -5,6 +5,7 @@
  *
  *   Usa `execFile` para evitar shell injection. Retorna objetos JS estruturados para uso no terminal REPL e HTTP
  *   endpoints.
+ * @see module:copilot/tools/git-tools
  */
 
 import { execFile } from 'node:child_process';

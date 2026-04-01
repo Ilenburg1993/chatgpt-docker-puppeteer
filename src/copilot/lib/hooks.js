@@ -9,6 +9,7 @@
  * ['read_file'] }); const session = await client.createSession({ hooks, ... });
  *
  * @module copilot/lib/hooks
+ * @see module:copilot/tools/hook-tools
  */
 
 import { log } from '#core/logger';
@@ -300,6 +301,9 @@ export function createHooks(cfg = {}) {
  * Cria hooks com auditLog desativado e sem restrições de ferramentas. UPG-06: loga tools em DEBUG para auditoria de
  * segurança mínima em produção.
  *
+ * @example
+ *     const hooks = createMinimalHooks();
+ *
  * @returns {SessionHooks}
  */
 export function createMinimalHooks() {
@@ -309,6 +313,9 @@ export function createMinimalHooks() {
 /**
  * Cria hooks com auditLog completo de todos os eventos.
  *
+ * @example
+ *     const hooks = createAuditHooks();
+ *
  * @returns {SessionHooks}
  */
 export function createAuditHooks() {
@@ -317,6 +324,9 @@ export function createAuditHooks() {
 
 /**
  * Cria hooks que negam todas as ferramentas (sessão read-only sem execução).
+ *
+ * @example
+ *     const hooks = createDenyAllHooks(); // sessão read-only
  *
  * @returns {SessionHooks}
  */
@@ -336,6 +346,9 @@ export function createDenyAllHooks() {
 /**
  * Cria hooks com whitelist de ferramentas seguras (apenas leitura).
  *
+ * @example
+ *     const hooks = createSafeHooks(['web_search']);
+ *
  * @param {string[]} [extraAllowed] - Ferramentas adicionais a permitir além do conjunto padrão
  * @returns {SessionHooks}
  */
@@ -349,6 +362,9 @@ export function createSafeHooks(extraAllowed = []) {
 /**
  * Constrói um hook onPreToolUse que combina múltiplos handlers em sequência. O primeiro handler que retornar um
  * resultado com `permissionDecision` encerra a cadeia.
+ *
+ * @example
+ *     const hook = composePreToolUseHandlers(auditHandler, denyHandler);
  *
  * @param {...PreToolUseHandler} handlers
  * @returns {PreToolUseHandler}
@@ -369,6 +385,9 @@ export function composePreToolUseHandlers(...handlers) {
 
 /**
  * Constrói um hook onErrorOccurred que notifica via callback customizado.
+ *
+ * @example
+ *     const hook = createErrorNotifierHook((err, ctx) => console.error(ctx, err));
  *
  * @param {(error: Error, context: string, recoverable: boolean, sessionId: string) => void | Promise<void>} onError
  * @returns {ErrorOccurredHandler}

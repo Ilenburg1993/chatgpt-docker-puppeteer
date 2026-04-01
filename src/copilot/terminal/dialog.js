@@ -13,6 +13,8 @@
  * - Renderizar output no stdout (`println`, `printExchange`)
  *
  * @module copilot/terminal/dialog
+ * @see module:copilot/terminal/repl
+ * @see module:copilot/channel/client
  */
 
 import { log } from '#core/logger';

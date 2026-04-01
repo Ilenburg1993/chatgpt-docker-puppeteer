@@ -54,6 +54,12 @@ function detectGitRoot(cwd) {
     return tryExec('git rev-parse --show-toplevel', cwd);
 }
 
+/** @type {number} */
+const CONTEXT_CACHE_TTL_MS = 30_000;
+
+/** @type {{ context: WorkspaceContext; expiresAt: number } | null} */
+let _contextCache = null;
+
 /**
  * Retorna o contexto do workspace atual.
  *
@@ -62,13 +68,6 @@ function detectGitRoot(cwd) {
  *
  * @returns {WorkspaceContext}
  */
-
-/** @type {number} */
-const CONTEXT_CACHE_TTL_MS = 30_000;
-
-/** @type {{ context: WorkspaceContext; expiresAt: number } | null} */
-let _contextCache = null;
-
 export function getWorkspaceContext() {
     const now = Date.now();
     if (_contextCache && _contextCache.expiresAt > now) {

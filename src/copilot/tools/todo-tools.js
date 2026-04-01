@@ -19,6 +19,8 @@
  * Arquivo de dados: `.github/hooks/state/todos.json` (criado automaticamente se ausente)
  *
  * @module copilot/tools/todo-tools
+ * @see module:copilot/db/migrations
+ * @see module:copilot/db/sqlite
  */
 
 import { getCopilotDb } from '#copilot/db/sqlite';

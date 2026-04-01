@@ -5,6 +5,7 @@
  *
  *   Detecta quando o dialog loop fica inativo por mais que o limiar configurado e dispara o callback `onStall`. Extraído
  *   de `always-alive.js` para isolar a lógica de temporização e facilitar testes.
+ * @see module:copilot/agent/dialog-loop-manager
  */
 
 import { log } from '#core/logger';

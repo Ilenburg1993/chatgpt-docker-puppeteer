@@ -16,6 +16,7 @@
  * `POST /api/copilot/answer` (ou equivalente na interface ativa).
  *
  * @module copilot/tools/hook-tools
+ * @see module:copilot/lib/hooks
  */
 
 import { log } from '#core/logger';
@@ -69,6 +70,7 @@ let _broadcastSse = () => {};
  * `startTerminalServer()` antes de iniciar o agente.
  *
  * @param {{ broadcastSse: (event: string, data: Record<string, unknown>) => void }} config
+ * @returns {void}
  */
 export function configureHookTools({ broadcastSse }) {
     _broadcastSse = broadcastSse;

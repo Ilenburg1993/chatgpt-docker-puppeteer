@@ -14,6 +14,8 @@
  * - Output de leitura truncado a MAX_CONTENT_BYTES para evitar overflow de contexto
  *
  * @module copilot/tools/file-tools
+ * @see module:copilot/terminal/file-context
+ * @see module:copilot/channel/inject
  */
 
 import { log } from '#core/logger';

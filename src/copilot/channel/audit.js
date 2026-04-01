@@ -87,6 +87,9 @@ function argsSummary(args) {
 /**
  * Registra o início de uma tool call. Chamado no evento `tool.execution_start`.
  *
+ * @example
+ *     auditToolStart({ toolCallId: 'tc-1', toolName: 'read_file' });
+ *
  * @param {{ toolCallId: string; toolName: string; args?: object; mcpServerName?: string | null }} entry
  * @returns {void}
  */
@@ -143,6 +146,9 @@ export function auditToolComplete(entry) {
  * Retorna as últimas `limit` entradas de auditoria para um dado `sessionId`.
  *
  * Leitura assíncrona do arquivo completo — usar apenas para debug/diagnóstico.
+ *
+ * @example
+ *     const entries = await getAuditSummary('session-123', 20);
  *
  * @param {string | null} sessionId - Filtrar por sessão; null retorna todas as entradas
  * @param {number} [limit=50] - Número máximo de entradas a retornar. Default is `50`

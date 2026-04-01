@@ -8,7 +8,6 @@
  * meio OFICIAL e recomendado para comunicação programática de LLM-A com LLM-B.
  *
  * @module copilot/channel/inject
- *
  * @example
  *     ```js
  *     import { injectToLlmB, checkLlmBHealth } from '#copilot/channel';
@@ -21,6 +20,9 @@
  *     const { reply, durationMs } = await injectToLlmB('Olá LLM-B!');
  *     console.log('Resposta:', reply); // ~15-20s
  *     ```;
+ *
+ * @see module:copilot/channel/client
+ * @see module:copilot/conversation-hub/orchestrator
  */
 
 import { BridgeError } from '#copilot/core';
@@ -260,7 +262,7 @@ export async function waitForLlmBReady(opts = {}) {
 /**
  * @typedef {Object} SseEvent
  * @property {string} type - tipo do evento SSE ('reply' | 'ready' | 'stalled')
- * @property {any} data - payload JSON do evento
+ * @property {Record<string, unknown>} data - payload JSON do evento
  */
 
 /**

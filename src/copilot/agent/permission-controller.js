@@ -8,6 +8,8 @@
  * Extrai responsabilidade de `always-alive.js` para isolar o ciclo de vida da permissão.
  *
  * @module copilot/agent/permission-controller
+ * @see module:copilot/lib/permissions
+ * @see module:copilot/tools/permission-tools
  */
 
 import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/lib/permissions';

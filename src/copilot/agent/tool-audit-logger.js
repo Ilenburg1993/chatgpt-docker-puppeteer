@@ -72,6 +72,9 @@ const HIGH_RISK_TOOLS = (() => {
 /**
  * Retorna `true` se a ferramenta é classificada como alto risco.
  *
+ * @example
+ *     if (isHighRiskTool('shell_exec')) log('WARN', 'high risk tool');
+ *
  * @param {string} toolName
  * @returns {boolean}
  */
@@ -86,6 +89,9 @@ export function isHighRiskTool(toolName) {
  *
  * Opera de forma assíncrona fire-and-forget para não bloquear o event loop. Rotaciona o log quando o arquivo ultrapassa
  * `MAX_LOG_BYTES` (10 MB), preservando a versão anterior em `.1`.
+ *
+ * @example
+ *     logToolAudit({ tool: 'read_file', decision: 'approved', highRisk: false });
  *
  * @param {{ tool: string; decision: 'approved' | 'denied'; highRisk: boolean }} entry
  * @returns {void}
@@ -125,6 +131,9 @@ export function logToolAudit(entry) {
  *
  * Aprovações de ferramentas de alto risco geram um log `WARN` adicional. Se `baseHandler` lançar exceção inesperada, o
  * handler faz fallback seguro para `approveAll` do SDK.
+ *
+ * @example
+ *     const handler = buildAuditingPermissionHandler(approveAll);
  *
  * @param {import('@github/copilot-sdk').PermissionHandler | undefined} baseHandler - Handler base a envolver
  * @returns {import('@github/copilot-sdk').PermissionHandler}

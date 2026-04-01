@@ -6,6 +6,8 @@
  * `setTimeout` + listener cleanup em `always-alive.js`, `dialog.js` e outros componentes com EventEmitter.
  *
  * @module copilot/lib/event-helpers
+ * @see module:copilot/always-alive
+ * @see module:copilot/agent/dialog-loop-manager
  */
 
 /**
@@ -21,6 +23,9 @@
  * ```
  *
  * mas com garantia de cleanup de listeners em todos os paths (resolve, reject, abort).
+ *
+ * @example
+ *     const result = await waitForEvent(agent, 'ready', { timeoutMs: 5000 });
  *
  * @template T
  * @param {import('node:events').EventEmitter} emitter - EventEmitter fonte do evento
@@ -80,6 +85,9 @@ export function waitForEvent(emitter, event, opts = {}) {
  *     new Promise((r) => setTimeout(r, 15_000)),
  * ]);
  * ```
+ *
+ * @example
+ *     const { event, data } = await raceEvents(agent, ['ready', 'error'], { timeoutMs: 10_000 });
  *
  * @param {import('node:events').EventEmitter} emitter
  * @param {string[]} events - Nomes dos eventos a monitorar

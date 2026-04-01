@@ -47,6 +47,9 @@ const STARVATION_THRESHOLD_MS = Number(process.env['AGENT_STARVATION_THRESHOLD_M
 /**
  * Constrói o snapshot de status do agente a partir de parâmetros imutáveis.
  *
+ * @example
+ *     const snap = buildStatusSnapshot({ status: 'running', taskCount: 5, ... });
+ *
  * @param {SnapshotParams} params - Todos os dados do agente necessários para o snapshot
  * @returns {AgentStatusSnapshot} Snapshot do estado atual
  */

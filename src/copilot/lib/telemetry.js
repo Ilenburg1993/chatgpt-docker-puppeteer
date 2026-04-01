@@ -10,6 +10,8 @@
  * getSummary(tel);
  *
  * @module copilot/lib/telemetry
+ * @see module:copilot/agent/tool-audit-logger
+ * @see module:copilot/lib/session
  */
 
 /**

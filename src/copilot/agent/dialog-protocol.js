@@ -9,6 +9,8 @@
  * `AlwaysAliveAgent`.
  *
  * @module copilot/agent/dialog-protocol
+ * @see module:copilot/agent/dialog-loop-manager
+ * @see module:copilot/channel/client
  */
 
 /** @typedef {'ready' | 'reply' | 'stopped' | 'question'} DialogMessageKind */

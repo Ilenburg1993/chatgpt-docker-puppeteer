@@ -10,6 +10,9 @@
  * - persistencia de estado (delegada ao session-manager.js)
  *
  * @module copilot/lib/session
+ * @see module:copilot/session-initializer
+ * @see module:copilot/lib/client
+ * @see module:copilot/config/session-config
  */
 
 import { log } from '#core/logger';
@@ -181,6 +184,7 @@ function buildSessionConfig(opts, mode) {
  * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
  * @param {SessionCreateOptions} [opts] - Opcoes de configuracao
  * @returns {Promise<SessionResult>}
+ * @throws {Error} Se o SDK falhar ao criar sessão
  */
 export async function createSession(client, opts) {
     const options = opts ?? {};
@@ -247,6 +251,7 @@ export async function resumeOrCreate(client, existingSessionId, opts) {
  * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
  * @param {object} [filter] - Filtro opcional
  * @returns {Promise<import('@github/copilot-sdk').SessionMetadata[]>}
+ * @throws {Error} Se a comunicação com o SDK falhar
  */
 export async function listSessions(client, filter) {
     return client.listSessions(filter);
@@ -258,9 +263,9 @@ export async function listSessions(client, filter) {
  * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
  * @param {string} sessionId - ID da sessao a remover
  * @returns {Promise<void>}
+ * @throws {Error} Se a comunicação com o SDK falhar
  */
 export async function deleteSession(client, sessionId) {
-    log('INFO', `[lib/session] Removendo sessao: ${sessionId}`);
     await client.deleteSession(sessionId);
     log('INFO', `[lib/session] Sessao removida: ${sessionId}`);
 }
@@ -270,6 +275,7 @@ export async function deleteSession(client, sessionId) {
  *
  * @param {CopilotSession} session - Sessao a desconectar
  * @returns {Promise<void>}
+ * @throws {Error} Se a sessão já estiver desconectada ou comunicação falhar
  */
 export async function disconnectSession(session) {
     log('INFO', `[lib/session] Desconectando sessao: ${session.sessionId}`);

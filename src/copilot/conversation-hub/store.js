@@ -8,6 +8,8 @@
  * formais em `src/copilot/db/migrations.js`, não mais por DDL inline neste arquivo.
  *
  * @module copilot/conversation-hub/store
+ * @see module:copilot/conversation-hub/orchestrator
+ * @see module:copilot/db/sqlite
  */
 
 import { getCopilotDb } from '#copilot/db/sqlite';

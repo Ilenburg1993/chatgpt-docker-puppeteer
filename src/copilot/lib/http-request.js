@@ -6,12 +6,16 @@
  * limite de resposta e timeout.
  *
  * @module copilot/lib/http-request
+ * @see module:copilot/tools/web-tools
  */
 
 import http from 'node:http';
 
 /**
  * Executa uma requisição HTTP simples para URLs `http://`.
+ *
+ * @example
+ *     const { statusCode, body } = await httpRequest('GET', 'http://localhost:3009/health');
  *
  * @param {string} method - Verbo HTTP (GET, POST, PUT, DELETE…)
  * @param {string} urlStr - URL completa, ex: `http://127.0.0.1:3009/api/tasks`

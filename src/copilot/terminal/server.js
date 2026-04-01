@@ -32,6 +32,8 @@
  * | GET    | /config             | Configuração dinâmica da sessão LLM-B |
  *
  * @module copilot/terminal/server
+ * @see module:copilot/terminal/http-handlers
+ * @see module:copilot/terminal/repl
  */
 
 import { log } from '#core/logger';

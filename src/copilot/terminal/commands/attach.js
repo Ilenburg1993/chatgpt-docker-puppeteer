@@ -23,6 +23,7 @@ import { addAttachment, clearAttachments, getAttachmentQueue } from '../state.js
  * @param {{ println: (text: string) => void }} ctx
  * @param {string} arg - Argumento passado após `/attach`
  * @returns {Promise<void>}
+ * @throws {Error} Se o acesso ao arquivo falhar ou stat retornar erro
  */
 export async function cmdAttach({ println }, arg) {
     const trimmed = (arg ?? '').trim();

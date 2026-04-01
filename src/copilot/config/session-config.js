@@ -6,6 +6,8 @@
  * mais comuns de sessão neste projeto: always-alive, read-only, full-access.
  *
  * @module copilot/config/session-config
+ * @see module:copilot/lib/session
+ * @see module:copilot/session-initializer
  */
 
 import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';

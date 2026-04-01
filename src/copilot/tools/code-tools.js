@@ -6,6 +6,7 @@
  * loop de sessão.
  *
  * @module copilot/tools/code-tools
+ * @see module:copilot/tools/tool-factory
  */
 
 import { log } from '#core/logger';

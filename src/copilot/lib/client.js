@@ -13,6 +13,8 @@
  * - Suporte a `COPILOT_CLI_URL` (env) para conectar a CLI já em execução (PM2 separado).
  *
  * @module copilot/lib/client
+ * @see module:copilot/lib/session
+ * @see module:copilot/always-alive
  */
 
 import { log } from '#core/logger';

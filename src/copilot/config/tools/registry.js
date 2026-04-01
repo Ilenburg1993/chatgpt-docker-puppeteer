@@ -249,6 +249,7 @@ loadCustomTools();
 /**
  * Reseta o estado interno do registry para isolamento de testes. **Não usar em produção.**
  *
+ * @returns {void}
  * @internal
  */
 export function _resetRegistry() {

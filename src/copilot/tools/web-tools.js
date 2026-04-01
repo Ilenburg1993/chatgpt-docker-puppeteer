@@ -5,6 +5,8 @@
  * Custom Tools para acesso web. Inclui proteção SSRF (OWASP A10), rate-limit interno e validação de content-type.
  *
  * @module copilot/tools/web-tools
+ * @see module:copilot/lib/http-request
+ * @see module:copilot/lib/url-validator
  */
 
 import { log } from '#core/logger';

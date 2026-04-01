@@ -13,6 +13,8 @@
  * Variável de ambiente: `COPILOT_DB_PATH` sobrescreve o caminho padrão. Padrão: `<cwd>/data/copilot.sqlite`
  *
  * @module copilot/db/sqlite
+ * @see module:copilot/db/migrations
+ * @see module:copilot/conversation-hub/store
  */
 
 import CONFIG from '#core/config';
@@ -112,6 +114,7 @@ function migrate(db) {
  * `ConversationStore` / `_initTodoDb`.
  *
  * @returns {import('better-sqlite3').Database}
+ * @throws {Error} Se a criação do diretório ou abertura do SQLite falhar
  */
 function getCopilotDb() {
     if (copilotDb) return copilotDb;

@@ -14,6 +14,10 @@
  * 5. Emite eventos via NERV bridge para que o dashboard receba atualizações
  *
  * @module copilot/always-alive
+ * @see module:copilot/agent/dialog-loop-manager
+ * @see module:copilot/agent/session-initializer
+ * @see module:copilot/agent/state-io
+ * @see module:copilot/agent/message-queue
  */
 
 import { SessionError } from '#copilot/core/errors';
@@ -370,6 +374,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Inicializa o agente: conecta ao CLI e cria/retoma sessão.
      *
      * @returns {Promise<void>}
+     * @throws {Error} Se a conexão ao CLI ou criação/retomada de sessão SDK falhar
      */
     async start() {
         if (this.#status !== 'stopped') {

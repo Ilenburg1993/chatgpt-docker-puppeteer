@@ -8,6 +8,7 @@
  * Usado por: web-tools.js, routes/webhooks.js, webhook-manager.js
  *
  * @module copilot/lib/url-validator
+ * @see module:copilot/tools/web-tools
  */
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -23,6 +24,10 @@ const BLOCKED_SCHEMES = new Set(['file:', 'ftp:', 'data:', 'javascript:']);
 
 /**
  * Valida se uma URL é segura para fetch (anti-SSRF).
+ *
+ * @example
+ *     const result = validateUrl(new URL('https://example.com'));
+ *     if (result.safe) fetch(url);
  *
  * @param {URL} url - URL já parseada
  * @returns {{ safe: boolean; reason?: string }}
@@ -65,6 +70,9 @@ export function validateUrl(url) {
 
 /**
  * Valida uma string URL: parseia e aplica validação anti-SSRF.
+ *
+ * @example
+ *     const { safe, parsed } = validateUrlString('https://api.example.com/data');
  *
  * @param {string} urlStr - URL como string
  * @returns {{ safe: boolean; reason?: string; parsed?: URL }}

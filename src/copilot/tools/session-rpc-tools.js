@@ -9,6 +9,8 @@
  * Ativação: chamar setSessionRpc(session.rpc) após a sessão ser criada no always-alive.js.
  *
  * @module copilot/tools/session-rpc-tools
+ * @see module:copilot/lib/session
+ * @see module:copilot/always-alive
  *
  * **SDK-05 (F6.13)**: as APIs `session.rpc.*` são RPCs JSON-RPC internos do CLI sem tipagem pública garantida.
  * Todas as chamadas são encapsuladas em `wrapRpc()` com try/catch e fallback gracioso (retorna `{ error }` em falha).

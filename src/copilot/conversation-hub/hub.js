@@ -8,6 +8,8 @@
  * conversationHub.init({ io, nerv }) na FASE 10 do boot do main-server.
  *
  * @module copilot/conversation-hub/hub
+ * @see module:copilot/conversation-hub/orchestrator
+ * @see module:copilot/bridges/nerv-bridge
  */
 
 import { log } from '#core/logger';
@@ -19,8 +21,9 @@ import { conversationStore } from './store.js';
 
 /**
  * @typedef {Object} HubInitOpts
- * @property {any} io - Instância Socket.io Server (obrigatório)
- * @property {any} [nerv] - Instância NERV bus (opcional, para forwarding de eventos)
+ * @property {import('socket.io').Server} io - Instância Socket.io Server (obrigatório)
+ * @property {{ emitEvent?: (e: { source: string; actionCode: string; payload: unknown; ts: number }) => void }} [nerv]
+ *   - Instância NERV bus (opcional, para forwarding de eventos)
  */
 
 /**

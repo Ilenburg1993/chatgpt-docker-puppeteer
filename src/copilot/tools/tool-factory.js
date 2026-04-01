@@ -52,6 +52,8 @@
  * ```
  *
  * @module copilot/tools/tool-factory
+ * @see module:copilot/lib/tools-registry
+ * @see module:copilot/agent/tools-bootstrap
  *
  * ## Quando usar `buildTool` vs `defineTool`
  *

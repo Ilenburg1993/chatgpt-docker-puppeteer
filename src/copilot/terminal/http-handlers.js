@@ -13,6 +13,8 @@
  * Padrão: **Command Pattern** — cada função encapsula uma intenção de domínio.
  *
  * @module copilot/terminal/http-handlers
+ * @see module:copilot/terminal/server
+ * @see module:copilot/terminal/route-table
  */
 
 import {

@@ -14,7 +14,6 @@
  * - Protocolo StructuredMessage (Sprint A): chatStructured() para comunicação tipada LLM-A ↔ LLM-B
  *
  * @module copilot/channel/client
- *
  * @example
  *     ```js
  *     import { LlmBridgeClient } from '#copilot/channel';
@@ -33,6 +32,9 @@
  *     });
  *     if (result.structured) console.log('Diagnóstico:', result.structured.output);
  *     ```;
+ *
+ * @see module:copilot/always-alive
+ * @see module:copilot/channel/inject
  */
 
 import {
@@ -406,6 +408,7 @@ export class LlmBridgeClient {
      * @param {string} message - Mensagem a enviar à LLM-B
      * @param {{ timeout?: number; onDelta?: (chunk: string) => void }} [opts]
      * @returns {Promise<string>} Resposta da LLM-B (conteúdo após REPLY: ou confirmação de DONE:)
+     * @throws {Error} Se o dialog loop não estiver ativo ou timeout for excedido
      */
     async dialogTurn(message, opts = {}) {
         const { timeout = 60_000, onDelta } = opts;

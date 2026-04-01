@@ -15,6 +15,8 @@
  * - Versões não podem ser reutilizadas.
  *
  * @module copilot/db/migrations
+ * @see module:copilot/db/sqlite
+ * @see module:copilot/conversation-hub/store
  */
 
 /**

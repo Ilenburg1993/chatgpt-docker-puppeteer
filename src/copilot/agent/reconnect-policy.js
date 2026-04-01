@@ -25,6 +25,9 @@ import { log } from '#core/logger';
  *
  * Algoritmo de delay: `base * 2^(attempt-1) + jitter(0..base)`.
  *
+ * @example
+ *     const ok = await tryReconnect(err, client, 'running', callbacks);
+ *
  * @param {Error} originalError - Erro original que desencadeou a reconexão
  * @param {import('@github/copilot-sdk').CopilotClient} client - Cliente SDK ativo (`CopilotClient`)
  * @param {string} currentStatus - Status atual do agente (retorna false se `'stopped'`)

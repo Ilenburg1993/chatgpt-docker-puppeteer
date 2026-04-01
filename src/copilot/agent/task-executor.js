@@ -55,6 +55,9 @@ const DEFAULT_TASK_TIMEOUT_MS = Number(process.env['AGENT_TASK_TIMEOUT_MS']) || 
  * Subscreve ao streaming de tokens, aguarda a resposta completa e trata erros com reconexão transparente. Chama os
  * callbacks fornecidos para toda interação com o estado do agente pai, evitando acesso direto a campos privados.
  *
+ * @example
+ *     await executeTask(session, task, { onDelta, setStatus, emit, ... });
+ *
  * @param {import('@github/copilot-sdk').CopilotSession} session Sessão SDK ativa — deve expor `on` e `sendAndWait`.
  * @param {QueuedTask} task - Tarefa a executar
  * @param {TaskExecutorCallbacks} callbacks - Callbacks de interação com o agente pai

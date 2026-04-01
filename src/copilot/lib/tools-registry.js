@@ -10,6 +10,8 @@
  * 'code');
  *
  * @module copilot/lib/tools-registry
+ * @see module:copilot/tools
+ * @see module:copilot/tools/tool-factory
  */
 
 /**

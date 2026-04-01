@@ -5,6 +5,8 @@
  * Custom Tools para leitura e atualização do estado da sessão (hook system).
  *
  * @module copilot/tools/session-tools
+ * @see module:copilot/lib/session
+ * @see module:copilot/always-alive
  */
 
 import { log } from '#core/logger';

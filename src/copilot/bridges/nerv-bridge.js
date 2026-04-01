@@ -20,6 +20,8 @@
  * ```
  *
  * @module copilot/bridges/nerv-bridge
+ * @see module:copilot/always-alive
+ * @see module:copilot/conversation-hub/hub
  */
 
 import { log } from '#core/logger';
@@ -248,6 +250,7 @@ export const copilotNervBridge = { mount, unmount, isMounted, emitNerv };
 /**
  * Reseta estado interno mutable do bridge para isolamento de testes. **Não usar em produção.**
  *
+ * @returns {void}
  * @internal
  */
 export function _resetNervBridgeState() {

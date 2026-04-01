@@ -11,6 +11,8 @@
  * - Fazer dispatch dos comandos `/xxx` para os módulos de commands/
  *
  * @module copilot/terminal/repl
+ * @see module:copilot/always-alive
+ * @see module:copilot/terminal/dialog
  */
 
 import { log } from '#core/logger';

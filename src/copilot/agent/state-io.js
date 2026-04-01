@@ -9,6 +9,8 @@
  * apenas serializa e desserializa o estado.
  *
  * @module copilot/agent/state-io
+ * @see module:copilot/always-alive
+ * @see module:copilot/session-initializer
  */
 
 import { log } from '#core/logger';
@@ -45,7 +47,7 @@ const STATE_FILE = process.env['AGENT_STATE_FILE']
  * @property {number} [lastPrConsumedAt] - Timestamp do último PR consumido (ms)
  * @property {string} [lastPrModel] - Modelo que consumiu o último PR
  * @property {number} [lastPrCost] - Custo reportado pelo SDK no último PR
- * @property {any} [lastQuotaSnapshots] - Snapshots de cota do último `assistant.usage`
+ * @property {Record<string, unknown> | null} [lastQuotaSnapshots] - Snapshots de cota do último `assistant.usage`
  */
 
 // ─── Cache in-process ────────────────────────────────────────────────────────
@@ -79,6 +81,10 @@ let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unk
  *
  * Retorna o cache in-process quando disponível, evitando I/O síncrono no hot path.
  *
+ * @example
+ *     const state = readState();
+ *     if (state) console.log(state.sessionId);
+ *
  * @returns {AliveAgentState | null} Estado persistido ou null se o arquivo não existir
  */
 export function readState() {
@@ -106,6 +112,9 @@ export function readState() {
  * Atualiza `_stateCache` após a escrita para que chamadas subsequentes a `readState()` não precisem de I/O adicional.
  * Preferir `writeStateAsync` em fluxos assíncronos para não bloquear o event loop.
  *
+ * @example
+ *     writeState({ sessionId: 'abc-123', lastActive: Date.now() });
+ *
  * @param {Partial<AliveAgentState>} updates - Campos a atualizar no estado atual
  * @returns {AliveAgentState} Estado completo após a atualização
  */
@@ -132,6 +141,7 @@ export function writeState(updates) {
  *
  * @param {Partial<AliveAgentState>} updates - Campos a atualizar no estado atual
  * @returns {Promise<AliveAgentState>}
+ * @throws {Error} Se a escrita em disco falhar após retry interno
  */
 export async function writeStateAsync(updates) {
     _writeQueue = _writeQueue.then(() => _doWriteState(updates)).catch(() => _doWriteState(updates));
@@ -158,6 +168,9 @@ async function _doWriteState(updates) {
 
 /**
  * Remove o estado persistido e invalida o cache. Força uma nova sessão SDK na próxima inicialização.
+ *
+ * @example
+ *     clearState(); // remove state.json e força nova sessão
  *
  * @returns {void}
  */

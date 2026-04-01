@@ -37,6 +37,9 @@ let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
 /**
  * Carrega aliases customizados do arquivo JSON. Mescla com built-ins (custom tem precedência).
  *
+ * @example
+ *     loadAliases(); // carrega de .copilot-aliases.json
+ *
  * @returns {void}
  */
 export function loadAliases() {
@@ -78,6 +81,10 @@ function saveCustomAliases() {
  * Resolve um alias para o comando completo. Suporta resolução em cadeia (alias que aponta para outro alias), até 5
  * níveis.
  *
+ * @example
+ *     resolve('st'); // 'status'
+ *     resolve('unknown cmd'); // 'unknown cmd'
+ *
  * @param {string} input - linha de comando digitada
  * @returns {string} comando resolvido (ou o mesmo input se não for alias)
  */
@@ -105,6 +112,9 @@ export function resolve(input) {
 /**
  * Define um alias (sobrescreve se já existir).
  *
+ * @example
+ *     setAlias('/issues', '/gh issue list --state open');
+ *
  * @param {string} name - nome do alias (ex: "/issues")
  * @param {string} command - comando alvo (ex: "/gh issue list --state open")
  * @returns {{ ok: boolean; error?: string }}
@@ -131,6 +141,9 @@ export function setAlias(name, command) {
 /**
  * Remove um alias. Built-ins podem ser removidos (mas voltam no loadAliases seguinte se não houver custom).
  *
+ * @example
+ *     removeAlias('/issues'); // true
+ *
  * @param {string} name
  * @returns {boolean} true se removido, false se não existia
  */
@@ -154,6 +167,10 @@ export function resetAliases() {
 
 /**
  * Retorna todos os aliases (builtin + custom).
+ *
+ * @example
+ *     const all = getAliases();
+ *     Object.entries(all).forEach(([k, v]) => console.log(k, '->', v));
  *
  * @returns {Record<string, string>}
  */

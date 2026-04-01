@@ -73,6 +73,10 @@ const KNOWN_SDK_EVENTS = new Set([
 /**
  * Registra todos os listeners de eventos da sessão SDK.
  *
+ * @example
+ *     const unsubs = wireSessionEvents(session, false, callbacks);
+ *     // cleanup: unsubs.forEach(fn => fn());
+ *
  * @param {CopilotSession} session - Sessão SDK ativa
  * @param {boolean} isResumed - Se a sessão foi retomada (afeta aviso de contexto pesado)
  * @param {SessionWirerCallbacks} callbacks - Callbacks para notificar o host

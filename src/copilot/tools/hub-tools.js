@@ -12,6 +12,8 @@
  * - Consultar histórico de conversas
  *
  * @module copilot/tools/hub-tools
+ * @see module:copilot/conversation-hub/orchestrator
+ * @see module:copilot/channel/client
  */
 
 import { log } from '#core/logger';
@@ -28,6 +30,7 @@ let _injectedHub = null;
  * session-rpc-tools.js. Deve ser chamado em `bootstrapTools()` após o hub ser inicializado.
  *
  * @param {import('../conversation-hub/hub.js').ConversationHub} hub
+ * @returns {void}
  */
 export function setHub(hub) {
     _injectedHub = hub;

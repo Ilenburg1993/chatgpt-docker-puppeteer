@@ -19,6 +19,8 @@
  * - Funções puras que retornam `PermissionHandler` tipado do SDK.
  *
  * @module copilot/lib/permissions
+ * @see module:copilot/agent/permission-controller
+ * @see module:copilot/tools/permission-tools
  */
 
 import { log } from '#core/logger';
@@ -83,6 +85,9 @@ function makeDenied() {
  * 4. denyPatterns - regex: tools com nome correspondente sao negadas
  * 5. denyTools - blacklist nominal
  * 6. Default: aprova tudo
+ *
+ * @example
+ *     const handler = createPermissionHandler({ allowAll: false, denyTools: ['shell'] });
  *
  * @param {PermissionHandlerConfig} [config]
  * @returns {PermissionHandler}
@@ -182,6 +187,9 @@ export function createPermissionHandler(config) {
 /**
  * Retorna o approveAll oficial do SDK.
  *
+ * @example
+ *     const handler = createApproveAllPermission();
+ *
  * @returns {PermissionHandler}
  */
 export function createApproveAllPermission() {
@@ -190,6 +198,9 @@ export function createApproveAllPermission() {
 
 /**
  * Cria um handler que aprova tudo mas loga cada decisao.
+ *
+ * @example
+ *     const handler = createAuditOnlyPermission();
  *
  * @returns {PermissionHandler}
  */

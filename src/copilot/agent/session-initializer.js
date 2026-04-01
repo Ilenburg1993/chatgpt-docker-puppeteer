@@ -9,6 +9,9 @@
  * `tool-audit-logger.js`.
  *
  * @module copilot/session-initializer
+ * @see module:copilot/lib/session
+ * @see module:copilot/agent/state-io
+ * @see module:copilot/config/session-config
  */
 
 import { DEFAULT_EXCLUDED_TOOLS } from '#copilot/config/session-config';
@@ -219,6 +222,7 @@ export async function buildHookSystemContextSafe() {
  * @param {boolean} [sessionOptions.injectHookContext] - Injetar contexto do hook system (default: true)
  * @param {Record<string, unknown>} [sessionOptions.mcpServers] - Configurações de servidores MCP nativos
  * @returns {Promise<{ session: CopilotSession; isResumed: boolean }>}
+ * @throws {Error} Se a criação/retomada da sessão SDK falhar ou a escrita de estado falhar
  */
 export async function initOrResumeSession(client, sessionOptions) {
     const state = _readState();

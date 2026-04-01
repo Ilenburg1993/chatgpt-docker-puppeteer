@@ -11,6 +11,8 @@
  *   ativa. Para desabilitar uma categoria de tools em runtime (ex.: `shellTools`), a sessão precisa ser recriada via
  *   `stop()` + `start()`. Um futuro `unregisterTool(name)` no `ToolRegistry` poderia manter o registro em sincronia,
  *   mas a limitação real está no SDK.
+ * @see module:copilot/tools/tool-factory
+ * @see module:copilot/lib/tools-registry
  */
 
 import { log } from '#core/logger';

@@ -18,6 +18,8 @@
  * ```
  *
  * @module copilot/bridges/mcp-tool-bridge
+ * @see module:copilot/agent/tools-bootstrap
+ * @see module:copilot/lib/tools-registry
  */
 
 import { log } from '#core/logger';
@@ -332,6 +334,7 @@ export async function buildMcpTools() {
 /**
  * Reseta estado interno mutable do bridge para isolamento de testes. **Não usar em produção.**
  *
+ * @returns {void}
  * @internal
  */
 export function _resetMcpState() {
