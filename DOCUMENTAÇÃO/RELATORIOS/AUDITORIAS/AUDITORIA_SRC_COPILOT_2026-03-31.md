@@ -1,7 +1,7 @@
 # Auditoria Completa — `src/copilot`
 
-**Data:** 2026-03-31
-**Escopo solicitado:** leitura completa de `src/copilot`, geração de relatório técnico (bugs + melhorias + upgrades) e execução inicial das correções.
+**Data:** 2026-03-31 **Escopo solicitado:** leitura completa de `src/copilot`, geração de relatório
+técnico (bugs + melhorias + upgrades) e execução inicial das correções.
 
 ---
 
@@ -9,7 +9,8 @@
 
 ### Cobertura integral de leitura
 
-A leitura foi executada em **100% dos arquivos** de `src/copilot` via varredura automatizada e validação manual nos hotspots críticos.
+A leitura foi executada em **100% dos arquivos** de `src/copilot` via varredura automatizada e
+validação manual nos hotspots críticos.
 
 - **Arquivos lidos:** 106
 - **Linhas totais:** 26.884
@@ -21,7 +22,8 @@ A leitura foi executada em **100% dos arquivos** de `src/copilot` via varredura 
 
 1. Inventário completo do módulo.
 2. Triagem de risco (concorrência, estado, segurança, API, observabilidade).
-3. Inspeção manual de arquivos críticos (`agent`, `terminal`, `routes`, `tools`, `config`, `conversation-hub`).
+3. Inspeção manual de arquivos críticos (`agent`, `terminal`, `routes`, `tools`, `config`,
+   `conversation-hub`).
 4. Execução de correções de baixo/médio risco com alto impacto.
 5. Validação por lint/typecheck/testes direcionados.
 
@@ -29,7 +31,8 @@ A leitura foi executada em **100% dos arquivos** de `src/copilot` via varredura 
 
 ## 2) Sumário executivo
 
-O módulo `src/copilot` está funcional e com várias melhorias prévias já aplicadas, porém havia gaps relevantes em:
+O módulo `src/copilot` está funcional e com várias melhorias prévias já aplicadas, porém havia gaps
+relevantes em:
 
 - **consistência de estado concorrente** no `todo-tools` (risco real de lost update),
 - **telemetria operacional** (`/metrics`) com sinal ativo/inativo incorreto,
@@ -43,8 +46,8 @@ Nesta rodada, os itens mais críticos/rápidos foram corrigidos e validados.
 
 ## 3) Top achados priorizados (com status)
 
-| ID   | Severidade | Achado                                                                                                   | Evidência                               | Ação                                                                                | Status      |
-| ---- | ---------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ----------- |
+| ID   | Severidade | Achado                                                                                                   | Evidência                               | Ação                                                                                | Status       |
+| ---- | ---------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ------------ |
 | A-01 | **Alta**   | Condição de corrida em operações de escrita do `todo-tools` (read-modify-write sem serialização efetiva) | `src/copilot/tools/todo-tools.js`       | Migradas operações de escrita para `withStore(...)` (serialização atômica)          | ✅ Executado |
 | A-02 | **Alta**   | Inconsistência de estado: `todo_bulk_update` não limpava `completedAt` ao sair de `done`                 | `src/copilot/tools/todo-tools.js`       | Normalização de `completedAt/completedBy` quando status != `done`                   | ✅ Executado |
 | A-03 | **Média**  | Métrica `llmb_agent_status` podia ficar sempre 0 (comparava estados inexistentes)                        | `src/copilot/terminal/http-handlers.js` | Ajuste para ativo quando `status !== 'stopped'`                                     | ✅ Executado |
@@ -105,7 +108,8 @@ Nesta rodada, os itens mais críticos/rápidos foram corrigidos e validados.
 
 ### Observação sobre suíte completa
 
-- `shell: test:all` apresenta falhas **pré-existentes** no repositório (não introduzidas por esta rodada), incluindo:
+- `shell: test:all` apresenta falhas **pré-existentes** no repositório (não introduzidas por esta
+  rodada), incluindo:
   - `test_hook_tools.spec.js` (pending promise/event loop)
   - alguns testes de `system_prompt` e `permissions`
 - Essas falhas já estavam fora do escopo direto das mudanças aplicadas aqui.
@@ -153,11 +157,16 @@ Nesta rodada, os itens mais críticos/rápidos foram corrigidos e validados.
 
 ## 7) Riscos residuais após execução
 
-- Persistem riscos de arquitetura por tamanho e acoplamento em alguns módulos centrais (`always-alive`, partes de terminal).
-- A suíte global do repositório contém falhas não relacionadas que podem mascarar regressões futuras se não forem tratadas.
+- Persistem riscos de arquitetura por tamanho e acoplamento em alguns módulos centrais
+  (`always-alive`, partes de terminal).
+- A suíte global do repositório contém falhas não relacionadas que podem mascarar regressões futuras
+  se não forem tratadas.
 
 ---
 
 ## 8) Conclusão
 
-A auditoria completa de `src/copilot` foi realizada com cobertura total de arquivos, relatório técnico e execução prática de correções prioritárias. O módulo ficou mais robusto em concorrência de tarefas, observabilidade e consistência de API/configuração. O próximo passo recomendado é atacar a bateria de testes de observabilidade e iniciar a refatoração estrutural dos módulos mais densos.
+A auditoria completa de `src/copilot` foi realizada com cobertura total de arquivos, relatório
+técnico e execução prática de correções prioritárias. O módulo ficou mais robusto em concorrência de
+tarefas, observabilidade e consistência de API/configuração. O próximo passo recomendado é atacar a
+bateria de testes de observabilidade e iniciar a refatoração estrutural dos módulos mais densos.

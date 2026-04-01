@@ -1,9 +1,4 @@
 {
-  "allowlist": [
-    "read_file",
-    "write_file"
-  ],
-  "denylist": [
-    "run_shell_command"
-  ]
+  "allowlist": ["read_file", "write_file"],
+  "denylist": ["run_shell_command"]
 }
