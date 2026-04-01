@@ -333,7 +333,7 @@ export function createInjectServer() {
         println(`[inject] Servidor de injeção ativo em http://127.0.0.1:${INJECT_PORT}`);
     });
 
-    server.on('error', (/** @type {any} */ e) => {
+    server.on('error', (/** @type {NodeJS.ErrnoException} */ e) => {
         log('ERROR', `[TerminalServer] Inject server erro: ${e.message}`);
         println(`[inject] Erro no servidor de injeção: ${e.message}`);
     });

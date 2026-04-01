@@ -126,7 +126,7 @@ export function registerStreamRoutes(bridge, agent) {
         const MAX_SSE_LIFETIME_MS = Number(process.env['MAX_SSE_LIFETIME_MS']) || 24 * 60 * 60 * 1000;
         const lifetimeTimer = setTimeout(() => {
             if (!res.writableEnded) {
-                sendEvt(/** @type {any} */ ('reconnect'), { reason: 'max_lifetime', ts: Date.now() });
+                sendEvt(/** @type {AgentEventName} */ ('reconnect'), { reason: 'max_lifetime', ts: Date.now() });
                 res.end();
             }
         }, MAX_SSE_LIFETIME_MS);

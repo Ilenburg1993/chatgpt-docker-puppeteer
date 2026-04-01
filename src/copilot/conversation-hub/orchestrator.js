@@ -269,7 +269,7 @@ export class HubOrchestrator extends EventEmitter {
 
         // ARCH-02 fix: verificar que o agente está ativo antes de prosseguir
         const agentCheck = this.#agent ?? alwaysAliveAgent;
-        if (/** @type {any} */ (agentCheck).status === 'stopped') {
+        if (/** @type {{ status?: string }} */ (agentCheck).status === 'stopped') {
             throw new Error('[HubOrchestrator] AlwaysAliveAgent não está ativo');
         }
 
@@ -286,8 +286,8 @@ export class HubOrchestrator extends EventEmitter {
         const structuredMeta =
             typeof message === 'object' && message !== null
                 ? {
-                      traceId: /** @type {any} */ (message).traceId,
-                      correlationId: /** @type {any} */ (message).correlationId,
+                      traceId: /** @type {Record<string, unknown>} */ (message)['traceId'],
+                      correlationId: /** @type {Record<string, unknown>} */ (message)['correlationId'],
                   }
                 : {};
         const llmATurnId = await this.#store.writeTurn(hubSessionId, {
@@ -551,7 +551,7 @@ export class HubOrchestrator extends EventEmitter {
             const chunk = evt?.chunk ?? '';
             if (chunk) this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
         };
-        const agentEmitter = /** @type {any} */ (agentInst);
+        const agentEmitter = /** @type {{ on: Function; off: Function }} */ (agentInst);
         agentEmitter.on('task.delta', onDelta);
         try {
             return await agentInst.sendDialogTurn(content, { timeout: timeoutMs });
@@ -572,7 +572,7 @@ export class HubOrchestrator extends EventEmitter {
     async #callViaStructured(message, hubSessionId, turnNumber, timeoutMs) {
         if (!this.#bridge) throw new Error('[HubOrchestrator] Não inicializado.');
         /** @type {string} */ let accumulated = '';
-        const result = await this.#bridge.chatStructured(/** @type {any} */ (message), {
+        const result = await this.#bridge.chatStructured(/** @type {import('#copilot/types/structured-message').StructuredMessageInput} */ (message), {
             onDelta: (chunk) => {
                 accumulated += chunk;
                 this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });

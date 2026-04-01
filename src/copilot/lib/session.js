@@ -126,7 +126,7 @@ function buildInfiniteSessionConfig(opts) {
 function buildSessionConfig(opts, mode) {
     const cfg = /** @type {Record<string, unknown>} */ ({});
 
-    cfg['streaming'] = /** @type {any} */ (opts).streaming ?? true;
+    cfg['streaming'] = /** @type {Record<string, unknown>} */ (opts)['streaming'] ?? true;
 
     if (mode === 'create') {
         const co = /** @type {SessionCreateOptions} */ (opts);
@@ -161,7 +161,7 @@ function buildSessionConfig(opts, mode) {
         if (ro.disableResume !== undefined) cfg['disableResume'] = ro.disableResume;
     }
 
-    const systemMsg = buildSystemMessageConfig(opts.systemMessage, /** @type {any} */ (opts).systemMessageContent);
+    const systemMsg = buildSystemMessageConfig(opts.systemMessage, /** @type {string | undefined} */ (/** @type {Record<string, unknown>} */ (opts)['systemMessageContent']));
     if (systemMsg !== undefined) cfg['systemMessage'] = systemMsg;
 
     return cfg;

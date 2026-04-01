@@ -66,8 +66,8 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 // Permite que o processo pai (PM2 / scripts de controle) envie comandos via IPC.
 // Comandos suportados: { cmd: 'ping' }, { cmd: 'status' }, { cmd: 'stop' }.
 if (process.send) {
-    process.on('message', (/** @type {any} */ msg) => {
-        const cmd = msg?.cmd;
+    process.on('message', (/** @type {Record<string, unknown>} */ msg) => {
+        const cmd = msg?.['cmd'];
         if (cmd === 'ping') {
             process.send?.({ ok: true, pong: true });
         } else if (cmd === 'status') {
@@ -91,8 +91,8 @@ alwaysAliveAgent.on('error', (err) => {
 });
 
 // `session.fatal` indica que a sessão está irrecuperável. Encerrar o processo permite ao PM2 reiniciar imediatamente.
-alwaysAliveAgent.on('session.fatal', (/** @type {any} */ evt) => {
-    const reason = evt?.reason ?? evt?.message ?? 'desconhecido';
+alwaysAliveAgent.on('session.fatal', (/** @type {Record<string, unknown>} */ evt) => {
+    const reason = evt?.['reason'] ?? evt?.['message'] ?? 'desconhecido';
     log('ERROR', `[copilot/agent] session.fatal recebido — encerrando processo: ${reason}`);
     process.exitCode = 1;
     process.exit(1);

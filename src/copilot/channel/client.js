@@ -144,11 +144,11 @@ export class LlmBridgeClient {
         let activeTaskId = null;
 
         // Listener de streaming para este turno
-        const onTaskQueued = (/** @type {any} */ evt) => {
-            activeTaskId = evt.taskId;
+        const onTaskQueued = (/** @type {{ taskId?: string }} */ evt) => {
+            activeTaskId = evt.taskId ?? null;
         };
 
-        const onDeltaEvt = (/** @type {any} */ evt) => {
+        const onDeltaEvt = (/** @type {{ taskId?: string; chunk?: string }} */ evt) => {
             if (activeTaskId && evt.taskId === activeTaskId) {
                 chunks.push(evt.chunk ?? '');
                 if (onDelta) {
@@ -161,7 +161,7 @@ export class LlmBridgeClient {
             }
         };
 
-        const onQuestionEvt = (/** @type {any} */ evt) => {
+        const onQuestionEvt = (/** @type {Record<string, unknown>} */ evt) => {
             if (onQuestion) {
                 try {
                     onQuestion(evt);
@@ -356,7 +356,7 @@ export class LlmBridgeClient {
      */
     #registerDialogListeners(opts) {
         const { onReady, onReply, onStopped } = opts;
-        const replyHandler = onReply ? (/** @type {any} */ evt) => onReply(evt.reply ?? '') : null;
+        const replyHandler = onReply ? (/** @type {{ reply?: string }} */ evt) => onReply(evt.reply ?? '') : null;
 
         if (onReady) alwaysAliveAgent.once('dialog.ready', onReady);
         if (replyHandler) alwaysAliveAgent.on('dialog.reply', replyHandler);
@@ -413,7 +413,7 @@ export class LlmBridgeClient {
 
         // BUG-H05 fix: propaga chunks de streaming para onDelta enquanto sendDialogTurn processa
         const onDeltaTemp = onDelta
-            ? (/** @type {any} */ evt) => {
+            ? (/** @type {{ chunk?: string }} */ evt) => {
                   if (evt.chunk) onDelta(evt.chunk);
               }
             : null;

@@ -107,8 +107,8 @@ export function registerDialogRoutes(bridge, agent) {
             // FLOW-UPG-04: diferenciar 409 (loop inativo) de outros erros para melhor diagnóstico
             const isLoopInactive =
                 msg.includes('não está ativo') ||
-                (err instanceof Error && /** @type {any} */ (err).code === 'DIALOG_NOT_ACTIVE');
-            const isQueueFull = /** @type {any} */ (err)?.code === 'DIALOG_QUEUE_FULL';
+                (err instanceof Error && /** @type {{ code?: string }} */ (err).code === 'DIALOG_NOT_ACTIVE');
+            const isQueueFull = /** @type {{ code?: string }} */ (err)?.code === 'DIALOG_QUEUE_FULL';
             const status = isLoopInactive ? 409 : isQueueFull ? 429 : msg.includes('timeout') ? 504 : 500;
             log('WARN', `[bridge-dialog/turn] falhou (${status}): ${msg}`);
             return res.status(status).json({

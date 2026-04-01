@@ -127,11 +127,14 @@ export function loadCustomTools() {
                     (/** @type {unknown} */ item) =>
                         item &&
                         typeof item === 'object' &&
-                        typeof (/** @type {any} */ (item).name) === 'string' &&
-                        typeof (/** @type {any} */ (item).description) === 'string' &&
-                        typeof (/** @type {any} */ (item).handlerId) === 'string',
+                        typeof (/** @type {Record<string, unknown>} */ (item)['name']) === 'string' &&
+                        typeof (/** @type {Record<string, unknown>} */ (item)['description']) === 'string' &&
+                        typeof (/** @type {Record<string, unknown>} */ (item)['handlerId']) === 'string',
                 )
-                .map((/** @type {any} */ item) => [item.name, item]),
+                .map((/** @type {unknown} */ item) => /** @type {[string, CustomToolDefinition]} */ ([
+                    /** @type {string} */ (/** @type {Record<string, unknown>} */ (item)['name']),
+                    /** @type {CustomToolDefinition} */ (item),
+                ])),
         );
         log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco.`);
     } catch (/** @type {any} */ err) {

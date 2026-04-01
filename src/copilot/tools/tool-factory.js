@@ -157,4 +157,4 @@ export function buildTool({
  * @returns {T} A mesma tool com `skipPermission: true`
  */
 export const withSkipPermission = /** @param {any} tool */ (tool) =>
-    Object.assign(tool, /** @type {any} */ ({ skipPermission: true }));
+    Object.assign(tool, /** @type {Record<string, unknown>} */ ({ skipPermission: true }));

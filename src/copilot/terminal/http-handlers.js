@@ -157,11 +157,14 @@ export function handleGetContext() {
  */
 export function handleListSessions({ limit = 20, offset = 0, status } = {}) {
     try {
-        const sessions = conversationStore.listHubSessions({
+        const opts = {
             limit: isNaN(limit) ? 20 : limit,
             offset: isNaN(offset) ? 0 : offset,
-            status: /** @type {any} */ (status),
-        });
+            ...(status !== undefined && {
+                status: /** @type {import('../conversation-hub/store.js').HubSessionStatus} */ (status),
+            }),
+        };
+        const sessions = conversationStore.listHubSessions(opts);
         return { status: 200, cors: true, body: { ok: true, sessions, current: getHubSessionId() } };
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
@@ -417,7 +420,7 @@ export async function handleInject(body) {
  */
 export async function handleGhIssues({ state = 'open', limit = 15, page = 1 } = {}) {
     try {
-        const result = await listIssues({ state: /** @type {any} */ (state), perPage: limit, page });
+        const result = await listIssues({ state: /** @type {'open' | 'closed' | 'all'} */ (state), perPage: limit, page });
         return {
             status: 200,
             cors: true,
@@ -438,7 +441,7 @@ export async function handleGhIssues({ state = 'open', limit = 15, page = 1 } = 
  */
 export async function handleGhPrs({ state = 'open', limit = 15, page = 1 } = {}) {
     try {
-        const result = await listPrs({ state: /** @type {any} */ (state), perPage: limit, page });
+        const result = await listPrs({ state: /** @type {'open' | 'closed' | 'merged' | 'all'} */ (state), perPage: limit, page });
         return {
             status: 200,
             cors: true,
@@ -635,7 +638,7 @@ export function handleGetSkills() {
  * @returns {HandlerResult}
  */
 export function handleSetSkills(body) {
-    const { paths } = /** @type {any} */ (body) ?? {};
+    const { paths } = /** @type {Record<string, unknown>} */ (body) ?? {};
     if (!Array.isArray(paths) || paths.some((p) => typeof p !== 'string')) {
         return { status: 400, body: { ok: false, error: 'body deve conter { paths: string[] }' } };
     }
@@ -663,23 +666,23 @@ export function handleGetToolsConfig() {
  * @returns {HandlerResult}
  */
 export function handleSetToolsConfig(rawBody) {
-    const body = /** @type {any} */ (rawBody) ?? {};
+    const body = /** @type {Record<string, unknown>} */ (rawBody) ?? {};
 
     if ('allowlist' in body) {
         if (
-            body.allowlist !== null &&
-            (!Array.isArray(body.allowlist) || body.allowlist.some((/** @type {unknown} */ t) => typeof t !== 'string'))
+            body['allowlist'] !== null &&
+            (!Array.isArray(body['allowlist']) || body['allowlist'].some((/** @type {unknown} */ t) => typeof t !== 'string'))
         ) {
             return { status: 400, body: { ok: false, error: 'allowlist deve ser string[] ou null' } };
         }
-        patchToolsConfig({ allowlist: body.allowlist });
+        patchToolsConfig({ allowlist: body['allowlist'] });
     }
 
     if ('denylist' in body) {
-        if (!Array.isArray(body.denylist) || body.denylist.some((/** @type {unknown} */ t) => typeof t !== 'string')) {
+        if (!Array.isArray(body['denylist']) || body['denylist'].some((/** @type {unknown} */ t) => typeof t !== 'string')) {
             return { status: 400, body: { ok: false, error: 'denylist deve ser string[]' } };
         }
-        patchToolsConfig({ denylist: body.denylist });
+        patchToolsConfig({ denylist: body['denylist'] });
     }
 
     return { status: 200, cors: true, body: { ok: true, tools: getToolsConfig() } };
@@ -706,24 +709,26 @@ export function handleGetCustomTools() {
  * @returns {HandlerResult}
  */
 export function handleRegisterCustomTool(rawBody) {
-    const body = /** @type {any} */ (rawBody) ?? {};
-    if (typeof body.name !== 'string' || !body.name) {
+    const body = /** @type {Record<string, unknown>} */ (rawBody) ?? {};
+    if (typeof body['name'] !== 'string' || !body['name']) {
         return { status: 400, body: { ok: false, error: 'name (string) é obrigatório' } };
     }
-    if (typeof body.description !== 'string' || !body.description) {
+    if (typeof body['description'] !== 'string' || !body['description']) {
         return { status: 400, body: { ok: false, error: 'description (string) é obrigatória' } };
     }
-    if (typeof body.handlerId !== 'string' || !body.handlerId) {
+    if (typeof body['handlerId'] !== 'string' || !body['handlerId']) {
         return { status: 400, body: { ok: false, error: 'handlerId (string) é obrigatório' } };
     }
     const result = registerCustomTool({
-        name: body.name,
-        description: body.description,
-        handlerId: body.handlerId,
-        parameters: body.parameters ?? undefined,
+        name: body['name'],
+        description: body['description'],
+        handlerId: body['handlerId'],
+        ...(body['parameters'] != null && {
+            parameters: /** @type {Record<string, unknown>} */ (body['parameters']),
+        }),
     });
     if (!result.ok) return { status: 400, body: { ok: false, error: result.error } };
-    return { status: 201, cors: true, body: { ok: true, tool: { name: body.name, handlerId: body.handlerId } } };
+    return { status: 201, cors: true, body: { ok: true, tool: { name: body['name'], handlerId: body['handlerId'] } } };
 }
 
 /**

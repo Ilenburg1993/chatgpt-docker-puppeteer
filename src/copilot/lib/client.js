@@ -94,18 +94,18 @@ export function buildClientOptions(overrides = {}) {
     const options = {};
 
     if (cliUrl) {
-        /** @type {any} */
+        /** @type {Record<string, unknown>} */
         const anyOptions = options;
-        anyOptions.cliUrl = cliUrl;
+        anyOptions['cliUrl'] = cliUrl;
         log('INFO', `[lib/client] Modo cliUrl ativo: conectando ao CLI em ${cliUrl}`);
     }
 
     // F4.8 (UPG-02): ativa telemetria OTLP via SDK quando OTEL_EXPORTER_OTLP_ENDPOINT está definida
     const otlpEndpoint = process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
     if (otlpEndpoint) {
-        /** @type {any} */
+        /** @type {Record<string, unknown>} */
         const anyOptions = options;
-        anyOptions.telemetry = { otlpEndpoint };
+        anyOptions['telemetry'] = { otlpEndpoint };
         log('INFO', `[lib/client] OTLP telemetria ativa: ${otlpEndpoint}`);
     }
 
@@ -153,7 +153,7 @@ export async function getClient(overrides = {}) {
     try {
         const options = buildClientOptions(overrides);
         log('INFO', '[lib/client] Iniciando CopilotClient...');
-        const client = new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {any} */ (options)));
+        const client = new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {unknown} */ (options)));
         await client.start();
         _client = client;
         log('INFO', `[lib/client] CopilotClient conectado. Estado: ${client.getState()}`);
@@ -193,7 +193,7 @@ export async function forceStopClient() {
     log('WARN', '[lib/client] Parando CopilotClient de forma forçada (sem cleanup)...');
     _sessions.clear();
     try {
-        /** @type {any} */
+        /** @type {{ forceStop?: () => Promise<void> }} */
         const anyClient = _client;
         if (typeof anyClient.forceStop === 'function') {
             await anyClient.forceStop();
@@ -297,7 +297,7 @@ export async function resumeClientSession(sessionId, config) {
     const session = await client.resumeSession(sessionId, config);
     _sessions.set(session.sessionId, {
         session,
-        model: /** @type {any} */ (config).model ?? 'unknown',
+        model: /** @type {string} */ (/** @type {Record<string, unknown>} */ (config)['model'] ?? 'unknown'),
         createdAt: Date.now(),
         messagesCount: 0,
     });

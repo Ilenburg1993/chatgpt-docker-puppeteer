@@ -37,6 +37,15 @@ const KNOWN_SDK_EVENTS = new Set([
  */
 
 /**
+ * Payload genérico de eventos SDK. Cada evento tem um `kind`/`type` e um `data` com propriedades variáveis.
+ *
+ * @typedef {object} SdkEventPayload
+ * @property {string} [kind]
+ * @property {string} [type]
+ * @property {Record<string, unknown>} [data]
+ */
+
+/**
  * Callbacks repassados pelo AlwaysAliveAgent para que o wirer possa notificá-lo sem acoplamento.
  *
  * @typedef {Object} SessionWirerCallbacks
@@ -76,7 +85,7 @@ export function wireSessionEvents(session, isResumed, callbacks) {
 
     // Compaction start
     unsubs.push(
-        session.on('session.compaction_start', (/** @type {any} */ evt) => {
+        session.on('session.compaction_start', (/** @type {SdkEventPayload} */ evt) => {
             log('INFO', '[AlwaysAlive] Compaction iniciada (sessão infinita).');
             emit('session.compaction_start', evt?.data ?? {});
         }),
@@ -84,46 +93,46 @@ export function wireSessionEvents(session, isResumed, callbacks) {
 
     // Compaction complete — detecta falha, captura checkpointPath para recovery.
     unsubs.push(
-        session.on('session.compaction_complete', (/** @type {any} */ evt) => {
-            const data = evt?.data ?? {};
-            if (data.success === false) {
+        session.on('session.compaction_complete', (/** @type {SdkEventPayload} */ evt) => {
+            const data = /** @type {{ success?: boolean; checkpointPath?: string }} */ (evt?.data ?? {});
+            if (data['success'] === false) {
                 log('ERROR', '[AlwaysAlive] Compaction falhou. Sessão pode estar instável.');
-                if (data.checkpointPath) {
+                if (data['checkpointPath']) {
                     log(
                         'WARN',
-                        `[AlwaysAlive] Checkpoint disponível: ${data.checkpointPath}. Para recovery manual, restaure esse arquivo e reinicie.`,
+                        `[AlwaysAlive] Checkpoint disponível: ${data['checkpointPath']}. Para recovery manual, restaure esse arquivo e reinicie.`,
                     );
                 }
             } else {
                 log('INFO', '[AlwaysAlive] Compaction concluída.');
             }
-            if (data.checkpointPath) {
-                onCheckpointPath(data.checkpointPath);
+            if (data['checkpointPath']) {
+                onCheckpointPath(data['checkpointPath']);
             }
             emit('session.compaction_complete', data);
             const snap = getStatusSnapshot();
             emit('context:compacted', {
                 sessionId: snap?.sessionId ?? null,
                 ts: Date.now(),
-                checkpoint: data.checkpointPath ?? null,
+                checkpoint: data['checkpointPath'] ?? null,
             });
         }),
     );
 
     // Reasoning tokens (o3/o4-mini extended thinking)
     unsubs.push(
-        session.on('assistant.reasoning_delta', (/** @type {any} */ evt) => {
-            const chunk = evt?.data?.deltaContent ?? '';
-            if (chunk) emit('task.reasoning', { chunk, reasoningId: evt?.data?.reasoningId ?? null });
+        session.on('assistant.reasoning_delta', (/** @type {SdkEventPayload} */ evt) => {
+            const chunk = /** @type {string} */ (evt?.data?.['deltaContent'] ?? '');
+            if (chunk) emit('task.reasoning', { chunk, reasoningId: /** @type {string | null} */ (evt?.data?.['reasoningId'] ?? null) });
         }),
     );
 
     // Streaming delta — filtra durante 'processing' (task.delta via task-executor) e durante
     // 'waiting_for_input' com dialog loop ativo (G1-BUG-06: evita taskId:null no SSE).
     unsubs.push(
-        session.on('assistant.message_delta', (/** @type {any} */ evt) => {
+        session.on('assistant.message_delta', (/** @type {SdkEventPayload} */ evt) => {
             if (isProcessing() || dialogLoopActive()) return;
-            const chunk = evt?.data?.deltaContent ?? evt?.data?.content ?? '';
+            const chunk = /** @type {string} */ (evt?.data?.['deltaContent'] ?? evt?.data?.['content'] ?? '');
             if (chunk) emit('task.delta', { taskId: null, chunk });
         }),
     );
@@ -162,10 +171,11 @@ export function wireSessionEvents(session, isResumed, callbacks) {
     // Token usage e janela de contexto — atualiza contextState e emite avisos.
     let _firstUsageChecked = false;
     unsubs.push(
-        session.on('session.usage_info', (/** @type {any} */ evt) => {
+        session.on('session.usage_info', (/** @type {SdkEventPayload} */ evt) => {
             const data = evt?.data ?? {};
             emit('session.usage', data);
-            const { currentTokens, tokenLimit } = data;
+            const currentTokens = /** @type {number} */ (data['currentTokens'] ?? 0);
+            const tokenLimit = /** @type {number} */ (data['tokenLimit'] ?? 0);
             if (tokenLimit > 0) {
                 onContextState({
                     tokens: currentTokens,
@@ -180,8 +190,8 @@ export function wireSessionEvents(session, isResumed, callbacks) {
 
     // Mudança de modo (plan ↔ act ↔ interactive)
     unsubs.push(
-        session.on('session.mode_changed', (/** @type {any} */ evt) => {
-            log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.previousMode} → ${evt?.data?.newMode}`);
+        session.on('session.mode_changed', (/** @type {SdkEventPayload} */ evt) => {
+            log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.['previousMode']} → ${evt?.data?.['newMode']}`);
             emit('session.mode_changed', evt?.data ?? {});
         }),
     );
@@ -189,13 +199,13 @@ export function wireSessionEvents(session, isResumed, callbacks) {
     // G2-BUG-14: tool.execution_start e tool.execution_complete estavam no knownEvents mas nunca subscritos.
     // Guard isProcessing(): durante task execution, task-executor.js já emite com taskId — evitar duplicata.
     unsubs.push(
-        session.on('tool.execution_start', (/** @type {any} */ evt) => {
+        session.on('tool.execution_start', (/** @type {SdkEventPayload} */ evt) => {
             if (isProcessing()) return;
             emit('tool.execution.start', evt?.data ?? {});
         }),
     );
     unsubs.push(
-        session.on('tool.execution_complete', (/** @type {any} */ evt) => {
+        session.on('tool.execution_complete', (/** @type {SdkEventPayload} */ evt) => {
             if (isProcessing()) return;
             emit('tool.execution.complete', evt?.data ?? {});
         }),
@@ -204,14 +214,22 @@ export function wireSessionEvents(session, isResumed, callbacks) {
     // Catch-all para eventos do SDK não tratados explicitamente + billing (assistant.usage).
     // G2-PERF-02: knownEvents movido para constante de módulo KNOWN_SDK_EVENTS
     unsubs.push(
-        session.on((/** @type {any} */ evt) => {
-            const kind = evt?.kind ?? evt?.type ?? 'unknown';
+        session.on((/** @type {SdkEventPayload} */ evt) => {
+            const kind = /** @type {string} */ (evt?.kind ?? evt?.type ?? 'unknown');
             if (kind === 'assistant.usage') {
                 const data = evt?.data ?? {};
-                const { model, cost, quotaSnapshots } = data;
+                const model = /** @type {string | undefined} */ (data['model']);
+                const cost = /** @type {number | undefined} */ (data['cost']);
+                const quotaSnapshots = /** @type {Record<string, unknown> | undefined} */ (data['quotaSnapshots']);
+                const prInfo = {
+                    ts: Date.now(),
+                    ...(model !== undefined ? { model } : {}),
+                    ...(cost !== undefined ? { cost } : {}),
+                    ...(quotaSnapshots !== undefined ? { quotaSnapshots } : {}),
+                };
                 log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
-                onPrInfo({ model, cost, quotaSnapshots, ts: Date.now() });
-                emit('pr.consumed', { model, cost, quotaSnapshots, ts: Date.now() });
+                onPrInfo(prInfo);
+                emit('pr.consumed', prInfo);
                 writeStateAsync({
                     pendingTurnConsumedPR: true,
                     lastPrConsumedAt: Date.now(),

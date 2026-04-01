@@ -74,20 +74,20 @@ export function buildAlwaysAliveConfig(options = {}) {
         onPermissionRequest = approveAll,
         onUserInputRequest,
         hookContextContent,
-    } = /** @type {any} */ (options);
+    } = options;
 
-    /** @type {any} */
+    /** @type {Record<string, unknown>} */
     const hooks = createHooks({
-        onSessionStart: (/** @type {any} */ ev) => {
+        onSessionStart: (/** @type {Record<string, unknown>} */ ev) => {
             void ev; // handled by AlwaysAliveAgent
         },
-        onSessionEnd: (/** @type {any} */ ev) => {
+        onSessionEnd: (/** @type {Record<string, unknown>} */ ev) => {
             void ev; // handled by AlwaysAliveAgent
         },
     });
 
     /** @type {SessionConfig} */
-    const config = /** @type {any} */ ({
+    const config = /** @type {SessionConfig} */ (/** @type {unknown} */ ({
         ...BASE_CONFIG,
         model,
         tools,
@@ -99,7 +99,7 @@ export function buildAlwaysAliveConfig(options = {}) {
                   systemMessage: buildHookContextAppendMessage(hookContextContent),
               }
             : {}),
-    });
+    }));
 
     return config;
 }

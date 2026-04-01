@@ -188,7 +188,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Cache de mensagens da sessão SDK para reduzir latência em chamadas repetidas via `getSessionMessages()`. Invalida
      * automaticamente após `#MESSAGES_CACHE_TTL` ou na troca de sessão.
      *
-     * @type {any[] | null}
+     * @type {unknown[] | null}
      */
     #messagesCache = null;
 
@@ -899,17 +899,17 @@ export class AlwaysAliveAgent extends EventEmitter {
         // listeners no #dialogLoop antes do attach(). Em reconexão, attach() é chamado novamente mas
         // o guard impede que removeAllListeners() seja ativado uma segunda vez, preservando os listeners abaixo.
         this.#dialogLoop.removeAllListeners();
-        this.#dialogLoop.on('ready', (/** @type {any} */ evt) => this.emit('dialog.ready', evt));
-        this.#dialogLoop.on('reply', (/** @type {any} */ evt) => this.emit('dialog.reply', evt));
-        this.#dialogLoop.on('stopped', (/** @type {any} */ evt) => this.emit('dialog.stopped', evt));
-        this.#dialogLoop.on('paused', (/** @type {any} */ evt) => this.emit('dialog.paused', evt));
-        this.#dialogLoop.on('resumed', (/** @type {any} */ evt) => this.emit('dialog.resumed', evt));
-        this.#dialogLoop.on('stalled', (/** @type {any} */ evt) => this.emit('dialog.stalled', evt));
-        this.#dialogLoop.on('turn_start', (/** @type {any} */ evt) => this.emit('dialog.turn_start', evt));
-        this.#dialogLoop.on('turn_end', (/** @type {any} */ evt) => this.emit('dialog.turn_end', evt));
-        this.#dialogLoop.on('turn_timeout', (/** @type {any} */ evt) => this.emit('dialog.turn_timeout', evt));
-        this.#dialogLoop.on('changed', (/** @type {any} */ evt) => this.emit('dialog.loop.changed', evt));
-        this.#dialogLoop.on('model.fallback', (/** @type {any} */ evt) => this.emit('pr.fallback_model', evt));
+        this.#dialogLoop.on('ready', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.ready', evt));
+        this.#dialogLoop.on('reply', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.reply', evt));
+        this.#dialogLoop.on('stopped', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.stopped', evt));
+        this.#dialogLoop.on('paused', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.paused', evt));
+        this.#dialogLoop.on('resumed', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.resumed', evt));
+        this.#dialogLoop.on('stalled', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.stalled', evt));
+        this.#dialogLoop.on('turn_start', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.turn_start', evt));
+        this.#dialogLoop.on('turn_end', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.turn_end', evt));
+        this.#dialogLoop.on('turn_timeout', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.turn_timeout', evt));
+        this.#dialogLoop.on('changed', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.loop.changed', evt));
+        this.#dialogLoop.on('model.fallback', (/** @type {Record<string, unknown>} */ evt) => this.emit('pr.fallback_model', evt));
     }
 
     /**
@@ -925,8 +925,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         try {
             const hubSessionId = getHubSessionId();
             if (!hubSessionId) return;
-            /** @type {any} */
-            const sdkSession = session;
+            const sdkSession = /** @type {{ getMessages?: () => Promise<unknown[]> }} */ (session);
             if (typeof sdkSession.getMessages !== 'function') {
                 log(
                     'WARN',
@@ -936,7 +935,11 @@ export class AlwaysAliveAgent extends EventEmitter {
             }
             const messages = await sdkSession.getMessages();
             if (!Array.isArray(messages) || messages.length === 0) return;
-            const { synced, skipped } = conversationStore.syncFromSdkHistory(hubSessionId, session.sessionId, messages);
+            const { synced, skipped } = conversationStore.syncFromSdkHistory(
+                hubSessionId,
+                session.sessionId,
+                /** @type {{ id?: string; type: string; content: string; createdAt?: number }[]} */ (messages),
+            );
             if (synced > 0) {
                 log(
                     'INFO',
@@ -995,8 +998,8 @@ export class AlwaysAliveAgent extends EventEmitter {
      *
      * Usado tanto no `start()` inicial quanto em cada tentativa de `#tryReconnect()`.
      *
-     * @param {any} client - Cliente SDK já instanciado
-     * @returns {Promise<{ session: any; isResumed: boolean }>}
+     * @param {CopilotClient} client - Cliente SDK já instanciado
+     * @returns {Promise<{ session: CopilotSession; isResumed: boolean }>}
      */
     async #initSession(client) {
         // G1-API-05 (fix): invalidar cache de mensagens para garantir que chamadas a
@@ -1117,11 +1120,15 @@ export class AlwaysAliveAgent extends EventEmitter {
 
         return new Promise((resolve) => {
             /** @type {PendingQuestion} */
-            const pq = /** @type {any} */ ({ question, allowFreeform, askedAt: Date.now() });
-            if (choices !== undefined) pq.choices = choices;
-            pq.resolve = (/** @type {string} */ answer) => {
-                this.#setStatus('processing');
-                resolve({ answer, wasFreeform: true });
+            const pq = {
+                question,
+                allowFreeform,
+                askedAt: Date.now(),
+                ...(choices !== undefined && { choices }),
+                resolve: (/** @type {string} */ answer) => {
+                    this.#setStatus('processing');
+                    resolve({ answer, wasFreeform: true });
+                },
             };
             this.#pendingQuestion = pq;
             this.emit('question.pending', { question, choices, allowFreeform });
@@ -1202,7 +1209,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * para reduzir chamadas repetidas ao SDK. Retorna array vazio se não houver sessão ativa ou se `getMessages()`
      * lance (sem suporte no SDK).
      *
-     * @returns {Promise<any[]>}
+     * @returns {Promise<unknown[]>}
      */
     async getSessionMessages() {
         if (!this.#session) return [];

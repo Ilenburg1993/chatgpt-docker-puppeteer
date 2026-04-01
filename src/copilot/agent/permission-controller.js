@@ -137,7 +137,7 @@ export class PermissionController {
                 break;
             }
             default:
-                log('WARN', `[PermissionController] setMode: modo inv\u00e1lido '${/** @type {any} */ (mode)}'`);
+                log('WARN', `[PermissionController] setMode: modo inv\u00e1lido '${/** @type {string} */ (mode)}'`);
                 return;
         }
         log(

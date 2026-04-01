@@ -88,9 +88,9 @@ import { v4 as uuidv4 } from 'uuid';
 function initTurnsFts(db) {
     try {
         /** @type {{ count: number } | undefined} */
-        const ftsCount = /** @type {any} */ (db.prepare('SELECT COUNT(*) AS count FROM copilot_turns_fts').get());
+        const ftsCount = /** @type {{ count: number } | undefined} */ (db.prepare('SELECT COUNT(*) AS count FROM copilot_turns_fts').get());
         /** @type {{ count: number } | undefined} */
-        const turnCount = /** @type {any} */ (
+        const turnCount = /** @type {{ count: number } | undefined} */ (
             db.prepare('SELECT COUNT(*) AS count FROM copilot_conversation_turns').get()
         );
         if ((ftsCount?.count ?? 0) === 0 && (turnCount?.count ?? 0) > 0) {
@@ -122,7 +122,7 @@ function migrateFts5Tokenizer(db) {
     try {
         // FTS5 expõe configuração via tabela shadow <nome>_config
         /** @type {{ v?: string } | undefined} */
-        const row = /** @type {any} */ (
+        const row = /** @type {{ v?: string } | undefined} */ (
             db.prepare("SELECT v FROM copilot_memories_fts_config WHERE k='tokenize'").get()
         );
         // Se o tokenizer já é o correto (ou a tabela foi recém-criada com IF NOT EXISTS no DDL), nada a fazer

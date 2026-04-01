@@ -64,39 +64,39 @@ export async function executeTask(session, task, callbacks) {
     const { onDelta, setStatus, emit, tryReconnect, scheduleNext, requeueTask } = callbacks;
 
     // Subscreve ao streaming de tokens enquanto a tarefa está em andamento
-    const unsubDelta = session.on('assistant.message_delta', (/** @type {any} */ event) => {
-        const chunk = event?.data?.deltaContent ?? '';
+    const unsubDelta = session.on('assistant.message_delta', (/** @type {{ data?: Record<string, unknown> }} */ event) => {
+        const chunk = /** @type {string} */ (event?.data?.['deltaContent'] ?? '');
         if (chunk) onDelta(chunk, task.id);
     });
 
     // Subscreve a eventos de execução de tool para auditoria e observabilidade
-    const unsubToolStart = session.on('tool.execution_start', (/** @type {any} */ event) => {
+    const unsubToolStart = session.on('tool.execution_start', (/** @type {{ data?: Record<string, unknown> }} */ event) => {
         auditToolStart({
-            toolCallId: event?.data?.toolCallId ?? '',
-            toolName: event?.data?.toolName ?? '',
-            args: event?.data?.arguments ?? {},
-            mcpServerName: event?.data?.mcpServerName ?? null,
+            toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
+            toolName: /** @type {string} */ (event?.data?.['toolName'] ?? ''),
+            args: event?.data?.['arguments'] ?? {},
+            mcpServerName: /** @type {string | null} */ (event?.data?.['mcpServerName'] ?? null),
         });
         emit('tool.execution.start', {
-            toolCallId: event?.data?.toolCallId ?? '',
-            toolName: event?.data?.toolName ?? '',
-            args: event?.data?.arguments ?? {},
-            mcpServerName: event?.data?.mcpServerName ?? null,
+            toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
+            toolName: /** @type {string} */ (event?.data?.['toolName'] ?? ''),
+            args: event?.data?.['arguments'] ?? {},
+            mcpServerName: /** @type {string | null} */ (event?.data?.['mcpServerName'] ?? null),
             taskId: task.id,
         });
     });
 
-    const unsubToolComplete = session.on('tool.execution_complete', (/** @type {any} */ event) => {
+    const unsubToolComplete = session.on('tool.execution_complete', (/** @type {{ data?: Record<string, unknown> }} */ event) => {
         auditToolComplete({
-            toolCallId: event?.data?.toolCallId ?? '',
-            success: event?.data?.success ?? false,
+            toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
+            success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
             taskId: task.id,
-            resultContent: event?.data?.result?.content ?? null,
+            resultContent: /** @type {string | null} */ (/** @type {Record<string, unknown> | undefined} */ (event?.data?.['result'])?.['content'] ?? null),
         });
         emit('tool.execution.complete', {
-            toolCallId: event?.data?.toolCallId ?? '',
-            toolName: event?.data?.toolName ?? null,
-            success: event?.data?.success ?? false,
+            toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
+            toolName: /** @type {string | null} */ (event?.data?.['toolName'] ?? null),
+            success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
             taskId: task.id,
         });
     });

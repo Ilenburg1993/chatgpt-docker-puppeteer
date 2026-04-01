@@ -131,13 +131,13 @@ export async function checkLlmBHealth(opts = {}) {
     const port = opts.port ?? DEFAULT_PORT;
     try {
         const { body } = await httpRequest('GET', '/health', null, port, 5_000);
-        const parsed = /** @type {any} */ (JSON.parse(body));
+        const parsed = /** @type {Record<string, unknown>} */ (JSON.parse(body));
         return {
-            ok: parsed.ok === true,
-            ready: parsed.dialogLoopActive === true,
-            busy: parsed.busy === true,
-            hubSessionId: parsed.hubSessionId ?? null,
-            agentStatus: parsed.agentStatus ?? 'unknown',
+            ok: parsed['ok'] === true,
+            ready: parsed['dialogLoopActive'] === true,
+            busy: parsed['busy'] === true,
+            hubSessionId: /** @type {string | null} */ (parsed['hubSessionId'] ?? null),
+            agentStatus: /** @type {string} */ (parsed['agentStatus'] ?? 'unknown'),
         };
     } catch {
         return { ok: false, ready: false, busy: false, hubSessionId: null, agentStatus: 'unknown' };
@@ -200,7 +200,7 @@ async function _doInjectToLlmB(message, opts) {
 
     let parsed;
     try {
-        parsed = /** @type {any} */ (JSON.parse(body));
+        parsed = /** @type {Record<string, unknown>} */ (JSON.parse(body));
     } catch {
         throw new BridgeError(
             `[inject-llmb] Resposta inválida do terminal (status ${statusCode}): ${body.slice(0, 200)}`,
@@ -222,15 +222,15 @@ async function _doInjectToLlmB(message, opts) {
         );
     }
 
-    if (!parsed.ok) {
-        throw new BridgeError(`[inject-llmb] Erro: ${parsed.error ?? 'desconhecido'}`, 'LLM_B_ERROR');
+    if (!parsed['ok']) {
+        throw new BridgeError(`[inject-llmb] Erro: ${parsed['error'] ?? 'desconhecido'}`, 'LLM_B_ERROR');
     }
 
     return {
         ok: true,
-        reply: parsed.reply ?? '',
-        durationMs: parsed.durationMs ?? 0,
-        from: parsed.from ?? from,
+        reply: /** @type {string} */ (parsed['reply'] ?? ''),
+        durationMs: /** @type {number} */ (parsed['durationMs'] ?? 0),
+        from: /** @type {string} */ (parsed['from'] ?? from),
     };
 }
 
@@ -454,7 +454,7 @@ export async function injectPipeline(steps, opts = {}) {
 
     let parsed;
     try {
-        parsed = /** @type {any} */ (JSON.parse(body));
+        parsed = /** @type {Record<string, unknown>} */ (JSON.parse(body));
     } catch {
         throw new BridgeError(
             `[inject-llmb] Resposta inválida do pipeline (status ${statusCode}): ${body.slice(0, 200)}`,
@@ -477,7 +477,7 @@ export async function injectPipeline(steps, opts = {}) {
     }
 
     return {
-        ok: parsed.ok === true,
-        results: parsed.results ?? [],
+        ok: parsed['ok'] === true,
+        results: /** @type {{ step: number; prompt: string; reply: string; durationMs: number }[]} */ (parsed['results'] ?? []),
     };
 }

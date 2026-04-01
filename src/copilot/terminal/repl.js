@@ -235,9 +235,9 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
  * @returns {() => void} Função de cleanup
  */
 export function setupAgentListeners(rl) {
-    const onQuestion = (/** @type {any} */ evt) => {
-        const q = /** @type {string} */ (evt?.question ?? '');
-        const choices = /** @type {string[]} */ (evt?.choices ?? []);
+    const onQuestion = (/** @type {Record<string, unknown>} */ evt) => {
+        const q = /** @type {string} */ (evt?.['question'] ?? '');
+        const choices = /** @type {string[]} */ (evt?.['choices'] ?? []);
 
         // Filtra mensagens internas do protocolo dialog loop
         if (/^(READY[:\s]|REPLY[:\s]|DONE[:\s]|STOPPED|STOP_DIALOG)/i.test(q.trim())) {

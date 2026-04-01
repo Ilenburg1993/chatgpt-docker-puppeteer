@@ -230,23 +230,23 @@ const webSearchTool = buildTool({
             }
 
             if (response.ok) {
-                /** @type {any} */
+                /** @type {Record<string, unknown>} */
                 const data = await response.json();
 
                 /** @type {{ title: string; url: string; snippet: string }[]} */
                 const results = [];
 
                 // AbstractText (resposta direta para queries com resultado instantâneo)
-                if (data.AbstractText && data.AbstractURL) {
+                if (data['AbstractText'] && data['AbstractURL']) {
                     results.push({
-                        title: data.Heading ?? query,
-                        url: data.AbstractURL,
-                        snippet: data.AbstractText,
+                        title: /** @type {string} */ (data['Heading'] ?? query),
+                        url: /** @type {string} */ (data['AbstractURL']),
+                        snippet: /** @type {string} */ (data['AbstractText']),
                     });
                 }
 
                 // RelatedTopics: array de tópicos relacionados
-                const topics = Array.isArray(data.RelatedTopics) ? data.RelatedTopics : [];
+                const topics = Array.isArray(data['RelatedTopics']) ? data['RelatedTopics'] : [];
                 for (const topic of topics) {
                     if (results.length >= limit) break;
                     // Tópicos simples têm FirstURL e Text

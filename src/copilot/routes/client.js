@@ -150,7 +150,7 @@ router.post('/client/force-stop', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const client = await getClient();
         // F6.8 (BUG-MOD-15): usar optional chaining para compatibilidade com versões SDK sem forceStop
-        await /** @type {any} */ (client).forceStop?.();
+        await /** @type {{ forceStop?: () => Promise<void> }} */ (client).forceStop?.();
         log('INFO', '[sdk-api] CopilotClient force-stop executado');
         res.json({ ok: true, message: 'CopilotClient force-stop executado.' });
     });
@@ -165,19 +165,20 @@ router.post('/client/force-stop', (req, res) => {
  * skipPermission). Caso contrário, usa allTools estático.
  */
 router.get('/tools', (_req, res) => {
-    const registry = /** @type {any} */ (alwaysAliveAgent).toolsRegistry;
+    const registry = /** @type {{ toolsRegistry?: { entries?: Map<string, Record<string, unknown>> } }} */ (alwaysAliveAgent).toolsRegistry;
 
     if (registry?.entries instanceof Map && registry.entries.size > 0) {
         // Registry rico disponível
         const list = [];
         for (const [name, entry] of registry.entries) {
+            const t = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (entry['tool']));
             list.push({
                 name,
-                description: /** @type {any} */ (entry.tool).description ?? null,
-                category: entry.category ?? 'uncategorized',
-                tags: entry.tags ?? [],
-                readOnly: entry.readOnly ?? false,
-                skipPermission: /** @type {any} */ (entry.tool).skipPermission ?? false,
+                description: /** @type {string | null} */ (t['description'] ?? null),
+                category: /** @type {string} */ (entry['category'] ?? 'uncategorized'),
+                tags: /** @type {string[]} */ (entry['tags'] ?? []),
+                readOnly: /** @type {boolean} */ (entry['readOnly'] ?? false),
+                skipPermission: /** @type {boolean} */ (t['skipPermission'] ?? false),
             });
         }
         res.json({ ok: true, source: 'registry', count: list.length, tools: list });
@@ -185,14 +186,17 @@ router.get('/tools', (_req, res) => {
     }
 
     // Fallback: allTools estático (agente não iniciado)
-    const list = allTools.map((tool) => ({
-        name: /** @type {any} */ (tool).name ?? '(unknown)',
-        description: /** @type {any} */ (tool).description ?? null,
-        category: 'uncategorized',
-        tags: [],
-        readOnly: false,
-        skipPermission: /** @type {any} */ (tool).skipPermission ?? false,
-    }));
+    const list = allTools.map((tool) => {
+        const t = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (tool));
+        return {
+            name: /** @type {string} */ (t['name'] ?? '(unknown)'),
+            description: /** @type {string | null} */ (t['description'] ?? null),
+            category: 'uncategorized',
+            tags: /** @type {string[]} */ ([]),
+            readOnly: false,
+            skipPermission: /** @type {boolean} */ (t['skipPermission'] ?? false),
+        };
+    });
     res.json({ ok: true, source: 'static', count: list.length, tools: list });
 });
 

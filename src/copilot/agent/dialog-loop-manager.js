@@ -243,12 +243,12 @@ export class DialogLoopManager extends EventEmitter {
         // O boot prompt tem timeout muito longo pois o dialog loop não emite session.idle organicamente.
         const host = this.#host;
         const bootSendFn =
-            typeof (/** @type {any} */ (host).sendMessageDialogBoot) === 'function'
-                ? /** @type {any} */ (host).sendMessageDialogBoot.bind(host)
+            typeof (/** @type {{ sendMessageDialogBoot?: Function }} */ (host).sendMessageDialogBoot) === 'function'
+                ? /** @type {{ sendMessageDialogBoot: Function }} */ (host).sendMessageDialogBoot.bind(host)
                 : (/** @type {string} */ msg, /** @type {{ timeoutMs?: number }} */ opts = {}) =>
                       host.sendMessage(msg, { ...opts, timeoutMs: 24 * 60 * 60 * 1000 });
 
-        bootSendFn(metaPrompt, { timeoutMs: 24 * 60 * 60 * 1000 }).catch((/** @type {any} */ e) => {
+        bootSendFn(metaPrompt, { timeoutMs: 24 * 60 * 60 * 1000 }).catch((/** @type {Error} */ e) => {
             if (this.#active) {
                 log('WARN', `[DialogLoopManager] Dialog loop encerrado: ${e.message}`);
                 this.#active = false;
@@ -378,7 +378,7 @@ export class DialogLoopManager extends EventEmitter {
             return;
         }
         await writeStateAsync({ dialogPaused: true, pausedAt: Date.now(), dialogLoopActive: true }).catch(
-            (/** @type {any} */ e) => log('WARN', `[DialogLoopManager] writeState dialogPaused: ${e.message}`),
+            (/** @type {Error} */ e) => log('WARN', `[DialogLoopManager] writeState dialogPaused: ${e.message}`),
         );
         log('INFO', `[DialogLoopManager] Dialog loop pausado. SessionId: ${sessionId}.`);
         this.emit('paused', { sessionId, pausedAt: Date.now() });
@@ -410,7 +410,7 @@ export class DialogLoopManager extends EventEmitter {
         // Estratégia A (async): aguardar ask_user preservado (0 PR)
         // G2-BUG-03: 'question.pending' é emitido pelo agente host (AlwaysAliveAgent),
         // não pelo DialogLoopManager — ouvir no host se ele for EventEmitter.
-        const hostEmitter = /** @type {any} */ (this.#host);
+        const hostEmitter = /** @type {import('events').EventEmitter} */ (/** @type {unknown} */ (this.#host));
         const pendingTarget = typeof hostEmitter?.on === 'function' ? hostEmitter : this;
         const preserved = await waitForEvent(pendingTarget, 'question.pending', { timeoutMs: 5_000 })
             .then(() => true)

@@ -35,7 +35,7 @@ import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from '@github/copilot-sdk';
  *         : never
  *     : never}
  */
-export const SYSTEM_PROMPT_SECTIONS = /** @type {any} */ (SDK_SECTIONS);
+export const SYSTEM_PROMPT_SECTIONS = /** @type {Record<string, { description: string }>} */ (SDK_SECTIONS);
 
 /**
  * Identidade do agente LLM-B.
@@ -184,7 +184,7 @@ export function buildReplaceSystemMessage(content) {
  * @returns {SystemMessageConfig}
  */
 export function buildAlwaysAliveSystemMessage(opts = {}) {
-    const { extraContext = '' } = /** @type {any} */ (opts);
+    const { extraContext = '' } = /** @type {{ extraContext?: string }} */ (opts);
 
     const sections = [
         `# Identidade\n\n${AGENT_IDENTITY}`,

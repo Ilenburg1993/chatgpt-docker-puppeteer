@@ -211,12 +211,12 @@ export function broadcastSse(event, data) {
     if (
         data !== null &&
         typeof data === 'object' &&
-        typeof (/** @type {any} */ (data).content) === 'string' &&
-        /** @type {any} */ (data).content.length > MAX_SSE_CONTENT_CHARS
+        typeof (/** @type {Record<string, unknown>} */ (data)['content']) === 'string' &&
+        /** @type {{ content: string }} */ (data).content.length > MAX_SSE_CONTENT_CHARS
     ) {
         safeData = {
             ...data,
-            content: /** @type {any} */ (data).content.slice(0, MAX_SSE_CONTENT_CHARS) + ' […truncado]',
+            content: /** @type {{ content: string }} */ (data).content.slice(0, MAX_SSE_CONTENT_CHARS) + ' [\u2026truncado]',
         };
     }
 

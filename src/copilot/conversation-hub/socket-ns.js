@@ -121,8 +121,8 @@ export function mountCopilotNamespace(io, orchestrator, store) {
                     return next(new Error('COPILOT_NS: Token de autenticação ausente.'));
                 }
 
-                const payload = jwt.verify(token, getJwtSecret(), /** @type {any} */ (JWT_VERIFY_OPTIONS));
-                /** @type {any} */ (socket).userId = /** @type {any} */ (payload).sub;
+                const payload = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
+                /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] = /** @type {{ sub?: string }} */ (payload).sub;
                 next();
             } catch (/** @type {any} */ err) {
                 log('WARN', `[socket-ns/copilot] Auth falhou: ${err.message}`);
@@ -205,7 +205,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
 
                 const turnId = await orchestrator.injectUserMessage(data.hubSession, safeContent, {
                     metadata: {
-                        injectedBy: /** @type {any} */ (socket).userId ?? 'anonymous',
+                        injectedBy: /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] ?? 'anonymous',
                         socketId: clientId,
                     },
                 });
@@ -223,10 +223,11 @@ export function mountCopilotNamespace(io, orchestrator, store) {
          */
         socket.on('sessions:list', (/** @type {{ limit?: number; offset?: number; status?: string }} */ opts) => {
             try {
+                const statusVal = /** @type {import('./store.js').HubSessionStatus | undefined} */ (opts?.status);
                 const sessions = store.listHubSessions({
                     limit: opts?.limit ?? 20,
                     offset: opts?.offset ?? 0,
-                    status: /** @type {any} */ (opts?.status),
+                    ...(statusVal !== undefined ? { status: statusVal } : {}),
                 });
                 socket.emit('sessions:list:result', { sessions });
             } catch (/** @type {any} */ err) {

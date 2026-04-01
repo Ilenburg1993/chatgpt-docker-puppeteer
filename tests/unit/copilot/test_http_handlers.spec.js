@@ -261,15 +261,15 @@ describe('http-handlers › handleRegisterCustomTool contratos', () => {
     });
 
     it('valida name (string obrigatório)', () => {
-        assert.match(fn, /typeof\s+body\.name\s*!==?\s*'string'/);
+        assert.match(fn, /typeof\s+body\[.name.\]\s*!==?\s*'string'/);
     });
 
     it('valida description (string obrigatória)', () => {
-        assert.match(fn, /typeof\s+body\.description\s*!==?\s*'string'/);
+        assert.match(fn, /typeof\s+body\[.description.\]\s*!==?\s*'string'/);
     });
 
     it('valida handlerId (string obrigatório)', () => {
-        assert.match(fn, /typeof\s+body\.handlerId\s*!==?\s*'string'/);
+        assert.match(fn, /typeof\s+body\[.handlerId.\]\s*!==?\s*'string'/);
     });
 
     it('retorna 400 para cada campo inválido', () => {

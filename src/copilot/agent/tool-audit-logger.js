@@ -131,14 +131,14 @@ export function logToolAudit(entry) {
 export function buildAuditingPermissionHandler(baseHandler) {
     return /** @type {import('@github/copilot-sdk').PermissionHandler} */ (
         async (request, invocation) => {
-            const toolName = /** @type {any} */ (request)?.toolName ?? /** @type {any} */ (request)?.tool ?? 'unknown';
+            const toolName = /** @type {{ toolName?: string; tool?: string }} */ (request)?.toolName ?? /** @type {{ toolName?: string; tool?: string }} */ (request)?.tool ?? 'unknown';
             const highRisk = isHighRiskTool(toolName);
 
             if (highRisk) {
                 log('WARN', `[ToolAudit] Ferramenta de alto risco solicitada: '${toolName}'`);
             }
 
-            /** @type {any} */
+            /** @type {{ kind?: string } | undefined} */
             let result;
             if (baseHandler) {
                 try {

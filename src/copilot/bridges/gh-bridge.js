@@ -486,7 +486,7 @@ export async function viewRun(runId) {
 export async function watchRun(runId, onUpdate, opts = {}) {
     const { intervalMs = 5000, maxAttempts = 360 } = opts;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const run = /** @type {any} */ (await viewRun(runId));
+        const run = /** @type {RunItem | null} */ (await viewRun(runId));
         if (!run) return null;
         onUpdate(run);
         if (run.status === 'completed') return run;

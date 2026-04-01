@@ -228,7 +228,7 @@ export async function initOrResumeSession(client, sessionOptions) {
     /** @type {import('@github/copilot-sdk').SystemMessageConfig | undefined} */
     const systemMessage = injectContext ? buildHookContextAppendMessage(await buildHookSystemContextSafe()) : undefined;
 
-    /** @type {any} */
+    /** @type {Record<string, unknown>} */
     const opts = {
         model,
         streaming: true,

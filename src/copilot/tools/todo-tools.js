@@ -180,7 +180,7 @@ async function withStore(fn) {
     /** @type {(v?: unknown) => void} */
     let release;
     const token = new Promise((r) => {
-        release = /** @type {any} */ (r);
+        release = /** @type {(v?: unknown) => void} */ (r);
     });
     const prev = _storeMutex;
     _storeMutex = _storeMutex.then(() => token);
@@ -380,7 +380,7 @@ const todoCreateTool = defineTool('todo_create', {
         'Suporta título, descrição detalhada, prioridade (critical/high/medium/low/none), ' +
         'tags, data de vencimento, notas livres, e subtarefas via parentId. ' +
         'Retorna o objeto completo da tarefa criada com seu ID gerado.',
-    parameters: /** @type {any} */ (
+    parameters: /** @type {import('zod').ZodSchema} */ (
         z.object({
             title: z.string().min(1).max(500).describe('Título da tarefa (obrigatório)'),
             description: z.string().max(5000).optional().describe('Descrição detalhada da tarefa'),
@@ -499,7 +499,7 @@ const todoListTool = withSkipPermission(
             'tag, parent_id (listar subtarefas de uma tarefa), texto de busca, e overdue. ' +
             'Retorna tarefas ordenadas por: overdue → priority → createdAt desc. ' +
             'Use para obter uma visão geral ou filtrar por critério.',
-        parameters: /** @type {any} */ (
+        parameters: /** @type {import('zod').ZodSchema} */ (
             z.object({
                 status: zStatus.optional().describe('Filtrar por status específico'),
                 priority: zPriority.optional().describe('Filtrar por prioridade específica'),
@@ -599,7 +599,7 @@ const todoUpdateTool = defineTool('todo_update', {
         'Atualiza campos arbitrários de uma tarefa existente. Apenas os campos fornecidos são ' +
         'alterados (patch parcial). Status segue máquina de estados validada. ' +
         'Use para modificar título, descrição, prioridade, tags, data, notas ou metadata.',
-    parameters: /** @type {any} */ (
+    parameters: /** @type {import('zod').ZodSchema} */ (
         z.object({
             id: zId,
             title: z.string().min(1).max(500).optional().describe('Novo título'),
@@ -689,7 +689,7 @@ const todoSetStatusTool = defineTool('todo_set_status', {
         'in_progress → todo | done | cancelled | blocked; ' +
         'done | cancelled → todo (reabrir); blocked → todo | in_progress. ' +
         'Use force: true para forçar transição fora do grafo (casos excepcionais).',
-    parameters: /** @type {any} */ (
+    parameters: /** @type {import('zod').ZodSchema} */ (
         z.object({
             id: zId,
             status: zStatus.describe('Novo status da tarefa'),
@@ -831,7 +831,7 @@ const todoAddSubtaskTool = defineTool('todo_add_subtask', {
         'Cria uma nova subtarefa vinculada a uma tarefa pai existente. ' +
         'Equivale a todo_create com parent_id preenchido, mas com interface mais direta. ' +
         'A tarefa pai tem sua lista subtaskIds atualizada automaticamente.',
-    parameters: /** @type {any} */ (
+    parameters: /** @type {import('zod').ZodSchema} */ (
         z.object({
             parent_id: z.string().min(1).describe('ID da tarefa pai'),
             title: z.string().min(1).max(500).describe('Título da subtarefa'),
@@ -895,7 +895,7 @@ const todoSearchTool = withSkipPermission(
             'Busca full-text avançada em todas as tarefas. Pesquisa simultânea em título, ' +
             'descrição, notas e tags. Suporta múltiplos termos (todos devem corresponder). ' +
             'Retorna tarefas ordenadas por relevância (número de campos com match) + prioridade.',
-        parameters: /** @type {any} */ (
+        parameters: /** @type {import('zod').ZodSchema} */ (
             z.object({
                 query: z
                     .string()
@@ -1069,7 +1069,7 @@ const todoBulkUpdateTool = defineTool('todo_bulk_update', {
         'Atualiza status, prioridade ou tags em múltiplas tarefas simultaneamente. ' +
         'Aplica a mesma mudança a todas as tarefas do array de IDs fornecido. ' +
         'Use para completar um sprint, repriorizar um conjunto ou etiquetar em lote.',
-    parameters: /** @type {any} */ (
+    parameters: /** @type {import('zod').ZodSchema} */ (
         z.object({
             ids: z.array(zId).min(1).max(100).describe('Lista de IDs de tarefas a atualizar (máximo 100)'),
             status: zStatus.optional().describe('Novo status a aplicar a todas (máquina de estados ignorada em bulk)'),
@@ -1231,7 +1231,7 @@ const todoImportTool = defineTool('todo_import', {
         'Cada objeto deve ter pelo menos "title". Campos opcionais: description, priority, status, ' +
         'tags, due_date, notes, metadata. IDs novos são gerados automaticamente. ' +
         'Use para migrar tarefas de outros sistemas ou criar um sprint inteiro de uma vez.',
-    parameters: /** @type {any} */ (
+    parameters: /** @type {import('zod').ZodSchema} */ (
         z.object({
             tasks: z
                 .array(

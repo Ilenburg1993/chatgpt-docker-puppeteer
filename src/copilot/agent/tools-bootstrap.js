@@ -118,7 +118,7 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
     /** @type {Map<string, number>} */
     const categoryCount = new Map();
     for (const [tools, opts] of TOOL_GROUPS) {
-        const cat = /** @type {string} */ (/** @type {any} */ (opts).category ?? 'unknown');
+        const cat = /** @type {string} */ (/** @type {Record<string, unknown>} */ (opts)['category'] ?? 'unknown');
         categoryCount.set(cat, (categoryCount.get(cat) ?? 0) + tools.length);
     }
     if (mcpTools.length > 0) categoryCount.set('mcp', mcpTools.length);

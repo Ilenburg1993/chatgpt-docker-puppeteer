@@ -137,7 +137,7 @@ function safeEmit(actionCode, payload) {
  */
 function _attachListeners() {
     for (const { event, actionCode } of EVENT_MAP) {
-        const handler = (/** @type {any} */ payload) => safeEmit(actionCode, payload ?? {});
+        const handler = (/** @type {Record<string, unknown>} */ payload) => safeEmit(actionCode, payload ?? {});
         _listeners.set(event, handler);
         alwaysAliveAgent.on(event, handler);
     }

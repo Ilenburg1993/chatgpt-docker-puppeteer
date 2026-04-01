@@ -25,7 +25,7 @@ import { withSkipPermission } from './tool-factory.js';
 /**
  * Handle RPC ativo da sessão corrente. Injetado via setSessionRpc() após inicialização.
  *
- * @type {any}
+ * @type {{ call?: Function } | null}
  */
 let _rpc = null;
 

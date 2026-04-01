@@ -47,6 +47,22 @@ let _bootAttemptCount = 0;
  */
 
 /**
+ * Fragmento de JSON Schema usado para converter para Zod.
+ *
+ * @typedef {object} JsonSchemaFragment
+ * @property {string} [type]
+ * @property {string} [description]
+ * @property {Record<string, JsonSchemaFragment>} [properties]
+ * @property {string[]} [required]
+ * @property {JsonSchemaFragment} [items]
+ * @property {unknown[]} [enum]
+ * @property {JsonSchemaFragment[]} [allOf]
+ * @property {JsonSchemaFragment[]} [oneOf]
+ * @property {JsonSchemaFragment[]} [anyOf]
+ * @property {unknown} [default]
+ */
+
+/**
  * Executa uma requisição JSON-RPC 2.0 contra o endpoint MCP local.
  *
  * MELHORIA-11 (fix): adiciona retry com backoff exponencial para erros de rede transientes (ECONNRESET, ETIMEDOUT, HTTP
@@ -65,7 +81,7 @@ async function rpcCall(method, params) {
     });
 
     const MAX_ATTEMPTS = 3;
-    /** @type {any} */
+    /** @type {unknown} */
     let lastError;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         try {
@@ -88,7 +104,7 @@ async function rpcCall(method, params) {
                 throw err;
             }
 
-            const json = /** @type {any} */ (await response.json());
+            const json = /** @type {{ error?: unknown; result?: unknown }} */ (await response.json());
 
             if (json.error) {
                 throw new Error(`MCP RPC error [${method}]: ${JSON.stringify(json.error)}`);
@@ -116,8 +132,8 @@ async function rpcCall(method, params) {
  */
 export async function listMcpTools() {
     try {
-        /** @type {any} */
-        const result = await rpcCall('tools/list', {});
+        /** @type {{ tools?: McpToolMeta[] }} */
+        const result = /** @type {{ tools?: McpToolMeta[] }} */ (await rpcCall('tools/list', {}));
         const tools = /** @type {McpToolMeta[]} */ (result?.tools ?? []);
         return tools.filter((t) => t && typeof t.name === 'string');
     } catch (/** @type {any} */ e) {
@@ -138,18 +154,18 @@ export async function listMcpTools() {
  * @returns {import('zod').ZodType} Schema Zod equivalente
  */
 function buildZodSchema(inputSchema, parentRequired, key) {
-    /** @type {any} */
-    const schema = inputSchema;
+    /** @type {JsonSchemaFragment} */
+    const schema = /** @type {JsonSchemaFragment} */ (inputSchema);
 
     if (!schema) return z.unknown();
 
     // BUG-H08 (fix): suporte a allOf/oneOf/anyOf (composição de schemas JSON Schema)
     if (Array.isArray(schema.allOf) && schema.allOf.length > 0) {
         // allOf: interseção — usamos o primeiro schema como base (simplificação segura)
-        return buildZodSchema(schema.allOf[0], parentRequired, key);
+        return buildZodSchema(/** @type {JsonSchemaFragment} */ (schema.allOf[0]), parentRequired, key);
     }
     if (Array.isArray(schema.oneOf) && schema.oneOf.length > 0) {
-        const options = schema.oneOf.map((/** @type {any} */ s) => buildZodSchema(s));
+        const options = schema.oneOf.map((/** @type {object} */ s) => buildZodSchema(s));
         const field = z.union(
             /** @type {[import('zod').ZodType, import('zod').ZodType, ...import('zod').ZodType[]]} */ (
                 options.length >= 2 ? options : [options[0], z.unknown()]
@@ -158,7 +174,7 @@ function buildZodSchema(inputSchema, parentRequired, key) {
         return parentRequired && key && !parentRequired.has(key) ? field.optional() : field;
     }
     if (Array.isArray(schema.anyOf) && schema.anyOf.length > 0) {
-        const options = schema.anyOf.map((/** @type {any} */ s) => buildZodSchema(s));
+        const options = schema.anyOf.map((/** @type {object} */ s) => buildZodSchema(s));
         const field = z.union(
             /** @type {[import('zod').ZodType, import('zod').ZodType, ...import('zod').ZodType[]]} */ (
                 options.length >= 2 ? options : [options[0], z.unknown()]
@@ -169,7 +185,7 @@ function buildZodSchema(inputSchema, parentRequired, key) {
 
     // GAP-02: enum (string literal union)
     if (Array.isArray(schema.enum) && schema.enum.length > 0) {
-        if (schema.enum.every((/** @type {any} */ v) => typeof v === 'string')) {
+        if (schema.enum.every((/** @type {unknown} */ v) => typeof v === 'string')) {
             const desc = schema.description ?? '';
             const baseEnum = z.enum(/** @type {[string, ...string[]]} */ (schema.enum));
             const field = desc ? baseEnum.describe(desc) : baseEnum;
@@ -239,21 +255,23 @@ function createSdkToolFromMcp(mcpTool) {
         overridesBuiltInTool: true,
         handler: async (/** @type {Record<string, unknown>} */ params) => {
             try {
-                /** @type {any} */
                 const result = await rpcCall('tools/call', {
                     name: mcpTool.name,
                     arguments: params,
                 });
 
+                if (typeof result === 'string') return result;
+
                 // MCP retorna { content: [{ type: 'text', text: '...' }] } ou texto direto
-                const content = result?.content;
+                const obj = /** @type {{ content?: { type: string; text?: string }[] }} */ (result);
+                const content = obj?.content;
                 if (Array.isArray(content)) {
                     return content
-                        .filter((/** @type {any} */ c) => c?.type === 'text')
-                        .map((/** @type {any} */ c) => c.text)
+                        .filter((/** @type {{ type: string; text?: string }} */ c) => c?.type === 'text')
+                        .map((/** @type {{ type: string; text?: string }} */ c) => c.text)
                         .join('\n');
                 }
-                return typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+                return JSON.stringify(result, null, 2);
             } catch (/** @type {any} */ e) {
                 log('WARN', `[mcp-tool-bridge] Falha ao executar tool '${mcpTool.name}': ${e.message}`);
                 return `Erro ao executar ${mcpTool.name}: ${e.message}`;
