@@ -734,17 +734,22 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna um snapshot do estado atual do agente para a API HTTP.
      *
-     * O resultado é cacheado por 500 ms para evitar leituras síncronas de `readState()` em polling rápido. O cache é
-     * invalidado automaticamente quando o status muda via `#setStatus()`. Configurável via
-     * AGENT_STATUS_SNAPSHOT_TTL_MS.
+     * G2-PERF-01: Dirty flag primário + TTL safety net. O cache é invalidado (null) em toda mutação de estado
+     * (`#setStatus()`, `messageQueue.onChanged`, `stop()`). O TTL existe apenas como segurança para edge cases onde a
+     * invalidação é perdida. `readState()` usa cache interno (O(1) quando warm).
      *
      * @returns {AgentStatusSnapshot}
      */
     getStatusSnapshot() {
-        const now = Date.now();
-        const ttl = Number(process.env.AGENT_STATUS_SNAPSHOT_TTL_MS) || 500;
-        if (this.#statusSnapshotCache && now - this.#statusSnapshotCache.at < ttl) {
-            return this.#statusSnapshotCache.snapshot;
+        // Dirty flag: cache não-nulo significa que nenhuma mutação ocorreu desde a última construção.
+        // TTL safety net: invalida após AGENT_STATUS_SNAPSHOT_TTL_MS para cenários extremos.
+        if (this.#statusSnapshotCache) {
+            const age = Date.now() - this.#statusSnapshotCache.at;
+            if (age < (Number(process.env.AGENT_STATUS_SNAPSHOT_TTL_MS) || 500)) {
+                return this.#statusSnapshotCache.snapshot;
+            }
+            // TTL expirado — forçar rebuild como safety net
+            this.#statusSnapshotCache = null;
         }
         const state = readState();
         const snapshot = buildStatusSnapshot({
@@ -763,7 +768,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             lastCheckpointPath: this.#lastCheckpointPath,
             permissionMode: this.#permissions.getMode(),
         });
-        this.#statusSnapshotCache = { snapshot, at: now };
+        this.#statusSnapshotCache = { snapshot, at: Date.now() };
         return snapshot;
     }
 

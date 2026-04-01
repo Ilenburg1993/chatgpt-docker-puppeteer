@@ -29,6 +29,15 @@ const ROTATE_LOG = TOOL_AUDIT_LOG + '.1';
 // G2-DX-11: limite de tamanho do log configurável via env (default 10MB).
 const MAX_LOG_BYTES = Number(process.env.AGENT_TOOL_AUDIT_MAX_LOG_BYTES) || 10 * 1024 * 1024;
 
+/**
+ * G2-PERF-03: Acumula tamanho do log em memória para evitar `stat()` a cada escrita. Inicializado em -1 (desconhecido)
+ * — o primeiro `logToolAudit()` faz stat() para sincronizar; chamadas subsequentes usam apenas o acumulador. Resetado
+ * para 0 após rotação.
+ *
+ * @type {number}
+ */
+let _logBytes = -1;
+
 // ─── Classificação de risco ───────────────────────────────────────────────────
 
 /**
@@ -82,17 +91,26 @@ export function isHighRiskTool(toolName) {
  */
 export function logToolAudit(entry) {
     const line = JSON.stringify({ ...entry, ts: new Date().toISOString() }) + '\n';
+    const lineBytes = Buffer.byteLength(line, 'utf8');
 
     void (async () => {
         try {
             await mkdir(join(TOOL_AUDIT_LOG, '..'), { recursive: true });
-            try {
-                const { size } = await stat(TOOL_AUDIT_LOG);
-                if (size >= MAX_LOG_BYTES) await rename(TOOL_AUDIT_LOG, ROTATE_LOG);
-            } catch {
-                // arquivo não existe ainda — ok
+            // G2-PERF-03: sincronizar acumulador de bytes no primeiro acesso
+            if (_logBytes < 0) {
+                try {
+                    const { size } = await stat(TOOL_AUDIT_LOG);
+                    _logBytes = size;
+                } catch {
+                    _logBytes = 0;
+                }
+            }
+            if (_logBytes + lineBytes >= MAX_LOG_BYTES) {
+                await rename(TOOL_AUDIT_LOG, ROTATE_LOG);
+                _logBytes = 0;
             }
             await appendFile(TOOL_AUDIT_LOG, line, 'utf8');
+            _logBytes += lineBytes;
         } catch {
             // falha no log de auditoria não deve interromper a sessão
         }

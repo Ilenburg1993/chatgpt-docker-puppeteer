@@ -15,6 +15,24 @@ import { log } from '#core/logger';
 import { writeStateAsync } from './state-io.js';
 
 /**
+ * G2-PERF-02: Set de eventos SDK conhecidos como constante de módulo para evitar realocação a cada chamada de
+ * `wireSessionEvents()` (ex.: reconexão após disconnect).
+ *
+ * @type {ReadonlySet<string>}
+ */
+const KNOWN_SDK_EVENTS = new Set([
+    'session.compaction_start',
+    'session.compaction_complete',
+    'assistant.reasoning_delta',
+    'session.usage_info',
+    'session.mode_changed',
+    'assistant.message_delta',
+    'tool.execution_start',
+    'tool.execution_complete',
+    'assistant.usage',
+]);
+
+/**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  */
 
@@ -184,18 +202,7 @@ export function wireSessionEvents(session, isResumed, callbacks) {
     );
 
     // Catch-all para eventos do SDK não tratados explicitamente + billing (assistant.usage).
-    /** @type {Set<string>} */
-    const knownEvents = new Set([
-        'session.compaction_start',
-        'session.compaction_complete',
-        'assistant.reasoning_delta',
-        'session.usage_info',
-        'session.mode_changed',
-        'assistant.message_delta',
-        'tool.execution_start',
-        'tool.execution_complete',
-        'assistant.usage',
-    ]);
+    // G2-PERF-02: knownEvents movido para constante de módulo KNOWN_SDK_EVENTS
     unsubs.push(
         session.on((/** @type {any} */ evt) => {
             const kind = evt?.kind ?? evt?.type ?? 'unknown';
@@ -216,7 +223,7 @@ export function wireSessionEvents(session, isResumed, callbacks) {
                 );
                 return;
             }
-            if (!knownEvents.has(kind)) {
+            if (!KNOWN_SDK_EVENTS.has(kind)) {
                 log('DEBUG', `[AlwaysAlive] Evento SDK não tratado: kind=${kind}`);
             }
         }),

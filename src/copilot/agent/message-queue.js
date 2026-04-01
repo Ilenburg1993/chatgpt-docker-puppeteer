@@ -129,6 +129,9 @@ export class MessageQueue {
         }
 
         if (signal) {
+            // G2-PERF-04: `indexOf` + `splice` é O(n), mas com MAX_QUEUE_SIZE ≤ 100 o custo é
+            // negligível (< 1μs). Um Map<AbortSignal, index> adicionaria complexidade desproporcional
+            // e complicaria a manutenção da ordem FIFO. Mantemos O(n) como trade-off pragmático.
             signal.addEventListener(
                 'abort',
                 () => {

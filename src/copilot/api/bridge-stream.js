@@ -95,11 +95,24 @@ export function registerStreamRoutes(bridge, agent) {
         // Evento inicial com snapshot do estado atual
         sendEvt('connected', { ...agent.getStatusSnapshot(), timestamp: Date.now() });
 
+        // G2-PERF-05: Em vez de criar N closures distintas (uma por evento AGENT_EVENTS), usar
+        // uma única factory function que captura `sendEvt` e recebe `evt` como binding.
+        // Cada handler é um bind leve: `sseHandler.bind(null, evtName)` — V8 otimiza binds
+        // melhor que closures individuais, e o padrão é mais explícito.
+
+        /**
+         * Handler genérico para SSE — bind de `eventName` via Function.bind.
+         *
+         * @param {AgentEventName} eventName
+         * @param {any} data
+         */
+        const sseHandler = (eventName, data) => sendEvt(eventName, data ?? {});
+
         /** @type {Map<AgentEventName, (data: any) => void>} */
         const handlers = new Map(
             AGENT_EVENTS.filter((evt) => !allowedEvents || allowedEvents.has(evt)).map((evt) => [
                 evt,
-                (/** @type {any} */ data) => sendEvt(evt, data ?? {}),
+                /** @type {(data: any) => void} */ (sseHandler.bind(null, evt)),
             ]),
         );
 
