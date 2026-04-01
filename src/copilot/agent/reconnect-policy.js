@@ -23,17 +23,18 @@ import { log } from '#core/logger';
 /**
  * Tenta reconectar ao SDK com backoff exponencial e jitter.
  *
- * Algoritmo de delay: `base * 2^(attempt-1) + random(0..base)`.
+ * Algoritmo de delay: `base * 2^(attempt-1) + jitter(0..base)`.
  *
  * @param {Error} originalError - Erro original que desencadeou a reconexão
  * @param {any} client - Cliente SDK ativo (`CopilotClient`)
  * @param {string} currentStatus - Status atual do agente (retorna false se `'stopped'`)
  * @param {ReconnectCallbacks} callbacks - Callbacks de side-effect do host
- * @param {{ maxAttempts?: number; baseDelayMs?: number }} [opts] - Opções de tuning
+ * @param {{ maxAttempts?: number; baseDelayMs?: number; jitterFn?: () => number }} [opts] - Opções de tuning
  * @returns {Promise<boolean>} `true` se reconexão bem-sucedida, `false` se esgotado
  */
 export async function tryReconnect(originalError, client, currentStatus, callbacks, opts = {}) {
-    const { maxAttempts = 5, baseDelayMs = 1_000 } = opts;
+    // G1-DX-03: jitterFn injetável para testes determinísticos (default: Math.random).
+    const { maxAttempts = 5, baseDelayMs = 1_000, jitterFn = Math.random } = opts;
     const { emit, initSession, dialogLoop, clearSessionEventUnsubs } = callbacks;
 
     // Só tenta reconectar se o cliente ainda existe e o agente não foi parado.
@@ -44,8 +45,8 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
     clearSessionEventUnsubs([]);
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + random(0..base)
-        const delay = baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * baseDelayMs;
+        // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + jitter(0..base)
+        const delay = baseDelayMs * Math.pow(2, attempt - 1) + jitterFn() * baseDelayMs;
         log('INFO', `[AlwaysAlive] Reconexão tentativa ${attempt}/${maxAttempts} em ${Math.round(delay)}ms...`);
         emit('status', `reconnecting:${attempt}/${maxAttempts}`);
 

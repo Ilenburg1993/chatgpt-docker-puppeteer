@@ -45,9 +45,10 @@ describe('always-alive › Sprint 6: backoff exponencial de reconexão', async (
 
     it('deve usar Math.random para jitter', () => {
         // F.6.2: lógica de jitter extraída para reconnect-policy.js
+        // G1-DX-03: Math.random é agora o default injetável via `jitterFn = Math.random`
         assert.ok(
-            reconnectPolicyCode.includes('Math.random()'),
-            'reconnect-policy.js deve usar Math.random() para jitter e evitar thundering herd',
+            reconnectPolicyCode.includes('Math.random'),
+            'reconnect-policy.js deve usar Math.random como jitter padrão (thundering herd prevention)',
         );
     });
 
