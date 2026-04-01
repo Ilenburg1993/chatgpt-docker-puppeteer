@@ -71,6 +71,7 @@ let _bootAttemptCount = 0;
  * @param {string} method - Método JSON-RPC (ex: 'tools/list', 'tools/call')
  * @param {unknown} [params] - Parâmetros do método
  * @returns {Promise<unknown>} Resultado do campo `result` ou lança Error em caso de falha
+ * @throws {Error} Se o servidor MCP retornar erro HTTP, erro RPC ou conexão falhar após retries
  */
 async function rpcCall(method, params) {
     const body = JSON.stringify({

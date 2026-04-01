@@ -158,7 +158,7 @@ export async function checkLlmBHealth(opts = {}) {
  * @param {string} message - Mensagem a enviar para LLM-B
  * @param {InjectOpts} [opts]
  * @returns {Promise<InjectResult>}
- * @throws {Error} Se o terminal não estiver ativo, LLM-B ocupada após todas as tentativas, ou timeout excedido
+ * @throws {BridgeError} Se o terminal não estiver ativo, LLM-B ocupada após todas as tentativas, ou timeout excedido
  */
 export async function injectToLlmB(message, opts = {}) {
     const maxRetries = opts.retries ?? 3;
@@ -188,6 +188,7 @@ export async function injectToLlmB(message, opts = {}) {
  * @param {string} message
  * @param {InjectOpts} opts
  * @returns {Promise<InjectResult>}
+ * @throws {BridgeError} Se a resposta for inválida, LLM-B ocupada, indisponível ou retornar erro
  */
 async function _doInjectToLlmB(message, opts) {
     const port = opts.port ?? DEFAULT_PORT;
@@ -239,7 +240,7 @@ async function _doInjectToLlmB(message, opts) {
  *
  * @param {{ maxWaitMs?: number; pollIntervalMs?: number; port?: number }} [opts]
  * @returns {Promise<void>}
- * @throws {Error} Se o terminal não ficar pronto dentro do tempo máximo
+ * @throws {BridgeError} Se o terminal não ficar pronto dentro do tempo máximo
  */
 export async function waitForLlmBReady(opts = {}) {
     const maxWaitMs = opts.maxWaitMs ?? 30_000;
@@ -443,7 +444,7 @@ export function subscribeLlmBCritical(onEvent, opts = {}) {
  * @param {PipelineStep[]} steps
  * @param {{ from?: string; port?: number; timeoutMs?: number }} [opts]
  * @returns {Promise<PipelineResult>}
- * @throws {Error} Se o terminal não estiver ativo ou timeout excedido
+ * @throws {BridgeError} Se a resposta for inválida, LLM-B ocupada ou terminal indisponível
  */
 export async function injectPipeline(steps, opts = {}) {
     const port = opts.port ?? DEFAULT_PORT;
@@ -478,6 +479,8 @@ export async function injectPipeline(steps, opts = {}) {
 
     return {
         ok: parsed['ok'] === true,
-        results: /** @type {{ step: number; prompt: string; reply: string; durationMs: number }[]} */ (parsed['results'] ?? []),
+        results: /** @type {{ step: number; prompt: string; reply: string; durationMs: number }[]} */ (
+            parsed['results'] ?? []
+        ),
     };
 }

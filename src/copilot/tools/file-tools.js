@@ -273,6 +273,15 @@ const listDirectoryTool = buildTool({
 
         log('INFO', `[copilot/list_directory] ${resolved} (recursive=${recursive}, depth=${depth})`);
 
+        /**
+         * @typedef {object} DirEntry
+         * @property {string} name
+         * @property {string} type
+         * @property {number} [size]
+         * @property {string} path
+         * @property {DirEntry[]} [children]
+         */
+
         try {
             const stats = fs.statSync(resolved);
             if (!stats.isDirectory()) return { success: false, error: 'Não é um diretório, use read_file_content.' };
@@ -280,7 +289,7 @@ const listDirectoryTool = buildTool({
             /**
              * @param {string} dir
              * @param {number} currentDepth
-             * @returns {{ name: string; type: string; size?: number; path: string; children?: any[] }[]}
+             * @returns {DirEntry[]}
              */
             function readDir(dir, currentDepth) {
                 /** @type {string[]} */
@@ -291,7 +300,7 @@ const listDirectoryTool = buildTool({
                     return [];
                 }
 
-                /** @type {{ name: string; type: string; size?: number; path: string; children?: any[] }[]} */
+                /** @type {DirEntry[]} */
                 const result = [];
                 for (const name of entries) {
                     if (!showHidden && name.startsWith('.')) continue;
@@ -311,7 +320,7 @@ const listDirectoryTool = buildTool({
                         continue;
                     }
                     const isDir = entryStats.isDirectory();
-                    /** @type {{ name: string; type: string; size?: number; path: string; children?: any[] }} */
+                    /** @type {DirEntry} */
                     const entry = {
                         name,
                         type: isDir ? 'dir' : 'file',

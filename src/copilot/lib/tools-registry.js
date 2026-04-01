@@ -34,6 +34,10 @@
 /**
  * Cria um novo registry de ferramentas vazio.
  *
+ * @example
+ *     const reg = createRegistry();
+ *     registerTool(reg, myTool, { category: 'code' });
+ *
  * @returns {ToolRegistry}
  */
 export function createRegistry() {
@@ -53,6 +57,7 @@ export function createRegistry() {
  * @param {boolean} [meta.readOnly=false] Se a ferramenta é somente-leitura. Default is `false`
  * @returns {void}
  * @throws {Error} Se tool ou tool.name for inválido
+ * @see createRegistry
  */
 export function registerTool(registry, tool, meta = {}) {
     if (!registry || !registry.entries) throw new Error('[lib/tools-registry] registry inválido.');

@@ -88,7 +88,9 @@ import { v4 as uuidv4 } from 'uuid';
 function initTurnsFts(db) {
     try {
         /** @type {{ count: number } | undefined} */
-        const ftsCount = /** @type {{ count: number } | undefined} */ (db.prepare('SELECT COUNT(*) AS count FROM copilot_turns_fts').get());
+        const ftsCount = /** @type {{ count: number } | undefined} */ (
+            db.prepare('SELECT COUNT(*) AS count FROM copilot_turns_fts').get()
+        );
         /** @type {{ count: number } | undefined} */
         const turnCount = /** @type {{ count: number } | undefined} */ (
             db.prepare('SELECT COUNT(*) AS count FROM copilot_conversation_turns').get()
@@ -386,6 +388,7 @@ export class ConversationStore {
      * @param {string} hubSessionId - ID da hub_session
      * @param {WriteTurnOpts} opts
      * @returns {Promise<number>} ID do turno inserido
+     * @throws {Error} Se init() não foi chamado ou todos os retries esgotados (SQLITE_CONSTRAINT)
      */
     async writeTurn(hubSessionId, opts) {
         const db = this.#getDb();

@@ -840,6 +840,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Retoma o dialog loop. Delega ao DialogLoopManager.
      *
      * @returns {Promise<void>}
+     * @throws {SessionError} Se o agente não estiver no estado 'idle' ou 'waiting_for_input'
      */
     async resumeDialogLoop() {
         if (this.#status !== 'idle' && this.#status !== 'waiting_for_input') {
@@ -901,15 +902,31 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.#dialogLoop.removeAllListeners();
         this.#dialogLoop.on('ready', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.ready', evt));
         this.#dialogLoop.on('reply', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.reply', evt));
-        this.#dialogLoop.on('stopped', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.stopped', evt));
+        this.#dialogLoop.on('stopped', (/** @type {Record<string, unknown>} */ evt) =>
+            this.emit('dialog.stopped', evt),
+        );
         this.#dialogLoop.on('paused', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.paused', evt));
-        this.#dialogLoop.on('resumed', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.resumed', evt));
-        this.#dialogLoop.on('stalled', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.stalled', evt));
-        this.#dialogLoop.on('turn_start', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.turn_start', evt));
-        this.#dialogLoop.on('turn_end', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.turn_end', evt));
-        this.#dialogLoop.on('turn_timeout', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.turn_timeout', evt));
-        this.#dialogLoop.on('changed', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.loop.changed', evt));
-        this.#dialogLoop.on('model.fallback', (/** @type {Record<string, unknown>} */ evt) => this.emit('pr.fallback_model', evt));
+        this.#dialogLoop.on('resumed', (/** @type {Record<string, unknown>} */ evt) =>
+            this.emit('dialog.resumed', evt),
+        );
+        this.#dialogLoop.on('stalled', (/** @type {Record<string, unknown>} */ evt) =>
+            this.emit('dialog.stalled', evt),
+        );
+        this.#dialogLoop.on('turn_start', (/** @type {Record<string, unknown>} */ evt) =>
+            this.emit('dialog.turn_start', evt),
+        );
+        this.#dialogLoop.on('turn_end', (/** @type {Record<string, unknown>} */ evt) =>
+            this.emit('dialog.turn_end', evt),
+        );
+        this.#dialogLoop.on('turn_timeout', (/** @type {Record<string, unknown>} */ evt) =>
+            this.emit('dialog.turn_timeout', evt),
+        );
+        this.#dialogLoop.on('changed', (/** @type {Record<string, unknown>} */ evt) =>
+            this.emit('dialog.loop.changed', evt),
+        );
+        this.#dialogLoop.on('model.fallback', (/** @type {Record<string, unknown>} */ evt) =>
+            this.emit('pr.fallback_model', evt),
+        );
     }
 
     /**
@@ -1049,7 +1066,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         try {
             return await tryReconnect(
                 originalError,
-                this.#client,
+                /** @type {import('@github/copilot-sdk').CopilotClient} */ (this.#client),
                 this.#status,
                 {
                     emit: (event, payload) => this.emit(event, payload),

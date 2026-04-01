@@ -62,6 +62,7 @@ function applyPragmas(db) {
  *
  * @param {import('better-sqlite3').Database} db
  * @returns {void}
+ * @throws {Error} Se uma migration tiver formato inválido (sem up/upFn)
  */
 function migrate(db) {
     db.exec(`
@@ -77,7 +78,7 @@ function migrate(db) {
         db
             .prepare('SELECT version FROM schema_migrations ORDER BY version ASC')
             .all()
-            .map(/** @param {any} r */ (r) => Number(r.version)),
+            .map((/** @type {unknown} */ r) => Number(/** @type {{ version: number }} */ (r).version)),
     );
 
     for (const migration of COPILOT_MIGRATIONS) {

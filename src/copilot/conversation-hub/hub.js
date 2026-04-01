@@ -79,6 +79,8 @@ export class ConversationHub {
      *
      * @returns {HubOrchestrator}
      * @throws {Error} Se hub não inicializado
+     * @see HubOrchestrator
+     * @see ConversationStore
      */
     get orchestrator() {
         if (!this.#orchestrator) {
@@ -216,13 +218,13 @@ export class ConversationHub {
     /**
      * Encaminha eventos do HubOrchestrator para o NERV bus.
      *
-     * @param {any} nerv
+     * @param {{ emitEvent?: (e: { source: string; actionCode: string; payload: unknown; ts: number }) => void }} nerv
      * @returns {void}
      */
     #bridgeToNerv(nerv) {
         if (!this.#orchestrator) return;
 
-        /** @param {string} actionCode @param {any} payload */
+        /** @param {string} actionCode @param {unknown} payload */
         const emit = (actionCode, payload) => {
             try {
                 nerv.emitEvent?.({

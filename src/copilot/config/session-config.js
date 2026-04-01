@@ -87,19 +87,21 @@ export function buildAlwaysAliveConfig(options = {}) {
     });
 
     /** @type {SessionConfig} */
-    const config = /** @type {SessionConfig} */ (/** @type {unknown} */ ({
-        ...BASE_CONFIG,
-        model,
-        tools,
-        onPermissionRequest,
-        ...(onUserInputRequest !== undefined ? { onUserInputRequest } : {}),
-        hooks,
-        ...(hookContextContent
-            ? {
-                  systemMessage: buildHookContextAppendMessage(hookContextContent),
-              }
-            : {}),
-    }));
+    const config = /** @type {SessionConfig} */ (
+        /** @type {unknown} */ ({
+            ...BASE_CONFIG,
+            model,
+            tools,
+            onPermissionRequest,
+            ...(onUserInputRequest !== undefined ? { onUserInputRequest } : {}),
+            hooks,
+            ...(hookContextContent
+                ? {
+                      systemMessage: buildHookContextAppendMessage(hookContextContent),
+                  }
+                : {}),
+        })
+    );
 
     return config;
 }

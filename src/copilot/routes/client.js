@@ -165,7 +165,9 @@ router.post('/client/force-stop', (req, res) => {
  * skipPermission). Caso contrário, usa allTools estático.
  */
 router.get('/tools', (_req, res) => {
-    const registry = /** @type {{ toolsRegistry?: { entries?: Map<string, Record<string, unknown>> } }} */ (alwaysAliveAgent).toolsRegistry;
+    const registry = /** @type {{ toolsRegistry?: { entries?: Map<string, Record<string, unknown>> } }} */ (
+        alwaysAliveAgent
+    ).toolsRegistry;
 
     if (registry?.entries instanceof Map && registry.entries.size > 0) {
         // Registry rico disponível

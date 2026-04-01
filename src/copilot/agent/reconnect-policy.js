@@ -26,7 +26,7 @@ import { log } from '#core/logger';
  * Algoritmo de delay: `base * 2^(attempt-1) + jitter(0..base)`.
  *
  * @param {Error} originalError - Erro original que desencadeou a reconexão
- * @param {any} client - Cliente SDK ativo (`CopilotClient`)
+ * @param {import('@github/copilot-sdk').CopilotClient} client - Cliente SDK ativo (`CopilotClient`)
  * @param {string} currentStatus - Status atual do agente (retorna false se `'stopped'`)
  * @param {ReconnectCallbacks} callbacks - Callbacks de side-effect do host
  * @param {{ maxAttempts?: number; baseDelayMs?: number; jitterFn?: () => number }} [opts] - Opções de tuning

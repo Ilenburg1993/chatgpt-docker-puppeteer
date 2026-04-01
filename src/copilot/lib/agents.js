@@ -37,6 +37,13 @@ export const READ_ONLY_TOOLS = [
 /**
  * Cria uma configuração de agente customizado para o SDK Copilot.
  *
+ * @example
+ *     const agent = createAgent({
+ *         name: 'reviewer',
+ *         prompt: 'Você é um revisor de código.',
+ *         tools: ['read_file', 'grep_search'],
+ *     });
+ *
  * @param {object} cfg
  * @param {string} cfg.name - Nome único do agente (obrigatório)
  * @param {string} cfg.prompt - Prompt de instrução do agente (obrigatório)
@@ -46,6 +53,8 @@ export const READ_ONLY_TOOLS = [
  * @param {Record<string, object>} [cfg.mcpServers] - MCP servers específicos deste agente
  * @param {boolean} [cfg.infer=true] - Se disponível para inferência de modelo. Default is `true`
  * @returns {CustomAgentConfig}
+ * @throws {Error} Se name ou prompt forem string vazia ou não-string
+ * @see createReadOnlyAgent
  */
 export function createAgent({ name, prompt, displayName, description, tools, mcpServers, infer }) {
     if (!name || typeof name !== 'string') throw new Error('[lib/agents] createAgent: "name" (string) é obrigatório.');

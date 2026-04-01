@@ -43,6 +43,10 @@
 /**
  * Cria um novo store de telemetria.
  *
+ * @example
+ *     const store = createTelemetry({ maxRecords: 100 });
+ *     recordToolCall(store, 'read_file', { durationMs: 50, success: true });
+ *
  * @param {object} [opts={}] Default is `{}`
  * @param {number} [opts.maxRecords=500] Limite de registros para evitar memory leak. Default is `500`
  * @returns {TelemetryStore}
@@ -327,14 +331,27 @@ export function clearTelemetry(store) {
  * @property {Record<string, unknown>} [extra] - Atributos adicionais
  */
 
-/** @type {any | null} Instância do tracer OTEL (null se não disponível) */
+/**
+ * @typedef {object} OtelSpan
+ * @property {(key: string, value: string | number | boolean) => void} setAttribute
+ * @property {(status: { code: number; message?: string }) => void} setStatus
+ * @property {(exception: unknown) => void} recordException
+ * @property {() => void} end
+ */
+
+/**
+ * @typedef {object} OtelTracer
+ * @property {(name: string) => OtelSpan} startSpan
+ */
+
+/** @type {OtelTracer | null} Instância do tracer OTEL (null se não disponível) */
 let _tracer = null;
 
 /**
  * Inicializa o tracer OTEL de forma segura (graceful degradation). Tentativa única no primeiro uso. Se
  * `@opentelemetry/sdk-trace-node` não estiver instalado ou falhar, o sistema opera sem traces.
  *
- * @returns {Promise<any>}
+ * @returns {Promise<OtelTracer | null>}
  */
 async function getTracer() {
     if (_tracer !== null) return _tracer;
@@ -345,7 +362,7 @@ async function getTracer() {
         const { trace } = await import('@opentelemetry/api');
         const provider = new NodeTracerProvider();
         provider.register();
-        _tracer = trace.getTracer('copilot-agent', '1.0.0');
+        _tracer = /** @type {OtelTracer} */ (/** @type {unknown} */ (trace.getTracer('copilot-agent', '1.0.0')));
         return _tracer;
     } catch {
         // Pacote não disponível — usar fallback de span no-op
@@ -392,7 +409,7 @@ export async function startSpan(name, attrs, fn) {
                 );
             }
         }
-        const ctx = trace.setSpan(context.active(), span);
+        const ctx = trace.setSpan(context.active(), /** @type {any} */ (span));
         const start = Date.now();
         try {
             const result = await context.with(ctx, fn);

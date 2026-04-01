@@ -420,7 +420,11 @@ export async function handleInject(body) {
  */
 export async function handleGhIssues({ state = 'open', limit = 15, page = 1 } = {}) {
     try {
-        const result = await listIssues({ state: /** @type {'open' | 'closed' | 'all'} */ (state), perPage: limit, page });
+        const result = await listIssues({
+            state: /** @type {'open' | 'closed' | 'all'} */ (state),
+            perPage: limit,
+            page,
+        });
         return {
             status: 200,
             cors: true,
@@ -441,7 +445,11 @@ export async function handleGhIssues({ state = 'open', limit = 15, page = 1 } = 
  */
 export async function handleGhPrs({ state = 'open', limit = 15, page = 1 } = {}) {
     try {
-        const result = await listPrs({ state: /** @type {'open' | 'closed' | 'merged' | 'all'} */ (state), perPage: limit, page });
+        const result = await listPrs({
+            state: /** @type {'open' | 'closed' | 'merged' | 'all'} */ (state),
+            perPage: limit,
+            page,
+        });
         return {
             status: 200,
             cors: true,
@@ -671,7 +679,8 @@ export function handleSetToolsConfig(rawBody) {
     if ('allowlist' in body) {
         if (
             body['allowlist'] !== null &&
-            (!Array.isArray(body['allowlist']) || body['allowlist'].some((/** @type {unknown} */ t) => typeof t !== 'string'))
+            (!Array.isArray(body['allowlist']) ||
+                body['allowlist'].some((/** @type {unknown} */ t) => typeof t !== 'string'))
         ) {
             return { status: 400, body: { ok: false, error: 'allowlist deve ser string[] ou null' } };
         }
@@ -679,7 +688,10 @@ export function handleSetToolsConfig(rawBody) {
     }
 
     if ('denylist' in body) {
-        if (!Array.isArray(body['denylist']) || body['denylist'].some((/** @type {unknown} */ t) => typeof t !== 'string')) {
+        if (
+            !Array.isArray(body['denylist']) ||
+            body['denylist'].some((/** @type {unknown} */ t) => typeof t !== 'string')
+        ) {
             return { status: 400, body: { ok: false, error: 'denylist deve ser string[]' } };
         }
         patchToolsConfig({ denylist: body['denylist'] });

@@ -104,15 +104,15 @@ export function registerStreamRoutes(bridge, agent) {
          * Handler genérico para SSE — bind de `eventName` via Function.bind.
          *
          * @param {AgentEventName} eventName
-         * @param {any} data
+         * @param {unknown} data
          */
         const sseHandler = (eventName, data) => sendEvt(eventName, data ?? {});
 
-        /** @type {Map<AgentEventName, (data: any) => void>} */
+        /** @type {Map<AgentEventName, (data: unknown) => void>} */
         const handlers = new Map(
             AGENT_EVENTS.filter((evt) => !allowedEvents || allowedEvents.has(evt)).map((evt) => [
                 evt,
-                /** @type {(data: any) => void} */ (sseHandler.bind(null, evt)),
+                /** @type {(data: unknown) => void} */ (sseHandler.bind(null, evt)),
             ]),
         );
 

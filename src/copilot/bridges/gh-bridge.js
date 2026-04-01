@@ -45,7 +45,7 @@ async function runGh(args, opts = {}) {
  *
  * @param {string[]} args
  * @param {object} [opts]
- * @returns {Promise<any>}
+ * @returns {Promise<any>} Resultado de JSON.parse da saída do `gh` CLI (tipo dinâmico por natureza)
  */
 async function runGhJson(args, opts = {}) {
     const raw = await runGh(args, opts);
@@ -669,7 +669,7 @@ export async function getStatus() {
  * @param {object} [opts]
  * @param {'GET' | 'POST' | 'PATCH' | 'DELETE'} [opts.method]
  * @param {object} [opts.body]
- * @returns {Promise<any>}
+ * @returns {Promise<Record<string, unknown> | null>}
  */
 export async function rawApi(endpoint, opts = {}) {
     const { method = 'GET', body } = opts;

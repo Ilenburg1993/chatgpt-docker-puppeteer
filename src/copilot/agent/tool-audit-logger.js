@@ -61,7 +61,8 @@ const HIGH_RISK_TOOLS = (() => {
         'computer',
     ];
     const extra = process.env['COPILOT_HIGH_RISK_TOOLS']
-        ? process.env['COPILOT_HIGH_RISK_TOOLS'].split(',')
+        ? process.env['COPILOT_HIGH_RISK_TOOLS']
+              .split(',')
               .map((t) => t.trim())
               .filter(Boolean)
         : [];
@@ -131,7 +132,10 @@ export function logToolAudit(entry) {
 export function buildAuditingPermissionHandler(baseHandler) {
     return /** @type {import('@github/copilot-sdk').PermissionHandler} */ (
         async (request, invocation) => {
-            const toolName = /** @type {{ toolName?: string; tool?: string }} */ (request)?.toolName ?? /** @type {{ toolName?: string; tool?: string }} */ (request)?.tool ?? 'unknown';
+            const toolName =
+                /** @type {{ toolName?: string; tool?: string }} */ (request)?.toolName ??
+                /** @type {{ toolName?: string; tool?: string }} */ (request)?.tool ??
+                'unknown';
             const highRisk = isHighRiskTool(toolName);
 
             if (highRisk) {

@@ -109,6 +109,7 @@ export function listCustomAgents() {
  *
  * @param {CustomAgentConfig} config
  * @returns {void}
+ * @throws {Error} Se config.name, config.description, config.tools ou config.prompt forem inválidos
  */
 export function registerCustomAgent(config) {
     if (!config?.name || typeof config.name !== 'string') {

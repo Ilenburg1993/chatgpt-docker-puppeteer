@@ -81,7 +81,9 @@ export function registerTaskRoutes(bridge, agent) {
             // agent.sendMessage rejeita imediatamente com QUEUE_FULL, mas só após a promise ser criada
             // Verificar proativamente via MAX_QUEUE_SIZE evita estado inconsistente
             const queueSize = /** @type {{ queueSize?: number }} */ (agent).queueSize ?? null;
-            const maxQueueSize = /** @type {{ constructor?: { MAX_QUEUE_SIZE?: number } }} */ (agent).constructor?.MAX_QUEUE_SIZE ?? null;
+            const maxQueueSize =
+                /** @type {{ constructor?: { MAX_QUEUE_SIZE?: number } }} */ (agent).constructor?.MAX_QUEUE_SIZE ??
+                null;
             if (queueSize !== null && maxQueueSize !== null && queueSize >= maxQueueSize) {
                 return res.status(429).json({
                     ok: false,

@@ -216,7 +216,8 @@ export function broadcastSse(event, data) {
     ) {
         safeData = {
             ...data,
-            content: /** @type {{ content: string }} */ (data).content.slice(0, MAX_SSE_CONTENT_CHARS) + ' [\u2026truncado]',
+            content:
+                /** @type {{ content: string }} */ (data).content.slice(0, MAX_SSE_CONTENT_CHARS) + ' [\u2026truncado]',
         };
     }
 

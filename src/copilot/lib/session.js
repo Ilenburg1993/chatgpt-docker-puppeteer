@@ -121,7 +121,7 @@ function buildInfiniteSessionConfig(opts) {
  *
  * @param {SessionCreateOptions | SessionResumeOptions} opts
  * @param {'create' | 'resume'} mode
- * @returns {any}
+ * @returns {Record<string, unknown>}
  */
 function buildSessionConfig(opts, mode) {
     const cfg = /** @type {Record<string, unknown>} */ ({});
@@ -161,7 +161,10 @@ function buildSessionConfig(opts, mode) {
         if (ro.disableResume !== undefined) cfg['disableResume'] = ro.disableResume;
     }
 
-    const systemMsg = buildSystemMessageConfig(opts.systemMessage, /** @type {string | undefined} */ (/** @type {Record<string, unknown>} */ (opts)['systemMessageContent']));
+    const systemMsg = buildSystemMessageConfig(
+        opts.systemMessage,
+        /** @type {string | undefined} */ (/** @type {Record<string, unknown>} */ (opts)['systemMessageContent']),
+    );
     if (systemMsg !== undefined) cfg['systemMessage'] = systemMsg;
 
     return cfg;
@@ -175,7 +178,7 @@ function buildSessionConfig(opts, mode) {
  * @example
  *     const { session } = await createSession(client, { model: 'gpt-4.1' });
  *
- * @param {any} client - CopilotClient instanciado
+ * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
  * @param {SessionCreateOptions} [opts] - Opcoes de configuracao
  * @returns {Promise<SessionResult>}
  */
@@ -185,7 +188,9 @@ export async function createSession(client, opts) {
     const config = buildSessionConfig({ ...options, model }, 'create');
 
     log('INFO', `[lib/session] Criando nova sessao: model='${model}'`);
-    const session = await client.createSession(config);
+    const session = await client.createSession(
+        /** @type {import('@github/copilot-sdk').SessionConfig} */ (/** @type {unknown} */ (config)),
+    );
     log('INFO', `[lib/session] Sessao criada: ${session.sessionId}`);
     return { session, isResumed: false, sessionId: session.sessionId };
 }
@@ -196,7 +201,7 @@ export async function createSession(client, opts) {
  * @example
  *     const { session } = await resumeSession(client, 'abc-123');
  *
- * @param {any} client - CopilotClient instanciado
+ * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
  * @param {string} sessionId - ID da sessao a retomar
  * @param {SessionResumeOptions} [opts] - Opcoes de configuracao compatíveis com resume
  * @returns {Promise<SessionResult>}
@@ -207,7 +212,10 @@ export async function resumeSession(client, sessionId, opts) {
     const config = buildSessionConfig(options, 'resume');
 
     log('INFO', `[lib/session] Retomando sessao: ${sessionId}`);
-    const session = await client.resumeSession(sessionId, config);
+    const session = await client.resumeSession(
+        sessionId,
+        /** @type {import('@github/copilot-sdk').SessionConfig} */ (/** @type {unknown} */ (config)),
+    );
     log('INFO', `[lib/session] Sessao retomada: ${session.sessionId}`);
     return { session, isResumed: true, sessionId: session.sessionId };
 }
@@ -216,7 +224,7 @@ export async function resumeSession(client, sessionId, opts) {
  * Tenta retomar uma sessao; se falhar, cria uma nova. Padrao usado pelo session-manager para persistencia entre
  * reinicializacoes.
  *
- * @param {any} client - CopilotClient instanciado
+ * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
  * @param {string | null | undefined} existingSessionId - ID da sessao persistida (ou null)
  * @param {SessionCreateOptions} [opts] - Opcoes usadas tanto para resume quanto para create
  * @returns {Promise<SessionResult>}
@@ -236,7 +244,7 @@ export async function resumeOrCreate(client, existingSessionId, opts) {
 /**
  * Lista todas as sessoes ativas no cliente.
  *
- * @param {any} client - CopilotClient instanciado
+ * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
  * @param {object} [filter] - Filtro opcional
  * @returns {Promise<import('@github/copilot-sdk').SessionMetadata[]>}
  */
@@ -247,7 +255,7 @@ export async function listSessions(client, filter) {
 /**
  * Remove uma sessao pelo ID.
  *
- * @param {any} client - CopilotClient instanciado
+ * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
  * @param {string} sessionId - ID da sessao a remover
  * @returns {Promise<void>}
  */

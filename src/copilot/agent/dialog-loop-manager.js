@@ -195,6 +195,7 @@ export class DialogLoopManager extends EventEmitter {
      *
      * @param {string} [bootPrompt] - Prompt de inicialização (default: DialogProtocol.buildBootPrompt())
      * @returns {Promise<void>}
+     * @throws {SessionError} Se não vinculado a um host (NOT_ATTACHED) ou dialog loop já ativo (DIALOG_ALREADY_ACTIVE)
      */
     async start(bootPrompt) {
         if (!this.#host) {

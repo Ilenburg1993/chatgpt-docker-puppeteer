@@ -37,9 +37,11 @@ const KNOWN_SDK_EVENTS = new Set([
  */
 
 /**
- * Payload genérico de eventos SDK. Cada evento tem um `kind`/`type` e um `data` com propriedades variáveis.
+ * Payload genérico de eventos SDK. O SDK emite eventos com um `type` discriminant e `data` variável. Como
+ * `session.on(eventName, cb)` não faz narrowing pelo tipo do evento, usamos este typedef genérico que permite acesso
+ * via bracket notation em `data`.
  *
- * @typedef {object} SdkEventPayload
+ * @typedef {object} SdkEvent
  * @property {string} [kind]
  * @property {string} [type]
  * @property {Record<string, unknown>} [data]
@@ -85,7 +87,7 @@ export function wireSessionEvents(session, isResumed, callbacks) {
 
     // Compaction start
     unsubs.push(
-        session.on('session.compaction_start', (/** @type {SdkEventPayload} */ evt) => {
+        session.on('session.compaction_start', (/** @type {SdkEvent} */ evt) => {
             log('INFO', '[AlwaysAlive] Compaction iniciada (sessão infinita).');
             emit('session.compaction_start', evt?.data ?? {});
         }),
@@ -93,7 +95,7 @@ export function wireSessionEvents(session, isResumed, callbacks) {
 
     // Compaction complete — detecta falha, captura checkpointPath para recovery.
     unsubs.push(
-        session.on('session.compaction_complete', (/** @type {SdkEventPayload} */ evt) => {
+        session.on('session.compaction_complete', (/** @type {SdkEvent} */ evt) => {
             const data = /** @type {{ success?: boolean; checkpointPath?: string }} */ (evt?.data ?? {});
             if (data['success'] === false) {
                 log('ERROR', '[AlwaysAlive] Compaction falhou. Sessão pode estar instável.');
@@ -121,16 +123,20 @@ export function wireSessionEvents(session, isResumed, callbacks) {
 
     // Reasoning tokens (o3/o4-mini extended thinking)
     unsubs.push(
-        session.on('assistant.reasoning_delta', (/** @type {SdkEventPayload} */ evt) => {
+        session.on('assistant.reasoning_delta', (/** @type {SdkEvent} */ evt) => {
             const chunk = /** @type {string} */ (evt?.data?.['deltaContent'] ?? '');
-            if (chunk) emit('task.reasoning', { chunk, reasoningId: /** @type {string | null} */ (evt?.data?.['reasoningId'] ?? null) });
+            if (chunk)
+                emit('task.reasoning', {
+                    chunk,
+                    reasoningId: /** @type {string | null} */ (evt?.data?.['reasoningId'] ?? null),
+                });
         }),
     );
 
     // Streaming delta — filtra durante 'processing' (task.delta via task-executor) e durante
     // 'waiting_for_input' com dialog loop ativo (G1-BUG-06: evita taskId:null no SSE).
     unsubs.push(
-        session.on('assistant.message_delta', (/** @type {SdkEventPayload} */ evt) => {
+        session.on('assistant.message_delta', (/** @type {SdkEvent} */ evt) => {
             if (isProcessing() || dialogLoopActive()) return;
             const chunk = /** @type {string} */ (evt?.data?.['deltaContent'] ?? evt?.data?.['content'] ?? '');
             if (chunk) emit('task.delta', { taskId: null, chunk });
@@ -171,7 +177,7 @@ export function wireSessionEvents(session, isResumed, callbacks) {
     // Token usage e janela de contexto — atualiza contextState e emite avisos.
     let _firstUsageChecked = false;
     unsubs.push(
-        session.on('session.usage_info', (/** @type {SdkEventPayload} */ evt) => {
+        session.on('session.usage_info', (/** @type {SdkEvent} */ evt) => {
             const data = evt?.data ?? {};
             emit('session.usage', data);
             const currentTokens = /** @type {number} */ (data['currentTokens'] ?? 0);
@@ -190,7 +196,7 @@ export function wireSessionEvents(session, isResumed, callbacks) {
 
     // Mudança de modo (plan ↔ act ↔ interactive)
     unsubs.push(
-        session.on('session.mode_changed', (/** @type {SdkEventPayload} */ evt) => {
+        session.on('session.mode_changed', (/** @type {SdkEvent} */ evt) => {
             log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.['previousMode']} → ${evt?.data?.['newMode']}`);
             emit('session.mode_changed', evt?.data ?? {});
         }),
@@ -199,13 +205,13 @@ export function wireSessionEvents(session, isResumed, callbacks) {
     // G2-BUG-14: tool.execution_start e tool.execution_complete estavam no knownEvents mas nunca subscritos.
     // Guard isProcessing(): durante task execution, task-executor.js já emite com taskId — evitar duplicata.
     unsubs.push(
-        session.on('tool.execution_start', (/** @type {SdkEventPayload} */ evt) => {
+        session.on('tool.execution_start', (/** @type {SdkEvent} */ evt) => {
             if (isProcessing()) return;
             emit('tool.execution.start', evt?.data ?? {});
         }),
     );
     unsubs.push(
-        session.on('tool.execution_complete', (/** @type {SdkEventPayload} */ evt) => {
+        session.on('tool.execution_complete', (/** @type {SdkEvent} */ evt) => {
             if (isProcessing()) return;
             emit('tool.execution.complete', evt?.data ?? {});
         }),
@@ -214,7 +220,7 @@ export function wireSessionEvents(session, isResumed, callbacks) {
     // Catch-all para eventos do SDK não tratados explicitamente + billing (assistant.usage).
     // G2-PERF-02: knownEvents movido para constante de módulo KNOWN_SDK_EVENTS
     unsubs.push(
-        session.on((/** @type {SdkEventPayload} */ evt) => {
+        session.on((/** @type {SdkEvent} */ evt) => {
             const kind = /** @type {string} */ (evt?.kind ?? evt?.type ?? 'unknown');
             if (kind === 'assistant.usage') {
                 const data = evt?.data ?? {};

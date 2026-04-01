@@ -323,6 +323,7 @@ export class LlmBridgeClient {
      *         | { error: string; response: null; taskId: string; durationMs: number }
      *     )[]
      * >}
+     * @throws {RangeError} Se messages.length > 50
      */
     async chatBatch(messages, opts = {}) {
         if (messages.length > 50) {
@@ -352,7 +353,7 @@ export class LlmBridgeClient {
      * Registra os event listeners de diálogo e retorna uma função de cleanup simétrica.
      *
      * @param {{ onReady?: () => void; onReply?: (reply: string) => void; onStopped?: () => void }} opts
-     * @returns {{ replyHandler: ((evt: any) => void) | null; cleanup: () => void }}
+     * @returns {{ replyHandler: ((evt: { reply?: string }) => void) | null; cleanup: () => void }}
      */
     #registerDialogListeners(opts) {
         const { onReady, onReply, onStopped } = opts;

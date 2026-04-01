@@ -164,14 +164,18 @@ const ConfigSchema = z
             .boolean()
             .default(process.env['DASHBOARD_EMIT_TASK_UPDATED_COMPAT'] === 'true'),
         CONTROL_REQUIRE_REASON: z.boolean().default(process.env['CONTROL_REQUIRE_REASON'] !== 'false'),
-        CONTROL_REQUIRE_IDEMPOTENCY_KEY: z.boolean().default(process.env['CONTROL_REQUIRE_IDEMPOTENCY_KEY'] !== 'false'),
+        CONTROL_REQUIRE_IDEMPOTENCY_KEY: z
+            .boolean()
+            .default(process.env['CONTROL_REQUIRE_IDEMPOTENCY_KEY'] !== 'false'),
         CONTROL_STRICT_PAUSE_TO_EDIT: z.boolean().default(process.env['CONTROL_STRICT_PAUSE_TO_EDIT'] !== 'false'),
         MAESTRO_ENTRY_AUTOSTART: z.boolean().default(process.env['MAESTRO_ENTRY_AUTOSTART'] === 'true'),
         BOOT_RETRY_BASE_MS: z.number().int().min(10).default(1000),
         BOOT_RETRY_MAX_MS: z.number().int().min(10).default(8000),
         BOOT_RETRY_MAX_ATTEMPTS: z.number().int().min(1).max(100).default(10),
         BOOT_DEGRADED_READY_ALLOWED: z.boolean().default(process.env['BOOT_DEGRADED_READY_ALLOWED'] !== 'false'),
-        MCP_UPSTREAM_INSTALL_GLOBAL_HOOK: z.boolean().default(process.env['MCP_UPSTREAM_INSTALL_GLOBAL_HOOK'] === 'true'),
+        MCP_UPSTREAM_INSTALL_GLOBAL_HOOK: z
+            .boolean()
+            .default(process.env['MCP_UPSTREAM_INSTALL_GLOBAL_HOOK'] === 'true'),
         RBAC_BOOTSTRAP_OWNER_USERNAME: z.string().default(process.env['RBAC_BOOTSTRAP_OWNER_USERNAME'] || ''),
         RBAC_BOOTSTRAP_OWNER_PASSWORD: z.string().default(process.env['RBAC_BOOTSTRAP_OWNER_PASSWORD'] || ''),
         UI_PREFS_PERSISTENCE: z.enum(['sqlite']).default('sqlite'),
@@ -325,7 +329,12 @@ class ConfigurationManager extends EventEmitter {
     }
     // Compatibilidade: retorna BROWSER_URL se definido, senão utiliza DEBUG_PORT
     get BROWSER_URL() {
-        return this.currentConfig['BROWSER_URL'] || this.currentConfig.DEBUG_PORT || this.currentConfig['DEBUG_URL'] || null;
+        return (
+            this.currentConfig['BROWSER_URL'] ||
+            this.currentConfig.DEBUG_PORT ||
+            this.currentConfig['DEBUG_URL'] ||
+            null
+        );
     }
 
     /**

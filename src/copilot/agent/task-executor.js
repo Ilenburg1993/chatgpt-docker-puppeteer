@@ -55,7 +55,7 @@ const DEFAULT_TASK_TIMEOUT_MS = Number(process.env['AGENT_TASK_TIMEOUT_MS']) || 
  * Subscreve ao streaming de tokens, aguarda a resposta completa e trata erros com reconexão transparente. Chama os
  * callbacks fornecidos para toda interação com o estado do agente pai, evitando acesso direto a campos privados.
  *
- * @param {any} session Sessão SDK ativa — deve expor `on` e `sendAndWait`.
+ * @param {import('@github/copilot-sdk').CopilotSession} session Sessão SDK ativa — deve expor `on` e `sendAndWait`.
  * @param {QueuedTask} task - Tarefa a executar
  * @param {TaskExecutorCallbacks} callbacks - Callbacks de interação com o agente pai
  * @returns {Promise<void>}
@@ -64,42 +64,53 @@ export async function executeTask(session, task, callbacks) {
     const { onDelta, setStatus, emit, tryReconnect, scheduleNext, requeueTask } = callbacks;
 
     // Subscreve ao streaming de tokens enquanto a tarefa está em andamento
-    const unsubDelta = session.on('assistant.message_delta', (/** @type {{ data?: Record<string, unknown> }} */ event) => {
-        const chunk = /** @type {string} */ (event?.data?.['deltaContent'] ?? '');
-        if (chunk) onDelta(chunk, task.id);
-    });
+    const unsubDelta = session.on(
+        'assistant.message_delta',
+        (/** @type {{ data?: Record<string, unknown> }} */ event) => {
+            const chunk = /** @type {string} */ (event?.data?.['deltaContent'] ?? '');
+            if (chunk) onDelta(chunk, task.id);
+        },
+    );
 
     // Subscreve a eventos de execução de tool para auditoria e observabilidade
-    const unsubToolStart = session.on('tool.execution_start', (/** @type {{ data?: Record<string, unknown> }} */ event) => {
-        auditToolStart({
-            toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
-            toolName: /** @type {string} */ (event?.data?.['toolName'] ?? ''),
-            args: event?.data?.['arguments'] ?? {},
-            mcpServerName: /** @type {string | null} */ (event?.data?.['mcpServerName'] ?? null),
-        });
-        emit('tool.execution.start', {
-            toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
-            toolName: /** @type {string} */ (event?.data?.['toolName'] ?? ''),
-            args: event?.data?.['arguments'] ?? {},
-            mcpServerName: /** @type {string | null} */ (event?.data?.['mcpServerName'] ?? null),
-            taskId: task.id,
-        });
-    });
+    const unsubToolStart = session.on(
+        'tool.execution_start',
+        (/** @type {{ data?: Record<string, unknown> }} */ event) => {
+            auditToolStart({
+                toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
+                toolName: /** @type {string} */ (event?.data?.['toolName'] ?? ''),
+                args: event?.data?.['arguments'] ?? {},
+                mcpServerName: /** @type {string | null} */ (event?.data?.['mcpServerName'] ?? null),
+            });
+            emit('tool.execution.start', {
+                toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
+                toolName: /** @type {string} */ (event?.data?.['toolName'] ?? ''),
+                args: event?.data?.['arguments'] ?? {},
+                mcpServerName: /** @type {string | null} */ (event?.data?.['mcpServerName'] ?? null),
+                taskId: task.id,
+            });
+        },
+    );
 
-    const unsubToolComplete = session.on('tool.execution_complete', (/** @type {{ data?: Record<string, unknown> }} */ event) => {
-        auditToolComplete({
-            toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
-            success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
-            taskId: task.id,
-            resultContent: /** @type {string | null} */ (/** @type {Record<string, unknown> | undefined} */ (event?.data?.['result'])?.['content'] ?? null),
-        });
-        emit('tool.execution.complete', {
-            toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
-            toolName: /** @type {string | null} */ (event?.data?.['toolName'] ?? null),
-            success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
-            taskId: task.id,
-        });
-    });
+    const unsubToolComplete = session.on(
+        'tool.execution_complete',
+        (/** @type {{ data?: Record<string, unknown> }} */ event) => {
+            auditToolComplete({
+                toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
+                success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
+                taskId: task.id,
+                resultContent: /** @type {string | null} */ (
+                    /** @type {Record<string, unknown> | undefined} */ (event?.data?.['result'])?.['content'] ?? null
+                ),
+            });
+            emit('tool.execution.complete', {
+                toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
+                toolName: /** @type {string | null} */ (event?.data?.['toolName'] ?? null),
+                success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
+                taskId: task.id,
+            });
+        },
+    );
 
     // Captura o timestamp exato de session.idle para durationMs preciso.
     const startTime = Date.now();

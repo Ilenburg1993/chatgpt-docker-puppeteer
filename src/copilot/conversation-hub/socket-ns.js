@@ -43,7 +43,7 @@ let copilotNamespace = null;
  * Autenticação: reutiliza a configuração `DASHBOARD_SOCKET_AUTH_REQUIRED` do main namespace, mas com flag própria
  * `COPILOT_HUB_SOCKET_AUTH_REQUIRED` para override.
  *
- * @param {any} io - Instância do `socket.io` Server existente
+ * @param {import('socket.io').Server} io - Instância do `socket.io` Server existente
  * @param {import('./orchestrator.js').HubOrchestrator} orchestrator
  * @param {import('./store.js').ConversationStore} store
  * @returns {SocketNamespace}
@@ -115,14 +115,16 @@ export function mountCopilotNamespace(io, orchestrator, store) {
         ns.use(async (/** @type {SocketClient} */ socket, /** @type {function} */ next) => {
             try {
                 const token =
-                    socket.handshake.auth?.['token'] || socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
+                    socket.handshake.auth?.['token'] ||
+                    socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
 
                 if (!token) {
                     return next(new Error('COPILOT_NS: Token de autenticação ausente.'));
                 }
 
                 const payload = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
-                /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] = /** @type {{ sub?: string }} */ (payload).sub;
+                /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] =
+                    /** @type {{ sub?: string }} */ (payload).sub;
                 next();
             } catch (/** @type {any} */ err) {
                 log('WARN', `[socket-ns/copilot] Auth falhou: ${err.message}`);
@@ -205,7 +207,9 @@ export function mountCopilotNamespace(io, orchestrator, store) {
 
                 const turnId = await orchestrator.injectUserMessage(data.hubSession, safeContent, {
                     metadata: {
-                        injectedBy: /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] ?? 'anonymous',
+                        injectedBy:
+                            /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] ??
+                            'anonymous',
                         socketId: clientId,
                     },
                 });
@@ -352,7 +356,7 @@ export function unmountCopilotNamespace() {
  *
  * @param {string} hubSessionId
  * @param {string} event
- * @param {any} payload
+ * @param {unknown} payload
  * @returns {void}
  */
 export function broadcastToSession(hubSessionId, event, payload) {
@@ -367,7 +371,7 @@ export function broadcastToSession(hubSessionId, event, payload) {
  * Emite um evento para todos os clients conectados ao namespace.
  *
  * @param {string} event
- * @param {any} payload
+ * @param {unknown} payload
  * @returns {void}
  */
 export function broadcastGlobal(event, payload) {

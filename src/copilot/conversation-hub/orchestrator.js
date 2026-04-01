@@ -219,6 +219,7 @@ export class HubOrchestrator extends EventEmitter {
      * @param {string | object} message - Texto da mensagem ou StructuredMessageInput
      * @param {SendToLlmBOpts} [opts]
      * @returns {Promise<OrchestratorResult>}
+     * @throws {Error} Se a sessão já estiver encerrada ou agente não estiver ativo
      */
     sendToLlmB(hubSessionId, message, opts = {}) {
         // F6.5 (BUG-MOD-09): bloquear novas mensagens para sessões já encerradas
@@ -261,6 +262,7 @@ export class HubOrchestrator extends EventEmitter {
      * @param {string | object} message
      * @param {SendToLlmBOpts} opts
      * @returns {Promise<OrchestratorResult>}
+     * @throws {Error} Se não inicializado, agente parado, ou turno não encontrado após writeTurn
      */
     async #executeSendToLlmB(hubSessionId, message, opts = {}) {
         if (!this.#bridge) {
@@ -538,6 +540,7 @@ export class HubOrchestrator extends EventEmitter {
      * @param {number} turnNumber
      * @param {number} timeoutMs
      * @returns {Promise<string>}
+     * @throws {Error} Se agentInst não suportar sendDialogTurn
      */
     async #callViaDialogLoop(message, messageContent, hubSessionId, turnNumber, timeoutMs) {
         const agentInst = this.#agent ?? alwaysAliveAgent;
@@ -567,18 +570,22 @@ export class HubOrchestrator extends EventEmitter {
      * @param {string} hubSessionId
      * @param {number} turnNumber
      * @param {number} timeoutMs
-     * @returns {Promise<{ llmBResponse: string; llmBStructured: object | null; parseError: any }>}
+     * @returns {Promise<{ llmBResponse: string; llmBStructured: object | null; parseError: unknown }>}
+     * @throws {Error} Se não inicializado
      */
     async #callViaStructured(message, hubSessionId, turnNumber, timeoutMs) {
         if (!this.#bridge) throw new Error('[HubOrchestrator] Não inicializado.');
         /** @type {string} */ let accumulated = '';
-        const result = await this.#bridge.chatStructured(/** @type {import('#copilot/types/structured-message').StructuredMessageInput} */ (message), {
-            onDelta: (chunk) => {
-                accumulated += chunk;
-                this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
+        const result = await this.#bridge.chatStructured(
+            /** @type {import('#copilot/types/structured-message').StructuredMessageInput} */ (message),
+            {
+                onDelta: (chunk) => {
+                    accumulated += chunk;
+                    this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
+                },
+                timeoutMs,
             },
-            timeoutMs,
-        });
+        );
         return {
             llmBResponse: result.raw ?? accumulated,
             llmBStructured: result.structured ?? null,
@@ -595,6 +602,7 @@ export class HubOrchestrator extends EventEmitter {
      * @param {number} turnNumber
      * @param {number} timeoutMs
      * @returns {Promise<string>}
+     * @throws {Error} Se não inicializado
      */
     async #callViaSimpleChat(messageContent, hubSessionId, turnNumber, timeoutMs) {
         if (!this.#bridge) throw new Error('[HubOrchestrator] Não inicializado.');

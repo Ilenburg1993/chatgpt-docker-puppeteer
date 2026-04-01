@@ -37,7 +37,9 @@ export function cmdSkills({ println }, arg) {
         case 'list':
         case '': {
             const result = handleGetSkills();
-            const skills = /** @type {{ paths: string[] }} */ (/** @type {Record<string, unknown>} */ (result.body)['skills']);
+            const skills = /** @type {{ paths: string[] }} */ (
+                /** @type {Record<string, unknown>} */ (result.body)['skills']
+            );
             if (!skills.paths.length) {
                 println('  (nenhum skill/path configurado)');
             } else {
@@ -52,7 +54,9 @@ export function cmdSkills({ println }, arg) {
                 println('  Uso: /skills add <caminho>');
                 break;
             }
-            const current = /** @type {{ paths: string[] }} */ (/** @type {Record<string, unknown>} */ (handleGetSkills().body)['skills']);
+            const current = /** @type {{ paths: string[] }} */ (
+                /** @type {Record<string, unknown>} */ (handleGetSkills().body)['skills']
+            );
             const newPaths = [...new Set([...current.paths, rest])];
             handleSetSkills({ paths: newPaths });
             println(`  ✓ Adicionado: ${rest}`);
@@ -65,7 +69,9 @@ export function cmdSkills({ println }, arg) {
                 println('  Uso: /skills remove <caminho>');
                 break;
             }
-            const current = /** @type {{ paths: string[] }} */ (/** @type {Record<string, unknown>} */ (handleGetSkills().body)['skills']);
+            const current = /** @type {{ paths: string[] }} */ (
+                /** @type {Record<string, unknown>} */ (handleGetSkills().body)['skills']
+            );
             const filtered = current.paths.filter((/** @type {string} */ p) => p !== rest);
             if (filtered.length === current.paths.length) {
                 println(`  ⚠ Caminho não encontrado: ${rest}`);

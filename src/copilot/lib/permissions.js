@@ -97,7 +97,10 @@ export function createPermissionHandler(config) {
     const onRequest = cfg.onRequest;
 
     const handlerFn = async (/** @type {PermissionRequest} */ request) => {
-        const toolName = /** @type {{ toolName?: string; tool?: string }} */ (request)?.toolName ?? /** @type {{ toolName?: string; tool?: string }} */ (request)?.tool ?? 'unknown';
+        const toolName =
+            /** @type {{ toolName?: string; tool?: string }} */ (request)?.toolName ??
+            /** @type {{ toolName?: string; tool?: string }} */ (request)?.tool ??
+            'unknown';
 
         // SDK-02 (fix): tratar content-exclusion-policy — não aprovar automaticamente
         // O SDK pode invocar o handler com kind='content-exclusion-check' para arquivos bloqueados por política

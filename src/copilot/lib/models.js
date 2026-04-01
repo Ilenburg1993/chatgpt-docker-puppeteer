@@ -156,6 +156,8 @@ export function resolveModelId(models, preferred, fallback = 'gpt-4.1') {
  *
  * @param {ModelInfo} model
  * @returns {boolean}
+ * @see getSupportedReasoningEfforts
+ * @see buildReasoningConfig
  */
 export function supportsReasoning(model) {
     return Boolean(model.capabilities.supports.reasoningEffort);
@@ -167,6 +169,7 @@ export function supportsReasoning(model) {
  *
  * @param {ModelInfo} model
  * @returns {ReasoningEffort[]}
+ * @see supportsReasoning
  */
 export function getSupportedReasoningEfforts(model) {
     if (!supportsReasoning(model)) return [];
@@ -177,10 +180,17 @@ export function getSupportedReasoningEfforts(model) {
  * Constrói opções de reasoningEffort para SessionConfig. Inclui `reasoningEffort` apenas se o modelo suportar. Lança
  * erro se effort for inválido para o modelo.
  *
+ * @example
+ *     const config = buildReasoningConfig(models, 'gpt-4.1', 'high');
+ *     // => { model: 'gpt-4.1', reasoningEffort: 'high' }
+ *
  * @param {ModelInfo[]} models - Lista de modelos disponíveis
  * @param {string} modelId - ID do modelo a usar
  * @param {ReasoningEffort} effort - Nível de esforço desejado
  * @returns {{ model: string; reasoningEffort?: ReasoningEffort }}
+ * @throws {Error} Se o reasoningEffort não for suportado pelo modelo
+ * @see getModelById
+ * @see supportsReasoning
  */
 export function buildReasoningConfig(models, modelId, effort) {
     const model = models.find((m) => m.id === modelId);

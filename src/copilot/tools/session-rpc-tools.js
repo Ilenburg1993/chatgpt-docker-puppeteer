@@ -33,11 +33,11 @@ let _rpc = null;
  * Injeta o handle RPC de uma sessão SDK ativa. Deve ser chamado após `initOrResumeSession()` retornar, passando
  * `session.rpc`.
  *
- * @param {any} rpc - session.rpc retornado pelo SDK (ver @github/copilot-sdk Session.rpc)
+ * @param {unknown} rpc - session.rpc retornado pelo SDK (ver @github/copilot-sdk Session.rpc)
  * @returns {void}
  */
 export function setSessionRpc(rpc) {
-    _rpc = rpc;
+    _rpc = /** @type {{ call?: Function } | null} */ (rpc);
     log('DEBUG', `[session-rpc-tools] RPC ${rpc ? 'registrado' : 'removido'}.`);
 }
 
@@ -46,7 +46,7 @@ export function setSessionRpc(rpc) {
 /**
  * Verifica se o RPC está disponível ou retorna um erro padronizado.
  *
- * @returns {{ ok: true; rpc: any } | { ok: false; error: string }}
+ * @returns {{ ok: true; rpc: { call?: Function } } | { ok: false; error: string }}
  */
 function getRpc() {
     if (!_rpc) return { ok: false, error: 'Sessão SDK não disponível. Agent não inicializado ou em reconexão.' };

@@ -152,9 +152,8 @@ export function buildTool({
  * Marca uma tool existente como `skipPermission: true` (execução sem aprovação prévia do usuário). Aplicável a tools de
  * leitura, introspecção e operações sem efeito colateral.
  *
- * @template {import('@github/copilot-sdk').Tool<any>} T
- * @param {T} tool - Tool a ser marcada
- * @returns {T} A mesma tool com `skipPermission: true`
+ * @param {import('@github/copilot-sdk').Tool} tool - Tool a ser marcada
+ * @returns {import('@github/copilot-sdk').Tool} A mesma tool com `skipPermission: true`
  */
-export const withSkipPermission = /** @param {any} tool */ (tool) =>
+export const withSkipPermission = (tool) =>
     Object.assign(tool, /** @type {Record<string, unknown>} */ ({ skipPermission: true }));
