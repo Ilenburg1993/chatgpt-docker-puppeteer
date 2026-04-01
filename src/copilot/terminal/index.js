@@ -165,7 +165,7 @@ function registerAgentEventListeners() {
  * @returns {void}
  */
 function startReflectionLoop() {
-    const reflectionIntervalMin = Number(process.env.LLM_B_REFLECTION_INTERVAL_MIN ?? '0');
+    const reflectionIntervalMin = Number(process.env['LLM_B_REFLECTION_INTERVAL_MIN'] ?? '0');
     if (reflectionIntervalMin <= 0) return;
 
     const reflectionIntervalMs = reflectionIntervalMin * 60 * 1000;

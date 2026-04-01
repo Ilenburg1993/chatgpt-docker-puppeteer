@@ -31,7 +31,7 @@ let _cachedSecret = null;
 export function getJwtSecret() {
     if (_cachedSecret) return _cachedSecret;
 
-    const secret = process.env.JWT_SECRET;
+    const secret = process.env['JWT_SECRET'];
 
     if (!secret || secret.trim().length === 0) {
         throw new Error(
@@ -73,7 +73,7 @@ export function _resetSecretCache() {
  */
 export const JWT_SIGN_OPTIONS = /** @type {unknown} */ (
     Object.freeze({
-        expiresIn: process.env.JWT_EXPIRY || '24h',
+        expiresIn: process.env['JWT_EXPIRY'] || '24h',
         algorithm: 'HS256',
     })
 );

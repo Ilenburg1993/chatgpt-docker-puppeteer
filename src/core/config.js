@@ -48,7 +48,7 @@ function validateEnvFile() {
 }
 
 function emitDeprecatedPortWarning() {
-    if (!process.env.PORT || process.env.SERVER_PORT) {
+    if (!process.env['PORT'] || process.env['SERVER_PORT']) {
         return;
     }
 
@@ -71,14 +71,14 @@ const ConfigSchema = z
         DEBUG_PORT: z
             .string()
             .url()
-            .default(`http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`),
+            .default(`http://localhost:${process.env['CHROME_PROXY_PORT'] || 9224}`),
 
         // --- Chrome & Proxy Connection (Topologia Canônica) ---
         // Porta onde Chrome REAL roda (Windows Host)
         CHROME_PORT: z.number().int().min(1024).max(65535).default(9225),
 
         // Host onde Chrome REAL roda (usado pelo Proxy para encaminhar)
-        CHROME_HOST: z.string().default(process.env.CHROME_HOST || 'host.docker.internal'),
+        CHROME_HOST: z.string().default(process.env['CHROME_HOST'] || 'host.docker.internal'),
 
         // Porta onde Proxy roda (DevContainer)
         CHROME_PROXY_PORT: z.number().int().min(1024).max(65535).default(9224),
@@ -148,34 +148,34 @@ const ConfigSchema = z
                 z.array(z.string()), // ["http://foo.com"]
             ])
             .default(['http://localhost:3008']),
-        DASHBOARD_AUTH_REQUIRED: z.boolean().default(process.env.DASHBOARD_AUTH_REQUIRED !== 'false'),
-        DASHBOARD_AUTH_USERNAME: z.string().default(process.env.DASHBOARD_AUTH_USERNAME || ''),
-        DASHBOARD_AUTH_PASSWORD: z.string().default(process.env.DASHBOARD_AUTH_PASSWORD || ''),
-        DASHBOARD_SOCKET_AUTH_REQUIRED: z.boolean().default(process.env.DASHBOARD_SOCKET_AUTH_REQUIRED !== 'false'),
-        DASHBOARD_COMMANDS_ENABLED: z.boolean().default(process.env.DASHBOARD_COMMANDS_ENABLED === 'true'),
-        DASHBOARD_COMMAND_ROLE: z.string().default(process.env.DASHBOARD_COMMAND_ROLE || 'admin'),
+        DASHBOARD_AUTH_REQUIRED: z.boolean().default(process.env['DASHBOARD_AUTH_REQUIRED'] !== 'false'),
+        DASHBOARD_AUTH_USERNAME: z.string().default(process.env['DASHBOARD_AUTH_USERNAME'] || ''),
+        DASHBOARD_AUTH_PASSWORD: z.string().default(process.env['DASHBOARD_AUTH_PASSWORD'] || ''),
+        DASHBOARD_SOCKET_AUTH_REQUIRED: z.boolean().default(process.env['DASHBOARD_SOCKET_AUTH_REQUIRED'] !== 'false'),
+        DASHBOARD_COMMANDS_ENABLED: z.boolean().default(process.env['DASHBOARD_COMMANDS_ENABLED'] === 'true'),
+        DASHBOARD_COMMAND_ROLE: z.string().default(process.env['DASHBOARD_COMMAND_ROLE'] || 'admin'),
         DASHBOARD_TASK_SYNC_MODE: z
             .enum(['ssot_feed', 'legacy_bridge'])
-            .default(process.env.DASHBOARD_TASK_SYNC_MODE === 'legacy_bridge' ? 'legacy_bridge' : 'ssot_feed'),
+            .default(process.env['DASHBOARD_TASK_SYNC_MODE'] === 'legacy_bridge' ? 'legacy_bridge' : 'ssot_feed'),
         DASHBOARD_LEGACY_BRIDGE_CONTINGENCY: z
             .boolean()
-            .default(process.env.DASHBOARD_LEGACY_BRIDGE_CONTINGENCY === 'true'),
+            .default(process.env['DASHBOARD_LEGACY_BRIDGE_CONTINGENCY'] === 'true'),
         DASHBOARD_EMIT_TASK_UPDATED_COMPAT: z
             .boolean()
-            .default(process.env.DASHBOARD_EMIT_TASK_UPDATED_COMPAT === 'true'),
-        CONTROL_REQUIRE_REASON: z.boolean().default(process.env.CONTROL_REQUIRE_REASON !== 'false'),
-        CONTROL_REQUIRE_IDEMPOTENCY_KEY: z.boolean().default(process.env.CONTROL_REQUIRE_IDEMPOTENCY_KEY !== 'false'),
-        CONTROL_STRICT_PAUSE_TO_EDIT: z.boolean().default(process.env.CONTROL_STRICT_PAUSE_TO_EDIT !== 'false'),
-        MAESTRO_ENTRY_AUTOSTART: z.boolean().default(process.env.MAESTRO_ENTRY_AUTOSTART === 'true'),
+            .default(process.env['DASHBOARD_EMIT_TASK_UPDATED_COMPAT'] === 'true'),
+        CONTROL_REQUIRE_REASON: z.boolean().default(process.env['CONTROL_REQUIRE_REASON'] !== 'false'),
+        CONTROL_REQUIRE_IDEMPOTENCY_KEY: z.boolean().default(process.env['CONTROL_REQUIRE_IDEMPOTENCY_KEY'] !== 'false'),
+        CONTROL_STRICT_PAUSE_TO_EDIT: z.boolean().default(process.env['CONTROL_STRICT_PAUSE_TO_EDIT'] !== 'false'),
+        MAESTRO_ENTRY_AUTOSTART: z.boolean().default(process.env['MAESTRO_ENTRY_AUTOSTART'] === 'true'),
         BOOT_RETRY_BASE_MS: z.number().int().min(10).default(1000),
         BOOT_RETRY_MAX_MS: z.number().int().min(10).default(8000),
         BOOT_RETRY_MAX_ATTEMPTS: z.number().int().min(1).max(100).default(10),
-        BOOT_DEGRADED_READY_ALLOWED: z.boolean().default(process.env.BOOT_DEGRADED_READY_ALLOWED !== 'false'),
-        MCP_UPSTREAM_INSTALL_GLOBAL_HOOK: z.boolean().default(process.env.MCP_UPSTREAM_INSTALL_GLOBAL_HOOK === 'true'),
-        RBAC_BOOTSTRAP_OWNER_USERNAME: z.string().default(process.env.RBAC_BOOTSTRAP_OWNER_USERNAME || ''),
-        RBAC_BOOTSTRAP_OWNER_PASSWORD: z.string().default(process.env.RBAC_BOOTSTRAP_OWNER_PASSWORD || ''),
+        BOOT_DEGRADED_READY_ALLOWED: z.boolean().default(process.env['BOOT_DEGRADED_READY_ALLOWED'] !== 'false'),
+        MCP_UPSTREAM_INSTALL_GLOBAL_HOOK: z.boolean().default(process.env['MCP_UPSTREAM_INSTALL_GLOBAL_HOOK'] === 'true'),
+        RBAC_BOOTSTRAP_OWNER_USERNAME: z.string().default(process.env['RBAC_BOOTSTRAP_OWNER_USERNAME'] || ''),
+        RBAC_BOOTSTRAP_OWNER_PASSWORD: z.string().default(process.env['RBAC_BOOTSTRAP_OWNER_PASSWORD'] || ''),
         UI_PREFS_PERSISTENCE: z.enum(['sqlite']).default('sqlite'),
-        LEGACY_PATHS_CONTINGENCY: z.boolean().default(process.env.LEGACY_PATHS_CONTINGENCY === 'true'),
+        LEGACY_PATHS_CONTINGENCY: z.boolean().default(process.env['LEGACY_PATHS_CONTINGENCY'] === 'true'),
 
         // --- Driver Factory / Pool Configuration (Centralized) ---
         DRIVER_POOL_MAX_SIZE: z.number().int().min(1).max(20).default(5),
@@ -189,10 +189,10 @@ const ConfigSchema = z
         TASK_CONTROL_ABORT_MAX_RETRIES: z.number().int().min(0).max(10).default(2),
         MISSION_STEP_DISPATCH_MODE: z
             .enum(['ssot_queue', 'legacy_direct'])
-            .default(process.env.MISSION_STEP_DISPATCH_MODE === 'legacy_direct' ? 'legacy_direct' : 'ssot_queue'),
+            .default(process.env['MISSION_STEP_DISPATCH_MODE'] === 'legacy_direct' ? 'legacy_direct' : 'ssot_queue'),
         MISSION_MANAGER_LEGACY_DISPATCH_ENABLED: z
             .boolean()
-            .default(process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED === 'true'),
+            .default(process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'] === 'true'),
 
         // --- BrowserPool Configuration (formalized schema) ---
         BROWSER_POOL_SIZE: z.number().int().min(1).max(20).default(3),
@@ -325,15 +325,15 @@ class ConfigurationManager extends EventEmitter {
     }
     // Compatibilidade: retorna BROWSER_URL se definido, senão utiliza DEBUG_PORT
     get BROWSER_URL() {
-        return this.currentConfig.BROWSER_URL || this.currentConfig.DEBUG_PORT || this.currentConfig.DEBUG_URL || null;
+        return this.currentConfig['BROWSER_URL'] || this.currentConfig.DEBUG_PORT || this.currentConfig['DEBUG_URL'] || null;
     }
 
     /**
-     * WebSocket endpoint do Chrome (opcional, para conexões diretas WS) Fonte: 1. process.env.CHROME_WS_ENDPOINT 2.
+     * WebSocket endpoint do Chrome (opcional, para conexões diretas WS) Fonte: 1. process.env['CHROME_WS_ENDPOINT'] 2.
      * config.json WS_ENDPOINT 3. null
      */
     get WS_ENDPOINT() {
-        return this.currentConfig.WS_ENDPOINT || null;
+        return this.currentConfig['WS_ENDPOINT'] || null;
     }
 
     /**
@@ -351,13 +351,13 @@ class ConfigurationManager extends EventEmitter {
 
         // URL: prioriza env vars, depois config, depois default
         const url =
-            process.env.CHROME_WS_ENDPOINT ||
-            this.currentConfig.BROWSER_URL ||
+            process.env['CHROME_WS_ENDPOINT'] ||
+            this.currentConfig['BROWSER_URL'] ||
             this.currentConfig.DEBUG_PORT ||
             defaultUrl;
 
         // wsEndpoint opcional (só se for WS URL)
-        const wsEndpoint = this.currentConfig.WS_ENDPOINT || null;
+        const wsEndpoint = this.currentConfig['WS_ENDPOINT'] || null;
 
         return {
             url,
@@ -518,7 +518,7 @@ class ConfigurationManager extends EventEmitter {
         return this.currentConfig.SERVER_PORT || 3008;
     }
     get ENABLE_TASK_SYNC_BRIDGE() {
-        return this.currentConfig.ENABLE_TASK_SYNC_BRIDGE || false;
+        return this.currentConfig['ENABLE_TASK_SYNC_BRIDGE'] || false;
     }
 
     // --- Driver Factory Getters ---

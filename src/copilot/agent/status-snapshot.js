@@ -42,7 +42,7 @@
 
 /** Tempo máximo (ms) antes de considerar uma tarefa em starvation. */
 // G1-DX-05: threshold configurável via env (default: 60s)
-const STARVATION_THRESHOLD_MS = Number(process.env.AGENT_STARVATION_THRESHOLD_MS) || 60_000;
+const STARVATION_THRESHOLD_MS = Number(process.env['AGENT_STARVATION_THRESHOLD_MS']) || 60_000;
 
 /**
  * Constrói o snapshot de status do agente a partir de parâmetros imutáveis.

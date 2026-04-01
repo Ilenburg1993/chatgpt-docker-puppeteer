@@ -17,14 +17,14 @@ import { auditToolComplete, auditToolStart } from '#copilot/channel';
  *
  * @type {number}
  */
-const MAX_TASK_RETRIES = Number(process.env.AGENT_MAX_TASK_RETRIES) || 3;
+const MAX_TASK_RETRIES = Number(process.env['AGENT_MAX_TASK_RETRIES']) || 3;
 
 /**
  * Timeout padrão de execução de tarefa em ms. Configurável via AGENT_TASK_TIMEOUT_MS.
  *
  * @type {number}
  */
-const DEFAULT_TASK_TIMEOUT_MS = Number(process.env.AGENT_TASK_TIMEOUT_MS) || 60_000;
+const DEFAULT_TASK_TIMEOUT_MS = Number(process.env['AGENT_TASK_TIMEOUT_MS']) || 60_000;
 
 /**
  * @typedef {object} TaskExecutorCallbacks

@@ -115,7 +115,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
         ns.use(async (/** @type {SocketClient} */ socket, /** @type {function} */ next) => {
             try {
                 const token =
-                    socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
+                    socket.handshake.auth?.['token'] || socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
 
                 if (!token) {
                     return next(new Error('COPILOT_NS: Token de autenticação ausente.'));
@@ -382,14 +382,14 @@ export function broadcastGlobal(event, payload) {
  * @returns {boolean}
  */
 function _parseAuthRequired() {
-    const envVal = process.env.COPILOT_HUB_SOCKET_AUTH_REQUIRED;
+    const envVal = process.env['COPILOT_HUB_SOCKET_AUTH_REQUIRED'];
     if (envVal !== undefined) {
         const lower = String(envVal).trim().toLowerCase();
         if (lower === '0' || lower === 'false' || lower === 'no') return false;
         if (lower === '1' || lower === 'true' || lower === 'yes') return true;
     }
     // Por default, herda de DASHBOARD_SOCKET_AUTH_REQUIRED (default: true em produção)
-    const dashVal = process.env.DASHBOARD_SOCKET_AUTH_REQUIRED;
+    const dashVal = process.env['DASHBOARD_SOCKET_AUTH_REQUIRED'];
     if (dashVal !== undefined) {
         const lower = String(dashVal).trim().toLowerCase();
         if (lower === '0' || lower === 'false' || lower === 'no') return false;

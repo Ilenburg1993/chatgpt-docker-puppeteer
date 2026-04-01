@@ -11,6 +11,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitOverride": true,
     "noEmit": true
   },
   "include": ["../../../src/copilot/**/*"]

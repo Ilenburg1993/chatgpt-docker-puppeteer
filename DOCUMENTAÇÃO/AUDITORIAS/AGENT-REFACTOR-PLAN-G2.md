@@ -1160,8 +1160,8 @@ conseguem identificar modo incorreto via health check. **Correção:** Adicionar
 > **Última atualização:** 2026-06-09 — commits `0ae748d9` → `56381148` → `53131a4b` → `791f4a88` →
 > `5bb75625` → `3f70ee61` → `a29cc9ed` → `9f203224` → `0f020810`
 
-| Fase                                    | Status       | Commit                |
-| --------------------------------------- | ------------ | --------------------- |
+| Fase                                    | Status      | Commit                |
+| --------------------------------------- | ----------- | --------------------- |
 | G2.1.1 — Bugs de emissão                | ✅ Concluído | `0ae748d9`            |
 | G2.1.2 — Race conditions                | ✅ Concluído | `0ae748d9`            |
 | G2.1.3 — Bugs de fluxo                  | ✅ Concluído | `0ae748d9`            |
@@ -1187,11 +1187,11 @@ permanecem como fase futura (baixa prioridade, documentação apenas).
 
 | Item       | Descrição resumida                             | Status       | Commit     |
 | ---------- | ---------------------------------------------- | ------------ | ---------- |
-| G2-PERF-01 | dirty flag + TTL safety net no status snapshot | ✅ Concluído | `3c7f9809` |
-| G2-PERF-02 | `knownEvents` Set → constante de módulo        | ✅ Concluído | `3c7f9809` |
-| G2-PERF-03 | acumular `_logBytes` sem `stat()` por linha    | ✅ Concluído | `3c7f9809` |
-| G2-PERF-04 | O(n) splice documentado como pragmático        | ✅ Concluído | `3c7f9809` |
-| G2-PERF-05 | sseHandler.bind() em vez de closure por evento | ✅ Concluído | `3c7f9809` |
+| G2-PERF-01 | dirty flag + TTL safety net no status snapshot | ✅ Concluído  | `3c7f9809` |
+| G2-PERF-02 | `knownEvents` Set → constante de módulo        | ✅ Concluído  | `3c7f9809` |
+| G2-PERF-03 | acumular `_logBytes` sem `stat()` por linha    | ✅ Concluído  | `3c7f9809` |
+| G2-PERF-04 | O(n) splice documentado como pragmático        | ✅ Concluído  | `3c7f9809` |
+| G2-PERF-05 | sseHandler.bind() em vez de closure por evento | ✅ Concluído  | `3c7f9809` |
 | G2-PERF-06 | webhook JSON.stringify cache (já correto)      | futura (doc) |            |
 | G2-PERF-07 | messages cache TTL stale (documentar)          | futura (doc) |            |
 | G2-PERF-08 | writeStateAsync Promise chain GC (documentar)  | futura (doc) |            |

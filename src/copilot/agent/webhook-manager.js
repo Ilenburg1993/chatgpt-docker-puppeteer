@@ -14,14 +14,14 @@ import { log } from '#core/logger';
  *
  * @type {number}
  */
-const WEBHOOK_TIMEOUT_MS = Number(process.env.WEBHOOK_TIMEOUT_MS) || 5_000;
+const WEBHOOK_TIMEOUT_MS = Number(process.env['WEBHOOK_TIMEOUT_MS']) || 5_000;
 
 /**
  * Máximo de webhooks simultâneos que podem ser registrados.
  *
  * @type {number}
  */
-const MAX_WEBHOOKS = Number(process.env.MAX_WEBHOOKS) || 50;
+const MAX_WEBHOOKS = Number(process.env['MAX_WEBHOOKS']) || 50;
 
 /**
  * @typedef {{ id: string; url: string }} WebhookEntry
@@ -62,7 +62,7 @@ export class WebhookManager {
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
             throw new Error(`[WebhookManager] Protocolo não permitido: ${parsed.protocol}. Use http ou https.`);
         }
-        const allowPrivate = process.env.WEBHOOK_ALLOW_PRIVATE_HOSTS === 'true';
+        const allowPrivate = process.env['WEBHOOK_ALLOW_PRIVATE_HOSTS'] === 'true';
         if (!allowPrivate) {
             const hostname = parsed.hostname;
             // Bloquear loopback, localhost, e ranges RFC-1918

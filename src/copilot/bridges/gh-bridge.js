@@ -13,10 +13,10 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 /** Timeout padrão para chamadas ao gh CLI (ms). */
-const DEFAULT_TIMEOUT_MS = parseInt(process.env.LLM_B_GH_TIMEOUT_MS ?? '15000', 10);
+const DEFAULT_TIMEOUT_MS = parseInt(process.env['LLM_B_GH_TIMEOUT_MS'] ?? '15000', 10);
 
 /** Repo padrão override (ex: "owner/repo"). Auto-detect se vazio. */
-const ENV_REPO = process.env.LLM_B_GH_DEFAULT_REPO ?? '';
+const ENV_REPO = process.env['LLM_B_GH_DEFAULT_REPO'] ?? '';
 
 // ---------------------------------------------------------------------------
 // Helpers internos

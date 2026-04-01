@@ -25,7 +25,7 @@ import { defineTool } from '@github/copilot-sdk';
 import { z } from 'zod';
 
 /** Porta do servidor local (fallback: 3008). */
-const MCP_PORT = process.env.PORT ?? '3008';
+const MCP_PORT = process.env['PORT'] ?? '3008';
 const MCP_BASE = `http://127.0.0.1:${MCP_PORT}/api/mcp`;
 
 // UPG-02: Circuit Breaker para chamadas ao MCP Tool Registry

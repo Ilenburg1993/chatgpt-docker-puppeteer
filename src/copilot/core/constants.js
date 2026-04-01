@@ -32,7 +32,7 @@ export const MAX_QUEUE_SIZE = 100;
  *
  * @type {number}
  */
-export const LLM_B_TURN_TIMEOUT_MS = Number(process.env.LLM_B_TURN_TIMEOUT ?? 120_000);
+export const LLM_B_TURN_TIMEOUT_MS = Number(process.env['LLM_B_TURN_TIMEOUT'] ?? 120_000);
 
 /**
  * Número máximo de clientes SSE simultâneos por endpoint. Evita leak de memória quando muitos clientes SSE abrem
@@ -40,7 +40,7 @@ export const LLM_B_TURN_TIMEOUT_MS = Number(process.env.LLM_B_TURN_TIMEOUT ?? 12
  *
  * @type {number}
  */
-export const MAX_SSE_CLIENTS = Number(process.env.MAX_SSE_CLIENTS ?? 50);
+export const MAX_SSE_CLIENTS = Number(process.env['MAX_SSE_CLIENTS'] ?? 50);
 
 /**
  * Nomes canônicos de eventos emitidos pelo AlwaysAliveAgent. Re-exportados de agent/events.js para acesso centralizado

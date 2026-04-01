@@ -22,12 +22,12 @@ import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 // G2-SEC-05: path do audit log configurável via COPILOT_AUDIT_LOG_PATH env var.
-const TOOL_AUDIT_LOG = process.env.COPILOT_AUDIT_LOG_PATH
-    ? resolve(process.env.COPILOT_AUDIT_LOG_PATH)
+const TOOL_AUDIT_LOG = process.env['COPILOT_AUDIT_LOG_PATH']
+    ? resolve(process.env['COPILOT_AUDIT_LOG_PATH'])
     : join(resolve(import.meta.dirname, '../../..'), 'logs', 'tool-audit.jsonl');
 const ROTATE_LOG = TOOL_AUDIT_LOG + '.1';
 // G2-DX-11: limite de tamanho do log configurável via env (default 10MB).
-const MAX_LOG_BYTES = Number(process.env.AGENT_TOOL_AUDIT_MAX_LOG_BYTES) || 10 * 1024 * 1024;
+const MAX_LOG_BYTES = Number(process.env['AGENT_TOOL_AUDIT_MAX_LOG_BYTES']) || 10 * 1024 * 1024;
 
 /**
  * G2-PERF-03: Acumula tamanho do log em memória para evitar `stat()` a cada escrita. Inicializado em -1 (desconhecido)
@@ -60,8 +60,8 @@ const HIGH_RISK_TOOLS = (() => {
         'execute_code',
         'computer',
     ];
-    const extra = process.env.COPILOT_HIGH_RISK_TOOLS
-        ? process.env.COPILOT_HIGH_RISK_TOOLS.split(',')
+    const extra = process.env['COPILOT_HIGH_RISK_TOOLS']
+        ? process.env['COPILOT_HIGH_RISK_TOOLS'].split(',')
               .map((t) => t.trim())
               .filter(Boolean)
         : [];

@@ -21,7 +21,7 @@ function ensureEnvBootstrap() {
         return false;
     }
 
-    const nodeEnv = String(process.env.NODE_ENV || '').trim();
+    const nodeEnv = String(process.env['NODE_ENV'] || '').trim();
     /** @type {{ path: string; override?: boolean }[]} */
     const loadOrder = [
         { path: '.env' },
@@ -42,8 +42,8 @@ function ensureEnvBootstrap() {
     }
 
     // Evita warning recorrente do Node quando NO_COLOR e FORCE_COLOR coexistem.
-    if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
-        delete process.env.NO_COLOR;
+    if (process.env['FORCE_COLOR'] && process.env['NO_COLOR']) {
+        delete process.env['NO_COLOR'];
     }
 
     /** @type {Record<string, unknown>} */ (globalThis)[BOOTSTRAP_FLAG] = true;

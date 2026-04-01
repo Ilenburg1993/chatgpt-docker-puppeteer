@@ -108,13 +108,13 @@ export class DialogLoopManager extends EventEmitter {
      */
     constructor(options = {}) {
         super();
-        this.#maxQueueSize = options.maxQueueSize ?? Number(process.env.LLM_B_DIALOG_QUEUE_MAX ?? 10);
-        this.#bootTimeoutMs = options.bootTimeoutMs ?? Number(process.env.LLM_B_BOOT_TIMEOUT_MS ?? 30_000);
+        this.#maxQueueSize = options.maxQueueSize ?? Number(process.env['LLM_B_DIALOG_QUEUE_MAX'] ?? 10);
+        this.#bootTimeoutMs = options.bootTimeoutMs ?? Number(process.env['LLM_B_BOOT_TIMEOUT_MS'] ?? 30_000);
         this.#watchdogIntervalMs =
-            options.watchdogIntervalMs ?? Number(process.env.LLM_B_WATCHDOG_MS ?? 5 * 60 * 1_000);
+            options.watchdogIntervalMs ?? Number(process.env['LLM_B_WATCHDOG_MS'] ?? 5 * 60 * 1_000);
         this.#watchdogStallMs =
-            options.watchdogStallMs ?? Number(process.env.LLM_B_WATCHDOG_STALL_MS ?? 15 * 60 * 1_000);
-        this.#fallbackModel = options.fallbackModel ?? process.env.COPILOT_FALLBACK_MODEL ?? null;
+            options.watchdogStallMs ?? Number(process.env['LLM_B_WATCHDOG_STALL_MS'] ?? 15 * 60 * 1_000);
+        this.#fallbackModel = options.fallbackModel ?? process.env['COPILOT_FALLBACK_MODEL'] ?? null;
     }
 
     /**

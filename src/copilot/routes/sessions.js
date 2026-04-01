@@ -55,7 +55,7 @@ const router = Router();
 
 // SEC-N06/UPG-N19 (fix): autenticação opcional por token Bearer para SDK routes
 // Configurar via variável de ambiente SDK_API_TOKEN. Endpoints são públicos se não configurado.
-const SDK_API_TOKEN = process.env.SDK_API_TOKEN ?? null;
+const SDK_API_TOKEN = process.env['SDK_API_TOKEN'] ?? null;
 
 if (SDK_API_TOKEN) {
     router.use((req, res, next) => {

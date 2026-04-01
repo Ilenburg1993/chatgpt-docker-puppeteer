@@ -74,7 +74,7 @@ export function getWorkspaceContext() {
     if (_contextCache && _contextCache.expiresAt > now) {
         return _contextCache.context;
     }
-    const cwd = process.env.COPILOT_WORKING_DIRECTORY ?? process.cwd();
+    const cwd = process.env['COPILOT_WORKING_DIRECTORY'] ?? process.cwd();
     const gitRoot = detectGitRoot(cwd);
     const currentBranch = gitRoot ? tryExec('git rev-parse --abbrev-ref HEAD', gitRoot) : null;
     const context = { cwd, gitRoot, currentBranch };

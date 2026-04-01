@@ -89,7 +89,7 @@ const _sessions = new Map();
  * @returns {Partial<CopilotClientOptions>}
  */
 export function buildClientOptions(overrides = {}) {
-    const cliUrl = process.env.COPILOT_CLI_URL;
+    const cliUrl = process.env['COPILOT_CLI_URL'];
     /** @type {Partial<CopilotClientOptions>} */
     const options = {};
 
@@ -101,7 +101,7 @@ export function buildClientOptions(overrides = {}) {
     }
 
     // F4.8 (UPG-02): ativa telemetria OTLP via SDK quando OTEL_EXPORTER_OTLP_ENDPOINT está definida
-    const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    const otlpEndpoint = process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
     if (otlpEndpoint) {
         /** @type {any} */
         const anyOptions = options;

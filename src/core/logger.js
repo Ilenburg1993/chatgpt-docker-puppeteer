@@ -18,7 +18,7 @@ const AUDIT_FILE = path.join(LOG_DIR, 'audit.log');
 // --- POLÍTICAS DE RETENÇÃO ---
 const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB para logs comuns
 const MAX_AUDIT_SIZE = 2 * 1024 * 1024; // 2MB para auditoria (conforme requisito server.js)
-const MAX_ARCHIVES = process.env.LOG_MAX_ARCHIVES ? parseInt(process.env.LOG_MAX_ARCHIVES, 10) : 5;
+const MAX_ARCHIVES = process.env['LOG_MAX_ARCHIVES'] ? parseInt(process.env['LOG_MAX_ARCHIVES'], 10) : 5;
 
 // BUG-02 FIX: Inicialização síncrona do diretório de logs na carga do módulo.
 // Isso elimina a necessidade de `async/await` na função `log()`, que era chamada
@@ -105,7 +105,7 @@ const LOG_LEVELS = {
 };
 
 // Read LOG_LEVEL from environment (default: INFO)
-const configuredLevel = process.env.LOG_LEVEL?.toUpperCase() || 'INFO';
+const configuredLevel = process.env['LOG_LEVEL']?.toUpperCase() || 'INFO';
 let minLevel = /** @type {Record<string, number>} */ (LOG_LEVELS)[configuredLevel] ?? LOG_LEVELS.INFO;
 
 /**

@@ -16,7 +16,7 @@ import { log } from '#core/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import { alwaysAliveAgent } from './always-alive.js';
 
-const RESTART_DELAY_MS = parseInt(process.env.COPILOT_RESTART_DELAY_MS ?? '5000', 10);
+const RESTART_DELAY_MS = parseInt(process.env['COPILOT_RESTART_DELAY_MS'] ?? '5000', 10);
 
 /**
  * Inicializa o agente com loop de retry (até 5 tentativas) em vez de recursão.
@@ -116,18 +116,18 @@ try {
 }
 
 // Valida COPILOT_MODEL proativamente — falha rápida em modelo inválido antes do start.
-if (process.env.COPILOT_MODEL) {
+if (process.env['COPILOT_MODEL']) {
     try {
         const { listModels } = await import('../lib/models.js');
         const models = await listModels();
-        const valid = models.some((/** @type {{ id: string }} */ m) => m.id === process.env.COPILOT_MODEL);
+        const valid = models.some((/** @type {{ id: string }} */ m) => m.id === process.env['COPILOT_MODEL']);
         if (!valid) {
             log(
                 'WARN',
-                `[copilot/agent] Modelo '${process.env.COPILOT_MODEL}' não encontrado na lista de modelos disponíveis. Verifique COPILOT_MODEL.`,
+                `[copilot/agent] Modelo '${process.env['COPILOT_MODEL']}' não encontrado na lista de modelos disponíveis. Verifique COPILOT_MODEL.`,
             );
         } else {
-            log('INFO', `[copilot/agent] Modelo '${process.env.COPILOT_MODEL}' validado na lista de modelos.`);
+            log('INFO', `[copilot/agent] Modelo '${process.env['COPILOT_MODEL']}' validado na lista de modelos.`);
         }
     } catch {
         /* não crítico — continuar sem validação */

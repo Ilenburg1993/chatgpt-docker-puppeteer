@@ -31,8 +31,8 @@ let copilotDb = null;
  * @returns {string}
  */
 function resolveCopilotDbPath() {
-    const fromEnv = process.env.COPILOT_DB_PATH || null;
-    const fromConfig = typeof CONFIG?.all?.COPILOT_DB_PATH === 'string' ? CONFIG.all.COPILOT_DB_PATH : null;
+    const fromEnv = process.env['COPILOT_DB_PATH'] || null;
+    const fromConfig = typeof CONFIG?.all?.['COPILOT_DB_PATH'] === 'string' ? CONFIG.all['COPILOT_DB_PATH'] : null;
     const raw = fromEnv || fromConfig || path.join(process.cwd(), 'data', 'copilot.sqlite');
 
     const looksLikeDir = raw.endsWith(path.sep) || raw.endsWith('/') || raw.endsWith('\\');

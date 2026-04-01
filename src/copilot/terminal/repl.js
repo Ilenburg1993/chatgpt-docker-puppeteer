@@ -49,7 +49,7 @@ import { addAttachment, getHubSessionId, setRl } from './state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
-const INJECT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
+const INJECT_PORT = Number(process.env['LLM_B_TERMINAL_PORT'] ?? 3009);
 const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
 
 const BANNER = `

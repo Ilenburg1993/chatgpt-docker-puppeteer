@@ -147,16 +147,16 @@ const getAgentInfoTool = defineTool('get_agent_info', {
         return {
             sdkVersion,
             nodeVersion: process.version,
-            model: process.env.COPILOT_MODEL ?? 'gpt-4.1',
+            model: process.env['COPILOT_MODEL'] ?? 'gpt-4.1',
             pid: process.pid,
             uptime: Math.round(process.uptime()),
             toolsRegistered: _registeredTools.length,
             toolNames: _registeredTools.map((t) => t.name),
             hasTelemetry: _telemetryStore !== null,
             env: {
-                COPILOT_MCP_SERVERS: process.env.COPILOT_MCP_SERVERS ?? '',
-                NODE_ENV: process.env.NODE_ENV ?? '',
-                COPILOT_SDK_ENABLED: process.env.COPILOT_SDK_ENABLED ?? '',
+                COPILOT_MCP_SERVERS: process.env['COPILOT_MCP_SERVERS'] ?? '',
+                NODE_ENV: process.env['NODE_ENV'] ?? '',
+                COPILOT_SDK_ENABLED: process.env['COPILOT_SDK_ENABLED'] ?? '',
             },
         };
     },

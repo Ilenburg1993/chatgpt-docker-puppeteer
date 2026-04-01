@@ -65,9 +65,9 @@ export function registerControlRoutes(bridge, agent) {
      * @param {import('express').NextFunction} next
      */
     function requireAdminAuth(req, res, next) {
-        const token = process.env.BRIDGE_ADMIN_TOKEN;
+        const token = process.env['BRIDGE_ADMIN_TOKEN'];
         if (!token) {
-            if (process.env.NODE_ENV === 'production') {
+            if (process.env['NODE_ENV'] === 'production') {
                 return res.status(503).json({ ok: false, error: 'BRIDGE_ADMIN_TOKEN não configurado.' });
             }
             // Em dev: permitir mas emitir aviso
@@ -138,7 +138,7 @@ export function registerControlRoutes(bridge, agent) {
             // UPG-PROP-10 (fix): diagnóstico de listeners disponível apenas em desenvolvimento
             // G2-SEC-09: ocultar em produção mesmo em dev via env para evitar vazar topologia de eventos
             listenerDiagnostics:
-                process.env.NODE_ENV === 'development' && process.env.BRIDGE_EXPOSE_DIAGNOSTICS === 'true'
+                process.env['NODE_ENV'] === 'development' && process.env['BRIDGE_EXPOSE_DIAGNOSTICS'] === 'true'
                     ? agent.listenerDiagnostics?.()
                     : undefined,
             hubStore,

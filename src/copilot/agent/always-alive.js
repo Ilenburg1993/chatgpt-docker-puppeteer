@@ -200,7 +200,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      *
      * @type {number}
      */
-    static #MESSAGES_CACHE_TTL = Number(process.env.AGENT_MESSAGES_CACHE_TTL_MS) || 30_000;
+    static #MESSAGES_CACHE_TTL = Number(process.env['AGENT_MESSAGES_CACHE_TTL_MS']) || 30_000;
 
     /**
      * Último caminho de checkpoint salvo pelo SDK durante compaction de contexto. `null` até a primeira compaction ser
@@ -231,12 +231,12 @@ export class AlwaysAliveAgent extends EventEmitter {
         super();
         // Agentes de alta carga acumulam múltiplos listeners por tarefa + SSE + bridge.
         // O padrão de 10 é insuficiente; configurável via AGENT_MAX_LISTENERS (padrão 50).
-        this.setMaxListeners(Number(process.env.AGENT_MAX_LISTENERS ?? 50));
-        this.#model = options.model ?? process.env.COPILOT_MODEL ?? 'gpt-4.1';
+        this.setMaxListeners(Number(process.env['AGENT_MAX_LISTENERS'] ?? 50));
+        this.#model = options.model ?? process.env['COPILOT_MODEL'] ?? 'gpt-4.1';
         this.#reasoningEffort =
             options.reasoningEffort ??
             /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */ (
-                process.env.COPILOT_REASONING_EFFORT || undefined
+                process.env['COPILOT_REASONING_EFFORT'] || undefined
             );
     }
 
@@ -729,7 +729,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      *
      * @type {number}
      */
-    static #METRICS_INTERVAL_MS = Number(process.env.AGENT_METRICS_INTERVAL_MS) || 30_000;
+    static #METRICS_INTERVAL_MS = Number(process.env['AGENT_METRICS_INTERVAL_MS']) || 30_000;
 
     /**
      * Retorna um snapshot do estado atual do agente para a API HTTP.
@@ -745,7 +745,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         // TTL safety net: invalida após AGENT_STATUS_SNAPSHOT_TTL_MS para cenários extremos.
         if (this.#statusSnapshotCache) {
             const age = Date.now() - this.#statusSnapshotCache.at;
-            if (age < (Number(process.env.AGENT_STATUS_SNAPSHOT_TTL_MS) || 500)) {
+            if (age < (Number(process.env['AGENT_STATUS_SNAPSHOT_TTL_MS']) || 500)) {
                 return this.#statusSnapshotCache.snapshot;
             }
             // TTL expirado — forçar rebuild como safety net
@@ -1174,7 +1174,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         // Aciona fallback de modelo se a quota/rate_limit foi atingida e COPILOT_FALLBACK_MODEL está configurado.
         const isRateOrQuotaError = input.errorContext === 'rate_limit' || input.errorContext === 'quota';
         if (isRateOrQuotaError) {
-            const fallbackModel = process.env.COPILOT_FALLBACK_MODEL;
+            const fallbackModel = process.env['COPILOT_FALLBACK_MODEL'];
             if (fallbackModel && fallbackModel !== this.#model) {
                 log(
                     'WARN',

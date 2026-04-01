@@ -535,7 +535,7 @@ export function handleGetConfig() {
             dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
             busy: getBusy(),
             hubSessionId: getHubSessionId(),
-            port: Number(process.env.LLM_B_TERMINAL_PORT ?? 3009),
+            port: Number(process.env['LLM_B_TERMINAL_PORT'] ?? 3009),
             // AA.5: expor dados reais de uso de contexto
             contextWindow: snapshot.contextWindow,
             // AC.3: último checkpoint da compaction

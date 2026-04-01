@@ -126,43 +126,43 @@ function buildInfiniteSessionConfig(opts) {
 function buildSessionConfig(opts, mode) {
     const cfg = /** @type {Record<string, unknown>} */ ({});
 
-    cfg.streaming = /** @type {any} */ (opts).streaming ?? true;
+    cfg['streaming'] = /** @type {any} */ (opts).streaming ?? true;
 
     if (mode === 'create') {
         const co = /** @type {SessionCreateOptions} */ (opts);
-        if (co.model !== undefined) cfg.model = co.model;
-        if (co.reasoningEffort !== undefined) cfg.reasoningEffort = co.reasoningEffort;
-        if (co.workingDirectory !== undefined) cfg.workingDirectory = co.workingDirectory;
-        if (co.mcpServers !== undefined) cfg.mcpServers = co.mcpServers;
-        if (co.customAgents !== undefined) cfg.customAgents = co.customAgents;
+        if (co.model !== undefined) cfg['model'] = co.model;
+        if (co.reasoningEffort !== undefined) cfg['reasoningEffort'] = co.reasoningEffort;
+        if (co.workingDirectory !== undefined) cfg['workingDirectory'] = co.workingDirectory;
+        if (co.mcpServers !== undefined) cfg['mcpServers'] = co.mcpServers;
+        if (co.customAgents !== undefined) cfg['customAgents'] = co.customAgents;
         // BUG-HIGH-06 (fix): só aplicar infiniteSessions quando explicitamente fornecido
         // Evita habilitar compaction automática em sessões que não solicitaram (ex: routes/sessions.js)
         if (co.infiniteSessions !== undefined) {
-            cfg.infiniteSessions = buildInfiniteSessionConfig(co.infiniteSessions);
+            cfg['infiniteSessions'] = buildInfiniteSessionConfig(co.infiniteSessions);
         }
     }
 
-    if (opts.onPermissionRequest !== undefined) cfg.onPermissionRequest = opts.onPermissionRequest;
-    else cfg.onPermissionRequest = approveAll; // SDK-01: obrigatório no v0.2.0 — default approveAll
-    if (opts.onUserInputRequest !== undefined) cfg.onUserInputRequest = opts.onUserInputRequest;
+    if (opts.onPermissionRequest !== undefined) cfg['onPermissionRequest'] = opts.onPermissionRequest;
+    else cfg['onPermissionRequest'] = approveAll; // SDK-01: obrigatório no v0.2.0 — default approveAll
+    if (opts.onUserInputRequest !== undefined) cfg['onUserInputRequest'] = opts.onUserInputRequest;
 
     // RF-PR-01: compor hooks — onErrorOccurred com retry automático está em buildErrorOccurredHandler() (hooks.js)
     // e é o default de createHooks(). Preservamos hooks do usuário sem sobrescrever.
     {
         const userHooks = /** @type {Record<string, any>} */ (opts.hooks ?? {});
-        cfg.hooks = { ...userHooks };
+        cfg['hooks'] = { ...userHooks };
     }
 
-    if (opts.tools !== undefined) cfg.tools = opts.tools;
+    if (opts.tools !== undefined) cfg['tools'] = opts.tools;
 
     // RF-PR-06: disableResume — reconexão silenciosa sem emitir session.resume
     if (mode === 'resume') {
         const ro = /** @type {SessionResumeOptions} */ (opts);
-        if (ro.disableResume !== undefined) cfg.disableResume = ro.disableResume;
+        if (ro.disableResume !== undefined) cfg['disableResume'] = ro.disableResume;
     }
 
     const systemMsg = buildSystemMessageConfig(opts.systemMessage, /** @type {any} */ (opts).systemMessageContent);
-    if (systemMsg !== undefined) cfg.systemMessage = systemMsg;
+    if (systemMsg !== undefined) cfg['systemMessage'] = systemMsg;
 
     return cfg;
 }

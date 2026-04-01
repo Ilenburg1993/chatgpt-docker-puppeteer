@@ -123,7 +123,7 @@ de encerramento — o sistema é projetado para funcionar de forma contínua e p
 O loop deve continuar mesmo quando não há mensagens pendentes.`;
 
 /** Boot prompt efetivo: env var sobrescreve o padrão. @type {string} */
-export const BOOT_PROMPT = process.env.LLM_B_BOOT_PROMPT ?? DEFAULT_BOOT_PROMPT;
+export const BOOT_PROMPT = process.env['LLM_B_BOOT_PROMPT'] ?? DEFAULT_BOOT_PROMPT;
 
 // ─── Output helpers ───────────────────────────────────────────────────────────
 

@@ -45,7 +45,7 @@ import { getSseClients, getSseCriticalClients } from './state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
-const INJECT_PORT = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
+const INJECT_PORT = Number(process.env['LLM_B_TERMINAL_PORT'] ?? 3009);
 
 // ─── Rate limiter simples para POST /inject ───────────────────────────────────
 // GAP-01 (fix): limitar POST /inject a 10 requisições por IP por janela de 60s
@@ -86,8 +86,8 @@ function createRateLimiter(max, windowMs) {
     };
 }
 
-const INJECT_RATE_MAX = Number(process.env.LLM_B_INJECT_RATE_MAX ?? 10);
-const INJECT_RATE_WINDOW_MS = Number(process.env.LLM_B_INJECT_RATE_WINDOW_MS ?? 60_000);
+const INJECT_RATE_MAX = Number(process.env['LLM_B_INJECT_RATE_MAX'] ?? 10);
+const INJECT_RATE_WINDOW_MS = Number(process.env['LLM_B_INJECT_RATE_WINDOW_MS'] ?? 60_000);
 const _injectRateLimiter = createRateLimiter(INJECT_RATE_MAX, INJECT_RATE_WINDOW_MS);
 
 /**
@@ -116,8 +116,8 @@ function checkWriteRate(ipEndpoint) {
 }
 
 // F6.2 (BUG-MOD-04): rate limiter SSE separado — conexões persistentes têm padrão distinto de writes
-const SSE_RATE_MAX = Number(process.env.LLM_B_SSE_RATE_MAX ?? 10);
-const SSE_RATE_WINDOW_MS = Number(process.env.LLM_B_SSE_RATE_WINDOW_MS ?? 60_000);
+const SSE_RATE_MAX = Number(process.env['LLM_B_SSE_RATE_MAX'] ?? 10);
+const SSE_RATE_WINDOW_MS = Number(process.env['LLM_B_SSE_RATE_WINDOW_MS'] ?? 60_000);
 const _sseRateLimiter = createRateLimiter(SSE_RATE_MAX, SSE_RATE_WINDOW_MS);
 
 /**
@@ -199,7 +199,7 @@ function tryParseJson(raw) {
  */
 export function createInjectServer() {
     // GAP-N03/UPG-N04 (fix): autenticação por token estático opcional no terminal LLM-B
-    const TERMINAL_TOKEN = process.env.LLM_B_TERMINAL_TOKEN ?? null;
+    const TERMINAL_TOKEN = process.env['LLM_B_TERMINAL_TOKEN'] ?? null;
 
     const server = http.createServer(async (req, res) => {
         const url = new URL(req.url ?? '/', `http://localhost:${INJECT_PORT}`);

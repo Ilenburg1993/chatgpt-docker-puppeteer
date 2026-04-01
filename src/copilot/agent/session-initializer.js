@@ -177,7 +177,7 @@ export async function buildHookSystemContext() {
 
 // G2-DX-09: limite máximo de contexto configurável via env (default 8KB).
 // SEC-02: previne injection de conteúdo grande via briefing
-const HOOK_CONTEXT_MAX_BYTES = Number(process.env.AGENT_HOOK_CONTEXT_MAX_BYTES) || 8 * 1024;
+const HOOK_CONTEXT_MAX_BYTES = Number(process.env['AGENT_HOOK_CONTEXT_MAX_BYTES']) || 8 * 1024;
 
 /**
  * Constrói contexto do hook system com limite de tamanho aplicado.
@@ -235,7 +235,7 @@ export async function initOrResumeSession(client, sessionOptions) {
         // Threshold dinâmico lido da variável de módulo (configurável via setBackgroundCompactionThreshold).
         infiniteSessions: { enabled: true, backgroundCompactionThreshold: _backgroundCompactionThreshold },
         // Diretório de trabalho para o SDK contextualizar ferramentas de busca.
-        workingDirectory: process.env.COPILOT_WORKING_DIRECTORY ?? process.cwd(),
+        workingDirectory: process.env['COPILOT_WORKING_DIRECTORY'] ?? process.cwd(),
         // Diretórios de skills para o SDK carregar.
         skillDirectories: ['.github/skills'],
         // AH.1: ferramentas excluídas por padrão + denylist configurável em runtime

@@ -1,7 +1,7 @@
 // @ts-check
 // O terminal LLM-B sempre requer o subsistema Copilot SDK habilitado.
 // Configuramos antes dos imports para que todos os módulos vejam o valor correto.
-if (!process.env.COPILOT_SDK_ENABLED) process.env.COPILOT_SDK_ENABLED = 'true';
+if (!process.env['COPILOT_SDK_ENABLED']) process.env['COPILOT_SDK_ENABLED'] = 'true';
 
 /**
  * src/copilot/terminal-server.js

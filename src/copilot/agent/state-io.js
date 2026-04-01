@@ -19,8 +19,8 @@ import { join, resolve } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '../../');
 const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
 // G2-DX-14: STATE_FILE path configurável via AGENT_STATE_FILE env var.
-const STATE_FILE = process.env.AGENT_STATE_FILE
-    ? resolve(process.env.AGENT_STATE_FILE)
+const STATE_FILE = process.env['AGENT_STATE_FILE']
+    ? resolve(process.env['AGENT_STATE_FILE'])
     : join(STATE_DIR, 'sdk-always-alive.json');
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────

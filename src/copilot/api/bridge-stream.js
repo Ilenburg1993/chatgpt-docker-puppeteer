@@ -35,7 +35,7 @@ export function registerStreamRoutes(bridge, agent) {
     // Com múltiplos clientes conectados, o EventEmitter emit warning de memory leak.
     // G2-ARCH-21: limite bounded (100 clientes × eventos AGENT_EVENTS) em vez de ilimitado (0)
     // para que o warning ainda apareça caso haja leak real de connections.
-    const MAX_SSE_CLIENTS = Number(process.env.MAX_SSE_CLIENTS) || 100;
+    const MAX_SSE_CLIENTS = Number(process.env['MAX_SSE_CLIENTS']) || 100;
     agent.setMaxListeners?.(MAX_SSE_CLIENTS * (AGENT_EVENTS.length + 2)); // +2 para heartbeat + reconnect
     // ─── GET /stream ──────────────────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ export function registerStreamRoutes(bridge, agent) {
         // G2-SEC-08: limite de vida por conexão SSE para evitar esgotamento de file descriptors.
         // Configurável via MAX_SSE_LIFETIME_MS (default 24h). Ao expirar, envia evento 'reconnect'
         // e fecha a conexão para forçar o cliente a reconectar.
-        const MAX_SSE_LIFETIME_MS = Number(process.env.MAX_SSE_LIFETIME_MS) || 24 * 60 * 60 * 1000;
+        const MAX_SSE_LIFETIME_MS = Number(process.env['MAX_SSE_LIFETIME_MS']) || 24 * 60 * 60 * 1000;
         const lifetimeTimer = setTimeout(() => {
             if (!res.writableEnded) {
                 sendEvt(/** @type {any} */ ('reconnect'), { reason: 'max_lifetime', ts: Date.now() });

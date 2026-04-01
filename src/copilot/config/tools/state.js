@@ -39,10 +39,10 @@ export function loadToolsConfig() {
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
             const data = /** @type {Record<string, unknown>} */ (parsed);
             const allowlist =
-                data.allowlist === null || Array.isArray(data.allowlist)
-                    ? /** @type {string[] | null} */ (data.allowlist)
+                data['allowlist'] === null || Array.isArray(data['allowlist'])
+                    ? /** @type {string[] | null} */ (data['allowlist'])
                     : null;
-            const denylist = Array.isArray(data.denylist) ? /** @type {string[]} */ (data.denylist) : [];
+            const denylist = Array.isArray(data['denylist']) ? /** @type {string[]} */ (data['denylist']) : [];
             _toolsConfig = { allowlist, denylist };
             log(
                 'INFO',
