@@ -858,7 +858,11 @@ export class AlwaysAliveAgent extends EventEmitter {
         // Wiring de eventos: somente na primeira vez (guard de idempotência).
         if (this.#dialogLoopAttached) return;
         this.#dialogLoopAttached = true;
-        // Propagar eventos do DialogLoopManager com prefixo dialog. para manter compatibilidade
+        // G2-ARCH-10: removeAllListeners() é seguro aqui porque o flag #dialogLoopAttached garante
+        // que este bloco só executa UMA vez por instância do agente. Listeners adicionados externamente
+        // antes desta chamada seriam perdidos — mas por design, nenhum external code deve registrar
+        // listeners no #dialogLoop antes do attach(). Em reconexão, attach() é chamado novamente mas
+        // o guard impede que removeAllListeners() seja ativado uma segunda vez, preservando os listeners abaixo.
         this.#dialogLoop.removeAllListeners();
         this.#dialogLoop.on('ready', (/** @type {any} */ evt) => this.emit('dialog.ready', evt));
         this.#dialogLoop.on('reply', (/** @type {any} */ evt) => this.emit('dialog.reply', evt));
@@ -868,6 +872,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.#dialogLoop.on('stalled', (/** @type {any} */ evt) => this.emit('dialog.stalled', evt));
         this.#dialogLoop.on('turn_start', (/** @type {any} */ evt) => this.emit('dialog.turn_start', evt));
         this.#dialogLoop.on('turn_end', (/** @type {any} */ evt) => this.emit('dialog.turn_end', evt));
+        this.#dialogLoop.on('turn_timeout', (/** @type {any} */ evt) => this.emit('dialog.turn_timeout', evt));
         this.#dialogLoop.on('changed', (/** @type {any} */ evt) => this.emit('dialog.loop.changed', evt));
         this.#dialogLoop.on('model.fallback', (/** @type {any} */ evt) => this.emit('pr.fallback_model', evt));
     }

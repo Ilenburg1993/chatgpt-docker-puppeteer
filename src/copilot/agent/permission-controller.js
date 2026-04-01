@@ -55,7 +55,8 @@ export class PermissionController {
     #handler = approveAll;
 
     /** @type {PermissionMode} */
-    #mode = 'approve_all';
+    // G2-DX-12: modo padrão configurável via AGENT_PERMISSION_MODE env var.
+    #mode = /** @type {PermissionMode} */ (process.env.AGENT_PERMISSION_MODE ?? 'approve_all');
 
     /**
      * Callback invocado após cada troca de modo. Pode ser usado pelo AlwaysAliveAgent para emitir eventos
@@ -118,7 +119,13 @@ export class PermissionController {
                 this.#mode = 'audit_only';
                 break;
             case 'selective': {
-                const shellTools = ['run_shell_command', 'run_npm_script', 'run_node_script'];
+                // G2-DX-13: lista de ferramentas shell configurável via AGENT_DENY_SHELL_TOOLS env var.
+                const defaultShellTools = ['run_shell_command', 'run_npm_script', 'run_node_script'];
+                const shellTools = process.env.AGENT_DENY_SHELL_TOOLS
+                    ? process.env.AGENT_DENY_SHELL_TOOLS.split(',')
+                          .map((t) => t.trim())
+                          .filter(Boolean)
+                    : defaultShellTools;
                 /** @type {import('#copilot/lib/permissions').PermissionHandlerConfig} */
                 const cfg = {
                     denyTools: [...(denyShell ? shellTools : []), ...(denyTools ?? [])],

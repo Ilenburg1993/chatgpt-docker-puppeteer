@@ -18,7 +18,10 @@ import { join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '../../');
 const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
-const STATE_FILE = join(STATE_DIR, 'sdk-always-alive.json');
+// G2-DX-14: STATE_FILE path configurável via AGENT_STATE_FILE env var.
+const STATE_FILE = process.env.AGENT_STATE_FILE
+    ? resolve(process.env.AGENT_STATE_FILE)
+    : join(STATE_DIR, 'sdk-always-alive.json');
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 
@@ -82,7 +85,14 @@ export function readState() {
     if (_stateCache !== null) return _stateCache;
     if (!existsSync(STATE_FILE)) return null;
     try {
-        _stateCache = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+        const raw = readFileSync(STATE_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        // G2-DX-15: validação mínima — rejeitar valores não-objeto para evitar falsos positivos
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            log('WARN', '[PersistentSession] Estado inválido (não é objeto) — ignorando ficheiro.');
+            return null;
+        }
+        _stateCache = /** @type {AliveAgentState} */ (parsed);
         return _stateCache;
     } catch (/** @type {any} */ e) {
         log('WARN', `[PersistentSession] Falha ao ler estado: ${e.message}`);

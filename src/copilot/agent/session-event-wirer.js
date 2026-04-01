@@ -110,6 +110,37 @@ export function wireSessionEvents(session, isResumed, callbacks) {
         }),
     );
 
+    // G2-ARCH-07: lógica de aviso de token budget extraída para função auxiliar local.
+    /**
+     * Verifica o uso de tokens e emite `session.token_budget_warning` quando necessário.
+     *
+     * Regras:
+     *
+     * - Sessão retomada com > 70%: emite `reason: 'startup_heavy'` uma única vez (na primeira checagem).
+     * - Qualquer sessão com > 80%: emite aviso normal (em checks subsequentes).
+     *
+     * @param {{ currentTokens: number; tokenLimit: number }} usageData
+     * @param {boolean} firstCheck - true se for a primeira `session.usage_info` desta sessão
+     * @returns {void}
+     */
+    function checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, firstCheck) {
+        const ratio = Math.round((currentTokens / tokenLimit) * 100);
+        if (firstCheck && isResumed && currentTokens / tokenLimit > 0.7) {
+            log(
+                'WARN',
+                `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
+            );
+            emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio, reason: 'startup_heavy' });
+            // G2-BUG-13: não emitir segundo warning neste mesmo tick (startup_heavy já cobre > 70%).
+        } else if (currentTokens / tokenLimit > 0.8) {
+            log(
+                'WARN',
+                `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
+            );
+            emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
+        }
+    }
+
     // Token usage e janela de contexto — atualiza contextState e emite avisos.
     let _firstUsageChecked = false;
     unsubs.push(
@@ -118,32 +149,12 @@ export function wireSessionEvents(session, isResumed, callbacks) {
             emit('session.usage', data);
             const { currentTokens, tokenLimit } = data;
             if (tokenLimit > 0) {
-                const ratio = Math.round((currentTokens / tokenLimit) * 100);
                 onContextState({
                     tokens: currentTokens,
                     tokenLimit,
                     utilization: currentTokens / tokenLimit,
                 });
-                if (!_firstUsageChecked && isResumed && currentTokens / tokenLimit > 0.7) {
-                    log(
-                        'WARN',
-                        `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
-                    );
-                    emit('session.token_budget_warning', {
-                        currentTokens,
-                        tokenLimit,
-                        ratio,
-                        reason: 'startup_heavy',
-                    });
-                    // G2-BUG-13: não emitir segundo token_budget_warning neste mesmo tick para sessões
-                    // retomadas com contexto pesado (> 70% já emitiu acima).
-                } else if (currentTokens / tokenLimit > 0.8) {
-                    log(
-                        'WARN',
-                        `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
-                    );
-                    emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
-                }
+                checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, !_firstUsageChecked);
                 _firstUsageChecked = true;
             }
         }),

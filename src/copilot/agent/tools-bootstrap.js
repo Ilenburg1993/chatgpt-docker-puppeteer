@@ -108,5 +108,17 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         }
     }
 
+    // G2-DX-18: log de summary do bootstrap com count por categoria.
+    /** @type {Map<string, number>} */
+    const categoryCount = new Map();
+    for (const [tools, opts] of TOOL_GROUPS) {
+        const cat = /** @type {string} */ (/** @type {any} */ (opts).category ?? 'unknown');
+        categoryCount.set(cat, (categoryCount.get(cat) ?? 0) + tools.length);
+    }
+    if (mcpTools.length > 0) categoryCount.set('mcp', mcpTools.length);
+    if (customTools.length > 0) categoryCount.set('custom', customTools.length);
+    const summary = [...categoryCount.entries()].map(([cat, n]) => `${cat}:${n}`).join(', ');
+    log('INFO', `[tools-bootstrap] Bootstrap concluído: ${allTools.length} tools registradas (${summary})`);
+
     return allTools;
 }

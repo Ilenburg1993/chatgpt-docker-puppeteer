@@ -16,7 +16,7 @@ import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
 import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools/state';
 import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#core/logger';
-import { access, readFile } from 'node:fs/promises';
+import { access, open, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { buildCustomAgentsConfig } from '../config/custom-agents.js';
@@ -96,7 +96,26 @@ export async function buildHookSystemContext() {
 
     try {
         await access(BRIEFING_FILE);
-        const content = await readFile(BRIEFING_FILE, 'utf8');
+        // G2-SEC-02: verificar tamanho antes de readFile para evitar consumo de memória excessivo.
+        // Limite: 16KB máximo antes de truncar na leitura.
+        const SEC02_READ_LIMIT = 16 * 1024;
+        const fileStat = await stat(BRIEFING_FILE);
+        let content;
+        if (fileStat.size > SEC02_READ_LIMIT) {
+            log(
+                'WARN',
+                `[session-initializer] session-briefing.md excede limite (${fileStat.size} bytes > ${SEC02_READ_LIMIT}) — lendo apenas os primeiros ${SEC02_READ_LIMIT} bytes.`,
+            );
+            const fh = await open(BRIEFING_FILE, 'r');
+            const buf = Buffer.alloc(SEC02_READ_LIMIT);
+            await fh.read(buf, 0, SEC02_READ_LIMIT, 0);
+            await fh.close();
+            content =
+                new TextDecoder('utf-8', { fatal: false }).decode(buf).replace(/\uFFFD+$/, '') +
+                '\n\n⚠️ [briefing truncado: arquivo excede 16KB]';
+        } else {
+            content = await readFile(BRIEFING_FILE, 'utf8');
+        }
         parts.push('## Contexto da Sessão (Hook System)\n\n' + content);
     } catch {
         /* arquivo não existe — ignorar */
@@ -132,7 +151,9 @@ export async function buildHookSystemContext() {
                 '\n## Estado de Compliance Atual',
                 `- Turno atual: #${turnNum}`,
                 `- Consecutivos sem vscode_askQuestions: ${consecutive}`,
-                `- close_key: \`${closeKey}\``,
+                // G2-SEC-03: close_key em bloco de código fenced para evitar que um valor
+                // com caracteres markdown especiais seja interpretado como instrução ativa.
+                `- close_key: \`\`${closeKey}\`\``,
                 `- strict_turn_close: ${strictClose}`,
                 '',
                 '**Protocolo obrigatório**: Encerre cada turno com `vscode_askQuestions`.',
@@ -146,8 +167,9 @@ export async function buildHookSystemContext() {
     return parts.join('\n\n');
 }
 
-// SEC-02: limite máximo de contexto (8KB) para prevenir injection de conteúdo grande via briefing
-const HOOK_CONTEXT_MAX_BYTES = 8 * 1024;
+// G2-DX-09: limite máximo de contexto configurável via env (default 8KB).
+// SEC-02: previne injection de conteúdo grande via briefing
+const HOOK_CONTEXT_MAX_BYTES = Number(process.env.AGENT_HOOK_CONTEXT_MAX_BYTES) || 8 * 1024;
 
 /**
  * Constrói contexto do hook system com limite de tamanho aplicado.

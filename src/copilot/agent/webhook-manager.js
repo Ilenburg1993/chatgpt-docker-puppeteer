@@ -122,6 +122,45 @@ export class WebhookManager {
     }
 
     /**
+     * G2-SEC-06: sanitiza o payload do webhook removendo campos potencialmente sensíveis.
+     *
+     * Campos removidos: content (mensagens), answer (respostas), token*, session*, key*, secret*, password* Para
+     * eventos de alto volume como `task.delta`, o payload é omitido completamente (campo `redacted: true`).
+     *
+     * @param {string} event
+     * @param {object} payload
+     * @returns {object}
+     */
+    static #sanitizePayload(event, payload) {
+        // Para eventos de streaming, omitir payload completo para evitar exfiltração de conteúdo
+        if (event === 'task.delta' || event === 'task.reasoning') {
+            return { redacted: true };
+        }
+        if (!payload || typeof payload !== 'object') return payload;
+        /** @type {Record<string, unknown>} */
+        const sanitized = {};
+        for (const [key, value] of Object.entries(payload)) {
+            const lk = key.toLowerCase();
+            // Remover campos com nomes suspeitos
+            if (
+                lk.includes('token') ||
+                lk.includes('secret') ||
+                lk.includes('password') ||
+                lk.includes('key') ||
+                lk.includes('auth') ||
+                lk === 'content' ||
+                lk === 'answer' ||
+                lk === 'message'
+            ) {
+                sanitized[key] = '[redacted]';
+            } else {
+                sanitized[key] = value;
+            }
+        }
+        return sanitized;
+    }
+
+    /**
      * Emite um evento para todas as URLs registradas via HTTP POST.
      *
      * Falhas individuais são logadas mas não propagadas (allSettled).
@@ -133,7 +172,11 @@ export class WebhookManager {
     async emit(event, payload) {
         if (this.#urls.size === 0) return;
 
-        const body = JSON.stringify({ event, payload, timestamp: Date.now() });
+        const body = JSON.stringify({
+            event,
+            payload: WebhookManager.#sanitizePayload(event, payload),
+            timestamp: Date.now(),
+        });
 
         await Promise.allSettled(
             [...this.#urls.entries()].map(async ([id, url]) => {

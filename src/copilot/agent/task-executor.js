@@ -20,6 +20,13 @@ import { auditToolComplete, auditToolStart } from '#copilot/channel';
 const MAX_TASK_RETRIES = Number(process.env.AGENT_MAX_TASK_RETRIES) || 3;
 
 /**
+ * Timeout padrão de execução de tarefa em ms. Configurável via AGENT_TASK_TIMEOUT_MS.
+ *
+ * @type {number}
+ */
+const DEFAULT_TASK_TIMEOUT_MS = Number(process.env.AGENT_TASK_TIMEOUT_MS) || 60_000;
+
+/**
  * @typedef {object} TaskExecutorCallbacks
  * @property {(chunk: string, taskId: string) => void} onDelta - Emite fragmento de resposta em streaming
  * @property {(status: 'idle' | 'processing' | 'waiting_for_input' | 'starting' | 'stopped') => void} setStatus - Muda
@@ -107,7 +114,7 @@ export async function executeTask(session, task, callbacks) {
             prompt: task.message,
             ...(task.attachments !== undefined ? { attachments: task.attachments } : {}),
         });
-        const event = await session.sendAndWait(sendOpts, task.timeoutMs ?? 60_000);
+        const event = await session.sendAndWait(sendOpts, task.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS);
         const text = event?.data?.content ?? '';
         const durationMs = (idleTime ?? Date.now()) - startTime;
         setStatus('idle');

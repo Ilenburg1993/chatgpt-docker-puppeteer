@@ -59,6 +59,8 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'dialog.loop.changed',
     'dialog.turn_start',
     'dialog.turn_end',
+    // G2-ARCH-17: dialog.turn_timeout emitido quando o boot ou um turno expira sem resposta
+    'dialog.turn_timeout',
     // ── tool execution ────────────────────────────────────────────────────
     'tool.execution.start',
     'tool.execution.complete',
@@ -68,6 +70,8 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'permission.mode_changed',
     // ── context ───────────────────────────────────────────────────────────
     'context:compacted',
+    // G2-DX-17: evento de métricas periódicas (cadência configurável por consumidor)
+    'agent.metrics',
 ]);
 
 /**
@@ -78,3 +82,15 @@ export const AGENT_EVENTS = /** @type {const} */ ([
  *
  * @typedef {(typeof AGENT_EVENTS)[number]} AgentEventName
  */
+
+/**
+ * G2-DX-16: Conjunto de eventos de alta frequência (hot-path) emitidos a cada turno ou frame de streaming.
+ *
+ * Consumidores que processam todos os eventos via `on()` genérico podem usar esta lista para filtrar eventos que não
+ * precisam ser roteados por bridges/SSE que não requerem streaming granular.
+ *
+ * @type {ReadonlySet<AgentEventName>}
+ */
+export const HIGH_FREQUENCY_EVENTS = /** @type {ReadonlySet<AgentEventName>} */ (
+    new Set(['task.delta', 'task.reasoning', 'session.usage', 'dialog.turn_start', 'dialog.turn_end'])
+);

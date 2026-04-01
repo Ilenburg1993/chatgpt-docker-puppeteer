@@ -21,9 +21,13 @@ import { approveAll } from '@github/copilot-sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-const TOOL_AUDIT_LOG = join(resolve(import.meta.dirname, '../../..'), 'logs', 'tool-audit.jsonl');
+// G2-SEC-05: path do audit log configurável via COPILOT_AUDIT_LOG_PATH env var.
+const TOOL_AUDIT_LOG = process.env.COPILOT_AUDIT_LOG_PATH
+    ? resolve(process.env.COPILOT_AUDIT_LOG_PATH)
+    : join(resolve(import.meta.dirname, '../../..'), 'logs', 'tool-audit.jsonl');
 const ROTATE_LOG = TOOL_AUDIT_LOG + '.1';
-const MAX_LOG_BYTES = 10 * 1024 * 1024; // 10 MB
+// G2-DX-11: limite de tamanho do log configurável via env (default 10MB).
+const MAX_LOG_BYTES = Number(process.env.AGENT_TOOL_AUDIT_MAX_LOG_BYTES) || 10 * 1024 * 1024;
 
 // ─── Classificação de risco ───────────────────────────────────────────────────
 
@@ -31,20 +35,29 @@ const MAX_LOG_BYTES = 10 * 1024 * 1024; // 10 MB
  * Nomes de ferramentas consideradas de alto risco. Decisões sobre estas ferramentas são sempre logadas explicitamente,
  * independentemente do resultado.
  *
+ * G2-SEC-04: configurável via COPILOT_HIGH_RISK_TOOLS (lista separada por vírgulas) para cobrir ferramentas novas.
+ *
  * @type {ReadonlySet<string>}
  */
-// G2-BUG-09: adicionadas ferramentas de shell que existem no ambiente
-const HIGH_RISK_TOOLS = new Set([
-    'bash',
-    'edit',
-    'create',
-    'git_apply_patch',
-    'run_shell_command',
-    'run_npm_script',
-    'run_node_script',
-    'execute_code',
-    'computer',
-]);
+const HIGH_RISK_TOOLS = (() => {
+    const base = [
+        'bash',
+        'edit',
+        'create',
+        'git_apply_patch',
+        'run_shell_command',
+        'run_npm_script',
+        'run_node_script',
+        'execute_code',
+        'computer',
+    ];
+    const extra = process.env.COPILOT_HIGH_RISK_TOOLS
+        ? process.env.COPILOT_HIGH_RISK_TOOLS.split(',')
+              .map((t) => t.trim())
+              .filter(Boolean)
+        : [];
+    return new Set([...base, ...extra]);
+})();
 
 /**
  * Retorna `true` se a ferramenta é classificada como alto risco.

@@ -257,6 +257,17 @@ export class DialogLoopManager extends EventEmitter {
             }
         });
 
+        // G2-ARCH-20: emitir dialog.turn_timeout via SSE quando o boot timeout expira, em vez de apenas rejeitar.
+        bootPromise.catch((/** @type {any} */ e) => {
+            if (e?.message?.includes('Boot timeout') || e?.code === 'DIALOG_TIMEOUT') {
+                this.emit('turn_timeout', { phase: 'boot', timeoutMs: this.#bootTimeoutMs, ts: Date.now() });
+                log(
+                    'WARN',
+                    `[DialogLoopManager] Boot timeout (${this.#bootTimeoutMs}ms) — evento turn_timeout emitido.`,
+                );
+            }
+        });
+
         await bootPromise;
         log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
     }
@@ -308,10 +319,17 @@ export class DialogLoopManager extends EventEmitter {
     /**
      * Para o dialog loop. Requer `authorized: true` para efetivamente encerrar.
      *
-     * @param {{ authorized?: boolean; reason?: 'watchdog_restart' | 'authorized_stop' }} [opts]
+     * G2-ARCH-11: adiciona timeout de encerramento — se o turno em andamento não terminar em `shutdownTimeoutMs`
+     * (default: 30 s), força desativação via `forceDeactivate()` para evitar espera indefinida.
+     *
+     * @param {{
+     *     authorized?: boolean;
+     *     reason?: 'watchdog_restart' | 'authorized_stop';
+     *     shutdownTimeoutMs?: number;
+     * }} [opts]
      * @returns {Promise<void>}
      */
-    async stop({ authorized = false, reason = 'authorized_stop' } = {}) {
+    async stop({ authorized = false, reason = 'authorized_stop', shutdownTimeoutMs = 30_000 } = {}) {
         if (!this.#active) return;
         if (!authorized) {
             log(
@@ -326,8 +344,21 @@ export class DialogLoopManager extends EventEmitter {
         if (this.#host?.getPendingQuestion()) {
             this.#host.answerPendingQuestion('STOP_DIALOG');
         }
+
+        // G2-ARCH-11: timeout de encerramento para o caso de um turno em andamento não terminar.
+        const shutdownTimer = setTimeout(() => {
+            if (this.#active) {
+                log(
+                    'WARN',
+                    `[DialogLoopManager] stop() timeout após ${shutdownTimeoutMs}ms — forçando forceDeactivate().`,
+                );
+                this.forceDeactivate();
+            }
+        }, shutdownTimeoutMs);
+
         this.#active = false;
         this.#stopping = false;
+        clearTimeout(shutdownTimer);
         writeStateAsync({ dialogLoopActive: false }).catch((/** @type {any} */ e) =>
             log('WARN', `[DialogLoopManager] writeState dialogLoopActive=false: ${e.message}`),
         );

@@ -88,7 +88,19 @@ export function registerStreamRoutes(bridge, agent) {
 
         const heartbeat = setInterval(() => sendEvt('heartbeat', { ts: Date.now() }), 15_000);
 
+        // G2-SEC-08: limite de vida por conexão SSE para evitar esgotamento de file descriptors.
+        // Configurável via MAX_SSE_LIFETIME_MS (default 24h). Ao expirar, envia evento 'reconnect'
+        // e fecha a conexão para forçar o cliente a reconectar.
+        const MAX_SSE_LIFETIME_MS = Number(process.env.MAX_SSE_LIFETIME_MS) || 24 * 60 * 60 * 1000;
+        const lifetimeTimer = setTimeout(() => {
+            if (!res.writableEnded) {
+                sendEvt(/** @type {any} */ ('reconnect'), { reason: 'max_lifetime', ts: Date.now() });
+                res.end();
+            }
+        }, MAX_SSE_LIFETIME_MS);
+
         req.on('close', () => {
+            clearTimeout(lifetimeTimer);
             clearInterval(heartbeat);
             handlers.forEach((handler, evt) => agent.off(evt, handler));
         });

@@ -45,6 +45,7 @@ const _sdkVersion = (() => {
  *     oldestTaskWaitMs: number;
  * }} AgentSnap
  *
+ *
  * @typedef {import('../agent/agent-contract.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
  */
 
@@ -56,6 +57,35 @@ const _sdkVersion = (() => {
  * @returns {void}
  */
 export function registerControlRoutes(bridge, agent) {
+    // G2-SEC-07: middleware de autenticação para rotas que alteram estado do agente.
+    // Usa BRIDGE_ADMIN_TOKEN env var. Sem token configurado, bloqueia em produção e permite em dev (com aviso).
+    /**
+     * @param {Req} req
+     * @param {Res} res
+     * @param {import('express').NextFunction} next
+     */
+    function requireAdminAuth(req, res, next) {
+        const token = process.env.BRIDGE_ADMIN_TOKEN;
+        if (!token) {
+            if (process.env.NODE_ENV === 'production') {
+                return res.status(503).json({ ok: false, error: 'BRIDGE_ADMIN_TOKEN não configurado.' });
+            }
+            // Em dev: permitir mas emitir aviso
+            log(
+                'WARN',
+                '[bridge-control] BRIDGE_ADMIN_TOKEN não configurado — endpoint admin sem autenticação (dev only).',
+            );
+            return next();
+        }
+        const authHeader = req.headers['authorization'] ?? '';
+        const provided =
+            typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        if (!provided || provided !== token) {
+            return res.status(401).json({ ok: false, error: 'Não autorizado.' });
+        }
+        return next();
+    }
+
     // ─── GET /status ──────────────────────────────────────────────────────────
 
     /**
@@ -104,7 +134,11 @@ export function registerControlRoutes(bridge, agent) {
             sdkVersion: _sdkVersion,
             nodeVersion: process.version,
             // UPG-PROP-10 (fix): diagnóstico de listeners disponível apenas em desenvolvimento
-            listenerDiagnostics: process.env.NODE_ENV === 'development' ? agent.listenerDiagnostics?.() : undefined,
+            // G2-SEC-09: ocultar em produção mesmo em dev via env para evitar vazar topologia de eventos
+            listenerDiagnostics:
+                process.env.NODE_ENV === 'development' && process.env.BRIDGE_EXPOSE_DIAGNOSTICS === 'true'
+                    ? agent.listenerDiagnostics?.()
+                    : undefined,
             hubStore,
         });
     });
@@ -180,9 +214,11 @@ export function registerControlRoutes(bridge, agent) {
      * Body: { mode: 'approve_all' | 'audit_only' | 'selective', allowTools?: string[], denyTools?: string[],
      * denyShell?: boolean }
      *
+     * G2-SEC-07: requer Authorization: Bearer <BRIDGE_ADMIN_TOKEN>
+     *
      * DL-PERM: o dialog loop não é uma tool e não é afetado por este endpoint.
      */
-    bridge.post('/permissions', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+    bridge.post('/permissions', requireAdminAuth, (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const { mode, allowTools, denyTools, denyShell } = req.body ?? {};
         const validModes = ['approve_all', 'audit_only', 'selective'];
         if (!mode || !validModes.includes(mode)) {
