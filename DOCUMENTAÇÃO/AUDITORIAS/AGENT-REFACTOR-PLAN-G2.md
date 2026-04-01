@@ -1178,16 +1178,20 @@ conseguem identificar modo incorreto via health check. **Correção:** Adicionar
 | G2.4.2 — DX e API                       | ✅ Concluído | `a29cc9ed`/`9f203224` |
 | G2.5.1 — Specs de componentes           | ✅ Concluído | `5bb75625`            |
 | G2.5.2 — Specs de infra                 | ✅ Concluído | `0f020810`            |
+| G2.6 — PERF (01..05)                    | ✅ Concluído | `3c7f9809`            |
 
 ### Itens individuais pendentes
 
-Todos os itens ARCH, SEC, BUG, API, DX e TEST foram concluídos. Restam apenas itens de performance
-(fase futura).
+Todos os itens ARCH, SEC, BUG, API, DX, TEST e PERF (01–05) foram concluídos. Itens PERF-06..08
+permanecem como fase futura (baixa prioridade, documentação apenas).
 
-| Item       | Descrição resumida                              | Fase   |
-| ---------- | ----------------------------------------------- | ------ |
-| G2-PERF-01 | dirty flag em vez de TTL no status snapshot     | futura |
-| G2-PERF-02 | `knownEvents` Set → constante de módulo         | futura |
-| G2-PERF-03 | acumular `_logBytes` sem `stat()` por linha     | futura |
-| G2-PERF-04 | remoção O(1) em `message-queue.js`              | futura |
-| G2-PERF-05 | closures SSE por cliente evitar Map por request | futura |
+| Item       | Descrição resumida                             | Status       | Commit     |
+| ---------- | ---------------------------------------------- | ------------ | ---------- |
+| G2-PERF-01 | dirty flag + TTL safety net no status snapshot | ✅ Concluído | `3c7f9809` |
+| G2-PERF-02 | `knownEvents` Set → constante de módulo        | ✅ Concluído | `3c7f9809` |
+| G2-PERF-03 | acumular `_logBytes` sem `stat()` por linha    | ✅ Concluído | `3c7f9809` |
+| G2-PERF-04 | O(n) splice documentado como pragmático        | ✅ Concluído | `3c7f9809` |
+| G2-PERF-05 | sseHandler.bind() em vez de closure por evento | ✅ Concluído | `3c7f9809` |
+| G2-PERF-06 | webhook JSON.stringify cache (já correto)      | futura (doc) |            |
+| G2-PERF-07 | messages cache TTL stale (documentar)          | futura (doc) |            |
+| G2-PERF-08 | writeStateAsync Promise chain GC (documentar)  | futura (doc) |            |
