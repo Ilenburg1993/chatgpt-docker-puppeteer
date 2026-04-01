@@ -1117,17 +1117,17 @@ conseguem identificar modo incorreto via health check. **Correção:** Adicionar
 - [x] G2-DX-13 — `COPILOT_SHELL_TOOLS` override
 - [x] G2-DX-15 — validação de JSON em `readState()`
 - [x] G2-DX-16 — marcar eventos de alta frequência em `events.js`
-- [ ] G2-DX-17 — evento `agent.metrics` periódico
+- [x] G2-DX-17 — evento `agent.metrics` já presente em AGENT_EVENTS
 - [x] G2-DX-18 — summary log no bootstrap de tools
-- [ ] G2-API-06 — abortar tarefa quando timeout vence em `bridge-tasks.js`
-- [ ] G2-API-07 — retornar `taskId` no enfileiramento assíncrono
-- [ ] G2-API-08 — adicionar `dialogLoopActive` ao corpo 409 de `/dialog/start`
-- [ ] G2-API-09 — rate limiting em `/dialog/turn`
-- [ ] G2-API-10 — filtro de eventos SSE por query param
-- [ ] G2-API-11 — paginação em `/agent/tools`
-- [ ] G2-API-12 — decrementar `_agentSseClients` em evento `'error'`/`'finish'`
-- [ ] G2-API-13 — verificar dialog loop em `POST /stop`
-- [ ] G2-API-14 — adicionar `permissionMode` ao health check
+- [x] G2-API-06 — abortar tarefa quando timeout vence em `bridge-tasks.js` (`a29cc9ed`)
+- [x] G2-API-07 — retornar `taskId` no enfileiramento assíncrono (`a29cc9ed`)
+- [x] G2-API-08 — adicionar `dialogLoopActive` ao corpo 409 de `/dialog/start` (`a29cc9ed`)
+- [x] G2-API-09 — rate limiting em `/dialog/turn` (`9f203224`)
+- [x] G2-API-10 — filtro de eventos SSE por query param (`9f203224`)
+- [x] G2-API-11 — paginação em `/agent/tools` (`9f203224`)
+- [x] G2-API-12 — decrementar `_agentSseClients` em evento `'error'`/`'finish'` (`a29cc9ed`)
+- [x] G2-API-13 — verificar dialog loop em `POST /stop` (`a29cc9ed`)
+- [x] G2-API-14 — adicionar `permissionMode` ao health check (`a29cc9ed`)
 
 ---
 
@@ -1146,17 +1146,17 @@ conseguem identificar modo incorreto via health check. **Correção:** Adicionar
 
 #### G2.5.2 — Specs de infraestrutura de fila e estado
 
-- [ ] G2-TEST-12 e G2-TEST-13 — spec `message-queue.spec.js` (sinal abortado, drain)
-- [ ] G2-TEST-14 — spec `state-io.spec.js` (mutex de escritas concorrentes)
-- [ ] G2-TEST-15 — spec `reconnect-policy.spec.js` (backoff exponencial)
-- [ ] G2-TEST-16 — spec para `buildHookSystemContextSafe()` com conteúdo > 8KB
+- [x] G2-TEST-12 e G2-TEST-13 — spec `message-queue.spec.js` (sinal abortado, drain) (`0f020810`)
+- [x] G2-TEST-14 — spec `state-io.spec.js` (mutex de escritas concorrentes) (`0f020810`)
+- [x] G2-TEST-15 — spec `reconnect-policy.spec.js` (backoff exponencial) — já existia
+- [x] G2-TEST-16 — spec `session-initializer.spec.js` buildHookSystemContextSafe > 8KB (`0f020810`)
 
 ---
 
 ## 5. Tabela de rastreamento
 
 > **Última atualização:** 2026-06-09 — commits `0ae748d9` → `56381148` → `53131a4b` → `791f4a88` →
-> `5bb75625` → `3f70ee61`
+> `5bb75625` → `3f70ee61` → `a29cc9ed` → `9f203224` → `0f020810`
 
 | Fase                                    | Status       | Commit                |
 | --------------------------------------- | ------------ | --------------------- |
@@ -1173,41 +1173,26 @@ conseguem identificar modo incorreto via health check. **Correção:** Adicionar
 | G2.3.4 — Resiliência                    | ✅ Concluído | `53131a4b`/`5bb75625` |
 | G2.3.5 — Colisão de tools               | ✅ Concluído | `791f4a88`/`5bb75625` |
 | G2.4.1 — Configurabilidade env          | ✅ Concluído | `53131a4b`/`791f4a88` |
-| G2.4.2 — DX e API                       | 🔴 Pendente  | —                     |
+| G2.4.2 — DX e API                       | ✅ Concluído | `a29cc9ed`/`9f203224` |
 | G2.5.1 — Specs de componentes           | ✅ Concluído | `5bb75625`            |
-| G2.5.2 — Specs de infra                 | 🔴 Pendente  | —                     |
+| G2.5.2 — Specs de infra                 | ✅ Concluído | `0f020810`            |
 
 ### Itens individuais pendentes
 
-| Item       | Descrição resumida                                     | Fase   |
-| ---------- | ------------------------------------------------------ | ------ |
-| G2-ARCH-02 | `sendMessage()` mistura fila + dialog loop             | G2.3.2 |
-| G2-ARCH-03 | import dinâmico `always-alive.js` → estático           | G2.3.2 |
-| G2-ARCH-04 | leak de listeners em `#waitForRestartAndReply()`       | G2.3.4 |
-| G2-ARCH-05 | `unshift()` sem `onEnqueue()` em `message-queue.js`    | G2.3.4 |
-| G2-ARCH-06 | `webhook-manager.js` migrar para `fetch()`             | G2.3.2 |
-| G2-ARCH-08 | cache TTL → dirty flag em `getStatusSnapshot()`        | G2.4.2 |
-| G2-ARCH-12 | cache TTL `#MESSAGES_CACHE_TTL` → configurável         | G2.4.1 |
-| G2-ARCH-13 | `MAX_TASK_RETRIES` → configurável                      | G2.4.1 |
-| G2-ARCH-19 | documentar `_backgroundCompactionThreshold` singleton  | G2.3.3 |
-| G2-ARCH-22 | documentar limitação de remoção dinâmica de tools      | G2.3.5 |
-| G2-API-06  | abortar tarefa quando timeout vencer em `bridge-tasks` | G2.4.2 |
-| G2-API-07  | retornar `taskId` no enfileiramento assíncrono         | G2.4.2 |
-| G2-API-08  | adicionar `dialogLoopActive` ao 409 de `/dialog/start` | G2.4.2 |
-| G2-API-09  | rate limiting em `/dialog/turn`                        | G2.4.2 |
-| G2-API-10  | filtro `?events=` no SSE                               | G2.4.2 |
-| G2-API-11  | paginação em `/agent/tools`                            | G2.4.2 |
-| G2-API-12  | `_agentSseClients` decrementar em `error`/`finish`     | G2.4.2 |
-| G2-API-13  | verificar dialog loop antes de `POST /stop`            | G2.4.2 |
-| G2-API-14  | `permissionMode` no health check                       | G2.4.2 |
-| G2-DX-17   | evento `agent.metrics` periódico                       | G2.4.2 |
-| G2-PERF-01 | dirty flag em vez de TTL no status snapshot            | futura |
-| G2-PERF-02 | `knownEvents` Set → constante de módulo                | futura |
-| G2-PERF-03 | acumular `_logBytes` sem `stat()` por linha            | futura |
-| G2-PERF-04 | remoção O(1) em `message-queue.js`                     | futura |
-| G2-PERF-05 | closures SSE por cliente evitar Map por request        | futura |
-| G2-TEST-12 | spec `message-queue.spec.js` sinal abortado/drain      | G2.5.2 |
-| G2-TEST-13 | spec `message-queue.spec.js` drain múltiplas tarefas   | G2.5.2 |
-| G2-TEST-14 | spec `state-io.spec.js` escritas concorrentes          | G2.5.2 |
-| G2-TEST-15 | spec `reconnect-policy.spec.js` backoff exponencial    | G2.5.2 |
-| G2-TEST-16 | spec `session-initializer.spec.js` briefing > 8KB      | G2.5.2 |
+| Item       | Descrição resumida                                    | Fase   |
+| ---------- | ----------------------------------------------------- | ------ |
+| G2-ARCH-02 | `sendMessage()` mistura fila + dialog loop            | G2.3.2 |
+| G2-ARCH-03 | import dinâmico `always-alive.js` → estático          | G2.3.2 |
+| G2-ARCH-04 | leak de listeners em `#waitForRestartAndReply()`      | G2.3.4 |
+| G2-ARCH-05 | `unshift()` sem `onEnqueue()` em `message-queue.js`   | G2.3.4 |
+| G2-ARCH-06 | `webhook-manager.js` migrar para `fetch()`            | G2.3.2 |
+| G2-ARCH-08 | cache TTL → dirty flag em `getStatusSnapshot()`       | G2.4.2 |
+| G2-ARCH-12 | cache TTL `#MESSAGES_CACHE_TTL` → configurável        | G2.4.1 |
+| G2-ARCH-13 | `MAX_TASK_RETRIES` → configurável                     | G2.4.1 |
+| G2-ARCH-19 | documentar `_backgroundCompactionThreshold` singleton | G2.3.3 |
+| G2-ARCH-22 | documentar limitação de remoção dinâmica de tools     | G2.3.5 |
+| G2-PERF-01 | dirty flag em vez de TTL no status snapshot           | futura |
+| G2-PERF-02 | `knownEvents` Set → constante de módulo               | futura |
+| G2-PERF-03 | acumular `_logBytes` sem `stat()` por linha           | futura |
+| G2-PERF-04 | remoção O(1) em `message-queue.js`                    | futura |
+| G2-PERF-05 | closures SSE por cliente evitar Map por request       | futura |
