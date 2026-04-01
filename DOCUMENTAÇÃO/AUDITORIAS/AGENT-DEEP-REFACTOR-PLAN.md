@@ -1,8 +1,8 @@
 # AGENT DEEP REFACTOR PLAN
-**Data**: 2026-03-31
-**Escopo**: `src/copilot/agent/` + arquivos correlatos em `src/copilot/`
-**Status**: EM EXECUÇÃO
-**Baseline**: Phase E.1 commitada (`5d9604d1`), 1817 testes passando, 0 erros TS, 0 erros lint.
+
+**Data**: 2026-03-31 **Escopo**: `src/copilot/agent/` + arquivos correlatos em `src/copilot/`
+**Status**: EM EXECUÇÃO **Baseline**: Phase E.1 commitada (`5d9604d1`), 1817 testes passando, 0
+erros TS, 0 erros lint.
 
 ---
 
@@ -13,7 +13,7 @@
 | Arquivo                  | LOC  | Estado               | Problemas identificados                                                                                                                                |
 | ------------------------ | ---- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `always-alive.js`        | 1393 | God Object residual  | Ainda possui: gestão de fila, reconexão, permissões, status snapshot, histórico SDK, webhook delegation, event wiring — 8+ responsabilidades distintas |
-| `dialog-loop-manager.js` | 596  | Recém extraído (E.1) | Bom estado; JSDoc genérico herda refs históricas de bugs (BUG-AA-*) irrelevantes ao DLM                                                                |
+| `dialog-loop-manager.js` | 596  | Recém extraído (E.1) | Bom estado; JSDoc genérico herda refs históricas de bugs (BUG-AA-\*) irrelevantes ao DLM                                                               |
 | `dialog-protocol.js`     | 113  | Bem isolado          | JSDoc adequado; sem problemas estruturais                                                                                                              |
 | `dialog-watchdog.js`     | 113  | Bem isolado          | Comentário `BUG-05` no interior do guard deve virar JSDoc sólido                                                                                       |
 | `entry.js`               | 124  | Bem estruturado      | Import `CopilotClient` não usado diretamente na lógica (apenas no ping); pode extrair `ping` para `lib/`                                               |
@@ -67,35 +67,43 @@
 ## 2. PLANO DE REFATORAÇÃO — FASES
 
 ### FASE F.1 — Corrigir bugs de events.js + JSDoc hardening sempre-alive (sem mover código)
-**Objetivo**: Zero bugs conhecidos; JSDoc sólido com tipos explícitos.
-**Risco**: Baixo — sem mudanças de comportamento.
-**Critério de conclusão**: 0 erros TS, 0 erros lint, 1817 testes.
+
+**Objetivo**: Zero bugs conhecidos; JSDoc sólido com tipos explícitos. **Risco**: Baixo — sem
+mudanças de comportamento. **Critério de conclusão**: 0 erros TS, 0 erros lint, 1817 testes.
 
 #### F.1.1 — `events.js`: adicionar eventos faltantes ao `AGENT_EVENTS`
+
 - Adicionar: `'dialog.paused'`, `'dialog.resumed'`, `'dialog.loop.changed'`
 - Atualizar `AgentEventName` union type
 
 #### F.1.2 — `always-alive.js`: JSDoc + tipagem hardening
-- Remover todos os comentários históricos (`BUG-AA-*`, `MELHORIA-NN`, `GAP-AA-*`, `RF-D*`, `RF-PR-*`, etc.)
+
+- Remover todos os comentários históricos (`BUG-AA-*`, `MELHORIA-NN`, `GAP-AA-*`, `RF-D*`,
+  `RF-PR-*`, etc.)
 - Substituir por JSDoc sólido com `@throws`, `@since`, context domain
 - Completar `AgentStatusSnapshot` typedef com `permissionMode`
 - Corrigir JSDoc malformado em `sendMessage` (backtick truncado)
-- Corrigir BUG-AGENT-04: `#ensureDialogLoopAttached` → verificar se já attached antes de removeAllListeners
+- Corrigir BUG-AGENT-04: `#ensureDialogLoopAttached` → verificar se já attached antes de
+  removeAllListeners
 
 #### F.1.3 — `dialog-loop-manager.js`: JSDoc + tipagem hardening
+
 - Remover comentários históricos desnecessários
 - Completar typedef `AgentHost.sendMessage` com tipos explícitos
 - Corrigir BUG-AGENT-08: verificar `host.getPendingQuestion()` antes de `waitForEvent` no `resume()`
 
 #### F.1.4 — `dialog-watchdog.js` + `dialog-protocol.js`: limpeza menor
+
 - `dialog-watchdog.js`: converter comentário inline `BUG-05` em guard sem texto histórico
 - `dialog-protocol.js`: typo "La questão" → "A questão" no JSDoc
 
 #### F.1.5 — `session-manager.js`: limpeza de comentários + JSDoc mínimo
+
 - Remover labels históricos (`BUG-HIGH-05`, `RF-D06`, `BUG-AA-07`, `PERF-02`, etc.)
 - JSDoc limpo em todas as funções exportadas
 
 #### F.1.6 — `task-executor.js` + `tools-bootstrap.js` + `webhook-manager.js`
+
 - `task-executor.js`: adicionar `@default 0` ao `QueuedTask.attempts`
 - `webhook-manager.js`: corrigir BUG-AGENT-06 com validação de URL antes do request
 - `tools-bootstrap.js`: mover lógica de colisão de nomes para `lib/tools-registry.js`
@@ -103,28 +111,37 @@
 ---
 
 ### FASE F.2 — Extrair SessionStateManager de session-manager.js
-**Objetivo**: Separar I/O de estado (read/write) de lógica de sessão (init/resume).
-**Risco**: Médio — precisa atualizar todos os importadores de `readState`/`writeState`/`writeStateAsync`/`clearState`.
-**Critério de conclusão**: 0 erros TS, 0 erros lint, 1817 testes.
+
+**Objetivo**: Separar I/O de estado (read/write) de lógica de sessão (init/resume). **Risco**: Médio
+— precisa atualizar todos os importadores de
+`readState`/`writeState`/`writeStateAsync`/`clearState`. **Critério de conclusão**: 0 erros TS, 0
+erros lint, 1817 testes.
 
 #### F.2.1 — Criar `agent/state-io.js`
+
 Extrair de `session-manager.js`:
+
 - `readState()`, `writeState()`, `writeStateAsync()`, `clearState()`
 - typedef `AliveAgentState` + schema Zod canônico
 - `_stateCache`, `_stateDirReady` (módulo-privados)
 
 #### F.2.2 — Criar `agent/tool-audit-logger.js`
+
 Extrair de `session-manager.js`:
+
 - `logToolAudit()`, `isHighRiskTool()`, `buildAuditingPermissionHandler()`
 - Constante `TOOL_AUDIT_LOG`
 
 #### F.2.3 — `session-manager.js` residual
+
 Após extrações, fica apenas com:
+
 - `buildHookSystemContext()`, `buildHookSystemContextSafe()`, `setBackgroundCompactionThreshold()`
 - `initOrResumeSession()`
 - Renomear para `session-initializer.js` para clareza semântica
 
 #### F.2.4 — Atualizar todos os importadores
+
 - `always-alive.js` → import de `state-io.js` em vez de `session-manager.js`
 - `dialog-loop-manager.js` → idem
 - Qualquer outro importador de `readState`/`writeState`
@@ -132,11 +149,12 @@ Após extrações, fica apenas com:
 ---
 
 ### FASE F.3 — Extrair PermissionController de always-alive.js
-**Objetivo**: Separar gestão de permissão/modo em classe própria.
-**Risco**: Baixo — já tem `WebhookManager` como precedente.
-**Critério de conclusão**: 0 erros TS, 0 erros lint, 1817 testes.
+
+**Objetivo**: Separar gestão de permissão/modo em classe própria. **Risco**: Baixo — já tem
+`WebhookManager` como precedente. **Critério de conclusão**: 0 erros TS, 0 erros lint, 1817 testes.
 
 #### F.3.1 — Criar `agent/permission-controller.js`
+
 ```js
 class PermissionController {
     #handler = approveAll;
@@ -150,17 +168,20 @@ class PermissionController {
 ```
 
 #### F.3.2 — `always-alive.js`: delegar para `#permissions`
+
 - Remove `#permissionHandler`, `#permissionModeLabel`
 - Expõe `getPermissionMode()`, `setPermissionMode()` como thin delegations
 
 ---
 
 ### FASE F.4 — Extrair MessageQueueManager de always-alive.js
-**Objetivo**: Separar fila + processamento de tarefas em classe própria.
-**Risco**: Alto — exige refatoração cuidadosa de `#processQueue()` e `executeTask` callback chain.
-**Critério de conclusão**: 0 erros TS, 0 erros lint, 1817 testes.
+
+**Objetivo**: Separar fila + processamento de tarefas em classe própria. **Risco**: Alto — exige
+refatoração cuidadosa de `#processQueue()` e `executeTask` callback chain. **Critério de
+conclusão**: 0 erros TS, 0 erros lint, 1817 testes.
 
 #### F.4.1 — Criar `agent/message-queue.js`
+
 ```js
 class MessageQueue extends EventEmitter {
     #queue = [];
@@ -178,6 +199,7 @@ class MessageQueue extends EventEmitter {
 ```
 
 #### F.4.2 — `always-alive.js` integração
+
 - `#queue` → `#messageQueue = new MessageQueue()`
 - `sendMessage()` → `return this.#messageQueue.enqueue(task, opts)`
 - `#processQueue()` → removido (está em MessageQueue)
@@ -187,11 +209,12 @@ class MessageQueue extends EventEmitter {
 ---
 
 ### FASE F.5 — Criar `agent/index.js` (barrel export) e limpar `agent.js` legado
-**Objetivo**: API pública limpa de `src/copilot/agent/`.
-**Risco**: Baixo.
-**Critério de conclusão**: 0 erros TS, 0 erros lint, 1817 testes.
+
+**Objetivo**: API pública limpa de `src/copilot/agent/`. **Risco**: Baixo. **Critério de
+conclusão**: 0 erros TS, 0 erros lint, 1817 testes.
 
 #### F.5.1 — Criar `agent/index.js`
+
 ```js
 export { AlwaysAliveAgent, alwaysAliveAgent } from './always-alive.js';
 export { DialogLoopManager } from './dialog-loop-manager.js';
@@ -199,36 +222,43 @@ export { DialogProtocol } from './dialog-protocol.js';
 export { DialogWatchdog } from './dialog-watchdog.js';
 export { WebhookManager } from './webhook-manager.js';
 export { AGENT_EVENTS } from './events.js';
-export * from './state-io.js';   // após F.2
+export * from './state-io.js'; // após F.2
 ```
 
 #### F.5.2 — Remover `src/copilot/agent.js` (shim)
+
 - Verificar se algum arquivo externo importa `src/copilot/agent.js` diretamente
 - Absorver em `index.js` ou deletar
 
 ---
 
 ### FASE F.6 — AlwaysAliveAgent: limpeza residual e hardening final
-**Objetivo**: Após extrações, o `always-alive.js` deve ter ~400 LOC de código limpo.
-**Risco**: Baixo — consolidação de cleanup.
-**Critério de conclusão**: 0 erros TS strict, 0 erros lint, 1817 testes.
+
+**Objetivo**: Após extrações, o `always-alive.js` deve ter ~400 LOC de código limpo. **Risco**:
+Baixo — consolidação de cleanup. **Critério de conclusão**: 0 erros TS strict, 0 erros lint, 1817
+testes.
 
 #### F.6.1 — `#wireSessionEvents()` → extrair para `agent/session-event-wirer.js`
+
 - Função pura (não classe); recebe session + callbacks e registra todos os listeners
 - Retorna array de unsubscribers
 - Fica em `agent/` pois é específico do contrato SDK
 
 #### F.6.2 — `#tryReconnect()` → extrair para `agent/reconnect-policy.js`
+
 - Encapsula lógica de backoff exponencial + jitter
 - Configurável: `maxAttempts`, `baseDelayMs`
 - Testável de forma independente
 
 #### F.6.3 — `getStatusSnapshot()` e cache
+
 - Mover para `agent/status-snapshot.js` como função pura
 - Recebe state parcial como parâmetro
 
 #### F.6.4 — `always-alive.js` resultado final
+
 Responsabilidades remanescentes (estado canônico):
+
 1. Orquestração de lifecycle (`start`, `stop`, shutdown)
 2. `sendMessage()` (frontend da fila)
 3. `answerPendingQuestion()`
@@ -254,8 +284,8 @@ F.6 (limpeza final) → commit
 
 ## 4. TRACKING DE PROGRESSO
 
-| Fase                     | Status | Commit                    |
-| ------------------------ | ------ | ------------------------- |
+| Fase                     | Status  | Commit                    |
+| ------------------------ | ------- | ------------------------- |
 | E.1 DialogLoopManager    | ✅ DONE | `5d9604d1`                |
 | F.1 Bugs + JSDoc         | ✅ DONE | `00b7ce27`                |
 | F.2 SessionStateManager  | ✅ DONE | committed                 |
@@ -269,6 +299,7 @@ F.6 (limpeza final) → commit
 ## 5. CRITÉRIOS DE QUALIDADE POR FASE
 
 A cada commit intermediário:
+
 - `npm run lint` → 0 erros
 - `npm run format:check` → clean
 - `npm run test:unit` → 1817 pass, 0 fail
