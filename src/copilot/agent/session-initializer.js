@@ -68,7 +68,15 @@ loadToolsConfig();
 const BRIEFING_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session-briefing.md');
 const SESSION_JSON_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session.json');
 
-// Threshold dinâmico de compaction — configurável via PUT /config/infinite-session.
+/**
+ * Threshold dinâmico de compaction — configurável em runtime via PUT /config/infinite-session.
+ *
+ * **Singleton de módulo**: este valor é compartilhado por todas as chamadas a `initOrResumeSession()` no mesmo
+ * processo. Em um cenário futuro multi-agent, cada instância deveria receber o threshold via opções em vez de depender
+ * desta variável de módulo. Por enquanto, o design singleton é intencional — há apenas um agente por processo Node.
+ *
+ * @type {number}
+ */
 let _backgroundCompactionThreshold = 0.75;
 
 /**

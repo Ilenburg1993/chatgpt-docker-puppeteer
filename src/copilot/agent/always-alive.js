@@ -422,6 +422,15 @@ export class AlwaysAliveAgent extends EventEmitter {
             }
 
             this.emit('ready', { sessionId: session.sessionId, isResumed });
+
+            // G2-DX-17: emissão periódica de agent.metrics para SSE/NERV observers
+            const metricsMs = AlwaysAliveAgent.#METRICS_INTERVAL_MS;
+            if (metricsMs > 0) {
+                this.#metricsTimer = setInterval(() => {
+                    this.emit('agent.metrics', this.getStatusSnapshot());
+                }, metricsMs);
+                this.#metricsTimer.unref();
+            }
         } catch (/** @type {any} */ e) {
             this.#setStatus('stopped');
             log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${e.message}`);
@@ -488,6 +497,12 @@ export class AlwaysAliveAgent extends EventEmitter {
         await writeStateAsync({ sendCount: this.#sendCount }).catch((/** @type {any} */ e) =>
             log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${e.message}`),
         );
+
+        // G2-DX-17: limpar timer de métricas antes de alterar status
+        if (this.#metricsTimer) {
+            clearInterval(this.#metricsTimer);
+            this.#metricsTimer = null;
+        }
 
         this.#setStatus('stopped');
 
@@ -700,6 +715,21 @@ export class AlwaysAliveAgent extends EventEmitter {
 
     /** @type {{ snapshot: import('./always-alive.js').AgentStatusSnapshot; at: number } | null} */
     #statusSnapshotCache = null;
+
+    /**
+     * G2-DX-17: Timer de emissão periódica de `agent.metrics`. Configurável via AGENT_METRICS_INTERVAL_MS (padrão: 30
+     * 000ms). Iniciado em `start()`, limpo em `stop()`.
+     *
+     * @type {ReturnType<typeof setInterval> | null}
+     */
+    #metricsTimer = null;
+
+    /**
+     * Intervalo de emissão de métricas em ms. Desabilitado se ≤ 0.
+     *
+     * @type {number}
+     */
+    static #METRICS_INTERVAL_MS = Number(process.env.AGENT_METRICS_INTERVAL_MS) || 30_000;
 
     /**
      * Retorna um snapshot do estado atual do agente para a API HTTP.
