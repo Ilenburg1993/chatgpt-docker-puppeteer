@@ -122,7 +122,8 @@ export class PermissionController {
                 // G2-DX-13: lista de ferramentas shell configurável via AGENT_DENY_SHELL_TOOLS env var.
                 const defaultShellTools = ['run_shell_command', 'run_npm_script', 'run_node_script'];
                 const shellTools = process.env['AGENT_DENY_SHELL_TOOLS']
-                    ? process.env['AGENT_DENY_SHELL_TOOLS'].split(',')
+                    ? process.env['AGENT_DENY_SHELL_TOOLS']
+                          .split(',')
                           .map((t) => t.trim())
                           .filter(Boolean)
                     : defaultShellTools;

@@ -380,29 +380,34 @@ const todoCreateTool = defineTool('todo_create', {
         'Suporta título, descrição detalhada, prioridade (critical/high/medium/low/none), ' +
         'tags, data de vencimento, notas livres, e subtarefas via parentId. ' +
         'Retorna o objeto completo da tarefa criada com seu ID gerado.',
-    parameters: /** @type {import('zod').ZodSchema} */ (
-        z.object({
-            title: z.string().min(1).max(500).describe('Título da tarefa (obrigatório)'),
-            description: z.string().max(5000).optional().describe('Descrição detalhada da tarefa'),
-            priority: zPriority
-                .optional()
-                .default('medium')
-                .describe('Prioridade: critical | high | medium | low | none'),
-            tags: z
-                .array(z.string().max(100))
-                .max(20)
-                .optional()
-                .default([])
-                .describe('Lista de tags/labels para categorização'),
-            due_date: z
-                .string()
-                .datetime({ offset: true })
-                .optional()
-                .describe('Data de vencimento ISO 8601 (ex: 2026-04-01T18:00:00Z)'),
-            parent_id: z.string().optional().describe('ID da tarefa pai para criar como subtarefa'),
-            notes: z.string().max(10000).optional().describe('Notas livres associadas à tarefa'),
-            metadata: z.record(z.string(), z.unknown()).optional().describe('Campos extras extensíveis (JSON livre)'),
-        })
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                title: z.string().min(1).max(500).describe('Título da tarefa (obrigatório)'),
+                description: z.string().max(5000).optional().describe('Descrição detalhada da tarefa'),
+                priority: zPriority
+                    .optional()
+                    .default('medium')
+                    .describe('Prioridade: critical | high | medium | low | none'),
+                tags: z
+                    .array(z.string().max(100))
+                    .max(20)
+                    .optional()
+                    .default([])
+                    .describe('Lista de tags/labels para categorização'),
+                due_date: z
+                    .string()
+                    .datetime({ offset: true })
+                    .optional()
+                    .describe('Data de vencimento ISO 8601 (ex: 2026-04-01T18:00:00Z)'),
+                parent_id: z.string().optional().describe('ID da tarefa pai para criar como subtarefa'),
+                notes: z.string().max(10000).optional().describe('Notas livres associadas à tarefa'),
+                metadata: z
+                    .record(z.string(), z.unknown())
+                    .optional()
+                    .describe('Campos extras extensíveis (JSON livre)'),
+            })
+        )
     ),
     handler: async (
         /**
@@ -499,24 +504,33 @@ const todoListTool = withSkipPermission(
             'tag, parent_id (listar subtarefas de uma tarefa), texto de busca, e overdue. ' +
             'Retorna tarefas ordenadas por: overdue → priority → createdAt desc. ' +
             'Use para obter uma visão geral ou filtrar por critério.',
-        parameters: /** @type {import('zod').ZodSchema} */ (
-            z.object({
-                status: zStatus.optional().describe('Filtrar por status específico'),
-                priority: zPriority.optional().describe('Filtrar por prioridade específica'),
-                tag: z.string().optional().describe('Filtrar tarefas que contenham esta tag'),
-                parent_id: z
-                    .string()
-                    .nullable()
-                    .optional()
-                    .describe('null = apenas raiz; string = subtarefas deste pai; omitido = todas'),
-                text: z
-                    .string()
-                    .max(200)
-                    .optional()
-                    .describe('Busca de texto em título, descrição e notas (case-insensitive)'),
-                overdue_only: z.boolean().optional().describe('Se true, retorna apenas tarefas vencidas'),
-                limit: z.number().int().min(1).max(MAX_LIST).optional().default(50).describe('Máximo de resultados'),
-            })
+        parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+            /** @type {unknown} */ (
+                z.object({
+                    status: zStatus.optional().describe('Filtrar por status específico'),
+                    priority: zPriority.optional().describe('Filtrar por prioridade específica'),
+                    tag: z.string().optional().describe('Filtrar tarefas que contenham esta tag'),
+                    parent_id: z
+                        .string()
+                        .nullable()
+                        .optional()
+                        .describe('null = apenas raiz; string = subtarefas deste pai; omitido = todas'),
+                    text: z
+                        .string()
+                        .max(200)
+                        .optional()
+                        .describe('Busca de texto em título, descrição e notas (case-insensitive)'),
+                    overdue_only: z.boolean().optional().describe('Se true, retorna apenas tarefas vencidas'),
+                    limit: z
+                        .number()
+                        .int()
+                        .min(1)
+                        .max(MAX_LIST)
+                        .optional()
+                        .default(50)
+                        .describe('Máximo de resultados'),
+                })
+            )
         ),
         handler: async (
             /**
@@ -599,25 +613,34 @@ const todoUpdateTool = defineTool('todo_update', {
         'Atualiza campos arbitrários de uma tarefa existente. Apenas os campos fornecidos são ' +
         'alterados (patch parcial). Status segue máquina de estados validada. ' +
         'Use para modificar título, descrição, prioridade, tags, data, notas ou metadata.',
-    parameters: /** @type {import('zod').ZodSchema} */ (
-        z.object({
-            id: zId,
-            title: z.string().min(1).max(500).optional().describe('Novo título'),
-            description: z.string().max(5000).optional().describe('Nova descrição'),
-            priority: zPriority.optional().describe('Nova prioridade'),
-            tags: z.array(z.string().max(100)).max(20).optional().describe('Substituir lista de tags'),
-            add_tags: z.array(z.string().max(100)).max(20).optional().describe('Adicionar tags (merge com existentes)'),
-            remove_tags: z.array(z.string()).optional().describe('Remover tags específicas'),
-            due_date: z
-                .string()
-                .datetime({ offset: true })
-                .nullable()
-                .optional()
-                .describe('Nova data vencimento ISO 8601 (null para remover)'),
-            notes: z.string().max(10000).optional().describe('Novas notas (substitui completamente)'),
-            append_notes: z.string().max(5000).optional().describe('Adicionar ao final das notas existentes'),
-            metadata: z.record(z.string(), z.unknown()).optional().describe('Merge de metadata (deep merge de keys)'),
-        })
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                id: zId,
+                title: z.string().min(1).max(500).optional().describe('Novo título'),
+                description: z.string().max(5000).optional().describe('Nova descrição'),
+                priority: zPriority.optional().describe('Nova prioridade'),
+                tags: z.array(z.string().max(100)).max(20).optional().describe('Substituir lista de tags'),
+                add_tags: z
+                    .array(z.string().max(100))
+                    .max(20)
+                    .optional()
+                    .describe('Adicionar tags (merge com existentes)'),
+                remove_tags: z.array(z.string()).optional().describe('Remover tags específicas'),
+                due_date: z
+                    .string()
+                    .datetime({ offset: true })
+                    .nullable()
+                    .optional()
+                    .describe('Nova data vencimento ISO 8601 (null para remover)'),
+                notes: z.string().max(10000).optional().describe('Novas notas (substitui completamente)'),
+                append_notes: z.string().max(5000).optional().describe('Adicionar ao final das notas existentes'),
+                metadata: z
+                    .record(z.string(), z.unknown())
+                    .optional()
+                    .describe('Merge de metadata (deep merge de keys)'),
+            })
+        )
     ),
     handler: async (
         /**
@@ -689,19 +712,21 @@ const todoSetStatusTool = defineTool('todo_set_status', {
         'in_progress → todo | done | cancelled | blocked; ' +
         'done | cancelled → todo (reabrir); blocked → todo | in_progress. ' +
         'Use force: true para forçar transição fora do grafo (casos excepcionais).',
-    parameters: /** @type {import('zod').ZodSchema} */ (
-        z.object({
-            id: zId,
-            status: zStatus.describe('Novo status da tarefa'),
-            force: z.boolean().optional().describe('Forçar transição mesmo fora do grafo de estados'),
-            // UPG-PROP-05 (fix): identificador de quem concluiu a tarefa (agente, usuário, etc.)
-            completed_by: z
-                .string()
-                .optional()
-                .describe(
-                    'Identificador de quem concluiu (agente, usuário). Gravado em completedBy quando status=done.',
-                ),
-        })
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                id: zId,
+                status: zStatus.describe('Novo status da tarefa'),
+                force: z.boolean().optional().describe('Forçar transição mesmo fora do grafo de estados'),
+                // UPG-PROP-05 (fix): identificador de quem concluiu a tarefa (agente, usuário, etc.)
+                completed_by: z
+                    .string()
+                    .optional()
+                    .describe(
+                        'Identificador de quem concluiu (agente, usuário). Gravado em completedBy quando status=done.',
+                    ),
+            })
+        )
     ),
     handler: async (/** @type {{ id: string; status: TodoStatus; force?: boolean; completed_by?: string }} */ args) =>
         withStore(async (store) => {
@@ -831,16 +856,18 @@ const todoAddSubtaskTool = defineTool('todo_add_subtask', {
         'Cria uma nova subtarefa vinculada a uma tarefa pai existente. ' +
         'Equivale a todo_create com parent_id preenchido, mas com interface mais direta. ' +
         'A tarefa pai tem sua lista subtaskIds atualizada automaticamente.',
-    parameters: /** @type {import('zod').ZodSchema} */ (
-        z.object({
-            parent_id: z.string().min(1).describe('ID da tarefa pai'),
-            title: z.string().min(1).max(500).describe('Título da subtarefa'),
-            description: z.string().max(5000).optional().describe('Descrição da subtarefa'),
-            priority: zPriority.optional().default('medium').describe('Prioridade da subtarefa'),
-            tags: z.array(z.string().max(100)).max(10).optional().describe('Tags da subtarefa'),
-            due_date: z.string().datetime({ offset: true }).optional().describe('Data de vencimento ISO 8601'),
-            notes: z.string().max(5000).optional().describe('Notas livres da subtarefa'),
-        })
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                parent_id: z.string().min(1).describe('ID da tarefa pai'),
+                title: z.string().min(1).max(500).describe('Título da subtarefa'),
+                description: z.string().max(5000).optional().describe('Descrição da subtarefa'),
+                priority: zPriority.optional().default('medium').describe('Prioridade da subtarefa'),
+                tags: z.array(z.string().max(100)).max(10).optional().describe('Tags da subtarefa'),
+                due_date: z.string().datetime({ offset: true }).optional().describe('Data de vencimento ISO 8601'),
+                notes: z.string().max(5000).optional().describe('Notas livres da subtarefa'),
+            })
+        )
     ),
     handler: async (
         /**
@@ -895,17 +922,26 @@ const todoSearchTool = withSkipPermission(
             'Busca full-text avançada em todas as tarefas. Pesquisa simultânea em título, ' +
             'descrição, notas e tags. Suporta múltiplos termos (todos devem corresponder). ' +
             'Retorna tarefas ordenadas por relevância (número de campos com match) + prioridade.',
-        parameters: /** @type {import('zod').ZodSchema} */ (
-            z.object({
-                query: z
-                    .string()
-                    .min(1)
-                    .max(500)
-                    .describe('Texto de busca. Múltiplos termos separados por espaço (AND implícito)'),
-                status: zStatus.optional().describe('Filtrar por status após a busca'),
-                priority: zPriority.optional().describe('Filtrar por prioridade após a busca'),
-                limit: z.number().int().min(1).max(MAX_LIST).optional().default(20).describe('Máximo de resultados'),
-            })
+        parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+            /** @type {unknown} */ (
+                z.object({
+                    query: z
+                        .string()
+                        .min(1)
+                        .max(500)
+                        .describe('Texto de busca. Múltiplos termos separados por espaço (AND implícito)'),
+                    status: zStatus.optional().describe('Filtrar por status após a busca'),
+                    priority: zPriority.optional().describe('Filtrar por prioridade após a busca'),
+                    limit: z
+                        .number()
+                        .int()
+                        .min(1)
+                        .max(MAX_LIST)
+                        .optional()
+                        .default(20)
+                        .describe('Máximo de resultados'),
+                })
+            )
         ),
         handler: async (
             /** @type {{ query: string; status?: TodoStatus; priority?: TodoPriority; limit?: number }} */ args,
@@ -1069,16 +1105,20 @@ const todoBulkUpdateTool = defineTool('todo_bulk_update', {
         'Atualiza status, prioridade ou tags em múltiplas tarefas simultaneamente. ' +
         'Aplica a mesma mudança a todas as tarefas do array de IDs fornecido. ' +
         'Use para completar um sprint, repriorizar um conjunto ou etiquetar em lote.',
-    parameters: /** @type {import('zod').ZodSchema} */ (
-        z.object({
-            ids: z.array(zId).min(1).max(100).describe('Lista de IDs de tarefas a atualizar (máximo 100)'),
-            status: zStatus.optional().describe('Novo status a aplicar a todas (máquina de estados ignorada em bulk)'),
-            priority: zPriority.optional().describe('Nova prioridade a aplicar a todas'),
-            add_tags: z.array(z.string().max(100)).max(10).optional().describe('Tags a adicionar a todas'),
-            remove_tags: z.array(z.string()).optional().describe('Tags a remover de todas'),
-            // UPG-PROP-05 (fix): identificador de quem concluiu (propagado quando status=done)
-            completed_by: z.string().optional().describe('Identificador de quem concluiu (agente, usuário, etc.)'),
-        })
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                ids: z.array(zId).min(1).max(100).describe('Lista de IDs de tarefas a atualizar (máximo 100)'),
+                status: zStatus
+                    .optional()
+                    .describe('Novo status a aplicar a todas (máquina de estados ignorada em bulk)'),
+                priority: zPriority.optional().describe('Nova prioridade a aplicar a todas'),
+                add_tags: z.array(z.string().max(100)).max(10).optional().describe('Tags a adicionar a todas'),
+                remove_tags: z.array(z.string()).optional().describe('Tags a remover de todas'),
+                // UPG-PROP-05 (fix): identificador de quem concluiu (propagado quando status=done)
+                completed_by: z.string().optional().describe('Identificador de quem concluiu (agente, usuário, etc.)'),
+            })
+        )
     ),
     handler: async (
         /**
@@ -1231,29 +1271,31 @@ const todoImportTool = defineTool('todo_import', {
         'Cada objeto deve ter pelo menos "title". Campos opcionais: description, priority, status, ' +
         'tags, due_date, notes, metadata. IDs novos são gerados automaticamente. ' +
         'Use para migrar tarefas de outros sistemas ou criar um sprint inteiro de uma vez.',
-    parameters: /** @type {import('zod').ZodSchema} */ (
-        z.object({
-            tasks: z
-                .array(
-                    z.object({
-                        title: z.string().min(1).max(500),
-                        description: z.string().max(5000).optional(),
-                        status: zStatus.optional(),
-                        priority: zPriority.optional(),
-                        tags: z.array(z.string().max(100)).max(20).optional(),
-                        due_date: z.string().datetime({ offset: true }).optional(),
-                        notes: z.string().max(10000).optional(),
-                        metadata: z.record(z.string(), z.unknown()).optional(),
-                    }),
-                )
-                .min(1)
-                .max(50)
-                .describe('Array de tarefas a importar (máximo 50 por chamada)'),
-            default_priority: zPriority
-                .optional()
-                .default('medium')
-                .describe('Prioridade padrão para tarefas sem priority'),
-        })
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                tasks: z
+                    .array(
+                        z.object({
+                            title: z.string().min(1).max(500),
+                            description: z.string().max(5000).optional(),
+                            status: zStatus.optional(),
+                            priority: zPriority.optional(),
+                            tags: z.array(z.string().max(100)).max(20).optional(),
+                            due_date: z.string().datetime({ offset: true }).optional(),
+                            notes: z.string().max(10000).optional(),
+                            metadata: z.record(z.string(), z.unknown()).optional(),
+                        }),
+                    )
+                    .min(1)
+                    .max(50)
+                    .describe('Array de tarefas a importar (máximo 50 por chamada)'),
+                default_priority: zPriority
+                    .optional()
+                    .default('medium')
+                    .describe('Prioridade padrão para tarefas sem priority'),
+            })
+        )
     ),
     handler: async (
         /**
