@@ -106,6 +106,14 @@ export class AlwaysAliveAgent extends EventEmitter {
     /** @type {AgentStatus} */
     #status = 'stopped';
 
+    /**
+     * G1-ARCH-03: Flag de reconexão em andamento. Bloqueia #processQueue() durante
+     * a tentativa de reconexão para evitar execução de tasks em sessão inválida.
+     *
+     * @type {boolean}
+     */
+    #isReconnecting = false;
+
     /** @type {PendingQuestion | null} */
     #pendingQuestion = null;
 
@@ -881,7 +889,8 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {void}
      */
     #processQueue() {
-        if (this.#status !== 'idle' || this.#messageQueue.size === 0 || !this.#session) return;
+        // G1-ARCH-03: bloqueia processamento durante reconexão ativa
+        if (this.#isReconnecting || this.#status !== 'idle' || this.#messageQueue.size === 0 || !this.#session) return;
         const session = this.#session;
 
         const task = this.#messageQueue.shift();
@@ -955,21 +964,27 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<boolean>} true se reconexão bem-sucedida, false se esgotado
      */
     async #tryReconnect(originalError, opts = {}) {
-        return tryReconnect(
-            originalError,
-            this.#client,
-            this.#status,
-            {
-                emit: (event, payload) => this.emit(event, payload),
-                initSession: (client) => this.#initSession(client),
-                dialogLoop: this.#dialogLoop,
-                clearSessionEventUnsubs: () => {
-                    for (const unsub of this.#sessionEventUnsubscribers) unsub();
-                    this.#sessionEventUnsubscribers = [];
+        // G1-ARCH-03: sinaliza reconexão ativa para bloquear #processQueue()
+        this.#isReconnecting = true;
+        try {
+            return await tryReconnect(
+                originalError,
+                this.#client,
+                this.#status,
+                {
+                    emit: (event, payload) => this.emit(event, payload),
+                    initSession: (client) => this.#initSession(client),
+                    dialogLoop: this.#dialogLoop,
+                    clearSessionEventUnsubs: () => {
+                        for (const unsub of this.#sessionEventUnsubscribers) unsub();
+                        this.#sessionEventUnsubscribers = [];
+                    },
                 },
-            },
-            opts,
-        );
+                opts,
+            );
+        } finally {
+            this.#isReconnecting = false;
+        }
     }
 
     /**
@@ -1146,3 +1161,15 @@ export class AlwaysAliveAgent extends EventEmitter {
  * @type {AlwaysAliveAgent}
  */
 export const alwaysAliveAgent = new AlwaysAliveAgent();
+
+/**
+ * G1-ARCH-01: Accessor lazy do singleton — use este em vez de importar `alwaysAliveAgent` diretamente.
+ *
+ * Permite que futuramente a instância seja substituída (ex.: por um mock em testes de integração)
+ * sem alterar todos os call sites.
+ *
+ * @returns {AlwaysAliveAgent}
+ */
+export function getAgent() {
+    return alwaysAliveAgent;
+}
