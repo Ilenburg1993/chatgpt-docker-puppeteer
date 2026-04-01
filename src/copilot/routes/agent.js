@@ -71,15 +71,40 @@ router.get('/agent/info', (_req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Lista as ferramentas registradas no ToolsRegistry do agente, com metadados ricos.
+ * Lista as ferramentas registradas no ToolsRegistry do agente, com metadados ricos. G2-API-11: suporta
+ * ?category=hook&page=1&limit=20 para filtragem e paginação.
  */
-router.get('/agent/tools', (_req, res) => {
+router.get('/agent/tools', (req, res) => {
     const registry = alwaysAliveAgent.toolsRegistry;
     if (!registry) {
         res.status(503).json({ ok: false, error: 'ToolsRegistry não disponível (agente não iniciado)' });
         return;
     }
-    res.json({ ok: true, ...registry });
+
+    let entries = [...registry.entries.values()];
+
+    // G2-API-11: filtro por categoria
+    const category = typeof req.query['category'] === 'string' ? req.query['category'].trim() : '';
+    if (category) {
+        entries = entries.filter((e) => e.category === category);
+    }
+
+    const total = entries.length;
+
+    // G2-API-11: paginação
+    const page = Math.max(1, parseInt(String(req.query['page'] ?? ''), 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query['limit'] ?? ''), 10) || total));
+    const start = (page - 1) * limit;
+    const paged = entries.slice(start, start + limit);
+
+    res.json({
+        ok: true,
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit) || 1,
+        tools: paged.map((e) => ({ name: e.tool.name, category: e.category, tags: e.tags, readOnly: e.readOnly })),
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -57,6 +57,20 @@ export function registerStreamRoutes(bridge, agent) {
      * Uso: `GET /api/copilot/stream` com `Accept: text/event-stream`
      */
     bridge.get('/stream', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        // G2-API-10: filtro de eventos por query param ?events=task.*,dialog.* (opcional)
+        // Se não fornecido, todos os eventos são entregues (backward-compatible).
+        const eventsParam = typeof req.query?.['events'] === 'string' ? req.query['events'].trim() : '';
+        /** @type {Set<string> | null} */
+        let allowedEvents = null;
+        if (eventsParam) {
+            allowedEvents = new Set(
+                eventsParam
+                    .split(',')
+                    .map((e) => e.trim())
+                    .filter(Boolean),
+            );
+        }
+
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
@@ -83,7 +97,10 @@ export function registerStreamRoutes(bridge, agent) {
 
         /** @type {Map<AgentEventName, (data: any) => void>} */
         const handlers = new Map(
-            AGENT_EVENTS.map((evt) => [evt, (/** @type {any} */ data) => sendEvt(evt, data ?? {})]),
+            AGENT_EVENTS.filter((evt) => !allowedEvents || allowedEvents.has(evt)).map((evt) => [
+                evt,
+                (/** @type {any} */ data) => sendEvt(evt, data ?? {}),
+            ]),
         );
 
         handlers.forEach((handler, evt) => agent.on(evt, handler));

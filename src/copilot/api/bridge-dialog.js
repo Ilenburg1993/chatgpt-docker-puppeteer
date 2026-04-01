@@ -31,6 +31,9 @@ import { log } from '#core/logger';
  * @returns {void}
  */
 export function registerDialogRoutes(bridge, agent) {
+    // G2-API-09: flag de rate limiting — impede turnos concorrentes na camada HTTP
+    let _turnInFlight = false;
+
     // ─── POST /dialog/start ───────────────────────────────────────────────────
 
     /**
@@ -73,6 +76,14 @@ export function registerDialogRoutes(bridge, agent) {
      * retorna.
      */
     bridge.post('/dialog/turn', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        // G2-API-09: rate limiting — rejeitar imediatamente se já há turno HTTP em andamento
+        if (_turnInFlight) {
+            return res.status(429).json({
+                ok: false,
+                error: 'Turno já em andamento. Aguarde a resposta antes de enviar outro.',
+            });
+        }
+
         const MIN_DIALOG_TIMEOUT_MS = 1_000;
         const MAX_DIALOG_TIMEOUT_MS = 300_000;
         const { message, timeout = 60_000 } = req.body ?? {};
@@ -87,6 +98,7 @@ export function registerDialogRoutes(bridge, agent) {
             });
         }
 
+        _turnInFlight = true;
         try {
             const reply = await agent.sendDialogTurn(message, { timeout });
             return res.json({ ok: true, reply });
@@ -105,6 +117,8 @@ export function registerDialogRoutes(bridge, agent) {
                 // FLOW-UPG-04: incluir estado do loop para facilitar diagnóstico pelo cliente
                 dialogLoopActive: agent.dialogLoopActive ?? false,
             });
+        } finally {
+            _turnInFlight = false;
         }
     });
 
