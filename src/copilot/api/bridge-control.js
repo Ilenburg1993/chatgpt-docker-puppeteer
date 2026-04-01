@@ -128,6 +128,8 @@ export function registerControlRoutes(bridge, agent) {
             queueSize: snap.queueSize,
             starvationAlert: snap.starvationAlert,
             uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
+            // G2-API-14: permissionMode para rastreabilidade de configuração de auditoria
+            permissionMode: typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all',
             // SEC-V04 (fix): listenerCounts removido da resposta HTTP — expunha topologia interna de eventos
             channelVersion: CHANNEL_VERSION,
             // UPG-PROP-07 (fix): versão do SDK e do Node.js para rastreabilidade em deploys
@@ -186,6 +188,10 @@ export function registerControlRoutes(bridge, agent) {
      */
     bridge.post('/stop', async (/** @type {Req} */ _req, /** @type {Res} */ res) => {
         try {
+            // G2-API-13: parar o dialog loop primeiro se ativo para evitar stop() concorrente
+            if (agent.dialogLoopActive) {
+                await agent.stopDialogLoop?.({ authorized: true, reason: 'api_stop' });
+            }
             await agent.stop();
             return res.json({ ok: true, message: 'Agente parado.' });
         } catch (/** @type {any} */ e) {

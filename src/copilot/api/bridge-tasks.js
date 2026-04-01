@@ -9,8 +9,8 @@
  * @module copilot/api/bridge-tasks
  */
 
-import { BridgeError } from '#copilot/core';
 import { log } from '#core/logger';
+import { randomUUID } from 'node:crypto';
 
 /**
  * @typedef {import('express').Request} Req
@@ -58,16 +58,23 @@ export function registerTaskRoutes(bridge, agent) {
 
         try {
             if (waitForResponse) {
-                const raceResult = await Promise.race([
-                    agent.sendMessage(message, { ...(attachments !== undefined ? { attachments } : {}) }),
-                    new Promise((_, reject) =>
-                        setTimeout(
-                            () => reject(new BridgeError(`Timeout após ${timeoutMs}ms`, 'HTTP_BRIDGE_TIMEOUT')),
-                            timeoutMs,
-                        ),
-                    ),
-                ]);
-                return res.json({ ok: true, response: raceResult });
+                // G2-API-06: usar AbortController para cancelar a tarefa quando timeout vencer
+                const controller = new AbortController();
+                const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+                try {
+                    const raceResult = await agent.sendMessage(message, {
+                        ...(attachments !== undefined ? { attachments } : {}),
+                        signal: controller.signal,
+                    });
+                    clearTimeout(timeoutHandle);
+                    return res.json({ ok: true, response: raceResult });
+                } catch (/** @type {any} */ e) {
+                    clearTimeout(timeoutHandle);
+                    if (e?.name === 'AbortError' || e?.code === 'ABORT_ERR') {
+                        return res.status(504).json({ ok: false, error: `Timeout após ${timeoutMs}ms` });
+                    }
+                    throw e;
+                }
             }
 
             // GAP-03 (fix): verificar se a fila está cheia antes de retornar ok:true
@@ -82,13 +89,14 @@ export function registerTaskRoutes(bridge, agent) {
                 });
             }
 
-            // Enfileira sem aguardar
+            // Enfileira sem aguardar — G2-API-07: retornar taskId para rastreabilidade no SSE
+            const taskId = randomUUID();
             agent
-                .sendMessage(message, { ...(attachments !== undefined ? { attachments } : {}) })
+                .sendMessage(message, { ...(attachments !== undefined ? { attachments } : {}), taskId })
                 .catch((/** @type {any} */ e) => {
                     log('WARN', `[bridge-tasks/send] Tarefa assíncrona falhou: ${e.message}`);
                 });
-            return res.json({ ok: true, message: 'Mensagem enfileirada.', status: agent.status });
+            return res.json({ ok: true, taskId, message: 'Mensagem enfileirada.', status: agent.status });
         } catch (/** @type {any} */ e) {
             log('ERROR', `[bridge-tasks/send] ${e.message}`);
             return res.status(500).json({ ok: false, error: e.message });

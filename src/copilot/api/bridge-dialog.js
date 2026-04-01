@@ -44,7 +44,12 @@ export function registerDialogRoutes(bridge, agent) {
         const { bootPrompt } = req.body ?? {};
 
         if (agent.status !== 'idle') {
-            return res.status(409).json({ ok: false, error: `Agente não está idle. Status: '${agent.status}'.` });
+            // G2-API-08: incluir dialogLoopActive para o cliente distinguir entre estados
+            return res.status(409).json({
+                ok: false,
+                error: `Agente não está idle. Status: '${agent.status}'.`,
+                dialogLoopActive: agent.dialogLoopActive ?? false,
+            });
         }
 
         try {

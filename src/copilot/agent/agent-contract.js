@@ -30,7 +30,12 @@
  * @property {() => Record<string, unknown>} getStatusSnapshot - Retorna o snapshot completo do status
  * @property {() => Promise<void>} start - Inicia o agente (conecta ao SDK e começa a processar a fila)
  * @property {(opts?: { shutdownTimeoutMs?: number }) => Promise<void>} stop - Para o agente graciosamente
- * @property {(message: string, opts?: { timeoutMs?: number; attachments?: any }) => Promise<unknown>} sendMessage -
+ * @property {(
+ *     message: string,
+ *     opts?: { timeoutMs?: number; attachments?: any; signal?: AbortSignal; taskId?: string },
+ * ) => Promise<unknown>} sendMessage
+ *   -
+ *
  *   Envia mensagem ao agente
  * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessageDialogBoot - Envia o boot
  *   prompt ignorando o guard do dialog loop (uso exclusivo do DialogLoopManager durante boot)

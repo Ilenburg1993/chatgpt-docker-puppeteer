@@ -199,6 +199,9 @@ router.get('/agent/stream', (req, res) => {
             unsubscribe();
             log('INFO', '[sdk-api] SSE agent/stream encerrado');
         });
+        // G2-API-12: decrementar também em 'error' e 'finish' para evitar vazamento do contador
+        res.on('error', () => _agentSseClients--);
+        res.on('finish', () => _agentSseClients--);
     });
 });
 
