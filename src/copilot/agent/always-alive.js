@@ -107,8 +107,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     #status = 'stopped';
 
     /**
-     * G1-ARCH-03: Flag de reconexão em andamento. Bloqueia #processQueue() durante
-     * a tentativa de reconexão para evitar execução de tasks em sessão inválida.
+     * G1-ARCH-03: Flag de reconexão em andamento. Bloqueia #processQueue() durante a tentativa de reconexão para evitar
+     * execução de tasks em sessão inválida.
      *
      * @type {boolean}
      */
@@ -574,8 +574,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * Variante interna de sendMessage() usada pelo DialogLoopManager para enviar o boot prompt.
-     * Bypassa o guard de dialog loop ativo — NÃO expor como API pública.
+     * Variante interna de sendMessage() usada pelo DialogLoopManager para enviar o boot prompt. Bypassa o guard de
+     * dialog loop ativo — NÃO expor como API pública.
      *
      * @param {string} message
      * @param {{ timeoutMs?: number }} [opts]
@@ -600,22 +600,22 @@ export class AlwaysAliveAgent extends EventEmitter {
      * }} opts
      */
     #enqueueTask(message, { timeoutMs, attachments, signal, resolve, reject }) {
-            const task = /** @type {AgentTask} */ ({
-                id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                message,
-                resolve,
-                reject,
-                enqueuedAt: Date.now(),
-                ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-                ...(attachments !== undefined ? { attachments } : {}),
-            });
-            try {
-                this.#messageQueue.enqueue(task, ...(signal ? [{ signal }] : []));
-            } catch (/** @type {any} */ err) {
-                reject(err instanceof Error ? err : new Error(String(err)));
-                return;
-            }
-            this.emit('task.queued', { taskId: task.id, message });
+        const task = /** @type {AgentTask} */ ({
+            id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            message,
+            resolve,
+            reject,
+            enqueuedAt: Date.now(),
+            ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+            ...(attachments !== undefined ? { attachments } : {}),
+        });
+        try {
+            this.#messageQueue.enqueue(task, ...(signal ? [{ signal }] : []));
+        } catch (/** @type {any} */ err) {
+            reject(err instanceof Error ? err : new Error(String(err)));
+            return;
+        }
+        this.emit('task.queued', { taskId: task.id, message });
     }
 
     /**
@@ -1207,8 +1207,8 @@ export const alwaysAliveAgent = new AlwaysAliveAgent();
 /**
  * G1-ARCH-01: Accessor lazy do singleton — use este em vez de importar `alwaysAliveAgent` diretamente.
  *
- * Permite que futuramente a instância seja substituída (ex.: por um mock em testes de integração)
- * sem alterar todos os call sites.
+ * Permite que futuramente a instância seja substituída (ex.: por um mock em testes de integração) sem alterar todos os
+ * call sites.
  *
  * @returns {AlwaysAliveAgent}
  */

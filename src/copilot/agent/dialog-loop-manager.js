@@ -242,9 +242,11 @@ export class DialogLoopManager extends EventEmitter {
         // G2-ARCH-02: usar sendMessageDialogBoot() para evitar a heurística frágil timeoutMs===24h.
         // O boot prompt tem timeout muito longo pois o dialog loop não emite session.idle organicamente.
         const host = this.#host;
-        const bootSendFn = typeof (/** @type {any} */ (host).sendMessageDialogBoot) === 'function'
-            ? /** @type {any} */ (host).sendMessageDialogBoot.bind(host)
-            : (/** @type {string} */ msg, /** @type {{ timeoutMs?: number }} */ opts = {}) => host.sendMessage(msg, { ...opts, timeoutMs: 24 * 60 * 60 * 1000 });
+        const bootSendFn =
+            typeof (/** @type {any} */ (host).sendMessageDialogBoot) === 'function'
+                ? /** @type {any} */ (host).sendMessageDialogBoot.bind(host)
+                : (/** @type {string} */ msg, /** @type {{ timeoutMs?: number }} */ opts = {}) =>
+                      host.sendMessage(msg, { ...opts, timeoutMs: 24 * 60 * 60 * 1000 });
 
         bootSendFn(metaPrompt, { timeoutMs: 24 * 60 * 60 * 1000 }).catch((/** @type {any} */ e) => {
             if (this.#active) {
