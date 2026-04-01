@@ -141,45 +141,27 @@ describe('AlwaysAliveAgent › webhooks: SSRF protection (G2-SEC-01)', () => {
     });
 
     it('deve bloquear localhost', () => {
-        assert.throws(
-            () => agent.registerWebhook('http://localhost/hook'),
-            /loopback|privado|bloqueado/i,
-        );
+        assert.throws(() => agent.registerWebhook('http://localhost/hook'), /loopback|privado|bloqueado/i);
     });
 
     it('deve bloquear 127.0.0.1', () => {
-        assert.throws(
-            () => agent.registerWebhook('http://127.0.0.1/hook'),
-            /loopback|privado|bloqueado/i,
-        );
+        assert.throws(() => agent.registerWebhook('http://127.0.0.1/hook'), /loopback|privado|bloqueado/i);
     });
 
     it('deve bloquear 10.0.0.1 (RFC-1918)', () => {
-        assert.throws(
-            () => agent.registerWebhook('http://10.0.0.1/hook'),
-            /loopback|privado|bloqueado/i,
-        );
+        assert.throws(() => agent.registerWebhook('http://10.0.0.1/hook'), /loopback|privado|bloqueado/i);
     });
 
     it('deve bloquear 192.168.1.1 (RFC-1918)', () => {
-        assert.throws(
-            () => agent.registerWebhook('http://192.168.1.1/hook'),
-            /loopback|privado|bloqueado/i,
-        );
+        assert.throws(() => agent.registerWebhook('http://192.168.1.1/hook'), /loopback|privado|bloqueado/i);
     });
 
     it('deve bloquear protocolo file://', () => {
-        assert.throws(
-            () => agent.registerWebhook('file:///etc/passwd'),
-            /protocolo|inválida/i,
-        );
+        assert.throws(() => agent.registerWebhook('file:///etc/passwd'), /protocolo|inválida/i);
     });
 
     it('deve bloquear URL inválida', () => {
-        assert.throws(
-            () => agent.registerWebhook('not-a-url'),
-            /inválida|invalid/i,
-        );
+        assert.throws(() => agent.registerWebhook('not-a-url'), /inválida|invalid/i);
     });
 
     it('deve aceitar URL pública válida', () => {

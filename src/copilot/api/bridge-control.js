@@ -190,7 +190,7 @@ export function registerControlRoutes(bridge, agent) {
         try {
             // G2-API-13: parar o dialog loop primeiro se ativo para evitar stop() concorrente
             if (agent.dialogLoopActive) {
-                await agent.stopDialogLoop?.({ authorized: true, reason: 'api_stop' });
+                await agent.stopDialogLoop?.({ authorized: true, reason: 'authorized_stop' });
             }
             await agent.stop();
             return res.json({ ok: true, message: 'Agente parado.' });

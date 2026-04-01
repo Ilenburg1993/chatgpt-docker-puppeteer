@@ -3,6 +3,7 @@
  * tests/unit/copilot/test_permission_controller.spec.js
  *
  * G2-TEST-04/05: Testes para PermissionController.
+ *
  * - G2-TEST-04: modo configurável via env (G2-DX-12/13)
  * - G2-TEST-05: setMode() emite log e notifica callback
  */
@@ -23,17 +24,11 @@ describe('PermissionController › análise estrutural (G2-DX-12/13/15)', async 
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');
         const dir = dirname(fileURLToPath(import.meta.url));
-        src = await readFile(
-            resolve(dir, '../../../src/copilot/agent/permission-controller.js'),
-            'utf8',
-        );
+        src = await readFile(resolve(dir, '../../../src/copilot/agent/permission-controller.js'), 'utf8');
     });
 
     it('modo padrão deve ser configurável via AGENT_PERMISSION_MODE', () => {
-        assert.ok(
-            src.includes('AGENT_PERMISSION_MODE'),
-            'deve usar process.env.AGENT_PERMISSION_MODE como default',
-        );
+        assert.ok(src.includes('AGENT_PERMISSION_MODE'), 'deve usar process.env.AGENT_PERMISSION_MODE como default');
     });
 
     it('lista denyShell deve ser configurável via AGENT_DENY_SHELL_TOOLS', () => {
@@ -85,14 +80,21 @@ describe('PermissionController › comportamento (G2-TEST-04/05)', async () => {
     it('handler deve ser um objeto após setMode("approve_all")', () => {
         ctrl.setMode('approve_all');
         assert.ok(ctrl.handler !== null && ctrl.handler !== undefined, 'handler deve ser definido');
-        assert.ok(typeof ctrl.handler === 'object' || typeof ctrl.handler === 'function', 'handler deve ser objeto ou função');
+        assert.ok(
+            typeof ctrl.handler === 'object' || typeof ctrl.handler === 'function',
+            'handler deve ser objeto ou função',
+        );
     });
 
     it('setMode() deve invocar callback onModeChanged fornecido no construtor', () => {
         /** @type {string | null} */
         let notified = null;
         const { PermissionController } = mod;
-        const c2 = new PermissionController({ onModeChanged: (m) => { notified = m; } });
+        const c2 = new PermissionController({
+            onModeChanged: (m) => {
+                notified = m;
+            },
+        });
         c2.setMode('audit_only');
         assert.equal(notified, 'audit_only', 'callback deve ser invocado com o novo modo');
     });

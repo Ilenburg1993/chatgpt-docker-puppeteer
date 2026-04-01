@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/test_status_snapshot.spec.js
  *
- * G2-TEST-06/07: Testes para buildStatusSnapshot() — função pura de construção do snapshot.
- * Cobre campos obrigatórios, starvationAlert e integração com getStatusSnapshot() do agente.
+ * G2-TEST-06/07: Testes para buildStatusSnapshot() — função pura de construção do snapshot. Cobre campos obrigatórios,
+ * starvationAlert e integração com getStatusSnapshot() do agente.
  */
 
 import assert from 'node:assert/strict';

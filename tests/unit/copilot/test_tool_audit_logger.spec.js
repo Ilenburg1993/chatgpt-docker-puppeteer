@@ -3,6 +3,7 @@
  * tests/unit/copilot/test_tool_audit_logger.spec.js
  *
  * G2-TEST-10: Testes para tool-audit-logger.js
+ *
  * - isHighRiskTool() — classificação de risco
  * - HIGH_RISK_TOOLS configurável via env (G2-SEC-04)
  * - logToolAudit() — fire-and-forget sem lançar exceção
@@ -62,31 +63,19 @@ describe('tool-audit-logger › análise estrutural', async () => {
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');
         const dir = dirname(fileURLToPath(import.meta.url));
-        src = await readFile(
-            resolve(dir, '../../../src/copilot/agent/tool-audit-logger.js'),
-            'utf8',
-        );
+        src = await readFile(resolve(dir, '../../../src/copilot/agent/tool-audit-logger.js'), 'utf8');
     });
 
     it('HIGH_RISK_TOOLS deve ser configurável via COPILOT_HIGH_RISK_TOOLS (G2-SEC-04)', () => {
-        assert.ok(
-            src.includes('COPILOT_HIGH_RISK_TOOLS'),
-            'deve usar process.env.COPILOT_HIGH_RISK_TOOLS',
-        );
+        assert.ok(src.includes('COPILOT_HIGH_RISK_TOOLS'), 'deve usar process.env.COPILOT_HIGH_RISK_TOOLS');
     });
 
     it('MAX_LOG_BYTES deve ser configurável via AGENT_TOOL_AUDIT_MAX_LOG_BYTES (G2-DX-11)', () => {
-        assert.ok(
-            src.includes('AGENT_TOOL_AUDIT_MAX_LOG_BYTES'),
-            'deve usar AGENT_TOOL_AUDIT_MAX_LOG_BYTES env',
-        );
+        assert.ok(src.includes('AGENT_TOOL_AUDIT_MAX_LOG_BYTES'), 'deve usar AGENT_TOOL_AUDIT_MAX_LOG_BYTES env');
     });
 
     it('TOOL_AUDIT_LOG deve ser configurável via COPILOT_AUDIT_LOG_PATH (G2-SEC-05)', () => {
-        assert.ok(
-            src.includes('COPILOT_AUDIT_LOG_PATH'),
-            'deve usar COPILOT_AUDIT_LOG_PATH env',
-        );
+        assert.ok(src.includes('COPILOT_AUDIT_LOG_PATH'), 'deve usar COPILOT_AUDIT_LOG_PATH env');
     });
 
     it('logToolAudit() deve ser fire-and-forget (não retorna Promise)', () => {
@@ -134,10 +123,7 @@ describe('buildAuditingPermissionHandler()', () => {
             return { behavior: 'allow' };
         };
         const handler = mod.buildAuditingPermissionHandler(base);
-        await handler(
-            /** @type {any} */ ({ toolName: 'list_files' }),
-            /** @type {any} */ ({}),
-        );
+        await handler(/** @type {any} */ ({ toolName: 'list_files' }), /** @type {any} */ ({}));
         assert.equal(called, true, 'baseHandler deve ser invocado');
     });
 
@@ -150,10 +136,7 @@ describe('buildAuditingPermissionHandler()', () => {
         // Não deve lançar — deve fazer fallback silencioso
         let result;
         await assert.doesNotReject(async () => {
-            result = await handler(
-                /** @type {any} */ ({ toolName: 'bash' }),
-                /** @type {any} */ ({}),
-            );
+            result = await handler(/** @type {any} */ ({ toolName: 'bash' }), /** @type {any} */ ({}));
         });
         assert.ok(result !== undefined, 'handler deve retornar resultado mesmo com exceção no baseHandler');
     });
