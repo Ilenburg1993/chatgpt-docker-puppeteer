@@ -358,7 +358,14 @@ export class DialogLoopManager extends EventEmitter {
             log('WARN', `[DialogLoopManager] writeState dialogPaused=false: ${e.message}`),
         );
 
-        // Estratégia A: aguardar ask_user preservado (0 PR)
+        // Estratégia A: ask_user já disponível sincronicamente (0 PR, 0 espera)
+        if (this.#host?.getPendingQuestion()) {
+            log('INFO', '[DialogLoopManager] ask_user já disponível — retomada zero-PR imediata.');
+            this.emit('resumed', { prConsumed: false });
+            return;
+        }
+
+        // Estratégia A (async): aguardar ask_user preservado (0 PR)
         const preserved = await waitForEvent(this, 'question.pending', { timeoutMs: 5_000 })
             .then(() => true)
             .catch(() => false);

@@ -134,6 +134,14 @@ export class AlwaysAliveAgent extends EventEmitter {
     #sessionEventUnsubscribers = [];
 
     /**
+     * Flag que indica se o DialogLoopManager já foi attached aos eventos deste agente. Evita `removeAllListeners()`
+     * redundante em chamadas repetidas de `#ensureDialogLoopAttached()`.
+     *
+     * @type {boolean}
+     */
+    #dialogLoopAttached = false;
+
+    /**
      * Contador de mensagens enviadas mantido em memória para evitar I/O síncrono por envio. Inicializado a partir do
      * estado persistido no boot; salvo em disco apenas no `stop()`.
      *
@@ -794,6 +802,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             getPendingQuestion: () => this.#pendingQuestion,
         };
         this.#dialogLoop.attach(host, this.#telemetry);
+        if (this.#dialogLoopAttached) return;
+        this.#dialogLoopAttached = true;
         // Propagar eventos do DialogLoopManager com prefixo dialog. para manter compatibilidade
         this.#dialogLoop.removeAllListeners();
         this.#dialogLoop.on('ready', (/** @type {any} */ evt) => this.emit('dialog.ready', evt));

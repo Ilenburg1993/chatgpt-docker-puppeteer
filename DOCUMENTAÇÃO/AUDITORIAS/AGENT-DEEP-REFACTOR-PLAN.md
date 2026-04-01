@@ -284,15 +284,28 @@ F.6 (limpeza final) → commit
 
 ## 4. TRACKING DE PROGRESSO
 
-| Fase                     | Status  | Commit                    |
-| ------------------------ | ------- | ------------------------- |
-| E.1 DialogLoopManager    | ✅ DONE | `5d9604d1`                |
-| F.1 Bugs + JSDoc         | ✅ DONE | `00b7ce27`                |
-| F.2 SessionStateManager  | ✅ DONE | committed                 |
-| F.3 PermissionController | ✅ DONE | (pendente commit F.3–F.6) |
-| F.4 MessageQueueManager  | ✅ DONE | (pendente commit F.3–F.6) |
-| F.5 index.js barrel      | ✅ DONE | (pendente commit F.3–F.6) |
-| F.6 limpeza final        | ✅ DONE | (pendente commit F.3–F.6) |
+| Fase                     | Status  | Commit     |
+| ------------------------ | ------- | ---------- |
+| E.1 DialogLoopManager    | ✅ DONE | `5d9604d1` |
+| F.1 Bugs + JSDoc         | ✅ DONE | `00b7ce27` |
+| F.2 SessionStateManager  | ✅ DONE | `080f67b0` |
+| F.3 PermissionController | ✅ DONE | `080f67b0` |
+| F.4 MessageQueueManager  | ✅ DONE | `080f67b0` |
+| F.5 index.js barrel      | ✅ DONE | `080f67b0` |
+| F.6 limpeza final        | ✅ DONE | `080f67b0` |
+| BUG-AGENT-04 fix         | ✅ DONE | pending    |
+| BUG-AGENT-08 fix         | ✅ DONE | pending    |
+
+### Observações de implementação
+
+- **F.4 MessageQueue**: implementação usa padrão callback (`onEnqueue`) em vez de EventEmitter
+  interno. O scheduler `#processQueue()` permanece no host (`AlwaysAliveAgent`) mas delega
+  shift/unshift à fila. Arquitetura pragmática equivalente ao design original.
+- **BUG-AGENT-04**: adicionado `#dialogLoopAttached = false` flag + guard em
+  `#ensureDialogLoopAttached()`. `removeAllListeners()` só executado na primeira chamada.
+- **BUG-AGENT-08**: `resume()` em `dialog-loop-manager.js` agora verifica
+  `host.getPendingQuestion()` sincronicamente antes de `waitForEvent`, evitando perda de evento já
+  emitido.
 
 ---
 
