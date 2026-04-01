@@ -82,7 +82,6 @@ export class WebhookManager {
         await Promise.allSettled(
             [...this.#urls.entries()].map(async ([id, url]) => {
                 try {
-                    // http e https importados no topo do módulo (RF-053)
                     const parsed = new URL(url);
                     const lib = parsed.protocol === 'https:' ? https : http;
                     await new Promise((resolve, reject) => {

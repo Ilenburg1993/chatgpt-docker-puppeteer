@@ -30,7 +30,7 @@ import { auditToolComplete, auditToolStart } from '#copilot/channel';
  * @property {number} [timeoutMs]
  * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments]
  * @property {number} enqueuedAt
- * @property {number} [attempts] - RF-D02: número de tentativas realizadas (para limitar reintentos)
+ * @property {number} [attempts] - Número de tentativas realizadas (para limitar reintentos após reconexão)
  * @property {(text: string) => void} resolve
  * @property {(err: Error) => void} reject
  */
@@ -87,7 +87,7 @@ export async function executeTask(session, task, callbacks) {
         });
     });
 
-    // F4.3 (UPG-06): captura o timestamp exato de session.idle para durationMs preciso
+    // Captura o timestamp exato de session.idle para durationMs preciso.
     const startTime = Date.now();
     /** @type {number | undefined} */
     let idleTime;
@@ -110,7 +110,7 @@ export async function executeTask(session, task, callbacks) {
         // Tenta reconectar com backoff exponencial se parecer erro de rede/sessão
         const recovered = await tryReconnect(e);
         if (recovered) {
-            // RF-D02: limitar reintentos transparentes para evitar loop infinito em falhas repetidas
+            // Limita reintentos transparentes para evitar loop infinito em falhas repetidas.
             const MAX_TASK_RETRIES = 3;
             task.attempts = (task.attempts ?? 0) + 1;
             if (task.attempts >= MAX_TASK_RETRIES) {

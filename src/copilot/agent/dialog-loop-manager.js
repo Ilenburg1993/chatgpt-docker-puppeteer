@@ -11,7 +11,7 @@
  * - Watchdog de inatividade
  * - Protocolo READY/REPLY/DONE/STOPPED (via DialogProtocol)
  * - Pause/Resume zero-PR
- * - Fallback de modelo (RF-PR-05)
+ * - Fallback de modelo automático ao atingir quota/rate_limit
  *
  * @module copilot/agent/dialog-loop-manager
  */
@@ -35,7 +35,7 @@ import { readState, writeStateAsync } from './session-manager.js';
  * @property {number} [bootTimeoutMs] - Timeout para boot do dialog (default: 30s)
  * @property {number} [watchdogIntervalMs] - Intervalo do watchdog (default: 5min)
  * @property {number} [watchdogStallMs] - Limiar de stall (default: 15min)
- * @property {string | null} [fallbackModel] - Modelo de fallback (RF-PR-05)
+ * @property {string | null} [fallbackModel] - Modelo de fallback a usar na próxima inicialização (agendado por `scheduleFallback()`)
  */
 
 /**
@@ -167,7 +167,9 @@ export class DialogLoopManager extends EventEmitter {
 
     /**
      * Notifica o DLM que houve reconexão do agente.
-     * Desativa o loop ativo para que DL-PERM-05 possa detectar o restart.
+     *
+     * Desativa o flag `active` para que o mecanismo de restart da fila detecte a reconexão
+     * e reenvie a mensagem pendente após a nova sessão ser estabelecida.
      */
     notifyReconnect() {
         if (this.#active) {
@@ -212,12 +214,12 @@ export class DialogLoopManager extends EventEmitter {
             log('WARN', `[DialogLoopManager] writeState dialogLoopActive=true: ${e.message}`),
         );
 
-        // RF-PR-05 (0-PR fix): aplicar fallback de modelo
+        // Aplica fallback de modelo se previamente agendado por `scheduleFallback()`.
         if (this.#pendingModelFallback && this.#fallbackModel) {
             const prev = this.#host.getModel();
             this.#pendingModelFallback = false;
             this.emit('model.fallback', { previousModel: prev, newModel: this.#fallbackModel, ts: Date.now() });
-            log('WARN', `[DialogLoopManager] RF-PR-05: modelo fallback sinalizado: ${prev} → ${this.#fallbackModel}`);
+            log('WARN', `[DialogLoopManager] Aplicando modelo fallback: ${prev} → ${this.#fallbackModel}`);
         }
 
         const metaPrompt = bootPrompt ?? DialogProtocol.buildBootPrompt();
@@ -300,7 +302,7 @@ export class DialogLoopManager extends EventEmitter {
     async stop({ authorized = false, reason = 'authorized_stop' } = {}) {
         if (!this.#active) return;
         if (!authorized) {
-            log('WARN', '[DialogLoopManager] stop() sem autorização — ignorado (DL-PERM).');
+            log('WARN', '[DialogLoopManager] stop() sem autorização — ignorado. Use `authorized: true` para encerrar o loop.');
             return;
         }
         if (this.#stopping) return;
@@ -471,7 +473,7 @@ export class DialogLoopManager extends EventEmitter {
                         } else {
                             log(
                                 'INFO',
-                                `[DialogLoopManager] DL-PERM-05: stopped (${stopEvt?.reason ?? 'unknown'}) — aguardando restart.`,
+                                `[DialogLoopManager] Dialog loop parado sem autorização (${stopEvt?.reason ?? 'unknown'}) — aguardando restart automático.`,
                             );
                             this.#waitForRestartAndReply(message, timeout, stopEvt?.reason).then(resolve).catch(reject);
                         }

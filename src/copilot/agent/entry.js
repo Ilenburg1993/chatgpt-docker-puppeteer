@@ -71,8 +71,7 @@ alwaysAliveAgent.on('error', (err) => {
     log('ERROR', `[copilot/agent] Erro do agente: ${err.message}`);
 });
 
-// BUG-AA-09 (fix): session.fatal indica que a sessão está irrecuperável. Sem este handler,
-// o processo continua vivo sem sessão ativa (zumbi). PM2 reinicia imediatamente após o exit.
+// `session.fatal` indica que a sessão está irrecuperável. Encerrar o processo permite ao PM2 reiniciar imediatamente.
 alwaysAliveAgent.on('session.fatal', (/** @type {any} */ evt) => {
     const reason = evt?.reason ?? evt?.message ?? 'desconhecido';
     log('ERROR', `[copilot/agent] session.fatal recebido — encerrando processo: ${reason}`);
@@ -82,7 +81,7 @@ alwaysAliveAgent.on('session.fatal', (/** @type {any} */ evt) => {
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
-// UPG-08: health check de conectividade proativo antes do primeiro start
+// Verifica conectividade do CLI antes do primeiro start para falhar rápido em caso de indisponibilidade.
 try {
     const pingClient = new CopilotClient();
     await Promise.race([
@@ -90,14 +89,14 @@ try {
         new Promise((_, reject) => setTimeout(() => reject(new Error('Ping timeout (5s)')), 5000)),
     ]);
     log('INFO', '[copilot/agent] CLI conectado — ping OK.');
-    // LEAK-01 (fix): parar pingClient após uso para evitar conexão TCP persistente
+    // Para o cliente de ping após uso para evitar conexão TCP persistente desnecessaria.
     pingClient.stop().catch(() => {});
 } catch (/** @type {any} */ e) {
     log('WARN', `[copilot/agent] CLI não respondeu ao ping no boot: ${e.message}`);
     // Continuar de qualquer forma — startWithRetry() tratará a falha
 }
 
-// MR-07 (fix): validar COPILOT_MODEL proativamente — falha rápida em modelo inválido
+// Valida COPILOT_MODEL proativamente — falha rápida em modelo inválido antes do start.
 if (process.env.COPILOT_MODEL) {
     try {
         const { listModels } = await import('../lib/models.js');
@@ -116,7 +115,7 @@ if (process.env.COPILOT_MODEL) {
     }
 }
 
-// RF-051: salvar Promise para garantir que erros de rejeição não fiquem silenciosos
+// Captura Promise para garantir que rejeições assíncronas não fiquem silenciosas.
 const _startPromise = startWithRetry();
 _startPromise.catch((/** @type {any} */ e) => {
     log('ERROR', `[copilot/agent] startWithRetry() rejeitou: ${e.message}`);

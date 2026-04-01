@@ -87,11 +87,6 @@ import { WebhookManager } from './webhook-manager.js';
  */
 
 /**
- * IMPROVE-AA-01: Constantes do protocolo importadas de dialog-protocol.js (RF-D01). Centralizadas lá para testabilidade
- * isolada; re-exportadas implicitamente pelo import acima.
- */
-
-/**
  * Always-Alive Agent — instância singleton que gerencia o ciclo de vida completo do agente Copilot SDK neste processo.
  *
  * @extends EventEmitter
@@ -120,27 +115,27 @@ export class AlwaysAliveAgent extends EventEmitter {
     #dialogLoop = new DialogLoopManager();
 
     /**
-     * BUG-AA-03 (fix): armazena as funções de unsubscribe retornadas por session.on(). O SDK não é um EventEmitter —
-     * session.on() retorna () => void, não this. Essas referências são chamadas no stop() / #tryReconnect() para evitar
-     * memory leak.
+     * Funções de unsubscribe retornadas por `session.on()`. O SDK não expõe um EventEmitter padrão —
+     * cada `session.on()` retorna `() => void`. Chamadas em `stop()` e `#tryReconnect()` para prevenir
+     * memory leaks entre ciclos de sessão.
      *
      * @type {(() => void)[]}
      */
     #sessionEventUnsubscribers = [];
 
     /**
-     * PERF-01 (fix): contador de mensagens em memória para evitar readState()+writeState() síncrono a cada envio.
-     * Inicializado a partir do estado persistido no boot; persiste ao atingir 'stopped'.
+     * Contador de mensagens enviadas mantido em memória para evitar I/O síncrono por envio.
+     * Inicializado a partir do estado persistido no boot; salvo em disco apenas no `stop()`.
      *
      * @type {number}
      */
     #sendCount = 0;
 
     /**
-     * RF-PR-04: último dados de billing PR (model, cost, quotaSnapshots, ts). Atualizado pelo listener assistant.usage
-     * em start().
+     * Último snapshot de billing (model, cost, quotaSnapshots, timestamp). Atualizado pelo listener
+     * `assistant.usage` durante o wiring de sessão em `start()`.
      *
-     * @type {{ model?: string; cost?: number; quotaSnapshots?: any; ts: number } | null}
+     * @type {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null}
      */
     #lastPrInfo = null;
 
@@ -154,16 +149,16 @@ export class AlwaysAliveAgent extends EventEmitter {
     #isResumed = false;
 
     /**
-     * AA.1 — Dados reais de uso de contexto capturados do evento `session.usage_info` do SDK. Atualizado a cada turno.
-     * null enquanto a sessão não emitir o primeiro evento.
+     * Snapshot de uso de contexto capturado do evento `session.usage_info` do SDK.
+     * Atualizado a cada turno; `null` enquanto a sessão não emitir o primeiro evento.
      *
      * @type {{ tokens: number; tokenLimit: number; utilization: number } | null}
      */
     #contextState = null;
 
     /**
-     * UPG-PROP-04 (fix): cache de mensagens da sessão SDK para reduzir latência em chamadas repetidas. Invalida
-     * automaticamente após TTL ou troca de sessão.
+     * Cache de mensagens da sessão SDK para reduzir latência em chamadas repetidas via `getSessionMessages()`.
+     * Invalida automaticamente após `#MESSAGES_CACHE_TTL` ou na troca de sessão.
      *
      * @type {any[] | null}
      */
@@ -180,7 +175,8 @@ export class AlwaysAliveAgent extends EventEmitter {
     static #MESSAGES_CACHE_TTL = 30_000;
 
     /**
-     * AC.3 — Último caminho de checkpoint salvo pelo SDK durante compaction. null até a primeira compaction concluída.
+     * Último caminho de checkpoint salvo pelo SDK durante compaction de contexto.
+     * `null` até a primeira compaction ser concluída.
      *
      * @type {string | null}
      */
@@ -240,7 +236,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * A mudança é aplicada na PRÓXIMA reconexão/reinício real de sessão. Para sessões já ativas, apenas novos
      * `initOrResumeSession` usarão o handler atualizado.
      *
-     * DL-PERM: o dialog loop não é uma tool e não passa por este handler. Não é possível bloquear o encerramento do
+     * O dialog loop não é uma tool e não passa por este handler. Não é possível bloquear o encerramento do
      * dialog loop via configuração de permissão.
      *
      * @param {'approve_all' | 'audit_only' | 'selective'} mode - Modo de aprovação
@@ -391,25 +387,22 @@ export class AlwaysAliveAgent extends EventEmitter {
             // Inicializa telemetria para esta sessão (registry e MCP tools são criados dentro de #initSession)
             this.#telemetry = createTelemetry();
 
-            // AI.3: span OTEL para metrificar duração do boot de sessão
             const { session, isResumed } = await startSpan('session.boot', { model: this.#model }, () =>
                 this.#initSession(client),
             );
 
-            // Wiring de eventos de compaction para observabilidade via SSE/NERV
-            // BUG-AA-03 (fix): session.on() retorna () => void (não this) — armazenar para cleanup no stop/reconnect.
+            // Wiring de eventos de compaction para observabilidade via SSE/NERV.
+            // session.on() retorna () => void (não this) — armazenado para cleanup no stop/reconnect.
             this.#sessionEventUnsubscribers = [];
             this.#wireSessionEvents(session, isResumed);
 
             this.#setStatus('idle');
-            // PERF-01 (fix): inicializar contador em memória a partir do estado persistido
             this.#sendCount = readState()?.sendCount ?? 0;
             log(
                 'INFO',
                 `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`,
             );
 
-            // AI.4: sincronizar histórico SDK → SQLite após reconexão com sessão existente
             if (isResumed) {
                 void this.#syncSdkHistory(session);
             }
@@ -444,12 +437,12 @@ export class AlwaysAliveAgent extends EventEmitter {
 
         log('INFO', '[AlwaysAlive] Parando agente...');
 
-        // BUG-02 (fix): emitir 'before-stop' para que consumers externos removam seus próprios listeners
-        // antes do shutdown, evitando acúmulo de dead callbacks a cada ciclo stop()/start()
+        // Sinaliza shutdown para que consumers externos removam seus próprios listeners
+        // antes do dreno da fila, evitando dead callbacks em ciclos stop()/start().
         this.emit('before-stop');
         this.removeAllListeners('before-stop');
 
-        // BUG-07 (fix): aguardar conclusão do boot antes de parar
+        // Garante que o boot não fique suspenso se stop() for chamado durante o start().
         if (this.#status === 'starting') {
             log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
             await raceEvents(this, ['ready', 'error'], { timeoutMs: 15_000 }).catch(() => {});
@@ -472,14 +465,11 @@ export class AlwaysAliveAgent extends EventEmitter {
             ]);
         }
 
-        // BUG-01 (fix): parar o watchdog e o dialog loop antes de setar status stopped
         if (this.#dialogLoop.active) {
             this.#dialogLoop.forceDeactivate();
             this.emit('dialog.loop.changed', { active: false, ts: Date.now() });
         }
 
-        // PERF-01 (fix): persistir contador em disco apenas no shutdown, não a cada mensagem
-        // SYNC-SM-01 (fix): usar writeStateAsync para não bloquear o event loop durante shutdown
         await writeStateAsync({ sendCount: this.#sendCount }).catch((/** @type {any} */ e) =>
             log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${e.message}`),
         );
@@ -488,7 +478,6 @@ export class AlwaysAliveAgent extends EventEmitter {
 
         // Rejeita todas as tarefas pendentes na fila
         const remainingTasks = this.#queue.splice(0);
-        // BUG-MED-03 (fix): invalidar cache após splice para garantir queueSize=0 no próximo snapshot
         this.#statusSnapshotCache = null;
         if (remainingTasks.length > 0) {
             log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
@@ -501,7 +490,6 @@ export class AlwaysAliveAgent extends EventEmitter {
             }
         }
 
-        // BUG-AA-03 (fix): cancelar todos os listeners session.on() antes de desconectar
         for (const unsub of this.#sessionEventUnsubscribers) unsub();
         this.#sessionEventUnsubscribers = [];
 
@@ -516,7 +504,6 @@ export class AlwaysAliveAgent extends EventEmitter {
             setSessionRpc(null);
         }
 
-        // SDK-08: parar o processo CLI para liberar recursos do processo
         if (this.#client) {
             try {
                 const stopErrors = await this.#client.stop();
@@ -556,7 +543,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             }),
         );
 
-        // Compaction complete — com detecção de falha (AC.2) e checkpoint (AC.3)
+        // Compaction complete — detecta falha, captura checkpointPath para recovery.
         this.#sessionEventUnsubscribers.push(
             session.on('session.compaction_complete', (/** @type {any} */ evt) => {
                 const data = evt?.data ?? {};
@@ -575,7 +562,6 @@ export class AlwaysAliveAgent extends EventEmitter {
                     this.#lastCheckpointPath = data.checkpointPath;
                 }
                 this.emit('session.compaction_complete', data);
-                // UPG-N15 (fix): emitir evento canônico 'context:compacted' para observabilidade externa
                 const snap = this.getStatusSnapshot();
                 this.emit('context:compacted', {
                     sessionId: snap?.sessionId ?? null,
@@ -593,7 +579,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             }),
         );
 
-        // BUG-HIGH-03 / BUG-CRIT-05: streaming de delta apenas para dialog-loop (status !== 'processing')
+        // Streaming delta apenas quando dialog loop está ativo (status !== 'processing').
         this.#sessionEventUnsubscribers.push(
             session.on('assistant.message_delta', (/** @type {any} */ evt) => {
                 if (this.#status === 'processing') return;
@@ -602,7 +588,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             }),
         );
 
-        // Token usage + context window — MELHORIA-02/05/AA.1
+        // Token usage e janela de contexto — atualiza contextState e emite avisos.
         let _firstUsageChecked = false;
         this.#sessionEventUnsubscribers.push(
             session.on('session.usage_info', (/** @type {any} */ evt) => {
@@ -648,7 +634,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             }),
         );
 
-        // BUG-AA-11: catch-all para eventos não tratados + billing (assistant.usage)
+        // Catch-all para eventos do SDK não tratados explicitamente + billing (assistant.usage).
         /** @type {Set<string>} */
         const knownEvents = new Set([
             'session.compaction_start',
@@ -697,22 +683,20 @@ export class AlwaysAliveAgent extends EventEmitter {
      *     attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
      *     signal?: AbortSignal;
      * }} [opts]
-     *   - Opções. `timeoutMs` sobrescreve o timeout padrão de 60s do SDK para `sendAndWait`. Use um valor grande (ex.: `24
-     *
-     *       - 60 * 60 * 1000`) para tarefas de longa duração como o dialog loop, que nunca emitem `session.idle`
-     *               organicamente.`attachments`permite enviar arquivos, imagens ou referências de contexto junto com a
-     *               mensagem.`signal` permite cancelar a tarefa via AbortSignal (MELHORIA-13).
+     *   - `timeoutMs` sobrescreve o timeout padrão de 60 s do SDK para `sendAndWait`. Use um valor grande (ex.:
+     *     `24 * 60 * 60 * 1000`) para tarefas de longa duração como o dialog loop, que nunca emitem `session.idle`
+     *     organicamente.
+     *   - `attachments` permite enviar arquivos, imagens ou referências de contexto junto com a mensagem.
+     *   - `signal` permite cancelar a tarefa via `AbortSignal` antes ou durante o processamento.
      *
      * @returns {Promise<string>} Resposta completa do modelo
      */
     sendMessage(message, { timeoutMs, attachments, signal } = {}) {
         return new Promise((resolve, reject) => {
-            // MELHORIA-13 (fix): suporte a AbortSignal para cancelamento externo da tarefa
             if (signal?.aborted) {
                 reject(new DOMException('AbortError: sendMessage cancelado antes de enfileirar.', 'AbortError'));
                 return;
             }
-            // GAP-AA-01 (fix): bloquear sendMessage() externo enquanto dialog loop estiver ativo.
             // startDialogLoop() chama sendMessage() antes de setar dialogLoopActive=true, portanto
             // o guard usa a heurística de timeoutMs==24h para distinguir a chamada interna.
             if (this.#dialogLoop.active && timeoutMs !== 24 * 60 * 60 * 1000) {
@@ -745,7 +729,6 @@ export class AlwaysAliveAgent extends EventEmitter {
                 ...(timeoutMs !== undefined ? { timeoutMs } : {}),
                 ...(attachments !== undefined ? { attachments } : {}),
             });
-            // MELHORIA-13 (fix): cancelar tarefa na fila se o AbortSignal disparar antes de executar
             if (signal) {
                 signal.addEventListener(
                     'abort',
@@ -761,7 +744,6 @@ export class AlwaysAliveAgent extends EventEmitter {
                 );
             }
             this.#queue.push(task);
-            // GAP-Q08 fix: invalidar cache de status ao enfileirar para manter queueSize atualizado
             this.#statusSnapshotCache = null;
             log('INFO', `[AlwaysAlive] Tarefa enfileirada: ${task.id}`);
             this.emit('task.queued', { taskId: task.id, message });
@@ -825,7 +807,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     setModel(modelId) {
         this.#model = modelId;
-        // MELHORIA-08 (fix): propagar ao SDK imediatamente se sessão ativa
+        // Propaga ao SDK imediatamente se a sessão já está ativa (suporte a runtime model switch).
         if (this.#session && typeof (/** @type {any} */ (this.#session).setModel) === 'function') {
             try {
                 /** @type {any} */ (this.#session).setModel(modelId);
@@ -858,16 +840,15 @@ export class AlwaysAliveAgent extends EventEmitter {
     #statusSnapshotCache = null;
 
     /**
-     * Retorna um snapshot do estado atual para a API HTTP.
+     * Retorna um snapshot do estado atual do agente para a API HTTP.
      *
-     * PERF-02 (fix): resultado cacheado por 500ms para evitar I/O síncrono em readState() por chamada. O cache é
-     * invalidado automaticamente quando status muda.
+     * O resultado é cacheado por 500 ms para evitar leituras síncronas de `readState()` em polling rápido.
+     * O cache é invalidado automaticamente quando o status muda via `#setStatus()`.
      *
      * @returns {AgentStatusSnapshot}
      */
     getStatusSnapshot() {
         const now = Date.now();
-        // Cache válido por 500ms para evitar leituras síncrona por polling rápido
         if (this.#statusSnapshotCache && now - this.#statusSnapshotCache.at < 500) {
             return this.#statusSnapshotCache.snapshot;
         }
@@ -895,11 +876,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             resumeCount: state?.resumeCount ?? 0,
             sendCount: this.#sendCount,
             startedAt: state?.startedAt ?? null,
-            // AA.2: dados reais de contexto do SDK (null enquanto a sessão não emitiu usage_info)
             contextWindow: this.#contextState,
-            // AC.3: último checkpoint da compaction (null até a primeira compaction)
             lastCheckpointPath: this.#lastCheckpointPath,
-            // PERM-01: modo de aprovação ativo
             permissionMode: this.#permissionModeLabel,
         };
         this.#statusSnapshotCache = { snapshot, at: now };
@@ -994,13 +972,12 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * RF-PR-04: Retorna os últimos dados de billing do PR consumido. Atualizado quando `assistant.usage` é emitido pelo
-     * SDK.
+     * Último snapshot de billing do PR consumido. Atualizado quando `assistant.usage` é emitido pelo SDK.
      *
-     * @returns {{ model?: string; cost?: number; quotaSnapshots?: any; ts: number } | null}
+     * @returns {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null}
      */
     get lastPrInfo() {
-        // F3.9 (LEVE-09): retornar cópia rasa para evitar mutação externa do estado interno
+        // Retorna cópia rasa para evitar mutação externa do estado interno.
         return this.#lastPrInfo ? { ...this.#lastPrInfo } : null;
     }
 
@@ -1034,8 +1011,10 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * AI.4 — Sincroniza o histórico SDK → ConversationStore (SQLite) após reconexão. Chamado de forma assíncrona
-     * (fire-and-forget) para não bloquear o startup.
+     * Sincroniza o histórico SDK → ConversationStore (SQLite) após reconexão.
+     *
+     * Chamado de forma assíncrona (fire-and-forget) no `start()` quando `isResumed=true`
+     * para não bloquear o startup. Falhas são logadas como WARN e não propagadas.
      *
      * @param {CopilotSession} session
      * @returns {Promise<void>}
@@ -1046,12 +1025,10 @@ export class AlwaysAliveAgent extends EventEmitter {
             if (!hubSessionId) return;
             /** @type {any} */
             const sdkSession = session;
-            // SDK-NC01 (fix): método correto é getMessages(), não getHistory()
-            // GAP-SDK-02 (fix): logar WARN para diagnóstico de incompatibilidade de versão do SDK
             if (typeof sdkSession.getMessages !== 'function') {
                 log(
                     'WARN',
-                    '[AlwaysAlive] AI.4: sdkSession.getMessages() não disponível nesta versão do SDK — histórico não sincronizado.',
+                    '[AlwaysAlive] sdkSession.getMessages() não disponível nesta versão do SDK — histórico não sincronizado.',
                 );
                 return;
             }
@@ -1061,12 +1038,12 @@ export class AlwaysAliveAgent extends EventEmitter {
             if (synced > 0) {
                 log(
                     'INFO',
-                    `[AlwaysAlive] AI.4: ${synced} turnos SDK sincronizados com o ConversationStore (${skipped} ignorados).`,
+                    `[AlwaysAlive] ${synced} turnos SDK sincronizados com o ConversationStore (${skipped} ignorados).`,
                 );
                 this.emit('session.history_synced', { hubSessionId, sessionId: session.sessionId, synced, skipped });
             }
         } catch (/** @type {any} */ err) {
-            log('WARN', `[AlwaysAlive] AI.4: syncSdkHistory falhou (não crítico): ${err.message}`);
+            log('WARN', `[AlwaysAlive] syncSdkHistory falhou (não crítico): ${err.message}`);
         }
     }
 
@@ -1075,7 +1052,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     #setStatus(status) {
         this.#status = status;
-        this.#statusSnapshotCache = null; // PERF-02: invalidar cache ao mudar status
+        this.#statusSnapshotCache = null;
         this.emit('status', status);
     }
 
@@ -1085,11 +1062,6 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {void}
      */
     #processQueue() {
-        // BUG-04 (fix): guard de reentrância — scheduleNext() é chamado no finally de executeTask,
-        // o que pode disparar uma segunda entrada em #processQueue antes de setStatus('processing')
-        // ter efeito via emit assíncrono. O status 'processing' ainda é o guard primário, mas o
-        // estágio de shift() da fila pode ocorrer duas vezes se dois scheduleNext() dispararem
-        // sequencialmente no mesmo tick. Este flag síncrono protege esse gap.
         if (this.#status !== 'idle' || this.#queue.length === 0 || !this.#session) return;
         const session = this.#session;
 
@@ -1100,7 +1072,6 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.emit('task.started', { taskId: task.id });
 
         log('INFO', `[AlwaysAlive] Processando tarefa ${task.id}`);
-        // PERF-01 (fix): incremento em memória — persiste no disco apenas no shutdown
         this.#sendCount++;
 
         void executeTask(session, task, {
@@ -1127,7 +1098,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         if (mcpTools.length > 0) {
             log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
         }
-        // BUG-C03 (fix): resetar registry antes de bootstrapTools para evitar duplicação de tools
+        // Reinicia o registry para evitar duplicação de tools em reconexões consecutivas.
         this.#toolsRegistry = createRegistry();
         const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
         log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
@@ -1171,14 +1142,12 @@ export class AlwaysAliveAgent extends EventEmitter {
 
         log('WARN', `[AlwaysAlive] Erro de sessão detectado: ${originalError.message}. Iniciando reconexão...`);
 
-        // BUG-AA-03 (fix): cancelar listeners da sessão anterior antes de reconectar
         for (const unsub of this.#sessionEventUnsubscribers) unsub();
         this.#sessionEventUnsubscribers = [];
 
-        // RF-PR-05: NÃO aplicar fallback de modelo aqui — #tryReconnect causa 1 PR inevitável
-        // (nova sessão), então o fallback seria aplicado para uma sessão que já custou 1 PR.
-        // O fallback DEVE ser aplicado em startDialogLoop() para garantia 0-PR adicional.
-        // Ver FLOW-UPG-02 em AUDIT_SEND_DIALOG_TURN_FLOW.md.
+        // Aplica fallback de modelo para a nova sessão se previamente agendado por scheduleFallback().
+        // Não aplicar aqui (na reconexão in-flight) para evitar consumo duplo de PR: a reconexão já gera 1 PR
+        // inevitável; o fallback deve ser aplicado na próxima chamada a startDialogLoop().
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + random(0..base)
@@ -1196,20 +1165,17 @@ export class AlwaysAliveAgent extends EventEmitter {
                 );
                 this.emit('ready', { sessionId: session.sessionId, isResumed, reconected: true });
 
-                // BUG-HIGH-04 (fix): se dialog loop estava ativo, emitir dialog.stopped autorizado=false
-                // para que sendDialogTurn (DL-PERM-05) detecte o restart e reenvie a mensagem pendente
                 if (this.#dialogLoop.active) {
                     log(
                         'INFO',
-                        '[AlwaysAlive] Reconexão: dialog loop ativo, emitindo dialog.stopped para restart via DL-PERM-05.',
+                        '[AlwaysAlive] Reconexão com dialog loop ativo — emitindo dialog.stopped para restart automático.',
                     );
                     this.#dialogLoop.notifyReconnect();
                     this.emit('dialog.stopped', { reason: 'reconnect_restart', authorized: false });
                 } else {
-                    // BUG-AA-10 (fix): log explícito para diagnóstico quando loop estava idle entre turnos
                     log(
                         'INFO',
-                        '[AlwaysAlive] Reconexão: dialog loop estava inativo. Aguardando terminal/dialog.js retomar via ensureDialogLoop...',
+                        '[AlwaysAlive] Reconexão com dialog loop inativo. Aguardando terminal/dialog.js retomar via ensureDialogLoop.',
                     );
                 }
                 return true;
@@ -1224,9 +1190,11 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * Handler chamado pelo SDK quando o modelo usa a ferramenta ask_user.
+     * Handler chamado pelo SDK quando o modelo usa a ferramenta `ask_user`.
      *
-     * RF-D03: delega para handler especializado conforme modo ativo.
+     * Delega para o handler especializado conforme o modo ativo:
+     * - Se dialog loop ativo: intercepta o protocolo READY/REPLY/STOPPED via DLM.
+     * - Caso contrário: suspende a execução até `answerPendingQuestion()` ser chamado via API HTTP.
      *
      * @param {{ question: string; choices?: string[]; allowFreeform: boolean }} input
      * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
@@ -1241,8 +1209,10 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * RF-D03: Handler de protocolo no modo dialog loop. Delega interceptação ao DialogLoopManager e
-     * retorna para o handler de pergunta interativa normal para suspender a execução (ask_user).
+     * Handler de protocolo no modo dialog loop.
+     *
+     * Propaga a classificação READY/REPLY/STOPPED ao DialogLoopManager e suspende a execução
+     * aguardando `answerPendingQuestion()` — necessário para fechar o ciclo `ask_user` do SDK.
      *
      * @param {{ question: string; allowFreeform: boolean }} input
      * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
@@ -1255,8 +1225,10 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * RF-D03: Handler para pergunta interativa normal (fora do dialog loop). Suspende execução até que
-     * answerPendingQuestion() seja chamado via API HTTP.
+     * Handler para pergunta interativa normal (fora do dialog loop).
+     *
+     * Suspende a execução até que `answerPendingQuestion()` seja chamado via API HTTP.
+     * Define `status='waiting_for_input'` e persiste a pergunta no estado para recovery após restart.
      *
      * @param {{ question: string; choices?: string[]; allowFreeform: boolean }} input
      * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
@@ -1323,18 +1295,18 @@ export class AlwaysAliveAgent extends EventEmitter {
             `[AlwaysAlive] SDK errorOccurred [${input.errorContext}]: ${input.error} (recuperável: ${input.recoverable})`,
         );
 
-        // RF-PR-05: sinalizar fallback de modelo quando a quota/rate_limit for atingida
+        // Aciona fallback de modelo se a quota/rate_limit foi atingida e COPILOT_FALLBACK_MODEL está configurado.
         const isRateOrQuotaError = input.errorContext === 'rate_limit' || input.errorContext === 'quota';
         if (isRateOrQuotaError) {
             const fallbackModel = process.env.COPILOT_FALLBACK_MODEL;
             if (fallbackModel && fallbackModel !== this.#model) {
                 log(
                     'WARN',
-                    `[AlwaysAlive] RF-PR-05: rate_limit/quota detectado — próxima reconexão usará model fallback: ${fallbackModel}`,
+                    `[AlwaysAlive] rate_limit/quota detectado — próxima reconexão usará model fallback: ${fallbackModel}`,
                 );
                 this.#dialogLoop.scheduleFallback(fallbackModel);
             } else {
-                log('WARN', '[AlwaysAlive] RF-PR-05: rate_limit/quota mas nenhum COPILOT_FALLBACK_MODEL configurado.');
+                log('WARN', '[AlwaysAlive] rate_limit/quota sem COPILOT_FALLBACK_MODEL configurado.');
             }
         }
 
@@ -1350,9 +1322,9 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna o histórico de mensagens da sessão SDK ativa.
      *
-     * Útil para debug, auditoria e introspecção do context window. Retorna array vazio se não houver sessão ativa.
-     * UPG-PROP-04 (fix): resultado em cache por até {@link AlwaysAliveAgent.#MESSAGES_CACHE_TTL} ms para reduzir
-     * chamadas repetidas ao SDK em fluxos de introspection.
+     * Útil para debug, auditoria e introspecção do context window.
+     * O resultado é cacheado por `#MESSAGES_CACHE_TTL` ms para reduzir chamadas repetidas ao SDK.
+     * Retorna array vazio se não houver sessão ativa ou se `getMessages()` lance (sem suporte no SDK).
      *
      * @returns {Promise<any[]>}
      */
@@ -1373,8 +1345,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * MELHORIA-07 (fix): suporte a `await using agent = alwaysAliveAgent` no padrão Explicit Resource Management
-     * (ECMAScript TC39 Stage 4).
+     * Suporte a `await using agent = alwaysAliveAgent` no padrão Explicit Resource Management (TC39 Stage 4).
      *
      * Permite encapsular o ciclo de vida do agente em blocos `await using` de forma determinística.
      *

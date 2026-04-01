@@ -4,53 +4,68 @@
  * @file Constantes de eventos emitidos pelo AlwaysAliveAgent.
  *
  *   Centraliza os nomes de evento para que testes, bridges e consumidores possam subscribir sem depender de strings
- *   literais espalhadas.
+ *   literais espalhadas. Manter esta lista sincronizada com os `emit()` em `always-alive.js`,
+ *   `dialog-loop-manager.js` e `task-executor.js`.
  */
 
 /**
  * Nomes canônicos de eventos emitidos por {@link AlwaysAliveAgent}.
  *
  * Use `AgentEventName` para obter o union type de todos os nomes válidos.
+ *
+ * Grupos de eventos:
+ * - **task.***: ciclo de vida de uma tarefa individual (enqueued → started → completed | error).
+ * - **session.***: eventos do ciclo de vida da sessão SDK (compaction, usage, billing, fatal).
+ * - **dialog.***: ciclo de vida do dialog loop (LLM-B ↔ SDK).
+ * - **tool.***: execução de ferramentas pelo SDK durante um turno.
+ * - **question.pending / question.answered / status / stopped / ready / error**: controle de estado de alto nível do agente.
+ * - **pr.consumed / pr.fallback_model / permission.mode_changed**: métricas e controle de permissões.
+ * - **context:compacted**: emitido após compactação de contexto local.
+ * - **before-stop**: emitido antes de `stop()` iniciar o dreno da fila.
  */
 export const AGENT_EVENTS = /** @type {const} */ ([
+    // ── task ──────────────────────────────────────────────────────────────
     'task.queued',
     'task.started',
     'task.completed',
     'task.error',
     'task.delta',
     'task.reasoning',
+    // ── questions / state ─────────────────────────────────────────────────
     'question.pending',
     'question.answered',
     'status',
     'stopped',
     'ready',
     'error',
+    'before-stop',
+    // ── session ───────────────────────────────────────────────────────────
     'session.compaction_start',
     'session.compaction_complete',
     'session.fatal',
     'session.usage',
     'session.token_budget_warning',
     'session.mode_changed',
+    'session.history_synced',
+    // ── dialog loop ───────────────────────────────────────────────────────
     'dialog.ready',
     'dialog.reply',
     'dialog.stopped',
     'dialog.stalled',
     'dialog.paused',
     'dialog.resumed',
-    'tool.execution.start',
-    'tool.execution.complete',
+    'dialog.loop.changed',
     'dialog.turn_start',
     'dialog.turn_end',
-    'session.history_synced',
-    'before-stop',
-    // GAP-SDK-04 (fix): event emitido pelo agent após compactação de contexto do SDK
-    'context:compacted',
-    // RF-PR-03: emitido quando assistant.usage é detectado (PR consumido)
+    // ── tool execution ────────────────────────────────────────────────────
+    'tool.execution.start',
+    'tool.execution.complete',
+    // ── PR / permission ───────────────────────────────────────────────────
     'pr.consumed',
-    // RF-PR-05: emitido quando o modelo falha com rate_limit/quota e o fallback é aplicado
     'pr.fallback_model',
-    // NEW-PAUSE: emitidos por pauseDialogLoop() e resumeDialogLoop()
     'permission.mode_changed',
+    // ── context ───────────────────────────────────────────────────────────
+    'context:compacted',
 ]);
 
 /**

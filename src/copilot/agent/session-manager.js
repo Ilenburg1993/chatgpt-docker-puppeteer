@@ -50,7 +50,7 @@ const SessionJsonSchema = z
     })
     .passthrough();
 
-// AI.1: carregar configuração de tools persistida ao iniciar o módulo
+// Carrega configuração de tools persistida ao iniciar o módulo.
 loadToolsConfig();
 
 const BRIEFING_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session-briefing.md');
@@ -81,7 +81,7 @@ function isHighRiskTool(toolName) {
  * @returns {void}
  */
 function logToolAudit(entry) {
-    // PERF-02 (fix): operações de I/O assíncronas (fire-and-forget) — não bloqueia o event loop
+    // I/O assísncro fire-and-forget — não bloqueia o event loop.
     const line = JSON.stringify({ ...entry, ts: new Date().toISOString() }) + '\n';
     const ROTATE_LOG = TOOL_AUDIT_LOG + '.1';
     const MAX_BYTES = 10 * 1024 * 1024;
@@ -102,7 +102,7 @@ function logToolAudit(entry) {
     })();
 }
 
-// AC.1: threshold dinâmico de compaction — configurável via PUT /config/infinite-session
+// Threshold dinâmico de compaction — configurável via PUT /config/infinite-session.
 let _backgroundCompactionThreshold = 0.75;
 
 /**
@@ -121,7 +121,7 @@ export function setBackgroundCompactionThreshold(threshold) {
  * Lê o session-briefing.md e session.json e constrói o conteúdo de systemMessage para injetar o contexto do hook system
  * em sessões SDK.
  *
- * BUG-HIGH-05 (fix): convertida para async para evitar bloqueio do event loop em I/O lento (ex.: containers Docker com
+ * Convertida para `async` para evitar bloqueio do event loop em I/O lento (ex.: containers Docker com
  * volumes NFS).
  *
  * @returns {Promise<string>} Conteúdo markdown com contexto operacional do hook system
@@ -202,9 +202,9 @@ const ROOT = resolve(import.meta.dirname, '../../');
 const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
 const STATE_FILE = join(STATE_DIR, 'sdk-always-alive.json');
 
-// RF-D06 + BUG-AA-07: cache in-process de readState e flag para evitar mkdir redundante.
-// _stateCache é atualizado em cada writeState/writeStateAsync; readState retorna o cache
-// quando disponível, sem I/O. _stateDirReady evita a chamada mkdirSync/mkdir após 1ª criação.
+// Cache in-process de readState e flag para evitar mkdir redundante.
+// `_stateCache` é atualizado em cada writeState/writeStateAsync; readState retorna o cache
+// quando disponível, sem I/O adicional. `_stateDirReady` evita mkdirSync/mkdir redundante após a 1ª criação.
 /** @type {import('./session-manager.js').AliveAgentState | null} */
 let _stateCache = null;
 let _stateDirReady = false;
@@ -224,22 +224,22 @@ let _stateDirReady = false;
  * @property {number} sendCount - Total de mensagens enviadas (tracked externamente)
  * @property {string} model - Modelo configurado para esta sessão
  * @property {string | null} pendingQuestion - Pergunta pendente do modelo (se houver)
- * @property {boolean} [dialogLoopActive] - MR-08: se o dialog loop estava ativo no momento do snapshot
- * @property {boolean} [dialogPaused] - NEW-PAUSE-01: true se pause explícito foi emitido via pauseDialogLoop()
- * @property {number} [pausedAt] - NEW-PAUSE-01: timestamp do pause
- * @property {string} [pendingTurnMessage] - RF-PR-02: última mensagem enviada sem resposta confirmada
- * @property {number} [pendingTurnTs] - RF-PR-02: timestamp do envio pendente
- * @property {boolean} [pendingTurnConsumedPR] - RF-PR-02: se assistant.usage já foi emitido para este turno
- * @property {number} [lastPrConsumedAt] - RF-PR-04: timestamp do último PR consumido
- * @property {string} [lastPrModel] - RF-PR-04: modelo que consumiu o último PR
- * @property {number} [lastPrCost] - RF-PR-04: custo reportado pelo SDK no último PR
- * @property {any} [lastQuotaSnapshots] - RF-PR-04: snapshots de cota do último assistant.usage
+ * @property {boolean} [dialogLoopActive] - Se o dialog loop estava ativo no momento do snapshot
+ * @property {boolean} [dialogPaused] - `true` se pause explícito foi emitido via `pauseDialogLoop()`
+ * @property {number} [pausedAt] - Timestamp do pause (ms)
+ * @property {string} [pendingTurnMessage] - Última mensagem enviada sem resposta confirmada
+ * @property {number} [pendingTurnTs] - Timestamp do envio pendente (ms)
+ * @property {boolean} [pendingTurnConsumedPR] - Se `assistant.usage` já foi emitido para este turno
+ * @property {number} [lastPrConsumedAt] - Timestamp do último PR consumido (ms)
+ * @property {string} [lastPrModel] - Modelo que consumiu o último PR
+ * @property {number} [lastPrCost] - Custo reportado pelo SDK no último PR
+ * @property {any} [lastQuotaSnapshots] - Snapshots de cota do último `assistant.usage`
  */
 
 /**
  * Lê o estado persistido do agente da sessão em disco.
  *
- * RF-D06 (melhoria): retorna o cache in-process quando disponível, evitando readFileSync no hot path.
+ * Retorna o cache in-process quando disponível, evitando readFileSync no hot path.
  *
  * @returns {AliveAgentState | null} Estado persistido ou null se não existir
  */
@@ -258,8 +258,8 @@ export function readState() {
 /**
  * Persiste o estado da sessão em disco.
  *
- * BUG-AA-07 (fix): `_stateDirReady` evita chamada mkdirSync redundante após 1ª criação. RF-D06 (melhoria): atualiza
- * `_stateCache` após escrita para que readState() não precise I/O.
+ * `_stateDirReady` evita chamada mkdirSync redundante após a 1ª criação. Atualiza
+ * `_stateCache` após a escrita para que `readState()` não precise de I/O nas leituras seguintes.
  *
  * @param {Partial<AliveAgentState>} updates - Campos a atualizar no estado
  * @returns {AliveAgentState} Estado completo após a atualização
@@ -287,8 +287,8 @@ export function writeState(updates) {
 /**
  * Versão async de `writeState`. Preferir em handlers de alta frequência para não bloquear o event loop.
  *
- * BUG-AA-07 (fix): `_stateDirReady` evita chamada mkdir redundante após 1ª criação. RF-D06 (melhoria): atualiza
- * `_stateCache` após escrita.
+ * `_stateDirReady` evita chamada mkdir redundante após a 1ª criação. Atualiza
+ * `_stateCache` após a escrita para que `readState()` não precise de I/O nas leituras seguintes.
  *
  * @param {Partial<AliveAgentState>} updates
  * @returns {Promise<AliveAgentState>}
@@ -324,7 +324,7 @@ export function clearState() {
         rmSync(STATE_FILE);
         log('INFO', '[PersistentSession] Estado removido — próxima inicialização criará nova sessão.');
     }
-    // RF-D06: invalidar cache após remoção do arquivo
+        // Invalida cache após remoção do arquivo.
     _stateCache = null;
     _stateDirReady = false;
 }
@@ -349,7 +349,7 @@ function buildAuditingPermissionHandler(baseHandler) {
             /** @type {any} */
             let result;
             if (baseHandler) {
-                // BUG-HIGH-09 (fix): baseHandler pode lançar exceção; fallback para approveAll
+                // Se o baseHandler lançar exceção, usa approveAll como fallback seguro.
                 try {
                     result = await baseHandler(request, invocation);
                 } catch (/** @type {any} */ err) {
@@ -357,7 +357,7 @@ function buildAuditingPermissionHandler(baseHandler) {
                     result = await approveAll(request, invocation);
                 }
             } else {
-                // BUG-H07 (fix): usar SDK approveAll em vez de objeto manual { kind: 'approved' }
+                // Usa SDK approveAll oficial em vez de objeto manual `{ kind: 'approved' }`.
                 result = await approveAll(request, invocation);
             }
 
@@ -409,11 +409,11 @@ export async function initOrResumeSession(client, sessionOptions) {
     const opts = {
         model,
         streaming: true,
-        // AC.1: threshold dinâmico lido da variável de módulo (configurável via setBackgroundCompactionThreshold)
+        // Threshold dinâmico lido da variável de módulo (configurável via setBackgroundCompactionThreshold).
         infiniteSessions: { enabled: true, backgroundCompactionThreshold: _backgroundCompactionThreshold },
-        // AA.6: passar workingDirectory para o SDK contextualizar ferramentas de busca
+        // Diretório de trabalho para o SDK contextualizar ferramentas de busca.
         workingDirectory: process.env.COPILOT_WORKING_DIRECTORY ?? process.cwd(),
-        // AA.7: diretórios de skills para o SDK carregar
+        // Diretórios de skills para o SDK carregar.
         skillDirectories: ['.github/skills'],
         // AH.1: ferramentas excluídas por padrão + denylist configurável em runtime
         excludedTools: [...DEFAULT_EXCLUDED_TOOLS, ...getToolsConfig().denylist],

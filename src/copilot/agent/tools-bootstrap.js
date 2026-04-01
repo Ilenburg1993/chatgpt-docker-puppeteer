@@ -107,7 +107,7 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         registerTools(registry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
     }
 
-    // AI.2: custom tools declarativas registradas via /config/tools/custom
+    // Tools declarativas customizadas registradas via /config/tools/custom.
     const customTools = buildCustomTools();
     if (customTools.length > 0) {
         registerTools(registry, customTools, { category: 'custom', tags: ['runtime', 'declarative'] });
@@ -137,8 +137,8 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
     registerForIntrospection(allTools);
     setTelemetryStore(telemetry);
 
-    // SDK-09: verificar colisões de nome e manter overridesBuiltInTool explícito em cada tool.
-    // Não forçar globalmente para não mascarar conflitos acidentais com built-ins do CLI.
+    // Detecta colisões de nome entre tools. Cada tool com sobreposição potencial com built-ins do CLI
+    // deve declarar `overridesBuiltInTool` explicitamente; não forçar globalmente para não mascarar conflitos.
     const nameCount = /** @type {Map<string, number>} */ (new Map());
     for (const t of allTools) {
         nameCount.set(t.name, (nameCount.get(t.name) ?? 0) + 1);
@@ -147,7 +147,7 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
         if (count > 1) {
             log(
                 'WARN',
-                `[tools-bootstrap] SDK-09: tool "${name}" registrada ${count}× — verifique sobreposição acidental.`,
+                `[tools-bootstrap] Tool "${name}" registrada ${count}× — verifique sobreposição acidental.`,
             );
         }
     }

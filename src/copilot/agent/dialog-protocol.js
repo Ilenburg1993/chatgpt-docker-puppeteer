@@ -2,7 +2,7 @@
 /**
  * src/copilot/agent/dialog-protocol.js
  *
- * RF-D01: Protocolo de comunicação do Dialog Loop.
+ * Protocolo de comunicação do Dialog Loop.
  *
  * Centraliza as constantes de protocolo, a lógica de classificação de mensagens `ask_user` e a extração de conteúdo de
  * REPLY/DONE. Exposto como `DialogProtocol` para permitir testes unitários isolados, sem depender de

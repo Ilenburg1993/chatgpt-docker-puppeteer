@@ -66,7 +66,7 @@ export class DialogWatchdog {
      * @returns {void}
      */
     start() {
-        // BUG-05 (fix): guard para evitar dois intervalos simultâneos se start() for chamado duas vezes
+        // Guard: evita dois intervalos simultâneos se start() for chamado duas vezes.
         if (this.#timer !== null) {
             log('WARN', '[DialogWatchdog] start() chamado com watchdog já ativo — ignorando.');
             return;
