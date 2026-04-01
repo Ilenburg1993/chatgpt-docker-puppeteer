@@ -48,33 +48,37 @@ describe('session-manager › createConfig inclui streaming: true', async () => 
 
 describe('always-alive › compaction events wirados', async () => {
     /** @type {string} */
-    let sourceCode = '';
+    let sessionEventWirerCode = '';
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
+        // F.6.1: assinaturas de eventos de sessão foram extraídas para session-event-wirer.js
+        sessionEventWirerCode = await readFile(
+            new URL('../../../src/copilot/agent/session-event-wirer.js', import.meta.url),
+            'utf-8',
+        );
     });
 
     it('contains session.compaction_start subscription', () => {
         assert.ok(
-            sourceCode.includes('session.compaction_start'),
-            'always-alive.js deve assinar session.compaction_start',
+            sessionEventWirerCode.includes('session.compaction_start'),
+            'session-event-wirer.js deve assinar session.compaction_start',
         );
     });
 
     it('contains session.compaction_complete subscription', () => {
         assert.ok(
-            sourceCode.includes('session.compaction_complete'),
-            'always-alive.js deve assinar session.compaction_complete',
+            sessionEventWirerCode.includes('session.compaction_complete'),
+            'session-event-wirer.js deve assinar session.compaction_complete',
         );
     });
 
     it('emite session.compaction_start e session.compaction_complete via this.emit', () => {
-        // Verifica que os eventos são propagados pelo EventEmitter
-        const emitPattern = /this\.emit\('session\.compaction/;
+        // F.6.1: eventos são propagados via callback emit(event, payload)
+        const emitPattern = /emit\('session\.compaction/;
         assert.ok(
-            emitPattern.test(sourceCode),
-            'always-alive.js deve chamar this.emit para repassar compaction events',
+            emitPattern.test(sessionEventWirerCode),
+            'session-event-wirer.js deve chamar emit para repassar compaction events',
         );
     });
 });

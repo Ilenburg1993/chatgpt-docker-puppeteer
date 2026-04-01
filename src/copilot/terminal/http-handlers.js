@@ -25,7 +25,7 @@ import { getToolsConfig, patchToolsConfig } from '#copilot/config/tools/state';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { setBackgroundCompactionThreshold } from '../agent/session-manager.js';
+import { setBackgroundCompactionThreshold } from '../agent/session-initializer.js';
 import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { conversationHub } from '../conversation-hub/hub.js';

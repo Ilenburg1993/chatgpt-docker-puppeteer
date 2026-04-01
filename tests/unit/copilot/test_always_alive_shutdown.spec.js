@@ -47,29 +47,22 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
         );
     });
 
-    it('stop() deve usar #queue.splice(0) para limpar a fila no shutdown', () => {
+    it('stop() deve usar messageQueue.drain() para limpar a fila no shutdown', () => {
         assert.ok(
-            sourceCode.includes('this.#queue.splice(0)'),
-            'stop() deve limpar a fila com #queue.splice(0) durante o shutdown gracioso',
+            sourceCode.includes('this.#messageQueue.drain('),
+            'stop() deve limpar a fila via #messageQueue.drain() durante o shutdown gracioso',
         );
     });
 
-    it('stop() deve chamar task.reject() nas tarefas pendentes', () => {
+    it('stop() deve logar tarefas rejeitadas (via drain do MessageQueue)', () => {
         assert.ok(
-            sourceCode.includes('task.reject(shutdownError)'),
-            'stop() deve rejeitar tarefas pendentes com shutdownError',
+            sourceCode.includes('remainingTasks.length') && sourceCode.includes('Rejeitando'),
+            'stop() deve logar quantas tarefas foram rejeitadas no shutdown',
         );
     });
 
     it('stop() deve emitir evento "stopped" após completar', () => {
         assert.ok(sourceCode.includes("emit('stopped')"), "stop() deve emitir o evento 'stopped' ao finalizar");
-    });
-
-    it('stop() deve logar quantidade de tarefas rejeitadas', () => {
-        assert.ok(
-            sourceCode.includes('remainingTasks.length') && sourceCode.includes('Rejeitando'),
-            'stop() deve logar quantas tarefas foram rejeitadas no shutdown',
-        );
     });
 });
 
@@ -137,14 +130,18 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
         assert.equal(MAX_QUEUE_SIZE, 100);
     });
 
-    it('MAX_QUEUE_SIZE deve ser importado de constants.js (sem campo static duplicado)', async () => {
+    it('MAX_QUEUE_SIZE deve ser importado em message-queue.js (migrado de always-alive.js)', async () => {
         const { readFile } = await import('node:fs/promises');
-        const src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
+        // F.4: MAX_QUEUE_SIZE migrou para message-queue.js; always-alive.js não deve mais importá-lo diretamente.
+        const mq = await readFile(new URL('../../../src/copilot/agent/message-queue.js', import.meta.url), 'utf-8');
         assert.ok(
-            src.includes("import { MAX_QUEUE_SIZE } from '#copilot/core/constants'"),
-            'MAX_QUEUE_SIZE deve ser importado de #copilot/core/constants',
+            mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/core/constants'"),
+            'MAX_QUEUE_SIZE deve ser importado em message-queue.js (onde a verificação de capacidade está)',
         );
-        assert.ok(!src.includes('static MAX_QUEUE_SIZE'), 'Não deve ter campo static MAX_QUEUE_SIZE duplicado');
+        assert.ok(
+            !mq.includes('static MAX_QUEUE_SIZE'),
+            'Não deve ter campo static MAX_QUEUE_SIZE duplicado em message-queue.js',
+        );
     });
 
     it('sendMessage() deve rejeitar se fila é igual a MAX_QUEUE_SIZE', () => {
@@ -155,19 +152,24 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
         assert.ok(MAX_QUEUE_SIZE > 0);
     });
 
-    it('código deve rejeitar sendMessage quando fila está no limite', async () => {
+    it('sendMessage() cria tarefa e delega enqueue ao MessageQueue', async () => {
         const { readFile } = await import('node:fs/promises');
         const src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
+        // F.4: lógica de verificação de limite migrou para MessageQueue.enqueue()
         assert.ok(
-            src.includes('#queue.length >= MAX_QUEUE_SIZE'),
-            'sendMessage deve verificar this.#queue.length >= MAX_QUEUE_SIZE',
+            src.includes('this.#messageQueue.enqueue(task'),
+            'sendMessage deve delegar enqueue ao #messageQueue (F.4)',
         );
     });
 
-    it('mensagem de erro ao atingir limite deve indicar o tamanho máximo', async () => {
+    it('mensagem de erro ao atingir limite deve conter "Fila cheia" em message-queue.js', async () => {
         const { readFile } = await import('node:fs/promises');
-        const src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
-        assert.ok(src.includes('Fila cheia'), "mensagem de erro deve conter 'Fila cheia' para clareza operacional");
+        // F.4: mensagem de erro migrou para message-queue.js
+        const mq = await readFile(new URL('../../../src/copilot/agent/message-queue.js', import.meta.url), 'utf-8');
+        assert.ok(
+            mq.includes('Fila cheia'),
+            "mensagem de erro deve conter 'Fila cheia' em message-queue.js para clareza operacional",
+        );
     });
 });
 

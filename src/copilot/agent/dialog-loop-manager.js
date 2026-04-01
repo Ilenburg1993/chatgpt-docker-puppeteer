@@ -23,7 +23,7 @@ import { log } from '#core/logger';
 import EventEmitter from 'node:events';
 import { DialogProtocol } from './dialog-protocol.js';
 import { DialogWatchdog } from './dialog-watchdog.js';
-import { readState, writeStateAsync } from './session-manager.js';
+import { readState, writeStateAsync } from './state-io.js';
 
 /**
  * @typedef {import('#copilot/lib/telemetry').TelemetryStore} TelemetryStore

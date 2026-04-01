@@ -20,10 +20,15 @@ import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 describe('always-alive › Sprint 6: backoff exponencial de reconexão', async () => {
     /** @type {string} */
     let sourceCode = '';
+    /** @type {string} */
+    let reconnectPolicyCode = '';
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
+        [sourceCode, reconnectPolicyCode] = await Promise.all([
+            readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/reconnect-policy.js', import.meta.url), 'utf-8'),
+        ]);
     });
 
     it('deve conter método privado #tryReconnect', () => {
@@ -31,63 +36,76 @@ describe('always-alive › Sprint 6: backoff exponencial de reconexão', async (
     });
 
     it('deve usar Math.pow para backoff exponencial', () => {
+        // F.6.2: lógica de backoff extraída para reconnect-policy.js
         assert.ok(
-            sourceCode.includes('Math.pow'),
-            '#tryReconnect deve usar Math.pow(2, attempt-1) para backoff exponencial',
+            reconnectPolicyCode.includes('Math.pow'),
+            'reconnect-policy.js deve usar Math.pow(2, attempt-1) para backoff exponencial',
         );
     });
 
     it('deve usar Math.random para jitter', () => {
+        // F.6.2: lógica de jitter extraída para reconnect-policy.js
         assert.ok(
-            sourceCode.includes('Math.random()'),
-            '#tryReconnect deve usar Math.random() para jitter e evitar thundering herd',
+            reconnectPolicyCode.includes('Math.random()'),
+            'reconnect-policy.js deve usar Math.random() para jitter e evitar thundering herd',
         );
     });
 
     it('deve emitir session.fatal quando tentativas esgotadas', () => {
+        // F.6.2: emission de session.fatal extraída para reconnect-policy.js
         assert.ok(
-            sourceCode.includes("emit('session.fatal'"),
-            'always-alive.js deve emitir session.fatal após esgotar tentativas de reconexão',
+            reconnectPolicyCode.includes("emit('session.fatal'"),
+            'reconnect-policy.js deve emitir session.fatal após esgotar tentativas de reconexão',
         );
     });
 
     it('deve ter maxAttempts padrão de 5 (recomendado pelo LLM-B: 5-7)', () => {
-        assert.ok(sourceCode.includes('maxAttempts = 5'), '#tryReconnect deve ter maxAttempts default = 5');
-    });
-
-    it('deve ter baseDelayMs padrão de 1000ms', () => {
+        // F.6.2: defaults extraídos para reconnect-policy.js
         assert.ok(
-            sourceCode.includes('baseDelayMs = 1_000') || sourceCode.includes('baseDelayMs = 1000'),
-            '#tryReconnect deve ter baseDelayMs default = 1000ms',
+            reconnectPolicyCode.includes('maxAttempts = 5'),
+            'reconnect-policy.js deve ter maxAttempts default = 5',
         );
     });
 
-    it('deve reenfileirar tarefa com #queue.unshift quando reconexão bem-sucedida', () => {
-        // A tarefa é reenfileirada via #queue.unshift(); o nome da variável pode variar (task, t, etc.)
+    it('deve ter baseDelayMs padrão de 1000ms', () => {
+        // F.6.2: defaults extraídos para reconnect-policy.js
         assert.ok(
-            sourceCode.includes('this.#queue.unshift('),
-            'ao reconectar, a tarefa deve ser reenfileirada no início via #queue.unshift()',
+            reconnectPolicyCode.includes('baseDelayMs = 1_000') || reconnectPolicyCode.includes('baseDelayMs = 1000'),
+            'reconnect-policy.js deve ter baseDelayMs default = 1000ms',
+        );
+    });
+
+    it('deve reenfileirar tarefa via #messageQueue.unshift quando reconexão bem-sucedida', () => {
+        // F.4: requeue migrou para MessageQueue.unshift()
+        assert.ok(
+            sourceCode.includes('this.#messageQueue.unshift('),
+            'ao reconectar, a tarefa deve ser reenfileirada no início via #messageQueue.unshift() (F.4)',
         );
     });
 
     it('deve chamar initOrResumeSession na tentativa de reconexão', () => {
-        // Verifica que #tryReconnect usa a mesma função de sessão principal
-        const hasInitOrResume = sourceCode.includes('initOrResumeSession');
-        assert.ok(hasInitOrResume, '#tryReconnect deve usar initOrResumeSession para recriar sessão');
+        // F.6.2: initOrResumeSession delegado via callback
+        const hasInitOrResume =
+            sourceCode.includes('initOrResumeSession') || reconnectPolicyCode.includes('initSession');
+        assert.ok(
+            hasInitOrResume,
+            'reconnect-policy.js deve usar initSession (callback para initOrResumeSession) para recriar sessão',
+        );
     });
 
     it('deve verificar se #client existe antes de tentar reconectar', () => {
+        // F.6.2: verificação de client passou para reconnect-policy.js como argumento direto
         assert.ok(
-            sourceCode.includes('!this.#client') || sourceCode.includes('this.#client === null'),
-            '#tryReconnect deve checar se #client existe antes de tentar reconectar',
+            reconnectPolicyCode.includes('!client') || reconnectPolicyCode.includes('client === null'),
+            'reconnect-policy.js deve checar se client existe antes de tentar reconectar',
         );
     });
 
     it('deve retornar false quando status é stopped (agente parado)', () => {
-        // Garante que #tryReconnect não tenta reconectar um agente parado
+        // F.6.2: verificação de stopped passou para reconnect-policy.js
         assert.ok(
-            sourceCode.includes("this.#status === 'stopped'"),
-            "#tryReconnect deve retornar false quando status === 'stopped'",
+            reconnectPolicyCode.includes("'stopped'"),
+            "reconnect-policy.js deve retornar false quando status === 'stopped'",
         );
     });
 });

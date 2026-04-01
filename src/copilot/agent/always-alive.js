@@ -16,13 +16,11 @@
  * @module copilot/always-alive
  */
 
-import { MAX_QUEUE_SIZE } from '#copilot/core/constants';
 import { SessionError } from '#copilot/core/errors';
 import { raceEvents } from '#copilot/lib/event-helpers';
 import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart, startSpan } from '#copilot/lib/index';
-import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/lib/permissions';
 import { log } from '#core/logger';
-import { CopilotClient, approveAll } from '@github/copilot-sdk';
+import { CopilotClient } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
 import { buildMcpTools } from '../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../config/mcp-servers.js';
@@ -31,7 +29,13 @@ import { getHubSessionId } from '../terminal/state.js';
 import { DialogLoopManager } from './dialog-loop-manager.js';
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 import { AGENT_EVENTS } from './events.js';
-import { initOrResumeSession, readState, writeStateAsync } from './session-manager.js';
+import { MessageQueue } from './message-queue.js';
+import { PermissionController } from './permission-controller.js';
+import { tryReconnect } from './reconnect-policy.js';
+import { wireSessionEvents } from './session-event-wirer.js';
+import { initOrResumeSession } from './session-initializer.js';
+import { readState, writeStateAsync } from './state-io.js';
+import { buildStatusSnapshot } from './status-snapshot.js';
 import { executeTask } from './task-executor.js';
 import { bootstrapTools, setSessionRpc } from './tools-bootstrap.js';
 import { WebhookManager } from './webhook-manager.js';
@@ -84,6 +88,7 @@ import { WebhookManager } from './webhook-manager.js';
  * @property {{ tokens: number; tokenLimit: number; utilization: number } | null} contextWindow - Dados reais de uso de
  *   contexto do SDK (ou null se não disponível)
  * @property {string | null} lastCheckpointPath - Último caminho de checkpoint do SDK (ou null se nenhum ainda)
+ * @property {'approve_all' | 'audit_only' | 'selective'} permissionMode - Modo de permissão ativo
  */
 
 /**
@@ -104,8 +109,13 @@ export class AlwaysAliveAgent extends EventEmitter {
     /** @type {PendingQuestion | null} */
     #pendingQuestion = null;
 
-    /** @type {AgentTask[]} */
-    #queue = [];
+    /** @type {MessageQueue} */
+    #messageQueue = new MessageQueue({
+        onEnqueue: () => this.#processQueue(),
+        onChanged: () => {
+            this.#statusSnapshotCache = null;
+        },
+    });
 
     /**
      * E.1: DialogLoopManager — encapsula mutex, watchdog, backpressure, protocolo e pause/resume do dialog loop.
@@ -185,11 +195,10 @@ export class AlwaysAliveAgent extends EventEmitter {
     /** @type {WebhookManager} */
     #webhooks = new WebhookManager();
 
-    /** @type {import('@github/copilot-sdk').PermissionHandler} */
-    #permissionHandler = approveAll;
-
-    /** @type {'approve_all' | 'audit_only' | 'selective'} */
-    #permissionModeLabel = /** @type {'approve_all'} */ ('approve_all');
+    /** @type {PermissionController} */
+    #permissions = new PermissionController({
+        onModeChanged: (mode) => this.emit('permission.mode_changed', { mode }),
+    });
 
     /** @type {import('#copilot/lib/telemetry').TelemetryStore} */
     #telemetry = createTelemetry();
@@ -227,7 +236,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {'approve_all' | 'audit_only' | 'selective'}
      */
     getPermissionMode() {
-        return this.#permissionModeLabel;
+        return this.#permissions.getMode();
     }
 
     /**
@@ -244,34 +253,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {void}
      */
     setPermissionMode(mode, opts = {}) {
-        const { allowTools, denyTools, denyShell } = opts;
-        switch (mode) {
-            case 'approve_all':
-                this.#permissionHandler = approveAll;
-                this.#permissionModeLabel = 'approve_all';
-                break;
-            case 'audit_only':
-                this.#permissionHandler = createAuditOnlyPermission();
-                this.#permissionModeLabel = 'audit_only';
-                break;
-            case 'selective': {
-                const shellTools = ['run_shell_command', 'run_npm_script', 'run_node_script'];
-                /** @type {import('#copilot/lib/permissions').PermissionHandlerConfig} */
-                const cfg = {
-                    denyTools: [...(denyShell ? shellTools : []), ...(denyTools ?? [])],
-                    auditMode: true,
-                };
-                if (allowTools?.length) cfg.allowTools = allowTools;
-                this.#permissionHandler = createPermissionHandler(cfg);
-                this.#permissionModeLabel = 'selective';
-                break;
-            }
-            default:
-                log('WARN', `[AlwaysAlive] setPermissionMode: modo inválido '${/** @type {any} */ (mode)}'`);
-                return;
-        }
-        log('INFO', `[AlwaysAlive] Modo de permissão alterado para '${mode}'.`);
-        this.emit('permission.mode_changed', { mode });
+        this.#permissions.setMode(mode, opts);
     }
 
     /**
@@ -327,7 +309,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number}
      */
     get queueSize() {
-        return this.#queue.length;
+        return this.#messageQueue.size;
     }
 
     /**
@@ -393,8 +375,20 @@ export class AlwaysAliveAgent extends EventEmitter {
 
             // Wiring de eventos de compaction para observabilidade via SSE/NERV.
             // session.on() retorna () => void (não this) — armazenado para cleanup no stop/reconnect.
-            this.#sessionEventUnsubscribers = [];
-            this.#wireSessionEvents(session, isResumed);
+            this.#sessionEventUnsubscribers = wireSessionEvents(session, isResumed, {
+                emit: (event, payload) => this.emit(event, payload),
+                getStatusSnapshot: () => this.getStatusSnapshot(),
+                onCheckpointPath: (path) => {
+                    this.#lastCheckpointPath = path;
+                },
+                onContextState: (state) => {
+                    this.#contextState = state;
+                },
+                onPrInfo: (info) => {
+                    this.#lastPrInfo = info;
+                },
+                isProcessing: () => this.#status === 'processing',
+            });
 
             this.#setStatus('idle');
             this.#sendCount = readState()?.sendCount ?? 0;
@@ -416,11 +410,6 @@ export class AlwaysAliveAgent extends EventEmitter {
         }
     }
 
-    /**
-     * Para o agente graciosamente (preserva sessão em disco via disconnect).
-     *
-     * @returns {Promise<void>}
-     */
     /**
      * Para o agente graciosamente:
      *
@@ -477,17 +466,12 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.#setStatus('stopped');
 
         // Rejeita todas as tarefas pendentes na fila
-        const remainingTasks = this.#queue.splice(0);
+        const remainingTasks = this.#messageQueue.drain(
+            new SessionError('[AlwaysAlive] Agente parado durante shutdown gracioso.', 'AGENT_STOPPED'),
+        );
         this.#statusSnapshotCache = null;
         if (remainingTasks.length > 0) {
             log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
-            const shutdownError = new SessionError(
-                '[AlwaysAlive] Agente parado durante shutdown gracioso.',
-                'AGENT_STOPPED',
-            );
-            for (const task of remainingTasks) {
-                task.reject(shutdownError);
-            }
         }
 
         for (const unsub of this.#sessionEventUnsubscribers) unsub();
@@ -523,157 +507,6 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Session Event Wiring (extraído de start() para clareza — D.4)
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /**
-     * Registra todos os listeners de eventos da sessão SDK e popula `#sessionEventUnsubscribers`. Extraído de `start()`
-     * para reduzir a complexidade ciclomática do boot.
-     *
-     * @param {CopilotSession} session
-     * @param {boolean} isResumed
-     * @returns {void}
-     */
-    #wireSessionEvents(session, isResumed) {
-        // Compaction start
-        this.#sessionEventUnsubscribers.push(
-            session.on('session.compaction_start', (/** @type {any} */ evt) => {
-                log('INFO', '[AlwaysAlive] Compaction iniciada (sessão infinita).');
-                this.emit('session.compaction_start', evt?.data ?? {});
-            }),
-        );
-
-        // Compaction complete — detecta falha, captura checkpointPath para recovery.
-        this.#sessionEventUnsubscribers.push(
-            session.on('session.compaction_complete', (/** @type {any} */ evt) => {
-                const data = evt?.data ?? {};
-                if (data.success === false) {
-                    log('ERROR', '[AlwaysAlive] Compaction falhou. Sessão pode estar instável.');
-                    if (data.checkpointPath) {
-                        log(
-                            'WARN',
-                            `[AlwaysAlive] Checkpoint disponível: ${data.checkpointPath}. Para recovery manual, restaure esse arquivo e reinicie.`,
-                        );
-                    }
-                } else {
-                    log('INFO', '[AlwaysAlive] Compaction concluída.');
-                }
-                if (data.checkpointPath) {
-                    this.#lastCheckpointPath = data.checkpointPath;
-                }
-                this.emit('session.compaction_complete', data);
-                const snap = this.getStatusSnapshot();
-                this.emit('context:compacted', {
-                    sessionId: snap?.sessionId ?? null,
-                    ts: Date.now(),
-                    checkpoint: data.checkpointPath ?? null,
-                });
-            }),
-        );
-
-        // Reasoning tokens (o3/o4-mini extended thinking)
-        this.#sessionEventUnsubscribers.push(
-            session.on('assistant.reasoning_delta', (/** @type {any} */ evt) => {
-                const chunk = evt?.data?.deltaContent ?? '';
-                if (chunk) this.emit('task.reasoning', { chunk, reasoningId: evt?.data?.reasoningId ?? null });
-            }),
-        );
-
-        // Streaming delta apenas quando dialog loop está ativo (status !== 'processing').
-        this.#sessionEventUnsubscribers.push(
-            session.on('assistant.message_delta', (/** @type {any} */ evt) => {
-                if (this.#status === 'processing') return;
-                const chunk = evt?.data?.deltaContent ?? evt?.data?.content ?? '';
-                if (chunk) this.emit('task.delta', { taskId: null, chunk });
-            }),
-        );
-
-        // Token usage e janela de contexto — atualiza contextState e emite avisos.
-        let _firstUsageChecked = false;
-        this.#sessionEventUnsubscribers.push(
-            session.on('session.usage_info', (/** @type {any} */ evt) => {
-                const data = evt?.data ?? {};
-                this.emit('session.usage', data);
-                const { currentTokens, tokenLimit } = data;
-                if (tokenLimit > 0) {
-                    const ratio = Math.round((currentTokens / tokenLimit) * 100);
-                    this.#contextState = {
-                        tokens: currentTokens,
-                        tokenLimit,
-                        utilization: currentTokens / tokenLimit,
-                    };
-                    if (!_firstUsageChecked && isResumed && currentTokens / tokenLimit > 0.7) {
-                        log(
-                            'WARN',
-                            `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
-                        );
-                        this.emit('session.token_budget_warning', {
-                            currentTokens,
-                            tokenLimit,
-                            ratio,
-                            reason: 'startup_heavy',
-                        });
-                    }
-                    _firstUsageChecked = true;
-                    if (currentTokens / tokenLimit > 0.8) {
-                        log(
-                            'WARN',
-                            `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
-                        );
-                        this.emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
-                    }
-                }
-            }),
-        );
-
-        // Mudança de modo (plan ↔ act ↔ interactive)
-        this.#sessionEventUnsubscribers.push(
-            session.on('session.mode_changed', (/** @type {any} */ evt) => {
-                log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.previousMode} → ${evt?.data?.newMode}`);
-                this.emit('session.mode_changed', evt?.data ?? {});
-            }),
-        );
-
-        // Catch-all para eventos do SDK não tratados explicitamente + billing (assistant.usage).
-        /** @type {Set<string>} */
-        const knownEvents = new Set([
-            'session.compaction_start',
-            'session.compaction_complete',
-            'assistant.reasoning_delta',
-            'session.usage_info',
-            'session.mode_changed',
-            'assistant.message_delta',
-            'tool.execution_start',
-            'tool.execution_complete',
-            'assistant.usage',
-        ]);
-        this.#sessionEventUnsubscribers.push(
-            session.on((/** @type {any} */ evt) => {
-                const kind = evt?.kind ?? evt?.type ?? 'unknown';
-                if (kind === 'assistant.usage') {
-                    const data = evt?.data ?? {};
-                    const { model, cost, quotaSnapshots } = data;
-                    log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
-                    this.#lastPrInfo = { model, cost, quotaSnapshots, ts: Date.now() };
-                    this.emit('pr.consumed', { model, cost, quotaSnapshots, ts: Date.now() });
-                    writeStateAsync({
-                        pendingTurnConsumedPR: true,
-                        lastPrConsumedAt: Date.now(),
-                        lastPrModel: model ?? '',
-                        lastPrCost: cost ?? 0,
-                        lastQuotaSnapshots: quotaSnapshots ?? null,
-                    }).catch((/** @type {any} */ e) =>
-                        log('WARN', `[AlwaysAlive] writeState pendingTurnConsumedPR: ${e.message}`),
-                    );
-                    return;
-                }
-                if (!knownEvents.has(kind)) {
-                    log('DEBUG', `[AlwaysAlive] Evento SDK não tratado: kind=${kind}`);
-                }
-            }),
-        );
-    }
-
     /**
      * Enfileira uma mensagem para ser enviada ao modelo.
      *
@@ -708,18 +541,6 @@ export class AlwaysAliveAgent extends EventEmitter {
                 );
                 return;
             }
-            if (this.#queue.length >= MAX_QUEUE_SIZE) {
-                const err = new SessionError(
-                    `[AlwaysAlive] Fila cheia (${MAX_QUEUE_SIZE} tarefas). Tente novamente mais tarde.`,
-                    'QUEUE_FULL',
-                );
-                log(
-                    'WARN',
-                    `[AlwaysAlive] sendMessage rejeitado: fila cheia (${this.#queue.length}/${MAX_QUEUE_SIZE}).`,
-                );
-                reject(err);
-                return;
-            }
             const task = /** @type {AgentTask} */ ({
                 id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                 message,
@@ -729,25 +550,13 @@ export class AlwaysAliveAgent extends EventEmitter {
                 ...(timeoutMs !== undefined ? { timeoutMs } : {}),
                 ...(attachments !== undefined ? { attachments } : {}),
             });
-            if (signal) {
-                signal.addEventListener(
-                    'abort',
-                    () => {
-                        const idx = this.#queue.indexOf(task);
-                        if (idx !== -1) {
-                            this.#queue.splice(idx, 1);
-                            log('INFO', `[AlwaysAlive] Tarefa ${task.id} cancelada via AbortSignal na fila.`);
-                        }
-                        reject(new DOMException('Tarefa cancelada pelo AbortSignal.', 'AbortError'));
-                    },
-                    { once: true },
-                );
+            try {
+                this.#messageQueue.enqueue(task, ...(signal ? [{ signal }] : []));
+            } catch (/** @type {any} */ err) {
+                reject(err instanceof Error ? err : new Error(String(err)));
+                return;
             }
-            this.#queue.push(task);
-            this.#statusSnapshotCache = null;
-            log('INFO', `[AlwaysAlive] Tarefa enfileirada: ${task.id}`);
             this.emit('task.queued', { taskId: task.id, message });
-            this.#processQueue();
         });
     }
 
@@ -853,33 +662,22 @@ export class AlwaysAliveAgent extends EventEmitter {
             return this.#statusSnapshotCache.snapshot;
         }
         const state = readState();
-        const STARVATION_THRESHOLD_MS = 60_000;
-        const first = this.#queue[0];
-        const oldestWaitMs = first !== undefined ? now - first.enqueuedAt : 0;
-        const snapshot = {
+        const snapshot = buildStatusSnapshot({
             status: this.#status,
             sessionId: this.sessionId,
             model: this.#model,
             reasoningEffort: this.#reasoningEffort,
-            queueSize: this.#queue.length,
-            oldestTaskWaitMs: oldestWaitMs,
-            starvationAlert: oldestWaitMs >= STARVATION_THRESHOLD_MS,
-            pendingQuestion: this.#pendingQuestion
-                ? {
-                      question: this.#pendingQuestion.question,
-                      choices: this.#pendingQuestion.choices,
-                      allowFreeform: this.#pendingQuestion.allowFreeform,
-                      askedAt: this.#pendingQuestion.askedAt,
-                  }
-                : null,
+            queueSize: this.#messageQueue.size,
+            queueOldest: this.#messageQueue.oldest,
+            pendingQuestion: this.#pendingQuestion,
             isResumed: this.#isResumed,
             resumeCount: state?.resumeCount ?? 0,
             sendCount: this.#sendCount,
             startedAt: state?.startedAt ?? null,
             contextWindow: this.#contextState,
             lastCheckpointPath: this.#lastCheckpointPath,
-            permissionMode: this.#permissionModeLabel,
-        };
+            permissionMode: this.#permissions.getMode(),
+        });
         this.#statusSnapshotCache = { snapshot, at: now };
         return snapshot;
     }
@@ -1062,10 +860,10 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {void}
      */
     #processQueue() {
-        if (this.#status !== 'idle' || this.#queue.length === 0 || !this.#session) return;
+        if (this.#status !== 'idle' || this.#messageQueue.size === 0 || !this.#session) return;
         const session = this.#session;
 
-        const task = this.#queue.shift();
+        const task = this.#messageQueue.shift();
         if (!task) return;
 
         this.#setStatus('processing');
@@ -1079,7 +877,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             setStatus: (s) => this.#setStatus(s),
             emit: (event, payload) => this.emit(event, payload),
             tryReconnect: (e) => this.#tryReconnect(e),
-            requeueTask: (t) => this.#queue.unshift(t),
+            requeueTask: (t) => this.#messageQueue.unshift(t),
             scheduleNext: () => this.#processQueue(),
         });
     }
@@ -1105,7 +903,7 @@ export class AlwaysAliveAgent extends EventEmitter {
 
         const { session, isResumed } = await initOrResumeSession(client, {
             model: this.#model,
-            onPermissionRequest: this.#permissionHandler,
+            onPermissionRequest: this.#permissions.handler,
             onUserInputRequest: this.#handleUserInputRequest.bind(this),
             hooks: {
                 onSessionStart: this.#onSessionStart.bind(this),
@@ -1125,68 +923,29 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * Tenta reconectar a sessão SDK com backoff exponencial e jitter.
-     *
-     * Chamado quando `session.sendAndWait` falha, para determinar se o erro é recuperável (rede/sessão) e reestabelecer
-     * a conexão antes de rejeitar a tarefa.
+     * Tenta reconectar à sessão SDK com backoff exponencial + jitter. Delega para a política centralizada em
+     * `reconnect-policy.js`.
      *
      * @param {Error} originalError - Erro original que desencadeou a reconexão
      * @param {{ maxAttempts?: number; baseDelayMs?: number }} [opts]
      * @returns {Promise<boolean>} true se reconexão bem-sucedida, false se esgotado
      */
     async #tryReconnect(originalError, opts = {}) {
-        const { maxAttempts = 5, baseDelayMs = 1_000 } = opts;
-
-        // Só tenta reconectar se o cliente ainda existe e o agente não foi parado
-        if (!this.#client || this.#status === 'stopped') return false;
-
-        log('WARN', `[AlwaysAlive] Erro de sessão detectado: ${originalError.message}. Iniciando reconexão...`);
-
-        for (const unsub of this.#sessionEventUnsubscribers) unsub();
-        this.#sessionEventUnsubscribers = [];
-
-        // Aplica fallback de modelo para a nova sessão se previamente agendado por scheduleFallback().
-        // Não aplicar aqui (na reconexão in-flight) para evitar consumo duplo de PR: a reconexão já gera 1 PR
-        // inevitável; o fallback deve ser aplicado na próxima chamada a startDialogLoop().
-
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + random(0..base)
-            const delay = baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * baseDelayMs;
-            log('INFO', `[AlwaysAlive] Reconexão tentativa ${attempt}/${maxAttempts} em ${Math.round(delay)}ms...`);
-            this.emit('status', `reconnecting:${attempt}/${maxAttempts}`);
-
-            await new Promise((r) => setTimeout(r, delay));
-
-            try {
-                const { session, isResumed } = await this.#initSession(this.#client);
-                log(
-                    'INFO',
-                    `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,
-                );
-                this.emit('ready', { sessionId: session.sessionId, isResumed, reconected: true });
-
-                if (this.#dialogLoop.active) {
-                    log(
-                        'INFO',
-                        '[AlwaysAlive] Reconexão com dialog loop ativo — emitindo dialog.stopped para restart automático.',
-                    );
-                    this.#dialogLoop.notifyReconnect();
-                    this.emit('dialog.stopped', { reason: 'reconnect_restart', authorized: false });
-                } else {
-                    log(
-                        'INFO',
-                        '[AlwaysAlive] Reconexão com dialog loop inativo. Aguardando terminal/dialog.js retomar via ensureDialogLoop.',
-                    );
-                }
-                return true;
-            } catch (/** @type {any} */ reconnectError) {
-                log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${reconnectError.message}`);
-            }
-        }
-
-        log('ERROR', `[AlwaysAlive] Reconexão esgotada após ${maxAttempts} tentativas. Emitindo session.fatal.`);
-        this.emit('session.fatal', { originalError: originalError.message, attempts: maxAttempts });
-        return false;
+        return tryReconnect(
+            originalError,
+            this.#client,
+            this.#status,
+            {
+                emit: (event, payload) => this.emit(event, payload),
+                initSession: (client) => this.#initSession(client),
+                dialogLoop: this.#dialogLoop,
+                clearSessionEventUnsubs: () => {
+                    for (const unsub of this.#sessionEventUnsubscribers) unsub();
+                    this.#sessionEventUnsubscribers = [];
+                },
+            },
+            opts,
+        );
     }
 
     /**
