@@ -323,8 +323,7 @@ describe('always-alive › dialog loop: DL-PERM hardening', async () => {
         // STOP_DIALOG deve existir no stop() / answerPendingQuestion
         assert.ok(
             dlmSourceCode.includes("'STOP_DIALOG'") || dlmSourceCode.includes('"STOP_DIALOG"'),
-            "STOP_DIALOG deve existir no stop() do DialogLoopManager",
+            'STOP_DIALOG deve existir no stop() do DialogLoopManager',
         );
     });
 });
-
