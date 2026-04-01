@@ -378,6 +378,9 @@ export class DialogLoopManager extends EventEmitter {
 
         // Estratégia B: reenviar boot prompt (1 PR)
         log('INFO', '[DialogLoopManager] ask_user não encontrado — reenviando boot prompt (1 PR).');
+        // G1-BUG-07 (fix): parar watchdog atual antes de start() para evitar dois watchdogs simultâneos.
+        this.#watchdog?.stop();
+        this.#watchdog = null;
         this.#active = false;
         await writeStateAsync({ dialogLoopActive: false }).catch(() => {});
         await this.start();

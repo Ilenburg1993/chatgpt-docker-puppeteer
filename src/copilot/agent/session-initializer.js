@@ -157,7 +157,10 @@ const HOOK_CONTEXT_MAX_BYTES = 8 * 1024;
 export async function buildHookSystemContextSafe() {
     const raw = await buildHookSystemContext();
     if (Buffer.byteLength(raw, 'utf8') > HOOK_CONTEXT_MAX_BYTES) {
-        const truncated = Buffer.from(raw, 'utf8').subarray(0, HOOK_CONTEXT_MAX_BYTES).toString('utf8');
+        // G1-BUG-08 (fix): usar TextDecoder com fatal=false para garantir que o truncamento em
+        // limite de bytes não corta caracteres UTF-8 multibyte no meio, gerando strings inválidas.
+        const bytes = Buffer.from(raw, 'utf8').subarray(0, HOOK_CONTEXT_MAX_BYTES);
+        const truncated = new TextDecoder('utf-8', { fatal: false }).decode(bytes).replace(/\uFFFD+$/, '');
         return truncated + '\n\n⚠️ [contexto truncado por limite SEC-02: 8KB]';
     }
     return raw;

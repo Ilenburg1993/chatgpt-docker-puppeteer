@@ -462,6 +462,12 @@ export class AlwaysAliveAgent extends EventEmitter {
             ]);
         }
 
+        // G1-BUG-02 (fix): resetar listeners e flag ANTES de forceDeactivate para evitar propagação
+        // de eventos para SSE subscribers já removidos durante o shutdown.
+        if (this.#dialogLoopAttached) {
+            this.#dialogLoop.removeAllListeners();
+            this.#dialogLoopAttached = false;
+        }
         if (this.#dialogLoop.active) {
             this.#dialogLoop.forceDeactivate();
             this.emit('dialog.loop.changed', { active: false, ts: Date.now() });
@@ -791,6 +797,9 @@ export class AlwaysAliveAgent extends EventEmitter {
 
     /**
      * E.1: Garante que o DialogLoopManager está vinculado ao host com a interface AgentHost.
+     *
+     * G1-BUG-01 (fix): `attach()` é sempre chamado para atualizar host/telemetry (podem mudar após reconexão). O wiring
+     * de eventos (listeners) só ocorre uma vez — guard `#dialogLoopAttached` protege apenas essa parte.
      */
     #ensureDialogLoopAttached() {
         /** @type {import('./dialog-loop-manager.js').AgentHost} */
@@ -801,7 +810,9 @@ export class AlwaysAliveAgent extends EventEmitter {
             getModel: () => this.#model,
             getPendingQuestion: () => this.#pendingQuestion,
         };
+        // Sempre atualiza host/telemetry — necessário após reconexão onde #telemetry é recriado.
         this.#dialogLoop.attach(host, this.#telemetry);
+        // Wiring de eventos: somente na primeira vez (guard de idempotência).
         if (this.#dialogLoopAttached) return;
         this.#dialogLoopAttached = true;
         // Propagar eventos do DialogLoopManager com prefixo dialog. para manter compatibilidade
@@ -902,6 +913,9 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<{ session: any; isResumed: boolean }>}
      */
     async #initSession(client) {
+        // G1-API-05 (fix): invalidar cache de mensagens para garantir que chamadas a
+        // getSessionMessages() após reconexão não retornem mensagens da sessão anterior.
+        this.#messagesCache = null;
         const mcpTools = await buildMcpTools();
         if (mcpTools.length > 0) {
             log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);

@@ -107,6 +107,13 @@ export async function executeTask(session, task, callbacks) {
         emit('task.completed', { taskId: task.id, response: text, responseLen: text.length, durationMs });
         task.resolve(text);
     } catch (/** @type {any} */ e) {
+        // G1-BUG-03 (fix): AbortError não é erro de rede/sessão — não deve acionar reconexão.
+        if (e instanceof DOMException && e.name === 'AbortError') {
+            setStatus('idle');
+            emit('task.error', { taskId: task.id, error: 'AbortError' });
+            task.reject(e);
+            return;
+        }
         // Tenta reconectar com backoff exponencial se parecer erro de rede/sessão
         const recovered = await tryReconnect(e);
         if (recovered) {

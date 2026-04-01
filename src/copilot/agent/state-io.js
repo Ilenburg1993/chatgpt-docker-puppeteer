@@ -61,6 +61,14 @@ let _stateCache = null;
  */
 let _stateDirReady = false;
 
+/**
+ * Mutex serial para `writeStateAsync` — evita race conditions quando múltiplas escritas concorrentes lêem o estado
+ * antes que qualquer escrita anterior seja concluída (G1-BUG-05).
+ *
+ * @type {Promise<AliveAgentState>}
+ */
+let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unknown} */ (null)));
+
 // ─── API pública ─────────────────────────────────────────────────────────────
 
 /**
@@ -109,10 +117,24 @@ export function writeState(updates) {
  * Preferir esta versão em handlers de alta frequência para não bloquear o event loop. Atualiza `_stateCache` após a
  * escrita para que chamadas subsequentes a `readState()` não precisem de I/O.
  *
+ * G1-BUG-05 (fix): escritas são serializadas via mutex interno para evitar race condition quando múltiplas chamadas
+ * concorrentes lêem o estado antes de qualquer escrita ser concluída.
+ *
  * @param {Partial<AliveAgentState>} updates - Campos a atualizar no estado atual
  * @returns {Promise<AliveAgentState>}
  */
 export async function writeStateAsync(updates) {
+    _writeQueue = _writeQueue.then(() => _doWriteState(updates)).catch(() => _doWriteState(updates));
+    return _writeQueue;
+}
+
+/**
+ * Executa efetivamente a escrita assíncrona de estado (chamado dentro do mutex serial).
+ *
+ * @param {Partial<AliveAgentState>} updates
+ * @returns {Promise<AliveAgentState>}
+ */
+async function _doWriteState(updates) {
     if (!_stateDirReady) {
         await mkdir(STATE_DIR, { recursive: true });
         _stateDirReady = true;
@@ -136,6 +158,7 @@ export function clearState() {
     }
     _stateCache = null;
     _stateDirReady = false;
+    _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unknown} */ (null)));
 }
 
 // ─── Helpers privados ─────────────────────────────────────────────────────────
