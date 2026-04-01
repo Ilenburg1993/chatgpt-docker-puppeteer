@@ -1063,9 +1063,10 @@ conseguem identificar modo incorreto via health check. **Correção:** Adicionar
 
 #### G2.3.2 — Separação de responsabilidades
 
-- [ ] G2-ARCH-02 — separar `#sendToDialogLoop()` de `sendMessage()` em `always-alive.js`
-- [ ] G2-ARCH-03 — mover import dinâmico para import estático (já coberto por G2-BUG-10)
-- [ ] G2-ARCH-06 — migrar `webhook-manager.js` de `http`/`https` para `fetch()`
+- [x] G2-ARCH-02 — separação já implementada: `sendDialogTurn()` delega ao DLM, `sendMessage()`
+      rejeita durante dialog loop
+- [x] G2-ARCH-03 — mover import dinâmico para import estático (já feito via G2-BUG-10 — linha 42)
+- [x] G2-ARCH-06 — migrar `webhook-manager.js` de `http`/`https` para `fetch()` (já feito)
 
 #### G2.3.3 — Contratos e interfaces
 
@@ -1076,8 +1077,9 @@ conseguem identificar modo incorreto via health check. **Correção:** Adicionar
 
 #### G2.3.4 — Resiliência e limites
 
-- [ ] G2-ARCH-04 — corrigir possível leak de listeners em `#waitForRestartAndReply()`
-- [ ] G2-ARCH-05 — documentar/tratar `unshift()` sem `onEnqueue()` em `message-queue.js`
+- [x] G2-ARCH-04 — corrigido: cleanup de `onRetryPending` no timeout handler (já inline)
+- [x] G2-ARCH-05 — documentado: JSDoc `@remarks` em `unshift()` explicando que `onEnqueue()` não é
+      chamado
 - [x] G2-ARCH-10 — corrigir `removeAllListeners()` em `#ensureDialogLoopAttached()`
 - [x] G2-ARCH-11 — timeout de encerramento em `stop()` de `dialog-loop-manager.js`
 - [x] G2-ARCH-09 — cap máximo de delay exponencial em `reconnect-policy.js`
@@ -1168,7 +1170,7 @@ conseguem identificar modo incorreto via health check. **Correção:** Adicionar
 | G2.2.1 — SSRF e validação               | ✅ Concluído | `791f4a88`            |
 | G2.2.2 — Hardening                      | ✅ Concluído | `791f4a88`            |
 | G2.3.1 — Extração de sub-funções        | ✅ Concluído | `5bb75625`            |
-| G2.3.2 — Separação de responsabilidades | 🔴 Pendente  | —                     |
+| G2.3.2 — Separação de responsabilidades | ✅ Concluído | verificado/`a8fb9f6f` |
 | G2.3.3 — Contratos e interfaces         | ✅ Concluído | `53131a4b`            |
 | G2.3.4 — Resiliência                    | ✅ Concluído | `53131a4b`/`5bb75625` |
 | G2.3.5 — Colisão de tools               | ✅ Concluído | `791f4a88`/`5bb75625` |
@@ -1179,20 +1181,13 @@ conseguem identificar modo incorreto via health check. **Correção:** Adicionar
 
 ### Itens individuais pendentes
 
-| Item       | Descrição resumida                                    | Fase   |
-| ---------- | ----------------------------------------------------- | ------ |
-| G2-ARCH-02 | `sendMessage()` mistura fila + dialog loop            | G2.3.2 |
-| G2-ARCH-03 | import dinâmico `always-alive.js` → estático          | G2.3.2 |
-| G2-ARCH-04 | leak de listeners em `#waitForRestartAndReply()`      | G2.3.4 |
-| G2-ARCH-05 | `unshift()` sem `onEnqueue()` em `message-queue.js`   | G2.3.4 |
-| G2-ARCH-06 | `webhook-manager.js` migrar para `fetch()`            | G2.3.2 |
-| G2-ARCH-08 | cache TTL → dirty flag em `getStatusSnapshot()`       | G2.4.2 |
-| G2-ARCH-12 | cache TTL `#MESSAGES_CACHE_TTL` → configurável        | G2.4.1 |
-| G2-ARCH-13 | `MAX_TASK_RETRIES` → configurável                     | G2.4.1 |
-| G2-ARCH-19 | documentar `_backgroundCompactionThreshold` singleton | G2.3.3 |
-| G2-ARCH-22 | documentar limitação de remoção dinâmica de tools     | G2.3.5 |
-| G2-PERF-01 | dirty flag em vez de TTL no status snapshot           | futura |
-| G2-PERF-02 | `knownEvents` Set → constante de módulo               | futura |
-| G2-PERF-03 | acumular `_logBytes` sem `stat()` por linha           | futura |
-| G2-PERF-04 | remoção O(1) em `message-queue.js`                    | futura |
-| G2-PERF-05 | closures SSE por cliente evitar Map por request       | futura |
+Todos os itens ARCH, SEC, BUG, API, DX e TEST foram concluídos. Restam apenas itens de performance
+(fase futura).
+
+| Item       | Descrição resumida                              | Fase   |
+| ---------- | ----------------------------------------------- | ------ |
+| G2-PERF-01 | dirty flag em vez de TTL no status snapshot     | futura |
+| G2-PERF-02 | `knownEvents` Set → constante de módulo         | futura |
+| G2-PERF-03 | acumular `_logBytes` sem `stat()` por linha     | futura |
+| G2-PERF-04 | remoção O(1) em `message-queue.js`              | futura |
+| G2-PERF-05 | closures SSE por cliente evitar Map por request | futura |
