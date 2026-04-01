@@ -23,7 +23,7 @@
 import { log } from '#core/logger';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { getClient, getClientState, stopClient } from '../lib/client.js';
+import { getClient, getClientState, stopClient } from '../lib/sdk-client.js';
 import { allTools } from '../tools/index.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 

@@ -37,21 +37,13 @@ export function setHub(hub) {
 }
 
 /**
- * Retorna o hub injetado (preferencial) ou resolve via import dinâmico como fallback.
+ * Retorna o hub injetado via `setHub()`. Retorna null se não injetado ou não pronto.
  *
- * @returns {Promise<import('../conversation-hub/hub.js').ConversationHub | null>}
+ * @returns {import('../conversation-hub/hub.js').ConversationHub | null}
  */
-async function requireHub() {
-    // ARCH-02: hub injetado via setHub() evita import dinâmico oculto
-    if (_injectedHub !== null) {
-        return _injectedHub.isReady ? _injectedHub : null;
-    }
-    // Fallback: import dinâmico para compatibilidade retroativa
-    const { conversationHub } = await import('../conversation-hub/hub.js');
-    if (!conversationHub.isReady) {
-        return null;
-    }
-    return conversationHub;
+function requireHub() {
+    if (_injectedHub === null) return null;
+    return _injectedHub.isReady ? _injectedHub : null;
 }
 
 // ─── Tool: hub_create_session ─────────────────────────────────────────────────
@@ -76,7 +68,7 @@ A sessão persiste no SQLite e sobrevive a restarts do servidor.`,
     }),
     handler: async (/** @type {{ title?: string; metadata?: Record<string, any> }} */ { title, metadata }) => {
         try {
-            const hub = await requireHub();
+            const hub = requireHub();
             if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
             const hubSessionId = hub.createSession({
                 ...(title !== undefined && { title }),
@@ -142,7 +134,7 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
         { hubSessionId, message, context, intent, priority, responseType, useStructured, timeoutMs },
     ) => {
         try {
-            const hub = await requireHub();
+            const hub = requireHub();
             if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
 
             // SEC-N04 (fix): truncar message para evitar payloads gigantes
@@ -219,7 +211,7 @@ As mensagens são marcadas como lidas após esta chamada.`,
     }),
     handler: async (/** @type {{ hubSessionId: string }} */ { hubSessionId }) => {
         try {
-            const hub = await requireHub();
+            const hub = requireHub();
             if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
             const messages = hub.pollUserMessages(hubSessionId);
 
@@ -262,7 +254,7 @@ Retorna turns ordenados por número de turno (mais antigos primeiro).`,
         { hubSessionId, limit, offset, after },
     ) => {
         try {
-            const hub = await requireHub();
+            const hub = requireHub();
             if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
             const turns = hub.store.readTurns(hubSessionId, {
                 limit: limit ?? 20,
@@ -308,7 +300,7 @@ const hubListSessionsTool = buildTool({
     }),
     handler: async (/** @type {{ limit?: number; status?: 'active' | 'closed' | 'error' }} */ { limit, status }) => {
         try {
-            const hub = await requireHub();
+            const hub = requireHub();
             if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
             const sessions = hub.store.listHubSessions({
                 limit: limit ?? 10,

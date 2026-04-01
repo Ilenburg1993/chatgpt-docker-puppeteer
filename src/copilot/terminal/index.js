@@ -19,11 +19,12 @@
 import { log } from '#core/logger';
 import { resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { configureHookTools, setHub } from '../agent/tools-bootstrap.js';
+import { configureHookTools, setHub, setPermissionAgent } from '../agent/tools-bootstrap.js';
 import { loadAliases } from '../bridges/alias-store.js';
-import { llmBridgeClient } from '../channel/client.js';
+import { llmBridgeClient, setBridgeAgent } from '../channel/client.js';
 import { PinnedFilesLoader } from '../config/pinned-files-loader.js';
 import { conversationHub } from '../conversation-hub/hub.js';
+import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
 import { broadcastSse, ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { startRepl } from './repl.js';
 import { createInjectServer } from './server.js';
@@ -203,6 +204,10 @@ export async function startTerminalServer() {
     setHub(conversationHub);
     // ARCH-03 (fix): injetar broadcastSse nas hook-tools para remover import dinâmico circular
     configureHookTools({ broadcastSse });
+    // ARCH-03 (fix): injetar agent nas permission-tools e orchestrator para quebrar circular deps
+    setPermissionAgent(alwaysAliveAgent);
+    setFallbackAgent(alwaysAliveAgent);
+    setBridgeAgent(alwaysAliveAgent);
 
     // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
     // Isso habilita o comando /skills reload e o sistema de pinned context files

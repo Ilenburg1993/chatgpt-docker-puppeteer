@@ -38,7 +38,7 @@ import {
     incrementSessionMessageCount as incrementMessageCount,
     listActiveClientSessions as listActiveSessions,
     resumeClientSession as resumeSdkSession,
-} from '../lib/client.js';
+} from '../lib/sdk-client.js';
 import { pickDefined } from '../lib/utils.js';
 
 /**

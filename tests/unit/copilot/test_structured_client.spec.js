@@ -60,23 +60,23 @@ function structuredJsonResponse(extra = {}) {
 // ─── Testes ───────────────────────────────────────────────────────────────────
 
 describe('LlmBridgeClient › chatStructured()', () => {
-    /** @type {import('../../../src/copilot/bridges/llm-bridge-client.js').LlmBridgeClient} */
+    /** @type {import('../../../src/copilot/channel/client.js').LlmBridgeClient} */
     let bridge;
 
     before(async () => {
         // Importamos o módulo real — mas substitui a chamada interna de chat() via spy
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         bridge = new mod.LlmBridgeClient();
     });
 
     it('exporta chatStructured como método de LlmBridgeClient', async () => {
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         const instance = new mod.LlmBridgeClient();
         assert.ok(typeof instance.chatStructured === 'function', 'chatStructured deve ser método');
     });
 
     it('chatStructured() retorna shape StructuredChatResult', async () => {
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         // Spy em chat() para retornar resposta estruturada sem rede
@@ -106,7 +106,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('parseia resposta JSON de LLM-B → structured ≠ null', async () => {
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         const mockChat = mock.fn(async () => ({
@@ -130,7 +130,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('retorna structured=null quando LLM-B responde texto puro', async () => {
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         const mockChat = mock.fn(async () => ({
@@ -153,7 +153,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('propaga raw sempre (JSON e texto puro)', async () => {
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         const responseText = structuredJsonResponse();
@@ -171,7 +171,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('inclui taskId, durationMs, chunks, responseLen no resultado', async () => {
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         const mockChat = mock.fn(async () => ({
@@ -191,7 +191,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('passa onDelta para chat() como opção', async () => {
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         /** @type {any} */
@@ -210,7 +210,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('serializa input como JSON com instrução de protocolo antes de enviar', async () => {
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         /** @type {string} */
@@ -233,7 +233,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('lança ZodError para input inválido (context vazio)', async () => {
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         await assert.rejects(
@@ -243,7 +243,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('lança ZodError para responseType inválido', async () => {
-        const mod = await import('../../../src/copilot/bridges/llm-bridge-client.js');
+        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         await assert.rejects(

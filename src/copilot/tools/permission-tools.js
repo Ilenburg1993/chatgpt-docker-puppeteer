@@ -22,8 +22,38 @@
 
 import { log } from '#core/logger';
 import { z } from 'zod';
-import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { buildTool } from './tool-factory.js';
+
+// ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────
+
+/**
+ * @typedef {{
+ *     getPermissionMode(): string;
+ *     setPermissionMode(mode: string, opts?: object): void;
+ * }} PermissionAgent
+ */
+
+/** @type {PermissionAgent | null} */
+let _agent = null;
+
+/**
+ * Injeta o AlwaysAliveAgent para evitar import circular. Chamado em `bootstrapTools()`.
+ *
+ * @param {PermissionAgent} agent
+ * @returns {void}
+ */
+export function setPermissionAgent(agent) {
+    _agent = agent;
+}
+
+/**
+ * @returns {PermissionAgent}
+ * @throws {Error} Se o agent não foi injetado via `setPermissionAgent()`.
+ */
+function requireAgent() {
+    if (!_agent) throw new Error('[permission-tools] agent não injetado — chamar setPermissionAgent() antes.');
+    return _agent;
+}
 
 // ─── permission_mode_get ──────────────────────────────────────────────────────
 
@@ -40,7 +70,7 @@ const permissionModeGetTool = buildTool({
     parameters: z.object({}),
     requiresApproval: false,
     handler: async () => {
-        const mode = alwaysAliveAgent.getPermissionMode();
+        const mode = requireAgent().getPermissionMode();
         log('INFO', `[permission_mode_get] modo atual: ${mode}`);
         return { mode };
     },
@@ -101,14 +131,14 @@ const permissionModeSetTool = buildTool({
          * }}
          */ { mode, allowTools, denyTools, denyShell },
     ) => {
-        const before = alwaysAliveAgent.getPermissionMode();
+        const before = requireAgent().getPermissionMode();
         /** @type {{ allowTools?: string[]; denyTools?: string[]; denyShell?: boolean }} */
         const opts = {};
         if (allowTools?.length) opts.allowTools = allowTools;
         if (denyTools?.length) opts.denyTools = denyTools;
         if (denyShell) opts.denyShell = denyShell;
-        alwaysAliveAgent.setPermissionMode(mode, opts);
-        const after = alwaysAliveAgent.getPermissionMode();
+        requireAgent().setPermissionMode(mode, opts);
+        const after = requireAgent().getPermissionMode();
         log('INFO', `[permission_mode_set] ${before} → ${after}`);
         return {
             ok: true,

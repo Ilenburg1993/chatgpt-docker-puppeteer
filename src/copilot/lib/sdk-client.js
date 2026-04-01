@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/lib/client.js
+ * src/copilot/lib/sdk-client.js
  *
  * Camada de lib pura para o CopilotClient — singleton com suporte a cliUrl (CLI como processo PM2 separado), registry
  * de sessões ativas, lifecycle handlers e utilitários de estado.
@@ -12,7 +12,7 @@
  * - Todas as funções são exportadas como factory/utilities (sem classes públicas).
  * - Suporte a `COPILOT_CLI_URL` (env) para conectar a CLI já em execução (PM2 separado).
  *
- * @module copilot/lib/client
+ * @module copilot/lib/sdk-client
  * @see module:copilot/lib/session
  * @see module:copilot/always-alive
  */
@@ -99,7 +99,7 @@ export function buildClientOptions(overrides = {}) {
         /** @type {Record<string, unknown>} */
         const anyOptions = options;
         anyOptions['cliUrl'] = cliUrl;
-        log('INFO', `[lib/client] Modo cliUrl ativo: conectando ao CLI em ${cliUrl}`);
+        log('INFO', `[lib/sdk-client] Modo cliUrl ativo: conectando ao CLI em ${cliUrl}`);
     }
 
     // F4.8 (UPG-02): ativa telemetria OTLP via SDK quando OTEL_EXPORTER_OTLP_ENDPOINT está definida
@@ -108,7 +108,7 @@ export function buildClientOptions(overrides = {}) {
         /** @type {Record<string, unknown>} */
         const anyOptions = options;
         anyOptions['telemetry'] = { otlpEndpoint };
-        log('INFO', `[lib/client] OTLP telemetria ativa: ${otlpEndpoint}`);
+        log('INFO', `[lib/sdk-client] OTLP telemetria ativa: ${otlpEndpoint}`);
     }
 
     return { ...options, ...overrides };
@@ -154,11 +154,11 @@ export async function getClient(overrides = {}) {
     _startError = null;
     try {
         const options = buildClientOptions(overrides);
-        log('INFO', '[lib/client] Iniciando CopilotClient...');
+        log('INFO', '[lib/sdk-client] Iniciando CopilotClient...');
         const client = new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {unknown} */ (options)));
         await client.start();
         _client = client;
-        log('INFO', `[lib/client] CopilotClient conectado. Estado: ${client.getState()}`);
+        log('INFO', `[lib/sdk-client] CopilotClient conectado. Estado: ${client.getState()}`);
         return client;
     } catch (/** @type {any} */ e) {
         _startError = e;
@@ -175,11 +175,11 @@ export async function getClient(overrides = {}) {
  */
 export async function stopClient() {
     if (!_client) return [];
-    log('INFO', '[lib/client] Parando CopilotClient...');
+    log('INFO', '[lib/sdk-client] Parando CopilotClient...');
     _sessions.clear();
     const errors = await _client.stop();
     if (errors.length > 0) {
-        log('WARN', `[lib/client] Erros ao parar: ${errors.map((e) => e.message).join(', ')}`);
+        log('WARN', `[lib/sdk-client] Erros ao parar: ${errors.map((e) => e.message).join(', ')}`);
     }
     _client = null;
     return errors;
@@ -192,7 +192,7 @@ export async function stopClient() {
  */
 export async function forceStopClient() {
     if (!_client) return;
-    log('WARN', '[lib/client] Parando CopilotClient de forma forçada (sem cleanup)...');
+    log('WARN', '[lib/sdk-client] Parando CopilotClient de forma forçada (sem cleanup)...');
     _sessions.clear();
     try {
         /** @type {{ forceStop?: () => Promise<void> }} */
@@ -203,7 +203,7 @@ export async function forceStopClient() {
             await _client.stop();
         }
     } catch (/** @type {any} */ e) {
-        log('WARN', `[lib/client] Erro no forceStop: ${e.message}`);
+        log('WARN', `[lib/sdk-client] Erro no forceStop: ${e.message}`);
     }
     _client = null;
 }
@@ -276,7 +276,7 @@ export async function createClientSession(config) {
         createdAt: Date.now(),
         messagesCount: 0,
     });
-    log('INFO', `[lib/client] Sessão criada: ${session.sessionId} (modelo: ${config.model ?? 'unknown'})`);
+    log('INFO', `[lib/sdk-client] Sessão criada: ${session.sessionId} (modelo: ${config.model ?? 'unknown'})`);
     return session;
 }
 
@@ -291,7 +291,7 @@ export async function createClientSession(config) {
 export async function resumeClientSession(sessionId, config) {
     const existing = _sessions.get(sessionId);
     if (existing) {
-        log('INFO', `[lib/client] Sessão ${sessionId} já ativa no registry — retornando existente.`);
+        log('INFO', `[lib/sdk-client] Sessão ${sessionId} já ativa no registry — retornando existente.`);
         return existing.session;
     }
 
@@ -303,7 +303,7 @@ export async function resumeClientSession(sessionId, config) {
         createdAt: Date.now(),
         messagesCount: 0,
     });
-    log('INFO', `[lib/client] Sessão retomada: ${session.sessionId}`);
+    log('INFO', `[lib/sdk-client] Sessão retomada: ${session.sessionId}`);
     return session;
 }
 
@@ -316,16 +316,16 @@ export async function resumeClientSession(sessionId, config) {
 export async function disconnectClientSession(sessionId) {
     const entry = _sessions.get(sessionId);
     if (!entry) {
-        log('WARN', `[lib/client] disconnectClientSession: sessão ${sessionId} não encontrada no registry.`);
+        log('WARN', `[lib/sdk-client] disconnectClientSession: sessão ${sessionId} não encontrada no registry.`);
         return;
     }
     try {
         await entry.session.disconnect();
     } catch (/** @type {any} */ e) {
-        log('WARN', `[lib/client] Erro ao desconectar sessão ${sessionId}: ${e.message}`);
+        log('WARN', `[lib/sdk-client] Erro ao desconectar sessão ${sessionId}: ${e.message}`);
     }
     _sessions.delete(sessionId);
-    log('INFO', `[lib/client] Sessão ${sessionId} desconectada e removida do registry.`);
+    log('INFO', `[lib/sdk-client] Sessão ${sessionId} desconectada e removida do registry.`);
 }
 
 /**
@@ -348,7 +348,7 @@ export async function deleteClientSession(sessionId) {
 
     const client = await getClient();
     await client.deleteSession(sessionId);
-    log('INFO', `[lib/client] Sessão ${sessionId} deletada do disco.`);
+    log('INFO', `[lib/sdk-client] Sessão ${sessionId} deletada do disco.`);
 }
 
 /**

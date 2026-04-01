@@ -11,7 +11,7 @@
  *
  * @module copilot/lib/session
  * @see module:copilot/session-initializer
- * @see module:copilot/lib/client
+ * @see module:copilot/lib/sdk-client
  * @see module:copilot/config/session-config
  */
 

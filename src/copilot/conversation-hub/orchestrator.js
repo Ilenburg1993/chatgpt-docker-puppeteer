@@ -16,8 +16,36 @@
 
 import { log } from '#core/logger';
 import EventEmitter from 'node:events';
-import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { LlmBridgeClient } from '../channel/client.js';
+
+// ─── Lazy resolution do AlwaysAliveAgent (ARCH-03: break circular dep) ────────
+
+/**
+ * @typedef {{
+ *     getStatusSnapshot(): object;
+ *     dialogLoopActive?: boolean;
+ *     sendDialogTurn?(content: string, opts?: { timeout?: number }): Promise<string>;
+ *     getPermissionMode?(): string;
+ *     setPermissionMode?(mode: string, opts?: object): void;
+ *     status?: string;
+ *     on?(event: string, listener: (...args: any[]) => void): void;
+ *     off?(event: string, listener: (...args: any[]) => void): void;
+ * }} AgentLike
+ */
+
+/** @type {AgentLike | null} */
+let _fallbackAgent = null;
+
+/**
+ * Injeta o AlwaysAliveAgent como fallback global. Chamado em `bootstrapTools()` após o agent ser instanciado. Evita
+ * import circular.
+ *
+ * @param {AgentLike} agent
+ * @returns {void}
+ */
+export function setFallbackAgent(agent) {
+    _fallbackAgent = agent;
+}
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -64,11 +92,7 @@ export class HubOrchestrator extends EventEmitter {
     #bridge = null;
 
     /**
-     * @type {{
-     *     getStatusSnapshot(): object;
-     *     dialogLoopActive?: boolean;
-     *     sendDialogTurn?(content: string, opts?: { timeout?: number }): Promise<string>;
-     * } | null}
+     * @type {AgentLike | null}
      */
     #agent = null;
 
@@ -93,11 +117,8 @@ export class HubOrchestrator extends EventEmitter {
 
     /**
      * @param {import('./store.js').ConversationStore} store
-     * @param {{
-     *     getStatusSnapshot(): object;
-     *     dialogLoopActive?: boolean;
-     *     sendDialogTurn?(content: string, opts?: { timeout?: number }): Promise<string>;
-     * }} [agentOverride]
+     * @param {AgentLike} [agentOverride]
+     *
      *   - AlwaysAliveAgent a usar (útil em testes).
      */
     constructor(store, agentOverride) {
@@ -162,7 +183,8 @@ export class HubOrchestrator extends EventEmitter {
         // Tenta obter o sdkSessionId atual do AlwaysAliveAgent
         let sdkSessionId;
         try {
-            const agent = this.#agent ?? alwaysAliveAgent;
+            const agent = this.#agent ?? _fallbackAgent;
+            if (!agent) throw new Error('agent not injected');
             const snap = /** @type {{ sessionId?: string }} */ (agent.getStatusSnapshot());
             sdkSessionId = snap.sessionId;
         } catch {
@@ -273,8 +295,8 @@ export class HubOrchestrator extends EventEmitter {
         }
 
         // ARCH-02 fix: verificar que o agente está ativo antes de prosseguir
-        const agentCheck = this.#agent ?? alwaysAliveAgent;
-        if (/** @type {{ status?: string }} */ (agentCheck).status === 'stopped') {
+        const agentCheck = this.#agent ?? _fallbackAgent;
+        if (!agentCheck || agentCheck.status === 'stopped') {
             throw new Error('[HubOrchestrator] AlwaysAliveAgent não está ativo');
         }
 
@@ -331,8 +353,8 @@ export class HubOrchestrator extends EventEmitter {
         try {
             // Preferir dialog loop (sendDialogTurn) quando ativo — mais eficiente (0 PR por turno)
             // Senão, usar LlmBridgeClient.chat() (1 PR por turno)
-            const agentInst = this.#agent ?? alwaysAliveAgent;
-            const useDialogLoop = agentInst.dialogLoopActive === true;
+            const agentInst = this.#agent ?? _fallbackAgent;
+            const useDialogLoop = agentInst?.dialogLoopActive === true;
 
             if (useDialogLoop) {
                 llmBResponse = await this.#callViaDialogLoop(
@@ -526,7 +548,8 @@ export class HubOrchestrator extends EventEmitter {
     #getActiveSdkSessionId() {
         try {
             // BUG-06 (fix): usar agentOverride quando fornecido em vez de hardcodar alwaysAliveAgent
-            const activeAgent = this.#agent ?? alwaysAliveAgent;
+            const activeAgent = this.#agent ?? _fallbackAgent;
+            if (!activeAgent) return undefined;
             const snap = /** @type {{ sessionId?: string }} */ (activeAgent.getStatusSnapshot());
             return snap.sessionId;
         } catch {
@@ -546,23 +569,22 @@ export class HubOrchestrator extends EventEmitter {
      * @throws {Error} Se agentInst não suportar sendDialogTurn
      */
     async #callViaDialogLoop(message, messageContent, hubSessionId, turnNumber, timeoutMs) {
-        const agentInst = this.#agent ?? alwaysAliveAgent;
-        const content = typeof message === 'string' ? message : messageContent;
-        log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${turnNumber + 1}.`);
-        if (!agentInst.sendDialogTurn) {
+        const agentInst = this.#agent ?? _fallbackAgent;
+        if (!agentInst?.sendDialogTurn) {
             throw new Error('[HubOrchestrator] agentInst não suporta sendDialogTurn');
         }
+        const content = typeof message === 'string' ? message : messageContent;
+        log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${turnNumber + 1}.`);
         // BUG-HIGH-03 (fix): capturar task.delta durante sendDialogTurn para emitir turn:delta em tempo real
         const onDelta = (/** @type {{ chunk: string }} */ evt) => {
             const chunk = evt?.chunk ?? '';
             if (chunk) this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
         };
-        const agentEmitter = /** @type {{ on: Function; off: Function }} */ (agentInst);
-        agentEmitter.on('task.delta', onDelta);
+        agentInst.on?.('task.delta', onDelta);
         try {
             return await agentInst.sendDialogTurn(content, { timeout: timeoutMs });
         } finally {
-            agentEmitter.off('task.delta', onDelta);
+            agentInst.off?.('task.delta', onDelta);
         }
     }
 

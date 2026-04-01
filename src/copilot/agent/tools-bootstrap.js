@@ -46,7 +46,7 @@ import {
  * @typedef {import('@github/copilot-sdk').Tool} Tool
  */
 
-export { configureHookTools, setHub, setSessionRpc } from '../tools/index.js';
+export { configureHookTools, setHub, setPermissionAgent, setSessionRpc } from '../tools/index.js';
 
 /**
  * Registra todas as tools estáticas do agente no registry por categoria/tags, e expõe o registry/telemetria para as

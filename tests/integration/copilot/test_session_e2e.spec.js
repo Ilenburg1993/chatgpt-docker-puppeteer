@@ -184,15 +184,15 @@ describe('Copilot SDK › E2E › ciclo completo de sessão', { timeout: MODEL_T
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Suite de teste via lib/client.js (módulo interno do projeto)
+// Suite de teste via lib/sdk-client.js (módulo interno do projeto)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Copilot SDK › E2E › via lib/client.js (módulo interno)', { timeout: MODEL_TIMEOUT_MS * 2 }, () => {
-    /** @type {import('../../../src/copilot/lib/client.js')} */
+describe('Copilot SDK › E2E › via lib/sdk-client.js (módulo interno)', { timeout: MODEL_TIMEOUT_MS * 2 }, () => {
+    /** @type {import('../../../src/copilot/lib/sdk-client.js')} */
     let sdkClient;
 
     before(async () => {
-        sdkClient = await import('../../../src/copilot/lib/client.js');
+        sdkClient = await import('../../../src/copilot/lib/sdk-client.js');
     });
 
     after(async () => {

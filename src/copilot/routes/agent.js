@@ -22,7 +22,7 @@ import { log } from '#core/logger';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
-import { getClient } from '../lib/client.js';
+import { getClient } from '../lib/sdk-client.js';
 import { clearTelemetry, getSummary } from '../lib/telemetry.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 

@@ -43,7 +43,47 @@ import {
     serializeStructuredMessage,
 } from '#copilot/types/structured-message';
 import { log } from '#core/logger';
-import { alwaysAliveAgent } from '../agent/always-alive.js';
+
+// ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────
+
+/**
+ * Interface mínima do AlwaysAliveAgent usada pelo LlmBridgeClient.
+ *
+ * @typedef {Object} BridgeAgentLike
+ * @property {string} status
+ * @property {Function} sendMessage
+ * @property {() => object} getStatusSnapshot
+ * @property {(bootPrompt?: string) => Promise<void>} startDialogLoop
+ * @property {(message: string, opts?: { timeout?: number }) => Promise<string>} sendDialogTurn
+ * @property {Function} stopDialogLoop
+ * @property {(answer: string) => any} answerPendingQuestion
+ * @property {(event: string, listener: (...args: any[]) => void) => void} on
+ * @property {(event: string, listener: (...args: any[]) => void) => void} once
+ * @property {(event: string, listener: (...args: any[]) => void) => void} off
+ */
+
+/** @type {BridgeAgentLike | null} */
+let _agent = null;
+
+/**
+ * Injeta o AlwaysAliveAgent singleton para quebrar dependência circular. Chamado em `startTerminalServer()` durante o
+ * boot.
+ *
+ * @param {BridgeAgentLike} agent
+ * @returns {void}
+ */
+export function setBridgeAgent(agent) {
+    _agent = agent;
+}
+
+/**
+ * @returns {BridgeAgentLike}
+ * @throws {Error} Se o agent não foi injetado via `setBridgeAgent()`.
+ */
+function requireAgent() {
+    if (!_agent) throw new Error('[LlmBridgeClient] agent não injetado — chamar setBridgeAgent() antes.');
+    return _agent;
+}
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -128,8 +168,8 @@ export class LlmBridgeClient {
         const { onDelta, onQuestion, timeoutMs = 60_000, attachments } = opts;
         const startedAt = Date.now();
 
-        if (alwaysAliveAgent.status === 'stopped') {
-            throw new Error('[LlmBridgeClient] Agente não está ativo. Chame alwaysAliveAgent.start() primeiro.');
+        if (requireAgent().status === 'stopped') {
+            throw new Error('[LlmBridgeClient] Agente não está ativo. Chame requireAgent().start() primeiro.');
         }
 
         // Registra turno do usuário no histórico
@@ -173,11 +213,11 @@ export class LlmBridgeClient {
             }
         };
 
-        alwaysAliveAgent.on('task.queued', onTaskQueued);
-        alwaysAliveAgent.on('task.delta', onDeltaEvt);
+        requireAgent().on('task.queued', onTaskQueued);
+        requireAgent().on('task.delta', onDeltaEvt);
 
         if (onQuestion) {
-            alwaysAliveAgent.once('question.pending', onQuestionEvt);
+            requireAgent().once('question.pending', onQuestionEvt);
         }
 
         /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -194,10 +234,7 @@ export class LlmBridgeClient {
                 );
             });
 
-            const response = await Promise.race([
-                alwaysAliveAgent.sendMessage(message, { attachments }),
-                timeoutPromise,
-            ]);
+            const response = await Promise.race([requireAgent().sendMessage(message, { attachments }), timeoutPromise]);
 
             const responseStr = /** @type {string} */ (response);
             const durationMs = Date.now() - startedAt;
@@ -225,10 +262,10 @@ export class LlmBridgeClient {
             };
         } finally {
             if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
-            alwaysAliveAgent.off('task.queued', onTaskQueued);
-            alwaysAliveAgent.off('task.delta', onDeltaEvt);
+            requireAgent().off('task.queued', onTaskQueued);
+            requireAgent().off('task.delta', onDeltaEvt);
             if (onQuestion) {
-                alwaysAliveAgent.off('question.pending', onQuestionEvt);
+                requireAgent().off('question.pending', onQuestionEvt);
             }
         }
     }
@@ -265,7 +302,7 @@ export class LlmBridgeClient {
     async chatStructured(input, opts = {}) {
         const { turnNumber, sessionId, ...chatOpts } = opts;
 
-        const snap = /** @type {{ sessionId?: string }} */ (alwaysAliveAgent.getStatusSnapshot());
+        const snap = /** @type {{ sessionId?: string }} */ (requireAgent().getStatusSnapshot());
         const msg = buildStructuredRequest({
             ...input,
             ...(turnNumber !== undefined ? { turnNumber } : {}),
@@ -361,14 +398,14 @@ export class LlmBridgeClient {
         const { onReady, onReply, onStopped } = opts;
         const replyHandler = onReply ? (/** @type {{ reply?: string }} */ evt) => onReply(evt.reply ?? '') : null;
 
-        if (onReady) alwaysAliveAgent.once('dialog.ready', onReady);
-        if (replyHandler) alwaysAliveAgent.on('dialog.reply', replyHandler);
-        if (onStopped) alwaysAliveAgent.once('dialog.stopped', onStopped);
+        if (onReady) requireAgent().once('dialog.ready', onReady);
+        if (replyHandler) requireAgent().on('dialog.reply', replyHandler);
+        if (onStopped) requireAgent().once('dialog.stopped', onStopped);
 
         const cleanup = () => {
-            if (onReady) alwaysAliveAgent.off('dialog.ready', onReady);
-            if (replyHandler) alwaysAliveAgent.off('dialog.reply', replyHandler);
-            if (onStopped) alwaysAliveAgent.off('dialog.stopped', onStopped);
+            if (onReady) requireAgent().off('dialog.ready', onReady);
+            if (replyHandler) requireAgent().off('dialog.reply', replyHandler);
+            if (onStopped) requireAgent().off('dialog.stopped', onStopped);
         };
 
         return { replyHandler, cleanup };
@@ -391,7 +428,7 @@ export class LlmBridgeClient {
         const { cleanup } = this.#registerDialogListeners(opts);
 
         try {
-            await alwaysAliveAgent.startDialogLoop(bootPrompt);
+            await requireAgent().startDialogLoop(bootPrompt);
             log('INFO', '[LlmBridgeClient] Modo diálogo ativo — LLM-B sinalizou READY.');
         } catch (err) {
             cleanup();
@@ -421,12 +458,12 @@ export class LlmBridgeClient {
                   if (evt.chunk) onDelta(evt.chunk);
               }
             : null;
-        if (onDeltaTemp) alwaysAliveAgent.on('task.delta', onDeltaTemp);
+        if (onDeltaTemp) requireAgent().on('task.delta', onDeltaTemp);
         let reply;
         try {
-            reply = await alwaysAliveAgent.sendDialogTurn(message, { timeout });
+            reply = await requireAgent().sendDialogTurn(message, { timeout });
         } finally {
-            if (onDeltaTemp) alwaysAliveAgent.off('task.delta', onDeltaTemp);
+            if (onDeltaTemp) requireAgent().off('task.delta', onDeltaTemp);
         }
         // BUG-MED-02 (fix): registrar turno de usuário apenas após confirmação de envio bem-sucedido
         // Evita histórico contaminado com menssagens do usuário sem resposta correspondente
@@ -445,7 +482,7 @@ export class LlmBridgeClient {
      * @returns {Promise<void>}
      */
     async stopDialogMode() {
-        await alwaysAliveAgent.stopDialogLoop({ authorized: true, reason: 'watchdog_restart' });
+        await requireAgent().stopDialogLoop({ authorized: true, reason: 'watchdog_restart' });
         log('INFO', '[LlmBridgeClient] Modo diálogo encerrado (restart autorizado do sistema).');
     }
 
@@ -456,7 +493,7 @@ export class LlmBridgeClient {
      * @returns {boolean} True se havia pergunta pendente e foi respondida
      */
     answer(answer) {
-        return alwaysAliveAgent.answerPendingQuestion(answer);
+        return requireAgent().answerPendingQuestion(answer);
     }
 
     /**
@@ -560,7 +597,7 @@ export class LlmBridgeClient {
      * @returns {object} Snapshot de status do AlwaysAliveAgent
      */
     getAgentStatus() {
-        return alwaysAliveAgent.getStatusSnapshot();
+        return requireAgent().getStatusSnapshot();
     }
 }
 

@@ -449,7 +449,7 @@ module.exports = {
                   {
                       name: 'llm-b-terminal',
                       cwd: projectRoot,
-                      script: './src/copilot/terminal-server.js',
+                      script: './src/copilot/terminal/bootstrap.js',
                       wait_ready: false,
                       exec_mode: 'fork',
                       instances: 1,

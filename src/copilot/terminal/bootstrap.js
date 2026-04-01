@@ -4,14 +4,14 @@
 if (!process.env['COPILOT_SDK_ENABLED']) process.env['COPILOT_SDK_ENABLED'] = 'true';
 
 /**
- * src/copilot/terminal-server.js
+ * src/copilot/terminal/bootstrap.js
  *
  * Terminal Permanente LLM-B — wrapper de entrypoint.
  *
  * Este arquivo é o ponto de entrada histórico. Toda a lógica foi migrada para `src/copilot/terminal/` (Fase C da
  * refatoração modular). Este wrapper apenas re-exporta `startTerminalServer` e, quando executado diretamente, chama-o.
  *
- * @module copilot/terminal-server
+ * @module copilot/terminal/bootstrap
  *
  * @example
  *     ```bash
@@ -25,14 +25,14 @@ if (!process.env['COPILOT_SDK_ENABLED']) process.env['COPILOT_SDK_ENABLED'] = 't
  *     ```;
  */
 
-export { startTerminalServer } from './terminal/index.js';
+export { startTerminalServer } from './index.js';
 
 import { fileURLToPath } from 'node:url';
 
 // Executa diretamente quando chamado via `node terminal-server.js`
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-    const { startTerminalServer } = await import('./terminal/index.js');
+    const { startTerminalServer } = await import('./index.js');
     startTerminalServer().catch((e) => {
         console.error('[TerminalServer] Erro fatal:', e);
         process.exit(1);

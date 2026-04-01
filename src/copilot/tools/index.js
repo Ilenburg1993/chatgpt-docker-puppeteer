@@ -14,7 +14,7 @@ import { gitTools } from './git/index.js';
 import { configureHookTools, hookTools } from './hook-tools.js';
 import { hubTools, setHub } from './hub-tools.js';
 import { introspectionTools, registerForIntrospection, setTelemetryStore } from './introspection-tools.js';
-import { permissionTools } from './permission-tools.js';
+import { permissionTools, setPermissionAgent } from './permission-tools.js';
 import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
 import { sessionTools } from './session-tools.js';
 import { shellTools } from './shell/index.js';
@@ -58,6 +58,7 @@ export {
     sessionRpcTools,
     sessionTools,
     setHub,
+    setPermissionAgent,
     setSessionRpc,
     setTelemetryStore,
     shellTools,

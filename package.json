@@ -258,7 +258,7 @@
     "start": "node --strip-types index.js",
     "start:container": "NODE_ENV=development NODE_OPTIONS='--strip-types --inspect=0.0.0.0:9229 --enable-source-maps --trace-warnings --trace-uncaught --unhandled-rejections=strict' node index.js",
     "summarize-code": "python3 agents/code_explainer/generate_summary.py",
-    "terminal:llm-b": "node --strip-types src/copilot/terminal-server.js",
+    "terminal:llm-b": "node --strip-types src/copilot/terminal/bootstrap.js",
     "test": "npm run test:unit && npm run test:integration && npm run test:regression",
     "test:coverage": "npx c8 npm test",
     "test:e2e": "env -u NO_COLOR node --strip-types --test 'tests/e2e/**/*.spec.js'",

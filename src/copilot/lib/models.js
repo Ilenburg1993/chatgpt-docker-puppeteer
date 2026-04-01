@@ -12,7 +12,7 @@
  * @module copilot/lib/models
  */
 
-import { getClient } from '#copilot/lib/client';
+import { getClient } from '#copilot/lib/sdk-client';
 
 /**
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo

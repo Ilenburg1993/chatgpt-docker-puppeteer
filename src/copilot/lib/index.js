@@ -40,7 +40,7 @@ export {
     pingClient,
     resumeClientSession,
     stopClient,
-} from '#copilot/lib/client';
+} from '#copilot/lib/sdk-client';
 
 export {
     composePreToolUseHandlers,
