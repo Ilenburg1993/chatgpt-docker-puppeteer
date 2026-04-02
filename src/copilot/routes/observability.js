@@ -19,6 +19,7 @@
  * @module copilot/routes/observability
  */
 
+import { defaultAuditLog } from '#copilot/observability/audit-log';
 import { defaultErrorTracker } from '#copilot/observability/error-tracker';
 import { getRecentLogs, log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
@@ -135,6 +136,30 @@ router.post('/observability/log-level', (req, res) =>
         obsLog.setLevel(/** @type {import('#copilot/observability/logger').LogLevel} */ (level.toUpperCase()));
         log('INFO', `[observability] Log level changed to ${level.toUpperCase()} via API`);
         res.json({ ok: true, level: level.toUpperCase() });
+    }),
+);
+
+// ─── GET /observability/audit ─────────────────────────────────────────────────
+
+router.get('/observability/audit', (req, res) =>
+    withErrorHandler(req, res, async () => {
+        const n = Math.min(Number(req.query['n']) || 50, 200);
+        const type = typeof req.query['type'] === 'string' ? req.query['type'] : undefined;
+        let entries = defaultAuditLog.getLast(n);
+        if (type) {
+            entries = entries.filter((e) => e.type === type);
+        }
+        res.json({ ok: true, entries, count: entries.length });
+    }),
+);
+
+// ─── POST /observability/audit/flush ─────────────────────────────────────────
+
+router.post('/observability/audit/flush', (req, res) =>
+    withErrorHandler(req, res, async () => {
+        await defaultAuditLog.flush();
+        log('INFO', '[observability] Audit log flushed via API');
+        res.json({ ok: true });
     }),
 );
 

@@ -76,14 +76,19 @@ function persistEvent(entry) {
  * @typedef {import('#copilot/lib/telemetry').TelemetryStore} TelemetryStore
  *
  * @typedef {import('#copilot/hooks/bus').HookBus} HookBus
+ *
+ * @typedef {import('./metrics.js').MetricsStore} MetricsStore
+ *
+ * @typedef {import('./error-tracker.js').ErrorTracker} ErrorTracker
  */
 
 /**
  * @typedef {object} EventCollectorOptions
- * @property {TelemetryStore | null} [telemetry] - Store de telemetria para alimentar (opcional)
- * @property {HookBus | null} [hookBus] - Bus para re-emitir eventos como hooks (opcional)
- * @property {boolean} [persist] - Se true, persiste eventos relevantes em events.jsonl (padrão: true)
- * @property {readonly string[]} [persistTypes] - Tipos de eventos a persistir (padrão: lista canônica)
+ * @property {MetricsStore | null} [metrics] - Store de métricas para alimentar contadores e histogramas.
+ * @property {ErrorTracker | null} [errorTracker] - Tracker para erros de sessão SDK.
+ * @property {HookBus | null} [hookBus] - Bus para re-emitir eventos como hooks (opcional).
+ * @property {boolean} [persist] - Se true, persiste eventos relevantes em events.jsonl (padrão: true).
+ * @property {readonly string[]} [persistTypes] - Tipos de eventos a persistir (padrão: lista canônica).
  */
 
 /**
@@ -130,7 +135,13 @@ const DEFAULT_PERSIST_TYPES = Object.freeze([
  * @returns {EventCollector}
  */
 export function createEventCollector(opts = {}) {
-    const { telemetry = null, hookBus = null, persist = true, persistTypes = DEFAULT_PERSIST_TYPES } = opts;
+    const {
+        metrics = null,
+        errorTracker = null,
+        hookBus = null,
+        persist = true,
+        persistTypes = DEFAULT_PERSIST_TYPES,
+    } = opts;
 
     /**
      * Mapa de toolCallId → { toolName, startTs } para calcular latência.
@@ -172,45 +183,20 @@ export function createEventCollector(opts = {}) {
                 const pending = _pending.get(toolCallId);
                 _pending.delete(toolCallId);
                 const durationMs = pending ? Date.now() - pending.startTs : 0;
+                const toolName = pending?.toolName ?? toolCallId;
 
-                // Alimentar telemetry store
-                if (telemetry) {
-                    const { recordToolCall } =
-                        /** @type {typeof import('#copilot/lib/telemetry')} */ (/** @type {unknown} */ (telemetry)) ??
-                        {};
-                    if (!recordToolCall) {
-                        // Compatibilidade direta se for um objeto TelemetryStore raw
-                        if (telemetry.toolCalls !== undefined) {
-                            telemetry.toolCalls.push({
-                                toolName: pending?.toolName ?? toolCallId,
-                                timestamp: Date.now() - durationMs,
-                                durationMs,
-                                success,
-                                sessionId,
-                            });
-                            if (telemetry.toolCalls.length > telemetry.maxRecords) {
-                                telemetry.toolCalls.shift();
-                            }
-                        }
-                    }
-                }
+                // Alimentar MetricsStore com latência e contadores
+                metrics?.recordToolCall(toolName, durationMs, success);
 
                 // Re-emitir no HookBus
-                hookBus?.emitHook(
-                    'post_tool_use',
-                    sessionId,
-                    { toolName: pending?.toolName ?? toolCallId, success },
-                    {
-                        durationMs,
-                    },
-                );
+                hookBus?.emitHook('post_tool_use', sessionId, { toolName, success }, { durationMs });
 
                 if (persist && persistTypes.includes('tool.execution_complete')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
                         ts: event.timestamp,
-                        toolName: pending?.toolName ?? toolCallId,
+                        toolName,
                         durationMs,
                         success: event.data.success,
                     });
@@ -218,7 +204,7 @@ export function createEventCollector(opts = {}) {
 
                 log(
                     'DEBUG',
-                    `[event-collector] tool.execution_complete: ${pending?.toolName ?? toolCallId} (${durationMs}ms, ${success ? 'ok' : 'err'}) session=${sessionId}`,
+                    `[event-collector] tool.execution_complete: ${toolName} (${durationMs}ms, ${success ? 'ok' : 'err'}) session=${sessionId}`,
                 );
             }),
         );
@@ -227,6 +213,10 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('assistant.usage', (event) => {
                 const { model, inputTokens, outputTokens, duration } = event.data;
+
+                // Alimentar MetricsStore com token usage por modelo
+                metrics?.recordUsage(model ?? 'unknown', inputTokens ?? 0, outputTokens ?? 0);
+
                 if (persist && persistTypes.includes('assistant.usage')) {
                     persistEvent({
                         type: event.type,
@@ -255,6 +245,16 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('session.error', (event) => {
                 const { errorType, message } = event.data;
+
+                // Alimentar ErrorTracker com contexto de sessão
+                errorTracker?.trackError(new Error(message ?? String(errorType)), {
+                    source: 'sdk:session.error',
+                    sessionId,
+                    metadata: { errorType },
+                });
+
+                metrics?.recordSessionError();
+
                 if (persist && persistTypes.includes('session.error')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, errorType, message });
                 }
@@ -365,7 +365,9 @@ export function createEventCollector(opts = {}) {
 let _defaultCollector = createEventCollector({ persist: true });
 
 /**
- * Inicializa o singleton defaultCollector com telemetry e hookBus.
+ * Inicializa o singleton defaultCollector com métricas, errorTracker e hookBus.
+ *
+ * Deve ser chamado uma vez no boot do agente, antes do primeiro `.attach()`.
  *
  * @param {EventCollectorOptions} opts
  * @returns {void}

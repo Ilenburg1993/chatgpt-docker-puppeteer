@@ -23,7 +23,14 @@
 import { SessionError } from '#copilot/core/errors';
 import { raceEvents } from '#copilot/lib/event-helpers';
 import { createRegistry, createTelemetry, startSpan } from '#copilot/lib/index';
-import { buildTelemetryConfig, defaultEventCollector } from '#copilot/observability';
+import {
+    buildTelemetryConfig,
+    createAgentEventObserver,
+    defaultErrorTracker,
+    defaultEventCollector,
+    defaultMetrics,
+    initEventCollector,
+} from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
@@ -390,6 +397,18 @@ export class AlwaysAliveAgent extends EventEmitter {
 
         this.#setStatus('starting');
         log('INFO', '[AlwaysAlive] Iniciando agente...');
+
+        // R.1: inicializar o event collector com métricas e errorTracker antes de qualquer attach
+        // O defaultBus já está wired via attachBus() em #initSession() — passado aqui para
+        // que o collector possa re-emitir hooks.
+        initEventCollector({
+            metrics: defaultMetrics,
+            errorTracker: defaultErrorTracker,
+            persist: true,
+        });
+
+        // T.1: ativar snapshot periódico de métricas em metrics.jsonl (Fase T)
+        defaultMetrics.startPeriodicSnapshot();
 
         try {
             const _otelConfig = buildTelemetryConfig();
@@ -913,6 +932,10 @@ export class AlwaysAliveAgent extends EventEmitter {
         // G2-ARCH-10: wireDialogLoopEvents() faz removeAllListeners() antes de registrar.
         // É seguro aqui porque o flag #dialogLoopAttached garante execução única por instância.
         wireDialogLoopEvents(this.#dialogLoop, (event, payload) => this.emit(event, payload));
+
+        // P.1: agent-event-observer alimenta defaultMetrics com eventos do agente (dialog/tasks/permissions)
+        const _agentObserver = createAgentEventObserver({ metrics: defaultMetrics, errorTracker: defaultErrorTracker });
+        _agentObserver.attach(this);
     }
 
     /**

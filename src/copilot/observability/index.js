@@ -32,5 +32,11 @@ export { createMetricsStore, defaultMetrics } from './metrics.js';
 // ─── Error Tracker ────────────────────────────────────────────────────────────
 export { createErrorTracker, defaultErrorTracker } from './error-tracker.js';
 
+// ─── Agent Event Observer ─────────────────────────────────────────────────────
+export { createAgentEventObserver } from './agent-event-observer.js';
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+export { createAuditLog, defaultAuditLog } from './audit-log.js';
+
 // ─── OTEL ─────────────────────────────────────────────────────────────────────
 export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled } from './otel.js';

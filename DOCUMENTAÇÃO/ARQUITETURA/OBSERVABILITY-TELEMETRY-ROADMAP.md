@@ -1,7 +1,165 @@
 # Observabilidade, Telemetria e Logging — Análise e Roadmap
 
-**Status**: Canônico — Problema prioritário de isolamento arquitetural **Última atualização**:
-2026-06-XX **Escopo**: `src/copilot/` — isolamento total + sistema centralizado robusto
+**Status**: Canônico — Implementação ativa (Fases A-M concluídas; Fases N-T em andamento)
+**Última atualização**: 2026-06-17 (pós-commit `ff71cc4e` — Fase A-M implementada)
+**Escopo**: `src/copilot/` — isolamento total + sistema centralizado robusto
+
+---
+
+## 0. Estado Pós-Implementação (Fases A-M) — Situação Real em jun/2026
+
+### 0.1 O que foi implementado e está funcionando
+
+| Componente                     | Arquivo                                     | Status                                     |
+| ------------------------------ | ------------------------------------------- | ------------------------------------------ |
+| Logger isolado                 | `observability/logger.js`                   | ✅ operacional, ring buffer 1000 entries    |
+| Alias `#copilot/observability` | `package.json` + `tsconfig.base.json`       | ✅ funcionando                              |
+| Codemod 76 arquivos            | `src/copilot/**/*.js`                       | ✅ zero ocorrências de `#core/logger`       |
+| Event-collector SDK            | `observability/event-collector.js`          | ✅ criado, parcialmente conectado           |
+| OTEL config builder            | `observability/otel.js`                     | ✅ criado, wireing em always-alive.js       |
+| Error tracker                  | `observability/error-tracker.js`            | ✅ criado, global handlers em entry.js      |
+| Metrics store                  | `observability/metrics.js`                  | ✅ criado, **NÃO alimentado** (gap crítico) |
+| Barrel export                  | `observability/index.js`                    | ✅ completo                                 |
+| HTTP API 7 endpoints           | `routes/observability.js`                   | ✅ montado em sdk-api.js                    |
+| Audit path migration           | `channel/audit.js` + `tool-audit-logger.js` | ✅ isolado em `src/copilot/logs/`           |
+| Global error handlers          | `entry.js`                                  | ✅ uncaughtException + unhandledRejection   |
+
+### 0.2 Gaps Críticos Identificados (pós-análise jun/2026)
+
+Após investigação profunda de `events.js`, `lib/telemetry.js`, `dialog-loop-manager.js`,
+`dialog-loop-wirer.js`, `task-executor.js`, `session-event-wirer.js` e `always-alive.js`, os
+seguintes gaps foram identificados:
+
+#### GAP-01 — `initEventCollector()` nunca chamado (CRÍTICO)
+
+`defaultEventCollector` é exportado de `event-collector.js` mas seu singleton interno é criado
+sem `metrics`, `errorTracker`, ou `hookBus`:
+
+```js
+// Estado atual (INCORRETO):
+let _defaultCollector = createEventCollector({ persist: true }); // sem metrics, sem errorTracker!
+
+// O que deveria acontecer:
+initEventCollector({ hookBus: defaultBus, metrics: defaultMetrics, errorTracker: defaultErrorTracker });
+```
+
+**Impacto**: `defaultMetrics.recordToolMetric()` e `defaultErrorTracker.trackError()` **nunca são
+chamados** pelo event-collector. Os singletons existem mas estão desconectados.
+
+#### GAP-02 — `event-collector.js` tem código morto de telemetry (CRÍTICO)
+
+```js
+// Código atual (morto/incorreto):
+if (telemetry) {
+    const { recordToolCall } = /** @type {typeof import('#copilot/lib/telemetry')} */ (telemetry) ?? {};
+    if (!recordToolCall) { /* tenta acessar telemetry.toolCalls diretamente */ }
+}
+```
+`telemetry` é um `TelemetryStore` (objeto de dados), não um módulo. `recordToolCall` nunca existe
+nele. O `if (!recordToolCall)` tenta um fallback direto no array — um hack frágil.
+
+**Solução**: Refatorar `EventCollectorOptions` para aceitar `metrics` (MetricsStore) e
+`errorTracker` (ErrorTracker) como tipos explícitos, em vez de um `TelemetryStore` opaco.
+
+#### GAP-03 — Dois sistemas de telemetria paralelos sem conexão (ARQUITETURAL)
+
+| Sistema          | Arquivo                    | Alimentado por                                          | Consumido por                                         |
+| ---------------- | -------------------------- | ------------------------------------------------------- | ----------------------------------------------------- |
+| `TelemetryStore` | `lib/telemetry.js`         | `task-executor.js`, `dialog-loop-manager.js` (indireto) | `introspection-tools.js`, `always-alive.js#telemetry` |
+| `MetricsStore`   | `observability/metrics.js` | **ninguém** (GAP-01)                                    | `routes/observability.js` (endpoint)                  |
+
+`always-alive.js` ainda usa `createTelemetry()` de `lib/telemetry.js`. O novo `defaultMetrics`
+nunca recebe dados da sessão real. Os dois vivem em paralelo sem integração.
+
+#### GAP-04 — Dialog loop sem observabilidade (ARQUITETURAL — mencionado pelo usuário)
+
+`DialogLoopManager` emite eventos via `dialogLoop.emit()` → `wireDialogLoopEvents()` →
+`AlwaysAliveAgent.emit()`. Mas nenhum listener do sistema de observabilidade ouve esses eventos.
+Eventos de alto valor não observados:
+
+| Evento agente         | Payload                              | Valor                        |
+| --------------------- | ------------------------------------ | ---------------------------- |
+| `dialog.turn_start`   | `{ sessionId, prompt, ts }`          | Início de turn → latência    |
+| `dialog.turn_end`     | `{ sessionId, durationMs, success }` | Duração de turn              |
+| `dialog.stalled`      | `{ stalledMs }`                      | Detecção de stalls do LLM    |
+| `dialog.turn_timeout` | `{ phase, timeoutMs }`               | Timeouts de boot/turn        |
+| `dialog.ready`        | `{}`                                 | Boot completo do dialog loop |
+| `dialog.stopped`      | `{ reason, authorized }`             | Encerramento do dialog       |
+| `session.fatal`       | `{ error, sessionId }`               | Falhas críticas de sessão    |
+
+⚠️ **`dialog.turn_start` e `dialog.turn_end` não aparecem em `dialog-loop-wirer.js`** —
+`DialogLoopManager` emite `turn_start`/`turn_end` mas o wirer NÃO os encaminha! São eventos
+"perdidos" que nunca chegam ao agente.
+
+#### GAP-05 — Task events sem observabilidade
+
+`task-executor.js` emite `task.completed`, `task.error`, `task.started` via `emit()`. Esses eventos
+chegam ao `AlwaysAliveAgent.emit()` mas nenhum módulo de observabilidade os captura para métricas.
+
+#### GAP-06 — `event-collector.js` não alimenta `defaultErrorTracker`
+
+No handler de `session.error`, apenas persiste em JSONL e loga. Não chama
+`defaultErrorTracker.trackError()`. Erros de sessão SDK ficam fora do ring buffer de erros.
+
+#### GAP-07 — Sem `audit-log.js` centralizado
+
+A Fase F do roadmap propunha criar um `audit-log.js` único que consolidasse `channel/audit.js` e
+`tool-audit-logger.js`. Apenas migramos os paths. Os dois módulos ainda escrevem de forma
+independente em formatos diferentes — sem ring buffer em memória, sem API de leitura.
+
+#### GAP-08 — SSE de eventos sem dados reais
+
+`GET /observability/events/stream` usa `defaultBus` para SSE. Mas `defaultBus` é um `HookBus` que
+só recebe eventos quando `emitHook()` é chamado — e o event-collector (que poderia chamar) está
+desconectado (GAP-01). Na prática o SSE nunca emite nada de valor.
+
+#### GAP-09 — Sem persistência de métricas
+
+`defaultMetrics` e `defaultErrorTracker` são puramente em memória. Dados são perdidos a cada
+restart. Sem snapshotting periódico em `metrics.jsonl` / `errors.jsonl`.
+
+#### GAP-10 — `lib/telemetry.js#startSpan()` conflita com SDK OTEL
+
+`lib/telemetry.js` tem `startSpan()` que tenta inicializar `@opentelemetry/sdk-trace-node`
+diretamente, criando um `NodeTracerProvider` próprio. Isso pode conflitar com o OTEL injetado via
+`CopilotClient({ telemetry: buildTelemetryConfig() })` que também usa OTEL internamente.
+
+#### GAP-11 — `dialog-turn-executor.js` sem métricas de turn
+
+`dialog-turn-executor.js` executa os turns reais do dialog loop mas não tem nenhum instrumento de
+métricas. Latência real de turns (incluindo tempo de resposta do LLM) não é medida.
+
+#### GAP-12 — Audit endpoint ausente na API HTTP
+
+`routes/observability.js` não tem `GET /observability/audit` — proposto no roadmap original mas
+não implementado.
+
+### 0.3 Situação Ideal (objetivo das Fases N-T)
+
+```
+AlwaysAliveAgent.emit('dialog.turn_end', { durationMs: 340 })
+        │
+        ▼
+AgentEventObserver.onAgentEvent()
+        │                │
+        ▼                ▼
+defaultMetrics       defaultErrorTracker
+.recordDialogTurn()  .trackError()  ←── session.error também
+        │
+        ▼
+observability/metrics.js  ←── GET /observability/metrics
+        │
+        ▼ (periodicamente)
+src/copilot/logs/metrics.jsonl (persistência)
+
+
+defaultBus.emitHook('post_tool_use', ...)    ← event-collector ALIMENTADO
+        │
+        ▼
+GET /observability/events/stream  ← SSE real de eventos
+```
+
+---
 
 ---
 
@@ -414,21 +572,237 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 - L.4 Verificar que todos os consumidores de `getSummary()`, `recordToolCall()` etc. continuam
   funcionando
 
-### Fase M — Testes, Lint, Typecheck, Commit
+### Fase M — Testes, Lint, Typecheck, Commit ✅ CONCLUÍDA (commit `ff71cc4e`)
 
 **Objetivo**: Validação completa antes de commit.
 
+- M.1 ✅ `npm run test:unit` — 2054/2054 passando
+- M.2 ✅ `npm run lint` — zero erros (1 warning pré-existente)
+- M.3 ✅ `npm run typecheck:node` — zero erros
+- M.4 ✅ `npm run format:check` — clean (após commit de prettier)
+- M.5 ✅ Commit `cc00b1d3` (89 files, 2011 insertions) + `ff71cc4e` (prettier)
+- M.6 ✅ Push para `origin/main`
+
+---
+
+## 4. Fases N-T — Segunda Rodada de Implementação (pós-análise jun/2026)
+
+Corrige os 12 gaps identificados na análise da Seção 0.2.
+
+### Fase N — Conectar `initEventCollector` aos singletons e corrigir event-collector
+
+**Corrige**: GAP-01, GAP-02, GAP-06
+
+**Objetivo**: `defaultEventCollector` deve alimentar `defaultMetrics` e `defaultErrorTracker`.
+O código morto de telemetry legacy deve ser removido.
+
 **Sub-tarefas**:
 
-- M.1 `npm run test:unit` — todos os 2054+ testes passando
-- M.2 `npm run lint` — zero erros
-- M.3 `npm run typecheck:node` — zero erros
-- M.4 `npm run format:check` — clean
-- M.5 Criar/atualizar testes para os novos módulos de observability:
-  - `tests/unit/copilot/test_observability_logger.spec.js`
-  - `tests/unit/copilot/test_observability_telemetry.spec.js`
-  - `tests/unit/copilot/test_observability_error_registry.spec.js`
-- M.6 Commit: `feat(observability): módulo isolado de observabilidade + migração #core/logger`
+- N.1 Refatorar `EventCollectorOptions`:
+  - Remover `telemetry: TelemetryStore | null` (era o campo errado — objeto de dados, não módulo)
+  - Adicionar `metrics: MetricsStore | null`
+  - Adicionar `errorTracker: ErrorTracker | null`
+  - Adicionar `hookBus: HookBus | null` (já existia, mas não era passado)
+- N.2 No handler `tool.execution_complete`:
+  - `opts.metrics?.recordToolMetric(toolName, durationMs, success)` (substitui código morto)
+  - `hookBus?.emitHook(...)` (já existe, manter)
+- N.3 No handler `assistant.usage`:
+  - `opts.metrics?.recordTokenUsage(model, inputTokens ?? 0, outputTokens ?? 0)`
+- N.4 No handler `session.error`:
+  - `opts.errorTracker?.trackError(new Error(message), { source: 'sdk:session.error', sessionId })`
+- N.5 Em `always-alive.js`, antes de usar `defaultEventCollector`:
+  - Chamar `initEventCollector({ hookBus: defaultBus, metrics: defaultMetrics, errorTracker: defaultErrorTracker })`
+  - Importar `defaultBus` de `#copilot/hooks/bus` — já disponível via `attachBus`
+  - Chamar no top-level do módulo (fora da class) ou no primeiro boot
+- N.6 Exportar `HookBus` type de `#copilot/hooks/bus` para uso nos tipos de `EventCollectorOptions`
+- N.7 Verifica: `npm run typecheck:node` zero erros + `npm run test:unit` verde
+
+### Fase O — `dialog-loop-wirer.js`: adicionar turn_start / turn_end
+
+**Corrige**: GAP-04 (parcial — eventos perdidos no wirer)
+
+**Objetivo**: `dialog.turn_start` e `dialog.turn_end` precisam ser encaminhados pelo wirer.
+
+**Sub-tarefas**:
+
+- O.1 Verificar que `DialogLoopManager` emite `turn_start` e `turn_end` (verificado: apenas
+  `changed`, `model.fallback` são encaminhados — `turn_start/end` faltam)
+- O.2 Adicionar ao `wireDialogLoopEvents()`:
+  ```js
+  dialogLoop.on('turn_start', (evt) => emitFn('dialog.turn_start', evt));
+  dialogLoop.on('turn_end',   (evt) => emitFn('dialog.turn_end',   evt));
+  ```
+- O.3 Verificar que `dialog.turn_start` e `dialog.turn_end` constam em `events.js` (AGENT_EVENTS)
+  — se não estiverem, adicionar
+- O.4 Validar que o wirer NÃO encaminha dois vezes (check de idempotência)
+
+### Fase P — `observability/agent-observer.js` — Observador do AlwaysAliveAgent
+
+**Corrige**: GAP-04 (completo), GAP-05
+
+**Objetivo**: Módulo que se inscreve nos eventos do `AlwaysAliveAgent` (emissor nativo Node.js) e
+alimenta `defaultMetrics` e `defaultErrorTracker`.
+
+**Sub-tarefas**:
+
+- P.1 Criar `src/copilot/observability/agent-observer.js`:
+  ```
+  AgentObserver.attach(agent)
+    → agent.on('dialog.turn_start', handler)
+    → agent.on('dialog.turn_end',   handler)
+    → agent.on('dialog.stalled',    handler)
+    → agent.on('dialog.turn_timeout', handler)
+    → agent.on('dialog.ready',      handler)
+    → agent.on('dialog.stopped',    handler)
+    → agent.on('task.completed',    handler)
+    → agent.on('task.error',        handler)
+    → agent.on('session.fatal',     handler)
+    → agent.on('agent.metrics',     handler)
+  ```
+- P.2 Nos handlers de `dialog.turn_start` / `dialog.turn_end`:
+  - `defaultMetrics.recordDialogTurnMetric(durationMs, success)` (nova função a criar em metrics.js)
+  - Persistir em `events.jsonl` se persist=true
+- P.3 No handler de `dialog.stalled`:
+  - `defaultMetrics.recordDialogStall(stalledMs)`
+- P.4 No handler de `dialog.turn_timeout`:
+  - `defaultMetrics.recordCounter('dialog.turn_timeout', 1)`
+  - `defaultErrorTracker.trackError(new Error('dialog.turn_timeout'), { source: 'dialog', sessionId: ... })`
+- P.5 No handler de `session.fatal`:
+  - `defaultErrorTracker.trackError(err, { source: 'session.fatal', sessionId })`
+- P.6 No handler de `task.error`:
+  - `defaultErrorTracker.trackError(err, { source: 'task.error', taskId })`
+- P.7 Exportar `AgentObserver`, `defaultAgentObserver` do `observability/index.js`
+- P.8 Em `always-alive.js`, após `startDialogLoop()`, chamar `defaultAgentObserver.attach(this)`
+- P.9 Retornar `detach()` para cleanup no `stop()` do agente
+
+### Fase Q — Estender `metrics.js` com métricas de dialog loop
+
+**Corrige**: GAP-04, GAP-11
+
+**Objetivo**: `MetricsStore` precisa de tipos específicos para dialog loop, sessions e tasks.
+
+**Sub-tarefas**:
+
+- Q.1 Adicionar `DialogMetrics` ao typedef do `MetricsStore`:
+  ```js
+  /** @typedef {object} DialogMetrics
+   * @property {number} turnsTotal - Total de turns executados
+   * @property {number} turnsSuccess - Turns completados com sucesso
+   * @property {number} stallsTotal - Total de stalls detectados
+   * @property {number} timeoutsTotal - Total de timeouts
+   * @property {LatencyHistogram} turnLatency - Histograma de latência de turns
+   * @property {number} avgStalledMs - Média de tempo stalled
+   */
+  ```
+- Q.2 Adicionar métodos efetivos:
+  - `recordDialogTurnMetric(durationMs, success)` — alimenta `dialogMetrics.turnLatency`
+  - `recordDialogStall(stalledMs)` — incrementa stalls + média smoother
+  - `recordCounter(name, delta)` — generic counter (para timeouts, etc.)
+- Q.3 Incluir `dialog` na saída de `getAggregatedMetrics()`
+- Q.4 Adicionar `TaskMetrics`: `tasksCompleted`, `tasksFailed`, `avgTaskDurationMs`
+- Q.5 Adicionar `SessionMetrics.durationBySession: Map<string, number>` para rastrear duração
+  de sessões individuais
+
+### Fase R — `observability/audit-log.js` (Central JSONL I/O + Ring Buffer)
+
+**Corrige**: GAP-07
+
+**Objetivo**: Consolidar `channel/audit.js` e `tool-audit-logger.js` em módulo central com ring
+buffer em memória e API de leitura.
+
+**Sub-tarefas**:
+
+- R.1 Criar `src/copilot/observability/audit-log.js`:
+  - Unifica leituras de ambos os módulos em `src/copilot/logs/audit.jsonl`
+  - Ring buffer em memória dos últimos 200 registros (para `/observability/audit`)
+  - Schema canônico: `{ ts, type, sessionId, toolName?, args?, result?, durationMs?, decision? }`
+  - Método `write(record)` — assíncrono, batching de escritas
+  - Métodos de consulta: `getRecent(n)`, `getBySession(sessionId)`, `getByTool(toolName)`
+  - Rotação por tamanho: 10 MB → `.1` (via lógica de rotação já em logger.js)
+- R.2 Adicionar alias `#copilot/observability/audit-log` em `package.json` + tsconfig
+- R.3 Migrar `channel/audit.js` para usar `auditLog.write()` internamente (mantém API pública)
+- R.4 Migrar `tool-audit-logger.js` para usar `auditLog.write()` internamente (mantém API pública)
+- R.5 Exportar `defaultAuditLog` de `observability/index.js`
+- R.6 Validar que os dois arquivos JSONL distintos atuais (`audit.js` e `tool-audit-logger.js`)
+  são unificados sem perda de informação
+
+### Fase S — Persistência Periódica de Métricas e Erros
+
+**Corrige**: GAP-09
+
+**Objetivo**: `defaultMetrics` e `defaultErrorTracker` persistem snapshots periodicamente.
+
+**Sub-tarefas**:
+
+- S.1 Em `observability/metrics.js`:
+  - Função `startPeriodicSnapshot(intervalMs?)` — inicia `setInterval` para gravar `metrics.jsonl`
+  - Formato: `{ _snapshot: ISO, tools, tokens, dialog, tasks, sessions }`
+  - Padrão: `COPILOT_METRICS_SNAPSHOT_INTERVAL` (default 300000ms = 5 min)
+  - Função `stopPeriodicSnapshot()` para cleanup
+- S.2 Em `observability/error-tracker.js`:
+  - Função `enablePersistence(logDir)` — persiste cada novo erro em `errors.jsonl` via append
+  - Diferente de snapshot: cada erro é gravado imediatamente ao ser rastreado
+- S.3 Em `always-alive.js` (ou `entry.js`):
+  - Chamar `defaultMetrics.startPeriodicSnapshot()` no boot
+  - Chamar `defaultErrorTracker.enablePersistence(LOG_DIR)` no boot
+  - No `stop()` do agente: `defaultMetrics.stopPeriodicSnapshot()`
+
+### Fase T — API HTTP: endpoint `/observability/audit` + SSE melhorado
+
+**Corrige**: GAP-08, GAP-12
+
+**Objetivo**: SSE de eventos reais + endpoint de auditoria.
+
+**Sub-tarefas**:
+
+- T.1 Em `routes/observability.js`:
+  - Adicionar `GET /observability/audit` → `defaultAuditLog.getRecent(limit)` com filtros
+    `?session=X&tool=Y&limit=50`
+  - Melhorar `GET /observability/events/stream`:
+    - Além de `defaultBus` hook events, também emitir via `AgentObserver` events (usando um
+      `EventEmitter` intermediário do observability)
+    - Heartbeat a cada 30s para manter SSE vivo com `event: ping`
+- T.2 Criar `ObservabilityEventEmitter` em `observability/index.js`:
+  - `EventEmitter` interno ao qual `AgentObserver` e `event-collector` emitem
+  - `routes/observability.js` usa esse emitter para o SSE (desacoplado de `defaultBus`)
+- T.3 Adicionar ao `observability/index.js`: `export { defaultObservabilityEmitter }`
+
+### Fase U — Unificação de `lib/telemetry.js` com novo sistema
+
+**Corrige**: GAP-03, GAP-10
+
+**Objetivo**: `TelemetryStore` e `MetricsStore` convivem de forma coerente sem duplicação.
+`introspection-tools.js` continua funcionando via `get_telemetry` tool.
+
+**Sub-tarefas**:
+
+- U.1 Analisar se `always-alive.js#telemetry` (TelemetryStore) pode ser REMOVIDO e substituído por
+  `defaultMetrics` (MetricsStore) — ou se precisam coexistir:
+  - `introspection-tools.js` → usa `getTelemetry: () => this.#telemetry` → precisa continuar
+  - `dialog-loop-manager.js` → recebe `telemetry` via `attach(host, telemetry)` → usa para?
+  - Verificar se `dialog-loop-manager.js` realmente usa o `TelemetryStore` ou só armazena
+- U.2 Se coexistência for necessária: criar ponte `telemetry-bridge.js` que mapeia
+  `TelemetryStore.toolCalls` para callbacks no `defaultMetrics` ao mesmo tempo
+- U.3 Se `dialog-loop-manager.js` usa `TelemetryStore` apenas como passagem: remover e usar
+  `defaultMetrics` diretamente via import
+- U.4 Desativar `lib/telemetry.js#startSpan()` quando SDK OTEL estiver ativo (GAP-10):
+  - `if (isOtelEnabled()) return fn()` — skip OTEL duplicado
+
+### Fase V — Validação e Testes
+
+**Objetivo**: Garantir que todas as fases N-U passam nos quality gates.
+
+**Sub-tarefas**:
+
+- V.1 `npm run test:unit` — mínimo 2054 passando (adicionar testes para novos módulos)
+- V.2 Testes novos:
+  - `tests/unit/copilot/test_observability_agent_observer.spec.js`
+  - `tests/unit/copilot/test_observability_metrics_dialog.spec.js`
+  - `tests/unit/copilot/test_observability_audit_log.spec.js`
+  - `tests/unit/copilot/test_observability_persistence.spec.js`
+- V.3 `npm run lint` + `npm run typecheck:node` — zero erros
+- V.4 `npm run format:check` — clean
+- V.5 Commit: `feat(copilot/observability): fases N-U — dialog loop, audit-log, persistência`
 
 ---
 
