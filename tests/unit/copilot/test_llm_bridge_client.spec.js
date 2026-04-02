@@ -73,6 +73,8 @@ describe('LlmBridgeClient › histórico de conversa', () => {
     before(async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
         LlmBridgeClient = mod.LlmBridgeClient;
+        // Injeta o agente real via DI para que requireAgent() não lance
+        mod.setBridgeAgent(alwaysAliveAgent);
     });
 
     it('history está vazio ao criar nova instância', () => {
@@ -99,8 +101,10 @@ describe('LlmBridgeClient › histórico de conversa', () => {
             () => client.chat('teste'),
             (/** @type {Error} */ err) => {
                 assert.ok(
-                    err.message.includes('Agente não está ativo'),
-                    `Esperado "Agente não está ativo", recebido: ${err.message}`,
+                    err.message.includes('Agente não está ativo') ||
+                        err.message.includes('agent não injetado') ||
+                        err.message.includes('ativo'),
+                    `Esperado erro de agente inativo, recebido: ${err.message}`,
                 );
                 return true;
             },

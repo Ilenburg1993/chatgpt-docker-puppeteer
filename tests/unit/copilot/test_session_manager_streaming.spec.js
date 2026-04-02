@@ -2,9 +2,9 @@
 /**
  * tests/unit/copilot/test_session_manager_streaming.spec.js
  *
- * Testes unitários para as mudanças do Upgrade 10 Sprint 3 em session-manager.js e always-alive.js:
+ * Testes unitários para as mudanças do Upgrade 10 Sprint 3 em session-initializer.js e always-alive.js:
  *
- * - session-manager.js passa streaming: true no createConfig
+ * - session-initializer.js passa streaming: true no createConfig
  * - always-alive.js faz wiring de session.compaction_start e .compaction_complete
  * - Eventos de compaction chegam ao SSE via http-bridge.js /stream
  */
@@ -14,7 +14,7 @@ import { EventEmitter } from 'node:events';
 import { before, describe, it } from 'node:test';
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
-// ─── Suite: session-manager tem streaming: true no createConfig ───────────────
+// ─── Suite: session-initializer tem streaming: true no createConfig ──────────
 
 describe('session-manager › createConfig inclui streaming: true', async () => {
     /** @type {string} */
@@ -22,7 +22,11 @@ describe('session-manager › createConfig inclui streaming: true', async () => 
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/agent/session-manager.js', import.meta.url), 'utf-8');
+        // session-manager.js foi renomeado/refatorado para session-initializer.js
+        sourceCode = await readFile(
+            new URL('../../../src/copilot/agent/session-initializer.js', import.meta.url),
+            'utf-8',
+        );
     });
 
     it('contém streaming: true no bloco createConfig', () => {

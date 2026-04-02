@@ -66,6 +66,8 @@ describe('LlmBridgeClient › chatStructured()', () => {
     before(async () => {
         // Importamos o módulo real — mas substitui a chamada interna de chat() via spy
         const mod = await import('../../../src/copilot/channel/client.js');
+        // Injeta mock como bridge agent para que requireAgent() não lance
+        mod.setBridgeAgent(mockAgent);
         bridge = new mod.LlmBridgeClient();
     });
 

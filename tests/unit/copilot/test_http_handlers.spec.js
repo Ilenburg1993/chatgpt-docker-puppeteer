@@ -32,7 +32,12 @@ import { before, describe, it } from 'node:test';
 let src = '';
 
 before(async () => {
-    src = await readFile(new URL('../../../src/copilot/terminal/http-handlers.js', import.meta.url), 'utf-8');
+    // http-handlers.js é um barrel; inclui também os handlers individuais para análise estática
+    const barrel = await readFile(new URL('../../../src/copilot/terminal/http-handlers.js', import.meta.url), 'utf-8');
+    const agent = await readFile(new URL('../../../src/copilot/terminal/handlers-agent.js', import.meta.url), 'utf-8');
+    const dialog = await readFile(new URL('../../../src/copilot/terminal/handlers-dialog.js', import.meta.url), 'utf-8');
+    const system = await readFile(new URL('../../../src/copilot/terminal/handlers-system.js', import.meta.url), 'utf-8');
+    src = [barrel, agent, dialog, system].join('\n');
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -65,7 +70,11 @@ describe('http-handlers › exports & estrutura', () => {
 
     for (const name of expectedExports) {
         it(`exporta ${name}`, () => {
-            assert.match(src, new RegExp(`export\\s+(?:async\\s+)?function\\s+${name}\\b`));
+            // Aceita: export function handleX, export async function handleX,
+            // ou re-export: export { handleX, ... } from '...'
+            const directDecl = new RegExp(`export\\s+(?:async\\s+)?function\\s+${name}\\b`);
+            const reExport = new RegExp(`export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`);
+            assert.ok(directDecl.test(src) || reExport.test(src), `${name} deve estar exportado (declaração ou re-export)`);
         });
     }
 

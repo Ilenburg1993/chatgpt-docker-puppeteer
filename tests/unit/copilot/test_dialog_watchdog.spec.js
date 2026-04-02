@@ -90,6 +90,11 @@ describe('DialogLoopManager › G2-ARCH-20: boot timeout emite turn_timeout', as
         const { fileURLToPath } = await import('node:url');
         const dir = dirname(fileURLToPath(import.meta.url));
         const aaSrc = await readFile(resolve(dir, '../../../src/copilot/agent/always-alive.js'), 'utf8');
-        assert.ok(aaSrc.includes('dialog.turn_timeout'), "always-alive deve reemitir 'dialog.turn_timeout'");
+        // dialog-loop-wirer.js é responsável pelo forwarding (Fase 5 refactor)
+        const wirerSrc = await readFile(resolve(dir, '../../../src/copilot/agent/dialog-loop-wirer.js'), 'utf8');
+        assert.ok(
+            aaSrc.includes('dialog.turn_timeout') || wirerSrc.includes('dialog.turn_timeout'),
+            "always-alive (ou dialog-loop-wirer) deve reemitir 'dialog.turn_timeout'",
+        );
     });
 });

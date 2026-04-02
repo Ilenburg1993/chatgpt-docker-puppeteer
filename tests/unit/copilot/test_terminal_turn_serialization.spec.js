@@ -117,7 +117,16 @@ describe('terminal/http-handlers.js › ATT-04: arquitetura zero-PR para attachm
     let source = '';
 
     before(async () => {
-        source = await readFile(new URL('../../../src/copilot/terminal/http-handlers.js', import.meta.url), 'utf-8');
+        // http-handlers.js é barrel; inclui handlers-agent.js onde attachmentToEmbed é realmente usado
+        const barrel = await readFile(
+            new URL('../../../src/copilot/terminal/http-handlers.js', import.meta.url),
+            'utf-8',
+        );
+        const agent = await readFile(
+            new URL('../../../src/copilot/terminal/handlers-agent.js', import.meta.url),
+            'utf-8',
+        );
+        source = barrel + '\n' + agent;
     });
 
     it('não deve importar setBusy de state.js (ATT-04: responsabilidade migrou para dialog.js)', () => {

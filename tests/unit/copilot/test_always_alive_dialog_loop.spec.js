@@ -35,12 +35,18 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
     let sourceCode = '';
     /** @type {string} */
     let dlmSourceCode = '';
+    /** @type {string} */
+    let wirerSourceCode = '';
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
         sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         dlmSourceCode = await readFile(
             new URL('../../../src/copilot/agent/dialog-loop-manager.js', import.meta.url),
+            'utf-8',
+        );
+        wirerSourceCode = await readFile(
+            new URL('../../../src/copilot/agent/dialog-loop-wirer.js', import.meta.url),
             'utf-8',
         );
     });
@@ -101,10 +107,11 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
     });
 
     it("evento 'dialog.ready' é emitido no handler", () => {
-        // E.1: always-alive.js propaga via listener do DLM (on 'ready' → emit 'dialog.ready')
+        // E.1: always-alive.js propaga via wireDialogLoopEvents (dialog-loop-wirer.js)
         assert.ok(
             sourceCode.includes("emit('dialog.ready'") ||
-                (sourceCode.includes("'dialog.ready'") && sourceCode.includes('#dialogLoop')),
+                (sourceCode.includes("'dialog.ready'") && sourceCode.includes('#dialogLoop')) ||
+                wirerSourceCode.includes("'dialog.ready'"),
             "handler deve emitir 'dialog.ready' quando modelo sinalizar READY",
         );
     });
@@ -112,14 +119,16 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
     it("evento 'dialog.reply' é emitido no handler", () => {
         assert.ok(
             sourceCode.includes("emit('dialog.reply'") ||
-                (sourceCode.includes("'dialog.reply'") && sourceCode.includes('#dialogLoop')),
+                (sourceCode.includes("'dialog.reply'") && sourceCode.includes('#dialogLoop')) ||
+                wirerSourceCode.includes("'dialog.reply'"),
             "handler deve emitir 'dialog.reply' quando modelo enviar REPLY:",
         );
     });
 
     it("evento 'dialog.stopped' é emitido no handler e no stopDialogLoop()", () => {
         assert.ok(
-            sourceCode.includes("emit('dialog.stopped'"),
+            sourceCode.includes("emit('dialog.stopped'") ||
+                wirerSourceCode.includes("'dialog.stopped'"),
             "handler deve emitir 'dialog.stopped' quando modelo enviar STOPPED",
         );
     });
@@ -260,11 +269,18 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
 describe('always-alive › dialog loop: DL-PERM hardening', async () => {
     /** @type {string} */
     let dlmSourceCode = '';
+    /** @type {string} */
+    let turnExecutorCode = '';
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
         dlmSourceCode = await readFile(
             new URL('../../../src/copilot/agent/dialog-loop-manager.js', import.meta.url),
+            'utf-8',
+        );
+        // #executeTurn foi extraído para dialog-turn-executor.js na Fase 5
+        turnExecutorCode = await readFile(
+            new URL('../../../src/copilot/agent/dialog-turn-executor.js', import.meta.url),
             'utf-8',
         );
     });
@@ -300,14 +316,18 @@ describe('always-alive › dialog loop: DL-PERM hardening', async () => {
 
     it('DL-PERM-05: #executeTurn distingue stop definitivo de restart ao receber stopped', () => {
         assert.ok(
-            dlmSourceCode.includes('stopEvt?.authorized') || dlmSourceCode.includes('stoppedEvt?.authorized'),
+            dlmSourceCode.includes('stopEvt?.authorized') ||
+                dlmSourceCode.includes('stoppedEvt?.authorized') ||
+                turnExecutorCode.includes('stopEvt?.authorized') ||
+                turnExecutorCode.includes('stoppedEvt?.authorized'),
             '#executeTurn deve verificar authorized para distinguir stop definitivo de restart',
         );
     });
 
     it('DL-PERM-05: #executeTurn aguarda ready para retry após restart não-definitivo', () => {
         assert.ok(
-            dlmSourceCode.includes("'ready'") && dlmSourceCode.includes('onRetryReady'),
+            (dlmSourceCode.includes("'ready'") && dlmSourceCode.includes('onRetryReady')) ||
+                (turnExecutorCode.includes("'ready'") && turnExecutorCode.includes('onRetryReady')),
             '#executeTurn deve aguardar ready e reenviar ao reencontrar após restart',
         );
     });
