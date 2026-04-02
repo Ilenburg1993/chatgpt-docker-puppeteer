@@ -22,7 +22,7 @@
 
 import { SessionError } from '#copilot/core/errors';
 import { raceEvents } from '#copilot/lib/event-helpers';
-import { createRegistry, createTelemetry, startSpan } from '#copilot/lib/index';
+import { createRegistry } from '#copilot/lib/index';
 import {
     buildTelemetryConfig,
     createAgentEventObserver,
@@ -30,6 +30,7 @@ import {
     defaultEventCollector,
     defaultMetrics,
     initEventCollector,
+    startSpan,
 } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
@@ -235,9 +236,6 @@ export class AlwaysAliveAgent extends EventEmitter {
         onModeChanged: (mode) => this.emit('permission.mode_changed', { mode }),
     });
 
-    /** @type {import('#copilot/lib/telemetry').TelemetryStore} */
-    #telemetry = createTelemetry();
-
     /** @type {import('#copilot/lib/tools-registry').ToolRegistry} */
     #toolsRegistry = createRegistry();
 
@@ -366,12 +364,12 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * Retorna o store de telemetria da sessão atual.
+     * Retorna o sumário de métricas da sessão atual (compatibilidade — use defaultMetrics diretamente).
      *
-     * @returns {import('#copilot/lib/telemetry').TelemetryStore}
+     * @returns {object}
      */
     get telemetry() {
-        return this.#telemetry;
+        return defaultMetrics.getSummary();
     }
 
     /**
@@ -414,9 +412,6 @@ export class AlwaysAliveAgent extends EventEmitter {
             const _otelConfig = buildTelemetryConfig();
             const client = new CopilotClient(...(_otelConfig ? [{ telemetry: _otelConfig }] : []));
             this.#client = client;
-
-            // Inicializa telemetria para esta sessão (registry e MCP tools são criados dentro de #initSession)
-            this.#telemetry = createTelemetry();
 
             const { session, isResumed } = await startSpan('session.boot', { model: this.#model }, () =>
                 this.#initSession(client),
@@ -924,8 +919,8 @@ export class AlwaysAliveAgent extends EventEmitter {
             getModel: () => this.#model,
             getPendingQuestion: () => this.#pendingQuestion,
         };
-        // Sempre atualiza host/telemetry — necessário após reconexão onde #telemetry é recriado.
-        this.#dialogLoop.attach(host, this.#telemetry);
+        // Sempre atualiza host — necessário após reconexão.
+        this.#dialogLoop.attach(host);
         // Wiring de eventos: somente na primeira vez (guard de idempotência).
         if (this.#dialogLoopAttached) return;
         this.#dialogLoopAttached = true;
@@ -1037,7 +1032,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         }
         // Reinicia o registry para evitar duplicação de tools em reconexões consecutivas.
         this.#toolsRegistry = createRegistry();
-        const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
+        const tools = bootstrapTools(this.#toolsRegistry, mcpTools);
         log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
 
         // N.2: compor todos os 6 hooks SDK usando o módulo canônico.
@@ -1046,7 +1041,6 @@ export class AlwaysAliveAgent extends EventEmitter {
         // - createHooks: wires onPreToolUse (auditLog) + onPostToolUse (ring buffer via auditLog)
         //   + onUserPromptSubmitted (auditLog) com os overrides de lifecycle acima.
         const lifecycleHooks = createSessionHooks({
-            getTelemetry: () => this.#telemetry,
             emitWebhook: (event, payload) => this.#webhooks.emit(event, payload),
             getModel: () => this.#model,
             scheduleFallback: (model) => this.#dialogLoop.scheduleFallback(model),

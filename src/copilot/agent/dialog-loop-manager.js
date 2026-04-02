@@ -29,10 +29,6 @@ import { DialogWatchdog } from './dialog-watchdog.js';
 import { readState, writeStateAsync } from './state-io.js';
 
 /**
- * @typedef {import('#copilot/lib/telemetry').TelemetryStore} TelemetryStore
- */
-
-/**
  * @typedef {Object} DialogLoopManagerOptions
  * @property {number} [maxQueueSize] - Máximo de turnos na fila (default: 10)
  * @property {number} [bootTimeoutMs] - Timeout para boot do dialog (default: 30s)
@@ -100,9 +96,6 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {AgentHost | null} */
     #host = null;
 
-    /** @type {TelemetryStore | null} */
-    #telemetry = null;
-
     /** @type {{ sendCount: number }} Ref mutável para o contador de sends — usado pelo dialog-turn-executor. */
     #sendCountRef = { sendCount: 0 };
 
@@ -124,11 +117,9 @@ export class DialogLoopManager extends EventEmitter {
      * Vincula o manager ao agente host. Deve ser chamado antes de startDialogLoop().
      *
      * @param {AgentHost} host - Referência ao AlwaysAliveAgent
-     * @param {TelemetryStore} telemetry - Store de telemetria
      */
-    attach(host, telemetry) {
+    attach(host) {
         this.#host = host;
-        this.#telemetry = telemetry;
     }
 
     /** @returns {boolean} */
@@ -486,7 +477,6 @@ export class DialogLoopManager extends EventEmitter {
             { timeout, ...(signal !== undefined && { signal }) },
             {
                 host: this.#host,
-                telemetry: this.#telemetry,
                 sendCountRef: this.#sendCountRef,
             },
         );

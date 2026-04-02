@@ -30,7 +30,6 @@ import {
     registerForIntrospection,
     sessionRpcTools,
     sessionTools,
-    setTelemetryStore,
     shellTools,
     taskTools,
     todoReadTools,
@@ -40,8 +39,6 @@ import {
 
 /**
  * @typedef {import('#copilot/lib/tools-registry').ToolRegistry} ToolRegistry
- *
- * @typedef {import('#copilot/lib/telemetry').TelemetryStore} TelemetryStore
  *
  * @typedef {import('@github/copilot-sdk').Tool} Tool
  */
@@ -53,11 +50,10 @@ export { configureHookTools, setHub, setPermissionAgent, setSessionRpc } from '.
  * ferramentas de introspecção.
  *
  * @param {ToolRegistry} registry - Registry de tools da sessão
- * @param {TelemetryStore} telemetry - Store de telemetria da sessão
  * @param {Tool[]} mcpTools - Tools MCP dinâmicas carregadas via bridge (pode ser vazio)
  * @returns {Tool[]} Array consolidado `[...staticTools, ...mcpTools]` pronto para a sessão SDK
  */
-export function bootstrapTools(registry, telemetry, mcpTools) {
+export function bootstrapTools(registry, mcpTools) {
     /**
      * G1-ARCH-07: Lista única de pares [tools, opts] usada tanto para registro quanto para buildAllTools. Declarada
      * local à função para evitar TDZ com módulos que exportam via inicialização lazy. Adicionar um novo grupo aqui é
@@ -100,9 +96,8 @@ export function bootstrapTools(registry, telemetry, mcpTools) {
 
     const allTools = [...TOOL_GROUPS.flatMap(([t]) => t), ...mcpTools, ...customTools];
 
-    // Expõe registry/telemetria para as ferramentas de introspecção (necessário antes de iniciar sessão)
+    // Expõe registry para as ferramentas de introspecção (necessário antes de iniciar sessão)
     registerForIntrospection(allTools);
-    setTelemetryStore(telemetry);
 
     // Detecta colisões de nome entre tools. Cada tool com sobreposição potencial com built-ins do CLI
     // deve declarar `overridesBuiltInTool` explicitamente; não forçar globalmente para não mascarar conflitos.

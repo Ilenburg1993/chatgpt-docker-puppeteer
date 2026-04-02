@@ -15,7 +15,7 @@
  * @see module:copilot/hooks/types
  */
 
-import { recordSessionEnd, recordSessionStart } from '#copilot/lib/index';
+import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { hostname } from 'node:os';
 
@@ -46,7 +46,7 @@ import { hostname } from 'node:os';
  * }}
  */
 export function createSessionHooks(ctx) {
-    const { getTelemetry, emitWebhook, getModel, scheduleFallback, emit, getContextSnapshot } = ctx;
+    const { emitWebhook, getModel, scheduleFallback, emit, getContextSnapshot } = ctx;
 
     /**
      * @param {import('./types.js').SessionStartHookInput} input
@@ -56,7 +56,7 @@ export function createSessionHooks(ctx) {
     async function onSessionStart(input, invocation) {
         const sessionId = invocation?.sessionId ?? '';
         log('INFO', `[hooks/session-lifecycle] SessionStart: ${sessionId}`);
-        recordSessionStart(getTelemetry(), sessionId);
+        defaultMetrics.recordSessionStart();
         await emitWebhook('session.start', { sessionId });
 
         // Gap 4: retornar additionalContext com snapshot de ambiente
@@ -84,7 +84,7 @@ export function createSessionHooks(ctx) {
     async function onSessionEnd(_input, invocation) {
         const sessionId = invocation?.sessionId ?? '';
         log('INFO', `[hooks/session-lifecycle] SessionEnd: ${sessionId}`);
-        recordSessionEnd(getTelemetry(), sessionId);
+        defaultMetrics.recordSessionEnd();
         await emitWebhook('session.end', { sessionId });
     }
 

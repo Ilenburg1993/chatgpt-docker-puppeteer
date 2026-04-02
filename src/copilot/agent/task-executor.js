@@ -10,7 +10,7 @@
  *   agente pai.
  */
 
-import { auditToolComplete, auditToolStart } from '#copilot/channel';
+import { defaultAuditLog } from '#copilot/observability';
 
 /**
  * Máximo de tentativas de retry por task após reconexão. Configurável via AGENT_MAX_TASK_RETRIES.
@@ -79,7 +79,7 @@ export async function executeTask(session, task, callbacks) {
     const unsubToolStart = session.on(
         'tool.execution_start',
         (/** @type {{ data?: Record<string, unknown> }} */ event) => {
-            auditToolStart({
+            defaultAuditLog.recordToolStart({
                 toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
                 toolName: /** @type {string} */ (event?.data?.['toolName'] ?? ''),
                 args: event?.data?.['arguments'] ?? {},
@@ -98,7 +98,7 @@ export async function executeTask(session, task, callbacks) {
     const unsubToolComplete = session.on(
         'tool.execution_complete',
         (/** @type {{ data?: Record<string, unknown> }} */ event) => {
-            auditToolComplete({
+            defaultAuditLog.recordToolComplete({
                 toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
                 success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
                 taskId: task.id,

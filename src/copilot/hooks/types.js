@@ -277,7 +277,6 @@
  * Dependências injetadas para o factory de session lifecycle hooks.
  *
  * @typedef {object} SessionLifecycleContext
- * @property {() => import('#copilot/lib/telemetry').TelemetryStore} getTelemetry
  * @property {(event: string, payload: object) => Promise<void>} emitWebhook
  * @property {() => string | undefined} getModel
  * @property {(fallbackModel: string) => void} scheduleFallback

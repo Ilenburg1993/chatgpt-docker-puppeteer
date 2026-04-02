@@ -9,6 +9,7 @@
  * @see module:copilot/agent/status-snapshot
  */
 
+import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { createRequire } from 'node:module';
@@ -30,11 +31,15 @@ import { withSkipPermission } from './tool-factory.js';
 let _registeredTools = [];
 
 /**
- * Store de telemetria injetado externamente (AlwaysAliveAgent).
+ * Injeta o store de telemetria — mantido por compatibilidade; uso interno migrado para defaultMetrics.
  *
- * @type {import('#copilot/lib/telemetry').TelemetryStore | null}
+ * @deprecated Use defaultMetrics diretamente.
+ * @param {unknown} _
+ * @returns {void}
  */
-let _telemetryStore = null;
+export function setTelemetryStore(_) {
+    // No-op: telemetria migrada para defaultMetrics (observability)
+}
 
 /**
  * Informa ao módulo quais ferramentas estão registradas na sessão atual. Deve ser chamado pelo AlwaysAliveAgent após
@@ -47,18 +52,6 @@ export function registerForIntrospection(tools) {
     _registeredTools = tools;
     log('DEBUG', `[introspection] ${tools.length} tools registradas para introspecção.`);
 }
-
-/**
- * Injeta o store de telemetria para uso pelos introspection tools.
- *
- * @param {import('#copilot/lib/telemetry').TelemetryStore} store
- * @returns {void}
- */
-export function setTelemetryStore(store) {
-    _telemetryStore = store;
-}
-
-// ─── Mapeamento de categorias heurísticas ────────────────────────────────────
 // TODO(RF-026): derivar categorias do ToolRegistry para evitar manutenção manual.
 
 /**
@@ -153,7 +146,7 @@ const getAgentInfoTool = defineTool('get_agent_info', {
             uptime: Math.round(process.uptime()),
             toolsRegistered: _registeredTools.length,
             toolNames: _registeredTools.map((t) => t.name),
-            hasTelemetry: _telemetryStore !== null,
+            hasTelemetry: true,
             env: {
                 COPILOT_MCP_SERVERS: process.env['COPILOT_MCP_SERVERS'] ?? '',
                 NODE_ENV: process.env['NODE_ENV'] ?? '',
@@ -185,49 +178,36 @@ const getTelemetryTool = defineTool('get_telemetry', {
             })
         )
     ),
-    handler: async (/** @type {{ recent?: number; toolName?: string }} */ { recent = 10, toolName }) => {
-        if (!_telemetryStore) {
-            return { available: false, message: 'Telemetria não inicializada nesta sessão.' };
-        }
+    handler: async (/** @type {{ recent?: number; toolName?: string }} */ { toolName }) => {
+        const summary = defaultMetrics.getSummary();
+        const toolsMap = summary.tools ?? {};
 
-        const store = _telemetryStore;
-        const calls = toolName
-            ? store.toolCalls.filter((c) => c.toolName === toolName)
-            : store.toolCalls.slice(-recent);
+        const toolValues = Object.values(toolsMap);
+        const totalCalls = toolValues.reduce((acc, t) => acc + (t.totalCalls ?? 0), 0);
+        const successCalls = toolValues.reduce((acc, t) => acc + (t.successCount ?? 0), 0);
+        const errorCalls = toolValues.reduce((acc, t) => acc + (t.errorCount ?? 0), 0);
 
-        const total = store.toolCalls.length;
-        const success = store.toolCalls.filter((c) => c.success).length;
-        const errors = total - success;
-        const avgDuration =
-            total > 0 ? Math.round(store.toolCalls.reduce((acc, c) => acc + c.durationMs, 0) / total) : 0;
-
-        /** @type {Record<string, number>} */
-        const byTool = {};
-        for (const c of store.toolCalls) {
-            byTool[c.toolName] = (byTool[c.toolName] ?? 0) + 1;
-        }
+        const topTools = toolName
+            ? toolsMap[toolName]
+                ? [{ name: toolName, count: toolsMap[toolName].totalCalls }]
+                : []
+            : Object.entries(toolsMap)
+                  .sort(([, a], [, b]) => (b.totalCalls ?? 0) - (a.totalCalls ?? 0))
+                  .slice(0, 10)
+                  .map(([name, t]) => ({ name, count: t.totalCalls ?? 0 }));
 
         return {
             available: true,
             summary: {
-                total,
-                success,
-                errors,
-                avgDurationMs: avgDuration,
-                successRate: total > 0 ? Math.round((success / total) * 100) : 0,
+                total: totalCalls,
+                success: successCalls,
+                errors: errorCalls,
+                successRate: totalCalls > 0 ? Math.round((successCalls / totalCalls) * 100) : 0,
             },
-            topTools: Object.entries(byTool)
-                .sort(([, a], [, b]) => b - a)
-                .slice(0, 5)
-                .map(([name, count]) => ({ name, count })),
-            recent: calls.slice(-recent).map((c) => ({
-                toolName: c.toolName,
-                timestamp: c.timestamp,
-                durationMs: c.durationMs,
-                success: c.success,
-                error: c.error ?? null,
-            })),
-            activeSessions: store.sessions.filter((s) => s.status === 'active').length,
+            topTools,
+            dialog: summary.dialog ?? {},
+            sessions: summary.sessions ?? {},
+            tasks: summary.tasks ?? {},
         };
     },
 });

@@ -19,8 +19,9 @@
  */
 
 import { SessionError } from '#copilot/core/errors';
-import { recordToolCall, startSpan } from '#copilot/lib/index';
+import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
+import { startSpan } from '#copilot/observability/otel';
 import { writeStateAsync } from './state-io.js';
 
 /**
@@ -60,7 +61,6 @@ export function emitTurnStart(emitter, message, counter) {
  * @param {TurnEmitter} emitter
  * @param {{
  *     host: any;
- *     telemetry: any;
  *     turnStart: number;
  *     timeout: number;
  *     message: string;
@@ -76,7 +76,7 @@ export function emitTurnStart(emitter, message, counter) {
  * }}
  */
 export function buildTurnResolutionListeners(emitter, opts) {
-    const { host, telemetry, turnStart, timeout, pendingListenerRef, resolve, reject, waitForRestartAndReplyFn } = opts;
+    const { turnStart, timeout, pendingListenerRef, resolve, reject, waitForRestartAndReplyFn } = opts;
 
     /**
      * @type {{
@@ -102,11 +102,7 @@ export function buildTurnResolutionListeners(emitter, opts) {
         emitter.off('stopped', handlers.stop);
         const durationMs = Date.now() - turnStart;
         emitter.emit('turn_end', { reply: evt.reply.slice(0, 120), durationMs });
-        recordToolCall(telemetry, 'dialog.turn', {
-            durationMs,
-            success: true,
-            sessionId: host.getSessionId() ?? undefined,
-        });
+        defaultMetrics.recordDialogTurn(durationMs, true);
         resolve(evt.reply);
     };
 
@@ -254,15 +250,14 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
  * @param {{ timeout: number; signal?: AbortSignal }} opts
  * @param {{
  *     host: any;
- *     telemetry: any;
  *     sendCountRef: { sendCount: number };
  * }} ctx
  * @returns {Promise<string>}
  */
 export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
-    const { host, telemetry, sendCountRef } = ctx;
+    const { host, sendCountRef } = ctx;
 
-    if (!host || !telemetry) {
+    if (!host) {
         return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
     }
     if (signal?.aborted) {
@@ -289,7 +284,6 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
 
                 const { timeoutHandle, onReplyOuter, onStopOuter } = buildTurnResolutionListeners(emitter, {
                     host,
-                    telemetry,
                     turnStart,
                     timeout,
                     message,

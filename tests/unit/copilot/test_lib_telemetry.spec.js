@@ -2,48 +2,34 @@
 /**
  * tests/unit/copilot/test_lib_telemetry.spec.js
  *
- * Testes unitários para src/copilot/lib/telemetry.js
+ * Testes unitários da API de telemetria migrada → src/copilot/observability/metrics.js.
+ *
+ * Substituição canônica de `lib/telemetry.js` (deletado). Cobre createMetricsStore + todas as funções de registro.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-    clearTelemetry,
-    createTelemetry,
-    getAverageDuration,
-    getCallsBySession,
-    getCallsByTool,
-    getErrorCalls,
-    getErrorCount,
-    getRecentCalls,
-    getSuccessCount,
-    getSummary,
-    getTotalCalls,
-    recordSessionEnd,
-    recordSessionStart,
-    recordToolCall,
-} from '../../../src/copilot/lib/telemetry.js';
+import { createMetricsStore } from '../../../src/copilot/observability/metrics.js';
 
-// ─── createTelemetry ─────────────────────────────────────────────────────────
+// ─── createMetricsStore ───────────────────────────────────────────────────────
 
-describe('createTelemetry', () => {
-    it('deve criar store vazio', () => {
-        const tel = createTelemetry();
-        assert.deepEqual(tel.toolCalls, []);
-        assert.deepEqual(tel.sessions, []);
-        assert.equal(tel.maxRecords, 500);
-    });
-
-    it('deve aceitar maxRecords customizado', () => {
-        const tel = createTelemetry({ maxRecords: 10 });
-        assert.equal(tel.maxRecords, 10);
+describe('createMetricsStore', () => {
+    it('deve criar store vazio com getSummary retornando zeros', () => {
+        const m = createMetricsStore();
+        const s = m.getSummary();
+        assert.deepEqual(s.tools, {});
+        assert.equal(s.sessions.started, 0);
+        assert.equal(s.sessions.ended, 0);
+        assert.equal(s.sessions.errors, 0);
+        assert.equal(s.dialog.turnsTotal, 0);
+        assert.equal(s.tasks.completed, 0);
     });
 
     it('deve criar instâncias independentes', () => {
-        const a = createTelemetry();
-        const b = createTelemetry();
-        recordToolCall(a, 'tool', { durationMs: 10, success: true });
-        assert.equal(b.toolCalls.length, 0);
+        const a = createMetricsStore();
+        const b = createMetricsStore();
+        a.recordToolCall('lint', 100, true);
+        assert.deepEqual(b.getSummary().tools, {});
     });
 });
 
@@ -51,304 +37,301 @@ describe('createTelemetry', () => {
 
 describe('recordToolCall', () => {
     it('deve registrar chamada bem-sucedida', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 'lint', { durationMs: 120, success: true });
-        assert.equal(tel.toolCalls.length, 1);
-        assert.equal(tel.toolCalls[0]?.toolName, 'lint');
-        assert.equal(tel.toolCalls[0]?.durationMs, 120);
-        assert.equal(tel.toolCalls[0]?.success, true);
+        const m = createMetricsStore();
+        m.recordToolCall('lint', 120, true);
+        const s = m.getSummary();
+        assert.equal(s.tools['lint']?.totalCalls, 1);
+        assert.equal(s.tools['lint']?.successCount, 1);
+        assert.equal(s.tools['lint']?.errorCount, 0);
     });
 
     it('deve registrar chamada com erro', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 'test', { durationMs: 50, success: false, error: 'falhou' });
-        assert.equal(tel.toolCalls[0]?.success, false);
-        assert.equal(tel.toolCalls[0]?.error, 'falhou');
+        const m = createMetricsStore();
+        m.recordToolCall('test', 50, false);
+        const s = m.getSummary();
+        assert.equal(s.tools['test']?.errorCount, 1);
+        assert.equal(s.tools['test']?.successCount, 0);
     });
 
-    it('deve registrar sessionId quando fornecido', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 't', { durationMs: 5, success: true, sessionId: 'sess-1' });
-        assert.equal(tel.toolCalls[0]?.sessionId, 'sess-1');
+    it('deve acumular chamadas da mesma ferramenta', () => {
+        const m = createMetricsStore();
+        m.recordToolCall('lint', 100, true);
+        m.recordToolCall('lint', 200, true);
+        m.recordToolCall('lint', 50, false);
+        const s = m.getSummary();
+        assert.equal(s.tools['lint']?.totalCalls, 3);
+        assert.equal(s.tools['lint']?.successCount, 2);
+        assert.equal(s.tools['lint']?.errorCount, 1);
     });
 
-    it('deve usar timestamp customizado quando fornecido', () => {
-        const tel = createTelemetry();
-        const ts = 1700000000000;
-        recordToolCall(tel, 't', { durationMs: 5, success: true, timestamp: ts });
-        assert.equal(tel.toolCalls[0]?.timestamp, ts);
+    it('deve registrar múltiplas ferramentas independentes', () => {
+        const m = createMetricsStore();
+        m.recordToolCall('lint', 100, true);
+        m.recordToolCall('test', 200, true);
+        const s = m.getSummary();
+        assert.equal(s.tools['lint']?.totalCalls, 1);
+        assert.equal(s.tools['test']?.totalCalls, 1);
     });
 
-    it('deve gerar timestamp automático quando não fornecido', () => {
-        const tel = createTelemetry();
-        const before = Date.now();
-        recordToolCall(tel, 't', { durationMs: 5, success: true });
-        const after = Date.now();
-        const ts = tel.toolCalls[0]?.timestamp ?? 0;
-        assert.ok(ts >= before && ts <= after);
-    });
-
-    it('deve lançar se toolName for inválido', () => {
-        const tel = createTelemetry();
-        assert.throws(() => recordToolCall(tel, '', { durationMs: 0, success: true }), /toolName/);
-    });
-
-    it('deve lançar se toolName não for string', () => {
-        const tel = createTelemetry();
-        // @ts-expect-error — teste de runtime
-        assert.throws(() => recordToolCall(tel, null, { durationMs: 0, success: true }), /toolName/);
-    });
-
-    it('deve aplicar circular buffer quando atingir maxRecords', () => {
-        const tel = createTelemetry({ maxRecords: 3 });
-        recordToolCall(tel, 'a', { durationMs: 1, success: true });
-        recordToolCall(tel, 'b', { durationMs: 1, success: true });
-        recordToolCall(tel, 'c', { durationMs: 1, success: true });
-        recordToolCall(tel, 'd', { durationMs: 1, success: true }); // Deve descartar 'a'
-        assert.equal(tel.toolCalls.length, 3);
-        assert.equal(tel.toolCalls[0]?.toolName, 'b');
-        assert.equal(tel.toolCalls[2]?.toolName, 'd');
+    it('deve ter latency snapshot disponível', () => {
+        const m = createMetricsStore();
+        m.recordToolCall('lint', 100, true);
+        const s = m.getSummary();
+        const latency = s.tools['lint']?.latency;
+        assert.ok(typeof latency === 'object' && latency !== null, 'latency deve ser um objeto');
     });
 });
 
 // ─── recordSessionStart / recordSessionEnd ────────────────────────────────────
 
 describe('recordSessionStart', () => {
-    it('deve registrar sessão com status ativo', () => {
-        const tel = createTelemetry();
-        recordSessionStart(tel, 'sess-1');
-        assert.equal(tel.sessions.length, 1);
-        assert.equal(tel.sessions[0]?.sessionId, 'sess-1');
-        assert.equal(tel.sessions[0]?.status, 'active');
+    it('deve incrementar contador de sessões iniciadas', () => {
+        const m = createMetricsStore();
+        m.recordSessionStart();
+        const s = m.getSummary();
+        assert.equal(s.sessions.started, 1);
     });
 
-    it('deve aceitar startedAt customizado', () => {
-        const tel = createTelemetry();
-        recordSessionStart(tel, 'sess-1', { startedAt: 1000 });
-        assert.equal(tel.sessions[0]?.startedAt, 1000);
-    });
-
-    it('deve lançar se sessionId inválido', () => {
-        const tel = createTelemetry();
-        assert.throws(() => recordSessionStart(tel, ''), /sessionId/);
+    it('deve acumular múltiplos starts', () => {
+        const m = createMetricsStore();
+        m.recordSessionStart();
+        m.recordSessionStart();
+        m.recordSessionStart();
+        assert.equal(m.getSummary().sessions.started, 3);
     });
 });
 
 describe('recordSessionEnd', () => {
-    it('deve marcar sessão como encerrada', () => {
-        const tel = createTelemetry();
-        recordSessionStart(tel, 'sess-1');
-        const ok = recordSessionEnd(tel, 'sess-1');
-        assert.equal(ok, true);
-        assert.equal(tel.sessions[0]?.status, 'ended');
-        assert.ok(tel.sessions[0]?.endedAt !== undefined);
+    it('deve incrementar contador de sessões encerradas', () => {
+        const m = createMetricsStore();
+        m.recordSessionStart();
+        m.recordSessionEnd();
+        const s = m.getSummary();
+        assert.equal(s.sessions.ended, 1);
     });
 
-    it('deve marcar sessão com status error', () => {
-        const tel = createTelemetry();
-        recordSessionStart(tel, 'sess-1');
-        recordSessionEnd(tel, 'sess-1', { status: 'error', error: 'conexão perdida' });
-        assert.equal(tel.sessions[0]?.status, 'error');
-        assert.equal(tel.sessions[0]?.error, 'conexão perdida');
-    });
-
-    it('deve retornar false se sessão não existe', () => {
-        const tel = createTelemetry();
-        const ok = recordSessionEnd(tel, 'inexistente');
-        assert.equal(ok, false);
-    });
-
-    it('deve retornar false se sessão já foi encerrada', () => {
-        const tel = createTelemetry();
-        recordSessionStart(tel, 'sess-1');
-        recordSessionEnd(tel, 'sess-1');
-        const ok = recordSessionEnd(tel, 'sess-1'); // Segunda chamada
-        assert.equal(ok, false);
-    });
-
-    it('deve usar endedAt customizado', () => {
-        const tel = createTelemetry();
-        recordSessionStart(tel, 'sess-1');
-        recordSessionEnd(tel, 'sess-1', { endedAt: 9999 });
-        assert.equal(tel.sessions[0]?.endedAt, 9999);
+    it('deve ser independente do start', () => {
+        const m = createMetricsStore();
+        m.recordSessionEnd();
+        assert.equal(m.getSummary().sessions.ended, 1);
     });
 });
 
-// ─── getTotalCalls / getSuccessCount / getErrorCount ──────────────────────────
-
-describe('getTotalCalls', () => {
-    it('deve retornar 0 para store vazio', () => {
-        assert.equal(getTotalCalls(createTelemetry()), 0);
-    });
-
-    it('deve retornar contagem correta', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 'a', { durationMs: 1, success: true });
-        recordToolCall(tel, 'b', { durationMs: 1, success: false });
-        assert.equal(getTotalCalls(tel), 2);
+describe('recordSessionError', () => {
+    it('deve incrementar contador de sessions com erro', () => {
+        const m = createMetricsStore();
+        m.recordSessionError();
+        assert.equal(m.getSummary().sessions.errors, 1);
     });
 });
 
-describe('getSuccessCount', () => {
-    it('deve contar apenas chamadas bem-sucedidas', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 'a', { durationMs: 1, success: true });
-        recordToolCall(tel, 'b', { durationMs: 1, success: false });
-        recordToolCall(tel, 'c', { durationMs: 1, success: true });
-        assert.equal(getSuccessCount(tel), 2);
+// ─── recordDialogTurn ─────────────────────────────────────────────────────────
+
+describe('recordDialogTurn', () => {
+    it('deve incrementar turnsTotal', () => {
+        const m = createMetricsStore();
+        m.recordDialogTurn(100, true);
+        assert.equal(m.getSummary().dialog.turnsTotal, 1);
+        assert.equal(m.getSummary().dialog.turnsSuccess, 1);
+    });
+
+    it('deve contabilizar turn com falha', () => {
+        const m = createMetricsStore();
+        m.recordDialogTurn(50, false);
+        const s = m.getSummary();
+        assert.equal(s.dialog.turnsTotal, 1);
+        assert.equal(s.dialog.turnsSuccess, 0);
+    });
+
+    it('deve acumular múltiplos turns', () => {
+        const m = createMetricsStore();
+        m.recordDialogTurn(100, true);
+        m.recordDialogTurn(200, true);
+        m.recordDialogTurn(50, false);
+        const s = m.getSummary();
+        assert.equal(s.dialog.turnsTotal, 3);
+        assert.equal(s.dialog.turnsSuccess, 2);
     });
 });
 
-describe('getErrorCount', () => {
-    it('deve contar apenas chamadas com erro', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 'a', { durationMs: 1, success: true });
-        recordToolCall(tel, 'b', { durationMs: 1, success: false });
-        assert.equal(getErrorCount(tel), 1);
-    });
+// ─── recordDialogStall / recordDialogTimeout ──────────────────────────────────
 
-    it('deve retornar 0 se não há erros', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 'a', { durationMs: 1, success: true });
-        assert.equal(getErrorCount(tel), 0);
+describe('recordDialogStall', () => {
+    it('deve incrementar stallsTotal', () => {
+        const m = createMetricsStore();
+        m.recordDialogStall(5000);
+        assert.equal(m.getSummary().dialog.stallsTotal, 1);
     });
 });
 
-// ─── getAverageDuration ───────────────────────────────────────────────────────
-
-describe('getAverageDuration', () => {
-    it('deve retornar 0 para store vazio', () => {
-        assert.equal(getAverageDuration(createTelemetry()), 0);
-    });
-
-    it('deve calcular média corretamente', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 'a', { durationMs: 100, success: true });
-        recordToolCall(tel, 'b', { durationMs: 200, success: true });
-        recordToolCall(tel, 'c', { durationMs: 300, success: true });
-        assert.equal(getAverageDuration(tel), 200);
+describe('recordDialogTimeout', () => {
+    it('deve incrementar timeoutsTotal', () => {
+        const m = createMetricsStore();
+        m.recordDialogTimeout();
+        assert.equal(m.getSummary().dialog.timeoutsTotal, 1);
     });
 });
 
-// ─── getCallsByTool / getCallsBySession ───────────────────────────────────────
+// ─── recordTaskCompletion ─────────────────────────────────────────────────────
 
-describe('getCallsByTool', () => {
-    it('deve filtrar por nome de ferramenta', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 'lint', { durationMs: 1, success: true });
-        recordToolCall(tel, 'test', { durationMs: 1, success: true });
-        recordToolCall(tel, 'lint', { durationMs: 1, success: false });
-        const calls = getCallsByTool(tel, 'lint');
-        assert.equal(calls.length, 2);
-        assert.ok(calls.every((c) => c.toolName === 'lint'));
+describe('recordTaskCompletion', () => {
+    it('deve incrementar tasks.completed quando success=true', () => {
+        const m = createMetricsStore();
+        m.recordTaskCompletion(1000, true);
+        assert.equal(m.getSummary().tasks.completed, 1);
+        assert.equal(m.getSummary().tasks.failed, 0);
     });
 
-    it('deve retornar array vazio se ferramenta não usada', () => {
-        assert.deepEqual(getCallsByTool(createTelemetry(), 'nope'), []);
-    });
-});
-
-describe('getCallsBySession', () => {
-    it('deve filtrar por sessionId', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 't', { durationMs: 1, success: true, sessionId: 'a' });
-        recordToolCall(tel, 't', { durationMs: 1, success: true, sessionId: 'b' });
-        const calls = getCallsBySession(tel, 'a');
-        assert.equal(calls.length, 1);
-        assert.equal(calls[0]?.sessionId, 'a');
+    it('deve incrementar tasks.failed quando success=false', () => {
+        const m = createMetricsStore();
+        m.recordTaskCompletion(500, false);
+        assert.equal(m.getSummary().tasks.failed, 1);
+        assert.equal(m.getSummary().tasks.completed, 0);
     });
 });
 
-// ─── getRecentCalls ───────────────────────────────────────────────────────────
+// ─── recordCounter ────────────────────────────────────────────────────────────
 
-describe('getRecentCalls', () => {
-    it('deve retornar os N mais recentes', () => {
-        const tel = createTelemetry();
-        for (let i = 1; i <= 5; i++) {
-            recordToolCall(tel, `t${i}`, { durationMs: i, success: true });
-        }
-        const recent = getRecentCalls(tel, 3);
-        assert.equal(recent.length, 3);
-        assert.equal(recent[0]?.toolName, 't3');
-        assert.equal(recent[2]?.toolName, 't5');
+describe('recordCounter', () => {
+    it('deve incrementar contador personalizado', () => {
+        const m = createMetricsStore();
+        m.recordCounter('reconnects');
+        m.recordCounter('reconnects');
+        assert.equal(m.getSummary().counters['reconnects'], 2);
     });
 
-    it('deve retornar todos se n > total', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 't', { durationMs: 1, success: true });
-        assert.equal(getRecentCalls(tel, 100).length, 1);
+    it('deve incrementar por valor fornecido', () => {
+        const m = createMetricsStore();
+        m.recordCounter('events', 5);
+        assert.equal(m.getSummary().counters['events'], 5);
     });
 
-    it('deve usar n=10 como padrão', () => {
-        const tel = createTelemetry();
-        for (let i = 0; i < 15; i++) recordToolCall(tel, 't', { durationMs: 1, success: true });
-        assert.equal(getRecentCalls(tel).length, 10);
-    });
-});
-
-// ─── getErrorCalls ────────────────────────────────────────────────────────────
-
-describe('getErrorCalls', () => {
-    it('deve retornar apenas chamadas com erro', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 'ok', { durationMs: 1, success: true });
-        recordToolCall(tel, 'fail', { durationMs: 1, success: false, error: 'x' });
-        const errors = getErrorCalls(tel);
-        assert.equal(errors.length, 1);
-        assert.equal(errors[0]?.toolName, 'fail');
+    it('deve criar contador novo ao primeiro uso', () => {
+        const m = createMetricsStore();
+        m.recordCounter('novo');
+        assert.equal(m.getSummary().counters['novo'], 1);
     });
 });
 
 // ─── getSummary ───────────────────────────────────────────────────────────────
 
 describe('getSummary', () => {
-    it('deve retornar sumário correto', () => {
-        const tel = createTelemetry();
-        recordSessionStart(tel, 'sess-1');
-        recordSessionStart(tel, 'sess-2');
-        recordSessionEnd(tel, 'sess-1');
-        recordToolCall(tel, 'lint', { durationMs: 100, success: true });
-        recordToolCall(tel, 'lint', { durationMs: 200, success: true });
-        recordToolCall(tel, 'test', { durationMs: 50, success: false });
-
-        const s = getSummary(tel);
-        assert.equal(s.totalCalls, 3);
-        assert.equal(s.successCalls, 2);
-        assert.equal(s.errorCalls, 1);
-        assert.ok(Math.abs(s.averageDurationMs - (100 + 200 + 50) / 3) < 0.01);
-        assert.equal(s.activeSessions, 1);
-        assert.equal(s.totalSessions, 2);
-        assert.equal(s.topTools[0]?.toolName, 'lint');
-        assert.equal(s.topTools[0]?.count, 2);
+    it('deve retornar sumário com todas as seções esperadas', () => {
+        const m = createMetricsStore();
+        const s = m.getSummary();
+        assert.ok('tools' in s, 'deve ter seção tools');
+        assert.ok('tokens' in s, 'deve ter seção tokens');
+        assert.ok('sessions' in s, 'deve ter seção sessions');
+        assert.ok('dialog' in s, 'deve ter seção dialog');
+        assert.ok('tasks' in s, 'deve ter seção tasks');
+        assert.ok('counters' in s, 'deve ter seção counters');
+        assert.ok('collectedAt' in s, 'deve ter collectedAt');
     });
 
-    it('deve retornar sumário vazio', () => {
-        const s = getSummary(createTelemetry());
-        assert.equal(s.totalCalls, 0);
-        assert.equal(s.successCalls, 0);
-        assert.equal(s.errorCalls, 0);
-        assert.equal(s.averageDurationMs, 0);
-        assert.equal(s.activeSessions, 0);
-        assert.equal(s.totalSessions, 0);
-        assert.deepEqual(s.topTools, []);
+    it('deve retornar sumário com dados corretos após operações', () => {
+        const m = createMetricsStore();
+        m.recordSessionStart();
+        m.recordSessionStart();
+        m.recordSessionEnd();
+        m.recordToolCall('lint', 100, true);
+        m.recordToolCall('lint', 200, true);
+        m.recordToolCall('test', 50, false);
+        m.recordDialogTurn(150, true);
+
+        const s = m.getSummary();
+        assert.equal(s.sessions.started, 2);
+        assert.equal(s.sessions.ended, 1);
+        assert.equal(s.tools['lint']?.totalCalls, 2);
+        assert.equal(s.tools['lint']?.successCount, 2);
+        assert.equal(s.tools['test']?.totalCalls, 1);
+        assert.equal(s.tools['test']?.errorCount, 1);
+        assert.equal(s.dialog.turnsTotal, 1);
+        assert.equal(s.dialog.turnsSuccess, 1);
+    });
+
+    it('deve retornar sumário vazio para store novo', () => {
+        const s = createMetricsStore().getSummary();
+        assert.deepEqual(s.tools, {});
+        assert.equal(s.sessions.started, 0);
+        assert.equal(s.sessions.ended, 0);
+        assert.equal(s.dialog.turnsTotal, 0);
+        assert.equal(s.tasks.completed, 0);
+    });
+
+    it('deve incluir collectedAt como timestamp recente', () => {
+        const before = Date.now();
+        const m = createMetricsStore();
+        const s = m.getSummary();
+        const after = Date.now();
+        assert.ok(s.collectedAt >= before && s.collectedAt <= after);
     });
 });
 
-// ─── clearTelemetry ───────────────────────────────────────────────────────────
+// ─── reset ────────────────────────────────────────────────────────────────────
 
-describe('clearTelemetry', () => {
-    it('deve limpar todos os registros', () => {
-        const tel = createTelemetry();
-        recordToolCall(tel, 't', { durationMs: 1, success: true });
-        recordSessionStart(tel, 'sess-1');
-        clearTelemetry(tel);
-        assert.equal(tel.toolCalls.length, 0);
-        assert.equal(tel.sessions.length, 0);
+describe('reset', () => {
+    it('deve limpar todos os contadores', () => {
+        const m = createMetricsStore();
+        m.recordSessionStart();
+        m.recordToolCall('lint', 100, true);
+        m.recordDialogTurn(50, true);
+        m.recordTaskCompletion(100, true);
+        m.recordCounter('x');
+        m.reset();
+        const s = m.getSummary();
+        assert.deepEqual(s.tools, {});
+        assert.equal(s.sessions.started, 0);
+        assert.equal(s.sessions.ended, 0);
+        assert.equal(s.dialog.turnsTotal, 0);
+        assert.equal(s.tasks.completed, 0);
+        assert.deepEqual(s.counters, {});
     });
 
-    it('deve preservar maxRecords após clear', () => {
-        const tel = createTelemetry({ maxRecords: 42 });
-        clearTelemetry(tel);
-        assert.equal(tel.maxRecords, 42);
+    it('deve permitir registros após reset', () => {
+        const m = createMetricsStore();
+        m.recordToolCall('a', 10, true);
+        m.reset();
+        m.recordToolCall('b', 20, true);
+        const s = m.getSummary();
+        assert.equal(s.tools['b']?.totalCalls, 1);
+        assert.ok(!s.tools['a'], 'ferramentas pré-reset não devem aparecer');
+    });
+});
+
+// ─── recordUsage ──────────────────────────────────────────────────────────────
+
+describe('recordUsage', () => {
+    it('deve acumular tokens de entrada e saída', () => {
+        const m = createMetricsStore();
+        m.recordUsage('gpt-4.1', 100, 50);
+        const s = m.getSummary();
+        assert.equal(s.tokens.inputTokens, 100);
+        assert.equal(s.tokens.outputTokens, 50);
+    });
+
+    it('deve acumular tokens de múltiplas chamadas', () => {
+        const m = createMetricsStore();
+        m.recordUsage('gpt-4.1', 100, 50);
+        m.recordUsage('gpt-4.1', 200, 75);
+        const s = m.getSummary();
+        assert.equal(s.tokens.inputTokens, 300);
+        assert.equal(s.tokens.outputTokens, 125);
+    });
+
+    it('deve rastrear tokens por modelo', () => {
+        const m = createMetricsStore();
+        m.recordUsage('gpt-4.1', 100, 50);
+        m.recordUsage('gpt-4o', 200, 75);
+        const s = m.getSummary();
+        assert.ok(s.tokens.byModel['gpt-4.1'], 'deve ter entrada para gpt-4.1');
+        assert.ok(s.tokens.byModel['gpt-4o'], 'deve ter entrada para gpt-4o');
+    });
+
+    it('deve aceitar tokens de cache', () => {
+        const m = createMetricsStore();
+        m.recordUsage('m', 0, 0, 500, 200);
+        const s = m.getSummary();
+        assert.equal(s.tokens.cacheReadTokens, 500);
+        assert.equal(s.tokens.cacheWriteTokens, 200);
     });
 });

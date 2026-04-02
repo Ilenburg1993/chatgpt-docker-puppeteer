@@ -114,23 +114,6 @@ export {
     registerTools,
 } from '#copilot/lib/tools-registry';
 
-export {
-    clearTelemetry,
-    createTelemetry,
-    getAverageDuration,
-    getCallsBySession,
-    getCallsByTool,
-    getErrorCalls,
-    getErrorCount,
-    getRecentCalls,
-    getSuccessCount,
-    getSummary,
-    getTotalCalls,
-    recordSessionEnd,
-    recordSessionStart,
-    recordToolCall,
-    startSpan,
-} from '#copilot/lib/telemetry';
 export { raceEvents, waitForEvent } from './event-helpers.js';
 export { httpRequest } from './http-request.js';
 export { validateUrl, validateUrlString } from './url-validator.js';

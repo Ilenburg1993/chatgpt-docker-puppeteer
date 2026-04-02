@@ -73,7 +73,7 @@ function persistEvent(entry) {
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 /**
- * @typedef {import('#copilot/lib/telemetry').TelemetryStore} TelemetryStore
+ * @typedef {import('./metrics.js').MetricsStore} TelemetryStore
  *
  * @typedef {import('#copilot/hooks/bus').HookBus} HookBus
  *

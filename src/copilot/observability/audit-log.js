@@ -2,33 +2,34 @@
 /**
  * src/copilot/observability/audit-log.js
  *
- * Fase S — Ring buffer de auditoria para eventos significativos do agente.
+ * Ring buffer de auditoria central para eventos significativos do agente. Consolida funcionalidade de
+ * `channel/audit.js` (correlação de tool calls + JSONL I/O) e ring buffer geral de auditoria.
  *
- * Armazena até MAX_AUDIT_ENTRIES entradas (padrão 200) em memória, com flush periódico ou ao hit de capacidade para
- * `logs/copilot/audit.jsonl`.
+ * Responsabilidades:
  *
- * Diferente do ErrorTracker (foco em erros), o AuditLog é um log de auditoria geral — registra decisões, mudanças de
- * estado, e eventos de conformidade:
- *
- * - Início/fim de session (session.start, session.end)
- * - Início/fim de turn (dialog.turn_start, dialog.turn_end)
- * - Permissões concedidas/negadas (permission.approved, permission.denied)
- * - Execução de tool (tool.executed)
- * - Erros fatais (session.fatal)
- * - Hooks disparados (hook.fired)
+ * - Ring buffer em memória de eventos de auditoria (session, permission, tool, hooks)
+ * - Correlação start/complete de tool calls (ex-`channel/audit.js`)
+ * - Escrita assíncrona em `logs/tool-audit.jsonl` via batch I/O com setImmediate
+ * - Rotação automática do JSONL (10 MB → `.1`)
+ * - Leitura de histórico via `getAuditSummary()`
  *
  * @module copilot/observability/audit-log
  */
 
-import { appendFile, mkdir } from 'node:fs/promises';
+import fs from 'node:fs';
+import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { LOG_DIR, log } from './logger.js';
 
 /** Máximo de entradas no buffer em memória. */
-const MAX_AUDIT_ENTRIES = 200;
+const MAX_AUDIT_ENTRIES = Number(process.env['COPILOT_AUDIT_RING_SIZE']) || 200;
 
-/** Default path do arquivo de audit em disco. */
+/** Default path do arquivo de audit geral em disco. */
 const AUDIT_FILE = join(LOG_DIR, 'audit.jsonl');
+
+/** Path do arquivo JSONL de tool calls (ex-channel/audit.js). */
+const TOOL_AUDIT_FILE = join(LOG_DIR, 'tool-audit.jsonl');
+const MAX_TOOL_AUDIT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /**
  * @typedef {object} AuditEntry
@@ -39,27 +40,103 @@ const AUDIT_FILE = join(LOG_DIR, 'audit.jsonl');
  */
 
 /**
- * @typedef {object} AuditLog
- * @property {(entry: Omit<AuditEntry, 'ts'>) => void} record Registra uma entrada de auditoria. Thread-safe (in-memory
- *   only).
- * @property {() => AuditEntry[]} getEntries Retorna cópia das entradas recentes no buffer.
- * @property {(n?: number) => AuditEntry[]} getLast Retorna as últimas N entradas.
- * @property {() => Promise<void>} flush Persiste todas as entradas do buffer em `logs/copilot/audit.jsonl`.
- * @property {() => void} clear Limpa o buffer sem persistir.
+ * @typedef {object} ToolAuditStartEntry
+ * @property {string} toolCallId - ID único do tool call.
+ * @property {string} toolName - Nome da ferramenta.
+ * @property {object} [args] - Argumentos da chamada.
+ * @property {string | null} [mcpServerName] - Servidor MCP (se aplicável).
  */
 
 /**
- * Cria um AuditLog com ring buffer em memória.
+ * @typedef {object} ToolAuditCompleteEntry
+ * @property {string} toolCallId - ID único do tool call.
+ * @property {boolean} success - Se a chamada foi bem-sucedida.
+ * @property {string | null} [sessionId] - ID da sessão.
+ * @property {string | null} [taskId] - ID da tarefa.
+ * @property {string | null} [resultContent] - Resultado parcial (até 200 chars).
+ */
+
+/**
+ * @typedef {object} AuditLog
+ * @property {(entry: Omit<AuditEntry, 'ts'>) => void} record Registra uma entrada de auditoria.
+ * @property {() => AuditEntry[]} getEntries Retorna cópia das entradas recentes no buffer.
+ * @property {(n?: number) => AuditEntry[]} getLast Retorna as últimas N entradas.
+ * @property {() => Promise<void>} flush Persiste todas as entradas do buffer em `logs/audit.jsonl`.
+ * @property {() => void} clear Limpa o buffer sem persistir.
+ * @property {(entry: ToolAuditStartEntry) => void} recordToolStart Registra início de tool call (correlação).
+ * @property {(entry: ToolAuditCompleteEntry) => void} recordToolComplete Registra conclusão de tool call + JSONL I/O.
+ * @property {(sessionId?: string | null, limit?: number) => Promise<object[]>} getAuditSummary Lê histórico JSONL.
+ */
+
+/**
+ * Serializa argumentos de tool call em texto curto para o log.
  *
- * @param {{ maxEntries?: number; auditFile?: string }} [opts]
+ * @param {object} args
+ * @returns {string}
+ */
+function _argsSummary(args) {
+    try {
+        const str = JSON.stringify(args);
+        return str.length > 200 ? str.slice(0, 200) + '…' : str;
+    } catch {
+        return '(não serializável)';
+    }
+}
+
+/**
+ * Cria um AuditLog com ring buffer em memória e suporte a JSONL I/O de tool calls.
+ *
+ * @param {{ maxEntries?: number; auditFile?: string; toolAuditFile?: string }} [opts]
  * @returns {AuditLog}
  */
 export function createAuditLog(opts = {}) {
     const maxEntries = opts.maxEntries ?? MAX_AUDIT_ENTRIES;
     const auditFile = opts.auditFile ?? AUDIT_FILE;
+    const toolAuditFile = opts.toolAuditFile ?? TOOL_AUDIT_FILE;
+    const toolAuditRotate = toolAuditFile + '.1';
 
     /** @type {AuditEntry[]} */
     const _buffer = [];
+
+    // ── Correlação de tool calls (ex-channel/audit.js) ─────────────────────────────
+
+    /** @type {Map<string, { toolName: string; mcpServerName: string | null; args: object; ts: number }>} */
+    const _pending = new Map();
+
+    // ── Fila de escritas assíncronas para tool-audit.jsonl ─────────────────────────
+
+    /** @type {string[]} */
+    const _toolWriteQueue = [];
+    let _flushScheduled = false;
+
+    /**
+     * Flush assíncrono via setImmediate — não bloqueia o event loop.
+     *
+     * @returns {void}
+     */
+    function scheduleFlushTool() {
+        if (_flushScheduled) return;
+        _flushScheduled = true;
+        setImmediate(async () => {
+            _flushScheduled = false;
+            const batch = _toolWriteQueue.splice(0);
+            if (!batch.length) return;
+            try {
+                await mkdir(/** @type {string} */ (toolAuditFile.replace(/[^/\\]+$/, '')), { recursive: true });
+                try {
+                    const { size } = await stat(toolAuditFile);
+                    if (size >= MAX_TOOL_AUDIT_BYTES) await rename(toolAuditFile, toolAuditRotate);
+                } catch {
+                    // arquivo ainda não existe — OK
+                }
+                await appendFile(toolAuditFile, batch.join(''), 'utf8');
+            } catch {
+                // Falha silenciosa — auditoria não deve interromper o agente
+            }
+        });
+    }
+
+    // ── Ring buffer geral ───────────────────────────────────────────────────────────
 
     /**
      * @param {Omit<AuditEntry, 'ts'>} entry
@@ -76,9 +153,7 @@ export function createAuditLog(opts = {}) {
         }
     }
 
-    /**
-     * @returns {AuditEntry[]}
-     */
+    /** @returns {AuditEntry[]} */
     function getEntries() {
         return [..._buffer];
     }
@@ -91,13 +166,11 @@ export function createAuditLog(opts = {}) {
         return _buffer.slice(-n);
     }
 
-    /**
-     * @returns {Promise<void>}
-     */
+    /** @returns {Promise<void>} */
     async function flush() {
         if (_buffer.length === 0) return;
         try {
-            await mkdir(/** @type {string} */ (auditFile.replace(/[^/]+$/, '')), { recursive: true });
+            await mkdir(/** @type {string} */ (auditFile.replace(/[^/\\]+$/, '')), { recursive: true });
             const lines = _buffer.map((e) => JSON.stringify(e)).join('\n') + '\n';
             await appendFile(auditFile, lines, 'utf8');
         } catch (/** @type {any} */ err) {
@@ -105,14 +178,100 @@ export function createAuditLog(opts = {}) {
         }
     }
 
-    /**
-     * @returns {void}
-     */
+    /** @returns {void} */
     function clear() {
         _buffer.length = 0;
     }
 
-    return { record, getEntries, getLast, flush, clear };
+    // ── Tool call audit (ex-channel/audit.js) ──────────────────────────────────────
+
+    /**
+     * Registra o início de uma tool call. Equivalente a `auditToolStart()` de `channel/audit.js`.
+     *
+     * @param {ToolAuditStartEntry} entry
+     * @returns {void}
+     */
+    function recordToolStart(entry) {
+        _pending.set(entry.toolCallId, {
+            toolName: entry.toolName,
+            mcpServerName: entry.mcpServerName ?? null,
+            args: entry.args ?? {},
+            ts: Date.now(),
+        });
+    }
+
+    /**
+     * Registra a conclusão de uma tool call, correlaciona com o start e escreve no JSONL. Equivalente a
+     * `auditToolComplete()` de `channel/audit.js`.
+     *
+     * @param {ToolAuditCompleteEntry} entry
+     * @returns {void}
+     */
+    function recordToolComplete(entry) {
+        const pending = _pending.get(entry.toolCallId);
+        _pending.delete(entry.toolCallId);
+
+        const durationMs = pending ? Date.now() - pending.ts : null;
+
+        const jsonRecord = {
+            ts: new Date().toISOString(),
+            sessionId: entry.sessionId ?? null,
+            taskId: entry.taskId ?? null,
+            toolCallId: entry.toolCallId,
+            toolName: pending?.toolName ?? '(desconhecido)',
+            mcpServerName: pending?.mcpServerName ?? null,
+            argsSummary: pending ? _argsSummary(pending.args) : null,
+            resultSummary: entry.resultContent ? entry.resultContent.slice(0, 200) : null,
+            durationMs,
+            success: entry.success,
+        };
+
+        // Alimenta ring buffer em memória
+        record({
+            type: 'tool.executed',
+            ...(entry.sessionId != null ? { sessionId: entry.sessionId } : {}),
+            data: {
+                toolName: jsonRecord.toolName,
+                durationMs,
+                success: entry.success,
+            },
+        });
+
+        // Enfileira para escrita assíncrona no JSONL
+        _toolWriteQueue.push(JSON.stringify(jsonRecord) + '\n');
+        scheduleFlushTool();
+    }
+
+    /**
+     * Retorna as últimas `limit` entradas de auditoria de tool calls do arquivo JSONL. Equivalente a
+     * `getAuditSummary()` de `channel/audit.js`.
+     *
+     * @param {string | null} [sessionId] - Filtrar por sessão; null retorna todas.
+     * @param {number} [limit=50] Default is `50`
+     * @returns {Promise<object[]>}
+     */
+    async function getAuditSummary(sessionId, limit = 50) {
+        try {
+            if (!fs.existsSync(toolAuditFile)) return [];
+            const raw = await fs.promises.readFile(toolAuditFile, 'utf8');
+            const lines = raw.trim().split('\n').filter(Boolean);
+            const entries = lines
+                .map((l) => {
+                    try {
+                        return JSON.parse(l);
+                    } catch {
+                        return null;
+                    }
+                })
+                .filter(Boolean);
+            const filtered = sessionId ? entries.filter((e) => e.sessionId === sessionId) : entries;
+            return filtered.slice(-limit);
+        } catch {
+            return [];
+        }
+    }
+
+    return { record, getEntries, getLast, flush, clear, recordToolStart, recordToolComplete, getAuditSummary };
 }
 
 // ─── Singleton ────────────────────────────────────────────────────────────────

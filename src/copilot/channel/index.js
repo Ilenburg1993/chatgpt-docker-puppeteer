@@ -68,10 +68,6 @@ export {
 
 export { LlmBridgeClient, llmBridgeClient } from './client.js';
 
-// ─── Tool Call Auditing ────────────────────────────────────────────────────────
-
-export { auditToolComplete, auditToolStart, getAuditSummary } from './audit.js';
-
 // ─── Tipos públicos do canal ───────────────────────────────────────────────────
 
 /**

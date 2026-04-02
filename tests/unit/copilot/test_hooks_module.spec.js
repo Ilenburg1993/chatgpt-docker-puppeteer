@@ -17,7 +17,6 @@
 
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { createTelemetry } from '../../../src/copilot/lib/telemetry.js';
 
 // ─── Imports diretos dos novos módulos ────────────────────────────────────────
 import {
@@ -534,11 +533,13 @@ describe('hooks/presets/minimal', () => {
 
 describe('hooks/presets/audit', () => {
     it('registra atividade no audit trail', async () => {
-        const { hooks, getAuditTrail } = createAuditPreset();
+        const { hooks, getAuditTrail, clearAuditTrail } = createAuditPreset();
+        clearAuditTrail();
         await hooks.onPreToolUse(preInput('shell'), inv());
         const trail = getAuditTrail();
         assert.ok(trail.length >= 1);
-        assert.strictEqual(trail[0].hookName, 'onPreToolUse');
+        const last = trail[trail.length - 1];
+        assert.strictEqual(last?.data?.hookName, 'onPreToolUse');
     });
 
     it('clearAuditTrail: limpa o trail', async () => {
@@ -628,9 +629,7 @@ describe('hooks/presets/interactive', () => {
 describe('hooks/session-lifecycle › createSessionHooks', () => {
     /** @returns {import('../../../src/copilot/hooks/types.js').SessionLifecycleContext} */
     function makeCtx(overrides = {}) {
-        const store = createTelemetry();
         return {
-            getTelemetry: () => /** @type {any} */ (store),
             emitWebhook: async () => {},
             getModel: () => 'gpt-4',
             scheduleFallback: () => {},

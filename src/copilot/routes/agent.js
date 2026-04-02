@@ -23,7 +23,7 @@ import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { getClient } from '../lib/sdk-client.js';
-import { clearTelemetry, getSummary } from '../lib/telemetry.js';
+import { defaultMetrics } from '../observability/index.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** Contador de clientes SSE ativos em /agent/stream. */
@@ -119,12 +119,7 @@ router.get('/agent/tools', (req, res) => {
  * @param {import('express').Response} res
  */
 function handleGetTelemetry(_req, res) {
-    const telemetry = alwaysAliveAgent.telemetry;
-    if (!telemetry) {
-        res.status(503).json({ ok: false, error: 'Telemetria não disponível (agente não iniciado)' });
-        return;
-    }
-    res.json({ ok: true, summary: getSummary(telemetry), raw: telemetry });
+    res.json({ ok: true, summary: defaultMetrics.getSummary() });
 }
 
 router.get('/agent/telemetry', handleGetTelemetry);
@@ -133,14 +128,8 @@ router.get('/telemetry', handleGetTelemetry);
 /**
  * Reseta o store de telemetria do agente. Útil após deploy ou manutenção.
  */
-router.post('/agent/telemetry/clear', (req, res) => {
-    void req;
-    const telemetry = alwaysAliveAgent.telemetry;
-    if (!telemetry) {
-        res.status(503).json({ ok: false, error: 'Telemetria não disponível (agente não iniciado)' });
-        return;
-    }
-    clearTelemetry(telemetry);
+router.post('/agent/telemetry/clear', (_req, res) => {
+    defaultMetrics.reset();
     log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
     res.json({ ok: true, message: 'Telemetria resetada com sucesso' });
 });

@@ -1,8 +1,8 @@
 # Observabilidade, Telemetria e Logging — Análise e Roadmap
 
-**Status**: Canônico — Implementação ativa (Fases A-M concluídas; Fases N-T em andamento)
-**Última atualização**: 2026-06-17 (pós-commit `ff71cc4e` — Fase A-M implementada)
-**Escopo**: `src/copilot/` — isolamento total + sistema centralizado robusto
+**Status**: Canônico — Implementação ativa (Fases A-M concluídas; Fases N-T em andamento) **Última
+atualização**: 2026-06-17 (pós-commit `ff71cc4e` — Fase A-M implementada) **Escopo**: `src/copilot/`
+— isolamento total + sistema centralizado robusto
 
 ---
 
@@ -10,8 +10,8 @@
 
 ### 0.1 O que foi implementado e está funcionando
 
-| Componente                     | Arquivo                                     | Status                                     |
-| ------------------------------ | ------------------------------------------- | ------------------------------------------ |
+| Componente                     | Arquivo                                     | Status                                      |
+| ------------------------------ | ------------------------------------------- | ------------------------------------------- |
 | Logger isolado                 | `observability/logger.js`                   | ✅ operacional, ring buffer 1000 entries    |
 | Alias `#copilot/observability` | `package.json` + `tsconfig.base.json`       | ✅ funcionando                              |
 | Codemod 76 arquivos            | `src/copilot/**/*.js`                       | ✅ zero ocorrências de `#core/logger`       |
@@ -32,15 +32,19 @@ seguintes gaps foram identificados:
 
 #### GAP-01 — `initEventCollector()` nunca chamado (CRÍTICO)
 
-`defaultEventCollector` é exportado de `event-collector.js` mas seu singleton interno é criado
-sem `metrics`, `errorTracker`, ou `hookBus`:
+`defaultEventCollector` é exportado de `event-collector.js` mas seu singleton interno é criado sem
+`metrics`, `errorTracker`, ou `hookBus`:
 
 ```js
 // Estado atual (INCORRETO):
 let _defaultCollector = createEventCollector({ persist: true }); // sem metrics, sem errorTracker!
 
 // O que deveria acontecer:
-initEventCollector({ hookBus: defaultBus, metrics: defaultMetrics, errorTracker: defaultErrorTracker });
+initEventCollector({
+  hookBus: defaultBus,
+  metrics: defaultMetrics,
+  errorTracker: defaultErrorTracker,
+});
 ```
 
 **Impacto**: `defaultMetrics.recordToolMetric()` e `defaultErrorTracker.trackError()` **nunca são
@@ -51,10 +55,14 @@ chamados** pelo event-collector. Os singletons existem mas estão desconectados.
 ```js
 // Código atual (morto/incorreto):
 if (telemetry) {
-    const { recordToolCall } = /** @type {typeof import('#copilot/lib/telemetry')} */ (telemetry) ?? {};
-    if (!recordToolCall) { /* tenta acessar telemetry.toolCalls diretamente */ }
+  const { recordToolCall } =
+    /** @type {typeof import('#copilot/lib/telemetry')} */ (telemetry) ?? {};
+  if (!recordToolCall) {
+    /* tenta acessar telemetry.toolCalls diretamente */
+  }
 }
 ```
+
 `telemetry` é um `TelemetryStore` (objeto de dados), não um módulo. `recordToolCall` nunca existe
 nele. O `if (!recordToolCall)` tenta um fallback direto no array — um hack frágil.
 
@@ -68,8 +76,8 @@ nele. O `if (!recordToolCall)` tenta um fallback direto no array — um hack fr�
 | `TelemetryStore` | `lib/telemetry.js`         | `task-executor.js`, `dialog-loop-manager.js` (indireto) | `introspection-tools.js`, `always-alive.js#telemetry` |
 | `MetricsStore`   | `observability/metrics.js` | **ninguém** (GAP-01)                                    | `routes/observability.js` (endpoint)                  |
 
-`always-alive.js` ainda usa `createTelemetry()` de `lib/telemetry.js`. O novo `defaultMetrics`
-nunca recebe dados da sessão real. Os dois vivem em paralelo sem integração.
+`always-alive.js` ainda usa `createTelemetry()` de `lib/telemetry.js`. O novo `defaultMetrics` nunca
+recebe dados da sessão real. Os dois vivem em paralelo sem integração.
 
 #### GAP-04 — Dialog loop sem observabilidade (ARQUITETURAL — mencionado pelo usuário)
 
@@ -109,8 +117,8 @@ independente em formatos diferentes — sem ring buffer em memória, sem API de 
 
 #### GAP-08 — SSE de eventos sem dados reais
 
-`GET /observability/events/stream` usa `defaultBus` para SSE. Mas `defaultBus` é um `HookBus` que
-só recebe eventos quando `emitHook()` é chamado — e o event-collector (que poderia chamar) está
+`GET /observability/events/stream` usa `defaultBus` para SSE. Mas `defaultBus` é um `HookBus` que só
+recebe eventos quando `emitHook()` é chamado — e o event-collector (que poderia chamar) está
 desconectado (GAP-01). Na prática o SSE nunca emite nada de valor.
 
 #### GAP-09 — Sem persistência de métricas
@@ -131,8 +139,8 @@ métricas. Latência real de turns (incluindo tempo de resposta do LLM) não é 
 
 #### GAP-12 — Audit endpoint ausente na API HTTP
 
-`routes/observability.js` não tem `GET /observability/audit` — proposto no roadmap original mas
-não implementado.
+`routes/observability.js` não tem `GET /observability/audit` — proposto no roadmap original mas não
+implementado.
 
 ### 0.3 Situação Ideal (objetivo das Fases N-T)
 
@@ -593,8 +601,8 @@ Corrige os 12 gaps identificados na análise da Seção 0.2.
 
 **Corrige**: GAP-01, GAP-02, GAP-06
 
-**Objetivo**: `defaultEventCollector` deve alimentar `defaultMetrics` e `defaultErrorTracker`.
-O código morto de telemetry legacy deve ser removido.
+**Objetivo**: `defaultEventCollector` deve alimentar `defaultMetrics` e `defaultErrorTracker`. O
+código morto de telemetry legacy deve ser removido.
 
 **Sub-tarefas**:
 
@@ -611,7 +619,8 @@ O código morto de telemetry legacy deve ser removido.
 - N.4 No handler `session.error`:
   - `opts.errorTracker?.trackError(new Error(message), { source: 'sdk:session.error', sessionId })`
 - N.5 Em `always-alive.js`, antes de usar `defaultEventCollector`:
-  - Chamar `initEventCollector({ hookBus: defaultBus, metrics: defaultMetrics, errorTracker: defaultErrorTracker })`
+  - Chamar
+    `initEventCollector({ hookBus: defaultBus, metrics: defaultMetrics, errorTracker: defaultErrorTracker })`
   - Importar `defaultBus` de `#copilot/hooks/bus` — já disponível via `attachBus`
   - Chamar no top-level do módulo (fora da class) ou no primeiro boot
 - N.6 Exportar `HookBus` type de `#copilot/hooks/bus` para uso nos tipos de `EventCollectorOptions`
@@ -630,10 +639,10 @@ O código morto de telemetry legacy deve ser removido.
 - O.2 Adicionar ao `wireDialogLoopEvents()`:
   ```js
   dialogLoop.on('turn_start', (evt) => emitFn('dialog.turn_start', evt));
-  dialogLoop.on('turn_end',   (evt) => emitFn('dialog.turn_end',   evt));
+  dialogLoop.on('turn_end', (evt) => emitFn('dialog.turn_end', evt));
   ```
-- O.3 Verificar que `dialog.turn_start` e `dialog.turn_end` constam em `events.js` (AGENT_EVENTS)
-  — se não estiverem, adicionar
+- O.3 Verificar que `dialog.turn_start` e `dialog.turn_end` constam em `events.js` (AGENT_EVENTS) —
+  se não estiverem, adicionar
 - O.4 Validar que o wirer NÃO encaminha dois vezes (check de idempotência)
 
 ### Fase P — `observability/agent-observer.js` — Observador do AlwaysAliveAgent
@@ -685,7 +694,8 @@ alimenta `defaultMetrics` e `defaultErrorTracker`.
 
 - Q.1 Adicionar `DialogMetrics` ao typedef do `MetricsStore`:
   ```js
-  /** @typedef {object} DialogMetrics
+  /**
+   * @typedef {object} DialogMetrics
    * @property {number} turnsTotal - Total de turns executados
    * @property {number} turnsSuccess - Turns completados com sucesso
    * @property {number} stallsTotal - Total de stalls detectados
@@ -700,8 +710,8 @@ alimenta `defaultMetrics` e `defaultErrorTracker`.
   - `recordCounter(name, delta)` — generic counter (para timeouts, etc.)
 - Q.3 Incluir `dialog` na saída de `getAggregatedMetrics()`
 - Q.4 Adicionar `TaskMetrics`: `tasksCompleted`, `tasksFailed`, `avgTaskDurationMs`
-- Q.5 Adicionar `SessionMetrics.durationBySession: Map<string, number>` para rastrear duração
-  de sessões individuais
+- Q.5 Adicionar `SessionMetrics.durationBySession: Map<string, number>` para rastrear duração de
+  sessões individuais
 
 ### Fase R — `observability/audit-log.js` (Central JSONL I/O + Ring Buffer)
 
@@ -723,8 +733,8 @@ buffer em memória e API de leitura.
 - R.3 Migrar `channel/audit.js` para usar `auditLog.write()` internamente (mantém API pública)
 - R.4 Migrar `tool-audit-logger.js` para usar `auditLog.write()` internamente (mantém API pública)
 - R.5 Exportar `defaultAuditLog` de `observability/index.js`
-- R.6 Validar que os dois arquivos JSONL distintos atuais (`audit.js` e `tool-audit-logger.js`)
-  são unificados sem perda de informação
+- R.6 Validar que os dois arquivos JSONL distintos atuais (`audit.js` e `tool-audit-logger.js`) são
+  unificados sem perda de informação
 
 ### Fase S — Persistência Periódica de Métricas e Erros
 

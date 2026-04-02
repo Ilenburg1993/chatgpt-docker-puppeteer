@@ -38,5 +38,8 @@ export { createAgentEventObserver } from './agent-event-observer.js';
 // ─── Audit Log ────────────────────────────────────────────────────────────────
 export { createAuditLog, defaultAuditLog } from './audit-log.js';
 
+// ─── Hooks Audit Preset ───────────────────────────────────────────────────────
+export { createHooksAuditPreset } from './hooks-audit-preset.js';
+
 // ─── OTEL ─────────────────────────────────────────────────────────────────────
-export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled } from './otel.js';
+export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled, startSpan } from './otel.js';
