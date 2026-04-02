@@ -30,9 +30,12 @@ import {
     createAuditHooks,
     createAuditPreset,
     createBlocklistHook,
+    createCircuitBreakerHandler,
     createContextInjector,
+    createContextualErrorHandler,
     createDenyAllHooks,
     createDenyAllPreset,
+    createErrorHandler,
     createErrorNotifierHook,
     createHooks,
     createInteractivePreset,
@@ -41,6 +44,7 @@ import {
     createMinimalPreset,
     createPermissionHandler,
     createPostToolEnricher,
+    createProductionHooks,
     createPromptTransformer,
     createQueuedInputHandler,
     createSafeHooks,
@@ -660,5 +664,142 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
         );
         assert.strictEqual(scheduled, 'gpt-3.5-turbo');
         delete process.env['COPILOT_FALLBACK_MODEL'];
+    });
+});
+
+// ─── error-handler.js ─────────────────────────────────────────────────────────
+
+describe('createErrorHandler', () => {
+    it('retorna estratégia fixa "retry"', async () => {
+        const handler = createErrorHandler({ strategy: 'retry', maxRetries: 3 });
+        const result = await handler({ error: 'oops', errorContext: 'tool', recoverable: true }, { sessionId: 's' });
+        assert.strictEqual(result.errorHandling, 'retry');
+        // retryCount começa em 1 na primeira chamada
+        assert.strictEqual(result.retryCount, 1);
+    });
+
+    it('retorna estratégia fixa "skip"', async () => {
+        const handler = createErrorHandler({ strategy: 'skip' });
+        const result = await handler({ error: 'err', errorContext: 'tool', recoverable: false }, { sessionId: 's' });
+        assert.strictEqual(result.errorHandling, 'skip');
+    });
+
+    it('usa função de decisão customizada', async () => {
+        const handler = createErrorHandler({
+            strategy: (input) => (input.errorContext === 'rate_limit' ? 'retry' : 'abort'),
+        });
+        const r1 = await handler({ error: 'e', errorContext: 'rate_limit', recoverable: true }, { sessionId: 's' });
+        assert.strictEqual(r1.errorHandling, 'retry');
+        const r2 = await handler({ error: 'e', errorContext: 'other', recoverable: false }, { sessionId: 's' });
+        assert.strictEqual(r2.errorHandling, 'abort');
+    });
+
+    it('usa "abort" como padrão quando nenhuma opção passada', async () => {
+        const handler = createErrorHandler();
+        const result = await handler({ error: 'err', errorContext: '', recoverable: false }, { sessionId: 's' });
+        assert.strictEqual(result.errorHandling, 'abort');
+    });
+});
+
+describe('createCircuitBreakerHandler', () => {
+    it('permite retries até maxRetries', async () => {
+        // maxRetries: 3 → primeira falha = retry (failures=1, 1<3)
+        const handler = createCircuitBreakerHandler({ maxRetries: 3, resetAfterMs: 10_000 });
+        const r1 = await handler({ error: 'e', errorContext: 'tool_x', recoverable: true }, { sessionId: 's' });
+        assert.strictEqual(r1.errorHandling, 'retry');
+        const r2 = await handler({ error: 'e', errorContext: 'tool_x', recoverable: true }, { sessionId: 's' });
+        assert.strictEqual(r2.errorHandling, 'retry');
+    });
+
+    it('aborta quando circuit está aberto após maxRetries', async () => {
+        const tripped = [];
+        // maxRetries: 1 → na primeira falha, failures++ = 1 >= 1, abre circuit
+        const handler = createCircuitBreakerHandler({
+            maxRetries: 1,
+            resetAfterMs: 10_000,
+            onTrip: (ctx) => tripped.push(ctx),
+        });
+        // primeira falha → abre o circuit (já retorna abort)
+        const r1 = await handler({ error: 'e', errorContext: 'ctx_a', recoverable: true }, { sessionId: 's' });
+        assert.strictEqual(r1.errorHandling, 'abort');
+        assert.ok(tripped.includes('ctx_a'));
+        // segunda falha → circuit ainda aberto → abort
+        const r2 = await handler({ error: 'e', errorContext: 'ctx_a', recoverable: true }, { sessionId: 's' });
+        assert.strictEqual(r2.errorHandling, 'abort');
+    });
+
+    it('contextos diferentes têm contadores isolados', async () => {
+        // maxRetries: 2 → ctx_1: failures=1 → 1<2 = retry, mas ctx_2 tem failures=0 → retry também
+        const handler = createCircuitBreakerHandler({ maxRetries: 2, resetAfterMs: 10_000 });
+        // Primeira falha de ctx_1 — failures=1
+        await handler({ error: 'e', errorContext: 'ctx_1', recoverable: true }, { sessionId: 's' });
+        // Segunda falha de ctx_1 — failures=2 → abre ctx_1
+        await handler({ error: 'e', errorContext: 'ctx_1', recoverable: true }, { sessionId: 's' });
+        // ctx_2 ainda sem falhas → deve retornar retry
+        const r = await handler({ error: 'e', errorContext: 'ctx_2', recoverable: true }, { sessionId: 's' });
+        assert.strictEqual(r.errorHandling, 'retry');
+    });
+});
+
+describe('createContextualErrorHandler', () => {
+    it('mapeia errorContext para estratégia correta', async () => {
+        const handler = createContextualErrorHandler({ rate_limit: 'retry', permission: 'skip' }, 'abort');
+        const r1 = await handler({ error: 'e', errorContext: 'rate_limit', recoverable: true }, { sessionId: 's' });
+        assert.strictEqual(r1.errorHandling, 'retry');
+        const r2 = await handler({ error: 'e', errorContext: 'permission', recoverable: false }, { sessionId: 's' });
+        assert.strictEqual(r2.errorHandling, 'skip');
+        const r3 = await handler({ error: 'e', errorContext: 'unknown', recoverable: false }, { sessionId: 's' });
+        assert.strictEqual(r3.errorHandling, 'abort');
+    });
+});
+
+// ─── presets/production.js ────────────────────────────────────────────────────
+
+describe('createProductionHooks', () => {
+    it('retorna hooks e onPermissionRequest', () => {
+        const { hooks, onPermissionRequest } = createProductionHooks();
+        assert.ok(typeof hooks.onPreToolUse === 'function');
+        assert.ok(typeof hooks.onPostToolUse === 'function');
+        assert.ok(typeof hooks.onUserPromptSubmitted === 'function');
+        assert.ok(typeof hooks.onSessionStart === 'function');
+        assert.ok(typeof hooks.onSessionEnd === 'function');
+        assert.ok(typeof hooks.onErrorOccurred === 'function');
+        assert.ok(typeof onPermissionRequest === 'function');
+    });
+
+    it('onPreToolUse: solicita confirmação para tool fora do allowList quando toolAllowList fornecido', async () => {
+        const { hooks } = createProductionHooks({ toolAllowList: ['read_file', 'list_dir'] });
+        const result = await hooks.onPreToolUse(
+            { toolName: 'run_in_terminal', toolArgs: {}, timestamp: Date.now(), cwd: '/tmp' },
+            { sessionId: 'prod-test' },
+        );
+        // production preset pede confirmação (ask), não nega diretamente, para tools fora do allowList
+        assert.ok(result.permissionDecision === 'ask' || result.permissionDecision === 'deny');
+    });
+
+    it('onPreToolUse: permite tool dentro do allowList', async () => {
+        const { hooks } = createProductionHooks({ toolAllowList: ['read_file', 'list_dir'] });
+        const result = await hooks.onPreToolUse(
+            { toolName: 'read_file', toolArgs: {}, timestamp: Date.now(), cwd: '/tmp' },
+            { sessionId: 'prod-test' },
+        );
+        assert.strictEqual(result.permissionDecision, 'allow');
+    });
+
+    it('onErrorOccurred: usa circuit-breaker por padrão', async () => {
+        // circuitBreakerMaxRetries: 2 → abre depois de 2 falhas; 1ª = retry
+        const { hooks } = createProductionHooks({ circuitBreakerMaxRetries: 2 });
+        const r1 = await hooks.onErrorOccurred(
+            { error: 'e', errorContext: 'circuit_test', recoverable: true },
+            { sessionId: 's' },
+        );
+        assert.strictEqual(r1.errorHandling, 'retry');
+    });
+
+    it('onSessionStart: retorna additionalContext', async () => {
+        const { hooks } = createProductionHooks();
+        const result = await hooks.onSessionStart({ sessionId: 'p-1', source: 'new' }, { sessionId: 'p-1' });
+        assert.ok(typeof result.additionalContext === 'string');
+        assert.ok(result.additionalContext.includes('p-1'));
     });
 });

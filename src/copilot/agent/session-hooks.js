@@ -2,12 +2,13 @@
 /**
  * src/copilot/agent/session-hooks.js
  *
- * Factory de session lifecycle hooks para o AlwaysAliveAgent.
+ * @module copilot/agent/session-hooks
+ * @deprecated Use `#copilot/hooks` (src/copilot/hooks/session-lifecycle.js) em novos módulos. Este arquivo será
+ *   convertido em re-export de compatibilidade na Fase K do roadmap.
+ * @see DOCUMENTAÇÃO/ARQUITETURA/HOOKS-SYSTEM-ANALYSIS-ROADMAP.md Factory de session lifecycle hooks para o AlwaysAliveAgent.
  *
  * Extrai `#onSessionStart`, `#onSessionEnd` e `#onErrorOccurred` para um módulo coeso, recebendo dependências via
  * injeção para eliminar acesso direto a campos privados.
- *
- * @module copilot/agent/session-hooks
  */
 
 import { recordSessionEnd, recordSessionStart } from '#copilot/lib/index';

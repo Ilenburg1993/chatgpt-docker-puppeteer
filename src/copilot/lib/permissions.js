@@ -2,7 +2,10 @@
 /**
  * src/copilot/lib/permissions.js
  *
- * Camada de lib pura para PermissionHandler — substitui o `approveAll` hardcoded por uma abstração configurável que
+ * @module copilot/lib/permissions
+ * @deprecated Use `#copilot/hooks` (src/copilot/hooks/permission-handler.js) em novos módulos. Este arquivo será
+ *   convertido em re-export de compatibilidade na Fase K do roadmap.
+ * @see DOCUMENTAÇÃO/ARQUITETURA/HOOKS-SYSTEM-ANALYSIS-ROADMAP.md Camada de lib pura para PermissionHandler — substitui o `approveAll` hardcoded por uma abstração configurável que
  * suporta whitelist/blacklist de tools, audit mode e callbacks custom.
  *
  * **Contratos do SDK (v0.1.32):** `PermissionRequestResult` union:
@@ -18,7 +21,6 @@
  * - Sem side effects no import.
  * - Funções puras que retornam `PermissionHandler` tipado do SDK.
  *
- * @module copilot/lib/permissions
  * @see module:copilot/agent/permission-controller
  * @see module:copilot/tools/permission-tools
  */

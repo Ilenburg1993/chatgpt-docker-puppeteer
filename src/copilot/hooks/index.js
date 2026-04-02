@@ -76,4 +76,8 @@ export { createAuditPreset } from './presets/audit.js';
 export { createDenyAllPreset } from './presets/deny-all.js';
 export { createInteractivePreset } from './presets/interactive.js';
 export { createMinimalPreset } from './presets/minimal.js';
+export { createProductionHooks } from './presets/production.js';
 export { createSafePreset } from './presets/safe.js';
+
+// ─── Error handler com circuit-breaker (Fase I) ───────────────────────────────
+export { createCircuitBreakerHandler, createContextualErrorHandler, createErrorHandler } from './error-handler.js';

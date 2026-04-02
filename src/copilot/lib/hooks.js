@@ -2,13 +2,15 @@
 /**
  * src/copilot/lib/hooks.js
  *
- * Lib para construção de SessionHooks do Copilot SDK. Fornece factories configuráveis para os 6 slots do SDK:
+ * @module copilot/lib/hooks
+ * @deprecated Use `#copilot/hooks` (src/copilot/hooks/factory.js) em novos módulos. Este arquivo será convertido em
+ *   re-export de compatibilidade na Fase K do roadmap.
+ * @see DOCUMENTAÇÃO/ARQUITETURA/HOOKS-SYSTEM-ANALYSIS-ROADMAP.md Lib para construção de SessionHooks do Copilot SDK. Fornece factories configuráveis para os 6 slots do SDK:
  * onPreToolUse, onPostToolUse, onUserPromptSubmitted, onSessionStart, onSessionEnd, onErrorOccurred
  *
  * Uso típico: import { createHooks } from '#copilot/lib/hooks'; const hooks = createHooks({ auditLog: true, allowTools:
  * ['read_file'] }); const session = await client.createSession({ hooks, ... });
  *
- * @module copilot/lib/hooks
  * @see module:copilot/tools/hook-tools
  */
 
