@@ -16,6 +16,7 @@
  */
 
 import { defaultMetrics } from '#copilot/observability';
+import { defaultAuditLog } from '#copilot/observability/audit-log';
 import { log } from '#copilot/observability/logger';
 import { hostname } from 'node:os';
 
@@ -57,6 +58,8 @@ export function createSessionHooks(ctx) {
         const sessionId = invocation?.sessionId ?? '';
         log('INFO', `[hooks/session-lifecycle] SessionStart: ${sessionId}`);
         defaultMetrics.recordSessionStart();
+        // CT-02: registrar no audit ring buffer
+        defaultAuditLog.record({ type: 'session.start', sessionId });
         await emitWebhook('session.start', { sessionId });
 
         // Gap 4: retornar additionalContext com snapshot de ambiente
@@ -85,6 +88,8 @@ export function createSessionHooks(ctx) {
         const sessionId = invocation?.sessionId ?? '';
         log('INFO', `[hooks/session-lifecycle] SessionEnd: ${sessionId}`);
         defaultMetrics.recordSessionEnd();
+        // CT-02: registrar no audit ring buffer
+        defaultAuditLog.record({ type: 'session.end', sessionId });
         await emitWebhook('session.end', { sessionId });
     }
 

@@ -10,7 +10,7 @@
  * Modos disponíveis:
  *
  * - `approve_all` — aprova tudo automaticamente (comportamento padrão)
- * - `audit_only` — aprova tudo mas loga cada decisão em logs/tool-audit.jsonl
+ * - `audit_only` — aprova tudo mas loga cada decisão em logs/tool-permissions-audit.jsonl
  * - `selective` — whitelist e/ou blacklist explícitas de tools
  *
  * DL-PERM: o dialog loop não é uma tool e não é controlado por este subsistema.

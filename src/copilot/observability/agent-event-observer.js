@@ -23,6 +23,7 @@
  */
 
 import { log } from './logger.js';
+import { startSpanImmediate } from './otel.js';
 
 /**
  * @typedef {import('./metrics.js').MetricsStore} MetricsStore
@@ -54,18 +55,21 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
     const _registrations = [];
 
     /**
-     * Mapa de turnId → performance timestamp do turn_start ativo.
+     * Mapa de turnId → { ts, span? } do turn_start ativo.
      *
      * Fase BB: usa turnId dinâmico como chave (em vez da chave estática 'current') para suportar múltiplos turnos
      * concorrentes sem corromper as durações. Entradas são removidas ao processar turn_end ou após TTL máximo para
-     * prevenir memory leak.
+     * prevenir memory leak. CO-03: inclui span OTEL para rastreio de turnos.
      *
-     * @type {Map<string, number>}
+     * @type {Map<string, { ts: number; span: import('./otel.js').OtelSpan | null }>}
      */
     const _turnStarts = new Map();
 
     /** TTL máximo de um turn no Map antes de ser descartado automaticamente (5 minutos). */
     const _TURN_START_TTL_MS = 5 * 60 * 1000;
+
+    /** CR-02: timestamp do último chunk de streaming para medir intervalo. */
+    let _lastChunkTs = 0;
 
     /**
      * @param {import('node:events').EventEmitter} emitter
@@ -107,15 +111,18 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 const ts = performance.now();
                 // Fase BB: usar turnId dinâmico como chave; fallback para 'current' por retrocompatibilidade
                 const turnId = evt?.turnId ?? 'current';
-                // Limpeza de entradas antigas por TTL antes de inserir nova (memory leak guard)
-                const now = Date.now();
-                for (const [id, startTs] of _turnStarts) {
-                    if (now - startTs > _TURN_START_TTL_MS) {
+                // CN-01 fix: TTL agora usa performance.now() (mesma base que ts armazenado)
+                const nowPerf = performance.now();
+                for (const [id, entry] of _turnStarts) {
+                    if (nowPerf - entry.ts > _TURN_START_TTL_MS) {
+                        entry.span?.end();
                         _turnStarts.delete(id);
                         log('DEBUG', `[agent-event-observer] dialog.turn_start: TTL expirado para turnId=${id}`);
                     }
                 }
-                _turnStarts.set(turnId, ts);
+                // CO-03: span OTEL para rastreio de turn
+                const span = startSpanImmediate('copilot.dialog.turn', { turnId });
+                _turnStarts.set(turnId, { ts, span });
                 if (!evt?.turnId) {
                     log(
                         'DEBUG',
@@ -133,11 +140,19 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
             _safe((/** @type {{ durationMs?: number; turnId?: string; reply?: string }} */ evt) => {
                 // Fase BB: correlacionar por turnId para suportar turnos concorrentes
                 const turnId = evt?.turnId ?? 'current';
-                const startTs = _turnStarts.get(turnId) ?? 0;
+                const entry = _turnStarts.get(turnId);
                 _turnStarts.delete(turnId); // cleanup imediato após consumo
-                const durationMs = evt?.durationMs ?? (startTs ? performance.now() - startTs : 0);
+                const durationMs = evt?.durationMs ?? (entry ? performance.now() - entry.ts : 0);
                 const success = typeof evt?.reply === 'string' && evt.reply.length > 0;
                 metrics.recordDialogTurn(Math.round(durationMs), success);
+                // CO-03: fechar span OTEL do turn
+                if (entry?.span) {
+                    entry.span.setAttribute('duration_ms', Math.round(durationMs));
+                    entry.span.setAttribute('success', success);
+                    entry.span.end();
+                }
+                // CR-02: resetar timestamp de chunk para não contaminar próximo turn
+                _lastChunkTs = 0;
                 log(
                     'DEBUG',
                     `[agent-event-observer] dialog.turn_end turnId=${turnId} durationMs=${Math.round(durationMs)} success=${success}`,
@@ -251,11 +266,16 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         );
 
         // ── tool.execution_start — contabiliza início de ferramenta ──────────
+        /** @type {Map<string, { toolName: string; ts: number }>} Tool callId → start info para duration calc */
+        const _toolStarts = new Map();
+
         _on(
             agent,
             'tool.execution_start',
             _safe((/** @type {{ toolName?: string; callId?: string }} */ evt) => {
                 metrics.recordCounter('tool.execution.start');
+                const callId = evt?.callId;
+                if (callId) _toolStarts.set(callId, { toolName: evt?.toolName ?? 'unknown', ts: performance.now() });
                 log('DEBUG', `[agent-event-observer] tool.execution_start tool=${evt?.toolName ?? '?'}`);
             }, 'tool.execution_start'),
         );
@@ -264,13 +284,26 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         _on(
             agent,
             'tool.execution_complete',
-            _safe((/** @type {{ toolName?: string; callId?: string; durationMs?: number }} */ evt) => {
-                metrics.recordCounter('tool.execution.complete');
-                log(
-                    'DEBUG',
-                    `[agent-event-observer] tool.execution_complete tool=${evt?.toolName ?? '?'} duration=${evt?.durationMs ?? '?'}ms`,
-                );
-            }, 'tool.execution_complete'),
+            _safe(
+                (/** @type {{ toolName?: string; callId?: string; durationMs?: number; success?: boolean }} */ evt) => {
+                    metrics.recordCounter('tool.execution.complete');
+                    // CN-06 fix: alimentar histograma de ferramentas no MetricsStore
+                    const callId = evt?.callId;
+                    const startInfo = callId ? _toolStarts.get(callId) : null;
+                    if (callId) _toolStarts.delete(callId);
+                    const toolName = evt?.toolName ?? startInfo?.toolName ?? 'unknown';
+                    const durationMs = evt?.durationMs ?? (startInfo ? performance.now() - startInfo.ts : undefined);
+                    const success = evt?.success !== false;
+                    if (typeof durationMs === 'number') {
+                        metrics.recordToolCall(toolName, durationMs, success);
+                    }
+                    log(
+                        'DEBUG',
+                        `[agent-event-observer] tool.execution_complete tool=${toolName} duration=${durationMs ?? '?'}ms`,
+                    );
+                },
+                'tool.execution_complete',
+            ),
         );
 
         // ── agent.metrics — snapshot periódico de estado do agente ───────────
@@ -304,6 +337,19 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
 
         // ── Fase CE: eventos adicionais ───────────────────────────────────────
 
+        // ── status — CT-03: rastreia reconnects ──────────────────────────────
+        _on(
+            agent,
+            'status',
+            _safe((/** @type {string | { status?: string }} */ raw) => {
+                const val = typeof raw === 'string' ? raw : (raw?.status ?? '');
+                if (typeof val === 'string' && val.startsWith('reconnecting:')) {
+                    metrics.recordCounter('agent.reconnect.attempt');
+                    log('WARN', `[agent-event-observer] reconnect attempt: ${val}`);
+                }
+            }, 'status'),
+        );
+
         // ── task.queued — tarefa enfileirada ──────────────────────────────────
         _on(
             agent,
@@ -325,11 +371,16 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         );
 
         // ── session.compaction_start ──────────────────────────────────────────
+        /** @type {import('./otel.js').OtelSpan | null} CO-04: span para compaction */
+        let _compactionSpan = null;
+
         _on(
             agent,
             'session.compaction_start',
             _safe(() => {
                 metrics.recordCounter('session.compaction.start');
+                // CO-04: span OTEL para compaction
+                _compactionSpan = startSpanImmediate('copilot.compaction');
                 log('DEBUG', '[agent-event-observer] session.compaction_start');
             }, 'session.compaction_start'),
         );
@@ -342,6 +393,14 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 metrics.recordCounter('session.compaction.complete');
                 if (typeof evt?.savedTokens === 'number') {
                     metrics.recordCounter('session.compaction.saved_tokens', evt.savedTokens);
+                }
+                // CO-04: fechar span de compaction
+                if (_compactionSpan) {
+                    if (typeof evt?.savedTokens === 'number') {
+                        _compactionSpan.setAttribute('savedTokens', evt.savedTokens);
+                    }
+                    _compactionSpan.end();
+                    _compactionSpan = null;
                 }
                 log(
                     'DEBUG',
@@ -356,6 +415,8 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
             'dialog.loop.changed',
             _safe((/** @type {{ active?: boolean }} */ evt) => {
                 metrics.recordCounter(evt?.active ? 'dialog.loop.activated' : 'dialog.loop.deactivated');
+                // CN-04 fix: gauge real-time para status do dialog loop
+                metrics.recordGauge('dialog.loop.active', evt?.active ? 1 : 0);
                 log('DEBUG', `[agent-event-observer] dialog.loop.changed active=${evt?.active}`);
             }, 'dialog.loop.changed'),
         );
@@ -466,6 +527,12 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 metrics.recordCounter('task.streaming.deltas');
                 const bytes = evt?.delta?.length ?? 0;
                 if (bytes > 0) metrics.recordCounter('task.streaming.bytes', bytes);
+                // CR-02: registrar intervalo entre chunks no histograma
+                const now = performance.now();
+                if (_lastChunkTs > 0) {
+                    metrics.recordStreamingChunk(now - _lastChunkTs);
+                }
+                _lastChunkTs = now;
             }, 'task.delta'),
         );
 
@@ -545,6 +612,8 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                      *     model?: string;
                      *     inputTokens?: number;
                      *     outputTokens?: number;
+                     *     cacheReadTokens?: number;
+                     *     cacheWriteTokens?: number;
                      * }}
                      */ evt,
                 ) => {
@@ -552,8 +621,11 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                     const model = evt?.model ?? 'unknown';
                     const input = evt?.inputTokens ?? 0;
                     const output = evt?.outputTokens ?? evt?.tokens ?? 0;
+                    // CN-03 fix: propagar cacheRead/cacheWrite para MetricsStore
+                    const cacheRead = evt?.cacheReadTokens ?? 0;
+                    const cacheWrite = evt?.cacheWriteTokens ?? 0;
                     if (input > 0 || output > 0) {
-                        metrics.recordUsage(model, input, output);
+                        metrics.recordUsage(model, input, output, cacheRead, cacheWrite);
                     }
                     log('DEBUG', `[agent-event-observer] session.usage tokens=${evt?.tokens ?? '?'} model=${model}`);
                 },
@@ -707,15 +779,25 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
 
         /** @type {Map<string, number>} Mapa questionId → timestamp para calcular latência de resposta */
         const _questionStarts = new Map();
+        /** @type {number} TTL para entradas de _questionStarts (30 minutos) */
+        const _QUESTION_START_TTL_MS = 30 * 60 * 1000;
 
         _on(
             agent,
             'question.pending',
             _safe((/** @type {{ questionId?: string }} */ evt) => {
-                const qId = evt?.questionId ?? `q_${Date.now()}`;
-                _questionStarts.set(qId, Date.now());
+                // CN-02 fix: não gerar chave fallback — sem questionId não há correlação possível
+                const qId = evt?.questionId ?? null;
+                // TTL cleanup antes de inserir nova entrada
+                const now = Date.now();
+                for (const [id, ts] of _questionStarts) {
+                    if (now - ts > _QUESTION_START_TTL_MS) {
+                        _questionStarts.delete(id);
+                    }
+                }
+                if (qId) _questionStarts.set(qId, now);
                 metrics.recordCounter('question.pending');
-                log('DEBUG', `[agent-event-observer] question.pending questionId=${qId}`);
+                log('DEBUG', `[agent-event-observer] question.pending questionId=${qId ?? '(sem id)'}`);
             }, 'question.pending'),
         );
 
@@ -729,6 +811,9 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 metrics.recordCounter('question.answered');
                 if (startTs) {
                     const waitMs = Date.now() - startTs;
+                    metrics.recordGauge('question.last_wait_ms', waitMs);
+                    // CS-02: registrar no histograma de latência de questions
+                    metrics.recordQuestionLatency(waitMs);
                     log('DEBUG', `[agent-event-observer] question.answered questionId=${qId} waitMs=${waitMs}`);
                 }
             }, 'question.answered'),
@@ -748,6 +833,7 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         }
         _registrations.length = 0;
         _turnStarts.clear();
+        _lastChunkTs = 0;
         log('INFO', '[agent-event-observer] Detached from agent EventEmitter');
     }
 

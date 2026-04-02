@@ -70,12 +70,26 @@
  */
 
 /**
+ * @typedef {object} StreamingMetrics
+ * @property {number} chunksTotal - Total de chunks de streaming recebidos.
+ * @property {LatencyHistogram} chunkLatency - Histograma de intervalo entre chunks (ms).
+ */
+
+/**
+ * @typedef {object} QuestionMetrics
+ * @property {number} total - Total de questions respondidas com latência medida.
+ * @property {LatencyHistogram} latency - Histograma de latência de questions (ms).
+ */
+
+/**
  * @typedef {object} MetricsSummary
  * @property {Record<string, ToolMetrics>} tools - Métricas por ferramenta.
  * @property {TokenUsageMetrics} tokens - Uso de tokens acumulado.
  * @property {SessionMetrics} sessions - Contadores de sessão.
  * @property {DialogMetrics} dialog - Métricas do dialog loop.
  * @property {TaskMetrics} tasks - Métricas de tasks.
+ * @property {StreamingMetrics} streaming - Métricas de streaming chunks.
+ * @property {QuestionMetrics} questions - Métricas de question lifecycle.
  * @property {Record<string, number>} counters - Contadores genéricos.
  * @property {Record<string, { value: number; ts: number }>} gauges - Valores instantâneos (gauges).
  * @property {number} collectedAt - Timestamp da coleta.
@@ -92,6 +106,8 @@
  * @property {(stalledMs: number) => void} recordDialogStall
  * @property {() => void} recordDialogTimeout
  * @property {(durationMs: number, success: boolean) => void} recordTaskCompletion
+ * @property {(chunkMs: number) => void} recordStreamingChunk
+ * @property {(waitMs: number) => void} recordQuestionLatency
  * @property {(name: string, delta?: number) => void} recordCounter
  * @property {(name: string, value: number) => void} recordGauge
  * @property {() => Record<string, { value: number; ts: number }>} getGauges
@@ -204,6 +220,12 @@ export function createMetricsStore() {
     /** @type {{ completed: number; failed: number; histogram: ReturnType<typeof createHistogram> }} */
     const _tasks = { completed: 0, failed: 0, histogram: createHistogram(500) };
 
+    /** @type {{ chunksTotal: number; histogram: ReturnType<typeof createHistogram> }} CR-01 */
+    const _streaming = { chunksTotal: 0, histogram: createHistogram(500) };
+
+    /** @type {{ total: number; histogram: ReturnType<typeof createHistogram> }} CS-02 */
+    const _questions = { total: 0, histogram: createHistogram(500) };
+
     /** @type {Record<string, number>} */
     const _counters = {};
 
@@ -295,6 +317,28 @@ export function createMetricsStore() {
         if (success) _tasks.completed++;
         else _tasks.failed++;
         _tasks.histogram.record(durationMs);
+    }
+
+    /**
+     * CR-01: Registra intervalo entre chunks de streaming (ms).
+     *
+     * @param {number} chunkMs - Intervalo desde o chunk anterior (ms).
+     * @returns {void}
+     */
+    function recordStreamingChunk(chunkMs) {
+        _streaming.chunksTotal++;
+        _streaming.histogram.record(chunkMs);
+    }
+
+    /**
+     * CS-02: Registra latência de resposta a question (ms).
+     *
+     * @param {number} waitMs - Tempo entre question.pending e question.answered (ms).
+     * @returns {void}
+     */
+    function recordQuestionLatency(waitMs) {
+        _questions.total++;
+        _questions.histogram.record(waitMs);
     }
 
     /**
@@ -402,6 +446,14 @@ export function createMetricsStore() {
                 failed: _tasks.failed,
                 taskLatency: _tasks.histogram.snapshot(),
             },
+            streaming: {
+                chunksTotal: _streaming.chunksTotal,
+                chunkLatency: _streaming.histogram.snapshot(),
+            },
+            questions: {
+                total: _questions.total,
+                latency: _questions.histogram.snapshot(),
+            },
             counters: { ..._counters },
             gauges: { ..._gauges },
             collectedAt: Date.now(),
@@ -427,6 +479,10 @@ export function createMetricsStore() {
         _tasks.completed = 0;
         _tasks.failed = 0;
         _tasks.histogram = createHistogram(500);
+        _streaming.chunksTotal = 0;
+        _streaming.histogram = createHistogram(500);
+        _questions.total = 0;
+        _questions.histogram = createHistogram(500);
         Object.keys(_counters).forEach((k) => delete _counters[k]);
         Object.keys(_gauges).forEach((k) => delete _gauges[k]);
     }
@@ -441,6 +497,8 @@ export function createMetricsStore() {
         recordDialogStall,
         recordDialogTimeout,
         recordTaskCompletion,
+        recordStreamingChunk,
+        recordQuestionLatency,
         recordCounter,
         recordGauge,
         getGauges,

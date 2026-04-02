@@ -6,12 +6,12 @@
  *
  * Responsabilidades:
  *
- * - `logToolAudit`: registra decisões de permissão (approve/deny) no JSONL `logs/tool-audit.jsonl`
+ * - `logToolAudit`: registra decisões de permissão (approve/deny) no JSONL `logs/tool-permissions-audit.jsonl`
  * - `isHighRiskTool`: classifica ferramentas como alto risco (bash, edit, create, git_apply_patch)
  * - `buildAuditingPermissionHandler`: envolve um PermissionHandler base com logging de auditoria
  *
- * Distinto de `channel/audit.js`, que registra tool calls SDK (start/complete com durationMs). Ambos escrevem em
- * `logs/tool-audit.jsonl` como registros complementares.
+ * Distinto de `audit-log.js`, que registra tool calls SDK (start/complete com durationMs) em
+ * `logs/tool-execution-audit.jsonl`. Schemas separados desde CQ-01.
  *
  * @module copilot/agent/tool-audit-logger
  */
@@ -22,11 +22,14 @@ import { approveAll } from '@github/copilot-sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-// G2-SEC-05: path do audit log configurável via COPILOT_AUDIT_LOG_PATH env var.
-// Isolado em src/copilot/logs/ por padrão para não poluir o workspace pai.
-const TOOL_AUDIT_LOG = process.env['COPILOT_AUDIT_LOG_PATH']
-    ? resolve(process.env['COPILOT_AUDIT_LOG_PATH'])
-    : join(resolve(import.meta.dirname, '../logs'), 'tool-audit.jsonl');
+// G2-SEC-05: path do audit log configurável via COPILOT_TOOL_PERMISSIONS_LOG env var.
+// CQ-01: renomeado para tool-permissions-audit.jsonl (distinto de tool-execution-audit.jsonl).
+// Backward compat: COPILOT_AUDIT_LOG_PATH ainda é aceito como fallback.
+const TOOL_AUDIT_LOG = process.env['COPILOT_TOOL_PERMISSIONS_LOG']
+    ? resolve(process.env['COPILOT_TOOL_PERMISSIONS_LOG'])
+    : process.env['COPILOT_AUDIT_LOG_PATH']
+      ? resolve(process.env['COPILOT_AUDIT_LOG_PATH'])
+      : join(resolve(import.meta.dirname, '../logs'), 'tool-permissions-audit.jsonl');
 const ROTATE_LOG = TOOL_AUDIT_LOG + '.1';
 // G2-DX-11: limite de tamanho do log configurável via env (default 10MB).
 const MAX_LOG_BYTES = Number(process.env['AGENT_TOOL_AUDIT_MAX_LOG_BYTES']) || 10 * 1024 * 1024;
@@ -99,7 +102,7 @@ export function isHighRiskTool(toolName) {
  * @returns {void}
  */
 export function logToolAudit(entry) {
-    const line = JSON.stringify({ ...entry, ts: new Date().toISOString() }) + '\n';
+    const line = JSON.stringify({ type: 'tool.permission', ...entry, ts: new Date().toISOString() }) + '\n';
     const lineBytes = Buffer.byteLength(line, 'utf8');
 
     void (async () => {

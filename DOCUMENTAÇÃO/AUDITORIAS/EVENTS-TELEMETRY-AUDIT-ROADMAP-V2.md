@@ -1,8 +1,12 @@
 # Auditoria e Roadmap: Events & Telemetria SDK Copilot — v2
 
-**Data**: 2026-05-28 **Escopo**: Sistema completo de captura de eventos SDK, telemetria e
-observabilidade em `src/copilot/` **Autores**: Investigação profunda + análise de schema
-`@github/copilot-sdk@latest`
+> **⚠️ ARQUIVO HISTÓRICO** — Este documento cobre Cycles 1-3 (Fases AN-AY, BA-BM, BH-BL), todos
+> concluídos. As pendências remanescentes (BN-BU) foram migradas para
+> `OBSERVABILITY-TELEMETRY-AUDIT-V3.md` (Fases CN-CU). Use o V3 como referência ativa.
+
+**Data**: 2026-05-28 **Migrado para V3**: 2026-07-03 **Escopo**: Sistema completo de captura de
+eventos SDK, telemetria e observabilidade em `src/copilot/` **Autores**: Investigação profunda +
+análise de schema `@github/copilot-sdk@latest`
 
 ---
 

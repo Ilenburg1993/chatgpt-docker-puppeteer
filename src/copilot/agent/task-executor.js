@@ -10,6 +10,8 @@
  *   agente pai.
  */
 
+import { startSpanImmediate } from '../observability/otel.js';
+
 /**
  * Máximo de tentativas de retry por task após reconexão. Configurável via AGENT_MAX_TASK_RETRIES.
  *
@@ -73,16 +75,28 @@ export async function executeTask(session, task, callbacks) {
         },
     );
 
+    // CO-01: span OTEL para toda a tarefa
+    const taskSpan = startSpanImmediate('copilot.task', { taskId: task.id });
+
     // Subscreve a eventos de execução de tool para observabilidade (SSE/NERV consumers)
     // Fase BC: removidas chamadas redundantes a defaultAuditLog.recordToolStart/Complete
     // (o event-collector.js já cobre registro completo via seus handlers dedicados)
     // Fase BC: corrigido naming dot→underscore para alinhar com AGENT_EVENTS em events.js
+
+    /** @type {Map<string, import('../observability/otel.js').OtelSpan>} CO-02: spans por tool call */
+    const _toolSpans = new Map();
+
     const unsubToolStart = session.on(
         'tool.execution_start',
         (/** @type {{ data?: Record<string, unknown> }} */ event) => {
+            const toolCallId = /** @type {string} */ (event?.data?.['toolCallId'] ?? '');
+            const toolName = /** @type {string} */ (event?.data?.['toolName'] ?? '');
+            // CO-02: span OTEL por tool execution
+            const toolSpan = startSpanImmediate('copilot.tool', { toolName, toolCallId, taskId: task.id });
+            if (toolSpan && toolCallId) _toolSpans.set(toolCallId, toolSpan);
             emit('tool.execution_start', {
-                toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
-                toolName: /** @type {string} */ (event?.data?.['toolName'] ?? ''),
+                toolCallId,
+                toolName,
                 args: event?.data?.['arguments'] ?? {},
                 mcpServerName: /** @type {string | null} */ (event?.data?.['mcpServerName'] ?? null),
                 taskId: task.id,
@@ -93,8 +107,15 @@ export async function executeTask(session, task, callbacks) {
     const unsubToolComplete = session.on(
         'tool.execution_complete',
         (/** @type {{ data?: Record<string, unknown> }} */ event) => {
+            const toolCallId = /** @type {string} */ (event?.data?.['toolCallId'] ?? '');
+            // CO-02: fecha span de tool
+            const toolSpan = _toolSpans.get(toolCallId);
+            if (toolSpan) {
+                toolSpan.end();
+                _toolSpans.delete(toolCallId);
+            }
             emit('tool.execution_complete', {
-                toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
+                toolCallId,
                 toolName: /** @type {string | null} */ (event?.data?.['toolName'] ?? null),
                 success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
                 taskId: task.id,
@@ -160,6 +181,10 @@ export async function executeTask(session, task, callbacks) {
         unsubToolStart();
         unsubToolComplete();
         unsubIdle();
+        // CO-01/CO-02: fechar spans OTEL residuais
+        for (const span of _toolSpans.values()) span.end();
+        _toolSpans.clear();
+        taskSpan?.end();
         scheduleNext();
     }
 }

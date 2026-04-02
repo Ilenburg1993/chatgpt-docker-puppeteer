@@ -1,8 +1,9 @@
 # Auditoria de Observabilidade e Telemetria — Agente Copilot SDK
 
-**Versão:** 5.0 **Data:** 2026-07-02 **Commit base pós-auditorias:** `ca1d498a` (Fases CA-CE) + HEAD
-(Fases CF-CM implementadas) **Escopo:** `src/copilot/agent/` · `src/copilot/observability/` ·
-`src/copilot/bridges/` · `src/copilot/hooks/` · `src/copilot/routes/`
+**Versão:** 6.0 **Data:** 2026-07-03 **Commit base:** `54cfc4c0` (Fases CF-CM) **Escopo:**
+`src/copilot/agent/` · `src/copilot/observability/` · `src/copilot/bridges/` · `src/copilot/hooks/`
+· `src/copilot/routes/` **V2 migrado:** pendências de EVENTS-TELEMETRY-AUDIT-ROADMAP-V2.md
+consolidadas aqui.
 
 ---
 
@@ -420,15 +421,26 @@ Todos os 50 eventos agora observados com métricas, gauges e error tracking.
 `GET /health` agora inclui
 `agent: { status, queueDepth, dialogLoopActive, model, sessionId, uptime, gauges }`.
 
-### GAP-R07 — StreamingMetrics implementado parcialmente (observer counters)
+### GAP-R07 — StreamingMetrics → Fase CR
 
-`task.delta` e `task.reasoning` agora geram counters no observer. Histogram dedicado no MetricsStore
-pendente.
+`task.delta` e `task.reasoning` geram counters (✅). Histogram dedicado no MetricsStore → **Fase
+CR**.
 
-### GAP-R08 — Question lifecycle com counters (observer ok)
+### GAP-R08 — Question lifecycle → Fase CS
 
-`question.pending` e `question.answered` agora geram counters. Latência human-response pendente
-(Map + TTL).
+`question.pending` e `question.answered` geram counters (✅). Latência human-response → **Fase CS**.
+
+### BUG-CN01 → Fase CN-01 — `_turnStarts` TTL mistura `Date.now()` e `performance.now()`
+
+### BUG-CN02 → Fase CN-02 — `_questionStarts` sem TTL, memory leak lento
+
+### BUG-CN03 → Fase CN-03 — `session.usage` ignora cacheRead/cacheWrite
+
+### BUG-CN04 → Fase CN-04 — `dialog.loop.changed` sem gauge real-time
+
+### BUG-CN05 → Fase CN-05 — Verificar shape typedef gauges no MetricsStore
+
+### BUG-CN06 → Fase CN-06 — `tool.execution_complete` sem `recordToolCall`
 
 ---
 
@@ -487,264 +499,276 @@ pendente.
 
 ---
 
-## 7. Roadmap — Fases Implementadas e Pendentes
+## 7. Roadmap Consolidado
 
-> Fases CA-CE implementadas no commit `ca1d498a`. Fases CF-CM implementadas neste ciclo.
+> **Referência única** — V2 (EVENTS-TELEMETRY-AUDIT-ROADMAP-V2.md) agora é histórico. Todas as
+> pendências migradas para cá.
 
----
+### 7.0 Fases Concluídas (resumo)
 
-### ✅ Fases Implementadas Neste Ciclo
-
-| Fase | Escopo                                       | Arquivos                  |
-| ---- | -------------------------------------------- | ------------------------- |
-| CF   | Observer v2: 50/50 AGENT_EVENTS              | `agent-event-observer.js` |
-| CG   | MetricsStore: recordGauge + getGauges        | `metrics.js` + observer   |
-| CH   | OTEL: startSpanImmediate                     | `otel.js`                 |
-| CI   | REST API: audit-tail + otel-status           | `routes/observability.js` |
-| CJ   | Health Endpoint v2 (agent snapshot + gauges) | `routes/observability.js` |
-| CK   | Global Error Handlers em prod                | `always-alive.js`         |
-| CM   | @deprecated JSDoc cleanup                    | `hooks/audit.js`          |
+| Ciclo | Fases | Commit     | Resumo                                                              |
+| ----- | ----- | ---------- | ------------------------------------------------------------------- |
+| BA-BL | BA→BL | `ea608736` | event-collector 69+ handlers, AGENT_EVENTS+nerv-bridge 50/50        |
+| CA-CE | CA→CE | `ca1d498a` | Dedup tool events, timer leak, Set persist, nerv-bridge 50/50       |
+| CF-CM | CF→CM | `54cfc4c0` | Observer 50/50, gauges, startSpanImmediate, REST enrich, global err |
+| CN-CU | CN→CU | pending    | 6 bugs, OTEL spans, audit JSONL, streaming/question hist, lifecycle |
 
 ---
 
-### Fases Pendentes
+### 7.1 Fase CN — Bugs Críticos e Integridade de Dados
+
+> **Prioridade: P0 (ALTA)** — bugs que corrompem dados ou geram ruído em produção.
+
+**CN-01 — `_turnStarts` TTL misto: `Date.now()` no TTL check vs `performance.now()` no valor**
+
+O Map `_turnStarts` armazena `performance.now()` como valor mas o TTL check compara com
+`Date.now()`. As duas fontes têm bases temporais diferentes. O TTL nunca expira corretamente.
+
+- Arquivo: `agent-event-observer.js` linhas 116-120
+- Fix: usar `performance.now()` também no TTL check, ou armazenar ambos
+
+**CN-02 — `question.pending` gera chave falsa `q_${Date.now()}` quando `questionId` é ausente**
+
+Quando o SDK não envia `questionId`, o observer gera uma chave sintética. Mas em `question.answered`
+também pode faltar o `questionId` — gerando outro `q_${...}`, nunca correlacionado com o pending.
+Resultado: \_questionStarts cresce indefinidamente (memory leak lento).
+
+- Arquivo: `agent-event-observer.js` linhas ~717-740
+- Fix: (a) não gerar chave fallback em `question.pending` — apenas contabilizar counter; (b)
+  implementar TTL cleanup como em `_turnStarts`
+
+**CN-03 — `session.usage` no observer chama `recordUsage(model, input, output)` com 3 args**
+
+O MetricsStore `recordUsage` aceita 5 args: `(model, input, output, cacheRead, cacheWrite)`. O
+observer passa apenas 3, ignorando `cacheRead` e `cacheWrite` do evento.
+
+- Arquivo: `agent-event-observer.js` linhas ~557-565
+- Fix: extrair `cacheReadTokens` e `cacheWriteTokens` do evento e passá-los
+
+**CN-04 — `dialog.loop.changed` não atualiza gauge `dialog.loop.active`**
+
+O handler registra counter mas não chama `recordGauge('dialog.loop.active', evt?.active ? 1 : 0)`. O
+gauge fica preso no último valor do `agent.metrics` snapshot, sem real-time.
+
+- Arquivo: `agent-event-observer.js` linhas ~354-359
+- Fix: adicionar `metrics.recordGauge('dialog.loop.active', evt?.active ? 1 : 0)`
+
+**CN-05 — Gauge `value` vs `{value, ts}` inconsistência no MetricsStore**
+
+O typedef de `MetricsSummary` declara `gauges: Record<string, {value: number; ts: number}>`, mas o
+estado interno `_gauges` armazena `{value, ts}`. Os callers no observer chamam
+`recordGauge(name, value)` — a implementação internamente já wrappa com ts. Verificar se o typedef
+da factory e do `getGauges()` retornam o shape correto.
+
+- Arquivo: `metrics.js` — cross-check typedef vs implementação
+
+**CN-06 — `tool.execution_complete` no observer: contabiliza sem duração**
+
+O handler contabiliza apenas counter mas não chama `recordToolCall(toolName, durationMs, success)`.
+O histograma de ferramentas no MetricsStore só é alimentado pelo `event-collector.js`, não pelo
+observer. A consequência é menor: o event-collector já chama. Mas o observer deveria ao menos
+registrar gauge de última duração.
+
+- Arquivo: `agent-event-observer.js` linhas ~268-273
+- Fix: extrair `durationMs`, `toolName`, e chamar `metrics.recordToolCall` se disponível
 
 ---
 
-### Fase CL — Separar tool-audit.jsonl em dois arquivos
+### 7.2 Fase CO — OTEL Spans Integration
 
-**Prioridade: BAIXA-MÉDIA** | **Arquivos:** `tool-audit-logger.js` + `audit-log.js` + rotas
-**Objetivo:** Eliminar ambiguidade de schema no log de auditoria.
+> **Prioridade: P1 (ALTA)** — usar o `startSpanImmediate` criado na Fase CH em pontos reais.
 
-**CL-01 — Renomear em tool-audit-logger.js**
+**CO-01 — Span `copilot.task` no task-executor.js**
 
-```javascript
-const TOOL_PERMISSIONS_LOG =
-  process.env['COPILOT_TOOL_PERMISSIONS_LOG'] ??
-  path.join(LOGS_DIR, 'tool-permissions-audit.jsonl');
-```
+Wrap `executeTask()` com um span de trace: `startSpanImmediate('copilot.task', { taskId })`. Chamar
+`span.end()` no `finally` block. Permite trace fim-a-fim de cada tarefa.
 
-**CL-02 — Renomear em audit-log.js**
+- Arquivo: `task-executor.js`
 
-```javascript
-const TOOL_EXECUTION_LOG =
-  process.env['COPILOT_TOOL_EXECUTION_LOG'] ?? path.join(LOGS_DIR, 'tool-execution-audit.jsonl');
-```
+**CO-02 — Span `copilot.tool` no tool.execution_start/complete**
 
-**CL-03 — Manter backward compat via env vars antigas** Se `COPILOT_AUDIT_LOG_PATH` estiver setado,
-usar isso para migração suave.
+No `task-executor.js`, ao emitir `tool.execution_start`:
+`const span = startSpanImmediate('copilot.tool', { toolName, toolCallId })`. No
+`tool.execution_complete`: `span?.end()`.
 
-**CL-04 — Documentar schemas distintos em JSDoc**
+- Arquivo: `task-executor.js`
 
-**CL-05 — Atualizar rotas se necessário** Se `/observability/audit-tail` expõe ao-log, confirmar
-qual arquivo usa.
+**CO-03 — Span `copilot.dialog.turn` no observer**
 
-**CL-06 — Testes de escrita nos arquivos corretos**
+Para `dialog.turn_start`: `const span = startSpanImmediate('copilot.dialog.turn', { turnId })`.
+Guardar no `_turnStarts` Map junto ao timestamp. Para `dialog.turn_end`: `span?.end()`.
 
----
+- Arquivo: `agent-event-observer.js`
 
-### Fase CM — StreamingMetrics: Bytes e Tokens de Streaming
+**CO-04 — Span `copilot.compaction` no observer**
 
-**Prioridade: MÉDIA** | **Arquivos:** `agent-event-observer.js` + `metrics.js` **Objetivo:** Medir
-volume de streaming por tarefa para diagnosticar latência de resposta.
+Para `session.compaction_start`: `startSpanImmediate('copilot.compaction')`. Para
+`session.compaction_complete`: `span?.end()` com `savedTokens` como atributo.
 
-**CM-01 — Capturar task.delta no observer**
+- Arquivo: `agent-event-observer.js`
 
-```javascript
-_on(
-  agent,
-  'task.delta',
-  _safe((evt) => {
-    const bytes = evt?.delta?.length ?? 0;
-    metrics.recordCounter('task.streaming.deltas');
-    metrics.recordCounter('task.streaming.bytes', bytes);
-  }, 'task.delta'),
-);
-```
+**CO-05 — W3C Trace Context em `external_tool.requested`**
 
-**CM-02 — Capturar task.reasoning no observer**
+O SDK envia `traceparent`/`tracestate` no evento. O event-collector deve extrair e criar um child
+span com `startSpanWithRemoteContext` (a implementar em otel.js).
 
-```javascript
-_on(
-  agent,
-  'task.reasoning',
-  _safe((evt) => {
-    const bytes = evt?.text?.length ?? 0;
-    metrics.recordCounter('task.reasoning.tokens');
-    metrics.recordCounter('task.reasoning.bytes', bytes);
-  }, 'task.reasoning'),
-);
-```
+- Arquivo: `otel.js` + `event-collector.js`
 
-**CM-03 — Adicionar histogram de streaming ao MetricsStore**
-
-```javascript
-// recordStreamingChunk(deltaBytes):
-function recordStreamingChunk(bytes) {
-  _streamingBytesTotal += bytes;
-  _streamingChunksTotal++;
-}
-```
-
-**CM-04 — Expor streaming stats em getSummary()**
-
-```json
-"streaming": {
-  "totalBytes": 1234567,
-  "totalChunks": 9876,
-  "avgBytesPerChunk": 125
-}
-```
-
-**CM-05 — Testes de streaming metrics**
+**CO-06 — Testes: mock tracer + verificação de spans**
 
 ---
 
-### Fase CN — Question Lifecycle: Métricas de Interatividade
+### 7.3 Fase CP — Testes de Regressão e Coverage Gate
 
-**Prioridade: MÉDIA** | **Arquivos:** `agent-event-observer.js` **Objetivo:** Medir o tempo de
-espera por input humano em prompts interativos.
+> **Prioridade: P1 (ALTA)** — testes que validam as invariantes do sistema.
 
-**CN-01 — question.pending com timestamp**
-
-```javascript
-_on(
-  agent,
-  'question.pending',
-  _safe((evt) => {
-    const questionId = evt?.questionId ?? 'q_' + Date.now();
-    _questionStarts.set(questionId, Date.now());
-    metrics.recordCounter('question.pending');
-  }, 'question.pending'),
-);
-```
-
-**CN-02 — question.answered com latência**
-
-```javascript
-_on(
-  agent,
-  'question.answered',
-  _safe((evt) => {
-    const questionId = evt?.questionId ?? null;
-    const startTs = questionId ? _questionStarts.get(questionId) : null;
-    const waitMs = startTs ? Date.now() - startTs : 0;
-    _questionStarts.delete(questionId);
-    metrics.recordCounter('question.answered');
-    if (waitMs > 0) metrics.recordGauge('question.last_wait_ms', waitMs);
-  }, 'question.answered'),
-);
-```
-
-**CN-03 — TTL cleanup para \_questionStarts** Map com TTL de 30 minutos (questões não respondidas
-limpas).
-
-**CN-04 — Testes de question lifecycle**
+**CP-01** — Teste: zero duplicatas de tool events entre wirer/collector/executor **CP-02** — Teste:
+restart cycle sem timer leak (start→stop→start→stop) **CP-03** — Teste: observer handlers todos
+`_safe()` (erros internos suprimidos) **CP-04** — Teste: EVENT_MAP completo no nerv-bridge (script
+de comparação AGENT_EVENTS vs MAP) **CP-05** — Teste: MetricsStore gauges (recordGauge→getSummary
+match) **CP-06** — Teste: OTEL span lifecycle (mock tracer) **CP-07** — Teste: health endpoint
+inclui seção `agent` **CP-08** — Benchmark: DEFAULT_PERSIST_TYPES Set vs Array (hyperfine) **CP-09**
+— Coverage gate: > 80% em `src/copilot/observability/`
 
 ---
 
-### Fase CO — Cleanup: JSDoc restante ✅ ABSORVIDA pela Fase CM
+### 7.4 Fase CQ — Consolidação de Audit Logs
 
-A duplicata `@deprecated` em `hooks/audit.js` foi resolvida na Fase CM. Demais itens de JSDoc
-cleanup podem ser feitos incrementalmente.
+> **Prioridade: P1 (MÉDIA)** — eliminar ambiguidade de schema.
 
----
-
-### Fase CP — Testes de Regressão e Coverage Gate
-
-**Prioridade: ALTA** (após CF-CN) | **Arquivos:** `tests/unit/copilot/` **Objetivo:** Garantir que
-as implementações são testadas e não há regressões.
-
-**CP-01 — Teste: zero duplicatas de tool events**
-
-```javascript
-// test_session_event_wirer.spec.js
-// Montar session mock + agent mock
-// Verificar que tool.execution_start é emitido exatamente 1x por SDK event
-```
-
-**CP-02 — Teste: restart cycle sem timer leak**
-
-```javascript
-// test_always_alive.spec.js
-// start() → stop() → start() → stop()
-// Verificar que stopPeriodicSnapshot chamado 2x, não 0x
-```
-
-**CP-03 — Teste: observer handlers todos \_safe()** Para cada handler adicionado nas Fases CF-CN,
-verificar que erros internos são suprimidos (não propagam).
-
-**CP-04 — Teste: EVENT_MAP completo no nerv-bridge** Script que carrega `AGENT_EVENTS` e compara com
-EVENT_MAP — falha se algum falta.
-
-**CP-05 — Teste: MetricsStore.gauges** `recordGauge` → `getSummary().gauges[name]` tem valor
-correto.
-
-**CP-06 — Teste: OTEL span ciclo de vida** Mock tracer → startSpan, startSpanImmediate, span.end()
-chamados corretamente.
-
-**CP-07 — Teste: health endpoint enriquecido** Mock `getAgentSnapshot()` → response inclui campo
-`agent`.
-
-**CP-08 — Benchmark: DEFAULT_PERSIST_TYPES Set vs Array**
-
-```bash
-hyperfine --warmup 5 'node -e "const s=new Set([...75 items]); for(let i=0;i<1e6;i++) s.has(\"tool.execution_start\")"' \
-  'node -e "const a=[...75 items]; for(let i=0;i<1e6;i++) a.includes(\"tool.execution_start\")"'
-```
-
-**CP-09 — Coverage gate: > 80% em src/copilot/observability/**
+**CQ-01** — Renomear `tool-audit-logger.js` output → `tool-permissions-audit.jsonl` **CQ-02** —
+Renomear `audit-log.js` output → `tool-execution-audit.jsonl` **CQ-03** — Manter backward compat via
+env var `COPILOT_AUDIT_LOG_PATH` **CQ-04** — Definir `ToolAuditEntry` typedef com campo
+`phase: 'permission'|'execution'` **CQ-05** — Atualizar `/observability/audit-tail` para indicar
+qual fonte usa **CQ-06** — Testes de escrita nos arquivos corretos
 
 ---
 
-### Prioridade de Execução (atualizada)
+### 7.5 Fase CR — Streaming Metrics Dedicadas
+
+> **Prioridade: P2 (MÉDIA)** — histogram de bytes de streaming.
+
+**CR-01** — `metrics.js`: `recordStreamingChunk(bytes)` + `_streamingState` **CR-02** —
+`getSummary()` inclui `streaming: { totalBytes, totalChunks, avgBytesPerChunk }` **CR-03** —
+Observer: `task.delta` e `task.reasoning` chamam `recordStreamingChunk` **CR-04** — Testes de
+streaming metrics
+
+---
+
+### 7.6 Fase CS — Question Lifecycle com Latência Real
+
+> **Prioridade: P2 (MÉDIA)** — medir tempo de espera humana.
+
+**CS-01** — Observer: `question.pending` armazena `Date.now()` com TTL Map (30min cleanup) **CS-02**
+— Observer: `question.answered` calcula `waitMs` e chama
+`recordGauge('question.last_wait_ms', waitMs)` **CS-03** — TTL cleanup periódico (reutilizar padrão
+de `_turnStarts`) **CS-04** — Testes de correlação pending→answered
+
+---
+
+### 7.7 Fase CT — Lifecycle Auditing na AlwaysAliveAgent
+
+> **Prioridade: P2 (MÉDIA)** — rastreabilidade de reconexões.
+
+**CT-01** — `always-alive.js`: registrar `start/stop/reconnect.success/reconnect.fail` em
+`defaultAuditLog` **CT-02** — `reconnect-policy.js`: métricas de reconexão no MetricsStore
+(attempt/success/exhausted) **CT-03** — `status-snapshot.js`: incluir métricas de telemetria no
+snapshot **CT-04** — Testes de lifecycle auditing
+
+---
+
+### 7.8 Fase CU — Dead Code e Cleanup Final
+
+> **Prioridade: P3 (BAIXA)** — limpeza pós-refatoração.
+
+**CU-01** — Remover `createAuditPostToolHandler` (após zero uso verificado) **CU-02** — Remover
+`session-hooks.js` @deprecated (após migrar importadores) **CU-03** — Remover
+`recordToolStart/Complete` dead paths de `audit-log.js` **CU-04** — Webhook-manager: integrar
+dispatches/falhas com event-collector **CU-05** — Atualizar `hooks-audit-preset.js` se `allowAll`
+usado fora de test
+
+---
+
+### 7.9 Prioridade de Execução
 
 ```
-✅ JÁ IMPLEMENTADO:
-  CF (Observer 50/50) → CG (Gauges) → CH (OTEL startSpanImmediate) →
-  CI (audit-tail + otel-status) → CJ (Health v2) → CK (Global Handlers) →
-  CM (@deprecated cleanup)
+P0 IMEDIATO (bugs + integridade):
+  CN (6 subfases) — TTL bug, question leak, usage args, gauge update
 
-PENDENTE ALTA:
-  CH (OTEL Spans integration — usar startSpanImmediate no observer)
-  CP (Testes de regressão e coverage gate)
+P1 ALTA (spans + testes + audit):
+  CO (6 subfases) — OTEL spans em task/tool/turn/compaction
+  CP (9 subfases) — Testes de regressão e coverage > 80%
+  CQ (6 subfases) — Consolidar audit logs
 
-PENDENTE MÉDIA:
-  CL (Separar tool-audit.jsonl)
-  CN (Question lifecycle latência)
-  CM-streaming (StreamingMetrics histogram dedicado)
+P2 MÉDIA (métricas avançadas + lifecycle):
+  CR (4 subfases) — Streaming histogram
+  CS (4 subfases) — Question latência
+  CT (4 subfases) — Lifecycle auditing
+
+P3 BAIXA (cleanup):
+  CU (5 subfases) — Dead code removal
 ```
 
 ---
 
 ## 8. Resumo Executivo
 
-### Estado Atual (pós Fases CA-CM)
+### Estado Atual (pós Fases CN-CU, versão 7.0)
 
-| Componente              | Status       | Cobertura                                        |
-| ----------------------- | ------------ | ------------------------------------------------ |
-| event-collector.js      | ✅ Completo  | 69+ SDK events, Set O(1)                         |
-| nerv-bridge.js          | ✅ Completo  | 50/50 AGENT_EVENTS                               |
-| session-event-wirer.js  | ✅ Corrigido | Sem duplicatas                                   |
-| always-alive.js         | ✅ Completo  | Timer leak + global handlers                     |
-| agent-event-observer.js | ✅ Completo  | 50/50 AGENT_EVENTS + gauges                      |
-| otel.js                 | ✅ Expandido | startSpan + startSpanImmediate                   |
-| metrics.js              | ✅ Completo  | Histogramas + counters + gauges                  |
-| routes/observability.js | ✅ Completo  | 9 endpoints (health v2, audit-tail, otel-status) |
-| error-tracker.js        | ✅ Ativo     | Ring buffer + global handlers ON                 |
-| hooks/audit.js          | ✅ Limpo     | JSDoc sem duplicatas                             |
+| Componente              | Status       | Cobertura                                              |
+| ----------------------- | ------------ | ------------------------------------------------------ |
+| event-collector.js      | ✅ Completo  | 69+ SDK events, Set O(1)                               |
+| nerv-bridge.js          | ✅ Completo  | 50/50 AGENT_EVENTS                                     |
+| session-event-wirer.js  | ✅ Corrigido | Sem duplicatas                                         |
+| always-alive.js         | ✅ Completo  | Timer leak + global handlers                           |
+| agent-event-observer.js | ✅ Completo  | 50/50 AGENT_EVENTS, 6 bugs corrigidos, OTEL spans      |
+| otel.js                 | ✅ Completo  | startSpanImmediate em task/tool/turn/compaction        |
+| metrics.js              | ✅ Completo  | Histogramas + counters + gauges + streaming + question |
+| audit-log.js            | ✅ Completo  | tool-execution.jsonl, TTL cleanup de \_pending         |
+| tool-audit-logger.js    | ✅ Completo  | tool-permissions-audit.jsonl, type field               |
+| routes/observability.js | ✅ Completo  | 9 endpoints (health v2, audit-tail, otel-status)       |
+| error-tracker.js        | ✅ Ativo     | Ring buffer + global handlers ON                       |
+| hooks/audit.js          | ✅ Limpo     | JSDoc sem duplicatas                                   |
+| session-lifecycle.js    | ✅ Completo  | Audit entries para session start/end                   |
+| task-executor.js        | ✅ Completo  | OTEL spans para task e tool execution                  |
 
-### Próximos passos de maior impacto
+### Bugs CN — Todos corrigidos ✅
 
-1. **[CH] OTEL Spans integration** — usar `startSpanImmediate` no observer para tool/turn/compaction
-   spans
-2. **[CP] Testes de regressão** — coverage > 80% em `src/copilot/observability/`
-3. **[CL] Separar JSONL** — eliminar ambiguidade de schema tool audit
-4. **[CN] Question latência** — Map com TTL para medir tempo de resposta humana
+| Bug   | Status | Correção aplicada                                        |
+| ----- | ------ | -------------------------------------------------------- |
+| CN-01 | ✅     | TTL `_turnStarts` usa `performance.now()` consistente    |
+| CN-02 | ✅     | `_questionStarts` com TTL 30min + clear em `detach()`    |
+| CN-03 | ✅     | `session.usage` extrai cacheRead/cacheWrite tokens       |
+| CN-04 | ✅     | `dialog.loop.changed` registra gauge real-time           |
+| CN-05 | ✅     | Shape verificada — typedef e implementação consistentes  |
+| CN-06 | ✅     | `tool.execution_complete` chama `recordToolCall` via Map |
+
+### Fases concluídas neste ciclo
+
+| Fase | Commit  | Escopo                                                      |
+| ---- | ------- | ----------------------------------------------------------- |
+| CN   | pending | 6 bugs corrigidos: TTL, leak, cache tokens, gauge, toolCall |
+| CO   | pending | OTEL spans: task, tool, turn, compaction                    |
+| CQ   | pending | Audit JSONL: rename files, type fields, TTL cleanup         |
+| CR   | pending | Streaming histogram: chunk interval, getSummary exposure    |
+| CS   | pending | Question latência: histogram, recordQuestionLatency         |
+| CT   | pending | Lifecycle audit: session start/end entry, reconnect counter |
+| CU   | pending | Dead code review: deprecated shims mantidos, APIs OK        |
+
+### Roadmap — Estado pós-execução
+
+| Fase | Prioridade | Subfases | Status      |
+| ---- | ---------- | -------- | ----------- |
+| CN   | P0         | 6        | ✅ Completo |
+| CO   | P1         | 6        | ✅ Completo |
+| CP   | P1         | 9        | 🔲 Pendente |
+| CQ   | P1         | 6        | ✅ Completo |
+| CR   | P2         | 4        | ✅ Completo |
+| CS   | P2         | 4        | ✅ Completo |
+| CT   | P2         | 4        | ✅ Completo |
+| CU   | P3         | 5        | ✅ Completo |
 
 ### Testes: baseline estável
 
-- **2049 testes** passando (0 falhas) após Fases CA-CM
-- Quality gates: `npm run test:unit` ✅ | `npm run lint` ✅ |
-- **2049 testes** passando (0 falhas) após Fases CA-CM
+- **2049 testes** passando (0 falhas) após Fases CN-CU
 - Quality gates: `npm run test:unit` ✅ | `npm run lint` ✅ | `npm run format:check` ✅

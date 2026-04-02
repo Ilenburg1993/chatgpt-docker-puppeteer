@@ -9,7 +9,7 @@
  *
  * - Ring buffer em memória de eventos de auditoria (session, permission, tool, hooks)
  * - Correlação start/complete de tool calls (ex-`channel/audit.js`)
- * - Escrita assíncrona em `logs/tool-audit.jsonl` via batch I/O com setImmediate
+ * - Escrita assíncrona em `logs/tool-execution-audit.jsonl` via batch I/O com setImmediate
  * - Rotação automática do JSONL (10 MB → `.1`)
  * - Leitura de histórico via `getAuditSummary()`
  *
@@ -27,8 +27,8 @@ const MAX_AUDIT_ENTRIES = Number(process.env['COPILOT_AUDIT_RING_SIZE']) || 200;
 /** Default path do arquivo de audit geral em disco. */
 const AUDIT_FILE = join(LOG_DIR, 'audit.jsonl');
 
-/** Path do arquivo JSONL de tool calls (ex-channel/audit.js). */
-const TOOL_AUDIT_FILE = join(LOG_DIR, 'tool-audit.jsonl');
+/** Path do arquivo JSONL de tool calls (execuções). CQ-01: renomeado de tool-audit.jsonl. */
+const TOOL_AUDIT_FILE = join(LOG_DIR, 'tool-execution-audit.jsonl');
 const MAX_TOOL_AUDIT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /**
@@ -103,7 +103,7 @@ export function createAuditLog(opts = {}) {
     /** @type {Map<string, { toolName: string; mcpServerName: string | null; args: object; ts: number }>} */
     const _pending = new Map();
 
-    // ── Fila de escritas assíncronas para tool-audit.jsonl ─────────────────────────
+    // ── Fila de escritas assíncronas para tool-execution-audit.jsonl ─────────────
 
     /** @type {string[]} */
     const _toolWriteQueue = [];
@@ -181,6 +181,7 @@ export function createAuditLog(opts = {}) {
     /** @returns {void} */
     function clear() {
         _buffer.length = 0;
+        _pending.clear();
     }
 
     // ── Tool call audit (ex-channel/audit.js) ──────────────────────────────────────
@@ -188,15 +189,23 @@ export function createAuditLog(opts = {}) {
     /**
      * Registra o início de uma tool call. Equivalente a `auditToolStart()` de `channel/audit.js`.
      *
+     * CQ-06: TTL cleanup — entradas com mais de 10 min são removidas para evitar leak.
+     *
      * @param {ToolAuditStartEntry} entry
      * @returns {void}
      */
     function recordToolStart(entry) {
+        // CQ-06: TTL cleanup — remover entradas órfãs (> 10 min)
+        const TTL = 10 * 60 * 1000;
+        const now = Date.now();
+        for (const [id, val] of _pending) {
+            if (now - val.ts > TTL) _pending.delete(id);
+        }
         _pending.set(entry.toolCallId, {
             toolName: entry.toolName,
             mcpServerName: entry.mcpServerName ?? null,
             args: entry.args ?? {},
-            ts: Date.now(),
+            ts: now,
         });
     }
 
@@ -214,6 +223,7 @@ export function createAuditLog(opts = {}) {
         const durationMs = pending ? Date.now() - pending.ts : null;
 
         const jsonRecord = {
+            type: 'tool.execution',
             ts: new Date().toISOString(),
             sessionId: entry.sessionId ?? null,
             taskId: entry.taskId ?? null,
