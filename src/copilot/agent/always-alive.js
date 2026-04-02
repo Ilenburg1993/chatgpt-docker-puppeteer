@@ -405,6 +405,11 @@ export class AlwaysAliveAgent extends EventEmitter {
             persist: true,
         });
 
+        // CK: Ativar global error handlers em produção (idempotente — segunda chamada é no-op).
+        if (process.env['NODE_ENV'] !== 'test') {
+            defaultErrorTracker.registerGlobalHandlers();
+        }
+
         // T.1: ativar snapshot periódico de métricas em metrics.jsonl (Fase T)
         defaultMetrics.startPeriodicSnapshot();
 

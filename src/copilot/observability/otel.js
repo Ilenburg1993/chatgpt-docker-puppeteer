@@ -199,3 +199,26 @@ export async function startSpan(name, attrs, fn) {
         return fn();
     }
 }
+
+// ─── startSpanImmediate — Span sem wrapper async para event handlers ──────────
+
+/**
+ * Inicia um span OTEL sem wrapper de função (para uso em event handlers). O caller é responsável por chamar
+ * `span.end()` quando a operação terminar. Se OTEL não estiver disponível, retorna `null`.
+ *
+ * @param {string} name - Nome do span (ex: 'copilot.tool', 'copilot.dialog.turn')
+ * @param {Record<string, string | number | boolean>} [attrs] - Atributos iniciais do span
+ * @returns {OtelSpan | null}
+ */
+export function startSpanImmediate(name, attrs = {}) {
+    if (!_tracer) return null;
+    try {
+        const span = _tracer.startSpan(name);
+        for (const [k, v] of Object.entries(attrs)) {
+            span.setAttribute(k, v);
+        }
+        return span;
+    } catch {
+        return null;
+    }
+}

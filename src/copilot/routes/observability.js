@@ -25,6 +25,8 @@ import { getRecentLogs, log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
 import { DEFAULT_OTEL_FILE, isOtelEnabled } from '#copilot/observability/otel';
 import { Router } from 'express';
+import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { getAuditTail } from '../hooks/audit.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 const router = Router();
@@ -51,8 +53,17 @@ router.get('/observability/health', (req, res) =>
         const errorStats = defaultErrorTracker.getStats();
         const recentLogs = getRecentLogs(1, 'ERROR');
 
+        /** @type {Record<string, unknown> | null} */
+        let agentSnapshot = null;
+        try {
+            agentSnapshot = alwaysAliveAgent.getStatusSnapshot();
+        } catch {
+            // agente ainda não inicializado — retorna null
+        }
+
         res.json({
             ok: true,
+            agent: agentSnapshot,
             observability: {
                 metricsActive: true,
                 errorTrackerBuffered: errorStats.buffered,
@@ -66,6 +77,7 @@ router.get('/observability/health', (req, res) =>
                 totalTokensOut: metrics.tokens.outputTokens,
                 totalErrorsCaptured: errorStats.total,
                 sessions: metrics.sessions,
+                gauges: metrics.gauges,
                 lastError: recentLogs.length ? recentLogs[recentLogs.length - 1] : null,
             },
             ts: Date.now(),
@@ -162,5 +174,35 @@ router.post('/observability/audit/flush', (req, res) =>
         res.json({ ok: true });
     }),
 );
+
+// ─── GET /observability/audit-tail ───────────────────────────────────────────
+
+router.get('/observability/audit-tail', (req, res) =>
+    withErrorHandler(req, res, async () => {
+        const n = Math.min(Math.max(Number(req.query['n']) || 50, 1), 500);
+        const sessionId = typeof req.query['sessionId'] === 'string' ? req.query['sessionId'] : undefined;
+        const tool = typeof req.query['tool'] === 'string' ? req.query['tool'] : undefined;
+        let entries = getAuditTail(n);
+        if (sessionId) {
+            entries = entries.filter((e) => /** @type {any} */ (e).sessionId === sessionId);
+        }
+        if (tool) {
+            entries = entries.filter((e) => /** @type {any} */ (e).toolName === tool);
+        }
+        res.json({ ok: true, entries, count: entries.length });
+    }),
+);
+
+// ─── GET /observability/otel-status ──────────────────────────────────────────
+
+router.get('/observability/otel-status', (_req, res) => {
+    res.json({
+        ok: true,
+        enabled: isOtelEnabled(),
+        endpoint: process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ?? null,
+        traceFile: DEFAULT_OTEL_FILE,
+        spanTypes: ['session.boot'],
+    });
+});
 
 export default router;

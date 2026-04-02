@@ -277,8 +277,14 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         _on(
             agent,
             'agent.metrics',
-            _safe(() => {
+            _safe((/** @type {{ queueDepth?: number; uptime?: number; sessionId?: string }} */ evt) => {
                 metrics.recordCounter('agent.metrics.snapshot');
+                if (typeof evt?.queueDepth === 'number') {
+                    metrics.recordGauge('agent.queue.depth', evt.queueDepth);
+                }
+                if (typeof evt?.uptime === 'number') {
+                    metrics.recordGauge('agent.session.uptime', evt.uptime);
+                }
                 log('DEBUG', '[agent-event-observer] agent.metrics snapshot recebido');
             }, 'agent.metrics'),
         );
@@ -397,6 +403,335 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 if (code !== 0) metrics.recordCounter('agent.shell.error');
                 log('DEBUG', `[agent-event-observer] agent.shell.completed exitCode=${code}`);
             }, 'agent.shell.completed'),
+        );
+
+        // ── Fase CF: Dialog state e lifecycle ────────────────────────────────
+
+        // ── dialog.ready — loop pronto para receber mensagens ────────────────
+        _on(
+            agent,
+            'dialog.ready',
+            _safe(() => {
+                metrics.recordCounter('dialog.ready');
+                log('DEBUG', '[agent-event-observer] dialog.ready');
+            }, 'dialog.ready'),
+        );
+
+        // ── dialog.reply — resposta emitida pelo loop ─────────────────────────
+        _on(
+            agent,
+            'dialog.reply',
+            _safe((/** @type {{ reply?: string; turnId?: string }} */ evt) => {
+                metrics.recordCounter('dialog.reply');
+                log('DEBUG', `[agent-event-observer] dialog.reply turnId=${evt?.turnId ?? '?'}`);
+            }, 'dialog.reply'),
+        );
+
+        // ── dialog.stopped — loop parado permanentemente ──────────────────────
+        _on(
+            agent,
+            'dialog.stopped',
+            _safe((/** @type {{ reason?: string }} */ evt) => {
+                metrics.recordCounter('dialog.stopped');
+                if (evt?.reason) metrics.recordCounter(`dialog.stopped.${evt.reason}`);
+                log('DEBUG', `[agent-event-observer] dialog.stopped reason=${evt?.reason ?? '?'}`);
+            }, 'dialog.stopped'),
+        );
+
+        // ── dialog.paused — loop pausado temporariamente ──────────────────────
+        _on(
+            agent,
+            'dialog.paused',
+            _safe(() => {
+                metrics.recordCounter('dialog.paused');
+                log('DEBUG', '[agent-event-observer] dialog.paused');
+            }, 'dialog.paused'),
+        );
+
+        // ── dialog.resumed — loop retomado após pausa ─────────────────────────
+        _on(
+            agent,
+            'dialog.resumed',
+            _safe(() => {
+                metrics.recordCounter('dialog.resumed');
+                log('DEBUG', '[agent-event-observer] dialog.resumed');
+            }, 'dialog.resumed'),
+        );
+
+        // ── task.delta — chunk de streaming de resposta ───────────────────────
+        _on(
+            agent,
+            'task.delta',
+            _safe((/** @type {{ delta?: string; taskId?: string }} */ evt) => {
+                metrics.recordCounter('task.streaming.deltas');
+                const bytes = evt?.delta?.length ?? 0;
+                if (bytes > 0) metrics.recordCounter('task.streaming.bytes', bytes);
+            }, 'task.delta'),
+        );
+
+        // ── task.reasoning — chunk de raciocínio (chain-of-thought) ──────────
+        _on(
+            agent,
+            'task.reasoning',
+            _safe((/** @type {{ text?: string; taskId?: string }} */ evt) => {
+                metrics.recordCounter('task.reasoning.chunks');
+                const bytes = evt?.text?.length ?? 0;
+                if (bytes > 0) metrics.recordCounter('task.reasoning.bytes', bytes);
+            }, 'task.reasoning'),
+        );
+
+        // ── agent lifecycle: ready, stopped, before-stop ─────────────────────
+        _on(
+            agent,
+            'ready',
+            _safe(() => {
+                metrics.recordCounter('agent.ready');
+                log('DEBUG', '[agent-event-observer] agent ready');
+            }, 'ready'),
+        );
+
+        _on(
+            agent,
+            'stopped',
+            _safe(() => {
+                metrics.recordCounter('agent.stopped');
+                log('DEBUG', '[agent-event-observer] agent stopped');
+            }, 'stopped'),
+        );
+
+        _on(
+            agent,
+            'before-stop',
+            _safe(() => {
+                metrics.recordCounter('agent.before_stop');
+                log('DEBUG', '[agent-event-observer] agent before-stop');
+            }, 'before-stop'),
+        );
+
+        _on(
+            agent,
+            'status',
+            _safe((/** @type {{ status?: string }} */ evt) => {
+                metrics.recordCounter(`agent.status.${evt?.status ?? 'unknown'}`);
+            }, 'status'),
+        );
+
+        // ── error no EventEmitter do agente ───────────────────────────────────
+        _on(
+            agent,
+            'error',
+            _safe((/** @type {unknown} */ err) => {
+                metrics.recordCounter('agent.emitter.error');
+                if (errorTracker) {
+                    const e = err instanceof Error ? err : new Error(String(err));
+                    errorTracker.trackError(e, { source: 'agent:emitter.error' });
+                }
+                log('WARN', `[agent-event-observer] agent error: ${err instanceof Error ? err.message : String(err)}`);
+            }, 'error'),
+        );
+
+        // ── session lifecycle ─────────────────────────────────────────────────
+
+        // ── session.usage — event sumário de tokens e custo ───────────────────
+        _on(
+            agent,
+            'session.usage',
+            _safe(
+                (
+                    /**
+                     * @type {{
+                     *     tokens?: number;
+                     *     cost?: number;
+                     *     model?: string;
+                     *     inputTokens?: number;
+                     *     outputTokens?: number;
+                     * }}
+                     */ evt,
+                ) => {
+                    metrics.recordCounter('session.usage');
+                    const model = evt?.model ?? 'unknown';
+                    const input = evt?.inputTokens ?? 0;
+                    const output = evt?.outputTokens ?? evt?.tokens ?? 0;
+                    if (input > 0 || output > 0) {
+                        metrics.recordUsage(model, input, output);
+                    }
+                    log('DEBUG', `[agent-event-observer] session.usage tokens=${evt?.tokens ?? '?'} model=${model}`);
+                },
+                'session.usage',
+            ),
+        );
+
+        // ── session.history_synced ────────────────────────────────────────────
+        _on(
+            agent,
+            'session.history_synced',
+            _safe(() => {
+                metrics.recordCounter('session.history_synced');
+                log('DEBUG', '[agent-event-observer] session.history_synced');
+            }, 'session.history_synced'),
+        );
+
+        // ── session.title_changed ─────────────────────────────────────────────
+        _on(
+            agent,
+            'session.title_changed',
+            _safe(() => {
+                metrics.recordCounter('session.title_changed');
+                log('DEBUG', '[agent-event-observer] session.title_changed');
+            }, 'session.title_changed'),
+        );
+
+        // ── session.info ──────────────────────────────────────────────────────
+        _on(
+            agent,
+            'session.info',
+            _safe((/** @type {{ type?: string }} */ evt) => {
+                metrics.recordCounter(`session.info.${evt?.type ?? 'unknown'}`);
+                log('DEBUG', `[agent-event-observer] session.info type=${evt?.type ?? '?'}`);
+            }, 'session.info'),
+        );
+
+        // ── session.snapshot_rewind ────────────────────────────────────────────
+        _on(
+            agent,
+            'session.snapshot_rewind',
+            _safe(() => {
+                metrics.recordCounter('session.snapshot_rewind');
+                log('DEBUG', '[agent-event-observer] session.snapshot_rewind');
+            }, 'session.snapshot_rewind'),
+        );
+
+        // ── context:compacted — contexto foi compactado (RLE/summarize) ───────
+        _on(
+            agent,
+            'context:compacted',
+            _safe((/** @type {{ savedTokens?: number }} */ evt) => {
+                metrics.recordCounter('context.compacted');
+                if (typeof evt?.savedTokens === 'number') {
+                    metrics.recordCounter('context.compacted.saved_tokens', evt.savedTokens);
+                }
+                log('DEBUG', `[agent-event-observer] context:compacted savedTokens=${evt?.savedTokens ?? '?'}`);
+            }, 'context:compacted'),
+        );
+
+        // ── background e shells restantes ─────────────────────────────────────
+
+        // ── agent.background.idle ─────────────────────────────────────────────
+        _on(
+            agent,
+            'agent.background.idle',
+            _safe(() => {
+                metrics.recordCounter('agent.background.idle');
+                log('DEBUG', '[agent-event-observer] agent.background.idle');
+            }, 'agent.background.idle'),
+        );
+
+        // ── agent.shell.detached_completed ────────────────────────────────────
+        _on(
+            agent,
+            'agent.shell.detached_completed',
+            _safe((/** @type {{ exitCode?: number }} */ evt) => {
+                metrics.recordCounter('agent.shell.detached_completed');
+                const code = evt?.exitCode ?? 0;
+                if (code !== 0) metrics.recordCounter('agent.shell.detached_error');
+                log('DEBUG', `[agent-event-observer] agent.shell.detached_completed exitCode=${code}`);
+            }, 'agent.shell.detached_completed'),
+        );
+
+        // ── domain events ─────────────────────────────────────────────────────
+
+        // ── system.message ─────────────────────────────────────────────────────
+        _on(
+            agent,
+            'system.message',
+            _safe((/** @type {{ type?: string }} */ evt) => {
+                metrics.recordCounter('system.message');
+                log('DEBUG', `[agent-event-observer] system.message type=${evt?.type ?? '?'}`);
+            }, 'system.message'),
+        );
+
+        // ── pending_messages.modified ─────────────────────────────────────────
+        _on(
+            agent,
+            'pending_messages.modified',
+            _safe((/** @type {{ count?: number }} */ evt) => {
+                metrics.recordCounter('pending_messages.modified');
+                log('DEBUG', `[agent-event-observer] pending_messages.modified count=${evt?.count ?? '?'}`);
+            }, 'pending_messages.modified'),
+        );
+
+        // ── exit_plan_mode.completed ──────────────────────────────────────────
+        _on(
+            agent,
+            'exit_plan_mode.completed',
+            _safe(() => {
+                metrics.recordCounter('exit_plan_mode.completed');
+                log('DEBUG', '[agent-event-observer] exit_plan_mode.completed');
+            }, 'exit_plan_mode.completed'),
+        );
+
+        // ── external_tool.completed ────────────────────────────────────────────
+        _on(
+            agent,
+            'external_tool.completed',
+            _safe((/** @type {{ toolName?: string; durationMs?: number }} */ evt) => {
+                metrics.recordCounter('external_tool.completed');
+                log('DEBUG', `[agent-event-observer] external_tool.completed tool=${evt?.toolName ?? '?'}`);
+            }, 'external_tool.completed'),
+        );
+
+        // ── tool.execution_progress ────────────────────────────────────────────
+        _on(
+            agent,
+            'tool.execution_progress',
+            _safe((/** @type {{ toolName?: string; progress?: number }} */ evt) => {
+                metrics.recordCounter('tool.execution.progress');
+                log(
+                    'DEBUG',
+                    `[agent-event-observer] tool.execution_progress tool=${evt?.toolName ?? '?'} progress=${evt?.progress ?? '?'}`,
+                );
+            }, 'tool.execution_progress'),
+        );
+
+        // ── session.workspace_file_changed ─────────────────────────────────────
+        _on(
+            agent,
+            'session.workspace_file_changed',
+            _safe((/** @type {{ path?: string }} */ evt) => {
+                metrics.recordCounter('session.workspace_file_changed');
+                log('DEBUG', `[agent-event-observer] session.workspace_file_changed path=${evt?.path ?? '?'}`);
+            }, 'session.workspace_file_changed'),
+        );
+
+        // ── question lifecycle ─────────────────────────────────────────────────
+
+        /** @type {Map<string, number>} Mapa questionId → timestamp para calcular latência de resposta */
+        const _questionStarts = new Map();
+
+        _on(
+            agent,
+            'question.pending',
+            _safe((/** @type {{ questionId?: string }} */ evt) => {
+                const qId = evt?.questionId ?? `q_${Date.now()}`;
+                _questionStarts.set(qId, Date.now());
+                metrics.recordCounter('question.pending');
+                log('DEBUG', `[agent-event-observer] question.pending questionId=${qId}`);
+            }, 'question.pending'),
+        );
+
+        _on(
+            agent,
+            'question.answered',
+            _safe((/** @type {{ questionId?: string }} */ evt) => {
+                const qId = evt?.questionId ?? null;
+                const startTs = qId ? _questionStarts.get(qId) : null;
+                if (qId) _questionStarts.delete(qId);
+                metrics.recordCounter('question.answered');
+                if (startTs) {
+                    const waitMs = Date.now() - startTs;
+                    log('DEBUG', `[agent-event-observer] question.answered questionId=${qId} waitMs=${waitMs}`);
+                }
+            }, 'question.answered'),
         );
 
         log('INFO', '[agent-event-observer] Attached to agent EventEmitter');

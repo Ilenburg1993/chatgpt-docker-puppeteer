@@ -77,6 +77,7 @@
  * @property {DialogMetrics} dialog - Métricas do dialog loop.
  * @property {TaskMetrics} tasks - Métricas de tasks.
  * @property {Record<string, number>} counters - Contadores genéricos.
+ * @property {Record<string, { value: number; ts: number }>} gauges - Valores instantâneos (gauges).
  * @property {number} collectedAt - Timestamp da coleta.
  */
 
@@ -92,6 +93,8 @@
  * @property {() => void} recordDialogTimeout
  * @property {(durationMs: number, success: boolean) => void} recordTaskCompletion
  * @property {(name: string, delta?: number) => void} recordCounter
+ * @property {(name: string, value: number) => void} recordGauge
+ * @property {() => Record<string, { value: number; ts: number }>} getGauges
  * @property {() => MetricsSummary} getSummary
  * @property {() => void} reset
  * @property {(intervalMs?: number, logDir?: string) => void} startPeriodicSnapshot
@@ -204,6 +207,9 @@ export function createMetricsStore() {
     /** @type {Record<string, number>} */
     const _counters = {};
 
+    /** @type {Record<string, { value: number; ts: number }>} */
+    const _gauges = {};
+
     /**
      * @param {string} toolName
      * @param {number} durationMs
@@ -302,6 +308,26 @@ export function createMetricsStore() {
         _counters[name] = (_counters[name] ?? 0) + delta;
     }
 
+    /**
+     * Registra um valor instantâneo (gauge) — sobrescreve o anterior.
+     *
+     * @param {string} name - Nome do gauge.
+     * @param {number} value - Valor atual.
+     * @returns {void}
+     */
+    function recordGauge(name, value) {
+        _gauges[name] = { value, ts: Date.now() };
+    }
+
+    /**
+     * Retorna todos os gauges registrados.
+     *
+     * @returns {Record<string, { value: number; ts: number }>}
+     */
+    function getGauges() {
+        return { ..._gauges };
+    }
+
     /** @type {ReturnType<typeof setInterval> | null} */
     let _snapshotTimer = null;
 
@@ -377,6 +403,7 @@ export function createMetricsStore() {
                 taskLatency: _tasks.histogram.snapshot(),
             },
             counters: { ..._counters },
+            gauges: { ..._gauges },
             collectedAt: Date.now(),
         };
     }
@@ -401,6 +428,7 @@ export function createMetricsStore() {
         _tasks.failed = 0;
         _tasks.histogram = createHistogram(500);
         Object.keys(_counters).forEach((k) => delete _counters[k]);
+        Object.keys(_gauges).forEach((k) => delete _gauges[k]);
     }
 
     return {
@@ -414,6 +442,8 @@ export function createMetricsStore() {
         recordDialogTimeout,
         recordTaskCompletion,
         recordCounter,
+        recordGauge,
+        getGauges,
         getSummary,
         reset,
         startPeriodicSnapshot,
