@@ -642,7 +642,7 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
     it('onSessionStart: retorna additionalContext com sessionId e model', async () => {
         const ctx = makeCtx();
         const { onSessionStart } = createSessionHooks(ctx);
-        const result = await onSessionStart({ sessionId: 'test-123', source: 'new' });
+        const result = await onSessionStart({ source: 'new' }, { sessionId: 'test-123' });
         assert.ok(result.additionalContext?.includes('test-123'));
         assert.ok(result.additionalContext?.includes('gpt-4'));
     });
@@ -650,7 +650,9 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
     it('onSessionEnd: não lança', async () => {
         const ctx = makeCtx();
         const { onSessionEnd } = createSessionHooks(ctx);
-        await assert.doesNotReject(() => onSessionEnd({ sessionId: 'test-123' }));
+        await assert.doesNotReject(() =>
+            onSessionEnd({ reason: 'complete', timestamp: Date.now(), cwd: '/' }, { sessionId: 'test-123' }),
+        );
     });
 
     it('onErrorOccurred: agenda fallback quando rate_limit e FALLBACK configurado', () => {

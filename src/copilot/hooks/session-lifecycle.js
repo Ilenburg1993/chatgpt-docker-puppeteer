@@ -34,33 +34,38 @@ import { hostname } from 'node:os';
  *
  * @param {SessionLifecycleContext} ctx
  * @returns {{
- *     onSessionStart: (input: { sessionId: string; source?: string }) => Promise<Record<string, unknown>>;
- *     onSessionEnd: (input: { sessionId: string }) => Promise<void>;
- *     onErrorOccurred: (
- *         input: { error: string; errorContext: string; recoverable: boolean },
- *         invocation: { sessionId: string },
- *     ) => void;
+ *     onSessionStart: (
+ *         input: import('./types.js').SessionStartHookInput,
+ *         invocation: import('./types.js').InvocationContext,
+ *     ) => Promise<import('./types.js').SessionStartHookOutput>;
+ *     onSessionEnd: (
+ *         input: import('./types.js').SessionEndHookInput,
+ *         invocation: import('./types.js').InvocationContext,
+ *     ) => Promise<void>;
+ *     onErrorOccurred: import('./types.js').ErrorOccurredHandler;
  * }}
  */
 export function createSessionHooks(ctx) {
     const { getTelemetry, emitWebhook, getModel, scheduleFallback, emit, getContextSnapshot } = ctx;
 
     /**
-     * @param {{ sessionId: string; source?: string }} _input
-     * @returns {Promise<Record<string, unknown>>}
+     * @param {import('./types.js').SessionStartHookInput} input
+     * @param {import('./types.js').InvocationContext} invocation
+     * @returns {Promise<import('./types.js').SessionStartHookOutput>}
      */
-    async function onSessionStart(_input) {
-        log('INFO', `[hooks/session-lifecycle] SessionStart: ${_input.sessionId}`);
-        recordSessionStart(getTelemetry(), _input.sessionId);
-        await emitWebhook('session.start', { sessionId: _input.sessionId });
+    async function onSessionStart(input, invocation) {
+        const sessionId = invocation?.sessionId ?? '';
+        log('INFO', `[hooks/session-lifecycle] SessionStart: ${sessionId}`);
+        recordSessionStart(getTelemetry(), sessionId);
+        await emitWebhook('session.start', { sessionId });
 
         // Gap 4: retornar additionalContext com snapshot de ambiente
         const snapshot = getContextSnapshot ? getContextSnapshot() : {};
         const model = getModel();
         const additionalContext = [
-            `sessionId: ${_input.sessionId}`,
+            `sessionId: ${sessionId}`,
             model ? `model: ${model}` : null,
-            `source: ${_input.source ?? 'unknown'}`,
+            `source: ${input.source ?? 'unknown'}`,
             `host: ${hostname()}`,
             `node: ${process.version}`,
             ...Object.entries(snapshot).map(([k, v]) => `${k}: ${v}`),
@@ -72,18 +77,20 @@ export function createSessionHooks(ctx) {
     }
 
     /**
-     * @param {{ sessionId: string }} _input
+     * @param {import('./types.js').SessionEndHookInput} _input
+     * @param {import('./types.js').InvocationContext} invocation
      * @returns {Promise<void>}
      */
-    async function onSessionEnd(_input) {
-        log('INFO', `[hooks/session-lifecycle] SessionEnd: ${_input.sessionId}`);
-        recordSessionEnd(getTelemetry(), _input.sessionId);
-        await emitWebhook('session.end', { sessionId: _input.sessionId });
+    async function onSessionEnd(_input, invocation) {
+        const sessionId = invocation?.sessionId ?? '';
+        log('INFO', `[hooks/session-lifecycle] SessionEnd: ${sessionId}`);
+        recordSessionEnd(getTelemetry(), sessionId);
+        await emitWebhook('session.end', { sessionId });
     }
 
     /**
      * @param {{ error: string; errorContext: string; recoverable: boolean }} input
-     * @param {{ sessionId: string }} invocation
+     * @param {import('./types.js').InvocationContext} invocation
      * @returns {void}
      */
     function onErrorOccurred(input, invocation) {

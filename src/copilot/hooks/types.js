@@ -121,7 +121,7 @@
 
 /**
  * @typedef {object} ErrorOccurredHookInput
- * @property {Error | string} error
+ * @property {string} error
  * @property {string} errorContext
  * @property {boolean} recoverable
  * @property {number} timestamp

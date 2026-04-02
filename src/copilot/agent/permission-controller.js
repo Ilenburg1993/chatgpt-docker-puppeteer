@@ -129,7 +129,7 @@ export class PermissionController {
                           .map((t) => t.trim())
                           .filter(Boolean)
                     : defaultShellTools;
-                /** @type {import('#copilot/lib/permissions').PermissionHandlerConfig} */
+                /** @type {import('#copilot/hooks/permission').PermissionHandlerConfig} */
                 const cfg = {
                     denyTools: [...(denyShell ? shellTools : []), ...(denyTools ?? [])],
                     auditMode: true,

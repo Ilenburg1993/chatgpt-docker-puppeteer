@@ -50,7 +50,7 @@ export {
     createHooks,
     createMinimalHooks,
     createSafeHooks,
-} from '#copilot/lib/hooks';
+} from '#copilot/hooks/factory';
 
 export {
     createApproveAllPermission,
@@ -58,7 +58,7 @@ export {
     createPermissionHandler,
     createRestrictedPermission,
     createSafePermission,
-} from '#copilot/lib/permissions';
+} from '#copilot/hooks/permission';
 
 export {
     createClientFromCliUrl,

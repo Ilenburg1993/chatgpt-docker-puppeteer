@@ -1,8 +1,8 @@
 # Sistema de Hooks — Análise Profunda e Roadmap de Implementação
 
-**Status**: Concluído — Todas as fases A–M implementadas **Data**: 2026-06-27 **Última
-atualização**: 2026-06-27 **Escopo**: `src/copilot/hooks/` (módulo unificado, isolado, pronto para
-expansão)
+**Status**: Ativo — Fases A–M concluídas; fases N–Q em execução **Data**: 2026-06-27 **Última
+atualização**: 2026-07-03 **Escopo**: `src/copilot/hooks/` (módulo unificado, isolado) + integração
+com `agent/`, `lib/` e `routes/`
 
 ---
 
@@ -12,8 +12,8 @@ expansão)
 
 O sistema de hooks do `src/copilot` está **fragmentado** em múltiplos locais sem uma pasta dedicada:
 
-| Arquivo atual                              | Responsabilidade                                                          | Problema                                                  |
-| ------------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Arquivo atual                              | Responsabilidade                                                          | Problema                                                 |
+| ------------------------------------------ | ------------------------------------------------------------------------- | -------------------------------------------------------- |
 | `src/copilot/lib/hooks.js`                 | Factory `createHooks()` para os 6 slots SDK                               | ✅ Bem estruturado, mas isolado                           |
 | `src/copilot/lib/permissions.js`           | `PermissionHandler` / `onPermissionRequest`                               | ⚠️ Conceitualmente é um hook, está em lib/                |
 | `src/copilot/agent/session-hooks.js`       | `onSessionStart`, `onSessionEnd`, `onErrorOccurred` para AlwaysAliveAgent | ⚠️ Hooks de ciclo de vida do agente misturados com agent/ |
@@ -487,8 +487,8 @@ Gerar `src/copilot/hooks/README.md` com:
 
 ## 4. Tabela de Rastreamento de Gaps
 
-| Gap | Descrição                                            | Fase | Arquivo alvo            | Status                                                           |
-| --- | ---------------------------------------------------- | ---- | ----------------------- | ---------------------------------------------------------------- |
+| Gap | Descrição                                            | Fase | Arquivo alvo            | Status                                                          |
+| --- | ---------------------------------------------------- | ---- | ----------------------- | --------------------------------------------------------------- |
 | G1  | `onUserPromptSubmitted.modifiedPrompt` não utilizado | B.1  | `prompt-transformer.js` | ✅ Concluído                                                     |
 | G2  | `onPreToolUse.modifiedArgs` não utilizado            | B.2  | `tool-interceptor.js`   | ✅ Concluído                                                     |
 | G3  | `onPostToolUse.additionalContext` não retornado      | B.2  | `tool-interceptor.js`   | ✅ Concluído                                                     |
@@ -582,55 +582,66 @@ HookBus ←────── emite eventos de todos os hooks
 
 ## 8. Critérios de Sucesso
 
-Ao final da Fase G, o sistema de hooks deve satisfazer:
+### Critérios originais (Fases A–G): todos concluídos
 
 - [x] **Módulo `src/copilot/hooks/` criado e isolado**
-- [x] **Alias `#copilot/hooks` registrado no `package.json`**
+- [x] **Alias `#copilot/hooks` registrado no `package.json`** (+ todos os aliases granulares)
 - [x] **Todos os 6 hooks SDK** implementados com suporte a retornos completos (modifiedArgs,
       modifiedPrompt, additionalContext)
 - [x] **`onPermissionRequest` e `onUserInputRequest`** gerenciados pelo módulo `hooks/`
 - [x] **`HookBus`** funcional com emit de todos os eventos
 - [x] **`HookRegistry`** com todos os hooks SDK registrados e seus schemas
-- [x] **Suite de testes** `tests/unit/copilot/test_hooks_module.spec.js` — 63 testes **63/63 ✔**
-- [x] **Zero regressões**: 2025/2025 testes passando
+- [x] **Suite de testes** `tests/unit/copilot/test_hooks_module.spec.js` — 79 testes **79/79 ✔**
+- [x] **Zero regressões**: 2054/2054 testes passando
 - [x] **Lint e format clean**: `npm run lint && npm run format:check`
 - [x] **Typecheck clean**: `npx tsc --project tsconfig.node.json --noEmit` exit 0
 - [x] **100% dos gaps (G1-G10) endereçados** — todos concluídos
-- [ ] **Zero referências a `.github/hooks/`** dentro de `src/copilot/hooks/`
-- [ ] **`error-handler.js`** com circuit-breaker e estratégias configuráveis
-- [ ] **`presets/production.js`** pronto para produção com segurança completa
-- [ ] **Re-exports de compatibilidade** nos arquivos legados
-- [ ] **`src/copilot/hooks/README.md`** com API, exemplos e diagrama
+- [x] **Zero referências a `.github/hooks/`** dentro de `src/copilot/hooks/` ✅
+- [x] **`error-handler.js`** com circuit-breaker e estratégias configuráveis ✅ (Fase I)
+- [x] **`presets/production.js`** pronto para produção com segurança completa ✅ (Fase J)
+- [x] **`src/copilot/hooks/README.md`** com API, exemplos e diagrama ✅ (Fase L)
+
+### Critérios das novas fases (N–Q)
+
+- [ ] **Fase N**: todos os 6 hooks SDK wired em `always-alive.js` via `createHooks()` composto
+- [ ] **Fase O**: `factory.js` chama `appendAuditEntry` em `onPostToolUse` com `auditLog: true`
+- [ ] **Fase P**: arquivos @deprecated convertidos para re-exports (sem duplicação de código)
+- [ ] **Fase Q**: rota `/api/sdk/hooks/audit` e `/api/sdk/hooks/registry` funcionando
+- [ ] **Re-exports de compatibilidade** nos arquivos legados sem ciclos de dependência
 
 ---
 
-## 9. Status de Implementação por Arquivo
+## 9. Status de Implementação por Arquivo (Fases A–M)
 
-| Arquivo                                    | Status      | Cobertura de testes    |
-| ------------------------------------------ | ----------- | ---------------------- |
-| `src/copilot/hooks/types.js`               | ✅ Criado   | N/A (zero runtime)     |
-| `src/copilot/hooks/factory.js`             | ✅ Criado   | 11 testes              |
-| `src/copilot/hooks/permission-handler.js`  | ✅ Criado   | 7 testes               |
-| `src/copilot/hooks/session-lifecycle.js`   | ✅ Criado   | 3 testes               |
-| `src/copilot/hooks/composer.js`            | ✅ Criado   | 5 testes               |
-| `src/copilot/hooks/bus.js`                 | ✅ Criado   | 3 testes               |
-| `src/copilot/hooks/registry.js`            | ✅ Criado   | 5 testes               |
-| `src/copilot/hooks/prompt-transformer.js`  | ✅ Criado   | 7 testes               |
-| `src/copilot/hooks/tool-interceptor.js`    | ✅ Criado   | 10 testes              |
-| `src/copilot/hooks/user-input.js`          | ✅ Criado   | 4 testes               |
-| `src/copilot/hooks/index.js`               | ✅ Criado   | 1 teste (barrel smoke) |
-| `src/copilot/hooks/presets/minimal.js`     | ✅ Criado   | 2 testes               |
-| `src/copilot/hooks/presets/audit.js`       | ✅ Criado   | 2 testes               |
-| `src/copilot/hooks/presets/safe.js`        | ✅ Criado   | 3 testes               |
-| `src/copilot/hooks/presets/deny-all.js`    | ✅ Criado   | 3 testes               |
-| `src/copilot/hooks/presets/interactive.js` | ✅ Criado   | 3 testes               |
-| `src/copilot/hooks/error-handler.js`       | ❌ Pendente | — (Fase B.4 / I)       |
-| `src/copilot/hooks/presets/production.js`  | ❌ Pendente | — (Fase F.1 / I)       |
-| `src/copilot/hooks/README.md`              | ❌ Pendente | — (Fase H.3 / I)       |
+| Arquivo                                    | Status   | Cobertura de testes              |
+| ------------------------------------------ | -------- | -------------------------------- |
+| `src/copilot/hooks/types.js`               | ✅ Criado | N/A (zero runtime)               |
+| `src/copilot/hooks/factory.js`             | ✅ Criado | 11 testes                        |
+| `src/copilot/hooks/permission-handler.js`  | ✅ Criado | 7 testes                         |
+| `src/copilot/hooks/session-lifecycle.js`   | ✅ Criado | 3 testes                         |
+| `src/copilot/hooks/composer.js`            | ✅ Criado | 5 testes                         |
+| `src/copilot/hooks/bus.js`                 | ✅ Criado | 3 testes                         |
+| `src/copilot/hooks/registry.js`            | ✅ Criado | 5 testes                         |
+| `src/copilot/hooks/prompt-transformer.js`  | ✅ Criado | 7 testes                         |
+| `src/copilot/hooks/tool-interceptor.js`    | ✅ Criado | 10 testes                        |
+| `src/copilot/hooks/user-input.js`          | ✅ Criado | 4 testes                         |
+| `src/copilot/hooks/index.js`               | ✅ Criado | 1 teste (barrel smoke)           |
+| `src/copilot/hooks/presets/minimal.js`     | ✅ Criado | 2 testes                         |
+| `src/copilot/hooks/presets/audit.js`       | ✅ Criado | 2 testes                         |
+| `src/copilot/hooks/presets/safe.js`        | ✅ Criado | 3 testes                         |
+| `src/copilot/hooks/presets/deny-all.js`    | ✅ Criado | 3 testes                         |
+| `src/copilot/hooks/presets/interactive.js` | ✅ Criado | 3 testes                         |
+| `src/copilot/hooks/error-handler.js`       | ✅ Criado | — (Fase I concluída)             |
+| `src/copilot/hooks/presets/production.js`  | ✅ Criado | — (Fase J concluída)             |
+| `src/copilot/hooks/audit.js`               | ✅ Criado | 16 testes (Gap 10 — ring buffer) |
+| `src/copilot/hooks/README.md`              | ✅ Criado | — (Fase L concluída)             |
 
 ---
 
-## 10. Fases Novas — Complementares à Implementação Base
+## 13. (Histórico) Fases Complementares I–L — já executadas
+
+> Fases I, J, K (parcial) e L foram planejadas aqui e estão hoje concluídas. Fase K ainda pendente
+> (veja Fase P acima).
 
 ### Fase I — `error-handler.js` com circuit-breaker (Gap 4 parcial + B.4)
 
@@ -765,12 +776,294 @@ Conteúdo:
 
 ---
 
+## 10. Análise Arquitetural Profunda (2026-07-03)
+
+> Esta seção registra a análise conduzida após a conclusão das fases A–M. Identificou o **gap
+> crítico de integração** e três novos eixos de trabalho (Fases N–Q).
+
+### 10.1 Gap Crítico: O Módulo Existe mas NÃO Está Integrado
+
+O `src/copilot/hooks/` é um módulo isolado, bem testado e documentado — mas **nunca é realmente
+usado na sessão SDK de produção**. A sessão é criada em `always-alive.js` (linha ~1015) assim:
+
+```js
+// SITUAÇÃO ATUAL — apenas 3 de 6 hooks configurados
+import { createSessionHooks } from './session-hooks.js'; // arquivo @deprecated
+
+hooks: createSessionHooks({
+    getTelemetry: () => this.#telemetry,
+    emitWebhook: ...,
+    getModel: ...,
+    scheduleFallback: ...,
+    emit: ...,
+}),
+```
+
+Resultado:
+
+- `onSessionStart` / `onSessionEnd` / `onErrorOccurred`: ✅ configurados via `session-hooks.js`
+  (arquivo @deprecated com impl própria)
+- `onPreToolUse`: ❌ **nunca wired** — nenhuma política de allow/deny via hooks SDK
+- `onPostToolUse`: ❌ **nunca wired** — ring buffer nunca recebe eventos de produção
+- `onUserPromptSubmitted`: ❌ **nunca wired** — PII sanitizer nunca executado
+
+O `createHooks()` e `createProductionHooks()` do módulo `hooks/` são **letra morta** em produção.
+
+### 10.2 Três Sistemas de Auditoria Concorrentes
+
+Existem 3 sistemas de auditoria que se sobrepõem:
+
+| Sistema                        | Localização            | O que registra                  | Destino                       |
+| ------------------------------ | ---------------------- | ------------------------------- | ----------------------------- |
+| `channel/audit.js`             | SDK tool call tracking | start + complete com durationMs | `logs/tool-audit.jsonl`       |
+| `agent/tool-audit-logger.js`   | Permission decisions   | approved/denied + highRisk      | `logs/tool-audit.jsonl`       |
+| `hooks/audit.js` (ring buffer) | Hook events SDK        | onPostToolUse timing + result   | memória (sem consumidor real) |
+
+Os dois primeiros escrevem no **mesmo arquivo JSONL**. O terceiro (ring buffer) nunca recebe dados
+em produção porque `onPostToolUse` não está wired.
+
+**Solução**: quando `onPostToolUse` for wired via `createHooks({ auditLog: true })`, o `factory.js`
+deve chamar `appendAuditEntry()` para popular o ring buffer. Os dois sistemas JSONL continuam
+complementares — cada um tem uma responsabilidade distinta.
+
+### 10.3 Arquivos @deprecated com Implementação Dupla
+
+Os três arquivos marcados como `@deprecated` ainda têm implementações COMPLETAS e independentes:
+
+| Arquivo                              | Status Real                                      | Problema                                                         |
+| ------------------------------------ | ------------------------------------------------ | ---------------------------------------------------------------- |
+| `src/copilot/lib/hooks.js`           | Implementação própria de createHooks             | Duplicata de `hooks/factory.js`                                  |
+| `src/copilot/lib/permissions.js`     | Implementação própria de createPermissionHandler | Duplicata de `hooks/permission-handler.js`                       |
+| `src/copilot/agent/session-hooks.js` | Implementação própria de createSessionHooks      | Versão inferior (retorna `{}` em onSessionStart vs rich context) |
+
+A Fase K (re-exports) foi planejada mas nunca executada.
+
+### 10.4 Aviso de Dependência Circular: lib/hooks → hooks/index
+
+Se `lib/hooks.js` for convertido para re-export de `#copilot/hooks` (= `hooks/index.js`):
+
+```
+hooks/session-lifecycle.js  →  #copilot/lib/index  →  #copilot/lib/hooks  →  #copilot/hooks  →  hooks/session-lifecycle.js
+```
+
+**CICLO!** A solução é re-exportar de módulos específicos:
+
+- `lib/hooks.js` → re-export de `#copilot/hooks/factory` (NÃO do barrel)
+- `lib/permissions.js` → re-export de `#copilot/hooks/permission-handler`
+- `agent/session-hooks.js` → re-export de `#copilot/hooks/session-lifecycle`
+
+### 10.5 HookBus: Implementado mas sem Consumidor
+
+`HookBus` (Gap 7) foi implementado e testado — mas:
+
+- Nenhum código de produção cria um `HookBus`
+- Nenhum hook emite eventos no bus em produção
+- Não existe endpoint SSE `/api/sdk/hooks/events`
+- Não existe rota `/api/sdk/hooks/registry` para introspecção
+
+### 10.6 Separação Correta: SDK Hooks vs Operacional Hooks
+
+O `session-initializer.js` lê `.github/hooks/state/session-briefing.md` e `session.json` para
+injetar contexto operacional no `systemMessage` da sessão SDK. Isso é **correto** — não é
+contaminação. O ISOLAMENTO aplica-se apenas a `src/copilot/hooks/` (que está limpo), não a
+`session-initializer.js` (que é o ponto de integração legítimo).
+
+---
+
+## 11. Fases N–Q — Integração, Convergência e Exposição
+
+> Fases executadas após análise arquitetural aprofundada em 2026-07-03.
+
+### Fase N — Integração plena do módulo hooks em `always-alive.js`
+
+**Objetivo**: Wire todos os 6 hooks SDK usando o novo módulo, eliminando a dependência do arquivo
+@deprecated.
+
+#### N.1 — Alterar import em `always-alive.js`
+
+```js
+// ANTES (deprecated):
+import { createSessionHooks } from './session-hooks.js';
+
+// DEPOIS (hooks module):
+import { createSessionHooks } from '#copilot/hooks/session-lifecycle';
+import { createHooks } from '#copilot/hooks/factory';
+```
+
+#### N.2 — Compor hooks completos em `#initSession()`
+
+```js
+// Pre-computar hooks antes do initOrResumeSession
+const lifecycleHooks = createSessionHooks({
+  getTelemetry: () => this.#telemetry,
+  emitWebhook: (event, payload) => this.#webhooks.emit(event, payload),
+  getModel: () => this.#model,
+  scheduleFallback: (model) => this.#dialogLoop.scheduleFallback(model),
+  emit: (event, payload) => this.emit(event, payload),
+});
+
+const hooks = createHooks({
+  auditLog: true, // activa onPostToolUse no ring buffer
+  onSessionStart: lifecycleHooks.onSessionStart, // override com telemetria + webhook
+  onSessionEnd: lifecycleHooks.onSessionEnd,
+  onErrorOccurred: lifecycleHooks.onErrorOccurred, // override com fallback model
+});
+```
+
+Resultado: todos os 6 slots configurados em produção pela primeira vez.
+
+#### N.3 — Testes de integração
+
+Adicionar/atualizar testes que verificam que `createHooks()` retorna todos os 6 slots e que a
+composição lifecycle+factory funciona.
+
+---
+
+### Fase O — Ring buffer recebe eventos reais de produção
+
+**Objetivo**: Quando `createHooks({ auditLog: true })` for configurado, o `onPostToolUse` deve
+popular o ring buffer.
+
+#### O.1 — Atualizar `factory.js` para chamar `appendAuditEntry`
+
+No `createHooks()`, quando `auditLog: true` e nenhum `onPostToolUse` customizado for fornecido:
+
+```js
+import { appendAuditEntry } from './audit.js';
+
+// No handler de onPostToolUse default (auditLog=true):
+const postToolFn = async (input, invocation) => {
+  const ts = new Date().toISOString();
+  appendAuditEntry({
+    toolName: input.toolName ?? 'unknown',
+    sessionId: invocation?.sessionId ?? '',
+    hookName: 'onPostToolUse',
+    durationMs: 0, // SDK não o expõe aqui; pode ser melhorado futuramente
+    ts,
+  });
+  log(
+    'DEBUG',
+    `[hooks/factory] onPostToolUse: tool='${input.toolName}' sessionId='${invocation?.sessionId}'`,
+  );
+};
+```
+
+#### O.2 — Verificar que `hook_get_audit_tail` reflete eventos reais
+
+Após N.2 + O.1: `hook_get_audit_tail` deve retornar eventos reais de produção do ring buffer.
+
+---
+
+### Fase P — Converter arquivos @deprecated para re-exports limpos
+
+**Objetivo**: Eliminar duplicação de código, mantendo compatibilidade retroativa com todos os
+importadores existentes.
+
+#### P.1 — `src/copilot/lib/hooks.js` → re-export de `#copilot/hooks/factory`
+
+```js
+// NOVO CONTEÚDO (substitui ~400 linhas):
+export * from '#copilot/hooks/factory';
+```
+
+**Sem ciclo**: `hooks/factory.js` não importa de `lib/hooks.js` ou `lib/index.js`.
+
+#### P.2 — `src/copilot/lib/permissions.js` → re-export de `#copilot/hooks/permission-handler`
+
+```js
+// NOVO CONTEÚDO:
+export * from '#copilot/hooks/permission-handler';
+```
+
+#### P.3 — `src/copilot/agent/session-hooks.js` → re-export de `#copilot/hooks/session-lifecycle`
+
+```js
+// NOVO CONTEÚDO:
+export { createSessionHooks } from '#copilot/hooks/session-lifecycle';
+/** @typedef {import('#copilot/hooks/session-lifecycle').SessionLifecycleContext} SessionHooksContext */
+```
+
+Preservamos o typedef alias `SessionHooksContext` por compatibilidade retroativa.
+
+#### P.4 — Testes de regressão
+
+Verificar que todos os 2054+ testes continuam passando após as substituições.
+
+---
+
+### Fase Q — Rota `/api/sdk/hooks` para introspecção
+
+**Objetivo**: Expor o estado do sistema de hooks via API HTTP.
+
+#### Q.1 — Criar `src/copilot/routes/hooks.js`
+
+Endpoints:
+
+| Método | Rota              | Descrição                                     |
+| ------ | ----------------- | --------------------------------------------- |
+| `GET`  | `/hooks/audit`    | Retorna ring buffer tail (últimas N entradas) |
+| `GET`  | `/hooks/registry` | Lista hooks SDK registrados com seus schemas  |
+
+```js
+import { getAuditTail } from '#copilot/hooks/audit';
+import { SDK_HOOKS } from '#copilot/hooks/registry';
+
+router.get('/hooks/audit', (req, res) => {
+  const n = Math.min(Number(req.query.n) || 20, 200);
+  res.json({ entries: getAuditTail(n) });
+});
+
+router.get('/hooks/registry', (req, res) => {
+  res.json({ hooks: SDK_HOOKS.list() });
+});
+```
+
+#### Q.2 — Registrar em `sdk-api.js`
+
+```js
+import hooksRouter from '../routes/hooks.js';
+router.use('/', hooksRouter);
+```
+
+---
+
+## 12. Status de Implementação Atualizado (2026-07-03)
+
+| Arquivo                                    | Status     | Notas                                                   |
+| ------------------------------------------ | ---------- | ------------------------------------------------------- |
+| `src/copilot/hooks/types.js`               | ✅ Criado   | N/A (zero runtime)                                      |
+| `src/copilot/hooks/factory.js`             | ✅ Criado   | Fase O adicionará appendAuditEntry                      |
+| `src/copilot/hooks/permission-handler.js`  | ✅ Criado   | —                                                       |
+| `src/copilot/hooks/session-lifecycle.js`   | ✅ Criado   | Superset de agent/session-hooks.js                      |
+| `src/copilot/hooks/composer.js`            | ✅ Criado   | —                                                       |
+| `src/copilot/hooks/bus.js`                 | ✅ Criado   | Sem consumidor em produção ainda (post-Q)               |
+| `src/copilot/hooks/registry.js`            | ✅ Criado   | Exposto via rota na Fase Q                              |
+| `src/copilot/hooks/prompt-transformer.js`  | ✅ Criado   | Wired via createHooks na Fase N                         |
+| `src/copilot/hooks/tool-interceptor.js`    | ✅ Criado   | Disponível para uso via createHooks                     |
+| `src/copilot/hooks/user-input.js`          | ✅ Criado   | —                                                       |
+| `src/copilot/hooks/error-handler.js`       | ✅ Criado   | (Fase I concluída)                                      |
+| `src/copilot/hooks/audit.js`               | ✅ Criado   | Ring buffer; Fase O adiciona consumidor real            |
+| `src/copilot/hooks/index.js`               | ✅ Criado   | Barrel completo                                         |
+| `src/copilot/hooks/README.md`              | ✅ Criado   | (Fase L concluída)                                      |
+| `src/copilot/hooks/presets/minimal.js`     | ✅ Criado   | —                                                       |
+| `src/copilot/hooks/presets/audit.js`       | ✅ Criado   | —                                                       |
+| `src/copilot/hooks/presets/safe.js`        | ✅ Criado   | —                                                       |
+| `src/copilot/hooks/presets/deny-all.js`    | ✅ Criado   | —                                                       |
+| `src/copilot/hooks/presets/interactive.js` | ✅ Criado   | —                                                       |
+| `src/copilot/hooks/presets/production.js`  | ✅ Criado   | (Fase J concluída)                                      |
+| `src/copilot/agent/always-alive.js`        | ⏳ Fase N   | Wiring todos os 6 slots com novo módulo hooks           |
+| `src/copilot/lib/hooks.js`                 | ⏳ Fase P.1 | Converter @deprecated → re-export de hooks/factory      |
+| `src/copilot/lib/permissions.js`           | ⏳ Fase P.2 | Converter @deprecated → re-export de hooks/perm-handler |
+| `src/copilot/agent/session-hooks.js`       | ⏳ Fase P.3 | Converter @deprecated → re-export de hooks/session      |
+| `src/copilot/routes/hooks.js`              | ⏳ Fase Q.1 | NOVO — rota /api/sdk/hooks/audit + /registry            |
+
+---
+
 ## 9. Referências
 
 - SDK README: `node_modules/@github/copilot-sdk/README.md`
 - SDK Tipos: `node_modules/@github/copilot-sdk/dist/cjs/types.js`
 - SDK Session: `node_modules/@github/copilot-sdk/dist/cjs/session.js`
-- Implementação atual: `src/copilot/lib/hooks.js`
-- Permissões: `src/copilot/lib/permissions.js`
-- Session lifecycle: `src/copilot/agent/session-hooks.js`
+- Implementação: `src/copilot/hooks/` (módulo canônico)
+- Ponto de integração: `src/copilot/agent/always-alive.js` → `session-initializer.js`
 - Hook tools: `src/copilot/tools/hook-tools.js`

@@ -16,6 +16,7 @@
  * @module copilot/agent/tool-audit-logger
  */
 
+import { defaultBus } from '#copilot/hooks/bus';
 import { log } from '#core/logger';
 import { approveAll } from '@github/copilot-sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
@@ -166,6 +167,14 @@ export function buildAuditingPermissionHandler(baseHandler) {
 
             const decision = result?.kind === 'approved' ? 'approved' : 'denied';
             logToolAudit({ tool: toolName, decision, highRisk });
+
+            // O.2: emitir evento no HookBus para observadores SSE (Fase P).
+            // O sessionId pode ser string vazia em contextos sem sessão ativa.
+            const sessionId =
+                typeof (/** @type {any} */ (invocation)?.sessionId) === 'string'
+                    ? /** @type {any} */ (invocation).sessionId
+                    : '';
+            defaultBus.emitHook('permission_request', sessionId, { toolName, highRisk }, { decision });
 
             if (highRisk && decision === 'approved') {
                 log('INFO', `[ToolAudit] Ferramenta alto risco APROVADA: '${toolName}'`);

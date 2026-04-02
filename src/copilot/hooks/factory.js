@@ -355,17 +355,17 @@ export function composePreToolUseHandlers(...handlers) {
  * @example
  *     const hook = createErrorNotifierHook((err, ctx) => console.error(ctx, err));
  *
- * @param {(error: Error, context: string, recoverable: boolean, sessionId: string) => void | Promise<void>} onError
+ * @param {(
+ *     error: string | Error,
+ *     context: string,
+ *     recoverable: boolean,
+ *     sessionId: string,
+ * ) => void | Promise<void>} onError
  * @returns {ErrorOccurredHandler}
  */
 export function createErrorNotifierHook(onError) {
     const fn = async (/** @type {ErrorOccurredHookInput} */ input, /** @type {InvocationContext} */ invocation) => {
-        await onError(
-            /** @type {Error} */ (input.error),
-            input.errorContext,
-            input.recoverable,
-            invocation?.sessionId ?? '',
-        );
+        await onError(input.error, input.errorContext, input.recoverable, invocation?.sessionId ?? '');
     };
     return /** @type {ErrorOccurredHandler} */ (fn);
 }

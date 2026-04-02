@@ -38,7 +38,10 @@ import { MessageQueue } from './message-queue.js';
 import { PermissionController } from './permission-controller.js';
 import { tryReconnect } from './reconnect-policy.js';
 import { wireSessionEvents } from './session-event-wirer.js';
-import { createSessionHooks } from './session-hooks.js';
+// N.1: usar hooks module canônico em vez do arquivo @deprecated
+import { attachBus } from '#copilot/hooks/bus';
+import { createHooks } from '#copilot/hooks/factory';
+import { createSessionHooks } from '#copilot/hooks/session-lifecycle';
 import { initOrResumeSession } from './session-initializer.js';
 import { readState, writeStateAsync } from './state-io.js';
 import { buildStatusSnapshot } from './status-snapshot.js';
@@ -1008,17 +1011,36 @@ export class AlwaysAliveAgent extends EventEmitter {
         const tools = bootstrapTools(this.#toolsRegistry, this.#telemetry, mcpTools);
         log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
 
+        // N.2: compor todos os 6 hooks SDK usando o módulo canônico.
+        // - lifecycleHooks: onSessionStart (rich additionalContext G4), onSessionEnd, onErrorOccurred
+        //   com telemetria, webhooks e fallback model via injeção de dependência.
+        // - createHooks: wires onPreToolUse (auditLog) + onPostToolUse (ring buffer via auditLog)
+        //   + onUserPromptSubmitted (auditLog) com os overrides de lifecycle acima.
+        const lifecycleHooks = createSessionHooks({
+            getTelemetry: () => this.#telemetry,
+            emitWebhook: (event, payload) => this.#webhooks.emit(event, payload),
+            getModel: () => this.#model,
+            scheduleFallback: (model) => this.#dialogLoop.scheduleFallback(model),
+            emit: (event, payload) => this.emit(event, payload),
+        });
+
+        const hooks = createHooks({
+            auditLog: true,
+            onSessionStart: lifecycleHooks.onSessionStart,
+            onSessionEnd: lifecycleHooks.onSessionEnd,
+            onErrorOccurred: lifecycleHooks.onErrorOccurred,
+        });
+
+        // O.1: attachBus wireará o defaultBus singleton como observer de todos os eventos
+        //      sem modificar o comportamento dos handlers — todos os listeners SSE (Fase P)
+        //      e ring buffer ouvirão via defaultBus.
+        const busHooks = attachBus(hooks);
+
         const { session, isResumed } = await initOrResumeSession(client, {
             model: this.#model,
             onPermissionRequest: this.#permissions.handler,
             onUserInputRequest: this.#handleUserInputRequest.bind(this),
-            hooks: createSessionHooks({
-                getTelemetry: () => this.#telemetry,
-                emitWebhook: (event, payload) => this.#webhooks.emit(event, payload),
-                getModel: () => this.#model,
-                scheduleFallback: (model) => this.#dialogLoop.scheduleFallback(model),
-                emit: (event, payload) => this.emit(event, payload),
-            }),
+            hooks: busHooks,
             tools,
             mcpServers: buildMcpConfig(),
             reasoningEffort: this.#reasoningEffort,
