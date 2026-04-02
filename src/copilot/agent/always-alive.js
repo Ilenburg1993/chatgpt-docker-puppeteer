@@ -22,7 +22,7 @@
 
 import { SessionError } from '#copilot/core/errors';
 import { raceEvents } from '#copilot/lib/event-helpers';
-import { createRegistry, createTelemetry, recordSessionEnd, recordSessionStart, startSpan } from '#copilot/lib/index';
+import { createRegistry, createTelemetry, startSpan } from '#copilot/lib/index';
 import { log } from '#core/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
@@ -32,11 +32,13 @@ import { conversationStore } from '../conversation-hub/store.js';
 import { getHubSessionId } from '../terminal/state.js';
 import { DialogLoopManager } from './dialog-loop-manager.js';
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
+import { wireDialogLoopEvents } from './dialog-loop-wirer.js';
 import { AGENT_EVENTS } from './events.js';
 import { MessageQueue } from './message-queue.js';
 import { PermissionController } from './permission-controller.js';
 import { tryReconnect } from './reconnect-policy.js';
 import { wireSessionEvents } from './session-event-wirer.js';
+import { createSessionHooks } from './session-hooks.js';
 import { initOrResumeSession } from './session-initializer.js';
 import { readState, writeStateAsync } from './state-io.js';
 import { buildStatusSnapshot } from './status-snapshot.js';
@@ -899,39 +901,9 @@ export class AlwaysAliveAgent extends EventEmitter {
         // Wiring de eventos: somente na primeira vez (guard de idempotência).
         if (this.#dialogLoopAttached) return;
         this.#dialogLoopAttached = true;
-        // G2-ARCH-10: removeAllListeners() é seguro aqui porque o flag #dialogLoopAttached garante
-        // que este bloco só executa UMA vez por instância do agente. Listeners adicionados externamente
-        // antes desta chamada seriam perdidos — mas por design, nenhum external code deve registrar
-        // listeners no #dialogLoop antes do attach(). Em reconexão, attach() é chamado novamente mas
-        // o guard impede que removeAllListeners() seja ativado uma segunda vez, preservando os listeners abaixo.
-        this.#dialogLoop.removeAllListeners();
-        this.#dialogLoop.on('ready', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.ready', evt));
-        this.#dialogLoop.on('reply', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.reply', evt));
-        this.#dialogLoop.on('stopped', (/** @type {Record<string, unknown>} */ evt) =>
-            this.emit('dialog.stopped', evt),
-        );
-        this.#dialogLoop.on('paused', (/** @type {Record<string, unknown>} */ evt) => this.emit('dialog.paused', evt));
-        this.#dialogLoop.on('resumed', (/** @type {Record<string, unknown>} */ evt) =>
-            this.emit('dialog.resumed', evt),
-        );
-        this.#dialogLoop.on('stalled', (/** @type {Record<string, unknown>} */ evt) =>
-            this.emit('dialog.stalled', evt),
-        );
-        this.#dialogLoop.on('turn_start', (/** @type {Record<string, unknown>} */ evt) =>
-            this.emit('dialog.turn_start', evt),
-        );
-        this.#dialogLoop.on('turn_end', (/** @type {Record<string, unknown>} */ evt) =>
-            this.emit('dialog.turn_end', evt),
-        );
-        this.#dialogLoop.on('turn_timeout', (/** @type {Record<string, unknown>} */ evt) =>
-            this.emit('dialog.turn_timeout', evt),
-        );
-        this.#dialogLoop.on('changed', (/** @type {Record<string, unknown>} */ evt) =>
-            this.emit('dialog.loop.changed', evt),
-        );
-        this.#dialogLoop.on('model.fallback', (/** @type {Record<string, unknown>} */ evt) =>
-            this.emit('pr.fallback_model', evt),
-        );
+        // G2-ARCH-10: wireDialogLoopEvents() faz removeAllListeners() antes de registrar.
+        // É seguro aqui porque o flag #dialogLoopAttached garante execução única por instância.
+        wireDialogLoopEvents(this.#dialogLoop, (event, payload) => this.emit(event, payload));
     }
 
     /**
@@ -1040,11 +1012,13 @@ export class AlwaysAliveAgent extends EventEmitter {
             model: this.#model,
             onPermissionRequest: this.#permissions.handler,
             onUserInputRequest: this.#handleUserInputRequest.bind(this),
-            hooks: {
-                onSessionStart: this.#onSessionStart.bind(this),
-                onSessionEnd: this.#onSessionEnd.bind(this),
-                onErrorOccurred: this.#onErrorOccurred.bind(this),
-            },
+            hooks: createSessionHooks({
+                getTelemetry: () => this.#telemetry,
+                emitWebhook: (event, payload) => this.#webhooks.emit(event, payload),
+                getModel: () => this.#model,
+                scheduleFallback: (model) => this.#dialogLoop.scheduleFallback(model),
+                emit: (event, payload) => this.emit(event, payload),
+            }),
             tools,
             mcpServers: buildMcpConfig(),
             reasoningEffort: this.#reasoningEffort,
@@ -1154,73 +1128,6 @@ export class AlwaysAliveAgent extends EventEmitter {
             };
             this.#pendingQuestion = pq;
             this.emit('question.pending', { question, choices, allowFreeform });
-        });
-    }
-
-    /**
-     * Emite um evento de webhook para todas as URLs registradas.
-     *
-     * @param {string} event - Nome do evento (ex: 'session.start', 'session.end')
-     * @param {object} payload - Dados do evento
-     * @returns {Promise<void>}
-     */
-    async #emitWebhook(event, payload) {
-        return this.#webhooks.emit(event, payload);
-    }
-
-    /**
-     * @param {{ sessionId: string }} _input
-     */
-    async #onSessionStart(_input) {
-        log('INFO', `[AlwaysAlive] SessionStart hook: ${_input.sessionId}`);
-        recordSessionStart(this.#telemetry, _input.sessionId);
-        await this.#emitWebhook('session.start', { sessionId: _input.sessionId });
-        return {};
-    }
-
-    /**
-     * @param {{ sessionId: string }} _input
-     */
-    async #onSessionEnd(_input) {
-        log('INFO', `[AlwaysAlive] SessionEnd hook: ${_input.sessionId}`);
-        recordSessionEnd(this.#telemetry, _input.sessionId);
-        await this.#emitWebhook('session.end', { sessionId: _input.sessionId });
-    }
-
-    /**
-     * Hook `onErrorOccurred` do SDK — emite evento no agente para observabilidade via SSE/NERV.
-     *
-     * @param {{ error: string; errorContext: string; recoverable: boolean }} input
-     * @param {{ sessionId: string }} invocation
-     * @returns {void}
-     */
-    #onErrorOccurred(input, invocation) {
-        log(
-            'WARN',
-            `[AlwaysAlive] SDK errorOccurred [${input.errorContext}]: ${input.error} (recuperável: ${input.recoverable})`,
-        );
-
-        // Aciona fallback de modelo se a quota/rate_limit foi atingida e COPILOT_FALLBACK_MODEL está configurado.
-        const isRateOrQuotaError = input.errorContext === 'rate_limit' || input.errorContext === 'quota';
-        if (isRateOrQuotaError) {
-            const fallbackModel = process.env['COPILOT_FALLBACK_MODEL'];
-            if (fallbackModel && fallbackModel !== this.#model) {
-                log(
-                    'WARN',
-                    `[AlwaysAlive] rate_limit/quota detectado — próxima reconexão usará model fallback: ${fallbackModel}`,
-                );
-                this.#dialogLoop.scheduleFallback(fallbackModel);
-            } else {
-                log('WARN', '[AlwaysAlive] rate_limit/quota sem COPILOT_FALLBACK_MODEL configurado.');
-            }
-        }
-
-        this.emit('error', {
-            hookType: 'errorOccurred',
-            errorMessage: input.error,
-            errorContext: input.errorContext,
-            recoverable: input.recoverable,
-            sessionId: invocation.sessionId,
         });
     }
 

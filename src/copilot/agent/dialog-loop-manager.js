@@ -21,10 +21,10 @@
 
 import { SessionError } from '#copilot/core/errors';
 import { waitForEvent } from '#copilot/lib/event-helpers';
-import { recordToolCall, startSpan } from '#copilot/lib/index';
 import { log } from '#core/logger';
 import EventEmitter from 'node:events';
 import { DialogProtocol } from './dialog-protocol.js';
+import { executeTurnImpl } from './dialog-turn-executor.js';
 import { DialogWatchdog } from './dialog-watchdog.js';
 import { readState, writeStateAsync } from './state-io.js';
 
@@ -103,8 +103,8 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {TelemetryStore | null} */
     #telemetry = null;
 
-    /** @type {number} */
-    #sendCount = 0;
+    /** @type {{ sendCount: number }} Ref mutável para o contador de sends — usado pelo dialog-turn-executor. */
+    #sendCountRef = { sendCount: 0 };
 
     /**
      * @param {DialogLoopManagerOptions} [options]
@@ -480,281 +480,15 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {Promise<string>}
      */
     #executeTurn(message, { timeout, signal }) {
-        if (!this.#host || !this.#telemetry) {
-            return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
-        }
-        // G2-BUG-05: verificar novamente signal?.aborted no início de #executeTurn para cobrir
-        // a janela de race entre a verificação em sendTurn() e a execução do mutex.
-        if (signal?.aborted) {
-            return Promise.reject(new DOMException('[DialogLoopManager] sendTurn abortado.', 'AbortError'));
-        }
-        const host = this.#host;
-        const telemetry = this.#telemetry;
-
-        // G2-ARCH-01: parte 1 — registrar métricas e emitir turn_start
-        const { turnStart } = this.#emitTurnStart(message);
-
-        return startSpan(
-            'dialog.send_turn',
+        return executeTurnImpl(
+            this,
+            message,
+            { timeout, ...(signal !== undefined && { signal }) },
             {
-                sessionId: host.getSessionId() ?? '',
-                actor: 'user',
-                model: host.getModel(),
-                extra: { turnNumber: this.#sendCount },
+                host: this.#host,
+                telemetry: this.#telemetry,
+                sendCountRef: this.#sendCountRef,
             },
-            () =>
-                new Promise((resolve, reject) => {
-                    // G2-ARCH-01: parte 2 — ref compartilhada para o listener de question.pending
-                    // (usada pelo timeoutHandle para limpar listener pendente ao expirar)
-                    /** @type {{ current: ((arg: unknown) => void) | null }} */
-                    const pendingListenerRef = { current: null };
-
-                    // G2-ARCH-01: parte 3 — construir listeners de resolução do turno
-                    const { timeoutHandle, onReplyOuter, onStopOuter } = this.#buildTurnResolutionListeners({
-                        host,
-                        telemetry,
-                        turnStart,
-                        timeout,
-                        message,
-                        pendingListenerRef,
-                        resolve,
-                        reject,
-                    });
-
-                    // G2-ARCH-01: parte 4 — registrar signal abort listener
-                    if (signal) {
-                        signal.addEventListener(
-                            'abort',
-                            () => {
-                                clearTimeout(timeoutHandle);
-                                this.off('reply', onReplyOuter);
-                                this.off('stopped', onStopOuter);
-                                reject(new DOMException('[DialogLoopManager] sendTurn abortado.', 'AbortError'));
-                            },
-                            { once: true },
-                        );
-                    }
-
-                    this.once('reply', onReplyOuter);
-                    this.once('stopped', onStopOuter);
-
-                    // G2-ARCH-01: parte 5 — despachar mensagem ao host
-                    this.#dispatchTurnToHost({
-                        host,
-                        message,
-                        timeout,
-                        timeoutHandle,
-                        pendingListenerRef,
-                        resolve,
-                        reject,
-                    });
-                }),
         );
-    }
-
-    /**
-     * Emite `turn_start`, incrementa contador e persiste estado pendente.
-     *
-     * G2-ARCH-01: extraído de #executeTurn para melhorar legibilidade.
-     *
-     * @param {string} message
-     * @returns {{ turnStart: number }}
-     */
-    #emitTurnStart(message) {
-        const turnStart = Date.now();
-        this.#sendCount++;
-        this.emit('turn_start', { message: message.slice(0, 120), ts: turnStart });
-        writeStateAsync({
-            pendingTurnMessage: message,
-            pendingTurnTs: turnStart,
-            pendingTurnConsumedPR: false,
-        }).catch((/** @type {any} */ e) => log('WARN', `[DialogLoopManager] writeState pendingTurn: ${e.message}`));
-        return { turnStart };
-    }
-
-    /**
-     * Constrói os event handlers principais de resolução/rejeição de um turno.
-     *
-     * G2-ARCH-01: extraído de #executeTurn para melhorar legibilidade.
-     *
-     * @param {{
-     *     host: any;
-     *     telemetry: any;
-     *     turnStart: number;
-     *     timeout: number;
-     *     message: string;
-     *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
-     *     resolve: (v: string) => void;
-     *     reject: (e: unknown) => void;
-     * }} opts
-     * @returns {{
-     *     timeoutHandle: ReturnType<typeof setTimeout>;
-     *     onReplyOuter: (evt: { reply: string }) => void;
-     *     onStopOuter: (evt: { authorized?: boolean; reason?: string }) => void;
-     * }}
-     */
-    #buildTurnResolutionListeners({
-        host,
-        telemetry,
-        turnStart,
-        timeout,
-        message,
-        pendingListenerRef,
-        resolve,
-        reject,
-    }) {
-        const timeoutHandle = setTimeout(() => {
-            if (pendingListenerRef.current) {
-                this.off('question.pending', pendingListenerRef.current);
-                pendingListenerRef.current = null;
-            }
-            reject(new SessionError(`[DialogLoopManager] sendTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
-        }, timeout);
-
-        const onReplyOuter = (/** @type {{ reply: string }} */ evt) => {
-            clearTimeout(timeoutHandle);
-            this.off('stopped', onStopOuter);
-            const durationMs = Date.now() - turnStart;
-            this.emit('turn_end', { reply: evt.reply.slice(0, 120), durationMs });
-            recordToolCall(telemetry, 'dialog.turn', {
-                durationMs,
-                success: true,
-                sessionId: host.getSessionId() ?? undefined,
-            });
-            resolve(evt.reply);
-        };
-
-        const onStopOuter = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt) => {
-            clearTimeout(timeoutHandle);
-            this.off('reply', onReplyOuter);
-            if (stopEvt?.authorized) {
-                reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
-            } else {
-                log(
-                    'INFO',
-                    `[DialogLoopManager] Dialog loop parado sem autorização (${stopEvt?.reason ?? 'unknown'}) — aguardando restart automático.`,
-                );
-                this.#waitForRestartAndReply(message, timeout, stopEvt?.reason).then(resolve).catch(reject);
-            }
-        };
-
-        return { timeoutHandle, onReplyOuter, onStopOuter };
-    }
-
-    /**
-     * Despacha a mensagem ao host — responde pergunta pendente ou envia diretamente.
-     *
-     * G2-ARCH-01: extraído de #executeTurn para melhorar legibilidade.
-     *
-     * @param {{
-     *     host: any;
-     *     message: string;
-     *     timeout: number;
-     *     timeoutHandle: ReturnType<typeof setTimeout>;
-     *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
-     *     resolve: (v: string) => void;
-     *     reject: (e: unknown) => void;
-     * }} opts
-     */
-    #dispatchTurnToHost({ host, message, timeout, timeoutHandle, pendingListenerRef, resolve, reject }) {
-        if (host.getPendingQuestion()) {
-            host.answerPendingQuestion(message);
-        } else {
-            const onPending = (/** @type {unknown} */ _) => {
-                pendingListenerRef.current = null;
-                clearTimeout(timeoutHandle);
-                const newTimeout = setTimeout(() => {
-                    this.off('reply', onReply);
-                    this.off('stopped', onStop);
-                    reject(
-                        new SessionError(`[DialogLoopManager] sendTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'),
-                    );
-                }, timeout);
-                const onReply = (/** @type {{ reply: string }} */ evt) => {
-                    clearTimeout(newTimeout);
-                    this.off('stopped', onStop);
-                    resolve(evt.reply);
-                };
-                const onStop = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt2) => {
-                    clearTimeout(newTimeout);
-                    this.off('reply', onReply);
-                    if (stopEvt2?.authorized) {
-                        reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
-                    } else {
-                        this.#waitForRestartAndReply(message, timeout, stopEvt2?.reason).then(resolve).catch(reject);
-                    }
-                };
-                this.once('reply', onReply);
-                this.once('stopped', onStop);
-                host.answerPendingQuestion(message);
-            };
-            pendingListenerRef.current = onPending;
-            this.once('question.pending', onPending);
-            if (host.getPendingQuestion()) {
-                this.off('question.pending', onPending);
-                pendingListenerRef.current = null;
-                onPending(undefined);
-            }
-        }
-    }
-
-    /**
-     * Aguarda restart (dialog.ready) e reenvia mensagem.
-     *
-     * @param {string} message
-     * @param {number} timeout
-     * @param {string} [stopReason]
-     * @returns {Promise<string>}
-     */
-    #waitForRestartAndReply(message, timeout, stopReason) {
-        const host = this.#host;
-        if (!host) return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
-
-        return new Promise((resolve, reject) => {
-            // G2-ARCH-04: declarar onRetryPending no escopo da Promise para poder removê-la no timeout
-            /** @type {(() => void) | null} */
-            let onRetryPending = null;
-
-            const retryTimeout = setTimeout(() => {
-                this.off('ready', onRetryReady);
-                // G2-ARCH-04: limpar listener 'question.pending' se ainda pendente
-                if (onRetryPending) this.off('question.pending', onRetryPending);
-                reject(
-                    new SessionError(
-                        `[DialogLoopManager] Timeout aguardando restart após stopped (${stopReason ?? 'unknown'})`,
-                        'DIALOG_RESTART_TIMEOUT',
-                    ),
-                );
-            }, timeout);
-
-            const onRetryReady = () => {
-                clearTimeout(retryTimeout);
-                onRetryPending = () => {
-                    host.answerPendingQuestion(message);
-                    const onRetryStopped = (/** @type {{ reason?: string }} */ stoppedEvt) => {
-                        this.off('reply', onRetryReply);
-                        reject(
-                            new SessionError(
-                                `[DialogLoopManager] stopped durante retry (${stoppedEvt?.reason ?? 'unknown'})`,
-                                'DIALOG_STOPPED_DURING_RETRY',
-                            ),
-                        );
-                    };
-                    /** @type {(evt: { reply: string }) => void} */
-                    const onRetryReply = (retryEvt) => {
-                        this.off('stopped', onRetryStopped);
-                        resolve(retryEvt.reply);
-                    };
-                    this.once('reply', onRetryReply);
-                    this.once('stopped', onRetryStopped);
-                };
-                if (host.getPendingQuestion()) {
-                    onRetryPending();
-                } else {
-                    this.once('question.pending', onRetryPending);
-                }
-            };
-            this.once('ready', onRetryReady);
-        });
     }
 }

@@ -90,15 +90,15 @@ importa de `agent/` via transitive.
 
 ### 1.6 God Objects (Arquivos > 700 LOC)
 
-| LOC  | Arquivo                        | Problema                                           |
-| ---- | ------------------------------ | -------------------------------------------------- |
-| 1385 | `tools/todo-tools.js`          | 1 arquivo com todo CRUD, render, e gestão de TODOs |
-| 1281 | `agent/always-alive.js`        | Lifecycle inteiro do agent em 1 classe             |
-| 922  | `terminal/http-handlers.js`    | Todos os handlers HTTP em 1 arquivo                |
-| 811  | `conversation-hub/store.js`    | Store + queries + lifecycle em 1 arquivo           |
-| 796  | `tools/file-tools.js`          | Todas as file tools (read, write, search, etc.)    |
-| 762  | `bridges/gh-bridge.js`         | Todo o wrapper GitHub CLI                          |
-| 760  | `agent/dialog-loop-manager.js` | Loop de diálogo inteiro em 1 arquivo               |
+| LOC  | Arquivo                        | Problema                                           | Status            |
+| ---- | ------------------------------ | -------------------------------------------------- | ----------------- |
+| 1385 | `tools/todo-tools.js`          | 1 arquivo com todo CRUD, render, e gestão de TODOs | ✅ Split (4.1)    |
+| 1281 | `agent/always-alive.js`        | Lifecycle inteiro do agent em 1 classe             | 🔄 Parcial (4.7) |
+| 922  | `terminal/http-handlers.js`    | Todos os handlers HTTP em 1 arquivo                | ✅ Split (4.3)    |
+| 811  | `conversation-hub/store.js`    | Store + queries + lifecycle em 1 arquivo           | ✅ Split (4.5)    |
+| 796  | `tools/file-tools.js`          | Todas as file tools (read, write, search, etc.)    | ✅ Split (4.2)    |
+| 762  | `bridges/gh-bridge.js`         | Todo o wrapper GitHub CLI                          | 🔄 Pendente (4.6) |
+| 760  | `agent/dialog-loop-manager.js` | Loop de diálogo inteiro em 1 arquivo               | 🔄 Pendente (4.8) |
 
 ### 1.7 Sobreposição de Responsabilidades
 
@@ -319,17 +319,50 @@ src/copilot/
 
 ### Fase 4 — Decomposição de God Objects
 
-- **4.1** Split `tools/todo-tools.js` (1385 LOC) → `tools/todo/crud.js` + `tools/todo/render.js` +
-  `tools/todo/index.js`
-- **4.2** Split `tools/file-tools.js` (796 LOC) → `tools/file/read-tools.js` +
-  `tools/file/write-tools.js` + `tools/file/search-tools.js` + `tools/file/index.js`
-- **4.3** Split `terminal/http-handlers.js` (922 LOC) → `terminal/handlers-agent.js` +
-  `terminal/handlers-dialog.js` + `terminal/handlers-system.js`
-- **4.4** Extrair métodos de `agent/always-alive.js` (1281 LOC) para arquivos existentes que já
-  receberam responsabilidades (dialog-loop-manager, session-initializer, etc.) — reduzir ≤ 600 LOC
-- **4.5** Split `conversation-hub/store.js` (811 LOC) → `store.js` (state) + `store-queries.js`
-  (queries)
-- **4.6** Validar: typecheck 0 erros, testes existentes passam
+#### Subfases concluídas (commit `a2ee413b`):
+
+- **4.1** ✅ Split `tools/todo-tools.js` (1385 LOC) → 5 arquivos em `tools/todo/` (store, crud,
+  query, bulk, index). Barrel re-export preservado.
+- **4.2** ✅ Split `tools/file-tools.js` (796 LOC) → 4 arquivos em `tools/file/` (shared,
+  read-tools, write-tools, index). Barrel re-export preservado.
+- **4.3** ✅ Split `terminal/http-handlers.js` (922 LOC) → 4 módulos handler (`handlers-shared`,
+  `handlers-agent`, `handlers-dialog`, `handlers-system`) + barrel re-export em `http-handlers.js`.
+- **4.4** ⏭️ SKIP `agent/always-alive.js` — classe já delega para 10 helper modules
+  (dialog-loop-manager, session-initializer, session-event-wirer, reconnect-policy, task-executor,
+  status-snapshot, state-io, message-queue, permission-controller, webhook-manager). Restante é
+  wiring de private fields que não pode ser extraído sem degradar a API.
+- **4.5** ✅ Extração `conversation-hub/store-helpers.js` de `store.js` (811→671 LOC). Tipos e
+  funções FTS5 extraídos; re-export de typedefs preserva backward compatibility.
+
+#### Subfases novas (planejamento detalhado):
+
+- **4.6** Split `bridges/gh-bridge.js` (762 LOC) em 4 módulos por domínio:
+  - `bridges/gh/shared.js` — helpers internos: `runGh`, `runGhJson`, `fmtDate`, `runIcon`,
+    `repoArgs`, `slicePage`, `calcFetchLimit` (~140 LOC)
+  - `bridges/gh/issues.js` — `listIssues`, `viewIssue`, `createIssue`, `closeIssue`,
+    `commentIssue`, `searchIssues`, `formatIssueList` (~180 LOC)
+  - `bridges/gh/prs.js` — `listPrs`, `viewPr`, `diffPr`, `mergePr`, `formatPrList` (~140 LOC)
+  - `bridges/gh/ci.js` — `listRuns`, `viewRun`, `watchRun`, `cancelRun`, `rerunRun`,
+    `formatRunList` (~120 LOC)
+  - `bridges/gh/index.js` — barrel re-export + `getDefaultRepo`, `getStatus`, `rawApi`,
+    `listReleases`, `viewRelease`, `formatReleaseList`, `searchCode` (~130 LOC)
+  - `bridges/gh-bridge.js` → thin barrel re-export para backward compatibility
+- **4.7** Extrair de `agent/always-alive.js` (1281 LOC) handlers de input do usuário e hooks de
+  sessão SDK:
+  - `agent/user-input-handler.js` — `handleUserInputRequest`, `handleDialogLoopInput`,
+    `handleInteractiveQuestion` (~80 LOC). Recebe callbacks via opts.
+  - `agent/session-hooks.js` — `createSessionHooks` factory retornando `onSessionStart`,
+    `onSessionEnd`, `onErrorOccurred` + lógica de fallback model (~70 LOC).
+  - `agent/dialog-loop-wirer.js` — `wireDialogLoopEvents` extraída de
+    `#ensureDialogLoopAttached` — boilerplate de 11 event pipes (~60 LOC).
+  - `agent/sdk-history-sync.js` — `syncSdkHistory(session, hubSessionId)` extraída do
+    método `#syncSdkHistory` (~40 LOC).
+  - Meta: reduzir `always-alive.js` de 1281 → ~1000 LOC (ganho ~280 LOC).
+- **4.8** Extrair de `agent/dialog-loop-manager.js` (760 LOC) a lógica de execução de turno:
+  - `agent/dialog-turn-executor.js` — `executeTurn`, `buildTurnResolutionListeners`,
+    `dispatchTurnToHost`, `waitForRestartAndReply`, `emitTurnStart` (~300 LOC).
+  - Meta: reduzir `dialog-loop-manager.js` de 760 → ~460 LOC.
+- **4.9** Validar tudo: typecheck 0 erros, ESLint, Prettier, madge --circular 0 ciclos
 
 ### Fase 5 — Decomposição de Funções Complexas (> 100 LOC)
 
