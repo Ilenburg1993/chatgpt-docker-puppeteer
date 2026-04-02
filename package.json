@@ -50,6 +50,8 @@
     "#copilot/config/custom-tools-registry": "./src/copilot/config/tools/registry.js",
     "#copilot/config/tools": "./src/copilot/config/tools/index.js",
     "#copilot/config/tools/*": "./src/copilot/config/tools/*.js",
+    "#copilot/hooks": "./src/copilot/hooks/index.js",
+    "#copilot/hooks/*": "./src/copilot/hooks/*.js",
     "#copilot/*": "./src/copilot/*.js",
     "#core/constants": "./src/core/constants/index.ts",
     "#core/constants/browser": "./src/core/constants/browser.ts",
