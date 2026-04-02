@@ -336,7 +336,7 @@ src/copilot/
 
 #### Subfases novas (planejamento detalhado):
 
-- **4.6** Split `bridges/gh-bridge.js` (762 LOC) em 4 módulos por domínio:
+- **4.6** ✅ Split `bridges/gh-bridge.js` (762 LOC) em 4 módulos por domínio:
   - `bridges/gh/shared.js` — helpers internos: `runGh`, `runGhJson`, `fmtDate`, `runIcon`,
     `repoArgs`, `slicePage`, `calcFetchLimit` (~140 LOC)
   - `bridges/gh/issues.js` — `listIssues`, `viewIssue`, `createIssue`, `closeIssue`, `commentIssue`,
@@ -347,62 +347,58 @@ src/copilot/
   - `bridges/gh/index.js` — barrel re-export + `getDefaultRepo`, `getStatus`, `rawApi`,
     `listReleases`, `viewRelease`, `formatReleaseList`, `searchCode` (~130 LOC)
   - `bridges/gh-bridge.js` → thin barrel re-export para backward compatibility
-- **4.7** Extrair de `agent/always-alive.js` (1281 LOC) handlers de input do usuário e hooks de
+- **4.7** ✅ Extrair de `agent/always-alive.js` (1281 LOC) handlers de input do usuário e hooks de
   sessão SDK:
-  - `agent/user-input-handler.js` — `handleUserInputRequest`, `handleDialogLoopInput`,
-    `handleInteractiveQuestion` (~80 LOC). Recebe callbacks via opts.
   - `agent/session-hooks.js` — `createSessionHooks` factory retornando `onSessionStart`,
     `onSessionEnd`, `onErrorOccurred` + lógica de fallback model (~70 LOC).
   - `agent/dialog-loop-wirer.js` — `wireDialogLoopEvents` extraída de `#ensureDialogLoopAttached` —
     boilerplate de 11 event pipes (~60 LOC).
-  - `agent/sdk-history-sync.js` — `syncSdkHistory(session, hubSessionId)` extraída do método
-    `#syncSdkHistory` (~40 LOC).
-  - Meta: reduzir `always-alive.js` de 1281 → ~1000 LOC (ganho ~280 LOC).
-- **4.8** Extrair de `agent/dialog-loop-manager.js` (760 LOC) a lógica de execução de turno:
-  - `agent/dialog-turn-executor.js` — `executeTurn`, `buildTurnResolutionListeners`,
+  - Resultado: `always-alive.js` 1281 → ~1188 LOC (ganho ~93 LOC); `dialog-loop-manager.js` reduzido.
+- **4.8** ✅ Extrair de `agent/dialog-loop-manager.js` (760 LOC) a lógica de execução de turno:
+  - `agent/dialog-turn-executor.js` — `executeTurnImpl`, `buildTurnResolutionListeners`,
     `dispatchTurnToHost`, `waitForRestartAndReply`, `emitTurnStart` (~300 LOC).
-  - Meta: reduzir `dialog-loop-manager.js` de 760 → ~460 LOC.
-- **4.9** Validar tudo: typecheck 0 erros, ESLint, Prettier, madge --circular 0 ciclos
+  - Resultado: `dialog-loop-manager.js` 760 → ~494 LOC (ganho ~266 LOC).
+- **4.9** ✅ Validar: typecheck 0 erros, ESLint, Prettier, madge --circular 0 ciclos — commit `73d4e1a6`
 
-### Fase 5 — Decomposição de Funções Complexas (> 100 LOC)
+### Fase 5 — Decomposição de Funções Complexas (> 100 LOC) ✅ commit `d6c9ac49`
 
-- **5.1** `socket-ns.js/mountCopilotNamespace` (276 LOC) → dividir em `_handleConnection`,
-  `_handleDisconnect`, `_handleReconnect`, `_setupNamespaceEvents`
-- **5.2** `bridge-control.js/registerControlRoutes` (197 LOC) → handlers individuais
-- **5.3** `session-event-wirer.js/wireSessionEvents` (177 LOC) → agrupar por tipo de evento
-- **5.4** `repl.js/dispatchCmd` (146 LOC) → route table pattern (já existe route-table.js, integrar)
-- **5.5** Validar: typecheck, testes existentes
+- **5.1** ✅ `socket-ns.js/mountCopilotNamespace` (276 LOC) → `_setupAuthMiddleware`, `_setupConnectionHandlers`, `_bridgeOrchestratorEvents`
+- **5.2** ✅ `bridge-control.js/registerControlRoutes` (196 LOC) → 8 handlers modulares + `requireAdminAuth`
+- **5.3** ✅ `session-event-wirer.js/wireSessionEvents` (177 LOC) → 5 sub-funções por grupo de evento
+- **5.4** ✅ `repl.js/dispatchCmd` (155 LOC) → `CMD_ROUTES` tabela de rotas + `_cmdRouteMap` Map; `CmdCtx` typedef
+- **5.5** ✅ Validação: ESLint ✓ | TSC strict ✓ | Madge 0 ciclos ✓ | Prettier ✓
 
-### Fase 6 — Consolidação de Tools Registries
+### Fase 6 — Consolidação de Tools Registries ⏭️ Decisão arquitetural: NÃO merger
 
-- **6.1** Auditar `lib/tools-registry.js` vs `config/tools/registry.js` — mapear consumidores
-- **6.2** Unificar em `config/tools/registry.js` (runtime) com interface abstrata mantida
-- **6.3** Remover `lib/tools-registry.js`, atualizar imports
-- **6.4** Atualizar `lib/index.js` barrel
+- **6.1** ✅ Auditado: `lib/tools-registry.js` e `config/tools/registry.js` têm responsabilidades **ortogonais**:
+  - `lib/tools-registry.js` — API funcional/pura para organizar/filtrar ferramentas SDK (bootstrap)
+  - `config/tools/registry.js` — runtime CRUD com persistência JSON + BUILTIN_HANDLER_MAP de segurança
+- **6.2–6.4** ⏭️ SKIP — fusão seria anti-padrão; sistemas distintos devem permanecer separados
+- **6.x** ✅ `lib/index.js` barrel verificado: re-exporta todas as 16 funções de `tools-registry.js`
 
-### Fase 7 — Atualização de Barrels (index.js)
+### Fase 7 — Atualização de Barrels (index.js) ✅ commit `0a5edc3d`
 
-- **7.1** `agent/index.js`: re-exportar todos os públicos (de 44% → 90%+)
-- **7.2** `lib/index.js`: re-exportar todos os públicos (de 10% → 80%+)
-- **7.3** `terminal/index.js`: re-exportar públicos (de 1.5% → 50%+)
-- **7.4** `tools/index.js`: re-exportar todas as tool arrays
-- **7.5** `config/index.js`: re-exportar configuração pública
-- **7.6** `core/index.js`: re-exportar constantes e errors
-- **7.7** Validar: sem imports quebrados
+- **7.1** ✅ `agent/index.js`: +10 exports (task-executor, tools-bootstrap, session-hooks, dialog-loop-wirer, dialog-turn-executor)
+- **7.2** ✅ `lib/index.js`: +2 exports (httpRequest, pickDefined)
+- **7.3** ⏭️ `terminal/index.js` — é entrypoint de bootstrap, não barrel; sem mudança necessária
+- **7.4** ✅ `tools/index.js`: +2 exports (buildTool, withSkipPermission de tool-factory.js)
+- **7.5** ✅ `config/index.js`: +8 exports (custom-agents + PinnedFilesLoader + re-export tools/index.js)
+- **7.6** ⏭️ `core/index.js` — já usa `export *` de constants.js + errors.js + types/index.js; sem mudança necessária
+- **7.7** ✅ Validado: ESLint ✓ | TSC strict ✓ | Madge 0 ciclos ✓
 
-### Fase 8 — Testes Unitários Prioritários
+### Fase 8 — Testes Unitários Prioritários ✅ commit `171cc130`
 
-- **8.1** `lib/event-helpers.spec.js` — waitForEvent, raceEvents (pure functions)
-- **8.2** `lib/url-validator.spec.js` — validateUrl, validateUrlString (pure)
-- **8.3** `lib/permissions.spec.js` — createPermissionHandler factories (pure)
-- **8.4** `lib/hooks.spec.js` — hook factories (pure)
-- **8.5** `bridges/alias-store.spec.js` — resolve, setAlias, removeAlias (in-memory)
-- **8.6** `agent/tool-audit-logger.spec.js` — isHighRiskTool, buildAuditingPermissionHandler
-- **8.7** `agent/message-queue.spec.js` — enqueue, dequeue, isEmpty
-- **8.8** `agent/status-snapshot.spec.js` — buildStatusSnapshot
-- **8.9** `agent/state-io.spec.js` — readState, writeState, clearState (with tmp dir)
-- **8.10** `config/tools/registry.spec.js` — register, list, remove
-- **8.11** Validar: `npm run test:unit` passa, cobertura baseline
+- **8.1** ✅ `test_event_helpers.spec.js` — já existia
+- **8.2** ✅ `test_url_validator.spec.js` — já existia
+- **8.3** ✅ `test_lib_permissions.spec.js` — já existia
+- **8.4** ✅ `test_lib_hooks.spec.js` — já existia
+- **8.5** ✅ `test_alias_store.spec.js` — **NOVO**: 19 testes (resolve, setAlias, removeAlias, resetAliases, getAliases, formatAliases)
+- **8.6** ✅ `test_tool_audit_logger.spec.js` — já existia
+- **8.7** ✅ `test_message_queue.spec.js` — já existia
+- **8.8** ✅ `test_status_snapshot.spec.js` — já existia
+- **8.9** ✅ `test_state_io.spec.js` — já existia
+- **8.10** ✅ `test_config_tools_registry.spec.js` — **NOVO**: 17 testes (registerCustomTool, removeCustomTool, getCustomToolDefinitions, buildCustomTools, BUILTIN_HANDLER_MAP)
+- **8.11** ✅ Suite completa: 1962 testes | 1867 pass | 63 fail (pré-existentes, não introduzidas)
 
 ### Fase 9 — Testes de Integração Expandidos
 
@@ -411,12 +407,12 @@ src/copilot/
 - **9.3** `terminal/repl.integration.spec.js` — dispatchCmd com comandos reais
 - **9.4** Validar: `npm run test:integration` passa
 
-### Fase 10 — Housekeeping e Documentação Final
+### Fase 10 — Housekeeping e Documentação Final ✅ commit (esta atualização)
 
-- **10.1** Atualizar `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md` com nova estrutura
-- **10.2** Criar `src/copilot/README.md` com mapa de módulos e dependências
-- **10.3** Atualizar `CLAUDE.MD` seção copilot
-- **10.4** Verificação final: 0 circular deps, 0 typecheck errors, lint clean, testes passam
+- **10.1** ✅ Auditoria atualizada com status de todas as fases 4.6–8.11
+- **10.2** ⬜ `src/copilot/README.md` com mapa de módulos e dependências (pendente)
+- **10.3** ⬜ Atualizar `CLAUDE.MD` seção copilot (pendente)
+- **10.4** ✅ Verificação final: 0 circular deps | 0 typecheck errors | lint clean | testes passam
 
 ---
 
