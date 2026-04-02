@@ -93,7 +93,7 @@ importa de `agent/` via transitive.
 | LOC  | Arquivo                        | Problema                                           | Status            |
 | ---- | ------------------------------ | -------------------------------------------------- | ----------------- |
 | 1385 | `tools/todo-tools.js`          | 1 arquivo com todo CRUD, render, e gestão de TODOs | ✅ Split (4.1)    |
-| 1281 | `agent/always-alive.js`        | Lifecycle inteiro do agent em 1 classe             | 🔄 Parcial (4.7) |
+| 1281 | `agent/always-alive.js`        | Lifecycle inteiro do agent em 1 classe             | 🔄 Parcial (4.7)  |
 | 922  | `terminal/http-handlers.js`    | Todos os handlers HTTP em 1 arquivo                | ✅ Split (4.3)    |
 | 811  | `conversation-hub/store.js`    | Store + queries + lifecycle em 1 arquivo           | ✅ Split (4.5)    |
 | 796  | `tools/file-tools.js`          | Todas as file tools (read, write, search, etc.)    | ✅ Split (4.2)    |
@@ -339,11 +339,11 @@ src/copilot/
 - **4.6** Split `bridges/gh-bridge.js` (762 LOC) em 4 módulos por domínio:
   - `bridges/gh/shared.js` — helpers internos: `runGh`, `runGhJson`, `fmtDate`, `runIcon`,
     `repoArgs`, `slicePage`, `calcFetchLimit` (~140 LOC)
-  - `bridges/gh/issues.js` — `listIssues`, `viewIssue`, `createIssue`, `closeIssue`,
-    `commentIssue`, `searchIssues`, `formatIssueList` (~180 LOC)
+  - `bridges/gh/issues.js` — `listIssues`, `viewIssue`, `createIssue`, `closeIssue`, `commentIssue`,
+    `searchIssues`, `formatIssueList` (~180 LOC)
   - `bridges/gh/prs.js` — `listPrs`, `viewPr`, `diffPr`, `mergePr`, `formatPrList` (~140 LOC)
-  - `bridges/gh/ci.js` — `listRuns`, `viewRun`, `watchRun`, `cancelRun`, `rerunRun`,
-    `formatRunList` (~120 LOC)
+  - `bridges/gh/ci.js` — `listRuns`, `viewRun`, `watchRun`, `cancelRun`, `rerunRun`, `formatRunList`
+    (~120 LOC)
   - `bridges/gh/index.js` — barrel re-export + `getDefaultRepo`, `getStatus`, `rawApi`,
     `listReleases`, `viewRelease`, `formatReleaseList`, `searchCode` (~130 LOC)
   - `bridges/gh-bridge.js` → thin barrel re-export para backward compatibility
@@ -353,10 +353,10 @@ src/copilot/
     `handleInteractiveQuestion` (~80 LOC). Recebe callbacks via opts.
   - `agent/session-hooks.js` — `createSessionHooks` factory retornando `onSessionStart`,
     `onSessionEnd`, `onErrorOccurred` + lógica de fallback model (~70 LOC).
-  - `agent/dialog-loop-wirer.js` — `wireDialogLoopEvents` extraída de
-    `#ensureDialogLoopAttached` — boilerplate de 11 event pipes (~60 LOC).
-  - `agent/sdk-history-sync.js` — `syncSdkHistory(session, hubSessionId)` extraída do
-    método `#syncSdkHistory` (~40 LOC).
+  - `agent/dialog-loop-wirer.js` — `wireDialogLoopEvents` extraída de `#ensureDialogLoopAttached` —
+    boilerplate de 11 event pipes (~60 LOC).
+  - `agent/sdk-history-sync.js` — `syncSdkHistory(session, hubSessionId)` extraída do método
+    `#syncSdkHistory` (~40 LOC).
   - Meta: reduzir `always-alive.js` de 1281 → ~1000 LOC (ganho ~280 LOC).
 - **4.8** Extrair de `agent/dialog-loop-manager.js` (760 LOC) a lógica de execução de turno:
   - `agent/dialog-turn-executor.js` — `executeTurn`, `buildTurnResolutionListeners`,

@@ -78,10 +78,12 @@ export function emitTurnStart(emitter, message, counter) {
 export function buildTurnResolutionListeners(emitter, opts) {
     const { host, telemetry, turnStart, timeout, pendingListenerRef, resolve, reject, waitForRestartAndReplyFn } = opts;
 
-    /** @type {{
-    reply: (evt: { reply: string }) => void;
-    stop: (evt: { authorized?: boolean; reason?: string }) => void;
-}} */
+    /**
+     * @type {{
+     *     reply: (evt: { reply: string }) => void;
+     *     stop: (evt: { authorized?: boolean; reason?: string }) => void;
+     * }}
+     */
     const handlers = {
         reply: (_) => {},
         stop: (_) => {},
