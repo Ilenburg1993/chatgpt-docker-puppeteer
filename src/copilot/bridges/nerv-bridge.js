@@ -57,8 +57,8 @@ const EVENT_MAP = [
     { event: 'dialog.reply', actionCode: 'COPILOT_DIALOG_REPLY' },
     { event: 'dialog.stopped', actionCode: 'COPILOT_DIALOG_STOPPED' },
     { event: 'dialog.stalled', actionCode: 'COPILOT_DIALOG_STALLED' },
-    { event: 'tool.execution.start', actionCode: 'COPILOT_TOOL_EXECUTION_START' },
-    { event: 'tool.execution.complete', actionCode: 'COPILOT_TOOL_EXECUTION_COMPLETE' },
+    { event: 'tool.execution_start', actionCode: 'COPILOT_TOOL_EXECUTION_START' },
+    { event: 'tool.execution_complete', actionCode: 'COPILOT_TOOL_EXECUTION_COMPLETE' },
     { event: 'session.history_synced', actionCode: 'COPILOT_SESSION_HISTORY_SYNCED' },
     // BUG-C04 (fix): before-stop é emitido pelo agent antes do encerramento
     { event: 'before-stop', actionCode: 'COPILOT_AGENT_BEFORE_STOP' },
@@ -66,6 +66,21 @@ const EVENT_MAP = [
     { event: 'context:compacted', actionCode: 'COPILOT_CONTEXT_COMPACTED' },
     // ARCH-04 (fix): removidos 'session.usage_info' e 'assistant.reasoning_delta' — são eventos do SDK session,
     // não do EventEmitter do agent, e nunca serão emitidos via agent.on()
+    // ── Fase BK: eventos ausentes de alto valor ──────────────────────────────
+    { event: 'pr.consumed', actionCode: 'COPILOT_PR_CONSUMED' },
+    { event: 'pr.fallback_model', actionCode: 'COPILOT_PR_FALLBACK_MODEL' },
+    { event: 'agent.metrics', actionCode: 'COPILOT_AGENT_METRICS' },
+    { event: 'dialog.turn_start', actionCode: 'COPILOT_TURN_START' },
+    { event: 'dialog.turn_end', actionCode: 'COPILOT_TURN_END' },
+    { event: 'dialog.turn_timeout', actionCode: 'COPILOT_TURN_TIMEOUT' },
+    { event: 'dialog.paused', actionCode: 'COPILOT_DIALOG_PAUSED' },
+    { event: 'dialog.resumed', actionCode: 'COPILOT_DIALOG_RESUMED' },
+    { event: 'permission.mode_changed', actionCode: 'COPILOT_PERMISSION_MODE_CHANGED' },
+    // ── Fase BJ: background agents e shells ──────────────────────────────────
+    { event: 'agent.background.completed', actionCode: 'COPILOT_BG_AGENT_COMPLETED' },
+    { event: 'agent.background.idle', actionCode: 'COPILOT_BG_AGENT_IDLE' },
+    { event: 'agent.shell.completed', actionCode: 'COPILOT_SHELL_COMPLETED' },
+    { event: 'agent.shell.detached_completed', actionCode: 'COPILOT_SHELL_DETACHED_COMPLETED' },
 ];
 
 /**

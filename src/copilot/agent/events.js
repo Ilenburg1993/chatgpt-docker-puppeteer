@@ -24,6 +24,10 @@
  * - **pr.consumed / pr.fallback_model / permission.mode_changed**: métricas e controle de permissões.
  * - **context:compacted**: emitido após compactação de contexto local.
  * - **before-stop**: emitido antes de `stop()` iniciar o dreno da fila.
+ *
+ * **Convenção de naming (Fase BG):** todos os eventos usam underscore como separador dentro de grupos (ex.:
+ * `tool.execution_start`, `session.mode_changed`). Hífens são reservados para `before-stop` (legado). Dot (`.`) separa
+ * grupo do nome, e `context:` usa dois-pontos por razões históricas.
  */
 export const AGENT_EVENTS = /** @type {const} */ ([
     // ── task ──────────────────────────────────────────────────────────────
@@ -61,9 +65,9 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'dialog.turn_end',
     // G2-ARCH-17: dialog.turn_timeout emitido quando o boot ou um turno expira sem resposta
     'dialog.turn_timeout',
-    // ── tool execution ────────────────────────────────────────────────────
-    'tool.execution.start',
-    'tool.execution.complete',
+    // ── tool execution (Fase BG: underscore, alinhado com SDK) ────────────
+    'tool.execution_start',
+    'tool.execution_complete',
     // ── PR / permission ───────────────────────────────────────────────────
     'pr.consumed',
     'pr.fallback_model',
@@ -72,6 +76,21 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'context:compacted',
     // G2-DX-17: evento de métricas periódicas (cadência configurável por consumidor)
     'agent.metrics',
+    // ── Fase BJ: background agents e shells (via system.notification kind) ──
+    'agent.background.completed',
+    'agent.background.idle',
+    'agent.shell.completed',
+    'agent.shell.detached_completed',
+    // ── Fase BD: eventos de sessão, comandos, plan mode ────────────────────
+    'session.title_changed',
+    'session.workspace_file_changed',
+    'session.info',
+    'session.snapshot_rewind',
+    'tool.execution_progress',
+    'system.message',
+    'pending_messages.modified',
+    'exit_plan_mode.completed',
+    'external_tool.completed',
 ]);
 
 /**

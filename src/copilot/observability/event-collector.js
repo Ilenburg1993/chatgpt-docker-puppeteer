@@ -168,12 +168,23 @@ const DEFAULT_PERSIST_TYPES = Object.freeze([
     'mcp.oauth_completed',
     // ── External tools / Comandos / Plan mode ──────────────────────────────
     'external_tool.requested',
+    'external_tool.completed',
     'command.execute',
+    'command.queued',
+    'command.completed',
     'exit_plan_mode.requested',
+    'exit_plan_mode.completed',
+    // ── Fase BF: novos tipos ────────────────────────────────────────────────
+    'assistant.reasoning',
+    'session.title_changed',
+    'session.workspace_file_changed',
+    'system.message',
     // ── Aborto ──────────────────────────────────────────────────────────────
     'abort',
     // ── Sistema ─────────────────────────────────────────────────────────────
     'system.notification',
+    // ── Fase BH: rewind e snapshot_rewind ──────────────────────────────────
+    'session.snapshot_rewind',
 ]);
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
@@ -996,6 +1007,196 @@ export function createEventCollector(opts = {}) {
                     'INFO',
                     `[event-collector] exit_plan_mode.requested recommended=${recommendedAction ?? 'n/a'} session=${sessionId}`,
                 );
+            }),
+        );
+
+        log('DEBUG', `[event-collector] ${unsubs.length} handlers registrados para session=${sessionId} (pre-BF)`);
+
+        // ── Fase BF: Novos handlers para eventos previamente não cobertos ──────────────────────────────
+
+        // assistant.reasoning — raciocínio completo (não delta); persiste hash de comprimento + reasoningId
+        unsubs.push(
+            session.on('assistant.reasoning', (event) => {
+                const { reasoningId, content } = event.data;
+                metrics?.recordCounter('assistant.reasoning');
+                if (persist && persistTypes.includes('assistant.reasoning')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        reasoningId,
+                        contentLength: content?.length ?? 0,
+                    });
+                }
+                log(
+                    'DEBUG',
+                    `[event-collector] assistant.reasoning id=${reasoningId ?? '?'} len=${content?.length ?? 0}`,
+                );
+            }),
+        );
+
+        // session.title_changed — persiste novo título da sessão
+        unsubs.push(
+            session.on('session.title_changed', (event) => {
+                const { title } = event.data;
+                metrics?.recordCounter('session.title_changed');
+                if (persist) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, title });
+                }
+                log('INFO', `[event-collector] session.title_changed title="${title ?? ''}" session=${sessionId}`);
+            }),
+        );
+
+        // session.workspace_file_changed — persiste path + operação (create/update/delete)
+        unsubs.push(
+            session.on('session.workspace_file_changed', (event) => {
+                const { path, operation } = event.data;
+                metrics?.recordCounter(`session.workspace_file_changed.${operation ?? 'unknown'}`);
+                if (persist && persistTypes.includes('session.workspace_file_changed')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, path, operation });
+                }
+                log(
+                    'DEBUG',
+                    `[event-collector] session.workspace_file_changed op=${operation ?? '?'} path=${path ?? '?'}`,
+                );
+            }),
+        );
+
+        // system.message — persiste role + promptVersion para rastreamento de system prompts
+        unsubs.push(
+            session.on('system.message', (event) => {
+                const { role, metadata } = event.data;
+                const promptVersion = metadata?.promptVersion;
+                metrics?.recordCounter('system.message');
+                if (persist && persistTypes.includes('system.message')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, role, promptVersion });
+                }
+                log('DEBUG', `[event-collector] system.message role=${role ?? '?'} v=${promptVersion ?? '?'}`);
+            }),
+        );
+
+        // pending_messages.modified — contador apenas (conteúdo efêmero)
+        unsubs.push(
+            session.on('pending_messages.modified', () => {
+                metrics?.recordCounter('pending_messages.modified');
+            }),
+        );
+
+        // exit_plan_mode.completed — persiste requestId
+        unsubs.push(
+            session.on('exit_plan_mode.completed', (event) => {
+                const { requestId } = event.data;
+                metrics?.recordCounter('exit_plan_mode.completed');
+                if (persist && persistTypes.includes('exit_plan_mode.completed')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
+                }
+                log('DEBUG', `[event-collector] exit_plan_mode.completed requestId=${requestId ?? '?'}`);
+            }),
+        );
+
+        // external_tool.completed — persiste requestId
+        unsubs.push(
+            session.on('external_tool.completed', (event) => {
+                const { requestId } = event.data;
+                metrics?.recordCounter('external_tool.completed');
+                if (persist && persistTypes.includes('external_tool.completed')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
+                }
+                log('DEBUG', `[event-collector] external_tool.completed requestId=${requestId ?? '?'}`);
+            }),
+        );
+
+        // command.queued — persiste requestId
+        unsubs.push(
+            session.on('command.queued', (event) => {
+                const { requestId } = event.data;
+                metrics?.recordCounter('command.queued');
+                if (persist && persistTypes.includes('command.queued')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
+                }
+                log('DEBUG', `[event-collector] command.queued requestId=${requestId ?? '?'}`);
+            }),
+        );
+
+        // command.completed — persiste requestId
+        unsubs.push(
+            session.on('command.completed', (event) => {
+                const { requestId } = event.data;
+                metrics?.recordCounter('command.completed');
+                if (persist && persistTypes.includes('command.completed')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
+                }
+                log('DEBUG', `[event-collector] command.completed requestId=${requestId ?? '?'}`);
+            }),
+        );
+
+        // commands.changed — contador apenas (lista de comandos disponíveis mudou)
+        unsubs.push(
+            session.on('commands.changed', (event) => {
+                const { commands } = event.data;
+                const count = Array.isArray(commands) ? commands.length : 0;
+                metrics?.recordCounter('commands.changed');
+                log('DEBUG', `[event-collector] commands.changed count=${count}`);
+            }),
+        );
+
+        // tool.execution_partial_result — contador apenas (streaming incremental de tool, não persistir)
+        unsubs.push(
+            session.on('tool.execution_partial_result', () => {
+                metrics?.recordCounter('tool.execution_partial_result');
+            }),
+        );
+
+        // ── assistant.streaming_delta (ephemeral — gauge de bytes, não persistir) ──────────────
+        unsubs.push(
+            session.on('assistant.streaming_delta', (event) => {
+                metrics?.recordCounter('assistant.streaming_delta');
+                const total = /** @type {number | undefined} */ (event.data?.totalResponseSizeBytes);
+                if (typeof total === 'number') {
+                    // recordCounter com bucket de tamanho: count por faixa de 100KB
+                    metrics?.recordCounter(`streaming.response_size.bucket_${Math.floor(total / 102400)}`);
+                }
+            }),
+        );
+
+        // ── session.snapshot_rewind (ephemeral — persiste metadados de rewind) ────────────────
+        unsubs.push(
+            session.on('session.snapshot_rewind', (event) => {
+                metrics?.recordCounter('session.snapshot_rewind');
+                const removed = /** @type {number | undefined} */ (event.data?.eventsRemoved);
+                log(
+                    'INFO',
+                    `[event-collector] session.snapshot_rewind: eventosRemovidos=${removed ?? '?'}, alvo=${event.data?.upToEventId ?? '?'}`,
+                );
+                if (persist && persistTypes.includes('session.snapshot_rewind')) {
+                    persistEvent({
+                        type: 'session.snapshot_rewind',
+                        sessionId,
+                        ts: event.timestamp,
+                        upToEventId: event.data?.upToEventId,
+                        eventsRemoved: removed,
+                    });
+                }
+            }),
+        );
+
+        // ── session.info — informações operacionais da sessão ────────────────────────────────
+        unsubs.push(
+            session.on('session.info', (event) => {
+                metrics?.recordCounter('session.info');
+                const infoType = /** @type {string | undefined} */ (event.data?.infoType);
+                const logLevel = infoType === 'authentication' || infoType === 'model' ? 'WARN' : 'DEBUG';
+                log(logLevel, `[event-collector] session.info[${infoType ?? '?'}]: ${event.data?.message ?? ''}`);
+                if (persist && persistTypes.includes('session.info')) {
+                    persistEvent({
+                        type: 'session.info',
+                        sessionId,
+                        ts: event.timestamp,
+                        infoType,
+                        message: event.data?.message,
+                        url: event.data?.url,
+                    });
+                }
             }),
         );
 

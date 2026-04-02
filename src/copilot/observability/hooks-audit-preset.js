@@ -25,9 +25,18 @@ import { log } from './logger.js';
  *
  * Substituto de `createAuditPreset()` de `hooks/presets/audit.js`. API compatível.
  *
+ * **SEGURANÇA (Fase BE):** O `onPermissionRequest` gerado por esta função usa `allowAll: false` por padrão para evitar
+ * aprovação silenciosa de todas as ferramentas em produção. Para contextos de teste, passe `options.allowAll: true`
+ * explicitamente.
+ *
  * @example
  *     const { hooks, onPermissionRequest, getAuditTrail, clearAuditTrail } = createHooksAuditPreset();
  *
+ * @example
+ *     // Apenas em testes:
+ *     const preset = createHooksAuditPreset({ allowAll: true });
+ *
+ * @param {{ allowAll?: boolean; permissionHandler?: import('../hooks/permission-handler.js').PermissionHandler }} [options]
  * @returns {{
  *     hooks: SessionHooks;
  *     onPermissionRequest: import('../hooks/permission-handler.js').PermissionHandler;
@@ -35,7 +44,14 @@ import { log } from './logger.js';
  *     clearAuditTrail: () => void;
  * }}
  */
-export function createHooksAuditPreset() {
+export function createHooksAuditPreset(options = {}) {
+    // Fase BE: emitir warning explícito se allowAll=true em ambiente de produção
+    if (options.allowAll === true && process.env['NODE_ENV'] !== 'test') {
+        log(
+            'WARN',
+            '[hooks-audit-preset] createHooksAuditPreset chamado com allowAll=true fora de ambiente de teste — risco de segurança!',
+        );
+    }
     /**
      * @param {string} hookName
      * @param {string | undefined} sessionId
@@ -53,7 +69,14 @@ export function createHooksAuditPreset() {
         log('DEBUG', `[hooks-audit-preset] ${hookName}${sessionId ? ` [${sessionId}]` : ''}`);
     }
 
-    const onPermissionRequest = createPermissionHandler({ allowAll: true, auditMode: true });
+    // Fase BE: usar opção explícita em vez de hardcoded allowAll=true
+    // O caller deve passar allowAll:true EXPLICITAMENTE em testes; padrão é false (seguro)
+    const onPermissionRequest =
+        options.permissionHandler ??
+        createPermissionHandler({
+            allowAll: options.allowAll === true,
+            auditMode: true,
+        });
 
     /** @type {SessionHooks} */
     const hooks = {

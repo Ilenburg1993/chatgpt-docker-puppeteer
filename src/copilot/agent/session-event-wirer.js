@@ -18,18 +18,88 @@ import { writeStateAsync } from './state-io.js';
  * G2-PERF-02: Set de eventos SDK conhecidos como constante de módulo para evitar realocação a cada chamada de
  * `wireSessionEvents()` (ex.: reconexão após disconnect).
  *
+ * Expandido na Fase BA para incluir todos os eventos gerenciados pelo event-collector.js, pela própria wirer e pelo
+ * task-executor.js. Isso elimina o DEBUG spam gerado pelo catch-all para eventos tratados por outros módulos do
+ * sistema.
+ *
+ * Para detectar eventos genuinamente novos do SDK (que nenhum módulo conhece), mantemos separado o Set
+ * `WIRER_HANDLED_EVENTS` com apenas os eventos tratados DIRETAMENTE por esta função.
+ *
  * @type {ReadonlySet<string>}
  */
 const KNOWN_SDK_EVENTS = new Set([
-    'session.compaction_start',
-    'session.compaction_complete',
-    'assistant.reasoning_delta',
-    'session.usage_info',
-    'session.mode_changed',
+    // ── Gerenciados pelo event-collector.js (53+ handlers) ──────────────────────
+    'abort',
+    'assistant.intent',
+    'assistant.message',
     'assistant.message_delta',
-    'tool.execution_start',
-    'tool.execution_complete',
+    'assistant.reasoning_delta',
+    'assistant.turn_end',
+    'assistant.turn_start',
     'assistant.usage',
+    'command.execute',
+    'elicitation.completed',
+    'elicitation.requested',
+    'exit_plan_mode.requested',
+    'external_tool.requested',
+    'hook.end',
+    'hook.start',
+    'mcp.oauth_completed',
+    'mcp.oauth_required',
+    'permission.completed',
+    'permission.requested',
+    'session.background_tasks_changed',
+    'session.compaction_complete',
+    'session.compaction_start',
+    'session.context_changed',
+    'session.error',
+    'session.extensions_loaded',
+    'session.handoff',
+    'session.idle',
+    'session.mcp_servers_loaded',
+    'session.mcp_server_status_changed',
+    'session.mode_changed',
+    'session.model_change',
+    'session.plan_changed',
+    'session.resume',
+    'session.shutdown',
+    'session.skills_loaded',
+    'session.start',
+    'session.task_complete',
+    'session.tools_updated',
+    'session.truncation',
+    'session.usage_info',
+    'session.warning',
+    'skill.invoked',
+    'subagent.completed',
+    'subagent.deselected',
+    'subagent.failed',
+    'subagent.selected',
+    'subagent.started',
+    'system.notification',
+    'tool.execution_complete',
+    'tool.execution_progress',
+    'tool.execution_start',
+    'tool.user_requested',
+    'user_input.completed',
+    'user_input.requested',
+    'user.message',
+    // ── Gerenciados pelo task-executor.js (por-tarefa) ───────────────────────────
+    'assistant.streaming_delta',
+    'tool.execution_partial_result',
+    // ── Cobertos parcialmente (Fases BI-BK) — reconhecidos para suprimir aviso ──
+    'session.info',
+    'session.snapshot_rewind',
+    'session.title_changed',
+    'session.workspace_file_changed',
+    'system.message',
+    'command.completed',
+    'command.queued',
+    'commands.changed',
+    'exit_plan_mode.completed',
+    'external_tool.completed',
+    'pending_messages.modified',
+    'assistant.reasoning',
 ]);
 
 /**
@@ -88,6 +158,8 @@ export function wireSessionEvents(session, isResumed, callbacks) {
         ..._wireStreamingEvents(session, callbacks),
         ..._wireTokenBudgetEvents(session, isResumed, callbacks),
         ..._wireModeAndToolEvents(session, callbacks),
+        ..._wireSystemNotificationEvents(session, callbacks),
+        _wireUsageEvent(session, callbacks),
         _wireCatchAll(session, callbacks),
     ];
     return unsubs;
@@ -220,61 +292,149 @@ function _wireTokenBudgetEvents(session, isResumed, { emit, onContextState }) {
  * @param {SessionWirerCallbacks} callbacks
  * @returns {(() => void)[]}
  */
-function _wireModeAndToolEvents(session, { emit, isProcessing }) {
+function _wireModeAndToolEvents(session, { emit }) {
     return [
         session.on('session.mode_changed', (/** @type {SdkEvent} */ evt) => {
             log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.['previousMode']} → ${evt?.data?.['newMode']}`);
             emit('session.mode_changed', evt?.data ?? {});
         }),
         // G2-BUG-14: tool events estavam no knownEvents mas nunca subscritos
+        // Fase BC: removido guard !isProcessing() — tool events devem chegar ao SSE durante task processing
         session.on('tool.execution_start', (/** @type {SdkEvent} */ evt) => {
-            if (isProcessing()) return;
-            emit('tool.execution.start', evt?.data ?? {});
+            emit('tool.execution_start', evt?.data ?? {});
         }),
         session.on('tool.execution_complete', (/** @type {SdkEvent} */ evt) => {
-            if (isProcessing()) return;
-            emit('tool.execution.complete', evt?.data ?? {});
+            emit('tool.execution_complete', evt?.data ?? {});
         }),
     ];
 }
 
 /**
- * Catch-all para eventos não tratados explicitamente + billing (assistant.usage).
+ * Propaga subtipos de `system.notification.kind` para o AGENT EventEmitter.
+ *
+ * O event-collector.js já captura `system.notification` para observabilidade (contadores, persist). Esta função
+ * complementa emitindo AGENT_EVENTS para que bridges (nerv-bridge) e observadores possam reagir a conclusões de agentes
+ * background e shells sem precisar ler o event-collector.
+ *
+ * Eventos AGENT emitidos:
+ *
+ * - `agent.background.completed` — agente background concluiu (status: 'completed' | 'failed')
+ * - `agent.background.idle` — agente background ficou idle
+ * - `agent.shell.completed` — shell concluiu com exitCode
+ * - `agent.shell.detached_completed` — shell desacoplado concluiu
+ *
+ * @param {CopilotSession} session
+ * @param {SessionWirerCallbacks} callbacks
+ * @returns {(() => void)[]}
+ */
+function _wireSystemNotificationEvents(session, { emit }) {
+    return [
+        session.on('system.notification', (/** @type {SdkEvent} */ event) => {
+            const kind = /** @type {Record<string, unknown> & { type: string }} */ (event?.data?.kind);
+            if (!kind?.type) return;
+
+            switch (kind.type) {
+                case 'agent_completed':
+                    emit('agent.background.completed', {
+                        agentId: kind.agentId,
+                        agentType: kind.agentType,
+                        status: kind.status,
+                        description: kind.description,
+                    });
+                    log(
+                        'INFO',
+                        `[session-event-wirer] system.notification agent_completed: agentId=${kind.agentId} status=${kind.status}`,
+                    );
+                    break;
+                case 'agent_idle':
+                    emit('agent.background.idle', {
+                        agentId: kind.agentId,
+                        agentType: kind.agentType,
+                        description: kind.description,
+                    });
+                    log('DEBUG', `[session-event-wirer] system.notification agent_idle: agentId=${kind.agentId}`);
+                    break;
+                case 'shell_completed':
+                    emit('agent.shell.completed', {
+                        shellId: kind.shellId,
+                        exitCode: kind.exitCode,
+                        description: kind.description,
+                    });
+                    log(
+                        'DEBUG',
+                        `[session-event-wirer] system.notification shell_completed: shellId=${kind.shellId} exitCode=${kind.exitCode ?? '?'}`,
+                    );
+                    break;
+                case 'shell_detached_completed':
+                    emit('agent.shell.detached_completed', {
+                        shellId: kind.shellId,
+                        description: kind.description,
+                    });
+                    log(
+                        'DEBUG',
+                        `[session-event-wirer] system.notification shell_detached_completed: shellId=${kind.shellId}`,
+                    );
+                    break;
+                default:
+                    // kind.type desconhecido dentro de system.notification — silencioso
+                    break;
+            }
+        }),
+    ];
+}
+
+/**
+ * Catch-all para eventos genuinamente não tratados por nenhum módulo do sistema.
+ *
+ * `assistant.usage` é tratado por um handler dedicado (_wireUsageEvent) — não deve aparecer aqui. Todos os eventos em
+ * `KNOWN_SDK_EVENTS` são gerenciados por outros módulos e suprimidos silenciosamente. Apenas eventos fora de
+ * `KNOWN_SDK_EVENTS` geram log WARNING para detectar novos tipos do SDK.
+ *
+ * @param {CopilotSession} session
+ * @param {SessionWirerCallbacks} _ Callbacks não utilizados diretamente neste handler.
+ * @returns {() => void}
+ */
+function _wireCatchAll(session, _) {
+    return session.on((/** @type {SdkEvent} */ evt) => {
+        const kind = /** @type {string} */ (evt?.kind ?? evt?.type ?? 'unknown');
+        // Suprimir silenciosamente eventos gerenciados por outros módulos do sistema
+        if (KNOWN_SDK_EVENTS.has(kind)) return;
+        // Detectar e logar eventos genuinamente desconhecidos (novos tipos do SDK)
+        log('WARN', `[AlwaysAlive] Evento SDK desconhecido: kind=${kind} — SDK pode ter sido atualizado`);
+    });
+}
+
+/**
+ * Registra handler dedicado para billing (assistant.usage).
+ *
+ * Responsabilidade do wirer: atualizar lastPrInfo, emitir pr.consumed no AGENT emitter, persistir estado de billing.
+ * NÃO chamar metrics.recordUsage() — isso é responsabilidade do event-collector.
  *
  * @param {CopilotSession} session
  * @param {SessionWirerCallbacks} callbacks
  * @returns {() => void}
  */
-function _wireCatchAll(session, { emit, onPrInfo }) {
-    return session.on((/** @type {SdkEvent} */ evt) => {
-        const kind = /** @type {string} */ (evt?.kind ?? evt?.type ?? 'unknown');
-        if (kind === 'assistant.usage') {
-            const data = evt?.data ?? {};
-            const model = /** @type {string | undefined} */ (data['model']);
-            const cost = /** @type {number | undefined} */ (data['cost']);
-            const quotaSnapshots = /** @type {Record<string, unknown> | undefined} */ (data['quotaSnapshots']);
-            const prInfo = {
-                ts: Date.now(),
-                ...(model !== undefined ? { model } : {}),
-                ...(cost !== undefined ? { cost } : {}),
-                ...(quotaSnapshots !== undefined ? { quotaSnapshots } : {}),
-            };
-            log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
-            onPrInfo(prInfo);
-            emit('pr.consumed', prInfo);
-            writeStateAsync({
-                pendingTurnConsumedPR: true,
-                lastPrConsumedAt: Date.now(),
-                lastPrModel: model ?? '',
-                lastPrCost: cost ?? 0,
-                lastQuotaSnapshots: quotaSnapshots ?? null,
-            }).catch((/** @type {any} */ e) =>
-                log('WARN', `[AlwaysAlive] writeState pendingTurnConsumedPR: ${e.message}`),
-            );
-            return;
-        }
-        if (!KNOWN_SDK_EVENTS.has(kind)) {
-            log('DEBUG', `[AlwaysAlive] Evento SDK não tratado: kind=${kind}`);
-        }
+function _wireUsageEvent(session, { emit, onPrInfo }) {
+    return session.on('assistant.usage', (/** @type {SdkEvent} */ evt) => {
+        const data = evt?.data ?? {};
+        const model = /** @type {string | undefined} */ (data['model']);
+        const cost = /** @type {number | undefined} */ (data['cost']);
+        const quotaSnapshots = /** @type {Record<string, unknown> | undefined} */ (data['quotaSnapshots']);
+        const prInfo = {
+            ts: Date.now(),
+            ...(model !== undefined ? { model } : {}),
+            ...(cost !== undefined ? { cost } : {}),
+            ...(quotaSnapshots !== undefined ? { quotaSnapshots } : {}),
+        };
+        log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
+        onPrInfo(prInfo);
+        emit('pr.consumed', prInfo);
+        writeStateAsync({
+            pendingTurnConsumedPR: true,
+            lastPrConsumedAt: Date.now(),
+            lastPrModel: model ?? '',
+            lastPrCost: cost ?? 0,
+            lastQuotaSnapshots: quotaSnapshots ?? null,
+        }).catch((/** @type {any} */ e) => log('WARN', `[AlwaysAlive] writeState pendingTurnConsumedPR: ${e.message}`));
     });
 }

@@ -53,8 +53,19 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
     /** @type {{ emitter: import('node:events').EventEmitter; event: string; listener: (...args: any[]) => void }[]} */
     const _registrations = [];
 
-    /** Mapa de sessionId → ts do turn_start ativo. */
+    /**
+     * Mapa de turnId → performance timestamp do turn_start ativo.
+     *
+     * Fase BB: usa turnId dinâmico como chave (em vez da chave estática 'current') para suportar múltiplos turnos
+     * concorrentes sem corromper as durações. Entradas são removidas ao processar turn_end ou após TTL máximo para
+     * prevenir memory leak.
+     *
+     * @type {Map<string, number>}
+     */
     const _turnStarts = new Map();
+
+    /** TTL máximo de um turn no Map antes de ser descartado automaticamente (5 minutos). */
+    const _TURN_START_TTL_MS = 5 * 60 * 1000;
 
     /**
      * @param {import('node:events').EventEmitter} emitter
@@ -92,10 +103,26 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         _on(
             agent,
             'dialog.turn_start',
-            _safe((/** @type {{ ts?: number; message?: string }} */ evt) => {
-                const ts = evt?.ts ?? Date.now();
-                _turnStarts.set('current', ts);
-                log('DEBUG', `[agent-event-observer] dialog.turn_start ts=${ts}`);
+            _safe((/** @type {{ ts?: number; turnId?: string; message?: string }} */ evt) => {
+                const ts = performance.now();
+                // Fase BB: usar turnId dinâmico como chave; fallback para 'current' por retrocompatibilidade
+                const turnId = evt?.turnId ?? 'current';
+                // Limpeza de entradas antigas por TTL antes de inserir nova (memory leak guard)
+                const now = Date.now();
+                for (const [id, startTs] of _turnStarts) {
+                    if (now - startTs > _TURN_START_TTL_MS) {
+                        _turnStarts.delete(id);
+                        log('DEBUG', `[agent-event-observer] dialog.turn_start: TTL expirado para turnId=${id}`);
+                    }
+                }
+                _turnStarts.set(turnId, ts);
+                if (!evt?.turnId) {
+                    log(
+                        'DEBUG',
+                        "[agent-event-observer] dialog.turn_start: turnId ausente, usando chave 'current' (retrocompatibilidade)",
+                    );
+                }
+                log('DEBUG', `[agent-event-observer] dialog.turn_start turnId=${turnId}`);
             }, 'dialog.turn_start'),
         );
 
@@ -103,13 +130,18 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         _on(
             agent,
             'dialog.turn_end',
-            _safe((/** @type {{ durationMs?: number; reply?: string }} */ evt) => {
-                const startTs = _turnStarts.get('current') ?? 0;
-                _turnStarts.delete('current');
-                const durationMs = evt?.durationMs ?? (startTs ? Date.now() - startTs : 0);
+            _safe((/** @type {{ durationMs?: number; turnId?: string; reply?: string }} */ evt) => {
+                // Fase BB: correlacionar por turnId para suportar turnos concorrentes
+                const turnId = evt?.turnId ?? 'current';
+                const startTs = _turnStarts.get(turnId) ?? 0;
+                _turnStarts.delete(turnId); // cleanup imediato após consumo
+                const durationMs = evt?.durationMs ?? (startTs ? performance.now() - startTs : 0);
                 const success = typeof evt?.reply === 'string' && evt.reply.length > 0;
-                metrics.recordDialogTurn(durationMs, success);
-                log('DEBUG', `[agent-event-observer] dialog.turn_end durationMs=${durationMs} success=${success}`);
+                metrics.recordDialogTurn(Math.round(durationMs), success);
+                log(
+                    'DEBUG',
+                    `[agent-event-observer] dialog.turn_end turnId=${turnId} durationMs=${Math.round(durationMs)} success=${success}`,
+                );
             }, 'dialog.turn_end'),
         );
 
@@ -129,9 +161,19 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         _on(
             agent,
             'dialog.turn_timeout',
-            _safe((/** @type {{ phase?: string; timeoutMs?: number }} */ evt) => {
+            _safe((/** @type {{ phase?: string; timeoutMs?: number; turnId?: string }} */ evt) => {
                 metrics.recordDialogTimeout();
                 metrics.recordCounter(`dialog.timeout.${evt?.phase ?? 'unknown'}`);
+                // Fase BB: limpar entrada do turn no map quando há timeout
+                if (evt?.turnId) _turnStarts.delete(evt.turnId);
+                // Fase BM: propagar para ErrorTracker
+                if (errorTracker) {
+                    const err = new Error(`Dialog turn timeout [phase=${evt?.phase ?? 'unknown'}]`);
+                    errorTracker.trackError(err, {
+                        source: 'agent:dialog.turn_timeout',
+                        metadata: { phase: evt?.phase, timeoutMs: evt?.timeoutMs, turnId: evt?.turnId },
+                    });
+                }
                 log('DEBUG', `[agent-event-observer] dialog.turn_timeout phase=${evt?.phase}`);
             }, 'dialog.turn_timeout'),
         );
@@ -156,9 +198,11 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 const durationMs = evt?.durationMs ?? 0;
                 metrics.recordTaskCompletion(durationMs, false);
                 metrics.recordCounter('tasks.errors');
+                metrics.recordSessionError();
 
-                if (errorTracker && evt?.error) {
-                    const err = evt.error instanceof Error ? evt.error : new Error(String(evt.error));
+                // Fase BM: propagar para ErrorTracker (anteriormente ausente para task.error)
+                if (errorTracker) {
+                    const err = evt?.error instanceof Error ? evt.error : new Error(String(evt?.error ?? 'task.error'));
                     errorTracker.trackError(err, { source: 'agent:task.error', metadata: { taskId: evt?.taskId } });
                 }
 
@@ -204,6 +248,52 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 metrics.recordCounter('model.fallback');
                 log('INFO', `[agent-event-observer] pr.fallback_model from=${evt?.from} to=${evt?.to}`);
             }, 'pr.fallback_model'),
+        );
+
+        // ── tool.execution_start — contabiliza início de ferramenta ──────────
+        _on(
+            agent,
+            'tool.execution_start',
+            _safe((/** @type {{ toolName?: string; callId?: string }} */ evt) => {
+                metrics.recordCounter('tool.execution.start');
+                log('DEBUG', `[agent-event-observer] tool.execution_start tool=${evt?.toolName ?? '?'}`);
+            }, 'tool.execution_start'),
+        );
+
+        // ── tool.execution_complete — contabiliza fim de ferramenta ──────────
+        _on(
+            agent,
+            'tool.execution_complete',
+            _safe((/** @type {{ toolName?: string; callId?: string; durationMs?: number }} */ evt) => {
+                metrics.recordCounter('tool.execution.complete');
+                log(
+                    'DEBUG',
+                    `[agent-event-observer] tool.execution_complete tool=${evt?.toolName ?? '?'} duration=${evt?.durationMs ?? '?'}ms`,
+                );
+            }, 'tool.execution_complete'),
+        );
+
+        // ── agent.metrics — snapshot periódico de estado do agente ───────────
+        _on(
+            agent,
+            'agent.metrics',
+            _safe(() => {
+                metrics.recordCounter('agent.metrics.snapshot');
+                log('DEBUG', '[agent-event-observer] agent.metrics snapshot recebido');
+            }, 'agent.metrics'),
+        );
+
+        // ── pr.consumed — contabiliza tokens de PR consumidos ─────────────────
+        _on(
+            agent,
+            'pr.consumed',
+            _safe((/** @type {{ tokens?: number; model?: string }} */ evt) => {
+                metrics.recordCounter('pr.consumed');
+                log(
+                    'DEBUG',
+                    `[agent-event-observer] pr.consumed model=${evt?.model ?? '?'} tokens=${evt?.tokens ?? '?'}`,
+                );
+            }, 'pr.consumed'),
         );
 
         log('INFO', '[agent-event-observer] Attached to agent EventEmitter');

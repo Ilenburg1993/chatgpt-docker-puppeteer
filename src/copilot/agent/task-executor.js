@@ -10,8 +10,6 @@
  *   agente pai.
  */
 
-import { defaultAuditLog } from '#copilot/observability';
-
 /**
  * Máximo de tentativas de retry por task após reconexão. Configurável via AGENT_MAX_TASK_RETRIES.
  *
@@ -75,17 +73,14 @@ export async function executeTask(session, task, callbacks) {
         },
     );
 
-    // Subscreve a eventos de execução de tool para auditoria e observabilidade
+    // Subscreve a eventos de execução de tool para observabilidade (SSE/NERV consumers)
+    // Fase BC: removidas chamadas redundantes a defaultAuditLog.recordToolStart/Complete
+    // (o event-collector.js já cobre registro completo via seus handlers dedicados)
+    // Fase BC: corrigido naming dot→underscore para alinhar com AGENT_EVENTS em events.js
     const unsubToolStart = session.on(
         'tool.execution_start',
         (/** @type {{ data?: Record<string, unknown> }} */ event) => {
-            defaultAuditLog.recordToolStart({
-                toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
-                toolName: /** @type {string} */ (event?.data?.['toolName'] ?? ''),
-                args: event?.data?.['arguments'] ?? {},
-                mcpServerName: /** @type {string | null} */ (event?.data?.['mcpServerName'] ?? null),
-            });
-            emit('tool.execution.start', {
+            emit('tool.execution_start', {
                 toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
                 toolName: /** @type {string} */ (event?.data?.['toolName'] ?? ''),
                 args: event?.data?.['arguments'] ?? {},
@@ -98,15 +93,7 @@ export async function executeTask(session, task, callbacks) {
     const unsubToolComplete = session.on(
         'tool.execution_complete',
         (/** @type {{ data?: Record<string, unknown> }} */ event) => {
-            defaultAuditLog.recordToolComplete({
-                toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
-                success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
-                taskId: task.id,
-                resultContent: /** @type {string | null} */ (
-                    /** @type {Record<string, unknown> | undefined} */ (event?.data?.['result'])?.['content'] ?? null
-                ),
-            });
-            emit('tool.execution.complete', {
+            emit('tool.execution_complete', {
                 toolCallId: /** @type {string} */ (event?.data?.['toolCallId'] ?? ''),
                 toolName: /** @type {string | null} */ (event?.data?.['toolName'] ?? null),
                 success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
