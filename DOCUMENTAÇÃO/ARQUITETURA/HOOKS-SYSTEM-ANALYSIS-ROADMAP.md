@@ -1,6 +1,6 @@
 # Sistema de Hooks — Análise Profunda e Roadmap de Implementação
 
-**Status**: Em execução — Fases A, B (parcial), C, D, E concluídas **Data**: 2026-06-27 **Última
+**Status**: Concluído — Todas as fases A–M implementadas **Data**: 2026-06-27 **Última
 atualização**: 2026-06-27 **Escopo**: `src/copilot/hooks/` (módulo unificado, isolado, pronto para
 expansão)
 
@@ -487,18 +487,18 @@ Gerar `src/copilot/hooks/README.md` com:
 
 ## 4. Tabela de Rastreamento de Gaps
 
-| Gap | Descrição                                            | Fase | Arquivo alvo            | Status                                                        |
-| --- | ---------------------------------------------------- | ---- | ----------------------- | ------------------------------------------------------------- |
-| G1  | `onUserPromptSubmitted.modifiedPrompt` não utilizado | B.1  | `prompt-transformer.js` | ✅ Concluído                                                  |
-| G2  | `onPreToolUse.modifiedArgs` não utilizado            | B.2  | `tool-interceptor.js`   | ✅ Concluído                                                  |
-| G3  | `onPostToolUse.additionalContext` não retornado      | B.2  | `tool-interceptor.js`   | ✅ Concluído                                                  |
-| G4  | `onSessionStart.additionalContext` vazio             | B.5  | `session-lifecycle.js`  | ⏳ Parcial — retorna contexto básico, enriquecimento pendente |
-| G5  | `onUserInputRequest` fora da factory                 | B.3  | `user-input.js`         | ✅ Concluído                                                  |
-| G6  | Sem composição para todos os hooks                   | E.1  | `composer.js`           | ✅ Concluído                                                  |
-| G7  | Sem HookBus/observadores                             | C.1  | `bus.js`                | ✅ Concluído                                                  |
-| G8  | Sem registry tipado                                  | D.1  | `registry.js`           | ✅ Concluído                                                  |
-| G9  | `onPermissionRequest` fora do módulo hooks           | A.3  | `permission-handler.js` | ✅ Concluído                                                  |
-| G10 | `hook_get_audit_tail` usa `.github/hooks/`           | H.1  | `audit.js`              | ⏳ Pendente                                                   |
+| Gap | Descrição                                            | Fase | Arquivo alvo            | Status                                                           |
+| --- | ---------------------------------------------------- | ---- | ----------------------- | ---------------------------------------------------------------- |
+| G1  | `onUserPromptSubmitted.modifiedPrompt` não utilizado | B.1  | `prompt-transformer.js` | ✅ Concluído                                                     |
+| G2  | `onPreToolUse.modifiedArgs` não utilizado            | B.2  | `tool-interceptor.js`   | ✅ Concluído                                                     |
+| G3  | `onPostToolUse.additionalContext` não retornado      | B.2  | `tool-interceptor.js`   | ✅ Concluído                                                     |
+| G4  | `onSessionStart.additionalContext` vazio             | B.5  | `session-lifecycle.js`  | ✅ Concluído — retorna host, node, model, sessionId, source      |
+| G5  | `onUserInputRequest` fora da factory                 | B.3  | `user-input.js`         | ✅ Concluído                                                     |
+| G6  | Sem composição para todos os hooks                   | E.1  | `composer.js`           | ✅ Concluído                                                     |
+| G7  | Sem HookBus/observadores                             | C.1  | `bus.js`                | ✅ Concluído                                                     |
+| G8  | Sem registry tipado                                  | D.1  | `registry.js`           | ✅ Concluído                                                     |
+| G9  | `onPermissionRequest` fora do módulo hooks           | A.3  | `permission-handler.js` | ✅ Concluído                                                     |
+| G10 | `hook_get_audit_tail` usa `.github/hooks/`           | H.1  | `audit.js`              | ✅ Concluído — ring buffer SDK isolado; compliance como fallback |
 
 ---
 
@@ -595,7 +595,7 @@ Ao final da Fase G, o sistema de hooks deve satisfazer:
 - [x] **Zero regressões**: 2025/2025 testes passando
 - [x] **Lint e format clean**: `npm run lint && npm run format:check`
 - [x] **Typecheck clean**: `npx tsc --project tsconfig.node.json --noEmit` exit 0
-- [ ] **100% dos gaps (G1-G10) endereçados** — G4 e G10 parciais/pendentes
+- [x] **100% dos gaps (G1-G10) endereçados** — todos concluídos
 - [ ] **Zero referências a `.github/hooks/`** dentro de `src/copilot/hooks/`
 - [ ] **`error-handler.js`** com circuit-breaker e estratégias configuráveis
 - [ ] **`presets/production.js`** pronto para produção com segurança completa
