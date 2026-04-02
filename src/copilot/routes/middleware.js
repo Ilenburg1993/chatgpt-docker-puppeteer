@@ -7,7 +7,7 @@
  * @module copilot/routes/middleware
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 
 /**
  * Wrapper que captura erros assíncronos e retorna resposta 500 padronizada.

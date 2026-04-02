@@ -15,7 +15,7 @@
  * @see module:copilot/lib/tools-registry
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { buildCustomTools } from '../config/tools/registry.js';
 import { registerTools } from '../lib/tools-registry.js';
 import {

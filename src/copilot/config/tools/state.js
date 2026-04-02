@@ -11,7 +11,7 @@
  * @module copilot/config/tools-state
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 

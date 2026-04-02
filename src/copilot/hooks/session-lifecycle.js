@@ -16,7 +16,7 @@
  */
 
 import { recordSessionEnd, recordSessionStart } from '#copilot/lib/index';
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { hostname } from 'node:os';
 
 /**

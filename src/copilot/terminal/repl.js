@@ -15,7 +15,7 @@
  * @see module:copilot/terminal/dialog
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import readline from 'node:readline';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { resolve } from '../bridges/alias-store.js';

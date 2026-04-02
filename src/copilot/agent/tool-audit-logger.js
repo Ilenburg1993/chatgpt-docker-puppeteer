@@ -17,15 +17,16 @@
  */
 
 import { defaultBus } from '#copilot/hooks/bus';
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 // G2-SEC-05: path do audit log configurável via COPILOT_AUDIT_LOG_PATH env var.
+// Isolado em src/copilot/logs/ por padrão para não poluir o workspace pai.
 const TOOL_AUDIT_LOG = process.env['COPILOT_AUDIT_LOG_PATH']
     ? resolve(process.env['COPILOT_AUDIT_LOG_PATH'])
-    : join(resolve(import.meta.dirname, '../../..'), 'logs', 'tool-audit.jsonl');
+    : join(resolve(import.meta.dirname, '../logs'), 'tool-audit.jsonl');
 const ROTATE_LOG = TOOL_AUDIT_LOG + '.1';
 // G2-DX-11: limite de tamanho do log configurável via env (default 10MB).
 const MAX_LOG_BYTES = Number(process.env['AGENT_TOOL_AUDIT_MAX_LOG_BYTES']) || 10 * 1024 * 1024;

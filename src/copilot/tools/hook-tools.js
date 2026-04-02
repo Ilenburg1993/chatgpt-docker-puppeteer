@@ -20,7 +20,7 @@
  * @see module:copilot/hooks/audit
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';

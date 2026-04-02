@@ -20,7 +20,7 @@
 
 import { SessionError } from '#copilot/core/errors';
 import { recordToolCall, startSpan } from '#copilot/lib/index';
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { writeStateAsync } from './state-io.js';
 
 /**

@@ -12,7 +12,8 @@
  * @module copilot/agent
  */
 
-import { log } from '#core/logger';
+import { defaultErrorTracker } from '#copilot/observability';
+import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import { alwaysAliveAgent } from './always-alive.js';
 
@@ -61,6 +62,17 @@ async function shutdown(signal = 'SIGTERM') {
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+// ─── Handlers de erros não tratados ──────────────────────────────────────────
+process.on('uncaughtException', (err) => {
+    log('FATAL', `[entry] uncaughtException: ${err.message}`);
+    defaultErrorTracker.trackError(err, { source: 'uncaughtException' });
+});
+process.on('unhandledRejection', (reason) => {
+    const msg = reason instanceof Error ? reason.message : String(reason);
+    log('ERROR', `[entry] unhandledRejection: ${msg}`);
+    defaultErrorTracker.trackError(reason, { source: 'unhandledRejection' });
+});
 
 // ─── IPC básico (G1-API-03) ───────────────────────────────────────────────────
 // Permite que o processo pai (PM2 / scripts de controle) envie comandos via IPC.

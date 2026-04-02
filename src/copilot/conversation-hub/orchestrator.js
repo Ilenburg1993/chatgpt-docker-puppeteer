@@ -14,7 +14,7 @@
  * @see module:copilot/always-alive
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
 import { LlmBridgeClient } from '../channel/client.js';
 

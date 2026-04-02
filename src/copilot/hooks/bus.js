@@ -11,7 +11,7 @@
  * @see module:copilot/hooks/factory
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { EventEmitter } from 'node:events';
 
 /**

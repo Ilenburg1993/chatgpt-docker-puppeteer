@@ -10,7 +10,7 @@
  * @see module:copilot/conversation-hub/store
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 
 // ─── Typedefs (re-exportadas por store.js) ────────────────────────────────────
 

@@ -9,7 +9,7 @@
  * @module copilot/api/bridge-control
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { createRequire } from 'node:module';
 import { CHANNEL_VERSION } from '../channel/index.js';
 import { conversationStore } from '../conversation-hub/index.js';

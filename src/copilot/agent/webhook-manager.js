@@ -7,7 +7,7 @@
  *   reuso isolado.
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 
 /**
  * Timeout (ms) para cada requisição HTTP de webhook. Evita que webhooks lentos bloqueiem o ciclo.

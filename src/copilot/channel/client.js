@@ -42,7 +42,7 @@ import {
     parseStructuredResponse,
     serializeStructuredMessage,
 } from '#copilot/types/structured-message';
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 
 // ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────
 

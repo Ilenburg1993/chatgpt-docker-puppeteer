@@ -19,7 +19,7 @@
  */
 
 import { getCopilotDb } from '#copilot/db/sqlite';
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';

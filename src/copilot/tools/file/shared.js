@@ -7,7 +7,7 @@
  * @module copilot/tools/file/shared
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';

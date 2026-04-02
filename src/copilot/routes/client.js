@@ -20,7 +20,7 @@
  * @module copilot/routes/client
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { getClient, getClientState, stopClient } from '../lib/sdk-client.js';

@@ -18,7 +18,7 @@
  */
 
 import CONFIG from '#core/config';
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';

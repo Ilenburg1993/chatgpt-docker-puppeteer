@@ -9,7 +9,7 @@
  * @see module:copilot/always-alive
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { execSync } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';

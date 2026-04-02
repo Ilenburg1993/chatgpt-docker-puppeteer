@@ -16,7 +16,7 @@
  * @module copilot/terminal
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { configureHookTools, setHub, setPermissionAgent } from '../agent/tools-bootstrap.js';

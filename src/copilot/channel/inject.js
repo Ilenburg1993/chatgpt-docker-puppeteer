@@ -26,7 +26,7 @@
  */
 
 import { BridgeError } from '#copilot/core';
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import http from 'node:http';
 import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';
 

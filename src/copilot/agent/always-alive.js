@@ -23,7 +23,8 @@
 import { SessionError } from '#copilot/core/errors';
 import { raceEvents } from '#copilot/lib/event-helpers';
 import { createRegistry, createTelemetry, startSpan } from '#copilot/lib/index';
-import { log } from '#core/logger';
+import { buildTelemetryConfig, defaultEventCollector } from '#copilot/observability';
+import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
 import { buildMcpTools } from '../bridges/mcp-tool-bridge.js';
@@ -391,7 +392,8 @@ export class AlwaysAliveAgent extends EventEmitter {
         log('INFO', '[AlwaysAlive] Iniciando agente...');
 
         try {
-            const client = new CopilotClient();
+            const _otelConfig = buildTelemetryConfig();
+            const client = new CopilotClient(...(_otelConfig ? [{ telemetry: _otelConfig }] : []));
             this.#client = client;
 
             // Inicializa telemetria para esta sessão (registry e MCP tools são criados dentro de #initSession)
@@ -419,6 +421,10 @@ export class AlwaysAliveAgent extends EventEmitter {
                 // G1-BUG-06: filtrar deltas durante waiting_for_input com dialog loop ativo
                 dialogLoopActive: () => this.#dialogLoop?.active ?? false,
             });
+
+            // Wiring do event-collector de observabilidade (tool calls, tokens, erros, spans SDK).
+            const _collectorUnsubs = defaultEventCollector.attach(session, session.sessionId ?? 'unknown');
+            this.#sessionEventUnsubscribers.push(..._collectorUnsubs);
 
             this.#setStatus('idle');
             this.#sendCount = readState()?.sendCount ?? 0;

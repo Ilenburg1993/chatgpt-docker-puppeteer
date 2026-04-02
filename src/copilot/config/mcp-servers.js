@@ -8,7 +8,7 @@
  * @module copilot/config/mcp-servers
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { DEFAULT_EXCLUDED_TOOLS } from './session-config.js';
 
 /**

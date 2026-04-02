@@ -22,7 +22,7 @@
  * @see module:copilot/lib/tools-registry
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { z } from 'zod';
 

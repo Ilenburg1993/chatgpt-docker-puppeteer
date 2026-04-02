@@ -12,7 +12,7 @@
  * @see module:copilot/hooks/composer
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 
 /**
  * @typedef {import('./types.js').SessionHooks} SessionHooks

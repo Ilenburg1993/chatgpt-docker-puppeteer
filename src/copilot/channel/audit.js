@@ -21,8 +21,10 @@ import { fileURLToPath } from 'node:url';
 // ─── Configuração de paths ────────────────────────────────────────────────────
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '../../..');
-const LOGS_DIR = path.join(ROOT, 'logs');
+// Isolado em src/copilot/logs/ para não poluir o workspace pai.
+const LOGS_DIR = process.env['COPILOT_LOG_DIR']
+    ? path.resolve(process.env['COPILOT_LOG_DIR'])
+    : path.resolve(__dirname, '../logs');
 const AUDIT_FILE = path.join(LOGS_DIR, 'tool-audit.jsonl');
 const AUDIT_ROTATE = path.join(LOGS_DIR, 'tool-audit.jsonl.1');
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB

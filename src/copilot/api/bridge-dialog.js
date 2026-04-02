@@ -11,7 +11,7 @@
  * @module copilot/api/bridge-dialog
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 
 /**
  * @typedef {import('express').Request} Req

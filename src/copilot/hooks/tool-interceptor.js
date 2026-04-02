@@ -12,7 +12,7 @@
  * @see module:copilot/hooks/types
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 
 /**
  * @typedef {import('./types.js').PreToolUseHookInput} PreToolUseHookInput

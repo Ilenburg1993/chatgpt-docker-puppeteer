@@ -8,7 +8,7 @@
  * @see module:copilot/agent/dialog-loop-manager
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 
 /**
  * @typedef {Object} DialogWatchdogOptions

@@ -10,7 +10,7 @@
  * @module copilot/agent/reconnect-policy
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 
 /**
  * @typedef {Object} ReconnectCallbacks

@@ -15,7 +15,7 @@
  * @see module:copilot/config/session-config
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 
 /**

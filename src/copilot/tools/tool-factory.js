@@ -64,7 +64,7 @@
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 

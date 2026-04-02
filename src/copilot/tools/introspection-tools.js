@@ -9,7 +9,7 @@
  * @see module:copilot/agent/status-snapshot
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { createRequire } from 'node:module';
 import { z } from 'zod';

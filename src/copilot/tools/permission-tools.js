@@ -20,7 +20,7 @@
  * @see module:copilot/agent/permission-controller
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { z } from 'zod';
 import { buildTool } from './tool-factory.js';
 

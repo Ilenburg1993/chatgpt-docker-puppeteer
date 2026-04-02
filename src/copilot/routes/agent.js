@@ -18,7 +18,7 @@
  * @module copilot/routes/agent
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';

@@ -12,7 +12,7 @@
  * @see module:copilot/bridges/nerv-bridge
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { HubOrchestrator } from './orchestrator.js';
 import { mountCopilotNamespace, unmountCopilotNamespace } from './socket-ns.js';
 import { conversationStore } from './store.js';

@@ -16,7 +16,7 @@
 
 import { defaultBus } from '#copilot/hooks/bus';
 import { SDK_HOOKS } from '#copilot/hooks/registry';
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';

@@ -9,7 +9,7 @@
  * @see module:copilot/lib/url-validator
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { z } from 'zod';
 import { validateUrl } from '../lib/url-validator.js';
 import { buildTool } from './tool-factory.js';

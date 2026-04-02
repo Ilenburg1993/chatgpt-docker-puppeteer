@@ -21,7 +21,7 @@
 
 import { SessionError } from '#copilot/core/errors';
 import { waitForEvent } from '#copilot/lib/event-helpers';
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
 import { DialogProtocol } from './dialog-protocol.js';
 import { executeTurnImpl } from './dialog-turn-executor.js';

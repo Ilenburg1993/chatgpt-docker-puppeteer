@@ -18,7 +18,7 @@
  * @module copilot/tools/shell-tools
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { execFile, spawn } from 'node:child_process';
 import * as path from 'node:path';

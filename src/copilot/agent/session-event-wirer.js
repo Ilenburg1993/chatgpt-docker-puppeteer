@@ -11,7 +11,7 @@
  * @module copilot/agent/session-event-wirer
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { writeStateAsync } from './state-io.js';
 
 /**

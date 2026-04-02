@@ -13,7 +13,7 @@
  * @see module:copilot/session-initializer
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

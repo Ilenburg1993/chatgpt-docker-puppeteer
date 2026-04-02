@@ -9,7 +9,7 @@
  * @see module:copilot/agent/task-executor
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';

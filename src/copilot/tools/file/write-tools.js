@@ -8,7 +8,7 @@
  * @see module:copilot/tools/file/shared
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';

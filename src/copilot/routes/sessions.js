@@ -27,7 +27,7 @@
  * @module copilot/routes/sessions
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
 import { Router } from 'express';
 import {

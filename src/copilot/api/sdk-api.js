@@ -20,6 +20,7 @@ import { Router } from 'express';
 import agentRouter from '../routes/agent.js';
 import clientRouter from '../routes/client.js';
 import hooksRouter from '../routes/hooks.js';
+import observabilityRouter from '../routes/observability.js';
 import sessionsRouter from '../routes/sessions.js';
 import webhooksRouter from '../routes/webhooks.js';
 
@@ -32,5 +33,7 @@ router.use('/', agentRouter);
 router.use('/', webhooksRouter);
 // P.2: rotas de introspecção de hooks (registry + SSE events)
 router.use('/', hooksRouter);
+// Rotas de observabilidade (metrics, errors, logs, health, log-level)
+router.use('/', observabilityRouter);
 
 export default router;

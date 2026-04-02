@@ -9,7 +9,7 @@
  * @see module:copilot/tools/tool-factory
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { execFile, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';

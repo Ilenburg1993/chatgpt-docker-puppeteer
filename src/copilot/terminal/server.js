@@ -36,7 +36,7 @@
  * @see module:copilot/terminal/repl
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';

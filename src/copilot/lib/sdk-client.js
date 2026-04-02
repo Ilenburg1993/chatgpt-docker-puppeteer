@@ -17,7 +17,7 @@
  * @see module:copilot/always-alive
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 
 /**

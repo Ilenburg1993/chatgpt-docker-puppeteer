@@ -17,7 +17,7 @@
  * @module copilot/hooks/presets/production
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import os from 'node:os';
 import { createCircuitBreakerHandler } from '../error-handler.js';
 import { createPermissionHandler } from '../permission-handler.js';

@@ -13,7 +13,7 @@
 
 import { MAX_QUEUE_SIZE } from '#copilot/core/constants';
 import { SessionError } from '#copilot/core/errors';
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 

@@ -9,7 +9,7 @@
  * @module copilot/api/bridge-tasks
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { randomUUID } from 'node:crypto';
 
 /**

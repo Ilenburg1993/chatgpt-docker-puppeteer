@@ -8,7 +8,7 @@
  * @module copilot/hooks/presets/safe
  */
 
-import { log } from '#core/logger';
+import { log } from '#copilot/observability/logger';
 import { createPermissionHandler } from '../permission-handler.js';
 
 /**
