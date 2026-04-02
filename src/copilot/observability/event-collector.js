@@ -89,7 +89,8 @@ function persistEvent(entry) {
  * @property {ErrorTracker | null} [errorTracker] - Tracker para erros de sessão SDK.
  * @property {HookBus | null} [hookBus] - Bus para re-emitir eventos como hooks (opcional).
  * @property {boolean} [persist] - Se true, persiste eventos relevantes em events.jsonl (padrão: true).
- * @property {readonly string[]} [persistTypes] - Tipos de eventos a persistir (padrão: lista canônica).
+ * @property {ReadonlySet<string> | readonly string[]} [persistTypes] - Tipos de eventos a persistir (padrão: Set
+ *   canônico). Set é preferido (O(1) vs O(n)); arrays são aceitos e convertidos internamente.
  * @property {boolean} [captureUserContent] - Se true, persiste content de user.message (OFF por padrão — risco PII).
  * @property {boolean} [captureAssistantContent] - Se true, persiste conteúdo de assistant.message (OFF por padrão).
  */
@@ -110,82 +111,85 @@ function persistEvent(entry) {
 
 // ─── Tipos globais de máxima relevância para telemetria ──────────────────────
 
-const DEFAULT_PERSIST_TYPES = Object.freeze([
-    // ── Tool calls ──────────────────────────────────────────────────────────
-    'tool.execution_start',
-    'tool.execution_complete',
-    'tool.user_requested',
-    // ── Assistant ───────────────────────────────────────────────────────────
-    'assistant.usage',
-    'assistant.turn_start',
-    'assistant.turn_end',
-    'assistant.message',
-    'assistant.intent',
-    // ── Usuário ─────────────────────────────────────────────────────────────
-    'user.message',
-    // ── Sessão ──────────────────────────────────────────────────────────────
-    'session.start',
-    'session.resume',
-    'session.usage_info',
-    'session.error',
-    'session.truncation',
-    'session.compaction_start',
-    'session.compaction_complete',
-    'session.tools_updated',
-    'session.mcp_servers_loaded',
-    'session.mode_changed',
-    'session.model_change',
-    'session.plan_changed',
-    'session.background_tasks_changed',
-    'session.workspace_file_changed',
-    'session.context_changed',
-    'session.handoff',
-    'session.skills_loaded',
-    'session.extensions_loaded',
-    'session.mcp_server_status_changed',
-    // ── Permissões, hooks, interações ──────────────────────────────────────
-    'permission.requested',
-    'permission.completed',
-    'elicitation.requested',
-    'elicitation.completed',
-    'user_input.requested',
-    'user_input.completed',
-    'hook.start',
-    'hook.end',
-    'session.task_complete',
-    'session.shutdown',
-    'session.info',
-    'session.warning',
-    'skill.invoked',
-    // ── Sub-agentes ─────────────────────────────────────────────────────────
-    'subagent.started',
-    'subagent.completed',
-    'subagent.failed',
-    'subagent.selected',
-    'subagent.deselected',
-    // ── MCP / OAuth ─────────────────────────────────────────────────────────
-    'mcp.oauth_required',
-    'mcp.oauth_completed',
-    // ── External tools / Comandos / Plan mode ──────────────────────────────
-    'external_tool.requested',
-    'external_tool.completed',
-    'command.execute',
-    'command.queued',
-    'command.completed',
-    'exit_plan_mode.requested',
-    'exit_plan_mode.completed',
-    // ── Fase BF: novos tipos ────────────────────────────────────────────────
-    'assistant.reasoning',
-    'session.title_changed',
-    'session.workspace_file_changed',
-    'system.message',
-    // ── Aborto ──────────────────────────────────────────────────────────────
-    'abort',
-    // ── Sistema ─────────────────────────────────────────────────────────────
-    'system.notification',
-    // ── Fase BH: rewind e snapshot_rewind ──────────────────────────────────
-    'session.snapshot_rewind',
-]);
+// Fase CC: convertido de Array.freeze para Set → O(1) lookup em .has() vs O(n) em .includes().
+// Remoção do duplicado 'session.workspace_file_changed' adicionado por engano na Fase BF.
+const DEFAULT_PERSIST_TYPES = /** @type {ReadonlySet<string>} */ (
+    Object.freeze(
+        new Set([
+            // ── Tool calls ──────────────────────────────────────────────────────────
+            'tool.execution_start',
+            'tool.execution_complete',
+            'tool.user_requested',
+            // ── Assistant ───────────────────────────────────────────────────────────
+            'assistant.usage',
+            'assistant.turn_start',
+            'assistant.turn_end',
+            'assistant.message',
+            'assistant.intent',
+            'assistant.reasoning',
+            // ── Usuário ─────────────────────────────────────────────────────────────
+            'user.message',
+            // ── Sessão ──────────────────────────────────────────────────────────────
+            'session.start',
+            'session.resume',
+            'session.usage_info',
+            'session.error',
+            'session.truncation',
+            'session.compaction_start',
+            'session.compaction_complete',
+            'session.tools_updated',
+            'session.mcp_servers_loaded',
+            'session.mode_changed',
+            'session.model_change',
+            'session.plan_changed',
+            'session.background_tasks_changed',
+            'session.workspace_file_changed',
+            'session.context_changed',
+            'session.handoff',
+            'session.skills_loaded',
+            'session.extensions_loaded',
+            'session.mcp_server_status_changed',
+            'session.title_changed',
+            'session.info',
+            'session.warning',
+            'session.task_complete',
+            'session.shutdown',
+            'session.snapshot_rewind',
+            // ── Permissões, hooks, interações ──────────────────────────────────────
+            'permission.requested',
+            'permission.completed',
+            'elicitation.requested',
+            'elicitation.completed',
+            'user_input.requested',
+            'user_input.completed',
+            'hook.start',
+            'hook.end',
+            'skill.invoked',
+            // ── Sub-agentes ─────────────────────────────────────────────────────────
+            'subagent.started',
+            'subagent.completed',
+            'subagent.failed',
+            'subagent.selected',
+            'subagent.deselected',
+            // ── MCP / OAuth ─────────────────────────────────────────────────────────
+            'mcp.oauth_required',
+            'mcp.oauth_completed',
+            // ── External tools / Comandos / Plan mode ──────────────────────────────
+            'external_tool.requested',
+            'external_tool.completed',
+            'command.execute',
+            'command.queued',
+            'command.completed',
+            'exit_plan_mode.requested',
+            'exit_plan_mode.completed',
+            // ── Sistema ─────────────────────────────────────────────────────────────
+            'system.message',
+            'system.notification',
+            // ── Aborto ──────────────────────────────────────────────────────────────
+            'abort',
+        ]),
+    )
+);
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
@@ -209,6 +213,11 @@ export function createEventCollector(opts = {}) {
         captureUserContent = false,
         captureAssistantContent = false,
     } = opts;
+
+    // Normaliza para Set para garantir O(1) em todas as buscas,
+    // aceitando arrays por retro-compatibilidade com chamadores externos.
+    /** @type {ReadonlySet<string>} */
+    const _persistSet = persistTypes instanceof Set ? persistTypes : new Set(persistTypes);
 
     /**
      * Mapa de toolCallId → entrada pendente com toolName, mcpServerName, startTs e toolArgs capturados de
@@ -247,7 +256,7 @@ export function createEventCollector(opts = {}) {
                     startTs: Date.now(),
                     toolArgs: /** @type {Record<string, unknown>} */ (event.data.arguments ?? {}),
                 });
-                if (persist && persistTypes.includes('tool.execution_start')) {
+                if (persist && _persistSet.has('tool.execution_start')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -287,7 +296,7 @@ export function createEventCollector(opts = {}) {
                     durationMs,
                 });
 
-                if (persist && persistTypes.includes('tool.execution_complete')) {
+                if (persist && _persistSet.has('tool.execution_complete')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -352,7 +361,7 @@ export function createEventCollector(opts = {}) {
                     }
                 }
 
-                if (persist && persistTypes.includes('assistant.usage')) {
+                if (persist && _persistSet.has('assistant.usage')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -407,7 +416,7 @@ export function createEventCollector(opts = {}) {
 
                 metrics?.recordSessionError();
 
-                if (persist && persistTypes.includes('session.error')) {
+                if (persist && _persistSet.has('session.error')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, errorType, message });
                 }
                 log('WARN', `[event-collector] session.error: type=${errorType} msg=${message} session=${sessionId}`);
@@ -417,7 +426,7 @@ export function createEventCollector(opts = {}) {
         // ── session.usage_info ────────────────────────────────────────────────
         unsubs.push(
             session.on('session.usage_info', (event) => {
-                if (persist && persistTypes.includes('session.usage_info')) {
+                if (persist && _persistSet.has('session.usage_info')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 }
             }),
@@ -426,7 +435,7 @@ export function createEventCollector(opts = {}) {
         // ── session.truncation ────────────────────────────────────────────────
         unsubs.push(
             session.on('session.truncation', (event) => {
-                if (persist && persistTypes.includes('session.truncation')) {
+                if (persist && _persistSet.has('session.truncation')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 }
                 log('INFO', `[event-collector] session.truncation: session=${sessionId}`);
@@ -510,14 +519,14 @@ export function createEventCollector(opts = {}) {
         // ── permission.requested / completed ─────────────────────────────────
         unsubs.push(
             session.on('permission.requested', (event) => {
-                if (persist && persistTypes.includes('permission.requested')) {
+                if (persist && _persistSet.has('permission.requested')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 }
             }),
         );
         unsubs.push(
             session.on('permission.completed', (event) => {
-                if (persist && persistTypes.includes('permission.completed')) {
+                if (persist && _persistSet.has('permission.completed')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 }
             }),
@@ -582,7 +591,7 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('elicitation.requested', (event) => {
                 metrics?.recordCounter('elicitation.requested');
-                if (persist && persistTypes.includes('elicitation.requested')) {
+                if (persist && _persistSet.has('elicitation.requested')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 }
                 log('DEBUG', `[event-collector] elicitation.requested session=${sessionId}`);
@@ -591,7 +600,7 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('elicitation.completed', (event) => {
                 metrics?.recordCounter('elicitation.completed');
-                if (persist && persistTypes.includes('elicitation.completed')) {
+                if (persist && _persistSet.has('elicitation.completed')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 }
             }),
@@ -601,7 +610,7 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('user_input.requested', (event) => {
                 metrics?.recordCounter('user_input.requested');
-                if (persist && persistTypes.includes('user_input.requested')) {
+                if (persist && _persistSet.has('user_input.requested')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 }
             }),
@@ -609,7 +618,7 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('user_input.completed', (event) => {
                 metrics?.recordCounter('user_input.completed');
-                if (persist && persistTypes.includes('user_input.completed')) {
+                if (persist && _persistSet.has('user_input.completed')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 }
             }),
@@ -649,7 +658,7 @@ export function createEventCollector(opts = {}) {
                 if (turnId) _turnStart.delete(turnId);
                 const durationMs = startTs ? Date.now() - startTs : 0;
                 metrics?.recordDialogTurn(durationMs, true);
-                if (persist && persistTypes.includes('assistant.turn_end')) {
+                if (persist && _persistSet.has('assistant.turn_end')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, turnId, durationMs });
                 }
                 log('DEBUG', `[event-collector] turn_end: ${turnId ?? 'n/a'} (${durationMs}ms) session=${sessionId}`);
@@ -661,7 +670,7 @@ export function createEventCollector(opts = {}) {
             session.on('assistant.message', (event) => {
                 const { messageId, content } = event.data;
                 metrics?.recordCounter('assistant.message');
-                if (persist && persistTypes.includes('assistant.message')) {
+                if (persist && _persistSet.has('assistant.message')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -678,7 +687,7 @@ export function createEventCollector(opts = {}) {
             session.on('assistant.intent', (event) => {
                 const { intent } = event.data;
                 metrics?.recordCounter(`assistant.intent.${intent ?? 'unknown'}`);
-                if (persist && persistTypes.includes('assistant.intent')) {
+                if (persist && _persistSet.has('assistant.intent')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, intent });
                 }
             }),
@@ -692,7 +701,7 @@ export function createEventCollector(opts = {}) {
                 if ((attachments?.length ?? 0) > 0) {
                     metrics?.recordCounter('user.message.with_attachments');
                 }
-                if (persist && persistTypes.includes('user.message')) {
+                if (persist && _persistSet.has('user.message')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -712,7 +721,7 @@ export function createEventCollector(opts = {}) {
             session.on('abort', (event) => {
                 metrics?.recordCounter('turn.aborted');
                 metrics?.recordSessionError();
-                if (persist && persistTypes.includes('abort')) {
+                if (persist && _persistSet.has('abort')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, reason: event.data.reason });
                 }
                 log('WARN', `[event-collector] turn aborted: ${event.data.reason ?? 'unknown'} session=${sessionId}`);
@@ -725,7 +734,7 @@ export function createEventCollector(opts = {}) {
                 const { sessionId: sdkSessionId, copilotVersion, selectedModel, reasoningEffort, context } = event.data;
                 metrics?.recordSessionStart();
                 metrics?.recordCounter(`model.${selectedModel ?? 'unknown'}`);
-                if (persist && persistTypes.includes('session.start')) {
+                if (persist && _persistSet.has('session.start')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -749,7 +758,7 @@ export function createEventCollector(opts = {}) {
                 const { eventCount, selectedModel, reasoningEffort, context, alreadyInUse } = event.data;
                 metrics?.recordCounter('session.resumed');
                 if (alreadyInUse) metrics?.recordCounter('session.already_in_use');
-                if (persist && persistTypes.includes('session.resume')) {
+                if (persist && _persistSet.has('session.resume')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -772,7 +781,7 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('session.context_changed', (event) => {
                 const { branch, repository, cwd } = event.data;
-                if (persist && persistTypes.includes('session.context_changed')) {
+                if (persist && _persistSet.has('session.context_changed')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -791,7 +800,7 @@ export function createEventCollector(opts = {}) {
                 const { handoffTime, sourceType, summary, remoteSessionId } = event.data;
                 metrics?.recordCounter('session.handoff');
                 metrics?.recordCounter(`session.handoff.source.${sourceType ?? 'unknown'}`);
-                if (persist && persistTypes.includes('session.handoff')) {
+                if (persist && _persistSet.has('session.handoff')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -813,7 +822,7 @@ export function createEventCollector(opts = {}) {
                 const enabledCount = skills.filter((/** @type {{ enabled?: boolean }} */ s) => s.enabled).length;
                 metrics?.recordCounter('session.skills_loaded');
                 metrics?.recordCounter('skills.enabled', enabledCount);
-                if (persist && persistTypes.includes('session.skills_loaded')) {
+                if (persist && _persistSet.has('session.skills_loaded')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -842,7 +851,7 @@ export function createEventCollector(opts = {}) {
                 const runningCount = extensions.filter(
                     (/** @type {{ status?: string }} */ e) => e.status === 'running',
                 ).length;
-                if (persist && persistTypes.includes('session.extensions_loaded')) {
+                if (persist && _persistSet.has('session.extensions_loaded')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -874,7 +883,7 @@ export function createEventCollector(opts = {}) {
                     metrics?.recordCounter('mcp.server.connected');
                     log('INFO', `[event-collector] MCP server connected: ${serverName} session=${sessionId}`);
                 }
-                if (persist && persistTypes.includes('session.mcp_server_status_changed')) {
+                if (persist && _persistSet.has('session.mcp_server_status_changed')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, serverName, status });
                 }
             }),
@@ -885,7 +894,7 @@ export function createEventCollector(opts = {}) {
             session.on('tool.user_requested', (event) => {
                 const { toolCallId, toolName } = event.data;
                 metrics?.recordCounter('tool.user_requested');
-                if (persist && persistTypes.includes('tool.user_requested')) {
+                if (persist && _persistSet.has('tool.user_requested')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -907,7 +916,7 @@ export function createEventCollector(opts = {}) {
                 if (kind.type === 'agent_completed') {
                     metrics?.recordCounter(`background_agent.${'status' in kind ? kind.status : 'unknown'}`);
                 }
-                if (persist && persistTypes.includes('system.notification')) {
+                if (persist && _persistSet.has('system.notification')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -924,7 +933,7 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('subagent.selected', (event) => {
                 metrics?.recordCounter('subagent.selected');
-                if (persist && persistTypes.includes('subagent.selected')) {
+                if (persist && _persistSet.has('subagent.selected')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 }
             }),
@@ -935,7 +944,7 @@ export function createEventCollector(opts = {}) {
             session.on('mcp.oauth_required', (event) => {
                 const { serverName } = event.data;
                 metrics?.recordCounter('mcp.oauth_required');
-                if (persist && persistTypes.includes('mcp.oauth_required')) {
+                if (persist && _persistSet.has('mcp.oauth_required')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, serverName });
                 }
                 log('WARN', `[event-collector] mcp.oauth_required: ${serverName} session=${sessionId}`);
@@ -946,7 +955,7 @@ export function createEventCollector(opts = {}) {
             session.on('mcp.oauth_completed', (event) => {
                 const { requestId } = event.data;
                 metrics?.recordCounter('mcp.oauth_completed');
-                if (persist && persistTypes.includes('mcp.oauth_completed')) {
+                if (persist && _persistSet.has('mcp.oauth_completed')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
                 }
             }),
@@ -957,7 +966,7 @@ export function createEventCollector(opts = {}) {
             session.on('external_tool.requested', (event) => {
                 const { requestId, toolName, traceparent, tracestate } = event.data;
                 metrics?.recordCounter('external_tool.requested');
-                if (persist && persistTypes.includes('external_tool.requested')) {
+                if (persist && _persistSet.has('external_tool.requested')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -981,7 +990,7 @@ export function createEventCollector(opts = {}) {
             session.on('command.execute', (event) => {
                 const { commandName, args } = event.data;
                 metrics?.recordCounter(`command.execute.${commandName ?? 'unknown'}`);
-                if (persist && persistTypes.includes('command.execute')) {
+                if (persist && _persistSet.has('command.execute')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, commandName, args });
                 }
                 log('DEBUG', `[event-collector] command.execute: /${commandName ?? '?'} session=${sessionId}`);
@@ -993,7 +1002,7 @@ export function createEventCollector(opts = {}) {
             session.on('exit_plan_mode.requested', (event) => {
                 const { summary, actions, recommendedAction } = event.data;
                 metrics?.recordCounter('exit_plan_mode.requested');
-                if (persist && persistTypes.includes('exit_plan_mode.requested')) {
+                if (persist && _persistSet.has('exit_plan_mode.requested')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -1019,7 +1028,7 @@ export function createEventCollector(opts = {}) {
             session.on('assistant.reasoning', (event) => {
                 const { reasoningId, content } = event.data;
                 metrics?.recordCounter('assistant.reasoning');
-                if (persist && persistTypes.includes('assistant.reasoning')) {
+                if (persist && _persistSet.has('assistant.reasoning')) {
                     persistEvent({
                         type: event.type,
                         sessionId,
@@ -1052,7 +1061,7 @@ export function createEventCollector(opts = {}) {
             session.on('session.workspace_file_changed', (event) => {
                 const { path, operation } = event.data;
                 metrics?.recordCounter(`session.workspace_file_changed.${operation ?? 'unknown'}`);
-                if (persist && persistTypes.includes('session.workspace_file_changed')) {
+                if (persist && _persistSet.has('session.workspace_file_changed')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, path, operation });
                 }
                 log(
@@ -1068,7 +1077,7 @@ export function createEventCollector(opts = {}) {
                 const { role, metadata } = event.data;
                 const promptVersion = metadata?.promptVersion;
                 metrics?.recordCounter('system.message');
-                if (persist && persistTypes.includes('system.message')) {
+                if (persist && _persistSet.has('system.message')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, role, promptVersion });
                 }
                 log('DEBUG', `[event-collector] system.message role=${role ?? '?'} v=${promptVersion ?? '?'}`);
@@ -1087,7 +1096,7 @@ export function createEventCollector(opts = {}) {
             session.on('exit_plan_mode.completed', (event) => {
                 const { requestId } = event.data;
                 metrics?.recordCounter('exit_plan_mode.completed');
-                if (persist && persistTypes.includes('exit_plan_mode.completed')) {
+                if (persist && _persistSet.has('exit_plan_mode.completed')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
                 }
                 log('DEBUG', `[event-collector] exit_plan_mode.completed requestId=${requestId ?? '?'}`);
@@ -1099,7 +1108,7 @@ export function createEventCollector(opts = {}) {
             session.on('external_tool.completed', (event) => {
                 const { requestId } = event.data;
                 metrics?.recordCounter('external_tool.completed');
-                if (persist && persistTypes.includes('external_tool.completed')) {
+                if (persist && _persistSet.has('external_tool.completed')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
                 }
                 log('DEBUG', `[event-collector] external_tool.completed requestId=${requestId ?? '?'}`);
@@ -1111,7 +1120,7 @@ export function createEventCollector(opts = {}) {
             session.on('command.queued', (event) => {
                 const { requestId } = event.data;
                 metrics?.recordCounter('command.queued');
-                if (persist && persistTypes.includes('command.queued')) {
+                if (persist && _persistSet.has('command.queued')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
                 }
                 log('DEBUG', `[event-collector] command.queued requestId=${requestId ?? '?'}`);
@@ -1123,7 +1132,7 @@ export function createEventCollector(opts = {}) {
             session.on('command.completed', (event) => {
                 const { requestId } = event.data;
                 metrics?.recordCounter('command.completed');
-                if (persist && persistTypes.includes('command.completed')) {
+                if (persist && _persistSet.has('command.completed')) {
                     persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
                 }
                 log('DEBUG', `[event-collector] command.completed requestId=${requestId ?? '?'}`);
@@ -1168,7 +1177,7 @@ export function createEventCollector(opts = {}) {
                     'INFO',
                     `[event-collector] session.snapshot_rewind: eventosRemovidos=${removed ?? '?'}, alvo=${event.data?.upToEventId ?? '?'}`,
                 );
-                if (persist && persistTypes.includes('session.snapshot_rewind')) {
+                if (persist && _persistSet.has('session.snapshot_rewind')) {
                     persistEvent({
                         type: 'session.snapshot_rewind',
                         sessionId,
@@ -1187,7 +1196,7 @@ export function createEventCollector(opts = {}) {
                 const infoType = /** @type {string | undefined} */ (event.data?.infoType);
                 const logLevel = infoType === 'authentication' || infoType === 'model' ? 'WARN' : 'DEBUG';
                 log(logLevel, `[event-collector] session.info[${infoType ?? '?'}]: ${event.data?.message ?? ''}`);
-                if (persist && persistTypes.includes('session.info')) {
+                if (persist && _persistSet.has('session.info')) {
                     persistEvent({
                         type: 'session.info',
                         sessionId,

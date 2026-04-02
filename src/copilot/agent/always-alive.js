@@ -533,6 +533,9 @@ export class AlwaysAliveAgent extends EventEmitter {
             clearInterval(this.#metricsTimer);
             this.#metricsTimer = null;
         }
+        // Fase CB: parar snapshot periódico de métricas — sem isso, em ciclos stop→start
+        // múltiplos snapshots rodam em paralelo, causando escrita concorrente em metrics.jsonl
+        defaultMetrics.stopPeriodicSnapshot();
 
         this.#setStatus('stopped');
 

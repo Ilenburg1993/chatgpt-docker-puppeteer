@@ -296,6 +296,109 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
             }, 'pr.consumed'),
         );
 
+        // ── Fase CE: eventos adicionais ───────────────────────────────────────
+
+        // ── task.queued — tarefa enfileirada ──────────────────────────────────
+        _on(
+            agent,
+            'task.queued',
+            _safe((/** @type {{ taskId?: string }} */ evt) => {
+                metrics.recordCounter('tasks.queued');
+                log('DEBUG', `[agent-event-observer] task.queued taskId=${evt?.taskId ?? '?'}`);
+            }, 'task.queued'),
+        );
+
+        // ── task.started — tarefa iniciada ────────────────────────────────────
+        _on(
+            agent,
+            'task.started',
+            _safe((/** @type {{ taskId?: string }} */ evt) => {
+                metrics.recordCounter('tasks.started');
+                log('DEBUG', `[agent-event-observer] task.started taskId=${evt?.taskId ?? '?'}`);
+            }, 'task.started'),
+        );
+
+        // ── session.compaction_start ──────────────────────────────────────────
+        _on(
+            agent,
+            'session.compaction_start',
+            _safe(() => {
+                metrics.recordCounter('session.compaction.start');
+                log('DEBUG', '[agent-event-observer] session.compaction_start');
+            }, 'session.compaction_start'),
+        );
+
+        // ── session.compaction_complete ───────────────────────────────────────
+        _on(
+            agent,
+            'session.compaction_complete',
+            _safe((/** @type {{ savedTokens?: number }} */ evt) => {
+                metrics.recordCounter('session.compaction.complete');
+                if (typeof evt?.savedTokens === 'number') {
+                    metrics.recordCounter('session.compaction.saved_tokens', evt.savedTokens);
+                }
+                log(
+                    'DEBUG',
+                    `[agent-event-observer] session.compaction_complete savedTokens=${evt?.savedTokens ?? '?'}`,
+                );
+            }, 'session.compaction_complete'),
+        );
+
+        // ── dialog.loop.changed — loop ativado/desativado ─────────────────────
+        _on(
+            agent,
+            'dialog.loop.changed',
+            _safe((/** @type {{ active?: boolean }} */ evt) => {
+                metrics.recordCounter(evt?.active ? 'dialog.loop.activated' : 'dialog.loop.deactivated');
+                log('DEBUG', `[agent-event-observer] dialog.loop.changed active=${evt?.active}`);
+            }, 'dialog.loop.changed'),
+        );
+
+        // ── session.mode_changed ──────────────────────────────────────────────
+        _on(
+            agent,
+            'session.mode_changed',
+            _safe((/** @type {{ newMode?: string; previousMode?: string }} */ evt) => {
+                metrics.recordCounter(`session.mode.${evt?.newMode ?? 'unknown'}`);
+                log('DEBUG', `[agent-event-observer] session.mode_changed ${evt?.previousMode} → ${evt?.newMode}`);
+            }, 'session.mode_changed'),
+        );
+
+        // ── session.token_budget_warning ──────────────────────────────────────
+        _on(
+            agent,
+            'session.token_budget_warning',
+            _safe((/** @type {{ remaining?: number; budgetPct?: number }} */ evt) => {
+                metrics.recordCounter('session.token_budget_warning');
+                log(
+                    'WARN',
+                    `[agent-event-observer] session.token_budget_warning remaining=${evt?.remaining ?? '?'} pct=${evt?.budgetPct ?? '?'}`,
+                );
+            }, 'session.token_budget_warning'),
+        );
+
+        // ── agent.background.completed ────────────────────────────────────────
+        _on(
+            agent,
+            'agent.background.completed',
+            _safe((/** @type {{ agentId?: string; durationMs?: number }} */ evt) => {
+                metrics.recordCounter('agent.background.completed');
+                log('DEBUG', `[agent-event-observer] agent.background.completed agentId=${evt?.agentId ?? '?'}`);
+            }, 'agent.background.completed'),
+        );
+
+        // ── agent.shell.completed ───────────────────────────────────────────
+        _on(
+            agent,
+            'agent.shell.completed',
+            _safe((/** @type {{ exitCode?: number; command?: string }} */ evt) => {
+                metrics.recordCounter('agent.shell.completed');
+                const code = evt?.exitCode ?? 0;
+                if (code !== 0) metrics.recordCounter('agent.shell.error');
+                log('DEBUG', `[agent-event-observer] agent.shell.completed exitCode=${code}`);
+            }, 'agent.shell.completed'),
+        );
+
         log('INFO', '[agent-event-observer] Attached to agent EventEmitter');
     }
 

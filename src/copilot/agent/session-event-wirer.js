@@ -77,16 +77,16 @@ const KNOWN_SDK_EVENTS = new Set([
     'subagent.selected',
     'subagent.started',
     'system.notification',
-    'tool.execution_complete',
     'tool.execution_progress',
-    'tool.execution_start',
     'tool.user_requested',
     'user_input.completed',
     'user_input.requested',
     'user.message',
-    // ── Gerenciados pelo task-executor.js (por-tarefa) ───────────────────────────
+    // ── Gerenciados pelo task-executor.js (por-tarefa) — NÃO subscrever aqui ────
     'assistant.streaming_delta',
+    'tool.execution_complete',
     'tool.execution_partial_result',
+    'tool.execution_start',
     // ── Cobertos parcialmente (Fases BI-BK) — reconhecidos para suprimir aviso ──
     'session.info',
     'session.snapshot_rewind',
@@ -286,7 +286,11 @@ function _wireTokenBudgetEvents(session, isResumed, { emit, onContextState }) {
 }
 
 /**
- * Registra eventos de mudança de modo e execução de tools.
+ * Registra eventos de mudança de modo.
+ *
+ * Nota: `tool.execution_start` e `tool.execution_complete` eram subscritos aqui (Fase BC / G2-BUG-14), mas causavam
+ * emissão duplicada no AGENT EventEmitter porque `task-executor.js` já os subscreve por-tarefa com enriquecimento de
+ * `taskId`. Removidos na Fase CA para eliminar métricas dobradas e eventos duplicados no nerv-bridge.
  *
  * @param {CopilotSession} session
  * @param {SessionWirerCallbacks} callbacks
@@ -298,14 +302,8 @@ function _wireModeAndToolEvents(session, { emit }) {
             log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.['previousMode']} → ${evt?.data?.['newMode']}`);
             emit('session.mode_changed', evt?.data ?? {});
         }),
-        // G2-BUG-14: tool events estavam no knownEvents mas nunca subscritos
-        // Fase BC: removido guard !isProcessing() — tool events devem chegar ao SSE durante task processing
-        session.on('tool.execution_start', (/** @type {SdkEvent} */ evt) => {
-            emit('tool.execution_start', evt?.data ?? {});
-        }),
-        session.on('tool.execution_complete', (/** @type {SdkEvent} */ evt) => {
-            emit('tool.execution_complete', evt?.data ?? {});
-        }),
+        // Fase CA: tool.execution_start e tool.execution_complete removidos daqui.
+        // task-executor.js gerencia esses eventos por-tarefa com payload enriquecido (taskId).
     ];
 }
 

@@ -81,6 +81,17 @@ const EVENT_MAP = [
     { event: 'agent.background.idle', actionCode: 'COPILOT_BG_AGENT_IDLE' },
     { event: 'agent.shell.completed', actionCode: 'COPILOT_SHELL_COMPLETED' },
     { event: 'agent.shell.detached_completed', actionCode: 'COPILOT_SHELL_DETACHED_COMPLETED' },
+    // ── Fase CD: eventos de AGENT_EVENTS ausentes do bridge ──────────────────
+    { event: 'dialog.loop.changed', actionCode: 'COPILOT_DIALOG_LOOP_CHANGED' },
+    { event: 'exit_plan_mode.completed', actionCode: 'COPILOT_EXIT_PLAN_MODE_COMPLETED' },
+    { event: 'external_tool.completed', actionCode: 'COPILOT_EXTERNAL_TOOL_COMPLETED' },
+    { event: 'pending_messages.modified', actionCode: 'COPILOT_PENDING_MESSAGES_MODIFIED' },
+    { event: 'session.info', actionCode: 'COPILOT_SESSION_INFO' },
+    { event: 'session.snapshot_rewind', actionCode: 'COPILOT_SESSION_SNAPSHOT_REWIND' },
+    { event: 'session.title_changed', actionCode: 'COPILOT_SESSION_TITLE_CHANGED' },
+    { event: 'session.workspace_file_changed', actionCode: 'COPILOT_SESSION_WORKSPACE_FILE_CHANGED' },
+    { event: 'system.message', actionCode: 'COPILOT_SYSTEM_MESSAGE' },
+    { event: 'tool.execution_progress', actionCode: 'COPILOT_TOOL_EXECUTION_PROGRESS' },
 ];
 
 /**
