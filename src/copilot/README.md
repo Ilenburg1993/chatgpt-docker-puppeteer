@@ -32,30 +32,30 @@ Arquitetura em camadas para orquestração do GitHub Copilot SDK:
 
 ### `agent/` — Agente Principal
 
-| Arquivo | Responsabilidade | LOC |
-|---|---|---|
-| `always-alive.js` | `AlwaysAliveAgent` — orquestra sessão, tools, reconexão | ~1188 |
-| `dialog-loop-manager.js` | Protocolo de turno com LLM-B (start/stop/restart) | ~494 |
-| `dialog-turn-executor.js` | Execução e resolução de um turno individual | ~300 |
-| `dialog-protocol.js` | `DialogProtocol` enum de estados | ~60 |
-| `dialog-watchdog.js` | `DialogWatchdog` — detecta loop travado | ~80 |
-| `dialog-loop-wirer.js` | `wireDialogLoopEvents` — pipe de 11 eventos | ~80 |
-| `session-initializer.js` | `initOrResumeSession`, context builders | ~200 |
-| `session-event-wirer.js` | Wire de eventos SDK por grupo (5 grupos) | ~150 |
-| `session-hooks.js` | `createSessionHooks` factory callbacks | ~90 |
-| `task-executor.js` | `executeTask` — execução de tarefas com callbacks | ~80 |
-| `tools-bootstrap.js` | `bootstrapTools` — registry por categoria + TOOL_GROUPS | ~120 |
-| `tool-audit-logger.js` | `isHighRiskTool`, `buildAuditingPermissionHandler` | ~120 |
-| `permission-controller.js` | `PermissionController` — approval flow | ~100 |
-| `message-queue.js` | `MessageQueue` — fila de mensagens com prioridade | ~80 |
-| `reconnect-policy.js` | `tryReconnect` — backoff exponencial com jitter | ~60 |
-| `state-io.js` | `readState`, `writeState`, `clearState` (persist) | ~80 |
-| `status-snapshot.js` | `buildStatusSnapshot` — snapshot para diagnóstico | ~60 |
-| `webhook-manager.js` | `WebhookManager` — disparo de webhooks externos | ~100 |
-| `events.js` | `AGENT_EVENTS` — nomes de eventos canônicos | ~40 |
-| `entry.js` | Entrypoint para PM2 (importa `main.js`) | ~10 |
-| `agent-contract.js` | `IAlwaysAliveAgent` typedef | ~30 |
-| `index.js` | **Barrel** — todos os públicos re-exportados | ~50 |
+| Arquivo                    | Responsabilidade                                        | LOC   |
+| -------------------------- | ------------------------------------------------------- | ----- |
+| `always-alive.js`          | `AlwaysAliveAgent` — orquestra sessão, tools, reconexão | ~1188 |
+| `dialog-loop-manager.js`   | Protocolo de turno com LLM-B (start/stop/restart)       | ~494  |
+| `dialog-turn-executor.js`  | Execução e resolução de um turno individual             | ~300  |
+| `dialog-protocol.js`       | `DialogProtocol` enum de estados                        | ~60   |
+| `dialog-watchdog.js`       | `DialogWatchdog` — detecta loop travado                 | ~80   |
+| `dialog-loop-wirer.js`     | `wireDialogLoopEvents` — pipe de 11 eventos             | ~80   |
+| `session-initializer.js`   | `initOrResumeSession`, context builders                 | ~200  |
+| `session-event-wirer.js`   | Wire de eventos SDK por grupo (5 grupos)                | ~150  |
+| `session-hooks.js`         | `createSessionHooks` factory callbacks                  | ~90   |
+| `task-executor.js`         | `executeTask` — execução de tarefas com callbacks       | ~80   |
+| `tools-bootstrap.js`       | `bootstrapTools` — registry por categoria + TOOL_GROUPS | ~120  |
+| `tool-audit-logger.js`     | `isHighRiskTool`, `buildAuditingPermissionHandler`      | ~120  |
+| `permission-controller.js` | `PermissionController` — approval flow                  | ~100  |
+| `message-queue.js`         | `MessageQueue` — fila de mensagens com prioridade       | ~80   |
+| `reconnect-policy.js`      | `tryReconnect` — backoff exponencial com jitter         | ~60   |
+| `state-io.js`              | `readState`, `writeState`, `clearState` (persist)       | ~80   |
+| `status-snapshot.js`       | `buildStatusSnapshot` — snapshot para diagnóstico       | ~60   |
+| `webhook-manager.js`       | `WebhookManager` — disparo de webhooks externos         | ~100  |
+| `events.js`                | `AGENT_EVENTS` — nomes de eventos canônicos             | ~40   |
+| `entry.js`                 | Entrypoint para PM2 (importa `main.js`)                 | ~10   |
+| `agent-contract.js`        | `IAlwaysAliveAgent` typedef                             | ~30   |
+| `index.js`                 | **Barrel** — todos os públicos re-exportados            | ~50   |
 
 **Importação recomendada**: `import { AlwaysAliveAgent } from '#copilot/agent'`
 
@@ -63,13 +63,13 @@ Arquitetura em camadas para orquestração do GitHub Copilot SDK:
 
 ### `conversation-hub/` — Hub de Conversas
 
-| Arquivo | Responsabilidade |
-|---|---|
-| `hub.js` | `ConversationHub` singleton — fachada pública |
-| `orchestrator.js` | `ConversationOrchestrator` — roteamento de requests |
-| `socket-ns.js` | `mountCopilotNamespace` — Socket.IO namespace |
-| `store.js` | `ConversationStore` — CRUD de sessões/turnos (SQLite) |
-| `store-helpers.js` | Helpers FTS5, tipos de query |
+| Arquivo            | Responsabilidade                                      |
+| ------------------ | ----------------------------------------------------- |
+| `hub.js`           | `ConversationHub` singleton — fachada pública         |
+| `orchestrator.js`  | `ConversationOrchestrator` — roteamento de requests   |
+| `socket-ns.js`     | `mountCopilotNamespace` — Socket.IO namespace         |
+| `store.js`         | `ConversationStore` — CRUD de sessões/turnos (SQLite) |
+| `store-helpers.js` | Helpers FTS5, tipos de query                          |
 
 ---
 
@@ -77,25 +77,25 @@ Arquitetura em camadas para orquestração do GitHub Copilot SDK:
 
 16 categorias organizadas em sub-diretórios onde aplicável:
 
-| Módulo | Categoria | Nº de tools |
-|---|---|---|
-| `task-tools.js` | task | ~5 |
-| `code-tools.js` | code | ~4 |
-| `git/index.js` | git | ~8 |
-| `session-tools.js` | session | ~4 |
-| `session-rpc-tools.js` | session-rpc | ~7 |
-| `hook-tools.js` | hook | ~5 |
-| `hub-tools.js` | hub | ~6 |
-| `introspection-tools.js` | introspection | ~4 |
-| `file/read-tools.js` | file (read) | ~5 |
-| `file/write-tools.js` | file (write) | ~4 |
-| `shell/index.js` | shell | ~6 |
-| `web-tools.js` | web | ~3 |
-| `todo/crud-tools.js` | todo | ~4 |
-| `todo/query-tools.js` | todo | ~4 |
-| `todo/bulk-tools.js` | todo | ~3 |
-| `permission-tools.js` | permission | ~3 |
-| `tool-factory.js` | — | builder utilitário |
+| Módulo                   | Categoria     | Nº de tools        |
+| ------------------------ | ------------- | ------------------ |
+| `task-tools.js`          | task          | ~5                 |
+| `code-tools.js`          | code          | ~4                 |
+| `git/index.js`           | git           | ~8                 |
+| `session-tools.js`       | session       | ~4                 |
+| `session-rpc-tools.js`   | session-rpc   | ~7                 |
+| `hook-tools.js`          | hook          | ~5                 |
+| `hub-tools.js`           | hub           | ~6                 |
+| `introspection-tools.js` | introspection | ~4                 |
+| `file/read-tools.js`     | file (read)   | ~5                 |
+| `file/write-tools.js`    | file (write)  | ~4                 |
+| `shell/index.js`         | shell         | ~6                 |
+| `web-tools.js`           | web           | ~3                 |
+| `todo/crud-tools.js`     | todo          | ~4                 |
+| `todo/query-tools.js`    | todo          | ~4                 |
+| `todo/bulk-tools.js`     | todo          | ~3                 |
+| `permission-tools.js`    | permission    | ~3                 |
+| `tool-factory.js`        | —             | builder utilitário |
 
 **Importação recomendada**: `import { allTools, buildTool } from '#copilot/tools'`
 
@@ -103,20 +103,20 @@ Arquitetura em camadas para orquestração do GitHub Copilot SDK:
 
 ### `lib/` — Camada de Biblioteca SDK
 
-| Arquivo | Exports principais |
-|---|---|
-| `sdk-client.js` | `getClient`, `createClientSession`, `pingClient`, ... |
-| `hooks.js` | `createHooks`, `createAuditHooks`, `createSafeHooks`, ... |
-| `permissions.js` | `createPermissionHandler`, `createApproveAllPermission`, ... |
-| `session.js` | `createSession`, `resumeOrCreate`, `deleteSession`, ... |
-| `agents.js` | `createAgent`, `createReadOnlyAgent`, `buildAgentList`, ... |
-| `models.js` | `listModels`, `pickModel`, `buildReasoningConfig`, ... |
-| `tools-registry.js` | `createRegistry`, `registerTools`, `getAllTools`, ... |
-| `telemetry.js` | `createTelemetry`, `recordToolCall`, `getSummary`, ... |
-| `event-helpers.js` | `waitForEvent`, `raceEvents` |
-| `url-validator.js` | `validateUrl`, `validateUrlString` (SSRF-safe) |
-| `http-request.js` | `httpRequest` (fetch wrapper com timeout + SSRF guard) |
-| `utils.js` | `pickDefined` |
+| Arquivo             | Exports principais                                           |
+| ------------------- | ------------------------------------------------------------ |
+| `sdk-client.js`     | `getClient`, `createClientSession`, `pingClient`, ...        |
+| `hooks.js`          | `createHooks`, `createAuditHooks`, `createSafeHooks`, ...    |
+| `permissions.js`    | `createPermissionHandler`, `createApproveAllPermission`, ... |
+| `session.js`        | `createSession`, `resumeOrCreate`, `deleteSession`, ...      |
+| `agents.js`         | `createAgent`, `createReadOnlyAgent`, `buildAgentList`, ...  |
+| `models.js`         | `listModels`, `pickModel`, `buildReasoningConfig`, ...       |
+| `tools-registry.js` | `createRegistry`, `registerTools`, `getAllTools`, ...        |
+| `telemetry.js`      | `createTelemetry`, `recordToolCall`, `getSummary`, ...       |
+| `event-helpers.js`  | `waitForEvent`, `raceEvents`                                 |
+| `url-validator.js`  | `validateUrl`, `validateUrlString` (SSRF-safe)               |
+| `http-request.js`   | `httpRequest` (fetch wrapper com timeout + SSRF guard)       |
+| `utils.js`          | `pickDefined`                                                |
 
 **Importação recomendada**: `import { createSession, createHooks } from '#copilot/lib'`
 
@@ -124,15 +124,15 @@ Arquitetura em camadas para orquestração do GitHub Copilot SDK:
 
 ### `config/` — Configuração
 
-| Arquivo | Responsabilidade |
-|---|---|
-| `session-config.js` | Builders de config SDK (`buildAlwaysAliveConfig`, ...) |
-| `system-prompt.js` | Builders de system message e seções do prompt |
-| `custom-agents.js` | Registry de Custom Agents declarativos |
-| `pinned-files-loader.js` | `PinnedFilesLoader` — carrega arquivos para contexto |
-| `mcp-servers.js` | Config dos MCP servers disponíveis |
-| `tools/registry.js` | Registry runtime de custom tools (persistência JSON) |
-| `tools/state.js` | Estado de tools (enabled/disabled por sessão) |
+| Arquivo                  | Responsabilidade                                       |
+| ------------------------ | ------------------------------------------------------ |
+| `session-config.js`      | Builders de config SDK (`buildAlwaysAliveConfig`, ...) |
+| `system-prompt.js`       | Builders de system message e seções do prompt          |
+| `custom-agents.js`       | Registry de Custom Agents declarativos                 |
+| `pinned-files-loader.js` | `PinnedFilesLoader` — carrega arquivos para contexto   |
+| `mcp-servers.js`         | Config dos MCP servers disponíveis                     |
+| `tools/registry.js`      | Registry runtime de custom tools (persistência JSON)   |
+| `tools/state.js`         | Estado de tools (enabled/disabled por sessão)          |
 
 **Importação recomendada**: `import { buildAlwaysAliveConfig } from '#copilot/config'`
 
@@ -140,49 +140,49 @@ Arquitetura em camadas para orquestração do GitHub Copilot SDK:
 
 ### `bridges/` — Bridges Externas
 
-| Arquivo | Responsabilidade |
-|---|---|
-| `gh-bridge.js` | Thin barrel → `gh/` (issues, PRs, CI, releases) |
-| `gh/issues.js`, `prs.js`, `ci.js`, `index.js` | GitHub CLI via `gh` |
-| `git-bridge.js` | Git via CLI subprocess |
-| `mcp-tool-bridge.js` | Ponte MCP → Tool SDK |
-| `alias-store.js` | `resolve`, `setAlias`, `removeAlias` — aliases REPL |
-| `nerv-bridge.js` | Bridge para sistema NERV |
+| Arquivo                                       | Responsabilidade                                    |
+| --------------------------------------------- | --------------------------------------------------- |
+| `gh-bridge.js`                                | Thin barrel → `gh/` (issues, PRs, CI, releases)     |
+| `gh/issues.js`, `prs.js`, `ci.js`, `index.js` | GitHub CLI via `gh`                                 |
+| `git-bridge.js`                               | Git via CLI subprocess                              |
+| `mcp-tool-bridge.js`                          | Ponte MCP → Tool SDK                                |
+| `alias-store.js`                              | `resolve`, `setAlias`, `removeAlias` — aliases REPL |
+| `nerv-bridge.js`                              | Bridge para sistema NERV                            |
 
 ---
 
 ### `channel/` — Canal LLM-B
 
-| Arquivo | Responsabilidade |
-|---|---|
+| Arquivo     | Responsabilidade                                  |
+| ----------- | ------------------------------------------------- |
 | `client.js` | `LlmBridgeClient` — conexão e protocolo com LLM-B |
-| `inject.js` | `InjectClient` — API de injeção de mensagens |
+| `inject.js` | `InjectClient` — API de injeção de mensagens      |
 
 ---
 
 ### `terminal/` — Terminal Permanente LLM-B
 
-| Arquivo | Responsabilidade |
-|---|---|
-| `index.js` (= `bootstrap.js`) | `startTerminalServer` — bootstrap do terminal completo |
-| `repl.js` | REPL readline + `CMD_ROUTES` route table |
-| `dialog.js` | `ensureDialogLoop`, `println`, SSE broadcast |
-| `server.js` | `createInjectServer` — HTTP server de injeção |
-| `route-table.js` | `ROUTE_TABLE`, `matchRoute` |
-| `http-handlers.js` | Barrel → handlers-agent, handlers-dialog, handlers-system |
-| `handlers-agent.js` | `handleInject`, `handlePipeline`, `handleGetContext` |
-| `handlers-dialog.js` | `handleListSessions`, `handleListTurns`, `handleStoreMemory` |
-| `handlers-system.js` | `handleHealth`, `handleGetConfig`, SSE clients |
-| `state.js` | `getHubSessionId`, `getBusy`, `stateEmitter` |
-| `file-context.js` | `readFileContext`, `attachmentToEmbed` |
-| `workspace-context.js` | `getWorkspaceContext` |
+| Arquivo                       | Responsabilidade                                             |
+| ----------------------------- | ------------------------------------------------------------ |
+| `index.js` (= `bootstrap.js`) | `startTerminalServer` — bootstrap do terminal completo       |
+| `repl.js`                     | REPL readline + `CMD_ROUTES` route table                     |
+| `dialog.js`                   | `ensureDialogLoop`, `println`, SSE broadcast                 |
+| `server.js`                   | `createInjectServer` — HTTP server de injeção                |
+| `route-table.js`              | `ROUTE_TABLE`, `matchRoute`                                  |
+| `http-handlers.js`            | Barrel → handlers-agent, handlers-dialog, handlers-system    |
+| `handlers-agent.js`           | `handleInject`, `handlePipeline`, `handleGetContext`         |
+| `handlers-dialog.js`          | `handleListSessions`, `handleListTurns`, `handleStoreMemory` |
+| `handlers-system.js`          | `handleHealth`, `handleGetConfig`, SSE clients               |
+| `state.js`                    | `getHubSessionId`, `getBusy`, `stateEmitter`                 |
+| `file-context.js`             | `readFileContext`, `attachmentToEmbed`                       |
+| `workspace-context.js`        | `getWorkspaceContext`                                        |
 
 ---
 
 ### `api/` — API REST Copilot
 
-| Arquivo | Responsabilidade |
-|---|---|
+| Arquivo             | Responsabilidade                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------- |
 | `bridge-control.js` | `registerControlRoutes` — endpoints /status, /health, /session, /start, /stop, /permissions |
 
 ---
@@ -190,7 +190,7 @@ Arquitetura em camadas para orquestração do GitHub Copilot SDK:
 ### `core/` — Contratos Centrais
 
 ```js
-import { LLM_B_TERMINAL_PORT, CopilotError, StructuredMessage } from '#copilot/core'
+import { LLM_B_TERMINAL_PORT, CopilotError, StructuredMessage } from '#copilot/core';
 ```
 
 - `constants.js` — portas, limites, nomes de eventos canônicos

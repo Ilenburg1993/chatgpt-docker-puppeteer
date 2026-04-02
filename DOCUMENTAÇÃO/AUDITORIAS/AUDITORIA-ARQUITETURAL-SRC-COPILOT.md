@@ -353,37 +353,48 @@ src/copilot/
     `onSessionEnd`, `onErrorOccurred` + lógica de fallback model (~70 LOC).
   - `agent/dialog-loop-wirer.js` — `wireDialogLoopEvents` extraída de `#ensureDialogLoopAttached` —
     boilerplate de 11 event pipes (~60 LOC).
-  - Resultado: `always-alive.js` 1281 → ~1188 LOC (ganho ~93 LOC); `dialog-loop-manager.js` reduzido.
+  - Resultado: `always-alive.js` 1281 → ~1188 LOC (ganho ~93 LOC); `dialog-loop-manager.js`
+    reduzido.
 - **4.8** ✅ Extrair de `agent/dialog-loop-manager.js` (760 LOC) a lógica de execução de turno:
   - `agent/dialog-turn-executor.js` — `executeTurnImpl`, `buildTurnResolutionListeners`,
     `dispatchTurnToHost`, `waitForRestartAndReply`, `emitTurnStart` (~300 LOC).
   - Resultado: `dialog-loop-manager.js` 760 → ~494 LOC (ganho ~266 LOC).
-- **4.9** ✅ Validar: typecheck 0 erros, ESLint, Prettier, madge --circular 0 ciclos — commit `73d4e1a6`
+- **4.9** ✅ Validar: typecheck 0 erros, ESLint, Prettier, madge --circular 0 ciclos — commit
+  `73d4e1a6`
 
 ### Fase 5 — Decomposição de Funções Complexas (> 100 LOC) ✅ commit `d6c9ac49`
 
-- **5.1** ✅ `socket-ns.js/mountCopilotNamespace` (276 LOC) → `_setupAuthMiddleware`, `_setupConnectionHandlers`, `_bridgeOrchestratorEvents`
-- **5.2** ✅ `bridge-control.js/registerControlRoutes` (196 LOC) → 8 handlers modulares + `requireAdminAuth`
-- **5.3** ✅ `session-event-wirer.js/wireSessionEvents` (177 LOC) → 5 sub-funções por grupo de evento
-- **5.4** ✅ `repl.js/dispatchCmd` (155 LOC) → `CMD_ROUTES` tabela de rotas + `_cmdRouteMap` Map; `CmdCtx` typedef
+- **5.1** ✅ `socket-ns.js/mountCopilotNamespace` (276 LOC) → `_setupAuthMiddleware`,
+  `_setupConnectionHandlers`, `_bridgeOrchestratorEvents`
+- **5.2** ✅ `bridge-control.js/registerControlRoutes` (196 LOC) → 8 handlers modulares +
+  `requireAdminAuth`
+- **5.3** ✅ `session-event-wirer.js/wireSessionEvents` (177 LOC) → 5 sub-funções por grupo de
+  evento
+- **5.4** ✅ `repl.js/dispatchCmd` (155 LOC) → `CMD_ROUTES` tabela de rotas + `_cmdRouteMap` Map;
+  `CmdCtx` typedef
 - **5.5** ✅ Validação: ESLint ✓ | TSC strict ✓ | Madge 0 ciclos ✓ | Prettier ✓
 
 ### Fase 6 — Consolidação de Tools Registries ⏭️ Decisão arquitetural: NÃO merger
 
-- **6.1** ✅ Auditado: `lib/tools-registry.js` e `config/tools/registry.js` têm responsabilidades **ortogonais**:
+- **6.1** ✅ Auditado: `lib/tools-registry.js` e `config/tools/registry.js` têm responsabilidades
+  **ortogonais**:
   - `lib/tools-registry.js` — API funcional/pura para organizar/filtrar ferramentas SDK (bootstrap)
-  - `config/tools/registry.js` — runtime CRUD com persistência JSON + BUILTIN_HANDLER_MAP de segurança
+  - `config/tools/registry.js` — runtime CRUD com persistência JSON + BUILTIN_HANDLER_MAP de
+    segurança
 - **6.2–6.4** ⏭️ SKIP — fusão seria anti-padrão; sistemas distintos devem permanecer separados
 - **6.x** ✅ `lib/index.js` barrel verificado: re-exporta todas as 16 funções de `tools-registry.js`
 
 ### Fase 7 — Atualização de Barrels (index.js) ✅ commit `0a5edc3d`
 
-- **7.1** ✅ `agent/index.js`: +10 exports (task-executor, tools-bootstrap, session-hooks, dialog-loop-wirer, dialog-turn-executor)
+- **7.1** ✅ `agent/index.js`: +10 exports (task-executor, tools-bootstrap, session-hooks,
+  dialog-loop-wirer, dialog-turn-executor)
 - **7.2** ✅ `lib/index.js`: +2 exports (httpRequest, pickDefined)
 - **7.3** ⏭️ `terminal/index.js` — é entrypoint de bootstrap, não barrel; sem mudança necessária
 - **7.4** ✅ `tools/index.js`: +2 exports (buildTool, withSkipPermission de tool-factory.js)
-- **7.5** ✅ `config/index.js`: +8 exports (custom-agents + PinnedFilesLoader + re-export tools/index.js)
-- **7.6** ⏭️ `core/index.js` — já usa `export *` de constants.js + errors.js + types/index.js; sem mudança necessária
+- **7.5** ✅ `config/index.js`: +8 exports (custom-agents + PinnedFilesLoader + re-export
+  tools/index.js)
+- **7.6** ⏭️ `core/index.js` — já usa `export *` de constants.js + errors.js + types/index.js; sem
+  mudança necessária
 - **7.7** ✅ Validado: ESLint ✓ | TSC strict ✓ | Madge 0 ciclos ✓
 
 ### Fase 8 — Testes Unitários Prioritários ✅ commit `171cc130`
@@ -392,12 +403,14 @@ src/copilot/
 - **8.2** ✅ `test_url_validator.spec.js` — já existia
 - **8.3** ✅ `test_lib_permissions.spec.js` — já existia
 - **8.4** ✅ `test_lib_hooks.spec.js` — já existia
-- **8.5** ✅ `test_alias_store.spec.js` — **NOVO**: 19 testes (resolve, setAlias, removeAlias, resetAliases, getAliases, formatAliases)
+- **8.5** ✅ `test_alias_store.spec.js` — **NOVO**: 19 testes (resolve, setAlias, removeAlias,
+  resetAliases, getAliases, formatAliases)
 - **8.6** ✅ `test_tool_audit_logger.spec.js` — já existia
 - **8.7** ✅ `test_message_queue.spec.js` — já existia
 - **8.8** ✅ `test_status_snapshot.spec.js` — já existia
 - **8.9** ✅ `test_state_io.spec.js` — já existia
-- **8.10** ✅ `test_config_tools_registry.spec.js` — **NOVO**: 17 testes (registerCustomTool, removeCustomTool, getCustomToolDefinitions, buildCustomTools, BUILTIN_HANDLER_MAP)
+- **8.10** ✅ `test_config_tools_registry.spec.js` — **NOVO**: 17 testes (registerCustomTool,
+  removeCustomTool, getCustomToolDefinitions, buildCustomTools, BUILTIN_HANDLER_MAP)
 - **8.11** ✅ Suite completa: 1962 testes | 1867 pass | 63 fail (pré-existentes, não introduzidas)
 
 ### Fase 9 — Testes de Integração Expandidos
