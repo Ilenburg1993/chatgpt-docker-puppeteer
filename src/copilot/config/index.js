@@ -30,3 +30,16 @@ export {
     buildHookContextAppendMessage,
     buildReplaceSystemMessage,
 } from './system-prompt.js';
+
+export {
+    buildCustomAgentsConfig,
+    getCustomAgent,
+    listAvailableSdkAgents,
+    listCustomAgents,
+    registerCustomAgent,
+    removeCustomAgent,
+} from './custom-agents.js';
+
+export { PinnedFilesLoader } from './pinned-files-loader.js';
+
+export * from './tools/index.js';

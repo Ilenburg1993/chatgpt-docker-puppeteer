@@ -132,4 +132,6 @@ export {
     startSpan,
 } from '#copilot/lib/telemetry';
 export { raceEvents, waitForEvent } from './event-helpers.js';
+export { httpRequest } from './http-request.js';
 export { validateUrl, validateUrlString } from './url-validator.js';
+export { pickDefined } from './utils.js';
