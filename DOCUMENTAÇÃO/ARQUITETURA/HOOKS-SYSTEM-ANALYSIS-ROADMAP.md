@@ -12,8 +12,8 @@ com `agent/`, `lib/` e `routes/`
 
 O sistema de hooks do `src/copilot` está **fragmentado** em múltiplos locais sem uma pasta dedicada:
 
-| Arquivo atual                              | Responsabilidade                                                          | Problema                                                 |
-| ------------------------------------------ | ------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Arquivo atual                              | Responsabilidade                                                          | Problema                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------- |
 | `src/copilot/lib/hooks.js`                 | Factory `createHooks()` para os 6 slots SDK                               | ✅ Bem estruturado, mas isolado                           |
 | `src/copilot/lib/permissions.js`           | `PermissionHandler` / `onPermissionRequest`                               | ⚠️ Conceitualmente é um hook, está em lib/                |
 | `src/copilot/agent/session-hooks.js`       | `onSessionStart`, `onSessionEnd`, `onErrorOccurred` para AlwaysAliveAgent | ⚠️ Hooks de ciclo de vida do agente misturados com agent/ |
@@ -487,8 +487,8 @@ Gerar `src/copilot/hooks/README.md` com:
 
 ## 4. Tabela de Rastreamento de Gaps
 
-| Gap | Descrição                                            | Fase | Arquivo alvo            | Status                                                          |
-| --- | ---------------------------------------------------- | ---- | ----------------------- | --------------------------------------------------------------- |
+| Gap | Descrição                                            | Fase | Arquivo alvo            | Status                                                           |
+| --- | ---------------------------------------------------- | ---- | ----------------------- | ---------------------------------------------------------------- |
 | G1  | `onUserPromptSubmitted.modifiedPrompt` não utilizado | B.1  | `prompt-transformer.js` | ✅ Concluído                                                     |
 | G2  | `onPreToolUse.modifiedArgs` não utilizado            | B.2  | `tool-interceptor.js`   | ✅ Concluído                                                     |
 | G3  | `onPostToolUse.additionalContext` não retornado      | B.2  | `tool-interceptor.js`   | ✅ Concluído                                                     |
@@ -613,8 +613,8 @@ HookBus ←────── emite eventos de todos os hooks
 
 ## 9. Status de Implementação por Arquivo (Fases A–M)
 
-| Arquivo                                    | Status   | Cobertura de testes              |
-| ------------------------------------------ | -------- | -------------------------------- |
+| Arquivo                                    | Status    | Cobertura de testes              |
+| ------------------------------------------ | --------- | -------------------------------- |
 | `src/copilot/hooks/types.js`               | ✅ Criado | N/A (zero runtime)               |
 | `src/copilot/hooks/factory.js`             | ✅ Criado | 11 testes                        |
 | `src/copilot/hooks/permission-handler.js`  | ✅ Criado | 7 testes                         |
@@ -1029,8 +1029,8 @@ router.use('/', hooksRouter);
 
 ## 12. Status de Implementação Atualizado (2026-07-03)
 
-| Arquivo                                    | Status     | Notas                                                   |
-| ------------------------------------------ | ---------- | ------------------------------------------------------- |
+| Arquivo                                    | Status      | Notas                                                   |
+| ------------------------------------------ | ----------- | ------------------------------------------------------- |
 | `src/copilot/hooks/types.js`               | ✅ Criado   | N/A (zero runtime)                                      |
 | `src/copilot/hooks/factory.js`             | ✅ Criado   | Fase O adicionará appendAuditEntry                      |
 | `src/copilot/hooks/permission-handler.js`  | ✅ Criado   | —                                                       |
