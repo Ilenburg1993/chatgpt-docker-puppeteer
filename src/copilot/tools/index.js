@@ -9,7 +9,7 @@
  */
 
 import { codeTools } from './code-tools.js';
-import { fileReadTools, fileTools, fileWriteTools } from './file-tools.js';
+import { fileReadTools, fileTools, fileWriteTools } from './file/index.js';
 import { gitTools } from './git/index.js';
 import { configureHookTools, hookTools } from './hook-tools.js';
 import { hubTools, setHub } from './hub-tools.js';
@@ -19,7 +19,7 @@ import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
 import { sessionTools } from './session-tools.js';
 import { shellTools } from './shell/index.js';
 import { taskTools } from './task-tools.js';
-import { todoReadTools, todoTools, todoWriteTools } from './todo-tools.js';
+import { todoReadTools, todoTools, todoWriteTools } from './todo/index.js';
 import { webTools } from './web-tools.js';
 
 /**

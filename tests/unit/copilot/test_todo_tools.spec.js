@@ -88,7 +88,7 @@ function clearTodoTable() {
 
 // Import estático (o módulo lê TODOS_FILE no handler, não no import)
 import { allTools } from '../../../src/copilot/tools/index.js';
-import { todoReadTools, todoTools, todoWriteTools } from '../../../src/copilot/tools/todo-tools.js';
+import { todoReadTools, todoTools, todoWriteTools } from '../../../src/copilot/tools/todo/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

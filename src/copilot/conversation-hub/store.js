@@ -7,7 +7,10 @@
  * F7.5: migrado para o banco isolado copilot.sqlite via `getCopilotDb()`. As tabelas são criadas pelas migrations
  * formais em `src/copilot/db/migrations.js`, não mais por DDL inline neste arquivo.
  *
+ * Tipos e helpers FTS5 vivem em `store-helpers.js` para manter este módulo focado na classe.
+ *
  * @module copilot/conversation-hub/store
+ * @see module:copilot/conversation-hub/store-helpers
  * @see module:copilot/conversation-hub/orchestrator
  * @see module:copilot/db/sqlite
  */
@@ -15,162 +18,25 @@
 import { getCopilotDb } from '#copilot/db/sqlite';
 import { log } from '#core/logger';
 import { v4 as uuidv4 } from 'uuid';
-
-// ─── Constantes ──────────────────────────────────────────────────────────────
-
-/** @typedef {'llm_a' | 'llm_b' | 'user'} TurnRole */
-/** @typedef {'active' | 'closed' | 'error'} HubSessionStatus */
+import { initTurnsFts, migrateFts5Tokenizer, sanitizeFtsQuery } from './store-helpers.js';
 
 /**
- * @typedef {Object} HubSession
- * @property {string} id - UUID único da sessão do hub
- * @property {string} [sdk_session_id] - sessionId do SDK AlwaysAliveAgent (pode mudar por restart)
- * @property {string} title - Título legível da sessão
- * @property {HubSessionStatus} status - Estado da sessão
- * @property {string} [metadata] - JSON de metadados extras
- * @property {number} created_at - Unix timestamp ms
- * @property {number} updated_at - Unix timestamp ms
- */
-
-/**
- * @typedef {Object} ConversationTurn
- * @property {number} id - ID autoincrement
- * @property {string} hub_session_id - FK para hub_sessions.id
- * @property {string} [sdk_session_id] - sessionId do SDK no momento do turno
- * @property {TurnRole} role - Quem enviou ('llm_a' | 'llm_b' | 'user')
- * @property {string} content - Texto raw ou serializado da mensagem
- * @property {string} [structured] - JSON StructuredMessage (nullable)
- * @property {string} [tools_used] - JSON array de ferramentas invocadas
- * @property {number} turn_number - Número sequencial do turno na sessão
- * @property {number} created_at - Unix timestamp ms
- * @property {number} [duration_ms] - Duração do turno em ms (para LLM-B)
- * @property {string} [model] - Modelo usado ('gpt-4.1' | 'copilot-claude-sonnet-4.6')
- * @property {0 | 1} [user_read] - Se a mensagem foi processada (0=pendente, 1=processada)
- * @property {string} [metadata] - JSON livre para extensão
- */
-
-/**
- * @typedef {Object} WriteTurnOpts
- * @property {TurnRole} role
- * @property {string} content
- * @property {string} [sdkSessionId]
- * @property {object | string | null} [structured]
- * @property {string[] | null} [toolsUsed]
- * @property {number | null} [durationMs]
- * @property {string | null} [model]
- * @property {object | null} [metadata]
- */
-
-/**
- * @typedef {Object} ReadTurnsOpts
- * @property {number} [limit] - Máximo de registros (default 50)
- * @property {number} [offset] - Offset para paginação (default 0)
- * @property {number} [after] - Retornar apenas turns com id > after
- */
-
-/**
- * @typedef {Object} SearchTurnsOpts
- * @property {string} query - Query FTS5 para busca em content
- * @property {string} [hubSessionId] - Filtrar por sessão específica
- * @property {string} [role] - Filtrar por role (user, llm_b, etc.)
- * @property {number} [limit] - Máximo de registros (default 20)
- */
-
-// ─── DDL movido para src/copilot/db/migrations.js (F7.3) ─────────────────────
-// As tabelas copilot_hub_sessions, copilot_conversation_turns, FTS5 e copilot_memories
-// são criadas pelas migrations v1–v4 no banco copilot.sqlite. O DDL inline foi removido.
-
-/**
- * Popula a tabela FTS5 de turns caso ela esteja vazia mas a tabela de conteúdo não. Executado após migrations para
- * bancos pré-existentes que migraram do maestro.sqlite.
+ * Re-export de tipos para manter backward compatibility nas import paths existentes.
  *
- * @param {import('better-sqlite3').Database} db
- * @returns {void}
- */
-function initTurnsFts(db) {
-    try {
-        /** @type {{ count: number } | undefined} */
-        const ftsCount = /** @type {{ count: number } | undefined} */ (
-            db.prepare('SELECT COUNT(*) AS count FROM copilot_turns_fts').get()
-        );
-        /** @type {{ count: number } | undefined} */
-        const turnCount = /** @type {{ count: number } | undefined} */ (
-            db.prepare('SELECT COUNT(*) AS count FROM copilot_conversation_turns').get()
-        );
-        if ((ftsCount?.count ?? 0) === 0 && (turnCount?.count ?? 0) > 0) {
-            log('INFO', '[ConversationStore] UPG-PROP-06: populando copilot_turns_fts a partir de dados existentes...');
-            db.exec(`
-                INSERT INTO copilot_turns_fts(rowid, id, hub_session_id, content)
-                SELECT id, id, hub_session_id, content FROM copilot_conversation_turns;
-            `);
-            log('INFO', '[ConversationStore] UPG-PROP-06: copilot_turns_fts populado.');
-        }
-    } catch (/** @type {any} */ err) {
-        log('WARN', `[ConversationStore] UPG-PROP-06: falha ao inicializar turns FTS5: ${err.message}`);
-    }
-}
-
-// ─── FTS5 tokenizer migration (PERF-03) ──────────────────────────────────────
-
-/**
- * Migra `copilot_memories_fts` para usar o tokenizer `porter unicode61 remove_diacritics 1`.
+ * @typedef {import('./store-helpers.js').TurnRole} TurnRole
  *
- * A tabela FTS5 não suporta ALTER TABLE, então a migração recria a estrutura completa caso o tokenizer atual seja
- * diferente. É idempotente: não faz nada se o tokenizer já estiver correto.
+ * @typedef {import('./store-helpers.js').HubSessionStatus} HubSessionStatus
  *
- * @param {import('better-sqlite3').Database} db
- * @returns {void}
- */
-function migrateFts5Tokenizer(db) {
-    const TARGET_TOKENIZER = 'porter unicode61 remove_diacritics 1';
-    try {
-        // FTS5 expõe configuração via tabela shadow <nome>_config
-        /** @type {{ v?: string } | undefined} */
-        const row = /** @type {{ v?: string } | undefined} */ (
-            db.prepare("SELECT v FROM copilot_memories_fts_config WHERE k='tokenize'").get()
-        );
-        // Se o tokenizer já é o correto (ou a tabela foi recém-criada com IF NOT EXISTS no DDL), nada a fazer
-        if (!row || row.v === TARGET_TOKENIZER) return;
-        log('INFO', '[ConversationStore] PERF-03: migrando FTS5 para porter unicode61...');
-    } catch {
-        // tabela shadow ainda não existe — será criada com o tokenizer correto pelo DDL
-        return;
-    }
-    // Recriar tabela com tokenizer correto, preservando dados existentes
-    db.exec(`
-        DROP TABLE IF EXISTS copilot_memories_fts;
-        CREATE VIRTUAL TABLE copilot_memories_fts USING fts5(
-            id UNINDEXED,
-            tag,
-            content,
-            content='copilot_memories',
-            content_rowid='rowid',
-            tokenize='porter unicode61 remove_diacritics 1'
-        );
-        -- Repopular a partir dos dados persistidos
-        INSERT INTO copilot_memories_fts(rowid, id, tag, content)
-        SELECT rowid, id, tag, content FROM copilot_memories;
-    `);
-    log('INFO', '[ConversationStore] PERF-03: FTS5 migrado com sucesso.');
-}
-
-// ─── Helpers FTS5 ─────────────────────────────────────────────────────────────
-
-/**
- * Sanitiza uma query para uso seguro em FTS5 MATCH. Remove metacaracteres e operadores reservados para evitar FTS5
- * injection e erros de parse.
+ * @typedef {import('./store-helpers.js').HubSession} HubSession
  *
- * @param {string} raw - Query bruta do usuário
- * @returns {string | null} Query sanitizada pronta para MATCH, ou null se vazia após sanitização
+ * @typedef {import('./store-helpers.js').ConversationTurn} ConversationTurn
+ *
+ * @typedef {import('./store-helpers.js').WriteTurnOpts} WriteTurnOpts
+ *
+ * @typedef {import('./store-helpers.js').ReadTurnsOpts} ReadTurnsOpts
+ *
+ * @typedef {import('./store-helpers.js').SearchTurnsOpts} SearchTurnsOpts
  */
-function sanitizeFtsQuery(raw) {
-    const sanitized = raw
-        .replace(/[*^"():|&!,-]/g, ' ')
-        .replace(/\b(AND|OR|NOT|NEAR)\b/gi, ' ')
-        .trim();
-    if (!sanitized) return null;
-    return `"${sanitized}"`;
-}
 
 // ─── ConversationStore ────────────────────────────────────────────────────────
 
