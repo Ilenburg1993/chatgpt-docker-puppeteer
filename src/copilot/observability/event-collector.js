@@ -90,6 +90,15 @@ function persistEvent(entry) {
  * @property {HookBus | null} [hookBus] - Bus para re-emitir eventos como hooks (opcional).
  * @property {boolean} [persist] - Se true, persiste eventos relevantes em events.jsonl (padrão: true).
  * @property {readonly string[]} [persistTypes] - Tipos de eventos a persistir (padrão: lista canônica).
+ * @property {boolean} [captureUserContent] - Se true, persiste content de user.message (OFF por padrão — risco PII).
+ * @property {boolean} [captureAssistantContent] - Se true, persiste conteúdo de assistant.message (OFF por padrão).
+ */
+
+/**
+ * @typedef {{ toolName: string; mcpServerName: string | null; startTs: number; toolArgs: Record<string, unknown> }} PendingToolEntry
+ *
+ *
+ * @typedef {{ turnId: string; startTs: number }} PendingTurnEntry
  */
 
 /**
@@ -102,11 +111,21 @@ function persistEvent(entry) {
 // ─── Tipos globais de máxima relevância para telemetria ──────────────────────
 
 const DEFAULT_PERSIST_TYPES = Object.freeze([
+    // ── Tool calls ──────────────────────────────────────────────────────────
     'tool.execution_start',
     'tool.execution_complete',
+    'tool.user_requested',
+    // ── Assistant ───────────────────────────────────────────────────────────
     'assistant.usage',
     'assistant.turn_start',
     'assistant.turn_end',
+    'assistant.message',
+    'assistant.intent',
+    // ── Usuário ─────────────────────────────────────────────────────────────
+    'user.message',
+    // ── Sessão ──────────────────────────────────────────────────────────────
+    'session.start',
+    'session.resume',
     'session.usage_info',
     'session.error',
     'session.truncation',
@@ -119,6 +138,12 @@ const DEFAULT_PERSIST_TYPES = Object.freeze([
     'session.plan_changed',
     'session.background_tasks_changed',
     'session.workspace_file_changed',
+    'session.context_changed',
+    'session.handoff',
+    'session.skills_loaded',
+    'session.extensions_loaded',
+    'session.mcp_server_status_changed',
+    // ── Permissões, hooks, interações ──────────────────────────────────────
     'permission.requested',
     'permission.completed',
     'elicitation.requested',
@@ -132,10 +157,23 @@ const DEFAULT_PERSIST_TYPES = Object.freeze([
     'session.info',
     'session.warning',
     'skill.invoked',
+    // ── Sub-agentes ─────────────────────────────────────────────────────────
     'subagent.started',
     'subagent.completed',
     'subagent.failed',
+    'subagent.selected',
     'subagent.deselected',
+    // ── MCP / OAuth ─────────────────────────────────────────────────────────
+    'mcp.oauth_required',
+    'mcp.oauth_completed',
+    // ── External tools / Comandos / Plan mode ──────────────────────────────
+    'external_tool.requested',
+    'command.execute',
+    'exit_plan_mode.requested',
+    // ── Aborto ──────────────────────────────────────────────────────────────
+    'abort',
+    // ── Sistema ─────────────────────────────────────────────────────────────
+    'system.notification',
 ]);
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
@@ -157,14 +195,24 @@ export function createEventCollector(opts = {}) {
         hookBus = null,
         persist = true,
         persistTypes = DEFAULT_PERSIST_TYPES,
+        captureUserContent = false,
+        captureAssistantContent = false,
     } = opts;
 
     /**
-     * Mapa de toolCallId → { toolName, startTs } para calcular latência.
+     * Mapa de toolCallId → entrada pendente com toolName, mcpServerName, startTs e toolArgs capturados de
+     * `tool.execution_start` para uso em `tool.execution_complete`.
      *
-     * @type {Map<string, { toolName: string; mcpServerName: string | null; startTs: number }>}
+     * @type {Map<string, PendingToolEntry>}
      */
     const _pending = new Map();
+
+    /**
+     * Mapa de turnId → startTs para calcular duração do turno em `assistant.turn_end`.
+     *
+     * @type {Map<string, number>}
+     */
+    const _turnStart = new Map();
 
     /**
      * Registra handlers nos eventos da sessão SDK e retorna lista de unsubscribers.
@@ -181,13 +229,24 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('tool.execution_start', (event) => {
                 const { toolCallId, toolName, mcpServerName } = event.data;
+                // Fase AN: preservar arguments para uso no execution_complete
                 _pending.set(toolCallId, {
                     toolName,
                     mcpServerName: mcpServerName ?? null,
                     startTs: Date.now(),
+                    toolArgs: /** @type {Record<string, unknown>} */ (event.data.arguments ?? {}),
                 });
                 if (persist && persistTypes.includes('tool.execution_start')) {
-                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        toolName,
+                        toolCallId,
+                        mcpServerName: mcpServerName ?? null,
+                        toolArgs: event.data.arguments ?? {},
+                        parentToolCallId: event.data.parentToolCallId ?? null,
+                    });
                 }
             }),
         );
@@ -207,11 +266,10 @@ export function createEventCollector(opts = {}) {
                 // Re-emitir no HookBus
                 hookBus?.emitHook('post_tool_use', sessionId, { toolName, success }, { durationMs });
 
-                // Alimentar globalAuditBuffer (hook_get_audit_tail via hook-tools.js)
-                // SDK não expõe toolArgs diretamente; usamos result.content como resumo do resultado
+                // Fase AN: usar toolArgs reais capturados em execution_start
                 globalAuditBuffer.push({
                     toolName,
-                    toolArgs: {},
+                    toolArgs: pending?.toolArgs ?? {},
                     toolResult: event.data.result?.content ?? null,
                     sessionId,
                     ts: event.timestamp ?? new Date().toISOString(),
@@ -236,10 +294,25 @@ export function createEventCollector(opts = {}) {
             }),
         );
 
-        // ── assistant.usage (tokens) ──────────────────────────────────────────
+        // ── assistant.usage (tokens + quota + cost) — Fase AO ────────────────
         unsubs.push(
             session.on('assistant.usage', (event) => {
-                const { model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, duration } = event.data;
+                const {
+                    model,
+                    inputTokens,
+                    outputTokens,
+                    cacheReadTokens,
+                    cacheWriteTokens,
+                    duration,
+                    cost,
+                    reasoningEffort,
+                    initiator,
+                    apiCallId,
+                    providerCallId,
+                    parentToolCallId,
+                    quotaSnapshots,
+                    copilotUsage,
+                } = event.data;
 
                 // Alimentar MetricsStore com token usage por modelo (incluindo cache tokens)
                 metrics?.recordUsage(
@@ -249,6 +322,24 @@ export function createEventCollector(opts = {}) {
                     cacheReadTokens ?? 0,
                     cacheWriteTokens ?? 0,
                 );
+
+                // Fase AO.3: rastrear reasoning effort por distribuição
+                if (reasoningEffort) {
+                    metrics?.recordCounter(`reasoning.effort.${reasoningEffort}`);
+                }
+
+                // Fase AO.2: alerta de quota baixa (< 10% restante)
+                if (quotaSnapshots) {
+                    for (const [quotaId, snapshot] of Object.entries(quotaSnapshots)) {
+                        if (snapshot.remainingPercentage < 0.1) {
+                            metrics?.recordCounter('quota.low_warning');
+                            log(
+                                'WARN',
+                                `[event-collector] quota baixa: quotaId=${quotaId} remaining=${(snapshot.remainingPercentage * 100).toFixed(1)}% resetDate=${snapshot.resetDate ?? 'n/a'} session=${sessionId}`,
+                            );
+                        }
+                    }
+                }
 
                 if (persist && persistTypes.includes('assistant.usage')) {
                     persistEvent({
@@ -261,6 +352,14 @@ export function createEventCollector(opts = {}) {
                         cacheReadTokens,
                         cacheWriteTokens,
                         duration,
+                        cost,
+                        reasoningEffort,
+                        initiator,
+                        apiCallId,
+                        providerCallId,
+                        parentToolCallId,
+                        quotaSnapshots,
+                        totalNanoAiu: copilotUsage?.totalNanoAiu ?? null,
                     });
                 }
                 hookBus?.emitHook(
@@ -278,7 +377,7 @@ export function createEventCollector(opts = {}) {
                 );
                 log(
                     'DEBUG',
-                    `[event-collector] assistant.usage: model=${model} in=${inputTokens ?? 0} out=${outputTokens ?? 0} cacheR=${cacheReadTokens ?? 0} cacheW=${cacheWriteTokens ?? 0} session=${sessionId}`,
+                    `[event-collector] assistant.usage: model=${model} in=${inputTokens ?? 0} out=${outputTokens ?? 0} cacheR=${cacheReadTokens ?? 0} cacheW=${cacheWriteTokens ?? 0} cost=${cost ?? 'n/a'} effort=${reasoningEffort ?? 'n/a'} session=${sessionId}`,
                 );
             }),
         );
@@ -522,10 +621,381 @@ export function createEventCollector(opts = {}) {
             }),
         );
 
-        // ── assistant.turn_start / turn_end ──────────────────────────────────
+        // ── assistant.turn_start / turn_end — Fase AR.2 ──────────────────────
         unsubs.push(
             session.on('assistant.turn_start', (event) => {
+                const { turnId } = event.data;
+                if (turnId) _turnStart.set(turnId, Date.now());
                 if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+            }),
+        );
+
+        // Fase AR.2: turn_end calcula duração correlacionando com turn_start
+        unsubs.push(
+            session.on('assistant.turn_end', (event) => {
+                const { turnId } = event.data;
+                const startTs = turnId ? _turnStart.get(turnId) : undefined;
+                if (turnId) _turnStart.delete(turnId);
+                const durationMs = startTs ? Date.now() - startTs : 0;
+                metrics?.recordDialogTurn(durationMs, true);
+                if (persist && persistTypes.includes('assistant.turn_end')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, turnId, durationMs });
+                }
+                log('DEBUG', `[event-collector] turn_end: ${turnId ?? 'n/a'} (${durationMs}ms) session=${sessionId}`);
+            }),
+        );
+
+        // ── assistant.message + intent — Fase AQ.2 / AQ.3 ───────────────────
+        unsubs.push(
+            session.on('assistant.message', (event) => {
+                const { messageId, content } = event.data;
+                metrics?.recordCounter('assistant.message');
+                if (persist && persistTypes.includes('assistant.message')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        messageId,
+                        // captureAssistantContent=false por padrão (não persiste conteúdo completo)
+                        ...(captureAssistantContent ? { content } : { contentLength: content?.length ?? 0 }),
+                    });
+                }
+            }),
+        );
+
+        unsubs.push(
+            session.on('assistant.intent', (event) => {
+                const { intent } = event.data;
+                metrics?.recordCounter(`assistant.intent.${intent ?? 'unknown'}`);
+                if (persist && persistTypes.includes('assistant.intent')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, intent });
+                }
+            }),
+        );
+
+        // ── user.message — Fase AQ.1 ─────────────────────────────────────────
+        unsubs.push(
+            session.on('user.message', (event) => {
+                const { content, attachments } = event.data;
+                metrics?.recordCounter('user.message');
+                if ((attachments?.length ?? 0) > 0) {
+                    metrics?.recordCounter('user.message.with_attachments');
+                }
+                if (persist && persistTypes.includes('user.message')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        // captureUserContent=false por padrão (não persiste conteúdo — risco PII)
+                        ...(captureUserContent ? { content } : { contentLength: content?.length ?? 0 }),
+                        attachmentCount: attachments?.length ?? 0,
+                        attachmentTypes:
+                            attachments?.map((/** @type {{ type?: string }} */ a) => a.type ?? 'unknown') ?? [],
+                    });
+                }
+            }),
+        );
+
+        // ── abort — Fase AR.1 ─────────────────────────────────────────────────
+        unsubs.push(
+            session.on('abort', (event) => {
+                metrics?.recordCounter('turn.aborted');
+                metrics?.recordSessionError();
+                if (persist && persistTypes.includes('abort')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, reason: event.data.reason });
+                }
+                log('WARN', `[event-collector] turn aborted: ${event.data.reason ?? 'unknown'} session=${sessionId}`);
+            }),
+        );
+
+        // ── session.start / resume — Fase AP ─────────────────────────────────
+        unsubs.push(
+            session.on('session.start', (event) => {
+                const { sessionId: sdkSessionId, copilotVersion, selectedModel, reasoningEffort, context } = event.data;
+                metrics?.recordSessionStart();
+                metrics?.recordCounter(`model.${selectedModel ?? 'unknown'}`);
+                if (persist && persistTypes.includes('session.start')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        sdkSessionId,
+                        copilotVersion,
+                        selectedModel,
+                        reasoningEffort,
+                        context,
+                    });
+                }
+                log(
+                    'INFO',
+                    `[event-collector] session.start model=${selectedModel ?? 'n/a'} branch=${context?.branch ?? 'n/a'} session=${sessionId}`,
+                );
+            }),
+        );
+
+        unsubs.push(
+            session.on('session.resume', (event) => {
+                const { eventCount, selectedModel, reasoningEffort, context, alreadyInUse } = event.data;
+                metrics?.recordCounter('session.resumed');
+                if (alreadyInUse) metrics?.recordCounter('session.already_in_use');
+                if (persist && persistTypes.includes('session.resume')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        eventCount,
+                        selectedModel,
+                        reasoningEffort,
+                        alreadyInUse,
+                        context,
+                    });
+                }
+                log(
+                    'INFO',
+                    `[event-collector] session.resume eventCount=${eventCount ?? 0} alreadyInUse=${alreadyInUse ?? false} session=${sessionId}`,
+                );
+            }),
+        );
+
+        // ── session.context_changed + session.handoff — Fase AT ──────────────
+        unsubs.push(
+            session.on('session.context_changed', (event) => {
+                const { branch, repository, cwd } = event.data;
+                if (persist && persistTypes.includes('session.context_changed')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        branch: branch ?? null,
+                        repository: repository ?? null,
+                        cwd: cwd ?? null,
+                    });
+                }
+                log('INFO', `[event-collector] context_changed branch=${branch ?? 'n/a'} session=${sessionId}`);
+            }),
+        );
+
+        unsubs.push(
+            session.on('session.handoff', (event) => {
+                const { handoffTime, sourceType, summary, remoteSessionId } = event.data;
+                metrics?.recordCounter('session.handoff');
+                metrics?.recordCounter(`session.handoff.source.${sourceType ?? 'unknown'}`);
+                if (persist && persistTypes.includes('session.handoff')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        handoffTime,
+                        sourceType,
+                        summary: summary ?? null,
+                        remoteSessionId: remoteSessionId ?? null,
+                    });
+                }
+                log('INFO', `[event-collector] session.handoff source=${sourceType} session=${sessionId}`);
+            }),
+        );
+
+        // ── session.skills_loaded + extensions_loaded — Fase AU ──────────────
+        unsubs.push(
+            session.on('session.skills_loaded', (event) => {
+                const { skills } = event.data;
+                const enabledCount = skills.filter((/** @type {{ enabled?: boolean }} */ s) => s.enabled).length;
+                metrics?.recordCounter('session.skills_loaded');
+                metrics?.recordCounter('skills.enabled', enabledCount);
+                if (persist && persistTypes.includes('session.skills_loaded')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        totalSkills: skills.length,
+                        enabledSkills: enabledCount,
+                        skills: skills.map(
+                            (/** @type {{ name?: string; enabled?: boolean; source?: string }} */ s) => ({
+                                name: s.name,
+                                enabled: s.enabled,
+                                source: s.source,
+                            }),
+                        ),
+                    });
+                }
+                log(
+                    'INFO',
+                    `[event-collector] skills_loaded: ${enabledCount}/${skills.length} enabled session=${sessionId}`,
+                );
+            }),
+        );
+
+        unsubs.push(
+            session.on('session.extensions_loaded', (event) => {
+                const { extensions } = event.data;
+                const runningCount = extensions.filter(
+                    (/** @type {{ status?: string }} */ e) => e.status === 'running',
+                ).length;
+                if (persist && persistTypes.includes('session.extensions_loaded')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        total: extensions.length,
+                        running: runningCount,
+                        extensions: extensions.map((/** @type {{ id?: string; status?: string }} */ e) => ({
+                            id: e.id,
+                            status: e.status,
+                        })),
+                    });
+                }
+                log(
+                    'INFO',
+                    `[event-collector] extensions_loaded: ${runningCount}/${extensions.length} running session=${sessionId}`,
+                );
+            }),
+        );
+
+        // ── session.mcp_server_status_changed — Fase AV ──────────────────────
+        unsubs.push(
+            session.on('session.mcp_server_status_changed', (event) => {
+                const { serverName, status } = event.data;
+                metrics?.recordCounter(`mcp.server.status.${status}`);
+                if (status === 'failed') {
+                    metrics?.recordCounter('mcp.server.failed');
+                    log('WARN', `[event-collector] MCP server failed: ${serverName} session=${sessionId}`);
+                } else if (status === 'connected') {
+                    metrics?.recordCounter('mcp.server.connected');
+                    log('INFO', `[event-collector] MCP server connected: ${serverName} session=${sessionId}`);
+                }
+                if (persist && persistTypes.includes('session.mcp_server_status_changed')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, serverName, status });
+                }
+            }),
+        );
+
+        // ── tool.user_requested — Fase AW (alto valor) ───────────────────────
+        unsubs.push(
+            session.on('tool.user_requested', (event) => {
+                const { toolCallId, toolName } = event.data;
+                metrics?.recordCounter('tool.user_requested');
+                if (persist && persistTypes.includes('tool.user_requested')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        toolCallId,
+                        toolName,
+                        toolArgs: event.data.arguments ?? {},
+                    });
+                }
+                log('DEBUG', `[event-collector] tool.user_requested: ${toolName} session=${sessionId}`);
+            }),
+        );
+
+        // ── system.notification — Fase AS.1 ──────────────────────────────────
+        unsubs.push(
+            session.on('system.notification', (event) => {
+                const { kind } = event.data;
+                metrics?.recordCounter(`system.notification.${kind.type}`);
+                if (kind.type === 'agent_completed') {
+                    metrics?.recordCounter(`background_agent.${'status' in kind ? kind.status : 'unknown'}`);
+                }
+                if (persist && persistTypes.includes('system.notification')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        notificationKind: kind.type,
+                        status: 'status' in kind ? kind.status : undefined,
+                    });
+                }
+                log('INFO', `[event-collector] system.notification: ${kind.type} session=${sessionId}`);
+            }),
+        );
+
+        // ── subagent.selected — Fase AW ───────────────────────────────────────
+        unsubs.push(
+            session.on('subagent.selected', (event) => {
+                metrics?.recordCounter('subagent.selected');
+                if (persist && persistTypes.includes('subagent.selected')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                }
+            }),
+        );
+
+        // ── mcp.oauth_required / mcp.oauth_completed — Fase AS.2 ─────────────
+        unsubs.push(
+            session.on('mcp.oauth_required', (event) => {
+                const { serverName } = event.data;
+                metrics?.recordCounter('mcp.oauth_required');
+                if (persist && persistTypes.includes('mcp.oauth_required')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, serverName });
+                }
+                log('WARN', `[event-collector] mcp.oauth_required: ${serverName} session=${sessionId}`);
+            }),
+        );
+
+        unsubs.push(
+            session.on('mcp.oauth_completed', (event) => {
+                const { requestId } = event.data;
+                metrics?.recordCounter('mcp.oauth_completed');
+                if (persist && persistTypes.includes('mcp.oauth_completed')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
+                }
+            }),
+        );
+
+        // ── external_tool.requested — Fase AW (com trace context W3C) ────────
+        unsubs.push(
+            session.on('external_tool.requested', (event) => {
+                const { requestId, toolName, traceparent, tracestate } = event.data;
+                metrics?.recordCounter('external_tool.requested');
+                if (persist && persistTypes.includes('external_tool.requested')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        requestId,
+                        toolName,
+                        toolArgs: event.data.arguments ?? {},
+                        traceparent: traceparent ?? null,
+                        tracestate: tracestate ?? null,
+                    });
+                }
+                log(
+                    'DEBUG',
+                    `[event-collector] external_tool.requested: ${toolName ?? requestId} session=${sessionId}`,
+                );
+            }),
+        );
+
+        // ── command.execute — Fase AW ─────────────────────────────────────────
+        unsubs.push(
+            session.on('command.execute', (event) => {
+                const { commandName, args } = event.data;
+                metrics?.recordCounter(`command.execute.${commandName ?? 'unknown'}`);
+                if (persist && persistTypes.includes('command.execute')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, commandName, args });
+                }
+                log('DEBUG', `[event-collector] command.execute: /${commandName ?? '?'} session=${sessionId}`);
+            }),
+        );
+
+        // ── exit_plan_mode.requested — Fase AW ───────────────────────────────
+        unsubs.push(
+            session.on('exit_plan_mode.requested', (event) => {
+                const { summary, actions, recommendedAction } = event.data;
+                metrics?.recordCounter('exit_plan_mode.requested');
+                if (persist && persistTypes.includes('exit_plan_mode.requested')) {
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        summaryLength: summary?.length ?? 0,
+                        actions,
+                        recommendedAction,
+                    });
+                }
+                log(
+                    'INFO',
+                    `[event-collector] exit_plan_mode.requested recommended=${recommendedAction ?? 'n/a'} session=${sessionId}`,
+                );
             }),
         );
 

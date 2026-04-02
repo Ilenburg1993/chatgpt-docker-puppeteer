@@ -154,6 +154,12 @@ export const globalAuditBuffer = new AuditRingBuffer({
  *
  * O handler é puro — não lança exceções. Falhas no logger são silenciadas para não interromper a sessão SDK.
  *
+ * @deprecated Desde Fase AL — o feed ao `globalAuditBuffer` ocorre automaticamente via `event-collector.js` (handler
+ *   `tool.execution_complete`). Este factory é mantido apenas para compatibilidade com testes legados. Não usar em
+ *   novas integrações; removível em v2.
+ * @deprecated Desde Fase AL — o feed ao `globalAuditBuffer` ocorre automaticamente via `event-collector.js` (handler
+ *   `tool.execution_complete`). Este factory é mantido apenas para compatibilidade com testes legados. Não usar em
+ *   novas integrações; removível em v2.
  * @example
  *     import { createAuditPostToolHandler } from '#copilot/hooks/audit';
  *     const hooks = {
