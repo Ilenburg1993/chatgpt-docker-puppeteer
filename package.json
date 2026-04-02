@@ -58,6 +58,7 @@
     "#copilot/hooks/registry": "./src/copilot/hooks/registry.js",
     "#copilot/hooks/session": "./src/copilot/hooks/session-lifecycle.js",
     "#copilot/hooks/error": "./src/copilot/hooks/error-handler.js",
+    "#copilot/hooks/audit": "./src/copilot/hooks/audit.js",
     "#copilot/hooks/*": "./src/copilot/hooks/*.js",
     "#copilot/*": "./src/copilot/*.js",
     "#core/constants": "./src/core/constants/index.ts",

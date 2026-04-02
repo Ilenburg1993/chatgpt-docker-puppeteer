@@ -81,3 +81,6 @@ export { createSafePreset } from './presets/safe.js';
 
 // ─── Error handler com circuit-breaker (Fase I) ───────────────────────────────
 export { createCircuitBreakerHandler, createContextualErrorHandler, createErrorHandler } from './error-handler.js';
+
+// ─── Audit ring buffer (Gap 10) ───────────────────────────────────────────────
+export { AuditRingBuffer, createAuditPostToolHandler, getAuditTail, globalAuditBuffer } from './audit.js';

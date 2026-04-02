@@ -127,8 +127,7 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
 
     it("evento 'dialog.stopped' é emitido no handler e no stopDialogLoop()", () => {
         assert.ok(
-            sourceCode.includes("emit('dialog.stopped'") ||
-                wirerSourceCode.includes("'dialog.stopped'"),
+            sourceCode.includes("emit('dialog.stopped'") || wirerSourceCode.includes("'dialog.stopped'"),
             "handler deve emitir 'dialog.stopped' quando modelo enviar STOPPED",
         );
     });

@@ -284,3 +284,24 @@
  * @property {(event: string, payload: object) => void} emit
  * @property {() => object} [getContextSnapshot] - Opcional: retorna snapshot de contexto para additionalContext
  */
+
+// ─── Tipos do Audit (Gap 10) ──────────────────────────────────────────────────
+
+/**
+ * Entrada de auditoria de uma chamada de ferramenta SDK capturada via `onPostToolUse`.
+ *
+ * @typedef {object} AuditEntry
+ * @property {string} toolName - Nome da ferramenta invocada
+ * @property {unknown} toolArgs - Argumentos recebidos pela ferramenta
+ * @property {unknown} toolResult - Resultado retornado pela ferramenta
+ * @property {string} sessionId - Identificador da sessão Copilot SDK
+ * @property {string} ts - Timestamp ISO 8601 da captura
+ * @property {number} durationMs - Duração aproximada da execução (ms) se disponível; 0 caso contrário
+ */
+
+/**
+ * Configuração do `AuditRingBuffer`.
+ *
+ * @typedef {object} AuditRingBufferConfig
+ * @property {number} [capacity] - Tamanho máximo do buffer (default: 500)
+ */

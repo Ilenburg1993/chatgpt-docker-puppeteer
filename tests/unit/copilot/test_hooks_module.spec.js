@@ -22,12 +22,14 @@ import { createTelemetry } from '../../../src/copilot/lib/telemetry.js';
 // ─── Imports diretos dos novos módulos ────────────────────────────────────────
 import {
     attachBus,
+    AuditRingBuffer,
     composeHandlers,
     composePreToolUseHandlers,
     conditional,
     createAllowlistHook,
     createArgSanitizerHook,
     createAuditHooks,
+    createAuditPostToolHandler,
     createAuditPreset,
     createBlocklistHook,
     createCircuitBreakerHandler,
@@ -53,6 +55,8 @@ import {
     createSessionHooks,
     createStaticInputHandler,
     fallback,
+    getAuditTail,
+    globalAuditBuffer,
     HookBus,
     HookRegistry,
     pipeline,
@@ -801,5 +805,191 @@ describe('createProductionHooks', () => {
         const result = await hooks.onSessionStart({ sessionId: 'p-1', source: 'new' }, { sessionId: 'p-1' });
         assert.ok(typeof result.additionalContext === 'string');
         assert.ok(result.additionalContext.includes('p-1'));
+    });
+});
+
+// ─── Seção N: hooks/audit.js (Gap 10) ────────────────────────────────────────
+
+describe('hooks/audit › AuditRingBuffer', () => {
+    it('começa vazio', () => {
+        const buf = new AuditRingBuffer({ capacity: 10 });
+        assert.strictEqual(buf.size, 0);
+        assert.strictEqual(buf.total, 0);
+        assert.deepStrictEqual(buf.tail(), []);
+    });
+
+    it('push e tail retornam entrada inserida', () => {
+        const buf = new AuditRingBuffer({ capacity: 10 });
+        /** @type {import('../../../src/copilot/hooks/types.js').AuditEntry} */
+        const entry = {
+            toolName: 'read_file',
+            toolArgs: {},
+            toolResult: 'ok',
+            sessionId: 's1',
+            ts: new Date().toISOString(),
+            durationMs: 5,
+        };
+        buf.push(entry);
+        assert.strictEqual(buf.size, 1);
+        assert.strictEqual(buf.total, 1);
+        const tail = buf.tail(1);
+        assert.strictEqual(tail.length, 1);
+        assert.strictEqual(tail[0].toolName, 'read_file');
+    });
+
+    it('tail(n) com n > size retorna todas as entradas disponíveis', () => {
+        const buf = new AuditRingBuffer({ capacity: 10 });
+        buf.push({ toolName: 'a', toolArgs: {}, toolResult: '', sessionId: 's', ts: '', durationMs: 0 });
+        buf.push({ toolName: 'b', toolArgs: {}, toolResult: '', sessionId: 's', ts: '', durationMs: 0 });
+        const tail = buf.tail(50);
+        assert.strictEqual(tail.length, 2);
+    });
+
+    it('comportamento circular — sobrescreve entradas mais antigas quando cheio', () => {
+        const buf = new AuditRingBuffer({ capacity: 3 });
+        for (let i = 0; i < 5; i++) {
+            buf.push({ toolName: `t${i}`, toolArgs: {}, toolResult: '', sessionId: 's', ts: '', durationMs: 0 });
+        }
+        assert.strictEqual(buf.size, 3); // limitado por capacity
+        assert.strictEqual(buf.total, 5); // total > capacity
+        const tail = buf.tail(3);
+        // deve retornar as 3 mais recentes: t2, t3, t4
+        assert.deepStrictEqual(
+            tail.map((e) => e.toolName),
+            ['t2', 't3', 't4'],
+        );
+    });
+
+    it('tail(n) retorna em ordem cronológica (mais antiga → mais recente)', () => {
+        const buf = new AuditRingBuffer({ capacity: 5 });
+        for (let i = 0; i < 4; i++) {
+            buf.push({ toolName: `tool_${i}`, toolArgs: {}, toolResult: '', sessionId: 's', ts: '', durationMs: 0 });
+        }
+        const tail = buf.tail(4);
+        assert.deepStrictEqual(
+            tail.map((e) => e.toolName),
+            ['tool_0', 'tool_1', 'tool_2', 'tool_3'],
+        );
+    });
+
+    it('clear() esvazia o buffer', () => {
+        const buf = new AuditRingBuffer({ capacity: 5 });
+        buf.push({ toolName: 'x', toolArgs: {}, toolResult: '', sessionId: 's', ts: '', durationMs: 0 });
+        buf.clear();
+        assert.strictEqual(buf.size, 0);
+        assert.strictEqual(buf.total, 0);
+        assert.deepStrictEqual(buf.tail(), []);
+    });
+
+    it('tail() com buffer exatamente cheio retorna capacity entradas', () => {
+        const buf = new AuditRingBuffer({ capacity: 4 });
+        for (let i = 0; i < 4; i++) {
+            buf.push({ toolName: `t${i}`, toolArgs: {}, toolResult: '', sessionId: 's', ts: '', durationMs: 0 });
+        }
+        assert.strictEqual(buf.tail(10).length, 4);
+    });
+});
+
+describe('hooks/audit › createAuditPostToolHandler', () => {
+    it('retorna função assíncrona', () => {
+        const handler = createAuditPostToolHandler();
+        assert.ok(typeof handler === 'function');
+    });
+
+    it('captura entrada no buffer fornecido', async () => {
+        const buf = new AuditRingBuffer({ capacity: 10 });
+        const handler = createAuditPostToolHandler(null, buf);
+        await handler(
+            {
+                toolName: 'write_file',
+                toolArgs: { path: '/tmp/x' },
+                toolResult: 'ok',
+                timestamp: new Date().toISOString(),
+            },
+            { sessionId: 'sess-1' },
+        );
+        const tail = buf.tail(1);
+        assert.strictEqual(tail.length, 1);
+        assert.strictEqual(tail[0].toolName, 'write_file');
+        assert.strictEqual(tail[0].sessionId, 'sess-1');
+    });
+
+    it('chama o logger externo com a entrada', async () => {
+        const buf = new AuditRingBuffer({ capacity: 10 });
+        /** @type {import('../../../src/copilot/hooks/types.js').AuditEntry[]} */
+        const captured = [];
+        const handler = createAuditPostToolHandler((e) => captured.push(e), buf);
+        await handler(
+            { toolName: 'bash', toolArgs: {}, toolResult: 'done', timestamp: new Date().toISOString() },
+            { sessionId: 'sess-2' },
+        );
+        assert.strictEqual(captured.length, 1);
+        assert.strictEqual(captured[0].toolName, 'bash');
+    });
+
+    it('ignora exceção lançada pelo logger externo (não propaga)', async () => {
+        const buf = new AuditRingBuffer({ capacity: 10 });
+        const badLogger = () => {
+            throw new Error('logger falhou');
+        };
+        const handler = createAuditPostToolHandler(badLogger, buf);
+        // não deve lançar
+        await assert.doesNotReject(() =>
+            handler(
+                { toolName: 'any', toolArgs: {}, toolResult: '', timestamp: new Date().toISOString() },
+                { sessionId: 'sess-3' },
+            ),
+        );
+        // entrada ainda foi gravada no buffer
+        assert.strictEqual(buf.size, 1);
+    });
+
+    it('retorna objeto vazio (compatível com onPostToolUse SDK)', async () => {
+        const buf = new AuditRingBuffer({ capacity: 10 });
+        const handler = createAuditPostToolHandler(null, buf);
+        const result = await handler(
+            { toolName: 'list_dir', toolArgs: {}, toolResult: ['a.js'], timestamp: new Date().toISOString() },
+            { sessionId: 's' },
+        );
+        assert.ok(result !== undefined);
+        assert.deepStrictEqual(result, {});
+    });
+
+    it('usa timestamp do input quando fornecido', async () => {
+        const buf = new AuditRingBuffer({ capacity: 10 });
+        const ts = '2026-01-01T00:00:00.000Z';
+        const handler = createAuditPostToolHandler(null, buf);
+        await handler({ toolName: 't', toolArgs: {}, toolResult: '', timestamp: ts }, { sessionId: 's' });
+        assert.strictEqual(buf.tail(1)[0].ts, ts);
+    });
+});
+
+describe('hooks/audit › getAuditTail', () => {
+    it('delega ao globalAuditBuffer por padrão', () => {
+        globalAuditBuffer.clear();
+        globalAuditBuffer.push({
+            toolName: 'global_tool',
+            toolArgs: {},
+            toolResult: '',
+            sessionId: 's',
+            ts: '',
+            durationMs: 0,
+        });
+        const tail = getAuditTail(5);
+        assert.ok(tail.some((e) => e.toolName === 'global_tool'));
+        globalAuditBuffer.clear();
+    });
+
+    it('aceita buffer personalizado como segundo argumento', () => {
+        const buf = new AuditRingBuffer({ capacity: 5 });
+        buf.push({ toolName: 'custom', toolArgs: {}, toolResult: '', sessionId: 's', ts: '', durationMs: 0 });
+        const tail = getAuditTail(5, buf);
+        assert.strictEqual(tail.length, 1);
+        assert.strictEqual(tail[0].toolName, 'custom');
+    });
+
+    it('retorna vazio quando buffer está vazio', () => {
+        const buf = new AuditRingBuffer({ capacity: 5 });
+        assert.deepStrictEqual(getAuditTail(10, buf), []);
     });
 });

@@ -17,6 +17,7 @@
  *
  * @module copilot/tools/hook-tools
  * @see module:copilot/lib/hooks
+ * @see module:copilot/hooks/audit
  */
 
 import { log } from '#core/logger';
@@ -27,6 +28,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { getAuditTail } from '../hooks/audit.js';
 import { buildTool, withSkipPermission } from './tool-factory.js';
 const execFileAsync = promisify(execFile);
 
@@ -110,14 +112,16 @@ export function getPendingInputIds() {
 /**
  * Tool: hook_get_audit_tail
  *
- * Lê as últimas N entradas do audit.jsonl do hook system. Útil para diagnosticar compliance e histórico de chamadas de
- * ferramentas.
+ * Retorna as últimas N entradas de auditoria de tool calls SDK. Fonte primária: ring buffer interno em
+ * `src/copilot/hooks/audit.js` (Gap 10 do roadmap — isolamento dos sistemas SDK e operacional). Fallback: lê
+ * `.github/hooks/state/audit.jsonl` (compliance operacional) quando o ring buffer está vazio, para compatibilidade
+ * retroativa.
  */
 const hookGetAuditTailTool = buildTool({
     name: 'hook_get_audit_tail',
     description:
-        'Lê as últimas entradas do audit.jsonl do hook system. Útil para verificar compliance, ' +
-        'histórico de chamadas de ferramentas e detectar violações de protocolo.',
+        'Lê as últimas entradas de auditoria de chamadas de ferramentas SDK. ' +
+        'Útil para verificar o histórico de tool calls, detectar ferramentas de alto risco e diagnosticar comportamento do agente.',
     parameters: z.object({
         lines: z
             .number()
@@ -127,15 +131,35 @@ const hookGetAuditTailTool = buildTool({
             .optional()
             .default(20)
             .describe('Número de linhas a retornar (padrão: 20, máximo: 200)'),
+        source: z
+            .enum(['sdk', 'compliance', 'auto'])
+            .optional()
+            .default('auto')
+            .describe(
+                'Fonte: "sdk" = ring buffer interno (tool calls SDK), "compliance" = audit.jsonl operacional (.github/hooks/), "auto" = sdk primeiro, compliance como fallback',
+            ),
     }),
-    handler: async (/** @type {{ lines?: number }} */ { lines }) => {
+    handler: async (/** @type {{ lines?: number; source?: 'sdk' | 'compliance' | 'auto' }} */ { lines, source }) => {
+        const n = lines ?? 20;
+        const src = source ?? 'auto';
+
+        // Fonte primária: ring buffer do SDK (Gap 10 — isolamento)
+        if (src === 'sdk' || src === 'auto') {
+            const sdkEntries = getAuditTail(n);
+            if (sdkEntries.length > 0 || src === 'sdk') {
+                log('INFO', `[hook-tools/get_audit_tail] Retornando ${sdkEntries.length} entradas do ring buffer SDK.`);
+                return { entries: sdkEntries, total: sdkEntries.length, source: 'sdk' };
+            }
+        }
+
+        // Fallback: audit.jsonl do sistema operacional de compliance (.github/hooks/state/)
         const auditPath = join(HOOK_STATE_DIR, 'audit.jsonl');
         if (!existsSync(auditPath)) {
-            log('WARN', '[hook-tools/get_audit_tail] audit.jsonl não encontrado.');
-            return { entries: [], error: 'audit.jsonl não encontrado' };
+            log('WARN', '[hook-tools/get_audit_tail] Ring buffer vazio e audit.jsonl não encontrado.');
+            return { entries: [], total: 0, source: 'none', note: 'Nenhuma fonte de auditoria disponível.' };
         }
         try {
-            const { stdout: raw } = await execFileAsync('tail', ['-n', String(lines ?? 20), auditPath], {
+            const { stdout: raw } = await execFileAsync('tail', ['-n', String(n), auditPath], {
                 encoding: 'utf8',
                 timeout: 3000,
             });
@@ -150,11 +174,14 @@ const hookGetAuditTailTool = buildTool({
                         return { raw: line };
                     }
                 });
-            log('INFO', `[hook-tools/get_audit_tail] Retornando ${entries.length} entradas do audit.`);
-            return { entries, total: entries.length };
+            log(
+                'INFO',
+                `[hook-tools/get_audit_tail] Retornando ${entries.length} entradas do audit.jsonl (compliance).`,
+            );
+            return { entries, total: entries.length, source: 'compliance' };
         } catch (/** @type {any} */ e) {
-            log('WARN', `[hook-tools/get_audit_tail] Erro: ${e.message}`);
-            return { entries: [], error: e.message };
+            log('WARN', `[hook-tools/get_audit_tail] Erro ao ler audit.jsonl: ${e.message}`);
+            return { entries: [], total: 0, source: 'none', error: e.message };
         }
     },
 });
