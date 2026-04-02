@@ -37,12 +37,12 @@
  * @see module:copilot/channel/inject
  */
 
+import { log } from '#copilot/observability/logger';
 import {
     buildStructuredRequest,
     parseStructuredResponse,
     serializeStructuredMessage,
 } from '#copilot/types/structured-message';
-import { log } from '#copilot/observability/logger';
 
 // ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────
 

@@ -15,8 +15,8 @@
  * @module copilot/config/custom-tools-registry
  */
 
-import { buildTool } from '#copilot/tools/tool-factory';
 import { log } from '#copilot/observability/logger';
+import { buildTool } from '#copilot/tools/tool-factory';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 

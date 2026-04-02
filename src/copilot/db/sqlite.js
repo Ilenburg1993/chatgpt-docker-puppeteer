@@ -17,8 +17,8 @@
  * @see module:copilot/conversation-hub/store
  */
 
-import CONFIG from '#core/config';
 import { log } from '#copilot/observability/logger';
+import CONFIG from '#core/config';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';

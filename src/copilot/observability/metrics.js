@@ -138,10 +138,12 @@ function createHistogram(maxSamples = 500) {
  * @returns {MetricsStore}
  */
 export function createMetricsStore() {
-    /** @type {Record<
-    string,
-    { total: number; success: number; errors: number; histogram: ReturnType<typeof createHistogram> }
->} */
+    /**
+     * @type {Record<
+     *     string,
+     *     { total: number; success: number; errors: number; histogram: ReturnType<typeof createHistogram> }
+     * >}
+     */
     const _tools = {};
 
     /** @type {TokenUsageMetrics} */

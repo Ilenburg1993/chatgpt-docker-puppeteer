@@ -1,8 +1,7 @@
 # Observabilidade, Telemetria e Logging — Análise e Roadmap
 
-**Status**: Canônico — Problema prioritário de isolamento arquitetural
-**Última atualização**: 2026-06-XX
-**Escopo**: `src/copilot/` — isolamento total + sistema centralizado robusto
+**Status**: Canônico — Problema prioritário de isolamento arquitetural **Última atualização**:
+2026-06-XX **Escopo**: `src/copilot/` — isolamento total + sistema centralizado robusto
 
 ---
 
@@ -10,8 +9,8 @@
 
 ### 1.1 Mapeamento do Problema Central — `#core/logger`
 
-O módulo `src/copilot/` não possui logger próprio. **76 arquivos** importam `import { log } from '#core/logger'`
-diretamente do workspace pai:
+O módulo `src/copilot/` não possui logger próprio. **76 arquivos** importam
+`import { log } from '#core/logger'` diretamente do workspace pai:
 
 ```
 src/copilot/
@@ -46,16 +45,17 @@ workspace (drivers de browser, kernel, orchestrator, etc.). Impossível distingu
 
 Dois módulos em `src/copilot` escrevem JSONL diretamente na pasta de logs do workspace pai:
 
-**`src/copilot/channel/audit.js`** → `ROOT/logs/tool-audit.jsonl`
-Registra execução de tool calls SDK (start/complete, duração, args, resultado).
+**`src/copilot/channel/audit.js`** → `ROOT/logs/tool-audit.jsonl` Registra execução de tool calls
+SDK (start/complete, duração, args, resultado).
 
-**`src/copilot/agent/tool-audit-logger.js`** → `ROOT/logs/tool-audit.jsonl`
-Registra decisões de permissão (approve/deny, high-risk, sessionId).
-(Ambos escrevem no mesmo arquivo como "registros complementares" — design confuso.)
+**`src/copilot/agent/tool-audit-logger.js`** → `ROOT/logs/tool-audit.jsonl` Registra decisões de
+permissão (approve/deny, high-risk, sessionId). (Ambos escrevem no mesmo arquivo como "registros
+complementares" — design confuso.)
 
 ### 1.3 Telemetria — Apenas In-Memory, Sem Persistência
 
 `src/copilot/lib/telemetry.js` implementa um buffer circular em memória (`TelemetryStore`):
+
 - Rastreia: `toolCalls[]`, `sessions[]`, com `maxRecords = 500`
 - **Sem persistência** — dados são perdidos ao reiniciar do processo
 - **Sem exportação** — dados só acessíveis via `introspection-tools.js` (tool do agente)
@@ -89,17 +89,17 @@ O SDK suporta OpenTelemetry nativo via `CopilotClientOptions.telemetry`:
 ```js
 const client = new CopilotClient({
   telemetry: {
-    otlpEndpoint: 'http://localhost:4318',  // OTLP HTTP
-    filePath: '/path/to/traces.jsonl',      // ou arquivo JSONL local
-    exporterType: 'file',                   // 'otlp-http' | 'file'
+    otlpEndpoint: 'http://localhost:4318', // OTLP HTTP
+    filePath: '/path/to/traces.jsonl', // ou arquivo JSONL local
+    exporterType: 'file', // 'otlp-http' | 'file'
     sourceName: 'copilot-sdk-agent',
-    captureContent: false,                  // capturar conteúdo de mensagens
-  }
+    captureContent: false, // capturar conteúdo de mensagens
+  },
 });
 ```
 
-Com essa configuração, o CLI interno do SDK emite **spans automáticos** para cada sessão, mensagem
-e tool call — incluindo `traceparent`/`tracestate` W3C nos eventos de invocação de ferramenta.
+Com essa configuração, o CLI interno do SDK emite **spans automáticos** para cada sessão, mensagem e
+tool call — incluindo `traceparent`/`tracestate` W3C nos eventos de invocação de ferramenta.
 
 **Estado atual**: zero integração. Nenhum span sendo capturado ou exportado.
 
@@ -159,6 +159,7 @@ A pasta `src/copilot/logs/` é adicionada ao `.gitignore` (já existe `logs/` no
 ### 2.3 `observability/logger.js` — Logger Interno
 
 Drop-in replacement para `{ log }` de `#core/logger`:
+
 - **Mesma API**: `log(level, msg, taskId?)`, `log.debug/info/warn/error/fatal()`
 - **Completamente isolado**: sem imports de `#core/*` ou `src/` externo
 - **Destino**: escreve em `src/copilot/logs/agent.log` (não mais `ROOT/logs/agente_current.log`)
@@ -169,6 +170,7 @@ Drop-in replacement para `{ log }` de `#core/logger`:
 ### 2.4 `observability/event-collector.js` — Captura de Eventos SDK
 
 Captura TODOS os eventos emitidos por uma sesssão SDK:
+
 - Registrado via `session.on('*', handler)` (handler genérico)
 - Emite eventos relevantes para o `TelemetryStore` e `ErrorRegistry`
 - Persiste eventos de alto valor em `events.jsonl` (filtrável por tipo)
@@ -177,6 +179,7 @@ Captura TODOS os eventos emitidos por uma sesssão SDK:
 ### 2.5 `observability/telemetry-store.js` — Store Centralizado
 
 Evolução de `lib/telemetry.js` com:
+
 - **Persistência opcional**: snapshots periódicos em `metrics.jsonl`
 - **Métricas por sessão**: duração, tokens, tool calls, erros
 - **Histogramas**: distribuição de latência de tool calls (P50, P90, P99)
@@ -201,6 +204,7 @@ Evolução de `lib/telemetry.js` com:
 ### 2.8 `observability/audit-log.js` — Auditoria I/O Isolada
 
 Consolida lógica de I/O atualmente dispersa em `channel/audit.js` e `tool-audit-logger.js`:
+
 - Único responsável por I/O em `src/copilot/logs/audit.jsonl`
 - Mantém a API pública de ambos (sem breaking change)
 - Suporte a filtros de leitura por sessionId, time range, toolName
@@ -243,6 +247,7 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Drop-in replacement de `#core/logger` sem dependência do workspace pai.
 
 **Sub-tarefas**:
+
 - A.1 Criar `src/copilot/observability/logger.js` com a mesma assinatura de `#core/logger`
   - Mesmos exports: `log`, `log.debug/info/warn/error/fatal`, `audit`, `metric`
   - `LOG_DIR = new URL('../../logs/', import.meta.url)` — relativo à própria pasta
@@ -257,6 +262,7 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Expor o módulo observability via alias limpo.
 
 **Sub-tarefas**:
+
 - B.1 Adicionar ao `package.json#imports`:
   ```json
   "#copilot/observability": "./src/copilot/observability/index.js",
@@ -269,6 +275,7 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Substituir os 76 imports sem alterar comportamento.
 
 **Sub-tarefas**:
+
 - C.1 Script de migration automatizado (sed/fd) para substituir imports
   ```bash
   fd -e js src/copilot | xargs sd "from '#core/logger'" "from '#copilot/observability/logger'"
@@ -281,8 +288,9 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Capturar sistematicamente todos os eventos de uma sessão SDK.
 
 **Sub-tarefas**:
-- D.1 Criar `EventCollector` que recebe uma `CopilotSession` e registra `session.on('*', cb)`
-  OU subscribe a múltiplos event types de alto valor
+
+- D.1 Criar `EventCollector` que recebe uma `CopilotSession` e registra `session.on('*', cb)` OU
+  subscribe a múltiplos event types de alto valor
 - D.2 Integrar com `TelemetryStore` (alimentar toolCalls, sessions via eventos)
 - D.3 Integrar com `HookBus.emitHook()` para re-emissão de eventos SDK no bus
 - D.4 Persistir eventos de highest-value em `events.jsonl` (assíncrono, com batching)
@@ -295,6 +303,7 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Ativar tracing OTEL nativo do SDK para captura automática de spans.
 
 **Sub-tarefas**:
+
 - E.1 Criar `observability/otel.js` com função `buildTelemetryConfig()`
   - Padrão: `{ filePath: '.../src/copilot/logs/otel-traces.jsonl', exporterType: 'file' }`
   - Se `COPILOT_OTEL_ENDPOINT` definido: usar otlp-http
@@ -308,6 +317,7 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Consolidar e isolar todo I/O de auditoria em módulo único dentro de `src/copilot`.
 
 **Sub-tarefas**:
+
 - F.1 Criar `observability/audit-log.js` que recebe registros e escreve em
   `src/copilot/logs/audit.jsonl` (não mais `ROOT/logs/tool-audit.jsonl`)
   - Manter mesmo schema JSONL (backward compatible para leitura)
@@ -325,11 +335,12 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Registro centralizado de erros com contexto, persistência e captura global.
 
 **Sub-tarefas**:
+
 - G.1 Criar `ErrorRegistry` com ring buffer (últimos 100 erros) e persistência `errors.jsonl`
 - G.2 Schema de erro: `{ ts, sessionId, errorContext, message, stack?, recoverable, source }`
 - G.3 Conectar ao `onErrorOccurred` hook: `errorRegistry.record(input, invocation)`
-- G.4 Registrar `process.on('uncaughtException', ...)` e `process.on('unhandledRejection', ...)`
-  em `entry.js` usando `errorRegistry`
+- G.4 Registrar `process.on('uncaughtException', ...)` e `process.on('unhandledRejection', ...)` em
+  `entry.js` usando `errorRegistry`
 - G.5 Emitir erros no `defaultBus` para SSE
 - G.6 API de consulta: `getRecentErrors(n)`, `getErrorsBySession(sessionId)`
 
@@ -338,6 +349,7 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Evoluir `lib/telemetry.js` com persistência e métricas ricas.
 
 **Sub-tarefas**:
+
 - H.1 Criar `TelemetryCentralStore` que estende `TelemetryStore`:
   - Mantém API de `lib/telemetry.js` (backward compatible)
   - Adiciona: snapshots periódicos em `metrics.jsonl` (a cada 5 min ou a cada N events)
@@ -353,6 +365,7 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Métricas agregadas em formatos padrão.
 
 **Sub-tarefas**:
+
 - I.1 Criar `MetricsRegistry` com counters e histogramas
 - I.2 Alimentar via `EventCollector` (tool calls, tokens, erros, permissões)
 - I.3 Serialização em formato Prometheus text (`# TYPE ... counter`, `# HELP ...`)
@@ -363,6 +376,7 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Expor toda observabilidade via API HTTP REST + SSE.
 
 **Sub-tarefas**:
+
 - J.1 `GET /status` — uptime, storage, contadores básicos, estado do agente
 - J.2 `GET /logs?n=100&level=WARN` — últimas N linhas de `agent.log` filtradas
 - J.3 `GET /metrics` — snapshot atual de todas as métricas
@@ -379,12 +393,13 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Publicar API pública limpa e coerente.
 
 **Sub-tarefas**:
+
 - K.1 Exportar singletons: `defaultLogger`, `defaultTelemetry`, `defaultErrorRegistry`,
   `defaultEventCollector`, `defaultAuditLog`, `defaultMetrics`
 - K.2 Exportar fábricas: `createLogger()`, `createTelemetry()` (para casos de uso isolado)
 - K.3 Exportar tipos: `LogLevel`, `TelemetryStore`, `ErrorRecord`, `AuditRecord`
-- K.4 Exportar helpers de inicialização: `initObservability(session, opts?)`
-  — único ponto de configuração usado por `always-alive.js`
+- K.4 Exportar helpers de inicialização: `initObservability(session, opts?)` — único ponto de
+  configuração usado por `always-alive.js`
 - K.5 Atualizar `always-alive.js` para usar `initObservability()` em `#initSession()`
 
 ### Fase L — Atualização de `lib/telemetry.js` e Compatibilidade
@@ -392,17 +407,19 @@ GET  /api/sdk/observability/prometheus  → métricas Prometheus (opcional)
 **Objetivo**: Preservar backward compat para consumidores existentes de `lib/telemetry.js`.
 
 **Sub-tarefas**:
-- L.1 Converter `lib/telemetry.js` em thin re-export de
-  `#copilot/observability/telemetry-store`
+
+- L.1 Converter `lib/telemetry.js` em thin re-export de `#copilot/observability/telemetry-store`
 - L.2 Converter `channel/audit.js` I/O em thin wrapper de `#copilot/observability/audit-log`
 - L.3 Converter `tool-audit-logger.js` I/O em thin wrapper de `#copilot/observability/audit-log`
-- L.4 Verificar que todos os consumidores de `getSummary()`, `recordToolCall()` etc. continuam funcionando
+- L.4 Verificar que todos os consumidores de `getSummary()`, `recordToolCall()` etc. continuam
+  funcionando
 
 ### Fase M — Testes, Lint, Typecheck, Commit
 
 **Objetivo**: Validação completa antes de commit.
 
 **Sub-tarefas**:
+
 - M.1 `npm run test:unit` — todos os 2054+ testes passando
 - M.2 `npm run lint` — zero erros
 - M.3 `npm run typecheck:node` — zero erros
@@ -438,10 +455,9 @@ H (telemetry-store) ── I (metrics) ─────────────�
                       M (testes + commit) ◄────────┘
 ```
 
-Fases A → B → C podem ser executadas em sequência sem bloqueio.
-Fases D, E, F, G, H, I são paralelas entre si (serão executadas em ordem por simplicidade).
-Fase J depende de D, E, F, G, H, I.
-Fase K depende de todas as anteriores.
+Fases A → B → C podem ser executadas em sequência sem bloqueio. Fases D, E, F, G, H, I são paralelas
+entre si (serão executadas em ordem por simplicidade). Fase J depende de D, E, F, G, H, I. Fase K
+depende de todas as anteriores.
 
 ---
 
