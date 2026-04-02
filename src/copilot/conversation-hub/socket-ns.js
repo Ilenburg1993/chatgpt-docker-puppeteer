@@ -55,217 +55,264 @@ export function mountCopilotNamespace(io, orchestrator, store) {
     }
 
     const ns = io.of('/copilot');
+    const checkSocketInjectRate = _createInjectRateLimiter();
 
-    // SEC-N04 (fix): rate limit por socket no evento user:inject
+    if (_parseAuthRequired()) {
+        _setupAuthMiddleware(ns);
+    }
+
+    _setupConnectionHandlers(ns, orchestrator, store, checkSocketInjectRate);
+    _bridgeOrchestratorEvents(ns, orchestrator);
+
+    copilotNamespace = ns;
+    log('INFO', '[socket-ns/copilot] Namespace /copilot montado com sucesso.');
+    return ns;
+}
+
+// ─── Sub-rotinas de mountCopilotNamespace ────────────────────────────────────
+
+/**
+ * Cria e retorna a função de rate-limit para injects, com buckets por socket e por IP.
+ *
+ * @returns {(socketId: string, ip: string) => boolean}
+ */
+function _createInjectRateLimiter() {
     /** @type {Map<string, { count: number; resetAt: number }>} */
-    const _socketInjectBuckets = new Map();
+    const _socketBuckets = new Map();
     const INJECT_LIMIT = 10;
     const INJECT_WINDOW_MS = 60_000;
 
-    // SEC-P2-06: rate limit complementar por IP — impede bypass via múltiplos sockets
     /** @type {Map<string, { count: number; resetAt: number }>} */
-    const _ipInjectBuckets = new Map();
+    const _ipBuckets = new Map();
     const IP_INJECT_LIMIT = 30;
 
     /**
-     * Retorna true se o socket ainda está dentro do limite de injects por minuto. Verifica tanto o limite por socket
-     * quanto o limite por IP.
-     *
      * @param {string} socketId
      * @param {string} ip
      * @returns {boolean}
      */
-    function checkSocketInjectRate(socketId, ip) {
+    return function checkSocketInjectRate(socketId, ip) {
         const now = Date.now();
-        // Prune expirados
-        for (const [key, bucket] of _socketInjectBuckets) {
-            if (now >= bucket.resetAt) _socketInjectBuckets.delete(key);
+        for (const [key, b] of _socketBuckets) {
+            if (now >= b.resetAt) _socketBuckets.delete(key);
         }
-        for (const [key, bucket] of _ipInjectBuckets) {
-            if (now >= bucket.resetAt) _ipInjectBuckets.delete(key);
+        for (const [key, b] of _ipBuckets) {
+            if (now >= b.resetAt) _ipBuckets.delete(key);
         }
-        // Check per-IP limit first (SEC-P2-06)
-        const ipBucket = _ipInjectBuckets.get(ip) ?? { count: 0, resetAt: now + INJECT_WINDOW_MS };
+        const ipBucket = _ipBuckets.get(ip) ?? { count: 0, resetAt: now + INJECT_WINDOW_MS };
         if (ipBucket.count >= IP_INJECT_LIMIT) return false;
-        // Check per-socket limit
-        const bucket = _socketInjectBuckets.get(socketId) ?? { count: 0, resetAt: now + INJECT_WINDOW_MS };
+        const bucket = _socketBuckets.get(socketId) ?? { count: 0, resetAt: now + INJECT_WINDOW_MS };
         if (bucket.count >= INJECT_LIMIT) return false;
         bucket.count++;
-        _socketInjectBuckets.set(socketId, bucket);
+        _socketBuckets.set(socketId, bucket);
         ipBucket.count++;
-        _ipInjectBuckets.set(ip, ipBucket);
+        _ipBuckets.set(ip, ipBucket);
         return true;
+    };
+}
+
+/**
+ * Instala o middleware JWT de autenticação no namespace.
+ *
+ * @param {SocketNamespace} ns
+ * @returns {void}
+ */
+function _setupAuthMiddleware(ns) {
+    // BUG-P2-14: validar JWT secret na inicialização para falhar cedo
+    try {
+        getJwtSecret();
+    } catch (/** @type {any} */ secretErr) {
+        log(
+            'WARN',
+            `[socket-ns/copilot] AUTH_REQUIRED=true mas JWT_SECRET inválido: ${secretErr.message}. Auth desabilitado.`,
+        );
+        return;
     }
-
-    // Autenticação opcional (controlada por env var ou herda do namespace principal)
-    const authRequired = _parseAuthRequired();
-
-    if (authRequired) {
-        // BUG-P2-14: validar JWT secret na inicialização para falhar cedo
+    // BUG-09 (fix): importações JWT movidas para top-level para evitar overhead por conexão
+    ns.use(async (/** @type {SocketClient} */ socket, /** @type {function} */ next) => {
         try {
-            getJwtSecret();
-        } catch (/** @type {any} */ secretErr) {
-            log(
-                'WARN',
-                `[socket-ns/copilot] AUTH_REQUIRED=true mas JWT_SECRET inválido: ${secretErr.message}. Auth desabilitado.`,
-            );
-            // Prossegue sem auth ao invés de falhar em cada conexão
-        }
-        // BUG-09 (fix): importações JWT movidas para top-level para evitar overhead por conexão
-        ns.use(async (/** @type {SocketClient} */ socket, /** @type {function} */ next) => {
-            try {
-                const token =
-                    socket.handshake.auth?.['token'] ||
-                    socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
-
-                if (!token) {
-                    return next(new Error('COPILOT_NS: Token de autenticação ausente.'));
-                }
-
-                const payload = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
-                /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] =
-                    /** @type {{ sub?: string }} */ (payload).sub;
-                next();
-            } catch (/** @type {any} */ err) {
-                log('WARN', `[socket-ns/copilot] Auth falhou: ${err.message}`);
-                next(new Error('COPILOT_NS: Token inválido ou expirado.'));
+            const token =
+                socket.handshake.auth?.['token'] || socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
+            if (!token) {
+                return next(new Error('COPILOT_NS: Token de autenticação ausente.'));
             }
-        });
-    }
+            const payload = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
+            /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] =
+                /** @type {{ sub?: string }} */ (payload).sub;
+            next();
+        } catch (/** @type {any} */ err) {
+            log('WARN', `[socket-ns/copilot] Auth falhou: ${err.message}`);
+            next(new Error('COPILOT_NS: Token inválido ou expirado.'));
+        }
+    });
+}
 
-    // Conexão de clients
+/**
+ * Registra todos os handlers de eventos de conexão de clientes no namespace.
+ *
+ * @param {SocketNamespace} ns
+ * @param {import('./orchestrator.js').HubOrchestrator} orchestrator
+ * @param {import('./store.js').ConversationStore} store
+ * @param {(socketId: string, ip: string) => boolean} checkRate
+ * @returns {void}
+ */
+function _setupConnectionHandlers(ns, orchestrator, store, checkRate) {
     ns.on('connection', (/** @type {SocketClient} */ socket) => {
         const clientId = socket.id;
         const clientIp = socket.handshake.address ?? 'unknown';
         log('DEBUG', `[socket-ns/copilot] Cliente conectado: ${clientId}`);
 
-        // ── Eventos recebidos do cliente ─────────────────────────────────────
-
-        /**
-         * Entrar em uma sala específica de hub_session para receber eventos apenas daquela conversa.
-         */
-        socket.on('join:session', (/** @type {{ hubSession: string }} */ data) => {
-            if (!data?.hubSession) return;
-            // SEC-05 (fix): verificar que a sessão existe no store antes de entrar na sala
-            // Sem isso, um cliente poderia criar salas com IDs arbitrários e receber eventos de broadcast
-            const sessionExists = store.getHubSession(data.hubSession);
-            if (!sessionExists) {
-                log(
-                    'WARN',
-                    `[socket-ns/copilot] join:session negado — sessão '${data.hubSession}' não existe (clientId=${clientId})`,
-                );
-                socket.emit('error:join', { hubSession: data.hubSession, reason: 'session_not_found' });
-                return;
-            }
-            void socket.join(data.hubSession);
-            log('DEBUG', `[socket-ns/copilot] Cliente ${clientId} entrou na sala: ${data.hubSession}`);
-            socket.emit('joined:session', { hubSession: data.hubSession });
-        });
-
-        /**
-         * Sair de uma sala de hub_session.
-         */
-        socket.on('leave:session', (/** @type {{ hubSession: string }} */ data) => {
-            if (!data?.hubSession) return;
-            void socket.leave(data.hubSession);
-            log('DEBUG', `[socket-ns/copilot] Cliente ${clientId} saiu da sala: ${data.hubSession}`);
-        });
-
-        /**
-         * Usuário injeta mensagem em uma hub_session ativa.
-         */
-        // BUG-CRIT-02 fix: handler assíncrono para await injectUserMessage (retorna Promise<number>)
-        socket.on('user:inject', async (/** @type {{ hubSession: string; content: string }} */ data) => {
-            if (!data?.hubSession || !data?.content) {
-                socket.emit('error:inject', { reason: 'hubSession e content são obrigatórios.' });
-                return;
-            }
-
-            // SEC-N04 (fix): rate limit por socket + SEC-P2-06: rate limit por IP
-            if (!checkSocketInjectRate(clientId, clientIp)) {
-                socket.emit('error:inject', { reason: 'Rate limit excedido. Tente novamente em breve.' });
-                log('WARN', `[socket-ns/copilot] Rate limit atingido pelo socket ${clientId}`);
-                return;
-            }
-
-            // SEC-N09 (fix): sanitizar content — remover marcadores de sistema para evitar prompt injection
-            const MAX_INJECT_CONTENT = 32_000;
-            const rawContent = typeof data.content === 'string' ? data.content : String(data.content ?? '');
-            const safeContent = rawContent
-                .slice(0, MAX_INJECT_CONTENT)
-                .replace(/^\s*\[SYSTEM[^\]]*\]/gim, '[BLOCKED]')
-                .replace(/^\s*SYSTEM:/gim, '[BLOCKED]');
-
-            try {
-                const session = store.getHubSession(data.hubSession);
-                if (!session || session.status !== 'active') {
-                    socket.emit('error:inject', {
-                        reason: `Sessão ${data.hubSession} não está ativa.`,
-                    });
-                    return;
-                }
-
-                const turnId = await orchestrator.injectUserMessage(data.hubSession, safeContent, {
-                    metadata: {
-                        injectedBy:
-                            /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] ??
-                            'anonymous',
-                        socketId: clientId,
-                    },
-                });
-
-                socket.emit('inject:ack', { hubSession: data.hubSession, turnId });
-                log('INFO', `[socket-ns/copilot] Mensagem injetada pelo usuário na sessão ${data.hubSession}.`);
-            } catch (/** @type {any} */ err) {
-                socket.emit('error:inject', { reason: err.message ?? String(err) });
-                log('ERROR', `[socket-ns/copilot] Erro ao injetar mensagem: ${err.message ?? String(err)}`);
-            }
-        });
-
-        /**
-         * Cliente solicita lista de sessões.
-         */
-        socket.on('sessions:list', (/** @type {{ limit?: number; offset?: number; status?: string }} */ opts) => {
-            try {
-                const statusVal = /** @type {import('./store.js').HubSessionStatus | undefined} */ (opts?.status);
-                const sessions = store.listHubSessions({
-                    limit: opts?.limit ?? 20,
-                    offset: opts?.offset ?? 0,
-                    ...(statusVal !== undefined ? { status: statusVal } : {}),
-                });
-                socket.emit('sessions:list:result', { sessions });
-            } catch (/** @type {any} */ err) {
-                socket.emit('error:sessions', { reason: err.message });
-            }
-        });
-
-        /**
-         * Cliente solicita histórico de turns de uma sessão.
-         */
-        socket.on(
-            'turns:history',
-            (/** @type {{ hubSession: string; limit?: number; offset?: number; after?: number }} */ data) => {
-                if (!data?.hubSession) return;
-                try {
-                    const turns = store.readTurns(data.hubSession, {
-                        limit: data.limit ?? 50,
-                        offset: data.offset ?? 0,
-                        ...(data.after !== undefined && { after: data.after }),
-                    });
-                    socket.emit('turns:history:result', { hubSession: data.hubSession, turns });
-                } catch (/** @type {any} */ err) {
-                    socket.emit('error:history', { reason: err.message });
-                }
-            },
-        );
+        _handleJoinSession(socket, store, clientId);
+        _handleLeaveSession(socket, clientId);
+        _handleUserInject(socket, orchestrator, store, clientId, clientIp, checkRate);
+        _handleSessionsList(socket, store);
+        _handleTurnsHistory(socket, store);
 
         socket.on('disconnect', () => {
             log('DEBUG', `[socket-ns/copilot] Cliente desconectado: ${clientId}`);
         });
     });
+}
 
-    // ── Bridge de eventos do Orchestrator → Namespace ────────────────────────
+/**
+ * @param {SocketClient} socket
+ * @param {import('./store.js').ConversationStore} store
+ * @param {string} clientId
+ */
+function _handleJoinSession(socket, store, clientId) {
+    socket.on('join:session', (/** @type {{ hubSession: string }} */ data) => {
+        if (!data?.hubSession) return;
+        // SEC-05 (fix): verificar que a sessão existe antes de entrar na sala
+        const sessionExists = store.getHubSession(data.hubSession);
+        if (!sessionExists) {
+            log(
+                'WARN',
+                `[socket-ns/copilot] join:session negado — sessão '${data.hubSession}' não existe (clientId=${clientId})`,
+            );
+            socket.emit('error:join', { hubSession: data.hubSession, reason: 'session_not_found' });
+            return;
+        }
+        void socket.join(data.hubSession);
+        log('DEBUG', `[socket-ns/copilot] Cliente ${clientId} entrou na sala: ${data.hubSession}`);
+        socket.emit('joined:session', { hubSession: data.hubSession });
+    });
+}
 
+/**
+ * @param {SocketClient} socket
+ * @param {string} clientId
+ */
+function _handleLeaveSession(socket, clientId) {
+    socket.on('leave:session', (/** @type {{ hubSession: string }} */ data) => {
+        if (!data?.hubSession) return;
+        void socket.leave(data.hubSession);
+        log('DEBUG', `[socket-ns/copilot] Cliente ${clientId} saiu da sala: ${data.hubSession}`);
+    });
+}
+
+/**
+ * @param {SocketClient} socket
+ * @param {import('./orchestrator.js').HubOrchestrator} orchestrator
+ * @param {import('./store.js').ConversationStore} store
+ * @param {string} clientId
+ * @param {string} clientIp
+ * @param {(socketId: string, ip: string) => boolean} checkRate
+ */
+function _handleUserInject(socket, orchestrator, store, clientId, clientIp, checkRate) {
+    // BUG-CRIT-02 fix: handler assíncrono para await injectUserMessage
+    socket.on('user:inject', async (/** @type {{ hubSession: string; content: string }} */ data) => {
+        if (!data?.hubSession || !data?.content) {
+            socket.emit('error:inject', { reason: 'hubSession e content são obrigatórios.' });
+            return;
+        }
+        // SEC-N04 + SEC-P2-06: rate limit por socket e por IP
+        if (!checkRate(clientId, clientIp)) {
+            socket.emit('error:inject', { reason: 'Rate limit excedido. Tente novamente em breve.' });
+            log('WARN', `[socket-ns/copilot] Rate limit atingido pelo socket ${clientId}`);
+            return;
+        }
+        // SEC-N09: sanitizar content — remover marcadores de sistema
+        const MAX_INJECT_CONTENT = 32_000;
+        const rawContent = typeof data.content === 'string' ? data.content : String(data.content ?? '');
+        const safeContent = rawContent
+            .slice(0, MAX_INJECT_CONTENT)
+            .replace(/^\s*\[SYSTEM[^\]]*\]/gim, '[BLOCKED]')
+            .replace(/^\s*SYSTEM:/gim, '[BLOCKED]');
+
+        try {
+            const session = store.getHubSession(data.hubSession);
+            if (!session || session.status !== 'active') {
+                socket.emit('error:inject', { reason: `Sessão ${data.hubSession} não está ativa.` });
+                return;
+            }
+            const turnId = await orchestrator.injectUserMessage(data.hubSession, safeContent, {
+                metadata: {
+                    injectedBy:
+                        /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] ??
+                        'anonymous',
+                    socketId: clientId,
+                },
+            });
+            socket.emit('inject:ack', { hubSession: data.hubSession, turnId });
+            log('INFO', `[socket-ns/copilot] Mensagem injetada pelo usuário na sessão ${data.hubSession}.`);
+        } catch (/** @type {any} */ err) {
+            socket.emit('error:inject', { reason: err.message ?? String(err) });
+            log('ERROR', `[socket-ns/copilot] Erro ao injetar mensagem: ${err.message ?? String(err)}`);
+        }
+    });
+}
+
+/**
+ * @param {SocketClient} socket
+ * @param {import('./store.js').ConversationStore} store
+ */
+function _handleSessionsList(socket, store) {
+    socket.on('sessions:list', (/** @type {{ limit?: number; offset?: number; status?: string }} */ opts) => {
+        try {
+            const statusVal = /** @type {import('./store.js').HubSessionStatus | undefined} */ (opts?.status);
+            const sessions = store.listHubSessions({
+                limit: opts?.limit ?? 20,
+                offset: opts?.offset ?? 0,
+                ...(statusVal !== undefined ? { status: statusVal } : {}),
+            });
+            socket.emit('sessions:list:result', { sessions });
+        } catch (/** @type {any} */ err) {
+            socket.emit('error:sessions', { reason: err.message });
+        }
+    });
+}
+
+/**
+ * @param {SocketClient} socket
+ * @param {import('./store.js').ConversationStore} store
+ */
+function _handleTurnsHistory(socket, store) {
+    socket.on(
+        'turns:history',
+        (/** @type {{ hubSession: string; limit?: number; offset?: number; after?: number }} */ data) => {
+            if (!data?.hubSession) return;
+            try {
+                const turns = store.readTurns(data.hubSession, {
+                    limit: data.limit ?? 50,
+                    offset: data.offset ?? 0,
+                    ...(data.after !== undefined && { after: data.after }),
+                });
+                socket.emit('turns:history:result', { hubSession: data.hubSession, turns });
+            } catch (/** @type {any} */ err) {
+                socket.emit('error:history', { reason: err.message });
+            }
+        },
+    );
+}
+
+/**
+ * Conecta eventos do HubOrchestrator ao namespace — bridge orquestradora → clientes.
+ *
+ * @param {SocketNamespace} ns
+ * @param {import('./orchestrator.js').HubOrchestrator} orchestrator
+ * @returns {void}
+ */
+function _bridgeOrchestratorEvents(ns, orchestrator) {
     orchestrator.on('session:created', (/** @type {{ hubSessionId: string; title: string }} */ data) => {
         ns.emit('session:created', data);
     });
@@ -319,10 +366,6 @@ export function mountCopilotNamespace(io, orchestrator, store) {
             message: data.message,
         });
     });
-
-    copilotNamespace = ns;
-    log('INFO', '[socket-ns/copilot] Namespace /copilot montado com sucesso.');
-    return ns;
 }
 
 /**

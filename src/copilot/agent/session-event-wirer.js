@@ -83,22 +83,31 @@ const KNOWN_SDK_EVENTS = new Set([
  * @returns {(() => void)[]} Lista de funções de unsubscribe a chamar no cleanup
  */
 export function wireSessionEvents(session, isResumed, callbacks) {
-    const { emit, getStatusSnapshot, onCheckpointPath, onContextState, onPrInfo, isProcessing, dialogLoopActive } =
-        callbacks;
+    const unsubs = [
+        ..._wireCompactionEvents(session, callbacks),
+        ..._wireStreamingEvents(session, callbacks),
+        ..._wireTokenBudgetEvents(session, isResumed, callbacks),
+        ..._wireModeAndToolEvents(session, callbacks),
+        _wireCatchAll(session, callbacks),
+    ];
+    return unsubs;
+}
 
-    /** @type {(() => void)[]} */
-    const unsubs = [];
+// ─── Sub-funções de wireSessionEvents ────────────────────────────────────────
 
-    // Compaction start
-    unsubs.push(
+/**
+ * Registra eventos de compaction da sessão.
+ *
+ * @param {CopilotSession} session
+ * @param {SessionWirerCallbacks} callbacks
+ * @returns {(() => void)[]}
+ */
+function _wireCompactionEvents(session, { emit, getStatusSnapshot, onCheckpointPath }) {
+    return [
         session.on('session.compaction_start', (/** @type {SdkEvent} */ evt) => {
             log('INFO', '[AlwaysAlive] Compaction iniciada (sessão infinita).');
             emit('session.compaction_start', evt?.data ?? {});
         }),
-    );
-
-    // Compaction complete — detecta falha, captura checkpointPath para recovery.
-    unsubs.push(
         session.on('session.compaction_complete', (/** @type {SdkEvent} */ evt) => {
             const data = /** @type {{ success?: boolean; checkpointPath?: string }} */ (evt?.data ?? {});
             if (data['success'] === false) {
@@ -123,10 +132,18 @@ export function wireSessionEvents(session, isResumed, callbacks) {
                 checkpoint: data['checkpointPath'] ?? null,
             });
         }),
-    );
+    ];
+}
 
-    // Reasoning tokens (o3/o4-mini extended thinking)
-    unsubs.push(
+/**
+ * Registra eventos de streaming de tokens (reasoning + message delta).
+ *
+ * @param {CopilotSession} session
+ * @param {SessionWirerCallbacks} callbacks
+ * @returns {(() => void)[]}
+ */
+function _wireStreamingEvents(session, { emit, isProcessing, dialogLoopActive }) {
+    return [
         session.on('assistant.reasoning_delta', (/** @type {SdkEvent} */ evt) => {
             const chunk = /** @type {string} */ (evt?.data?.['deltaContent'] ?? '');
             if (chunk)
@@ -135,127 +152,129 @@ export function wireSessionEvents(session, isResumed, callbacks) {
                     reasoningId: /** @type {string | null} */ (evt?.data?.['reasoningId'] ?? null),
                 });
         }),
-    );
-
-    // Streaming delta — filtra durante 'processing' (task.delta via task-executor) e durante
-    // 'waiting_for_input' com dialog loop ativo (G1-BUG-06: evita taskId:null no SSE).
-    unsubs.push(
+        // Streaming delta — filtra durante 'processing' e 'waiting_for_input' com dialog loop ativo
+        // (G1-BUG-06: evita taskId:null no SSE durante dialog loop)
         session.on('assistant.message_delta', (/** @type {SdkEvent} */ evt) => {
             if (isProcessing() || dialogLoopActive()) return;
             const chunk = /** @type {string} */ (evt?.data?.['deltaContent'] ?? evt?.data?.['content'] ?? '');
             if (chunk) emit('task.delta', { taskId: null, chunk });
         }),
-    );
+    ];
+}
 
-    // G2-ARCH-07: lógica de aviso de token budget extraída para função auxiliar local.
-    /**
-     * Verifica o uso de tokens e emite `session.token_budget_warning` quando necessário.
-     *
-     * Regras:
-     *
-     * - Sessão retomada com > 70%: emite `reason: 'startup_heavy'` uma única vez (na primeira checagem).
-     * - Qualquer sessão com > 80%: emite aviso normal (em checks subsequentes).
-     *
-     * @param {{ currentTokens: number; tokenLimit: number }} usageData
-     * @param {boolean} firstCheck - true se for a primeira `session.usage_info` desta sessão
-     * @returns {void}
-     */
-    function checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, firstCheck) {
-        const ratio = Math.round((currentTokens / tokenLimit) * 100);
-        if (firstCheck && isResumed && currentTokens / tokenLimit > 0.7) {
-            log(
-                'WARN',
-                `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
-            );
-            emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio, reason: 'startup_heavy' });
-            // G2-BUG-13: não emitir segundo warning neste mesmo tick (startup_heavy já cobre > 70%).
-        } else if (currentTokens / tokenLimit > 0.8) {
-            log(
-                'WARN',
-                `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
-            );
-            emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
-        }
+/**
+ * Verifica uso de tokens e emite aviso quando próximo do limite.
+ *
+ * @param {{ currentTokens: number; tokenLimit: number }} usageData
+ * @param {boolean} isResumed
+ * @param {boolean} firstCheck
+ * @param {(event: string, payload?: any) => void} emit
+ * @returns {void}
+ */
+function _checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, isResumed, firstCheck, emit) {
+    const ratio = Math.round((currentTokens / tokenLimit) * 100);
+    if (firstCheck && isResumed && currentTokens / tokenLimit > 0.7) {
+        log(
+            'WARN',
+            `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
+        );
+        emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio, reason: 'startup_heavy' });
+    } else if (currentTokens / tokenLimit > 0.8) {
+        log(
+            'WARN',
+            `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
+        );
+        emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio });
     }
+}
 
-    // Token usage e janela de contexto — atualiza contextState e emite avisos.
+/**
+ * Registra evento de token usage (atualiza contextState + aviso de budget).
+ *
+ * @param {CopilotSession} session
+ * @param {boolean} isResumed
+ * @param {SessionWirerCallbacks} callbacks
+ * @returns {(() => void)[]}
+ */
+function _wireTokenBudgetEvents(session, isResumed, { emit, onContextState }) {
     let _firstUsageChecked = false;
-    unsubs.push(
+    return [
         session.on('session.usage_info', (/** @type {SdkEvent} */ evt) => {
             const data = evt?.data ?? {};
             emit('session.usage', data);
             const currentTokens = /** @type {number} */ (data['currentTokens'] ?? 0);
             const tokenLimit = /** @type {number} */ (data['tokenLimit'] ?? 0);
             if (tokenLimit > 0) {
-                onContextState({
-                    tokens: currentTokens,
-                    tokenLimit,
-                    utilization: currentTokens / tokenLimit,
-                });
-                checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, !_firstUsageChecked);
+                onContextState({ tokens: currentTokens, tokenLimit, utilization: currentTokens / tokenLimit });
+                _checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, isResumed, !_firstUsageChecked, emit);
                 _firstUsageChecked = true;
             }
         }),
-    );
+    ];
+}
 
-    // Mudança de modo (plan ↔ act ↔ interactive)
-    unsubs.push(
+/**
+ * Registra eventos de mudança de modo e execução de tools.
+ *
+ * @param {CopilotSession} session
+ * @param {SessionWirerCallbacks} callbacks
+ * @returns {(() => void)[]}
+ */
+function _wireModeAndToolEvents(session, { emit, isProcessing }) {
+    return [
         session.on('session.mode_changed', (/** @type {SdkEvent} */ evt) => {
             log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.['previousMode']} → ${evt?.data?.['newMode']}`);
             emit('session.mode_changed', evt?.data ?? {});
         }),
-    );
-
-    // G2-BUG-14: tool.execution_start e tool.execution_complete estavam no knownEvents mas nunca subscritos.
-    // Guard isProcessing(): durante task execution, task-executor.js já emite com taskId — evitar duplicata.
-    unsubs.push(
+        // G2-BUG-14: tool events estavam no knownEvents mas nunca subscritos
         session.on('tool.execution_start', (/** @type {SdkEvent} */ evt) => {
             if (isProcessing()) return;
             emit('tool.execution.start', evt?.data ?? {});
         }),
-    );
-    unsubs.push(
         session.on('tool.execution_complete', (/** @type {SdkEvent} */ evt) => {
             if (isProcessing()) return;
             emit('tool.execution.complete', evt?.data ?? {});
         }),
-    );
+    ];
+}
 
-    // Catch-all para eventos do SDK não tratados explicitamente + billing (assistant.usage).
-    // G2-PERF-02: knownEvents movido para constante de módulo KNOWN_SDK_EVENTS
-    unsubs.push(
-        session.on((/** @type {SdkEvent} */ evt) => {
-            const kind = /** @type {string} */ (evt?.kind ?? evt?.type ?? 'unknown');
-            if (kind === 'assistant.usage') {
-                const data = evt?.data ?? {};
-                const model = /** @type {string | undefined} */ (data['model']);
-                const cost = /** @type {number | undefined} */ (data['cost']);
-                const quotaSnapshots = /** @type {Record<string, unknown> | undefined} */ (data['quotaSnapshots']);
-                const prInfo = {
-                    ts: Date.now(),
-                    ...(model !== undefined ? { model } : {}),
-                    ...(cost !== undefined ? { cost } : {}),
-                    ...(quotaSnapshots !== undefined ? { quotaSnapshots } : {}),
-                };
-                log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
-                onPrInfo(prInfo);
-                emit('pr.consumed', prInfo);
-                writeStateAsync({
-                    pendingTurnConsumedPR: true,
-                    lastPrConsumedAt: Date.now(),
-                    lastPrModel: model ?? '',
-                    lastPrCost: cost ?? 0,
-                    lastQuotaSnapshots: quotaSnapshots ?? null,
-                }).catch((/** @type {any} */ e) =>
-                    log('WARN', `[AlwaysAlive] writeState pendingTurnConsumedPR: ${e.message}`),
-                );
-                return;
-            }
-            if (!KNOWN_SDK_EVENTS.has(kind)) {
-                log('DEBUG', `[AlwaysAlive] Evento SDK não tratado: kind=${kind}`);
-            }
-        }),
-    );
-
-    return unsubs;
+/**
+ * Catch-all para eventos não tratados explicitamente + billing (assistant.usage).
+ *
+ * @param {CopilotSession} session
+ * @param {SessionWirerCallbacks} callbacks
+ * @returns {() => void}
+ */
+function _wireCatchAll(session, { emit, onPrInfo }) {
+    return session.on((/** @type {SdkEvent} */ evt) => {
+        const kind = /** @type {string} */ (evt?.kind ?? evt?.type ?? 'unknown');
+        if (kind === 'assistant.usage') {
+            const data = evt?.data ?? {};
+            const model = /** @type {string | undefined} */ (data['model']);
+            const cost = /** @type {number | undefined} */ (data['cost']);
+            const quotaSnapshots = /** @type {Record<string, unknown> | undefined} */ (data['quotaSnapshots']);
+            const prInfo = {
+                ts: Date.now(),
+                ...(model !== undefined ? { model } : {}),
+                ...(cost !== undefined ? { cost } : {}),
+                ...(quotaSnapshots !== undefined ? { quotaSnapshots } : {}),
+            };
+            log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
+            onPrInfo(prInfo);
+            emit('pr.consumed', prInfo);
+            writeStateAsync({
+                pendingTurnConsumedPR: true,
+                lastPrConsumedAt: Date.now(),
+                lastPrModel: model ?? '',
+                lastPrCost: cost ?? 0,
+                lastQuotaSnapshots: quotaSnapshots ?? null,
+            }).catch((/** @type {any} */ e) =>
+                log('WARN', `[AlwaysAlive] writeState pendingTurnConsumedPR: ${e.message}`),
+            );
+            return;
+        }
+        if (!KNOWN_SDK_EVENTS.has(kind)) {
+            log('DEBUG', `[AlwaysAlive] Evento SDK não tratado: kind=${kind}`);
+        }
+    });
 }

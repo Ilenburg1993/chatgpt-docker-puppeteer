@@ -73,6 +73,75 @@ const BANNER = `
 // ─── Helpers de dispatch ──────────────────────────────────────────────────────
 
 /**
+ * @typedef {{ hubSessionId: string | null; injectPort: number }} CmdCtx
+ */
+
+/**
+ * Tabela de roteamento de comandos REPL. `println` é resolvida via closure sobre o módulo. Cada entry: `[nomes[],
+ * handler(ctx, arg, rest, rl, injectServer, cleanup)]`
+ *
+ * @type {[
+ *     string[],
+ *     (
+ *         ctx: CmdCtx,
+ *         arg: string,
+ *         rest: string[],
+ *         rl: readline.Interface,
+ *         injectServer: import('node:http').Server,
+ *         cleanup: () => void,
+ *     ) => Promise<void> | void,
+ * ][]}
+ */
+const CMD_ROUTES = [
+    [['status'], (ctx) => _cmdStatus({ hubSessionId: ctx.hubSessionId, injectPort: ctx.injectPort, println })],
+    [['history'], (_, arg) => _cmdHistory({ println }, Number(arg) || 10)],
+    [
+        ['db-history'],
+        (ctx, arg, rest) =>
+            _cmdDbHistory({ hubSessionId: ctx.hubSessionId, println }, Number(arg) || 20, Number(rest[0]) || 0),
+    ],
+    [['db-sessions'], (ctx, arg) => _cmdDbSessions({ hubSessionId: ctx.hubSessionId, println }, Number(arg) || 10)],
+    [['remember'], (ctx, arg) => _cmdRemember({ hubSessionId: ctx.hubSessionId, println }, arg)],
+    [['recall'], (ctx, arg) => _cmdRecall({ hubSessionId: ctx.hubSessionId, println }, arg)],
+    [['forget'], (ctx, arg) => _cmdForget({ hubSessionId: ctx.hubSessionId, println }, arg)],
+    [['who'], (ctx) => _cmdWho({ injectPort: ctx.injectPort, println })],
+    [['clear'], () => _cmdClear({ println })],
+    [['answer'], (_, arg) => _cmdAnswer({ println }, arg)],
+    [['count'], (ctx) => _cmdCount({ hubSessionId: ctx.hubSessionId, println })],
+    [['restart'], () => _cmdRestart()],
+    [['model'], (_, arg) => _cmdModel({ println }, arg)],
+    [['reasoning'], (_, arg) => _cmdReasoning({ println }, arg)],
+    [['attach'], (_, arg) => _cmdAttach({ println }, arg)],
+    [['context'], () => _cmdContext({ println })],
+    [['compact'], () => _cmdCompact({ println })],
+    [['plan'], (_, arg) => _cmdPlan({ println }, arg)],
+    [['resume'], (ctx, arg) => _cmdResume({ println, hubSessionId: ctx.hubSessionId }, arg)],
+    [['pause'], () => _cmdPauseDialogLoop()],
+    [['dialog-resume'], () => _cmdDialogResume()],
+    [['skills'], (_, arg) => _cmdSkills({ println }, arg)],
+    [['quit', 'exit'], (_, _2, _3, rl, injectServer, cleanup) => _cmdQuit(rl, injectServer, cleanup)],
+    [['gh'], (_, _2, rest) => _cmdGh({ println }, rest)],
+    [['git'], (_, _2, rest) => _cmdGit({ println }, rest)],
+    [['alias'], (_, _2, rest) => _cmdAlias({ println }, rest)],
+    [['help'], (ctx) => _cmdHelp({ println, injectPort: ctx.injectPort })],
+];
+
+/**
+ * @type {Map<
+ *     string,
+ *     (
+ *         ctx: CmdCtx,
+ *         arg: string,
+ *         rest: string[],
+ *         rl: readline.Interface,
+ *         injectServer: import('node:http').Server,
+ *         cleanup: () => void,
+ *     ) => Promise<void> | void
+ * >}
+ */
+const _cmdRouteMap = new Map(CMD_ROUTES.flatMap(([names, fn]) => names.map((n) => [n, fn])));
+
+/**
  * @param {string} cmd
  * @param {string} arg
  * @param {string[]} rest
@@ -82,150 +151,71 @@ const BANNER = `
  * @returns {Promise<void>}
  */
 async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
-    const _hubSessionId = getHubSessionId();
-    switch (cmd?.toLowerCase()) {
-        case 'status':
-            _cmdStatus({ hubSessionId: _hubSessionId, injectPort: INJECT_PORT, println });
-            break;
-        case 'history': {
-            const n = Number(arg) || 10;
-            _cmdHistory({ println }, n);
-            break;
-        }
-        case 'db-history': {
-            // UPG-PROP-13 (fix): suporte a offset para paginação: /db-history [n] [offset]
-            const n = Number(arg) || 20;
-            const dbHistOffset = Number(rest[0]) || 0;
-            _cmdDbHistory({ hubSessionId: _hubSessionId, println }, n, dbHistOffset);
-            break;
-        }
-        case 'db-sessions': {
-            const n = Number(arg) || 10;
-            _cmdDbSessions({ hubSessionId: _hubSessionId, println }, n);
-            break;
-        }
-        case 'remember':
-            _cmdRemember({ hubSessionId: _hubSessionId, println }, arg);
-            break;
-        case 'recall':
-            _cmdRecall({ hubSessionId: _hubSessionId, println }, arg);
-            break;
-        case 'forget':
-            _cmdForget({ hubSessionId: _hubSessionId, println }, arg);
-            break;
-        case 'who':
-            _cmdWho({ injectPort: INJECT_PORT, println });
-            break;
-        case 'clear':
-            _cmdClear({ println });
-            break;
-        case 'answer':
-            _cmdAnswer({ println }, arg);
-            break;
-        case 'count':
-            _cmdCount({ hubSessionId: _hubSessionId, println });
-            break;
-        case 'restart':
-            // DL-PERM: /restart para o loop via stopDialogMode() (reason: watchdog_restart), que
-            // emite dialog.stopped → o handler em index.js chama ensureDialogLoop() automaticamente.
-            // Aguardamos dialog.ready para confirmar que o boot completou antes de exibir feedback.
-            //
-            // F6.1 (BUG-MOD-07): registrar o listener APÓS stopDialogMode() para evitar capturar
-            // um dialog.ready de um boot anterior. Se o boot completar antes do registro (ultra-rápido),
-            // verificamos dialogLoopActive para não ficatarmos presos no timeout.
-            println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
-            try {
-                await llmBridgeClient.stopDialogMode();
-                // Verifica se o loop já voltou antes de registrar o listener
-                if (!alwaysAliveAgent.dialogLoopActive) {
-                    await new Promise((resolve, reject) => {
-                        const timeout = setTimeout(() => reject(new Error('Timeout aguardando restart')), 30_000);
-                        alwaysAliveAgent.once('dialog.ready', () => {
-                            clearTimeout(timeout);
-                            resolve(undefined);
-                        });
-                    });
-                }
-            } catch (/** @type {any} */ e) {
-                println(`\x1b[31m  Falha no restart: ${e.message}\x1b[0m`);
-                // Fallback: tentar ensureDialogLoop diretamente
-                await ensureDialogLoop().catch(() => {});
-            }
-            println('\x1b[32m  Dialog loop reiniciado.\x1b[0m');
-            break;
-        case 'model':
-            await _cmdModel({ println }, arg);
-            break;
-        case 'reasoning':
-            _cmdReasoning({ println }, arg);
-            break;
-        case 'attach':
-            await _cmdAttach({ println }, arg);
-            break;
-        case 'context':
-            _cmdContext({ println });
-            break;
-        case 'compact':
-            await _cmdCompact({ println });
-            break;
-        case 'plan':
-            _cmdPlan({ println }, arg);
-            break;
-        case 'resume':
-            await _cmdResume({ println, hubSessionId: _hubSessionId }, arg);
-            break;
-        case 'pause':
-            // NEW-PAUSE: pausa o dialog loop preservando sessionId para retomada sem PR
-            try {
-                await alwaysAliveAgent.pauseDialogLoop();
-                println('\x1b[33m  Dialog loop pausado. Use /dialog-resume para retomar sem consumir PR.\x1b[0m');
-            } catch (/** @type {any} */ e) {
-                println(`\x1b[31m  Erro ao pausar: ${e.message}\x1b[0m`);
-            }
-            break;
-        case 'dialog-resume':
-            // NEW-PAUSE: retoma o dialog loop a partir do sessionId pausado (0 PR se ainda ativo)
-            try {
-                await alwaysAliveAgent.resumeDialogLoop();
-                println('\x1b[32m  Dialog loop retomado.\x1b[0m');
-            } catch (/** @type {any} */ e) {
-                println(`\x1b[31m  Erro ao retomar: ${e.message}\x1b[0m`);
-            }
-            break;
-        case 'skills':
-            _cmdSkills({ println }, arg);
-            break;
-        case 'quit':
-        case 'exit':
-            println('[terminal] Encerrando sessão…');
-            cleanup();
-            // TERM-QUIT-01: usar authorized_stop para que o handler de dialog.stopped
-            // em index.js NÃO tente reiniciar o loop após o encerramento explícito pelo usuário.
-            // stopDialogMode() usa reason='watchdog_restart' que causaria restart indevido.
-            try {
-                await alwaysAliveAgent.stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
-            } catch {
-                /* ignora — loop pode já estar parado */
-            }
-            rl.close();
-            injectServer.close();
-            setRl(null);
-            break;
-        case 'gh':
-            await _cmdGh({ println }, rest);
-            break;
-        case 'git':
-            await _cmdGit({ println }, rest);
-            break;
-        case 'alias':
-            _cmdAlias({ println }, rest);
-            break;
-        case 'help':
-            _cmdHelp({ println, injectPort: INJECT_PORT });
-            break;
-        default:
-            println(`\x1b[90m  Comando desconhecido: /${cmd}. Use /help para ver todos os comandos.\x1b[0m`);
+    const ctx = { println, hubSessionId: getHubSessionId(), injectPort: INJECT_PORT };
+    const handler = _cmdRouteMap.get(cmd?.toLowerCase() ?? '');
+    if (handler) {
+        await handler(ctx, arg, rest, rl, injectServer, cleanup);
+    } else {
+        println(`\x1b[90m  Comando desconhecido: /${cmd}. Use /help para ver todos os comandos.\x1b[0m`);
     }
+}
+
+// ─── Handlers standalone de comandos inline ───────────────────────────────────
+
+async function _cmdRestart() {
+    println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
+    try {
+        await llmBridgeClient.stopDialogMode();
+        if (!alwaysAliveAgent.dialogLoopActive) {
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Timeout aguardando restart')), 30_000);
+                alwaysAliveAgent.once('dialog.ready', () => {
+                    clearTimeout(timeout);
+                    resolve(undefined);
+                });
+            });
+        }
+    } catch (/** @type {any} */ e) {
+        println(`\x1b[31m  Falha no restart: ${e.message}\x1b[0m`);
+        await ensureDialogLoop().catch(() => {});
+    }
+    println('\x1b[32m  Dialog loop reiniciado.\x1b[0m');
+}
+
+async function _cmdPauseDialogLoop() {
+    try {
+        await alwaysAliveAgent.pauseDialogLoop();
+        println('\x1b[33m  Dialog loop pausado. Use /dialog-resume para retomar sem consumir PR.\x1b[0m');
+    } catch (/** @type {any} */ e) {
+        println(`\x1b[31m  Erro ao pausar: ${e.message}\x1b[0m`);
+    }
+}
+
+async function _cmdDialogResume() {
+    try {
+        await alwaysAliveAgent.resumeDialogLoop();
+        println('\x1b[32m  Dialog loop retomado.\x1b[0m');
+    } catch (/** @type {any} */ e) {
+        println(`\x1b[31m  Erro ao retomar: ${e.message}\x1b[0m`);
+    }
+}
+
+/**
+ * @param {readline.Interface} rl
+ * @param {import('node:http').Server} injectServer
+ * @param {() => void} cleanup
+ */
+async function _cmdQuit(rl, injectServer, cleanup) {
+    println('[terminal] Encerrando sessão…');
+    cleanup();
+    try {
+        await alwaysAliveAgent.stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
+    } catch {
+        /* ignora — loop pode já estar parado */
+    }
+    rl.close();
+    injectServer.close();
+    setRl(null);
 }
 
 // ─── Agent listeners ──────────────────────────────────────────────────────────
