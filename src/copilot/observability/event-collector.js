@@ -18,6 +18,7 @@
  * @module copilot/observability/event-collector
  */
 
+import { globalAuditBuffer } from '#copilot/hooks/audit';
 import { appendFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -104,22 +105,37 @@ const DEFAULT_PERSIST_TYPES = Object.freeze([
     'tool.execution_start',
     'tool.execution_complete',
     'assistant.usage',
+    'assistant.turn_start',
+    'assistant.turn_end',
     'session.usage_info',
     'session.error',
     'session.truncation',
     'session.compaction_start',
     'session.compaction_complete',
+    'session.tools_updated',
+    'session.mcp_servers_loaded',
+    'session.mode_changed',
+    'session.model_change',
+    'session.plan_changed',
+    'session.background_tasks_changed',
+    'session.workspace_file_changed',
     'permission.requested',
     'permission.completed',
+    'elicitation.requested',
+    'elicitation.completed',
+    'user_input.requested',
+    'user_input.completed',
     'hook.start',
     'hook.end',
     'session.task_complete',
-    'assistant.turn_end',
     'session.shutdown',
     'session.info',
+    'session.warning',
     'skill.invoked',
+    'subagent.started',
     'subagent.completed',
     'subagent.failed',
+    'subagent.deselected',
 ]);
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
@@ -191,6 +207,17 @@ export function createEventCollector(opts = {}) {
                 // Re-emitir no HookBus
                 hookBus?.emitHook('post_tool_use', sessionId, { toolName, success }, { durationMs });
 
+                // Alimentar globalAuditBuffer (hook_get_audit_tail via hook-tools.js)
+                // SDK não expõe toolArgs diretamente; usamos result.content como resumo do resultado
+                globalAuditBuffer.push({
+                    toolName,
+                    toolArgs: {},
+                    toolResult: event.data.result?.content ?? null,
+                    sessionId,
+                    ts: event.timestamp ?? new Date().toISOString(),
+                    durationMs,
+                });
+
                 if (persist && persistTypes.includes('tool.execution_complete')) {
                     persistEvent({
                         type: event.type,
@@ -212,10 +239,16 @@ export function createEventCollector(opts = {}) {
         // ── assistant.usage (tokens) ──────────────────────────────────────────
         unsubs.push(
             session.on('assistant.usage', (event) => {
-                const { model, inputTokens, outputTokens, duration } = event.data;
+                const { model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, duration } = event.data;
 
-                // Alimentar MetricsStore com token usage por modelo
-                metrics?.recordUsage(model ?? 'unknown', inputTokens ?? 0, outputTokens ?? 0);
+                // Alimentar MetricsStore com token usage por modelo (incluindo cache tokens)
+                metrics?.recordUsage(
+                    model ?? 'unknown',
+                    inputTokens ?? 0,
+                    outputTokens ?? 0,
+                    cacheReadTokens ?? 0,
+                    cacheWriteTokens ?? 0,
+                );
 
                 if (persist && persistTypes.includes('assistant.usage')) {
                     persistEvent({
@@ -225,18 +258,27 @@ export function createEventCollector(opts = {}) {
                         model,
                         inputTokens,
                         outputTokens,
+                        cacheReadTokens,
+                        cacheWriteTokens,
                         duration,
                     });
                 }
                 hookBus?.emitHook(
                     'post_tool_use',
                     sessionId,
-                    { _eventType: 'assistant.usage', model, inputTokens, outputTokens },
+                    {
+                        _eventType: 'assistant.usage',
+                        model,
+                        inputTokens,
+                        outputTokens,
+                        cacheReadTokens,
+                        cacheWriteTokens,
+                    },
                     null,
                 );
                 log(
                     'DEBUG',
-                    `[event-collector] assistant.usage: model=${model} in=${inputTokens ?? 0} out=${outputTokens ?? 0} session=${sessionId}`,
+                    `[event-collector] assistant.usage: model=${model} in=${inputTokens ?? 0} out=${outputTokens ?? 0} cacheR=${cacheReadTokens ?? 0} cacheW=${cacheWriteTokens ?? 0} session=${sessionId}`,
                 );
             }),
         );
@@ -295,6 +337,66 @@ export function createEventCollector(opts = {}) {
             }),
         );
 
+        // ── session.tools_updated / mcp_servers_loaded ────────────────────────
+        unsubs.push(
+            session.on('session.tools_updated', (event) => {
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                log('DEBUG', `[event-collector] session.tools_updated session=${sessionId}`);
+            }),
+        );
+        unsubs.push(
+            session.on('session.mcp_servers_loaded', (event) => {
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                log('DEBUG', `[event-collector] session.mcp_servers_loaded session=${sessionId}`);
+            }),
+        );
+
+        // ── session.mode_changed / model_change / plan_changed ────────────────
+        unsubs.push(
+            session.on('session.mode_changed', (event) => {
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                log('INFO', `[event-collector] session.mode_changed session=${sessionId}`);
+            }),
+        );
+        unsubs.push(
+            session.on('session.model_change', (event) => {
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                log('INFO', `[event-collector] session.model_change session=${sessionId}`);
+            }),
+        );
+        unsubs.push(
+            session.on('session.plan_changed', (event) => {
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+            }),
+        );
+
+        // ── session.background_tasks_changed ─────────────────────────────────
+        unsubs.push(
+            session.on('session.background_tasks_changed', (event) => {
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+            }),
+        );
+
+        // ── session.warning / session.idle / session.shutdown ─────────────────
+        unsubs.push(
+            session.on('session.warning', (event) => {
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                log('WARN', `[event-collector] session.warning session=${sessionId}`);
+            }),
+        );
+        unsubs.push(
+            session.on('session.idle', (event) => {
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                log('DEBUG', `[event-collector] session.idle session=${sessionId}`);
+            }),
+        );
+        unsubs.push(
+            session.on('session.shutdown', (event) => {
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                log('INFO', `[event-collector] session.shutdown session=${sessionId}`);
+            }),
+        );
+
         // ── permission.requested / completed ─────────────────────────────────
         unsubs.push(
             session.on('permission.requested', (event) => {
@@ -338,16 +440,92 @@ export function createEventCollector(opts = {}) {
             }),
         );
 
-        // ── subagent.completed / failed ───────────────────────────────────────
+        // ── subagent.started / completed / failed / deselected ────────────────
+        unsubs.push(
+            session.on('subagent.started', (event) => {
+                metrics?.recordCounter('subagent.started');
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                log('DEBUG', `[event-collector] subagent.started session=${sessionId}`);
+            }),
+        );
         unsubs.push(
             session.on('subagent.completed', (event) => {
+                metrics?.recordCounter('subagent.completed');
                 if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             }),
         );
         unsubs.push(
             session.on('subagent.failed', (event) => {
+                metrics?.recordCounter('subagent.failed');
                 if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 log('WARN', `[event-collector] subagent.failed session=${sessionId}`);
+            }),
+        );
+        unsubs.push(
+            session.on('subagent.deselected', (event) => {
+                metrics?.recordCounter('subagent.deselected');
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+            }),
+        );
+
+        // ── elicitation.requested / completed ────────────────────────────────
+        unsubs.push(
+            session.on('elicitation.requested', (event) => {
+                metrics?.recordCounter('elicitation.requested');
+                if (persist && persistTypes.includes('elicitation.requested')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                }
+                log('DEBUG', `[event-collector] elicitation.requested session=${sessionId}`);
+            }),
+        );
+        unsubs.push(
+            session.on('elicitation.completed', (event) => {
+                metrics?.recordCounter('elicitation.completed');
+                if (persist && persistTypes.includes('elicitation.completed')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                }
+            }),
+        );
+
+        // ── user_input.requested / completed ────────────────────────────────
+        unsubs.push(
+            session.on('user_input.requested', (event) => {
+                metrics?.recordCounter('user_input.requested');
+                if (persist && persistTypes.includes('user_input.requested')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                }
+            }),
+        );
+        unsubs.push(
+            session.on('user_input.completed', (event) => {
+                metrics?.recordCounter('user_input.completed');
+                if (persist && persistTypes.includes('user_input.completed')) {
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                }
+            }),
+        );
+
+        // ── tool.execution_progress (ephemeral — não persistir) ──────────────
+        unsubs.push(
+            session.on('tool.execution_progress', (event) => {
+                // Evento efêmero de progresso — emitido pelo hookBus para SSE sem persistência
+                hookBus?.emitHook(
+                    'post_tool_use',
+                    sessionId,
+                    {
+                        _eventType: 'tool.execution_progress',
+                        toolCallId: event.data.toolCallId,
+                        progressMessage: event.data.progressMessage,
+                    },
+                    null,
+                );
+            }),
+        );
+
+        // ── assistant.turn_start / turn_end ──────────────────────────────────
+        unsubs.push(
+            session.on('assistant.turn_start', (event) => {
+                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             }),
         );
 
