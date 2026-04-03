@@ -27,12 +27,18 @@ export const LLM_B_TERMINAL_PORT = 3009;
 export const MAX_QUEUE_SIZE = 100;
 
 /**
- * Timeout padrão de turno LLM-B em ms. Pode ser sobrescrito via `LLM_B_TURN_TIMEOUT`. Usado por dialog.js (terminal
- * REPL) e channel/inject.js (injeção HTTP).
+ * Timeout padrão de turno LLM-B em ms. Pode ser sobrescrito via `LLM_B_TURN_TIMEOUT_MS` (preferido) ou
+ * `LLM_B_TURN_TIMEOUT` (legado, aceito por compatibilidade). Usado por dialog.js (terminal REPL) e channel/inject.js
+ * (injeção HTTP).
+ *
+ * GAP-CORE-001 fix: suporte às duas formas de env var — prefere a versão `_MS` para nomenclatura inequívoca; mantém
+ * `LLM_B_TURN_TIMEOUT` por compatibilidade retroativa.
  *
  * @type {number}
  */
-export const LLM_B_TURN_TIMEOUT_MS = Number(process.env['LLM_B_TURN_TIMEOUT'] ?? 120_000);
+export const LLM_B_TURN_TIMEOUT_MS = Number(
+    process.env['LLM_B_TURN_TIMEOUT_MS'] ?? process.env['LLM_B_TURN_TIMEOUT'] ?? 120_000,
+);
 
 /**
  * Número máximo de clientes SSE simultâneos por endpoint. Evita leak de memória quando muitos clientes SSE abrem
@@ -41,6 +47,15 @@ export const LLM_B_TURN_TIMEOUT_MS = Number(process.env['LLM_B_TURN_TIMEOUT'] ??
  * @type {number}
  */
 export const MAX_SSE_CLIENTS = Number(process.env['MAX_SSE_CLIENTS'] ?? 50);
+
+/**
+ * Tamanho máximo em caracteres de um chunk de conteúdo SSE antes de truncamento. Evita mensagens de eventos SSE
+ * excessivamente grandes que podem causar problemas em buffers de proxy/cliente. Configurável via variável de ambiente
+ * MAX_SSE_CONTENT_CHARS.
+ *
+ * @type {number}
+ */
+export const MAX_SSE_CONTENT_CHARS = Number(process.env['MAX_SSE_CONTENT_CHARS'] ?? 64_000);
 
 /**
  * Nomes canônicos de eventos emitidos pelo AlwaysAliveAgent. Re-exportados de agent/events.js para acesso centralizado
