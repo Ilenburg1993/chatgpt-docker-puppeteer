@@ -509,29 +509,40 @@ Fase 5 (Observab.)   →  Fase 4 (API)          →  Fase 6 (Hardening)
 
 ### Arquivos modificados nesta implementação
 
-| Arquivo                                    | Tipo       | Mudanças                                                                                                                                                              |
-| ------------------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/copilot/agent/events.js`              | Modificado | +8 eventos no AGENT_EVENTS: `assistant.intent`, `assistant.reasoning`, `session.context_changed`, `abort`, `subagent.started/completed/failed`, `elicitation.pending` |
-| `src/copilot/agent/session-event-wirer.js` | Modificado | Nova função `_wireSdkResponseEvents()` com 8 handlers SDK → AGENT EventEmitter                                                                                        |
-| `src/copilot/bridges/nerv-bridge.js`       | Modificado | +8 entradas no EVENT_MAP para novos eventos                                                                                                                           |
-| `src/copilot/agent/always-alive.js`        | Modificado | Novo método `steerMessage(message)` com `mode: 'immediate'`                                                                                                           |
-| `src/copilot/agent/agent-contract.js`      | Modificado | `steerMessage` adicionado ao typedef `IAlwaysAliveAgent`                                                                                                              |
-| `src/copilot/api/bridge-control.js`        | Modificado | Novo endpoint `POST /steer` com admin auth                                                                                                                            |
-| `src/copilot/routes/sessions.js`           | Modificado | Campo `mode` no `POST /sessions/:id/send`; filtro `?events=` no SSE; `POST /sessions/:id/disconnect`                                                                  |
+| Arquivo                                        | Tipo       | Mudanças                                                                                                                                                              |
+| ---------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/copilot/agent/events.js`                  | Modificado | +8 eventos no AGENT_EVENTS: `assistant.intent`, `assistant.reasoning`, `session.context_changed`, `abort`, `subagent.started/completed/failed`, `elicitation.pending` |
+| `src/copilot/agent/session-event-wirer.js`     | Modificado | Nova função `_wireSdkResponseEvents()` com 8 handlers SDK → AGENT EventEmitter                                                                                        |
+| `src/copilot/bridges/nerv-bridge.js`           | Modificado | +8 entradas no EVENT_MAP para novos eventos                                                                                                                           |
+| `src/copilot/agent/always-alive.js`            | Modificado | Novo método `steerMessage(message)` com `mode: 'immediate'`                                                                                                           |
+| `src/copilot/agent/agent-contract.js`          | Modificado | `steerMessage` adicionado ao typedef `IAlwaysAliveAgent`                                                                                                              |
+| `src/copilot/api/bridge-control.js`            | Modificado | Novo endpoint `POST /steer` com admin auth                                                                                                                            |
+| `src/copilot/routes/sessions.js`               | Modificado | Campo `mode` no `POST /sessions/:id/send`; filtro `?events=` no SSE; `POST /sessions/:id/disconnect`; `GET /sessions/:id/compaction-history`                          |
+| `src/copilot/api/sse-replay-buffer.js`         | Novo       | Circular buffer para SSE event replay via `Last-Event-ID`                                                                                                             |
+| `src/copilot/api/bridge-stream.js`             | Modificado | Integração de `SseReplayBuffer`: IDs monotônicos em eventos SSE, replay via `Last-Event-ID`                                                                           |
+| `src/copilot/observability/event-collector.js` | Modificado | `getLastQuotaSnapshots()`, `getCompactionHistory()`, inter-token latency histogram via buckets                                                                        |
+| `src/copilot/routes/observability.js`          | Modificado | `GET /observability/quota` endpoint                                                                                                                                   |
 
 ### Validação
 
 - ✅ ESLint: 0 erros (1 warning pré-existente em `debug-conflicts.mjs`)
-- ✅ Testes: 2049 pass, 0 fail
+- ✅ Testes: 2665 pass, 0 fail
 - ✅ Prettier: formatação aplicada
 
 ### Resumo por fase
 
-| Fase                           | Status          | Notas                                                                       |
-| ------------------------------ | --------------- | --------------------------------------------------------------------------- |
-| Fase 1 — Bugs & Fixes          | ✅ Implementada | 8 novos eventos propagados via AGENT EventEmitter + NERV                    |
-| Fase 2 — Steering & Queueing   | ✅ Implementada | `steerMessage()`, `POST /steer`, campo `mode` no send                       |
-| Fase 3 — SDK Response Handlers | ℹ️ N/A          | `respondTo*()` são internos ao SDK runtime, não à API pública               |
-| Fase 4 — API Improvements      | ✅ Parcial      | SSE filter ✅, disconnect ✅, delete ✅ (pré-existente), upload ⬜          |
-| Fase 5 — Observabilidade       | ⬜ Pendente     | Reasoning stream, event replay, quota endpoint, sub-agent SSE               |
-| Fase 6 — Hardening             | ⬜ Pendente     | Inter-token latency, compaction API, abort propagation (já feita na Fase 1) |
+| Fase                           | Status          | Notas                                                                        |
+| ------------------------------ | --------------- | ---------------------------------------------------------------------------- |
+| Fase 1 — Bugs & Fixes          | ✅ Implementada | 8 novos eventos propagados via AGENT EventEmitter + NERV                     |
+| Fase 2 — Steering & Queueing   | ✅ Implementada | `steerMessage()`, `POST /steer`, campo `mode` no send                        |
+| Fase 3 — SDK Response Handlers | ℹ️ N/A          | `respondTo*()` são internos ao SDK runtime, não à API pública                |
+| Fase 4 — API Improvements      | ✅ Implementada | SSE filter ✅, disconnect ✅, delete ✅ (pré-existente), upload ⬜ (N/A SDK) |
+| Fase 5 — Observabilidade       | ✅ Implementada | Reasoning SSE ✅, event replay ✅, quota endpoint ✅, sub-agent SSE ✅       |
+| Fase 6 — Hardening             | ✅ Implementada | Inter-token latency ✅, compaction API ✅, abort propagation ✅ (Fase 1)     |
+
+### Commits
+
+- `c00a9c3a` — Fases 1-2-4: event propagation, steering, API improvements
+- `10611f2b` — Prettier formatting
+- `713149a7` — Fases 5-6: SSE replay, quota, latency histogram, compaction history
+- `25c5d1b5` — TS fix + formatting
