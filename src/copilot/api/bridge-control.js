@@ -69,6 +69,9 @@ export function registerControlRoutes(bridge, agent) {
     bridge.post('/permissions', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
         _handleSetPermissions(req, res, agent),
     );
+
+    // GAP-SE-001b (STREAMING-EVENTS-AUDIT Fase 2.2): endpoint de steering (immediate mode)
+    bridge.post('/steer', (/** @type {Req} */ req, /** @type {Res} */ res) => _handleSteer(req, res, agent));
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -241,6 +244,30 @@ function _handleSetPermissions(req, res, agent) {
         return void res.json({ ok: true, before, after });
     } catch (/** @type {any} */ e) {
         log('ERROR', `[bridge-control/permissions] ${e.message}`);
+        return void res.status(500).json({ ok: false, error: e.message });
+    }
+}
+
+/**
+ * GAP-SE-001b: Envia uma mensagem em modo steering (immediate) para redirecionar o agente mid-turn.
+ *
+ * @param {Req} req
+ * @param {Res} res
+ * @param {AlwaysAliveAgentLike} agent
+ */
+async function _handleSteer(req, res, agent) {
+    const { message } = req.body ?? {};
+    if (!message || typeof message !== 'string') {
+        return void res.status(400).json({ ok: false, error: 'Campo "message" (string) é obrigatório.' });
+    }
+    if (typeof agent.steerMessage !== 'function') {
+        return void res.status(501).json({ ok: false, error: 'steerMessage não disponível nesta instância.' });
+    }
+    try {
+        const messageId = await agent.steerMessage(message);
+        return void res.json({ ok: true, messageId });
+    } catch (/** @type {any} */ e) {
+        log('ERROR', `[bridge-control/steer] ${e.message}`);
         return void res.status(500).json({ ok: false, error: e.message });
     }
 }

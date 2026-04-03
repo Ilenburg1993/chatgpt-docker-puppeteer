@@ -92,6 +92,17 @@ const EVENT_MAP = [
     { event: 'session.workspace_file_changed', actionCode: 'COPILOT_SESSION_WORKSPACE_FILE_CHANGED' },
     { event: 'system.message', actionCode: 'COPILOT_SYSTEM_MESSAGE' },
     { event: 'tool.execution_progress', actionCode: 'COPILOT_TOOL_EXECUTION_PROGRESS' },
+    // ── Fase SE: eventos de streaming & SDK responses (STREAMING-EVENTS-AUDIT) ──
+    { event: 'assistant.intent', actionCode: 'COPILOT_ASSISTANT_INTENT' },
+    { event: 'assistant.reasoning_complete', actionCode: 'COPILOT_ASSISTANT_REASONING_COMPLETE' },
+    { event: 'session.context_changed', actionCode: 'COPILOT_SESSION_CONTEXT_CHANGED' },
+    { event: 'abort', actionCode: 'COPILOT_ABORT' },
+    { event: 'steering.sent', actionCode: 'COPILOT_STEERING_SENT' },
+    { event: 'elicitation.pending', actionCode: 'COPILOT_ELICITATION_PENDING' },
+    { event: 'elicitation.answered', actionCode: 'COPILOT_ELICITATION_ANSWERED' },
+    { event: 'subagent.started', actionCode: 'COPILOT_SUBAGENT_STARTED' },
+    { event: 'subagent.completed', actionCode: 'COPILOT_SUBAGENT_COMPLETED' },
+    { event: 'subagent.failed', actionCode: 'COPILOT_SUBAGENT_FAILED' },
 ];
 
 /**

@@ -403,6 +403,33 @@ router.delete('/sessions/:id', _requireAdminForDestructive, (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/disconnect  (GAP-SE-007 Fase 4.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Desconecta uma sessão ativa sem deletá-la do disco. A sessão pode ser retomada depois via POST /sessions/:id/resume.
+ * Diferente do DELETE, que remove permanentemente.
+ */
+router.post('/sessions/:id/disconnect', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const { id } = req.params;
+
+        const entry = getSdkSession(id);
+        if (!entry) {
+            res.status(404).json({
+                ok: false,
+                error: `Sessão "${id}" não está ativa no registry.`,
+            });
+            return;
+        }
+
+        await disconnectSdkSession(id);
+        log('INFO', `[sdk-api] Sessão desconectada (preservada em disco): ${id}`);
+        res.json({ ok: true, message: `Sessão "${id}" desconectada. Use POST /sessions/${id}/resume para retomar.` });
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /sessions/:id/resume
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -475,6 +502,10 @@ router.post('/sessions/:id/send', rateLimitMiddleware(30, 'session_send'), (req,
         const id = /** @type {string} */ (req.params['id']);
         const { prompt, waitForResponse = true, attachments } = req.body ?? {};
         const rawTimeoutMs = (req.body ?? {}).timeoutMs;
+        // GAP-SE-001c: campo mode para steering/queueing (STREAMING-EVENTS-AUDIT Fase 2.3)
+        const rawMode = (req.body ?? {}).mode;
+        /** @type {'immediate' | 'enqueue' | undefined} */
+        const mode = rawMode === 'immediate' || rawMode === 'enqueue' ? rawMode : undefined;
         // NEW-03 (fix): validar timeoutMs para evitar NaN / Infinity / negativo no setTimeout
         const timeoutMs =
             rawTimeoutMs === undefined
@@ -511,7 +542,11 @@ router.post('/sessions/:id/send', rateLimitMiddleware(30, 'session_send'), (req,
         incrementMessageCount(id);
 
         /** @type {import('@github/copilot-sdk').MessageOptions} */
-        const messageOptions = { prompt, ...(attachments ? { attachments } : {}) };
+        const messageOptions = {
+            prompt,
+            ...(attachments ? { attachments } : {}),
+            ...(mode !== undefined ? { mode } : {}),
+        };
 
         if (waitForResponse) {
             const event = await Promise.race([
@@ -596,9 +631,29 @@ router.get('/sessions/:id/stream', (req, res) => {
 
     sendEvent('connected', { sessionId: id, timestamp: Date.now() });
 
+    // GAP-SE-007 (STREAMING-EVENTS-AUDIT Fase 4.2): filtro de eventos via ?events= query param
+    const eventsParam = typeof req.query['events'] === 'string' ? req.query['events'] : '';
+    const eventFilters = eventsParam
+        ? eventsParam
+              .split(',')
+              .map((e) => e.trim())
+              .filter(Boolean)
+        : [];
+    /**
+     * Verifica se um tipo de evento passa pelo filtro.
+     *
+     * @param {string} eventType
+     * @returns {boolean}
+     */
+    const matchesFilter = (eventType) => {
+        if (eventFilters.length === 0) return true;
+        return eventFilters.some((f) => (f.endsWith('.*') ? eventType.startsWith(f.slice(0, -1)) : eventType === f));
+    };
+
     // Registra handler no SDK para encaminhar eventos
     const unsubscribe = entry.session.on((event) => {
-        sendEvent('message', event);
+        const type = /** @type {string} */ (event?.type ?? '');
+        if (matchesFilter(type)) sendEvent('message', event);
     });
 
     // Heartbeat a cada 15s para manter a conexão aberta

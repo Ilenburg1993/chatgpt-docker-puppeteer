@@ -643,6 +643,24 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Envia uma mensagem em modo "steering" (immediate) — injetada no turno ativo para redirecionar o agente sem
+     * abortar o processamento. Se o agente não estiver processando, a mensagem inicia um novo turno.
+     *
+     * @param {string} prompt - Mensagem de steering
+     * @returns {Promise<string>} messageId retornado pelo SDK
+     * @throws {SessionError} Se a sessão não estiver ativa
+     */
+    async steerMessage(prompt) {
+        if (!this.#session) {
+            throw new SessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
+        }
+        const messageId = await this.#session.send({ prompt, mode: 'immediate' });
+        log('INFO', `[AlwaysAlive] Steering enviado: messageId=${messageId}`);
+        this.emit('steering.sent', { messageId, prompt: prompt.slice(0, 200), ts: Date.now() });
+        return messageId;
+    }
+
+    /**
      * Enfileira uma task internamente — compartilhado por sendMessage e sendMessageDialogBoot.
      *
      * @param {string} message

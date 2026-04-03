@@ -91,6 +91,17 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'pending_messages.modified',
     'exit_plan_mode.completed',
     'external_tool.completed',
+    // ── Fase SE: eventos de streaming & SDK responses (STREAMING-EVENTS-AUDIT) ──
+    'assistant.intent',
+    'assistant.reasoning_complete',
+    'session.context_changed',
+    'abort',
+    'steering.sent',
+    'elicitation.pending',
+    'elicitation.answered',
+    'subagent.started',
+    'subagent.completed',
+    'subagent.failed',
 ]);
 
 /**

@@ -159,6 +159,7 @@ export function wireSessionEvents(session, isResumed, callbacks) {
         ..._wireTokenBudgetEvents(session, isResumed, callbacks),
         ..._wireModeAndToolEvents(session, callbacks),
         ..._wireSystemNotificationEvents(session, callbacks),
+        ..._wireSdkResponseEvents(session, callbacks),
         _wireUsageEvent(session, callbacks),
         _wireCatchAll(session, callbacks),
     ];
@@ -377,6 +378,63 @@ function _wireSystemNotificationEvents(session, { emit }) {
                     // kind.type desconhecido dentro de system.notification — silencioso
                     break;
             }
+        }),
+    ];
+}
+
+/**
+ * Propaga eventos do SDK previamente não emitidos no AGENT EventEmitter (STREAMING-EVENTS-AUDIT BUG-SE-002/003).
+ *
+ * - `assistant.intent` — intenção detectada pelo modelo (ex.: 'code_edit', 'explain')
+ * - `assistant.reasoning` — bloco de raciocínio completo (não delta)
+ * - `session.context_changed` — workspace/branch/cwd mudou
+ * - `abort` — processamento abortado pelo usuário
+ * - `subagent.started/completed/failed` — ciclo de vida de sub-agentes
+ * - `elicitation.requested` — MCP form solicitado (surfaced como elicitation.pending)
+ *
+ * @param {CopilotSession} session
+ * @param {SessionWirerCallbacks} callbacks
+ * @returns {(() => void)[]}
+ */
+function _wireSdkResponseEvents(session, { emit }) {
+    return [
+        session.on('assistant.intent', (/** @type {SdkEvent} */ evt) => {
+            const { intent } = evt?.data ?? {};
+            emit('assistant.intent', { intent: intent ?? 'unknown', ts: Date.now() });
+        }),
+        session.on('assistant.reasoning', (/** @type {SdkEvent} */ evt) => {
+            const { reasoningId, content } = evt?.data ?? {};
+            const len = typeof content === 'string' ? content.length : 0;
+            emit('assistant.reasoning_complete', {
+                reasoningId: reasoningId ?? null,
+                contentLength: len,
+                ts: Date.now(),
+            });
+        }),
+        session.on('session.context_changed', (/** @type {SdkEvent} */ evt) => {
+            emit('session.context_changed', evt?.data ?? {});
+            log('DEBUG', `[session-event-wirer] session.context_changed propagado para AGENT EventEmitter`);
+        }),
+        session.on('abort', (/** @type {SdkEvent} */ evt) => {
+            emit('abort', { reason: evt?.data?.['reason'] ?? 'user_initiated', ts: Date.now() });
+            log('INFO', '[session-event-wirer] abort propagado para AGENT EventEmitter');
+        }),
+        session.on('subagent.started', (/** @type {SdkEvent} */ evt) => {
+            const { agentName, agentId } = evt?.data ?? {};
+            emit('subagent.started', { agentName, agentId, ts: Date.now() });
+        }),
+        session.on('subagent.completed', (/** @type {SdkEvent} */ evt) => {
+            const { agentName, agentId } = evt?.data ?? {};
+            emit('subagent.completed', { agentName, agentId, ts: Date.now() });
+        }),
+        session.on('subagent.failed', (/** @type {SdkEvent} */ evt) => {
+            const { agentName, agentId, error } = evt?.data ?? {};
+            emit('subagent.failed', { agentName, agentId, error: error ?? 'unknown', ts: Date.now() });
+        }),
+        session.on('elicitation.requested', (/** @type {SdkEvent} */ evt) => {
+            const { requestId, schema, title, description } = evt?.data ?? {};
+            emit('elicitation.pending', { requestId, schema, title, description, ts: Date.now() });
+            log('INFO', `[session-event-wirer] elicitation.pending requestId=${requestId ?? '?'}`);
         }),
     ];
 }
