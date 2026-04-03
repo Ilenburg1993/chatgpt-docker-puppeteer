@@ -119,6 +119,10 @@
 
 // ─── Helpers para percentis ───────────────────────────────────────────────────
 
+// FINDING-P5-3: imports estáticos em vez de dynamic import dentro de setInterval
+import { appendFile as _appendFile, mkdir as _mkdir } from 'node:fs/promises';
+import { join as _join } from 'node:path';
+
 /**
  * Calcula percentil de um array ordenado.
  *
@@ -148,7 +152,11 @@ function createHistogram(maxSamples = 500) {
 
     return {
         record(ms) {
-            if (_samples.length >= maxSamples) _samples.shift();
+            // FINDING-P4-1: descontar amostra removida de _sum para manter média correta
+            if (_samples.length >= maxSamples) {
+                const removed = _samples.shift();
+                _sum -= removed ?? 0;
+            }
             _samples.push(ms);
             _sorted = false;
             if (ms < _min) _min = ms;
@@ -163,11 +171,12 @@ function createHistogram(maxSamples = 500) {
                 _samples.sort((a, b) => a - b);
                 _sorted = true;
             }
+            // FINDING-P4-2: recalcular min/max a partir do array ordenado (evita stale após shift)
             return {
                 count: _samples.length,
                 sum: _sum,
-                min: _min,
-                max: _max,
+                min: _samples[0] ?? 0,
+                max: _samples[_samples.length - 1] ?? 0,
                 p50: percentile(_samples, 50),
                 p95: percentile(_samples, 95),
                 p99: percentile(_samples, 99),
@@ -390,11 +399,10 @@ export function createMetricsStore() {
         _snapshotTimer = setInterval(() => {
             void (async () => {
                 try {
-                    const { appendFile: appendFileFn, mkdir: mkdirFn } = await import('node:fs/promises');
-                    const pathMod = await import('node:path');
-                    await mkdirFn(resolvedDir, { recursive: true });
+                    // FINDING-P5-3: usar imports estáticos em vez de dynamic import a cada tick
+                    await _mkdir(resolvedDir, { recursive: true });
                     const line = JSON.stringify({ _snapshot: new Date().toISOString(), ...getSummary() }) + '\n';
-                    await appendFileFn(pathMod.default.join(resolvedDir, 'metrics.jsonl'), line, 'utf8');
+                    await _appendFile(_join(resolvedDir, 'metrics.jsonl'), line, 'utf8');
                 } catch {
                     // Falha silenciosa — métricas não devem bloquear
                 }

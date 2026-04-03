@@ -268,6 +268,8 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         // ── tool.execution_start — contabiliza início de ferramenta ──────────
         /** @type {Map<string, { toolName: string; ts: number }>} Tool callId → start info para duration calc */
         const _toolStarts = new Map();
+        /** @type {number} TTL para entradas _toolStarts (2 min) */
+        const _TOOL_START_TTL_MS = 2 * 60 * 1000;
 
         _on(
             agent,
@@ -275,7 +277,14 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
             _safe((/** @type {{ toolName?: string; callId?: string }} */ evt) => {
                 metrics.recordCounter('tool.execution.start');
                 const callId = evt?.callId;
-                if (callId) _toolStarts.set(callId, { toolName: evt?.toolName ?? 'unknown', ts: performance.now() });
+                if (callId) {
+                    // FINDING-P5-4: TTL cleanup antes de inserir nova entrada
+                    const _nowPerf = performance.now();
+                    for (const [id, entry] of _toolStarts) {
+                        if (_nowPerf - entry.ts > _TOOL_START_TTL_MS) _toolStarts.delete(id);
+                    }
+                    _toolStarts.set(callId, { toolName: evt?.toolName ?? 'unknown', ts: _nowPerf });
+                }
                 log('DEBUG', `[agent-event-observer] tool.execution_start tool=${evt?.toolName ?? '?'}`);
             }, 'tool.execution_start'),
         );
@@ -337,16 +346,17 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
 
         // ── Fase CE: eventos adicionais ───────────────────────────────────────
 
-        // ── status — CT-03: rastreia reconnects ──────────────────────────────
+        // ── status — CT-03: rastreia reconnects + status genérico (unificado FINDING-P5-1) ─
         _on(
             agent,
             'status',
             _safe((/** @type {string | { status?: string }} */ raw) => {
-                const val = typeof raw === 'string' ? raw : (raw?.status ?? '');
+                const val = typeof raw === 'string' ? raw : (raw?.status ?? 'unknown');
                 if (typeof val === 'string' && val.startsWith('reconnecting:')) {
                     metrics.recordCounter('agent.reconnect.attempt');
                     log('WARN', `[agent-event-observer] reconnect attempt: ${val}`);
                 }
+                metrics.recordCounter(`agent.status.${val}`);
             }, 'status'),
         );
 
@@ -379,7 +389,11 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
             'session.compaction_start',
             _safe(() => {
                 metrics.recordCounter('session.compaction.start');
-                // CO-04: span OTEL para compaction
+                // CO-04: span OTEL para compaction; FINDING-P5-3: fechar span anterior se ainda aberto
+                if (_compactionSpan) {
+                    _compactionSpan.end();
+                    _compactionSpan = null;
+                }
                 _compactionSpan = startSpanImmediate('copilot.compaction');
                 log('DEBUG', '[agent-event-observer] session.compaction_start');
             }, 'session.compaction_start'),
@@ -575,13 +589,7 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
             }, 'before-stop'),
         );
 
-        _on(
-            agent,
-            'status',
-            _safe((/** @type {{ status?: string }} */ evt) => {
-                metrics.recordCounter(`agent.status.${evt?.status ?? 'unknown'}`);
-            }, 'status'),
-        );
+        // FINDING-P5-1: segundo handler de 'status' removido (unificado em CT-03 acima)
 
         // ── error no EventEmitter do agente ───────────────────────────────────
         _on(
@@ -788,8 +796,9 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
             _safe((/** @type {{ questionId?: string }} */ evt) => {
                 // CN-02 fix: não gerar chave fallback — sem questionId não há correlação possível
                 const qId = evt?.questionId ?? null;
+                // FINDING-P5-2: padronizar para performance.now() igual a _turnStarts (monotônico)
+                const now = performance.now();
                 // TTL cleanup antes de inserir nova entrada
-                const now = Date.now();
                 for (const [id, ts] of _questionStarts) {
                     if (now - ts > _QUESTION_START_TTL_MS) {
                         _questionStarts.delete(id);
@@ -810,7 +819,8 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 if (qId) _questionStarts.delete(qId);
                 metrics.recordCounter('question.answered');
                 if (startTs) {
-                    const waitMs = Date.now() - startTs;
+                    // FINDING-P5-2: startTs agora é performance.now() base
+                    const waitMs = performance.now() - startTs;
                     metrics.recordGauge('question.last_wait_ms', waitMs);
                     // CS-02: registrar no histograma de latência de questions
                     metrics.recordQuestionLatency(waitMs);

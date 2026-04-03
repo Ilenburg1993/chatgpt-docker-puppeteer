@@ -17,7 +17,7 @@
 
 import { log } from '#copilot/observability/logger';
 import { buildTool } from '#copilot/tools/tool-factory';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 /** Caminho do arquivo de persistência. @type {string} */
@@ -46,6 +46,22 @@ export const BUILTIN_HANDLER_MAP = new Map([
         (args) => {
             const key = typeof args['key'] === 'string' ? args['key'] : '';
             if (!key) return '(key ausente)';
+            // C12-02: allowlist explícita — bloquear exposição de tokens/secrets ao modelo
+            const ENV_ALLOWLIST = new Set([
+                'NODE_ENV',
+                'COPILOT_WORKING_DIRECTORY',
+                'COPILOT_DB_PATH',
+                'TZ',
+                'LANG',
+                'HOME',
+                'HOSTNAME',
+                'PATH',
+                'npm_package_version',
+                'npm_lifecycle_event',
+            ]);
+            if (!ENV_ALLOWLIST.has(key)) {
+                return `(variável '${key}' não está na allowlist de leitura)`;
+            }
             const val = process.env[key];
             return val !== undefined ? val : '(não definido)';
         },
@@ -152,7 +168,10 @@ export function loadCustomTools() {
  */
 function persistCustomTools() {
     try {
-        writeFileSync(CUSTOM_TOOLS_PATH, JSON.stringify([..._registry.values()], null, 2), 'utf8');
+        // C12-04: write atômico — escreve em tmpfile e faz rename para evitar JSON corrompido em crash
+        const tmpPath = `${CUSTOM_TOOLS_PATH}.tmp`;
+        writeFileSync(tmpPath, JSON.stringify([..._registry.values()], null, 2), 'utf8');
+        renameSync(tmpPath, CUSTOM_TOOLS_PATH);
     } catch (/** @type {any} */ err) {
         log('WARN', `[custom-tools-registry] Falha ao persistir custom-tools.json: ${err.message}`);
     }

@@ -248,6 +248,27 @@ export class ConversationStore {
         );
     }
 
+    /**
+     * Conta sessões por status (ou total) com SELECT COUNT(*) — O(1) com índice. T-08: substitui
+     * listHubSessions({limit:1000}).length no health check.
+     *
+     * @param {{ status?: string }} [opts]
+     * @returns {number}
+     */
+    countHubSessions(opts = {}) {
+        const db = this.#getDb();
+        if (opts.status) {
+            const row = /** @type {{ count: number }} */ (
+                db.prepare(`SELECT COUNT(*) as count FROM copilot_hub_sessions WHERE status = ?`).get(opts.status)
+            );
+            return row?.count ?? 0;
+        }
+        const row = /** @type {{ count: number }} */ (
+            db.prepare(`SELECT COUNT(*) as count FROM copilot_hub_sessions`).get()
+        );
+        return row?.count ?? 0;
+    }
+
     // ─── ConversationTurns ─────────────────────────────────────────────────────
 
     /**
@@ -619,14 +640,13 @@ export class ConversationStore {
                 // INSERT OR IGNORE pelo sdkTurnId para idempotência
                 // Usamos sdk_session_id + metadata.sdkTurnId como chave natural de dedup
                 if (sdkTurnId) {
-                    // Escapar metacaracteres SQL LIKE (% e _) para evitar match acidental de outras linhas
-                    const escapedId = sdkTurnId.replace(/%/g, '\\%').replace(/_/g, '\\_');
+                    // C11-03: usar coluna sdk_turn_id indexada para dedup O(1) (antes era LIKE scan O(n))
                     const exists = db
                         .prepare(
                             `SELECT 1 FROM copilot_conversation_turns
-                             WHERE hub_session_id = ? AND metadata LIKE ? ESCAPE '\\'`,
+                             WHERE hub_session_id = ? AND sdk_turn_id = ?`,
                         )
-                        .get(hubSessionId, `%${escapedId}%`);
+                        .get(hubSessionId, sdkTurnId);
                     if (exists) {
                         skipped++;
                         continue;
@@ -644,8 +664,8 @@ export class ConversationStore {
 
                 db.prepare(
                     `INSERT INTO copilot_conversation_turns
-                     (hub_session_id, sdk_session_id, role, content, turn_number, created_at, user_read, metadata)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                     (hub_session_id, sdk_session_id, role, content, turn_number, created_at, user_read, metadata, sdk_turn_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 ).run(
                     hubSessionId,
                     sdkSessionId,
@@ -655,6 +675,7 @@ export class ConversationStore {
                     msg.createdAt ?? Date.now(),
                     1, // mensagens históricas: marcadas como lidas
                     metadata,
+                    sdkTurnId,
                 );
                 synced++;
             }

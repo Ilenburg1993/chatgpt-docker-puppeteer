@@ -19,11 +19,18 @@ import { DEFAULT_EXCLUDED_TOOLS } from './session-config.js';
  * @property {Record<string, string>} [env] - Variáveis de ambiente adicionais
  * @property {string} [url] - URL do servidor HTTP/SSE remoto
  * @property {Record<string, string>} [headers] - Headers HTTP adicionais (para http/sse)
+ * @property {number} [timeout] - Timeout em ms para tool calls neste servidor (GAP-CONF-002 fix)
  */
 
 /**
  * @typedef {Record<string, McpServerConfig>} McpServersMap
  */
+
+/** Timeout padrão para tool calls stdio MCP (ms). Configurável via COPILOT_MCP_STDIO_TIMEOUT_MS. */
+const MCP_STDIO_TIMEOUT_MS = Number(process.env['COPILOT_MCP_STDIO_TIMEOUT_MS'] ?? 30_000);
+
+/** Timeout padrão para tool calls HTTP MCP (ms). Configurável via COPILOT_MCP_HTTP_TIMEOUT_MS. */
+const MCP_HTTP_TIMEOUT_MS = Number(process.env['COPILOT_MCP_HTTP_TIMEOUT_MS'] ?? 15_000);
 
 /**
  * Mapa de servidores MCP pré-configurados para este workspace.
@@ -41,6 +48,7 @@ export const MCP_SERVERS = {
         command: 'npx',
         args: ['@modelcontextprotocol/server-github'],
         env: { GITHUB_TOKEN: process.env['GITHUB_TOKEN'] ?? '' },
+        timeout: MCP_STDIO_TIMEOUT_MS,
     },
 
     /**
@@ -50,6 +58,7 @@ export const MCP_SERVERS = {
         type: 'stdio',
         command: 'npx',
         args: ['@modelcontextprotocol/server-filesystem', '/workspaces/chatgpt-docker-puppeteer'],
+        timeout: MCP_STDIO_TIMEOUT_MS,
     },
 
     /**
@@ -59,6 +68,7 @@ export const MCP_SERVERS = {
         type: 'stdio',
         command: 'npx',
         args: ['@modelcontextprotocol/server-memory'],
+        timeout: MCP_STDIO_TIMEOUT_MS,
     },
 
     /**
@@ -75,6 +85,7 @@ export const MCP_SERVERS = {
         headers: {
             Authorization: `Bearer ${process.env['GITHUB_TOKEN'] ?? ''}`,
         },
+        timeout: MCP_HTTP_TIMEOUT_MS,
     },
 };
 

@@ -269,7 +269,14 @@ function _handleUserInject(socket, orchestrator, store, clientId, clientIp, chec
 function _handleSessionsList(socket, store) {
     socket.on('sessions:list', (/** @type {{ limit?: number; offset?: number; status?: string }} */ opts) => {
         try {
-            const statusVal = /** @type {import('./store.js').HubSessionStatus | undefined} */ (opts?.status);
+            // FINDING-P4-2: validar status para evitar valores arbitrários no banco
+            const VALID_STATUS = new Set(['active', 'closed', 'error']);
+            const rawStatus = opts?.status;
+            if (rawStatus !== undefined && !VALID_STATUS.has(rawStatus)) {
+                socket.emit('error:sessions', { reason: `status inválido: "${rawStatus}"` });
+                return;
+            }
+            const statusVal = /** @type {import('./store.js').HubSessionStatus | undefined} */ (rawStatus);
             const sessions = store.listHubSessions({
                 limit: opts?.limit ?? 20,
                 offset: opts?.offset ?? 0,
@@ -291,6 +298,11 @@ function _handleTurnsHistory(socket, store) {
         'turns:history',
         (/** @type {{ hubSession: string; limit?: number; offset?: number; after?: number }} */ data) => {
             if (!data?.hubSession) return;
+            // C11-01: verificar que o socket está na room da sessão antes de retornar histórico
+            if (!socket.rooms.has(data.hubSession)) {
+                socket.emit('error:history', { reason: 'not_in_session: execute join:session primeiro.' });
+                return;
+            }
             try {
                 const turns = store.readTurns(data.hubSession, {
                     limit: data.limit ?? 50,

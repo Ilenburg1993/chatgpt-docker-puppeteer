@@ -17,8 +17,8 @@
  */
 
 import fs from 'node:fs';
-import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { appendFile, mkdir, open, rename, stat } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { LOG_DIR, log } from './logger.js';
 
 /** Máximo de entradas no buffer em memória. */
@@ -30,6 +30,49 @@ const AUDIT_FILE = join(LOG_DIR, 'audit.jsonl');
 /** Path do arquivo JSONL de tool calls (execuções). CQ-01: renomeado de tool-audit.jsonl. */
 const TOOL_AUDIT_FILE = join(LOG_DIR, 'tool-execution-audit.jsonl');
 const MAX_TOOL_AUDIT_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/**
+ * FINDING-P4-1 fix: lê as últimas N linhas de um arquivo JSONL sem carregar o arquivo inteiro em memória. Usa leitura
+ * reversa em blocos de 64 KB a partir do fim do arquivo.
+ *
+ * @param {string} filePath - Caminho do arquivo
+ * @param {number} [n=50] - Número de linhas a retornar. Default is `50`
+ * @returns {Promise<string[]>} Últimas N linhas não-vazias
+ */
+async function readLastNLines(filePath, n = 50) {
+    const BLOCK = 65_536; // 64KB por bloco
+    let fh;
+    try {
+        fh = await open(filePath, 'r');
+        const { size } = await fh.stat();
+        if (size === 0) return [];
+        let remaining = size;
+        let tail = '';
+        /** @type {string[]} */
+        const lines = [];
+        while (remaining > 0 && lines.length < n) {
+            const readSize = Math.min(BLOCK, remaining);
+            remaining -= readSize;
+            const buf = Buffer.alloc(readSize);
+            await fh.read(buf, 0, readSize, remaining);
+            tail = buf.toString('utf8') + tail;
+            const split = tail.split('\n');
+            // Últimas linhas completas — a primeira pode estar incompleta
+            for (let i = split.length - 1; i >= 1 && lines.length < n; i--) {
+                const line = split[i];
+                if (line && line.trim()) lines.unshift(line);
+            }
+            tail = split[0] ?? ''; // possível linha incompleta no início
+        }
+        // Incluir a linha "tail" restante se for válida
+        if (tail.trim() && lines.length < n) lines.unshift(tail);
+        return lines.slice(-n);
+    } catch {
+        return [];
+    } finally {
+        await fh?.close();
+    }
+}
 
 /**
  * @typedef {object} AuditEntry
@@ -63,6 +106,7 @@ const MAX_TOOL_AUDIT_BYTES = 10 * 1024 * 1024; // 10 MB
  * @property {(n?: number) => AuditEntry[]} getLast Retorna as últimas N entradas.
  * @property {() => Promise<void>} flush Persiste todas as entradas do buffer em `logs/audit.jsonl`.
  * @property {() => void} clear Limpa o buffer sem persistir.
+ * @property {() => Promise<void>} clearAndFlush Persiste o buffer antes de limpar (FINDING-P4-2 fix).
  * @property {(entry: ToolAuditStartEntry) => void} recordToolStart Registra início de tool call (correlação).
  * @property {(entry: ToolAuditCompleteEntry) => void} recordToolComplete Registra conclusão de tool call + JSONL I/O.
  * @property {(sessionId?: string | null, limit?: number) => Promise<object[]>} getAuditSummary Lê histórico JSONL.
@@ -122,7 +166,8 @@ export function createAuditLog(opts = {}) {
             const batch = _toolWriteQueue.splice(0);
             if (!batch.length) return;
             try {
-                await mkdir(/** @type {string} */ (toolAuditFile.replace(/[^/\\]+$/, '')), { recursive: true });
+                // FINDING-P5-3: usar dirname em vez de regex para extrair diretório
+                await mkdir(dirname(/** @type {string} */ (toolAuditFile)), { recursive: true });
                 try {
                     const { size } = await stat(toolAuditFile);
                     if (size >= MAX_TOOL_AUDIT_BYTES) await rename(toolAuditFile, toolAuditRotate);
@@ -170,7 +215,8 @@ export function createAuditLog(opts = {}) {
     async function flush() {
         if (_buffer.length === 0) return;
         try {
-            await mkdir(/** @type {string} */ (auditFile.replace(/[^/\\]+$/, '')), { recursive: true });
+            // FINDING-P5-3: usar dirname em vez de regex para extrair diretório
+            await mkdir(dirname(/** @type {string} */ (auditFile)), { recursive: true });
             const lines = _buffer.map((e) => JSON.stringify(e)).join('\n') + '\n';
             await appendFile(auditFile, lines, 'utf8');
         } catch (/** @type {any} */ err) {
@@ -182,6 +228,16 @@ export function createAuditLog(opts = {}) {
     function clear() {
         _buffer.length = 0;
         _pending.clear();
+    }
+
+    /**
+     * FINDING-P4-2 fix: persiste o buffer antes de limpar, evitando perda de eventos não escritos.
+     *
+     * @returns {Promise<void>}
+     */
+    async function clearAndFlush() {
+        await flush();
+        clear();
     }
 
     // ── Tool call audit (ex-channel/audit.js) ──────────────────────────────────────
@@ -263,8 +319,10 @@ export function createAuditLog(opts = {}) {
     async function getAuditSummary(sessionId, limit = 50) {
         try {
             if (!fs.existsSync(toolAuditFile)) return [];
-            const raw = await fs.promises.readFile(toolAuditFile, 'utf8');
-            const lines = raw.trim().split('\n').filter(Boolean);
+            // FINDING-P4-1 fix: leitura reversa (readLastNLines) — evita readFile completo de 10 MB
+            // Se houver filtro de session, lemos um múltiplo para ter margem para filtragem
+            const fetchCount = sessionId ? limit * 10 : limit;
+            const lines = await readLastNLines(toolAuditFile, fetchCount);
             const entries = lines
                 .map((l) => {
                     try {
@@ -281,10 +339,26 @@ export function createAuditLog(opts = {}) {
         }
     }
 
-    return { record, getEntries, getLast, flush, clear, recordToolStart, recordToolComplete, getAuditSummary };
+    return {
+        record,
+        getEntries,
+        getLast,
+        flush,
+        clear,
+        clearAndFlush,
+        recordToolStart,
+        recordToolComplete,
+        getAuditSummary,
+    };
 }
 
 // ─── Singleton ────────────────────────────────────────────────────────────────
 
 /** Singleton global de audit log para src/copilot. */
 export const defaultAuditLog = createAuditLog();
+
+// BUG-OBS-001 fix: garante flush do buffer em desligamento ordenado (beforeExit).
+// Registrado uma única vez no singleton para evitar duplicação em hot-reload.
+process.once('beforeExit', () => {
+    void defaultAuditLog.flush();
+});

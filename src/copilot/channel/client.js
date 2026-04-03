@@ -213,7 +213,9 @@ export class LlmBridgeClient {
             }
         };
 
-        requireAgent().on('task.queued', onTaskQueued);
+        // CH-P4-01: usar once para evitar cross-contamination em chatBatch concorrente
+        // e remover listener imediatamente após capturar o taskId deste turno
+        requireAgent().once('task.queued', onTaskQueued);
         requireAgent().on('task.delta', onDeltaEvt);
 
         if (onQuestion) {

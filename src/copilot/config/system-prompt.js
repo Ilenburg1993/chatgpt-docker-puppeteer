@@ -37,6 +37,9 @@ import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from '@github/copilot-sdk';
  */
 export const SYSTEM_PROMPT_SECTIONS = /** @type {Record<string, { description: string }>} */ (SDK_SECTIONS);
 
+// C12-03: verificar em runtime se SDK suporta mode:'customize' (v0.2.0+)
+const _sdkSupportsCustomize = typeof SDK_SECTIONS === 'object' && SDK_SECTIONS !== null && 'guidelines' in SDK_SECTIONS;
+
 /**
  * Identidade do agente LLM-B.
  *
@@ -132,6 +135,13 @@ Antes de encerrar este turno:
  * @returns {SystemMessageConfig}
  */
 export function buildGuidelinesAppendMessage(content) {
+    // C12-03: fallback para mode:'append' se SDK não suportar mode:'customize' (v0.2.0+)
+    if (!_sdkSupportsCustomize) {
+        return /** @type {SystemMessageConfig} */ ({
+            mode: 'append',
+            content,
+        });
+    }
     // As chaves de sections são strings (ex.: 'guidelines'), não os objetos { description }
     return /** @type {SystemMessageConfig} */ ({
         mode: 'customize',

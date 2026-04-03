@@ -146,7 +146,8 @@ const COPILOT_MIGRATIONS = [
                 END;
             CREATE TRIGGER IF NOT EXISTS memories_ad
                 AFTER DELETE ON copilot_memories BEGIN
-                    DELETE FROM copilot_memories_fts WHERE id=old.id;
+                    INSERT INTO copilot_memories_fts(copilot_memories_fts, rowid, id, tag, content)
+                        VALUES('delete', old.rowid, old.id, old.tag, old.content);
                 END;
         `,
     },
@@ -175,6 +176,18 @@ const COPILOT_MIGRATIONS = [
         // BUG-CRIT-03: corrigir role 'llm-b' (hífen) para 'llm_b' (underscore canônico)
         // Idempotente — linhas já corrigidas não são afetadas.
         up: `UPDATE copilot_conversation_turns SET role = 'llm_b' WHERE role = 'llm-b';`,
+    },
+    {
+        version: 7,
+        name: 'add_sdk_turn_id_column',
+        // C11-03: adicionar coluna sdk_turn_id indexada para deduplicação O(1) em syncFromSdkHistory
+        // Substitui o LIKE scan em metadata JSON que era O(n) sem índice
+        up: `
+            ALTER TABLE copilot_conversation_turns ADD COLUMN sdk_turn_id TEXT;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_turns_sdk_id
+                ON copilot_conversation_turns(hub_session_id, sdk_turn_id)
+                WHERE sdk_turn_id IS NOT NULL;
+        `,
     },
 ];
 

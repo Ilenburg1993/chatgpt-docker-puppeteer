@@ -19,7 +19,7 @@
  */
 
 import { globalAuditBuffer } from '#copilot/hooks/audit';
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { log } from './logger.js';
@@ -40,6 +40,25 @@ const _writeQueue = [];
 let _flushScheduled = false;
 
 /**
+ * FINDING-P4-3 fix: flush síncrono dos eventos pendentes antes do processo encerrar. Registrado uma única vez como
+ * beforeExit handler para não duplicar em múltiplos reloads.
+ */
+async function _flushOnExit() {
+    const batch = _writeQueue.splice(0);
+    if (!batch.length) return;
+    try {
+        await mkdir(LOGS_DIR, { recursive: true });
+        await appendFile(EVENTS_FILE, batch.join(''), 'utf8');
+    } catch {
+        /* silencioso */
+    }
+}
+
+process.once('beforeExit', () => {
+    void _flushOnExit();
+});
+
+/**
  * Agenda flush assíncrono de eventos para disco.
  *
  * @returns {void}
@@ -53,6 +72,15 @@ function scheduleFlush() {
         if (!batch.length) return;
         try {
             await mkdir(LOGS_DIR, { recursive: true });
+            // LEAK-OBS-001: rotacionar arquivo quando MAX_EVENTS_BYTES é atingido
+            try {
+                const { size } = await stat(EVENTS_FILE);
+                if (size >= MAX_EVENTS_BYTES) {
+                    await rename(EVENTS_FILE, EVENTS_FILE + '.1');
+                }
+            } catch {
+                /* arquivo ainda não existe */
+            }
             await appendFile(EVENTS_FILE, batch.join(''), 'utf8');
         } catch {
             // Falha silenciosa — telemetria não deve bloquear
@@ -246,9 +274,18 @@ export function createEventCollector(opts = {}) {
         const unsubs = [];
 
         // ── tool.execution_start ──────────────────────────────────────────────
+        /** @type {number} TTL para entradas _pending em milissegundos (5 min) */
+        const _PENDING_TTL_MS = 5 * 60 * 1000;
+        /** @type {number} TTL para entradas _turnStart em milissegundos (10 min) */
+        const _TURN_TTL_MS = 10 * 60 * 1000;
         unsubs.push(
             session.on('tool.execution_start', (event) => {
                 const { toolCallId, toolName, mcpServerName } = event.data;
+                // FINDING-P5-4: TTL cleanup para _pending antes de inserir nova entrada
+                const _now = Date.now();
+                for (const [id, entry] of _pending) {
+                    if (_now - entry.startTs > _PENDING_TTL_MS) _pending.delete(id);
+                }
                 // Fase AN: preservar arguments para uso no execution_complete
                 _pending.set(toolCallId, {
                     toolName,
@@ -505,7 +542,9 @@ export function createEventCollector(opts = {}) {
         );
         unsubs.push(
             session.on('session.idle', (event) => {
-                if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                // FINDING-P4-2: verificar _persistSet igual aos outros handlers
+                if (persist && _persistSet.has('session.idle'))
+                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
                 log('DEBUG', `[event-collector] session.idle session=${sessionId}`);
             }),
         );
@@ -645,7 +684,14 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('assistant.turn_start', (event) => {
                 const { turnId } = event.data;
-                if (turnId) _turnStart.set(turnId, Date.now());
+                if (turnId) {
+                    // FINDING-P5-4: TTL cleanup para _turnStart antes de inserir
+                    const _nowTs = Date.now();
+                    for (const [id, startTs] of _turnStart) {
+                        if (_nowTs - startTs > _TURN_TTL_MS) _turnStart.delete(id);
+                    }
+                    _turnStart.set(turnId, _nowTs);
+                }
                 if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             }),
         );
@@ -1019,7 +1065,8 @@ export function createEventCollector(opts = {}) {
             }),
         );
 
-        log('DEBUG', `[event-collector] ${unsubs.length} handlers registrados para session=${sessionId} (pre-BF)`);
+        // FINDING-P5-5 fix: log de fase intermediária removido — a contagem total correta
+        //   é emitida após todos os handlers (linha seguinte ao final da Fase BF).
 
         // ── Fase BF: Novos handlers para eventos previamente não cobertos ──────────────────────────────
 
@@ -1103,15 +1150,31 @@ export function createEventCollector(opts = {}) {
             }),
         );
 
-        // external_tool.completed — persiste requestId
+        // external_tool.completed — persiste requestId + toolName + durationMs (FINDING-P5-6 fix)
         unsubs.push(
             session.on('external_tool.completed', (event) => {
                 const { requestId } = event.data;
+                // FINDING-P5-6: extrair toolName e durationMs via cast (SDK type só declara requestId)
+                const extra = /** @type {{ toolName?: string; durationMs?: number }} */ (
+                    /** @type {unknown} */ (event.data)
+                );
+                const toolName = extra.toolName ?? null;
+                const durationMs = extra.durationMs ?? null;
                 metrics?.recordCounter('external_tool.completed');
                 if (persist && _persistSet.has('external_tool.completed')) {
-                    persistEvent({ type: event.type, sessionId, ts: event.timestamp, requestId });
+                    persistEvent({
+                        type: event.type,
+                        sessionId,
+                        ts: event.timestamp,
+                        requestId,
+                        toolName,
+                        durationMs,
+                    });
                 }
-                log('DEBUG', `[event-collector] external_tool.completed requestId=${requestId ?? '?'}`);
+                log(
+                    'DEBUG',
+                    `[event-collector] external_tool.completed requestId=${requestId ?? '?'} tool=${toolName ?? '?'}`,
+                );
             }),
         );
 

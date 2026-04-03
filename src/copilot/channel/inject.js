@@ -305,8 +305,16 @@ function _subscribeSse(path, port, onEvent) {
                 // Reconexão bem-sucedida — resetar backoff
                 reconnectMs = 1_000;
                 let buf = '';
+                // LEAK-CHAN-001: limite de tamanho do buffer SSE para evitar memory leak com streams lentos
+                const MAX_BUF_BYTES = 256 * 1024; // 256 KB
                 res.on('data', (/** @type {Buffer} */ chunk) => {
-                    buf += chunk.toString();
+                    const chunkStr = chunk.toString();
+                    if (buf.length + chunkStr.length > MAX_BUF_BYTES) {
+                        // Descartar buffer acumulado (sem fechar conexão — próximo bloco completo funciona)
+                        buf = '';
+                        return;
+                    }
+                    buf += chunkStr;
                     // SSE-INJECT-01 (fix): parsear por blocos delimitados por linha vazia (RFC 8895).
                     // Múltiplas linhas data: num mesmo bloco são acumuladas e concatenadas com \n.
                     const blocks = buf.split(/\r?\n\r?\n/);

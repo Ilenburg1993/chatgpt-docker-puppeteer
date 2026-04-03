@@ -159,10 +159,15 @@ function closeCopilotDb() {
 }
 
 let exitHandlerRegistered = false;
+/**
+ * Registra handlers de saída para fechar o banco de dados. DB-P4-01: idempotente via `exitHandlerRegistered` — seguro
+ * para chamadas múltiplas (hot-reload, testes).
+ */
 function registerExitHandler() {
     if (exitHandlerRegistered) return;
     exitHandlerRegistered = true;
-    process.on('exit', () => {
+
+    const handler = () => {
         if (copilotDb) {
             try {
                 copilotDb.close();
@@ -171,7 +176,13 @@ function registerExitHandler() {
             }
             copilotDb = null;
         }
-    });
+    };
+
+    // DB-P3-01: registrar também SIGTERM/SIGINT para garantir flush do WAL em
+    // graceful shutdown PM2 (SIGTERM → 1600ms timeout).
+    process.on('exit', handler);
+    process.once('SIGTERM', handler);
+    process.once('SIGINT', handler);
 }
 
 export { closeCopilotDb, getCopilotDb, resolveCopilotDbPath };
