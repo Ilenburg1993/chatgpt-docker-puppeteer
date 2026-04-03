@@ -296,9 +296,17 @@ function _subscribeSse(path, port, onEvent) {
     let reconnectTimer = null;
     /** @type {ReturnType<typeof http.request> | null} */
     let currentReq = null;
+    // PHASE-10: rastreia último event ID recebido para replay via Last-Event-ID na reconexão
+    /** @type {string} */
+    let lastEventId = '';
 
     function connect() {
         if (destroyed) return;
+
+        /** @type {Record<string, string>} */
+        const headers = { Accept: 'text/event-stream' };
+        // PHASE-10: enviar Last-Event-ID para replay de eventos perdidos na reconexão
+        if (lastEventId) headers['Last-Event-ID'] = lastEventId;
 
         const req = http.request(
             {
@@ -306,7 +314,7 @@ function _subscribeSse(path, port, onEvent) {
                 port,
                 path,
                 method: 'GET',
-                headers: { Accept: 'text/event-stream' },
+                headers,
             },
             (res) => {
                 // Reconexão bem-sucedida — resetar backoff
@@ -330,15 +338,21 @@ function _subscribeSse(path, port, onEvent) {
                     for (const block of blocks) {
                         if (!block.trim()) continue;
                         let currentEvent = '';
+                        let currentId = '';
                         const dataLines = /** @type {string[]} */ ([]);
                         for (const line of block.split(/\r?\n/)) {
                             if (line.startsWith('event:')) {
                                 currentEvent = line.slice(6).trim();
                             } else if (line.startsWith('data:')) {
                                 dataLines.push(line.slice(5).trimStart());
+                            } else if (line.startsWith('id:')) {
+                                // PHASE-10: capturar event ID para Last-Event-ID na reconexão
+                                currentId = line.slice(3).trim();
                             }
-                            // ignorar linhas 'id:' e 'retry:' — não usadas por este parser
+                            // ignorar linhas 'retry:' — não usadas por este parser
                         }
+                        // PHASE-10: atualizar lastEventId para replay na reconexão
+                        if (currentId) lastEventId = currentId;
                         if (dataLines.length > 0) {
                             try {
                                 const data = JSON.parse(dataLines.join('\n'));

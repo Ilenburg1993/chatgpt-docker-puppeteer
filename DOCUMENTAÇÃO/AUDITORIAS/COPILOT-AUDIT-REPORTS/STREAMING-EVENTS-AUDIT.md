@@ -880,3 +880,57 @@ ilimitado) **Arquivos**: `src/copilot/api/bridge-stream.js`
 **Complexidade**: Alta (raw node:http parser precisa ler header, broadcastSse precisa gerar IDs)
 **Decisão**: Marcado como OPCIONAL — o inject client já tem backoff e reconexão. O ganho é marginal
 vs a complexidade.
+
+---
+
+## 13. Fase 9-10 — Terminal SSE Hardening + inject.js Last-Event-ID (IMPLEMENTADO)
+
+**Data**: 2026-04-03 **Commit**: _pendente_
+
+### 13.1 — Heartbeat no terminal SSE (GAP-EVARCH-01)
+
+**Problema**: O endpoint `GET /events` do terminal (raw `node:http`) não emitia heartbeats. Conexões
+SSE atrás de proxies ou LBs podiam ser encerradas por inatividade.
+
+**Correção**: Adicionado `setInterval` de 30s emitindo `: heartbeat\n\n` para cada cliente SSE
+conectado. O intervalo é limpo no `req.close`.
+
+**Arquivo**: `src/copilot/terminal/server.js`
+
+### 13.2 — Event IDs monotônicos no terminal SSE (GAP-EVARCH-02)
+
+**Problema**: Os eventos SSE emitidos por `broadcastSse()` não incluíam o campo `id:`. Isso
+impossibilitava o uso de `Last-Event-ID` para replay na reconexão.
+
+**Correção**: Adicionado contador monotônico `_sseEventIdCounter` e função `nextSseEventId()` em
+`dialog.js`. O campo `id: N` é incluído automaticamente em cada evento SSE emitido via `emitSse`.
+
+**Arquivo**: `src/copilot/terminal/dialog.js`
+
+### 13.3 — inject.js Last-Event-ID na reconexão (GAP-CHAN-003)
+
+**Problema**: O parser SSE em `_subscribeSse()` ignorava linhas `id:` e não enviava `Last-Event-ID`
+na reconexão. Eventos perdidos durante desconexão não eram recuperados.
+
+**Correção**:
+
+- Parser SSE agora captura linhas `id:` e atualiza `lastEventId`
+- Header `Last-Event-ID` é enviado ao reconectar
+- Obs: o servidor terminal não suporta replay (não há `SseReplayBuffer`), mas o header é enviado
+  para compatibilidade forward — quando/se replay for adicionado ao server, o client já está pronto
+
+**Arquivo**: `src/copilot/channel/inject.js`
+
+### 13.4 — Avaliação Socket.io vs SSE (redundância)
+
+**Análise**: O `broadcastSse()` emite para **dois transportes distintos**:
+
+| Transporte | Endpoint              | Clientes-alvo           | Protocolo |
+| ---------- | --------------------- | ----------------------- | --------- |
+| SSE (raw)  | `GET /events` (:3009) | LLM-A (inject.js)       | node:http |
+| Socket.io  | `/copilot` namespace  | Dashboard/UI no browser | WebSocket |
+
+**Decisão**: **NÃO é redundância** — são transportes complementares para consumidores diferentes. O
+SSE serve clients headless (LLM-A), o Socket.io serve UIs reativas no browser com suporte a rooms
+(isolamento por hub_session). Remover qualquer um quebraria funcionalidade. A dual-emission em
+`broadcastSse()` está correta e intencional.

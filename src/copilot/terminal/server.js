@@ -303,12 +303,26 @@ export function createInjectServer() {
                     'Access-Control-Allow-Origin': '*',
                 });
                 res.write(`: connected (level=${isCriticalOnly ? 'critical' : 'all'})\n\n`);
+                // PHASE-9: heartbeat periódico para manter conexão viva (proxy/LB timeout)
+                const heartbeat = setInterval(() => {
+                    try {
+                        if (!res.writableEnded) res.write(`: heartbeat\n\n`);
+                    } catch {
+                        clearInterval(heartbeat);
+                    }
+                }, 30_000);
                 if (isCriticalOnly) {
                     _sseCriticalClients.add(res);
-                    req.on('close', () => _sseCriticalClients.delete(res));
+                    req.on('close', () => {
+                        clearInterval(heartbeat);
+                        _sseCriticalClients.delete(res);
+                    });
                 } else {
                     _sseClients.add(res);
-                    req.on('close', () => _sseClients.delete(res));
+                    req.on('close', () => {
+                        clearInterval(heartbeat);
+                        _sseClients.delete(res);
+                    });
                 }
                 return;
             }

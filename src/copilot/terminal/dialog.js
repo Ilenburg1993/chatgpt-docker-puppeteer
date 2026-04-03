@@ -41,6 +41,22 @@ import {
 /** Eventos considerados críticos para clientes em modo ?level=critical. */
 export const CRITICAL_EVENTS = new Set(['stalled', 'fatal', 'system']);
 
+/**
+ * Contador monotônico de IDs para eventos SSE do terminal. Permite reconexão com Last-Event-ID (RFC 8895 §9.2.4).
+ *
+ * @type {number}
+ */
+let _sseEventIdCounter = 0;
+
+/**
+ * Gera o próximo ID SSE monotônico.
+ *
+ * @returns {number}
+ */
+export function nextSseEventId() {
+    return ++_sseEventIdCounter;
+}
+
 // ─── Fila de serialização de turnos (TERM-01) ─────────────────────────────────
 
 /**
@@ -244,7 +260,9 @@ function emitSse(clients, criticalClients, event, data) {
     // SEC-VULN-02 (fix): sanitizar nome do evento SSE para prevenir injeção de protocolo
     // (event names não podem conter \n ou \r — RFC 8895 §6.2)
     const safeEvent = String(event).replace(/[\r\n]/g, '_');
-    const payload = `event: ${safeEvent}\ndata: ${JSON.stringify(ssePayloadData)}\n\n`;
+    // PHASE-9: incluir id: monotônico para suporte a Last-Event-ID (RFC 8895 §9.2.4)
+    const eventId = nextSseEventId();
+    const payload = `id: ${eventId}\nevent: ${safeEvent}\ndata: ${JSON.stringify(ssePayloadData)}\n\n`;
 
     for (const client of clients) {
         try {
