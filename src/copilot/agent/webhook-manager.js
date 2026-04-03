@@ -18,6 +18,21 @@ import dns from 'node:dns/promises';
 const WEBHOOK_TIMEOUT_MS = Number(process.env['WEBHOOK_TIMEOUT_MS']) || 5_000;
 
 /**
+ * Número máximo de retries para webhooks que falham com erro retriable (5xx, timeout, network). GAP-ROUTE-002:
+ * implementa retry com exponential backoff.
+ *
+ * @type {number}
+ */
+const WEBHOOK_MAX_RETRIES = Number(process.env['WEBHOOK_MAX_RETRIES']) || 2;
+
+/**
+ * Delay base (ms) para backoff exponencial entre retries de webhook.
+ *
+ * @type {number}
+ */
+const WEBHOOK_RETRY_BASE_MS = 500;
+
+/**
  * Máximo de webhooks simultâneos que podem ser registrados.
  *
  * @type {number}
@@ -237,28 +252,68 @@ export class WebhookManager {
                         return;
                     }
                 }
-                // G2-ARCH-06: usar fetch (Node 18+) em vez de http/https nativos — mais limpo e testável
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
-                try {
-                    const resp = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body,
-                        signal: controller.signal,
-                    });
-                    // GAP-AGENT-009: diferenciar erros HTTP (4xx/5xx) de sucesso
-                    if (!resp.ok) {
-                        log('WARN', `[WebhookManager] ${id} HTTP ${resp.status} de ${url}`);
-                    }
-                } catch (/** @type {any} */ e) {
-                    // GAP-AGENT-009: distinguir timeout de erro de rede
-                    const reason = e.name === 'AbortError' ? 'timeout' : 'network';
-                    log('WARN', `[WebhookManager] ${id} falhou (${reason}) ao notificar ${url}: ${e.message}`);
-                } finally {
-                    clearTimeout(timeoutId);
-                }
+                // GAP-ROUTE-002: retry com exponential backoff para falhas retriable
+                await WebhookManager.#deliverWithRetry(id, url, body, WEBHOOK_MAX_RETRIES);
             }),
         );
+    }
+
+    /**
+     * Entrega uma requisição de webhook com retry exponential backoff. Retries ocorrem apenas para erros retriable:
+     * 5xx, timeout, network error. 4xx são considerados erros permanentes e não são retriados.
+     *
+     * @param {string} id - Identificador do webhook
+     * @param {string} url - URL de destino
+     * @param {string} body - JSON body a enviar
+     * @param {number} maxRetries - Número máximo de retries
+     * @returns {Promise<void>}
+     */
+    static async #deliverWithRetry(id, url, body, maxRetries) {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            if (attempt > 0) {
+                // Exponential backoff: 500ms, 1000ms, 2000ms...
+                const delay = WEBHOOK_RETRY_BASE_MS * 2 ** (attempt - 1);
+                await new Promise((r) => setTimeout(r, delay));
+            }
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+            try {
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body,
+                    signal: controller.signal,
+                });
+                if (resp.ok) return; // sucesso
+
+                // 4xx = erro permanente, não retriar
+                if (resp.status >= 400 && resp.status < 500) {
+                    log('WARN', `[WebhookManager] ${id} HTTP ${resp.status} de ${url} (permanente, sem retry)`);
+                    return;
+                }
+                // 5xx = retriable
+                if (attempt < maxRetries) {
+                    log(
+                        'DEBUG',
+                        `[WebhookManager] ${id} HTTP ${resp.status} de ${url} — retry ${attempt + 1}/${maxRetries}`,
+                    );
+                } else {
+                    log('WARN', `[WebhookManager] ${id} HTTP ${resp.status} de ${url} após ${maxRetries} retries`);
+                }
+            } catch (/** @type {any} */ e) {
+                const reason = e.name === 'AbortError' ? 'timeout' : 'network';
+                if (attempt < maxRetries) {
+                    log('DEBUG', `[WebhookManager] ${id} ${reason} — retry ${attempt + 1}/${maxRetries}`);
+                } else {
+                    log(
+                        'WARN',
+                        `[WebhookManager] ${id} falhou (${reason}) ao notificar ${url} após ${maxRetries} retries: ${e.message}`,
+                    );
+                }
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
     }
 }
