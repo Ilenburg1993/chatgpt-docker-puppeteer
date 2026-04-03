@@ -1,11 +1,9 @@
 # Auditoria de Streaming & Events — Copilot SDK vs Implementação Atual
 
-**Data**: 2026-04-03
-**Escopo**: Integração completa de eventos de streaming e features do Copilot SDK
-**Módulos analisados**: `event-collector.js`, `session-event-wirer.js`, `always-alive.js`,
+**Data**: 2026-04-03 **Escopo**: Integração completa de eventos de streaming e features do Copilot
+SDK **Módulos analisados**: `event-collector.js`, `session-event-wirer.js`, `always-alive.js`,
 `task-executor.js`, `bridge-stream.js`, `nerv-bridge.js`, `socket-ns.js`, `sessions.js` (routes),
-`session-initializer.js`
-**Referência oficial**:
+`session-initializer.js` **Referência oficial**:
 [copilot-sdk/docs/features/streaming-events.md](https://github.com/github/copilot-sdk/blob/main/docs/features/streaming-events.md)
 
 ---
@@ -41,57 +39,57 @@ SDK, persistindo-os em `events.jsonl` com rotação de arquivo e flush assíncro
 
 ### 2.1 Eventos de Streaming (44 tipos oficiais)
 
-| Evento SDK                      | Coletado | Métricas        | Persistido | Propagado (SSE/NERV) | Notas                                                       |
-| ------------------------------- | -------- | --------------- | ---------- | -------------------- | ----------------------------------------------------------- |
-| `assistant.turn_start`          | ✅        | ✅ turn duration | ✅          | ✅                    | TTL cleanup em \_turnStart                                  |
-| `assistant.intent`              | ✅        | ✅ counter       | ✅          | ✅ NERV+SSE           | ✅ Implementado Fase 1                                       |
-| `assistant.reasoning`           | ✅        | ✅ counter       | ✅          | ✅ NERV+SSE           | ✅ Implementado Fase 1                                       |
-| `assistant.reasoning_delta`     | ✅        | ❌               | ❌          | ✅ task.reasoning     | Ephemeral, OK                                               |
-| `assistant.streaming_delta`     | ✅        | ✅ bucket        | ❌          | ❌                    | Network-level, corretamente omitido                         |
-| `assistant.message`             | ✅        | ✅ counter       | ✅          | ❌                    | PII: conteúdo off por padrão                                |
-| `assistant.message_delta`       | ✅        | ❌               | ❌          | ✅ task.delta         | Dual: wirer + task-executor                                 |
-| `assistant.turn_end`            | ✅        | ✅ duration      | ✅          | ✅                    | OK                                                          |
-| `assistant.usage`               | ✅        | ✅ tokens+cache  | ✅          | ✅ pr.consumed        | Completo: quota, cost, reasoning                            |
-| `tool.execution_start`          | ✅        | ✅ pending map   | ✅          | ✅                    | task-executor enriquece com taskId                          |
-| `tool.execution_partial_result` | ✅        | ✅ counter       | ❌          | ✅ via hookBus        | Ephemeral, OK                                               |
-| `tool.execution_progress`       | ✅        | ❌               | ❌          | ✅ via hookBus        | Ephemeral, OK                                               |
-| `tool.execution_complete`       | ✅        | ✅ latency       | ✅          | ✅                    | Alimenta audit buffer                                       |
-| `tool.user_requested`           | ✅        | ✅ counter       | ✅          | ❌                    |                                                             |
-| `session.idle`                  | ✅        | ❌               | ✅\*        | ❌                    | \*Condicional a \_persistSet                                |
-| `session.error`                 | ✅        | ✅ counter       | ✅          | ❌                    | Alimenta ErrorTracker                                       |
-| `session.compaction_start`      | ✅        | ❌               | ✅          | ✅                    | OK                                                          |
-| `session.compaction_complete`   | ✅        | ❌               | ✅          | ✅                    | Checkpoint path propagado                                   |
-| `session.title_changed`         | ✅        | ✅ counter       | ✅          | ✅                    | OK                                                          |
-| `session.context_changed`       | ✅        | ❌               | ✅          | ✅ NERV+SSE           | ✅ Implementado Fase 1                                       |
-| `session.usage_info`            | ✅        | ❌               | ✅          | ✅ session.usage      | Wirer calcula utilization                                   |
-| `session.task_complete`         | ✅        | ❌               | ✅          | ❌                    |                                                             |
-| `session.shutdown`              | ✅        | ❌               | ✅          | ❌                    |                                                             |
-| `permission.requested`          | ✅        | ❌               | ✅          | ❌                    | **GAP: Sem responder programático**                         |
-| `permission.completed`          | ✅        | ❌               | ✅          | ❌                    |                                                             |
-| `user_input.requested`          | ✅        | ✅ counter       | ✅          | ✅ question.pending   | Handler via onUserInputRequest                              |
-| `user_input.completed`          | ✅        | ✅ counter       | ✅          | ✅ question.answered  |                                                             |
-| `elicitation.requested`         | ✅        | ✅ counter       | ✅          | ✅ SSE+NERV           | ✅ Propagação implementada Fase 1 (respond é interno ao SDK) |
-| `elicitation.completed`         | ✅        | ✅ counter       | ✅          | ❌                    |                                                             |
-| `subagent.started`              | ✅        | ✅ counter       | ✅          | ✅ NERV+SSE           | ✅ Implementado Fase 1                                       |
-| `subagent.completed`            | ✅        | ✅ counter       | ✅          | ✅ NERV+SSE           | ✅ Implementado Fase 1                                       |
-| `subagent.failed`               | ✅        | ✅ counter       | ✅          | ✅ NERV+SSE           | ✅ Implementado Fase 1                                       |
-| `subagent.selected`             | ✅        | ✅ counter       | ✅          | ❌                    |                                                             |
-| `subagent.deselected`           | ✅        | ✅ counter       | ✅          | ❌                    |                                                             |
-| `skill.invoked`                 | ✅        | ❌               | ✅          | ❌                    |                                                             |
-| `abort`                         | ✅        | ✅ counter       | ✅          | ✅ NERV+SSE           | ✅ Implementado Fase 1                                       |
-| `user.message`                  | ✅        | ✅ counter       | ✅          | ❌                    | PII: conteúdo off por padrão                                |
-| `system.message`                | ✅        | ✅ counter       | ✅          | ✅                    |                                                             |
-| `external_tool.requested`       | ✅        | ✅ counter       | ✅          | ❌                    | **GAP: Sem responder programático**                         |
-| `external_tool.completed`       | ✅        | ✅ counter       | ✅          | ✅                    |                                                             |
-| `exit_plan_mode.requested`      | ✅        | ✅ counter       | ✅          | ❌                    | **GAP: Sem responder programático**                         |
-| `exit_plan_mode.completed`      | ✅        | ✅ counter       | ✅          | ✅                    |                                                             |
-| `command.queued`                | ✅        | ✅ counter       | ✅          | ❌                    | **GAP: Sem responder programático**                         |
-| `command.completed`             | ✅        | ✅ counter       | ✅          | ❌                    |                                                             |
+| Evento SDK                      | Coletado | Métricas         | Persistido | Propagado (SSE/NERV) | Notas                                                        |
+| ------------------------------- | -------- | ---------------- | ---------- | -------------------- | ------------------------------------------------------------ |
+| `assistant.turn_start`          | ✅       | ✅ turn duration | ✅         | ✅                   | TTL cleanup em \_turnStart                                   |
+| `assistant.intent`              | ✅       | ✅ counter       | ✅         | ✅ NERV+SSE          | ✅ Implementado Fase 1                                       |
+| `assistant.reasoning`           | ✅       | ✅ counter       | ✅         | ✅ NERV+SSE          | ✅ Implementado Fase 1                                       |
+| `assistant.reasoning_delta`     | ✅       | ❌               | ❌         | ✅ task.reasoning    | Ephemeral, OK                                                |
+| `assistant.streaming_delta`     | ✅       | ✅ bucket        | ❌         | ❌                   | Network-level, corretamente omitido                          |
+| `assistant.message`             | ✅       | ✅ counter       | ✅         | ❌                   | PII: conteúdo off por padrão                                 |
+| `assistant.message_delta`       | ✅       | ❌               | ❌         | ✅ task.delta        | Dual: wirer + task-executor                                  |
+| `assistant.turn_end`            | ✅       | ✅ duration      | ✅         | ✅                   | OK                                                           |
+| `assistant.usage`               | ✅       | ✅ tokens+cache  | ✅         | ✅ pr.consumed       | Completo: quota, cost, reasoning                             |
+| `tool.execution_start`          | ✅       | ✅ pending map   | ✅         | ✅                   | task-executor enriquece com taskId                           |
+| `tool.execution_partial_result` | ✅       | ✅ counter       | ❌         | ✅ via hookBus       | Ephemeral, OK                                                |
+| `tool.execution_progress`       | ✅       | ❌               | ❌         | ✅ via hookBus       | Ephemeral, OK                                                |
+| `tool.execution_complete`       | ✅       | ✅ latency       | ✅         | ✅                   | Alimenta audit buffer                                        |
+| `tool.user_requested`           | ✅       | ✅ counter       | ✅         | ❌                   |                                                              |
+| `session.idle`                  | ✅       | ❌               | ✅\*       | ❌                   | \*Condicional a \_persistSet                                 |
+| `session.error`                 | ✅       | ✅ counter       | ✅         | ❌                   | Alimenta ErrorTracker                                        |
+| `session.compaction_start`      | ✅       | ❌               | ✅         | ✅                   | OK                                                           |
+| `session.compaction_complete`   | ✅       | ❌               | ✅         | ✅                   | Checkpoint path propagado                                    |
+| `session.title_changed`         | ✅       | ✅ counter       | ✅         | ✅                   | OK                                                           |
+| `session.context_changed`       | ✅       | ❌               | ✅         | ✅ NERV+SSE          | ✅ Implementado Fase 1                                       |
+| `session.usage_info`            | ✅       | ❌               | ✅         | ✅ session.usage     | Wirer calcula utilization                                    |
+| `session.task_complete`         | ✅       | ❌               | ✅         | ❌                   |                                                              |
+| `session.shutdown`              | ✅       | ❌               | ✅         | ❌                   |                                                              |
+| `permission.requested`          | ✅       | ❌               | ✅         | ❌                   | **GAP: Sem responder programático**                          |
+| `permission.completed`          | ✅       | ❌               | ✅         | ❌                   |                                                              |
+| `user_input.requested`          | ✅       | ✅ counter       | ✅         | ✅ question.pending  | Handler via onUserInputRequest                               |
+| `user_input.completed`          | ✅       | ✅ counter       | ✅         | ✅ question.answered |                                                              |
+| `elicitation.requested`         | ✅       | ✅ counter       | ✅         | ✅ SSE+NERV          | ✅ Propagação implementada Fase 1 (respond é interno ao SDK) |
+| `elicitation.completed`         | ✅       | ✅ counter       | ✅         | ❌                   |                                                              |
+| `subagent.started`              | ✅       | ✅ counter       | ✅         | ✅ NERV+SSE          | ✅ Implementado Fase 1                                       |
+| `subagent.completed`            | ✅       | ✅ counter       | ✅         | ✅ NERV+SSE          | ✅ Implementado Fase 1                                       |
+| `subagent.failed`               | ✅       | ✅ counter       | ✅         | ✅ NERV+SSE          | ✅ Implementado Fase 1                                       |
+| `subagent.selected`             | ✅       | ✅ counter       | ✅         | ❌                   |                                                              |
+| `subagent.deselected`           | ✅       | ✅ counter       | ✅         | ❌                   |                                                              |
+| `skill.invoked`                 | ✅       | ❌               | ✅         | ❌                   |                                                              |
+| `abort`                         | ✅       | ✅ counter       | ✅         | ✅ NERV+SSE          | ✅ Implementado Fase 1                                       |
+| `user.message`                  | ✅       | ✅ counter       | ✅         | ❌                   | PII: conteúdo off por padrão                                 |
+| `system.message`                | ✅       | ✅ counter       | ✅         | ✅                   |                                                              |
+| `external_tool.requested`       | ✅       | ✅ counter       | ✅         | ❌                   | **GAP: Sem responder programático**                          |
+| `external_tool.completed`       | ✅       | ✅ counter       | ✅         | ✅                   |                                                              |
+| `exit_plan_mode.requested`      | ✅       | ✅ counter       | ✅         | ❌                   | **GAP: Sem responder programático**                          |
+| `exit_plan_mode.completed`      | ✅       | ✅ counter       | ✅         | ✅                   |                                                              |
+| `command.queued`                | ✅       | ✅ counter       | ✅         | ❌                   | **GAP: Sem responder programático**                          |
+| `command.completed`             | ✅       | ✅ counter       | ✅         | ❌                   |                                                              |
 
 ### 2.2 Features do SDK
 
-| Feature                       | Status         | Detalhes                                                                                               |
-| ----------------------------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| Feature                       | Status          | Detalhes                                                                                               |
+| ----------------------------- | --------------- | ------------------------------------------------------------------------------------------------------ |
 | **Streaming (session.on)**    | ✅ Completo     | 55+ handlers                                                                                           |
 | **Session persistence**       | ✅ Completo     | resumeOrCreate + sessionId em disco                                                                    |
 | **Infinite sessions**         | ✅ Completo     | Compaction threshold dinâmico                                                                          |
@@ -295,16 +293,16 @@ custo/risco supera o benefício dado que:
 
 ### Fase 1 — Bugs & Fixes Imediatos (P3) ✅ IMPLEMENTADA
 
-| ID         | Item                         | Módulo                        | Ação                                                                                                             | Status                          |
-| ---------- | ---------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| ID         | Item                         | Módulo                        | Ação                                                                                                             | Status                           |
+| ---------- | ---------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------- |
 | BUG-SE-001 | message_delta race condition | session-event-wirer.js        | Remover handler duplicado do wirer para `assistant.message_delta` — task-executor já cobre                       | ⚠️ Mantido (impacto desprezível) |
 | BUG-SE-002 | intent/reasoning sem SSE     | event-collector.js, events.js | Emitir `assistant.intent` e `assistant.reasoning` no AGENT EventEmitter; adicionar ao AGENT_EVENTS e nerv-bridge | ✅ Implementado                  |
 | BUG-SE-003 | context_changed sem SSE      | event-collector.js, events.js | Emitir `session.context_changed` no AGENT EventEmitter; adicionar ao nerv-bridge                                 | ✅ Implementado                  |
 
 ### Fase 2 — Steering & Queueing (P3) ✅ IMPLEMENTADA
 
-| ID          | Item                     | Módulo             | Ação                                                                                       | Status         |
-| ----------- | ------------------------ | ------------------ | ------------------------------------------------------------------------------------------ | -------------- |
+| ID          | Item                     | Módulo             | Ação                                                                                       | Status          |
+| ----------- | ------------------------ | ------------------ | ------------------------------------------------------------------------------------------ | --------------- |
 | GAP-SE-001a | Steering via AlwaysAlive | always-alive.js    | Novo método `steerMessage(prompt)` que chama `session.send({ prompt, mode: 'immediate' })` | ✅ Implementado |
 | GAP-SE-001b | Steering via HTTP        | bridge-control.js  | Endpoint `POST /api/copilot/steer` com body `{ message }`                                  | ✅ Implementado |
 | GAP-SE-001c | Steering via SDK API     | routes/sessions.js | Adicionar campo `mode: 'immediate' \| 'enqueue'` ao `POST /sessions/:id/send`              | ✅ Implementado |
@@ -317,8 +315,8 @@ custo/risco supera o benefício dado que:
 > essas respostas internamente via `_handleBroadcastEvent()`. A propagação SSE dos eventos
 > `*.requested` foi implementada na Fase 1 para observabilidade.
 
-| ID          | Item                    | Módulo                             | Ação                                                                | Status                       |
-| ----------- | ----------------------- | ---------------------------------- | ------------------------------------------------------------------- | ---------------------------- |
+| ID          | Item                    | Módulo                             | Ação                                                                | Status                        |
+| ----------- | ----------------------- | ---------------------------------- | ------------------------------------------------------------------- | ----------------------------- |
 | GAP-SE-002a | Elicitation surfacing   | events.js + session-event-wirer.js | Emitir `elicitation.pending` no EventEmitter com requestId + schema | ✅ Implementado (Fase 1)      |
 | GAP-SE-002b | Elicitation HTTP        | routes/sessions.js                 | Endpoint para resposta                                              | ❌ N/A — SDK interno gerencia |
 | GAP-SE-002c | Elicitation auto-pass   | hooks/elicitation.js               | Config auto-approve                                                 | ❌ N/A — SDK interno gerencia |
@@ -329,8 +327,8 @@ custo/risco supera o benefício dado que:
 
 ### Fase 4 — Upload & API Improvements (P4) ✅ PARCIALMENTE IMPLEMENTADA
 
-| ID          | Item                                 | Módulo                          | Ação                                                              | Status          |
-| ----------- | ------------------------------------ | ------------------------------- | ----------------------------------------------------------------- | --------------- |
+| ID          | Item                                 | Módulo                          | Ação                                                              | Status           |
+| ----------- | ------------------------------------ | ------------------------------- | ----------------------------------------------------------------- | ---------------- |
 | GAP-SE-006  | Session deletion API                 | routes/sessions.js              | Endpoint `DELETE /sessions/:id` com admin auth + X-Confirm-Delete | ✅ Já existia    |
 | GAP-SE-007  | Per-session SSE filter               | routes/sessions.js              | Adicionar suporte a `?events=` na rota `/sessions/:id/stream`     | ✅ Implementado  |
 | GAP-SE-007b | Session disconnect (preservar disco) | routes/sessions.js              | `POST /sessions/:id/disconnect`                                   | ✅ Implementado  |
@@ -359,10 +357,10 @@ custo/risco supera o benefício dado que:
 
 ### Fase 1.1 — Fix BUG-SE-001: Remover message_delta duplicado
 
-**Arquivo**: `src/copilot/agent/session-event-wirer.js`
-**Ação**: Remover o handler de `assistant.message_delta` da função `_wireStreamingEvents()`. O
-`task-executor.js` já subscreve esse evento por-tarefa com enriquecimento de `taskId`, e o
-`assistant.message_delta` no wirer causa emissão de `task.delta` com `taskId: null` que conflita.
+**Arquivo**: `src/copilot/agent/session-event-wirer.js` **Ação**: Remover o handler de
+`assistant.message_delta` da função `_wireStreamingEvents()`. O `task-executor.js` já subscreve esse
+evento por-tarefa com enriquecimento de `taskId`, e o `assistant.message_delta` no wirer causa
+emissão de `task.delta` com `taskId: null` que conflita.
 
 ### Fase 1.2 — Fix BUG-SE-002: Propagar intent + reasoning
 
@@ -386,8 +384,8 @@ custo/risco supera o benefício dado que:
 
 ### Fase 2.1 — Steering via AlwaysAlive
 
-**Arquivo**: `src/copilot/agent/always-alive.js`
-**Método novo**: `steerMessage(prompt: string): Promise<string>`
+**Arquivo**: `src/copilot/agent/always-alive.js` **Método novo**:
+`steerMessage(prompt: string): Promise<string>`
 
 - Verifica se session existe e status é `processing`
 - Chama `this.#session.send({ prompt, mode: 'immediate' })`
@@ -396,8 +394,8 @@ custo/risco supera o benefício dado que:
 
 ### Fase 2.2 — Steering via HTTP
 
-**Arquivo**: `src/copilot/api/bridge-control.js` ou `src/copilot/routes/agent.js`
-**Endpoint**: `POST /api/copilot/steer`
+**Arquivo**: `src/copilot/api/bridge-control.js` ou `src/copilot/routes/agent.js` **Endpoint**:
+`POST /api/copilot/steer`
 
 - Body: `{ message: string }`
 - Chama `agent.steerMessage(message)`
@@ -405,9 +403,9 @@ custo/risco supera o benefício dado que:
 
 ### Fase 2.3 — Mode no SDK Sessions API
 
-**Arquivo**: `src/copilot/routes/sessions.js`
-**Ação**: No handler de `POST /sessions/:id/send`, aceitar campo `mode: 'immediate' | 'enqueue'` no
-body e passá-lo para `session.send({ prompt, mode, attachments })`.
+**Arquivo**: `src/copilot/routes/sessions.js` **Ação**: No handler de `POST /sessions/:id/send`,
+aceitar campo `mode: 'immediate' | 'enqueue'` no body e passá-lo para
+`session.send({ prompt, mode, attachments })`.
 
 ### Fase 3.1 — Elicitation Handler
 
@@ -529,11 +527,11 @@ Fase 5 (Observab.)   →  Fase 4 (API)          →  Fase 6 (Hardening)
 
 ### Resumo por fase
 
-| Fase                           | Status         | Notas                                                                       |
-| ------------------------------ | -------------- | --------------------------------------------------------------------------- |
+| Fase                           | Status          | Notas                                                                       |
+| ------------------------------ | --------------- | --------------------------------------------------------------------------- |
 | Fase 1 — Bugs & Fixes          | ✅ Implementada | 8 novos eventos propagados via AGENT EventEmitter + NERV                    |
 | Fase 2 — Steering & Queueing   | ✅ Implementada | `steerMessage()`, `POST /steer`, campo `mode` no send                       |
 | Fase 3 — SDK Response Handlers | ℹ️ N/A          | `respondTo*()` são internos ao SDK runtime, não à API pública               |
-| Fase 4 — API Improvements      | ✅ Parcial      | SSE filter ✅, disconnect ✅, delete ✅ (pré-existente), upload ⬜              |
+| Fase 4 — API Improvements      | ✅ Parcial      | SSE filter ✅, disconnect ✅, delete ✅ (pré-existente), upload ⬜          |
 | Fase 5 — Observabilidade       | ⬜ Pendente     | Reasoning stream, event replay, quota endpoint, sub-agent SSE               |
 | Fase 6 — Hardening             | ⬜ Pendente     | Inter-token latency, compaction API, abort propagation (já feita na Fase 1) |

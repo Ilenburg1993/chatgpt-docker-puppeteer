@@ -61,6 +61,7 @@ export class SseReplayBuffer {
 
     /** Retorna o ID do último evento, ou 0 se vazio. */
     get lastId() {
-        return this.#buffer.length > 0 ? this.#buffer[this.#buffer.length - 1].id : 0;
+        const last = this.#buffer[this.#buffer.length - 1];
+        return last ? last.id : 0;
     }
 }
