@@ -72,8 +72,8 @@ export { HookRegistry, SDK_HOOKS } from './registry.js';
 export { composeHandlers, conditional, fallback, memoize, pipeline, raceWithTimeout } from './composer.js';
 
 // ─── Presets standalone (Gap 7) ───────────────────────────────────────────────
-// createAuditPreset agora re-exportado do módulo de observabilidade (migrado da Fase AG)
-export { createHooksAuditPreset as createAuditPreset } from '../observability/hooks-audit-preset.js';
+// ARCH-OBS-003 fix: audit preset agora reside em hooks/presets/ (antes: observability/)
+export { createHooksAuditPreset as createAuditPreset } from './presets/audit.js';
 export { createDenyAllPreset } from './presets/deny-all.js';
 export { createInteractivePreset } from './presets/interactive.js';
 export { createMinimalPreset } from './presets/minimal.js';

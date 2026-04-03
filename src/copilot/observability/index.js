@@ -39,7 +39,8 @@ export { createAgentEventObserver } from './agent-event-observer.js';
 export { createAuditLog, defaultAuditLog } from './audit-log.js';
 
 // ─── Hooks Audit Preset ───────────────────────────────────────────────────────
-export { createHooksAuditPreset } from './hooks-audit-preset.js';
+// ARCH-OBS-003: movido para hooks/presets/audit.js — re-export mantido por backward compat
+export { createHooksAuditPreset } from '../hooks/presets/audit.js';
 
 // ─── OTEL ─────────────────────────────────────────────────────────────────────
 export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled, startSpan } from './otel.js';
