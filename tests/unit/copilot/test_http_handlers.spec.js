@@ -201,7 +201,7 @@ describe('http-handlers › handleSetSkills contratos', () => {
     let fn = '';
 
     before(() => {
-        const match = src.match(/export\s+function\s+handleSetSkills[\s\S]*?\n\}/);
+        const match = src.match(/export\s+(?:async\s+)?function\s+handleSetSkills[\s\S]*?\n\}/);
         assert.ok(match, 'handler encontrado');
         fn = match[0];
     });
