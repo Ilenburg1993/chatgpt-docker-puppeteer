@@ -109,64 +109,68 @@ export class HookRegistry {
 /**
  * Registry pré-populado com todos os hooks do SDK `@github/copilot-sdk`.
  *
- * @type {HookRegistry}
+ * ARCH-REG-001: após a construção, o objeto é congelado — o mapa interno permanece imutável.
+ *
+ * @type {Readonly<HookRegistry>}
  */
-export const SDK_HOOKS = new HookRegistry()
-    .register('onPreToolUse', {
-        description: 'Intercepta tool antes de executar. Pode allow/deny ou modificar args.',
-        inputFields: ['toolName', 'toolArgs', 'timestamp', 'cwd'],
-        outputFields: ['permissionDecision', 'modifiedArgs', 'additionalContext'],
-        canModifyInput: true,
-        canAbort: true,
-    })
-    .register('onPostToolUse', {
-        description: 'Processa resultado após execução da tool. Pode adicionar contexto ao modelo.',
-        inputFields: ['toolName', 'toolArgs', 'toolResult', 'timestamp', 'cwd'],
-        outputFields: ['additionalContext'],
-        canModifyInput: false,
-        canAbort: false,
-    })
-    .register('onUserPromptSubmitted', {
-        description: 'Intercepta prompt do usuário. Pode modificar o prompt antes do processamento.',
-        inputFields: ['prompt', 'timestamp', 'cwd'],
-        outputFields: ['modifiedPrompt'],
-        canModifyInput: true,
-        canAbort: false,
-    })
-    .register('onSessionStart', {
-        description: 'Executado ao iniciar ou retomar sessão. Pode injetar contexto inicial.',
-        inputFields: ['source', 'timestamp', 'cwd'],
-        outputFields: ['additionalContext'],
-        canModifyInput: false,
-        canAbort: false,
-    })
-    .register('onSessionEnd', {
-        description: 'Limpeza ao encerrar sessão.',
-        inputFields: ['reason', 'timestamp', 'cwd'],
-        outputFields: [],
-        canModifyInput: false,
-        canAbort: false,
-    })
-    .register('onErrorOccurred', {
-        description: 'Controle de recuperação de erros com estratégias retry/skip/abort.',
-        inputFields: ['error', 'errorContext', 'recoverable', 'timestamp', 'cwd'],
-        outputFields: ['errorHandling', 'retryCount'],
-        canModifyInput: false,
-        canAbort: true,
-    })
-    .register('onPermissionRequest', {
-        description:
-            'Handler de permissão (obrigatório). Chamado antes de cada tool para approve/deny. ' +
-            'Kinds: shell, write, read, mcp, custom-tool, url, memory, hook.',
-        inputFields: ['kind', 'toolCallId', 'toolName'],
-        outputFields: ['kind'],
-        canModifyInput: false,
-        canAbort: true,
-    })
-    .register('onUserInputRequest', {
-        description: 'Handler para ask_user (input interativo). Habilita a tool nativa ask_user do CLI.',
-        inputFields: ['question', 'choices', 'allowFreeform'],
-        outputFields: ['answer', 'wasFreeform'],
-        canModifyInput: false,
-        canAbort: false,
-    });
+export const SDK_HOOKS = Object.freeze(
+    new HookRegistry()
+        .register('onPreToolUse', {
+            description: 'Intercepta tool antes de executar. Pode allow/deny ou modificar args.',
+            inputFields: ['toolName', 'toolArgs', 'timestamp', 'cwd'],
+            outputFields: ['permissionDecision', 'modifiedArgs', 'additionalContext'],
+            canModifyInput: true,
+            canAbort: true,
+        })
+        .register('onPostToolUse', {
+            description: 'Processa resultado após execução da tool. Pode adicionar contexto ao modelo.',
+            inputFields: ['toolName', 'toolArgs', 'toolResult', 'timestamp', 'cwd'],
+            outputFields: ['additionalContext'],
+            canModifyInput: false,
+            canAbort: false,
+        })
+        .register('onUserPromptSubmitted', {
+            description: 'Intercepta prompt do usuário. Pode modificar o prompt antes do processamento.',
+            inputFields: ['prompt', 'timestamp', 'cwd'],
+            outputFields: ['modifiedPrompt'],
+            canModifyInput: true,
+            canAbort: false,
+        })
+        .register('onSessionStart', {
+            description: 'Executado ao iniciar ou retomar sessão. Pode injetar contexto inicial.',
+            inputFields: ['source', 'timestamp', 'cwd'],
+            outputFields: ['additionalContext'],
+            canModifyInput: false,
+            canAbort: false,
+        })
+        .register('onSessionEnd', {
+            description: 'Limpeza ao encerrar sessão.',
+            inputFields: ['reason', 'timestamp', 'cwd'],
+            outputFields: [],
+            canModifyInput: false,
+            canAbort: false,
+        })
+        .register('onErrorOccurred', {
+            description: 'Controle de recuperação de erros com estratégias retry/skip/abort.',
+            inputFields: ['error', 'errorContext', 'recoverable', 'timestamp', 'cwd'],
+            outputFields: ['errorHandling', 'retryCount'],
+            canModifyInput: false,
+            canAbort: true,
+        })
+        .register('onPermissionRequest', {
+            description:
+                'Handler de permissão (obrigatório). Chamado antes de cada tool para approve/deny. ' +
+                'Kinds: shell, write, read, mcp, custom-tool, url, memory, hook.',
+            inputFields: ['kind', 'toolCallId', 'toolName'],
+            outputFields: ['kind'],
+            canModifyInput: false,
+            canAbort: true,
+        })
+        .register('onUserInputRequest', {
+            description: 'Handler para ask_user (input interativo). Habilita a tool nativa ask_user do CLI.',
+            inputFields: ['question', 'choices', 'allowFreeform'],
+            outputFields: ['answer', 'wasFreeform'],
+            canModifyInput: false,
+            canAbort: false,
+        }),
+);
