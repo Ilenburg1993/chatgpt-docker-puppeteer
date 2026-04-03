@@ -123,11 +123,13 @@ export class PermissionController {
             case 'selective': {
                 // G2-DX-13: lista de ferramentas shell configurável via AGENT_DENY_SHELL_TOOLS env var.
                 const defaultShellTools = ['run_shell_command', 'run_npm_script', 'run_node_script'];
+                // P3 (permission-controller-audit): validar tool names contra regex ^[a-zA-Z0-9_]+$
+                const _toolNameRe = /^[a-zA-Z0-9_]+$/;
                 const shellTools = process.env['AGENT_DENY_SHELL_TOOLS']
                     ? process.env['AGENT_DENY_SHELL_TOOLS']
                           .split(',')
                           .map((t) => t.trim())
-                          .filter(Boolean)
+                          .filter((t) => Boolean(t) && _toolNameRe.test(t))
                     : defaultShellTools;
                 /** @type {import('#copilot/hooks/permission').PermissionHandlerConfig} */
                 const cfg = {

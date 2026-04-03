@@ -16,6 +16,7 @@ import { defaultErrorTracker } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import { alwaysAliveAgent } from './always-alive.js';
+import { drainStateWrites } from './state-io.js';
 
 const RESTART_DELAY_MS = parseInt(process.env['COPILOT_RESTART_DELAY_MS'] ?? '5000', 10);
 
@@ -106,8 +107,16 @@ alwaysAliveAgent.on('error', (err) => {
 alwaysAliveAgent.on('session.fatal', (/** @type {Record<string, unknown>} */ evt) => {
     const reason = evt?.['reason'] ?? evt?.['message'] ?? 'desconhecido';
     log('ERROR', `[copilot/agent] session.fatal recebido — encerrando processo: ${reason}`);
-    process.exitCode = 1;
-    process.exit(1);
+    // P3 (entry-audit): chamar stop() para liberar recursos antes de sair (evita corrupção de state-io)
+    void alwaysAliveAgent
+        .stop()
+        .catch(() => {})
+        .finally(() => {
+            void drainStateWrites(3000).finally(() => {
+                process.exitCode = 1;
+                process.exit(1);
+            });
+        });
 });
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────

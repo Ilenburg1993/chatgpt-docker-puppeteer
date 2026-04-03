@@ -24,7 +24,22 @@
  * @returns {void}
  */
 export function wireDialogLoopEvents(dialogLoop, emitFn) {
-    dialogLoop.removeAllListeners();
+    // FINDING-P4: remover apenas os eventos conhecidos em vez de todos os listeners
+    // (evita remover listeners de outros componentes que possam ter registrado no DLM)
+    const DLM_EVENTS = [
+        'ready',
+        'reply',
+        'stopped',
+        'paused',
+        'resumed',
+        'stalled',
+        'turn_start',
+        'turn_end',
+        'turn_timeout',
+        'changed',
+        'model.fallback',
+    ];
+    for (const event of DLM_EVENTS) dialogLoop.removeAllListeners(event);
 
     dialogLoop.on('ready', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.ready', evt));
     dialogLoop.on('reply', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.reply', evt));

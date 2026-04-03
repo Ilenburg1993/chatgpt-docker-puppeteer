@@ -109,7 +109,10 @@ export function readState() {
 /**
  * Persiste o estado da sessão em disco (síncrono).
  *
- * Atualiza `_stateCache` após a escrita para que chamadas subsequentes a `readState()` não precisem de I/O adicional.
+ * Atualiza `_stateCache` e reseta `_writeQueue` após a escrita para garantir consistência entre o path síncrono e o
+ * mutex serial de `writeStateAsync`. Chamar `writeState()` enquanto há escritas async pendentes na fila as descarta — o
+ * arquivo em disco já contém o estado mais recente após retorno desta função.
+ *
  * Preferir `writeStateAsync` em fluxos assíncronos para não bloquear o event loop.
  *
  * @example
@@ -127,6 +130,9 @@ export function writeState(updates) {
     const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
     writeFileSync(STATE_FILE, JSON.stringify(next, null, 4), 'utf8');
     _stateCache = next;
+    // RACE-AGENT-003 fix: resetar o mutex para que escritas async subsequentes partam do
+    // estado que acabou de ser commitado em disco, e não de uma snapshot anterior.
+    _writeQueue = Promise.resolve(next);
     return next;
 }
 
@@ -144,7 +150,12 @@ export function writeState(updates) {
  * @throws {Error} Se a escrita em disco falhar após retry interno
  */
 export async function writeStateAsync(updates) {
-    _writeQueue = _writeQueue.then(() => _doWriteState(updates)).catch(() => _doWriteState(updates));
+    _writeQueue = _writeQueue
+        .then(() => _doWriteState(updates))
+        .catch((/** @type {any} */ err) => {
+            log('WARN', `[PersistentSession] writeStateAsync retry após falha: ${err?.message ?? err}`);
+            return _doWriteState(updates);
+        });
     return _writeQueue;
 }
 
@@ -182,6 +193,20 @@ export function clearState() {
     _stateCache = null;
     _stateDirReady = false;
     _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unknown} */ (null)));
+}
+
+/**
+ * Aguarda que todos os writes assíncronos pendentes sejam concluídos (ou que o timeout expire). BUG-AGENT-006: usar
+ * antes de process.exit para garantir que state.json não seja corrompido.
+ *
+ * @param {number} [timeoutMs=3000] - Timeout máximo em ms. Default is `3000`
+ * @returns {Promise<void>}
+ */
+export async function drainStateWrites(timeoutMs = 3000) {
+    await Promise.race([
+        _writeQueue.then(() => undefined).catch(() => undefined),
+        new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
 }
 
 // ─── Helpers privados ─────────────────────────────────────────────────────────

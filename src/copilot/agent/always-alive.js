@@ -1219,6 +1219,16 @@ export class AlwaysAliveAgent extends EventEmitter {
     async [Symbol.asyncDispose]() {
         await this.stop();
     }
+
+    /**
+     * UPG-AGENT-005: Suporte a `using agent = alwaysAliveAgent` (sync Explicit Resource Management). Dispara stop() em
+     * fire-and-forget; útil em contextos onde `await using` não é possível.
+     */
+    [Symbol.dispose]() {
+        this.stop().catch((/** @type {any} */ e) =>
+            log('WARN', `[AlwaysAlive] stop() em Symbol.dispose falhou: ${e.message}`),
+        );
+    }
 }
 
 /**

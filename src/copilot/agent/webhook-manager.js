@@ -8,6 +8,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import dns from 'node:dns/promises';
 
 /**
  * Timeout (ms) para cada requisição HTTP de webhook. Evita que webhooks lentos bloqueiem o ciclo.
@@ -166,6 +167,47 @@ export class WebhookManager {
     }
 
     /**
+     * SEC-AGENT-005: Verifica se o IP resolvido para um hostname é privado/loopback. Mitiga DNS rebinding — atacante
+     * usa hostname público que resolve para IP interno.
+     *
+     * @param {string} hostname
+     * @returns {Promise<void>}
+     * @throws {Error} Se o IP resolvido for privado/loopback
+     */
+    static async #checkResolvedIp(hostname) {
+        let address;
+        try {
+            const result = await dns.lookup(hostname, { family: 4 });
+            address = result.address;
+        } catch {
+            // IPv6 fallback
+            try {
+                const result = await dns.lookup(hostname, { family: 6 });
+                address = result.address;
+            } catch {
+                return; // Não conseguiu resolver — deixa o fetch falhar naturalmente
+            }
+        }
+        const isPrivate =
+            address === '127.0.0.1' ||
+            address === '0.0.0.0' ||
+            /^127\./.test(address) ||
+            /^::1$/.test(address) ||
+            /^10\./.test(address) ||
+            /^172\.(1[6-9]|2\d|3[01])\./.test(address) ||
+            /^192\.168\./.test(address) ||
+            /^169\.254\./.test(address) ||
+            /^fe80:/i.test(address) || // link-local IPv6
+            /^f[cd]/i.test(address) || // ULA IPv6 (fc00::/7 → fc/fd prefixes)
+            /^::ffff:(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(address); // IPv4-mapped
+        if (isPrivate) {
+            throw new Error(
+                `[WebhookManager] DNS rebinding bloqueado: ${hostname} resolveu para IP privado ${address}.`,
+            );
+        }
+    }
+
+    /**
      * Emite um evento para todas as URLs registradas via HTTP POST.
      *
      * Falhas individuais são logadas mas não propagadas (allSettled).
@@ -185,6 +227,16 @@ export class WebhookManager {
 
         await Promise.allSettled(
             [...this.#urls.entries()].map(async ([id, url]) => {
+                // SEC-AGENT-005: verificar IP resolvido para mitigar DNS rebinding
+                if (process.env['WEBHOOK_ALLOW_PRIVATE_HOSTS'] !== 'true') {
+                    try {
+                        const hostname = new URL(url).hostname;
+                        await WebhookManager.#checkResolvedIp(hostname);
+                    } catch (/** @type {any} */ e) {
+                        log('WARN', `[WebhookManager] ${id} bloqueado (DNS rebinding): ${e.message}`);
+                        return;
+                    }
+                }
                 // G2-ARCH-06: usar fetch (Node 18+) em vez de http/https nativos — mais limpo e testável
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
