@@ -282,7 +282,15 @@ function _handleSessionsList(socket, store) {
                 offset: opts?.offset ?? 0,
                 ...(statusVal !== undefined ? { status: statusVal } : {}),
             });
-            socket.emit('sessions:list:result', { sessions });
+            // C11-02 fix: projetar apenas campos públicos — omitir sdk_session_id e metadata raw
+            const publicSessions = sessions.map((s) => ({
+                id: s.id,
+                title: s.title,
+                status: s.status,
+                created_at: s.created_at,
+                updated_at: s.updated_at,
+            }));
+            socket.emit('sessions:list:result', { sessions: publicSessions });
         } catch (/** @type {any} */ err) {
             socket.emit('error:sessions', { reason: err.message });
         }
