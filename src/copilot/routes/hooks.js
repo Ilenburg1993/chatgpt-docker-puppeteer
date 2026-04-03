@@ -18,11 +18,15 @@ import { defaultBus } from '#copilot/hooks/bus';
 import { SDK_HOOKS } from '#copilot/hooks/registry';
 import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
+import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
 import { createSseWriter, SseConnectionTracker } from '../api/sse-utils.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** GAP-EVARCH-01 (fix): tracker centralizado para /hooks/events. */
 const _hooksTracker = new SseConnectionTracker('hooks/events');
+
+/** FASE-11.1: replay buffer global para hooks/events. */
+const _hooksReplayBuffer = new SseReplayBuffer();
 
 /**
  * @typedef {import('express').Request} Req
@@ -88,9 +92,12 @@ router.get('/hooks/events', (req, res) => {
         }
 
         // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
+        // FASE-11.1/11.4: replay buffer + max lifetime
         const sse = createSseWriter(req, res, {
             heartbeatMs: 30_000,
             tracker: _hooksTracker,
+            replayBuffer: _hooksReplayBuffer,
+            maxLifetimeMs: 24 * 60 * 60 * 1000,
         });
 
         sse.send('connected', { timestamp: Date.now(), message: 'hooks/events stream iniciado' });

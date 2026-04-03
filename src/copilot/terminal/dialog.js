@@ -244,6 +244,29 @@ export function broadcastSse(event, data) {
 }
 
 /**
+ * FASE-12.1: Escreve um evento SSE formatado para um único client raw (node:http).
+ *
+ * Centraliza sanitização, event ID monotônico, hubSessionId injection e escrita.
+ *
+ * @param {import('node:http').ServerResponse} client
+ * @param {string} event - Nome do evento (será sanitizado)
+ * @param {object} data - Payload JSON (já truncado se necessário)
+ * @param {{ hubSessionId?: string | null }} [ctx]
+ * @returns {boolean} true se a escrita foi bem-sucedida
+ */
+function writeSseEvent(client, event, data, ctx = {}) {
+    const safeEvent = String(event).replace(/[\r\n]/g, '_');
+    const eventId = nextSseEventId();
+    const payload = `id: ${eventId}\nevent: ${safeEvent}\ndata: ${JSON.stringify({ ...data, hubSessionId: ctx.hubSessionId ?? null })}\n\n`;
+    try {
+        client.write(payload);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Envia um evento SSE para clientes raw (node:http ServerResponse).
  *
  * @param {Set<import('node:http').ServerResponse>} clients - Clientes SSE gerais
@@ -255,27 +278,16 @@ export function broadcastSse(event, data) {
 function emitSse(clients, criticalClients, event, data) {
     if (clients.size === 0 && criticalClients.size === 0) return;
 
-    // BUG-N06 (fix): incluir hubSessionId no payload SSE para consistência com Socket.io
-    const ssePayloadData = { ...data, hubSessionId: getHubSessionId() };
-    // SEC-VULN-02 (fix): sanitizar nome do evento SSE para prevenir injeção de protocolo
-    // (event names não podem conter \n ou \r — RFC 8895 §6.2)
-    const safeEvent = String(event).replace(/[\r\n]/g, '_');
-    // PHASE-9: incluir id: monotônico para suporte a Last-Event-ID (RFC 8895 §9.2.4)
-    const eventId = nextSseEventId();
-    const payload = `id: ${eventId}\nevent: ${safeEvent}\ndata: ${JSON.stringify(ssePayloadData)}\n\n`;
+    const ctx = { hubSessionId: getHubSessionId() };
 
     for (const client of clients) {
-        try {
-            client.write(payload);
-        } catch {
+        if (!writeSseEvent(client, event, data, ctx)) {
             clients.delete(client);
         }
     }
     if (CRITICAL_EVENTS.has(event)) {
         for (const client of criticalClients) {
-            try {
-                client.write(payload);
-            } catch {
+            if (!writeSseEvent(client, event, data, ctx)) {
                 criticalClients.delete(client);
             }
         }

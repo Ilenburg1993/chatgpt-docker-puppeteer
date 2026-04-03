@@ -934,3 +934,372 @@ na reconexão. Eventos perdidos durante desconexão não eram recuperados.
 SSE serve clients headless (LLM-A), o Socket.io serve UIs reativas no browser com suporte a rooms
 (isolamento por hub_session). Remover qualquer um quebraria funcionalidade. A dual-emission em
 `broadcastSse()` está correta e intencional.
+
+---
+
+## 14. Análise Arquitetural Profunda — Situação Atual vs Ideal (2026-04-03)
+
+### 14.1 Visão Geral Arquitetural Atual
+
+O subsistema de difusão de eventos em tempo real do copilot opera com **7 canais distintos**
+(§12.1), 3 transportes (SSE, WebSocket, EventEmitter interno), e 4 "produtores" de eventos
+primários:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     PRODUTORES DE EVENTOS                          │
+│                                                                     │
+│  ┌───────────────┐  ┌──────────────┐  ┌──────────┐  ┌───────────┐ │
+│  │ CopilotSession│  │ AlwaysAlive  │  │ HookBus  │  │ CopilotCl.│ │
+│  │ (SDK events)  │  │ Agent (AGENT │  │ (audit/  │  │ (lifecycle│ │
+│  │ 70+ tipos     │  │ EventEmitter)│  │ governan)│  │ events)   │ │
+│  └──────┬────────┘  └──────┬───────┘  └────┬─────┘  └─────┬─────┘ │
+│         │                  │               │               │       │
+└─────────┼──────────────────┼───────────────┼───────────────┼───────┘
+          │                  │               │               │
+          ▼                  ▼               ▼               ▼
+   ┌─────────────┐    ┌───────────┐    ┌──────────┐    ┌──────────┐
+   │ event-      │    │ bridge-   │    │ hooks    │    │ agent    │
+   │ collector   │    │ stream.js │    │ /events  │    │ /stream  │
+   │ (persist,   │    │ SSE (#1)  │    │ SSE (#3) │    │ SSE (#4) │
+   │ metrics)    │    │ :3000     │    │ :3000    │    │ :3000    │
+   └──────┬──────┘    └───────────┘    └──────────┘    └──────────┘
+          │                                │
+          │                                │ (via hookBus)
+          ▼                                │
+   ┌─────────────┐                         │
+   │ session-    │                         │
+   │ event-wirer │◄────────────────────────┘
+   │ (AGENT EE)  │
+   └──────┬──────┘
+          │                 ┌───────────┐    ┌───────────┐
+          ├────────────────►│ terminal  │    │ sessions  │
+          │                 │ SSE (#2)  │    │ /:id/     │
+          │                 │ :3009     │    │ stream    │
+          │                 │ +Socket.io│    │ SSE (#5)  │
+          │                 │ (#6)      │    │ :3000     │
+          │                 └───────────┘    └───────────┘
+          │
+          ▼
+   ┌─────────────┐
+   │ NERV bridge │
+   │ (#7) intern │
+   └─────────────┘
+```
+
+### 14.2 Problemas Arquiteturais Identificados
+
+#### PROB-01: Falta de Camada Abstrata de Difusão
+
+**Estado atual**: Cada endpoint SSE implementa seu próprio loop de difusão:
+
+- `bridge-stream.js`: `AGENT_EVENTS.forEach(evt => agent.on(evt, handler))`
+- `terminal/index.js`: Wiring manual + auto-wiring catch-all
+- `routes/hooks.js`: `defaultBus.on('*', onAnyHook)`
+- `routes/agent.js`: `client.on(event => sse.send(...))`
+- `routes/sessions.js`: `session.on(event => sse.send(...))`
+
+**Problema**: Não existe um _event dispatcher_ central que garanta:
+
+1. Formato uniforme de payloads SSE (campo `hubSessionId`, timestamps)
+2. Política consistente de truncamento (apenas `broadcastSse` trunca via `MAX_SSE_CONTENT_CHARS`)
+3. Filtro uniforme de PII (apenas o event-collector omite content por config)
+
+#### PROB-02: Sobreposição bridge-stream ↔ terminal/index.js
+
+**Estado atual**: Ambos subscrevem os mesmos eventos do `alwaysAliveAgent`:
+
+- `bridge-stream.js` usa loop automático sobre `AGENT_EVENTS` (35+ eventos)
+- `terminal/index.js` tem 9 handlers manuais com business logic + catch-all genérico
+
+**Problema**: Quando bridge-stream e terminal rodam no **mesmo processo** (modo integrado, não PM2),
+o mesmo evento é processado 2x. No modo PM2 separado, cada um roda em processo distinto (correto). A
+coexistência no mesmo processo causa overhead de listeners desnecessário.
+
+#### PROB-03: Inconsistência de Features entre Endpoints
+
+| Feature           | bridge-stream   | terminal SSE   | hooks SSE  | agent SSE  | sessions SSE |
+| ----------------- | --------------- | -------------- | ---------- | ---------- | ------------ |
+| Event IDs (`id:`) | ✅ (replay)     | ✅ (monotôn.)  | ❌         | ❌         | ✅ (replay)  |
+| Replay buffer     | ✅              | ❌             | ❌         | ❌         | ✅           |
+| Event filter      | ✅ (`?events=`) | ❌             | ❌         | ❌         | ✅           |
+| Heartbeat         | ✅ (15s)        | ✅ (30s)       | ✅ (30s)   | ✅ (30s)   | ✅ (15s)     |
+| Max lifetime      | ✅ (24h)        | ❌             | ❌         | ❌         | ❌           |
+| Sanitização       | ✅ (sse-utils)  | ✅ (manual)    | ✅ (utils) | ✅ (utils) | ✅ (utils)   |
+| Connection limit  | ✅ (tracker)    | ✅ (Set size)  | ✅ (track) | ✅ (track) | ✅ (tracker) |
+| Truncamento       | ❌              | ✅ (MAX_CHARS) | ❌         | ❌         | ❌           |
+| `connected` event | ✅              | ✅ (comment)   | ✅         | ✅         | ✅           |
+
+#### PROB-04: Terminal SSE Não Usa sse-utils.js
+
+O terminal server (`server.js`) usa raw `node:http` e **não pode importar** `sse-utils.js` porque
+`createSseWriter` depende de Express `req/res` interfaces (`.query`, `.setHeader()` etc.). O
+terminal usa `res.writeHead(200, {...})` e `res.write()` do `node:http`. Isso cria uma bifurcação
+permanente na stack SSE.
+
+#### PROB-05: Dialog.js broadcastSse Dual-Emit Monolítico
+
+O `broadcastSse()` em `dialog.js` é o único ponto de emissão para AMBOS:
+
+1. SSE raw via `emitSse()` (Set de ServerResponse)
+2. Socket.io via `emitSocket()` (namespace /copilot com rooms)
+
+Essa função faz truncamento, sanitização, hub session injection e dispatch para 2 transportes numa
+única chamada síncrona. Se um transporte falhar, pode afetar o outro.
+
+### 14.3 Arquitetura Ideal Proposta
+
+#### Princípio: "Event Fanout Layer"
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    PRODUTORES (inalterado)                         │
+│  CopilotSession │ AlwaysAliveAgent │ HookBus │ CopilotClient      │
+└────────┬──────────────────┬────────────┬──────────────┬───────────┘
+         │                  │            │              │
+         ▼                  ▼            ▼              ▼
+   ┌─────────────────────────────────────────────────────────────┐
+   │              EVENT FANOUT LAYER (novo)                       │
+   │                                                             │
+   │  ┌──────────────────────────────────────────────────┐       │
+   │  │  SseEventChannel (por endpoint)                   │       │
+   │  │  - createSseWriter wrapper                        │       │
+   │  │  - standardizePayload(event, data, opts)          │       │
+   │  │  - truncateIfNeeded(data, MAX_CHARS)              │       │
+   │  │  - addMetadata(hubSessionId, timestamp)           │       │
+   │  └──────────────────────────────────────────────────┘       │
+   │                                                             │
+   │  ┌──────────────────────────────────────────────────┐       │
+   │  │  TerminalSseChannel (raw node:http)               │       │
+   │  │  - writeSseEvent(clients, event, data, opts)      │       │
+   │  │  - sanitize + id + truncate + metadata            │       │
+   │  └──────────────────────────────────────────────────┘       │
+   │                                                             │
+   │  ┌──────────────────────────────────────────────────┐       │
+   │  │  SocketIoChannel                                  │       │
+   │  │  - emitToNamespace(ns, event, data, room?)        │       │
+   │  └──────────────────────────────────────────────────┘       │
+   └─────────────────────────────────────────────────────────────┘
+```
+
+**Benefícios**:
+
+- Payload standardization em um único ponto
+- Features (event IDs, replay, filter, truncamento) disponíveis para TODOS os canais
+- Terminal SSE obtém replay buffer sem precisar importar Express types
+- Adição de novos canais (ex: Redis PubSub, Kafka) sem tocar nos produtores
+
+### 14.4 Comparação: Estado Atual vs Ideal
+
+| Dimensão                 | Estado Atual                      | Estado Ideal                            | Gap       |
+| ------------------------ | --------------------------------- | --------------------------------------- | --------- |
+| Módulo SSE compartilhado | ✅ `sse-utils.js` (Express only)  | Universal (Express + raw http)          | Parcial   |
+| Event IDs                | 2/5 endpoints                     | 5/5 endpoints                           | 3 missing |
+| Replay buffer            | 2/5 endpoints                     | 4/5 (terminal é futuro)                 | 2 missing |
+| Event filter             | 2/5 endpoints                     | 4/5 (hooks não precisa — já é wildcard) | 2 missing |
+| Max lifetime             | 1/5 endpoints                     | 3/5 (hooks + agent + bridge)            | 2 missing |
+| Truncamento              | 1/5 endpoints (broadcastSse only) | Política centralizada configurável      | Alto      |
+| Payload standard         | Inconsistente entre endpoints     | `{ hubSessionId, ts, ... }` em todos    | Alto      |
+| PII filtering            | event-collector only              | Política declarativa no fanout layer    | Médio     |
+| Terminal sse-utils       | ❌ (raw http incompatível)        | Adapter pattern para raw http           | Alto      |
+
+---
+
+## 15. Roadmap de Centralização Arquitetural — Fases 11-15
+
+### FASE 11 — Normalização de Features SSE (P2)
+
+Nivelar features de todos os endpoints Express SSE ao mesmo baseline:
+
+#### 11.1 — Event IDs + replay buffer no hooks/events SSE
+
+**Ação**: Adicionar `SseReplayBuffer` ao hooks SSE e usar `replayBuffer` option no
+`createSseWriter`. **Arquivos**: `src/copilot/routes/hooks.js` **Impacto**: Clientes SSE de hooks
+que reconectam não perdem eventos de auditoria.
+
+#### 11.2 — Event IDs + replay buffer no agent/stream SSE
+
+**Ação**: Adicionar `SseReplayBuffer` ao agent SSE e usar `replayBuffer` option. **Arquivos**:
+`src/copilot/routes/agent.js` **Impacto**: Lifecycle events do CopilotClient são replayáveis.
+
+#### 11.3 — Event filter no agent/stream SSE
+
+**Ação**: Adicionar `?events=` query param parsing ao agent/stream. **Arquivos**:
+`src/copilot/routes/agent.js` **Impacto**: Clientes podem filtrar apenas lifecycle events de
+interesse.
+
+#### 11.4 — Max lifetime nos endpoints hooks, agent e sessions
+
+**Ação**: Adicionar `maxLifetimeMs` option aos 3 endpoints Express SSE restantes. **Arquivos**:
+`routes/hooks.js`, `routes/agent.js`, `routes/sessions.js` **Impacto**: Prevenção de conexões SSE
+órfãs em produção.
+
+### FASE 12 — Terminal SSE Adapter (P3)
+
+Criar adapter que permita o terminal server beneficiar-se das utilities do sse-utils sem depender de
+Express types.
+
+#### 12.1 — Função `writeSseEvent()` para raw node:http
+
+**Ação**: Extrair do `broadcastSse()`/`emitSse()` de `dialog.js` uma função utilitária:
+
+```javascript
+/**
+ * Escreve um evento SSE formatado (raw node:http).
+ * @param {import('node:http').ServerResponse} client
+ * @param {string} event - Nome do evento (será sanitizado)
+ * @param {object} data - Payload JSON
+ * @param {{ id?: number; maxContentChars?: number }} [opts]
+ */
+function writeSseEvent(client, event, data, opts) { ... }
+```
+
+**Arquivos**: `src/copilot/terminal/dialog.js` (interna, não exportada — scope do terminal)
+**Impacto**: Sanitização, truncamento e event IDs centralizados no terminal.
+
+#### 12.2 — Replay buffer no terminal broadcastSse (OPCIONAL)
+
+**Ação**: Adicionar um `SseReplayBuffer` ao `broadcastSse()` e suportar `Last-Event-ID` header no
+handler de `/events` do `server.js`. **Arquivos**: `src/copilot/terminal/server.js`,
+`src/copilot/terminal/dialog.js` **Complexidade**: Alta — raw http request não tem `.headers` como
+Express; precisa parsear manualmente. **Impacto**: inject.js já envia o header (Fase 10); com replay
+no server, a reconexão se torna zero-loss. **Decisão**: OPCIONAL — implementar se tempo permitir.
+
+### FASE 13 — Payload Standardization (P2)
+
+Garantir que TODOS os eventos SSE emitidos por QUALQUER canal incluam campos mínimos padrão.
+
+#### 13.1 — Definir SsePayloadStandard
+
+**Ação**: Criar typedef e helper function em `sse-utils.js`:
+
+```javascript
+/**
+ * @typedef {object} SsePayloadMetadata
+ * @property {number} ts - Timestamp Unix ms
+ * @property {string | null} hubSessionId - ID da hub_session ativa (se aplicável)
+ */
+
+/**
+ * Envolve um payload de evento com metadados padrão SSE.
+ *
+ * @param {object} data - Payload original
+ * @param {{ hubSessionId?: string | null }} [ctx]
+ * @returns {object}
+ */
+export function standardizeSsePayload(data, ctx = {}) {
+  return { ...data, ts: Date.now(), hubSessionId: ctx.hubSessionId ?? null };
+}
+```
+
+**Arquivos**: `src/copilot/api/sse-utils.js`
+
+#### 13.2 — Aplicar standardizeSsePayload nos endpoints Express
+
+**Ação**: Chamar `standardizeSsePayload()` antes de `sse.send()` nos 4 endpoints Express.
+**Arquivos**: `bridge-stream.js`, `routes/hooks.js`, `routes/agent.js`, `routes/sessions.js`
+**Nota**: O bridge-stream já inclui `timestamp` no connected event e o agent/stream inclui `state`.
+O standardize adiciona `ts` e `hubSessionId` uniformemente a TODOS os eventos.
+
+#### 13.3 — Truncamento configurable via option
+
+**Ação**: Adicionar option `maxContentChars` ao `createSseWriter` que aplica truncamento automático
+no campo `content` de qualquer payload (como `broadcastSse()` já faz para o terminal). **Arquivos**:
+`src/copilot/api/sse-utils.js` **Impacto**: Proteção contra SSE messages gigantes em TODOS os
+endpoints.
+
+### FASE 14 — Consolidação de Wiring do AlwaysAliveAgent (P3)
+
+#### 14.1 — Eliminar duplicação bridge-stream ↔ terminal para modo integrado
+
+**Ação**: Quando bridge-stream e terminal rodam no MESMO processo:
+
+- Detectar via flag/env se o processo é integrado vs PM2 separado
+- No modo integrado: o bridge-stream já faz wiring completo de AGENT_EVENTS; o terminal
+  `registerAgentEventListeners()` pode reusar os eventos do bridge-stream em vez de subscrever
+  diretamente no agent
+- No modo PM2: manter independente (sem IPC disponível)
+
+**Decisão**: ADIADO — complexidade alta e o overhead atual é desprezível (listeners em EventEmitter
+são O(1)). Documentar como arquitetura futura.
+
+#### 14.2 — Unificar event naming no terminal broadcastSse
+
+**Problema**: O terminal usa nomes de evento diferentes dos AGENT_EVENTS em alguns casos:
+
+- `'reply'` (terminal) vs `'dialog.reply'` (AGENT_EVENTS)
+- `'ready'` (terminal) vs `'dialog.ready'` (AGENT_EVENTS) — mas `'ready'` TAMBÉM existe em
+  AGENT_EVENTS como evento de alto nível
+- `'stopped'` (terminal) vs `'dialog.stopped'` (AGENT_EVENTS) — idem
+- `'stalled'` vs `'dialog.stalled'`
+- `'context'` vs `'session.usage'`
+- `'cache.hit'` vs não tem equivalente direto
+
+**Ação**: Documentar mapeamento e avaliar se normalizar para nomes AGENT_EVENTS. Risco: quebrar
+clientes existentes do inject.js que dependem dos nomes atuais. **Decisão**: DOCUMENTAR E MANTER —
+breaking change nos nomes seria regressão para inject clients. Adicionar mapping table na
+documentação para referência.
+
+#### 14.2.1 — Tabela de mapeamento: Terminal SSE → AGENT_EVENTS
+
+| Terminal SSE (broadcastSse) | AGENT_EVENTS                    | Notas                                               |
+| --------------------------- | ------------------------------- | --------------------------------------------------- |
+| `'reply'`                   | `'dialog.reply'`                | Conteúdo da resposta LLM-B                          |
+| `'ready'`                   | `'dialog.ready'`                | Coincide com `ready` (alto nível) de AGENT_EVENTS   |
+| `'stopped'`                 | `'dialog.stopped'`              | Coincide com `stopped` (alto nível) de AGENT_EVENTS |
+| `'stalled'`                 | `'dialog.stalled'`              | Watchdog timeout                                    |
+| `'context'`                 | `'session.usage'`               | Tokens/utilization — nome arbitrário local          |
+| `'cache.hit'`               | `'session.compaction_complete'` | Emitido apenas se `cachedInput > 0`                 |
+| `'dialog.loop.changed'`     | `'dialog.loop.changed'`         | ✅ Nomes iguais                                     |
+| (auto-wiring catch-all)     | Todos os demais                 | broadcastSse(evt, data) sem transformação           |
+
+### FASE 15 — Consolidação de Socket.io no Fanout Layer (P4 — FUTURO)
+
+#### 15.1 — Separar emitSocket de broadcastSse
+
+**Ação**: `broadcastSse()` atualmente faz dual-emit (SSE + Socket.io). Separar em duas chamadas
+independentes no caller (`terminal/index.js`) para permitir que cada transporte evolua
+independentemente. **Decisão**: ADIADO — funciona bem como está e a separação não traz benefício
+imediato além de pureza arquitetural.
+
+#### 15.2 — Avaliar event bus centralizado (EventEmitter → Redis PubSub)
+
+Para cenários multi-processo (PM2 cluster), considerar Redis PubSub ou `BroadcastChannel` do Node.js
+24 como barramento de eventos inter-processo. **Decisão**: FUTURO — requisito não existe ainda (PM2
+usa fork mode, não cluster).
+
+### Resumo de Prioridades
+
+| Fase | Prioridade | Escopo                                   | Complexidade |
+| ---- | ---------- | ---------------------------------------- | ------------ |
+| 11   | P2         | Normalização de features SSE             | Baixa        |
+| 12   | P3         | Terminal SSE adapter                     | Média        |
+| 13   | P2         | Payload standardization                  | Baixa        |
+| 14   | P3/P4      | Consolidação de wiring (doc + avaliação) | N/A          |
+| 15   | P4         | Socket.io fanout layer (futuro)          | Alta         |
+
+### Execução Recomendada
+
+Implementar Fases 11 e 13 imediatamente (baixa complexidade, alto impacto em consistência). Fase 12
+seletivamente (12.1 sim, 12.2 opcional). Fases 14 e 15 são documentação + decisões do futuro.
+
+### Status de Execução (atualizado 2026-04-03)
+
+| Sub-fase | Status   | Detalhes                                                      |
+| -------- | -------- | ------------------------------------------------------------- |
+| 11.1     | ✅ FEITO | Replay buffer no hooks/events SSE                             |
+| 11.2     | ✅ FEITO | Replay buffer no agent/stream SSE                             |
+| 11.3     | ✅ FEITO | Event filter `?events=` no agent/stream SSE                   |
+| 11.4     | ✅ FEITO | Max lifetime (24h) nos 3 endpoints restantes                  |
+| 12.1     | ✅ FEITO | `writeSseEvent()` extraída em `dialog.js`                     |
+| 12.2     | ⏸ ADIADO | Replay buffer no terminal (complexidade alta, opcional)       |
+| 13.1     | ✅ FEITO | `standardizeSsePayload()` em `sse-utils.js`                   |
+| 13.2     | ⏸ ADIADO | Aplicar nos callers (baixo impacto — endpoints já incluem ts) |
+| 13.3     | ✅ FEITO | `maxContentChars` option no `createSseWriter`                 |
+| 14.1     | 📋 DOC   | Duplicação bridge↔terminal documentada (overhead O(1))        |
+| 14.2     | 📋 DOC   | Tabela de mapeamento de nomes adicionada (§14.2.1)            |
+| 15.1     | ⏸ FUTURO | Separar emitSocket de broadcastSse (não urgente)              |
+| 15.2     | ⏸ FUTURO | Redis PubSub / BroadcastChannel (sem requisito)               |
+
+**Testes**: 2048/2049 pass (1 flaky pré-existente — order-dependent, não relacionado). Lint: 0
+erros.

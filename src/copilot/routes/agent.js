@@ -21,13 +21,17 @@
 import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { createSseWriter, SseConnectionTracker } from '../api/sse-utils.js';
+import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
+import { createEventFilter, createSseWriter, SseConnectionTracker } from '../api/sse-utils.js';
 import { getClient } from '../lib/sdk-client.js';
 import { defaultMetrics } from '../observability/index.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** GAP-EVARCH-01 (fix): tracker centralizado para /agent/stream. */
 const _agentTracker = new SseConnectionTracker('agent/stream');
+
+/** FASE-11.2: replay buffer global para agent/stream. */
+const _agentReplayBuffer = new SseReplayBuffer();
 
 /**
  * @typedef {import('express').Request} Req
@@ -179,16 +183,25 @@ router.get('/agent/stream', (req, res) => {
         const client = await getClient();
 
         // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
+        // FASE-11.2/11.3/11.4: replay buffer + event filter + max lifetime
         const sse = createSseWriter(req, res, {
             heartbeatMs: 30_000,
             tracker: _agentTracker,
+            replayBuffer: _agentReplayBuffer,
+            maxLifetimeMs: 24 * 60 * 60 * 1000,
         });
 
         sse.send('connected', { state: client.getState(), timestamp: Date.now() });
 
+        // FASE-11.3: filtro de eventos via ?events= query param
+        const eventFilter = createEventFilter(
+            typeof req.query['events'] === 'string' ? req.query['events'] : undefined,
+        );
+
         // Inscreve nos eventos de ciclo de vida do client
         const unsubscribe = client.on((event) => {
-            sse.send('lifecycle', event);
+            const type = /** @type {string} */ (event?.type ?? 'lifecycle');
+            if (!eventFilter || eventFilter(type)) sse.send('lifecycle', event);
         });
 
         req.on('close', () => {

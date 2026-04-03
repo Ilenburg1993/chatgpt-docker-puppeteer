@@ -23,6 +23,8 @@ import { MAX_SSE_CLIENTS } from '#copilot/core';
  * @property {number} [maxLifetimeMs=0] - Tempo máximo de vida da conexão (0 = sem limite). Default is `0`
  * @property {SseReplayBuffer | null} [replayBuffer=null] - Buffer de replay (null = sem replay). Default is `null`
  * @property {SseConnectionTracker | null} [tracker=null] - Tracker de conexões (null = sem limite). Default is `null`
+ * @property {number} [maxContentChars=0] - Trunca campo `content` de payloads maiores que este valor (0 =
+ *   desabilitado). Default is `0`
  */
 
 /**
@@ -60,7 +62,7 @@ export function sanitizeSseEvent(event) {
  * @returns {SseWriter}
  */
 export function createSseWriter(req, res, opts = {}) {
-    const { heartbeatMs = 15_000, maxLifetimeMs = 0, replayBuffer = null, tracker = null } = opts;
+    const { heartbeatMs = 15_000, maxLifetimeMs = 0, replayBuffer = null, tracker = null, maxContentChars = 0 } = opts;
 
     // Registrar no tracker (caller já verificou accept() antes de chamar)
     tracker?.increment();
@@ -82,9 +84,17 @@ export function createSseWriter(req, res, opts = {}) {
     const send = (event, data, sendOpts) => {
         if (res.writableEnded) return;
         const safeEvent = sanitizeSseEvent(event);
-        const id = replayBuffer && !sendOpts?.skipBuffer ? replayBuffer.push(safeEvent, data) : undefined;
+        // FASE-13.3: truncamento configurável de campo `content`
+        let payload = data;
+        if (maxContentChars > 0 && data && typeof data === 'object') {
+            const obj = /** @type {Record<string, unknown>} */ (data);
+            if (typeof obj['content'] === 'string' && obj['content'].length > maxContentChars) {
+                payload = { ...obj, content: obj['content'].slice(0, maxContentChars) + '…[truncado]' };
+            }
+        }
+        const id = replayBuffer && !sendOpts?.skipBuffer ? replayBuffer.push(safeEvent, payload) : undefined;
         const idLine = id != null ? `id: ${id}\n` : '';
-        res.write(`${idLine}event: ${safeEvent}\ndata: ${JSON.stringify(data)}\n\n`);
+        res.write(`${idLine}event: ${safeEvent}\ndata: ${JSON.stringify(payload)}\n\n`);
     };
 
     // --- Replay de eventos perdidos via Last-Event-ID ---
@@ -216,4 +226,18 @@ export function createEventFilter(eventsParam) {
     const prefixes = patterns.filter((p) => p.endsWith('.*')).map((p) => p.slice(0, -1)); // 'task.*' → 'task.'
 
     return (evt) => exact.has(evt) || prefixes.some((pfx) => evt.startsWith(pfx));
+}
+
+/**
+ * FASE-13.1: Envolve um payload de evento com metadados padrão SSE.
+ *
+ * Garante que todos os eventos SSE emitidos incluam `ts` (timestamp Unix ms) e `hubSessionId` (se disponível no
+ * contexto).
+ *
+ * @param {object} data - Payload original
+ * @param {{ hubSessionId?: string | null }} [ctx]
+ * @returns {object}
+ */
+export function standardizeSsePayload(data, ctx = {}) {
+    return { .../** @type {object} */ (data), ts: Date.now(), hubSessionId: ctx.hubSessionId ?? null };
 }

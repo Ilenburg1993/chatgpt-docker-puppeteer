@@ -621,10 +621,12 @@ router.get('/sessions/:id/stream', (req, res) => {
     const replayBuffer = /** @type {SseReplayBuffer} */ (_sessionReplayBuffers.get(id));
 
     // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
+    // FASE-11.4: max lifetime para evitar conexões órfãs
     const sse = createSseWriter(req, res, {
         heartbeatMs: 15_000,
         replayBuffer,
         tracker: _sessionsTracker,
+        maxLifetimeMs: 24 * 60 * 60 * 1000,
     });
 
     sse.send('connected', { sessionId: id, timestamp: Date.now() });
