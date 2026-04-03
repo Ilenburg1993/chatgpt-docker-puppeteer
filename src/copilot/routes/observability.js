@@ -21,6 +21,7 @@
 
 import { defaultAuditLog } from '#copilot/observability/audit-log';
 import { defaultErrorTracker } from '#copilot/observability/error-tracker';
+import { getLastQuotaSnapshots } from '#copilot/observability/event-collector';
 import { getRecentLogs, log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
 import { DEFAULT_OTEL_FILE, isOtelEnabled } from '#copilot/observability/otel';
@@ -101,6 +102,26 @@ router.get('/observability/metrics', (req, res) =>
             return res.json({ ok: true, ...summary, counters: filtered });
         }
         res.json({ ok: true, ...summary });
+    }),
+);
+
+// ─── GET /observability/quota (UPG-SE-005) ─────────────────────────────────────
+
+/**
+ * Retorna o último quotaSnapshot recebido via `assistant.usage`.
+ *
+ * Cada snapshot contém `remainingPercentage`, `resetDate`, e outros campos dependentes do plano.
+ */
+router.get('/observability/quota', (req, res) =>
+    withErrorHandler(req, res, async () => {
+        const { snapshots, ts } = getLastQuotaSnapshots();
+        const hasData = Object.keys(snapshots).length > 0;
+        res.json({
+            ok: true,
+            quotaSnapshots: snapshots,
+            lastUpdated: ts || null,
+            hasData,
+        });
     }),
 );
 

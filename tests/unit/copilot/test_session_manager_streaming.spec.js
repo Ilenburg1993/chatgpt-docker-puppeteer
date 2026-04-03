@@ -193,7 +193,7 @@ describe('http-bridge GET /stream › compaction events chegam via SSE', () => {
 
         alwaysAliveAgent.emit('session.compaction_start', { tokensUsed: 3000 });
 
-        const compactionChunks = chunks.filter((c) => c.startsWith('event: session.compaction_start\n'));
+        const compactionChunks = chunks.filter((c) => c.includes('event: session.compaction_start\n'));
         assert.ok(compactionChunks.length >= 1, 'deve ter recebido evento session.compaction_start via SSE');
 
         reqEmitter.emit('close');

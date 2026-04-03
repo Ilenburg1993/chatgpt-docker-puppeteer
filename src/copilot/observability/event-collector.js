@@ -33,6 +33,68 @@ const LOGS_DIR = process.env['COPILOT_LOG_DIR']
 const EVENTS_FILE = path.join(LOGS_DIR, 'events.jsonl');
 const MAX_EVENTS_BYTES = Number(process.env['COPILOT_EVENTS_MAX_BYTES']) || 5 * 1024 * 1024; // 5 MB
 
+// ─── UPG-SE-005: último quotaSnapshot recebido ───────────────────────────────
+
+/**
+ * @typedef {{ remainingPercentage: number; resetDate?: string; [k: string]: unknown }} QuotaSnapshot
+ */
+
+/**
+ * Último quotaSnapshot por quotaId, atualizado a cada `assistant.usage`.
+ *
+ * @type {Record<string, QuotaSnapshot>}
+ */
+let _lastQuotaSnapshots = {};
+
+/** @type {number} */
+let _lastQuotaTs = 0;
+
+/**
+ * Retorna o último quotaSnapshot recebido.
+ *
+ * @returns {{ snapshots: Record<string, QuotaSnapshot>; ts: number }}
+ */
+export function getLastQuotaSnapshots() {
+    return { snapshots: _lastQuotaSnapshots, ts: _lastQuotaTs };
+}
+
+// ─── UPG-SE-003: compaction history por sessão ────────────────────────────────
+
+/**
+ * @typedef {{ type: string; ts: unknown; data?: unknown }} CompactionEntry
+ */
+
+/** @type {Map<string, CompactionEntry[]>} */
+const _compactionHistory = new Map();
+
+const MAX_COMPACTION_ENTRIES = 50;
+
+/**
+ * Registra um evento de compaction para a sessão.
+ *
+ * @param {string} sessionId
+ * @param {CompactionEntry} entry
+ */
+function _recordCompaction(sessionId, entry) {
+    let list = _compactionHistory.get(sessionId);
+    if (!list) {
+        list = [];
+        _compactionHistory.set(sessionId, list);
+    }
+    list.push(entry);
+    if (list.length > MAX_COMPACTION_ENTRIES) list.shift();
+}
+
+/**
+ * Retorna o histórico de compaction para uma sessão.
+ *
+ * @param {string} sessionId
+ * @returns {CompactionEntry[]}
+ */
+export function getCompactionHistory(sessionId) {
+    return _compactionHistory.get(sessionId) ?? [];
+}
+
 // ─── Fila de escrita assíncrona ───────────────────────────────────────────────
 
 /** @type {string[]} */
@@ -386,7 +448,10 @@ export function createEventCollector(opts = {}) {
                 }
 
                 // Fase AO.2: alerta de quota baixa (< 10% restante)
+                // UPG-SE-005: armazenar último snapshot para GET /quota
                 if (quotaSnapshots) {
+                    _lastQuotaSnapshots = /** @type {Record<string, QuotaSnapshot>} */ (quotaSnapshots);
+                    _lastQuotaTs = Date.now();
                     for (const [quotaId, snapshot] of Object.entries(quotaSnapshots)) {
                         if (snapshot.remainingPercentage < 0.1) {
                             metrics?.recordCounter('quota.low_warning');
@@ -483,12 +548,14 @@ export function createEventCollector(opts = {}) {
         unsubs.push(
             session.on('session.compaction_start', (event) => {
                 if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp });
+                _recordCompaction(sessionId, { type: event.type, ts: event.timestamp });
                 log('INFO', `[event-collector] compaction_start session=${sessionId}`);
             }),
         );
         unsubs.push(
             session.on('session.compaction_complete', (event) => {
                 if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                _recordCompaction(sessionId, { type: event.type, ts: event.timestamp, data: event.data });
                 log('INFO', `[event-collector] compaction_complete session=${sessionId}`);
             }),
         );
@@ -1218,6 +1285,37 @@ export function createEventCollector(opts = {}) {
                 metrics?.recordCounter('tool.execution_partial_result');
             }),
         );
+
+        // ── UPG-SE-002: assistant.message_delta inter-token latency histogram ───────────
+        {
+            /** @type {number} */
+            let _lastDeltaTs = 0;
+            unsubs.push(
+                session.on('assistant.message_delta', () => {
+                    const now = performance.now();
+                    if (_lastDeltaTs > 0) {
+                        const gap = Math.round(now - _lastDeltaTs);
+                        // Registra em buckets: 0-50ms, 50-100ms, 100-250ms, 250-500ms, 500ms+
+                        /** @type {string} */
+                        let bucket;
+                        if (gap <= 50) bucket = '0_50';
+                        else if (gap <= 100) bucket = '50_100';
+                        else if (gap <= 250) bucket = '100_250';
+                        else if (gap <= 500) bucket = '250_500';
+                        else bucket = '500_plus';
+                        metrics?.recordCounter(`inter_token_latency.bucket.${bucket}`);
+                        metrics?.recordGauge('inter_token_latency.last_ms', gap);
+                    }
+                    _lastDeltaTs = now;
+                }),
+            );
+            // Reset on turn end to avoid cross-turn latency pollution
+            unsubs.push(
+                session.on('assistant.turn_end', () => {
+                    _lastDeltaTs = 0;
+                }),
+            );
+        }
 
         // ── assistant.streaming_delta (ephemeral — gauge de bytes, não persistir) ──────────────
         unsubs.push(

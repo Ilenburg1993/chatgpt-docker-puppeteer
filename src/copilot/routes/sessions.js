@@ -28,9 +28,11 @@
  */
 
 import { MAX_SSE_CLIENTS } from '#copilot/core';
+import { getCompactionHistory } from '#copilot/observability/event-collector';
 import { log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
 import { Router } from 'express';
+import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
 import {
     createClientSession as createSdkSession,
     disconnectClientSession as disconnectSdkSession,
@@ -58,6 +60,10 @@ const router = Router();
 // INC-CORE-001/INC-CHAN-001 (fix): usar MAX_SSE_CLIENTS de core/constants.js em vez de definição local
 /** @type {number} */
 let _sessionsSseClients = 0;
+
+// UPG-SE-004: buffers de replay SSE por sessão
+/** @type {Map<string, SseReplayBuffer>} */
+const _sessionReplayBuffers = new Map();
 
 // C14-04: limite máximo de bytes aceitos em prompt para evitar uso excessivo de tokens
 const MAX_PROMPT_BYTES = 512_000;
@@ -462,17 +468,17 @@ router.post('/sessions/:id/resume', (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /sessions/:id/disconnect
+// GET /sessions/:id/compaction-history  (UPG-SE-003)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Desconecta uma sessão ativa (libera memória, preserva dados no disco para retomada).
+ * Retorna o histórico de compaction (start/complete) para uma sessão.
  */
-router.post('/sessions/:id/disconnect', (req, res) => {
+router.get('/sessions/:id/compaction-history', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
-        await disconnectSdkSession(id);
-        res.json({ ok: true, message: `Sessão "${id}" desconectada (dados preservados no disco).` });
+        const history = getCompactionHistory(String(id));
+        res.json({ ok: true, sessionId: id, entries: history, count: history.length });
     });
 });
 
@@ -617,17 +623,37 @@ router.get('/sessions/:id/stream', (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
+    // UPG-SE-004: buffer de replay por sessão
+    if (!_sessionReplayBuffers.has(id)) {
+        _sessionReplayBuffers.set(id, new SseReplayBuffer());
+    }
+    const replayBuffer = /** @type {SseReplayBuffer} */ (_sessionReplayBuffers.get(id));
+
     /**
-     * Envia um evento SSE formatado.
+     * Envia um evento SSE formatado, com ID para replay.
      *
      * @param {string} eventType
      * @param {unknown} data
+     * @param {{ skipBuffer?: boolean }} [opts]
      */
-    const sendEvent = (eventType, data) => {
+    const sendEvent = (eventType, data, opts) => {
         if (res.writableEnded) return;
         const payload = JSON.stringify(data);
-        res.write(`event: ${eventType}\ndata: ${payload}\n\n`);
+        const eventId = opts?.skipBuffer ? undefined : replayBuffer.push(eventType, data);
+        const idLine = eventId != null ? `id: ${eventId}\n` : '';
+        res.write(`${idLine}event: ${eventType}\ndata: ${payload}\n\n`);
     };
+
+    // UPG-SE-004: replay de eventos perdidos via Last-Event-ID
+    const lastEventId = Number(req.headers?.['last-event-id']) || 0;
+    if (lastEventId > 0) {
+        const missed = replayBuffer.getAfter(lastEventId);
+        for (const evt of missed) {
+            if (!res.writableEnded) {
+                res.write(`id: ${evt.id}\nevent: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`);
+            }
+        }
+    }
 
     sendEvent('connected', { sessionId: id, timestamp: Date.now() });
 
@@ -658,7 +684,7 @@ router.get('/sessions/:id/stream', (req, res) => {
 
     // Heartbeat a cada 15s para manter a conexão aberta
     const heartbeatInterval = setInterval(() => {
-        sendEvent('heartbeat', { ts: Date.now() });
+        sendEvent('heartbeat', { ts: Date.now() }, { skipBuffer: true });
     }, 15_000);
 
     // C14-03: decrement idempotente para evitar underflow

@@ -10,6 +10,7 @@
  */
 
 import { AGENT_EVENTS, MAX_SSE_CLIENTS } from '#copilot/core';
+import { SseReplayBuffer } from './sse-replay-buffer.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -37,6 +38,9 @@ export function registerStreamRoutes(bridge, agent) {
     // caso haja leak real de connections.
     // INC-CORE-001 (fix): usar MAX_SSE_CLIENTS de core/constants.js (padrão 50 via env MAX_SSE_CLIENTS)
     agent.setMaxListeners?.(MAX_SSE_CLIENTS * (AGENT_EVENTS.length + 2)); // +2 para heartbeat + reconnect
+
+    // UPG-SE-004: buffer de replay para reconexão SSE via Last-Event-ID
+    const replayBuffer = new SseReplayBuffer();
     // ─── GET /stream ──────────────────────────────────────────────────────────
 
     /**
@@ -80,19 +84,35 @@ export function registerStreamRoutes(bridge, agent) {
         res.flushHeaders();
 
         /**
-         * Envia um evento SSE para o cliente.
+         * Envia um evento SSE para o cliente, com ID para replay.
          *
          * @param {AgentEventName | 'connected' | 'heartbeat'} event - Nome do evento SSE
          * @param {object} data - Dados serializados em JSON
+         * @param {{ skipBuffer?: boolean }} [opts]
          * @returns {void}
          */
-        const sendEvt = (event, data) => {
+        const sendEvt = (event, data, opts) => {
             if (!res.writableEnded) {
                 // SEC-VULN-02 (fix aplicado consistentemente): sanitizar nome do evento SSE
                 const safeEvent = String(event).replace(/[\r\n]/g, '_');
-                res.write(`event: ${safeEvent}\ndata: ${JSON.stringify(data)}\n\n`);
+                // UPG-SE-004: atribuir ID para Last-Event-ID replay
+                const id = opts?.skipBuffer ? undefined : replayBuffer.push(safeEvent, data);
+                const idLine = id != null ? `id: ${id}\n` : '';
+                res.write(`${idLine}event: ${safeEvent}\ndata: ${JSON.stringify(data)}\n\n`);
             }
         };
+
+        // UPG-SE-004: replay de eventos perdidos via Last-Event-ID
+        const lastEventId = Number(req.headers?.['last-event-id']) || 0;
+        if (lastEventId > 0) {
+            const missed = replayBuffer.getAfter(lastEventId);
+            for (const evt of missed) {
+                if (!res.writableEnded) {
+                    const safeEvent = String(evt.event).replace(/[\r\n]/g, '_');
+                    res.write(`id: ${evt.id}\nevent: ${safeEvent}\ndata: ${JSON.stringify(evt.data)}\n\n`);
+                }
+            }
+        }
 
         // Evento inicial com snapshot do estado atual
         sendEvt('connected', { ...agent.getStatusSnapshot(), timestamp: Date.now() });
@@ -120,7 +140,7 @@ export function registerStreamRoutes(bridge, agent) {
 
         handlers.forEach((handler, evt) => agent.on(evt, handler));
 
-        const heartbeat = setInterval(() => sendEvt('heartbeat', { ts: Date.now() }), 15_000);
+        const heartbeat = setInterval(() => sendEvt('heartbeat', { ts: Date.now() }, { skipBuffer: true }), 15_000);
 
         // G2-SEC-08: limite de vida por conexão SSE para evitar esgotamento de file descriptors.
         // Configurável via MAX_SSE_LIFETIME_MS (default 24h). Ao expirar, envia evento 'reconnect'

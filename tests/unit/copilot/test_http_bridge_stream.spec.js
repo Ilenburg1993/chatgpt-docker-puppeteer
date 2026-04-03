@@ -208,8 +208,8 @@ describe('http-bridge GET /stream — evento connected', () => {
         assert.ok(chunks.length >= 1, 'deve ter escrito ao menos 1 chunk SSE');
         const firstChunk = chunks[0] ?? '';
         assert.ok(
-            firstChunk.startsWith('event: connected\n'),
-            `primeiro evento deve ser 'connected', recebido: ${firstChunk}`,
+            firstChunk.includes('event: connected\n'),
+            `primeiro evento deve conter 'event: connected', recebido: ${firstChunk}`,
         );
 
         reqEmitter.emit('close');
@@ -223,7 +223,8 @@ describe('http-bridge GET /stream — evento connected', () => {
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
 
-        const dataLine = (chunks[0] ?? '').split('\n')[1] ?? ''; // "data: {...}"
+        const lines = (chunks[0] ?? '').split('\n');
+        const dataLine = lines.find((l) => l.startsWith('data: ')) ?? '';
         assert.ok(dataLine.startsWith('data: '), 'deve ter linha data:');
         const parsed = JSON.parse(dataLine.replace('data: ', ''));
         assert.ok(typeof parsed.timestamp === 'number', 'connected deve ter timestamp numérico');
@@ -263,8 +264,8 @@ describe('http-bridge GET /stream — repasse de eventos do agente', () => {
         assert.ok(chunks.length > initialCount, 'deve ter escrito novo chunk SSE');
         const lastChunk = chunks[chunks.length - 1] ?? '';
         assert.ok(
-            lastChunk.startsWith('event: task.completed\n'),
-            `deve ser evento task.completed, recebido: ${lastChunk}`,
+            lastChunk.includes('event: task.completed\n'),
+            `deve conter 'event: task.completed', recebido: ${lastChunk}`,
         );
 
         reqEmitter.emit('close');
@@ -283,11 +284,12 @@ describe('http-bridge GET /stream — repasse de eventos do agente', () => {
             chunk: 'token parcial',
         });
 
-        const deltaChunks = chunks.filter((c) => c.startsWith('event: task.delta\n'));
+        const deltaChunks = chunks.filter((c) => c.includes('event: task.delta\n'));
         assert.ok(deltaChunks.length >= 1, 'deve ter recebido ao menos 1 chunk task.delta via SSE');
 
-        const dataLine = (deltaChunks[0] ?? '').split('\n')[1] ?? '';
-        const parsed = JSON.parse(dataLine.replace('data: ', ''));
+        const dLines = (deltaChunks[0] ?? '').split('\n');
+        const dDataLine = dLines.find((l) => l.startsWith('data: ')) ?? '';
+        const parsed = JSON.parse(dDataLine.replace('data: ', ''));
         assert.strictEqual(parsed.taskId, 'stream-delta-001');
 
         reqEmitter.emit('close');
