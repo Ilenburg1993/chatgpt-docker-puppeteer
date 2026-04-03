@@ -29,9 +29,10 @@
 
 **Conclusão**: O sistema está **100% auditado e resolvido** — nenhum P0, P1, P2, P3 ou P4 aberto.
 **Todos os 137 achados foram triados** (FIXED, N/A, ACCEPTED ou design observations verificados). Os
-44 itens P4 remanescentes foram sistematicamente analisados: 12 receberam code fixes, 24 verificados
+44 itens P4 remanescentes foram sistematicamente analisados: 14 receberam code fixes, 24 verificados
 como N/A (já implementados ou sem ação necessária), e 8 aceitos como decisões de design
-documentadas.
+documentadas. Adicionalmente, 2 P3 foram resolvidos (C11-02, C12-03) e 2 features implementadas
+(GAP-ROUTE-002 webhook retry, GAP-TOOLS-004 runtime tool disable).
 
 ---
 
@@ -143,7 +144,7 @@ Gaps/Observações         ████████████████░  
 | **2 — Bug Fix Funcional** | Alta          | 6 P2 funcionais   | Sprint 1 (2 dias) | ✅ **CONCLUÍDA**                                              |
 | **3 — Estabilidade**      | Média         | 12 P3 principais  | Sprint 2 (5 dias) | ✅ **CONCLUÍDA**                                              |
 | **4 — Arquitetura**       | Planejada     | 6 refatorações    | Sprint 3 (5 dias) | ✅ **CONCLUÍDA** (3 FIXED, 3 ACCEPTED)                        |
-| **5 — Backlog P4**        | Iterativa     | 69 P4             | Sprint 4+         | ✅ **CONCLUÍDA** (44 triados: 12 FIXED + 24 N/A + 8 ACCEPTED) |
+| **5 — Backlog P4**        | Iterativa     | 69 P4             | Sprint 4+         | ✅ **CONCLUÍDA** (44 triados: 14 FIXED + 24 N/A + 8 ACCEPTED) |
 | **6 — Cosmético P5**      | Oportunística | 8 P5              | Contínuo          | ✅ **CONCLUÍDA**                                              |
 
 ---

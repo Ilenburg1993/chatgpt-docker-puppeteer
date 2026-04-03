@@ -82,7 +82,7 @@ referência**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
 | 2-A      | `routes/sessions.js`      | SEC-ROUTE-001, BUG-ROUTE-001, INC-ROUTE-001 | ✅ FIXED / N/A / N/A |
 | 2-B      | `routes/agent.js`         | BUG-ROUTE-002                               | ✅ N/A               |
 | 2-C      | `routes/observability.js` | GAP-ROUTE-001                               | ⬜ GAP P4            |
-| 2-D      | `routes/webhooks.js`      | GAP-ROUTE-002                               | ⬜ GAP P4            |
+| 2-D      | `routes/webhooks.js`      | GAP-ROUTE-002                               | ✅ FIXED             |
 | 2-E      | `routes/hooks.js`         | GAP-ROUTE-003                               | ✅ N/A               |
 | 2-F      | `routes/client.js`        | INC-ROUTE-001                               | ✅ N/A               |
 | 2-G      | `api/bridge-control.js`   | SEC-API-001, BUG-API-002                    | ✅ FIXED / FIXED     |
@@ -101,7 +101,7 @@ referência**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
 | 3-E      | `tools/todo/store.js`          | BUG-TOOLS-001, PERF-TOOLS-001, GAP-TOOLS-002 | ✅ N/A / ⬜ PERF / ⬜ GAP |
 | 3-F      | `tools/web-tools.js`           | SEC-TOOLS-003                                | ✅ FIXED                  |
 | 3-G      | `tools/session-rpc-tools.js`   | GAP-TOOLS-003                                | ⬜ GAP P4                 |
-| 3-H      | `tools/introspection-tools.js` | GAP-TOOLS-004                                | ⬜ GAP P4                 |
+| 3-H      | `tools/introspection-tools.js` | GAP-TOOLS-004                                | ✅ FIXED                  |
 | 3-I      | `tools/tool-factory.js`        | ARCH-TOOLS-001                               | ⬜ ARCH P4                |
 | 3-J      | `tools/index.js`               | GAP-TOOLS-001                                | ⬜ GAP P4                 |
 
@@ -116,7 +116,7 @@ referência**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
 | 4-E      | `lib/agents.js`                 | GAP-LIB-003                 | ✅ N/A             |
 | 4-F      | `lib/tools-registry.js`         | GAP-LIB-001, INC-LIB-001    | ✅ N/A / ⬜ INC    |
 | 4-G      | `config/tools/custom-tools.js`  | C12-02 (env_read allowlist) | ✅ FIXED           |
-| 4-H      | `config/session-config.js`      | C12-03                      | ⬜ GAP P4          |
+| 4-H      | `config/system-prompt.js`       | C12-03                      | ✅ FIXED           |
 | 4-I      | `config/index.js`               | INC-CONF-001                | ✅ N/A             |
 | 4-J      | `config/pinned-files-loader.js` | GAP-CONF-001                | ✅ N/A             |
 | 4-K      | `config/mcp-servers.js`         | GAP-CONF-002                | ✅ FIXED           |
@@ -175,14 +175,14 @@ referência**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
 
 ### FASE 9 — Módulos: bridges/ + conversation-hub/ + channel/
 
-| Sub-fase | Arquivo                         | Issues                      | Status                          |
-| -------- | ------------------------------- | --------------------------- | ------------------------------- |
-| 9-A      | `bridges/nerv-bridge.js`        | B10-03                      | ✅ FIXED                        |
-| 9-B      | `bridges/mcp-tool-bridge.js`    | B10-01, B10-02              | ✅ ALL FIXED                    |
-| 9-C      | `conversation-hub/socket-ns.js` | C11-01, C11-02              | ✅ C11-01 FIXED / ⬜ C11-02 GAP |
-| 9-D      | `conversation-hub/store.js`     | C11-03                      | ✅ FIXED                        |
-| 9-E      | `channel/inject.js`             | LEAK-CHAN-001, GAP-CHAN-002 | ✅ LEAK FIXED / ⬜ GAP          |
-| 9-F      | `channel/client.js`             | BUG-CHAN-001, GAP-CHAN-001  | ✅ BUG FIXED / ⬜ GAP           |
+| Sub-fase | Arquivo                         | Issues                      | Status                            |
+| -------- | ------------------------------- | --------------------------- | --------------------------------- |
+| 9-A      | `bridges/nerv-bridge.js`        | B10-03                      | ✅ FIXED                          |
+| 9-B      | `bridges/mcp-tool-bridge.js`    | B10-01, B10-02              | ✅ ALL FIXED                      |
+| 9-C      | `conversation-hub/socket-ns.js` | C11-01, C11-02              | ✅ C11-01 FIXED / ✅ C11-02 FIXED |
+| 9-D      | `conversation-hub/store.js`     | C11-03                      | ✅ FIXED                          |
+| 9-E      | `channel/inject.js`             | LEAK-CHAN-001, GAP-CHAN-002 | ✅ LEAK FIXED / ⬜ GAP            |
+| 9-F      | `channel/client.js`             | BUG-CHAN-001, GAP-CHAN-001  | ✅ BUG FIXED / ⬜ GAP             |
 
 ### FASE 10 — Módulos: core/ + types/ + P5 cosmético
 

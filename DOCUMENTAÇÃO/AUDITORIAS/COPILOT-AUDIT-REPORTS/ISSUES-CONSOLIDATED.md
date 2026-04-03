@@ -121,13 +121,13 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P4 — Informativos
 
-| ID                 | Arquivo                | Título                                                                                                                                                          |
-| ------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~PERF-TOOLS-001~~ | todo/store.js          | ~~Queries SQLite sem índice para `listTasks({ status })` em tabelas grandes~~ **[N/A — 4 índices já existem: status, priority, parent_id, created_at]**         |
-| ~~PERF-TOOLS-002~~ | file/read-tools.js     | ~~Leitura multi-file sem concorrência (sequencial)~~ **[N/A — SDK chama tool uma vez por arquivo; loop local é `readdirSync` + stat, não leitura de conteúdo]** |
-| ~~GAP-TOOLS-002~~  | todo/store.js          | ~~Sem paginação default em `listTasks` — retorna todos os registros~~ **[N/A — paginação já implementada: limit default 50/20, slice, has_more]**               |
-| ~~GAP-TOOLS-003~~  | session-rpc-tools.js   | ~~`timeout` não propagado para SDK call interno~~ **[FIXED — RPC_TIMEOUT_MS 15s com AbortSignal.timeout]**                                                      |
-| ~~GAP-TOOLS-004~~  | introspection-tools.js | ~~`listActiveTools` não reflete tools desabilitadas em runtime~~ **[N/A — não existe mecanismo de desabilitar tools em runtime; feature request]**              |
+| ID                 | Arquivo                | Título                                                                                                                                                                                           |
+| ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ~~PERF-TOOLS-001~~ | todo/store.js          | ~~Queries SQLite sem índice para `listTasks({ status })` em tabelas grandes~~ **[N/A — 4 índices já existem: status, priority, parent_id, created_at]**                                          |
+| ~~PERF-TOOLS-002~~ | file/read-tools.js     | ~~Leitura multi-file sem concorrência (sequencial)~~ **[N/A — SDK chama tool uma vez por arquivo; loop local é `readdirSync` + stat, não leitura de conteúdo]**                                  |
+| ~~GAP-TOOLS-002~~  | todo/store.js          | ~~Sem paginação default em `listTasks` — retorna todos os registros~~ **[N/A — paginação já implementada: limit default 50/20, slice, has_more]**                                                |
+| ~~GAP-TOOLS-003~~  | session-rpc-tools.js   | ~~`timeout` não propagado para SDK call interno~~ **[FIXED — RPC_TIMEOUT_MS 15s com AbortSignal.timeout]**                                                                                       |
+| ~~GAP-TOOLS-004~~  | introspection-tools.js | ~~`listActiveTools` não reflete tools desabilitadas em runtime~~ **[FIXED — toggle_tool + isToolDisabled() + integração em production hooks onPreToolUse; tools protegidas não desabilitáveis]** |
 
 ---
 
@@ -142,13 +142,13 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P3 — Importantes
 
-| ID              | Arquivo          | Título                                                                                                                                                                   |
-| --------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ARCH-OBS-001    | observability/   | God module — 87 de 171 imports cross-module apontam para observability/ **[ACCEPTED — papel fundamental de observabilidade centralizada; decomposição reduziria DX]**    |
-| BUG-OBS-001     | audit-log.js     | ~~JSONL append sem flush forçado~~ **[FIXED — `process.once('beforeExit', flush)` no singleton]**                                                                        |
-| ~~BUG-OBS-002~~ | error-tracker.js | ~~`captureException` sem stack normalization~~ **[NOTED P4 — stack capturado corretamente; formatação varia entre V8 versions mas é cosmético]**                         |
-| ~~GAP-OBS-001~~ | metrics.js       | ~~Contadores de métricas não reiniciados em reconexão — acumulação contínua~~ **[N/A — contadores cumulativos é design correto (Prometheus-style); reset() disponível]** |
-| GAP-OBS-002     | otel.js          | Span exporters não configuráveis via env — hardcoded para console                                                                                                        |
+| ID              | Arquivo          | Título                                                                                                                                                                                                     |
+| --------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ARCH-OBS-001    | observability/   | God module — 87 de 171 imports cross-module apontam para observability/ **[ACCEPTED — papel fundamental de observabilidade centralizada; decomposição reduziria DX]**                                      |
+| BUG-OBS-001     | audit-log.js     | ~~JSONL append sem flush forçado~~ **[FIXED — `process.once('beforeExit', flush)` no singleton]**                                                                                                          |
+| ~~BUG-OBS-002~~ | error-tracker.js | ~~`captureException` sem stack normalization~~ **[NOTED P4 — stack capturado corretamente; formatação varia entre V8 versions mas é cosmético]**                                                           |
+| ~~GAP-OBS-001~~ | metrics.js       | ~~Contadores de métricas não reiniciados em reconexão — acumulação contínua~~ **[N/A — contadores cumulativos é design correto (Prometheus-style); reset() disponível]**                                   |
+| ~~GAP-OBS-002~~ | otel.js          | ~~Span exporters não configuráveis via env — hardcoded para console~~ **[N/A — otel.js é stub opcional; sistema usa defaultMetrics (observability/metrics.js) em produção; OTel seria integração futura]** |
 
 ### P4 — Informativos
 
@@ -229,11 +229,11 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P3 — Importantes
 
-| ID         | Arquivo      | Título                                                                                                                         |
-| ---------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| ~~C11-01~~ | socket-ns.js | ~~`turns:history` sem verificação de membership de sessão~~ **[FIXED — `socket.rooms.has(data.hubSession)` check adicionado]** |
-| C11-02     | socket-ns.js | `sessions:list` sem filtro de acesso — todos veem metadados de todas as sessões                                                |
-| ~~C11-03~~ | store.js     | ~~`syncFromSdkHistory` deduplicação via `LIKE '%id%'` full scan~~ **[FIXED — coluna `sdk_turn_id` indexada para dedup O(1)]**  |
+| ID         | Arquivo      | Título                                                                                                                                                                                                        |
+| ---------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~C11-01~~ | socket-ns.js | ~~`turns:history` sem verificação de membership de sessão~~ **[FIXED — `socket.rooms.has(data.hubSession)` check adicionado]**                                                                                |
+| ~~C11-02~~ | socket-ns.js | ~~`sessions:list` sem filtro de acesso — todos veem metadados de todas as sessões~~ **[FIXED — projeta apenas campos públicos (id, title, status, created_at, updated_at); strip sdk_session_id e metadata]** |
+| ~~C11-03~~ | store.js     | ~~`syncFromSdkHistory` deduplicação via `LIKE '%id%'` full scan~~ **[FIXED — coluna `sdk_turn_id` indexada para dedup O(1)]**                                                                                 |
 
 ---
 
@@ -241,10 +241,10 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P3 — Importantes
 
-| ID         | Arquivo               | Título                                                                                                                           |
-| ---------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| ~~C12-02~~ | tools/custom-tools.js | ~~`env_read` builtin handler expõe todo `process.env` ao modelo sem allowlist~~ **[FIXED — allowlist explícita de 10 env vars]** |
-| C12-03     | session-config.js     | `mode:'customize'` sem fallback de versão SDK — pode falhar silenciosamente                                                      |
+| ID         | Arquivo               | Título                                                                                                                                                                |
+| ---------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~C12-02~~ | tools/custom-tools.js | ~~`env_read` builtin handler expõe todo `process.env` ao modelo sem allowlist~~ **[FIXED — allowlist explícita de 10 env vars]**                                      |
+| ~~C12-03~~ | system-prompt.js      | ~~`mode:'customize'` sem fallback de versão SDK — pode falhar silenciosamente~~ **[FIXED — `_sdkSupportsCustomize` check + graceful degradation para mode:'append']** |
 
 ### P4 — Informativos
 
@@ -292,12 +292,12 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P4 — Informativos
 
-| ID                | Arquivo          | Título                                                                                                                                                                             |
-| ----------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~GAP-ROUTE-001~~ | observability.js | ~~`/metrics` endpoint retorna todos os contadores sem filtragem~~ **[FIXED — parâmetro ?category= adicionado para filtro]**                                                        |
-| GAP-ROUTE-002     | webhooks.js      | Webhook delivery sem retry — falha silenciosa em endpoint indisponível **[ACCEPTED — feature enhancement para ciclo futuro; webhook-manager já diferencia erros (GAP-AGENT-009)]** |
-| ~~GAP-ROUTE-003~~ | hooks.js         | ~~Preset hooks não validados contra schema~~ **[N/A — não há rota de apply preset; hooks.js tem apenas GET /hooks/registry e /hooks/events]**                                      |
-| ~~INC-ROUTE-001~~ | client.js        | ~~Autenticação inconsistente: query param `token`~~ **[N/A — não há `req.query.token` no código atual]**                                                                           |
+| ID                | Arquivo            | Título                                                                                                                                                                                                          |
+| ----------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~GAP-ROUTE-001~~ | observability.js   | ~~`/metrics` endpoint retorna todos os contadores sem filtragem~~ **[FIXED — parâmetro ?category= adicionado para filtro]**                                                                                     |
+| ~~GAP-ROUTE-002~~ | webhook-manager.js | ~~Webhook delivery sem retry — falha silenciosa em endpoint indisponível~~ **[FIXED — exponential backoff retry (WEBHOOK_MAX_RETRIES=2, base 500ms); 5xx/timeout/network retriable; 4xx permanente sem retry]** |
+| ~~GAP-ROUTE-003~~ | hooks.js           | ~~Preset hooks não validados contra schema~~ **[N/A — não há rota de apply preset; hooks.js tem apenas GET /hooks/registry e /hooks/events]**                                                                   |
+| ~~INC-ROUTE-001~~ | client.js          | ~~Autenticação inconsistente: query param `token`~~ **[N/A — não há `req.query.token` no código atual]**                                                                                                        |
 
 ---
 
@@ -358,7 +358,7 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 | ID              | Arquivo               | Título                                                                                                                                                                                                                          |
 | --------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| TYPES-P4-01     | structured-message.js | Parser Estratégia 4 greedy `{...}` pode extrair JSON parcial de múltiplos objetos                                                                                                                                               |
+| ~~TYPES-P4-01~~ | structured-message.js | ~~Parser Estratégia 4 greedy `{...}` pode extrair JSON parcial de múltiplos objetos~~ **[N/A — Estratégia 4 é fallback-de-último-recurso com `JSON.parse` validando resultado; greedy é intencional para maximizar extração]**  |
 | ~~TYPES-P4-02~~ | structured-message.js | ~~`serializeStructuredMessage` instrução protocolo como texto simples~~ **[ACCEPTED — limitação de design; handshake de confirmação requereria mudança de protocolo LLM-A↔LLM-B; sistema tolera graciosamente via parseError]** |
 | ~~TYPES-P4-03~~ | structured-message.js | ~~`buildStructuredRequest` gera UUIDs não-determinísticos — dificuldade em testes~~ **[N/A — by design; testes devem usar mock de crypto.randomUUID]**                                                                          |
 | ~~TYPES-P4-04~~ | sdk.js                | ~~Não re-exportado via `types/index.js`~~ **[N/A — arquivo é puro JSDoc `@typedef`; `export *` de módulo sem values ES não produz efeito runtime]**                                                                             |
