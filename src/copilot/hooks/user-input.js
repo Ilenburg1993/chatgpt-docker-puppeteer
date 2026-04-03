@@ -98,13 +98,14 @@ export function createReadlineInputHandler(opts = {}) {
  *     // Em outro contexto:
  *     const response = await requestInput({ question: '...' });
  *
+ * @param {{ maxSize?: number }} [opts]
  * @returns {{
  *     handler: UserInputHandler;
  *     answerNext: (response: UserInputResponse) => boolean;
  *     listPending: () => UserInputRequest[];
  * }}
  */
-export function createQueuedInputHandler() {
+export function createQueuedInputHandler({ maxSize = 100 } = {}) {
     /** @type {{ resolve: (r: UserInputResponse) => void; request: UserInputRequest }[]} */
     const queue = [];
 
@@ -113,6 +114,11 @@ export function createQueuedInputHandler() {
      * @returns {Promise<UserInputResponse>}
      */
     const handler = async (request) => {
+        // BUG-UI-001: limite máximo para evitar crescimento unbounded da fila
+        if (queue.length >= maxSize) {
+            log('WARN', `[hooks/user-input] queue cheia (maxSize=${maxSize}) — rejeitando ask_user`);
+            return { response: '' };
+        }
         return new Promise((resolve) => {
             // Publica o request na fila para quem estiver ouvindo
             queue.push({ resolve, request });

@@ -82,11 +82,47 @@ function resolveToolDecision(toolName, allowTools, denyTools, denyPatterns) {
  * @param {boolean} opts.auditLog
  * @param {boolean} opts.debugTools
  * @param {((toolName: string) => Promise<boolean>) | null} opts.askHandler
+ * @param {((toolName: string, args: object) => object | null | undefined) | null} opts.argsModifier
  * @returns {PreToolUseHandler}
  */
-function buildPreToolUseHandler({ allowTools, denyTools, denyPatterns, auditLog, debugTools, askHandler }) {
+function buildPreToolUseHandler({
+    allowTools,
+    denyTools,
+    denyPatterns,
+    auditLog,
+    debugTools,
+    askHandler,
+    argsModifier,
+}) {
     const preToolFn = async (/** @type {PreToolUseHookInput} */ input, /** @type {InvocationContext} */ invocation) => {
         const toolName = input.toolName ?? 'unknown';
+
+        // Verificar askHandler ANTES de resolveToolDecision para dar chance de aprovação interativa.
+        // Se a tool não está em denyTools mas também não está em allowTools, delegamos ao askHandler.
+        // Usamos permissionDecision:'ask' (SDK-native) ao invés de callback manual.
+        if (askHandler) {
+            const explicitlyDenied = denyTools.includes(toolName) || denyPatterns.some((p) => p.test(toolName));
+            const inAllowList = allowTools.length === 0 || allowTools.includes(toolName);
+            if (!explicitlyDenied && !inAllowList) {
+                // Tool não é deny-explícito nem allow-explícito → pede aprovação via callback
+                let approved = false;
+                try {
+                    approved = await askHandler(toolName);
+                } catch (/** @type {any} */ e) {
+                    log(
+                        'WARN',
+                        `[hooks/factory] onPermissionAsk lançou erro para '${toolName}': ${e.message} — negando`,
+                    );
+                }
+                if (!approved) {
+                    return {
+                        permissionDecision: /** @type {'deny'} */ ('deny'),
+                        additionalContext: `Ferramenta '${toolName}' não aprovada pelo usuário.`,
+                    };
+                }
+            }
+        }
+
         const decision = resolveToolDecision(toolName, allowTools, denyTools, denyPatterns);
 
         if (auditLog || debugTools) {
@@ -103,18 +139,11 @@ function buildPreToolUseHandler({ allowTools, denyTools, denyPatterns, auditLog,
             };
         }
 
-        if (askHandler && allowTools.length > 0 && !allowTools.includes(toolName)) {
-            let approved = false;
-            try {
-                approved = await askHandler(toolName);
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[hooks/factory] onPermissionAsk lançou erro para '${toolName}': ${e.message} — negando`);
-            }
-            if (!approved) {
-                return {
-                    permissionDecision: /** @type {'deny'} */ ('deny'),
-                    additionalContext: `Ferramenta '${toolName}' negada pelo callback onPermissionAsk.`,
-                };
+        // GAP-HOOK-001: aplicar modificação de args quando argsModifier estiver configurado
+        if (argsModifier) {
+            const modified = argsModifier(toolName, /** @type {object} */ (input.toolArgs) ?? {});
+            if (modified != null) {
+                return { permissionDecision: /** @type {'allow'} */ ('allow'), modifiedArgs: modified };
             }
         }
 
@@ -176,6 +205,7 @@ export function createHooks(cfg = {}) {
     const denyTools = cfg.denyTools ?? [];
     const denyPatterns = cfg.denyPatterns ?? [];
     const askHandler = cfg.onPermissionAsk ?? null;
+    const argsModifier = cfg.argsModifier ?? null;
 
     /** @type {SessionHooks} */
     const hooks = {};
@@ -191,6 +221,7 @@ export function createHooks(cfg = {}) {
             auditLog,
             debugTools,
             askHandler,
+            argsModifier,
         });
     }
 

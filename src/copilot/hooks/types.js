@@ -172,7 +172,10 @@
  * @property {string[]} [allowTools] - Whitelist de tools permitidas (deny se ausente)
  * @property {string[]} [denyTools] - Blacklist com precedência sobre allowTools
  * @property {RegExp[]} [denyPatterns] - Padrões regex: match → deny
- * @property {(toolName: string) => Promise<boolean>} [onPermissionAsk] - Callback de aprovação interativa
+ * @property {(toolName: string) => Promise<boolean>} [onPermissionAsk] - Callback de aprovação interativa para tools
+ *   não listadas em allowTools/denyTools
+ * @property {(toolName: string, args: object) => object | null | undefined} [argsModifier] - Callback para modificar
+ *   args antes da execução. Retornar null/undefined para não modificar.
  * @property {PreToolUseHandler} [onPreToolUse] - Override completo do handler pré-tool
  * @property {PostToolUseHandler} [onPostToolUse] - Override completo do handler pós-tool
  * @property {UserPromptSubmittedHandler} [onUserPromptSubmitted] - Override do handler de prompt

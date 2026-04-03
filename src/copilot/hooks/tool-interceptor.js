@@ -206,23 +206,41 @@ export function createPostToolEnricher(opts = {}) {
 }
 
 /**
- * Cria um hook `onPostToolUse` que emite métricas de duração no contexto. O timestamp de início deve ser injetado via
- * input.startTimestamp customização do input.
+ * Cria um par `{ onPreToolUse, onPostToolUse }` que mede a duração de cada execução de tool e injeta o resultado como
+ * `additionalContext` no pós-hook.
  *
- * @returns {PostToolUseHandler}
+ * **Atenção**: Esta função retorna um **objeto** com dois handlers — não um único handler. Use spread ou destructuring
+ * ao compor com outros hooks:
+ *
+ * @example
+ *     const timing = createTimingEnricherHook();
+ *     const { hooks } = createSomePreset();
+ *     const composedHooks = { ...hooks, ...timing };
+ *
+ * @returns {{ onPreToolUse: PreToolUseHandler; onPostToolUse: PostToolUseHandler }}
  */
 export function createTimingEnricherHook() {
     /** @type {Map<string, number>} */
     const timings = new Map();
 
-    return async function onPostToolUse(input, invocation) {
+    /** @type {PreToolUseHandler} */
+    const onPreToolUse = async function onPreToolUse(input, invocation) {
+        const key = `${invocation?.sessionId ?? ''}:${input.toolName}`;
+        timings.set(key, Date.now());
+        return {};
+    };
+
+    /** @type {PostToolUseHandler} */
+    const onPostToolUse = async function onPostToolUse(input, invocation) {
         const key = `${invocation?.sessionId ?? ''}:${input.toolName}`;
         const t0 = timings.get(key);
+        timings.delete(key); // limpa independentemente para evitar leak
         if (t0 !== undefined) {
             const elapsed = Date.now() - t0;
-            timings.delete(key);
             return { additionalContext: `tool '${input.toolName}' completada em ${elapsed}ms` };
         }
         return {};
     };
+
+    return { onPreToolUse, onPostToolUse };
 }

@@ -50,7 +50,22 @@ export function createInteractivePreset(opts = {}) {
     ]);
     const autoDeny = new Set(autoDenyTools.map((t) => t.toLowerCase()));
 
-    const onPermissionRequest = createPermissionHandler({ allowAll: true });
+    // onPermissionRequest espelha a lógica do onPreToolUse:
+    // auto-deny → nega, auto-allow → aprova, demais → nega (conservative default para permissionRequest
+    // uma vez que o fluxo interativo de 'ask' não está disponível nesse contexto).
+    const onPermissionRequest = createPermissionHandler({
+        onRequest: (req) => {
+            const name =
+                /** @type {{ toolName?: string; tool?: string }} */ (req)?.toolName?.toLowerCase() ??
+                /** @type {{ toolName?: string; tool?: string }} */ (req)?.tool?.toLowerCase() ??
+                'unknown';
+            if (autoDeny.has(name)) return false;
+            if (autoAllow.has(name)) return true;
+            // 'ask' não é possível em onPermissionRequest → deny conservative
+            log('WARN', `[preset/interactive] onPermissionRequest: tool '${name}' NEGADA (ask não disponível aqui)`);
+            return false;
+        },
+    });
 
     /** @type {SessionHooks} */
     const hooks = {

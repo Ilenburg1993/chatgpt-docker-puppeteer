@@ -21,6 +21,7 @@
 import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { execFile, spawn } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
@@ -174,15 +175,29 @@ function tokenizeShell(command) {
 }
 
 /**
- * Verifica se um cwd é seguro (dentro do workspace).
+ * Verifica se um cwd é seguro (dentro do workspace). SEC-TOOLS-001: resolve symlinks antes de comparar para evitar path
+ * traversal via symlink.
  *
  * @param {string | undefined} cwd
  * @returns {{ ok: boolean; reason?: string; resolved: string }}
  */
 function validateCwd(cwd) {
     const resolved = cwd ? (path.isAbsolute(cwd) ? cwd : path.resolve(WORKSPACE_ROOT, cwd)) : WORKSPACE_ROOT;
-    const relative = path.relative(WORKSPACE_ROOT, resolved);
-    if (relative.startsWith('..')) {
+    // Resolve symlinks para bloquear travessia via link simbólico
+    let real;
+    try {
+        real = realpathSync(resolved);
+    } catch {
+        real = resolved; // diretório ainda não existe — falha posterior ou ok para criação
+    }
+    const rootReal = (() => {
+        try {
+            return realpathSync(WORKSPACE_ROOT);
+        } catch {
+            return WORKSPACE_ROOT;
+        }
+    })();
+    if (!real.startsWith(rootReal + path.sep) && real !== rootReal) {
         return { ok: false, reason: `Cwd fora do workspace: ${resolved}`, resolved };
     }
     return { ok: true, resolved };
@@ -570,10 +585,22 @@ const runNodeFileTool = defineTool('run_node_file', {
             return { success: false, error: 'Apenas arquivos .js, .mjs e .cjs são permitidos.' };
         }
 
-        // Valida caminho
+        // Valida caminho — SEC-TOOLS-001: resolve symlinks para bloquear traversal via link simbólico
         const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(WORKSPACE_ROOT, filePath);
-        const relative = path.relative(WORKSPACE_ROOT, resolved);
-        if (relative.startsWith('..')) {
+        let realResolved;
+        try {
+            realResolved = realpathSync(resolved);
+        } catch {
+            realResolved = resolved; // arquivo não existe ainda
+        }
+        const rootReal = (() => {
+            try {
+                return realpathSync(WORKSPACE_ROOT);
+            } catch {
+                return WORKSPACE_ROOT;
+            }
+        })();
+        if (!realResolved.startsWith(rootReal + path.sep) && realResolved !== rootReal) {
             return { success: false, error: `Acesso negado: arquivo fora do workspace (${resolved})` };
         }
 

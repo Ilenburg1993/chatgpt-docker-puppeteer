@@ -2,7 +2,7 @@
 /**
  * src/copilot/hooks/presets/deny-all.js
  *
- * Preset deny-all: bloqueia todass as tools. Útil para modo read-only ou análise estática.
+ * Preset deny-all: bloqueia todas as tools. Útil para modo read-only ou análise estática.
  *
  * @module copilot/hooks/presets/deny-all
  */
@@ -24,6 +24,9 @@ import { createPermissionHandler } from '../permission-handler.js';
 /**
  * Preset deny-all: bloqueia a execução de todas as tools. Opcionalmente, permite uma lista de exceções (`exceptTools`).
  *
+ * Ambos os pontos de interceptação (`onPreToolUse` e `onPermissionRequest`) são configurados de forma consistente: deny
+ * por padrão, com exceções aplicadas nos dois.
+ *
  * @example
  *     const { hooks, onPermissionRequest } = createDenyAllPreset({
  *         exceptTools: ['read_file', 'list_dir'],
@@ -36,7 +39,20 @@ export function createDenyAllPreset(opts = {}) {
     const { exceptTools = [] } = opts;
     const allowed = new Set(exceptTools.map((t) => t.toLowerCase()));
 
-    const onPermissionRequest = createPermissionHandler({ allowAll: false, denyTools: [] });
+    // onPermissionRequest: usa allowTools para forçar deny para tudo que não está na lista.
+    // Quando exceptTools é vazio, allowTools recebe lista vazia — o que pelo contrato de
+    // createPermissionHandler (step 3: allowTools.length > 0) só ativa a whitelist se não-vazia.
+    // Por isso usamos onRequest para garantir deny incondicional quando nenhuma exceção existe,
+    // e whitelist estrita quando há exceções.
+    const onPermissionRequest =
+        exceptTools.length > 0
+            ? createPermissionHandler({ allowTools: exceptTools })
+            : createPermissionHandler({
+                  onRequest: (_) => {
+                      log('WARN', '[preset/deny-all] onPermissionRequest: tool NEGADA (deny-all)');
+                      return false; // false → makeDenied()
+                  },
+              });
 
     /** @type {SessionHooks} */
     const hooks = {

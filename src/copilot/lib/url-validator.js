@@ -59,10 +59,22 @@ export function validateUrl(url) {
             return { safe: false, reason: `Endereço IP privado/link-local bloqueado: ${url.hostname}` };
         }
     }
-    // Bloquear IPv6 loopback e ULA (fd00::/8)
+    // Bloquear IPv6 loopback, link-local (fe80::), ULA (fc00::/7 → fc e fd prefixes) e IPv4-mapped
+    // SEC-LIB-001: adicionados fe80::, fc00::, ::ffff: (IPv4-mapped privados)
     // URL.hostname retorna IPv6 com brackets: '[::1]' — normalizar removendo-os
     const h = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
-    if (h === '::1' || h === '0:0:0:0:0:0:0:1' || h.startsWith('fd') || h === 'fe80') {
+    if (
+        h === '::1' ||
+        h === '0:0:0:0:0:0:0:1' ||
+        h.startsWith('fd') || // ULA fd00::/8
+        h.startsWith('fc') || // ULA fc00::/8
+        h.startsWith('fe80:') || // link-local fe80::/10
+        h.startsWith('::ffff:10.') || // IPv4-mapped 10.x
+        /^::ffff:172\.(1[6-9]|2\d|3[01])\./.test(h) || // IPv4-mapped 172.16-31.x
+        h.startsWith('::ffff:192.168.') || // IPv4-mapped 192.168.x
+        h.startsWith('::ffff:127.') || // IPv4-mapped 127.x
+        h === '::ffff:0:0' // edge case
+    ) {
         return { safe: false, reason: `IPv6 privado/loopback bloqueado: ${url.hostname}` };
     }
     return { safe: true };

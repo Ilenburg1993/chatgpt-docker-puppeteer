@@ -72,6 +72,10 @@ let _starting = false;
 /** @type {Error | null} */
 let _startError = null;
 
+// C13-01: Promise compartilhada entre waiters para evitar retry storm após falha
+/** @type {Promise<import('@github/copilot-sdk').CopilotClient> | null} */
+let _startPromise = null;
+
 /** @type {Map<string, SessionEntry>} */
 const _sessions = new Map();
 
@@ -127,45 +131,32 @@ export async function getClient(overrides = {}) {
         return _client;
     }
 
-    if (_starting) {
-        // Aguarda até o cliente estar pronto (UPG-05: backoff exponencial para reduzir pressão)
-        await new Promise((resolve) => {
-            let pollDelay = 100;
-            const poll = () => {
-                if (!_starting) {
-                    resolve(undefined);
-                    return;
-                }
-                pollDelay = Math.min(pollDelay * 2, 2000);
-                setTimeout(poll, pollDelay);
-            };
-            setTimeout(poll, pollDelay);
-        });
-        // NEW-02 (fix): propagar erro de inicialização para waiters
-        if (_startError) {
-            const err = _startError;
-            _startError = null;
-            throw err;
-        }
-        if (_client) return _client;
+    // C13-01: usar Promise compartilhada para evitar retry storm em concorrência
+    if (_startPromise) {
+        return _startPromise;
     }
 
-    _starting = true;
-    _startError = null;
-    try {
-        const options = buildClientOptions(overrides);
-        log('INFO', '[lib/sdk-client] Iniciando CopilotClient...');
-        const client = new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {unknown} */ (options)));
-        await client.start();
-        _client = client;
-        log('INFO', `[lib/sdk-client] CopilotClient conectado. Estado: ${client.getState()}`);
-        return client;
-    } catch (/** @type {any} */ e) {
-        _startError = e;
-        throw e;
-    } finally {
-        _starting = false;
-    }
+    _startPromise = (async () => {
+        _starting = true;
+        _startError = null;
+        try {
+            const options = buildClientOptions(overrides);
+            log('INFO', '[lib/sdk-client] Iniciando CopilotClient...');
+            const client = new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {unknown} */ (options)));
+            await client.start();
+            _client = client;
+            log('INFO', `[lib/sdk-client] CopilotClient conectado. Estado: ${client.getState()}`);
+            return client;
+        } catch (/** @type {any} */ e) {
+            _startError = e;
+            throw e;
+        } finally {
+            _starting = false;
+            _startPromise = null;
+        }
+    })();
+
+    return _startPromise;
 }
 
 /**
@@ -419,6 +410,7 @@ export function _resetClientState() {
     _client = null;
     _starting = false;
     _startError = null;
+    _startPromise = null;
     _sessions.clear();
 }
 
@@ -432,4 +424,5 @@ export function _injectClientForTest(mockClient) {
     _client = mockClient;
     _starting = false;
     _startError = null;
+    _startPromise = null;
 }

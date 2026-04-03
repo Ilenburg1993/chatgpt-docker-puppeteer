@@ -57,7 +57,22 @@ export function createSafePreset(opts = {}) {
 
     const DENY_TOOLS = new Set(['rm_rf', 'drop_table', 'wipe_data', ...extraDenyTools.map((t) => t.toLowerCase())]);
 
-    const onPermissionRequest = createPermissionHandler({ allowAll: true });
+    // onPermissionRequest espelha a lógica do onPreToolUse:
+    // DENY_TOOLS → nega, DEFAULT_ASK_TOOLS → nega (ask não disponível em permissionRequest), demais → aprova.
+    const onPermissionRequest = createPermissionHandler({
+        onRequest: (req) => {
+            const name =
+                /** @type {{ toolName?: string; tool?: string }} */ (req)?.toolName?.toLowerCase() ??
+                /** @type {{ toolName?: string; tool?: string }} */ (req)?.tool?.toLowerCase() ??
+                'unknown';
+            if (DENY_TOOLS.has(name) || DEFAULT_ASK_TOOLS.has(name)) {
+                if (auditLog) log('WARN', `[preset/safe] onPermissionRequest: tool '${name}' NEGADA`);
+                return false;
+            }
+            if (auditLog) log('DEBUG', `[preset/safe] onPermissionRequest: tool '${name}' APROVADA`);
+            return true;
+        },
+    });
 
     /** @type {SessionHooks} */
     const hooks = {

@@ -119,12 +119,14 @@ export function createLoggingPromptHook() {
 
 /**
  * Hook que redige tokens/senhas antes que o prompt seja processado. Padrões cobertos: Bearer tokens, API keys
- * prefixadas, senhas inline simples.
+ * prefixadas, senhas inline simples, JWT (3-part base64url), AWS keys e tokens GitHub.
  *
  * @returns {UserPromptSubmittedHandler}
  */
 export function createSensitiveDataRedactor() {
-    const SENSITIVE_PATTERN = /Bearer\s+\S+|(?:api[-_]key|token|password|secret)\s*[:=]\s*\S+/gi;
+    // SEC-PT-001: adicionados padrões JWT, AWS Access/Secret keys e tokens GitHub (ghp_/ghs_/gho_/github_pat_)
+    const SENSITIVE_PATTERN =
+        /Bearer\s+\S+|(?:api[-_]key|token|password|secret)\s*[:=]\s*\S+|eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+|(?:AKIA|ASIA|ABIA)[0-9A-Z]{16}|(?:aws_secret_access_key\s*=\s*)\S+|gh[psotr]_[a-zA-Z0-9]{36,}|github_pat_[a-zA-Z0-9_]{82}/gi;
     return createPromptTransformer({
         sensitivePattern: SENSITIVE_PATTERN,
         sensitiveReplacement: '[REDACTED]',
@@ -132,13 +134,17 @@ export function createSensitiveDataRedactor() {
 }
 
 /**
- * Hook que envolve o prompt com contexto de sistema adicional como prefixo ou sufixo.
+ * Hook que envolve o prompt com contexto de sistema adicional como prefixo ou sufixo. UPG-PT-001: retorna identidade
+ * early se prefix e suffix forem ambos vazios.
  *
  * @param {{ prefix?: string; suffix?: string }} opts
  * @returns {UserPromptSubmittedHandler}
  */
 export function createContextInjector(opts) {
     const { prefix = '', suffix = '' } = opts;
+    if (!prefix && !suffix) {
+        return createPromptTransformer({ transformFn: (p) => p });
+    }
     return createPromptTransformer({
         transformFn: (p) => `${prefix}${prefix ? '\n' : ''}${p}${suffix ? '\n' : ''}${suffix}`,
     });

@@ -336,12 +336,19 @@ export function parseStructuredResponse(raw) {
     }
 
     // Estratégia 4: JSON embutido em texto (busca { ... })
+    // TYPES-P4-01: usar abordagem incremental da direita para evitar capturar texto entre dois objetos JSON
     const firstBrace = raw.indexOf('{');
-    const lastBrace = raw.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        const candidate = raw.slice(firstBrace, lastBrace + 1);
-        const result = _tryParseJson(candidate);
-        if (result) return result;
+    if (firstBrace !== -1) {
+        // Iterar de cada '}' para trás em busca do JSON mais próximo e compacto
+        let searchFrom = raw.length;
+        while (true) {
+            const lastBrace = raw.lastIndexOf('}', searchFrom - 1);
+            if (lastBrace === -1 || lastBrace <= firstBrace) break;
+            const candidate = raw.slice(firstBrace, lastBrace + 1);
+            const result = _tryParseJson(candidate);
+            if (result) return result;
+            searchFrom = lastBrace; // tentar com '}' anterior
+        }
     }
 
     return null;

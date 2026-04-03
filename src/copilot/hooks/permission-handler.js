@@ -77,6 +77,15 @@ export function createPermissionHandler(config) {
     const auditMode = cfg.auditMode ?? false;
     const onRequest = cfg.onRequest;
 
+    // UPG-PERM-001: validar denyPatterns em tempo de construção (fail-fast)
+    for (const p of denyPatterns) {
+        if (!(p instanceof RegExp)) {
+            throw new TypeError(
+                `[hooks/permission] createPermissionHandler: denyPatterns deve conter instâncias de RegExp, recebido: ${typeof p}`,
+            );
+        }
+    }
+
     const handlerFn = async (/** @type {PermissionRequest} */ request) => {
         const toolName =
             /** @type {{ toolName?: string; tool?: string }} */ (request)?.toolName ??
@@ -109,8 +118,21 @@ export function createPermissionHandler(config) {
             }
         }
 
-        // 2. allowAll — equivalente ao approveAll do SDK
+        // 2. allowAll — aprova tudo, mas denyTools/denyPatterns ainda têm precedência
         if (allowAll) {
+            // Verificar deny explícita antes de aprovar
+            if (denyTools.length > 0 && denyTools.includes(toolName)) {
+                log('WARN', `[hooks/permission] NEGADO (denyTools override allowAll): tool='${toolName}'`);
+                return makeDenied();
+            }
+            const deniedByPattern = denyPatterns.length > 0 ? denyPatterns.find((p) => p.test(toolName)) : null;
+            if (deniedByPattern) {
+                log(
+                    'WARN',
+                    `[hooks/permission] NEGADO (denyPattern override allowAll ${String(deniedByPattern)}): tool='${toolName}'`,
+                );
+                return makeDenied();
+            }
             if (auditMode) {
                 log('INFO', `[hooks/permission] APROVADO (allowAll): tool='${toolName}'`);
             }
