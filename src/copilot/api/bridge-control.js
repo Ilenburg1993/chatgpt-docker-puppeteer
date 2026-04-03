@@ -62,8 +62,9 @@ export function registerControlRoutes(bridge, agent) {
     bridge.get('/status', (_req, /** @type {Res} */ res) => res.json({ ok: true, ...agent.getStatusSnapshot() }));
     bridge.get('/health', (_req, /** @type {Res} */ res) => _handleHealth(res, agent));
     bridge.get('/session', (_req, /** @type {Res} */ res) => _handleSession(res, agent));
-    bridge.post('/start', (/** @type {Req} */ _req, /** @type {Res} */ res) => _handleStart(res, agent));
-    bridge.post('/stop', (/** @type {Req} */ _req, /** @type {Res} */ res) => _handleStop(res, agent));
+    // SEC-API-001: POST /start e /stop protegidas com requireAdmin (defesa em profundidade)
+    bridge.post('/start', requireAdmin, (/** @type {Req} */ _req, /** @type {Res} */ res) => _handleStart(res, agent));
+    bridge.post('/stop', requireAdmin, (/** @type {Req} */ _req, /** @type {Res} */ res) => _handleStop(res, agent));
     bridge.get('/permissions', (_req, /** @type {Res} */ res) => _handleGetPermissions(res, agent));
     bridge.post('/permissions', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
         _handleSetPermissions(req, res, agent),
@@ -114,13 +115,15 @@ function _handleHealth(res, agent) {
     const healthy = snap.status === 'idle' || snap.status === 'processing' || snap.status === 'waiting_for_input';
 
     // ARCH-04: verificar conectividade do ConversationStore (SQLite)
+    // API-P4-01: verificar se db existe antes de usar ? para não gerar false positive
     /** @type {{ ok: boolean; error?: string }} */
     const hubStore = (() => {
+        if (!conversationStore.db) return { ok: false, error: 'db não inicializado' };
         try {
-            conversationStore.db?.prepare('SELECT 1').get();
+            conversationStore.db.prepare('SELECT 1').get();
             return { ok: true };
         } catch (/** @type {any} */ e) {
-            return { ok: false, error: /** @type {string} */ (e.message ?? 'unknown') };
+            return { ok: false, error: String(e?.message ?? 'unknown') };
         }
     })();
 

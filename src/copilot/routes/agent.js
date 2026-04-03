@@ -207,15 +207,22 @@ router.get('/agent/stream', (req, res) => {
             sendEvent('heartbeat', { ts: Date.now() });
         }, 30_000);
 
+        // C14-02: flag idempotente para evitar triple-decrement e underflow do contador
+        let _sseDecremented = false;
+        const decrement = () => {
+            if (!_sseDecremented) {
+                _sseDecremented = true;
+                _agentSseClients--;
+            }
+        };
         req.on('close', () => {
-            _agentSseClients--;
+            decrement();
             clearInterval(heartbeatInterval);
             unsubscribe();
             log('INFO', '[sdk-api] SSE agent/stream encerrado');
         });
-        // G2-API-12: decrementar também em 'error' e 'finish' para evitar vazamento do contador
-        res.on('error', () => _agentSseClients--);
-        res.on('finish', () => _agentSseClients--);
+        res.on('error', decrement);
+        res.on('finish', decrement);
     });
 });
 

@@ -27,6 +27,7 @@
  * @module copilot/routes/sessions
  */
 
+import { MAX_SSE_CLIENTS } from '#copilot/core';
 import { log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
 import { Router } from 'express';
@@ -52,6 +53,14 @@ import { pickDefined } from '../lib/utils.js';
  */
 
 const router = Router();
+
+// C14-03: limite de SSE streams simultâneos por /sessions/:id/stream
+// INC-CORE-001/INC-CHAN-001 (fix): usar MAX_SSE_CLIENTS de core/constants.js em vez de definição local
+/** @type {number} */
+let _sessionsSseClients = 0;
+
+// C14-04: limite máximo de bytes aceitos em prompt para evitar uso excessivo de tokens
+const MAX_PROMPT_BYTES = 512_000;
 
 // SEC-N06/UPG-N19 (fix): autenticação opcional por token Bearer para SDK routes
 // Configurar via variável de ambiente SDK_API_TOKEN. Endpoints são públicos se não configurado.
@@ -348,10 +357,28 @@ router.get('/sessions/:id', (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * SEC-ROUTE-001: Middleware interno para proteger endpoints destrutivos. Exige BRIDGE_ADMIN_TOKEN se configurado
+ * (defesa em profundidade sobre SDK_API_TOKEN).
+ *
+ * @type {import('express').RequestHandler}
+ */
+function _requireAdminForDestructive(req, res, next) {
+    const adminToken = process.env['BRIDGE_ADMIN_TOKEN'];
+    if (!adminToken) return next(); // token não configurado — comportamento legado (dev)
+    const authHeader = req.headers['x-admin-token'] ?? req.headers['authorization'] ?? '';
+    const provided = String(authHeader).replace(/^Bearer\s+/i, '');
+    if (provided !== adminToken) {
+        res.status(403).json({ ok: false, error: 'Forbidden: token admin inválido ou ausente.' });
+        return;
+    }
+    return next();
+}
+
+/**
  * Deleta permanentemente uma sessão do disco (irreversível). Se a sessão estiver ativa no registry, desconecta antes de
  * deletar.
  */
-router.delete('/sessions/:id', (req, res) => {
+router.delete('/sessions/:id', _requireAdminForDestructive, (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
 
@@ -466,6 +493,12 @@ router.post('/sessions/:id/send', rateLimitMiddleware(30, 'session_send'), (req,
             return;
         }
 
+        // C14-04: limit máximo de bytes em prompt para evitar uso excessivo de tokens
+        if (Buffer.byteLength(prompt, 'utf8') > MAX_PROMPT_BYTES) {
+            res.status(400).json({ ok: false, error: `Prompt excede o limite de ${MAX_PROMPT_BYTES} bytes.` });
+            return;
+        }
+
         const entry = getSdkSession(id);
         if (!entry) {
             res.status(404).json({
@@ -525,8 +558,16 @@ router.post('/sessions/:id/send', rateLimitMiddleware(30, 'session_send'), (req,
 router.get('/sessions/:id/stream', (req, res) => {
     const { id } = req.params;
 
+    // C14-03: limitar streams SSE simultâneos
+    if (_sessionsSseClients >= MAX_SSE_CLIENTS) {
+        res.status(503).json({ ok: false, error: 'Máximo de clientes SSE atingido' });
+        return;
+    }
+    _sessionsSseClients++;
+
     const entry = getSdkSession(id);
     if (!entry) {
+        _sessionsSseClients--; // C14-03: decrementar ao rejeitar por sessão inexistente
         res.status(404).json({
             ok: false,
             error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
@@ -565,12 +606,24 @@ router.get('/sessions/:id/stream', (req, res) => {
         sendEvent('heartbeat', { ts: Date.now() });
     }, 15_000);
 
+    // C14-03: decrement idempotente para evitar underflow
+    let _sseDecremented = false;
+    const decrement = () => {
+        if (!_sseDecremented) {
+            _sseDecremented = true;
+            _sessionsSseClients--;
+        }
+    };
+
     // Limpeza quando cliente desconecta
     req.on('close', () => {
+        decrement();
         clearInterval(heartbeatInterval);
         unsubscribe();
         log('INFO', `[sdk-api] SSE stream encerrado: sessão ${id}`);
     });
+    res.on('error', decrement);
+    res.on('finish', decrement);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -92,12 +92,32 @@ export function registerTaskRoutes(bridge, agent) {
             }
 
             // Enfileira sem aguardar — G2-API-07: retornar taskId para rastreabilidade no SSE
+            // API-P4-02: usar await microtask para capturar rejeição imediata de QUEUE_FULL
             const taskId = randomUUID();
-            agent
-                .sendMessage(message, { ...(attachments !== undefined ? { attachments } : {}), taskId })
-                .catch((/** @type {any} */ e) => {
-                    log('WARN', `[bridge-tasks/send] Tarefa assíncrona falhou: ${e.message}`);
-                });
+            const sendPromise = agent.sendMessage(message, {
+                ...(attachments !== undefined ? { attachments } : {}),
+                taskId,
+            });
+            // Aguarda uma microtask para capturar rejeição síncrona (QUEUE_FULL)
+            const earlyCatch = await Promise.race([
+                sendPromise.then(
+                    () => null,
+                    (/** @type {any} */ e) => e,
+                ),
+                Promise.resolve(null),
+            ]);
+            if (earlyCatch !== null) {
+                const errMsg = /** @type {any} */ (earlyCatch).message ?? String(earlyCatch);
+                if (String(errMsg).includes('QUEUE_FULL') || String(errMsg).includes('Fila cheia')) {
+                    return res.status(429).json({ ok: false, error: errMsg });
+                }
+                // Outros erros imediatos também propagam ao cliente
+                return res.status(500).json({ ok: false, error: errMsg });
+            }
+            // Erros tardios (após o enqueue real) apenas logados
+            sendPromise.catch((/** @type {any} */ e) => {
+                log('WARN', `[bridge-tasks/send] Tarefa assíncrona falhou: ${e.message}`);
+            });
             return res.json({ ok: true, taskId, message: 'Mensagem enfileirada.', status: agent.status });
         } catch (/** @type {any} */ e) {
             log('ERROR', `[bridge-tasks/send] ${e.message}`);

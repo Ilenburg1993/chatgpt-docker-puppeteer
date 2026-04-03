@@ -119,15 +119,22 @@ router.get('/hooks/events', (req, res) => {
             sendEvent('heartbeat', { ts: Date.now() });
         }, 30_000);
 
+        // C14-01: flag idempotente para evitar triple-decrement e underflow do contador
+        let _sseDecremented = false;
+        const decrement = () => {
+            if (!_sseDecremented) {
+                _sseDecremented = true;
+                _hooksSseClients--;
+            }
+        };
         req.on('close', () => {
-            _hooksSseClients--;
+            decrement();
             clearInterval(heartbeatInterval);
             defaultBus.off('*', onAnyHook);
             log('INFO', '[sdk-api] SSE hooks/events encerrado');
         });
-        // Decrementar em 'error' e 'finish' para evitar vazamento do contador
-        res.on('error', () => _hooksSseClients--);
-        res.on('finish', () => _hooksSseClients--);
+        res.on('error', decrement);
+        res.on('finish', decrement);
     });
 });
 
