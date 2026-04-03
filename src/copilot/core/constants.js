@@ -58,6 +58,18 @@ export const MAX_SSE_CLIENTS = Number(process.env['MAX_SSE_CLIENTS'] ?? 50);
 export const MAX_SSE_CONTENT_CHARS = Number(process.env['MAX_SSE_CONTENT_CHARS'] ?? 64_000);
 
 /**
+ * Retorna o modelo de fallback do Copilot para situações de rate_limit/quota. Lido em runtime (não import-time) para
+ * permitir configuração dinâmica via `process.env`.
+ *
+ * UPG-SL-001 fix: centraliza valor que antes era lido diretamente de `process.env` em cada callsite.
+ *
+ * @returns {string | null}
+ */
+export function getCopilotFallbackModel() {
+    return process.env['COPILOT_FALLBACK_MODEL'] ?? null;
+}
+
+/**
  * Nomes canônicos de eventos emitidos pelo AlwaysAliveAgent. Re-exportados de agent/events.js para acesso centralizado
  * via core/.
  *

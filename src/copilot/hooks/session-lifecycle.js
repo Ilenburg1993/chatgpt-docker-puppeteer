@@ -15,6 +15,7 @@
  * @see module:copilot/hooks/types
  */
 
+import { getCopilotFallbackModel } from '#copilot/core/constants';
 import { defaultMetrics } from '#copilot/observability';
 import { defaultAuditLog } from '#copilot/observability/audit-log';
 import { log } from '#copilot/observability/logger';
@@ -106,8 +107,8 @@ export function createSessionHooks(ctx) {
 
         const isRateOrQuotaError = input.errorContext === 'rate_limit' || input.errorContext === 'quota';
         if (isRateOrQuotaError) {
-            const fallbackModel = process.env['COPILOT_FALLBACK_MODEL'];
             const currentModel = getModel();
+            const fallbackModel = getCopilotFallbackModel();
             if (fallbackModel && fallbackModel !== currentModel) {
                 log(
                     'WARN',

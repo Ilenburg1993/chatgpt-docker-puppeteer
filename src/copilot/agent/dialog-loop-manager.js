@@ -19,6 +19,7 @@
  * @see module:copilot/agent/dialog-watchdog
  */
 
+import { getCopilotFallbackModel } from '#copilot/core/constants';
 import { SessionError } from '#copilot/core/errors';
 import { waitForEvent } from '#copilot/lib/event-helpers';
 import { log } from '#copilot/observability/logger';
@@ -110,7 +111,7 @@ export class DialogLoopManager extends EventEmitter {
             options.watchdogIntervalMs ?? Number(process.env['LLM_B_WATCHDOG_MS'] ?? 5 * 60 * 1_000);
         this.#watchdogStallMs =
             options.watchdogStallMs ?? Number(process.env['LLM_B_WATCHDOG_STALL_MS'] ?? 15 * 60 * 1_000);
-        this.#fallbackModel = options.fallbackModel ?? process.env['COPILOT_FALLBACK_MODEL'] ?? null;
+        this.#fallbackModel = options.fallbackModel ?? getCopilotFallbackModel();
     }
 
     /**
