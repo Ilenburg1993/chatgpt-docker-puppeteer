@@ -1,12 +1,10 @@
 # Plano de Auditoria Completa — src/copilot
 
-**Versão**: 2.0
-**Data**: 2026-07-05
-**Escopo**: Todo o diretório `src/copilot/` (160 arquivos JS, ~19.439 LOC, 15 módulos)
-**Skill guia**: `.github/skills/copilot-full-audit/SKILL.md`
-**Saída**: 160+ relatórios MD individuais + 15 consolidados de módulo + 7 de integração + 4 globais
-**Diretório de saída**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/`
-**Templates**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/templates/`
+**Versão**: 2.0 **Data**: 2026-07-05 **Escopo**: Todo o diretório `src/copilot/` (160 arquivos JS,
+~19.439 LOC, 15 módulos) **Skill guia**: `.github/skills/copilot-full-audit/SKILL.md` **Saída**:
+160+ relatórios MD individuais + 15 consolidados de módulo + 7 de integração + 4 globais **Diretório
+de saída**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/` **Templates**:
+`DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/templates/`
 
 ---
 
@@ -319,15 +317,15 @@ DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/
 
 ### MACRO-FASE I — Leitura Exploratória (F01-F04) ✅ CONCLUÍDA
 
-> MF-I foi concluída na v1.x. Todos os 160 arquivos foram lidos. Anotações em session memory.
-> A partir da v2.0, MF-I serve como referência histórica. O trabalho recomeça na MF-II.
+> MF-I foi concluída na v1.x. Todos os 160 arquivos foram lidos. Anotações em session memory. A
+> partir da v2.0, MF-I serve como referência histórica. O trabalho recomeça na MF-II.
 
 | Fase | Escopo                                                       | Files | Status |
 | ---- | ------------------------------------------------------------ | ----- | ------ |
-| F01  | agent/ + hooks/                                              | 40    | ✅      |
-| F02  | observability/ + bridges/ + api/                             | 25    | ✅      |
-| F03  | tools/ + config/ + terminal/                                 | 59    | ✅      |
-| F04  | channel/ + conv-hub/ + core/ + db/ + lib/ + types/ + routes/ | 36    | ✅      |
+| F01  | agent/ + hooks/                                              | 40    | ✅     |
+| F02  | observability/ + bridges/ + api/                             | 25    | ✅     |
+| F03  | tools/ + config/ + terminal/                                 | 59    | ✅     |
+| F04  | channel/ + conv-hub/ + core/ + db/ + lib/ + types/ + routes/ | 36    | ✅     |
 
 **Deliverable**: 22 achados preliminares documentados na conversa + session memory.
 
@@ -336,8 +334,8 @@ DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/
 ### MACRO-FASE II — Leitura Individual + Documentação por Arquivo (F05-F17)
 
 > **Objetivo**: Reler cada arquivo integralmente, aplicar o checklist de análise, e produzir um MD
-> individual por arquivo usando o `TEMPLATE-ARQUIVO-INDIVIDUAL.md`. Ao terminar todos os arquivos
-> de um módulo, produzir o MD consolidado usando `TEMPLATE-MODULO-CONSOLIDADO.md`.
+> individual por arquivo usando o `TEMPLATE-ARQUIVO-INDIVIDUAL.md`. Ao terminar todos os arquivos de
+> um módulo, produzir o MD consolidado usando `TEMPLATE-MODULO-CONSOLIDADO.md`.
 
 **Ritmo obrigatório: 1 arquivo lido → 1 MD individual criado → (ao final do módulo) 1 MD
 consolidado**
@@ -740,7 +738,7 @@ consolidado**
 
 | Macro-fase      | Fases  | Subfases | Artefatos MD gerados                      |
 | --------------- | ------ | -------- | ----------------------------------------- |
-| I: Leitura      | 4      | 61       | 0 (anotações internas) ✅ CONCLUÍDA        |
+| I: Leitura      | 4      | 61       | 0 (anotações internas) ✅ CONCLUÍDA       |
 | II: Individual  | 13     | 176      | 160 MDs individuais + 15 consolidados     |
 | III: Integração | 8      | 36       | 7 integrações + 1 arquitetura + 3 globais |
 | IV: Correções   | 6      | 21       | Updates nos MDs existentes                |
@@ -754,19 +752,19 @@ Na Macro-Fase II, os módulos são analisados na ordem de risco ponderado:
 
 | Prioridade | Fase | Módulo            | LOC  | Risco | Justificativa                                  |
 | ---------- | ---- | ----------------- | ---- | ----- | ---------------------------------------------- |
-| 🔴 1        | F07  | tools/            | 5716 | Alto  | Maior LOC, shell/file/web sec surface, 3 specs |
-| 🔴 2        | F05  | agent/            | 4914 | Alto  | State machine, concurrency, lifecycle          |
-| 🔴 3        | F08  | observability/    | 3784 | Alto  | 0 specs, god module, Maps com leaks            |
-| 🟠 4        | F06  | hooks/            | 3334 | Médio | Permission handling, prompt injection          |
-| 🟠 5        | F09  | terminal/         | 4920 | Médio | HTTP handlers, commands, 27 arquivos           |
-| 🟠 6        | F11  | conversation-hub/ | 2206 | Médio | Multi-session isolation, store                 |
-| 🟡 7        | F10  | bridges/          | 2044 | Médio | External API calls, error handling             |
-| 🟡 8        | F12  | config/           | 1540 | Baixo | Validation, defaults                           |
-| 🟡 9        | F13  | lib/              | 1904 | Baixo | Utilities, boa cobertura (10 specs)            |
-| 🟡 10       | F14  | routes/           | 1546 | Médio | HTTP middleware, auth, 1 spec                  |
-| 🟢 11       | F15  | channel/          | 1175 | Baixo | SSE client, relativamente isolado              |
-| 🟢 12       | F16  | api/              | 741  | Baixo | HTTP bridge, 4 specs                           |
-| 🟢 13       | F17  | core/db/types     | 1035 | Médio | Constants, DB/SQL, type definitions            |
+| 🔴 1       | F07  | tools/            | 5716 | Alto  | Maior LOC, shell/file/web sec surface, 3 specs |
+| 🔴 2       | F05  | agent/            | 4914 | Alto  | State machine, concurrency, lifecycle          |
+| 🔴 3       | F08  | observability/    | 3784 | Alto  | 0 specs, god module, Maps com leaks            |
+| 🟠 4       | F06  | hooks/            | 3334 | Médio | Permission handling, prompt injection          |
+| 🟠 5       | F09  | terminal/         | 4920 | Médio | HTTP handlers, commands, 27 arquivos           |
+| 🟠 6       | F11  | conversation-hub/ | 2206 | Médio | Multi-session isolation, store                 |
+| 🟡 7       | F10  | bridges/          | 2044 | Médio | External API calls, error handling             |
+| 🟡 8       | F12  | config/           | 1540 | Baixo | Validation, defaults                           |
+| 🟡 9       | F13  | lib/              | 1904 | Baixo | Utilities, boa cobertura (10 specs)            |
+| 🟡 10      | F14  | routes/           | 1546 | Médio | HTTP middleware, auth, 1 spec                  |
+| 🟢 11      | F15  | channel/          | 1175 | Baixo | SSE client, relativamente isolado              |
+| 🟢 12      | F16  | api/              | 741  | Baixo | HTTP bridge, 4 specs                           |
+| 🟢 13      | F17  | core/db/types     | 1035 | Médio | Constants, DB/SQL, type definitions            |
 
 **Nota**: A execução segue a numeração das fases (F05-F17) que foi organizada por afinidade lógica
 (agent+hooks primeiro, tools depois), mas o agente pode consultar esta tabela para priorizar módulos
@@ -848,9 +846,11 @@ Em caso de interrupção (token limit, crash, nova sessão):
 # Copilot Full Audit — Progresso
 
 ## Última atualização: {timestamp}
+
 ## Fase atual: {FXX-YY}
 
 ### Macro-Fase II: Leitura + Documentação
+
 - [x] F05-01 always-alive.js → agent/always-alive-audit.md ✅
 - [x] F05-02 dialog-loop-manager.js → agent/dialog-loop-manager-audit.md ✅
 - [ ] F05-03 dialog-loop-wirer.js (em progresso)
@@ -858,9 +858,11 @@ Em caso de interrupção (token limit, crash, nova sessão):
 - [ ] F05-23 — CONSOLIDAÇÃO → 01-agent.md
 
 ### Macro-Fase III: Integração
+
 - [ ] F18-01 ...
 
 ### Achados por módulo
+
 | Módulo | BUG | RACE | LEAK | SEC | PERF | ARCH | Total |
 | ------ | --- | ---- | ---- | --- | ---- | ---- | ----- |
 | agent/ |     |      |      |     |      |      |       |
@@ -888,76 +890,76 @@ Em caso de interrupção (token limit, crash, nova sessão):
 ### agent/ (22 arquivos)
 
 1. `always-alive.js` 2. `dialog-loop-manager.js` 3. `dialog-loop-wirer.js`
-4. `dialog-protocol.js` 5. `dialog-turn-executor.js` 6. `dialog-watchdog.js`
-7. `entry.js` 8. `events.js` 9. `index.js` 10. `message-queue.js`
-11. `mission-agent.js` 12. `permission-controller.js` 13. `post-process.js`
-14. `reconnect-policy.js` 15. `session-initializer.js` 16. `state-io.js`
-17. `status-snapshot.js` 18. `streaming-handler.js` 19. `task-executor.js`
-20. `tool-audit-logger.js` 21. `types.js` 22. `webhook-manager.js`
+2. `dialog-protocol.js` 5. `dialog-turn-executor.js` 6. `dialog-watchdog.js`
+3. `entry.js` 8. `events.js` 9. `index.js` 10. `message-queue.js`
+4. `mission-agent.js` 12. `permission-controller.js` 13. `post-process.js`
+5. `reconnect-policy.js` 15. `session-initializer.js` 16. `state-io.js`
+6. `status-snapshot.js` 18. `streaming-handler.js` 19. `task-executor.js`
+7. `tool-audit-logger.js` 21. `types.js` 22. `webhook-manager.js`
 
 ### tools/ (23 arquivos)
 
 1. `code-tools.js` 2. `file/index.js` 3. `file/read-tools.js` 4. `file/shared.js`
-5. `file/write-tools.js` 6. `git/index.js` 7. `git-tools.js` 8. `hook-tools.js`
-9. `hub-tools.js` 10. `index.js` 11. `introspection-tools.js` 12. `permission-tools.js`
-13. `session-rpc-tools.js` 14. `session-tools.js` 15. `shell/index.js` 16. `task-tools.js`
-17. `todo/bulk-tools.js` 18. `todo/crud-tools.js` 19. `todo/index.js`
-20. `todo/query-tools.js` 21. `todo/store.js` 22. `tool-factory.js` 23. `web-tools.js`
+2. `file/write-tools.js` 6. `git/index.js` 7. `git-tools.js` 8. `hook-tools.js`
+3. `hub-tools.js` 10. `index.js` 11. `introspection-tools.js` 12. `permission-tools.js`
+4. `session-rpc-tools.js` 14. `session-tools.js` 15. `shell/index.js` 16. `task-tools.js`
+5. `todo/bulk-tools.js` 18. `todo/crud-tools.js` 19. `todo/index.js`
+6. `todo/query-tools.js` 21. `todo/store.js` 22. `tool-factory.js` 23. `web-tools.js`
 
 ### observability/ (9 arquivos)
 
 1. `agent-event-observer.js` 2. `audit-log.js` 3. `error-tracker.js`
-4. `event-collector.js` 5. `hooks-audit-preset.js` 6. `index.js`
-7. `logger.js` 8. `metrics.js` 9. `otel.js`
+2. `event-collector.js` 5. `hooks-audit-preset.js` 6. `index.js`
+3. `logger.js` 8. `metrics.js` 9. `otel.js`
 
 ### hooks/ (18 arquivos)
 
 1. `audit.js` 2. `bus.js` 3. `composer.js` 4. `error-handler.js`
-5. `factory.js` 6. `index.js` 7. `permission-handler.js`
-8. `presets/deny-all.js` 9. `presets/index.js` 10. `presets/interactive.js`
-11. `presets/production.js` 12. `presets/safe.js` 13. `prompt-transformer.js`
-14. `registry.js` 15. `session-lifecycle.js` 16. `tool-interceptor.js`
-17. `types.js` 18. `user-input.js`
+2. `factory.js` 6. `index.js` 7. `permission-handler.js`
+3. `presets/deny-all.js` 9. `presets/index.js` 10. `presets/interactive.js`
+4. `presets/production.js` 12. `presets/safe.js` 13. `prompt-transformer.js`
+5. `registry.js` 15. `session-lifecycle.js` 16. `tool-interceptor.js`
+6. `types.js` 18. `user-input.js`
 
 ### terminal/ (27 arquivos)
 
 1. `bootstrap.js` 2. `commands/alias.js` 3. `commands/attach.js`
-4. `commands/config.js` 5. `commands/context.js` 6. `commands/gh.js`
-7. `commands/git.js` 8. `commands/help.js` 9. `commands/index.js`
-10. `commands/memory.js` 11. `commands/plan.js` 12. `commands/resume.js`
-13. `commands/session.js` 14. `commands/skills.js` 15. `dialog.js`
-16. `file-context.js` 17. `handlers-agent.js` 18. `handlers-dialog.js`
-19. `handlers-shared.js` 20. `handlers-system.js` 21. `http-handlers.js`
-22. `index.js` 23. `repl.js` 24. `route-table.js` 25. `server.js`
-26. `state.js` 27. `workspace-context.js`
+2. `commands/config.js` 5. `commands/context.js` 6. `commands/gh.js`
+3. `commands/git.js` 8. `commands/help.js` 9. `commands/index.js`
+4. `commands/memory.js` 11. `commands/plan.js` 12. `commands/resume.js`
+5. `commands/session.js` 14. `commands/skills.js` 15. `dialog.js`
+6. `file-context.js` 17. `handlers-agent.js` 18. `handlers-dialog.js`
+7. `handlers-shared.js` 20. `handlers-system.js` 21. `http-handlers.js`
+8. `index.js` 23. `repl.js` 24. `route-table.js` 25. `server.js`
+9. `state.js` 27. `workspace-context.js`
 
 ### conversation-hub/ (6 arquivos)
 
 1. `hub.js` 2. `index.js` 3. `orchestrator.js`
-4. `socket-ns.js` 5. `store.js` 6. `store-helpers.js`
+2. `socket-ns.js` 5. `store.js` 6. `store-helpers.js`
 
 ### bridges/ (10 arquivos)
 
 1. `alias-store.js` 2. `gh-bridge.js` 3. `gh/ci.js` 4. `gh/issues.js`
-5. `gh/pr.js` 6. `gh/utils.js` 7. `git-bridge.js` 8. `index.js`
-9. `mcp-tool-bridge.js` 10. `nerv-bridge.js`
+2. `gh/pr.js` 6. `gh/utils.js` 7. `git-bridge.js` 8. `index.js`
+3. `mcp-tool-bridge.js` 10. `nerv-bridge.js`
 
 ### lib/ (12 arquivos)
 
 1. `agents.js` 2. `event-helpers.js` 3. `hooks.js` 4. `http-request.js`
-5. `index.js` 6. `models.js` 7. `permissions.js` 8. `sdk-client.js`
-9. `session.js` 10. `tools-registry.js` 11. `url-validator.js` 12. `utils.js`
+2. `index.js` 6. `models.js` 7. `permissions.js` 8. `sdk-client.js`
+3. `session.js` 10. `tools-registry.js` 11. `url-validator.js` 12. `utils.js`
 
 ### routes/ (7 arquivos)
 
 1. `agent.js` 2. `client.js` 3. `hooks.js` 4. `middleware.js`
-5. `observability.js` 6. `sessions.js` 7. `webhooks.js`
+2. `observability.js` 6. `sessions.js` 7. `webhooks.js`
 
 ### config/ (9 arquivos)
 
 1. `custom-agents.js` 2. `index.js` 3. `mcp-servers.js`
-4. `pinned-files-loader.js` 5. `session-config.js` 6. `system-prompt.js`
-7. `tools/custom-tools.js` 8. `tools/index.js` 9. `tools/sdk-tools.js`
+2. `pinned-files-loader.js` 5. `session-config.js` 6. `system-prompt.js`
+3. `tools/custom-tools.js` 8. `tools/index.js` 9. `tools/sdk-tools.js`
 
 ### channel/ (3 arquivos)
 
@@ -966,7 +968,7 @@ Em caso de interrupção (token limit, crash, nova sessão):
 ### api/ (6 arquivos)
 
 1. `bridge-control.js` 2. `bridge-dialog.js` 3. `bridge-stream.js`
-4. `bridge-tasks.js` 5. `http-bridge.js` 6. `sdk-api.js`
+2. `bridge-tasks.js` 5. `http-bridge.js` 6. `sdk-api.js`
 
 ### core/ (3 arquivos)
 

@@ -1,8 +1,8 @@
 # Visão Arquitetural Consolidada — src/copilot
 
-> Gerado como etapa final da Macro-Fase III do Copilot Full Audit.
-> Plano: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
-> Este documento é escrito APÓS todos os MDs de módulo e de integração estarem completos.
+> Gerado como etapa final da Macro-Fase III do Copilot Full Audit. Plano:
+> `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0 Este documento é escrito APÓS todos os
+> MDs de módulo e de integração estarem completos.
 
 ---
 
@@ -150,11 +150,11 @@ Layer 6 — Interface:       routes/, api/, server/
 
 | Onda | Descrição                    | Achados cobertos | Esforço | Impacto |
 | ---- | ---------------------------- | ---------------- | ------- | ------- |
-| 1    | Correções P0 (bloqueantes)   | {IDs}            | {S/M/L} | 🔴       |
-| 2    | Correções P1 (alto impacto)  | {IDs}            | {S/M/L} | 🟠       |
-| 3    | Correções P2 (melhorias)     | {IDs}            | {S/M/L} | 🟡       |
-| 4    | Transformações arquiteturais | {IDs T1-T9}      | {S/M/L} | 🟣       |
-| 5    | Cobertura de testes          | {IDs TEST-*}     | {S/M/L} | 🔵       |
+| 1    | Correções P0 (bloqueantes)   | {IDs}            | {S/M/L} | 🔴      |
+| 2    | Correções P1 (alto impacto)  | {IDs}            | {S/M/L} | 🟠      |
+| 3    | Correções P2 (melhorias)     | {IDs}            | {S/M/L} | 🟡      |
+| 4    | Transformações arquiteturais | {IDs T1-T9}      | {S/M/L} | 🟣      |
+| 5    | Cobertura de testes          | {IDs TEST-\*}    | {S/M/L} | 🔵      |
 
 ### 6.2 Pré-requisitos e dependências entre ondas
 
@@ -228,4 +228,4 @@ Onda 5 ← pode iniciar após Onda 2
 
 ---
 
-*Gerado por copilot-full-audit skill v2.0 — Visão Arquitetural Consolidada*
+_Gerado por copilot-full-audit skill v2.0 — Visão Arquitetural Consolidada_

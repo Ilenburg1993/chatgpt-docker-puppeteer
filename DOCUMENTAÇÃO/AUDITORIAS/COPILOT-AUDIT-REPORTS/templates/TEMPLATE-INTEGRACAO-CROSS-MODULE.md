@@ -1,7 +1,7 @@
 # Análise de Integração — {NOME DO FLUXO}
 
-> Gerado como parte da Macro-Fase III do Copilot Full Audit.
-> Plano: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
+> Gerado como parte da Macro-Fase III do Copilot Full Audit. Plano:
+> `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
 
 ---
 
@@ -36,6 +36,7 @@
 ```
 
 > Usar formato ASCII art detalhado mostrando o data flow principal com:
+>
 > - Setas indicando direção
 > - Labels com nome do método/evento
 > - Notas inline para transformações de dados
@@ -68,9 +69,9 @@
 
 | Verificação                                         | Status | Detalhes   |
 | --------------------------------------------------- | ------ | ---------- |
-| Shapes compatíveis entre produtor e consumidor?     | ❌/✅    | {detalhes} |
-| Campos opcionais tratados em todos os consumidores? | ❌/✅    | {detalhes} |
-| Tipos alinhados (number vs string, etc.)?           | ❌/✅    | {detalhes} |
+| Shapes compatíveis entre produtor e consumidor?     | ❌/✅  | {detalhes} |
+| Campos opcionais tratados em todos os consumidores? | ❌/✅  | {detalhes} |
+| Tipos alinhados (number vs string, etc.)?           | ❌/✅  | {detalhes} |
 
 ---
 
@@ -92,10 +93,10 @@
 
 | Verificação                                    | Status | Detalhes   |
 | ---------------------------------------------- | ------ | ---------- |
-| Todo evento emitido tem pelo menos 1 consumer? | ❌/✅    | {detalhes} |
-| Handlers recebem o payload shape correto?      | ❌/✅    | {detalhes} |
-| Deduplicação: mesmo evento processado 2x?      | ❌/✅    | {detalhes} |
-| Ordenação: eventos chegam na ordem esperada?   | ❌/✅    | {detalhes} |
+| Todo evento emitido tem pelo menos 1 consumer? | ❌/✅  | {detalhes} |
+| Handlers recebem o payload shape correto?      | ❌/✅  | {detalhes} |
+| Deduplicação: mesmo evento processado 2x?      | ❌/✅  | {detalhes} |
+| Ordenação: eventos chegam na ordem esperada?   | ❌/✅  | {detalhes} |
 
 ---
 
@@ -117,11 +118,11 @@
 
 | Verificação                                    | Status | Detalhes   |
 | ---------------------------------------------- | ------ | ---------- |
-| Erros no ponto A chegam ao consumidor final?   | ❌/✅    | {detalhes} |
-| Erros são transformados adequadamente?         | ❌/✅    | {detalhes} |
-| Cleanup ocorre em todos os pontos de falha?    | ❌/✅    | {detalhes} |
-| Erros silenciados indevidamente (catch vazio)? | ❌/✅    | {detalhes} |
-| Stack trace preservado?                        | ❌/✅    | {detalhes} |
+| Erros no ponto A chegam ao consumidor final?   | ❌/✅  | {detalhes} |
+| Erros são transformados adequadamente?         | ❌/✅  | {detalhes} |
+| Cleanup ocorre em todos os pontos de falha?    | ❌/✅  | {detalhes} |
+| Erros silenciados indevidamente (catch vazio)? | ❌/✅  | {detalhes} |
+| Stack trace preservado?                        | ❌/✅  | {detalhes} |
 
 ---
 
@@ -129,7 +130,7 @@
 
 | Recurso                 | Criado em           | Liberado em         | Lifecycle correto? |
 | ----------------------- | ------------------- | ------------------- | ------------------ |
-| {timer/listener/handle} | `{arquivo}.js:L{N}` | `{arquivo}.js:L{M}` | ❌/✅                |
+| {timer/listener/handle} | `{arquivo}.js:L{N}` | `{arquivo}.js:L{M}` | ❌/✅              |
 
 ---
 
@@ -137,7 +138,7 @@
 
 | Interface         | Módulo A (provê)          | Módulo B (consome)        | Alinhado? | Divergências   |
 | ----------------- | ------------------------- | ------------------------- | --------- | -------------- |
-| `{fn/type/event}` | `{módulo_A}/{arquivo}.js` | `{módulo_B}/{arquivo}.js` | ❌/✅       | {divergências} |
+| `{fn/type/event}` | `{módulo_A}/{arquivo}.js` | `{módulo_B}/{arquivo}.js` | ❌/✅     | {divergências} |
 
 ---
 
@@ -145,8 +146,8 @@
 
 | Cenário                           | Risco   | Mitigação          | Status |
 | --------------------------------- | ------- | ------------------ | ------ |
-| {2 chamadas simultâneas ao fluxo} | {A/M/B} | {mutex/lock/none}  | ❌/✅    |
-| {evento chega antes de init}      | {A/M/B} | {guard/queue/none} | ❌/✅    |
+| {2 chamadas simultâneas ao fluxo} | {A/M/B} | {mutex/lock/none}  | ❌/✅  |
+| {evento chega antes de init}      | {A/M/B} | {guard/queue/none} | ❌/✅  |
 
 ---
 
@@ -194,4 +195,4 @@
 
 ---
 
-*Gerado por copilot-full-audit skill v2.0 — Integração F{XX}*
+_Gerado por copilot-full-audit skill v2.0 — Integração F{XX}_

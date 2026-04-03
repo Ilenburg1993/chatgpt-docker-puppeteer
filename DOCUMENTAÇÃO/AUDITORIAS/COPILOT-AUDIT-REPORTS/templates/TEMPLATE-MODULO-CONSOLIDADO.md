@@ -1,8 +1,8 @@
 # Auditoria Consolidada — Módulo `{MÓDULO}/`
 
-> Gerado como parte da Macro-Fase II do Copilot Full Audit.
-> Plano: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
-> Este documento é escrito APÓS todos os MDs individuais do módulo terem sido gerados.
+> Gerado como parte da Macro-Fase II do Copilot Full Audit. Plano:
+> `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0 Este documento é escrito APÓS todos os
+> MDs individuais do módulo terem sido gerados.
 
 ---
 
@@ -16,7 +16,7 @@
 | **Fase de análise**      | F{XX}                   |
 | **Data de consolidação** | {YYYY-MM-DD}            |
 | **Specs de teste**       | {N} specs, {N} casos    |
-| **Prioridade de risco**  | 🔴/🟠/🟡/🟢                 |
+| **Prioridade de risco**  | 🔴/🟠/🟡/🟢             |
 
 ---
 
@@ -46,8 +46,7 @@
 | 2   | `{arquivo2}.js` | {N} | {descrição curta} | {0-10}      | {N}     |
 | …   | …               | …   | …                 | …           | …       |
 
-**Score médio de saúde do módulo**: {0-10}
-**Arquivo mais saudável**: `{arquivo}` ({score})
+**Score médio de saúde do módulo**: {0-10} **Arquivo mais saudável**: `{arquivo}` ({score})
 **Arquivo mais problemático**: `{arquivo}` ({score})
 
 ---
@@ -74,8 +73,8 @@
 
 | Export re-exportado | Arquivo origem | Usado externamente? |
 | ------------------- | -------------- | ------------------- |
-| `{export1}`         | `{arquivo}.js` | ❌/✅                 |
-| `{export2}`         | `{arquivo}.js` | ❌/✅                 |
+| `{export1}`         | `{arquivo}.js` | ❌/✅               |
+| `{export2}`         | `{arquivo}.js` | ❌/✅               |
 
 **Barrel bypasses detectados**: {N} (imports que ignoram o `index.js`)
 
@@ -193,15 +192,15 @@
 
 | Vetor             | Exposto? | Mitigado? | Detalhes   |
 | ----------------- | -------- | --------- | ---------- |
-| User input direto | ❌/✅      | ❌/✅       | {detalhes} |
-| File I/O          | ❌/✅      | ❌/✅       | {detalhes} |
-| Shell execution   | ❌/✅      | ❌/✅       | {detalhes} |
-| Network requests  | ❌/✅      | ❌/✅       | {detalhes} |
-| SDK interactions  | ❌/✅      | ❌/✅       | {detalhes} |
+| User input direto | ❌/✅    | ❌/✅     | {detalhes} |
+| File I/O          | ❌/✅    | ❌/✅     | {detalhes} |
+| Shell execution   | ❌/✅    | ❌/✅     | {detalhes} |
+| Network requests  | ❌/✅    | ❌/✅     | {detalhes} |
+| SDK interactions  | ❌/✅    | ❌/✅     | {detalhes} |
 
 ### 10.2 Achados de segurança consolidados
 
-{Referenciar os SEC-* do módulo}
+{Referenciar os SEC-\* do módulo}
 
 ---
 
@@ -221,25 +220,25 @@
 
 | Critério                             | Status | Detalhes              |
 | ------------------------------------ | ------ | --------------------- |
-| Segue direção de imports da camada?  | ❌/✅    | {violações se houver} |
-| Usa barrels consistentemente?        | ❌/✅    | {bypasses se houver}  |
-| Sem dependência de SDK direto?       | ❌/✅    | {files se houver}     |
-| Singletons com lifecycle gerenciado? | ❌/✅    | {sem reset/dispose?}  |
-| Maps/Sets com TTL?                   | ❌/✅    | {sem TTL?}            |
+| Segue direção de imports da camada?  | ❌/✅  | {violações se houver} |
+| Usa barrels consistentemente?        | ❌/✅  | {bypasses se houver}  |
+| Sem dependência de SDK direto?       | ❌/✅  | {files se houver}     |
+| Singletons com lifecycle gerenciado? | ❌/✅  | {sem reset/dispose?}  |
+| Maps/Sets com TTL?                   | ❌/✅  | {sem TTL?}            |
 
 ### 12.2 Mapeamento no Delta AS-IS → TO-BE
 
 | Transformação do plano            | Aplicável a este módulo? | Estado atual |
 | --------------------------------- | ------------------------ | ------------ |
-| T1: Logger abstraction layer      | ❌/✅                      | {estado}     |
-| T2: SDK accessor centralization   | ❌/✅                      | {estado}     |
-| T3: Event bus unification         | ❌/✅                      | {estado}     |
-| T4: Barrel-only imports           | ❌/✅                      | {estado}     |
-| T5: core/ independence            | ❌/✅                      | {estado}     |
-| T6: Circular dep resolution       | ❌/✅                      | {estado}     |
-| T7: Singleton lifecycle           | ❌/✅                      | {estado}     |
-| T8: Map TTL/eviction              | ❌/✅                      | {estado}     |
-| T9: Observability as pure utility | ❌/✅                      | {estado}     |
+| T1: Logger abstraction layer      | ❌/✅                    | {estado}     |
+| T2: SDK accessor centralization   | ❌/✅                    | {estado}     |
+| T3: Event bus unification         | ❌/✅                    | {estado}     |
+| T4: Barrel-only imports           | ❌/✅                    | {estado}     |
+| T5: core/ independence            | ❌/✅                    | {estado}     |
+| T6: Circular dep resolution       | ❌/✅                    | {estado}     |
+| T7: Singleton lifecycle           | ❌/✅                    | {estado}     |
+| T8: Map TTL/eviction              | ❌/✅                    | {estado}     |
+| T9: Observability as pure utility | ❌/✅                    | {estado}     |
 
 ---
 
@@ -288,4 +287,4 @@
 
 ---
 
-*Gerado por copilot-full-audit skill v2.0 — Consolidação do módulo `{módulo}/`*
+_Gerado por copilot-full-audit skill v2.0 — Consolidação do módulo `{módulo}/`_

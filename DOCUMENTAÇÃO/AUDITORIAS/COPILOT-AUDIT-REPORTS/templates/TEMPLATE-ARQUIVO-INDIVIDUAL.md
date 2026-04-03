@@ -1,7 +1,7 @@
 # Auditoria Individual — `{MÓDULO}/{ARQUIVO}.js`
 
-> Gerado como parte da Macro-Fase II do Copilot Full Audit.
-> Plano: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
+> Gerado como parte da Macro-Fase II do Copilot Full Audit. Plano:
+> `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
 
 ---
 
@@ -36,9 +36,8 @@
 | `{CONSTANTE}`   | const    | {O que representa} |
 | `{TypedefName}` | @typedef | {Shape dos dados}  |
 
-**Total de exports**: {N}
-**Exports consumidos externamente**: {N} (verificar com `rg 'import.*{export}' src/copilot/`)
-**Exports possivelmente dead**: {lista ou "nenhum"}
+**Total de exports**: {N} **Exports consumidos externamente**: {N} (verificar com
+`rg 'import.*{export}' src/copilot/`) **Exports possivelmente dead**: {lista ou "nenhum"}
 
 ---
 
@@ -48,7 +47,7 @@
 
 | Import                    | Via barrel? | Módulo origem  |
 | ------------------------- | ----------- | -------------- |
-| `#copilot/{módulo}/{sub}` | ❌/✅         | {módulo}       |
+| `#copilot/{módulo}/{sub}` | ❌/✅       | {módulo}       |
 | `../{relativo}`           | N/A         | {mesmo módulo} |
 
 ### 4.2 Imports externos (npm)
@@ -80,7 +79,7 @@
 
 | Singleton    | Factory com reset? | Symbol.dispose? | Testabilidade |
 | ------------ | ------------------ | --------------- | ------------- |
-| `{instance}` | ❌/✅                | ❌/✅             | {boa/ruim}    |
+| `{instance}` | ❌/✅              | ❌/✅           | {boa/ruim}    |
 
 ### 5.3 Timers e Listeners
 
@@ -97,24 +96,24 @@
 
 | Função/Método | Param     | Tipo esperado | Validação? | Default seguro? |
 | ------------- | --------- | ------------- | ---------- | --------------- |
-| `{fn1}`       | `{param}` | `{type}`      | ❌/✅        | ❌/✅             |
+| `{fn1}`       | `{param}` | `{type}`      | ❌/✅      | ❌/✅           |
 
 ### 6.2 Contratos de saída (retornos)
 
 | Função/Método | Return type | Nullable? | Error propagation     |
 | ------------- | ----------- | --------- | --------------------- |
-| `{fn1}`       | `{type}`    | ❌/✅       | throws / returns null |
+| `{fn1}`       | `{type}`    | ❌/✅     | throws / returns null |
 
 ### 6.3 JSDoc completeness
 
 | Critério                       | Status |
 | ------------------------------ | ------ |
-| Todos os exports têm JSDoc?    | ❌/✅    |
-| @param com tipo explícito?     | ❌/✅    |
-| @returns com tipo explícito?   | ❌/✅    |
-| @throws documentado?           | ❌/✅    |
-| @example em funções complexas? | ❌/✅    |
-| Typedefs completos e corretos? | ❌/✅    |
+| Todos os exports têm JSDoc?    | ❌/✅  |
+| @param com tipo explícito?     | ❌/✅  |
+| @returns com tipo explícito?   | ❌/✅  |
+| @throws documentado?           | ❌/✅  |
+| @example em funções complexas? | ❌/✅  |
+| Typedefs completos e corretos? | ❌/✅  |
 
 ---
 
@@ -122,10 +121,10 @@
 
 | Função/Método | try/catch? | finally? | Error transformado? | Propagado? |
 | ------------- | ---------- | -------- | ------------------- | ---------- |
-| `{fn1}`       | ❌/✅        | ❌/✅      | ❌/✅                 | ❌/✅        |
+| `{fn1}`       | ❌/✅      | ❌/✅    | ❌/✅               | ❌/✅      |
 
-**Padrão dominante**: {catch-and-log / rethrow / swallow / transform}
-**Comentário**: {análise de adequação}
+**Padrão dominante**: {catch-and-log / rethrow / swallow / transform} **Comentário**: {análise de
+adequação}
 
 ---
 
@@ -133,12 +132,12 @@
 
 | Vetor               | Aplicável? | Mitigado? | Detalhes   |
 | ------------------- | ---------- | --------- | ---------- |
-| Injection (SQL/cmd) | ❌/✅        | ❌/✅       | {detalhes} |
-| Path traversal      | ❌/✅        | ❌/✅       | {detalhes} |
-| SSRF                | ❌/✅        | ❌/✅       | {detalhes} |
-| Secrets exposure    | ❌/✅        | ❌/✅       | {detalhes} |
-| Prompt injection    | ❌/✅        | ❌/✅       | {detalhes} |
-| Auth bypass         | ❌/✅        | ❌/✅       | {detalhes} |
+| Injection (SQL/cmd) | ❌/✅      | ❌/✅     | {detalhes} |
+| Path traversal      | ❌/✅      | ❌/✅     | {detalhes} |
+| SSRF                | ❌/✅      | ❌/✅     | {detalhes} |
+| Secrets exposure    | ❌/✅      | ❌/✅     | {detalhes} |
+| Prompt injection    | ❌/✅      | ❌/✅     | {detalhes} |
+| Auth bypass         | ❌/✅      | ❌/✅     | {detalhes} |
 
 ---
 
@@ -198,7 +197,7 @@
 
 | Critério                      | Status                              |
 | ----------------------------- | ----------------------------------- |
-| Existe spec dedicado?         | ❌/✅                                 |
+| Existe spec dedicado?         | ❌/✅                               |
 | Arquivo do spec               | `tests/unit/copilot/{spec}.spec.js` |
 | Cenários cobertos             | {lista ou "N/A"}                    |
 | Cenários edge NÃO cobertos    | {lista}                             |
@@ -228,4 +227,4 @@
 
 ---
 
-*Gerado por copilot-full-audit skill v2.0 — Fase F{XX}-{YY}*
+_Gerado por copilot-full-audit skill v2.0 — Fase F{XX}-{YY}_
