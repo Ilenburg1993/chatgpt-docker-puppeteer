@@ -30,7 +30,8 @@ import EventEmitter from 'node:events';
  *     stateEmitter.on('busy:changed', (busy) => console.log('terminal busy:', busy));
  */
 export const stateEmitter = new EventEmitter();
-stateEmitter.setMaxListeners(20);
+// T-23: setMaxListeners calculado em vez de hardcoded (base 10 + margem p/ hot patches)
+stateEmitter.setMaxListeners(Number(process.env['TERMINAL_MAX_LISTENERS'] ?? '25'));
 
 // ─── Estado compartilhado ─────────────────────────────────────────────────────
 
@@ -45,6 +46,8 @@ let _rl = null;
 
 /** Fila de arquivos a embutir no próximo turno (via `/attach` ou `@path`). @type {string[]} */
 let _attachmentQueue = [];
+// T-22: limite máximo da fila de attachments (configurável via ENV)
+const MAX_ATTACHMENT_QUEUE = Number(process.env['TERMINAL_MAX_ATTACHMENTS'] ?? '50');
 
 /** Modo planejamento: prefaça mensagens com instrução de plano antes de enviar. @type {boolean} */
 let _planMode = false;
@@ -120,6 +123,10 @@ export function getAttachmentQueue() {
  * @returns {void}
  */
 export function addAttachment(filePath) {
+    // T-22: verificar limite antes de enfileirar
+    if (_attachmentQueue.length >= MAX_ATTACHMENT_QUEUE) {
+        throw new Error(`[terminal/state] Fila de attachments cheia (máx: ${MAX_ATTACHMENT_QUEUE})`);
+    }
     if (!_attachmentQueue.includes(filePath)) {
         _attachmentQueue.push(filePath);
     }

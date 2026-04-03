@@ -25,6 +25,11 @@ import { getHubSessionId } from './state.js';
  * @returns {HandlerResult}
  */
 export function handleListSessions({ limit = 20, offset = 0, status } = {}) {
+    // T-25: validar status contra valores permitidos pelo schema HubSessionStatus
+    const VALID_STATUS = new Set(['active', 'closed', 'error']);
+    if (status !== undefined && !VALID_STATUS.has(status)) {
+        return { status: 400, body: { ok: false, error: `status inválido: "${status}". Use: active, closed, error` } };
+    }
     try {
         const opts = {
             limit: isNaN(limit) ? 20 : limit,
@@ -54,7 +59,9 @@ export function handleListTurns({ sessionId, limit = 50, offset = 0 }) {
             limit: isNaN(limit) ? 50 : limit,
             offset: isNaN(offset) ? 0 : offset,
         });
-        return { status: 200, cors: true, body: { ok: true, turns, sessionId } };
+        // T-26 fix: incluir totalCount para paginação correta no cliente
+        const totalCount = conversationStore.countTurns(sessionId);
+        return { status: 200, cors: true, body: { ok: true, turns, sessionId, totalCount } };
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
     }
@@ -136,16 +143,16 @@ export function handleHubHealth() {
         return { status: 503, body: { ok: false, error: 'ConversationHub não inicializado' } };
     }
     try {
-        // SELECT 1 funcional: listar com limit=1 confirma que o DB responde
-        const activeSessions = conversationStore.listHubSessions({ status: 'active', limit: 1000 });
-        const allSessions = conversationStore.listHubSessions({ limit: 1000 });
+        // T-08: usar countHubSessions (COUNT(*)) em vez de listHubSessions({limit:1000}).length — O(1) com índice
+        const activeSessions = conversationStore.countHubSessions({ status: 'active' });
+        const totalSessions = conversationStore.countHubSessions();
         return {
             status: 200,
             body: {
                 ok: true,
                 dbResponsive: true,
-                activeSessions: activeSessions.length,
-                totalSessions: allSessions.length,
+                activeSessions,
+                totalSessions,
             },
         };
     } catch (/** @type {any} */ e) {

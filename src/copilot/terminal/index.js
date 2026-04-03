@@ -30,12 +30,22 @@ import { startRepl } from './repl.js';
 import { createInjectServer } from './server.js';
 import { getHubSessionId, setHubSessionId } from './state.js';
 
+/** @type {boolean} */
+let _agentListenersRegistered = false;
+
+// T-20: armazenar referência do reflectionTimer em escopo de módulo para permitir cancelamento
+/** @type {ReturnType<typeof setInterval> | null} */
+let _reflectionTimer = null;
+
 /**
  * Registra todos os event listeners do AlwaysAliveAgent no terminal server.
  *
  * @returns {void}
  */
 function registerAgentEventListeners() {
+    // T-14: guard contra registros duplicados (ex: hot-reload, tests)
+    if (_agentListenersRegistered) return;
+    _agentListenersRegistered = true;
     alwaysAliveAgent.on('dialog.stalled', async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         println(`\n[watchdog] ⚠️  Dialog loop inativo há ${secs}s — reiniciando automaticamente…`);
@@ -93,6 +103,14 @@ function registerAgentEventListeners() {
             println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
             log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
             broadcastSse('stopped', { authorized: true, reason });
+            return;
+        }
+
+        // T-15: respeitar pausa intencional do usuário — não reiniciar se dialogPaused
+        if (alwaysAliveAgent.dialogPaused) {
+            println(`\n\x1b[33m  [dialog] Loop encerrado enquanto pausado pelo usuário — não reiniciando.\x1b[0m`);
+            log('INFO', '[TerminalServer] Dialog loop encerrado com dialogPaused=true. Não reiniciando.');
+            broadcastSse('stopped', { reason, paused: true });
             return;
         }
 
@@ -186,8 +204,9 @@ function startReflectionLoop() {
         ).catch((/** @type {any} */ e) => log('WARN', `[TerminalServer] Reflection loop falhou: ${e.message}`));
     };
 
-    const reflectionTimer = setInterval(runReflection, reflectionIntervalMs);
-    if (typeof reflectionTimer.unref === 'function') reflectionTimer.unref();
+    // T-20: armazenar referência em variável de módulo para permitir cancelamento no graceful shutdown
+    _reflectionTimer = setInterval(runReflection, reflectionIntervalMs);
+    if (typeof _reflectionTimer.unref === 'function') _reflectionTimer.unref();
 }
 
 /**
@@ -240,6 +259,17 @@ export async function startTerminalServer() {
 
     registerAgentEventListeners();
     startReflectionLoop();
+
+    // T-21: graceful shutdown handlers para SIGTERM/SIGINT
+    const _onShutdown = () => {
+        log('INFO', '[TerminalServer] Sinal de encerramento recebido — cleanup...');
+        if (_reflectionTimer !== null) {
+            clearInterval(_reflectionTimer);
+            _reflectionTimer = null;
+        }
+    };
+    process.once('SIGTERM', _onShutdown);
+    process.once('SIGINT', _onShutdown);
 
     await startRepl(injectServer);
 }

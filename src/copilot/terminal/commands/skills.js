@@ -26,9 +26,9 @@ import { handleGetSkills, handleSetSkills } from '../http-handlers.js';
  *
  * @param {CmdContext} ctx
  * @param {string} [arg] - Subcomando e argumentos (e.g. "add ./docs", "remove ./docs", "list")
- * @returns {void}
+ * @returns {Promise<void>}
  */
-export function cmdSkills({ println }, arg) {
+export async function cmdSkills({ println }, arg) {
     const parts = (arg ?? '').trim().split(/\s+/);
     const sub = parts[0] ?? 'list';
     const rest = parts.slice(1).join(' ');
@@ -36,7 +36,8 @@ export function cmdSkills({ println }, arg) {
     switch (sub) {
         case 'list':
         case '': {
-            const result = handleGetSkills();
+            // T-09: await para async I/O
+            const result = await handleGetSkills();
             const skills = /** @type {{ paths: string[] }} */ (
                 /** @type {Record<string, unknown>} */ (result.body)['skills']
             );
@@ -55,10 +56,10 @@ export function cmdSkills({ println }, arg) {
                 break;
             }
             const current = /** @type {{ paths: string[] }} */ (
-                /** @type {Record<string, unknown>} */ (handleGetSkills().body)['skills']
+                /** @type {Record<string, unknown>} */ ((await handleGetSkills()).body)['skills']
             );
             const newPaths = [...new Set([...current.paths, rest])];
-            handleSetSkills({ paths: newPaths });
+            await handleSetSkills({ paths: newPaths });
             println(`  ✓ Adicionado: ${rest}`);
             println(`  Total de skills: ${newPaths.length}`);
             break;
@@ -70,14 +71,14 @@ export function cmdSkills({ println }, arg) {
                 break;
             }
             const current = /** @type {{ paths: string[] }} */ (
-                /** @type {Record<string, unknown>} */ (handleGetSkills().body)['skills']
+                /** @type {Record<string, unknown>} */ ((await handleGetSkills()).body)['skills']
             );
             const filtered = current.paths.filter((/** @type {string} */ p) => p !== rest);
             if (filtered.length === current.paths.length) {
                 println(`  ⚠ Caminho não encontrado: ${rest}`);
                 break;
             }
-            handleSetSkills({ paths: filtered });
+            await handleSetSkills({ paths: filtered });
             println(`  ✓ Removido: ${rest}`);
             println(`  Total de skills: ${filtered.length}`);
             break;

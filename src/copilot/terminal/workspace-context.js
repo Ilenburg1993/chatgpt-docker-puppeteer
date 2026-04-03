@@ -47,10 +47,20 @@ function tryExec(cmd, cwd) {
  * @returns {string | null}
  */
 function detectGitRoot(cwd) {
-    // Verificação rápida antes de invocar git
-    if (!existsSync(join(cwd, '.git')) && !tryExec('git rev-parse --git-dir', cwd)) {
-        return null;
+    // T-17: verificação hierárquica por .git antes de qualquer execSync
+    // Percorre do cwd até / procurando .git para evitar invocar git em non-git dirs
+    let dir = cwd;
+    let found = false;
+    for (let i = 0; i < 30 && dir !== '/'; i++) {
+        if (existsSync(join(dir, '.git'))) {
+            found = true;
+            break;
+        }
+        const parent = join(dir, '..');
+        if (parent === dir) break;
+        dir = parent;
     }
+    if (!found) return null;
     return tryExec('git rev-parse --show-toplevel', cwd);
 }
 

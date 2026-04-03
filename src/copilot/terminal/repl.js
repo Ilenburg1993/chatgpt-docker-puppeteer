@@ -165,15 +165,30 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
 async function _cmdRestart() {
     println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
     try {
+        // FINDING-P4-1 (T-05 fix): registrar 'dialog.ready' ANTES de stopDialogMode()
+        // para evitar race condition (o evento pode disparar antes do .once ser registrado)
+        /** @type {(v?: unknown) => void} */
+        let resolveReady = () => {};
+        /** @type {(e: Error) => void} */
+        let rejectReady = () => {};
+        const readyPromise = new Promise((resolve, reject) => {
+            resolveReady = resolve;
+            rejectReady = reject;
+        });
+        const timeout = setTimeout(() => rejectReady(new Error('Timeout aguardando restart')), 30_000);
+        /** @type {() => void} */
+        const onReady = () => {
+            clearTimeout(timeout);
+            resolveReady();
+        };
+        alwaysAliveAgent.once('dialog.ready', onReady);
         await llmBridgeClient.stopDialogMode();
         if (!alwaysAliveAgent.dialogLoopActive) {
-            await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Timeout aguardando restart')), 30_000);
-                alwaysAliveAgent.once('dialog.ready', () => {
-                    clearTimeout(timeout);
-                    resolve(undefined);
-                });
-            });
+            await readyPromise;
+        } else {
+            // dialog loop já está ativo — não precisamos aguardar, limpar listener e timeout
+            clearTimeout(timeout);
+            alwaysAliveAgent.off('dialog.ready', onReady);
         }
     } catch (/** @type {any} */ e) {
         println(`\x1b[31m  Falha no restart: ${e.message}\x1b[0m`);
@@ -334,6 +349,9 @@ export async function startRepl(injectServer) {
     });
 
     rl.on('SIGINT', () => {
+        // T-27: Ctrl+C mantém dialog loop ativo. Cancelar turno in-flight exigiria
+        // propagar AbortController de sendTurn → sendMessage (infra AbortSignal já existe
+        // em message-queue.js). Candidato a upgrade P4 futuro.
         println('\n[terminal] Ctrl+C detectado. Dialog loop mantido ativo. Use /quit para encerrar.');
         rl.prompt();
     });

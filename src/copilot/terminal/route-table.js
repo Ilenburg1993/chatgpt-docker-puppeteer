@@ -77,7 +77,7 @@ export const ROUTE_TABLE = [
     { method: 'GET', path: '/context', handler: handleGetContext },
     { method: 'GET', path: '/quota', handler: handleGetQuota },
     { method: 'GET', path: '/config', handler: handleGetConfig },
-    { method: 'GET', path: '/config/skills', handler: handleGetSkills },
+    { method: 'GET', path: '/config/skills', handler: handleGetSkills, async: true },
     { method: 'GET', path: '/config/tools', handler: handleGetToolsConfig },
     { method: 'GET', path: '/config/tools/custom', handler: handleGetCustomTools },
 
@@ -157,7 +157,7 @@ export const ROUTE_TABLE = [
 
     // ── PUT routes (body parsing) ─────────────────────────────────────────
     { method: 'PUT', path: '/config/infinite-session', handler: handleSetInfiniteSessionConfig, body: 'json' },
-    { method: 'PUT', path: '/config/skills', handler: handleSetSkills, body: 'json' },
+    { method: 'PUT', path: '/config/skills', handler: handleSetSkills, body: 'json', async: true },
     { method: 'PUT', path: '/config/tools', handler: handleSetToolsConfig, body: 'json' },
 
     // ── POST routes ───────────────────────────────────────────────────────

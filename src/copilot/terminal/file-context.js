@@ -225,7 +225,12 @@ export function extractAtReferences(message) {
     const pattern = /@"([^"]+)"|@([\w./\-_]+)/g;
     const strippedMessage = message.replace(pattern, (_match, quoted, plain) => {
         const p = quoted ?? plain;
-        if (p) paths.push(p);
+        if (p) {
+            // T-11: rejeitar emails e domínios (@user@host, @domain.tld sem /)
+            // Um caminho válido deve conter / ou começar com . ou ~ ou ser palavra simples sem ponto
+            const isLikelyEmail = /^[^/]+\.[a-z]{2,}$/i.test(p);
+            if (!isLikelyEmail) paths.push(p);
+        }
         return '';
     });
     return { paths, strippedMessage: strippedMessage.trim() };
@@ -248,20 +253,29 @@ export async function readDirectoryContext(dirPath) {
     const entries = await readdir(absPath, { withFileTypes: true });
     const files = entries.filter((e) => e.isFile()).map((e) => pathJoin(absPath, e.name));
 
+    // T-12: paralelizar stat() para reduzir latência em diretórios grandes
+    const statResults = await Promise.allSettled(
+        files.map(async (filePath) => {
+            const info = await stat(filePath);
+            return { filePath, size: info.size };
+        }),
+    );
+
     let totalBytes = 0;
     /** @type {FileContext[]} */
     const ctxs = [];
 
-    for (const filePath of files) {
+    for (const result of statResults) {
+        if (result.status !== 'fulfilled') continue;
+        const { filePath, size } = result.value;
+        if (size === 0 || totalBytes + size > MAX_EMBED_BYTES) continue;
         try {
-            const info = await stat(filePath);
-            if (info.size === 0 || totalBytes + info.size > MAX_EMBED_BYTES) continue;
             const content = await readFile(filePath, 'utf-8');
             // Verifica se é texto (rejeita binários por heurística: NUL byte)
             if (content.includes('\0')) continue;
-            const ctx = { path: filePath, content, size: info.size, lang: detectLang(filePath) };
+            const ctx = { path: filePath, content, size, lang: detectLang(filePath) };
             ctxs.push(ctx);
-            totalBytes += info.size;
+            totalBytes += size;
         } catch {
             // Ignora arquivos ilegíveis ou binários
         }
@@ -333,12 +347,25 @@ export async function attachmentToEmbed(att) {
     // F6.8 (UPG-04): suporte a type: 'blob' (base64) adicionado no SDK v0.2.0
     if (att.type === 'blob' && typeof att.data === 'string') {
         const mimeType = typeof att.mimeType === 'string' ? att.mimeType : 'application/octet-stream';
-        // Decodifica base64 para texto; se não for legível, exibe como hexadecimal parcial
+        // T-13: verificar mimeType antes de tentar decodificar como texto
+        const isText =
+            mimeType.startsWith('text/') ||
+            mimeType === 'application/json' ||
+            mimeType === 'application/xml' ||
+            mimeType === 'application/javascript' ||
+            mimeType === 'application/typescript';
         let decodedContent;
-        try {
-            decodedContent = Buffer.from(att.data, 'base64').toString('utf8');
-        } catch {
+        if (!isText) {
+            // Binário: não tenta decodificar como UTF-8
             decodedContent = `(dados binários, mimeType: ${mimeType})`;
+        } else {
+            try {
+                const text = Buffer.from(att.data, 'base64').toString('utf8');
+                // Heurística adicional: rejeitar se contém NUL bytes
+                decodedContent = text.includes('\0') ? `(dados binários, mimeType: ${mimeType})` : text;
+            } catch {
+                decodedContent = `(dados binários, mimeType: ${mimeType})`;
+            }
         }
         return `Blob \`${label}\` (${mimeType})\n\`\`\`\n${decodedContent}\n\`\`\``;
     }

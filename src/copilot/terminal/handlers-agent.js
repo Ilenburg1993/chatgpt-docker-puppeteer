@@ -107,7 +107,9 @@ export async function handlePipeline(body) {
         const from = ALLOWED_FROM.has(rawStepFrom) ? rawStepFrom : globalFrom;
 
         if (step.waitMs && step.waitMs > 0) {
-            await new Promise((r) => setTimeout(r, step.waitMs));
+            // T-06: limite máximo de 30s por step wait para evitar DoS ou bloqueio indefinido
+            const MAX_WAIT_MS = 30_000;
+            await new Promise((r) => setTimeout(r, Math.min(step.waitMs ?? 0, MAX_WAIT_MS)));
         }
 
         const t0 = Date.now();
@@ -176,7 +178,13 @@ export async function handleInject(body) {
 
     const rawAttachments = Array.isArray(body?.attachments) ? body.attachments : [];
     if (rawAttachments.length > 0) {
-        const embedParts = await Promise.all(rawAttachments.map(attachmentToEmbed));
+        let embedParts;
+        try {
+            // T-07: capturar erros de attachment individualmente para não mascarar falhas
+            embedParts = await Promise.all(rawAttachments.map(attachmentToEmbed));
+        } catch (/** @type {any} */ attErr) {
+            return { status: 400, body: { ok: false, error: `Falha ao processar attachments: ${attErr.message}` } };
+        }
         const validParts = embedParts.filter(/** @type {(s: string | null) => s is string} */ (s) => s !== null);
         if (validParts.length > 0) {
             let totalBytes = 0;

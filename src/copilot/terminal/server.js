@@ -213,6 +213,18 @@ export function createInjectServer() {
         try {
             const route = matchRoute(req.method ?? 'GET', url.pathname);
 
+            // T-04/T-16: responder preflight CORS OPTIONS antes de qualquer auth/route check
+            if (req.method === 'OPTIONS') {
+                res.writeHead(204, {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Request-ID',
+                    'Access-Control-Max-Age': '86400',
+                });
+                res.end();
+                return;
+            }
+
             // ── Rotas não encontradas ─────────────────────────────────────────
             if (!route) {
                 res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -223,13 +235,16 @@ export function createInjectServer() {
             // ── Auth bypass para rotas isentas (health, metrics, hub-health) ──
             // Demais rotas verificam token se configurado
             if (!route.skipAuth && TERMINAL_TOKEN) {
-                // SEC-04: timingSafeEqual evita timing-attack na comparação do token
+                // SEC-04 + T-18 fix: timingSafeEqual sem short-circuit para evitar timing leak
                 const authHeader = req.headers['authorization'] ?? '';
                 const expected = `Bearer ${TERMINAL_TOKEN}`;
-                const providedBuf = Buffer.from(authHeader.padEnd(expected.length));
-                const expectedBuf = Buffer.from(expected);
+                // Normalizar tamanho dos buffers para timingSafeEqual (requer mesma length)
+                const maxLen = Math.max(authHeader.length, expected.length);
+                const providedBuf = Buffer.from(authHeader.padEnd(maxLen));
+                const expectedBuf = Buffer.from(expected.padEnd(maxLen));
+                // Bitwise AND evita short-circuit — timingSafeEqual sempre executa
                 const lengthMatch = authHeader.length === expected.length;
-                const tokenMatch = lengthMatch && timingSafeEqual(providedBuf, expectedBuf);
+                const tokenMatch = timingSafeEqual(providedBuf, expectedBuf) && lengthMatch;
                 if (!tokenMatch) {
                     res.writeHead(401, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));

@@ -15,7 +15,8 @@ import {
     removeCustomTool,
 } from '#copilot/config/tools/registry';
 import { getToolsConfig, patchToolsConfig } from '#copilot/config/tools/state';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { setBackgroundCompactionThreshold } from '../agent/session-initializer.js';
@@ -43,8 +44,9 @@ export function handleHealth() {
     let hubInfo = { initialized: false, activeSessions: 0 };
     if (conversationHub.isReady) {
         try {
-            const activeSessions = conversationStore.listHubSessions({ status: 'active' });
-            hubInfo = { initialized: true, activeSessions: activeSessions.length };
+            // T-30 fix: usar countHubSessions (COUNT(*)) em vez de listHubSessions({}).length O(n)
+            const activeSessions = conversationStore.countHubSessions({ status: 'active' });
+            hubInfo = { initialized: true, activeSessions };
         } catch {
             hubInfo = { initialized: true, activeSessions: -1 };
         }
@@ -163,12 +165,13 @@ const SKILLS_PATH = join(resolve(import.meta.dirname, '../../../..'), 'skills.js
 /**
  * Lê o skills.json do disco.
  *
- * @returns {SkillsConfig}
+ * @returns {Promise<SkillsConfig>}
  */
-function readSkillsConfig() {
+async function readSkillsConfig() {
     if (!existsSync(SKILLS_PATH)) return { paths: [] };
     try {
-        const raw = readFileSync(SKILLS_PATH, 'utf8');
+        // T-09: usar async I/O para não bloquear o event loop
+        const raw = await readFileAsync(SKILLS_PATH, 'utf8');
         return JSON.parse(raw);
     } catch {
         return { paths: [] };
@@ -179,34 +182,38 @@ function readSkillsConfig() {
  * Persiste o skills.json no disco.
  *
  * @param {SkillsConfig} config
- * @returns {void}
+ * @returns {Promise<void>}
  */
-function writeSkillsConfig(config) {
-    writeFileSync(SKILLS_PATH, JSON.stringify(config, null, 2), 'utf8');
+async function writeSkillsConfig(config) {
+    // T-09: usar async I/O para não bloquear o event loop
+    await writeFileAsync(SKILLS_PATH, JSON.stringify(config, null, 2), 'utf8');
 }
 
 /**
  * GET /config/skills — retorna a lista de skills configurados.
  *
- * @returns {HandlerResult}
+ * @returns {Promise<HandlerResult>}
  */
-export function handleGetSkills() {
-    return { status: 200, cors: true, body: { ok: true, skills: readSkillsConfig() } };
+export async function handleGetSkills() {
+    // T-09: async I/O para não bloquear o event loop
+    const skills = await readSkillsConfig();
+    return { status: 200, cors: true, body: { ok: true, skills } };
 }
 
 /**
  * PUT /config/skills — atualiza a lista de paths pinned.
  *
  * @param {unknown} body
- * @returns {HandlerResult}
+ * @returns {Promise<HandlerResult>}
  */
-export function handleSetSkills(body) {
+export async function handleSetSkills(body) {
     const { paths } = /** @type {Record<string, unknown>} */ (body) ?? {};
     if (!Array.isArray(paths) || paths.some((p) => typeof p !== 'string')) {
         return { status: 400, body: { ok: false, error: 'body deve conter { paths: string[] }' } };
     }
     const config = { paths };
-    writeSkillsConfig(config);
+    // T-09: async I/O para não bloquear o event loop
+    await writeSkillsConfig(config);
     return { status: 200, cors: true, body: { ok: true, skills: config } };
 }
 

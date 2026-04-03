@@ -23,7 +23,7 @@ import { emitNerv } from '../bridges/nerv-bridge.js';
 import { llmBridgeClient } from '../channel/client.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { getCopilotNamespace } from '../conversation-hub/socket-ns.js';
-import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';
+import { LLM_B_TURN_TIMEOUT_MS, MAX_SSE_CONTENT_CHARS } from '../core/constants.js';
 import { embedMultiple, readFileContext } from './file-context.js';
 import {
     clearAttachments,
@@ -207,7 +207,7 @@ export function broadcastSse(event, data) {
     const _sseCriticalClients = getSseCriticalClients();
 
     // BUG-N07 (fix): truncar conteúdo de reply para evitar SSE message gigante
-    const MAX_SSE_CONTENT_CHARS = 64_000;
+    // T-29 fix: MAX_SSE_CONTENT_CHARS agora importada de core/constants.js (compartilhada)
     /** @type {object} */
     let safeData = data;
     if (
