@@ -60,20 +60,20 @@ referência**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
 > **Motivação**: BUG-DA-001 é a issue mais crítica do sistema inteiro — preset de segurança com
 > lógica invertida.
 
-| Sub-fase | Arquivo                        | Issues                     | Status                   |
-| -------- | ------------------------------ | -------------------------- | ------------------------ |
-| 1-A      | `hooks/presets/deny-all.js`    | BUG-DA-001 + INC-HOOKS-001 | ✅ N/A + FIXED           |
-| 1-B      | `hooks/tool-interceptor.js`    | BUG-TI-001, BUG-TI-002     | ✅ N/A (funcional)       |
-| 1-C      | `hooks/factory.js`             | BUG-HOOK-001, GAP-HOOK-001 | ✅ N/A / ⬜ GAP-HOOK-001 |
-| 1-D      | `hooks/presets/interactive.js` | INC-HOOKS-001 (preset)     | ✅ FIXED                 |
-| 1-E      | `hooks/presets/safe.js`        | INC-HOOKS-001 (preset)     | ✅ FIXED                 |
-| 1-F      | `hooks/permission-handler.js`  | BUG-PERM-001               | ✅ N/A (waterfall ok)    |
-| 1-G      | `hooks/user-input.js`          | BUG-UI-001, BUG-UI-002     | ✅ FIXED / N/A           |
-| 1-H      | `hooks/registry.js`            | ARCH-REG-001, GAP-REG-001  | ⬜ ARCH / ✅ N/A         |
-| 1-I      | `hooks/session-lifecycle.js`   | ARCH-SL-001, UPG-SL-001    | ⬜ ARCH / ⬜ UPG         |
-| 1-J      | `hooks/prompt-transformer.js`  | SEC-PT-001                 | ✅ FIXED                 |
-| 1-K      | `hooks/types.js`               | GAP-TYPES-001              | ✅ FIXED                 |
-| 1-L      | `hooks/index.js`               | ARCH-HOOK-002              | ⬜ ARCH                  |
+| Sub-fase | Arquivo                        | Issues                     | Status                |
+| -------- | ------------------------------ | -------------------------- | --------------------- |
+| 1-A      | `hooks/presets/deny-all.js`    | BUG-DA-001 + INC-HOOKS-001 | ✅ N/A + FIXED        |
+| 1-B      | `hooks/tool-interceptor.js`    | BUG-TI-001, BUG-TI-002     | ✅ N/A (funcional)    |
+| 1-C      | `hooks/factory.js`             | BUG-HOOK-001, GAP-HOOK-001 | ✅ N/A / ✅ N/A       |
+| 1-D      | `hooks/presets/interactive.js` | INC-HOOKS-001 (preset)     | ✅ FIXED              |
+| 1-E      | `hooks/presets/safe.js`        | INC-HOOKS-001 (preset)     | ✅ FIXED              |
+| 1-F      | `hooks/permission-handler.js`  | BUG-PERM-001               | ✅ N/A (waterfall ok) |
+| 1-G      | `hooks/user-input.js`          | BUG-UI-001, BUG-UI-002     | ✅ FIXED / N/A        |
+| 1-H      | `hooks/registry.js`            | ARCH-REG-001, GAP-REG-001  | ✅ FIXED / ✅ N/A     |
+| 1-I      | `hooks/session-lifecycle.js`   | ARCH-SL-001, UPG-SL-001    | ✅ N/A / ✅ FIXED     |
+| 1-J      | `hooks/prompt-transformer.js`  | SEC-PT-001                 | ✅ FIXED              |
+| 1-K      | `hooks/types.js`               | GAP-TYPES-001              | ✅ FIXED              |
+| 1-L      | `hooks/index.js`               | ARCH-HOOK-002              | ✅ FIXED              |
 
 ### FASE 2 — Módulo: routes/ + api/ (Broken Access Control)
 
@@ -81,81 +81,81 @@ referência**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
 | -------- | ------------------------- | ------------------------------------------- | -------------------- |
 | 2-A      | `routes/sessions.js`      | SEC-ROUTE-001, BUG-ROUTE-001, INC-ROUTE-001 | ✅ FIXED / N/A / N/A |
 | 2-B      | `routes/agent.js`         | BUG-ROUTE-002                               | ✅ N/A               |
-| 2-C      | `routes/observability.js` | GAP-ROUTE-001                               | ⬜ GAP P4            |
+| 2-C      | `routes/observability.js` | GAP-ROUTE-001                               | ✅ FIXED             |
 | 2-D      | `routes/webhooks.js`      | GAP-ROUTE-002                               | ✅ FIXED             |
 | 2-E      | `routes/hooks.js`         | GAP-ROUTE-003                               | ✅ N/A               |
 | 2-F      | `routes/client.js`        | INC-ROUTE-001                               | ✅ N/A               |
 | 2-G      | `api/bridge-control.js`   | SEC-API-001, BUG-API-002                    | ✅ FIXED / FIXED     |
 | 2-H      | `api/bridge-tasks.js`     | BUG-API-001                                 | ✅ N/A               |
-| 2-I      | `api/bridge-stream.js`    | INC-API-001, GAP-API-002                    | ✅ FIXED / ⬜ GAP    |
-| 2-J      | `api/bridge-dialog.js`    | GAP-API-001                                 | ⬜ GAP P4            |
+| 2-I      | `api/bridge-stream.js`    | INC-API-001, GAP-API-002                    | ✅ FIXED / ✅ FIXED  |
+| 2-J      | `api/bridge-dialog.js`    | GAP-API-001                                 | ✅ N/A               |
 
 ### FASE 3 — Módulo: tools/ (Path Traversal)
 
-| Sub-fase | Arquivo                        | Issues                                       | Status                    |
-| -------- | ------------------------------ | -------------------------------------------- | ------------------------- |
-| 3-A      | `tools/shell/index.js`         | SEC-TOOLS-001                                | ✅ FIXED                  |
-| 3-B      | `tools/file/write-tools.js`    | SEC-TOOLS-002                                | ✅ FIXED                  |
-| 3-C      | `tools/file/read-tools.js`     | PERF-TOOLS-002                               | ⬜ PERF P4                |
-| 3-D      | `tools/git-tools.js`           | BUG-TOOLS-002                                | ✅ N/A                    |
-| 3-E      | `tools/todo/store.js`          | BUG-TOOLS-001, PERF-TOOLS-001, GAP-TOOLS-002 | ✅ N/A / ⬜ PERF / ⬜ GAP |
-| 3-F      | `tools/web-tools.js`           | SEC-TOOLS-003                                | ✅ FIXED                  |
-| 3-G      | `tools/session-rpc-tools.js`   | GAP-TOOLS-003                                | ⬜ GAP P4                 |
-| 3-H      | `tools/introspection-tools.js` | GAP-TOOLS-004                                | ✅ FIXED                  |
-| 3-I      | `tools/tool-factory.js`        | ARCH-TOOLS-001                               | ⬜ ARCH P4                |
-| 3-J      | `tools/index.js`               | GAP-TOOLS-001                                | ⬜ GAP P4                 |
+| Sub-fase | Arquivo                        | Issues                                       | Status                   |
+| -------- | ------------------------------ | -------------------------------------------- | ------------------------ |
+| 3-A      | `tools/shell/index.js`         | SEC-TOOLS-001                                | ✅ FIXED                 |
+| 3-B      | `tools/file/write-tools.js`    | SEC-TOOLS-002                                | ✅ FIXED                 |
+| 3-C      | `tools/file/read-tools.js`     | PERF-TOOLS-002                               | ✅ N/A                   |
+| 3-D      | `tools/git-tools.js`           | BUG-TOOLS-002                                | ✅ N/A                   |
+| 3-E      | `tools/todo/store.js`          | BUG-TOOLS-001, PERF-TOOLS-001, GAP-TOOLS-002 | ✅ N/A / ✅ N/A / ✅ N/A |
+| 3-F      | `tools/web-tools.js`           | SEC-TOOLS-003                                | ✅ FIXED                 |
+| 3-G      | `tools/session-rpc-tools.js`   | GAP-TOOLS-003                                | ✅ FIXED                 |
+| 3-H      | `tools/introspection-tools.js` | GAP-TOOLS-004                                | ✅ FIXED                 |
+| 3-I      | `tools/tool-factory.js`        | ARCH-TOOLS-001                               | ✅ N/A                   |
+| 3-J      | `tools/index.js`               | GAP-TOOLS-001                                | ✅ N/A                   |
 
 ### FASE 4 — Módulo: lib/ + config/ (SSRF + env_read)
 
-| Sub-fase | Arquivo                         | Issues                      | Status             |
-| -------- | ------------------------------- | --------------------------- | ------------------ |
-| 4-A      | `lib/url-validator.js`          | SEC-LIB-001                 | ✅ FIXED           |
-| 4-B      | `lib/sdk-client.js`             | BUG-LIB-001, PERF-LIB-001   | ✅ NOTED / ⬜ PERF |
-| 4-C      | `lib/session.js`                | BUG-LIB-002                 | ✅ N/A             |
-| 4-D      | `lib/models.js`                 | GAP-LIB-002                 | ✅ N/A             |
-| 4-E      | `lib/agents.js`                 | GAP-LIB-003                 | ✅ N/A             |
-| 4-F      | `lib/tools-registry.js`         | GAP-LIB-001, INC-LIB-001    | ✅ N/A / ⬜ INC    |
-| 4-G      | `config/tools/custom-tools.js`  | C12-02 (env_read allowlist) | ✅ FIXED           |
-| 4-H      | `config/system-prompt.js`       | C12-03                      | ✅ FIXED           |
-| 4-I      | `config/index.js`               | INC-CONF-001                | ✅ N/A             |
-| 4-J      | `config/pinned-files-loader.js` | GAP-CONF-001                | ✅ N/A             |
-| 4-K      | `config/mcp-servers.js`         | GAP-CONF-002                | ✅ FIXED           |
-| 4-L      | `config/tools/sdk-tools.js`     | GAP-CONF-003                | ✅ N/A             |
-| 4-M      | `config/system-prompt.js`       | ARCH-CONF-001               | ⬜ ARCH P4         |
+| Sub-fase | Arquivo                         | Issues                      | Status                 |
+| -------- | ------------------------------- | --------------------------- | ---------------------- |
+| 4-A      | `lib/url-validator.js`          | SEC-LIB-001                 | ✅ FIXED               |
+| 4-B      | `lib/sdk-client.js`             | BUG-LIB-001, PERF-LIB-001   | ✅ NOTED / ✅ ACCEPTED |
+| 4-C      | `lib/session.js`                | BUG-LIB-002                 | ✅ N/A                 |
+| 4-D      | `lib/models.js`                 | GAP-LIB-002                 | ✅ N/A                 |
+| 4-E      | `lib/agents.js`                 | GAP-LIB-003                 | ✅ N/A                 |
+| 4-F      | `lib/tools-registry.js`         | GAP-LIB-001, INC-LIB-001    | ✅ N/A / ✅ ACCEPTED   |
+| 4-G      | `config/tools/custom-tools.js`  | C12-02 (env_read allowlist) | ✅ FIXED               |
+| 4-H      | `config/system-prompt.js`       | C12-03                      | ✅ FIXED               |
+| 4-I      | `config/index.js`               | INC-CONF-001                | ✅ N/A                 |
+| 4-J      | `config/pinned-files-loader.js` | GAP-CONF-001                | ✅ N/A                 |
+| 4-K      | `config/mcp-servers.js`         | GAP-CONF-002                | ✅ FIXED               |
+| 4-L      | `config/tools/sdk-tools.js`     | GAP-CONF-003                | ✅ N/A                 |
+| 4-M      | `config/system-prompt.js`       | ARCH-CONF-001               | ✅ N/A                 |
 
 ### FASE 5 — Módulo: agent/ (Memory Leaks + Race Conditions)
 
-| Sub-fase | Arquivo                          | Issues                                                                        | Status                           |
-| -------- | -------------------------------- | ----------------------------------------------------------------------------- | -------------------------------- |
-| 5-A      | `agent/always-alive.js`          | LEAK-AGENT-001/002, RACE-AGENT-001/002/003, ARCH-AGENT-001, BUG-AGENT-007/008 | ✅ LEAK/RACE/BUG FIXED / ⬜ ARCH |
-| 5-B      | `agent/state-io.js`              | RACE-AGENT-001/002/003, PERF-AGENT-001/002/003                                | ✅ RACE FIXED / ⬜ PERF          |
-| 5-C      | `agent/entry.js`                 | BUG-AGENT-006                                                                 | ✅ FIXED                         |
-| 5-D      | `agent/webhook-manager.js`       | SEC-AGENT-003/004/005, GAP-AGENT-009                                          | ✅ SEC FIXED / ⬜ GAP            |
-| 5-E      | `agent/session-initializer.js`   | SEC-AGENT-004                                                                 | ✅ N/A                           |
-| 5-F      | `agent/tool-audit-logger.js`     | PERF-AGENT-004                                                                | ⬜ PERF P4                       |
-| 5-G      | `agent/session-event-wirer.js`   | BUG-AGENT-008                                                                 | ✅ N/A                           |
-| 5-H      | `agent/task-executor.js`         | GAP-AGENT-010                                                                 | ⬜ GAP P4                        |
-| 5-I      | `agent/permission-controller.js` | GAP-AGENT-011                                                                 | ⬜ GAP P4                        |
-| 5-J      | `agent/index.js`                 | ARCH-AGENT-002, GAP-AGENT-007/008                                             | ✅ GAP FIXED / ⬜ ARCH           |
+| Sub-fase | Arquivo                          | Issues                                                                        | Status                                    |
+| -------- | -------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------- |
+| 5-A      | `agent/always-alive.js`          | LEAK-AGENT-001/002, RACE-AGENT-001/002/003, ARCH-AGENT-001, BUG-AGENT-007/008 | ✅ LEAK/RACE/BUG FIXED / ✅ ARCH ACCEPTED |
+| 5-B      | `agent/state-io.js`              | RACE-AGENT-001/002/003, PERF-AGENT-001/002/003                                | ✅ RACE FIXED / ✅ PERF N/A               |
+| 5-C      | `agent/entry.js`                 | BUG-AGENT-006                                                                 | ✅ FIXED                                  |
+| 5-D      | `agent/webhook-manager.js`       | SEC-AGENT-003/004/005, GAP-AGENT-009                                          | ✅ SEC FIXED / ✅ GAP FIXED               |
+| 5-E      | `agent/session-initializer.js`   | SEC-AGENT-004                                                                 | ✅ N/A                                    |
+| 5-F      | `agent/tool-audit-logger.js`     | PERF-AGENT-004                                                                | ✅ N/A                                    |
+| 5-G      | `agent/session-event-wirer.js`   | BUG-AGENT-008                                                                 | ✅ N/A                                    |
+| 5-H      | `agent/task-executor.js`         | GAP-AGENT-010                                                                 | ✅ N/A                                    |
+| 5-I      | `agent/permission-controller.js` | GAP-AGENT-011                                                                 | ✅ N/A                                    |
+| 5-J      | `agent/index.js`                 | ARCH-AGENT-002, GAP-AGENT-007/008                                             | ✅ GAP FIXED / ✅ ARCH ACCEPTED           |
 
 ### FASE 6 — Módulo: observability/ (God Module + Leaks)
 
-| Sub-fase | Arquivo                                 | Issues                                   | Status                       |
-| -------- | --------------------------------------- | ---------------------------------------- | ---------------------------- |
-| 6-A      | `observability/event-collector.js`      | LEAK-OBS-001, ARCH-OBS-003, PERF-OBS-001 | ✅ LEAK/PERF FIXED / ⬜ ARCH |
-| 6-B      | `observability/agent-event-observer.js` | LEAK-OBS-002                             | ✅ FIXED                     |
-| 6-C      | `observability/audit-log.js`            | BUG-OBS-001                              | ✅ FIXED                     |
-| 6-D      | `observability/error-tracker.js`        | BUG-OBS-002                              | ✅ NOTED (cosmético)         |
-| 6-E      | `observability/metrics.js`              | GAP-OBS-001, PERF-OBS-002                | ⬜ GAP + PERF                |
-| 6-F      | `observability/otel.js`                 | GAP-OBS-002                              | ⬜ GAP P4                    |
-| 6-G      | `observability/` (desacoplamento)       | ARCH-OBS-001/002 (criar contracts.js)    | ⬜ ARCH (god module)         |
+| Sub-fase | Arquivo                                 | Issues                                   | Status                             |
+| -------- | --------------------------------------- | ---------------------------------------- | ---------------------------------- |
+| 6-A      | `observability/event-collector.js`      | LEAK-OBS-001, ARCH-OBS-003, PERF-OBS-001 | ✅ LEAK/PERF FIXED / ✅ ARCH FIXED |
+| 6-B      | `observability/agent-event-observer.js` | LEAK-OBS-002                             | ✅ FIXED                           |
+| 6-C      | `observability/audit-log.js`            | BUG-OBS-001                              | ✅ FIXED                           |
+| 6-D      | `observability/error-tracker.js`        | BUG-OBS-002                              | ✅ NOTED (cosmético)               |
+| 6-E      | `observability/metrics.js`              | GAP-OBS-001, PERF-OBS-002                | ✅ N/A / ✅ N/A                    |
+| 6-F      | `observability/otel.js`                 | GAP-OBS-002                              | ✅ N/A                             |
+| 6-G      | `observability/` (desacoplamento)       | ARCH-OBS-001/002 (criar contracts.js)    | ✅ ACCEPTED (god module)           |
 
 ### FASE 7 — Módulo: db/ (FTS5 Triggers)
 
-| Sub-fase | Arquivo            | Issues                                            | Status                         |
-| -------- | ------------------ | ------------------------------------------------- | ------------------------------ |
-| 7-A      | `db/migrations.js` | DB-P3-01, DB-P4-02/03/04 (migration v7 corretiva) | ✅ DB-P3-01 FIXED / ⬜ DB-P4   |
-| 7-B      | `db/sqlite.js`     | DB-P4-01 (documentação + SIGTERM handler)         | ✅ SIGTERM FIXED / ⬜ DB-P4-01 |
+| Sub-fase | Arquivo            | Issues                                            | Status                                 |
+| -------- | ------------------ | ------------------------------------------------- | -------------------------------------- |
+| 7-A      | `db/migrations.js` | DB-P3-01, DB-P4-02/03/04 (migration v7 corretiva) | ✅ DB-P3-01 FIXED / ✅ DB-P4 N/A/A     |
+| 7-B      | `db/sqlite.js`     | DB-P4-01 (documentação + SIGTERM handler)         | ✅ SIGTERM FIXED / ✅ DB-P4-01 N/A N/A |
 
 ### FASE 8 — Módulo: terminal/ (30 achados P3/P4)
 
@@ -181,17 +181,17 @@ referência**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-FULL-AUDIT-PLAN.md` v2.0
 | 9-B      | `bridges/mcp-tool-bridge.js`    | B10-01, B10-02              | ✅ ALL FIXED                      |
 | 9-C      | `conversation-hub/socket-ns.js` | C11-01, C11-02              | ✅ C11-01 FIXED / ✅ C11-02 FIXED |
 | 9-D      | `conversation-hub/store.js`     | C11-03                      | ✅ FIXED                          |
-| 9-E      | `channel/inject.js`             | LEAK-CHAN-001, GAP-CHAN-002 | ✅ LEAK FIXED / ⬜ GAP            |
-| 9-F      | `channel/client.js`             | BUG-CHAN-001, GAP-CHAN-001  | ✅ BUG FIXED / ⬜ GAP             |
+| 9-E      | `channel/inject.js`             | LEAK-CHAN-001, GAP-CHAN-002 | ✅ LEAK FIXED / ✅ GAP FIXED      |
+| 9-F      | `channel/client.js`             | BUG-CHAN-001, GAP-CHAN-001  | ✅ BUG FIXED / ✅ GAP FIXED       |
 
 ### FASE 10 — Módulos: core/ + types/ + P5 cosmético
 
-| Sub-fase | Arquivo                       | Issues                                   | Status                                      |
-| -------- | ----------------------------- | ---------------------------------------- | ------------------------------------------- |
-| 10-A     | `core/constants.js`           | INC-CORE-001, GAP-CORE-001, INC-CORE-002 | ✅ INC/GAP FIXED / ⬜ INC-CORE-002 ARCH     |
-| 10-B     | `types/structured-message.js` | TYPES-P4-01, TYPES-P4-02, TYPES-P4-03    | ⬜ TYPES-P4-01 / ✅ 02 ACCEPTED / ✅ 03 N/A |
-| 10-C     | `types/sdk.js`                | TYPES-P4-04                              | ✅ N/A                                      |
-| 10-D     | P5 cosméticos (todos módulos) | T-18 a T-29, naming conventions          | ✅ ALL FIXED                                |
+| Sub-fase | Arquivo                       | Issues                                   | Status                                              |
+| -------- | ----------------------------- | ---------------------------------------- | --------------------------------------------------- |
+| 10-A     | `core/constants.js`           | INC-CORE-001, GAP-CORE-001, INC-CORE-002 | ✅ INC/GAP FIXED / ✅ INC-CORE-002 N/A              |
+| 10-B     | `types/structured-message.js` | TYPES-P4-01, TYPES-P4-02, TYPES-P4-03    | ✅ TYPES-P4-01 N/A N/A / ✅ 02 ACCEPTED / ✅ 03 N/A |
+| 10-C     | `types/sdk.js`                | TYPES-P4-04                              | ✅ N/A                                              |
+| 10-D     | P5 cosméticos (todos módulos) | T-18 a T-29, naming conventions          | ✅ ALL FIXED                                        |
 
 > **Critério**: Broken Access Control (OWASP #1), SSRF, Path Traversal, Security Bypass. Todas as
 > fixes devem ser acompanhadas de testes de regressão.
