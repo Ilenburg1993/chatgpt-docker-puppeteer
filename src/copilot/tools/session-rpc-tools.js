@@ -56,6 +56,13 @@ function getRpc() {
 }
 
 /**
+ * Timeout padrão para chamadas RPC (ms). GAP-TOOLS-003.
+ *
+ * @type {number}
+ */
+const RPC_TIMEOUT_MS = Number(process.env['COPILOT_RPC_TIMEOUT_MS']) || 30_000;
+
+/**
  * Executa uma operação RPC com checagem de disponibilidade e tratamento de erros padronizado.
  *
  * @template T
@@ -67,7 +74,14 @@ async function wrapRpc(toolName, fn) {
     const r = getRpc();
     if (!r.ok) return { error: r.error };
     try {
-        return await fn(r.rpc);
+        // GAP-TOOLS-003: timeout para evitar RPC travada indefinidamente
+        const result = await Promise.race([
+            fn(r.rpc),
+            new Promise((_resolve, reject) =>
+                setTimeout(() => reject(new Error(`RPC timeout (${RPC_TIMEOUT_MS}ms)`)), RPC_TIMEOUT_MS),
+            ),
+        ]);
+        return /** @type {T} */ (result);
     } catch (/** @type {any} */ e) {
         log('ERROR', `[${toolName}] ${e.message}`);
         return { error: e.message };

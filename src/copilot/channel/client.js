@@ -478,14 +478,15 @@ export class LlmBridgeClient {
     /**
      * Encerra o modo de diálogo direto, sinalizando STOP_DIALOG para LLM-B.
      *
-     * DL-PERM: autorizado internamente para uso pelo watchdog e mecanismos de restart do sistema. Usa reason
-     * 'watchdog_restart' para que o handler em index.js saiba que deve reiniciar.
+     * DL-PERM: autorizado internamente para uso pelo watchdog e mecanismos de restart do sistema.
      *
+     * @param {string} [reason='watchdog_restart'] - Motivo do encerramento (GAP-CHAN-001). Default is
+     *   `'watchdog_restart'`
      * @returns {Promise<void>}
      */
-    async stopDialogMode() {
-        await requireAgent().stopDialogLoop({ authorized: true, reason: 'watchdog_restart' });
-        log('INFO', '[LlmBridgeClient] Modo diálogo encerrado (restart autorizado do sistema).');
+    async stopDialogMode(reason = 'watchdog_restart') {
+        await requireAgent().stopDialogLoop({ authorized: true, reason });
+        log('INFO', `[LlmBridgeClient] Modo diálogo encerrado (reason=${reason}).`);
     }
 
     /**

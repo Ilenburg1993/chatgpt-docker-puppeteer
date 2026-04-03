@@ -241,14 +241,20 @@ export class WebhookManager {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
                 try {
-                    await fetch(url, {
+                    const resp = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body,
                         signal: controller.signal,
                     });
+                    // GAP-AGENT-009: diferenciar erros HTTP (4xx/5xx) de sucesso
+                    if (!resp.ok) {
+                        log('WARN', `[WebhookManager] ${id} HTTP ${resp.status} de ${url}`);
+                    }
                 } catch (/** @type {any} */ e) {
-                    log('WARN', `[WebhookManager] ${id} falhou ao notificar ${url}: ${e.message}`);
+                    // GAP-AGENT-009: distinguir timeout de erro de rede
+                    const reason = e.name === 'AbortError' ? 'timeout' : 'network';
+                    log('WARN', `[WebhookManager] ${id} falhou (${reason}) ao notificar ${url}: ${e.message}`);
                 } finally {
                     clearTimeout(timeoutId);
                 }

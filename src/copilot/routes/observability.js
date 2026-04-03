@@ -90,6 +90,16 @@ router.get('/observability/health', (req, res) =>
 router.get('/observability/metrics', (req, res) =>
     withErrorHandler(req, res, async () => {
         const summary = defaultMetrics.getSummary();
+        // GAP-ROUTE-001: filtro opcional por prefixo de counter (ex: ?prefix=tool.)
+        const prefix = typeof req.query?.['prefix'] === 'string' ? req.query['prefix'] : '';
+        if (prefix && summary.counters) {
+            /** @type {Record<string, number>} */
+            const filtered = {};
+            for (const [k, v] of Object.entries(summary.counters)) {
+                if (k.startsWith(prefix)) filtered[k] = v;
+            }
+            return res.json({ ok: true, ...summary, counters: filtered });
+        }
         res.json({ ok: true, ...summary });
     }),
 );

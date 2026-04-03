@@ -59,16 +59,18 @@ export function registerStreamRoutes(bridge, agent) {
     bridge.get('/stream', (/** @type {Req} */ req, /** @type {Res} */ res) => {
         // G2-API-10: filtro de eventos por query param ?events=task.*,dialog.* (opcional)
         // Se não fornecido, todos os eventos são entregues (backward-compatible).
+        // GAP-API-002: suporte a wildcard simples (ex: "task.*" matcha "task.started", "task.delta", etc.)
         const eventsParam = typeof req.query?.['events'] === 'string' ? req.query['events'].trim() : '';
-        /** @type {Set<string> | null} */
-        let allowedEvents = null;
+        /** @type {((evt: string) => boolean) | null} */
+        let eventFilter = null;
         if (eventsParam) {
-            allowedEvents = new Set(
-                eventsParam
-                    .split(',')
-                    .map((e) => e.trim())
-                    .filter(Boolean),
-            );
+            const patterns = eventsParam
+                .split(',')
+                .map((e) => e.trim())
+                .filter(Boolean);
+            const exact = new Set(patterns.filter((p) => !p.includes('*')));
+            const prefixes = patterns.filter((p) => p.endsWith('.*')).map((p) => p.slice(0, -1)); // 'task.*' → 'task.'
+            eventFilter = (evt) => exact.has(evt) || prefixes.some((pfx) => evt.startsWith(pfx));
         }
 
         res.setHeader('Content-Type', 'text/event-stream');
@@ -110,7 +112,7 @@ export function registerStreamRoutes(bridge, agent) {
 
         /** @type {Map<AgentEventName, (data: unknown) => void>} */
         const handlers = new Map(
-            AGENT_EVENTS.filter((evt) => !allowedEvents || allowedEvents.has(evt)).map((evt) => [
+            AGENT_EVENTS.filter((evt) => !eventFilter || eventFilter(evt)).map((evt) => [
                 evt,
                 /** @type {(data: unknown) => void} */ (sseHandler.bind(null, evt)),
             ]),

@@ -30,8 +30,15 @@ import { log } from '#copilot/observability/logger';
 import http from 'node:http';
 import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';
 
-/** Porta padrão do terminal LLM-B. */
-const DEFAULT_PORT = Number(process.env['LLM_B_TERMINAL_PORT'] ?? 3009);
+/** Porta padrão do terminal LLM-B. GAP-CHAN-002: validação de range. */
+const DEFAULT_PORT = (() => {
+    const raw = Number(process.env['LLM_B_TERMINAL_PORT'] ?? 3009);
+    if (!Number.isInteger(raw) || raw < 1 || raw > 65535) {
+        log('WARN', `[channel/inject] LLM_B_TERMINAL_PORT inválida (${raw}), usando 3009`);
+        return 3009;
+    }
+    return raw;
+})();
 
 /** Timeout padrão para aguardar resposta (ms). */
 const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
