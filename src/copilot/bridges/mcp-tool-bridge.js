@@ -27,7 +27,8 @@ import { defineTool } from '@github/copilot-sdk';
 import { z } from 'zod';
 
 /** Porta do servidor local (fallback: 3008). */
-const MCP_PORT = process.env['PORT'] ?? '3008';
+// FINDING-P4-2: usar MCP_PORT dedicado com fallback para PORT genérico e 3008
+const MCP_PORT = process.env['MCP_PORT'] ?? process.env['PORT'] ?? '3008';
 const MCP_BASE = `http://127.0.0.1:${MCP_PORT}/api/mcp`;
 
 // UPG-02: Circuit Breaker para chamadas ao MCP Tool Registry
@@ -162,10 +163,26 @@ function buildZodSchema(inputSchema, parentRequired, key) {
 
     if (!schema) return z.unknown();
 
-    // BUG-H08 (fix): suporte a allOf/oneOf/anyOf (composição de schemas JSON Schema)
+    // FINDING-P4-1: allOf — merge de properties/required de todos os schemas
     if (Array.isArray(schema.allOf) && schema.allOf.length > 0) {
-        // allOf: interseção — usamos o primeiro schema como base (simplificação segura)
-        return buildZodSchema(/** @type {JsonSchemaFragment} */ (schema.allOf[0]), parentRequired, key);
+        if (schema.allOf.length === 1) {
+            return buildZodSchema(/** @type {JsonSchemaFragment} */ (schema.allOf[0]), parentRequired, key);
+        }
+        // Merge recursivo: combinar properties e required de todos os schemas
+        /** @type {Record<string, object>} */
+        const mergedProps = {};
+        /** @type {string[]} */
+        const mergedRequired = [];
+        for (const s of schema.allOf) {
+            const sub = /** @type {JsonSchemaFragment} */ (s);
+            if (sub.properties) Object.assign(mergedProps, sub.properties);
+            if (Array.isArray(sub.required)) mergedRequired.push(...sub.required);
+        }
+        return buildZodSchema(
+            /** @type {JsonSchemaFragment} */ ({ type: 'object', properties: mergedProps, required: mergedRequired }),
+            parentRequired,
+            key,
+        );
     }
     if (Array.isArray(schema.oneOf) && schema.oneOf.length > 0) {
         const options = schema.oneOf.map((/** @type {object} */ s) => buildZodSchema(s));

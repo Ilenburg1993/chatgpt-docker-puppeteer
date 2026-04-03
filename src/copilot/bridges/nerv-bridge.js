@@ -123,6 +123,14 @@ const _listeners = new Map();
 let _beforeStopRegistered = false;
 
 /**
+ * B10-03: rastrear o handler once('ready') pendente para poder removê-lo em unmount() antes do disparo. Evita
+ * re-anexação de listeners após bridge ter sido desmontado.
+ *
+ * @type {(() => void) | null}
+ */
+let _pendingReadyHandler = null;
+
+/**
  * Cria um envelope simples para emissão no NERV.
  *
  * @param {string} actionCode
@@ -222,14 +230,18 @@ export function mount(nerv) {
 function _onAgentBeforeStop() {
     log('INFO', '[nerv-bridge] Agente sinalizou before-stop — removendo listeners temporariamente.');
     _detachListeners();
-    // Ao reiniciar, o agente emite 'ready'; re-registramos UMA vez.
-    alwaysAliveAgent.once('ready', () => {
+    // B10-03: armazenar handler para que unmount() possa cancelar o once() se bridge for desmontado
+    // antes do agente emitir 'ready'.
+    _pendingReadyHandler = () => {
+        _pendingReadyHandler = null; // consumido
         if (_nerv === null) return; // bridge foi desmontado enquanto o agente reiniciava
         log('INFO', '[nerv-bridge] Agente pronto novamente — re-registrando listeners.');
         _attachListeners();
         // Reagendar o handler para o próximo ciclo de stop (flag já true, apenas re-registra)
         alwaysAliveAgent.on('before-stop', _onAgentBeforeStop);
-    });
+    };
+    // Ao reiniciar, o agente emite 'ready'; re-registramos UMA vez.
+    alwaysAliveAgent.once('ready', _pendingReadyHandler);
 }
 
 /**
@@ -240,6 +252,11 @@ function _onAgentBeforeStop() {
 export function unmount() {
     _detachListeners();
     alwaysAliveAgent.off('before-stop', _onAgentBeforeStop);
+    // B10-03: cancelar handler 'ready' pendente para evitar re-anexação após desmontagem
+    if (_pendingReadyHandler) {
+        alwaysAliveAgent.off('ready', _pendingReadyHandler);
+        _pendingReadyHandler = null;
+    }
     _beforeStopRegistered = false;
     _nerv = null;
     log('INFO', '[nerv-bridge] Bridge NERV↔AlwaysAlive desmontado.');
@@ -282,5 +299,6 @@ export const copilotNervBridge = { mount, unmount, isMounted, emitNerv };
 export function _resetNervBridgeState() {
     _nerv = null;
     _beforeStopRegistered = false;
+    _pendingReadyHandler = null;
     _listeners.clear();
 }
