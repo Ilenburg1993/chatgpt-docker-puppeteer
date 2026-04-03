@@ -244,3 +244,20 @@ export function createTimingEnricherHook() {
 
     return { onPreToolUse, onPostToolUse };
 }
+
+/**
+ * GAP-TOOLS-004: Cria um hook `onPreToolUse` que bloqueia tools desabilitadas em runtime via `isToolDisabled()` do
+ * introspection-tools.
+ *
+ * @param {(name: string) => boolean} isDisabledFn - Função que recebe o nome da tool e verifica se está desabilitado
+ * @returns {PreToolUseHandler}
+ */
+export function createRuntimeDisableHook(isDisabledFn) {
+    return async function onPreToolUse(input) {
+        if (isDisabledFn(input.toolName)) {
+            log('WARN', `[hooks/tool-interceptor] tool desabilitada em runtime: ${input.toolName}`);
+            return { permissionDecision: 'deny' };
+        }
+        return {};
+    };
+}

@@ -19,6 +19,7 @@
 
 import { log } from '#copilot/observability/logger';
 import os from 'node:os';
+import { isToolDisabled } from '../../tools/introspection-tools.js';
 import { createCircuitBreakerHandler } from '../error-handler.js';
 import { createPermissionHandler } from '../permission-handler.js';
 import { createPromptTransformer } from '../prompt-transformer.js';
@@ -141,6 +142,18 @@ export function createProductionHooks(opts = {}) {
             timestamp: Date.now(),
             input,
         });
+
+        // GAP-TOOLS-004: bloquear tools desabilitadas em runtime
+        if (isToolDisabled(toolName)) {
+            audit({
+                ts: Date.now(),
+                hookName: 'onPreToolUse',
+                sessionId: invocation?.sessionId,
+                toolName,
+                decision: 'deny',
+            });
+            return { permissionDecision: 'deny' };
+        }
 
         if (toolDenyList.includes(toolName)) {
             audit({

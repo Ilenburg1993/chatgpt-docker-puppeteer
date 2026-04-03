@@ -13,7 +13,13 @@ import { fileReadTools, fileTools, fileWriteTools } from './file/index.js';
 import { gitTools } from './git/index.js';
 import { configureHookTools, hookTools } from './hook-tools.js';
 import { hubTools, setHub } from './hub-tools.js';
-import { introspectionTools, registerForIntrospection, setTelemetryStore } from './introspection-tools.js';
+import {
+    getDisabledTools,
+    introspectionTools,
+    isToolDisabled,
+    registerForIntrospection,
+    setTelemetryStore,
+} from './introspection-tools.js';
 import { permissionTools, setPermissionAgent } from './permission-tools.js';
 import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
 import { sessionTools } from './session-tools.js';
@@ -51,10 +57,12 @@ export {
     fileReadTools,
     fileTools,
     fileWriteTools,
+    getDisabledTools,
     gitTools,
     hookTools,
     hubTools,
     introspectionTools,
+    isToolDisabled,
     permissionTools,
     registerForIntrospection,
     sessionRpcTools,

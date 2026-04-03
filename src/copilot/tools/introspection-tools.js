@@ -31,6 +31,33 @@ import { withSkipPermission } from './tool-factory.js';
 let _registeredTools = [];
 
 /**
+ * GAP-TOOLS-004: Set de tools desabilitadas em runtime. O agente pode desabilitar/habilitar tools durante a sessão via
+ * toggle_tool. O tool-interceptor consulta isToolDisabled() para bloquear chamadas a tools desabilitadas.
+ *
+ * @type {Set<string>}
+ */
+const _disabledTools = new Set();
+
+/**
+ * Verifica se uma tool está desabilitada em runtime.
+ *
+ * @param {string} name - Nome da tool
+ * @returns {boolean}
+ */
+export function isToolDisabled(name) {
+    return _disabledTools.has(name.toLowerCase());
+}
+
+/**
+ * Retorna a lista de tools desabilitadas.
+ *
+ * @returns {string[]}
+ */
+export function getDisabledTools() {
+    return [..._disabledTools];
+}
+
+/**
  * Injeta o store de telemetria — mantido por compatibilidade; uso interno migrado para defaultMetrics.
  *
  * @deprecated Use defaultMetrics diretamente.
@@ -93,6 +120,11 @@ const listToolsTool = defineTool('list_tools', {
         log('INFO', `[introspection/list_tools] category=${category ?? '*'} search=${search ?? '*'}`);
 
         let tools = _registeredTools;
+
+        // GAP-TOOLS-004: filtrar tools desabilitadas em runtime
+        if (_disabledTools.size > 0) {
+            tools = tools.filter((t) => !_disabledTools.has(t.name.toLowerCase()));
+        }
 
         if (search) {
             const term = search.toLowerCase();
@@ -248,6 +280,57 @@ const reportIntentTool = defineTool('report_intent', {
 });
 
 /**
+ * GAP-TOOLS-004: Tool toggle_tool — permite ao agente desabilitar/habilitar tools em runtime. Tools desabilitadas são
+ * bloqueadas pelo tool-interceptor e não aparecem em list_tools. Tools de introspecção (list_tools, get_agent_info,
+ * toggle_tool) não podem ser desabilitadas.
+ */
+const PROTECTED_TOOLS = new Set(['list_tools', 'get_agent_info', 'get_telemetry', 'report_intent', 'toggle_tool']);
+
+const toggleToolTool = defineTool('toggle_tool', {
+    description:
+        'Desabilita ou habilita uma tool em runtime. Tools desabilitadas são bloqueadas e não aparecem em list_tools. ' +
+        'Use para restringir temporariamente o acesso a tools durante operações sensíveis. ' +
+        'As tools de introspecção não podem ser desabilitadas.',
+    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ toolName: string; enabled: boolean }>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                toolName: z.string().describe('Nome da tool a habilitar/desabilitar'),
+                enabled: z.boolean().describe('true para habilitar, false para desabilitar'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ toolName: string; enabled: boolean }} */ { toolName, enabled }) => {
+        const normalized = toolName.toLowerCase();
+
+        if (PROTECTED_TOOLS.has(normalized)) {
+            log('WARN', `[introspection/toggle_tool] tool protegida não pode ser desabilitada: ${toolName}`);
+            return { success: false, reason: 'tool protegida', toolName, enabled: true };
+        }
+
+        // Verificar se a tool existe
+        const exists = _registeredTools.some((t) => t.name.toLowerCase() === normalized);
+        if (!exists) {
+            return { success: false, reason: 'tool não encontrada', toolName, enabled };
+        }
+
+        if (enabled) {
+            _disabledTools.delete(normalized);
+            log('INFO', `[introspection/toggle_tool] tool habilitada: ${toolName}`);
+        } else {
+            _disabledTools.add(normalized);
+            log('INFO', `[introspection/toggle_tool] tool desabilitada: ${toolName}`);
+        }
+
+        return {
+            success: true,
+            toolName,
+            enabled,
+            disabledTools: [..._disabledTools],
+        };
+    },
+});
+
+/**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
 export const introspectionTools = [
@@ -255,4 +338,5 @@ export const introspectionTools = [
     withSkipPermission(getAgentInfoTool),
     withSkipPermission(getTelemetryTool),
     withSkipPermission(reportIntentTool),
+    withSkipPermission(toggleToolTool),
 ];
