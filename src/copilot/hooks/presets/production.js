@@ -96,8 +96,12 @@ export function createProductionHooks(opts = {}) {
         if (auditSink) {
             try {
                 auditSink(entry);
-            } catch (_) {
-                // ignora erros no sink
+            } catch (sinkError) {
+                // UPG-PROD-001: falha no sink não deve ser silenciosa — registra via logger core
+                log(
+                    'WARN',
+                    `[preset/production] auditSink falhou para ${entry.hookName}: ${/** @type {Error} */ (sinkError).message ?? sinkError}`,
+                );
             }
         } else {
             log(
