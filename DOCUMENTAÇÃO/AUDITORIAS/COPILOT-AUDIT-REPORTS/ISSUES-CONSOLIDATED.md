@@ -30,36 +30,36 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P3 — Importantes
 
-| ID                 | Arquivo                | Título                                                                                                                                           |
-| ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ~~RACE-AGENT-001~~ | state-io.js            | ~~`writeState()` sync vs `writeStateAsync()` async race~~ **[FIXED — mutex serial implementado]**                                                |
-| ~~RACE-AGENT-002~~ | state-io.js            | ~~`writeStateAsync()` não serializa~~ **[FIXED — mutex serial garante serialização]**                                                            |
-| ~~RACE-AGENT-003~~ | state-io.js            | ~~Múltiplos callers sem mutex~~ **[FIXED — mutex compartilhado + reset em writeState sync]**                                                     |
-| ~~BUG-AGENT-006~~  | entry.js               | ~~`session.fatal` → `process.exit(1)` sem aguardar~~ **[FIXED — `drainStateWrites(3000)` + `stop()` antes de exit]**                             |
-| ~~BUG-AGENT-007~~  | always-alive.js        | ~~Abort listener não removido~~ **[N/A — não há `addEventListener` para abort; abort via AbortController.signal nativo]**                        |
-| ~~BUG-AGENT-008~~  | session-event-wirer.js | ~~cleanup não verifica se listeners adicionados~~ **[N/A — `wireSessionEvents` retorna unsubs; `always-alive` chama unsub() em stop/reconnect]** |
-| ARCH-AGENT-001     | always-alive.js        | God class — 1241 LOC, 16 achados, difícil de testar e manter                                                                                     |
-| ARCH-AGENT-002     | agent/                 | Barrel bypass — 14+ imports diretos ignoram `index.js`                                                                                           |
-| ARCH-AGENT-003     | agent/                 | 4 arquivos importam `@github/copilot-sdk` diretamente (sem façade)                                                                               |
-| ~~SEC-AGENT-003~~  | webhook-manager.js     | ~~DNS rebinding bypass~~ **[FIXED — `#checkResolvedIp` resolve DNS at delivery time + IPv6 private ranges]**                                     |
-| ~~SEC-AGENT-004~~  | session-initializer.js | ~~Env vars injetadas no prompt~~ **[N/A — env vars usadas em config, não em prompt; `close_key` sanitizada]**                                    |
-| ~~SEC-AGENT-005~~  | webhook-manager.js     | ~~`allowedDomains` case bypass~~ **[N/A — `new URL()` normaliza hostname para lowercase por spec]**                                              |
+| ID                 | Arquivo                | Título                                                                                                                                                    |
+| ------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~RACE-AGENT-001~~ | state-io.js            | ~~`writeState()` sync vs `writeStateAsync()` async race~~ **[FIXED — mutex serial implementado]**                                                         |
+| ~~RACE-AGENT-002~~ | state-io.js            | ~~`writeStateAsync()` não serializa~~ **[FIXED — mutex serial garante serialização]**                                                                     |
+| ~~RACE-AGENT-003~~ | state-io.js            | ~~Múltiplos callers sem mutex~~ **[FIXED — mutex compartilhado + reset em writeState sync]**                                                              |
+| ~~BUG-AGENT-006~~  | entry.js               | ~~`session.fatal` → `process.exit(1)` sem aguardar~~ **[FIXED — `drainStateWrites(3000)` + `stop()` antes de exit]**                                      |
+| ~~BUG-AGENT-007~~  | always-alive.js        | ~~Abort listener não removido~~ **[N/A — não há `addEventListener` para abort; abort via AbortController.signal nativo]**                                 |
+| ~~BUG-AGENT-008~~  | session-event-wirer.js | ~~cleanup não verifica se listeners adicionados~~ **[N/A — `wireSessionEvents` retorna unsubs; `always-alive` chama unsub() em stop/reconnect]**          |
+| ARCH-AGENT-001     | always-alive.js        | God class — 1241 LOC, 16 achados, difícil de testar e manter **[ACCEPTED — refactoring de alto risco; decomposição planejada para ciclo futuro]**         |
+| ARCH-AGENT-002     | agent/                 | Barrel bypass — 14+ imports diretos ignoram `index.js` **[ACCEPTED — necessário para evitar ciclos e clareza de dependência]**                            |
+| ARCH-AGENT-003     | agent/                 | 4 arquivos importam `@github/copilot-sdk` diretamente (sem façade) **[ACCEPTED — façade adicionaria indireção sem benefício; SDK é dependência estável]** |
+| ~~SEC-AGENT-003~~  | webhook-manager.js     | ~~DNS rebinding bypass~~ **[FIXED — `#checkResolvedIp` resolve DNS at delivery time + IPv6 private ranges]**                                              |
+| ~~SEC-AGENT-004~~  | session-initializer.js | ~~Env vars injetadas no prompt~~ **[N/A — env vars usadas em config, não em prompt; `close_key` sanitizada]**                                             |
+| ~~SEC-AGENT-005~~  | webhook-manager.js     | ~~`allowedDomains` case bypass~~ **[N/A — `new URL()` normaliza hostname para lowercase por spec]**                                                       |
 
 ### P4 — Informativos
 
-| ID                | Arquivo                  | Título                                                                                                                                                     |
-| ----------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PERF-AGENT-001    | state-io.js              | `readState()` usa `readFileSync` (sync I/O em cold path)                                                                                                   |
-| PERF-AGENT-002    | state-io.js              | `writeState()` usa `writeFileSync` (sync I/O)                                                                                                              |
-| PERF-AGENT-003    | always-alive.js          | `writeStateAsync` chamado por cada `usage` event — pode ser debounceable                                                                                   |
-| PERF-AGENT-004    | tool-audit-logger.js     | JSONL rotation usa `readFile` + rewrite completo em cada rotação                                                                                           |
-| ~~GAP-AGENT-005~~ | always-alive.js          | ~~`KNOWN_SDK_EVENTS` duplicado entre `always-alive.js` e `event-collector.js`~~ **[FIXED — deduplicado; agora existe apenas em `session-event-wirer.js`]** |
-| ~~GAP-AGENT-007~~ | agent/                   | ~~`session-hooks.js` re-export deprecated sem deprecation warning~~ **[FIXED — `@deprecated` JSDoc adicionado]**                                           |
-| ~~GAP-AGENT-008~~ | index.js                 | ~~Barrel re-exporta símbolos internos (`_internal*`) para consumidores externos~~ **[FIXED — sem `_internal` exports em barrel]**                          |
-| GAP-AGENT-009     | webhook-manager.js       | `tryNotify` silencia todos os erros HTTP sem diferenciação                                                                                                 |
-| GAP-AGENT-010     | task-executor.js         | Timeout de task não é configurável por tarefa individual                                                                                                   |
-| GAP-AGENT-011     | permission-controller.js | Modo `ask` sem fallback para timeout de resposta                                                                                                           |
-| ~~GAP-AGENT-012~~ | always-alive.js          | ~~`_stateCache` TTL nunca é de 0~~ **[N/A — cache invalidado corretamente via `writeState`/`writeStateAsync`/`clearState`; TTL é de leitura]**             |
+| ID                 | Arquivo                  | Título                                                                                                                                                     |
+| ------------------ | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~PERF-AGENT-001~~ | state-io.js              | ~~`readState()` usa `readFileSync` (sync I/O em cold path)~~ **[N/A — cold path only (boot/test); in-process cache evita re-reads]**                       |
+| ~~PERF-AGENT-002~~ | state-io.js              | ~~`writeState()` usa `writeFileSync` (sync I/O)~~ **[N/A — cold path only (boot/exit); hot path usa `writeStateAsync`]**                                   |
+| ~~PERF-AGENT-003~~ | always-alive.js          | ~~`writeStateAsync` chamado por cada `usage` event — pode ser debounceable~~ **[N/A — serializado via mutex; frequência dialog-turn é aceitável]**         |
+| ~~PERF-AGENT-004~~ | tool-audit-logger.js     | ~~JSONL rotation usa `readFile` + rewrite completo em cada rotação~~ **[N/A — usa `rename()` O(1), não rewrite; rotação por threshold de linhas]**         |
+| ~~GAP-AGENT-005~~  | always-alive.js          | ~~`KNOWN_SDK_EVENTS` duplicado entre `always-alive.js` e `event-collector.js`~~ **[FIXED — deduplicado; agora existe apenas em `session-event-wirer.js`]** |
+| ~~GAP-AGENT-007~~  | agent/                   | ~~`session-hooks.js` re-export deprecated sem deprecation warning~~ **[FIXED — `@deprecated` JSDoc adicionado]**                                           |
+| ~~GAP-AGENT-008~~  | index.js                 | ~~Barrel re-exporta símbolos internos (`_internal*`) para consumidores externos~~ **[FIXED — sem `_internal` exports em barrel]**                          |
+| ~~GAP-AGENT-009~~  | webhook-manager.js       | ~~`tryNotify` silencia todos os erros HTTP sem diferenciação~~ **[FIXED — diferenciação HTTP status/timeout/network com métricas específicas]**            |
+| ~~GAP-AGENT-010~~  | task-executor.js         | ~~Timeout de task não é configurável por tarefa individual~~ **[N/A — já configurável via `task.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS`]**                   |
+| ~~GAP-AGENT-011~~  | permission-controller.js | ~~Modo `ask` sem fallback para timeout de resposta~~ **[N/A — modo `ask` não existe; modos são approve_all/audit_only/selective]**                         |
+| ~~GAP-AGENT-012~~  | always-alive.js          | ~~`_stateCache` TTL nunca é de 0~~ **[N/A — cache invalidado corretamente via `writeState`/`writeStateAsync`/`clearState`; TTL é de leitura]**             |
 
 ---
 
@@ -75,28 +75,28 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P3 — Importantes
 
-| ID                | Arquivo               | Título                                                                                                                                |
-| ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~BUG-TI-002~~    | tool-interceptor.js   | ~~`timings` Map unbounded~~ **[N/A — `timings.delete(key)` chamado no post-hook; Map nunca acumula]**                                 |
-| ~~BUG-UI-001~~    | user-input.js         | ~~Queue sem limite de tamanho~~ **[FIXED — `maxSize` limit com reject quando cheio]**                                                 |
-| ~~BUG-UI-002~~    | user-input.js         | ~~Fila vazia retorna `''`~~ **[N/A — `answerNext()` retorna `false` quando vazio; `''` é para overflow de fila]**                     |
-| ~~BUG-PERM-001~~  | permission-handler.js | ~~`allowAll: true` ignora `denyTools`~~ **[N/A — waterfall verifica denyTools/denyPatterns ANTES de aprovar via allowAll]**           |
-| ~~GAP-REG-001~~   | registry.js           | ~~`SDK_HOOKS` inclui hooks não declarados em `SessionHooks` typedef~~ **[N/A — typedef ampliada; hooks estão declarados]**            |
-| ~~GAP-TYPES-001~~ | types.js              | ~~`SessionHooks` typedef não inclui `onPermissionRequest`/`onUserInputRequest`~~ **[FIXED — typedef atualizada com campos]**          |
-| ~~INC-HOOKS-001~~ | presets/              | ~~Inconsistência sistêmica: 3/5 presets divergem~~ **[FIXED — 5/5 presets retornam `{hooks, onPermissionRequest}` consistentemente]** |
-| ~~SEC-HOOK-001~~  | factory.js            | ~~`onPermissionAsk` callback é dead code~~ **[N/A — v. BUG-HOOK-001; askHandler funcional]**                                          |
-| ~~SEC-PT-001~~    | prompt-transformer.js | ~~SENSITIVE_PATTERN não detecta JWT, AWS, GitHub~~ **[FIXED — padrões JWT/AWS/ghp_/github_pat_ adicionados]**                         |
-| ARCH-HOOK-002     | index.js              | Barrel importa diretamente de `observability/` (violação de layer)                                                                    |
+| ID                | Arquivo               | Título                                                                                                                                               |
+| ----------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~BUG-TI-002~~    | tool-interceptor.js   | ~~`timings` Map unbounded~~ **[N/A — `timings.delete(key)` chamado no post-hook; Map nunca acumula]**                                                |
+| ~~BUG-UI-001~~    | user-input.js         | ~~Queue sem limite de tamanho~~ **[FIXED — `maxSize` limit com reject quando cheio]**                                                                |
+| ~~BUG-UI-002~~    | user-input.js         | ~~Fila vazia retorna `''`~~ **[N/A — `answerNext()` retorna `false` quando vazio; `''` é para overflow de fila]**                                    |
+| ~~BUG-PERM-001~~  | permission-handler.js | ~~`allowAll: true` ignora `denyTools`~~ **[N/A — waterfall verifica denyTools/denyPatterns ANTES de aprovar via allowAll]**                          |
+| ~~GAP-REG-001~~   | registry.js           | ~~`SDK_HOOKS` inclui hooks não declarados em `SessionHooks` typedef~~ **[N/A — typedef ampliada; hooks estão declarados]**                           |
+| ~~GAP-TYPES-001~~ | types.js              | ~~`SessionHooks` typedef não inclui `onPermissionRequest`/`onUserInputRequest`~~ **[FIXED — typedef atualizada com campos]**                         |
+| ~~INC-HOOKS-001~~ | presets/              | ~~Inconsistência sistêmica: 3/5 presets divergem~~ **[FIXED — 5/5 presets retornam `{hooks, onPermissionRequest}` consistentemente]**                |
+| ~~SEC-HOOK-001~~  | factory.js            | ~~`onPermissionAsk` callback é dead code~~ **[N/A — v. BUG-HOOK-001; askHandler funcional]**                                                         |
+| ~~SEC-PT-001~~    | prompt-transformer.js | ~~SENSITIVE_PATTERN não detecta JWT, AWS, GitHub~~ **[FIXED — padrões JWT/AWS/ghp_/github_pat_ adicionados]**                                        |
+| ARCH-HOOK-002     | index.js              | Barrel importa diretamente de `observability/` (violação de layer) **[FIXED — hooks/presets/audit.js é a fonte canônica; obs/ re-exporta via stub]** |
 
 ### P4 — Informativos
 
-| ID           | Arquivo               | Título                                                        |
-| ------------ | --------------------- | ------------------------------------------------------------- |
-| ARCH-REG-001 | registry.js           | `SDK_HOOKS` singleton mutável sem `Object.freeze`             |
-| ARCH-SL-001  | session-lifecycle.js  | Singletons `defaultMetrics`/`defaultAuditLog` module-level    |
-| UPG-PROD-001 | presets/production.js | `auditSink` falha silenciosamente sem telemetria              |
-| UPG-SL-001   | session-lifecycle.js  | `COPILOT_FALLBACK_MODEL` hardcoded em lugar de config central |
-| GAP-HOOK-001 | factory.js            | `modifiedArgs` capability ausente em `createHooks`            |
+| ID               | Arquivo               | Título                                                                                                                           |
+| ---------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| ~~ARCH-REG-001~~ | registry.js           | ~~`SDK_HOOKS` singleton mutável sem `Object.freeze`~~ **[FIXED — Object.freeze aplicado]**                                       |
+| ~~ARCH-SL-001~~  | session-lifecycle.js  | ~~Singletons `defaultMetrics`/`defaultAuditLog` module-level~~ **[N/A — padrão standard Node.js para singletons de módulo]**     |
+| ~~UPG-PROD-001~~ | presets/production.js | ~~`auditSink` falha silenciosamente sem telemetria~~ **[FIXED — log WARN + metrics.increment('audit.sink_error')]**              |
+| ~~UPG-SL-001~~   | session-lifecycle.js  | ~~`COPILOT_FALLBACK_MODEL` hardcoded em lugar de config central~~ **[FIXED — `getCopilotFallbackModel()` em core/constants.js]** |
+| ~~GAP-HOOK-001~~ | factory.js            | ~~`modifiedArgs` capability ausente em `createHooks`~~ **[N/A — já implementado: `argsModifier` em L141-147]**                   |
 
 ---
 
@@ -111,23 +111,23 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P3 — Importantes
 
-| ID                | Arquivo         | Título                                                                                                                                       |
-| ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~BUG-TOOLS-001~~ | todo/store.js   | ~~`updateTask` não verifica existência~~ **[N/A — store opera por replacement (DELETE + re-sync via json_each), não por individual update]** |
-| ~~BUG-TOOLS-002~~ | git-tools.js    | ~~git diff path injection~~ **[N/A — `safeGitArgs` passes paths as array elements to spawn, not shell interpolated]**                        |
-| GAP-TOOLS-001     | tools/index.js  | Barrel não re-exporta todos os tipos — callers importam direto                                                                               |
-| ~~SEC-TOOLS-003~~ | web-tools.js    | ~~urlValidator não bloqueia IPv6~~ **[FIXED — usa `validateUrl` de url-validator.js que cobre IPv6 privado]**                                |
-| ARCH-TOOLS-001    | tool-factory.js | Factory recria objetos de tool a cada chamada sem memoization                                                                                |
+| ID                 | Arquivo         | Título                                                                                                                                                        |
+| ------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~BUG-TOOLS-001~~  | todo/store.js   | ~~`updateTask` não verifica existência~~ **[N/A — store opera por replacement (DELETE + re-sync via json_each), não por individual update]**                  |
+| ~~BUG-TOOLS-002~~  | git-tools.js    | ~~git diff path injection~~ **[N/A — `safeGitArgs` passes paths as array elements to spawn, not shell interpolated]**                                         |
+| ~~GAP-TOOLS-001~~  | tools/index.js  | ~~Barrel não re-exporta todos os tipos — callers importam direto~~ **[N/A — mínimas imports diretas; barrel exporta `buildTool` e `withSkipPermission`]**     |
+| ~~SEC-TOOLS-003~~  | web-tools.js    | ~~urlValidator não bloqueia IPv6~~ **[FIXED — usa `validateUrl` de url-validator.js que cobre IPv6 privado]**                                                 |
+| ~~ARCH-TOOLS-001~~ | tool-factory.js | ~~Factory recria objetos de tool a cada chamada sem memoization~~ **[N/A — tools criados uma vez no boot (cold path); memoization é premature optimization]** |
 
 ### P4 — Informativos
 
-| ID             | Arquivo                | Título                                                                    |
-| -------------- | ---------------------- | ------------------------------------------------------------------------- |
-| PERF-TOOLS-001 | todo/store.js          | Queries SQLite sem índice para `listTasks({ status })` em tabelas grandes |
-| PERF-TOOLS-002 | file/read-tools.js     | Leitura multi-file sem concorrência (sequencial)                          |
-| GAP-TOOLS-002  | todo/store.js          | Sem paginação default em `listTasks` — retorna todos os registros         |
-| GAP-TOOLS-003  | session-rpc-tools.js   | `timeout` não propagado para SDK call interno                             |
-| GAP-TOOLS-004  | introspection-tools.js | `listActiveTools` não reflete tools desabilitadas em runtime              |
+| ID                 | Arquivo                | Título                                                                                                                                                          |
+| ------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~PERF-TOOLS-001~~ | todo/store.js          | ~~Queries SQLite sem índice para `listTasks({ status })` em tabelas grandes~~ **[N/A — 4 índices já existem: status, priority, parent_id, created_at]**         |
+| ~~PERF-TOOLS-002~~ | file/read-tools.js     | ~~Leitura multi-file sem concorrência (sequencial)~~ **[N/A — SDK chama tool uma vez por arquivo; loop local é `readdirSync` + stat, não leitura de conteúdo]** |
+| ~~GAP-TOOLS-002~~  | todo/store.js          | ~~Sem paginação default em `listTasks` — retorna todos os registros~~ **[N/A — paginação já implementada: limit default 50/20, slice, has_more]**               |
+| ~~GAP-TOOLS-003~~  | session-rpc-tools.js   | ~~`timeout` não propagado para SDK call interno~~ **[FIXED — RPC_TIMEOUT_MS 15s com AbortSignal.timeout]**                                                      |
+| ~~GAP-TOOLS-004~~  | introspection-tools.js | ~~`listActiveTools` não reflete tools desabilitadas em runtime~~ **[N/A — não existe mecanismo de desabilitar tools em runtime; feature request]**              |
 
 ---
 
@@ -142,22 +142,22 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P3 — Importantes
 
-| ID              | Arquivo          | Título                                                                                                                                           |
-| --------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ARCH-OBS-001    | observability/   | God module — 87 de 171 imports cross-module apontam para observability/                                                                          |
-| BUG-OBS-001     | audit-log.js     | ~~JSONL append sem flush forçado~~ **[FIXED — `process.once('beforeExit', flush)` no singleton]**                                                |
-| ~~BUG-OBS-002~~ | error-tracker.js | ~~`captureException` sem stack normalization~~ **[NOTED P4 — stack capturado corretamente; formatação varia entre V8 versions mas é cosmético]** |
-| GAP-OBS-001     | metrics.js       | Contadores de métricas não reiniciados em reconexão — acumulação contínua                                                                        |
-| GAP-OBS-002     | otel.js          | Span exporters não configuráveis via env — hardcoded para console                                                                                |
+| ID              | Arquivo          | Título                                                                                                                                                                   |
+| --------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ARCH-OBS-001    | observability/   | God module — 87 de 171 imports cross-module apontam para observability/ **[ACCEPTED — papel fundamental de observabilidade centralizada; decomposição reduziria DX]**    |
+| BUG-OBS-001     | audit-log.js     | ~~JSONL append sem flush forçado~~ **[FIXED — `process.once('beforeExit', flush)` no singleton]**                                                                        |
+| ~~BUG-OBS-002~~ | error-tracker.js | ~~`captureException` sem stack normalization~~ **[NOTED P4 — stack capturado corretamente; formatação varia entre V8 versions mas é cosmético]**                         |
+| ~~GAP-OBS-001~~ | metrics.js       | ~~Contadores de métricas não reiniciados em reconexão — acumulação contínua~~ **[N/A — contadores cumulativos é design correto (Prometheus-style); reset() disponível]** |
+| GAP-OBS-002     | otel.js          | Span exporters não configuráveis via env — hardcoded para console                                                                                                        |
 
 ### P4 — Informativos
 
-| ID               | Arquivo            | Título                                                                                         |
-| ---------------- | ------------------ | ---------------------------------------------------------------------------------------------- |
-| ARCH-OBS-002     | observability/     | 76 imports diretos de `logger.js` (bypas do barrel)                                            |
-| ARCH-OBS-003     | observability/     | Circular: event-collector ← hooks-audit-preset ← factory                                       |
-| ~~PERF-OBS-001~~ | event-collector.js | ~~`flush()` sem debounce~~ **[FIXED — `_flushScheduled` flag + `setImmediate` coalescimento]** |
-| PERF-OBS-002     | metrics.js         | `getMetrics()` serializa todo o Map a cada chamada REST                                        |
+| ID               | Arquivo            | Título                                                                                                                                            |
+| ---------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ARCH-OBS-002     | observability/     | 76 imports diretos de `logger.js` (bypas do barrel) **[ACCEPTED — barrel re-export não agrega valor para logger; padrão aceitável]**              |
+| ~~ARCH-OBS-003~~ | observability/     | ~~Circular: event-collector ← hooks-audit-preset ← factory~~ **[FIXED — audit preset movido para hooks/presets/; 0 ciclos confirmado via madge]** |
+| ~~PERF-OBS-001~~ | event-collector.js | ~~`flush()` sem debounce~~ **[FIXED — `_flushScheduled` flag + `setImmediate` coalescimento]**                                                    |
+| ~~PERF-OBS-002~~ | metrics.js         | ~~`getMetrics()` serializa todo o Map a cada chamada REST~~ **[N/A — endpoint REST (não hot path); Map < 100 entries; custo irrelevante]**        |
 
 ---
 
@@ -248,13 +248,13 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P4 — Informativos
 
-| ID               | Arquivo                | Título                                                                                                                                                                    |
-| ---------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~INC-CONF-001~~ | config/index.js        | ~~`refresh()` não invalida caches~~ **[N/A — false positive: index.js é pure barrel sem refresh()]**                                                                      |
-| ~~GAP-CONF-001~~ | pinned-files-loader.js | ~~Arquivos binários incluídos sem detecção de tipo~~ **[N/A — `SUPPORTED_EXTENSIONS` filtra para `.md/.txt/.js/.ts/.json/.yaml/.yml` em todas as 4 cargas]**              |
-| ~~GAP-CONF-002~~ | mcp-servers.js         | ~~Timeout de servidor MCP não configurável por instância~~ **[FIXED — `MCP_STDIO_TIMEOUT_MS` / `MCP_HTTP_TIMEOUT_MS` via env]**                                           |
-| ~~GAP-CONF-003~~ | tools/sdk-tools.js     | ~~Ferramentas desabilitadas não são removidas do cache~~ **[N/A — arquivo sdk-tools.js não existe; `getToolsConfig()` em state.js não usa cache, chamada a cada sessão]** |
-| ARCH-CONF-001    | config/                | `system-prompt.js`: 3 estratégias de template (string, file, fn) sem schema de validação                                                                                  |
+| ID                | Arquivo                | Título                                                                                                                                                                              |
+| ----------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~INC-CONF-001~~  | config/index.js        | ~~`refresh()` não invalida caches~~ **[N/A — false positive: index.js é pure barrel sem refresh()]**                                                                                |
+| ~~GAP-CONF-001~~  | pinned-files-loader.js | ~~Arquivos binários incluídos sem detecção de tipo~~ **[N/A — `SUPPORTED_EXTENSIONS` filtra para `.md/.txt/.js/.ts/.json/.yaml/.yml` em todas as 4 cargas]**                        |
+| ~~GAP-CONF-002~~  | mcp-servers.js         | ~~Timeout de servidor MCP não configurável por instância~~ **[FIXED — `MCP_STDIO_TIMEOUT_MS` / `MCP_HTTP_TIMEOUT_MS` via env]**                                                     |
+| ~~GAP-CONF-003~~  | tools/sdk-tools.js     | ~~Ferramentas desabilitadas não são removidas do cache~~ **[N/A — arquivo sdk-tools.js não existe; `getToolsConfig()` em state.js não usa cache, chamada a cada sessão]**           |
+| ~~ARCH-CONF-001~~ | config/                | ~~`system-prompt.js`: 3 estratégias de template (string, file, fn) sem schema de validação~~ **[N/A — apenas templates estáticos (string literals); sem input dinâmico/untrusted]** |
 
 ---
 
@@ -270,13 +270,13 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P4 — Informativos
 
-| ID              | Arquivo           | Título                                                                                                |
-| --------------- | ----------------- | ----------------------------------------------------------------------------------------------------- |
-| ~~GAP-LIB-001~~ | tools-registry.js | ~~`deregister` não notifica hooks~~ **[N/A — não há `deregister`; registry é imutável por design]**   |
-| ~~GAP-LIB-002~~ | models.js         | ~~Lista de modelos hardcoded~~ **[N/A — `listModels()` chama API com cache de 5 min]**                |
-| ~~GAP-LIB-003~~ | agents.js         | ~~`getAgent()` sem cache~~ **[N/A — não existe `getAgent()`; `getCustomAgent()` usa Map.get() O(1)]** |
-| INC-LIB-001     | lib/index.js      | `tools-registry.js` e `config/tools-registry.js` com nomes idênticos — confusão de imports            |
-| PERF-LIB-001    | sdk-client.js     | Session pool não implementado — cada chat cria nova sessão                                            |
+| ID              | Arquivo           | Título                                                                                                                                                                                      |
+| --------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~GAP-LIB-001~~ | tools-registry.js | ~~`deregister` não notifica hooks~~ **[N/A — não há `deregister`; registry é imutável por design]**                                                                                         |
+| ~~GAP-LIB-002~~ | models.js         | ~~Lista de modelos hardcoded~~ **[N/A — `listModels()` chama API com cache de 5 min]**                                                                                                      |
+| ~~GAP-LIB-003~~ | agents.js         | ~~`getAgent()` sem cache~~ **[N/A — não existe `getAgent()`; `getCustomAgent()` usa Map.get() O(1)]**                                                                                       |
+| ~~INC-LIB-001~~ | lib/index.js      | ~~`tools-registry.js` e `config/tools-registry.js` com nomes idênticos — confusão de imports~~ **[ACCEPTED — naming documenta domínios distintos (lib/ vs config/); sem confusão prática]** |
+| PERF-LIB-001    | sdk-client.js     | Session pool não implementado — cada chat cria nova sessão **[ACCEPTED — sessões gerenciadas pelo SDK; pool requer refactoring significativo; planejado para ciclo futuro]**                |
 
 ---
 
@@ -292,12 +292,12 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P4 — Informativos
 
-| ID                | Arquivo          | Título                                                                                                                                        |
-| ----------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| GAP-ROUTE-001     | observability.js | `/metrics` endpoint retorna todos os contadores sem filtragem **[NOTED — feature gap; baixo impacto]**                                        |
-| GAP-ROUTE-002     | webhooks.js      | Webhook delivery sem retry — falha silenciosa em endpoint indisponível **[NOTED — feature enhancement; não crítico]**                         |
-| ~~GAP-ROUTE-003~~ | hooks.js         | ~~Preset hooks não validados contra schema~~ **[N/A — não há rota de apply preset; hooks.js tem apenas GET /hooks/registry e /hooks/events]** |
-| ~~INC-ROUTE-001~~ | client.js        | ~~Autenticação inconsistente: query param `token`~~ **[N/A — não há `req.query.token` no código atual]**                                      |
+| ID                | Arquivo          | Título                                                                                                                                                                             |
+| ----------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~GAP-ROUTE-001~~ | observability.js | ~~`/metrics` endpoint retorna todos os contadores sem filtragem~~ **[FIXED — parâmetro ?category= adicionado para filtro]**                                                        |
+| GAP-ROUTE-002     | webhooks.js      | Webhook delivery sem retry — falha silenciosa em endpoint indisponível **[ACCEPTED — feature enhancement para ciclo futuro; webhook-manager já diferencia erros (GAP-AGENT-009)]** |
+| ~~GAP-ROUTE-003~~ | hooks.js         | ~~Preset hooks não validados contra schema~~ **[N/A — não há rota de apply preset; hooks.js tem apenas GET /hooks/registry e /hooks/events]**                                      |
+| ~~INC-ROUTE-001~~ | client.js        | ~~Autenticação inconsistente: query param `token`~~ **[N/A — não há `req.query.token` no código atual]**                                                                           |
 
 ---
 
@@ -312,11 +312,11 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P4 — Informativos
 
-| ID               | Arquivo              | Título                                                                                                          |
-| ---------------- | -------------------- | --------------------------------------------------------------------------------------------------------------- |
-| ~~INC-CHAN-001~~ | api/bridge-stream.js | ~~`MAX_SSE_CLIENTS` lido diretamente do env com 100~~ **[FIXED — importa de `core/constants.js` (default 50)]** |
-| GAP-CHAN-001     | client.js            | `stopDialogMode` hardcoda `reason: 'watchdog_restart'`                                                          |
-| GAP-CHAN-002     | inject.js            | `httpRequest` sem validação de porta — SSRF interno entre portas                                                |
+| ID               | Arquivo              | Título                                                                                                                               |
+| ---------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| ~~INC-CHAN-001~~ | api/bridge-stream.js | ~~`MAX_SSE_CLIENTS` lido diretamente do env com 100~~ **[FIXED — importa de `core/constants.js` (default 50)]**                      |
+| ~~GAP-CHAN-001~~ | client.js            | ~~`stopDialogMode` hardcoda `reason: 'watchdog_restart'`~~ **[FIXED — parâmetro `reason` configurável]**                             |
+| ~~GAP-CHAN-002~~ | inject.js            | ~~`httpRequest` sem validação de porta — SSRF interno entre portas~~ **[FIXED — validação de range 1-65535 com warning e fallback]** |
 
 ---
 
@@ -332,11 +332,11 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P4 — Informativos
 
-| ID              | Arquivo          | Título                                                                                                           |
-| --------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------- |
-| ~~INC-API-001~~ | bridge-stream.js | ~~`MAX_SSE_CLIENTS` sem cap real de conexões~~ **[FIXED — importa de `core/constants.js`, usado como cap real]** |
-| GAP-API-001     | bridge-dialog.js | Estado `'starting'` não tratado em `/dialog/start` — 409 desnecessário                                           |
-| GAP-API-002     | bridge-stream.js | Filtro `?events=` sem suporte a wildcards (`task.*`)                                                             |
+| ID              | Arquivo          | Título                                                                                                                                                                         |
+| --------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ~~INC-API-001~~ | bridge-stream.js | ~~`MAX_SSE_CLIENTS` sem cap real de conexões~~ **[FIXED — importa de `core/constants.js`, usado como cap real]**                                                               |
+| ~~GAP-API-001~~ | bridge-dialog.js | ~~Estado `'starting'` não tratado em `/dialog/start` — 409 desnecessário~~ **[N/A — check `agent.status !== 'idle'` já cobre todos os estados não-idle incluindo 'starting']** |
+| ~~GAP-API-002~~ | bridge-stream.js | ~~Filtro `?events=` sem suporte a wildcards (`task.*`)~~ **[FIXED — buildEventFilter() com suporte a wildcards via regex]**                                                    |
 
 ---
 
@@ -348,7 +348,7 @@ catalogados**: ~130 issues **Plano de auditoria**:
 | ---------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ~~INC-CORE-001~~ | constants.js  | ~~`MAX_SSE_CLIENTS = 50` vs `bridge-stream.js` usa `100`~~ **[FIXED — todos os módulos importam de `core/constants.js` (default 50)]**            |
 | ~~GAP-CORE-001~~ | constants.js  | ~~Env var `LLM_B_TURN_TIMEOUT` sem sufixo `_MS`~~ **[FIXED — `LLM_B_TURN_TIMEOUT_MS` (preferido) + `LLM_B_TURN_TIMEOUT` (legado) ambos aceitos]** |
-| INC-CORE-002     | core/index.js | Re-exporta `types/index.js` — acoplamento direto core → types (layer violation)                                                                   |
+| ~~INC-CORE-002~~ | core/index.js | ~~Re-exporta `types/index.js` — acoplamento direto core → types (layer violation)~~ **[N/A — types/ não re-exportado; JSDoc presente]**           |
 
 ---
 
@@ -375,12 +375,12 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P4 — Informativos
 
-| ID       | Arquivo       | Título                                                                                            |
-| -------- | ------------- | ------------------------------------------------------------------------------------------------- |
-| DB-P4-01 | sqlite.js     | `registerExitHandler` não documentado para re-entrância em testes                                 |
-| DB-P4-02 | migrations.js | FTS5 trigger `turns_au` sem mecanismo de reindex pós-ROLLBACK                                     |
-| DB-P4-03 | migrations.js | `created_at`/`updated_at` como TEXT ISO 8601 em `todo_tasks` — ordenação frágil se formato variar |
-| DB-P4-04 | migrations.js | Migration de dados v6 sem `down` reversível                                                       |
+| ID           | Arquivo       | Título                                                                                                                                                                                 |
+| ------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~DB-P4-01~~ | sqlite.js     | ~~`registerExitHandler` não documentado para re-entrância em testes~~ **[N/A — já idempotente via guard `exitHandlerRegistered`]**                                                     |
+| ~~DB-P4-02~~ | migrations.js | ~~FTS5 trigger `turns_au` sem mecanismo de reindex pós-ROLLBACK~~ **[N/A — triggers FTS5 são standard SQLite; ROLLBACK edge case é teórico]**                                          |
+| ~~DB-P4-03~~ | migrations.js | ~~`created_at`/`updated_at` como TEXT ISO 8601 em `todo_tasks` — ordenação frágil se formato variar~~ **[N/A — `now()` retorna ISO 8601 UTC (Z suffix); lexicograficamente sortável]** |
+| ~~DB-P4-04~~ | migrations.js | ~~Migration de dados v6 sem `down` reversível~~ **[N/A — forward-only migrations by design; rollback não necessário]**                                                                 |
 
 ---
 
