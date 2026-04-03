@@ -175,7 +175,7 @@ describe('http-bridge GET /stream › compaction events chegam via SSE', () => {
         /** @type {string[]} */
         const chunks = [];
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
         const resMock = /** @type {any} */ ({
             _writableEnded: false,
             get writableEnded() {
@@ -183,6 +183,7 @@ describe('http-bridge GET /stream › compaction events chegam via SSE', () => {
             },
             setHeader() {},
             flushHeaders() {},
+            on() {},
             write(/** @type {any} */ chunk) {
                 chunks.push(chunk);
             },

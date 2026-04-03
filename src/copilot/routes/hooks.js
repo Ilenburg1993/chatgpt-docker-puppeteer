@@ -18,11 +18,11 @@ import { defaultBus } from '#copilot/hooks/bus';
 import { SDK_HOOKS } from '#copilot/hooks/registry';
 import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
-import { MAX_SSE_CLIENTS } from '../core/constants.js';
+import { createSseWriter, SseConnectionTracker } from '../api/sse-utils.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
-/** Contador de clientes SSE ativos em /hooks/events. */
-let _hooksSseClients = 0;
+/** GAP-EVARCH-01 (fix): tracker centralizado para /hooks/events. */
+const _hooksTracker = new SseConnectionTracker('hooks/events');
 
 /**
  * @typedef {import('express').Request} Req
@@ -82,59 +82,31 @@ router.get('/hooks/registry', (_req, res) => {
  */
 router.get('/hooks/events', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        if (_hooksSseClients >= MAX_SSE_CLIENTS) {
+        if (!_hooksTracker.accept()) {
             res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
             return;
         }
 
-        _hooksSseClients++;
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.setHeader('X-Accel-Buffering', 'no');
-        res.flushHeaders();
+        // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
+        const sse = createSseWriter(req, res, {
+            heartbeatMs: 30_000,
+            tracker: _hooksTracker,
+        });
 
-        /**
-         * Envia evento SSE formatado.
-         *
-         * @param {string} eventType
-         * @param {unknown} data
-         */
-        const sendEvent = (eventType, data) => {
-            if (res.writableEnded) return;
-            res.write(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
-        };
-
-        sendEvent('connected', { timestamp: Date.now(), message: 'hooks/events stream iniciado' });
+        sse.send('connected', { timestamp: Date.now(), message: 'hooks/events stream iniciado' });
 
         /** @param {import('#copilot/hooks/bus').HookBusEvent} ev */
         const onAnyHook = (ev) => {
-            sendEvent('hook', ev);
+            sse.send('hook', ev);
         };
 
         // Observar todos os eventos via wildcard '*'
         defaultBus.on('*', onAnyHook);
 
-        const heartbeatInterval = setInterval(() => {
-            sendEvent('heartbeat', { ts: Date.now() });
-        }, 30_000);
-
-        // C14-01: flag idempotente para evitar triple-decrement e underflow do contador
-        let _sseDecremented = false;
-        const decrement = () => {
-            if (!_sseDecremented) {
-                _sseDecremented = true;
-                _hooksSseClients--;
-            }
-        };
         req.on('close', () => {
-            decrement();
-            clearInterval(heartbeatInterval);
             defaultBus.off('*', onAnyHook);
             log('INFO', '[sdk-api] SSE hooks/events encerrado');
         });
-        res.on('error', decrement);
-        res.on('finish', decrement);
     });
 });
 

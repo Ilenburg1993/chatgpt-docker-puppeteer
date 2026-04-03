@@ -11,6 +11,7 @@
 
 import { AGENT_EVENTS, MAX_SSE_CLIENTS } from '#copilot/core';
 import { SseReplayBuffer } from './sse-replay-buffer.js';
+import { createEventFilter, createSseWriter, SseConnectionTracker } from './sse-utils.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -41,6 +42,10 @@ export function registerStreamRoutes(bridge, agent) {
 
     // UPG-SE-004: buffer de replay para reconexão SSE via Last-Event-ID
     const replayBuffer = new SseReplayBuffer();
+
+    // BUG-EVDUP-03 (fix): tracker centralizado para limitar conexões SSE no bridge-stream
+    const tracker = new SseConnectionTracker('bridge-stream', MAX_SSE_CLIENTS);
+
     // ─── GET /stream ──────────────────────────────────────────────────────────
 
     /**
@@ -61,74 +66,38 @@ export function registerStreamRoutes(bridge, agent) {
      * Uso: `GET /api/copilot/stream` com `Accept: text/event-stream`
      */
     bridge.get('/stream', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        // BUG-EVDUP-03 (fix): verificar limite de conexões SSE antes de aceitar
+        if (!tracker.accept()) {
+            res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
+            return;
+        }
+
         // G2-API-10: filtro de eventos por query param ?events=task.*,dialog.* (opcional)
-        // Se não fornecido, todos os eventos são entregues (backward-compatible).
         // GAP-API-002: suporte a wildcard simples (ex: "task.*" matcha "task.started", "task.delta", etc.)
-        const eventsParam = typeof req.query?.['events'] === 'string' ? req.query['events'].trim() : '';
-        /** @type {((evt: string) => boolean) | null} */
-        let eventFilter = null;
-        if (eventsParam) {
-            const patterns = eventsParam
-                .split(',')
-                .map((e) => e.trim())
-                .filter(Boolean);
-            const exact = new Set(patterns.filter((p) => !p.includes('*')));
-            const prefixes = patterns.filter((p) => p.endsWith('.*')).map((p) => p.slice(0, -1)); // 'task.*' → 'task.'
-            eventFilter = (evt) => exact.has(evt) || prefixes.some((pfx) => evt.startsWith(pfx));
-        }
+        const eventFilter = createEventFilter(
+            typeof req.query?.['events'] === 'string' ? req.query['events'] : undefined,
+        );
 
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.setHeader('X-Accel-Buffering', 'no');
-        res.flushHeaders();
-
-        /**
-         * Envia um evento SSE para o cliente, com ID para replay.
-         *
-         * @param {AgentEventName | 'connected' | 'heartbeat'} event - Nome do evento SSE
-         * @param {object} data - Dados serializados em JSON
-         * @param {{ skipBuffer?: boolean }} [opts]
-         * @returns {void}
-         */
-        const sendEvt = (event, data, opts) => {
-            if (!res.writableEnded) {
-                // SEC-VULN-02 (fix aplicado consistentemente): sanitizar nome do evento SSE
-                const safeEvent = String(event).replace(/[\r\n]/g, '_');
-                // UPG-SE-004: atribuir ID para Last-Event-ID replay
-                const id = opts?.skipBuffer ? undefined : replayBuffer.push(safeEvent, data);
-                const idLine = id != null ? `id: ${id}\n` : '';
-                res.write(`${idLine}event: ${safeEvent}\ndata: ${JSON.stringify(data)}\n\n`);
-            }
-        };
-
-        // UPG-SE-004: replay de eventos perdidos via Last-Event-ID
-        const lastEventId = Number(req.headers?.['last-event-id']) || 0;
-        if (lastEventId > 0) {
-            const missed = replayBuffer.getAfter(lastEventId);
-            for (const evt of missed) {
-                if (!res.writableEnded) {
-                    const safeEvent = String(evt.event).replace(/[\r\n]/g, '_');
-                    res.write(`id: ${evt.id}\nevent: ${safeEvent}\ndata: ${JSON.stringify(evt.data)}\n\n`);
-                }
-            }
-        }
+        // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado de headers,
+        // heartbeat, replay, sanitização e cleanup.
+        // G2-SEC-08: limite de vida por conexão SSE (default 24h)
+        const MAX_SSE_LIFETIME_MS = Number(process.env['MAX_SSE_LIFETIME_MS']) || 24 * 60 * 60 * 1000;
+        const sse = createSseWriter(req, res, {
+            heartbeatMs: 15_000,
+            maxLifetimeMs: MAX_SSE_LIFETIME_MS,
+            replayBuffer,
+            tracker,
+        });
 
         // Evento inicial com snapshot do estado atual
-        sendEvt('connected', { ...agent.getStatusSnapshot(), timestamp: Date.now() });
+        sse.send('connected', { ...agent.getStatusSnapshot(), timestamp: Date.now() });
 
-        // G2-PERF-05: Em vez de criar N closures distintas (uma por evento AGENT_EVENTS), usar
-        // uma única factory function que captura `sendEvt` e recebe `evt` como binding.
-        // Cada handler é um bind leve: `sseHandler.bind(null, evtName)` — V8 otimiza binds
-        // melhor que closures individuais, e o padrão é mais explícito.
-
+        // G2-PERF-05: handler genérico com bind leve por evento AGENT_EVENTS
         /**
-         * Handler genérico para SSE — bind de `eventName` via Function.bind.
-         *
          * @param {AgentEventName} eventName
          * @param {unknown} data
          */
-        const sseHandler = (eventName, data) => sendEvt(eventName, data ?? {});
+        const sseHandler = (eventName, data) => sse.send(eventName, data ?? {});
 
         /** @type {Map<AgentEventName, (data: unknown) => void>} */
         const handlers = new Map(
@@ -140,22 +109,7 @@ export function registerStreamRoutes(bridge, agent) {
 
         handlers.forEach((handler, evt) => agent.on(evt, handler));
 
-        const heartbeat = setInterval(() => sendEvt('heartbeat', { ts: Date.now() }, { skipBuffer: true }), 15_000);
-
-        // G2-SEC-08: limite de vida por conexão SSE para evitar esgotamento de file descriptors.
-        // Configurável via MAX_SSE_LIFETIME_MS (default 24h). Ao expirar, envia evento 'reconnect'
-        // e fecha a conexão para forçar o cliente a reconectar.
-        const MAX_SSE_LIFETIME_MS = Number(process.env['MAX_SSE_LIFETIME_MS']) || 24 * 60 * 60 * 1000;
-        const lifetimeTimer = setTimeout(() => {
-            if (!res.writableEnded) {
-                sendEvt(/** @type {AgentEventName} */ ('reconnect'), { reason: 'max_lifetime', ts: Date.now() });
-                res.end();
-            }
-        }, MAX_SSE_LIFETIME_MS);
-
         req.on('close', () => {
-            clearTimeout(lifetimeTimer);
-            clearInterval(heartbeat);
             handlers.forEach((handler, evt) => agent.off(evt, handler));
         });
     });

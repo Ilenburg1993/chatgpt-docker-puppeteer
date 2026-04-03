@@ -53,6 +53,10 @@ function makeSseResMock() {
         write(/** @type {string} */ chunk) {
             chunks.push(chunk);
         },
+        on() {},
+        end() {
+            res._writableEnded = true;
+        },
     });
 
     return {
@@ -74,6 +78,8 @@ function makeSseReqMock() {
     const reqEmitter = new EventEmitter();
     const req = /** @type {any} */ ({
         on: reqEmitter.on.bind(reqEmitter),
+        query: {},
+        headers: {},
     });
     return {
         req,
@@ -138,7 +144,7 @@ describe('http-bridge GET /stream — headers SSE', () => {
 
         // Precisamos de req e res sincronizados
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
         const { res: resMock, headers: hdrs } = makeSseResMock();
 
         const handler = getRouteHandler(bridge, 'get', '/stream');
@@ -151,7 +157,7 @@ describe('http-bridge GET /stream — headers SSE', () => {
     it('define Cache-Control: no-cache', () => {
         const { res: resMock, headers: hdrs } = makeSseResMock();
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
 
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
@@ -163,7 +169,7 @@ describe('http-bridge GET /stream — headers SSE', () => {
     it('define Connection: keep-alive', () => {
         const { res: resMock, headers: hdrs } = makeSseResMock();
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
 
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
@@ -175,7 +181,7 @@ describe('http-bridge GET /stream — headers SSE', () => {
     it('define X-Accel-Buffering: no', () => {
         const { res: resMock, headers: hdrs } = makeSseResMock();
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
 
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
@@ -199,7 +205,7 @@ describe('http-bridge GET /stream — evento connected', () => {
     it('emite evento SSE "connected" imediatamente ao conectar', () => {
         const { res: resMock, chunks } = makeSseResMock();
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
 
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
@@ -218,7 +224,7 @@ describe('http-bridge GET /stream — evento connected', () => {
     it('evento connected contém campo timestamp', () => {
         const { res: resMock, chunks } = makeSseResMock();
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
 
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
@@ -247,7 +253,7 @@ describe('http-bridge GET /stream — repasse de eventos do agente', () => {
     it('task.completed do alwaysAliveAgent é enviado via SSE', () => {
         const { res: resMock, chunks } = makeSseResMock();
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
 
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
@@ -274,7 +280,7 @@ describe('http-bridge GET /stream — repasse de eventos do agente', () => {
     it('task.delta do alwaysAliveAgent é enviado via SSE com chunk correto', () => {
         const { res: resMock, chunks } = makeSseResMock();
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
 
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
@@ -310,7 +316,7 @@ describe('http-bridge GET /stream — cleanup no fechamento', () => {
     it('após req.close os eventos do agente não chegam mais ao SSE', () => {
         const { res: resMock, chunks } = makeSseResMock();
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
 
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);
@@ -333,7 +339,7 @@ describe('http-bridge GET /stream — cleanup no fechamento', () => {
     it('writableEnded=true protege contra escrita em res já encerrado', () => {
         const { res: resMock, chunks } = makeSseResMock();
         const reqEmitter = new EventEmitter();
-        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter) });
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
 
         const handler = getRouteHandler(bridge, 'get', '/stream');
         handler(reqMock, resMock);

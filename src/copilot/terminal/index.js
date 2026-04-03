@@ -16,6 +16,7 @@
  * @module copilot/terminal
  */
 
+import { AGENT_EVENTS } from '#copilot/core';
 import { log } from '#copilot/observability/logger';
 import { resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
@@ -176,6 +177,29 @@ function registerAgentEventListeners() {
             /* best-effort */
         }
     });
+
+    // BUG-EVDUP-01 (fix): auto-wiring genérico para AGENT_EVENTS sem handler específico.
+    // Garante que novos eventos adicionados a AGENT_EVENTS sejam automaticamente broadcast
+    // no terminal SSE sem necessidade de wiring manual em cada adição.
+    /** @type {Set<string>} */
+    const handledEvents = new Set([
+        'dialog.stalled',
+        'dialog.reply',
+        'dialog.loop.changed',
+        'dialog.ready',
+        'dialog.stopped',
+        'session.usage',
+        'session.compaction_complete',
+        'ready',
+        'session.fatal',
+    ]);
+    for (const evt of AGENT_EVENTS) {
+        if (!handledEvents.has(evt)) {
+            alwaysAliveAgent.on(evt, (/** @type {unknown} */ data) => {
+                broadcastSse(evt, /** @type {object} */ (data ?? {}));
+            });
+        }
+    }
 }
 
 /**

@@ -546,3 +546,337 @@ Fase 5 (Observab.)   →  Fase 4 (API)          →  Fase 6 (Hardening)
 - `10611f2b` — Prettier formatting
 - `713149a7` — Fases 5-6: SSE replay, quota, latency histogram, compaction history
 - `25c5d1b5` — TS fix + formatting
+
+---
+
+## 12. Análise de Fontes de Emissão de Eventos e Endpoints SSE (2026-04-03)
+
+### 12.1 Mapa Completo de Canais de Difusão
+
+O sistema possui **7 canais distintos** de difusão de eventos em tempo real. A tabela abaixo
+cataloga cada um:
+
+| #   | Canal               | Endpoint / Mecanismo               | Módulo                                                       | Fonte de Eventos                                                    | Porta            | Protocolo    |
+| --- | ------------------- | ---------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------- | ---------------- | ------------ |
+| 1   | **Bridge Stream**   | `GET /api/copilot/stream`          | `api/bridge-stream.js`                                       | `alwaysAliveAgent` EventEmitter (AGENT_EVENTS)                      | 3000 (Express)   | SSE          |
+| 2   | **Terminal Server** | `GET /events`                      | `terminal/server.js` + `terminal/dialog.js` (`broadcastSse`) | `alwaysAliveAgent` (manual wiring em `terminal/index.js`)           | 3009 (raw http)  | SSE          |
+| 3   | **Hooks Events**    | `GET /api/sdk/hooks/events`        | `routes/hooks.js`                                            | `HookBus` wildcard `*` (pre/post tool_use, session_start/end, etc.) | 3000 (Express)   | SSE          |
+| 4   | **Agent Lifecycle** | `GET /api/sdk/agent/stream`        | `routes/agent.js`                                            | `CopilotClient.on()` (lifecycle events do client SDK)               | 3000 (Express)   | SSE          |
+| 5   | **Session Stream**  | `GET /api/sdk/sessions/:id/stream` | `routes/sessions.js`                                         | `CopilotSession.on()` (TODOS os 70+ eventos SDK por sessão)         | 3000 (Express)   | SSE          |
+| 6   | **Socket.io**       | namespace `/copilot`               | `conversation-hub/socket-ns.js`                              | Dual-emit com `broadcastSse()` (terminal/dialog.js)                 | 3000 (Socket.io) | WebSocket    |
+| 7   | **NERV Bridge**     | Event bus interno                  | `bridges/nerv-bridge.js`                                     | `alwaysAliveAgent` EventEmitter → NERV actionCodes                  | N/A (in-process) | EventEmitter |
+
+### 12.2 Diagrama de Fluxo de Eventos
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        CopilotSession (SDK)                             │
+│    70+ event types: assistant.*, tool.*, session.*, etc.                │
+└──────────────┬──────────────────────┬────────────────────────────────────┘
+               │                      │
+               ▼                      ▼
+   ┌────────────────────┐   ┌──────────────────────┐
+   │  event-collector   │   │  session-event-wirer  │
+   │  (observability)   │   │  (AGENT EventEmitter) │
+   │  → metrics         │   └──────────┬───────────┘
+   │  → persist .jsonl  │              │
+   │  → hookBus.emit    │              ▼
+   └────────┬───────────┘   ┌──────────────────────┐
+            │               │  AlwaysAliveAgent     │
+            ▼               │  (EventEmitter)       │
+   ┌────────────────────┐   └──┬──────┬──────┬─────┘
+   │  HookBus (*)       │      │      │      │
+   └────────┬───────────┘      │      │      │
+            │                  │      │      │
+            ▼                  ▼      ▼      ▼
+   ┌──────────────┐  ┌──────────┐ ┌────────┐ ┌──────────┐
+   │ hooks/events │  │ bridge-  │ │terminal│ │ NERV     │
+   │ SSE (#3)     │  │ stream   │ │ SSE    │ │ bridge   │
+   │              │  │ SSE (#1) │ │(#2)+WS │ │ (#7)     │
+   └──────────────┘  └──────────┘ │(#6)    │ └──────────┘
+                                  └────────┘
+                     ┌──────────┐ ┌──────────┐
+                     │ agent/   │ │ sessions │
+                     │ stream   │ │ /:id/    │
+                     │ SSE (#4) │ │ stream   │
+                     │          │ │ SSE (#5) │
+                     └──────────┘ └──────────┘
+```
+
+### 12.3 Análise de Sobreposição e Duplicação
+
+#### DUP-01: bridge-stream (#1) vs terminal SSE (#2) — **SOBREPOSIÇÃO SIGNIFICATIVA**
+
+| Aspecto    | bridge-stream (#1)                                                            | terminal SSE (#2)                                                                |
+| ---------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Fonte      | `alwaysAliveAgent` via `AGENT_EVENTS` automático                              | `alwaysAliveAgent` via wiring manual em `terminal/index.js`                      |
+| Eventos    | 35+ tipos (todos de AGENT_EVENTS)                                             | Subconjunto selecionado (reply, ready, stopped, stalled, busy, etc.)             |
+| Formato    | `event: X\ndata: {...}\n\n`                                                   | `event: X\ndata: {...}\n\n`                                                      |
+| Features   | ✅ Replay (Last-Event-ID), ✅ Filter (?events=), ✅ Wildcard, ✅ Max lifetime | ❌ Sem replay, ❌ Sem filtro, ❌ Level filter (critical), ✅ Dual emit Socket.io |
+| Payload    | Raw do EventEmitter                                                           | Processado (truncamento de conteúdo, safe data)                                  |
+| Consumidor | Dashboard web, monitoramento externo                                          | Terminal LLM-B REPL, inject client (`channel/inject.js`)                         |
+
+**Diagnóstico**: Ambos escutam o MESMO `alwaysAliveAgent` EventEmitter. O bridge-stream é mais
+completo (todos os AGENT_EVENTS, replay, filtro), enquanto o terminal SSE é mais simples
+(subconjunto manual, dual-emit Socket.io). A duplicação de wiring gera manutenção duplicada — quando
+novos eventos são adicionados em AGENT_EVENTS, precisa atualizar tanto o bridge-stream quanto o
+terminal/index.js.
+
+**Razão da existência separada**: O terminal server roda em processo separado via PM2 na porta 3009,
+sem acesso ao Express router. O `channel/inject.js` faz `http.request()` para
+`127.0.0.1:3009/events` para consumir SSE do terminal. Portanto, a separação tem **razão
+arquitetural válida** (multi-processo).
+
+#### DUP-02: bridge-stream (#1) vs sessions/:id/stream (#5) — **SOBREPOSIÇÃO PARCIAL**
+
+| Aspecto       | bridge-stream (#1)                          | sessions/:id/stream (#5)                                            |
+| ------------- | ------------------------------------------- | ------------------------------------------------------------------- |
+| Escopo        | GLOBAL — todos os eventos do agente inteiro | PER-SESSION — eventos de uma sessão SDK específica                  |
+| Fonte         | `alwaysAliveAgent` EventEmitter             | `CopilotSession.on()` direto no SDK                                 |
+| Eventos       | Eventos processados (nomes AGENT_EVENTS)    | Eventos raw do SDK (70+ tipos, incluindo `assistant.message_delta`) |
+| Granularidade | Agregado                                    | Individual por sessão                                               |
+| Features      | ✅ Replay, ✅ Filter, ✅ Max lifetime       | ✅ Replay, ✅ Filter, ❌ Max lifetime                               |
+
+**Diagnóstico**: Complementares, não duplicados. O bridge-stream (#1) é o "firehose" global
+processado. O sessions/:id/stream (#5) dá acesso granular aos eventos raw do SDK por sessão. **Fusão
+NÃO recomendada** — cada um serve a um caso de uso distinto.
+
+#### DUP-03: hooks SSE (#3) — **INDEPENDENTE**
+
+O hooks SSE consome o `HookBus` (que é alimentado pelo event-collector via `hookBus.emitHook`).
+Fornece eventos de governança e auditoria (pre/post tool_use, session lifecycle). **Sem sobreposição
+real** com os outros — domínio diferente. Manter separado.
+
+#### DUP-04: agent/stream (#4) — **POTENCIAL DE FUSÃO com bridge-stream**
+
+| Aspecto    | bridge-stream (#1)                         | agent/stream (#4)                        |
+| ---------- | ------------------------------------------ | ---------------------------------------- |
+| Fonte      | `alwaysAliveAgent` EventEmitter            | `CopilotClient.on()` (lifecycle)         |
+| Eventos    | Eventos do agente (task._, dialog._, etc.) | Eventos do client SDK (lifecycle apenas) |
+| Consumidor | Dashboard, monitoring                      | Dashboard, monitoring                    |
+
+**Diagnóstico**: O `agent/stream` fornece eventos de lifecycle do `CopilotClient` (conexão,
+desconexão, reconnect). São eventos de **nível mais baixo** que os do alwaysAliveAgent. **Fusão
+possível**: adicionar esses lifecycle events ao bridge-stream como uma categoria extra, eliminando o
+endpoint separado. Porém, como é um endpoint simples (30 LOC) e serve um domínio distinto, a fusão é
+**opcional**.
+
+### 12.4 Bugs Identificados
+
+#### BUG-EVDUP-01: Wiring Manual Duplicado no Terminal (P3-MODERADO)
+
+**Problema**: `terminal/index.js` faz wiring manual de eventos do `alwaysAliveAgent`:
+
+```javascript
+alwaysAliveAgent.on('dialog.reply', (evt) => broadcastSse('reply', {...}));
+alwaysAliveAgent.on('ready', (evt) => broadcastSse('ready', {...}));
+alwaysAliveAgent.on('dialog.loop.changed', ...);
+// ... vários outros
+```
+
+Quando novos eventos são adicionados ao AGENT_EVENTS (como fizemos nas Fases 1-6), o terminal server
+NÃO os recebe automaticamente. Cada novo evento precisa de wiring manual em `terminal/index.js`.
+
+**Fix**: Criar um listener genérico que repassa TODOS os AGENT_EVENTS automaticamente para
+`broadcastSse()`, mantendo transformações específicas apenas onde necessário (truncamento de
+conteúdo).
+
+#### BUG-EVDUP-02: Formato Inconsistente entre Endpoints SSE (P4-BAIXO)
+
+**Problema**: O bridge-stream (#1) agora inclui `id:` em cada evento SSE (UPG-SE-004), mas o
+terminal SSE (#2), hooks SSE (#3) e agent/stream (#4) NÃO incluem. Isso significa que clientes
+desses endpoints não podem usar `Last-Event-ID` para replay em caso de reconexão.
+
+**Fix**: Extrair uma função utilitária `writeSseEvent(res, event, data, opts)` compartilhada que
+inclui `id:` opcional, sanitização SSE, e proteção de `writableEnded`. Atualmente cada endpoint
+reimplementa essa lógica.
+
+#### BUG-EVDUP-03: Contadores SSE Inconsistentes (P4-BAIXO)
+
+**Problema**: Cada endpoint SSE tem sua própria lógica de limitação de clientes e contagem:
+
+- bridge-stream: usa `agent.setMaxListeners(MAX_SSE_CLIENTS * N)` mas NÃO limita conexões
+- hooks SSE: `_hooksSseClients` com incremento/decremento manual
+- agent/stream: `_agentSseClients` com incremento/decremento manual
+- sessions/:id/stream: `_sessionsSseClients` com incremento/decremento manual
+- terminal server: `_sseClients.size + _sseCriticalClients.size`
+
+O bridge-stream NÃO verifica limite — permite conexões ilimitadas! Os outros têm cada um sua
+variável de contagem isolada.
+
+**Fix**: Unificar contagem com um `SseConnectionTracker` centralized.
+
+### 12.5 Gaps Identificados
+
+#### GAP-EVARCH-01: Nenhuma Função Utilitária Compartilhada para SSE (P2-ALTO)
+
+Cada endpoint reimplementa:
+
+- Headers SSE (`Content-Type`, `Cache-Control`, `Connection`, `X-Accel-Buffering`)
+- Formatação de evento (`event: X\ndata: {...}\n\n`)
+- Heartbeat (intervalos variam: 15s vs 30s)
+- Sanitização de nomes de evento (só bridge-stream faz SEC-VULN-02)
+- Proteção de `writableEnded`
+- Contagem de clientes e limite
+- Cleanup no `req.on('close')`
+
+**Recomendação**: Criar `api/sse-utils.js` com:
+
+- `createSseResponse(req, res, opts)` → configura headers, retorna `{ send, close }`
+- `SseConnectionTracker` → contagem centralizada
+- Heartbeat e cleanup automáticos
+
+#### GAP-EVARCH-02: Terminal SSE Não Tem Replay (P3-MODERADO)
+
+O terminal SSE (#2) na porta 3009 não tem replay via `Last-Event-ID`. Como o `channel/inject.js`
+consome via `_subscribeSse('/events', port)`, uma perda de conexão temporária resulta em perda de
+eventos. O inject client tem backoff exponencial para reconexão, mas perde eventos durante o gap.
+
+#### GAP-EVARCH-03: Sanitização SSE Inconsistente (P2-ALTO — Segurança)
+
+Apenas o bridge-stream (#1) aplica `SEC-VULN-02` (sanitização de `\r\n` em nomes de eventos SSE). Os
+outros 4 endpoints SSE NÃO sanitizam. Um nome de evento com `\r\n` poderia injetar headers em
+clientes vulneráveis.
+
+### 12.6 Possibilidades de Upgrade
+
+#### UPG-EVARCH-01: Módulo SSE Compartilhado (`api/sse-utils.js`)
+
+Extrair lógica comum em um módulo reutilizável:
+
+```javascript
+// Proposta de API
+import { createSseWriter, SseConnectionTracker } from '#copilot/api/sse-utils';
+
+const tracker = new SseConnectionTracker('bridge-stream', MAX_SSE_CLIENTS);
+
+router.get('/stream', (req, res) => {
+    if (!tracker.accept()) return res.status(429).json({...});
+    const sse = createSseWriter(req, res, {
+        heartbeatMs: 15000,
+        maxLifetimeMs: 24 * 60 * 60 * 1000,
+        replayBuffer: sharedBuffer,  // opcional
+        sanitize: true,
+    });
+    sse.send('connected', { ... });
+    // sse.close() chamado automaticamente no req close
+});
+```
+
+#### UPG-EVARCH-02: Auto-Wiring do Terminal via AGENT_EVENTS
+
+Substituir o wiring manual em `terminal/index.js` por um loop automático:
+
+```javascript
+import { AGENT_EVENTS } from '#copilot/core';
+
+for (const evt of AGENT_EVENTS) {
+  alwaysAliveAgent.on(evt, (payload) => {
+    broadcastSse(evt, payload);
+  });
+}
+```
+
+Com exceções específicas para eventos que precisam de transformação (ex: `dialog.reply` que trunca
+conteúdo).
+
+#### UPG-EVARCH-03: Fusão Opcional de agent/stream (#4) no bridge-stream (#1)
+
+O `agent/stream` escuta `CopilotClient.on()` para lifecycle events. Estes poderiam ser adicionados
+ao `alwaysAliveAgent` como eventos `client.lifecycle.*` e incluídos no bridge-stream. Isso
+eliminaria o endpoint separado e centralizaria toda a observabilidade em um único stream.
+
+### 12.7 Decisões Arquiteturais
+
+#### ARCH-EVDUP-01: Manter Separação bridge-stream vs terminal SSE
+
+**Decisão**: MANTER separados. **Razão**: O terminal server roda como processo PM2 separado na
+porta 3009. Não tem acesso ao Express router do processo principal (porta 3000). A comunicação
+inter-processo usa `http.request` para `127.0.0.1:3009`. Fundir os dois SSE endpoints exigiria IPC
+complexo ou shared memory — complexidade desproporcional ao benefício.
+
+#### ARCH-EVDUP-02: Manter Separação session/stream vs bridge-stream
+
+**Decisão**: MANTER separados. **Razão**: São escopos complementares. O bridge-stream é global
+(todos os eventos do agente), enquanto session/:id/stream é granular (eventos raw do SDK por
+sessão). Consumidores são diferentes: dashboard vs debug de sessão individual.
+
+#### ARCH-EVDUP-03: Manter hooks SSE independente
+
+**Decisão**: MANTER separado. **Razão**: Domínio diferente (governança/auditoria vs operação). Fonte
+diferente (HookBus vs alwaysAliveAgent/CopilotSession).
+
+---
+
+## 13. Roadmap — Unificação e Qualidade de Event Streaming (Fase 7-8)
+
+### FASE 7 — Infraestrutura SSE Compartilhada (P2-ALTO)
+
+#### 7.1 — Módulo `api/sse-utils.js` (GAP-EVARCH-01)
+
+**Ação**: Criar módulo com `createSseWriter()` e `SseConnectionTracker`. **Arquivos**: Novo
+`src/copilot/api/sse-utils.js` **Complexidade**: Moderada (extração de padrão, sem mudança de
+comportamento)
+
+O `createSseWriter` deve:
+
+- Configurar headers SSE padrão
+- Sanitizar nomes de eventos (SEC-VULN-02 universal)
+- Gerenciar heartbeat com intervalo configurável
+- Suportar replay buffer opcional (reusar `SseReplayBuffer`)
+- Auto-cleanup no `req.on('close')` e `res.on('error'|'finish')`
+- Retornar `{ send(event, data, opts?), close() }`
+
+O `SseConnectionTracker` deve:
+
+- Contagem centralizada por nome de endpoint
+- `accept()` → `boolean` (retorna false se limite atingido)
+- Auto-decrement idempotente
+
+#### 7.2 — Migrar bridge-stream para sse-utils (BUG-EVDUP-02, BUG-EVDUP-03)
+
+**Ação**: Refatorar `bridge-stream.js` para usar `createSseWriter` **Arquivos**:
+`src/copilot/api/bridge-stream.js`
+
+#### 7.3 — Migrar hooks SSE para sse-utils (GAP-EVARCH-03)
+
+**Ação**: Refatorar `routes/hooks.js` para usar `createSseWriter` **Arquivos**:
+`src/copilot/routes/hooks.js` **Ganho extra**: Sanitização SSE aplicada (fix de GAP-EVARCH-03)
+
+#### 7.4 — Migrar agent/stream SSE para sse-utils
+
+**Ação**: Refatorar `routes/agent.js` para usar `createSseWriter` **Arquivos**:
+`src/copilot/routes/agent.js`
+
+#### 7.5 — Migrar session stream SSE para sse-utils
+
+**Ação**: Refatorar `routes/sessions.js` SSE para usar `createSseWriter` **Arquivos**:
+`src/copilot/routes/sessions.js`
+
+#### 7.6 — Aplicar sanitização ao terminal SSE (GAP-EVARCH-03 — Segurança)
+
+**Ação**: Aplicar sanitização de `\r\n` em nomes de evento no `terminal/dialog.js` `broadcastSse()`
+**Arquivos**: `src/copilot/terminal/dialog.js` **Nota**: O terminal server usa raw node:http, não
+Express — não pode usar `createSseWriter`. Apenas aplicar sanitização inline.
+
+### FASE 8 — Eliminação de Duplicação e Auto-Wiring (P3-MODERADO)
+
+#### 8.1 — Auto-wiring do terminal via AGENT_EVENTS (BUG-EVDUP-01)
+
+**Ação**: Substituir o wiring manual em `terminal/index.js` por loop automático sobre `AGENT_EVENTS`
+**Arquivos**: `src/copilot/terminal/index.js` **Nota**: Manter exceções para eventos que precisam
+transformação específica. Usar um Map de transformers para eventos como `dialog.reply` (truncamento
+de conteúdo).
+
+#### 8.2 — Limite de conexões SSE no bridge-stream (BUG-EVDUP-03)
+
+**Ação**: Adicionar verificação de `SseConnectionTracker.accept()` no bridge-stream (atualmente
+ilimitado) **Arquivos**: `src/copilot/api/bridge-stream.js`
+
+#### 8.3 — Replay no terminal SSE (GAP-EVARCH-02) — OPCIONAL
+
+**Ação**: Adicionar `SseReplayBuffer` ao terminal SSE (`terminal/server.js`) para suportar
+`Last-Event-ID` **Arquivos**: `src/copilot/terminal/server.js`, `src/copilot/terminal/dialog.js`
+**Complexidade**: Alta (raw node:http parser precisa ler header, broadcastSse precisa gerar IDs)
+**Decisão**: Marcado como OPCIONAL — o inject client já tem backoff e reconexão. O ganho é marginal
+vs a complexidade.

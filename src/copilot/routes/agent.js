@@ -21,13 +21,13 @@
 import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { MAX_SSE_CLIENTS } from '../core/constants.js';
+import { createSseWriter, SseConnectionTracker } from '../api/sse-utils.js';
 import { getClient } from '../lib/sdk-client.js';
 import { defaultMetrics } from '../observability/index.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
-/** Contador de clientes SSE ativos em /agent/stream. */
-let _agentSseClients = 0;
+/** GAP-EVARCH-01 (fix): tracker centralizado para /agent/stream. */
+const _agentTracker = new SseConnectionTracker('agent/stream');
 
 /**
  * @typedef {import('express').Request} Req
@@ -172,57 +172,29 @@ router.get('/agent/state', (req, res) => {
  */
 router.get('/agent/stream', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        if (_agentSseClients >= MAX_SSE_CLIENTS) {
+        if (!_agentTracker.accept()) {
             res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
             return;
         }
         const client = await getClient();
 
-        _agentSseClients++;
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.setHeader('X-Accel-Buffering', 'no');
-        res.flushHeaders();
+        // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
+        const sse = createSseWriter(req, res, {
+            heartbeatMs: 30_000,
+            tracker: _agentTracker,
+        });
 
-        /**
-         * Envia evento SSE formatado.
-         *
-         * @param {string} eventType
-         * @param {unknown} data
-         */
-        const sendEvent = (eventType, data) => {
-            if (res.writableEnded) return;
-            res.write(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
-        };
-
-        sendEvent('connected', { state: client.getState(), timestamp: Date.now() });
+        sse.send('connected', { state: client.getState(), timestamp: Date.now() });
 
         // Inscreve nos eventos de ciclo de vida do client
         const unsubscribe = client.on((event) => {
-            sendEvent('lifecycle', event);
+            sse.send('lifecycle', event);
         });
 
-        const heartbeatInterval = setInterval(() => {
-            sendEvent('heartbeat', { ts: Date.now() });
-        }, 30_000);
-
-        // C14-02: flag idempotente para evitar triple-decrement e underflow do contador
-        let _sseDecremented = false;
-        const decrement = () => {
-            if (!_sseDecremented) {
-                _sseDecremented = true;
-                _agentSseClients--;
-            }
-        };
         req.on('close', () => {
-            decrement();
-            clearInterval(heartbeatInterval);
             unsubscribe();
             log('INFO', '[sdk-api] SSE agent/stream encerrado');
         });
-        res.on('error', decrement);
-        res.on('finish', decrement);
     });
 });
 

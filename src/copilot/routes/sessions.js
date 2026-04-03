@@ -27,12 +27,12 @@
  * @module copilot/routes/sessions
  */
 
-import { MAX_SSE_CLIENTS } from '#copilot/core';
 import { getCompactionHistory } from '#copilot/observability/event-collector';
 import { log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
+import { createEventFilter, createSseWriter, SseConnectionTracker } from '../api/sse-utils.js';
 import {
     createClientSession as createSdkSession,
     disconnectClientSession as disconnectSdkSession,
@@ -58,8 +58,8 @@ const router = Router();
 
 // C14-03: limite de SSE streams simultâneos por /sessions/:id/stream
 // INC-CORE-001/INC-CHAN-001 (fix): usar MAX_SSE_CLIENTS de core/constants.js em vez de definição local
-/** @type {number} */
-let _sessionsSseClients = 0;
+// GAP-EVARCH-01 (fix): tracker centralizado para /sessions/:id/stream
+const _sessionsTracker = new SseConnectionTracker('sessions/stream');
 
 // UPG-SE-004: buffers de replay SSE por sessão
 /** @type {Map<string, SseReplayBuffer>} */
@@ -600,15 +600,13 @@ router.get('/sessions/:id/stream', (req, res) => {
     const { id } = req.params;
 
     // C14-03: limitar streams SSE simultâneos
-    if (_sessionsSseClients >= MAX_SSE_CLIENTS) {
+    if (!_sessionsTracker.accept()) {
         res.status(503).json({ ok: false, error: 'Máximo de clientes SSE atingido' });
         return;
     }
-    _sessionsSseClients++;
 
     const entry = getSdkSession(id);
     if (!entry) {
-        _sessionsSseClients--; // C14-03: decrementar ao rejeitar por sessão inexistente
         res.status(404).json({
             ok: false,
             error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
@@ -616,95 +614,35 @@ router.get('/sessions/:id/stream', (req, res) => {
         return;
     }
 
-    // Configura headers SSE
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
-
     // UPG-SE-004: buffer de replay por sessão
     if (!_sessionReplayBuffers.has(id)) {
         _sessionReplayBuffers.set(id, new SseReplayBuffer());
     }
     const replayBuffer = /** @type {SseReplayBuffer} */ (_sessionReplayBuffers.get(id));
 
-    /**
-     * Envia um evento SSE formatado, com ID para replay.
-     *
-     * @param {string} eventType
-     * @param {unknown} data
-     * @param {{ skipBuffer?: boolean }} [opts]
-     */
-    const sendEvent = (eventType, data, opts) => {
-        if (res.writableEnded) return;
-        const payload = JSON.stringify(data);
-        const eventId = opts?.skipBuffer ? undefined : replayBuffer.push(eventType, data);
-        const idLine = eventId != null ? `id: ${eventId}\n` : '';
-        res.write(`${idLine}event: ${eventType}\ndata: ${payload}\n\n`);
-    };
+    // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
+    const sse = createSseWriter(req, res, {
+        heartbeatMs: 15_000,
+        replayBuffer,
+        tracker: _sessionsTracker,
+    });
 
-    // UPG-SE-004: replay de eventos perdidos via Last-Event-ID
-    const lastEventId = Number(req.headers?.['last-event-id']) || 0;
-    if (lastEventId > 0) {
-        const missed = replayBuffer.getAfter(lastEventId);
-        for (const evt of missed) {
-            if (!res.writableEnded) {
-                res.write(`id: ${evt.id}\nevent: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`);
-            }
-        }
-    }
-
-    sendEvent('connected', { sessionId: id, timestamp: Date.now() });
+    sse.send('connected', { sessionId: id, timestamp: Date.now() });
 
     // GAP-SE-007 (STREAMING-EVENTS-AUDIT Fase 4.2): filtro de eventos via ?events= query param
-    const eventsParam = typeof req.query['events'] === 'string' ? req.query['events'] : '';
-    const eventFilters = eventsParam
-        ? eventsParam
-              .split(',')
-              .map((e) => e.trim())
-              .filter(Boolean)
-        : [];
-    /**
-     * Verifica se um tipo de evento passa pelo filtro.
-     *
-     * @param {string} eventType
-     * @returns {boolean}
-     */
-    const matchesFilter = (eventType) => {
-        if (eventFilters.length === 0) return true;
-        return eventFilters.some((f) => (f.endsWith('.*') ? eventType.startsWith(f.slice(0, -1)) : eventType === f));
-    };
+    const eventFilter = createEventFilter(typeof req.query['events'] === 'string' ? req.query['events'] : undefined);
 
     // Registra handler no SDK para encaminhar eventos
     const unsubscribe = entry.session.on((event) => {
         const type = /** @type {string} */ (event?.type ?? '');
-        if (matchesFilter(type)) sendEvent('message', event);
+        if (!eventFilter || eventFilter(type)) sse.send('message', event);
     });
-
-    // Heartbeat a cada 15s para manter a conexão aberta
-    const heartbeatInterval = setInterval(() => {
-        sendEvent('heartbeat', { ts: Date.now() }, { skipBuffer: true });
-    }, 15_000);
-
-    // C14-03: decrement idempotente para evitar underflow
-    let _sseDecremented = false;
-    const decrement = () => {
-        if (!_sseDecremented) {
-            _sseDecremented = true;
-            _sessionsSseClients--;
-        }
-    };
 
     // Limpeza quando cliente desconecta
     req.on('close', () => {
-        decrement();
-        clearInterval(heartbeatInterval);
         unsubscribe();
         log('INFO', `[sdk-api] SSE stream encerrado: sessão ${id}`);
     });
-    res.on('error', decrement);
-    res.on('finish', decrement);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
