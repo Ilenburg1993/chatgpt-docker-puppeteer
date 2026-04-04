@@ -759,4 +759,252 @@ observabilidade.
 
 ---
 
+## Fase 18 — Terminal: Streaming Thinking Display (LLM-B Reasoning)
+
+**Objetivo**: Exibir o raciocínio (extended thinking / reasoning) da LLM-B em tempo real no terminal
+e via SSE/Socket.io, proporcionando transparência total do processo de pensamento do modelo.
+
+**Contexto**: A SDK emite eventos `assistant.reasoning_delta` (chunks incrementais) e
+`assistant.reasoning` (bloco completo). O `session-event-wirer.js` já captura esses eventos e emite
+`task.reasoning` no AlwaysAlive. Porém o terminal (`dialog.js`) **não consome** esses eventos —
+exibe apenas a resposta final. Esta fase conecta o pipeline de reasoning ao terminal.
+
+### F18.1 — Propagação de reasoning via `dialogTurn()` callback ✅
+
+- **Arquivos**: `channel/client.js`, `agent/always-alive.js`
+- **Mudança**: Adicionar callback `onReasoning` em `dialogTurn()` (análogo ao `onDelta` existente)
+  que recebe chunks de `task.reasoning` em tempo real
+- **Detalhes**: O `dialogTurn()` já recebe `onDelta` para message deltas; adicionar `onReasoning`
+  para reasoning deltas. Registrar listener temporário em `task.reasoning` e remover no finally.
+
+### F18.2 — Rendering de thinking no stdout do terminal ✅
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Em `_executeTurn()`, passar callback `onReasoning` que renderiza chunks de raciocínio
+  com prefixo visual distinto (ex: `💭` com cor dim/italic)
+- **Formato visual**:
+  ```
+  ── [14:22:10] 💭 pensando… ──────────────────────────────────────────
+    │  <chunk1><chunk2><chunk3>...
+  ── [14:22:12] pensamento completo (2.1s) ─────────────────────────────
+  ```
+- **Toggle**: Controlado pela flag `showThinking` no state.js (default: `true`)
+- **Env var**: `TERMINAL_SHOW_THINKING=true|false`
+
+### F18.3 — Evento SSE `reasoning` para clientes externos ✅
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Em `onReasoning` callback, emitir `broadcastSse('reasoning', { chunk, reasoningId })`
+  para que clientes SSE/Socket.io recebam o reasoning em real time
+- **Evento persisted**: Emitir `broadcastSse('reasoning.complete', { content, durationMs })` ao
+  final do bloco de reasoning
+
+### F18.4 — Armazenamento de reasoning no ConversationStore
+
+- **Arquivo**: `conversation-hub/store.js`
+- **Mudança**: Campo `reasoning` no schema de turn (string nullable). Ao concluir o turno, persistir
+  o bloco de reasoning completo junto com a resposta
+- **Exposição**: `GET /history` inclui campo `reasoning` quando presente
+
+### F18.5 — Comando `/thinking` no REPL ✅
+
+- **Arquivo**: `terminal/commands/thinking.js` (novo)
+- **Mudança**: Toggle `/thinking [on|off|toggle]` que controla `showThinking` no state.js
+- **Registro**: Adicionar em `terminal/commands/index.js`
+
+---
+
+## Fase 19 — Terminal: Streaming Response (Real-time Message Delta)
+
+**Objetivo**: Substituir a exibição batch (resposta completa ao final) por streaming real token a
+token no stdout, semelhante ao comportamento de um chat com LLM.
+
+### F19.1 — Streaming stdout em `_executeTurn()` ✅
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Usar callback `onDelta` do `dialogTurn()` para escrever chunks diretamente no stdout
+  à medida que chegam, em vez de esperar o `reply` completo
+- **Detalhes**:
+  - O header do turno (timestamp, modelo, etc.) é impresso ao receber o primeiro chunk
+  - Cada chunk é `process.stdout.write()` sem `\n` (inline)
+  - Ao final (`reply` retornado), imprimir newline final + separador
+  - Medir `durationMs` do primeiro chunk ao último (time-to-first-token + total)
+
+### F19.2 — Métricas de streaming (TTFT + throughput) ✅
+
+- **Arquivo**: `terminal/dialog.js` + `observability/tool-stats.js`
+- **Mudança**: Registrar `timeToFirstTokenMs` e `tokensPerSecond` no audit/metrics
+- **Exposição**: Campo adicional no evento `copilot:turn:complete` do NERV
+
+### F19.3 — SSE delta events para clientes do terminal
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Emitir `broadcastSse('delta', { chunk, messageId })` a cada chunk de resposta,
+  permitindo que o dashboard Vue renderize streaming em tempo real
+- **Rate limit**: Agrupar chunks menores que 50ms em batch para evitar flood SSE
+
+---
+
+## Fase 20 — Terminal: Usage & Intent Display
+
+**Objetivo**: Exibir informações de intent (o que o modelo está fazendo) e usage (tokens/custo) em
+tempo real no terminal.
+
+### F20.1 — Intent display inline
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Registrar listener em `assistant.intent` (via AlwaysAlive events) e exibir status
+  efêmero no stdout durante processamento
+- **Formato**: `  ⏳ aguardando gpt-4.1 · high… [Exploring codebase]`
+- **Cleanup**: Sobrescrever a linha com `\r` quando a resposta começa a chegar
+
+### F20.2 — Usage summary pós-turno ✅
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Após cada turno, mostrar resumo de tokens usado (via evento `session.usage_info` que
+  já é capturado pelo session-event-wirer)
+- **Formato**:
+  ```
+    📊 tokens: 1,234 in / 567 out · cache: 890 · custo: 0.003 · ctx: 45%
+  ```
+- **Toggle**: Controlado por `showUsage` no state.js (default: `false`, ativável via `/usage`)
+
+### F20.3 — Comando `/usage` no REPL ✅
+
+- **Novo arquivo**: `terminal/commands/usage.js`
+- **Funcionalidade**: Toggle `/usage [on|off]` para mostrar/ocultar usage pós-turno
+- **Bônus**: `/usage now` mostra snapshot instantâneo do context window
+
+---
+
+## Fase 21 — Terminal: Context & Tools Integration
+
+**Objetivo**: Integrar o terminal com os subsistemas existentes de tools, observabilidade e contexto
+do src/copilot.
+
+### F21.1 — Comando `/tools` no REPL ✅
+
+- **Novo arquivo**: `terminal/commands/tools.js`
+- **Funcionalidade**: Lista todas as tools registradas (git, shell, todo, etc.) com stats de uso
+- **Dados**: Puxa de `getToolStats()` do observability module
+
+### F21.2 — Comando `/errors` no REPL ✅
+
+- **Novo arquivo**: `terminal/commands/errors.js`
+- **Funcionalidade**: Mostra últimos N erros do `defaultErrorTracker`, formatados com cor
+- **Integração**: Reutiliza o endpoint lógica do `GET /errors` HTTP
+
+### F21.3 — Comando `/audit` no REPL ✅
+
+- **Novo arquivo**: `terminal/commands/audit.js`
+- **Funcionalidade**: Mostra resumo do audit log (últimas entradas + summary)
+- **Integração**: Reutiliza `defaultAuditLog.getAuditSummary()`
+
+### F21.4 — Comando `/compact` no REPL
+
+- **Novo arquivo**: `terminal/commands/compact.js`
+- **Funcionalidade**: Dispara compaction da context window da sessão ativa
+- **Integração**: Chama `alwaysAliveAgent.requestCompaction()` ou equivalente
+
+### F21.5 — Auto-display de tool executions em background
+
+- **Arquivo**: `terminal/dialog.js` ou novo `terminal/tool-display.js`
+- **Mudança**: Registrar listeners nos eventos `tool.execution_start` e `tool.execution_complete` do
+  AlwaysAlive para exibir notificações inline quando tools são executadas durante o diálogo
+- **Formato**:
+  ```
+    🔧 bash: npm run test:unit (executando…)
+    ✅ bash: npm run test:unit (ok, 3.2s)
+  ```
+
+---
+
+## Fase 22 — Terminal: Session Lifecycle Awareness
+
+**Objetivo**: Tornar o terminal ciente e reativo ao ciclo de vida da sessão SDK, incluindo
+compaction, erros, idle e shutdown.
+
+### F22.1 — Display de compaction events
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Listener em `session.compaction_start` / `session.compaction_complete` para mostrar
+  progresso visual
+- **Formato**:
+  ```
+    🔄 Compactando contexto… (45,000 → ?)
+    ✅ Compaction completa: 45,000 → 22,000 tokens (-51%)
+  ```
+
+### F22.2 — Display de session errors
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Listener em `session.error` para alertar o usuário de erros de sessão (quota, rate
+  limit, auth) com ações sugeridas
+- **Formato**:
+  ```
+    ❌ Erro de sessão: rate_limit — aguarde 30s antes de tentar novamente
+  ```
+
+### F22.3 — Context window gauge
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Mostra barra de progresso da context window no prompt do REPL quando uso > 50%
+- **Formato**: `[████████░░░░] 67% ctx` exibido sutilmente após o prompt
+
+### F22.4 — Graceful shutdown display
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Listener em `session.shutdown` para exibir resumo final da sessão antes de encerrar
+  (total de requests, duração, code changes)
+
+---
+
+## Fase 23 — Terminal: Rich Markdown & Syntax Rendering
+
+**Objetivo**: Melhorar a renderização de respostas da LLM-B no terminal com formatação Markdown e
+syntax highlighting para blocos de código.
+
+### F23.1 — Parser Markdown básico para terminal
+
+- **Novo arquivo**: `terminal/markdown-renderer.js`
+- **Funcionalidade**: Converte Markdown básico (headings, bold, italic, lists, inline code) em ANSI
+  escape codes para renderização no terminal
+- **Dependências**: Implementação zero-dependency usando regex patterns
+
+### F23.2 — Syntax highlighting para code blocks
+
+- **Arquivo**: `terminal/markdown-renderer.js`
+- **Mudança**: Detectar blocos ` ```lang ` e aplicar highlighting básico (keywords, strings,
+  comments) para JS/TS/Python/Bash
+- **Abordagem**: Patterns regex por linguagem — sem dependência de tree-sitter ou prism
+
+### F23.3 — Integração com `printExchange()`
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Filtrar output da LLM-B pelo markdown renderer antes de exibir, respeitando o toggle
+  `/markdown [on|off]` (novo comando REPL)
+
+### F23.4 — Comando `/markdown` no REPL
+
+- **Novo arquivo**: `terminal/commands/markdown.js`
+- **Funcionalidade**: Toggle `/markdown [on|off]` para ativar/desativar renderização rich
+- **Default**: `on` (ativado por padrão)
+
+---
+
+## Sumário de Novas Fases (F18-F23)
+
+| Fase | Nome                        | SubFases | Prioridade | Dependências |
+| ---- | --------------------------- | -------- | ---------- | ------------ |
+| F18  | Streaming Thinking Display  | 5        | **Alta**   | Nenhuma      |
+| F19  | Streaming Response          | 3        | **Alta**   | F18          |
+| F20  | Usage & Intent Display      | 3        | Média      | F18, F19     |
+| F21  | Context & Tools Integration | 5        | Média      | Nenhuma      |
+| F22  | Session Lifecycle Awareness | 4        | Média      | F18          |
+| F23  | Rich Markdown & Syntax      | 4        | Baixa      | F19          |
+
+**Estimativa de escopo total**: 24 subfases · ~6 novos arquivos · ~15 arquivos modificados
+
+---
+
 _Atualizado automaticamente conforme upgrades são aplicados._
