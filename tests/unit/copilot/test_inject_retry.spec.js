@@ -60,10 +60,14 @@ describe('channel/inject.js › INJECT-01: análise estrutural', async () => {
         );
     });
 
-    it('deve ter backoff por multiplicação de tentativa (retryDelay * (attempt + 1))', () => {
+    it('deve ter backoff por tentativa (linear ou exponencial)', () => {
+        // F11.2: backoff foi migrado para exponencial: retryDelayMs * Math.pow(2, attempt)
+        const hasLinear = source.includes('retryDelayMs * (attempt + 1)');
+        const hasExponential =
+            source.includes('Math.pow(2, attempt)') || source.includes('2 ** attempt') || source.includes('2**attempt');
         assert.ok(
-            source.includes('retryDelayMs * (attempt + 1)'),
-            'backoff linear deve multiplicar retryDelayMs pelo número da tentativa',
+            hasLinear || hasExponential,
+            'backoff deve multiplicar retryDelayMs pelo número da tentativa (linear ou exponencial)',
         );
     });
 });

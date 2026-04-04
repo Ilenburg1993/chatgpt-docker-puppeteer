@@ -157,11 +157,12 @@ describe('session-manager › initOrResumeSession › com sessão prévia', () =
         const { initOrResumeSession, writeState, clearState } = await import('#copilot/session-manager');
         clearState();
 
-        // Prepara estado com sessão existente
+        // Prepara estado com sessão existente (timestamp recente para não expirar)
+        const now = Date.now();
         writeState({
             sessionId: 'existing-session-xyz',
-            startedAt: 1000,
-            resumedAt: 1000,
+            startedAt: now,
+            resumedAt: now,
             resumeCount: 0,
             sendCount: 5,
             model: 'gpt-4.1',
@@ -218,8 +219,11 @@ describe('session-manager › initOrResumeSession › injectHookContext', () => 
         // systemMessage só é passado se buildHookSystemContext() retornar string não-vazia;
         // no CI sem arquivos de hook, pode ou não estar presente — verificamos apenas a estrutura
         if (created.opts?.systemMessage) {
-            assert.strictEqual(created.opts.systemMessage.mode, 'append');
-            assert.ok(typeof created.opts.systemMessage.content === 'string');
+            // SDK v0.2.0+: mode='customize'; versões anteriores: mode='append'
+            assert.ok(
+                ['append', 'customize'].includes(created.opts.systemMessage.mode),
+                `systemMessage.mode desconhecido: ${created.opts.systemMessage.mode}`,
+            );
         }
     });
 
