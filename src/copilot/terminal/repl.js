@@ -47,6 +47,7 @@ import {
     cmdRecall as _cmdRecall,
     cmdRemember as _cmdRemember,
     cmdResume as _cmdResume,
+    cmdSearch as _cmdSearch,
     cmdSkills as _cmdSkills,
     cmdStatus as _cmdStatus,
     cmdThinking as _cmdThinking,
@@ -54,7 +55,7 @@ import {
     cmdUsage as _cmdUsage,
     cmdWho as _cmdWho,
 } from './commands/index.js';
-import { ensureDialogLoop, println, sendTurn, broadcastSse } from './dialog.js';
+import { broadcastSse, ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { extractAtReferences } from './file-context.js';
 import { clearRateLimiters } from './rate-limiter-state.js';
 import { addAttachment, getHubSessionId, setRl } from './state.js';
@@ -142,6 +143,7 @@ const CMD_ROUTES = [
     [['display'], (_, arg, rest) => _cmdDisplay({ println }, arg, rest)],
     [['export'], (_, arg) => _cmdExport({ println }, arg)],
     [['metrics'], () => _cmdMetrics({ println })],
+    [['search'], (ctx, arg) => _cmdSearch({ println, hubSessionId: ctx.hubSessionId }, arg)],
     [['quit', 'exit'], (_, _2, _3, rl, injectServer, cleanup) => _cmdQuit(rl, injectServer, cleanup)],
     [['gh'], (_, _2, rest) => _cmdGh({ println }, rest)],
     [['git'], (_, _2, rest) => _cmdGit({ println }, rest)],
@@ -318,7 +320,12 @@ export function setupAgentListeners(rl) {
         const dur = entry ? ((Date.now() - entry.t0) / 1000).toFixed(1) : '?';
         const icon = success ? '\x1b[32m✅\x1b[0m' : '\x1b[31m❌\x1b[0m';
         println(`  ${icon} \x1b[90m${name}\x1b[0m \x1b[90m(${dur}s)\x1b[0m`);
-        broadcastSse('tool.complete', { toolCallId, toolName: name, success, durationMs: entry ? Date.now() - entry.t0 : 0 });
+        broadcastSse('tool.complete', {
+            toolCallId,
+            toolName: name,
+            success,
+            durationMs: entry ? Date.now() - entry.t0 : 0,
+        });
     };
 
     // F22.2: Session error display
@@ -341,7 +348,9 @@ export function setupAgentListeners(rl) {
         const success = Boolean(evt?.['success']);
         if (success && pre !== undefined && post !== undefined) {
             const pct = ((1 - post / pre) * 100).toFixed(0);
-            println(`  \x1b[32m🗜️  Compactação concluída: ${pre.toLocaleString('pt-BR')} → ${post.toLocaleString('pt-BR')} tokens (-${pct}%)\x1b[0m`);
+            println(
+                `  \x1b[32m🗜️  Compactação concluída: ${pre.toLocaleString('pt-BR')} → ${post.toLocaleString('pt-BR')} tokens (-${pct}%)\x1b[0m`,
+            );
         } else if (!success) {
             println(`  \x1b[31m🗜️  Compactação falhou\x1b[0m`);
         }
@@ -418,11 +427,27 @@ export async function startRepl(injectServer) {
         return;
     }
 
+    // F37: lista de comandos para tab completion
+    const _cmdNames = CMD_ROUTES.flatMap(([names]) => names).map((n) => `/${n}`);
+
+    /**
+     * Readline completer para comandos REPL (F37.1).
+     *
+     * @param {string} line
+     * @returns {[string[], string]}
+     */
+    function _completer(line) {
+        if (!line.startsWith('/')) return [[], line];
+        const hits = _cmdNames.filter((c) => c.startsWith(line));
+        return [hits.length ? hits : _cmdNames, line];
+    }
+
     const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
         terminal: true,
         prompt: PROMPT_USER,
+        completer: _completer,
     });
     setRl(rl);
 
@@ -440,7 +465,28 @@ export async function startRepl(injectServer) {
 
     rl.prompt();
 
+    // F37.6: Buffer para multiline input via backslash continuation
+    /** @type {string[]} */
+    let _multilineBuffer = [];
+    const PROMPT_CONTINUATION = '\x1b[90m  ...\x1b[0m ';
+
     rl.on('line', async (line) => {
+        // F37.6: Se a linha termina com `\`, acumular no buffer multiline
+        if (line.endsWith('\\')) {
+            _multilineBuffer.push(line.slice(0, -1));
+            rl.setPrompt(PROMPT_CONTINUATION);
+            rl.prompt();
+            return;
+        }
+
+        // Se havia buffer multiline acumulado, juntar tudo
+        if (_multilineBuffer.length > 0) {
+            _multilineBuffer.push(line);
+            line = _multilineBuffer.join('\n');
+            _multilineBuffer = [];
+            rl.setPrompt(PROMPT_USER);
+        }
+
         const trimmed = line.trim();
         if (!trimmed) {
             rl.prompt();

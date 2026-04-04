@@ -23,6 +23,7 @@ export { cmdForget, cmdRecall, cmdRemember } from './memory.js';
 export { cmdMetrics } from './metrics.js';
 export { cmdPlan } from './plan.js';
 export { cmdResume } from './resume.js';
+export { cmdSearch } from './search.js';
 export {
     cmdAnswer,
     cmdClear,

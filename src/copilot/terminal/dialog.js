@@ -45,6 +45,55 @@ import {
 /** Eventos considerados críticos para clientes em modo ?level=critical. */
 export const CRITICAL_EVENTS = new Set(['dialog.stalled', 'fatal', 'system']);
 
+// ─── F35.1: Queue local para notifyTerminalTurn em standalone ─────────────────
+
+/**
+ * @typedef {object} PendingTurnNotification
+ * @property {string} hubSessionId
+ * @property {{ turnId: number; role: 'user' | 'llm_a'; content: string; turnNumber: number }} userTurn
+ * @property {{ turnId: number; content: string; turnNumber: number; durationMs: number }} llmBTurn
+ */
+
+/** @type {PendingTurnNotification[]} */
+const _pendingNotifications = [];
+
+/** F35.4: Counter de falhas de persistência (notifyTerminalTurn). */
+let _persistenceFailureCount = 0;
+
+/** Máximo de notificações pendentes na fila local. */
+const MAX_PENDING_NOTIFICATIONS = 50;
+
+/**
+ * F35.1: Drena a fila de notificações pendentes quando o hub ficar disponível. Deve ser chamada após o hub ser
+ * inicializado (initStandalone/init).
+ */
+export function drainPendingNotifications() {
+    if (!conversationHub.isReady || _pendingNotifications.length === 0) return;
+    const drained = _pendingNotifications.splice(0);
+    let replayed = 0;
+    for (const n of drained) {
+        try {
+            conversationHub.notifyTerminalTurn(n.hubSessionId, n.userTurn, n.llmBTurn);
+            replayed++;
+        } catch (/** @type {any} */ e) {
+            log('WARN', `[dialog] F35.1: replay notifyTerminalTurn falhou: ${e.message}`);
+            _persistenceFailureCount++;
+        }
+    }
+    if (replayed > 0) {
+        log('INFO', `[dialog] F35.1: ${replayed} notificações pendentes drenadas com sucesso.`);
+    }
+}
+
+/**
+ * F35.4: Retorna o counter de falhas de persistência.
+ *
+ * @returns {number}
+ */
+export function getPersistenceFailureCount() {
+    return _persistenceFailureCount;
+}
+
 /**
  * Contador monotônico de IDs para eventos SSE do terminal. Permite reconexão com Last-Event-ID (RFC 8895 §9.2.4).
  *
@@ -202,8 +251,20 @@ export function printExchange(actor, message, reply, durationMs) {
         `  \x1b[90m[${ts}]\x1b[0m  🧠  \x1b[32mLLM-B\x1b[0m  \x1b[90m·\x1b[0m  \x1b[36m${model}\x1b[0m  \x1b[90m·\x1b[0m  \x1b[35m${effort}\x1b[0m  \x1b[90m·\x1b[0m  ${secsColor}`,
     );
     println('');
-    for (const line of reply.split('\n')) {
-        println(`  \x1b[32m│\x1b[0m  ${line}`);
+    // F37.3: Syntax highlighting para code blocks (```...```)
+    const replyLines = reply.split('\n');
+    let inCodeBlock = false;
+    for (const line of replyLines) {
+        if (line.trimStart().startsWith('```')) {
+            inCodeBlock = !inCodeBlock;
+            // Exibir delimitador em dim
+            println(`  \x1b[32m│\x1b[0m  \x1b[2m${line}\x1b[0m`);
+        } else if (inCodeBlock) {
+            // Código: fundo escuro + cyan para distinguir
+            println(`  \x1b[32m│\x1b[0m  \x1b[48;5;236m\x1b[36m${line}\x1b[0m`);
+        } else {
+            println(`  \x1b[32m│\x1b[0m  ${line}`);
+        }
     }
     println('');
 }
@@ -773,23 +834,67 @@ async function _executeTurn(message, actor) {
                 // mensagem do terminal. Usa turn_number do store para consistência de sequência.
                 // Guard: hub inicializado via initStandalone() (standalone) ou init() (main-server).
                 if (conversationHub.isReady) {
+                    try {
+                        const msgTurn = conversationHub.store.getTurn(msgTurnId);
+                        const replyTurn = conversationHub.store.getTurn(replyTurnId);
+                        conversationHub.notifyTerminalTurn(
+                            _hubSessionId,
+                            {
+                                turnId: msgTurnId,
+                                role: senderRole,
+                                content: message,
+                                turnNumber: msgTurn?.turn_number ?? 0,
+                            },
+                            {
+                                turnId: replyTurnId,
+                                content: reply,
+                                turnNumber: replyTurn?.turn_number ?? 0,
+                                durationMs,
+                            },
+                        );
+                    } catch (/** @type {any} */ hubErr) {
+                        // F33/F35.1: enfileirar para replay quando hub reconectar
+                        _persistenceFailureCount++;
+                        log('DEBUG', `[dialog] notifyTerminalTurn falhou (enfileirado): ${hubErr.message}`);
+                        if (_pendingNotifications.length < MAX_PENDING_NOTIFICATIONS) {
+                            const msgTurn = conversationHub.store.getTurn(msgTurnId);
+                            const replyTurn = conversationHub.store.getTurn(replyTurnId);
+                            _pendingNotifications.push({
+                                hubSessionId: _hubSessionId,
+                                userTurn: {
+                                    turnId: msgTurnId,
+                                    role: senderRole,
+                                    content: message,
+                                    turnNumber: msgTurn?.turn_number ?? 0,
+                                },
+                                llmBTurn: {
+                                    turnId: replyTurnId,
+                                    content: reply,
+                                    turnNumber: replyTurn?.turn_number ?? 0,
+                                    durationMs,
+                                },
+                            });
+                        }
+                    }
+                } else if (_pendingNotifications.length < MAX_PENDING_NOTIFICATIONS) {
+                    // F35.1: hub offline — enfileirar notificação para replay futuro
                     const msgTurn = conversationHub.store.getTurn(msgTurnId);
                     const replyTurn = conversationHub.store.getTurn(replyTurnId);
-                    conversationHub.notifyTerminalTurn(
-                        _hubSessionId,
-                        {
+                    _pendingNotifications.push({
+                        hubSessionId: _hubSessionId,
+                        userTurn: {
                             turnId: msgTurnId,
                             role: senderRole,
                             content: message,
                             turnNumber: msgTurn?.turn_number ?? 0,
                         },
-                        {
+                        llmBTurn: {
                             turnId: replyTurnId,
                             content: reply,
                             turnNumber: replyTurn?.turn_number ?? 0,
                             durationMs,
                         },
-                    );
+                    });
                 }
                 emitNerv('copilot:turn:sent', {
                     hubSessionId: _hubSessionId,

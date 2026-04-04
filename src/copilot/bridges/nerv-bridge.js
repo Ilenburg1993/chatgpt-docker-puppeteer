@@ -103,11 +103,18 @@ const EVENT_MAP = [
     { event: 'subagent.started', actionCode: 'COPILOT_SUBAGENT_STARTED' },
     { event: 'subagent.completed', actionCode: 'COPILOT_SUBAGENT_COMPLETED' },
     { event: 'subagent.failed', actionCode: 'COPILOT_SUBAGENT_FAILED' },
+    // ── F31.3-F31.4: compaction proativa ─────────────────────────────────────
+    { event: 'compaction.proactive_request', actionCode: 'COPILOT_COMPACTION_PROACTIVE_REQUEST' },
+    { event: 'compaction.force_request', actionCode: 'COPILOT_COMPACTION_FORCE_REQUEST' },
+    // ── F36.2: dialog delta routing ──────────────────────────────────────────
+    { event: 'dialog.delta', actionCode: 'COPILOT_DIALOG_DELTA' },
 ];
 
 /**
  * @typedef {object} NervInstance
  * @property {(envelope: any) => Promise<void>} emitEvent - Emite um envelope no bus NERV
+ * @property {((actionCode: string, handler: (envelope: any) => void) => () => void) | undefined} [onEvent] - Assina
+ *   eventos por actionCode (F34)
  */
 
 /**
@@ -124,6 +131,49 @@ let _nerv = null;
 
 /** @type {Map<string, (payload: any) => void>} */
 const _listeners = new Map();
+
+// ─── F34: Inbound command schema ────────────────────────────────────────────
+
+/**
+ * Comandos aceitos pelo canal NERV → agent (inbound).
+ *
+ * @type {Readonly<Record<string, (payload: Record<string, any>) => Promise<void>>>}
+ */
+const INBOUND_COMMANDS = Object.freeze({
+    /** Envia uma mensagem para o agente (equivale a sendMessage). */
+    async sendMessage(payload) {
+        const { message, options } = payload;
+        if (typeof message !== 'string' || !message.trim()) {
+            log('WARN', '[nerv-bridge:inbound] sendMessage ignorado — message inválido.');
+            return;
+        }
+        await alwaysAliveAgent.sendMessage(message, options ?? {});
+    },
+    /** Pausa o dialog loop do agente. */
+    async pause() {
+        if (typeof alwaysAliveAgent.pauseDialogLoop === 'function') {
+            await alwaysAliveAgent.pauseDialogLoop();
+        }
+    },
+    /** Retoma o dialog loop após pause. */
+    async resume() {
+        if (typeof alwaysAliveAgent.resumeDialogLoop === 'function') {
+            await alwaysAliveAgent.resumeDialogLoop();
+        }
+    },
+    /** Reinicia o agente (stop + start). */
+    async restart() {
+        await alwaysAliveAgent.stop();
+        await alwaysAliveAgent.start();
+    },
+});
+
+/**
+ * Handler inbound: recebe envelopes NERV com actionCode `COPILOT_COMMAND` e despacha o comando para o agente.
+ *
+ * @type {(() => void) | null}
+ */
+let _inboundUnsub = null;
 
 /**
  * F3.7 (BUG-MOD-12): rastrear se o handler before-stop já está registrado para evitar re-registro duplo em caso de
@@ -220,6 +270,21 @@ export function mount(nerv) {
     _nerv = nerv;
     _attachListeners();
 
+    // F34: assinar canal inbound NERV → agent para comandos remotos
+    if (typeof nerv.onEvent === 'function') {
+        _inboundUnsub = nerv.onEvent('COPILOT_COMMAND', (/** @type {any} */ envelope) => {
+            const command = envelope?.payload?.command;
+            const handler = typeof command === 'string' ? INBOUND_COMMANDS[command] : undefined;
+            if (!handler) {
+                log('WARN', `[nerv-bridge:inbound] Comando desconhecido: ${String(command)}`);
+                return;
+            }
+            Promise.resolve(handler(envelope.payload)).catch((/** @type {any} */ e) => {
+                log('WARN', `[nerv-bridge:inbound] Erro ao executar ${command}: ${e?.message ?? String(e)}`);
+            });
+        });
+    }
+
     // BUG-HIGH-10 (fix): re-registrar listeners após ciclo stop()/start() do agente.
     // O agente emite 'before-stop' antes de encerrar; ouvimos para limpar nossos listeners
     // e então re-registramos quando 'ready' disparar (novo ciclo de vida do agente).
@@ -262,6 +327,11 @@ function _onAgentBeforeStop() {
  */
 export function unmount() {
     _detachListeners();
+    // F34: limpar assinatura inbound NERV → agent
+    if (typeof _inboundUnsub === 'function') {
+        _inboundUnsub();
+        _inboundUnsub = null;
+    }
     alwaysAliveAgent.off('before-stop', _onAgentBeforeStop);
     // B10-03: cancelar handler 'ready' pendente para evitar re-anexação após desmontagem
     if (_pendingReadyHandler) {

@@ -211,6 +211,9 @@ function _wireCompactionEvents(session, { emit, getStatusSnapshot, onCheckpointP
 /**
  * Registra eventos de streaming de tokens (reasoning + message delta).
  *
+ * F36.2: Separa roteamento de filtro — `task.delta` só é emitido para non-dialog tasks; durante dialog loop, deltas vão
+ * para `dialog.delta` (canais distintos para SSE/listeners).
+ *
  * @param {CopilotSession} session
  * @param {SessionWirerCallbacks} callbacks
  * @returns {(() => void)[]}
@@ -225,12 +228,19 @@ function _wireStreamingEvents(session, { emit, isProcessing, dialogLoopActive })
                     reasoningId: /** @type {string | null} */ (evt?.data?.['reasoningId'] ?? null),
                 });
         }),
-        // Streaming delta — filtra durante 'processing' e 'waiting_for_input' com dialog loop ativo
+        // F36.2: Roteamento explícito — dialog deltas vão para `dialog.delta`, task deltas para `task.delta`.
         // (G1-BUG-06: evita taskId:null no SSE durante dialog loop)
         session.on('assistant.message_delta', (/** @type {SdkEvent} */ evt) => {
-            if (isProcessing() || dialogLoopActive()) return;
             const chunk = /** @type {string} */ (evt?.data?.['deltaContent'] ?? evt?.data?.['content'] ?? '');
-            if (chunk) emit('task.delta', { taskId: null, chunk });
+            if (!chunk) return;
+
+            if (dialogLoopActive()) {
+                // F36.2: Deltas durante dialog loop são internos — roteados para canal dialog
+                emit('dialog.delta', { chunk });
+                return;
+            }
+            if (isProcessing()) return; // Suppress durante estado transitório
+            emit('task.delta', { taskId: null, chunk });
         }),
     ];
 }
