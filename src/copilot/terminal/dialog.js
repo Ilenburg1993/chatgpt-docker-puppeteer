@@ -32,6 +32,8 @@ import {
     getHubSessionId,
     getPlanMode,
     getRl,
+    getShowThinking,
+    getShowUsage,
     getSseClients,
     getSseCriticalClients,
     getTerminalReplayBuffer,
@@ -569,10 +571,189 @@ async function _executeTurn(message, actor) {
     const t0 = Date.now();
     try {
         await ensureDialogLoop();
-        const reply = await llmBridgeClient.dialogTurn(enrichedMessage, { timeout: TURN_TIMEOUT_MS });
+
+        // F19.1: exibir mensagem do ator (user/llm-a) ANTES de iniciar o streaming
+        //        (no fallback batch mode, printExchange cuida de tudo)
+        if (actor === 'llm-a') {
+            const tsNow = new Date().toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+            println(SEPARATOR);
+            println(`  \x1b[90m[${tsNow}]\x1b[0m  🤖  \x1b[34mLLM-A\x1b[0m`);
+            println('');
+            for (const line of message.split('\n')) {
+                println(`  \x1b[34m│\x1b[0m  ${line}`);
+            }
+            println('');
+        }
+
+        // ── F18.2: Thinking display (reasoning deltas) ──────────────────────
+        const showThinking = getShowThinking();
+        let _reasoningStarted = false;
+        let _reasoningChars = 0;
+        let _reasoningContent = '';
+        let _reasoningId = /** @type {string | null} */ (null);
+        const tThinkingStart = Date.now();
+
+        /** @type {((chunk: string, reasoningId: string | null) => void) | undefined} */
+        const onReasoning = showThinking
+            ? (chunk, rId) => {
+                  if (!_reasoningStarted) {
+                      _reasoningStarted = true;
+                      _reasoningId = rId;
+                      // Limpar a linha "⏳ aguardando…"
+                      process.stdout.write('\r\x1b[K');
+                      const tsNow = new Date().toLocaleTimeString('pt-BR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                      });
+                      println(SEPARATOR);
+                      println(`  \x1b[90m[${tsNow}]\x1b[0m  💭  \x1b[2m\x1b[35mpensando…\x1b[0m`);
+                      println('');
+                      process.stdout.write('  \x1b[2m\x1b[90m│\x1b[0m  \x1b[2m\x1b[37m');
+                  }
+                  _reasoningChars += chunk.length;
+                  _reasoningContent += chunk;
+                  // Renderizar chunk inline com word wrap a cada ~100 chars por linha
+                  const lines = chunk.split('\n');
+                  for (let i = 0; i < lines.length; i++) {
+                      if (i > 0) process.stdout.write('\n  \x1b[2m\x1b[90m│\x1b[0m  \x1b[2m\x1b[37m');
+                      process.stdout.write(/** @type {string} */ (lines[i]));
+                  }
+                  // F18.3: SSE reasoning event para clientes externos
+                  broadcastSse('reasoning', { chunk, reasoningId: rId });
+              }
+            : undefined;
+
+        // ── F19.1: Streaming response (message deltas) ──────────────────────
+        let _streamingStarted = false;
+        let _streamingChars = 0;
+        let _firstChunkTime = 0;
+
+        /** @type {((chunk: string) => void) | undefined} */
+        const onDelta = (chunk) => {
+            if (!_streamingStarted) {
+                _streamingStarted = true;
+                _firstChunkTime = Date.now();
+                // Se thinking estava ativo, fechar o bloco de thinking
+                if (_reasoningStarted) {
+                    process.stdout.write('\x1b[0m\n');
+                    const thinkSecs = ((Date.now() - tThinkingStart) / 1000).toFixed(1);
+                    println(`  \x1b[90m└── pensamento completo (${thinkSecs}s · ${_reasoningChars} chars)\x1b[0m`);
+                    println('');
+                    // F18.3: SSE evento de reasoning completo
+                    broadcastSse('reasoning.complete', {
+                        content: _reasoningContent,
+                        reasoningId: _reasoningId,
+                        durationMs: Date.now() - tThinkingStart,
+                        chars: _reasoningChars,
+                    });
+                } else {
+                    // Limpar a linha "⏳ aguardando…"
+                    process.stdout.write('\r\x1b[K');
+                }
+                // Imprimir header da resposta
+                const tsNow = new Date().toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                });
+                const model = alwaysAliveAgent.model;
+                const effort = alwaysAliveAgent.reasoningEffort ?? 'high';
+                println(SEPARATOR);
+                println(
+                    `  \x1b[90m[${tsNow}]\x1b[0m  🧠  \x1b[32mLLM-B\x1b[0m  \x1b[90m·\x1b[0m  \x1b[36m${model}\x1b[0m  \x1b[90m·\x1b[0m  \x1b[35m${effort}\x1b[0m`,
+                );
+                println('');
+                process.stdout.write('  \x1b[32m│\x1b[0m  ');
+            }
+            _streamingChars += chunk.length;
+            // Renderizar chunk inline
+            const lines = chunk.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                if (i > 0) process.stdout.write('\n  \x1b[32m│\x1b[0m  ');
+                process.stdout.write(/** @type {string} */ (lines[i]));
+            }
+            // F19.3: SSE delta event para clientes externos
+            broadcastSse('delta', { chunk });
+        };
+
+        const reply = await llmBridgeClient.dialogTurn(enrichedMessage, {
+            timeout: TURN_TIMEOUT_MS,
+            onDelta,
+            ...(onReasoning && { onReasoning }),
+        });
         const durationMs = Date.now() - t0;
-        printExchange(actor, message, reply, durationMs);
+
+        if (_streamingStarted) {
+            // Fechar bloco de streaming e imprimir duração
+            const secs = (durationMs / 1000).toFixed(1);
+            const secsNum = durationMs / 1000;
+            const secsColor =
+                secsNum < 5
+                    ? `\x1b[32m${secs}s\x1b[0m`
+                    : secsNum < 15
+                      ? `\x1b[33m${secs}s\x1b[0m`
+                      : `\x1b[31m${secs}s\x1b[0m`;
+            const ttft = _firstChunkTime > 0 ? ((_firstChunkTime - t0) / 1000).toFixed(1) + 's TTFT' : '';
+            process.stdout.write('\n');
+            println(`  \x1b[90m└── ${secsColor}${ttft ? `  \x1b[90m·\x1b[0m  \x1b[90m${ttft}\x1b[0m` : ''}\x1b[0m`);
+            println('');
+        } else {
+            // Fallback: sem streaming — exibir resposta completa (batch mode)
+            printExchange(actor, message, reply, durationMs);
+        }
+
+        // Se thinking não foi fechado (modelo não produziu message deltas), fechar aqui
+        if (_reasoningStarted && !_streamingStarted) {
+            process.stdout.write('\x1b[0m\n');
+            const thinkSecs = ((Date.now() - tThinkingStart) / 1000).toFixed(1);
+            println(`  \x1b[90m└── pensamento completo (${thinkSecs}s · ${_reasoningChars} chars)\x1b[0m`);
+            println('');
+            broadcastSse('reasoning.complete', {
+                content: _reasoningContent,
+                reasoningId: _reasoningId,
+                durationMs: Date.now() - tThinkingStart,
+                chars: _reasoningChars,
+            });
+        }
+
+        // F19.2: TTFT e throughput metrics
+        if (_firstChunkTime > 0) {
+            const ttftMs = _firstChunkTime - t0;
+            emitNerv('copilot:turn:streaming_metrics', {
+                timeToFirstTokenMs: ttftMs,
+                totalDurationMs: durationMs,
+                streamedChars: _streamingChars,
+                reasoningChars: _reasoningChars,
+            });
+        }
+
         log('INFO', `[TerminalServer] Turno ${actor} concluído em ${durationMs}ms`);
+
+        // F20.2: Usage summary pós-turno
+        if (getShowUsage()) {
+            const snap = alwaysAliveAgent.getStatusSnapshot();
+            const ctxWin = snap?.contextWindow;
+            const prInfo = alwaysAliveAgent.lastPrInfo;
+            if (ctxWin || prInfo) {
+                const parts = [];
+                if (prInfo) {
+                    if (prInfo.model) parts.push(`modelo=\x1b[36m${prInfo.model}\x1b[0m`);
+                    if (typeof prInfo.cost === 'number') parts.push(`custo=\x1b[33m${prInfo.cost.toFixed(4)}\x1b[0m`);
+                }
+                if (ctxWin) {
+                    parts.push(`ctx=${(ctxWin.utilization * 100).toFixed(0)}%`);
+                    parts.push(
+                        `${ctxWin.tokens.toLocaleString('pt-BR')}/${ctxWin.tokenLimit.toLocaleString('pt-BR')} tokens`,
+                    );
+                }
+                println(`  \x1b[90m📊 ${parts.join(' · ')}\x1b[0m`);
+            }
+        }
 
         const _hubSessionId = getHubSessionId();
         if (_hubSessionId) {

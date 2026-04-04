@@ -507,15 +507,23 @@ export class LlmBridgeClient {
      * A LLM-B está suspensa em ask_user aguardando input. Esta chamada fornece o input e aguarda a resposta (REPLY: ou
      * DONE: próximo READY). O histórico local é atualizado com o turno do usuário e a resposta da LLM-B.
      *
+     * F18.1: callback `onReasoning` para receber chunks de extended thinking em tempo real.
+     *
      * @param {string} message - Mensagem a enviar à LLM-B
-     * @param {{ timeout?: number; onDelta?: (chunk: string) => void }} [opts]
+     * @param {{
+     *     timeout?: number;
+     *     onDelta?: (chunk: string) => void;
+     *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
+     * }} [opts]
      * @returns {Promise<string>} Resposta da LLM-B (conteúdo após REPLY: ou confirmação de DONE:)
      * @throws {Error} Se o dialog loop não estiver ativo ou timeout for excedido
      */
     async dialogTurn(message, opts = {}) {
-        const { timeout = 60_000, onDelta } = opts;
+        const { timeout = 60_000, onDelta, onReasoning } = opts;
         const sentAt = Date.now();
         this.#turnCount++;
+
+        const agent = requireAgent();
 
         // BUG-H05 fix: propaga chunks de streaming para onDelta enquanto sendDialogTurn processa
         const onDeltaTemp = onDelta
@@ -523,12 +531,22 @@ export class LlmBridgeClient {
                   if (evt.chunk) onDelta(evt.chunk);
               }
             : null;
-        if (onDeltaTemp) requireAgent().on('task.delta', onDeltaTemp);
+        if (onDeltaTemp) agent.on('task.delta', onDeltaTemp);
+
+        // F18.1: propaga chunks de reasoning (extended thinking) via callback
+        const onReasoningTemp = onReasoning
+            ? (/** @type {{ chunk?: string; reasoningId?: string | null }} */ evt) => {
+                  if (evt.chunk) onReasoning(evt.chunk, evt.reasoningId ?? null);
+              }
+            : null;
+        if (onReasoningTemp) agent.on('task.reasoning', onReasoningTemp);
+
         let reply;
         try {
-            reply = await requireAgent().sendDialogTurn(message, { timeout });
+            reply = await agent.sendDialogTurn(message, { timeout });
         } finally {
-            if (onDeltaTemp) requireAgent().off('task.delta', onDeltaTemp);
+            if (onDeltaTemp) agent.off('task.delta', onDeltaTemp);
+            if (onReasoningTemp) agent.off('task.reasoning', onReasoningTemp);
         }
         // BUG-MED-02 (fix): registrar turno de usuário apenas após confirmação de envio bem-sucedido
         // Evita histórico contaminado com menssagens do usuário sem resposta correspondente
