@@ -75,7 +75,7 @@ export function getCopilotFallbackModel() {
  *
  * @type {readonly string[]}
  */
-export { AGENT_EVENTS } from '../agent/events.js';
+export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from '../agent/events.js';
 /** @typedef {import('../agent/events.js').AgentEventName} AgentEventName */
 
 /**

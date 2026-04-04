@@ -72,12 +72,12 @@ function registerAgentEventListeners() {
                 log('ERROR', `[TerminalServer] Falha no fallback de restart após watchdog: ${e2.message}`),
             );
         });
-        broadcastSse('stalled', { stalledMs: evt.stalledMs });
+        broadcastSse('dialog.stalled', { stalledMs: evt.stalledMs });
     });
 
     // SSE: transmite respostas da LLM-B para clientes subscritos
     alwaysAliveAgent.on('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
-        broadcastSse('reply', {
+        broadcastSse('dialog.reply', {
             content: evt.reply,
             timestamp: Date.now(),
             model: alwaysAliveAgent.model,
@@ -89,7 +89,7 @@ function registerAgentEventListeners() {
         broadcastSse('dialog.loop.changed', { active: evt.active, timestamp: evt.ts });
     });
     alwaysAliveAgent.on('dialog.ready', () => {
-        broadcastSse('ready', {
+        broadcastSse('dialog.ready', {
             timestamp: Date.now(),
             model: alwaysAliveAgent.model,
             reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
@@ -103,7 +103,7 @@ function registerAgentEventListeners() {
         if (reason === 'authorized_stop') {
             println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
             log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
-            broadcastSse('stopped', { authorized: true, reason });
+            broadcastSse('dialog.stopped', { authorized: true, reason });
             return;
         }
 
@@ -111,7 +111,7 @@ function registerAgentEventListeners() {
         if (alwaysAliveAgent.dialogPaused) {
             println(`\n\x1b[33m  [dialog] Loop encerrado enquanto pausado pelo usuário — não reiniciando.\x1b[0m`);
             log('INFO', '[TerminalServer] Dialog loop encerrado com dialogPaused=true. Não reiniciando.');
-            broadcastSse('stopped', { reason, paused: true });
+            broadcastSse('dialog.stopped', { reason, paused: true });
             return;
         }
 
@@ -119,7 +119,7 @@ function registerAgentEventListeners() {
         const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
         println(`\n\x1b[33m  [dialog] Loop encerrado (${label}) — reiniciando automaticamente…\x1b[0m`);
         log('WARN', `[TerminalServer] Dialog loop encerrado (${label}). Reiniciando.`);
-        broadcastSse('stopped', { reason, restarting: true });
+        broadcastSse('dialog.stopped', { reason, restarting: true });
         ensureDialogLoop().catch((/** @type {any} */ e) =>
             log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop após stop: ${e.message}`),
         );
@@ -129,7 +129,7 @@ function registerAgentEventListeners() {
     alwaysAliveAgent.on('session.usage', (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
         const { currentTokens = 0, tokenLimit = 0 } = data;
         if (tokenLimit > 0) {
-            broadcastSse('context', {
+            broadcastSse('session.usage', {
                 tokens: currentTokens,
                 tokenLimit,
                 utilization: currentTokens / tokenLimit,
@@ -144,7 +144,7 @@ function registerAgentEventListeners() {
         (/** @type {{ compactionTokensUsed?: { cachedInput?: number }; success?: boolean }} */ evt) => {
             const cachedInput = evt?.compactionTokensUsed?.cachedInput ?? 0;
             if (cachedInput > 0) {
-                broadcastSse('cache.hit', { cachedInput, timestamp: Date.now() });
+                broadcastSse('session.compaction_complete', { cachedInput, timestamp: Date.now() });
             }
         },
     );

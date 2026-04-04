@@ -19,6 +19,7 @@
  */
 
 import EventEmitter from 'node:events';
+import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
 
 // ─── Emitter reativo ──────────────────────────────────────────────────────────
 
@@ -66,6 +67,13 @@ const _sseClients = new Set();
  */
 const _sseCriticalClients = new Set();
 
+/**
+ * FASE-12.2: Buffer circular de replay SSE do terminal.
+ *
+ * Permite que clientes reconectando (com Last-Event-ID) recebam os eventos perdidos.
+ */
+const _terminalReplayBuffer = new SseReplayBuffer();
+
 // ─── Getters / setters ────────────────────────────────────────────────────────
 
 /** @returns {string | null} */
@@ -107,6 +115,11 @@ export function getSseClients() {
 /** @returns {Set<import('node:http').ServerResponse>} */
 export function getSseCriticalClients() {
     return _sseCriticalClients;
+}
+
+/** FASE-12.2: @returns {SseReplayBuffer} */
+export function getTerminalReplayBuffer() {
+    return _terminalReplayBuffer;
 }
 
 // ─── Attachment queue ─────────────────────────────────────────────────────────

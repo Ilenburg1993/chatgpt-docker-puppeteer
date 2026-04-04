@@ -43,7 +43,7 @@ import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { println } from './dialog.js';
 import { handleMetrics } from './http-handlers.js';
 import { matchRoute } from './route-table.js';
-import { getSseClients, getSseCriticalClients } from './state.js';
+import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from './state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
@@ -303,6 +303,19 @@ export function createInjectServer() {
                     'Access-Control-Allow-Origin': '*',
                 });
                 res.write(`: connected (level=${isCriticalOnly ? 'critical' : 'all'})\n\n`);
+
+                // FASE-12.2: replay de eventos perdidos via Last-Event-ID
+                const lastEventId = Number(req.headers['last-event-id']) || 0;
+                if (lastEventId > 0) {
+                    const replayBuffer = getTerminalReplayBuffer();
+                    const missed = replayBuffer.getAfter(lastEventId);
+                    for (const evt of missed) {
+                        if (res.writableEnded) break;
+                        const safeEvent = String(evt.event).replace(/[\r\n]/g, '_');
+                        res.write(`id: ${evt.id}\nevent: ${safeEvent}\ndata: ${JSON.stringify(evt.data)}\n\n`);
+                    }
+                }
+
                 // PHASE-9: heartbeat periódico para manter conexão viva (proxy/LB timeout)
                 const heartbeat = setInterval(() => {
                     try {

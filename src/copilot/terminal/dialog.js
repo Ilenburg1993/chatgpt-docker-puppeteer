@@ -19,10 +19,11 @@
 
 import { log } from '#copilot/observability/logger';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { eventFanout } from '../api/event-fanout.js';
 import { emitNerv } from '../bridges/nerv-bridge.js';
 import { llmBridgeClient } from '../channel/client.js';
 import { conversationHub } from '../conversation-hub/hub.js';
-import { getCopilotNamespace } from '../conversation-hub/socket-ns.js';
+import { broadcastGlobal, broadcastToSession } from '../conversation-hub/socket-ns.js';
 import { LLM_B_TURN_TIMEOUT_MS, MAX_SSE_CONTENT_CHARS } from '../core/constants.js';
 import { embedMultiple, readFileContext } from './file-context.js';
 import {
@@ -33,13 +34,14 @@ import {
     getRl,
     getSseClients,
     getSseCriticalClients,
+    getTerminalReplayBuffer,
     setBusy,
 } from './state.js';
 
 // ─── Eventos críticos para SSE ────────────────────────────────────────────────
 
 /** Eventos considerados críticos para clientes em modo ?level=critical. */
-export const CRITICAL_EVENTS = new Set(['stalled', 'fatal', 'system']);
+export const CRITICAL_EVENTS = new Set(['dialog.stalled', 'fatal', 'system']);
 
 /**
  * Contador monotônico de IDs para eventos SSE do terminal. Permite reconexão com Last-Event-ID (RFC 8895 §9.2.4).
@@ -240,24 +242,30 @@ export function broadcastSse(event, data) {
     }
 
     emitSse(_sseClients, _sseCriticalClients, event, safeData);
-    emitSocket(getCopilotNamespace(), getHubSessionId(), event, safeData);
+    emitSocket(event, safeData);
+
+    // FASE-15.2: publicar no barramento de fanout para propagação inter-processo
+    eventFanout.publish('terminal', event, safeData);
 }
 
 /**
  * FASE-12.1: Escreve um evento SSE formatado para um único client raw (node:http).
  *
- * Centraliza sanitização, event ID monotônico, hubSessionId injection e escrita.
+ * Centraliza sanitização, event ID monotônico, hubSessionId injection e escrita. FASE-12.2: Armazena no replay buffer
+ * para suporte a Last-Event-ID.
  *
  * @param {import('node:http').ServerResponse} client
  * @param {string} event - Nome do evento (será sanitizado)
  * @param {object} data - Payload JSON (já truncado se necessário)
- * @param {{ hubSessionId?: string | null }} [ctx]
+ * @param {{ hubSessionId?: string | null; replayBuffer?: import('../api/sse-replay-buffer.js').SseReplayBuffer }} [ctx]
  * @returns {boolean} true se a escrita foi bem-sucedida
  */
 function writeSseEvent(client, event, data, ctx = {}) {
     const safeEvent = String(event).replace(/[\r\n]/g, '_');
-    const eventId = nextSseEventId();
-    const payload = `id: ${eventId}\nevent: ${safeEvent}\ndata: ${JSON.stringify({ ...data, hubSessionId: ctx.hubSessionId ?? null })}\n\n`;
+    const enrichedData = { ...data, hubSessionId: ctx.hubSessionId ?? null };
+    // FASE-12.2: push no replay buffer e usar o ID retornado
+    const eventId = ctx.replayBuffer ? ctx.replayBuffer.push(safeEvent, enrichedData) : nextSseEventId();
+    const payload = `id: ${eventId}\nevent: ${safeEvent}\ndata: ${JSON.stringify(enrichedData)}\n\n`;
     try {
         client.write(payload);
         return true;
@@ -278,7 +286,7 @@ function writeSseEvent(client, event, data, ctx = {}) {
 function emitSse(clients, criticalClients, event, data) {
     if (clients.size === 0 && criticalClients.size === 0) return;
 
-    const ctx = { hubSessionId: getHubSessionId() };
+    const ctx = { hubSessionId: getHubSessionId(), replayBuffer: getTerminalReplayBuffer() };
 
     for (const client of clients) {
         if (!writeSseEvent(client, event, data, ctx)) {
@@ -303,17 +311,26 @@ function emitSse(clients, criticalClients, event, data) {
  * @param {object} data - Payload já sanitizado/truncado
  * @returns {void}
  */
-function emitSocket(ns, hubSessionId, event, data) {
-    if (!ns) return;
+/**
+ * Emite um evento via Socket.io namespace `/copilot` usando helpers centralizados de socket-ns.js.
+ *
+ * FASE-15.1: desacoplado de broadcastSse — usa broadcastToSession/broadcastGlobal em vez de manipulação direta do
+ * namespace.
+ *
+ * @param {string} event - Tipo do evento
+ * @param {object} data - Payload já sanitizado/truncado
+ * @returns {void}
+ */
+function emitSocket(event, data) {
+    const hubSessionId = getHubSessionId();
     if (hubSessionId) {
-        // ── Socket.io (BUG-HIGH-02 fix): emitir apenas para a sala da hub_session ativa ──
-        // Evita vazamento de dados entre sessões diferentes conectadas ao mesmo namespace
-        ns.to(hubSessionId).emit(event, { ...data, hubSessionId });
+        // BUG-HIGH-02 fix: emitir apenas para a sala da hub_session ativa
+        broadcastToSession(hubSessionId, event, { ...data, hubSessionId });
     } else {
         // Sem sessão ativa: emitir globalmente apenas eventos de sistema inócuos
-        const SYSTEM_EVENTS = new Set(['ready', 'stalled', 'stopped', 'fatal', 'busy']);
+        const SYSTEM_EVENTS = new Set(['dialog.ready', 'dialog.stalled', 'dialog.stopped', 'fatal', 'busy']);
         if (SYSTEM_EVENTS.has(event)) {
-            ns.emit(event, { ...data, hubSessionId: null });
+            broadcastGlobal(event, { ...data, hubSessionId: null });
         }
     }
 }

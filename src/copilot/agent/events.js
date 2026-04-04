@@ -15,29 +15,40 @@
  *
  * Grupos de eventos:
  *
- * - **task.***: ciclo de vida de uma tarefa individual (enqueued → started → completed | error).
- * - **session.***: eventos do ciclo de vida da sessão SDK (compaction, usage, billing, fatal).
- * - **dialog.***: ciclo de vida do dialog loop (LLM-B ↔ SDK).
- * - **tool.***: execução de ferramentas pelo SDK durante um turno.
+ * - **task.***: ciclo de vida de uma tarefa individual (enqueued → started → completed | error). ⚠️ **Consome Premium
+ *   Requests** — cada task usa `sendMessage()`.
+ * - **session.***: eventos do ciclo de vida da sessão SDK (compaction, usage, billing, fatal). ℹ️ **Não consome PR** —
+ *   são eventos de infraestrutura/observabilidade.
+ * - **dialog.***: ciclo de vida do dialog loop (LLM-B ↔ SDK). ✅ **Não consome PR** — usa `dialogTurn()` (dialog mode),
+ *   que é free.
+ * - **tool.***: execução de ferramentas pelo SDK durante um turno. ℹ️ **Não consome PR isoladamente** — acontece dentro
+ *   de um turno já em curso.
  * - **question.pending / question.answered / status / stopped / ready / error**: controle de estado de alto nível do
- *   agente.
- * - **pr.consumed / pr.fallback_model / permission.mode_changed**: métricas e controle de permissões.
+ *   agente. ℹ️ **Não consome PR** — eventos de estado.
+ * - **pr.consumed / pr.fallback_model / permission.mode_changed**: métricas e controle de permissões. ℹ️ **Tracking** —
+ *   `pr.consumed` é emitido APÓS consumo para observabilidade.
  * - **context:compacted**: emitido após compactação de contexto local.
  * - **before-stop**: emitido antes de `stop()` iniciar o dreno da fila.
+ *
+ * **PR Consumption Summary:**
+ *
+ * - `sendMessage()` → consome 1 PR por chamada (task.started/completed/error).
+ * - `dialogTurn()` → NÃO consome PR (dialog.reply, dialog.turn_start/end, etc.).
+ * - Dialog loop events são SEMPRE free e devem ser o padrão para interação contínua.
  *
  * **Convenção de naming (Fase BG):** todos os eventos usam underscore como separador dentro de grupos (ex.:
  * `tool.execution_start`, `session.mode_changed`). Hífens são reservados para `before-stop` (legado). Dot (`.`) separa
  * grupo do nome, e `context:` usa dois-pontos por razões históricas.
  */
 export const AGENT_EVENTS = /** @type {const} */ ([
-    // ── task ──────────────────────────────────────────────────────────────
+    // ── task (⚠️ CONSOME PR via sendMessage) ───────────────────────────
     'task.queued',
     'task.started',
     'task.completed',
     'task.error',
     'task.delta',
     'task.reasoning',
-    // ── questions / state ─────────────────────────────────────────────────
+    // ── questions / state (não consome PR) ────────────────────────────
     'question.pending',
     'question.answered',
     'status',
@@ -45,7 +56,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'ready',
     'error',
     'before-stop',
-    // ── session ───────────────────────────────────────────────────────────
+    // ── session (não consome PR — observabilidade) ─────────────────────
     'session.compaction_start',
     'session.compaction_complete',
     'session.fatal',
@@ -53,7 +64,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'session.token_budget_warning',
     'session.mode_changed',
     'session.history_synced',
-    // ── dialog loop ───────────────────────────────────────────────────────
+    // ── dialog loop (✅ NÃO consome PR — usa dialogTurn) ────────────────
     'dialog.ready',
     'dialog.reply',
     'dialog.stopped',
@@ -65,10 +76,10 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'dialog.turn_end',
     // G2-ARCH-17: dialog.turn_timeout emitido quando o boot ou um turno expira sem resposta
     'dialog.turn_timeout',
-    // ── tool execution (Fase BG: underscore, alinhado com SDK) ────────────
+    // ── tool execution (não consome PR isoladamente) ───────────────────
     'tool.execution_start',
     'tool.execution_complete',
-    // ── PR / permission ───────────────────────────────────────────────────
+    // ── PR / permission (tracking — pr.consumed emitido APÓS consumo) ──
     'pr.consumed',
     'pr.fallback_model',
     'permission.mode_changed',
@@ -112,6 +123,40 @@ export const AGENT_EVENTS = /** @type {const} */ ([
  *
  * @typedef {(typeof AGENT_EVENTS)[number]} AgentEventName
  */
+
+/**
+ * Eventos que indicam consumo de Premium Requests (via sendMessage).
+ *
+ * Usado para auditoria, billing e para garantir que dialog loop events (free) nunca sejam confundidos com task events
+ * (PR-consuming).
+ *
+ * @type {ReadonlySet<string>}
+ */
+export const PR_CONSUMING_EVENTS = /** @type {ReadonlySet<string>} */ (
+    new Set(['task.started', 'task.completed', 'task.error', 'pr.consumed'])
+);
+
+/**
+ * Eventos do dialog loop que NÃO consomem Premium Requests.
+ *
+ * Usa dialogTurn() internamente — free e seguro para interação contínua.
+ *
+ * @type {ReadonlySet<string>}
+ */
+export const DIALOG_LOOP_EVENTS = /** @type {ReadonlySet<string>} */ (
+    new Set([
+        'dialog.ready',
+        'dialog.reply',
+        'dialog.stopped',
+        'dialog.stalled',
+        'dialog.paused',
+        'dialog.resumed',
+        'dialog.loop.changed',
+        'dialog.turn_start',
+        'dialog.turn_end',
+        'dialog.turn_timeout',
+    ])
+);
 
 /**
  * G2-DX-16: Conjunto de eventos de alta frequência (hot-path) emitidos a cada turno ou frame de streaming.

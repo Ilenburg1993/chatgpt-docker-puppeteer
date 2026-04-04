@@ -10,8 +10,9 @@
  */
 
 import { AGENT_EVENTS, MAX_SSE_CLIENTS } from '#copilot/core';
+import { eventFanout } from './event-fanout.js';
 import { SseReplayBuffer } from './sse-replay-buffer.js';
-import { createEventFilter, createSseWriter, SseConnectionTracker } from './sse-utils.js';
+import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from './sse-utils.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -97,7 +98,12 @@ export function registerStreamRoutes(bridge, agent) {
          * @param {AgentEventName} eventName
          * @param {unknown} data
          */
-        const sseHandler = (eventName, data) => sse.send(eventName, data ?? {});
+        const sseHandler = (eventName, data) => {
+            const payload = standardizeSsePayload(data ?? {});
+            sse.send(eventName, payload);
+            // FASE-15.2: publicar no barramento de fanout para propagação inter-processo
+            eventFanout.publish('bridge', eventName, /** @type {object} */ (payload));
+        };
 
         /** @type {Map<AgentEventName, (data: unknown) => void>} */
         const handlers = new Map(

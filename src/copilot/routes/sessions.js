@@ -32,7 +32,7 @@ import { log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
-import { createEventFilter, createSseWriter, SseConnectionTracker } from '../api/sse-utils.js';
+import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../api/sse-utils.js';
 import {
     createClientSession as createSdkSession,
     disconnectClientSession as disconnectSdkSession,
@@ -637,7 +637,7 @@ router.get('/sessions/:id/stream', (req, res) => {
     // Registra handler no SDK para encaminhar eventos
     const unsubscribe = entry.session.on((event) => {
         const type = /** @type {string} */ (event?.type ?? '');
-        if (!eventFilter || eventFilter(type)) sse.send('message', event);
+        if (!eventFilter || eventFilter(type)) sse.send('message', standardizeSsePayload(event));
     });
 
     // Limpeza quando cliente desconecta

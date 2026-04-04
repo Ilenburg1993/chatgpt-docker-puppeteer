@@ -268,7 +268,8 @@ export async function waitForLlmBReady(opts = {}) {
 
 /**
  * @typedef {Object} SseEvent
- * @property {string} type - tipo do evento SSE ('reply' | 'ready' | 'stalled')
+ * @property {string} type - tipo do evento SSE ('dialog.reply' | 'dialog.ready' | 'dialog.stalled' | 'dialog.stopped' |
+ *   'session.usage' | ...)
  * @property {Record<string, unknown>} data - payload JSON do evento
  */
 
@@ -416,7 +417,7 @@ function _subscribeSse(path, port, onEvent) {
  * @example
  *     ```js
  *     const sub = subscribeLlmB((evt) => {
- *         if (evt.type === 'reply') console.log('LLM-B respondeu:', evt.data.content);
+ *         if (evt.type === 'dialog.reply') console.log('LLM-B respondeu:', evt.data.content);
  *     });
  *     // ... depois:
  *     sub.unsubscribe();

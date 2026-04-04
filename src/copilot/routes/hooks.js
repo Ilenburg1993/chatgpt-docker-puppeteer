@@ -19,7 +19,7 @@ import { SDK_HOOKS } from '#copilot/hooks/registry';
 import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
-import { createSseWriter, SseConnectionTracker } from '../api/sse-utils.js';
+import { createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../api/sse-utils.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** GAP-EVARCH-01 (fix): tracker centralizado para /hooks/events. */
@@ -104,7 +104,7 @@ router.get('/hooks/events', (req, res) => {
 
         /** @param {import('#copilot/hooks/bus').HookBusEvent} ev */
         const onAnyHook = (ev) => {
-            sse.send('hook', ev);
+            sse.send('hook', standardizeSsePayload(ev));
         };
 
         // Observar todos os eventos via wildcard '*'

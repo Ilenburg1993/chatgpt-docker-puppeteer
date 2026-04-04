@@ -22,7 +22,7 @@ import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
-import { createEventFilter, createSseWriter, SseConnectionTracker } from '../api/sse-utils.js';
+import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../api/sse-utils.js';
 import { getClient } from '../lib/sdk-client.js';
 import { defaultMetrics } from '../observability/index.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
@@ -201,7 +201,7 @@ router.get('/agent/stream', (req, res) => {
         // Inscreve nos eventos de ciclo de vida do client
         const unsubscribe = client.on((event) => {
             const type = /** @type {string} */ (event?.type ?? 'lifecycle');
-            if (!eventFilter || eventFilter(type)) sse.send('lifecycle', event);
+            if (!eventFilter || eventFilter(type)) sse.send('lifecycle', standardizeSsePayload(event));
         });
 
         req.on('close', () => {
