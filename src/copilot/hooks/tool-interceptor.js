@@ -223,24 +223,26 @@ export function createTimingEnricherHook() {
     /** @type {Map<string, number>} */
     const timings = new Map();
 
-    /** @type {PreToolUseHandler} */
-    const onPreToolUse = async function onPreToolUse(input, invocation) {
-        const key = `${invocation?.sessionId ?? ''}:${input.toolName}`;
-        timings.set(key, Date.now());
-        return {};
-    };
-
-    /** @type {PostToolUseHandler} */
-    const onPostToolUse = async function onPostToolUse(input, invocation) {
-        const key = `${invocation?.sessionId ?? ''}:${input.toolName}`;
-        const t0 = timings.get(key);
-        timings.delete(key); // limpa independentemente para evitar leak
-        if (t0 !== undefined) {
-            const elapsed = Date.now() - t0;
-            return { additionalContext: `tool '${input.toolName}' completada em ${elapsed}ms` };
+    const onPreToolUse = /** @type {PreToolUseHandler} */ (
+        async function onPreToolUse(input, invocation) {
+            const key = `${invocation?.sessionId ?? ''}:${input.toolName}`;
+            timings.set(key, Date.now());
+            return {};
         }
-        return {};
-    };
+    );
+
+    const onPostToolUse = /** @type {PostToolUseHandler} */ (
+        async function onPostToolUse(input, invocation) {
+            const key = `${invocation?.sessionId ?? ''}:${input.toolName}`;
+            const t0 = timings.get(key);
+            timings.delete(key); // limpa independentemente para evitar leak
+            if (t0 !== undefined) {
+                const elapsed = Date.now() - t0;
+                return { additionalContext: `tool '${input.toolName}' completada em ${elapsed}ms` };
+            }
+            return {};
+        }
+    );
 
     return { onPreToolUse, onPostToolUse };
 }

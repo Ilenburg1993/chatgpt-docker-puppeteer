@@ -11,6 +11,7 @@
 
 import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
+import { getToolStats } from '#copilot/observability/tool-stats';
 import { defineTool } from '@github/copilot-sdk';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
@@ -331,6 +332,81 @@ const toggleToolTool = defineTool('toggle_tool', {
 });
 
 /**
+ * Tool: get_tool_health — retorna métricas de uso por tool: chamadas, erros, latência e status.
+ *
+ * F7.3: introspecção por tool individual para diagnóstico de saúde.
+ */
+const getToolHealthTool = defineTool('get_tool_health', {
+    description:
+        'Retorna métricas de saúde por ferramenta: total de chamadas, taxa de erro, latência média e última execução. ' +
+        'Útil para identificar tools com alta taxa de falha ou lentidão. ' +
+        'Filtre por nome específico ou receba todas com sort por chamadas.',
+    parameters: /**
+     * @type {import('zod').ZodType<{
+     *     tool_name?: string;
+     *     sort_by?: 'calls' | 'errors' | 'latency' | 'error_rate';
+     *     limit?: number;
+     * }>}
+     */ (
+        z.object({
+            tool_name: z.string().optional().describe('Nome da tool para detalhar (omitir = todas)'),
+            sort_by: z
+                .enum(['calls', 'errors', 'latency', 'error_rate'])
+                .optional()
+                .default('calls')
+                .describe('Campo para ordenação descendente'),
+            limit: z
+                .number()
+                .int()
+                .min(1)
+                .max(50)
+                .optional()
+                .default(20)
+                .describe('Número máximo de tools no resultado'),
+        })
+    ),
+    handler: async (
+        /** @type {{ tool_name?: string; sort_by?: 'calls' | 'errors' | 'latency' | 'error_rate'; limit?: number }} */ {
+            tool_name,
+            sort_by = 'calls',
+            limit = 20,
+        },
+    ) => {
+        const stats = getToolStats();
+
+        if (tool_name) {
+            const s = stats[tool_name];
+            if (!s) return { found: false, tool: tool_name };
+            return { found: true, tool: tool_name, stats: s };
+        }
+
+        /** @type {keyof ReturnType<typeof getToolStats>[string]} */
+        const sortKey = sort_by === 'latency' ? 'avgLatencyMs' : sort_by === 'error_rate' ? 'errorRate' : sort_by;
+
+        const entries = Object.entries(stats)
+            .sort(([, a], [, b]) => {
+                const av = /** @type {number} */ (a[/** @type {keyof typeof a} */ (sortKey)] ?? 0);
+                const bv = /** @type {number} */ (b[/** @type {keyof typeof b} */ (sortKey)] ?? 0);
+                return bv - av;
+            })
+            .slice(0, limit)
+            .map(([name, s]) => ({ name, ...s }));
+
+        const total = Object.values(stats).reduce((acc, s) => acc + s.calls, 0);
+        const totalErrors = Object.values(stats).reduce((acc, s) => acc + s.errors, 0);
+
+        log('DEBUG', `[get_tool_health] stats=${Object.keys(stats).length} tools tracked`);
+        return {
+            tracked: Object.keys(stats).length,
+            totalCalls: total,
+            totalErrors,
+            overallErrorRate: total > 0 ? parseFloat(((totalErrors / total) * 100).toFixed(1)) : 0,
+            topTools: entries,
+        };
+    },
+});
+
+/**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
 export const introspectionTools = [
@@ -339,4 +415,5 @@ export const introspectionTools = [
     withSkipPermission(getTelemetryTool),
     withSkipPermission(reportIntentTool),
     withSkipPermission(toggleToolTool),
+    withSkipPermission(getToolHealthTool),
 ];

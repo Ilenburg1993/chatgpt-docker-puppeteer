@@ -19,11 +19,13 @@ import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
 import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools/state';
 import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#copilot/observability/logger';
-import { access, open, readFile, stat } from 'node:fs/promises';
+import { defaultMetrics } from '#copilot/observability/metrics';
+import { access, open, readFile, readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { buildCustomAgentsConfig } from '../config/custom-agents.js';
 import { pickDefined } from '../lib/utils.js';
+import { readStore as _readTodoStore } from '../tools/todo/store.js';
 import { readState as _readState, writeStateAsync as _writeStateAsync } from './state-io.js';
 import { buildAuditingPermissionHandler } from './tool-audit-logger.js';
 // Re-exporta funções de I/O de estado de state-io.js para compatibilidade retroativa com importadores
@@ -175,6 +177,48 @@ export async function buildHookSystemContext() {
         /* arquivo não existe ou JSON inválido — ignorar silenciosamente */
     }
 
+    // F5.3: skills disponíveis no diretório .github/skills/
+    try {
+        const skillsDir = join(resolve(import.meta.dirname, '../../'), '.github', 'skills');
+        const entries = await readdir(skillsDir, { withFileTypes: true });
+        const skillNames = entries
+            .filter((e) => e.isDirectory())
+            .map((e) => e.name)
+            .sort();
+        if (skillNames.length > 0) {
+            parts.push('\n## Skills Disponíveis\n\n' + skillNames.map((s) => `- \`${s}\``).join('\n'));
+        }
+    } catch {
+        /* ignorar — skills são opcionais no system prompt */
+    }
+
+    // F5.2: estado runtime do agente SDK (in-memory, sem I/O de arquivo)
+    try {
+        const summary = defaultMetrics.getSummary();
+        const uptimeSecs = Math.round(process.uptime());
+        // Contagem de TODOs pendentes (best-effort — falha silenciosa)
+        let pendingCount = 0;
+        try {
+            const todoStore = await _readTodoStore();
+            pendingCount = Object.values(todoStore.tasks).filter(
+                (t) => t.status === 'todo' || t.status === 'in_progress',
+            ).length;
+        } catch {
+            /* ignorar */
+        }
+        parts.push(
+            [
+                '\n## Estado Runtime do Agente (LLM-B SDK)',
+                `- Uptime do processo: ${uptimeSecs}s`,
+                `- Turns SDK completados: ${summary.dialog.turnsTotal}`,
+                `- Tokens acumulados (entrada+saída): ${summary.tokens.inputTokens + summary.tokens.outputTokens}`,
+                `- TODOs ativos (todo/in_progress): ${pendingCount}`,
+            ].join('\n'),
+        );
+    } catch {
+        /* ignorar falhas silenciosamente — estado runtime não é crítico */
+    }
+
     return parts.join('\n\n');
 }
 
@@ -197,6 +241,37 @@ export async function buildHookSystemContextSafe() {
         return truncated + '\n\n⚠️ [contexto truncado por limite SEC-02: 8KB]';
     }
     return raw;
+}
+
+/**
+ * F8.2: Valida se um sessionId persistido é elegível para tentativa de resumo.
+ *
+ * Retorna null (força criação de nova sessão) quando:
+ *
+ * - `sessionId` for falsy, não-string ou falhar no padrão UUID/opaque
+ * - `lastActivityMs` for mais antigo que `SESSION_MAX_AGE_MS` (padrão: 24h) indicando que a sessão pode ter expirado no
+ *   servidor do SDK
+ *
+ * @param {string | null | undefined} sessionId - ID da sessão persistida
+ * @param {number | null | undefined} lastActivityMs - Epoch ms da última atividade conhecida
+ * @returns {string | null} sessionId validado ou null para forçar nova sessão
+ */
+function _validateSessionForResume(sessionId, lastActivityMs) {
+    if (!sessionId || typeof sessionId !== 'string') return null;
+    // Aceita UUIDs (xxxxxxxx-xxxx-...) e IDs opacos alfanuméricos usados pelo SDK
+    if (!/^[a-zA-Z0-9_-]{8,128}$/.test(sessionId)) {
+        log('WARN', '[session-initializer] sessionId inválido — forçando nova sessão.');
+        return null;
+    }
+    const maxAgeMs = Number(process.env['AGENT_SESSION_MAX_AGE_MS']) || 24 * 60 * 60_000;
+    if (lastActivityMs && Date.now() - lastActivityMs > maxAgeMs) {
+        log(
+            'WARN',
+            `[session-initializer] Sessão ${sessionId.slice(0, 12)}... expirou (${Math.round((Date.now() - lastActivityMs) / 3_600_000)}h inativa) — forçando nova.`,
+        );
+        return null;
+    }
+    return sessionId;
 }
 
 /**
@@ -261,7 +336,9 @@ export async function initOrResumeSession(client, sessionOptions) {
     };
 
     // Delega para lib/session.resumeOrCreate — tenta retomar, cria se falhar
-    const result = await resumeOrCreate(client, state?.sessionId ?? null, opts);
+    // F8.2: validação de saúde da sessão persistida antes de tentar retomada
+    const savedSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
+    const result = await resumeOrCreate(client, savedSessionId, opts);
 
     // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop
     if (result.isResumed) {

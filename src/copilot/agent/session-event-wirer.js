@@ -329,49 +329,49 @@ function _wireModeAndToolEvents(session, { emit }) {
 function _wireSystemNotificationEvents(session, { emit }) {
     return [
         session.on('system.notification', (/** @type {SdkEvent} */ event) => {
-            const kind = /** @type {Record<string, unknown> & { type: string }} */ (event?.data?.kind);
+            const kind = /** @type {Record<string, unknown> & { type: string }} */ (event?.data?.['kind']);
             if (!kind?.type) return;
 
             switch (kind.type) {
                 case 'agent_completed':
                     emit('agent.background.completed', {
-                        agentId: kind.agentId,
-                        agentType: kind.agentType,
-                        status: kind.status,
-                        description: kind.description,
+                        agentId: kind['agentId'],
+                        agentType: kind['agentType'],
+                        status: kind['status'],
+                        description: kind['description'],
                     });
                     log(
                         'INFO',
-                        `[session-event-wirer] system.notification agent_completed: agentId=${kind.agentId} status=${kind.status}`,
+                        `[session-event-wirer] system.notification agent_completed: agentId=${kind['agentId']} status=${kind['status']}`,
                     );
                     break;
                 case 'agent_idle':
                     emit('agent.background.idle', {
-                        agentId: kind.agentId,
-                        agentType: kind.agentType,
-                        description: kind.description,
+                        agentId: kind['agentId'],
+                        agentType: kind['agentType'],
+                        description: kind['description'],
                     });
-                    log('DEBUG', `[session-event-wirer] system.notification agent_idle: agentId=${kind.agentId}`);
+                    log('DEBUG', `[session-event-wirer] system.notification agent_idle: agentId=${kind['agentId']}`);
                     break;
                 case 'shell_completed':
                     emit('agent.shell.completed', {
-                        shellId: kind.shellId,
-                        exitCode: kind.exitCode,
-                        description: kind.description,
+                        shellId: kind['shellId'],
+                        exitCode: kind['exitCode'],
+                        description: kind['description'],
                     });
                     log(
                         'DEBUG',
-                        `[session-event-wirer] system.notification shell_completed: shellId=${kind.shellId} exitCode=${kind.exitCode ?? '?'}`,
+                        `[session-event-wirer] system.notification shell_completed: shellId=${kind['shellId']} exitCode=${kind['exitCode'] ?? '?'}`,
                     );
                     break;
                 case 'shell_detached_completed':
                     emit('agent.shell.detached_completed', {
-                        shellId: kind.shellId,
-                        description: kind.description,
+                        shellId: kind['shellId'],
+                        description: kind['description'],
                     });
                     log(
                         'DEBUG',
-                        `[session-event-wirer] system.notification shell_detached_completed: shellId=${kind.shellId}`,
+                        `[session-event-wirer] system.notification shell_detached_completed: shellId=${kind['shellId']}`,
                     );
                     break;
                 default:

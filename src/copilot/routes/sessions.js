@@ -386,7 +386,7 @@ function _requireAdminForDestructive(req, res, next) {
  */
 router.delete('/sessions/:id', _requireAdminForDestructive, (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const { id } = req.params;
+        const id = /** @type {string} */ (req.params['id']);
 
         // SEC-N10 (fix): exigir confirmação explícita para operação irreversível
         const confirmHeader = req.headers['x-confirm-delete'];

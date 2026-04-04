@@ -24,12 +24,66 @@
 
 import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
+import net from 'node:net';
 import { z } from 'zod';
 
-/** Porta do servidor local (fallback: 3008). */
+/**
+ * Estado de saúde do MCP bridge. Atualizado a cada chamada de `buildMcpTools()` e pelo health check periódico.
+ *
+ * @typedef {object} McpHealthStatus
+ * @property {boolean} available - true se o último check foi bem-sucedido
+ * @property {number | null} lastCheckMs - Timestamp (Date.now()) do último check, ou null se nunca executado
+ * @property {string | null} lastError - Mensagem do último erro, ou null
+ * @property {number} toolCount - Número de tools MCP disponíveis no último check bem-sucedido
+ * @property {boolean} circuitOpen - true se o circuit breaker está aberto
+ * @property {number | null} latencyMs - Latência da última chamada listMcpTools bem-sucedida (ms), ou null
+ */
+
+/** @type {McpHealthStatus} */
+let _mcpHealth = {
+    available: false,
+    lastCheckMs: null,
+    lastError: null,
+    toolCount: 0,
+    circuitOpen: false,
+    latencyMs: null,
+};
+
+/**
+ * Retorna uma snapshot imutável do estado de saúde do MCP bridge.
+ *
+ * @returns {McpHealthStatus}
+ */
+export function getMcpStatus() {
+    return { ..._mcpHealth };
+}
+
 // FINDING-P4-2: usar MCP_PORT dedicado com fallback para PORT genérico e 3008
 const MCP_PORT = process.env['MCP_PORT'] ?? process.env['PORT'] ?? '3008';
 const MCP_BASE = `http://127.0.0.1:${MCP_PORT}/api/mcp`;
+
+/**
+ * F10.1: probe TCP rápido para verificar se a porta MCP está aberta sem bloquear o boot.
+ *
+ * Evita ~24s de espera (3 × 8s timeout) quando o servidor MCP está offline. Tempo máximo: PORT_PROBE_TIMEOUT_MS.
+ *
+ * @returns {Promise<boolean>} true se a porta está acessível
+ */
+function _isMcpPortOpen() {
+    const portProbeTimeoutMs = Number(process.env['MCP_PORT_PROBE_TIMEOUT_MS'] ?? 1_500);
+    return new Promise((resolve) => {
+        const socket = net.connect({ host: '127.0.0.1', port: Number(MCP_PORT) }, () => {
+            socket.destroy();
+            resolve(true);
+        });
+        socket.setTimeout(portProbeTimeoutMs);
+        socket.on('timeout', () => {
+            socket.destroy();
+            resolve(false);
+        });
+        socket.on('error', () => resolve(false));
+    });
+}
 
 // UPG-02: Circuit Breaker para chamadas ao MCP Tool Registry
 // Evita 40s de bloqueio quando o servidor MCP está offline (5 tentativas × 8s timeout)
@@ -312,6 +366,25 @@ export async function buildMcpTools() {
     // UPG-02: circuit breaker — não tentar se o circuito está aberto
     if (_mcpCircuitOpen && Date.now() - _mcpCircuitOpenAt < CIRCUIT_RESET_MS) {
         log('INFO', '[mcp-tool-bridge] Circuit aberto — pulando consulta ao MCP Registry.');
+        _mcpHealth = { ..._mcpHealth, circuitOpen: true };
+        return [];
+    }
+
+    // F10.1: port probe rápido antes de qualquer HTTP — evita 24s de bloqueio quando servidor está offline
+    const portOpen = await _isMcpPortOpen();
+    if (!portOpen) {
+        _mcpCircuitOpen = true;
+        _mcpCircuitOpenAt = Date.now();
+        _bootAttemptCount = 0;
+        _mcpHealth = {
+            available: false,
+            lastCheckMs: Date.now(),
+            lastError: `ECONNREFUSED (port probe: ${MCP_PORT} fechada)`,
+            toolCount: 0,
+            circuitOpen: true,
+            latencyMs: null,
+        };
+        log('INFO', `[mcp-tool-bridge] Porta MCP ${MCP_PORT} fechada (standalone?) — circuit aberto imediatamente.`);
         return [];
     }
 
@@ -324,13 +397,30 @@ export async function buildMcpTools() {
 
     let mcpTools;
     try {
+        const _t0mcp = Date.now();
         mcpTools = await listMcpTools();
         _mcpCircuitOpen = false; // reset em caso de sucesso
         _bootAttemptCount = 0; // BUG-MED-09: reset contador de boot após sucesso
+        _mcpHealth = {
+            available: true,
+            lastCheckMs: Date.now(),
+            lastError: null,
+            toolCount: mcpTools.length,
+            circuitOpen: false,
+            latencyMs: Date.now() - _t0mcp,
+        };
     } catch (/** @type {any} */ err) {
         _mcpCircuitOpen = true;
         _mcpCircuitOpenAt = Date.now();
         _bootAttemptCount = 0; // F3.2 (BUG-MOD-02): resetar ao abrir circuit para evitar backoff acumulado
+        _mcpHealth = {
+            available: false,
+            lastCheckMs: Date.now(),
+            lastError: err.message,
+            toolCount: 0,
+            circuitOpen: true,
+            latencyMs: null,
+        };
         log(
             'WARN',
             `[mcp-tool-bridge] Falha ao consultar MCP Registry — circuit aberto por ${CIRCUIT_RESET_MS / 1000}s: ${err.message}`,
@@ -358,4 +448,82 @@ export function _resetMcpState() {
     _mcpCircuitOpen = false;
     _mcpCircuitOpenAt = 0;
     _bootAttemptCount = 0;
+    _mcpHealth = {
+        available: false,
+        lastCheckMs: null,
+        lastError: null,
+        toolCount: 0,
+        circuitOpen: false,
+        latencyMs: null,
+    };
+}
+
+/**
+ * F9.2: Inicia um job periódico de auto-reconnect ao MCP Tool Registry.
+ *
+ * Quando o circuit breaker está aberto ou não há tools disponíveis, o job tenta chamar `buildMcpTools()` e, em caso de
+ * sucesso, invoca o callback `onReconnect` com a nova lista de tools para que o agente possa atualizar sua sessão.
+ *
+ * @param {(tools: import('@github/copilot-sdk').Tool[]) => void | Promise<void>} onReconnect - Callback chamado com as
+ *   tools reconectadas quando o MCP volta a responder
+ * @param {number} [baseIntervalMs=5 * 60_000] - Intervalo base em ms; multiplicado pelo backoff step (padrão: 5 min).
+ *   Default is `5 * 60_000`
+ * @returns {() => void} Função de cancelamento — chame para parar o job
+ */
+export function startMcpAutoReconnect(onReconnect, baseIntervalMs = 5 * 60_000) {
+    // F10.2: backoff crescente para evitar ruído permanente em modo standalone
+    // Passos: 1×, 2×, 3×, 6× — ex: 5min, 10min, 15min, 30min (cap)
+    const BACKOFF_MULTIPLIERS = [1, 2, 3, 6];
+    let _stepIndex = 0;
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let _timer = null;
+    let _cancelled = false;
+
+    function scheduleNext() {
+        if (_cancelled) return;
+        const mult = BACKOFF_MULTIPLIERS[Math.min(_stepIndex, BACKOFF_MULTIPLIERS.length - 1)] ?? 6;
+        const delayMs = baseIntervalMs * mult;
+        _timer = setTimeout(async () => {
+            if (_cancelled) return;
+            _timer = null;
+
+            const status = getMcpStatus();
+            if (!status.circuitOpen && status.available && status.toolCount > 0) {
+                // MCP saudável — resetar backoff e reagendar no intervalo base
+                _stepIndex = 0;
+                scheduleNext();
+                return;
+            }
+
+            log('DEBUG', `[mcp-auto-reconnect] Tentando reconectar (step ${_stepIndex}, delay ${delayMs / 1000}s)...`);
+            try {
+                const tools = await buildMcpTools();
+                if (tools.length > 0) {
+                    log('INFO', `[mcp-auto-reconnect] MCP reconectado: ${tools.length} tools disponíveis`);
+                    _stepIndex = 0;
+                    await onReconnect(tools);
+                } else {
+                    // Circuit fechou mas sem tools — avançar backoff
+                    _stepIndex = Math.min(_stepIndex + 1, BACKOFF_MULTIPLIERS.length - 1);
+                }
+            } catch (/** @type {any} */ err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                log('DEBUG', `[mcp-auto-reconnect] Falha na tentativa de reconnect: ${msg}`);
+                _stepIndex = Math.min(_stepIndex + 1, BACKOFF_MULTIPLIERS.length - 1);
+            }
+
+            scheduleNext();
+        }, delayMs);
+        if (typeof _timer.unref === 'function') _timer.unref();
+    }
+
+    scheduleNext();
+
+    return () => {
+        _cancelled = true;
+        if (_timer !== null) {
+            clearTimeout(_timer);
+            _timer = null;
+        }
+    };
 }

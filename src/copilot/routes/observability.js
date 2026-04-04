@@ -101,7 +101,7 @@ router.get('/observability/metrics', (req, res) =>
             }
             return res.json({ ok: true, ...summary, counters: filtered });
         }
-        res.json({ ok: true, ...summary });
+        return res.json({ ok: true, ...summary });
     }),
 );
 
