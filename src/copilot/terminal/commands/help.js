@@ -55,6 +55,9 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/tools\x1b[0m                               — lista ferramentas registradas com stats
   \x1b[33m/errors [n]\x1b[0m                          — mostra últimos N erros rastreados (default: 10)
   \x1b[33m/audit [n]\x1b[0m                           — últimas N entradas do audit log (default: 10)
+  \x1b[33m/display [toggle] [on|off]\x1b[0m           — gerencia toggles de exibição (thinking, streaming, usage)
+  \x1b[33m/metrics\x1b[0m                             — métricas consolidadas da sessão (turns, tokens, billing)
+  \x1b[33m/export [path]\x1b[0m                       — exporta conversa como Markdown
   \x1b[33m/resume\x1b[0m                              — lista últimas sessões do hub (para retomar)
   \x1b[33m/resume <sessionId>\x1b[0m                  — injeta resumo de sessão anterior como contexto
 

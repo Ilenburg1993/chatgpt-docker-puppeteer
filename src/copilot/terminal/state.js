@@ -204,6 +204,27 @@ export function setShowUsage(value) {
     stateEmitter.emit('showUsage:changed', value);
 }
 
+// ─── Streaming display (F19.2) ───────────────────────────────────────────────
+
+/**
+ * F19.2: Flag para exibir resposta em streaming (message deltas) inline. Controlável via comando `/display streaming` e
+ * variável de ambiente `TERMINAL_SHOW_STREAMING`.
+ *
+ * @type {boolean}
+ */
+let _showStreaming = process.env['TERMINAL_SHOW_STREAMING'] !== 'false';
+
+/** @returns {boolean} */
+export function getShowStreaming() {
+    return _showStreaming;
+}
+
+/** @param {boolean} value @returns {void} */
+export function setShowStreaming(value) {
+    _showStreaming = value;
+    stateEmitter.emit('showStreaming:changed', value);
+}
+
 // ─── Inject history (F16.3) ──────────────────────────────────────────────────
 
 const MAX_INJECT_HISTORY = Number(process.env['TERMINAL_MAX_INJECT_HISTORY'] ?? '100');

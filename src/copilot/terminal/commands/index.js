@@ -13,11 +13,14 @@ export { cmdAudit } from './audit.js';
 export { cmdModel, cmdReasoning } from './config.js';
 export { cmdCompact, cmdContext } from './context.js';
 export { cmdDiagnose } from './diagnose.js';
+export { cmdDisplay } from './display.js';
 export { cmdErrors } from './errors.js';
+export { cmdExport } from './export.js';
 export { cmdGh } from './gh.js';
 export { cmdGit } from './git.js';
 export { cmdHelp } from './help.js';
 export { cmdForget, cmdRecall, cmdRemember } from './memory.js';
+export { cmdMetrics } from './metrics.js';
 export { cmdPlan } from './plan.js';
 export { cmdResume } from './resume.js';
 export {
