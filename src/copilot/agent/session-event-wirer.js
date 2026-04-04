@@ -387,7 +387,12 @@ function _wireSystemNotificationEvents(session, { emit }) {
  *
  * - `assistant.intent` — intenção detectada pelo modelo (ex.: 'code_edit', 'explain')
  * - `assistant.reasoning` — bloco de raciocínio completo (não delta)
+ * - `assistant.turn_start` / `assistant.turn_end` — ciclo de vida de turns
  * - `session.context_changed` — workspace/branch/cwd mudou
+ * - `session.error` — erro de sessão (auth, quota, etc.)
+ * - `session.shutdown` — sessão encerrada com métricas
+ * - `session.task_complete` — tarefa concluída pelo agente
+ * - `session.title_changed` — título da sessão atualizado
  * - `abort` — processamento abortado pelo usuário
  * - `subagent.started/completed/failed` — ciclo de vida de sub-agentes
  * - `elicitation.requested` — MCP form solicitado (surfaced como elicitation.pending)
@@ -410,6 +415,40 @@ function _wireSdkResponseEvents(session, { emit }) {
                 contentLength: len,
                 ts: Date.now(),
             });
+        }),
+        // ── Turn lifecycle ──────────────────────────────────────────────────
+        session.on('assistant.turn_start', (/** @type {SdkEvent} */ evt) => {
+            const { turnId } = evt?.data ?? {};
+            emit('assistant.turn_start', { turnId: turnId ?? null, ts: Date.now() });
+            log('DEBUG', `[session-event-wirer] assistant.turn_start turnId=${turnId ?? '?'}`);
+        }),
+        session.on('assistant.turn_end', (/** @type {SdkEvent} */ evt) => {
+            const { turnId } = evt?.data ?? {};
+            emit('assistant.turn_end', { turnId: turnId ?? null, ts: Date.now() });
+            log('DEBUG', `[session-event-wirer] assistant.turn_end turnId=${turnId ?? '?'}`);
+        }),
+        // ── Session lifecycle ───────────────────────────────────────────────
+        session.on('session.error', (/** @type {SdkEvent} */ evt) => {
+            const data = evt?.data ?? {};
+            const errorType = /** @type {string} */ (data['errorType'] ?? 'unknown');
+            const message = /** @type {string} */ (data['message'] ?? 'Unknown error');
+            emit('session.error', { errorType, message, ts: Date.now() });
+            log('ERROR', `[session-event-wirer] session.error type=${errorType}: ${message}`);
+        }),
+        session.on('session.shutdown', (/** @type {SdkEvent} */ evt) => {
+            const data = evt?.data ?? {};
+            emit('session.shutdown', { ...data, ts: Date.now() });
+            log('INFO', `[session-event-wirer] session.shutdown type=${data['shutdownType'] ?? '?'}`);
+        }),
+        session.on('session.task_complete', (/** @type {SdkEvent} */ evt) => {
+            const { summary } = evt?.data ?? {};
+            emit('session.task_complete', { summary: summary ?? null, ts: Date.now() });
+            log('INFO', `[session-event-wirer] session.task_complete`);
+        }),
+        session.on('session.title_changed', (/** @type {SdkEvent} */ evt) => {
+            const { title } = evt?.data ?? {};
+            emit('session.title_changed', { title: title ?? '', ts: Date.now() });
+            log('DEBUG', `[session-event-wirer] session.title_changed: "${title ?? ''}"`);
         }),
         session.on('session.context_changed', (/** @type {SdkEvent} */ evt) => {
             emit('session.context_changed', evt?.data ?? {});

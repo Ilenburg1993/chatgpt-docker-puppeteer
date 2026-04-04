@@ -32,12 +32,15 @@ import {
     cmdDbHistory as _cmdDbHistory,
     cmdDbSessions as _cmdDbSessions,
     cmdDiagnose as _cmdDiagnose,
+    cmdDisplay as _cmdDisplay,
     cmdErrors as _cmdErrors,
+    cmdExport as _cmdExport,
     cmdForget as _cmdForget,
     cmdGh as _cmdGh,
     cmdGit as _cmdGit,
     cmdHelp as _cmdHelp,
     cmdHistory as _cmdHistory,
+    cmdMetrics as _cmdMetrics,
     cmdModel as _cmdModel,
     cmdPlan as _cmdPlan,
     cmdReasoning as _cmdReasoning,
@@ -51,7 +54,7 @@ import {
     cmdUsage as _cmdUsage,
     cmdWho as _cmdWho,
 } from './commands/index.js';
-import { ensureDialogLoop, println, sendTurn } from './dialog.js';
+import { ensureDialogLoop, println, sendTurn, broadcastSse } from './dialog.js';
 import { extractAtReferences } from './file-context.js';
 import { clearRateLimiters } from './rate-limiter-state.js';
 import { addAttachment, getHubSessionId, setRl } from './state.js';
@@ -71,6 +74,7 @@ const BANNER = `
   \x1b[33m/pause\x1b[0m · \x1b[33m/dialog-resume [bootPrompt]\x1b[0m \x1b[90m← NEW-PAUSE: pausa/retoma sem PR\x1b[0m
   \x1b[33m/thinking [on|off]\x1b[0m · \x1b[33m/usage [on|off|now]\x1b[0m \x1b[90m← F18/F20: thinking display + usage\x1b[0m
   \x1b[33m/tools\x1b[0m · \x1b[33m/errors [n]\x1b[0m · \x1b[33m/audit [n]\x1b[0m \x1b[90m← F22: tool stats, error tracker, audit log\x1b[0m
+  \x1b[33m/display [toggle] [on|off]\x1b[0m · \x1b[33m/metrics\x1b[0m · \x1b[33m/export [path]\x1b[0m \x1b[90m← F24: display, metrics, export\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m
   \x1b[33m/skills [list|add <path>|remove <path>|reload]\x1b[0m
   \x1b[36m/gh issue list\x1b[0m · \x1b[36m/gh pr list\x1b[0m · \x1b[36m/gh run list\x1b[0m · \x1b[36m/git status\x1b[0m · \x1b[36m/git log\x1b[0m · \x1b[36m/alias\x1b[0m · \x1b[36m/help\x1b[0m
@@ -135,6 +139,9 @@ const CMD_ROUTES = [
     [['usage'], (_, arg) => _cmdUsage({ println }, arg)],
     [['errors'], (_, arg) => _cmdErrors({ println }, arg)],
     [['audit'], (_, arg) => _cmdAudit({ println }, arg)],
+    [['display'], (_, arg, rest) => _cmdDisplay({ println }, arg, rest)],
+    [['export'], (_, arg) => _cmdExport({ println }, arg)],
+    [['metrics'], () => _cmdMetrics({ println })],
     [['quit', 'exit'], (_, _2, _3, rl, injectServer, cleanup) => _cmdQuit(rl, injectServer, cleanup)],
     [['gh'], (_, _2, rest) => _cmdGh({ println }, rest)],
     [['git'], (_, _2, rest) => _cmdGit({ println }, rest)],
@@ -290,12 +297,106 @@ export function setupAgentListeners(rl) {
         println('[llm-b] ⚠️  Agente parado. Use /restart para reiniciar.');
     };
 
+    // F21.5: Tool execution inline display
+    /** @type {Map<string, { name: string; t0: number }>} */
+    const _activeTools = new Map();
+
+    const onToolStart = (/** @type {Record<string, unknown>} */ evt) => {
+        const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
+        const name = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
+        _activeTools.set(toolCallId, { name, t0: Date.now() });
+        println(`  \x1b[90m🔧 ${name}\x1b[0m \x1b[33m(executando…)\x1b[0m`);
+        broadcastSse('tool.start', { toolCallId, toolName: name });
+    };
+
+    const onToolComplete = (/** @type {Record<string, unknown>} */ evt) => {
+        const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
+        const success = Boolean(evt?.['success']);
+        const entry = _activeTools.get(toolCallId);
+        _activeTools.delete(toolCallId);
+        const name = entry?.name ?? 'tool';
+        const dur = entry ? ((Date.now() - entry.t0) / 1000).toFixed(1) : '?';
+        const icon = success ? '\x1b[32m✅\x1b[0m' : '\x1b[31m❌\x1b[0m';
+        println(`  ${icon} \x1b[90m${name}\x1b[0m \x1b[90m(${dur}s)\x1b[0m`);
+        broadcastSse('tool.complete', { toolCallId, toolName: name, success, durationMs: entry ? Date.now() - entry.t0 : 0 });
+    };
+
+    // F22.2: Session error display
+    const onSessionError = (/** @type {Record<string, unknown>} */ evt) => {
+        const msg = /** @type {string} */ (evt?.['message'] ?? 'unknown error');
+        const errorType = /** @type {string} */ (evt?.['errorType'] ?? 'error');
+        println(`\n  \x1b[31m⚠️  Erro de sessão [${errorType}]: ${msg}\x1b[0m`);
+        broadcastSse('session.error', { errorType, message: msg });
+    };
+
+    // F22.1: Compaction events display
+    const onCompactionStart = () => {
+        println(`  \x1b[33m🗜️  Compactando context window…\x1b[0m`);
+        broadcastSse('compaction.start', {});
+    };
+
+    const onCompactionComplete = (/** @type {Record<string, unknown>} */ evt) => {
+        const pre = /** @type {number | undefined} */ (evt?.['preCompactionTokens']);
+        const post = /** @type {number | undefined} */ (evt?.['postCompactionTokens']);
+        const success = Boolean(evt?.['success']);
+        if (success && pre !== undefined && post !== undefined) {
+            const pct = ((1 - post / pre) * 100).toFixed(0);
+            println(`  \x1b[32m🗜️  Compactação concluída: ${pre.toLocaleString('pt-BR')} → ${post.toLocaleString('pt-BR')} tokens (-${pct}%)\x1b[0m`);
+        } else if (!success) {
+            println(`  \x1b[31m🗜️  Compactação falhou\x1b[0m`);
+        }
+        broadcastSse('compaction.complete', { success, pre, post });
+    };
+
+    // F23.1: Intent display
+    const onIntent = (/** @type {Record<string, unknown>} */ evt) => {
+        const intent = /** @type {string} */ (evt?.['intent'] ?? '');
+        if (intent) {
+            process.stdout.write(`\r  \x1b[90m⏳ ${intent}\x1b[0m\x1b[K`);
+        }
+    };
+
+    // F23.5: Sub-agent events
+    const onSubagentStarted = (/** @type {Record<string, unknown>} */ evt) => {
+        const name = /** @type {string} */ (evt?.['agentName'] ?? 'sub-agent');
+        println(`  \x1b[36m🤖 Sub-agente iniciado: ${name}\x1b[0m`);
+    };
+
+    const onSubagentCompleted = (/** @type {Record<string, unknown>} */ evt) => {
+        const name = /** @type {string} */ (evt?.['agentName'] ?? 'sub-agent');
+        println(`  \x1b[32m🤖 Sub-agente concluído: ${name}\x1b[0m`);
+    };
+
+    const onSubagentFailed = (/** @type {Record<string, unknown>} */ evt) => {
+        const name = /** @type {string} */ (evt?.['agentName'] ?? 'sub-agent');
+        const error = /** @type {string} */ (evt?.['error'] ?? 'unknown');
+        println(`  \x1b[31m🤖 Sub-agente falhou: ${name} — ${error}\x1b[0m`);
+    };
+
     alwaysAliveAgent.on('question.pending', onQuestion);
     alwaysAliveAgent.once('stopped', onStopped);
+    alwaysAliveAgent.on('tool.execution_start', onToolStart);
+    alwaysAliveAgent.on('tool.execution_complete', onToolComplete);
+    alwaysAliveAgent.on('session.error', onSessionError);
+    alwaysAliveAgent.on('session.compaction_start', onCompactionStart);
+    alwaysAliveAgent.on('session.compaction_complete', onCompactionComplete);
+    alwaysAliveAgent.on('assistant.intent', onIntent);
+    alwaysAliveAgent.on('subagent.started', onSubagentStarted);
+    alwaysAliveAgent.on('subagent.completed', onSubagentCompleted);
+    alwaysAliveAgent.on('subagent.failed', onSubagentFailed);
 
     return () => {
         alwaysAliveAgent.off('question.pending', onQuestion);
         alwaysAliveAgent.off('stopped', onStopped);
+        alwaysAliveAgent.off('tool.execution_start', onToolStart);
+        alwaysAliveAgent.off('tool.execution_complete', onToolComplete);
+        alwaysAliveAgent.off('session.error', onSessionError);
+        alwaysAliveAgent.off('session.compaction_start', onCompactionStart);
+        alwaysAliveAgent.off('session.compaction_complete', onCompactionComplete);
+        alwaysAliveAgent.off('assistant.intent', onIntent);
+        alwaysAliveAgent.off('subagent.started', onSubagentStarted);
+        alwaysAliveAgent.off('subagent.completed', onSubagentCompleted);
+        alwaysAliveAgent.off('subagent.failed', onSubagentFailed);
     };
 }
 
