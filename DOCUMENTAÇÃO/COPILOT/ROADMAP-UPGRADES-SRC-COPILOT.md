@@ -836,7 +836,7 @@ token no stdout, semelhante ao comportamento de um chat com LLM.
 - **Mudança**: Registrar `timeToFirstTokenMs` e `tokensPerSecond` no audit/metrics
 - **Exposição**: Campo adicional no evento `copilot:turn:complete` do NERV
 
-### F19.3 — SSE delta events para clientes do terminal
+### F19.3 — SSE delta events para clientes do terminal ✅
 
 - **Arquivo**: `terminal/dialog.js`
 - **Mudança**: Emitir `broadcastSse('delta', { chunk, messageId })` a cada chunk de resposta,
@@ -850,7 +850,7 @@ token no stdout, semelhante ao comportamento de um chat com LLM.
 **Objetivo**: Exibir informações de intent (o que o modelo está fazendo) e usage (tokens/custo) em
 tempo real no terminal.
 
-### F20.1 — Intent display inline
+### F20.1 — Intent display inline ✅
 
 - **Arquivo**: `terminal/dialog.js`
 - **Mudança**: Registrar listener em `assistant.intent` (via AlwaysAlive events) e exibir status
@@ -900,13 +900,13 @@ do src/copilot.
 - **Funcionalidade**: Mostra resumo do audit log (últimas entradas + summary)
 - **Integração**: Reutiliza `defaultAuditLog.getAuditSummary()`
 
-### F21.4 — Comando `/compact` no REPL
+### F21.4 — Comando `/compact` no REPL (pendente)
 
 - **Novo arquivo**: `terminal/commands/compact.js`
 - **Funcionalidade**: Dispara compaction da context window da sessão ativa
 - **Integração**: Chama `alwaysAliveAgent.requestCompaction()` ou equivalente
 
-### F21.5 — Auto-display de tool executions em background
+### F21.5 — Auto-display de tool executions em background ✅
 
 - **Arquivo**: `terminal/dialog.js` ou novo `terminal/tool-display.js`
 - **Mudança**: Registrar listeners nos eventos `tool.execution_start` e `tool.execution_complete` do
@@ -924,7 +924,7 @@ do src/copilot.
 **Objetivo**: Tornar o terminal ciente e reativo ao ciclo de vida da sessão SDK, incluindo
 compaction, erros, idle e shutdown.
 
-### F22.1 — Display de compaction events
+### F22.1 — Display de compaction events ✅
 
 - **Arquivo**: `terminal/dialog.js`
 - **Mudança**: Listener em `session.compaction_start` / `session.compaction_complete` para mostrar
@@ -935,7 +935,7 @@ compaction, erros, idle e shutdown.
     ✅ Compaction completa: 45,000 → 22,000 tokens (-51%)
   ```
 
-### F22.2 — Display de session errors
+### F22.2 — Display de session errors ✅
 
 - **Arquivo**: `terminal/dialog.js`
 - **Mudança**: Listener em `session.error` para alertar o usuário de erros de sessão (quota, rate
@@ -951,7 +951,7 @@ compaction, erros, idle e shutdown.
 - **Mudança**: Mostra barra de progresso da context window no prompt do REPL quando uso > 50%
 - **Formato**: `[████████░░░░] 67% ctx` exibido sutilmente após o prompt
 
-### F22.4 — Graceful shutdown display
+### F22.4 — Graceful shutdown display ✅
 
 - **Arquivo**: `terminal/dialog.js`
 - **Mudança**: Listener em `session.shutdown` para exibir resumo final da sessão antes de encerrar
@@ -992,18 +992,258 @@ syntax highlighting para blocos de código.
 
 ---
 
-## Sumário de Novas Fases (F18-F23)
+## Fase 24 — Terminal: Session Management & Multi-Session
 
-| Fase | Nome                        | SubFases | Prioridade | Dependências |
-| ---- | --------------------------- | -------- | ---------- | ------------ |
-| F18  | Streaming Thinking Display  | 5        | **Alta**   | Nenhuma      |
-| F19  | Streaming Response          | 3        | **Alta**   | F18          |
-| F20  | Usage & Intent Display      | 3        | Média      | F18, F19     |
-| F21  | Context & Tools Integration | 5        | Média      | Nenhuma      |
-| F22  | Session Lifecycle Awareness | 4        | Média      | F18          |
-| F23  | Rich Markdown & Syntax      | 4        | Baixa      | F19          |
+**Objetivo**: Expor o gerenciamento completo de sessões do SDK no terminal — listar, retomar, deletar
+e alternar entre sessões sem sair do REPL.
 
-**Estimativa de escopo total**: 24 subfases · ~6 novos arquivos · ~15 arquivos modificados
+### F24.1 — Comando `/sessions` no REPL
+
+- **Novo arquivo**: `terminal/commands/sessions.js`
+- **Funcionalidade**: Lista todas as sessões persistidas via `client.listSessions()`
+- **Exibição**: Tabela com sessionId (truncado), modelo, último uso, summary
+- **Formato**:
+  ```
+    📋 Sessions disponíveis:
+    ─────────────────────────────────────────────────────────────
+    #  ID (8 chars)   Modelo         Última modificação   Status
+    1  a3f2b1c8       gpt-5          2026-04-05 14:22     ● ativa
+    2  d9e7f4a2       claude-4.5     2026-04-04 09:15     ○ salva
+    3  b5c1d8e3       gpt-4.1        2026-04-03 18:30     ○ salva
+  ```
+
+### F24.2 — Comando `/resume <id>` no REPL
+
+- **Arquivo**: `terminal/commands/sessions.js` (sub-comando)
+- **Funcionalidade**: Retoma uma sessão persistida via `client.resumeSession(id)`
+- **Integração**: Desconecta sessão atual (se houver) e reconecta a selecionada
+
+### F24.3 — Comando `/session delete <id>` no REPL
+
+- **Arquivo**: `terminal/commands/sessions.js` (sub-comando)
+- **Funcionalidade**: Deleta uma sessão persistida via `client.deleteSession(id)`
+- **Confirmação**: Exige confirmação textual antes de deletar (`y/n`)
+
+### F24.4 — Comando `/session new [model]` no REPL
+
+- **Arquivo**: `terminal/commands/sessions.js` (sub-comando)
+- **Funcionalidade**: Cria nova sessão com modelo especificado, desconecta a anterior
+- **Integração**: Reutiliza lógica de `session-initializer.js` com override de modelo
+
+### F24.5 — Session info no prompt do REPL
+
+- **Arquivo**: `terminal/repl.js`
+- **Mudança**: Exibir identificador curto da sessão ativa no prompt
+- **Formato**: `LLM-B [a3f2]> ` em vez de `LLM-B> `
+
+---
+
+## Fase 25 — Terminal: Abort, Retry & Turn Control
+
+**Objetivo**: Controle fino do turno de diálogo — abort, retry, regeneração e timeout — para
+experiência mais interativa e responsiva.
+
+### F25.1 — Ctrl+C para abort de turno em progresso
+
+- **Arquivo**: `terminal/repl.js` + `terminal/dialog.js`
+- **Mudança**: Ao pressionar Ctrl+C durante processamento de resposta, chamar `session.abort()`
+  para cancelar o turno atual sem encerrar o REPL
+- **Display**: `⏹ Turno abortado pelo usuário.`
+
+### F25.2 — Comando `/abort` no REPL
+
+- **Novo arquivo**: `terminal/commands/abort.js`
+- **Funcionalidade**: Abort explícito via comando — equivalente ao Ctrl+C mas acessível
+  programaticamente e via SSE
+- **Integração**: Chama `alwaysAliveAgent.abort()` se a sessão estiver processando
+
+### F25.3 — Comando `/retry` no REPL
+
+- **Novo arquivo**: `terminal/commands/retry.js`
+- **Funcionalidade**: Reenvia a última mensagem do usuário (retry) para obter nova resposta
+- **Integração**: Lê o último prompt do histórico e dispara novo `sendTurn()`
+
+### F25.4 — Timeout visual com feedback
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Exibir cronômetro progressivo durante espera da resposta (após 10s sem delta)
+- **Formato**: `⏱ Aguardando… 15s (timeout em 120s)` atualizado a cada segundo
+- **Ação**: Ao atingir timeout, sugerir `/retry` ou `/abort`
+
+### F25.5 — Auto-retry com backoff para erros transitórios
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Ao receber `session.error` com tipo `rate_limit` ou `timeout`, oferecer auto-retry
+  com backoff exponencial (2s → 4s → 8s)
+- **UI**: `⏳ rate_limit — retry automático em 4s… (Ctrl+C para cancelar)`
+
+---
+
+## Fase 26 — Terminal: Permission Display & Smart Context
+
+**Objetivo**: Exibir requisições de permissão no terminal e dar ao usuário controle interativo
+sobre aprovações/negações de tool executions.
+
+### F26.1 — Display de permission requests no terminal
+
+- **Arquivo**: `terminal/repl.js` (setupAgentListeners)
+- **Mudança**: Ao receber evento `permission.requested`, exibir detalhes formatados
+- **Formato**:
+  ```
+    🔐 Permissão solicitada: [shell]
+       Comando: npm run test:unit
+       ─── Aprovação automática ativada ───
+  ```
+
+### F26.2 — Modo interativo de permissão
+
+- **Arquivo**: `terminal/dialog.js` + `session-config.js`
+- **Mudança**: Modo opcional `--interactive-permissions` que, em vez de auto-approve, exibe cada
+  permissão e aguarda `y/n` do usuário no terminal
+- **Toggle**: `/permissions interactive|auto`
+
+### F26.3 — Context window display inline
+
+- **Arquivo**: `terminal/dialog.js`
+- **Mudança**: Após cada turno, exibir gauge da context window quando usage > 50%
+- **Formato**: `[███████░░░] 72% ctx (32k/45k tokens)`
+- **Toggle**: Integrado ao `/display` como toggle `context`
+
+### F26.4 — Comando `/context` no REPL
+
+- **Novo arquivo**: `terminal/commands/context.js`
+- **Funcionalidade**: Mostra snapshot detalhado da context window — tokens in/out/cache,
+  percentual, limites, e dica de `/compact` quando > 80%
+- **Integração**: Usa dados do `session.usage_info` acumulados pelo session-event-wirer
+
+### F26.5 — Context alerts automáticos
+
+- **Arquivo**: `terminal/repl.js` (setupAgentListeners)
+- **Mudança**: Ao receber `session.usage_info` com ctx > 85%, emitir warning amarelo
+- **Formato**: `⚠️ Context window em 87% — considere usar /compact`
+
+---
+
+## Fase 27 — Terminal: History, Search & Navigation
+
+**Objetivo**: Tornar o histórico de conversas pesquisável, navegável e exportável diretamente
+do terminal.
+
+### F27.1 — Comando `/history` no REPL ✅ (parcial)
+
+- **Arquivo**: `terminal/commands/history.js` (existente → expandir)
+- **Mudança**: Adicionar filtros — `/history last 5`, `/history search <termo>`,
+  `/history since 2h`
+- **Exibição**: Resumo compacto com timestamp, role, preview (primeiros 80 chars)
+
+### F27.2 — Scroll de histórico com setas (readline)
+
+- **Arquivo**: `terminal/repl.js`
+- **Mudança**: Manter histórico de inputs do usuário navegável via ↑/↓ (readline nativo)
+- **Persistência**: Salvar `.llm-b-history` no workspace para cross-session
+
+### F27.3 — Comando `/search <query>` no REPL
+
+- **Novo arquivo**: `terminal/commands/search.js`
+- **Funcionalidade**: Busca full-text no histórico de conversas (user + assistant)
+- **Formato**: Exibe matches com highlight do termo e link para turno completo
+
+### F27.4 — Comando `/export` expandido ✅ (base criada)
+
+- **Arquivo**: `terminal/commands/export.js` (já criado)
+- **Expansão**: Suportar formatos adicionais: `/export json [path]`, `/export html [path]`
+- **JSON**: Array de objetos `{ role, content, timestamp, reasoning? }`
+
+### F27.5 — Bookmark de turnos importantes
+
+- **Novo arquivo**: `terminal/commands/bookmark.js`
+- **Funcionalidade**: `/bookmark [nota]` marca o turno atual para referência futura
+- **Exibição**: `/bookmarks` lista todos os turnos bookmarkados na sessão
+
+---
+
+## Fase 28 — Terminal: Telemetry, Diagnostics & DevTools
+
+**Objetivo**: Observabilidade profunda do terminal — métricas de latência, performance da sessão,
+diagnósticos e integração com telemetria do SDK.
+
+### F28.1 — Dashboard resumido no terminal
+
+- **Arquivo**: `terminal/commands/metrics.js` (expandir da versão criada em F21)
+- **Expansão**: Adicionar seção de latência média por turno, p50/p95/p99 de response time,
+  throughput de tokens/segundo, e taxa de erro
+- **Formato**:
+  ```
+    📊 Métricas de sessão (uptime: 2h14m)
+    ─────────────────────────────────────────
+    Turnos: 47 total · 3 erros (6.4%)
+    Latência: p50=2.1s · p95=8.3s · p99=15.2s
+    Throughput: 42 tok/s médio
+    Context: 67% (30,150/45,000 tokens)
+    Modelo: gpt-5 · reasoning: high
+    Tools: 134 calls · 2 errors
+  ```
+
+### F28.2 — Comando `/latency` no REPL
+
+- **Novo arquivo**: `terminal/commands/latency.js`
+- **Funcionalidade**: Histograma visual de latências dos últimos N turnos
+- **Formato**:
+  ```
+    ⏱ Latência (últimos 20 turnos):
+    0-1s  ████████░░░░░░░░  8
+    1-3s  ██████████████░░ 14
+    3-5s  ████░░░░░░░░░░░░  4
+    5s+   ██░░░░░░░░░░░░░░  2
+  ```
+
+### F28.3 — Comando `/diag` no REPL
+
+- **Novo arquivo**: `terminal/commands/diag.js`
+- **Funcionalidade**: Diagnóstico completo do estado do terminal + SDK
+- **Informações**: Versão do SDK, estado do client, sessão ativa, model caps, uptime, memory RSS,
+  event listeners ativos, queue size, último erro
+- **Integração**: `client.ping()` para verificar conectividade, `client.getState()` para status
+
+### F28.4 — Telemetria OpenTelemetry (opcional)
+
+- **Arquivo**: `agent/session-initializer.js`
+- **Mudança**: Se `COPILOT_OTEL_ENDPOINT` estiver definido, ativar telemetria no `CopilotClient`
+- **Integração**: Exporta spans para collector configurado (Jaeger, Grafana, etc.)
+
+### F28.5 — Event log stream no terminal
+
+- **Arquivo**: `terminal/commands/events.js` (novo)
+- **Funcionalidade**: `/events [on|off|last N]` — stream de todos os eventos SDK em tempo real
+- **Formato**: `[14:22:10] assistant.turn_start · turnId=abc123`
+- **Filtro**: `/events filter tool.*` para filtrar por regex
+
+### F28.6 — Health check contínuo
+
+- **Arquivo**: `terminal/repl.js` (setupAgentListeners)
+- **Mudança**: A cada 60s, verificar saúde do SDK client via `client.ping()` e emitir warning se
+  ping > 5s ou falhar
+- **Formato**: `⚠️ SDK health check failed — conexão instável (ping=8.2s)`
+
+---
+
+## Sumário de Novas Fases (F18-F28)
+
+| Fase | Nome                             | SubFases | Prioridade | Dependências | Status     |
+| ---- | -------------------------------- | -------- | ---------- | ------------ | ---------- |
+| F18  | Streaming Thinking Display       | 5        | **Alta**   | Nenhuma      | ✅ Concluída |
+| F19  | Streaming Response               | 3        | **Alta**   | F18          | ✅ Concluída |
+| F20  | Usage & Intent Display           | 3        | Média      | F18, F19     | ✅ Concluída |
+| F21  | Context & Tools Integration      | 5        | Média      | Nenhuma      | 🔶 Parcial  |
+| F22  | Session Lifecycle Awareness      | 4        | Média      | F18          | 🔶 Parcial  |
+| F23  | Rich Markdown & Syntax           | 4        | Baixa      | F19          | ⬜ Pendente  |
+| F24  | Session Management & Multi-Sess. | 5        | Média      | Nenhuma      | ⬜ Pendente  |
+| F25  | Abort, Retry & Turn Control      | 5        | **Alta**   | F19          | ⬜ Pendente  |
+| F26  | Permission Display & Smart Ctx   | 5        | Média      | F22          | ⬜ Pendente  |
+| F27  | History, Search & Navigation     | 5        | Média      | Nenhuma      | ⬜ Pendente  |
+| F28  | Telemetry, Diagnostics & DevTools| 6        | Baixa      | F21          | ⬜ Pendente  |
+
+**Escopo total**: 50 subfases · ~20 novos arquivos · ~25 arquivos modificados
 
 ---
 
