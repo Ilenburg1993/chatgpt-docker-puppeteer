@@ -9,9 +9,11 @@
 
 export { cmdAlias } from './alias.js';
 export { cmdAttach } from './attach.js';
+export { cmdAudit } from './audit.js';
 export { cmdModel, cmdReasoning } from './config.js';
 export { cmdCompact, cmdContext } from './context.js';
 export { cmdDiagnose } from './diagnose.js';
+export { cmdErrors } from './errors.js';
 export { cmdGh } from './gh.js';
 export { cmdGit } from './git.js';
 export { cmdHelp } from './help.js';
@@ -29,3 +31,6 @@ export {
     cmdWho,
 } from './session.js';
 export { cmdSkills } from './skills.js';
+export { cmdThinking } from './thinking.js';
+export { cmdTools } from './tools.js';
+export { cmdUsage } from './usage.js';

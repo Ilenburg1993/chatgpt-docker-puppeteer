@@ -162,6 +162,48 @@ export function setPlanMode(value) {
     _planMode = value;
 }
 
+// ─── Thinking display (F18.2) ─────────────────────────────────────────────────
+
+/**
+ * F18.2: Flag para exibir reasoning/thinking da LLM-B em tempo real no stdout. Controlável via comando `/thinking` e
+ * variável de ambiente `TERMINAL_SHOW_THINKING`.
+ *
+ * @type {boolean}
+ */
+let _showThinking = process.env['TERMINAL_SHOW_THINKING'] !== 'false';
+
+/** @returns {boolean} */
+export function getShowThinking() {
+    return _showThinking;
+}
+
+/** @param {boolean} value @returns {void} */
+export function setShowThinking(value) {
+    _showThinking = value;
+    stateEmitter.emit('showThinking:changed', value);
+}
+
+// ─── Usage display (F20.2) ────────────────────────────────────────────────────
+
+/**
+ * F20.2: Flag para exibir usage summary (tokens, custo) após cada turno. Controlável via comando `/usage` e variável de
+ * ambiente `TERMINAL_SHOW_USAGE`.
+ *
+ * @type {boolean}
+ */
+let _showUsage = process.env['TERMINAL_SHOW_USAGE'] === 'true';
+
+/** @returns {boolean} */
+export function getShowUsage() {
+    return _showUsage;
+}
+
+/** @param {boolean} value @returns {void} */
+export function setShowUsage(value) {
+    _showUsage = value;
+    stateEmitter.emit('showUsage:changed', value);
+}
+
 // ─── Inject history (F16.3) ──────────────────────────────────────────────────
 
 const MAX_INJECT_HISTORY = Number(process.env['TERMINAL_MAX_INJECT_HISTORY'] ?? '100');

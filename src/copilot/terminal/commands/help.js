@@ -50,6 +50,11 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/context\x1b[0m                             — estima uso atual de tokens da sessão
   \x1b[33m/compact\x1b[0m                             — compacta histórico em resumo técnico denso
   \x1b[33m/plan [on|off]\x1b[0m                       — ativa/desativa modo de planejamento passo-a-passo
+  \x1b[33m/thinking [on|off]\x1b[0m                   — toggle exibição de thinking/reasoning da LLM-B
+  \x1b[33m/usage [on|off|now]\x1b[0m                  — toggle usage pós-turno ou snapshot instantâneo
+  \x1b[33m/tools\x1b[0m                               — lista ferramentas registradas com stats
+  \x1b[33m/errors [n]\x1b[0m                          — mostra últimos N erros rastreados (default: 10)
+  \x1b[33m/audit [n]\x1b[0m                           — últimas N entradas do audit log (default: 10)
   \x1b[33m/resume\x1b[0m                              — lista últimas sessões do hub (para retomar)
   \x1b[33m/resume <sessionId>\x1b[0m                  — injeta resumo de sessão anterior como contexto
 

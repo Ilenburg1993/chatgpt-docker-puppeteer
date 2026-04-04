@@ -24,6 +24,7 @@ import {
     cmdAlias as _cmdAlias,
     cmdAnswer as _cmdAnswer,
     cmdAttach as _cmdAttach,
+    cmdAudit as _cmdAudit,
     cmdClear as _cmdClear,
     cmdCompact as _cmdCompact,
     cmdContext as _cmdContext,
@@ -31,6 +32,7 @@ import {
     cmdDbHistory as _cmdDbHistory,
     cmdDbSessions as _cmdDbSessions,
     cmdDiagnose as _cmdDiagnose,
+    cmdErrors as _cmdErrors,
     cmdForget as _cmdForget,
     cmdGh as _cmdGh,
     cmdGit as _cmdGit,
@@ -44,6 +46,9 @@ import {
     cmdResume as _cmdResume,
     cmdSkills as _cmdSkills,
     cmdStatus as _cmdStatus,
+    cmdThinking as _cmdThinking,
+    cmdTools as _cmdTools,
+    cmdUsage as _cmdUsage,
     cmdWho as _cmdWho,
 } from './commands/index.js';
 import { ensureDialogLoop, println, sendTurn } from './dialog.js';
@@ -64,6 +69,8 @@ const BANNER = `
   \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
   \x1b[33m/attach [path|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
   \x1b[33m/pause\x1b[0m · \x1b[33m/dialog-resume [bootPrompt]\x1b[0m \x1b[90m← NEW-PAUSE: pausa/retoma sem PR\x1b[0m
+  \x1b[33m/thinking [on|off]\x1b[0m · \x1b[33m/usage [on|off|now]\x1b[0m \x1b[90m← F18/F20: thinking display + usage\x1b[0m
+  \x1b[33m/tools\x1b[0m · \x1b[33m/errors [n]\x1b[0m · \x1b[33m/audit [n]\x1b[0m \x1b[90m← F22: tool stats, error tracker, audit log\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m
   \x1b[33m/skills [list|add <path>|remove <path>|reload]\x1b[0m
   \x1b[36m/gh issue list\x1b[0m · \x1b[36m/gh pr list\x1b[0m · \x1b[36m/gh run list\x1b[0m · \x1b[36m/git status\x1b[0m · \x1b[36m/git log\x1b[0m · \x1b[36m/alias\x1b[0m · \x1b[36m/help\x1b[0m
@@ -123,6 +130,11 @@ const CMD_ROUTES = [
     [['pause'], () => _cmdPauseDialogLoop()],
     [['dialog-resume'], () => _cmdDialogResume()],
     [['skills'], (_, arg) => _cmdSkills({ println }, arg)],
+    [['thinking'], (_, arg) => _cmdThinking({ println }, arg)],
+    [['tools'], () => _cmdTools({ println })],
+    [['usage'], (_, arg) => _cmdUsage({ println }, arg)],
+    [['errors'], (_, arg) => _cmdErrors({ println }, arg)],
+    [['audit'], (_, arg) => _cmdAudit({ println }, arg)],
     [['quit', 'exit'], (_, _2, _3, rl, injectServer, cleanup) => _cmdQuit(rl, injectServer, cleanup)],
     [['gh'], (_, _2, rest) => _cmdGh({ println }, rest)],
     [['git'], (_, _2, rest) => _cmdGit({ println }, rest)],
