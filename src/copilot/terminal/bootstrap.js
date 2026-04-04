@@ -6,13 +6,16 @@ if (!process.env['COPILOT_SDK_ENABLED']) process.env['COPILOT_SDK_ENABLED'] = 't
 /**
  * src/copilot/terminal/bootstrap.js
  *
- * Terminal Permanente LLM-B — wrapper de entrypoint.
- *
- * Este arquivo é o ponto de entrada histórico. Toda a lógica foi migrada para `src/copilot/terminal/` (Fase C da
- * refatoração modular). Este wrapper apenas re-exporta `startTerminalServer` e, quando executado diretamente, chama-o.
- *
  * @module copilot/terminal/bootstrap
  *
+ * @deprecated F33.1: Wrapper de entrypoint legado — usar `src/copilot/terminal/index.js` diretamente. Este arquivo será
+ *   removido em versão futura.
+ *
+ *   Terminal Permanente LLM-B — wrapper de entrypoint.
+ *
+ *   Este arquivo é o ponto de entrada histórico. Toda a lógica foi migrada para `src/copilot/terminal/` (Fase C da
+ *   refatoração modular). Este wrapper apenas re-exporta `startTerminalServer` e, quando executado diretamente,
+ *   chama-o.
  * @example
  *     ```bash
  *     # Iniciar diretamente:

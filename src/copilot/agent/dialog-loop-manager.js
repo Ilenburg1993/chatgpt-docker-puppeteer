@@ -79,6 +79,9 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {boolean} */
     #pendingModelFallback = false;
 
+    /** @type {boolean} F31.3: flag para evitar compaction duplicada */
+    #compactionRequested = false;
+
     /** @type {string | null} */
     #fallbackModel;
 
@@ -376,6 +379,8 @@ export class DialogLoopManager extends EventEmitter {
         await writeStateAsync({ dialogPaused: true, pausedAt: Date.now(), dialogLoopActive: true }).catch(
             (/** @type {Error} */ e) => log('WARN', `[DialogLoopManager] writeState dialogPaused: ${e.message}`),
         );
+        // F31: pausar watchdog durante pause para evitar falsos-positivos de stall
+        this.#watchdog?.stop();
         log('INFO', `[DialogLoopManager] Dialog loop pausado. SessionId: ${sessionId}.`);
         this.emit('paused', { sessionId, pausedAt: Date.now() });
     }
@@ -399,6 +404,8 @@ export class DialogLoopManager extends EventEmitter {
         // Estratégia A: ask_user já disponível sincronicamente (0 PR, 0 espera)
         if (this.#host?.getPendingQuestion()) {
             log('INFO', '[DialogLoopManager] ask_user já disponível — retomada zero-PR imediata.');
+            // F31: reiniciar watchdog após resume
+            this.#watchdog?.start();
             this.emit('resumed', { prConsumed: false });
             return;
         }
@@ -414,6 +421,8 @@ export class DialogLoopManager extends EventEmitter {
 
         if (preserved) {
             log('INFO', '[DialogLoopManager] ask_user preservado — retomada zero-PR.');
+            // F31: reiniciar watchdog após resume
+            this.#watchdog?.start();
             this.emit('resumed', { prConsumed: false });
             return;
         }
@@ -460,6 +469,38 @@ export class DialogLoopManager extends EventEmitter {
         // G2-BUG-11: emitir 'stopped' para que o host receba notificação do encerramento forçado
         this.emit('stopped', { reason: 'force_deactivate', authorized: false });
         this.emit('changed', { active: false, ts: Date.now(), reason: 'force_deactivate' });
+    }
+
+    /**
+     * F31.3/F31.4: Compaction proativa baseada em token utilization. Emite `compaction.requested` quando ratio atinge
+     * 90% (proativa) ou 95% (urgente). O AlwaysAliveAgent deve ouvir este evento e acionar compaction via SDK.
+     *
+     * @param {{ currentTokens: number; tokenLimit: number; ratio: number }} budget
+     */
+    handleTokenBudget({ currentTokens, tokenLimit, ratio }) {
+        if (!this.#active) return;
+
+        // F31.4: compaction urgente em 95%+
+        if (ratio >= 95) {
+            log('WARN', `[DialogLoopManager] F31.4: Token budget CRÍTICO em ${ratio}% — compaction urgente.`);
+            this.#compactionRequested = false; // Permite re-emissão
+            this.emit('compaction.requested', { ratio, currentTokens, tokenLimit, urgency: 'critical' });
+            return;
+        }
+
+        // F31.3: compaction proativa em 90%+
+        if (ratio >= 90 && !this.#compactionRequested) {
+            log('WARN', `[DialogLoopManager] F31.3: Token budget em ${ratio}% — compaction proativa solicitada.`);
+            this.#compactionRequested = true;
+            this.emit('compaction.requested', { ratio, currentTokens, tokenLimit, urgency: 'proactive' });
+        }
+    }
+
+    /**
+     * Reseta o flag de compaction solicitada (chamado após compaction concluída com sucesso).
+     */
+    resetCompactionFlag() {
+        this.#compactionRequested = false;
     }
 
     // ────────────── Privado ──────────────

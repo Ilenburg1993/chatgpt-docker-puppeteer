@@ -40,6 +40,7 @@ export { createAuditLog, defaultAuditLog } from './audit-log.js';
 
 // ─── Hooks Audit Preset ───────────────────────────────────────────────────────
 // ARCH-OBS-003: movido para hooks/presets/audit.js — re-export mantido por backward compat
+/** @deprecated F33.1: Importar de `../hooks/presets/audit.js` diretamente. */
 export { createHooksAuditPreset } from '../hooks/presets/audit.js';
 
 // ─── OTEL ─────────────────────────────────────────────────────────────────────

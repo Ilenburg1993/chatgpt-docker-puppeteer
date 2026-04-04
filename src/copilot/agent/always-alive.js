@@ -170,6 +170,14 @@ export class AlwaysAliveAgent extends EventEmitter {
     #dialogLoopAttached = false;
 
     /**
+     * F29: Referência ao agent-event-observer para cleanup no stop(). Criado no start() para garantir que métricas são
+     * coletadas para TODAS as tasks, não apenas aquelas executadas após o primeiro dialog loop boot.
+     *
+     * @type {{ attach: (agent: EventEmitter) => void; detach: () => void } | null}
+     */
+    #agentObserver = null;
+
+    /**
      * Contador de mensagens enviadas mantido em memória para evitar I/O síncrono por envio. Inicializado a partir do
      * estado persistido no boot; salvo em disco apenas no `stop()`.
      *
@@ -452,6 +460,15 @@ export class AlwaysAliveAgent extends EventEmitter {
             const _collectorUnsubs = defaultEventCollector.attach(session, session.sessionId ?? 'unknown');
             this.#sessionEventUnsubscribers.push(..._collectorUnsubs);
 
+            // F29: agent-event-observer eagerness — criar e atachar aqui para cobrir
+            // tasks via sendMessage() que ocorrem ANTES do primeiro dialog loop boot.
+            if (this.#agentObserver) this.#agentObserver.detach();
+            this.#agentObserver = createAgentEventObserver({
+                metrics: defaultMetrics,
+                errorTracker: defaultErrorTracker,
+            });
+            this.#agentObserver.attach(this);
+
             this.#setStatus('idle');
             this.#sendCount = readState()?.sendCount ?? 0;
             log(
@@ -570,6 +587,12 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.#statusSnapshotCache = null;
         if (remainingTasks.length > 0) {
             log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
+        }
+
+        // F29: detach agent-event-observer antes de limpar session event unsubscribers
+        if (this.#agentObserver) {
+            this.#agentObserver.detach();
+            this.#agentObserver = null;
         }
 
         for (const unsub of this.#sessionEventUnsubscribers) unsub();
@@ -973,9 +996,21 @@ export class AlwaysAliveAgent extends EventEmitter {
         // É seguro aqui porque o flag #dialogLoopAttached garante execução única por instância.
         wireDialogLoopEvents(this.#dialogLoop, (event, payload) => this.emit(event, payload));
 
-        // P.1: agent-event-observer alimenta defaultMetrics com eventos do agente (dialog/tasks/permissions)
-        const _agentObserver = createAgentEventObserver({ metrics: defaultMetrics, errorTracker: defaultErrorTracker });
-        _agentObserver.attach(this);
+        // F31.3/F31.4: Proxy token_budget_warning → DLM para compaction proativa
+        this.on('session.token_budget_warning', (evt) => {
+            const ratio = typeof evt?.ratio === 'number' ? evt.ratio : 0;
+            const currentTokens = typeof evt?.currentTokens === 'number' ? evt.currentTokens : 0;
+            const tokenLimit = typeof evt?.tokenLimit === 'number' ? evt.tokenLimit : 0;
+            this.#dialogLoop.handleTokenBudget({ currentTokens, tokenLimit, ratio });
+        });
+
+        // F31.3: Reset compaction flag após compaction bem-sucedida
+        this.on('session.compaction_complete', (evt) => {
+            if (evt?.success) this.#dialogLoop.resetCompactionFlag();
+        });
+
+        // F29: agent-event-observer agora é criado no start() (eagerness).
+        // Não precisa mais ser criado aqui.
     }
 
     /**

@@ -22,6 +22,7 @@
  * @module copilot/observability/agent-event-observer
  */
 
+import { createErrorAlerter } from './error-alerting.js';
 import { log } from './logger.js';
 import { startSpanImmediate } from './otel.js';
 
@@ -53,6 +54,9 @@ import { startSpanImmediate } from './otel.js';
 export function createAgentEventObserver({ metrics, errorTracker }) {
     /** @type {{ emitter: import('node:events').EventEmitter; event: string; listener: (...args: any[]) => void }[]} */
     const _registrations = [];
+
+    /** @type {import('./error-alerting.js').ErrorAlerter | null} F39: instância do alerter. */
+    let _alerter = null;
 
     /**
      * Mapa de turnId → { ts, span? } do turn_start ativo.
@@ -316,18 +320,29 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         );
 
         // ── agent.metrics — snapshot periódico de estado do agente ───────────
+        // F33.2: só registra counter/gauge quando há delta significativo vs snapshot anterior
+        /** @type {{ queueDepth: number; uptime: number }} */
+        let _lastMetricsSnapshot = { queueDepth: -1, uptime: 0 };
         _on(
             agent,
             'agent.metrics',
             _safe((/** @type {{ queueDepth?: number; uptime?: number; sessionId?: string }} */ evt) => {
-                metrics.recordCounter('agent.metrics.snapshot');
-                if (typeof evt?.queueDepth === 'number') {
-                    metrics.recordGauge('agent.queue.depth', evt.queueDepth);
+                const depth = typeof evt?.queueDepth === 'number' ? evt.queueDepth : _lastMetricsSnapshot.queueDepth;
+                const uptime = typeof evt?.uptime === 'number' ? evt.uptime : _lastMetricsSnapshot.uptime;
+                const hasDelta =
+                    depth !== _lastMetricsSnapshot.queueDepth ||
+                    Math.abs(uptime - _lastMetricsSnapshot.uptime) > 60_000;
+                if (hasDelta) {
+                    metrics.recordCounter('agent.metrics.snapshot');
+                    if (typeof evt?.queueDepth === 'number') {
+                        metrics.recordGauge('agent.queue.depth', evt.queueDepth);
+                    }
+                    if (typeof evt?.uptime === 'number') {
+                        metrics.recordGauge('agent.session.uptime', evt.uptime);
+                    }
+                    _lastMetricsSnapshot = { queueDepth: depth, uptime };
+                    log('DEBUG', '[agent-event-observer] agent.metrics snapshot recebido (delta)');
                 }
-                if (typeof evt?.uptime === 'number') {
-                    metrics.recordGauge('agent.session.uptime', evt.uptime);
-                }
-                log('DEBUG', '[agent-event-observer] agent.metrics snapshot recebido');
             }, 'agent.metrics'),
         );
 
@@ -632,10 +647,13 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                     // CN-03 fix: propagar cacheRead/cacheWrite para MetricsStore
                     const cacheRead = evt?.cacheReadTokens ?? 0;
                     const cacheWrite = evt?.cacheWriteTokens ?? 0;
-                    if (input > 0 || output > 0) {
-                        metrics.recordUsage(model, input, output, cacheRead, cacheWrite);
-                    }
-                    log('DEBUG', `[agent-event-observer] session.usage tokens=${evt?.tokens ?? '?'} model=${model}`);
+                    // F30: recordUsage removido daqui para evitar dupla contagem.
+                    // O event-collector.js já chama recordUsage() diretamente do SDK session event,
+                    // que é o source-of-truth para persistência de usage.
+                    log(
+                        'DEBUG',
+                        `[agent-event-observer] session.usage tokens=${evt?.tokens ?? '?'} model=${model} input=${input} output=${output} cache=${cacheRead}/${cacheWrite}`,
+                    );
                 },
                 'session.usage',
             ),
@@ -830,6 +848,16 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         );
 
         log('INFO', '[agent-event-observer] Attached to agent EventEmitter');
+
+        // F39: Criar error alerter vinculado ao error tracker deste observer
+        if (errorTracker) {
+            _alerter = createErrorAlerter(errorTracker, {
+                windowMs: 60_000,
+                warningThreshold: 5,
+                criticalThreshold: 15,
+                cooldownMs: 120_000,
+            });
+        }
     }
 
     /**
@@ -844,6 +872,12 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         _registrations.length = 0;
         _turnStarts.clear();
         _lastChunkTs = 0;
+
+        // F39: destruir error alerter
+        if (_alerter) {
+            _alerter.destroy();
+            _alerter = null;
+        }
         log('INFO', '[agent-event-observer] Detached from agent EventEmitter');
     }
 

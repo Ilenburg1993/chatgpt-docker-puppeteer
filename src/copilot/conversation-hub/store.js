@@ -21,8 +21,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { initTurnsFts, migrateFts5Tokenizer, sanitizeFtsQuery } from './store-helpers.js';
 
 /**
- * Re-export de tipos para manter backward compatibility nas import paths existentes.
- *
+ * @deprecated F33.1: Importar tipos diretamente de `./store-helpers.js`. Re-export de tipos para manter backward
+ *   compatibility nas import paths existentes.
  * @typedef {import('./store-helpers.js').TurnRole} TurnRole
  *
  * @typedef {import('./store-helpers.js').HubSessionStatus} HubSessionStatus

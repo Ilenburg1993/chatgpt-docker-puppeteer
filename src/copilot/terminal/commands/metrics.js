@@ -69,18 +69,18 @@ export function cmdMetrics({ println }) {
   sessão      \x1b[90m${sessionId}\x1b[0m
   status      ${status}
   modelo      \x1b[36m${model}\x1b[0m
-  
+
   \x1b[35m📊 Uso\x1b[0m
   ─────────────────────────────────────
   turns       ${turnCount}
   contexto    ${ctxStr}
   último PR   ${lastModel} · ${costStr}
-  
+
   \x1b[35m🔧 Ferramentas\x1b[0m
   ─────────────────────────────────────
   chamadas    ${toolCallCount}
   erros       ${toolErrorCount > 0 ? `\x1b[31m${toolErrorCount}\x1b[0m` : '\x1b[32m0\x1b[0m'}
-  
+
   \x1b[35m⚠️  Erros\x1b[0m
   ─────────────────────────────────────
   total       ${errorStats.total > 0 ? `\x1b[31m${errorStats.total}\x1b[0m` : '\x1b[32m0\x1b[0m'}

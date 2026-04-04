@@ -24,7 +24,7 @@ import { join, resolve } from 'node:path';
 
 // G2-SEC-05: path do audit log configurável via COPILOT_TOOL_PERMISSIONS_LOG env var.
 // CQ-01: renomeado para tool-permissions-audit.jsonl (distinto de tool-execution-audit.jsonl).
-// Backward compat: COPILOT_AUDIT_LOG_PATH ainda é aceito como fallback.
+// @deprecated F33.1: COPILOT_AUDIT_LOG_PATH é legado — usar COPILOT_TOOL_PERMISSIONS_LOG.
 const TOOL_AUDIT_LOG = process.env['COPILOT_TOOL_PERMISSIONS_LOG']
     ? resolve(process.env['COPILOT_TOOL_PERMISSIONS_LOG'])
     : process.env['COPILOT_AUDIT_LOG_PATH']

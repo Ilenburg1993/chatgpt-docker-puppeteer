@@ -34,6 +34,7 @@ export const MAX_QUEUE_SIZE = 100;
  * GAP-CORE-001 fix: suporte às duas formas de env var — prefere a versão `_MS` para nomenclatura inequívoca; mantém
  * `LLM_B_TURN_TIMEOUT` por compatibilidade retroativa.
  *
+ * @deprecated F33.1: `LLM_B_TURN_TIMEOUT` env var é legado — usar `LLM_B_TURN_TIMEOUT_MS`.
  * @type {number}
  */
 export const LLM_B_TURN_TIMEOUT_MS = Number(

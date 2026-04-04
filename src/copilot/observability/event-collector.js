@@ -336,8 +336,9 @@ export function createEventCollector(opts = {}) {
         const unsubs = [];
 
         // ── tool.execution_start ──────────────────────────────────────────────
-        /** @type {number} TTL para entradas _pending em milissegundos (5 min) */
-        const _PENDING_TTL_MS = 5 * 60 * 1000;
+        /** @type {number} TTL para entradas _pending em milissegundos (10 min — F33: aumentado de 5min para cobrir tools
+  de longa duração) */
+        const _PENDING_TTL_MS = 10 * 60 * 1000;
         /** @type {number} TTL para entradas _turnStart em milissegundos (10 min) */
         const _TURN_TTL_MS = 10 * 60 * 1000;
         unsubs.push(

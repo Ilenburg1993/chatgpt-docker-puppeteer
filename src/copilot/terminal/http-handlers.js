@@ -2,10 +2,12 @@
 /**
  * src/copilot/terminal/http-handlers.js
  *
- * Barrel re-export: mantém compatibilidade com consumidores existentes (route-table, server, commands). A lógica real
- * agora vive em handlers-agent.js, handlers-dialog.js e handlers-system.js.
- *
  * @module copilot/terminal/http-handlers
+ * @deprecated F33.1: Barrel de compatibilidade — usar imports diretos de handlers-agent.js, handlers-dialog.js e
+ *   handlers-system.js. Este re-export será removido em versão futura.
+ *
+ *   Barrel re-export: mantém compatibilidade com consumidores existentes (route-table, server, commands). A lógica real
+ *   agora vive em handlers-agent.js, handlers-dialog.js e handlers-system.js.
  */
 
 export {
