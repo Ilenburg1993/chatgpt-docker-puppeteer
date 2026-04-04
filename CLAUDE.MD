@@ -14,6 +14,8 @@
 
 ---
 
+SEMPRE PROIBIDO: ENCERRAR/PAUSAR TURN E/OU SESSION SEM AUTORIZAÇÃO EXPRESSA DO USUÁRIO ATRAVÉS DA TOOL 'VSCODE_ASKQUESTION'.
+
 ## Quick Start for AI Assistants
 
 ### Essential Files to Read First
@@ -162,14 +164,14 @@ make logs            # View logs
 
 ## Important Configuration Files
 
-| File | Purpose | Location |
-|------|---------|----------|
-| `config.json` | Global runtime config (timeouts, concurrency, domains) | Root |
-| `dynamic_rules.json` | Runtime policy rules (priorities, limits) | Root |
-| `controle.json` | Application state/control metadata | Root |
-| `chrome-config.json` | Chrome launch configuration | Root |
-| `ecosystem.config.js` | PM2 process management | Root |
-| `.env` | Environment variables (optional) | Root |
+| File                  | Purpose                                                | Location |
+| --------------------- | ------------------------------------------------------ | -------- |
+| `config.json`         | Global runtime config (timeouts, concurrency, domains) | Root     |
+| `dynamic_rules.json`  | Runtime policy rules (priorities, limits)              | Root     |
+| `controle.json`       | Application state/control metadata                     | Root     |
+| `chrome-config.json`  | Chrome launch configuration                            | Root     |
+| `ecosystem.config.js` | PM2 process management                                 | Root     |
+| `.env`                | Environment variables (optional)                       | Root     |
 
 ### Key Config Settings
 - **Browser Mode**: headless/headful (config.json → puppeteer.headless)

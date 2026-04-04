@@ -1,12 +1,10 @@
 # Plano de Auditoria Completa — src/copilot
 
-**Versão**: 2.0
-**Data**: 2026-07-05
-**Escopo**: Todo o diretório `src/copilot/` (160 arquivos JS, ~19.439 LOC, 15 módulos)
-**Skill guia**: `.github/skills/copilot-full-audit/SKILL.md`
-**Saída**: 160+ relatórios MD individuais + 15 consolidados de módulo + 7 de integração + 4 globais
-**Diretório de saída**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/`
-**Templates**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/templates/`
+**Versão**: 2.0 **Data**: 2026-07-05 **Escopo**: Todo o diretório `src/copilot/` (160 arquivos JS,
+~19.439 LOC, 15 módulos) **Skill guia**: `.github/skills/copilot-full-audit/SKILL.md` **Saída**:
+160+ relatórios MD individuais + 15 consolidados de módulo + 7 de integração + 4 globais **Diretório
+de saída**: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/` **Templates**:
+`DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/templates/`
 
 ---
 
